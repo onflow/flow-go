@@ -195,7 +195,7 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Module("execution data getter", exeNode.LoadExecutionDataGetter).
 		Module("blobservice peer manager dependencies", exeNode.LoadBlobservicePeerManagerDependencies).
 		Module("bootstrap", exeNode.LoadBootstrapper).
-		Module("register store", exeNode.LoadRegisterStore).
+		// Module("register store", exeNode.LoadRegisterStore).
 		Component("execution state ledger", exeNode.LoadExecutionStateLedger).
 
 		// TODO: Modules should be able to depends on components
@@ -764,62 +764,62 @@ func (exeNode *ExecutionNode) LoadExecutionStateLedger(
 	return exeNode.ledgerStorage, err
 }
 
-func (exeNode *ExecutionNode) LoadRegisterStore(
-	node *NodeConfig,
-) error {
-
-	pebbledb, err := storagepebble.OpenRegisterPebbleDB(exeNode.exeConf.registerDir)
-
-	if err != nil {
-		return fmt.Errorf("could not create disk register store: %w", err)
-	}
-
-	// close pebble db on shut down
-	exeNode.builder.ShutdownFunc(func() error {
-		err := pebbledb.Close()
-		if err != nil {
-			return fmt.Errorf("could not close register store: %w", err)
-		}
-		return nil
-	})
-
-	bootstrapped, err := storagepebble.IsBootstrapped(pebbledb)
-	if err != nil {
-		return fmt.Errorf("could not check if registers db is bootstrapped: %w", err)
-	}
-
-	if !bootstrapped {
-		checkpointFile := path.Join(exeNode.exeConf.triedir, modelbootstrap.FilenameWALRootCheckpoint)
-		root, err := exeNode.builder.RootSnapshot.Head()
-		if err != nil {
-			return fmt.Errorf("could not get root snapshot head: %w", err)
-		}
-
-		checkpointHeight := root.Height
-
-		err = bootstrap.ImportRegistersFromCheckpoint(node.Logger, checkpointFile, checkpointHeight, pebbledb)
-		if err != nil {
-			return fmt.Errorf("could not import registers from checkpoint: %w", err)
-		}
-	}
-	diskStore, err := storagepebble.NewRegisters(pebbledb)
-	if err != nil {
-		return fmt.Errorf("could not create registers storage: %w", err)
-	}
-
-	reader := finalizedreader.NewFinalizedReader(node.Storage.Headers)
-	registerStore, err := storehouse.NewRegisterStore(
-		diskStore,
-		nil, // TODO: replace with real WAL
-		reader,
-		node.Logger,
-	)
-	if err != nil {
-		return err
-	}
-	exeNode.registerStore = registerStore
-	return nil
-}
+// func (exeNode *ExecutionNode) LoadRegisterStore(
+// 	node *NodeConfig,
+// ) error {
+//
+// 	pebbledb, err := storagepebble.OpenRegisterPebbleDB(exeNode.exeConf.registerDir)
+//
+// 	if err != nil {
+// 		return fmt.Errorf("could not create disk register store: %w", err)
+// 	}
+//
+// 	// close pebble db on shut down
+// 	exeNode.builder.ShutdownFunc(func() error {
+// 		err := pebbledb.Close()
+// 		if err != nil {
+// 			return fmt.Errorf("could not close register store: %w", err)
+// 		}
+// 		return nil
+// 	})
+//
+// 	bootstrapped, err := storagepebble.IsBootstrapped(pebbledb)
+// 	if err != nil {
+// 		return fmt.Errorf("could not check if registers db is bootstrapped: %w", err)
+// 	}
+//
+// 	if !bootstrapped {
+// 		checkpointFile := path.Join(exeNode.exeConf.triedir, modelbootstrap.FilenameWALRootCheckpoint)
+// 		root, err := exeNode.builder.RootSnapshot.Head()
+// 		if err != nil {
+// 			return fmt.Errorf("could not get root snapshot head: %w", err)
+// 		}
+//
+// 		checkpointHeight := root.Height
+//
+// 		err = bootstrap.ImportRegistersFromCheckpoint(node.Logger, checkpointFile, checkpointHeight, pebbledb)
+// 		if err != nil {
+// 			return fmt.Errorf("could not import registers from checkpoint: %w", err)
+// 		}
+// 	}
+// 	diskStore, err := storagepebble.NewRegisters(pebbledb)
+// 	if err != nil {
+// 		return fmt.Errorf("could not create registers storage: %w", err)
+// 	}
+//
+// 	reader := finalizedreader.NewFinalizedReader(node.Storage.Headers)
+// 	registerStore, err := storehouse.NewRegisterStore(
+// 		diskStore,
+// 		nil, // TODO: replace with real WAL
+// 		reader,
+// 		node.Logger,
+// 	)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	exeNode.registerStore = registerStore
+// 	return nil
+// }
 
 func (exeNode *ExecutionNode) LoadExecutionStateLedgerWALCompactor(
 	node *NodeConfig,
@@ -1181,6 +1181,32 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 		return fmt.Errorf("could not query database to know whether database has been bootstrapped: %w", err)
 	}
 
+	pebbledb, err := storagepebble.OpenRegisterPebbleDB(exeNode.exeConf.registerDir)
+
+	if err != nil {
+		return fmt.Errorf("could not create disk register store: %w", err)
+	}
+
+	// close pebble db on shut down
+	exeNode.builder.ShutdownFunc(func() error {
+		err := pebbledb.Close()
+		if err != nil {
+			return fmt.Errorf("could not close register store: %w", err)
+		}
+		return nil
+	})
+
+	pebbleBootstrapped, err := storagepebble.IsBootstrapped(pebbledb)
+	if err != nil {
+		return fmt.Errorf("could not check if registers db is bootstrapped: %w", err)
+	}
+
+	if bootstrapped != pebbleBootstrapped {
+		return fmt.Errorf("execution database and registers database are not in sync, "+
+			"execution database is bootstrapped: %t, registers database is bootstrapped: %t",
+			bootstrapped, pebbleBootstrapped)
+	}
+
 	// if the execution database does not exist, then we need to bootstrap the execution database.
 	if !bootstrapped {
 		err := wal.CheckpointHasRootHash(
@@ -1200,10 +1226,31 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 			return fmt.Errorf("could not load bootstrap state from checkpoint file: %w", err)
 		}
 
+<<<<<<< HEAD
+=======
+		checkpointFile := path.Join(exeNode.exeConf.triedir, modelbootstrap.FilenameWALRootCheckpoint)
+		root, err := exeNode.builder.RootSnapshot.Head()
+		if err != nil {
+			return fmt.Errorf("could not get root snapshot head: %w", err)
+		}
+
+		checkpointHeight := root.Height
+
+		fmt.Println("importing registers to pebble")
+		err = bootstrap.ImportRegistersFromCheckpoint(node.Logger, checkpointFile, checkpointHeight, pebbledb)
+		if err != nil {
+			return fmt.Errorf("could not import registers from checkpoint: %w", err)
+		}
+
+		// TODO: check that the checkpoint file contains the root block's statecommit hash
+
+		fmt.Println("finish importing to pebble, bootstrapp execution data")
+>>>>>>> db39737c7b (fix bootstrap)
 		err = bootstrapper.BootstrapExecutionDatabase(node.DB, node.RootSeal)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap execution database: %w", err)
 		}
+		fmt.Println("finish bootstrapping execution data")
 	} else {
 		// if execution database has been bootstrapped, then the root statecommit must equal to the one
 		// in the bootstrap folder
@@ -1213,6 +1260,25 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 				commit, node.RootSeal.FinalState)
 		}
 	}
+
+	diskStore, err := storagepebble.NewRegisters(pebbledb)
+	if err != nil {
+		return fmt.Errorf("could not create registers storage: %w", err)
+	}
+
+	reader := finalizedreader.NewFinalizedReader(node.Storage.Headers)
+	registerStore, err := storehouse.NewRegisterStore(
+		diskStore,
+		nil, // TODO: replace with real WAL
+		reader,
+		node.Logger,
+	)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("finish creating register store")
+	exeNode.registerStore = registerStore
 
 	return nil
 }
