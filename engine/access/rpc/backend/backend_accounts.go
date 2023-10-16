@@ -113,15 +113,8 @@ func (b *backendAccounts) getAccountFromLocalStorage(
 	// make sure data is available for the requested block
 	account, err := b.scriptExecutor.GetAccountAtBlockHeight(ctx, address, height)
 	if err != nil {
-		if errors.Is(err, ErrDataNotAvailable) {
-			return nil, status.Errorf(codes.OutOfRange, "data for block height %d is not available", height)
-		}
-		if errors.Is(err, storage.ErrNotFound) {
-			return nil, status.Errorf(codes.NotFound, "data not found: %v", err)
-		}
-		return nil, rpc.ConvertError(err, "failed to get account from local storage", codes.Internal)
+		return nil, convertIndexError(err, height, "failed to get account from local storage")
 	}
-
 	return account, nil
 }
 

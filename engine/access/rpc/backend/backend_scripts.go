@@ -359,14 +359,6 @@ func convertScriptExecutionError(err error, height uint64) error {
 		return nil
 	}
 
-	if errors.Is(err, ErrDataNotAvailable) {
-		return status.Errorf(codes.OutOfRange, "data for block height %d is not available", height)
-	}
-
-	if errors.Is(err, storage.ErrNotFound) {
-		return status.Errorf(codes.NotFound, "data not found: %v", err)
-	}
-
 	var coded fvmerrors.CodedError
 	if fvmerrors.As(err, &coded) {
 		// general FVM/ledger errors
@@ -378,5 +370,22 @@ func convertScriptExecutionError(err error, height uint64) error {
 		return status.Errorf(codes.InvalidArgument, "failed to execute script: %v", err)
 	}
 
-	return rpc.ConvertError(err, "failed to execute script", codes.Internal)
+	return convertIndexError(err, height, "failed to execute script")
+}
+
+// convertIndexError converts errors related to index to a gRPC error
+func convertIndexError(err error, height uint64, defaultMsg string) error {
+	if err == nil {
+		return nil
+	}
+
+	if errors.Is(err, ErrDataNotAvailable) {
+		return status.Errorf(codes.OutOfRange, "data for block height %d is not available", height)
+	}
+
+	if errors.Is(err, storage.ErrNotFound) {
+		return status.Errorf(codes.NotFound, "data not found: %v", err)
+	}
+
+	return rpc.ConvertError(err, defaultMsg, codes.Internal)
 }
