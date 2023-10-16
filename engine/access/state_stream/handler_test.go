@@ -60,23 +60,33 @@ func (s *HandlerTestSuite) SetupTest() {
 	s.handler = state_stream.NewHandler(s.Backend, chain, conf, 5)
 }
 
+// TestHeartbeatResponse tests the periodic heartbeat response.
+//
+// Test Steps:
+// - Generate different events in blocks.
+// - Create different filters for generated events.
+// - Wait for either responses with filtered events or heartbeat responses.
+// - Verify that the responses are being sent with proper heartbeat interval.
 func (s *HandlerTestSuite) TestHeartbeatResponse() {
 	reader := &fakeReadServerImpl{
 		ctx:      context.Background(),
 		received: make(chan *access.SubscribeEventsResponse, 100),
 	}
 
+	// notify backend block is available
 	s.Backend.SetHighestHeight(s.Blocks[len(s.Blocks)-1].Header.Height)
 
-	s.Run("Empty event filter", func() {
-
+	s.Run("ALl events filter", func() {
+		// create empty event filter
 		filter := &access.EventFilter{}
+		// create subscribe events request, set the created filter and heartbeatInterval
 		req := &access.SubscribeEventsRequest{
 			StartBlockHeight:  0,
 			Filter:            filter,
 			HeartbeatInterval: 1,
 		}
 
+		// subscribe for events
 		go func() {
 			err := s.handler.SubscribeEvents(req, reader)
 			require.NoError(s.T(), err)
@@ -97,18 +107,20 @@ func (s *HandlerTestSuite) TestHeartbeatResponse() {
 	})
 
 	s.Run("Event A.0x1.Foo.Bar filter with heartbeat interval 1", func() {
+		// create A.0x1.Foo.Bar event filter
 		pbFilter := &access.EventFilter{
 			EventType: []string{string(state_stream.TestEventTypes[0])},
 			Contract:  nil,
 			Address:   nil,
 		}
-
+		// create subscribe events request, set the created filter and heartbeatInterval
 		req := &access.SubscribeEventsRequest{
 			StartBlockHeight:  0,
 			Filter:            pbFilter,
 			HeartbeatInterval: 1,
 		}
 
+		// subscribe for events
 		go func() {
 			err := s.handler.SubscribeEvents(req, reader)
 			require.NoError(s.T(), err)
@@ -129,19 +141,22 @@ func (s *HandlerTestSuite) TestHeartbeatResponse() {
 		}
 	})
 
-	s.Run("No events filter with heartbeat interval 2", func() {
+	s.Run("Non existent filter with heartbeat interval 2", func() {
+		// create non existent filter
 		pbFilter := &access.EventFilter{
 			EventType: []string{"A.0x1.NonExistent.Event"},
 			Contract:  nil,
 			Address:   nil,
 		}
 
+		// create subscribe events request, set the created filter and heartbeatInterval
 		req := &access.SubscribeEventsRequest{
 			StartBlockHeight:  0,
 			Filter:            pbFilter,
 			HeartbeatInterval: 2,
 		}
 
+		// subscribe for events
 		go func() {
 			err := s.handler.SubscribeEvents(req, reader)
 			require.NoError(s.T(), err)

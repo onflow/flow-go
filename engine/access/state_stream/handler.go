@@ -167,8 +167,12 @@ func (h *Handler) SubscribeEvents(request *access.SubscribeEventsRequest, stream
 			return status.Errorf(codes.Internal, "unexpected response type: %T", v)
 		}
 
+		// check if events count in response is zero, if so check if there have been heartbeat interval value
+		// since last response.
 		if len(resp.Events) == 0 {
 			blocksFromLastHeartbeat++
+			// if there was less blocks since last response than
+			// HeartbeatInterval exit from loop and check next block.
 			if blocksFromLastHeartbeat < request.HeartbeatInterval {
 				continue
 			}
