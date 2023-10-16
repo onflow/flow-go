@@ -49,7 +49,7 @@ type EpochStateContainer struct {
 	// ActiveIdentities contains the dynamic identity properties for the nodes that
 	// are active in this epoch. Active means that these nodes are authorized to contribute to
 	// extending the chain. Nodes are listed in `Identities` if and only if
-	// they are part of the EpochSetup even for the respective epoch.
+	// they are part of the EpochSetup event for the respective epoch.
 	// The dynamic identity properties can change from block to block. Each non-deferred
 	// identity-mutating operation is applied independently to the `ActiveIdentities`
 	// of the relevant epoch's EpochStateContainer separately.
