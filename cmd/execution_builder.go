@@ -789,7 +789,7 @@ func (exeNode *ExecutionNode) LoadRegisterStore(
 	}
 
 	if !bootstrapped {
-		checkpointFile := path.Join(exeNode.exeConf.triedir, modelbootstrap.PathRootCheckpoint)
+		checkpointFile := path.Join(exeNode.exeConf.triedir, modelbootstrap.FilenameWALRootCheckpoint)
 		root, err := exeNode.builder.RootSnapshot.Head()
 		if err != nil {
 			return fmt.Errorf("could not get root snapshot head: %w", err)
