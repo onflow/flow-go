@@ -432,72 +432,74 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 	removedSize := uint64(0)
 
 	// add all values that were not changed
-	progressLog = util2.LogProgress(m.log, "checking unchanged registers", len(changes))
-	for id, value := range originalPayloads {
-		progressLog(1)
+	if len(originalPayloads) > 0 {
+		progressLog = util2.LogProgress(m.log, "checking unchanged registers", len(originalPayloads))
+		for id, value := range originalPayloads {
+			progressLog(1)
 
-		if len(value.Value()) == 0 {
-			// this is strange, but we don't want to add empty values. Log it.
-			m.log.Warn().Msgf("empty value for key %s", id)
-			continue
-		}
-
-		key := util.RegisterIDToKey(id)
-		if isAccountKey(key) {
-			statePayload = value
-			// we will append this later
-			continue
-		}
-
-		if id.IsInternalState() {
-			// this is expected. Move it to the new payloads
-			newPayloads = append(newPayloads, value)
-			continue
-		}
-
-		isADomainKey := false
-		for _, domain := range domains {
-			if id.Key == domain {
-				isADomainKey = true
-				break
+			if len(value.Value()) == 0 {
+				// this is strange, but we don't want to add empty values. Log it.
+				m.log.Warn().Msgf("empty value for key %s", id)
+				continue
 			}
+
+			key := util.RegisterIDToKey(id)
+			if isAccountKey(key) {
+				statePayload = value
+				// we will append this later
+				continue
+			}
+
+			if id.IsInternalState() {
+				// this is expected. Move it to the new payloads
+				newPayloads = append(newPayloads, value)
+				continue
+			}
+
+			isADomainKey := false
+			for _, domain := range domains {
+				if id.Key == domain {
+					isADomainKey = true
+					break
+				}
+			}
+			if isADomainKey {
+				// TODO: check if this is really expected
+				// this is expected. Move it to the new payloads
+				newPayloads = append(newPayloads, value)
+				continue
+			}
+
+			if _, ok := storageMapIds[id.Key]; ok {
+				newPayloads = append(newPayloads, value)
+				continue
+			}
+
+			if mr.Address == cricketMomentsAddress {
+				// to be sure, copy all cricket moments keys
+				newPayloads = append(newPayloads, value)
+				m.log.Info().Msgf("copying cricket moments key %s", id)
+				continue
+			}
+
+			m.rw.Write(migrationProblem{
+				Address: mr.Address.Hex(),
+				Key:     id.String(),
+				Size:    len(mr.Snapshot.Payloads),
+				Kind:    "not_migrated",
+				Msg:     fmt.Sprintf("%x", value),
+			})
+
+			size, err := payloadSize(key, value)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get payload size: %w", err)
+			}
+
+			removedSize += size
+
+			// this is ok
+			// return nil, skippableAccountError
 		}
-		if isADomainKey {
-			// TODO: check if this is really expected
-			// this is expected. Move it to the new payloads
-			newPayloads = append(newPayloads, value)
-			continue
-		}
-
-		if _, ok := storageMapIds[id.Key]; ok {
-			newPayloads = append(newPayloads, value)
-			continue
-		}
-
-		if mr.Address == cricketMomentsAddress {
-			// to be sure, copy all cricket moments keys
-			newPayloads = append(newPayloads, value)
-			m.log.Info().Msgf("copying cricket moments key %s", id)
-			continue
-		}
-
-		m.rw.Write(migrationProblem{
-			Address: mr.Address.Hex(),
-			Key:     id.String(),
-			Size:    len(mr.Snapshot.Payloads),
-			Kind:    "not_migrated",
-			Msg:     fmt.Sprintf("%x", value),
-		})
-
-		size, err := payloadSize(key, value)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get payload size: %w", err)
-		}
-
-		removedSize += size
-
-		// this is ok
-		// return nil, skippableAccountError
 	}
 
 	if statePayload == nil {
