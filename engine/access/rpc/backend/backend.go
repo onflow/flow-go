@@ -2,13 +2,13 @@ package backend
 
 import (
 	"context"
+	"crypto/md5" //nolint:gosec
 	"fmt"
 	"net"
 	"strconv"
 	"time"
 
-	lru "github.com/hashicorp/golang-lru"
-	lru2 "github.com/hashicorp/golang-lru/v2"
+	lru "github.com/hashicorp/golang-lru/v2"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 
@@ -74,6 +74,9 @@ type Backend struct {
 	collections       storage.Collections
 	executionReceipts storage.ExecutionReceipts
 	connFactory       connection.ConnectionFactory
+
+	// cache the response to GetNodeVersionInfo since it doesn't change
+	nodeInfo *access.NodeVersionInfo
 }
 
 // Config defines the configurable options for creating Backend
@@ -115,32 +118,38 @@ type Params struct {
 }
 
 // New creates backend instance
-func New(params Params) *Backend {
+func New(params Params) (*Backend, error) {
 	retry := newRetry()
 	if params.RetryEnabled {
 		retry.Activate()
 	}
 
-	loggedScripts, err := lru.New(DefaultLoggedScriptsCacheSize)
+	loggedScripts, err := lru.New[[md5.Size]byte, time.Time](DefaultLoggedScriptsCacheSize)
 	if err != nil {
-		params.Log.Fatal().Err(err).Msg("failed to initialize script logging cache")
+		return nil, fmt.Errorf("failed to initialize script logging cache: %w", err)
 	}
 
 	archivePorts := make([]uint, len(params.ArchiveAddressList))
 	for idx, addr := range params.ArchiveAddressList {
 		port, err := findPortFromAddress(addr)
 		if err != nil {
-			params.Log.Fatal().Err(err).Msg("failed to find archive node port")
+			return nil, fmt.Errorf("failed to find archive node port: %w", err)
 		}
 		archivePorts[idx] = port
 	}
 
-	var txResCache *lru2.Cache[flow.Identifier, *access.TransactionResult]
+	var txResCache *lru.Cache[flow.Identifier, *access.TransactionResult]
 	if params.TxResultCacheSize > 0 {
-		txResCache, err = lru2.New[flow.Identifier, *access.TransactionResult](int(params.TxResultCacheSize))
+		txResCache, err = lru.New[flow.Identifier, *access.TransactionResult](int(params.TxResultCacheSize))
 		if err != nil {
-			params.Log.Fatal().Err(err).Msg("failed to init cache for transaction results")
+			return nil, fmt.Errorf("failed to init cache for transaction results: %w", err)
 		}
+	}
+
+	// initialize node version info
+	nodeInfo, err := getNodeVersionInfo(params.State.Params())
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize node version info: %w", err)
 	}
 
 	b := &Backend{
@@ -213,48 +222,43 @@ func New(params Params) *Backend {
 		executionReceipts: params.ExecutionReceipts,
 		connFactory:       params.ConnFactory,
 		chainID:           params.ChainID,
+		nodeInfo:          nodeInfo,
 	}
 
 	retry.SetBackend(b)
 
 	preferredENIdentifiers, err = identifierList(params.PreferredExecutionNodeIDs)
 	if err != nil {
-		params.Log.Fatal().Err(err).Msg("failed to convert node id string to Flow Identifier for preferred EN map")
+		return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for preferred EN map: %w", err)
 	}
 
 	fixedENIdentifiers, err = identifierList(params.FixedExecutionNodeIDs)
 	if err != nil {
-		params.Log.Fatal().Err(err).Msg("failed to convert node id string to Flow Identifier for fixed EN map")
+		return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for fixed EN map: %w", err)
 	}
 
-	return b
+	return b, nil
 }
 
 // NewCache constructs cache for storing connections to other nodes.
 // No errors are expected during normal operations.
 func NewCache(
 	log zerolog.Logger,
-	accessMetrics module.AccessMetrics,
-	connectionPoolSize uint,
-) (*lru.Cache, uint, error) {
+	metrics module.AccessMetrics,
+	connectionPoolSize int,
+) (*lru.Cache[string, *connection.CachedClient], error) {
+	cache, err := lru.NewWithEvict(connectionPoolSize, func(_ string, client *connection.CachedClient) {
+		go client.Close() // close is blocking, so run in a goroutine
 
-	var cache *lru.Cache
-	cacheSize := connectionPoolSize
-	if cacheSize > 0 {
-		var err error
-		cache, err = lru.NewWithEvict(int(cacheSize), func(_, evictedValue interface{}) {
-			store := evictedValue.(*connection.CachedClient)
-			store.Close()
-			log.Debug().Str("grpc_conn_evicted", store.Address).Msg("closing grpc connection evicted from pool")
-			if accessMetrics != nil {
-				accessMetrics.ConnectionFromPoolEvicted()
-			}
-		})
-		if err != nil {
-			return nil, 0, fmt.Errorf("could not initialize connection pool cache: %w", err)
-		}
+		log.Debug().Str("grpc_conn_evicted", client.Address).Msg("closing grpc connection evicted from pool")
+		metrics.ConnectionFromPoolEvicted()
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize connection pool cache: %w", err)
 	}
-	return cache, cacheSize, nil
+
+	return cache, nil
 }
 
 func identifierList(ids []string) (flow.IdentifierList, error) {
@@ -302,17 +306,31 @@ func (b *Backend) Ping(ctx context.Context) error {
 
 // GetNodeVersionInfo returns node version information such as semver, commit, sporkID, protocolVersion, etc
 func (b *Backend) GetNodeVersionInfo(_ context.Context) (*access.NodeVersionInfo, error) {
-	stateParams := b.state.Params()
-	sporkId := stateParams.SporkID()
+	return b.nodeInfo, nil
+}
 
+// getNodeVersionInfo returns the NodeVersionInfo for the node.
+// Since these values are static while the node is running, it is safe to cache.
+func getNodeVersionInfo(stateParams protocol.Params) (*access.NodeVersionInfo, error) {
+	sporkID := stateParams.SporkID()
 	protocolVersion := stateParams.ProtocolVersion()
+	sporkRootBlockHeight := stateParams.SporkRootBlockHeight()
 
-	return &access.NodeVersionInfo{
-		Semver:          build.Version(),
-		Commit:          build.Commit(),
-		SporkId:         sporkId,
-		ProtocolVersion: uint64(protocolVersion),
-	}, nil
+	nodeRootBlockHeader, err := stateParams.SealedRoot()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read node root block: %w", err)
+	}
+
+	nodeInfo := &access.NodeVersionInfo{
+		Semver:               build.Version(),
+		Commit:               build.Commit(),
+		SporkId:              sporkID,
+		ProtocolVersion:      uint64(protocolVersion),
+		SporkRootBlockHeight: sporkRootBlockHeight,
+		NodeRootBlockHeight:  nodeRootBlockHeader.Height,
+	}
+
+	return nodeInfo, nil
 }
 
 func (b *Backend) GetCollectionByID(_ context.Context, colID flow.Identifier) (*flow.LightCollection, error) {

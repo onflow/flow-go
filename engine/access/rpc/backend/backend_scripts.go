@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-multierror"
-	lru "github.com/hashicorp/golang-lru"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
@@ -33,7 +33,7 @@ type backendScripts struct {
 	connFactory          connection.ConnectionFactory
 	log                  zerolog.Logger
 	metrics              module.BackendScriptsMetrics
-	loggedScripts        *lru.Cache
+	loggedScripts        *lru.Cache[[md5.Size]byte, time.Time]
 	archiveAddressList   []string
 	archivePorts         []uint
 	scriptExecValidation bool
@@ -309,15 +309,14 @@ func (b *backendScripts) executeScriptOnAvailableExecutionNodes(
 }
 
 // shouldLogScript checks if the script hash is unique in the time window
-func (b *backendScripts) shouldLogScript(execTime time.Time, scriptHash [16]byte) bool {
-	rawTimestamp, seen := b.loggedScripts.Get(scriptHash)
-	if !seen || rawTimestamp == nil {
-		return true
-	} else {
+func (b *backendScripts) shouldLogScript(execTime time.Time, scriptHash [md5.Size]byte) bool {
+	timestamp, seen := b.loggedScripts.Get(scriptHash)
+	if seen {
 		// safe cast
-		timestamp := rawTimestamp.(time.Time)
 		return execTime.Sub(timestamp) >= uniqueScriptLoggingTimeWindow
 	}
+	return true
+
 }
 
 func (b *backendScripts) tryExecuteScriptOnExecutionNode(
@@ -378,9 +377,6 @@ func (b *backendScripts) tryExecuteScriptOnArchiveNode(
 	}(closer)
 	resp, err := archiveClient.ExecuteScriptAtBlockID(ctx, req)
 	if err != nil {
-		if status.Code(err) == codes.Unavailable {
-			b.connFactory.InvalidateAccessAPIClient(executorAddress)
-		}
 		return nil, status.Errorf(status.Code(err), "failed to execute the script on archive node %s: %v",
 			executorAddress, err)
 	}

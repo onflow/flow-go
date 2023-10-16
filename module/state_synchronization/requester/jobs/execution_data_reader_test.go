@@ -99,8 +99,8 @@ func (suite *ExecutionDataReaderSuite) reset() {
 	suite.reader = NewExecutionDataReader(
 		cache,
 		suite.fetchTimeout,
-		func() uint64 {
-			return suite.highestAvailableHeight()
+		func() (uint64, error) {
+			return suite.highestAvailableHeight(), nil
 		},
 	)
 }

@@ -9,8 +9,10 @@
 package models
 
 type NodeVersionInfo struct {
-	Semver          string `json:"semver"`
-	Commit          string `json:"commit"`
-	SporkId         string `json:"spork_id"`
-	ProtocolVersion string `json:"protocol_version"`
+	Semver               string `json:"semver"`
+	Commit               string `json:"commit"`
+	SporkId              string `json:"spork_id"`
+	ProtocolVersion      string `json:"protocol_version"`
+	SporkRootBlockHeight string `json:"spork_root_block_height"`
+	NodeRootBlockHeight  string `json:"node_root_block_height"`
 }
