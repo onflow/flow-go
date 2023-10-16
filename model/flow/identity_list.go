@@ -271,7 +271,9 @@ func (il GenericIdentityList[T]) SamplePct(pct float64) (GenericIdentityList[T],
 
 // Union returns a new identity list containing every identity that occurs in
 // either `il`, or `other`, or both. There are no duplicates in the output,
-// where duplicates are identities with the same node ID.
+// where duplicates are identities with the same node ID. In case an entry
+// with the same NodeID exists in the receiver `il` as well as in `other`,
+// the identity from `il` is included in the output.
 // Receiver `il` and/or method input `other` can be nil or empty.
 // The returned IdentityList is sorted in canonical order.
 func (il GenericIdentityList[T]) Union(other GenericIdentityList[T]) GenericIdentityList[T] {
