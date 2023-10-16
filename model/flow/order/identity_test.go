@@ -1,5 +1,3 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package order_test
 
 import (
