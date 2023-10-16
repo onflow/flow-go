@@ -52,7 +52,17 @@ cmd/util/util:
 
 .PHONY: update-core-contracts-version
 update-core-contracts-version:
+	# updates the core-contracts version in all of the go.mod files
+	# usage example: CC_VERSION=0.16.0 make update-core-contracts-version
 	./scripts/update-core-contracts.sh $(CC_VERSION)
+	make tidy
+
+.PHONY: update-cadence-version
+update-cadence-version:
+	# updates the cadence version in all of the go.mod files
+	# usage example: CC_VERSION=0.16.0 make update-cadence-version
+	./scripts/update-cadence.sh $(CC_VERSION)
+	make tidy
 
 ############################################################################################
 # CAUTION: DO NOT MODIFY THESE TARGETS! DOING SO WILL BREAK THE FLAKY TEST MONITOR
