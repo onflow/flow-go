@@ -52,3 +52,27 @@ func EvaluateDistributionUniformity(t *testing.T, distribution []float64) {
 	mean := stat.Mean(distribution, nil)
 	assert.Greater(t, tolerance*mean, stdev, fmt.Sprintf("basic randomness test failed: n: %d, stdev: %v, mean: %v", len(distribution), stdev, mean))
 }
+
+// computes a bijection from the set of all permutations
+// into the the set [0, n!-1] (where `n` is the size of input `s`)
+// input `s` is assumed to be a correct permutation.
+func encodePermutation(s []int) int {
+	r := make([]int, len(s))
+	// Convert to Lehmer code.
+	for i, x := range s {
+		for _, y := range s[i+1:] {
+			if y < x {
+				r[i]++
+			}
+		}
+	}
+
+	// Convert to an integer following the factorial number system
+	m := 0
+	fact := 1
+	for i := len(s) - 1; i >= 0; i-- {
+		m += s[i] * fact
+		fact *= len(s) - i
+	}
+	return m
+}
