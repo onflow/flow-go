@@ -11,7 +11,8 @@ import (
 
 // this constant should be increased if tests are flakey, but it the higher the constant
 // the slower the test
-const sampleConstant = 1000
+const sampleSizeConstant = 85000
+const sampleCoefficient = sampleSizeConstant / 85
 
 // BasicDistributionTest is a test function to run a basic statistic test on `randf` output.
 // `randf` is a function that outputs random integers.
@@ -24,10 +25,10 @@ const sampleConstant = 1000
 // uniformity)
 func BasicDistributionTest(t *testing.T, n uint64, classWidth uint64, randf func() (uint64, error)) {
 	// sample size should ideally be a high number multiple of `n`
-	sampleSize := sampleConstant * n
-	if n < 100 {
+	sampleSize := sampleCoefficient * n
+	if n < 80 {
 		// but if `n` is too small, we use a "high enough" sample size
-		sampleSize = ((80 * sampleConstant) / n) * n // highest multiple of n less than 80000
+		sampleSize = ((sampleSizeConstant) / n) * n // highest multiple of n less than 80000
 	}
 	distribution := make([]float64, n)
 	// populate the distribution
@@ -56,23 +57,22 @@ func EvaluateDistributionUniformity(t *testing.T, distribution []float64) {
 // computes a bijection from the set of all permutations
 // into the the set [0, n!-1] (where `n` is the size of input `s`)
 // input `s` is assumed to be a correct permutation.
-func encodePermutation(s []int) int {
-	r := make([]int, len(s))
-	// Convert to Lehmer code.
-	for i, x := range s {
-		for _, y := range s[i+1:] {
+func EncodePermutation(perm []int) int {
+	r := make([]int, len(perm))
+	// generate Lehmer code
+	for i, x := range perm {
+		for _, y := range perm[i+1:] {
 			if y < x {
 				r[i]++
 			}
 		}
 	}
-
 	// Convert to an integer following the factorial number system
 	m := 0
 	fact := 1
-	for i := len(s) - 1; i >= 0; i-- {
-		m += s[i] * fact
-		fact *= len(s) - i
+	for i := len(perm) - 1; i >= 0; i-- {
+		m += r[i] * fact
+		fact *= len(perm) - i
 	}
 	return m
 }
