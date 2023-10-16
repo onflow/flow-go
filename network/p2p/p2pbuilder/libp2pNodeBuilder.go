@@ -219,11 +219,11 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		limits := rcmgr.DefaultLimits
 		libp2p.SetDefaultServiceLimits(&limits)
 
-		mem, err := allowedMemory(builder.resourceManagerCfg.MemoryLimitRatio)
+		mem, err := AllowedMemory(builder.resourceManagerCfg.MemoryLimitRatio)
 		if err != nil {
 			return nil, fmt.Errorf("could not get allowed memory: %w", err)
 		}
-		fd, err := allowedFileDescriptors(builder.resourceManagerCfg.FileDescriptorsRatio)
+		fd, err := AllowedFileDescriptors(builder.resourceManagerCfg.FileDescriptorsRatio)
 		if err != nil {
 			return nil, fmt.Errorf("could not get allowed file descriptors: %w", err)
 		}
@@ -238,7 +238,7 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 			Int64("allowed_memory", mem).
 			Int("allowed_file_descriptors", fd).
 			Msg("allowed memory and file descriptors are fetched from the system")
-		newLimitConfigLogger(builder.logger).logResourceManagerLimits(l)
+		NewLimitConfigLogger(builder.logger).LogResourceManagerLimits(l)
 
 		opts = append(opts, libp2p.ResourceManager(mgr))
 		builder.logger.Info().Msg("libp2p resource manager is set to default with metrics")

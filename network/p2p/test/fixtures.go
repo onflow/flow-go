@@ -398,6 +398,14 @@ func WithDefaultResourceManager() NodeFixtureParameterOption {
 	}
 }
 
+// WithResourceManager sets the resource manager to the provided resource manager.
+// Otherwise, it uses the resource manager provided by the test (the infinite resource manager).
+func WithResourceManager(resourceManager network.ResourceManager) NodeFixtureParameterOption {
+	return func(p *NodeFixtureParameters) {
+		p.ResourceManager = resourceManager
+	}
+}
+
 func WithUnicastHandlerFunc(handler network.StreamHandler) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
 		p.HandlerFunc = handler
