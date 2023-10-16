@@ -746,7 +746,7 @@ type ExecutionMetrics interface {
 }
 
 type BackendScriptsMetrics interface {
-	// Record the round trip time while executing a script
+	// ScriptExecuted records the round trip time while executing a script
 	ScriptExecuted(dur time.Duration, size int)
 
 	// ScriptExecutionErrorLocal records script execution failures from local execution
@@ -755,12 +755,20 @@ type BackendScriptsMetrics interface {
 	// ScriptExecutionErrorOnExecutionNode records script execution failures on Execution Nodes
 	ScriptExecutionErrorOnExecutionNode()
 
+	// ScriptExecutionResultMismatch records script execution result mismatches between local and
+	// execution nodes
 	ScriptExecutionResultMismatch()
 
+	// ScriptExecutionResultMatch records script execution result matches between local and
+	// execution nodes
 	ScriptExecutionResultMatch()
 
+	// ScriptExecutionErrorMismatch records script execution error mismatches between local and
+	// execution nodes
 	ScriptExecutionErrorMismatch()
 
+	// ScriptExecutionErrorMatch records script execution error matches between local and
+	// execution nodes
 	ScriptExecutionErrorMatch()
 }
 

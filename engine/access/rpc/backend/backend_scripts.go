@@ -99,17 +99,23 @@ func (b *backendScripts) executeScript(
 	// *DO NOT* use this hash for any protocol-related or cryptographic functions.
 	insecureScriptHash := md5.Sum(script) //nolint:gosec
 
-	if b.scriptExecMode == ScriptExecutionModeExecutionNodesOnly {
-		return b.executeScriptOnAvailableExecutionNodes(ctx, blockID, script, arguments, insecureScriptHash)
-	}
-
-	localResult, localErr := b.executeScriptLocally(ctx, blockID, height, script, arguments, insecureScriptHash)
 	switch b.scriptExecMode {
+	case ScriptExecutionModeExecutionNodesOnly:
+		return b.executeScriptOnAvailableExecutionNodes(ctx, blockID, script, arguments, insecureScriptHash)
+
+	case ScriptExecutionModeLocalOnly:
+		return b.executeScriptLocally(ctx, blockID, height, script, arguments, insecureScriptHash)
+
 	case ScriptExecutionModeFailover:
+		localResult, localErr := b.executeScriptLocally(ctx, blockID, height, script, arguments, insecureScriptHash)
 		if localErr == nil || isInvalidArgumentError(localErr) {
 			return localResult, localErr
 		}
-		return b.executeScriptOnAvailableExecutionNodes(ctx, blockID, script, arguments, insecureScriptHash)
+		execResult, execErr := b.executeScriptOnAvailableExecutionNodes(ctx, blockID, script, arguments, insecureScriptHash)
+
+		b.compareScriptExecutionResults(execResult, execErr, localResult, localErr, blockID, script, insecureScriptHash)
+
+		return execResult, execErr
 
 	case ScriptExecutionModeCompare:
 		execResult, execErr := b.executeScriptOnAvailableExecutionNodes(ctx, blockID, script, arguments, insecureScriptHash)
@@ -119,6 +125,7 @@ func (b *backendScripts) executeScript(
 		if execErr != nil && !isInvalidArgumentError(execErr) {
 			return nil, execErr
 		}
+		localResult, localErr := b.executeScriptLocally(ctx, blockID, height, script, arguments, insecureScriptHash)
 
 		b.compareScriptExecutionResults(execResult, execErr, localResult, localErr, blockID, script, insecureScriptHash)
 
@@ -126,7 +133,7 @@ func (b *backendScripts) executeScript(
 		return execResult, execErr
 
 	default:
-		return localResult, localErr
+		return nil, status.Errorf(codes.Internal, "unknown script execution mode: %v", b.scriptExecMode)
 	}
 }
 
@@ -162,7 +169,7 @@ func (b *backendScripts) executeScriptLocally(
 				Str("script", string(script)).
 				Msg("script failed to execute locally")
 		} else {
-			lg.Error().Err(err).Msg("script execution failed for internal reasons")
+			lg.Error().Err(err).Msg("script execution failed")
 			b.metrics.ScriptExecutionErrorLocal()
 		}
 
@@ -296,52 +303,55 @@ func (b *backendScripts) compareScriptExecutionResults(
 	if execErr != nil {
 		if execErr == localErr {
 			b.metrics.ScriptExecutionErrorMatch()
-		} else {
-			b.metrics.ScriptExecutionErrorMismatch()
-			b.logScriptExecutionComparison(blockID, script, insecureScriptHash, execNodeResult, localResult, execErr, localErr,
-				"cadence errors from local execution do not match and EN")
+			return
 		}
+
+		b.metrics.ScriptExecutionErrorMismatch()
+		b.logScriptExecutionComparison(execNodeResult, execErr, localResult, localErr, blockID, script, insecureScriptHash,
+			"cadence errors from local execution do not match and EN")
 		return
 	}
 
 	if bytes.Equal(execNodeResult, localResult) {
 		b.metrics.ScriptExecutionResultMatch()
-	} else {
-		b.metrics.ScriptExecutionResultMismatch()
-		b.logScriptExecutionComparison(blockID, script, insecureScriptHash, execNodeResult, localResult, execErr, localErr,
-			"script execution results from local execution do not match EN")
+		return
 	}
+
+	b.metrics.ScriptExecutionResultMismatch()
+	b.logScriptExecutionComparison(execNodeResult, execErr, localResult, localErr, blockID, script, insecureScriptHash,
+		"script execution results from local execution do not match EN")
 }
 
 // logScriptExecutionComparison logs the script execution comparison between local execution and execution node
 func (b *backendScripts) logScriptExecutionComparison(
+	execNodeResult []byte,
+	execErr error,
+	localResult []byte,
+	localErr error,
 	blockID flow.Identifier,
 	script []byte,
 	insecureScriptHash [md5.Size]byte,
-	execNodeResult []byte,
-	localResult []byte,
-	executionError error,
-	localError error,
 	msg string,
 ) {
-	// over-log for ease of debug
-	if executionError != nil || localError != nil {
-		b.log.Debug().
-			Hex("block_id", blockID[:]).
-			Str("script", string(script)).
-			Hex("script_hash", insecureScriptHash[:]).
-			AnErr("execution_node_error", executionError).
-			AnErr("local_error", localError).
-			Msg(msg)
+	lgCtx := b.log.With().
+		Hex("block_id", blockID[:]).
+		Str("script", string(script)).
+		Hex("script_hash", insecureScriptHash[:])
+
+	if execErr != nil {
+		lgCtx = lgCtx.AnErr("execution_node_error", execErr)
 	} else {
-		b.log.Debug().
-			Hex("block_id", blockID[:]).
-			Str("script", string(script)).
-			Hex("script_hash", insecureScriptHash[:]).
-			Hex("execution_node_result", execNodeResult).
-			Hex("local_result", localResult).
-			Msg(msg)
+		lgCtx = lgCtx.Hex("execution_node_result", execNodeResult)
 	}
+
+	if localErr != nil {
+		lgCtx = lgCtx.AnErr("local_error", localErr)
+	} else {
+		lgCtx = lgCtx.Hex("local_result", localResult)
+	}
+
+	lg := lgCtx.Logger()
+	lg.Debug().Msg(msg)
 }
 
 // shouldLogScript checks if the script hash is unique in the time window
