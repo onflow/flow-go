@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync/atomic"
 
+	"github.com/onflow/flow/protobuf/go/flow/execution"
 	access "github.com/onflow/flow/protobuf/go/flow/executiondata"
 	executiondata "github.com/onflow/flow/protobuf/go/flow/executiondata"
 	"google.golang.org/grpc/codes"
@@ -23,6 +24,14 @@ type Handler struct {
 	maxStreams  int32
 	streamCount atomic.Int32
 }
+
+// TODO: TEMPORARY, since grpc service was updated but handler not yet
+func (h *Handler) GetRegisterValues(ctx context.Context, request *executiondata.GetRegisterValuesRequest) (*executiondata.GetRegisterValuesResponse, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+var _ access.ExecutionDataAPIServer = (*Handler)(nil)
 
 func NewHandler(api API, chain flow.Chain, conf EventFilterConfig, maxGlobalStreams uint32) *Handler {
 	h := &Handler{
@@ -49,6 +58,13 @@ func (h *Handler) GetExecutionDataByBlockID(ctx context.Context, request *access
 	message, err := convert.BlockExecutionDataToMessage(execData)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "could not convert execution data to entity: %v", err)
+	}
+
+	// convert event payloads from CCF to JSON-CDC
+	// This is a temporary solution until the Access API supports specifying the encoding in the request
+	err = convert.BlockExecutionDataEventPayloadsToJson(message)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "could not convert execution data event payloads to JSON: %v", err)
 	}
 
 	return &access.GetExecutionDataByBlockIDResponse{BlockExecutionData: message}, nil
@@ -90,6 +106,13 @@ func (h *Handler) SubscribeExecutionData(request *access.SubscribeExecutionDataR
 		execData, err := convert.BlockExecutionDataToMessage(resp.ExecutionData)
 		if err != nil {
 			return status.Errorf(codes.Internal, "could not convert execution data to entity: %v", err)
+		}
+
+		// convert event payloads from CCF to JSON-CDC
+		// This is a temporary solution until the Access API supports specifying the encoding in the request
+		err = convert.BlockExecutionDataEventPayloadsToJson(execData)
+		if err != nil {
+			return status.Errorf(codes.Internal, "could not convert execution data event payloads to JSON: %v", err)
 		}
 
 		err = stream.Send(&executiondata.SubscribeExecutionDataResponse{
@@ -151,10 +174,18 @@ func (h *Handler) SubscribeEvents(request *access.SubscribeEventsRequest, stream
 			return status.Errorf(codes.Internal, "unexpected response type: %T", v)
 		}
 
-		err := stream.Send(&executiondata.SubscribeEventsResponse{
+		// BlockExecutionData contains CCF encoded events, and the Access API returns JSON-CDC events.
+		// convert event payload formats.
+		// This is a temporary solution until the Access API supports specifying the encoding in the request
+		events, err := convert.EventsToMessagesFromVersion(resp.Events, execution.EventEncodingVersion_CCF_V0)
+		if err != nil {
+			return status.Errorf(codes.Internal, "could not convert events to entity: %v", err)
+		}
+
+		err = stream.Send(&executiondata.SubscribeEventsResponse{
 			BlockHeight: resp.Height,
 			BlockId:     convert.IdentifierToMessage(resp.BlockID),
-			Events:      convert.EventsToMessages(resp.Events),
+			Events:      events,
 		})
 		if err != nil {
 			return rpc.ConvertError(err, "could not send response", codes.Internal)
