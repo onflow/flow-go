@@ -22,6 +22,7 @@ import (
 
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -76,9 +77,17 @@ func (suite *RateLimitTestSuite) SetupTest() {
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
 
+	rootHeader := unittest.BlockHeaderFixture()
+	params := new(protocol.Params)
+	params.On("SporkID").Return(unittest.IdentifierFixture(), nil)
+	params.On("ProtocolVersion").Return(uint(unittest.Uint64InRange(10, 30)), nil)
+	params.On("SporkRootBlockHeight").Return(rootHeader.Height, nil)
+	params.On("SealedRoot").Return(rootHeader, nil)
+
 	suite.epochQuery = new(protocol.EpochQuery)
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
+	suite.state.On("Params").Return(params, nil).Maybe()
 	suite.snapshot.On("Epochs").Return(suite.epochQuery).Maybe()
 	suite.blocks = new(storagemock.Blocks)
 	suite.headers = new(storagemock.Headers)
@@ -147,7 +156,7 @@ func (suite *RateLimitTestSuite) SetupTest() {
 	block := unittest.BlockHeaderFixture()
 	suite.snapshot.On("Head").Return(block, nil)
 
-	bnd := backend.New(backend.Params{
+	bnd, err := backend.New(backend.Params{
 		State:                suite.state,
 		CollectionRPC:        suite.collClient,
 		Blocks:               suite.blocks,
@@ -161,6 +170,7 @@ func (suite *RateLimitTestSuite) SetupTest() {
 		SnapshotHistoryLimit: 0,
 		Communicator:         backend.NewNodeCommunicator(false),
 	})
+	suite.Require().NoError(err)
 
 	rpcEngBuilder, err := NewBuilder(
 		suite.log,
@@ -173,8 +183,10 @@ func (suite *RateLimitTestSuite) SetupTest() {
 		bnd,
 		bnd,
 		suite.secureGrpcServer,
-		suite.unsecureGrpcServer)
-
+		suite.unsecureGrpcServer,
+		nil,
+		state_stream.DefaultEventFilterConfig,
+		0)
 	require.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
 	require.NoError(suite.T(), err)

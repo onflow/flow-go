@@ -10,7 +10,6 @@ import (
 
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -36,21 +35,11 @@ func (suite *Suite) TestHistoricalTransactionResult() {
 		Events: nil,
 	}
 
-	backend := New(Params{
-		State:                 suite.state,
-		HistoricalAccessNodes: []accessproto.AccessAPIClient{suite.historicalAccessClient},
-		Blocks:                suite.blocks,
-		Headers:               suite.headers,
-		Collections:           suite.collections,
-		Transactions:          suite.transactions,
-		ExecutionReceipts:     suite.receipts,
-		ExecutionResults:      suite.results,
-		ChainID:               suite.chainID,
-		AccessMetrics:         metrics.NewNoopCollector(),
-		MaxHeightRange:        DefaultMaxHeightRange,
-		SnapshotHistoryLimit:  DefaultSnapshotHistoryLimit,
-		Communicator:          NewNodeCommunicator(false),
-	})
+	params := suite.defaultBackendParams()
+	params.HistoricalAccessNodes = []accessproto.AccessAPIClient{suite.historicalAccessClient}
+
+	backend, err := New(params)
+	suite.Require().NoError(err)
 
 	// Successfully return the transaction from the historical node
 	suite.historicalAccessClient.
@@ -89,22 +78,11 @@ func (suite *Suite) TestHistoricalTransaction() {
 		Transaction: convert.TransactionToMessage(*transactionBody),
 	}
 
-	backend := New(
-		Params{
-			State:                 suite.state,
-			HistoricalAccessNodes: []accessproto.AccessAPIClient{suite.historicalAccessClient},
-			Blocks:                suite.blocks,
-			Headers:               suite.headers,
-			Collections:           suite.collections,
-			Transactions:          suite.transactions,
-			ExecutionReceipts:     suite.receipts,
-			ExecutionResults:      suite.results,
-			ChainID:               suite.chainID,
-			AccessMetrics:         metrics.NewNoopCollector(),
-			MaxHeightRange:        DefaultMaxHeightRange,
-			SnapshotHistoryLimit:  DefaultSnapshotHistoryLimit,
-			Communicator:          NewNodeCommunicator(false),
-		})
+	params := suite.defaultBackendParams()
+	params.HistoricalAccessNodes = []accessproto.AccessAPIClient{suite.historicalAccessClient}
+
+	backend, err := New(params)
+	suite.Require().NoError(err)
 
 	// Successfully return the transaction from the historical node
 	suite.historicalAccessClient.

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	lru2 "github.com/hashicorp/golang-lru/v2"
+	lru "github.com/hashicorp/golang-lru/v2"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
@@ -41,7 +41,7 @@ type backendTransactions struct {
 	previousAccessNodes []accessproto.AccessAPIClient
 	log                 zerolog.Logger
 	nodeCommunicator    Communicator
-	txResultCache       *lru2.Cache[flow.Identifier, *access.TransactionResult]
+	txResultCache       *lru.Cache[flow.Identifier, *access.TransactionResult]
 }
 
 // SendTransaction forwards the transaction to the collection node

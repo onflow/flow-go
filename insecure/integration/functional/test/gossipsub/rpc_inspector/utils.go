@@ -36,7 +36,7 @@ func startNodesAndEnsureConnected(t *testing.T, ctx irrecoverable.SignalerContex
 	})
 }
 
-func stopTestComponents(t *testing.T, cancel context.CancelFunc, nodes []p2p.LibP2PNode, components ...module.ReadyDoneAware) {
+func stopComponents(t *testing.T, cancel context.CancelFunc, nodes []p2p.LibP2PNode, components ...module.ReadyDoneAware) {
 	p2ptest.StopNodes(t, nodes, cancel)
 	unittest.RequireComponentsDoneBefore(t, time.Second, components...)
 }

@@ -34,6 +34,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	rpcConnection "github.com/onflow/flow-go/engine/access/rpc/connection"
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/common/follower"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/protocol"
@@ -60,6 +61,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
+	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"github.com/onflow/flow-go/network/p2p/p2pnet"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/tracer"
@@ -588,7 +590,7 @@ func (builder *ObserverServiceBuilder) InitIDProviders() {
 
 					if flowID, err := builder.IDTranslator.GetFlowID(pid); err != nil {
 						// TODO: this is an instance of "log error and continue with best effort" anti-pattern
-						builder.Logger.Err(err).Str("peer", pid.String()).Msg("failed to translate to Flow ID")
+						builder.Logger.Err(err).Str("peer", p2plogging.PeerId(pid)).Msg("failed to translate to Flow ID")
 					} else {
 						result = append(result, flowID)
 					}
@@ -893,17 +895,15 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		accessMetrics := builder.AccessMetrics
 		config := builder.rpcConf
 		backendConfig := config.BackendConfig
-
-		backendCache, cacheSize, err := backend.NewCache(node.Logger,
-			accessMetrics,
-			config.BackendConfig.ConnectionPoolSize)
-		if err != nil {
-			return nil, fmt.Errorf("could not initialize backend cache: %w", err)
-		}
+		cacheSize := int(backendConfig.ConnectionPoolSize)
 
 		var connBackendCache *rpcConnection.Cache
-		if backendCache != nil {
-			connBackendCache = rpcConnection.NewCache(backendCache, int(cacheSize))
+		if cacheSize > 0 {
+			backendCache, err := backend.NewCache(node.Logger, accessMetrics, cacheSize)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize backend cache: %w", err)
+			}
+			connBackendCache = rpcConnection.NewCache(backendCache, cacheSize)
 		}
 
 		connFactory := &rpcConnection.ConnectionFactoryImpl{
@@ -922,7 +922,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			),
 		}
 
-		accessBackend := backend.New(backend.Params{
+		accessBackend, err := backend.New(backend.Params{
 			State:                     node.State,
 			Blocks:                    node.Storage.Blocks,
 			Headers:                   node.Storage.Headers,
@@ -943,6 +943,9 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			Communicator:              backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
 			ScriptExecValidation:      backendConfig.ScriptExecValidation,
 		})
+		if err != nil {
+			return nil, fmt.Errorf("could not initialize backend: %w", err)
+		}
 
 		observerCollector := metrics.NewObserverCollector()
 		restHandler, err := restapiproxy.NewRestProxyHandler(
@@ -969,6 +972,9 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			restHandler,
 			builder.secureGrpcServer,
 			builder.unsecureGrpcServer,
+			nil, // state streaming is not supported
+			state_stream.DefaultEventFilterConfig,
+			0,
 		)
 		if err != nil {
 			return nil, err

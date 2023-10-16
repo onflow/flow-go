@@ -36,7 +36,6 @@ import (
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
-	"github.com/onflow/flow-go/network/p2p/p2pconf"
 	"github.com/onflow/flow-go/network/p2p/tracer"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
@@ -83,9 +82,10 @@ func NodeFixture(
 
 	logger := unittest.Logger().Level(zerolog.WarnLevel)
 	require.NotNil(t, idProvider)
-	connectionGater := NewConnectionGater(idProvider, func(p peer.ID) error {
-		return nil
-	})
+	connectionGater := NewConnectionGater(
+		idProvider, func(p peer.ID) error {
+			return nil
+		})
 	require.NotNil(t, connectionGater)
 
 	meshTracerCfg := &tracer.GossipSubMeshTracerConfig{
@@ -117,7 +117,7 @@ func NodeFixture(
 		GossipSubPeerScoreTracerInterval: 0, // disabled by default
 		ConnGater:                        connectionGater,
 		PeerManagerConfig:                PeerManagerConfigFixture(), // disabled by default
-		GossipSubRPCInspectorCfg:         &defaultFlowConfig.NetworkConfig.GossipSubRPCInspectorsConfig,
+		FlowConfig:                       defaultFlowConfig,
 		PubSubTracer:                     tracer.NewGossipSubMeshTracer(meshTracerCfg),
 	}
 
@@ -132,7 +132,10 @@ func NodeFixture(
 
 	logger = parameters.Logger.With().Hex("node_id", logging.ID(identity.NodeID)).Logger()
 
-	connManager, err := connection.NewConnManager(logger, parameters.MetricsCfg.Metrics, &defaultFlowConfig.NetworkConfig.ConnectionManagerConfig)
+	connManager, err := connection.NewConnManager(
+		logger,
+		parameters.MetricsCfg.Metrics,
+		&defaultFlowConfig.NetworkConfig.ConnectionManagerConfig)
 	require.NoError(t, err)
 
 	builder := p2pbuilder.NewNodeBuilder(
@@ -144,7 +147,7 @@ func NodeFixture(
 		sporkID,
 		parameters.IdProvider,
 		&defaultFlowConfig.NetworkConfig.ResourceManagerConfig,
-		parameters.GossipSubRPCInspectorCfg,
+		&parameters.FlowConfig.NetworkConfig.GossipSubRPCInspectorsConfig,
 		parameters.PeerManagerConfig,
 		&p2p.DisallowListCacheConfig{
 			MaxSize: uint32(1000),
@@ -152,17 +155,29 @@ func NodeFixture(
 		},
 		parameters.PubSubTracer).
 		SetConnectionManager(connManager).
-		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
-			return p2pdht.NewDHT(c, h,
-				protocol.ID(protocols.FlowDHTProtocolIDPrefix+sporkID.String()+"/"+dhtPrefix),
-				logger,
-				parameters.MetricsCfg.Metrics,
-				parameters.DhtOptions...,
-			)
-		}).
 		SetCreateNode(p2pbuilder.DefaultCreateNodeFunc).
 		SetStreamCreationRetryInterval(parameters.CreateStreamRetryDelay).
 		SetResourceManager(parameters.ResourceManager)
+
+	if parameters.DhtOptions != nil && (parameters.Role != flow.RoleAccess && parameters.Role != flow.RoleExecution) {
+		require.Fail(t, "DHT should not be enabled for non-access and non-execution nodes")
+	}
+
+	if parameters.Role == flow.RoleAccess || parameters.Role == flow.RoleExecution {
+		// Only access and execution nodes need to run DHT;
+		// Access nodes and execution nodes need DHT to run a blob service.
+		// Moreover, access nodes run a DHT to let un-staked (public) access nodes find each other on the public network.
+		builder.SetRoutingSystem(
+			func(ctx context.Context, host host.Host) (routing.Routing, error) {
+				return p2pdht.NewDHT(
+					ctx,
+					host,
+					protocol.ID(protocols.FlowDHTProtocolIDPrefix+sporkID.String()+"/"+dhtPrefix),
+					logger,
+					parameters.MetricsCfg.Metrics,
+					parameters.DhtOptions...)
+			})
+	}
 
 	if parameters.GossipSubRpcInspectorSuiteFactory != nil {
 		builder.OverrideDefaultRpcInspectorSuiteFactory(parameters.GossipSubRpcInspectorSuiteFactory)
@@ -245,7 +260,7 @@ type NodeFixtureParameters struct {
 	CreateStreamRetryDelay            time.Duration
 	UnicastRateLimitDistributor       p2p.UnicastRateLimiterDistributor
 	GossipSubRpcInspectorSuiteFactory p2p.GossipSubRpcInspectorSuiteFactoryFunc
-	GossipSubRPCInspectorCfg          *p2pconf.GossipSubRPCInspectorsConfig
+	FlowConfig                        *config.FlowConfig
 }
 
 func WithUnicastRateLimitDistributor(distributor p2p.UnicastRateLimiterDistributor) NodeFixtureParameterOption {
@@ -260,9 +275,9 @@ func OverrideGossipSubRpcInspectorSuiteFactory(factory p2p.GossipSubRpcInspector
 	}
 }
 
-func OverrideGossipSubRpcInspectorConfig(cfg *p2pconf.GossipSubRPCInspectorsConfig) NodeFixtureParameterOption {
+func OverrideFlowConfig(cfg *config.FlowConfig) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
-		p.GossipSubRPCInspectorCfg = cfg
+		p.FlowConfig = cfg
 	}
 }
 
@@ -429,7 +444,14 @@ func WithZeroJitterAndZeroBackoff(t *testing.T) func(*p2pconfig.PeerManagerConfi
 
 // NodesFixture is a test fixture that creates a number of libp2p nodes with the given callback function for stream handling.
 // It returns the nodes and their identities.
-func NodesFixture(t *testing.T, sporkID flow.Identifier, dhtPrefix string, count int, idProvider module.IdentityProvider, opts ...NodeFixtureParameterOption) ([]p2p.LibP2PNode,
+func NodesFixture(
+	t *testing.T,
+	sporkID flow.Identifier,
+	dhtPrefix string,
+	count int,
+	idProvider module.IdentityProvider,
+	opts ...NodeFixtureParameterOption) (
+	[]p2p.LibP2PNode,
 	flow.IdentityList) {
 	var nodes []p2p.LibP2PNode
 
@@ -553,22 +575,23 @@ func TryConnectionAndEnsureConnected(t *testing.T, ctx context.Context, nodes []
 // - tick: the tick duration
 // - timeout: the timeout duration
 func RequireConnectedEventually(t *testing.T, nodes []p2p.LibP2PNode, tick time.Duration, timeout time.Duration) {
-	require.Eventually(t, func() bool {
-		for _, node := range nodes {
-			for _, other := range nodes {
-				if node == other {
-					continue
-				}
-				if node.Host().Network().Connectedness(other.ID()) != network.Connected {
-					return false
-				}
-				if len(node.Host().Network().ConnsToPeer(other.ID())) == 0 {
-					return false
+	require.Eventually(
+		t, func() bool {
+			for _, node := range nodes {
+				for _, other := range nodes {
+					if node == other {
+						continue
+					}
+					if node.Host().Network().Connectedness(other.ID()) != network.Connected {
+						return false
+					}
+					if len(node.Host().Network().ConnsToPeer(other.ID())) == 0 {
+						return false
+					}
 				}
 			}
-		}
-		return true
-	}, timeout, tick)
+			return true
+		}, timeout, tick)
 }
 
 // RequireEventuallyNotConnected ensures eventually that the given groups of nodes are not connected to each other.
@@ -578,20 +601,26 @@ func RequireConnectedEventually(t *testing.T, nodes []p2p.LibP2PNode, tick time.
 // - groupB: the second group of nodes
 // - tick: the tick duration
 // - timeout: the timeout duration
-func RequireEventuallyNotConnected(t *testing.T, groupA []p2p.LibP2PNode, groupB []p2p.LibP2PNode, tick time.Duration, timeout time.Duration) {
-	require.Eventually(t, func() bool {
-		for _, node := range groupA {
-			for _, other := range groupB {
-				if node.Host().Network().Connectedness(other.ID()) == network.Connected {
-					return false
-				}
-				if len(node.Host().Network().ConnsToPeer(other.ID())) > 0 {
-					return false
+func RequireEventuallyNotConnected(
+	t *testing.T,
+	groupA []p2p.LibP2PNode,
+	groupB []p2p.LibP2PNode,
+	tick time.Duration,
+	timeout time.Duration) {
+	require.Eventually(
+		t, func() bool {
+			for _, node := range groupA {
+				for _, other := range groupB {
+					if node.Host().Network().Connectedness(other.ID()) == network.Connected {
+						return false
+					}
+					if len(node.Host().Network().ConnsToPeer(other.ID())) > 0 {
+						return false
+					}
 				}
 			}
-		}
-		return true
-	}, timeout, tick)
+			return true
+		}, timeout, tick)
 }
 
 // EnsureStreamCreationInBothDirections ensure that between each pair of nodes in the given list, a stream is created in both directions.
@@ -602,11 +631,12 @@ func EnsureStreamCreationInBothDirections(t *testing.T, ctx context.Context, nod
 				continue
 			}
 			// stream creation should pass without error
-			err := this.OpenProtectedStream(ctx, other.ID(), t.Name(), func(stream network.Stream) error {
-				// do nothing
-				require.NotNil(t, stream)
-				return nil
-			})
+			err := this.OpenProtectedStream(
+				ctx, other.ID(), t.Name(), func(stream network.Stream) error {
+					// do nothing
+					require.NotNil(t, stream)
+					return nil
+				})
 			require.NoError(t, err)
 
 		}
@@ -624,7 +654,13 @@ func EnsureStreamCreationInBothDirections(t *testing.T, ctx context.Context, nod
 //
 // Note-1: this function assumes a timeout of 5 seconds for each message to be received.
 // Note-2: TryConnectionAndEnsureConnected() must be called to connect all nodes before calling this function.
-func EnsurePubsubMessageExchange(t *testing.T, ctx context.Context, nodes []p2p.LibP2PNode, topic channels.Topic, count int, messageFactory func() interface{}) {
+func EnsurePubsubMessageExchange(
+	t *testing.T,
+	ctx context.Context,
+	nodes []p2p.LibP2PNode,
+	topic channels.Topic,
+	count int,
+	messageFactory func() interface{}) {
 	subs := make([]p2p.Subscription, len(nodes))
 	for i, node := range nodes {
 		ps, err := node.Subscribe(topic, validator.TopicValidator(unittest.Logger(), unittest.AllowAllPeerFilter()))
@@ -710,7 +746,7 @@ func EnsurePubsubMessageExchangeFromNode(
 
 // PeerIdFixture returns a random peer ID for testing.
 // peer ID is the identifier of a node on the libp2p network.
-func PeerIdFixture(t *testing.T) peer.ID {
+func PeerIdFixture(t testing.TB) peer.ID {
 	buf := make([]byte, 16)
 	n, err := rand.Read(buf)
 	require.NoError(t, err)
@@ -841,7 +877,8 @@ func PeerIdSliceFixture(t *testing.T, n int) peer.IDSlice {
 // NewConnectionGater creates a new connection gater for testing with given allow listing filter.
 func NewConnectionGater(idProvider module.IdentityProvider, allowListFilter p2p.PeerFilter) p2p.ConnectionGater {
 	filters := []p2p.PeerFilter{allowListFilter}
-	return connection.NewConnGater(unittest.Logger(),
+	return connection.NewConnGater(
+		unittest.Logger(),
 		idProvider,
 		connection.WithOnInterceptPeerDialFilters(filters),
 		connection.WithOnInterceptSecuredFilters(filters))
