@@ -28,7 +28,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-var TestEventTypes = []flow.EventType{
+var testEventTypes = []flow.EventType{
 	"A.0x1.Foo.Bar",
 	"A.0x2.Zoo.Moo",
 	"A.0x3.Goo.Hoo",
@@ -49,9 +49,9 @@ type BackendExecutionDataSuite struct {
 	broadcaster       *engine.Broadcaster
 	execDataCache     *cache.ExecutionDataCache
 	execDataHeroCache *herocache.BlockExecutionData
-	Backend           *StateStreamBackend
+	backend           *StateStreamBackend
 
-	Blocks      []*flow.Block
+	blocks      []*flow.Block
 	blockEvents map[flow.Identifier]flow.EventsList
 	execDataMap map[flow.Identifier]*execution_data.BlockExecutionDataEntity
 	blockMap    map[uint64]*flow.Block
@@ -94,7 +94,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 	s.blockMap = make(map[uint64]*flow.Block, blockCount)
 	s.sealMap = make(map[flow.Identifier]*flow.Seal, blockCount)
 	s.resultMap = make(map[flow.Identifier]*flow.ExecutionResult, blockCount)
-	s.Blocks = make([]*flow.Block, 0, blockCount)
+	s.blocks = make([]*flow.Block, 0, blockCount)
 
 	// generate blockCount consecutive blocks with associated seal, result and execution data
 	rootBlock := unittest.BlockFixture()
@@ -110,7 +110,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 
 		seal := unittest.BlockSealsFixture(1)[0]
 		result := unittest.ExecutionResultFixture()
-		blockEvents := unittest.BlockEventsFixture(block.Header, (i%len(TestEventTypes))*3+1, TestEventTypes...)
+		blockEvents := unittest.BlockEventsFixture(block.Header, (i%len(testEventTypes))*3+1, testEventTypes...)
 
 		numChunks := 5
 		chunkDatas := make([]*execution_data.ChunkExecutionData, 0, numChunks)
@@ -134,7 +134,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 		result.ExecutionDataID, err = s.eds.Add(context.TODO(), execData)
 		assert.NoError(s.T(), err)
 
-		s.Blocks = append(s.Blocks, block)
+		s.blocks = append(s.blocks, block)
 		s.execDataMap[block.ID()] = execution_data.NewBlockExecutionDataEntity(result.ExecutionDataID, execData)
 		s.blockEvents[block.ID()] = blockEvents.Events
 		s.blockMap[block.Header.Height] = block
@@ -145,7 +145,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 	}
 
 	s.state.On("Sealed").Return(s.snapshot, nil).Maybe()
-	s.snapshot.On("Head").Return(s.Blocks[0].Header, nil).Maybe()
+	s.snapshot.On("Head").Return(s.blocks[0].Header, nil).Maybe()
 
 	s.seals.On("FinalizedSealForBlock", mock.AnythingOfType("flow.Identifier")).Return(
 		func(blockID flow.Identifier) *flow.Seal {
@@ -226,7 +226,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 		},
 	).Maybe()
 
-	s.Backend, err = New(
+	s.backend, err = New(
 		logger,
 		conf,
 		s.state,
@@ -246,20 +246,20 @@ func (s *BackendExecutionDataSuite) TestGetExecutionDataByBlockID() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	block := s.Blocks[0]
+	block := s.blocks[0]
 	seal := s.sealMap[block.ID()]
 	result := s.resultMap[seal.ResultID]
 	execData := s.execDataMap[block.ID()]
 
 	// notify backend block is available
-	s.Backend.SetHighestHeight(block.Header.Height)
+	s.backend.setHighestHeight(block.Header.Height)
 
 	var err error
 	s.Run("happy path TestGetExecutionDataByBlockID success", func() {
 		result.ExecutionDataID, err = s.eds.Add(ctx, execData.BlockExecutionData)
 		require.NoError(s.T(), err)
 
-		res, err := s.Backend.GetExecutionDataByBlockID(ctx, block.ID())
+		res, err := s.backend.GetExecutionDataByBlockID(ctx, block.ID())
 		assert.Equal(s.T(), execData.BlockExecutionData, res)
 		assert.NoError(s.T(), err)
 	})
@@ -269,7 +269,7 @@ func (s *BackendExecutionDataSuite) TestGetExecutionDataByBlockID() {
 	s.Run("missing exec data for TestGetExecutionDataByBlockID failure", func() {
 		result.ExecutionDataID = unittest.IdentifierFixture()
 
-		execDataRes, err := s.Backend.GetExecutionDataByBlockID(ctx, block.ID())
+		execDataRes, err := s.backend.GetExecutionDataByBlockID(ctx, block.ID())
 		assert.Nil(s.T(), execDataRes)
 		assert.Equal(s.T(), codes.NotFound, status.Code(err))
 	})
@@ -295,24 +295,24 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionData() {
 			name:            "happy path - partial backfill",
 			highestBackfill: 2, // backfill the first 3 blocks
 			startBlockID:    flow.ZeroID,
-			startHeight:     s.Blocks[0].Header.Height,
+			startHeight:     s.blocks[0].Header.Height,
 		},
 		{
 			name:            "happy path - complete backfill",
-			highestBackfill: len(s.Blocks) - 1, // backfill all blocks
-			startBlockID:    s.Blocks[0].ID(),
+			highestBackfill: len(s.blocks) - 1, // backfill all blocks
+			startBlockID:    s.blocks[0].ID(),
 			startHeight:     0,
 		},
 		{
 			name:            "happy path - start from root block by height",
-			highestBackfill: len(s.Blocks) - 1, // backfill all blocks
+			highestBackfill: len(s.blocks) - 1, // backfill all blocks
 			startBlockID:    flow.ZeroID,
-			startHeight:     s.Backend.rootBlockHeight, // start from root block
+			startHeight:     s.backend.rootBlockHeight, // start from root block
 		},
 		{
 			name:            "happy path - start from root block by id",
-			highestBackfill: len(s.Blocks) - 1,     // backfill all blocks
-			startBlockID:    s.Backend.rootBlockID, // start from root block
+			highestBackfill: len(s.blocks) - 1,     // backfill all blocks
+			startBlockID:    s.backend.rootBlockID, // start from root block
 			startHeight:     0,
 		},
 	}
@@ -328,21 +328,21 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionData() {
 			// this simulates a subscription on a past block
 			for i := 0; i <= test.highestBackfill; i++ {
 				s.T().Logf("backfilling block %d", i)
-				s.Backend.SetHighestHeight(s.Blocks[i].Header.Height)
+				s.backend.setHighestHeight(s.blocks[i].Header.Height)
 			}
 
 			subCtx, subCancel := context.WithCancel(ctx)
-			sub := s.Backend.SubscribeExecutionData(subCtx, test.startBlockID, test.startHeight)
+			sub := s.backend.SubscribeExecutionData(subCtx, test.startBlockID, test.startHeight)
 
 			// loop over all of the blocks
-			for i, b := range s.Blocks {
+			for i, b := range s.blocks {
 				execData := s.execDataMap[b.ID()]
 				s.T().Logf("checking block %d %v", i, b.ID())
 
 				// simulate new exec data received.
 				// exec data for all blocks with index <= highestBackfill were already received
 				if i > test.highestBackfill {
-					s.Backend.SetHighestHeight(b.Header.Height)
+					s.backend.setHighestHeight(b.Header.Height)
 					s.broadcaster.Publish()
 				}
 
@@ -386,7 +386,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataHandlesErrors() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.Backend.SubscribeExecutionData(subCtx, unittest.IdentifierFixture(), 1)
+		sub := s.backend.SubscribeExecutionData(subCtx, unittest.IdentifierFixture(), 1)
 		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()))
 	})
 
@@ -394,7 +394,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataHandlesErrors() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.Backend.SubscribeExecutionData(subCtx, flow.ZeroID, s.Backend.rootBlockHeight-1)
+		sub := s.backend.SubscribeExecutionData(subCtx, flow.ZeroID, s.backend.rootBlockHeight-1)
 		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()))
 	})
 
@@ -402,7 +402,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataHandlesErrors() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.Backend.SubscribeExecutionData(subCtx, unittest.IdentifierFixture(), 0)
+		sub := s.backend.SubscribeExecutionData(subCtx, unittest.IdentifierFixture(), 0)
 		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()))
 	})
 
@@ -413,7 +413,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataHandlesErrors() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.Backend.SubscribeExecutionData(subCtx, flow.ZeroID, s.Blocks[len(s.Blocks)-1].Header.Height+10)
+		sub := s.backend.SubscribeExecutionData(subCtx, flow.ZeroID, s.blocks[len(s.blocks)-1].Header.Height+10)
 		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()))
 	})
 }

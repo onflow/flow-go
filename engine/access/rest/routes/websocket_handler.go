@@ -38,7 +38,7 @@ type WebsocketController struct {
 	maxStreams        int32                          // the maximum number of streams allowed
 	activeStreamCount *atomic.Int32                  // the current number of active streams
 	readChannel       chan error                     // channel which notify closing connection by the client and provide errors to the client
-	heartbeatInterval uint64                         // the interval is calculated from the last response returned
+	heartbeatInterval uint64                         // the interval to deliver heartbeat messages to client[IN BLOCKS]
 }
 
 // SetWebsocketConf used to set read and write deadlines for WebSocket connections and establishes a Pong handler to
@@ -112,7 +112,7 @@ func (wsController *WebsocketController) writeEvents(sub state_stream.Subscripti
 	ticker := time.NewTicker(pingPeriod)
 	defer ticker.Stop()
 
-	blocksFromLastHeartbeat := uint64(0)
+	blocksSinceLastMessage := uint64(0)
 	for {
 		select {
 		case err := <-wsController.readChannel:
@@ -147,16 +147,14 @@ func (wsController *WebsocketController) writeEvents(sub state_stream.Subscripti
 				wsController.wsErrorHandler(err)
 				return
 			}
-			// check if events count in response is zero, if so check if there have been heartbeat interval value
-			// since last response.
+			// responses with empty events increase heartbeat interval counter, when threshold is met a heartbeat
+			// message will be emitted.
 			if len(resp.Events) == 0 {
-				blocksFromLastHeartbeat++
-				// if there was less blocks since last response than
-				// HeartbeatInterval exit from loop and check next block.
-				if blocksFromLastHeartbeat < wsController.heartbeatInterval {
+				blocksSinceLastMessage++
+				if blocksSinceLastMessage < wsController.heartbeatInterval {
 					continue
 				}
-				blocksFromLastHeartbeat = 0
+				blocksSinceLastMessage = 0
 			}
 
 			// Write the response to the WebSocket connection

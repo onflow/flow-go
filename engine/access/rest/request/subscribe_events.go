@@ -83,12 +83,9 @@ func (g *SubscribeEvents) Parse(
 		return nil
 	}
 
-	g.HeartbeatInterval, err = strconv.ParseUint(rawHeartbeatInterval, 0, 64)
+	g.HeartbeatInterval, err = strconv.ParseUint(rawHeartbeatInterval, 10, 64)
 	if err != nil {
 		return fmt.Errorf("invalid heartbeat interval format")
-	}
-	if g.HeartbeatInterval == 0 {
-		return fmt.Errorf("heartbeat interval value should be grater then 0")
 	}
 
 	return nil

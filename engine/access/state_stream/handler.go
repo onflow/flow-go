@@ -152,7 +152,7 @@ func (h *Handler) SubscribeEvents(request *access.SubscribeEventsRequest, stream
 
 	sub := h.api.SubscribeEvents(stream.Context(), startBlockID, request.GetStartBlockHeight(), filter)
 
-	blocksFromLastHeartbeat := uint64(0)
+	blocksSinceLastMessage := uint64(0)
 	for {
 		v, ok := <-sub.Channel()
 		if !ok {
@@ -167,16 +167,14 @@ func (h *Handler) SubscribeEvents(request *access.SubscribeEventsRequest, stream
 			return status.Errorf(codes.Internal, "unexpected response type: %T", v)
 		}
 
-		// check if events count in response is zero, if so check if there have been heartbeat interval value
-		// since last response.
+		// check if there are any events in the response. if not, do not send a message unless the last
+		// response was more than HeartbeatInterval blocks ago
 		if len(resp.Events) == 0 {
-			blocksFromLastHeartbeat++
-			// if there was less blocks since last response than
-			// HeartbeatInterval exit from loop and check next block.
-			if blocksFromLastHeartbeat < request.HeartbeatInterval {
+			blocksSinceLastMessage++
+			if blocksSinceLastMessage < request.HeartbeatInterval {
 				continue
 			}
-			blocksFromLastHeartbeat = 0
+			blocksSinceLastMessage = 0
 		}
 
 		// BlockExecutionData contains CCF encoded events, and the Access API returns JSON-CDC events.

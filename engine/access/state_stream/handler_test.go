@@ -1,4 +1,4 @@
-package state_stream_test
+package state_stream
 
 import (
 	"context"
@@ -17,7 +17,7 @@ import (
 	access "github.com/onflow/flow/protobuf/go/flow/executiondata"
 	pb "google.golang.org/genproto/googleapis/bytestream"
 
-	"github.com/onflow/flow-go/engine/access/state_stream"
+	//"github.com/onflow/flow-go/engine/access/state_stream"
 	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -32,10 +32,12 @@ func TestHeartbeatResponseSuite(t *testing.T) {
 }
 
 type HandlerTestSuite struct {
-	state_stream.BackendExecutionDataSuite
-	handler *state_stream.Handler
+	BackendExecutionDataSuite
+	handler *Handler
 }
 
+// fakeReadServerImpl is an utility structure for receiving response from grpc handler without building a complete pipeline with client and server.
+// It allows to receive streamed events pushed by server in buffered channel that can be later used to assert correctness of responses
 type fakeReadServerImpl struct {
 	pb.ByteStream_ReadServer
 	ctx      context.Context
@@ -55,9 +57,9 @@ func (fake *fakeReadServerImpl) Send(response *access.SubscribeEventsResponse) e
 
 func (s *HandlerTestSuite) SetupTest() {
 	s.BackendExecutionDataSuite.SetupTest()
-	conf := state_stream.DefaultEventFilterConfig
+	conf := DefaultEventFilterConfig
 	chain := flow.MonotonicEmulator.Chain()
-	s.handler = state_stream.NewHandler(s.Backend, chain, conf, 5)
+	s.handler = NewHandler(s.backend, chain, conf, 5)
 }
 
 // TestHeartbeatResponse tests the periodic heartbeat response.
@@ -74,9 +76,9 @@ func (s *HandlerTestSuite) TestHeartbeatResponse() {
 	}
 
 	// notify backend block is available
-	s.Backend.SetHighestHeight(s.Blocks[len(s.Blocks)-1].Header.Height)
+	s.backend.setHighestHeight(s.blocks[len(s.blocks)-1].Header.Height)
 
-	s.Run("ALl events filter", func() {
+	s.Run("All events filter", func() {
 		// create empty event filter
 		filter := &access.EventFilter{}
 		// create subscribe events request, set the created filter and heartbeatInterval
@@ -92,7 +94,7 @@ func (s *HandlerTestSuite) TestHeartbeatResponse() {
 			require.NoError(s.T(), err)
 		}()
 
-		for _, b := range s.Blocks {
+		for _, b := range s.blocks {
 			// consume execution data from subscription
 			unittest.RequireReturnsBefore(s.T(), func() {
 				resp, ok := <-reader.received
@@ -109,7 +111,7 @@ func (s *HandlerTestSuite) TestHeartbeatResponse() {
 	s.Run("Event A.0x1.Foo.Bar filter with heartbeat interval 1", func() {
 		// create A.0x1.Foo.Bar event filter
 		pbFilter := &access.EventFilter{
-			EventType: []string{string(state_stream.TestEventTypes[0])},
+			EventType: []string{string(testEventTypes[0])},
 			Contract:  nil,
 			Address:   nil,
 		}
@@ -126,7 +128,7 @@ func (s *HandlerTestSuite) TestHeartbeatResponse() {
 			require.NoError(s.T(), err)
 		}()
 
-		for _, b := range s.Blocks {
+		for _, b := range s.blocks {
 
 			// consume execution data from subscription
 			unittest.RequireReturnsBefore(s.T(), func() {
@@ -162,14 +164,15 @@ func (s *HandlerTestSuite) TestHeartbeatResponse() {
 			require.NoError(s.T(), err)
 		}()
 
+		// expect a response for every other block
 		expectedBlocks := make([]*flow.Block, 0)
-		for i, block := range s.Blocks {
+		for i, block := range s.blocks {
 			if (i+1)%int(req.HeartbeatInterval) == 0 {
 				expectedBlocks = append(expectedBlocks, block)
 			}
 		}
 
-		require.Len(s.T(), expectedBlocks, len(s.Blocks)/int(req.HeartbeatInterval))
+		require.Len(s.T(), expectedBlocks, len(s.blocks)/int(req.HeartbeatInterval))
 
 		for _, b := range expectedBlocks {
 			// consume execution data from subscription
@@ -195,7 +198,7 @@ func TestExecutionDataStream(t *testing.T) {
 
 	api := ssmock.NewAPI(t)
 	stream := makeStreamMock[access.SubscribeExecutionDataRequest, access.SubscribeExecutionDataResponse](ctx)
-	sub := state_stream.NewSubscription(1)
+	sub := NewSubscription(1)
 
 	// generate some events with a payload to include
 	// generators will produce identical event payloads (before encoding)
@@ -210,7 +213,7 @@ func TestExecutionDataStream(t *testing.T) {
 
 	api.On("SubscribeExecutionData", mock.Anything, flow.ZeroID, uint64(0), mock.Anything).Return(sub)
 
-	h := state_stream.NewHandler(api, flow.Localnet.Chain(), state_stream.EventFilterConfig{}, 1)
+	h := NewHandler(api, flow.Localnet.Chain(), EventFilterConfig{}, 1)
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
@@ -231,7 +234,7 @@ func TestExecutionDataStream(t *testing.T) {
 		),
 	)
 
-	err := sub.Send(ctx, &state_stream.ExecutionDataResponse{
+	err := sub.Send(ctx, &ExecutionDataResponse{
 		Height:        blockHeight,
 		ExecutionData: executionData,
 	}, 100*time.Millisecond)
@@ -282,7 +285,7 @@ func TestEventStream(t *testing.T) {
 
 	api := ssmock.NewAPI(t)
 	stream := makeStreamMock[access.SubscribeEventsRequest, access.SubscribeEventsResponse](ctx)
-	sub := state_stream.NewSubscription(1)
+	sub := NewSubscription(1)
 
 	// generate some events with a payload to include
 	// generators will produce identical event payloads (before encoding)
@@ -297,7 +300,7 @@ func TestEventStream(t *testing.T) {
 
 	api.On("SubscribeEvents", mock.Anything, flow.ZeroID, uint64(0), mock.Anything).Return(sub)
 
-	h := state_stream.NewHandler(api, flow.Localnet.Chain(), state_stream.EventFilterConfig{}, 1)
+	h := NewHandler(api, flow.Localnet.Chain(), EventFilterConfig{}, 1)
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
@@ -312,7 +315,7 @@ func TestEventStream(t *testing.T) {
 	// send a single response
 	blockHeight := uint64(1)
 	blockID := unittest.IdentifierFixture()
-	err := sub.Send(ctx, &state_stream.EventsResponse{
+	err := sub.Send(ctx, &EventsResponse{
 		BlockID: blockID,
 		Height:  blockHeight,
 		Events:  inputEvents,

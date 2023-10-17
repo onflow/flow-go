@@ -84,7 +84,7 @@ func (e *Engine) OnExecutionData(executionData *execution_data.BlockExecutionDat
 		return
 	}
 
-	if ok := e.backend.SetHighestHeight(header.Height); !ok {
+	if ok := e.backend.setHighestHeight(header.Height); !ok {
 		// this means that the height was lower than the current highest height
 		// OnExecutionData is guaranteed by the requester to be called in order, but may be called
 		// multiple times for the same block.

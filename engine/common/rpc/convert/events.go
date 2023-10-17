@@ -66,18 +66,18 @@ func MessagesToEvents(l []*entities.Event) []flow.Event {
 func EventToMessageFromVersion(e flow.Event, version execproto.EventEncodingVersion) (*entities.Event, error) {
 	message := EventToMessage(e)
 
-	switch version {
-	case execproto.EventEncodingVersion_CCF_V0:
-		if len(e.Payload) != 0 {
+	if len(e.Payload) > 0 {
+		switch version {
+		case execproto.EventEncodingVersion_CCF_V0:
 			convertedPayload, err := CcfPayloadToJsonPayload(e.Payload)
 			if err != nil {
 				return nil, fmt.Errorf("could not convert event payload from CCF to Json: %w", err)
 			}
 			message.Payload = convertedPayload
+		case execproto.EventEncodingVersion_JSON_CDC_V0:
+		default:
+			return nil, fmt.Errorf("invalid encoding format %d", version)
 		}
-	case execproto.EventEncodingVersion_JSON_CDC_V0:
-	default:
-		return nil, fmt.Errorf("invalid encoding format %d", version)
 	}
 
 	return message, nil
