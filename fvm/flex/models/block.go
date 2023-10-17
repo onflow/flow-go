@@ -27,9 +27,6 @@ type FlexBlock struct {
 
 	// ReceiptRoot returns the root hash of the receipts emitted in this block
 	ReceiptRoot gethCommon.Hash
-
-	// Transactions holds the hash values of transactions in this block
-	Transactions []gethCommon.Hash
 }
 
 func (b *FlexBlock) ToBytes() ([]byte, error) {

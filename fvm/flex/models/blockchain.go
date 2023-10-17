@@ -2,6 +2,7 @@ package models
 
 import "github.com/ethereum/go-ethereum/common"
 
+// BlockChain stores the chain of blocks
 type BlockChain interface {
 	// Appends a block to the block chain
 	AppendBlock(block *FlexBlock) error
