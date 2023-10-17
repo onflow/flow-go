@@ -159,7 +159,7 @@ func IPPortFromMultiAddress(addrs ...multiaddr.Multiaddr) (string, string, error
 			return "", "", err
 		}
 
-		//there should only be one valid IPv4 address
+		// there should only be one valid IPv4 address
 		return ipOrHostname, port, nil
 	}
 	return "", "", fmt.Errorf("ip address or hostname not found")
