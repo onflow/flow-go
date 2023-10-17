@@ -173,7 +173,7 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 	// if the block is for the current view, then try voting for this block
 	err = e.processBlockForCurrentView(proposal)
 	if err != nil {
-		return fmt.Errorf("failed processing current block: %w", err)
+		return fmt.Errorf("failed processing current block at view %v: %w", proposal.Block.View, err)
 	}
 	log.Debug().Msg("proposal processed from compliance engine")
 
