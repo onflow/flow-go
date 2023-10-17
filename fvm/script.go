@@ -208,14 +208,16 @@ func (executor *scriptExecutor) executeScript() error {
 		// TODO: pass proper flex root address based on enviornment
 		flexRootAddress := emulator.FlexRootAccountAddress
 
+		bs, err := flex.NewBlockStore(executor.env, flexRootAddress)
+		if err != nil {
+			panic(err)
+		}
 		db, err := flexStorage.NewDatabase(executor.env, flexRootAddress)
 		if err != nil {
-			// TODO don't panic just log and don't setup
 			panic(err)
 		}
 		em := evm.NewEmulator(db)
-
-		handler := flex.NewFlexContractHandler(db, executor.env, em)
+		handler := flex.NewFlexContractHandler(bs, executor.env, em)
 		// TODO: pass proper Flex type definition based on environment
 		flexTypeDefinition := emulator.FlexTypeDefinition
 		rt.DeclareValue(flexStdlib.NewFlexStandardLibraryValue(nil, flexTypeDefinition, handler))
