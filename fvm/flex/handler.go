@@ -136,7 +136,7 @@ func (h FlexContractHandler) Run(rlpEncodedTx []byte, coinbase models.FlexAddres
 	h.EmitEvent(models.NewTransactionExecutedEvent(h.lastExecutedBlock.Height+1, res))
 	h.EmitLastExecutedBlockEvent()
 	h.updateLastExecutedBlock(res.StateRootHash, types.EmptyRootHash)
-	return failed
+	return !failed
 }
 
 func (h FlexContractHandler) checkGasLimit(limit models.GasLimit) {
