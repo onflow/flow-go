@@ -79,7 +79,6 @@ func (b *RegisterBootstrap) batchIndexRegisters(leafNodes []*wal.LeafNode) error
 		}
 
 		encoded := newLookupKey(b.rootHeight, registerID).Bytes()
-		b.log.Info().Msgf("index register ID at height %v: %s", b.rootHeight, registerID)
 		err = batch.Set(encoded, payload.Value(), nil)
 		if err != nil {
 			return fmt.Errorf("failed to set key: %w", err)
