@@ -17,9 +17,6 @@ import (
 	access "github.com/onflow/flow/protobuf/go/flow/executiondata"
 	pb "google.golang.org/genproto/googleapis/bytestream"
 
-	//"github.com/onflow/flow/protobuf/go/flow/executiondata"
-
-	//"github.com/onflow/flow-go/engine/access/state_stream"
 	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
