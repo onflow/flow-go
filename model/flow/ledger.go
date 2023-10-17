@@ -135,7 +135,7 @@ func (id RegisterID) String() string {
 		i := uint64(binary.BigEndian.Uint64([]byte(id.Key[1:])))
 		formattedKey = fmt.Sprintf("$%d", i)
 	} else {
-		formattedKey = fmt.Sprintf("#%s", []byte(id.Key))
+		formattedKey = fmt.Sprintf("#%x", []byte(id.Key))
 	}
 
 	return fmt.Sprintf("%x/%s", id.Owner, formattedKey)
