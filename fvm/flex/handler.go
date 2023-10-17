@@ -3,7 +3,6 @@ package flex
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -133,8 +132,10 @@ func (h FlexContractHandler) Run(rlpEncodedTx []byte, coinbase models.FlexAddres
 		failed = true
 	}
 	if res == nil {
-		fmt.Println(err)
+		// fatal error
+		panic("empty result is retuned by emulator")
 	}
+
 	res.Failed = failed
 
 	h.EmitEvent(models.NewTransactionExecutedEvent(h.lastExecutedBlock.Height+1, res))
