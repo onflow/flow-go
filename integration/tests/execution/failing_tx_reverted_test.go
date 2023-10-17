@@ -72,11 +72,14 @@ func (s *FailingTxRevertedSuite) TestExecutionFailingTxReverted() {
 
 	// wait for execution receipt for blockC from execution node 1
 	erBlockC := s.ReceiptState.WaitForReceiptFrom(s.T(), blockC.Header.ID(), s.exe1ID)
-	finalStateBlockC, err := erBlockC.ExecutionResult.FinalStateCommitment()
-	require.NoError(s.T(), err)
 
+	require.Len(s.T(), erBlockC.Chunks, 2)
+
+	// the second chunk is the system chunk, and it should change state as the
+	// source of randomness history is updated. That is why we only compare the first chunk.
+	finalStateBlockC := erBlockC.Chunks[0].EndState
 	s.T().Logf("got erBlockC with SC %x\n", finalStateBlockC)
 
-	// assert that state did not change between blockB and blockC
+	// assert that state did not change between blockB and blockC (first chunk)
 	require.Equal(s.T(), finalStateBlockB, finalStateBlockC)
 }
