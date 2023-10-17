@@ -739,6 +739,8 @@ func closeAndMergeError(closable io.Closer, err error) error {
 	return merr.ErrorOrNil()
 }
 
+// withFile opens the file at the given path, and calls the given function with the opened file.
+// it handles closing the file and evicting the file from Linux page cache.
 func withFile(logger zerolog.Logger, filepath string, f func(file *os.File) error) (
 	errToReturn error,
 ) {
