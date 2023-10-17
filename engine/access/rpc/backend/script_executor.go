@@ -33,7 +33,7 @@ func NewScriptExecutor() *ScriptExecutor {
 
 // InitReporter initializes the indexReporter and script executor
 // This method can be called at any time after the ScriptExecutor object is created. Any requests
-// made to the other methods will return ErrDataNotAvailable until this method is called.
+// made to the other methods will return execution.ErrDataNotAvailable until this method is called.
 func (s *ScriptExecutor) InitReporter(indexReporter state_synchronization.IndexReporter, scriptExecutor *execution.Scripts) {
 	s.init.Do(func() {
 		defer s.initialized.Store(true)
@@ -45,12 +45,12 @@ func (s *ScriptExecutor) InitReporter(indexReporter state_synchronization.IndexR
 // ExecuteAtBlockHeight executes provided script at the provided block height against a local execution state.
 //
 // Expected errors:
-//   - ErrDataNotAvailable if the data for the block height is not available. this could be because
-//     the height is not within the index block range, or the index is not ready.
 //   - storage.ErrNotFound if the register or block height is not found
+//   - execution.ErrDataNotAvailable if the data for the block height is not available. this could be because
+//     the height is not within the index block range, or the index is not ready.
 func (s *ScriptExecutor) ExecuteAtBlockHeight(ctx context.Context, script []byte, arguments [][]byte, height uint64) ([]byte, error) {
 	if !s.isDataAvailable(height) {
-		return nil, ErrDataNotAvailable
+		return nil, execution.ErrDataNotAvailable
 	}
 
 	return s.scriptExecutor.ExecuteAtBlockHeight(ctx, script, arguments, height)
@@ -59,12 +59,12 @@ func (s *ScriptExecutor) ExecuteAtBlockHeight(ctx context.Context, script []byte
 // GetAccountAtBlockHeight returns the account at the provided block height from a local execution state.
 //
 // Expected errors:
-//   - ErrDataNotAvailable if the data for the block height is not available. this could be because
-//     the height is not within the index block range, or the index is not ready.
 //   - storage.ErrNotFound if the account or block height is not found
+//   - execution.ErrDataNotAvailable if the data for the block height is not available. this could be because
+//     the height is not within the index block range, or the index is not ready.
 func (s *ScriptExecutor) GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error) {
 	if !s.isDataAvailable(height) {
-		return nil, ErrDataNotAvailable
+		return nil, execution.ErrDataNotAvailable
 	}
 
 	return s.scriptExecutor.GetAccountAtBlockHeight(ctx, address, height)

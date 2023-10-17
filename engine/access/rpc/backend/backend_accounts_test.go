@@ -16,6 +16,7 @@ import (
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/execution"
 	execmock "github.com/onflow/flow-go/module/execution/mock"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
@@ -219,7 +220,7 @@ func (s *BackendAccountsSuite) TestGetAccountFromStorage_Fails() {
 		statusCode codes.Code
 	}{
 		{
-			err:        ErrDataNotAvailable,
+			err:        execution.ErrDataNotAvailable,
 			statusCode: codes.OutOfRange,
 		},
 		{
@@ -264,7 +265,7 @@ func (s *BackendAccountsSuite) TestGetAccountFromFailover_HappyPath() {
 	backend.scriptExecMode = ScriptExecutionModeFailover
 	backend.scriptExecutor = scriptExecutor
 
-	for _, errToReturn := range []error{ErrDataNotAvailable, storage.ErrNotFound} {
+	for _, errToReturn := range []error{execution.ErrDataNotAvailable, storage.ErrNotFound} {
 		scriptExecutor.On("GetAccountAtBlockHeight", mock.Anything, s.account.Address, s.block.Header.Height).
 			Return(nil, errToReturn).Times(3)
 
@@ -296,7 +297,7 @@ func (s *BackendAccountsSuite) TestGetAccountFromFailover_ReturnsENErrors() {
 
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
 	scriptExecutor.On("GetAccountAtBlockHeight", mock.Anything, s.failingAddress, s.block.Header.Height).
-		Return(nil, ErrDataNotAvailable)
+		Return(nil, execution.ErrDataNotAvailable)
 
 	backend := s.defaultBackend()
 	backend.scriptExecMode = ScriptExecutionModeFailover

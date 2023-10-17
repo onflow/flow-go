@@ -387,7 +387,7 @@ func convertIndexError(err error, height uint64, defaultMsg string) error {
 		return nil
 	}
 
-	if errors.Is(err, ErrDataNotAvailable) {
+	if errors.Is(err, execution.ErrDataNotAvailable) {
 		return status.Errorf(codes.OutOfRange, "data for block height %d is not available", height)
 	}
 

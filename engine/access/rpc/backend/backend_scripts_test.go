@@ -20,6 +20,7 @@ import (
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	fvmerrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/execution"
 	execmock "github.com/onflow/flow-go/module/execution/mock"
 	"github.com/onflow/flow-go/module/metrics"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
@@ -239,7 +240,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_Fails() {
 		statusCode codes.Code
 	}{
 		{
-			err:        ErrDataNotAvailable,
+			err:        execution.ErrDataNotAvailable,
 			statusCode: codes.OutOfRange,
 		},
 		{
@@ -284,7 +285,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_HappyPath() {
 	ctx := context.Background()
 
 	errors := []error{
-		ErrDataNotAvailable,
+		execution.ErrDataNotAvailable,
 		storage.ErrNotFound,
 		fmt.Errorf("system error"),
 		fvmFailureErr,
@@ -361,7 +362,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_ReturnsENErrors() {
 	// configure local script executor to fail
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
 	scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, mock.Anything, mock.Anything, s.block.Header.Height).
-		Return(nil, ErrDataNotAvailable)
+		Return(nil, execution.ErrDataNotAvailable)
 
 	backend := s.defaultBackend()
 	backend.scriptExecMode = ScriptExecutionModeFailover

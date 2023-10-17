@@ -2,6 +2,7 @@ package execution
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/rs/zerolog"
@@ -16,11 +17,17 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// ErrDataNotAvailable indicates that the data for a given block was not available
+//
+// This generally indicates a request was made for execution data at a block height that was not
+// not locally indexed
+var ErrDataNotAvailable = errors.New("data for block is not available")
+
 // RegistersAtHeight returns register value for provided register ID at the block height.
 // Even if the register wasn't indexed at the provided height, returns the highest height the register was indexed at.
 // Expected errors:
 // - storage.ErrNotFound if the register by the ID was never indexed
-// - ErrIndexBoundary if the height is out of indexed height boundary
+// - storage.ErrHeightNotIndexed if the given height was not indexed yet or lower than the first indexed height.
 type RegistersAtHeight func(ID flow.RegisterID, height uint64) (flow.RegisterValue, error)
 
 type ScriptExecutor interface {
@@ -29,6 +36,7 @@ type ScriptExecutor interface {
 	// doesn't successfully execute.
 	// Expected errors:
 	// - storage.ErrNotFound if block or register value at height was not found.
+	// - ErrDataNotAvailable if the data for the block height is not available
 	ExecuteAtBlockHeight(
 		ctx context.Context,
 		script []byte,
@@ -39,6 +47,7 @@ type ScriptExecutor interface {
 	// GetAccountAtBlockHeight returns a Flow account by the provided address and block height.
 	// Expected errors:
 	// - storage.ErrNotFound if block or register value at height was not found.
+	// - ErrDataNotAvailable if the data for the block height is not available
 	GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error)
 }
 
@@ -90,6 +99,7 @@ func NewScripts(
 // doesn't successfully execute.
 // Expected errors:
 // - storage.ErrNotFound if block or register value at height was not found.
+// - ErrDataNotAvailable if the data for the block height is not available
 func (s *Scripts) ExecuteAtBlockHeight(
 	ctx context.Context,
 	script []byte,
@@ -108,6 +118,7 @@ func (s *Scripts) ExecuteAtBlockHeight(
 // GetAccountAtBlockHeight returns a Flow account by the provided address and block height.
 // Expected errors:
 // - storage.ErrNotFound if block or register value at height was not found.
+// - ErrDataNotAvailable if the data for the block height is not available
 func (s *Scripts) GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error) {
 	snap, header, err := s.snapshotWithBlock(height)
 	if err != nil {
@@ -126,7 +137,11 @@ func (s *Scripts) snapshotWithBlock(height uint64) (snapshot.StorageSnapshot, *f
 	}
 
 	storageSnapshot := snapshot.NewReadFuncStorageSnapshot(func(ID flow.RegisterID) (flow.RegisterValue, error) {
-		return s.registersAtHeight(ID, height)
+		registers, err := s.registersAtHeight(ID, height)
+		if errors.Is(err, storage.ErrHeightNotIndexed) {
+			return nil, errors.Join(ErrDataNotAvailable, err)
+		}
+		return registers, err
 	})
 
 	return storageSnapshot, header, nil
