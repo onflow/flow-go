@@ -3,6 +3,8 @@ package state_stream
 import (
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow/protobuf/go/flow/executiondata"
+
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
@@ -12,8 +14,6 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
-
-	access "github.com/onflow/flow/protobuf/go/flow/executiondata"
 )
 
 // Engine exposes the server with the state stream API.
@@ -63,7 +63,7 @@ func NewEng(
 		}).
 		Build()
 
-	access.RegisterExecutionDataAPIServer(server.Server, e.handler)
+	executiondata.RegisterExecutionDataAPIServer(server.Server, e.handler)
 
 	return e, nil
 }
