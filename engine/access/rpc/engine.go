@@ -36,9 +36,10 @@ type Config struct {
 	CollectionAddr         string                           // the address of the upstream collection node
 	HistoricalAccessAddrs  string                           // the list of all access nodes from previous spork
 
-	BackendConfig backend.Config // configurable options for creating Backend
-	RestConfig    rest.Config    // the REST server configuration
-	MaxMsgSize    uint           // GRPC max message size
+	BackendConfig  backend.Config // configurable options for creating Backend
+	RestConfig     rest.Config    // the REST server configuration
+	MaxMsgSize     uint           // GRPC max message size
+	CompressorName string         // GRPC compressor name
 }
 
 // Engine exposes the server with a simplified version of the Access API.
