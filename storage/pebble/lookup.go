@@ -9,28 +9,21 @@ import (
 	"github.com/onflow/flow-go/storage/pebble/registers"
 )
 
-var latestHeightKeyLiteral = binary.BigEndian.AppendUint64(
+// latestHeightKey is a special case of a lookupKey
+// with keyLatestBlockHeight as key, no owner and a placeholder height of 0.
+// This is to ensure SeekPrefixGE in pebble does not break
+var latestHeightKey = binary.BigEndian.AppendUint64(
 	[]byte{codeLatestBlockHeight, byte('/'), byte('/')}, placeHolderHeight)
-var firstHeightKeyLiteral = binary.BigEndian.AppendUint64(
+
+// firstHeightKey is a special case of a lookupKey
+// with keyFirstBlockHeight as key, no owner and a placeholder height of 0.
+// This is to ensure SeekPrefixGE in pebble does not break
+var firstHeightKey = binary.BigEndian.AppendUint64(
 	[]byte{codeFirstBlockHeight, byte('/'), byte('/')}, placeHolderHeight)
 
 // lookupKey is the encoded format of the storage key for looking up register value
 type lookupKey struct {
 	encoded []byte
-}
-
-// latestHeightKey is a special case of a lookupKey
-// with keyLatestBlockHeight as key, no owner and a placeholder height of 0.
-// This is to ensure SeekPrefixGE in pebble does not break
-func latestHeightKey() []byte {
-	return latestHeightKeyLiteral
-}
-
-// firstHeightKey is a special case of a lookupKey
-// with keyFirstBlockHeight as key, no owner and a placeholder height of 0.
-// This is to ensure SeekPrefixGE in pebble does not break
-func firstHeightKey() []byte {
-	return firstHeightKeyLiteral
 }
 
 // newLookupKey takes a height and registerID, returns the key for storing the register value in storage
@@ -123,7 +116,7 @@ func (h lookupKey) Bytes() []byte {
 	return h.encoded
 }
 
-// EncodedUint64 encodes uint64 for storing as a pebble payload
+// encodedUint64 encodes uint64 for storing as a pebble payload
 func encodedUint64(height uint64) []byte {
 	payload := make([]byte, 0, 8)
 	return binary.BigEndian.AppendUint64(payload, height)

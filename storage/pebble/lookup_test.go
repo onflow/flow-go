@@ -99,7 +99,7 @@ func Test_decodeKey_fail(t *testing.T) {
 
 func Test_prefix_error(t *testing.T) {
 	correctKey := newLookupKey(uint64(0), flow.RegisterID{Owner: "owner", Key: "key"})
-	incorrectKey := firstHeightKey()
+	incorrectKey := firstHeightKey
 	_, _, err := lookupKeyToRegisterID(correctKey.Bytes())
 	require.NoError(t, err)
 
