@@ -74,20 +74,23 @@ func TestHandler_TransactionRun(t *testing.T) {
 
 					// check events (1 extra for block event)
 					events := backend.Events()
-					// require.Len(t, events, len(result.Logs)+1)
-					// for i, l := range result.Logs {
-					// 	assert.Equal(t, events[i].Type, models.EventTypeFlexEVMLog)
-					// 	retLog := types.Log{}
-					// 	err := rlp.Decode(bytes.NewReader(events[i].Payload), &retLog)
-					// 	require.NoError(t, err)
-					// 	assert.Equal(t, *l, retLog)
-					// }
+
+					require.Len(t, events, 2)
+
+					event := events[0]
+					assert.Equal(t, event.Type, models.EventTypeTransactionExecuted)
+					ev := models.TransactionExecutedPayload{}
+					err = rlp.Decode(bytes.NewReader(event.Payload), &ev)
+					require.NoError(t, err)
+					for i, l := range result.Logs {
+						assert.Equal(t, l, ev.Result.Logs[i])
+					}
 
 					// check block event
-					lastEvent := events[len(events)-1]
-					assert.Equal(t, lastEvent.Type, models.EventTypeBlockExecuted)
+					event = events[1]
+					assert.Equal(t, event.Type, models.EventTypeBlockExecuted)
 					payload := models.BlockExecutedEventPayload{}
-					err = rlp.Decode(bytes.NewReader(lastEvent.Payload), &payload)
+					err = rlp.Decode(bytes.NewReader(event.Payload), &payload)
 					require.NoError(t, err)
 				})
 			})
