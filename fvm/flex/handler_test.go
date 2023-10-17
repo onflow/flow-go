@@ -449,8 +449,8 @@ func TestHandler_FOA(t *testing.T) {
 				foa := handler.AccountByAddress(handler.AllocateAddress(), true)
 				require.NotNil(t, foa)
 
-				// deposit 100 flow
-				orgBalance, err := models.NewBalanceFromAttoFlow(new(big.Int).Mul(big.NewInt(1e18), big.NewInt(100)))
+				// deposit 10000 flow
+				orgBalance, err := models.NewBalanceFromAttoFlow(new(big.Int).Mul(big.NewInt(1e18), big.NewInt(10000)))
 				require.NoError(t, err)
 				vault := models.NewFlowTokenVault(orgBalance)
 				foa.Deposit(vault)

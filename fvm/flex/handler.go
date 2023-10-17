@@ -62,8 +62,6 @@ func (h *FlexContractHandler) AllocateAddress() models.FlexAddress {
 	binary.BigEndian.PutUint64(target[12:], h.lastExecutedBlock.UUIDIndex)
 	h.uuidIndex++
 
-	// TODO commit changes to the database
-
 	// TODO: if account exist try some new number
 	// if fe.State.Exist(target.ToCommon()) {
 	// }
