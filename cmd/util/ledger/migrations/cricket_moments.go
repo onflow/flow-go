@@ -295,7 +295,7 @@ func cloneCricketMomentsShardedCollection(
 						},
 					)
 
-					ownedNFTs.UnsafeRemove(
+					ownedNFTs.Remove(
 						inter,
 						interpreter.EmptyLocationRange,
 						keyPair.nftCollectionKey,
