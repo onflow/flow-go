@@ -2,7 +2,6 @@ package access
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -299,7 +298,7 @@ func (s *AccessAPISuite) waitUntilIndexed(height uint64) {
 	// TODO: once the indexed height is include in the Access API's metadata response, we can get
 	// ride of this
 	s.Require().Eventually(func() bool {
-		_, err := s.an2Client.ExecuteScriptAtBlockHeight(s.ctx, height, []byte(fmt.Sprintf(simpleScript, 42)), nil)
+		_, err := s.an2Client.ExecuteScriptAtBlockHeight(s.ctx, height, []byte(simpleScript), nil)
 		return err == nil
 	}, 30*time.Second, 1*time.Second)
 }
