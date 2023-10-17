@@ -48,7 +48,7 @@ type EpochStateContainer struct {
 	CommitID Identifier
 	// ActiveIdentities contains the dynamic identity properties for the nodes that
 	// are active in this epoch. Active means that these nodes are authorized to contribute to
-	// extending the chain. Nodes are listed in `Identities` if and only if
+	// extending the chain. Nodes are listed in `ActiveIdentities` if and only if
 	// they are part of the EpochSetup event for the respective epoch.
 	// The dynamic identity properties can change from block to block. Each non-deferred
 	// identity-mutating operation is applied independently to the `ActiveIdentities`
