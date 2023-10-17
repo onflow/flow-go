@@ -374,3 +374,16 @@ func (c *Client) CreateAccount(
 
 	return sdk.Address{}, fmt.Errorf("failed to get account address of the created flow account")
 }
+
+func (c *Client) GetEventsForBlockIDs(
+	ctx context.Context,
+	eventType string,
+	blockIDs []sdk.Identifier,
+) ([]sdk.BlockEvents, error) {
+	events, err := c.client.GetEventsForBlockIDs(ctx, eventType, blockIDs)
+	if err != nil {
+		return nil, fmt.Errorf("could not get events for block ids: %w", err)
+	}
+
+	return events, nil
+}

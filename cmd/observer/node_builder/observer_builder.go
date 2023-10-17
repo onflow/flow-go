@@ -136,7 +136,8 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 				ReadTimeout:   rest.DefaultReadTimeout,
 				IdleTimeout:   rest.DefaultIdleTimeout,
 			},
-			MaxMsgSize: grpcutils.DefaultMaxMsgSize,
+			MaxMsgSize:     grpcutils.DefaultMaxMsgSize,
+			CompressorName: grpcutils.NoCompressor,
 		},
 		rpcMetricsEnabled:         false,
 		apiRatelimits:             nil,
@@ -919,6 +920,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 				accessMetrics,
 				config.MaxMsgSize,
 				backendConfig.CircuitBreakerConfig,
+				config.CompressorName,
 			),
 		}
 
