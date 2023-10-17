@@ -1114,6 +1114,30 @@ func (exeNode *ExecutionNode) LoadGrpcServer(
 	), nil
 }
 
+func validateCheckpointRootHash(logger zerolog.Logger, bootstrapDir, filename string, expectedCommit flow.StateCommitment) error {
+	roots, err := wal.ReadTriesRootHash(logger, bootstrapDir, filename)
+	if err != nil {
+		return fmt.Errorf("could not read checkpoint root hash: %w", err)
+	}
+
+	if len(roots) == 0 {
+		return fmt.Errorf("no root hash found in checkpoint file")
+	}
+
+	if len(roots) > 1 {
+		return fmt.Errorf("more than one root hash found in checkpoint file")
+	}
+
+	trieRootHash := roots[0]
+
+	if flow.StateCommitment(trieRootHash) != expectedCommit {
+		return fmt.Errorf("mismatching root statecommitment. checkpoint file has state commitment: %x, "+
+			"but execution database has state commitment: %x", trieRootHash, expectedCommit)
+	}
+
+	return nil
+}
+
 func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 
 	// check if the execution database already exists
@@ -1126,14 +1150,18 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 
 	// if the execution database does not exist, then we need to bootstrap the execution database.
 	if !bootstrapped {
+		err := validateCheckpointRootHash(
+			node.Logger, node.BootstrapDir, bootstrapFilenames.FilenameWALRootCheckpoint, node.RootSeal.FinalState)
+		if err != nil {
+			return err
+		}
+
 		// when bootstrapping, the bootstrap folder must have a checkpoint file
 		// we need to cover this file to the trie folder to restore the trie to restore the execution state.
 		err = copyBootstrapState(node.BootstrapDir, exeNode.exeConf.triedir)
 		if err != nil {
 			return fmt.Errorf("could not load bootstrap state from checkpoint file: %w", err)
 		}
-
-		// TODO: check that the checkpoint file contains the root block's statecommit hash
 
 		err = bootstrapper.BootstrapExecutionDatabase(node.DB, node.RootSeal)
 		if err != nil {
