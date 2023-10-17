@@ -319,7 +319,6 @@ func newMigratorRuntime(
 }
 
 type migratorRuntime struct {
-	mu               sync.Mutex
 	Snapshot         *util.PayloadSnapshot
 	TransactionState state.NestedTransactionPreparer
 	Interpreter      *interpreter.Interpreter
@@ -333,51 +332,109 @@ func (mr *migratorRuntime) GetReadOnlyStorage() *runtime.Storage {
 	return runtime.NewStorage(util.NewPayloadsReadonlyLedger(mr.Snapshot), util.NopMemoryGauge{})
 }
 
-func (mr *migratorRuntime) ChildInterpreter() (*interpreter.Interpreter, func() error, error) {
+func (mr *migratorRuntime) ChildInterpreters(log zerolog.Logger, n int, address flow.Address) ([]*interpreter.Interpreter, func() error, error) {
 
-	ledger := util.NewPayloadsReadonlyLedger(mr.Snapshot)
-	ledger.AllocateStorageIndexFunc = func(owner []byte) (atree.StorageIndex, error) {
-		mr.mu.Lock()
-		defer mr.mu.Unlock()
+	interpreters := make([]*interpreter.Interpreter, n)
+	storages := make([]*runtime.Storage, n)
 
-		return mr.Accounts.AllocateStorageIndex(owner)
-	}
-	ledger.SetValueFunc = func(owner, key, value []byte) (err error) {
-		return mr.Accounts.SetValue(owner, key, value)
-	}
-
-	storage := runtime.NewStorage(ledger, util.NopMemoryGauge{})
-
-	ri := &util.MigrationRuntimeInterface{}
-
-	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{
-		AccountLinkingEnabled: true,
-		// Attachments are enabled everywhere except for Mainnet
-		AttachmentsEnabled: true,
-		// Capability Controllers are enabled everywhere except for Mainnet
-		CapabilityControllersEnabled: true,
-	})
-
-	env.Configure(
-		ri,
-		runtime.NewCodesAndPrograms(),
-		storage,
-		runtime.NewCoverageReport(),
-	)
-
-	inter, err := interpreter.NewInterpreter(
-		nil,
-		nil,
-		env.InterpreterConfig)
+	id := flow.AccountStatusRegisterID(address)
+	statusBytes, err := mr.Accounts.GetValue([]byte(id.Owner), []byte(id.Key))
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf(
+			"failed to load account status for the account (%s): %w",
+			address.String(),
+			err)
+	}
+	accountStatus, err := environment.AccountStatusFromBytes(statusBytes)
+	if err != nil {
+		return nil, nil, fmt.Errorf(
+			"failed to parse account status for the account (%s): %w",
+			address.String(),
+			err)
 	}
 
-	commit := func() error {
-		return storage.Commit(inter, false)
+	index := accountStatus.StorageIndex()
+	index = index.Next()
+
+	// create a channel that will generate storage indexes on demand
+	storageIndexChan := make(chan atree.StorageIndex)
+	stopStorageIndexChan := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case <-stopStorageIndexChan:
+				return
+			case storageIndexChan <- index:
+				index = index.Next()
+			}
+		}
+	}()
+
+	for i := 0; i < n; i++ {
+		ledger := util.NewPayloadsReadonlyLedger(mr.Snapshot)
+		ledger.AllocateStorageIndexFunc = func(owner []byte) (atree.StorageIndex, error) {
+			return <-storageIndexChan, nil
+		}
+		ledger.SetValueFunc = func(owner, key, value []byte) (err error) {
+			return mr.Accounts.SetValue(owner, key, value)
+		}
+
+		storage := runtime.NewStorage(ledger, util.NopMemoryGauge{})
+
+		ri := &util.MigrationRuntimeInterface{}
+
+		env := runtime.NewBaseInterpreterEnvironment(runtime.Config{
+			AccountLinkingEnabled: true,
+			// Attachments are enabled everywhere except for Mainnet
+			AttachmentsEnabled: true,
+			// Capability Controllers are enabled everywhere except for Mainnet
+			CapabilityControllersEnabled: true,
+		})
+
+		env.Configure(
+			ri,
+			runtime.NewCodesAndPrograms(),
+			storage,
+			runtime.NewCoverageReport(),
+		)
+
+		inter, err := interpreter.NewInterpreter(
+			nil,
+			nil,
+			env.InterpreterConfig)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		interpreters[i] = inter
+		storages[i] = storage
 	}
 
-	return inter, commit, nil
+	closeInterpreters := func() error {
+		progressLog := util2.LogProgress(log, "closing child interpreters", len(interpreters))
+		index := <-storageIndexChan
+		close(stopStorageIndexChan)
+		accountStatus.SetStorageIndex(index)
+		err := mr.Accounts.SetValue([]byte(id.Owner), []byte(id.Key), accountStatus.ToBytes())
+		if err != nil {
+			return fmt.Errorf(
+				"failed to save account status for the account (%s): %w",
+				address.String(),
+				err)
+		}
+
+		for i, storage := range storages {
+			err := storage.Commit(interpreters[i], false)
+			if err != nil {
+				return fmt.Errorf("failed to commit storage: %w", err)
+			}
+			progressLog(1)
+		}
+
+		return nil
+	}
+
+	return interpreters, closeInterpreters, nil
 }
 
 func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(

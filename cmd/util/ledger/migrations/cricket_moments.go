@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
+	"github.com/onflow/flow-go/model/flow"
 	util2 "github.com/onflow/flow-go/module/util"
 	"github.com/rs/zerolog"
 	"sync"
@@ -164,15 +165,15 @@ func cloneCricketMomentsShardedCollection(
 	wg := sync.WaitGroup{}
 	wg.Add(nWorkers)
 
+	interpreters, _, err := mr.ChildInterpreters(log, 1, flow.ConvertAddress(mr.Address))
+	if err != nil {
+		return nil, err
+	}
+	inter := interpreters[0]
+
 	// worker for dispatching values to clone
 	go func() {
 		defer close(keyPairChan)
-
-		inter, _, err := mr.ChildInterpreter()
-		if err != nil {
-			cancel(err)
-			return
-		}
 
 		storageMap := mr.GetReadOnlyStorage().GetStorageMap(mr.Address, domain, false)
 		storageMapValue := storageMap.ReadValue(&util.NopMemoryGauge{}, key)
@@ -222,26 +223,15 @@ func cloneCricketMomentsShardedCollection(
 		}
 	}()
 
-	type interpreterWithClose struct {
-		inter *interpreter.Interpreter
-		close func() error
+	interpreters, closeInterpreters, err := mr.ChildInterpreters(log, nWorkers, flow.ConvertAddress(mr.Address))
+	if err != nil {
+		return nil, err
 	}
-
-	interpreters := make([]interpreterWithClose, 0, nWorkers)
 
 	// workers for cloning values
 	for i := 0; i < nWorkers; i++ {
-
-		inter, c, err := mr.ChildInterpreter()
-		if err != nil {
-			return nil, err
-		}
-		interpreters = append(interpreters, interpreterWithClose{
-			inter: inter,
-			close: c,
-		})
 		go func(i int) {
-			inter := interpreters[i].inter
+			inter := interpreters[i]
 			defer wg.Done()
 
 			storageMap := mr.GetReadOnlyStorage().GetStorageMap(mr.Address, domain, false)
@@ -304,7 +294,7 @@ func cloneCricketMomentsShardedCollection(
 					)
 
 					ownedNFTs.UnsafeRemove(
-						mr.Interpreter,
+						inter,
 						interpreter.EmptyLocationRange,
 						keyPair.nftCollectionKey,
 					)
@@ -321,14 +311,10 @@ func cloneCricketMomentsShardedCollection(
 		return nil, fmt.Errorf("context error when cloning values: %w", ctx.Err())
 	}
 
-	progressLog = util2.LogProgress(log, "closing child interpreters", len(interpreters))
 	// close all child interpreters
-	for _, i := range interpreters {
-		err := i.close()
-		if err != nil {
-			return nil, err
-		}
-		progressLog(1)
+	err = closeInterpreters()
+	if err != nil {
+		return nil, err
 	}
 
 	log.Info().Msg("cloning empty cricket moments sharded collection")
