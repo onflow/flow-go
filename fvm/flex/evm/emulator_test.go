@@ -19,6 +19,7 @@ import (
 )
 
 var blockNumber = big.NewInt(10)
+var defaultCtx = models.NewDefaultBlockContext(blockNumber.Uint64())
 
 func RunWithTestDB(t testing.TB, f func(*storage.Database)) {
 	testutils.RunWithTestBackend(t, func(backend models.Backend) {
@@ -31,9 +32,20 @@ func RunWithTestDB(t testing.TB, f func(*storage.Database)) {
 }
 
 func RunWithNewEmulator(t testing.TB, db *storage.Database, f func(*evm.Emulator)) {
-	cfg := evm.NewConfig(evm.WithBlockNumber(blockNumber))
-	env := evm.NewEmulator(cfg, db)
+	env := evm.NewEmulator(db)
 	f(env)
+}
+
+func RunWithNewBlock(t testing.TB, em *evm.Emulator, f func(blk models.Block)) {
+	blk, err := em.NewBlock(defaultCtx)
+	require.NoError(t, err)
+	f(blk)
+}
+
+func RunWithNewBlockView(t testing.TB, em *evm.Emulator, f func(blk models.BlockView)) {
+	blk, err := em.NewBlockView(defaultCtx)
+	require.NoError(t, err)
+	f(blk)
 }
 
 func TestNativeTokenBridging(t *testing.T) {
@@ -43,28 +55,36 @@ func TestNativeTokenBridging(t *testing.T) {
 
 		t.Run("mint tokens to the first account", func(t *testing.T) {
 			RunWithNewEmulator(t, db, func(env *evm.Emulator) {
-				amount := big.NewInt(10000)
-				res, err := env.MintTo(testAccount, amount)
-				require.NoError(t, err)
-				require.Equal(t, evm.TransferGasUsage, res.GasConsumed)
+				RunWithNewBlock(t, env, func(blk models.Block) {
+					amount := big.NewInt(10000)
+					res, err := blk.MintTo(testAccount, amount)
+					require.NoError(t, err)
+					require.Equal(t, defaultCtx.DirectCallBaseGasUsage, res.GasConsumed)
+				})
 			})
 		})
 		t.Run("mint tokens withdraw", func(t *testing.T) {
 			amount := big.NewInt(1000)
 			RunWithNewEmulator(t, db, func(env *evm.Emulator) {
-				retBalance, err := env.BalanceOf(testAccount)
-				require.NoError(t, err)
-				require.Equal(t, originalBalance, retBalance)
+				RunWithNewBlockView(t, env, func(blk models.BlockView) {
+					retBalance, err := blk.BalanceOf(testAccount)
+					require.NoError(t, err)
+					require.Equal(t, originalBalance, retBalance)
+				})
 			})
 			RunWithNewEmulator(t, db, func(env *evm.Emulator) {
-				res, err := env.WithdrawFrom(testAccount, amount)
-				require.NoError(t, err)
-				require.Equal(t, evm.TransferGasUsage, res.GasConsumed)
+				RunWithNewBlock(t, env, func(blk models.Block) {
+					res, err := blk.WithdrawFrom(testAccount, amount)
+					require.NoError(t, err)
+					require.Equal(t, defaultCtx.DirectCallBaseGasUsage, res.GasConsumed)
+				})
 			})
 			RunWithNewEmulator(t, db, func(env *evm.Emulator) {
-				retBalance, err := env.BalanceOf(testAccount)
-				require.NoError(t, err)
-				require.Equal(t, amount.Sub(originalBalance, amount), retBalance)
+				RunWithNewBlockView(t, env, func(blk models.BlockView) {
+					retBalance, err := blk.BalanceOf(testAccount)
+					require.NoError(t, err)
+					require.Equal(t, amount.Sub(originalBalance, amount), retBalance)
+				})
 			})
 		})
 	})
@@ -82,31 +102,35 @@ func TestContractInteraction(t *testing.T) {
 
 		// fund test account
 		RunWithNewEmulator(t, db, func(env *evm.Emulator) {
-			_, err := env.MintTo(testAccount, amount)
-			require.NoError(t, err)
+			RunWithNewBlock(t, env, func(blk models.Block) {
+				_, err := blk.MintTo(testAccount, amount)
+				require.NoError(t, err)
+			})
 		})
 
 		var contractAddr models.FlexAddress
 
 		t.Run("deploy contract", func(t *testing.T) {
 			RunWithNewEmulator(t, db, func(env *evm.Emulator) {
-				res, err := env.Deploy(testAccount, testContract.ByteCode, math.MaxUint64, amountToBeTransfered)
-				require.NoError(t, err)
+				RunWithNewBlock(t, env, func(blk models.Block) {
+					res, err := blk.Deploy(testAccount, testContract.ByteCode, math.MaxUint64, amountToBeTransfered)
+					require.NoError(t, err)
+					contractAddr = res.DeployedContractAddress
+				})
+				RunWithNewBlockView(t, env, func(blk models.BlockView) {
+					require.NotNil(t, contractAddr)
+					retCode, err := blk.CodeOf(contractAddr)
+					require.NoError(t, err)
+					require.True(t, len(retCode) > 0)
 
-				contractAddr = res.DeployedContractAddress
-				require.NotNil(t, contractAddr)
-				retCode, err := env.CodeOf(contractAddr)
-				require.NoError(t, err)
-				require.True(t, len(retCode) > 0)
+					retBalance, err := blk.BalanceOf(contractAddr)
+					require.NoError(t, err)
+					require.Equal(t, amountToBeTransfered, retBalance)
 
-				retBalance, err := env.BalanceOf(contractAddr)
-				require.NoError(t, err)
-				require.Equal(t, amountToBeTransfered, retBalance)
-
-				retBalance, err = env.BalanceOf(testAccount)
-				require.NoError(t, err)
-				require.Equal(t, amount.Sub(amount, amountToBeTransfered), retBalance)
-
+					retBalance, err = blk.BalanceOf(testAccount)
+					require.NoError(t, err)
+					require.Equal(t, amount.Sub(amount, amountToBeTransfered), retBalance)
+				})
 			})
 		})
 
@@ -114,44 +138,53 @@ func TestContractInteraction(t *testing.T) {
 			num := big.NewInt(10)
 
 			RunWithNewEmulator(t, db, func(env *evm.Emulator) {
-				res, err := env.Call(testAccount,
-					contractAddr,
-					testContract.MakeStoreCallData(t, num),
-					1_000_000,
-					// this should be zero because the contract doesn't have receiver
-					big.NewInt(0),
-				)
-				require.NoError(t, err)
-				require.GreaterOrEqual(t, res.GasConsumed, uint64(40_000))
+				RunWithNewBlock(t, env, func(blk models.Block) {
+					res, err := blk.Call(
+						testAccount,
+						contractAddr,
+						testContract.MakeStoreCallData(t, num),
+						1_000_000,
+						// this should be zero because the contract doesn't have receiver
+						big.NewInt(0),
+					)
+					require.NoError(t, err)
+					require.GreaterOrEqual(t, res.GasConsumed, uint64(40_000))
+				})
 			})
 
 			RunWithNewEmulator(t, db, func(env *evm.Emulator) {
-				res, err := env.Call(testAccount,
-					contractAddr,
-					testContract.MakeRetrieveCallData(t),
-					1_000_000,
-					// this should be zero because the contract doesn't have receiver
-					big.NewInt(0),
-				)
-				require.NoError(t, err)
+				RunWithNewBlock(t, env, func(blk models.Block) {
+					res, err := blk.Call(
+						testAccount,
+						contractAddr,
+						testContract.MakeRetrieveCallData(t),
+						1_000_000,
+						// this should be zero because the contract doesn't have receiver
+						big.NewInt(0),
+					)
+					require.NoError(t, err)
 
-				ret := new(big.Int).SetBytes(res.ReturnedValue)
-				require.Equal(t, num, ret)
-				require.GreaterOrEqual(t, res.GasConsumed, uint64(23_000))
+					ret := new(big.Int).SetBytes(res.ReturnedValue)
+					require.Equal(t, num, ret)
+					require.GreaterOrEqual(t, res.GasConsumed, uint64(23_000))
+				})
 			})
 
 			RunWithNewEmulator(t, db, func(env *evm.Emulator) {
-				res, err := env.Call(testAccount,
-					contractAddr,
-					testContract.MakeBlockNumberCallData(t),
-					1_000_000,
-					// this should be zero because the contract doesn't have receiver
-					big.NewInt(0),
-				)
-				require.NoError(t, err)
+				RunWithNewBlock(t, env, func(blk models.Block) {
+					res, err := blk.Call(
+						testAccount,
+						contractAddr,
+						testContract.MakeBlockNumberCallData(t),
+						1_000_000,
+						// this should be zero because the contract doesn't have receiver
+						big.NewInt(0),
+					)
+					require.NoError(t, err)
 
-				ret := new(big.Int).SetBytes(res.ReturnedValue)
-				require.Equal(t, blockNumber, ret)
+					ret := new(big.Int).SetBytes(res.ReturnedValue)
+					require.Equal(t, blockNumber, ret)
+				})
 			})
 
 		})
@@ -163,15 +196,20 @@ func TestContractInteraction(t *testing.T) {
 			fAddr := models.NewFlexAddress(address)
 
 			RunWithNewEmulator(t, db, func(env *evm.Emulator) {
-				_, err := env.MintTo(fAddr, amount)
-				require.NoError(t, err)
+				RunWithNewBlock(t, env, func(blk models.Block) {
+					_, err := blk.MintTo(fAddr, amount)
+					require.NoError(t, err)
+				})
 			})
 
 			RunWithNewEmulator(t, db, func(env *evm.Emulator) {
+				ctx := models.NewDefaultBlockContext(blockNumber.Uint64())
+				ctx.GasFeeCollector = models.NewFlexAddressFromString("coinbase")
+				blk, err := env.NewBlock(ctx)
+				require.NoError(t, err)
 				signer := evm.GetDefaultSigner()
 				tx, _ := types.SignTx(types.NewTransaction(0, testAccount.ToCommon(), big.NewInt(1000), params.TxGas, new(big.Int).Add(big.NewInt(0), common.Big1), nil), signer, key)
-				coinbase := models.NewFlexAddressFromString("coinbase")
-				_, err := env.RunTransaction(tx, coinbase)
+				_, err = blk.RunTransaction(tx)
 				// TODO check the balance of coinbase
 				require.NoError(t, err)
 			})

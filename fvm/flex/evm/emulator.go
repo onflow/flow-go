@@ -18,7 +18,6 @@ import (
 
 // Emulator handles operations against evm runtime
 type Emulator struct {
-	Config   *Config
 	Database *storage.Database
 }
 
@@ -26,42 +25,66 @@ var _ models.Emulator = &Emulator{}
 
 // NewEmulator constructs a new EVM Emulator
 func NewEmulator(
-	config *Config,
 	db *storage.Database,
 ) *Emulator {
 	return &Emulator{
-		Config:   config,
 		Database: db,
 	}
 }
 
-// TransferGasUsage returns amount of gas usage for token transfer operation
-func (em *Emulator) TransferGasUsage() uint64 {
-	return TransferGasUsage
+func newConfig(ctx models.BlockContext) *Config {
+	return NewConfig(
+		WithBlockNumber(new(big.Int).SetUint64(ctx.BlockNumber)),
+		WithCoinbase(ctx.GasFeeCollector.ToCommon()),
+		WithDirectCallBaseGasUsage(ctx.DirectCallBaseGasUsage),
+	)
+}
+
+// BlockView constructs a new block view
+func (em *Emulator) NewBlockView(ctx models.BlockContext) (models.BlockView, error) {
+	execState, err := newState(em.Database)
+	return &BlockView{
+		state: execState,
+	}, err
+}
+
+// BlockView constructs a new block
+func (em *Emulator) NewBlock(ctx models.BlockContext) (models.Block, error) {
+	cfg := newConfig(ctx)
+	return &Block{
+		config:   cfg,
+		database: em.Database,
+	}, nil
+}
+
+type BlockView struct {
+	state *state.StateDB
 }
 
 // BalanceOf returns the balance of the given account
-func (em *Emulator) BalanceOf(address models.FlexAddress) (*big.Int, error) {
-	execState, err := em.newState()
-	if err != nil {
-		return nil, err
-	}
-	return execState.GetBalance(address.ToCommon()), nil
+func (bv *BlockView) BalanceOf(address models.FlexAddress) (*big.Int, error) {
+	return bv.state.GetBalance(address.ToCommon()), nil
 }
 
 // CodeOf return the code of the given account
-func (em *Emulator) CodeOf(address models.FlexAddress) (models.Code, error) {
-	execState, err := em.newState()
-	if err != nil {
-		return nil, err
-	}
-	return execState.GetCode(address.ToCommon()), nil
+func (bv *BlockView) CodeOf(address models.FlexAddress) (models.Code, error) {
+	return bv.state.GetCode(address.ToCommon()), nil
+}
+
+// TODO: allow block level to do multiple procedure per block
+// TODO: add block commit
+type Block struct {
+	config   *Config
+	database *storage.Database
 }
 
 // MintTo mints tokens into the target address, if the address dees not
 // exist it would create it first.
-func (em *Emulator) MintTo(address models.FlexAddress, amount *big.Int) (*models.Result, error) {
-	proc, err := em.newProcedure(em.Config)
+func (bl *Block) MintTo(
+	address models.FlexAddress,
+	amount *big.Int,
+) (*models.Result, error) {
+	proc, err := bl.newProcedure()
 	if err != nil {
 		return nil, err
 	}
@@ -70,12 +93,15 @@ func (em *Emulator) MintTo(address models.FlexAddress, amount *big.Int) (*models
 		return nil, err
 	}
 	res.TxType = models.DirectCallTxType
-	return res, em.commit(res.StateRootHash)
+	return res, bl.commit(res.StateRootHash)
 }
 
 // WithdrawFrom deduct the balance from the given address.
-func (em *Emulator) WithdrawFrom(address models.FlexAddress, amount *big.Int) (*models.Result, error) {
-	proc, err := em.newProcedure(em.Config)
+func (bl *Block) WithdrawFrom(
+	address models.FlexAddress,
+	amount *big.Int,
+) (*models.Result, error) {
+	proc, err := bl.newProcedure()
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +110,7 @@ func (em *Emulator) WithdrawFrom(address models.FlexAddress, amount *big.Int) (*
 		return nil, err
 	}
 	res.TxType = models.DirectCallTxType
-	return res, em.commit(res.StateRootHash)
+	return res, bl.commit(res.StateRootHash)
 }
 
 // Transfer transfers flow token from an FOA account to another flex account
@@ -93,11 +119,11 @@ func (em *Emulator) WithdrawFrom(address models.FlexAddress, amount *big.Int) (*
 //
 // Warning, This method should only be used for bridged accounts
 // where resource ownership has been verified
-func (em *Emulator) Transfer(
+func (bl *Block) Transfer(
 	from, to models.FlexAddress,
 	value *big.Int,
 ) (*models.Result, error) {
-	proc, err := em.newProcedure(NewConfig(WithBlockNumber(BlockNumberForEVMRules)))
+	proc, err := bl.newProcedure()
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +135,7 @@ func (em *Emulator) Transfer(
 		return nil, err
 	}
 	res.TxType = models.DirectCallTxType
-	return res, em.commit(res.StateRootHash)
+	return res, bl.commit(res.StateRootHash)
 }
 
 // Deploy deploys a contract at the given address
@@ -117,13 +143,13 @@ func (em *Emulator) Transfer(
 //
 // Warning, This method should only be used for bridged accounts
 // where resource ownership has been verified
-func (em *Emulator) Deploy(
+func (bl *Block) Deploy(
 	caller models.FlexAddress,
 	code models.Code,
 	gasLimit uint64,
 	value *big.Int,
 ) (*models.Result, error) {
-	proc, err := em.newProcedure(em.Config)
+	proc, err := bl.newProcedure()
 	if err != nil {
 		return nil, err
 	}
@@ -135,20 +161,20 @@ func (em *Emulator) Deploy(
 		return nil, err
 	}
 	res.TxType = models.DirectCallTxType
-	return res, em.commit(res.StateRootHash)
+	return res, bl.commit(res.StateRootHash)
 }
 
 // Call calls a smart contract with the input
 //
 // Warning, This method should only be used for bridged accounts
 // where resource ownership has been verified
-func (em *Emulator) Call(
+func (bl *Block) Call(
 	from, to models.FlexAddress,
 	data models.Data,
 	gasLimit uint64,
 	value *big.Int,
 ) (*models.Result, error) {
-	proc, err := em.newProcedure(em.Config)
+	proc, err := bl.newProcedure()
 	if err != nil {
 		return nil, err
 	}
@@ -158,24 +184,19 @@ func (em *Emulator) Call(
 		return nil, err
 	}
 	res.TxType = models.DirectCallTxType
-	return res, em.commit(res.StateRootHash)
+	return res, bl.commit(res.StateRootHash)
 }
 
 // RunTransaction runs an evm transaction
-func (em *Emulator) RunTransaction(tx *types.Transaction, coinbase models.FlexAddress) (*models.Result, error) {
-
-	orgCoinbase := em.Config.BlockContext.Coinbase
-	em.Config.BlockContext.Coinbase = coinbase.ToCommon()
-	defer func() {
-		em.Config.BlockContext.Coinbase = orgCoinbase
-	}()
-
-	proc, err := em.newProcedure(em.Config)
+func (bl *Block) RunTransaction(
+	tx *types.Transaction,
+) (*models.Result, error) {
+	proc, err := bl.newProcedure()
 	if err != nil {
 		return nil, err
 	}
 
-	msg, err := core.TransactionToMessage(tx, GetSigner(em.Config), proc.config.BlockContext.BaseFee)
+	msg, err := core.TransactionToMessage(tx, GetSigner(bl.config), proc.config.BlockContext.BaseFee)
 	if err != nil {
 		// note that this is not a fatal errro
 		return nil, models.NewEVMExecutionError(err)
@@ -187,27 +208,15 @@ func (em *Emulator) RunTransaction(tx *types.Transaction, coinbase models.FlexAd
 	}
 
 	res.TxType = tx.Type()
-	return res, em.commit(res.StateRootHash)
+	return res, bl.commit(res.StateRootHash)
 }
 
-func (em *Emulator) newState() (*state.StateDB, error) {
-	root, err := em.Database.GetRootHash()
+func (bl *Block) newProcedure() (*procedure, error) {
+	execState, err := newState(bl.database)
 	if err != nil {
 		return nil, err
 	}
-
-	return state.New(root,
-		state.NewDatabase(
-			rawdb.NewDatabase(em.Database),
-		),
-		nil)
-}
-
-func (em *Emulator) newProcedure(cfg *Config) (*procedure, error) {
-	execState, err := em.newState()
-	if err != nil {
-		return nil, err
-	}
+	cfg := bl.config
 	return &procedure{
 		config: cfg,
 		evm: vm.NewEVM(
@@ -221,12 +230,12 @@ func (em *Emulator) newProcedure(cfg *Config) (*procedure, error) {
 	}, nil
 }
 
-func (fe *Emulator) commit(rootHash common.Hash) error {
+func (bl *Block) commit(rootHash common.Hash) error {
 	// sets root hash
-	fe.Database.SetRootHash(rootHash)
+	bl.database.SetRootHash(rootHash)
 
 	// commit atree changes back to the backend
-	err := fe.Database.Commit()
+	err := bl.database.Commit()
 	if err != nil {
 		return models.NewFatalError(err)
 	}
@@ -274,7 +283,7 @@ func (proc *procedure) mintTo(address models.FlexAddress, amount *big.Int) (*mod
 	faddr := address.ToCommon()
 	// minting from gas prespective is considered similar to transfer of tokens
 	res := &models.Result{
-		GasConsumed: TransferGasUsage,
+		GasConsumed: proc.config.DirectCallBaseGasUsage,
 	}
 
 	// check account if not exist
@@ -297,7 +306,7 @@ func (proc *procedure) withdrawFrom(address models.FlexAddress, amount *big.Int)
 	faddr := address.ToCommon()
 	// token withdraw from gas prespective is considered similar to transfer of tokens
 	res := &models.Result{
-		GasConsumed: TransferGasUsage,
+		GasConsumed: proc.config.DirectCallBaseGasUsage,
 	}
 
 	// check source balance
@@ -364,10 +373,23 @@ func directCallMessage(
 		Value:     value,
 		Data:      data,
 		GasLimit:  gasLimit,
-		GasPrice:  big.NewInt(0), // price is set to zero fo direct calls
+		GasPrice:  big.NewInt(0), // price is set to zero fo direct calls // TODO update me from the config
 		GasTipCap: big.NewInt(1), // TODO revisit this value (also known as maxPriorityFeePerGas)
 		GasFeeCap: big.NewInt(2), // TODO revisit this value (also known as maxFeePerGas)
 		// AccessList:        tx.AccessList(), // TODO revisit this value, the cost matter but performance might
 		SkipAccountChecks: true, // this would let us not set the nonce
 	}
+}
+
+func newState(database *storage.Database) (*state.StateDB, error) {
+	root, err := database.GetRootHash()
+	if err != nil {
+		return nil, err
+	}
+
+	return state.New(root,
+		state.NewDatabase(
+			rawdb.NewDatabase(database),
+		),
+		nil)
 }

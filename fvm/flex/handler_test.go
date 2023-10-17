@@ -48,7 +48,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 					}
 
 					em := &testutils.TestEmulator{
-						RunTransactionFunc: func(tx *types.Transaction, coinbase models.FlexAddress) (*models.Result, error) {
+						RunTransactionFunc: func(tx *types.Transaction) (*models.Result, error) {
 							return result, nil
 						},
 					}
@@ -103,7 +103,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 					require.NoError(t, err)
 
 					em := &testutils.TestEmulator{
-						RunTransactionFunc: func(tx *types.Transaction, coinbase models.FlexAddress) (*models.Result, error) {
+						RunTransactionFunc: func(tx *types.Transaction) (*models.Result, error) {
 							return nil, models.NewEVMExecutionError(fmt.Errorf("some sort of error"))
 						},
 					}
@@ -161,7 +161,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 				db, err := storage.NewDatabase(backend, flexRoot)
 				require.NoError(t, err)
 
-				emulator := evm.NewEmulator(evm.NewConfig(), db)
+				emulator := evm.NewEmulator(db)
 
 				handler := flex.NewFlexContractHandler(bs, backend, emulator)
 
@@ -265,7 +265,7 @@ func TestHandler_FOA(t *testing.T) {
 				db, err := storage.NewDatabase(backend, flexRoot)
 				require.NoError(t, err)
 
-				emulator := evm.NewEmulator(evm.NewConfig(), db)
+				emulator := evm.NewEmulator(db)
 
 				handler := flex.NewFlexContractHandler(bs, backend, emulator)
 				foa := handler.AccountByAddress(handler.AllocateAddress(), true)
@@ -322,7 +322,7 @@ func TestHandler_FOA(t *testing.T) {
 				// check gas usage
 				computationUsed, err := backend.ComputationUsed()
 				require.NoError(t, err)
-				require.Equal(t, evm.TransferGasUsage*2, computationUsed)
+				require.Equal(t, models.DefaultDirectCallBaseGasUsage*2, computationUsed)
 			})
 		})
 	})
@@ -349,9 +349,6 @@ func TestHandler_FOA(t *testing.T) {
 							WithdrawFromFunc: func(address models.FlexAddress, amount *big.Int) (*models.Result, error) {
 								return nil, models.NewEVMExecutionError(fmt.Errorf("some sort of error"))
 							},
-							TransferGasUsageFunc: func() uint64 {
-								return 1
-							},
 						}
 						handler := flex.NewFlexContractHandler(bs, backend, em)
 						account := handler.AccountByAddress(testutils.RandomFlexAddress(), true)
@@ -364,9 +361,6 @@ func TestHandler_FOA(t *testing.T) {
 							WithdrawFromFunc: func(address models.FlexAddress, amount *big.Int) (*models.Result, error) {
 								return nil, models.NewEVMExecutionError(fmt.Errorf("some sort of error"))
 							},
-							TransferGasUsageFunc: func() uint64 {
-								return 1
-							},
 						}
 						handler := flex.NewFlexContractHandler(bs, backend, em)
 						account := handler.AccountByAddress(testutils.RandomFlexAddress(), true)
@@ -378,9 +372,6 @@ func TestHandler_FOA(t *testing.T) {
 						em := &testutils.TestEmulator{
 							WithdrawFromFunc: func(address models.FlexAddress, amount *big.Int) (*models.Result, error) {
 								return nil, models.NewFatalError(fmt.Errorf("some sort of fatal error"))
-							},
-							TransferGasUsageFunc: func() uint64 {
-								return 1
 							},
 						}
 						handler := flex.NewFlexContractHandler(bs, backend, em)
@@ -405,9 +396,6 @@ func TestHandler_FOA(t *testing.T) {
 							MintToFunc: func(address models.FlexAddress, amount *big.Int) (*models.Result, error) {
 								return nil, models.NewEVMExecutionError(fmt.Errorf("some sort of error"))
 							},
-							TransferGasUsageFunc: func() uint64 {
-								return 1
-							},
 						}
 						handler := flex.NewFlexContractHandler(bs, backend, em)
 						account := handler.AccountByAddress(testutils.RandomFlexAddress(), true)
@@ -419,9 +407,6 @@ func TestHandler_FOA(t *testing.T) {
 						em := &testutils.TestEmulator{
 							MintToFunc: func(address models.FlexAddress, amount *big.Int) (*models.Result, error) {
 								return nil, models.NewFatalError(fmt.Errorf("some sort of fatal error"))
-							},
-							TransferGasUsageFunc: func() uint64 {
-								return 1
 							},
 						}
 						handler := flex.NewFlexContractHandler(bs, backend, em)
@@ -443,7 +428,7 @@ func TestHandler_FOA(t *testing.T) {
 				db, err := storage.NewDatabase(backend, flexRoot)
 				require.NoError(t, err)
 
-				emulator := evm.NewEmulator(evm.NewConfig(), db)
+				emulator := evm.NewEmulator(db)
 
 				handler := flex.NewFlexContractHandler(bs, backend, emulator)
 				foa := handler.AccountByAddress(handler.AllocateAddress(), true)

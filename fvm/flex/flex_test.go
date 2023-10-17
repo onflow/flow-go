@@ -68,7 +68,7 @@ func TestFlexAddressConstructionAndReturn(t *testing.T) {
 			db, err := storage.NewDatabase(backend, flexRoot)
 			require.NoError(t, err)
 
-			em := evm.NewEmulator(evm.NewConfig(), db)
+			em := evm.NewEmulator(db)
 
 			handler := flex.NewFlexContractHandler(bs, backend, em)
 			env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
@@ -148,7 +148,7 @@ func TestFlexRun(t *testing.T) {
 					db, err := storage.NewDatabase(backend, flexRoot)
 					require.NoError(t, err)
 
-					em := evm.NewEmulator(evm.NewConfig(), db)
+					em := evm.NewEmulator(db)
 
 					handler := flex.NewFlexContractHandler(bs, backend, em)
 					interEnv := runtime.NewBaseInterpreterEnvironment(runtime.Config{})

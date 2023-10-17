@@ -95,10 +95,13 @@ func RunWithEOATestAccount(t *testing.T, led atree.Ledger, flexRoot flow.Address
 	db, err := storage.NewDatabase(led, flexRoot)
 	require.NoError(t, err)
 
-	e := evm.NewEmulator(evm.NewConfig(), db)
+	e := evm.NewEmulator(db)
 	require.NoError(t, err)
 
-	_, err = e.MintTo(account.FlexAddress(), new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1000)))
+	blk, err := e.NewBlock(models.NewDefaultBlockContext(2))
+	require.NoError(t, err)
+
+	_, err = blk.MintTo(account.FlexAddress(), new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1000)))
 	require.NoError(t, err)
 
 	f(account)

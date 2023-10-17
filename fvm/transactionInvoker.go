@@ -101,12 +101,16 @@ func newTransactionExecutor(
 
 		db, err := flexStorage.NewDatabase(env, flexRootAddress)
 		if err != nil {
-			// TODO don't panic just log and don't setup
 			panic(err)
 		}
+
 		em := evm.NewEmulator(db)
 
-		handler := flex.NewFlexContractHandler(db, env, em)
+		bs, err := flex.NewBlockStore(env, flexRootAddress)
+		if err != nil {
+			panic(err)
+		}
+		handler := flex.NewFlexContractHandler(bs, env, em)
 		// TODO: pass proper Flex type definition based on environment
 		flexTypeDefinition := emulator.FlexTypeDefinition
 		cadenceRuntime.DeclareValue(flexStdlib.NewFlexStandardLibraryValue(nil, flexTypeDefinition, handler))

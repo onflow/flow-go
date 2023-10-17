@@ -111,7 +111,14 @@ func (h FlexContractHandler) Run(rlpEncodedTx []byte, coinbase models.FlexAddres
 	// TODO: let caller set an optional limit as well and take the min
 	gasLimit := tx.Gas()
 	h.checkGasLimit(models.GasLimit(gasLimit))
-	res, err := h.emulator.RunTransaction(&tx, coinbase)
+
+	ctx := h.getBlockContext()
+	ctx.GasFeeCollector = coinbase
+
+	blk, err := h.emulator.NewBlock(ctx)
+	handleError(err)
+
+	res, err := blk.RunTransaction(&tx)
 	h.meterGasUsage(res)
 
 	failed := false
@@ -159,6 +166,13 @@ func (h *FlexContractHandler) EmitLastExecutedBlockEvent() {
 	h.EmitEvent(models.NewBlockExecutedEvent(block))
 }
 
+func (h *FlexContractHandler) getBlockContext() models.BlockContext {
+	return models.BlockContext{
+		BlockNumber:            h.lastExecutedBlock.Height + 1,
+		DirectCallBaseGasUsage: models.DefaultDirectCallBaseGasUsage,
+	}
+}
+
 type flexAccount struct {
 	isFOA   bool
 	address models.FlexAddress
@@ -181,8 +195,14 @@ func (f *flexAccount) Address() models.FlexAddress {
 
 // Balance returns the balance of this foa
 func (f *flexAccount) Balance() models.Balance {
-	bl, err := f.fch.emulator.BalanceOf(f.address)
+	ctx := f.fch.getBlockContext()
+
+	blk, err := f.fch.emulator.NewBlockView(ctx)
 	handleError(err)
+
+	bl, err := blk.BalanceOf(f.address)
+	handleError(err)
+
 	balance, err := models.NewBalanceFromAttoFlow(bl)
 	handleError(err)
 	return balance
@@ -191,8 +211,13 @@ func (f *flexAccount) Balance() models.Balance {
 // Deposit deposits the token from the given vault into the Flex main vault
 // and update the FOA balance with the new amount
 func (f *flexAccount) Deposit(v *models.FLOWTokenVault) {
-	f.fch.checkGasLimit(models.GasLimit(f.fch.emulator.TransferGasUsage()))
-	res, err := f.fch.emulator.MintTo(f.address, v.Balance().ToAttoFlow())
+	cfg := f.fch.getBlockContext()
+	f.fch.checkGasLimit(models.GasLimit(cfg.DirectCallBaseGasUsage))
+
+	blk, err := f.fch.emulator.NewBlock(cfg)
+	handleError(err)
+
+	res, err := blk.MintTo(f.address, v.Balance().ToAttoFlow())
 	f.fch.meterGasUsage(res)
 	handleError(err)
 	// emit event
@@ -212,8 +237,13 @@ func (f *flexAccount) Withdraw(b models.Balance) *models.FLOWTokenVault {
 		handleError(models.ErrInsufficientTotalSupply)
 	}
 
-	f.fch.checkGasLimit(models.GasLimit(f.fch.emulator.TransferGasUsage()))
-	res, err := f.fch.emulator.WithdrawFrom(f.address, b.ToAttoFlow())
+	cfg := f.fch.getBlockContext()
+	f.fch.checkGasLimit(models.GasLimit(cfg.DirectCallBaseGasUsage))
+
+	blk, err := f.fch.emulator.NewBlock(cfg)
+	handleError(err)
+
+	res, err := blk.WithdrawFrom(f.address, b.ToAttoFlow())
 	f.fch.meterGasUsage(res)
 	handleError(err)
 
@@ -228,8 +258,14 @@ func (f *flexAccount) Withdraw(b models.Balance) *models.FLOWTokenVault {
 // Transfer transfers tokens between accounts
 func (f *flexAccount) Transfer(to models.FlexAddress, balance models.Balance) {
 	f.checkAuthorized()
-	f.fch.checkGasLimit(models.GasLimit(f.fch.emulator.TransferGasUsage()))
-	res, err := f.fch.emulator.Transfer(f.address, to, balance.ToAttoFlow())
+
+	cfg := f.fch.getBlockContext()
+	f.fch.checkGasLimit(models.GasLimit(cfg.DirectCallBaseGasUsage))
+
+	blk, err := f.fch.emulator.NewBlock(cfg)
+	handleError(err)
+
+	res, err := blk.Transfer(f.address, to, balance.ToAttoFlow())
 	f.fch.meterGasUsage(res)
 	handleError(err)
 	f.fch.EmitLastExecutedBlockEvent()
@@ -242,7 +278,11 @@ func (f *flexAccount) Transfer(to models.FlexAddress, balance models.Balance) {
 func (f *flexAccount) Deploy(code models.Code, gaslimit models.GasLimit, balance models.Balance) models.FlexAddress {
 	f.checkAuthorized()
 	f.fch.checkGasLimit(gaslimit)
-	res, err := f.fch.emulator.Deploy(f.address, code, uint64(gaslimit), balance.ToAttoFlow())
+
+	blk, err := f.fch.emulator.NewBlock(f.fch.getBlockContext())
+	handleError(err)
+
+	res, err := blk.Deploy(f.address, code, uint64(gaslimit), balance.ToAttoFlow())
 	f.fch.meterGasUsage(res)
 	handleError(err)
 	f.fch.EmitLastExecutedBlockEvent()
@@ -258,7 +298,11 @@ func (f *flexAccount) Deploy(code models.Code, gaslimit models.GasLimit, balance
 func (f *flexAccount) Call(to models.FlexAddress, data models.Data, gaslimit models.GasLimit, balance models.Balance) models.Data {
 	f.checkAuthorized()
 	f.fch.checkGasLimit(gaslimit)
-	res, err := f.fch.emulator.Call(f.address, to, data, uint64(gaslimit), balance.ToAttoFlow())
+
+	blk, err := f.fch.emulator.NewBlock(f.fch.getBlockContext())
+	handleError(err)
+
+	res, err := blk.Call(f.address, to, data, uint64(gaslimit), balance.ToAttoFlow())
 	f.fch.meterGasUsage(res)
 	handleError(err)
 	f.fch.EmitLastExecutedBlockEvent()

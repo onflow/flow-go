@@ -169,13 +169,16 @@ func RunWithDeployedContract(t *testing.T, led atree.Ledger, flexRoot flow.Addre
 	db, err := storage.NewDatabase(led, flexRoot)
 	require.NoError(t, err)
 
-	e := evm.NewEmulator(evm.NewConfig(), db)
+	e := evm.NewEmulator(db)
 
-	caller := models.NewFlexAddress(gethCommon.Address{})
-	_, err = e.MintTo(caller, new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1000)))
+	blk, err := e.NewBlock(models.NewDefaultBlockContext(2))
 	require.NoError(t, err)
 
-	res, err := e.Deploy(caller, tc.ByteCode, math.MaxUint64, big.NewInt(0))
+	caller := models.NewFlexAddress(gethCommon.Address{})
+	_, err = blk.MintTo(caller, new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1000)))
+	require.NoError(t, err)
+
+	res, err := blk.Deploy(caller, tc.ByteCode, math.MaxUint64, big.NewInt(0))
 	require.NoError(t, err)
 
 	tc.SetDeployedAt(res.DeployedContractAddress)
