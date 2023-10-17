@@ -22,9 +22,20 @@ type Config struct {
 type ScriptExecutionMode int
 
 const (
+	// ScriptExecutionModeLocalOnly executes scripts and gets accounts using only local storage
 	ScriptExecutionModeLocalOnly ScriptExecutionMode = iota + 1
+
+	// ScriptExecutionModeExecutionNodesOnly executes scripts and gets accounts using only
+	// execution nodes
 	ScriptExecutionModeExecutionNodesOnly
+
+	// ScriptExecutionModeFailover executes scripts and gets accounts using local storage first,
+	// then falls back to execution nodes if data is not available for the height or if request
+	// failed due to a non-user error.
 	ScriptExecutionModeFailover
+
+	// ScriptExecutionModeCompare executes scripts and gets accounts using both local storage and
+	// execution nodes and compares the results. The execution node result is always returned.
 	ScriptExecutionModeCompare
 )
 
