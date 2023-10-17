@@ -739,11 +739,10 @@ func closeAndMergeError(closable io.Closer, err error) error {
 	return merr.ErrorOrNil()
 }
 
-func withFile(logger zerolog.Logger, dir string, fileName string, f func(file *os.File) error) (
+func withFile(logger zerolog.Logger, filepath string, f func(file *os.File) error) (
 	errToReturn error,
 ) {
 
-	filepath, _ := filePathTopTries(dir, fileName)
 	file, err := os.Open(filepath)
 	if err != nil {
 		return fmt.Errorf("could not open file %v: %w", filepath, err)

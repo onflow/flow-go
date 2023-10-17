@@ -91,7 +91,8 @@ func OpenAndReadCheckpointV6(dir string, fileName string, logger zerolog.Logger)
 	errToReturn error,
 ) {
 
-	errToReturn = withFile(logger, dir, fileName, func(file *os.File) error {
+	filepath := filePathCheckpointHeader(dir, fileName)
+	errToReturn = withFile(logger, filepath, func(file *os.File) error {
 		tries, err := readCheckpointV6(file, logger)
 		if err != nil {
 			return err
@@ -378,7 +379,12 @@ func processCheckpointSubTrie(
 	logger zerolog.Logger,
 	processNode func(*Crc32Reader, uint64) error,
 ) error {
-	return withFile(logger, dir, fileName, func(f *os.File) error {
+
+	filepath, _, err := filePathSubTries(dir, fileName, index)
+	if err != nil {
+		return err
+	}
+	return withFile(logger, filepath, func(f *os.File) error {
 		// valite the magic bytes and version
 		err := validateFileHeader(MagicBytesCheckpointSubtrie, VersionV6, f)
 		if err != nil {
@@ -489,7 +495,8 @@ func readTopLevelTries(dir string, fileName string, subtrieNodes [][]*node.Node,
 	errToReturn error,
 ) {
 
-	errToReturn = withFile(logger, dir, fileName, func(file *os.File) error {
+	filepath, _ := filePathTopTries(dir, fileName)
+	errToReturn = withFile(logger, filepath, func(file *os.File) error {
 		// read and validate magic bytes and version
 		err := validateFileHeader(MagicBytesCheckpointToptrie, VersionV6, file)
 		if err != nil {
@@ -612,7 +619,9 @@ func readTriesRootHash(logger zerolog.Logger, dir string, fileName string) (
 	trieRootsToReturn []ledger.RootHash,
 	errToReturn error,
 ) {
-	errToReturn = withFile(logger, dir, fileName, func(file *os.File) error {
+
+	filepath, _ := filePathTopTries(dir, fileName)
+	errToReturn = withFile(logger, filepath, func(file *os.File) error {
 		var err error
 
 		// read and validate magic bytes and version
@@ -669,7 +678,7 @@ func validateFileHeader(expectedMagic uint16, expectedVersion uint16, reader io.
 	}
 
 	if magic != expectedMagic {
-		return fmt.Errorf("wrong magic bytes, expect %v, bot got: %v", expectedMagic, magic)
+		return fmt.Errorf("wrong magic bytes, expect %#x, bot got: %#x", expectedMagic, magic)
 	}
 
 	if version != expectedVersion {
