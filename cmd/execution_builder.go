@@ -1129,7 +1129,7 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 	if !bootstrapped {
 		err := wal.CheckpointHasRootHash(
 			node.Logger,
-			node.BootstrapDir,
+			path.Join(node.BootstrapDir, bootstrapFilenames.DirnameExecutionState),
 			bootstrapFilenames.FilenameWALRootCheckpoint,
 			ledgerpkg.RootHash(node.RootSeal.FinalState),
 		)
