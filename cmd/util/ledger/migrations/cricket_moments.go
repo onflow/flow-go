@@ -3,13 +3,15 @@ package migrations
 import (
 	"context"
 	"fmt"
+	"sync"
+
+	"github.com/rs/zerolog"
+
+	"github.com/onflow/cadence/runtime/interpreter"
+
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/model/flow"
 	util2 "github.com/onflow/flow-go/module/util"
-	"github.com/rs/zerolog"
-	"sync"
-
-	"github.com/onflow/cadence/runtime/interpreter"
 )
 
 var cricketMomentsAddress = mustHexToAddress("4eded0de73020ca5")

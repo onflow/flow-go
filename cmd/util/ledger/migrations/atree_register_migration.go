@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
 	util2 "github.com/onflow/flow-go/module/util"
 )
@@ -475,7 +476,7 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 		//		Msg("key is part of the change set, but is for a different account")
 		//}
 
-		key := util.RegisterIDToKey(id)
+		key := convert.RegisterIDToLedgerKey(id)
 
 		if statePayload != nil && isAccountKey(key) {
 			statePayload = ledger.NewPayload(key, value)
@@ -500,7 +501,7 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 				continue
 			}
 
-			key := util.RegisterIDToKey(id)
+			key := convert.RegisterIDToLedgerKey(id)
 			if isAccountKey(key) {
 				statePayload = value
 				// we will append this later

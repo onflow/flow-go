@@ -12,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -109,7 +110,7 @@ func generateRandomPayloads(n int) []*ledger.Payload {
 }
 
 func generateRandomAccountKey() ledger.Key {
-	return util.RegisterIDToKey(flow.RegisterID{
+	return convert.RegisterIDToLedgerKey(flow.RegisterID{
 		Owner: generateRandomAddress(),
 		Key:   generateRandomString(10),
 	})

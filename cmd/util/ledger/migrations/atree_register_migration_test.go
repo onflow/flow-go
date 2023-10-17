@@ -1,7 +1,6 @@
 package migrations_test
 
 import (
-	"github.com/onflow/flow-go/model/flow"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -9,11 +8,12 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
-	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 )
 
@@ -47,7 +47,7 @@ func TestAtreeRegisterMigration(t *testing.T) {
 				for _, payload := range oldPayloads {
 					key, err := payload.Key()
 					require.NoError(t, err)
-					id, err := util.KeyToRegisterID(key)
+					id, err := convert.LedgerKeyToRegisterID(key)
 					require.NoError(t, err)
 					oldPayloadsMap[id] = payload
 				}
@@ -57,7 +57,7 @@ func TestAtreeRegisterMigration(t *testing.T) {
 				for _, payload := range newPayloads {
 					key, err := payload.Key()
 					require.NoError(t, err)
-					id, err := util.KeyToRegisterID(key)
+					id, err := convert.LedgerKeyToRegisterID(key)
 					require.NoError(t, err)
 					newPayloadsMap[id] = payload
 				}

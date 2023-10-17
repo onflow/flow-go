@@ -6,40 +6,12 @@ import (
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence/runtime/common"
 
-	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
 )
-
-func KeyToRegisterID(key ledger.Key) (flow.RegisterID, error) {
-	if len(key.KeyParts) != 2 ||
-		key.KeyParts[0].Type != state.KeyPartOwner ||
-		key.KeyParts[1].Type != state.KeyPartKey {
-		return flow.RegisterID{}, fmt.Errorf("key not in expected format %s", key.String())
-	}
-
-	return flow.NewRegisterID(
-		string(key.KeyParts[0].Value),
-		string(key.KeyParts[1].Value),
-	), nil
-}
-
-func RegisterIDToKey(registerID flow.RegisterID) ledger.Key {
-	newKey := ledger.Key{}
-	newKey.KeyParts = []ledger.KeyPart{
-		{
-			Type:  state.KeyPartOwner,
-			Value: []byte(registerID.Owner),
-		},
-		{
-			Type:  state.KeyPartKey,
-			Value: []byte(registerID.Key),
-		},
-	}
-	return newKey
-}
 
 type AccountsAtreeLedger struct {
 	Accounts environment.Accounts
@@ -107,7 +79,7 @@ func NewPayloadSnapshot(payloads []*ledger.Payload) (*PayloadSnapshot, error) {
 		if err != nil {
 			return nil, err
 		}
-		id, err := KeyToRegisterID(key)
+		id, err := convert.LedgerKeyToRegisterID(key)
 		if err != nil {
 			return nil, err
 		}

@@ -8,9 +8,10 @@ import (
 
 	"github.com/onflow/cadence/runtime/common"
 
-	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/fvm/environment"
+	fvm "github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -143,8 +144,12 @@ func newPayloadWithValue(payload *ledger.Payload, value ledger.Value) (ledger.Pa
 	return *newPayload, nil
 }
 
+func registerSize(id flow.RegisterID, p *ledger.Payload) int {
+	return fvm.RegisterSize(id, p.Value())
+}
+
 func payloadSize(key ledger.Key, payload *ledger.Payload) (uint64, error) {
-	id, err := util.KeyToRegisterID(key)
+	id, err := convert.LedgerKeyToRegisterID(key)
 	if err != nil {
 		return 0, err
 	}

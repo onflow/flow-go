@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -129,7 +130,7 @@ func payloadToAddress(p *ledger.Payload) (common.Address, error) {
 		return common.ZeroAddress, fmt.Errorf("could not find key for payload: %w", err)
 	}
 
-	id, err := KeyToRegisterID(k)
+	id, err := convert.LedgerKeyToRegisterID(k)
 	if err != nil {
 		return common.ZeroAddress, fmt.Errorf("error converting key to register ID")
 	}
