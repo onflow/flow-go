@@ -48,6 +48,8 @@ import (
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -143,7 +145,6 @@ type AccessNodeConfig struct {
 	executionDataIndexingEnabled bool
 	registersDBPath              string
 	checkpointFile               string
-	checkpointHeight             uint64
 }
 
 type PublicNetworkConfig struct {
@@ -230,7 +231,6 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		executionDataIndexingEnabled: false,
 		registersDBPath:              filepath.Join(homedir, ".flow", "execution_state"),
 		checkpointFile:               cmd.NotSet,
-		checkpointHeight:             0,
 	}
 }
 
@@ -682,24 +682,27 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				}
 
 				if !bootstrapped {
-					// since indexing is done using execution data, make sure that execution data
-					// will be available starting at the checkpoint height. otherwise, the indexer
-					// will fail to progress.
-					if builder.checkpointHeight < builder.executionDataConfig.InitialBlockHeight {
-						return nil, fmt.Errorf(
-							"checkpoint is from height %d, but execution data is only available from height %d. "+
-								"either provide a more recent checkpoint, or configure execution sync to start from a lower height",
-							builder.checkpointHeight,
-							builder.executionDataConfig.InitialBlockHeight,
-						)
-					}
-
 					checkpointFile := builder.checkpointFile
 					if checkpointFile == cmd.NotSet {
 						checkpointFile = path.Join(builder.BootstrapDir, bootstrap.PathRootCheckpoint)
 					}
 
-					bootstrap, err := pStorage.NewRegisterBootstrap(pdb, checkpointFile, builder.checkpointHeight, builder.Logger)
+					// currently, the checkpoint must be from the root block.
+					// read the root hash from the provided checkpoint and verify it matches the
+					// state commitment from the root snapshot.
+					err := wal.CheckpointHasRootHash(
+						node.Logger,
+						"", // checkpoint file already full path
+						checkpointFile,
+						ledger.RootHash(node.RootSeal.FinalState),
+					)
+					if err != nil {
+						return nil, fmt.Errorf("could not verify checkpoint file: %w", err)
+					}
+
+					checkpointHeight := builder.SealedRootBlock.Header.Height
+
+					bootstrap, err := pStorage.NewRegisterBootstrap(pdb, checkpointFile, checkpointHeight, builder.Logger)
 					if err != nil {
 						return nil, fmt.Errorf("could not create registers bootstrapper: %w", err)
 					}
@@ -911,7 +914,6 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.BoolVar(&builder.executionDataIndexingEnabled, "execution-data-indexing-enabled", defaultConfig.executionDataIndexingEnabled, "whether to enable the execution data indexing")
 		flags.StringVar(&builder.registersDBPath, "execution-state-dir", defaultConfig.registersDBPath, "directory to use for execution-state database")
 		flags.StringVar(&builder.checkpointFile, "execution-state-checkpoint", defaultConfig.checkpointFile, "execution-state checkpoint file")
-		flags.Uint64Var(&builder.checkpointHeight, "execution-state-checkpoint-height", defaultConfig.checkpointHeight, "block height at which the execution-state checkpoint was generated")
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-observer is true")
