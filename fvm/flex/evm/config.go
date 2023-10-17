@@ -11,13 +11,16 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 )
 
-// TODO we might need to register our chain ID here https://github.com/DefiLlama/chainlist/blob/main/constants/chainIds.json
+// TODO we might need to register our chain ID here:
+//  https://github.com/DefiLlama/chainlist/blob/main/constants/chainIds.json
+
 var (
-	FlexTestnetChainID     = big.NewInt(666)
-	FlexMainnetChainID     = big.NewInt(777)
-	TransferGasUsage       = uint64(21_000)
-	DefaultGasPrice        = big.NewInt(1)
-	BlockNumberForEVMRules = big.NewInt(18138954) // a recent block to be used as a refrence for the EVM setup
+	FlexTestnetChainID = big.NewInt(666)
+	FlexMainnetChainID = big.NewInt(777)
+	TransferGasUsage   = uint64(21_000)
+	DefaultGasPrice    = big.NewInt(0)
+	// anything block number above 0 works here
+	BlockNumberForEVMRules = big.NewInt(1)
 )
 
 // Config sets the required parameters
@@ -32,23 +35,32 @@ type Config struct {
 	TxContext *vm.TxContext
 }
 
+var zero = uint64(0)
+
 func defaultConfig() *Config {
 	return &Config{
 		ChainConfig: &params.ChainConfig{
-			ChainID:             FlexTestnetChainID, // default is testnet
-			HomesteadBlock:      new(big.Int),
-			DAOForkBlock:        new(big.Int),
+			ChainID: FlexTestnetChainID, // default is testnet
+
+			// Fork scheduling based on block heights
+			HomesteadBlock:      big.NewInt(0),
+			DAOForkBlock:        big.NewInt(0),
 			DAOForkSupport:      false,
-			EIP150Block:         new(big.Int),
-			EIP155Block:         new(big.Int),
-			EIP158Block:         new(big.Int),
-			ByzantiumBlock:      new(big.Int),
-			ConstantinopleBlock: new(big.Int),
-			PetersburgBlock:     new(big.Int),
-			IstanbulBlock:       new(big.Int),
-			MuirGlacierBlock:    new(big.Int),
-			BerlinBlock:         new(big.Int),
-			LondonBlock:         new(big.Int),
+			EIP150Block:         big.NewInt(0),
+			EIP155Block:         big.NewInt(0),
+			EIP158Block:         big.NewInt(0),
+			ByzantiumBlock:      big.NewInt(0), // already on Byzantium
+			ConstantinopleBlock: big.NewInt(0), // already on Constantinople
+			PetersburgBlock:     big.NewInt(0), // already on Petersburg
+			IstanbulBlock:       big.NewInt(0), // already on Istanbul
+			BerlinBlock:         big.NewInt(0), // already on Berlin
+			LondonBlock:         big.NewInt(0), // already on London
+			MuirGlacierBlock:    big.NewInt(0), // already on MuirGlacier
+
+			// Fork scheduling based on timestamps
+			ShanghaiTime: &zero, // already on Shanghai
+			CancunTime:   &zero, // already on Cancun
+			PragueTime:   &zero, // already on Prague
 		},
 		EVMConfig: vm.Config{
 			NoBaseFee: true,
@@ -57,11 +69,12 @@ func defaultConfig() *Config {
 			GasPrice: DefaultGasPrice,
 		},
 		BlockContext: &vm.BlockContext{
+			BlockNumber: BlockNumberForEVMRules, // default block number to make setup right
 			CanTransfer: core.CanTransfer,
 			Transfer:    core.Transfer,
 			GasLimit:    math.MaxUint64, // block gas limit
 			BaseFee:     big.NewInt(1),  // small base fee for block
-			GetHash: func(n uint64) common.Hash {
+			GetHash: func(n uint64) common.Hash { // default returns some random hash values
 				return common.BytesToHash(crypto.Keccak256([]byte(new(big.Int).SetUint64(n).String())))
 			},
 		},
@@ -75,11 +88,6 @@ func NewConfig(opts ...Option) *Config {
 		ctx = applyOption(ctx)
 	}
 	return ctx
-}
-
-// returns the chain rules based on the block number
-func (fc *Config) Rules() params.Rules {
-	return fc.ChainConfig.Rules(BlockNumberForEVMRules, false, fc.BlockContext.Time)
 }
 
 type Option func(*Config) *Config
@@ -142,16 +150,6 @@ func WithCoinbase(coinbase common.Address) Option {
 	}
 }
 
-// Ramtin: This is only available if we update the EVM to 1.13 etc
-// // WithBlobHashes sets the blob hash part of the transaction context
-// // not used at the moment but would be useful in near future
-// func WithBlobHashes(hashes []common.Hash) Option {
-// 	return func(c *Config) *Config {
-// 		c.TxContext.BlobHashes = hashes
-// 		return c
-// 	}
-// }
-
 // WithBlockNumber sets the block height in the block context
 func WithBlockNumber(blockNumber *big.Int) Option {
 	return func(c *Config) *Config {
@@ -164,6 +162,14 @@ func WithBlockNumber(blockNumber *big.Int) Option {
 func WithBlockTime(time uint64) Option {
 	return func(c *Config) *Config {
 		c.BlockContext.Time = time
+		return c
+	}
+}
+
+// WithGetBlockHashFunction sets the functionality to look up block hash by height
+func WithGetBlockHashFunction(getHash vm.GetHashFunc) Option {
+	return func(c *Config) *Config {
+		c.BlockContext.GetHash = getHash
 		return c
 	}
 }

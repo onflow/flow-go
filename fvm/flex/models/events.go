@@ -1,23 +1,19 @@
 package models
 
 import (
-	"bytes"
-	"io"
-
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 const (
-	EventTypeFlexBlockExecuted   flow.EventType = "flex.BlockExecuted"
-	EventTypeFlexEVMLog          flow.EventType = "flex.EVMLog"
-	EventTypeFlowTokenDeposit    flow.EventType = "flex.FlowTokenDeposit"
-	EventTypeFlowTokenWithdrawal flow.EventType = "flex.FlowTokenWithdrawal"
+	EventTypeBlockExecuted       flow.EventType = "evm.BlockExecuted"
+	EventTypeTransactionExecuted flow.EventType = "evm.TransactionExecuted"
+	EventTypeFlowTokenDeposit    flow.EventType = "evm.FlowTokenDeposit"
+	EventTypeFlowTokenWithdrawal flow.EventType = "evm.FlowTokenWithdrawal"
 )
 
 type EventPayload interface {
-	RLPEncode() ([]byte, error)
+	Encode() ([]byte, error)
 }
 
 type Event struct {
@@ -30,11 +26,8 @@ type FlowTokenEventPayload struct {
 	Amount  Balance
 }
 
-func (p *FlowTokenEventPayload) RLPEncode() ([]byte, error) {
-	var encoded bytes.Buffer
-	encWriter := io.Writer(&encoded)
-	err := rlp.Encode(encWriter, p)
-	return encoded.Bytes(), err
+func (p *FlowTokenEventPayload) Encode() ([]byte, error) {
+	return rlp.EncodeToBytes(p)
 }
 
 func NewFlowTokenDepositEvent(address FlexAddress, amount Balance) *Event {
@@ -57,22 +50,24 @@ func NewFlowTokenWithdrawalEvent(address FlexAddress, amount Balance) *Event {
 	}
 }
 
-type EVMLogEventPayload struct {
-	log *types.Log
+type TransactionExecutedPayload struct {
+	BlockHeight uint64
+	Result      *Result
 }
 
-func (p *EVMLogEventPayload) RLPEncode() ([]byte, error) {
-	var encoded bytes.Buffer
-	encWriter := io.Writer(&encoded)
-	err := p.log.EncodeRLP(encWriter)
-	return encoded.Bytes(), err
+func (p *TransactionExecutedPayload) Encode() ([]byte, error) {
+	return rlp.EncodeToBytes(p)
 }
 
-func NewEVMLogEvent(log *types.Log) *Event {
+func NewTransactionExecutedEvent(
+	height uint64,
+	result *Result,
+) *Event {
 	return &Event{
-		Etype: EventTypeFlexEVMLog,
-		Payload: &EVMLogEventPayload{
-			log: log,
+		Etype: EventTypeTransactionExecuted,
+		Payload: &TransactionExecutedPayload{
+			BlockHeight: height,
+			Result:      result,
 		},
 	}
 }
@@ -81,16 +76,13 @@ type BlockExecutedEventPayload struct {
 	Block *FlexBlock
 }
 
-func (p *BlockExecutedEventPayload) RLPEncode() ([]byte, error) {
-	var encoded bytes.Buffer
-	encWriter := io.Writer(&encoded)
-	err := rlp.Encode(encWriter, p)
-	return encoded.Bytes(), err
+func (p *BlockExecutedEventPayload) Encode() ([]byte, error) {
+	return rlp.EncodeToBytes(p)
 }
 
 func NewBlockExecutedEvent(block *FlexBlock) *Event {
 	return &Event{
-		Etype: EventTypeFlexBlockExecuted,
+		Etype: EventTypeBlockExecuted,
 		Payload: &BlockExecutedEventPayload{
 			Block: block,
 		},

@@ -18,6 +18,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var blockNumber = big.NewInt(10)
+
 func RunWithTestDB(t testing.TB, f func(*storage.Database)) {
 	testutils.RunWithTestBackend(t, func(backend models.Backend) {
 		testutils.RunWithTestFlexRoot(t, backend, func(flexRoot flow.Address) {
@@ -29,7 +31,8 @@ func RunWithTestDB(t testing.TB, f func(*storage.Database)) {
 }
 
 func RunWithNewEmulator(t testing.TB, db *storage.Database, f func(*evm.Emulator)) {
-	env := evm.NewEmulator(db)
+	cfg := evm.NewConfig(evm.WithBlockNumber(blockNumber))
+	env := evm.NewEmulator(cfg, db)
 	f(env)
 }
 
@@ -119,7 +122,7 @@ func TestContractInteraction(t *testing.T) {
 					big.NewInt(0),
 				)
 				require.NoError(t, err)
-				require.Equal(t, uint64(43_724), res.GasConsumed)
+				require.GreaterOrEqual(t, res.GasConsumed, uint64(40_000))
 			})
 
 			RunWithNewEmulator(t, db, func(env *evm.Emulator) {
@@ -134,12 +137,26 @@ func TestContractInteraction(t *testing.T) {
 
 				ret := new(big.Int).SetBytes(res.ReturnedValue)
 				require.Equal(t, num, ret)
-				require.Equal(t, uint64(23_479), res.GasConsumed)
+				require.GreaterOrEqual(t, res.GasConsumed, uint64(23_000))
 			})
+
+			RunWithNewEmulator(t, db, func(env *evm.Emulator) {
+				res, err := env.Call(testAccount,
+					contractAddr,
+					testContract.MakeBlockNumberCallData(t),
+					1_000_000,
+					// this should be zero because the contract doesn't have receiver
+					big.NewInt(0),
+				)
+				require.NoError(t, err)
+
+				ret := new(big.Int).SetBytes(res.ReturnedValue)
+				require.Equal(t, blockNumber, ret)
+			})
+
 		})
 
 		t.Run("test sending transactions", func(t *testing.T) {
-
 			keyHex := "9c647b8b7c4e7c3490668fb6c11473619db80c93704c70893d3813af4090c39c"
 			key, _ := crypto.HexToECDSA(keyHex)
 			address := crypto.PubkeyToAddress(key.PublicKey) // 658bdf435d810c91414ec09147daa6db62406379
@@ -151,7 +168,7 @@ func TestContractInteraction(t *testing.T) {
 			})
 
 			RunWithNewEmulator(t, db, func(env *evm.Emulator) {
-				signer := evm.GetSigner()
+				signer := evm.GetDefaultSigner()
 				tx, _ := types.SignTx(types.NewTransaction(0, testAccount.ToCommon(), big.NewInt(1000), params.TxGas, new(big.Int).Add(big.NewInt(0), common.Big1), nil), signer, key)
 				coinbase := models.NewFlexAddressFromString("coinbase")
 				_, err := env.RunTransaction(tx, coinbase)

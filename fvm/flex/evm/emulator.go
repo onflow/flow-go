@@ -16,29 +16,31 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
-// Environment is a one-time use flex environment and
-// should not be used more than once
+// Emulator handles operations against evm runtime
 type Emulator struct {
+	Config   *Config
 	Database *storage.Database
 }
 
 var _ models.Emulator = &Emulator{}
 
 // NewEmulator constructs a new EVM Emulator
-// TODO: last executed block should be maybe injected here, it should not be a
-// concern for the EVM environment to load, should be injected as part of config
 func NewEmulator(
+	config *Config,
 	db *storage.Database,
 ) *Emulator {
 	return &Emulator{
+		Config:   config,
 		Database: db,
 	}
 }
 
+// TransferGasUsage returns amount of gas usage for token transfer operation
 func (em *Emulator) TransferGasUsage() uint64 {
 	return TransferGasUsage
 }
 
+// BalanceOf returns the balance of the given account
 func (em *Emulator) BalanceOf(address models.FlexAddress) (*big.Int, error) {
 	execState, err := em.newState()
 	if err != nil {
@@ -59,7 +61,7 @@ func (em *Emulator) CodeOf(address models.FlexAddress) (models.Code, error) {
 // MintTo mints tokens into the target address, if the address dees not
 // exist it would create it first.
 func (em *Emulator) MintTo(address models.FlexAddress, amount *big.Int) (*models.Result, error) {
-	proc, err := em.newProcedure(NewConfig())
+	proc, err := em.newProcedure(em.Config)
 	if err != nil {
 		return nil, err
 	}
@@ -67,12 +69,13 @@ func (em *Emulator) MintTo(address models.FlexAddress, amount *big.Int) (*models
 	if err != nil {
 		return nil, err
 	}
+	res.TxType = models.DirectCallTxType
 	return res, em.commit(res.StateRootHash)
 }
 
 // WithdrawFrom deduct the balance from the given address.
 func (em *Emulator) WithdrawFrom(address models.FlexAddress, amount *big.Int) (*models.Result, error) {
-	proc, err := em.newProcedure(NewConfig())
+	proc, err := em.newProcedure(em.Config)
 	if err != nil {
 		return nil, err
 	}
@@ -80,6 +83,7 @@ func (em *Emulator) WithdrawFrom(address models.FlexAddress, amount *big.Int) (*
 	if err != nil {
 		return nil, err
 	}
+	res.TxType = models.DirectCallTxType
 	return res, em.commit(res.StateRootHash)
 }
 
@@ -87,8 +91,8 @@ func (em *Emulator) WithdrawFrom(address models.FlexAddress, amount *big.Int) (*
 // this is a similar functionality as calling a call with empty data,
 // mostly provided for a easier interaction
 //
-// Warning, This method should only be used for FOA's
-// accounts where resource ownership has been verified
+// Warning, This method should only be used for bridged accounts
+// where resource ownership has been verified
 func (em *Emulator) Transfer(
 	from, to models.FlexAddress,
 	value *big.Int,
@@ -104,21 +108,22 @@ func (em *Emulator) Transfer(
 	if err != nil {
 		return nil, err
 	}
+	res.TxType = models.DirectCallTxType
 	return res, em.commit(res.StateRootHash)
 }
 
 // Deploy deploys a contract at the given address
 // the value passed to this method would be deposited on the contract account
 //
-// Warning, This method should only be used for FOA's
-// accounts where resource ownership has been verified
+// Warning, This method should only be used for bridged accounts
+// where resource ownership has been verified
 func (em *Emulator) Deploy(
 	caller models.FlexAddress,
 	code models.Code,
 	gasLimit uint64,
 	value *big.Int,
 ) (*models.Result, error) {
-	proc, err := em.newProcedure(NewConfig(WithBlockNumber(BlockNumberForEVMRules)))
+	proc, err := em.newProcedure(em.Config)
 	if err != nil {
 		return nil, err
 	}
@@ -129,20 +134,21 @@ func (em *Emulator) Deploy(
 	if err != nil {
 		return nil, err
 	}
+	res.TxType = models.DirectCallTxType
 	return res, em.commit(res.StateRootHash)
 }
 
 // Call calls a smart contract with the input
 //
-// Warning, This method should only be used for FOA's
-// accounts where resource ownership has been verified
+// Warning, This method should only be used for bridged accounts
+// where resource ownership has been verified
 func (em *Emulator) Call(
 	from, to models.FlexAddress,
 	data models.Data,
 	gasLimit uint64,
 	value *big.Int,
 ) (*models.Result, error) {
-	proc, err := em.newProcedure(NewConfig(WithBlockNumber(BlockNumberForEVMRules)))
+	proc, err := em.newProcedure(em.Config)
 	if err != nil {
 		return nil, err
 	}
@@ -151,23 +157,25 @@ func (em *Emulator) Call(
 	if err != nil {
 		return nil, err
 	}
+	res.TxType = models.DirectCallTxType
 	return res, em.commit(res.StateRootHash)
 }
 
-// RunTransaction runs a flex transaction
-// this method could be called by anyone.
+// RunTransaction runs an evm transaction
 func (em *Emulator) RunTransaction(tx *types.Transaction, coinbase models.FlexAddress) (*models.Result, error) {
-	cfg := NewConfig(
-		WithBlockNumber(BlockNumberForEVMRules),
-		WithCoinbase(coinbase.ToCommon()))
-	proc, err := em.newProcedure(cfg)
+
+	orgCoinbase := em.Config.BlockContext.Coinbase
+	em.Config.BlockContext.Coinbase = coinbase.ToCommon()
+	defer func() {
+		em.Config.BlockContext.Coinbase = orgCoinbase
+	}()
+
+	proc, err := em.newProcedure(em.Config)
 	if err != nil {
 		return nil, err
 	}
 
-	signer := types.MakeSigner(proc.config.ChainConfig, BlockNumberForEVMRules, proc.config.BlockContext.Time)
-
-	msg, err := core.TransactionToMessage(tx, signer, proc.config.BlockContext.BaseFee)
+	msg, err := core.TransactionToMessage(tx, GetSigner(em.Config), proc.config.BlockContext.BaseFee)
 	if err != nil {
 		// note that this is not a fatal errro
 		return nil, models.NewEVMExecutionError(err)
@@ -177,6 +185,8 @@ func (em *Emulator) RunTransaction(tx *types.Transaction, coinbase models.FlexAd
 	if err != nil {
 		return nil, err
 	}
+
+	res.TxType = tx.Type()
 	return res, em.commit(res.StateRootHash)
 }
 
@@ -198,7 +208,6 @@ func (em *Emulator) newProcedure(cfg *Config) (*procedure, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	return &procedure{
 		config: cfg,
 		evm: vm.NewEVM(
@@ -263,8 +272,7 @@ func (proc *procedure) commit() (common.Hash, error) {
 func (proc *procedure) mintTo(address models.FlexAddress, amount *big.Int) (*models.Result, error) {
 	var err error
 	faddr := address.ToCommon()
-	// update the gas consumed // TODO: revisit
-	// do it as the very first thing to prevent attacks
+	// minting from gas prespective is considered similar to transfer of tokens
 	res := &models.Result{
 		GasConsumed: TransferGasUsage,
 	}
@@ -287,8 +295,7 @@ func (proc *procedure) withdrawFrom(address models.FlexAddress, amount *big.Int)
 	var err error
 
 	faddr := address.ToCommon()
-	// update the gas consumed // TODO: revisit, we might do this at the higher level
-	// do it as the very first thing to prevent attacks
+	// token withdraw from gas prespective is considered similar to transfer of tokens
 	res := &models.Result{
 		GasConsumed: TransferGasUsage,
 	}
@@ -334,7 +341,6 @@ func (proc *procedure) run(msg *core.Message) (*models.Result, error) {
 		return nil, models.NewEVMExecutionError(execResult.Err)
 	}
 
-	// TODO check if we have the logic to pay the coinbase
 	res.StateRootHash, err = proc.commit()
 
 	return res, err
@@ -358,7 +364,7 @@ func directCallMessage(
 		Value:     value,
 		Data:      data,
 		GasLimit:  gasLimit,
-		GasPrice:  big.NewInt(0), // price has to be zero
+		GasPrice:  big.NewInt(0), // price is set to zero fo direct calls
 		GasTipCap: big.NewInt(1), // TODO revisit this value (also known as maxPriorityFeePerGas)
 		GasFeeCap: big.NewInt(2), // TODO revisit this value (also known as maxFeePerGas)
 		// AccessList:        tx.AccessList(), // TODO revisit this value, the cost matter but performance might

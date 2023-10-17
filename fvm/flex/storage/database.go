@@ -146,10 +146,15 @@ func (db *Database) GetRootHash() (common.Hash, error) {
 	return common.Hash(data), err
 }
 
+// TODO depricate these
 // SetLatestBlock sets the latest executed block
 // we have this functionality given we only allow on state to exist
 func (db *Database) SetLatestBlock(block *models.FlexBlock) error {
-	err := db.led.SetValue(db.flexAddress[:], []byte(FlexLatextBlockKey), block.ToBytes())
+	blockBytes, err := block.ToBytes()
+	if err != nil {
+		return models.NewFatalError(err)
+	}
+	err = db.led.SetValue(db.flexAddress[:], []byte(FlexLatextBlockKey), blockBytes)
 	if err != nil {
 		return models.NewFatalError(err)
 	}
@@ -166,7 +171,7 @@ func (db *Database) GetLatestBlock() (*models.FlexBlock, error) {
 	if err != nil {
 		return nil, models.NewFatalError(err)
 	}
-	return models.NewFlexBlockFromBytes(data), nil
+	return models.NewFlexBlockFromBytes(data)
 }
 
 func (db *Database) storeMapRoot() error {

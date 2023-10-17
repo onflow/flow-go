@@ -79,7 +79,7 @@ func (a *EOATestAccount) PrepareAndSignTx(
 func GetTestEOAAccount(t testing.TB, keyHex string) *EOATestAccount {
 	key, _ := crypto.HexToECDSA(keyHex)
 	address := crypto.PubkeyToAddress(key.PublicKey)
-	signer := evm.GetSigner()
+	signer := evm.GetDefaultSigner()
 	return &EOATestAccount{
 		address: address,
 		key:     key,
@@ -95,7 +95,7 @@ func RunWithEOATestAccount(t *testing.T, led atree.Ledger, flexRoot flow.Address
 	db, err := storage.NewDatabase(led, flexRoot)
 	require.NoError(t, err)
 
-	e := evm.NewEmulator(db)
+	e := evm.NewEmulator(evm.NewConfig(), db)
 	require.NoError(t, err)
 
 	_, err = e.MintTo(account.FlexAddress(), new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1000)))

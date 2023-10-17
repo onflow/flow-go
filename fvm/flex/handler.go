@@ -10,7 +10,6 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/flex/models"
-	"github.com/onflow/flow-go/fvm/flex/storage"
 )
 
 // FlexContractHandler is responsible for triggering calls to emulator, metering,
@@ -24,7 +23,7 @@ import (
 // in the future we might benefit from a view style of access to db passed as
 // a param to the emulator.
 type FlexContractHandler struct {
-	db                *storage.Database
+	blockchain        models.BlockChain
 	backend           models.Backend
 	emulator          models.Emulator
 	lastExecutedBlock *models.FlexBlock
@@ -35,18 +34,18 @@ type FlexContractHandler struct {
 var _ models.FlexContractHandler = &FlexContractHandler{}
 
 func NewFlexContractHandler(
-	db *storage.Database,
+	blockchain models.BlockChain,
 	backend models.Backend,
 	emulator models.Emulator,
 ) *FlexContractHandler {
-	lastExecutedBlock, err := db.GetLatestBlock()
+	lastExecutedBlock, err := blockchain.LatestBlock()
 	// fatal error
 	if err != nil {
 		panic(err)
 	}
 
 	return &FlexContractHandler{
-		db:                db,
+		blockchain:        blockchain,
 		backend:           backend,
 		emulator:          emulator,
 		lastExecutedBlock: lastExecutedBlock,
@@ -81,7 +80,7 @@ func (h FlexContractHandler) AccountByAddress(addr models.FlexAddress, isFOA boo
 
 // LastExecutedBlock returns the last executed block
 func (h FlexContractHandler) LastExecutedBlock() *models.FlexBlock {
-	block, err := h.db.GetLatestBlock()
+	block, err := h.blockchain.LatestBlock()
 	handleError(err)
 	return block
 }
@@ -95,7 +94,7 @@ func (h *FlexContractHandler) updateLastExecutedBlock(stateRoot, eventRoot commo
 		eventRoot,
 	)
 
-	err := h.db.SetLatestBlock(h.lastExecutedBlock)
+	err := h.blockchain.AppendBlock(h.lastExecutedBlock)
 	handleError(err)
 }
 
@@ -117,18 +116,22 @@ func (h FlexContractHandler) Run(rlpEncodedTx []byte, coinbase models.FlexAddres
 	res, err := h.emulator.RunTransaction(&tx, coinbase)
 	h.meterGasUsage(res)
 
-	// TODO: we might need to revisit returning bool
-	if models.IsEVMExecutionError(err) {
-		return false
+	failed := false
+	if err != nil {
+		// if error is fatal panic here
+		if models.IsAFatalError(err) {
+			// don't wrap it
+			panic(err)
+		}
+		err = errors.NewEVMError(err)
+		failed = true
 	}
-	handleError(err)
-	// emit logs as events
-	for _, log := range res.Logs {
-		h.EmitEvent(models.NewEVMLogEvent(log))
-	}
+
+	res.Failed = failed
+	h.EmitEvent(models.NewTransactionExecutedEvent(h.lastExecutedBlock.Height+1, res))
 	h.EmitLastExecutedBlockEvent()
-	h.updateLastExecutedBlock(res.StateRootHash, res.LogsRootHash)
-	return true
+	h.updateLastExecutedBlock(res.StateRootHash, types.EmptyRootHash)
+	return failed
 }
 
 func (h FlexContractHandler) checkGasLimit(limit models.GasLimit) {
@@ -147,13 +150,13 @@ func (h FlexContractHandler) meterGasUsage(res *models.Result) {
 
 func (h *FlexContractHandler) EmitEvent(event *models.Event) {
 	// TODO add extra metering for rlp encoding
-	encoded, err := event.Payload.RLPEncode()
+	encoded, err := event.Payload.Encode()
 	handleError(err)
 	h.backend.EmitFlowEvent(event.Etype, encoded)
 }
 
 func (h *FlexContractHandler) EmitLastExecutedBlockEvent() {
-	block, err := h.db.GetLatestBlock()
+	block, err := h.blockchain.LatestBlock()
 	handleError(err)
 	h.EmitEvent(models.NewBlockExecutedEvent(block))
 }
@@ -198,7 +201,7 @@ func (f *flexAccount) Deposit(v *models.FLOWTokenVault) {
 	f.fch.EmitEvent(models.NewFlowTokenDepositEvent(f.address, v.Balance()))
 	f.fch.EmitLastExecutedBlockEvent()
 	f.fch.totalSupply += v.Balance().ToAttoFlow().Uint64()
-	f.fch.updateLastExecutedBlock(res.StateRootHash, res.LogsRootHash)
+	f.fch.updateLastExecutedBlock(res.StateRootHash, types.EmptyRootHash)
 }
 
 // Withdraw deducts the balance from the FOA account and
@@ -220,7 +223,7 @@ func (f *flexAccount) Withdraw(b models.Balance) *models.FLOWTokenVault {
 	f.fch.EmitEvent(models.NewFlowTokenWithdrawalEvent(f.address, b))
 	f.fch.EmitLastExecutedBlockEvent()
 	f.fch.totalSupply -= b.ToAttoFlow().Uint64()
-	f.fch.updateLastExecutedBlock(res.StateRootHash, res.LogsRootHash)
+	f.fch.updateLastExecutedBlock(res.StateRootHash, types.EmptyRootHash)
 	return models.NewFlowTokenVault(b)
 }
 
@@ -232,7 +235,7 @@ func (f *flexAccount) Transfer(to models.FlexAddress, balance models.Balance) {
 	f.fch.meterGasUsage(res)
 	handleError(err)
 	f.fch.EmitLastExecutedBlockEvent()
-	f.fch.updateLastExecutedBlock(res.StateRootHash, res.LogsRootHash)
+	f.fch.updateLastExecutedBlock(res.StateRootHash, types.EmptyRootHash)
 }
 
 // Deploy deploys a contract to the Flex environment
@@ -245,7 +248,7 @@ func (f *flexAccount) Deploy(code models.Code, gaslimit models.GasLimit, balance
 	f.fch.meterGasUsage(res)
 	handleError(err)
 	f.fch.EmitLastExecutedBlockEvent()
-	f.fch.updateLastExecutedBlock(res.StateRootHash, res.LogsRootHash)
+	f.fch.updateLastExecutedBlock(res.StateRootHash, types.EmptyRootHash)
 	return models.FlexAddress(res.DeployedContractAddress)
 }
 
@@ -261,7 +264,8 @@ func (f *flexAccount) Call(to models.FlexAddress, data models.Data, gaslimit mod
 	f.fch.meterGasUsage(res)
 	handleError(err)
 	f.fch.EmitLastExecutedBlockEvent()
-	f.fch.updateLastExecutedBlock(res.StateRootHash, res.LogsRootHash)
+	// TODO: update this to calculate receipt hash
+	f.fch.updateLastExecutedBlock(res.StateRootHash, types.EmptyRootHash)
 	return res.ReturnedValue
 }
 

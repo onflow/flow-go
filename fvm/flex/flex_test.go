@@ -62,12 +62,15 @@ func TestFlexAddressConstructionAndReturn(t *testing.T) {
 	t.Parallel()
 	testutils.RunWithTestBackend(t, func(backend models.Backend) {
 		testutils.RunWithTestFlexRoot(t, backend, func(flexRoot flow.Address) {
+			bs, err := flex.NewBlockStore(backend, flexRoot)
+			require.NoError(t, err)
+
 			db, err := storage.NewDatabase(backend, flexRoot)
 			require.NoError(t, err)
 
-			em := evm.NewEmulator(db)
+			em := evm.NewEmulator(evm.NewConfig(), db)
 
-			handler := flex.NewFlexContractHandler(db, backend, em)
+			handler := flex.NewFlexContractHandler(bs, backend, em)
 			env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
 
 			flexTypeDefinition := emulator.FlexTypeDefinition
@@ -138,12 +141,16 @@ func TestFlexRun(t *testing.T) {
 			testutils.RunWithDeployedContract(t, backend, flexRoot, func(testContract *testutils.TestContract) {
 				testutils.RunWithEOATestAccount(t, backend, flexRoot, func(testAccount *testutils.EOATestAccount) {
 					num := int64(12)
+
+					bs, err := flex.NewBlockStore(backend, flexRoot)
+					require.NoError(t, err)
+
 					db, err := storage.NewDatabase(backend, flexRoot)
 					require.NoError(t, err)
 
-					em := evm.NewEmulator(db)
+					em := evm.NewEmulator(evm.NewConfig(), db)
 
-					handler := flex.NewFlexContractHandler(db, backend, em)
+					handler := flex.NewFlexContractHandler(bs, backend, em)
 					interEnv := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
 
 					flexTypeDefinition := emulator.FlexTypeDefinition

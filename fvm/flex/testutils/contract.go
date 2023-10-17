@@ -40,12 +40,20 @@ func (tc *TestContract) MakeRetrieveCallData(t *testing.T) []byte {
 	return retrieve
 }
 
+func (tc *TestContract) MakeBlockNumberCallData(t *testing.T) []byte {
+	abi, err := abi.JSON(strings.NewReader(tc.ABI))
+	require.NoError(t, err)
+	blockNum, err := abi.Pack("blockNumber")
+	require.NoError(t, err)
+	return blockNum
+}
+
 func (tc *TestContract) SetDeployedAt(deployedAt models.FlexAddress) {
 	tc.DeployedAt = deployedAt
 }
 
 func GetTestContract(t *testing.T) *TestContract {
-	byteCodes, err := hex.DecodeString("6080604052610150806100136000396000f3fe608060405234801561001057600080fd5b50600436106100365760003560e01c80632e64cec11461003b5780636057361d14610059575b600080fd5b610043610075565b60405161005091906100a1565b60405180910390f35b610073600480360381019061006e91906100ed565b61007e565b005b60008054905090565b8060008190555050565b6000819050919050565b61009b81610088565b82525050565b60006020820190506100b66000830184610092565b92915050565b600080fd5b6100ca81610088565b81146100d557600080fd5b50565b6000813590506100e7816100c1565b92915050565b600060208284031215610103576101026100bc565b5b6000610111848285016100d8565b9150509291505056fea2646970667358221220029e22143e146846aff5dd684a6d627d0bec77c78e5b7ce77674d91c25d7e22264736f6c63430008120033")
+	byteCodes, err := hex.DecodeString("608060405261022c806100136000396000f3fe608060405234801561001057600080fd5b50600436106100575760003560e01c80632e64cec11461005c57806348b151661461007a57806357e871e7146100985780636057361d146100b657806385df51fd146100d2575b600080fd5b610064610102565b6040516100719190610149565b60405180910390f35b61008261010b565b60405161008f9190610149565b60405180910390f35b6100a0610113565b6040516100ad9190610149565b60405180910390f35b6100d060048036038101906100cb9190610195565b61011b565b005b6100ec60048036038101906100e79190610195565b610125565b6040516100f991906101db565b60405180910390f35b60008054905090565b600042905090565b600043905090565b8060008190555050565b600081409050919050565b6000819050919050565b61014381610130565b82525050565b600060208201905061015e600083018461013a565b92915050565b600080fd5b61017281610130565b811461017d57600080fd5b50565b60008135905061018f81610169565b92915050565b6000602082840312156101ab576101aa610164565b5b60006101b984828501610180565b91505092915050565b6000819050919050565b6101d5816101c2565b82525050565b60006020820190506101f060008301846101cc565b9291505056fea26469706673582212203ee61567a25f0b1848386ae6b8fdbd7733c8a502c83b5ed305b921b7933f4e8164736f6c63430008120033")
 	require.NoError(t, err)
 	return &TestContract{
 		Code: `
@@ -59,43 +67,97 @@ func GetTestContract(t *testing.T) *TestContract {
 				function retrieve() public view returns (uint256){
 					return number;
 				}
+				function blockNumber() public view returns (uint256) {
+					return block.number;
+				}
+				function blockTime() public view returns (uint) {
+					return  block.timestamp;
+				}
+				function blockHash(uint num)  public view returns (bytes32) {
+					return blockhash(num);
+				}
 			}
 		`,
 
 		ABI: `
-			[
-				{
-					"inputs": [],
-					"stateMutability": "payable",
-					"type": "constructor"
-				},
-				{
-					"inputs": [],
-					"name": "retrieve",
-					"outputs": [
-						{
-							"internalType": "uint256",
-							"name": "",
-							"type": "uint256"
-						}
-					],
-					"stateMutability": "view",
-					"type": "function"
-				},
-				{
-					"inputs": [
-						{
-							"internalType": "uint256",
-							"name": "num",
-							"type": "uint256"
-						}
-					],
-					"name": "store",
-					"outputs": [],
-					"stateMutability": "nonpayable",
-					"type": "function"
-				}
-			]
+		[
+			{
+				"inputs": [],
+				"stateMutability": "payable",
+				"type": "constructor"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "num",
+						"type": "uint256"
+					}
+				],
+				"name": "blockHash",
+				"outputs": [
+					{
+						"internalType": "bytes32",
+						"name": "",
+						"type": "bytes32"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "blockNumber",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "blockTime",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "retrieve",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "num",
+						"type": "uint256"
+					}
+				],
+				"name": "store",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			}
+		]
 		`,
 		ByteCode: byteCodes,
 	}
@@ -107,7 +169,7 @@ func RunWithDeployedContract(t *testing.T, led atree.Ledger, flexRoot flow.Addre
 	db, err := storage.NewDatabase(led, flexRoot)
 	require.NoError(t, err)
 
-	e := evm.NewEmulator(db)
+	e := evm.NewEmulator(evm.NewConfig(), db)
 
 	caller := models.NewFlexAddress(gethCommon.Address{})
 	_, err = e.MintTo(caller, new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1000)))
