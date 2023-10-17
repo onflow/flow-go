@@ -1,21 +1,20 @@
 package stdmap_test
 
 import (
+	"github.com/stretchr/testify/require"
 	"runtime"
 	"runtime/debug"
 	"testing"
 	"time"
 
 	lru "github.com/hashicorp/golang-lru"
-	zlog "github.com/rs/zerolog/log"
-	"github.com/stretchr/testify/require"
-
 	"github.com/onflow/flow-go/model/flow"
 	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
+	zlog "github.com/rs/zerolog/log"
 )
 
 // BenchmarkBaselineLRU benchmarks heap allocation performance of
@@ -32,13 +31,14 @@ func BenchmarkBaselineLRU(b *testing.B) {
 		stdmap.WithLimit(limit))
 
 	entityFactory := func() flow.Entity {
-		return unittest.MockEntityFixtureWithSize(b, 10)
+		e := unittest.MockEntityFixtureWithSize(b, 10)
+		return *e
 	}
 
 	b.Log("starting benchmark")
 
 	b.ResetTimer()
-	testAddEntities(b, limit, 10_000_000, backData, entityFactory)
+	testAddEntities(b, limit, 100_000_000, backData, entityFactory)
 	b.StopTimer()
 
 	b.Log("benchmark done")
@@ -67,11 +67,12 @@ func BenchmarkHeroCacheLRU(b *testing.B) {
 		stdmap.WithLimit(limit))
 
 	entityFactory := func() flow.Entity {
-		return unittest.MockEntityFixtureWithSize(b, 10)
+		e := unittest.MockEntityFixtureWithSize(b, 10)
+		return *e
 	}
 
 	b.ResetTimer()
-	testAddEntities(b, limit, 100_000, backData, entityFactory)
+	testAddEntities(b, limit, 100_000_000, backData, entityFactory)
 	b.StopTimer()
 
 	unittest.PrintHeapInfo(unittest.Logger()) // heap info after writing 100M entities
@@ -93,9 +94,11 @@ func gcAndWriteHeapProfile() {
 // and each entity is retrievable right after it is written to backdata.
 func testAddEntities(t testing.TB, limit uint, count uint, b *stdmap.Backend, entityFactory func() flow.Entity) {
 	// adding elements
-	t1 := time.Now()
+	totalDur := time.Duration(0)
 	for i := 0; i < int(count); i++ {
 		e := entityFactory()
+
+		t1 := time.Now()
 		require.False(t, b.Has(e.ID()))
 		// adding each element must be successful.
 		require.True(t, b.Add(e))
@@ -114,9 +117,11 @@ func testAddEntities(t testing.TB, limit uint, count uint, b *stdmap.Backend, en
 		actual, ok := b.ByID(e.ID())
 		require.True(t, ok)
 		require.Equal(t, e, actual)
+
+		totalDur += time.Since(t1)
 	}
-	elapsed := time.Since(t1).String()
-	zlog.Info().Str("interaction_time", elapsed).Msg("adding elements done")
+
+	zlog.Info().Str("interaction_time", totalDur.String()).Msg("adding elements done")
 }
 
 // baseLineLRU implements a BackData wrapper around hashicorp lru, which makes
