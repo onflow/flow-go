@@ -57,7 +57,7 @@ require (
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.2.3
 	github.com/onflow/flow-go-sdk v0.41.10
 	github.com/onflow/flow-go/crypto v0.24.9
-	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20230915140723-432828f7afb9
+	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20231017162044-5d0f9b6dfdb2
 	github.com/onflow/go-bitswap v0.0.0-20230703214630-6d3db958c73d
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/pierrec/lz4 v2.6.1+incompatible
@@ -101,6 +101,7 @@ require (
 	github.com/cockroachdb/pebble v0.0.0-20230829171545-74d4bb649d92
 	github.com/coreos/go-semver v0.3.0
 	github.com/go-playground/validator/v10 v10.14.1
+	github.com/golang/snappy v0.0.4
 	github.com/gorilla/websocket v1.5.0
 	github.com/hashicorp/golang-lru/v2 v2.0.2
 	github.com/mitchellh/mapstructure v1.5.0
@@ -172,7 +173,6 @@ require (
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/golang/glog v1.1.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
-	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/gopacket v1.1.19 // indirect
 	github.com/google/s2a-go v0.1.4 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.2.3 // indirect

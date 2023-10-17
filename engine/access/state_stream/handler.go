@@ -5,8 +5,7 @@ import (
 	"sync/atomic"
 
 	"github.com/onflow/flow/protobuf/go/flow/execution"
-	access "github.com/onflow/flow/protobuf/go/flow/executiondata"
-	executiondata "github.com/onflow/flow/protobuf/go/flow/executiondata"
+	"github.com/onflow/flow/protobuf/go/flow/executiondata"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -36,7 +35,7 @@ func NewHandler(api API, chain flow.Chain, conf EventFilterConfig, maxGlobalStre
 	return h
 }
 
-func (h *Handler) GetExecutionDataByBlockID(ctx context.Context, request *access.GetExecutionDataByBlockIDRequest) (*access.GetExecutionDataByBlockIDResponse, error) {
+func (h *Handler) GetExecutionDataByBlockID(ctx context.Context, request *executiondata.GetExecutionDataByBlockIDRequest) (*executiondata.GetExecutionDataByBlockIDResponse, error) {
 	blockID, err := convert.BlockID(request.GetBlockId())
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "could not convert block ID: %v", err)
@@ -59,10 +58,10 @@ func (h *Handler) GetExecutionDataByBlockID(ctx context.Context, request *access
 		return nil, status.Errorf(codes.Internal, "could not convert execution data event payloads to JSON: %v", err)
 	}
 
-	return &access.GetExecutionDataByBlockIDResponse{BlockExecutionData: message}, nil
+	return &executiondata.GetExecutionDataByBlockIDResponse{BlockExecutionData: message}, nil
 }
 
-func (h *Handler) SubscribeExecutionData(request *access.SubscribeExecutionDataRequest, stream access.ExecutionDataAPI_SubscribeExecutionDataServer) error {
+func (h *Handler) SubscribeExecutionData(request *executiondata.SubscribeExecutionDataRequest, stream executiondata.ExecutionDataAPI_SubscribeExecutionDataServer) error {
 	// check if the maximum number of streams is reached
 	if h.streamCount.Load() >= h.maxStreams {
 		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
@@ -117,7 +116,7 @@ func (h *Handler) SubscribeExecutionData(request *access.SubscribeExecutionDataR
 	}
 }
 
-func (h *Handler) SubscribeEvents(request *access.SubscribeEventsRequest, stream access.ExecutionDataAPI_SubscribeEventsServer) error {
+func (h *Handler) SubscribeEvents(request *executiondata.SubscribeEventsRequest, stream executiondata.ExecutionDataAPI_SubscribeEventsServer) error {
 	// check if the maximum number of streams is reached
 	if h.streamCount.Load() >= h.maxStreams {
 		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
@@ -194,4 +193,8 @@ func (h *Handler) SubscribeEvents(request *access.SubscribeEventsRequest, stream
 			return rpc.ConvertError(err, "could not send response", codes.Internal)
 		}
 	}
+}
+
+func (h *Handler) GetRegisterValues(ctx context.Context, request *executiondata.GetRegisterValuesRequest) (*executiondata.GetRegisterValuesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
 }

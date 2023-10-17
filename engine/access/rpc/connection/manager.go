@@ -13,10 +13,14 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
+	_ "google.golang.org/grpc/encoding/gzip" //required for gRPC compression
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/status"
 
+	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/deflate" //required for gRPC compression
+	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/snappy"  //required for gRPC compression
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
 // DefaultClientTimeout is used when making a GRPC request to a collection node or an execution node.
@@ -43,6 +47,7 @@ type Manager struct {
 	metrics              module.AccessMetrics
 	maxMsgSize           uint
 	circuitBreakerConfig CircuitBreakerConfig
+	compressorName       string
 }
 
 // CircuitBreakerConfig is a configuration struct for the circuit breaker.
@@ -66,6 +71,7 @@ func NewManager(
 	metrics module.AccessMetrics,
 	maxMsgSize uint,
 	circuitBreakerConfig CircuitBreakerConfig,
+	compressorName string,
 ) Manager {
 	return Manager{
 		cache:                cache,
@@ -73,6 +79,7 @@ func NewManager(
 		metrics:              metrics,
 		maxMsgSize:           maxMsgSize,
 		circuitBreakerConfig: circuitBreakerConfig,
+		compressorName:       compressorName,
 	}
 }
 
@@ -203,12 +210,19 @@ func (m *Manager) createConnection(address string, timeout time.Duration, cached
 	// The connections should be safe to be persisted and reused.
 	// https://pkg.go.dev/google.golang.org/grpc#WithKeepaliveParams
 	// https://grpc.io/blog/grpc-on-http2/#keeping-connections-alive
+	var opts []grpc.DialOption
+	opts = append(opts, grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(int(m.maxMsgSize))))
+	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	opts = append(opts, grpc.WithKeepaliveParams(keepaliveParams))
+	opts = append(opts, grpc.WithChainUnaryInterceptor(connInterceptors...))
+
+	if m.compressorName != grpcutils.NoCompressor {
+		opts = append(opts, grpc.WithDefaultCallOptions(grpc.UseCompressor(m.compressorName)))
+	}
+
 	conn, err := grpc.Dial(
 		address,
-		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(int(m.maxMsgSize))),
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithKeepaliveParams(keepaliveParams),
-		grpc.WithChainUnaryInterceptor(connInterceptors...),
+		opts...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to address %s: %w", address, err)
