@@ -1522,12 +1522,10 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 	}
 	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
 
-	libp2pNode, err := p2pbuilder.NewNodeBuilder(
-		builder.Logger,
-		&p2pconfig.MetricsConfig{
-			HeroCacheFactory: builder.HeroCacheMetricsFactory(),
-			Metrics:          networkMetrics,
-		},
+	libp2pNode, err := p2pbuilder.NewNodeBuilder(builder.Logger, &p2pconfig.MetricsConfig{
+		HeroCacheFactory: builder.HeroCacheMetricsFactory(),
+		Metrics:          networkMetrics,
+	},
 		network.PublicNetwork,
 		bindAddress,
 		networkKey,
@@ -1546,26 +1544,17 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 			MaxSize: builder.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
 			Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
 		},
-		meshTracer).
+		meshTracer,
+		&p2pconfig.UnicastConfig{
+			UnicastConfig: builder.FlowConfig.NetworkConfig.UnicastConfig,
+		}).
 		SetBasicResolver(builder.Resolver).
-		SetSubscriptionFilter(
-			subscription.NewRoleBasedFilter(
-				flow.RoleAccess, builder.IdentityProvider,
-			),
-		).
+		SetSubscriptionFilter(subscription.NewRoleBasedFilter(flow.RoleAccess, builder.IdentityProvider)).
 		SetConnectionManager(connManager).
 		SetRoutingSystem(func(ctx context.Context, h host.Host) (routing.Routing, error) {
-			return dht.NewDHT(
-				ctx,
-				h,
-				protocols.FlowPublicDHTProtocolID(builder.SporkID),
-				builder.Logger,
-				networkMetrics,
-				dht.AsServer(),
-			)
+			return dht.NewDHT(ctx, h, protocols.FlowPublicDHTProtocolID(builder.SporkID), builder.Logger, networkMetrics, dht.AsServer())
 		}).
 		// disable connection pruning for the access node which supports the observer
-		SetStreamCreationRetryInterval(builder.FlowConfig.NetworkConfig.UnicastCreateStreamRetryDelay).
 		SetGossipSubTracer(meshTracer).
 		SetGossipSubScoreTracerInterval(builder.FlowConfig.NetworkConfig.GossipSubConfig.ScoreTracerInterval).
 		Build()

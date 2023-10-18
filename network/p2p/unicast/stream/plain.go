@@ -1,4 +1,4 @@
-package unicast
+package stream
 
 import (
 	libp2pnet "github.com/libp2p/go-libp2p/core/network"
@@ -9,6 +9,19 @@ import (
 type PlainStream struct {
 	handler    libp2pnet.StreamHandler
 	protocolId protocol.ID
+}
+
+// NewPlainStream creates a new PlainStream.
+// Args:
+// - handler: the stream handler that handles the input stream.
+// - protocolId: the protocol id of the stream.
+// Returns:
+//   - PlainStream instance.
+func NewPlainStream(handler libp2pnet.StreamHandler, protocolId protocol.ID) PlainStream {
+	return PlainStream{
+		handler:    handler,
+		protocolId: protocolId,
+	}
 }
 
 // UpgradeRawStream implements protocol interface and returns the input stream without any modification.
