@@ -18,8 +18,7 @@ func BlockExecutionDataEventPayloadsToVersion(
 	m *entities.BlockExecutionData,
 	to entities.EventEncodingVersion,
 ) error {
-	eventEncodingVersion := GetConversionEventEncodingVersion(to)
-	if eventEncodingVersion == entities.EventEncodingVersion_CCF_V0 {
+	if to == entities.EventEncodingVersion_CCF_V0 {
 		return nil
 	}
 

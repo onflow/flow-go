@@ -53,7 +53,7 @@ func (suite *Suite) TestHistoricalTransactionResult() {
 		txID,
 		flow.ZeroID,
 		flow.ZeroID,
-		entities.EventEncodingVersion_DEFAULT,
+		entities.EventEncodingVersion_JSON_CDC_V0,
 	)
 	suite.checkResponse(result, err)
 

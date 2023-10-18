@@ -190,7 +190,13 @@ func (h *Handler) GetTransactionResult(
 ) (*accessproto.TransactionResultResponse, error) {
 	id := convert.MessageToIdentifier(req.GetId())
 
-	result, err := h.api.GetTransactionResult(ctx, id, flow.ZeroID, flow.ZeroID, entities.EventEncodingVersion_JSON_CDC_V0)
+	result, err := h.api.GetTransactionResult(
+		ctx,
+		id,
+		flow.ZeroID,
+		flow.ZeroID,
+		entities.EventEncodingVersion_JSON_CDC_V0,
+	)
 	if err != nil {
 		return nil, err
 	}

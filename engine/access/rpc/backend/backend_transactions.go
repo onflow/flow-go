@@ -228,7 +228,7 @@ func (b *backendTransactions) GetTransactionResult(
 	txID flow.Identifier,
 	blockID flow.Identifier,
 	collectionID flow.Identifier,
-	eventEncodingVersion entities.EventEncodingVersion,
+	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) (*access.TransactionResult, error) {
 	// look up transaction from storage
 	start := time.Now()
@@ -287,7 +287,7 @@ func (b *backendTransactions) GetTransactionResult(
 	// access node may not have the block if it hasn't yet been finalized, hence block can be nil at this point
 	if block != nil {
 		foundBlockID := block.ID()
-		transactionWasExecuted, events, statusCode, txError, err = b.lookupTransactionResult(ctx, txID, foundBlockID, eventEncodingVersion)
+		transactionWasExecuted, events, statusCode, txError, err = b.lookupTransactionResult(ctx, txID, foundBlockID, requiredEventEncodingVersion)
 		if err != nil {
 			return nil, rpc.ConvertError(err, "failed to retrieve result from any execution node", codes.Internal)
 		}
@@ -386,7 +386,7 @@ func (b *backendTransactions) retrieveBlock(
 func (b *backendTransactions) GetTransactionResultsByBlockID(
 	ctx context.Context,
 	blockID flow.Identifier,
-	eventEncodingVersion entities.EventEncodingVersion,
+	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) ([]*access.TransactionResult, error) {
 	// TODO: consider using storage.Index.ByBlockID, the index contains collection id and seals ID
 	block, err := b.blocks.ByID(blockID)
@@ -411,14 +411,16 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 		return nil, rpc.ConvertError(err, "failed to retrieve result from execution node", codes.Internal)
 	}
 
+	if resp.GetEventEncodingVersion() == entities.EventEncodingVersion_JSON_CDC_V0 && requiredEventEncodingVersion == entities.EventEncodingVersion_CCF_V0 {
+		return nil, errors.New("conversion from JSON-CDC to CCF is forbidden")
+	}
+
 	results := make([]*access.TransactionResult, 0, len(resp.TransactionResults))
 	i := 0
 	errInsufficientResults := status.Errorf(
 		codes.Internal,
 		"number of transaction results returned by execution node is less than the number of transactions  in the block",
 	)
-
-	requestedEventEncodingVersion := convert.GetConversionEventEncodingVersion(eventEncodingVersion)
 
 	for _, guarantee := range block.Payload.Guarantees {
 		collection, err := b.collections.LightByID(guarantee.CollectionID)
@@ -438,7 +440,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 			if err != nil {
 				return nil, rpc.ConvertStorageError(err)
 			}
-			events, err := convert.MessagesToEventsFromVersion(txResult.GetEvents(), requestedEventEncodingVersion)
+			events, err := convert.MessagesToEventsFromVersion(txResult.GetEvents(), requiredEventEncodingVersion)
 			if err != nil {
 				return nil, status.Errorf(codes.Internal,
 					"failed to convert events to message in txID %x: %v", txID, err)
@@ -493,7 +495,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 			return nil, rpc.ConvertStorageError(err)
 		}
 
-		events, err := convert.MessagesToEventsFromVersion(systemTxResult.GetEvents(), requestedEventEncodingVersion)
+		events, err := convert.MessagesToEventsFromVersion(systemTxResult.GetEvents(), requiredEventEncodingVersion)
 		if err != nil {
 			return nil, rpc.ConvertError(err, "failed to convert events from system tx result", codes.Internal)
 		}
@@ -518,7 +520,7 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 	ctx context.Context,
 	blockID flow.Identifier,
 	index uint32,
-	eventEncodingVersion entities.EventEncodingVersion,
+	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) (*access.TransactionResult, error) {
 	// TODO: https://github.com/onflow/flow-go/issues/2175 so caching doesn't cause a circular dependency
 	block, err := b.blocks.ByID(blockID)
@@ -545,15 +547,17 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 		return nil, rpc.ConvertError(err, "failed to retrieve result from execution node", codes.Internal)
 	}
 
+	if resp.GetEventEncodingVersion() == entities.EventEncodingVersion_JSON_CDC_V0 && requiredEventEncodingVersion == entities.EventEncodingVersion_CCF_V0 {
+		return nil, errors.New("conversion from JSON-CDC to CCF is forbidden")
+	}
+
 	// tx body is irrelevant to status if it's in an executed block
 	txStatus, err := b.deriveTransactionStatus(nil, true, block)
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	requestedEventEncodingVersion := convert.GetConversionEventEncodingVersion(eventEncodingVersion)
-
-	events, err := convert.MessagesToEventsFromVersion(resp.GetEvents(), requestedEventEncodingVersion)
+	events, err := convert.MessagesToEventsFromVersion(resp.GetEvents(), requiredEventEncodingVersion)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to convert events in blockID %x: %v", blockID, err)
 	}
@@ -670,9 +674,9 @@ func (b *backendTransactions) lookupTransactionResult(
 	ctx context.Context,
 	txID flow.Identifier,
 	blockID flow.Identifier,
-	eventEncodingVersion entities.EventEncodingVersion,
+	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) (bool, []flow.Event, uint32, string, error) {
-	events, txStatus, message, err := b.getTransactionResultFromExecutionNode(ctx, blockID, txID[:], eventEncodingVersion)
+	events, txStatus, message, err := b.getTransactionResultFromExecutionNode(ctx, blockID, txID[:], requiredEventEncodingVersion)
 	if err != nil {
 		// if either the execution node reported no results or the execution node could not be chosen
 		if status.Code(err) == codes.NotFound {
@@ -755,7 +759,7 @@ func (b *backendTransactions) getTransactionResultFromExecutionNode(
 	ctx context.Context,
 	blockID flow.Identifier,
 	transactionID []byte,
-	eventEncodingVersion entities.EventEncodingVersion,
+	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) ([]flow.Event, uint32, string, error) {
 
 	// create an execution API request for events at blockID and transactionID
@@ -778,9 +782,11 @@ func (b *backendTransactions) getTransactionResultFromExecutionNode(
 		return nil, 0, "", err
 	}
 
-	requestedEventEncodingVersion := convert.GetConversionEventEncodingVersion(eventEncodingVersion)
+	if resp.GetEventEncodingVersion() == entities.EventEncodingVersion_JSON_CDC_V0 && requiredEventEncodingVersion == entities.EventEncodingVersion_CCF_V0 {
+		return nil, 0, "", rpc.ConvertError(err, "conversion from JSON-CDC to CCF is forbidden", codes.Internal)
+	}
 
-	events, err := convert.MessagesToEventsFromVersion(resp.GetEvents(), requestedEventEncodingVersion)
+	events, err := convert.MessagesToEventsFromVersion(resp.GetEvents(), requiredEventEncodingVersion)
 	if err != nil {
 		return nil, 0, "", rpc.ConvertError(err, "failed to convert events to message", codes.Internal)
 	}

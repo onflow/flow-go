@@ -23,7 +23,12 @@ func GetEvents(r *request.Request, backend access.API, _ models.LinkGenerator) (
 	// if the request has block IDs provided then return events for block IDs
 	var blocksEvents models.BlocksEvents
 	if len(req.BlockIDs) > 0 {
-		events, err := backend.GetEventsForBlockIDs(r.Context(), req.Type, req.BlockIDs, entitiesproto.EventEncodingVersion_DEFAULT)
+		events, err := backend.GetEventsForBlockIDs(
+			r.Context(),
+			req.Type,
+			req.BlockIDs,
+			entitiesproto.EventEncodingVersion_JSON_CDC_V0,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -47,7 +52,13 @@ func GetEvents(r *request.Request, backend access.API, _ models.LinkGenerator) (
 	}
 
 	// if request provided block height range then return events for that range
-	events, err := backend.GetEventsForHeightRange(r.Context(), req.Type, req.StartHeight, req.EndHeight, entitiesproto.EventEncodingVersion_DEFAULT)
+	events, err := backend.GetEventsForHeightRange(
+		r.Context(),
+		req.Type,
+		req.StartHeight,
+		req.EndHeight,
+		entitiesproto.EventEncodingVersion_JSON_CDC_V0,
+	)
 	if err != nil {
 		return nil, err
 	}

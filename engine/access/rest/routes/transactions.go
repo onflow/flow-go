@@ -28,7 +28,7 @@ func GetTransactionByID(r *request.Request, backend access.API, link models.Link
 			req.ID,
 			req.BlockID,
 			req.CollectionID,
-			entitiesproto.EventEncodingVersion_DEFAULT,
+			entitiesproto.EventEncodingVersion_JSON_CDC_V0,
 		)
 		if err != nil {
 			return nil, err
@@ -52,7 +52,7 @@ func GetTransactionResultByID(r *request.Request, backend access.API, link model
 		req.ID,
 		req.BlockID,
 		req.CollectionID,
-		entitiesproto.EventEncodingVersion_DEFAULT,
+		entitiesproto.EventEncodingVersion_JSON_CDC_V0,
 	)
 	if err != nil {
 		return nil, err

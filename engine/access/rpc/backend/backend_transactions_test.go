@@ -79,7 +79,7 @@ func (suite *Suite) TestGetTransactionResultReturnsUnknown() {
 			tx.ID(),
 			block.ID(),
 			coll.ID(),
-			entities.EventEncodingVersion_DEFAULT,
+			entities.EventEncodingVersion_JSON_CDC_V0,
 		)
 		suite.Require().NoError(err)
 		suite.Require().Equal(res.Status, flow.TransactionStatusUnknown)
@@ -118,7 +118,7 @@ func (suite *Suite) TestGetTransactionResultReturnsTransactionError() {
 			tx.ID(),
 			block.ID(),
 			coll.ID(),
-			entities.EventEncodingVersion_DEFAULT,
+			entities.EventEncodingVersion_JSON_CDC_V0,
 		)
 		suite.Require().Equal(err, status.Errorf(codes.Internal, "failed to find: %v", fmt.Errorf("some other error")))
 
@@ -162,7 +162,7 @@ func (suite *Suite) TestGetTransactionResultReturnsValidTransactionResultFromHis
 			tx.ID(),
 			block.ID(),
 			coll.ID(),
-			entities.EventEncodingVersion_DEFAULT,
+			entities.EventEncodingVersion_JSON_CDC_V0,
 		)
 		suite.Require().NoError(err)
 		suite.Require().Equal(flow.TransactionStatusExecuted, resp.Status)
@@ -214,7 +214,7 @@ func (suite *Suite) TestGetTransactionResultFromCache() {
 			tx.ID(),
 			block.ID(),
 			coll.ID(),
-			entities.EventEncodingVersion_DEFAULT,
+			entities.EventEncodingVersion_JSON_CDC_V0,
 		)
 		suite.Require().NoError(err)
 		suite.Require().Equal(flow.TransactionStatusExecuted, resp.Status)
@@ -225,7 +225,7 @@ func (suite *Suite) TestGetTransactionResultFromCache() {
 			tx.ID(),
 			block.ID(),
 			coll.ID(),
-			entities.EventEncodingVersion_DEFAULT,
+			entities.EventEncodingVersion_JSON_CDC_V0,
 		)
 		suite.Require().NoError(err)
 		suite.Require().Equal(flow.TransactionStatusExecuted, resp2.Status)
@@ -258,7 +258,7 @@ func (suite *Suite) TestGetTransactionResultCacheNonExistent() {
 			tx.ID(),
 			block.ID(),
 			coll.ID(),
-			entities.EventEncodingVersion_DEFAULT,
+			entities.EventEncodingVersion_JSON_CDC_V0,
 		)
 		suite.Require().NoError(err)
 		suite.Require().Equal(flow.TransactionStatusUnknown, resp.Status)
@@ -299,7 +299,7 @@ func (suite *Suite) TestGetTransactionResultUnknownFromCache() {
 			tx.ID(),
 			block.ID(),
 			coll.ID(),
-			entities.EventEncodingVersion_DEFAULT,
+			entities.EventEncodingVersion_JSON_CDC_V0,
 		)
 		suite.Require().NoError(err)
 		suite.Require().Equal(flow.TransactionStatusUnknown, resp.Status)
@@ -319,7 +319,7 @@ func (suite *Suite) TestGetTransactionResultUnknownFromCache() {
 			tx.ID(),
 			block.ID(),
 			coll.ID(),
-			entities.EventEncodingVersion_DEFAULT,
+			entities.EventEncodingVersion_JSON_CDC_V0,
 		)
 		suite.Require().NoError(err)
 		suite.Require().Equal(flow.TransactionStatusUnknown, resp2.Status)

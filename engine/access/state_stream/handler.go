@@ -160,8 +160,7 @@ func (h *Handler) SubscribeEvents(request *executiondata.SubscribeEventsRequest,
 			return status.Errorf(codes.Internal, "unexpected response type: %T", v)
 		}
 
-		eventEncodingVersion := convert.GetConversionEventEncodingVersion(request.GetEventEncodingVersion())
-		events, err := convert.EventsToMessagesFromVersion(resp.Events, eventEncodingVersion)
+		events, err := convert.EventsToMessagesFromVersion(resp.Events, request.GetEventEncodingVersion())
 		if err != nil {
 			return status.Errorf(codes.Internal, "could not convert events to entity: %v", err)
 		}

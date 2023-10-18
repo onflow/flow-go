@@ -261,13 +261,3 @@ func BlockEventsToMessage(block flow.BlockEvents) (*accessproto.EventsResponse_R
 		Events:         eventMessages,
 	}, nil
 }
-
-// GetConversionEventEncodingVersion returns the appropriate event encoding version for conversion.
-func GetConversionEventEncodingVersion(requestedEventEncodingVersion entities.EventEncodingVersion) entities.EventEncodingVersion {
-	// 1. Check the requested version of payloads.
-	if requestedEventEncodingVersion == entities.EventEncodingVersion_DEFAULT {
-		return entities.EventEncodingVersion_JSON_CDC_V0
-	}
-
-	return requestedEventEncodingVersion
-}

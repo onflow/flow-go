@@ -168,14 +168,14 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 		events[i] = unittest.BlockEventsFixture(header, 2)
 
 		backend.Mock.
-			On("GetEventsForBlockIDs", mocks.Anything, mocks.Anything, []flow.Identifier{header.ID()}, entities.EventEncodingVersion_DEFAULT).
+			On("GetEventsForBlockIDs", mocks.Anything, mocks.Anything, []flow.Identifier{header.ID()}, entities.EventEncodingVersion_JSON_CDC_V0).
 			Return([]flow.BlockEvents{events[i]}, nil)
 
 		lastHeader = header
 	}
 
 	backend.Mock.
-		On("GetEventsForBlockIDs", mocks.Anything, mocks.Anything, ids, entities.EventEncodingVersion_DEFAULT).
+		On("GetEventsForBlockIDs", mocks.Anything, mocks.Anything, ids, entities.EventEncodingVersion_JSON_CDC_V0).
 		Return(events, nil)
 
 	// range from first to last block
@@ -185,7 +185,7 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 		mocks.Anything,
 		events[0].BlockHeight,
 		events[len(events)-1].BlockHeight,
-		entities.EventEncodingVersion_DEFAULT,
+		entities.EventEncodingVersion_JSON_CDC_V0,
 	).Return(events, nil)
 
 	// range from first to last block + 5
@@ -195,7 +195,7 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 		mocks.Anything,
 		events[0].BlockHeight,
 		events[len(events)-1].BlockHeight+5,
-		entities.EventEncodingVersion_DEFAULT,
+		entities.EventEncodingVersion_JSON_CDC_V0,
 	).Return(append(events[:len(events)-1], unittest.BlockEventsFixture(lastHeader, 0)), nil)
 
 	latestBlock := unittest.BlockHeaderFixture()
@@ -203,7 +203,7 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 
 	// default not found
 	backend.Mock.
-		On("GetEventsForBlockIDs", mocks.Anything, mocks.Anything, mocks.Anything, entities.EventEncodingVersion_DEFAULT).
+		On("GetEventsForBlockIDs", mocks.Anything, mocks.Anything, mocks.Anything, entities.EventEncodingVersion_JSON_CDC_V0).
 		Return(nil, status.Error(codes.NotFound, "not found"))
 
 	backend.Mock.

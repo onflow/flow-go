@@ -171,7 +171,7 @@ func TestExecutionDataStreamEventEncoding(t *testing.T) {
 	// Test scenario for default (JSON) event encoding.
 	t.Run("test default(JSON)", func(t *testing.T) {
 		makeStreamRequest(&executiondata.SubscribeExecutionDataRequest{
-			EventEncodingVersion: entities.EventEncodingVersion_DEFAULT,
+			EventEncodingVersion: entities.EventEncodingVersion_JSON_CDC_V0,
 		})
 		for {
 			resp, err := stream.RecvToClient()
