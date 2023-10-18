@@ -86,34 +86,12 @@ func (u *Updater) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
 	// by definition, this will include identities from current epoch + identities from previous epoch with 0 weight.
 	activeIdentitiesLookup := u.parentState.CurrentEpoch.ActiveIdentities.Lookup()
 
-	currentEpochSetupParticipants := u.parentState.CurrentEpochSetup.Participants
 	// construct identities for current epoch: current epoch participants + next epoch participants with 0 weight
-	currentEpochIdentities := make(flow.DynamicIdentityEntryList, 0, len(currentEpochSetupParticipants))
 	// In this loop, we will perform step 1 from above.
-	for _, identity := range currentEpochSetupParticipants {
-		identityParentState := activeIdentitiesLookup[identity.NodeID]
-		currentEpochIdentities = append(currentEpochIdentities, &flow.DynamicIdentityEntry{
-			NodeID:  identity.NodeID,
-			Dynamic: identityParentState.Dynamic,
-		})
-	}
 
-	nextEpochIdentities := make(flow.DynamicIdentityEntryList, 0, len(currentEpochIdentities))
-	currentEpochIdentitiesLookup := currentEpochIdentities.Lookup()
+	nextEpochIdentities := make(flow.DynamicIdentityEntryList, 0, len(epochSetup.Participants))
 	// For an `identity` participating in the upcoming epoch, we effectively perform steps 2 and 3 from above within a single loop.
 	for _, identity := range epochSetup.Participants {
-		// Step 2: node is _not_ participating in the current epoch, but joining in the upcoming epoch.
-		// The node is allowed to join the network already in this epoch's Setup Phase, but has weight 0.
-		if _, found := currentEpochIdentitiesLookup[identity.NodeID]; !found {
-			currentEpochIdentities = append(currentEpochIdentities, &flow.DynamicIdentityEntry{
-				NodeID: identity.NodeID,
-				Dynamic: flow.DynamicIdentity{
-					Weight:  0,
-					Ejected: false,
-				},
-			})
-		}
-
 		// Step 3: for the next epoch we include every identity from its setup event;
 		identityParentState, found := activeIdentitiesLookup[identity.NodeID]
 		nextEpochIdentities = append(nextEpochIdentities, &flow.DynamicIdentityEntry{
@@ -124,26 +102,6 @@ func (u *Updater) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
 			},
 		})
 	}
-
-	nextEpochIdentitiesLookup := nextEpochIdentities.Lookup()
-	// Step 4: we need to extend the next epoch's identities by adding identities that are leaving at the end of
-	// the current epoch. Specifically, each identity from the current epoch that is _not_ listed in the
-	// Setup Event for the next epoch is added with 0 weight and the _current_ value of the Ejected flag.
-	for _, identity := range currentEpochSetupParticipants {
-		if _, found := nextEpochIdentitiesLookup[identity.NodeID]; !found {
-			identityParentState := activeIdentitiesLookup[identity.NodeID]
-			nextEpochIdentities = append(nextEpochIdentities, &flow.DynamicIdentityEntry{
-				NodeID: identity.NodeID,
-				Dynamic: flow.DynamicIdentity{
-					Weight:  0,
-					Ejected: identityParentState.Dynamic.Ejected,
-				},
-			})
-		}
-	}
-
-	// IMPORTANT: per convention, identities must be listed on canonical order!
-	u.state.CurrentEpoch.ActiveIdentities = currentEpochIdentities.Sort(order.IdentifierCanonical)
 
 	// construct protocol state entry for next epoch
 	u.state.NextEpoch = &flow.EpochStateContainer{

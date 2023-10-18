@@ -34,7 +34,11 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 				CommitID:         currentEpochCommit.ID(),
 				ActiveIdentities: identities,
 			},
-			PreviousEpoch:                   flow.EventIDs{},
+			PreviousEpoch: flow.EpochStateContainer{
+				SetupID:          flow.ZeroID,
+				CommitID:         flow.ZeroID,
+				ActiveIdentities: nil,
+			},
 			InvalidStateTransitionAttempted: false,
 		}
 		entry, err := flow.NewRichProtocolStateEntry(
@@ -47,7 +51,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 			nil,
 		)
 		assert.NoError(t, err)
-		expectedIdentities, err := flow.BuildIdentityTable(identities, setup.Participants, nil)
+		expectedIdentities, err := flow.BuildIdentityTable(identities, setup.Participants, nil, nil)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedIdentities, entry.CurrentEpochIdentityTable, "should be equal to current epoch setup participants")
 	})
@@ -72,6 +76,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 			stateEntry.CurrentEpoch.ActiveIdentities,
 			stateEntry.CurrentEpochSetup.Participants,
 			stateEntry.PreviousEpochSetup.Participants,
+			stateEntry.PreviousEpoch.ActiveIdentities,
 		)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedIdentities, richEntry.CurrentEpochIdentityTable, "should be equal to current epoch setup participants + previous epoch setup participants")
@@ -102,6 +107,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 			stateEntry.CurrentEpoch.ActiveIdentities,
 			stateEntry.CurrentEpochSetup.Participants,
 			stateEntry.NextEpochSetup.Participants,
+			stateEntry.NextEpoch.ActiveIdentities,
 		)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedIdentities, richEntry.CurrentEpochIdentityTable, "should be equal to current epoch setup participants + next epoch setup participants")
@@ -110,6 +116,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 			stateEntry.NextEpoch.ActiveIdentities,
 			stateEntry.NextEpochSetup.Participants,
 			stateEntry.CurrentEpochSetup.Participants,
+			stateEntry.CurrentEpoch.ActiveIdentities,
 		)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedIdentities, richEntry.NextEpochIdentityTable, "should be equal to next epoch setup participants + current epoch setup participants")
@@ -138,6 +145,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 			stateEntry.CurrentEpoch.ActiveIdentities,
 			stateEntry.CurrentEpochSetup.Participants,
 			stateEntry.NextEpochSetup.Participants,
+			stateEntry.NextEpoch.ActiveIdentities,
 		)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedIdentities, richEntry.CurrentEpochIdentityTable, "should be equal to current epoch setup participants + next epoch setup participants")
@@ -145,6 +153,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 			stateEntry.NextEpoch.ActiveIdentities,
 			stateEntry.NextEpochSetup.Participants,
 			stateEntry.CurrentEpochSetup.Participants,
+			stateEntry.CurrentEpoch.ActiveIdentities,
 		)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedIdentities, richEntry.NextEpochIdentityTable, "should be equal to next epoch setup participants + current epoch setup participants")

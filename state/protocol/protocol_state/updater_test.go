@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/mapfunc"
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -297,18 +296,8 @@ func (s *UpdaterSuite) TestProcessEpochSetupHappyPath() {
 		setup.Participants = setupParticipants.ToSkeleton()
 	})
 
-	participantsFromCurrentEpochSetup := s.parentProtocolState.CurrentEpochIdentityTable.Filter(func(i *flow.Identity) bool {
-		_, exists := s.parentProtocolState.CurrentEpochSetup.Participants.ByNodeID(i.NodeID)
-		return exists
-	})
-	// for current epoch we will have all the nodes from the current epoch + nodes from the next epoch with 0 weight
-	expectedCurrentEpochIdentityTable := flow.DynamicIdentityEntryListFromIdentities(
-		participantsFromCurrentEpochSetup.Union(setupParticipants.Map(mapfunc.WithWeight(0))),
-	)
-	// for next epoch we will have all the nodes from the next epoch + nodes from the current epoch with 0 weight
-	expectedNextEpochIdentityTable := flow.DynamicIdentityEntryListFromIdentities(
-		setupParticipants.Union(participantsFromCurrentEpochSetup.Map(mapfunc.WithWeight(0))),
-	)
+	// for next epoch we will have all the identities from setup event
+	expectedNextEpochActiveIdentities := flow.DynamicIdentityEntryListFromIdentities(setupParticipants)
 
 	// process actual event
 	err := s.updater.ProcessEpochSetup(setup)
@@ -316,22 +305,25 @@ func (s *UpdaterSuite) TestProcessEpochSetupHappyPath() {
 
 	updatedState, _, hasChanges := s.updater.Build()
 	require.True(s.T(), hasChanges, "should have changes")
-	require.Equal(s.T(), expectedCurrentEpochIdentityTable, updatedState.CurrentEpoch.ActiveIdentities)
+	require.Equal(s.T(), s.parentProtocolState.PreviousEpoch.ActiveIdentities, updatedState.PreviousEpoch.ActiveIdentities,
+		"should not change active identities for previous epoch")
+	require.Equal(s.T(), s.parentProtocolState.CurrentEpoch.ActiveIdentities, updatedState.CurrentEpoch.ActiveIdentities,
+		"should not change active identities for current epoch")
 	nextEpoch := updatedState.NextEpoch
 	require.NotNil(s.T(), nextEpoch, "should have next epoch protocol state")
 	require.Equal(s.T(), nextEpoch.SetupID, setup.ID(),
 		"should have correct setup ID for next protocol state")
-	require.Equal(s.T(), expectedNextEpochIdentityTable, nextEpoch.ActiveIdentities)
+	require.Equal(s.T(), expectedNextEpochActiveIdentities, nextEpoch.ActiveIdentities,
+		"should have filled active identities for next epoch")
 }
 
 // TestProcessEpochSetupWithSameParticipants tests that processing epoch setup with overlapping participants results in correctly
 // built updated protocol state. It should build a union of participants from current and next epoch for current and
 // next epoch protocol states respectively.
 func (s *UpdaterSuite) TestProcessEpochSetupWithSameParticipants() {
-	participantsFromCurrentEpochSetup := s.parentProtocolState.CurrentEpochIdentityTable.Filter(func(i *flow.Identity) bool {
-		_, exists := s.parentProtocolState.CurrentEpochSetup.Participants.ByNodeID(i.NodeID)
-		return exists
-	}).Sort(order.Canonical[flow.Identity])
+	participantsFromCurrentEpochSetup, err := flow.ReconstructIdentities(s.parentProtocolState.CurrentEpochSetup.Participants,
+		s.parentProtocolState.CurrentEpoch.ActiveIdentities)
+	require.NoError(s.T(), err)
 
 	overlappingNodes, err := participantsFromCurrentEpochSetup.Sample(2)
 	require.NoError(s.T(), err)
@@ -345,19 +337,13 @@ func (s *UpdaterSuite) TestProcessEpochSetupWithSameParticipants() {
 	require.NoError(s.T(), err)
 	updatedState, _, _ := s.updater.Build()
 
-	expectedParticipants := flow.DynamicIdentityEntryListFromIdentities(
-		participantsFromCurrentEpochSetup.Union(setupParticipants.Map(mapfunc.WithWeight(0))),
-	)
-	require.Equal(s.T(), updatedState.CurrentEpoch.ActiveIdentities,
-		expectedParticipants,
-		"should have all participants from current epoch and next epoch, but without duplicates")
+	require.Equal(s.T(), s.parentProtocolState.CurrentEpoch.ActiveIdentities,
+		updatedState.CurrentEpoch.ActiveIdentities,
+		"should not change active identities for current epoch")
 
-	nextEpochParticipants := flow.DynamicIdentityEntryListFromIdentities(
-		setupParticipants.Union(participantsFromCurrentEpochSetup.Map(mapfunc.WithWeight(0))),
-	)
-	require.Equal(s.T(), updatedState.NextEpoch.ActiveIdentities,
-		nextEpochParticipants,
-		"should have all participants from previous epoch and current epoch, but without duplicates")
+	expectedNextEpochActiveIdentities := flow.DynamicIdentityEntryListFromIdentities(setupParticipants)
+	require.Equal(s.T(), expectedNextEpochActiveIdentities, updatedState.NextEpoch.ActiveIdentities,
+		"should have filled active identities for next epoch")
 }
 
 // TestEpochSetupAfterIdentityChange tests that after processing epoch an setup event, all previously made changes to the identity table
