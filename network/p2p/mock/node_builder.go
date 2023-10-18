@@ -199,22 +199,6 @@ func (_m *NodeBuilder) SetGossipSubTracer(_a0 p2p.PubSubTracer) p2p.NodeBuilder 
 	return r0
 }
 
-// SetRateLimiterDistributor provides a mock function with given fields: _a0
-func (_m *NodeBuilder) SetRateLimiterDistributor(_a0 p2p.UnicastRateLimiterDistributor) p2p.NodeBuilder {
-	ret := _m.Called(_a0)
-
-	var r0 p2p.NodeBuilder
-	if rf, ok := ret.Get(0).(func(p2p.UnicastRateLimiterDistributor) p2p.NodeBuilder); ok {
-		r0 = rf(_a0)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(p2p.NodeBuilder)
-		}
-	}
-
-	return r0
-}
-
 // SetResourceManager provides a mock function with given fields: _a0
 func (_m *NodeBuilder) SetResourceManager(_a0 network.ResourceManager) p2p.NodeBuilder {
 	ret := _m.Called(_a0)
@@ -237,22 +221,6 @@ func (_m *NodeBuilder) SetRoutingSystem(_a0 func(context.Context, host.Host) (ro
 
 	var r0 p2p.NodeBuilder
 	if rf, ok := ret.Get(0).(func(func(context.Context, host.Host) (routing.Routing, error)) p2p.NodeBuilder); ok {
-		r0 = rf(_a0)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(p2p.NodeBuilder)
-		}
-	}
-
-	return r0
-}
-
-// SetStreamCreationRetryInterval provides a mock function with given fields: _a0
-func (_m *NodeBuilder) SetStreamCreationRetryInterval(_a0 time.Duration) p2p.NodeBuilder {
-	ret := _m.Called(_a0)
-
-	var r0 p2p.NodeBuilder
-	if rf, ok := ret.Get(0).(func(time.Duration) p2p.NodeBuilder); ok {
 		r0 = rf(_a0)
 	} else {
 		if ret.Get(0) != nil {
