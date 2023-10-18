@@ -13,6 +13,16 @@ type UnicastManagerMetrics struct {
 	mock.Mock
 }
 
+// OnDialRetryBudgetResetToDefault provides a mock function with given fields:
+func (_m *UnicastManagerMetrics) OnDialRetryBudgetResetToDefault() {
+	_m.Called()
+}
+
+// OnDialRetryBudgetUpdated provides a mock function with given fields: budget
+func (_m *UnicastManagerMetrics) OnDialRetryBudgetUpdated(budget uint64) {
+	_m.Called(budget)
+}
+
 // OnEstablishStreamFailure provides a mock function with given fields: duration, attempts
 func (_m *UnicastManagerMetrics) OnEstablishStreamFailure(duration time.Duration, attempts int) {
 	_m.Called(duration, attempts)
@@ -36,6 +46,16 @@ func (_m *UnicastManagerMetrics) OnStreamCreated(duration time.Duration, attempt
 // OnStreamCreationFailure provides a mock function with given fields: duration, attempts
 func (_m *UnicastManagerMetrics) OnStreamCreationFailure(duration time.Duration, attempts int) {
 	_m.Called(duration, attempts)
+}
+
+// OnStreamCreationRetryBudgetResetToDefault provides a mock function with given fields:
+func (_m *UnicastManagerMetrics) OnStreamCreationRetryBudgetResetToDefault() {
+	_m.Called()
+}
+
+// OnStreamCreationRetryBudgetUpdated provides a mock function with given fields: budget
+func (_m *UnicastManagerMetrics) OnStreamCreationRetryBudgetUpdated(budget uint64) {
+	_m.Called(budget)
 }
 
 // OnStreamEstablished provides a mock function with given fields: duration, attempts
