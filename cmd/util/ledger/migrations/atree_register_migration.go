@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	runtime2 "runtime"
-	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -36,8 +35,6 @@ type AtreeRegisterMigrator struct {
 	rw      reporters.ReportWriter
 	rwf     reporters.ReportWriterFactory
 
-	metrics *metrics
-
 	nWorkers int
 }
 
@@ -55,8 +52,6 @@ func NewAtreeRegisterMigrator(
 
 		rwf: rwf,
 		rw:  rwf.ReportWriter("atree-register-migrator"),
-
-		metrics: &metrics{},
 	}
 
 	return migrator
@@ -64,12 +59,6 @@ func NewAtreeRegisterMigrator(
 
 func (m *AtreeRegisterMigrator) Close() error {
 	m.rw.Close()
-	m.log.Info().
-		Str("average_non_zero_clone_time", m.metrics.AverageNonZeroCloneTime().String()).
-		Str("average_non_zero_save_time", m.metrics.AverageNonZeroSaveTime().String()).
-		Int("non_zero_time_clones", m.metrics.cloned).
-		Int("non_zero_time_saves", m.metrics.saved).
-		Msg("metrics")
 
 	return nil
 }
@@ -90,24 +79,6 @@ func (m *AtreeRegisterMigrator) MigrateAccount(
 	address common.Address,
 	oldPayloads []*ledger.Payload,
 ) ([]*ledger.Payload, error) {
-
-	if address == common.ZeroAddress {
-		return oldPayloads, nil
-	}
-
-	if address != cricketMomentsAddress {
-		// skip non-cricket-moments accounts for quicker testing
-		return oldPayloads, nil
-	}
-
-	if reason, ok := knownProblematicAccounts[address]; ok {
-		m.log.Info().
-			Str("account", address.Hex()).
-			Str("reason", reason).
-			Msg("Account is known to have issues. Skipping it.")
-		return oldPayloads, nil
-	}
-
 	// create all the runtime components we need for the migration
 	mr, err := newMigratorRuntime(address, oldPayloads)
 	if err != nil {
@@ -115,7 +86,7 @@ func (m *AtreeRegisterMigrator) MigrateAccount(
 	}
 
 	// keep track of all storage maps that were accessed
-	// if they are empty the wont be changed, but we sill need to copy them over
+	// if they are empty they won't be changed, but we still need to copy them over
 	storageMapIds := make(map[string]struct{})
 
 	// Do the storage conversion
@@ -149,8 +120,12 @@ func (m *AtreeRegisterMigrator) MigrateAccount(
 		})
 	}
 
-	if _, ok := accountsToLog[address]; ok {
-		m.dumpAccount(mr.Address, oldPayloads, newPayloads)
+	if address == cricketMomentsAddress {
+		m.log.Info().
+			Str("address", address.Hex()).
+			Int("originalLen", originalLen).
+			Int("newLen", newLen).
+			Msgf("done migrating cricketMomentsAddress")
 	}
 
 	return newPayloads, nil
@@ -225,23 +200,17 @@ func (m *AtreeRegisterMigrator) convertStorageDomain(
 				return fmt.Errorf("failed to read value for key %s: %w", key, err)
 			}
 
-			m.metrics.trackCloneTime(
-				func() {
-					value, err = m.cloneValue(mr, domain, key, value)
-				},
-			)
+			value, err = m.cloneValue(mr, domain, key, value)
+
 			if err != nil {
 				return fmt.Errorf("failed to clone value for key %s: %w", key, err)
 			}
 
-			m.metrics.trackSaveTime(
-				func() {
-					err = capturePanic(func() {
-						// set value will first purge the old value
-						storageMap.SetValue(mr.Interpreter, key, value)
-					})
-				},
-			)
+			err = capturePanic(func() {
+				// set value will first purge the old value
+				storageMap.SetValue(mr.Interpreter, key, value)
+			})
+
 			if err != nil {
 				return fmt.Errorf("failed to set value for key %s: %w", key, err)
 			}
@@ -449,8 +418,12 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 
 	// store state payload so that it can be updated
 	var statePayload *ledger.Payload
+	progressLog := func(int) {}
 
-	progressLog := util2.LogProgress(m.log, "applying changes", len(changes))
+	if mr.Address == cricketMomentsAddress {
+		progressLog = util2.LogProgress(m.log, "applying changes", len(changes))
+	}
+
 	for id, value := range changes {
 		progressLog(1)
 		// delete all values that were changed from the original payloads so that we can
@@ -462,19 +435,19 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 			continue
 		}
 
-		//ownerAddress, err := common.BytesToAddress([]byte(id.Owner))
-		//if err != nil {
-		//	return nil, fmt.Errorf("failed to convert owner address: %w", err)
-		//}
-		//
-		//if ownerAddress.Hex() != mr.Address.Hex() {
-		//	// something was changed that does not belong to this account. Log it.
-		//	m.log.Error().
-		//		Str("key", id.String()).
-		//		Str("owner_address", ownerAddress.Hex()).
-		//		Str("account", mr.Address.Hex()).
-		//		Msg("key is part of the change set, but is for a different account")
-		//}
+		ownerAddress, err := common.BytesToAddress([]byte(id.Owner))
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert owner address: %w", err)
+		}
+
+		if ownerAddress.Hex() != mr.Address.Hex() {
+			// something was changed that does not belong to this account. Log it.
+			m.log.Error().
+				Str("key", id.String()).
+				Str("owner_address", ownerAddress.Hex()).
+				Str("account", mr.Address.Hex()).
+				Msg("key is part of the change set, but is for a different account")
+		}
 
 		key := convert.RegisterIDToLedgerKey(id)
 
@@ -491,7 +464,9 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 
 	// add all values that were not changed
 	if len(originalPayloads) > 0 {
-		progressLog = util2.LogProgress(m.log, "checking unchanged registers", len(originalPayloads))
+		if mr.Address == cricketMomentsAddress {
+			progressLog = util2.LogProgress(m.log, "applying changes", len(changes))
+		}
 		for id, value := range originalPayloads {
 			progressLog(1)
 
@@ -586,20 +561,6 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 	return newPayloads, nil
 }
 
-func (m *AtreeRegisterMigrator) dumpAccount(address common.Address, before, after []*ledger.Payload) {
-	beforeWriter := m.rwf.ReportWriter(fmt.Sprintf("account-before-%s", address.Hex()))
-	for _, p := range before {
-		beforeWriter.Write(p)
-	}
-	beforeWriter.Close()
-
-	afterWriter := m.rwf.ReportWriter(fmt.Sprintf("account-after-%s", address.Hex()))
-	for _, p := range after {
-		afterWriter.Write(p)
-	}
-	afterWriter.Close()
-}
-
 func (m *AtreeRegisterMigrator) cloneValue(
 	mr *migratorRuntime,
 	domain string,
@@ -679,22 +640,6 @@ type migrationProblem struct {
 	Msg  string
 }
 
-var knownProblematicAccounts = map[common.Address]string{
-	// Testnet accounts with broken contracts
-	mustHexToAddress("434a1f199a7ae3ba"): "Broken contract FanTopPermission",
-	mustHexToAddress("454c9991c2b8d947"): "Broken contract Test",
-	mustHexToAddress("48602d8056ff9d93"): "Broken contract FanTopPermission",
-	mustHexToAddress("5d63c34d7f05e5a4"): "Broken contract FanTopPermission",
-	mustHexToAddress("5e3448b3cffb97f2"): "Broken contract FanTopPermission",
-	mustHexToAddress("7d8c7e050c694eaa"): "Broken contract Test",
-	mustHexToAddress("ba53f16ede01972d"): "Broken contract FanTopPermission",
-	mustHexToAddress("c843c1f5a4805c3a"): "Broken contract FanTopPermission",
-	mustHexToAddress("48d3be92e6e4a973"): "Broken contract FanTopPermission",
-	// Mainnet account
-}
-
-var accountsToLog = map[common.Address]string{}
-
 func mustHexToAddress(hex string) common.Address {
 	address, err := common.HexToAddress(hex)
 	if err != nil {
@@ -704,62 +649,3 @@ func mustHexToAddress(hex string) common.Address {
 }
 
 var skippableAccountError = errors.New("account can be skipped")
-
-type metrics struct {
-	timeToClone      time.Duration
-	clonedWithZeroMS int
-	cloned           int
-	timeToSave       time.Duration
-	savedWithZeroMS  int
-	saved            int
-
-	mu sync.Mutex
-}
-
-func (m *metrics) trackCloneTime(clone func()) {
-	start := time.Now()
-	clone()
-
-	time := time.Since(start)
-	if time == 0 {
-		// only count non-zero times
-		m.clonedWithZeroMS += 1
-		return
-	}
-	m.mu.Lock()
-	m.timeToClone += time
-	m.cloned += 1
-	m.mu.Unlock()
-}
-
-func (m *metrics) trackSaveTime(save func()) {
-	start := time.Now()
-	save()
-
-	time := time.Since(start)
-	if time == 0 {
-		// only count non-zero times
-		m.savedWithZeroMS += 1
-		return
-	}
-	m.mu.Lock()
-	m.timeToSave += time
-	m.saved += 1
-	m.mu.Unlock()
-}
-
-func (m *metrics) AverageNonZeroCloneTime() time.Duration {
-	if m.cloned == 0 {
-		return 0
-	}
-	avg := m.timeToClone / time.Duration(m.cloned)
-	return avg
-}
-
-func (m *metrics) AverageNonZeroSaveTime() time.Duration {
-	if m.saved == 0 {
-		return 0
-	}
-	avg := m.timeToSave / time.Duration(m.saved)
-	return avg
-}

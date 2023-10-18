@@ -150,11 +150,27 @@ func MigrateGroupConcurrently(
 					}
 					start := time.Now()
 
+					// this is not an account, but common values for all accounts.
+					if job.Address == common.ZeroAddress {
+						continue
+					}
+
+					if _, ok := knownProblematicAccounts[job.Address]; ok {
+						log.Info().
+							Hex("address", job.Address[:]).
+							Msg("skipping problematic account")
+						continue
+					}
+
 					var err error
 					accountMigrated := job.Payloads
 					for _, migrator := range migrations {
 						accountMigrated, err = migrator.MigrateAccount(ctx, job.Address, accountMigrated)
 						if err != nil {
+							log.Error().
+								Err(err).
+								Hex("address", job.Address[:]).
+								Msg("could not migrate account")
 							cancel(fmt.Errorf("could not migrate account: %w", err))
 							return
 						}
@@ -232,6 +248,20 @@ func MigrateGroupConcurrently(
 	}
 
 	return migrated, nil
+}
+
+var knownProblematicAccounts = map[common.Address]string{
+	// Testnet accounts with broken contracts
+	mustHexToAddress("434a1f199a7ae3ba"): "Broken contract FanTopPermission",
+	mustHexToAddress("454c9991c2b8d947"): "Broken contract Test",
+	mustHexToAddress("48602d8056ff9d93"): "Broken contract FanTopPermission",
+	mustHexToAddress("5d63c34d7f05e5a4"): "Broken contract FanTopPermission",
+	mustHexToAddress("5e3448b3cffb97f2"): "Broken contract FanTopPermission",
+	mustHexToAddress("7d8c7e050c694eaa"): "Broken contract Test",
+	mustHexToAddress("ba53f16ede01972d"): "Broken contract FanTopPermission",
+	mustHexToAddress("c843c1f5a4805c3a"): "Broken contract FanTopPermission",
+	mustHexToAddress("48d3be92e6e4a973"): "Broken contract FanTopPermission",
+	// Mainnet account
 }
 
 type jobMigrateAccountGroup struct {

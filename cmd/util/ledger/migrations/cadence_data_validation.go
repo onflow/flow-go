@@ -18,11 +18,15 @@ import (
 	"github.com/onflow/flow-go/ledger"
 )
 
+// CadenceDataValidationMigrations are pre and post steps to a migration that compares
+// cadence data on each account before and after the migration to ensure that the
+// migration did not change the cadence data.
 type CadenceDataValidationMigrations struct {
+	// reporter writer factory for creating reports of problematic accounts
 	rwf reporters.ReportWriterFactory
 
-	mu     sync.RWMutex
-	hashes map[common.Address][]byte
+	accountHashesMu sync.RWMutex
+	accountHashes   map[common.Address][]byte
 
 	nWorkers int
 }
@@ -32,9 +36,9 @@ func NewCadenceDataValidationMigrations(
 	nWorkers int,
 ) *CadenceDataValidationMigrations {
 	return &CadenceDataValidationMigrations{
-		rwf:      rwf,
-		hashes:   make(map[common.Address][]byte, 40_000_000),
-		nWorkers: nWorkers,
+		rwf:           rwf,
+		accountHashes: make(map[common.Address][]byte, 40_000_000),
+		nWorkers:      nWorkers,
 	}
 }
 
@@ -51,31 +55,32 @@ func (m *CadenceDataValidationMigrations) PostMigration() AccountBasedMigration 
 	}
 }
 
-func (m *CadenceDataValidationMigrations) set(key common.Address, value []byte) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+func (m *CadenceDataValidationMigrations) setAccountHash(key common.Address, value []byte) {
+	m.accountHashesMu.Lock()
+	defer m.accountHashesMu.Unlock()
 
-	m.hashes[key] = value
+	m.accountHashes[key] = value
 }
 
-func (m *CadenceDataValidationMigrations) get(key common.Address) ([]byte, bool) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+func (m *CadenceDataValidationMigrations) getAccountHash(key common.Address) ([]byte, bool) {
+	m.accountHashesMu.RLock()
+	defer m.accountHashesMu.RUnlock()
 
-	value, ok := m.hashes[key]
+	value, ok := m.accountHashes[key]
 	return value, ok
 }
 
-func (m *CadenceDataValidationMigrations) delete(address common.Address) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+func (m *CadenceDataValidationMigrations) deleteAccountHash(address common.Address) {
+	m.accountHashesMu.Lock()
+	defer m.accountHashesMu.Unlock()
 
-	delete(m.hashes, address)
+	delete(m.accountHashes, address)
 }
 
 type preMigration struct {
 	log zerolog.Logger
 
+	// reference to parent for common data
 	v *CadenceDataValidationMigrations
 }
 
@@ -92,36 +97,23 @@ func (m *preMigration) InitMigration(
 }
 
 func (m *preMigration) MigrateAccount(
-	ctx context.Context,
+	_ context.Context,
 	address common.Address,
 	payloads []*ledger.Payload,
 ) ([]*ledger.Payload, error) {
-	if address == common.ZeroAddress {
-		return payloads, nil
-	}
 
-	if address != cricketMomentsAddress {
-		// skip non-cricket-moments accounts for quicker testing
-		return payloads, nil
-	}
-
-	if _, ok := knownProblematicAccounts[address]; ok {
-		m.log.Error().
-			Hex("address", address[:]).
-			Msg("skipping problematic account")
-		return payloads, nil
-	}
-
-	hash, err := m.v.hashAccountCadenceValues(m.log, address, payloads)
+	accountHash, err := m.v.hashAccountCadenceValues(m.log, address, payloads)
 	if err != nil {
 		m.log.Info().
 			Err(err).
 			Hex("address", address[:]).
 			Msg("failed to hash cadence values")
+
+		// on error still continue with the migration
 		return payloads, nil
 	}
 
-	m.v.set(address, hash)
+	m.v.setAccountHash(address, accountHash)
 
 	return payloads, nil
 }
@@ -138,7 +130,7 @@ type postMigration struct {
 var _ AccountBasedMigration = &postMigration{}
 
 func (m *postMigration) Close() error {
-	for address := range m.v.hashes {
+	for address := range m.v.accountHashes {
 		m.log.Error().
 			Hex("address", address[:]).
 			Msg("cadence values missing after migration")
@@ -170,22 +162,6 @@ func (m *postMigration) MigrateAccount(
 	address common.Address,
 	payloads []*ledger.Payload,
 ) ([]*ledger.Payload, error) {
-	if address == common.ZeroAddress {
-		return payloads, nil
-	}
-
-	if address != cricketMomentsAddress {
-		// skip non-cricket-moments accounts for quicker testing
-		return payloads, nil
-	}
-
-	if _, ok := knownProblematicAccounts[address]; ok {
-		m.log.Error().
-			Hex("address", address[:]).
-			Msg("skipping problematic account")
-		return payloads, nil
-	}
-
 	newHash, err := m.v.hashAccountCadenceValues(m.log, address, payloads)
 	if err != nil {
 		m.log.Info().
@@ -195,7 +171,7 @@ func (m *postMigration) MigrateAccount(
 		return payloads, nil
 	}
 
-	hash, ok := m.v.get(address)
+	hash, ok := m.v.getAccountHash(address)
 
 	if !ok {
 		m.log.Error().
@@ -226,7 +202,7 @@ func (m *postMigration) MigrateAccount(
 
 	// remove the address from the map so we can check if there are any
 	// missing addresses
-	m.v.delete(address)
+	m.v.deleteAccountHash(address)
 
 	return payloads, nil
 }
@@ -242,7 +218,6 @@ func (m *CadenceDataValidationMigrations) hashAccountCadenceValues(
 		return nil, err
 	}
 
-	// iterate through all domains and migrate them
 	for _, domain := range domains {
 		domainHash, err := m.hashDomainCadenceValues(log, mr, domain)
 		if err != nil {

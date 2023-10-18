@@ -39,21 +39,6 @@ func (m *AccountUsageMigrator) MigrateAccount(
 	address common.Address,
 	payloads []*ledger.Payload,
 ) ([]*ledger.Payload, error) {
-	if address == common.ZeroAddress {
-		return payloads, nil
-	}
-
-	if address != cricketMomentsAddress {
-		// skip non-cricket-moments accounts for quicker testing
-		return payloads, nil
-	}
-
-	if _, ok := knownProblematicAccounts[address]; ok {
-		m.log.Error().
-			Hex("address", address[:]).
-			Msg("skipping problematic account")
-		return payloads, nil
-	}
 
 	var status *environment.AccountStatus
 	var statusIndex int
