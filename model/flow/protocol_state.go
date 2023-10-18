@@ -25,7 +25,7 @@ type DynamicIdentityEntryList []*DynamicIdentityEntry
 // TODO: https://github.com/onflow/flow-go/issues/4649
 type ProtocolStateEntry struct {
 	// Setup and commit event IDs for previous epoch.
-	PreviousEpochEventIDs EventIDs
+	PreviousEpoch EpochStateContainer
 	// Setup and commit event IDs for previous epoch. These EventIDs are ZeroID if
 	// and only if the current Epoch is the first epoch after a spork or genesis.
 	CurrentEpoch EpochStateContainer
@@ -148,16 +148,16 @@ func NewRichProtocolStateEntry(
 	}
 
 	// ensure data is consistent
-	if protocolState.PreviousEpochEventIDs.SetupID != ZeroID {
-		if protocolState.PreviousEpochEventIDs.SetupID != previousEpochSetup.ID() {
+	if protocolState.PreviousEpoch.SetupID != ZeroID {
+		if protocolState.PreviousEpoch.SetupID != previousEpochSetup.ID() {
 			return nil, fmt.Errorf("supplied previous epoch setup (%x) does not match protocol state (%x)",
 				previousEpochSetup.ID(),
-				protocolState.PreviousEpochEventIDs.SetupID)
+				protocolState.PreviousEpoch.SetupID)
 		}
-		if protocolState.PreviousEpochEventIDs.CommitID != previousEpochCommit.ID() {
+		if protocolState.PreviousEpoch.CommitID != previousEpochCommit.ID() {
 			return nil, fmt.Errorf("supplied previous epoch commit (%x) does not match protocol state (%x)",
 				previousEpochCommit.ID(),
-				protocolState.PreviousEpochEventIDs.CommitID)
+				protocolState.PreviousEpoch.CommitID)
 		}
 	}
 	if protocolState.CurrentEpoch.SetupID != currentEpochSetup.ID() {
@@ -193,6 +193,7 @@ func NewRichProtocolStateEntry(
 			protocolState.CurrentEpoch.ActiveIdentities,
 			currentEpochSetup.Participants,
 			nextEpochSetup.Participants,
+			nextEpoch.ActiveIdentities,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not build identity table for setup/commit phase: %w", err)
@@ -202,6 +203,7 @@ func NewRichProtocolStateEntry(
 			nextEpoch.ActiveIdentities,
 			nextEpochSetup.Participants,
 			currentEpochSetup.Participants,
+			protocolState.CurrentEpoch.ActiveIdentities,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not build next epoch identity table: %w", err)
@@ -217,6 +219,7 @@ func NewRichProtocolStateEntry(
 			protocolState.CurrentEpoch.ActiveIdentities,
 			currentEpochSetup.Participants,
 			otherIdentities,
+			protocolState.PreviousEpoch.ActiveIdentities,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not build identity table for staking phase: %w", err)
@@ -232,12 +235,12 @@ func (e *ProtocolStateEntry) ID() Identifier {
 		return ZeroID
 	}
 	body := struct {
-		PreviousEpochEventIDs           EventIDs
+		PreviousEpochID                 Identifier
 		CurrentEpochID                  Identifier
 		NextEpochID                     Identifier
 		InvalidStateTransitionAttempted bool
 	}{
-		PreviousEpochEventIDs:           e.PreviousEpochEventIDs,
+		PreviousEpochID:                 e.PreviousEpoch.ID(),
 		CurrentEpochID:                  e.CurrentEpoch.ID(),
 		NextEpochID:                     e.NextEpoch.ID(),
 		InvalidStateTransitionAttempted: e.InvalidStateTransitionAttempted,
@@ -252,7 +255,7 @@ func (e *ProtocolStateEntry) Copy() *ProtocolStateEntry {
 		return nil
 	}
 	return &ProtocolStateEntry{
-		PreviousEpochEventIDs:           e.PreviousEpochEventIDs,
+		PreviousEpoch:                   e.PreviousEpoch,
 		CurrentEpoch:                    *e.CurrentEpoch.Copy(),
 		NextEpoch:                       e.NextEpoch.Copy(),
 		InvalidStateTransitionAttempted: e.InvalidStateTransitionAttempted,
@@ -282,7 +285,7 @@ func (e *RichProtocolStateEntry) Copy() *RichProtocolStateEntry {
 // EpochStatus returns epoch status for the current protocol state.
 func (e *ProtocolStateEntry) EpochStatus() *EpochStatus {
 	return &EpochStatus{
-		PreviousEpoch:                   e.PreviousEpochEventIDs,
+		PreviousEpoch:                   e.PreviousEpoch.EventIDs(),
 		CurrentEpoch:                    e.CurrentEpoch.EventIDs(),
 		NextEpoch:                       e.NextEpoch.EventIDs(),
 		InvalidServiceEventIncorporated: e.InvalidStateTransitionAttempted,
@@ -368,27 +371,45 @@ func BuildIdentityTable(
 	targetEpochDynamicIdentities DynamicIdentityEntryList,
 	targetEpochIdentitySkeletons IdentitySkeletonList,
 	adjacentEpochIdentitySkeletons IdentitySkeletonList,
+	adjacentEpochDynamicIdentities DynamicIdentityEntryList,
 ) (IdentityList, error) {
-	// produce a unique set for current and previous epoch participants
-	allEpochParticipants := targetEpochIdentitySkeletons.Union(adjacentEpochIdentitySkeletons)
-	// sanity check: size of identities should be equal to previous and current epoch participants combined
-	if len(allEpochParticipants) != len(targetEpochDynamicIdentities) {
-		return nil, fmt.Errorf("invalid number of identities in protocol state: expected %d, got %d", len(allEpochParticipants), len(targetEpochDynamicIdentities))
+
+	reconstructIdentityTable := func(skeletons IdentitySkeletonList, dynamics DynamicIdentityEntryList) (IdentityList, error) {
+		// sanity check: size of identities should be equal to previous and current epoch participants combined
+		if len(skeletons) != len(dynamics) {
+			return nil, fmt.Errorf("invalid number of identities in protocol state: expected %d, got %d", len(skeletons), len(dynamics))
+		}
+
+		// build full identity table for current epoch
+		var result IdentityList
+		for i := range dynamics {
+			// sanity check: identities should be sorted in canonical order
+			if dynamics[i].NodeID != skeletons[i].NodeID {
+				return nil, fmt.Errorf("identites in protocol state are not in canonical order: expected %s, got %s", skeletons[i].NodeID, dynamics[i].NodeID)
+			}
+			result = append(result, &Identity{
+				IdentitySkeleton: *skeletons[i],
+				DynamicIdentity:  dynamics[i].Dynamic,
+			})
+		}
+		return result, nil
 	}
 
-	// build full identity table for current epoch
-	var result IdentityList
-	for i, identity := range targetEpochDynamicIdentities {
-		// sanity check: identities should be sorted in canonical order
-		if identity.NodeID != allEpochParticipants[i].NodeID {
-			return nil, fmt.Errorf("identites in protocol state are not in canonical order: expected %s, got %s", allEpochParticipants[i].NodeID, identity.NodeID)
-		}
-		result = append(result, &Identity{
-			IdentitySkeleton: *allEpochParticipants[i],
-			DynamicIdentity:  identity.Dynamic,
-		})
+	targetEpochParticipants, err := reconstructIdentityTable(targetEpochIdentitySkeletons, targetEpochDynamicIdentities)
+	if err != nil {
+		return nil, fmt.Errorf("could not reconstruct participants for target epoch: %w", err)
 	}
-	return result, nil
+	adjacentEpochParticipants, err := reconstructIdentityTable(adjacentEpochIdentitySkeletons, adjacentEpochDynamicIdentities)
+	if err != nil {
+		return nil, fmt.Errorf("could not reconstruct participants for adjacent epoch: %w", err)
+	}
+
+	// produce a unique set for current and previous epoch participants
+	allEpochParticipants := targetEpochParticipants.Union(adjacentEpochParticipants.Map(func(identity Identity) Identity {
+		identity.Weight = 0
+		return identity
+	}))
+	return allEpochParticipants, nil
 }
 
 // DynamicIdentityEntryListFromIdentities converts IdentityList to DynamicIdentityEntryList.

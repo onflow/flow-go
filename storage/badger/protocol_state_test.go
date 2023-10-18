@@ -195,14 +195,14 @@ func assertRichProtocolStateValidity(t *testing.T, state *flow.RichProtocolState
 
 	var previousEpochParticipants flow.IdentityList
 	// invariant: PreviousEpochSetup and PreviousEpochCommit should be present if respective ID is not zero.
-	if state.PreviousEpochEventIDs.SetupID != flow.ZeroID {
+	if state.PreviousEpoch.SetupID != flow.ZeroID {
 		// invariant: PreviousEpochSetup and PreviousEpochCommit are for the same epoch. Never nil.
 		assert.Equal(t, state.CurrentEpochSetup.Counter, state.PreviousEpochSetup.Counter+1, "current epoch setup should be next after previous epoch")
 		assert.Equal(t, state.PreviousEpochSetup.Counter, state.PreviousEpochCommit.Counter, "previous epoch setup and commit should be for the same epoch")
 
 		// invariant: PreviousEpochSetup and PreviousEpochCommit IDs are the equal to the ID of the protocol state entry. Never nil.
-		assert.Equal(t, state.PreviousEpochSetup.ID(), state.ProtocolStateEntry.PreviousEpochEventIDs.SetupID, "epoch setup should be for correct event ID")
-		assert.Equal(t, state.PreviousEpochCommit.ID(), state.ProtocolStateEntry.PreviousEpochEventIDs.CommitID, "epoch commit should be for correct event ID")
+		assert.Equal(t, state.PreviousEpochSetup.ID(), state.ProtocolStateEntry.PreviousEpoch.SetupID, "epoch setup should be for correct event ID")
+		assert.Equal(t, state.PreviousEpochCommit.ID(), state.ProtocolStateEntry.PreviousEpoch.CommitID, "epoch commit should be for correct event ID")
 
 		for _, participant := range state.PreviousEpochSetup.Participants {
 			if identity, found := state.CurrentEpochIdentityTable.ByNodeID(participant.NodeID); found {
@@ -231,7 +231,7 @@ func assertRichProtocolStateValidity(t *testing.T, state *flow.RichProtocolState
 	assert.Equal(t, allIdentities, state.CurrentEpochIdentityTable, "identities should be a full identity table for the current epoch, without duplicates")
 
 	for i, identity := range state.CurrentEpoch.ActiveIdentities {
-		assert.Equal(t, identity.NodeID, allIdentities[i].NodeID, "identity node ID should match")
+		assert.Equal(t, identity.NodeID, participantsFromCurrentEpochSetup[i].NodeID, "active identities should hold value from current epoch")
 	}
 
 	nextEpoch := state.NextEpoch

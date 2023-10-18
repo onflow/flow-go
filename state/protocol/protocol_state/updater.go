@@ -233,7 +233,7 @@ func (u *Updater) TransitionToNextEpoch() error {
 		return fmt.Errorf("protocol state transition is only allowed when enterring next epoch")
 	}
 	u.state = &flow.ProtocolStateEntry{
-		PreviousEpochEventIDs:           u.state.CurrentEpoch.EventIDs(),
+		PreviousEpoch:                   u.state.CurrentEpoch,
 		CurrentEpoch:                    *u.state.NextEpoch,
 		InvalidStateTransitionAttempted: false,
 	}
