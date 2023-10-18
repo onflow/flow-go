@@ -22,13 +22,18 @@ type Updater struct {
 	state       *flow.ProtocolStateEntry
 	candidate   *flow.Header
 
-	// nextEpochIdentitiesLookup is a map from NodeID → DynamicIdentityEntry for the _current_ epoch, containing the
-	// same identities as in the EpochStateContainer `state.CurrentEpoch.Identities`. Note that map values are pointers,
+	// prevEpochIdentitiesLookup is a map from NodeID → DynamicIdentityEntry for the _previous_ epoch, containing the
+	// same identities as in the EpochStateContainer `state.PreviousEpoch.ActiveIdentities`. Note that map values are pointers,
+	// so writes to map values will modify the respective DynamicIdentityEntry in EpochStateContainer.
+	prevEpochIdentitiesLookup map[flow.Identifier]*flow.DynamicIdentityEntry
+
+	// currentEpochIdentitiesLookup is a map from NodeID → DynamicIdentityEntry for the _current_ epoch, containing the
+	// same identities as in the EpochStateContainer `state.CurrentEpoch.ActiveIdentities`. Note that map values are pointers,
 	// so writes to map values will modify the respective DynamicIdentityEntry in EpochStateContainer.
 	currentEpochIdentitiesLookup map[flow.Identifier]*flow.DynamicIdentityEntry
 
 	// nextEpochIdentitiesLookup is a map from NodeID → DynamicIdentityEntry for the _next_ epoch, containing the
-	// same identities as in the EpochStateContainer `state.NextEpoch.Identities`. Note that map values are pointers,
+	// same identities as in the EpochStateContainer `state.NextEpoch.ActiveIdentities`. Note that map values are pointers,
 	// so writes to map values will modify the respective DynamicIdentityEntry in EpochStateContainer.
 	nextEpochIdentitiesLookup map[flow.Identifier]*flow.DynamicIdentityEntry
 }
@@ -145,17 +150,20 @@ func (u *Updater) ProcessEpochCommit(epochCommit *flow.EpochCommit) error {
 // No errors are expected during normal operations.
 func (u *Updater) UpdateIdentity(updated *flow.DynamicIdentityEntry) error {
 	u.ensureLookupPopulated()
-	currentEpochIdentity, found := u.currentEpochIdentitiesLookup[updated.NodeID]
-	if !found {
-		return fmt.Errorf("expected to find identity for current epoch, but (%v) not found", updated.NodeID)
+	prevEpochIdentity, foundInPrev := u.prevEpochIdentitiesLookup[updated.NodeID]
+	if foundInPrev {
+		prevEpochIdentity.Dynamic = updated.Dynamic
 	}
-
-	currentEpochIdentity.Dynamic = updated.Dynamic
-	if u.state.NextEpoch != nil {
-		nextEpochIdentity, found := u.nextEpochIdentitiesLookup[updated.NodeID]
-		if found {
-			nextEpochIdentity.Dynamic = updated.Dynamic
-		}
+	currentEpochIdentity, foundInCurrent := u.currentEpochIdentitiesLookup[updated.NodeID]
+	if foundInCurrent {
+		currentEpochIdentity.Dynamic = updated.Dynamic
+	}
+	nextEpochIdentity, foundInNext := u.nextEpochIdentitiesLookup[updated.NodeID]
+	if foundInNext {
+		nextEpochIdentity.Dynamic = updated.Dynamic
+	}
+	if !foundInPrev && !foundInCurrent && !foundInNext {
+		return fmt.Errorf("expected to find identity for prev, current or next epoch, but (%v) was not found", updated.NodeID)
 	}
 	return nil
 }
@@ -226,6 +234,6 @@ func (u *Updater) rebuildIdentityLookup() {
 	if u.state.NextEpoch != nil {
 		u.nextEpochIdentitiesLookup = u.state.NextEpoch.ActiveIdentities.Lookup()
 	} else {
-		u.nextEpochIdentitiesLookup = nil
+		u.prevEpochIdentitiesLookup = u.state.PreviousEpoch.ActiveIdentities.Lookup()
 	}
 }
