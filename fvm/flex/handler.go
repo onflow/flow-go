@@ -108,7 +108,6 @@ func (h FlexContractHandler) Run(rlpEncodedTx []byte, coinbase models.FlexAddres
 	handleError(err)
 
 	// check tx gas limit
-	// TODO: let caller set an optional limit as well and take the min
 	gasLimit := tx.Gas()
 	h.checkGasLimit(models.GasLimit(gasLimit))
 

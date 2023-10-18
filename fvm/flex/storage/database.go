@@ -15,20 +15,21 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// TODO: all database opeartion errors at the moments are labeled as fatal, we might revisit this
-var (
-	// err not implemented
-	errNotImplemented = models.NewFatalError(errors.New("not implemented yet"))
+const (
+	flexLatextBlockKey = "LatestBlock"
+	flexRootSlabKey    = "RootSlabKey"
+	flexRootHashKey    = "RootHash"
 )
 
-var FlexLatextBlockKey = "LatestBlock"
-var FlexRootSlabKey = "RootSlabKey"
-var FlexRootHashKey = "RootHash"
+var (
+	errNotImplemented = models.NewFatalError(errors.New("not implemented yet"))
+)
 
 // Database is an ephemeral key-value store. Apart from basic data storage
 // functionality it also supports batch writes and iterating over the keyspace in
 // binary-alphabetical order.
-
+//
+// TODO: all database operational errors at the moments are labeled as fatal, we might revisit this
 type Database struct {
 	led         atree.Ledger
 	flexAddress flow.Address
@@ -44,7 +45,7 @@ func NewDatabase(led atree.Ledger, flexAddress flow.Address) (*Database, error) 
 
 	storage := NewPersistentSlabStorage(baseStorage)
 
-	rootIDBytes, err := led.GetValue(flexAddress.Bytes(), []byte(FlexRootSlabKey))
+	rootIDBytes, err := led.GetValue(flexAddress.Bytes(), []byte(flexRootSlabKey))
 	if err != nil {
 		return nil, models.NewFatalError(err)
 	}
@@ -131,7 +132,7 @@ func (db *Database) Delete(key []byte) error {
 }
 
 func (db *Database) SetRootHash(root common.Hash) error {
-	err := db.led.SetValue(db.flexAddress[:], []byte(FlexRootHashKey), root[:])
+	err := db.led.SetValue(db.flexAddress[:], []byte(flexRootHashKey), root[:])
 	if err != nil {
 		return models.NewFatalError(err)
 	}
@@ -139,7 +140,7 @@ func (db *Database) SetRootHash(root common.Hash) error {
 }
 
 func (db *Database) GetRootHash() (common.Hash, error) {
-	data, err := db.led.GetValue(db.flexAddress[:], []byte(FlexRootHashKey))
+	data, err := db.led.GetValue(db.flexAddress[:], []byte(flexRootHashKey))
 	if len(data) == 0 {
 		return types.EmptyRootHash, err
 	}
@@ -154,7 +155,7 @@ func (db *Database) SetLatestBlock(block *models.FlexBlock) error {
 	if err != nil {
 		return models.NewFatalError(err)
 	}
-	err = db.led.SetValue(db.flexAddress[:], []byte(FlexLatextBlockKey), blockBytes)
+	err = db.led.SetValue(db.flexAddress[:], []byte(flexLatextBlockKey), blockBytes)
 	if err != nil {
 		return models.NewFatalError(err)
 	}
@@ -164,7 +165,7 @@ func (db *Database) SetLatestBlock(block *models.FlexBlock) error {
 // GetLatestBlock returns the latest executed block
 // we have this functionality given we only allow on state to exist (no forks, etc.)
 func (db *Database) GetLatestBlock() (*models.FlexBlock, error) {
-	data, err := db.led.GetValue(db.flexAddress[:], []byte(FlexLatextBlockKey))
+	data, err := db.led.GetValue(db.flexAddress[:], []byte(flexLatextBlockKey))
 	if len(data) == 0 {
 		return models.GenesisFlexBlock, err
 	}
@@ -182,7 +183,7 @@ func (db *Database) storeMapRoot() error {
 	if err != nil {
 		return err
 	}
-	return db.led.SetValue(db.flexAddress.Bytes(), []byte(FlexRootSlabKey), rootIDBytes[:])
+	return db.led.SetValue(db.flexAddress.Bytes(), []byte(flexRootSlabKey), rootIDBytes[:])
 }
 
 // Commits the changes from atree
