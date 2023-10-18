@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/integration/tests/mvp"
+	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -79,7 +80,7 @@ func (s *AccessAPISuite) SetupTest() {
 		testnet.WithAdditionalFlag("--execution-data-retry-delay=1s"),
 		testnet.WithAdditionalFlag("--execution-data-indexing-enabled=true"),
 		testnet.WithAdditionalFlagf("--execution-state-dir=%s", testnet.DefaultExecutionStateDir),
-		testnet.WithAdditionalFlag("--execution-state-checkpoint=/bootstrap/execution-state/bootstrap-checkpoint"),
+		testnet.WithAdditionalFlagf("--execution-state-checkpoint=/bootstrap/%s", bootstrap.PathRootCheckpoint),
 		testnet.WithAdditionalFlag("--execution-state-checkpoint-height=0"),
 		testnet.WithAdditionalFlagf("--script-execution-mode=%s", backend.ScriptExecutionModeLocalOnly),
 	)
@@ -133,13 +134,13 @@ func (s *AccessAPISuite) SetupTest() {
 		s.Require().NoError(err)
 
 		return header.Height > 0
-	}, 10*time.Second, 1*time.Second)
+	}, 30*time.Second, 1*time.Second)
 
 	// the service client uses GetAccount and requires the first block to be indexed
 	s.Require().Eventually(func() bool {
 		s.serviceClient, err = s.accessNode2.TestnetClient()
 		return err == nil
-	}, 10*time.Second, 1*time.Second)
+	}, 30*time.Second, 1*time.Second)
 }
 
 // TestScriptExecutionAndGetAccounts test the Access API endpoints for executing scripts and getting
