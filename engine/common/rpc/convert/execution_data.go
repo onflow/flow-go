@@ -13,26 +13,24 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 )
 
-// BlockExecutionDataEventPayloadsFromVersion converts all event payloads from version
-func BlockExecutionDataEventPayloadsFromVersion(
+// BlockExecutionDataEventPayloadsToVersion converts all event payloads to version
+func BlockExecutionDataEventPayloadsToVersion(
 	m *entities.BlockExecutionData,
-	eventEncodingVersionValue *entities.EventEncodingVersionValue,
+	to entities.EventEncodingVersion,
 ) error {
-	eventEncodingVersion := GetConversionEventEncodingVersion(eventEncodingVersionValue)
-	switch eventEncodingVersion {
-	case entities.EventEncodingVersion_CCF_V0:
-		for i, chunk := range m.ChunkExecutionData {
-			for j, e := range chunk.Events {
-				converted, err := CcfPayloadToJsonPayload(e.Payload)
-				if err != nil {
-					return fmt.Errorf("failed to convert payload for event %d to json: %w", j, err)
-				}
-				m.ChunkExecutionData[i].Events[j].Payload = converted
+	eventEncodingVersion := GetConversionEventEncodingVersion(to)
+	if eventEncodingVersion == entities.EventEncodingVersion_CCF_V0 {
+		return nil
+	}
+
+	for i, chunk := range m.ChunkExecutionData {
+		for j, e := range chunk.Events {
+			converted, err := CcfPayloadToJsonPayload(e.Payload)
+			if err != nil {
+				return fmt.Errorf("failed to convert payload for event %d to json: %w", j, err)
 			}
+			m.ChunkExecutionData[i].Events[j].Payload = converted
 		}
-	case entities.EventEncodingVersion_JSON_CDC_V0:
-	default:
-		return fmt.Errorf("invalid encoding format %d", eventEncodingVersion)
 	}
 
 	return nil

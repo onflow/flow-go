@@ -153,7 +153,7 @@ func (r *RestProxyHandler) GetTransactionResult(
 	id flow.Identifier,
 	blockID flow.Identifier,
 	collectionID flow.Identifier,
-	eventEncodingVersionValue *entities.EventEncodingVersionValue,
+	eventEncodingVersion entities.EventEncodingVersion,
 ) (*access.TransactionResult, error) {
 	upstream, err := r.FaultTolerantClient()
 	if err != nil {
@@ -165,7 +165,7 @@ func (r *RestProxyHandler) GetTransactionResult(
 		Id:                   id[:],
 		BlockId:              blockID[:],
 		CollectionId:         collectionID[:],
-		EventEncodingVersion: eventEncodingVersionValue,
+		EventEncodingVersion: eventEncodingVersion,
 	}
 
 	transactionResultResponse, err := upstream.GetTransactionResult(ctx, getTransactionResultRequest)
@@ -270,7 +270,7 @@ func (r *RestProxyHandler) GetEventsForHeightRange(
 	ctx context.Context,
 	eventType string,
 	startHeight, endHeight uint64,
-	eventEncodingVersionValue *entities.EventEncodingVersionValue,
+	eventEncodingVersion entities.EventEncodingVersion,
 ) ([]flow.BlockEvents, error) {
 	upstream, err := r.FaultTolerantClient()
 	if err != nil {
@@ -281,7 +281,7 @@ func (r *RestProxyHandler) GetEventsForHeightRange(
 		Type:                 eventType,
 		StartHeight:          startHeight,
 		EndHeight:            endHeight,
-		EventEncodingVersion: eventEncodingVersionValue,
+		EventEncodingVersion: eventEncodingVersion,
 	}
 	eventsResponse, err := upstream.GetEventsForHeightRange(ctx, getEventsForHeightRangeRequest)
 	r.log("upstream", "GetEventsForHeightRange", err)
@@ -298,7 +298,7 @@ func (r *RestProxyHandler) GetEventsForBlockIDs(
 	ctx context.Context,
 	eventType string,
 	blockIDs []flow.Identifier,
-	eventEncodingVersionValue *entities.EventEncodingVersionValue,
+	eventEncodingVersion entities.EventEncodingVersion,
 ) ([]flow.BlockEvents, error) {
 	upstream, err := r.FaultTolerantClient()
 	if err != nil {
@@ -310,7 +310,7 @@ func (r *RestProxyHandler) GetEventsForBlockIDs(
 	getEventsForBlockIDsRequest := &accessproto.GetEventsForBlockIDsRequest{
 		Type:                 eventType,
 		BlockIds:             blockIds,
-		EventEncodingVersion: eventEncodingVersionValue,
+		EventEncodingVersion: eventEncodingVersion,
 	}
 	eventsResponse, err := upstream.GetEventsForBlockIDs(ctx, getEventsForBlockIDsRequest)
 	r.log("upstream", "GetEventsForBlockIDs", err)

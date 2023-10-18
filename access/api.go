@@ -29,9 +29,9 @@ type API interface {
 	SendTransaction(ctx context.Context, tx *flow.TransactionBody) error
 	GetTransaction(ctx context.Context, id flow.Identifier) (*flow.TransactionBody, error)
 	GetTransactionsByBlockID(ctx context.Context, blockID flow.Identifier) ([]*flow.TransactionBody, error)
-	GetTransactionResult(ctx context.Context, id flow.Identifier, blockID flow.Identifier, collectionID flow.Identifier, eventEncodingVersionValue *entities.EventEncodingVersionValue) (*TransactionResult, error)
-	GetTransactionResultByIndex(ctx context.Context, blockID flow.Identifier, index uint32, eventEncodingVersionValue *entities.EventEncodingVersionValue) (*TransactionResult, error)
-	GetTransactionResultsByBlockID(ctx context.Context, blockID flow.Identifier, eventEncodingVersionValue *entities.EventEncodingVersionValue) ([]*TransactionResult, error)
+	GetTransactionResult(ctx context.Context, id flow.Identifier, blockID flow.Identifier, collectionID flow.Identifier, eventEncodingVersionValue entities.EventEncodingVersion) (*TransactionResult, error)
+	GetTransactionResultByIndex(ctx context.Context, blockID flow.Identifier, index uint32, eventEncodingVersionValue entities.EventEncodingVersion) (*TransactionResult, error)
+	GetTransactionResultsByBlockID(ctx context.Context, blockID flow.Identifier, eventEncodingVersionValue entities.EventEncodingVersion) ([]*TransactionResult, error)
 
 	GetAccount(ctx context.Context, address flow.Address) (*flow.Account, error)
 	GetAccountAtLatestBlock(ctx context.Context, address flow.Address) (*flow.Account, error)
@@ -41,8 +41,8 @@ type API interface {
 	ExecuteScriptAtBlockHeight(ctx context.Context, blockHeight uint64, script []byte, arguments [][]byte) ([]byte, error)
 	ExecuteScriptAtBlockID(ctx context.Context, blockID flow.Identifier, script []byte, arguments [][]byte) ([]byte, error)
 
-	GetEventsForHeightRange(ctx context.Context, eventType string, startHeight, endHeight uint64, eventEncodingVersionValue *entities.EventEncodingVersionValue) ([]flow.BlockEvents, error)
-	GetEventsForBlockIDs(ctx context.Context, eventType string, blockIDs []flow.Identifier, eventEncodingVersionValue *entities.EventEncodingVersionValue) ([]flow.BlockEvents, error)
+	GetEventsForHeightRange(ctx context.Context, eventType string, startHeight, endHeight uint64, eventEncodingVersionValue entities.EventEncodingVersion) ([]flow.BlockEvents, error)
+	GetEventsForBlockIDs(ctx context.Context, eventType string, blockIDs []flow.Identifier, eventEncodingVersionValue entities.EventEncodingVersion) ([]flow.BlockEvents, error)
 
 	GetLatestProtocolStateSnapshot(ctx context.Context) ([]byte, error)
 

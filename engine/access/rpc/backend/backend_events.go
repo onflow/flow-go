@@ -38,7 +38,7 @@ func (b *backendEvents) GetEventsForHeightRange(
 	ctx context.Context,
 	eventType string,
 	startHeight, endHeight uint64,
-	eventEncodingVersionValue *entities.EventEncodingVersionValue,
+	eventEncodingVersion entities.EventEncodingVersion,
 ) ([]flow.BlockEvents, error) {
 
 	if endHeight < startHeight {
@@ -80,7 +80,7 @@ func (b *backendEvents) GetEventsForHeightRange(
 		blockHeaders = append(blockHeaders, header)
 	}
 
-	return b.getBlockEventsFromExecutionNode(ctx, blockHeaders, eventType, eventEncodingVersionValue)
+	return b.getBlockEventsFromExecutionNode(ctx, blockHeaders, eventType, eventEncodingVersion)
 }
 
 // GetEventsForBlockIDs retrieves events for all the specified block IDs that have the given type
@@ -88,7 +88,7 @@ func (b *backendEvents) GetEventsForBlockIDs(
 	ctx context.Context,
 	eventType string,
 	blockIDs []flow.Identifier,
-	eventEncodingVersionValue *entities.EventEncodingVersionValue,
+	eventEncodingVersion entities.EventEncodingVersion,
 ) ([]flow.BlockEvents, error) {
 
 	if uint(len(blockIDs)) > b.maxHeightRange {
@@ -107,14 +107,14 @@ func (b *backendEvents) GetEventsForBlockIDs(
 	}
 
 	// forward the request to the execution node
-	return b.getBlockEventsFromExecutionNode(ctx, blockHeaders, eventType, eventEncodingVersionValue)
+	return b.getBlockEventsFromExecutionNode(ctx, blockHeaders, eventType, eventEncodingVersion)
 }
 
 func (b *backendEvents) getBlockEventsFromExecutionNode(
 	ctx context.Context,
 	blockHeaders []*flow.Header,
 	eventType string,
-	eventEncodingVersionValue *entities.EventEncodingVersionValue,
+	eventEncodingVersion entities.EventEncodingVersion,
 ) ([]flow.BlockEvents, error) {
 
 	// create an execution API request for events at block ID
@@ -153,10 +153,12 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 		Str("last_block_id", lastBlockID.String()).
 		Msg("successfully got events")
 
-	eventEncodingVersion := convert.GetConversionEventEncodingVersion(eventEncodingVersionValue)
-
 	// convert execution node api result to access node api result
-	results, err := verifyAndConvertToAccessEvents(resp.GetResults(), blockHeaders, eventEncodingVersion)
+	results, err := verifyAndConvertToAccessEvents(
+		resp.GetResults(),
+		blockHeaders,
+		convert.GetConversionEventEncodingVersion(eventEncodingVersion),
+	)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to verify retrieved events from execution node: %v", err)
 	}

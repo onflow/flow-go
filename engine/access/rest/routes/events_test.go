@@ -161,7 +161,6 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 	ids := make([]flow.Identifier, n)
 
 	var lastHeader *flow.Header
-	var emptyEventEncodingVersion *entities.EventEncodingVersionValue
 	for i := 0; i < n; i++ {
 		header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(uint64(i)))
 		ids[i] = header.ID()
@@ -169,14 +168,14 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 		events[i] = unittest.BlockEventsFixture(header, 2)
 
 		backend.Mock.
-			On("GetEventsForBlockIDs", mocks.Anything, mocks.Anything, []flow.Identifier{header.ID()}, emptyEventEncodingVersion).
+			On("GetEventsForBlockIDs", mocks.Anything, mocks.Anything, []flow.Identifier{header.ID()}, entities.EventEncodingVersion_DEFAULT).
 			Return([]flow.BlockEvents{events[i]}, nil)
 
 		lastHeader = header
 	}
 
 	backend.Mock.
-		On("GetEventsForBlockIDs", mocks.Anything, mocks.Anything, ids, emptyEventEncodingVersion).
+		On("GetEventsForBlockIDs", mocks.Anything, mocks.Anything, ids, entities.EventEncodingVersion_DEFAULT).
 		Return(events, nil)
 
 	// range from first to last block
@@ -186,7 +185,7 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 		mocks.Anything,
 		events[0].BlockHeight,
 		events[len(events)-1].BlockHeight,
-		emptyEventEncodingVersion,
+		entities.EventEncodingVersion_DEFAULT,
 	).Return(events, nil)
 
 	// range from first to last block + 5
@@ -196,7 +195,7 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 		mocks.Anything,
 		events[0].BlockHeight,
 		events[len(events)-1].BlockHeight+5,
-		emptyEventEncodingVersion,
+		entities.EventEncodingVersion_DEFAULT,
 	).Return(append(events[:len(events)-1], unittest.BlockEventsFixture(lastHeader, 0)), nil)
 
 	latestBlock := unittest.BlockHeaderFixture()
@@ -204,7 +203,7 @@ func generateEventsMocks(backend *mock.API, n int) []flow.BlockEvents {
 
 	// default not found
 	backend.Mock.
-		On("GetEventsForBlockIDs", mocks.Anything, mocks.Anything, mocks.Anything, emptyEventEncodingVersion).
+		On("GetEventsForBlockIDs", mocks.Anything, mocks.Anything, mocks.Anything, entities.EventEncodingVersion_DEFAULT).
 		Return(nil, status.Error(codes.NotFound, "not found"))
 
 	backend.Mock.

@@ -120,7 +120,7 @@ func TestGetTransactions(t *testing.T) {
 	t.Run("Get by ID with results", func(t *testing.T) {
 		backend := &mock.API{}
 
-		var emptyEventEncodingVersion *entities.EventEncodingVersionValue
+		var emptyEventEncodingVersion entities.EventEncodingVersion
 		tx := unittest.TransactionFixture()
 		txr := transactionResultFixture(tx)
 
@@ -247,14 +247,13 @@ func TestGetTransactionResult(t *testing.T) {
 				"_self": "/v1/transaction_results/%s"
 			}
 		}`, bid.String(), cid.String(), id.String(), util.ToBase64(txr.Events[0].Payload), id.String())
-	var emptyEventEncodingVersion *entities.EventEncodingVersionValue
 
 	t.Run("get by transaction ID", func(t *testing.T) {
 		backend := &mock.API{}
 		req := getTransactionResultReq(id.String(), "", "")
 
 		backend.Mock.
-			On("GetTransactionResult", mocks.Anything, id, flow.ZeroID, flow.ZeroID, emptyEventEncodingVersion).
+			On("GetTransactionResult", mocks.Anything, id, flow.ZeroID, flow.ZeroID, entities.EventEncodingVersion_DEFAULT).
 			Return(txr, nil)
 
 		assertOKResponse(t, req, expected, backend)
@@ -266,7 +265,7 @@ func TestGetTransactionResult(t *testing.T) {
 		req := getTransactionResultReq(id.String(), bid.String(), "")
 
 		backend.Mock.
-			On("GetTransactionResult", mocks.Anything, id, bid, flow.ZeroID, emptyEventEncodingVersion).
+			On("GetTransactionResult", mocks.Anything, id, bid, flow.ZeroID, entities.EventEncodingVersion_DEFAULT).
 			Return(txr, nil)
 
 		assertOKResponse(t, req, expected, backend)
@@ -277,7 +276,7 @@ func TestGetTransactionResult(t *testing.T) {
 		req := getTransactionResultReq(id.String(), "", cid.String())
 
 		backend.Mock.
-			On("GetTransactionResult", mocks.Anything, id, flow.ZeroID, cid, emptyEventEncodingVersion).
+			On("GetTransactionResult", mocks.Anything, id, flow.ZeroID, cid, entities.EventEncodingVersion_DEFAULT).
 			Return(txr, nil)
 
 		assertOKResponse(t, req, expected, backend)
@@ -311,7 +310,7 @@ func TestGetTransactionResult(t *testing.T) {
 			txResult.CollectionID = cid
 			req := getTransactionResultReq(id.String(), "", "")
 			backend.Mock.
-				On("GetTransactionResult", mocks.Anything, id, flow.ZeroID, flow.ZeroID, emptyEventEncodingVersion).
+				On("GetTransactionResult", mocks.Anything, id, flow.ZeroID, flow.ZeroID, entities.EventEncodingVersion_DEFAULT).
 				Return(txResult, nil).
 				Once()
 

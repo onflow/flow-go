@@ -51,7 +51,7 @@ func (h *Handler) GetExecutionDataByBlockID(ctx context.Context, request *access
 		return nil, status.Errorf(codes.Internal, "could not convert execution data to entity: %v", err)
 	}
 
-	err = convert.BlockExecutionDataEventPayloadsFromVersion(message, request.GetEventEncodingVersion())
+	err = convert.BlockExecutionDataEventPayloadsToVersion(message, request.GetEventEncodingVersion())
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "could not convert execution data event payloads to JSON: %v", err)
 	}
@@ -97,7 +97,7 @@ func (h *Handler) SubscribeExecutionData(request *access.SubscribeExecutionDataR
 			return status.Errorf(codes.Internal, "could not convert execution data to entity: %v", err)
 		}
 
-		err = convert.BlockExecutionDataEventPayloadsFromVersion(execData, request.GetEventEncodingVersion())
+		err = convert.BlockExecutionDataEventPayloadsToVersion(execData, request.GetEventEncodingVersion())
 		if err != nil {
 			return status.Errorf(codes.Internal, "could not convert execution data event payloads to JSON: %v", err)
 		}
