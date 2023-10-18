@@ -20,12 +20,12 @@ func (b Balance) ToAttoFlow() *big.Int {
 }
 
 func (b Balance) Sub(other Balance) Balance {
-	// TODO check for underflow
+	// no need to check for underflow, as go does it
 	return Balance(uint64(b) - uint64(other))
 }
 
 func (b Balance) Add(other Balance) Balance {
-	// TODO check for overflow
+	// no need to check for overflow, as go does it
 	return Balance(uint64(b) + uint64(other))
 }
 
@@ -42,11 +42,9 @@ func DecodeBalance(encoded []byte) (Balance, error) {
 
 func NewBalanceFromAttoFlow(inp *big.Int) (Balance, error) {
 	conv := new(big.Int).SetInt64(1e10)
-	// TODO: check for underflow
-	// rem := new(big.Int).Rem(inp, conv)
-	// if rem != 0 {
-	// 	return error
-	// }
+	if new(big.Int).Mod(inp, conv).Cmp(big.NewInt(0)) != 0 {
+		return 0, ErrBalanceConversion
+	}
 
 	// we only need to divide by 10 given we already have 8 as factor
 	converted := new(big.Int).Div(inp, conv)

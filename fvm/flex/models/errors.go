@@ -21,9 +21,10 @@ var (
 	// TODO we might consider this fatal
 	ErrInsufficientTotalSupply = errors.New("insufficient total supply")
 
-	// ErrFlexEnvReuse is returned when a flex environment is used more than once
-	// TODO: this might be considered fatal
-	ErrFlexEnvReuse = errors.New("flex env has been used")
+	// ErrBalanceConversion is returned conversion of balance has failed, usually
+	// is returned when the balance presented in attoflow has values that could
+	// be marginally lost on the conversion.
+	ErrBalanceConversion = errors.New("balance converion error")
 )
 
 // EVMExecutionError is a user-related error,

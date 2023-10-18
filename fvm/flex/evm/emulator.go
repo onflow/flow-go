@@ -252,14 +252,9 @@ type procedure struct {
 // commit commits the changes to the state.
 // if error is returned is a fatal one.
 func (proc *procedure) commit() (common.Hash, error) {
-	// commit the changes
-	// ramtin: height is needed when we want to update to version v13
-	// var height uint64
-	// if fe.Config.BlockContext.BlockNumber != nil {
-	// 	height = fe.Config.BlockContext.BlockNumber.Uint64()
-	// }
-
 	// commits the changes from the journal into the in memory trie.
+	// in the future if we want to move this to the block level we could use finalize
+	// to get the root hash
 	newRoot, err := proc.state.Commit(true)
 	if err != nil {
 		return types.EmptyRootHash, models.NewFatalError(err)

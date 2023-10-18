@@ -273,6 +273,7 @@ func (f *flexAccount) Transfer(to models.FlexAddress, balance models.Balance) {
 	res, err := blk.Transfer(f.address, to, balance.ToAttoFlow())
 	f.fch.meterGasUsage(res)
 	handleError(err)
+
 	f.fch.EmitLastExecutedBlockEvent()
 	f.fch.updateLastExecutedBlock(res.StateRootHash, types.EmptyRootHash)
 }
