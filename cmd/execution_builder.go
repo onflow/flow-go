@@ -1200,29 +1200,6 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 			return fmt.Errorf("could not load bootstrap state from checkpoint file: %w", err)
 		}
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
-		checkpointFile := path.Join(exeNode.exeConf.triedir, modelbootstrap.FilenameWALRootCheckpoint)
-		root, err := exeNode.builder.RootSnapshot.Head()
-		if err != nil {
-			return fmt.Errorf("could not get root snapshot head: %w", err)
-		}
-
-		checkpointHeight := root.Height
-
-		fmt.Println("importing registers to pebble")
-		err = bootstrap.ImportRegistersFromCheckpoint(node.Logger, checkpointFile, checkpointHeight, pebbledb)
-		if err != nil {
-			return fmt.Errorf("could not import registers from checkpoint: %w", err)
-		}
-
-=======
->>>>>>> cbbd604a1c (revert bootstrap pebble)
-		// TODO: check that the checkpoint file contains the root block's statecommit hash
-
-		fmt.Println("finish importing to pebble, bootstrapp execution data")
->>>>>>> db39737c7b (fix bootstrap)
 		err = bootstrapper.BootstrapExecutionDatabase(node.DB, node.RootSeal)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap execution database: %w", err)
