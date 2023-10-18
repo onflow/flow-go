@@ -15,12 +15,15 @@ import (
 // Registers library that implements pebble storage for registers
 // given a pebble instance with root block and root height populated
 type Registers struct {
-	db           *pebble.DB
-	firstHeight  uint64
-	latestHeight *atomic.Uint64
+	db             *pebble.DB
+	firstHeight    uint64
+	latestHeight   *atomic.Uint64
+	pruneThreshold uint64
 }
 
 var _ storage.RegisterIndex = (*Registers)(nil)
+
+const DefaultPruneThreshold = 1000
 
 // NewRegisters takes a populated pebble instance with LatestHeight and FirstHeight set.
 // return storage.ErrNotBootstrapped if they those two keys are unavailable as it implies a uninitialized state
@@ -34,9 +37,10 @@ func NewRegisters(db *pebble.DB) (*Registers, error) {
 	}
 	/// All registers between firstHeight and lastHeight have been indexed
 	return &Registers{
-		db:           db,
-		firstHeight:  firstHeight,
-		latestHeight: atomic.NewUint64(latestHeight),
+		db:             db,
+		firstHeight:    firstHeight,
+		latestHeight:   atomic.NewUint64(latestHeight),
+		pruneThreshold: DefaultPruneThreshold,
 	}, nil
 }
 
@@ -59,6 +63,9 @@ func (s *Registers) Get(
 			fmt.Sprintf("height %d not indexed, indexed range is [%d-%d]", height, s.firstHeight, latestHeight),
 		)
 	}
+
+	// TODO(leo): check pruned height
+
 	iter, err := s.db.NewIter(&pebble.IterOptions{
 		UseL6Filters: true,
 	})
@@ -129,6 +136,14 @@ func (s *Registers) Store(
 	s.latestHeight.Store(height)
 
 	return nil
+}
+
+func (s *Registers) Prune(height uint64) error {
+	latestHeight := s.latestHeight.Load()
+	if height <= latestHeight {
+		return nil
+	}
+	// TOOD: ensure only prune with one process
 }
 
 // LatestHeight Gets the latest height of complete registers available
