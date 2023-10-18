@@ -577,6 +577,11 @@ type ExecutionStateIndexerMetrics interface {
 
 	// BlockReindexed records that a previously indexed block was indexed again.
 	BlockReindexed()
+
+	// InitializeLatestHeight records the latest height that has been indexed.
+	// This should only be used during startup. After startup, use BlockIndexed to record newly
+	// indexed heights.
+	InitializeLatestHeight(height uint64)
 }
 
 type RuntimeMetrics interface {
