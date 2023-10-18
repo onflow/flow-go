@@ -295,12 +295,6 @@ func cloneCricketMomentsShardedCollection(
 						},
 					)
 
-					ownedNFTs.Remove(
-						inter,
-						interpreter.EmptyLocationRange,
-						keyPair.nftCollectionKey,
-					)
-
 					progressLog(1)
 				}
 			}
@@ -317,6 +311,31 @@ func cloneCricketMomentsShardedCollection(
 	err = closeInterpreters()
 	if err != nil {
 		return nil, err
+	}
+
+	progressLog = util2.LogProgress(log, "removing cricket moments", len(clonedValues))
+	for _, clonedValue := range clonedValues {
+		ownedNFTs, err := getNftCollection(
+			mr.Interpreter,
+			clonedValue.shardedCollectionKey,
+			shardedCollectionMap,
+		)
+
+		if err != nil {
+			return nil, fmt.Errorf("failed to get nft collection: %w", err)
+		}
+
+		err = capturePanic(func() {
+			ownedNFTs.Remove(
+				mr.Interpreter,
+				interpreter.EmptyLocationRange,
+				clonedValue.nftCollectionKey,
+			)
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to set key: %w", err)
+		}
+		progressLog(1)
 	}
 
 	log.Info().Msg("cloning empty cricket moments sharded collection")
