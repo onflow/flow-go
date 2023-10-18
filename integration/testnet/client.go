@@ -112,7 +112,7 @@ func (c *Client) Events(ctx context.Context, typ string) ([]sdk.BlockEvents, err
 
 // DeployContract submits a transaction to deploy a contract with the given
 // code to the root account.
-func (c *Client) DeployContract(ctx context.Context, refID sdk.Identifier, contract dsl.Contract) error {
+func (c *Client) DeployContract(ctx context.Context, refID sdk.Identifier, contract dsl.Contract) (*sdk.Transaction, error) {
 
 	code := dsl.Transaction{
 		Import: dsl.Import{},
@@ -128,7 +128,12 @@ func (c *Client) DeployContract(ctx context.Context, refID sdk.Identifier, contr
 		SetPayer(c.SDKServiceAddress()).
 		AddAuthorizer(c.SDKServiceAddress())
 
-	return c.SignAndSendTransaction(ctx, tx)
+	err := c.SignAndSendTransaction(ctx, tx)
+	if err != nil {
+		return nil, fmt.Errorf("could not deploy contract: %w", err)
+	}
+
+	return tx, nil
 }
 
 // SignTransaction signs the transaction using the proposer's key
@@ -195,12 +200,25 @@ func (c *Client) Account() *sdk.Account {
 
 // WaitForSealed waits for the transaction to be sealed, then returns the result.
 func (c *Client) WaitForSealed(ctx context.Context, id sdk.Identifier) (*sdk.TransactionResult, error) {
+	return c.waitForStatus(ctx, id, sdk.TransactionStatusSealed)
+}
 
+// WaitForExecuted waits for the transaction to be executed, then returns the result.
+func (c *Client) WaitForExecuted(ctx context.Context, id sdk.Identifier) (*sdk.TransactionResult, error) {
+	return c.waitForStatus(ctx, id, sdk.TransactionStatusExecuted)
+}
+
+// waitForStatus waits for the transaction to be in a certain status, then returns the result.
+func (c *Client) waitForStatus(
+	ctx context.Context,
+	id sdk.Identifier,
+	status sdk.TransactionStatus,
+) (*sdk.TransactionResult, error) {
 	fmt.Printf("Waiting for transaction %s to be sealed...\n", id)
 	errCount := 0
 	var result *sdk.TransactionResult
 	var err error
-	for result == nil || (result.Status != sdk.TransactionStatusSealed) {
+	for result == nil || (result.Status != status) {
 		childCtx, cancel := context.WithTimeout(ctx, time.Second*5)
 		result, err = c.client.GetTransactionResult(childCtx, id)
 		cancel()
