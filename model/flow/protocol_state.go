@@ -374,32 +374,11 @@ func BuildIdentityTable(
 	adjacentEpochDynamicIdentities DynamicIdentityEntryList,
 ) (IdentityList, error) {
 
-	reconstructIdentityTable := func(skeletons IdentitySkeletonList, dynamics DynamicIdentityEntryList) (IdentityList, error) {
-		// sanity check: size of identities should be equal to previous and current epoch participants combined
-		if len(skeletons) != len(dynamics) {
-			return nil, fmt.Errorf("invalid number of identities in protocol state: expected %d, got %d", len(skeletons), len(dynamics))
-		}
-
-		// build full identity table for current epoch
-		var result IdentityList
-		for i := range dynamics {
-			// sanity check: identities should be sorted in canonical order
-			if dynamics[i].NodeID != skeletons[i].NodeID {
-				return nil, fmt.Errorf("identites in protocol state are not in canonical order: expected %s, got %s", skeletons[i].NodeID, dynamics[i].NodeID)
-			}
-			result = append(result, &Identity{
-				IdentitySkeleton: *skeletons[i],
-				DynamicIdentity:  dynamics[i].Dynamic,
-			})
-		}
-		return result, nil
-	}
-
-	targetEpochParticipants, err := reconstructIdentityTable(targetEpochIdentitySkeletons, targetEpochDynamicIdentities)
+	targetEpochParticipants, err := ReconstructIdentities(targetEpochIdentitySkeletons, targetEpochDynamicIdentities)
 	if err != nil {
 		return nil, fmt.Errorf("could not reconstruct participants for target epoch: %w", err)
 	}
-	adjacentEpochParticipants, err := reconstructIdentityTable(adjacentEpochIdentitySkeletons, adjacentEpochDynamicIdentities)
+	adjacentEpochParticipants, err := ReconstructIdentities(adjacentEpochIdentitySkeletons, adjacentEpochDynamicIdentities)
 	if err != nil {
 		return nil, fmt.Errorf("could not reconstruct participants for adjacent epoch: %w", err)
 	}
@@ -422,4 +401,27 @@ func DynamicIdentityEntryListFromIdentities(identities IdentityList) DynamicIden
 		})
 	}
 	return dynamicIdentities
+}
+
+// ReconstructIdentities combines identity skeletons and dynamic identities to produce a flow.IdentityList.
+// No errors are expected during normal operations.
+func ReconstructIdentities(skeletons IdentitySkeletonList, dynamics DynamicIdentityEntryList) (IdentityList, error) {
+	// sanity check: list of skeletons and dynamic should be the same
+	if len(skeletons) != len(dynamics) {
+		return nil, fmt.Errorf("invalid number of identities to reconstruct: expected %d, got %d", len(skeletons), len(dynamics))
+	}
+
+	// reconstruct identities from skeleton and dynamic parts
+	var result IdentityList
+	for i := range dynamics {
+		// sanity check: identities should be sorted in the same order
+		if dynamics[i].NodeID != skeletons[i].NodeID {
+			return nil, fmt.Errorf("identites in protocol state are not in canonical order: expected %s, got %s", skeletons[i].NodeID, dynamics[i].NodeID)
+		}
+		result = append(result, &Identity{
+			IdentitySkeleton: *skeletons[i],
+			DynamicIdentity:  dynamics[i].Dynamic,
+		})
+	}
+	return result, nil
 }
