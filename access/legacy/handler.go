@@ -190,9 +190,7 @@ func (h *Handler) GetTransactionResult(
 ) (*accessproto.TransactionResultResponse, error) {
 	id := convert.MessageToIdentifier(req.GetId())
 
-	result, err := h.api.GetTransactionResult(ctx, id, flow.ZeroID, flow.ZeroID, &entities.EventEncodingVersionValue{
-		Value: entities.EventEncodingVersion_JSON_CDC_V0,
-	})
+	result, err := h.api.GetTransactionResult(ctx, id, flow.ZeroID, flow.ZeroID, entities.EventEncodingVersion_JSON_CDC_V0)
 	if err != nil {
 		return nil, err
 	}
@@ -316,9 +314,7 @@ func (h *Handler) GetEventsForHeightRange(
 	startHeight := req.GetStartHeight()
 	endHeight := req.GetEndHeight()
 
-	results, err := h.api.GetEventsForHeightRange(ctx, eventType, startHeight, endHeight, &entities.EventEncodingVersionValue{
-		Value: entities.EventEncodingVersion_JSON_CDC_V0,
-	})
+	results, err := h.api.GetEventsForHeightRange(ctx, eventType, startHeight, endHeight, entities.EventEncodingVersion_JSON_CDC_V0)
 	if err != nil {
 		return nil, err
 	}
@@ -336,9 +332,7 @@ func (h *Handler) GetEventsForBlockIDs(
 	eventType := req.GetType()
 	blockIDs := convert.MessagesToIdentifiers(req.GetBlockIds())
 
-	results, err := h.api.GetEventsForBlockIDs(ctx, eventType, blockIDs, &entities.EventEncodingVersionValue{
-		Value: entities.EventEncodingVersion_JSON_CDC_V0,
-	})
+	results, err := h.api.GetEventsForBlockIDs(ctx, eventType, blockIDs, entities.EventEncodingVersion_JSON_CDC_V0)
 	if err != nil {
 		return nil, err
 	}

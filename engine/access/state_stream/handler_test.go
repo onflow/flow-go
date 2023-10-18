@@ -13,8 +13,9 @@ import (
 	"google.golang.org/grpc"
 
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+
 	"github.com/onflow/flow/protobuf/go/flow/entities"
-	access "github.com/onflow/flow/protobuf/go/flow/executiondata"
+	"github.com/onflow/flow/protobuf/go/flow/executiondata"
 
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
@@ -31,7 +32,7 @@ func TestExecutionDataStream(t *testing.T) {
 	defer cancel()
 
 	api := ssmock.NewAPI(t)
-	stream := makeStreamMock[access.SubscribeExecutionDataRequest, access.SubscribeExecutionDataResponse](ctx)
+	stream := makeStreamMock[executiondata.SubscribeExecutionDataRequest, executiondata.SubscribeExecutionDataResponse](ctx)
 	sub := state_stream.NewSubscription(1)
 
 	// generate some events with a payload to include
@@ -53,7 +54,7 @@ func TestExecutionDataStream(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		wg.Done()
-		err := h.SubscribeExecutionData(&access.SubscribeExecutionDataRequest{}, stream)
+		err := h.SubscribeExecutionData(&executiondata.SubscribeExecutionDataRequest{}, stream)
 		require.NoError(t, err)
 		t.Log("subscription closed")
 	}()
@@ -129,10 +130,10 @@ func TestExecutionDataStreamEventEncoding(t *testing.T) {
 
 	// Create a mock API and a mock stream for subscription.
 	api := ssmock.NewAPI(t)
-	stream := makeStreamMock[access.SubscribeExecutionDataRequest, access.SubscribeExecutionDataResponse](ctx)
+	stream := makeStreamMock[executiondata.SubscribeExecutionDataRequest, executiondata.SubscribeExecutionDataResponse](ctx)
 
 	// Helper function to perform a stream request and handle responses.
-	makeStreamRequest := func(request *access.SubscribeExecutionDataRequest) {
+	makeStreamRequest := func(request *executiondata.SubscribeExecutionDataRequest) {
 		sub := state_stream.NewSubscription(1)
 
 		api.On("SubscribeExecutionData", mock.Anything, flow.ZeroID, uint64(0), mock.Anything).Return(sub)
@@ -169,7 +170,9 @@ func TestExecutionDataStreamEventEncoding(t *testing.T) {
 
 	// Test scenario for default (JSON) event encoding.
 	t.Run("test default(JSON)", func(t *testing.T) {
-		makeStreamRequest(&access.SubscribeExecutionDataRequest{})
+		makeStreamRequest(&executiondata.SubscribeExecutionDataRequest{
+			EventEncodingVersion: entities.EventEncodingVersion_DEFAULT,
+		})
 		for {
 			resp, err := stream.RecvToClient()
 			if err == io.EOF {
@@ -193,8 +196,8 @@ func TestExecutionDataStreamEventEncoding(t *testing.T) {
 
 	// Test scenario for JSON event encoding.
 	t.Run("test JSON event encoding", func(t *testing.T) {
-		makeStreamRequest(&access.SubscribeExecutionDataRequest{
-			EventEncodingVersion: &entities.EventEncodingVersionValue{Value: entities.EventEncodingVersion_JSON_CDC_V0},
+		makeStreamRequest(&executiondata.SubscribeExecutionDataRequest{
+			EventEncodingVersion: entities.EventEncodingVersion_JSON_CDC_V0,
 		})
 		for {
 			resp, err := stream.RecvToClient()
@@ -219,8 +222,8 @@ func TestExecutionDataStreamEventEncoding(t *testing.T) {
 
 	// Test scenario for CFF event encoding.
 	t.Run("test CFF event encoding", func(t *testing.T) {
-		makeStreamRequest(&access.SubscribeExecutionDataRequest{
-			EventEncodingVersion: &entities.EventEncodingVersionValue{Value: entities.EventEncodingVersion_CCF_V0},
+		makeStreamRequest(&executiondata.SubscribeExecutionDataRequest{
+			EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
 		})
 		for {
 			resp, err := stream.RecvToClient()
@@ -250,7 +253,7 @@ func TestEventStream(t *testing.T) {
 	defer cancel()
 
 	api := ssmock.NewAPI(t)
-	stream := makeStreamMock[access.SubscribeEventsRequest, access.SubscribeEventsResponse](ctx)
+	stream := makeStreamMock[executiondata.SubscribeEventsRequest, executiondata.SubscribeEventsResponse](ctx)
 	sub := state_stream.NewSubscription(1)
 
 	// generate some events with a payload to include
@@ -272,7 +275,7 @@ func TestEventStream(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		wg.Done()
-		err := h.SubscribeEvents(&access.SubscribeEventsRequest{}, stream)
+		err := h.SubscribeEvents(&executiondata.SubscribeEventsRequest{}, stream)
 		require.NoError(t, err)
 		t.Log("subscription closed")
 	}()

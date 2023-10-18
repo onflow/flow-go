@@ -3,6 +3,8 @@ package convert_test
 import (
 	"testing"
 
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -53,7 +55,7 @@ func TestConvertBlockExecutionDataEventPayloads(t *testing.T) {
 	})
 
 	t.Run("converted event payloads are encoded in jsoncdc", func(t *testing.T) {
-		err = convert.BlockExecutionDataEventPayloadsToVersion(execDataMessage, nil)
+		err = convert.BlockExecutionDataEventPayloadsToVersion(execDataMessage, entities.EventEncodingVersion_JSON_CDC_V0)
 		require.NoError(t, err)
 
 		for _, chunk := range execDataMessage.GetChunkExecutionData() {
