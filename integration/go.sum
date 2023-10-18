@@ -100,8 +100,8 @@ github.com/DATA-DOG/go-sqlmock v1.3.3/go.mod h1:f/Ixk793poVmq4qj/V1dPUg2JEAKC73Q
 github.com/DataDog/zstd v1.4.1/go.mod h1:1jcaCB/ufaK+sKp1NBhlGmpz41jOoPQ35bpF36t7BBo=
 github.com/DataDog/zstd v1.4.5 h1:EndNeuB0l9syBZhut0wns3gV1hL8zX8LIu6ZiVHWLIQ=
 github.com/DataDog/zstd v1.4.5/go.mod h1:1jcaCB/ufaK+sKp1NBhlGmpz41jOoPQ35bpF36t7BBo=
-github.com/Guitarheroua/flow-emulator v0.0.0-20231013104524-7b022a3992d5 h1:33av+pFXKq9WNbg3EvIFQoYuDBdTqVrzc8/XCMkGc5o=
-github.com/Guitarheroua/flow-emulator v0.0.0-20231013104524-7b022a3992d5/go.mod h1:gKnyRos42AIy5wm1BfHUDhhrg322F0WpIAsOU+nljj0=
+github.com/Guitarheroua/flow-emulator v0.0.0-20231018151849-2b2f7bcd6fa2 h1:WIoMCjOzGI2WyVWsTiVmWzTfnPKoaq0jGDj0XjuFBwE=
+github.com/Guitarheroua/flow-emulator v0.0.0-20231018151849-2b2f7bcd6fa2/go.mod h1:m0BlKMdFBteEH3oepU1yeerU4kvpTctvO+6mkmF9nlU=
 github.com/Guitarheroua/flow/protobuf/go/flow v0.0.0-20231018150252-f223f1d42001 h1:6Szrh+jL5X83OiKh76ORt7QHxtZvM/uRaU5G6zd6syc=
 github.com/Guitarheroua/flow/protobuf/go/flow v0.0.0-20231018150252-f223f1d42001/go.mod h1:NA2pX2nw8zuaxfKphhKsk00kWLwfd+tv8mS23YXO4Sk=
 github.com/JohnCGriffin/overflow v0.0.0-20211019200055-46fa312c352c h1:RGWPOewvKIROun94nF7v2cua9qP+thov/7M50KEoeSU=

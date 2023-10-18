@@ -179,10 +179,6 @@ func verifyAndConvertToAccessEvents(
 		return nil, errors.New("number of results does not match number of blocks requested")
 	}
 
-	if from == entities.EventEncodingVersion_JSON_CDC_V0 && to == entities.EventEncodingVersion_CCF_V0 {
-		return nil, errors.New("conversion from JSON-CDC to CCF is forbidden")
-	}
-
 	requestedBlockHeaderSet := map[string]*flow.Header{}
 	for _, header := range requestedBlockHeaders {
 		requestedBlockHeaderSet[header.ID().String()] = header
@@ -201,7 +197,7 @@ func verifyAndConvertToAccessEvents(
 				result.GetBlockId())
 		}
 
-		events, err := convert.MessagesToEventsFromVersion(result.GetEvents(), to)
+		events, err := convert.MessagesToEventsWithEncodingConversion(result.GetEvents(), from, to)
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal events in event %d with encoding version %s: %w",
 				i, to.String(), err)

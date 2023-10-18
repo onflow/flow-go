@@ -168,32 +168,6 @@ func TestExecutionDataStreamEventEncoding(t *testing.T) {
 		sub.Close()
 	}
 
-	// Test scenario for default (JSON) event encoding.
-	t.Run("test default(JSON)", func(t *testing.T) {
-		makeStreamRequest(&executiondata.SubscribeExecutionDataRequest{
-			EventEncodingVersion: entities.EventEncodingVersion_JSON_CDC_V0,
-		})
-		for {
-			resp, err := stream.RecvToClient()
-			if err == io.EOF {
-				break
-			}
-			require.NoError(t, err)
-
-			convertedExecData, err := convert.MessageToBlockExecutionData(resp.GetBlockExecutionData(), flow.Testnet.Chain())
-			require.NoError(t, err)
-
-			// Verify that the payload is valid JSON-CDC.
-			for _, chunk := range convertedExecData.ChunkExecutionDatas {
-				for i, e := range chunk.Events {
-					assert.Equal(t, jsonEvents[i], e)
-				}
-			}
-
-			close(stream.sentFromServer)
-		}
-	})
-
 	// Test scenario for JSON event encoding.
 	t.Run("test JSON event encoding", func(t *testing.T) {
 		makeStreamRequest(&executiondata.SubscribeExecutionDataRequest{
@@ -275,7 +249,9 @@ func TestEventStream(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		wg.Done()
-		err := h.SubscribeEvents(&executiondata.SubscribeEventsRequest{}, stream)
+		err := h.SubscribeEvents(&executiondata.SubscribeEventsRequest{
+			EventEncodingVersion: entities.EventEncodingVersion_JSON_CDC_V0,
+		}, stream)
 		require.NoError(t, err)
 		t.Log("subscription closed")
 	}()

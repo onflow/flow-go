@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync/atomic"
 
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/onflow/flow/protobuf/go/flow/executiondata"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -160,7 +161,7 @@ func (h *Handler) SubscribeEvents(request *executiondata.SubscribeEventsRequest,
 			return status.Errorf(codes.Internal, "unexpected response type: %T", v)
 		}
 
-		events, err := convert.EventsToMessagesFromVersion(resp.Events, request.GetEventEncodingVersion())
+		events, err := convert.EventsToMessagesWithEncodingConversion(resp.Events, entities.EventEncodingVersion_CCF_V0, request.GetEventEncodingVersion())
 		if err != nil {
 			return status.Errorf(codes.Internal, "could not convert events to entity: %v", err)
 		}

@@ -411,10 +411,6 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 		return nil, rpc.ConvertError(err, "failed to retrieve result from execution node", codes.Internal)
 	}
 
-	if resp.GetEventEncodingVersion() == entities.EventEncodingVersion_JSON_CDC_V0 && requiredEventEncodingVersion == entities.EventEncodingVersion_CCF_V0 {
-		return nil, errors.New("conversion from JSON-CDC to CCF is forbidden")
-	}
-
 	results := make([]*access.TransactionResult, 0, len(resp.TransactionResults))
 	i := 0
 	errInsufficientResults := status.Errorf(
@@ -440,7 +436,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 			if err != nil {
 				return nil, rpc.ConvertStorageError(err)
 			}
-			events, err := convert.MessagesToEventsFromVersion(txResult.GetEvents(), requiredEventEncodingVersion)
+			events, err := convert.MessagesToEventsWithEncodingConversion(txResult.GetEvents(), resp.GetEventEncodingVersion(), requiredEventEncodingVersion)
 			if err != nil {
 				return nil, status.Errorf(codes.Internal,
 					"failed to convert events to message in txID %x: %v", txID, err)
@@ -495,7 +491,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 			return nil, rpc.ConvertStorageError(err)
 		}
 
-		events, err := convert.MessagesToEventsFromVersion(systemTxResult.GetEvents(), requiredEventEncodingVersion)
+		events, err := convert.MessagesToEventsWithEncodingConversion(systemTxResult.GetEvents(), resp.GetEventEncodingVersion(), requiredEventEncodingVersion)
 		if err != nil {
 			return nil, rpc.ConvertError(err, "failed to convert events from system tx result", codes.Internal)
 		}
@@ -547,17 +543,13 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 		return nil, rpc.ConvertError(err, "failed to retrieve result from execution node", codes.Internal)
 	}
 
-	if resp.GetEventEncodingVersion() == entities.EventEncodingVersion_JSON_CDC_V0 && requiredEventEncodingVersion == entities.EventEncodingVersion_CCF_V0 {
-		return nil, errors.New("conversion from JSON-CDC to CCF is forbidden")
-	}
-
 	// tx body is irrelevant to status if it's in an executed block
 	txStatus, err := b.deriveTransactionStatus(nil, true, block)
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	events, err := convert.MessagesToEventsFromVersion(resp.GetEvents(), requiredEventEncodingVersion)
+	events, err := convert.MessagesToEventsWithEncodingConversion(resp.GetEvents(), resp.GetEventEncodingVersion(), requiredEventEncodingVersion)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to convert events in blockID %x: %v", blockID, err)
 	}
@@ -782,11 +774,7 @@ func (b *backendTransactions) getTransactionResultFromExecutionNode(
 		return nil, 0, "", err
 	}
 
-	if resp.GetEventEncodingVersion() == entities.EventEncodingVersion_JSON_CDC_V0 && requiredEventEncodingVersion == entities.EventEncodingVersion_CCF_V0 {
-		return nil, 0, "", rpc.ConvertError(err, "conversion from JSON-CDC to CCF is forbidden", codes.Internal)
-	}
-
-	events, err := convert.MessagesToEventsFromVersion(resp.GetEvents(), requiredEventEncodingVersion)
+	events, err := convert.MessagesToEventsWithEncodingConversion(resp.GetEvents(), resp.GetEventEncodingVersion(), requiredEventEncodingVersion)
 	if err != nil {
 		return nil, 0, "", rpc.ConvertError(err, "failed to convert events to message", codes.Internal)
 	}

@@ -98,32 +98,56 @@ func MessageToEventFromVersion(m *entities.Event, inputVersion entities.EventEnc
 	}
 }
 
-// EventsToMessagesFromVersion converts a slice of flow.Events to a slice of protobuf messages, converting
+// EventsToMessagesWithEncodingConversion converts a slice of flow.Events to a slice of protobuf messages, converting
 // the payload encoding from CCF to JSON if the input version is CCF
-func EventsToMessagesFromVersion(flowEvents []flow.Event, version entities.EventEncodingVersion) ([]*entities.Event, error) {
+func EventsToMessagesWithEncodingConversion(
+	flowEvents []flow.Event,
+	from entities.EventEncodingVersion,
+	to entities.EventEncodingVersion,
+) ([]*entities.Event, error) {
+	if from == entities.EventEncodingVersion_JSON_CDC_V0 && to == entities.EventEncodingVersion_CCF_V0 {
+		return nil, fmt.Errorf("conversion from format %s to %s is forbidden", from.String(), to.String())
+	}
+
 	events := make([]*entities.Event, len(flowEvents))
 	for i, e := range flowEvents {
-		event, err := EventToMessageFromVersion(e, version)
-		if err != nil {
-			return nil, fmt.Errorf("could not convert event at index %d from format %d: %w",
-				e.EventIndex, version, err)
+		if to == entities.EventEncodingVersion_JSON_CDC_V0 {
+			event, err := EventToMessageFromVersion(e, from)
+			if err != nil {
+				return nil, fmt.Errorf("could not convert event at index %d from format %d: %w",
+					e.EventIndex, from, err)
+			}
+			events[i] = event
+		} else {
+			events[i] = EventToMessage(e)
 		}
-		events[i] = event
 	}
 	return events, nil
 }
 
-// MessagesToEventsFromVersion converts a slice of protobuf messages to a slice of flow.Events, converting
+// MessagesToEventsWithEncodingConversion converts a slice of protobuf messages to a slice of flow.Events, converting
 // the payload encoding from CCF to JSON if the input version is CCF
-func MessagesToEventsFromVersion(l []*entities.Event, version entities.EventEncodingVersion) ([]flow.Event, error) {
+func MessagesToEventsWithEncodingConversion(
+	l []*entities.Event,
+	from entities.EventEncodingVersion,
+	to entities.EventEncodingVersion,
+) ([]flow.Event, error) {
+	if from == entities.EventEncodingVersion_JSON_CDC_V0 && to == entities.EventEncodingVersion_CCF_V0 {
+		return nil, fmt.Errorf("conversion from format %s to %s is forbidden", from.String(), to.String())
+	}
+
 	events := make([]flow.Event, len(l))
 	for i, m := range l {
-		event, err := MessageToEventFromVersion(m, version)
-		if err != nil {
-			return nil, fmt.Errorf("could not convert event at index %d from format %d: %w",
-				m.EventIndex, version, err)
+		if to == entities.EventEncodingVersion_JSON_CDC_V0 {
+			event, err := MessageToEventFromVersion(m, from)
+			if err != nil {
+				return nil, fmt.Errorf("could not convert event at index %d from format %d: %w",
+					m.EventIndex, from, err)
+			}
+			events[i] = *event
+		} else {
+			events[i] = MessageToEvent(m)
 		}
-		events[i] = *event
 	}
 	return events, nil
 }

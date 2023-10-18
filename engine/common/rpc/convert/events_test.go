@@ -150,7 +150,7 @@ func TestConvertEvents(t *testing.T) {
 
 	t.Run("convert event from ccf to jsoncdc", func(t *testing.T) {
 		messages := convert.EventsToMessages(ccfEvents)
-		converted, err := convert.MessagesToEventsFromVersion(messages, entities.EventEncodingVersion_CCF_V0)
+		converted, err := convert.MessagesToEventsWithEncodingConversion(messages, entities.EventEncodingVersion_CCF_V0, entities.EventEncodingVersion_JSON_CDC_V0)
 		assert.NoError(t, err)
 
 		assert.Equal(t, jsonEvents, converted)
@@ -158,10 +158,25 @@ func TestConvertEvents(t *testing.T) {
 
 	t.Run("convert event from jsoncdc", func(t *testing.T) {
 		messages := convert.EventsToMessages(jsonEvents)
-		converted, err := convert.MessagesToEventsFromVersion(messages, entities.EventEncodingVersion_JSON_CDC_V0)
+		converted, err := convert.MessagesToEventsWithEncodingConversion(messages, entities.EventEncodingVersion_JSON_CDC_V0, entities.EventEncodingVersion_JSON_CDC_V0)
 		assert.NoError(t, err)
 
 		assert.Equal(t, jsonEvents, converted)
+	})
+
+	t.Run("convert event from ccf", func(t *testing.T) {
+		messages := convert.EventsToMessages(jsonEvents)
+		converted, err := convert.MessagesToEventsWithEncodingConversion(messages, entities.EventEncodingVersion_CCF_V0, entities.EventEncodingVersion_CCF_V0)
+		assert.NoError(t, err)
+
+		assert.Equal(t, jsonEvents, converted)
+	})
+
+	t.Run("convert event from jsoncdc to ccf", func(t *testing.T) {
+		messages := convert.EventsToMessages(jsonEvents)
+		converted, err := convert.MessagesToEventsWithEncodingConversion(messages, entities.EventEncodingVersion_JSON_CDC_V0, entities.EventEncodingVersion_CCF_V0)
+		assert.Error(t, err)
+		assert.Nil(t, converted)
 	})
 }
 

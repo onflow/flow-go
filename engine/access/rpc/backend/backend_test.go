@@ -2182,43 +2182,45 @@ func (suite *Suite) TestGetTransactionResultByIndexEventEncodingVersion() {
 		Index:   index,
 	}
 
+	defaultEncoding := entitiesproto.EventEncodingVersion_CCF_V0
+
 	// Define a helper function to prepare the GetTransactionResultResponse with a given encoding version.
-	prepareGetTransactionResultByIndex := func() *execproto.GetTransactionResultResponse {
-		events := getEventsWithEncoding(1, entitiesproto.EventEncodingVersion_CCF_V0)
+	prepareGetTransactionResultByIndex := func() {
+		events := getEventsWithEncoding(1, defaultEncoding)
 
 		exeEventResp := &execproto.GetTransactionResultResponse{
-			Events: convert.EventsToMessages(events),
+			Events:               convert.EventsToMessages(events),
+			EventEncodingVersion: entitiesproto.EventEncodingVersion_CCF_V0,
 		}
 
 		suite.execClient.
 			On("GetTransactionResultByIndex", ctx, exeEventReq).
 			Return(exeEventResp, nil).
 			Once()
-
-		return exeEventResp
 	}
 
 	// Define a helper function to assert the result expectations.
 	assertResultExpectations := func(
-		exeEventResp *execproto.GetTransactionResultResponse,
+		expectedResult []flow.Event,
 		encodingVersion entitiesproto.EventEncodingVersion,
 	) {
 		result, err := backend.GetTransactionResultByIndex(ctx, blockId, index, encodingVersion)
 		suite.checkResponse(result, err)
 
-		expectedResultEvents, err := convert.MessagesToEventsFromVersion(exeEventResp.GetEvents(), encodingVersion)
 		suite.Require().NoError(err)
-		suite.Assert().Equal(result.Events, expectedResultEvents)
+		suite.Assert().Equal(result.Events, expectedResult)
 	}
 
 	suite.Run("test JSON event encoding", func() {
-		exeEventResp := prepareGetTransactionResultByIndex()
-		assertResultExpectations(exeEventResp, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+		prepareGetTransactionResultByIndex()
+		expectedResult := getEventsWithEncoding(1, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+		assertResultExpectations(expectedResult, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
 	})
 
 	suite.Run("test CFF event encoding", func() {
-		exeEventResp := prepareGetTransactionResultByIndex()
-		assertResultExpectations(exeEventResp, entitiesproto.EventEncodingVersion_CCF_V0)
+		prepareGetTransactionResultByIndex()
+		expectedResult := getEventsWithEncoding(1, entitiesproto.EventEncodingVersion_CCF_V0)
+		assertResultExpectations(expectedResult, entitiesproto.EventEncodingVersion_CCF_V0)
 	})
 }
 

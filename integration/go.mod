@@ -346,6 +346,6 @@ replace github.com/onflow/flow-go => ../
 replace github.com/onflow/flow-go/insecure => ../insecure
 
 replace (
-	github.com/onflow/flow-emulator v0.53.0 => github.com/Guitarheroua/flow-emulator v0.0.0-20231013104524-7b022a3992d5
+	github.com/onflow/flow-emulator v0.53.0 => github.com/Guitarheroua/flow-emulator v0.0.0-20231018151849-2b2f7bcd6fa2
 	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20231017162044-5d0f9b6dfdb2 => github.com/Guitarheroua/flow/protobuf/go/flow v0.0.0-20231018150252-f223f1d42001
 )
