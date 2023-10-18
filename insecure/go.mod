@@ -288,4 +288,4 @@ require (
 
 replace github.com/onflow/flow-go => ../
 
-replace github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20231017162044-5d0f9b6dfdb2 => github.com/Guitarheroua/flow/protobuf/go/flow v0.0.0-20231018142143-4d2222e8b26d
+replace github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20231017162044-5d0f9b6dfdb2 => github.com/Guitarheroua/flow/protobuf/go/flow v0.0.0-20231018150252-f223f1d42001
