@@ -44,8 +44,8 @@ type InMemoryRegisterStore struct {
 	registersByBlockID map[flow.Identifier]map[flow.RegisterID]flow.RegisterValue // for storing the registers
 	parentByBlockID    map[flow.Identifier]flow.Identifier                        // for register updates to be fork-aware
 	blockIDsByHeight   map[uint64]map[flow.Identifier]struct{}                    // for pruning
-	prunedHeight       uint64
-	prunedID           flow.Identifier // to ensure all blocks are extending from pruned block (last finalized and executed block)
+	prunedHeight       uint64                                                     // registers at pruned height are pruned (not saved in registersByBlockID)
+	prunedID           flow.Identifier                                            // to ensure all blocks are extending from pruned block (last finalized and executed block)
 }
 
 func NewInMemoryRegisterStore(lastHeight uint64, lastID flow.Identifier) *InMemoryRegisterStore {
