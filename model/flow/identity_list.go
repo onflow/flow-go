@@ -317,8 +317,10 @@ func IdentitySkeletonListEqualTo(lhs, rhs IdentitySkeletonList) bool {
 }
 
 // Exists takes a previously sorted Identity list and searches it for the target
-// identity by its NodeID. Caution: other identity fields are not compared.
-// CAUTION:  The identity list MUST be sorted prior to calling this method
+// identity by its NodeID.
+// CAUTION:
+//   - Other identity fields are not compared.
+//   - The identity list MUST be sorted prior to calling this method.
 func (il GenericIdentityList[T]) Exists(target *T) bool {
 	return il.IdentifierExists((*target).GetNodeID())
 }

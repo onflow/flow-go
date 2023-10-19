@@ -472,7 +472,6 @@ func createNode(
 	rootQC, err := rootSnapshot.QuorumCertificate()
 	require.NoError(t, err)
 
-	// selector := filter.HasRole[flow.Identity](flow.RoleConsensus)
 	committee, err := committees.NewConsensusCommittee(state, localID)
 	require.NoError(t, err)
 	protocolStateEvents.AddConsumer(committee)

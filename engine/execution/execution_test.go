@@ -43,26 +43,22 @@ func TestExecutionFlow(t *testing.T) {
 
 	chainID := flow.Testnet
 
-	colID := unittest.PrivateNodeInfosFixture(
-		1,
+	colID := unittest.PrivateNodeInfoFixture(
 		unittest.WithRole(flow.RoleCollection),
 		unittest.WithKeys,
-	)[0]
-	conID := unittest.PrivateNodeInfosFixture(
-		1,
+	)
+	conID := unittest.PrivateNodeInfoFixture(
 		unittest.WithRole(flow.RoleConsensus),
 		unittest.WithKeys,
-	)[0]
-	exeID := unittest.PrivateNodeInfosFixture(
-		1,
+	)
+	exeID := unittest.PrivateNodeInfoFixture(
 		unittest.WithRole(flow.RoleExecution),
 		unittest.WithKeys,
-	)[0]
-	verID := unittest.PrivateNodeInfosFixture(
-		1,
+	)
+	verID := unittest.PrivateNodeInfoFixture(
 		unittest.WithRole(flow.RoleVerification),
 		unittest.WithKeys,
-	)[0]
+	)
 
 	identities := unittest.CompleteIdentitySet(colID.Identity(), conID.Identity(), exeID.Identity(), verID.Identity()).
 		Sort(order.Canonical[flow.Identity])
@@ -357,21 +353,18 @@ func TestFailedTxWillNotChangeStateCommitment(t *testing.T) {
 
 	chainID := flow.Emulator
 
-	colNodeInfo := unittest.PrivateNodeInfosFixture(
-		1,
+	colNodeInfo := unittest.PrivateNodeInfoFixture(
 		unittest.WithRole(flow.RoleCollection),
 		unittest.WithKeys,
-	)[0]
-	conNodeInfo := unittest.PrivateNodeInfosFixture(
-		1,
+	)
+	conNodeInfo := unittest.PrivateNodeInfoFixture(
 		unittest.WithRole(flow.RoleConsensus),
 		unittest.WithKeys,
-	)[0]
-	exe1NodeInfo := unittest.PrivateNodeInfosFixture(
-		1,
+	)
+	exe1NodeInfo := unittest.PrivateNodeInfoFixture(
 		unittest.WithRole(flow.RoleExecution),
 		unittest.WithKeys,
-	)[0]
+	)
 
 	colID := colNodeInfo.Identity()
 	conID := conNodeInfo.Identity()
@@ -516,31 +509,26 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 
 	chainID := flow.Emulator
 
-	colID := unittest.PrivateNodeInfosFixture(
-		1,
+	colID := unittest.PrivateNodeInfoFixture(
 		unittest.WithRole(flow.RoleCollection),
 		unittest.WithKeys,
-	)[0]
-	conID := unittest.PrivateNodeInfosFixture(
-		1,
+	)
+	conID := unittest.PrivateNodeInfoFixture(
 		unittest.WithRole(flow.RoleConsensus),
 		unittest.WithKeys,
-	)[0]
-	exeID := unittest.PrivateNodeInfosFixture(
-		1,
+	)
+	exeID := unittest.PrivateNodeInfoFixture(
 		unittest.WithRole(flow.RoleExecution),
 		unittest.WithKeys,
-	)[0]
-	ver1ID := unittest.PrivateNodeInfosFixture(
-		1,
+	)
+	ver1ID := unittest.PrivateNodeInfoFixture(
 		unittest.WithRole(flow.RoleVerification),
 		unittest.WithKeys,
-	)[0]
-	ver2ID := unittest.PrivateNodeInfosFixture(
-		1,
+	)
+	ver2ID := unittest.PrivateNodeInfoFixture(
 		unittest.WithRole(flow.RoleVerification),
 		unittest.WithKeys,
-	)[0]
+	)
 
 	identities := unittest.CompleteIdentitySet(colID.Identity(),
 		conID.Identity(),

@@ -1095,9 +1095,16 @@ func NodeInfosFixture(n int, opts ...func(*flow.Identity)) []bootstrap.NodeInfo 
 	return nodeInfos
 }
 
+func PrivateNodeInfoFixture(opts ...func(*flow.Identity)) bootstrap.NodeInfo {
+	return PrivateNodeInfosFixture(1, opts...)[0]
+}
+
 func PrivateNodeInfosFixture(n int, opts ...func(*flow.Identity)) []bootstrap.NodeInfo {
-	il := IdentityListFixture(n, opts...)
-	nodeInfos := make([]bootstrap.NodeInfo, 0, n)
+	return PrivateNodeInfosFromIdentityList(IdentityListFixture(n, opts...))
+}
+
+func PrivateNodeInfosFromIdentityList(il flow.IdentityList) []bootstrap.NodeInfo {
+	nodeInfos := make([]bootstrap.NodeInfo, 0, len(il))
 	for _, identity := range il {
 		nodeInfo := bootstrap.PrivateNodeInfoFromIdentity(identity, KeyFixture(crypto.ECDSAP256), KeyFixture(crypto.BLSBLS12381))
 		nodeInfos = append(nodeInfos, nodeInfo)

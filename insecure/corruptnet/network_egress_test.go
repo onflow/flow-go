@@ -26,7 +26,7 @@ import (
 // The attacker is mocked out in this test.
 func TestHandleOutgoingEvent_AttackerRegistered(t *testing.T) {
 	codec := unittest.NetworkCodec()
-	corruptedIdentity := unittest.PrivateNodeInfosFixture(1, unittest.WithAddress(insecure.DefaultAddress))[0]
+	corruptedIdentity := unittest.PrivateNodeInfoFixture(unittest.WithAddress(insecure.DefaultAddress))
 	flowNetwork := mocknetwork.NewNetwork(t)
 	ccf := mockinsecure.NewCorruptConduitFactory(t)
 	ccf.On("RegisterEgressController", mock.Anything).Return(nil)
