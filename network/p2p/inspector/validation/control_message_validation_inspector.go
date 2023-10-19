@@ -822,7 +822,7 @@ func (c *ControlMsgValidationInspector) logAndDistributeAsyncInspectErrs(req *In
 			Msg("rpc control message async inspection failed")
 		err = c.distributor.Distribute(notification)
 		if err != nil {
-			lg.Error().
+			lg.Fatal().
 				Err(err).
 				Str("notification_error", notification.Error.Error()).
 				Str("control_msg_type", notification.MsgType.String()).
