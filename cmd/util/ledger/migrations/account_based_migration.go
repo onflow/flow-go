@@ -138,10 +138,10 @@ func MigrateGroupConcurrently(
 	jobs := make(chan jobMigrateAccountGroup, accountGroups.Len())
 
 	wg := sync.WaitGroup{}
-	wg.Add(nWorker)
 	resultCh := make(chan *migrationResult, accountGroups.Len())
-	for i := 0; i < int(nWorker); i++ {
+	for i := 0; i < nWorker; i++ {
 		go func() {
+			wg.Add(1)
 			defer wg.Done()
 
 			for {
@@ -235,16 +235,13 @@ func MigrateGroupConcurrently(
 		select {
 		case <-ctx.Done():
 			break
-		default:
+		case result := <-resultCh:
+			durations.Add(result)
+
+			accountMigrated := result.Migrated
+			migrated = append(migrated, accountMigrated...)
+			logAccount(1)
 		}
-
-		result := <-resultCh
-
-		durations.Add(result)
-
-		accountMigrated := result.Migrated
-		migrated = append(migrated, accountMigrated...)
-		logAccount(1)
 	}
 	close(jobs)
 

@@ -191,8 +191,10 @@ func (s sortablePayloads) FindLastOfTheSameKey(i int) int {
 		}
 	}
 
-	fmt.Println(hex.EncodeToString(s[low-1].EncodedKey()[:encodedKeyAddressPrefixLength]))
-	fmt.Println(hex.EncodeToString(s[low-1].EncodedKey()))
+	if i < 1000 {
+		fmt.Println(hex.EncodeToString(s[low-1].EncodedKey()[:encodedKeyAddressPrefixLength]))
+		fmt.Println(hex.EncodeToString(s[low-1].EncodedKey()))
+	}
 
 	return low - 1
 }
