@@ -3,10 +3,7 @@ package backend
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"testing"
-
-	"github.com/onflow/flow-go/utils/unittest/generator"
 
 	"github.com/dgraph-io/badger/v2"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
@@ -35,6 +32,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/generator"
 )
 
 const TEST_MAX_HEIGHT = 100
@@ -112,7 +110,6 @@ func (suite *Suite) TestPing() {
 	suite.Require().NoError(err)
 
 	err = backend.Ping(context.Background())
-
 	suite.Require().NoError(err)
 }
 
@@ -1017,7 +1014,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	blockHeaders := setupStorage(5)
 
 	suite.snapshot.On("Identities", mock.Anything).Return(validExecutorIdentities, nil)
-	validENIDs := validExecutorIdentities.NodeIDs()
+	validENIDs := flow.IdentifierList(validExecutorIdentities.NodeIDs())
 
 	// create a mock connection factory
 	connFactory := connectionmock.NewConnectionFactory(suite.T())
@@ -1084,12 +1081,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		suite.Require().NoError(err)
 
 		// execute request
-		actual, err := backend.GetEventsForBlockIDs(
-			ctx,
-			string(flow.EventAccountCreated),
-			blockIDs,
-			entitiesproto.EventEncodingVersion_JSON_CDC_V0,
-		)
+		actual, err := backend.GetEventsForBlockIDs(ctx, string(flow.EventAccountCreated), blockIDs, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
 		suite.checkResponse(actual, err)
 
 		suite.Require().Equal(expected, actual)
@@ -1107,12 +1099,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		suite.Require().NoError(err)
 
 		// execute request with an empty block id list and expect an empty list of events and no error
-		resp, err := backend.GetEventsForBlockIDs(
-			ctx,
-			string(flow.EventAccountCreated),
-			[]flow.Identifier{},
-			entitiesproto.EventEncodingVersion_JSON_CDC_V0,
-		)
+		resp, err := backend.GetEventsForBlockIDs(ctx, string(flow.EventAccountCreated), []flow.Identifier{}, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
 		require.NoError(suite.T(), err)
 		require.Empty(suite.T(), resp)
 	})
@@ -1366,13 +1353,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		backend, err := New(params)
 		suite.Require().NoError(err)
 
-		_, err = backend.GetEventsForHeightRange(
-			ctx,
-			string(flow.EventAccountCreated),
-			maxHeight,
-			minHeight,
-			entitiesproto.EventEncodingVersion_JSON_CDC_V0,
-		)
+		_, err = backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), maxHeight, minHeight, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
 		suite.Require().Error(err)
 
 		suite.assertAllExpectations() // assert that request was not sent to execution node
@@ -1402,13 +1383,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		suite.Require().NoError(err)
 
 		// execute request
-		actualResp, err := backend.GetEventsForHeightRange(
-			ctx,
-			string(flow.EventAccountCreated),
-			minHeight,
-			maxHeight,
-			entitiesproto.EventEncodingVersion_JSON_CDC_V0,
-		)
+		actualResp, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
 
 		// check response
 		suite.checkResponse(actualResp, err)
@@ -1436,13 +1411,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		backend, err := New(params)
 		suite.Require().NoError(err)
 
-		actualResp, err := backend.GetEventsForHeightRange(
-			ctx,
-			string(flow.EventAccountCreated),
-			minHeight,
-			maxHeight,
-			entitiesproto.EventEncodingVersion_JSON_CDC_V0,
-		)
+		actualResp, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
 		suite.checkResponse(actualResp, err)
 
 		suite.assertAllExpectations()
@@ -1464,13 +1433,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		backend, err := New(params)
 		suite.Require().NoError(err)
 
-		_, err = backend.GetEventsForHeightRange(
-			ctx,
-			string(flow.EventAccountCreated),
-			minHeight,
-			minHeight+1,
-			entitiesproto.EventEncodingVersion_JSON_CDC_V0,
-		)
+		_, err = backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, minHeight+1, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
 		suite.Require().Error(err)
 	})
 
@@ -1492,147 +1455,10 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		backend, err := New(params)
 		suite.Require().NoError(err)
 
-		_, err = backend.GetEventsForHeightRange(
-			ctx,
-			string(flow.EventAccountCreated),
-			minHeight,
-			maxHeight,
-			entitiesproto.EventEncodingVersion_JSON_CDC_V0,
-		)
+		_, err = backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
 		suite.Require().Error(err)
 	})
 
-}
-
-func (suite *Suite) TestGetAccount() {
-	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
-	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
-
-	address, err := suite.chainID.Chain().NewAddressGenerator().NextAddress()
-	suite.Require().NoError(err)
-
-	account := &entitiesproto.Account{
-		Address: address.Bytes(),
-	}
-	ctx := context.Background()
-
-	// setup the latest sealed block
-	block := unittest.BlockFixture()
-	header := block.Header          // create a mock header
-	seal := unittest.Seal.Fixture() // create a mock seal
-	seal.BlockID = header.ID()      // make the seal point to the header
-
-	suite.snapshot.
-		On("Head").
-		Return(header, nil).
-		Once()
-
-	// create the expected execution API request
-	blockID := header.ID()
-	exeReq := &execproto.GetAccountAtBlockIDRequest{
-		BlockId: blockID[:],
-		Address: address.Bytes(),
-	}
-
-	// create the expected execution API response
-	exeResp := &execproto.GetAccountAtBlockIDResponse{
-		Account: account,
-	}
-
-	// setup the execution client mock
-	suite.execClient.
-		On("GetAccountAtBlockID", ctx, exeReq).
-		Return(exeResp, nil).
-		Once()
-
-	receipts, ids := suite.setupReceipts(&block)
-
-	suite.snapshot.On("Identities", mock.Anything).Return(ids, nil)
-	// create a mock connection factory
-	connFactory := connectionmock.NewConnectionFactory(suite.T())
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
-
-	params := suite.defaultBackendParams()
-	params.ConnFactory = connFactory
-
-	backend, err := New(params)
-	suite.Require().NoError(err)
-
-	preferredENIdentifiers = flow.IdentifierList{receipts[0].ExecutorID}
-
-	suite.Run("happy path - valid request and valid response", func() {
-		account, err := backend.GetAccountAtLatestBlock(ctx, address)
-		suite.checkResponse(account, err)
-
-		suite.Require().Equal(address, account.Address)
-
-		suite.assertAllExpectations()
-	})
-}
-
-func (suite *Suite) TestGetAccountAtBlockHeight() {
-	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
-	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
-
-	height := uint64(5)
-	address := unittest.AddressFixture()
-	account := &entitiesproto.Account{
-		Address: address.Bytes(),
-	}
-	ctx := context.Background()
-
-	// create a mock block header
-	b := unittest.BlockFixture()
-	h := b.Header
-
-	// setup Headers storage to return the header when queried by height
-	suite.headers.
-		On("ByHeight", height).
-		Return(h, nil).
-		Once()
-
-	receipts, ids := suite.setupReceipts(&b)
-	suite.snapshot.On("Identities", mock.Anything).Return(ids, nil)
-
-	// create a mock connection factory
-	connFactory := connectionmock.NewConnectionFactory(suite.T())
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
-
-	// create the expected execution API request
-	blockID := h.ID()
-	exeReq := &execproto.GetAccountAtBlockIDRequest{
-		BlockId: blockID[:],
-		Address: address.Bytes(),
-	}
-
-	// create the expected execution API response
-	exeResp := &execproto.GetAccountAtBlockIDResponse{
-		Account: account,
-	}
-
-	// setup the execution client mock
-	suite.execClient.
-		On("GetAccountAtBlockID", ctx, exeReq).
-		Return(exeResp, nil).
-		Once()
-
-	params := suite.defaultBackendParams()
-	params.ChainID = flow.Testnet
-	params.ConnFactory = connFactory
-
-	backend, err := New(params)
-	suite.Require().NoError(err)
-
-	preferredENIdentifiers = flow.IdentifierList{receipts[0].ExecutorID}
-
-	suite.Run("happy path - valid request and valid response", func() {
-		account, err := backend.GetAccountAtBlockHeight(ctx, address, height)
-		suite.checkResponse(account, err)
-
-		suite.Require().Equal(address, account.Address)
-
-		suite.assertAllExpectations()
-	})
 }
 
 func (suite *Suite) TestGetNodeVersionInfo() {
@@ -1921,229 +1747,6 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 	})
 }
 
-// TestExecuteScriptOnExecutionNode tests the method backend.scripts.executeScriptOnExecutionNode for script execution
-func (suite *Suite) TestExecuteScriptOnExecutionNode() {
-
-	// create a mock connection factory
-	connFactory := connectionmock.NewConnectionFactory(suite.T())
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
-
-	params := suite.defaultBackendParams()
-	params.ChainID = flow.Mainnet
-	params.ConnFactory = connFactory
-
-	backend, err := New(params)
-	suite.Require().NoError(err)
-
-	// mock parameters
-	ctx := context.Background()
-	block := unittest.BlockFixture()
-	blockID := block.ID()
-	script := []byte("dummy script")
-	arguments := [][]byte(nil)
-	executionNode := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
-	execReq := &execproto.ExecuteScriptAtBlockIDRequest{
-		BlockId:   blockID[:],
-		Script:    script,
-		Arguments: arguments,
-	}
-	execRes := &execproto.ExecuteScriptAtBlockIDResponse{
-		Value: []byte{4, 5, 6},
-	}
-
-	suite.Run("happy path script execution success", func() {
-		suite.execClient.On("ExecuteScriptAtBlockID", ctx, execReq).Return(execRes, nil).Once()
-		res, err := backend.tryExecuteScriptOnExecutionNode(ctx, executionNode.Address, blockID, script, arguments)
-		suite.execClient.AssertExpectations(suite.T())
-		suite.checkResponse(res, err)
-	})
-
-	suite.Run("script execution failure returns status OK", func() {
-		suite.execClient.On("ExecuteScriptAtBlockID", ctx, execReq).
-			Return(nil, status.Error(codes.InvalidArgument, "execution failure!")).Once()
-		_, err := backend.tryExecuteScriptOnExecutionNode(ctx, executionNode.Address, blockID, script, arguments)
-		suite.execClient.AssertExpectations(suite.T())
-		suite.Require().Error(err)
-		suite.Require().Equal(status.Code(err), codes.InvalidArgument)
-	})
-
-	suite.Run("execution node internal failure returns status code Internal", func() {
-		suite.execClient.On("ExecuteScriptAtBlockID", ctx, execReq).
-			Return(nil, status.Error(codes.Internal, "execution node internal error!")).Once()
-		_, err := backend.tryExecuteScriptOnExecutionNode(ctx, executionNode.Address, blockID, script, arguments)
-		suite.execClient.AssertExpectations(suite.T())
-		suite.Require().Error(err)
-		suite.Require().Equal(status.Code(err), codes.Internal)
-	})
-}
-
-// TestExecuteScriptOnArchiveNode tests the method backend.scripts.executeScriptOnArchiveNode for script execution
-func (suite *Suite) TestExecuteScriptOnArchiveNode() {
-
-	// create a mock connection factory
-	var mockPort uint = 9000
-	connFactory := connectionmock.NewConnectionFactory(suite.T())
-	connFactory.On("GetAccessAPIClientWithPort", mock.Anything, mockPort).Return(suite.archiveClient, &mockCloser{}, nil)
-	archiveNode := unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
-	fullArchiveAddress := archiveNode.Address + ":" + strconv.FormatUint(uint64(mockPort), 10)
-
-	params := suite.defaultBackendParams()
-	params.ChainID = flow.Mainnet
-	params.ConnFactory = connFactory
-	params.ArchiveAddressList = []string{fullArchiveAddress}
-
-	backend, err := New(params)
-	suite.Require().NoError(err)
-
-	// mock parameters
-	ctx := context.Background()
-	block := unittest.BlockFixture()
-	blockID := block.ID()
-	script := []byte("dummy script")
-	arguments := [][]byte(nil)
-	archiveRes := &accessproto.ExecuteScriptResponse{Value: []byte{4, 5, 6}}
-	archiveReq := &accessproto.ExecuteScriptAtBlockIDRequest{
-		BlockId:   blockID[:],
-		Script:    script,
-		Arguments: arguments}
-
-	suite.Run("happy path script execution success", func() {
-		suite.archiveClient.On("ExecuteScriptAtBlockID", ctx, archiveReq).Return(archiveRes, nil).Once()
-		res, err := backend.tryExecuteScriptOnArchiveNode(ctx, archiveNode.Address, mockPort, blockID, script, arguments)
-		suite.archiveClient.AssertExpectations(suite.T())
-		suite.checkResponse(res, err)
-	})
-
-	suite.Run("script execution failure returns status OK", func() {
-		suite.archiveClient.On("ExecuteScriptAtBlockID", ctx, archiveReq).
-			Return(nil, status.Error(codes.InvalidArgument, "execution failure!")).Once()
-		_, err := backend.tryExecuteScriptOnArchiveNode(ctx, archiveNode.Address, mockPort, blockID, script, arguments)
-		suite.archiveClient.AssertExpectations(suite.T())
-		suite.Require().Error(err)
-		suite.Require().Equal(status.Code(err), codes.InvalidArgument)
-	})
-
-	suite.Run("script execution due to missing block returns Not found", func() {
-		suite.archiveClient.On("ExecuteScriptAtBlockID", ctx, archiveReq).
-			Return(nil, status.Error(codes.NotFound, "missing block!")).Once()
-		_, err := backend.tryExecuteScriptOnArchiveNode(ctx, archiveNode.Address, mockPort, blockID, script, arguments)
-		suite.archiveClient.AssertExpectations(suite.T())
-		suite.Require().Error(err)
-		suite.Require().Equal(status.Code(err), codes.NotFound)
-	})
-
-	suite.Run("archive node internal failure returns status code Internal", func() {
-		suite.archiveClient.On("ExecuteScriptAtBlockID", ctx, archiveReq).
-			Return(nil, status.Error(codes.Internal, "archive node internal error!")).Once()
-		_, err := backend.tryExecuteScriptOnArchiveNode(ctx, archiveNode.Address, mockPort, blockID, script, arguments)
-		suite.archiveClient.AssertExpectations(suite.T())
-		suite.Require().Error(err)
-		suite.Require().Equal(status.Code(err), codes.Internal)
-	})
-}
-
-// TestExecuteScriptOnArchiveNode tests the method backend.scripts.executeScriptOnArchiveNode for script execution
-func (suite *Suite) TestScriptExecutionValidationMode() {
-
-	// create a mock connection factory
-	var mockPort uint = 9000
-	connFactory := connectionmock.NewConnectionFactory(suite.T())
-	connFactory.On("GetAccessAPIClientWithPort", mock.Anything, mockPort).Return(suite.archiveClient, &mockCloser{}, nil)
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
-	archiveNode := unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
-	fullArchiveAddress := archiveNode.Address + ":" + strconv.FormatUint(uint64(mockPort), 10)
-
-	params := suite.defaultBackendParams()
-	params.ChainID = flow.Mainnet
-	params.ConnFactory = connFactory
-	params.ArchiveAddressList = []string{fullArchiveAddress}
-	params.ScriptExecValidation = true
-
-	backend, err := New(params)
-	suite.Require().NoError(err)
-
-	// mock parameters
-	ctx := context.Background()
-	block := unittest.BlockFixture()
-	blockID := block.ID()
-	_, ids := suite.setupReceipts(&block)
-	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
-	suite.snapshot.On("Identities", mock.Anything).Return(ids, nil)
-	suite.state.On("AtBlockID", mock.Anything).Return(suite.snapshot)
-
-	script := []byte("dummy script")
-	arguments := [][]byte(nil)
-	archiveRes := &accessproto.ExecuteScriptResponse{Value: []byte{4, 5, 6}}
-	archiveReq := &accessproto.ExecuteScriptAtBlockIDRequest{
-		BlockId:   blockID[:],
-		Script:    script,
-		Arguments: arguments}
-
-	archiveBlockUnavailableErr := status.Error(codes.NotFound, "placeholder block error")
-	archiveCadenceErr := status.Error(codes.InvalidArgument, "placeholder cadence error")
-	internalErr := status.Error(codes.Internal, "placeholder internal error")
-
-	execReq := &execproto.ExecuteScriptAtBlockIDRequest{
-		BlockId:   blockID[:],
-		Script:    script,
-		Arguments: arguments}
-	matchingExecRes := &execproto.ExecuteScriptAtBlockIDResponse{Value: []byte{4, 5, 6}}
-	mismatchingExecRes := &execproto.ExecuteScriptAtBlockIDResponse{Value: []byte{1, 2, 3}}
-
-	suite.Run("happy path script execution success both en and rn return responses", func() {
-		suite.archiveClient.On("ExecuteScriptAtBlockID", ctx, archiveReq).Return(archiveRes, nil).Once()
-		suite.execClient.On("ExecuteScriptAtBlockID", ctx, execReq).Return(matchingExecRes, nil).Once()
-		res, err := backend.executeScriptOnExecutor(ctx, blockID, script, arguments)
-		suite.archiveClient.AssertExpectations(suite.T())
-		suite.checkResponse(res, err)
-		assert.Equal(suite.T(), res, matchingExecRes.Value)
-	})
-
-	suite.Run("script execution success but mismatching responses", func() {
-		suite.archiveClient.On("ExecuteScriptAtBlockID", ctx, archiveReq).Return(archiveRes, nil).Once()
-		suite.execClient.On("ExecuteScriptAtBlockID", ctx, execReq).Return(mismatchingExecRes, nil).Once()
-		res, err := backend.executeScriptOnExecutor(ctx, blockID, script, arguments)
-		suite.archiveClient.AssertExpectations(suite.T())
-		suite.checkResponse(res, err)
-		suite.Require().Equal(res, mismatchingExecRes.Value)
-	})
-
-	suite.Run("script execution failure on both nodes", func() {
-		suite.archiveClient.On("ExecuteScriptAtBlockID", ctx, archiveReq).Return(nil, archiveCadenceErr).Once()
-		suite.execClient.On("ExecuteScriptAtBlockID", ctx, execReq).Return(nil, archiveCadenceErr).Once()
-		_, err := backend.executeScriptOnExecutor(ctx, blockID, script, arguments)
-		suite.archiveClient.AssertExpectations(suite.T())
-		suite.Require().Error(err)
-		suite.Require().Equal(status.Code(err), codes.InvalidArgument)
-	})
-
-	suite.Run("script execution failure on rn but not en", func() {
-		suite.archiveClient.On("ExecuteScriptAtBlockID", ctx, archiveReq).Return(
-			nil, archiveCadenceErr).Once()
-		suite.execClient.On("ExecuteScriptAtBlockID", ctx, execReq).Return(matchingExecRes, nil).Once()
-		_, err := backend.executeScriptOnExecutor(ctx, blockID, script, arguments)
-		suite.Require().NoError(err)
-		suite.archiveClient.AssertExpectations(suite.T())
-	})
-
-	suite.Run("block not found on rn", func() {
-		suite.archiveClient.On("ExecuteScriptAtBlockID", ctx, archiveReq).Return(
-			nil, archiveBlockUnavailableErr).Once()
-		suite.execClient.On("ExecuteScriptAtBlockID", ctx, execReq).Return(matchingExecRes, nil).Once()
-		_, err := backend.ExecuteScriptAtBlockID(ctx, blockID, script, arguments)
-		suite.Require().NoError(err)
-		suite.archiveClient.AssertExpectations(suite.T())
-	})
-
-	suite.Run("block not found on en", func() {
-		suite.execClient.On("ExecuteScriptAtBlockID", ctx, execReq).Return(nil, internalErr).
-			Times(int(ids.Count()))
-		_, err := backend.ExecuteScriptAtBlockID(ctx, blockID, script, arguments)
-		suite.archiveClient.AssertExpectations(suite.T())
-		suite.Require().Error(err)
-	})
-}
-
 // TestGetTransactionResultByIndexEventEncodingVersion tests the GetTransactionResultByIndex function with different
 // event encoding versions.
 func (suite *Suite) TestGetTransactionResultByIndexEventEncodingVersion() {
@@ -2224,6 +1827,24 @@ func (suite *Suite) TestGetTransactionResultByIndexEventEncodingVersion() {
 	})
 }
 
+// getEventsWithEncoding generates a specified number of events with a given encoding version.
+func getEventsWithEncoding(n int, version entitiesproto.EventEncodingVersion) []flow.Event {
+	var eventGenerator *generator.Events
+	switch version {
+	case entitiesproto.EventEncodingVersion_CCF_V0:
+		eventGenerator = generator.EventGenerator(generator.WithEncoding(generator.EncodingCCF))
+	case entitiesproto.EventEncodingVersion_JSON_CDC_V0:
+		eventGenerator = generator.EventGenerator(generator.WithEncoding(generator.EncodingJSON))
+	}
+
+	events := make([]flow.Event, 0, n)
+	for i := 0; i < n; i++ {
+		events = append(events, eventGenerator.New())
+	}
+
+	return events
+}
+
 func (suite *Suite) assertAllExpectations() {
 	suite.snapshot.AssertExpectations(suite.T())
 	suite.state.AssertExpectations(suite.T())
@@ -2267,24 +1888,6 @@ func getEvents(n int) []flow.Event {
 	for i := range events {
 		events[i] = flow.Event{Type: flow.EventAccountCreated}
 	}
-	return events
-}
-
-// getEventsWithEncoding generates a specified number of events with a given encoding version.
-func getEventsWithEncoding(n int, version entitiesproto.EventEncodingVersion) []flow.Event {
-	var eventGenerator *generator.Events
-	switch version {
-	case entitiesproto.EventEncodingVersion_CCF_V0:
-		eventGenerator = generator.EventGenerator(generator.WithEncoding(generator.EncodingCCF))
-	case entitiesproto.EventEncodingVersion_JSON_CDC_V0:
-		eventGenerator = generator.EventGenerator(generator.WithEncoding(generator.EncodingJSON))
-	}
-
-	events := make([]flow.Event, 0, n)
-	for i := 0; i < n; i++ {
-		events = append(events, eventGenerator.New())
-	}
-
 	return events
 }
 

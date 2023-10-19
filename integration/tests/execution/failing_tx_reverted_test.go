@@ -32,7 +32,7 @@ func (s *FailingTxRevertedSuite) TestExecutionFailingTxReverted() {
 	s.T().Logf("got blockA height %v ID %v\n", blockA.Header.Height, blockA.Header.ID())
 
 	// send transaction
-	err := s.AccessClient().DeployContract(context.Background(), sdk.Identifier(s.net.Root().ID()), lib.CounterContract)
+	_, err := s.AccessClient().DeployContract(context.Background(), sdk.Identifier(s.net.Root().ID()), lib.CounterContract)
 	require.NoError(s.T(), err, "could not deploy counter")
 
 	// wait until we see a different state commitment for a finalized block, call that block blockB

@@ -197,7 +197,7 @@ func (nc *NoopCollector) RuntimeSetNumberOfAccounts(count uint64)               
 func (nc *NoopCollector) RuntimeTransactionProgramsCacheMiss()                                  {}
 func (nc *NoopCollector) RuntimeTransactionProgramsCacheHit()                                   {}
 func (nc *NoopCollector) ScriptExecuted(dur time.Duration, size int)                            {}
-func (nc *NoopCollector) ScriptExecutionErrorOnArchiveNode()                                    {}
+func (nc *NoopCollector) ScriptExecutionErrorLocal()                                            {}
 func (nc *NoopCollector) ScriptExecutionErrorOnExecutionNode()                                  {}
 func (nc *NoopCollector) ScriptExecutionResultMismatch()                                        {}
 func (nc *NoopCollector) ScriptExecutionResultMatch()                                           {}
@@ -320,3 +320,4 @@ var _ module.ExecutionStateIndexerMetrics = (*NoopCollector)(nil)
 
 func (nc *NoopCollector) BlockIndexed(uint64, time.Duration, int, int, int) {}
 func (nc *NoopCollector) BlockReindexed()                                   {}
+func (nc *NoopCollector) InitializeLatestHeight(height uint64)              {}

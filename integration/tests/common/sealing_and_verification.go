@@ -38,7 +38,7 @@ func SealingAndVerificationHappyPathTest(
 	t.Logf("blockA generated, height: %v ID: %v\n", blockA.Header.Height, blockA.Header.ID())
 
 	// sends a transaction
-	err := accessClient.DeployContract(context.Background(), sdk.Identifier(rootBlockId), lib.CounterContract)
+	_, err := accessClient.DeployContract(context.Background(), sdk.Identifier(rootBlockId), lib.CounterContract)
 	require.NoError(t, err, "could not deploy counter")
 
 	// waits until for a different state commitment for a finalized block, call that block blockB,
