@@ -138,10 +138,10 @@ func MigrateGroupConcurrently(
 	jobs := make(chan jobMigrateAccountGroup, accountGroups.Len())
 
 	wg := sync.WaitGroup{}
+	wg.Add(nWorker)
 	resultCh := make(chan *migrationResult, accountGroups.Len())
 	for i := 0; i < nWorker; i++ {
 		go func() {
-			wg.Add(1)
 			defer wg.Done()
 
 			for {
@@ -156,6 +156,13 @@ func MigrateGroupConcurrently(
 
 					// this is not an account, but common values for all accounts.
 					if job.Address == common.ZeroAddress {
+						resultCh <- &migrationResult{
+							migrationDuration: migrationDuration{
+								Address:  job.Address,
+								Duration: time.Since(start),
+							},
+							Migrated: job.Payloads,
+						}
 						continue
 					}
 
@@ -163,6 +170,13 @@ func MigrateGroupConcurrently(
 						log.Info().
 							Hex("address", job.Address[:]).
 							Msg("skipping problematic account")
+						resultCh <- &migrationResult{
+							migrationDuration: migrationDuration{
+								Address:  job.Address,
+								Duration: time.Since(start),
+							},
+							Migrated: job.Payloads,
+						}
 						continue
 					}
 

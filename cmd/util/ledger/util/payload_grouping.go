@@ -2,7 +2,6 @@ package util
 
 import (
 	"bytes"
-	"encoding/hex"
 	"fmt"
 	"sort"
 	"sync"
@@ -189,11 +188,6 @@ func (s sortablePayloads) FindLastOfTheSameKey(i int) int {
 		} else {
 			high = mid
 		}
-	}
-
-	if i < 1000 {
-		fmt.Println(hex.EncodeToString(s[low-1].EncodedKey()[:encodedKeyAddressPrefixLength]))
-		fmt.Println(hex.EncodeToString(s[low-1].EncodedKey()))
 	}
 
 	return low - 1
