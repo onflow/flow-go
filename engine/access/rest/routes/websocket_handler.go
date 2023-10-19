@@ -224,11 +224,11 @@ type WSHandler struct {
 	*HttpHandler
 	subscribeFunc SubscribeHandlerFunc
 
-	api                     state_stream.API
-	eventFilterConfig       state_stream.EventFilterConfig
-	maxStreams              int32
-	configHeartbeatInterval uint64
-	activeStreamCount       *atomic.Int32
+	api                      state_stream.API
+	eventFilterConfig        state_stream.EventFilterConfig
+	maxStreams               int32
+	defaultHeartbeatInterval uint64
+	activeStreamCount        *atomic.Int32
 }
 
 var _ http.Handler = (*WSHandler)(nil)
@@ -241,13 +241,13 @@ func NewWSHandler(
 	stateStreamConfig backend.Config,
 ) *WSHandler {
 	handler := &WSHandler{
-		subscribeFunc:           subscribeFunc,
-		api:                     api,
-		eventFilterConfig:       stateStreamConfig.EventFilterConfig,
-		maxStreams:              int32(stateStreamConfig.MaxGlobalStreams),
-		configHeartbeatInterval: stateStreamConfig.HeartbeatInterval,
-		activeStreamCount:       atomic.NewInt32(0),
-		HttpHandler:             NewHttpHandler(logger, chain),
+		subscribeFunc:            subscribeFunc,
+		api:                      api,
+		eventFilterConfig:        stateStreamConfig.EventFilterConfig,
+		maxStreams:               int32(stateStreamConfig.MaxGlobalStreams),
+		defaultHeartbeatInterval: stateStreamConfig.HeartbeatInterval,
+		activeStreamCount:        atomic.NewInt32(0),
+		HttpHandler:              NewHttpHandler(logger, chain),
 	}
 
 	return handler
@@ -282,7 +282,7 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		maxStreams:        h.maxStreams,
 		activeStreamCount: h.activeStreamCount,
 		readChannel:       make(chan error),
-		heartbeatInterval: h.configHeartbeatInterval, // set default heartbeat interval from state stream config
+		heartbeatInterval: h.defaultHeartbeatInterval, // set default heartbeat interval from state stream config
 	}
 
 	err = wsController.SetWebsocketConf()

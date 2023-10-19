@@ -16,7 +16,7 @@ import (
 	"google.golang.org/grpc"
 
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	access "github.com/onflow/flow/protobuf/go/flow/executiondata"
+	"github.com/onflow/flow/protobuf/go/flow/executiondata"
 
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
@@ -40,16 +40,16 @@ type HandlerTestSuite struct {
 type fakeReadServerImpl struct {
 	pb.ByteStream_ReadServer
 	ctx      context.Context
-	received chan *access.SubscribeEventsResponse
+	received chan *executiondata.SubscribeEventsResponse
 }
 
-var _ access.ExecutionDataAPI_SubscribeEventsServer = (*fakeReadServerImpl)(nil)
+var _ executiondata.ExecutionDataAPI_SubscribeEventsServer = (*fakeReadServerImpl)(nil)
 
 func (fake *fakeReadServerImpl) Context() context.Context {
 	return fake.ctx
 }
 
-func (fake *fakeReadServerImpl) Send(response *access.SubscribeEventsResponse) error {
+func (fake *fakeReadServerImpl) Send(response *executiondata.SubscribeEventsResponse) error {
 	fake.received <- response
 	return nil
 }
@@ -79,7 +79,7 @@ func (s *HandlerTestSuite) SetupTest() {
 func (s *HandlerTestSuite) TestHeartbeatResponse() {
 	reader := &fakeReadServerImpl{
 		ctx:      context.Background(),
-		received: make(chan *access.SubscribeEventsResponse, 100),
+		received: make(chan *executiondata.SubscribeEventsResponse, 100),
 	}
 
 	// notify backend block is available
@@ -87,9 +87,9 @@ func (s *HandlerTestSuite) TestHeartbeatResponse() {
 
 	s.Run("All events filter", func() {
 		// create empty event filter
-		filter := &access.EventFilter{}
+		filter := &executiondata.EventFilter{}
 		// create subscribe events request, set the created filter and heartbeatInterval
-		req := &access.SubscribeEventsRequest{
+		req := &executiondata.SubscribeEventsRequest{
 			StartBlockHeight:  0,
 			Filter:            filter,
 			HeartbeatInterval: 1,
@@ -117,13 +117,13 @@ func (s *HandlerTestSuite) TestHeartbeatResponse() {
 
 	s.Run("Event A.0x1.Foo.Bar filter with heartbeat interval 1", func() {
 		// create A.0x1.Foo.Bar event filter
-		pbFilter := &access.EventFilter{
+		pbFilter := &executiondata.EventFilter{
 			EventType: []string{string(testEventTypes[0])},
 			Contract:  nil,
 			Address:   nil,
 		}
 		// create subscribe events request, set the created filter and heartbeatInterval
-		req := &access.SubscribeEventsRequest{
+		req := &executiondata.SubscribeEventsRequest{
 			StartBlockHeight:  0,
 			Filter:            pbFilter,
 			HeartbeatInterval: 1,
@@ -152,14 +152,14 @@ func (s *HandlerTestSuite) TestHeartbeatResponse() {
 
 	s.Run("Non existent filter with heartbeat interval 2", func() {
 		// create non existent filter
-		pbFilter := &access.EventFilter{
+		pbFilter := &executiondata.EventFilter{
 			EventType: []string{"A.0x1.NonExistent.Event"},
 			Contract:  nil,
 			Address:   nil,
 		}
 
 		// create subscribe events request, set the created filter and heartbeatInterval
-		req := &access.SubscribeEventsRequest{
+		req := &executiondata.SubscribeEventsRequest{
 			StartBlockHeight:  0,
 			Filter:            pbFilter,
 			HeartbeatInterval: 2,
@@ -204,7 +204,7 @@ func TestExecutionDataStream(t *testing.T) {
 	defer cancel()
 
 	api := ssmock.NewAPI(t)
-	stream := makeStreamMock[access.SubscribeExecutionDataRequest, access.SubscribeExecutionDataResponse](ctx)
+	stream := makeStreamMock[executiondata.SubscribeExecutionDataRequest, executiondata.SubscribeExecutionDataResponse](ctx)
 	sub := NewSubscription(1)
 
 	config := Config{
@@ -234,7 +234,7 @@ func TestExecutionDataStream(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		wg.Done()
-		err := h.SubscribeExecutionData(&access.SubscribeExecutionDataRequest{}, stream)
+		err := h.SubscribeExecutionData(&executiondata.SubscribeExecutionDataRequest{}, stream)
 		require.NoError(t, err)
 		t.Log("subscription closed")
 	}()
@@ -299,7 +299,7 @@ func TestEventStream(t *testing.T) {
 	defer cancel()
 
 	api := ssmock.NewAPI(t)
-	stream := makeStreamMock[access.SubscribeEventsRequest, access.SubscribeEventsResponse](ctx)
+	stream := makeStreamMock[executiondata.SubscribeEventsRequest, executiondata.SubscribeEventsResponse](ctx)
 	sub := NewSubscription(1)
 
 	// generate some events with a payload to include
@@ -329,7 +329,7 @@ func TestEventStream(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		wg.Done()
-		err := h.SubscribeEvents(&access.SubscribeEventsRequest{}, stream)
+		err := h.SubscribeEvents(&executiondata.SubscribeEventsRequest{}, stream)
 		require.NoError(t, err)
 		t.Log("subscription closed")
 	}()
