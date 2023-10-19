@@ -67,6 +67,10 @@ const (
 	alspSpamRecordCacheSize = "alsp-spam-record-cache-size"
 	alspSpamRecordQueueSize = "alsp-spam-report-queue-size"
 	alspHearBeatInterval    = "alsp-heart-beat-interval"
+
+	alspSyncEngineBatchRequestBaseProb = "alsp-sync-engine-batch-request-base-prob"
+	alspSyncEngineRangeRequestBaseProb = "alsp-sync-engine-range-request-base-prob"
+	alspSyncEngineSyncRequestProb      = "alsp-sync-engine-sync-request-prob"
 )
 
 func AllFlagNames() []string {
@@ -76,7 +80,8 @@ func AllFlagNames() []string {
 		fileDescriptorsRatio, peerBaseLimitConnsInbound, highWatermark, lowWatermark, gracePeriod, silencePeriod, peerScoring, localMeshLogInterval, rpcSentTrackerCacheSize, rpcSentTrackerQueueCacheSize, rpcSentTrackerNumOfWorkers,
 		scoreTracerInterval, gossipSubRPCInspectorNotificationCacheSize, validationInspectorNumberOfWorkers, validationInspectorInspectMessageQueueCacheSize, validationInspectorClusterPrefixedTopicsReceivedCacheSize,
 		validationInspectorClusterPrefixedTopicsReceivedCacheDecay, validationInspectorClusterPrefixHardThreshold,
-		ihaveMaxSampleSize, metricsInspectorNumberOfWorkers, metricsInspectorCacheSize, alspDisabled, alspSpamRecordCacheSize, alspSpamRecordQueueSize, alspHearBeatInterval,
+		ihaveMaxSampleSize, metricsInspectorNumberOfWorkers, metricsInspectorCacheSize,
+		alspDisabled, alspSpamRecordCacheSize, alspSpamRecordQueueSize, alspHearBeatInterval, alspSyncEngineBatchRequestBaseProb, alspSyncEngineRangeRequestBaseProb, alspSyncEngineSyncRequestProb,
 		iwantMaxSampleSize, iwantMaxMessageIDSampleSize, ihaveMaxMessageIDSampleSize, iwantCacheMissThreshold, controlMessageMaxSampleSize, iwantDuplicateMsgIDThreshold, iwantCacheMissCheckSize,
 	}
 }
@@ -133,6 +138,9 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 	flags.Uint32(alspSpamRecordCacheSize, config.AlspConfig.SpamRecordCacheSize, "size of spam record cache, recommended to be 10x the number of authorized nodes")
 	flags.Uint32(alspSpamRecordQueueSize, config.AlspConfig.SpamReportQueueSize, "size of spam report queue, recommended to be 100x the number of authorized nodes")
 	flags.Duration(alspHearBeatInterval, config.AlspConfig.HearBeatInterval, "interval between two consecutive heartbeat events at alsp, recommended to leave it as default unless you know what you are doing.")
+	flags.Float32(alspSyncEngineBatchRequestBaseProb, config.AlspConfig.SyncEngineBatchRequestBaseProb, "base probability of creating a misbehavior report for a batch request message")
+	flags.Float32(alspSyncEngineRangeRequestBaseProb, config.AlspConfig.SyncEngineRangeRequestBaseProb, "base probability of creating a misbehavior report for a range request message")
+	flags.Float32(alspSyncEngineSyncRequestProb, config.AlspConfig.SyncEngineSyncRequestProb, "probability of creating a misbehavior report for a sync request message")
 
 	flags.Int(ihaveMaxSampleSize, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IHaveRPCInspectionConfig.MaxSampleSize, "max number of ihaves to sample when performing validation")
 	flags.Int(ihaveMaxMessageIDSampleSize, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IHaveRPCInspectionConfig.MaxMessageIDSampleSize, "max number of message ids to sample when performing validation per ihave")
