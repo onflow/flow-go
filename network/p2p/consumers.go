@@ -38,6 +38,14 @@ type InvCtrlMsgNotif struct {
 }
 
 // NewInvalidControlMessageNotification returns a new *InvCtrlMsgNotif
+// Args:
+//   - peerID: peer id of the offender.
+//   - ctlMsgType: the control message type of the rpc message that caused the error.
+//   - err: the error that occurred.
+//   - count: the number of occurrences of the error.
+//
+// Returns:
+//   - *InvCtlMsgNotif: invalid control message notification.
 func NewInvalidControlMessageNotification(peerID peer.ID, ctlMsgType p2pmsg.ControlMessageType, err error, count uint64) *InvCtrlMsgNotif {
 	return &InvCtrlMsgNotif{
 		PeerID:  peerID,
