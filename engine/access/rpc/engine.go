@@ -4,14 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/engine/access/state_stream"
-	backend2 "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"net"
 	"net/http"
 	"sync"
 
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/credentials"
+
+	"github.com/onflow/flow-go/engine/access/state_stream"
+	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -24,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
+
 )
 
 // Config defines the configurable options for the access node server
@@ -68,9 +70,8 @@ type Engine struct {
 	addrLock       sync.RWMutex
 	restAPIAddress net.Addr
 
-	stateStreamBackend backend2.API
-	eventFilterConfig  state_stream.EventFilterConfig
-	maxGlobalStreams   uint32
+	stateStreamBackend state_stream.API
+	stateStreamConfig  statestreambackend.Config
 }
 type Option func(*RPCEngineBuilder)
 
@@ -86,9 +87,8 @@ func NewBuilder(log zerolog.Logger,
 	restHandler access.API,
 	secureGrpcServer *grpcserver.GrpcServer,
 	unsecureGrpcServer *grpcserver.GrpcServer,
-	stateStreamBackend backend2.API,
-	eventFilterConfig state_stream.EventFilterConfig,
-	maxGlobalStreams uint32,
+	stateStreamBackend state_stream.API,
+	stateStreamConfig statestreambackend.Config,
 ) (*RPCEngineBuilder, error) {
 	log = log.With().Str("engine", "rpc").Logger()
 
@@ -113,8 +113,7 @@ func NewBuilder(log zerolog.Logger,
 		restCollector:             accessMetrics,
 		restHandler:               restHandler,
 		stateStreamBackend:        stateStreamBackend,
-		eventFilterConfig:         eventFilterConfig,
-		maxGlobalStreams:          maxGlobalStreams,
+		stateStreamConfig: 		   stateStreamConfig,
 	}
 	backendNotifierActor, backendNotifierWorker := events.NewFinalizationActor(eng.notifyBackendOnBlockFinalized)
 	eng.backendNotifierActor = backendNotifierActor
@@ -225,8 +224,7 @@ func (e *Engine) serveREST(ctx irrecoverable.SignalerContext, ready component.Re
 	e.log.Info().Str("rest_api_address", e.config.RestConfig.ListenAddress).Msg("starting REST server on address")
 
 	r, err := rest.NewServer(e.restHandler, e.config.RestConfig, e.log, e.chain, e.restCollector, e.stateStreamBackend,
-		e.eventFilterConfig,
-		e.maxGlobalStreams)
+		e.stateStreamConfig)
 	if err != nil {
 		e.log.Err(err).Msg("failed to initialize the REST server")
 		ctx.Throw(err)

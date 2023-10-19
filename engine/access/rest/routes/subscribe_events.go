@@ -5,7 +5,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/request"
 	"github.com/onflow/flow-go/engine/access/state_stream"
-	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 )
 
 // SubscribeEvents create websocket connection and write to it requested events.
@@ -13,7 +12,7 @@ func SubscribeEvents(
 	ctx context.Context,
 	request *request.Request,
 	wsController *WebsocketController,
-) (backend.Subscription, error) {
+) (state_stream.Subscription, error) {
 	req, err := request.SubscribeEventsRequest()
 	if err != nil {
 		return nil, models.NewBadRequestError(err)
@@ -30,7 +29,10 @@ func SubscribeEvents(
 		return nil, models.NewBadRequestError(err)
 	}
 
-	wsController.heartbeatInterval = req.HeartbeatInterval
+	// Check if heartbeat interval was passed via request
+	if req.HeartbeatInterval > 0 {
+		wsController.heartbeatInterval = req.HeartbeatInterval
+	}
 
 	return wsController.api.SubscribeEvents(ctx, req.StartBlockID, req.StartHeight, filter), nil
 }

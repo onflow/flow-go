@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
+
 	"net/http"
 	"regexp"
 	"strings"
@@ -61,13 +62,12 @@ func (b *RouterBuilder) AddRestRoutes(backend access.API, chain flow.Chain) *Rou
 
 // AddWsRoutes adds WebSocket routes to the router.
 func (b *RouterBuilder) AddWsRoutes(
-	stateStreamApi backend.API,
+	stateStreamApi state_stream.API,
 	chain flow.Chain,
-	eventFilterConfig state_stream.EventFilterConfig,
-	maxGlobalStreams uint32) *RouterBuilder {
+	stateStreamConfig backend.Config,) *RouterBuilder {
 
 	for _, r := range WSRoutes {
-		h := NewWSHandler(b.logger, stateStreamApi, r.Handler, chain, eventFilterConfig, maxGlobalStreams)
+		h := NewWSHandler(b.logger, stateStreamApi, r.Handler, chain, stateStreamConfig)
 		b.v1SubRouter.
 			Methods(r.Method).
 			Path(r.Pattern).

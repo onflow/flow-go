@@ -34,7 +34,7 @@ const (
 type WebsocketController struct {
 	logger            zerolog.Logger
 	conn              *websocket.Conn                // the WebSocket connection for communication with the client
-	api               backend.API                    // the state_stream.API instance for managing event subscriptions
+	api               state_stream.API               // the state_stream.API instance for managing event subscriptions
 	eventFilterConfig state_stream.EventFilterConfig // the configuration for filtering events
 	maxStreams        int32                          // the maximum number of streams allowed
 	activeStreamCount *atomic.Int32                  // the current number of active streams
@@ -109,7 +109,7 @@ func (wsController *WebsocketController) wsErrorHandler(err error) {
 // It listens to the subscription's channel for events and writes them to the WebSocket connection.
 // If an error occurs or the subscription channel is closed, it handles the error or termination accordingly.
 // The function uses a ticker to periodically send ping messages to the client to maintain the connection.
-func (wsController *WebsocketController) writeEvents(sub backend.Subscription) {
+func (wsController *WebsocketController) writeEvents(sub state_stream.Subscription) {
 	ticker := time.NewTicker(pingPeriod)
 	defer ticker.Stop()
 
@@ -216,7 +216,7 @@ type SubscribeHandlerFunc func(
 	ctx context.Context,
 	request *request.Request,
 	wsController *WebsocketController,
-) (backend.Subscription, error)
+) (state_stream.Subscription, error)
 
 // WSHandler is websocket handler implementing custom websocket handler function and allows easier handling of errors and
 // responses as it wraps functionality for handling error and responses outside of endpoint handling.
@@ -224,29 +224,30 @@ type WSHandler struct {
 	*HttpHandler
 	subscribeFunc SubscribeHandlerFunc
 
-	api               backend.API
-	eventFilterConfig state_stream.EventFilterConfig
-	maxStreams        int32
-	activeStreamCount *atomic.Int32
+	api                     state_stream.API
+	eventFilterConfig       state_stream.EventFilterConfig
+	maxStreams              int32
+	configHeartbeatInterval uint64
+	activeStreamCount       *atomic.Int32
 }
 
 var _ http.Handler = (*WSHandler)(nil)
 
 func NewWSHandler(
 	logger zerolog.Logger,
-	api backend.API,
+	api state_stream.API,
 	subscribeFunc SubscribeHandlerFunc,
 	chain flow.Chain,
-	eventFilterConfig state_stream.EventFilterConfig,
-	maxGlobalStreams uint32,
+	stateStreamConfig backend.Config,
 ) *WSHandler {
 	handler := &WSHandler{
-		subscribeFunc:     subscribeFunc,
-		api:               api,
-		eventFilterConfig: eventFilterConfig,
-		maxStreams:        int32(maxGlobalStreams),
-		activeStreamCount: atomic.NewInt32(0),
-		HttpHandler:       NewHttpHandler(logger, chain),
+		subscribeFunc:           subscribeFunc,
+		api:                     api,
+		eventFilterConfig:       stateStreamConfig.EventFilterConfig,
+		maxStreams:              int32(stateStreamConfig.MaxGlobalStreams),
+		configHeartbeatInterval: stateStreamConfig.HeartbeatInterval,
+		activeStreamCount:       atomic.NewInt32(0),
+		HttpHandler:             NewHttpHandler(logger, chain),
 	}
 
 	return handler
@@ -281,6 +282,7 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		maxStreams:        h.maxStreams,
 		activeStreamCount: h.activeStreamCount,
 		readChannel:       make(chan error),
+		heartbeatInterval: h.configHeartbeatInterval, // set default heartbeat interval from state stream config
 	}
 
 	err = wsController.SetWebsocketConf()

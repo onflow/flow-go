@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/onflow/flow-go/engine/access/state_stream"
-	backend2 "github.com/onflow/flow-go/engine/access/state_stream/backend"
+	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"os"
 	"path"
 	"path/filepath"
@@ -126,7 +126,7 @@ type AccessNodeConfig struct {
 	apiRatelimits                map[string]int
 	apiBurstlimits               map[string]int
 	rpcConf                      rpc.Config
-	stateStreamConf              backend2.Config
+	stateStreamConf              statestreambackend.Config
 	stateStreamFilterConf        map[string]int
 	ExecutionNodeAddress         string // deprecated
 	HistoricalAccessRPCs         []access.AccessAPIClient
@@ -192,15 +192,15 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			MaxMsgSize:     grpcutils.DefaultMaxMsgSize,
 			CompressorName: grpcutils.NoCompressor,
 		},
-		stateStreamConf: backend2.Config{
+		stateStreamConf: statestreambackend.Config{
 			MaxExecutionDataMsgSize: grpcutils.DefaultMaxMsgSize,
-			ExecutionDataCacheSize:  backend2.DefaultCacheSize,
-			ClientSendTimeout:       backend2.DefaultSendTimeout,
-			ClientSendBufferSize:    backend2.DefaultSendBufferSize,
-			MaxGlobalStreams:        backend2.DefaultMaxGlobalStreams,
+			ExecutionDataCacheSize:  statestreambackend.DefaultCacheSize,
+			ClientSendTimeout:       statestreambackend.DefaultSendTimeout,
+			ClientSendBufferSize:    statestreambackend.DefaultSendBufferSize,
+			MaxGlobalStreams:        statestreambackend.DefaultMaxGlobalStreams,
 			EventFilterConfig:       state_stream.DefaultEventFilterConfig,
-			ResponseLimit:           backend2.DefaultResponseLimit,
-			HeartbeatInterval:       backend2.DefaultHeartbeatInterval,
+			ResponseLimit:           statestreambackend.DefaultResponseLimit,
+			HeartbeatInterval:       statestreambackend.DefaultHeartbeatInterval,
 		},
 		stateStreamFilterConf:        nil,
 		ExecutionNodeAddress:         "localhost:9000",
@@ -280,14 +280,14 @@ type FlowAccessNodeBuilder struct {
 	RequestEng     *requester.Engine
 	FollowerEng    *followereng.ComplianceEngine
 	SyncEng        *synceng.Engine
-	StateStreamEng *backend2.Engine
+	StateStreamEng *statestreambackend.Engine
 
 	// grpc servers
 	secureGrpcServer      *grpcserver.GrpcServer
 	unsecureGrpcServer    *grpcserver.GrpcServer
 	stateStreamGrpcServer *grpcserver.GrpcServer
 
-	stateStreamBackend *backend2.StateStreamBackend
+	stateStreamBackend *statestreambackend.StateStreamBackend
 }
 
 func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilder {
@@ -788,7 +788,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			}
 			broadcaster := engine.NewBroadcaster()
 
-			builder.stateStreamBackend, err = backend2.New(
+			builder.stateStreamBackend, err = statestreambackend.New(
 				node.Logger,
 				builder.stateStreamConf,
 				node.State,
@@ -804,7 +804,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				return nil, fmt.Errorf("could not create state stream backend: %w", err)
 			}
 
-			stateStreamEng, err := backend2.NewEng(
+			stateStreamEng, err := statestreambackend.NewEng(
 				node.Logger,
 				builder.stateStreamConf,
 				executionDataStoreCache,
@@ -1292,8 +1292,9 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.secureGrpcServer,
 				builder.unsecureGrpcServer,
 				builder.stateStreamBackend,
-				builder.stateStreamConf.EventFilterConfig,
-				builder.stateStreamConf.MaxGlobalStreams,
+				builder.stateStreamConf,
+				//builder.stateStreamConf.EventFilterConfig,
+				//builder.stateStreamConf.MaxGlobalStreams,
 			)
 			if err != nil {
 				return nil, err

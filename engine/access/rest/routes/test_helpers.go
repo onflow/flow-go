@@ -122,14 +122,18 @@ func executeRequest(req *http.Request, backend access.API) *httptest.ResponseRec
 	return rr
 }
 
-func executeWsRequest(req *http.Request, stateStreamApi backend.API, responseRecorder *testHijackResponseRecorder) {
+func executeWsRequest(req *http.Request, stateStreamApi state_stream.API, responseRecorder *testHijackResponseRecorder) {
 	restCollector := metrics.NewNoopCollector()
+
+	config := backend.Config{
+		EventFilterConfig:    state_stream.DefaultEventFilterConfig,
+		MaxGlobalStreams:     backend.DefaultMaxGlobalStreams,
+		HeartbeatInterval:    backend.DefaultHeartbeatInterval,
+	}
+
 	router := NewRouterBuilder(unittest.Logger(), restCollector).AddWsRoutes(
 		stateStreamApi,
-		flow.Testnet.Chain(),
-		state_stream.DefaultEventFilterConfig,
-		backend.DefaultMaxGlobalStreams,
-	).Build()
+		flow.Testnet.Chain(), config).Build()
 	router.ServeHTTP(responseRecorder, req)
 }
 

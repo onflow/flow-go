@@ -39,13 +39,12 @@ func NewServer(serverAPI access.API,
 	logger zerolog.Logger,
 	chain flow.Chain,
 	restCollector module.RestMetrics,
-	stateStreamApi backend.API,
-	eventFilterConfig state_stream.EventFilterConfig,
-	maxGlobalStreams uint32,
+	stateStreamApi state_stream.API,
+	stateStreamConfig backend.Config,
 ) (*http.Server, error) {
 	builder := routes.NewRouterBuilder(logger, restCollector).AddRestRoutes(serverAPI, chain)
 	if stateStreamApi != nil {
-		builder.AddWsRoutes(stateStreamApi, chain, eventFilterConfig, maxGlobalStreams)
+		builder.AddWsRoutes(stateStreamApi, chain, stateStreamConfig)
 	}
 
 	c := cors.New(cors.Options{

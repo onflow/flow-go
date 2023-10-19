@@ -208,6 +208,13 @@ func TestExecutionDataStream(t *testing.T) {
 	stream := makeStreamMock[access.SubscribeExecutionDataRequest, access.SubscribeExecutionDataResponse](ctx)
 	sub := NewSubscription(1)
 
+	config := Config{
+		EventFilterConfig:    state_stream.EventFilterConfig{},
+		ClientSendTimeout:    DefaultSendTimeout,
+		ClientSendBufferSize: DefaultSendBufferSize,
+		MaxGlobalStreams:     1,
+		HeartbeatInterval:    DefaultHeartbeatInterval,
+	}
 
 	// generate some events with a payload to include
 	// generators will produce identical event payloads (before encoding)
@@ -222,7 +229,7 @@ func TestExecutionDataStream(t *testing.T) {
 
 	api.On("SubscribeExecutionData", mock.Anything, flow.ZeroID, uint64(0), mock.Anything).Return(sub)
 
-	h := NewHandler(api, flow.Localnet.Chain(), state_stream.EventFilterConfig{}, 1)
+	h := NewHandler(api, flow.Localnet.Chain(), config)
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
@@ -310,7 +317,15 @@ func TestEventStream(t *testing.T) {
 
 	api.On("SubscribeEvents", mock.Anything, flow.ZeroID, uint64(0), mock.Anything).Return(sub)
 
-	h := NewHandler(api, flow.Localnet.Chain(), state_stream.EventFilterConfig{}, 1)
+	config := Config{
+		EventFilterConfig:    state_stream.EventFilterConfig{},
+		ClientSendTimeout:    DefaultSendTimeout,
+		ClientSendBufferSize: DefaultSendBufferSize,
+		MaxGlobalStreams:     1,
+		HeartbeatInterval:    DefaultHeartbeatInterval,
+	}
+
+	h := NewHandler(api, flow.Localnet.Chain(), config)
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
