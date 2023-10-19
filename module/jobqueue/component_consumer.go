@@ -35,6 +35,12 @@ func NewComponentConsumer(
 	maxSearchAhead uint64,
 ) (*ComponentConsumer, error) {
 
+	c := &ComponentConsumer{
+		workSignal: workSignal,
+		jobs:       jobs,
+		log:        log,
+	}
+
 	// create a worker pool with maxProcessing workers to process jobs
 	worker := NewWorkerPool(
 		processor,
@@ -46,13 +52,7 @@ func NewComponentConsumer(
 	if err != nil {
 		return nil, err
 	}
-
-	c := &ComponentConsumer{
-		workSignal: workSignal,
-		jobs:       jobs,
-		log:        log,
-		consumer:   consumer,
-	}
+	c.consumer = consumer
 
 	builder := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {

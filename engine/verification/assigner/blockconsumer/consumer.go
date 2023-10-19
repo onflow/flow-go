@@ -101,7 +101,7 @@ func (c *BlockConsumer) OnFinalizedBlock(*model.Block) {
 }
 
 func (c *BlockConsumer) Ready() <-chan struct{} {
-	err := c.consumer.Start(c.defaultIndex)
+	err := c.consumer.Start()
 	if err != nil {
 		panic(fmt.Errorf("could not start block consumer for finder engine: %w", err))
 	}

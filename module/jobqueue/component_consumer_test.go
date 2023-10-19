@@ -11,6 +11,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/atomic"
 
@@ -88,7 +89,7 @@ func (suite *ComponentConsumerSuite) prepareTest(
 	progress.On("ProcessedIndex").Return(suite.defaultIndex, nil)
 	progress.On("SetProcessedIndex", mock.AnythingOfType("uint64")).Return(nil)
 
-	consumer := NewComponentConsumer(
+	consumer, err := NewComponentConsumer(
 		zerolog.New(os.Stdout).With().Timestamp().Logger(),
 		workSignal,
 		progress,
@@ -98,6 +99,7 @@ func (suite *ComponentConsumerSuite) prepareTest(
 		suite.maxProcessing,
 		suite.maxSearchAhead,
 	)
+	require.NoError(suite.T(), err)
 	consumer.SetPreNotifier(preNotifier)
 	consumer.SetPostNotifier(postNotifier)
 
