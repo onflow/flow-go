@@ -21,19 +21,19 @@ type Handler struct {
 
 	eventFilterConfig state_stream.EventFilterConfig
 
-	maxStreams        int32
-	streamCount       atomic.Int32
-	heartbeatInterval uint64
+	maxStreams               int32
+	streamCount              atomic.Int32
+	defaultHeartbeatInterval uint64
 }
 
 func NewHandler(api state_stream.API, chain flow.Chain, config Config) *Handler {
 	h := &Handler{
-		api:               api,
-		chain:             chain,
-		eventFilterConfig: config.EventFilterConfig,
-		maxStreams:        int32(config.MaxGlobalStreams),
-		streamCount:       atomic.Int32{},
-		heartbeatInterval: config.HeartbeatInterval,
+		api:                      api,
+		chain:                    chain,
+		eventFilterConfig:        config.EventFilterConfig,
+		maxStreams:               int32(config.MaxGlobalStreams),
+		streamCount:              atomic.Int32{},
+		defaultHeartbeatInterval: config.HeartbeatInterval,
 	}
 	return h
 }
@@ -156,7 +156,7 @@ func (h *Handler) SubscribeEvents(request *executiondata.SubscribeEventsRequest,
 
 	heartbeatInterval := uint64(0)
 	if request.HeartbeatInterval == 0 {
-		heartbeatInterval = h.heartbeatInterval
+		heartbeatInterval = h.defaultHeartbeatInterval
 	} else {
 		heartbeatInterval = request.HeartbeatInterval
 	}
