@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/onflow/flow-go/engine/access/state_stream"
+	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"io"
 	"os"
 	"testing"
@@ -172,6 +173,12 @@ func (suite *RateLimitTestSuite) SetupTest() {
 	})
 	suite.Require().NoError(err)
 
+	stateStreamConfig := statestreambackend.Config{
+		EventFilterConfig: state_stream.DefaultEventFilterConfig,
+		MaxGlobalStreams: 0,
+		HeartbeatInterval: statestreambackend.DefaultHeartbeatInterval,
+	}
+
 	rpcEngBuilder, err := NewBuilder(
 		suite.log,
 		suite.state,
@@ -185,8 +192,7 @@ func (suite *RateLimitTestSuite) SetupTest() {
 		suite.secureGrpcServer,
 		suite.unsecureGrpcServer,
 		nil,
-		state_stream.DefaultEventFilterConfig,
-		0)
+		stateStreamConfig)
 	require.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
 	require.NoError(suite.T(), err)

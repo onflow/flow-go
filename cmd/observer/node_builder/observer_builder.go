@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/onflow/flow-go/engine/access/state_stream"
+	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"strings"
 	"time"
 
@@ -962,6 +963,13 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			return nil, err
 		}
 
+
+		stateStreamConfig := statestreambackend.Config{
+			EventFilterConfig: state_stream.DefaultEventFilterConfig,
+			MaxGlobalStreams: 0,
+			HeartbeatInterval: statestreambackend.DefaultHeartbeatInterval,
+		}
+
 		engineBuilder, err := rpc.NewBuilder(
 			node.Logger,
 			node.State,
@@ -975,8 +983,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			builder.secureGrpcServer,
 			builder.unsecureGrpcServer,
 			nil, // state streaming is not supported
-			state_stream.DefaultEventFilterConfig,
-			0,
+			stateStreamConfig,
 		)
 		if err != nil {
 			return nil, err

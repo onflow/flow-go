@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/onflow/flow-go/engine/access/state_stream"
+	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"math/rand"
 	"net/http"
 	"os"
@@ -178,6 +179,12 @@ func (suite *RestAPITestSuite) SetupTest() {
 	})
 	require.NoError(suite.T(), err)
 
+	stateStreamConfig := statestreambackend.Config{
+		EventFilterConfig: state_stream.DefaultEventFilterConfig,
+		MaxGlobalStreams: 0,
+		HeartbeatInterval: statestreambackend.DefaultHeartbeatInterval,
+	}
+
 	rpcEngBuilder, err := rpc.NewBuilder(
 		suite.log,
 		suite.state,
@@ -191,8 +198,7 @@ func (suite *RestAPITestSuite) SetupTest() {
 		suite.secureGrpcServer,
 		suite.unsecureGrpcServer,
 		nil,
-		state_stream.DefaultEventFilterConfig,
-		0,
+		stateStreamConfig,
 	)
 	assert.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()

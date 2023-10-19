@@ -3,7 +3,7 @@ package access
 import (
 	"context"
 	"github.com/onflow/flow-go/engine/access/state_stream"
-	backend2 "github.com/onflow/flow-go/engine/access/state_stream/backend"
+	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"io"
 	"os"
 	"testing"
@@ -57,7 +57,7 @@ type SameGRPCPortTestSuite struct {
 	chainID        flow.ChainID
 	metrics        *metrics.NoopCollector
 	rpcEng         *rpc.Engine
-	stateStreamEng *backend2.Engine
+	stateStreamEng *statestreambackend.Engine
 
 	// storage
 	blocks       *storagemock.Blocks
@@ -115,7 +115,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 
 	suite.broadcaster = engine.NewBroadcaster()
 
-	suite.execDataHeroCache = herocache.NewBlockExecutionData(backend2.DefaultCacheSize, suite.log, metrics.NewNoopCollector())
+	suite.execDataHeroCache = herocache.NewBlockExecutionData(statestreambackend.DefaultCacheSize, suite.log, metrics.NewNoopCollector())
 	suite.execDataCache = cache.NewExecutionDataCache(suite.eds, suite.headers, suite.seals, suite.results, suite.execDataHeroCache)
 
 	accessIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
@@ -191,6 +191,12 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	})
 	require.NoError(suite.T(), err)
 
+	stateStreamConfig := statestreambackend.Config{
+		EventFilterConfig: state_stream.DefaultEventFilterConfig,
+		MaxGlobalStreams: 0,
+		HeartbeatInterval: statestreambackend.DefaultHeartbeatInterval,
+	}
+
 	// create rpc engine builder
 	rpcEngBuilder, err := rpc.NewBuilder(
 		suite.log,
@@ -205,8 +211,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		suite.secureGrpcServer,
 		suite.unsecureGrpcServer,
 		nil,
-		state_stream.DefaultEventFilterConfig,
-		0,
+		stateStreamConfig,
 	)
 	assert.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
@@ -228,12 +233,12 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		},
 	).Maybe()
 
-	conf := backend2.Config{
-		ClientSendTimeout:    backend2.DefaultSendTimeout,
-		ClientSendBufferSize: backend2.DefaultSendBufferSize,
+	conf := statestreambackend.Config{
+		ClientSendTimeout:    statestreambackend.DefaultSendTimeout,
+		ClientSendBufferSize: statestreambackend.DefaultSendBufferSize,
 	}
 
-	stateStreamBackend, err := backend2.New(
+	stateStreamBackend, err := statestreambackend.New(
 		suite.log,
 		conf,
 		suite.state,
@@ -249,7 +254,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	assert.NoError(suite.T(), err)
 
 	// create state stream engine
-	suite.stateStreamEng, err = backend2.NewEng(
+	suite.stateStreamEng, err = statestreambackend.NewEng(
 		suite.log,
 		conf,
 		suite.execDataCache,
