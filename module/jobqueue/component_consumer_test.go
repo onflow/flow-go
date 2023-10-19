@@ -245,7 +245,7 @@ func (suite *ComponentConsumerSuite) TestSignalsBeforeReadyDoNotCheck() {
 	jobConsumer.On("Check").Run(func(_ mock.Arguments) {
 		assert.True(suite.T(), started.Load(), "check was called before started")
 		wg.Done()
-	}).Maybe()
+	})
 
 	consumer, workSignal := suite.prepareTest(nil, nil, nil, nil)
 	consumer.consumer = jobConsumer
