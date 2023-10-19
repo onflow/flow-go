@@ -245,13 +245,17 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				v.verConf.stopAtHeight)
 
 			// requester and fetcher engines are started by chunk consumer
-			chunkConsumer = chunkconsumer.NewChunkConsumer(
+			chunkConsumer, err = chunkconsumer.NewChunkConsumer(
 				node.Logger,
 				collector,
 				processedChunkIndex,
 				chunkQueue,
 				fetcherEngine,
 				v.verConf.chunkWorkers)
+
+			if err != nil {
+				return nil, fmt.Errorf("could not create chunk consumer: %w", err)
+			}
 
 			err = node.Metrics.Mempool.Register(metrics.ResourceChunkConsumer, chunkConsumer.Size)
 			if err != nil {

@@ -1055,12 +1055,13 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.ChunkConsumer == nil {
-		node.ChunkConsumer = chunkconsumer.NewChunkConsumer(node.Log,
+		node.ChunkConsumer, err = chunkconsumer.NewChunkConsumer(node.Log,
 			collector,
 			node.ProcessedChunkIndex,
 			node.ChunksQueue,
 			node.FetcherEngine,
 			chunkconsumer.DefaultChunkWorkers) // defaults number of workers to 3.
+		require.NoError(t, err)
 		err = mempoolCollector.Register(metrics.ResourceChunkConsumer, node.ChunkConsumer.Size)
 		require.NoError(t, err)
 	}

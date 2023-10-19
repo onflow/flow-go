@@ -30,7 +30,7 @@ type JobConsumer interface {
 
 	// Start starts processing jobs from a job queue. If this is the first time, a processed index
 	// will be initialized in the storage. If it fails to initialize, an error will be returned
-	Start(defaultIndex uint64) error
+	Start() error
 
 	// Stop gracefully stops the consumer from reading new jobs from the job queue. It does not stop
 	// the existing worker finishing their jobs
