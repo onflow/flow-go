@@ -155,6 +155,13 @@ func (h *Handler) SubscribeEvents(request *executiondata.SubscribeEventsRequest,
 
 	sub := h.api.SubscribeEvents(stream.Context(), startBlockID, request.GetStartBlockHeight(), filter)
 
+	heartbeatInterval := uint64(0)
+	if request.HeartbeatInterval == 0 {
+		heartbeatInterval = h.heartbeatInterval
+	} else {
+		heartbeatInterval = request.HeartbeatInterval
+	}
+
 	blocksSinceLastMessage := uint64(0)
 	for {
 		v, ok := <-sub.Channel()
@@ -174,14 +181,6 @@ func (h *Handler) SubscribeEvents(request *executiondata.SubscribeEventsRequest,
 		// response was more than HeartbeatInterval blocks ago
 		if len(resp.Events) == 0 {
 			blocksSinceLastMessage++
-
-			heartbeatInterval := uint64(0)
-			if request.HeartbeatInterval == 0 {
-				heartbeatInterval = h.heartbeatInterval
-			} else {
-				heartbeatInterval = request.HeartbeatInterval
-			}
-
 			if blocksSinceLastMessage < heartbeatInterval {
 				continue
 			}
