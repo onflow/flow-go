@@ -55,8 +55,9 @@ func EvaluateDistributionUniformity(t *testing.T, distribution []float64) {
 }
 
 // computes a bijection from the set of all permutations
-// into the the set [0, n!-1] (where `n` is the size of input `s`)
-// input `s` is assumed to be a correct permutation.
+// into the the set [0, n!-1] (where `n` is the size of input `perm`).
+// input `perm` is assumed to be a correct permutation of the set [0,n-1]
+// (not checked in this function).
 func EncodePermutation(perm []int) int {
 	r := make([]int, len(perm))
 	// generate Lehmer code
