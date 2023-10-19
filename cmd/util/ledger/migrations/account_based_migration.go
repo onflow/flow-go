@@ -90,9 +90,13 @@ func MigrateByAccount(
 		Msgf("created account migrations")
 
 	defer func() {
-		for _, migrator := range migrations {
+		for i, migrator := range migrations {
 			// close the migrator if it's a Closer
 			if migrator, ok := migrator.(io.Closer); ok {
+				log.Info().
+					Int("migration_index", i).
+					Type("migration", migrator).
+					Msg("closing migration")
 				if err := migrator.Close(); err != nil {
 					log.Error().Err(err).Msg("error closing migration")
 				}
@@ -106,7 +110,7 @@ func MigrateByAccount(
 	migrated, err := MigrateGroupConcurrently(log, migrations, accountGroups, nWorker)
 
 	if err != nil {
-		return nil, fmt.Errorf("could not migrate group: %w", err)
+		return nil, fmt.Errorf("could not migrate accounts: %w", err)
 	}
 
 	log.Info().
@@ -164,11 +168,20 @@ func MigrateGroupConcurrently(
 
 					var err error
 					accountMigrated := job.Payloads
-					for _, migrator := range migrations {
+					for m, migrator := range migrations {
+
+						select {
+						case <-ctx.Done():
+							return
+						default:
+						}
+
 						accountMigrated, err = migrator.MigrateAccount(ctx, job.Address, accountMigrated)
 						if err != nil {
 							log.Error().
 								Err(err).
+								Int("migration_index", m).
+								Type("migration", migrator).
 								Hex("address", job.Address[:]).
 								Msg("could not migrate account")
 							cancel(fmt.Errorf("could not migrate account: %w", err))
@@ -237,6 +250,7 @@ func MigrateGroupConcurrently(
 
 	// make sure to exit all workers before returning from this function
 	// so that the migrator can be closed properly
+	log.Info().Msg("waiting for migration workers to finish")
 	wg.Wait()
 
 	log.Info().
