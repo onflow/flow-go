@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/access/state_stream"
+	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
@@ -68,8 +69,7 @@ type Engine struct {
 	restAPIAddress net.Addr
 
 	stateStreamBackend state_stream.API
-	eventFilterConfig  state_stream.EventFilterConfig
-	maxGlobalStreams   uint32
+	stateStreamConfig  statestreambackend.Config
 }
 type Option func(*RPCEngineBuilder)
 
@@ -86,8 +86,7 @@ func NewBuilder(log zerolog.Logger,
 	secureGrpcServer *grpcserver.GrpcServer,
 	unsecureGrpcServer *grpcserver.GrpcServer,
 	stateStreamBackend state_stream.API,
-	eventFilterConfig state_stream.EventFilterConfig,
-	maxGlobalStreams uint32,
+	stateStreamConfig statestreambackend.Config,
 ) (*RPCEngineBuilder, error) {
 	log = log.With().Str("engine", "rpc").Logger()
 
@@ -112,8 +111,7 @@ func NewBuilder(log zerolog.Logger,
 		restCollector:             accessMetrics,
 		restHandler:               restHandler,
 		stateStreamBackend:        stateStreamBackend,
-		eventFilterConfig:         eventFilterConfig,
-		maxGlobalStreams:          maxGlobalStreams,
+		stateStreamConfig:         stateStreamConfig,
 	}
 	backendNotifierActor, backendNotifierWorker := events.NewFinalizationActor(eng.notifyBackendOnBlockFinalized)
 	eng.backendNotifierActor = backendNotifierActor
@@ -224,8 +222,7 @@ func (e *Engine) serveREST(ctx irrecoverable.SignalerContext, ready component.Re
 	e.log.Info().Str("rest_api_address", e.config.RestConfig.ListenAddress).Msg("starting REST server on address")
 
 	r, err := rest.NewServer(e.restHandler, e.config.RestConfig, e.log, e.chain, e.restCollector, e.stateStreamBackend,
-		e.eventFilterConfig,
-		e.maxGlobalStreams)
+		e.stateStreamConfig)
 	if err != nil {
 		e.log.Err(err).Msg("failed to initialize the REST server")
 		ctx.Throw(err)
