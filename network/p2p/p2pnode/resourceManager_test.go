@@ -119,6 +119,17 @@ func TestCreateStream_InboundStreamResourceLimit(t *testing.T) {
 			maxInboundStreamSystem:       50, // the total number of streams from all senders to the receiver is 50
 		})
 	})
+	t.Run("peer-limit-greater-than-system", func(t *testing.T) {
+		// the case where peer and protocol-level limits are higher than the system-wide limit.
+		testCreateStreamInboundStreamResourceLimits(t, &testPeerLimitConfig{
+			nodeCount:                    10,
+			maxInboundPeerStream:         500,
+			maxInboundStreamProtocol:     500,
+			maxInboundStreamPeerProtocol: 500,
+			maxInboundStreamTransient:    500,
+			maxInboundStreamSystem:       5,
+		})
+	})
 }
 
 // TestCreateStream_SystemStreamLimit_NotEnforced is a re-production of a hypothetical bug where the system-wide inbound stream limit of libp2p resource management
@@ -211,10 +222,12 @@ func testCreateStreamInboundStreamResourceLimits(t *testing.T, cfg *testPeerLimi
 	defaultProtocolID := protocols.FlowProtocolID(sporkID)
 
 	// creates max(maxInboundPeerStream * nodeCount, maxInboundStreamSystem) streams from each sender to the receiver; breaks as soon as the system-wide limit is reached.
-	totalStreamsCreated := int64(0)
+	totalStreamsCreated := int64(0)  // total number of streams successfully created.
+	totalStreamAttempted := int64(0) // total number of stream creation attempts.
 	for sIndex := range senders {
 		for i := int64(0); i < int64(cfg.maxInboundPeerStream); i++ {
-			if i >= int64(cfg.maxInboundStreamSystem) {
+			totalStreamAttempted++
+			if totalStreamAttempted >= int64(cfg.maxInboundStreamSystem) {
 				// we reached the system-wide limit; no need to create more streams; as stream creation may fail; we re-examine pressure on system-wide limit later.
 				break
 			}
