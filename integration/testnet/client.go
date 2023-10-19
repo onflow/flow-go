@@ -212,13 +212,13 @@ func (c *Client) WaitForExecuted(ctx context.Context, id sdk.Identifier) (*sdk.T
 func (c *Client) waitForStatus(
 	ctx context.Context,
 	id sdk.Identifier,
-	status sdk.TransactionStatus,
+	targetStatus sdk.TransactionStatus,
 ) (*sdk.TransactionResult, error) {
-	fmt.Printf("Waiting for transaction %s to be sealed...\n", id)
+	fmt.Printf("Waiting for transaction %s to be %v...\n", id, targetStatus)
 	errCount := 0
 	var result *sdk.TransactionResult
 	var err error
-	for result == nil || (result.Status != status) {
+	for result == nil || (result.Status != targetStatus) {
 		childCtx, cancel := context.WithTimeout(ctx, time.Second*5)
 		result, err = c.client.GetTransactionResult(childCtx, id)
 		cancel()
