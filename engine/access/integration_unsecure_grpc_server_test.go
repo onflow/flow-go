@@ -235,7 +235,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 
 	conf := statestreambackend.Config{
 		ClientSendTimeout:    state_stream.DefaultSendTimeout,
-		ClientSendBufferSize: statestreambackend.DefaultSendBufferSize,
+		ClientSendBufferSize: state_stream.DefaultSendBufferSize,
 	}
 
 	stateStreamBackend, err := statestreambackend.New(
