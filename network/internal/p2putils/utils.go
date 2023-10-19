@@ -133,11 +133,11 @@ func All() FilterOption {
 // It returns a slice of network.Stream values that match the filtering criteria.
 func FilterStream(host host.Host, targetID peer.ID, options ...FilterOption) []network.Stream {
 	var filteredStreams []network.Stream
-
+	const discardTheProtocol = "discard-the-protocol"
 	// default values
 	opts := FilterOptions{
 		dir:      network.DirUnknown, // by default, consider both inbound and outbound streams
-		protocol: "",                 // by default, consider streams of all protocol IDs
+		protocol: discardTheProtocol, // by default, consider streams of all protocol IDs
 		all:      false,              // by default, return just the first matching stream
 	}
 
@@ -155,7 +155,7 @@ func FilterStream(host host.Host, targetID peer.ID, options ...FilterOption) []n
 		streams := conn.GetStreams()
 		for _, stream := range streams {
 			if (opts.dir == network.DirUnknown || stream.Stat().Direction == opts.dir) &&
-				(opts.protocol == "" || stream.Protocol() == opts.protocol) {
+				(opts.protocol == discardTheProtocol || stream.Protocol() == opts.protocol) {
 				filteredStreams = append(filteredStreams, stream)
 				if !opts.all {
 					return filteredStreams
