@@ -3,8 +3,13 @@ package p2pbuilder
 import (
 	"testing"
 
+	"github.com/libp2p/go-libp2p"
+	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 	"github.com/pbnjay/memory"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/config"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestAllowedMemoryScale(t *testing.T) {
@@ -101,4 +106,66 @@ func TestAllowedFileDescriptorsScale(t *testing.T) {
 	s, err = AllowedFileDescriptors(0.0001)
 	require.NoError(t, err)
 	require.Equal(t, fd/10000, s)
+}
+
+// TestApplyInboundStreamLimits tests that the inbound stream limits are applied correctly, i.e., the limits from the config file
+// are applied to the concrete limit config when the concrete limit config is greater than the limits from the config file.
+func TestApplyInboundStreamLimits(t *testing.T) {
+	cfg, err := config.DefaultConfig()
+	require.NoError(t, err)
+
+	mem, err := AllowedMemory(cfg.NetworkConfig.ResourceManagerConfig.MemoryLimitRatio)
+	require.NoError(t, err)
+
+	fd, err := AllowedFileDescriptors(cfg.NetworkConfig.FileDescriptorsRatio)
+	require.NoError(t, err)
+	limits := rcmgr.DefaultLimits
+	libp2p.SetDefaultServiceLimits(&limits)
+	scaled := limits.Scale(mem, fd)
+
+	concrete := rcmgr.PartialLimitConfig{
+		System: rcmgr.ResourceLimits{
+			// intentionally sets to 1 to test that it is not overridden.
+			StreamsInbound: 1,
+		},
+		Transient: rcmgr.ResourceLimits{
+			// sets it higher than the default to test that it is overridden.
+			StreamsInbound: rcmgr.LimitVal(cfg.NetworkConfig.ResourceManagerConfig.InboundStream.Transient + 1),
+		},
+		ProtocolDefault: rcmgr.ResourceLimits{
+			// sets it higher than the default to test that it is overridden.
+			StreamsInbound: rcmgr.LimitVal(cfg.NetworkConfig.ResourceManagerConfig.InboundStream.Protocol + 1),
+		},
+		ProtocolPeerDefault: rcmgr.ResourceLimits{
+			StreamsInbound: 1, // intentionally sets to 1 to test that it is not overridden.
+		},
+		PeerDefault: rcmgr.ResourceLimits{
+			StreamsInbound: rcmgr.LimitVal(cfg.NetworkConfig.ResourceManagerConfig.InboundStream.Peer + 1),
+		},
+		Conn: rcmgr.ResourceLimits{
+			StreamsInbound: 1, // intentionally sets to 1 to test that it is not overridden.
+		},
+		Stream: rcmgr.ResourceLimits{
+			StreamsInbound: 1, // intentionally sets to 1 to test that it is not overridden.
+		},
+	}.Build(scaled)
+
+	// apply inbound stream limits from the config file.
+	applied := ApplyInboundStreamLimits(unittest.Logger(), concrete, cfg.NetworkConfig.ResourceManagerConfig.InboundStream)
+
+	// check that the applied limits are overridden.
+	// transient limit should be overridden.
+	require.Equal(t, int(cfg.NetworkConfig.ResourceManagerConfig.InboundStream.Transient), int(applied.ToPartialLimitConfig().Transient.StreamsInbound))
+	// protocol default limit should be overridden.
+	require.Equal(t, int(cfg.NetworkConfig.ResourceManagerConfig.InboundStream.Protocol), int(applied.ToPartialLimitConfig().ProtocolDefault.StreamsInbound))
+	// peer default limit should be overridden.
+	require.Equal(t, int(cfg.NetworkConfig.ResourceManagerConfig.InboundStream.Peer), int(applied.ToPartialLimitConfig().PeerDefault.StreamsInbound))
+	// protocol peer default limit should not be overridden.
+	require.Equal(t, int(1), int(applied.ToPartialLimitConfig().ProtocolPeerDefault.StreamsInbound))
+	// conn limit should not be overridden.
+	require.Equal(t, int(1), int(applied.ToPartialLimitConfig().Conn.StreamsInbound))
+	// stream limit should not be overridden.
+	require.Equal(t, int(1), int(applied.ToPartialLimitConfig().Stream.StreamsInbound))
+	// system limit should not be overridden.
+	require.Equal(t, int(1), int(applied.ToPartialLimitConfig().System.StreamsInbound))
 }
