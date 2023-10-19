@@ -95,6 +95,17 @@ func NewDerivedDataCacheImplementationFailure(
 		"implementation error in derived data cache")
 }
 
+// NewRandomSourceFailure indicate an implementation error in
+// the random source provider.
+func NewRandomSourceFailure(
+	err error,
+) CodedError {
+	return WrapCodedError(
+		FailureCodeRandomSourceFailure,
+		err,
+		"implementation error in random source provider")
+}
+
 // NewComputationLimitExceededError constructs a new CodedError which indicates
 // that computation has exceeded its limit.
 func NewComputationLimitExceededError(limit uint64) CodedError {

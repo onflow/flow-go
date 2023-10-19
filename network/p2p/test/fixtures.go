@@ -37,7 +37,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
 	"github.com/onflow/flow-go/network/p2p/tracer"
-	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
@@ -71,11 +70,7 @@ func NetworkingKeyFixtures(t *testing.T) crypto.PrivateKey {
 // NodeFixture is a test fixture that creates a single libp2p node with the given key, spork id, and options.
 // It returns the node and its identity.
 func NodeFixture(
-	t *testing.T,
-	sporkID flow.Identifier,
-	dhtPrefix string,
-	idProvider module.IdentityProvider,
-	opts ...NodeFixtureParameterOption,
+	t *testing.T, sporkID flow.Identifier, dhtPrefix string, idProvider module.IdentityProvider, opts ...NodeFixtureParameterOption,
 ) (p2p.LibP2PNode, flow.Identity) {
 	defaultFlowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
@@ -100,15 +95,14 @@ func NodeFixture(
 	}
 
 	parameters := &NodeFixtureParameters{
-		NetworkingType:         flownet.PrivateNetwork,
-		HandlerFunc:            func(network.Stream) {},
-		Unicasts:               nil,
-		Key:                    NetworkingKeyFixtures(t),
-		Address:                unittest.DefaultAddress,
-		Logger:                 logger,
-		Role:                   flow.RoleCollection,
-		CreateStreamRetryDelay: unicast.DefaultRetryDelay,
-		IdProvider:             idProvider,
+		NetworkingType: flownet.PrivateNetwork,
+		HandlerFunc:    func(network.Stream) {},
+		Unicasts:       nil,
+		Key:            NetworkingKeyFixtures(t),
+		Address:        unittest.DefaultAddress,
+		Logger:         logger,
+		Role:           flow.RoleCollection,
+		IdProvider:     idProvider,
 		MetricsCfg: &p2pconfig.MetricsConfig{
 			HeroCacheFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 			Metrics:          metrics.NewNoopCollector(),
@@ -119,16 +113,16 @@ func NodeFixture(
 		PeerManagerConfig:                PeerManagerConfigFixture(), // disabled by default
 		FlowConfig:                       defaultFlowConfig,
 		PubSubTracer:                     tracer.NewGossipSubMeshTracer(meshTracerCfg),
+		UnicastConfig: &p2pconfig.UnicastConfig{
+			UnicastConfig: defaultFlowConfig.NetworkConfig.UnicastConfig,
+		},
 	}
 
 	for _, opt := range opts {
 		opt(parameters)
 	}
 
-	identity := unittest.IdentityFixture(
-		unittest.WithNetworkingKey(parameters.Key.PublicKey()),
-		unittest.WithAddress(parameters.Address),
-		unittest.WithRole(parameters.Role))
+	identity := unittest.IdentityFixture(unittest.WithNetworkingKey(parameters.Key.PublicKey()), unittest.WithAddress(parameters.Address), unittest.WithRole(parameters.Role))
 
 	logger = parameters.Logger.With().Hex("node_id", logging.ID(identity.NodeID)).Logger()
 
@@ -138,8 +132,7 @@ func NodeFixture(
 		&defaultFlowConfig.NetworkConfig.ConnectionManagerConfig)
 	require.NoError(t, err)
 
-	builder := p2pbuilder.NewNodeBuilder(
-		logger,
+	builder := p2pbuilder.NewNodeBuilder(logger,
 		parameters.MetricsCfg,
 		parameters.NetworkingType,
 		parameters.Address,
@@ -153,10 +146,10 @@ func NodeFixture(
 			MaxSize: uint32(1000),
 			Metrics: metrics.NewNoopCollector(),
 		},
-		parameters.PubSubTracer).
+		parameters.PubSubTracer,
+		parameters.UnicastConfig).
 		SetConnectionManager(connManager).
 		SetCreateNode(p2pbuilder.DefaultCreateNodeFunc).
-		SetStreamCreationRetryInterval(parameters.CreateStreamRetryDelay).
 		SetResourceManager(parameters.ResourceManager)
 
 	if parameters.DhtOptions != nil && (parameters.Role != flow.RoleAccess && parameters.Role != flow.RoleExecution) {
@@ -207,10 +200,6 @@ func NodeFixture(
 		builder.SetGossipSubTracer(parameters.PubSubTracer)
 	}
 
-	if parameters.UnicastRateLimitDistributor != nil {
-		builder.SetRateLimiterDistributor(parameters.UnicastRateLimitDistributor)
-	}
-
 	builder.SetGossipSubScoreTracerInterval(parameters.GossipSubPeerScoreTracerInterval)
 
 	n, err := builder.Build()
@@ -239,6 +228,7 @@ type NodeFixtureParameters struct {
 	HandlerFunc                       network.StreamHandler
 	NetworkingType                    flownet.NetworkingType
 	Unicasts                          []protocols.ProtocolName
+	UnicastConfig                     *p2pconfig.UnicastConfig
 	Key                               crypto.PrivateKey
 	Address                           string
 	DhtOptions                        []dht.Option
@@ -257,15 +247,13 @@ type NodeFixtureParameters struct {
 	ResourceManager                   network.ResourceManager
 	PubSubTracer                      p2p.PubSubTracer
 	GossipSubPeerScoreTracerInterval  time.Duration // intervals at which the peer score is updated and logged.
-	CreateStreamRetryDelay            time.Duration
-	UnicastRateLimitDistributor       p2p.UnicastRateLimiterDistributor
 	GossipSubRpcInspectorSuiteFactory p2p.GossipSubRpcInspectorSuiteFactoryFunc
 	FlowConfig                        *config.FlowConfig
 }
 
 func WithUnicastRateLimitDistributor(distributor p2p.UnicastRateLimiterDistributor) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
-		p.UnicastRateLimitDistributor = distributor
+		p.UnicastConfig.RateLimiterDistributor = distributor
 	}
 }
 
@@ -283,7 +271,7 @@ func OverrideFlowConfig(cfg *config.FlowConfig) NodeFixtureParameterOption {
 
 func WithCreateStreamRetryDelay(delay time.Duration) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
-		p.CreateStreamRetryDelay = delay
+		p.UnicastConfig.CreateStreamBackoffDelay = delay
 	}
 }
 
@@ -432,17 +420,9 @@ func WithZeroJitterAndZeroBackoff(t *testing.T) func(*p2pconfig.PeerManagerConfi
 		cfg.ConnectorFactory = func(host host.Host) (p2p.Connector, error) {
 			cacheSize := 100
 			dialTimeout := time.Minute * 2
-			backoff := discoveryBackoff.NewExponentialBackoff(
-				1*time.Second,
-				1*time.Hour,
-				func(_, _, _ time.Duration, _ *crand.Rand) time.Duration {
-					return 0 // no jitter
-				},
-				time.Second,
-				1,
-				0,
-				crand.NewSource(crand.Int63()),
-			)
+			backoff := discoveryBackoff.NewExponentialBackoff(1*time.Second, 1*time.Hour, func(_, _, _ time.Duration, _ *crand.Rand) time.Duration {
+				return 0 // no jitter
+			}, time.Second, 1, 0, crand.NewSource(crand.Int63()))
 			backoffConnector, err := discoveryBackoff.NewBackoffConnector(host, cacheSize, dialTimeout, backoff)
 			require.NoError(t, err)
 			return backoffConnector, nil
@@ -683,12 +663,7 @@ func EnsurePubsubMessageExchange(
 		for i := 0; i < count; i++ {
 			// creates a unique message to be published by the node
 			payload := messageFactory()
-			outgoingMessageScope, err := message.NewOutgoingScope(
-				flow.IdentifierList{unittest.IdentifierFixture()},
-				topic,
-				payload,
-				unittest.NetworkCodec().Encode,
-				message.ProtocolTypePubSub)
+			outgoingMessageScope, err := message.NewOutgoingScope(flow.IdentifierList{unittest.IdentifierFixture()}, topic, payload, unittest.NetworkCodec().Encode, message.ProtocolTypePubSub)
 			require.NoError(t, err)
 			require.NoError(t, node.Publish(ctx, outgoingMessageScope))
 
@@ -714,14 +689,8 @@ func EnsurePubsubMessageExchange(
 // - count: the number of messages to exchange from `sender` to `receiver`.
 // - messageFactory: a function that creates a unique message to be published by the node.
 func EnsurePubsubMessageExchangeFromNode(
-	t *testing.T,
-	ctx context.Context,
-	sender p2p.LibP2PNode,
-	receiverNode p2p.LibP2PNode,
-	receiverIdentifier flow.Identifier,
-	topic channels.Topic,
-	count int,
-	messageFactory func() interface{}) {
+	t *testing.T, ctx context.Context, sender p2p.LibP2PNode, receiverNode p2p.LibP2PNode, receiverIdentifier flow.Identifier, topic channels.Topic, count int, messageFactory func() interface{},
+) {
 	_, err := sender.Subscribe(topic, validator.TopicValidator(unittest.Logger(), unittest.AllowAllPeerFilter()))
 	require.NoError(t, err)
 
@@ -734,12 +703,7 @@ func EnsurePubsubMessageExchangeFromNode(
 	for i := 0; i < count; i++ {
 		// creates a unique message to be published by the node
 		payload := messageFactory()
-		outgoingMessageScope, err := message.NewOutgoingScope(
-			flow.IdentifierList{receiverIdentifier},
-			topic,
-			payload,
-			unittest.NetworkCodec().Encode,
-			message.ProtocolTypePubSub)
+		outgoingMessageScope, err := message.NewOutgoingScope(flow.IdentifierList{receiverIdentifier}, topic, payload, unittest.NetworkCodec().Encode, message.ProtocolTypePubSub)
 		require.NoError(t, err)
 		require.NoError(t, sender.Publish(ctx, outgoingMessageScope))
 
@@ -782,18 +746,10 @@ func EnsureNotConnectedBetweenGroups(t *testing.T, ctx context.Context, groupA [
 // - count: the number of messages to exchange from each node.
 // - messageFactory: a function that creates a unique message to be published by the node.
 func EnsureNoPubsubMessageExchange(
-	t *testing.T,
-	ctx context.Context,
-	from []p2p.LibP2PNode,
-	to []p2p.LibP2PNode,
-	toIdentifiers flow.IdentifierList,
-	topic channels.Topic,
-	count int,
-	messageFactory func() interface{}) {
+	t *testing.T, ctx context.Context, from []p2p.LibP2PNode, to []p2p.LibP2PNode, toIdentifiers flow.IdentifierList, topic channels.Topic, count int, messageFactory func() interface{},
+) {
 	subs := make([]p2p.Subscription, len(to))
-	tv := validator.TopicValidator(
-		unittest.Logger(),
-		unittest.AllowAllPeerFilter())
+	tv := validator.TopicValidator(unittest.Logger(), unittest.AllowAllPeerFilter())
 	var err error
 	for _, node := range from {
 		_, err = node.Subscribe(topic, tv)
@@ -818,12 +774,7 @@ func EnsureNoPubsubMessageExchange(
 				// creates a unique message to be published by the node.
 
 				payload := messageFactory()
-				outgoingMessageScope, err := message.NewOutgoingScope(
-					toIdentifiers,
-					topic,
-					payload,
-					unittest.NetworkCodec().Encode,
-					message.ProtocolTypePubSub)
+				outgoingMessageScope, err := message.NewOutgoingScope(toIdentifiers, topic, payload, unittest.NetworkCodec().Encode, message.ProtocolTypePubSub)
 				require.NoError(t, err)
 				require.NoError(t, node.Publish(ctx, outgoingMessageScope))
 
@@ -860,7 +811,8 @@ func EnsureNoPubsubExchangeBetweenGroups(
 	groupBIdentifiers flow.IdentifierList,
 	topic channels.Topic,
 	count int,
-	messageFactory func() interface{}) {
+	messageFactory func() interface{},
+) {
 	// ensure no message exchange from group A to group B
 	EnsureNoPubsubMessageExchange(t, ctx, groupANodes, groupBNodes, groupBIdentifiers, topic, count, messageFactory)
 	// ensure no message exchange from group B to group A

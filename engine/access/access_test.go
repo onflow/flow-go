@@ -164,7 +164,13 @@ func (suite *Suite) RunTest(
 		})
 		require.NoError(suite.T(), err)
 
-		handler := access.NewHandler(suite.backend, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me, access.WithBlockSignerDecoder(suite.signerIndicesDecoder))
+		handler := access.NewHandler(
+			suite.backend,
+			suite.chainID.Chain(),
+			suite.finalizedHeaderCache,
+			suite.me,
+			access.WithBlockSignerDecoder(suite.signerIndicesDecoder),
+		)
 		f(handler, db, all)
 	})
 }
@@ -961,7 +967,8 @@ func (suite *Suite) TestExecuteScript() {
 		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
 		var err error
-		suite.backend, err = backend.New(backend.Params{State: suite.state,
+		suite.backend, err = backend.New(backend.Params{
+			State:                 suite.state,
 			CollectionRPC:         suite.collClient,
 			Blocks:                all.Blocks,
 			Headers:               all.Headers,
@@ -977,6 +984,7 @@ func (suite *Suite) TestExecuteScript() {
 			Log:                   suite.log,
 			SnapshotHistoryLimit:  backend.DefaultSnapshotHistoryLimit,
 			Communicator:          backend.NewNodeCommunicator(false),
+			ScriptExecutionMode:   backend.ScriptExecutionModeExecutionNodesOnly,
 		})
 		require.NoError(suite.T(), err)
 

@@ -3,8 +3,6 @@ package p2pnode_test
 import (
 	"context"
 	"fmt"
-	"os"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -12,11 +10,8 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -26,7 +21,6 @@ import (
 	"github.com/onflow/flow-go/network/internal/p2putils"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/p2plogging"
-	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
@@ -42,15 +36,18 @@ func TestMultiAddress(t *testing.T) {
 		identity     *flow.Identity
 		multiaddress string
 	}{
-		{ // ip4 test case
+		{
+			// ip4 test case
 			identity:     unittest.IdentityFixture(unittest.WithNetworkingKey(key.PublicKey()), unittest.WithAddress("172.16.254.1:72")),
 			multiaddress: "/ip4/172.16.254.1/tcp/72",
 		},
-		{ // dns test case
+		{
+			// dns test case
 			identity:     unittest.IdentityFixture(unittest.WithNetworkingKey(key.PublicKey()), unittest.WithAddress("consensus:2222")),
 			multiaddress: "/dns4/consensus/tcp/2222",
 		},
-		{ // dns test case
+		{
+			// dns test case
 			identity:     unittest.IdentityFixture(unittest.WithNetworkingKey(key.PublicKey()), unittest.WithAddress("flow.com:3333")),
 			multiaddress: "/dns4/flow.com/tcp/3333",
 		},
@@ -71,12 +68,7 @@ func TestSingleNodeLifeCycle(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	idProvider := mockmodule.NewIdentityProvider(t)
-	node, _ := p2ptest.NodeFixture(
-		t,
-		unittest.IdentifierFixture(),
-		"test_single_node_life_cycle",
-		idProvider,
-	)
+	node, _ := p2ptest.NodeFixture(t, unittest.IdentifierFixture(), "test_single_node_life_cycle", idProvider)
 
 	node.Start(signalerCtx)
 	unittest.RequireComponentsReadyBefore(t, 100*time.Millisecond, node)
@@ -167,17 +159,12 @@ func TestConnGater(t *testing.T) {
 	idProvider := mockmodule.NewIdentityProvider(t)
 
 	node1Peers := unittest.NewProtectedMap[peer.ID, struct{}]()
-	node1, identity1 := p2ptest.NodeFixture(
-		t,
-		sporkID,
-		t.Name(),
-		idProvider,
-		p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(pid peer.ID) error {
-			if !node1Peers.Has(pid) {
-				return fmt.Errorf("peer id not found: %s", p2plogging.PeerId(pid))
-			}
-			return nil
-		})))
+	node1, identity1 := p2ptest.NodeFixture(t, sporkID, t.Name(), idProvider, p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(pid peer.ID) error {
+		if !node1Peers.Has(pid) {
+			return fmt.Errorf("peer id not found: %s", p2plogging.PeerId(pid))
+		}
+		return nil
+	})))
 	idProvider.On("ByPeerID", node1.ID()).Return(&identity1, true).Maybe()
 
 	p2ptest.StartNode(t, signalerCtx, node1)
@@ -187,16 +174,12 @@ func TestConnGater(t *testing.T) {
 	assert.NoError(t, err)
 
 	node2Peers := unittest.NewProtectedMap[peer.ID, struct{}]()
-	node2, identity2 := p2ptest.NodeFixture(
-		t,
-		sporkID, t.Name(),
-		idProvider,
-		p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(pid peer.ID) error {
-			if !node2Peers.Has(pid) {
-				return fmt.Errorf("id not found: %s", p2plogging.PeerId(pid))
-			}
-			return nil
-		})))
+	node2, identity2 := p2ptest.NodeFixture(t, sporkID, t.Name(), idProvider, p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(pid peer.ID) error {
+		if !node2Peers.Has(pid) {
+			return fmt.Errorf("id not found: %s", p2plogging.PeerId(pid))
+		}
+		return nil
+	})))
 	idProvider.On("ByPeerID", node2.ID()).Return(&identity2,
 
 		true).Maybe()
@@ -275,12 +258,7 @@ func TestCreateStream_SinglePairwiseConnection(t *testing.T) {
 	defer cancel()
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
-	nodes, ids := p2ptest.NodesFixture(t,
-		sporkId,
-		"test_create_stream_single_pairwise_connection",
-		nodeCount,
-		idProvider,
-		p2ptest.WithDefaultResourceManager())
+	nodes, ids := p2ptest.NodesFixture(t, sporkId, "test_create_stream_single_pairwise_connection", nodeCount, idProvider, p2ptest.WithDefaultResourceManager())
 	idProvider.SetIdentities(ids)
 
 	p2ptest.StartNodes(t, signalerCtx, nodes)
