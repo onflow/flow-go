@@ -4,8 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/engine/access/state_stream"
 	"time"
+
+	"github.com/onflow/flow-go/engine/access/state_stream"
 
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"

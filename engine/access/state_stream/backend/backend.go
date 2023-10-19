@@ -3,8 +3,9 @@ package backend
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/engine/access/state_stream"
 	"time"
+
+	"github.com/onflow/flow-go/engine/access/state_stream"
 
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
@@ -76,7 +77,6 @@ type Config struct {
 
 type GetExecutionDataFunc func(context.Context, uint64) (*execution_data.BlockExecutionDataEntity, error)
 type GetStartHeightFunc func(flow.Identifier, uint64) (uint64, error)
-
 
 type StateStreamBackend struct {
 	ExecutionDataBackend

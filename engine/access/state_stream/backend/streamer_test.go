@@ -3,9 +3,10 @@ package backend_test
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"testing"
 	"time"
+
+	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"

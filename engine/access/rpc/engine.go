@@ -25,7 +25,6 @@ import (
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
-
 )
 
 // Config defines the configurable options for the access node server
@@ -113,7 +112,7 @@ func NewBuilder(log zerolog.Logger,
 		restCollector:             accessMetrics,
 		restHandler:               restHandler,
 		stateStreamBackend:        stateStreamBackend,
-		stateStreamConfig: 		   stateStreamConfig,
+		stateStreamConfig:         stateStreamConfig,
 	}
 	backendNotifierActor, backendNotifierWorker := events.NewFinalizationActor(eng.notifyBackendOnBlockFinalized)
 	eng.backendNotifierActor = backendNotifierActor

@@ -3,10 +3,11 @@ package backend_test
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

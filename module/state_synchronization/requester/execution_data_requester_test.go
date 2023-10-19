@@ -3,11 +3,12 @@ package requester_test
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"math/rand"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/ipfs/go-datastore"

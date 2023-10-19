@@ -6,10 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/engine/access/state_stream"
-	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"strings"
 	"time"
+
+	"github.com/onflow/flow-go/engine/access/state_stream"
+	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -963,10 +964,9 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			return nil, err
 		}
 
-
 		stateStreamConfig := statestreambackend.Config{
 			EventFilterConfig: state_stream.DefaultEventFilterConfig,
-			MaxGlobalStreams: 0,
+			MaxGlobalStreams:  0,
 			HeartbeatInterval: statestreambackend.DefaultHeartbeatInterval,
 		}
 

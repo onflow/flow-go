@@ -2,9 +2,10 @@ package state_stream
 
 import (
 	"context"
+	"time"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
-	"time"
 )
 
 // API represents an interface that defines methods for interacting with a blockchain's execution data and events.

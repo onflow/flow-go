@@ -3,9 +3,10 @@ package backend
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/engine/access/state_stream"
 	"testing"
 	"time"
+
+	"github.com/onflow/flow-go/engine/access/state_stream"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

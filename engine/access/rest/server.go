@@ -1,10 +1,11 @@
 package rest
 
 import (
-	"github.com/onflow/flow-go/engine/access/state_stream"
-	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"net/http"
 	"time"
+
+	"github.com/onflow/flow-go/engine/access/state_stream"
+	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 
 	"github.com/rs/cors"
 	"github.com/rs/zerolog"

@@ -3,9 +3,10 @@ package backend
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/engine/access/state_stream"
 	"sync"
 	"time"
+
+	"github.com/onflow/flow-go/engine/access/state_stream"
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc/status"

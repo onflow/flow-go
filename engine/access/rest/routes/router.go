@@ -2,6 +2,7 @@ package routes
 
 import (
 	"fmt"
+
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 
@@ -64,7 +65,7 @@ func (b *RouterBuilder) AddRestRoutes(backend access.API, chain flow.Chain) *Rou
 func (b *RouterBuilder) AddWsRoutes(
 	stateStreamApi state_stream.API,
 	chain flow.Chain,
-	stateStreamConfig backend.Config,) *RouterBuilder {
+	stateStreamConfig backend.Config) *RouterBuilder {
 
 	for _, r := range WSRoutes {
 		h := NewWSHandler(b.logger, stateStreamApi, r.Handler, chain, stateStreamConfig)

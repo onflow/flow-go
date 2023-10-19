@@ -3,9 +3,10 @@ package jobs
 import (
 	"context"
 	"errors"
-	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"testing"
 	"time"
+
+	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"

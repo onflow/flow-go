@@ -2,8 +2,9 @@ package backend
 
 import (
 	"context"
-	"github.com/onflow/flow-go/engine/access/state_stream"
 	"sync/atomic"
+
+	"github.com/onflow/flow-go/engine/access/state_stream"
 
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/onflow/flow/protobuf/go/flow/executiondata"
@@ -21,8 +22,8 @@ type Handler struct {
 
 	eventFilterConfig state_stream.EventFilterConfig
 
-	maxStreams  int32
-	streamCount atomic.Int32
+	maxStreams        int32
+	streamCount       atomic.Int32
 	heartbeatInterval uint64
 }
 
@@ -174,7 +175,7 @@ func (h *Handler) SubscribeEvents(request *executiondata.SubscribeEventsRequest,
 		if len(resp.Events) == 0 {
 			blocksSinceLastMessage++
 
-			heartbeatInterval:= uint64(0)
+			heartbeatInterval := uint64(0)
 			if request.HeartbeatInterval == 0 {
 				heartbeatInterval = h.heartbeatInterval
 			} else {

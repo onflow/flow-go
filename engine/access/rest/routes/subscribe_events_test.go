@@ -5,14 +5,15 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/onflow/flow-go/engine/access/state_stream"
-	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"net/http"
 	"net/url"
 	"regexp"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/onflow/flow-go/engine/access/state_stream"
+	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 
 	"golang.org/x/exp/slices"
 
@@ -230,15 +231,6 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 		respRecorder := newTestHijackResponseRecorder()
 		executeWsRequest(req, stateStreamBackend, respRecorder)
 		requireError(s.T(), respRecorder, "can only provide either block ID or start height")
-	})
-
-	s.Run("returns error for invalid heartbeat interval", func() {
-		stateStreamBackend := mockstatestream.NewAPI(s.T())
-		req, err := getSubscribeEventsRequest(s.T(), flow.ZeroID, s.blocks[0].Header.Height, nil, nil, nil, 0)
-		require.NoError(s.T(), err)
-		respRecorder := newTestHijackResponseRecorder()
-		executeWsRequest(req, stateStreamBackend, respRecorder)
-		requireError(s.T(), respRecorder, "heartbeat interval value should be grater then 0")
 	})
 
 	s.Run("returns error for invalid block id", func() {

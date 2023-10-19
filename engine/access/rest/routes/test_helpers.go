@@ -4,8 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"github.com/onflow/flow-go/engine/access/state_stream"
-	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"io"
 	"net"
 	"net/http"
@@ -13,6 +11,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/onflow/flow-go/engine/access/state_stream"
+	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 
 	"github.com/stretchr/testify/require"
 
@@ -126,9 +127,9 @@ func executeWsRequest(req *http.Request, stateStreamApi state_stream.API, respon
 	restCollector := metrics.NewNoopCollector()
 
 	config := backend.Config{
-		EventFilterConfig:    state_stream.DefaultEventFilterConfig,
-		MaxGlobalStreams:     backend.DefaultMaxGlobalStreams,
-		HeartbeatInterval:    backend.DefaultHeartbeatInterval,
+		EventFilterConfig: state_stream.DefaultEventFilterConfig,
+		MaxGlobalStreams:  backend.DefaultMaxGlobalStreams,
+		HeartbeatInterval: backend.DefaultHeartbeatInterval,
 	}
 
 	router := NewRouterBuilder(unittest.Logger(), restCollector).AddWsRoutes(

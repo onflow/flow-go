@@ -3,14 +3,15 @@ package access
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/engine/access/state_stream"
-	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"math/rand"
 	"net/http"
 	"os"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/onflow/flow-go/engine/access/state_stream"
+	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 
 	"github.com/antihax/optional"
 	restclient "github.com/onflow/flow/openapi/go-client-generated"
@@ -181,7 +182,7 @@ func (suite *RestAPITestSuite) SetupTest() {
 
 	stateStreamConfig := statestreambackend.Config{
 		EventFilterConfig: state_stream.DefaultEventFilterConfig,
-		MaxGlobalStreams: 0,
+		MaxGlobalStreams:  0,
 		HeartbeatInterval: statestreambackend.DefaultHeartbeatInterval,
 	}
 

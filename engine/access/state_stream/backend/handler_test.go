@@ -3,7 +3,6 @@ package backend
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/engine/access/state_stream"
 	"io"
 	"sync"
 	"testing"
@@ -18,6 +17,7 @@ import (
 	access "github.com/onflow/flow/protobuf/go/flow/executiondata"
 	pb "google.golang.org/genproto/googleapis/bytestream"
 
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -302,7 +302,6 @@ func TestEventStream(t *testing.T) {
 	api := ssmock.NewAPI(t)
 	stream := makeStreamMock[access.SubscribeEventsRequest, access.SubscribeEventsResponse](ctx)
 	sub := NewSubscription(1)
-
 
 	// generate some events with a payload to include
 	// generators will produce identical event payloads (before encoding)
