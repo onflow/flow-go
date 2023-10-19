@@ -214,7 +214,7 @@ func TestCheckBeforeStartIsNoop(t *testing.T) {
 		c.Check()
 
 		// start will load the processedIndex from storage
-		err := c.Start(10)
+		err = c.Start(10)
 		require.NoError(t, err)
 
 		// make sure that the processedIndex at the end is from storage
