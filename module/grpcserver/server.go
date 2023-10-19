@@ -7,6 +7,10 @@ import (
 	"github.com/rs/zerolog"
 
 	"google.golang.org/grpc"
+	_ "google.golang.org/grpc/encoding/gzip" //required for gRPC compression
+
+	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/deflate" // required for gRPC compression
+	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/snappy"  // required for gRPC compression
 
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"

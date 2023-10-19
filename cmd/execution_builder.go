@@ -60,6 +60,7 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
+	ledgerpkg "github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	ledger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
@@ -1126,14 +1127,22 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 
 	// if the execution database does not exist, then we need to bootstrap the execution database.
 	if !bootstrapped {
+		err := wal.CheckpointHasRootHash(
+			node.Logger,
+			path.Join(node.BootstrapDir, bootstrapFilenames.DirnameExecutionState),
+			bootstrapFilenames.FilenameWALRootCheckpoint,
+			ledgerpkg.RootHash(node.RootSeal.FinalState),
+		)
+		if err != nil {
+			return err
+		}
+
 		// when bootstrapping, the bootstrap folder must have a checkpoint file
 		// we need to cover this file to the trie folder to restore the trie to restore the execution state.
 		err = copyBootstrapState(node.BootstrapDir, exeNode.exeConf.triedir)
 		if err != nil {
 			return fmt.Errorf("could not load bootstrap state from checkpoint file: %w", err)
 		}
-
-		// TODO: check that the checkpoint file contains the root block's statecommit hash
 
 		err = bootstrapper.BootstrapExecutionDatabase(node.DB, node.RootSeal)
 		if err != nil {
