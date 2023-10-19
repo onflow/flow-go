@@ -1,6 +1,8 @@
 package rest
 
 import (
+	"github.com/onflow/flow-go/engine/access/state_stream"
+	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"net/http"
 	"time"
 
@@ -9,7 +11,6 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/routes"
-	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )
@@ -38,7 +39,7 @@ func NewServer(serverAPI access.API,
 	logger zerolog.Logger,
 	chain flow.Chain,
 	restCollector module.RestMetrics,
-	stateStreamApi state_stream.API,
+	stateStreamApi backend.API,
 	eventFilterConfig state_stream.EventFilterConfig,
 	maxGlobalStreams uint32,
 ) (*http.Server, error) {

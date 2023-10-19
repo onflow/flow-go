@@ -1,8 +1,9 @@
-package state_stream
+package backend
 
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	"io"
 	"sync"
 	"testing"
@@ -56,9 +57,17 @@ func (fake *fakeReadServerImpl) Send(response *access.SubscribeEventsResponse) e
 
 func (s *HandlerTestSuite) SetupTest() {
 	s.BackendExecutionDataSuite.SetupTest()
-	conf := DefaultEventFilterConfig
+
+	config := Config{
+		EventFilterConfig:    state_stream.DefaultEventFilterConfig,
+		ClientSendTimeout:    DefaultSendTimeout,
+		ClientSendBufferSize: DefaultSendBufferSize,
+		MaxGlobalStreams:     5,
+		HeartbeatInterval:    DefaultHeartbeatInterval,
+	}
+
 	chain := flow.MonotonicEmulator.Chain()
-	s.handler = NewHandler(s.backend, chain, conf, 5)
+	s.handler = NewHandler(s.backend, chain, config)
 }
 
 // TestHeartbeatResponse tests the periodic heartbeat response.
@@ -213,7 +222,7 @@ func TestExecutionDataStream(t *testing.T) {
 
 	api.On("SubscribeExecutionData", mock.Anything, flow.ZeroID, uint64(0), mock.Anything).Return(sub)
 
-	h := NewHandler(api, flow.Localnet.Chain(), EventFilterConfig{}, 1)
+	h := NewHandler(api, flow.Localnet.Chain(), state_stream.EventFilterConfig{}, 1)
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
@@ -301,7 +310,7 @@ func TestEventStream(t *testing.T) {
 
 	api.On("SubscribeEvents", mock.Anything, flow.ZeroID, uint64(0), mock.Anything).Return(sub)
 
-	h := NewHandler(api, flow.Localnet.Chain(), EventFilterConfig{}, 1)
+	h := NewHandler(api, flow.Localnet.Chain(), state_stream.EventFilterConfig{}, 1)
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)

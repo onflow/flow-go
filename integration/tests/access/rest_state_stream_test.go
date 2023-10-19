@@ -3,6 +3,7 @@ package access
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"net/url"
 	"strings"
 	"testing"
@@ -16,7 +17,6 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/onflow/flow-go/engine/access/rest/request"
-	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
@@ -112,7 +112,7 @@ func (s *RestStateStreamSuite) TestRestEventStreaming() {
 		client, err := getWSClient(s.ctx, url)
 		require.NoError(t, err)
 
-		var receivedEventsResponse []*state_stream.EventsResponse
+		var receivedEventsResponse []*backend.EventsResponse
 
 		go func() {
 			time.Sleep(10 * time.Second)
@@ -120,10 +120,10 @@ func (s *RestStateStreamSuite) TestRestEventStreaming() {
 			client.Close()
 		}()
 
-		eventChan := make(chan *state_stream.EventsResponse)
+		eventChan := make(chan *backend.EventsResponse)
 		go func() {
 			for {
-				resp := &state_stream.EventsResponse{}
+				resp := &backend.EventsResponse{}
 				err := client.ReadJSON(resp)
 				if err != nil {
 					if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway) {
@@ -149,7 +149,7 @@ func (s *RestStateStreamSuite) TestRestEventStreaming() {
 
 // requireEvents is a helper function that encapsulates logic for comparing received events from rest state streaming and
 // events which received from grpc api
-func (s *RestStateStreamSuite) requireEvents(receivedEventsResponse []*state_stream.EventsResponse) {
+func (s *RestStateStreamSuite) requireEvents(receivedEventsResponse []*backend.EventsResponse) {
 	// make sure there are received events
 	require.GreaterOrEqual(s.T(), len(receivedEventsResponse), 1, "expect received events")
 

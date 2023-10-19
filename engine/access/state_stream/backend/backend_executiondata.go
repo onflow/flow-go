@@ -1,9 +1,10 @@
-package state_stream
+package backend
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -54,7 +55,7 @@ func (b *ExecutionDataBackend) GetExecutionDataByBlockID(ctx context.Context, bl
 	return executionData.BlockExecutionData, nil
 }
 
-func (b *ExecutionDataBackend) SubscribeExecutionData(ctx context.Context, startBlockID flow.Identifier, startHeight uint64) Subscription {
+func (b *ExecutionDataBackend) SubscribeExecutionData(ctx context.Context, startBlockID flow.Identifier, startHeight uint64) state_stream.Subscription {
 	nextHeight, err := b.getStartHeight(startBlockID, startHeight)
 	if err != nil {
 		return NewFailedSubscription(err, "could not get start height")

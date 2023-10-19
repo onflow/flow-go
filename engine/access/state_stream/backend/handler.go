@@ -1,7 +1,8 @@
-package state_stream
+package backend
 
 import (
 	"context"
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	"sync/atomic"
 
 	"github.com/onflow/flow/protobuf/go/flow/execution"
@@ -15,22 +16,24 @@ import (
 )
 
 type Handler struct {
-	api   API
+	api   state_stream.API
 	chain flow.Chain
 
-	eventFilterConfig EventFilterConfig
+	eventFilterConfig state_stream.EventFilterConfig
 
 	maxStreams  int32
 	streamCount atomic.Int32
+	heartbeatInterval uint64
 }
 
-func NewHandler(api API, chain flow.Chain, conf EventFilterConfig, maxGlobalStreams uint32) *Handler {
+func NewHandler(api state_stream.API, chain flow.Chain, config Config) *Handler {
 	h := &Handler{
 		api:               api,
 		chain:             chain,
-		eventFilterConfig: conf,
-		maxStreams:        int32(maxGlobalStreams),
+		eventFilterConfig: config.EventFilterConfig,
+		maxStreams:        int32(config.MaxGlobalStreams),
 		streamCount:       atomic.Int32{},
+		heartbeatInterval: config.HeartbeatInterval,
 	}
 	return h
 }
@@ -133,11 +136,11 @@ func (h *Handler) SubscribeEvents(request *executiondata.SubscribeEventsRequest,
 		startBlockID = blockID
 	}
 
-	filter := EventFilter{}
+	filter := state_stream.EventFilter{}
 	if request.GetFilter() != nil {
 		var err error
 		reqFilter := request.GetFilter()
-		filter, err = NewEventFilter(
+		filter, err = state_stream.NewEventFilter(
 			h.eventFilterConfig,
 			h.chain,
 			reqFilter.GetEventType(),
@@ -170,7 +173,15 @@ func (h *Handler) SubscribeEvents(request *executiondata.SubscribeEventsRequest,
 		// response was more than HeartbeatInterval blocks ago
 		if len(resp.Events) == 0 {
 			blocksSinceLastMessage++
-			if blocksSinceLastMessage < request.HeartbeatInterval {
+
+			heartbeatInterval:= uint64(0)
+			if request.HeartbeatInterval == 0 {
+				heartbeatInterval = h.heartbeatInterval
+			} else {
+				heartbeatInterval = request.HeartbeatInterval
+			}
+
+			if blocksSinceLastMessage < heartbeatInterval {
 				continue
 			}
 			blocksSinceLastMessage = 0

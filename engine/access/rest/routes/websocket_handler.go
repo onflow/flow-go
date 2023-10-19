@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/engine/access/state_stream"
+	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"net/http"
 	"time"
 
@@ -13,7 +15,6 @@ import (
 
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/request"
-	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -33,7 +34,7 @@ const (
 type WebsocketController struct {
 	logger            zerolog.Logger
 	conn              *websocket.Conn                // the WebSocket connection for communication with the client
-	api               state_stream.API               // the state_stream.API instance for managing event subscriptions
+	api               backend.API                    // the state_stream.API instance for managing event subscriptions
 	eventFilterConfig state_stream.EventFilterConfig // the configuration for filtering events
 	maxStreams        int32                          // the maximum number of streams allowed
 	activeStreamCount *atomic.Int32                  // the current number of active streams
@@ -108,7 +109,7 @@ func (wsController *WebsocketController) wsErrorHandler(err error) {
 // It listens to the subscription's channel for events and writes them to the WebSocket connection.
 // If an error occurs or the subscription channel is closed, it handles the error or termination accordingly.
 // The function uses a ticker to periodically send ping messages to the client to maintain the connection.
-func (wsController *WebsocketController) writeEvents(sub state_stream.Subscription) {
+func (wsController *WebsocketController) writeEvents(sub backend.Subscription) {
 	ticker := time.NewTicker(pingPeriod)
 	defer ticker.Stop()
 
@@ -141,7 +142,7 @@ func (wsController *WebsocketController) writeEvents(sub state_stream.Subscripti
 				return
 			}
 
-			resp, ok := event.(*state_stream.EventsResponse)
+			resp, ok := event.(*backend.EventsResponse)
 			if !ok {
 				err = fmt.Errorf("unexpected response type: %s", event)
 				wsController.wsErrorHandler(err)
@@ -215,7 +216,7 @@ type SubscribeHandlerFunc func(
 	ctx context.Context,
 	request *request.Request,
 	wsController *WebsocketController,
-) (state_stream.Subscription, error)
+) (backend.Subscription, error)
 
 // WSHandler is websocket handler implementing custom websocket handler function and allows easier handling of errors and
 // responses as it wraps functionality for handling error and responses outside of endpoint handling.
@@ -223,7 +224,7 @@ type WSHandler struct {
 	*HttpHandler
 	subscribeFunc SubscribeHandlerFunc
 
-	api               state_stream.API
+	api               backend.API
 	eventFilterConfig state_stream.EventFilterConfig
 	maxStreams        int32
 	activeStreamCount *atomic.Int32
@@ -233,7 +234,7 @@ var _ http.Handler = (*WSHandler)(nil)
 
 func NewWSHandler(
 	logger zerolog.Logger,
-	api state_stream.API,
+	api backend.API,
 	subscribeFunc SubscribeHandlerFunc,
 	chain flow.Chain,
 	eventFilterConfig state_stream.EventFilterConfig,

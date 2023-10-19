@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"github.com/onflow/flow-go/engine/access/state_stream"
+	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"io"
 	"net"
 	"net/http"
@@ -16,7 +18,6 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/access/mock"
-	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -92,8 +93,8 @@ var _ http.Hijacker = (*testHijackResponseRecorder)(nil)
 // Hijack implements the http.Hijacker interface by returning a fakeNetConn and a bufio.ReadWriter
 // that simulate a hijacked connection.
 func (w *testHijackResponseRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	br := bufio.NewReaderSize(strings.NewReader(""), state_stream.DefaultSendBufferSize)
-	bw := bufio.NewWriterSize(&bytes.Buffer{}, state_stream.DefaultSendBufferSize)
+	br := bufio.NewReaderSize(strings.NewReader(""), backend.DefaultSendBufferSize)
+	bw := bufio.NewWriterSize(&bytes.Buffer{}, backend.DefaultSendBufferSize)
 	w.responseBuff = bytes.NewBuffer(make([]byte, 0))
 	w.closed = make(chan struct{}, 1)
 
@@ -121,13 +122,13 @@ func executeRequest(req *http.Request, backend access.API) *httptest.ResponseRec
 	return rr
 }
 
-func executeWsRequest(req *http.Request, stateStreamApi state_stream.API, responseRecorder *testHijackResponseRecorder) {
+func executeWsRequest(req *http.Request, stateStreamApi backend.API, responseRecorder *testHijackResponseRecorder) {
 	restCollector := metrics.NewNoopCollector()
 	router := NewRouterBuilder(unittest.Logger(), restCollector).AddWsRoutes(
 		stateStreamApi,
 		flow.Testnet.Chain(),
 		state_stream.DefaultEventFilterConfig,
-		state_stream.DefaultMaxGlobalStreams,
+		backend.DefaultMaxGlobalStreams,
 	).Build()
 	router.ServeHTTP(responseRecorder, req)
 }

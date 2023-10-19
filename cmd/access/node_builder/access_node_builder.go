@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/engine/access/state_stream"
+	backend2 "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"os"
 	"path"
 	"path/filepath"
@@ -43,7 +45,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	rpcConnection "github.com/onflow/flow-go/engine/access/rpc/connection"
-	"github.com/onflow/flow-go/engine/access/state_stream"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
@@ -125,7 +126,7 @@ type AccessNodeConfig struct {
 	apiRatelimits                map[string]int
 	apiBurstlimits               map[string]int
 	rpcConf                      rpc.Config
-	stateStreamConf              state_stream.Config
+	stateStreamConf              backend2.Config
 	stateStreamFilterConf        map[string]int
 	ExecutionNodeAddress         string // deprecated
 	HistoricalAccessRPCs         []access.AccessAPIClient
@@ -191,14 +192,15 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			MaxMsgSize:     grpcutils.DefaultMaxMsgSize,
 			CompressorName: grpcutils.NoCompressor,
 		},
-		stateStreamConf: state_stream.Config{
+		stateStreamConf: backend2.Config{
 			MaxExecutionDataMsgSize: grpcutils.DefaultMaxMsgSize,
-			ExecutionDataCacheSize:  state_stream.DefaultCacheSize,
-			ClientSendTimeout:       state_stream.DefaultSendTimeout,
-			ClientSendBufferSize:    state_stream.DefaultSendBufferSize,
-			MaxGlobalStreams:        state_stream.DefaultMaxGlobalStreams,
+			ExecutionDataCacheSize:  backend2.DefaultCacheSize,
+			ClientSendTimeout:       backend2.DefaultSendTimeout,
+			ClientSendBufferSize:    backend2.DefaultSendBufferSize,
+			MaxGlobalStreams:        backend2.DefaultMaxGlobalStreams,
 			EventFilterConfig:       state_stream.DefaultEventFilterConfig,
-			ResponseLimit:           state_stream.DefaultResponseLimit,
+			ResponseLimit:           backend2.DefaultResponseLimit,
+			HeartbeatInterval:       backend2.DefaultHeartbeatInterval,
 		},
 		stateStreamFilterConf:        nil,
 		ExecutionNodeAddress:         "localhost:9000",
@@ -278,14 +280,14 @@ type FlowAccessNodeBuilder struct {
 	RequestEng     *requester.Engine
 	FollowerEng    *followereng.ComplianceEngine
 	SyncEng        *synceng.Engine
-	StateStreamEng *state_stream.Engine
+	StateStreamEng *backend2.Engine
 
 	// grpc servers
 	secureGrpcServer      *grpcserver.GrpcServer
 	unsecureGrpcServer    *grpcserver.GrpcServer
 	stateStreamGrpcServer *grpcserver.GrpcServer
 
-	stateStreamBackend *state_stream.StateStreamBackend
+	stateStreamBackend *backend2.StateStreamBackend
 }
 
 func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilder {
@@ -786,7 +788,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			}
 			broadcaster := engine.NewBroadcaster()
 
-			builder.stateStreamBackend, err = state_stream.New(
+			builder.stateStreamBackend, err = backend2.New(
 				node.Logger,
 				builder.stateStreamConf,
 				node.State,
@@ -802,7 +804,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				return nil, fmt.Errorf("could not create state stream backend: %w", err)
 			}
 
-			stateStreamEng, err := state_stream.NewEng(
+			stateStreamEng, err := backend2.NewEng(
 				node.Logger,
 				builder.stateStreamConf,
 				executionDataStoreCache,
@@ -906,6 +908,8 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.DurationVar(&builder.stateStreamConf.ClientSendTimeout, "state-stream-send-timeout", defaultConfig.stateStreamConf.ClientSendTimeout, "maximum wait before timing out while sending a response to a streaming client e.g. 30s")
 		flags.UintVar(&builder.stateStreamConf.ClientSendBufferSize, "state-stream-send-buffer-size", defaultConfig.stateStreamConf.ClientSendBufferSize, "maximum number of responses to buffer within a stream")
 		flags.Float64Var(&builder.stateStreamConf.ResponseLimit, "state-stream-response-limit", defaultConfig.stateStreamConf.ResponseLimit, "max number of responses per second to send over streaming endpoints. this helps manage resources consumed by each client querying data not in the cache e.g. 3 or 0.5. 0 means no limit")
+		flags.Uint64Var(&builder.stateStreamConf.HeartbeatInterval, "state-stream-heartbeat-interval", defaultConfig.stateStreamConf.HeartbeatInterval, "block interval at which heartbeat messages should be sent")
+
 
 		// Execution Data Indexer
 		flags.BoolVar(&builder.executionDataIndexingEnabled, "execution-data-indexing-enabled", defaultConfig.executionDataIndexingEnabled, "whether to enable the execution data indexing")

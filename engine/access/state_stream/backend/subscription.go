@@ -1,8 +1,9 @@
-package state_stream
+package backend
 
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	"sync"
 	"time"
 
@@ -22,20 +23,7 @@ const DefaultSendBufferSize = 10
 // All other errors are considered exceptions
 type GetDataByHeightFunc func(ctx context.Context, height uint64) (interface{}, error)
 
-// Subscription represents a streaming request, and handles the communication between the grpc handler
-// and the backend implementation.
-type Subscription interface {
-	// ID returns the unique identifier for this subscription used for logging
-	ID() string
-
-	// Channel returns the channel from which subscription data can be read
-	Channel() <-chan interface{}
-
-	// Err returns the error that caused the subscription to fail
-	Err() error
-}
-
-var _ Subscription = (*SubscriptionImpl)(nil)
+var _ state_stream.Subscription = (*SubscriptionImpl)(nil)
 
 type SubscriptionImpl struct {
 	id string
@@ -126,7 +114,7 @@ func NewFailedSubscription(err error, msg string) *SubscriptionImpl {
 	return sub
 }
 
-var _ Subscription = (*HeightBasedSubscription)(nil)
+var _ state_stream.Subscription = (*HeightBasedSubscription)(nil)
 var _ Streamable = (*HeightBasedSubscription)(nil)
 
 // HeightBasedSubscription is a subscription that retrieves data sequentially by block height

@@ -5,6 +5,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/onflow/flow-go/engine/access/state_stream"
+	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -19,7 +21,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine/access/rest/request"
-	"github.com/onflow/flow-go/engine/access/state_stream"
 	mockstatestream "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -153,8 +154,8 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 				test.contracts)
 			require.NoError(s.T(), err)
 
-			var expectedEventsResponses []*state_stream.EventsResponse
-			var subscriptionEventsResponses []*state_stream.EventsResponse
+			var expectedEventsResponses []*backend.EventsResponse
+			var subscriptionEventsResponses []*backend.EventsResponse
 			startBlockFound := test.startBlockID == flow.ZeroID
 
 			// construct expected event responses based on the provided test configuration
@@ -169,7 +170,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 								eventsForBlock = append(eventsForBlock, event)
 							}
 						}
-						eventResponse := &state_stream.EventsResponse{
+						eventResponse := &backend.EventsResponse{
 							Height:  block.Header.Height,
 							BlockID: block.ID(),
 							Events:  eventsForBlock,
@@ -366,7 +367,7 @@ func requireError(t *testing.T, recorder *testHijackResponseRecorder, expected s
 // requireResponse validates that the response received from WebSocket communication matches the expected EventsResponses.
 // This function compares the BlockID, Events count, and individual event properties for each expected and actual
 // EventsResponse. It ensures that the response received from WebSocket matches the expected structure and content.
-func requireResponse(t *testing.T, recorder *testHijackResponseRecorder, expected []*state_stream.EventsResponse) {
+func requireResponse(t *testing.T, recorder *testHijackResponseRecorder, expected []*backend.EventsResponse) {
 	<-recorder.closed
 	// Convert the actual response from respRecorder to JSON bytes
 	actualJSON := recorder.responseBuff.Bytes()
@@ -375,9 +376,9 @@ func requireResponse(t *testing.T, recorder *testHijackResponseRecorder, expecte
 	matches := regexp.MustCompile(pattern).FindAll(actualJSON, -1)
 
 	// Unmarshal each matched JSON into []state_stream.EventsResponse
-	var actual []state_stream.EventsResponse
+	var actual []backend.EventsResponse
 	for _, match := range matches {
-		var response state_stream.EventsResponse
+		var response backend.EventsResponse
 		if err := json.Unmarshal(match, &response); err == nil {
 			actual = append(actual, response)
 		}

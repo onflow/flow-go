@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/engine/access/state_stream"
+	backend2 "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"net"
 	"net/http"
 	"sync"
@@ -15,7 +17,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
-	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
@@ -67,7 +68,7 @@ type Engine struct {
 	addrLock       sync.RWMutex
 	restAPIAddress net.Addr
 
-	stateStreamBackend state_stream.API
+	stateStreamBackend backend2.API
 	eventFilterConfig  state_stream.EventFilterConfig
 	maxGlobalStreams   uint32
 }
@@ -85,7 +86,7 @@ func NewBuilder(log zerolog.Logger,
 	restHandler access.API,
 	secureGrpcServer *grpcserver.GrpcServer,
 	unsecureGrpcServer *grpcserver.GrpcServer,
-	stateStreamBackend state_stream.API,
+	stateStreamBackend backend2.API,
 	eventFilterConfig state_stream.EventFilterConfig,
 	maxGlobalStreams uint32,
 ) (*RPCEngineBuilder, error) {

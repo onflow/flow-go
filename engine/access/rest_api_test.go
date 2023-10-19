@@ -3,6 +3,7 @@ package access
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	"math/rand"
 	"net/http"
 	"os"
@@ -25,7 +26,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/routes"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
-	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/irrecoverable"

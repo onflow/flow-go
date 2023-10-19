@@ -1,11 +1,11 @@
 package state_stream_test
 
 import (
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )

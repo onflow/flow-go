@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	"strings"
 	"time"
 
@@ -34,7 +35,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	rpcConnection "github.com/onflow/flow-go/engine/access/rpc/connection"
-	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/common/follower"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/protocol"

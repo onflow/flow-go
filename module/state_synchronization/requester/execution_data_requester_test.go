@@ -3,6 +3,7 @@ package requester_test
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"math/rand"
 	"sync"
 	"testing"
@@ -18,7 +19,6 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
-	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
@@ -408,7 +408,7 @@ func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun
 	suite.downloader = mockDownloader(cfg.executionDataEntries)
 	suite.distributor = requester.NewExecutionDataDistributor()
 
-	heroCache := herocache.NewBlockExecutionData(state_stream.DefaultCacheSize, logger, metrics)
+	heroCache := herocache.NewBlockExecutionData(backend.DefaultCacheSize, logger, metrics)
 	cache := cache.NewExecutionDataCache(suite.downloader, headers, seals, results, heroCache)
 
 	followerDistributor := pubsub.NewFollowerDistributor()

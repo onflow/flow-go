@@ -1,8 +1,9 @@
-package state_stream
+package backend
 
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -29,7 +30,7 @@ type EventsBackend struct {
 	getStartHeight   GetStartHeightFunc
 }
 
-func (b EventsBackend) SubscribeEvents(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter EventFilter) Subscription {
+func (b EventsBackend) SubscribeEvents(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter state_stream.EventFilter) state_stream.Subscription {
 	nextHeight, err := b.getStartHeight(startBlockID, startHeight)
 	if err != nil {
 		return NewFailedSubscription(err, "could not get start height")
@@ -42,7 +43,7 @@ func (b EventsBackend) SubscribeEvents(ctx context.Context, startBlockID flow.Id
 	return sub
 }
 
-func (b EventsBackend) getResponseFactory(filter EventFilter) GetDataByHeightFunc {
+func (b EventsBackend) getResponseFactory(filter state_stream.EventFilter) GetDataByHeightFunc {
 	return func(ctx context.Context, height uint64) (interface{}, error) {
 		executionData, err := b.getExecutionData(ctx, height)
 		if err != nil {
