@@ -22,7 +22,6 @@ import (
 
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
-	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/grpcserver"
@@ -173,12 +172,7 @@ func (suite *RateLimitTestSuite) SetupTest() {
 	})
 	suite.Require().NoError(err)
 
-	stateStreamConfig := statestreambackend.Config{
-		EventFilterConfig: state_stream.DefaultEventFilterConfig,
-		MaxGlobalStreams:  0,
-		HeartbeatInterval: state_stream.DefaultHeartbeatInterval,
-	}
-
+	stateStreamConfig := statestreambackend.Config{}
 	rpcEngBuilder, err := NewBuilder(
 		suite.log,
 		suite.state,

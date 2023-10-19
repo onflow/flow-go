@@ -191,12 +191,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	})
 	require.NoError(suite.T(), err)
 
-	stateStreamConfig := statestreambackend.Config{
-		EventFilterConfig: state_stream.DefaultEventFilterConfig,
-		MaxGlobalStreams:  0,
-		HeartbeatInterval: state_stream.DefaultHeartbeatInterval,
-	}
-
+	stateStreamConfig := statestreambackend.Config{}
 	// create rpc engine builder
 	rpcEngBuilder, err := rpc.NewBuilder(
 		suite.log,
