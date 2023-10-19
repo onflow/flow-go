@@ -43,7 +43,7 @@ func (gs *ChunkDataPacksSuite) TestVerificationNodesRequestChunkDataPacks() {
 		"expected no ChunkDataRequest to be sent before a transaction existed")
 
 	// send transaction
-	err = gs.AccessClient().DeployContract(context.Background(), sdk.Identifier(gs.net.Root().ID()), lib.CounterContract)
+	_, err = gs.AccessClient().DeployContract(context.Background(), sdk.Identifier(gs.net.Root().ID()), lib.CounterContract)
 	require.NoError(gs.T(), err, "could not deploy counter")
 
 	// wait until we see a different state commitment for a finalized block, call that block blockB
