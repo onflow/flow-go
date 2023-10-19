@@ -91,16 +91,15 @@ func TestValidationInspector_InvalidTopicId_Detection(t *testing.T) {
 	withExpectedNotificationDissemination(expectedNumOfTotalNotif, inspectDisseminatedNotifyFunc)(distributor, spammer)
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
 	validationInspector, err := validation.NewControlMsgValidationInspector(signalerCtx, &validation.InspectorParams{
-		Logger:                        unittest.Logger(),
-		SporkID:                       sporkID,
-		Config:                        &inspectorConfig,
-		Distributor:                   distributor,
-		InspectMsgQueueCacheCollector: metrics.NewNoopCollector(),
-		ClusterPrefixedCacheCollector: metrics.NewNoopCollector(),
-		IdProvider:                    idProvider,
-		InspectorMetrics:              metrics.NewNoopCollector(),
-		RpcTracker:                    meshTracer,
-		NetworkingType:                network.PrivateNetwork,
+		Logger:                  unittest.Logger(),
+		SporkID:                 sporkID,
+		Config:                  &inspectorConfig,
+		Distributor:             distributor,
+		IdProvider:              idProvider,
+		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
+		InspectorMetrics:        metrics.NewNoopCollector(),
+		RpcTracker:              meshTracer,
+		NetworkingType:          network.PrivateNetwork,
 	})
 	require.NoError(t, err)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
@@ -228,16 +227,15 @@ func TestValidationInspector_DuplicateTopicId_Detection(t *testing.T) {
 	withExpectedNotificationDissemination(expectedNumOfTotalNotif, inspectDisseminatedNotifyFunc)(distributor, spammer)
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
 	validationInspector, err := validation.NewControlMsgValidationInspector(signalerCtx, &validation.InspectorParams{
-		Logger:                        unittest.Logger(),
-		SporkID:                       sporkID,
-		Config:                        &inspectorConfig,
-		Distributor:                   distributor,
-		InspectMsgQueueCacheCollector: metrics.NewNoopCollector(),
-		ClusterPrefixedCacheCollector: metrics.NewNoopCollector(),
-		IdProvider:                    idProvider,
-		InspectorMetrics:              metrics.NewNoopCollector(),
-		RpcTracker:                    meshTracer,
-		NetworkingType:                network.PrivateNetwork,
+		Logger:                  unittest.Logger(),
+		SporkID:                 sporkID,
+		Config:                  &inspectorConfig,
+		Distributor:             distributor,
+		IdProvider:              idProvider,
+		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
+		InspectorMetrics:        metrics.NewNoopCollector(),
+		RpcTracker:              meshTracer,
+		NetworkingType:          network.PrivateNetwork,
 	})
 	require.NoError(t, err)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
@@ -326,16 +324,15 @@ func TestValidationInspector_IHaveDuplicateMessageId_Detection(t *testing.T) {
 	withExpectedNotificationDissemination(expectedNumOfTotalNotif, inspectDisseminatedNotifyFunc)(distributor, spammer)
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
 	validationInspector, err := validation.NewControlMsgValidationInspector(signalerCtx, &validation.InspectorParams{
-		Logger:                        unittest.Logger(),
-		SporkID:                       sporkID,
-		Config:                        &inspectorConfig,
-		Distributor:                   distributor,
-		InspectMsgQueueCacheCollector: metrics.NewNoopCollector(),
-		ClusterPrefixedCacheCollector: metrics.NewNoopCollector(),
-		IdProvider:                    idProvider,
-		InspectorMetrics:              metrics.NewNoopCollector(),
-		RpcTracker:                    meshTracer,
-		NetworkingType:                network.PrivateNetwork,
+		Logger:                  unittest.Logger(),
+		SporkID:                 sporkID,
+		Config:                  &inspectorConfig,
+		Distributor:             distributor,
+		IdProvider:              idProvider,
+		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
+		InspectorMetrics:        metrics.NewNoopCollector(),
+		RpcTracker:              meshTracer,
+		NetworkingType:          network.PrivateNetwork,
 	})
 	require.NoError(t, err)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
@@ -440,16 +437,15 @@ func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
 	withExpectedNotificationDissemination(expectedNumOfTotalNotif, inspectDisseminatedNotifyFunc)(distributor, spammer)
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
 	validationInspector, err := validation.NewControlMsgValidationInspector(signalerCtx, &validation.InspectorParams{
-		Logger:                        unittest.Logger(),
-		SporkID:                       sporkID,
-		Config:                        &inspectorConfig,
-		Distributor:                   distributor,
-		InspectMsgQueueCacheCollector: metrics.NewNoopCollector(),
-		ClusterPrefixedCacheCollector: metrics.NewNoopCollector(),
-		IdProvider:                    idProvider,
-		InspectorMetrics:              metrics.NewNoopCollector(),
-		RpcTracker:                    meshTracer,
-		NetworkingType:                network.PrivateNetwork,
+		Logger:                  unittest.Logger(),
+		SporkID:                 sporkID,
+		Config:                  &inspectorConfig,
+		Distributor:             distributor,
+		IdProvider:              idProvider,
+		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
+		InspectorMetrics:        metrics.NewNoopCollector(),
+		RpcTracker:              meshTracer,
+		NetworkingType:          network.PrivateNetwork,
 	})
 	require.NoError(t, err)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
@@ -534,16 +530,15 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection(t *testing.T
 	mockDistributorReadyDoneAware(distributor)
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
 	validationInspector, err := validation.NewControlMsgValidationInspector(signalerCtx, &validation.InspectorParams{
-		Logger:                        logger,
-		SporkID:                       sporkID,
-		Config:                        &inspectorConfig,
-		Distributor:                   distributor,
-		InspectMsgQueueCacheCollector: metrics.NewNoopCollector(),
-		ClusterPrefixedCacheCollector: metrics.NewNoopCollector(),
-		IdProvider:                    idProvider,
-		InspectorMetrics:              metrics.NewNoopCollector(),
-		RpcTracker:                    meshTracer,
-		NetworkingType:                network.PrivateNetwork,
+		Logger:                  logger,
+		SporkID:                 sporkID,
+		Config:                  &inspectorConfig,
+		Distributor:             distributor,
+		IdProvider:              idProvider,
+		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
+		InspectorMetrics:        metrics.NewNoopCollector(),
+		RpcTracker:              meshTracer,
+		NetworkingType:          network.PrivateNetwork,
 	})
 	require.NoError(t, err)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
@@ -622,16 +617,15 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection(t *testing.T
 	mockDistributorReadyDoneAware(distributor)
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
 	validationInspector, err := validation.NewControlMsgValidationInspector(signalerCtx, &validation.InspectorParams{
-		Logger:                        logger,
-		SporkID:                       sporkID,
-		Config:                        &inspectorConfig,
-		Distributor:                   distributor,
-		InspectMsgQueueCacheCollector: metrics.NewNoopCollector(),
-		ClusterPrefixedCacheCollector: metrics.NewNoopCollector(),
-		IdProvider:                    idProvider,
-		InspectorMetrics:              metrics.NewNoopCollector(),
-		RpcTracker:                    meshTracer,
-		NetworkingType:                network.PrivateNetwork,
+		Logger:                  logger,
+		SporkID:                 sporkID,
+		Config:                  &inspectorConfig,
+		Distributor:             distributor,
+		IdProvider:              idProvider,
+		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
+		InspectorMetrics:        metrics.NewNoopCollector(),
+		RpcTracker:              meshTracer,
+		NetworkingType:          network.PrivateNetwork,
 	})
 	require.NoError(t, err)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
@@ -714,16 +708,15 @@ func TestValidationInspector_UnstakedNode_Detection(t *testing.T) {
 	mockDistributorReadyDoneAware(distributor)
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
 	validationInspector, err := validation.NewControlMsgValidationInspector(signalerCtx, &validation.InspectorParams{
-		Logger:                        logger,
-		SporkID:                       sporkID,
-		Config:                        &inspectorConfig,
-		Distributor:                   distributor,
-		InspectMsgQueueCacheCollector: metrics.NewNoopCollector(),
-		ClusterPrefixedCacheCollector: metrics.NewNoopCollector(),
-		IdProvider:                    idProvider,
-		InspectorMetrics:              metrics.NewNoopCollector(),
-		RpcTracker:                    meshTracer,
-		NetworkingType:                network.PrivateNetwork,
+		Logger:                  logger,
+		SporkID:                 sporkID,
+		Config:                  &inspectorConfig,
+		Distributor:             distributor,
+		IdProvider:              idProvider,
+		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
+		InspectorMetrics:        metrics.NewNoopCollector(),
+		RpcTracker:              meshTracer,
+		NetworkingType:          network.PrivateNetwork,
 	})
 	require.NoError(t, err)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
@@ -813,16 +806,15 @@ func TestValidationInspector_InspectIWants_CacheMissThreshold(t *testing.T) {
 	withExpectedNotificationDissemination(1, inspectDisseminatedNotifyFunc)(distributor, spammer)
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
 	validationInspector, err := validation.NewControlMsgValidationInspector(signalerCtx, &validation.InspectorParams{
-		Logger:                        unittest.Logger(),
-		SporkID:                       sporkID,
-		Config:                        &inspectorConfig,
-		Distributor:                   distributor,
-		InspectMsgQueueCacheCollector: metrics.NewNoopCollector(),
-		ClusterPrefixedCacheCollector: metrics.NewNoopCollector(),
-		IdProvider:                    idProvider,
-		InspectorMetrics:              metrics.NewNoopCollector(),
-		RpcTracker:                    meshTracer,
-		NetworkingType:                network.PrivateNetwork,
+		Logger:                  unittest.Logger(),
+		SporkID:                 sporkID,
+		Config:                  &inspectorConfig,
+		Distributor:             distributor,
+		IdProvider:              idProvider,
+		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
+		InspectorMetrics:        metrics.NewNoopCollector(),
+		RpcTracker:              meshTracer,
+		NetworkingType:          network.PrivateNetwork,
 	})
 	require.NoError(t, err)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
@@ -942,16 +934,15 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 	withExpectedNotificationDissemination(1, inspectDisseminatedNotifyFunc)(distributor, spammer)
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
 	validationInspector, err := validation.NewControlMsgValidationInspector(signalerCtx, &validation.InspectorParams{
-		Logger:                        unittest.Logger(),
-		SporkID:                       sporkID,
-		Config:                        &inspectorConfig,
-		Distributor:                   distributor,
-		InspectMsgQueueCacheCollector: metrics.NewNoopCollector(),
-		ClusterPrefixedCacheCollector: metrics.NewNoopCollector(),
-		IdProvider:                    idProvider,
-		InspectorMetrics:              metrics.NewNoopCollector(),
-		RpcTracker:                    meshTracer,
-		NetworkingType:                network.PrivateNetwork,
+		Logger:                  unittest.Logger(),
+		SporkID:                 sporkID,
+		Config:                  &inspectorConfig,
+		Distributor:             distributor,
+		IdProvider:              idProvider,
+		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
+		InspectorMetrics:        metrics.NewNoopCollector(),
+		RpcTracker:              meshTracer,
+		NetworkingType:          network.PrivateNetwork,
 	})
 	// set topic oracle to return list with all topics to avoid hasSubscription failures and force topic validation
 	require.NoError(t, validationInspector.SetTopicOracle(func() []string {

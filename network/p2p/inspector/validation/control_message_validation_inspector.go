@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/queue"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
@@ -71,10 +72,8 @@ type InspectorParams struct {
 	Config *p2pconf.GossipSubRPCValidationInspectorConfigs `validate:"required"`
 	// Distributor gossipsub inspector notification distributor.
 	Distributor p2p.GossipSubInspectorNotifDistributor `validate:"required"`
-	// InspectMsgQueueCacheCollector metrics collector for the underlying inspect message queue cache.
-	InspectMsgQueueCacheCollector module.HeroCacheMetrics `validate:"required"`
-	// ClusterPrefixedCacheCollector metrics collector for the underlying cluster prefix received tracker cache.
-	ClusterPrefixedCacheCollector module.HeroCacheMetrics `validate:"required"`
+	// HeroCacheMetricsFactory the metrics factory.
+	HeroCacheMetricsFactory metrics.HeroCacheMetricsFactory `validate:"required"`
 	// IdProvider identity provider is used to get the flow identifier for a peer.
 	IdProvider module.IdentityProvider `validate:"required"`
 	// InspectorMetrics metrics for the validation inspector.
@@ -103,7 +102,10 @@ func NewControlMsgValidationInspector(ctx irrecoverable.SignalerContext, params 
 	}
 	lg := params.Logger.With().Str("component", "gossip_sub_rpc_validation_inspector").Logger()
 
-	clusterPrefixedTracker, err := cache.NewClusterPrefixedMessagesReceivedTracker(params.Logger, params.Config.ClusterPrefixedControlMsgsReceivedCacheSize, params.ClusterPrefixedCacheCollector, params.Config.ClusterPrefixedControlMsgsReceivedCacheDecay)
+	inspectMsgQueueCacheCollector := metrics.GossipSubRPCInspectorQueueMetricFactory(params.HeroCacheMetricsFactory, params.NetworkingType)
+	clusterPrefixedCacheCollector := metrics.GossipSubRPCInspectorClusterPrefixedCacheMetricFactory(params.HeroCacheMetricsFactory, params.NetworkingType)
+
+	clusterPrefixedTracker, err := cache.NewClusterPrefixedMessagesReceivedTracker(params.Logger, params.Config.ClusterPrefixedControlMsgsReceivedCacheSize, clusterPrefixedCacheCollector, params.Config.ClusterPrefixedControlMsgsReceivedCacheDecay)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cluster prefix topics received tracker")
 	}
@@ -125,7 +127,7 @@ func NewControlMsgValidationInspector(ctx irrecoverable.SignalerContext, params 
 		networkingType: params.NetworkingType,
 	}
 
-	store := queue.NewHeroStore(params.Config.CacheSize, params.Logger, params.InspectMsgQueueCacheCollector)
+	store := queue.NewHeroStore(params.Config.CacheSize, params.Logger, inspectMsgQueueCacheCollector)
 
 	pool := worker.NewWorkerPoolBuilder[*InspectRPCRequest](lg, store, c.processInspectRPCReq).Build()
 
@@ -440,14 +442,8 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 		}
 		return false
 	}
-
 	var errs *multierror.Error
 	for _, message := range messages[:sampleSize] {
-		// return an error when we exceed the error threshold
-		if errs != nil && errs.Len() > c.config.RpcMessageErrorThreshold {
-			return NewInvalidRpcPublishMessagesErr(errs.ErrorOrNil(), errs.Len()), uint64(errs.Len())
-		}
-
 		if c.networkingType == network.PrivateNetwork {
 			err := c.checkPubsubMessageSender(message)
 			if err != nil {
@@ -467,6 +463,12 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 			continue
 		}
 	}
+
+	// return an error when we exceed the error threshold
+	if errs != nil && errs.Len() > c.config.RpcMessageErrorThreshold {
+		return NewInvalidRpcPublishMessagesErr(errs.ErrorOrNil(), errs.Len()), uint64(errs.Len())
+	}
+
 	return nil, 0
 }
 

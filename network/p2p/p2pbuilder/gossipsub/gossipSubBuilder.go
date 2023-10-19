@@ -255,19 +255,16 @@ func defaultInspectorSuite(rpcTracker p2p.RpcControlTracking) p2p.GossipSubRpcIn
 				queue.WithHeroStoreSizeLimit(inspectorCfg.GossipSubRPCInspectorNotificationCacheSize),
 				queue.WithHeroStoreCollector(metrics.RpcInspectorNotificationQueueMetricFactory(heroCacheMetricsFactory, networkType))}...)
 
-		inspectMsgQueueCacheCollector := metrics.GossipSubRPCInspectorQueueMetricFactory(heroCacheMetricsFactory, networkType)
-		clusterPrefixedCacheCollector := metrics.GossipSubRPCInspectorClusterPrefixedCacheMetricFactory(heroCacheMetricsFactory, networkType)
 		params := &validation.InspectorParams{
-			Logger:                        logger,
-			SporkID:                       sporkId,
-			Config:                        &inspectorCfg.GossipSubRPCValidationInspectorConfigs,
-			Distributor:                   notificationDistributor,
-			InspectMsgQueueCacheCollector: inspectMsgQueueCacheCollector,
-			ClusterPrefixedCacheCollector: clusterPrefixedCacheCollector,
-			IdProvider:                    idProvider,
-			InspectorMetrics:              gossipSubMetrics,
-			RpcTracker:                    rpcTracker,
-			NetworkingType:                networkType,
+			Logger:                  logger,
+			SporkID:                 sporkId,
+			Config:                  &inspectorCfg.GossipSubRPCValidationInspectorConfigs,
+			Distributor:             notificationDistributor,
+			HeroCacheMetricsFactory: heroCacheMetricsFactory,
+			IdProvider:              idProvider,
+			InspectorMetrics:        gossipSubMetrics,
+			RpcTracker:              rpcTracker,
+			NetworkingType:          networkType,
 		}
 		rpcValidationInspector, err := validation.NewControlMsgValidationInspector(ctx, params)
 		if err != nil {

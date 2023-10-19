@@ -32,44 +32,39 @@ func TestNewControlMsgValidationInspector(t *testing.T) {
 		idProvider := mockmodule.NewIdentityProvider(t)
 		signalerCtx := irrecoverable.NewMockSignalerContext(t, context.Background())
 		inspector, err := NewControlMsgValidationInspector(signalerCtx, &InspectorParams{
-			Logger:                        unittest.Logger(),
-			SporkID:                       sporkID,
-			Config:                        &flowConfig.NetworkConfig.GossipSubRPCValidationInspectorConfigs,
-			Distributor:                   distributor,
-			InspectMsgQueueCacheCollector: metrics.NewNoopCollector(),
-			ClusterPrefixedCacheCollector: metrics.NewNoopCollector(),
-			IdProvider:                    idProvider,
-			InspectorMetrics:              metrics.NewNoopCollector(),
-			RpcTracker:                    mockp2p.NewRpcControlTracking(t),
-			NetworkingType:                network.PublicNetwork,
+			Logger:                  unittest.Logger(),
+			SporkID:                 sporkID,
+			Config:                  &flowConfig.NetworkConfig.GossipSubRPCValidationInspectorConfigs,
+			Distributor:             distributor,
+			IdProvider:              idProvider,
+			HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
+			InspectorMetrics:        metrics.NewNoopCollector(),
+			RpcTracker:              mockp2p.NewRpcControlTracking(t),
+			NetworkingType:          network.PublicNetwork,
 		})
 		require.NoError(t, err)
 		require.NotNil(t, inspector)
 	})
 	t.Run("should return error if any of the params are nil", func(t *testing.T) {
 		inspector, err := NewControlMsgValidationInspector(irrecoverable.NewMockSignalerContext(t, context.Background()), &InspectorParams{
-			Logger:                        unittest.Logger(),
-			SporkID:                       unittest.IdentifierFixture(),
-			Config:                        nil,
-			Distributor:                   nil,
-			InspectMsgQueueCacheCollector: nil,
-			ClusterPrefixedCacheCollector: nil,
-			IdProvider:                    nil,
-			InspectorMetrics:              nil,
-			RpcTracker:                    nil,
+			Logger:                  unittest.Logger(),
+			SporkID:                 unittest.IdentifierFixture(),
+			Config:                  nil,
+			Distributor:             nil,
+			IdProvider:              nil,
+			HeroCacheMetricsFactory: nil,
+			InspectorMetrics:        nil,
+			RpcTracker:              nil,
 		})
 		require.Nil(t, inspector)
 		require.Error(t, err)
 		s := err.Error()
-		require.Contains(t, s, "validation for 'Ctx' failed on the 'required'")
 		require.Contains(t, s, "validation for 'Config' failed on the 'required'")
 		require.Contains(t, s, "validation for 'Distributor' failed on the 'required'")
-		require.Contains(t, s, "validation for 'InspectMsgQueueCacheCollector' failed on the 'required'")
-		require.Contains(t, s, "validation for 'ClusterPrefixedCacheCollector' failed on the 'required'")
 		require.Contains(t, s, "validation for 'IdProvider' failed on the 'required'")
+		require.Contains(t, s, "validation for 'HeroCacheMetricsFactory' failed on the 'required'")
 		require.Contains(t, s, "validation for 'InspectorMetrics' failed on the 'required'")
 		require.Contains(t, s, "validation for 'RpcTracker' failed on the 'required'")
-		require.Contains(t, s, "validation for 'Subscriptions' failed on the 'required'")
 		require.Contains(t, s, "validation for 'NetworkingType' failed on the 'required'")
 	})
 }
@@ -455,10 +450,6 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		expectedPeerID := unittest.PeerIdFixture(t)
 		req, err := NewInspectRPCRequest(expectedPeerID, unittest.P2PRPCFixture(unittest.WithPubsubMessages(pubsubMsgs...)))
 		require.NoError(t, err, "failed to get inspect message request")
-		topics := make([]string, len(pubsubMsgs))
-		for i, msg := range pubsubMsgs {
-			topics[i] = *msg.Topic
-		}
 		// set topic oracle to return list of topics excluding first topic sent
 		require.NoError(t, inspector.SetTopicOracle(func() []string {
 			return []string{}
@@ -596,16 +587,15 @@ func TestControlMessageValidationInspector_ActiveClustersChanged(t *testing.T) {
 	distributor := mockp2p.NewGossipSubInspectorNotifDistributor(t)
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, context.Background())
 	inspector, err := NewControlMsgValidationInspector(signalerCtx, &InspectorParams{
-		Logger:                        unittest.Logger(),
-		SporkID:                       sporkID,
-		Config:                        &flowConfig.NetworkConfig.GossipSubRPCValidationInspectorConfigs,
-		Distributor:                   distributor,
-		InspectMsgQueueCacheCollector: metrics.NewNoopCollector(),
-		ClusterPrefixedCacheCollector: metrics.NewNoopCollector(),
-		IdProvider:                    mockmodule.NewIdentityProvider(t),
-		InspectorMetrics:              metrics.NewNoopCollector(),
-		RpcTracker:                    mockp2p.NewRpcControlTracking(t),
-		NetworkingType:                network.PrivateNetwork,
+		Logger:                  unittest.Logger(),
+		SporkID:                 sporkID,
+		Config:                  &flowConfig.NetworkConfig.GossipSubRPCValidationInspectorConfigs,
+		Distributor:             distributor,
+		IdProvider:              mockmodule.NewIdentityProvider(t),
+		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
+		InspectorMetrics:        metrics.NewNoopCollector(),
+		RpcTracker:              mockp2p.NewRpcControlTracking(t),
+		NetworkingType:          network.PrivateNetwork,
 	})
 	require.NoError(t, err)
 	activeClusterIds := make(flow.ChainIDList, 0)
@@ -626,16 +616,15 @@ func inspectorFixture(t *testing.T) (*ControlMsgValidationInspector, *mockp2p.Go
 	idProvider := mockmodule.NewIdentityProvider(t)
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, context.Background())
 	inspector, err := NewControlMsgValidationInspector(signalerCtx, &InspectorParams{
-		Logger:                        unittest.Logger(),
-		SporkID:                       sporkID,
-		Config:                        &flowConfig.NetworkConfig.GossipSubRPCValidationInspectorConfigs,
-		Distributor:                   distributor,
-		InspectMsgQueueCacheCollector: metrics.NewNoopCollector(),
-		ClusterPrefixedCacheCollector: metrics.NewNoopCollector(),
-		IdProvider:                    idProvider,
-		InspectorMetrics:              metrics.NewNoopCollector(),
-		RpcTracker:                    mockp2p.NewRpcControlTracking(t),
-		NetworkingType:                network.PublicNetwork,
+		Logger:                  unittest.Logger(),
+		SporkID:                 sporkID,
+		Config:                  &flowConfig.NetworkConfig.GossipSubRPCValidationInspectorConfigs,
+		Distributor:             distributor,
+		IdProvider:              idProvider,
+		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
+		InspectorMetrics:        metrics.NewNoopCollector(),
+		RpcTracker:              mockp2p.NewRpcControlTracking(t),
+		NetworkingType:          network.PublicNetwork,
 	})
 	require.NoError(t, err, "failed to create control message validation inspector fixture")
 	rpcTracker := mockp2p.NewRpcControlTracking(t)
