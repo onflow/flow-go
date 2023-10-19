@@ -197,7 +197,8 @@ func TestCheckBeforeStartIsNoop(t *testing.T) {
 
 		worker := newMockWorker()
 		progress := badger.NewConsumerProgress(db, "consumer")
-		progress.InitProcessedIndex(storedProcessedIndex)
+		err := progress.InitProcessedIndex(storedProcessedIndex)
+		require.NoError(t, err)
 
 		c := NewConsumer(
 			unittest.Logger(),
