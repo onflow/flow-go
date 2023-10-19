@@ -536,7 +536,9 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 	}
 
 	if statePayload == nil {
-		return nil, fmt.Errorf("state payload was not found")
+		m.log.Error().Msg("state payload was not found")
+		return newPayloads, nil
+		//return nil, fmt.Errorf("state payload was not found")
 	}
 
 	if removedSize > 0 {
