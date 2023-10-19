@@ -171,6 +171,7 @@ func (c *Consumer) NotifyJobIsDone(jobID module.JobID) uint64 {
 func (c *Consumer) Check() {
 	if !c.started.Load() {
 		// Check is not allowed before the consumer is started
+		c.log.Warn().Msg("ignoring Check before Start")
 		return
 	}
 
