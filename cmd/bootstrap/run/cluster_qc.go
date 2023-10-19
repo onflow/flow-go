@@ -32,8 +32,8 @@ func GenerateClusterRootQC(signers []bootstrap.NodeInfo, allCommitteeMembers flo
 	}
 
 	// STEP 1.5: patch committee to include dynamic identities. This is a temporary measure until bootstrapping is refactored.
-	// We need to do this since the committee is used to create the QC uses dynamic identities, but clustering for root block contain only
-	// static identities since there no state transitions haven't happened yet.
+	// We need a Committee for creating the cluster's root QC and the Committee requires dynamic identities to be instantiated.
+	// The clustering for root block contain only static identities, since there no state transitions have happened yet.
 	dynamicCommitteeMembers := make(flow.IdentityList, 0, len(allCommitteeMembers))
 	for _, participant := range allCommitteeMembers {
 		dynamicCommitteeMembers = append(dynamicCommitteeMembers, &flow.Identity{

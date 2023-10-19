@@ -32,7 +32,7 @@ func corruptNetworkFixture(t *testing.T, logger zerolog.Logger, corruptedID ...f
 	// create corruptible network with no attacker registered
 	codec := unittest.NetworkCodec()
 
-	corruptedIdentity := unittest.PrivateNodeInfosFixture(1, unittest.WithAddress(insecure.DefaultAddress))[0]
+	corruptedIdentity := unittest.PrivateNodeInfoFixture(unittest.WithAddress(insecure.DefaultAddress))
 	// some tests will want to create corruptible network with a specific ID
 	if len(corruptedID) > 0 {
 		corruptedIdentity.NodeID = corruptedID[0]

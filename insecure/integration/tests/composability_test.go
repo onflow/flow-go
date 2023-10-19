@@ -122,7 +122,7 @@ func TestCorruptNetworkFrameworkHappyPath(t *testing.T) {
 // withCorruptNetwork creates a real corrupt network, starts it, runs the "run" function, and then stops it.
 func withCorruptNetwork(t *testing.T, run func(*testing.T, flow.Identity, *corruptnet.Network, *stub.Hub)) {
 	codec := unittest.NetworkCodec()
-	corruptedIdentity := unittest.PrivateNodeInfosFixture(1, unittest.WithAddress(insecure.DefaultAddress))[0]
+	corruptedIdentity := unittest.PrivateNodeInfoFixture(unittest.WithAddress(insecure.DefaultAddress))
 
 	// life-cycle management of orchestratorNetwork.
 	ctx, cancel := context.WithCancel(context.Background())

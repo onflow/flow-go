@@ -55,7 +55,7 @@ func newStaticEpochInfo(epoch protocol.Epoch) (*staticEpochInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not initial identities: %w", err)
 	}
-	initialCommittee := initialIdentities.Filter(filter.IsAllowedConsensusCommitteeMember).ToSkeleton()
+	initialCommittee := initialIdentities.Filter(filter.IsConsensusCommitteeMember).ToSkeleton()
 	dkg, err := epoch.DKG()
 	if err != nil {
 		return nil, fmt.Errorf("could not get dkg: %w", err)

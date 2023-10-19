@@ -209,14 +209,14 @@ func NewRichProtocolStateEntry(
 	} else {
 		// if next epoch is not yet created, it means that we are in staking phase,
 		// so we need to build the identity table using previous and current epoch setup events.
-		var otherIdentities IdentitySkeletonList
+		var previousEpochIdentities IdentitySkeletonList
 		if previousEpochSetup != nil {
-			otherIdentities = previousEpochSetup.Participants
+			previousEpochIdentities = previousEpochSetup.Participants
 		}
 		result.CurrentEpochIdentityTable, err = BuildIdentityTable(
 			protocolState.CurrentEpoch.ActiveIdentities,
 			currentEpochSetup.Participants,
-			otherIdentities,
+			previousEpochIdentities,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not build identity table for staking phase: %w", err)
@@ -354,8 +354,9 @@ func (ll DynamicIdentityEntryList) Sort(less IdentifierOrder) DynamicIdentityEnt
 }
 
 // BuildIdentityTable constructs the full identity table for the target epoch by combining data from:
-//  1. The target epoch's Dynamic Identities.
-//  2. The target epoch's IdentitySkeletons
+//  1. The Dynamic Identities for the nodes that are _active_ in the target epoch (i.e. the dynamic identity
+//     fields for the IdentitySkeletons contained in the EpochSetup event for the respective epoch).
+//  2. The IdentitySkeletons for the nodes that are _active_ in the target epoch
 //     (recorded in EpochSetup event and immutable throughout the epoch).
 //  3. [optional] An adjacent epoch's IdentitySkeletons (can be empty or nil), as recorded in the
 //     adjacent epoch's setup event. For a target epoch N, the epochs N-1 and N+1 are defined to be
@@ -369,7 +370,13 @@ func BuildIdentityTable(
 	targetEpochIdentitySkeletons IdentitySkeletonList,
 	adjacentEpochIdentitySkeletons IdentitySkeletonList,
 ) (IdentityList, error) {
-	// produce a unique set for current and previous epoch participants
+	// Combine the participants of the current and adjacent epoch. The method `GenericIdentityList.Union`
+	// already implements the following required conventions:
+	//  1. Preference for IdentitySkeleton of the target epoch:
+	//     In case an IdentitySkeleton with the same NodeID exists in the target epoch as well as
+	//     in the adjacent epoch, we use the IdentitySkeleton for the target epoch (for example,
+	//     to account for changes of keys, address, initial weight, etc).
+	//  2. Canonical ordering
 	allEpochParticipants := targetEpochIdentitySkeletons.Union(adjacentEpochIdentitySkeletons)
 	// sanity check: size of identities should be equal to previous and current epoch participants combined
 	if len(allEpochParticipants) != len(targetEpochDynamicIdentities) {

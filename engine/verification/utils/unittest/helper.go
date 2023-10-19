@@ -628,13 +628,13 @@ func bootstrapSystem(
 	bootstrapNodesInfo := make([]bootstrap.NodeInfo, 0)
 	var verID bootstrap.NodeInfo
 	for _, missingRole := range unittest.CompleteIdentitySet() {
-		nodeInfo := unittest.PrivateNodeInfosFixture(1, unittest.WithRole(missingRole.Role))[0]
+		nodeInfo := unittest.PrivateNodeInfoFixture(unittest.WithRole(missingRole.Role))
 		if nodeInfo.Role == flow.RoleVerification {
 			verID = nodeInfo
 		}
 		bootstrapNodesInfo = append(bootstrapNodesInfo, nodeInfo)
 	}
-	bootstrapNodesInfo = append(bootstrapNodesInfo, unittest.PrivateNodeInfosFixture(1, unittest.WithRole(flow.RoleExecution))...) // adds extra execution node
+	bootstrapNodesInfo = append(bootstrapNodesInfo, unittest.PrivateNodeInfoFixture(unittest.WithRole(flow.RoleExecution))) // adds extra execution node
 
 	identities := bootstrap.ToIdentityList(bootstrapNodesInfo)
 
@@ -645,7 +645,7 @@ func bootstrapSystem(
 
 	if !authorized {
 		// creates a new verification node identity that is unauthorized for this epoch
-		verID = unittest.PrivateNodeInfosFixture(1, unittest.WithRole(flow.RoleVerification))[0]
+		verID = unittest.PrivateNodeInfoFixture(unittest.WithRole(flow.RoleVerification))
 		bootstrapNodesInfo = append(bootstrapNodesInfo, verID)
 		identities = append(identities, verID.Identity())
 

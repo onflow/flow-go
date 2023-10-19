@@ -52,8 +52,11 @@ func Not[T flow.GenericIdentity](filter flow.IdentityFilter[T]) flow.IdentityFil
 	}
 }
 
-// In returns a filter for identities within the input list. This is equivalent
-// to HasNodeID, but for list-typed inputs.
+// In returns a filter for identities within the input list. For an input identity i,
+// the filter returns true if and only if i ∈ list.
+// Caution: The filter solely operates on NodeIDs. Other identity fields are not compared.
+// This function is just a compact representation of `HasNodeID[T](list.NodeIDs()...)`
+// which behaves algorithmically the same way.
 func In[T flow.GenericIdentity](list flow.GenericIdentityList[T]) flow.IdentityFilter[T] {
 	return HasNodeID[T](list.NodeIDs()...)
 }
@@ -91,7 +94,12 @@ func HasInitialWeight[T flow.GenericIdentity](hasWeight bool) flow.IdentityFilte
 	}
 }
 
-// HasWeight returns a filter for nodes with non-zero weight.
+// HasWeight filters Identities by their weight:
+// When `hasWeight == true`:
+//   - for an input identity i, the filter returns true if and only if i's weight is greater than zero
+//
+// When `hasWeight == false`:
+//   - for an input identity i, the filter returns true if and only if i's weight is zero
 func HasWeight(hasWeight bool) flow.IdentityFilter[flow.Identity] {
 	return func(identity *flow.Identity) bool {
 		return (identity.Weight > 0) == hasWeight
@@ -122,9 +130,11 @@ var IsValidCurrentEpochParticipant = And(
 	Not(Ejected), // ejection will change signer index
 )
 
-// IsAllowedConsensusCommitteeMember is a identity filter for all members of
-// the consensus committee allowed to participate.
-var IsAllowedConsensusCommitteeMember = And(
+// IsConsensusCommitteeMember is an identity filter for all members of the consensus committee.
+// Formally, a Node X is a Consensus Committee Member if and only if X is a consensus node with
+// positive initial stake. This is specified by the EpochSetup Event and remains static
+// throughout the epoch.
+var IsConsensusCommitteeMember = And(
 	HasRole[flow.IdentitySkeleton](flow.RoleConsensus),
 	HasInitialWeight[flow.IdentitySkeleton](true),
 )
@@ -139,4 +149,4 @@ var IsVotingConsensusCommitteeMember = And[flow.Identity](
 // IsValidDKGParticipant is an identity filter for all DKG participants. It is
 // equivalent to the filter for consensus committee members, as these are
 // the same group for now.
-var IsValidDKGParticipant = IsAllowedConsensusCommitteeMember
+var IsValidDKGParticipant = IsConsensusCommitteeMember
