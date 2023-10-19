@@ -154,11 +154,9 @@ func (h *Handler) SubscribeEvents(request *executiondata.SubscribeEventsRequest,
 
 	sub := h.api.SubscribeEvents(stream.Context(), startBlockID, request.GetStartBlockHeight(), filter)
 
-	heartbeatInterval := uint64(0)
-	if request.HeartbeatInterval == 0 {
+	heartbeatInterval := request.HeartbeatInterval
+	if heartbeatInterval == 0 {
 		heartbeatInterval = h.defaultHeartbeatInterval
-	} else {
-		heartbeatInterval = request.HeartbeatInterval
 	}
 
 	blocksSinceLastMessage := uint64(0)
