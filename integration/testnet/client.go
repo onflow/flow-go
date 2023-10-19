@@ -237,7 +237,7 @@ func (c *Client) waitForStatus(
 	}
 
 	fmt.Println()
-	fmt.Printf("(Wait for Seal) Transaction %s sealed\n", id)
+	fmt.Printf("(Wait for Seal) Transaction %s %s\n", id, targetStatus)
 
 	return result, err
 }

@@ -21,6 +21,7 @@ import (
 var ErrEOFNotReached = errors.New("expect to reach EOF, but actually didn't")
 
 var ReadTriesRootHash = readTriesRootHash
+var CheckpointHasRootHash = checkpointHasRootHash
 
 // readCheckpointV6 reads checkpoint file from a main file and 17 file parts.
 // the main file stores:
@@ -660,6 +661,29 @@ func readTriesRootHash(logger zerolog.Logger, dir string, fileName string) (
 		return nil
 	})
 	return trieRootsToReturn, errToReturn
+}
+
+// checkpointHasRootHash check if the given checkpoint file contains the expected root hash
+func checkpointHasRootHash(logger zerolog.Logger, bootstrapDir, filename string, expectedRootHash ledger.RootHash) error {
+	roots, err := ReadTriesRootHash(logger, bootstrapDir, filename)
+	if err != nil {
+		return fmt.Errorf("could not read checkpoint root hash: %w", err)
+	}
+
+	if len(roots) == 0 {
+		return fmt.Errorf("no root hash found in checkpoint file")
+	}
+
+	for i, root := range roots {
+		if root == expectedRootHash {
+			logger.Info().Msgf("found matching checkpoint root hash at index: %v, checkpoint total trie roots: %v",
+				i, len(roots))
+			// found the expected commit
+			return nil
+		}
+	}
+
+	return fmt.Errorf("could not find expected root hash %v in checkpoint file which contains: %v ", expectedRootHash, roots)
 }
 
 func readFileHeader(reader io.Reader) (uint16, uint16, error) {
