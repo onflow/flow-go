@@ -12,13 +12,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/engine/access/state_stream"
-	"github.com/onflow/flow-go/engine/access/state_stream/backend"
-
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/access/mock"
+	"github.com/onflow/flow-go/engine/access/state_stream"
+	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -128,8 +127,8 @@ func executeWsRequest(req *http.Request, stateStreamApi state_stream.API, respon
 
 	config := backend.Config{
 		EventFilterConfig: state_stream.DefaultEventFilterConfig,
-		MaxGlobalStreams:  backend.DefaultMaxGlobalStreams,
-		HeartbeatInterval: backend.DefaultHeartbeatInterval,
+		MaxGlobalStreams:  state_stream.DefaultMaxGlobalStreams,
+		HeartbeatInterval: state_stream.DefaultHeartbeatInterval,
 	}
 
 	router := NewRouterBuilder(unittest.Logger(), restCollector).AddWsRoutes(

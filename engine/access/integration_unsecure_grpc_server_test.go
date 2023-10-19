@@ -7,9 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/engine/access/state_stream"
-	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
-
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	executiondataproto "github.com/onflow/flow/protobuf/go/flow/executiondata"
 	"github.com/rs/zerolog"
@@ -25,6 +22,8 @@ import (
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/state_stream"
+	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -116,7 +115,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 
 	suite.broadcaster = engine.NewBroadcaster()
 
-	suite.execDataHeroCache = herocache.NewBlockExecutionData(statestreambackend.DefaultCacheSize, suite.log, metrics.NewNoopCollector())
+	suite.execDataHeroCache = herocache.NewBlockExecutionData(state_stream.DefaultCacheSize, suite.log, metrics.NewNoopCollector())
 	suite.execDataCache = cache.NewExecutionDataCache(suite.eds, suite.headers, suite.seals, suite.results, suite.execDataHeroCache)
 
 	accessIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
@@ -195,7 +194,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	stateStreamConfig := statestreambackend.Config{
 		EventFilterConfig: state_stream.DefaultEventFilterConfig,
 		MaxGlobalStreams:  0,
-		HeartbeatInterval: statestreambackend.DefaultHeartbeatInterval,
+		HeartbeatInterval: state_stream.DefaultHeartbeatInterval,
 	}
 
 	// create rpc engine builder
@@ -235,7 +234,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	).Maybe()
 
 	conf := statestreambackend.Config{
-		ClientSendTimeout:    statestreambackend.DefaultSendTimeout,
+		ClientSendTimeout:    state_stream.DefaultSendTimeout,
 		ClientSendBufferSize: statestreambackend.DefaultSendBufferSize,
 	}
 

@@ -183,7 +183,7 @@ func (suite *RestAPITestSuite) SetupTest() {
 	stateStreamConfig := statestreambackend.Config{
 		EventFilterConfig: state_stream.DefaultEventFilterConfig,
 		MaxGlobalStreams:  0,
-		HeartbeatInterval: statestreambackend.DefaultHeartbeatInterval,
+		HeartbeatInterval: state_stream.DefaultHeartbeatInterval,
 	}
 
 	rpcEngBuilder, err := rpc.NewBuilder(

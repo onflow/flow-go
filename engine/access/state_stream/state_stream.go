@@ -8,6 +8,25 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 )
 
+const (
+	// DefaultMaxGlobalStreams defines the default max number of streams that can be open at the same time.
+	DefaultMaxGlobalStreams = 1000
+
+	// DefaultCacheSize defines the default max number of objects for the execution data cache.
+	DefaultCacheSize = 100
+
+	// DefaultSendTimeout is the default timeout for sending a message to the client. After the timeout
+	// expires, the connection is closed.
+	DefaultSendTimeout = 30 * time.Second
+
+	// DefaultResponseLimit is default max responses per second allowed on a stream. After exceeding
+	// the limit, the stream is paused until more capacity is available.
+	DefaultResponseLimit = float64(0)
+
+	// DefaultHeartbeatInterval specifies the block interval at which heartbeat messages should be sent.
+	DefaultHeartbeatInterval = 1
+)
+
 // API represents an interface that defines methods for interacting with a blockchain's execution data and events.
 type API interface {
 	// GetExecutionDataByBlockID retrieves execution data for a specific block by its block ID.

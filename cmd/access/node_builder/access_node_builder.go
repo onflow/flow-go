@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 
 	badger "github.com/ipfs/go-ds-badger2"
@@ -195,13 +196,13 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		},
 		stateStreamConf: statestreambackend.Config{
 			MaxExecutionDataMsgSize: grpcutils.DefaultMaxMsgSize,
-			ExecutionDataCacheSize:  statestreambackend.DefaultCacheSize,
-			ClientSendTimeout:       statestreambackend.DefaultSendTimeout,
+			ExecutionDataCacheSize:  state_stream.DefaultCacheSize,
+			ClientSendTimeout:       state_stream.DefaultSendTimeout,
 			ClientSendBufferSize:    statestreambackend.DefaultSendBufferSize,
-			MaxGlobalStreams:        statestreambackend.DefaultMaxGlobalStreams,
+			MaxGlobalStreams:        state_stream.DefaultMaxGlobalStreams,
 			EventFilterConfig:       state_stream.DefaultEventFilterConfig,
-			ResponseLimit:           statestreambackend.DefaultResponseLimit,
-			HeartbeatInterval:       statestreambackend.DefaultHeartbeatInterval,
+			ResponseLimit:           state_stream.DefaultResponseLimit,
+			HeartbeatInterval:       state_stream.DefaultHeartbeatInterval,
 		},
 		stateStreamFilterConf:        nil,
 		ExecutionNodeAddress:         "localhost:9000",

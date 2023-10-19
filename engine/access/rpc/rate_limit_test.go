@@ -177,7 +177,7 @@ func (suite *RateLimitTestSuite) SetupTest() {
 	stateStreamConfig := statestreambackend.Config{
 		EventFilterConfig: state_stream.DefaultEventFilterConfig,
 		MaxGlobalStreams:  0,
-		HeartbeatInterval: statestreambackend.DefaultHeartbeatInterval,
+		HeartbeatInterval: state_stream.DefaultHeartbeatInterval,
 	}
 
 	rpcEngBuilder, err := NewBuilder(

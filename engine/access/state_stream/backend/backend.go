@@ -5,13 +5,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onflow/flow-go/engine/access/state_stream"
-
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
@@ -19,25 +18,6 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
-)
-
-const (
-	// DefaultMaxGlobalStreams defines the default max number of streams that can be open at the same time.
-	DefaultMaxGlobalStreams = 1000
-
-	// DefaultCacheSize defines the default max number of objects for the execution data cache.
-	DefaultCacheSize = 100
-
-	// DefaultSendTimeout is the default timeout for sending a message to the client. After the timeout
-	// expires, the connection is closed.
-	DefaultSendTimeout = 30 * time.Second
-
-	// DefaultResponseLimit is default max responses per second allowed on a stream. After exceeding
-	// the limit, the stream is paused until more capacity is available.
-	DefaultResponseLimit = float64(0)
-
-	// DefaultHeartbeatInterval specifies the block interval at which heartbeat messages should be sent.
-	DefaultHeartbeatInterval = 1
 )
 
 // Config defines the configurable options for the ingress server.

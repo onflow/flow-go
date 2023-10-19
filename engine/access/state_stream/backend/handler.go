@@ -4,13 +4,12 @@ import (
 	"context"
 	"sync/atomic"
 
-	"github.com/onflow/flow-go/engine/access/state_stream"
-
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/onflow/flow/protobuf/go/flow/executiondata"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"

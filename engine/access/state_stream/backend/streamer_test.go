@@ -6,13 +6,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/engine/access/state_stream/backend"
-
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/access/state_stream"
+	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	streammock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -28,7 +28,7 @@ func TestStream(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	timeout := backend.DefaultSendTimeout
+	timeout := state_stream.DefaultSendTimeout
 
 	sub := streammock.NewStreamable(t)
 	sub.On("ID").Return(uuid.NewString())
@@ -40,7 +40,7 @@ func TestStream(t *testing.T) {
 	tests = append(tests, testData{"", testErr})
 
 	broadcaster := engine.NewBroadcaster()
-	streamer := backend.NewStreamer(unittest.Logger(), broadcaster, timeout, backend.DefaultResponseLimit, sub)
+	streamer := backend.NewStreamer(unittest.Logger(), broadcaster, timeout, state_stream.DefaultResponseLimit, sub)
 
 	for _, d := range tests {
 		sub.On("Next", mock.Anything).Return(d.data, d.err).Once()
@@ -65,7 +65,7 @@ func TestStreamRatelimited(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	timeout := backend.DefaultSendTimeout
+	timeout := state_stream.DefaultSendTimeout
 	duration := 100 * time.Millisecond
 
 	for _, limit := range []float64{0.2, 3, 20, 500} {
@@ -116,7 +116,7 @@ func TestLongStreamRatelimited(t *testing.T) {
 	unittest.SkipUnless(t, unittest.TEST_LONG_RUNNING, "skipping long stream rate limit test")
 
 	ctx := context.Background()
-	timeout := backend.DefaultSendTimeout
+	timeout := state_stream.DefaultSendTimeout
 
 	limit := 5.0
 	duration := 30 * time.Second

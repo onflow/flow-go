@@ -11,11 +11,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+	pb "google.golang.org/genproto/googleapis/bytestream"
 	"google.golang.org/grpc"
 
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	access "github.com/onflow/flow/protobuf/go/flow/executiondata"
-	pb "google.golang.org/genproto/googleapis/bytestream"
 
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
@@ -23,8 +24,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/generator"
-
-	"github.com/stretchr/testify/suite"
 )
 
 func TestHeartbeatResponseSuite(t *testing.T) {
@@ -60,10 +59,10 @@ func (s *HandlerTestSuite) SetupTest() {
 
 	config := Config{
 		EventFilterConfig:    state_stream.DefaultEventFilterConfig,
-		ClientSendTimeout:    DefaultSendTimeout,
+		ClientSendTimeout:    state_stream.DefaultSendTimeout,
 		ClientSendBufferSize: DefaultSendBufferSize,
 		MaxGlobalStreams:     5,
-		HeartbeatInterval:    DefaultHeartbeatInterval,
+		HeartbeatInterval:    state_stream.DefaultHeartbeatInterval,
 	}
 
 	chain := flow.MonotonicEmulator.Chain()
@@ -210,10 +209,10 @@ func TestExecutionDataStream(t *testing.T) {
 
 	config := Config{
 		EventFilterConfig:    state_stream.EventFilterConfig{},
-		ClientSendTimeout:    DefaultSendTimeout,
+		ClientSendTimeout:    state_stream.DefaultSendTimeout,
 		ClientSendBufferSize: DefaultSendBufferSize,
 		MaxGlobalStreams:     1,
-		HeartbeatInterval:    DefaultHeartbeatInterval,
+		HeartbeatInterval:    state_stream.DefaultHeartbeatInterval,
 	}
 
 	// generate some events with a payload to include
@@ -318,10 +317,10 @@ func TestEventStream(t *testing.T) {
 
 	config := Config{
 		EventFilterConfig:    state_stream.EventFilterConfig{},
-		ClientSendTimeout:    DefaultSendTimeout,
+		ClientSendTimeout:    state_stream.DefaultSendTimeout,
 		ClientSendBufferSize: DefaultSendBufferSize,
 		MaxGlobalStreams:     1,
-		HeartbeatInterval:    DefaultHeartbeatInterval,
+		HeartbeatInterval:    state_stream.DefaultHeartbeatInterval,
 	}
 
 	h := NewHandler(api, flow.Localnet.Chain(), config)
