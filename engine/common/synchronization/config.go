@@ -1,6 +1,10 @@
 package synchronization
 
 import (
+	"context"
+	"fmt"
+	"github.com/onflow/flow-go/config"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"time"
 
 	core "github.com/onflow/flow-go/module/chainsync"
@@ -68,10 +72,16 @@ type SpamDetectionConfig struct {
 }
 
 func NewSpamDetectionConfig() *SpamDetectionConfig {
+	flowConfig, err := config.DefaultConfig()
+	if err != nil {
+		irrecoverable.Throw(context.TODO(), fmt.Errorf("failed to read default config: %w", err))
+	}
+
 	return &SpamDetectionConfig{
+		batchRequestBaseProb: flowConfig.NetworkConfig.SyncEngineBatchRequestBaseProb,
+
 		// create misbehavior report for 1% of SyncRequest messages
-		// TODO: make this configurable as a start up flag for the engine
-		syncRequestProb: 0.01,
+		syncRequestProb: flowConfig.NetworkConfig.SyncEngineSyncRequestProb,
 
 		// create misbehavior report for about 0.2% of RangeRequest messages for normal range requests (i.e. not too large)
 		// and about 15% of RangeRequest messages for very large range requests
@@ -85,7 +95,6 @@ func NewSpamDetectionConfig() *SpamDetectionConfig {
 		// creating a misbehavior report is:
 		// rangeRequestBaseProb * (1000+1) / synccore.DefaultConfig().MaxSize
 		// = 0.01 * 1001 / 64 = 0.15640625 = 15.640625%
-		// TODO: make this configurable as a start up flag for the engine
-		rangeRequestBaseProb: 0.01,
+		rangeRequestBaseProb: flowConfig.NetworkConfig.SyncEngineRangeRequestBaseProb,
 	}
 }
