@@ -451,7 +451,7 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 
 		key := convert.RegisterIDToLedgerKey(id)
 
-		if statePayload != nil && isAccountKey(key) {
+		if statePayload == nil && isAccountKey(key) {
 			statePayload = ledger.NewPayload(key, value)
 			// we will append this later
 			continue
@@ -477,7 +477,7 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 			}
 
 			key := convert.RegisterIDToLedgerKey(id)
-			if isAccountKey(key) {
+			if statePayload == nil && isAccountKey(key) {
 				statePayload = value
 				// we will append this later
 				continue
