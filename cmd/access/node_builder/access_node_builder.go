@@ -10,9 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onflow/flow-go/engine/access/state_stream"
-	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
-
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/routing"
@@ -45,8 +42,9 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/routes"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
-
 	rpcConnection "github.com/onflow/flow-go/engine/access/rpc/connection"
+	"github.com/onflow/flow-go/engine/access/state_stream"
+	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
@@ -198,7 +196,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			MaxExecutionDataMsgSize: grpcutils.DefaultMaxMsgSize,
 			ExecutionDataCacheSize:  state_stream.DefaultCacheSize,
 			ClientSendTimeout:       state_stream.DefaultSendTimeout,
-			ClientSendBufferSize:    statestreambackend.DefaultSendBufferSize,
+			ClientSendBufferSize:    state_stream.DefaultSendBufferSize,
 			MaxGlobalStreams:        state_stream.DefaultMaxGlobalStreams,
 			EventFilterConfig:       state_stream.DefaultEventFilterConfig,
 			ResponseLimit:           state_stream.DefaultResponseLimit,

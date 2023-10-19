@@ -5,11 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onflow/flow-go/engine/access/state_stream"
-
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/logging"
 )

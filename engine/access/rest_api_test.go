@@ -10,9 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/engine/access/state_stream"
-	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
-
 	"github.com/antihax/optional"
 	restclient "github.com/onflow/flow/openapi/go-client-generated"
 	"github.com/rs/zerolog"
@@ -28,6 +25,8 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/routes"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/state_stream"
+	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/irrecoverable"

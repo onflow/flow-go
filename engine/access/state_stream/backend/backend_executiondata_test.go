@@ -84,7 +84,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 
 	conf := Config{
 		ClientSendTimeout:    state_stream.DefaultSendTimeout,
-		ClientSendBufferSize: DefaultSendBufferSize,
+		ClientSendBufferSize: state_stream.DefaultSendBufferSize,
 	}
 
 	var err error

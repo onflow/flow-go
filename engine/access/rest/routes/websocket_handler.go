@@ -7,15 +7,14 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/onflow/flow-go/engine/access/state_stream"
-	"github.com/onflow/flow-go/engine/access/state_stream/backend"
-
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/request"
+	"github.com/onflow/flow-go/engine/access/state_stream"
+	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/model/flow"
 )
 

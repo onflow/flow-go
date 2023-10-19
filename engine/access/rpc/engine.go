@@ -11,13 +11,12 @@ import (
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/credentials"
 
-	"github.com/onflow/flow-go/engine/access/state_stream"
-	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
-
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/state_stream"
+	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"

@@ -93,8 +93,8 @@ var _ http.Hijacker = (*testHijackResponseRecorder)(nil)
 // Hijack implements the http.Hijacker interface by returning a fakeNetConn and a bufio.ReadWriter
 // that simulate a hijacked connection.
 func (w *testHijackResponseRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	br := bufio.NewReaderSize(strings.NewReader(""), backend.DefaultSendBufferSize)
-	bw := bufio.NewWriterSize(&bytes.Buffer{}, backend.DefaultSendBufferSize)
+	br := bufio.NewReaderSize(strings.NewReader(""), state_stream.DefaultSendBufferSize)
+	bw := bufio.NewWriterSize(&bytes.Buffer{}, state_stream.DefaultSendBufferSize)
 	w.responseBuff = bytes.NewBuffer(make([]byte, 0))
 	w.closed = make(chan struct{}, 1)
 

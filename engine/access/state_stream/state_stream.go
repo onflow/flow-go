@@ -8,6 +8,11 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 )
 
+// DefaultSendBufferSize is the default buffer size for the subscription's send channel.
+// The size is chosen to balance memory overhead from each subscription with performance when
+// streaming existing data.
+const DefaultSendBufferSize = 10
+
 const (
 	// DefaultMaxGlobalStreams defines the default max number of streams that can be open at the same time.
 	DefaultMaxGlobalStreams = 1000

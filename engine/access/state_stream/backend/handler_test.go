@@ -60,7 +60,7 @@ func (s *HandlerTestSuite) SetupTest() {
 	config := Config{
 		EventFilterConfig:    state_stream.DefaultEventFilterConfig,
 		ClientSendTimeout:    state_stream.DefaultSendTimeout,
-		ClientSendBufferSize: DefaultSendBufferSize,
+		ClientSendBufferSize: state_stream.DefaultSendBufferSize,
 		MaxGlobalStreams:     5,
 		HeartbeatInterval:    state_stream.DefaultHeartbeatInterval,
 	}
@@ -210,7 +210,7 @@ func TestExecutionDataStream(t *testing.T) {
 	config := Config{
 		EventFilterConfig:    state_stream.EventFilterConfig{},
 		ClientSendTimeout:    state_stream.DefaultSendTimeout,
-		ClientSendBufferSize: DefaultSendBufferSize,
+		ClientSendBufferSize: state_stream.DefaultSendBufferSize,
 		MaxGlobalStreams:     1,
 		HeartbeatInterval:    state_stream.DefaultHeartbeatInterval,
 	}
@@ -318,7 +318,7 @@ func TestEventStream(t *testing.T) {
 	config := Config{
 		EventFilterConfig:    state_stream.EventFilterConfig{},
 		ClientSendTimeout:    state_stream.DefaultSendTimeout,
-		ClientSendBufferSize: DefaultSendBufferSize,
+		ClientSendBufferSize: state_stream.DefaultSendBufferSize,
 		MaxGlobalStreams:     1,
 		HeartbeatInterval:    state_stream.DefaultHeartbeatInterval,
 	}

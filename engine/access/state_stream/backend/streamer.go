@@ -6,12 +6,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onflow/flow-go/engine/access/state_stream"
-
 	"github.com/rs/zerolog"
 	"golang.org/x/time/rate"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/storage"
 )
