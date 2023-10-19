@@ -11,14 +11,21 @@ import (
 const (
 	// All constant strings are used for CLI flag names and corresponding keys for config values.
 	// network configuration
-	networkingConnectionPruning       = "networking-connection-pruning"
-	preferredUnicastsProtocols        = "preferred-unicast-protocols"
-	receivedMessageCacheSize          = "received-message-cache-size"
-	peerUpdateInterval                = "peerupdate-interval"
-	unicastMessageTimeout             = "unicast-message-timeout"
-	unicastCreateStreamRetryDelay     = "unicast-create-stream-retry-delay"
-	dnsCacheTTL                       = "dns-cache-ttl"
-	disallowListNotificationCacheSize = "disallow-list-notification-cache-size"
+	networkingConnectionPruning               = "networking-connection-pruning"
+	preferredUnicastsProtocols                = "preferred-unicast-protocols"
+	receivedMessageCacheSize                  = "received-message-cache-size"
+	peerUpdateInterval                        = "peerupdate-interval"
+	unicastMessageTimeout                     = "unicast-message-timeout"
+	unicastCreateStreamRetryDelay             = "unicast-create-stream-retry-delay"
+	unicastStreamZeroRetryResetThreshold      = "unicast-stream-zero-retry-reset-threshold"
+	unicastDialZeroRetryResetThreshold        = "unicast-dial-zero-retry-reset-threshold"
+	unicastMaxDialRetryAttemptTimes           = "unicast-max-dial-retry-attempt-times"
+	unicastMaxStreamCreationRetryAttemptTimes = "unicast-max-stream-creation-retry-attempt-times"
+	unicastDialInProgressBackoffDelay         = "unicast-dial-in-progress-backoff-delay"
+	unicastDialBackoffDelay                   = "unicast-dial-backoff-delay"
+	unicastDialConfigCacheSize                = "unicast-dial-config-cache-size"
+	dnsCacheTTL                               = "dns-cache-ttl"
+	disallowListNotificationCacheSize         = "disallow-list-notification-cache-size"
 	// unicast rate limiters config
 	dryRun              = "unicast-dry-run"
 	lockoutDuration     = "unicast-lockout-duration"
@@ -75,14 +82,62 @@ const (
 
 func AllFlagNames() []string {
 	return []string{
-		networkingConnectionPruning, preferredUnicastsProtocols, receivedMessageCacheSize, peerUpdateInterval, unicastMessageTimeout, unicastCreateStreamRetryDelay,
-		dnsCacheTTL, disallowListNotificationCacheSize, dryRun, lockoutDuration, messageRateLimit, bandwidthRateLimit, bandwidthBurstLimit, memoryLimitRatio,
-		fileDescriptorsRatio, peerBaseLimitConnsInbound, highWatermark, lowWatermark, gracePeriod, silencePeriod, peerScoring, localMeshLogInterval, rpcSentTrackerCacheSize, rpcSentTrackerQueueCacheSize, rpcSentTrackerNumOfWorkers,
-		scoreTracerInterval, gossipSubRPCInspectorNotificationCacheSize, validationInspectorNumberOfWorkers, validationInspectorInspectMessageQueueCacheSize, validationInspectorClusterPrefixedTopicsReceivedCacheSize,
-		validationInspectorClusterPrefixedTopicsReceivedCacheDecay, validationInspectorClusterPrefixHardThreshold,
-		ihaveMaxSampleSize, metricsInspectorNumberOfWorkers, metricsInspectorCacheSize,
-		alspDisabled, alspSpamRecordCacheSize, alspSpamRecordQueueSize, alspHearBeatInterval, alspSyncEngineBatchRequestBaseProb, alspSyncEngineRangeRequestBaseProb, alspSyncEngineSyncRequestProb,
-		iwantMaxSampleSize, iwantMaxMessageIDSampleSize, ihaveMaxMessageIDSampleSize, iwantCacheMissThreshold, controlMessageMaxSampleSize, iwantDuplicateMsgIDThreshold, iwantCacheMissCheckSize,
+		networkingConnectionPruning,
+		preferredUnicastsProtocols,
+		receivedMessageCacheSize,
+		peerUpdateInterval,
+		unicastMessageTimeout,
+		unicastCreateStreamRetryDelay,
+		unicastDialInProgressBackoffDelay,
+		unicastDialBackoffDelay,
+		unicastStreamZeroRetryResetThreshold,
+		unicastDialZeroRetryResetThreshold,
+		unicastMaxDialRetryAttemptTimes,
+		unicastMaxStreamCreationRetryAttemptTimes,
+		unicastDialConfigCacheSize,
+		dnsCacheTTL,
+		disallowListNotificationCacheSize,
+		dryRun,
+		lockoutDuration,
+		messageRateLimit,
+		bandwidthRateLimit,
+		bandwidthBurstLimit,
+		memoryLimitRatio,
+		fileDescriptorsRatio,
+		peerBaseLimitConnsInbound,
+		highWatermark,
+		lowWatermark,
+		gracePeriod,
+		silencePeriod,
+		peerScoring,
+		localMeshLogInterval,
+		rpcSentTrackerCacheSize,
+		rpcSentTrackerQueueCacheSize,
+		rpcSentTrackerNumOfWorkers,
+		scoreTracerInterval,
+		gossipSubRPCInspectorNotificationCacheSize,
+		validationInspectorNumberOfWorkers,
+		validationInspectorInspectMessageQueueCacheSize,
+		validationInspectorClusterPrefixedTopicsReceivedCacheSize,
+		validationInspectorClusterPrefixedTopicsReceivedCacheDecay,
+		validationInspectorClusterPrefixHardThreshold,
+		ihaveMaxSampleSize,
+		metricsInspectorNumberOfWorkers,
+		metricsInspectorCacheSize,
+		alspDisabled,
+		alspSpamRecordCacheSize,
+		alspSpamRecordQueueSize,
+		alspHearBeatInterval,
+    alspSyncEngineBatchRequestBaseProb, 
+    alspSyncEngineRangeRequestBaseProb, 
+    alspSyncEngineSyncRequestProb,
+		iwantMaxSampleSize,
+		iwantMaxMessageIDSampleSize,
+		ihaveMaxMessageIDSampleSize,
+		iwantCacheMissThreshold,
+		controlMessageMaxSampleSize,
+		iwantDuplicateMsgIDThreshold,
+		iwantCacheMissCheckSize,
 	}
 }
 
@@ -100,13 +155,24 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 	flags.Duration(peerUpdateInterval, config.PeerUpdateInterval, "how often to refresh the peer connections for the node")
 	flags.Duration(unicastMessageTimeout, config.UnicastMessageTimeout, "how long a unicast transmission can take to complete")
 	// unicast manager options
-	flags.Duration(unicastCreateStreamRetryDelay, config.UnicastCreateStreamRetryDelay, "Initial delay between failing to establish a connection with another node and retrying. This delay increases exponentially (exponential backoff) with the number of subsequent failures to establish a connection.")
+	flags.Duration(unicastCreateStreamRetryDelay, config.UnicastConfig.CreateStreamBackoffDelay, "initial backoff delay between failing to establish a connection with another node and retrying, "+
+		"this delay increases exponentially with the number of subsequent failures to establish a connection.")
+	flags.Duration(unicastDialBackoffDelay, config.UnicastConfig.DialInProgressBackoffDelay, "initial backoff delay between failing to establish a connection with another node and retrying, "+
+		"this delay increases exponentially with the number of subsequent failures to establish a connection.")
+	flags.Duration(unicastDialInProgressBackoffDelay, config.UnicastConfig.DialInProgressBackoffDelay, "initial backoff delay for concurrent stream creations to a remote peer when there is no exising connection and a dial is in progress. "+
+		"this delay increases exponentially with the number of subsequent failure attempts")
+	flags.Uint64(unicastStreamZeroRetryResetThreshold, config.UnicastConfig.StreamZeroRetryResetThreshold, "reset stream creation retry budget from zero to the maximum after consecutive successful streams reach this threshold.")
+	flags.Duration(unicastDialZeroRetryResetThreshold, config.UnicastConfig.DialZeroRetryResetThreshold, "reset dial retry budget if the last successful dial is longer than this threshold.")
+	flags.Uint64(unicastMaxDialRetryAttemptTimes, config.UnicastConfig.MaxDialRetryAttemptTimes, "maximum attempts to establish a unicast connection.")
+	flags.Uint64(unicastMaxStreamCreationRetryAttemptTimes, config.UnicastConfig.MaxStreamCreationRetryAttemptTimes, "max attempts to create a unicast stream.")
+	flags.Uint32(unicastDialConfigCacheSize, config.UnicastConfig.DialConfigCacheSize, "cache size of the dial config cache, recommended to be big enough to accommodate the entire nodes in the network.")
+
 	// unicast stream handler rate limits
-	flags.Int(messageRateLimit, config.UnicastRateLimitersConfig.MessageRateLimit, "maximum number of unicast messages that a peer can send per second")
-	flags.Int(bandwidthRateLimit, config.UnicastRateLimitersConfig.BandwidthRateLimit, "bandwidth size in bytes a peer is allowed to send via unicast streams per second")
-	flags.Int(bandwidthBurstLimit, config.UnicastRateLimitersConfig.BandwidthBurstLimit, "bandwidth size in bytes a peer is allowed to send at one time")
-	flags.Duration(lockoutDuration, config.UnicastRateLimitersConfig.LockoutDuration, "the number of seconds a peer will be forced to wait before being allowed to successful reconnect to the node after being rate limited")
-	flags.Bool(dryRun, config.UnicastRateLimitersConfig.DryRun, "disable peer disconnects and connections gating when rate limiting peers")
+	flags.Int(messageRateLimit, config.UnicastConfig.UnicastRateLimitersConfig.MessageRateLimit, "maximum number of unicast messages that a peer can send per second")
+	flags.Int(bandwidthRateLimit, config.UnicastConfig.UnicastRateLimitersConfig.BandwidthRateLimit, "bandwidth size in bytes a peer is allowed to send via unicast streams per second")
+	flags.Int(bandwidthBurstLimit, config.UnicastConfig.UnicastRateLimitersConfig.BandwidthBurstLimit, "bandwidth size in bytes a peer is allowed to send at one time")
+	flags.Duration(lockoutDuration, config.UnicastConfig.UnicastRateLimitersConfig.LockoutDuration, "the number of seconds a peer will be forced to wait before being allowed to successful reconnect to the node after being rate limited")
+	flags.Bool(dryRun, config.UnicastConfig.UnicastRateLimitersConfig.DryRun, "disable peer disconnects and connections gating when rate limiting peers")
 	// resource manager cli flags
 	flags.Float64(fileDescriptorsRatio, config.ResourceManagerConfig.FileDescriptorsRatio, "ratio of available file descriptors to be used by libp2p (in (0,1])")
 	flags.Float64(memoryLimitRatio, config.ResourceManagerConfig.MemoryLimitRatio, "ratio of available memory to be used by libp2p (in (0,1])")

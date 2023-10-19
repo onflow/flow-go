@@ -3,8 +3,6 @@ package p2pnode_test
 import (
 	"context"
 	"fmt"
-	"os"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -12,11 +10,8 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -26,7 +21,6 @@ import (
 	"github.com/onflow/flow-go/network/internal/p2putils"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/p2plogging"
-	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/utils"
@@ -43,15 +37,18 @@ func TestMultiAddress(t *testing.T) {
 		identity     *flow.Identity
 		multiaddress string
 	}{
-		{ // ip4 test case
+		{
+			// ip4 test case
 			identity:     unittest.IdentityFixture(unittest.WithNetworkingKey(key.PublicKey()), unittest.WithAddress("172.16.254.1:72")),
 			multiaddress: "/ip4/172.16.254.1/tcp/72",
 		},
-		{ // dns test case
+		{
+			// dns test case
 			identity:     unittest.IdentityFixture(unittest.WithNetworkingKey(key.PublicKey()), unittest.WithAddress("consensus:2222")),
 			multiaddress: "/dns4/consensus/tcp/2222",
 		},
-		{ // dns test case
+		{
+			// dns test case
 			identity:     unittest.IdentityFixture(unittest.WithNetworkingKey(key.PublicKey()), unittest.WithAddress("flow.com:3333")),
 			multiaddress: "/dns4/flow.com/tcp/3333",
 		},
@@ -72,12 +69,7 @@ func TestSingleNodeLifeCycle(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	idProvider := mockmodule.NewIdentityProvider(t)
-	node, _ := p2ptest.NodeFixture(
-		t,
-		unittest.IdentifierFixture(),
-		"test_single_node_life_cycle",
-		idProvider,
-	)
+	node, _ := p2ptest.NodeFixture(t, unittest.IdentifierFixture(), "test_single_node_life_cycle", idProvider)
 
 	node.Start(signalerCtx)
 	unittest.RequireComponentsReadyBefore(t, 100*time.Millisecond, node)
@@ -168,17 +160,12 @@ func TestConnGater(t *testing.T) {
 	idProvider := mockmodule.NewIdentityProvider(t)
 
 	node1Peers := unittest.NewProtectedMap[peer.ID, struct{}]()
-	node1, identity1 := p2ptest.NodeFixture(
-		t,
-		sporkID,
-		t.Name(),
-		idProvider,
-		p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(pid peer.ID) error {
-			if !node1Peers.Has(pid) {
-				return fmt.Errorf("peer id not found: %s", p2plogging.PeerId(pid))
-			}
-			return nil
-		})))
+	node1, identity1 := p2ptest.NodeFixture(t, sporkID, t.Name(), idProvider, p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(pid peer.ID) error {
+		if !node1Peers.Has(pid) {
+			return fmt.Errorf("peer id not found: %s", p2plogging.PeerId(pid))
+		}
+		return nil
+	})))
 	idProvider.On("ByPeerID", node1.ID()).Return(&identity1, true).Maybe()
 
 	p2ptest.StartNode(t, signalerCtx, node1)
@@ -188,16 +175,12 @@ func TestConnGater(t *testing.T) {
 	assert.NoError(t, err)
 
 	node2Peers := unittest.NewProtectedMap[peer.ID, struct{}]()
-	node2, identity2 := p2ptest.NodeFixture(
-		t,
-		sporkID, t.Name(),
-		idProvider,
-		p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(pid peer.ID) error {
-			if !node2Peers.Has(pid) {
-				return fmt.Errorf("id not found: %s", p2plogging.PeerId(pid))
-			}
-			return nil
-		})))
+	node2, identity2 := p2ptest.NodeFixture(t, sporkID, t.Name(), idProvider, p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(pid peer.ID) error {
+		if !node2Peers.Has(pid) {
+			return fmt.Errorf("id not found: %s", p2plogging.PeerId(pid))
+		}
+		return nil
+	})))
 	idProvider.On("ByPeerID", node2.ID()).Return(&identity2,
 
 		true).Maybe()
@@ -276,12 +259,7 @@ func TestCreateStream_SinglePairwiseConnection(t *testing.T) {
 	defer cancel()
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
-	nodes, ids := p2ptest.NodesFixture(t,
-		sporkId,
-		"test_create_stream_single_pairwise_connection",
-		nodeCount,
-		idProvider,
-		p2ptest.WithDefaultResourceManager())
+	nodes, ids := p2ptest.NodesFixture(t, sporkId, "test_create_stream_single_pairwise_connection", nodeCount, idProvider, p2ptest.WithDefaultResourceManager())
 	idProvider.SetIdentities(ids)
 
 	p2ptest.StartNodes(t, signalerCtx, nodes)
@@ -305,106 +283,6 @@ func TestCreateStream_SinglePairwiseConnection(t *testing.T) {
 	close(streamChan)
 }
 
-// TestCreateStream_SinglePeerDial ensures that the unicast manager only attempts to dial a peer once, retries dialing a peer the expected max amount of times when an
-// error is encountered and retries creating the stream the expected max amount of times when unicast.ErrDialInProgress is encountered.
-func TestCreateStream_SinglePeerDial(t *testing.T) {
-	createStreamRetries := atomic.NewInt64(0)
-	dialPeerRetries := atomic.NewInt64(0)
-	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
-		if level == zerolog.WarnLevel {
-			switch {
-			case strings.Contains(message, "retrying create stream, dial to peer in progress"):
-				createStreamRetries.Inc()
-			case strings.Contains(message, "retrying peer dialing"):
-				dialPeerRetries.Inc()
-			}
-		}
-	})
-	logger := zerolog.New(os.Stdout).Level(zerolog.InfoLevel).Hook(hook)
-	idProvider := mockmodule.NewIdentityProvider(t)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-
-	sporkID := unittest.IdentifierFixture()
-
-	// mock metrics we expected only a single call to CreateStream to initiate the dialing to the peer, which will result in 3 failed attempts
-	// the next call to CreateStream will encounter a DialInProgress error which will result in 3 failed attempts
-	m := mockmodule.NewNetworkMetrics(t)
-	m.On("OnPeerDialFailure", mock.Anything, 3).Once()
-	m.On("OnStreamCreationFailure", mock.Anything, mock.Anything).Twice().Run(func(args mock.Arguments) {
-		attempts := args.Get(1).(int)
-		// We expect OnCreateStream to be called twice: once in each separate call to CreateStream. The first call that initializes
-		// the peer dialing should not attempt to retry CreateStream because all peer dialing attempts will be made which will not
-		// return the DialInProgress err that kicks off the CreateStream retries so we expect attempts to be 1 in this case. In the
-		// second call to CreateStream we expect all 3 attempts to be made as we wait for the DialInProgress to complete, in this case
-		// we expect attempts to be 3. Thus we only expect this method to be called twice with either 1 or 3 attempts.
-		require.False(t, attempts != 1 && attempts != 3, fmt.Sprintf("expected either 1 or 3 attempts got %d", attempts))
-	})
-
-	sender, id1 := p2ptest.NodeFixture(
-		t,
-		sporkID,
-		t.Name(),
-		idProvider,
-		p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(pid peer.ID) error {
-			// avoid connection gating outbound messages on sender
-			return nil
-		})),
-		// add very small delay so that when the sender attempts to create multiple streams
-		// the func fails fast before the first routine can finish the peer dialing retries
-		// this prevents us from making another call to dial peer
-		p2ptest.WithCreateStreamRetryDelay(10*time.Millisecond),
-		p2ptest.WithLogger(logger),
-		p2ptest.WithMetricsCollector(m))
-
-	receiver, id2 := p2ptest.NodeFixture(
-		t,
-		sporkID,
-		t.Name(),
-		idProvider,
-		p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(pid peer.ID) error {
-			// connection gate all incoming connections forcing the senders unicast manager to perform retries
-			return fmt.Errorf("gate keep")
-		})),
-		p2ptest.WithCreateStreamRetryDelay(10*time.Millisecond),
-		p2ptest.WithLogger(logger))
-
-	idProvider.On("ByPeerID", sender.ID()).Return(&id1, true).Maybe()
-	idProvider.On("ByPeerID", receiver.ID()).Return(&id2, true).Maybe()
-
-	p2ptest.StartNodes(t, signalerCtx, []p2p.LibP2PNode{sender, receiver})
-	defer p2ptest.StopNodes(t, []p2p.LibP2PNode{sender, receiver}, cancel)
-
-	var wg sync.WaitGroup
-	wg.Add(2)
-	// attempt to create two concurrent streams
-	go func() {
-		defer wg.Done()
-		err := sender.OpenProtectedStream(ctx, receiver.ID(), t.Name(), func(stream network.Stream) error {
-			return nil
-		})
-		require.Error(t, err)
-	}()
-	go func() {
-		defer wg.Done()
-		err := sender.OpenProtectedStream(ctx, receiver.ID(), t.Name(), func(stream network.Stream) error {
-			return nil
-		})
-		require.Error(t, err)
-	}()
-
-	unittest.RequireReturnsBefore(t, wg.Wait, 3*time.Second, "cannot create streams on time")
-
-	// we expect a single routine to start attempting to dial thus the number of retries
-	// before failure should be at most p2pnode.MaxConnectAttempt
-	expectedNumOfDialRetries := int64(p2pnode.MaxConnectAttempt)
-	// we expect the second routine to retry creating a stream p2pnode.MaxConnectAttempt when dialing is in progress
-	expectedCreateStreamRetries := int64(p2pnode.MaxConnectAttempt)
-	require.Equal(t, expectedNumOfDialRetries, dialPeerRetries.Load(), fmt.Sprintf("expected %d dial peer retries got %d", expectedNumOfDialRetries, dialPeerRetries.Load()))
-	require.Equal(t, expectedCreateStreamRetries, createStreamRetries.Load(), fmt.Sprintf("expected %d dial peer retries got %d", expectedCreateStreamRetries, createStreamRetries.Load()))
-}
-
 // TestCreateStream_InboundConnResourceLimit ensures that the setting the resource limit config for
 // PeerDefaultLimits.ConnsInbound restricts the number of inbound connections created from a peer to the configured value.
 // NOTE: If this test becomes flaky, it indicates a violation of the single inbound connection guarantee.
@@ -417,21 +295,9 @@ func TestCreateStream_InboundConnResourceLimit(t *testing.T) {
 
 	sporkID := unittest.IdentifierFixture()
 
-	sender, id1 := p2ptest.NodeFixture(
-		t,
-		sporkID,
-		t.Name(),
-		idProvider,
-		p2ptest.WithDefaultResourceManager(),
-		p2ptest.WithCreateStreamRetryDelay(10*time.Millisecond))
+	sender, id1 := p2ptest.NodeFixture(t, sporkID, t.Name(), idProvider, p2ptest.WithDefaultResourceManager(), p2ptest.WithCreateStreamRetryDelay(10*time.Millisecond))
 
-	receiver, id2 := p2ptest.NodeFixture(
-		t,
-		sporkID,
-		t.Name(),
-		idProvider,
-		p2ptest.WithDefaultResourceManager(),
-		p2ptest.WithCreateStreamRetryDelay(10*time.Millisecond))
+	receiver, id2 := p2ptest.NodeFixture(t, sporkID, t.Name(), idProvider, p2ptest.WithDefaultResourceManager(), p2ptest.WithCreateStreamRetryDelay(10*time.Millisecond))
 
 	idProvider.On("ByPeerID", sender.ID()).Return(&id1, true).Maybe()
 	idProvider.On("ByPeerID", receiver.ID()).Return(&id2, true).Maybe()

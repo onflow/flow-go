@@ -13,7 +13,7 @@ import (
 	"google.golang.org/grpc"
 
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	access "github.com/onflow/flow/protobuf/go/flow/executiondata"
+	"github.com/onflow/flow/protobuf/go/flow/executiondata"
 
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
@@ -30,7 +30,7 @@ func TestExecutionDataStream(t *testing.T) {
 	defer cancel()
 
 	api := ssmock.NewAPI(t)
-	stream := makeStreamMock[access.SubscribeExecutionDataRequest, access.SubscribeExecutionDataResponse](ctx)
+	stream := makeStreamMock[executiondata.SubscribeExecutionDataRequest, executiondata.SubscribeExecutionDataResponse](ctx)
 	sub := state_stream.NewSubscription(1)
 
 	// generate some events with a payload to include
@@ -52,7 +52,7 @@ func TestExecutionDataStream(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		wg.Done()
-		err := h.SubscribeExecutionData(&access.SubscribeExecutionDataRequest{}, stream)
+		err := h.SubscribeExecutionData(&executiondata.SubscribeExecutionDataRequest{}, stream)
 		require.NoError(t, err)
 		t.Log("subscription closed")
 	}()
@@ -117,7 +117,7 @@ func TestEventStream(t *testing.T) {
 	defer cancel()
 
 	api := ssmock.NewAPI(t)
-	stream := makeStreamMock[access.SubscribeEventsRequest, access.SubscribeEventsResponse](ctx)
+	stream := makeStreamMock[executiondata.SubscribeEventsRequest, executiondata.SubscribeEventsResponse](ctx)
 	sub := state_stream.NewSubscription(1)
 
 	// generate some events with a payload to include
@@ -139,7 +139,7 @@ func TestEventStream(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		wg.Done()
-		err := h.SubscribeEvents(&access.SubscribeEventsRequest{}, stream)
+		err := h.SubscribeEvents(&executiondata.SubscribeEventsRequest{}, stream)
 		require.NoError(t, err)
 		t.Log("subscription closed")
 	}()

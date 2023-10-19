@@ -26,7 +26,7 @@ require (
 	github.com/onflow/flow-go-sdk v0.41.10
 	github.com/onflow/flow-go/crypto v0.24.9
 	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
-	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20230915140723-432828f7afb9
+	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20231017162044-5d0f9b6dfdb2
 	github.com/plus3it/gorecurcopy v0.0.1
 	github.com/prometheus/client_golang v1.14.0
 	github.com/prometheus/client_model v0.4.0
@@ -278,6 +278,7 @@ require (
 	github.com/sirupsen/logrus v1.8.1 // indirect
 	github.com/skeema/knownhosts v1.1.0 // indirect
 	github.com/slok/go-http-metrics v0.10.0 // indirect
+	github.com/sony/gobreaker v0.5.0 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/spf13/afero v1.9.3 // indirect
 	github.com/spf13/cast v1.5.0 // indirect

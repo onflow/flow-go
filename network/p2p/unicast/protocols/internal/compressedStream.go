@@ -1,4 +1,4 @@
-package compressed
+package internal
 
 import (
 	"fmt"
@@ -11,10 +11,10 @@ import (
 	flownet "github.com/onflow/flow-go/network"
 )
 
-// compressedStream is an internal networking layer data structure,
+// CompressedStream is an internal networking layer data structure,
 // which implements a compression mechanism as a wrapper around a native
 // libp2p stream.
-type compressedStream struct {
+type CompressedStream struct {
 	network.Stream
 
 	writeLock  sync.Mutex
@@ -26,8 +26,8 @@ type compressedStream struct {
 }
 
 // NewCompressedStream creates a compressed stream with gzip as default compressor.
-func NewCompressedStream(s network.Stream, compressor flownet.Compressor) (*compressedStream, error) {
-	c := &compressedStream{
+func NewCompressedStream(s network.Stream, compressor flownet.Compressor) (*CompressedStream, error) {
+	c := &CompressedStream{
 		Stream:     s,
 		compressor: compressor,
 	}
@@ -42,7 +42,7 @@ func NewCompressedStream(s network.Stream, compressor flownet.Compressor) (*comp
 	return c, nil
 }
 
-func (c *compressedStream) Write(b []byte) (int, error) {
+func (c *CompressedStream) Write(b []byte) (int, error) {
 	c.writeLock.Lock()
 	defer c.writeLock.Unlock()
 
@@ -51,7 +51,7 @@ func (c *compressedStream) Write(b []byte) (int, error) {
 	return n, multierr.Combine(err, c.w.Flush())
 }
 
-func (c *compressedStream) Read(b []byte) (int, error) {
+func (c *CompressedStream) Read(b []byte) (int, error) {
 	c.readLock.Lock()
 	defer c.readLock.Unlock()
 
@@ -71,7 +71,7 @@ func (c *compressedStream) Read(b []byte) (int, error) {
 	return n, err
 }
 
-func (c *compressedStream) Close() error {
+func (c *CompressedStream) Close() error {
 	c.writeLock.Lock()
 	defer c.writeLock.Unlock()
 
