@@ -258,7 +258,6 @@ func defaultInspectorSuite(rpcTracker p2p.RpcControlTracking) p2p.GossipSubRpcIn
 		inspectMsgQueueCacheCollector := metrics.GossipSubRPCInspectorQueueMetricFactory(heroCacheMetricsFactory, networkType)
 		clusterPrefixedCacheCollector := metrics.GossipSubRPCInspectorClusterPrefixedCacheMetricFactory(heroCacheMetricsFactory, networkType)
 		params := &validation.InspectorParams{
-			Ctx:                           ctx,
 			Logger:                        logger,
 			SporkID:                       sporkId,
 			Config:                        &inspectorCfg.GossipSubRPCValidationInspectorConfigs,
@@ -270,7 +269,7 @@ func defaultInspectorSuite(rpcTracker p2p.RpcControlTracking) p2p.GossipSubRpcIn
 			RpcTracker:                    rpcTracker,
 			NetworkingType:                networkType,
 		}
-		rpcValidationInspector, err := validation.NewControlMsgValidationInspector(params)
+		rpcValidationInspector, err := validation.NewControlMsgValidationInspector(ctx, params)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create new control message valiadation inspector: %w", err)
 		}

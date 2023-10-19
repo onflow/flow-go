@@ -31,8 +31,7 @@ func TestNewControlMsgValidationInspector(t *testing.T) {
 		distributor := mockp2p.NewGossipSubInspectorNotifDistributor(t)
 		idProvider := mockmodule.NewIdentityProvider(t)
 		signalerCtx := irrecoverable.NewMockSignalerContext(t, context.Background())
-		inspector, err := NewControlMsgValidationInspector(&InspectorParams{
-			Ctx:                           signalerCtx,
+		inspector, err := NewControlMsgValidationInspector(signalerCtx, &InspectorParams{
 			Logger:                        unittest.Logger(),
 			SporkID:                       sporkID,
 			Config:                        &flowConfig.NetworkConfig.GossipSubRPCValidationInspectorConfigs,
@@ -48,8 +47,7 @@ func TestNewControlMsgValidationInspector(t *testing.T) {
 		require.NotNil(t, inspector)
 	})
 	t.Run("should return error if any of the params are nil", func(t *testing.T) {
-		inspector, err := NewControlMsgValidationInspector(&InspectorParams{
-			Ctx:                           nil,
+		inspector, err := NewControlMsgValidationInspector(irrecoverable.NewMockSignalerContext(t, context.Background()), &InspectorParams{
 			Logger:                        unittest.Logger(),
 			SporkID:                       unittest.IdentifierFixture(),
 			Config:                        nil,
@@ -597,8 +595,7 @@ func TestControlMessageValidationInspector_ActiveClustersChanged(t *testing.T) {
 	require.NoError(t, err, "failed to get default flow config")
 	distributor := mockp2p.NewGossipSubInspectorNotifDistributor(t)
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, context.Background())
-	inspector, err := NewControlMsgValidationInspector(&InspectorParams{
-		Ctx:                           signalerCtx,
+	inspector, err := NewControlMsgValidationInspector(signalerCtx, &InspectorParams{
 		Logger:                        unittest.Logger(),
 		SporkID:                       sporkID,
 		Config:                        &flowConfig.NetworkConfig.GossipSubRPCValidationInspectorConfigs,
@@ -628,8 +625,7 @@ func inspectorFixture(t *testing.T) (*ControlMsgValidationInspector, *mockp2p.Go
 	distributor := mockp2p.NewGossipSubInspectorNotifDistributor(t)
 	idProvider := mockmodule.NewIdentityProvider(t)
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, context.Background())
-	inspector, err := NewControlMsgValidationInspector(&InspectorParams{
-		Ctx:                           signalerCtx,
+	inspector, err := NewControlMsgValidationInspector(signalerCtx, &InspectorParams{
 		Logger:                        unittest.Logger(),
 		SporkID:                       sporkID,
 		Config:                        &flowConfig.NetworkConfig.GossipSubRPCValidationInspectorConfigs,

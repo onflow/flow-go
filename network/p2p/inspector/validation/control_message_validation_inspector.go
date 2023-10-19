@@ -63,7 +63,6 @@ type ControlMsgValidationInspector struct {
 }
 
 type InspectorParams struct {
-	Ctx irrecoverable.SignalerContext `validate:"required"`
 	// Logger the logger used by the inspector.
 	Logger zerolog.Logger `validate:"required"`
 	// SporkID the current spork ID.
@@ -97,7 +96,7 @@ var _ protocol.Consumer = (*ControlMsgValidationInspector)(nil)
 // Returns:
 //   - *ControlMsgValidationInspector: a new control message validation inspector.
 //   - error: an error if there is any error while creating the inspector. All errors are irrecoverable and unexpected.
-func NewControlMsgValidationInspector(params *InspectorParams) (*ControlMsgValidationInspector, error) {
+func NewControlMsgValidationInspector(ctx irrecoverable.SignalerContext, params *InspectorParams) (*ControlMsgValidationInspector, error) {
 	err := validator.New().Struct(params)
 	if err != nil {
 		return nil, fmt.Errorf("inspector params validation failed: %w", err)
@@ -114,7 +113,7 @@ func NewControlMsgValidationInspector(params *InspectorParams) (*ControlMsgValid
 	}
 
 	c := &ControlMsgValidationInspector{
-		ctx:            params.Ctx,
+		ctx:            ctx,
 		logger:         lg,
 		sporkID:        params.SporkID,
 		config:         params.Config,
