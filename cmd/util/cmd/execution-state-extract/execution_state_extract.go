@@ -98,6 +98,7 @@ func extractExecutionState(
 				migrators.NewAtreeRegisterMigrator(
 					rwf,
 				),
+				&migrators.DeduplicateContractNamesMigration{},
 				cadenceDataValidation.PostMigration(),
 				&migrators.AccountUsageMigrator{},
 			}),
