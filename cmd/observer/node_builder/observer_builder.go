@@ -962,7 +962,6 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		}
 
 		stateStreamConfig := statestreambackend.Config{}
-
 		engineBuilder, err := rpc.NewBuilder(
 			node.Logger,
 			node.State,
