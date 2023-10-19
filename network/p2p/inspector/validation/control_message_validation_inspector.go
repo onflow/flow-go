@@ -797,6 +797,11 @@ func (c *ControlMsgValidationInspector) checkClusterPrefixHardThreshold(nodeID f
 }
 
 // logAndDistributeErr logs the provided error and attempts to disseminate an invalid control message validation notification for the error.
+// Args:
+//   - req: inspect rpc request that failed validation.
+//   - ctlMsgType: the control message type of the rpc message that caused the error.
+//   - err: the error that occurred.
+//   - count: the number of occurrences of the error.
 func (c *ControlMsgValidationInspector) logAndDistributeAsyncInspectErrs(req *InspectRPCRequest, ctlMsgType p2pmsg.ControlMessageType, err error, count uint64) {
 	lg := c.logger.With().
 		Bool(logging.KeySuspicious, true).
