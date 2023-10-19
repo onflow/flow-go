@@ -3,9 +3,10 @@ package synchronization
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"time"
 
 	core "github.com/onflow/flow-go/module/chainsync"
 )
