@@ -159,12 +159,14 @@ func (c *ControlMsgValidationInspector) Start(parent irrecoverable.SignalerConte
 
 // Inspect is called by gossipsub upon reception of a rpc from a remote  node.
 // It creates a new InspectRPCRequest for the RPC to be inspected async by the worker pool.
+// Args:
+//   - from: the sender.
+//   - rpc: the control message RPC.
+//
+// Returns:
+//   - error: if a new inspect rpc request cannot be created, all errors returned are considered irrecoverable.
 func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) error {
-	err := c.truncateRPC(from, rpc)
-	if err != nil {
-		// irrecoverable error encountered
-		c.logAndThrowError(fmt.Errorf("failed to get inspect RPC request could not perform truncation: %w", err))
-	}
+	c.truncateRPC(from, rpc)
 	// queue further async inspection
 	req, err := NewInspectRPCRequest(from, rpc)
 	if err != nil {
@@ -181,6 +183,11 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 
 // processInspectRPCReq func used by component workers to perform further inspection of RPC control messages that will validate ensure all control message
 // types are valid in the RPC.
+// Args:
+//   - req: the inspect rpc request.
+//
+// Returns:
+//   - error: no error is expected to be returned from this func as they are logged and distributed in invalid control message notifications.
 func (c *ControlMsgValidationInspector) processInspectRPCReq(req *InspectRPCRequest) error {
 	c.metrics.AsyncProcessingStarted()
 	start := time.Now()
@@ -228,8 +235,13 @@ func (c *ControlMsgValidationInspector) processInspectRPCReq(req *InspectRPCRequ
 	return nil
 }
 
-// preProcessRPCPublishMessages checks the sender of the sender of pubsub message to ensure they are not unstaked, or ejected.
+// checkPubsubMessageSender checks the sender of the sender of pubsub message to ensure they are not unstaked, or ejected.
 // This check is only required on private networks.
+// Args:
+//   - message: the pubsub message.
+//
+// Returns:
+//   - error: if the peer ID cannot be created from bytes, sender is unknown or the identity is ejected.
 func (c *ControlMsgValidationInspector) checkPubsubMessageSender(message *pubsub_pb.Message) error {
 	pid, err := peer.IDFromBytes(message.GetFrom())
 	if err != nil {
@@ -473,7 +485,10 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 }
 
 // truncateRPC truncates the RPC by truncating each control message type using the configured max sample size values.
-func (c *ControlMsgValidationInspector) truncateRPC(from peer.ID, rpc *pubsub.RPC) error {
+// Args:
+// - from: peer ID of the sender.
+// - rpc: the pubsub RPC.
+func (c *ControlMsgValidationInspector) truncateRPC(from peer.ID, rpc *pubsub.RPC) {
 	for _, ctlMsgType := range p2pmsg.ControlMessageTypes() {
 		switch ctlMsgType {
 		case p2pmsg.CtrlMsgGraft:
@@ -489,16 +504,12 @@ func (c *ControlMsgValidationInspector) truncateRPC(from peer.ID, rpc *pubsub.RP
 			c.logAndThrowError(fmt.Errorf("unknown control message type encountered during RPC truncation"))
 		}
 	}
-	return nil
 }
 
 // truncateGraftMessages truncates the Graft control messages in the RPC. If the total number of Grafts in the RPC exceeds the configured
 // GraftPruneMessageMaxSampleSize the list of Grafts will be truncated.
 // Args:
 //   - rpc: the rpc message to truncate.
-//
-// Returns:
-//   - error: if any error encountered while sampling the messages, all errors are considered irrecoverable.
 func (c *ControlMsgValidationInspector) truncateGraftMessages(rpc *pubsub.RPC) {
 	grafts := rpc.GetControl().GetGraft()
 	totalGrafts := len(grafts)
@@ -519,9 +530,6 @@ func (c *ControlMsgValidationInspector) truncateGraftMessages(rpc *pubsub.RPC) {
 // GraftPruneMessageMaxSampleSize the list of Prunes will be truncated.
 // Args:
 //   - rpc: the rpc message to truncate.
-//
-// Returns:
-//   - error: if any error encountered while sampling the messages, all errors are considered irrecoverable.
 func (c *ControlMsgValidationInspector) truncatePruneMessages(rpc *pubsub.RPC) {
 	prunes := rpc.GetControl().GetPrune()
 	totalPrunes := len(prunes)
@@ -542,9 +550,6 @@ func (c *ControlMsgValidationInspector) truncatePruneMessages(rpc *pubsub.RPC) {
 // MaxSampleSize the list of iHaves will be truncated.
 // Args:
 //   - rpc: the rpc message to truncate.
-//
-// Returns:
-//   - error: if any error encountered while sampling the messages, all errors are considered irrecoverable.
 func (c *ControlMsgValidationInspector) truncateIHaveMessages(rpc *pubsub.RPC) {
 	ihaves := rpc.GetControl().GetIhave()
 	totalIHaves := len(ihaves)
@@ -589,9 +594,6 @@ func (c *ControlMsgValidationInspector) truncateIHaveMessageIds(rpc *pubsub.RPC)
 // MaxSampleSize the list of iWants will be truncated.
 // Args:
 //   - rpc: the rpc message to truncate.
-//
-// Returns:
-//   - error: if any error encountered while sampling the messages, all errors are considered irrecoverable.
 func (c *ControlMsgValidationInspector) truncateIWantMessages(from peer.ID, rpc *pubsub.RPC) {
 	iWants := rpc.GetControl().GetIwant()
 	totalIWants := uint(len(iWants))
@@ -613,9 +615,6 @@ func (c *ControlMsgValidationInspector) truncateIWantMessages(from peer.ID, rpc 
 // MaxMessageIDSampleSize the list of message ids will be truncated. Before message ids are truncated the iWant control messages should have been truncated themselves.
 // Args:
 //   - rpc: the rpc message to truncate.
-//
-// Returns:
-//   - error: if any error encountered while sampling the messages, all errors are considered irrecoverable.
 func (c *ControlMsgValidationInspector) truncateIWantMessageIds(from peer.ID, rpc *pubsub.RPC) {
 	lastHighest := c.rpcTracker.LastHighestIHaveRPCSize()
 	lg := c.logger.With().
@@ -831,6 +830,9 @@ func (c *ControlMsgValidationInspector) logAndDistributeAsyncInspectErrs(req *In
 	}
 }
 
+// logAndThrowError logs and throws irrecoverable errors on the context.
+// Args:
+//   err: the error encountered.
 func (c *ControlMsgValidationInspector) logAndThrowError(err error) {
 	c.logger.Error().
 		Err(err).
