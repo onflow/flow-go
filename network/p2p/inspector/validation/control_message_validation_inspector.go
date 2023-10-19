@@ -53,12 +53,13 @@ type ControlMsgValidationInspector struct {
 	// 1. The cluster prefix topic is received while the inspector waits for the cluster IDs provider to be set (this can happen during the startup or epoch transitions).
 	// 2. The node sends a cluster prefix topic where the cluster prefix does not match any of the active cluster IDs.
 	// In such cases, the inspector will allow a configured number of these messages from the corresponding peer.
-	tracker       *cache.ClusterPrefixedMessagesReceivedTracker
-	idProvider    module.IdentityProvider
-	rpcTracker    p2p.RpcControlTracking
-	subscriptions p2p.Subscriptions
+	tracker    *cache.ClusterPrefixedMessagesReceivedTracker
+	idProvider module.IdentityProvider
+	rpcTracker p2p.RpcControlTracking
 	// networkingType indicates public or private network, rpc publish messages are inspected for unstaked senders when running the private network.
 	networkingType network.NetworkingType
+	// topicOracle callback used to retrieve the current subscribed topics of the libp2p node.
+	topicOracle func() []string
 }
 
 type InspectorParams struct {
@@ -88,7 +89,7 @@ type InspectorParams struct {
 }
 
 var _ component.Component = (*ControlMsgValidationInspector)(nil)
-var _ p2p.GossipSubRPCInspector = (*ControlMsgValidationInspector)(nil)
+var _ p2p.GossipSubMsgValidationRpcInspector = (*ControlMsgValidationInspector)(nil)
 var _ protocol.Consumer = (*ControlMsgValidationInspector)(nil)
 
 // NewControlMsgValidationInspector returns new ControlMsgValidationInspector
@@ -103,12 +104,15 @@ func NewControlMsgValidationInspector(params *InspectorParams) (*ControlMsgValid
 	if err != nil {
 		return nil, fmt.Errorf("inspector params validation failed: %w", err)
 	}
-
 	lg := params.Logger.With().Str("component", "gossip_sub_rpc_validation_inspector").Logger()
 
 	clusterPrefixedTracker, err := cache.NewClusterPrefixedMessagesReceivedTracker(params.Logger, params.Config.ClusterPrefixedControlMsgsReceivedCacheSize, params.ClusterPrefixedCacheCollector, params.Config.ClusterPrefixedControlMsgsReceivedCacheDecay)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cluster prefix topics received tracker")
+	}
+
+	if params.Config.RpcMessageMaxSampleSize < params.Config.RpcMessageErrorThreshold {
+		return nil, fmt.Errorf("rpc message max sample size must be greater than or equal to rpc message error threshold, got %d and %d respectively", params.Config.RpcMessageMaxSampleSize, params.Config.RpcMessageErrorThreshold)
 	}
 
 	c := &ControlMsgValidationInspector{
@@ -121,11 +125,11 @@ func NewControlMsgValidationInspector(params *InspectorParams) (*ControlMsgValid
 		rpcTracker:     params.RpcTracker,
 		idProvider:     params.IdProvider,
 		metrics:        params.InspectorMetrics,
-		subscriptions:  params.Subscriptions,
 		networkingType: params.NetworkingType,
 	}
 
 	store := queue.NewHeroStore(params.Config.CacheSize, params.Logger, params.InspectMsgQueueCacheCollector)
+
 	pool := worker.NewWorkerPoolBuilder[*InspectRPCRequest](lg, store, c.processInspectRPCReq).Build()
 
 	c.workerPool = pool
@@ -145,6 +149,13 @@ func NewControlMsgValidationInspector(params *InspectorParams) (*ControlMsgValid
 	}
 	c.Component = builder.Build()
 	return c, nil
+}
+
+func (c *ControlMsgValidationInspector) Start(parent irrecoverable.SignalerContext) {
+	if c.topicOracle == nil {
+		parent.Throw(fmt.Errorf("6"))
+	}
+	c.Component.Start(parent)
 }
 
 // Inspect is called by gossipsub upon reception of a rpc from a remote  node.
@@ -416,7 +427,7 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 	if totalMessages == 0 {
 		return nil, 0
 	}
-	sampleSize := c.config.RPCMessageMaxSampleSize
+	sampleSize := c.config.RpcMessageMaxSampleSize
 	if sampleSize > totalMessages {
 		sampleSize = totalMessages
 	}
@@ -424,10 +435,20 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 		messages[i], messages[j] = messages[j], messages[i]
 	})
 
+	subscribedTopics := c.topicOracle()
+	hasSubscription := func(topic string) bool {
+		for _, subscribedTopic := range subscribedTopics {
+			if topic == subscribedTopic {
+				return true
+			}
+		}
+		return false
+	}
+
 	var errs *multierror.Error
 	for _, message := range messages[:sampleSize] {
 		// return an error when we exceed the error threshold
-		if errs != nil && errs.Len() > c.config.RPCMessageErrorThreshold {
+		if errs != nil && errs.Len() > c.config.RpcMessageErrorThreshold {
 			return NewInvalidRpcPublishMessagesErr(errs.ErrorOrNil(), errs.Len()), uint64(errs.Len())
 		}
 
@@ -445,11 +466,10 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 			continue
 		}
 
-		if !c.subscriptions.HasSubscription(topic) {
+		if !hasSubscription(topic.String()) {
 			errs = multierror.Append(errs, fmt.Errorf("subscription for topic %s not found", topic))
 			continue
 		}
-
 	}
 	return nil, 0
 }
@@ -636,6 +656,18 @@ func (c *ControlMsgValidationInspector) Name() string {
 // ActiveClustersChanged consumes cluster ID update protocol events.
 func (c *ControlMsgValidationInspector) ActiveClustersChanged(clusterIDList flow.ChainIDList) {
 	c.tracker.StoreActiveClusterIds(clusterIDList)
+}
+
+// SetTopicOracle Sets the topic oracle. The topic oracle is used to determine the list of topics that the node is subscribed to.
+// If an oracle is not set, the node will not be able to determine the list of topics that the node is subscribed to.
+// This func is expected to be called once and will return an error on all subsequent calls.
+// All errors returned from this func are considered irrecoverable.
+func (c *ControlMsgValidationInspector) SetTopicOracle(topicOracle func() []string) error {
+	if c.topicOracle != nil {
+		return fmt.Errorf("topic oracle already set")
+	}
+	c.topicOracle = topicOracle
+	return nil
 }
 
 // performSample performs sampling on the specified control message that will randomize

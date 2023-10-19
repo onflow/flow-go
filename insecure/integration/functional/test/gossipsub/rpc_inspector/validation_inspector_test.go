@@ -954,7 +954,7 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 		NetworkingType:                network.PrivateNetwork,
 	})
 	// after 7 errors encountered disseminate a notification
-	inspectorConfig.RPCMessageErrorThreshold = 6
+	inspectorConfig.RpcMessageErrorThreshold = 6
 
 	require.NoError(t, err)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
@@ -987,7 +987,7 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 	ctlMsg := spammer.GenerateCtlMessages(int(controlMessageCount))
 	topic := channels.Topic(fmt.Sprintf("%s/%s", channels.PushBlocks, sporkID))
 	// first create 4 valid messages
-	publishMsgs := unittest.GossipSubMessageFixtures(4, topic.String(), spammer.SpammerNode.ID())
+	publishMsgs := unittest.GossipSubMessageFixtures(4, topic.String(), unittest.WithFrom(spammer.SpammerNode.ID()))
 	publishMsgs = append(publishMsgs, invalidPublishMsgs...)
 	// start spamming the victim peer
 	spammer.SpamControlMessage(t, victimNode, ctlMsg, publishMsgs...)

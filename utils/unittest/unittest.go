@@ -368,6 +368,10 @@ func TempBadgerDB(t testing.TB) (*badger.DB, string) {
 	return db, dir
 }
 
+func TempPebblePath(t *testing.T) string {
+	return path.Join(TempDir(t), "pebble"+strconv.Itoa(rand.Int())+".db")
+}
+
 func TempPebbleDBWithOpts(t testing.TB, opts *pebble.Options) (*pebble.DB, string) {
 	// create random path string for parallelization
 	dbpath := path.Join(TempDir(t), "pebble"+strconv.Itoa(rand.Int())+".db")

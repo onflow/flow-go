@@ -6,7 +6,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/onflow/flow-go/network/p2p/p2plogging/internal"
-	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -27,7 +26,7 @@ func TestPeerIdCache_PeerIdString(t *testing.T) {
 	assert.NoError(t, err)
 
 	t.Run("existing peer ID", func(t *testing.T) {
-		pid := p2ptest.PeerIdFixture(t)
+		pid := unittest.PeerIdFixture(t)
 		pidStr := cache.PeerIdString(pid)
 		assert.NotEmpty(t, pidStr)
 		assert.Equal(t, pid.String(), pidStr)
@@ -38,8 +37,8 @@ func TestPeerIdCache_PeerIdString(t *testing.T) {
 	})
 
 	t.Run("non-existing peer ID", func(t *testing.T) {
-		pid1 := p2ptest.PeerIdFixture(t)
-		pid2 := p2ptest.PeerIdFixture(t)
+		pid1 := unittest.PeerIdFixture(t)
+		pid2 := unittest.PeerIdFixture(t)
 
 		cache.PeerIdString(pid1)
 		pidStr := cache.PeerIdString(pid2)

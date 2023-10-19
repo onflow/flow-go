@@ -2368,6 +2368,18 @@ func TransactionResultsFixture(n int) []flow.TransactionResult {
 	return results
 }
 
+func LightTransactionResultsFixture(n int) []flow.LightTransactionResult {
+	results := make([]flow.LightTransactionResult, 0, n)
+	for i := 0; i < n; i++ {
+		results = append(results, flow.LightTransactionResult{
+			TransactionID:   IdentifierFixture(),
+			Failed:          i%2 == 0,
+			ComputationUsed: Uint64InRange(1, 10_000),
+		})
+	}
+	return results
+}
+
 func AllowAllPeerFilter() func(peer.ID) error {
 	return func(_ peer.ID) error {
 		return nil
@@ -2682,19 +2694,35 @@ func P2PRPCFixture(opts ...RPCFixtureOpt) *pubsub.RPC {
 	return rpc
 }
 
-// GossipSubMessageFixture a gossipsub message fixture for the provided topic.
-func GossipSubMessageFixture(topic string, from []byte) *pubsub_pb.Message {
-	return &pubsub_pb.Message{
-		Topic: &topic,
-		From:  from,
+func WithFrom(pid peer.ID) func(*pubsub_pb.Message) {
+	return func(msg *pubsub_pb.Message) {
+		msg.From = []byte(pid)
 	}
 }
 
+// GossipSubMessageFixture returns a gossip sub message fixture for the specified topic.
+func GossipSubMessageFixture(s string, opts ...func(*pubsub_pb.Message)) *pubsub_pb.Message {
+	pb := &pubsub_pb.Message{
+		From:      RandomBytes(32),
+		Data:      RandomBytes(32),
+		Seqno:     RandomBytes(10),
+		Topic:     &s,
+		Signature: RandomBytes(100),
+		Key:       RandomBytes(32),
+	}
+
+	for _, opt := range opts {
+		opt(pb)
+	}
+
+	return pb
+}
+
 // GossipSubMessageFixtures returns a list of gossipsub message fixtures.
-func GossipSubMessageFixtures(n int, topic string, from peer.ID) []*pubsub_pb.Message {
+func GossipSubMessageFixtures(n int, topic string, opts ...func(*pubsub_pb.Message)) []*pubsub_pb.Message {
 	msgs := make([]*pubsub_pb.Message, n)
 	for i := 0; i < n; i++ {
-		msgs[i] = GossipSubMessageFixture(topic, []byte(from))
+		msgs[i] = GossipSubMessageFixture(topic, opts...)
 	}
 	return msgs
 }

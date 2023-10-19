@@ -50,7 +50,6 @@ type Builder struct {
 	routingSystem            routing.Routing
 	rpcInspectorConfig       *p2pconf.GossipSubRPCInspectorsConfig
 	rpcInspectorSuiteFactory p2p.GossipSubRpcInspectorSuiteFactoryFunc
-	subscriptions            p2p.Subscriptions
 }
 
 var _ p2p.GossipSubBuilder = (*Builder)(nil)
@@ -72,15 +71,6 @@ func (g *Builder) SetSubscriptionFilter(subscriptionFilter pubsub.SubscriptionFi
 		g.logger.Fatal().Msg("subscription filter has already been set")
 	}
 	g.subscriptionFilter = subscriptionFilter
-}
-
-// SetSubscriptions sets the subscriptions interface of the builder.
-// If the subscriptions interface has already been set, a fatal error is logged.
-func (g *Builder) SetSubscriptions(subscriptions p2p.Subscriptions) {
-	if g.subscriptions != nil {
-		g.logger.Fatal().Msg("subscriptions interface has already been set")
-	}
-	g.subscriptions = subscriptions
 }
 
 // SetGossipSubFactory sets the gossipsub factory of the builder.
@@ -250,8 +240,7 @@ func defaultInspectorSuite(rpcTracker p2p.RpcControlTracking) p2p.GossipSubRpcIn
 		gossipSubMetrics module.GossipSubMetrics,
 		heroCacheMetricsFactory metrics.HeroCacheMetricsFactory,
 		networkType network.NetworkingType,
-		idProvider module.IdentityProvider,
-		subscriptions p2p.Subscriptions) (p2p.GossipSubInspectorSuite, error) {
+		idProvider module.IdentityProvider) (p2p.GossipSubInspectorSuite, error) {
 		metricsInspector := inspector.NewControlMsgMetricsInspector(
 			logger,
 			p2pnode.NewGossipSubControlMessageMetrics(gossipSubMetrics, logger),
@@ -268,7 +257,7 @@ func defaultInspectorSuite(rpcTracker p2p.RpcControlTracking) p2p.GossipSubRpcIn
 
 		inspectMsgQueueCacheCollector := metrics.GossipSubRPCInspectorQueueMetricFactory(heroCacheMetricsFactory, networkType)
 		clusterPrefixedCacheCollector := metrics.GossipSubRPCInspectorClusterPrefixedCacheMetricFactory(heroCacheMetricsFactory, networkType)
-		rpcValidationInspector, err := validation.NewControlMsgValidationInspector(&validation.InspectorParams{
+		params := &validation.InspectorParams{
 			Ctx:                           ctx,
 			Logger:                        logger,
 			SporkID:                       sporkId,
@@ -279,9 +268,9 @@ func defaultInspectorSuite(rpcTracker p2p.RpcControlTracking) p2p.GossipSubRpcIn
 			IdProvider:                    idProvider,
 			InspectorMetrics:              gossipSubMetrics,
 			RpcTracker:                    rpcTracker,
-			Subscriptions:                 subscriptions,
 			NetworkingType:                networkType,
-		})
+		}
+		rpcValidationInspector, err := validation.NewControlMsgValidationInspector(params)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create new control message valiadation inspector: %w", err)
 		}
@@ -323,8 +312,7 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, e
 		g.metricsCfg.Metrics,
 		g.metricsCfg.HeroCacheFactory,
 		g.networkType,
-		g.idProvider,
-		g.subscriptions)
+		g.idProvider)
 	if err != nil {
 		return nil, fmt.Errorf("could not create gossipsub inspector suite: %w", err)
 	}
@@ -363,6 +351,11 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, e
 	gossipSub, err := g.gossipSubFactory(ctx, g.logger, g.h, gossipSubConfigs, inspectorSuite)
 	if err != nil {
 		return nil, fmt.Errorf("could not create gossipsub: %w", err)
+	}
+
+	err = inspectorSuite.SetTopicOracle(gossipSub.GetTopics)
+	if err != nil {
+		return nil, fmt.Errorf("could not set topic oracle on inspector suite: %w", err)
 	}
 
 	if scoreOpt != nil {

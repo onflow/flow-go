@@ -136,17 +136,19 @@ func IsErrUnstakedPeer(err error) bool {
 
 // InvalidRpcPublishMessagesErr error indicates that rpc publish message validation failed.
 type InvalidRpcPublishMessagesErr struct {
-	err       error
-	numOfErrs int
+	// err the original error returned by the calling func.
+	err error
+	// count the number of times this err was encountered.
+	count int
 }
 
 func (e InvalidRpcPublishMessagesErr) Error() string {
-	return fmt.Errorf("rpc publish messages validation failed %d error(s) encountered: %w", e.numOfErrs, e.err).Error()
+	return fmt.Errorf("rpc publish messages validation failed %d error(s) encountered: %w", e.count, e.err).Error()
 }
 
 // NewInvalidRpcPublishMessagesErr returns a new InvalidRpcPublishMessagesErr.
-func NewInvalidRpcPublishMessagesErr(err error, numOfErrs int) InvalidRpcPublishMessagesErr {
-	return InvalidRpcPublishMessagesErr{err: err, numOfErrs: numOfErrs}
+func NewInvalidRpcPublishMessagesErr(err error, count int) InvalidRpcPublishMessagesErr {
+	return InvalidRpcPublishMessagesErr{err: err, count: count}
 }
 
 // IsInvalidRpcPublishMessagesErr returns true if an error is InvalidRpcPublishMessagesErr.
