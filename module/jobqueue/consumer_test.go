@@ -164,7 +164,8 @@ func TestProcessedIndexDeletion(t *testing.T) {
 			progress := badger.NewConsumerProgress(db, "consumer")
 			worker := newMockWorker()
 			maxProcessing := uint64(3)
-			c := NewConsumer(log, jobs, progress, worker, maxProcessing, 0)
+			c, err := NewConsumer(log, jobs, progress, worker, maxProcessing, 0, 0)
+			require.NoError(t, err)
 			worker.WithConsumer(c)
 
 			f(c, jobs)
@@ -173,7 +174,7 @@ func TestProcessedIndexDeletion(t *testing.T) {
 
 	setup(t, func(c *Consumer, jobs *MockJobs) {
 		require.NoError(t, jobs.PushN(10))
-		require.NoError(t, c.Start(0))
+		require.NoError(t, c.Start())
 
 		require.Eventually(t, func() bool {
 			c.mu.Lock()
