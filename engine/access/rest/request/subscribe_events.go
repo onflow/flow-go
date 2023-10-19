@@ -79,7 +79,7 @@ func (g *SubscribeEvents) Parse(
 
 	// parse heartbeat interval
 	if rawHeartbeatInterval == "" {
-		// set zero if the interval wasn't passed in request, so we can check it before setting in WebsocketController
+		// set zero if the interval wasn't passed in request, so we can check it later and apply any default value if needed
 		g.HeartbeatInterval = 0
 		return nil
 	}
