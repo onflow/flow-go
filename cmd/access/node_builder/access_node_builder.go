@@ -1304,8 +1304,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.unsecureGrpcServer,
 				builder.stateStreamBackend,
 				builder.stateStreamConf,
-				//builder.stateStreamConf.EventFilterConfig,
-				//builder.stateStreamConf.MaxGlobalStreams,
 			)
 			if err != nil {
 				return nil, err
