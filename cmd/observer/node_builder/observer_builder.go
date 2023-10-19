@@ -963,9 +963,6 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		}
 
 		stateStreamConfig := statestreambackend.Config{
-			EventFilterConfig: state_stream.DefaultEventFilterConfig,
-			MaxGlobalStreams:  0,
-			HeartbeatInterval: state_stream.DefaultHeartbeatInterval,
 		}
 
 		engineBuilder, err := rpc.NewBuilder(
