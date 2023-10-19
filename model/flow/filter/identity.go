@@ -139,7 +139,7 @@ var IsConsensusCommitteeMember = And(
 	HasInitialWeight[flow.IdentitySkeleton](true),
 )
 
-// IsVotingConsensusCommitteeMember is a identity filter for all members of
+// IsVotingConsensusCommitteeMember is an identity filter for all members of
 // the consensus committee allowed to vote.
 var IsVotingConsensusCommitteeMember = And[flow.Identity](
 	HasRole[flow.Identity](flow.RoleConsensus),

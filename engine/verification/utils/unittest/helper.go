@@ -635,7 +635,6 @@ func bootstrapSystem(
 		bootstrapNodesInfo = append(bootstrapNodesInfo, nodeInfo)
 	}
 	bootstrapNodesInfo = append(bootstrapNodesInfo, unittest.PrivateNodeInfoFixture(unittest.WithRole(flow.RoleExecution))) // adds extra execution node
-
 	identities := bootstrap.ToIdentityList(bootstrapNodesInfo)
 
 	collector := &metrics.NoopCollector{}

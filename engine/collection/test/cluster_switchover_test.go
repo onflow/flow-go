@@ -56,14 +56,11 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 		t:    t,
 		conf: conf,
 	}
-
-	identityRoles := unittest.CompleteIdentitySet(unittest.IdentityListFixture(int(conf.collectors), unittest.WithRole(flow.RoleCollection))...)
-	identities := flow.IdentityList{}
-	for _, missingRole := range identityRoles {
-		nodeInfo := unittest.PrivateNodeInfoFixture(unittest.WithRole(missingRole.Role))
-		tc.nodeInfos = append(tc.nodeInfos, nodeInfo)
-		identities = append(identities, nodeInfo.Identity())
-	}
+	tc.nodeInfos = unittest.PrivateNodeInfosFromIdentityList(
+		unittest.CompleteIdentitySet(
+			unittest.IdentityListFixture(int(conf.collectors), unittest.WithRole(flow.RoleCollection))...),
+	)
+	identities := model.ToIdentityList(tc.nodeInfos)
 	collectors := identities.Filter(filter.HasRole[flow.Identity](flow.RoleCollection)).ToSkeleton()
 	assignment := unittest.ClusterAssignment(tc.conf.clusters, collectors)
 	clusters, err := factory.NewClusterList(assignment, collectors)
