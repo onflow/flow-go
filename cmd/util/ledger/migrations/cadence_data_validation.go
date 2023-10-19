@@ -171,7 +171,7 @@ func (m *postMigration) MigrateAccount(
 		return payloads, nil
 	}
 
-	hash, ok := m.v.getAccountHash(address)
+	accountHash, ok := m.v.getAccountHash(address)
 
 	if !ok {
 		m.log.Error().
@@ -186,7 +186,7 @@ func (m *postMigration) MigrateAccount(
 			},
 		)
 	}
-	if !bytes.Equal(hash, newHash) {
+	if !bytes.Equal(accountHash, newHash) {
 		m.log.Error().
 			Hex("address", address[:]).
 			Msg("cadence values mismatch")

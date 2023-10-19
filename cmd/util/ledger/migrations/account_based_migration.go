@@ -57,8 +57,8 @@ func CreateAccountBasedMigration(
 	}
 }
 
-// MigrateByAccount teaks a migrator function and all the Payloads,
-// and return the migrated Payloads.
+// MigrateByAccount takes migrations and all the Payloads,
+// and returns the migrated Payloads.
 func MigrateByAccount(
 	log zerolog.Logger,
 	nWorker int,
@@ -104,6 +104,7 @@ func MigrateByAccount(
 		}
 	}()
 
+	// group the Payloads by account
 	accountGroups := util.GroupPayloadsByAccount(log, allPayloads, nWorker)
 
 	// migrate the Payloads under accounts
@@ -154,8 +155,20 @@ func MigrateGroupConcurrently(
 					}
 					start := time.Now()
 
-					// this is not an account, but common values for all accounts.
+					// This is not an account, but common values for all accounts.
 					if job.Address == common.ZeroAddress {
+						resultCh <- &migrationResult{
+							migrationDuration: migrationDuration{
+								Address:  job.Address,
+								Duration: time.Since(start),
+							},
+							Migrated: job.Payloads,
+						}
+						continue
+					}
+
+					// TODO remove to migrate all accounts. This is for testing only
+					if job.Address != cricketMomentsAddress {
 						resultCh <- &migrationResult{
 							migrationDuration: migrationDuration{
 								Address:  job.Address,

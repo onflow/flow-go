@@ -158,9 +158,10 @@ func (s sortablePayloads) Less(i, j int) bool {
 }
 
 func (s sortablePayloads) Compare(i, j int) int {
+	// sort descending to force one of the big accounts to be more at the beginning
 	return bytes.Compare(
-		s[i].EncodedKey()[:encodedKeyAddressPrefixLength],
 		s[j].EncodedKey()[:encodedKeyAddressPrefixLength],
+		s[i].EncodedKey()[:encodedKeyAddressPrefixLength],
 	)
 }
 

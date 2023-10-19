@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/ledger/common/convert"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -12,10 +11,12 @@ import (
 	"github.com/fxamacker/cbor/v2"
 
 	"github.com/onflow/cadence/runtime/common"
+
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -27,8 +28,8 @@ type DeduplicateContractNamesMigration struct {
 
 func (d *DeduplicateContractNamesMigration) InitMigration(
 	log zerolog.Logger,
-	allPayloads []*ledger.Payload,
-	nWorkers int,
+	_ []*ledger.Payload,
+	_ int,
 ) error {
 	d.log = log.
 		With().
@@ -43,11 +44,6 @@ func (d *DeduplicateContractNamesMigration) MigrateAccount(
 	address common.Address,
 	payloads []*ledger.Payload,
 ) ([]*ledger.Payload, error) {
-
-	if address == common.ZeroAddress {
-		return payloads, nil
-	}
-
 	snapshot, err := util.NewPayloadSnapshot(payloads)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create payload snapshot: %w", err)
@@ -57,6 +53,9 @@ func (d *DeduplicateContractNamesMigration) MigrateAccount(
 	flowAddress := flow.ConvertAddress(address)
 
 	contractNames, err := accounts.GetContractNames(flowAddress)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get contract names: %w", err)
+	}
 	if len(contractNames) == 0 {
 		return payloads, nil
 	}

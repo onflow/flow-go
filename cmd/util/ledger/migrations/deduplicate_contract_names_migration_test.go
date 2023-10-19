@@ -3,16 +3,19 @@ package migrations_test
 import (
 	"bytes"
 	"context"
+	"testing"
+
 	"github.com/fxamacker/cbor/v2"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/cadence/runtime/common"
+
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestDeduplicateContractNamesMigration(t *testing.T) {
