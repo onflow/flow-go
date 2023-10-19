@@ -41,8 +41,16 @@ func New(
 	events storage.Events,
 	results storage.LightTransactionResults,
 ) (*IndexerCore, error) {
+	log = log.With().Str("component", "execution_indexer").Logger()
+	metrics.InitializeLatestHeight(registers.LatestHeight())
+
+	log.Info().
+		Uint64("first_height", registers.FirstHeight()).
+		Uint64("latest_height", registers.LatestHeight()).
+		Msg("indexer initialized")
+
 	return &IndexerCore{
-		log:       log.With().Str("component", "execution_indexer").Logger(),
+		log:       log,
 		metrics:   metrics,
 		batcher:   batcher,
 		registers: registers,

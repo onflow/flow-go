@@ -17,7 +17,6 @@ import (
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/integration/tests/mvp"
-	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -80,8 +79,6 @@ func (s *AccessAPISuite) SetupTest() {
 		testnet.WithAdditionalFlag("--execution-data-retry-delay=1s"),
 		testnet.WithAdditionalFlag("--execution-data-indexing-enabled=true"),
 		testnet.WithAdditionalFlagf("--execution-state-dir=%s", testnet.DefaultExecutionStateDir),
-		testnet.WithAdditionalFlagf("--execution-state-checkpoint=/bootstrap/%s", bootstrap.PathRootCheckpoint),
-		testnet.WithAdditionalFlag("--execution-state-checkpoint-height=0"),
 		testnet.WithAdditionalFlagf("--script-execution-mode=%s", backend.ScriptExecutionModeLocalOnly),
 	)
 
