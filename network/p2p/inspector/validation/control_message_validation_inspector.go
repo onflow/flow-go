@@ -82,8 +82,6 @@ type InspectorParams struct {
 	InspectorMetrics module.GossipSubRpcValidationInspectorMetrics `validate:"required"`
 	// RpcTracker tracker used to track iHave RPC's sent and last size.
 	RpcTracker p2p.RpcControlTracking `validate:"required"`
-	// Subscriptions p2p subscriptions used to check if node has a subscription to a topic.
-	Subscriptions p2p.Subscriptions `validate:"required"`
 	// NetworkingType the networking type of the node.
 	NetworkingType network.NetworkingType `validate:"required"`
 }
@@ -153,7 +151,7 @@ func NewControlMsgValidationInspector(params *InspectorParams) (*ControlMsgValid
 
 func (c *ControlMsgValidationInspector) Start(parent irrecoverable.SignalerContext) {
 	if c.topicOracle == nil {
-		parent.Throw(fmt.Errorf("6"))
+		parent.Throw(fmt.Errorf("control message validation inspector topic oracle not set"))
 	}
 	c.Component.Start(parent)
 }
@@ -236,7 +234,6 @@ func (c *ControlMsgValidationInspector) checkPubsubMessageSender(message *pubsub
 	if err != nil {
 		return fmt.Errorf("failed to get peer ID from bytes: %w", err)
 	}
-
 	if id, ok := c.idProvider.ByPeerID(pid); !ok {
 		return fmt.Errorf("received rpc publish message from unstaked peer: %s", pid)
 	} else if id.Ejected {
@@ -367,7 +364,7 @@ func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWant
 	allowedCacheMissesThreshold := float64(sampleSize) * c.config.IWantRPCInspectionConfig.CacheMissThreshold
 	duplicates := 0
 	allowedDuplicatesThreshold := float64(sampleSize) * c.config.IWantRPCInspectionConfig.DuplicateMsgIDThreshold
-	checkCacheMisses := len(iWants) > c.config.IWantRPCInspectionConfig.CacheMissCheckSize
+	checkCacheMisses := len(iWants) >= c.config.IWantRPCInspectionConfig.CacheMissCheckSize
 	lg = lg.With().
 		Uint("iwant_sample_size", sampleSize).
 		Float64("allowed_cache_misses_threshold", allowedCacheMissesThreshold).

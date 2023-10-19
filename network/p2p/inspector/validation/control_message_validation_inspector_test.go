@@ -31,7 +31,6 @@ func TestNewControlMsgValidationInspector(t *testing.T) {
 		distributor := mockp2p.NewGossipSubInspectorNotifDistributor(t)
 		idProvider := mockmodule.NewIdentityProvider(t)
 		signalerCtx := irrecoverable.NewMockSignalerContext(t, context.Background())
-		subscriptions := mockp2p.NewSubscriptions(t)
 		inspector, err := NewControlMsgValidationInspector(&InspectorParams{
 			Ctx:                           signalerCtx,
 			Logger:                        unittest.Logger(),
@@ -43,7 +42,6 @@ func TestNewControlMsgValidationInspector(t *testing.T) {
 			IdProvider:                    idProvider,
 			InspectorMetrics:              metrics.NewNoopCollector(),
 			RpcTracker:                    mockp2p.NewRpcControlTracking(t),
-			Subscriptions:                 subscriptions,
 			NetworkingType:                network.PublicNetwork,
 		})
 		require.NoError(t, err)
@@ -61,7 +59,6 @@ func TestNewControlMsgValidationInspector(t *testing.T) {
 			IdProvider:                    nil,
 			InspectorMetrics:              nil,
 			RpcTracker:                    nil,
-			Subscriptions:                 nil,
 		})
 		require.Nil(t, inspector)
 		require.Error(t, err)
@@ -611,7 +608,6 @@ func TestControlMessageValidationInspector_ActiveClustersChanged(t *testing.T) {
 		IdProvider:                    mockmodule.NewIdentityProvider(t),
 		InspectorMetrics:              metrics.NewNoopCollector(),
 		RpcTracker:                    mockp2p.NewRpcControlTracking(t),
-		Subscriptions:                 mockp2p.NewSubscriptions(t),
 		NetworkingType:                network.PrivateNetwork,
 	})
 	require.NoError(t, err)
