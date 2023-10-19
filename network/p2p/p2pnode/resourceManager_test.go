@@ -496,10 +496,8 @@ func TestCreateStream_PeerLimit_Enforced(t *testing.T) {
 
 	var allStreamsCreated sync.WaitGroup
 	defaultProtocolID := protocols.FlowProtocolID(sporkID)
-	// maxTransientPerPeer := l.ToPartialLimitConfig().Transient.StreamsInbound
-	//
-	// t.Log("max allowed inbound stream from each sender to receiver (per protocol)", maxInboundStreamPerPeer, "max transient", maxTransientPerPeer)
 
+	// creates max(maxStreamPerPeer * nodeCount, maxSystemStream) streams from each sender to the receiver; breaks as soon as the system-wide limit is reached.
 	totalStreamsCreated := int64(0)
 	for sIndex := range senders {
 		for i := int64(0); i < int64(maxStreamPerPeer); i++ {
@@ -535,16 +533,17 @@ func TestCreateStream_PeerLimit_Enforced(t *testing.T) {
 		return nil
 	}))
 
-	for i, sender := range senders {
+	totalInboundStreams := 0
+	for _, sender := range senders {
 		actualNumOfStreams := p2putils.CountStream(receiver.Host(), sender.ID(), p2putils.Direction(network.DirInbound))
-		t.Logf("sender %d has %d streams", i, actualNumOfStreams)
-		// require.Equalf(t,
-		// 	int64(maxStreamPerPeer),
-		// 	int64(actualNumOfStreams),
-		// 	"expected to create %d number of streams got %d",
-		// 	int64(maxStreamPerPeer),
-		// 	actualNumOfStreams)
+		// t.Logf("sender %d has %d streams", i, actualNumOfStreams)
+		require.LessOrEqual(t, int64(actualNumOfStreams), int64(maxStreamPerPeer))
+		totalInboundStreams += actualNumOfStreams
 	}
+	// sanity check; the total number of inbound streams must be less than or equal to the system-wide limit.
+	// TODO: this must be a hard equal check; but falls short; to be shared with libp2p community.
+	// Failing at this line means the system-wide limit is not being enforced.
+	require.LessOrEqual(t, totalInboundStreams, maxSystemStream)
 
 	// now the test goes beyond the protocol-peer limit and tries to create one more stream from each sender.
 	// this should cause receiver to close all streams from the sender and disconnect from the sender.
