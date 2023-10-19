@@ -129,11 +129,11 @@ network-config:
   # The reason for this is that we want to increase the probability of creating a misbehavior report for a large batch.
   alsp-sync-engine-batch-request-base-prob: 0.1
 
-  # Probability in [0,1] of creating a misbehavior report for a SyncRequest message.
-  alsp-sync-engine-sync-request-prob: 0.1
-
   # Base probability in [0,1] that's used in creating the final probability of creating a
   # misbehavior report for a RangeRequest message. This is why the word "base" is used in the name of this field,
   # since it's not the final probability and there are other factors that determine the final probability.
   # The reason for this is that we want to increase the probability of creating a misbehavior report for a large range.
   alsp-sync-engine-range-request-base-prob: 0.1
+
+  # Probability in [0,1] of creating a misbehavior report for a SyncRequest message.
+  alsp-sync-engine-sync-request-prob: 0.1
