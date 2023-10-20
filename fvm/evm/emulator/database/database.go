@@ -1,7 +1,6 @@
 package database
 
 import (
-	"encoding/hex"
 	"errors"
 	"sync"
 
@@ -43,7 +42,10 @@ type Database struct {
 func NewDatabase(led atree.Ledger, flowEVMRootAddress flow.Address) (*Database, error) {
 	baseStorage := atree.NewLedgerBaseStorage(led)
 
-	storage := NewPersistentSlabStorage(baseStorage)
+	storage, err := NewPersistentSlabStorage(baseStorage)
+	if err != nil {
+		return nil, types.NewFatalError(err)
+	}
 
 	rootIDBytes, err := led.GetValue(flowEVMRootAddress.Bytes(), []byte(FlowEVMRootSlabKey))
 	if err != nil {
@@ -80,7 +82,7 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	data, err := db.atreemap.Get(compare, hashInputProvider, NewStringValue(hex.EncodeToString(key)))
+	data, err := db.atreemap.Get(compare, hashInputProvider, NewByteStringValue(key))
 	if err != nil {
 		return nil, types.NewFatalError(err)
 	}
@@ -90,12 +92,7 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 		return nil, types.NewFatalError(err)
 	}
 
-	val, err := hex.DecodeString(v.(StringValue).String())
-	if err != nil {
-		return nil, types.NewFatalError(err)
-	}
-
-	return val, err
+	return v.(ByteStringValue).Bytes(), err
 }
 
 // Put inserts the given value into the key-value store.
@@ -103,7 +100,7 @@ func (db *Database) Put(key []byte, value []byte) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
-	_, err := db.atreemap.Set(compare, hashInputProvider, NewStringValue(hex.EncodeToString(key)), NewStringValue(hex.EncodeToString(value)))
+	_, err := db.atreemap.Set(compare, hashInputProvider, NewByteStringValue(key), NewByteStringValue(value))
 	return err
 }
 
@@ -124,7 +121,7 @@ func (db *Database) Delete(key []byte) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
-	_, _, err := db.atreemap.Remove(compare, hashInputProvider, NewStringValue(hex.EncodeToString(key)))
+	_, _, err := db.atreemap.Remove(compare, hashInputProvider, NewByteStringValue(key))
 	if err != nil {
 		return types.NewFatalError(err)
 	}
