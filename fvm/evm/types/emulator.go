@@ -57,8 +57,8 @@ type BlockView interface {
 
 type Emulator interface {
 	// constructs a new block view
-	NewReadOnlyBlockView(ctx BlockContext) (BlockView, error)
+	NewReadOnlyBlockView(ctx BlockContext) (ReadOnlyBlockView, error)
 
 	// constructs a new block
-	NewBlockView(ctx BlockContext) (Block, error)
+	NewBlockView(ctx BlockContext) (BlockView, error)
 }
