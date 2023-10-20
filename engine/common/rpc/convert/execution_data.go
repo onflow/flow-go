@@ -31,7 +31,6 @@ func BlockExecutionDataEventPayloadsToVersion(
 			m.ChunkExecutionData[i].Events[j].Payload = converted
 		}
 	}
-
 	return nil
 }
 
