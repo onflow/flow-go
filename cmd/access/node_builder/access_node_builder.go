@@ -795,6 +795,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				builder.stateStreamConf,
 				node.State,
 				node.Storage.Headers,
+				node.Storage.Events,
 				node.Storage.Seals,
 				node.Storage.Results,
 				builder.ExecutionDataStore,

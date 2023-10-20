@@ -42,6 +42,7 @@ type BackendExecutionDataSuite struct {
 	params   *protocolmock.Params
 	snapshot *protocolmock.Snapshot
 	headers  *storagemock.Headers
+	events   *storagemock.Events
 	seals    *storagemock.Seals
 	results  *storagemock.ExecutionResults
 
@@ -71,6 +72,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 	s.snapshot = protocolmock.NewSnapshot(s.T())
 	s.params = protocolmock.NewParams(s.T())
 	s.headers = storagemock.NewHeaders(s.T())
+	s.events = storagemock.NewEvents(s.T())
 	s.seals = storagemock.NewSeals(s.T())
 	s.results = storagemock.NewExecutionResults(s.T())
 
@@ -232,6 +234,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 		conf,
 		s.state,
 		s.headers,
+		s.events,
 		s.seals,
 		s.results,
 		s.eds,

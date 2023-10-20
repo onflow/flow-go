@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -25,9 +26,13 @@ type EventsBackend struct {
 	sendTimeout    time.Duration
 	responseLimit  float64
 	sendBufferSize int
+	events         storage.Events
+	headers        storage.Headers
 
 	getExecutionData GetExecutionDataFunc
 	getStartHeight   GetStartHeightFunc
+
+	useIndex bool
 }
 
 func (b EventsBackend) SubscribeEvents(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter state_stream.EventFilter) state_stream.Subscription {
@@ -36,14 +41,21 @@ func (b EventsBackend) SubscribeEvents(ctx context.Context, startBlockID flow.Id
 		return NewFailedSubscription(err, "could not get start height")
 	}
 
-	sub := NewHeightBasedSubscription(b.sendBufferSize, nextHeight, b.getResponseFactory(filter))
+	var responseFactory GetDataByHeightFunc
+	if b.useIndex {
+		responseFactory = b.getIndexResponseFactory(filter)
+	} else {
+		responseFactory = b.getExecutionDataResponseFactory(filter)
+	}
+
+	sub := NewHeightBasedSubscription(b.sendBufferSize, nextHeight, responseFactory)
 
 	go NewStreamer(b.log, b.broadcaster, b.sendTimeout, b.responseLimit, sub).Stream(ctx)
 
 	return sub
 }
 
-func (b EventsBackend) getResponseFactory(filter state_stream.EventFilter) GetDataByHeightFunc {
+func (b EventsBackend) getExecutionDataResponseFactory(filter state_stream.EventFilter) GetDataByHeightFunc {
 	return func(ctx context.Context, height uint64) (interface{}, error) {
 		executionData, err := b.getExecutionData(ctx, height)
 		if err != nil {
@@ -62,6 +74,33 @@ func (b EventsBackend) getResponseFactory(filter state_stream.EventFilter) GetDa
 
 		return &EventsResponse{
 			BlockID: executionData.BlockID,
+			Height:  height,
+			Events:  events,
+		}, nil
+	}
+}
+
+func (b EventsBackend) getIndexResponseFactory(filter state_stream.EventFilter) GetDataByHeightFunc {
+	return func(ctx context.Context, height uint64) (interface{}, error) {
+		header, err := b.headers.ByHeight(height)
+		if err != nil {
+			return nil, fmt.Errorf("could not get header for height %d: %w", height, err)
+		}
+
+		events, err := b.events.ByBlockID(header.ID())
+		if err != nil {
+			return nil, fmt.Errorf("could not get events for block %d: %w", height, err)
+		}
+
+		events = filter.Filter(events)
+
+		b.log.Trace().
+			Hex("block_id", logging.ID(header.ID())).
+			Uint64("height", height).
+			Msgf("sending %d events", len(events))
+
+		return &EventsResponse{
+			BlockID: header.ID(),
 			Height:  height,
 			Events:  events,
 		}, nil

@@ -83,6 +83,7 @@ func New(
 	config Config,
 	state protocol.State,
 	headers storage.Headers,
+	events storage.Events,
 	seals storage.Seals,
 	results storage.ExecutionResults,
 	execDataStore execution_data.ExecutionDataStore,
@@ -127,6 +128,8 @@ func New(
 	b.EventsBackend = EventsBackend{
 		log:              logger,
 		broadcaster:      broadcaster,
+		headers:          headers,
+		events:           events,
 		sendTimeout:      config.ClientSendTimeout,
 		responseLimit:    config.ResponseLimit,
 		sendBufferSize:   int(config.ClientSendBufferSize),
