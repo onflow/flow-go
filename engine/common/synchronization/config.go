@@ -1,13 +1,10 @@
 package synchronization
 
 import (
-	"context"
 	"fmt"
 	"time"
 
 	"github.com/onflow/flow-go/config"
-	"github.com/onflow/flow-go/module/irrecoverable"
-
 	core "github.com/onflow/flow-go/module/chainsync"
 )
 
@@ -72,10 +69,10 @@ type SpamDetectionConfig struct {
 	rangeRequestBaseProb float32
 }
 
-func NewSpamDetectionConfig() *SpamDetectionConfig {
+func NewSpamDetectionConfig() (*SpamDetectionConfig, error) {
 	flowConfig, err := config.DefaultConfig()
 	if err != nil {
-		irrecoverable.Throw(context.TODO(), fmt.Errorf("failed to read default config: %w", err))
+		return nil, fmt.Errorf("failed to read default config: %w", err)
 	}
 
 	return &SpamDetectionConfig{
@@ -83,5 +80,5 @@ func NewSpamDetectionConfig() *SpamDetectionConfig {
 		batchRequestBaseProb: flowConfig.NetworkConfig.SyncEngineBatchRequestBaseProb,
 		syncRequestProb:      flowConfig.NetworkConfig.SyncEngineSyncRequestProb,
 		rangeRequestBaseProb: flowConfig.NetworkConfig.SyncEngineRangeRequestBaseProb,
-	}
+	}, nil
 }
