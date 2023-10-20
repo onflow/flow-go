@@ -10,19 +10,19 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime/common"
 
-	fvmenv "github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/model/flow"
 )
 
-var TestFlexRootAddress = flow.BytesToAddress([]byte("Flex"))
+var TestFlowEVMRootAddress = flow.BytesToAddress([]byte("FlowEVM"))
 var TestComputationLimit = uint(math.MaxUint64 - 1)
 
-func RunWithTestFlexRoot(t testing.TB, backend types.Backend, f func(flow.Address)) {
-	as := fvmenv.NewAccountStatus()
-	backend.SetValue(TestFlexRootAddress[:], []byte(flow.AccountStatusKey), as.ToBytes())
-	f(TestFlexRootAddress)
+func RunWithTestFlowEVMRootAddress(t testing.TB, backend types.Backend, f func(flow.Address)) {
+	as := environment.NewAccountStatus()
+	backend.SetValue(TestFlowEVMRootAddress[:], []byte(flow.AccountStatusKey), as.ToBytes())
+	f(TestFlowEVMRootAddress)
 }
 
 func RunWithTestBackend(t testing.TB, f func(types.Backend)) {
@@ -118,7 +118,7 @@ type testValueStore struct {
 	allocateStorageIndex func(owner []byte) (atree.StorageIndex, error)
 }
 
-var _ fvmenv.ValueStore = &testValueStore{}
+var _ environment.ValueStore = &testValueStore{}
 
 func (vs *testValueStore) GetValue(owner, key []byte) ([]byte, error) {
 	if vs.getValue == nil {
@@ -163,7 +163,7 @@ type testMeter struct {
 	interactionUsed func() (uint64, error)
 }
 
-var _ fvmenv.Meter = &testMeter{}
+var _ environment.Meter = &testMeter{}
 
 func (m *testMeter) MeterComputation(
 	kind common.ComputationKind,
@@ -243,7 +243,7 @@ type testEventEmitter struct {
 	reset                  func()
 }
 
-var _ fvmenv.EventEmitter = &testEventEmitter{}
+var _ environment.EventEmitter = &testEventEmitter{}
 
 func (vs *testEventEmitter) EmitEvent(event cadence.Event) error {
 	if vs.emitEvent == nil {

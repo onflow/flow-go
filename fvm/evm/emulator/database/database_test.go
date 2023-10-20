@@ -15,8 +15,8 @@ func TestDatabase(t *testing.T) {
 
 	t.Run("test database", func(t *testing.T) {
 		testutils.RunWithTestBackend(t, func(backend types.Backend) {
-			testutils.RunWithTestFlexRoot(t, backend, func(flexRoot flow.Address) {
-				db, err := database.NewDatabase(backend, flexRoot)
+			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(flowEVMRoot flow.Address) {
+				db, err := database.NewDatabase(backend, flowEVMRoot)
 				require.NoError(t, err)
 
 				key := []byte("ABC")
@@ -27,7 +27,7 @@ func TestDatabase(t *testing.T) {
 				err = db.Commit()
 				require.NoError(t, err)
 
-				newdb, err := database.NewDatabase(backend, flexRoot)
+				newdb, err := database.NewDatabase(backend, flowEVMRoot)
 				require.NoError(t, err)
 
 				retValue, err := newdb.Get(key)

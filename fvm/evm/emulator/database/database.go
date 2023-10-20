@@ -7,7 +7,7 @@ import (
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/ethdb"
+	gethDB "github.com/ethereum/go-ethereum/ethdb"
 
 	"github.com/onflow/atree"
 
@@ -207,14 +207,14 @@ func (db *Database) Close() error {
 
 // NewBatch creates a write-only key-value store that buffers changes to its host
 // database until a final write is called.
-func (db *Database) NewBatch() ethdb.Batch {
+func (db *Database) NewBatch() gethDB.Batch {
 	return &batch{
 		db: db,
 	}
 }
 
 // NewBatchWithSize creates a write-only database batch with pre-allocated buffer.
-func (db *Database) NewBatchWithSize(size int) ethdb.Batch {
+func (db *Database) NewBatchWithSize(size int) gethDB.Batch {
 	return &batch{
 		db: db,
 	}
@@ -223,7 +223,7 @@ func (db *Database) NewBatchWithSize(size int) ethdb.Batch {
 // NewIterator creates a binary-alphabetical iterator over a subset
 // of database content with a particular key prefix, starting at a particular
 // initial key (or after, if it does not exist).
-func (db *Database) NewIterator(prefix []byte, start []byte) ethdb.Iterator {
+func (db *Database) NewIterator(prefix []byte, start []byte) gethDB.Iterator {
 	// TODO(ramtin): implement this if needed with iterator over atree
 	panic(errNotImplemented)
 }
@@ -231,7 +231,7 @@ func (db *Database) NewIterator(prefix []byte, start []byte) ethdb.Iterator {
 // NewSnapshot creates a database snapshot based on the current state.
 // The created snapshot will not be affected by all following mutations
 // happened on the database.
-func (db *Database) NewSnapshot() (ethdb.Snapshot, error) {
+func (db *Database) NewSnapshot() (gethDB.Snapshot, error) {
 	return nil, errNotImplemented
 }
 
@@ -313,7 +313,7 @@ func (b *batch) Reset() {
 }
 
 // Replay replays the batch contents.
-func (b *batch) Replay(w ethdb.KeyValueWriter) error {
+func (b *batch) Replay(w gethDB.KeyValueWriter) error {
 	for _, keyvalue := range b.writes {
 		if keyvalue.delete {
 			if err := w.Delete(keyvalue.key); err != nil {
