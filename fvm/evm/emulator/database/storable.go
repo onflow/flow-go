@@ -17,6 +17,8 @@ const (
 	cborTagUInt64Value = 164
 )
 
+// TODO: a lot of these types won't be used, reduce to a set that we are going to use
+
 type Uint8Value uint8
 
 var _ atree.Value = Uint8Value(0)
