@@ -49,20 +49,23 @@ func TestNoPenaltyRecord(t *testing.T) {
 // penalty value as the app specific score.
 func TestPeerWithSpamRecord(t *testing.T) {
 	t.Run("graft", func(t *testing.T) {
-		testPeerWithSpamRecord(t, p2pmsg.CtrlMsgGraft, penaltyValueFixtures().Graft)
+		testPeerWithSpamRecord(t, p2pmsg.CtrlMsgGraft, penaltyValueFixtures().Graft, false)
 	})
 	t.Run("prune", func(t *testing.T) {
-		testPeerWithSpamRecord(t, p2pmsg.CtrlMsgPrune, penaltyValueFixtures().Prune)
+		testPeerWithSpamRecord(t, p2pmsg.CtrlMsgPrune, penaltyValueFixtures().Prune, false)
 	})
 	t.Run("ihave", func(t *testing.T) {
-		testPeerWithSpamRecord(t, p2pmsg.CtrlMsgIHave, penaltyValueFixtures().IHave)
+		testPeerWithSpamRecord(t, p2pmsg.CtrlMsgIHave, penaltyValueFixtures().IHave, false)
 	})
 	t.Run("iwant", func(t *testing.T) {
-		testPeerWithSpamRecord(t, p2pmsg.CtrlMsgIWant, penaltyValueFixtures().IWant)
+		testPeerWithSpamRecord(t, p2pmsg.CtrlMsgIWant, penaltyValueFixtures().IWant, false)
+	})
+	t.Run("cluster prefixed", func(t *testing.T) {
+		testPeerWithSpamRecord(t, p2pmsg.CtrlMsgIWant, penaltyValueFixtures().IWant*penaltyValueFixtures().ClusterPrefixedPenaltyReductionFactor, true)
 	})
 }
 
-func testPeerWithSpamRecord(t *testing.T, messageType p2pmsg.ControlMessageType, expectedPenalty float64) {
+func testPeerWithSpamRecord(t *testing.T, messageType p2pmsg.ControlMessageType, expectedPenalty float64, isClusterPrefixed bool) {
 	peerID := peer.ID("peer-1")
 	reg, spamRecords := newGossipSubAppSpecificScoreRegistry(
 		t,
@@ -79,8 +82,9 @@ func testPeerWithSpamRecord(t *testing.T, messageType p2pmsg.ControlMessageType,
 
 	// report a misbehavior for the peer id.
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
-		PeerID:  peerID,
-		MsgType: messageType,
+		PeerID:            peerID,
+		MsgType:           messageType,
+		IsClusterPrefixed: isClusterPrefixed,
 	})
 
 	// the penalty should now be updated in the spamRecords
@@ -468,9 +472,10 @@ func newGossipSubAppSpecificScoreRegistry(t *testing.T, opts ...func(*scoring.Go
 // that the tests are not passing because of the default values.
 func penaltyValueFixtures() scoring.GossipSubCtrlMsgPenaltyValue {
 	return scoring.GossipSubCtrlMsgPenaltyValue{
-		Graft: -100,
-		Prune: -50,
-		IHave: -20,
-		IWant: -10,
+		Graft:                                 -100,
+		Prune:                                 -50,
+		IHave:                                 -20,
+		IWant:                                 -10,
+		ClusterPrefixedPenaltyReductionFactor: .5,
 	}
 }

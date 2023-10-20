@@ -48,6 +48,9 @@ const (
 	iHaveMisbehaviourPenalty = -10
 	// iWantMisbehaviourPenalty is the penalty applied to the application specific penalty when a peer conducts a iWant misbehaviour.
 	iWantMisbehaviourPenalty = -10
+	// clusterPrefixedPenaltyReductionFactor factor used to reduce the penalty for control message misbehaviours on cluster prefixed topics. This is allows a more lenient punishment for nodes
+	// that fall behind and may need to request old data.
+	clusterPrefixedPenaltyReductionFactor = .5
 )
 
 // GossipSubCtrlMsgPenaltyValue is the penalty value for each control message type.
@@ -56,15 +59,19 @@ type GossipSubCtrlMsgPenaltyValue struct {
 	Prune float64 // penalty value for an individual prune message misbehaviour.
 	IHave float64 // penalty value for an individual iHave message misbehaviour.
 	IWant float64 // penalty value for an individual iWant message misbehaviour.
+	// ClusterPrefixedPenaltyReductionFactor factor used to reduce the penalty for control message misbehaviours on cluster prefixed topics. This is allows a more lenient punishment for nodes
+	// that fall behind and may need to request old data.
+	ClusterPrefixedPenaltyReductionFactor float64
 }
 
 // DefaultGossipSubCtrlMsgPenaltyValue returns the default penalty value for each control message type.
 func DefaultGossipSubCtrlMsgPenaltyValue() GossipSubCtrlMsgPenaltyValue {
 	return GossipSubCtrlMsgPenaltyValue{
-		Graft: graftMisbehaviourPenalty,
-		Prune: pruneMisbehaviourPenalty,
-		IHave: iHaveMisbehaviourPenalty,
-		IWant: iWantMisbehaviourPenalty,
+		Graft:                                 graftMisbehaviourPenalty,
+		Prune:                                 pruneMisbehaviourPenalty,
+		IHave:                                 iHaveMisbehaviourPenalty,
+		IWant:                                 iWantMisbehaviourPenalty,
+		ClusterPrefixedPenaltyReductionFactor: clusterPrefixedPenaltyReductionFactor,
 	}
 }
 
@@ -268,6 +275,12 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 			// the error is considered fatal as it means that we have an unsupported misbehaviour type, we should crash the node to prevent routing attack vulnerability.
 			lg.Fatal().Str("misbehavior_type", notification.MsgType.String()).Msg("unknown misbehaviour type")
 		}
+
+		// reduce penalty for cluster prefixed topics allowing nodes that are potentially behind to catch up
+		if notification.IsClusterPrefixed {
+			record.Penalty *= r.penalty.ClusterPrefixedPenaltyReductionFactor
+		}
+
 		return record
 	})
 	if err != nil {
