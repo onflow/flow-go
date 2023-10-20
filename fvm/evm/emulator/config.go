@@ -11,9 +11,8 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 )
 
-// TODO we might need to register our chain ID here:
+// TODO: we might need to register our chain ID here:
 //  https://github.com/DefiLlama/chainlist/blob/main/constants/chainIds.json
-// TODO: rename to emulator config
 
 var (
 	FlowEVMTestnetChainID = big.NewInt(666)
