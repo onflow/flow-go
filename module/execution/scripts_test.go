@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -34,7 +35,7 @@ func Test_ExecuteScript(t *testing.T) {
 	t.Run("Simple Script Execution", func(t *testing.T) {
 		blockchain := unittest.BlockchainFixture(10)
 		first := blockchain[0]
-		tree := bootstrapFVM()
+		tree := bootstrapFVM(t)
 
 		scripts := newScripts(
 			t,
@@ -76,7 +77,7 @@ func Test_ExecuteScript(t *testing.T) {
 func Test_GetAccount(t *testing.T) {
 	blockchain := unittest.BlockchainFixture(10)
 	first := blockchain[0]
-	tree := bootstrapFVM()
+	tree := bootstrapFVM(t)
 
 	scripts := newScripts(
 		t,
@@ -86,6 +87,26 @@ func Test_GetAccount(t *testing.T) {
 
 	address := chain.ServiceAddress()
 	account, err := scripts.GetAccountAtBlockHeight(context.Background(), address, first.Header.Height)
+	require.NoError(t, err)
+	assert.Equal(t, address, account.Address)
+	assert.NotZero(t, account.Balance)
+	assert.NotZero(t, len(account.Contracts))
+}
+
+func Test_NewlyCreatedAccount(t *testing.T) {
+	blockchain := unittest.BlockchainFixture(10)
+	first := blockchain[0]
+	tree := bootstrapFVM(t)
+	tree, newAddress := createAccount(t, tree)
+
+	scripts := newScripts(
+		t,
+		newBlockHeadersStorage(blockchain),
+		treeToRegisterAdapter(tree),
+	)
+
+	address := chain.ServiceAddress()
+	account, err := scripts.GetAccountAtBlockHeight(context.Background(), newAddress, first.Header.Height)
 	require.NoError(t, err)
 	assert.Equal(t, address, account.Address)
 	assert.NotZero(t, account.Balance)
@@ -121,11 +142,8 @@ func newBlockHeadersStorage(blocks []*flow.Block) storage.Headers {
 }
 
 // bootstrapFVM starts up an FVM and run bootstrap procedures and returns the snapshot tree of the state.
-func bootstrapFVM() snapshot.SnapshotTree {
-	opts := []fvm.Option{
-		fvm.WithChain(chain),
-	}
-	ctx := fvm.NewContext(opts...)
+func bootstrapFVM(t *testing.T) snapshot.SnapshotTree {
+	ctx := fvm.NewContext(fvm.WithChain(chain))
 	vm := fvm.NewVirtualMachine()
 
 	snapshotTree := snapshot.NewSnapshotTree(nil)
@@ -134,12 +152,62 @@ func bootstrapFVM() snapshot.SnapshotTree {
 		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
 	}
 
-	executionSnapshot, _, _ := vm.Run(
+	executionSnapshot, out, err := vm.Run(
 		ctx,
 		fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOpts...),
 		snapshotTree)
 
+	require.NoError(t, err)
+	require.NoError(t, out.Err)
+
 	return snapshotTree.Append(executionSnapshot)
+}
+
+// createAccount on an existing bootstrapped snapshot and return a new snapshot as well as the newly created account address
+func createAccount(t *testing.T, tree snapshot.SnapshotTree) (snapshot.SnapshotTree, flow.Address) {
+	const createAccountTransaction = `
+	transaction {
+	  prepare(signer: AuthAccount) {
+		let account = AuthAccount(payer: signer)
+	  }
+	}
+	`
+
+	ctx := fvm.NewContext(
+		fvm.WithAuthorizationChecksEnabled(false),
+		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
+	)
+	vm := fvm.NewVirtualMachine()
+
+	txBody := flow.NewTransactionBody().
+		SetScript([]byte(createAccountTransaction)).
+		AddAuthorizer(chain.ServiceAddress())
+
+	executionSnapshot, output, err := vm.Run(
+		ctx,
+		fvm.Transaction(txBody, 0),
+		tree,
+	)
+	require.NoError(t, err)
+	require.NoError(t, output.Err)
+
+	tree = tree.Append(executionSnapshot)
+
+	var accountCreatedEvents []flow.Event
+	for _, event := range output.Events {
+		if event.Type != flow.EventAccountCreated {
+			continue
+		}
+		accountCreatedEvents = append(accountCreatedEvents, event)
+		break
+	}
+	require.Len(t, accountCreatedEvents, 1)
+
+	data, err := ccf.Decode(nil, accountCreatedEvents[0].Payload)
+	require.NoError(t, err)
+	address := flow.ConvertAddress(data.(cadence.Event).Fields[0].(cadence.Address))
+
+	return tree, address
 }
 
 // converts tree get register function to the required script get register function
