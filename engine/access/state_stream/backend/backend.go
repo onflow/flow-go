@@ -65,6 +65,7 @@ type StateStreamBackend struct {
 	log             zerolog.Logger
 	state           protocol.State
 	headers         storage.Headers
+	events          storage.Events
 	seals           storage.Seals
 	results         storage.ExecutionResults
 	execDataStore   execution_data.ExecutionDataStore
@@ -83,6 +84,7 @@ func New(
 	config Config,
 	state protocol.State,
 	headers storage.Headers,
+	events storage.Events,
 	seals storage.Seals,
 	results storage.ExecutionResults,
 	execDataStore execution_data.ExecutionDataStore,
@@ -126,6 +128,8 @@ func New(
 
 	b.EventsBackend = EventsBackend{
 		log:              logger,
+		events:           events,
+		headers:          headers,
 		broadcaster:      broadcaster,
 		sendTimeout:      config.ClientSendTimeout,
 		responseLimit:    config.ResponseLimit,

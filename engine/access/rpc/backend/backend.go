@@ -84,6 +84,7 @@ type Params struct {
 	HistoricalAccessNodes     []accessproto.AccessAPIClient
 	Blocks                    storage.Blocks
 	Headers                   storage.Headers
+	Events                    storage.Events
 	Collections               storage.Collections
 	Transactions              storage.Transactions
 	ExecutionReceipts         storage.ExecutionReceipts
@@ -133,11 +134,11 @@ func New(params Params) (*Backend, error) {
 		state: params.State,
 		// create the sub-backends
 		backendScripts: backendScripts{
+			log:               params.Log,
 			headers:           params.Headers,
 			executionReceipts: params.ExecutionReceipts,
 			connFactory:       params.ConnFactory,
 			state:             params.State,
-			log:               params.Log,
 			metrics:           params.AccessMetrics,
 			loggedScripts:     loggedScripts,
 			nodeCommunicator:  params.Communicator,
@@ -145,6 +146,7 @@ func New(params Params) (*Backend, error) {
 			scriptExecMode:    params.ScriptExecutionMode,
 		},
 		backendTransactions: backendTransactions{
+			log:                  params.Log,
 			staticCollectionRPC:  params.CollectionRPC,
 			state:                params.State,
 			chainID:              params.ChainID,
@@ -157,16 +159,16 @@ func New(params Params) (*Backend, error) {
 			retry:                retry,
 			connFactory:          params.ConnFactory,
 			previousAccessNodes:  params.HistoricalAccessNodes,
-			log:                  params.Log,
 			nodeCommunicator:     params.Communicator,
 			txResultCache:        txResCache,
 		},
 		backendEvents: backendEvents{
+			log:               params.Log,
 			state:             params.State,
 			headers:           params.Headers,
+			events:            params.Events,
 			executionReceipts: params.ExecutionReceipts,
 			connFactory:       params.ConnFactory,
-			log:               params.Log,
 			maxHeightRange:    params.MaxHeightRange,
 			nodeCommunicator:  params.Communicator,
 		},
@@ -179,11 +181,11 @@ func New(params Params) (*Backend, error) {
 			state:  params.State,
 		},
 		backendAccounts: backendAccounts{
+			log:               params.Log,
 			state:             params.State,
 			headers:           params.Headers,
 			executionReceipts: params.ExecutionReceipts,
 			connFactory:       params.ConnFactory,
-			log:               params.Log,
 			nodeCommunicator:  params.Communicator,
 			scriptExecutor:    params.ScriptExecutor,
 			scriptExecMode:    params.ScriptExecutionMode,

@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/onflow/flow/protobuf/go/flow/entities"
@@ -24,6 +25,7 @@ import (
 
 type backendEvents struct {
 	headers           storage.Headers
+	events            storage.Events
 	executionReceipts storage.ExecutionReceipts
 	state             protocol.State
 	connFactory       connection.ConnectionFactory
@@ -42,30 +44,40 @@ func (b *backendEvents) GetEventsForHeightRange(
 ) ([]flow.BlockEvents, error) {
 
 	if endHeight < startHeight {
-		return nil, status.Error(codes.InvalidArgument, "invalid start or end height")
+		return nil, status.Error(codes.InvalidArgument, "start height must not be larger than end height")
 	}
 
 	rangeSize := endHeight - startHeight + 1 // range is inclusive on both ends
 	if rangeSize > uint64(b.maxHeightRange) {
-		return nil, status.Errorf(codes.InvalidArgument, "requested block range (%d) exceeded maximum (%d)", rangeSize, b.maxHeightRange)
+		return nil, status.Errorf(codes.InvalidArgument,
+			"requested block range (%d) exceeded maximum (%d)", rangeSize, b.maxHeightRange)
 	}
 
 	// get the latest sealed block header
-	head, err := b.state.Sealed().Head()
+	sealed, err := b.state.Sealed().Head()
 	if err != nil {
 		// sealed block must be in the store, so return an Internal code even if we got NotFound
 		return nil, status.Errorf(codes.Internal, "failed to get events: %v", err)
 	}
 
 	// start height should not be beyond the last sealed height
-	if head.Height < startHeight {
+	if startHeight > sealed.Height {
 		return nil, status.Errorf(codes.OutOfRange,
-			"start height %d is greater than the last sealed block height %d", startHeight, head.Height)
+			"start height %d is greater than the last sealed block height %d", startHeight, sealed.Height)
 	}
 
 	// limit max height to last sealed block in the chain
-	if head.Height < endHeight {
-		endHeight = head.Height
+	//
+	// Note: this causes unintuitive behavior for clients making requests through a proxy that
+	// fronts multiple nodes. With that setup, clients may receive responses for a smaller range
+	// than requested because the node serving the request has a slightly delayed view of the chain.
+	//
+	// An alternative option is to return an error here, but that's likely to cause more pain for
+	// these clients since the requests would intermittently fail. it's recommended instead to
+	// check the block height of the last message in the response. this will be the last block
+	// height searched, and can be used to determine the start height for the next range.
+	if endHeight > sealed.Height {
+		endHeight = sealed.Height
 	}
 
 	// find the block headers for all the blocks between min and max height (inclusive)
@@ -80,7 +92,7 @@ func (b *backendEvents) GetEventsForHeightRange(
 		blockHeaders = append(blockHeaders, header)
 	}
 
-	return b.getBlockEventsFromExecutionNode(ctx, blockHeaders, eventType, requiredEventEncodingVersion)
+	return b.getBlockEvents(ctx, blockHeaders, eventType, requiredEventEncodingVersion)
 }
 
 // GetEventsForBlockIDs retrieves events for all the specified block IDs that have the given type
@@ -106,10 +118,94 @@ func (b *backendEvents) GetEventsForBlockIDs(
 		blockHeaders = append(blockHeaders, header)
 	}
 
-	// forward the request to the execution node
-	return b.getBlockEventsFromExecutionNode(ctx, blockHeaders, eventType, requiredEventEncodingVersion)
+	return b.getBlockEvents(ctx, blockHeaders, eventType, requiredEventEncodingVersion)
 }
 
+// getBlockEvents retrieves events for all the specified blocks that have the given type
+// It gets all events available on storage, and requests the rest to an execution node.
+func (b *backendEvents) getBlockEvents(
+	ctx context.Context,
+	blockHeaders []*flow.Header,
+	eventType string,
+	requiredEventEncodingVersion entities.EventEncodingVersion,
+) ([]flow.BlockEvents, error) {
+	localResponse, missingHeaders, err := b.getBlockEventsFromStorage(ctx, blockHeaders, eventType, requiredEventEncodingVersion)
+	if err != nil {
+		return nil, err
+	}
+
+	enResponse, err := b.getBlockEventsFromExecutionNode(ctx, missingHeaders, eventType, requiredEventEncodingVersion)
+	if err != nil {
+		return nil, err
+	}
+
+	// sort ascending by block height
+	// Note: this may not match the order of the original request for clients uses GetEventsForBlockIDs
+	// that provide out of order block IDs
+	response := append(localResponse, enResponse...)
+	sort.Slice(response, func(i, j int) bool {
+		return response[i].BlockHeight < response[j].BlockHeight
+	})
+
+	return response, nil
+}
+
+// getBlockEventsFromStorage retrieves events for all the specified blocks that have the given type
+// from the local storage
+func (b *backendEvents) getBlockEventsFromStorage(
+	ctx context.Context,
+	blockHeaders []*flow.Header,
+	eventType string,
+	requiredEventEncodingVersion entities.EventEncodingVersion,
+) ([]flow.BlockEvents, []*flow.Header, error) {
+	target := flow.EventType(eventType)
+
+	missing := make([]*flow.Header, 0)
+	resp := make([]flow.BlockEvents, 0)
+	for _, header := range blockHeaders {
+		if ctx.Err() != nil {
+			return nil, nil, rpc.ConvertError(ctx.Err(), "failed to get events", codes.Canceled)
+		}
+
+		events, err := b.events.ByBlockID(header.ID())
+		if err != nil {
+			if errors.Is(err, storage.ErrNotFound) {
+				missing = append(missing, header)
+				continue
+			}
+			return nil, nil, rpc.ConvertError(err, "failed to get events", codes.Internal)
+		}
+
+		filteredEvents := make([]flow.Event, 0)
+		for _, e := range events {
+			if e.Type != target {
+				continue
+			}
+
+			if requiredEventEncodingVersion == entities.EventEncodingVersion_CCF_V0 {
+				payload, err := convert.CcfPayloadToJsonPayload(e.Payload)
+				if err != nil {
+					return nil, nil, rpc.ConvertError(err, "failed to convert event payload", codes.Internal)
+				}
+				e.Payload = payload
+			}
+
+			filteredEvents = append(filteredEvents, e)
+		}
+
+		resp = append(resp, flow.BlockEvents{
+			BlockID:        header.ID(),
+			BlockHeight:    header.Height,
+			BlockTimestamp: header.Timestamp,
+			Events:         filteredEvents,
+		})
+	}
+
+	return resp, missing, nil
+}
+
+// getBlockEventsFromExecutionNode retrieves events for all the specified blocks that have the given type
+// from an execution node
 func (b *backendEvents) getBlockEventsFromExecutionNode(
 	ctx context.Context,
 	blockHeaders []*flow.Header,
@@ -220,7 +316,8 @@ func verifyAndConvertToAccessEvents(
 // error aggregating all failures is returned.
 func (b *backendEvents) getEventsFromAnyExeNode(ctx context.Context,
 	execNodes flow.IdentityList,
-	req *execproto.GetEventsForBlockIDsRequest) (*execproto.GetEventsForBlockIDsResponse, *flow.Identity, error) {
+	req *execproto.GetEventsForBlockIDsRequest,
+) (*execproto.GetEventsForBlockIDsResponse, *flow.Identity, error) {
 	var resp *execproto.GetEventsForBlockIDsResponse
 	var execNode *flow.Identity
 	errToReturn := b.nodeCommunicator.CallAvailableNode(
@@ -256,16 +353,13 @@ func (b *backendEvents) getEventsFromAnyExeNode(ctx context.Context,
 
 func (b *backendEvents) tryGetEvents(ctx context.Context,
 	execNode *flow.Identity,
-	req *execproto.GetEventsForBlockIDsRequest) (*execproto.GetEventsForBlockIDsResponse, error) {
+	req *execproto.GetEventsForBlockIDsRequest,
+) (*execproto.GetEventsForBlockIDsResponse, error) {
 	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
 	if err != nil {
 		return nil, err
 	}
 	defer closer.Close()
 
-	resp, err := execRPCClient.GetEventsForBlockIDs(ctx, req)
-	if err != nil {
-		return nil, err
-	}
-	return resp, nil
+	return execRPCClient.GetEventsForBlockIDs(ctx, req)
 }
