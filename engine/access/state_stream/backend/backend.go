@@ -1,4 +1,4 @@
-package state_stream
+package backend
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
@@ -19,25 +20,9 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-const (
-	// DefaultMaxGlobalStreams defines the default max number of streams that can be open at the same time.
-	DefaultMaxGlobalStreams = 1000
-
-	// DefaultCacheSize defines the default max number of objects for the execution data cache.
-	DefaultCacheSize = 100
-
-	// DefaultSendTimeout is the default timeout for sending a message to the client. After the timeout
-	// expires, the connection is closed.
-	DefaultSendTimeout = 30 * time.Second
-
-	// DefaultResponseLimit is default max responses per second allowed on a stream. After exceeding
-	// the limit, the stream is paused until more capacity is available.
-	DefaultResponseLimit = float64(0)
-)
-
 // Config defines the configurable options for the ingress server.
 type Config struct {
-	EventFilterConfig
+	state_stream.EventFilterConfig
 
 	// ListenAddr is the address the GRPC server will listen on as host:port
 	ListenAddr string
@@ -65,16 +50,13 @@ type Config struct {
 	// the stream is paused until more capacity is available. Searches of past data can be CPU
 	// intensive, so this helps manage the impact.
 	ResponseLimit float64
+
+	// HeartbeatInterval specifies the block interval at which heartbeat messages should be sent.
+	HeartbeatInterval uint64
 }
 
 type GetExecutionDataFunc func(context.Context, uint64) (*execution_data.BlockExecutionDataEntity, error)
 type GetStartHeightFunc func(flow.Identifier, uint64) (uint64, error)
-
-type API interface {
-	GetExecutionDataByBlockID(ctx context.Context, blockID flow.Identifier) (*execution_data.BlockExecutionData, error)
-	SubscribeExecutionData(ctx context.Context, startBlockID flow.Identifier, startBlockHeight uint64) Subscription
-	SubscribeEvents(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter EventFilter) Subscription
-}
 
 type StateStreamBackend struct {
 	ExecutionDataBackend
@@ -226,7 +208,7 @@ func (b *StateStreamBackend) getStartHeight(startBlockID flow.Identifier, startH
 	return header.Height, nil
 }
 
-// SetHighestHeight sets the highest height for which execution data is available.
+// setHighestHeight sets the highest height for which execution data is available.
 func (b *StateStreamBackend) setHighestHeight(height uint64) bool {
 	return b.highestHeight.Set(height)
 }

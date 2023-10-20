@@ -1,4 +1,4 @@
-package state_stream_test
+package backend_test
 
 import (
 	"context"
@@ -12,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/state_stream"
+	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	streammock "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -39,7 +40,7 @@ func TestStream(t *testing.T) {
 	tests = append(tests, testData{"", testErr})
 
 	broadcaster := engine.NewBroadcaster()
-	streamer := state_stream.NewStreamer(unittest.Logger(), broadcaster, timeout, state_stream.DefaultResponseLimit, sub)
+	streamer := backend.NewStreamer(unittest.Logger(), broadcaster, timeout, state_stream.DefaultResponseLimit, sub)
 
 	for _, d := range tests {
 		sub.On("Next", mock.Anything).Return(d.data, d.err).Once()
@@ -73,7 +74,7 @@ func TestStreamRatelimited(t *testing.T) {
 			sub.On("ID").Return(uuid.NewString())
 
 			broadcaster := engine.NewBroadcaster()
-			streamer := state_stream.NewStreamer(unittest.Logger(), broadcaster, timeout, limit, sub)
+			streamer := backend.NewStreamer(unittest.Logger(), broadcaster, timeout, limit, sub)
 
 			var nextCalls, sendCalls int
 			sub.On("Next", mock.Anything).Return("data", nil).Run(func(args mock.Arguments) {
@@ -124,7 +125,7 @@ func TestLongStreamRatelimited(t *testing.T) {
 	sub.On("ID").Return(uuid.NewString())
 
 	broadcaster := engine.NewBroadcaster()
-	streamer := state_stream.NewStreamer(unittest.Logger(), broadcaster, timeout, limit, sub)
+	streamer := backend.NewStreamer(unittest.Logger(), broadcaster, timeout, limit, sub)
 
 	var nextCalls, sendCalls int
 	sub.On("Next", mock.Anything).Return("data", nil).Run(func(args mock.Arguments) {

@@ -1,4 +1,4 @@
-package state_stream
+package backend
 
 import (
 	"context"
@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -40,7 +41,7 @@ func (s *BackendEventsSuite) TestSubscribeEvents() {
 		highestBackfill int
 		startBlockID    flow.Identifier
 		startHeight     uint64
-		filters         EventFilter
+		filters         state_stream.EventFilter
 	}
 
 	baseTests := []testType{
@@ -84,18 +85,18 @@ func (s *BackendEventsSuite) TestSubscribeEvents() {
 	for _, test := range baseTests {
 		t1 := test
 		t1.name = fmt.Sprintf("%s - all events", test.name)
-		t1.filters = EventFilter{}
+		t1.filters = state_stream.EventFilter{}
 		tests = append(tests, t1)
 
 		t2 := test
 		t2.name = fmt.Sprintf("%s - some events", test.name)
-		t2.filters, err = NewEventFilter(DefaultEventFilterConfig, chain, []string{string(testEventTypes[0])}, nil, nil)
+		t2.filters, err = state_stream.NewEventFilter(state_stream.DefaultEventFilterConfig, chain, []string{string(testEventTypes[0])}, nil, nil)
 		require.NoError(s.T(), err)
 		tests = append(tests, t2)
 
 		t3 := test
 		t3.name = fmt.Sprintf("%s - no events", test.name)
-		t3.filters, err = NewEventFilter(DefaultEventFilterConfig, chain, []string{"A.0x1.NonExistent.Event"}, nil, nil)
+		t3.filters, err = state_stream.NewEventFilter(state_stream.DefaultEventFilterConfig, chain, []string{"A.0x1.NonExistent.Event"}, nil, nil)
 		require.NoError(s.T(), err)
 		tests = append(tests, t3)
 	}
@@ -173,7 +174,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsHandlesErrors() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.backend.SubscribeEvents(subCtx, unittest.IdentifierFixture(), 1, EventFilter{})
+		sub := s.backend.SubscribeEvents(subCtx, unittest.IdentifierFixture(), 1, state_stream.EventFilter{})
 		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()))
 	})
 
@@ -181,7 +182,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsHandlesErrors() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.backend.SubscribeEvents(subCtx, flow.ZeroID, s.backend.rootBlockHeight-1, EventFilter{})
+		sub := s.backend.SubscribeEvents(subCtx, flow.ZeroID, s.backend.rootBlockHeight-1, state_stream.EventFilter{})
 		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected InvalidArgument, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
 
@@ -189,7 +190,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsHandlesErrors() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.backend.SubscribeEvents(subCtx, unittest.IdentifierFixture(), 0, EventFilter{})
+		sub := s.backend.SubscribeEvents(subCtx, unittest.IdentifierFixture(), 0, state_stream.EventFilter{})
 		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()), "expected NotFound, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
 
@@ -200,7 +201,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsHandlesErrors() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.backend.SubscribeEvents(subCtx, flow.ZeroID, s.blocks[len(s.blocks)-1].Header.Height+10, EventFilter{})
+		sub := s.backend.SubscribeEvents(subCtx, flow.ZeroID, s.blocks[len(s.blocks)-1].Header.Height+10, state_stream.EventFilter{})
 		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()), "expected NotFound, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
 }
