@@ -240,7 +240,6 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		conf,
 		suite.state,
 		suite.headers,
-		suite.events,
 		suite.seals,
 		suite.results,
 		nil,
