@@ -146,8 +146,6 @@ func cloneCricketMomentsShardedCollection(
 		return nil, err
 	}
 
-	progressLog := util2.LogProgress(log, "cloning cricket moments", count)
-
 	ctx, c := context.WithCancelCause(context.Background())
 	cancel := func(err error) {
 		if err != nil {
@@ -164,14 +162,13 @@ func cloneCricketMomentsShardedCollection(
 
 	keyPairChan := make(chan cricketKeyPair, count)
 	clonedValues := make([]valueWithKeys, 0, count)
-	wg := sync.WaitGroup{}
-	wg.Add(nWorkers)
 
 	interpreters, _, err := mr.ChildInterpreters(log, 1, flow.ConvertAddress(mr.Address))
 	if err != nil {
 		return nil, err
 	}
 	inter := interpreters[0]
+	inter.SharedState.Config.InvalidatedResourceValidationEnabled = false
 
 	// worker for dispatching values to clone
 	go func() {
@@ -231,10 +228,13 @@ func cloneCricketMomentsShardedCollection(
 	}
 
 	// workers for cloning values
+	wg := sync.WaitGroup{}
+	wg.Add(nWorkers)
+	progressLog := util2.LogProgress(log, "cloning cricket moments", count)
 	for i := 0; i < nWorkers; i++ {
 		go func(i int) {
-			inter := interpreters[i]
 			defer wg.Done()
+			inter := interpreters[i]
 
 			storageMap := mr.GetReadOnlyStorage().GetStorageMap(mr.Address, domain, false)
 			storageMapValue := storageMap.ReadValue(&util.NopMemoryGauge{}, key)
@@ -359,7 +359,7 @@ func cloneCricketMomentsShardedCollection(
 		}
 
 		err = capturePanic(func() {
-			ownedNFTs.UnsafeInsert(
+			ownedNFTs.Insert(
 				mr.Interpreter,
 				interpreter.EmptyLocationRange,
 				clonedValue.nftCollectionKey,
