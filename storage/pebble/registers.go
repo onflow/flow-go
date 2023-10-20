@@ -186,7 +186,8 @@ func (s *Registers) PruneByHeight(pruneHeight uint64) error {
 
 		height, reg, err := lookupKeyToRegisterID(key)
 		if err != nil {
-			return err
+			log.Error().Err(err).Msg("failed to parse register id")
+			continue
 		}
 
 		if height < pruneHeight {
