@@ -33,15 +33,6 @@ func run(dir string, pruneHeight uint64) error {
 		return err
 	}
 
-	bootstrapped, err := pStorage.IsBootstrapped(pdb)
-	if err != nil {
-		return fmt.Errorf("could not check if registers db is bootstrapped: %w", err)
-	}
-
-	if !bootstrapped {
-		return fmt.Errorf("registers db is not bootstrapped")
-	}
-
 	registers, err := pStorage.NewRegisters(pdb)
 	if err != nil {
 		return fmt.Errorf("could not create registers storage: %w", err)
