@@ -16,9 +16,9 @@ import (
 )
 
 const (
-	flexLatextBlockKey = "LatestBlock"
-	flexRootSlabKey    = "RootSlabKey"
-	flexRootHashKey    = "RootHash"
+	FlowEVMLatextBlockKey = "LatestBlock"
+	FlowEVMRootSlabKey    = "RootSlabKey"
+	FlowEVMRootHashKey    = "RootHash"
 )
 
 var (
@@ -31,28 +31,28 @@ var (
 //
 // TODO: all database operational errors at the moments are labeled as fatal, we might revisit this
 type Database struct {
-	led         atree.Ledger
-	flexAddress flow.Address
-	storage     *atree.PersistentSlabStorage
-	atreemap    *atree.OrderedMap
-	lock        sync.RWMutex // Ramtin: do we need this?
+	led                atree.Ledger
+	flowEVMRootAddress flow.Address
+	storage            *atree.PersistentSlabStorage
+	atreemap           *atree.OrderedMap
+	lock               sync.RWMutex // Ramtin: do we need this?
 }
 
 // New returns a wrapped map with all the required database interface methods
 // implemented.
-func NewDatabase(led atree.Ledger, flexAddress flow.Address) (*Database, error) {
+func NewDatabase(led atree.Ledger, flowEVMRootAddress flow.Address) (*Database, error) {
 	baseStorage := atree.NewLedgerBaseStorage(led)
 
 	storage := NewPersistentSlabStorage(baseStorage)
 
-	rootIDBytes, err := led.GetValue(flexAddress.Bytes(), []byte(flexRootSlabKey))
+	rootIDBytes, err := led.GetValue(flowEVMRootAddress.Bytes(), []byte(FlowEVMRootSlabKey))
 	if err != nil {
 		return nil, types.NewFatalError(err)
 	}
 
 	var m *atree.OrderedMap
 	if len(rootIDBytes) == 0 {
-		m, err = atree.NewMap(storage, atree.Address(flexAddress), atree.NewDefaultDigesterBuilder(), typeInfo{})
+		m, err = atree.NewMap(storage, atree.Address(flowEVMRootAddress), atree.NewDefaultDigesterBuilder(), typeInfo{})
 		if err != nil {
 			return nil, types.NewFatalError(err)
 		}
@@ -68,10 +68,10 @@ func NewDatabase(led atree.Ledger, flexAddress flow.Address) (*Database, error) 
 	}
 
 	return &Database{
-		led:         led,
-		flexAddress: flexAddress,
-		storage:     storage,
-		atreemap:    m,
+		led:                led,
+		flowEVMRootAddress: flowEVMRootAddress,
+		storage:            storage,
+		atreemap:           m,
 	}, nil
 }
 
@@ -132,7 +132,7 @@ func (db *Database) Delete(key []byte) error {
 }
 
 func (db *Database) SetRootHash(root gethCommon.Hash) error {
-	err := db.led.SetValue(db.flexAddress[:], []byte(flexRootHashKey), root[:])
+	err := db.led.SetValue(db.flowEVMRootAddress[:], []byte(FlowEVMRootHashKey), root[:])
 	if err != nil {
 		return types.NewFatalError(err)
 	}
@@ -140,7 +140,7 @@ func (db *Database) SetRootHash(root gethCommon.Hash) error {
 }
 
 func (db *Database) GetRootHash() (gethCommon.Hash, error) {
-	data, err := db.led.GetValue(db.flexAddress[:], []byte(flexRootHashKey))
+	data, err := db.led.GetValue(db.flowEVMRootAddress[:], []byte(FlowEVMRootHashKey))
 	if len(data) == 0 {
 		return gethTypes.EmptyRootHash, err
 	}
@@ -155,7 +155,7 @@ func (db *Database) SetLatestBlock(block *types.Block) error {
 	if err != nil {
 		return types.NewFatalError(err)
 	}
-	err = db.led.SetValue(db.flexAddress[:], []byte(flexLatextBlockKey), blockBytes)
+	err = db.led.SetValue(db.flowEVMRootAddress[:], []byte(FlowEVMLatextBlockKey), blockBytes)
 	if err != nil {
 		return types.NewFatalError(err)
 	}
@@ -165,7 +165,7 @@ func (db *Database) SetLatestBlock(block *types.Block) error {
 // GetLatestBlock returns the latest executed block
 // we have this functionality given we only allow on state to exist (no forks, etc.)
 func (db *Database) GetLatestBlock() (*types.Block, error) {
-	data, err := db.led.GetValue(db.flexAddress[:], []byte(flexLatextBlockKey))
+	data, err := db.led.GetValue(db.flowEVMRootAddress[:], []byte(FlowEVMLatextBlockKey))
 	if len(data) == 0 {
 		return types.GenesisBlock, err
 	}
@@ -183,7 +183,7 @@ func (db *Database) storeMapRoot() error {
 	if err != nil {
 		return err
 	}
-	return db.led.SetValue(db.flexAddress.Bytes(), []byte(flexRootSlabKey), rootIDBytes[:])
+	return db.led.SetValue(db.flowEVMRootAddress.Bytes(), []byte(FlowEVMRootSlabKey), rootIDBytes[:])
 }
 
 // Commits the changes from atree
