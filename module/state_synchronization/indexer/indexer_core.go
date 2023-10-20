@@ -1,6 +1,7 @@
 package indexer
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -62,15 +63,18 @@ func New(
 
 // RegisterValues retrieves register values by the register IDs at the provided block height.
 // Even if the register wasn't indexed at the provided height, returns the highest height the register was indexed at.
+// If a register is not found it will return a nil value and not an error.
 // Expected errors:
-// - storage.ErrNotFound if the register by the ID was never indexed
 // - storage.ErrHeightNotIndexed if the given height was not indexed yet or lower than the first indexed height.
 func (c *IndexerCore) RegisterValues(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
 	values := make([]flow.RegisterValue, len(IDs))
 
 	for j, id := range IDs {
 		value, err := c.registers.Get(id, height)
-		if err != nil {
+		// only return an error if the error doesn't match the not found error, since we have
+		// to gracefully handle not found values and instead assign nil, that is because the script executor
+		// expects that behaviour
+		if err != nil && !errors.Is(err, storage.ErrNotFound) {
 			return nil, err
 		}
 
