@@ -33,14 +33,17 @@ type InvCtrlMsgNotif struct {
 	Error error
 	// MsgType the control message type.
 	MsgType p2pmsg.ControlMessageType
+	// IsClusterPrefixed indicates if the error occurred on a cluster prefixed topic of the control message.
+	IsClusterPrefixed bool
 }
 
 // NewInvalidControlMessageNotification returns a new *InvCtrlMsgNotif
-func NewInvalidControlMessageNotification(peerID peer.ID, ctlMsgType p2pmsg.ControlMessageType, err error) *InvCtrlMsgNotif {
+func NewInvalidControlMessageNotification(peerID peer.ID, ctlMsgType p2pmsg.ControlMessageType, err error, isClusterPrefixed bool) *InvCtrlMsgNotif {
 	return &InvCtrlMsgNotif{
-		PeerID:  peerID,
-		Error:   err,
-		MsgType: ctlMsgType,
+		PeerID:            peerID,
+		Error:             err,
+		MsgType:           ctlMsgType,
+		IsClusterPrefixed: isClusterPrefixed,
 	}
 }
 
