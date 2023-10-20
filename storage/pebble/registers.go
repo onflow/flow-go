@@ -31,17 +31,11 @@ const DefaultPruneThreshold = 1000
 // return storage.ErrNotBootstrapped if they those two keys are unavailable as it implies a uninitialized state
 // return other error if database is in a corrupted state
 func NewRegisters(db *pebble.DB) (*Registers, error) {
-	// check height keys and populate cache. These two variables will have been set
-	firstHeight, latestHeight, err := ReadHeightsFromBootstrappedDB(db)
-	if err != nil {
-		// first height is found, but latest height is not found, this means that the DB is in a corrupted state
-		return nil, fmt.Errorf("unable to initialize register storage, latest height unavailable in db: %w", err)
-	}
 	/// All registers between firstHeight and lastHeight have been indexed
 	return &Registers{
 		db:             db,
-		firstHeight:    firstHeight,
-		latestHeight:   atomic.NewUint64(latestHeight),
+		firstHeight:    0,
+		latestHeight:   atomic.NewUint64(0),
 		pruneThreshold: DefaultPruneThreshold,
 	}, nil
 }

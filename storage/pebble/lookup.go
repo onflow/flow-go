@@ -68,14 +68,6 @@ func lookupKeyToRegisterID(lookupKey []byte) (uint64, flow.RegisterID, error) {
 			MinLookupKeyLen, len(lookupKey))
 	}
 
-	// check and exclude db prefix
-	prefix := lookupKey[0]
-	if prefix != codeRegister {
-		return 0, flow.RegisterID{}, fmt.Errorf("incorrect prefix %d for register lookup key, expected %d",
-			prefix, codeRegister)
-	}
-	lookupKey = lookupKey[1:]
-
 	// Find the first slash to split the lookup key and decode the owner.
 	firstSlash := bytes.IndexByte(lookupKey, '/')
 	if firstSlash == -1 {

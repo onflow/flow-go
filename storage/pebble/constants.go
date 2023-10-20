@@ -32,7 +32,7 @@ const (
 	//
 	// Therefore the minimum key would be 3 bytes + # of bytes for height
 	//     [code] / / [height]
-	MinLookupKeyLen = 3 + registers.HeightSuffixLen
+	MinLookupKeyLen = 2 + registers.HeightSuffixLen
 
 	// prefixes
 	// codeRegister starting at 2, 1 and 0 reserved for DB specific constants
