@@ -1,4 +1,4 @@
-package state_stream
+package backend
 
 import (
 	"context"
@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -78,12 +79,12 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 
 	s.broadcaster = engine.NewBroadcaster()
 
-	s.execDataHeroCache = herocache.NewBlockExecutionData(DefaultCacheSize, logger, metrics.NewNoopCollector())
+	s.execDataHeroCache = herocache.NewBlockExecutionData(state_stream.DefaultCacheSize, logger, metrics.NewNoopCollector())
 	s.execDataCache = cache.NewExecutionDataCache(s.eds, s.headers, s.seals, s.results, s.execDataHeroCache)
 
 	conf := Config{
-		ClientSendTimeout:    DefaultSendTimeout,
-		ClientSendBufferSize: DefaultSendBufferSize,
+		ClientSendTimeout:    state_stream.DefaultSendTimeout,
+		ClientSendBufferSize: state_stream.DefaultSendBufferSize,
 	}
 
 	var err error

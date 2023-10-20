@@ -1,7 +1,8 @@
-package state_stream_test
+package backend
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"sync"
 	"testing"
@@ -10,11 +11,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+	pb "google.golang.org/genproto/googleapis/bytestream"
 	"google.golang.org/grpc"
 
-	jsoncdc "github.com/onflow/cadence/encoding/json"
-
 	"github.com/onflow/flow/protobuf/go/flow/entities"
+
+	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/flow/protobuf/go/flow/executiondata"
 
 	"github.com/onflow/flow-go/engine/access/state_stream"
@@ -25,6 +28,178 @@ import (
 	"github.com/onflow/flow-go/utils/unittest/generator"
 )
 
+func TestHeartbeatResponseSuite(t *testing.T) {
+	suite.Run(t, new(HandlerTestSuite))
+}
+
+type HandlerTestSuite struct {
+	BackendExecutionDataSuite
+	handler *Handler
+}
+
+// fakeReadServerImpl is an utility structure for receiving response from grpc handler without building a complete pipeline with client and server.
+// It allows to receive streamed events pushed by server in buffered channel that can be later used to assert correctness of responses
+type fakeReadServerImpl struct {
+	pb.ByteStream_ReadServer
+	ctx      context.Context
+	received chan *executiondata.SubscribeEventsResponse
+}
+
+var _ executiondata.ExecutionDataAPI_SubscribeEventsServer = (*fakeReadServerImpl)(nil)
+
+func (fake *fakeReadServerImpl) Context() context.Context {
+	return fake.ctx
+}
+
+func (fake *fakeReadServerImpl) Send(response *executiondata.SubscribeEventsResponse) error {
+	fake.received <- response
+	return nil
+}
+
+func (s *HandlerTestSuite) SetupTest() {
+	s.BackendExecutionDataSuite.SetupTest()
+
+	config := Config{
+		EventFilterConfig:    state_stream.DefaultEventFilterConfig,
+		ClientSendTimeout:    state_stream.DefaultSendTimeout,
+		ClientSendBufferSize: state_stream.DefaultSendBufferSize,
+		MaxGlobalStreams:     5,
+		HeartbeatInterval:    state_stream.DefaultHeartbeatInterval,
+	}
+
+	chain := flow.MonotonicEmulator.Chain()
+	s.handler = NewHandler(s.backend, chain, config)
+}
+
+// TestHeartbeatResponse tests the periodic heartbeat response.
+//
+// Test Steps:
+// - Generate different events in blocks.
+// - Create different filters for generated events.
+// - Wait for either responses with filtered events or heartbeat responses.
+// - Verify that the responses are being sent with proper heartbeat interval.
+func (s *HandlerTestSuite) TestHeartbeatResponse() {
+	reader := &fakeReadServerImpl{
+		ctx:      context.Background(),
+		received: make(chan *executiondata.SubscribeEventsResponse, 100),
+	}
+
+	// notify backend block is available
+	s.backend.setHighestHeight(s.blocks[len(s.blocks)-1].Header.Height)
+
+	s.Run("All events filter", func() {
+		// create empty event filter
+		filter := &executiondata.EventFilter{}
+		// create subscribe events request, set the created filter and heartbeatInterval
+		req := &executiondata.SubscribeEventsRequest{
+			StartBlockHeight:  0,
+			Filter:            filter,
+			HeartbeatInterval: 1,
+		}
+
+		// subscribe for events
+		go func() {
+			err := s.handler.SubscribeEvents(req, reader)
+			require.NoError(s.T(), err)
+		}()
+
+		for _, b := range s.blocks {
+			// consume execution data from subscription
+			unittest.RequireReturnsBefore(s.T(), func() {
+				resp, ok := <-reader.received
+				require.True(s.T(), ok, "channel closed while waiting for exec data for block %d %v", b.Header.Height, b.ID())
+
+				blockID, err := convert.BlockID(resp.BlockId)
+				require.NoError(s.T(), err)
+				require.Equal(s.T(), b.Header.ID(), blockID)
+				require.Equal(s.T(), b.Header.Height, resp.BlockHeight)
+			}, time.Second, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Header.Height, b.ID()))
+		}
+	})
+
+	s.Run("Event A.0x1.Foo.Bar filter with heartbeat interval 1", func() {
+		// create A.0x1.Foo.Bar event filter
+		pbFilter := &executiondata.EventFilter{
+			EventType: []string{string(testEventTypes[0])},
+			Contract:  nil,
+			Address:   nil,
+		}
+		// create subscribe events request, set the created filter and heartbeatInterval
+		req := &executiondata.SubscribeEventsRequest{
+			StartBlockHeight:  0,
+			Filter:            pbFilter,
+			HeartbeatInterval: 1,
+		}
+
+		// subscribe for events
+		go func() {
+			err := s.handler.SubscribeEvents(req, reader)
+			require.NoError(s.T(), err)
+		}()
+
+		for _, b := range s.blocks {
+
+			// consume execution data from subscription
+			unittest.RequireReturnsBefore(s.T(), func() {
+				resp, ok := <-reader.received
+				require.True(s.T(), ok, "channel closed while waiting for exec data for block %d %v", b.Header.Height, b.ID())
+
+				blockID, err := convert.BlockID(resp.BlockId)
+				require.NoError(s.T(), err)
+				require.Equal(s.T(), b.Header.ID(), blockID)
+				require.Equal(s.T(), b.Header.Height, resp.BlockHeight)
+			}, time.Second, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Header.Height, b.ID()))
+		}
+	})
+
+	s.Run("Non existent filter with heartbeat interval 2", func() {
+		// create non existent filter
+		pbFilter := &executiondata.EventFilter{
+			EventType: []string{"A.0x1.NonExistent.Event"},
+			Contract:  nil,
+			Address:   nil,
+		}
+
+		// create subscribe events request, set the created filter and heartbeatInterval
+		req := &executiondata.SubscribeEventsRequest{
+			StartBlockHeight:  0,
+			Filter:            pbFilter,
+			HeartbeatInterval: 2,
+		}
+
+		// subscribe for events
+		go func() {
+			err := s.handler.SubscribeEvents(req, reader)
+			require.NoError(s.T(), err)
+		}()
+
+		// expect a response for every other block
+		expectedBlocks := make([]*flow.Block, 0)
+		for i, block := range s.blocks {
+			if (i+1)%int(req.HeartbeatInterval) == 0 {
+				expectedBlocks = append(expectedBlocks, block)
+			}
+		}
+
+		require.Len(s.T(), expectedBlocks, len(s.blocks)/int(req.HeartbeatInterval))
+
+		for _, b := range expectedBlocks {
+			// consume execution data from subscription
+			unittest.RequireReturnsBefore(s.T(), func() {
+				resp, ok := <-reader.received
+				require.True(s.T(), ok, "channel closed while waiting for exec data for block %d %v", b.Header.Height, b.ID())
+
+				blockID, err := convert.BlockID(resp.BlockId)
+				require.NoError(s.T(), err)
+				require.Equal(s.T(), b.Header.Height, resp.BlockHeight)
+				require.Equal(s.T(), b.Header.ID(), blockID)
+				require.Empty(s.T(), resp.Events)
+			}, time.Second, fmt.Sprintf("timed out waiting for exec data for block %d %v", b.Header.Height, b.ID()))
+		}
+	})
+}
+
+// TestExecutionDataStream tests the execution data stream with different event encoding versions.
 func TestExecutionDataStream(t *testing.T) {
 	t.Parallel()
 
@@ -48,13 +223,21 @@ func TestExecutionDataStream(t *testing.T) {
 	// Send a single response.
 	blockHeight := uint64(1)
 
+	config := Config{
+		EventFilterConfig:    state_stream.EventFilterConfig{},
+		ClientSendTimeout:    state_stream.DefaultSendTimeout,
+		ClientSendBufferSize: state_stream.DefaultSendBufferSize,
+		MaxGlobalStreams:     1,
+		HeartbeatInterval:    state_stream.DefaultHeartbeatInterval,
+	}
+
 	// Helper function to perform a stream request and handle responses.
 	makeStreamRequest := func(request *executiondata.SubscribeExecutionDataRequest) {
-		sub := state_stream.NewSubscription(1)
+		sub := NewSubscription(1)
 
 		api.On("SubscribeExecutionData", mock.Anything, flow.ZeroID, uint64(0), mock.Anything).Return(sub)
 
-		h := state_stream.NewHandler(api, flow.Localnet.Chain(), state_stream.EventFilterConfig{}, 1)
+		h := NewHandler(api, flow.Localnet.Chain(), config)
 
 		wg := sync.WaitGroup{}
 		wg.Add(1)
@@ -73,7 +256,7 @@ func TestExecutionDataStream(t *testing.T) {
 			),
 		)
 
-		err := sub.Send(ctx, &state_stream.ExecutionDataResponse{
+		err := sub.Send(ctx, &ExecutionDataResponse{
 			Height:        blockHeight,
 			ExecutionData: executionData,
 		}, 100*time.Millisecond)
@@ -122,24 +305,22 @@ func TestExecutionDataStream(t *testing.T) {
 	}
 
 	tests := []struct {
-		name         string
 		eventVersion entities.EventEncodingVersion
 		expected     []flow.Event
 	}{
 		{
-			"test JSON event encoding",
 			entities.EventEncodingVersion_JSON_CDC_V0,
 			jsonExpectedEvents,
 		},
 		{
-			"test CFF event encoding",
 			entities.EventEncodingVersion_CCF_V0,
 			ccfInputEvents,
 		},
 	}
 
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+		t.Run(fmt.Sprintf("test %s event encoding version add ."+
+			"", test.eventVersion.String()), func(t *testing.T) {
 			makeStreamRequest(&executiondata.SubscribeExecutionDataRequest{
 				EventEncodingVersion: test.eventVersion,
 			})
@@ -157,7 +338,15 @@ func TestEventStream(t *testing.T) {
 
 	api := ssmock.NewAPI(t)
 	stream := makeStreamMock[executiondata.SubscribeEventsRequest, executiondata.SubscribeEventsResponse](ctx)
-	sub := state_stream.NewSubscription(1)
+	sub := NewSubscription(1)
+
+	config := Config{
+		EventFilterConfig:    state_stream.EventFilterConfig{},
+		ClientSendTimeout:    state_stream.DefaultSendTimeout,
+		ClientSendBufferSize: state_stream.DefaultSendBufferSize,
+		MaxGlobalStreams:     1,
+		HeartbeatInterval:    state_stream.DefaultHeartbeatInterval,
+	}
 
 	// generate some events with a payload to include
 	// generators will produce identical event payloads (before encoding)
@@ -172,7 +361,7 @@ func TestEventStream(t *testing.T) {
 
 	api.On("SubscribeEvents", mock.Anything, flow.ZeroID, uint64(0), mock.Anything).Return(sub)
 
-	h := state_stream.NewHandler(api, flow.Localnet.Chain(), state_stream.EventFilterConfig{}, 1)
+	h := NewHandler(api, flow.Localnet.Chain(), config)
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
@@ -189,7 +378,7 @@ func TestEventStream(t *testing.T) {
 	// send a single response
 	blockHeight := uint64(1)
 	blockID := unittest.IdentifierFixture()
-	err := sub.Send(ctx, &state_stream.EventsResponse{
+	err := sub.Send(ctx, &EventsResponse{
 		BlockID: blockID,
 		Height:  blockHeight,
 		Events:  inputEvents,
