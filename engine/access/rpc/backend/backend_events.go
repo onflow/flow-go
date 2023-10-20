@@ -140,7 +140,7 @@ func (b *backendEvents) getBlockEvents(
 	}
 
 	// sort ascending by block height
-	// Note: this may not match the order of the original request for clients uses GetEventsForBlockIDs
+	// Note: this may not match the order of the original request for clients using GetEventsForBlockIDs
 	// that provide out of order block IDs
 	response := append(localResponse, enResponse...)
 	sort.Slice(response, func(i, j int) bool {
