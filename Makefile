@@ -43,6 +43,11 @@ include crypto_adx_flag.mk
 
 CGO_FLAG := CGO_CFLAGS=$(CRYPTO_FLAG)
 
+# needed for CI
+.PHONY: noop
+noop:
+	@echo "This is a no-op target"
+
 cmd/collection/collection:
 	$(CGO_FLAG) go build -o cmd/collection/collection cmd/collection/main.go
 
