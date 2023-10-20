@@ -299,3 +299,73 @@ func RunWithRegistersStorageAtHeight1(tb testing.TB, f func(r *Registers)) {
 	defaultHeight := uint64(1)
 	RunWithRegistersStorageAtInitialHeights(tb, defaultHeight, defaultHeight, f)
 }
+
+func TestRegsiterIteration(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		db := newBootstrappedRegistersWithPathForTest(t, dir, 1, 1)
+		r, err := NewRegisters(db)
+		require.NoError(t, err)
+
+		require.NoError(t, r.Store(flow.RegisterEntries{
+			unittest.MakeReg("owner2", "key4", "value1"),
+			unittest.MakeReg("owner3", "key3", "value2"),
+		}, 2))
+
+		require.NoError(t, r.Store(flow.RegisterEntries{
+			unittest.MakeReg("owner4", "key1", "value1"),
+			unittest.MakeReg("owner3", "key2", "value2"),
+		}, 3))
+
+		// v, err := r.Get(makeReg("key1", "value1").Key, 3)
+		// require.NoError(t, err)
+		// require.Equal(t, makeReg("key1", "value1").Value, v)
+		//
+		iter, err := db.NewIter(&pebble.IterOptions{
+			UseL6Filters: true,
+		})
+		require.NoError(t, err)
+
+		for iter.First(); iter.Valid(); iter.Next() {
+			key := iter.Key()
+			value := iter.Value()
+			if bytes.Equal(key, firstHeightKey) || bytes.Equal(key, latestHeightKey) {
+				continue
+			}
+			// Do something with the key and value
+			height, regID, err := lookupKeyToRegisterID(key)
+			require.NoError(t, err)
+			if height == 2 {
+				fmt.Println("deleting key", key)
+				require.NoError(t, db.Delete(key, &pebble.WriteOptions{}))
+			}
+			fmt.Printf("Key: %s, Value: %s, height: %v, regID: %s\n", key, value, height, regID)
+		}
+		require.NoError(t, iter.Close())
+
+		fmt.Println("======")
+
+		iter2, err := db.NewIter(&pebble.IterOptions{
+			UseL6Filters: true,
+		})
+		require.NoError(t, err)
+		for iter2.First(); iter2.Valid(); iter2.Next() {
+			key := iter2.Key()
+			value := iter2.Value()
+			if bytes.Equal(key, firstHeightKey) || bytes.Equal(key, latestHeightKey) {
+				continue
+			}
+
+			height, regID, err := lookupKeyToRegisterID(key)
+			require.NoError(t, err)
+			fmt.Printf("Key: %s, Value: %s, height: %v, regID: %s\n", key, value, height, regID)
+		}
+
+		require.NoError(t, iter2.Close())
+		require.NoError(t, db.Close())
+	})
+
+}
+
+func makeReg(key string, value string) flow.RegisterEntry {
+	return unittest.MakeReg("owner", key, value)
+}

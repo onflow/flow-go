@@ -1,6 +1,7 @@
 package pebble
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 
@@ -138,14 +139,6 @@ func (s *Registers) Store(
 	return nil
 }
 
-func (s *Registers) Prune(height uint64) error {
-	latestHeight := s.latestHeight.Load()
-	if height <= latestHeight {
-		return nil
-	}
-	// TOOD: ensure only prune with one process
-}
-
 // LatestHeight Gets the latest height of complete registers available
 func (s *Registers) LatestHeight() uint64 {
 	return s.latestHeight.Load()
@@ -179,4 +172,38 @@ func convertNotFoundError(err error) error {
 		return storage.ErrNotFound
 	}
 	return err
+}
+
+func (s *Registers) PruneByHeight(pruneHeight uint64) error {
+	iter, err := s.db.NewIter(&pebble.IterOptions{
+		UseL6Filters: true,
+	})
+	if err != nil {
+		return err
+	}
+
+	for iter.First(); iter.Valid(); iter.Next() {
+		key := iter.Key()
+		if bytes.Equal(key, firstHeightKey) || bytes.Equal(key, latestHeightKey) {
+			continue
+		}
+
+		height, _, err := lookupKeyToRegisterID(key)
+		if err != nil {
+			return err
+		}
+
+		if height < pruneHeight {
+			err := s.deleteKey(key)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func (s *Registers) deleteKey(key []byte) error {
+	return s.db.Delete(key, &pebble.WriteOptions{})
 }

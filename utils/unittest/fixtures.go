@@ -995,6 +995,16 @@ func IdentifierListFixture(n int) flow.IdentifierList {
 	return list
 }
 
+func MakeReg(owner string, key string, value string) flow.RegisterEntry {
+	return flow.RegisterEntry{
+		Key: flow.RegisterID{
+			Owner: owner,
+			Key:   key,
+		},
+		Value: []byte(value),
+	}
+}
+
 func IdentifierFixture() flow.Identifier {
 	var id flow.Identifier
 	_, _ = crand.Read(id[:])
