@@ -58,9 +58,6 @@ cmd/util/util:
 update-core-contracts-version:
 	./scripts/update-core-contracts.sh $(CC_VERSION)
 
-############################################################################################
-# CAUTION: DO NOT MODIFY THESE TARGETS! DOING SO WILL BREAK THE FLAKY TEST MONITOR
-
 .PHONY: unittest-main
 unittest-main:
 	# test all packages
@@ -83,8 +80,6 @@ install-tools: check-go-version install-mock-generators
 .PHONY: verify-mocks
 verify-mocks: tidy generate-mocks
 	git diff --exit-code
-
-############################################################################################
 
 .SILENT: go-math-rand-check
 go-math-rand-check:
