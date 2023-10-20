@@ -110,7 +110,7 @@ func TestAllowedFileDescriptorsScale(t *testing.T) {
 
 // TestApplyInboundStreamLimits tests that the inbound stream limits are applied correctly, i.e., the limits from the config file
 // are applied to the concrete limit config when the concrete limit config is greater than the limits from the config file.
-func TestApplyInboundStreamLimits(t *testing.T) {
+func TestApplyInboundStreamAndConnectionLimits(t *testing.T) {
 	cfg, err := config.DefaultConfig()
 	require.NoError(t, err)
 
@@ -135,6 +135,8 @@ func TestApplyInboundStreamLimits(t *testing.T) {
 		ProtocolDefault: rcmgr.ResourceLimits{
 			// sets it higher than the default to test that it is overridden.
 			StreamsInbound: rcmgr.LimitVal(cfg.NetworkConfig.ResourceManagerConfig.InboundStream.Protocol + 1),
+			// intentionally sets it lower than the default to test that it is not overridden.
+			ConnsInbound: rcmgr.LimitVal(cfg.NetworkConfig.ResourceManagerConfig.PeerBaseLimitConnsInbound - 1),
 		},
 		ProtocolPeerDefault: rcmgr.ResourceLimits{
 			StreamsInbound: 1, // intentionally sets to 1 to test that it is not overridden.
@@ -153,6 +155,9 @@ func TestApplyInboundStreamLimits(t *testing.T) {
 	// apply inbound stream limits from the config file.
 	applied := ApplyInboundStreamLimits(unittest.Logger(), concrete, cfg.NetworkConfig.ResourceManagerConfig.InboundStream)
 
+	// then applies the peer base limit connections from the config file.
+	applied = ApplyInboundConnectionLimits(unittest.Logger(), applied, cfg.NetworkConfig.ResourceManagerConfig.PeerBaseLimitConnsInbound)
+
 	// check that the applied limits are overridden.
 	// transient limit should be overridden.
 	require.Equal(t, int(cfg.NetworkConfig.ResourceManagerConfig.InboundStream.Transient), int(applied.ToPartialLimitConfig().Transient.StreamsInbound))
@@ -168,4 +173,7 @@ func TestApplyInboundStreamLimits(t *testing.T) {
 	require.Equal(t, int(1), int(applied.ToPartialLimitConfig().Stream.StreamsInbound))
 	// system limit should not be overridden.
 	require.Equal(t, int(1), int(applied.ToPartialLimitConfig().System.StreamsInbound))
+
+	// check that the applied peer base limit connections are overridden.
+	require.Equal(t, int(cfg.NetworkConfig.ResourceManagerConfig.PeerBaseLimitConnsInbound), int(applied.ToPartialLimitConfig().PeerDefault.ConnsInbound))
 }

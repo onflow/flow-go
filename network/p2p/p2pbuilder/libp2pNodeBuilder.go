@@ -222,9 +222,10 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		if err != nil {
 			return nil, fmt.Errorf("could not get allowed file descriptors: %w", err)
 		}
-		limits.PeerBaseLimit.ConnsInbound = builder.resourceManagerCfg.PeerBaseLimitConnsInbound
-		scaledLimits := limits.Scale(mem, fd)
-		appliedLimits := ApplyInboundStreamLimits(builder.logger, scaledLimits, builder.resourceManagerCfg.InboundStream)
+
+		// scales the default limits by the allowed memory and file descriptors and applies the inbound connection and stream limits.
+		appliedLimits := ApplyInboundConnectionLimits(builder.logger, limits.Scale(mem, fd), builder.resourceManagerCfg.PeerBaseLimitConnsInbound)
+		appliedLimits = ApplyInboundStreamLimits(builder.logger, appliedLimits, builder.resourceManagerCfg.InboundStream)
 		mgr, err := rcmgr.NewResourceManager(rcmgr.NewFixedLimiter(appliedLimits), rcmgr.WithMetrics(builder.metricsConfig.Metrics))
 		if err != nil {
 			return nil, fmt.Errorf("could not create libp2p resource manager: %w", err)
