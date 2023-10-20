@@ -1,4 +1,4 @@
-package state_stream
+package backend
 
 import (
 	"context"
@@ -10,23 +10,15 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/storage"
 )
 
-// Streamable represents a subscription that can be streamed.
-type Streamable interface {
-	ID() string
-	Close()
-	Fail(error)
-	Send(context.Context, interface{}, time.Duration) error
-	Next(context.Context) (interface{}, error)
-}
-
 // Streamer
 type Streamer struct {
 	log         zerolog.Logger
-	sub         Streamable
+	sub         state_stream.Streamable
 	broadcaster *engine.Broadcaster
 	sendTimeout time.Duration
 	limiter     *rate.Limiter
@@ -37,7 +29,7 @@ func NewStreamer(
 	broadcaster *engine.Broadcaster,
 	sendTimeout time.Duration,
 	limit float64,
-	sub Streamable,
+	sub state_stream.Streamable,
 ) *Streamer {
 	var limiter *rate.Limiter
 	if limit > 0 {

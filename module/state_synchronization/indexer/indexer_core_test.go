@@ -85,8 +85,12 @@ func (i *indexCoreTest) setLastHeight(f func(t *testing.T) uint64) *indexCoreTes
 		})
 	return i
 }
-
-func (i *indexCoreTest) useDefaultLastHeight() *indexCoreTest {
+func (i *indexCoreTest) useDefaultHeights() *indexCoreTest {
+	i.registers.
+		On("FirstHeight").
+		Return(func() uint64 {
+			return i.blocks[0].Header.Height
+		})
 	i.registers.
 		On("LatestHeight").
 		Return(func() uint64 {
@@ -154,6 +158,8 @@ func (i *indexCoreTest) initIndexer() *indexCoreTest {
 		require.NoError(i.t, os.RemoveAll(dbDir))
 	})
 
+	i.useDefaultHeights()
+
 	indexer, err := New(zerolog.New(os.Stdout), metrics.NewNoopCollector(), db, i.registers, i.headers, i.events, i.results)
 	require.NoError(i.t, err)
 	i.indexer = indexer
@@ -188,7 +194,6 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 
 		err := newIndexCoreTest(t, blocks, execData).
 			initIndexer().
-			useDefaultLastHeight().
 			useDefaultEvents().
 			useDefaultTransactionResults().
 			// make sure update registers match in length and are same as block data ledger payloads
@@ -233,7 +238,6 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 		err = newIndexCoreTest(t, blocks, execData).
 			initIndexer().
 			useDefaultEvents().
-			useDefaultLastHeight().
 			useDefaultTransactionResults().
 			// make sure update registers match in length and are same as block data ledger payloads
 			setStoreRegisters(func(t *testing.T, entries flow.RegisterEntries, height uint64) error {
@@ -268,7 +272,6 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 
 		err := newIndexCoreTest(t, blocks, execData).
 			initIndexer().
-			useDefaultLastHeight().
 			// make sure all events are stored at once in order
 			setStoreEvents(func(t *testing.T, actualBlockID flow.Identifier, actualEvents []flow.EventsList) error {
 				assert.Equal(t, block.ID(), actualBlockID)
@@ -310,7 +313,6 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 
 		err := newIndexCoreTest(t, blocks, execData).
 			initIndexer().
-			useDefaultLastHeight().
 			// make sure an empty set of events were stored
 			setStoreEvents(func(t *testing.T, actualBlockID flow.Identifier, actualEvents []flow.EventsList) error {
 				assert.Equal(t, block.ID(), actualBlockID)
@@ -366,7 +368,6 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 
 		err := newIndexCoreTest(t, blocks, execData).
 			initIndexer().
-			useDefaultLastHeight().
 			// make sure all events are stored at once in order
 			setStoreEvents(func(t *testing.T, actualBlockID flow.Identifier, actualEvents []flow.EventsList) error {
 				assert.Equal(t, block.ID(), actualBlockID)
