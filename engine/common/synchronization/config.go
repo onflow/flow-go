@@ -79,23 +79,9 @@ func NewSpamDetectionConfig() *SpamDetectionConfig {
 	}
 
 	return &SpamDetectionConfig{
+		// see config/default-config.yml for more information on the following fields
 		batchRequestBaseProb: flowConfig.NetworkConfig.SyncEngineBatchRequestBaseProb,
-
-		// create misbehavior report for 1% of SyncRequest messages
-		syncRequestProb: flowConfig.NetworkConfig.SyncEngineSyncRequestProb,
-
-		// create misbehavior report for about 0.2% of RangeRequest messages for normal range requests (i.e. not too large)
-		// and about 15% of RangeRequest messages for very large range requests
-		// The final probability is calculated as follows:
-		// rangeRequestBaseProb * ((rangeRequest.ToHeight-rangeRequest.FromHeight) + 1) / synccore.DefaultConfig().MaxSize
-		// Example 1 (small range) if the range request is for 10 blocks and rangeRequestBaseProb is 0.01, then the probability of
-		// creating a misbehavior report is:
-		// rangeRequestBaseProb * (10+1) / synccore.DefaultConfig().MaxSize
-		// = 0.01 * 11 / 64 = 0.00171875 = 0.171875%
-		// Example 2 (large range) if the range request is for 1000 blocks and rangeRequestBaseProb is 0.01, then the probability of
-		// creating a misbehavior report is:
-		// rangeRequestBaseProb * (1000+1) / synccore.DefaultConfig().MaxSize
-		// = 0.01 * 1001 / 64 = 0.15640625 = 15.640625%
+		syncRequestProb:      flowConfig.NetworkConfig.SyncEngineSyncRequestProb,
 		rangeRequestBaseProb: flowConfig.NetworkConfig.SyncEngineRangeRequestBaseProb,
 	}
 }
