@@ -238,7 +238,7 @@ func TestShuffle(t *testing.T) {
 		for listSize := 2; listSize <= 6; listSize++ {
 			factN := uint64(fact(listSize))
 			t.Logf("permutation size is %d (factorial is %d)", listSize, factN)
-			t.Run("shuffle a random permutation of size", func(t *testing.T) {
+			t.Run("shuffle a random permutation", func(t *testing.T) {
 				list := make([]int, 0, listSize)
 				for i := 0; i < listSize; i++ {
 					list = append(list, i)

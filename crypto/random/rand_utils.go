@@ -61,6 +61,7 @@ func EvaluateDistributionUniformity(t *testing.T, distribution []float64) {
 func EncodePermutation(perm []int) int {
 	r := make([]int, len(perm))
 	// generate Lehmer code
+	// (for details https://en.wikipedia.org/wiki/Lehmer_code)
 	for i, x := range perm {
 		for _, y := range perm[i+1:] {
 			if y < x {
@@ -69,6 +70,7 @@ func EncodePermutation(perm []int) int {
 		}
 	}
 	// Convert to an integer following the factorial number system
+	// (for details https://en.wikipedia.org/wiki/Factorial_number_system)
 	m := 0
 	fact := 1
 	for i := len(perm) - 1; i >= 0; i-- {
