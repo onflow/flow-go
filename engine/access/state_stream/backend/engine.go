@@ -1,4 +1,4 @@
-package state_stream
+package backend
 
 import (
 	"github.com/rs/zerolog"
@@ -51,7 +51,7 @@ func NewEng(
 		headers:             headers,
 		chain:               chainID.Chain(),
 		config:              config,
-		handler:             NewHandler(backend, chainID.Chain(), config.EventFilterConfig, config.MaxGlobalStreams),
+		handler:             NewHandler(backend, chainID.Chain(), config),
 		execDataBroadcaster: broadcaster,
 		execDataCache:       execDataCache,
 	}

@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/routes"
 	"github.com/onflow/flow-go/engine/access/state_stream"
+	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )
@@ -39,12 +40,11 @@ func NewServer(serverAPI access.API,
 	chain flow.Chain,
 	restCollector module.RestMetrics,
 	stateStreamApi state_stream.API,
-	eventFilterConfig state_stream.EventFilterConfig,
-	maxGlobalStreams uint32,
+	stateStreamConfig backend.Config,
 ) (*http.Server, error) {
 	builder := routes.NewRouterBuilder(logger, restCollector).AddRestRoutes(serverAPI, chain)
 	if stateStreamApi != nil {
-		builder.AddWsRoutes(stateStreamApi, chain, eventFilterConfig, maxGlobalStreams)
+		builder.AddWsRoutes(stateStreamApi, chain, stateStreamConfig)
 	}
 
 	c := cors.New(cors.Options{

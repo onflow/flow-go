@@ -1,4 +1,4 @@
-package state_stream
+package backend
 
 import (
 	"context"
@@ -9,28 +9,31 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 type Handler struct {
-	api   API
+	api   state_stream.API
 	chain flow.Chain
 
-	eventFilterConfig EventFilterConfig
+	eventFilterConfig state_stream.EventFilterConfig
 
-	maxStreams  int32
-	streamCount atomic.Int32
+	maxStreams               int32
+	streamCount              atomic.Int32
+	defaultHeartbeatInterval uint64
 }
 
-func NewHandler(api API, chain flow.Chain, conf EventFilterConfig, maxGlobalStreams uint32) *Handler {
+func NewHandler(api state_stream.API, chain flow.Chain, config Config) *Handler {
 	h := &Handler{
-		api:               api,
-		chain:             chain,
-		eventFilterConfig: conf,
-		maxStreams:        int32(maxGlobalStreams),
-		streamCount:       atomic.Int32{},
+		api:                      api,
+		chain:                    chain,
+		eventFilterConfig:        config.EventFilterConfig,
+		maxStreams:               int32(config.MaxGlobalStreams),
+		streamCount:              atomic.Int32{},
+		defaultHeartbeatInterval: config.HeartbeatInterval,
 	}
 	return h
 }
@@ -133,11 +136,11 @@ func (h *Handler) SubscribeEvents(request *executiondata.SubscribeEventsRequest,
 		startBlockID = blockID
 	}
 
-	filter := EventFilter{}
+	filter := state_stream.EventFilter{}
 	if request.GetFilter() != nil {
 		var err error
 		reqFilter := request.GetFilter()
-		filter, err = NewEventFilter(
+		filter, err = state_stream.NewEventFilter(
 			h.eventFilterConfig,
 			h.chain,
 			reqFilter.GetEventType(),
@@ -151,6 +154,12 @@ func (h *Handler) SubscribeEvents(request *executiondata.SubscribeEventsRequest,
 
 	sub := h.api.SubscribeEvents(stream.Context(), startBlockID, request.GetStartBlockHeight(), filter)
 
+	heartbeatInterval := request.HeartbeatInterval
+	if heartbeatInterval == 0 {
+		heartbeatInterval = h.defaultHeartbeatInterval
+	}
+
+	blocksSinceLastMessage := uint64(0)
 	for {
 		v, ok := <-sub.Channel()
 		if !ok {
@@ -163,6 +172,16 @@ func (h *Handler) SubscribeEvents(request *executiondata.SubscribeEventsRequest,
 		resp, ok := v.(*EventsResponse)
 		if !ok {
 			return status.Errorf(codes.Internal, "unexpected response type: %T", v)
+		}
+
+		// check if there are any events in the response. if not, do not send a message unless the last
+		// response was more than HeartbeatInterval blocks ago
+		if len(resp.Events) == 0 {
+			blocksSinceLastMessage++
+			if blocksSinceLastMessage < heartbeatInterval {
+				continue
+			}
+			blocksSinceLastMessage = 0
 		}
 
 		// BlockExecutionData contains CCF encoded events, and the Access API returns JSON-CDC events.
