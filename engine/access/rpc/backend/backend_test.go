@@ -37,6 +37,11 @@ import (
 
 const TEST_MAX_HEIGHT = 100
 
+var eventEncodingVersions = []entitiesproto.EventEncodingVersion{
+	entitiesproto.EventEncodingVersion_JSON_CDC_V0,
+	entitiesproto.EventEncodingVersion_CCF_V0,
+}
+
 type Suite struct {
 	suite.Suite
 
@@ -983,7 +988,8 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 
-	events := getEvents(10)
+	exeNodeEventEncodingVersion := entitiesproto.EventEncodingVersion_CCF_V0
+	events := getEventsWithEncoding(10, exeNodeEventEncodingVersion)
 	validExecutorIdentities := flow.IdentityList{}
 
 	setupStorage := func(n int) []*flow.Header {
@@ -1032,18 +1038,20 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	}
 
 	expected := make([]flow.BlockEvents, len(blockHeaders))
+	expectedEvents := getEventsWithEncoding(10, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
 	for i := 0; i < len(blockHeaders); i++ {
 		expected[i] = flow.BlockEvents{
 			BlockID:        blockHeaders[i].ID(),
 			BlockHeight:    blockHeaders[i].Height,
 			BlockTimestamp: blockHeaders[i].Timestamp,
-			Events:         events,
+			Events:         expectedEvents,
 		}
 	}
 
 	// create the execution node response
 	exeResp := &execproto.GetEventsForBlockIDsResponse{
-		Results: exeResults,
+		Results:              exeResults,
+		EventEncodingVersion: exeNodeEventEncodingVersion,
 	}
 
 	ctx := context.Background()
@@ -1103,6 +1111,28 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		require.NoError(suite.T(), err)
 		require.Empty(suite.T(), resp)
 	})
+
+	for _, version := range eventEncodingVersions {
+		suite.Run(fmt.Sprintf("test %s event encoding version for GetEventsForBlockIDs", version.String()), func() {
+			params := suite.defaultBackendParams()
+			params.ExecutionReceipts = receipts
+			params.ConnFactory = connFactory
+			params.FixedExecutionNodeIDs = validENIDs.Strings()
+
+			// create the handler
+			backend, err := New(params)
+			suite.Require().NoError(err)
+
+			// execute request with an empty block id list and expect an empty list of events and no error
+			result, err := backend.GetEventsForBlockIDs(ctx, string(flow.EventAccountCreated), []flow.Identifier{}, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+			expectedResult := getEventsWithEncoding(1, version)
+			suite.checkResponse(result, err)
+
+			for _, blockEvent := range result {
+				suite.Assert().Equal(blockEvent.Events, expectedResult)
+			}
+		})
+	}
 
 	suite.assertAllExpectations()
 }
@@ -1313,15 +1343,17 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		results := make([]flow.BlockEvents, len(blockHeaders))
 		exeResults := make([]*execproto.GetEventsForBlockIDsResponse_Result, len(blockHeaders))
 
+		exeNodeEventEncodingVersion := entitiesproto.EventEncodingVersion_CCF_V0
+
 		for i, header := range blockHeaders {
-			events := getEvents(1)
+			events := getEventsWithEncoding(1, exeNodeEventEncodingVersion)
 			height := header.Height
 
 			results[i] = flow.BlockEvents{
 				BlockID:        header.ID(),
 				BlockHeight:    height,
 				BlockTimestamp: header.Timestamp,
-				Events:         events,
+				Events:         getEventsWithEncoding(1, entitiesproto.EventEncodingVersion_JSON_CDC_V0),
 			}
 
 			exeResults[i] = &execproto.GetEventsForBlockIDsResponse_Result{
@@ -1332,7 +1364,8 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		}
 
 		exeResp := &execproto.GetEventsForBlockIDsResponse{
-			Results: exeResults,
+			Results:              exeResults,
+			EventEncodingVersion: exeNodeEventEncodingVersion,
 		}
 
 		suite.execClient.
@@ -1459,6 +1492,36 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		suite.Require().Error(err)
 	})
 
+	for _, version := range eventEncodingVersions {
+		suite.Run(fmt.Sprintf("test %s event encoding version for GetEventsForHeightRange", version.String()), func() {
+			headHeight = maxHeight - 1
+			setupHeadHeight(headHeight)
+			blockHeaders, _, nodeIdentities = setupStorage(minHeight, headHeight)
+			_ = setupExecClient()
+			fixedENIdentifiersStr := nodeIdentities.NodeIDs().Strings()
+
+			stateParams.On("SporkID").Return(unittest.IdentifierFixture(), nil)
+			stateParams.On("ProtocolVersion").Return(uint(unittest.Uint64InRange(10, 30)), nil)
+			stateParams.On("SporkRootBlockHeight").Return(headHeight, nil)
+			stateParams.On("SealedRoot").Return(head, nil)
+
+			params := suite.defaultBackendParams()
+			params.State = state
+			params.ConnFactory = connFactory
+			params.FixedExecutionNodeIDs = fixedENIdentifiersStr
+
+			backend, err := New(params)
+			suite.Require().NoError(err)
+
+			result, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight, version)
+			expectedResult := getEventsWithEncoding(1, version)
+			suite.checkResponse(result, err)
+
+			for _, blockEvent := range result {
+				suite.Assert().Equal(blockEvent.Events, expectedResult)
+			}
+		})
+	}
 }
 
 func (suite *Suite) TestGetNodeVersionInfo() {
@@ -1747,9 +1810,90 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 	})
 }
 
-// TestGetTransactionResultByIndexEventEncodingVersion tests the GetTransactionResultByIndex function with different
-// event encoding versions.
-func (suite *Suite) TestGetTransactionResultByIndexEventEncodingVersion() {
+// TestGetTransactionResultEventEncodingVersion tests the GetTransactionResult function with different event encoding versions.
+func (suite *Suite) TestGetTransactionResultEventEncodingVersion() {
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+
+	ctx := context.Background()
+
+	collection := unittest.CollectionFixture(1)
+	transactionBody := collection.Transactions[0]
+	// block which will eventually contain the transaction
+	block := unittest.BlockFixture()
+	block.SetPayload(
+		unittest.PayloadFixture(
+			unittest.WithGuarantees(
+				unittest.CollectionGuaranteesWithCollectionIDFixture([]*flow.Collection{&collection})...)))
+	blockId := block.ID()
+
+	// reference block to which the transaction points to
+	refBlock := unittest.BlockFixture()
+	refBlockID := refBlock.ID()
+	refBlock.Header.Height = 2
+	transactionBody.SetReferenceBlockID(refBlockID)
+	txId := transactionBody.ID()
+
+	// transaction storage returns the corresponding transaction
+	suite.transactions.
+		On("ByID", txId).
+		Return(transactionBody, nil)
+
+	light := collection.Light()
+	suite.collections.On("LightByID", mock.Anything).Return(&light, nil)
+
+	suite.snapshot.On("Head").Return(block.Header, nil)
+
+	// block storage returns the corresponding block
+	suite.blocks.
+		On("ByID", blockId).
+		Return(&block, nil)
+
+	_, fixedENIDs := suite.setupReceipts(&block)
+	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
+	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
+
+	// create a mock connection factory
+	connFactory := connectionmock.NewConnectionFactory(suite.T())
+	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+
+	params := suite.defaultBackendParams()
+	// the connection factory should be used to get the execution node client
+	params.ConnFactory = connFactory
+	params.FixedExecutionNodeIDs = (fixedENIDs.NodeIDs()).Strings()
+
+	backend, err := New(params)
+	suite.Require().NoError(err)
+
+	exeNodeEventEncodingVersion := entitiesproto.EventEncodingVersion_CCF_V0
+	events := getEventsWithEncoding(1, exeNodeEventEncodingVersion)
+	eventMessages := convert.EventsToMessages(events)
+
+	for _, version := range eventEncodingVersions {
+		suite.Run(fmt.Sprintf("test %s event encoding version for GetTransactionResult", version.String()), func() {
+			exeEventResp := &execproto.GetTransactionResultResponse{
+				Events:               eventMessages,
+				EventEncodingVersion: exeNodeEventEncodingVersion,
+			}
+
+			suite.execClient.
+				On("GetTransactionResult", ctx, &execproto.GetTransactionResultRequest{
+					BlockId:       blockId[:],
+					TransactionId: txId[:],
+				}).
+				Return(exeEventResp, nil).
+				Once()
+
+			result, err := backend.GetTransactionResult(ctx, txId, blockId, flow.ZeroID, version)
+			expectedResult := getEventsWithEncoding(1, version)
+			suite.checkResponse(result, err)
+
+			suite.Assert().Equal(result.Events, expectedResult)
+		})
+	}
+}
+
+// TestGetTransactionResultEventEncodingVersion tests the GetTransactionResult function with different event encoding versions.
+func (suite *Suite) TestGetTransactionResultByIndexAndBlockIdEventEncodingVersion() {
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 
 	ctx := context.Background()
@@ -1780,51 +1924,58 @@ func (suite *Suite) TestGetTransactionResultByIndexEventEncodingVersion() {
 	backend, err := New(params)
 	suite.Require().NoError(err)
 
-	exeEventReq := &execproto.GetTransactionByIndexRequest{
-		BlockId: blockId[:],
-		Index:   index,
+	exeNodeEventEncodingVersion := entitiesproto.EventEncodingVersion_CCF_V0
+	events := getEventsWithEncoding(1, exeNodeEventEncodingVersion)
+	eventMessages := convert.EventsToMessages(events)
+
+	for _, version := range eventEncodingVersions {
+		suite.Run(fmt.Sprintf("test %s event encoding version for GetTransactionResultByIndex", version.String()), func() {
+			exeEventResp := &execproto.GetTransactionResultResponse{
+				Events:               eventMessages,
+				EventEncodingVersion: exeNodeEventEncodingVersion,
+			}
+
+			suite.execClient.
+				On("GetTransactionResultByIndex", ctx, &execproto.GetTransactionByIndexRequest{
+					BlockId: blockId[:],
+					Index:   index,
+				}).
+				Return(exeEventResp, nil).
+				Once()
+
+			result, err := backend.GetTransactionResultByIndex(ctx, blockId, index, version)
+			suite.checkResponse(result, err)
+
+			expectedResult := getEventsWithEncoding(1, version)
+			suite.Assert().Equal(result.Events, expectedResult)
+		})
+
+		suite.Run(fmt.Sprintf("test %s event encoding version for GetTransactionResultsByBlockID", version.String()), func() {
+			exeEventResp := &execproto.GetTransactionResultsResponse{
+				TransactionResults: []*execproto.GetTransactionResultResponse{
+					{
+						Events:               eventMessages,
+						EventEncodingVersion: exeNodeEventEncodingVersion,
+					}},
+				EventEncodingVersion: exeNodeEventEncodingVersion,
+			}
+
+			suite.execClient.
+				On("GetTransactionResultsByBlockID", ctx, &execproto.GetTransactionsByBlockIDRequest{
+					BlockId: blockId[:],
+				}).
+				Return(exeEventResp, nil).
+				Once()
+
+			results, err := backend.GetTransactionResultsByBlockID(ctx, blockId, version)
+			suite.checkResponse(results, err)
+
+			expectedResult := getEventsWithEncoding(1, version)
+			for _, result := range results {
+				suite.Assert().Equal(result.Events, expectedResult)
+			}
+		})
 	}
-
-	defaultEncoding := entitiesproto.EventEncodingVersion_CCF_V0
-
-	// Define a helper function to prepare the GetTransactionResultResponse with a given encoding version.
-	prepareGetTransactionResultByIndex := func() {
-		events := getEventsWithEncoding(1, defaultEncoding)
-
-		exeEventResp := &execproto.GetTransactionResultResponse{
-			Events:               convert.EventsToMessages(events),
-			EventEncodingVersion: entitiesproto.EventEncodingVersion_CCF_V0,
-		}
-
-		suite.execClient.
-			On("GetTransactionResultByIndex", ctx, exeEventReq).
-			Return(exeEventResp, nil).
-			Once()
-	}
-
-	// Define a helper function to assert the result expectations.
-	assertResultExpectations := func(
-		expectedResult []flow.Event,
-		encodingVersion entitiesproto.EventEncodingVersion,
-	) {
-		result, err := backend.GetTransactionResultByIndex(ctx, blockId, index, encodingVersion)
-		suite.checkResponse(result, err)
-
-		suite.Require().NoError(err)
-		suite.Assert().Equal(result.Events, expectedResult)
-	}
-
-	suite.Run("test JSON event encoding", func() {
-		prepareGetTransactionResultByIndex()
-		expectedResult := getEventsWithEncoding(1, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
-		assertResultExpectations(expectedResult, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
-	})
-
-	suite.Run("test CFF event encoding", func() {
-		prepareGetTransactionResultByIndex()
-		expectedResult := getEventsWithEncoding(1, entitiesproto.EventEncodingVersion_CCF_V0)
-		assertResultExpectations(expectedResult, entitiesproto.EventEncodingVersion_CCF_V0)
-	})
 }
 
 // getEventsWithEncoding generates a specified number of events with a given encoding version.
