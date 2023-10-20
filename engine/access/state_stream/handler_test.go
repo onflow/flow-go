@@ -33,104 +33,20 @@ func TestExecutionDataStream(t *testing.T) {
 
 	api := ssmock.NewAPI(t)
 	stream := makeStreamMock[executiondata.SubscribeExecutionDataRequest, executiondata.SubscribeExecutionDataResponse](ctx)
-	sub := state_stream.NewSubscription(1)
 
 	// generate some events with a payload to include
 	// generators will produce identical event payloads (before encoding)
 	ccfEventGenerator := generator.EventGenerator(generator.WithEncoding(generator.EncodingCCF))
 	jsonEventsGenerator := generator.EventGenerator(generator.WithEncoding(generator.EncodingJSON))
-	inputEvents := make([]flow.Event, 0, 3)
-	expectedEvents := make([]flow.Event, 0, 3)
+	ccfInputEvents := make([]flow.Event, 0, 3)
+	jsonExpectedEvents := make([]flow.Event, 0, 3)
 	for i := 0; i < 3; i++ {
-		inputEvents = append(inputEvents, ccfEventGenerator.New())
-		expectedEvents = append(expectedEvents, jsonEventsGenerator.New())
+		ccfInputEvents = append(ccfInputEvents, ccfEventGenerator.New())
+		jsonExpectedEvents = append(jsonExpectedEvents, jsonEventsGenerator.New())
 	}
 
-	api.On("SubscribeExecutionData", mock.Anything, flow.ZeroID, uint64(0), mock.Anything).Return(sub)
-
-	h := state_stream.NewHandler(api, flow.Localnet.Chain(), state_stream.EventFilterConfig{}, 1)
-
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		wg.Done()
-		err := h.SubscribeExecutionData(&executiondata.SubscribeExecutionDataRequest{}, stream)
-		require.NoError(t, err)
-		t.Log("subscription closed")
-	}()
-	wg.Wait()
-
-	// send a single response
+	// Send a single response.
 	blockHeight := uint64(1)
-	executionData := unittest.BlockExecutionDataFixture(
-		unittest.WithChunkExecutionDatas(
-			unittest.ChunkExecutionDataFixture(t, 1024, unittest.WithChunkEvents(inputEvents)),
-			unittest.ChunkExecutionDataFixture(t, 1024, unittest.WithChunkEvents(inputEvents)),
-		),
-	)
-
-	err := sub.Send(ctx, &state_stream.ExecutionDataResponse{
-		Height:        blockHeight,
-		ExecutionData: executionData,
-	}, 100*time.Millisecond)
-	require.NoError(t, err)
-
-	// notify end of data
-	sub.Close()
-
-	receivedCount := 0
-	for {
-		t.Log(receivedCount)
-		resp, err := stream.RecvToClient()
-		if err == io.EOF {
-			break
-		}
-		require.NoError(t, err)
-
-		convertedExecData, err := convert.MessageToBlockExecutionData(resp.GetBlockExecutionData(), flow.Testnet.Chain())
-		require.NoError(t, err)
-
-		assert.Equal(t, blockHeight, resp.GetBlockHeight())
-
-		// make sure the payload is valid JSON-CDC
-		for _, chunk := range convertedExecData.ChunkExecutionDatas {
-			for i, e := range chunk.Events {
-				assert.Equal(t, expectedEvents[i], e)
-
-				_, err := jsoncdc.Decode(nil, e.Payload)
-				require.NoError(t, err)
-			}
-		}
-
-		receivedCount++
-
-		// shutdown the stream after one response
-		close(stream.sentFromServer)
-	}
-
-	// only expect a single response
-	assert.Equal(t, 1, receivedCount)
-}
-
-// TestExecutionDataStreamEventEncoding tests the event encoding behavior of the execution data stream.
-func TestExecutionDataStreamEventEncoding(t *testing.T) {
-	t.Parallel()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// Generate sample events for testing, each with a payload.
-	ccfEventGenerator := generator.EventGenerator(generator.WithEncoding(generator.EncodingCCF))
-	ccfEvents := make([]flow.Event, 0, 1)
-	ccfEvents = append(ccfEvents, ccfEventGenerator.New())
-
-	jsonEventsGenerator := generator.EventGenerator(generator.WithEncoding(generator.EncodingJSON))
-	jsonEvents := make([]flow.Event, 0, 1)
-	jsonEvents = append(jsonEvents, jsonEventsGenerator.New())
-
-	// Create a mock API and a mock stream for subscription.
-	api := ssmock.NewAPI(t)
-	stream := makeStreamMock[executiondata.SubscribeExecutionDataRequest, executiondata.SubscribeExecutionDataResponse](ctx)
 
 	// Helper function to perform a stream request and handle responses.
 	makeStreamRequest := func(request *executiondata.SubscribeExecutionDataRequest) {
@@ -150,11 +66,10 @@ func TestExecutionDataStreamEventEncoding(t *testing.T) {
 		}()
 		wg.Wait()
 
-		// Send a single response.
-		blockHeight := uint64(1)
 		executionData := unittest.BlockExecutionDataFixture(
 			unittest.WithChunkExecutionDatas(
-				unittest.ChunkExecutionDataFixture(t, 1024, unittest.WithChunkEvents(ccfEvents)),
+				unittest.ChunkExecutionDataFixture(t, 1024, unittest.WithChunkEvents(ccfInputEvents)),
+				unittest.ChunkExecutionDataFixture(t, 1024, unittest.WithChunkEvents(ccfInputEvents)),
 			),
 		)
 
@@ -168,56 +83,70 @@ func TestExecutionDataStreamEventEncoding(t *testing.T) {
 		sub.Close()
 	}
 
-	// Test scenario for JSON event encoding.
-	t.Run("test JSON event encoding", func(t *testing.T) {
-		makeStreamRequest(&executiondata.SubscribeExecutionDataRequest{
-			EventEncodingVersion: entities.EventEncodingVersion_JSON_CDC_V0,
-		})
+	// handleExecutionDataStreamResponses handles responses from the execution data stream.
+	handleExecutionDataStreamResponses := func(version entities.EventEncodingVersion, expectedEvents []flow.Event) {
+		receivedCount := 0
+		var responses []*executiondata.SubscribeExecutionDataResponse
 		for {
 			resp, err := stream.RecvToClient()
 			if err == io.EOF {
 				break
 			}
 			require.NoError(t, err)
-
-			convertedExecData, err := convert.MessageToBlockExecutionData(resp.GetBlockExecutionData(), flow.Testnet.Chain())
-			require.NoError(t, err)
-
-			// Verify that the payload is valid JSON-CDC.
-			for _, chunk := range convertedExecData.ChunkExecutionDatas {
-				for i, e := range chunk.Events {
-					assert.Equal(t, jsonEvents[i], e)
-				}
-			}
+			responses = append(responses, resp)
+			receivedCount++
 			close(stream.sentFromServer)
 		}
 
-	})
+		for _, resp := range responses {
+			convertedExecData, err := convert.MessageToBlockExecutionData(resp.GetBlockExecutionData(), flow.Testnet.Chain())
+			require.NoError(t, err)
 
-	// Test scenario for CFF event encoding.
-	t.Run("test CFF event encoding", func(t *testing.T) {
-		makeStreamRequest(&executiondata.SubscribeExecutionDataRequest{
-			EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
+			assert.Equal(t, blockHeight, resp.GetBlockHeight())
+
+			// Verify that the payload is valid
+			for _, chunk := range convertedExecData.ChunkExecutionDatas {
+				for i, e := range chunk.Events {
+					assert.Equal(t, expectedEvents[i], e)
+
+					if version == entities.EventEncodingVersion_JSON_CDC_V0 {
+						_, err := jsoncdc.Decode(nil, e.Payload)
+						require.NoError(t, err)
+					}
+				}
+			}
+
+			// only expect a single response
+			assert.Equal(t, 1, receivedCount)
+		}
+	}
+
+	tests := []struct {
+		name         string
+		eventVersion entities.EventEncodingVersion
+		expected     []flow.Event
+	}{
+		{
+			"test JSON event encoding",
+			entities.EventEncodingVersion_JSON_CDC_V0,
+			jsonExpectedEvents,
+		},
+		{
+			"test CFF event encoding",
+			entities.EventEncodingVersion_CCF_V0,
+			ccfInputEvents,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			makeStreamRequest(&executiondata.SubscribeExecutionDataRequest{
+				EventEncodingVersion: test.eventVersion,
+			})
+			handleExecutionDataStreamResponses(test.eventVersion, test.expected)
 		})
-		for {
-			resp, err := stream.RecvToClient()
-			if err == io.EOF {
-				break
-			}
-			require.NoError(t, err)
+	}
 
-			convertedExecData, err := convert.MessageToBlockExecutionData(resp.GetBlockExecutionData(), flow.Testnet.Chain())
-			require.NoError(t, err)
-
-			// Verify that the payload is valid CCF-V0.
-			for _, chunk := range convertedExecData.ChunkExecutionDatas {
-				for i, e := range chunk.Events {
-					assert.Equal(t, ccfEvents[i], e)
-				}
-			}
-			close(stream.sentFromServer)
-		}
-	})
 }
 
 func TestEventStream(t *testing.T) {
