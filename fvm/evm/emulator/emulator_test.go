@@ -208,10 +208,26 @@ func TestContractInteraction(t *testing.T) {
 				blk, err := env.NewBlockView(ctx)
 				require.NoError(t, err)
 				signer := emulator.GetDefaultSigner()
-				tx, _ := gethTypes.SignTx(gethTypes.NewTransaction(0, testAccount.ToCommon(), big.NewInt(1000), gethParams.TxGas, new(big.Int).Add(big.NewInt(0), gethCommon.Big1), nil), signer, key)
+				tx, _ := gethTypes.SignTx(
+					gethTypes.NewTransaction(
+						0,                      // nonce
+						testAccount.ToCommon(), // to
+						big.NewInt(1000),       // amount
+						gethParams.TxGas,       // gas limit
+						gethCommon.Big1,        // gas price
+						nil,                    // data
+					), signer, key)
 				_, err = blk.RunTransaction(tx)
-				// TODO check the balance of coinbase
 				require.NoError(t, err)
+
+				// check the balance of coinbase
+				// TODO: fix this ?
+				blk2, err := env.NewReadOnlyBlockView(ctx)
+				require.NoError(t, err)
+
+				bal, err := blk2.BalanceOf(ctx.GasFeeCollector)
+				require.NoError(t, err)
+				require.Greater(t, bal.Uint64(), uint64(0))
 			})
 		})
 	})

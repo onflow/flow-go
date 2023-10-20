@@ -18,7 +18,7 @@ var (
 	// ErrInsufficientTotalSupply is returned when flow token
 	// is withdraw request is there but not enough balance is on EVM vault
 	// this should never happen but its a saftey measure to protect Flow against EVM issues.
-	// TODO we might consider this fatal
+	// TODO: we might consider this fatal
 	ErrInsufficientTotalSupply = errors.New("insufficient total supply")
 
 	// ErrBalanceConversion is returned conversion of balance has failed, usually
