@@ -146,16 +146,30 @@ func (m *AtreeRegisterMigrator) migrateAccountStorage(
 		}
 	}
 
+	if mr.Address == cricketMomentsAddress {
+		m.log.Info().Msg("Committing storage domain changes")
+	}
+
 	// commit the storage changes
-	err := mr.Storage.Commit(mr.Interpreter, true)
+	// TODO: for cricket moments `commitNewStorageMaps` already happened potentially
+	// try switching directly to s.PersistentSlabStorage.FastCommit(runtime.NumCPU())
+	err := mr.Storage.Commit(mr.Interpreter, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to commit storage: %w", err)
+	}
+
+	if mr.Address == cricketMomentsAddress {
+		m.log.Info().Msg("Finalizing storage domain changes transaction")
 	}
 
 	// finalize the transaction
 	result, err := mr.TransactionState.FinalizeMainTransaction()
 	if err != nil {
 		return nil, fmt.Errorf("failed to finalize main transaction: %w", err)
+	}
+
+	if mr.Address == cricketMomentsAddress {
+		m.log.Info().Msg("Storage domain changes transaction finalized")
 	}
 
 	return result.WriteSet, nil

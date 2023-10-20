@@ -295,6 +295,8 @@ func cloneCricketMomentsShardedCollection(
 						},
 					)
 
+					// TODO: potentially remove here as well
+
 					progressLog(1)
 				}
 			}
@@ -325,7 +327,10 @@ func cloneCricketMomentsShardedCollection(
 			return nil, fmt.Errorf("failed to get nft collection: %w", err)
 		}
 
+		// TODO: move remove inside the copy loop
 		err = capturePanic(func() {
+			// TODO: remove is fairly slow, consider customizing it, to remove some
+			// unnecessary checks
 			ownedNFTs.Remove(
 				mr.Interpreter,
 				interpreter.EmptyLocationRange,
@@ -346,6 +351,7 @@ func cloneCricketMomentsShardedCollection(
 		return nil, err
 	}
 
+	// this is fairly short no need to optimise
 	progressLog = util2.LogProgress(log, "setting cloned cricket moments", len(clonedValues))
 	for _, clonedValue := range clonedValues {
 		ownedNFTs, err := getNftCollection(
@@ -359,7 +365,7 @@ func cloneCricketMomentsShardedCollection(
 		}
 
 		err = capturePanic(func() {
-			ownedNFTs.Insert(
+			ownedNFTs.UnsafeInsert(
 				mr.Interpreter,
 				interpreter.EmptyLocationRange,
 				clonedValue.nftCollectionKey,
