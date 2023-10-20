@@ -77,8 +77,8 @@ func NewSpamDetectionConfig() (*SpamDetectionConfig, error) {
 
 	return &SpamDetectionConfig{
 		// see config/default-config.yml for more information on the following fields
-		batchRequestBaseProb: flowConfig.NetworkConfig.SyncEngineBatchRequestBaseProb,
-		syncRequestProb:      flowConfig.NetworkConfig.SyncEngineSyncRequestProb,
-		rangeRequestBaseProb: flowConfig.NetworkConfig.SyncEngineRangeRequestBaseProb,
+		batchRequestBaseProb: flowConfig.NetworkConfig.SyncEngine.SyncEngineBatchRequestBaseProb,
+		syncRequestProb:      flowConfig.NetworkConfig.SyncEngine.SyncEngineSyncRequestProb,
+		rangeRequestBaseProb: flowConfig.NetworkConfig.SyncEngine.SyncEngineRangeRequestBaseProb,
 	}, nil
 }

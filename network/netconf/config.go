@@ -115,6 +115,11 @@ type AlspConfig struct {
 	// events that are used to perform critical ALSP tasks, such as updating the spam records cache.
 	HearBeatInterval time.Duration `mapstructure:"alsp-heart-beat-interval"`
 
+	SyncEngine SyncEngineAlspConfig
+}
+
+// SyncEngineAlspConfig is the ALSP config for the SyncEngine.
+type SyncEngineAlspConfig struct {
 	// SyncEngineBatchRequestBaseProb is the base probability in [0,1] that's used in creating the final probability of creating a
 	// misbehavior report for a BatchRequest message. This is why the word "base" is used in the name of this field,
 	// since it's not the final probability and there are other factors that determine the final probability.
