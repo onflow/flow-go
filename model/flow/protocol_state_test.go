@@ -29,15 +29,11 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 			})
 		}
 		stateEntry := &flow.ProtocolStateEntry{
+			PreviousEpoch: nil,
 			CurrentEpoch: flow.EpochStateContainer{
 				SetupID:          setup.ID(),
 				CommitID:         currentEpochCommit.ID(),
 				ActiveIdentities: identities,
-			},
-			PreviousEpoch: &flow.EpochStateContainer{
-				SetupID:          flow.ZeroID,
-				CommitID:         flow.ZeroID,
-				ActiveIdentities: nil,
 			},
 			InvalidStateTransitionAttempted: false,
 		}

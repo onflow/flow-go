@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -214,10 +215,12 @@ func (s *UpdaterSuite) TestUpdateIdentityHappyPath() {
 	s.updater = NewUpdater(s.candidate, s.parentProtocolState)
 
 	currentEpochParticipants := s.parentProtocolState.CurrentEpochIdentityTable.Copy()
-	weightChanges, err := currentEpochParticipants.Sample(2)
+	weightChanges, err := currentEpochParticipants.Sample(3)
 	require.NoError(s.T(), err)
 	ejectedChanges, err := currentEpochParticipants.Sample(2)
 	require.NoError(s.T(), err)
+	require.Greater(s.T(), len(weightChanges), len(ejectedChanges),
+		"due to sampling and test setup we want to have more weight changes than ejected changes")
 	for i, identity := range weightChanges {
 		identity.DynamicIdentity.Weight = uint64(100 * i)
 	}
@@ -236,17 +239,24 @@ func (s *UpdaterSuite) TestUpdateIdentityHappyPath() {
 	updatedState, _, hasChanges := s.updater.Build()
 	require.True(s.T(), hasChanges, "should have changes")
 
-	requireUpdatesApplied := func(identityLookup map[flow.Identifier]*flow.DynamicIdentityEntry) {
-		for _, identity := range allUpdates {
-			updatedIdentity := identityLookup[identity.NodeID]
-			require.Equal(s.T(), identity.NodeID, updatedIdentity.NodeID)
-			require.Equal(s.T(), identity.DynamicIdentity, updatedIdentity.Dynamic, "identity should be updated")
-		}
-	}
+	// assert that all changes made in the previous epoch are preserved
+	currentEpochLookup := updatedState.CurrentEpoch.ActiveIdentities.Lookup()
+	nextEpochLookup := updatedState.NextEpoch.ActiveIdentities.Lookup()
 
-	// check if changes are reflected in current and next epochs
-	requireUpdatesApplied(updatedState.CurrentEpoch.ActiveIdentities.Lookup())
-	requireUpdatesApplied(updatedState.NextEpoch.ActiveIdentities.Lookup())
+	for _, updated := range allUpdates {
+		currentEpochIdentity, foundInCurrentEpoch := currentEpochLookup[updated.NodeID]
+		if foundInCurrentEpoch {
+			require.Equal(s.T(), updated.NodeID, currentEpochIdentity.NodeID)
+			require.Equal(s.T(), updated.DynamicIdentity, currentEpochIdentity.Dynamic)
+		}
+
+		nextEpochIdentity, foundInNextEpoch := nextEpochLookup[updated.NodeID]
+		if foundInNextEpoch {
+			require.Equal(s.T(), updated.NodeID, nextEpochIdentity.NodeID)
+			require.Equal(s.T(), updated.DynamicIdentity, nextEpochIdentity.Dynamic)
+		}
+		require.True(s.T(), foundInCurrentEpoch || foundInNextEpoch, "identity should be found in either current or next epoch")
+	}
 }
 
 // TestProcessEpochSetupInvariants tests if processing epoch setup when invariants are violated doesn't update internal structures.
@@ -358,10 +368,12 @@ func (s *UpdaterSuite) TestEpochSetupAfterIdentityChange() {
 		_, exists := s.parentProtocolState.CurrentEpochSetup.Participants.ByNodeID(i.NodeID)
 		return exists
 	}).Sort(order.Canonical[flow.Identity])
-	weightChanges, err := participantsFromCurrentEpochSetup.Sample(2)
+	weightChanges, err := participantsFromCurrentEpochSetup.Sample(3)
 	require.NoError(s.T(), err)
 	ejectedChanges, err := participantsFromCurrentEpochSetup.Sample(2)
 	require.NoError(s.T(), err)
+	require.Greater(s.T(), len(weightChanges), len(ejectedChanges),
+		"due to sampling and test setup we want to have more weight changes than ejected changes")
 	for i, identity := range weightChanges {
 		identity.DynamicIdentity.Weight = uint64(100 * (i + 1))
 	}
@@ -403,7 +415,12 @@ func (s *UpdaterSuite) TestEpochSetupAfterIdentityChange() {
 
 	setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
 		setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
-		setup.Participants = append(setup.Participants, allUpdates.ToSkeleton()...) // add those nodes that were changed in previous epoch
+		// add those nodes that were changed in the previous epoch, but not those that were ejected
+		// it's important to exclude ejected nodes, since we expect that service smart contract has emitted ejection operation
+		// and service events are delivered (asynchronously) in an *order-preserving* manner meaning if ejection has happened before
+		// epoch setup then there is no possible way that it will include ejected node unless there is a severe bug in the service contract.
+		setup.Participants = append(setup.Participants, weightChanges.ToSkeleton()...).Filter(
+			filter.Not(filter.In(ejectedChanges.ToSkeleton()))).Sort(order.Canonical[flow.IdentitySkeleton])
 	})
 
 	err = s.updater.ProcessEpochSetup(setup)
@@ -417,24 +434,28 @@ func (s *UpdaterSuite) TestEpochSetupAfterIdentityChange() {
 
 	for _, updated := range ejectedChanges {
 		currentEpochIdentity := currentEpochLookup[updated.NodeID]
-		nextEpochIdentity := nextEpochLookup[updated.NodeID]
 		require.Equal(s.T(), updated.NodeID, currentEpochIdentity.NodeID)
-		require.Equal(s.T(), updated.NodeID, nextEpochIdentity.NodeID)
-
 		require.Equal(s.T(), updated.Ejected, currentEpochIdentity.Dynamic.Ejected)
-		require.Equal(s.T(), updated.Ejected, nextEpochIdentity.Dynamic.Ejected)
+
+		_, foundInNextEpoch := nextEpochLookup[updated.NodeID]
+		require.False(s.T(), foundInNextEpoch)
 	}
 
 	for _, updated := range weightChanges {
 		currentEpochIdentity := currentEpochLookup[updated.NodeID]
-		nextEpochIdentity := nextEpochLookup[updated.NodeID]
 		require.Equal(s.T(), updated.NodeID, currentEpochIdentity.NodeID)
-		require.Equal(s.T(), updated.NodeID, nextEpochIdentity.NodeID)
-
 		require.Equal(s.T(), updated.DynamicIdentity.Weight, currentEpochIdentity.Dynamic.Weight)
 		require.NotEqual(s.T(), updated.InitialWeight, currentEpochIdentity.Dynamic.Weight,
 			"since we have updated weight it should not be equal to initial weight")
-		require.Equal(s.T(), updated.InitialWeight, nextEpochIdentity.Dynamic.Weight,
-			"we take information about weight from next epoc setup event")
+
+		// it's possible that we have sampled weight and ejected changes for the same node so we need to check if it was ejected
+		if nextEpochIdentity, found := nextEpochLookup[updated.NodeID]; found {
+			require.Equal(s.T(), updated.NodeID, nextEpochIdentity.NodeID)
+			require.Equal(s.T(), updated.InitialWeight, nextEpochIdentity.Dynamic.Weight,
+				"we take information about weight from next epoc setup event")
+		} else {
+			_, wasEjected := ejectedChanges.ByNodeID(updated.NodeID)
+			require.True(s.T(), wasEjected, "only if node is ejected it could be missing from next epoch lookup")
+		}
 	}
 }

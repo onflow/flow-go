@@ -2596,16 +2596,11 @@ func RootProtocolStateFixture() *flow.RichProtocolStateEntry {
 	}
 	return &flow.RichProtocolStateEntry{
 		ProtocolStateEntry: &flow.ProtocolStateEntry{
-
+			PreviousEpoch: nil,
 			CurrentEpoch: flow.EpochStateContainer{
 				SetupID:          currentEpochSetup.ID(),
 				CommitID:         currentEpochCommit.ID(),
 				ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(allIdentities),
-			},
-			PreviousEpoch: &flow.EpochStateContainer{
-				SetupID:          flow.ZeroID,
-				CommitID:         flow.ZeroID,
-				ActiveIdentities: nil,
 			},
 			InvalidStateTransitionAttempted: false,
 			NextEpoch:                       nil,
