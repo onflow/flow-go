@@ -3,11 +3,11 @@ config is a package to hold all configuration values for each Flow component. Th
 to the entire FlowConfig and utilities to add a new config value, corresponding CLI flag, and validation.
 
 ### Package structure
-The root config package contains the FlowConfig struct and the default config file [default-config.yml](https://github.com/onflow/flow-go/blob/master/config/default-config.yml). The `default-config.yml` file is the default configuration that is loaded when the config package is initialize.
+The root config package contains the FlowConfig struct and the default config file [default-config.yml](https://github.com/onflow/flow-go/blob/master/config/default-config.yml). The `default-config.yml` file is the default configuration that is loaded when the config package is initialized.
 The `default-config.yml` is a snapshot of all the configuration values defined for Flow.
-Each subpackage contains configuration structs and utilities for components and their related subcomponents. These packages also contain the CLI flags for each configuration value. The [network](https://github.com/onflow/flow-go/tree/master/config/network) package
+Each subpackage contains configuration structs and utilities for components and their related subcomponents. These packages also contain the CLI flags for each configuration value. The [netconf](https://github.com/onflow/flow-go/tree/master/network/netconf) package
 is a good example of this pattern. The network component is a large component made of many other large components and subcomponents. Each configuration 
-struct is defined for all of these network related components in the network subpackage and CLI flags. 
+struct is defined for all of these network related components in the netconf subpackage and CLI flags. 
 
 ### Overriding default values
 The entire default config can be overridden using the `--config-file` CLI flag. When set the config package will attempt to parse the specified config file and override all the values 
@@ -26,19 +26,30 @@ go build -tags relic -o flow-access-node ./cmd/access
 ### Adding a new config value
 Adding a new config to the FlowConfig can be done in a few easy steps.
 
+The network package can be used as a good example of how to add CLI flags and will be used in the steps below.
+
 1. Create a new subpackage in the config package for the new configuration structs to live. Although it is encouraged to put all configuration sub-packages in the config package 
 so that configuration can be updated in one place these sub-packages can live anywhere. This package will define the configuration structs and CLI flags for overriding.
     ```shell
     mkdir example_config 
     ```
+    For the network package we have a subpackage created in [network/netconf](https://github.com/onflow/flow-go/tree/master/network/netconf). 
+
 2. Add a new CLI flag for the config value. 
     ```go
     const workersCLIFlag = "app-workers"
     flags.String(workersCLIFlag, 1, "number of app workers")
     ```
-    The network package can be used as a good example of how to structure CLI flag initialization. All flags are initialized in a single function [InitializeNetworkFlags](https://github.com/onflow/flow-go/blob/master/network/netconf/flags.go#L80), this function is then used during flag initialization 
-    of the [config package](https://github.com/onflow/flow-go/blob/master/config/base_flags.go#L22).
-3. Add the config as a new field to an existing configuration struct or create a new one. Each configuration struct must be a field on the FlowConfig struct so that it is unmarshalled during configuration initialization.
+
+   All network package CLI flags are defined in [network/netconf/flags.go](https://github.com/onflow/flow-go/blob/master/network/netconf/flags.go) in:
+    - `const` block
+    - `AllFlagNames` function
+    - `InitializeNetworkFlags` function
+
+    `InitializeNetworkFlags` is used during initialization of all flags 
+    in the `InitializePFlagSet` function in the [config/base_flags.go](https://github.com/onflow/flow-go/blob/master/config/base_flags.go).
+
+3. Add the config as a new field to an existing configuration struct or create a new struct. Each configuration struct must be a field on the FlowConfig struct so that it is unmarshalled during configuration initialization.
     Each field on a configuration struct must contain the following field tags.
    1. `validate` - validate tag is used to perform validation on field structs using the [validator](https://github.com/go-playground/validator) package. In the example below you will notice 
    the `validate:"gt=0"` tag, this will ensure that the value of `AppWorkers` is greater than 0. The top level `FlowConfig` struct has a Validate method that performs struct validation. This 
@@ -50,6 +61,9 @@ so that configuration can be updated in one place these sub-packages can live an
         }
     ```
    It's important to make sure that the CLI flag name matches the mapstructure field tag to avoid parsing errors.
+   
+   All network package configuration structs are defined in [network/netconf/config.go](https://github.com/onflow/flow-go/blob/master/network/netconf/config.go)
+
 4. Add the new config and a default value to the `default-config.yml` file. Ensure that the new property added matches the configuration struct structure for the subpackage the config belongs to.
     ```yaml
       config-file: "./default-config.yml"
@@ -58,8 +72,11 @@ so that configuration can be updated in one place these sub-packages can live an
       my-component:
         app-workers: 1
     ```
-5. Finally, if a new struct was created add it as a new field to the FlowConfig. In the previous steps we added a new config struct and added a new property to the default-config.yml for this struct `my-component`. This property name
-    must match the mapstructure field tag for the struct when added to the FlowConfig.
+   
+    All network package configuration values are defined under `network-config` in `default-config.yml`
+
+5. If a new struct was created in step 3, add it as a new field to `FlowConfig` struct in [config/config.go](https://github.com/onflow/flow-go/blob/master/config/config.go). In the previous steps we added a new config struct and added a new property to the `default-config.yml` for this struct `my-component`. This property name
+    must match the mapstructure field tag for the struct when added to `FlowConfig`.
     ```go
     // FlowConfig Flow configuration.
     type FlowConfig struct {
@@ -68,6 +85,9 @@ so that configuration can be updated in one place these sub-packages can live an
         MyComponentConfig *mypackage.MyComponentConfig `mapstructure:"my-component"`
     }
     ```
+   
+    The network package configuration struct, `NetworkConfig`, is already embedded as a field in `FlowConfig` struct.
+    This means that new flags can be added to the network package configuration struct without having to update the `FlowConfig` struct.
 
 ### Nested structs
 In an effort to keep the configuration yaml structure readable some configuration will be in nested properties. When this is the case the mapstructure `squash` tag can be used so that the corresponding nested struct will be 
