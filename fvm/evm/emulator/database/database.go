@@ -99,7 +99,10 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 func (db *Database) Put(key []byte, value []byte) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
+	return db.put(key, value)
+}
 
+func (db *Database) put(key []byte, value []byte) error {
 	_, err := db.atreemap.Set(compare, hashInputProvider, NewByteStringValue(key), NewByteStringValue(value))
 	return err
 }
@@ -120,7 +123,10 @@ func (db *Database) Has(key []byte) (bool, error) {
 func (db *Database) Delete(key []byte) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
+	return db.delete(key)
+}
 
+func (db *Database) delete(key []byte) error {
 	_, _, err := db.atreemap.Remove(compare, hashInputProvider, NewByteStringValue(key))
 	if err != nil {
 		return types.NewFatalError(err)
@@ -144,36 +150,7 @@ func (db *Database) GetRootHash() (gethCommon.Hash, error) {
 	return gethCommon.Hash(data), err
 }
 
-// TODO depricate these
-// SetLatestBlock sets the latest executed block
-// we have this functionality given we only allow on state to exist
-func (db *Database) SetLatestBlock(block *types.Block) error {
-	blockBytes, err := block.ToBytes()
-	if err != nil {
-		return types.NewFatalError(err)
-	}
-	err = db.led.SetValue(db.flowEVMRootAddress[:], []byte(FlowEVMLatextBlockKey), blockBytes)
-	if err != nil {
-		return types.NewFatalError(err)
-	}
-	return nil
-}
-
-// GetLatestBlock returns the latest executed block
-// we have this functionality given we only allow on state to exist (no forks, etc.)
-func (db *Database) GetLatestBlock() (*types.Block, error) {
-	data, err := db.led.GetValue(db.flowEVMRootAddress[:], []byte(FlowEVMLatextBlockKey))
-	if len(data) == 0 {
-		return types.GenesisBlock, err
-	}
-	if err != nil {
-		return nil, types.NewFatalError(err)
-	}
-	return types.NewBlockFromBytes(data)
-}
-
 func (db *Database) storeMapRoot() error {
-	// TODO: read the size from atree package
 	storageIDSize := 16
 	rootIDBytes := make([]byte, storageIDSize)
 	_, err := db.atreemap.StorageID().ToRawBytes(rootIDBytes)
@@ -221,7 +198,7 @@ func (db *Database) NewBatchWithSize(size int) gethDB.Batch {
 // of database content with a particular key prefix, starting at a particular
 // initial key (or after, if it does not exist).
 func (db *Database) NewIterator(prefix []byte, start []byte) gethDB.Iterator {
-	// TODO(ramtin): implement this if needed with iterator over atree
+	// Ramtin: we could implement this in the future if needed using atree iterator support
 	panic(errNotImplemented)
 }
 
@@ -291,15 +268,15 @@ func (b *batch) ValueSize() int {
 
 // Write flushes any accumulated data to the memory database.
 func (b *batch) Write() error {
-	// TODO we could optimize this by locking once and do the update using underlying put and delete method
+	b.db.lock.Lock()
+	defer b.db.lock.Unlock()
 	for _, keyvalue := range b.writes {
 		if keyvalue.delete {
-			b.db.Delete(keyvalue.key)
+			b.db.delete(keyvalue.key)
 			continue
 		}
-		b.db.Put(keyvalue.key, keyvalue.value)
+		b.db.put(keyvalue.key, keyvalue.value)
 	}
-
 	return nil
 }
 
