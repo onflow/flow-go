@@ -23,6 +23,7 @@ import (
 	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/storage"
+	pebbleStorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -97,7 +98,7 @@ func Test_NewlyCreatedAccount(t *testing.T) {
 	blockchain := unittest.BlockchainFixture(10)
 	first := blockchain[0]
 	tree := bootstrapFVM(t)
-	tree, newAddress := createAccount(t, tree)
+	tree, _, newAddress := createAccount(t, tree)
 
 	scripts := newScripts(
 		t,
@@ -105,12 +106,39 @@ func Test_NewlyCreatedAccount(t *testing.T) {
 		treeToRegisterAdapter(tree),
 	)
 
-	address := chain.ServiceAddress()
 	account, err := scripts.GetAccountAtBlockHeight(context.Background(), newAddress, first.Header.Height)
 	require.NoError(t, err)
-	assert.Equal(t, address, account.Address)
-	assert.NotZero(t, account.Balance)
-	assert.NotZero(t, len(account.Contracts))
+	assert.Equal(t, newAddress, account.Address)
+}
+
+func Test_IntegrationStorage(t *testing.T) {
+	entropyProvider := testutil.EntropyProviderFixture(nil)
+	entropyBlock := mock.NewEntropyProviderPerBlock(t)
+	blockchain := unittest.BlockchainFixture(10)
+	headers := newBlockHeadersStorage(blockchain)
+
+	pebbleStorage.RunWithRegistersStorageAtInitialHeights(t, 0, blockchain[0].Header.Height, func(registers *pebbleStorage.Registers) {
+		entropyBlock.
+			On("AtBlockID", mocks.AnythingOfType("flow.Identifier")).
+			Return(entropyProvider).
+			Maybe()
+
+		snap := bootstrapFVM(t)
+		snap, exeSnap, newAddress := createAccount(t, snap)
+
+		newHeight := blockchain[1].Header.Height
+		err := registers.Store(exeSnap.UpdatedRegisters(), newHeight)
+		require.NoError(t, err)
+
+		scripts, err := NewScripts(zerolog.Nop(), collector, flow.Emulator, entropyBlock, headers, func(ID flow.RegisterID, height uint64) (flow.RegisterValue, error) {
+			return registers.Get(ID, height)
+		})
+		require.NoError(t, err)
+
+		acc, err := scripts.GetAccountAtBlockHeight(context.Background(), newAddress, newHeight)
+		require.NoError(t, err)
+		assert.Equal(t, acc.Address, newAddress)
+	})
 }
 
 func newScripts(
@@ -163,8 +191,8 @@ func bootstrapFVM(t *testing.T) snapshot.SnapshotTree {
 	return snapshotTree.Append(executionSnapshot)
 }
 
-// createAccount on an existing bootstrapped snapshot and return a new snapshot as well as the newly created account address
-func createAccount(t *testing.T, tree snapshot.SnapshotTree) (snapshot.SnapshotTree, flow.Address) {
+// createAccount on an existing bootstrapped snapshot tree, execution snapshot and return a new snapshot as well as the newly created account address
+func createAccount(t *testing.T, tree snapshot.SnapshotTree) (snapshot.SnapshotTree, *snapshot.ExecutionSnapshot, flow.Address) {
 	const createAccountTransaction = `
 	transaction {
 	  prepare(signer: AuthAccount) {
@@ -174,6 +202,7 @@ func createAccount(t *testing.T, tree snapshot.SnapshotTree) (snapshot.SnapshotT
 	`
 
 	ctx := fvm.NewContext(
+		fvm.WithChain(chain),
 		fvm.WithAuthorizationChecksEnabled(false),
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 	)
@@ -207,7 +236,7 @@ func createAccount(t *testing.T, tree snapshot.SnapshotTree) (snapshot.SnapshotT
 	require.NoError(t, err)
 	address := flow.ConvertAddress(data.(cadence.Event).Fields[0].(cadence.Address))
 
-	return tree, address
+	return tree, executionSnapshot, address
 }
 
 // converts tree get register function to the required script get register function
