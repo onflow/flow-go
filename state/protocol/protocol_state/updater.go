@@ -24,7 +24,8 @@ type Updater struct {
 
 	// The following fields are maps from NodeID → DynamicIdentityEntry for the nodes that are *active* in the respective epoch.
 	// Active means that these nodes are authorized to contribute to extending the chain. Formally, as node is active if and only
-	// if it is listed in the EpochSetup event for the respective epoch.
+	// if it is listed in the EpochSetup event for the respective epoch. Note that map values are pointers, so writes to map values
+	// will modify the respective DynamicIdentityEntry in EpochStateContainer.
 
 	prevEpochIdentitiesLookup    map[flow.Identifier]*flow.DynamicIdentityEntry // lookup for nodes active in the previous epoch, may be nil or empty
 	currentEpochIdentitiesLookup map[flow.Identifier]*flow.DynamicIdentityEntry // lookup for nodes active in the current epoch, never nil or empty
