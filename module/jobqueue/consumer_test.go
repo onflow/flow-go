@@ -201,21 +201,23 @@ func TestCheckBeforeStartIsNoop(t *testing.T) {
 		err := progress.InitProcessedIndex(storedProcessedIndex)
 		require.NoError(t, err)
 
-		c := NewConsumer(
+		c, err := NewConsumer(
 			unittest.Logger(),
 			NewMockJobs(),
 			progress,
 			worker,
 			uint64(3),
 			0,
+			10,
 		)
+		require.NoError(t, err)
 		worker.WithConsumer(c)
 
 		// check will store the processedIndex. Before start, it will be uninitialized (0)
 		c.Check()
 
 		// start will load the processedIndex from storage
-		err = c.Start(10)
+		err = c.Start()
 		require.NoError(t, err)
 
 		// make sure that the processedIndex at the end is from storage
