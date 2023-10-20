@@ -4,7 +4,6 @@ import (
 	"bytes"
 	crand "crypto/rand"
 	"fmt"
-	"github.com/onflow/flow-go/model/flow/mapfunc"
 	"math/rand"
 	"net"
 	"testing"
@@ -34,6 +33,7 @@ import (
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/flow/mapfunc"
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/model/verification"
@@ -2602,7 +2602,7 @@ func RootProtocolStateFixture() *flow.RichProtocolStateEntry {
 				CommitID:         currentEpochCommit.ID(),
 				ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(allIdentities),
 			},
-			PreviousEpoch: flow.EpochStateContainer{
+			PreviousEpoch: &flow.EpochStateContainer{
 				SetupID:          flow.ZeroID,
 				CommitID:         flow.ZeroID,
 				ActiveIdentities: nil,
@@ -2673,7 +2673,7 @@ func ProtocolStateFixture(options ...func(*flow.RichProtocolStateEntry)) *flow.R
 				CommitID:         currentEpochCommit.ID(),
 				ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(currentEpochIdentities),
 			},
-			PreviousEpoch: flow.EpochStateContainer{
+			PreviousEpoch: &flow.EpochStateContainer{
 				SetupID:          prevEpochSetup.ID(),
 				CommitID:         prevEpochCommit.ID(),
 				ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(prevEpochIdentities),

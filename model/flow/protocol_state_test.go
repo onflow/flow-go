@@ -34,7 +34,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 				CommitID:         currentEpochCommit.ID(),
 				ActiveIdentities: identities,
 			},
-			PreviousEpoch: flow.EpochStateContainer{
+			PreviousEpoch: &flow.EpochStateContainer{
 				SetupID:          flow.ZeroID,
 				CommitID:         flow.ZeroID,
 				ActiveIdentities: nil,

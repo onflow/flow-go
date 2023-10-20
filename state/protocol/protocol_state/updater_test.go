@@ -321,9 +321,14 @@ func (s *UpdaterSuite) TestProcessEpochSetupHappyPath() {
 // built updated protocol state. It should build a union of participants from current and next epoch for current and
 // next epoch protocol states respectively.
 func (s *UpdaterSuite) TestProcessEpochSetupWithSameParticipants() {
-	participantsFromCurrentEpochSetup, err := flow.ReconstructIdentities(s.parentProtocolState.CurrentEpochSetup.Participants,
+	participantsFromCurrentEpochSetup, err := flow.ComposeFullIdentities(s.parentProtocolState.CurrentEpochSetup.Participants,
 		s.parentProtocolState.CurrentEpoch.ActiveIdentities)
 	require.NoError(s.T(), err)
+	// Function `ComposeFullIdentities` verified that `Participants` and `ActiveIdentities` have identical ordering w.r.t nodeID.
+	// By construction, `participantsFromCurrentEpochSetup` lists the full Identities in the same ordering as `Participants` and
+	// `ActiveIdentities`. By confirming that `participantsFromCurrentEpochSetup` follows canonical ordering, we can conclude that
+	// also `Participants` and `ActiveIdentities` are canonically ordered.
+	require.True(s.T(), participantsFromCurrentEpochSetup.Sorted(order.Canonical[flow.Identity]), "participants in current epoch's setup event are not in canonical order")
 
 	overlappingNodes, err := participantsFromCurrentEpochSetup.Sample(2)
 	require.NoError(s.T(), err)

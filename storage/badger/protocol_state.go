@@ -144,7 +144,7 @@ func newRichProtocolStateEntry(
 		err                 error
 	)
 	// query and fill in epoch setups and commits for previous and current epochs
-	if protocolState.PreviousEpoch.SetupID != flow.ZeroID {
+	if protocolState.PreviousEpoch != nil {
 		previousEpochSetup, err = setups.ByID(protocolState.PreviousEpoch.SetupID)
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve previous epoch setup: %w", err)
