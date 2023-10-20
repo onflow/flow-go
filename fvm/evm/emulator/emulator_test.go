@@ -7,15 +7,15 @@ import (
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/params"
+	gethCrypto "github.com/ethereum/go-ethereum/crypto"
+	gethParams "github.com/ethereum/go-ethereum/params"
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/fvm/evm/emulator"
 	"github.com/onflow/flow-go/fvm/evm/emulator/database"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
-
-	"github.com/stretchr/testify/require"
 )
 
 var blockNumber = big.NewInt(10)
@@ -23,8 +23,8 @@ var defaultCtx = types.NewDefaultBlockContext(blockNumber.Uint64())
 
 func RunWithTestDB(t testing.TB, f func(*database.Database)) {
 	testutils.RunWithTestBackend(t, func(backend types.Backend) {
-		testutils.RunWithTestFlexRoot(t, backend, func(flexRoot flow.Address) {
-			db, err := database.NewDatabase(backend, testutils.TestFlexRootAddress)
+		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(flowEVMRoot flow.Address) {
+			db, err := database.NewDatabase(backend, flowEVMRoot)
 			require.NoError(t, err)
 			f(db)
 		})
@@ -97,8 +97,8 @@ func TestContractInteraction(t *testing.T) {
 		testContract := testutils.GetTestContract(t)
 
 		testAccount := types.NewAddressFromString("test")
-		amount := big.NewInt(0).Mul(big.NewInt(1337), big.NewInt(params.Ether))
-		amountToBeTransfered := big.NewInt(0).Mul(big.NewInt(100), big.NewInt(params.Ether))
+		amount := big.NewInt(0).Mul(big.NewInt(1337), big.NewInt(gethParams.Ether))
+		amountToBeTransfered := big.NewInt(0).Mul(big.NewInt(100), big.NewInt(gethParams.Ether))
 
 		// fund test account
 		RunWithNewEmulator(t, db, func(env *emulator.Emulator) {
@@ -191,8 +191,8 @@ func TestContractInteraction(t *testing.T) {
 
 		t.Run("test sending transactions", func(t *testing.T) {
 			keyHex := "9c647b8b7c4e7c3490668fb6c11473619db80c93704c70893d3813af4090c39c"
-			key, _ := crypto.HexToECDSA(keyHex)
-			address := crypto.PubkeyToAddress(key.PublicKey) // 658bdf435d810c91414ec09147daa6db62406379
+			key, _ := gethCrypto.HexToECDSA(keyHex)
+			address := gethCrypto.PubkeyToAddress(key.PublicKey) // 658bdf435d810c91414ec09147daa6db62406379
 			fAddr := types.NewAddress(address)
 
 			RunWithNewEmulator(t, db, func(env *emulator.Emulator) {
@@ -208,7 +208,7 @@ func TestContractInteraction(t *testing.T) {
 				blk, err := env.NewBlockView(ctx)
 				require.NoError(t, err)
 				signer := emulator.GetDefaultSigner()
-				tx, _ := gethTypes.SignTx(gethTypes.NewTransaction(0, testAccount.ToCommon(), big.NewInt(1000), params.TxGas, new(big.Int).Add(big.NewInt(0), gethCommon.Big1), nil), signer, key)
+				tx, _ := gethTypes.SignTx(gethTypes.NewTransaction(0, testAccount.ToCommon(), big.NewInt(1000), gethParams.TxGas, new(big.Int).Add(big.NewInt(0), gethCommon.Big1), nil), signer, key)
 				_, err = blk.RunTransaction(tx)
 				// TODO check the balance of coinbase
 				require.NoError(t, err)

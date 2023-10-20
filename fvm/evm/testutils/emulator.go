@@ -5,8 +5,9 @@ import (
 	"math/big"
 	"math/rand"
 
-	"github.com/ethereum/go-ethereum/common"
+	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
+
 	"github.com/onflow/flow-go/fvm/evm/types"
 )
 
@@ -97,19 +98,19 @@ func (em *TestEmulator) RunTransaction(tx *gethTypes.Transaction) (*types.Result
 	return em.RunTransactionFunc(tx)
 }
 
-func RandomCommonHash() common.Hash {
-	ret := common.Hash{}
-	cryptoRand.Read(ret[:common.HashLength])
+func RandomCommonHash() gethCommon.Hash {
+	ret := gethCommon.Hash{}
+	cryptoRand.Read(ret[:gethCommon.HashLength])
 	return ret
 }
 
-func RandomFlexAddress() types.Address {
-	return types.NewAddress(RandomAddress())
+func RandomAddress() types.Address {
+	return types.NewAddress(RandomCommonAddress())
 }
 
-func RandomAddress() common.Address {
-	ret := common.Address{}
-	cryptoRand.Read(ret[:common.AddressLength])
+func RandomCommonAddress() gethCommon.Address {
+	ret := gethCommon.Address{}
+	cryptoRand.Read(ret[:gethCommon.AddressLength])
 	return ret
 }
 
@@ -127,8 +128,8 @@ func RandomData() []byte {
 
 func GetRandomLogFixture() *gethTypes.Log {
 	return &gethTypes.Log{
-		Address: RandomAddress(),
-		Topics: []common.Hash{
+		Address: RandomCommonAddress(),
+		Topics: []gethCommon.Hash{
 			RandomCommonHash(),
 			RandomCommonHash(),
 		},

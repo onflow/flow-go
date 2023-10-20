@@ -32,7 +32,7 @@ type EOATestAccount struct {
 	lock    sync.Mutex
 }
 
-func (a *EOATestAccount) FlexAddress() types.Address {
+func (a *EOATestAccount) Address() types.Address {
 	return types.Address(a.address)
 }
 
@@ -90,11 +90,11 @@ func GetTestEOAAccount(t testing.TB, keyHex string) *EOATestAccount {
 	}
 }
 
-func RunWithEOATestAccount(t *testing.T, led atree.Ledger, flexRoot flow.Address, f func(*EOATestAccount)) {
+func RunWithEOATestAccount(t *testing.T, led atree.Ledger, flowEVMRootAddress flow.Address, f func(*EOATestAccount)) {
 	account := GetTestEOAAccount(t, EOATestAccount1KeyHex)
 
 	// fund account
-	db, err := database.NewDatabase(led, flexRoot)
+	db, err := database.NewDatabase(led, flowEVMRootAddress)
 	require.NoError(t, err)
 
 	e := emulator.NewEmulator(db)
@@ -103,7 +103,7 @@ func RunWithEOATestAccount(t *testing.T, led atree.Ledger, flexRoot flow.Address
 	blk, err := e.NewBlockView(types.NewDefaultBlockContext(2))
 	require.NoError(t, err)
 
-	_, err = blk.MintTo(account.FlexAddress(), new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1000)))
+	_, err = blk.MintTo(account.Address(), new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1000)))
 	require.NoError(t, err)
 
 	f(account)

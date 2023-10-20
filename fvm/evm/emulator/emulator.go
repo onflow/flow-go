@@ -113,7 +113,7 @@ func (bl *Block) WithdrawFrom(
 	return res, bl.commit(res.StateRootHash)
 }
 
-// Transfer transfers flow token from an FOA account to another flex account
+// Transfer transfers flow token from an bridged account to another account
 // this is a similar functionality as calling a call with empty data,
 // mostly provided for a easier interaction
 //

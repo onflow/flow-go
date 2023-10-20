@@ -165,10 +165,10 @@ func GetTestContract(t *testing.T) *TestContract {
 	}
 }
 
-func RunWithDeployedContract(t *testing.T, led atree.Ledger, flexRoot flow.Address, f func(*TestContract)) {
+func RunWithDeployedContract(t *testing.T, led atree.Ledger, flowEVMRootAddress flow.Address, f func(*TestContract)) {
 	tc := GetTestContract(t)
 	// deploy contract
-	db, err := database.NewDatabase(led, flexRoot)
+	db, err := database.NewDatabase(led, flowEVMRootAddress)
 	require.NoError(t, err)
 
 	e := emulator.NewEmulator(db)
