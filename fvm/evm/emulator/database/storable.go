@@ -152,7 +152,6 @@ func (v Uint64Value) getHashInput(scratch []byte) ([]byte, error) {
 	return buf[:11], nil
 }
 
-// TODO: cache size
 func (v Uint64Value) ByteSize() uint32 {
 	// tag number (2 bytes) + encoded content
 	return 2 + atree.GetUintCBORSize(uint64(v))
