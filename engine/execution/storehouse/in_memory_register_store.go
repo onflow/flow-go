@@ -144,13 +144,19 @@ func (s *InMemoryRegisterStore) GetRegister(height uint64, blockID flow.Identifi
 
 		parent, ok := s.parentByBlockID[block]
 		if !ok {
-			// if parent doesn't exist, we check if we've reached the pruned block,
-			// if so, the register is not found.
-			// otherwise, it means the parent block index is not consistent, which is a bug
-			// we've reached the pruned block, so the register is not found
+			// if the parent doesn't exist because the block itself is the pruned block,
+			// then it means the register is not updated since the pruned height.
+			// since we can't distinguish whether the register is not updated or not exist at all,
+			// we just return ErrPruned error along with the prunedHeight, so the
+			// caller could check with OnDiskRegisterStore to find if this register has a updated value
+			// at earlier height.
 			if block == s.prunedID {
 				return flow.RegisterValue{}, NewErrPruned(height, s.prunedHeight)
 			}
+
+			// in this case, it means the state of in-memory register store is inconsistent,
+			// because all saved block must have their parent saved in `parentByBlockID`, and traversing
+			// its parent should eventually reach the pruned block, otherwise it's a bug.
 
 			return flow.RegisterValue{},
 				fmt.Errorf("inconsistent parent block index in in-memory-register-store, ancient block %v is not found when getting register at block %v",
@@ -173,6 +179,25 @@ func (s *InMemoryRegisterStore) readRegisterAtBlockID(blockID flow.Identifier, r
 
 // GetUpdatedRegisters returns the updated registers of a block
 func (s *InMemoryRegisterStore) GetUpdatedRegisters(height uint64, blockID flow.Identifier) ([]flow.RegisterEntry, error) {
+	registerUpdates, err := s.getUpdatedRegisters(height, blockID)
+	if err != nil {
+		return nil, err
+	}
+
+	// since the registerUpdates won't be updated, we don't need to hold the log when converting
+	// it from map into slice.
+	registers := make([]flow.RegisterEntry, 0, len(registerUpdates))
+	for regID, reg := range registerUpdates {
+		registers = append(registers, flow.RegisterEntry{
+			Key:   regID,
+			Value: reg,
+		})
+	}
+
+	return registers, nil
+}
+
+func (s *InMemoryRegisterStore) getUpdatedRegisters(height uint64, blockID flow.Identifier) (map[flow.RegisterID]flow.RegisterValue, error) {
 	s.RLock()
 	defer s.RUnlock()
 	if height <= s.prunedHeight {
@@ -183,17 +208,7 @@ func (s *InMemoryRegisterStore) GetUpdatedRegisters(height uint64, blockID flow.
 	if !ok {
 		return nil, fmt.Errorf("cannot get register at height %d, block %s is not found: %w", height, blockID, ErrNotExecuted)
 	}
-
-	// convert from map to into slice
-	registers := make([]flow.RegisterEntry, 0, len(registerUpdates))
-	for regID, reg := range registerUpdates {
-		registers = append(registers, flow.RegisterEntry{
-			Key:   regID,
-			Value: reg,
-		})
-	}
-
-	return registers, nil
+	return registerUpdates, nil
 }
 
 // Prune prunes the register store to the given height
