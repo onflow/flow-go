@@ -2,6 +2,7 @@ package types
 
 import (
 	"github.com/ethereum/go-ethereum/rlp"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 

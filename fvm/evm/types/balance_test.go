@@ -4,8 +4,9 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/onflow/cadence"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/cadence"
 
 	"github.com/onflow/flow-go/fvm/evm/types"
 )
