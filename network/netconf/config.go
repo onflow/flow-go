@@ -120,18 +120,18 @@ type AlspConfig struct {
 
 // SyncEngineAlspConfig is the ALSP config for the SyncEngine.
 type SyncEngineAlspConfig struct {
-	// SyncEngineBatchRequestBaseProb is the base probability in [0,1] that's used in creating the final probability of creating a
+	// BatchRequestBaseProb is the base probability in [0,1] that's used in creating the final probability of creating a
 	// misbehavior report for a BatchRequest message. This is why the word "base" is used in the name of this field,
 	// since it's not the final probability and there are other factors that determine the final probability.
 	// The reason for this is that we want to increase the probability of creating a misbehavior report for a large batch.
-	SyncEngineBatchRequestBaseProb float32 `validate:"gte=0,lte=1" mapstructure:"alsp-sync-engine-batch-request-base-prob"`
+	BatchRequestBaseProb float32 `validate:"gte=0,lte=1" mapstructure:"alsp-sync-engine-batch-request-base-prob"`
 
-	// SyncEngineRangeRequestBaseProb is the base probability in [0,1] that's used in creating the final probability of creating a
+	// RangeRequestBaseProb is the base probability in [0,1] that's used in creating the final probability of creating a
 	// misbehavior report for a RangeRequest message. This is why the word "base" is used in the name of this field,
 	// since it's not the final probability and there are other factors that determine the final probability.
 	// The reason for this is that we want to increase the probability of creating a misbehavior report for a large range.
-	SyncEngineRangeRequestBaseProb float32 `validate:"gte=0,lte=1" mapstructure:"alsp-sync-engine-range-request-base-prob"`
+	RangeRequestBaseProb float32 `validate:"gte=0,lte=1" mapstructure:"alsp-sync-engine-range-request-base-prob"`
 
-	// SyncEngineSyncRequestProb is the probability in [0,1] of creating a misbehavior report for a SyncRequest message.
-	SyncEngineSyncRequestProb float32 `validate:"gte=0,lte=1" mapstructure:"alsp-sync-engine-sync-request-prob"`
+	// SyncRequestProb is the probability in [0,1] of creating a misbehavior report for a SyncRequest message.
+	SyncRequestProb float32 `validate:"gte=0,lte=1" mapstructure:"alsp-sync-engine-sync-request-prob"`
 }
