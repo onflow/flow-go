@@ -213,8 +213,11 @@ func (r *FungibleTokenTracker) iterateChildren(tr trace, addr flow.Address, valu
 
 		// iterate over fields of the composite value (skip the ones that are not resource typed)
 		compValue.ForEachField(inter,
-			func(key string, value interpreter.Value) {
+			func(key string, value interpreter.Value) (resume bool) {
 				r.iterateChildren(append(tr, key), addr, value)
+
+				// continue iteration
+				return true
 			})
 	}
 }

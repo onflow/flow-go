@@ -6,12 +6,15 @@ import (
 	"math/rand"
 	"os"
 	"os/exec"
+	"path"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -360,6 +363,18 @@ func TempBadgerDB(t testing.TB) (*badger.DB, string) {
 	dir := TempDir(t)
 	db := BadgerDB(t, dir)
 	return db, dir
+}
+
+func TempPebblePath(t *testing.T) string {
+	return path.Join(TempDir(t), "pebble"+strconv.Itoa(rand.Int())+".db")
+}
+
+func TempPebbleDBWithOpts(t testing.TB, opts *pebble.Options) (*pebble.DB, string) {
+	// create random path string for parallelization
+	dbpath := path.Join(TempDir(t), "pebble"+strconv.Itoa(rand.Int())+".db")
+	db, err := pebble.Open(dbpath, opts)
+	require.NoError(t, err)
+	return db, dbpath
 }
 
 func Concurrently(n int, f func(int)) {

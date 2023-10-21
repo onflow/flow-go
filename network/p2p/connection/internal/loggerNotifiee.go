@@ -25,23 +25,23 @@ func NewLoggerNotifiee(logger zerolog.Logger, metrics module.LibP2PConnectionMet
 
 func (l *LoggerNotifiee) Listen(_ network.Network, multiaddr multiaddr.Multiaddr) {
 	// just log the multiaddress on which we listen
-	l.logger.Info().Str("multiaddress", multiaddr.String()).Msg("listen started")
+	l.logger.Debug().Str("multiaddress", multiaddr.String()).Msg("listen started")
 }
 
 func (l *LoggerNotifiee) ListenClose(_ network.Network, multiaddr multiaddr.Multiaddr) {
-	l.logger.Info().Str("multiaddress", multiaddr.String()).Msg("listen stopped")
+	l.logger.Debug().Str("multiaddress", multiaddr.String()).Msg("listen stopped")
 }
 
 func (l *LoggerNotifiee) Connected(n network.Network, conn network.Conn) {
 	l.updateConnectionMetric(n)
 	lg := l.connectionUpdateLogger(n, conn)
-	lg.Info().Msg("connection established")
+	lg.Debug().Msg("connection established")
 }
 
 func (l *LoggerNotifiee) Disconnected(n network.Network, conn network.Conn) {
 	l.updateConnectionMetric(n)
 	lg := l.connectionUpdateLogger(n, conn)
-	lg.Warn().Msg("connection closed")
+	lg.Debug().Msg("connection closed")
 }
 
 func (l *LoggerNotifiee) connectionUpdateLogger(n network.Network, con network.Conn) zerolog.Logger {

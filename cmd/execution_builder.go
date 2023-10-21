@@ -48,6 +48,8 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
+	"github.com/onflow/flow-go/engine/execution/ingestion/fetcher"
+	"github.com/onflow/flow-go/engine/execution/ingestion/loader"
 	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
 	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 	exeprovider "github.com/onflow/flow-go/engine/execution/provider"
@@ -58,6 +60,7 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
+	ledgerpkg "github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	ledger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
@@ -864,13 +867,15 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		return nil, fmt.Errorf("could not create requester engine: %w", err)
 	}
 
+	fetcher := fetcher.NewCollectionFetcher(node.Logger, exeNode.collectionRequester, node.State, exeNode.exeConf.onflowOnlyLNs)
+	loader := loader.NewLoader(node.Logger, node.State, node.Storage.Headers, exeNode.executionState)
+
 	exeNode.ingestionEng, err = ingestion.New(
 		exeNode.ingestionUnit,
 		node.Logger,
 		node.EngineRegistry,
 		node.Me,
-		exeNode.collectionRequester,
-		node.State,
+		fetcher,
 		node.Storage.Headers,
 		node.Storage.Blocks,
 		node.Storage.Collections,
@@ -880,11 +885,10 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		exeNode.collector,
 		node.Tracer,
 		exeNode.exeConf.extensiveLog,
-		exeNode.checkAuthorizedAtBlock,
 		exeNode.executionDataPruner,
 		exeNode.blockDataUploader,
 		exeNode.stopControl,
-		exeNode.exeConf.onflowOnlyLNs,
+		loader,
 	)
 
 	// TODO: we should solve these mutual dependencies better
@@ -1123,14 +1127,22 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 
 	// if the execution database does not exist, then we need to bootstrap the execution database.
 	if !bootstrapped {
+		err := wal.CheckpointHasRootHash(
+			node.Logger,
+			path.Join(node.BootstrapDir, bootstrapFilenames.DirnameExecutionState),
+			bootstrapFilenames.FilenameWALRootCheckpoint,
+			ledgerpkg.RootHash(node.RootSeal.FinalState),
+		)
+		if err != nil {
+			return err
+		}
+
 		// when bootstrapping, the bootstrap folder must have a checkpoint file
 		// we need to cover this file to the trie folder to restore the trie to restore the execution state.
 		err = copyBootstrapState(node.BootstrapDir, exeNode.exeConf.triedir)
 		if err != nil {
 			return fmt.Errorf("could not load bootstrap state from checkpoint file: %w", err)
 		}
-
-		// TODO: check that the checkpoint file contains the root block's statecommit hash
 
 		err = bootstrapper.BootstrapExecutionDatabase(node.DB, node.RootSeal)
 		if err != nil {

@@ -43,6 +43,8 @@ type Consumer struct {
 	processings      map[uint64]*jobStatus   // keep track of the status of each on going job
 	processingsIndex map[module.JobID]uint64 // lookup the index of the job, useful when fast forwarding the
 	// `processed` variable
+
+	started *atomic.Bool // only allow the consumer to be started once, and forbid calls to Check before Start
 }
 
 func NewConsumer(
@@ -68,6 +70,7 @@ func NewConsumer(
 		// init state variables
 		running:          false,
 		isChecking:       atomic.NewBool(false),
+		started:          atomic.NewBool(false),
 		processedIndex:   0,
 		processings:      make(map[uint64]*jobStatus),
 		processingsIndex: make(map[module.JobID]uint64),
@@ -79,10 +82,9 @@ func (c *Consumer) Start(defaultIndex uint64) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if c.running {
-		return nil
+	if !c.started.CompareAndSwap(false, true) {
+		return fmt.Errorf("consumer has already been started")
 	}
-
 	c.running = true
 
 	// on startup, sync with storage for the processed index
@@ -109,11 +111,12 @@ func (c *Consumer) Start(defaultIndex uint64) error {
 
 	c.processedIndex = processedIndex
 
-	c.checkProcessable()
-
 	c.log.Info().
 		Uint64("processed", processedIndex).
 		Msg("consumer started")
+
+	c.checkProcessable()
+
 	return nil
 }
 
@@ -166,6 +169,12 @@ func (c *Consumer) NotifyJobIsDone(jobID module.JobID) uint64 {
 // since multiple checks at the same time are unnecessary, we could only keep one check by checking.
 // an atomic isChecking value.
 func (c *Consumer) Check() {
+	if !c.started.Load() {
+		// Check is not allowed before the consumer is started
+		c.log.Warn().Msg("ignoring Check before Start")
+		return
+	}
+
 	if !c.isChecking.CompareAndSwap(false, true) {
 		// other process is checking, we could exit and rely on that process to check
 		// processable jobs

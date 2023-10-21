@@ -1,36 +1,23 @@
 package run
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
 	ledger "github.com/onflow/flow-go/ledger/complete"
+	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/ledger/complete/wal"
+	bootstrapFilenames "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 )
-
-// NOTE: this is now unused and should become part of another tool.
-func GenerateServiceAccountPrivateKey(seed []byte) (flow.AccountPrivateKey, error) {
-	priv, err := crypto.GeneratePrivateKey(crypto.ECDSASecp256k1, seed)
-	if err != nil {
-		return flow.AccountPrivateKey{}, err
-	}
-
-	return flow.AccountPrivateKey{
-		PrivateKey: priv,
-		SignAlgo:   crypto.ECDSASecp256k1,
-		HashAlgo:   hash.SHA2_256,
-	}, nil
-}
 
 func GenerateExecutionState(
 	dbDir string,
@@ -67,11 +54,30 @@ func GenerateExecutionState(
 		<-compactor.Done()
 	}()
 
-	return bootstrap.NewBootstrapper(
-		zerolog.Nop()).BootstrapLedger(
-		ledgerStorage,
-		accountKey,
-		chain,
-		bootstrapOptions...,
-	)
+	stateCommitment, err := bootstrap.
+		NewBootstrapper(zerolog.Nop()).
+		BootstrapLedger(
+			ledgerStorage,
+			accountKey,
+			chain,
+			bootstrapOptions...,
+		)
+	if err != nil {
+		return flow.DummyStateCommitment, err
+	}
+
+	matchTrie, err := ledgerStorage.FindTrieByStateCommit(stateCommitment)
+	if err != nil {
+		return flow.DummyStateCommitment, err
+	}
+	if matchTrie == nil {
+		return flow.DummyStateCommitment, fmt.Errorf("bootstraping failed to produce a checkpoint for trie %v", stateCommitment)
+	}
+
+	err = wal.StoreCheckpointV6([]*trie.MTrie{matchTrie}, dbDir, bootstrapFilenames.FilenameWALRootCheckpoint, zerolog.Nop(), 1)
+	if err != nil {
+		return flow.DummyStateCommitment, fmt.Errorf("failed to store bootstrap checkpoint: %w", err)
+	}
+
+	return stateCommitment, nil
 }

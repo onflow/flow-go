@@ -25,6 +25,29 @@ network-config:
   unicast-bandwidth-rate-limit: 0
   # Bandwidth size in bytes a peer is allowed to send via unicast streams at once
   unicast-bandwidth-burst-limit: 1e9
+  # The minimum number of consecutive successful streams to reset the unicast stream creation retry budget from zero to the maximum default. If it is set to 100 for example, it
+  # means that if a peer has 100 consecutive successful streams to the remote peer, and the remote peer has a zero stream creation budget,
+  # the unicast stream creation retry budget for that remote peer will be reset to the maximum default.
+  unicast-stream-zero-retry-reset-threshold: 100
+  # The maximum number of retry attempts for creating a unicast stream to a remote peer before giving up. If it is set to 3 for example, it means that if a peer fails to create
+  # retry a unicast stream to a remote peer 3 times, the peer will give up and will not retry creating a unicast stream to that remote peer.
+  # When it is set to zero it means that the peer will not retry creating a unicast stream to a remote peer if it fails.
+  unicast-max-stream-creation-retry-attempt-times: 3
+  # The number of seconds that the local peer waits since the last successful dial to a remote peer before resetting the unicast dial retry budget from zero to the maximum default.
+  # If it is set to 3600s (1h) for example, it means that if it has passed at least one hour since the last successful dial, and the remote peer has a zero dial retry budget,
+  # the unicast dial retry budget for that remote peer will be reset to the maximum default.
+  unicast-dial-zero-retry-reset-threshold: 3600s
+  # The maximum number of retry attempts for dialing a remote peer before giving up. If it is set to 3 for example, it means that if a peer fails to dial a remote peer 3 times,
+  # the peer will give up and will not retry dialing that remote peer.
+  unicast-max-dial-retry-attempt-times: 3
+  # The backoff delay used in the exponential backoff for consecutive failed unicast dial attempts to a remote peer.
+  unicast-dial-backoff-delay: 1s
+  # The backoff delay used in the exponential backoff for backing off concurrent create stream attempts to the same remote peer
+  # when there is no available connections to that remote peer and a dial is in progress.
+  unicast-dial-in-progress-backoff-delay: 1s
+  # The size of the dial config cache used to keep track of the dial config for each remote peer. The dial config is used to keep track of the dial retry budget for each remote peer.
+  # Recommended to set it to the maximum number of remote peers in the network.
+  unicast-dial-config-cache-size: 10000
   # Resource manager config
   # Maximum allowed fraction of file descriptors to be allocated by the libp2p resources in (0,1]
   libp2p-memory-limit-ratio: 0.5 # flow default
@@ -72,12 +95,36 @@ network-config:
   gossipsub-rpc-sent-tracker-workers: 5
   # Peer scoring is the default value for enabling peer scoring
   gossipsub-peer-scoring-enabled: true
+
   # Gossipsub rpc inspectors configs
   # The size of the queue for notifications about invalid RPC messages
   gossipsub-rpc-inspector-notification-cache-size: 10000
   # RPC control message validation inspector configs
   # Rpc validation inspector number of pool workers
   gossipsub-rpc-validation-inspector-workers: 5
+  # Max number of ihave messages in a sample to be inspected. If the number of ihave messages exceeds this configured value
+  # the control message ihaves will be truncated to the max sample size. This sample is randomly selected.
+  gossipsub-rpc-ihave-max-sample-size: 1000
+  # Max number of ihave message ids in a sample to be inspected per ihave. Each ihave message includes a list of message ids
+  # each. If the size of the message ids list for a single ihave message exceeds the configured max message id sample size the list of message ids will be truncated.
+  gossipsub-rpc-ihave-max-message-id-sample-size: 1000
+  # Max number of control messages in a sample to be inspected when inspecting GRAFT and PRUNE message types. If the total number of control messages (GRAFT or PRUNE)
+  # exceeds this max sample size then the respective message will be truncated before being processed.
+  gossipsub-rpc-graft-and-prune-message-max-sample-size: 1000
+  # Max number of iwant messages in a sample to be inspected. If the total number of iWant control messages
+  # exceeds this max sample size then the respective message will be truncated before being processed.
+  gossipsub-rpc-iwant-max-sample-size: 1000
+  # Max number of iwant message ids in a sample to be inspected per iwant. Each iwant message includes a list of message ids
+  # each, if the size of this list exceeds the configured max message id sample size the list of message ids will be truncated.
+  gossipsub-rpc-iwant-max-message-id-sample-size: 1000
+  # The allowed threshold of iWant messages received without a corresponding tracked iHave message that was sent. If the cache miss threshold is exceeded an
+  # invalid control message notification is disseminated and the sender will be penalized.
+  gossipsub-rpc-iwant-cache-miss-threshold: .5
+  # The iWants size at which message id cache misses will be checked.
+  gossipsub-rpc-iwant-cache-miss-check-size: 1000
+  # The max allowed duplicate message IDs in a single iWant control message. If the duplicate message threshold is exceeded an invalid control message
+  # notification is disseminated and the sender will be penalized.
+  gossipsub-rpc-iwant-duplicate-message-id-threshold: .15
   # The size of the queue used by worker pool for the control message validation inspector
   gossipsub-rpc-validation-inspector-queue-cache-size: 100
   # Cluster prefixed control message validation configs
@@ -87,32 +134,7 @@ network-config:
   gossipsub-cluster-prefix-tracker-cache-decay: 0.99
   # The upper bound on the amount of cluster prefixed control messages that will be processed
   gossipsub-rpc-cluster-prefixed-hard-threshold: 100
-  # GRAFT libp2p control message validation limits
-  gossipsub-rpc-graft-hard-threshold: 30
-  gossipsub-rpc-graft-safety-threshold: 15
-  gossipsub-rpc-graft-rate-limit: 30
-  # PRUNE libp2p control message validation limits
-  gossipsub-rpc-prune-hard-threshold: 30
-  gossipsub-rpc-prune-safety-threshold: 15
-  gossipsub-rpc-prune-rate-limit: 30
-  # IHAVE libp2p control message validation limits
-  gossipsub-rpc-ihave-hard-threshold: 100
-  gossipsub-rpc-ihave-safety-threshold: 50
-  # Rate limiting is disabled for ihave control messages
-  gossipsub-rpc-ihave-rate-limit: 0
-  # Percentage of ihaves to use as the sample size for synchronous inspection 25%
-  ihave-sync-inspection-sample-size-percentage: .25
-  # Percentage of ihaves to use as the sample size for asynchronous inspection 10%
-  ihave-async-inspection-sample-size-percentage: .10
-  # Max number of ihave messages in a sample to be inspected
-  ihave-max-sample-size: 100
 
-  # Max number of iwant messages in a sample to be inspected
-  gossipsub-rpc-iwant-max-sample-size: 1_000_000
-  # The allowed threshold of iWant messages received without a corresponding tracked iHave message that was sent
-  gossipsub-rpc-iwant-cache-miss-threshold: .5
-  # The max allowed duplicate message IDs in a single iWant control message
-  gossipsub-rpc-iwant-duplicate-message-id-threshold: .15
   # RPC metrics observer inspector configs
   # The number of metrics inspector pool workers
   gossipsub-rpc-metrics-inspector-workers: 1
@@ -123,3 +145,5 @@ network-config:
   alsp-spam-report-queue-size: 10e4
   alsp-disable-penalty: false
   alsp-heart-beat-interval: 1s
+
+
