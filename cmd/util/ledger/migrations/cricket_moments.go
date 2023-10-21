@@ -3,6 +3,7 @@ package migrations
 import (
 	"context"
 	"fmt"
+	"sort"
 	"sync"
 
 	"github.com/rs/zerolog"
@@ -460,7 +461,7 @@ func hashAllNftsInAllCollections(
 			storageMap := mr.GetReadOnlyStorage().GetStorageMap(mr.Address, domain, false)
 			storageMapValue := storageMap.ReadValue(&util.NopMemoryGauge{}, key)
 
-			hashNFTWorker(progressLog, ctx, cancel, mr, storageMapValue, keyPairChan, hashChan)
+			hashNFTWorker(log, progressLog, ctx, cancel, mr, storageMapValue, keyPairChan, hashChan)
 		}()
 	}
 
@@ -567,7 +568,7 @@ func consolidateAllHashes(
 	done := make(chan struct{})
 
 	for i := 0; i < nWorkers; i++ {
-		go func() {
+		go func(i int) {
 			defer wg.Done()
 			hasher := newHasher()
 
@@ -584,13 +585,13 @@ func consolidateAllHashes(
 					h, err := l.SortAndHash(hasher)
 					if err != nil {
 						cancel(fmt.Errorf("failed to write hash: %w", err))
-
 						return
 					}
+
 					hashedCollectionChan <- h
 				}
 			}
-		}()
+		}(i)
 	}
 
 	go func() {
@@ -632,6 +633,14 @@ func consolidateAllHashes(
 		return nil, ctx.Err()
 	}
 
+	sort.Sort(finalHashes)
+
+	for _, h := range finalHashes {
+		log.Info().
+			Hex("hash", h).
+			Msg("hashed collection")
+	}
+
 	hasher := newHasher()
 	h, err := finalHashes.SortAndHash(hasher)
 	if err != nil {
@@ -642,6 +651,7 @@ func consolidateAllHashes(
 }
 
 func hashNFTWorker(
+	log zerolog.Logger,
 	progress util2.LogProgressFunc,
 	ctx context.Context,
 	cancel context.CancelCauseFunc,
@@ -657,6 +667,8 @@ func hashNFTWorker(
 		cancel(err)
 		return
 	}
+
+	printValue := 10
 
 	for {
 		select {
@@ -695,6 +707,14 @@ func hashNFTWorker(
 			hasher.Reset()
 
 			uintKey := uint64(keyPair.shardedCollectionKey.(interpreter.UInt64Value))
+
+			if printValue > 0 && uintKey == 0 {
+				printValue--
+				log.Info().
+					Hex("hash", hash).
+					Str("rs", s).
+					Msg("recursive string hash for cricket moments sharded collection")
+			}
 
 			hashChan <- hashWithKeys{
 				key:  uintKey,
