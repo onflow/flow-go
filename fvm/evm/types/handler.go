@@ -1,7 +1,7 @@
 package types
 
 import (
-	fvmenv "github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/environment"
 )
 
 // EVM is an account inside FVM with special access to the underlying infrastructure
@@ -40,7 +40,7 @@ type ContractHandler interface {
 
 // Backend passes the FVM functionality needed inside the handler
 type Backend interface {
-	fvmenv.ValueStore
-	fvmenv.Meter
-	fvmenv.EventEmitter
+	environment.ValueStore
+	environment.Meter
+	environment.EventEmitter
 }
