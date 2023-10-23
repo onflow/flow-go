@@ -28,12 +28,11 @@ var FlexTypeDefinition = stdlib.FlexTypeDefinition{
 
 var FlowToken_VaultType = stdlib.NewFlowTokenVaultType(flow.Emulator.Chain())
 
-var FlexRootAccountAddress = setupFlexRootAccountAddress()
+func EVMRootAccountAddress(chainID flow.ChainID) (flow.Address, error) {
+	// TODO handle other chains
+	switch chainID {
 
-func setupFlexRootAccountAddress() flow.Address {
-	flexRootAddress, err := flow.Emulator.Chain().AddressAtIndex(environment.FlexAccountIndex)
-	if err != nil {
-		panic(err)
+	default:
+		return flow.Emulator.Chain().AddressAtIndex(environment.FlexAccountIndex)
 	}
-	return flexRootAddress
 }

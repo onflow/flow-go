@@ -12,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/evm"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
@@ -87,6 +88,13 @@ func newTransactionExecutor(
 		ctx.EnvironmentParams,
 		txnState)
 
+	cadenceRuntime := env.BorrowCadenceRuntime()
+
+	// TODO: how to remove value and type runtime environment after decleration
+	if ctx.EVMEnabled {
+		evm.SetupEnvironment(ctx.Chain.ChainID(), env, cadenceRuntime.Environment)
+	}
+
 	return &transactionExecutor{
 		TransactionExecutorParams: ctx.TransactionExecutorParams,
 		TransactionVerifier: TransactionVerifier{
@@ -99,7 +107,7 @@ func newTransactionExecutor(
 		env:                             env,
 		errs:                            errors.NewErrorsCollector(),
 		startedTransactionBodyExecution: false,
-		cadenceRuntime:                  env.BorrowCadenceRuntime(),
+		cadenceRuntime:                  cadenceRuntime,
 	}
 }
 

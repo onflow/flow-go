@@ -380,6 +380,9 @@ func (b *bootstrapExecutor) Execute() error {
 	// set the list of nodes which are allowed to stake in this network
 	b.setStakingAllowlist(service, b.identities.NodeIDs())
 
+	// sets up the EVM environment
+	b.setupEVM()
+
 	return nil
 }
 
@@ -774,6 +777,12 @@ func (b *bootstrapExecutor) setStakingAllowlist(
 			0),
 	)
 	panicOnMetaInvokeErrf("failed to set staking allow-list: %s", txError, err)
+}
+
+func (b *bootstrapExecutor) setupEVM() {
+	// setup EVM root account
+	// TODO: maybe we reuse the service account key here
+	b.createAccount(nil)
 }
 
 func (b *bootstrapExecutor) registerNodes(service, fungibleToken, flowToken flow.Address) {

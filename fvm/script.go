@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/evm"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/model/flow"
@@ -197,6 +198,11 @@ func (executor *scriptExecutor) execute() error {
 func (executor *scriptExecutor) executeScript() error {
 	rt := executor.env.BorrowCadenceRuntime()
 	defer executor.env.ReturnCadenceRuntime(rt)
+
+	// TODO: how to clean up for the next script
+	if executor.ctx.EVMEnabled {
+		evm.SetupEnvironment(executor.ctx.Chain.ChainID(), executor.env, rt.Environment)
+	}
 
 	value, err := rt.ExecuteScript(
 		runtime.Script{
