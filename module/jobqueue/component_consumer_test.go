@@ -232,7 +232,7 @@ func (suite *ComponentConsumerSuite) TestSignalsBeforeReadyDoNotCheck() {
 	started := atomic.NewBool(false)
 
 	jobConsumer := modulemock.NewJobConsumer(suite.T())
-	jobConsumer.On("Start", suite.defaultIndex).Return(func(_ uint64) error {
+	jobConsumer.On("Start").Return(func() error {
 		// force Start to take a while so the processingLoop is ready first
 		// the processingLoop should wait to start, otherwise Check would be called
 		time.Sleep(500 * time.Millisecond)
