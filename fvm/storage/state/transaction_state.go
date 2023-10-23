@@ -21,7 +21,7 @@ func (id NestedTransactionId) StateForTestingOnly() *ExecutionState {
 
 type Meter interface {
 	MeterComputation(kind common.ComputationKind, intensity uint) error
-	HasComputationCapacity(kind common.ComputationKind, intensity uint) bool
+	ComputationAvailable(kind common.ComputationKind, intensity uint) bool
 	ComputationIntensities() meter.MeteredComputationIntensities
 	TotalComputationLimit() uint
 	TotalComputationUsed() uint64
@@ -436,11 +436,11 @@ func (txnState *transactionState) MeterComputation(
 	return txnState.current().MeterComputation(kind, intensity)
 }
 
-func (txnState *transactionState) HasComputationCapacity(
+func (txnState *transactionState) ComputationAvailable(
 	kind common.ComputationKind,
 	intensity uint,
 ) bool {
-	return txnState.current().HasComputationCapacity(kind, intensity)
+	return txnState.current().ComputationAvailable(kind, intensity)
 }
 
 func (txnState *transactionState) MeterMemory(

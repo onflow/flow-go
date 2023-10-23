@@ -96,8 +96,8 @@ func (m *ComputationMeter) MeterComputation(
 	return nil
 }
 
-// HasComputationCapacity returns true if enough computation capacity has left in the transaction
-func (m *ComputationMeter) HasComputationCapacity(
+// ComputationAvailable returns true if enough computation is left in the transaction for the given intensity and type
+func (m *ComputationMeter) ComputationAvailable(
 	kind common.ComputationKind,
 	intensity uint,
 ) bool {
