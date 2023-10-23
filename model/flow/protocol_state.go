@@ -348,16 +348,19 @@ func (ll DynamicIdentityEntryList) Sort(less IdentifierOrder) DynamicIdentityEnt
 }
 
 // BuildIdentityTable constructs the full identity table for the target epoch by combining data from:
-//  1. The Dynamic Identities for the nodes that are _active_ in the target epoch (i.e. the dynamic identity
-//     fields for the IdentitySkeletons contained in the EpochSetup event for the respective epoch).
-//  2. The IdentitySkeletons for the nodes that are _active_ in the target epoch
+//  1. The IdentitySkeletons for the nodes that are _active_ in the target epoch
 //     (recorded in EpochSetup event and immutable throughout the epoch).
-//  3. [optional] An adjacent epoch's IdentitySkeletons (can be empty or nil), as recorded in the
-//     adjacent epoch's setup event. For a target epoch N, the epochs N-1 and N+1 are defined to be
-//     adjacent. Adjacent epochs do not _necessarily_ exist (e.g. consider a spork comprising only
-//     a single epoch), in which case this input is nil or empty.
+//  2. The Dynamic Identities for the nodes that are _active_ in the target epoch (i.e. the dynamic identity
+//     fields for the IdentitySkeletons contained in the EpochSetup event for the respective epoch).
 //
-// It also performs sanity checks to make sure that the data is consistent.
+// Optionally, identity information for an adjacent epoch is given if and only if an adjacent epoch exists. For
+// a target epoch N, the epochs N-1 and N+1 are defined to be adjacent. Adjacent epochs do not necessarily exist
+// (e.g. consider a spork comprising only a single epoch), in which case the respective inputs are nil or empty.
+//  3. [optional] An adjacent epoch's IdentitySkeletons as recorded in the adjacent epoch's setup event.
+//  4. [optional] An adjacent epoch's Dynamic Identities.
+//
+// The function enforces that the input slices pertaining to the same epoch contain the same identities
+// (compared by nodeID) in the same order. Otherwise, an exception is returned.
 // No errors are expected during normal operation. All errors indicate inconsistent or invalid inputs.
 func BuildIdentityTable(targetEpochIdentitySkeletons IdentitySkeletonList, targetEpochDynamicIdentities DynamicIdentityEntryList, adjacentEpochIdentitySkeletons IdentitySkeletonList, adjacentEpochDynamicIdentities DynamicIdentityEntryList) (IdentityList, error) {
 	targetEpochParticipants, err := ComposeFullIdentities(targetEpochIdentitySkeletons, targetEpochDynamicIdentities)
@@ -398,7 +401,7 @@ func DynamicIdentityEntryListFromIdentities(identities IdentityList) DynamicIden
 
 // ComposeFullIdentities combines identity skeletons and dynamic identities to produce a flow.IdentityList.
 // It enforces that the input slices `skeletons` and `dynamics` list the same identities (compared by nodeID)
-// in the same order. Otherwise, an exception if returned.
+// in the same order. Otherwise, an exception is returned.
 // No errors are expected during normal operations.
 func ComposeFullIdentities(skeletons IdentitySkeletonList, dynamics DynamicIdentityEntryList) (IdentityList, error) {
 	// sanity check: list of skeletons and dynamic should be the same
