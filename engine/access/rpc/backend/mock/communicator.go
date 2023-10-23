@@ -13,11 +13,11 @@ type Communicator struct {
 }
 
 // CallAvailableNode provides a mock function with given fields: nodes, call, shouldTerminateOnError
-func (_m *Communicator) CallAvailableNode(nodes flow.IdentityList, call func(*flow.Identity) error, shouldTerminateOnError func(*flow.Identity, error) bool) error {
+func (_m *Communicator) CallAvailableNode(nodes flow.GenericIdentityList[flow.IdentitySkeleton], call func(*flow.IdentitySkeleton) error, shouldTerminateOnError func(*flow.IdentitySkeleton, error) bool) error {
 	ret := _m.Called(nodes, call, shouldTerminateOnError)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.IdentityList, func(*flow.Identity) error, func(*flow.Identity, error) bool) error); ok {
+	if rf, ok := ret.Get(0).(func(flow.GenericIdentityList[flow.IdentitySkeleton], func(*flow.IdentitySkeleton) error, func(*flow.IdentitySkeleton, error) bool) error); ok {
 		r0 = rf(nodes, call, shouldTerminateOnError)
 	} else {
 		r0 = ret.Error(0)

@@ -41,8 +41,8 @@ func (l *Local) Sign(msg []byte, hasher hash.Hasher) (crypto.Signature, error) {
 	return l.sk.Sign(msg, hasher)
 }
 
-func (l *Local) NotMeFilter() flow.IdentityFilter {
-	return filter.Not(filter.HasNodeID(l.NodeID()))
+func (l *Local) NotMeFilter() flow.IdentityFilter[flow.Identity] {
+	return filter.Not(filter.HasNodeID[flow.Identity](l.NodeID()))
 }
 
 // SignFunc provides a signature oracle that given a message, a hasher, and a signing function, it

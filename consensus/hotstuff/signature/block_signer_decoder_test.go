@@ -32,7 +32,7 @@ type blockSignerDecoderSuite struct {
 
 func (s *blockSignerDecoderSuite) SetupTest() {
 	// the default header fixture creates signerIDs for a committee of 10 nodes, so we prepare a committee same as that
-	s.allConsensus = unittest.IdentityListFixture(40, unittest.WithRole(flow.RoleConsensus)).Sort(order.Canonical)
+	s.allConsensus = unittest.IdentityListFixture(40, unittest.WithRole(flow.RoleConsensus)).Sort(order.Canonical[flow.Identity])
 
 	// mock consensus committee
 	s.committee = hotstuff.NewDynamicCommittee(s.T())

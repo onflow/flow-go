@@ -108,14 +108,14 @@ func (suite *IngestionCoreSuite) SetupTest() {
 		},
 	)
 	final.On("Identities", mock.Anything).Return(
-		func(selector flow.IdentityFilter) flow.IdentityList {
+		func(selector flow.IdentityFilter[flow.Identity]) flow.IdentityList {
 			return suite.finalIdentities.Filter(selector)
 		},
 		nil,
 	)
 	ref.On("Epochs").Return(suite.query)
 	suite.query.On("Current").Return(suite.epoch)
-	cluster.On("Members").Return(suite.clusterMembers)
+	cluster.On("Members").Return(suite.clusterMembers.ToSkeleton())
 	suite.epoch.On("ClusterByChainID", mock.Anything).Return(
 		func(chainID flow.ChainID) protocol.Cluster {
 			if chainID == suite.clusterID {

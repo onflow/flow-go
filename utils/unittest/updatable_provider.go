@@ -29,7 +29,7 @@ func (p *UpdatableIDProvider) SetIdentities(identities flow.IdentityList) {
 	p.identities = identities
 }
 
-func (p *UpdatableIDProvider) Identities(filter flow.IdentityFilter) flow.IdentityList {
+func (p *UpdatableIDProvider) Identities(filter flow.IdentityFilter[flow.Identity]) flow.IdentityList {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	return p.identities.Filter(filter)

@@ -463,8 +463,8 @@ func convertClusterAssignments(cdcClusters []cadence.Value) (flow.AssignmentList
 // convertParticipants converts the network participants specified in the
 // EpochSetup event into an IdentityList.
 // CONVENTION: returned IdentityList is in CANONICAL ORDER
-func convertParticipants(cdcParticipants []cadence.Value) (flow.IdentityList, error) {
-	participants := make(flow.IdentityList, 0, len(cdcParticipants))
+func convertParticipants(cdcParticipants []cadence.Value) (flow.IdentitySkeletonList, error) {
+	participants := make(flow.IdentitySkeletonList, 0, len(cdcParticipants))
 	var err error
 
 	for _, value := range cdcParticipants {
@@ -583,15 +583,10 @@ func convertParticipants(cdcParticipants []cadence.Value) (flow.IdentityList, er
 			return nil, fmt.Errorf("invalid role %d", role)
 		}
 
-		identity := &flow.Identity{
-			IdentitySkeleton: flow.IdentitySkeleton{
-				InitialWeight: uint64(initialWeight),
-				Address:       string(address),
-				Role:          flow.Role(role),
-			},
-			DynamicIdentity: flow.DynamicIdentity{
-				Weight: uint64(initialWeight),
-			},
+		identity := &flow.IdentitySkeleton{
+			InitialWeight: uint64(initialWeight),
+			Address:       string(address),
+			Role:          flow.Role(role),
 		}
 
 		// convert nodeID string into identifier
@@ -636,7 +631,7 @@ func convertParticipants(cdcParticipants []cadence.Value) (flow.IdentityList, er
 	}
 
 	// IMPORTANT: returned identities must be in *canonical order*
-	participants = participants.Sort(order.Canonical)
+	participants = participants.Sort(order.Canonical[flow.IdentitySkeleton])
 	return participants, nil
 }
 

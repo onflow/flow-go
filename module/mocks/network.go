@@ -5,12 +5,11 @@
 package mocks
 
 import (
-	reflect "reflect"
-
 	gomock "github.com/golang/mock/gomock"
 	crypto "github.com/onflow/flow-go/crypto"
 	hash "github.com/onflow/flow-go/crypto/hash"
 	flow "github.com/onflow/flow-go/model/flow"
+	reflect "reflect"
 )
 
 // MockLocal is a mock of Local interface.
@@ -65,10 +64,10 @@ func (mr *MockLocalMockRecorder) NodeID() *gomock.Call {
 }
 
 // NotMeFilter mocks base method.
-func (m *MockLocal) NotMeFilter() flow.IdentityFilter {
+func (m *MockLocal) NotMeFilter() flow.IdentityFilter[flow.Identity] {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "NotMeFilter")
-	ret0, _ := ret[0].(flow.IdentityFilter)
+	ret0, _ := ret[0].(flow.IdentityFilter[flow.Identity])
 	return ret0
 }
 
@@ -132,7 +131,7 @@ func (m *MockRequester) EXPECT() *MockRequesterMockRecorder {
 }
 
 // EntityByID mocks base method.
-func (m *MockRequester) EntityByID(arg0 flow.Identifier, arg1 flow.IdentityFilter) {
+func (m *MockRequester) EntityByID(arg0 flow.Identifier, arg1 flow.IdentityFilter[flow.Identity]) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "EntityByID", arg0, arg1)
 }
@@ -156,7 +155,7 @@ func (mr *MockRequesterMockRecorder) Force() *gomock.Call {
 }
 
 // Query mocks base method.
-func (m *MockRequester) Query(arg0 flow.Identifier, arg1 flow.IdentityFilter) {
+func (m *MockRequester) Query(arg0 flow.Identifier, arg1 flow.IdentityFilter[flow.Identity]) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "Query", arg0, arg1)
 }

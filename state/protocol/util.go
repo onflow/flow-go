@@ -34,7 +34,7 @@ func IsNodeAuthorizedWithRoleAt(snapshot Snapshot, id flow.Identifier, role flow
 		id,
 		filter.HasWeight(true),
 		filter.Not(filter.Ejected),
-		filter.HasRole(role),
+		filter.HasRole[flow.Identity](role),
 	)
 }
 
@@ -44,7 +44,7 @@ func IsNodeAuthorizedWithRoleAt(snapshot Snapshot, id flow.Identifier, role flow
 //   - state.ErrUnknownSnapshotReference if snapshot references an unknown block
 //
 // All other errors are unexpected and potential symptoms of internal state corruption.
-func CheckNodeStatusAt(snapshot Snapshot, id flow.Identifier, checks ...flow.IdentityFilter) (bool, error) {
+func CheckNodeStatusAt(snapshot Snapshot, id flow.Identifier, checks ...flow.IdentityFilter[flow.Identity]) (bool, error) {
 	identity, err := snapshot.Identity(id)
 	if IsIdentityNotFound(err) {
 		return false, nil

@@ -788,7 +788,7 @@ func (m *mockSnapshot) Head() (*flow.Header, error) {
 
 // none of these are used in this test
 func (m *mockSnapshot) QuorumCertificate() (*flow.QuorumCertificate, error) { return nil, nil }
-func (m *mockSnapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, error) {
+func (m *mockSnapshot) Identities(selector flow.IdentityFilter[flow.Identity]) (flow.IdentityList, error) {
 	return nil, nil
 }
 func (m *mockSnapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) { return nil, nil }

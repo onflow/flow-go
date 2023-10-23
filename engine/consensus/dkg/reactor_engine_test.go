@@ -123,7 +123,7 @@ func (suite *ReactorEngineSuite_SetupPhase) SetupTest() {
 	suite.currentEpoch.On("DKGPhase3FinalView").Return(suite.dkgPhase3FinalView, nil)
 	suite.nextEpoch = new(protocol.Epoch)
 	suite.nextEpoch.On("Counter").Return(suite.NextEpochCounter(), nil)
-	suite.nextEpoch.On("InitialIdentities").Return(suite.committee, nil)
+	suite.nextEpoch.On("InitialIdentities").Return(suite.committee.ToSkeleton(), nil)
 
 	suite.epochQuery = mocks.NewEpochQuery(suite.T(), suite.epochCounter)
 	suite.epochQuery.Add(suite.currentEpoch)
@@ -162,7 +162,7 @@ func (suite *ReactorEngineSuite_SetupPhase) SetupTest() {
 	suite.factory = new(module.DKGControllerFactory)
 	suite.factory.On("Create",
 		dkgmodule.CanonicalInstanceID(suite.firstBlock.ChainID, suite.NextEpochCounter()),
-		suite.committee,
+		suite.committee.ToSkeleton(),
 		mock.Anything,
 	).Return(suite.controller, nil)
 

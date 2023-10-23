@@ -148,7 +148,7 @@ func withConsumer(
 		// hold any guarantees.
 		root, err := s.State.Params().FinalizedRoot()
 		require.NoError(t, err)
-		clusterCommittee := participants.Filter(filter.HasRole(flow.RoleCollection))
+		clusterCommittee := participants.Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
 		sources := unittest.RandomSourcesFixture(110)
 		results := vertestutils.CompleteExecutionReceiptChainFixture(t, root, blockCount/2, sources, vertestutils.WithClusterCommittee(clusterCommittee))
 		blocks := vertestutils.ExtendStateWithFinalizedBlocks(t, results, s.State)

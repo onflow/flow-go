@@ -9,14 +9,15 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestSort(t *testing.T) {
 	nodes := unittest.NodeInfosFixture(20)
-	nodes = bootstrap.Sort(nodes, order.Canonical)
-	require.True(t, bootstrap.ToIdentityList(nodes).Sorted(order.Canonical))
+	nodes = bootstrap.Sort(nodes, order.Canonical[flow.Identity])
+	require.True(t, bootstrap.ToIdentityList(nodes).Sorted(order.Canonical[flow.Identity]))
 }
 
 func TestNodeConfigEncodingJSON(t *testing.T) {

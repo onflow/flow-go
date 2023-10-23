@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -46,7 +47,7 @@ type ProposalSuite struct {
 func (ps *ProposalSuite) SetupTest() {
 	// the leader is a random node for now
 	ps.finalized = uint64(rand.Uint32() + 1)
-	ps.participants = unittest.IdentityListFixture(8, unittest.WithRole(flow.RoleConsensus))
+	ps.participants = unittest.IdentityListFixture(8, unittest.WithRole(flow.RoleConsensus)).Sort(order.Canonical[flow.Identity])
 	ps.leader = &ps.participants[0].IdentitySkeleton
 
 	// the parent is the last finalized block, followed directly by a block from the leader
@@ -69,7 +70,7 @@ func (ps *ProposalSuite) SetupTest() {
 	voterIDs, err := signature.DecodeSignerIndicesToIdentifiers(ps.participants.NodeIDs(), ps.block.QC.SignerIndices)
 	require.NoError(ps.T(), err)
 
-	ps.voters = ps.participants.Filter(filter.HasNodeID(voterIDs...)).ToSkeleton()
+	ps.voters = ps.participants.Filter(filter.HasNodeID[flow.Identity](voterIDs...)).ToSkeleton()
 	ps.proposal = &model.Proposal{Block: ps.block}
 	ps.vote = ps.proposal.ProposerVote()
 	ps.voter = ps.leader
@@ -584,7 +585,7 @@ func (qs *QCSuite) SetupTest() {
 	qs.participants = unittest.IdentityListFixture(10,
 		unittest.WithRole(flow.RoleConsensus),
 		unittest.WithWeight(1),
-	).ToSkeleton()
+	).Sort(order.Canonical[flow.Identity]).ToSkeleton()
 
 	// signers are a qualified majority at 7
 	qs.signers = qs.participants[:7]
@@ -742,7 +743,7 @@ func (s *TCSuite) SetupTest() {
 	s.participants = unittest.IdentityListFixture(10,
 		unittest.WithRole(flow.RoleConsensus),
 		unittest.WithWeight(1),
-	).ToSkeleton()
+	).Sort(order.Canonical[flow.Identity]).ToSkeleton()
 
 	// signers are a qualified majority at 7
 	s.signers = s.participants[:7]

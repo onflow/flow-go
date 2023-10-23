@@ -15,15 +15,15 @@ type DKGControllerFactory struct {
 }
 
 // Create provides a mock function with given fields: dkgInstanceID, participants, seed
-func (_m *DKGControllerFactory) Create(dkgInstanceID string, participants flow.IdentityList, seed []byte) (module.DKGController, error) {
+func (_m *DKGControllerFactory) Create(dkgInstanceID string, participants flow.GenericIdentityList[flow.IdentitySkeleton], seed []byte) (module.DKGController, error) {
 	ret := _m.Called(dkgInstanceID, participants, seed)
 
 	var r0 module.DKGController
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string, flow.IdentityList, []byte) (module.DKGController, error)); ok {
+	if rf, ok := ret.Get(0).(func(string, flow.GenericIdentityList[flow.IdentitySkeleton], []byte) (module.DKGController, error)); ok {
 		return rf(dkgInstanceID, participants, seed)
 	}
-	if rf, ok := ret.Get(0).(func(string, flow.IdentityList, []byte) module.DKGController); ok {
+	if rf, ok := ret.Get(0).(func(string, flow.GenericIdentityList[flow.IdentitySkeleton], []byte) module.DKGController); ok {
 		r0 = rf(dkgInstanceID, participants, seed)
 	} else {
 		if ret.Get(0) != nil {
@@ -31,7 +31,7 @@ func (_m *DKGControllerFactory) Create(dkgInstanceID string, participants flow.I
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(string, flow.IdentityList, []byte) error); ok {
+	if rf, ok := ret.Get(1).(func(string, flow.GenericIdentityList[flow.IdentitySkeleton], []byte) error); ok {
 		r1 = rf(dkgInstanceID, participants, seed)
 	} else {
 		r1 = ret.Error(1)

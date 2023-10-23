@@ -62,7 +62,7 @@ func (cs *EngineSuite) SetupTest() {
 	cs.myID = cs.cluster[0].NodeID
 
 	protoEpoch := &protocol.Epoch{}
-	clusters := flow.ClusterList{cs.cluster}
+	clusters := flow.ClusterList{cs.cluster.ToSkeleton()}
 	protoEpoch.On("Clustering").Return(clusters, nil)
 
 	protoQuery := &protocol.EpochQuery{}
@@ -71,7 +71,7 @@ func (cs *EngineSuite) SetupTest() {
 	protoSnapshot := &protocol.Snapshot{}
 	protoSnapshot.On("Epochs").Return(protoQuery)
 	protoSnapshot.On("Identities", mock.Anything).Return(
-		func(selector flow.IdentityFilter) flow.IdentityList {
+		func(selector flow.IdentityFilter[flow.Identity]) flow.IdentityList {
 			return cs.cluster.Filter(selector)
 		},
 		nil,

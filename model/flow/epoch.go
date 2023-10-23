@@ -63,15 +63,15 @@ const EpochSetupRandomSourceLength = 16
 // for the upcoming epoch. It contains the participants in the epoch, the
 // length, the cluster assignment, and the seed for leader selection.
 type EpochSetup struct {
-	Counter            uint64         // the number of the epoch
-	FirstView          uint64         // the first view of the epoch
-	DKGPhase1FinalView uint64         // the final view of DKG phase 1
-	DKGPhase2FinalView uint64         // the final view of DKG phase 2
-	DKGPhase3FinalView uint64         // the final view of DKG phase 3
-	FinalView          uint64         // the final view of the epoch
-	Participants       IdentityList   // all participants of the epoch in canonical order
-	Assignments        AssignmentList // cluster assignment for the epoch with node IDs for each cluster in canonical order
-	RandomSource       []byte         // source of randomness for epoch-specific setup tasks
+	Counter            uint64               // the number of the epoch
+	FirstView          uint64               // the first view of the epoch
+	DKGPhase1FinalView uint64               // the final view of DKG phase 1
+	DKGPhase2FinalView uint64               // the final view of DKG phase 2
+	DKGPhase3FinalView uint64               // the final view of DKG phase 3
+	FinalView          uint64               // the final view of the epoch
+	Participants       IdentitySkeletonList // all participants of the epoch in canonical order
+	Assignments        AssignmentList       // cluster assignment for the epoch with node IDs for each cluster in canonical order
+	RandomSource       []byte               // source of randomness for epoch-specific setup tasks
 }
 
 func (setup *EpochSetup) ServiceEvent() ServiceEvent {
@@ -105,7 +105,7 @@ func (setup *EpochSetup) EqualTo(other *EpochSetup) bool {
 	if setup.FinalView != other.FinalView {
 		return false
 	}
-	if !setup.Participants.EqualTo(other.Participants) {
+	if !IdentitySkeletonListEqualTo(setup.Participants, other.Participants) {
 		return false
 	}
 	if !setup.Assignments.EqualTo(other.Assignments) {
@@ -312,7 +312,7 @@ func (commit *EpochCommit) EqualTo(other *EpochCommit) bool {
 // ToDKGParticipantLookup constructs a DKG participant lookup from an identity
 // list and a key list. The identity list must be EXACTLY the same (order and
 // contents) as that used when initializing the corresponding DKG instance.
-func ToDKGParticipantLookup(participants IdentityList, keys []crypto.PublicKey) (map[Identifier]DKGParticipant, error) {
+func ToDKGParticipantLookup(participants IdentitySkeletonList, keys []crypto.PublicKey) (map[Identifier]DKGParticipant, error) {
 	if len(participants) != len(keys) {
 		return nil, fmt.Errorf("participant list (len=%d) does not match key list (len=%d)", len(participants), len(keys))
 	}

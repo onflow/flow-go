@@ -73,19 +73,6 @@ func TestIdentityEncodingJSON(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, identity, &dec)
 	})
-
-	t.Run("compat: should accept old files using Stake field", func(t *testing.T) {
-		identity := unittest.IdentityFixture(unittest.WithRandomPublicKeys())
-		enc, err := json.Marshal(identity)
-		require.NoError(t, err)
-		// emulate the old encoding by replacing the new field with old field name
-		// NOTE: use replace in such way to avoid replacing InitialWeight field.
-		enc = []byte(strings.Replace(string(enc), "\"Weight", "\"Stake", 1))
-		var dec flow.Identity
-		err = json.Unmarshal(enc, &dec)
-		require.NoError(t, err)
-		require.Equal(t, identity, &dec)
-	})
 }
 
 func TestIdentityEncodingMsgpack(t *testing.T) {
@@ -104,7 +91,7 @@ func TestIdentityList_Exists(t *testing.T) {
 		il2 := unittest.IdentityListFixture(1)
 
 		// sort the first list
-		il1 = il1.Sort(order.Canonical)
+		il1 = il1.Sort(order.Canonical[flow.Identity])
 
 		for i := 0; i < 10; i++ {
 			assert.True(t, il1.Exists(il1[i]))
@@ -119,7 +106,7 @@ func TestIdentityList_IdentifierExists(t *testing.T) {
 		il2 := unittest.IdentityListFixture(1)
 
 		// sort the first list
-		il1 = il1.Sort(order.Canonical)
+		il1 = il1.Sort(order.Canonical[flow.Identity])
 
 		for i := 0; i < 10; i++ {
 			assert.True(t, il1.IdentifierExists(il1[i].NodeID))
@@ -246,10 +233,10 @@ func TestIdentity_Sort(t *testing.T) {
 	il := unittest.IdentityListFixture(20)
 	random, err := il.Shuffle()
 	require.NoError(t, err)
-	assert.False(t, random.Sorted(order.Canonical))
+	assert.False(t, random.Sorted(order.Canonical[flow.Identity]))
 
-	canonical := il.Sort(order.Canonical)
-	assert.True(t, canonical.Sorted(order.Canonical))
+	canonical := il.Sort(order.Canonical[flow.Identity])
+	assert.True(t, canonical.Sorted(order.Canonical[flow.Identity]))
 }
 
 func TestIdentity_EqualTo(t *testing.T) {
@@ -369,8 +356,8 @@ func TestIdentityList_EqualTo(t *testing.T) {
 		a := flow.IdentityList{}
 		b := flow.IdentityList{}
 
-		require.True(t, a.EqualTo(b))
-		require.True(t, b.EqualTo(a))
+		require.True(t, flow.IdentityListEqualTo(a, b))
+		require.True(t, flow.IdentityListEqualTo(b, a))
 	})
 
 	t.Run("different len arent equal", func(t *testing.T) {
@@ -379,8 +366,8 @@ func TestIdentityList_EqualTo(t *testing.T) {
 		a := flow.IdentityList{identityA}
 		b := flow.IdentityList{}
 
-		require.False(t, a.EqualTo(b))
-		require.False(t, b.EqualTo(a))
+		require.False(t, flow.IdentityListEqualTo(a, b))
+		require.False(t, flow.IdentityListEqualTo(b, a))
 	})
 
 	t.Run("different data means not equal", func(t *testing.T) {
@@ -390,8 +377,8 @@ func TestIdentityList_EqualTo(t *testing.T) {
 		a := flow.IdentityList{identityA}
 		b := flow.IdentityList{identityB}
 
-		require.False(t, a.EqualTo(b))
-		require.False(t, b.EqualTo(a))
+		require.False(t, flow.IdentityListEqualTo(a, b))
+		require.False(t, flow.IdentityListEqualTo(b, a))
 	})
 
 	t.Run("same data means equal", func(t *testing.T) {
@@ -400,8 +387,8 @@ func TestIdentityList_EqualTo(t *testing.T) {
 		a := flow.IdentityList{identityA, identityA}
 		b := flow.IdentityList{identityA, identityA}
 
-		require.True(t, a.EqualTo(b))
-		require.True(t, b.EqualTo(a))
+		require.True(t, flow.IdentityListEqualTo(a, b))
+		require.True(t, flow.IdentityListEqualTo(b, a))
 	})
 }
 

@@ -156,7 +156,7 @@ func finalize(cmd *cobra.Command, args []string) {
 	log.Info().Msg("")
 
 	// create flow.IdentityList representation of participant set
-	participants := model.ToIdentityList(stakingNodes).Sort(order.Canonical)
+	participants := model.ToIdentityList(stakingNodes).Sort(order.Canonical[flow.Identity])
 
 	log.Info().Msg("reading root block data")
 	block := readRootBlock()
@@ -491,7 +491,7 @@ func mergeNodeInfos(internalNodes, partnerNodes []model.NodeInfo) []model.NodeIn
 	}
 
 	// sort nodes using the canonical ordering
-	nodes = model.Sort(nodes, order.Canonical)
+	nodes = model.Sort(nodes, order.Canonical[flow.Identity])
 
 	return nodes
 }

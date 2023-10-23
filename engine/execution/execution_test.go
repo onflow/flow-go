@@ -43,24 +43,25 @@ func TestExecutionFlow(t *testing.T) {
 
 	chainID := flow.Testnet
 
-	colID := unittest.IdentityFixture(
+	colID := unittest.PrivateNodeInfoFixture(
 		unittest.WithRole(flow.RoleCollection),
 		unittest.WithKeys,
 	)
-	conID := unittest.IdentityFixture(
+	conID := unittest.PrivateNodeInfoFixture(
 		unittest.WithRole(flow.RoleConsensus),
 		unittest.WithKeys,
 	)
-	exeID := unittest.IdentityFixture(
+	exeID := unittest.PrivateNodeInfoFixture(
 		unittest.WithRole(flow.RoleExecution),
 		unittest.WithKeys,
 	)
-	verID := unittest.IdentityFixture(
+	verID := unittest.PrivateNodeInfoFixture(
 		unittest.WithRole(flow.RoleVerification),
 		unittest.WithKeys,
 	)
 
-	identities := unittest.CompleteIdentitySet(colID, conID, exeID, verID).Sort(order.Canonical)
+	identities := unittest.CompleteIdentitySet(colID.Identity(), conID.Identity(), exeID.Identity(), verID.Identity()).
+		Sort(order.Canonical[flow.Identity])
 
 	// create execution node
 	exeNode := testutil.ExecutionNode(t, hub, exeID, identities, 21, chainID)
@@ -98,7 +99,7 @@ func TestExecutionFlow(t *testing.T) {
 		col2.ID(): &col2,
 	}
 
-	clusterChainID := cluster.CanonicalClusterID(1, flow.IdentityList{colID}.NodeIDs())
+	clusterChainID := cluster.CanonicalClusterID(1, flow.IdentityList{colID.Identity()}.NodeIDs())
 
 	// signed by the only collector
 	block := unittest.BlockWithParentAndProposerFixture(t, genesis, conID.NodeID)
@@ -352,28 +353,32 @@ func TestFailedTxWillNotChangeStateCommitment(t *testing.T) {
 
 	chainID := flow.Emulator
 
-	colID := unittest.IdentityFixture(
+	colNodeInfo := unittest.PrivateNodeInfoFixture(
 		unittest.WithRole(flow.RoleCollection),
 		unittest.WithKeys,
 	)
-	conID := unittest.IdentityFixture(
+	conNodeInfo := unittest.PrivateNodeInfoFixture(
 		unittest.WithRole(flow.RoleConsensus),
 		unittest.WithKeys,
 	)
-	exe1ID := unittest.IdentityFixture(
+	exe1NodeInfo := unittest.PrivateNodeInfoFixture(
 		unittest.WithRole(flow.RoleExecution),
 		unittest.WithKeys,
 	)
+
+	colID := colNodeInfo.Identity()
+	conID := conNodeInfo.Identity()
+	exe1ID := exe1NodeInfo.Identity()
 
 	identities := unittest.CompleteIdentitySet(colID, conID, exe1ID)
 	key := unittest.NetworkingPrivKeyFixture()
 	identities[3].NetworkPubKey = key.PublicKey()
 
-	collectionNode := testutil.GenericNodeFromParticipants(t, hub, colID, identities, chainID)
+	collectionNode := testutil.GenericNodeFromParticipants(t, hub, colNodeInfo, identities, chainID)
 	defer collectionNode.Done()
-	consensusNode := testutil.GenericNodeFromParticipants(t, hub, conID, identities, chainID)
+	consensusNode := testutil.GenericNodeFromParticipants(t, hub, conNodeInfo, identities, chainID)
 	defer consensusNode.Done()
-	exe1Node := testutil.ExecutionNode(t, hub, exe1ID, identities, 27, chainID)
+	exe1Node := testutil.ExecutionNode(t, hub, exe1NodeInfo, identities, 27, chainID)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	unittest.RequireReturnsBefore(t, func() {
@@ -504,28 +509,33 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 
 	chainID := flow.Emulator
 
-	colID := unittest.IdentityFixture(
+	colID := unittest.PrivateNodeInfoFixture(
 		unittest.WithRole(flow.RoleCollection),
 		unittest.WithKeys,
 	)
-	conID := unittest.IdentityFixture(
+	conID := unittest.PrivateNodeInfoFixture(
 		unittest.WithRole(flow.RoleConsensus),
 		unittest.WithKeys,
 	)
-	exeID := unittest.IdentityFixture(
+	exeID := unittest.PrivateNodeInfoFixture(
 		unittest.WithRole(flow.RoleExecution),
 		unittest.WithKeys,
 	)
-	ver1ID := unittest.IdentityFixture(
+	ver1ID := unittest.PrivateNodeInfoFixture(
 		unittest.WithRole(flow.RoleVerification),
 		unittest.WithKeys,
 	)
-	ver2ID := unittest.IdentityFixture(
+	ver2ID := unittest.PrivateNodeInfoFixture(
 		unittest.WithRole(flow.RoleVerification),
 		unittest.WithKeys,
 	)
 
-	identities := unittest.CompleteIdentitySet(colID, conID, exeID, ver1ID, ver2ID)
+	identities := unittest.CompleteIdentitySet(colID.Identity(),
+		conID.Identity(),
+		exeID.Identity(),
+		ver1ID.Identity(),
+		ver2ID.Identity(),
+	)
 
 	exeNode := testutil.ExecutionNode(t, hub, exeID, identities, 21, chainID)
 	ctx, cancel := context.WithCancel(context.Background())

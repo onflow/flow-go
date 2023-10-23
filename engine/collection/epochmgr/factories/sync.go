@@ -37,7 +37,7 @@ func NewSyncEngineFactory(
 }
 
 func (f *SyncEngineFactory) Create(
-	participants flow.IdentityList,
+	participants flow.IdentitySkeletonList,
 	state cluster.State,
 	blocks storage.ClusterBlocks,
 	core *chainsync.Core,

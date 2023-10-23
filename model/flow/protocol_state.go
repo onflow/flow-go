@@ -48,8 +48,8 @@ type EpochStateContainer struct {
 	CommitID Identifier
 	// ActiveIdentities contains the dynamic identity properties for the nodes that
 	// are active in this epoch. Active means that these nodes are authorized to contribute to
-	// extending the chain. Nodes are listed in `Identities` if and only if
-	// they are part of the EpochSetup even for the respective epoch.
+	// extending the chain. Nodes are listed in `ActiveIdentities` if and only if
+	// they are part of the EpochSetup event for the respective epoch.
 	// The dynamic identity properties can change from block to block. Each non-deferred
 	// identity-mutating operation is applied independently to the `ActiveIdentities`
 	// of the relevant epoch's EpochStateContainer separately.
@@ -189,7 +189,7 @@ func NewRichProtocolStateEntry(
 
 		// if next epoch is available, it means that we have observed epoch setup event and we are not anymore in staking phase,
 		// so we need to build the identity table using current and next epoch setup events.
-		result.CurrentEpochIdentityTable, err = buildIdentityTable(
+		result.CurrentEpochIdentityTable, err = BuildIdentityTable(
 			protocolState.CurrentEpoch.ActiveIdentities,
 			currentEpochSetup.Participants,
 			nextEpochSetup.Participants,
@@ -198,7 +198,7 @@ func NewRichProtocolStateEntry(
 			return nil, fmt.Errorf("could not build identity table for setup/commit phase: %w", err)
 		}
 
-		result.NextEpochIdentityTable, err = buildIdentityTable(
+		result.NextEpochIdentityTable, err = BuildIdentityTable(
 			nextEpoch.ActiveIdentities,
 			nextEpochSetup.Participants,
 			currentEpochSetup.Participants,
@@ -209,14 +209,14 @@ func NewRichProtocolStateEntry(
 	} else {
 		// if next epoch is not yet created, it means that we are in staking phase,
 		// so we need to build the identity table using previous and current epoch setup events.
-		var otherIdentities IdentityList
+		var previousEpochIdentities IdentitySkeletonList
 		if previousEpochSetup != nil {
-			otherIdentities = previousEpochSetup.Participants
+			previousEpochIdentities = previousEpochSetup.Participants
 		}
-		result.CurrentEpochIdentityTable, err = buildIdentityTable(
+		result.CurrentEpochIdentityTable, err = BuildIdentityTable(
 			protocolState.CurrentEpoch.ActiveIdentities,
 			currentEpochSetup.Participants,
-			otherIdentities,
+			previousEpochIdentities,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not build identity table for staking phase: %w", err)
@@ -353,9 +353,10 @@ func (ll DynamicIdentityEntryList) Sort(less IdentifierOrder) DynamicIdentityEnt
 	return dup
 }
 
-// buildIdentityTable constructs the full identity table for the target epoch by combining data from:
-//  1. The target epoch's Dynamic Identities.
-//  2. The target epoch's IdentitySkeletons
+// BuildIdentityTable constructs the full identity table for the target epoch by combining data from:
+//  1. The Dynamic Identities for the nodes that are _active_ in the target epoch (i.e. the dynamic identity
+//     fields for the IdentitySkeletons contained in the EpochSetup event for the respective epoch).
+//  2. The IdentitySkeletons for the nodes that are _active_ in the target epoch
 //     (recorded in EpochSetup event and immutable throughout the epoch).
 //  3. [optional] An adjacent epoch's IdentitySkeletons (can be empty or nil), as recorded in the
 //     adjacent epoch's setup event. For a target epoch N, the epochs N-1 and N+1 are defined to be
@@ -364,12 +365,18 @@ func (ll DynamicIdentityEntryList) Sort(less IdentifierOrder) DynamicIdentityEnt
 //
 // It also performs sanity checks to make sure that the data is consistent.
 // No errors are expected during normal operation. All errors indicate inconsistent or invalid inputs.
-func buildIdentityTable(
+func BuildIdentityTable(
 	targetEpochDynamicIdentities DynamicIdentityEntryList,
-	targetEpochIdentitySkeletons IdentityList, // TODO: change to `IdentitySkeletonList`
-	adjacentEpochIdentitySkeletons IdentityList, // TODO: change to `IdentitySkeletonList`
+	targetEpochIdentitySkeletons IdentitySkeletonList,
+	adjacentEpochIdentitySkeletons IdentitySkeletonList,
 ) (IdentityList, error) {
-	// produce a unique set for current and previous epoch participants
+	// Combine the participants of the current and adjacent epoch. The method `GenericIdentityList.Union`
+	// already implements the following required conventions:
+	//  1. Preference for IdentitySkeleton of the target epoch:
+	//     In case an IdentitySkeleton with the same NodeID exists in the target epoch as well as
+	//     in the adjacent epoch, we use the IdentitySkeleton for the target epoch (for example,
+	//     to account for changes of keys, address, initial weight, etc).
+	//  2. Canonical ordering
 	allEpochParticipants := targetEpochIdentitySkeletons.Union(adjacentEpochIdentitySkeletons)
 	// sanity check: size of identities should be equal to previous and current epoch participants combined
 	if len(allEpochParticipants) != len(targetEpochDynamicIdentities) {
@@ -384,7 +391,7 @@ func buildIdentityTable(
 			return nil, fmt.Errorf("identites in protocol state are not in canonical order: expected %s, got %s", allEpochParticipants[i].NodeID, identity.NodeID)
 		}
 		result = append(result, &Identity{
-			IdentitySkeleton: allEpochParticipants[i].IdentitySkeleton,
+			IdentitySkeleton: *allEpochParticipants[i],
 			DynamicIdentity:  identity.Dynamic,
 		})
 	}

@@ -382,7 +382,7 @@ func TestBootstrap_InvalidIdentities(t *testing.T) {
 	})
 
 	t.Run("zero weight", func(t *testing.T) {
-		zeroWeightIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification), unittest.WithWeight(0))
+		zeroWeightIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification), unittest.WithInitialWeight(0))
 		participants := unittest.CompleteIdentitySet(zeroWeightIdentity)
 		root := unittest.RootSnapshotFixture(participants)
 		bootstrap(t, root, func(state *bprotocol.State, err error) {
@@ -426,7 +426,7 @@ func TestBootstrap_InvalidIdentities(t *testing.T) {
 		// randomly shuffle the identities so they are not canonically ordered
 		encodable := root.Encodable()
 		var err error
-		encodable.Epochs.Current.InitialIdentities, err = participants.Shuffle()
+		encodable.Epochs.Current.InitialIdentities, err = participants.ToSkeleton().Shuffle()
 		require.NoError(t, err)
 		root = inmem.SnapshotFromEncodable(encodable)
 		bootstrap(t, root, func(state *bprotocol.State, err error) {

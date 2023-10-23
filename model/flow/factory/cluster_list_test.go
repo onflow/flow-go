@@ -14,12 +14,12 @@ import (
 // This tests verifies that NewClusterList has implemented the check on the assumption.
 func TestNewClusterListFail(t *testing.T) {
 	identities := unittest.IdentityListFixture(100, unittest.WithRole(flow.RoleCollection))
-	assignments := unittest.ClusterAssignment(10, identities)
+	assignments := unittest.ClusterAssignment(10, identities.ToSkeleton())
 
 	tmp := assignments[1][0]
 	assignments[1][0] = assignments[1][1]
 	assignments[1][1] = tmp
 
-	_, err := factory.NewClusterList(assignments, identities)
+	_, err := factory.NewClusterList(assignments, identities.ToSkeleton())
 	require.Error(t, err)
 }

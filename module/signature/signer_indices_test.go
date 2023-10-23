@@ -23,7 +23,7 @@ import (
 //  2. for the decoding step, we offer an optimized convenience function to directly
 //     decode to full identities: Indices --decode--> Identities
 func TestEncodeDecodeIdentities(t *testing.T) {
-	canonicalIdentities := unittest.IdentityListFixture(20).ToSkeleton()
+	canonicalIdentities := unittest.IdentityListFixture(20).Sort(order.Canonical[flow.Identity]).ToSkeleton()
 	canonicalIdentifiers := canonicalIdentities.NodeIDs()
 	for s := 0; s < 20; s++ {
 		for e := s; e < 20; e++ {
@@ -111,7 +111,7 @@ func Test_EncodeSignerToIndicesAndSigType(t *testing.T) {
 		numRandomBeaconSigners := rapid.IntRange(0, committeeSize-numStakingSigners).Draw(t, "numRandomBeaconSigners").(int)
 
 		// create committee
-		committeeIdentities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).Sort(order.Canonical)
+		committeeIdentities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).Sort(order.Canonical[flow.Identity])
 		committee := committeeIdentities.NodeIDs()
 		stakingSigners, beaconSigners := sampleSigners(t, committee, numStakingSigners, numRandomBeaconSigners)
 
@@ -127,7 +127,7 @@ func Test_EncodeSignerToIndicesAndSigType(t *testing.T) {
 		correctEncoding(t, signerIndices, committee, unorderedSigners)
 
 		// check sigTypes
-		canSigners := committeeIdentities.Filter(filter.HasNodeID(unorderedSigners...)).NodeIDs() // generates list of signer IDs in canonical order
+		canSigners := committeeIdentities.Filter(filter.HasNodeID[flow.Identity](unorderedSigners...)).NodeIDs() // generates list of signer IDs in canonical order
 		correctEncoding(t, sigTypes, canSigners, beaconSigners)
 	})
 }
@@ -150,7 +150,7 @@ func Test_DecodeSigTypeToStakingAndBeaconSigners(t *testing.T) {
 
 		// create committee
 		committeeIdentities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).
-			Sort(order.Canonical)
+			Sort(order.Canonical[flow.Identity])
 		committee := committeeIdentities.NodeIDs()
 		stakingSigners, beaconSigners := sampleSigners(t, committee, numStakingSigners, numRandomBeaconSigners)
 
@@ -167,19 +167,19 @@ func Test_DecodeSigTypeToStakingAndBeaconSigners(t *testing.T) {
 		// verify; note that there is a slightly different convention between Filter and the decoding logic:
 		// Filter returns nil for an empty list, while the decoding logic returns an instance of an empty slice
 		sigIdentities := committeeIdentities.Filter(
-			filter.Or(filter.HasNodeID(stakingSigners...), filter.HasNodeID(beaconSigners...))).ToSkeleton() // signer identities in canonical order
+			filter.Or(filter.HasNodeID[flow.Identity](stakingSigners...), filter.HasNodeID[flow.Identity](beaconSigners...))).ToSkeleton() // signer identities in canonical order
 		if len(stakingSigners)+len(decBeaconSigners) > 0 {
 			require.Equal(t, sigIdentities, decSignerIdentites)
 		}
 		if len(stakingSigners) == 0 {
 			require.Empty(t, decStakingSigners)
 		} else {
-			require.Equal(t, committeeIdentities.Filter(filter.HasNodeID(stakingSigners...)).ToSkeleton(), decStakingSigners)
+			require.Equal(t, committeeIdentities.Filter(filter.HasNodeID[flow.Identity](stakingSigners...)).ToSkeleton(), decStakingSigners)
 		}
 		if len(decBeaconSigners) == 0 {
 			require.Empty(t, decBeaconSigners)
 		} else {
-			require.Equal(t, committeeIdentities.Filter(filter.HasNodeID(beaconSigners...)).ToSkeleton(), decBeaconSigners)
+			require.Equal(t, committeeIdentities.Filter(filter.HasNodeID[flow.Identity](beaconSigners...)).ToSkeleton(), decBeaconSigners)
 		}
 	})
 }
@@ -276,7 +276,7 @@ func Test_EncodeSignersToIndices(t *testing.T) {
 		numSigners := rapid.IntRange(0, committeeSize).Draw(t, "numSigners").(int)
 
 		// create committee
-		identities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).Sort(order.Canonical)
+		identities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).Sort(order.Canonical[flow.Identity])
 		committee := identities.NodeIDs()
 		signers, err := committee.Sample(uint(numSigners))
 		require.NoError(t, err)
@@ -306,7 +306,7 @@ func Test_DecodeSignerIndicesToIdentifiers(t *testing.T) {
 		numSigners := rapid.IntRange(0, committeeSize).Draw(t, "numSigners").(int)
 
 		// create committee
-		identities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).Sort(order.Canonical)
+		identities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).Sort(order.Canonical[flow.Identity])
 		committee := identities.NodeIDs()
 		signers, err := committee.Sample(uint(numSigners))
 		require.NoError(t, err)
@@ -342,7 +342,7 @@ func Test_DecodeSignerIndicesToIdentities(t *testing.T) {
 		numSigners := rapid.IntRange(0, committeeSize).Draw(t, "numSigners").(int)
 
 		// create committee
-		identities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).Sort(order.Canonical)
+		identities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).Sort(order.Canonical[flow.Identity])
 		fullSigners, err := identities.Sample(uint(numSigners))
 		require.NoError(t, err)
 		signers := fullSigners.ToSkeleton()

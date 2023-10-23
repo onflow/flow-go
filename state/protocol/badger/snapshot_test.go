@@ -193,9 +193,9 @@ func TestIdentities(t *testing.T) {
 		t.Run("filtered", func(t *testing.T) {
 			sample, err := identities.SamplePct(0.1)
 			require.NoError(t, err)
-			filters := []flow.IdentityFilter{
-				filter.HasRole(flow.RoleCollection),
-				filter.HasNodeID(sample.NodeIDs()...),
+			filters := []flow.IdentityFilter[flow.Identity]{
+				filter.HasRole[flow.Identity](flow.RoleCollection),
+				filter.HasNodeID[flow.Identity](sample.NodeIDs()...),
 				filter.HasWeight(true),
 			}
 
@@ -220,7 +220,7 @@ func TestClusters(t *testing.T) {
 	qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(root.ID()))
 	setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 	commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
-	setup.Assignments = unittest.ClusterAssignment(uint(nClusters), collectors)
+	setup.Assignments = unittest.ClusterAssignment(uint(nClusters), collectors.ToSkeleton())
 	clusterQCs := unittest.QuorumCertificatesFromAssignments(setup.Assignments)
 	commit.ClusterQCs = flow.ClusterQCVoteDatasFromQCs(clusterQCs)
 	seal.ResultID = result.ID()
@@ -229,7 +229,7 @@ func TestClusters(t *testing.T) {
 	require.NoError(t, err)
 
 	util.RunWithBootstrapState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.State) {
-		expectedClusters, err := factory.NewClusterList(setup.Assignments, collectors)
+		expectedClusters, err := factory.NewClusterList(setup.Assignments, collectors.ToSkeleton())
 		require.NoError(t, err)
 		actualClusters, err := state.Final().Epochs().Current().Clustering()
 		require.NoError(t, err)
@@ -1240,7 +1240,7 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 	removedAtEpoch2 := epoch1Identities[rand.Intn(len(epoch1Identities))]
 	// epoch 2 has partial overlap with epoch 1
 	epoch2Identities := append(
-		epoch1Identities.Filter(filter.Not(filter.HasNodeID(removedAtEpoch2.NodeID))),
+		epoch1Identities.Filter(filter.Not(filter.HasNodeID[flow.Identity](removedAtEpoch2.NodeID))),
 		addedAtEpoch2)
 	// epoch 3 has no overlap with epoch 2
 	epoch3Identities := unittest.IdentityListFixture(10, unittest.WithAllRoles())
@@ -1251,12 +1251,12 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 		epochBuilder := unittest.NewEpochBuilder(t, state)
 		// build epoch 1 (prepare epoch 2)
 		epochBuilder.
-			UsingSetupOpts(unittest.WithParticipants(epoch2Identities)).
+			UsingSetupOpts(unittest.WithParticipants(epoch2Identities.ToSkeleton())).
 			BuildEpoch().
 			CompleteEpoch()
 		// build epoch 2 (prepare epoch 3)
 		epochBuilder.
-			UsingSetupOpts(unittest.WithParticipants(epoch3Identities)).
+			UsingSetupOpts(unittest.WithParticipants(epoch3Identities.ToSkeleton())).
 			BuildEpoch().
 			CompleteEpoch()
 
@@ -1298,7 +1298,7 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 					assert.ElementsMatch(t, epoch1Identities, identities.Filter(epoch1Identities.Selector()))
 
 					// should contain single next epoch identity with 0 weight
-					nextEpochIdentity := identities.Filter(filter.HasNodeID(addedAtEpoch2.NodeID))[0]
+					nextEpochIdentity := identities.Filter(filter.HasNodeID[flow.Identity](addedAtEpoch2.NodeID))[0]
 					assert.Equal(t, uint64(0), nextEpochIdentity.Weight) // should have 0 weight
 					nextEpochIdentity.Weight = addedAtEpoch2.Weight
 					assert.Equal(t, addedAtEpoch2, nextEpochIdentity) // should be equal besides weight
@@ -1319,7 +1319,7 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 			assert.ElementsMatch(t, epoch2Identities, identities.Filter(epoch2Identities.Selector()))
 
 			// should contain single previous epoch identity with 0 weight
-			lastEpochIdentity := identities.Filter(filter.HasNodeID(removedAtEpoch2.NodeID))[0]
+			lastEpochIdentity := identities.Filter(filter.HasNodeID[flow.Identity](removedAtEpoch2.NodeID))[0]
 			assert.Equal(t, uint64(0), lastEpochIdentity.Weight) // should have 0 weight
 			lastEpochIdentity.Weight = removedAtEpoch2.Weight    // overwrite weight
 			assert.Equal(t, removedAtEpoch2, lastEpochIdentity)  // should be equal besides weight

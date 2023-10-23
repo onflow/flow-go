@@ -814,6 +814,6 @@ func (e *Engine) requestCollectionsInFinalizedBlock(missingColls []*flow.Collect
 			// failed to find guarantors for guarantees contained in a finalized block is fatal error
 			e.log.Fatal().Err(err).Msgf("could not find guarantors for guarantee %v", cg.ID())
 		}
-		e.request.EntityByID(cg.ID(), filter.HasNodeID(guarantors...))
+		e.request.EntityByID(cg.ID(), filter.HasNodeID[flow.Identity](guarantors...))
 	}
 }

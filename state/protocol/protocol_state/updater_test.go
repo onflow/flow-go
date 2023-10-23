@@ -214,7 +214,7 @@ func (s *UpdaterSuite) TestUpdateIdentityHappyPath() {
 	unittest.WithNextEpochProtocolState()(s.parentProtocolState)
 	s.updater = NewUpdater(s.candidate, s.parentProtocolState)
 
-	currentEpochParticipants := s.parentProtocolState.CurrentEpochSetup.Participants.Copy()
+	currentEpochParticipants := s.parentProtocolState.CurrentEpochIdentityTable.Copy()
 	weightChanges, err := currentEpochParticipants.Sample(2)
 	require.NoError(s.T(), err)
 	ejectedChanges, err := currentEpochParticipants.Sample(2)
@@ -289,66 +289,26 @@ func (s *UpdaterSuite) TestProcessEpochSetupInvariants() {
 // For current epoch we should have identity table with all the nodes from the current epoch + nodes from the next epoch with 0 weight.
 // For next epoch we should have identity table with all the nodes from the next epoch + nodes from the current epoch with 0 weight.
 func (s *UpdaterSuite) TestProcessEpochSetupHappyPath() {
+	setupParticipants := unittest.IdentityListFixture(5).Sort(order.Canonical[flow.Identity])
+	setupParticipants[0].InitialWeight = 13
+	setupParticipants[0].Weight = setupParticipants[0].InitialWeight
 	setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
 		setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
-		setup.Participants[0].InitialWeight = 13
+		setup.Participants = setupParticipants.ToSkeleton()
 	})
 
-	// prepare expected identity tables for current and next epochs
-	expectedCurrentEpochIdentityTable := make(flow.DynamicIdentityEntryList, 0,
-		len(s.parentProtocolState.CurrentEpochSetup.Participants)+len(setup.Participants))
-	expectedNextEpochIdentityTable := make(flow.DynamicIdentityEntryList, 0,
-		len(expectedCurrentEpochIdentityTable))
-
+	participantsFromCurrentEpochSetup := s.parentProtocolState.CurrentEpochIdentityTable.Filter(func(i *flow.Identity) bool {
+		_, exists := s.parentProtocolState.CurrentEpochSetup.Participants.ByNodeID(i.NodeID)
+		return exists
+	})
 	// for current epoch we will have all the nodes from the current epoch + nodes from the next epoch with 0 weight
+	expectedCurrentEpochIdentityTable := flow.DynamicIdentityEntryListFromIdentities(
+		participantsFromCurrentEpochSetup.Union(setupParticipants.Map(mapfunc.WithWeight(0))),
+	)
 	// for next epoch we will have all the nodes from the next epoch + nodes from the current epoch with 0 weight
-	for _, participant := range s.parentProtocolState.CurrentEpochSetup.Participants {
-		expectedCurrentEpochIdentityTable = append(expectedCurrentEpochIdentityTable, &flow.DynamicIdentityEntry{
-			NodeID: participant.NodeID,
-			Dynamic: flow.DynamicIdentity{
-				Weight:  participant.Weight,
-				Ejected: participant.Ejected,
-			},
-		})
-
-		expectedNextEpochIdentityTable = append(expectedNextEpochIdentityTable, &flow.DynamicIdentityEntry{
-			NodeID: participant.NodeID,
-			Dynamic: flow.DynamicIdentity{
-				Weight:  0,
-				Ejected: participant.Ejected,
-			},
-		})
-	}
-
-	// in this loop we perform a few extra lookups to avoid duplicates
-	for _, participant := range setup.Participants {
-		if _, found := expectedCurrentEpochIdentityTable.ByNodeID(participant.NodeID); !found {
-			expectedCurrentEpochIdentityTable = append(expectedCurrentEpochIdentityTable, &flow.DynamicIdentityEntry{
-				NodeID: participant.NodeID,
-				Dynamic: flow.DynamicIdentity{
-					Weight:  0,
-					Ejected: participant.Ejected,
-				},
-			})
-		}
-
-		entry := &flow.DynamicIdentityEntry{
-			NodeID: participant.NodeID,
-			Dynamic: flow.DynamicIdentity{
-				Weight:  participant.InitialWeight,
-				Ejected: participant.Ejected,
-			},
-		}
-		existing, found := expectedNextEpochIdentityTable.ByNodeID(participant.NodeID)
-		if found {
-			existing.Dynamic = entry.Dynamic
-		} else {
-			expectedNextEpochIdentityTable = append(expectedNextEpochIdentityTable, entry)
-		}
-	}
-	// finally, sort in canonical order
-	expectedCurrentEpochIdentityTable = expectedCurrentEpochIdentityTable.Sort(order.IdentifierCanonical)
-	expectedNextEpochIdentityTable = expectedNextEpochIdentityTable.Sort(order.IdentifierCanonical)
+	expectedNextEpochIdentityTable := flow.DynamicIdentityEntryListFromIdentities(
+		setupParticipants.Union(participantsFromCurrentEpochSetup.Map(mapfunc.WithWeight(0))),
+	)
 
 	// process actual event
 	err := s.updater.ProcessEpochSetup(setup)
@@ -368,24 +328,32 @@ func (s *UpdaterSuite) TestProcessEpochSetupHappyPath() {
 // built updated protocol state. It should build a union of participants from current and next epoch for current and
 // next epoch protocol states respectively.
 func (s *UpdaterSuite) TestProcessEpochSetupWithSameParticipants() {
-	overlappingNodes, err := s.parentProtocolState.CurrentEpochSetup.Participants.Sample(2)
+	participantsFromCurrentEpochSetup := s.parentProtocolState.CurrentEpochIdentityTable.Filter(func(i *flow.Identity) bool {
+		_, exists := s.parentProtocolState.CurrentEpochSetup.Participants.ByNodeID(i.NodeID)
+		return exists
+	}).Sort(order.Canonical[flow.Identity])
+
+	overlappingNodes, err := participantsFromCurrentEpochSetup.Sample(2)
 	require.NoError(s.T(), err)
+	setupParticipants := append(unittest.IdentityListFixture(len(s.parentProtocolState.CurrentEpochIdentityTable)),
+		overlappingNodes...).Sort(order.Canonical[flow.Identity])
 	setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
 		setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
-		setup.Participants = append(setup.Participants, overlappingNodes...)
+		setup.Participants = setupParticipants.ToSkeleton()
 	})
 	err = s.updater.ProcessEpochSetup(setup)
 	require.NoError(s.T(), err)
 	updatedState, _, _ := s.updater.Build()
+
 	expectedParticipants := flow.DynamicIdentityEntryListFromIdentities(
-		s.parentProtocolState.CurrentEpochSetup.Participants.Union(setup.Participants.Map(mapfunc.WithWeight(0))),
+		participantsFromCurrentEpochSetup.Union(setupParticipants.Map(mapfunc.WithWeight(0))),
 	)
 	require.Equal(s.T(), updatedState.CurrentEpoch.ActiveIdentities,
 		expectedParticipants,
 		"should have all participants from current epoch and next epoch, but without duplicates")
 
 	nextEpochParticipants := flow.DynamicIdentityEntryListFromIdentities(
-		setup.Participants.Union(s.parentProtocolState.CurrentEpochSetup.Participants.Map(mapfunc.WithWeight(0))),
+		setupParticipants.Union(participantsFromCurrentEpochSetup.Map(mapfunc.WithWeight(0))),
 	)
 	require.Equal(s.T(), updatedState.NextEpoch.ActiveIdentities,
 		nextEpochParticipants,
@@ -395,10 +363,13 @@ func (s *UpdaterSuite) TestProcessEpochSetupWithSameParticipants() {
 // TestEpochSetupAfterIdentityChange tests that after processing epoch an setup event, all previously made changes to the identity table
 // are preserved and reflected in the resulting protocol state.
 func (s *UpdaterSuite) TestEpochSetupAfterIdentityChange() {
-	currentEpochParticipants := s.parentProtocolState.CurrentEpochSetup.Participants.Copy() // DEEP copy of Identity List
-	weightChanges, err := currentEpochParticipants.Sample(2)
+	participantsFromCurrentEpochSetup := s.parentProtocolState.CurrentEpochIdentityTable.Filter(func(i *flow.Identity) bool {
+		_, exists := s.parentProtocolState.CurrentEpochSetup.Participants.ByNodeID(i.NodeID)
+		return exists
+	}).Sort(order.Canonical[flow.Identity])
+	weightChanges, err := participantsFromCurrentEpochSetup.Sample(2)
 	require.NoError(s.T(), err)
-	ejectedChanges, err := currentEpochParticipants.Sample(2)
+	ejectedChanges, err := participantsFromCurrentEpochSetup.Sample(2)
 	require.NoError(s.T(), err)
 	for i, identity := range weightChanges {
 		identity.DynamicIdentity.Weight = uint64(100 * (i + 1))
@@ -441,7 +412,7 @@ func (s *UpdaterSuite) TestEpochSetupAfterIdentityChange() {
 
 	setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
 		setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
-		setup.Participants = append(setup.Participants, allUpdates...) // add those nodes that were changed in previous epoch
+		setup.Participants = append(setup.Participants, allUpdates.ToSkeleton()...) // add those nodes that were changed in previous epoch
 	})
 
 	err = s.updater.ProcessEpochSetup(setup)

@@ -49,11 +49,11 @@ func (suite *ClusterSuite) SetupTest() {
 	suite.members = unittest.IdentityListFixture(5, unittest.WithRole(flow.RoleCollection))
 	suite.me = suite.members[0]
 	counter := uint64(1)
-	suite.root = clusterstate.CanonicalRootBlock(counter, suite.members)
+	suite.root = clusterstate.CanonicalRootBlock(counter, suite.members.ToSkeleton())
 
 	suite.cluster.On("EpochCounter").Return(counter)
 	suite.cluster.On("Index").Return(uint(1))
-	suite.cluster.On("Members").Return(suite.members)
+	suite.cluster.On("Members").Return(suite.members.ToSkeleton())
 	suite.cluster.On("RootBlock").Return(suite.root)
 	suite.epoch.On("Counter").Return(counter, nil)
 	suite.epoch.On("RandomSource").Return(unittest.SeedFixture(prg.RandomSourceLength), nil)
@@ -146,12 +146,6 @@ func (suite *ClusterSuite) TestInvalidSigner() {
 	})
 
 	suite.Run("should return ErrInvalidSigner for existent but ejected cluster member", func() {
-		// at the root block, the cluster member is not ejected yet
-		suite.Run("root block", func() {
-			actual, err := suite.com.IdentityByBlock(rootBlockID, realEjectedClusterMember.NodeID)
-			suite.Require().NoError(err)
-			suite.Assert().Equal(realEjectedClusterMember, actual)
-		})
 		suite.Run("non-root block", func() {
 			_, err := suite.com.IdentityByBlock(nonRootBlockID, realEjectedClusterMember.NodeID)
 			suite.Assert().True(model.IsInvalidSignerError(err))
@@ -164,12 +158,6 @@ func (suite *ClusterSuite) TestInvalidSigner() {
 	})
 
 	suite.Run("should return ErrInvalidSigner for existent but zero-weight cluster member", func() {
-		// at the root block, the cluster member has its initial weight
-		suite.Run("root block", func() {
-			actual, err := suite.com.IdentityByBlock(rootBlockID, realNoWeightClusterMember.NodeID)
-			suite.Require().NoError(err)
-			suite.Assert().Equal(realNoWeightClusterMember, actual)
-		})
 		suite.Run("non-root block", func() {
 			_, err := suite.com.IdentityByBlock(nonRootBlockID, realNoWeightClusterMember.NodeID)
 			suite.Assert().True(model.IsInvalidSignerError(err))

@@ -27,7 +27,7 @@ func (s Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
 	return s.enc.QuorumCertificate, nil
 }
 
-func (s Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, error) {
+func (s Snapshot) Identities(selector flow.IdentityFilter[flow.Identity]) (flow.IdentityList, error) {
 	protocolState, err := s.ProtocolState()
 	if err != nil {
 		return nil, fmt.Errorf("could not access protocol state: %w", err)
@@ -37,7 +37,7 @@ func (s Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, e
 
 func (s Snapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
 	// filter identities at snapshot for node ID
-	identities, err := s.Identities(filter.HasNodeID(nodeID))
+	identities, err := s.Identities(filter.HasNodeID[flow.Identity](nodeID))
 	if err != nil {
 		return nil, fmt.Errorf("could not get identities: %w", err)
 	}

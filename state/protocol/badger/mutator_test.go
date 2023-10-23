@@ -868,7 +868,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// add a participant for the next epoch
 		epoch2NewParticipant := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-		epoch2Participants := append(participants, epoch2NewParticipant).Sort(order.Canonical)
+		epoch2Participants := append(participants, epoch2NewParticipant).Sort(order.Canonical[flow.Identity]).ToSkeleton()
 
 		// create the epoch setup event for the second epoch
 		epoch2Setup := unittest.EpochSetupFixture(
@@ -951,7 +951,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		epoch2Commit := unittest.EpochCommitFixture(
 			unittest.CommitWithCounter(epoch2Setup.Counter),
 			unittest.WithClusterQCsFromAssignments(epoch2Setup.Assignments),
-			unittest.WithDKGFromParticipants(epoch2Participants),
+			unittest.WithDKGFromParticipants(epoch2Participants.ToSkeleton()),
 		)
 
 		// create receipt and seal for block 2
@@ -1319,7 +1319,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 
 		// add a participant for the next epoch
 		epoch2NewParticipant := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-		epoch2Participants := append(participants, epoch2NewParticipant).Sort(order.Canonical)
+		epoch2Participants := append(participants, epoch2NewParticipant).Sort(order.Canonical[flow.Identity]).ToSkeleton()
 
 		// this function will return a VALID setup event and seal, we will modify
 		// in different ways in each test case
@@ -1435,9 +1435,9 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 		// swap consensus node for a new one for epoch 2
 		epoch2NewParticipant := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
 		epoch2Participants := append(
-			participants.Filter(filter.Not(filter.HasRole(flow.RoleConsensus))),
+			participants.Filter(filter.Not[flow.Identity](filter.HasRole[flow.Identity](flow.RoleConsensus))),
 			epoch2NewParticipant,
-		).Sort(order.Canonical)
+		).Sort(order.Canonical[flow.Identity]).ToSkeleton()
 
 		// factory method to create a valid EpochSetup method w.r.t. the generated state
 		createSetup := func(block *flow.Block) (*flow.EpochSetup, *flow.ExecutionReceipt, *flow.Seal) {
@@ -1620,7 +1620,7 @@ func TestExtendEpochTransitionWithoutCommit(t *testing.T) {
 
 		// add a participant for the next epoch
 		epoch2NewParticipant := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-		epoch2Participants := append(participants, epoch2NewParticipant).Sort(order.Canonical)
+		epoch2Participants := append(participants, epoch2NewParticipant).Sort(order.Canonical[flow.Identity]).ToSkeleton()
 
 		// create the epoch setup event for the second epoch
 		epoch2Setup := unittest.EpochSetupFixture(
@@ -1761,7 +1761,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 
 			// add a participant for the next epoch
 			epoch2NewParticipant := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-			epoch2Participants := append(participants, epoch2NewParticipant).Sort(order.Canonical)
+			epoch2Participants := append(participants, epoch2NewParticipant).Sort(order.Canonical[flow.Identity]).ToSkeleton()
 
 			// create the epoch setup event for the second epoch
 			epoch2Setup := unittest.EpochSetupFixture(
@@ -1851,7 +1851,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 
 			// add a participant for the next epoch
 			epoch2NewParticipant := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-			epoch2Participants := append(participants, epoch2NewParticipant).Sort(order.Canonical)
+			epoch2Participants := append(participants, epoch2NewParticipant).Sort(order.Canonical[flow.Identity]).ToSkeleton()
 
 			// create the epoch setup event for the second epoch
 			// this event is invalid because it used a non-contiguous first view

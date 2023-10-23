@@ -1258,10 +1258,10 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		func() error { return nil },
 	)
 	snapshot.On("Identities", mock.Anything).Return(
-		func(_ flow.IdentityFilter) flow.IdentityList {
+		func(_ flow.IdentityFilter[flow.Identity]) flow.IdentityList {
 			return nodeIdentities
 		},
-		func(flow.IdentityFilter) error { return nil },
+		func(flow.IdentityFilter[flow.Identity]) error { return nil },
 	)
 
 	// mock Headers to pull from Headers backend
@@ -1711,11 +1711,11 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		func(id flow.Identifier) error { return nil })
 
 	suite.snapshot.On("Identities", mock.Anything).Return(
-		func(filter flow.IdentityFilter) flow.IdentityList {
+		func(filter flow.IdentityFilter[flow.Identity]) flow.IdentityList {
 			// apply the filter passed in to the list of all the execution nodes
 			return allExecutionNodes.Filter(filter)
 		},
-		func(flow.IdentityFilter) error { return nil })
+		func(flow.IdentityFilter[flow.Identity]) error { return nil })
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 
 	testExecutionNodesForBlockID := func(preferredENs, fixedENs, expectedENs flow.IdentityList) {
@@ -1738,17 +1738,20 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		execSelector, err := execNodeSelectorFactory.SelectNodes(allExecNodes)
 		require.NoError(suite.T(), err)
 
-		actualList := flow.IdentityList{}
+		actualList := flow.IdentitySkeletonList{}
 		for actual := execSelector.Next(); actual != nil; actual = execSelector.Next() {
 			actualList = append(actualList, actual)
 		}
 
-		if len(expectedENs) > maxNodesCnt {
-			for _, actual := range actualList {
-				require.Contains(suite.T(), expectedENs, actual)
+		{
+			expectedENs := expectedENs.ToSkeleton()
+			if len(expectedENs) > maxNodesCnt {
+				for _, actual := range actualList {
+					require.Contains(suite.T(), expectedENs, actual)
+				}
+			} else {
+				require.ElementsMatch(suite.T(), actualList, expectedENs)
 			}
-		} else {
-			require.ElementsMatch(suite.T(), actualList, expectedENs)
 		}
 	}
 	// if we don't find sufficient receipts, executionNodesForBlockID should return a list of random ENs
@@ -1766,7 +1769,7 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		execSelector, err := execNodeSelectorFactory.SelectNodes(allExecNodes)
 		require.NoError(suite.T(), err)
 
-		actualList := flow.IdentityList{}
+		actualList := flow.IdentitySkeletonList{}
 		for actual := execSelector.Next(); actual != nil; actual = execSelector.Next() {
 			actualList = append(actualList, actual)
 		}

@@ -50,12 +50,12 @@ type Snapshot interface {
 	// epoch. At the end of an epoch, this includes identities scheduled to join
 	// in the next epoch but are not active yet.
 	//
-	// Identities are guaranteed to be returned in canonical order (order.Canonical).
+	// Identities are guaranteed to be returned in canonical order (order.Canonical[flow.Identity]).
 	//
 	// It allows us to provide optional upfront filters which can be used by the
 	// implementation to speed up database lookups.
 	// TODO document error returns
-	Identities(selector flow.IdentityFilter) (flow.IdentityList, error)
+	Identities(selector flow.IdentityFilter[flow.Identity]) (flow.IdentityList, error)
 
 	// Identity attempts to retrieve the node with the given identifier at the
 	// selected point of the protocol state history. It will error if it doesn't exist.

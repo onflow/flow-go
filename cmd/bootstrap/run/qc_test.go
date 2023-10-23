@@ -45,7 +45,7 @@ func TestGenerateRootQCWithSomeInvalidVotes(t *testing.T) {
 }
 
 func createSignerData(t *testing.T, n int) *ParticipantData {
-	identities := unittest.IdentityListFixture(n).Sort(order.Canonical)
+	identities := unittest.IdentityListFixture(n).Sort(order.Canonical[flow.Identity])
 
 	networkingKeys := unittest.NetworkingKeys(n)
 	stakingKeys := unittest.StakingKeys(n)

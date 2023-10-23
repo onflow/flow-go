@@ -91,7 +91,7 @@ func (s *Snapshot) Phase() (flow.EpochPhase, error) {
 	return phase, err
 }
 
-func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, error) {
+func (s *Snapshot) Identities(selector flow.IdentityFilter[flow.Identity]) (flow.IdentityList, error) {
 	psSnapshot, err := s.state.protocolState.AtBlockID(s.blockID)
 	if err != nil {
 		return nil, err
@@ -104,7 +104,7 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 
 func (s *Snapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
 	// filter identities at snapshot for node ID
-	identities, err := s.Identities(filter.HasNodeID(nodeID))
+	identities, err := s.Identities(filter.HasNodeID[flow.Identity](nodeID))
 	if err != nil {
 		return nil, fmt.Errorf("could not get identities: %w", err)
 	}
