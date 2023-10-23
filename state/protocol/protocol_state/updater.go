@@ -23,7 +23,7 @@ type Updater struct {
 	candidate   *flow.Header
 
 	// The following fields are maps from NodeID → DynamicIdentityEntry for the nodes that are *active* in the respective epoch.
-	// Active means that these nodes are authorized to contribute to extending the chain. Formally, as node is active if and only
+	// Active means that these nodes are authorized to contribute to extending the chain. Formally, a node is active if and only
 	// if it is listed in the EpochSetup event for the respective epoch. Note that map values are pointers, so writes to map values
 	// will modify the respective DynamicIdentityEntry in EpochStateContainer.
 
@@ -80,7 +80,7 @@ func (u *Updater) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
 	// While ejection status and dynamic weight are not part of the EpochSetup event, we can supplement this information as follows:
 	//   - Per convention, service events are delivered (asynchronously) in an *order-preserving* manner. Furthermore, weight changes or
 	//     node ejection is entirely mediated by system smart contracts and delivered via service events.
-	//   - Therefore, the EpochSetup event contains the up-to-date snapshot of the cluster members. Any weight changes or node ejection
+	//   - Therefore, the EpochSetup event contains the up-to-date snapshot of the epoch participants. Any weight changes or node ejection
 	//     that happened before should be reflected in the EpochSetup event. Specifically, the initial weight should be reduced and ejected
 	//     nodes should be no longer listed in the EpochSetup event.
 	//   - Hence, the following invariant must be satisfied by the system smart contracts for all active nodes in the upcoming epoch:
@@ -94,7 +94,7 @@ func (u *Updater) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
 
 	// For collector clusters, we rely on invariants (I) and (II) holding. See `committees.Cluster` for details, specifically function
 	// `constructInitialClusterIdentities(..)`. While the system smart contract must satisfy this invariant, we run a sanity check below.
-	// TODO: In case the invariant is violated (likely bug in system smart contracts), we should go into EECC and not reject the block containing the service event.
+	// TODO: In case the invariant is violated (likely bug in system smart contracts), we should go into epoch fallback mode and not reject the block containing the service event.
 	//
 	activeIdentitiesLookup := u.parentState.CurrentEpoch.ActiveIdentities.Lookup() // lookup NodeID → DynamicIdentityEntry for nodes _active_ in the current epoch
 	nextEpochActiveIdentities := make(flow.DynamicIdentityEntryList, 0, len(epochSetup.Participants))
