@@ -8,7 +8,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -52,14 +51,6 @@ func NewComponentConsumer(
 
 	builder := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			worker.Start(ctx)
-			if err := util.WaitClosed(ctx, worker.Ready()); err != nil {
-				c.log.Info().Msg("job consumer startup aborted")
-				<-worker.Done()
-				c.log.Info().Msg("job consumer shutdown complete")
-				return
-			}
-
 			c.log.Info().Msg("job consumer starting")
 			err := c.consumer.Start(defaultIndex)
 			if err != nil {
@@ -73,13 +64,31 @@ func NewComponentConsumer(
 
 			// blocks until all running jobs have stopped
 			c.consumer.Stop()
+		}).
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			worker.Start(ctx)
+
+			select {
+			case <-ctx.Done():
+				c.log.Info().Msg("job consumer startup aborted")
+			case <-worker.Ready():
+				ready()
+			}
 
 			<-worker.Done()
 			c.log.Info().Msg("job consumer shutdown complete")
 		}).
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			// marking this ready first allows this worker to depend on the component's own Ready()
+			// channel to detect when other workers have started
 			ready()
-			c.processingLoop(ctx)
+
+			select {
+			case <-ctx.Done():
+				return
+			case <-c.Ready():
+				c.processingLoop(ctx)
+			}
 		})
 
 	cm := builder.Build()

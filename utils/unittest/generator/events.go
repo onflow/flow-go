@@ -5,21 +5,49 @@ import (
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type Events struct {
-	count uint32
-	ids   *Identifiers
+type EventEncoding string
+
+const (
+	EncodingCCF  EventEncoding = "ccf"
+	EncodingJSON EventEncoding = "json"
+)
+
+type EventGeneratorOption func(*Events)
+
+func WithEncoding(encoding EventEncoding) EventGeneratorOption {
+	return func(g *Events) {
+		if encoding != EncodingCCF && encoding != EncodingJSON {
+			panic(fmt.Sprintf("unexpected encoding: %s", encoding))
+		}
+
+		g.encoding = encoding
+	}
 }
 
-func EventGenerator() *Events {
-	return &Events{
-		count: 1,
-		ids:   IdentifierGenerator(),
+type Events struct {
+	count    uint32
+	ids      *Identifiers
+	encoding EventEncoding
+}
+
+func EventGenerator(opts ...EventGeneratorOption) *Events {
+	g := &Events{
+		count:    1,
+		ids:      IdentifierGenerator(),
+		encoding: EncodingCCF,
 	}
+
+	for _, opt := range opts {
+		opt(g)
+	}
+
+	return g
 }
 
 func (g *Events) New() flow.Event {
@@ -53,10 +81,20 @@ func (g *Events) New() flow.Event {
 			fooString,
 		}).WithType(testEventType)
 
-	payload, err := ccf.Encode(testEvent)
-	if err != nil {
-		panic(fmt.Sprintf("unexpected error while encoding events: %s", err))
+	var payload []byte
+	switch g.encoding {
+	case EncodingCCF:
+		payload, err = ccf.Encode(testEvent)
+		if err != nil {
+			panic(fmt.Sprintf("unexpected error while ccf encoding events: %s", err))
+		}
+	case EncodingJSON:
+		payload, err = jsoncdc.Encode(testEvent)
+		if err != nil {
+			panic(fmt.Sprintf("unexpected error while json encoding events: %s", err))
+		}
 	}
+
 	event := flow.Event{
 		Type:             flow.EventType(typeID),
 		TransactionID:    g.ids.New(),

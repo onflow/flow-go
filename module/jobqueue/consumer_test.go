@@ -9,6 +9,7 @@ import (
 
 	badgerdb "github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module"
@@ -185,6 +186,39 @@ func TestProcessedIndexDeletion(t *testing.T) {
 		defer c.mu.Unlock()
 		require.Len(t, c.processings, 0)
 		require.Len(t, c.processingsIndex, 0)
+	})
+}
+
+func TestCheckBeforeStartIsNoop(t *testing.T) {
+	t.Parallel()
+
+	unittest.RunWithBadgerDB(t, func(db *badgerdb.DB) {
+		storedProcessedIndex := uint64(100)
+
+		worker := newMockWorker()
+		progress := badger.NewConsumerProgress(db, "consumer")
+		err := progress.InitProcessedIndex(storedProcessedIndex)
+		require.NoError(t, err)
+
+		c := NewConsumer(
+			unittest.Logger(),
+			NewMockJobs(),
+			progress,
+			worker,
+			uint64(3),
+			0,
+		)
+		worker.WithConsumer(c)
+
+		// check will store the processedIndex. Before start, it will be uninitialized (0)
+		c.Check()
+
+		// start will load the processedIndex from storage
+		err = c.Start(10)
+		require.NoError(t, err)
+
+		// make sure that the processedIndex at the end is from storage
+		assert.Equal(t, storedProcessedIndex, c.LastProcessedIndex())
 	})
 }
 

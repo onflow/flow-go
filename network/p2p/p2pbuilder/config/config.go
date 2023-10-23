@@ -3,14 +3,14 @@ package p2pconfig
 import (
 	"time"
 
+	"github.com/onflow/flow-go/network/netconf"
 	"github.com/onflow/flow-go/network/p2p"
 )
 
-// UnicastConfig configuration parameters for the unicast manager.
+// UnicastConfig configuration parameters for the unicast protocol.
 type UnicastConfig struct {
-	// StreamRetryInterval is the initial delay between failing to establish a connection with another node and retrying. This
-	// delay increases exponentially (exponential backoff) with the number of subsequent failures to establish a connection.
-	StreamRetryInterval time.Duration
+	netconf.UnicastConfig
+
 	// RateLimiterDistributor distributor that distributes notifications whenever a peer is rate limited to all consumers.
 	RateLimiterDistributor p2p.UnicastRateLimiterDistributor
 }

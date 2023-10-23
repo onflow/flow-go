@@ -26,6 +26,7 @@ type facadeEnvironment struct {
 
 	RandomGenerator
 	CryptoLibrary
+	RandomSourceHistoryProvider
 
 	BlockInfo
 	AccountInfo
@@ -75,7 +76,8 @@ func newFacadeEnvironment(
 		ProgramLogger: logger,
 		EventEmitter:  NoEventEmitter{},
 
-		CryptoLibrary: NewCryptoLibrary(tracer, meter),
+		CryptoLibrary:               NewCryptoLibrary(tracer, meter),
+		RandomSourceHistoryProvider: NewForbiddenRandomSourceHistoryProvider(),
 
 		BlockInfo: NewBlockInfo(
 			tracer,
@@ -170,7 +172,11 @@ func NewScriptEnv(
 		params,
 		txnState,
 		NewCancellableMeter(ctx, txnState))
-	env.RandomGenerator = NewDummyRandomGenerator()
+	env.RandomGenerator = NewRandomGenerator(
+		tracer,
+		params.EntropyProvider,
+		params.ScriptInfoParams.ID[:],
+	)
 	env.addParseRestrictedChecks()
 	return env
 }
@@ -229,7 +235,14 @@ func NewTransactionEnvironment(
 	env.RandomGenerator = NewRandomGenerator(
 		tracer,
 		params.EntropyProvider,
-		params.TxId,
+		params.TxId[:],
+	)
+
+	env.RandomSourceHistoryProvider = NewRandomSourceHistoryProvider(
+		tracer,
+		env.Meter,
+		params.EntropyProvider,
+		params.TransactionInfoParams.RandomSourceHistoryCallAllowed,
 	)
 
 	env.addParseRestrictedChecks()
@@ -275,6 +288,9 @@ func (env *facadeEnvironment) addParseRestrictedChecks() {
 	env.RandomGenerator = NewParseRestrictedRandomGenerator(
 		env.txnState,
 		env.RandomGenerator)
+	env.RandomSourceHistoryProvider = NewParseRestrictedRandomSourceHistoryProvider(
+		env.txnState,
+		env.RandomSourceHistoryProvider)
 	env.UUIDGenerator = NewParseRestrictedUUIDGenerator(
 		env.txnState,
 		env.UUIDGenerator)
@@ -313,11 +329,5 @@ func (env *facadeEnvironment) SetInterpreterSharedState(state *interpreter.Share
 }
 
 func (env *facadeEnvironment) GetInterpreterSharedState() *interpreter.SharedState {
-	return nil
-}
-
-func (env *facadeEnvironment) ReadRandom(buffer []byte) error {
-	// NO-OP for now, to unblock certain downstream dependencies.
-	// E.g. cadence-tools/test
 	return nil
 }

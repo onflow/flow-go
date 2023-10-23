@@ -38,9 +38,6 @@ const (
 )
 
 const (
-	// MaxConnectAttempt is the maximum number of attempts to be made to connect to a remote node for 1-1 direct communication
-	MaxConnectAttempt = 3
-
 	// DefaultMaxPubSubMsgSize defines the maximum message size in publish and multicast modes
 	DefaultMaxPubSubMsgSize = 5 * mb // 5 mb
 
@@ -87,7 +84,8 @@ func NewNode(
 		disallowListedCache: internal.NewDisallowListCache(
 			disallowLstCacheCfg.MaxSize,
 			logger.With().Str("module", "disallow-list-cache").Logger(),
-			disallowLstCacheCfg.Metrics),
+			disallowLstCacheCfg.Metrics,
+		),
 	}
 }
 
@@ -252,7 +250,7 @@ func (n *Node) createStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stre
 	// certainly fail. If this Node was configured with a routing system, we can try to use it to
 	// look up the address of the peer.
 	if len(n.host.Peerstore().Addrs(peerID)) == 0 && n.routing != nil {
-		lg.Info().Msg("address not found in peer store, searching for peer in routing system")
+		lg.Debug().Msg("address not found in peer store, searching for peer in routing system")
 
 		var err error
 		func() {
@@ -269,15 +267,13 @@ func (n *Node) createStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stre
 		}
 	}
 
-	stream, dialAddrs, err := n.uniMgr.CreateStream(ctx, peerID, MaxConnectAttempt)
+	stream, err := n.uniMgr.CreateStream(ctx, peerID)
 	if err != nil {
-		return nil, flownet.NewPeerUnreachableError(fmt.Errorf("could not create stream (peer_id: %s, dialing address(s): %v): %w", peerID,
-			dialAddrs, err))
+		return nil, flownet.NewPeerUnreachableError(fmt.Errorf("could not create stream peer_id: %s: %w", peerID, err))
 	}
 
 	lg.Info().
 		Str("networking_protocol_id", string(stream.Protocol())).
-		Str("dial_address", fmt.Sprintf("%v", dialAddrs)).
 		Msg("stream successfully created to remote peer")
 	return stream, nil
 }
@@ -495,7 +491,8 @@ func (n *Node) WithPeersProvider(peersProvider p2p.PeersProvider) {
 				}
 
 				return allowListedPeerIds
-			})
+			},
+		)
 	}
 }
 
@@ -530,12 +527,14 @@ func (n *Node) IsConnected(peerID peer.ID) (bool, error) {
 
 // SetRouting sets the node's routing implementation.
 // SetRouting may be called at most once.
-func (n *Node) SetRouting(r routing.Routing) {
+func (n *Node) SetRouting(r routing.Routing) error {
 	if n.routing != nil {
-		n.logger.Fatal().Msg("routing already set")
+		// we should not allow overriding the routing implementation if one is already set; crashing the node.
+		return fmt.Errorf("routing already set")
 	}
 
 	n.routing = r
+	return nil
 }
 
 // Routing returns the node's routing implementation.
@@ -618,7 +617,7 @@ func (n *Node) OnDisallowListNotification(peerId peer.ID, cause flownet.Disallow
 func (n *Node) OnAllowListNotification(peerId peer.ID, cause flownet.DisallowListedCause) {
 	remainingCauses := n.disallowListedCache.AllowFor(peerId, cause)
 
-	n.logger.Info().
+	n.logger.Debug().
 		Str("peer_id", p2plogging.PeerId(peerId)).
 		Str("causes", fmt.Sprintf("%v", cause)).
 		Str("remaining_causes", fmt.Sprintf("%v", remainingCauses)).
