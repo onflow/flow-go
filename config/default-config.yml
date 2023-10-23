@@ -6,7 +6,7 @@ network-config:
   networking-connection-pruning: true
   # Preferred unicasts protocols list of unicast protocols in preferred order
   preferred-unicast-protocols: [ ]
-  received-message-cache-size: 10e4
+  received-message-cache-size: 10_000
   peerupdate-interval: 10m
   unicast-message-timeout: 5s
   # Unicast create stream retry delay is initial delay used in the exponential backoff for create stream retries
@@ -47,7 +47,7 @@ network-config:
   unicast-dial-in-progress-backoff-delay: 1s
   # The size of the dial config cache used to keep track of the dial config for each remote peer. The dial config is used to keep track of the dial retry budget for each remote peer.
   # Recommended to set it to the maximum number of remote peers in the network.
-  unicast-dial-config-cache-size: 10000
+  unicast-dial-config-cache-size: 10_000
   # Resource manager config
   # Maximum allowed fraction of file descriptors to be allocated by the libp2p resources in (0,1]
   libp2p-memory-limit-ratio: 0.5 # flow default
@@ -111,7 +111,7 @@ network-config:
 
   # Gossipsub rpc inspectors configs
   # The size of the queue for notifications about invalid RPC messages
-  gossipsub-rpc-inspector-notification-cache-size: 10000
+  gossipsub-rpc-inspector-notification-cache-size: 10_000
   # RPC control message validation inspector configs
   # Rpc validation inspector number of pool workers
   gossipsub-rpc-validation-inspector-workers: 5
@@ -154,8 +154,8 @@ network-config:
   # The size of the queue used by worker pool for the control message metrics inspector
   gossipsub-rpc-metrics-inspector-cache-size: 100
   # Application layer spam prevention
-  alsp-spam-record-cache-size: 10e3
-  alsp-spam-report-queue-size: 10e4
+  alsp-spam-record-cache-size: 1000
+  alsp-spam-report-queue-size: 10_000
   alsp-disable-penalty: false
   alsp-heart-beat-interval: 1s
 
