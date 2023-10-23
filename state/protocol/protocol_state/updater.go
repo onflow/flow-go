@@ -59,7 +59,7 @@ func (u *Updater) Build() (updatedState *flow.ProtocolStateEntry, stateID flow.I
 //
 // As a result of this operation protocol state for the next epoch will be created.
 // Expected errors during normal operations:
-// - `protocol.InvalidServiceEventError` - an invalid service event with respect to the protocol state has been supplied.
+// - `protocol.InvalidServiceEventError` if the service event is not a valid state transition for the current protocol state
 func (u *Updater) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
 	if epochSetup.Counter != u.parentState.CurrentEpochSetup.Counter+1 {
 		return protocol.NewInvalidServiceEventErrorf("invalid epoch setup counter, expecting %d got %d", u.parentState.CurrentEpochSetup.Counter+1, epochSetup.Counter)
@@ -90,8 +90,12 @@ func (u *Updater) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
 	//          smart contracts earlier) but also being listed in the setup event for the subsequent epoch (service event emitted by
 	//          the system smart contracts later) is illegal.
 	// sanity checking SAFETY-CRITICAL INVARIANT (II):
-	//   - Per convention, the system smart contracts should list the IdentitySkeletons in canonical order. This is useful for
-	//     most efficient construction of the full active Identities for an epoch.
+	//   - Per convention, the `flow.EpochSetup` event should list the IdentitySkeletons in canonical order. This is useful
+	//     for most efficient construction of the full active Identities for an epoch. We enforce this here at the gateway
+	//     to the protocol state, when we incorporate new information from the EpochSetup event.
+	//   - Note that the system smart contracts manage the identity table as an unordered set! For the protocol state, we desire a fixed
+	//     ordering to simplify various implementation details, like the DKG. Therefore, we order identities in `flow.EpochSetup` during
+	//     conversion from cadence to Go in the function `convert.ServiceEvent(flow.ChainID, flow.Event)` in package `model/convert`
 
 	// For collector clusters, we rely on invariants (I) and (II) holding. See `committees.Cluster` for details, specifically function
 	// `constructInitialClusterIdentities(..)`. While the system smart contract must satisfy this invariant, we run a sanity check below.
