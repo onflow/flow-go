@@ -100,7 +100,7 @@ func (s *SubscriptionProvider) updateTopics() {
 	s.logger.Trace().Msgf("all topics updated: %v", allTopics)
 
 	// increments the update cycle of the cache; so that the previous cache entries are invalidated upon a read or write.
-	s.cache.IncrementUpdateCycle()
+	s.cache.MoveToNextUpdateCycle()
 	for _, topic := range allTopics {
 		peers := s.tp.ListPeers(topic)
 
