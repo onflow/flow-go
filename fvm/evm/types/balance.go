@@ -7,6 +7,12 @@ import (
 	"github.com/onflow/cadence"
 )
 
+var (
+	SmalletUnitOfAttoFlowConvertibleToCadence = new(big.Int).SetInt64(1e10)
+	OneAttoFlow                               = new(big.Int).SetInt64(1)
+	OneFlowInAttoFlow                         = new(big.Int).SetInt64(1e18)
+)
+
 // Balance represents the balance of an address
 // in the evm environment, balances are kept in attoflow,
 // the smallest denomination of FLOW token (similar to how Wei is used to store Eth)
@@ -16,8 +22,7 @@ type Balance cadence.UFix64
 
 // ToAttoFlow converts the balance into AttoFlow
 func (b Balance) ToAttoFlow() *big.Int {
-	conv := new(big.Int).SetInt64(1e10)
-	return new(big.Int).Mul(new(big.Int).SetUint64(uint64(b)), conv)
+	return new(big.Int).Mul(new(big.Int).SetUint64(uint64(b)), SmalletUnitOfAttoFlowConvertibleToCadence)
 }
 
 // Sub subtract the other balance from this balance
@@ -47,12 +52,11 @@ func DecodeBalance(encoded []byte) (Balance, error) {
 
 // NewBalanceFromAttoFlow constructs a new balance from atto flow value
 func NewBalanceFromAttoFlow(inp *big.Int) (Balance, error) {
-	conv := new(big.Int).SetInt64(1e10)
-	if new(big.Int).Mod(inp, conv).Cmp(big.NewInt(0)) != 0 {
+	if new(big.Int).Mod(inp, SmalletUnitOfAttoFlowConvertibleToCadence).Cmp(big.NewInt(0)) != 0 {
 		return 0, ErrBalanceConversion
 	}
 
 	// we only need to divide by 10 given we already have 8 as factor
-	converted := new(big.Int).Div(inp, conv)
+	converted := new(big.Int).Div(inp, SmalletUnitOfAttoFlowConvertibleToCadence)
 	return Balance(cadence.UFix64(converted.Uint64())), nil
 }

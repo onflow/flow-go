@@ -172,7 +172,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 
 				// deposit 1 Flow to the foa account
 				addr := handler.AllocateAddress()
-				orgBalance, err := types.NewBalanceFromAttoFlow(big.NewInt(1e18))
+				orgBalance, err := types.NewBalanceFromAttoFlow(types.OneFlowInAttoFlow)
 				require.NoError(t, err)
 				vault := types.NewFlowTokenVault(orgBalance)
 				foa := handler.AccountByAddress(addr, true)
@@ -278,7 +278,7 @@ func TestHandler_FOA(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, zeroBalance, foa.Balance())
 
-				balance, err := types.NewBalanceFromAttoFlow(big.NewInt(100))
+				balance, err := types.NewBalanceFromAttoFlow(types.OneFlowInAttoFlow)
 				require.NoError(t, err)
 				vault := types.NewFlowTokenVault(balance)
 
