@@ -28,7 +28,7 @@ Adding a new config to the FlowConfig can be done in a few easy steps.
 
 The network package can be used as a good example of how to add CLI flags and will be used in the steps below.
 
-1. Create a new configuration package for the new configuration structs and CLI flags. Although it is encouraged to define all package configuration structs and CLI flags as a subpackage of the component they are related to,
+1. Create a new configuration package for the new configuration structs and CLI flags. Although it is encouraged to define all package configuration structs and CLI flags as a subpackage of the [config package](https://github.com/onflow/flow-go/tree/master/config),
 the configuration package can live anywhere. This configuration package will define the configuration structs and CLI flags for overriding.
     ```shell
     mkdir example_config 
