@@ -146,7 +146,7 @@ func (h ContractHandler) Run(rlpEncodedTx []byte, coinbase types.Address) bool {
 
 func (h ContractHandler) checkGasLimit(limit types.GasLimit) {
 	// check gas limit against what has been left on the transaction side
-	if !h.backend.HasComputationCapacity(environment.ComputationKindEVMGasUsage, uint(limit)) {
+	if !h.backend.ComputationAvailable(environment.ComputationKindEVMGasUsage, uint(limit)) {
 		handleError(types.ErrInsufficientComputation)
 	}
 }
