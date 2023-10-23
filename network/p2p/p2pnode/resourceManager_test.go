@@ -237,7 +237,7 @@ func TestCreateStream_PeerLimitGreaterThanPeerProtocolLimit(t *testing.T) {
 	// the case where peer-level limit is higher than the peer-protocol-level limit.
 	unittest.SkipUnless(t,
 		unittest.TEST_TODO,
-		"max inbound stream peer protocol is not preserved; can be partially due to count steam not counting inbound streams on a protocol")
+		"max inbound stream peer protocol is not preserved; can be partially due to count stream not counting inbound streams on a protocol")
 	base := baseCreateStreamInboundStreamResourceLimitConfig()
 	base.maxInboundPeerStream = 10        // each peer can create 10 streams.
 	base.maxInboundStreamPeerProtocol = 5 // each peer can create 5 streams on a specific protocol.
