@@ -7,9 +7,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// Adapt adapts a filter for a specific identity type.
-//
-//	Converts flow.IdentityFilter[flow.IdentitySkeleton] to flow.IdentityFilter[flow.Identity].
+// Adapt takes an IdentityFilter on the domain of IdentitySkeletons
+// and adapts the filter to the domain of full Identities. In other words, it converts
+// flow.IdentityFilter[flow.IdentitySkeleton] to flow.IdentityFilter[flow.Identity].
 func Adapt(f flow.IdentityFilter[flow.IdentitySkeleton]) flow.IdentityFilter[flow.Identity] {
 	return func(i *flow.Identity) bool {
 		return f(&i.IdentitySkeleton)
