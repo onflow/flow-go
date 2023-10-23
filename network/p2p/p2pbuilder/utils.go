@@ -33,8 +33,8 @@ type limitConfigLogger struct {
 	logger zerolog.Logger
 }
 
-// NewLimitConfigLogger creates a new limitConfigLogger.
-func NewLimitConfigLogger(logger zerolog.Logger) *limitConfigLogger {
+// newLimitConfigLogger creates a new limitConfigLogger.
+func newLimitConfigLogger(logger zerolog.Logger) *limitConfigLogger {
 	return &limitConfigLogger{logger: logger}
 }
 
