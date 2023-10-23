@@ -25,9 +25,8 @@ type SubscriptionProvider struct {
 	// allTopics is a list of all topics in the pubsub network
 	// TODO: we should add an expiry time to this cache and clean up the cache periodically
 	// to avoid leakage of stale topics.
-	peersByTopic         sync.Map      // map[topic]peers
-	peersByTopicUpdating sync.Map      // whether a goroutine is already updating the list of peers for a topic
-	peerUpdateInterval   time.Duration // the interval for updating the list of peers for a topic.
+	peersByTopic         sync.Map // map[topic]peers
+	peersByTopicUpdating sync.Map // whether a goroutine is already updating the list of peers for a topic
 
 	// allTopics is a list of all topics in the pubsub network that this node is subscribed to.
 	allTopicsLock           sync.RWMutex  // protects allTopics
@@ -52,7 +51,6 @@ func NewSubscriptionProvider(cfg *SubscriptionProviderConfig) (*SubscriptionProv
 		tp:                      cfg.TopicProvider,
 		allTopics:               make([]string, 0),
 		allTopicsUpdateInterval: cfg.Params.SubscriptionUpdateInterval,
-		peerUpdateInterval:      cfg.Params.PeerSubscriptionUpdateTTL,
 	}
 
 	builder := component.NewComponentManagerBuilder()
