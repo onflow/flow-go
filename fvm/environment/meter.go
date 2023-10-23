@@ -55,7 +55,7 @@ type Meter interface {
 	MeterComputation(common.ComputationKind, uint) error
 	ComputationUsed() (uint64, error)
 	ComputationIntensities() meter.MeteredComputationIntensities
-	HasComputationCapacity(common.ComputationKind, uint) bool
+	ComputationAvailable(common.ComputationKind, uint) bool
 
 	MeterMemory(usage common.MemoryUsage) error
 	MemoryUsed() (uint64, error)
@@ -87,11 +87,11 @@ func (meter *meterImpl) ComputationIntensities() meter.MeteredComputationIntensi
 	return meter.txnState.ComputationIntensities()
 }
 
-func (meter *meterImpl) HasComputationCapacity(
+func (meter *meterImpl) ComputationAvailable(
 	kind common.ComputationKind,
 	intensity uint,
 ) bool {
-	return meter.txnState.HasComputationCapacity(kind, intensity)
+	return meter.txnState.ComputationAvailable(kind, intensity)
 }
 
 func (meter *meterImpl) ComputationUsed() (uint64, error) {

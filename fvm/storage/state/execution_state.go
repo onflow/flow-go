@@ -208,15 +208,15 @@ func (state *ExecutionState) MeterComputation(kind common.ComputationKind, inten
 	return nil
 }
 
-// HasComputationCapacity checks if enough computation capacity is available without metering
-func (state *ExecutionState) HasComputationCapacity(kind common.ComputationKind, intensity uint) bool {
+// ComputationAvailable checks if enough computation capacity is available without metering
+func (state *ExecutionState) ComputationAvailable(kind common.ComputationKind, intensity uint) bool {
 	if state.finalized {
 		// if state is finalized return false
 		return false
 	}
 
 	if state.enforceLimits {
-		return state.meter.HasComputationCapacity(kind, intensity)
+		return state.meter.ComputationAvailable(kind, intensity)
 	}
 	return true
 }

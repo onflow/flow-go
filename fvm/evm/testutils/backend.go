@@ -96,7 +96,7 @@ func getSimpleMeter() *testMeter {
 			}
 			return nil
 		},
-		hasComputationCapacity: func(kind common.ComputationKind, intensity uint) bool {
+		computationAvailable: func(kind common.ComputationKind, intensity uint) bool {
 			return compUsed+intensity < computationLimit
 		},
 		computationUsed: func() (uint64, error) {
@@ -150,7 +150,7 @@ func (vs *testValueStore) AllocateStorageIndex(owner []byte) (atree.StorageIndex
 
 type testMeter struct {
 	meterComputation       func(common.ComputationKind, uint) error
-	hasComputationCapacity func(common.ComputationKind, uint) bool
+	computationAvailable   func(common.ComputationKind, uint) bool
 	computationUsed        func() (uint64, error)
 	computationIntensities func() meter.MeteredComputationIntensities
 
@@ -175,14 +175,14 @@ func (m *testMeter) MeterComputation(
 	return m.meterComputation(kind, intensity)
 }
 
-func (m *testMeter) HasComputationCapacity(
+func (m *testMeter) ComputationAvailable(
 	kind common.ComputationKind,
 	intensity uint,
 ) bool {
-	if m.hasComputationCapacity == nil {
+	if m.computationAvailable == nil {
 		panic("method not set")
 	}
-	return m.hasComputationCapacity(kind, intensity)
+	return m.computationAvailable(kind, intensity)
 }
 
 func (m *testMeter) ComputationIntensities() meter.MeteredComputationIntensities {

@@ -903,8 +903,8 @@ func (_m *Environment) GetValue(owner []byte, key []byte) ([]byte, error) {
 	return r0, r1
 }
 
-// HasComputationCapacity provides a mock function with given fields: _a0, _a1
-func (_m *Environment) HasComputationCapacity(_a0 common.ComputationKind, _a1 uint) bool {
+// ComputationAvailable provides a mock function with given fields: _a0, _a1
+func (_m *Environment) ComputationAvailable(_a0 common.ComputationKind, _a1 uint) bool {
 	ret := _m.Called(_a0, _a1)
 
 	var r0 bool
