@@ -26,6 +26,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/netconf"
 	"github.com/onflow/flow-go/network/p2p"
@@ -39,9 +40,17 @@ import (
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/tracer"
 	"github.com/onflow/flow-go/network/p2p/unicast"
+	unicastcache "github.com/onflow/flow-go/network/p2p/unicast/cache"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/unicast/stream"
 	"github.com/onflow/flow-go/network/p2p/utils"
+)
+
+type DhtSystemActivation bool
+
+const (
+	DhtSystemEnabled  DhtSystemActivation = true
+	DhtSystemDisabled DhtSystemActivation = false
 )
 
 type LibP2PNodeBuilder struct {
@@ -50,20 +59,20 @@ type LibP2PNodeBuilder struct {
 	address          string
 	networkKey       fcrypto.PrivateKey
 	logger           zerolog.Logger
-	metrics          module.LibP2PMetrics
+	metricsConfig    *p2pconfig.MetricsConfig
 	basicResolver    madns.BasicResolver
 
-	resourceManager           network.ResourceManager
-	resourceManagerCfg        *p2pconf.ResourceManagerConfig
-	connManager               connmgr.ConnManager
-	connGater                 p2p.ConnectionGater
-	routingFactory            func(context.Context, host.Host) (routing.Routing, error)
-	peerManagerConfig         *p2pconfig.PeerManagerConfig
-	createNode                p2p.CreateNodeFunc
-	createStreamRetryInterval time.Duration
-	rateLimiterDistributor    p2p.UnicastRateLimiterDistributor
-	gossipSubTracer           p2p.PubSubTracer
-	disallowListCacheCfg      *p2p.DisallowListCacheConfig
+	resourceManager      network.ResourceManager
+	resourceManagerCfg   *p2pconf.ResourceManagerConfig
+	connManager          connmgr.ConnManager
+	connGater            p2p.ConnectionGater
+	routingFactory       func(context.Context, host.Host) (routing.Routing, error)
+	peerManagerConfig    *p2pconfig.PeerManagerConfig
+	createNode           p2p.CreateNodeFunc
+	gossipSubTracer      p2p.PubSubTracer
+	disallowListCacheCfg *p2p.DisallowListCacheConfig
+	unicastConfig        *p2pconfig.UnicastConfig
+	networkingType       flownet.NetworkingType // whether the node is running in private (staked) or public (unstaked) network
 }
 
 func NewNodeBuilder(
@@ -79,18 +88,20 @@ func NewNodeBuilder(
 	peerManagerConfig *p2pconfig.PeerManagerConfig,
 	subscriptionProviderParam *p2pconf.SubscriptionProviderParameters,
 	disallowListCacheCfg *p2p.DisallowListCacheConfig,
-	rpcTracker p2p.RpcControlTracking) *LibP2PNodeBuilder {
+	rpcTracker p2p.RpcControlTracking,
+	unicastConfig *p2pconfig.UnicastConfig,
+) *LibP2PNodeBuilder {
 	return &LibP2PNodeBuilder{
 		logger:               logger,
 		sporkId:              sporkId,
 		address:              address,
 		networkKey:           networkKey,
 		createNode:           DefaultCreateNodeFunc,
-		metrics:              metricsConfig.Metrics,
+		metricsConfig:        metricsConfig,
 		resourceManagerCfg:   rCfg,
 		disallowListCacheCfg: disallowListCacheCfg,
-		gossipSubBuilder: gossipsubbuilder.NewGossipSubBuilder(
-			logger,
+		networkingType:       networkingType,
+		gossipSubBuilder: gossipsubbuilder.NewGossipSubBuilder(logger,
 			metricsConfig,
 			networkingType,
 			sporkId,
@@ -98,6 +109,7 @@ func NewNodeBuilder(
 			rpcInspectorCfg, subscriptionProviderParam,
 			rpcTracker),
 		peerManagerConfig: peerManagerConfig,
+		unicastConfig:     unicastConfig,
 	}
 }
 
@@ -170,16 +182,6 @@ func (builder *LibP2PNodeBuilder) SetCreateNode(f p2p.CreateNodeFunc) p2p.NodeBu
 	return builder
 }
 
-func (builder *LibP2PNodeBuilder) SetRateLimiterDistributor(distributor p2p.UnicastRateLimiterDistributor) p2p.NodeBuilder {
-	builder.rateLimiterDistributor = distributor
-	return builder
-}
-
-func (builder *LibP2PNodeBuilder) SetStreamCreationRetryInterval(createStreamRetryInterval time.Duration) p2p.NodeBuilder {
-	builder.createStreamRetryInterval = createStreamRetryInterval
-	return builder
-}
-
 func (builder *LibP2PNodeBuilder) SetGossipSubScoreTracerInterval(interval time.Duration) p2p.NodeBuilder {
 	builder.gossipSubBuilder.SetGossipSubScoreTracerInterval(interval)
 	return builder
@@ -190,32 +192,8 @@ func (builder *LibP2PNodeBuilder) OverrideDefaultRpcInspectorSuiteFactory(factor
 	return builder
 }
 
-// buildRouting creates a new routing system factory for a libp2p node using the provided host.
-// It returns the newly created routing system and any errors encountered during its creation.
-//
-// Arguments:
-// - ctx: a context.Context object used to manage the lifecycle of the node.
-// - h: a libp2p host.Host object used to initialize the routing system.
-//
-// Returns:
-// - routing.Routing: a routing system for the libp2p node.
-// - error: if an error occurs during the creation of the routing system, it is returned. Otherwise, nil is returned.
-// Note that on happy path, the returned error is nil. Any non-nil error indicates that the routing system could not be created
-// and is non-recoverable. In case of an error the node should be stopped.
-func (builder *LibP2PNodeBuilder) buildRouting(ctx context.Context, h host.Host) (routing.Routing, error) {
-	routingSystem, err := builder.routingFactory(ctx, h)
-	if err != nil {
-		return nil, fmt.Errorf("could not create libp2p node routing system: %w", err)
-	}
-	return routingSystem, nil
-}
-
 // Build creates a new libp2p node using the configured options.
 func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
-	if builder.routingFactory == nil {
-		return nil, errors.New("routing system factory is not set")
-	}
-
 	var opts []libp2p.Option
 
 	if builder.basicResolver != nil {
@@ -247,7 +225,7 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		}
 		limits.PeerBaseLimit.ConnsInbound = builder.resourceManagerCfg.PeerBaseLimitConnsInbound
 		l := limits.Scale(mem, fd)
-		mgr, err := rcmgr.NewResourceManager(rcmgr.NewFixedLimiter(l), rcmgr.WithMetrics(builder.metrics))
+		mgr, err := rcmgr.NewResourceManager(rcmgr.NewFixedLimiter(l), rcmgr.WithMetrics(builder.metricsConfig.Metrics))
 		if err != nil {
 			return nil, fmt.Errorf("could not create libp2p resource manager: %w", err)
 		}
@@ -300,8 +278,8 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 
 		peerManager = connection.NewPeerManager(builder.logger, builder.peerManagerConfig.UpdateInterval, peerUpdater)
 
-		if builder.rateLimiterDistributor != nil {
-			builder.rateLimiterDistributor.AddConsumer(peerManager)
+		if builder.unicastConfig.RateLimiterDistributor != nil {
+			builder.unicastConfig.RateLimiterDistributor.AddConsumer(peerManager)
 		}
 	}
 
@@ -311,26 +289,45 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		builder.connGater.SetDisallowListOracle(node)
 	}
 
-	unicastManager := unicast.NewUnicastManager(
-		builder.logger,
-		stream.NewLibP2PStreamFactory(h),
-		builder.sporkId,
-		builder.createStreamRetryInterval,
-		node,
-		builder.metrics)
+	unicastManager, err := unicast.NewUnicastManager(&unicast.ManagerConfig{
+		Logger:                             builder.logger,
+		StreamFactory:                      stream.NewLibP2PStreamFactory(h),
+		SporkId:                            builder.sporkId,
+		ConnStatus:                         node,
+		CreateStreamBackoffDelay:           builder.unicastConfig.CreateStreamBackoffDelay,
+		DialBackoffDelay:                   builder.unicastConfig.DialBackoffDelay,
+		DialInProgressBackoffDelay:         builder.unicastConfig.DialInProgressBackoffDelay,
+		Metrics:                            builder.metricsConfig.Metrics,
+		StreamZeroRetryResetThreshold:      builder.unicastConfig.StreamZeroRetryResetThreshold,
+		DialZeroRetryResetThreshold:        builder.unicastConfig.DialZeroRetryResetThreshold,
+		MaxStreamCreationRetryAttemptTimes: builder.unicastConfig.MaxStreamCreationRetryAttemptTimes,
+		MaxDialRetryAttemptTimes:           builder.unicastConfig.MaxDialRetryAttemptTimes,
+		DialConfigCacheFactory: func(configFactory func() unicast.DialConfig) unicast.DialConfigCache {
+			return unicastcache.NewDialConfigCache(builder.unicastConfig.DialConfigCacheSize,
+				builder.logger,
+				metrics.DialConfigCacheMetricFactory(builder.metricsConfig.HeroCacheFactory, builder.networkingType),
+				configFactory)
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not create unicast manager: %w", err)
+	}
 	node.SetUnicastManager(unicastManager)
 
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(
 			func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-				// routing system is created here, because it needs to be created during the node startup.
-				routingSystem, err := builder.buildRouting(ctx, h)
-				if err != nil {
-					ctx.Throw(fmt.Errorf("could not create routing system: %w", err))
+				if builder.routingFactory != nil {
+					routingSystem, err := builder.routingFactory(ctx, h)
+					if err != nil {
+						ctx.Throw(fmt.Errorf("could not create routing system: %w", err))
+					}
+					if err := node.SetRouting(routingSystem); err != nil {
+						ctx.Throw(fmt.Errorf("could not set routing system: %w", err))
+					}
+					builder.gossipSubBuilder.SetRoutingSystem(routingSystem)
+					builder.logger.Debug().Msg("routing system created")
 				}
-				node.SetRouting(routingSystem)
-				builder.gossipSubBuilder.SetRoutingSystem(routingSystem)
-
 				// gossipsub is created here, because it needs to be created during the node startup.
 				gossipSub, err := builder.gossipSubBuilder.Build(ctx)
 				if err != nil {
@@ -426,7 +423,8 @@ func DefaultCreateNodeFunc(
 	host host.Host,
 	pCache p2p.ProtocolPeerCache,
 	peerManager p2p.PeerManager,
-	disallowListCacheCfg *p2p.DisallowListCacheConfig) p2p.LibP2PNode {
+	disallowListCacheCfg *p2p.DisallowListCacheConfig,
+) p2p.LibP2PNode {
 	return p2pnode.NewNode(logger, host, pCache, peerManager, disallowListCacheCfg)
 }
 
@@ -448,7 +446,9 @@ func DefaultNodeBuilder(
 	rCfg *p2pconf.ResourceManagerConfig,
 	uniCfg *p2pconfig.UnicastConfig,
 	connMgrConfig *netconf.ConnectionManagerConfig,
-	disallowListCacheCfg *p2p.DisallowListCacheConfig) (p2p.NodeBuilder, error) {
+	disallowListCacheCfg *p2p.DisallowListCacheConfig,
+	dhtSystemActivation DhtSystemActivation,
+) (p2p.NodeBuilder, error) {
 
 	connManager, err := connection.NewConnManager(logger, metricsCfg.Metrics, connMgrConfig)
 	if err != nil {
@@ -478,8 +478,7 @@ func DefaultNodeBuilder(
 	}
 	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
 
-	builder := NewNodeBuilder(
-		logger,
+	builder := NewNodeBuilder(logger,
 		metricsCfg,
 		networkingType,
 		address,
@@ -489,17 +488,12 @@ func DefaultNodeBuilder(
 		rCfg,
 		rpcInspectorCfg, peerManagerCfg, &gossipCfg.SubscriptionProviderConfig,
 		disallowListCacheCfg,
-		meshTracer).
+		meshTracer,
+		uniCfg).
 		SetBasicResolver(resolver).
 		SetConnectionManager(connManager).
 		SetConnectionGater(connGater).
-		SetRoutingSystem(
-			func(ctx context.Context, host host.Host) (routing.Routing, error) {
-				return dht.NewDHT(ctx, host, protocols.FlowDHTProtocolID(sporkId), logger, metricsCfg.Metrics, dht.AsServer())
-			}).
-		SetStreamCreationRetryInterval(uniCfg.StreamRetryInterval).
-		SetCreateNode(DefaultCreateNodeFunc).
-		SetRateLimiterDistributor(uniCfg.RateLimiterDistributor)
+		SetCreateNode(DefaultCreateNodeFunc)
 
 	if gossipCfg.PeerScoring {
 		// In production, we never override the default scoring config.
@@ -510,8 +504,18 @@ func DefaultNodeBuilder(
 	builder.SetGossipSubScoreTracerInterval(gossipCfg.ScoreTracerInterval)
 
 	if role != "ghost" {
-		r, _ := flow.ParseRole(role)
+		r, err := flow.ParseRole(role)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse role: %w", err)
+		}
 		builder.SetSubscriptionFilter(subscription.NewRoleBasedFilter(r, idProvider))
+
+		if dhtSystemActivation == DhtSystemEnabled {
+			builder.SetRoutingSystem(
+				func(ctx context.Context, host host.Host) (routing.Routing, error) {
+					return dht.NewDHT(ctx, host, protocols.FlowDHTProtocolID(sporkId), logger, metricsCfg.Metrics, dht.AsServer())
+				})
+		}
 	}
 
 	return builder, nil

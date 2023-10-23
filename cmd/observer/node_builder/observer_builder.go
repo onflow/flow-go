@@ -34,7 +34,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	rpcConnection "github.com/onflow/flow-go/engine/access/rpc/connection"
-	"github.com/onflow/flow-go/engine/access/state_stream"
+	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/common/follower"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/protocol"
@@ -128,7 +128,6 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 				MaxHeightRange:            backend.DefaultMaxHeightRange,
 				PreferredExecutionNodeIDs: nil,
 				FixedExecutionNodeIDs:     nil,
-				ArchiveAddressList:        nil,
 			},
 			RestConfig: rest.Config{
 				ListenAddress: "",
@@ -136,7 +135,8 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 				ReadTimeout:   rest.DefaultReadTimeout,
 				IdleTimeout:   rest.DefaultIdleTimeout,
 			},
-			MaxMsgSize: grpcutils.DefaultMaxMsgSize,
+			MaxMsgSize:     grpcutils.DefaultMaxMsgSize,
+			CompressorName: grpcutils.NoCompressor,
 		},
 		rpcMetricsEnabled:         false,
 		apiRatelimits:             nil,
@@ -722,7 +722,10 @@ func (builder *ObserverServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 			MaxSize: builder.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
 			Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
 		},
-		meshTracer).
+		meshTracer,
+		&p2pconfig.UnicastConfig{
+			UnicastConfig: builder.FlowConfig.NetworkConfig.UnicastConfig,
+		}).
 		SetSubscriptionFilter(
 			subscription.NewRoleBasedFilter(
 				subscription.UnstakedRole, builder.IdentityProvider,
@@ -736,7 +739,6 @@ func (builder *ObserverServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 				dht.BootstrapPeers(pis...),
 			)
 		}).
-		SetStreamCreationRetryInterval(builder.FlowConfig.NetworkConfig.UnicastCreateStreamRetryDelay).
 		SetGossipSubTracer(meshTracer).
 		SetGossipSubScoreTracerInterval(builder.FlowConfig.NetworkConfig.GossipSubConfig.ScoreTracerInterval).
 		Build()
@@ -920,6 +922,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 				accessMetrics,
 				config.MaxMsgSize,
 				backendConfig.CircuitBreakerConfig,
+				config.CompressorName,
 			),
 		}
 
@@ -940,9 +943,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			FixedExecutionNodeIDs:     backendConfig.FixedExecutionNodeIDs,
 			Log:                       node.Logger,
 			SnapshotHistoryLimit:      backend.DefaultSnapshotHistoryLimit,
-			ArchiveAddressList:        backendConfig.ArchiveAddressList,
 			Communicator:              backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
-			ScriptExecValidation:      backendConfig.ScriptExecValidation,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize backend: %w", err)
@@ -961,6 +962,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			return nil, err
 		}
 
+		stateStreamConfig := statestreambackend.Config{}
 		engineBuilder, err := rpc.NewBuilder(
 			node.Logger,
 			node.State,
@@ -974,8 +976,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			builder.secureGrpcServer,
 			builder.unsecureGrpcServer,
 			nil, // state streaming is not supported
-			state_stream.DefaultEventFilterConfig,
-			0,
+			stateStreamConfig,
 		)
 		if err != nil {
 			return nil, err
