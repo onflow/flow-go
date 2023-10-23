@@ -773,6 +773,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	idCache, err := cache.NewProtocolStateIDCache(node.Log, node.State, events.NewDistributor())
 	require.NoError(t, err, "could not create finalized snapshot cache")
+	spamConfig, err := synchronization.NewSpamDetectionConfig()
+	require.NoError(t, err, "could not initialize spam detection config")
 	syncEngine, err := synchronization.New(
 		node.Log,
 		node.Metrics,
@@ -789,7 +791,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 			),
 			idCache,
 		),
-		synchronization.NewSpamDetectionConfig(),
+		spamConfig,
 		synchronization.WithPollInterval(time.Duration(0)),
 	)
 	require.NoError(t, err)

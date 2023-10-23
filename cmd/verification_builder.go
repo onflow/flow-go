@@ -395,6 +395,11 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			return followerEng, nil
 		}).
 		Component("sync engine", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+			spamConfig, err := commonsync.NewSpamDetectionConfig()
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize spam detection config: %w", err)
+			}
+
 			sync, err := commonsync.New(
 				node.Logger,
 				node.Metrics.Engine,
@@ -405,7 +410,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				followerEng,
 				syncCore,
 				node.SyncEngineIdentifierProvider,
-				commonsync.NewSpamDetectionConfig(),
+				spamConfig,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
