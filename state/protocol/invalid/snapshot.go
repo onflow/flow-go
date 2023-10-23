@@ -44,7 +44,7 @@ func (u *Snapshot) Phase() (flow.EpochPhase, error) {
 	return 0, u.err
 }
 
-func (u *Snapshot) Identities(_ flow.IdentityFilter) (flow.IdentityList, error) {
+func (u *Snapshot) Identities(_ flow.IdentityFilter[flow.Identity]) (flow.IdentityList, error) {
 	return nil, u.err
 }
 

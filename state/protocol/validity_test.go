@@ -40,7 +40,7 @@ func TestEpochSetupValidity(t *testing.T) {
 		_, result, _ := unittest.BootstrapFixture(participants)
 		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 		// create an invalid cluster assignment (node appears in multiple clusters)
-		collector := participants.Filter(filter.HasRole(flow.RoleCollection))[0]
+		collector := participants.Filter(filter.HasRole[flow.Identity](flow.RoleCollection))[0]
 		setup.Assignments = append(setup.Assignments, []flow.Identifier{collector.NodeID})
 
 		err := protocol.VerifyEpochSetup(setup, true)

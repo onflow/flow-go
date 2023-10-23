@@ -12,10 +12,10 @@ import (
 // The caller must ensure each assignment contains identities ordered in canonical order, so that
 // each cluster in the returned cluster list is ordered in canonical order as well. If not,
 // an error will be returned.
-func NewClusterList(assignments flow.AssignmentList, collectors flow.IdentityList) (flow.ClusterList, error) {
+func NewClusterList(assignments flow.AssignmentList, collectors flow.IdentitySkeletonList) (flow.ClusterList, error) {
 
 	// build a lookup for all the identities by node identifier
-	lookup := make(map[flow.Identifier]*flow.Identity)
+	lookup := collectors.Lookup()
 	for _, collector := range collectors {
 		lookup[collector.NodeID] = collector
 	}
@@ -23,10 +23,11 @@ func NewClusterList(assignments flow.AssignmentList, collectors flow.IdentityLis
 		return nil, fmt.Errorf("duplicate collector in list")
 	}
 
-	// replicate the identifier list but use identities instead
+	// assignments only contains the NodeIDs for each cluster. In the following, we
+	// substitute them with the respective IdentitySkeletons.
 	clusters := make(flow.ClusterList, 0, len(assignments))
 	for i, participants := range assignments {
-		cluster := make(flow.IdentityList, 0, len(participants))
+		cluster := make(flow.IdentitySkeletonList, 0, len(participants))
 		if len(participants) == 0 {
 			return nil, fmt.Errorf("particpants in assignment list is empty, cluster index %v", i)
 		}

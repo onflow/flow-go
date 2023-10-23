@@ -41,19 +41,19 @@ func (_m *DynamicCommittee) DKG(view uint64) (hotstuff.DKG, error) {
 }
 
 // IdentitiesByBlock provides a mock function with given fields: blockID
-func (_m *DynamicCommittee) IdentitiesByBlock(blockID flow.Identifier) (flow.IdentityList, error) {
+func (_m *DynamicCommittee) IdentitiesByBlock(blockID flow.Identifier) (flow.GenericIdentityList[flow.Identity], error) {
 	ret := _m.Called(blockID)
 
-	var r0 flow.IdentityList
+	var r0 flow.GenericIdentityList[flow.Identity]
 	var r1 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier) (flow.IdentityList, error)); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) (flow.GenericIdentityList[flow.Identity], error)); ok {
 		return rf(blockID)
 	}
-	if rf, ok := ret.Get(0).(func(flow.Identifier) flow.IdentityList); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) flow.GenericIdentityList[flow.Identity]); ok {
 		r0 = rf(blockID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(flow.IdentityList)
+			r0 = ret.Get(0).(flow.GenericIdentityList[flow.Identity])
 		}
 	}
 
@@ -67,19 +67,19 @@ func (_m *DynamicCommittee) IdentitiesByBlock(blockID flow.Identifier) (flow.Ide
 }
 
 // IdentitiesByEpoch provides a mock function with given fields: view
-func (_m *DynamicCommittee) IdentitiesByEpoch(view uint64) (flow.IdentitySkeletonList, error) {
+func (_m *DynamicCommittee) IdentitiesByEpoch(view uint64) (flow.GenericIdentityList[flow.IdentitySkeleton], error) {
 	ret := _m.Called(view)
 
-	var r0 flow.IdentitySkeletonList
+	var r0 flow.GenericIdentityList[flow.IdentitySkeleton]
 	var r1 error
-	if rf, ok := ret.Get(0).(func(uint64) (flow.IdentitySkeletonList, error)); ok {
+	if rf, ok := ret.Get(0).(func(uint64) (flow.GenericIdentityList[flow.IdentitySkeleton], error)); ok {
 		return rf(view)
 	}
-	if rf, ok := ret.Get(0).(func(uint64) flow.IdentitySkeletonList); ok {
+	if rf, ok := ret.Get(0).(func(uint64) flow.GenericIdentityList[flow.IdentitySkeleton]); ok {
 		r0 = rf(view)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(flow.IdentitySkeletonList)
+			r0 = ret.Get(0).(flow.GenericIdentityList[flow.IdentitySkeleton])
 		}
 	}
 

@@ -253,7 +253,7 @@ func (b *backendScripts) executeScriptOnAvailableExecutionNodes(
 	hasInvalidArgument := false
 	errToReturn := b.nodeCommunicator.CallAvailableNode(
 		executors,
-		func(node *flow.Identity) error {
+		func(node *flow.IdentitySkeleton) error {
 			execStartTime := time.Now()
 			result, err = b.tryExecuteScriptOnExecutionNode(ctx, node.Address, blockID, script, arguments)
 			if err == nil {
@@ -281,7 +281,7 @@ func (b *backendScripts) executeScriptOnAvailableExecutionNodes(
 
 			return err
 		},
-		func(node *flow.Identity, err error) bool {
+		func(node *flow.IdentitySkeleton, err error) bool {
 			hasInvalidArgument = status.Code(err) == codes.InvalidArgument
 			if hasInvalidArgument {
 				b.log.Debug().Err(err).

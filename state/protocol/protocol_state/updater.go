@@ -84,14 +84,14 @@ func (u *Updater) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
 
 	// lookup of dynamic data for current protocol state identities
 	// by definition, this will include identities from current epoch + identities from previous epoch with 0 weight.
-	identitiesStateLookup := u.parentState.CurrentEpoch.ActiveIdentities.Lookup()
+	activeIdentitiesLookup := u.parentState.CurrentEpoch.ActiveIdentities.Lookup()
 
 	currentEpochSetupParticipants := u.parentState.CurrentEpochSetup.Participants
 	// construct identities for current epoch: current epoch participants + next epoch participants with 0 weight
 	currentEpochIdentities := make(flow.DynamicIdentityEntryList, 0, len(currentEpochSetupParticipants))
 	// In this loop, we will perform step 1 from above.
 	for _, identity := range currentEpochSetupParticipants {
-		identityParentState := identitiesStateLookup[identity.NodeID]
+		identityParentState := activeIdentitiesLookup[identity.NodeID]
 		currentEpochIdentities = append(currentEpochIdentities, &flow.DynamicIdentityEntry{
 			NodeID:  identity.NodeID,
 			Dynamic: identityParentState.Dynamic,
@@ -109,18 +109,18 @@ func (u *Updater) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
 				NodeID: identity.NodeID,
 				Dynamic: flow.DynamicIdentity{
 					Weight:  0,
-					Ejected: identity.Ejected,
+					Ejected: false,
 				},
 			})
 		}
 
 		// Step 3: for the next epoch we include every identity from its setup event;
-		// we give authority to epoch smart contract to decide who should be included in the next epoch and with what flags.
+		identityParentState, found := activeIdentitiesLookup[identity.NodeID]
 		nextEpochIdentities = append(nextEpochIdentities, &flow.DynamicIdentityEntry{
 			NodeID: identity.NodeID,
 			Dynamic: flow.DynamicIdentity{
 				Weight:  identity.InitialWeight,
-				Ejected: identity.Ejected,
+				Ejected: found && identityParentState.Dynamic.Ejected,
 			},
 		})
 	}
@@ -131,7 +131,7 @@ func (u *Updater) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
 	// Setup Event for the next epoch is added with 0 weight and the _current_ value of the Ejected flag.
 	for _, identity := range currentEpochSetupParticipants {
 		if _, found := nextEpochIdentitiesLookup[identity.NodeID]; !found {
-			identityParentState := identitiesStateLookup[identity.NodeID]
+			identityParentState := activeIdentitiesLookup[identity.NodeID]
 			nextEpochIdentities = append(nextEpochIdentities, &flow.DynamicIdentityEntry{
 				NodeID: identity.NodeID,
 				Dynamic: flow.DynamicIdentity{

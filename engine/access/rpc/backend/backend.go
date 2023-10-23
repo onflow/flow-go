@@ -374,7 +374,7 @@ func executionNodesForBlockID(
 	blockID flow.Identifier,
 	executionReceipts storage.ExecutionReceipts,
 	state protocol.State,
-	log zerolog.Logger) (flow.IdentityList, error) {
+	log zerolog.Logger) (flow.IdentitySkeletonList, error) {
 
 	var executorIDs flow.IdentifierList
 
@@ -386,7 +386,7 @@ func executionNodesForBlockID(
 	}
 
 	if rootBlock.ID() == blockID {
-		executorIdentities, err := state.Final().Identities(filter.HasRole(flow.RoleExecution))
+		executorIdentities, err := state.Final().Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
 		if err != nil {
 			return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
 		}
@@ -423,7 +423,7 @@ func executionNodesForBlockID(
 		receiptCnt := len(executorIDs)
 		// if less than minExecutionNodesCnt execution receipts have been received so far, then return random ENs
 		if receiptCnt < minExecutionNodesCnt {
-			newExecutorIDs, err := state.AtBlockID(blockID).Identities(filter.HasRole(flow.RoleExecution))
+			newExecutorIDs, err := state.AtBlockID(blockID).Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
 			if err != nil {
 				return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
 			}
@@ -506,9 +506,9 @@ func findAllExecutionNodes(
 // If neither preferred nor fixed nodes are defined, then all execution node matching the executor IDs are returned.
 // e.g. If execution nodes in identity table are {1,2,3,4}, preferred ENs are defined as {2,3,4}
 // and the executor IDs is {1,2,3}, then {2, 3} is returned as the chosen subset of ENs
-func chooseExecutionNodes(state protocol.State, executorIDs flow.IdentifierList) (flow.IdentityList, error) {
+func chooseExecutionNodes(state protocol.State, executorIDs flow.IdentifierList) (flow.IdentitySkeletonList, error) {
 
-	allENs, err := state.Final().Identities(filter.HasRole(flow.RoleExecution))
+	allENs, err := state.Final().Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
 	if err != nil {
 		return nil, fmt.Errorf("failed to retreive all execution IDs: %w", err)
 	}
@@ -517,27 +517,29 @@ func chooseExecutionNodes(state protocol.State, executorIDs flow.IdentifierList)
 	var chosenIDs flow.IdentityList
 	if len(preferredENIdentifiers) > 0 {
 		// find the preferred execution node IDs which have executed the transaction
-		chosenIDs = allENs.Filter(filter.And(filter.HasNodeID(preferredENIdentifiers...),
-			filter.HasNodeID(executorIDs...)))
+		chosenIDs = allENs.Filter(filter.And(filter.HasNodeID[flow.Identity](preferredENIdentifiers...),
+			filter.HasNodeID[flow.Identity](executorIDs...)))
 		if len(chosenIDs) > 0 {
-			return chosenIDs, nil
+			return chosenIDs.ToSkeleton(), nil
 		}
 	}
 
 	// if no preferred EN ID is found, then choose from the fixed EN IDs
 	if len(fixedENIdentifiers) > 0 {
 		// choose fixed ENs which have executed the transaction
-		chosenIDs = allENs.Filter(filter.And(filter.HasNodeID(fixedENIdentifiers...), filter.HasNodeID(executorIDs...)))
+		chosenIDs = allENs.Filter(filter.And(
+			filter.HasNodeID[flow.Identity](fixedENIdentifiers...),
+			filter.HasNodeID[flow.Identity](executorIDs...)))
 		if len(chosenIDs) > 0 {
-			return chosenIDs, nil
+			return chosenIDs.ToSkeleton(), nil
 		}
 		// if no such ENs are found then just choose all fixed ENs
-		chosenIDs = allENs.Filter(filter.HasNodeID(fixedENIdentifiers...))
-		return chosenIDs, nil
+		chosenIDs = allENs.Filter(filter.HasNodeID[flow.Identity](fixedENIdentifiers...))
+		return chosenIDs.ToSkeleton(), nil
 	}
 
 	// If no preferred or fixed ENs have been specified, then return all executor IDs i.e. no preference at all
-	return allENs.Filter(filter.HasNodeID(executorIDs...)), nil
+	return allENs.Filter(filter.HasNodeID[flow.Identity](executorIDs...)).ToSkeleton(), nil
 }
 
 // Find ports from supplied Address

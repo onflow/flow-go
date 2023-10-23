@@ -327,7 +327,8 @@ func (suite *ConsensusSuite) TestIdentitiesByEpoch() {
 	// epoch 1 identities with varying conditions which would disqualify them
 	// from committee participation
 	realIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
-	zeroWeightConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus), unittest.WithWeight(0))
+	zeroWeightConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus),
+		unittest.WithInitialWeight(0))
 	ejectedConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus), unittest.WithEjected(true))
 	validNonConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 	epoch1Identities := flow.IdentityList{realIdentity, zeroWeightConsensusIdentity, ejectedConsensusIdentity, validNonConsensusIdentity}
@@ -353,11 +354,6 @@ func (suite *ConsensusSuite) TestIdentitiesByEpoch() {
 		t.Run("existent but non-committee-member identity should return InvalidSignerError", func(t *testing.T) {
 			t.Run("zero-weight consensus node", func(t *testing.T) {
 				_, err := suite.committee.IdentityByEpoch(unittest.Uint64InRange(1, 100), zeroWeightConsensusIdentity.NodeID)
-				require.True(t, model.IsInvalidSignerError(err))
-			})
-
-			t.Run("ejected consensus node", func(t *testing.T) {
-				_, err := suite.committee.IdentityByEpoch(unittest.Uint64InRange(1, 100), ejectedConsensusIdentity.NodeID)
 				require.True(t, model.IsInvalidSignerError(err))
 			})
 
@@ -679,7 +675,7 @@ func newMockEpoch(counter uint64, identities flow.IdentityList, firstView uint64
 
 	epoch := new(protocolmock.Epoch)
 	epoch.On("Counter").Return(counter, nil)
-	epoch.On("InitialIdentities").Return(identities, nil)
+	epoch.On("InitialIdentities").Return(identities.ToSkeleton(), nil)
 	epoch.On("FirstView").Return(firstView, nil)
 	epoch.On("FinalView").Return(finalView, nil)
 	if committed {

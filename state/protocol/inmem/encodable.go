@@ -35,7 +35,7 @@ type EncodableEpoch struct {
 	DKGPhase3FinalView uint64
 	FinalView          uint64
 	RandomSource       []byte
-	InitialIdentities  flow.IdentityList
+	InitialIdentities  flow.IdentitySkeletonList
 	Clustering         flow.ClusterList
 	Clusters           []EncodableCluster
 	DKG                *EncodableDKG
@@ -59,7 +59,7 @@ type EncodableFullDKG struct {
 type EncodableCluster struct {
 	Index     uint
 	Counter   uint64
-	Members   flow.IdentityList
+	Members   flow.IdentitySkeletonList
 	RootBlock *cluster.Block
 	RootQC    *flow.QuorumCertificate
 }

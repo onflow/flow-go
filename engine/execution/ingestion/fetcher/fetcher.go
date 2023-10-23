@@ -55,8 +55,8 @@ func (e *CollectionFetcher) FetchCollection(blockID flow.Identifier, height uint
 		return fmt.Errorf("could not find guarantors: %w", err)
 	}
 
-	filters := []flow.IdentityFilter{
-		filter.HasNodeID(guarantors...),
+	filters := []flow.IdentityFilter[flow.Identity]{
+		filter.HasNodeID[flow.Identity](guarantors...),
 	}
 
 	// This is included to temporarily work around an issue observed on a small number of ENs.

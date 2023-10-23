@@ -151,7 +151,7 @@ func withConsumer(
 		rootProtocolState, err := s.State.Final().ProtocolState()
 		require.NoError(t, err)
 		rootProtocolStateID := rootProtocolState.Entry().ID()
-		clusterCommittee := participants.Filter(filter.HasRole(flow.RoleCollection))
+		clusterCommittee := participants.Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
 		sources := unittest.RandomSourcesFixture(110)
 		results := vertestutils.CompleteExecutionReceiptChainFixture(
 			t,

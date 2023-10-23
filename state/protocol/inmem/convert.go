@@ -155,7 +155,7 @@ func FromEpoch(from protocol.Epoch) (*Epoch, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get dkg: %w", err)
 	}
-	convertedDKG, err := FromDKG(dkg, epoch.InitialIdentities.Filter(filter.HasRole(flow.RoleConsensus)))
+	convertedDKG, err := FromDKG(dkg, epoch.InitialIdentities.Filter(filter.HasRole[flow.IdentitySkeleton](flow.RoleConsensus)))
 	if err != nil {
 		return nil, err
 	}
@@ -215,7 +215,7 @@ func FromCluster(from protocol.Cluster) (*Cluster, error) {
 // The given participant list must exactly match the DKG members.
 // All errors indicate inconsistent or invalid inputs.
 // No errors are expected during normal operation.
-func FromDKG(from protocol.DKG, participants flow.IdentityList) (*DKG, error) {
+func FromDKG(from protocol.DKG, participants flow.IdentitySkeletonList) (*DKG, error) {
 	var dkg EncodableDKG
 	dkg.GroupKey = encodable.RandomBeaconPubKey{PublicKey: from.GroupKey()}
 
@@ -352,12 +352,22 @@ func SnapshotFromBootstrapStateWithParams(
 
 // ProtocolStateForBootstrapState generates a protocol.ProtocolStateEntry for a root protocol state which is used for bootstrapping.
 func ProtocolStateForBootstrapState(setup *flow.EpochSetup, commit *flow.EpochCommit) *flow.ProtocolStateEntry {
+	identities := make(flow.DynamicIdentityEntryList, 0, len(setup.Participants))
+	for _, identity := range setup.Participants {
+		identities = append(identities, &flow.DynamicIdentityEntry{
+			NodeID: identity.NodeID,
+			Dynamic: flow.DynamicIdentity{
+				Weight:  identity.InitialWeight,
+				Ejected: false,
+			},
+		})
+	}
 	return &flow.ProtocolStateEntry{
 		PreviousEpochEventIDs: flow.EventIDs{},
 		CurrentEpoch: flow.EpochStateContainer{
 			SetupID:          setup.ID(),
 			CommitID:         commit.ID(),
-			ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(setup.Participants),
+			ActiveIdentities: identities,
 		},
 		NextEpoch:                       nil,
 		InvalidStateTransitionAttempted: false,

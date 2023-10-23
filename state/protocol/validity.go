@@ -82,14 +82,14 @@ func VerifyEpochSetup(setup *flow.EpochSetup, verifyNetworkAddress bool) error {
 	}
 
 	// the participants must be listed in canonical order
-	if !setup.Participants.Sorted(order.Canonical) {
+	if !setup.Participants.Sorted(order.Canonical[flow.IdentitySkeleton]) {
 		return fmt.Errorf("participants are not canonically ordered")
 	}
 
 	// STEP 3: sanity checks for individual roles
 	// IMPORTANT: here we remove all nodes with zero weight, as they are allowed to partake
 	// in communication but not in respective node functions
-	activeParticipants := setup.Participants.Filter(filter.HasWeight(true))
+	activeParticipants := setup.Participants.Filter(filter.HasInitialWeight[flow.IdentitySkeleton](true))
 
 	// we need at least one node of each role
 	roles := make(map[flow.Role]uint)
@@ -120,7 +120,7 @@ func VerifyEpochSetup(setup *flow.EpochSetup, verifyNetworkAddress bool) error {
 	}
 
 	// the collection cluster assignments need to be valid
-	_, err := factory.NewClusterList(setup.Assignments, activeParticipants.Filter(filter.HasRole(flow.RoleCollection)))
+	_, err := factory.NewClusterList(setup.Assignments, activeParticipants.Filter(filter.HasRole[flow.IdentitySkeleton](flow.RoleCollection)))
 	if err != nil {
 		return fmt.Errorf("invalid cluster assignments: %w", err)
 	}

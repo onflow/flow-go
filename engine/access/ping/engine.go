@@ -93,7 +93,7 @@ func (e *Engine) Done() <-chan struct{} {
 func (e *Engine) startPing() {
 
 	e.unit.LaunchPeriodically(func() {
-		peers := e.idProvider.Identities(filter.Not(filter.HasNodeID(e.me.NodeID())))
+		peers := e.idProvider.Identities(filter.Not(filter.HasNodeID[flow.Identity](e.me.NodeID())))
 
 		// for each peer, send a ping every ping interval
 		for _, peer := range peers {

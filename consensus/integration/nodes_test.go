@@ -189,7 +189,7 @@ func buildEpochLookupList(epochs ...protocol.Epoch) []epochInfo {
 // The list of created nodes, the common network hub, and a function which starts
 // all the nodes together, is returned.
 func createNodes(t *testing.T, participants *ConsensusParticipants, rootSnapshot protocol.Snapshot, stopper *Stopper) (nodes []*Node, hub *Hub, runFor func(time.Duration)) {
-	consensus, err := rootSnapshot.Identities(filter.HasRole(flow.RoleConsensus))
+	consensus, err := rootSnapshot.Identities(filter.HasRole[flow.Identity](flow.RoleConsensus))
 	require.NoError(t, err)
 
 	epochViewLookup := buildEpochLookupList(rootSnapshot.Epochs().Current(),
@@ -258,16 +258,16 @@ func createRootBlockData(participantData *run.ParticipantData) (*flow.Block, *fl
 
 	// add other roles to create a complete identity list
 	participants := unittest.CompleteIdentitySet(consensusParticipants...)
-	participants.Sort(order.Canonical)
+	participants.Sort(order.Canonical[flow.Identity])
 
 	dkgParticipantsKeys := make([]crypto.PublicKey, 0, len(consensusParticipants))
-	for _, participant := range participants.Filter(filter.HasRole(flow.RoleConsensus)) {
+	for _, participant := range participants.Filter(filter.HasRole[flow.Identity](flow.RoleConsensus)) {
 		dkgParticipantsKeys = append(dkgParticipantsKeys, participantData.Lookup[participant.NodeID].KeyShare)
 	}
 
 	counter := uint64(1)
 	setup := unittest.EpochSetupFixture(
-		unittest.WithParticipants(participants),
+		unittest.WithParticipants(participants.ToSkeleton()),
 		unittest.SetupWithCounter(counter),
 		unittest.WithFirstView(root.Header.View),
 		unittest.WithFinalView(root.Header.View+1000),
@@ -291,7 +291,7 @@ func createRootBlockData(participantData *run.ParticipantData) (*flow.Block, *fl
 }
 
 func createPrivateNodeIdentities(n int) []bootstrap.NodeInfo {
-	consensus := unittest.IdentityListFixture(n, unittest.WithRole(flow.RoleConsensus)).Sort(order.Canonical)
+	consensus := unittest.IdentityListFixture(n, unittest.WithRole(flow.RoleConsensus)).Sort(order.Canonical[flow.Identity])
 	infos := make([]bootstrap.NodeInfo, 0, n)
 	for _, node := range consensus {
 		networkPrivKey := unittest.NetworkingPrivKeyFixture()
@@ -490,7 +490,6 @@ func createNode(
 	rootQC, err := rootSnapshot.QuorumCertificate()
 	require.NoError(t, err)
 
-	// selector := filter.HasRole(flow.RoleConsensus)
 	committee, err := committees.NewConsensusCommittee(state, localID)
 	require.NoError(t, err)
 	protocolStateEvents.AddConsumer(committee)
@@ -639,8 +638,8 @@ func createNode(
 	require.NoError(t, err)
 
 	identities, err := state.Final().Identities(filter.And(
-		filter.HasRole(flow.RoleConsensus),
-		filter.Not(filter.HasNodeID(me.NodeID())),
+		filter.HasRole[flow.Identity](flow.RoleConsensus),
+		filter.Not(filter.HasNodeID[flow.Identity](me.NodeID())),
 	))
 	require.NoError(t, err)
 	idProvider := id.NewFixedIdentifierProvider(identities.NodeIDs())

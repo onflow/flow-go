@@ -265,7 +265,7 @@ func TestStakingVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 		require.NoError(t, err)
 
 		signers[identity.NodeID] = verification.NewStakingSigner(me)
-	}).Sort(order.Canonical)
+	}).Sort(order.Canonical[flow.Identity])
 
 	leader := stakingSigners[0]
 	block := helper.MakeBlock(helper.WithBlockView(view), helper.WithBlockProposer(leader.NodeID))

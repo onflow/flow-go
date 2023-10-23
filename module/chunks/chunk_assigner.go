@@ -66,7 +66,7 @@ func (p *ChunkAssigner) Assign(result *flow.ExecutionResult, blockID flow.Identi
 	}
 
 	// Get a list of verifiers at block that is being sealed
-	verifiers, err := p.protocolState.AtBlockID(result.BlockID).Identities(filter.And(filter.HasRole(flow.RoleVerification),
+	verifiers, err := p.protocolState.AtBlockID(result.BlockID).Identities(filter.And(filter.HasRole[flow.Identity](flow.RoleVerification),
 		filter.HasWeight(true),
 		filter.Not(filter.Ejected)))
 	if err != nil {

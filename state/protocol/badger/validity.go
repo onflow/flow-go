@@ -55,7 +55,7 @@ func IsValidRootSnapshot(snap protocol.Snapshot, verifyResultID bool) error {
 	if err != nil {
 		return fmt.Errorf("could not get identities for root snapshot: %w", err)
 	}
-	if !identities.Sorted(order.Canonical) {
+	if !identities.Sorted(order.Canonical[flow.Identity]) {
 		return fmt.Errorf("identities are not canonically ordered")
 	}
 
@@ -155,7 +155,7 @@ func validateRootQC(snap protocol.Snapshot) error {
 // validateClusterQC performs QC validation of single collection cluster
 // Returns nil on success
 func validateClusterQC(cluster protocol.Cluster) error {
-	committee, err := committees.NewStaticCommittee(cluster.Members(), flow.Identifier{}, nil, nil)
+	committee, err := committees.NewStaticReplicas(cluster.Members(), flow.Identifier{}, nil, nil)
 	if err != nil {
 		return fmt.Errorf("could not create static committee: %w", err)
 	}

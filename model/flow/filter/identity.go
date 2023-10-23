@@ -7,14 +7,23 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// Adapt takes an IdentityFilter on the domain of IdentitySkeletons
+// and adapts the filter to the domain of full Identities. In other words, it converts
+// flow.IdentityFilter[flow.IdentitySkeleton] to flow.IdentityFilter[flow.Identity].
+func Adapt(f flow.IdentityFilter[flow.IdentitySkeleton]) flow.IdentityFilter[flow.Identity] {
+	return func(i *flow.Identity) bool {
+		return f(&i.IdentitySkeleton)
+	}
+}
+
 // Any will always be true.
 func Any(*flow.Identity) bool {
 	return true
 }
 
 // And combines two or more filters that all need to be true.
-func And(filters ...flow.IdentityFilter) flow.IdentityFilter {
-	return func(identity *flow.Identity) bool {
+func And[T flow.GenericIdentity](filters ...flow.IdentityFilter[T]) flow.IdentityFilter[T] {
+	return func(identity *T) bool {
 		for _, filter := range filters {
 			if !filter(identity) {
 				return false
@@ -25,8 +34,8 @@ func And(filters ...flow.IdentityFilter) flow.IdentityFilter {
 }
 
 // Or combines two or more filters and only needs one of them to be true.
-func Or(filters ...flow.IdentityFilter) flow.IdentityFilter {
-	return func(identity *flow.Identity) bool {
+func Or[T flow.GenericIdentity](filters ...flow.IdentityFilter[T]) flow.IdentityFilter[T] {
+	return func(identity *T) bool {
 		for _, filter := range filters {
 			if filter(identity) {
 				return true
@@ -37,34 +46,37 @@ func Or(filters ...flow.IdentityFilter) flow.IdentityFilter {
 }
 
 // Not returns a filter equivalent to the inverse of the input filter.
-func Not(filter flow.IdentityFilter) flow.IdentityFilter {
-	return func(identity *flow.Identity) bool {
+func Not[T flow.GenericIdentity](filter flow.IdentityFilter[T]) flow.IdentityFilter[T] {
+	return func(identity *T) bool {
 		return !filter(identity)
 	}
 }
 
-// In returns a filter for identities within the input list. This is equivalent
-// to HasNodeID, but for list-typed inputs.
-func In(list flow.IdentityList) flow.IdentityFilter {
-	return HasNodeID(list.NodeIDs()...)
+// In returns a filter for identities within the input list. For an input identity i,
+// the filter returns true if and only if i ∈ list.
+// Caution: The filter solely operates on NodeIDs. Other identity fields are not compared.
+// This function is just a compact representation of `HasNodeID[T](list.NodeIDs()...)`
+// which behaves algorithmically the same way.
+func In[T flow.GenericIdentity](list flow.GenericIdentityList[T]) flow.IdentityFilter[T] {
+	return HasNodeID[T](list.NodeIDs()...)
 }
 
 // HasNodeID returns a filter that returns true for any identity with an ID
 // matching any of the inputs.
-func HasNodeID(nodeIDs ...flow.Identifier) flow.IdentityFilter {
+func HasNodeID[T flow.GenericIdentity](nodeIDs ...flow.Identifier) flow.IdentityFilter[T] {
 	lookup := make(map[flow.Identifier]struct{})
 	for _, nodeID := range nodeIDs {
 		lookup[nodeID] = struct{}{}
 	}
-	return func(identity *flow.Identity) bool {
-		_, ok := lookup[identity.NodeID]
+	return func(identity *T) bool {
+		_, ok := lookup[(*identity).GetNodeID()]
 		return ok
 	}
 }
 
 // HasNetworkingKey returns a filter that returns true for any identity with a
 // networking public key matching any of the inputs.
-func HasNetworkingKey(keys ...crypto.PublicKey) flow.IdentityFilter {
+func HasNetworkingKey(keys ...crypto.PublicKey) flow.IdentityFilter[flow.Identity] {
 	return func(identity *flow.Identity) bool {
 		for _, key := range keys {
 			if key.Equals(identity.NetworkPubKey) {
@@ -75,8 +87,20 @@ func HasNetworkingKey(keys ...crypto.PublicKey) flow.IdentityFilter {
 	}
 }
 
-// HasWeight returns a filter for nodes with non-zero weight.
-func HasWeight(hasWeight bool) flow.IdentityFilter {
+// HasInitialWeight returns a filter for nodes with non-zero initial weight.
+func HasInitialWeight[T flow.GenericIdentity](hasWeight bool) flow.IdentityFilter[T] {
+	return func(identity *T) bool {
+		return ((*identity).GetInitialWeight() > 0) == hasWeight
+	}
+}
+
+// HasWeight filters Identities by their weight:
+// When `hasWeight == true`:
+//   - for an input identity i, the filter returns true if and only if i's weight is greater than zero
+//
+// When `hasWeight == false`:
+//   - for an input identity i, the filter returns true if and only if i's weight is zero
+func HasWeight(hasWeight bool) flow.IdentityFilter[flow.Identity] {
 	return func(identity *flow.Identity) bool {
 		return (identity.Weight > 0) == hasWeight
 	}
@@ -88,13 +112,13 @@ func Ejected(identity *flow.Identity) bool {
 }
 
 // HasRole returns a filter for nodes with one of the input roles.
-func HasRole(roles ...flow.Role) flow.IdentityFilter {
+func HasRole[T flow.GenericIdentity](roles ...flow.Role) flow.IdentityFilter[T] {
 	lookup := make(map[flow.Role]struct{})
 	for _, role := range roles {
 		lookup[role] = struct{}{}
 	}
-	return func(identity *flow.Identity) bool {
-		_, ok := lookup[identity.Role]
+	return func(identity *T) bool {
+		_, ok := lookup[(*identity).GetRole()]
 		return ok
 	}
 }
@@ -106,14 +130,23 @@ var IsValidCurrentEpochParticipant = And(
 	Not(Ejected), // ejection will change signer index
 )
 
-// IsVotingConsensusCommitteeMember is a identity filter for all members of
+// IsConsensusCommitteeMember is an identity filter for all members of the consensus committee.
+// Formally, a Node X is a Consensus Committee Member if and only if X is a consensus node with
+// positive initial stake. This is specified by the EpochSetup Event and remains static
+// throughout the epoch.
+var IsConsensusCommitteeMember = And(
+	HasRole[flow.IdentitySkeleton](flow.RoleConsensus),
+	HasInitialWeight[flow.IdentitySkeleton](true),
+)
+
+// IsVotingConsensusCommitteeMember is an identity filter for all members of
 // the consensus committee allowed to vote.
-var IsVotingConsensusCommitteeMember = And(
-	HasRole(flow.RoleConsensus),
+var IsVotingConsensusCommitteeMember = And[flow.Identity](
+	HasRole[flow.Identity](flow.RoleConsensus),
 	IsValidCurrentEpochParticipant,
 )
 
 // IsValidDKGParticipant is an identity filter for all DKG participants. It is
 // equivalent to the filter for consensus committee members, as these are
 // the same group for now.
-var IsValidDKGParticipant = IsVotingConsensusCommitteeMember
+var IsValidDKGParticipant = IsConsensusCommitteeMember

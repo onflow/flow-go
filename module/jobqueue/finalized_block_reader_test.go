@@ -68,7 +68,7 @@ func withReader(
 		require.NoError(t, err)
 		protocolStateID := protocolState.Entry().ID()
 
-		clusterCommittee := participants.Filter(filter.HasRole(flow.RoleCollection))
+		clusterCommittee := participants.Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
 		sources := unittest.RandomSourcesFixture(10)
 		results := vertestutils.CompleteExecutionReceiptChainFixture(t, root, protocolStateID, blockCount/2, sources, vertestutils.WithClusterCommittee(clusterCommittee))
 		blocks := vertestutils.ExtendStateWithFinalizedBlocks(t, results, s.State)

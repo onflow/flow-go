@@ -128,7 +128,7 @@ func (w *NodeDisallowListingWrapper) GetDisallowList() flow.IdentifierList {
 // protocol that pass the provided filter. Caution, this includes ejected nodes.
 // Please check the `Ejected` flag in the returned identities (or provide a
 // filter for removing ejected nodes).
-func (w *NodeDisallowListingWrapper) Identities(filter flow.IdentityFilter) flow.IdentityList {
+func (w *NodeDisallowListingWrapper) Identities(filter flow.IdentityFilter[flow.Identity]) flow.IdentityList {
 	identities := w.identityProvider.Identities(filter)
 	if len(identities) == 0 {
 		return identities

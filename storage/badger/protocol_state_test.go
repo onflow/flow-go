@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/mapfunc"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage/badger/transaction"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -107,6 +108,8 @@ func TestProtocolStateMergeParticipants(t *testing.T) {
 		nodeID := stateEntry.CurrentEpochSetup.Participants[1].NodeID
 		stateEntry.CurrentEpochSetup.Participants[1].Address = newAddress
 		stateEntry.CurrentEpoch.SetupID = stateEntry.CurrentEpochSetup.ID()
+		identity, _ := stateEntry.CurrentEpochIdentityTable.ByNodeID(nodeID)
+		identity.Address = newAddress
 		protocolStateID := stateEntry.ID()
 
 		// store protocol state and auxiliary info
@@ -201,15 +204,28 @@ func assertRichProtocolStateValidity(t *testing.T, state *flow.RichProtocolState
 		assert.Equal(t, state.PreviousEpochSetup.ID(), state.ProtocolStateEntry.PreviousEpochEventIDs.SetupID, "epoch setup should be for correct event ID")
 		assert.Equal(t, state.PreviousEpochCommit.ID(), state.ProtocolStateEntry.PreviousEpochEventIDs.CommitID, "epoch commit should be for correct event ID")
 
-		previousEpochParticipants = state.PreviousEpochSetup.Participants
+		for _, participant := range state.PreviousEpochSetup.Participants {
+			if identity, found := state.CurrentEpochIdentityTable.ByNodeID(participant.NodeID); found {
+				previousEpochParticipants = append(previousEpochParticipants, identity)
+			}
+		}
 	}
 
+	participantsFromCurrentEpochSetup := state.CurrentEpochIdentityTable.Filter(func(i *flow.Identity) bool {
+		_, exists := state.CurrentEpochSetup.Participants.ByNodeID(i.NodeID)
+		return exists
+	})
+
 	// invariant: Identities is a full identity table for the current epoch. Identities are sorted in canonical order. Without duplicates. Never nil.
-	var allIdentities flow.IdentityList
+	var allIdentities, participantsFromNextEpochSetup flow.IdentityList
 	if state.NextEpoch != nil {
-		allIdentities = state.CurrentEpochSetup.Participants.Union(state.NextEpochSetup.Participants)
+		participantsFromNextEpochSetup = state.NextEpochIdentityTable.Filter(func(i *flow.Identity) bool {
+			_, exists := state.NextEpochSetup.Participants.ByNodeID(i.NodeID)
+			return exists
+		})
+		allIdentities = participantsFromCurrentEpochSetup.Union(participantsFromNextEpochSetup.Map(mapfunc.WithWeight(0)))
 	} else {
-		allIdentities = state.CurrentEpochSetup.Participants.Union(previousEpochParticipants)
+		allIdentities = participantsFromCurrentEpochSetup.Union(previousEpochParticipants.Map(mapfunc.WithWeight(0)))
 	}
 
 	assert.Equal(t, allIdentities, state.CurrentEpochIdentityTable, "identities should be a full identity table for the current epoch, without duplicates")
@@ -230,7 +246,7 @@ func assertRichProtocolStateValidity(t *testing.T, state *flow.RichProtocolState
 	assert.Equal(t, state.NextEpochCommit.ID(), nextEpoch.CommitID, "epoch commit should be for correct event ID")
 
 	// invariant: Identities is a full identity table for the current epoch. Identities are sorted in canonical order. Without duplicates. Never nil.
-	allIdentities = state.NextEpochSetup.Participants.Union(state.CurrentEpochSetup.Participants)
+	allIdentities = participantsFromNextEpochSetup.Union(participantsFromCurrentEpochSetup.Map(mapfunc.WithWeight(0)))
 
 	assert.Equal(t, allIdentities, state.NextEpochIdentityTable, "identities should be a full identity table for the next epoch, without duplicates")
 }

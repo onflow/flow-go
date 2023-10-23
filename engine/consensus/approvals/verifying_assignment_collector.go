@@ -396,7 +396,7 @@ func (ac *VerifyingAssignmentCollector) RequestMissingApprovals(observation cons
 func authorizedVerifiersAtBlock(state protocol.State, blockID flow.Identifier) (map[flow.Identifier]*flow.Identity, error) {
 	authorizedVerifierList, err := state.AtBlockID(blockID).Identities(
 		filter.And(
-			filter.HasRole(flow.RoleVerification),
+			filter.HasRole[flow.Identity](flow.RoleVerification),
 			filter.HasWeight(true),
 			filter.Not(filter.Ejected),
 		))

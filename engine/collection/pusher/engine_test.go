@@ -40,13 +40,13 @@ func (suite *Suite) SetupTest() {
 
 	// add some dummy identities so we have one of each role
 	suite.identities = unittest.IdentityListFixture(5, unittest.WithAllRoles())
-	me := suite.identities.Filter(filter.HasRole(flow.RoleCollection))[0]
+	me := suite.identities.Filter(filter.HasRole[flow.Identity](flow.RoleCollection))[0]
 
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
-	suite.snapshot.On("Identities", mock.Anything).Return(func(filter flow.IdentityFilter) flow.IdentityList {
+	suite.snapshot.On("Identities", mock.Anything).Return(func(filter flow.IdentityFilter[flow.Identity]) flow.IdentityList {
 		return suite.identities.Filter(filter)
-	}, func(filter flow.IdentityFilter) error {
+	}, func(filter flow.IdentityFilter[flow.Identity]) error {
 		return nil
 	})
 	suite.state.On("Final").Return(suite.snapshot)
@@ -86,7 +86,7 @@ func (suite *Suite) TestSubmitCollectionGuarantee() {
 	guarantee := unittest.CollectionGuaranteeFixture()
 
 	// should submit the collection to consensus nodes
-	consensus := suite.identities.Filter(filter.HasRole(flow.RoleConsensus))
+	consensus := suite.identities.Filter(filter.HasRole[flow.Identity](flow.RoleConsensus))
 	suite.conduit.On("Publish", guarantee, consensus[0].NodeID).Return(nil)
 
 	msg := &messages.SubmitCollectionGuarantee{
@@ -104,7 +104,7 @@ func (suite *Suite) TestSubmitCollectionGuaranteeNonLocal() {
 	guarantee := unittest.CollectionGuaranteeFixture()
 
 	// send from a non-allowed role
-	sender := suite.identities.Filter(filter.HasRole(flow.RoleVerification))[0]
+	sender := suite.identities.Filter(filter.HasRole[flow.Identity](flow.RoleVerification))[0]
 
 	msg := &messages.SubmitCollectionGuarantee{
 		Guarantee: *guarantee,

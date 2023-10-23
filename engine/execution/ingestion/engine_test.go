@@ -82,7 +82,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	var engine *Engine
 
 	defer func() {
-		<-engine.Done()
+		unittest.AssertClosesBefore(t, engine.Done(), 5*time.Second, "expect to stop before timeout")
 		computationManager.AssertExpectations(t)
 		protocolState.AssertExpectations(t)
 		executionState.AssertExpectations(t)
