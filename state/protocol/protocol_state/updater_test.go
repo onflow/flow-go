@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/order"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -140,6 +141,7 @@ func (s *UpdaterSuite) TestProcessEpochCommit() {
 		})
 		err := s.updater.ProcessEpochCommit(commit)
 		require.Error(s.T(), err)
+		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 	})
 	s.Run("no next epoch protocol state", func() {
 		commit := unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
@@ -147,6 +149,7 @@ func (s *UpdaterSuite) TestProcessEpochCommit() {
 		})
 		err := s.updater.ProcessEpochCommit(commit)
 		require.Error(s.T(), err)
+		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 	})
 	s.Run("invalid state transition attempted", func() {
 		updater := NewUpdater(s.candidate, s.parentProtocolState)
@@ -189,6 +192,7 @@ func (s *UpdaterSuite) TestProcessEpochCommit() {
 		// processing another epoch commit has to be an error since we have already processed one
 		err = updater.ProcessEpochCommit(commit)
 		require.Error(s.T(), err)
+		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 
 		newState, _, _ := updater.Build()
 		require.Equal(s.T(), commit.ID(), newState.NextEpoch.CommitID, "next epoch must be committed")
@@ -267,6 +271,7 @@ func (s *UpdaterSuite) TestProcessEpochSetupInvariants() {
 		})
 		err := s.updater.ProcessEpochSetup(setup)
 		require.Error(s.T(), err)
+		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 	})
 	s.Run("invalid state transition attempted", func() {
 		updater := NewUpdater(s.candidate, s.parentProtocolState)
@@ -290,6 +295,36 @@ func (s *UpdaterSuite) TestProcessEpochSetupInvariants() {
 
 		err = updater.ProcessEpochSetup(setup)
 		require.Error(s.T(), err)
+		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
+	})
+	s.Run("participants not sorted", func() {
+		updater := NewUpdater(s.candidate, s.parentProtocolState)
+		setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
+			setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
+			var err error
+			setup.Participants, err = setup.Participants.Shuffle()
+			require.NoError(s.T(), err)
+		})
+		err := updater.ProcessEpochSetup(setup)
+		require.Error(s.T(), err)
+		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
+	})
+	s.Run("epoch setup state conflicts with protocol state", func() {
+		conflictingIdentity := s.parentProtocolState.ProtocolStateEntry.CurrentEpoch.ActiveIdentities[0]
+		conflictingIdentity.Dynamic.Ejected = true
+
+		updater := NewUpdater(s.candidate, s.parentProtocolState)
+		setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
+			setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
+			// using same identities as in previous epoch should result in an error since
+			// we have ejected conflicting identity but it was added back in epoch setup
+			// such epoch setup event is invalid.
+			setup.Participants = s.parentProtocolState.CurrentEpochSetup.Participants
+		})
+
+		err := updater.ProcessEpochSetup(setup)
+		require.Error(s.T(), err)
+		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 	})
 }
 

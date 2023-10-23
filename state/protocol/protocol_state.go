@@ -79,14 +79,16 @@ type StateUpdater interface {
 	// identities from previous+current epochs and start returning identities from current+next epochs.
 	// As a result of this operation protocol state for the next epoch will be created.
 	// CAUTION: Caller must validate input event.
-	// No errors are expected during normal operations.
+	// Expected errors during normal operations:
+	// - `protocol.InvalidServiceEventError` - an invalid service event with respect to the protocol state has been supplied.
 	ProcessEpochSetup(epochSetup *flow.EpochSetup) error
 	// ProcessEpochCommit updates current protocol state with data from epoch commit event.
 	// Observing an epoch setup commit, transitions protocol state from setup to commit phase, at this point we have
 	// finished construction of the next epoch.
 	// As a result of this operation protocol state for next epoch will be committed.
 	// CAUTION: Caller must validate input event.
-	// No errors are expected during normal operations.
+	// Expected errors during normal operations:
+	// - `protocol.InvalidServiceEventError` - an invalid service event with respect to the protocol state has been supplied.
 	ProcessEpochCommit(epochCommit *flow.EpochCommit) error
 	// UpdateIdentity updates identity table with new identity entry.
 	// Should pass identity which is already present in the table, otherwise an exception will be raised.

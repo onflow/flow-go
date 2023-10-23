@@ -1404,6 +1404,28 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 			assertEpochEmergencyFallbackTriggered(t, state, true)
 		})
 	})
+
+	t.Run("participants not ordered (EECC)", func(t *testing.T) {
+		util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+			block1, createSetup := setupState(t, db, state)
+
+			_, receipt, seal := createSetup(func(setup *flow.EpochSetup) {
+				var err error
+				setup.Participants, err = setup.Participants.Shuffle()
+				require.NoError(t, err)
+			})
+
+			receiptBlock, sealingBlock := unittest.SealBlock(t, state, block1, receipt, seal)
+			err := state.Finalize(context.Background(), receiptBlock.ID())
+			require.NoError(t, err)
+			// epoch fallback not triggered before finalization
+			assertEpochEmergencyFallbackTriggered(t, state, false)
+			err = state.Finalize(context.Background(), sealingBlock.ID())
+			require.NoError(t, err)
+			// epoch fallback triggered after finalization
+			assertEpochEmergencyFallbackTriggered(t, state, true)
+		})
+	})
 }
 
 // TestExtendEpochCommitInvalid tests that incorporating an invalid EpochCommit
