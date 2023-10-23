@@ -177,7 +177,7 @@ func TestCreateStream_MaxProtocolLimit(t *testing.T) {
 func TestCreateStream_MinPeerProtocolLimit(t *testing.T) {
 	unittest.SkipUnless(t,
 		unittest.TEST_TODO,
-		"max inbound stream peer protocol is not preserved; can be partially due to count steam not counting inbound streams on a protocol")
+		"max inbound stream peer protocol is not preserved; can be partially due to count stream not counting inbound streams on a protocol")
 	base := baseCreateStreamInboundStreamResourceLimitConfig()
 	base.maxInboundStreamPeerProtocol = 1
 	testCreateStreamInboundStreamResourceLimits(t, base)
