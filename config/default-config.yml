@@ -58,13 +58,13 @@ network-config:
   #	Without this limit peers can end up in a state where there exists n number of connections per peer which
   #	can lead to resource exhaustion of the libp2p node.
   libp2p-peer-base-limits-conns-inbound: 1
-  # maximum number of inbound system-wide limit for streams, across all peers and protocols
+  # maximum number of inbound system-wide streams, across all peers and protocols
   # Note that streams are ephemeral and are created and destroyed intermittently.
   libp2p-inbound-stream-limit-system: 15_000
-  # maximum number of inbound transient limit for streams, across all streams that are not yet fully opened and associated with a protocol.
+  # maximum number of inbound transient streams, across all streams that are not yet fully opened and associated with a protocol.
   # Note that streams are ephemeral and are created and destroyed intermittently.
   libp2p-inbound-stream-limit-transient: 15_000
-  # maximum number of inbound limit for streams for each protocol across all peers; this is a per-protocol limit. We expect at least
+  # maximum number of inbound streams for each protocol across all peers; this is a per-protocol limit. We expect at least
   # three protocols per node; gossipsub, unicast, and dht. Note that streams are ephemeral and are created and destroyed intermittently.
   libp2p-inbound-stream-limit-protocol: 5000
   # maximum number of inbound streams from each peer across all protocols.
