@@ -137,7 +137,7 @@ func FilterStream(host host.Host, targetID peer.ID, options ...FilterOption) []n
 	// default values
 	opts := FilterOptions{
 		dir:      network.DirUnknown, // by default, consider both inbound and outbound streams
-		protocol: discardTheProtocol, // by default, consider streams of all protocol IDs
+		protocol: allProtocols,       // by default, consider streams of all protocol IDs
 		all:      false,              // by default, return just the first matching stream
 	}
 
@@ -155,7 +155,7 @@ func FilterStream(host host.Host, targetID peer.ID, options ...FilterOption) []n
 		streams := conn.GetStreams()
 		for _, stream := range streams {
 			if (opts.dir == network.DirUnknown || stream.Stat().Direction == opts.dir) &&
-				(opts.protocol == discardTheProtocol || stream.Protocol() == opts.protocol) {
+				(opts.protocol == allProtocols || stream.Protocol() == opts.protocol) {
 				filteredStreams = append(filteredStreams, stream)
 				if !opts.all {
 					return filteredStreams
