@@ -65,7 +65,7 @@ func (u *Updater) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
 		return protocol.NewInvalidServiceEventErrorf("invalid epoch setup counter, expecting %d got %d", u.parentState.CurrentEpochSetup.Counter+1, epochSetup.Counter)
 	}
 	if u.state.NextEpoch != nil {
-		return protocol.NewInvalidServiceEventErrorf("protocol state has already a setup event")
+		return protocol.NewInvalidServiceEventErrorf("repeated setup for epoch %d", epochSetup.Counter)
 	}
 	if u.state.InvalidStateTransitionAttempted {
 		return nil // won't process new events if we are in epoch fallback mode.
@@ -78,6 +78,13 @@ func (u *Updater) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
 	// they are part of the EpochSetup event for the respective epoch.
 	//
 	// sanity checking SAFETY-CRITICAL INVARIANT (I):
+	//   - Per convention, the `flow.EpochSetup` event should list the IdentitySkeletons in canonical order. This is useful
+	//     for most efficient construction of the full active Identities for an epoch. We enforce this here at the gateway
+	//     to the protocol state, when we incorporate new information from the EpochSetup event.
+	//   - Note that the system smart contracts manage the identity table as an unordered set! For the protocol state, we desire a fixed
+	//     ordering to simplify various implementation details, like the DKG. Therefore, we order identities in `flow.EpochSetup` during
+	//     conversion from cadence to Go in the function `convert.ServiceEvent(flow.ChainID, flow.Event)` in package `model/convert`
+	// sanity checking SAFETY-CRITICAL INVARIANT (II):
 	// While ejection status and dynamic weight are not part of the EpochSetup event, we can supplement this information as follows:
 	//   - Per convention, service events are delivered (asynchronously) in an *order-preserving* manner. Furthermore, weight changes or
 	//     node ejection is entirely mediated by system smart contracts and delivered via service events.
@@ -85,17 +92,10 @@ func (u *Updater) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
 	//     that happened before should be reflected in the EpochSetup event. Specifically, the initial weight should be reduced and ejected
 	//     nodes should be no longer listed in the EpochSetup event.
 	//   - Hence, the following invariant must be satisfied by the system smart contracts for all active nodes in the upcoming epoch:
-	//      (i) When the EpochSetup event is emitted / processed, the weight of all active nodes equals their InitialWeight and
-	//     (ii) The Ejected flag is false. Node X being ejected in epoch N (necessarily via a service event emitted by the system
+	//      (i) The Ejected flag is false. Node X being ejected in epoch N (necessarily via a service event emitted by the system
 	//          smart contracts earlier) but also being listed in the setup event for the subsequent epoch (service event emitted by
 	//          the system smart contracts later) is illegal.
-	// sanity checking SAFETY-CRITICAL INVARIANT (II):
-	//   - Per convention, the `flow.EpochSetup` event should list the IdentitySkeletons in canonical order. This is useful
-	//     for most efficient construction of the full active Identities for an epoch. We enforce this here at the gateway
-	//     to the protocol state, when we incorporate new information from the EpochSetup event.
-	//   - Note that the system smart contracts manage the identity table as an unordered set! For the protocol state, we desire a fixed
-	//     ordering to simplify various implementation details, like the DKG. Therefore, we order identities in `flow.EpochSetup` during
-	//     conversion from cadence to Go in the function `convert.ServiceEvent(flow.ChainID, flow.Event)` in package `model/convert`
+	//     (ii) When the EpochSetup event is emitted / processed, the weight of all active nodes equals their InitialWeight and
 
 	// For collector clusters, we rely on invariants (I) and (II) holding. See `committees.Cluster` for details, specifically function
 	// `constructInitialClusterIdentities(..)`. While the system smart contract must satisfy this invariant, we run a sanity check below.
@@ -104,21 +104,21 @@ func (u *Updater) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
 	prevNodeID := epochSetup.Participants[0].NodeID
 	for idx, nextEpochIdentitySkeleton := range epochSetup.Participants {
 		// sanity checking invariant (I):
-		currentEpochDynamicProperties, found := activeIdentitiesLookup[nextEpochIdentitySkeleton.NodeID]
-		if found && currentEpochDynamicProperties.Dynamic.Ejected { // invariance violated
-			return protocol.NewInvalidServiceEventErrorf("node %v is ejected in current epoch %d but readmitted by EpochSetup event for epoch %d", nextEpochIdentitySkeleton.NodeID, u.parentState.CurrentEpochSetup.Counter, epochSetup.Counter)
-		}
-
-		// sanity checking invariant (II):
 		if idx > 0 && !order.IdentifierCanonical(prevNodeID, nextEpochIdentitySkeleton.NodeID) {
 			return protocol.NewInvalidServiceEventErrorf("epoch setup event lists active participants not in canonical ordering")
 		}
 		prevNodeID = nextEpochIdentitySkeleton.NodeID
 
+		// sanity checking invariant (II.i):
+		currentEpochDynamicProperties, found := activeIdentitiesLookup[nextEpochIdentitySkeleton.NodeID]
+		if found && currentEpochDynamicProperties.Dynamic.Ejected { // invariance violated
+			return protocol.NewInvalidServiceEventErrorf("node %v is ejected in current epoch %d but readmitted by EpochSetup event for epoch %d", nextEpochIdentitySkeleton.NodeID, u.parentState.CurrentEpochSetup.Counter, epochSetup.Counter)
+		}
+
 		nextEpochActiveIdentities = append(nextEpochActiveIdentities, &flow.DynamicIdentityEntry{
 			NodeID: nextEpochIdentitySkeleton.NodeID,
 			Dynamic: flow.DynamicIdentity{
-				Weight:  nextEpochIdentitySkeleton.InitialWeight,
+				Weight:  nextEpochIdentitySkeleton.InitialWeight, // according to invariant (II.ii)
 				Ejected: false,
 			},
 		})

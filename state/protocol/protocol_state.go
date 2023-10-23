@@ -80,7 +80,7 @@ type StateUpdater interface {
 	// As a result of this operation protocol state for the next epoch will be created.
 	// CAUTION: Caller must validate input event.
 	// Expected errors during normal operations:
-	// - `protocol.InvalidServiceEventError` - an invalid service event with respect to the protocol state has been supplied.
+	// - `protocol.InvalidServiceEventError` if the service event is not a valid state transition for the current protocol state
 	ProcessEpochSetup(epochSetup *flow.EpochSetup) error
 	// ProcessEpochCommit updates current protocol state with data from epoch commit event.
 	// Observing an epoch setup commit, transitions protocol state from setup to commit phase, at this point we have
@@ -88,7 +88,7 @@ type StateUpdater interface {
 	// As a result of this operation protocol state for next epoch will be committed.
 	// CAUTION: Caller must validate input event.
 	// Expected errors during normal operations:
-	// - `protocol.InvalidServiceEventError` - an invalid service event with respect to the protocol state has been supplied.
+	// - `protocol.InvalidServiceEventError` if the service event is not a valid state transition for the current protocol state
 	ProcessEpochCommit(epochCommit *flow.EpochCommit) error
 	// UpdateIdentity updates identity table with new identity entry.
 	// Should pass identity which is already present in the table, otherwise an exception will be raised.
