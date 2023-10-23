@@ -179,8 +179,8 @@ func NewRichProtocolStateEntry(
 			previousEpochDynamicIdentities = protocolState.PreviousEpoch.ActiveIdentities
 		}
 		result.CurrentEpochIdentityTable, err = BuildIdentityTable(
-			protocolState.CurrentEpoch.ActiveIdentities,
 			currentEpochSetup.Participants,
+			protocolState.CurrentEpoch.ActiveIdentities,
 			previousEpochIdentitySkeletons,
 			previousEpochDynamicIdentities,
 		)
@@ -198,9 +198,9 @@ func NewRichProtocolStateEntry(
 			}
 		}
 
-		result.CurrentEpochIdentityTable, err = BuildIdentityTable( // build full identity table for current epoch according to (2a)
-			protocolState.CurrentEpoch.ActiveIdentities,
+		result.CurrentEpochIdentityTable, err = BuildIdentityTable(
 			currentEpochSetup.Participants,
+			protocolState.CurrentEpoch.ActiveIdentities,
 			nextEpochSetup.Participants,
 			nextEpoch.ActiveIdentities,
 		)
@@ -208,9 +208,9 @@ func NewRichProtocolStateEntry(
 			return nil, fmt.Errorf("could not build identity table for setup/commit phase: %w", err)
 		}
 
-		result.NextEpochIdentityTable, err = BuildIdentityTable( // build full identity table for next epoch according to (2b)
-			nextEpoch.ActiveIdentities,
+		result.NextEpochIdentityTable, err = BuildIdentityTable(
 			nextEpochSetup.Participants,
+			nextEpoch.ActiveIdentities,
 			currentEpochSetup.Participants,
 			protocolState.CurrentEpoch.ActiveIdentities,
 		)
@@ -359,12 +359,7 @@ func (ll DynamicIdentityEntryList) Sort(less IdentifierOrder) DynamicIdentityEnt
 //
 // It also performs sanity checks to make sure that the data is consistent.
 // No errors are expected during normal operation. All errors indicate inconsistent or invalid inputs.
-func BuildIdentityTable(
-	targetEpochDynamicIdentities DynamicIdentityEntryList,
-	targetEpochIdentitySkeletons IdentitySkeletonList,
-	adjacentEpochIdentitySkeletons IdentitySkeletonList,
-	adjacentEpochDynamicIdentities DynamicIdentityEntryList,
-) (IdentityList, error) {
+func BuildIdentityTable(targetEpochIdentitySkeletons IdentitySkeletonList, targetEpochDynamicIdentities DynamicIdentityEntryList, adjacentEpochIdentitySkeletons IdentitySkeletonList, adjacentEpochDynamicIdentities DynamicIdentityEntryList) (IdentityList, error) {
 	targetEpochParticipants, err := ComposeFullIdentities(targetEpochIdentitySkeletons, targetEpochDynamicIdentities)
 	if err != nil {
 		return nil, fmt.Errorf("could not reconstruct participants for target epoch: %w", err)

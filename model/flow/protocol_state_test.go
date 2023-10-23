@@ -49,7 +49,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 			nil,
 		)
 		assert.NoError(t, err)
-		expectedIdentities, err := flow.BuildIdentityTable(identities, setup.Participants, nil, nil)
+		expectedIdentities, err := flow.BuildIdentityTable(setup.Participants, identities, nil, nil)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedIdentities, entry.CurrentEpochIdentityTable, "should be equal to current epoch setup participants")
 	})
@@ -71,8 +71,8 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		)
 		assert.NoError(t, err)
 		expectedIdentities, err := flow.BuildIdentityTable(
-			stateEntry.CurrentEpoch.ActiveIdentities,
 			stateEntry.CurrentEpochSetup.Participants,
+			stateEntry.CurrentEpoch.ActiveIdentities,
 			stateEntry.PreviousEpochSetup.Participants,
 			stateEntry.PreviousEpoch.ActiveIdentities,
 		)
@@ -102,8 +102,8 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		)
 		assert.NoError(t, err)
 		expectedIdentities, err := flow.BuildIdentityTable(
-			stateEntry.CurrentEpoch.ActiveIdentities,
 			stateEntry.CurrentEpochSetup.Participants,
+			stateEntry.CurrentEpoch.ActiveIdentities,
 			stateEntry.NextEpochSetup.Participants,
 			stateEntry.NextEpoch.ActiveIdentities,
 		)
@@ -111,8 +111,8 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		assert.Equal(t, expectedIdentities, richEntry.CurrentEpochIdentityTable, "should be equal to current epoch setup participants + next epoch setup participants")
 		assert.Nil(t, richEntry.NextEpochCommit)
 		expectedIdentities, err = flow.BuildIdentityTable(
-			stateEntry.NextEpoch.ActiveIdentities,
 			stateEntry.NextEpochSetup.Participants,
+			stateEntry.NextEpoch.ActiveIdentities,
 			stateEntry.CurrentEpochSetup.Participants,
 			stateEntry.CurrentEpoch.ActiveIdentities,
 		)
@@ -140,16 +140,16 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		)
 		assert.NoError(t, err)
 		expectedIdentities, err := flow.BuildIdentityTable(
-			stateEntry.CurrentEpoch.ActiveIdentities,
 			stateEntry.CurrentEpochSetup.Participants,
+			stateEntry.CurrentEpoch.ActiveIdentities,
 			stateEntry.NextEpochSetup.Participants,
 			stateEntry.NextEpoch.ActiveIdentities,
 		)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedIdentities, richEntry.CurrentEpochIdentityTable, "should be equal to current epoch setup participants + next epoch setup participants")
 		expectedIdentities, err = flow.BuildIdentityTable(
-			stateEntry.NextEpoch.ActiveIdentities,
 			stateEntry.NextEpochSetup.Participants,
+			stateEntry.NextEpoch.ActiveIdentities,
 			stateEntry.CurrentEpochSetup.Participants,
 			stateEntry.CurrentEpoch.ActiveIdentities,
 		)
@@ -196,8 +196,8 @@ func TestBuildIdentityTable(t *testing.T) {
 		adjacentEpochIdentities := unittest.IdentityListFixture(10).Sort(order.Canonical[flow.Identity])
 
 		identityList, err := flow.BuildIdentityTable(
-			flow.DynamicIdentityEntryListFromIdentities(targetEpochIdentities),
 			targetEpochIdentities.ToSkeleton(),
+			flow.DynamicIdentityEntryListFromIdentities(targetEpochIdentities),
 			adjacentEpochIdentities.ToSkeleton(),
 			flow.DynamicIdentityEntryListFromIdentities(adjacentEpochIdentities),
 		)
@@ -221,8 +221,8 @@ func TestBuildIdentityTable(t *testing.T) {
 		assert.NoError(t, err)
 
 		identityList, err := flow.BuildIdentityTable(
-			flow.DynamicIdentityEntryListFromIdentities(targetEpochIdentities),
 			targetEpochIdentities.ToSkeleton(),
+			flow.DynamicIdentityEntryListFromIdentities(targetEpochIdentities),
 			adjacentEpochIdentities.ToSkeleton(),
 			flow.DynamicIdentityEntryListFromIdentities(adjacentEpochIdentities),
 		)
@@ -242,8 +242,8 @@ func TestBuildIdentityTable(t *testing.T) {
 
 		adjacentEpochIdentities := unittest.IdentityListFixture(10).Sort(order.Canonical[flow.Identity])
 		identityList, err := flow.BuildIdentityTable(
-			targetEpochDynamicIdentities,
 			targetEpochIdentitySkeletons,
+			targetEpochDynamicIdentities,
 			adjacentEpochIdentities.ToSkeleton(),
 			flow.DynamicIdentityEntryListFromIdentities(adjacentEpochIdentities),
 		)
@@ -258,8 +258,8 @@ func TestBuildIdentityTable(t *testing.T) {
 
 		targetEpochIdentities := unittest.IdentityListFixture(10).Sort(order.Canonical[flow.Identity])
 		identityList, err := flow.BuildIdentityTable(
-			flow.DynamicIdentityEntryListFromIdentities(targetEpochIdentities),
 			targetEpochIdentities.ToSkeleton(),
+			flow.DynamicIdentityEntryListFromIdentities(targetEpochIdentities),
 			adjacentEpochIdentitySkeletons,
 			adjacentEpochDynamicIdentities,
 		)
