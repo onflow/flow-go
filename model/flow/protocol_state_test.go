@@ -2,12 +2,12 @@ package flow_test
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/model/flow/order"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
