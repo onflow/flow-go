@@ -102,15 +102,13 @@ func (m *ComputationMeter) HasComputationCapacity(
 	intensity uint,
 ) bool {
 	w, ok := m.params.computationWeights[kind]
-	// if not found use a default weight
+	// if not found return has capacity
+	// given the behaviour of MeterComputation is ignoring intensities without a set weight
 	if !ok {
-		w = 1 << MeterExecutionInternalPrecisionBytes
+		return true
 	}
-	potentialComputationUsage := w * uint64(intensity)
-	if potentialComputationUsage > m.params.computationLimit {
-		return false
-	}
-	return true
+	potentialComputationUsage := m.computationUsed + w*uint64(intensity)
+	return potentialComputationUsage <= m.params.computationLimit
 }
 
 // ComputationIntensities returns all the measured computational intensities
