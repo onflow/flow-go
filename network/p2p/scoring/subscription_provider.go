@@ -54,7 +54,7 @@ func NewSubscriptionProvider(cfg *SubscriptionProviderConfig) (*SubscriptionProv
 	}
 
 	builder := component.NewComponentManagerBuilder()
-	builder.AddWorker(
+	p.Component = builder.AddWorker(
 		func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			ready()
 			p.logger.Debug().Msg("subscription provider started; starting update topics loop")
@@ -62,7 +62,7 @@ func NewSubscriptionProvider(cfg *SubscriptionProviderConfig) (*SubscriptionProv
 
 			<-ctx.Done()
 			p.logger.Debug().Msg("subscription provider stopped; stopping update topics loop")
-		})
+		}).Build()
 
 	return p, nil
 }

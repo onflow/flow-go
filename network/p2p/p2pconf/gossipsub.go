@@ -24,7 +24,7 @@ type GossipSubConfig struct {
 	// PeerScoring is whether to enable GossipSub peer scoring.
 	PeerScoring bool `mapstructure:"gossipsub-peer-scoring-enabled"`
 
-	SubscriptionProviderConfig SubscriptionProviderParameters
+	SubscriptionProviderConfig SubscriptionProviderParameters `mapstructure:",squash"`
 }
 
 type SubscriptionProviderParameters struct {
