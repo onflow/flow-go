@@ -210,7 +210,7 @@ func TestCreateStream_MinSystemLimit(t *testing.T) {
 func TestCreateStream_MaxSystemLimit(t *testing.T) {
 	unittest.SkipUnless(t,
 		unittest.TEST_TODO,
-		"max inbound stream protocol is not preserved; can be partially due to count steam not counting inbound streams on a protocol")
+		"max inbound stream protocol is not preserved; can be partially due to count stream not counting inbound streams on a protocol")
 	base := baseCreateStreamInboundStreamResourceLimitConfig()
 	base.maxInboundStreamSystem = math.MaxInt
 	testCreateStreamInboundStreamResourceLimits(t, base)
