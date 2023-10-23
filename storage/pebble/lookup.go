@@ -63,15 +63,10 @@ func newLookupKey(height uint64, reg flow.RegisterID) *lookupKey {
 
 // lookupKeyToRegisterID takes a lookup key and decode it into height and RegisterID
 func lookupKeyToRegisterID(lookupKey []byte) (uint64, flow.RegisterID, error) {
-	if len(lookupKey) < MinLookupKeyLen {
-		return 0, flow.RegisterID{}, fmt.Errorf("invalid lookup key format: expected >= %d bytes, got %d bytes",
-			MinLookupKeyLen, len(lookupKey))
-	}
-
 	// Find the first slash to split the lookup key and decode the owner.
 	firstSlash := bytes.IndexByte(lookupKey, '/')
 	if firstSlash == -1 {
-		return 0, flow.RegisterID{}, fmt.Errorf("invalid lookup key format: cannot find first slash")
+		return 0, flow.RegisterID{}, fmt.Errorf("invalid lookup key format: cannot find first slash: %x", lookupKey)
 	}
 
 	owner := string(lookupKey[:firstSlash])
