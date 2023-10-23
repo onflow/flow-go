@@ -66,7 +66,7 @@ func defaultConfig() *Config {
 			CanTransfer: core.CanTransfer,
 			Transfer:    core.Transfer,
 			GasLimit:    math.MaxUint64, // block gas limit
-			BaseFee:     big.NewInt(1),  // small base fee for block
+			BaseFee:     big.NewInt(0),  //
 			GetHash: func(n uint64) common.Hash { // default returns some random hash values
 				return common.BytesToHash(crypto.Keccak256([]byte(new(big.Int).SetUint64(n).String())))
 			},

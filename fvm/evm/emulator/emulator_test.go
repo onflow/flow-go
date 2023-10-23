@@ -205,6 +205,13 @@ func TestContractInteraction(t *testing.T) {
 			RunWithNewEmulator(t, db, func(env *emulator.Emulator) {
 				ctx := types.NewDefaultBlockContext(blockNumber.Uint64())
 				ctx.GasFeeCollector = types.NewAddressFromString("coinbase")
+				coinbaseOrgBalance := gethCommon.Big1
+				// small amount of money to create account
+				RunWithNewBlockView(t, env, func(blk types.BlockView) {
+					_, err := blk.MintTo(ctx.GasFeeCollector, coinbaseOrgBalance)
+					require.NoError(t, err)
+				})
+
 				blk, err := env.NewBlockView(ctx)
 				require.NoError(t, err)
 				signer := emulator.GetDefaultSigner()
@@ -221,13 +228,11 @@ func TestContractInteraction(t *testing.T) {
 				require.NoError(t, err)
 
 				// check the balance of coinbase
-				// TODO: fix this ?
-				blk2, err := env.NewReadOnlyBlockView(ctx)
-				require.NoError(t, err)
-
-				bal, err := blk2.BalanceOf(ctx.GasFeeCollector)
-				require.NoError(t, err)
-				require.Greater(t, bal.Uint64(), uint64(0))
+				RunWithNewReadOnlyBlockView(t, env, func(blk2 types.ReadOnlyBlockView) {
+					bal, err := blk2.BalanceOf(ctx.GasFeeCollector)
+					require.NoError(t, err)
+					require.Greater(t, bal.Uint64(), coinbaseOrgBalance.Uint64())
+				})
 			})
 		})
 	})
