@@ -1,6 +1,8 @@
 package flow_test
 
 import (
+	"fmt"
+	"github.com/onflow/flow-go/model/flow/order"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -184,4 +186,84 @@ func TestProtocolStateEntry_Copy(t *testing.T) {
 		},
 	})
 	assert.NotEqual(t, entry.CurrentEpoch.ActiveIdentities, cpy.CurrentEpoch.ActiveIdentities)
+}
+
+// TestBuildIdentityTable tests if BuildIdentityTable returns a correct identity, whenever we pass arguments with or without
+// overlap. It also tests if the function returns an error when the arguments are not ordered in the same order.
+func TestBuildIdentityTable(t *testing.T) {
+	t.Run("happy-path-no-identities-overlap", func(t *testing.T) {
+		targetEpochIdentities := unittest.IdentityListFixture(10).Sort(order.Canonical[flow.Identity])
+		adjacentEpochIdentities := unittest.IdentityListFixture(10).Sort(order.Canonical[flow.Identity])
+
+		identityList, err := flow.BuildIdentityTable(
+			flow.DynamicIdentityEntryListFromIdentities(targetEpochIdentities),
+			targetEpochIdentities.ToSkeleton(),
+			adjacentEpochIdentities.ToSkeleton(),
+			flow.DynamicIdentityEntryListFromIdentities(adjacentEpochIdentities),
+		)
+		assert.NoError(t, err)
+
+		expectedIdentities := targetEpochIdentities.Union(adjacentEpochIdentities.Map(func(identity flow.Identity) flow.Identity {
+			identity.Weight = 0
+			return identity
+		}))
+		assert.Equal(t, expectedIdentities, identityList)
+	})
+	t.Run("happy-path-identities-overlap", func(t *testing.T) {
+		targetEpochIdentities := unittest.IdentityListFixture(10).Sort(order.Canonical[flow.Identity])
+		adjacentEpochIdentities := unittest.IdentityListFixture(10)
+		sampledIdentities, err := targetEpochIdentities.Sample(2)
+		// change address so we can assert that we take identities from target epoch and not adjacent epoch
+		for i, identity := range sampledIdentities.Copy() {
+			identity.Address = fmt.Sprintf("%d", i)
+			adjacentEpochIdentities = append(adjacentEpochIdentities, identity)
+		}
+		assert.NoError(t, err)
+
+		identityList, err := flow.BuildIdentityTable(
+			flow.DynamicIdentityEntryListFromIdentities(targetEpochIdentities),
+			targetEpochIdentities.ToSkeleton(),
+			adjacentEpochIdentities.ToSkeleton(),
+			flow.DynamicIdentityEntryListFromIdentities(adjacentEpochIdentities),
+		)
+		assert.NoError(t, err)
+
+		expectedIdentities := targetEpochIdentities.Union(adjacentEpochIdentities.Map(func(identity flow.Identity) flow.Identity {
+			identity.Weight = 0
+			return identity
+		}))
+		assert.Equal(t, expectedIdentities, identityList)
+	})
+	t.Run("target-epoch-identities-not-ordered", func(t *testing.T) {
+		targetEpochIdentities := unittest.IdentityListFixture(10).Sort(order.Canonical[flow.Identity])
+		targetEpochIdentitySkeletons, err := targetEpochIdentities.ToSkeleton().Shuffle()
+		assert.NoError(t, err)
+		targetEpochDynamicIdentities := flow.DynamicIdentityEntryListFromIdentities(targetEpochIdentities)
+
+		adjacentEpochIdentities := unittest.IdentityListFixture(10).Sort(order.Canonical[flow.Identity])
+		identityList, err := flow.BuildIdentityTable(
+			targetEpochDynamicIdentities,
+			targetEpochIdentitySkeletons,
+			adjacentEpochIdentities.ToSkeleton(),
+			flow.DynamicIdentityEntryListFromIdentities(adjacentEpochIdentities),
+		)
+		assert.Error(t, err)
+		assert.Empty(t, identityList)
+	})
+	t.Run("adjacent-epoch-identities-not-ordered", func(t *testing.T) {
+		adjacentEpochIdentities := unittest.IdentityListFixture(10).Sort(order.Canonical[flow.Identity])
+		adjacentEpochIdentitySkeletons, err := adjacentEpochIdentities.ToSkeleton().Shuffle()
+		assert.NoError(t, err)
+		adjacentEpochDynamicIdentities := flow.DynamicIdentityEntryListFromIdentities(adjacentEpochIdentities)
+
+		targetEpochIdentities := unittest.IdentityListFixture(10).Sort(order.Canonical[flow.Identity])
+		identityList, err := flow.BuildIdentityTable(
+			flow.DynamicIdentityEntryListFromIdentities(targetEpochIdentities),
+			targetEpochIdentities.ToSkeleton(),
+			adjacentEpochIdentitySkeletons,
+			adjacentEpochDynamicIdentities,
+		)
+		assert.Error(t, err)
+		assert.Empty(t, identityList)
+	})
 }
