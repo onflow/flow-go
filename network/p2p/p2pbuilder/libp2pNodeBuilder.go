@@ -214,11 +214,11 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		limits := rcmgr.DefaultLimits
 		libp2p.SetDefaultServiceLimits(&limits)
 
-		mem, err := AllowedMemory(builder.resourceManagerCfg.MemoryLimitRatio)
+		mem, err := allowedMemory(builder.resourceManagerCfg.MemoryLimitRatio)
 		if err != nil {
 			return nil, fmt.Errorf("could not get allowed memory: %w", err)
 		}
-		fd, err := AllowedFileDescriptors(builder.resourceManagerCfg.FileDescriptorsRatio)
+		fd, err := allowedFileDescriptors(builder.resourceManagerCfg.FileDescriptorsRatio)
 		if err != nil {
 			return nil, fmt.Errorf("could not get allowed file descriptors: %w", err)
 		}

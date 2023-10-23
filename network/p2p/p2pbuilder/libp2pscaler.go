@@ -16,14 +16,14 @@ func getNumFDs() (int, error) {
 	return int(l.Cur), nil
 }
 
-func AllowedMemory(scaleFactor float64) (int64, error) {
+func allowedMemory(scaleFactor float64) (int64, error) {
 	if scaleFactor <= 0 || scaleFactor > 1 {
 		return 0, fmt.Errorf("memory scale factor must be greater than 0 and less than or equal to 1: %f", scaleFactor)
 	}
 	return int64(math.Floor(float64(memory.TotalMemory()) * scaleFactor)), nil
 }
 
-func AllowedFileDescriptors(scaleFactor float64) (int, error) {
+func allowedFileDescriptors(scaleFactor float64) (int, error) {
 	if scaleFactor <= 0 || scaleFactor > 1 {
 		return 0, fmt.Errorf("fd scale factor must be greater than 0 and less than or equal to 1: %f", scaleFactor)
 	}
