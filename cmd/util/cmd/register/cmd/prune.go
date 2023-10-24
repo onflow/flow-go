@@ -20,25 +20,25 @@ var pruneCmd = &cobra.Command{
 	Use:   "prune",
 	Short: "prune by height",
 	Run: func(cmd *cobra.Command, args []string) {
-		err := run(flagRegisterDir, flagPruneHeight)
+		err := runPrune(flagRegisterDir, flagPruneHeight)
 		if err != nil {
 			log.Error().Err(err).Msgf("fail to prune")
 		}
 	},
 }
 
-func run(dir string, pruneHeight uint64) error {
-	pdb, err := pStorage.OpenRegisterPebbleDB(dir)
-	if err != nil {
-		return err
-	}
+func runPrune(dir string, pruneHeight uint64) error {
+	log.Info().Msgf("pruning by height %v from dir %v", pruneHeight, dir)
 
-	registers, err := pStorage.NewRegisters(pdb)
+	registers, pdb, err := pStorage.NewBootstrappedRegistersWithPath(dir)
 	if err != nil {
 		return fmt.Errorf("could not create registers storage: %w", err)
 	}
 
-	log.Info().Msgf("pruning by height %v", pruneHeight)
+	defer func() {
+		pdb.Close()
+	}()
+
 	err = registers.PruneByHeight(pruneHeight)
 	if err != nil {
 		return err
