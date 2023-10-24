@@ -14,7 +14,7 @@ var flagCheckpointPath string
 var flagCheckpointHeight uint64
 
 func init() {
-	rootCmd.AddCommand(pruneCmd)
+	rootCmd.AddCommand(importCmd)
 
 	importCmd.Flags().StringVar(&flagCheckpointPath, "checkpoint", "", "the path of the checkpoint")
 	importCmd.Flags().Uint64Var(&flagCheckpointHeight, "height", 0, "the height of the checkpoint")
