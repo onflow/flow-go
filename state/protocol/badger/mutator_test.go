@@ -1456,7 +1456,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 	})
 
 	t.Run("participants not ordered (EECC)", func(t *testing.T) {
-		util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutator realprotocol.StateMutator) {
 			block1, createSetup := setupState(t, db, state)
 
 			_, receipt, seal := createSetup(func(setup *flow.EpochSetup) {
@@ -1465,7 +1465,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 				require.NoError(t, err)
 			})
 
-			receiptBlock, sealingBlock := unittest.SealBlock(t, state, block1, receipt, seal)
+			receiptBlock, sealingBlock := unittest.SealBlock(t, state, mutator, block1, receipt, seal)
 			err := state.Finalize(context.Background(), receiptBlock.ID())
 			require.NoError(t, err)
 			// epoch fallback not triggered before finalization

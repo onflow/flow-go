@@ -298,7 +298,7 @@ func (s *UpdaterSuite) TestProcessEpochSetupInvariants() {
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 	})
 	s.Run("participants not sorted", func() {
-		updater := NewUpdater(s.candidate, s.parentProtocolState)
+		updater := NewUpdater(s.candidate.View, s.parentProtocolState)
 		setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
 			setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
 			var err error
@@ -313,7 +313,7 @@ func (s *UpdaterSuite) TestProcessEpochSetupInvariants() {
 		conflictingIdentity := s.parentProtocolState.ProtocolStateEntry.CurrentEpoch.ActiveIdentities[0]
 		conflictingIdentity.Dynamic.Ejected = true
 
-		updater := NewUpdater(s.candidate, s.parentProtocolState)
+		updater := NewUpdater(s.candidate.View, s.parentProtocolState)
 		setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
 			setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
 			// using same identities as in previous epoch should result in an error since
