@@ -9,6 +9,7 @@ import (
 
 const (
 	EventTypeBlockExecuted       flow.EventType = "evm.BlockExecuted"
+	EventTypeTransactionIncluded flow.EventType = "evm.TransactionIncluded"
 	EventTypeTransactionExecuted flow.EventType = "evm.TransactionExecuted"
 )
 
