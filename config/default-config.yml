@@ -146,4 +146,41 @@ network-config:
   alsp-disable-penalty: false
   alsp-heart-beat-interval: 1s
 
+  # Base probability in [0,1] that's used in creating the final probability of creating a
+  # misbehavior report for a BatchRequest message. This is why the word "base" is used in the name of this field,
+  # since it's not the final probability and there are other factors that determine the final probability.
+  # The reason for this is that we want to increase the probability of creating a misbehavior report for a large batch.
+  # Create misbehavior report for about 0.2% of BatchRequest messages for normal batch requests (i.e. not too large)
+  # The final batch request probability is calculated as follows:
+  # batchRequestBaseProb * (len(batchRequest.BlockIDs) + 1) / synccore.DefaultConfig().MaxSize
+  # Example 1 (small batch of block IDs) if the batch request is for 10 blocks IDs and batchRequestBaseProb is 0.01, then the probability of
+  # creating a misbehavior report is:
+  # batchRequestBaseProb * (10+1) / synccore.DefaultConfig().MaxSize
+  # = 0.01 * 11 / 64 = 0.00171875 = 0.171875%
+  # Example 2 (large batch of block IDs) if the batch request is for 1000 block IDs and batchRequestBaseProb is 0.01, then the probability of
+  # creating a misbehavior report is:
+  # batchRequestBaseProb * (1000+1) / synccore.DefaultConfig().MaxSize
+  # = 0.01 * 1001 / 64 = 0.15640625 = 15.640625%
+  alsp-sync-engine-batch-request-base-prob: 0.01
 
+  # Base probability in [0,1] that's used in creating the final probability of creating a
+  # misbehavior report for a RangeRequest message. This is why the word "base" is used in the name of this field,
+  # since it's not the final probability and there are other factors that determine the final probability.
+  # The reason for this is that we want to increase the probability of creating a misbehavior report for a large range.
+  # Create misbehavior report for about 0.2% of RangeRequest messages for normal range requests (i.e. not too large)
+  # and about 15% of RangeRequest messages for very large range requests.
+  # The final probability is calculated as follows:
+  # rangeRequestBaseProb * ((rangeRequest.ToHeight-rangeRequest.FromHeight) + 1) / synccore.DefaultConfig().MaxSize
+  # Example 1 (small range) if the range request is for 10 blocks and rangeRequestBaseProb is 0.01, then the probability of
+  # creating a misbehavior report is:
+  # rangeRequestBaseProb * (10+1) / synccore.DefaultConfig().MaxSize
+  # = 0.01 * 11 / 64 = 0.00171875 = 0.171875%
+  # Example 2 (large range) if the range request is for 1000 blocks and rangeRequestBaseProb is 0.01, then the probability of
+  # creating a misbehavior report is:
+  # rangeRequestBaseProb * (1000+1) / synccore.DefaultConfig().MaxSize
+  # = 0.01 * 1001 / 64 = 0.15640625 = 15.640625%
+  alsp-sync-engine-range-request-base-prob: 0.01
+
+  # Probability in [0,1] of creating a misbehavior report for a SyncRequest message.
+  # create misbehavior report for 1% of SyncRequest messages
+  alsp-sync-engine-sync-request-prob: 0.01
