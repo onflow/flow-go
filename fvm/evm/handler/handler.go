@@ -222,7 +222,12 @@ func (a *Account) Deposit(v *types.FLOWTokenVault) {
 	blk, err := a.fch.emulator.NewBlockView(cfg)
 	handleError(err)
 
-	res, err := blk.MintTo(a.address, v.Balance().ToAttoFlow())
+	res, err := blk.DirectCall(
+		types.NewDepositCall(
+			a.address,
+			v.Balance().ToAttoFlow(),
+		),
+	)
 	a.fch.meterGasUsage(res)
 	handleError(err)
 	// emit event
@@ -248,7 +253,12 @@ func (a *Account) Withdraw(b types.Balance) *types.FLOWTokenVault {
 	blk, err := a.fch.emulator.NewBlockView(cfg)
 	handleError(err)
 
-	res, err := blk.WithdrawFrom(a.address, b.ToAttoFlow())
+	res, err := blk.DirectCall(
+		types.NewWithdrawCall(
+			a.address,
+			b.ToAttoFlow(),
+		),
+	)
 	a.fch.meterGasUsage(res)
 	handleError(err)
 
@@ -270,7 +280,13 @@ func (a *Account) Transfer(to types.Address, balance types.Balance) {
 	blk, err := a.fch.emulator.NewBlockView(cfg)
 	handleError(err)
 
-	res, err := blk.Transfer(a.address, to, balance.ToAttoFlow())
+	res, err := blk.DirectCall(
+		types.NewTransferCall(
+			a.address,
+			to,
+			balance.ToAttoFlow(),
+		),
+	)
 	a.fch.meterGasUsage(res)
 	handleError(err)
 
@@ -288,7 +304,14 @@ func (a *Account) Deploy(code types.Code, gaslimit types.GasLimit, balance types
 	blk, err := a.fch.emulator.NewBlockView(a.fch.getBlockContext())
 	handleError(err)
 
-	res, err := blk.Deploy(a.address, code, uint64(gaslimit), balance.ToAttoFlow())
+	res, err := blk.DirectCall(
+		types.NewDeployCall(
+			a.address,
+			code,
+			uint64(gaslimit),
+			balance.ToAttoFlow(),
+		),
+	)
 	a.fch.meterGasUsage(res)
 	handleError(err)
 	a.fch.EmitLastExecutedBlockEvent()
@@ -308,7 +331,15 @@ func (a *Account) Call(to types.Address, data types.Data, gaslimit types.GasLimi
 	blk, err := a.fch.emulator.NewBlockView(a.fch.getBlockContext())
 	handleError(err)
 
-	res, err := blk.Call(a.address, to, data, uint64(gaslimit), balance.ToAttoFlow())
+	res, err := blk.DirectCall(
+		types.NewContractCall(
+			a.address,
+			to,
+			data,
+			uint64(gaslimit),
+			balance.ToAttoFlow(),
+		),
+	)
 	a.fch.meterGasUsage(res)
 	handleError(err)
 	a.fch.EmitLastExecutedBlockEvent()

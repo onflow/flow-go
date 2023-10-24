@@ -12,6 +12,9 @@ type Address gethCommon.Address
 // AddressLength holds the number of bytes used for each EVM address
 const AddressLength = gethCommon.AddressLength
 
+// EmptyAddress is an empty evm address
+var EmptyAddress = Address(gethCommon.Address{})
+
 // NewAddress constructs a new Address
 func NewAddress(addr gethCommon.Address) Address {
 	fa := Address(addr)

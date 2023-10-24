@@ -41,17 +41,10 @@ type ReadOnlyBlockView interface {
 
 // BlockView allows evm calls in the context of a block
 type BlockView interface {
-	// MintTo mints new tokens to this address
-	MintTo(address Address, amount *big.Int) (*Result, error)
-	// WithdrawFrom withdraws tokens from this address
-	WithdrawFrom(address Address, amount *big.Int) (*Result, error)
-	// Transfer transfers token between addresses
-	Transfer(from Address, to Address, value *big.Int) (*Result, error)
-	// Deploy deploys an smart contract
-	Deploy(caller Address, code Code, gasLimit uint64, value *big.Int) (*Result, error)
-	// Call makes a call to a smart contract
-	Call(caller Address, to Address, data Data, gasLimit uint64, value *big.Int) (*Result, error)
-	// RunTransaction runs a transaction
+	// executes a direct call
+	DirectCall(call *DirectCall) (*Result, error)
+
+	// RunTransaction executes an evm transaction
 	RunTransaction(tx *gethTypes.Transaction) (*Result, error)
 }
 

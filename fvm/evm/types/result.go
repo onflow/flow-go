@@ -5,9 +5,6 @@ import (
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 )
 
-// tx type 255 is used for direct calls from bridged accounts
-var DirectCallTxType = uint8(255)
-
 // Result captures the result of an interaction to the emulator
 // it could be the out put of a direct call or output of running an
 // evm transaction.
@@ -21,6 +18,8 @@ type Result struct {
 	// type of transaction defined by the evm package
 	// see DirectCallTxType as extra type we added type for direct calls.
 	TxType uint8
+	// transaction hash
+	TxHash gethCommon.Hash
 	// total gas consumed during an opeartion
 	GasConsumed uint64
 	// the root hash of the state after execution
@@ -42,6 +41,7 @@ func (res *Result) Receipt() *gethTypes.ReceiptForStorage {
 		CumulativeGasUsed: res.GasConsumed, // TODO: update to capture cumulative
 		Logs:              res.Logs,
 		ContractAddress:   res.DeployedContractAddress.ToCommon(),
+		TxHash:            res.TxHash,
 	}
 	if res.Failed {
 		receipt.Status = gethTypes.ReceiptStatusFailed

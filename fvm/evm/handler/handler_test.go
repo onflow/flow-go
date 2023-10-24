@@ -257,7 +257,7 @@ func TestHandler_OpsWithoutEmulator(t *testing.T) {
 	})
 }
 
-func TestHandler_FOA(t *testing.T) {
+func TestHandler_BridgedAccount(t *testing.T) {
 
 	t.Run("test deposit/withdraw (with integrated emulator)", func(t *testing.T) {
 		testutils.RunWithTestBackend(t, func(backend types.Backend) {
@@ -349,7 +349,7 @@ func TestHandler_FOA(t *testing.T) {
 					// test insufficient total supply
 					assertPanic(t, types.IsAInsufficientTotalSupplyError, func() {
 						em := &testutils.TestEmulator{
-							WithdrawFromFunc: func(address types.Address, amount *big.Int) (*types.Result, error) {
+							DirectCallFunc: func(call *types.DirectCall) (*types.Result, error) {
 								return &types.Result{}, types.NewEVMExecutionError(fmt.Errorf("some sort of error"))
 							},
 						}
@@ -361,8 +361,8 @@ func TestHandler_FOA(t *testing.T) {
 					// test non fatal error of emulator
 					assertPanic(t, types.IsEVMExecutionError, func() {
 						em := &testutils.TestEmulator{
-							WithdrawFromFunc: func(address types.Address, amount *big.Int) (*types.Result, error) {
-								return &types.Result{}, types.NewEVMExecutionError(fmt.Errorf("some sort of error"))
+							DirectCallFunc: func(call *types.DirectCall) (*types.Result, error) {
+								return &types.Result{}, fmt.Errorf("some sort of error")
 							},
 						}
 						handler := handler.NewContractHandler(bs, backend, em)
@@ -373,8 +373,8 @@ func TestHandler_FOA(t *testing.T) {
 					// test fatal error of emulator
 					assertPanic(t, types.IsAFatalError, func() {
 						em := &testutils.TestEmulator{
-							WithdrawFromFunc: func(address types.Address, amount *big.Int) (*types.Result, error) {
-								return &types.Result{}, types.NewFatalError(fmt.Errorf("some sort of fatal error"))
+							DirectCallFunc: func(call *types.DirectCall) (*types.Result, error) {
+								return &types.Result{}, types.NewEVMExecutionError(fmt.Errorf("some sort of error"))
 							},
 						}
 						handler := handler.NewContractHandler(bs, backend, em)
@@ -396,8 +396,8 @@ func TestHandler_FOA(t *testing.T) {
 					// test non fatal error of emulator
 					assertPanic(t, types.IsEVMExecutionError, func() {
 						em := &testutils.TestEmulator{
-							MintToFunc: func(address types.Address, amount *big.Int) (*types.Result, error) {
-								return nil, types.NewEVMExecutionError(fmt.Errorf("some sort of error"))
+							DirectCallFunc: func(call *types.DirectCall) (*types.Result, error) {
+								return &types.Result{}, types.NewEVMExecutionError(fmt.Errorf("some sort of error"))
 							},
 						}
 						handler := handler.NewContractHandler(bs, backend, em)
@@ -408,8 +408,8 @@ func TestHandler_FOA(t *testing.T) {
 					// test fatal error of emulator
 					assertPanic(t, types.IsAFatalError, func() {
 						em := &testutils.TestEmulator{
-							MintToFunc: func(address types.Address, amount *big.Int) (*types.Result, error) {
-								return nil, types.NewFatalError(fmt.Errorf("some sort of fatal error"))
+							DirectCallFunc: func(call *types.DirectCall) (*types.Result, error) {
+								return &types.Result{}, fmt.Errorf("some sort of fatal error")
 							},
 						}
 						handler := handler.NewContractHandler(bs, backend, em)

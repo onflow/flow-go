@@ -103,7 +103,12 @@ func RunWithEOATestAccount(t *testing.T, led atree.Ledger, flowEVMRootAddress fl
 	blk, err := e.NewBlockView(types.NewDefaultBlockContext(2))
 	require.NoError(t, err)
 
-	_, err = blk.MintTo(account.Address(), new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1000)))
+	_, err = blk.DirectCall(
+		types.NewDepositCall(
+			account.Address(),
+			new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1000)),
+		),
+	)
 	require.NoError(t, err)
 
 	f(account)
