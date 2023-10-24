@@ -46,6 +46,7 @@ type EventEmitter interface {
 	// Cadence runtime.
 	// Warning: current implementation of EmitFlowEvent does not support handling service events
 	// that functionality should be added if needed in the future
+	// TODO: we could merge this one with the EmitEvent endpoint
 	EmitFlowEvent(etype flow.EventType, payload []byte) error
 
 	Events() flow.EventsList
