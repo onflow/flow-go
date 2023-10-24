@@ -1,5 +1,3 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package badger
 
 import (
@@ -1121,6 +1119,11 @@ func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block, updater 
 
 				err = updater.ProcessEpochSetup(ev)
 				if err != nil {
+					if protocol.IsInvalidServiceEventError(err) {
+						// we have observed an invalid service event, which triggers epoch fallback mode
+						updater.SetInvalidStateTransitionAttempted()
+						return dbUpdates, nil
+					}
 					return nil, irrecoverable.NewExceptionf("could not process epoch setup event: %w", err)
 				}
 
@@ -1149,6 +1152,11 @@ func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block, updater 
 
 				err = updater.ProcessEpochCommit(ev)
 				if err != nil {
+					if protocol.IsInvalidServiceEventError(err) {
+						// we have observed an invalid service event, which triggers epoch fallback mode
+						updater.SetInvalidStateTransitionAttempted()
+						return dbUpdates, nil
+					}
 					return nil, irrecoverable.NewExceptionf("could not process epoch commit event: %w", err)
 				}
 

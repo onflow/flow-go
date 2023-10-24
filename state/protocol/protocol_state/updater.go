@@ -22,15 +22,14 @@ type Updater struct {
 	state       *flow.ProtocolStateEntry
 	candidate   *flow.Header
 
-	// nextEpochIdentitiesLookup is a map from NodeID → DynamicIdentityEntry for the _current_ epoch, containing the
-	// same identities as in the EpochStateContainer `state.CurrentEpoch.Identities`. Note that map values are pointers,
-	// so writes to map values will modify the respective DynamicIdentityEntry in EpochStateContainer.
-	currentEpochIdentitiesLookup map[flow.Identifier]*flow.DynamicIdentityEntry
+	// The following fields are maps from NodeID → DynamicIdentityEntry for the nodes that are *active* in the respective epoch.
+	// Active means that these nodes are authorized to contribute to extending the chain. Formally, a node is active if and only
+	// if it is listed in the EpochSetup event for the respective epoch. Note that map values are pointers, so writes to map values
+	// will modify the respective DynamicIdentityEntry in EpochStateContainer.
 
-	// nextEpochIdentitiesLookup is a map from NodeID → DynamicIdentityEntry for the _next_ epoch, containing the
-	// same identities as in the EpochStateContainer `state.NextEpoch.Identities`. Note that map values are pointers,
-	// so writes to map values will modify the respective DynamicIdentityEntry in EpochStateContainer.
-	nextEpochIdentitiesLookup map[flow.Identifier]*flow.DynamicIdentityEntry
+	prevEpochIdentitiesLookup    map[flow.Identifier]*flow.DynamicIdentityEntry // lookup for nodes active in the previous epoch, may be nil or empty
+	currentEpochIdentitiesLookup map[flow.Identifier]*flow.DynamicIdentityEntry // lookup for nodes active in the current epoch, never nil or empty
+	nextEpochIdentitiesLookup    map[flow.Identifier]*flow.DynamicIdentityEntry // lookup for nodes active in the next epoch, may be nil or empty
 }
 
 var _ protocol.StateUpdater = (*Updater)(nil)
@@ -59,102 +58,81 @@ func (u *Updater) Build() (updatedState *flow.ProtocolStateEntry, stateID flow.I
 //   - we stop returning identities from previous+current epochs and instead returning identities from current+next epochs.
 //
 // As a result of this operation protocol state for the next epoch will be created.
-// No errors are expected during normal operations.
+// Expected errors during normal operations:
+// - `protocol.InvalidServiceEventError` if the service event is not a valid state transition for the current protocol state
 func (u *Updater) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
 	if epochSetup.Counter != u.parentState.CurrentEpochSetup.Counter+1 {
-		return fmt.Errorf("invalid epoch setup counter, expecting %v got %v", u.parentState.CurrentEpochSetup.Counter+1, epochSetup.Counter)
+		return protocol.NewInvalidServiceEventErrorf("invalid epoch setup counter, expecting %d got %d", u.parentState.CurrentEpochSetup.Counter+1, epochSetup.Counter)
 	}
 	if u.state.NextEpoch != nil {
-		return fmt.Errorf("protocol state has already a setup event")
+		return protocol.NewInvalidServiceEventErrorf("repeated setup for epoch %d", epochSetup.Counter)
 	}
 	if u.state.InvalidStateTransitionAttempted {
-		return nil // won't process new events if we are in EECC
-	}
-	// Observing epoch setup impacts current and next epoch.
-	// - For the current epoch, we stop returning identities from previous epoch.
-	// Instead, we will return identities of current epoch + identities from the next epoch with 0 weight.
-	// - For the next epoch we need to additionally include identities from previous(current) epoch with 0 weight.
-	// We will do this in next steps:
-	// 1. Add identities from current epoch setup event to currentEpochIdentities.
-	// 2. Add identities from next epoch setup event to currentEpochIdentities, with 0 weight,
-	//     but only if they are not present in currentEpochIdentities.
-	// 3. Add identities from next epoch setup event to nextEpochIdentities.
-	// 4. Add identities from current epoch setup event to nextEpochIdentities, with 0 weight,
-	//    but only if they are not present in nextEpochIdentities.
-
-	// lookup of dynamic data for current protocol state identities
-	// by definition, this will include identities from current epoch + identities from previous epoch with 0 weight.
-	activeIdentitiesLookup := u.parentState.CurrentEpoch.ActiveIdentities.Lookup()
-
-	currentEpochSetupParticipants := u.parentState.CurrentEpochSetup.Participants
-	// construct identities for current epoch: current epoch participants + next epoch participants with 0 weight
-	currentEpochIdentities := make(flow.DynamicIdentityEntryList, 0, len(currentEpochSetupParticipants))
-	// In this loop, we will perform step 1 from above.
-	for _, identity := range currentEpochSetupParticipants {
-		identityParentState := activeIdentitiesLookup[identity.NodeID]
-		currentEpochIdentities = append(currentEpochIdentities, &flow.DynamicIdentityEntry{
-			NodeID:  identity.NodeID,
-			Dynamic: identityParentState.Dynamic,
-		})
+		return nil // won't process new events if we are in epoch fallback mode.
 	}
 
-	nextEpochIdentities := make(flow.DynamicIdentityEntryList, 0, len(currentEpochIdentities))
-	currentEpochIdentitiesLookup := currentEpochIdentities.Lookup()
-	// For an `identity` participating in the upcoming epoch, we effectively perform steps 2 and 3 from above within a single loop.
-	for _, identity := range epochSetup.Participants {
-		// Step 2: node is _not_ participating in the current epoch, but joining in the upcoming epoch.
-		// The node is allowed to join the network already in this epoch's Setup Phase, but has weight 0.
-		if _, found := currentEpochIdentitiesLookup[identity.NodeID]; !found {
-			currentEpochIdentities = append(currentEpochIdentities, &flow.DynamicIdentityEntry{
-				NodeID: identity.NodeID,
-				Dynamic: flow.DynamicIdentity{
-					Weight:  0,
-					Ejected: false,
-				},
-			})
+	// When observing setup event for subsequent epoch, construct the EpochStateContainer for `ProtocolStateEntry.NextEpoch`.
+	// Context:
+	// Note that the `EpochStateContainer.ActiveIdentities` only contains the nodes that are *active* in the next epoch. Active means
+	// that these nodes are authorized to contribute to extending the chain. Nodes are listed in `ActiveIdentities` if and only if
+	// they are part of the EpochSetup event for the respective epoch.
+	//
+	// sanity checking SAFETY-CRITICAL INVARIANT (I):
+	//   - Per convention, the `flow.EpochSetup` event should list the IdentitySkeletons in canonical order. This is useful
+	//     for most efficient construction of the full active Identities for an epoch. We enforce this here at the gateway
+	//     to the protocol state, when we incorporate new information from the EpochSetup event.
+	//   - Note that the system smart contracts manage the identity table as an unordered set! For the protocol state, we desire a fixed
+	//     ordering to simplify various implementation details, like the DKG. Therefore, we order identities in `flow.EpochSetup` during
+	//     conversion from cadence to Go in the function `convert.ServiceEvent(flow.ChainID, flow.Event)` in package `model/convert`
+	// sanity checking SAFETY-CRITICAL INVARIANT (II):
+	// While ejection status and dynamic weight are not part of the EpochSetup event, we can supplement this information as follows:
+	//   - Per convention, service events are delivered (asynchronously) in an *order-preserving* manner. Furthermore, weight changes or
+	//     node ejection is entirely mediated by system smart contracts and delivered via service events.
+	//   - Therefore, the EpochSetup event contains the up-to-date snapshot of the epoch participants. Any weight changes or node ejection
+	//     that happened before should be reflected in the EpochSetup event. Specifically, the initial weight should be reduced and ejected
+	//     nodes should be no longer listed in the EpochSetup event.
+	//   - Hence, the following invariant must be satisfied by the system smart contracts for all active nodes in the upcoming epoch:
+	//      (i) The Ejected flag is false. Node X being ejected in epoch N (necessarily via a service event emitted by the system
+	//          smart contracts earlier) but also being listed in the setup event for the subsequent epoch (service event emitted by
+	//          the system smart contracts later) is illegal.
+	//     (ii) When the EpochSetup event is emitted / processed, the weight of all active nodes equals their InitialWeight and
+
+	// For collector clusters, we rely on invariants (I) and (II) holding. See `committees.Cluster` for details, specifically function
+	// `constructInitialClusterIdentities(..)`. While the system smart contract must satisfy this invariant, we run a sanity check below.
+	activeIdentitiesLookup := u.parentState.CurrentEpoch.ActiveIdentities.Lookup() // lookup NodeID → DynamicIdentityEntry for nodes _active_ in the current epoch
+	nextEpochActiveIdentities := make(flow.DynamicIdentityEntryList, 0, len(epochSetup.Participants))
+	prevNodeID := epochSetup.Participants[0].NodeID
+	for idx, nextEpochIdentitySkeleton := range epochSetup.Participants {
+		// sanity checking invariant (I):
+		if idx > 0 && !order.IdentifierCanonical(prevNodeID, nextEpochIdentitySkeleton.NodeID) {
+			return protocol.NewInvalidServiceEventErrorf("epoch setup event lists active participants not in canonical ordering")
+		}
+		prevNodeID = nextEpochIdentitySkeleton.NodeID
+
+		// sanity checking invariant (II.i):
+		currentEpochDynamicProperties, found := activeIdentitiesLookup[nextEpochIdentitySkeleton.NodeID]
+		if found && currentEpochDynamicProperties.Dynamic.Ejected { // invariance violated
+			return protocol.NewInvalidServiceEventErrorf("node %v is ejected in current epoch %d but readmitted by EpochSetup event for epoch %d", nextEpochIdentitySkeleton.NodeID, u.parentState.CurrentEpochSetup.Counter, epochSetup.Counter)
 		}
 
-		// Step 3: for the next epoch we include every identity from its setup event;
-		identityParentState, found := activeIdentitiesLookup[identity.NodeID]
-		nextEpochIdentities = append(nextEpochIdentities, &flow.DynamicIdentityEntry{
-			NodeID: identity.NodeID,
+		nextEpochActiveIdentities = append(nextEpochActiveIdentities, &flow.DynamicIdentityEntry{
+			NodeID: nextEpochIdentitySkeleton.NodeID,
 			Dynamic: flow.DynamicIdentity{
-				Weight:  identity.InitialWeight,
-				Ejected: found && identityParentState.Dynamic.Ejected,
+				Weight:  nextEpochIdentitySkeleton.InitialWeight, // according to invariant (II.ii)
+				Ejected: false,
 			},
 		})
 	}
 
-	nextEpochIdentitiesLookup := nextEpochIdentities.Lookup()
-	// Step 4: we need to extend the next epoch's identities by adding identities that are leaving at the end of
-	// the current epoch. Specifically, each identity from the current epoch that is _not_ listed in the
-	// Setup Event for the next epoch is added with 0 weight and the _current_ value of the Ejected flag.
-	for _, identity := range currentEpochSetupParticipants {
-		if _, found := nextEpochIdentitiesLookup[identity.NodeID]; !found {
-			identityParentState := activeIdentitiesLookup[identity.NodeID]
-			nextEpochIdentities = append(nextEpochIdentities, &flow.DynamicIdentityEntry{
-				NodeID: identity.NodeID,
-				Dynamic: flow.DynamicIdentity{
-					Weight:  0,
-					Ejected: identityParentState.Dynamic.Ejected,
-				},
-			})
-		}
-	}
-
-	// IMPORTANT: per convention, identities must be listed on canonical order!
-	u.state.CurrentEpoch.ActiveIdentities = currentEpochIdentities.Sort(order.IdentifierCanonical)
-
-	// construct protocol state entry for next epoch
+	// construct data container specifying next epoch
 	u.state.NextEpoch = &flow.EpochStateContainer{
 		SetupID:          epochSetup.ID(),
 		CommitID:         flow.ZeroID,
-		ActiveIdentities: nextEpochIdentities.Sort(order.IdentifierCanonical),
+		ActiveIdentities: nextEpochActiveIdentities,
 	}
 
-	// since identities have changed, rebuild identity lookups, so we can safely process
-	// subsequent epoch commit event and update identities afterward.
-	u.rebuildIdentityLookup()
+	// subsequent epoch commit event and update identities afterwards.
+	u.nextEpochIdentitiesLookup = u.state.NextEpoch.ActiveIdentities.Lookup()
 
 	return nil
 }
@@ -163,19 +141,20 @@ func (u *Updater) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
 // Observing an epoch setup commit, transitions protocol state from setup to commit phase, at this point we have
 // finished construction of the next epoch.
 // As a result of this operation protocol state for next epoch will be committed.
-// No errors are expected during normal operations.
+// Expected errors during normal operations:
+// - `protocol.InvalidServiceEventError` - an invalid service event with respect to the protocol state has been supplied.
 func (u *Updater) ProcessEpochCommit(epochCommit *flow.EpochCommit) error {
 	if epochCommit.Counter != u.parentState.CurrentEpochSetup.Counter+1 {
-		return fmt.Errorf("invalid epoch commit counter, expecting %v got %v", u.parentState.CurrentEpochSetup.Counter+1, epochCommit.Counter)
+		return protocol.NewInvalidServiceEventErrorf("invalid epoch commit counter, expecting %d got %d", u.parentState.CurrentEpochSetup.Counter+1, epochCommit.Counter)
 	}
 	if u.state.NextEpoch == nil {
-		return fmt.Errorf("protocol state has been setup yet")
+		return protocol.NewInvalidServiceEventErrorf("protocol state has been setup yet")
 	}
 	if u.state.NextEpoch.CommitID != flow.ZeroID {
-		return fmt.Errorf("protocol state has already a commit event")
+		return protocol.NewInvalidServiceEventErrorf("protocol state has already a commit event")
 	}
 	if u.state.InvalidStateTransitionAttempted {
-		return nil // won't process new events if we are going to enter EECC
+		return nil // won't process new events if we are going to enter epoch fallback mode
 	}
 
 	u.state.NextEpoch.CommitID = epochCommit.ID()
@@ -187,17 +166,20 @@ func (u *Updater) ProcessEpochCommit(epochCommit *flow.EpochCommit) error {
 // No errors are expected during normal operations.
 func (u *Updater) UpdateIdentity(updated *flow.DynamicIdentityEntry) error {
 	u.ensureLookupPopulated()
-	currentEpochIdentity, found := u.currentEpochIdentitiesLookup[updated.NodeID]
-	if !found {
-		return fmt.Errorf("expected to find identity for current epoch, but (%v) not found", updated.NodeID)
+	prevEpochIdentity, foundInPrev := u.prevEpochIdentitiesLookup[updated.NodeID]
+	if foundInPrev {
+		prevEpochIdentity.Dynamic = updated.Dynamic
 	}
-
-	currentEpochIdentity.Dynamic = updated.Dynamic
-	if u.state.NextEpoch != nil {
-		nextEpochIdentity, found := u.nextEpochIdentitiesLookup[updated.NodeID]
-		if found {
-			nextEpochIdentity.Dynamic = updated.Dynamic
-		}
+	currentEpochIdentity, foundInCurrent := u.currentEpochIdentitiesLookup[updated.NodeID]
+	if foundInCurrent {
+		currentEpochIdentity.Dynamic = updated.Dynamic
+	}
+	nextEpochIdentity, foundInNext := u.nextEpochIdentitiesLookup[updated.NodeID]
+	if foundInNext {
+		nextEpochIdentity.Dynamic = updated.Dynamic
+	}
+	if !foundInPrev && !foundInCurrent && !foundInNext {
+		return fmt.Errorf("expected to find identity for prev, current or next epoch, but (%v) was not found", updated.NodeID)
 	}
 	return nil
 }
@@ -233,7 +215,7 @@ func (u *Updater) TransitionToNextEpoch() error {
 		return fmt.Errorf("protocol state transition is only allowed when enterring next epoch")
 	}
 	u.state = &flow.ProtocolStateEntry{
-		PreviousEpochEventIDs:           u.state.CurrentEpoch.EventIDs(),
+		PreviousEpoch:                   &u.state.CurrentEpoch,
 		CurrentEpoch:                    *u.state.NextEpoch,
 		InvalidStateTransitionAttempted: false,
 	}
@@ -261,9 +243,15 @@ func (u *Updater) ensureLookupPopulated() {
 	u.rebuildIdentityLookup()
 }
 
-// rebuildIdentityLookup re-generates `currentEpochIdentitiesLookup` and `nextEpochIdentitiesLookup` from the
-// underlying identity lists `state.CurrentEpoch.Identities` and `state.NextEpoch.Identities`, respectively.
+// rebuildIdentityLookup re-generates lookups of *active* participants for
+// previous (optional, if u.state.PreviousEpoch ≠ nil), current (required) and
+// next epoch (optional, if u.state.NextEpoch ≠ nil).
 func (u *Updater) rebuildIdentityLookup() {
+	if u.state.PreviousEpoch != nil {
+		u.prevEpochIdentitiesLookup = u.state.PreviousEpoch.ActiveIdentities.Lookup()
+	} else {
+		u.prevEpochIdentitiesLookup = nil
+	}
 	u.currentEpochIdentitiesLookup = u.state.CurrentEpoch.ActiveIdentities.Lookup()
 	if u.state.NextEpoch != nil {
 		u.nextEpochIdentitiesLookup = u.state.NextEpoch.ActiveIdentities.Lookup()

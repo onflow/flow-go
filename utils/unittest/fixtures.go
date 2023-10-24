@@ -33,6 +33,7 @@ import (
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/flow/mapfunc"
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/model/verification"
@@ -2595,15 +2596,11 @@ func RootProtocolStateFixture() *flow.RichProtocolStateEntry {
 	}
 	return &flow.RichProtocolStateEntry{
 		ProtocolStateEntry: &flow.ProtocolStateEntry{
-
+			PreviousEpoch: nil,
 			CurrentEpoch: flow.EpochStateContainer{
 				SetupID:          currentEpochSetup.ID(),
 				CommitID:         currentEpochCommit.ID(),
 				ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(allIdentities),
-			},
-			PreviousEpochEventIDs: flow.EventIDs{
-				SetupID:  flow.ZeroID,
-				CommitID: flow.ZeroID,
 			},
 			InvalidStateTransitionAttempted: false,
 			NextEpoch:                       nil,
@@ -2640,45 +2637,41 @@ func ProtocolStateFixture(options ...func(*flow.RichProtocolStateEntry)) *flow.R
 		// reuse same participant for current epoch
 		sameParticipant := *prevEpochSetup.Participants[1]
 		setup.Participants[1] = &sameParticipant
+		setup.Participants = setup.Participants.Sort(order.Canonical[flow.IdentitySkeleton])
 	})
 	currentEpochCommit := EpochCommitFixture(func(commit *flow.EpochCommit) {
 		commit.Counter = currentEpochSetup.Counter
 	})
 
-	allIdentities := make(flow.IdentityList, 0, len(currentEpochSetup.Participants))
-	for _, identity := range currentEpochSetup.Participants {
-		allIdentities = append(allIdentities, &flow.Identity{
-			IdentitySkeleton: *identity,
-			DynamicIdentity: flow.DynamicIdentity{
-				Weight:  identity.InitialWeight,
-				Ejected: false,
-			},
-		})
-	}
-	for _, identity := range prevEpochSetup.Participants {
-		if _, found := allIdentities.ByNodeID(identity.NodeID); !found {
-			allIdentities = append(allIdentities, &flow.Identity{
+	buildDefaultIdentities := func(setup *flow.EpochSetup) flow.IdentityList {
+		epochIdentities := make(flow.IdentityList, 0, len(setup.Participants))
+		for _, identity := range setup.Participants {
+			epochIdentities = append(epochIdentities, &flow.Identity{
 				IdentitySkeleton: *identity,
 				DynamicIdentity: flow.DynamicIdentity{
-					Weight:  0,
+					Weight:  identity.InitialWeight,
 					Ejected: false,
 				},
 			})
 		}
+		return epochIdentities.Sort(order.Canonical[flow.Identity])
 	}
 
-	allIdentities = allIdentities.Sort(order.Canonical[flow.Identity])
+	prevEpochIdentities := buildDefaultIdentities(prevEpochSetup)
+	currentEpochIdentities := buildDefaultIdentities(currentEpochSetup)
+	allIdentities := currentEpochIdentities.Union(prevEpochIdentities.Map(mapfunc.WithWeight(0)))
 
 	entry := &flow.RichProtocolStateEntry{
 		ProtocolStateEntry: &flow.ProtocolStateEntry{
 			CurrentEpoch: flow.EpochStateContainer{
 				SetupID:          currentEpochSetup.ID(),
 				CommitID:         currentEpochCommit.ID(),
-				ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(allIdentities),
+				ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(currentEpochIdentities),
 			},
-			PreviousEpochEventIDs: flow.EventIDs{
-				SetupID:  prevEpochSetup.ID(),
-				CommitID: prevEpochCommit.ID(),
+			PreviousEpoch: &flow.EpochStateContainer{
+				SetupID:          prevEpochSetup.ID(),
+				CommitID:         prevEpochCommit.ID(),
+				ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(prevEpochIdentities),
 			},
 			InvalidStateTransitionAttempted: false,
 			NextEpoch:                       nil,
@@ -2714,32 +2707,15 @@ func WithNextEpochProtocolState() func(entry *flow.RichProtocolStateEntry) {
 			// reuse same participant for current epoch
 			sameParticipant := *entry.CurrentEpochSetup.Participants[1]
 			setup.Participants[1] = &sameParticipant
+			setup.Participants = setup.Participants.Sort(order.Canonical[flow.IdentitySkeleton])
 		})
 		nextEpochCommit := EpochCommitFixture(func(commit *flow.EpochCommit) {
 			commit.Counter = nextEpochSetup.Counter
 		})
 
-		entry.CurrentEpochIdentityTable = nil
-		identitiesStateLookup := entry.CurrentEpoch.ActiveIdentities.Lookup()
-		for _, identity := range entry.CurrentEpochSetup.Participants {
-			entry.CurrentEpochIdentityTable = append(entry.CurrentEpochIdentityTable, &flow.Identity{
-				IdentitySkeleton: *identity,
-				DynamicIdentity:  identitiesStateLookup[identity.NodeID].Dynamic,
-			})
-		}
-
+		nextEpochParticipants := make(flow.IdentityList, 0, len(nextEpochSetup.Participants))
 		for _, identity := range nextEpochSetup.Participants {
-			if _, found := entry.CurrentEpochIdentityTable.ByNodeID(identity.NodeID); !found {
-				entry.CurrentEpochIdentityTable = append(entry.CurrentEpochIdentityTable, &flow.Identity{
-					IdentitySkeleton: *identity,
-					DynamicIdentity: flow.DynamicIdentity{
-						Weight:  0,
-						Ejected: false,
-					},
-				})
-			}
-
-			entry.NextEpochIdentityTable = append(entry.NextEpochIdentityTable, &flow.Identity{
+			nextEpochParticipants = append(nextEpochParticipants, &flow.Identity{
 				IdentitySkeleton: *identity,
 				DynamicIdentity: flow.DynamicIdentity{
 					Weight:  identity.InitialWeight,
@@ -2747,27 +2723,20 @@ func WithNextEpochProtocolState() func(entry *flow.RichProtocolStateEntry) {
 				},
 			})
 		}
+		nextEpochParticipants = nextEpochParticipants.Sort(order.Canonical[flow.Identity])
 
-		for _, identity := range entry.CurrentEpochSetup.Participants {
-			if _, found := entry.NextEpochIdentityTable.ByNodeID(identity.NodeID); !found {
-				entry.NextEpochIdentityTable = append(entry.NextEpochIdentityTable, &flow.Identity{
-					IdentitySkeleton: *identity,
-					DynamicIdentity: flow.DynamicIdentity{
-						Weight:  0,
-						Ejected: false,
-					},
-				})
-			}
-		}
+		currentEpochParticipants := entry.CurrentEpochIdentityTable.Filter(func(identity *flow.Identity) bool {
+			_, found := entry.CurrentEpochSetup.Participants.ByNodeID(identity.NodeID)
+			return found
+		}).Sort(order.Canonical[flow.Identity])
 
-		entry.CurrentEpochIdentityTable = entry.CurrentEpochIdentityTable.Sort(order.Canonical[flow.Identity])
-		entry.NextEpochIdentityTable = entry.NextEpochIdentityTable.Sort(order.Canonical[flow.Identity])
+		entry.CurrentEpochIdentityTable = currentEpochParticipants.Union(nextEpochParticipants.Map(mapfunc.WithWeight(0)))
+		entry.NextEpochIdentityTable = nextEpochParticipants.Union(currentEpochParticipants.Map(mapfunc.WithWeight(0)))
 
-		entry.CurrentEpoch.ActiveIdentities = flow.DynamicIdentityEntryListFromIdentities(entry.CurrentEpochIdentityTable)
 		entry.NextEpoch = &flow.EpochStateContainer{
 			SetupID:          nextEpochSetup.ID(),
 			CommitID:         nextEpochCommit.ID(),
-			ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(entry.NextEpochIdentityTable),
+			ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(nextEpochParticipants),
 		}
 		entry.NextEpochSetup = nextEpochSetup
 		entry.NextEpochCommit = nextEpochCommit

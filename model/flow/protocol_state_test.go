@@ -1,11 +1,13 @@
 package flow_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -29,12 +31,12 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 			})
 		}
 		stateEntry := &flow.ProtocolStateEntry{
+			PreviousEpoch: nil,
 			CurrentEpoch: flow.EpochStateContainer{
 				SetupID:          setup.ID(),
 				CommitID:         currentEpochCommit.ID(),
 				ActiveIdentities: identities,
 			},
-			PreviousEpochEventIDs:           flow.EventIDs{},
 			InvalidStateTransitionAttempted: false,
 		}
 		entry, err := flow.NewRichProtocolStateEntry(
@@ -47,7 +49,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 			nil,
 		)
 		assert.NoError(t, err)
-		expectedIdentities, err := flow.BuildIdentityTable(identities, setup.Participants, nil)
+		expectedIdentities, err := flow.BuildIdentityTable(setup.Participants, identities, nil, nil)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedIdentities, entry.CurrentEpochIdentityTable, "should be equal to current epoch setup participants")
 	})
@@ -69,9 +71,10 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		)
 		assert.NoError(t, err)
 		expectedIdentities, err := flow.BuildIdentityTable(
-			stateEntry.CurrentEpoch.ActiveIdentities,
 			stateEntry.CurrentEpochSetup.Participants,
+			stateEntry.CurrentEpoch.ActiveIdentities,
 			stateEntry.PreviousEpochSetup.Participants,
+			stateEntry.PreviousEpoch.ActiveIdentities,
 		)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedIdentities, richEntry.CurrentEpochIdentityTable, "should be equal to current epoch setup participants + previous epoch setup participants")
@@ -99,17 +102,19 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		)
 		assert.NoError(t, err)
 		expectedIdentities, err := flow.BuildIdentityTable(
-			stateEntry.CurrentEpoch.ActiveIdentities,
 			stateEntry.CurrentEpochSetup.Participants,
+			stateEntry.CurrentEpoch.ActiveIdentities,
 			stateEntry.NextEpochSetup.Participants,
+			stateEntry.NextEpoch.ActiveIdentities,
 		)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedIdentities, richEntry.CurrentEpochIdentityTable, "should be equal to current epoch setup participants + next epoch setup participants")
 		assert.Nil(t, richEntry.NextEpochCommit)
 		expectedIdentities, err = flow.BuildIdentityTable(
-			stateEntry.NextEpoch.ActiveIdentities,
 			stateEntry.NextEpochSetup.Participants,
+			stateEntry.NextEpoch.ActiveIdentities,
 			stateEntry.CurrentEpochSetup.Participants,
+			stateEntry.CurrentEpoch.ActiveIdentities,
 		)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedIdentities, richEntry.NextEpochIdentityTable, "should be equal to next epoch setup participants + current epoch setup participants")
@@ -135,16 +140,18 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		)
 		assert.NoError(t, err)
 		expectedIdentities, err := flow.BuildIdentityTable(
-			stateEntry.CurrentEpoch.ActiveIdentities,
 			stateEntry.CurrentEpochSetup.Participants,
+			stateEntry.CurrentEpoch.ActiveIdentities,
 			stateEntry.NextEpochSetup.Participants,
+			stateEntry.NextEpoch.ActiveIdentities,
 		)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedIdentities, richEntry.CurrentEpochIdentityTable, "should be equal to current epoch setup participants + next epoch setup participants")
 		expectedIdentities, err = flow.BuildIdentityTable(
-			stateEntry.NextEpoch.ActiveIdentities,
 			stateEntry.NextEpochSetup.Participants,
+			stateEntry.NextEpoch.ActiveIdentities,
 			stateEntry.CurrentEpochSetup.Participants,
+			stateEntry.CurrentEpoch.ActiveIdentities,
 		)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedIdentities, richEntry.NextEpochIdentityTable, "should be equal to next epoch setup participants + current epoch setup participants")
@@ -161,7 +168,7 @@ func TestProtocolStateEntry_Copy(t *testing.T) {
 	cpy := entry.Copy()
 	assert.Equal(t, entry, cpy)
 	assert.NotSame(t, entry.NextEpoch, cpy.NextEpoch)
-	assert.NotSame(t, entry.PreviousEpochEventIDs, cpy.PreviousEpochEventIDs)
+	assert.NotSame(t, entry.PreviousEpoch, cpy.PreviousEpoch)
 	assert.NotSame(t, entry.CurrentEpoch, cpy.CurrentEpoch)
 
 	cpy.InvalidStateTransitionAttempted = !entry.InvalidStateTransitionAttempted
@@ -179,4 +186,84 @@ func TestProtocolStateEntry_Copy(t *testing.T) {
 		},
 	})
 	assert.NotEqual(t, entry.CurrentEpoch.ActiveIdentities, cpy.CurrentEpoch.ActiveIdentities)
+}
+
+// TestBuildIdentityTable tests if BuildIdentityTable returns a correct identity, whenever we pass arguments with or without
+// overlap. It also tests if the function returns an error when the arguments are not ordered in the same order.
+func TestBuildIdentityTable(t *testing.T) {
+	t.Run("happy-path-no-identities-overlap", func(t *testing.T) {
+		targetEpochIdentities := unittest.IdentityListFixture(10).Sort(order.Canonical[flow.Identity])
+		adjacentEpochIdentities := unittest.IdentityListFixture(10).Sort(order.Canonical[flow.Identity])
+
+		identityList, err := flow.BuildIdentityTable(
+			targetEpochIdentities.ToSkeleton(),
+			flow.DynamicIdentityEntryListFromIdentities(targetEpochIdentities),
+			adjacentEpochIdentities.ToSkeleton(),
+			flow.DynamicIdentityEntryListFromIdentities(adjacentEpochIdentities),
+		)
+		assert.NoError(t, err)
+
+		expectedIdentities := targetEpochIdentities.Union(adjacentEpochIdentities.Map(func(identity flow.Identity) flow.Identity {
+			identity.Weight = 0
+			return identity
+		}))
+		assert.Equal(t, expectedIdentities, identityList)
+	})
+	t.Run("happy-path-identities-overlap", func(t *testing.T) {
+		targetEpochIdentities := unittest.IdentityListFixture(10).Sort(order.Canonical[flow.Identity])
+		adjacentEpochIdentities := unittest.IdentityListFixture(10)
+		sampledIdentities, err := targetEpochIdentities.Sample(2)
+		// change address so we can assert that we take identities from target epoch and not adjacent epoch
+		for i, identity := range sampledIdentities.Copy() {
+			identity.Address = fmt.Sprintf("%d", i)
+			adjacentEpochIdentities = append(adjacentEpochIdentities, identity)
+		}
+		assert.NoError(t, err)
+
+		identityList, err := flow.BuildIdentityTable(
+			targetEpochIdentities.ToSkeleton(),
+			flow.DynamicIdentityEntryListFromIdentities(targetEpochIdentities),
+			adjacentEpochIdentities.ToSkeleton(),
+			flow.DynamicIdentityEntryListFromIdentities(adjacentEpochIdentities),
+		)
+		assert.NoError(t, err)
+
+		expectedIdentities := targetEpochIdentities.Union(adjacentEpochIdentities.Map(func(identity flow.Identity) flow.Identity {
+			identity.Weight = 0
+			return identity
+		}))
+		assert.Equal(t, expectedIdentities, identityList)
+	})
+	t.Run("target-epoch-identities-not-ordered", func(t *testing.T) {
+		targetEpochIdentities := unittest.IdentityListFixture(10).Sort(order.Canonical[flow.Identity])
+		targetEpochIdentitySkeletons, err := targetEpochIdentities.ToSkeleton().Shuffle()
+		assert.NoError(t, err)
+		targetEpochDynamicIdentities := flow.DynamicIdentityEntryListFromIdentities(targetEpochIdentities)
+
+		adjacentEpochIdentities := unittest.IdentityListFixture(10).Sort(order.Canonical[flow.Identity])
+		identityList, err := flow.BuildIdentityTable(
+			targetEpochIdentitySkeletons,
+			targetEpochDynamicIdentities,
+			adjacentEpochIdentities.ToSkeleton(),
+			flow.DynamicIdentityEntryListFromIdentities(adjacentEpochIdentities),
+		)
+		assert.Error(t, err)
+		assert.Empty(t, identityList)
+	})
+	t.Run("adjacent-epoch-identities-not-ordered", func(t *testing.T) {
+		adjacentEpochIdentities := unittest.IdentityListFixture(10).Sort(order.Canonical[flow.Identity])
+		adjacentEpochIdentitySkeletons, err := adjacentEpochIdentities.ToSkeleton().Shuffle()
+		assert.NoError(t, err)
+		adjacentEpochDynamicIdentities := flow.DynamicIdentityEntryListFromIdentities(adjacentEpochIdentities)
+
+		targetEpochIdentities := unittest.IdentityListFixture(10).Sort(order.Canonical[flow.Identity])
+		identityList, err := flow.BuildIdentityTable(
+			targetEpochIdentities.ToSkeleton(),
+			flow.DynamicIdentityEntryListFromIdentities(targetEpochIdentities),
+			adjacentEpochIdentitySkeletons,
+			adjacentEpochDynamicIdentities,
+		)
+		assert.Error(t, err)
+		assert.Empty(t, identityList)
+	})
 }

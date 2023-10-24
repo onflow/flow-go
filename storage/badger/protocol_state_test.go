@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/mapfunc"
+	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage/badger/transaction"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -101,7 +102,6 @@ func TestProtocolStateMergeParticipants(t *testing.T) {
 		store := NewProtocolState(metrics, setups, commits, db, DefaultCacheSize)
 
 		stateEntry := unittest.ProtocolStateFixture()
-		require.Equal(t, stateEntry.CurrentEpochSetup.Participants[1], stateEntry.PreviousEpochSetup.Participants[1])
 		// change address of participant in current epoch, so we can distinguish it from the one in previous epoch
 		// when performing assertion.
 		newAddress := "123"
@@ -186,67 +186,78 @@ func TestProtocolStateRootSnapshot(t *testing.T) {
 
 // assertRichProtocolStateValidity checks if RichProtocolState holds its invariant and is correctly populated by storage layer.
 func assertRichProtocolStateValidity(t *testing.T, state *flow.RichProtocolStateEntry) {
-	// invariant: CurrentEpochSetup and CurrentEpochCommit are for the same epoch. Never nil.
+	// invariants:
+	//  - CurrentEpochSetup and CurrentEpochCommit are for the same epoch. Never nil.
+	//  - CurrentEpochSetup and CurrentEpochCommit IDs match respective commitments in the `ProtocolStateEntry`.
 	assert.Equal(t, state.CurrentEpochSetup.Counter, state.CurrentEpochCommit.Counter, "current epoch setup and commit should be for the same epoch")
-
-	// invariant: CurrentEpochSetup and CurrentEpochCommit IDs are the equal to the ID of the protocol state entry. Never nil.
 	assert.Equal(t, state.CurrentEpochSetup.ID(), state.ProtocolStateEntry.CurrentEpoch.SetupID, "epoch setup should be for correct event ID")
 	assert.Equal(t, state.CurrentEpochCommit.ID(), state.ProtocolStateEntry.CurrentEpoch.CommitID, "epoch commit should be for correct event ID")
 
-	var previousEpochParticipants flow.IdentityList
+	var (
+		previousEpochParticipants flow.IdentityList
+		err                       error
+	)
 	// invariant: PreviousEpochSetup and PreviousEpochCommit should be present if respective ID is not zero.
-	if state.PreviousEpochEventIDs.SetupID != flow.ZeroID {
+	if state.PreviousEpoch != nil {
 		// invariant: PreviousEpochSetup and PreviousEpochCommit are for the same epoch. Never nil.
-		assert.Equal(t, state.CurrentEpochSetup.Counter, state.PreviousEpochSetup.Counter+1, "current epoch setup should be next after previous epoch")
+		assert.Equal(t, state.PreviousEpochSetup.Counter+1, state.CurrentEpochSetup.Counter, "current epoch (%d) should be following right after previous epoch (%d)", state.CurrentEpochSetup.Counter, state.PreviousEpochSetup.Counter)
 		assert.Equal(t, state.PreviousEpochSetup.Counter, state.PreviousEpochCommit.Counter, "previous epoch setup and commit should be for the same epoch")
 
 		// invariant: PreviousEpochSetup and PreviousEpochCommit IDs are the equal to the ID of the protocol state entry. Never nil.
-		assert.Equal(t, state.PreviousEpochSetup.ID(), state.ProtocolStateEntry.PreviousEpochEventIDs.SetupID, "epoch setup should be for correct event ID")
-		assert.Equal(t, state.PreviousEpochCommit.ID(), state.ProtocolStateEntry.PreviousEpochEventIDs.CommitID, "epoch commit should be for correct event ID")
+		assert.Equal(t, state.PreviousEpochSetup.ID(), state.ProtocolStateEntry.PreviousEpoch.SetupID, "epoch setup should be for correct event ID")
+		assert.Equal(t, state.PreviousEpochCommit.ID(), state.ProtocolStateEntry.PreviousEpoch.CommitID, "epoch commit should be for correct event ID")
 
-		for _, participant := range state.PreviousEpochSetup.Participants {
-			if identity, found := state.CurrentEpochIdentityTable.ByNodeID(participant.NodeID); found {
-				previousEpochParticipants = append(previousEpochParticipants, identity)
-			}
-		}
+		// invariant: ComposeFullIdentities ensures that we can build full identities of previous epoch's active participants. This step also confirms that the
+		// previous epoch's `Participants` [IdentitySkeletons] and `ActiveIdentities` [DynamicIdentity properties] list the same nodes in canonical ordering.
+		previousEpochParticipants, err = flow.ComposeFullIdentities(state.PreviousEpochSetup.Participants, state.PreviousEpoch.ActiveIdentities)
+		assert.NoError(t, err, "should be able to reconstruct previous epoch active participants")
+		// Function `ComposeFullIdentities` verified that `Participants` and `ActiveIdentities` have identical ordering w.r.t nodeID.
+		// By construction, `participantsFromCurrentEpochSetup` lists the full Identities in the same ordering as `Participants` and
+		// `ActiveIdentities`. By confirming that `participantsFromCurrentEpochSetup` follows canonical ordering, we can conclude that
+		// also `Participants` and `ActiveIdentities` are canonically ordered.
+		require.True(t, previousEpochParticipants.Sorted(order.Canonical[flow.Identity]), "participants in previous epoch's setup event are not in canonical order")
 	}
 
-	participantsFromCurrentEpochSetup := state.CurrentEpochIdentityTable.Filter(func(i *flow.Identity) bool {
-		_, exists := state.CurrentEpochSetup.Participants.ByNodeID(i.NodeID)
-		return exists
-	})
+	// invariant: ComposeFullIdentities ensures that we can build full identities of current epoch's *active* participants. This step also confirms that the
+	// current epoch's `Participants` [IdentitySkeletons] and `ActiveIdentities` [DynamicIdentity properties] list the same nodes in canonical ordering.
+	participantsFromCurrentEpochSetup, err := flow.ComposeFullIdentities(state.CurrentEpochSetup.Participants, state.CurrentEpoch.ActiveIdentities)
+	assert.NoError(t, err, "should be able to reconstruct current epoch active participants")
+	require.True(t, participantsFromCurrentEpochSetup.Sorted(order.Canonical[flow.Identity]), "participants in current epoch's setup event are not in canonical order")
 
-	// invariant: Identities is a full identity table for the current epoch. Identities are sorted in canonical order. Without duplicates. Never nil.
+	// invariants for `CurrentEpochIdentityTable`:
+	//  - full identity table containing *active* nodes for the current epoch + weight-zero identities of adjacent epoch
+	//  - Identities are sorted in canonical order. Without duplicates. Never nil.
 	var allIdentities, participantsFromNextEpochSetup flow.IdentityList
 	if state.NextEpoch != nil {
-		participantsFromNextEpochSetup = state.NextEpochIdentityTable.Filter(func(i *flow.Identity) bool {
-			_, exists := state.NextEpochSetup.Participants.ByNodeID(i.NodeID)
-			return exists
-		})
+		// setup/commit phase
+		// invariant: ComposeFullIdentities ensures that we can build full identities of next epoch's *active* participants. This step also confirms that the
+		// next epoch's `Participants` [IdentitySkeletons] and `ActiveIdentities` [DynamicIdentity properties] list the same nodes in canonical ordering.
+		participantsFromNextEpochSetup, err = flow.ComposeFullIdentities(state.NextEpochSetup.Participants, state.NextEpoch.ActiveIdentities)
+		assert.NoError(t, err, "should be able to reconstruct next epoch active participants")
 		allIdentities = participantsFromCurrentEpochSetup.Union(participantsFromNextEpochSetup.Map(mapfunc.WithWeight(0)))
 	} else {
+		// staking phase
 		allIdentities = participantsFromCurrentEpochSetup.Union(previousEpochParticipants.Map(mapfunc.WithWeight(0)))
 	}
-
 	assert.Equal(t, allIdentities, state.CurrentEpochIdentityTable, "identities should be a full identity table for the current epoch, without duplicates")
+	require.True(t, allIdentities.Sorted(order.Canonical[flow.Identity]), "current epoch's identity table is not in canonical order")
 
-	for i, identity := range state.CurrentEpoch.ActiveIdentities {
-		assert.Equal(t, identity.NodeID, allIdentities[i].NodeID, "identity node ID should match")
-	}
-
-	nextEpoch := state.NextEpoch
-	if nextEpoch == nil {
+	// check next epoch; only applicable during setup/commit phase
+	if state.NextEpoch == nil { // during staking phase, next epoch is not yet specified; hence there is nothing else to check
 		return
 	}
-	// invariant: NextEpochSetup and NextEpochCommit are for the same epoch. Never nil.
+
+	// invariants:
+	//  - NextEpochSetup and NextEpochCommit are for the same epoch. Never nil.
+	//  - NextEpochSetup and NextEpochCommit IDs match respective commitments in the `ProtocolStateEntry`.
+	assert.Equal(t, state.CurrentEpochSetup.Counter+1, state.NextEpochSetup.Counter, "next epoch (%d) should be following right after current epoch (%d)", state.NextEpochSetup.Counter, state.CurrentEpochSetup.Counter)
 	assert.Equal(t, state.NextEpochSetup.Counter, state.NextEpochCommit.Counter, "next epoch setup and commit should be for the same epoch")
+	assert.Equal(t, state.NextEpochSetup.ID(), state.NextEpoch.SetupID, "epoch setup should be for correct event ID")
+	assert.Equal(t, state.NextEpochCommit.ID(), state.NextEpoch.CommitID, "epoch commit should be for correct event ID")
 
-	// invariant: NextEpochSetup and NextEpochCommit IDs are the equal to the ID of the protocol state entry. Never nil.
-	assert.Equal(t, state.NextEpochSetup.ID(), nextEpoch.SetupID, "epoch setup should be for correct event ID")
-	assert.Equal(t, state.NextEpochCommit.ID(), nextEpoch.CommitID, "epoch commit should be for correct event ID")
-
-	// invariant: Identities is a full identity table for the current epoch. Identities are sorted in canonical order. Without duplicates. Never nil.
+	// invariants for `NextEpochIdentityTable`:
+	//  - full identity table containing *active* nodes for next epoch + weight-zero identities of current epoch
+	//  - Identities are sorted in canonical order. Without duplicates. Never nil.
 	allIdentities = participantsFromNextEpochSetup.Union(participantsFromCurrentEpochSetup.Map(mapfunc.WithWeight(0)))
-
 	assert.Equal(t, allIdentities, state.NextEpochIdentityTable, "identities should be a full identity table for the next epoch, without duplicates")
 }

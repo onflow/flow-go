@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/model/flow/mapfunc"
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
@@ -220,7 +219,6 @@ func withNextEpoch(
 	encodableSnapshot := snapshot.Encodable()
 
 	currEpoch := &encodableSnapshot.Epochs.Current // take pointer so assignments apply
-	currentEpochIdentities, _ := snapshot.Identities(filter.Any)
 	nextEpochIdentities = nextEpochIdentities.Sort(order.Canonical[flow.Identity])
 
 	currEpoch.FinalView = currEpoch.FirstView + curEpochViews - 1 // first epoch lasts curEpochViews
@@ -248,27 +246,6 @@ func withNextEpoch(
 
 	// update protocol state
 	protocolState := encodableSnapshot.ProtocolState
-
-	// set identities for root snapshot to include next epoch identities,
-	// since we are in committed phase
-	protocolState.CurrentEpoch.ActiveIdentities = flow.DynamicIdentityEntryListFromIdentities(
-		append(
-			// all the current epoch identities
-			currentEpochIdentities,
-			// and all the NEW identities in next epoch, with 0 weight
-			nextEpochIdentities.
-				Filter(filter.Not(filter.In[flow.Identity](currentEpochIdentities))).
-				Map(mapfunc.WithWeight(0))...,
-		).Sort(order.Canonical[flow.Identity]))
-
-	nextEpochIdentities = append(
-		// all the next epoch identities
-		nextEpochIdentities,
-		// and all identities from current epoch, with 0 weight
-		currentEpochIdentities.
-			Filter(filter.Not(filter.In(nextEpochIdentities))).
-			Map(mapfunc.WithWeight(0))...,
-	).Sort(order.Canonical[flow.Identity])
 
 	// setup ID has changed, need to update it
 	convertedEpochSetup, _ := protocol.ToEpochSetup(inmem.NewEpoch(*currEpoch))
