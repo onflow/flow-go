@@ -61,14 +61,14 @@ func (u *Updater) Build() (updatedState *flow.ProtocolStateEntry, stateID flow.I
 // Expected errors during normal operations:
 // - `protocol.InvalidServiceEventError` if the service event is not a valid state transition for the current protocol state
 func (u *Updater) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
+	if u.state.InvalidStateTransitionAttempted {
+		return nil // won't process new events if we are in epoch fallback mode.
+	}
 	if epochSetup.Counter != u.parentState.CurrentEpochSetup.Counter+1 {
 		return protocol.NewInvalidServiceEventErrorf("invalid epoch setup counter, expecting %d got %d", u.parentState.CurrentEpochSetup.Counter+1, epochSetup.Counter)
 	}
 	if u.state.NextEpoch != nil {
 		return protocol.NewInvalidServiceEventErrorf("repeated setup for epoch %d", epochSetup.Counter)
-	}
-	if u.state.InvalidStateTransitionAttempted {
-		return nil // won't process new events if we are in epoch fallback mode.
 	}
 
 	// When observing setup event for subsequent epoch, construct the EpochStateContainer for `ProtocolStateEntry.NextEpoch`.
@@ -144,6 +144,9 @@ func (u *Updater) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
 // Expected errors during normal operations:
 // - `protocol.InvalidServiceEventError` - an invalid service event with respect to the protocol state has been supplied.
 func (u *Updater) ProcessEpochCommit(epochCommit *flow.EpochCommit) error {
+	if u.state.InvalidStateTransitionAttempted {
+		return nil // won't process new events if we are going to enter epoch fallback mode
+	}
 	if epochCommit.Counter != u.parentState.CurrentEpochSetup.Counter+1 {
 		return protocol.NewInvalidServiceEventErrorf("invalid epoch commit counter, expecting %d got %d", u.parentState.CurrentEpochSetup.Counter+1, epochCommit.Counter)
 	}
@@ -152,9 +155,6 @@ func (u *Updater) ProcessEpochCommit(epochCommit *flow.EpochCommit) error {
 	}
 	if u.state.NextEpoch.CommitID != flow.ZeroID {
 		return protocol.NewInvalidServiceEventErrorf("protocol state has already a commit event")
-	}
-	if u.state.InvalidStateTransitionAttempted {
-		return nil // won't process new events if we are going to enter epoch fallback mode
 	}
 
 	u.state.NextEpoch.CommitID = epochCommit.ID()
@@ -197,18 +197,17 @@ func (u *Updater) SetInvalidStateTransitionAttempted() {
 // - candidate block is in the next epoch.
 // No errors are expected during normal operations.
 func (u *Updater) TransitionToNextEpoch() error {
+	if u.state.InvalidStateTransitionAttempted {
+		return fmt.Errorf("invalid state transition has been attempted, no transition is allowed")
+	}
 	nextEpoch := u.state.NextEpoch
 	// Check if there is next epoch protocol state
 	if nextEpoch == nil {
 		return fmt.Errorf("protocol state has not been setup yet")
 	}
-
 	// Check if there is a commit event for next epoch
 	if nextEpoch.CommitID == flow.ZeroID {
 		return fmt.Errorf("protocol state has not been committed yet")
-	}
-	if u.state.InvalidStateTransitionAttempted {
-		return fmt.Errorf("invalid state transition has been attempted, no transition is allowed")
 	}
 	// Check if we are at the next epoch, only then a transition is allowed
 	if u.view < u.parentState.NextEpochSetup.FirstView {
