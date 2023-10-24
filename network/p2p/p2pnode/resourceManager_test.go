@@ -160,9 +160,8 @@ func TestCreateStream_MaxPeerLimit(t *testing.T) {
 }
 
 func TestCreateStream_MinProtocolLimit(t *testing.T) {
-	unittest.SkipUnless(t,
-		unittest.TEST_TODO,
-		"max inbound stream protocol is not preserved; can be partially due to count stream not counting inbound streams on a protocol")
+	// max inbound protocol is not preserved; can be partially due to count stream not counting inbound streams on a protocol
+	unittest.SkipUnless(t, unittest.TEST_TODO, "broken test")
 	base := baseCreateStreamInboundStreamResourceLimitConfig()
 	base.maxInboundStreamProtocol = 1
 	testCreateStreamInboundStreamResourceLimits(t, base)
@@ -175,9 +174,8 @@ func TestCreateStream_MaxProtocolLimit(t *testing.T) {
 }
 
 func TestCreateStream_MinPeerProtocolLimit(t *testing.T) {
-	unittest.SkipUnless(t,
-		unittest.TEST_TODO,
-		"max inbound stream peer protocol is not preserved; can be partially due to count stream not counting inbound streams on a protocol")
+	// max inbound stream peer protocol is not preserved; can be partially due to count stream not counting inbound streams on a protocol
+	unittest.SkipUnless(t, unittest.TEST_TODO, "broken test")
 	base := baseCreateStreamInboundStreamResourceLimitConfig()
 	base.maxInboundStreamPeerProtocol = 1
 	testCreateStreamInboundStreamResourceLimits(t, base)
@@ -208,18 +206,16 @@ func TestCreateStream_MinSystemLimit(t *testing.T) {
 }
 
 func TestCreateStream_MaxSystemLimit(t *testing.T) {
-	unittest.SkipUnless(t,
-		unittest.TEST_TODO,
-		"max inbound stream protocol is not preserved; can be partially due to count stream not counting inbound streams on a protocol")
+	// max inbound stream protocol is not preserved; can be partially due to count stream not counting inbound streams on a protocol
+	unittest.SkipUnless(t, unittest.TEST_TODO, "broken test")
 	base := baseCreateStreamInboundStreamResourceLimitConfig()
 	base.maxInboundStreamSystem = math.MaxInt
 	testCreateStreamInboundStreamResourceLimits(t, base)
 }
 
 func TestCreateStream_DefaultConfigWithUnknownProtocol(t *testing.T) {
-	unittest.SkipUnless(t,
-		unittest.TEST_TODO,
-		"limits are not enforced when using an unknown protocol ID")
+	// limits are not enforced when using an unknown protocol ID
+	unittest.SkipUnless(t, unittest.TEST_TODO, "broken test")
 	base := baseCreateStreamInboundStreamResourceLimitConfig()
 	base.unknownProtocol = true
 	testCreateStreamInboundStreamResourceLimits(t, base)
@@ -235,9 +231,8 @@ func TestCreateStream_PeerLimitLessThanPeerProtocolLimit(t *testing.T) {
 
 func TestCreateStream_PeerLimitGreaterThanPeerProtocolLimit(t *testing.T) {
 	// the case where peer-level limit is higher than the peer-protocol-level limit.
-	unittest.SkipUnless(t,
-		unittest.TEST_TODO,
-		"max inbound stream peer protocol is not preserved; can be partially due to count stream not counting inbound streams on a protocol")
+	// max inbound stream peer protocol is not preserved; can be partially due to count stream not counting inbound streams on a protocol
+	unittest.SkipUnless(t, unittest.TEST_TODO, "broken test")
 	base := baseCreateStreamInboundStreamResourceLimitConfig()
 	base.maxInboundPeerStream = 10        // each peer can create 10 streams.
 	base.maxInboundStreamPeerProtocol = 5 // each peer can create 5 streams on a specific protocol.
@@ -248,9 +243,9 @@ func TestCreateStream_PeerLimitGreaterThanPeerProtocolLimit(t *testing.T) {
 }
 
 func TestCreateStream_ProtocolLimitLessThanPeerProtocolLimit(t *testing.T) {
+	// max inbound stream peer protocol is not preserved; can be partially due to count stream not counting inbound streams on a protocol
 	unittest.SkipUnless(t,
-		unittest.TEST_TODO,
-		"max inbound stream peer protocol is not preserved; can be partially due to count stream not counting inbound streams on a protocol")
+		unittest.TEST_TODO, "broken test")
 	// the case where protocol-level limit is lower than the peer-protocol-level limit.
 	base := baseCreateStreamInboundStreamResourceLimitConfig()
 	base.maxInboundStreamProtocol = 5      // each peer can create 5 streams on a specific protocol.
