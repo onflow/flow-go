@@ -362,7 +362,7 @@ func TestHandler_BridgedAccount(t *testing.T) {
 					assertPanic(t, types.IsEVMExecutionError, func() {
 						em := &testutils.TestEmulator{
 							DirectCallFunc: func(call *types.DirectCall) (*types.Result, error) {
-								return &types.Result{}, fmt.Errorf("some sort of error")
+								return &types.Result{}, types.NewEVMExecutionError(fmt.Errorf("some sort of error"))
 							},
 						}
 						handler := handler.NewContractHandler(bs, backend, em)
@@ -374,7 +374,7 @@ func TestHandler_BridgedAccount(t *testing.T) {
 					assertPanic(t, types.IsAFatalError, func() {
 						em := &testutils.TestEmulator{
 							DirectCallFunc: func(call *types.DirectCall) (*types.Result, error) {
-								return &types.Result{}, types.NewEVMExecutionError(fmt.Errorf("some sort of error"))
+								return &types.Result{}, types.NewFatalError(fmt.Errorf("some sort of fatal error"))
 							},
 						}
 						handler := handler.NewContractHandler(bs, backend, em)
@@ -409,7 +409,7 @@ func TestHandler_BridgedAccount(t *testing.T) {
 					assertPanic(t, types.IsAFatalError, func() {
 						em := &testutils.TestEmulator{
 							DirectCallFunc: func(call *types.DirectCall) (*types.Result, error) {
-								return &types.Result{}, fmt.Errorf("some sort of fatal error")
+								return &types.Result{}, types.NewFatalError(fmt.Errorf("some sort of fatal error"))
 							},
 						}
 						handler := handler.NewContractHandler(bs, backend, em)
