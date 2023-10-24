@@ -8,7 +8,7 @@ import (
 
 // Config encapsulation of configuration structs for all components related to the Flow network.
 type Config struct {
-	UnicastConfig                 UnicastConfig `mapstructure:",squash"`
+	UnicastConfig                 `mapstructure:",squash"`
 	p2pconf.ResourceManagerConfig `mapstructure:",squash"`
 	ConnectionManagerConfig       `mapstructure:",squash"`
 	// GossipSubConfig core gossipsub configuration.
@@ -114,4 +114,24 @@ type AlspConfig struct {
 	// HeartBeatInterval is the interval between heartbeats sent by the ALSP module. The heartbeats are recurring
 	// events that are used to perform critical ALSP tasks, such as updating the spam records cache.
 	HearBeatInterval time.Duration `mapstructure:"alsp-heart-beat-interval"`
+
+	SyncEngine SyncEngineAlspConfig `mapstructure:",squash"`
+}
+
+// SyncEngineAlspConfig is the ALSP config for the SyncEngine.
+type SyncEngineAlspConfig struct {
+	// BatchRequestBaseProb is the base probability in [0,1] that's used in creating the final probability of creating a
+	// misbehavior report for a BatchRequest message. This is why the word "base" is used in the name of this field,
+	// since it's not the final probability and there are other factors that determine the final probability.
+	// The reason for this is that we want to increase the probability of creating a misbehavior report for a large batch.
+	BatchRequestBaseProb float32 `validate:"gte=0,lte=1" mapstructure:"alsp-sync-engine-batch-request-base-prob"`
+
+	// RangeRequestBaseProb is the base probability in [0,1] that's used in creating the final probability of creating a
+	// misbehavior report for a RangeRequest message. This is why the word "base" is used in the name of this field,
+	// since it's not the final probability and there are other factors that determine the final probability.
+	// The reason for this is that we want to increase the probability of creating a misbehavior report for a large range.
+	RangeRequestBaseProb float32 `validate:"gte=0,lte=1" mapstructure:"alsp-sync-engine-range-request-base-prob"`
+
+	// SyncRequestProb is the probability in [0,1] of creating a misbehavior report for a SyncRequest message.
+	SyncRequestProb float32 `validate:"gte=0,lte=1" mapstructure:"alsp-sync-engine-sync-request-prob"`
 }
