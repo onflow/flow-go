@@ -62,7 +62,7 @@ func TestNativeTokenBridging(t *testing.T) {
 				})
 			})
 		})
-		t.Run("mint tokens withdraw", func(t *testing.T) {
+		t.Run("tokens withdraw", func(t *testing.T) {
 			amount := big.NewInt(1000)
 			RunWithNewEmulator(t, db, func(env *emulator.Emulator) {
 				RunWithNewReadOnlyBlockView(t, env, func(blk types.ReadOnlyBlockView) {
