@@ -86,6 +86,7 @@ func (s *scriptTestSuite) TestGetAccount() {
 		account, err := s.scripts.GetAccountAtBlockHeight(context.Background(), address, s.height)
 		s.Require().NoError(err)
 		s.Require().Equal(address, account.Address)
+		s.Assert().NotZero(account.Balance)
 	})
 }
 

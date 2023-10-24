@@ -178,21 +178,21 @@ func (s *AccessAPISuite) testGetAccount(client *client.Client) {
 		account, err := client.GetAccount(s.ctx, serviceAddress)
 		s.Require().NoError(err)
 		s.Assert().Equal(serviceAddress, account.Address)
-		s.Assert().NotZero(serviceAddress, account.Balance)
+		s.Assert().NotZero(account.Balance)
 	})
 
 	s.Run("get account block ID", func() {
 		account, err := client.GetAccountAtLatestBlock(s.ctx, serviceAddress)
 		s.Require().NoError(err)
 		s.Assert().Equal(serviceAddress, account.Address)
-		s.Assert().NotZero(serviceAddress, account.Balance)
+		s.Assert().NotZero(account.Balance)
 	})
 
 	s.Run("get account block height", func() {
 		account, err := client.GetAccountAtBlockHeight(s.ctx, serviceAddress, header.Height)
 		s.Require().NoError(err)
 		s.Assert().Equal(serviceAddress, account.Address)
-		s.Assert().NotZero(serviceAddress, account.Balance)
+		s.Assert().NotZero(account.Balance)
 	})
 
 	s.Run("get newly created account", func() {
@@ -201,6 +201,7 @@ func (s *AccessAPISuite) testGetAccount(client *client.Client) {
 		acc, err := client.GetAccount(s.ctx, addr)
 		s.Require().NoError(err)
 		s.Assert().Equal(addr, acc.Address)
+		s.Assert().NotZero(acc.Balance)
 	})
 }
 
