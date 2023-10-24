@@ -89,6 +89,18 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 	idProvider := mock.NewIdentityProvider(t)
 
 	inspectorSuite1 := newMockInspectorSuite(t)
+	factory := func(
+		irrecoverable.SignalerContext,
+		zerolog.Logger,
+		flow.Identifier,
+		*p2pconf.GossipSubRPCInspectorsConfig,
+		module.GossipSubMetrics,
+		metrics.HeroCacheMetricsFactory,
+		flownet.NetworkingType,
+		module.IdentityProvider) (p2p.GossipSubInspectorSuite, error) {
+		// override the gossipsub rpc inspector suite factory to return the mock inspector suite
+		return inspectorSuite1, nil
+	}
 	node1, id1 := p2ptest.NodeFixture(
 		t,
 		sporkId,
@@ -96,19 +108,7 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 		idProvider,
 		p2ptest.WithRole(flow.RoleConsensus),
 		p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride),
-		p2ptest.OverrideGossipSubRpcInspectorSuiteFactory(func(
-			irrecoverable.SignalerContext,
-			zerolog.Logger,
-			flow.Identifier,
-			*p2pconf.GossipSubRPCInspectorsConfig,
-			module.GossipSubMetrics,
-			metrics.HeroCacheMetricsFactory,
-			flownet.NetworkingType,
-			module.IdentityProvider,
-			p2p.Subscriptions) (p2p.GossipSubInspectorSuite, error) {
-			// override the gossipsub rpc inspector suite factory to return the mock inspector suite
-			return inspectorSuite1, nil
-		}))
+		p2ptest.OverrideGossipSubRpcInspectorSuiteFactory(factory))
 
 	node2, id2 := p2ptest.NodeFixture(
 		t,

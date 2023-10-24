@@ -109,7 +109,12 @@ type GossipSubRPCInspector interface {
 type GossipSubMsgValidationRpcInspector interface {
 	collection.ClusterEvents
 	GossipSubRPCInspector
-	InspectorTopicOracle
+	// SetTopicOracle sets the topic oracle of the gossipsub inspector suite.
+	// The topic oracle is used to determine the list of topics that the node is subscribed to.
+	// If an oracle is not set, the node will not be able to determine the list of topics that the node is subscribed to.
+	// This func is expected to be called once and will return an error on all subsequent calls.
+	// All errors returned from this func are considered irrecoverable.
+	SetTopicOracle(topicOracle func() []string) error
 }
 
 // Topic is the abstraction of the underlying pubsub topic that is used by the Flow network.

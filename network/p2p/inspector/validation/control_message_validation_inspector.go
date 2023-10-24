@@ -124,7 +124,7 @@ func NewControlMsgValidationInspector(ctx irrecoverable.SignalerContext, logger 
 
 func (c *ControlMsgValidationInspector) Start(parent irrecoverable.SignalerContext) {
 	if c.topicOracle == nil {
-		parent.Throw(fmt.Errorf("6"))
+		parent.Throw(fmt.Errorf("topic oracle not set"))
 	}
 	c.Component.Start(parent)
 }
