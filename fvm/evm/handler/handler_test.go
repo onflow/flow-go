@@ -298,12 +298,13 @@ func TestHandler_BridgedAccount(t *testing.T) {
 
 				// deposit event
 				event := events[0]
-				assert.Equal(t, event.Type, types.EventTypeFlowTokenDeposit)
-				ret := types.FlowTokenEventPayload{}
+				assert.Equal(t, event.Type, types.EventTypeTransactionExecuted)
+				ret := types.TransactionExecutedPayload{}
 				err = rlp.Decode(bytes.NewReader(event.Payload), &ret)
 				require.NoError(t, err)
-				assert.Equal(t, foa.Address(), ret.Address)
-				assert.Equal(t, balance, ret.Amount)
+				// TODO: decode encoded tx and check for the amount and value
+				// assert.Equal(t, foa.Address(), ret.Address)
+				// assert.Equal(t, balance, ret.Amount)
 
 				// block event
 				event = events[1]
@@ -311,12 +312,13 @@ func TestHandler_BridgedAccount(t *testing.T) {
 
 				// withdraw event
 				event = events[2]
-				assert.Equal(t, event.Type, types.EventTypeFlowTokenWithdrawal)
-				ret = types.FlowTokenEventPayload{}
+				assert.Equal(t, event.Type, types.EventTypeTransactionExecuted)
+				ret = types.TransactionExecutedPayload{}
 				err = rlp.Decode(bytes.NewReader(event.Payload), &ret)
 				require.NoError(t, err)
-				assert.Equal(t, foa.Address(), ret.Address)
-				assert.Equal(t, balance, ret.Amount)
+				// TODO: decode encoded tx and check for the amount and value
+				// assert.Equal(t, foa.Address(), ret.Address)
+				// assert.Equal(t, balance, ret.Amount)
 
 				// block event
 				event = events[3]

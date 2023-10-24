@@ -96,7 +96,6 @@ func (bl *Block) DirectCall(call *types.DirectCall) (*types.Result, error) {
 		return nil, err
 	}
 	res.TxType = types.DirectCallTxType
-	res.TxHash, err = call.Hash()
 	if err != nil {
 		return nil, err
 	}

@@ -122,7 +122,7 @@ func (h ContractHandler) Run(rlpEncodedTx []byte, coinbase types.Address) bool {
 	handleError(err)
 
 	res, err := blk.RunTransaction(&tx)
-	h.captureTxHash(&tx)
+	txHash := h.captureTx(&tx)
 	h.meterGasUsage(res)
 
 	failed := false
@@ -142,7 +142,12 @@ func (h ContractHandler) Run(rlpEncodedTx []byte, coinbase types.Address) bool {
 
 	res.Failed = failed
 
-	h.EmitEvent(types.NewTransactionExecutedEvent(h.lastExecutedBlock.Height+1, res))
+	h.EmitEvent(types.NewTransactionExecutedEvent(
+		h.lastExecutedBlock.Height+1,
+		rlpEncodedTx,
+		txHash,
+		res,
+	))
 	h.EmitLastExecutedBlockEvent()
 	h.updateLastExecutedBlock(res.StateRootHash, gethTypes.EmptyRootHash)
 	return !failed
@@ -169,17 +174,22 @@ func (h *ContractHandler) EmitEvent(event *types.Event) {
 	h.backend.EmitFlowEvent(event.Etype, encoded)
 }
 
-func (h *ContractHandler) captureTxHash(tx *gethTypes.Transaction) {
-	h.transactions = append(h.transactions, tx.Hash())
+func (h *ContractHandler) captureTx(tx *gethTypes.Transaction) gethCommon.Hash {
+	hash := tx.Hash()
+	h.transactions = append(h.transactions, hash)
+	return hash
 }
 
-func (h *ContractHandler) captureCallHash(call *types.DirectCall) {
+func (h *ContractHandler) captureCall(call *types.DirectCall) ([]byte, gethCommon.Hash) {
 	hash, err := call.Hash()
 	if err != nil {
 		// this is fatal
 		panic(err)
 	}
 	h.transactions = append(h.transactions, hash)
+	encoded, err := call.Encode()
+	handleError(err)
+	return encoded, hash
 }
 
 func (h *ContractHandler) EmitLastExecutedBlockEvent() {
@@ -245,10 +255,17 @@ func (a *Account) Deposit(v *types.FLOWTokenVault) {
 	)
 	res, err := blk.DirectCall(call)
 	a.fch.meterGasUsage(res)
-	a.fch.captureCallHash(call)
+	encoded, callHash := a.fch.captureCall(call)
+	a.fch.EmitEvent(
+		types.NewTransactionExecutedEvent(
+			a.fch.lastExecutedBlock.Height+1,
+			encoded,
+			callHash,
+			res,
+		),
+	)
 	handleError(err)
 	// emit event
-	a.fch.EmitEvent(types.NewFlowTokenDepositEvent(a.address, v.Balance()))
 	a.fch.EmitLastExecutedBlockEvent()
 	a.fch.totalSupply += v.Balance().ToAttoFlow().Uint64()
 	a.fch.updateLastExecutedBlock(res.StateRootHash, gethTypes.EmptyRootHash)
@@ -275,11 +292,26 @@ func (a *Account) Withdraw(b types.Balance) *types.FLOWTokenVault {
 	)
 	res, err := blk.DirectCall(call)
 	a.fch.meterGasUsage(res)
-	a.fch.captureCallHash(call)
+	encoded, callHash := a.fch.captureCall(call)
+	a.fch.EmitEvent(
+		types.NewTransactionExecutedEvent(
+			a.fch.lastExecutedBlock.Height+1,
+			encoded,
+			callHash,
+			res,
+		),
+	)
 	handleError(err)
 
 	// emit event
-	a.fch.EmitEvent(types.NewFlowTokenWithdrawalEvent(a.address, b))
+	a.fch.EmitEvent(
+		types.NewTransactionExecutedEvent(
+			a.fch.lastExecutedBlock.Height+1,
+			encoded,
+			callHash,
+			res,
+		),
+	)
 	a.fch.EmitLastExecutedBlockEvent()
 	a.fch.totalSupply -= b.ToAttoFlow().Uint64()
 	a.fch.updateLastExecutedBlock(res.StateRootHash, gethTypes.EmptyRootHash)
@@ -345,9 +377,17 @@ func (a *Account) executeAndHandleCall(
 
 	res, err := blk.DirectCall(call)
 	a.fch.meterGasUsage(res)
-	a.fch.captureCallHash(call)
+	encoded, callHash := a.fch.captureCall(call)
 	handleError(err)
 
+	a.fch.EmitEvent(
+		types.NewTransactionExecutedEvent(
+			a.fch.lastExecutedBlock.Height+1,
+			encoded,
+			callHash,
+			res,
+		),
+	)
 	a.fch.EmitLastExecutedBlockEvent()
 	// TODO: update this to calculate receipt hash
 	a.fch.updateLastExecutedBlock(res.StateRootHash, gethTypes.EmptyRootHash)
