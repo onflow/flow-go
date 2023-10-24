@@ -1,11 +1,13 @@
 package pebble
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 
 	"github.com/cockroachdb/pebble"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -164,4 +166,47 @@ func convertNotFoundError(err error) error {
 		return storage.ErrNotFound
 	}
 	return err
+}
+
+func (s *Registers) PruneByHeight(pruneHeight uint64) error {
+	iter, err := s.db.NewIter(&pebble.IterOptions{
+		UseL6Filters: true,
+	})
+	if err != nil {
+		return err
+	}
+
+	prevOwner := ""
+	for iter.First(); iter.Valid(); iter.Next() {
+		key := iter.Key()
+		if bytes.Equal(key, firstHeightKey) || bytes.Equal(key, latestHeightKey) {
+			continue
+		}
+
+		height, reg, err := lookupKeyToRegisterID(key)
+		if err != nil {
+			log.Error().Err(err).Msg("failed to parse register id")
+			continue
+		}
+
+		if height < pruneHeight {
+			err := s.deleteKey(key)
+			if err != nil {
+				return err
+			}
+		}
+
+		if prevOwner != reg.Owner &&
+			len(prevOwner) > 0 &&
+			len(reg.Owner) > 0 &&
+			prevOwner[0] != reg.Owner[0] {
+			log.Info().Msgf("start indexing reg owner with prefix %v", reg.Owner[0])
+		}
+	}
+
+	return nil
+}
+
+func (s *Registers) deleteKey(key []byte) error {
+	return s.db.Delete(key, &pebble.WriteOptions{})
 }
