@@ -107,7 +107,7 @@ func NewDeployCall(caller Address, code Code, gasLimit uint64, value *big.Int) *
 
 func NewContractCall(caller Address, to Address, data Data, gasLimit uint64, value *big.Int) *DirectCall {
 	return &DirectCall{
-		SubType:  DepositCallSubType,
+		SubType:  ContractCallSubType,
 		From:     caller,
 		To:       to,
 		Data:     data,
