@@ -304,14 +304,6 @@ func (a *Account) Withdraw(b types.Balance) *types.FLOWTokenVault {
 	handleError(err)
 
 	// emit event
-	a.fch.EmitEvent(
-		types.NewTransactionExecutedEvent(
-			a.fch.lastExecutedBlock.Height+1,
-			encoded,
-			callHash,
-			res,
-		),
-	)
 	a.fch.EmitLastExecutedBlockEvent()
 	a.fch.totalSupply -= b.ToAttoFlow().Uint64()
 	a.fch.updateLastExecutedBlock(res.StateRootHash, gethTypes.EmptyRootHash)
