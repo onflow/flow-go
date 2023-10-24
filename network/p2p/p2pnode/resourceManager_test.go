@@ -135,11 +135,11 @@ func (t testPeerLimitConfig) maxLimit() int {
 func baseCreateStreamInboundStreamResourceLimitConfig() *testPeerLimitConfig {
 	return &testPeerLimitConfig{
 		nodeCount:                    10,
-		maxInboundPeerStream:         100,
-		maxInboundStreamProtocol:     100,
-		maxInboundStreamPeerProtocol: 100,
-		maxInboundStreamTransient:    100,
-		maxInboundStreamSystem:       100,
+		maxInboundPeerStream:         20,
+		maxInboundStreamProtocol:     20,
+		maxInboundStreamPeerProtocol: 20,
+		maxInboundStreamTransient:    20,
+		maxInboundStreamSystem:       20,
 	}
 }
 
@@ -195,7 +195,6 @@ func TestCreateStream_MinTransientLimit(t *testing.T) {
 }
 
 func TestCreateStream_MaxTransientLimit(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_TODO, "fails on CI constantly")
 	base := baseCreateStreamInboundStreamResourceLimitConfig()
 	base.maxInboundStreamTransient = math.MaxInt
 	testCreateStreamInboundStreamResourceLimits(t, base)
