@@ -241,7 +241,7 @@ func (emitter *eventEmitter) EmitFlowEvent(etype flow.EventType, payload []byte)
 
 	err := emitter.meter.MeterComputation(ComputationKindEmitEvent, 1)
 	if err != nil {
-		return fmt.Errorf("emit event failed: %w", err)
+		return fmt.Errorf("emit flow event failed: %w", err)
 	}
 
 	eventSize := uint64(len(etype) + len(payload))
@@ -254,16 +254,7 @@ func (emitter *eventEmitter) EmitFlowEvent(etype flow.EventType, payload []byte)
 		Payload:          payload,
 	}
 
-	// TODO: to set limit to maximum when it is service account and get rid of this flag
-	isServiceAccount := emitter.payer == emitter.chain.ServiceAddress()
-
-	eventEmitError := emitter.eventCollection.AppendEvent(flowEvent, eventSize)
-	// skip limit if payer is service account
-	if !isServiceAccount {
-		return eventEmitError
-	}
-
-	return nil
+	return emitter.eventCollection.AppendEvent(flowEvent, eventSize)
 }
 
 func (emitter *eventEmitter) Events() flow.EventsList {
