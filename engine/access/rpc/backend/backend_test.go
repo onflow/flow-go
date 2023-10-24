@@ -989,7 +989,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 
 	exeNodeEventEncodingVersion := entitiesproto.EventEncodingVersion_CCF_V0
-	events := getEventsWithEncoding(10, exeNodeEventEncodingVersion)
+	events := generator.GetEventsWithEncoding(10, exeNodeEventEncodingVersion)
 	validExecutorIdentities := flow.IdentityList{}
 
 	setupStorage := func(n int) []*flow.Header {
@@ -1038,7 +1038,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	}
 
 	expected := make([]flow.BlockEvents, len(blockHeaders))
-	expectedEvents := getEventsWithEncoding(10, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+	expectedEvents := generator.GetEventsWithEncoding(10, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
 	for i := 0; i < len(blockHeaders); i++ {
 		expected[i] = flow.BlockEvents{
 			BlockID:        blockHeaders[i].ID(),
@@ -1124,8 +1124,8 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			suite.Require().NoError(err)
 
 			// execute request with an empty block id list and expect an empty list of events and no error
-			result, err := backend.GetEventsForBlockIDs(ctx, string(flow.EventAccountCreated), []flow.Identifier{}, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
-			expectedResult := getEventsWithEncoding(1, version)
+			result, err := backend.GetEventsForBlockIDs(ctx, string(flow.EventAccountCreated), []flow.Identifier{}, version)
+			expectedResult := generator.GetEventsWithEncoding(1, version)
 			suite.checkResponse(result, err)
 
 			for _, blockEvent := range result {
@@ -1346,14 +1346,14 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		exeNodeEventEncodingVersion := entitiesproto.EventEncodingVersion_CCF_V0
 
 		for i, header := range blockHeaders {
-			events := getEventsWithEncoding(1, exeNodeEventEncodingVersion)
+			events := generator.GetEventsWithEncoding(1, exeNodeEventEncodingVersion)
 			height := header.Height
 
 			results[i] = flow.BlockEvents{
 				BlockID:        header.ID(),
 				BlockHeight:    height,
 				BlockTimestamp: header.Timestamp,
-				Events:         getEventsWithEncoding(1, entitiesproto.EventEncodingVersion_JSON_CDC_V0),
+				Events:         generator.GetEventsWithEncoding(1, entitiesproto.EventEncodingVersion_JSON_CDC_V0),
 			}
 
 			exeResults[i] = &execproto.GetEventsForBlockIDsResponse_Result{
@@ -1514,7 +1514,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			suite.Require().NoError(err)
 
 			result, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight, version)
-			expectedResult := getEventsWithEncoding(1, version)
+			expectedResult := generator.GetEventsWithEncoding(1, version)
 			suite.checkResponse(result, err)
 
 			for _, blockEvent := range result {
@@ -1865,7 +1865,7 @@ func (suite *Suite) TestGetTransactionResultEventEncodingVersion() {
 	suite.Require().NoError(err)
 
 	exeNodeEventEncodingVersion := entitiesproto.EventEncodingVersion_CCF_V0
-	events := getEventsWithEncoding(1, exeNodeEventEncodingVersion)
+	events := generator.GetEventsWithEncoding(1, exeNodeEventEncodingVersion)
 	eventMessages := convert.EventsToMessages(events)
 
 	for _, version := range eventEncodingVersions {
@@ -1884,7 +1884,7 @@ func (suite *Suite) TestGetTransactionResultEventEncodingVersion() {
 				Once()
 
 			result, err := backend.GetTransactionResult(ctx, txId, blockId, flow.ZeroID, version)
-			expectedResult := getEventsWithEncoding(1, version)
+			expectedResult := generator.GetEventsWithEncoding(1, version)
 			suite.checkResponse(result, err)
 
 			suite.Assert().Equal(result.Events, expectedResult)
@@ -1925,7 +1925,7 @@ func (suite *Suite) TestGetTransactionResultByIndexAndBlockIdEventEncodingVersio
 	suite.Require().NoError(err)
 
 	exeNodeEventEncodingVersion := entitiesproto.EventEncodingVersion_CCF_V0
-	events := getEventsWithEncoding(1, exeNodeEventEncodingVersion)
+	events := generator.GetEventsWithEncoding(1, exeNodeEventEncodingVersion)
 	eventMessages := convert.EventsToMessages(events)
 
 	for _, version := range eventEncodingVersions {
@@ -1946,7 +1946,7 @@ func (suite *Suite) TestGetTransactionResultByIndexAndBlockIdEventEncodingVersio
 			result, err := backend.GetTransactionResultByIndex(ctx, blockId, index, version)
 			suite.checkResponse(result, err)
 
-			expectedResult := getEventsWithEncoding(1, version)
+			expectedResult := generator.GetEventsWithEncoding(1, version)
 			suite.Assert().Equal(result.Events, expectedResult)
 		})
 
@@ -1970,30 +1970,12 @@ func (suite *Suite) TestGetTransactionResultByIndexAndBlockIdEventEncodingVersio
 			results, err := backend.GetTransactionResultsByBlockID(ctx, blockId, version)
 			suite.checkResponse(results, err)
 
-			expectedResult := getEventsWithEncoding(1, version)
+			expectedResult := generator.GetEventsWithEncoding(1, version)
 			for _, result := range results {
 				suite.Assert().Equal(result.Events, expectedResult)
 			}
 		})
 	}
-}
-
-// getEventsWithEncoding generates a specified number of events with a given encoding version.
-func getEventsWithEncoding(n int, version entitiesproto.EventEncodingVersion) []flow.Event {
-	var eventGenerator *generator.Events
-	switch version {
-	case entitiesproto.EventEncodingVersion_CCF_V0:
-		eventGenerator = generator.EventGenerator(generator.WithEncoding(generator.EncodingCCF))
-	case entitiesproto.EventEncodingVersion_JSON_CDC_V0:
-		eventGenerator = generator.EventGenerator(generator.WithEncoding(generator.EncodingJSON))
-	}
-
-	events := make([]flow.Event, 0, n)
-	for i := 0; i < n; i++ {
-		events = append(events, eventGenerator.New())
-	}
-
-	return events
 }
 
 func (suite *Suite) assertAllExpectations() {

@@ -21,15 +21,8 @@ import (
 
 func TestConvertBlockExecutionDataEventPayloads(t *testing.T) {
 	// generators will produce identical event payloads (before encoding)
-	ccfEventGenerator := generator.EventGenerator(generator.WithEncoding(generator.EncodingCCF))
-	jsonEventsGenerator := generator.EventGenerator(generator.WithEncoding(generator.EncodingJSON))
-
-	ccfEvents := make([]flow.Event, 0, 3)
-	jsonEvents := make([]flow.Event, 0, 3)
-	for i := 0; i < 3; i++ {
-		ccfEvents = append(ccfEvents, ccfEventGenerator.New())
-		jsonEvents = append(jsonEvents, jsonEventsGenerator.New())
-	}
+	ccfEvents := generator.GetEventsWithEncoding(3, entities.EventEncodingVersion_CCF_V0)
+	jsonEvents := generator.GetEventsWithEncoding(3, entities.EventEncodingVersion_JSON_CDC_V0)
 
 	// generate BlockExecutionData with CCF encoded events
 	executionData := unittest.BlockExecutionDataFixture(
