@@ -26,6 +26,9 @@ type Block struct {
 
 	// ReceiptRoot returns the root hash of the receipts emitted in this block
 	ReceiptRoot gethCommon.Hash
+
+	// transaction hashes
+	TransactionHashes []gethCommon.Hash
 }
 
 func (b *Block) ToBytes() ([]byte, error) {
@@ -38,7 +41,14 @@ func (b *Block) Hash() (gethCommon.Hash, error) {
 }
 
 // NewBlock constructs a new block
-func NewBlock(height, uuidIndex, totalSupply uint64, stateRoot, receiptRoot gethCommon.Hash) *Block {
+func NewBlock(
+	height,
+	uuidIndex,
+	totalSupply uint64,
+	stateRoot,
+	receiptRoot gethCommon.Hash,
+	TransactionHashes []gethCommon.Hash,
+) *Block {
 	return &Block{
 		Height:      height,
 		UUIDIndex:   uuidIndex,
