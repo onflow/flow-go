@@ -363,7 +363,7 @@ func ProtocolStateForBootstrapState(setup *flow.EpochSetup, commit *flow.EpochCo
 		})
 	}
 	return &flow.ProtocolStateEntry{
-		PreviousEpochEventIDs: flow.EventIDs{},
+		PreviousEpoch: nil,
 		CurrentEpoch: flow.EpochStateContainer{
 			SetupID:          setup.ID(),
 			CommitID:         commit.ID(),

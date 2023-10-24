@@ -33,7 +33,7 @@ func TestDynamicProtocolStateAdapter(t *testing.T) {
 		entry := unittest.ProtocolStateFixture()
 		adapter := inmem.NewDynamicProtocolStateAdapter(entry, globalParams)
 		status := adapter.EpochStatus()
-		assert.Equal(t, entry.PreviousEpochEventIDs, status.PreviousEpoch)
+		assert.Equal(t, entry.PreviousEpoch.EventIDs(), status.PreviousEpoch)
 		assert.Equal(t, flow.EventIDs{
 			SetupID:  entry.CurrentEpoch.SetupID,
 			CommitID: entry.CurrentEpoch.CommitID,
@@ -48,7 +48,7 @@ func TestDynamicProtocolStateAdapter(t *testing.T) {
 
 		adapter := inmem.NewDynamicProtocolStateAdapter(entry, globalParams)
 		status := adapter.EpochStatus()
-		assert.Equal(t, entry.PreviousEpochEventIDs, status.PreviousEpoch)
+		assert.Equal(t, entry.PreviousEpoch.EventIDs(), status.PreviousEpoch)
 		assert.Equal(t, flow.EventIDs{
 			SetupID:  entry.CurrentEpoch.SetupID,
 			CommitID: entry.CurrentEpoch.CommitID,
@@ -63,7 +63,7 @@ func TestDynamicProtocolStateAdapter(t *testing.T) {
 		entry := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
 		adapter := inmem.NewDynamicProtocolStateAdapter(entry, globalParams)
 		status := adapter.EpochStatus()
-		assert.Equal(t, entry.PreviousEpochEventIDs, status.PreviousEpoch)
+		assert.Equal(t, entry.PreviousEpoch.EventIDs(), status.PreviousEpoch)
 		assert.Equal(t, flow.EventIDs{
 			SetupID:  entry.CurrentEpoch.SetupID,
 			CommitID: entry.CurrentEpoch.CommitID,
