@@ -27,7 +27,7 @@ type SubscriptionRecordEntity struct {
 var _ flow.Entity = (*SubscriptionRecordEntity)(nil)
 
 // ID returns the entity id of the subscription record, which is the hash of the peer id.
-func (s *SubscriptionRecordEntity) ID() flow.Identifier {
+func (s SubscriptionRecordEntity) ID() flow.Identifier {
 	if s.entityId == flow.ZeroID {
 		s.entityId = flow.MakeID(s.PeerID)
 	}
@@ -36,6 +36,6 @@ func (s *SubscriptionRecordEntity) ID() flow.Identifier {
 
 // Checksum returns the entity id of the subscription record, which is the hash of the peer id.
 // It is of no use in the cache, but it is implemented to satisfy the flow.Entity interface.
-func (s *SubscriptionRecordEntity) Checksum() flow.Identifier {
+func (s SubscriptionRecordEntity) Checksum() flow.Identifier {
 	return s.ID()
 }
