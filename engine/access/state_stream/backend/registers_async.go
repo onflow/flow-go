@@ -39,10 +39,10 @@ func (r *RegistersAsyncStore) InitDataAvailable(
 	})
 }
 
-// GetRegisterValues atomically gets the register values from the underlying storage.RegisterIndex
+// RegisterValues atomically gets the register values from the underlying storage.RegisterIndex
 // Expected errors:
 //   - storage.ErrHeightNotIndexed if the store is still bootstrapping or if the values at the height is not indexed yet
-func (r *RegistersAsyncStore) GetRegisterValues(ids flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
+func (r *RegistersAsyncStore) RegisterValues(ids flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
 	if !r.isDataAvailable(height) {
 		return nil, storage.ErrHeightNotIndexed
 	}

@@ -204,5 +204,8 @@ func (h *Handler) SubscribeEvents(request *executiondata.SubscribeEventsRequest,
 }
 
 func (h *Handler) GetRegisterValues(ctx context.Context, request *executiondata.GetRegisterValuesRequest) (*executiondata.GetRegisterValuesResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "not implemented")
+	// Convert data
+
+	// get payload from store
+	return nil, nil
 }
