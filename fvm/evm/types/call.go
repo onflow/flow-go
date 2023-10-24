@@ -23,7 +23,11 @@ const (
 	TransferGasUsage = 21_000
 )
 
+// DirectCall captures all the data related to a direct call to evm
+// direct calls are similar to transactions but they don't have
+// signatures and don't need sequence number checks
 type DirectCall struct {
+	Type     byte
 	SubType  byte
 	From     Address
 	To       Address
@@ -32,15 +36,20 @@ type DirectCall struct {
 	GasLimit uint64
 }
 
+// Encode encodes the direct call it also adds the type
+// as the very first byte, similar to how evm encodes types.
 func (dc *DirectCall) Encode() ([]byte, error) {
-	return rlp.EncodeToBytes(dc)
+	encoded, err := rlp.EncodeToBytes(dc)
+	return append([]byte{dc.Type}, encoded...), err
 }
 
+// Hash computes the hash of a direct call
 func (dc *DirectCall) Hash() (gethCommon.Hash, error) {
 	encoded, err := dc.Encode()
 	return gethCrypto.Keccak256Hash(encoded), err
 }
 
+// Message constructs a core.Message from the direct call
 func (dc *DirectCall) Message() *gethCore.Message {
 	var to *gethCommon.Address
 	if dc.To != EmptyAddress {
@@ -63,6 +72,7 @@ func (dc *DirectCall) Message() *gethCore.Message {
 
 func NewDepositCall(address Address, amount *big.Int) *DirectCall {
 	return &DirectCall{
+		Type:     DirectCallTxType,
 		SubType:  DepositCallSubType,
 		From:     EmptyAddress,
 		To:       address,
@@ -74,6 +84,7 @@ func NewDepositCall(address Address, amount *big.Int) *DirectCall {
 
 func NewWithdrawCall(address Address, amount *big.Int) *DirectCall {
 	return &DirectCall{
+		Type:     DirectCallTxType,
 		SubType:  WithdrawCallSubType,
 		From:     address,
 		To:       EmptyAddress,
@@ -85,6 +96,7 @@ func NewWithdrawCall(address Address, amount *big.Int) *DirectCall {
 
 func NewTransferCall(from Address, to Address, amount *big.Int) *DirectCall {
 	return &DirectCall{
+		Type:     DirectCallTxType,
 		SubType:  TransferCallSubType,
 		From:     from,
 		To:       to,
@@ -96,6 +108,7 @@ func NewTransferCall(from Address, to Address, amount *big.Int) *DirectCall {
 
 func NewDeployCall(caller Address, code Code, gasLimit uint64, value *big.Int) *DirectCall {
 	return &DirectCall{
+		Type:     DirectCallTxType,
 		SubType:  DeployCallSubType,
 		From:     caller,
 		To:       EmptyAddress,
@@ -107,6 +120,7 @@ func NewDeployCall(caller Address, code Code, gasLimit uint64, value *big.Int) *
 
 func NewContractCall(caller Address, to Address, data Data, gasLimit uint64, value *big.Int) *DirectCall {
 	return &DirectCall{
+		Type:     DirectCallTxType,
 		SubType:  ContractCallSubType,
 		From:     caller,
 		To:       to,
