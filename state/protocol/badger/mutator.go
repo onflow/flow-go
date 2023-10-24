@@ -509,6 +509,9 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, certi
 	}
 
 	protocolStateUpdater, err := m.protocolStateMutator.CreateUpdater(candidate.Header.View, parentID)
+	if err != nil {
+		return fmt.Errorf("could not create protocol state updater for view %d: %w", candidate.Header.View, err)
+	}
 
 	// apply any state changes from service events sealed by this block
 	dbUpdates, err := m.protocolStateMutator.ApplyServiceEvents(protocolStateUpdater, candidate.Payload.Seals)

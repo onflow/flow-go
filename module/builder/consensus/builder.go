@@ -638,7 +638,13 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 	}
 
 	updater, err := b.protoStateMutator.CreateUpdater(header.View, header.ParentID)
+	if err != nil {
+		return nil, fmt.Errorf("could not create protocol state updater for view %d: %w", header.View, err)
+	}
 	_, err = b.protoStateMutator.ApplyServiceEvents(updater, seals)
+	if err != nil {
+		return nil, fmt.Errorf("could not apply service events as leader: %w", err)
+	}
 	_, protocolStateID, _ := updater.Build()
 
 	proposal := &flow.Block{

@@ -3,9 +3,9 @@ package protocol_state
 import (
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/module/irrecoverable"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/transaction"

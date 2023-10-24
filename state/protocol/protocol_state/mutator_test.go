@@ -1,12 +1,12 @@
 package protocol_state
 
 import (
-	"github.com/onflow/flow-go/state/protocol/mock"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/state/protocol/mock"
 	storerr "github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/transaction"
 	storagemock "github.com/onflow/flow-go/storage/mock"

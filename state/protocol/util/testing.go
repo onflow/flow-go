@@ -1,7 +1,6 @@
 package util
 
 import (
-	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
@@ -18,6 +17,7 @@ import (
 	pbadger "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/unittest"

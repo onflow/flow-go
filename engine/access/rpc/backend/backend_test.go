@@ -3,7 +3,6 @@ package backend
 import (
 	"context"
 	"fmt"
-	realprotocol "github.com/onflow/flow-go/state/protocol"
 	"strconv"
 	"testing"
 
@@ -28,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
+	realprotocol "github.com/onflow/flow-go/state/protocol"
 	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/state/protocol/util"
