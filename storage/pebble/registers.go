@@ -202,6 +202,7 @@ func (s *Registers) PruneByHeight(pruneHeight uint64) error {
 			prevOwner[0] != reg.Owner[0] {
 			log.Info().Msgf("start indexing reg owner with prefix %v", reg.Owner[0])
 		}
+		prevOwner = reg.Owner
 	}
 
 	return nil
