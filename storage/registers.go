@@ -17,6 +17,7 @@ type RegisterIndex interface {
 
 	// LatestHeight returns the latest indexed height.
 	LatestHeight() uint64
+
 	// FirstHeight at which we started to index. Returns the first indexed height found in the store.
 	FirstHeight() uint64
 

@@ -9,6 +9,7 @@ import (
 
 	executionState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
@@ -127,7 +128,7 @@ func TestProofsForEmptyRegisters(t *testing.T) {
 	// Read one register during execution.
 	registerID := flow.NewRegisterID("b", "nk")
 	allKeys := []ledger.Key{
-		executionState.RegisterIDToKey(registerID),
+		convert.RegisterIDToLedgerKey(registerID),
 	}
 
 	newState := updated.State()
@@ -142,7 +143,7 @@ func TestProofsForEmptyRegisters(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, pled.InitialState(), emptyState)
 
-	query, err := ledger.NewQuery(newState, []ledger.Key{executionState.RegisterIDToKey(registerID)})
+	query, err := ledger.NewQuery(newState, []ledger.Key{convert.RegisterIDToLedgerKey(registerID)})
 	require.NoError(t, err)
 
 	results, err := pled.Get(query)
@@ -150,5 +151,4 @@ func TestProofsForEmptyRegisters(t *testing.T) {
 	require.Len(t, results, 1)
 
 	require.Empty(t, results[0])
-
 }
