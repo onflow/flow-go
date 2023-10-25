@@ -21,11 +21,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/attribute"
 
+	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/evm"
 	"github.com/onflow/flow-go/fvm/evm/stdlib/emulator"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/types"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func encodeArgs(argValues []cadence.Value) [][]byte {
@@ -721,4 +724,120 @@ func (i *testRuntimeInterface) invalidateUpdatedPrograms() {
 		}
 		i.updatedContractCode = false
 	}
+}
+
+func TestTransactionIntegration(t *testing.T) {
+	chain := flow.Emulator.Chain()
+	testutils.RunWithTestBackend(t, func(backend types.Backend) {
+		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+			RunWithNewTestVM(t, chain, func(ctx fvm.Context, vm fvm.VM, snapshot snapshot.SnapshotTree) {
+
+				code := []byte(`
+					transaction(bytes: [UInt8; 20]) {
+						execute {
+							Flex.FlexAddress(bytes: bytes)
+						}
+					}	
+					`)
+
+				addressBytesArray := cadence.NewArray([]cadence.Value{
+					cadence.UInt8(1), cadence.UInt8(1),
+					cadence.UInt8(2), cadence.UInt8(2),
+					cadence.UInt8(3), cadence.UInt8(3),
+					cadence.UInt8(4), cadence.UInt8(4),
+					cadence.UInt8(5), cadence.UInt8(5),
+					cadence.UInt8(6), cadence.UInt8(6),
+					cadence.UInt8(7), cadence.UInt8(7),
+					cadence.UInt8(8), cadence.UInt8(8),
+					cadence.UInt8(9), cadence.UInt8(9),
+					cadence.UInt8(10), cadence.UInt8(10),
+				}).WithType(evmAddressBytesCadenceType)
+
+				tx := flow.NewTransactionBody().
+					SetScript(code).
+					SetPayer(unittest.AddressFixture()).
+					AddArgument(json.MustEncode(addressBytesArray))
+
+				executionSnapshot, output, err := vm.Run(
+					ctx,
+					fvm.Transaction(tx, 0),
+					snapshot)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+
+				_ = executionSnapshot
+				// snapshot = snapshot.Append(executionSnapshot)
+			})
+		})
+	})
+}
+
+func TestScriptIntegration(t *testing.T) {
+	chain := flow.Emulator.Chain()
+	testutils.RunWithTestBackend(t, func(backend types.Backend) {
+		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+			RunWithNewTestVM(t, chain, func(ctx fvm.Context, vm fvm.VM, snapshot snapshot.SnapshotTree) {
+
+				code := []byte(`
+					pub fun main(_ bytes: [UInt8; 20]): Flex.FlexAddress {
+						return Flex.FlexAddress(bytes: bytes)
+						}
+					`)
+
+				addressBytesArray := cadence.NewArray([]cadence.Value{
+					cadence.UInt8(1), cadence.UInt8(1),
+					cadence.UInt8(2), cadence.UInt8(2),
+					cadence.UInt8(3), cadence.UInt8(3),
+					cadence.UInt8(4), cadence.UInt8(4),
+					cadence.UInt8(5), cadence.UInt8(5),
+					cadence.UInt8(6), cadence.UInt8(6),
+					cadence.UInt8(7), cadence.UInt8(7),
+					cadence.UInt8(8), cadence.UInt8(8),
+					cadence.UInt8(9), cadence.UInt8(9),
+					cadence.UInt8(10), cadence.UInt8(10),
+				}).WithType(evmAddressBytesCadenceType)
+
+				script := fvm.Script(code).WithArguments(
+					json.MustEncode(addressBytesArray),
+				)
+
+				executionSnapshot, output, err := vm.Run(
+					ctx,
+					script,
+					snapshot)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+
+				_ = executionSnapshot
+				// snapshot = snapshot.Append(executionSnapshot)
+			})
+		})
+	})
+}
+
+func RunWithNewTestVM(t *testing.T, chain flow.Chain, f func(fvm.Context, fvm.VM, snapshot.SnapshotTree)) {
+	opts := []fvm.Option{
+		fvm.WithChain(chain),
+		fvm.WithAuthorizationChecksEnabled(false),
+		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
+		fvm.WithEVMEnabled(true),
+	}
+	ctx := fvm.NewContext(opts...)
+
+	vm := fvm.NewVirtualMachine()
+	snapshotTree := snapshot.NewSnapshotTree(nil)
+
+	baseBootstrapOpts := []fvm.BootstrapProcedureOption{
+		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
+	}
+
+	executionSnapshot, _, err := vm.Run(
+		ctx,
+		fvm.Bootstrap(unittest.ServiceAccountPublicKey, baseBootstrapOpts...),
+		snapshotTree)
+	require.NoError(t, err)
+
+	snapshotTree = snapshotTree.Append(executionSnapshot)
+
+	f(ctx, vm, snapshotTree)
 }
