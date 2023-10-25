@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/sema"
 	cadenceStdlib "github.com/onflow/cadence/runtime/stdlib"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/attribute"
 
@@ -21,11 +23,11 @@ import (
 	"errors"
 
 	"github.com/onflow/cadence/encoding/json"
-	"github.com/stretchr/testify/assert"
 
+	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
-	"github.com/onflow/flow-go/fvm/evm/stdlib/emulator"
 	"github.com/onflow/flow-go/fvm/evm/types"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 type testContractHandler struct {
@@ -48,11 +50,11 @@ func (t *testContractHandler) AllocateAddress() types.Address {
 	return t.allocateAddress()
 }
 
-func (t *testContractHandler) AccountByAddress(addr types.Address, isFOA bool) types.Account {
+func (t *testContractHandler) AccountByAddress(addr types.Address, isAuthorized bool) types.Account {
 	if t.accountByAddress == nil {
 		panic("unexpected AccountByAddress")
 	}
-	return t.accountByAddress(addr, isFOA)
+	return t.accountByAddress(addr, isAuthorized)
 }
 
 func (t *testContractHandler) LastExecutedBlock() *types.Block {
@@ -125,21 +127,7 @@ func (t *testFlowAccount) Call(address types.Address, data types.Data, limit typ
 	return t.call(address, data, limit, balance)
 }
 
-var flexAddressBytesCadenceType = cadence.NewConstantSizedArrayType(20, cadence.TheUInt8Type)
-
-var flexAddressCadenceType = cadence.NewStructType(
-	nil,
-	emulator.Flex_FlexAddressType.QualifiedIdentifier(),
-	[]cadence.Field{
-		{
-			Identifier: emulator.Flex_FlexAddressTypeBytesFieldName,
-			Type:       flexAddressBytesCadenceType,
-		},
-	},
-	nil,
-)
-
-func TestFlexAddressConstructionAndReturn(t *testing.T) {
+func TestEVMAddressConstructionAndReturn(t *testing.T) {
 
 	t.Parallel()
 
@@ -147,20 +135,42 @@ func TestFlexAddressConstructionAndReturn(t *testing.T) {
 
 	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
 
-	flexTypeDefinition := emulator.FlexTypeDefinition
-	env.DeclareValue(stdlib.NewFlexStandardLibraryValue(nil, flexTypeDefinition, handler))
-	env.DeclareType(stdlib.NewFlexStandardLibraryType(flexTypeDefinition))
+	contractAddress := flow.BytesToAddress([]byte{0x1})
 
-	inter := runtime.NewInterpreterRuntime(runtime.Config{})
+	stdlib.SetupEnvironment(env, handler, contractAddress)
+
+	rt := runtime.NewInterpreterRuntime(runtime.Config{})
 
 	script := []byte(`
-			pub fun main(_ bytes: [UInt8; 20]): Flex.FlexAddress {
-				return Flex.FlexAddress(bytes: bytes)
-			}
-		`)
+      import EVM from 0x1
+
+      access(all)
+      fun main(_ bytes: [UInt8; 20]): EVM.EVMAddress {
+          return EVM.EVMAddress(bytes: bytes)
+      }
+    `)
+
+	accountCodes := map[common.Location][]byte{}
+	var events []cadence.Event
 
 	runtimeInterface := &testRuntimeInterface{
 		storage: newTestLedger(),
+		getSigningAccounts: func() ([]runtime.Address, error) {
+			return []runtime.Address{runtime.Address(contractAddress)}, nil
+		},
+		resolveLocation: singleIdentifierLocationResolver(t),
+		updateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+			accountCodes[location] = code
+			return nil
+		},
+		getAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+			code = accountCodes[location]
+			return code, nil
+		},
+		emitEvent: func(event cadence.Event) error {
+			events = append(events, event)
+			return nil
+		},
 		decodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
 			return json.Decode(nil, b)
 		},
@@ -177,9 +187,32 @@ func TestFlexAddressConstructionAndReturn(t *testing.T) {
 		cadence.UInt8(8), cadence.UInt8(8),
 		cadence.UInt8(9), cadence.UInt8(9),
 		cadence.UInt8(10), cadence.UInt8(10),
-	}).WithType(flexAddressBytesCadenceType)
+	}).WithType(stdlib.EVMAddressBytesCadenceType)
 
-	result, err := inter.ExecuteScript(
+	nextTransactionLocation := newTransactionLocationGenerator()
+	nextScriptLocation := newScriptLocationGenerator()
+
+	// Deploy EVM contract
+
+	err := rt.ExecuteTransaction(
+		runtime.Script{
+			Source: blueprints.DeployContractTransactionTemplate,
+			Arguments: encodeArgs([]cadence.Value{
+				cadence.String(stdlib.ContractName),
+				cadence.String(stdlib.ContractCode),
+			}),
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: env,
+			Location:    nextTransactionLocation(),
+		},
+	)
+	require.NoError(t, err)
+
+	// Run script
+
+	result, err := rt.ExecuteScript(
 		runtime.Script{
 			Source: script,
 			Arguments: encodeArgs([]cadence.Value{
@@ -189,32 +222,136 @@ func TestFlexAddressConstructionAndReturn(t *testing.T) {
 		runtime.Context{
 			Interface:   runtimeInterface,
 			Environment: env,
-			Location:    common.ScriptLocation{},
+			Location:    nextScriptLocation(),
 		},
 	)
 	require.NoError(t, err)
 
+	evmAddressCadenceType := stdlib.NewEVMAddressCadenceType(common.Address(contractAddress))
+
 	assert.Equal(t,
 		cadence.Struct{
-			StructType: flexAddressCadenceType,
+			StructType: evmAddressCadenceType,
 			Fields: []cadence.Value{
 				addressBytesArray,
 			},
 		},
 		result,
 	)
-
 }
 
-func TestFlexRun(t *testing.T) {
+func TestBalanceConstructionAndReturn(t *testing.T) {
 
 	t.Parallel()
 
-	tx := cadence.NewArray([]cadence.Value{
+	handler := &testContractHandler{}
+
+	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
+
+	contractAddress := flow.BytesToAddress([]byte{0x1})
+
+	stdlib.SetupEnvironment(env, handler, contractAddress)
+
+	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+
+	script := []byte(`
+      import EVM from 0x1
+
+      access(all)
+      fun main(_ flow: UFix64): EVM.Balance {
+          return EVM.Balance(flow: flow)
+      }
+    `)
+
+	accountCodes := map[common.Location][]byte{}
+	var events []cadence.Event
+
+	runtimeInterface := &testRuntimeInterface{
+		storage: newTestLedger(),
+		getSigningAccounts: func() ([]runtime.Address, error) {
+			return []runtime.Address{runtime.Address(contractAddress)}, nil
+		},
+		resolveLocation: singleIdentifierLocationResolver(t),
+		updateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+			accountCodes[location] = code
+			return nil
+		},
+		getAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+			code = accountCodes[location]
+			return code, nil
+		},
+		emitEvent: func(event cadence.Event) error {
+			events = append(events, event)
+			return nil
+		},
+		decodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+			return json.Decode(nil, b)
+		},
+	}
+
+	nextTransactionLocation := newTransactionLocationGenerator()
+	nextScriptLocation := newScriptLocationGenerator()
+
+	// Deploy EVM contract
+
+	err := rt.ExecuteTransaction(
+		runtime.Script{
+			Source: blueprints.DeployContractTransactionTemplate,
+			Arguments: encodeArgs([]cadence.Value{
+				cadence.String(stdlib.ContractName),
+				cadence.String(stdlib.ContractCode),
+			}),
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: env,
+			Location:    nextTransactionLocation(),
+		},
+	)
+	require.NoError(t, err)
+
+	// Run script
+
+	flowValue, err := cadence.NewUFix64FromParts(1, 23000000)
+	require.NoError(t, err)
+
+	result, err := rt.ExecuteScript(
+		runtime.Script{
+			Source: script,
+			Arguments: encodeArgs([]cadence.Value{
+				flowValue,
+			}),
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: env,
+			Location:    nextScriptLocation(),
+		},
+	)
+	require.NoError(t, err)
+
+	evmBalanceCadenceType := stdlib.NewBalanceCadenceType(common.Address(contractAddress))
+
+	assert.Equal(t,
+		cadence.Struct{
+			StructType: evmBalanceCadenceType,
+			Fields: []cadence.Value{
+				flowValue,
+			},
+		},
+		result,
+	)
+}
+
+func TestEVMRun(t *testing.T) {
+
+	t.Parallel()
+
+	evmTx := cadence.NewArray([]cadence.Value{
 		cadence.UInt8(1),
 		cadence.UInt8(2),
 		cadence.UInt8(3),
-	}).WithType(flexAddressBytesCadenceType)
+	}).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 	coinbase := cadence.NewArray([]cadence.Value{
 		cadence.UInt8(1), cadence.UInt8(1),
@@ -227,7 +364,7 @@ func TestFlexRun(t *testing.T) {
 		cadence.UInt8(8), cadence.UInt8(8),
 		cadence.UInt8(9), cadence.UInt8(9),
 		cadence.UInt8(10), cadence.UInt8(10),
-	}).WithType(flexAddressBytesCadenceType)
+	}).WithType(stdlib.EVMAddressBytesCadenceType)
 
 	runCalled := false
 
@@ -249,35 +386,80 @@ func TestFlexRun(t *testing.T) {
 
 	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
 
-	flexTypeDefinition := emulator.FlexTypeDefinition
-	env.DeclareValue(stdlib.NewFlexStandardLibraryValue(nil, flexTypeDefinition, handler))
-	env.DeclareType(stdlib.NewFlexStandardLibraryType(flexTypeDefinition))
+	contractAddress := flow.BytesToAddress([]byte{0x1})
 
-	inter := runtime.NewInterpreterRuntime(runtime.Config{})
+	stdlib.SetupEnvironment(env, handler, contractAddress)
+
+	rt := runtime.NewInterpreterRuntime(runtime.Config{})
 
 	script := []byte(`
-      pub fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): Bool {
-          let coinbase = Flex.FlexAddress(bytes: coinbaseBytes)
-          return Flex.run(tx: tx, coinbase: coinbase)
+      import EVM from 0x1
+
+      access(all)
+      fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): Bool {
+          let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+          return EVM.run(tx: tx, coinbase: coinbase)
       }
-	`)
+    `)
+
+	accountCodes := map[common.Location][]byte{}
+	var events []cadence.Event
 
 	runtimeInterface := &testRuntimeInterface{
 		storage: newTestLedger(),
+		getSigningAccounts: func() ([]runtime.Address, error) {
+			return []runtime.Address{runtime.Address(contractAddress)}, nil
+		},
+		resolveLocation: singleIdentifierLocationResolver(t),
+		updateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+			accountCodes[location] = code
+			return nil
+		},
+		getAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+			code = accountCodes[location]
+			return code, nil
+		},
+		emitEvent: func(event cadence.Event) error {
+			events = append(events, event)
+			return nil
+		},
 		decodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
 			return json.Decode(nil, b)
 		},
 	}
 
-	result, err := inter.ExecuteScript(
+	nextTransactionLocation := newTransactionLocationGenerator()
+	nextScriptLocation := newScriptLocationGenerator()
+
+	// Deploy EVM contract
+
+	err := rt.ExecuteTransaction(
 		runtime.Script{
-			Source:    script,
-			Arguments: encodeArgs([]cadence.Value{tx, coinbase}),
+			Source: blueprints.DeployContractTransactionTemplate,
+			Arguments: encodeArgs([]cadence.Value{
+				cadence.String(stdlib.ContractName),
+				cadence.String(stdlib.ContractCode),
+			}),
 		},
 		runtime.Context{
 			Interface:   runtimeInterface,
 			Environment: env,
-			Location:    common.ScriptLocation{},
+			Location:    nextTransactionLocation(),
+		},
+	)
+	require.NoError(t, err)
+
+	// Run script
+
+	result, err := rt.ExecuteScript(
+		runtime.Script{
+			Source:    script,
+			Arguments: encodeArgs([]cadence.Value{evmTx, coinbase}),
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: env,
+			Location:    nextScriptLocation(),
 		},
 	)
 	require.NoError(t, err)
@@ -286,7 +468,7 @@ func TestFlexRun(t *testing.T) {
 	assert.Equal(t, cadence.Bool(true), result)
 }
 
-func TestFlexCreateFlowOwnedAccount(t *testing.T) {
+func TestEVMCreateBridgedAccount(t *testing.T) {
 
 	t.Parallel()
 
@@ -294,42 +476,91 @@ func TestFlexCreateFlowOwnedAccount(t *testing.T) {
 
 	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
 
-	flexTypeDefinition := emulator.FlexTypeDefinition
-	env.DeclareValue(stdlib.NewFlexStandardLibraryValue(nil, flexTypeDefinition, handler))
-	env.DeclareType(stdlib.NewFlexStandardLibraryType(flexTypeDefinition))
+	contractAddress := flow.BytesToAddress([]byte{0x1})
 
-	inter := runtime.NewInterpreterRuntime(runtime.Config{})
+	stdlib.SetupEnvironment(env, handler, contractAddress)
+
+	rt := runtime.NewInterpreterRuntime(runtime.Config{})
 
 	script := []byte(`
-      pub fun main(): [UInt8; 20] {
-          let foa <- Flex.createFlowOwnedAccount()
-          let bytes = foa.address().bytes
-          destroy foa
+      import EVM from 0x1
+
+      access(all)
+      fun main(): [UInt8; 20] {
+          let bridgedAccount1 <- EVM.createBridgedAccount()
+          destroy bridgedAccount1
+
+          let bridgedAccount2 <- EVM.createBridgedAccount()
+          let bytes = bridgedAccount2.address().bytes
+          destroy bridgedAccount2
+
           return bytes
       }
-	`)
+    `)
+
+	accountCodes := map[common.Location][]byte{}
+	var events []cadence.Event
 
 	runtimeInterface := &testRuntimeInterface{
 		storage: newTestLedger(),
+		getSigningAccounts: func() ([]runtime.Address, error) {
+			return []runtime.Address{runtime.Address(contractAddress)}, nil
+		},
+		resolveLocation: singleIdentifierLocationResolver(t),
+		updateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+			accountCodes[location] = code
+			return nil
+		},
+		getAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+			code = accountCodes[location]
+			return code, nil
+		},
+		emitEvent: func(event cadence.Event) error {
+			events = append(events, event)
+			return nil
+		},
 		decodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
 			return json.Decode(nil, b)
 		},
 	}
 
-	actual, err := inter.ExecuteScript(
+	nextTransactionLocation := newTransactionLocationGenerator()
+	nextScriptLocation := newScriptLocationGenerator()
+
+	// Deploy EVM contract
+
+	err := rt.ExecuteTransaction(
+		runtime.Script{
+			Source: blueprints.DeployContractTransactionTemplate,
+			Arguments: encodeArgs([]cadence.Value{
+				cadence.String(stdlib.ContractName),
+				cadence.String(stdlib.ContractCode),
+			}),
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: env,
+			Location:    nextTransactionLocation(),
+		},
+	)
+	require.NoError(t, err)
+
+	// Run script
+
+	actual, err := rt.ExecuteScript(
 		runtime.Script{
 			Source: script,
 		},
 		runtime.Context{
 			Interface:   runtimeInterface,
 			Environment: env,
-			Location:    common.ScriptLocation{},
+			Location:    nextScriptLocation(),
 		},
 	)
 	require.NoError(t, err)
 
 	expected := cadence.NewArray([]cadence.Value{
-		cadence.UInt8(1), cadence.UInt8(0),
+		cadence.UInt8(2), cadence.UInt8(0),
 		cadence.UInt8(0), cadence.UInt8(0),
 		cadence.UInt8(0), cadence.UInt8(0),
 		cadence.UInt8(0), cadence.UInt8(0),
@@ -347,29 +578,27 @@ func TestFlexCreateFlowOwnedAccount(t *testing.T) {
 	require.Equal(t, expected, actual)
 }
 
-func TestFlowOwnedAccountCall(t *testing.T) {
+func TestBridgedAccountCall(t *testing.T) {
 
 	t.Parallel()
 
 	expectedBalance, err := cadence.NewUFix64FromParts(1, 23000000)
 	require.NoError(t, err)
 
-	expectedAddress := types.Address{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
-
 	handler := &testContractHandler{
-		accountByAddress: func(address types.Address, isFOA bool) types.Account {
-			assert.Equal(t, expectedAddress, address)
-			assert.True(t, isFOA)
+		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
+			assert.Equal(t, types.Address{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
+			assert.True(t, isAuthorized)
 
 			return &testFlowAccount{
-				address: address,
+				address: fromAddress,
 				call: func(
-					address types.Address,
+					toAddress types.Address,
 					data types.Data,
 					limit types.GasLimit,
 					balance types.Balance,
 				) types.Data {
-					assert.Equal(t, expectedAddress, address)
+					assert.Equal(t, types.Address{2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, toAddress)
 					assert.Equal(t, types.Data{4, 5, 6}, data)
 					assert.Equal(t, types.GasLimit(9999), limit)
 					assert.Equal(t, types.Balance(expectedBalance), balance)
@@ -382,41 +611,88 @@ func TestFlowOwnedAccountCall(t *testing.T) {
 
 	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
 
-	flexTypeDefinition := emulator.FlexTypeDefinition
-	env.DeclareValue(stdlib.NewFlexStandardLibraryValue(nil, flexTypeDefinition, handler))
-	env.DeclareType(stdlib.NewFlexStandardLibraryType(flexTypeDefinition))
+	contractAddress := flow.BytesToAddress([]byte{0x1})
 
-	inter := runtime.NewInterpreterRuntime(runtime.Config{})
+	stdlib.SetupEnvironment(env, handler, contractAddress)
+
+	rt := runtime.NewInterpreterRuntime(runtime.Config{})
 
 	script := []byte(`
-      pub fun main(): [UInt8] {
-          let foa <- Flex.createFlowOwnedAccount()
-          let response = foa.call(
-              to: Flex.FlexAddress(bytes: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+      import EVM from 0x1
+
+      access(all)
+      fun main(): [UInt8] {
+          let bridgedAccount <- EVM.createBridgedAccount()
+          let response = bridgedAccount.call(
+              to: EVM.EVMAddress(
+                  bytes: [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+              ),
               data: [4, 5, 6],
               gasLimit: 9999,
-              value: Flex.Balance(flow: 1.23)
+              value: EVM.Balance(flow: 1.23)
           )
-          destroy foa
+          destroy bridgedAccount
           return response
       }
-	`)
+   `)
+
+	accountCodes := map[common.Location][]byte{}
+	var events []cadence.Event
 
 	runtimeInterface := &testRuntimeInterface{
 		storage: newTestLedger(),
+		getSigningAccounts: func() ([]runtime.Address, error) {
+			return []runtime.Address{runtime.Address(contractAddress)}, nil
+		},
+		resolveLocation: singleIdentifierLocationResolver(t),
+		updateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+			accountCodes[location] = code
+			return nil
+		},
+		getAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+			code = accountCodes[location]
+			return code, nil
+		},
+		emitEvent: func(event cadence.Event) error {
+			events = append(events, event)
+			return nil
+		},
 		decodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
 			return json.Decode(nil, b)
 		},
 	}
 
-	actual, err := inter.ExecuteScript(
+	nextTransactionLocation := newTransactionLocationGenerator()
+	nextScriptLocation := newScriptLocationGenerator()
+
+	// Deploy EVM contract
+
+	err = rt.ExecuteTransaction(
+		runtime.Script{
+			Source: blueprints.DeployContractTransactionTemplate,
+			Arguments: encodeArgs([]cadence.Value{
+				cadence.String(stdlib.ContractName),
+				cadence.String(stdlib.ContractCode),
+			}),
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: env,
+			Location:    nextTransactionLocation(),
+		},
+	)
+	require.NoError(t, err)
+
+	// Run script
+
+	actual, err := rt.ExecuteScript(
 		runtime.Script{
 			Source: script,
 		},
 		runtime.Context{
 			Interface:   runtimeInterface,
 			Environment: env,
-			Location:    common.ScriptLocation{},
+			Location:    nextScriptLocation(),
 		},
 	)
 	require.NoError(t, err)
@@ -431,6 +707,47 @@ func TestFlowOwnedAccountCall(t *testing.T) {
 }
 
 // TODO: replace with Cadence runtime testing utils once available https://github.com/onflow/cadence/pull/2800
+
+func singleIdentifierLocationResolver(t testing.TB) func(
+	identifiers []runtime.Identifier,
+	location runtime.Location,
+) (
+	[]runtime.ResolvedLocation,
+	error,
+) {
+	return func(identifiers []runtime.Identifier, location runtime.Location) ([]runtime.ResolvedLocation, error) {
+		require.Len(t, identifiers, 1)
+		require.IsType(t, common.AddressLocation{}, location)
+
+		return []runtime.ResolvedLocation{
+			{
+				Location: common.AddressLocation{
+					Address: location.(common.AddressLocation).Address,
+					Name:    identifiers[0].Identifier,
+				},
+				Identifiers: identifiers,
+			},
+		}, nil
+	}
+}
+
+func newLocationGenerator[T ~[32]byte]() func() T {
+	var count uint64
+	return func() T {
+		t := T{}
+		newCount := atomic.AddUint64(&count, 1)
+		binary.LittleEndian.PutUint64(t[:], newCount)
+		return t
+	}
+}
+
+func newTransactionLocationGenerator() func() common.TransactionLocation {
+	return newLocationGenerator[common.TransactionLocation]()
+}
+
+func newScriptLocationGenerator() func() common.ScriptLocation {
+	return newLocationGenerator[common.ScriptLocation]()
+}
 
 func encodeArgs(argValues []cadence.Value) [][]byte {
 	args := make([][]byte, len(argValues))
