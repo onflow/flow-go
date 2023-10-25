@@ -38,15 +38,12 @@ var (
 	flagPartnerWeights              string
 	flagDKGDataPath                 string
 	flagRootBlock                   string
+	flagRootEpoch                   string
 	flagRootBlockVotesDir           string
 	flagRootCommit                  string
 	flagProtocolVersion             uint
 	flagServiceAccountPublicKeyJSON string
 	flagGenesisTokenSupply          string
-	flagEpochCounter                uint64
-	flagNumViewsInEpoch             uint64
-	flagNumViewsInStakingAuction    uint64
-	flagNumViewsInDKGPhase          uint64
 	flagEpochCommitSafetyThreshold  uint64
 )
 
@@ -93,21 +90,13 @@ func addFinalizeCmdFlags() {
 		"path to a JSON file containing root block")
 	finalizeCmd.Flags().StringVar(&flagRootBlockVotesDir, "root-block-votes-dir", "", "path to directory with votes for root block")
 	finalizeCmd.Flags().StringVar(&flagRootCommit, "root-commit", "0000000000000000000000000000000000000000000000000000000000000000", "state commitment of root execution state")
-	finalizeCmd.Flags().Uint64Var(&flagEpochCounter, "epoch-counter", 0, "epoch counter for the epoch beginning with the root block")
-	finalizeCmd.Flags().Uint64Var(&flagNumViewsInEpoch, "epoch-length", 4000, "length of each epoch measured in views")
-	finalizeCmd.Flags().Uint64Var(&flagNumViewsInStakingAuction, "epoch-staking-phase-length", 100, "length of the epoch staking phase measured in views")
-	finalizeCmd.Flags().Uint64Var(&flagNumViewsInDKGPhase, "epoch-dkg-phase-length", 1000, "length of each DKG phase measured in views")
 	finalizeCmd.Flags().Uint64Var(&flagEpochCommitSafetyThreshold, "epoch-commit-safety-threshold", 500, "defines epoch commitment deadline")
 	finalizeCmd.Flags().UintVar(&flagProtocolVersion, "protocol-version", flow.DefaultProtocolVersion, "major software version used for the duration of this spork")
 
 	cmd.MarkFlagRequired(finalizeCmd, "root-block")
+	cmd.MarkFlagRequired(finalizeCmd, "root-epoch")
 	cmd.MarkFlagRequired(finalizeCmd, "root-block-votes-dir")
 	cmd.MarkFlagRequired(finalizeCmd, "root-commit")
-	cmd.MarkFlagRequired(finalizeCmd, "epoch-counter")
-	cmd.MarkFlagRequired(finalizeCmd, "epoch-length")
-	cmd.MarkFlagRequired(finalizeCmd, "epoch-staking-phase-length")
-	cmd.MarkFlagRequired(finalizeCmd, "epoch-dkg-phase-length")
-	cmd.MarkFlagRequired(finalizeCmd, "epoch-commit-safety-threshold")
 	cmd.MarkFlagRequired(finalizeCmd, "protocol-version")
 
 	// optional parameters to influence various aspects of identity generation
@@ -172,6 +161,11 @@ func finalize(cmd *cobra.Command, args []string) {
 	dkgData := readDKGData()
 	log.Info().Msg("")
 
+	log.Info().Msg("reading root epoch")
+	epochSetup, epochCommit := readRootEpoch()
+	clusterQCs := epochCommit.ClusterQCs
+	log.Info().Msg("")
+
 	log.Info().Msg("constructing root QC")
 	rootQC := constructRootQC(
 		block,
@@ -182,26 +176,11 @@ func finalize(cmd *cobra.Command, args []string) {
 	)
 	log.Info().Msg("")
 
-	log.Info().Msg("computing collection node clusters")
-	assignments, clusters, err := constructClusterAssignment(partnerNodes, internalNodes)
-	if err != nil {
-		log.Fatal().Err(err).Msg("unable to generate cluster assignment")
-	}
-	log.Info().Msg("")
-
-	log.Info().Msg("constructing root blocks for collection node clusters")
-	clusterBlocks := run.GenerateRootClusterBlocks(flagEpochCounter, clusters)
-	log.Info().Msg("")
-
-	log.Info().Msg("constructing root QCs for collection node clusters")
-	clusterQCs := constructRootQCsForClusters(clusters, internalNodes, clusterBlocks)
-	log.Info().Msg("")
-
 	// if no root commit is specified, bootstrap an empty execution state
 	if flagRootCommit == "0000000000000000000000000000000000000000000000000000000000000000" {
 		generateEmptyExecutionState(
 			block.Header.ChainID,
-			assignments,
+			epochSetup.Assignments,
 			clusterQCs,
 			dkgData,
 			participants,
@@ -209,7 +188,7 @@ func finalize(cmd *cobra.Command, args []string) {
 	}
 
 	log.Info().Msg("constructing root execution result and block seal")
-	result, seal := constructRootResultAndSeal(flagRootCommit, block, participants, assignments, clusterQCs, dkgData)
+	result, seal := constructRootResultAndSeal(flagRootCommit, block, epochSetup, epochCommit)
 	log.Info().Msg("")
 
 	// construct serializable root protocol snapshot
@@ -499,15 +478,32 @@ func mergeNodeInfos(internalNodes, partnerNodes []model.NodeInfo) []model.NodeIn
 // readRootBlock reads root block data from disc, this file needs to be prepared with
 // rootblock command
 func readRootBlock() *flow.Block {
-	rootBlock, err := utils.ReadRootBlock(flagRootBlock)
+	rootBlock, err := utils.ReadData[flow.Block](flagRootBlock)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not read root block data")
 	}
 	return rootBlock
 }
 
+func readRootEpoch() (*flow.EpochSetup, *flow.EpochCommit) {
+	encodableEpoch, err := utils.ReadData[inmem.EncodableEpoch](flagRootEpoch)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not read root block data")
+	}
+	epoch := inmem.NewEpoch(*encodableEpoch)
+	setup, err := protocol.ToEpochSetup(epoch)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not extract setup event")
+	}
+	commit, err := protocol.ToEpochCommit(epoch)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not extract commit event")
+	}
+	return setup, commit
+}
+
 func readDKGData() dkg.DKGData {
-	encodableDKG, err := utils.ReadDKGData(flagDKGDataPath)
+	encodableDKG, err := utils.ReadData[inmem.EncodableFullDKG](flagDKGDataPath)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not read DKG data")
 	}
