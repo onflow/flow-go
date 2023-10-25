@@ -36,6 +36,7 @@ func constructRootBlock(rootHeader *flow.Header, setup *flow.EpochSetup, commit 
 	return block
 }
 
+// constructRootEpochEvents constructs the epoch setup and commit events for the first epoch after spork.
 func constructRootEpochEvents(
 	firstView uint64,
 	participants flow.IdentityList,

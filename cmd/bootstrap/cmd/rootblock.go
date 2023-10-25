@@ -65,7 +65,6 @@ func addRootBlockCmdFlags() {
 	cmd.MarkFlagRequired(rootBlockCmd, "epoch-length")
 	cmd.MarkFlagRequired(rootBlockCmd, "epoch-staking-phase-length")
 	cmd.MarkFlagRequired(rootBlockCmd, "epoch-dkg-phase-length")
-	cmd.MarkFlagRequired(rootBlockCmd, "epoch-commit-safety-threshold")
 
 	// required parameters for generation of root block, root execution result and root block seal
 	rootBlockCmd.Flags().StringVar(&flagRootChain, "root-chain", "local", "chain ID for the root block (can be 'main', 'test', 'sandbox', 'bench', or 'local'")
@@ -111,7 +110,7 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	dkgData := runBeaconKG(model.FilterByRole(stakingNodes, flow.RoleConsensus))
 	log.Info().Msg("")
 
-	// create flow.IdentityList representation of participant set
+	// create flow.IdentityList representation of the participant set
 	participants := model.ToIdentityList(stakingNodes).Sort(order.Canonical[flow.Identity])
 
 	log.Info().Msg("computing collection node clusters")
@@ -140,7 +139,7 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	if err != nil {
 		log.Fatal().Msg("could not convert root epoch to encodable")
 	}
-	writeJSON(model.PathRootEpoch, encodableEpoch)
+	writeJSON(model.PathRootEpoch, encodableEpoch.Encodable())
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing root block")

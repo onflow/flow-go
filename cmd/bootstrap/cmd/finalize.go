@@ -88,6 +88,8 @@ func addFinalizeCmdFlags() {
 	// required parameters for generation of root block, root execution result and root block seal
 	finalizeCmd.Flags().StringVar(&flagRootBlock, "root-block", "",
 		"path to a JSON file containing root block")
+	finalizeCmd.Flags().StringVar(&flagRootEpoch, "root-epoch", "",
+		"path to a JSON file containing root epoch")
 	finalizeCmd.Flags().StringVar(&flagRootBlockVotesDir, "root-block-votes-dir", "", "path to directory with votes for root block")
 	finalizeCmd.Flags().StringVar(&flagRootCommit, "root-commit", "0000000000000000000000000000000000000000000000000000000000000000", "state commitment of root execution state")
 	finalizeCmd.Flags().Uint64Var(&flagEpochCommitSafetyThreshold, "epoch-commit-safety-threshold", 500, "defines epoch commitment deadline")
@@ -98,6 +100,7 @@ func addFinalizeCmdFlags() {
 	cmd.MarkFlagRequired(finalizeCmd, "root-block-votes-dir")
 	cmd.MarkFlagRequired(finalizeCmd, "root-commit")
 	cmd.MarkFlagRequired(finalizeCmd, "protocol-version")
+	cmd.MarkFlagRequired(finalizeCmd, "epoch-commit-safety-threshold")
 
 	// optional parameters to influence various aspects of identity generation
 	finalizeCmd.Flags().UintVar(&flagCollectionClusters, "collection-clusters", 2, "number of collection clusters")
@@ -162,8 +165,8 @@ func finalize(cmd *cobra.Command, args []string) {
 	log.Info().Msg("")
 
 	log.Info().Msg("reading root epoch")
-	epochSetup, epochCommit := readRootEpoch()
-	clusterQCs := epochCommit.ClusterQCs
+	epoch, epochSetup, epochCommit := readRootEpoch()
+	clusterQCs := clusterRootQCsFromEpoch(epoch)
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing root QC")
@@ -485,10 +488,12 @@ func readRootBlock() *flow.Block {
 	return rootBlock
 }
 
-func readRootEpoch() (*flow.EpochSetup, *flow.EpochCommit) {
+// readRootEpoch reads root epoch data from disc, this file needs to be prepared with
+// rootblock command
+func readRootEpoch() (protocol.Epoch, *flow.EpochSetup, *flow.EpochCommit) {
 	encodableEpoch, err := utils.ReadData[inmem.EncodableEpoch](flagRootEpoch)
 	if err != nil {
-		log.Fatal().Err(err).Msg("could not read root block data")
+		log.Fatal().Err(err).Msg("could not read root epoch data")
 	}
 	epoch := inmem.NewEpoch(*encodableEpoch)
 	setup, err := protocol.ToEpochSetup(epoch)
@@ -499,9 +504,11 @@ func readRootEpoch() (*flow.EpochSetup, *flow.EpochCommit) {
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not extract commit event")
 	}
-	return setup, commit
+	return epoch, setup, commit
 }
 
+// readDKGData reads DKG data from disc, this file needs to be prepared with
+// rootblock command
 func readDKGData() dkg.DKGData {
 	encodableDKG, err := utils.ReadData[inmem.EncodableFullDKG](flagDKGDataPath)
 	if err != nil {
