@@ -40,7 +40,10 @@ func runCheckpoint(registerDir string, pebbleCheckpointDir string) error {
 		pdb.Close()
 	}()
 
-	registers.Checkpoint(pebbleCheckpointDir)
+	err = registers.Checkpoint(pebbleCheckpointDir)
+	if err != nil {
+		return err
+	}
 
 	log.Info().Msgf("successfully created checkpoint at %v", pebbleCheckpointDir)
 	return nil
