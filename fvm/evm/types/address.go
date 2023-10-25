@@ -14,8 +14,7 @@ const AddressLength = gethCommon.AddressLength
 
 // NewAddress constructs a new Address
 func NewAddress(addr gethCommon.Address) Address {
-	fa := Address(addr)
-	return fa
+	return Address(addr)
 }
 
 // Bytes returns a byte slice for the address
