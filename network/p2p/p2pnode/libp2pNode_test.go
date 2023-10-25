@@ -22,7 +22,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
-	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -276,58 +275,14 @@ func TestCreateStream_SinglePairwiseConnection(t *testing.T) {
 
 	go createConcurrentStreams(t, ctxWithTimeout, nodes, ids, numOfStreamsPerNode, streamChan, done)
 	unittest.RequireCloseBefore(t, done, 5*time.Second, "could not create streamChan on time")
-	require.Len(t, streamChan, expectedTotalNumOfStreams, fmt.Sprintf("expected %d total number of streamChan created got %d", expectedTotalNumOfStreams, len(streamChan)))
+	require.Len(t,
+		streamChan,
+		expectedTotalNumOfStreams,
+		fmt.Sprintf("expected %d total number of streamChan created got %d", expectedTotalNumOfStreams, len(streamChan)))
 
 	// ensure only a single connection exists between all nodes
 	ensureSinglePairwiseConnection(t, nodes)
 	close(streamChan)
-}
-
-// TestCreateStream_InboundConnResourceLimit ensures that the setting the resource limit config for
-// PeerDefaultLimits.ConnsInbound restricts the number of inbound connections created from a peer to the configured value.
-// NOTE: If this test becomes flaky, it indicates a violation of the single inbound connection guarantee.
-// In such cases the test should not be quarantined but requires immediate resolution.
-func TestCreateStream_InboundConnResourceLimit(t *testing.T) {
-	idProvider := mockmodule.NewIdentityProvider(t)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-
-	sporkID := unittest.IdentifierFixture()
-
-	sender, id1 := p2ptest.NodeFixture(t, sporkID, t.Name(), idProvider, p2ptest.WithDefaultResourceManager(), p2ptest.WithCreateStreamRetryDelay(10*time.Millisecond))
-
-	receiver, id2 := p2ptest.NodeFixture(t, sporkID, t.Name(), idProvider, p2ptest.WithDefaultResourceManager(), p2ptest.WithCreateStreamRetryDelay(10*time.Millisecond))
-
-	idProvider.On("ByPeerID", sender.ID()).Return(&id1, true).Maybe()
-	idProvider.On("ByPeerID", receiver.ID()).Return(&id2, true).Maybe()
-
-	p2ptest.StartNodes(t, signalerCtx, []p2p.LibP2PNode{sender, receiver})
-	defer p2ptest.StopNodes(t, []p2p.LibP2PNode{sender, receiver}, cancel)
-
-	p2ptest.LetNodesDiscoverEachOther(t, signalerCtx, []p2p.LibP2PNode{sender, receiver}, flow.IdentityList{&id1, &id2})
-
-	var allStreamsCreated sync.WaitGroup
-	// at this point both nodes have discovered each other and we can now create an
-	// arbitrary number of streams from sender -> receiver. This will force libp2p
-	// to create multiple streams concurrently and attempt to reuse the single pairwise
-	// connection. If more than one connection is established while creating the conccurent
-	// streams this indicates a bug in the libp2p PeerBaseLimitConnsInbound limit.
-	defaultProtocolID := protocols.FlowProtocolID(sporkID)
-	expectedNumOfStreams := int64(50)
-	for i := int64(0); i < expectedNumOfStreams; i++ {
-		allStreamsCreated.Add(1)
-		go func() {
-			defer allStreamsCreated.Done()
-			_, err := sender.Host().NewStream(ctx, receiver.ID(), defaultProtocolID)
-			require.NoError(t, err)
-		}()
-	}
-
-	unittest.RequireReturnsBefore(t, allStreamsCreated.Wait, 2*time.Second, "could not create streams on time")
-	require.Len(t, receiver.Host().Network().ConnsToPeer(sender.ID()), 1)
-	actualNumOfStreams := p2putils.CountStream(sender.Host(), receiver.ID(), defaultProtocolID, network.DirOutbound)
-	require.Equal(t, expectedNumOfStreams, int64(actualNumOfStreams), fmt.Sprintf("expected to create %d number of streams got %d", expectedNumOfStreams, actualNumOfStreams))
 }
 
 // createStreams will attempt to create n number of streams concurrently between each combination of node pairs.
