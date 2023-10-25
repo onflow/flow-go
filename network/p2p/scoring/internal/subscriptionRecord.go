@@ -7,7 +7,7 @@ import (
 )
 
 // SubscriptionRecordEntity is an entity that represents a the list of topics a peer is subscribed to.
-// It is internally used by the SubscriptionCache to store the subscription records in the cache.
+// It is internally used by the SubscriptionRecordCache to store the subscription records in the cache.
 type SubscriptionRecordEntity struct {
 	// entityId is the key of the entity in the cache. It is the hash of the peer id.
 	// It is intentionally encoded as part of the struct to avoid recomputing it.

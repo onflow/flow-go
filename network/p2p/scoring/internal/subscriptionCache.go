@@ -5,20 +5,49 @@ import (
 	"fmt"
 
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
+	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/network/alsp/model"
 )
 
 var ErrTopicRecordNotFound = fmt.Errorf("topic record not found")
 
-type SubscriptionCache struct {
+type SubscriptionRecordCache struct {
 	c            *stdmap.Backend
 	currentCycle atomic.Uint64
 }
 
-func (s *SubscriptionCache) GetSubscribedTopics(pid peer.ID) ([]string, bool) {
+func NewSubscriptionRecordCache(sizeLimit uint32,
+	logger zerolog.Logger,
+	collector module.HeroCacheMetrics,
+	recordFactory model.SpamRecordFactoryFunc) *SubscriptionRecordCache {
+	backData := herocache.NewCache(sizeLimit,
+		herocache.DefaultOversizeFactor,
+		// this cache is supposed to keep the subscription for the authorized (staked) nodes. Since the number of such nodes is
+		// expected to be small, we do not eject any records from the cache. The cache size must be large enough to hold all
+		// the spam records of the authorized nodes. Also, this cache is keeping at most one record per origin id, so the
+		// size of the cache must be at least the number of authorized nodes.
+		heropool.NoEjection,
+		logger.With().Str("mempool", "subscription-records").Logger(),
+		collector)
+
+	return &SubscriptionRecordCache{
+		c:            stdmap.NewBackend(stdmap.WithBackData(backData)),
+		currentCycle: *atomic.NewUint64(0),
+	}
+}
+
+// GetSubscribedTopics returns the list of topics a peer is subscribed to.
+// Returns:
+// - []string: the list of topics the peer is subscribed to.
+// - bool: true if there is a record for the peer, false otherwise.
+func (s *SubscriptionRecordCache) GetSubscribedTopics(pid peer.ID) ([]string, bool) {
 	e, ok := s.c.ByID(flow.MakeID(pid))
 	if !ok {
 		return nil, false
@@ -26,11 +55,29 @@ func (s *SubscriptionCache) GetSubscribedTopics(pid peer.ID) ([]string, bool) {
 	return e.(*SubscriptionRecordEntity).Topics, true
 }
 
-func (s *SubscriptionCache) MoveToNextUpdateCycle() {
+// MoveToNextUpdateCycle moves the subscription cache to the next update cycle.
+// A new update cycle is started when the subscription cache is first created, and then every time the subscription cache
+// is updated. The update cycle is used to keep track of the last time the subscription cache was updated. It is used to
+// implement a notion of time in the subscription cache.
+// Returns:
+// - uint64: the current update cycle.
+func (s *SubscriptionRecordCache) MoveToNextUpdateCycle() uint64 {
 	s.currentCycle.Inc()
+	return s.currentCycle.Load()
 }
 
-func (s *SubscriptionCache) AddTopicForPeer(pid peer.ID, topic string) ([]string, error) {
+// AddTopicForPeer appends a topic to the list of topics a peer is subscribed to. If the peer is not subscribed to any
+// topics yet, a new record is created.
+// If the last update cycle is older than the current cycle, the list of topics for the peer is first cleared, and then
+// the topic is added to the list. This is to ensure that the list of topics for a peer is always up to date.
+// Args:
+// - pid: the peer id of the peer.
+// - topic: the topic to add.
+// Returns:
+// - []string: the list of topics the peer is subscribed to after the update.
+// - error: an error if the update failed; any returned error is an irrecoverable error and indicates a bug or misconfiguration.
+// Implementation must be thread-safe.
+func (s *SubscriptionRecordCache) AddTopicForPeer(pid peer.ID, topic string) ([]string, error) {
 	// first, we try to optimistically adjust the record assuming that the record already exists.
 	entityId := flow.MakeID(pid)
 	topics, err := s.addTopicForPeer(entityId, topic)
@@ -61,7 +108,7 @@ func (s *SubscriptionCache) AddTopicForPeer(pid peer.ID, topic string) ([]string
 	}
 }
 
-func (s *SubscriptionCache) addTopicForPeer(entityId flow.Identifier, topic string) ([]string, error) {
+func (s *SubscriptionRecordCache) addTopicForPeer(entityId flow.Identifier, topic string) ([]string, error) {
 	var rErr error
 	updatedEntity, adjusted := s.c.Adjust(entityId, func(entity flow.Entity) flow.Entity {
 		record, ok := entity.(SubscriptionRecordEntity)
