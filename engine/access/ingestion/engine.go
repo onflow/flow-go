@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/network"
@@ -45,6 +46,8 @@ const missingCollsForAgeThreshold = 100
 
 // default queue capacity
 const defaultQueueCapacity = 10_000
+
+const defaultExecutionDataCatchupDistance = 10
 
 var defaultCollectionCatchupTimeout = collectionCatchupTimeout
 var defaultCollectionCatchupDBPollInterval = collectionCatchupDBPollInterval
@@ -82,6 +85,9 @@ type Engine struct {
 	collectionsToMarkFinalized *stdmap.Times
 	collectionsToMarkExecuted  *stdmap.Times
 	blocksToMarkExecuted       *stdmap.Times
+
+	executionDataHeight func() (uint64, error)
+	execDataCache       *cache.ExecutionDataCache
 }
 
 // New creates a new access ingestion engine
@@ -101,6 +107,8 @@ func New(
 	collectionsToMarkFinalized *stdmap.Times,
 	collectionsToMarkExecuted *stdmap.Times,
 	blocksToMarkExecuted *stdmap.Times,
+	executionDataHeight func() (uint64, error),
+	execDataCache *cache.ExecutionDataCache,
 ) (*Engine, error) {
 	executionReceiptsRawQueue, err := fifoqueue.NewFifoQueue(defaultQueueCapacity)
 	if err != nil {
@@ -152,6 +160,8 @@ func New(
 		collectionsToMarkFinalized: collectionsToMarkFinalized,
 		collectionsToMarkExecuted:  collectionsToMarkExecuted,
 		blocksToMarkExecuted:       blocksToMarkExecuted,
+		executionDataHeight:        executionDataHeight,
+		execDataCache:              execDataCache,
 
 		// queue / notifier for execution receipts
 		executionReceiptsNotifier: engine.NewNotifier(),
@@ -216,12 +226,24 @@ func (e *Engine) initLastFullBlockHeightIndex() error {
 }
 
 func (e *Engine) processBackground(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	// first, index all missing collection that are available in locally stored execution data
+	lastFullHeight, err := e.blocks.GetLastFullBlockHeight()
+	if err != nil {
+		e.log.Error().Err(err).Msg("failed to get last full block")
+	} else {
+		err := e.indexMissingCollectionsFromExecutionData(ctx, lastFullHeight)
+		if err != nil {
+			e.log.Error().Err(err).Msg("failed to index missing collections from execution data")
+		}
+	}
+
+	// next, request any collections that are still missing from the network
 	// context with timeout
 	requestCtx, cancel := context.WithTimeout(ctx, defaultCollectionCatchupTimeout)
 	defer cancel()
 
 	// request missing collections
-	err := e.requestMissingCollections(requestCtx)
+	err = e.requestMissingCollections(requestCtx)
 	if err != nil {
 		e.log.Error().Err(err).Msg("requesting missing collections failed")
 	}
@@ -233,7 +255,7 @@ func (e *Engine) processBackground(ctx irrecoverable.SignalerContext, ready comp
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			e.updateLastFullBlockReceivedIndex()
+			e.updateLastFullBlockReceivedIndex(ctx)
 		}
 	}
 }
@@ -275,7 +297,6 @@ func (e *Engine) processAvailableExecutionReceipts(ctx context.Context) error {
 			return err
 		}
 	}
-
 }
 
 func (e *Engine) processFinalizedBlocks(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
@@ -514,7 +535,7 @@ func (e *Engine) trackExecutedMetricForBlock(block *flow.Block, ti time.Time) {
 }
 
 // handleCollection handles the response of the a collection request made earlier when a block was received
-func (e *Engine) handleCollection(originID flow.Identifier, entity flow.Entity) error {
+func (e *Engine) handleCollection(entity flow.Entity) error {
 
 	// convert the entity to a strictly typed collection
 	collection, ok := entity.(*flow.Collection)
@@ -567,7 +588,7 @@ func (e *Engine) handleCollection(originID flow.Identifier, entity flow.Entity) 
 }
 
 func (e *Engine) OnCollection(originID flow.Identifier, entity flow.Entity) {
-	err := e.handleCollection(originID, entity)
+	err := e.handleCollection(entity)
 	if err != nil {
 		e.log.Error().Err(err).Msg("could not handle collection")
 		return
@@ -676,10 +697,86 @@ func (e *Engine) requestMissingCollections(ctx context.Context) error {
 	return nil
 }
 
+func (e *Engine) indexMissingCollectionsFromExecutionData(ctx context.Context, lastFullHeight uint64) error {
+	// these are not set if catchup from execution data is disabled
+	if e.executionDataHeight == nil || e.execDataCache == nil {
+		return nil
+	}
+
+	latestExecDataHeight, err := e.executionDataHeight()
+	if err != nil {
+		return fmt.Errorf("could not get latest execution data available: %w", err)
+	}
+
+	if lastFullHeight >= latestExecDataHeight {
+		return nil
+	}
+
+	lg := e.log.With().
+		Uint64("last_full_height", lastFullHeight).
+		Uint64("latest_exec_data_height", latestExecDataHeight).
+		Logger()
+
+	lg.Trace().Msg("indexing missing collections from execution data")
+
+	start := time.Now()
+	indexedCount := 0
+	for i := lastFullHeight + 1; i <= latestExecDataHeight; i++ {
+		// find missing collections for block at height i
+		missingColls, err := e.missingCollectionsAtHeight(i)
+		if err != nil {
+			return fmt.Errorf("could not get missing collections for height %d: %w", i, err)
+		}
+
+		// nothing to do
+		if len(missingColls) == 0 {
+			lg.Trace().
+				Uint64("height", i).
+				Msg("no missing collections for height")
+			continue
+		}
+
+		execData, err := e.execDataCache.ByHeight(ctx, i)
+		if err != nil {
+			return fmt.Errorf("could not get execution data for height %d: %w", i, err)
+		}
+
+		collections := make(map[flow.Identifier]*flow.Collection, len(execData.ChunkExecutionDatas))
+		for _, chunk := range execData.ChunkExecutionDatas {
+			collections[chunk.Collection.ID()] = chunk.Collection
+		}
+
+		for _, missingColl := range missingColls {
+			coll, ok := collections[missingColl.CollectionID]
+			if !ok {
+				// this indicates a bug, since all collections for the block must exist in the execution data
+				return fmt.Errorf("could not find collection %s in execution data for height %d", missingColl.CollectionID, i)
+			}
+
+			err = e.handleCollection(coll)
+			if err != nil {
+				lg.Error().
+					Err(err).
+					Uint64("height", i).
+					Msg("failed to index collection from execution data")
+				continue
+			}
+			indexedCount++
+		}
+	}
+
+	lg.Debug().
+		Int("indexed_count", indexedCount).
+		Dur("duration_ms", time.Since(start)).
+		Msg("indexed missing collections from execution data")
+
+	return nil
+}
+
 // updateLastFullBlockReceivedIndex keeps the FullBlockHeight index up to date and requests missing collections if
 // the number of blocks missing collection have reached the defaultMissingCollsForBlkThreshold value.
 // (The FullBlockHeight index indicates that block for which all collections have been received)
-func (e *Engine) updateLastFullBlockReceivedIndex() {
+func (e *Engine) updateLastFullBlockReceivedIndex(ctx context.Context) {
 
 	logError := func(err error) {
 		e.log.Error().Err(err).Msg("failed to update the last full block height")
@@ -755,6 +852,17 @@ func (e *Engine) updateLastFullBlockReceivedIndex() {
 		}
 
 		e.metrics.UpdateLastFullBlockHeight(lastFullHeight)
+	}
+
+	// if we've fallen behind by more than a few blocks, try to catch up using execution data
+	if latestFullHeight < finalBlk.Height-defaultExecutionDataCatchupDistance {
+		err = e.indexMissingCollectionsFromExecutionData(ctx, latestFullHeight)
+		if err != nil {
+			logError(err)
+			// continue to normal flow on error
+			// Note: this may mean we attempt to sync collections we've already indexed, but this is
+			// OK for this temporary fix.
+		}
 	}
 
 	// additionally, if more than threshold blocks have missing collection OR collections are missing since defaultMissingCollsForAgeThreshold, re-request those collections
