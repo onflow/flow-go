@@ -149,8 +149,9 @@ func (reusable *ReusableCadenceRuntime) ExecuteScript(
 	return reusable.Runtime.ExecuteScript(
 		script,
 		runtime.Context{
-			Interface: reusable.fvmEnv,
-			Location:  location,
+			Interface:   reusable.fvmEnv,
+			Location:    location,
+			Environment: reusable.Environment,
 		},
 	)
 }
