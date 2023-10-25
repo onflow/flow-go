@@ -1,5 +1,3 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package badger
 
 import (
@@ -792,7 +790,6 @@ func newState(
 		cachedFinal:          new(atomic.Pointer[cachedHeader]),
 		cachedSealed:         new(atomic.Pointer[cachedHeader]),
 	}
-
 	state.protocolStateMutator = protocol_state.NewMutator(
 		headers,
 		results,
