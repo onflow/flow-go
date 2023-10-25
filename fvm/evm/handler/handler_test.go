@@ -157,17 +157,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 	t.Run("test running transaction (with integrated emulator)", func(t *testing.T) {
 		testutils.RunWithTestBackend(t, func(backend types.Backend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
-
-				bs, err := handler.NewBlockStore(backend, rootAddr)
-				require.NoError(t, err)
-
-				db, err := database.NewDatabase(backend, rootAddr)
-				require.NoError(t, err)
-
-				emulator := emulator.NewEmulator(db)
-
-				handler := handler.NewContractHandler(bs, backend, emulator)
-
+				handler := SetupHandler(t, backend, rootAddr)
 				eoa := testutils.GetTestEOAAccount(t, testutils.EOATestAccount1KeyHex)
 
 				// deposit 1 Flow to the foa account
@@ -262,15 +252,8 @@ func TestHandler_BridgedAccount(t *testing.T) {
 	t.Run("test deposit/withdraw (with integrated emulator)", func(t *testing.T) {
 		testutils.RunWithTestBackend(t, func(backend types.Backend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
-				bs, err := handler.NewBlockStore(backend, rootAddr)
-				require.NoError(t, err)
 
-				db, err := database.NewDatabase(backend, rootAddr)
-				require.NoError(t, err)
-
-				emulator := emulator.NewEmulator(db)
-
-				handler := handler.NewContractHandler(bs, backend, emulator)
+				handler := SetupHandler(t, backend, rootAddr)
 				foa := handler.AccountByAddress(handler.AllocateAddress(), true)
 				require.NotNil(t, foa)
 
@@ -427,15 +410,7 @@ func TestHandler_BridgedAccount(t *testing.T) {
 		// TODO update this test with events, gas metering, etc
 		testutils.RunWithTestBackend(t, func(backend types.Backend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
-				bs, err := handler.NewBlockStore(backend, rootAddr)
-				require.NoError(t, err)
-
-				db, err := database.NewDatabase(backend, rootAddr)
-				require.NoError(t, err)
-
-				emulator := emulator.NewEmulator(db)
-
-				handler := handler.NewContractHandler(bs, backend, emulator)
+				handler := SetupHandler(t, backend, rootAddr)
 				foa := handler.AccountByAddress(handler.AllocateAddress(), true)
 				require.NotNil(t, foa)
 
@@ -476,6 +451,17 @@ type checkError func(error) bool
 
 var isNotFatal = func(err error) bool {
 	return !errors.IsFailure(err)
+}
+
+func SetupHandler(t testing.TB, backend types.Backend, rootAddr flow.Address) *handler.ContractHandler {
+	bs, err := handler.NewBlockStore(backend, rootAddr)
+	require.NoError(t, err)
+
+	db, err := database.NewDatabase(backend, rootAddr)
+	require.NoError(t, err)
+
+	emulator := emulator.NewEmulator(db)
+	return handler.NewContractHandler(bs, backend, emulator)
 }
 
 func assertPanic(t *testing.T, check checkError, f func()) {

@@ -39,5 +39,6 @@ func SetupEnvironment(
 	flexTypeDefinition := emulator.FlexTypeDefinition
 	env.DeclareValue(stdlib.NewFlexStandardLibraryValue(nil, flexTypeDefinition, handler))
 	env.DeclareType(stdlib.NewFlexStandardLibraryType(flexTypeDefinition))
+
 	return nil
 }
