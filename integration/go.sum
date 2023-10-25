@@ -100,8 +100,6 @@ github.com/DATA-DOG/go-sqlmock v1.3.3/go.mod h1:f/Ixk793poVmq4qj/V1dPUg2JEAKC73Q
 github.com/DataDog/zstd v1.4.1/go.mod h1:1jcaCB/ufaK+sKp1NBhlGmpz41jOoPQ35bpF36t7BBo=
 github.com/DataDog/zstd v1.4.5 h1:EndNeuB0l9syBZhut0wns3gV1hL8zX8LIu6ZiVHWLIQ=
 github.com/DataDog/zstd v1.4.5/go.mod h1:1jcaCB/ufaK+sKp1NBhlGmpz41jOoPQ35bpF36t7BBo=
-github.com/Guitarheroua/flow-emulator v0.0.0-20231018151849-2b2f7bcd6fa2 h1:WIoMCjOzGI2WyVWsTiVmWzTfnPKoaq0jGDj0XjuFBwE=
-github.com/Guitarheroua/flow-emulator v0.0.0-20231018151849-2b2f7bcd6fa2/go.mod h1:m0BlKMdFBteEH3oepU1yeerU4kvpTctvO+6mkmF9nlU=
 github.com/JohnCGriffin/overflow v0.0.0-20211019200055-46fa312c352c h1:RGWPOewvKIROun94nF7v2cua9qP+thov/7M50KEoeSU=
 github.com/Joker/hpp v1.0.0/go.mod h1:8x5n+M1Hp5hC0g8okX3sR3vFQwynaX/UgSOM9MeBKzY=
 github.com/Joker/jade v1.0.1-0.20190614124447-d475f43051e7/go.mod h1:6E6s8o2AE4KhCrqr6GRJjdC/gNfTdxkIXvuGZZda2VM=
@@ -1436,6 +1434,8 @@ github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.4-0.20231016154253-a
 github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.4-0.20231016154253-a00dbf7c061f/go.mod h1:jM6GMAL+m0hjusUgiYDNrixPQ6b9s8xjoJQoEu5bHQI=
 github.com/onflow/flow-core-contracts/lib/go/templates v1.2.4-0.20231016154253-a00dbf7c061f h1:Ep+Mpo2miWMe4pjPGIaEvEzshRep30dvNgxqk+//FrQ=
 github.com/onflow/flow-core-contracts/lib/go/templates v1.2.4-0.20231016154253-a00dbf7c061f/go.mod h1:ZeLxwaBkzuSInESGjL8/IPZWezF+YOYsYbMrZlhN+q4=
+github.com/onflow/flow-emulator v0.54.1-0.20231024204057-0273f8fe3807 h1:/4jZ2oELdhKubgL97NGqhiuO80oMH/M+fIQoNPfGg+g=
+github.com/onflow/flow-emulator v0.54.1-0.20231024204057-0273f8fe3807/go.mod h1:Qq1YmTDYlfpzfuzrFH8gwMgzzv80LCKFiS1Kqm8vFcY=
 github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20230711213910-baad011d2b13 h1:B4ll7e3j+MqTJv2122Enq3RtDNzmIGRu9xjV7fo7un0=
 github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20230711213910-baad011d2b13/go.mod h1:kTMFIySzEJJeupk+7EmXs0EJ6CBWY/MV9fv9iYQk+RU=
 github.com/onflow/flow-go-sdk v0.24.0/go.mod h1:IoptMLPyFXWvyd9yYA6/4EmSeeozl6nJoIv4FaEMg74=

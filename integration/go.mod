@@ -21,8 +21,8 @@ require (
 	github.com/onflow/cadence v0.42.1
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.4-0.20231016154253-a00dbf7c061f
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.2.4-0.20231016154253-a00dbf7c061f
-	github.com/onflow/flow-emulator v0.54.1
-	github.com/onflow/flow-go v0.31.1-0.20230808172820-f074502a67e3
+	github.com/onflow/flow-emulator v0.54.1-0.20231024204057-0273f8fe3807
+	github.com/onflow/flow-go v0.32.3
 	github.com/onflow/flow-go-sdk v0.41.12
 	github.com/onflow/flow-go/crypto v0.24.9
 	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
@@ -345,5 +345,3 @@ require (
 replace github.com/onflow/flow-go => ../
 
 replace github.com/onflow/flow-go/insecure => ../insecure
-
-replace github.com/onflow/flow-emulator v0.54.1 => github.com/Guitarheroua/flow-emulator v0.0.0-20231018151849-2b2f7bcd6fa2
