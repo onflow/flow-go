@@ -211,3 +211,7 @@ func (s *Registers) PruneByHeight(pruneHeight uint64) error {
 func (s *Registers) deleteKey(key []byte) error {
 	return s.db.Delete(key, &pebble.WriteOptions{})
 }
+
+func (s *Registers) Checkpoint(dir string) error {
+	return s.db.Checkpoint(dir)
+}
