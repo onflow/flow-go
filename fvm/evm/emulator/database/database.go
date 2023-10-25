@@ -15,9 +15,8 @@ import (
 )
 
 const (
-	FlowEVMLatextBlockKey = "LatestBlock"
-	FlowEVMRootSlabKey    = "RootSlabKey"
-	FlowEVMRootHashKey    = "RootHash"
+	FlowEVMRootSlabKey = "RootSlabKey"
+	FlowEVMRootHashKey = "RootHash"
 )
 
 var (
