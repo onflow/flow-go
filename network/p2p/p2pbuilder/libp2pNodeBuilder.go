@@ -290,7 +290,6 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 
 	if builder.basicResolver != nil {
 		resolver, err := madns.NewResolver(madns.WithDefaultResolver(builder.basicResolver))
-
 		if err != nil {
 			return nil, fmt.Errorf("could not create resolver: %w", err)
 		}
@@ -391,7 +390,7 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 				}
 				node.SetRouting(routingSystem)
 				builder.gossipSubBuilder.SetRoutingSystem(routingSystem)
-				builder.logger.Debug().Msg("routing system created")
+				builder.logger.Info().Msg("routing system created")
 			}
 
 			// gossipsub is created here, because it needs to be created during the node startup.
