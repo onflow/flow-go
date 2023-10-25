@@ -49,7 +49,7 @@ func TestEVMRun(t *testing.T) {
 
 							txBytes := testAccount.PrepareSignAndEncodeTx(t,
 								testContract.DeployedAt.ToCommon(),
-								testContract.MakeStoreCallData(t, big.NewInt(num)),
+								testContract.MakeCallData(t, "store", big.NewInt(num)),
 								big.NewInt(0),
 								gasLimit,
 								big.NewInt(0),
