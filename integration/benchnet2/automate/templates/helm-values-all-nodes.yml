@@ -25,6 +25,11 @@ access:
         - --log-tx-time-to-finalized
         - --log-tx-time-to-executed
         - --log-tx-time-to-finalized-executed
+        - --execution-data-sync-enabled=true 
+        - --execution-data-dir=/data/execution-data
+        - --execution-state-dir=/data/execution-state
+        - --execution-data-indexing-enabled=true
+        - --script-execution-mode=local-only
       env:{{template "env" .}}
       image: {{$val.docker_registry}}/access:{{$val.docker_tag}}
       nodeId: {{$val.node_id}}
