@@ -10,6 +10,7 @@ import (
 	"github.com/rs/zerolog"
 	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
 
+	"github.com/onflow/flow-go/cmd"
 	fcrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -80,6 +81,10 @@ func InitCorruptLibp2pNode(
 		return nil, fmt.Errorf("failed to create gossipsub rpc inspectors for default libp2p node: %w", err)
 	}
 
+	dhtActivationStatus, err := cmd.DhtSystemActivationStatus(role)
+	if err != nil {
+		return nil, fmt.Errorf("could not get dht system activation status: %w", err)
+	}
 	builder, err := p2pbuilder.DefaultNodeBuilder(
 		log,
 		address,
@@ -94,7 +99,8 @@ func InitCorruptLibp2pNode(
 		gossipSubCfg,
 		rpcInspectorSuite,
 		p2pbuilder.DefaultResourceManagerConfig(),
-		uniCfg)
+		uniCfg,
+		dhtActivationStatus)
 
 	if err != nil {
 		return nil, fmt.Errorf("could not create corrupt libp2p node builder: %w", err)

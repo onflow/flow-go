@@ -43,6 +43,13 @@ import (
 	"github.com/onflow/flow-go/network/p2p/unicast"
 )
 
+type DhtSystemActivation bool
+
+const (
+	DhtSystemEnabled  DhtSystemActivation = true
+	DhtSystemDisabled DhtSystemActivation = false
+)
+
 const (
 	// defaultMemoryLimitRatio  flow default
 	defaultMemoryLimitRatio = 0.2
@@ -500,7 +507,8 @@ func DefaultNodeBuilder(log zerolog.Logger,
 	gossipCfg *GossipSubConfig,
 	rpcInspectorSuite p2p.GossipSubInspectorSuite,
 	rCfg *ResourceManagerConfig,
-	uniCfg *p2pconfig.UnicastConfig) (p2p.NodeBuilder, error) {
+	uniCfg *p2pconfig.UnicastConfig,
+	routingSystemActivation DhtSystemActivation) (p2p.NodeBuilder, error) {
 
 	connManager, err := connection.NewConnManager(log, metricsCfg.Metrics, connection.DefaultConnManagerConfig())
 	if err != nil {
@@ -539,8 +547,18 @@ func DefaultNodeBuilder(log zerolog.Logger,
 	builder.SetGossipSubScoreTracerInterval(gossipCfg.ScoreTracerInterval)
 
 	if role != "ghost" {
-		r, _ := flow.ParseRole(role)
+		r, err := flow.ParseRole(role)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse role: %w", err)
+		}
 		builder.SetSubscriptionFilter(subscription.NewRoleBasedFilter(r, idProvider))
+
+		if routingSystemActivation == DhtSystemEnabled {
+			builder.SetRoutingSystem(
+				func(ctx context.Context, host host.Host) (routing.Routing, error) {
+					return dht.NewDHT(ctx, host, protocols.FlowDHTProtocolID(sporkId), log, metricsCfg.Metrics, dht.AsServer())
+				})
+		}
 	}
 
 	return builder, nil
