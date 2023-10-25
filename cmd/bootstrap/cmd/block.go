@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/inmem"
 )
 
+// constructRootHeader constructs a header for the root block.
 func constructRootHeader(rootChain string, rootParent string, rootHeight uint64, rootTimestamp string) *flow.Header {
 	chainID := parseChainID(rootChain)
 	parentID := parseParentID(rootParent)
@@ -21,6 +22,7 @@ func constructRootHeader(rootChain string, rootParent string, rootHeight uint64,
 	return run.GenerateRootHeader(chainID, parentID, height, timestamp)
 }
 
+// constructRootBlock constructs a valid root block based on the given header, setup, and commit.
 func constructRootBlock(rootHeader *flow.Header, setup *flow.EpochSetup, commit *flow.EpochCommit) *flow.Block {
 	block := &flow.Block{
 		Header:  rootHeader,
