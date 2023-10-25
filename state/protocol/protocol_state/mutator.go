@@ -78,10 +78,10 @@ func (m *Mutator) CommitProtocolState(blockID flow.Identifier, updater protocol.
 	}, updatedStateID
 }
 
-// handleEpochServiceEvents handles applying state changes which occur as a result
+// ApplyServiceEvents handles applying state changes which occur as a result
 // of service events being included in a block payload:
 //   - inserting incorporated service events
-//   - updating EpochStatus for the candidate block
+//   - updating protocol state for the candidate block
 //
 // Consider a chain where a service event is emitted during execution of block A.
 // Block B contains a receipt for A. Block C contains a seal for block A.
@@ -101,11 +101,14 @@ func (m *Mutator) CommitProtocolState(blockID flow.Identifier, updater protocol.
 // input block has the form of block C (ie. contains a seal for a block in
 // which a service event was emitted).
 //
+// All updates that are incorporated in service events are applied to the protocol state by mutating protocol state updater.
+// This method doesn't modify any data from self, all protocol state changes are applied to state updater.
+// All other changes are returned as slice of deferred DB updates.
+//
 // Return values:
 //   - dbUpdates - If the service events are valid, or there are no service events,
 //     this method returns a slice of Badger operations to apply while storing the block.
-//     This includes an operation to index the epoch status for every block, and
-//     operations to insert service events for blocks that include them.
+//     This includes operations to insert service events for blocks that include them.
 //
 // No errors are expected during normal operation.
 func (m *Mutator) ApplyServiceEvents(updater protocol.StateUpdater, seals []*flow.Seal) (dbUpdates []func(*transaction.Tx) error, err error) {
@@ -177,6 +180,11 @@ func (m *Mutator) ApplyServiceEvents(updater protocol.StateUpdater, seals []*flo
 
 				err = updater.ProcessEpochSetup(ev)
 				if err != nil {
+					if protocol.IsInvalidServiceEventError(err) {
+						// we have observed an invalid service event, which triggers epoch fallback mode
+						updater.SetInvalidStateTransitionAttempted()
+						return dbUpdates, nil
+					}
 					return nil, irrecoverable.NewExceptionf("could not process epoch setup event: %w", err)
 				}
 
@@ -204,6 +212,11 @@ func (m *Mutator) ApplyServiceEvents(updater protocol.StateUpdater, seals []*flo
 
 				err = updater.ProcessEpochCommit(ev)
 				if err != nil {
+					if protocol.IsInvalidServiceEventError(err) {
+						// we have observed an invalid service event, which triggers epoch fallback mode
+						updater.SetInvalidStateTransitionAttempted()
+						return dbUpdates, nil
+					}
 					return nil, irrecoverable.NewExceptionf("could not process epoch commit event: %w", err)
 				}
 

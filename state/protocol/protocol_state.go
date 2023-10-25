@@ -114,9 +114,12 @@ type StateUpdater interface {
 }
 
 // StateMutator is an interface for creating protocol state updaters and committing protocol state to the database.
-// It is used by the compliance layer to update protocol state when certain events that are stored in blocks are observed.
+// It is used by the replica's compliance layer to update protocol state when certain events that are stored in blocks are observed.
+// It is used by the primary in the block building process to obtain a correct protocol state for a proposal.
+// Specifically, leader includes service events in the block payload; those service events when being processed by replica will mutate the protocol state, so
+// leader needs to include correct protocol state ID in the block payload otherwise replicas won't be able to verify the validity of the block.
+// He can do that by creating a state updater for the proposal, applying service events to it and get updated protocol state ID from updater.
 // It has to be used for each block that is added to the block tree to maintain a correct protocol state on a block-by-block basis.
-// TODO: this should be a stand-alone interface to support evolving the protocol state in the compliance layer (already possible) as well as during block construction (complex with the current implementation).
 type StateMutator interface {
 	// CreateUpdater creates a protocol state updater based on previous protocol state.
 	// Has to be called for each block to correctly index the protocol state.
@@ -127,6 +130,15 @@ type StateMutator interface {
 	// Has to be called for each block to correctly index the protocol state.
 	// No errors are expected during normal operations.
 	CommitProtocolState(blockID flow.Identifier, updater StateUpdater) (func(tx *transaction.Tx) error, flow.Identifier)
-
+	// ApplyServiceEvents handles applying state changes which occur as a result
+	// of service events being included in a block payload.
+	// All updates that are incorporated in service events are applied to the protocol state by mutating protocol state updater.
+	//
+	// Return values:
+	//   - dbUpdates - If the service events are valid, or there are no service events,
+	//     this method returns a slice of Badger operations to apply while storing the block.
+	//     This includes operations to insert service events for blocks that include them.
+	//
+	// No errors are expected during normal operation.
 	ApplyServiceEvents(updater StateUpdater, seals []*flow.Seal) (dbUpdates []func(*transaction.Tx) error, err error)
 }
