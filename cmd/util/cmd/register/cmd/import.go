@@ -17,7 +17,9 @@ func init() {
 	rootCmd.AddCommand(importCmd)
 
 	importCmd.Flags().StringVar(&flagCheckpointPath, "checkpoint", "", "the path of the checkpoint")
+	importCmd.MarkFlagRequired("checkpoint")
 	importCmd.Flags().Uint64Var(&flagCheckpointHeight, "height", 0, "the height of the checkpoint")
+	importCmd.MarkFlagRequired("height")
 }
 
 var importCmd = &cobra.Command{

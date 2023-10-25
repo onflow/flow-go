@@ -14,6 +14,7 @@ func init() {
 	rootCmd.AddCommand(pruneCmd)
 
 	pruneCmd.Flags().Uint64VarP(&flagPruneHeight, "height", "", 0, "the height to be pruned")
+	pruneCmd.MarkFlagRequired("height")
 }
 
 var pruneCmd = &cobra.Command{
