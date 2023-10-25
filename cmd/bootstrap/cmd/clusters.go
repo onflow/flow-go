@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"errors"
-	"github.com/onflow/flow-go/state/protocol"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	model "github.com/onflow/flow-go/model/bootstrap"
@@ -11,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/assignment"
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 // Construct random cluster assignment with internal and partner nodes.

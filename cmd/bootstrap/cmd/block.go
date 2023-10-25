@@ -2,14 +2,14 @@ package cmd
 
 import (
 	"encoding/hex"
-	"github.com/onflow/flow-go/model/dkg"
-	"github.com/onflow/flow-go/model/flow/order"
-	"github.com/onflow/flow-go/module/signature"
-	"github.com/onflow/flow-go/state/protocol/inmem"
 	"time"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
+	"github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/order"
+	"github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 )
 
 func constructRootHeader(rootChain string, rootParent string, rootHeight uint64, rootTimestamp string) *flow.Header {
