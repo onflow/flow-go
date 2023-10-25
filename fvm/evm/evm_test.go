@@ -124,7 +124,8 @@ func TestEVMRun(t *testing.T) {
 	t.Parallel()
 	testutils.RunWithTestBackend(t, func(backend types.Backend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
-			testutils.RunWithDeployedContract(t, backend, rootAddr, func(testContract *testutils.TestContract) {
+			tc := testutils.GetStorageTestContract(t)
+			testutils.RunWithDeployedContract(t, tc, backend, rootAddr, func(testContract *testutils.TestContract) {
 				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *testutils.EOATestAccount) {
 					num := int64(12)
 
@@ -145,7 +146,7 @@ func TestEVMRun(t *testing.T) {
 
 					txBytes := testAccount.PrepareSignAndEncodeTx(t,
 						testContract.DeployedAt.ToCommon(),
-						testContract.MakeStoreCallData(t, big.NewInt(num)),
+						testContract.MakeCallData(t, "store", big.NewInt(num)),
 						big.NewInt(0),
 						gasLimit,
 						big.NewInt(1),
