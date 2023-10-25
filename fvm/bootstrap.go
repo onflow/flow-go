@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/evm/stdlib"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/logical"
@@ -782,7 +783,17 @@ func (b *bootstrapExecutor) setStakingAllowlist(
 func (b *bootstrapExecutor) setupEVM() {
 	// setup EVM root account
 	// TODO: maybe we reuse the service account key here
-	b.createAccount(nil)
+	addr := b.createAccount(nil)
+	tx := blueprints.DeployContractTransaction(
+		addr,
+		stdlib.ContractContent(),
+		stdlib.ContractName(),
+	)
+	txError, err := b.invokeMetaTransaction(
+		b.ctx,
+		Transaction(tx, 0),
+	)
+	panicOnMetaInvokeErrf("failed to deploy EVM contract: %s", txError, err)
 }
 
 func (b *bootstrapExecutor) registerNodes(service, fungibleToken, flowToken flow.Address) {
