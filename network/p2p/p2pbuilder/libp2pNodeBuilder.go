@@ -286,10 +286,6 @@ func (builder *LibP2PNodeBuilder) buildRouting(ctx context.Context, h host.Host)
 
 // Build creates a new libp2p node using the configured options.
 func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
-	if builder.routingFactory == nil {
-		return nil, errors.New("routing system factory is not set")
-	}
-
 	var opts []libp2p.Option
 
 	if builder.basicResolver != nil {
@@ -387,13 +383,16 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 
 	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			// routing system is created here, because it needs to be created during the node startup.
-			routingSystem, err := builder.buildRouting(ctx, h)
-			if err != nil {
-				ctx.Throw(fmt.Errorf("could not create routing system: %w", err))
+			if builder.routingFactory != nil {
+				// routing system is created here, because it needs to be created during the node startup.
+				routingSystem, err := builder.buildRouting(ctx, h)
+				if err != nil {
+					ctx.Throw(fmt.Errorf("could not create routing system: %w", err))
+				}
+				node.SetRouting(routingSystem)
+				builder.gossipSubBuilder.SetRoutingSystem(routingSystem)
+				builder.logger.Debug().Msg("routing system created")
 			}
-			node.SetRouting(routingSystem)
-			builder.gossipSubBuilder.SetRoutingSystem(routingSystem)
 
 			// gossipsub is created here, because it needs to be created during the node startup.
 			gossipSub, scoreTracer, err := builder.gossipSubBuilder.Build(ctx)
