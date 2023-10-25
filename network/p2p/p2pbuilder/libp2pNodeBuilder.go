@@ -527,9 +527,6 @@ func DefaultNodeBuilder(log zerolog.Logger,
 		SetBasicResolver(resolver).
 		SetConnectionManager(connManager).
 		SetConnectionGater(connGater).
-		SetRoutingSystem(func(ctx context.Context, host host.Host) (routing.Routing, error) {
-			return dht.NewDHT(ctx, host, protocols.FlowDHTProtocolID(sporkId), log, metricsCfg.Metrics, dht.AsServer())
-		}).
 		SetPeerManagerOptions(peerManagerCfg.ConnectionPruning, peerManagerCfg.UpdateInterval).
 		SetStreamCreationRetryInterval(uniCfg.StreamRetryInterval).
 		SetCreateNode(DefaultCreateNodeFunc).
