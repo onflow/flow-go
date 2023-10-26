@@ -705,7 +705,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					}
 
 					// TODO: find a way to hook a context up to this to allow a graceful shutdown
-					err = bootstrap.IndexCheckpointFile(context.Background())
+					workerCount := 10
+					err = bootstrap.IndexCheckpointFile(context.Background(), workerCount)
 					if err != nil {
 						return nil, fmt.Errorf("could not load checkpoint file: %w", err)
 					}
