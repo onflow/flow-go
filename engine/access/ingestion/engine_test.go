@@ -114,7 +114,7 @@ func (suite *Suite) SetupTest() {
 
 	eng, err := New(log, net, suite.proto.state, suite.me, suite.request, suite.blocks, suite.headers, suite.collections,
 		suite.transactions, suite.results, suite.receipts, metrics.NewNoopCollector(), collectionsToMarkFinalized, collectionsToMarkExecuted,
-		blocksToMarkExecuted)
+		blocksToMarkExecuted, nil, nil)
 	require.NoError(suite.T(), err)
 
 	suite.blocks.On("GetLastFullBlockHeight").Once().Return(uint64(0), errors.New("do nothing"))
@@ -566,7 +566,7 @@ func (suite *Suite) TestUpdateLastFullBlockReceivedIndex() {
 		suite.proto.params.On("FinalizedRoot").Return(rootBlk.Header, nil)
 		suite.blocks.On("UpdateLastFullBlockHeight", finalizedHeight).Return(nil).Once()
 
-		suite.eng.updateLastFullBlockReceivedIndex()
+		suite.eng.updateLastFullBlockReceivedIndex(context.Background())
 
 		suite.blocks.AssertExpectations(suite.T())
 	})
@@ -577,7 +577,7 @@ func (suite *Suite) TestUpdateLastFullBlockReceivedIndex() {
 		lastFullBlockHeight = block.Header.Height
 		suite.blocks.On("UpdateLastFullBlockHeight", finalizedHeight).Return(nil).Once()
 
-		suite.eng.updateLastFullBlockReceivedIndex()
+		suite.eng.updateLastFullBlockReceivedIndex(context.Background())
 
 		suite.blocks.AssertExpectations(suite.T())
 	})
@@ -586,7 +586,7 @@ func (suite *Suite) TestUpdateLastFullBlockReceivedIndex() {
 		rtnErr = nil
 		lastFullBlockHeight = finalizedHeight
 
-		suite.eng.updateLastFullBlockReceivedIndex()
+		suite.eng.updateLastFullBlockReceivedIndex(context.Background())
 		suite.blocks.AssertExpectations(suite.T()) // not new call to UpdateLastFullBlockHeight should be made
 	})
 
@@ -607,7 +607,7 @@ func (suite *Suite) TestUpdateLastFullBlockReceivedIndex() {
 			}
 		}
 
-		suite.eng.updateLastFullBlockReceivedIndex()
+		suite.eng.updateLastFullBlockReceivedIndex(context.Background())
 
 		// assert that missing collections are requested
 		suite.request.AssertExpectations(suite.T())
@@ -636,7 +636,7 @@ func (suite *Suite) TestUpdateLastFullBlockReceivedIndex() {
 			}
 		}
 
-		suite.eng.updateLastFullBlockReceivedIndex()
+		suite.eng.updateLastFullBlockReceivedIndex(context.Background())
 
 		// assert that missing collections are requested
 		suite.request.AssertExpectations(suite.T())
@@ -659,7 +659,7 @@ func (suite *Suite) TestUpdateLastFullBlockReceivedIndex() {
 			blkMissingColl[i] = true
 		}
 
-		suite.eng.updateLastFullBlockReceivedIndex()
+		suite.eng.updateLastFullBlockReceivedIndex(context.Background())
 
 		// assert that missing collections are not requested even though there are collections missing
 		suite.request.AssertExpectations(suite.T())
