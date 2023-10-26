@@ -72,7 +72,7 @@ func NewNode(
 ) *Node {
 	return &Node{
 		host:        host,
-		logger:      logger.With().Str("component", "libp2p-node").Logger(),
+		logger:      logger.With().Str("component", "libp2p-node").Str("local_peer_id", p2plogging.PeerId(host.ID())).Logger(),
 		topics:      make(map[channels.Topic]p2p.Topic),
 		subs:        make(map[channels.Topic]p2p.Subscription),
 		pCache:      pCache,
