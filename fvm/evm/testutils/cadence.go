@@ -157,7 +157,7 @@ func NewTestLedger(
 }
 
 type TestRuntimeInterface struct {
-	Storage TestLedger
+	Storage atree.Ledger
 
 	OnResolveLocation func(
 		identifiers []runtime.Identifier,
@@ -319,30 +319,18 @@ func (i *TestRuntimeInterface) GetInterpreterSharedState() *interpreter.SharedSt
 }
 
 func (i *TestRuntimeInterface) ValueExists(owner, key []byte) (exists bool, err error) {
-	if i.Storage.OnValueExists == nil {
-		panic("must specify TestRuntimeInterface.Storage.OnValueExists")
-	}
 	return i.Storage.ValueExists(owner, key)
 }
 
 func (i *TestRuntimeInterface) GetValue(owner, key []byte) (value []byte, err error) {
-	if i.Storage.OnGetValue == nil {
-		panic("must specify TestRuntimeInterface.Storage.OnGetValue")
-	}
 	return i.Storage.GetValue(owner, key)
 }
 
 func (i *TestRuntimeInterface) SetValue(owner, key, value []byte) (err error) {
-	if i.Storage.OnSetValue == nil {
-		panic("must specify TestRuntimeInterface.Storage.SetValue")
-	}
 	return i.Storage.SetValue(owner, key, value)
 }
 
 func (i *TestRuntimeInterface) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
-	if i.Storage.OnAllocateStorageIndex == nil {
-		panic("must specify TestRuntimeInterface.storage.OnAllocateStorageIndex")
-	}
 	return i.Storage.AllocateStorageIndex(owner)
 }
 
