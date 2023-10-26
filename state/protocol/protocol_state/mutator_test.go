@@ -1,6 +1,7 @@
 package protocol_state
 
 import (
+	"github.com/onflow/flow-go/model/flow"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -83,4 +84,64 @@ func (s *MutatorSuite) TestMutatorHappyPathHasChanges() {
 	dbOps, _ := s.mutator.CommitProtocolState(candidate.ID(), updater)
 	err = dbOps(&transaction.Tx{})
 	require.NoError(s.T(), err)
+}
+
+func (s *MutatorSuite) TestMutatorApplyServiceEvents_InvalidEpochSetup() {
+	s.params.On("EpochFallbackTriggered").Return(false, nil)
+	s.Run("invalid-counter", func() {
+		parentState := unittest.ProtocolStateFixture()
+		rootSetup := parentState.CurrentEpochSetup
+		updater := mock.NewStateUpdater(s.T())
+		updater.On("ParentState").Return(parentState)
+
+		epochSetup := unittest.EpochSetupFixture(
+			unittest.WithParticipants(rootSetup.Participants),
+			unittest.SetupWithCounter(rootSetup.Counter+2), // invalid counter
+			unittest.WithFinalView(rootSetup.FinalView+1000),
+			unittest.WithFirstView(rootSetup.FinalView+1),
+		)
+		result := unittest.ExecutionResultFixture(func(result *flow.ExecutionResult) {
+			result.ServiceEvents = []flow.ServiceEvent{epochSetup.ServiceEvent()}
+		})
+
+		block := unittest.BlockHeaderFixture()
+		seal := unittest.Seal.Fixture(unittest.Seal.WithBlockID(block.ID()))
+		s.headersDB.On("ByBlockID", seal.BlockID).Return(block, nil)
+		s.resultsDB.On("ByID", seal.ResultID).Return(result, nil)
+
+		updater.On("SetInvalidStateTransitionAttempted").Return().Once()
+
+		updates, err := s.mutator.ApplyServiceEvents(updater, []*flow.Seal{seal})
+		require.NoError(s.T(), err)
+		require.Empty(s.T(), updates)
+	})
+
+}
+
+// TestMutatorApplyServiceEvents_EpochFallbackTriggered tests two scenarios when network is in epoch fallback mode.
+// In first case we have observed a global flag that we have finalized fork with invalid event and network is in epoch fallback mode.
+// In second case we have observed an InvalidStateTransitionAttempted flag which is part of some fork but has not been finalized yet.
+// In both cases we shouldn't process any service events. This is asserted by using mocked state updater without any expected methods.
+func (s *MutatorSuite) TestMutatorApplyServiceEvents_EpochFallbackTriggered() {
+	s.Run("epoch-fallback-triggered", func() {
+		s.params.On("EpochFallbackTriggered").Return(true, nil)
+		parentState := unittest.ProtocolStateFixture()
+		updater := mock.NewStateUpdater(s.T())
+		updater.On("ParentState").Return(parentState)
+		seals := unittest.Seal.Fixtures(2)
+		updates, err := s.mutator.ApplyServiceEvents(updater, seals)
+		require.NoError(s.T(), err)
+		require.Empty(s.T(), updates)
+	})
+	s.Run("invalid-service-event-incorporated", func() {
+		s.params.On("EpochFallbackTriggered").Return(false, nil)
+		parentState := unittest.ProtocolStateFixture()
+		parentState.InvalidStateTransitionAttempted = true
+		updater := mock.NewStateUpdater(s.T())
+		updater.On("ParentState").Return(parentState)
+		seals := unittest.Seal.Fixtures(2)
+		updates, err := s.mutator.ApplyServiceEvents(updater, seals)
+		require.NoError(s.T(), err)
+		require.Empty(s.T(), updates)
+	})
 }
