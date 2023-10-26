@@ -59,7 +59,11 @@ func NodeFixture(
 
 	logger := unittest.Logger().Level(zerolog.ErrorLevel)
 
-	rpcInspectorSuite, err := inspectorbuilder.NewGossipSubInspectorBuilder(logger, sporkID, inspectorbuilder.DefaultGossipSubRPCInspectorsConfig(), idProvider, metrics.NewNoopCollector()).
+	rpcInspectorSuite, err := inspectorbuilder.NewGossipSubInspectorBuilder(logger,
+		sporkID,
+		inspectorbuilder.DefaultGossipSubRPCInspectorsConfig(),
+		idProvider,
+		metrics.NewNoopCollector()).
 		Build()
 	require.NoError(t, err)
 
@@ -99,18 +103,30 @@ func NodeFixture(
 		sporkID,
 		p2pbuilder.DefaultResourceManagerConfig()).
 		SetConnectionManager(connManager).
-		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
-			return p2pdht.NewDHT(c, h,
-				protocol.ID(protocols.FlowDHTProtocolIDPrefix+sporkID.String()+"/"+dhtPrefix),
-				logger,
-				parameters.Metrics,
-				parameters.DhtOptions...,
-			)
-		}).
 		SetCreateNode(p2pbuilder.DefaultCreateNodeFunc).
 		SetStreamCreationRetryInterval(parameters.CreateStreamRetryDelay).
 		SetResourceManager(parameters.ResourceManager).
 		SetGossipSubRpcInspectorSuite(parameters.GossipSubRPCInspector)
+
+	if parameters.DhtOptions != nil && (parameters.Role != flow.RoleAccess && parameters.Role != flow.RoleExecution) {
+		require.Fail(t, "DHT should not be enabled for non-access and non-execution nodes")
+	}
+
+	if parameters.Role == flow.RoleAccess || parameters.Role == flow.RoleExecution {
+		// Only access and execution nodes need to run DHT;
+		// Access nodes and execution nodes need DHT to run a blob service.
+		// Moreover, access nodes run a DHT to let un-staked (public) access nodes find each other on the public network.
+		builder.SetRoutingSystem(
+			func(ctx context.Context, host host.Host) (routing.Routing, error) {
+				return p2pdht.NewDHT(
+					ctx,
+					host,
+					protocol.ID(protocols.FlowDHTProtocolIDPrefix+sporkID.String()+"/"+dhtPrefix),
+					logger,
+					parameters.Metrics,
+					parameters.DhtOptions...)
+			})
+	}
 
 	if parameters.ResourceManager != nil {
 		builder.SetResourceManager(parameters.ResourceManager)
@@ -304,7 +320,12 @@ func WithDefaultResourceManager() NodeFixtureParameterOption {
 
 // NodesFixture is a test fixture that creates a number of libp2p nodes with the given callback function for stream handling.
 // It returns the nodes and their identities.
-func NodesFixture(t *testing.T, sporkID flow.Identifier, dhtPrefix string, count int, idProvider module.IdentityProvider, opts ...NodeFixtureParameterOption) ([]p2p.LibP2PNode,
+func NodesFixture(t *testing.T,
+	sporkID flow.Identifier,
+	dhtPrefix string,
+	count int,
+	idProvider module.IdentityProvider,
+	opts ...NodeFixtureParameterOption) ([]p2p.LibP2PNode,
 	flow.IdentityList) {
 	var nodes []p2p.LibP2PNode
 
@@ -510,7 +531,11 @@ func EnsureNoPubsubMessageExchange(t *testing.T, ctx context.Context, from []p2p
 }
 
 // EnsureNoPubsubExchangeBetweenGroups ensures that no pubsub message is exchanged between the given groups of nodes.
-func EnsureNoPubsubExchangeBetweenGroups(t *testing.T, ctx context.Context, groupA []p2p.LibP2PNode, groupB []p2p.LibP2PNode, messageFactory func() (interface{}, channels.Topic)) {
+func EnsureNoPubsubExchangeBetweenGroups(t *testing.T,
+	ctx context.Context,
+	groupA []p2p.LibP2PNode,
+	groupB []p2p.LibP2PNode,
+	messageFactory func() (interface{}, channels.Topic)) {
 	// ensure no message exchange from group A to group B
 	EnsureNoPubsubMessageExchange(t, ctx, groupA, groupB, messageFactory)
 	// ensure no message exchange from group B to group A

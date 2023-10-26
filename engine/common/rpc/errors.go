@@ -20,6 +20,11 @@ func ConvertError(err error, msg string, defaultCode codes.Code) error {
 		return nil
 	}
 
+	// Handle multierrors separately
+	if multiErr, ok := err.(*multierror.Error); ok {
+		return ConvertMultiError(multiErr, msg, defaultCode)
+	}
+
 	// Already converted
 	if status.Code(err) != codes.Unknown {
 		return err
