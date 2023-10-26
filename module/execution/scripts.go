@@ -3,7 +3,6 @@ package execution
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/rs/zerolog"
 
@@ -145,22 +144,4 @@ func (s *Scripts) snapshotWithBlock(height uint64) (snapshot.StorageSnapshot, *f
 	})
 
 	return storageSnapshot, header, nil
-}
-
-// IndexRegisterAdapter an adapter for using indexer register values function that takes a slice of IDs in the
-// script executor that only uses a single register ID at a time. It also does additional sanity checks if multiple values
-// are returned, which shouldn't occur in normal operation.
-func IndexRegisterAdapter(registerFun func(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error)) func(flow.RegisterID, uint64) (flow.RegisterValue, error) {
-	return func(ID flow.RegisterID, height uint64) (flow.RegisterValue, error) {
-		values, err := registerFun([]flow.RegisterID{ID}, height)
-		if err != nil {
-			return nil, err
-		}
-
-		// even though this shouldn't occur in correct implementation we check that function returned either a single register or error
-		if len(values) != 1 {
-			return nil, fmt.Errorf("invalid number of returned values for a single register: %d", len(values))
-		}
-		return values[0], nil
-	}
 }

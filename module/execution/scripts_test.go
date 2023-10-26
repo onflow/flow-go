@@ -56,13 +56,9 @@ func (s *scriptTestSuite) TestScriptExecution() {
 	})
 
 	s.Run("Handle Not Found Register", func() {
-		s.scripts.registersAtHeight = IndexRegisterAdapter( // using the adapter checks the error handling in the adapter
-			func(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
-				vals := make([]flow.RegisterValue, 1)
-				vals[0] = nil
-				return vals, nil // intentionally return nil to check edge case
-			},
-		)
+		s.scripts.registersAtHeight = func(ID flow.RegisterID, height uint64) (flow.RegisterValue, error) {
+			return nil, nil // intentionally return nil to check edge case
+		}
 
 		// use a non-existing address to trigger register get function
 		code := []byte("import Foo from 0x01; pub fun main() { }")
@@ -129,7 +125,7 @@ func (s *scriptTestSuite) SetupTest() {
 		s.chain.ChainID(),
 		entropyBlock,
 		headers,
-		IndexRegisterAdapter(index.RegisterValues),
+		index.RegisterValue,
 	)
 	s.Require().NoError(err)
 	s.scripts = scripts
