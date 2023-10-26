@@ -49,6 +49,13 @@ func AddKeyToAccountScript() ([]byte, error) {
 	return []byte(addKeyToAccountTransactionTemplate), nil
 }
 
+//go:embed scripts/queryAccount.cdc
+var queryAccountScriptTemplate string
+
+func QueryAccountScript() ([]byte, error) {
+	return []byte(queryAccountScriptTemplate), nil
+}
+
 //go:embed scripts/createAccountsTransaction.cdc
 var createAccountsScriptTemplate string
 
