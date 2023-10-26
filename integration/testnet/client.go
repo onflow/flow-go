@@ -386,6 +386,10 @@ func (c *Client) CreateAccount(
 		return sdk.Address{}, fmt.Errorf("failed to wait for create account transaction to seal %w", err)
 	}
 
+	if result.Error != nil {
+		return sdk.Address{}, fmt.Errorf("failed to create new account %w", result.Error)
+	}
+
 	if address, ok := c.UserAddress(result); ok {
 		return address, nil
 	}
