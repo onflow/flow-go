@@ -368,7 +368,8 @@ func (suite *Suite) TestRequestMissingCollections() {
 			return storerr.ErrNotFound
 		})
 	// consider collections are missing for all blocks
-	suite.blocks.On("GetLastFullBlockHeight").Return(startHeight-1, nil)
+	lastFullHeight := startHeight - 1
+
 	// consider the last test block as the head
 	suite.finalizedBlock = blocks[blkCnt-1].Header
 
@@ -432,7 +433,7 @@ func (suite *Suite) TestRequestMissingCollections() {
 		ctx, cancel := context.WithTimeout(context.Background(), 100*defaultCollectionCatchupDBPollInterval)
 		defer cancel()
 
-		err := suite.eng.requestMissingCollections(ctx)
+		err := suite.eng.requestMissingCollections(ctx, lastFullHeight)
 
 		require.Error(suite.T(), err)
 		require.Contains(suite.T(), err.Error(), "context deadline exceeded")
@@ -448,7 +449,7 @@ func (suite *Suite) TestRequestMissingCollections() {
 		ctx, cancel := context.WithTimeout(context.Background(), defaultCollectionCatchupTimeout)
 		defer cancel()
 
-		err := suite.eng.requestMissingCollections(ctx)
+		err := suite.eng.requestMissingCollections(ctx, lastFullHeight)
 
 		require.NoError(suite.T(), err)
 		require.Len(suite.T(), rcvdColl, len(collIDs))

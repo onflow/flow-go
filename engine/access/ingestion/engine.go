@@ -226,27 +226,11 @@ func (e *Engine) initLastFullBlockHeightIndex() error {
 }
 
 func (e *Engine) processBackground(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	// first, index all missing collection that are available in locally stored execution data
-	lastFullHeight, err := e.blocks.GetLastFullBlockHeight()
+	err := e.initialCatchup(ctx)
 	if err != nil {
-		e.log.Error().Err(err).Msg("failed to get last full block")
-	} else {
-		err := e.indexMissingCollectionsFromExecutionData(ctx, lastFullHeight)
-		if err != nil {
-			e.log.Error().Err(err).Msg("failed to index missing collections from execution data")
-		}
+		e.log.Error().Err(err).Msg("failed to do initial catchup")
 	}
 
-	// next, request any collections that are still missing from the network
-	// context with timeout
-	requestCtx, cancel := context.WithTimeout(ctx, defaultCollectionCatchupTimeout)
-	defer cancel()
-
-	// request missing collections
-	err = e.requestMissingCollections(requestCtx)
-	if err != nil {
-		e.log.Error().Err(err).Msg("requesting missing collections failed")
-	}
 	ready()
 
 	ticker := time.NewTicker(defaultFullBlockUpdateInterval)
@@ -595,16 +579,39 @@ func (e *Engine) OnCollection(originID flow.Identifier, entity flow.Entity) {
 	}
 }
 
-// requestMissingCollections requests missing collections for all blocks in the local db storage once at startup
-func (e *Engine) requestMissingCollections(ctx context.Context) error {
-
-	var startHeight, endHeight uint64
-
-	// get the height of the last block for which all collections were received
+// initialCatchup attempts to catchup on missing collections on startup.
+// It first uses available execution data to index missing collections.
+// Then, requests any remaining from the network.
+func (e *Engine) initialCatchup(ctx context.Context) error {
 	lastFullHeight, err := e.blocks.GetLastFullBlockHeight()
 	if err != nil {
-		return fmt.Errorf("failed to complete requests for missing collections: %w", err)
+		return err
 	}
+
+	// first, index all missing collection that are available in locally stored execution data
+	err = e.indexMissingCollectionsFromExecutionData(ctx, lastFullHeight)
+	if err != nil {
+		e.log.Error().Err(err).Msg("failed to index missing collections from execution data")
+	}
+
+	// next, request any collections that are still missing from the network
+	// context with timeout
+	requestCtx, cancel := context.WithTimeout(ctx, defaultCollectionCatchupTimeout)
+	defer cancel()
+
+	// request missing collections
+	err = e.requestMissingCollections(requestCtx, lastFullHeight)
+	if err != nil {
+		return fmt.Errorf("requesting missing collections failed: %w", err)
+	}
+
+	return nil
+}
+
+// requestMissingCollections requests missing collections for all blocks in the local db storage once at startup
+func (e *Engine) requestMissingCollections(ctx context.Context, lastFullHeight uint64) error {
+
+	var startHeight, endHeight uint64
 
 	// start from the next block
 	startHeight = lastFullHeight + 1
