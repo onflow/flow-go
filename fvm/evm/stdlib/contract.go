@@ -344,8 +344,7 @@ func newInternalEVMStandardLibraryValue(
 func SetupEnvironment(env runtime.Environment, handler types.ContractHandler, service flow.Address) {
 	env.DeclareValue(
 		newInternalEVMStandardLibraryValue(nil, handler),
-		// TODO:
-		//common.NewAddressLocation(nil, service, ContractName),
+		common.NewAddressLocation(nil, common.Address(service), ContractName),
 	)
 }
 

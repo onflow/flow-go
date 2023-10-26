@@ -55,7 +55,7 @@ func NewContractHandler(
 	}
 }
 
-// AllocateAddress allocates an address to be used by FOA resources
+// AllocateAddress allocates an address to be used by the bridged accounts
 func (h *ContractHandler) AllocateAddress() types.Address {
 	target := types.Address{}
 	// first 12 bytes would be zero
@@ -72,7 +72,7 @@ func (h *ContractHandler) AllocateAddress() types.Address {
 }
 
 // AccountByAddress returns the account for the given address,
-// if isAuthorized is set, account is controlled by the FVM and FOA resources
+// if isAuthorized is set, account is controlled by the FVM (bridged accounts)
 func (h *ContractHandler) AccountByAddress(addr types.Address, isAuthorized bool) types.Account {
 	return newAccount(h, addr, isAuthorized)
 }
@@ -101,8 +101,11 @@ func (h *ContractHandler) updateLastExecutedBlock(stateRoot, eventRoot gethCommo
 func (h ContractHandler) Run(rlpEncodedTx []byte, coinbase types.Address) bool {
 	// Decode transaction encoding
 	tx := gethTypes.Transaction{}
-	// TODO: update the max limit on the encoded size to a meaningful value
-	err := tx.DecodeRLP(
+
+	err := h.backend.MeterComputation(environment.ComputationKindRLPDecoding, uint(len(rlpEncodedTx)))
+	handleError(err)
+
+	err = tx.DecodeRLP(
 		rlp.NewStream(
 			bytes.NewReader(rlpEncodedTx),
 			uint64(len(rlpEncodedTx))))
@@ -214,7 +217,7 @@ func (a *Account) Balance() types.Balance {
 }
 
 // Deposit deposits the token from the given vault into the flow evm main vault
-// and update the FOA balance with the new amount
+// and update the account balance with the new amount
 func (a *Account) Deposit(v *types.FLOWTokenVault) {
 	cfg := a.fch.getBlockContext()
 	a.fch.checkGasLimit(types.GasLimit(cfg.DirectCallBaseGasUsage))
@@ -232,7 +235,7 @@ func (a *Account) Deposit(v *types.FLOWTokenVault) {
 	a.fch.updateLastExecutedBlock(res.StateRootHash, gethTypes.EmptyRootHash)
 }
 
-// Withdraw deducts the balance from the FOA account and
+// Withdraw deducts the balance from the account and
 // withdraw and return flow token from the Flex main vault.
 func (a *Account) Withdraw(b types.Balance) *types.FLOWTokenVault {
 	a.checkAuthorized()
@@ -280,7 +283,7 @@ func (a *Account) Transfer(to types.Address, balance types.Balance) {
 
 // Deploy deploys a contract to the EVM environment
 // the new deployed contract would be at the returned address and
-// the contract data is not controlled by the FOA accounts
+// the contract data is not controlled by the caller accounts
 func (a *Account) Deploy(code types.Code, gaslimit types.GasLimit, balance types.Balance) types.Address {
 	a.checkAuthorized()
 	a.fch.checkGasLimit(gaslimit)
@@ -300,7 +303,6 @@ func (a *Account) Deploy(code types.Code, gaslimit types.GasLimit, balance types
 // it would limit the gas used according to the limit provided
 // given it doesn't goes beyond what Flow transaction allows.
 // the balance would be deducted from the OFA account and would be transferred to the target address
-// contract data is not controlled by the FOA accounts
 func (a *Account) Call(to types.Address, data types.Data, gaslimit types.GasLimit, balance types.Balance) types.Data {
 	a.checkAuthorized()
 	a.fch.checkGasLimit(gaslimit)
@@ -318,7 +320,7 @@ func (a *Account) Call(to types.Address, data types.Data, gaslimit types.GasLimi
 }
 
 func (a *Account) checkAuthorized() {
-	// check if account is authorized to to FOA related opeartions
+	// check if account is authorized (i.e. is a bridged account)
 	if !a.isAuthorized {
 		handleError(types.ErrUnAuthroizedMethodCall)
 	}

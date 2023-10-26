@@ -78,7 +78,7 @@ func NewReusableCadenceRuntime(rt runtime.Runtime, config runtime.Config) *Reusa
 		),
 	}
 
-	reusable.DeclareValue(blockRandomSource)
+	reusable.DeclareValue(blockRandomSource, nil)
 
 	return reusable
 }
@@ -149,8 +149,9 @@ func (reusable *ReusableCadenceRuntime) ExecuteScript(
 	return reusable.Runtime.ExecuteScript(
 		script,
 		runtime.Context{
-			Interface: reusable.fvmEnv,
-			Location:  location,
+			Interface:   reusable.fvmEnv,
+			Location:    location,
+			Environment: reusable.Environment,
 		},
 	)
 }

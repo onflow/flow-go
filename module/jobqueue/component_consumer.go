@@ -33,7 +33,7 @@ func NewComponentConsumer(
 	processor JobProcessor, // method used to process jobs
 	maxProcessing uint64,
 	maxSearchAhead uint64,
-) *ComponentConsumer {
+) (*ComponentConsumer, error) {
 
 	c := &ComponentConsumer{
 		workSignal: workSignal,
@@ -47,12 +47,17 @@ func NewComponentConsumer(
 		func(id module.JobID) { c.NotifyJobIsDone(id) },
 		maxProcessing,
 	)
-	c.consumer = NewConsumer(c.log, c.jobs, progress, worker, maxProcessing, maxSearchAhead)
+
+	consumer, err := NewConsumer(log, jobs, progress, worker, maxProcessing, maxSearchAhead, defaultIndex)
+	if err != nil {
+		return nil, err
+	}
+	c.consumer = consumer
 
 	builder := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			c.log.Info().Msg("job consumer starting")
-			err := c.consumer.Start(defaultIndex)
+			err := c.consumer.Start()
 			if err != nil {
 				ctx.Throw(fmt.Errorf("could not start consumer: %w", err))
 			}
@@ -95,7 +100,7 @@ func NewComponentConsumer(
 	c.cm = cm
 	c.Component = cm
 
-	return c
+	return c, nil
 }
 
 // SetPreNotifier sets a notification function that is invoked before marking a job as done in the
