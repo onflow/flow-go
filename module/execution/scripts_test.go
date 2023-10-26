@@ -95,6 +95,17 @@ func (s *scriptTestSuite) TestScriptExecution() {
 		s.Require().True(errors.As(err, &coded))
 		s.Assert().Equal(errors.ErrCodeInvalidArgumentError, coded.Code())
 	})
+
+	s.Run("Get Block", func() {
+		code := []byte("pub fun main(): UInt64 { return getCurrentBlock().height }")
+
+		result, err := s.scripts.ExecuteAtBlockHeight(context.Background(), code, nil, s.height)
+		s.Require().NoError(err)
+		val, err := jsoncdc.Decode(nil, result)
+		s.Require().NoError(err)
+		// make sure that the returned block height matches the current one set
+		s.Assert().Equal(s.height, val.(cadence.UInt64).ToGoValue())
+	})
 }
 
 func (s *scriptTestSuite) TestGetAccount() {
