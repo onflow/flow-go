@@ -781,6 +781,8 @@ func (b *bootstrapExecutor) setStakingAllowlist(
 }
 
 func (b *bootstrapExecutor) setupEVM(service flow.Address) {
+
+	b.createAccount(nil) // account for storage
 	tx := blueprints.DeployContractTransaction(
 		service,
 		stdlib.ContractCode,
@@ -791,6 +793,9 @@ func (b *bootstrapExecutor) setupEVM(service flow.Address) {
 		Transaction(tx, 0),
 	)
 	panicOnMetaInvokeErrf("failed to deploy EVM contract: %s", txError, err)
+	// TODO: clean up
+	// b.accounts.SetContract(stdlib.ContractName, service, stdlib.ContractCode)
+	// TODO: think about storage
 }
 
 func (b *bootstrapExecutor) registerNodes(service, fungibleToken, flowToken flow.Address) {
@@ -989,6 +994,7 @@ func (b *bootstrapExecutor) invokeMetaTransaction(
 		WithAccountStorageLimit(false),
 		WithTransactionFeesEnabled(false),
 		WithAuthorizationChecksEnabled(false),
+		WithEVMEnabled(true),
 		WithSequenceNumberCheckAndIncrementEnabled(false),
 
 		// disable interaction and computation limits for bootstrapping
