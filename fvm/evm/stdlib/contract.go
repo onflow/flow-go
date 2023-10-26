@@ -341,10 +341,22 @@ func newInternalEVMStandardLibraryValue(
 	}
 }
 
+func newInternalEVMStandardLibraryType() stdlib.StandardLibraryType {
+	return stdlib.StandardLibraryType{
+		Name: InternalEVMContractName,
+		Type: InternalEVMContractType,
+		Kind: common.DeclarationKindContract,
+	}
+}
+
 func SetupEnvironment(env runtime.Environment, handler types.ContractHandler, service flow.Address) {
+	location := common.NewAddressLocation(nil, common.Address(service), ContractName)
+	env.DeclareType(
+		newInternalEVMStandardLibraryType(),
+		location)
 	env.DeclareValue(
 		newInternalEVMStandardLibraryValue(nil, handler),
-		common.NewAddressLocation(nil, common.Address(service), ContractName),
+		location,
 	)
 }
 
