@@ -395,7 +395,7 @@ func NewScoreOption(cfg *ScoreOptionConfig) *ScoreOption {
 		Init:       InitAppScoreRecordState,
 		IdProvider: cfg.provider,
 		CacheFactory: func() p2p.GossipSubSpamRecordCache {
-			return netcache.NewGossipSubSpamRecordCache(cfg.cacheSize, cfg.logger, cfg.cacheMetrics, DefaultDecayFunction())
+			return netcache.NewGossipSubSpamRecordCache(cfg.cacheSize, cfg.logger, cfg.cacheMetrics, DefaultPreprocessorFuncs()...)
 		},
 	})
 	s := &ScoreOption{

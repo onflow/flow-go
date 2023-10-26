@@ -87,8 +87,9 @@ func testPeerWithSpamRecord(t *testing.T, messageType p2pmsg.ControlMessageType,
 	record, err, ok := spamRecords.Get(peerID) // get the record from the spamRecords.
 	assert.True(t, ok)
 	assert.NoError(t, err)
-	assert.Less(t, math.Abs(expectedPenalty-record.Penalty), 10e-3)        // penalty should be updated to -10.
-	assert.Equal(t, scoring.InitAppScoreRecordState().Decay, record.Decay) // decay should be initialized to the initial state.
+	assert.Less(t, math.Abs(expectedPenalty-record.Penalty), 10e-3)     // penalty should be updated to -10.
+	assert.GreaterOrEqual(t, record.Decay, scoring.InitDecayLowerBound) // decay should be greater than the init lower bound.
+	assert.LessOrEqual(t, record.Decay, scoring.InitDecayUpperBound)    // decay should be less than the init upper bound.
 
 	// this peer has a spam record, with no subscription penalty. Hence, the app specific score should only be the spam penalty,
 	// and the peer should be deprived of the default reward for its valid staked role.
@@ -137,9 +138,9 @@ func testSpamRecordWithUnknownIdentity(t *testing.T, messageType p2pmsg.ControlM
 	record, err, ok := spamRecords.Get(peerID) // get the record from the spamRecords.
 	assert.True(t, ok)
 	assert.NoError(t, err)
-	assert.Less(t, math.Abs(expectedPenalty-record.Penalty), 10e-3)        // penalty should be updated to -10, we account for decay.
-	assert.Equal(t, scoring.InitAppScoreRecordState().Decay, record.Decay) // decay should be initialized to the initial state.
-
+	assert.Less(t, math.Abs(expectedPenalty-record.Penalty), 10e-3)     // penalty should be updated to -10, we account for decay.
+	assert.GreaterOrEqual(t, record.Decay, scoring.InitDecayLowerBound) // decay should be greater than the init lower bound.
+	assert.LessOrEqual(t, record.Decay, scoring.InitDecayUpperBound)    // decay should be less than the init upper bound.
 	// the peer has spam record as well as an unknown identity. Hence, the app specific score should be the spam penalty
 	// and the staking penalty.
 	score = reg.AppSpecificScoreFunc()(peerID)
@@ -188,8 +189,8 @@ func testSpamRecordWithSubscriptionPenalty(t *testing.T, messageType p2pmsg.Cont
 	assert.True(t, ok)
 	assert.NoError(t, err)
 	assert.Less(t, math.Abs(expectedPenalty-record.Penalty), 10e-3)
-	assert.Equal(t, scoring.InitAppScoreRecordState().Decay, record.Decay) // decay should be initialized to the initial state.
-
+	assert.GreaterOrEqual(t, record.Decay, scoring.InitDecayLowerBound) // decay should be greater than the init lower bound.
+	assert.LessOrEqual(t, record.Decay, scoring.InitDecayUpperBound)    // decay should be less than the init upper bound.
 	// the peer has spam record as well as an unknown identity. Hence, the app specific score should be the spam penalty
 	// and the staking penalty.
 	score = reg.AppSpecificScoreFunc()(peerID)
@@ -405,6 +406,10 @@ func TestPersistingInvalidSubscriptionPenalty(t *testing.T) {
 	assert.Equal(t, 0.0, record.Penalty) // penalty should be zero.
 }
 
+func TestSpamRecordDecayAdjustment(t *testing.T) {
+
+}
+
 // withStakedIdentity returns a function that sets the identity provider to return an staked identity for the given peer id.
 // It is used for testing purposes, and causes the given peer id to benefit from the staked identity reward in GossipSub.
 func withStakedIdentity(peerId peer.ID) func(cfg *scoring.GossipSubAppSpecificScoreRegistryConfig) {
@@ -446,7 +451,7 @@ func withInitFunction(initFunction func() p2p.GossipSubSpamRecord) func(cfg *sco
 // newGossipSubAppSpecificScoreRegistry returns a new instance of GossipSubAppSpecificScoreRegistry with default values
 // for the testing purposes.
 func newGossipSubAppSpecificScoreRegistry(t *testing.T, opts ...func(*scoring.GossipSubAppSpecificScoreRegistryConfig)) (*scoring.GossipSubAppSpecificScoreRegistry, *netcache.GossipSubSpamRecordCache) {
-	cache := netcache.NewGossipSubSpamRecordCache(100, unittest.Logger(), metrics.NewNoopCollector(), scoring.DefaultDecayFunction())
+	cache := netcache.NewGossipSubSpamRecordCache(100, unittest.Logger(), metrics.NewNoopCollector(), scoring.DefaultPreprocessorFuncs()...)
 	cfg := &scoring.GossipSubAppSpecificScoreRegistryConfig{
 		Logger:     unittest.Logger(),
 		Init:       scoring.InitAppScoreRecordState,
