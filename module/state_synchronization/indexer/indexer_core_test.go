@@ -171,9 +171,9 @@ func (i *indexCoreTest) runIndexBlockData() error {
 	return i.indexer.IndexBlockData(i.data)
 }
 
-func (i *indexCoreTest) runGetRegisters(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
+func (i *indexCoreTest) runGetRegister(ID flow.RegisterID, height uint64) (flow.RegisterValue, error) {
 	i.initIndexer()
-	return i.indexer.RegisterValues(IDs, height)
+	return i.indexer.RegisterValue(ID, height)
 }
 
 func TestExecutionState_IndexBlockData(t *testing.T) {
@@ -441,10 +441,10 @@ func TestExecutionState_RegisterValues(t *testing.T) {
 	t.Run("Get value for single register", func(t *testing.T) {
 		blocks := unittest.BlockchainFixture(5)
 		height := blocks[1].Header.Height
-		ids := []flow.RegisterID{{
+		id := flow.RegisterID{
 			Owner: "1",
 			Key:   "2",
-		}}
+		}
 		val := flow.RegisterValue("0x1")
 
 		values, err := newIndexCoreTest(t, blocks, nil).
@@ -452,7 +452,7 @@ func TestExecutionState_RegisterValues(t *testing.T) {
 			setGetRegisters(func(t *testing.T, ID flow.RegisterID, height uint64) (flow.RegisterValue, error) {
 				return val, nil
 			}).
-			runGetRegisters(ids, height)
+			runGetRegister(id, height)
 
 		assert.NoError(t, err)
 		assert.Equal(t, values, []flow.RegisterValue{val})
@@ -559,9 +559,9 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 			index, err := New(logger, metrics, db, registers, nil, nil, nil)
 			require.NoError(t, err)
 
-			values := [][]byte{[]byte("1"), []byte("1"), []byte("2"), []byte("3") /*nil,*/, []byte("4")}
+			values := [][]byte{[]byte("1"), []byte("1"), []byte("2"), []byte("3"), []byte("4")}
 
-			value, err := index.RegisterValues(flow.RegisterIDs{registerID}, 0)
+			value, err := index.RegisterValue(registerID, 0)
 			require.Nil(t, value)
 			assert.ErrorIs(t, err, storage.ErrNotFound)
 
@@ -571,7 +571,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 				err := storeRegisterWithValue(index, height, regOwner, regKey, val)
 				assert.NoError(t, err)
 
-				results, err := index.RegisterValues(flow.RegisterIDs{registerID}, height)
+				results, err := index.RegisterValue(registerID, height)
 				require.Nil(t, err, testDesc)
 				assert.Equal(t, val, results[0])
 			}
@@ -592,7 +592,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 
 			require.NoError(t, index.indexRegisters(nil, 2))
 
-			value, err := index.RegisterValues(flow.RegisterIDs{registerID}, uint64(2))
+			value, err := index.RegisterValue(registerID, uint64(2))
 			require.Nil(t, err)
 			assert.Equal(t, storeValues[0], value[0])
 
@@ -601,11 +601,11 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 			err = storeRegisterWithValue(index, 4, regOwner, regKey, storeValues[1])
 			require.NoError(t, err)
 
-			value, err = index.RegisterValues(flow.RegisterIDs{registerID}, uint64(4))
+			value, err = index.RegisterValue(registerID, uint64(4))
 			require.Nil(t, err)
 			assert.Equal(t, storeValues[1], value[0])
 
-			value, err = index.RegisterValues(flow.RegisterIDs{registerID}, uint64(3))
+			value, err = index.RegisterValue(registerID, uint64(3))
 			require.Nil(t, err)
 			assert.Equal(t, storeValues[0], value[0])
 		})
