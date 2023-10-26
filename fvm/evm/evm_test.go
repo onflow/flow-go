@@ -50,7 +50,7 @@ func TestEVMRun(t *testing.T) {
 							testContract.MakeStoreCallData(t, big.NewInt(num)),
 							big.NewInt(0),
 							gasLimit,
-							big.NewInt(1),
+							big.NewInt(0),
 						)
 
 						tx := cadence.NewArray(
