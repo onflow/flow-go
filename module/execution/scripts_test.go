@@ -6,6 +6,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/onflow/flow-go/fvm/errors"
+
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
@@ -65,6 +67,33 @@ func (s *scriptTestSuite) TestScriptExecution() {
 		result, err := s.scripts.ExecuteAtBlockHeight(context.Background(), code, nil, s.height)
 		s.Assert().Error(err)
 		s.Assert().Nil(result)
+	})
+
+	s.Run("Valid Argument", func() {
+		code := []byte("pub fun main(foo: Int): Int { return foo }")
+		arg := cadence.NewInt(2)
+		encoded, err := jsoncdc.Encode(arg)
+		s.Require().NoError(err)
+
+		result, err := s.scripts.ExecuteAtBlockHeight(
+			context.Background(),
+			code,
+			[][]byte{encoded},
+			s.height,
+		)
+		s.Require().NoError(err)
+		s.Assert().Equal(encoded, result)
+	})
+
+	s.Run("Invalid Argument", func() {
+		code := []byte("pub fun main(foo: Int): Int { return foo }")
+		invalid := [][]byte{[]byte("i")}
+
+		result, err := s.scripts.ExecuteAtBlockHeight(context.Background(), code, invalid, s.height)
+		s.Assert().Nil(result)
+		var coded errors.CodedError
+		s.Require().True(errors.As(err, &coded))
+		s.Assert().Equal(errors.ErrCodeInvalidArgumentError, coded.Code())
 	})
 }
 
