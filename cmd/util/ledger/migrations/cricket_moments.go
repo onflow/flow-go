@@ -22,17 +22,18 @@ func isCricketMomentsShardedCollection(
 	mr *migratorRuntime,
 	value interpreter.Value,
 ) bool {
+	return false
 
-	if mr.Address != cricketMomentsAddress {
-		return false
-	}
-
-	compositeValue, ok := value.(*interpreter.CompositeValue)
-	if !ok {
-		return false
-	}
-
-	return string(compositeValue.TypeID()) == cricketMomentsShardedCollectionType
+	//if mr.Address != cricketMomentsAddress {
+	//	return false
+	//}
+	//
+	//compositeValue, ok := value.(*interpreter.CompositeValue)
+	//if !ok {
+	//	return false
+	//}
+	//
+	//return string(compositeValue.TypeID()) == cricketMomentsShardedCollectionType
 }
 
 func getCricketMomentsShardedCollectionNFTCount(
