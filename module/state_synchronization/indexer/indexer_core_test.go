@@ -455,7 +455,7 @@ func TestExecutionState_RegisterValues(t *testing.T) {
 			runGetRegister(id, height)
 
 		assert.NoError(t, err)
-		assert.Equal(t, values, []flow.RegisterValue{val})
+		assert.Equal(t, values, val)
 	})
 }
 
@@ -560,11 +560,6 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 			require.NoError(t, err)
 
 			values := [][]byte{[]byte("1"), []byte("1"), []byte("2"), []byte("3"), []byte("4")}
-
-			value, err := index.RegisterValue(registerID, 0)
-			require.Nil(t, value)
-			assert.ErrorIs(t, err, storage.ErrNotFound)
-
 			for i, val := range values {
 				testDesc := fmt.Sprintf("test itteration number %d failed with test value %s", i, val)
 				height := uint64(i + 1)
@@ -573,8 +568,21 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 
 				results, err := index.RegisterValue(registerID, height)
 				require.Nil(t, err, testDesc)
-				assert.Equal(t, val, results[0])
+				assert.Equal(t, val, results)
 			}
+		})
+	})
+
+	// this test makes sure if a register is not found the value returned is nil and without an error in order for this to be
+	// up to the specification script executor requires
+	t.Run("Missing Register", func(t *testing.T) {
+		pebbleStorage.RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
+			index, err := New(logger, metrics, db, registers, nil, nil, nil)
+			require.NoError(t, err)
+
+			value, err := index.RegisterValue(registerID, 0)
+			require.Nil(t, value)
+			assert.NoError(t, err)
 		})
 	})
 
@@ -594,7 +602,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 
 			value, err := index.RegisterValue(registerID, uint64(2))
 			require.Nil(t, err)
-			assert.Equal(t, storeValues[0], value[0])
+			assert.Equal(t, storeValues[0], value)
 
 			require.NoError(t, index.indexRegisters(nil, 3))
 
@@ -603,11 +611,11 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 
 			value, err = index.RegisterValue(registerID, uint64(4))
 			require.Nil(t, err)
-			assert.Equal(t, storeValues[1], value[0])
+			assert.Equal(t, storeValues[1], value)
 
 			value, err = index.RegisterValue(registerID, uint64(3))
 			require.Nil(t, err)
-			assert.Equal(t, storeValues[0], value[0])
+			assert.Equal(t, storeValues[0], value)
 		})
 	})
 

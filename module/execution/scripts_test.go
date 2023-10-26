@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 	"testing"
 
 	"github.com/onflow/cadence"
@@ -55,7 +54,7 @@ func (s *scriptTestSuite) TestScriptExecution() {
 		s.Assert().Equal(number, val.(cadence.Int).Value.Int64())
 	})
 
-	s.Run("Handle Not Found Register", func() {
+	s.Run("Not Found Register", func() {
 		s.scripts.registersAtHeight = func(ID flow.RegisterID, height uint64) (flow.RegisterValue, error) {
 			return nil, nil // intentionally return nil to check edge case
 		}
@@ -64,7 +63,7 @@ func (s *scriptTestSuite) TestScriptExecution() {
 		code := []byte("import Foo from 0x01; pub fun main() { }")
 
 		result, err := s.scripts.ExecuteAtBlockHeight(context.Background(), code, nil, s.height)
-		s.Assert().True(strings.Contains(err.Error(), "invalid number of returned values for a single register"))
+		s.Assert().Error(err)
 		s.Assert().Nil(result)
 	})
 }
@@ -84,7 +83,7 @@ func (s *scriptTestSuite) TestGetAccount() {
 		account, err := s.scripts.GetAccountAtBlockHeight(context.Background(), address, s.height)
 		s.Require().NoError(err)
 		s.Require().Equal(address, account.Address)
-		s.Assert().NotZero(account.Balance)
+		s.Assert().Zero(account.Balance)
 	})
 }
 
