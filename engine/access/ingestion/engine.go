@@ -855,7 +855,7 @@ func (e *Engine) updateLastFullBlockReceivedIndex(ctx context.Context) {
 	}
 
 	// if we've fallen behind by more than a few blocks, try to catch up using execution data
-	if latestFullHeight + defaultExecutionDataCatchupDistance < finalBlk.Height {
+	if latestFullHeight+defaultExecutionDataCatchupDistance < finalBlk.Height {
 		err = e.indexMissingCollectionsFromExecutionData(ctx, latestFullHeight)
 		if err != nil {
 			logError(err)
