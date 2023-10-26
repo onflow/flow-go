@@ -30,11 +30,6 @@ func ConvertError(err error, msg string, defaultCode codes.Code) error {
 		return err
 	}
 
-	// Handle multierrors separately
-	if multiErr, ok := err.(*multierror.Error); ok {
-		return ConvertMultiError(multiErr, msg, defaultCode)
-	}
-
 	if msg != "" {
 		msg += ": "
 	}

@@ -114,7 +114,7 @@ func (suite *Suite) SetupTest() {
 
 	eng, err := New(log, net, suite.proto.state, suite.me, suite.request, suite.blocks, suite.headers, suite.collections,
 		suite.transactions, suite.results, suite.receipts, metrics.NewNoopCollector(), collectionsToMarkFinalized, collectionsToMarkExecuted,
-		blocksToMarkExecuted)
+		blocksToMarkExecuted, nil, nil)
 	require.NoError(suite.T(), err)
 
 	suite.blocks.On("GetLastFullBlockHeight").Once().Return(uint64(0), errors.New("do nothing"))
@@ -368,7 +368,8 @@ func (suite *Suite) TestRequestMissingCollections() {
 			return storerr.ErrNotFound
 		})
 	// consider collections are missing for all blocks
-	suite.blocks.On("GetLastFullBlockHeight").Return(startHeight-1, nil)
+	lastFullHeight := startHeight - 1
+
 	// consider the last test block as the head
 	suite.finalizedBlock = blocks[blkCnt-1].Header
 
@@ -432,7 +433,7 @@ func (suite *Suite) TestRequestMissingCollections() {
 		ctx, cancel := context.WithTimeout(context.Background(), 100*defaultCollectionCatchupDBPollInterval)
 		defer cancel()
 
-		err := suite.eng.requestMissingCollections(ctx)
+		err := suite.eng.requestMissingCollections(ctx, lastFullHeight)
 
 		require.Error(suite.T(), err)
 		require.Contains(suite.T(), err.Error(), "context deadline exceeded")
@@ -448,7 +449,7 @@ func (suite *Suite) TestRequestMissingCollections() {
 		ctx, cancel := context.WithTimeout(context.Background(), defaultCollectionCatchupTimeout)
 		defer cancel()
 
-		err := suite.eng.requestMissingCollections(ctx)
+		err := suite.eng.requestMissingCollections(ctx, lastFullHeight)
 
 		require.NoError(suite.T(), err)
 		require.Len(suite.T(), rcvdColl, len(collIDs))
@@ -566,7 +567,7 @@ func (suite *Suite) TestUpdateLastFullBlockReceivedIndex() {
 		suite.proto.params.On("FinalizedRoot").Return(rootBlk.Header, nil)
 		suite.blocks.On("UpdateLastFullBlockHeight", finalizedHeight).Return(nil).Once()
 
-		suite.eng.updateLastFullBlockReceivedIndex()
+		suite.eng.updateLastFullBlockReceivedIndex(context.Background())
 
 		suite.blocks.AssertExpectations(suite.T())
 	})
@@ -577,7 +578,7 @@ func (suite *Suite) TestUpdateLastFullBlockReceivedIndex() {
 		lastFullBlockHeight = block.Header.Height
 		suite.blocks.On("UpdateLastFullBlockHeight", finalizedHeight).Return(nil).Once()
 
-		suite.eng.updateLastFullBlockReceivedIndex()
+		suite.eng.updateLastFullBlockReceivedIndex(context.Background())
 
 		suite.blocks.AssertExpectations(suite.T())
 	})
@@ -586,7 +587,7 @@ func (suite *Suite) TestUpdateLastFullBlockReceivedIndex() {
 		rtnErr = nil
 		lastFullBlockHeight = finalizedHeight
 
-		suite.eng.updateLastFullBlockReceivedIndex()
+		suite.eng.updateLastFullBlockReceivedIndex(context.Background())
 		suite.blocks.AssertExpectations(suite.T()) // not new call to UpdateLastFullBlockHeight should be made
 	})
 
@@ -607,7 +608,7 @@ func (suite *Suite) TestUpdateLastFullBlockReceivedIndex() {
 			}
 		}
 
-		suite.eng.updateLastFullBlockReceivedIndex()
+		suite.eng.updateLastFullBlockReceivedIndex(context.Background())
 
 		// assert that missing collections are requested
 		suite.request.AssertExpectations(suite.T())
@@ -636,7 +637,7 @@ func (suite *Suite) TestUpdateLastFullBlockReceivedIndex() {
 			}
 		}
 
-		suite.eng.updateLastFullBlockReceivedIndex()
+		suite.eng.updateLastFullBlockReceivedIndex(context.Background())
 
 		// assert that missing collections are requested
 		suite.request.AssertExpectations(suite.T())
@@ -659,7 +660,7 @@ func (suite *Suite) TestUpdateLastFullBlockReceivedIndex() {
 			blkMissingColl[i] = true
 		}
 
-		suite.eng.updateLastFullBlockReceivedIndex()
+		suite.eng.updateLastFullBlockReceivedIndex(context.Background())
 
 		// assert that missing collections are not requested even though there are collections missing
 		suite.request.AssertExpectations(suite.T())
