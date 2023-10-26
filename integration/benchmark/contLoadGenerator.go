@@ -806,6 +806,33 @@ func (lg *ContLoadGenerator) sendConstExecCostTx(workerID int) {
 	log.Trace().Msg("const-exec tx suceeded")
 }
 
+func (lg *ContLoadGenerator) queryAccounts(workerID int) {
+	log := lg.log.With().Int("workerID", workerID).Logger()
+
+	log.Trace().
+		Int("availableAccounts", len(lg.availableAccounts)).
+		Msg("getting next available account")
+
+	var acc *account.FlowAccount
+
+	select {
+	case acc = <-lg.availableAccounts:
+	default:
+		log.Error().Msg("next available account channel empty; skipping send")
+		return
+	}
+	defer func() { lg.availableAccounts <- acc }()
+
+	nextAcc := lg.accounts[(acc.ID+1)%len(lg.accounts)]
+
+	log.Trace().
+		Hex("address", nextAcc.Address.Bytes()).
+		Msg("querying account with a script")
+
+	script, _ := QueryAccountScript()
+
+}
+
 func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
 	log := lg.log.With().Int("workerID", workerID).Logger()
 
@@ -968,4 +995,23 @@ func (lg *ContLoadGenerator) sendTx(workerID int, tx *flowsdk.Transaction) (<-ch
 	lg.workerStatsTracker.IncTxSent()
 	lg.loaderMetrics.TransactionSent()
 	return ch, err
+}
+
+func (lg *ContLoadGenerator) executeScript(
+	workerID int,
+	height uint64,
+	script []byte,
+	args []cadence.Value,
+) (cadence.Value, error) {
+	log := lg.log.With().Int("workerID", workerID).Uint64("height", height).Logger()
+	log.Trace().Msg("executing script")
+
+	val, err := lg.flowClient.ExecuteScriptAtBlockHeight(lg.ctx, height, script, args)
+	if err != nil {
+		log.Error().Err(err).Msg("error executing script")
+		return nil, err
+	}
+
+	// todo add metrics
+	return val, nil
 }
