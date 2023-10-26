@@ -25,8 +25,8 @@ func RunWithTestFlowEVMRootAddress(t testing.TB, backend types.Backend, f func(f
 	f(TestFlowEVMRootAddress)
 }
 
-func RunWithTestBackend(t testing.TB, f func(types.Backend)) {
-	tb := &testBackend{
+func RunWithTestBackend(t testing.TB, f func(*TestBackend)) {
+	tb := &TestBackend{
 		testValueStore:   getSimpleValueStore(),
 		testEventEmitter: getSimpleEventEmitter(),
 		testMeter:        getSimpleMeter(),
@@ -72,6 +72,16 @@ func getSimpleValueStore() *testValueStore {
 			binary.BigEndian.PutUint64(data[:], index)
 			return atree.StorageIndex(data), nil
 		},
+		totalStorageSize: func() int {
+			size := 0
+			for k, v := range data {
+				size += len(k) + len(v)
+			}
+			for k := range allocator {
+				size += len(k) + 8
+			}
+			return size
+		},
 	}
 }
 
@@ -84,6 +94,9 @@ func getSimpleEventEmitter() *testEventEmitter {
 		},
 		events: func() flow.EventsList {
 			return events
+		},
+		reset: func() {
+			events = make(flow.EventsList, 0)
 		},
 	}
 }
@@ -108,10 +121,24 @@ func getSimpleMeter() *testMeter {
 	}
 }
 
-type testBackend struct {
+type TestBackend struct {
 	*testValueStore
 	*testMeter
 	*testEventEmitter
+}
+
+func (tb *TestBackend) TotalStorageSize() int {
+	if tb.totalStorageSize == nil {
+		panic("method not set")
+	}
+	return tb.totalStorageSize()
+}
+
+func (tb *TestBackend) DropEvents() {
+	if tb.reset == nil {
+		panic("method not set")
+	}
+	tb.reset()
 }
 
 type testValueStore struct {
@@ -119,6 +146,7 @@ type testValueStore struct {
 	setValue             func(owner, key, value []byte) error
 	valueExists          func(owner, key []byte) (bool, error)
 	allocateStorageIndex func(owner []byte) (atree.StorageIndex, error)
+	totalStorageSize     func() int
 }
 
 var _ environment.ValueStore = &testValueStore{}
@@ -149,6 +177,13 @@ func (vs *testValueStore) AllocateStorageIndex(owner []byte) (atree.StorageIndex
 		panic("method not set")
 	}
 	return vs.allocateStorageIndex(owner)
+}
+
+func (vs *testValueStore) TotalStorageSize() int {
+	if vs.totalStorageSize == nil {
+		panic("method not set")
+	}
+	return vs.totalStorageSize()
 }
 
 type testMeter struct {

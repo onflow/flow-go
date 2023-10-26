@@ -130,9 +130,18 @@ func (db *Database) Delete(key []byte) error {
 }
 
 func (db *Database) delete(key []byte) error {
-	_, _, err := db.atreemap.Remove(compare, hashInputProvider, NewByteStringValue(key))
+	// TODO: does this remove the extra slab as well ?
+	existingKeyStorable, _, err := db.atreemap.Remove(compare, hashInputProvider, NewByteStringValue(key))
 	if err != nil {
 		return types.NewFatalError(err)
+	}
+	storageIDStorable, ok := existingKeyStorable.(atree.StorageIDStorable)
+	if ok {
+		storageID := atree.StorageID(storageIDStorable)
+		err := db.atreemap.Storage.Remove(storageID)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }

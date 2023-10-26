@@ -24,7 +24,6 @@ import (
 	"github.com/onflow/flow-go/fvm/evm"
 	"github.com/onflow/flow-go/fvm/evm/stdlib/emulator"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
-	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -57,7 +56,7 @@ var evmAddressCadenceType = cadence.NewStructType(
 func TestFlexAddressConstructionAndReturn(t *testing.T) {
 
 	t.Parallel()
-	testutils.RunWithTestBackend(t, func(backend types.Backend) {
+	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 
 			env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
@@ -122,7 +121,7 @@ func TestFlexAddressConstructionAndReturn(t *testing.T) {
 func TestEVMRun(t *testing.T) {
 
 	t.Parallel()
-	testutils.RunWithTestBackend(t, func(backend types.Backend) {
+	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 			tc := testutils.GetStorageTestContract(t)
 			testutils.RunWithDeployedContract(t, tc, backend, rootAddr, func(testContract *testutils.TestContract) {
