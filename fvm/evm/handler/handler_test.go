@@ -157,7 +157,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 	t.Run("test running transaction (with integrated emulator)", func(t *testing.T) {
 		testutils.RunWithTestBackend(t, func(backend types.Backend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
-				handler := SetupHandler(t, backend, rootAddr)
+				_, handler := SetupHandler(t, backend, rootAddr)
 				eoa := testutils.GetTestEOAAccount(t, testutils.EOATestAccount1KeyHex)
 
 				// deposit 1 Flow to the foa account
@@ -253,7 +253,7 @@ func TestHandler_BridgedAccount(t *testing.T) {
 		testutils.RunWithTestBackend(t, func(backend types.Backend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 
-				handler := SetupHandler(t, backend, rootAddr)
+				_, handler := SetupHandler(t, backend, rootAddr)
 				foa := handler.AccountByAddress(handler.AllocateAddress(), true)
 				require.NotNil(t, foa)
 
@@ -410,7 +410,7 @@ func TestHandler_BridgedAccount(t *testing.T) {
 		// TODO update this test with events, gas metering, etc
 		testutils.RunWithTestBackend(t, func(backend types.Backend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
-				handler := SetupHandler(t, backend, rootAddr)
+				_, handler := SetupHandler(t, backend, rootAddr)
 				foa := handler.AccountByAddress(handler.AllocateAddress(), true)
 				require.NotNil(t, foa)
 
@@ -453,7 +453,7 @@ var isNotFatal = func(err error) bool {
 	return !errors.IsFailure(err)
 }
 
-func SetupHandler(t testing.TB, backend types.Backend, rootAddr flow.Address) *handler.ContractHandler {
+func SetupHandler(t testing.TB, backend types.Backend, rootAddr flow.Address) (*database.Database, *handler.ContractHandler) {
 	bs, err := handler.NewBlockStore(backend, rootAddr)
 	require.NoError(t, err)
 
@@ -461,7 +461,8 @@ func SetupHandler(t testing.TB, backend types.Backend, rootAddr flow.Address) *h
 	require.NoError(t, err)
 
 	emulator := emulator.NewEmulator(db)
-	return handler.NewContractHandler(bs, backend, emulator)
+	handler := handler.NewContractHandler(bs, backend, emulator)
+	return db, handler
 }
 
 func assertPanic(t *testing.T, check checkError, f func()) {

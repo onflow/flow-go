@@ -26,23 +26,10 @@ func RunWithTestFlowEVMRootAddress(t testing.TB, backend types.Backend, f func(f
 }
 
 func RunWithTestBackend(t testing.TB, f func(types.Backend)) {
-	RunWithTestBackendWithMeterOption(t, false, f)
-}
-
-func RunWithTestBackendWithMeterOption(t testing.TB, meterReadsOnly bool, f func(types.Backend)) {
-	var bytesRead, bytesWritten int
 	tb := &testBackend{
-		testValueStore: getSimpleValueStore(
-			func(i int) { bytesRead += i },
-			func(i int) { bytesWritten += i },
-		),
+		testValueStore:   getSimpleValueStore(),
 		testEventEmitter: getSimpleEventEmitter(),
-		testMeter: getSimpleMeter(func() uint64 {
-			if meterReadsOnly {
-				return uint64(bytesRead)
-			}
-			return uint64(bytesRead + bytesWritten)
-		}),
+		testMeter:        getSimpleMeter(),
 	}
 	f(tb)
 }
@@ -59,29 +46,22 @@ func fullKey(owner, key []byte) string {
 	return string(owner) + "~" + string(key)
 }
 
-func getSimpleValueStore(
-	meterRead func(int),
-	meterWrite func(int),
-) *testValueStore {
+func getSimpleValueStore() *testValueStore {
 	data := make(map[string][]byte)
 	allocator := make(map[string]uint64)
 	return &testValueStore{
 		getValue: func(owner, key []byte) ([]byte, error) {
 			fk := fullKey(owner, key)
-			data := data[fk]
-			meterRead(len(fk) + len(data))
-			return data, nil
+			return data[fk], nil
 		},
 		setValue: func(owner, key, value []byte) error {
 			fk := fullKey(owner, key)
 			data[fk] = value
-			meterWrite(len(fk) + len(data))
 			return nil
 		},
 		valueExists: func(owner, key []byte) (bool, error) {
 			fk := fullKey(owner, key)
 			data := data[fk]
-			meterRead(len(fk) + len(data))
 			return len(data) > 0, nil
 
 		},
@@ -90,7 +70,6 @@ func getSimpleValueStore(
 			var data [8]byte
 			allocator[string(owner)] = index + 1
 			binary.BigEndian.PutUint64(data[:], index)
-			meterWrite(len(owner) + len(data))
 			return atree.StorageIndex(data), nil
 		},
 	}
@@ -109,7 +88,7 @@ func getSimpleEventEmitter() *testEventEmitter {
 	}
 }
 
-func getSimpleMeter(interactionUsed func() uint64) *testMeter {
+func getSimpleMeter() *testMeter {
 	computationLimit := TestComputationLimit
 	compUsed := uint(0)
 	return &testMeter{
@@ -125,9 +104,6 @@ func getSimpleMeter(interactionUsed func() uint64) *testMeter {
 		},
 		computationUsed: func() (uint64, error) {
 			return uint64(compUsed), nil
-		},
-		interactionUsed: func() (uint64, error) {
-			return interactionUsed(), nil
 		},
 	}
 }

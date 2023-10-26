@@ -32,6 +32,7 @@ var (
 type Database struct {
 	led                atree.Ledger
 	flowEVMRootAddress flow.Address
+	baseStorage        *atree.LedgerBaseStorage
 	storage            *atree.PersistentSlabStorage
 	atreemap           *atree.OrderedMap
 	lock               sync.RWMutex // Ramtin: do we need this?
@@ -72,6 +73,7 @@ func NewDatabase(led atree.Ledger, flowEVMRootAddress flow.Address) (*Database, 
 	return &Database{
 		led:                led,
 		flowEVMRootAddress: flowEVMRootAddress,
+		baseStorage:        baseStorage,
 		storage:            storage,
 		atreemap:           m,
 	}, nil
@@ -79,6 +81,7 @@ func NewDatabase(led atree.Ledger, flowEVMRootAddress flow.Address) (*Database, 
 
 // Get retrieves the given key if it's present in the key-value store.
 func (db *Database) Get(key []byte) ([]byte, error) {
+
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
@@ -173,6 +176,11 @@ func (db *Database) Commit() error {
 	return nil
 }
 
+// DropCache drops the database read cache
+func (db *Database) DropCache() {
+	db.storage.DropCache()
+}
+
 // Close deallocates the internal map and ensures any consecutive data access op
 // fails with an error.
 func (db *Database) Close() error {
@@ -212,6 +220,17 @@ func (db *Database) NewSnapshot() (gethDB.Snapshot, error) {
 // Stat returns a particular internal stat of the database.
 func (db *Database) Stat(property string) (string, error) {
 	return "", errNotImplemented
+}
+
+func (db *Database) BytesRetrieved() int {
+	return db.baseStorage.BytesRetrieved()
+}
+
+func (db *Database) BytesStored() int {
+	return db.baseStorage.BytesStored()
+}
+func (db *Database) ResetReporter() {
+	db.baseStorage.ResetReporter()
 }
 
 // Compact is not supported on a memory database, but there's no need either as

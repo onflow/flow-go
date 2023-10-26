@@ -10,22 +10,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func BenchmarkStorage(b *testing.B) { benchmarkStorageGrowth(1000, b) }
+func BenchmarkStorage(b *testing.B) { benchmarkStorageGrowth(1_000_000, b) }
 
 // benchmark
 func benchmarkStorageGrowth(count int, b *testing.B) {
-	testutils.RunWithTestBackendWithMeterOption(b, true, func(backend types.Backend) {
+	testutils.RunWithTestBackend(b, func(backend types.Backend) {
 		testutils.RunWithTestFlowEVMRootAddress(b, backend, func(rootAddr flow.Address) {
 			testutils.RunWithDeployedContract(b,
 				testutils.GetDummyKittyTestContract(b),
 				backend,
 				rootAddr,
 				func(tc *testutils.TestContract) {
-					handler := SetupHandler(b, backend, rootAddr)
+					db, handler := SetupHandler(b, backend, rootAddr)
 					account := handler.AccountByAddress(handler.AllocateAddress(), true)
 					account.Deposit(types.NewFlowTokenVault(types.Balance(10000)))
-					lastInteractionUsed, err := backend.InteractionUsed()
-					require.NoError(b, err)
 					for i := 0; i < count; i++ {
 						matronId := testutils.RandomBigInt(1000)
 						sireId := testutils.RandomBigInt(1000)
@@ -38,11 +36,9 @@ func benchmarkStorageGrowth(count int, b *testing.B) {
 							300_000_000,
 							types.Balance(0),
 						)
-						newint, err := backend.InteractionUsed()
-						require.NoError(b, err)
-
-						fmt.Println("interaction used:", newint-lastInteractionUsed)
-						lastInteractionUsed = newint
+						fmt.Println(i, ">> read:", db.BytesRetrieved(), " written:", db.BytesStored())
+						db.ResetReporter()
+						db.DropCache()
 					}
 
 					b.Fatal("XXX")
@@ -58,8 +54,6 @@ func benchmarkStorageGrowth(count int, b *testing.B) {
 	// b.ReportMetric(float64(totalPTrieConstTimeMS/steps), "ptrie_const_time_(ms)")
 
 }
-
-// TODO reads are too low, some sort of caching is happening somewhere , or data optimizaiton ?
 
 // account data is important
 
