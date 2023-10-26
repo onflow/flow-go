@@ -141,7 +141,8 @@ func (bl *Block) newProcedure() (*procedure, error) {
 			cfg.ChainConfig,
 			cfg.EVMConfig,
 		),
-		state: execState,
+		state:    execState,
+		database: bl.database,
 	}, nil
 }
 
@@ -159,9 +160,10 @@ func (bl *Block) commit(rootHash gethCommon.Hash) error {
 }
 
 type procedure struct {
-	config *Config
-	evm    *gethVM.EVM
-	state  *gethState.StateDB
+	config   *Config
+	evm      *gethVM.EVM
+	state    *gethState.StateDB
+	database *database.Database
 }
 
 // commit commits the changes to the state.
@@ -185,6 +187,12 @@ func (proc *procedure) commit() (gethCommon.Hash, error) {
 	if err != nil {
 		return gethTypes.EmptyRootHash, types.NewFatalError(err)
 	}
+
+	// // remove the read registers (no history tracking)
+	// err = proc.database.DeleteAndCleanReadKey()
+	// if err != nil {
+	// 	return gethTypes.EmptyRootHash, types.NewFatalError(err)
+	// }
 	return newRoot, nil
 }
 

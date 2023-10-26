@@ -1,7 +1,6 @@
 package database_test
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -32,16 +31,10 @@ func TestDatabase(t *testing.T) {
 
 				retValue, err := newdb.Get(key)
 				require.NoError(t, err)
-
 				require.Equal(t, value, retValue)
-
-				fmt.Println(backend.TotalStorageSize())
 
 				err = newdb.Delete(key)
 				require.NoError(t, err)
-
-				fmt.Println(backend.TotalStorageSize())
-				t.Fatal("XXX")
 
 			})
 		})

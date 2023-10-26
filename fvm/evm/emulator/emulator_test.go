@@ -246,3 +246,29 @@ func TestContractInteraction(t *testing.T) {
 		})
 	})
 }
+
+func TestStorageNoSideEffect(t *testing.T) {
+
+	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(flowEVMRoot flow.Address) {
+			db, err := database.NewDatabase(backend, flowEVMRoot)
+			require.NoError(t, err)
+
+			em := emulator.NewEmulator(db)
+			testAccount := types.NewAddressFromString("test")
+
+			amount := big.NewInt(100)
+			RunWithNewBlockView(t, em, func(blk types.BlockView) {
+				_, err = blk.DirectCall(types.NewDepositCall(testAccount, amount))
+				require.NoError(t, err)
+			})
+
+			orgSize := backend.TotalStorageSize()
+			RunWithNewBlockView(t, em, func(blk types.BlockView) {
+				_, err = blk.DirectCall(types.NewDepositCall(testAccount, amount))
+				require.NoError(t, err)
+			})
+			require.Equal(t, orgSize, backend.TotalStorageSize())
+		})
+	})
+}

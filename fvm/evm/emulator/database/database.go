@@ -36,6 +36,7 @@ type Database struct {
 	storage            *atree.PersistentSlabStorage
 	atreemap           *atree.OrderedMap
 	lock               sync.RWMutex // Ramtin: do we need this?
+	readKeys           map[string]interface{}
 }
 
 // New returns a wrapped map with all the required database interface methods
@@ -76,12 +77,12 @@ func NewDatabase(led atree.Ledger, flowEVMRootAddress flow.Address) (*Database, 
 		baseStorage:        baseStorage,
 		storage:            storage,
 		atreemap:           m,
+		readKeys:           make(map[string]interface{}, 0),
 	}, nil
 }
 
 // Get retrieves the given key if it's present in the key-value store.
 func (db *Database) Get(key []byte) ([]byte, error) {
-
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
@@ -94,7 +95,7 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 	if err != nil {
 		return nil, types.NewFatalError(err)
 	}
-
+	db.readKeys[string(key)] = struct{}{}
 	return v.(ByteStringValue).Bytes(), err
 }
 
@@ -130,19 +131,24 @@ func (db *Database) Delete(key []byte) error {
 }
 
 func (db *Database) delete(key []byte) error {
-	// TODO: does this remove the extra slab as well ?
-	existingKeyStorable, _, err := db.atreemap.Remove(compare, hashInputProvider, NewByteStringValue(key))
+	_, _, err := db.atreemap.Remove(compare, hashInputProvider, NewByteStringValue(key))
 	if err != nil {
 		return types.NewFatalError(err)
 	}
-	storageIDStorable, ok := existingKeyStorable.(atree.StorageIDStorable)
-	if ok {
-		storageID := atree.StorageID(storageIDStorable)
-		err := db.atreemap.Storage.Remove(storageID)
+	return nil
+}
+
+func (db *Database) DeleteAndCleanReadKey() error {
+	db.lock.Lock()
+	defer db.lock.Unlock()
+
+	for k := range db.readKeys {
+		err := db.delete([]byte(k))
 		if err != nil {
 			return err
 		}
 	}
+	db.readKeys = make(map[string]interface{})
 	return nil
 }
 
