@@ -2656,7 +2656,7 @@ func ProtocolStateFixture(options ...func(*flow.RichProtocolStateEntry)) *flow.R
 		setup.Counter = prevEpochSetup.Counter + 1
 		// reuse same participant for current epoch
 		sameParticipant := *prevEpochSetup.Participants[1]
-		setup.Participants[1] = &sameParticipant
+		setup.Participants = append(setup.Participants, &sameParticipant)
 		setup.Participants = setup.Participants.Sort(order.Canonical[flow.IdentitySkeleton])
 	})
 	currentEpochCommit := EpochCommitFixture(func(commit *flow.EpochCommit) {
