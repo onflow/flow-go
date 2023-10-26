@@ -13,7 +13,6 @@ import (
 	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
-	"github.com/onflow/flow-go/network/alsp/model"
 )
 
 var ErrTopicRecordNotFound = fmt.Errorf("topic record not found")
@@ -23,10 +22,14 @@ type SubscriptionRecordCache struct {
 	currentCycle atomic.Uint64
 }
 
+// NewSubscriptionRecordCache creates a new subscription cache with the given size limit.
+// Args:
+// - sizeLimit: the size limit of the cache.
+// - logger: the logger to use for logging.
+// - collector: the metrics collector to use for collecting metrics.
 func NewSubscriptionRecordCache(sizeLimit uint32,
 	logger zerolog.Logger,
-	collector module.HeroCacheMetrics,
-	recordFactory model.SpamRecordFactoryFunc) *SubscriptionRecordCache {
+	collector module.HeroCacheMetrics) *SubscriptionRecordCache {
 	backData := herocache.NewCache(sizeLimit,
 		herocache.DefaultOversizeFactor,
 		// this cache is supposed to keep the subscription for the authorized (staked) nodes. Since the number of such nodes is

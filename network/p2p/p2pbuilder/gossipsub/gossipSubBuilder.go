@@ -294,6 +294,10 @@ func defaultInspectorSuite(rpcTracker p2p.RpcControlTracking) p2p.GossipSubRpcIn
 // - error: if an error occurs during the creation of the GossipSub pubsub system, it is returned. Otherwise, nil is returned.
 // Note that on happy path, the returned error is nil. Any error returned is unexpected and should be handled as irrecoverable.
 func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, error) {
+	// placeholder for the gossipsub pubsub system that will be created (so that it can be passed around even
+	// before it is created).
+	var gossipSub p2p.PubSubAdapter
+
 	gossipSubConfigs := g.gossipSubConfigFunc(
 		&p2p.BasePubSubAdapterConfig{
 			MaxMessageSize: p2pnode.DefaultMaxPubSubMsgSize,
@@ -325,15 +329,29 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, e
 	var scoreOpt *scoring.ScoreOption
 	var scoreTracer p2p.PeerScoreTracer
 	if g.gossipSubPeerScoring {
+		// wires the gossipsub score option to the subscription provider.
+		subscriptionProvider, err := scoring.NewSubscriptionProvider(&scoring.SubscriptionProviderConfig{
+			Logger: g.logger,
+			TopicProviderOracle: func() p2p.TopicProvider {
+				// gossipSub has not been created yet, hence instead of passing it directly, we pass a function that returns it.
+				// the cardinal assumption is this function is only invoked when the subscription provider is started, which is
+				// after the gossipsub is created.
+				return gossipSub
+			},
+			Params: g.subscriptionProviderParam,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("could not create subscription provider: %w", err)
+		}
+
 		g.scoreOptionConfig.SetRegisterNotificationConsumerFunc(inspectorSuite.AddInvalidControlMessageConsumer)
-		scoreOpt = scoring.NewScoreOption(g.scoreOptionConfig)
+		scoreOpt = scoring.NewScoreOption(g.scoreOptionConfig, subscriptionProvider)
 		gossipSubConfigs.WithScoreOption(scoreOpt)
 
 		if g.gossipSubScoreTracerInterval > 0 {
 			scoreTracer = tracer.NewGossipSubScoreTracer(g.logger, g.idProvider, g.metricsCfg.Metrics, g.gossipSubScoreTracerInterval)
 			gossipSubConfigs.WithScoreTracer(scoreTracer)
 		}
-
 	} else {
 		g.logger.Warn().
 			Str(logging.KeyNetworkingSecurity, "true").
@@ -348,26 +366,9 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, e
 		return nil, fmt.Errorf("could not create gossipsub: host is nil")
 	}
 
-	gossipSub, err := g.gossipSubFactory(ctx, g.logger, g.h, gossipSubConfigs, inspectorSuite)
+	gossipSub, err = g.gossipSubFactory(ctx, g.logger, g.h, gossipSubConfigs, inspectorSuite)
 	if err != nil {
 		return nil, fmt.Errorf("could not create gossipsub: %w", err)
-	}
-
-	if scoreOpt != nil {
-		// wires the gossipsub score option to the subscription provider.
-		subscriptionProvider, err := scoring.NewSubscriptionProvider(
-			&scoring.SubscriptionProviderConfig{
-				Logger:        g.logger,
-				TopicProvider: gossipSub,
-				Params:        g.subscriptionProviderParam,
-			})
-		if err != nil {
-			return nil, fmt.Errorf("could not create subscription provider: %w", err)
-		}
-		err = scoreOpt.SetSubscriptionProvider(subscriptionProvider)
-		if err != nil {
-			return nil, fmt.Errorf("could not set subscription provider for score option: %w", err)
-		}
 	}
 
 	return gossipSub, nil

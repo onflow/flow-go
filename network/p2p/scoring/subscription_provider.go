@@ -15,13 +15,14 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/p2pconf"
+	"github.com/onflow/flow-go/network/p2p/p2plogging"
 )
 
 // SubscriptionProvider provides a list of topics a peer is subscribed to.
 type SubscriptionProvider struct {
 	component.Component
-	logger zerolog.Logger
-	tp     p2p.TopicProvider
+	logger              zerolog.Logger
+	topicProviderOracle func() p2p.TopicProvider
 
 	// allTopics is a list of all topics in the pubsub network
 	// TODO: we should add an expiry time to this cache and clean up the cache periodically
@@ -38,10 +39,10 @@ type SubscriptionProvider struct {
 }
 
 type SubscriptionProviderConfig struct {
-	Logger        zerolog.Logger          `validate:"required"`
-	TopicProvider p2p.TopicProvider       `validate:"required"`
-	IdProvider    module.IdentityProvider `validate:"required"`
-	Params        *p2pconf.SubscriptionProviderParameters
+	Logger              zerolog.Logger           `validate:"required"`
+	TopicProviderOracle func() p2p.TopicProvider `validate:"required"`
+	IdProvider          module.IdentityProvider  `validate:"required"`
+	Params              *p2pconf.SubscriptionProviderParameters
 }
 
 var _ p2p.SubscriptionProvider = (*SubscriptionProvider)(nil)
@@ -53,7 +54,7 @@ func NewSubscriptionProvider(cfg *SubscriptionProviderConfig) (*SubscriptionProv
 
 	p := &SubscriptionProvider{
 		logger:                  cfg.Logger.With().Str("module", "subscription_provider").Logger(),
-		tp:                      cfg.TopicProvider,
+		topicProviderOracle:     cfg.TopicProviderOracle,
 		allTopicsUpdateInterval: cfg.Params.SubscriptionUpdateInterval,
 	}
 
@@ -80,7 +81,7 @@ func (s *SubscriptionProvider) updateTopicsLoop(ctx irrecoverable.SignalerContex
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			s.updateTopics()
+			s.updateTopics(ctx)
 		}
 	}
 }
@@ -89,20 +90,20 @@ func (s *SubscriptionProvider) updateTopicsLoop(ctx irrecoverable.SignalerContex
 // Note that this method always returns the cached version of the subscribed topics while querying the
 // pubsub network for the list of topics in a goroutine. Hence, the first call to this method always returns an empty
 // list.
-func (s *SubscriptionProvider) updateTopics() {
+func (s *SubscriptionProvider) updateTopics(ctx irrecoverable.SignalerContext) {
 	if updateInProgress := s.allTopicsUpdate.CompareAndSwap(false, true); updateInProgress {
 		// another goroutine is already updating the list of topics
 		return
 	}
 
 	// start of critical section; protected by updateInProgress atomic flag
-	allTopics := s.tp.GetTopics()
+	allTopics := s.topicProviderOracle().GetTopics()
 	s.logger.Trace().Msgf("all topics updated: %v", allTopics)
 
 	// increments the update cycle of the cache; so that the previous cache entries are invalidated upon a read or write.
 	s.cache.MoveToNextUpdateCycle()
 	for _, topic := range allTopics {
-		peers := s.tp.ListPeers(topic)
+		peers := s.topicProviderOracle().ListPeers(topic)
 
 		if _, authorized := s.idProvider.ByPeerID(peers[0]); !authorized {
 			// peer is not authorized (staked); hence it does not have a valid role in the network; and
@@ -111,7 +112,15 @@ func (s *SubscriptionProvider) updateTopics() {
 		}
 
 		for _, p := range peers {
-			s.cache.AddTopicForPeer(p, topic)
+			updatedTopics, err := s.cache.AddTopicForPeer(p, topic)
+			if err != nil {
+				// this is an irrecoverable error; hence, we crash the node.
+				ctx.Throw(fmt.Errorf("failed to update topics for peer %s: %w", p, err))
+			}
+			s.logger.Debug().
+				Str("remote_peer_id", p2plogging.PeerId(p)).
+				Strs("updated_topics", updatedTopics).
+				Msg("updated topics for peer")
 		}
 	}
 
@@ -121,5 +130,10 @@ func (s *SubscriptionProvider) updateTopics() {
 
 // GetSubscribedTopics returns all the subscriptions of a peer within the pubsub network.
 func (s *SubscriptionProvider) GetSubscribedTopics(pid peer.ID) []string {
-	return s.cache.GetSubscribedTopics(pid)
+	topics, ok := s.cache.GetSubscribedTopics(pid)
+	if !ok {
+		s.logger.Trace().Str("peer_id", p2plogging.PeerId(pid)).Msg("no topics found for peer")
+		return nil
+	}
+	return topics
 }

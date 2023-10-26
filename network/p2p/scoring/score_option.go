@@ -378,7 +378,7 @@ func (c *ScoreOptionConfig) OverrideDecayInterval(interval time.Duration) {
 }
 
 // NewScoreOption creates a new penalty option with the given configuration.
-func NewScoreOption(cfg *ScoreOptionConfig) *ScoreOption {
+func NewScoreOption(cfg *ScoreOptionConfig, provider p2p.SubscriptionProvider) *ScoreOption {
 	throttledSampler := logging.BurstSampler(MaxDebugLogs, time.Second)
 	logger := cfg.logger.With().
 		Str("module", "pubsub_score_option").
@@ -387,7 +387,7 @@ func NewScoreOption(cfg *ScoreOptionConfig) *ScoreOption {
 			TraceSampler: throttledSampler,
 			DebugSampler: throttledSampler,
 		})
-	validator := NewSubscriptionValidator()
+	validator := NewSubscriptionValidator(cfg.logger, provider)
 	scoreRegistry := NewGossipSubAppSpecificScoreRegistry(&GossipSubAppSpecificScoreRegistryConfig{
 		Logger:     logger,
 		Penalty:    DefaultGossipSubCtrlMsgPenaltyValue(),
@@ -437,10 +437,6 @@ func NewScoreOption(cfg *ScoreOptionConfig) *ScoreOption {
 		topicParams(s.peerScoreParams.Topics)
 	}
 	return s
-}
-
-func (s *ScoreOption) SetSubscriptionProvider(provider *SubscriptionProvider) error {
-	return s.validator.RegisterSubscriptionProvider(provider)
 }
 
 func (s *ScoreOption) BuildFlowPubSubScoreOption() (*pubsub.PeerScoreParams, *pubsub.PeerScoreThresholds) {
