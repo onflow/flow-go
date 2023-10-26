@@ -7,16 +7,16 @@ import (
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/json"
-	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/fvm/evm"
+	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
 	. "github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/types"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestEVMRun(t *testing.T) {
@@ -28,19 +28,10 @@ func TestEVMRun(t *testing.T) {
 			RunWithDeployedContract(t, backend, rootAddr, func(testContract *TestContract) {
 				RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *EOATestAccount) {
 					num := int64(12)
-
-					interEnv := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
-
-					chainID := flow.Emulator
-					service := chainID.Chain().ServiceAddress()
-
-					err := evm.SetupEnvironment(chainID, backend, interEnv, service)
-					require.NoError(t, err)
-
-					inter := runtime.NewInterpreterRuntime(runtime.Config{})
-
-					script := []byte(fmt.Sprintf(
-						`
+					chain := flow.Emulator.Chain()
+					RunWithNewTestVM(t, chain, func(ctx fvm.Context, vm fvm.VM, snapshot snapshot.SnapshotTree) {
+						code := []byte(fmt.Sprintf(
+							`
                           import EVM from %s
 
                           access(all)
@@ -49,66 +40,72 @@ func TestEVMRun(t *testing.T) {
                               return EVM.run(tx: tx, coinbase: coinbase)
                           }
                         `,
-						service.HexWithPrefix(),
-					))
+							chain.ServiceAddress().HexWithPrefix(),
+						))
 
-					gasLimit := uint64(100_000)
+						gasLimit := uint64(100_000)
 
-					txBytes := testAccount.PrepareSignAndEncodeTx(t,
-						testContract.DeployedAt.ToCommon(),
-						testContract.MakeStoreCallData(t, big.NewInt(num)),
-						big.NewInt(0),
-						gasLimit,
-						big.NewInt(1),
-					)
+						txBytes := testAccount.PrepareSignAndEncodeTx(t,
+							testContract.DeployedAt.ToCommon(),
+							testContract.MakeStoreCallData(t, big.NewInt(num)),
+							big.NewInt(0),
+							gasLimit,
+							big.NewInt(1),
+						)
 
-					tx := cadence.NewArray(
-						ConvertToCadence(txBytes),
-					).WithType(stdlib.EVMTransactionBytesCadenceType)
+						tx := cadence.NewArray(
+							ConvertToCadence(txBytes),
+						).WithType(stdlib.EVMTransactionBytesCadenceType)
 
-					coinbase := cadence.NewArray(
-						ConvertToCadence(testAccount.Address().Bytes()),
-					).WithType(stdlib.EVMAddressBytesCadenceType)
+						coinbase := cadence.NewArray(
+							ConvertToCadence(testAccount.Address().Bytes()),
+						).WithType(stdlib.EVMAddressBytesCadenceType)
 
-					accountCodes := map[common.Location][]byte{}
-					var events []cadence.Event
+						script := fvm.Script(code).WithArguments(
+							json.MustEncode(tx),
+							json.MustEncode(coinbase),
+						)
 
-					runtimeInterface := &TestRuntimeInterface{
-						Storage:           backend,
-						OnResolveLocation: SingleIdentifierLocationResolver(t),
-						OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
-							accountCodes[location] = code
-							return nil
-						},
-						OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
-							code = accountCodes[location]
-							return code, nil
-						},
-						OnEmitEvent: func(event cadence.Event) error {
-							events = append(events, event)
-							return nil
-						},
-						OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
-							return json.Decode(nil, b)
-						},
-					}
+						executionSnapshot, output, err := vm.Run(
+							ctx,
+							script,
+							snapshot)
+						require.NoError(t, err)
+						require.NoError(t, output.Err)
+						assert.Equal(t, cadence.Bool(true), output.Value)
 
-					result, err := inter.ExecuteScript(
-						runtime.Script{
-							Source:    script,
-							Arguments: EncodeArgs([]cadence.Value{tx, coinbase}),
-						},
-						runtime.Context{
-							Interface:   runtimeInterface,
-							Environment: interEnv,
-							Location:    common.ScriptLocation{},
-						},
-					)
-					require.NoError(t, err)
-
-					assert.Equal(t, cadence.Bool(true), result)
+						_ = executionSnapshot
+						// snapshot = snapshot.Append(executionSnapshot)
+					})
 				})
 			})
 		})
 	})
+}
+
+func RunWithNewTestVM(t *testing.T, chain flow.Chain, f func(fvm.Context, fvm.VM, snapshot.SnapshotTree)) {
+	opts := []fvm.Option{
+		fvm.WithChain(chain),
+		fvm.WithAuthorizationChecksEnabled(false),
+		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
+		fvm.WithEVMEnabled(true),
+	}
+	ctx := fvm.NewContext(opts...)
+
+	vm := fvm.NewVirtualMachine()
+	snapshotTree := snapshot.NewSnapshotTree(nil)
+
+	baseBootstrapOpts := []fvm.BootstrapProcedureOption{
+		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
+	}
+
+	executionSnapshot, _, err := vm.Run(
+		ctx,
+		fvm.Bootstrap(unittest.ServiceAccountPublicKey, baseBootstrapOpts...),
+		snapshotTree)
+	require.NoError(t, err)
+
+	snapshotTree = snapshotTree.Append(executionSnapshot)
+
+	f(ctx, vm, snapshotTree)
 }
