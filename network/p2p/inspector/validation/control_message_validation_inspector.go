@@ -95,7 +95,7 @@ var _ protocol.Consumer = (*ControlMsgValidationInspector)(nil)
 // Returns:
 //   - *ControlMsgValidationInspector: a new control message validation inspector.
 //   - error: an error if there is any error while creating the inspector. All errors are irrecoverable and unexpected.
-func NewControlMsgValidationInspector(ctx irrecoverable.SignalerContext, params *InspectorParams) (*ControlMsgValidationInspector, error) {
+func NewControlMsgValidationInspector(params *InspectorParams) (*ControlMsgValidationInspector, error) {
 	err := validator.New().Struct(params)
 	if err != nil {
 		return nil, fmt.Errorf("inspector params validation failed: %w", err)
@@ -115,7 +115,6 @@ func NewControlMsgValidationInspector(ctx irrecoverable.SignalerContext, params 
 	}
 
 	c := &ControlMsgValidationInspector{
-		ctx:            ctx,
 		logger:         lg,
 		sporkID:        params.SporkID,
 		config:         params.Config,
@@ -135,6 +134,7 @@ func NewControlMsgValidationInspector(ctx irrecoverable.SignalerContext, params 
 
 	builder := component.NewComponentManagerBuilder()
 	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		c.ctx = ctx
 		c.distributor.Start(ctx)
 		select {
 		case <-ctx.Done():

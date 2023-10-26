@@ -33,7 +33,7 @@ func TestNewControlMsgValidationInspector(t *testing.T) {
 		distributor := mockp2p.NewGossipSubInspectorNotifDistributor(t)
 		idProvider := mockmodule.NewIdentityProvider(t)
 		signalerCtx := irrecoverable.NewMockSignalerContext(t, context.Background())
-		inspector, err := validation.NewControlMsgValidationInspector(signalerCtx, &validation.InspectorParams{
+		inspector, err := validation.NewControlMsgValidationInspector(&validation.InspectorParams{
 			Logger:                  unittest.Logger(),
 			SporkID:                 sporkID,
 			Config:                  &flowConfig.NetworkConfig.GossipSubRPCValidationInspectorConfigs,
@@ -48,7 +48,7 @@ func TestNewControlMsgValidationInspector(t *testing.T) {
 		require.NotNil(t, inspector)
 	})
 	t.Run("should return error if any of the params are nil", func(t *testing.T) {
-		inspector, err := validation.NewControlMsgValidationInspector(irrecoverable.NewMockSignalerContext(t, context.Background()), &validation.InspectorParams{
+		inspector, err := validation.NewControlMsgValidationInspector(&validation.InspectorParams{
 			Logger:                  unittest.Logger(),
 			SporkID:                 unittest.IdentifierFixture(),
 			Config:                  nil,
@@ -598,7 +598,7 @@ func TestControlMessageValidationInspector_ActiveClustersChanged(t *testing.T) {
 	idProvider := mockmodule.NewIdentityProvider(t)
 	identity := unittest.IdentityFixture()
 	idProvider.On("ByPeerID", mock.AnythingOfType("peer.ID")).Return(identity, true).Times(5)
-	inspector, err := validation.NewControlMsgValidationInspector(signalerCtx, &validation.InspectorParams{
+	inspector, err := validation.NewControlMsgValidationInspector(&validation.InspectorParams{
 		Logger:                  unittest.Logger(),
 		SporkID:                 sporkID,
 		Config:                  &flowConfig.NetworkConfig.GossipSubRPCValidationInspectorConfigs,
@@ -646,7 +646,7 @@ func inspectorFixture(t *testing.T, opts ...func(*validation.InspectorParams)) (
 	for _, opt := range opts {
 		opt(params)
 	}
-	inspector, err := validation.NewControlMsgValidationInspector(signalerCtx, params)
+	inspector, err := validation.NewControlMsgValidationInspector(params)
 	require.NoError(t, err, "failed to create control message validation inspector fixture")
 	return inspector, distributor, rpcTracker, idProvider, sporkID, &flowConfig.NetworkConfig.GossipSubRPCValidationInspectorConfigs
 }

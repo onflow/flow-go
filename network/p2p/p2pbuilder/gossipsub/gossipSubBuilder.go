@@ -266,7 +266,7 @@ func defaultInspectorSuite(rpcTracker p2p.RpcControlTracking) p2p.GossipSubRpcIn
 			RpcTracker:              rpcTracker,
 			NetworkingType:          networkType,
 		}
-		rpcValidationInspector, err := validation.NewControlMsgValidationInspector(ctx, params)
+		rpcValidationInspector, err := validation.NewControlMsgValidationInspector(params)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create new control message valiadation inspector: %w", err)
 		}

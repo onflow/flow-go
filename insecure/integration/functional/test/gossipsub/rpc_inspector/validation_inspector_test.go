@@ -90,7 +90,7 @@ func TestValidationInspector_InvalidTopicId_Detection(t *testing.T) {
 	mockDistributorReadyDoneAware(distributor)
 	withExpectedNotificationDissemination(expectedNumOfTotalNotif, inspectDisseminatedNotifyFunc)(distributor, spammer)
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
-	validationInspector, err := validation.NewControlMsgValidationInspector(signalerCtx, &validation.InspectorParams{
+	validationInspector, err := validation.NewControlMsgValidationInspector(&validation.InspectorParams{
 		Logger:                  unittest.Logger(),
 		SporkID:                 sporkID,
 		Config:                  &inspectorConfig,
@@ -226,7 +226,7 @@ func TestValidationInspector_DuplicateTopicId_Detection(t *testing.T) {
 	mockDistributorReadyDoneAware(distributor)
 	withExpectedNotificationDissemination(expectedNumOfTotalNotif, inspectDisseminatedNotifyFunc)(distributor, spammer)
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
-	validationInspector, err := validation.NewControlMsgValidationInspector(signalerCtx, &validation.InspectorParams{
+	validationInspector, err := validation.NewControlMsgValidationInspector(&validation.InspectorParams{
 		Logger:                  unittest.Logger(),
 		SporkID:                 sporkID,
 		Config:                  &inspectorConfig,
@@ -323,7 +323,7 @@ func TestValidationInspector_IHaveDuplicateMessageId_Detection(t *testing.T) {
 	mockDistributorReadyDoneAware(distributor)
 	withExpectedNotificationDissemination(expectedNumOfTotalNotif, inspectDisseminatedNotifyFunc)(distributor, spammer)
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
-	validationInspector, err := validation.NewControlMsgValidationInspector(signalerCtx, &validation.InspectorParams{
+	validationInspector, err := validation.NewControlMsgValidationInspector(&validation.InspectorParams{
 		Logger:                  unittest.Logger(),
 		SporkID:                 sporkID,
 		Config:                  &inspectorConfig,
@@ -436,7 +436,7 @@ func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
 	mockDistributorReadyDoneAware(distributor)
 	withExpectedNotificationDissemination(expectedNumOfTotalNotif, inspectDisseminatedNotifyFunc)(distributor, spammer)
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
-	validationInspector, err := validation.NewControlMsgValidationInspector(signalerCtx, &validation.InspectorParams{
+	validationInspector, err := validation.NewControlMsgValidationInspector(&validation.InspectorParams{
 		Logger:                  unittest.Logger(),
 		SporkID:                 sporkID,
 		Config:                  &inspectorConfig,
@@ -529,7 +529,7 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection(t *testing.T
 	distributor := mockp2p.NewGossipSubInspectorNotificationDistributor(t)
 	mockDistributorReadyDoneAware(distributor)
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
-	validationInspector, err := validation.NewControlMsgValidationInspector(signalerCtx, &validation.InspectorParams{
+	validationInspector, err := validation.NewControlMsgValidationInspector(&validation.InspectorParams{
 		Logger:                  logger,
 		SporkID:                 sporkID,
 		Config:                  &inspectorConfig,
@@ -616,7 +616,7 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection(t *testing.T
 	distributor := mockp2p.NewGossipSubInspectorNotificationDistributor(t)
 	mockDistributorReadyDoneAware(distributor)
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
-	validationInspector, err := validation.NewControlMsgValidationInspector(signalerCtx, &validation.InspectorParams{
+	validationInspector, err := validation.NewControlMsgValidationInspector(&validation.InspectorParams{
 		Logger:                  logger,
 		SporkID:                 sporkID,
 		Config:                  &inspectorConfig,
@@ -707,7 +707,7 @@ func TestValidationInspector_UnstakedNode_Detection(t *testing.T) {
 	distributor := mockp2p.NewGossipSubInspectorNotificationDistributor(t)
 	mockDistributorReadyDoneAware(distributor)
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
-	validationInspector, err := validation.NewControlMsgValidationInspector(signalerCtx, &validation.InspectorParams{
+	validationInspector, err := validation.NewControlMsgValidationInspector(&validation.InspectorParams{
 		Logger:                  logger,
 		SporkID:                 sporkID,
 		Config:                  &inspectorConfig,
@@ -805,7 +805,7 @@ func TestValidationInspector_InspectIWants_CacheMissThreshold(t *testing.T) {
 	mockDistributorReadyDoneAware(distributor)
 	withExpectedNotificationDissemination(1, inspectDisseminatedNotifyFunc)(distributor, spammer)
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
-	validationInspector, err := validation.NewControlMsgValidationInspector(signalerCtx, &validation.InspectorParams{
+	validationInspector, err := validation.NewControlMsgValidationInspector(&validation.InspectorParams{
 		Logger:                  unittest.Logger(),
 		SporkID:                 sporkID,
 		Config:                  &inspectorConfig,
@@ -933,7 +933,7 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 	mockDistributorReadyDoneAware(distributor)
 	withExpectedNotificationDissemination(1, inspectDisseminatedNotifyFunc)(distributor, spammer)
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
-	validationInspector, err := validation.NewControlMsgValidationInspector(signalerCtx, &validation.InspectorParams{
+	validationInspector, err := validation.NewControlMsgValidationInspector(&validation.InspectorParams{
 		Logger:                  unittest.Logger(),
 		SporkID:                 sporkID,
 		Config:                  &inspectorConfig,
