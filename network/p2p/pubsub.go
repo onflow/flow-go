@@ -208,7 +208,7 @@ func (p PeerScoreSnapshot) IsWarning() bool {
 		// If the IP colocation factor is positive, the peer is in warning state, it means that the peer is running on the
 		// same IP as another peer and is suspected to be a sybil node. For now, we set it to a high value to make sure
 		// that peers from the same operator are not marked as sybil nodes.
-		// TODO: this should be revisited once the collocation penalty is enabled. Setting it to 20 to reduce the noise; 20 is twice the threshold (defaultBehaviourPenaltyThreshold).
+		// TODO: this should be revisited once the collocation penalty is enabled. Setting it to 5 to reduce the noise.
 		return true
 	// Check behaviour penalty.
 	case p.BehaviourPenalty > 20:
