@@ -4,13 +4,12 @@ import (
 	"context"
 	"errors"
 
-	"github.com/onflow/flow-go/fvm/environment"
-
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"

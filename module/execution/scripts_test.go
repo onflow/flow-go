@@ -97,7 +97,10 @@ func (s *scriptTestSuite) TestScriptExecution() {
 	})
 
 	s.Run("Get Block", func() {
-		code := []byte("pub fun main(): UInt64 { return getCurrentBlock().height }")
+		code := []byte(fmt.Sprintf(`pub fun main(): UInt64 {
+			getBlock(at: %d)!
+			return getCurrentBlock().height 
+		}`, s.height))
 
 		result, err := s.scripts.ExecuteAtBlockHeight(context.Background(), code, nil, s.height)
 		s.Require().NoError(err)
