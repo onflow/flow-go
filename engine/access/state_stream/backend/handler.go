@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync/atomic"
 
-	"github.com/onflow/flow/protobuf/go/flow/entities"
+	"github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/onflow/flow/protobuf/go/flow/executiondata"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -54,7 +54,9 @@ func (h *Handler) GetExecutionDataByBlockID(ctx context.Context, request *execut
 		return nil, status.Errorf(codes.Internal, "could not convert execution data to entity: %v", err)
 	}
 
-	err = convert.BlockExecutionDataEventPayloadsToVersion(message, request.GetEventEncodingVersion())
+	// convert event payloads from CCF to JSON-CDC
+	// This is a temporary solution until the Access API supports specifying the encoding in the request
+	err = convert.BlockExecutionDataEventPayloadsToJson(message)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "could not convert execution data event payloads to JSON: %v", err)
 	}
@@ -100,7 +102,9 @@ func (h *Handler) SubscribeExecutionData(request *executiondata.SubscribeExecuti
 			return status.Errorf(codes.Internal, "could not convert execution data to entity: %v", err)
 		}
 
-		err = convert.BlockExecutionDataEventPayloadsToVersion(execData, request.GetEventEncodingVersion())
+		// convert event payloads from CCF to JSON-CDC
+		// This is a temporary solution until the Access API supports specifying the encoding in the request
+		err = convert.BlockExecutionDataEventPayloadsToJson(execData)
 		if err != nil {
 			return status.Errorf(codes.Internal, "could not convert execution data event payloads to JSON: %v", err)
 		}
@@ -183,7 +187,7 @@ func (h *Handler) SubscribeEvents(request *executiondata.SubscribeEventsRequest,
 		// BlockExecutionData contains CCF encoded events, and the Access API returns JSON-CDC events.
 		// convert event payload formats.
 		// This is a temporary solution until the Access API supports specifying the encoding in the request
-		events, err := convert.EventsToMessagesWithEncodingConversion(resp.Events, entities.EventEncodingVersion_CCF_V0, request.GetEventEncodingVersion())
+		events, err := convert.EventsToMessagesFromVersion(resp.Events, execution.EventEncodingVersion_CCF_V0)
 		if err != nil {
 			return status.Errorf(codes.Internal, "could not convert events to entity: %v", err)
 		}

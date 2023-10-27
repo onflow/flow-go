@@ -8,29 +8,9 @@ import (
 // The resource manager is used to limit the number of open connections and streams (as well as any other resources
 // used by libp2p) for each peer.
 type ResourceManagerConfig struct {
-	InboundStream             InboundStreamLimit `mapstructure:",squash"`
-	MemoryLimitRatio          float64            `mapstructure:"libp2p-memory-limit-ratio"`             // maximum allowed fraction of memory to be allocated by the libp2p resources in (0,1]
-	FileDescriptorsRatio      float64            `mapstructure:"libp2p-file-descriptors-ratio"`         // maximum allowed fraction of file descriptors to be allocated by the libp2p resources in (0,1]
-	PeerBaseLimitConnsInbound int                `mapstructure:"libp2p-peer-base-limits-conns-inbound"` // the maximum amount of allowed inbound connections per peer
-}
-
-// InboundStreamLimit is the configuration for the inbound stream limit. The inbound stream limit is used to limit the
-// number of inbound streams that can be opened by the node.
-type InboundStreamLimit struct {
-	// the system-wide limit on the number of inbound streams
-	System int `validate:"gt=0" mapstructure:"libp2p-inbound-stream-limit-system"`
-
-	// Transient is the transient limit on the number of inbound streams (applied to streams that are not associated with a peer or protocol yet)
-	Transient int `validate:"gt=0" mapstructure:"libp2p-inbound-stream-limit-transient"`
-
-	// Protocol is the limit on the number of inbound streams per protocol (over all peers).
-	Protocol int `validate:"gt=0" mapstructure:"libp2p-inbound-stream-limit-protocol"`
-
-	// Peer is the limit on the number of inbound streams per peer (over all protocols).
-	Peer int `validate:"gt=0" mapstructure:"libp2p-inbound-stream-limit-peer"`
-
-	// ProtocolPeer is the limit on the number of inbound streams per protocol per peer.
-	ProtocolPeer int `validate:"gt=0" mapstructure:"libp2p-inbound-stream-limit-protocol-peer"`
+	MemoryLimitRatio          float64 `mapstructure:"libp2p-memory-limit-ratio"`             // maximum allowed fraction of memory to be allocated by the libp2p resources in (0,1]
+	FileDescriptorsRatio      float64 `mapstructure:"libp2p-file-descriptors-ratio"`         // maximum allowed fraction of file descriptors to be allocated by the libp2p resources in (0,1]
+	PeerBaseLimitConnsInbound int     `mapstructure:"libp2p-peer-base-limits-conns-inbound"` // the maximum amount of allowed inbound connections per peer
 }
 
 // GossipSubConfig is the configuration for the GossipSub pubsub implementation.

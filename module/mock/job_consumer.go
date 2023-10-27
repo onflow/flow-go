@@ -59,13 +59,13 @@ func (_m *JobConsumer) Size() uint {
 	return r0
 }
 
-// Start provides a mock function with given fields:
-func (_m *JobConsumer) Start() error {
-	ret := _m.Called()
+// Start provides a mock function with given fields: defaultIndex
+func (_m *JobConsumer) Start(defaultIndex uint64) error {
+	ret := _m.Called(defaultIndex)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func() error); ok {
-		r0 = rf()
+	if rf, ok := ret.Get(0).(func(uint64) error); ok {
+		r0 = rf(defaultIndex)
 	} else {
 		r0 = ret.Error(0)
 	}

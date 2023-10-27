@@ -194,15 +194,6 @@ func (s *AccessAPISuite) testGetAccount(client *client.Client) {
 		s.Assert().Equal(serviceAddress, account.Address)
 		s.Assert().NotZero(account.Balance)
 	})
-
-	s.Run("get newly created account", func() {
-		addr, err := utils.CreateFlowAccount(s.ctx, s.serviceClient)
-		s.Require().NoError(err)
-		acc, err := client.GetAccount(s.ctx, addr)
-		s.Require().NoError(err)
-		s.Assert().Equal(addr, acc.Address)
-		s.Assert().NotZero(acc.Balance)
-	})
 }
 
 func (s *AccessAPISuite) testExecuteScriptWithSimpleScript(client *client.Client) {

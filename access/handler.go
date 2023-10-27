@@ -274,8 +274,7 @@ func (h *Handler) GetTransactionResult(
 		}
 	}
 
-	eventEncodingVersion := req.GetEventEncodingVersion()
-	result, err := h.api.GetTransactionResult(ctx, transactionID, blockId, collectionId, eventEncodingVersion)
+	result, err := h.api.GetTransactionResult(ctx, transactionID, blockId, collectionId)
 	if err != nil {
 		return nil, err
 	}
@@ -297,9 +296,7 @@ func (h *Handler) GetTransactionResultsByBlockID(
 		return nil, err
 	}
 
-	eventEncodingVersion := req.GetEventEncodingVersion()
-
-	results, err := h.api.GetTransactionResultsByBlockID(ctx, id, eventEncodingVersion)
+	results, err := h.api.GetTransactionResultsByBlockID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -345,9 +342,7 @@ func (h *Handler) GetTransactionResultByIndex(
 		return nil, err
 	}
 
-	eventEncodingVersion := req.GetEventEncodingVersion()
-
-	result, err := h.api.GetTransactionResultByIndex(ctx, blockID, req.GetIndex(), eventEncodingVersion)
+	result, err := h.api.GetTransactionResultByIndex(ctx, blockID, req.GetIndex())
 	if err != nil {
 		return nil, err
 	}
@@ -518,9 +513,7 @@ func (h *Handler) GetEventsForHeightRange(
 	startHeight := req.GetStartHeight()
 	endHeight := req.GetEndHeight()
 
-	eventEncodingVersion := req.GetEventEncodingVersion()
-
-	results, err := h.api.GetEventsForHeightRange(ctx, eventType, startHeight, endHeight, eventEncodingVersion)
+	results, err := h.api.GetEventsForHeightRange(ctx, eventType, startHeight, endHeight)
 	if err != nil {
 		return nil, err
 	}
@@ -552,9 +545,7 @@ func (h *Handler) GetEventsForBlockIDs(
 		return nil, err
 	}
 
-	eventEncodingVersion := req.GetEventEncodingVersion()
-
-	results, err := h.api.GetEventsForBlockIDs(ctx, eventType, blockIDs, eventEncodingVersion)
+	results, err := h.api.GetEventsForBlockIDs(ctx, eventType, blockIDs)
 	if err != nil {
 		return nil, err
 	}

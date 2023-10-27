@@ -7,15 +7,25 @@ import (
 	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
 
 	"github.com/onflow/flow-go/model/flow"
 )
 
+type EventEncoding string
+
+const (
+	EncodingCCF  EventEncoding = "ccf"
+	EncodingJSON EventEncoding = "json"
+)
+
 type EventGeneratorOption func(*Events)
 
-func WithEncoding(encoding entities.EventEncodingVersion) EventGeneratorOption {
+func WithEncoding(encoding EventEncoding) EventGeneratorOption {
 	return func(g *Events) {
+		if encoding != EncodingCCF && encoding != EncodingJSON {
+			panic(fmt.Sprintf("unexpected encoding: %s", encoding))
+		}
+
 		g.encoding = encoding
 	}
 }
@@ -23,14 +33,14 @@ func WithEncoding(encoding entities.EventEncodingVersion) EventGeneratorOption {
 type Events struct {
 	count    uint32
 	ids      *Identifiers
-	encoding entities.EventEncodingVersion
+	encoding EventEncoding
 }
 
 func EventGenerator(opts ...EventGeneratorOption) *Events {
 	g := &Events{
 		count:    1,
 		ids:      IdentifierGenerator(),
-		encoding: entities.EventEncodingVersion_CCF_V0,
+		encoding: EncodingCCF,
 	}
 
 	for _, opt := range opts {
@@ -73,12 +83,12 @@ func (g *Events) New() flow.Event {
 
 	var payload []byte
 	switch g.encoding {
-	case entities.EventEncodingVersion_CCF_V0:
+	case EncodingCCF:
 		payload, err = ccf.Encode(testEvent)
 		if err != nil {
 			panic(fmt.Sprintf("unexpected error while ccf encoding events: %s", err))
 		}
-	case entities.EventEncodingVersion_JSON_CDC_V0:
+	case EncodingJSON:
 		payload, err = jsoncdc.Encode(testEvent)
 		if err != nil {
 			panic(fmt.Sprintf("unexpected error while json encoding events: %s", err))
@@ -96,14 +106,4 @@ func (g *Events) New() flow.Event {
 	g.count++
 
 	return event
-}
-
-// GetEventsWithEncoding generates a specified number of events with a given encoding version.
-func GetEventsWithEncoding(n int, version entities.EventEncodingVersion) []flow.Event {
-	eventGenerator := EventGenerator(WithEncoding(version))
-	events := make([]flow.Event, 0, n)
-	for i := 0; i < n; i++ {
-		events = append(events, eventGenerator.New())
-	}
-	return events
 }
