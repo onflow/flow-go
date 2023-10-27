@@ -9,6 +9,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
@@ -281,7 +283,7 @@ func (h *handler) GetEventsForBlockIDs(
 
 	return &execution.GetEventsForBlockIDsResponse{
 		Results:              results,
-		EventEncodingVersion: execution.EventEncodingVersion_CCF_V0,
+		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
 	}, nil
 }
 
@@ -344,7 +346,7 @@ func (h *handler) GetTransactionResult(
 		StatusCode:           statusCode,
 		ErrorMessage:         errMsg,
 		Events:               events,
-		EventEncodingVersion: execution.EventEncodingVersion_CCF_V0,
+		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
 	}, nil
 }
 
@@ -403,7 +405,7 @@ func (h *handler) GetTransactionResultByIndex(
 		StatusCode:           statusCode,
 		ErrorMessage:         errMsg,
 		Events:               events,
-		EventEncodingVersion: execution.EventEncodingVersion_CCF_V0,
+		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
 	}, nil
 }
 
@@ -489,7 +491,7 @@ func (h *handler) GetTransactionResultsByBlockID(
 	// compose a response
 	return &execution.GetTransactionResultsResponse{
 		TransactionResults:   responseTxResults,
-		EventEncodingVersion: execution.EventEncodingVersion_CCF_V0,
+		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
 	}, nil
 }
 
