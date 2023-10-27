@@ -236,7 +236,6 @@ func TestGetExecutionDataByBlockID(t *testing.T) {
 			require.NotNil(t, response)
 
 			blockExecutionData := response.GetBlockExecutionData()
-
 			require.Equal(t, blockID[:], blockExecutionData.GetBlockId())
 
 			convertedExecData, err := convert.MessageToBlockExecutionData(blockExecutionData, flow.Testnet.Chain())

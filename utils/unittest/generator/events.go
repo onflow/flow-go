@@ -101,11 +101,9 @@ func (g *Events) New() flow.Event {
 // GetEventsWithEncoding generates a specified number of events with a given encoding version.
 func GetEventsWithEncoding(n int, version entities.EventEncodingVersion) []flow.Event {
 	eventGenerator := EventGenerator(WithEncoding(version))
-
 	events := make([]flow.Event, 0, n)
 	for i := 0; i < n; i++ {
 		events = append(events, eventGenerator.New())
 	}
-
 	return events
 }
