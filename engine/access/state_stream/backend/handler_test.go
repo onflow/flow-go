@@ -16,9 +16,8 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/onflow/cadence/encoding/ccf"
-	"github.com/onflow/flow/protobuf/go/flow/entities"
-
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/onflow/flow/protobuf/go/flow/executiondata"
 
 	"github.com/onflow/flow-go/engine/access/state_stream"

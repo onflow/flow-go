@@ -3,9 +3,8 @@ package backend
 import (
 	"context"
 
-	"github.com/onflow/flow/protobuf/go/flow/entities"
-
 	"github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/stretchr/testify/mock"
 	"google.golang.org/grpc/codes"
