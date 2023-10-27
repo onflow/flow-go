@@ -738,7 +738,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 				address: fromAddress,
 				deposit: func(vault *types.FLOWTokenVault) {
 					deposited = true
-					assert.Zero(t, vault.Balance())
+					assert.Equal(t, types.Balance(0), vault.Balance())
 				},
 			}
 		},
@@ -833,6 +833,7 @@ func TestEVMAddressWithdraw(t *testing.T) {
 			return &testFlowAccount{
 				address: fromAddress,
 				withdraw: func(balance types.Balance) *types.FLOWTokenVault {
+					assert.Equal(t, types.Balance(0), balance)
 					withdrew = true
 					return types.NewFlowTokenVault(balance)
 				},
