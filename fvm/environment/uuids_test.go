@@ -66,6 +66,9 @@ func TestUUIDGeneratorInitializePartitionNoHeader(t *testing.T) {
 }
 
 func TestUUIDGeneratorInitializePartition(t *testing.T) {
+	t.Skip("Temporarily disabled because we want to always use the 0 partition" +
+		" for now")
+
 	blockHeader := &flow.Header{}
 
 	for numBlocks := 0; numBlocks < 10; numBlocks++ {
