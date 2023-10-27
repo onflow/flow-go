@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/onflow/flow-go/fvm/environment"
+
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/execution/computation"
@@ -70,6 +72,8 @@ func NewScripts(
 	vm := fvm.NewVirtualMachine()
 
 	options := computation.DefaultFVMOptions(chainID, false, false)
+	blocks := environment.NewBlockFinder(header)
+	options = append(options, fvm.WithBlocks(blocks)) // add blocks for getBlocks calls in scripts
 	vmCtx := fvm.NewContext(options...)
 
 	derivedChainData, err := derived.NewDerivedChainData(derived.DefaultDerivedDataCacheSize)
