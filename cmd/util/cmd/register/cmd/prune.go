@@ -3,9 +3,10 @@ package cmd
 import (
 	"fmt"
 
-	pStorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+
+	pStorage "github.com/onflow/flow-go/storage/pebble"
 )
 
 var flagPruneHeight uint64
@@ -14,7 +15,7 @@ func init() {
 	rootCmd.AddCommand(pruneCmd)
 
 	pruneCmd.Flags().Uint64VarP(&flagPruneHeight, "height", "", 0, "the height to be pruned")
-	pruneCmd.MarkFlagRequired("height")
+	_ = pruneCmd.MarkFlagRequired("height")
 }
 
 var pruneCmd = &cobra.Command{

@@ -3,9 +3,10 @@ package cmd
 import (
 	"fmt"
 
-	pStorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+
+	pStorage "github.com/onflow/flow-go/storage/pebble"
 )
 
 var flagPebbleCheckpointPath string
@@ -14,7 +15,10 @@ func init() {
 	rootCmd.AddCommand(checkpointCmd)
 
 	checkpointCmd.Flags().StringVar(&flagPebbleCheckpointPath, "checkpoint-dir", "", "the path of the checkpoint")
-	checkpointCmd.MarkFlagRequired("checkpoint-dir")
+	err := checkpointCmd.MarkFlagRequired("checkpoint-dir")
+	if err != nil {
+		panic(err)
+	}
 }
 
 var checkpointCmd = &cobra.Command{
