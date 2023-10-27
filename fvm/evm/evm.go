@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	evm "github.com/onflow/flow-go/fvm/evm/emulator"
@@ -29,6 +30,7 @@ func SetupEnvironment(
 	backend types.Backend,
 	env runtime.Environment,
 	service flow.Address,
+	flowToken flow.Address,
 ) error {
 	// TODO: setup proper root address based on chainID
 	evmRootAddress, err := RootAccountAddress(chainID)
@@ -48,7 +50,7 @@ func SetupEnvironment(
 		return err
 	}
 
-	contractHandler := handler.NewContractHandler(bs, backend, em)
+	contractHandler := handler.NewContractHandler(common.Address(flowToken), bs, backend, em)
 
 	stdlib.SetupEnvironment(env, contractHandler, service)
 

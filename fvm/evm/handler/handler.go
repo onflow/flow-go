@@ -7,6 +7,7 @@ import (
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
@@ -24,6 +25,7 @@ import (
 // in the future we might benefit from a view style of access to db passed as
 // a param to the emulator.
 type ContractHandler struct {
+	flowTokenAddress  common.Address
 	blockchain        types.BlockChain
 	backend           types.Backend
 	emulator          types.Emulator
@@ -32,9 +34,14 @@ type ContractHandler struct {
 	totalSupply       uint64
 }
 
+func (h *ContractHandler) FlowTokenAddress() common.Address {
+	return h.flowTokenAddress
+}
+
 var _ types.ContractHandler = &ContractHandler{}
 
 func NewContractHandler(
+	flowTokenAddress common.Address,
 	blockchain types.BlockChain,
 	backend types.Backend,
 	emulator types.Emulator,
@@ -46,6 +53,7 @@ func NewContractHandler(
 	}
 
 	return &ContractHandler{
+		flowTokenAddress:  flowTokenAddress,
 		blockchain:        blockchain,
 		backend:           backend,
 		emulator:          emulator,
@@ -78,7 +86,7 @@ func (h *ContractHandler) AccountByAddress(addr types.Address, isAuthorized bool
 }
 
 // LastExecutedBlock returns the last executed block
-func (h ContractHandler) LastExecutedBlock() *types.Block {
+func (h *ContractHandler) LastExecutedBlock() *types.Block {
 	block, err := h.blockchain.LatestBlock()
 	handleError(err)
 	return block
@@ -98,7 +106,7 @@ func (h *ContractHandler) updateLastExecutedBlock(stateRoot, eventRoot gethCommo
 }
 
 // Run runs an rlpencoded evm transaction, collect the evm fees under the provided coinbase
-func (h ContractHandler) Run(rlpEncodedTx []byte, coinbase types.Address) bool {
+func (h *ContractHandler) Run(rlpEncodedTx []byte, coinbase types.Address) bool {
 	// Decode transaction encoding
 	tx := gethTypes.Transaction{}
 
@@ -149,14 +157,14 @@ func (h ContractHandler) Run(rlpEncodedTx []byte, coinbase types.Address) bool {
 	return !failed
 }
 
-func (h ContractHandler) checkGasLimit(limit types.GasLimit) {
+func (h *ContractHandler) checkGasLimit(limit types.GasLimit) {
 	// check gas limit against what has been left on the transaction side
 	if !h.backend.ComputationAvailable(environment.ComputationKindEVMGasUsage, uint(limit)) {
 		handleError(types.ErrInsufficientComputation)
 	}
 }
 
-func (h ContractHandler) meterGasUsage(res *types.Result) {
+func (h *ContractHandler) meterGasUsage(res *types.Result) {
 	if res != nil {
 		err := h.backend.MeterComputation(environment.ComputationKindEVMGasUsage, uint(res.GasConsumed))
 		handleError(err)
@@ -167,6 +175,7 @@ func (h *ContractHandler) EmitEvent(event *types.Event) {
 	// TODO add extra metering for rlp encoding
 	encoded, err := event.Payload.Encode()
 	handleError(err)
+	// TODO: handle error
 	h.backend.EmitFlowEvent(event.Etype, encoded)
 }
 

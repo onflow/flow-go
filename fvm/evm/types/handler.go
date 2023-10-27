@@ -1,6 +1,8 @@
 package types
 
 import (
+	"github.com/onflow/cadence/runtime/common"
+
 	"github.com/onflow/flow-go/fvm/environment"
 )
 
@@ -36,6 +38,8 @@ type ContractHandler interface {
 	// collects the gas fees, and transfers the gas fees to the given coinbase account.
 	// Returns true if the transaction was successfully executed
 	Run(tx []byte, coinbase Address) bool
+
+	FlowTokenAddress() common.Address
 }
 
 // Backend passes the FVM functionality needed inside the handler

@@ -99,6 +99,7 @@ func newTransactionExecutor(
 			env,
 			cadenceRuntime.Environment,
 			chain.ServiceAddress(),
+			FlowTokenAddress(chain),
 		)
 	}
 

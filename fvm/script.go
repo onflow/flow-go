@@ -208,6 +208,7 @@ func (executor *scriptExecutor) executeScript() error {
 			executor.env,
 			rt.Environment,
 			chain.ServiceAddress(),
+			FlowTokenAddress(chain),
 		)
 	}
 
