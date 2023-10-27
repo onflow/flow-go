@@ -24,13 +24,14 @@ import (
 type LoadType string
 
 const (
-	TokenTransferLoadType LoadType = "token-transfer"
-	TokenAddKeysLoadType  LoadType = "add-keys"
-	CompHeavyLoadType     LoadType = "computation-heavy"
-	EventHeavyLoadType    LoadType = "event-heavy"
-	LedgerHeavyLoadType   LoadType = "ledger-heavy"
-	ConstExecCostLoadType LoadType = "const-exec" // for an empty transactions with various tx arguments
-	ExecDataHeavyLoadType LoadType = "exec-data-heavy"
+	TokenTransferLoadType  LoadType = "token-transfer"
+	TokenAddKeysLoadType   LoadType = "add-keys"
+	CompHeavyLoadType      LoadType = "computation-heavy"
+	EventHeavyLoadType     LoadType = "event-heavy"
+	LedgerHeavyLoadType    LoadType = "ledger-heavy"
+	ConstExecCostLoadType  LoadType = "const-exec" // for an empty transactions with various tx arguments
+	ExecDataHeavyLoadType  LoadType = "exec-data-heavy"
+	ScriptQueryAccountType LoadType = "script-query"
 )
 
 const lostTransactionThreshold = 90 * time.Second
@@ -58,6 +59,7 @@ type ContLoadGenerator struct {
 
 	log                zerolog.Logger
 	loaderMetrics      *metrics.LoaderCollector
+	scriptMetrics      *metrics.AccessCollector
 	loadParams         LoadParams
 	networkParams      NetworkParams
 	constExecParams    ConstExecParams
@@ -154,10 +156,15 @@ func New(
 		}
 	}
 
+	scriptMetrics := metrics.NewAccessCollector(
+		metrics.WithBackendScriptsMetrics(metrics.NewTransactionCollector(log, nil, false, false, false)),
+	)
+
 	lg := &ContLoadGenerator{
 		ctx:                ctx,
 		log:                log,
 		loaderMetrics:      loaderMetrics,
+		scriptMetrics:      scriptMetrics,
 		loadParams:         loadParams,
 		networkParams:      networkParams,
 		constExecParams:    constExecParams,
@@ -182,6 +189,8 @@ func New(
 		lg.workFunc = lg.sendConstExecCostTx
 	case CompHeavyLoadType, EventHeavyLoadType, LedgerHeavyLoadType, ExecDataHeavyLoadType:
 		lg.workFunc = lg.sendFavContractTx
+	case ScriptQueryAccountType:
+		lg.workFunc = lg.queryAccounts
 	default:
 		return nil, fmt.Errorf("unknown load type: %s", loadParams.LoadType)
 	}
@@ -831,6 +840,26 @@ func (lg *ContLoadGenerator) queryAccounts(workerID int) {
 
 	script, _ := QueryAccountScript()
 
+	header, err := lg.flowClient.GetLatestBlockHeader(lg.ctx, true)
+	if err != nil {
+		log.Error().Err(err).Msg("error getting latest block")
+		return
+	}
+
+	addr := cadence.BytesToAddress(nextAcc.Address.Bytes())
+
+	startTime := time.Now()
+	log.Trace().Msg("starting to execute script")
+	val, err := lg.executeScript(workerID, header.Height, script, []cadence.Value{addr})
+
+	dur := time.Since(startTime)
+	lg.scriptMetrics.ScriptExecuted(dur, len(script))
+
+	log.Trace().
+		Dur("duration", dur).
+		Err(err).
+		Str("result", val.String()).
+		Msg("script executed")
 }
 
 func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
