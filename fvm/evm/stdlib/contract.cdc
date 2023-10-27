@@ -80,15 +80,22 @@ contract EVM {
             return <-vault
         }
 
-        // TODO:
-        // /// Deploys a contract to the EVM environment.
-        // /// Returns the address of the newly deployed contract
-        // access(all)
-        // fun deploy(
-        //     code: [UInt8],
-        //     gasLimit: UInt64,
-        //     value: Balance
-        // ): EVMAddress
+        /// Deploys a contract to the EVM environment.
+        /// Returns the address of the newly deployed contract
+        access(all)
+        fun deploy(
+            code: [UInt8],
+            gasLimit: UInt64,
+            value: Balance
+        ): EVMAddress {
+            let addressBytes = InternalEVM.deploy(
+                from: self.addressBytes,
+                code: code,
+                gasLimit: gasLimit,
+                value: value.flow
+            )
+            return EVMAddress(bytes: addressBytes)
+        }
 
         /// Calls a function with the given data.
         /// The execution is limited by the given amount of gas

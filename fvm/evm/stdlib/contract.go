@@ -418,6 +418,94 @@ func newInternalEVMTypeWithdrawFunction(
 	)
 }
 
+const internalEVMTypeDeployFunctionName = "deploy"
+
+var internalEVMTypeDeployFunctionType = &sema.FunctionType{
+	Parameters: []sema.Parameter{
+		{
+			Label:          "from",
+			TypeAnnotation: sema.NewTypeAnnotation(evmAddressBytesType),
+		},
+		{
+			Label:          "code",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.ByteArrayType),
+		},
+		{
+			Label:          "gasLimit",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.UInt64Type),
+		},
+		{
+			Label:          "value",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.UFix64Type),
+		},
+	},
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(evmAddressBytesType),
+}
+
+func newInternalEVMTypeDeployFunction(
+	gauge common.MemoryGauge,
+	handler types.ContractHandler,
+) *interpreter.HostFunctionValue {
+	return interpreter.NewHostFunctionValue(
+		gauge,
+		internalEVMTypeCallFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			inter := invocation.Interpreter
+			locationRange := invocation.LocationRange
+
+			// Get from address
+
+			fromAddressValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			fromAddress, err := AddressBytesArrayValueToEVMAddress(inter, locationRange, fromAddressValue)
+			if err != nil {
+				panic(err)
+			}
+
+			// Get code
+
+			codeValue, ok := invocation.Arguments[1].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			code, err := interpreter.ByteArrayValueToByteSlice(inter, codeValue, locationRange)
+			if err != nil {
+				panic(err)
+			}
+
+			// Get gas limit
+
+			gasLimitValue, ok := invocation.Arguments[2].(interpreter.UInt64Value)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			gasLimit := types.GasLimit(gasLimitValue)
+
+			// Get value
+
+			amountValue, ok := invocation.Arguments[3].(interpreter.UFix64Value)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			amount := types.Balance(amountValue)
+
+			// Deploy
+
+			const isAuthorized = true
+			account := handler.AccountByAddress(fromAddress, isAuthorized)
+			address := account.Deploy(code, gasLimit, amount)
+
+			return EVMAddressToAddressBytesArrayValue(inter, address)
+		},
+	)
+}
+
 func NewInternalEVMContractValue(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
@@ -433,6 +521,7 @@ func NewInternalEVMContractValue(
 			internalEVMTypeCallFunctionName:                 newInternalEVMTypeCallFunction(gauge, handler),
 			internalEVMTypeDepositFunctionName:              newInternalEVMTypeDepositFunction(gauge, handler),
 			internalEVMTypeWithdrawFunctionName:             newInternalEVMTypeWithdrawFunction(gauge, handler),
+			internalEVMTypeDeployFunctionName:               newInternalEVMTypeDeployFunction(gauge, handler),
 		},
 		nil,
 		nil,
@@ -477,6 +566,12 @@ var InternalEVMContractType = func() *sema.CompositeType {
 			ty,
 			internalEVMTypeWithdrawFunctionName,
 			internalEVMTypeWithdrawFunctionType,
+			"",
+		),
+		sema.NewUnmeteredPublicFunctionMember(
+			ty,
+			internalEVMTypeDeployFunctionName,
+			internalEVMTypeDeployFunctionType,
 			"",
 		),
 	})
