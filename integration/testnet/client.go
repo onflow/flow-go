@@ -365,8 +365,12 @@ func (c *Client) CreateAccount(
 	payer sdk.Address,
 	latestBlockID sdk.Identifier,
 ) (sdk.Address, error) {
+	updatedPayer, err := c.client.GetAccount(ctx, payerAccount.Address)
+	if err != nil {
+		return sdk.Address{}, err
+	}
 
-	payerKey := payerAccount.Keys[0]
+	payerKey := updatedPayer.Keys[0]
 	tx, err := templates.CreateAccount([]*sdk.AccountKey{accountKey}, nil, payer)
 	if err != nil {
 		return sdk.Address{}, fmt.Errorf("failed cusnctruct create account transaction %w", err)
@@ -384,6 +388,10 @@ func (c *Client) CreateAccount(
 	result, err := c.WaitForSealed(ctx, tx.ID())
 	if err != nil {
 		return sdk.Address{}, fmt.Errorf("failed to wait for create account transaction to seal %w", err)
+	}
+
+	if result.Error != nil {
+		return sdk.Address{}, fmt.Errorf("failed to create new account %w", result.Error)
 	}
 
 	if address, ok := c.UserAddress(result); ok {
