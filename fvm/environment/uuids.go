@@ -162,9 +162,12 @@ func (generator *uUIDGenerator) maybeInitializePartition() {
 	if generator.blockHeader == nil {
 		generator.partition = 0
 	} else {
-		generator.partition = uuidPartition(
-			generator.blockHeader.ID(),
-			generator.txnIndex)
+		// temporarily use the 0 partition so that uuid fits into 56 bits.
+		generator.partition = 0
+		// TODO: switch to code below once the community is ready
+		// generator.partition = uuidPartition(
+		//	 generator.blockHeader.ID(),
+		//	 generator.txnIndex)
 	}
 
 	generator.registerId = flow.UUIDRegisterID(generator.partition)
