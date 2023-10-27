@@ -1,7 +1,9 @@
 package protocol_state
 
 import (
+	"errors"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -86,6 +88,8 @@ func (s *MutatorSuite) TestMutatorHappyPathHasChanges() {
 	require.NoError(s.T(), err)
 }
 
+// TestMutatorApplyServiceEvents_InvalidEpochSetup tests that ApplyServiceEvents rejects invalid epoch setup event and sets
+// InvalidStateTransitionAttempted flag in protocol.StateUpdater.
 func (s *MutatorSuite) TestMutatorApplyServiceEvents_InvalidEpochSetup() {
 	s.params.On("EpochFallbackTriggered").Return(false, nil)
 	s.Run("invalid-counter", func() {
@@ -115,7 +119,63 @@ func (s *MutatorSuite) TestMutatorApplyServiceEvents_InvalidEpochSetup() {
 		require.NoError(s.T(), err)
 		require.Empty(s.T(), updates)
 	})
+	s.Run("conflicts-with-protocol-state", func() {
+		parentState := unittest.ProtocolStateFixture()
+		rootSetup := parentState.CurrentEpochSetup
+		updater := mock.NewStateUpdater(s.T())
+		updater.On("ParentState").Return(parentState)
 
+		epochSetup := unittest.EpochSetupFixture(
+			unittest.WithParticipants(rootSetup.Participants),
+			unittest.SetupWithCounter(rootSetup.Counter+1),
+			unittest.WithFinalView(rootSetup.FinalView+1000),
+			unittest.WithFirstView(rootSetup.FinalView+1),
+		)
+		result := unittest.ExecutionResultFixture(func(result *flow.ExecutionResult) {
+			result.ServiceEvents = []flow.ServiceEvent{epochSetup.ServiceEvent()}
+		})
+
+		block := unittest.BlockHeaderFixture()
+		seal := unittest.Seal.Fixture(unittest.Seal.WithBlockID(block.ID()))
+		s.headersDB.On("ByBlockID", seal.BlockID).Return(block, nil)
+		s.resultsDB.On("ByID", seal.ResultID).Return(result, nil)
+
+		updater.On("ProcessEpochSetup", epochSetup).Return(protocol.NewInvalidServiceEventErrorf("")).Once()
+		updater.On("SetInvalidStateTransitionAttempted").Return().Once()
+
+		updates, err := s.mutator.ApplyServiceEvents(updater, []*flow.Seal{seal})
+		require.NoError(s.T(), err)
+		require.Empty(s.T(), updates)
+	})
+	s.Run("process-epoch-setup-exception", func() {
+		parentState := unittest.ProtocolStateFixture()
+		rootSetup := parentState.CurrentEpochSetup
+		updater := mock.NewStateUpdater(s.T())
+		updater.On("ParentState").Return(parentState)
+
+		epochSetup := unittest.EpochSetupFixture(
+			unittest.WithParticipants(rootSetup.Participants),
+			unittest.SetupWithCounter(rootSetup.Counter+1),
+			unittest.WithFinalView(rootSetup.FinalView+1000),
+			unittest.WithFirstView(rootSetup.FinalView+1),
+		)
+		result := unittest.ExecutionResultFixture(func(result *flow.ExecutionResult) {
+			result.ServiceEvents = []flow.ServiceEvent{epochSetup.ServiceEvent()}
+		})
+
+		block := unittest.BlockHeaderFixture()
+		seal := unittest.Seal.Fixture(unittest.Seal.WithBlockID(block.ID()))
+		s.headersDB.On("ByBlockID", seal.BlockID).Return(block, nil)
+		s.resultsDB.On("ByID", seal.ResultID).Return(result, nil)
+
+		exception := errors.New("exception")
+		updater.On("ProcessEpochSetup", epochSetup).Return(exception).Once()
+
+		updates, err := s.mutator.ApplyServiceEvents(updater, []*flow.Seal{seal})
+		require.Error(s.T(), err)
+		require.False(s.T(), protocol.IsInvalidServiceEventError(err))
+		require.Empty(s.T(), updates)
+	})
 }
 
 // TestMutatorApplyServiceEvents_EpochFallbackTriggered tests two scenarios when network is in epoch fallback mode.
