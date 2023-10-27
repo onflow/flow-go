@@ -167,18 +167,6 @@ func MigrateGroupConcurrently(
 						continue
 					}
 
-					// TODO remove to migrate all accounts. This is for testing only
-					if job.Address != cricketMomentsAddress {
-						resultCh <- &migrationResult{
-							migrationDuration: migrationDuration{
-								Address:  job.Address,
-								Duration: time.Since(start),
-							},
-							Migrated: job.Payloads,
-						}
-						continue
-					}
-
 					if _, ok := knownProblematicAccounts[job.Address]; ok {
 						log.Info().
 							Hex("address", job.Address[:]).
