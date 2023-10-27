@@ -828,7 +828,7 @@ func TestEVMAddressWithdraw(t *testing.T) {
 		flowTokenAddress: common.Address(contractsAddress),
 		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
 			assert.Equal(t, types.Address{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
-			assert.False(t, isAuthorized)
+			assert.True(t, isAuthorized)
 
 			return &testFlowAccount{
 				address: fromAddress,
