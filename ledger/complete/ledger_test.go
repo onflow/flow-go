@@ -55,7 +55,7 @@ func TestLedger_Update(t *testing.T) {
 
 		newState, trieUpdate, err := l.Set(up)
 		require.NoError(t, err)
-		require.True(t, trieUpdate.IsEmpty())
+		require.Nil(t, trieUpdate)
 
 		// state shouldn't change
 		assert.Equal(t, currentState, newState)

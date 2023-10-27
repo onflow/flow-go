@@ -16,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/ledger/partial"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestFunctionalityWithCompleteTrie(t *testing.T) {
@@ -152,20 +151,4 @@ func TestProofsForEmptyRegisters(t *testing.T) {
 	require.Len(t, results, 1)
 
 	require.Empty(t, results[0])
-}
-
-func TestEmptyLedger(t *testing.T) {
-	l, err := complete.NewLedger(&fixtures.NoopWAL{}, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
-	require.NoError(t, err)
-
-	u, err := ledger.NewUpdate(
-		ledger.State(unittest.StateCommitmentFixture()),
-		[]ledger.Key{},
-		[]ledger.Value{},
-	)
-	require.NoError(t, err)
-	newState, trieUpdate, err := l.Set(u)
-	require.NoError(t, err)
-	require.True(t, trieUpdate.IsEmpty())
-	require.Equal(t, u.State(), newState)
 }

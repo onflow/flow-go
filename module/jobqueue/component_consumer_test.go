@@ -11,7 +11,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/atomic"
 
@@ -89,7 +88,7 @@ func (suite *ComponentConsumerSuite) prepareTest(
 	progress.On("ProcessedIndex").Return(suite.defaultIndex, nil)
 	progress.On("SetProcessedIndex", mock.AnythingOfType("uint64")).Return(nil)
 
-	consumer, err := NewComponentConsumer(
+	consumer := NewComponentConsumer(
 		zerolog.New(os.Stdout).With().Timestamp().Logger(),
 		workSignal,
 		progress,
@@ -99,7 +98,6 @@ func (suite *ComponentConsumerSuite) prepareTest(
 		suite.maxProcessing,
 		suite.maxSearchAhead,
 	)
-	require.NoError(suite.T(), err)
 	consumer.SetPreNotifier(preNotifier)
 	consumer.SetPostNotifier(postNotifier)
 
@@ -232,7 +230,7 @@ func (suite *ComponentConsumerSuite) TestSignalsBeforeReadyDoNotCheck() {
 	started := atomic.NewBool(false)
 
 	jobConsumer := modulemock.NewJobConsumer(suite.T())
-	jobConsumer.On("Start").Return(func() error {
+	jobConsumer.On("Start", suite.defaultIndex).Return(func(_ uint64) error {
 		// force Start to take a while so the processingLoop is ready first
 		// the processingLoop should wait to start, otherwise Check would be called
 		time.Sleep(500 * time.Millisecond)

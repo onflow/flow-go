@@ -159,8 +159,6 @@ func (ss *SyncSuite) SetupTest() {
 
 	idCache, err := cache.NewProtocolStateIDCache(log, ss.state, protocolEvents.NewDistributor())
 	require.NoError(ss.T(), err, "could not create protocol state identity cache")
-	spamConfig, err := NewSpamDetectionConfig()
-	require.NoError(ss.T(), err, "could not create spam detection config")
 	e, err := New(log, metrics, ss.net, ss.me, ss.state, ss.blocks, ss.comp, ss.core,
 		id.NewIdentityFilterIdentifierProvider(
 			filter.And(
@@ -169,7 +167,8 @@ func (ss *SyncSuite) SetupTest() {
 			),
 			idCache,
 		),
-		spamConfig)
+		NewSpamDetectionConfig())
 	require.NoError(ss.T(), err, "should pass engine initialization")
+
 	ss.e = e
 }

@@ -394,11 +394,6 @@ func (builder *ObserverServiceBuilder) buildFollowerEngine() *ObserverServiceBui
 
 func (builder *ObserverServiceBuilder) buildSyncEngine() *ObserverServiceBuilder {
 	builder.Component("sync engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		spamConfig, err := synceng.NewSpamDetectionConfig()
-		if err != nil {
-			return nil, fmt.Errorf("could not initialize spam detection config: %w", err)
-		}
-
 		sync, err := synceng.New(
 			node.Logger,
 			node.Metrics.Engine,
@@ -409,7 +404,7 @@ func (builder *ObserverServiceBuilder) buildSyncEngine() *ObserverServiceBuilder
 			builder.FollowerEng,
 			builder.SyncCore,
 			builder.SyncEngineParticipantsProviderFactory(),
-			spamConfig,
+			synceng.NewSpamDetectionConfig(),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create synchronization engine: %w", err)

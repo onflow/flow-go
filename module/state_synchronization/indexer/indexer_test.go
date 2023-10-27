@@ -75,7 +75,7 @@ func newIndexerTest(t *testing.T, availableBlocks int, lastIndexedIndex int) *in
 		executionData: executionData,
 	}
 
-	test.worker, err = NewIndexer(
+	test.worker = NewIndexer(
 		unittest.Logger(),
 		test.first().Header.Height,
 		registers,
@@ -84,7 +84,6 @@ func newIndexerTest(t *testing.T, availableBlocks int, lastIndexedIndex int) *in
 		test.latestHeight,
 		progress,
 	)
-	require.NoError(t, err)
 
 	return test
 }

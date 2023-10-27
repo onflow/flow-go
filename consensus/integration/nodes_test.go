@@ -627,9 +627,6 @@ func createNode(
 	require.NoError(t, err)
 	idProvider := id.NewFixedIdentifierProvider(identities.NodeIDs())
 
-	spamConfig, err := synceng.NewSpamDetectionConfig()
-	require.NoError(t, err, "could not initialize spam detection config")
-
 	// initialize the synchronization engine
 	sync, err := synceng.New(
 		log,
@@ -641,7 +638,7 @@ func createNode(
 		comp,
 		syncCore,
 		idProvider,
-		spamConfig,
+		synceng.NewSpamDetectionConfig(),
 		func(cfg *synceng.Config) {
 			// use a small pool and scan interval for sync engine
 			cfg.ScanInterval = 500 * time.Millisecond

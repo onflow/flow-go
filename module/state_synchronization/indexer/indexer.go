@@ -1,7 +1,6 @@
 package indexer
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -56,7 +55,7 @@ func NewIndexer(
 	executionCache *cache.ExecutionDataCache,
 	executionDataLatestHeight func() (uint64, error),
 	processedHeight storage.ConsumerProgress,
-) (*Indexer, error) {
+) *Indexer {
 	r := &Indexer{
 		log:             log.With().Str("module", "execution_indexer").Logger(),
 		exeDataNotifier: engine.NewNotifier(),
@@ -68,7 +67,7 @@ func NewIndexer(
 
 	// create a jobqueue that will process new available block execution data. The `exeDataNotifier` is used to
 	// signal new work, which is being triggered on the `OnExecutionData` handler.
-	jobConsumer, err := jobqueue.NewComponentConsumer(
+	r.jobConsumer = jobqueue.NewComponentConsumer(
 		r.log,
 		r.exeDataNotifier.Channel(),
 		processedHeight,
@@ -78,15 +77,10 @@ func NewIndexer(
 		workersCount,
 		searchAhead,
 	)
-	if err != nil {
-		return nil, fmt.Errorf("error creating execution data jobqueue: %w", err)
-	}
-
-	r.jobConsumer = jobConsumer
 
 	r.Component = r.jobConsumer
 
-	return r, nil
+	return r
 }
 
 // Start the worker jobqueue to consume the available data.

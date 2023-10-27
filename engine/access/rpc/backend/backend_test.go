@@ -7,7 +7,6 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
-	entitiesproto "github.com/onflow/flow/protobuf/go/flow/entities"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -32,15 +31,9 @@ import (
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/onflow/flow-go/utils/unittest/generator"
 )
 
 const TEST_MAX_HEIGHT = 100
-
-var eventEncodingVersions = []entitiesproto.EventEncodingVersion{
-	entitiesproto.EventEncodingVersion_JSON_CDC_V0,
-	entitiesproto.EventEncodingVersion_CCF_V0,
-}
 
 type Suite struct {
 	suite.Suite
@@ -514,7 +507,7 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 		Return(exeEventResp, nil).
 		Once()
 
-	result, err := backend.GetTransactionResultByIndex(ctx, blockId, index, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+	result, err := backend.GetTransactionResultByIndex(ctx, blockId, index)
 	suite.checkResponse(result, err)
 	suite.Assert().Equal(result.BlockHeight, block.Header.Height)
 
@@ -564,7 +557,7 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 		Return(exeEventResp, nil).
 		Once()
 
-	result, err := backend.GetTransactionResultsByBlockID(ctx, blockId, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+	result, err := backend.GetTransactionResultsByBlockID(ctx, blockId)
 	suite.checkResponse(result, err)
 
 	suite.assertAllExpectations()
@@ -643,7 +636,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 		Times(len(fixedENIDs)) // should call each EN once
 
 	// first call - when block under test is greater height than the sealed head, but execution node does not know about Tx
-	result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+	result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID)
 	suite.checkResponse(result, err)
 
 	// status should be finalized since the sealed Blocks is smaller in height
@@ -658,7 +651,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 		Return(exeEventResp, nil)
 
 	// second call - when block under test's height is greater height than the sealed head
-	result, err = backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+	result, err = backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID)
 	suite.checkResponse(result, err)
 
 	// status should be executed since no `NotFound` error in the `GetTransactionResult` call
@@ -668,7 +661,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	headBlock.Header.Height = block.Header.Height + 1
 
 	// third call - when block under test's height is less than sealed head's height
-	result, err = backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+	result, err = backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID)
 	suite.checkResponse(result, err)
 
 	// status should be sealed since the sealed Blocks is greater in height
@@ -679,7 +672,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 
 	// fourth call - when block under test's height so much less than the head's height that it's considered expired,
 	// but since there is a execution result, means it should retain it's sealed status
-	result, err = backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+	result, err = backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID)
 	suite.checkResponse(result, err)
 
 	// status should be expired since
@@ -742,7 +735,7 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 	// should return pending status when we have not observed an expiry block
 	suite.Run("pending", func() {
 		// referenced block isn't known yet, so should return pending status
-		result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+		result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID)
 		suite.checkResponse(result, err)
 
 		suite.Assert().Equal(flow.TransactionStatusPending, result.Status)
@@ -758,7 +751,7 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 			// we have NOT observed all intermediary Collections
 			fullHeight = block.Header.Height + flow.DefaultTransactionExpiry/2
 
-			result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+			result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID)
 			suite.checkResponse(result, err)
 			suite.Assert().Equal(flow.TransactionStatusPending, result.Status)
 		})
@@ -768,7 +761,7 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 			// we have observed all intermediary Collections
 			fullHeight = block.Header.Height + flow.DefaultTransactionExpiry + 1
 
-			result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+			result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID)
 			suite.checkResponse(result, err)
 			suite.Assert().Equal(flow.TransactionStatusPending, result.Status)
 		})
@@ -783,7 +776,7 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 		// we have observed all intermediary Collections
 		fullHeight = block.Header.Height + flow.DefaultTransactionExpiry + 1
 
-		result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+		result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID)
 		suite.checkResponse(result, err)
 		suite.Assert().Equal(flow.TransactionStatusExpired, result.Status)
 	})
@@ -896,7 +889,7 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 	// should return pending status when we have not observed collection for the transaction
 	suite.Run("pending", func() {
 		currentState = flow.TransactionStatusPending
-		result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+		result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID)
 		suite.checkResponse(result, err)
 		suite.Assert().Equal(flow.TransactionStatusPending, result.Status)
 		// assert that no call to an execution node is made
@@ -907,7 +900,7 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 	// preceding sealed refBlock)
 	suite.Run("finalized", func() {
 		currentState = flow.TransactionStatusFinalized
-		result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+		result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID)
 		suite.checkResponse(result, err)
 		suite.Assert().Equal(flow.TransactionStatusFinalized, result.Status)
 	})
@@ -933,7 +926,7 @@ func (suite *Suite) TestTransactionResultUnknown() {
 	suite.Require().NoError(err)
 
 	// first call - when block under test is greater height than the sealed head, but execution node does not know about Tx
-	result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+	result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID)
 	suite.checkResponse(result, err)
 
 	// status should be reported as unknown
@@ -988,8 +981,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 
-	exeNodeEventEncodingVersion := entitiesproto.EventEncodingVersion_CCF_V0
-	events := generator.GetEventsWithEncoding(10, exeNodeEventEncodingVersion)
+	events := getEvents(10)
 	validExecutorIdentities := flow.IdentityList{}
 
 	setupStorage := func(n int) []*flow.Header {
@@ -1038,20 +1030,18 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	}
 
 	expected := make([]flow.BlockEvents, len(blockHeaders))
-	expectedEvents := generator.GetEventsWithEncoding(10, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
 	for i := 0; i < len(blockHeaders); i++ {
 		expected[i] = flow.BlockEvents{
 			BlockID:        blockHeaders[i].ID(),
 			BlockHeight:    blockHeaders[i].Height,
 			BlockTimestamp: blockHeaders[i].Timestamp,
-			Events:         expectedEvents,
+			Events:         events,
 		}
 	}
 
 	// create the execution node response
 	exeResp := &execproto.GetEventsForBlockIDsResponse{
-		Results:              exeResults,
-		EventEncodingVersion: exeNodeEventEncodingVersion,
+		Results: exeResults,
 	}
 
 	ctx := context.Background()
@@ -1089,7 +1079,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		suite.Require().NoError(err)
 
 		// execute request
-		actual, err := backend.GetEventsForBlockIDs(ctx, string(flow.EventAccountCreated), blockIDs, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+		actual, err := backend.GetEventsForBlockIDs(ctx, string(flow.EventAccountCreated), blockIDs)
 		suite.checkResponse(actual, err)
 
 		suite.Require().Equal(expected, actual)
@@ -1107,32 +1097,10 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		suite.Require().NoError(err)
 
 		// execute request with an empty block id list and expect an empty list of events and no error
-		resp, err := backend.GetEventsForBlockIDs(ctx, string(flow.EventAccountCreated), []flow.Identifier{}, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+		resp, err := backend.GetEventsForBlockIDs(ctx, string(flow.EventAccountCreated), []flow.Identifier{})
 		require.NoError(suite.T(), err)
 		require.Empty(suite.T(), resp)
 	})
-
-	for _, version := range eventEncodingVersions {
-		suite.Run(fmt.Sprintf("test %s event encoding version for GetEventsForBlockIDs", version.String()), func() {
-			params := suite.defaultBackendParams()
-			params.ExecutionReceipts = receipts
-			params.ConnFactory = connFactory
-			params.FixedExecutionNodeIDs = validENIDs.Strings()
-
-			// create the handler
-			backend, err := New(params)
-			suite.Require().NoError(err)
-
-			// execute request with an empty block id list and expect an empty list of events and no error
-			result, err := backend.GetEventsForBlockIDs(ctx, string(flow.EventAccountCreated), []flow.Identifier{}, version)
-			expectedResult := generator.GetEventsWithEncoding(1, version)
-			suite.checkResponse(result, err)
-
-			for _, blockEvent := range result {
-				suite.Assert().Equal(blockEvent.Events, expectedResult)
-			}
-		})
-	}
 
 	suite.assertAllExpectations()
 }
@@ -1343,17 +1311,15 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		results := make([]flow.BlockEvents, len(blockHeaders))
 		exeResults := make([]*execproto.GetEventsForBlockIDsResponse_Result, len(blockHeaders))
 
-		exeNodeEventEncodingVersion := entitiesproto.EventEncodingVersion_CCF_V0
-
 		for i, header := range blockHeaders {
-			events := generator.GetEventsWithEncoding(1, exeNodeEventEncodingVersion)
+			events := getEvents(1)
 			height := header.Height
 
 			results[i] = flow.BlockEvents{
 				BlockID:        header.ID(),
 				BlockHeight:    height,
 				BlockTimestamp: header.Timestamp,
-				Events:         generator.GetEventsWithEncoding(1, entitiesproto.EventEncodingVersion_JSON_CDC_V0),
+				Events:         events,
 			}
 
 			exeResults[i] = &execproto.GetEventsForBlockIDsResponse_Result{
@@ -1364,8 +1330,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		}
 
 		exeResp := &execproto.GetEventsForBlockIDsResponse{
-			Results:              exeResults,
-			EventEncodingVersion: exeNodeEventEncodingVersion,
+			Results: exeResults,
 		}
 
 		suite.execClient.
@@ -1386,7 +1351,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		backend, err := New(params)
 		suite.Require().NoError(err)
 
-		_, err = backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), maxHeight, minHeight, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+		_, err = backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), maxHeight, minHeight)
 		suite.Require().Error(err)
 
 		suite.assertAllExpectations() // assert that request was not sent to execution node
@@ -1416,7 +1381,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		suite.Require().NoError(err)
 
 		// execute request
-		actualResp, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+		actualResp, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight)
 
 		// check response
 		suite.checkResponse(actualResp, err)
@@ -1444,7 +1409,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		backend, err := New(params)
 		suite.Require().NoError(err)
 
-		actualResp, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+		actualResp, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight)
 		suite.checkResponse(actualResp, err)
 
 		suite.assertAllExpectations()
@@ -1466,7 +1431,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		backend, err := New(params)
 		suite.Require().NoError(err)
 
-		_, err = backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, minHeight+1, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+		_, err = backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, minHeight+1)
 		suite.Require().Error(err)
 	})
 
@@ -1488,40 +1453,10 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		backend, err := New(params)
 		suite.Require().NoError(err)
 
-		_, err = backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+		_, err = backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight)
 		suite.Require().Error(err)
 	})
 
-	for _, version := range eventEncodingVersions {
-		suite.Run(fmt.Sprintf("test %s event encoding version for GetEventsForHeightRange", version.String()), func() {
-			headHeight = maxHeight - 1
-			setupHeadHeight(headHeight)
-			blockHeaders, _, nodeIdentities = setupStorage(minHeight, headHeight)
-			_ = setupExecClient()
-			fixedENIdentifiersStr := nodeIdentities.NodeIDs().Strings()
-
-			stateParams.On("SporkID").Return(unittest.IdentifierFixture(), nil)
-			stateParams.On("ProtocolVersion").Return(uint(unittest.Uint64InRange(10, 30)), nil)
-			stateParams.On("SporkRootBlockHeight").Return(headHeight, nil)
-			stateParams.On("SealedRoot").Return(head, nil)
-
-			params := suite.defaultBackendParams()
-			params.State = state
-			params.ConnFactory = connFactory
-			params.FixedExecutionNodeIDs = fixedENIdentifiersStr
-
-			backend, err := New(params)
-			suite.Require().NoError(err)
-
-			result, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight, version)
-			expectedResult := generator.GetEventsWithEncoding(1, version)
-			suite.checkResponse(result, err)
-
-			for _, blockEvent := range result {
-				suite.Assert().Equal(blockEvent.Events, expectedResult)
-			}
-		})
-	}
 }
 
 func (suite *Suite) TestGetNodeVersionInfo() {
@@ -1808,174 +1743,6 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		expectedList := preferredENs
 		testExecutionNodesForBlockID(preferredENs, nil, expectedList)
 	})
-}
-
-// TestGetTransactionResultEventEncodingVersion tests the GetTransactionResult function with different event encoding versions.
-func (suite *Suite) TestGetTransactionResultEventEncodingVersion() {
-	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
-
-	ctx := context.Background()
-
-	collection := unittest.CollectionFixture(1)
-	transactionBody := collection.Transactions[0]
-	// block which will eventually contain the transaction
-	block := unittest.BlockFixture()
-	block.SetPayload(
-		unittest.PayloadFixture(
-			unittest.WithGuarantees(
-				unittest.CollectionGuaranteesWithCollectionIDFixture([]*flow.Collection{&collection})...)))
-	blockId := block.ID()
-
-	// reference block to which the transaction points to
-	refBlock := unittest.BlockFixture()
-	refBlockID := refBlock.ID()
-	refBlock.Header.Height = 2
-	transactionBody.SetReferenceBlockID(refBlockID)
-	txId := transactionBody.ID()
-
-	// transaction storage returns the corresponding transaction
-	suite.transactions.
-		On("ByID", txId).
-		Return(transactionBody, nil)
-
-	light := collection.Light()
-	suite.collections.On("LightByID", mock.Anything).Return(&light, nil)
-
-	suite.snapshot.On("Head").Return(block.Header, nil)
-
-	// block storage returns the corresponding block
-	suite.blocks.
-		On("ByID", blockId).
-		Return(&block, nil)
-
-	_, fixedENIDs := suite.setupReceipts(&block)
-	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
-	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
-
-	// create a mock connection factory
-	connFactory := connectionmock.NewConnectionFactory(suite.T())
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
-
-	params := suite.defaultBackendParams()
-	// the connection factory should be used to get the execution node client
-	params.ConnFactory = connFactory
-	params.FixedExecutionNodeIDs = (fixedENIDs.NodeIDs()).Strings()
-
-	backend, err := New(params)
-	suite.Require().NoError(err)
-
-	exeNodeEventEncodingVersion := entitiesproto.EventEncodingVersion_CCF_V0
-	events := generator.GetEventsWithEncoding(1, exeNodeEventEncodingVersion)
-	eventMessages := convert.EventsToMessages(events)
-
-	for _, version := range eventEncodingVersions {
-		suite.Run(fmt.Sprintf("test %s event encoding version for GetTransactionResult", version.String()), func() {
-			exeEventResp := &execproto.GetTransactionResultResponse{
-				Events:               eventMessages,
-				EventEncodingVersion: exeNodeEventEncodingVersion,
-			}
-
-			suite.execClient.
-				On("GetTransactionResult", ctx, &execproto.GetTransactionResultRequest{
-					BlockId:       blockId[:],
-					TransactionId: txId[:],
-				}).
-				Return(exeEventResp, nil).
-				Once()
-
-			result, err := backend.GetTransactionResult(ctx, txId, blockId, flow.ZeroID, version)
-			expectedResult := generator.GetEventsWithEncoding(1, version)
-			suite.checkResponse(result, err)
-
-			suite.Assert().Equal(result.Events, expectedResult)
-		})
-	}
-}
-
-// TestGetTransactionResultEventEncodingVersion tests the GetTransactionResult function with different event encoding versions.
-func (suite *Suite) TestGetTransactionResultByIndexAndBlockIdEventEncodingVersion() {
-	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
-
-	ctx := context.Background()
-	block := unittest.BlockFixture()
-	blockId := block.ID()
-	index := uint32(0)
-
-	suite.snapshot.On("Head").Return(block.Header, nil)
-
-	// block storage returns the corresponding block
-	suite.blocks.
-		On("ByID", blockId).
-		Return(&block, nil)
-
-	_, fixedENIDs := suite.setupReceipts(&block)
-	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
-	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
-
-	// create a mock connection factory
-	connFactory := connectionmock.NewConnectionFactory(suite.T())
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
-
-	params := suite.defaultBackendParams()
-	// the connection factory should be used to get the execution node client
-	params.ConnFactory = connFactory
-	params.FixedExecutionNodeIDs = (fixedENIDs.NodeIDs()).Strings()
-
-	backend, err := New(params)
-	suite.Require().NoError(err)
-
-	exeNodeEventEncodingVersion := entitiesproto.EventEncodingVersion_CCF_V0
-	events := generator.GetEventsWithEncoding(1, exeNodeEventEncodingVersion)
-	eventMessages := convert.EventsToMessages(events)
-
-	for _, version := range eventEncodingVersions {
-		suite.Run(fmt.Sprintf("test %s event encoding version for GetTransactionResultByIndex", version.String()), func() {
-			exeEventResp := &execproto.GetTransactionResultResponse{
-				Events:               eventMessages,
-				EventEncodingVersion: exeNodeEventEncodingVersion,
-			}
-
-			suite.execClient.
-				On("GetTransactionResultByIndex", ctx, &execproto.GetTransactionByIndexRequest{
-					BlockId: blockId[:],
-					Index:   index,
-				}).
-				Return(exeEventResp, nil).
-				Once()
-
-			result, err := backend.GetTransactionResultByIndex(ctx, blockId, index, version)
-			suite.checkResponse(result, err)
-
-			expectedResult := generator.GetEventsWithEncoding(1, version)
-			suite.Assert().Equal(result.Events, expectedResult)
-		})
-
-		suite.Run(fmt.Sprintf("test %s event encoding version for GetTransactionResultsByBlockID", version.String()), func() {
-			exeEventResp := &execproto.GetTransactionResultsResponse{
-				TransactionResults: []*execproto.GetTransactionResultResponse{
-					{
-						Events:               eventMessages,
-						EventEncodingVersion: exeNodeEventEncodingVersion,
-					}},
-				EventEncodingVersion: exeNodeEventEncodingVersion,
-			}
-
-			suite.execClient.
-				On("GetTransactionResultsByBlockID", ctx, &execproto.GetTransactionsByBlockIDRequest{
-					BlockId: blockId[:],
-				}).
-				Return(exeEventResp, nil).
-				Once()
-
-			results, err := backend.GetTransactionResultsByBlockID(ctx, blockId, version)
-			suite.checkResponse(results, err)
-
-			expectedResult := generator.GetEventsWithEncoding(1, version)
-			for _, result := range results {
-				suite.Assert().Equal(result.Events, expectedResult)
-			}
-		})
-	}
 }
 
 func (suite *Suite) assertAllExpectations() {

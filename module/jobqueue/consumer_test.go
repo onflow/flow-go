@@ -164,8 +164,7 @@ func TestProcessedIndexDeletion(t *testing.T) {
 			progress := badger.NewConsumerProgress(db, "consumer")
 			worker := newMockWorker()
 			maxProcessing := uint64(3)
-			c, err := NewConsumer(log, jobs, progress, worker, maxProcessing, 0, 0)
-			require.NoError(t, err)
+			c := NewConsumer(log, jobs, progress, worker, maxProcessing, 0)
 			worker.WithConsumer(c)
 
 			f(c, jobs)
@@ -174,7 +173,7 @@ func TestProcessedIndexDeletion(t *testing.T) {
 
 	setup(t, func(c *Consumer, jobs *MockJobs) {
 		require.NoError(t, jobs.PushN(10))
-		require.NoError(t, c.Start())
+		require.NoError(t, c.Start(0))
 
 		require.Eventually(t, func() bool {
 			c.mu.Lock()
@@ -201,23 +200,21 @@ func TestCheckBeforeStartIsNoop(t *testing.T) {
 		err := progress.InitProcessedIndex(storedProcessedIndex)
 		require.NoError(t, err)
 
-		c, err := NewConsumer(
+		c := NewConsumer(
 			unittest.Logger(),
 			NewMockJobs(),
 			progress,
 			worker,
 			uint64(3),
 			0,
-			10,
 		)
-		require.NoError(t, err)
 		worker.WithConsumer(c)
 
 		// check will store the processedIndex. Before start, it will be uninitialized (0)
 		c.Check()
 
 		// start will load the processedIndex from storage
-		err = c.Start()
+		err = c.Start(10)
 		require.NoError(t, err)
 
 		// make sure that the processedIndex at the end is from storage
