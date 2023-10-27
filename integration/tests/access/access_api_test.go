@@ -154,13 +154,13 @@ func (s *AccessAPISuite) TestScriptExecutionAndGetAccounts() {
 
 	// Run tests against Access 2, which uses local storage
 	s.testGetAccount(s.an2Client)
-	//s.testExecuteScriptWithSimpleScript(s.an2Client)
-	//s.testExecuteScriptWithSimpleContract(s.an2Client, targetHeight)
+	s.testExecuteScriptWithSimpleScript(s.an2Client)
+	s.testExecuteScriptWithSimpleContract(s.an2Client, targetHeight)
 
 	// Run tests against Access 1, which uses the execution node
-	//s.testGetAccount(s.an1Client)
-	//s.testExecuteScriptWithSimpleScript(s.an1Client)
-	//s.testExecuteScriptWithSimpleContract(s.an1Client, targetHeight)
+	s.testGetAccount(s.an1Client)
+	s.testExecuteScriptWithSimpleScript(s.an1Client)
+	s.testExecuteScriptWithSimpleContract(s.an1Client, targetHeight)
 
 	// this is a specialized test that creates accounts, deposits funds, deploys contracts, etc, and
 	// uses the provided access node to handle the Access API calls. there is an existing test that
