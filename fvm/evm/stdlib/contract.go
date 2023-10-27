@@ -2,6 +2,8 @@ package stdlib
 
 import (
 	_ "embed"
+	"fmt"
+	"regexp"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
@@ -16,7 +18,16 @@ import (
 )
 
 //go:embed contract.cdc
-var ContractCode []byte
+var contractCode string
+
+var flowTokenImportPattern = regexp.MustCompile(`^import "FlowToken"\n`)
+
+func ContractCode(flowTokenAddress flow.Address) []byte {
+	return []byte(flowTokenImportPattern.ReplaceAllString(
+		contractCode,
+		fmt.Sprintf("import FlowToken from %s", flowTokenAddress.HexWithPrefix()),
+	))
+}
 
 const ContractName = "EVM"
 
@@ -273,6 +284,65 @@ func newInternalEVMTypeCreateBridgedAccountFunction(
 	)
 }
 
+const internalEVMTypeDepositFunctionName = "deposit"
+
+var internalEVMTypeDepositFunctionType = &sema.FunctionType{
+	Parameters: []sema.Parameter{
+		{
+			Label:          "to",
+			TypeAnnotation: sema.NewTypeAnnotation(evmAddressBytesType),
+		},
+		{
+			Label:          "amount",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.UFix64Type),
+		},
+	},
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.VoidType),
+}
+
+func newInternalEVMTypeDepositFunction(
+	gauge common.MemoryGauge,
+	handler types.ContractHandler,
+) *interpreter.HostFunctionValue {
+	return interpreter.NewHostFunctionValue(
+		gauge,
+		internalEVMTypeCallFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			inter := invocation.Interpreter
+			locationRange := invocation.LocationRange
+
+			// Get to address
+
+			toAddressValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			toAddress, err := AddressBytesArrayValueToEVMAddress(inter, locationRange, toAddressValue)
+			if err != nil {
+				panic(err)
+			}
+
+			// Get amount
+
+			amountValue, ok := invocation.Arguments[1].(interpreter.UFix64Value)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			amount := types.Balance(amountValue)
+
+			// Call
+
+			const isAuthorized = false
+			account := handler.AccountByAddress(toAddress, isAuthorized)
+			account.Deposit(types.NewFlowTokenVault(amount))
+
+			return interpreter.Void
+		},
+	)
+}
+
 func NewInternalEVMContractValue(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
@@ -286,6 +356,7 @@ func NewInternalEVMContractValue(
 			internalEVMTypeRunFunctionName:                  newInternalEVMTypeRunFunction(gauge, handler),
 			internalEVMTypeCreateBridgedAccountFunctionName: newInternalEVMTypeCreateBridgedAccountFunction(gauge, handler),
 			internalEVMTypeCallFunctionName:                 newInternalEVMTypeCallFunction(gauge, handler),
+			internalEVMTypeDepositFunctionName:              newInternalEVMTypeDepositFunction(gauge, handler),
 		},
 		nil,
 		nil,
@@ -318,6 +389,12 @@ var InternalEVMContractType = func() *sema.CompositeType {
 			ty,
 			internalEVMTypeCallFunctionName,
 			internalEVMTypeCallFunctionType,
+			"",
+		),
+		sema.NewUnmeteredPublicFunctionMember(
+			ty,
+			internalEVMTypeDepositFunctionName,
+			internalEVMTypeDepositFunctionType,
 			"",
 		),
 	})

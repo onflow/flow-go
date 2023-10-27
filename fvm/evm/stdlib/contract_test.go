@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
+	contracts2 "github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -61,10 +62,12 @@ func (t *testContractHandler) Run(tx []byte, coinbase types.Address) bool {
 
 type testFlowAccount struct {
 	address  types.Address
-	vault    *types.FLOWTokenVault
+	balance  func() types.Balance
+	transfer func(address types.Address, balance types.Balance)
+	deposit  func(vault *types.FLOWTokenVault)
+	withdraw func(balance types.Balance) *types.FLOWTokenVault
 	deploy   func(code types.Code, limit types.GasLimit, balance types.Balance) types.Address
 	call     func(address types.Address, data types.Data, limit types.GasLimit, balance types.Balance) types.Data
-	transfer func(address types.Address, balance types.Balance)
 }
 
 var _ types.Account = &testFlowAccount{}
@@ -74,31 +77,31 @@ func (t *testFlowAccount) Address() types.Address {
 }
 
 func (t *testFlowAccount) Balance() types.Balance {
-	if t.vault == nil {
+	if t.balance == nil {
 		return types.Balance(0)
 	}
-	return t.vault.Balance()
+	return t.balance()
 }
 
 func (t *testFlowAccount) Transfer(address types.Address, balance types.Balance) {
 	if t.transfer == nil {
-		panic("unexpected Call")
+		panic("unexpected Transfer")
 	}
 	t.transfer(address, balance)
 }
 
 func (t *testFlowAccount) Deposit(vault *types.FLOWTokenVault) {
-	if t.vault == nil {
-		t.vault = types.NewFlowTokenVault(0)
+	if t.deposit == nil {
+		panic("unexpected Deposit")
 	}
-	t.vault.Deposit(vault)
+	t.deposit(vault)
 }
 
 func (t *testFlowAccount) Withdraw(balance types.Balance) *types.FLOWTokenVault {
-	if t.vault == nil {
-		return types.NewFlowTokenVault(0)
+	if t.withdraw == nil {
+		panic("unexpected Withdraw")
 	}
-	return t.vault.Withdraw(balance)
+	return t.withdraw(balance)
 }
 
 func (t *testFlowAccount) Deploy(code types.Code, limit types.GasLimit, balance types.Balance) types.Address {
@@ -115,6 +118,95 @@ func (t *testFlowAccount) Call(address types.Address, data types.Data, limit typ
 	return t.call(address, data, limit, balance)
 }
 
+func deployContracts(
+	t *testing.T,
+	rt runtime.Runtime,
+	contractsAddress flow.Address,
+	runtimeInterface *TestRuntimeInterface,
+	env runtime.Environment,
+	nextTransactionLocation func() common.TransactionLocation,
+) {
+
+	contractsAddressHex := contractsAddress.Hex()
+
+	contracts := []struct {
+		name     string
+		code     []byte
+		deployTx []byte
+	}{
+		{
+			name: "FungibleToken",
+			code: contracts2.FungibleToken(),
+		},
+		{
+			name: "NonFungibleToken",
+			code: contracts2.NonFungibleToken(),
+		},
+		{
+			name: "MetadataViews",
+			code: contracts2.MetadataViews(
+				contractsAddressHex,
+				contractsAddressHex,
+			),
+		},
+		{
+			name: "FungibleTokenMetadataViews",
+			code: contracts2.FungibleTokenMetadataViews(
+				contractsAddressHex,
+				contractsAddressHex,
+			),
+		},
+		{
+			name: "ViewResolver",
+			code: contracts2.ViewResolver(),
+		},
+		{
+			name: "FlowToken",
+			code: contracts2.FlowToken(
+				contractsAddressHex,
+				contractsAddressHex,
+				contractsAddressHex,
+			),
+			deployTx: []byte(`
+              transaction(name: String, code: String) {
+                prepare(signer: AuthAccount) {
+                  signer.contracts.add(name: name, code: code.utf8, signer)
+                }
+              }
+            `),
+		},
+		{
+			name: stdlib.ContractName,
+			code: stdlib.ContractCode(contractsAddress),
+		},
+	}
+
+	for _, contract := range contracts {
+
+		deployTx := contract.deployTx
+		if len(deployTx) == 0 {
+			deployTx = blueprints.DeployContractTransactionTemplate
+		}
+
+		err := rt.ExecuteTransaction(
+			runtime.Script{
+				Source: deployTx,
+				Arguments: EncodeArgs([]cadence.Value{
+					cadence.String(contract.name),
+					cadence.String(contract.code),
+				}),
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: env,
+				Location:    nextTransactionLocation(),
+			},
+		)
+		require.NoError(t, err)
+	}
+
+}
+
 func TestEVMAddressConstructionAndReturn(t *testing.T) {
 
 	t.Parallel()
@@ -123,9 +215,9 @@ func TestEVMAddressConstructionAndReturn(t *testing.T) {
 
 	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
 
-	contractAddress := flow.BytesToAddress([]byte{0x1})
+	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	stdlib.SetupEnvironment(env, handler, contractAddress)
+	stdlib.SetupEnvironment(env, handler, contractsAddress)
 
 	rt := runtime.NewInterpreterRuntime(runtime.Config{})
 
@@ -144,7 +236,7 @@ func TestEVMAddressConstructionAndReturn(t *testing.T) {
 	runtimeInterface := &TestRuntimeInterface{
 		Storage: NewTestLedger(nil, nil),
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
-			return []runtime.Address{runtime.Address(contractAddress)}, nil
+			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
 		OnResolveLocation: SingleIdentifierLocationResolver(t),
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
@@ -180,23 +272,9 @@ func TestEVMAddressConstructionAndReturn(t *testing.T) {
 	nextTransactionLocation := NewTransactionLocationGenerator()
 	nextScriptLocation := NewScriptLocationGenerator()
 
-	// Deploy EVM contract
+	// Deploy contracts
 
-	err := rt.ExecuteTransaction(
-		runtime.Script{
-			Source: blueprints.DeployContractTransactionTemplate,
-			Arguments: EncodeArgs([]cadence.Value{
-				cadence.String(stdlib.ContractName),
-				cadence.String(stdlib.ContractCode),
-			}),
-		},
-		runtime.Context{
-			Interface:   runtimeInterface,
-			Environment: env,
-			Location:    nextTransactionLocation(),
-		},
-	)
-	require.NoError(t, err)
+	deployContracts(t, rt, contractsAddress, runtimeInterface, env, nextTransactionLocation)
 
 	// Run script
 
@@ -215,7 +293,7 @@ func TestEVMAddressConstructionAndReturn(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	evmAddressCadenceType := stdlib.NewEVMAddressCadenceType(common.Address(contractAddress))
+	evmAddressCadenceType := stdlib.NewEVMAddressCadenceType(common.Address(contractsAddress))
 
 	assert.Equal(t,
 		cadence.Struct{
@@ -236,9 +314,9 @@ func TestBalanceConstructionAndReturn(t *testing.T) {
 
 	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
 
-	contractAddress := flow.BytesToAddress([]byte{0x1})
+	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	stdlib.SetupEnvironment(env, handler, contractAddress)
+	stdlib.SetupEnvironment(env, handler, contractsAddress)
 
 	rt := runtime.NewInterpreterRuntime(runtime.Config{})
 
@@ -257,7 +335,7 @@ func TestBalanceConstructionAndReturn(t *testing.T) {
 	runtimeInterface := &TestRuntimeInterface{
 		Storage: NewTestLedger(nil, nil),
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
-			return []runtime.Address{runtime.Address(contractAddress)}, nil
+			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
 		OnResolveLocation: SingleIdentifierLocationResolver(t),
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
@@ -280,23 +358,9 @@ func TestBalanceConstructionAndReturn(t *testing.T) {
 	nextTransactionLocation := NewTransactionLocationGenerator()
 	nextScriptLocation := NewScriptLocationGenerator()
 
-	// Deploy EVM contract
+	// Deploy contracts
 
-	err := rt.ExecuteTransaction(
-		runtime.Script{
-			Source: blueprints.DeployContractTransactionTemplate,
-			Arguments: EncodeArgs([]cadence.Value{
-				cadence.String(stdlib.ContractName),
-				cadence.String(stdlib.ContractCode),
-			}),
-		},
-		runtime.Context{
-			Interface:   runtimeInterface,
-			Environment: env,
-			Location:    nextTransactionLocation(),
-		},
-	)
-	require.NoError(t, err)
+	deployContracts(t, rt, contractsAddress, runtimeInterface, env, nextTransactionLocation)
 
 	// Run script
 
@@ -318,7 +382,7 @@ func TestBalanceConstructionAndReturn(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	evmBalanceCadenceType := stdlib.NewBalanceCadenceType(common.Address(contractAddress))
+	evmBalanceCadenceType := stdlib.NewBalanceCadenceType(common.Address(contractsAddress))
 
 	assert.Equal(t,
 		cadence.Struct{
@@ -374,9 +438,9 @@ func TestEVMRun(t *testing.T) {
 
 	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
 
-	contractAddress := flow.BytesToAddress([]byte{0x1})
+	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	stdlib.SetupEnvironment(env, handler, contractAddress)
+	stdlib.SetupEnvironment(env, handler, contractsAddress)
 
 	rt := runtime.NewInterpreterRuntime(runtime.Config{})
 
@@ -396,7 +460,7 @@ func TestEVMRun(t *testing.T) {
 	runtimeInterface := &TestRuntimeInterface{
 		Storage: NewTestLedger(nil, nil),
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
-			return []runtime.Address{runtime.Address(contractAddress)}, nil
+			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
 		OnResolveLocation: SingleIdentifierLocationResolver(t),
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
@@ -419,23 +483,9 @@ func TestEVMRun(t *testing.T) {
 	nextTransactionLocation := NewTransactionLocationGenerator()
 	nextScriptLocation := NewScriptLocationGenerator()
 
-	// Deploy EVM contract
+	// Deploy contracts
 
-	err := rt.ExecuteTransaction(
-		runtime.Script{
-			Source: blueprints.DeployContractTransactionTemplate,
-			Arguments: EncodeArgs([]cadence.Value{
-				cadence.String(stdlib.ContractName),
-				cadence.String(stdlib.ContractCode),
-			}),
-		},
-		runtime.Context{
-			Interface:   runtimeInterface,
-			Environment: env,
-			Location:    nextTransactionLocation(),
-		},
-	)
-	require.NoError(t, err)
+	deployContracts(t, rt, contractsAddress, runtimeInterface, env, nextTransactionLocation)
 
 	// Run script
 
@@ -464,9 +514,9 @@ func TestEVMCreateBridgedAccount(t *testing.T) {
 
 	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
 
-	contractAddress := flow.BytesToAddress([]byte{0x1})
+	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	stdlib.SetupEnvironment(env, handler, contractAddress)
+	stdlib.SetupEnvironment(env, handler, contractsAddress)
 
 	rt := runtime.NewInterpreterRuntime(runtime.Config{})
 
@@ -492,7 +542,7 @@ func TestEVMCreateBridgedAccount(t *testing.T) {
 	runtimeInterface := &TestRuntimeInterface{
 		Storage: NewTestLedger(nil, nil),
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
-			return []runtime.Address{runtime.Address(contractAddress)}, nil
+			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
 		OnResolveLocation: SingleIdentifierLocationResolver(t),
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
@@ -515,23 +565,9 @@ func TestEVMCreateBridgedAccount(t *testing.T) {
 	nextTransactionLocation := NewTransactionLocationGenerator()
 	nextScriptLocation := NewScriptLocationGenerator()
 
-	// Deploy EVM contract
+	// Deploy contracts
 
-	err := rt.ExecuteTransaction(
-		runtime.Script{
-			Source: blueprints.DeployContractTransactionTemplate,
-			Arguments: EncodeArgs([]cadence.Value{
-				cadence.String(stdlib.ContractName),
-				cadence.String(stdlib.ContractCode),
-			}),
-		},
-		runtime.Context{
-			Interface:   runtimeInterface,
-			Environment: env,
-			Location:    nextTransactionLocation(),
-		},
-	)
-	require.NoError(t, err)
+	deployContracts(t, rt, contractsAddress, runtimeInterface, env, nextTransactionLocation)
 
 	// Run script
 
@@ -599,9 +635,9 @@ func TestBridgedAccountCall(t *testing.T) {
 
 	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
 
-	contractAddress := flow.BytesToAddress([]byte{0x1})
+	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	stdlib.SetupEnvironment(env, handler, contractAddress)
+	stdlib.SetupEnvironment(env, handler, contractsAddress)
 
 	rt := runtime.NewInterpreterRuntime(runtime.Config{})
 
@@ -630,7 +666,7 @@ func TestBridgedAccountCall(t *testing.T) {
 	runtimeInterface := &TestRuntimeInterface{
 		Storage: NewTestLedger(nil, nil),
 		OnGetSigningAccounts: func() ([]runtime.Address, error) {
-			return []runtime.Address{runtime.Address(contractAddress)}, nil
+			return []runtime.Address{runtime.Address(contractsAddress)}, nil
 		},
 		OnResolveLocation: SingleIdentifierLocationResolver(t),
 		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
@@ -653,23 +689,9 @@ func TestBridgedAccountCall(t *testing.T) {
 	nextTransactionLocation := NewTransactionLocationGenerator()
 	nextScriptLocation := NewScriptLocationGenerator()
 
-	// Deploy EVM contract
+	// Deploy contracts
 
-	err = rt.ExecuteTransaction(
-		runtime.Script{
-			Source: blueprints.DeployContractTransactionTemplate,
-			Arguments: EncodeArgs([]cadence.Value{
-				cadence.String(stdlib.ContractName),
-				cadence.String(stdlib.ContractCode),
-			}),
-		},
-		runtime.Context{
-			Interface:   runtimeInterface,
-			Environment: env,
-			Location:    nextTransactionLocation(),
-		},
-	)
-	require.NoError(t, err)
+	deployContracts(t, rt, contractsAddress, runtimeInterface, env, nextTransactionLocation)
 
 	// Run script
 
@@ -692,4 +714,98 @@ func TestBridgedAccountCall(t *testing.T) {
 	}).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type{}))
 
 	require.Equal(t, expected, actual)
+}
+
+func TestEVMAddressDeposit(t *testing.T) {
+
+	t.Parallel()
+
+	var deposited bool
+
+	handler := &testContractHandler{
+
+		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
+			assert.Equal(t, types.Address{2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
+			assert.False(t, isAuthorized)
+
+			return &testFlowAccount{
+				address: fromAddress,
+				deposit: func(vault *types.FLOWTokenVault) {
+					deposited = true
+					assert.Zero(t, vault.Balance())
+				},
+			}
+		},
+	}
+
+	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
+
+	contractsAddress := flow.BytesToAddress([]byte{0x1})
+
+	stdlib.SetupEnvironment(env, handler, contractsAddress)
+
+	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+
+	script := []byte(`
+      import EVM from 0x1
+      import FlowToken from 0x1
+
+      access(all)
+      fun main() {
+          let address = EVM.EVMAddress(
+              bytes: [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          )
+          let vault <- FlowToken.createEmptyVault() as! @FlowToken.Vault
+          address.deposit(from: <-vault)
+      }
+   `)
+
+	accountCodes := map[common.Location][]byte{}
+	var events []cadence.Event
+
+	runtimeInterface := &TestRuntimeInterface{
+		Storage: NewTestLedger(nil, nil),
+		OnGetSigningAccounts: func() ([]runtime.Address, error) {
+			return []runtime.Address{runtime.Address(contractsAddress)}, nil
+		},
+		OnResolveLocation: SingleIdentifierLocationResolver(t),
+		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+			accountCodes[location] = code
+			return nil
+		},
+		OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+			code = accountCodes[location]
+			return code, nil
+		},
+		OnEmitEvent: func(event cadence.Event) error {
+			events = append(events, event)
+			return nil
+		},
+		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+			return json.Decode(nil, b)
+		},
+	}
+
+	nextTransactionLocation := NewTransactionLocationGenerator()
+	nextScriptLocation := NewScriptLocationGenerator()
+
+	// Deploy contracts
+
+	deployContracts(t, rt, contractsAddress, runtimeInterface, env, nextTransactionLocation)
+
+	// Run script
+
+	_, err := rt.ExecuteScript(
+		runtime.Script{
+			Source: script,
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: env,
+			Location:    nextScriptLocation(),
+		},
+	)
+	require.NoError(t, err)
+
+	require.True(t, deposited)
 }

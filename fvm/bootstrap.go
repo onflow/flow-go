@@ -382,7 +382,7 @@ func (b *bootstrapExecutor) Execute() error {
 	b.setStakingAllowlist(service, b.identities.NodeIDs())
 
 	// sets up the EVM environment
-	b.setupEVM(service)
+	b.setupEVM(service, flowToken)
 
 	return nil
 }
@@ -780,12 +780,13 @@ func (b *bootstrapExecutor) setStakingAllowlist(
 	panicOnMetaInvokeErrf("failed to set staking allow-list: %s", txError, err)
 }
 
-func (b *bootstrapExecutor) setupEVM(service flow.Address) {
+func (b *bootstrapExecutor) setupEVM(serviceAddress, flowTokenAddress flow.Address) {
 
 	b.createAccount(nil) // account for storage
+
 	tx := blueprints.DeployContractTransaction(
-		service,
-		stdlib.ContractCode,
+		serviceAddress,
+		stdlib.ContractCode(flowTokenAddress),
 		stdlib.ContractName,
 	)
 	txError, err := b.invokeMetaTransaction(
