@@ -816,7 +816,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 	require.True(t, deposited)
 }
 
-func TestEVMAddressWithdraw(t *testing.T) {
+func TestBridgedAccountWithdraw(t *testing.T) {
 
 	t.Parallel()
 

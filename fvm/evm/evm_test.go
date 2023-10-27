@@ -161,7 +161,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 }
 
 // TODO: deposit non-zero amount
-func TestEVMAddressWithdraw(t *testing.T) {
+func TestBridgedAccountWithdraw(t *testing.T) {
 
 	t.Parallel()
 
