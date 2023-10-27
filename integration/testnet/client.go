@@ -365,8 +365,12 @@ func (c *Client) CreateAccount(
 	payer sdk.Address,
 	latestBlockID sdk.Identifier,
 ) (sdk.Address, error) {
+	updatedPayer, err := c.client.GetAccount(ctx, payerAccount.Address)
+	if err != nil {
+		return sdk.Address{}, err
+	}
 
-	payerKey := payerAccount.Keys[0]
+	payerKey := updatedPayer.Keys[0]
 	tx, err := templates.CreateAccount([]*sdk.AccountKey{accountKey}, nil, payer)
 	if err != nil {
 		return sdk.Address{}, fmt.Errorf("failed cusnctruct create account transaction %w", err)
