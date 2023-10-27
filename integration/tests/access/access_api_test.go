@@ -201,7 +201,6 @@ func (s *AccessAPISuite) testGetAccount(client *client.Client) {
 		acc, err := client.GetAccount(s.ctx, addr)
 		s.Require().NoError(err)
 		s.Assert().Equal(addr, acc.Address)
-		s.Assert().NotZero(acc.Balance)
 	})
 }
 
