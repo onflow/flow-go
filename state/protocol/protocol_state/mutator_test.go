@@ -2,13 +2,13 @@ package protocol_state
 
 import (
 	"errors"
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/state/protocol"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/mock"
 	storerr "github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/transaction"
@@ -92,34 +92,7 @@ func (s *MutatorSuite) TestMutatorHappyPathHasChanges() {
 // InvalidStateTransitionAttempted flag in protocol.StateUpdater.
 func (s *MutatorSuite) TestMutatorApplyServiceEvents_InvalidEpochSetup() {
 	s.params.On("EpochFallbackTriggered").Return(false, nil)
-	s.Run("invalid-counter", func() {
-		parentState := unittest.ProtocolStateFixture()
-		rootSetup := parentState.CurrentEpochSetup
-		updater := mock.NewStateUpdater(s.T())
-		updater.On("ParentState").Return(parentState)
-
-		epochSetup := unittest.EpochSetupFixture(
-			unittest.WithParticipants(rootSetup.Participants),
-			unittest.SetupWithCounter(rootSetup.Counter+2), // invalid counter
-			unittest.WithFinalView(rootSetup.FinalView+1000),
-			unittest.WithFirstView(rootSetup.FinalView+1),
-		)
-		result := unittest.ExecutionResultFixture(func(result *flow.ExecutionResult) {
-			result.ServiceEvents = []flow.ServiceEvent{epochSetup.ServiceEvent()}
-		})
-
-		block := unittest.BlockHeaderFixture()
-		seal := unittest.Seal.Fixture(unittest.Seal.WithBlockID(block.ID()))
-		s.headersDB.On("ByBlockID", seal.BlockID).Return(block, nil)
-		s.resultsDB.On("ByID", seal.ResultID).Return(result, nil)
-
-		updater.On("SetInvalidStateTransitionAttempted").Return().Once()
-
-		updates, err := s.mutator.ApplyServiceEvents(updater, []*flow.Seal{seal})
-		require.NoError(s.T(), err)
-		require.Empty(s.T(), updates)
-	})
-	s.Run("conflicts-with-protocol-state", func() {
+	s.Run("invalid-epoch-setup", func() {
 		parentState := unittest.ProtocolStateFixture()
 		rootSetup := parentState.CurrentEpochSetup
 		updater := mock.NewStateUpdater(s.T())

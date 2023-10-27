@@ -155,6 +155,8 @@ func (s *UpdaterSuite) TestProcessEpochCommit() {
 		updater := NewUpdater(s.candidate.View, s.parentProtocolState)
 		setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
 			setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
+			setup.FirstView = s.parentProtocolState.CurrentEpochSetup.FinalView + 1
+			setup.FinalView = s.parentProtocolState.CurrentEpochSetup.FinalView + 1000
 		})
 		// processing setup event results in creating next epoch protocol state
 		err := updater.ProcessEpochSetup(setup)
@@ -175,16 +177,31 @@ func (s *UpdaterSuite) TestProcessEpochCommit() {
 	})
 	s.Run("happy path processing", func() {
 		updater := NewUpdater(s.candidate.View, s.parentProtocolState)
-		setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
-			setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
-		})
+		setup := unittest.EpochSetupFixture(
+			unittest.SetupWithCounter(s.parentProtocolState.CurrentEpochSetup.Counter+1),
+			unittest.WithFirstView(s.parentProtocolState.CurrentEpochSetup.FinalView+1),
+			unittest.WithFinalView(s.parentProtocolState.CurrentEpochSetup.FinalView+1000),
+		)
 		// processing setup event results in creating next epoch protocol state
 		err := updater.ProcessEpochSetup(setup)
 		require.NoError(s.T(), err)
 
-		commit := unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
-			commit.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
-		})
+		updatedState, _, _ := updater.Build()
+
+		parentState, err := flow.NewRichProtocolStateEntry(updatedState,
+			s.parentProtocolState.PreviousEpochSetup,
+			s.parentProtocolState.PreviousEpochCommit,
+			s.parentProtocolState.CurrentEpochSetup,
+			s.parentProtocolState.CurrentEpochCommit,
+			setup,
+			nil,
+		)
+		require.NoError(s.T(), err)
+		updater = NewUpdater(s.candidate.View+1, parentState)
+		commit := unittest.EpochCommitFixture(
+			unittest.CommitWithCounter(setup.Counter),
+			unittest.WithDKGFromParticipants(setup.Participants),
+		)
 
 		err = updater.ProcessEpochCommit(commit)
 		require.NoError(s.T(), err)
@@ -287,9 +304,11 @@ func (s *UpdaterSuite) TestProcessEpochSetupInvariants() {
 	})
 	s.Run("processing second epoch setup", func() {
 		updater := NewUpdater(s.candidate.View, s.parentProtocolState)
-		setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
-			setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
-		})
+		setup := unittest.EpochSetupFixture(
+			unittest.SetupWithCounter(s.parentProtocolState.CurrentEpochSetup.Counter+1),
+			unittest.WithFirstView(s.parentProtocolState.CurrentEpochSetup.FinalView+1),
+			unittest.WithFinalView(s.parentProtocolState.CurrentEpochSetup.FinalView+1000),
+		)
 		err := updater.ProcessEpochSetup(setup)
 		require.NoError(s.T(), err)
 
@@ -333,13 +352,15 @@ func (s *UpdaterSuite) TestProcessEpochSetupInvariants() {
 // For current epoch we should have identity table with all the nodes from the current epoch + nodes from the next epoch with 0 weight.
 // For next epoch we should have identity table with all the nodes from the next epoch + nodes from the current epoch with 0 weight.
 func (s *UpdaterSuite) TestProcessEpochSetupHappyPath() {
-	setupParticipants := unittest.IdentityListFixture(5).Sort(order.Canonical[flow.Identity])
+	setupParticipants := unittest.IdentityListFixture(5, unittest.WithAllRoles()).Sort(order.Canonical[flow.Identity])
 	setupParticipants[0].InitialWeight = 13
 	setupParticipants[0].Weight = setupParticipants[0].InitialWeight
-	setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
-		setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
-		setup.Participants = setupParticipants.ToSkeleton()
-	})
+	setup := unittest.EpochSetupFixture(
+		unittest.SetupWithCounter(s.parentProtocolState.CurrentEpochSetup.Counter+1),
+		unittest.WithFirstView(s.parentProtocolState.CurrentEpochSetup.FinalView+1),
+		unittest.WithFinalView(s.parentProtocolState.CurrentEpochSetup.FinalView+1000),
+		unittest.WithParticipants(setupParticipants.ToSkeleton()),
+	)
 
 	// for next epoch we will have all the identities from setup event
 	expectedNextEpochActiveIdentities := flow.DynamicIdentityEntryListFromIdentities(setupParticipants)
@@ -377,12 +398,14 @@ func (s *UpdaterSuite) TestProcessEpochSetupWithSameParticipants() {
 
 	overlappingNodes, err := participantsFromCurrentEpochSetup.Sample(2)
 	require.NoError(s.T(), err)
-	setupParticipants := append(unittest.IdentityListFixture(len(s.parentProtocolState.CurrentEpochIdentityTable)),
+	setupParticipants := append(unittest.IdentityListFixture(len(s.parentProtocolState.CurrentEpochIdentityTable), unittest.WithAllRoles()),
 		overlappingNodes...).Sort(order.Canonical[flow.Identity])
-	setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
-		setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
-		setup.Participants = setupParticipants.ToSkeleton()
-	})
+	setup := unittest.EpochSetupFixture(
+		unittest.SetupWithCounter(s.parentProtocolState.CurrentEpochSetup.Counter+1),
+		unittest.WithFirstView(s.parentProtocolState.CurrentEpochSetup.FinalView+1),
+		unittest.WithFinalView(s.parentProtocolState.CurrentEpochSetup.FinalView+1000),
+		unittest.WithParticipants(setupParticipants.ToSkeleton()),
+	)
 	err = s.updater.ProcessEpochSetup(setup)
 	require.NoError(s.T(), err)
 	updatedState, _, _ := s.updater.Build()
@@ -448,15 +471,19 @@ func (s *UpdaterSuite) TestEpochSetupAfterIdentityChange() {
 	nextBlock := unittest.BlockHeaderWithParentFixture(s.candidate)
 	s.updater = NewUpdater(nextBlock.View, updatedRichProtocolState)
 
-	setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
-		setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
-		// add those nodes that were changed in the previous epoch, but not those that were ejected
-		// it's important to exclude ejected nodes, since we expect that service smart contract has emitted ejection operation
-		// and service events are delivered (asynchronously) in an *order-preserving* manner meaning if ejection has happened before
-		// epoch setup then there is no possible way that it will include ejected node unless there is a severe bug in the service contract.
-		setup.Participants = append(setup.Participants, weightChanges.ToSkeleton()...).Filter(
-			filter.Not(filter.In(ejectedChanges.ToSkeleton()))).Sort(order.Canonical[flow.IdentitySkeleton])
-	})
+	setup := unittest.EpochSetupFixture(
+		unittest.SetupWithCounter(s.parentProtocolState.CurrentEpochSetup.Counter+1),
+		unittest.WithFirstView(s.parentProtocolState.CurrentEpochSetup.FinalView+1),
+		unittest.WithFinalView(s.parentProtocolState.CurrentEpochSetup.FinalView+1000),
+		func(setup *flow.EpochSetup) {
+			// add those nodes that were changed in the previous epoch, but not those that were ejected
+			// it's important to exclude ejected nodes, since we expect that service smart contract has emitted ejection operation
+			// and service events are delivered (asynchronously) in an *order-preserving* manner meaning if ejection has happened before
+			// epoch setup then there is no possible way that it will include ejected node unless there is a severe bug in the service contract.
+			setup.Participants = append(setup.Participants, weightChanges.ToSkeleton()...).Filter(
+				filter.Not(filter.In(ejectedChanges.ToSkeleton()))).Sort(order.Canonical[flow.IdentitySkeleton])
+		},
+	)
 
 	err = s.updater.ProcessEpochSetup(setup)
 	require.NoError(s.T(), err)

@@ -168,16 +168,6 @@ func (m *Mutator) ApplyServiceEvents(updater protocol.StateUpdater, seals []*flo
 
 			switch ev := event.Event.(type) {
 			case *flow.EpochSetup:
-				err := protocol.IsValidExtendingEpochSetup(ev, activeSetup, epochStatus)
-				if err != nil {
-					if protocol.IsInvalidServiceEventError(err) {
-						// we have observed an invalid service event, which triggers epoch fallback mode
-						updater.SetInvalidStateTransitionAttempted()
-						return dbUpdates, nil
-					}
-					return nil, fmt.Errorf("unexpected error validating EpochSetup service event: %w", err)
-				}
-
 				err = updater.ProcessEpochSetup(ev)
 				if err != nil {
 					if protocol.IsInvalidServiceEventError(err) {
@@ -192,24 +182,6 @@ func (m *Mutator) ApplyServiceEvents(updater protocol.StateUpdater, seals []*flo
 				dbUpdates = append(dbUpdates, m.setups.StoreTx(ev))
 
 			case *flow.EpochCommit:
-				// if we receive an EpochCommit event, we must have already observed an EpochSetup event
-				// => otherwise, we have observed an EpochCommit without corresponding EpochSetup, which triggers epoch fallback mode
-				if epochStatus.NextEpoch.SetupID == flow.ZeroID {
-					updater.SetInvalidStateTransitionAttempted()
-					return dbUpdates, nil
-				}
-				extendingSetup := parentProtocolState.NextEpochSetup
-
-				err = protocol.IsValidExtendingEpochCommit(ev, extendingSetup, activeSetup, epochStatus)
-				if err != nil {
-					if protocol.IsInvalidServiceEventError(err) {
-						// we have observed an invalid service event, which triggers epoch fallback mode
-						updater.SetInvalidStateTransitionAttempted()
-						return dbUpdates, nil
-					}
-					return nil, fmt.Errorf("unexpected error validating EpochCommit service event: %w", err)
-				}
-
 				err = updater.ProcessEpochCommit(ev)
 				if err != nil {
 					if protocol.IsInvalidServiceEventError(err) {

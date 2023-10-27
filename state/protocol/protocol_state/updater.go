@@ -59,13 +59,14 @@ func (u *Updater) Build() (updatedState *flow.ProtocolStateEntry, stateID flow.I
 //
 // As a result of this operation protocol state for the next epoch will be created.
 // Expected errors during normal operations:
-// - `protocol.InvalidServiceEventError` if the service event is not a valid state transition for the current protocol state
+// - `protocol.InvalidServiceEventError` if the service event is invalid or is not a valid state transition for the current protocol state
 func (u *Updater) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
 	if u.state.InvalidStateTransitionAttempted {
 		return nil // won't process new events if we are in epoch fallback mode.
 	}
-	if epochSetup.Counter != u.parentState.CurrentEpochSetup.Counter+1 {
-		return protocol.NewInvalidServiceEventErrorf("invalid epoch setup counter, expecting %d got %d", u.parentState.CurrentEpochSetup.Counter+1, epochSetup.Counter)
+	err := protocol.IsValidExtendingEpochSetup(epochSetup, u.parentState.CurrentEpochSetup, u.parentState.EpochStatus())
+	if err != nil {
+		return fmt.Errorf("invalid epoch setup event: %w", err)
 	}
 	if u.state.NextEpoch != nil {
 		return protocol.NewInvalidServiceEventErrorf("repeated setup for epoch %d", epochSetup.Counter)
@@ -142,19 +143,24 @@ func (u *Updater) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
 // finished construction of the next epoch.
 // As a result of this operation protocol state for next epoch will be committed.
 // Expected errors during normal operations:
-// - `protocol.InvalidServiceEventError` - an invalid service event with respect to the protocol state has been supplied.
+// - `protocol.InvalidServiceEventError` if the service event is invalid or is not a valid state transition for the current protocol state
 func (u *Updater) ProcessEpochCommit(epochCommit *flow.EpochCommit) error {
 	if u.state.InvalidStateTransitionAttempted {
 		return nil // won't process new events if we are going to enter epoch fallback mode
-	}
-	if epochCommit.Counter != u.parentState.CurrentEpochSetup.Counter+1 {
-		return protocol.NewInvalidServiceEventErrorf("invalid epoch commit counter, expecting %d got %d", u.parentState.CurrentEpochSetup.Counter+1, epochCommit.Counter)
 	}
 	if u.state.NextEpoch == nil {
 		return protocol.NewInvalidServiceEventErrorf("protocol state has been setup yet")
 	}
 	if u.state.NextEpoch.CommitID != flow.ZeroID {
 		return protocol.NewInvalidServiceEventErrorf("protocol state has already a commit event")
+	}
+	err := protocol.IsValidExtendingEpochCommit(
+		epochCommit,
+		u.parentState.NextEpochSetup,
+		u.parentState.CurrentEpochSetup,
+		u.parentState.EpochStatus())
+	if err != nil {
+		return fmt.Errorf("invalid epoch commit event: %w", err)
 	}
 
 	u.state.NextEpoch.CommitID = epochCommit.ID()
