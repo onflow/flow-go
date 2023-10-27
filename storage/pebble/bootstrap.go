@@ -40,15 +40,16 @@ func NewRegisterBootstrap(
 ) (*RegisterBootstrap, error) {
 	// check for pre-populated heights, fail if it is populated
 	// i.e. the IndexCheckpointFile function has already run for the db in this directory
-	isBootstrapped, err := IsBootstrapped(db)
-	if err != nil {
-		return nil, err
-	}
-	if isBootstrapped {
-		// key detected, attempt to run bootstrap on corrupt or already bootstrapped data
-		return nil, ErrAlreadyBootstrapped
-	}
-
+	// TODO: tmp disable
+	// isBootstrapped, err := IsBootstrapped(db)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// if isBootstrapped {
+	// 	// key detected, attempt to run bootstrap on corrupt or already bootstrapped data
+	// 	return nil, ErrAlreadyBootstrapped
+	// }
+	//
 	checkpointDir, checkpointFileName := filepath.Split(checkpointFile)
 	return &RegisterBootstrap{
 		log:                log.With().Str("module", "register_bootstrap").Logger(),
