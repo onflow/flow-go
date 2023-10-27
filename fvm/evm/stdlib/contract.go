@@ -332,7 +332,7 @@ func newInternalEVMTypeDepositFunction(
 
 			amount := types.Balance(amountValue)
 
-			// Call
+			// Deposit
 
 			const isAuthorized = false
 			account := handler.AccountByAddress(toAddress, isAuthorized)
@@ -391,7 +391,7 @@ func newInternalEVMTypeWithdrawFunction(
 
 			amount := types.Balance(amountValue)
 
-			// Call
+			// Withdraw
 
 			const isAuthorized = true
 			account := handler.AccountByAddress(fromAddress, isAuthorized)

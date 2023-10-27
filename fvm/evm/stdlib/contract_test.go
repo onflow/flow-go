@@ -816,7 +816,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 	require.True(t, deposited)
 }
 
-func TestEVMAddressDepositWithdraw(t *testing.T) {
+func TestEVMAddressWithdraw(t *testing.T) {
 
 	t.Parallel()
 
@@ -852,7 +852,7 @@ func TestEVMAddressDepositWithdraw(t *testing.T) {
 
       access(all)
       fun main(): UFix64 {
-		  let bridgedAccount <- EVM.createBridgedAccount()
+          let bridgedAccount <- EVM.createBridgedAccount()
           let vault <- bridgedAccount.withdraw(balance: EVM.Balance(flow: 0.0))
           let balance = vault.balance
           destroy bridgedAccount
