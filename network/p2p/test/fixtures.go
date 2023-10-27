@@ -132,22 +132,10 @@ func NodeFixture(
 		&defaultFlowConfig.NetworkConfig.ConnectionManagerConfig)
 	require.NoError(t, err)
 
-	builder := p2pbuilder.NewNodeBuilder(logger,
-		parameters.MetricsCfg,
-		parameters.NetworkingType,
-		parameters.Address,
-		parameters.Key,
-		sporkID,
-		parameters.IdProvider,
-		&defaultFlowConfig.NetworkConfig.ResourceManagerConfig,
-		&parameters.FlowConfig.NetworkConfig.GossipSubRPCInspectorsConfig,
-		parameters.PeerManagerConfig,
-		&p2p.DisallowListCacheConfig{
-			MaxSize: uint32(1000),
-			Metrics: metrics.NewNoopCollector(),
-		},
-		parameters.PubSubTracer,
-		parameters.UnicastConfig).
+	builder := p2pbuilder.NewNodeBuilder(logger, parameters.MetricsCfg, parameters.NetworkingType, parameters.Address, parameters.Key, sporkID, parameters.IdProvider, defaultFlowConfig.NetworkConfig.GossipSubConfig.GossipSubScoringRegistryConfig, &defaultFlowConfig.NetworkConfig.ResourceManagerConfig, &parameters.FlowConfig.NetworkConfig.GossipSubRPCInspectorsConfig, parameters.PeerManagerConfig, &p2p.DisallowListCacheConfig{
+		MaxSize: uint32(1000),
+		Metrics: metrics.NewNoopCollector(),
+	}, parameters.PubSubTracer, parameters.UnicastConfig).
 		SetConnectionManager(connManager).
 		SetCreateNode(p2pbuilder.DefaultCreateNodeFunc).
 		SetResourceManager(parameters.ResourceManager)

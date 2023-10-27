@@ -40,7 +40,8 @@ type Builder struct {
 	subscriptionFilter           pubsub.SubscriptionFilter
 	gossipSubFactory             p2p.GossipSubFactoryFunc
 	gossipSubConfigFunc          p2p.GossipSubAdapterConfigFunc
-	gossipSubPeerScoring         bool          // whether to enable gossipsub peer scoring
+	gossipSubPeerScoring         bool // whether to enable gossipsub peer scoring
+	scoringRegistryConfig        p2pconf.GossipSubScoringRegistryConfig
 	gossipSubScoreTracerInterval time.Duration // the interval at which the gossipsub score tracer logs the peer scores.
 	// gossipSubTracer is a callback interface that is called by the gossipsub implementation upon
 	// certain events. Currently, we use it to log and observe the local mesh of the node.
@@ -177,15 +178,7 @@ func (g *Builder) OverrideDefaultRpcInspectorSuiteFactory(factory p2p.GossipSubR
 // Returns:
 // - a new gossipsub builder.
 // Note: the builder is not thread-safe. It should only be used in the main thread.
-func NewGossipSubBuilder(
-	logger zerolog.Logger,
-	metricsCfg *p2pconfig.MetricsConfig,
-	networkType network.NetworkingType,
-	sporkId flow.Identifier,
-	idProvider module.IdentityProvider,
-	rpcInspectorConfig *p2pconf.GossipSubRPCInspectorsConfig,
-	rpcTracker p2p.RpcControlTracking,
-) *Builder {
+func NewGossipSubBuilder(logger zerolog.Logger, metricsCfg *p2pconfig.MetricsConfig, networkType network.NetworkingType, sporkId flow.Identifier, idProvider module.IdentityProvider, scoringRegistryConfig p2pconf.GossipSubScoringRegistryConfig, rpcInspectorConfig *p2pconf.GossipSubRPCInspectorsConfig, rpcTracker p2p.RpcControlTracking) *Builder {
 	lg := logger.With().
 		Str("component", "gossipsub").
 		Str("network-type", networkType.String()).
@@ -199,6 +192,7 @@ func NewGossipSubBuilder(
 		idProvider:               idProvider,
 		gossipSubFactory:         defaultGossipSubFactory(),
 		gossipSubConfigFunc:      defaultGossipSubAdapterConfig(),
+		scoringRegistryConfig:    scoringRegistryConfig,
 		scoreOptionConfig:        scoring.NewScoreOptionConfig(lg, idProvider),
 		rpcInspectorConfig:       rpcInspectorConfig,
 		rpcInspectorSuiteFactory: defaultInspectorSuite(rpcTracker),
@@ -327,7 +321,7 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, e
 	var scoreTracer p2p.PeerScoreTracer
 	if g.gossipSubPeerScoring {
 		g.scoreOptionConfig.SetRegisterNotificationConsumerFunc(inspectorSuite.AddInvalidControlMessageConsumer)
-		scoreOpt = scoring.NewScoreOption(g.scoreOptionConfig)
+		scoreOpt = scoring.NewScoreOption(g.scoringRegistryConfig, g.scoreOptionConfig)
 		gossipSubConfigs.WithScoreOption(scoreOpt)
 
 		if g.gossipSubScoreTracerInterval > 0 {

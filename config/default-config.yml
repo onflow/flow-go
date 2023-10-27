@@ -140,6 +140,17 @@ network-config:
   gossipsub-rpc-metrics-inspector-workers: 1
   # The size of the queue used by worker pool for the control message metrics inspector
   gossipsub-rpc-metrics-inspector-cache-size: 100
+  #  The lower bound on the decay value for a spam record when initialized.
+  #  A random value in a range of InitDecayLowerBound and InitDecayUpperBound is used when initializing the decay
+  #  of a spam record.
+  gossipsub-scoring-registry-init-decay-lowerbound: .5
+  #  The upper bound on the decay value for a spam record when initialized.
+  gossipsub-scoring-registry-init-decay-upperbound: .7
+  #  The threshold for which when the negative penalty is below this value the decay threshold will be increased by some amount. This will
+  #  lead to malicious nodes having longer decays while honest nodes will have faster decays.
+  gossipsub-scoring-registry-increase-decay-threshold: -99
+  #  The amount the decay will be increased when the negative penalty score falls below the IncreaseDecayThreshold.
+  gossipsub-scoring-registry-decay-threshold-incrementer: .01
   # Application layer spam prevention
   alsp-spam-record-cache-size: 10e3
   alsp-spam-report-queue-size: 10e4

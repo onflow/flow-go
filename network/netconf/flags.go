@@ -70,6 +70,12 @@ const (
 	metricsInspectorNumberOfWorkers = "gossipsub-rpc-metrics-inspector-workers"
 	metricsInspectorCacheSize       = "gossipsub-rpc-metrics-inspector-cache-size"
 
+	// gossipsub scoring registry
+	scoringRegistryInitDecayLowerbound       = "gossipsub-scoring-registry-init-decay-lowerbound"
+	scoringRegistryInitDecayUpperbound       = "gossipsub-scoring-registry-init-decay-upperbound"
+	scoringRegistryIncreaseDecayThreshold    = "gossipsub-scoring-registry-increase-decay-threshold"
+	scoringRegistryDecayThresholdIncrementer = "gossipsub-scoring-registry-decay-threshold-incrementer"
+
 	alspDisabled            = "alsp-disable-penalty"
 	alspSpamRecordCacheSize = "alsp-spam-record-cache-size"
 	alspSpamRecordQueueSize = "alsp-spam-report-queue-size"
@@ -138,6 +144,10 @@ func AllFlagNames() []string {
 		controlMessageMaxSampleSize,
 		iwantDuplicateMsgIDThreshold,
 		iwantCacheMissCheckSize,
+		scoringRegistryInitDecayLowerbound,
+		scoringRegistryInitDecayUpperbound,
+		scoringRegistryIncreaseDecayThreshold,
+		scoringRegistryDecayThresholdIncrementer,
 	}
 }
 
@@ -216,6 +226,11 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 	flags.Float64(iwantCacheMissThreshold, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IWantRPCInspectionConfig.CacheMissThreshold, "max number of iwants to sample when performing validation")
 	flags.Int(iwantCacheMissCheckSize, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IWantRPCInspectionConfig.CacheMissCheckSize, "the iWants size at which message id cache misses will be checked")
 	flags.Float64(iwantDuplicateMsgIDThreshold, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IWantRPCInspectionConfig.DuplicateMsgIDThreshold, "max allowed duplicate message IDs in a single iWant control message")
+
+	flags.Float64(scoringRegistryInitDecayLowerbound, config.GossipSubConfig.GossipSubScoringRegistryConfig.InitDecayLowerBound, "the lower bound on the decay value for a spam record when initialized")
+	flags.Float64(scoringRegistryInitDecayUpperbound, config.GossipSubConfig.GossipSubScoringRegistryConfig.InitDecayUpperBound, "the upper bound on the decay value for a spam record when initialized")
+	flags.Float64(scoringRegistryIncreaseDecayThreshold, config.GossipSubConfig.GossipSubScoringRegistryConfig.IncreaseDecayThreshold, "the threshold for which when the negative penalty is below this value the decay threshold will be increased by some amount")
+	flags.Float64(scoringRegistryDecayThresholdIncrementer, config.GossipSubConfig.GossipSubScoringRegistryConfig.DecayThresholdIncrementer, "the amount the decay will be increased when the negative penalty score falls below the IncreaseDecayThreshold")
 }
 
 // SetAliases this func sets an aliases for each CLI flag defined for network config overrides to it's corresponding

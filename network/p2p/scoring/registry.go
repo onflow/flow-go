@@ -18,15 +18,7 @@ import (
 )
 
 const (
-	// skipDecayThreshold is the threshold for which when the negative penalty is above this value, the decay function will not be called.
-	// instead, the penalty will be set to 0. This is to prevent the penalty from keeping a small negative value for a long time.
-	skipDecayThreshold = -0.1
-	// increaseDecayThreshold is the threshold for which when the negative penalty is below this value the decay threshold will be increased by some amount. This will
-	// lead to malicious nodes having longer decays while honest nodes will have faster decays.
-	increaseDecayThreshold = -99
-	// decayThresholdIncrementer is the amount the decay will be increased when the negative penalty score falls below the increaseDecayThreshold.
-	decayThresholdIncrementer = .01
-	// maxDecay is the maximum decay value for the application specific penalty.
+	// MaxDecay is the maximum decay value for the application specific penalty.
 	// Spam record will be initialized with a decay value between .5 , .7 and this value will then be decayed up to .99 on consecutive misbehavior's,
 	// The maximum decay value decays the penalty by 1% every second.
 	// assume:
@@ -46,13 +38,10 @@ const (
 	//     n > log( 0.001 ) / log( 0.99 )
 	//     n > -3 / log( 0.99 )
 	//     n >  458.22
-	maxDecay = 0.99 // default decay value for the application specific penalty.
-	// InitDecayLowerBound is the lower bound on the decay value for a spam record when initialized.
-	// A random value in a range of InitDecayLowerBound and InitDecayUpperBound is used when initializing the decay
-	// of a spam record.
-	InitDecayLowerBound = .5
-	// InitDecayUpperBound is the upper bound on the decay value for a spam record when initialized.
-	InitDecayUpperBound = .7
+	MaxDecay = 0.99 // default decay value for the application specific penalty.
+	// skipDecayThreshold is the threshold for which when the negative penalty is above this value, the decay function will not be called.
+	// instead, the penalty will be set to 0. This is to prevent the penalty from keeping a small negative value for a long time.
+	skipDecayThreshold = -0.1
 	// graftMisbehaviourPenalty is the penalty applied to the application specific penalty when a peer conducts a graft misbehaviour.
 	graftMisbehaviourPenalty = -10
 	// pruneMisbehaviourPenalty is the penalty applied to the application specific penalty when a peer conducts a prune misbehaviour.
@@ -95,13 +84,17 @@ type GossipSubAppSpecificScoreRegistry struct {
 	spamScoreCache p2p.GossipSubSpamRecordCache
 	penalty        GossipSubCtrlMsgPenaltyValue
 	// initial application specific penalty record, used to initialize the penalty cache entry.
-	init      func() p2p.GossipSubSpamRecord
-	validator p2p.SubscriptionValidator
+	init                      func() p2p.GossipSubSpamRecord
+	validator                 p2p.SubscriptionValidator
+	initDecayLowerBound       float64
+	initDecayUpperBound       float64
+	increaseDecayThreshold    float64
+	decayThresholdIncrementer float64
 }
 
-// GossipSubAppSpecificScoreRegistryConfig is the configuration for the GossipSubAppSpecificScoreRegistry.
+// GossipSubAppSpecificScoreRegistryParams is the configuration for the GossipSubAppSpecificScoreRegistry.
 // The configuration is used to initialize the registry.
-type GossipSubAppSpecificScoreRegistryConfig struct {
+type GossipSubAppSpecificScoreRegistryParams struct {
 	Logger zerolog.Logger
 
 	// Validator is the subscription validator used to validate the subscriptions of peers, and determine if a peer is
@@ -122,24 +115,43 @@ type GossipSubAppSpecificScoreRegistryConfig struct {
 	// CacheFactory is a factory function that returns a new GossipSubSpamRecordCache. It is used to initialize the spamScoreCache.
 	// The cache is used to store the application specific penalty of peers.
 	CacheFactory func() p2p.GossipSubSpamRecordCache
+
+	// InitDecayLowerBound is the lower bound on the decay value for a spam record when initialized.
+	// A random value in a range of InitDecayLowerBound and InitDecayUpperBound is used when initializing the decay
+	// of a spam record.
+	InitDecayLowerBound float64
+
+	// InitDecayUpperBound is the upper bound on the decay value for a spam record when initialized.
+	InitDecayUpperBound float64
+
+	// IncreaseDecayThreshold is the threshold for which when the negative penalty is below this value the decay threshold will be increased by some amount. This will
+	// lead to malicious nodes having longer decays while honest nodes will have faster decays.
+	IncreaseDecayThreshold float64
+
+	// DecayThresholdIncrementer is the amount the decay will be increased when the negative penalty score falls below the IncreaseDecayThreshold.
+	DecayThresholdIncrementer float64
 }
 
 // NewGossipSubAppSpecificScoreRegistry returns a new GossipSubAppSpecificScoreRegistry.
 // Args:
 //
-//	config: the configuration for the registry.
+//	params: the parameters for the registry.
 //
 // Returns:
 //
 //	a new GossipSubAppSpecificScoreRegistry.
-func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegistryConfig) *GossipSubAppSpecificScoreRegistry {
+func NewGossipSubAppSpecificScoreRegistry(params *GossipSubAppSpecificScoreRegistryParams) *GossipSubAppSpecificScoreRegistry {
 	reg := &GossipSubAppSpecificScoreRegistry{
-		logger:         config.Logger.With().Str("module", "app_score_registry").Logger(),
-		spamScoreCache: config.CacheFactory(),
-		penalty:        config.Penalty,
-		init:           config.Init,
-		validator:      config.Validator,
-		idProvider:     config.IdProvider,
+		logger:                    params.Logger.With().Str("module", "app_score_registry").Logger(),
+		spamScoreCache:            params.CacheFactory(),
+		penalty:                   params.Penalty,
+		init:                      params.Init,
+		validator:                 params.Validator,
+		idProvider:                params.IdProvider,
+		initDecayLowerBound:       params.InitDecayLowerBound,
+		initDecayUpperBound:       params.InitDecayUpperBound,
+		increaseDecayThreshold:    params.IncreaseDecayThreshold,
+		decayThresholdIncrementer: params.DecayThresholdIncrementer,
 	}
 
 	return reg
@@ -293,11 +305,16 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 		Msg("applied misbehaviour penalty and updated application specific penalty")
 }
 
-// DefaultDecayAdjustmentFunc will adjust the decay for a spam record if the record penalty has reached the increaseDecayThreshold.
-func DefaultDecayAdjustmentFunc() netcache.PreprocessorFunc {
+// DefaultDecayAdjustmentFunc will adjust the decay for a spam record if the record penalty has reached the IncreaseDecayThreshold.
+func DefaultDecayAdjustmentFunc(increaseDecayThreshold float64, decayThresholdIncrementer float64) netcache.PreprocessorFunc {
 	return func(record p2p.GossipSubSpamRecord, lastUpdated time.Time) (p2p.GossipSubSpamRecord, error) {
-		if record.Penalty <= increaseDecayThreshold && record.Decay < maxDecay {
-			record.Decay += decayThresholdIncrementer
+		if record.Penalty <= increaseDecayThreshold {
+			decay := record.Decay + decayThresholdIncrementer
+			if decay > MaxDecay {
+				record.Decay = MaxDecay
+			} else {
+				record.Decay = decay
+			}
 		}
 		return record, nil
 	}
@@ -331,23 +348,19 @@ func DefaultDecayFunction() netcache.PreprocessorFunc {
 	}
 }
 
-// DefaultPreprocessorFuncs returns the default pre-processor funcs used in the spam record cache. The funcs are returned in a specific order such that
-// the DefaultDecayAdjustmentFunc is applied to the decay of a spam record before decay is applied to the spam penalty.
-func DefaultPreprocessorFuncs() []netcache.PreprocessorFunc {
-	return []netcache.PreprocessorFunc{DefaultDecayAdjustmentFunc(), DefaultDecayFunction()}
-}
-
-// initDecay returns a random decay value n that is  InitDecayLowerBound > n > InitDecayUpperBound
-func initDecay() float64 {
-	return rand.Float64()*(InitDecayUpperBound-InitDecayLowerBound) + InitDecayLowerBound
-}
-
-// InitAppScoreRecordState initializes the gossipsub spam record state for a peer.
+// InitAppScoreRecordStateFunc returns a func that will initialize the spac record state for a peer. The initial decay for the
+// spam record will be a random value between the lower and upper bounds provided.
+// Args:
+//   - decayLowerbound: the lower bound of the range for the initial random decay value
+//   - decayUpperbound: the upper bound of the range for the initial random decay value
+//
 // Returns:
-//   - a gossipsub spam record with the default decay value and 0 penalty.
-func InitAppScoreRecordState() p2p.GossipSubSpamRecord {
-	return p2p.GossipSubSpamRecord{
-		Decay:   initDecay(),
-		Penalty: 0,
+//   - callback func that initializes and returns a spam record.
+func InitAppScoreRecordStateFunc(decayLowerbound, decayUpperbound float64) func() p2p.GossipSubSpamRecord {
+	return func() p2p.GossipSubSpamRecord {
+		return p2p.GossipSubSpamRecord{
+			Decay:   rand.Float64()*(decayUpperbound-decayLowerbound) + decayLowerbound,
+			Penalty: 0,
+		}
 	}
 }
