@@ -75,6 +75,7 @@ func TestEVMRun(t *testing.T) {
 						require.NoError(t, output.Err)
 						assert.Equal(t, cadence.Bool(true), output.Value)
 
+						// TODO:
 						_ = executionSnapshot
 						// snapshot = snapshot.Append(executionSnapshot)
 					})
