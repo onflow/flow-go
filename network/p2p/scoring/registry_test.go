@@ -447,7 +447,7 @@ func TestSpamRecordDecayAdjustment(t *testing.T) {
 		record, err, ok := spamRecords.Get(peerID)
 		require.NoError(t, err)
 		require.True(t, ok)
-		return record.Decay >= scoring.MaxDecay
+		return record.Decay == scoring.MaxDecay
 	}, 10*time.Second, 500*time.Millisecond)
 
 	// the spam record decay should have reached max possible decay
