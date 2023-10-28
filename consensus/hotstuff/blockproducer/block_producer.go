@@ -46,6 +46,7 @@ func (bp *BlockProducer) MakeBlockProposal(view uint64, qc *flow.QuorumCertifica
 		return nil
 	}
 
+	// TODO: We should utilize the `EventHandler`'s `SafetyRules` to generate the block signature instead of using an independent signing logic: https://github.com/dapperlabs/flow-go/issues/6892
 	signProposal := func(header *flow.Header) error {
 		// turn the header into a block header proposal as known by hotstuff
 		block := model.Block{
