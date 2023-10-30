@@ -5,6 +5,10 @@ import (
 	"testing"
 	"time"
 
+	"google.golang.org/grpc/codes"
+
+	"google.golang.org/grpc/status"
+
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/suite"
 
@@ -175,21 +179,27 @@ func (s *AccessAPISuite) testGetAccount(client *client.Client) {
 	serviceAddress := s.serviceClient.SDKServiceAddress()
 
 	s.Run("get account at latest block", func() {
-		account, err := client.GetAccount(s.ctx, serviceAddress)
+		account, err := s.waitAccountsUntilIndexed(func() (*sdk.Account, error) {
+			return client.GetAccount(s.ctx, serviceAddress)
+		})
 		s.Require().NoError(err)
 		s.Assert().Equal(serviceAddress, account.Address)
 		s.Assert().NotZero(account.Balance)
 	})
 
 	s.Run("get account block ID", func() {
-		account, err := client.GetAccountAtLatestBlock(s.ctx, serviceAddress)
+		account, err := s.waitAccountsUntilIndexed(func() (*sdk.Account, error) {
+			return client.GetAccountAtLatestBlock(s.ctx, serviceAddress)
+		})
 		s.Require().NoError(err)
 		s.Assert().Equal(serviceAddress, account.Address)
 		s.Assert().NotZero(account.Balance)
 	})
 
 	s.Run("get account block height", func() {
-		account, err := client.GetAccountAtBlockHeight(s.ctx, serviceAddress, header.Height)
+		account, err := s.waitAccountsUntilIndexed(func() (*sdk.Account, error) {
+			return client.GetAccountAtBlockHeight(s.ctx, serviceAddress, header.Height)
+		})
 		s.Require().NoError(err)
 		s.Assert().Equal(serviceAddress, account.Address)
 		s.Assert().NotZero(account.Balance)
@@ -209,19 +219,25 @@ func (s *AccessAPISuite) testExecuteScriptWithSimpleScript(client *client.Client
 	s.Require().NoError(err)
 
 	s.Run("execute at latest block", func() {
-		result, err := client.ExecuteScriptAtLatestBlock(s.ctx, []byte(simpleScript), nil)
+		result, err := s.waitScriptExecutionUntilIndexed(func() (cadence.Value, error) {
+			return client.ExecuteScriptAtLatestBlock(s.ctx, []byte(simpleScript), nil)
+		})
 		s.Require().NoError(err)
 		s.Assert().Equal(simpleScriptResult, result)
 	})
 
 	s.Run("execute at block height", func() {
-		result, err := client.ExecuteScriptAtBlockHeight(s.ctx, header.Height, []byte(simpleScript), nil)
+		result, err := s.waitScriptExecutionUntilIndexed(func() (cadence.Value, error) {
+			return client.ExecuteScriptAtBlockHeight(s.ctx, header.Height, []byte(simpleScript), nil)
+		})
 		s.Require().NoError(err)
 		s.Assert().Equal(simpleScriptResult, result)
 	})
 
 	s.Run("execute at block ID", func() {
-		result, err := client.ExecuteScriptAtBlockID(s.ctx, header.ID, []byte(simpleScript), nil)
+		result, err := s.waitScriptExecutionUntilIndexed(func() (cadence.Value, error) {
+			return client.ExecuteScriptAtBlockID(s.ctx, header.ID, []byte(simpleScript), nil)
+		})
 		s.Require().NoError(err)
 		s.Assert().Equal(simpleScriptResult, result)
 	})
@@ -295,6 +311,37 @@ func (s *AccessAPISuite) deployContract() *sdk.TransactionResult {
 	s.Require().Empty(result.Error, "create counter tx should be accepted but got: %s", result.Error)
 
 	return result
+}
+
+type getAccount func() (*sdk.Account, error)
+type executeScript func() (cadence.Value, error)
+
+var indexDelay = 10 * time.Second
+var indexRetry = 100 * time.Millisecond
+
+// wait for sealed block to get indexed, as there is a delay in syncing blocks between nodes
+func (s *AccessAPISuite) waitAccountsUntilIndexed(get getAccount) (*sdk.Account, error) {
+	var account *sdk.Account
+	var err error
+	s.Require().Eventually(func() bool {
+		account, err = get()
+		statusErr, ok := status.FromError(err)
+		return ok && statusErr.Code() != codes.OutOfRange
+	}, indexDelay, indexRetry)
+
+	return account, err
+}
+
+func (s *AccessAPISuite) waitScriptExecutionUntilIndexed(execute executeScript) (cadence.Value, error) {
+	var val cadence.Value
+	var err error
+	s.Require().Eventually(func() bool {
+		val, err = execute()
+		statusErr, ok := status.FromError(err)
+		return ok && statusErr.Code() != codes.OutOfRange
+	}, indexDelay, indexRetry)
+
+	return val, err
 }
 
 func (s *AccessAPISuite) waitUntilIndexed(height uint64) {
