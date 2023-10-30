@@ -13,6 +13,7 @@ import (
 	storerr "github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/transaction"
 	storagemock "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/utils/rand"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -149,6 +150,125 @@ func (s *MutatorSuite) TestMutatorApplyServiceEvents_InvalidEpochSetup() {
 		require.False(s.T(), protocol.IsInvalidServiceEventError(err))
 		require.Empty(s.T(), updates)
 	})
+}
+
+// TestMutatorApplyServiceEvents_InvalidEpochCommit tests that ApplyServiceEvents rejects invalid epoch commit event and sets
+// InvalidStateTransitionAttempted flag in protocol.StateUpdater.
+func (s *MutatorSuite) TestMutatorApplyServiceEvents_InvalidEpochCommit() {
+	s.params.On("EpochFallbackTriggered").Return(false, nil)
+	s.Run("invalid-epoch-commit", func() {
+		parentState := unittest.ProtocolStateFixture()
+		updater := mock.NewStateUpdater(s.T())
+		updater.On("ParentState").Return(parentState)
+
+		epochCommit := unittest.EpochCommitFixture()
+		result := unittest.ExecutionResultFixture(func(result *flow.ExecutionResult) {
+			result.ServiceEvents = []flow.ServiceEvent{epochCommit.ServiceEvent()}
+		})
+
+		block := unittest.BlockHeaderFixture()
+		seal := unittest.Seal.Fixture(unittest.Seal.WithBlockID(block.ID()))
+		s.headersDB.On("ByBlockID", seal.BlockID).Return(block, nil)
+		s.resultsDB.On("ByID", seal.ResultID).Return(result, nil)
+
+		updater.On("ProcessEpochCommit", epochCommit).Return(protocol.NewInvalidServiceEventErrorf("")).Once()
+		updater.On("SetInvalidStateTransitionAttempted").Return().Once()
+
+		updates, err := s.mutator.ApplyServiceEvents(updater, []*flow.Seal{seal})
+		require.NoError(s.T(), err)
+		require.Empty(s.T(), updates)
+	})
+	s.Run("process-epoch-commit-exception", func() {
+		parentState := unittest.ProtocolStateFixture()
+		updater := mock.NewStateUpdater(s.T())
+		updater.On("ParentState").Return(parentState)
+
+		epochCommit := unittest.EpochCommitFixture()
+		result := unittest.ExecutionResultFixture(func(result *flow.ExecutionResult) {
+			result.ServiceEvents = []flow.ServiceEvent{epochCommit.ServiceEvent()}
+		})
+
+		block := unittest.BlockHeaderFixture()
+		seal := unittest.Seal.Fixture(unittest.Seal.WithBlockID(block.ID()))
+		s.headersDB.On("ByBlockID", seal.BlockID).Return(block, nil)
+		s.resultsDB.On("ByID", seal.ResultID).Return(result, nil)
+
+		exception := errors.New("exception")
+		updater.On("ProcessEpochCommit", epochCommit).Return(exception).Once()
+
+		updates, err := s.mutator.ApplyServiceEvents(updater, []*flow.Seal{seal})
+		require.Error(s.T(), err)
+		require.False(s.T(), protocol.IsInvalidServiceEventError(err))
+		require.Empty(s.T(), updates)
+	})
+}
+
+// TestMutatorApplyServiceEventsSealsOrdered tests that ApplyServiceEvents processes seals in order of block height.
+func (s *MutatorSuite) TestMutatorApplyServiceEventsSealsOrdered() {
+	s.params.On("EpochFallbackTriggered").Return(false, nil)
+	parentState := unittest.ProtocolStateFixture()
+	updater := mock.NewStateUpdater(s.T())
+	updater.On("ParentState").Return(parentState)
+
+	blocks := unittest.ChainFixtureFrom(10, unittest.BlockHeaderFixture())
+	var seals []*flow.Seal
+	resultByHeight := make(map[flow.Identifier]uint64)
+	for _, block := range blocks {
+		receipt, seal := unittest.ReceiptAndSealForBlock(block)
+		resultByHeight[seal.ResultID] = block.Header.Height
+		s.headersDB.On("ByBlockID", seal.BlockID).Return(block.Header, nil).Once()
+		s.resultsDB.On("ByID", seal.ResultID).Return(&receipt.ExecutionResult, nil).Once()
+		seals = append(seals, seal)
+	}
+
+	// shuffle seals to make sure we order them
+	require.NoError(s.T(), rand.Shuffle(uint(len(seals)), func(i, j uint) {
+		seals[i], seals[j] = seals[j], seals[i]
+	}))
+
+	updates, err := s.mutator.ApplyServiceEvents(updater, seals)
+	require.NoError(s.T(), err)
+	require.Empty(s.T(), updates)
+	// assert that results were queried in order of executed block height
+	// if seals were properly ordered before processing, then results should be ordered by block height
+	lastExecutedBlockHeight := uint64(0)
+	for _, call := range s.resultsDB.Calls {
+		resultID := call.Arguments.Get(0).(flow.Identifier)
+		executedBlockHeight, found := resultByHeight[resultID]
+		require.True(s.T(), found)
+		require.Less(s.T(), lastExecutedBlockHeight, executedBlockHeight, "seals must be ordered by block height")
+	}
+}
+
+// TestMutatorApplyServiceEventsTransitionToNextEpoch tests that ApplyServiceEvents transitions to the next epoch
+// when epoch has been committed, and we are at the first block of the next epoch.
+func (s *MutatorSuite) TestMutatorApplyServiceEventsTransitionToNextEpoch() {
+	s.params.On("EpochFallbackTriggered").Return(false, nil)
+	parentState := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
+	updater := mock.NewStateUpdater(s.T())
+	updater.On("ParentState").Return(parentState)
+	// we are at the first block of the next epoch
+	updater.On("View").Return(parentState.CurrentEpochSetup.FinalView + 1)
+	updater.On("TransitionToNextEpoch").Return(nil).Once()
+	dbUpdates, err := s.mutator.ApplyServiceEvents(updater, []*flow.Seal{})
+	require.NoError(s.T(), err)
+	require.Empty(s.T(), dbUpdates)
+}
+
+// TestMutatorApplyServiceEventsTransitionToNextEpoch_Error tests that error that has been
+// observed in ApplyServiceEvents when transitioning to the next epoch is propagated to the caller.
+func (s *MutatorSuite) TestMutatorApplyServiceEventsTransitionToNextEpoch_Error() {
+	s.params.On("EpochFallbackTriggered").Return(false, nil)
+	parentState := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
+	updater := mock.NewStateUpdater(s.T())
+	updater.On("ParentState").Return(parentState)
+	// we are at the first block of the next epoch
+	updater.On("View").Return(parentState.CurrentEpochSetup.FinalView + 1)
+	exception := errors.New("exception")
+	updater.On("TransitionToNextEpoch").Return(exception).Once()
+	_, err := s.mutator.ApplyServiceEvents(updater, []*flow.Seal{})
+	require.ErrorIs(s.T(), err, exception)
+	require.False(s.T(), protocol.IsInvalidServiceEventError(err))
 }
 
 // TestMutatorApplyServiceEvents_EpochFallbackTriggered tests two scenarios when network is in epoch fallback mode.
