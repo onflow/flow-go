@@ -105,7 +105,7 @@ func (i *Indexer) LowestIndexedHeight() uint64 {
 
 // HighestIndexedHeight returns the highest height indexed by the execution indexer.
 func (i *Indexer) HighestIndexedHeight() uint64 {
-	return i.registers.LatestHeight()
+	return i.jobConsumer.LastProcessedIndex()
 }
 
 // OnExecutionData is used to notify when new execution data is downloaded by the execution data requester jobqueue.
