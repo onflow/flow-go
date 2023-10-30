@@ -16,14 +16,14 @@ import (
 )
 
 func TestRandomGenerator(t *testing.T) {
-	entropyProvider := &mock.EntropyProvider{}
-	entropyProvider.On("RandomSource").Return(unittest.RandomBytes(48), nil)
+	randomSourceHistoryProvider := &mock.EntropyProvider{}
+	randomSourceHistoryProvider.On("RandomSource").Return(unittest.RandomBytes(48), nil)
 
 	getRandoms := func(txId []byte, N int) []uint64 {
 		// seed the RG with the same block header
 		urg := environment.NewRandomGenerator(
 			tracing.NewTracerSpan(),
-			entropyProvider,
+			randomSourceHistoryProvider,
 			txId)
 		numbers := make([]uint64, N)
 		for i := 0; i < N; i++ {
@@ -42,7 +42,7 @@ func TestRandomGenerator(t *testing.T) {
 			txId := unittest.TransactionFixture().ID()
 			urg := environment.NewRandomGenerator(
 				tracing.NewTracerSpan(),
-				entropyProvider,
+				randomSourceHistoryProvider,
 				txId[:])
 
 			// make sure n is a power of 2 so that there is no bias in the last class

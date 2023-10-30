@@ -13,6 +13,27 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 )
 
+// BlockExecutionDataEventPayloadsToVersion converts all event payloads to version
+func BlockExecutionDataEventPayloadsToVersion(
+	m *entities.BlockExecutionData,
+	to entities.EventEncodingVersion,
+) error {
+	if to == entities.EventEncodingVersion_CCF_V0 {
+		return nil
+	}
+
+	for i, chunk := range m.ChunkExecutionData {
+		for j, e := range chunk.Events {
+			converted, err := CcfPayloadToJsonPayload(e.Payload)
+			if err != nil {
+				return fmt.Errorf("failed to convert payload for event %d to json: %w", j, err)
+			}
+			m.ChunkExecutionData[i].Events[j].Payload = converted
+		}
+	}
+	return nil
+}
+
 // BlockExecutionDataToMessage converts a BlockExecutionData to a protobuf message
 func BlockExecutionDataToMessage(data *execution_data.BlockExecutionData) (
 	*entities.BlockExecutionData,
