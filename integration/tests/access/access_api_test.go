@@ -316,9 +316,7 @@ func (s *AccessAPISuite) waitAccountsUntilIndexed(get getAccount) (*sdk.Account,
 	var err error
 	s.Require().Eventually(func() bool {
 		account, err = get()
-		statusErr, ok := status.FromError(err)
-		// make sure we either don't have an error or the error is not out of range error, since in that case we have to wait a bit longer for index to get synced
-		return err == nil || ok && statusErr.Code() != codes.OutOfRange
+		return notOutOfRangeError(err)
 	}, indexDelay, indexRetry)
 
 	return account, err
@@ -329,8 +327,7 @@ func (s *AccessAPISuite) waitScriptExecutionUntilIndexed(execute executeScript) 
 	var err error
 	s.Require().Eventually(func() bool {
 		val, err = execute()
-		statusErr, ok := status.FromError(err)
-		return err == nil || ok && statusErr.Code() != codes.OutOfRange
+		return notOutOfRangeError(err)
 	}, indexDelay, indexRetry)
 
 	return val, err
@@ -347,4 +344,13 @@ func (s *AccessAPISuite) waitUntilIndexed(height uint64) {
 		_, err := s.an2Client.ExecuteScriptAtBlockHeight(s.ctx, height, []byte(simpleScript), nil)
 		return err == nil
 	}, 30*time.Second, 1*time.Second)
+}
+
+// make sure we either don't have an error or the error is not out of range error, since in that case we have to wait a bit longer for index to get synced
+func notOutOfRangeError(err error) bool {
+	statusErr, ok := status.FromError(err)
+	if !ok || err == nil {
+		return true
+	}
+	return statusErr.Code() != codes.OutOfRange
 }
