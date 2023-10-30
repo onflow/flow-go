@@ -793,9 +793,6 @@ func (b *bootstrapExecutor) setupEVM(service flow.Address) {
 		Transaction(tx, 0),
 	)
 	panicOnMetaInvokeErrf("failed to deploy EVM contract: %s", txError, err)
-	// TODO: clean up
-	// b.accounts.SetContract(stdlib.ContractName, service, stdlib.ContractCode)
-	// TODO: think about storage
 }
 
 func (b *bootstrapExecutor) registerNodes(service, fungibleToken, flowToken flow.Address) {
