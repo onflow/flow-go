@@ -41,6 +41,7 @@ func (b *backendAccounts) GetAccount(ctx context.Context, address flow.Address) 
 
 // GetAccountAtLatestBlock returns the account details at the latest sealed block.
 func (b *backendAccounts) GetAccountAtLatestBlock(ctx context.Context, address flow.Address) (*flow.Account, error) {
+	height := b.scriptExecutor.LatestHeight()
 	sealed, err := b.state.Sealed().Head()
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get latest sealed header: %v", err)
@@ -48,7 +49,7 @@ func (b *backendAccounts) GetAccountAtLatestBlock(ctx context.Context, address f
 
 	sealedBlockID := sealed.ID()
 
-	account, err := b.getAccountAtBlock(ctx, address, sealedBlockID, sealed.Height)
+	account, err := b.getAccountAtBlock(ctx, address, sealedBlockID, height)
 	if err != nil {
 		b.log.Debug().Err(err).Msgf("failed to get account at blockID: %v", sealedBlockID)
 		return nil, err

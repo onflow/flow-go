@@ -759,6 +759,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					query.NewProtocolStateWrapper(builder.State),
 					builder.Storage.Headers,
 					builder.ExecutionIndexerCore.RegisterValue,
+					builder.ExecutionIndexer,
 				)
 				if err != nil {
 					return nil, err

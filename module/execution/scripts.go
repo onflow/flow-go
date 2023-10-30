@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 
+	"github.com/onflow/flow-go/module/state_synchronization/indexer"
+
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/execution/computation"
@@ -47,6 +49,8 @@ type ScriptExecutor interface {
 	// Expected errors:
 	// - ErrDataNotAvailable if the data for the block height is not available
 	GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error)
+
+	LatestHeight() uint64
 }
 
 var _ ScriptExecutor = (*Scripts)(nil)
@@ -55,6 +59,7 @@ type Scripts struct {
 	executor         *query.QueryExecutor
 	headers          storage.Headers
 	registerAtHeight RegisterAtHeight
+	indexer          *indexer.Indexer
 }
 
 func NewScripts(
@@ -64,6 +69,7 @@ func NewScripts(
 	entropy query.EntropyProviderPerBlock,
 	header storage.Headers,
 	registerAtHeight RegisterAtHeight,
+	indexer *indexer.Indexer,
 ) (*Scripts, error) {
 	vm := fvm.NewVirtualMachine()
 
@@ -89,7 +95,12 @@ func NewScripts(
 		executor:         queryExecutor,
 		headers:          header,
 		registerAtHeight: registerAtHeight,
+		indexer:          indexer,
 	}, nil
+}
+
+func (s *Scripts) LatestHeight() uint64 {
+	return s.indexer.HighestIndexedHeight()
 }
 
 // ExecuteAtBlockHeight executes provided script against the block height.
