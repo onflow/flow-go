@@ -317,7 +317,8 @@ func (s *AccessAPISuite) waitAccountsUntilIndexed(get getAccount) (*sdk.Account,
 	s.Require().Eventually(func() bool {
 		account, err = get()
 		statusErr, ok := status.FromError(err)
-		return ok && statusErr.Code() != codes.OutOfRange
+		// make sure we either don't have an error or the error is not out of range error, since in that case we have to wait a bit longer for index to get synced
+		return err == nil || ok && statusErr.Code() != codes.OutOfRange
 	}, indexDelay, indexRetry)
 
 	return account, err
@@ -329,7 +330,7 @@ func (s *AccessAPISuite) waitScriptExecutionUntilIndexed(execute executeScript) 
 	s.Require().Eventually(func() bool {
 		val, err = execute()
 		statusErr, ok := status.FromError(err)
-		return ok && statusErr.Code() != codes.OutOfRange
+		return err == nil || ok && statusErr.Code() != codes.OutOfRange
 	}, indexDelay, indexRetry)
 
 	return val, err
