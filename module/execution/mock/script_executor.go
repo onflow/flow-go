@@ -67,6 +67,20 @@ func (_m *ScriptExecutor) GetAccountAtBlockHeight(ctx context.Context, address f
 	return r0, r1
 }
 
+// LatestHeight provides a mock function with given fields:
+func (_m *ScriptExecutor) LatestHeight() uint64 {
+	ret := _m.Called()
+
+	var r0 uint64
+	if rf, ok := ret.Get(0).(func() uint64); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	return r0
+}
+
 type mockConstructorTestingTNewScriptExecutor interface {
 	mock.TestingT
 	Cleanup(func())
