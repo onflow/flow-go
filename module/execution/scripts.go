@@ -45,7 +45,6 @@ type ScriptExecutor interface {
 
 	// GetAccountAtBlockHeight returns a Flow account by the provided address and block height.
 	// Expected errors:
-	// - storage.ErrNotFound if block or register value at height was not found.
 	// - ErrDataNotAvailable if the data for the block height is not available
 	GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error)
 }
