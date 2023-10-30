@@ -125,7 +125,6 @@ func (s *scriptTestSuite) SetupTest() {
 		entropyBlock,
 		headers,
 		index.RegisterValue,
-		nil,
 	)
 	s.Require().NoError(err)
 	s.scripts = scripts
