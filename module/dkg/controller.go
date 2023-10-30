@@ -15,10 +15,13 @@ import (
 )
 
 const (
+	// all constants below are used to compute delays (jitters) before
+	// expensive operations that can impact finalization if all consensus nodes
+	// compute them at the same time.
 
 	// DefaultBaseStartDelay is the default base delay to use when introducing
 	// random delay to the DKG start process. See preStartDelay for details.
-	DefaultBaseStartDelay = 500 * time.Microsecond
+	DefaultBaseStartDelay = 0
 
 	// DefaultBaseHandleFirstBroadcastDelay is the default base to use when
 	// introducing random delay to processing the first DKG broadcast message.
@@ -32,11 +35,11 @@ const (
 	// total processing time of 30m, we sample the initial delay from [0,18m].
 	// We use 50ms as the default because 50ms*150^2 = 18.75m
 	//
-	DefaultBaseHandleFirstBroadcastDelay = 50 * time.Millisecond
+	DefaultBaseHandleFirstBroadcastDelay = 0
 
 	// DefaultHandleSubsequentBroadcastDelay is the default delay to use before
 	// processing all DKG broadcasts after the first.
-	DefaultHandleSubsequentBroadcastDelay = 2500 * time.Millisecond
+	DefaultHandleSubsequentBroadcastDelay = 0
 )
 
 // ControllerConfig defines configuration for the DKG Controller. These define
