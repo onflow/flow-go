@@ -2,6 +2,7 @@ package access
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -196,9 +197,12 @@ func (s *AccessAPISuite) testGetAccount(client *client.Client) {
 	})
 
 	s.Run("get newly created account", func() {
+		acc, err := s.serviceClient.GetAccount(s.serviceClient.SDKServiceAddress())
+		fmt.Println("-----------", acc.Keys[0])
+
 		addr, err := utils.CreateFlowAccount(s.ctx, s.serviceClient)
 		s.Require().NoError(err)
-		acc, err := client.GetAccount(s.ctx, addr)
+		acc, err = client.GetAccount(s.ctx, addr)
 		s.Require().NoError(err)
 		s.Assert().Equal(addr, acc.Address)
 	})
