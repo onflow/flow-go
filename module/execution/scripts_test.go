@@ -54,6 +54,30 @@ func Test_ExecuteScript(t *testing.T) {
 		assert.Equal(t, number, value.(cadence.Int).Value.Int64())
 	})
 
+	t.Run("Get Block", func(t *testing.T) {
+		blockchain := unittest.BlockchainFixture(10)
+		first := blockchain[0]
+		tree := bootstrapFVM()
+
+		scripts := newScripts(
+			t,
+			newBlockHeadersStorage(blockchain),
+			treeToRegisterAdapter(tree),
+		)
+
+		code := []byte(fmt.Sprintf(`pub fun main(): UInt64 {
+			getBlock(at: %d)!
+			return getCurrentBlock().height 
+		}`, first.Header.Height))
+
+		result, err := scripts.ExecuteAtBlockHeight(context.Background(), code, nil, first.Header.Height)
+		require.NoError(t, err)
+		val, err := jsoncdc.Decode(nil, result)
+		require.NoError(t, err)
+		// make sure that the returned block height matches the current one set
+		assert.Equal(t, first.Header.Height, val.(cadence.UInt64).ToGoValue())
+	})
+
 	t.Run("Handle not found Register", func(t *testing.T) {
 		blockchain := unittest.BlockchainFixture(10)
 		first := blockchain[0]
