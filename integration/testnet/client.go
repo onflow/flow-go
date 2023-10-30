@@ -361,18 +361,16 @@ func (c *Client) GetAccount(accountAddress sdk.Address) (*sdk.Account, error) {
 func (c *Client) CreateAccount(
 	ctx context.Context,
 	accountKey *sdk.AccountKey,
-	payerAccount *sdk.Account,
-	payer sdk.Address,
 	latestBlockID sdk.Identifier,
 ) (sdk.Address, error) {
-	payerKey := payerAccount.Keys[0]
+	payer := c.SDKServiceAddress()
 	tx, err := templates.CreateAccount([]*sdk.AccountKey{accountKey}, nil, payer)
 	if err != nil {
 		return sdk.Address{}, fmt.Errorf("failed cusnctruct create account transaction %w", err)
 	}
 	tx.SetGasLimit(1000).
 		SetReferenceBlockID(latestBlockID).
-		SetProposalKey(payer, 0, payerKey.SequenceNumber).
+		SetProposalKey(payer, 0, c.GetSeqNumber()).
 		SetPayer(payer)
 
 	err = c.SignAndSendTransaction(ctx, tx)
