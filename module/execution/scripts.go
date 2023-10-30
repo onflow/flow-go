@@ -22,12 +22,12 @@ import (
 // not locally indexed
 var ErrDataNotAvailable = errors.New("data for block is not available")
 
-// RegistersAtHeight returns register value for provided register ID at the block height.
+// RegisterAtHeight returns register value for provided register ID at the block height.
 // Even if the register wasn't indexed at the provided height, returns the highest height the register was indexed at.
 // If the register with the ID was not indexed at all return nil value and no error.
 // Expected errors:
 // - storage.ErrHeightNotIndexed if the given height was not indexed yet or lower than the first indexed height.
-type RegistersAtHeight func(ID flow.RegisterID, height uint64) (flow.RegisterValue, error)
+type RegisterAtHeight func(ID flow.RegisterID, height uint64) (flow.RegisterValue, error)
 
 type ScriptExecutor interface {
 	// ExecuteAtBlockHeight executes provided script against the block height.
@@ -52,9 +52,9 @@ type ScriptExecutor interface {
 var _ ScriptExecutor = (*Scripts)(nil)
 
 type Scripts struct {
-	executor          *query.QueryExecutor
-	headers           storage.Headers
-	registersAtHeight RegistersAtHeight
+	executor         *query.QueryExecutor
+	headers          storage.Headers
+	registerAtHeight RegisterAtHeight
 }
 
 func NewScripts(
@@ -63,7 +63,7 @@ func NewScripts(
 	chainID flow.ChainID,
 	entropy query.EntropyProviderPerBlock,
 	header storage.Headers,
-	registersAtHeight RegistersAtHeight,
+	registerAtHeight RegisterAtHeight,
 ) (*Scripts, error) {
 	vm := fvm.NewVirtualMachine()
 
@@ -86,9 +86,9 @@ func NewScripts(
 	)
 
 	return &Scripts{
-		executor:          queryExecutor,
-		headers:           header,
-		registersAtHeight: registersAtHeight,
+		executor:         queryExecutor,
+		headers:          header,
+		registerAtHeight: registerAtHeight,
 	}, nil
 }
 
@@ -135,11 +135,11 @@ func (s *Scripts) snapshotWithBlock(height uint64) (snapshot.StorageSnapshot, *f
 	}
 
 	storageSnapshot := snapshot.NewReadFuncStorageSnapshot(func(ID flow.RegisterID) (flow.RegisterValue, error) {
-		registers, err := s.registersAtHeight(ID, height)
+		register, err := s.registerAtHeight(ID, height)
 		if errors.Is(err, storage.ErrHeightNotIndexed) {
 			return nil, errors.Join(ErrDataNotAvailable, err)
 		}
-		return registers, err
+		return register, err
 	})
 
 	return storageSnapshot, header, nil
