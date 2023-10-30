@@ -243,20 +243,25 @@ func (s *AccessAPISuite) testExecuteScriptWithSimpleContract(client *client.Clie
 	script := lib.ReadCounterScript(serviceAccount.Address, serviceAccount.Address).ToCadence()
 
 	s.Run("execute at latest block", func() {
-		result, err := client.ExecuteScriptAtLatestBlock(s.ctx, []byte(script), nil)
+		result, err := s.waitScriptExecutionUntilIndexed(func() (cadence.Value, error) {
+			return client.ExecuteScriptAtLatestBlock(s.ctx, []byte(script), nil)
+		})
 		s.Require().NoError(err)
 		s.Assert().Equal(lib.CounterInitializedValue, result.(cadence.Int).Int())
 	})
 
 	s.Run("execute at block height", func() {
-		result, err := client.ExecuteScriptAtBlockHeight(s.ctx, header.Height, []byte(script), nil)
+		result, err := s.waitScriptExecutionUntilIndexed(func() (cadence.Value, error) {
+			return client.ExecuteScriptAtBlockHeight(s.ctx, header.Height, []byte(script), nil)
+		})
 		s.Require().NoError(err)
-
 		s.Assert().Equal(lib.CounterInitializedValue, result.(cadence.Int).Int())
 	})
 
 	s.Run("execute at block ID", func() {
-		result, err := client.ExecuteScriptAtBlockID(s.ctx, header.ID, []byte(script), nil)
+		result, err := s.waitScriptExecutionUntilIndexed(func() (cadence.Value, error) {
+			return client.ExecuteScriptAtBlockID(s.ctx, header.ID, []byte(script), nil)
+		})
 		s.Require().NoError(err)
 		s.Assert().Equal(lib.CounterInitializedValue, result.(cadence.Int).Int())
 	})
