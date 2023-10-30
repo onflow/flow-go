@@ -262,7 +262,7 @@ func defaultInspectorSuite(rpcTracker p2p.RpcControlTracking) p2p.GossipSubRpcIn
 			return nil, fmt.Errorf("failed to create new control message valiadation inspector: %w", err)
 		}
 
-		return inspectorbuilder.NewGossipSubInspectorSuite([]p2p.GossipSubRPCInspector{metricsInspector, rpcValidationInspector}, notificationDistributor), nil
+		return inspectorbuilder.NewGossipSubInspectorSuite(metricsInspector, rpcValidationInspector, notificationDistributor), nil
 	}
 }
 
