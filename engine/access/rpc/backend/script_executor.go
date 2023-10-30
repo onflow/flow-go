@@ -31,6 +31,10 @@ func NewScriptExecutor() *ScriptExecutor {
 	}
 }
 
+func (s *ScriptExecutor) LatestHeight() uint64 {
+	return s.indexReporter.HighestIndexedHeight()
+}
+
 // InitReporter initializes the indexReporter and script executor
 // This method can be called at any time after the ScriptExecutor object is created. Any requests
 // made to the other methods will return execution.ErrDataNotAvailable until this method is called.

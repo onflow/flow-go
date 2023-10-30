@@ -48,7 +48,9 @@ func (b *backendAccounts) GetAccountAtLatestBlock(ctx context.Context, address f
 
 	sealedBlockID := sealed.ID()
 
-	account, err := b.getAccountAtBlock(ctx, address, sealedBlockID, sealed.Height)
+	height := b.scriptExecutor.LatestHeight()
+
+	account, err := b.getAccountAtBlock(ctx, address, sealedBlockID, height)
 	if err != nil {
 		b.log.Debug().Err(err).Msgf("failed to get account at blockID: %v", sealedBlockID)
 		return nil, err
