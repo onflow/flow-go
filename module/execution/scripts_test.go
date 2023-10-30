@@ -55,7 +55,7 @@ func (s *scriptTestSuite) TestScriptExecution() {
 	})
 
 	s.Run("Not Found Register", func() {
-		s.scripts.registersAtHeight = func(ID flow.RegisterID, height uint64) (flow.RegisterValue, error) {
+		s.scripts.registerAtHeight = func(ID flow.RegisterID, height uint64) (flow.RegisterValue, error) {
 			return nil, nil // intentionally return nil to check edge case
 		}
 
