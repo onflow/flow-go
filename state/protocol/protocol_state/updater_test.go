@@ -136,6 +136,7 @@ func (s *UpdaterSuite) TestSetInvalidStateTransitionAttempted() {
 // correctly behaves when invariants are violated.
 func (s *UpdaterSuite) TestProcessEpochCommit() {
 	s.Run("invalid counter", func() {
+		s.updater = NewUpdater(s.candidate.View, s.parentProtocolState)
 		commit := unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
 			commit.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 10 // set invalid counter for next epoch
 		})
@@ -144,6 +145,7 @@ func (s *UpdaterSuite) TestProcessEpochCommit() {
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 	})
 	s.Run("no next epoch protocol state", func() {
+		s.updater = NewUpdater(s.candidate.View, s.parentProtocolState)
 		commit := unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
 			commit.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
 		})
@@ -152,41 +154,41 @@ func (s *UpdaterSuite) TestProcessEpochCommit() {
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 	})
 	s.Run("invalid state transition attempted", func() {
-		updater := NewUpdater(s.candidate.View, s.parentProtocolState)
+		s.updater = NewUpdater(s.candidate.View, s.parentProtocolState)
 		setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
 			setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
 			setup.FirstView = s.parentProtocolState.CurrentEpochSetup.FinalView + 1
 			setup.FinalView = s.parentProtocolState.CurrentEpochSetup.FinalView + 1000
 		})
 		// processing setup event results in creating next epoch protocol state
-		err := updater.ProcessEpochSetup(setup)
+		err := s.updater.ProcessEpochSetup(setup)
 		require.NoError(s.T(), err)
 
-		updater.SetInvalidStateTransitionAttempted()
+		s.updater.SetInvalidStateTransitionAttempted()
 
 		commit := unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
 			commit.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
 		})
 
 		// processing epoch commit should be no-op since we have observed an invalid state transition
-		err = updater.ProcessEpochCommit(commit)
+		err = s.updater.ProcessEpochCommit(commit)
 		require.NoError(s.T(), err)
 
-		newState, _, _ := updater.Build()
-		require.Equal(s.T(), flow.ZeroID, newState.NextEpoch.CommitID, "operation must be no-op")
+		newState, _, _ := s.updater.Build()
+		require.Nil(s.T(), newState.NextEpoch, "operation must be no-op")
 	})
-	s.Run("happy path processing", func() {
-		updater := NewUpdater(s.candidate.View, s.parentProtocolState)
+	s.Run("conflicting epoch commit", func() {
+		s.updater = NewUpdater(s.candidate.View, s.parentProtocolState)
 		setup := unittest.EpochSetupFixture(
 			unittest.SetupWithCounter(s.parentProtocolState.CurrentEpochSetup.Counter+1),
 			unittest.WithFirstView(s.parentProtocolState.CurrentEpochSetup.FinalView+1),
 			unittest.WithFinalView(s.parentProtocolState.CurrentEpochSetup.FinalView+1000),
 		)
 		// processing setup event results in creating next epoch protocol state
-		err := updater.ProcessEpochSetup(setup)
+		err := s.updater.ProcessEpochSetup(setup)
 		require.NoError(s.T(), err)
 
-		updatedState, _, _ := updater.Build()
+		updatedState, _, _ := s.updater.Build()
 
 		parentState, err := flow.NewRichProtocolStateEntry(updatedState,
 			s.parentProtocolState.PreviousEpochSetup,
@@ -197,22 +199,57 @@ func (s *UpdaterSuite) TestProcessEpochCommit() {
 			nil,
 		)
 		require.NoError(s.T(), err)
-		updater = NewUpdater(s.candidate.View+1, parentState)
+		s.updater = NewUpdater(s.candidate.View+1, parentState)
 		commit := unittest.EpochCommitFixture(
 			unittest.CommitWithCounter(setup.Counter),
 			unittest.WithDKGFromParticipants(setup.Participants),
 		)
 
-		err = updater.ProcessEpochCommit(commit)
+		err = s.updater.ProcessEpochCommit(commit)
 		require.NoError(s.T(), err)
 
 		// processing another epoch commit has to be an error since we have already processed one
-		err = updater.ProcessEpochCommit(commit)
+		err = s.updater.ProcessEpochCommit(commit)
 		require.Error(s.T(), err)
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 
-		newState, _, _ := updater.Build()
-		require.Equal(s.T(), commit.ID(), newState.NextEpoch.CommitID, "next epoch must be committed")
+		newState, _, _ := s.updater.Build()
+		require.Equal(s.T(), flow.ZeroID, newState.NextEpoch.CommitID, "next epoch shouldn't be committed, "+
+			"since we have observed invalid state transition")
+	})
+	s.Run("happy path processing", func() {
+		s.updater = NewUpdater(s.candidate.View, s.parentProtocolState)
+		setup := unittest.EpochSetupFixture(
+			unittest.SetupWithCounter(s.parentProtocolState.CurrentEpochSetup.Counter+1),
+			unittest.WithFirstView(s.parentProtocolState.CurrentEpochSetup.FinalView+1),
+			unittest.WithFinalView(s.parentProtocolState.CurrentEpochSetup.FinalView+1000),
+		)
+		// processing setup event results in creating next epoch protocol state
+		err := s.updater.ProcessEpochSetup(setup)
+		require.NoError(s.T(), err)
+
+		updatedState, _, _ := s.updater.Build()
+
+		parentState, err := flow.NewRichProtocolStateEntry(updatedState,
+			s.parentProtocolState.PreviousEpochSetup,
+			s.parentProtocolState.PreviousEpochCommit,
+			s.parentProtocolState.CurrentEpochSetup,
+			s.parentProtocolState.CurrentEpochCommit,
+			setup,
+			nil,
+		)
+		require.NoError(s.T(), err)
+		s.updater = NewUpdater(s.candidate.View+1, parentState)
+		commit := unittest.EpochCommitFixture(
+			unittest.CommitWithCounter(setup.Counter),
+			unittest.WithDKGFromParticipants(setup.Participants),
+		)
+
+		err = s.updater.ProcessEpochCommit(commit)
+		require.NoError(s.T(), err)
+
+		newState, _, _ := s.updater.Build()
+		require.Equal(s.T(), commit.ID(), newState.NextEpoch.CommitID, "next epoch should be committed")
 	})
 }
 

@@ -46,7 +46,12 @@ func NewUpdater(view uint64, parentState *flow.RichProtocolStateEntry) *Updater 
 
 // Build returns updated protocol state entry, state ID and a flag indicating if there were any changes.
 func (u *Updater) Build() (updatedState *flow.ProtocolStateEntry, stateID flow.Identifier, hasChanges bool) {
-	updatedState = u.state.Copy()
+	if u.state.InvalidStateTransitionAttempted {
+		updatedState = u.parentState.ProtocolStateEntry.Copy()
+		updatedState.InvalidStateTransitionAttempted = true
+	} else {
+		updatedState = u.state.Copy()
+	}
 	stateID = updatedState.ID()
 	hasChanges = stateID != u.parentState.ID()
 	return
@@ -64,6 +69,23 @@ func (u *Updater) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
 	if u.state.InvalidStateTransitionAttempted {
 		return nil // won't process new events if we are in epoch fallback mode.
 	}
+
+	if err := u.processEpochSetup(epochSetup); err != nil {
+		u.SetInvalidStateTransitionAttempted()
+		return err
+	}
+	return nil
+}
+
+// processEpochSetup updates the protocol state with data from the epoch setup event.
+// Observing an epoch setup event also affects the identity table for current epoch:
+//   - it transitions the protocol state from Staking to Epoch Setup phase
+//   - we stop returning identities from previous+current epochs and instead returning identities from current+next epochs.
+//
+// As a result of this operation protocol state for the next epoch will be created.
+// Expected errors during normal operations:
+// - `protocol.InvalidServiceEventError` if the service event is invalid or is not a valid state transition for the current protocol state
+func (u *Updater) processEpochSetup(epochSetup *flow.EpochSetup) error {
 	err := protocol.IsValidExtendingEpochSetup(epochSetup, u.parentState.CurrentEpochSetup, u.parentState.EpochStatus())
 	if err != nil {
 		return fmt.Errorf("invalid epoch setup event: %w", err)
@@ -148,6 +170,20 @@ func (u *Updater) ProcessEpochCommit(epochCommit *flow.EpochCommit) error {
 	if u.state.InvalidStateTransitionAttempted {
 		return nil // won't process new events if we are going to enter epoch fallback mode
 	}
+	if err := u.processEpochCommit(epochCommit); err != nil {
+		u.SetInvalidStateTransitionAttempted()
+		return err
+	}
+	return nil
+}
+
+// processEpochCommit updates current protocol state with data from epoch commit event.
+// Observing an epoch setup commit, transitions protocol state from setup to commit phase, at this point we have
+// finished construction of the next epoch.
+// As a result of this operation protocol state for next epoch will be committed.
+// Expected errors during normal operations:
+// - `protocol.InvalidServiceEventError` if the service event is invalid or is not a valid state transition for the current protocol state
+func (u *Updater) processEpochCommit(epochCommit *flow.EpochCommit) error {
 	if u.state.NextEpoch == nil {
 		return protocol.NewInvalidServiceEventErrorf("protocol state has been setup yet")
 	}
