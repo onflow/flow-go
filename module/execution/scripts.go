@@ -44,6 +44,8 @@ type ScriptExecutor interface {
 		height uint64,
 	) ([]byte, error)
 
+	LatestHeight() uint64
+
 	// GetAccountAtBlockHeight returns a Flow account by the provided address and block height.
 	// Expected errors:
 	// - storage.ErrNotFound if block or register value at height was not found.
@@ -92,6 +94,10 @@ func NewScripts(
 		headers:           header,
 		registersAtHeight: registersAtHeight,
 	}, nil
+}
+
+func (s *Scripts) LatestHeight() uint64 {
+	panic(0)
 }
 
 // ExecuteAtBlockHeight executes provided script against the block height.

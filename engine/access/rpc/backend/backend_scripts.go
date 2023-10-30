@@ -52,7 +52,9 @@ func (b *backendScripts) ExecuteScriptAtLatestBlock(
 		return nil, status.Errorf(codes.Internal, "failed to get latest sealed header: %v", err)
 	}
 
-	return b.executeScript(ctx, latestHeader.ID(), latestHeader.Height, script, arguments)
+	height := b.scriptExecutor.LatestHeight()
+
+	return b.executeScript(ctx, latestHeader.ID(), height, script, arguments)
 }
 
 // ExecuteScriptAtBlockID executes provided script at the provided block ID.
