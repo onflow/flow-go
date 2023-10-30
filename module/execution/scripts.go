@@ -98,7 +98,7 @@ func NewScripts(
 // A result value is returned encoded as byte array. An error will be returned if script
 // doesn't successfully execute.
 // Expected errors:
-// - storage.ErrNotFound if block or register value at height was not found.
+// - Script execution related errors
 // - ErrDataNotAvailable if the data for the block height is not available
 func (s *Scripts) ExecuteAtBlockHeight(
 	ctx context.Context,
@@ -117,7 +117,7 @@ func (s *Scripts) ExecuteAtBlockHeight(
 
 // GetAccountAtBlockHeight returns a Flow account by the provided address and block height.
 // Expected errors:
-// - storage.ErrNotFound if block or register value at height was not found.
+// - Script execution related errors
 // - ErrDataNotAvailable if the data for the block height is not available
 func (s *Scripts) GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error) {
 	snap, header, err := s.snapshotWithBlock(height)
