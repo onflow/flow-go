@@ -252,20 +252,25 @@ func (s *AccessAPISuite) testExecuteScriptWithSimpleContract(client *client.Clie
 	script := lib.ReadCounterScript(serviceAccount.Address, serviceAccount.Address).ToCadence()
 
 	s.Run("execute at latest block", func() {
-		result, err := client.ExecuteScriptAtLatestBlock(s.ctx, []byte(script), nil)
+		result, err := s.waitScriptExecutionUntilIndexed(func() (cadence.Value, error) {
+			return client.ExecuteScriptAtLatestBlock(s.ctx, []byte(script), nil)
+		})
 		s.Require().NoError(err)
 		s.Assert().Equal(lib.CounterInitializedValue, result.(cadence.Int).Int())
 	})
 
 	s.Run("execute at block height", func() {
-		result, err := client.ExecuteScriptAtBlockHeight(s.ctx, header.Height, []byte(script), nil)
+		result, err := s.waitScriptExecutionUntilIndexed(func() (cadence.Value, error) {
+			return client.ExecuteScriptAtBlockHeight(s.ctx, header.Height, []byte(script), nil)
+		})
 		s.Require().NoError(err)
-
 		s.Assert().Equal(lib.CounterInitializedValue, result.(cadence.Int).Int())
 	})
 
 	s.Run("execute at block ID", func() {
-		result, err := client.ExecuteScriptAtBlockID(s.ctx, header.ID, []byte(script), nil)
+		result, err := s.waitScriptExecutionUntilIndexed(func() (cadence.Value, error) {
+			return client.ExecuteScriptAtBlockID(s.ctx, header.ID, []byte(script), nil)
+		})
 		s.Require().NoError(err)
 		s.Assert().Equal(lib.CounterInitializedValue, result.(cadence.Int).Int())
 	})
@@ -325,8 +330,7 @@ func (s *AccessAPISuite) waitAccountsUntilIndexed(get getAccount) (*sdk.Account,
 	var err error
 	s.Require().Eventually(func() bool {
 		account, err = get()
-		statusErr, ok := status.FromError(err)
-		return ok && statusErr.Code() != codes.OutOfRange
+		return notOutOfRangeError(err)
 	}, indexDelay, indexRetry)
 
 	return account, err
@@ -337,8 +341,7 @@ func (s *AccessAPISuite) waitScriptExecutionUntilIndexed(execute executeScript) 
 	var err error
 	s.Require().Eventually(func() bool {
 		val, err = execute()
-		statusErr, ok := status.FromError(err)
-		return ok && statusErr.Code() != codes.OutOfRange
+		return notOutOfRangeError(err)
 	}, indexDelay, indexRetry)
 
 	return val, err
@@ -355,4 +358,13 @@ func (s *AccessAPISuite) waitUntilIndexed(height uint64) {
 		_, err := s.an2Client.ExecuteScriptAtBlockHeight(s.ctx, height, []byte(simpleScript), nil)
 		return err == nil
 	}, 30*time.Second, 1*time.Second)
+}
+
+// make sure we either don't have an error or the error is not out of range error, since in that case we have to wait a bit longer for index to get synced
+func notOutOfRangeError(err error) bool {
+	statusErr, ok := status.FromError(err)
+	if !ok || err == nil {
+		return true
+	}
+	return statusErr.Code() != codes.OutOfRange
 }
