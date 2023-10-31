@@ -332,23 +332,23 @@ func (m *Manager) tryCreateStream(ctx context.Context, peerID peer.ID, protocol 
 // Unexpected errors during normal operations:
 //   - network.ErrIllegalConnectionState indicates bug in libpp2p when checking IsConnected status of peer.
 func (m *Manager) rawStreamWithProtocol(ctx context.Context, protocolID protocol.ID, peerID peer.ID, dialCfg *DialConfig) (libp2pnet.Stream, error) {
-	isConnected, err := m.connStatus.IsConnected(peerID)
-	if err != nil {
-		return nil, err
-	}
-
-	// check connection status and attempt to dial the peer if dialing is not in progress
-	if !isConnected {
-		// return error if we can't start dialing
-		if _, inProgress := m.peerDialing.LoadOrStore(peerID, struct{}{}); inProgress {
-			return nil, NewDialInProgressErr(peerID)
-		}
-		defer m.peerDialing.Delete(peerID)
-		err := m.dialPeer(ctx, peerID, dialCfg)
-		if err != nil {
-			return nil, err
-		}
-	}
+	// isConnected, err := m.connStatus.IsConnected(peerID)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	//
+	// // check connection status and attempt to dial the peer if dialing is not in progress
+	// if !isConnected {
+	// 	// return error if we can't start dialing
+	// 	if _, inProgress := m.peerDialing.LoadOrStore(peerID, struct{}{}); inProgress {
+	// 		// return nil, NewDialInProgressErr(peerID)
+	// 	}
+	// 	defer m.peerDialing.Delete(peerID)
+	// 	err := m.dialPeer(ctx, peerID, dialCfg)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// }
 
 	// at this point dialing should have completed, we are already connected we can attempt to create the stream
 	s, err := m.rawStream(ctx, peerID, protocolID, dialCfg)
@@ -444,7 +444,7 @@ func (m *Manager) rawStream(ctx context.Context, peerID peer.ID, protocolID prot
 		var err error
 		// add libp2p context value NoDial to prevent the underlying host from dialingComplete the peer while creating the stream
 		// we've already ensured that a connection already exists.
-		ctx = libp2pnet.WithNoDial(ctx, "application ensured connection to peer exists")
+		// ctx = libp2pnet.WithNoDial(ctx, "application ensured connection to peer exists")
 		// creates stream using stream factory
 		s, err = m.streamFactory.NewStream(ctx, peerID, protocolID)
 		if err != nil {

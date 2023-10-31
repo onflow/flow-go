@@ -29,17 +29,17 @@ func notEjectedPeerFilter(idProvider module.IdentityProvider) p2p.PeerFilter {
 	}
 }
 
-type limitConfigLogger struct {
+type LimitConfigLogger struct {
 	logger zerolog.Logger
 }
 
-// newLimitConfigLogger creates a new limitConfigLogger.
-func newLimitConfigLogger(logger zerolog.Logger) *limitConfigLogger {
-	return &limitConfigLogger{logger: logger}
+// NewLimitConfigLogger creates a new LimitConfigLogger.
+func NewLimitConfigLogger(logger zerolog.Logger) *LimitConfigLogger {
+	return &LimitConfigLogger{logger: logger}
 }
 
 // withBaseLimit appends the base limit to the logger with the given prefix.
-func (l *limitConfigLogger) withBaseLimit(prefix string, baseLimit rcmgr.ResourceLimits) zerolog.Logger {
+func (l *LimitConfigLogger) withBaseLimit(prefix string, baseLimit rcmgr.ResourceLimits) zerolog.Logger {
 	return l.logger.With().
 		Str("key", keyResourceManagerLimit).
 		Str(fmt.Sprintf("%s_streams", prefix), fmt.Sprintf("%v", baseLimit.Streams)).
@@ -52,7 +52,7 @@ func (l *limitConfigLogger) withBaseLimit(prefix string, baseLimit rcmgr.Resourc
 		Str(fmt.Sprintf("%s_memory", prefix), fmt.Sprintf("%v", baseLimit.Memory)).Logger()
 }
 
-func (l *limitConfigLogger) LogResourceManagerLimits(config rcmgr.ConcreteLimitConfig) {
+func (l *LimitConfigLogger) LogResourceManagerLimits(config rcmgr.ConcreteLimitConfig) {
 	// PartialLimit config is the same as ConcreteLimit config, but with the exported fields.
 	pCfg := config.ToPartialLimitConfig()
 	l.logGlobalResourceLimits(pCfg)
@@ -62,7 +62,7 @@ func (l *limitConfigLogger) LogResourceManagerLimits(config rcmgr.ConcreteLimitC
 	l.logPeerProtocolLimits(pCfg.ProtocolPeer)
 }
 
-func (l *limitConfigLogger) logGlobalResourceLimits(config rcmgr.PartialLimitConfig) {
+func (l *LimitConfigLogger) logGlobalResourceLimits(config rcmgr.PartialLimitConfig) {
 	lg := l.withBaseLimit("system", config.System)
 	lg.Info().Msg("system limits set")
 
@@ -97,28 +97,28 @@ func (l *limitConfigLogger) logGlobalResourceLimits(config rcmgr.PartialLimitCon
 	lg.Info().Msg("stream limits set")
 }
 
-func (l *limitConfigLogger) logServiceLimits(s map[string]rcmgr.ResourceLimits) {
+func (l *LimitConfigLogger) logServiceLimits(s map[string]rcmgr.ResourceLimits) {
 	for sName, sLimits := range s {
 		lg := l.withBaseLimit(fmt.Sprintf("service_%s", sName), sLimits)
 		lg.Info().Msg("service limits set")
 	}
 }
 
-func (l *limitConfigLogger) logProtocolLimits(p map[protocol.ID]rcmgr.ResourceLimits) {
+func (l *LimitConfigLogger) logProtocolLimits(p map[protocol.ID]rcmgr.ResourceLimits) {
 	for pName, pLimits := range p {
 		lg := l.withBaseLimit(fmt.Sprintf("protocol_%s", pName), pLimits)
 		lg.Info().Msg("protocol limits set")
 	}
 }
 
-func (l *limitConfigLogger) logPeerLimits(p map[peer.ID]rcmgr.ResourceLimits) {
+func (l *LimitConfigLogger) logPeerLimits(p map[peer.ID]rcmgr.ResourceLimits) {
 	for pId, pLimits := range p {
 		lg := l.withBaseLimit(fmt.Sprintf("peer_%s", p2plogging.PeerId(pId)), pLimits)
 		lg.Info().Msg("peer limits set")
 	}
 }
 
-func (l *limitConfigLogger) logPeerProtocolLimits(p map[protocol.ID]rcmgr.ResourceLimits) {
+func (l *LimitConfigLogger) logPeerProtocolLimits(p map[protocol.ID]rcmgr.ResourceLimits) {
 	for pName, pLimits := range p {
 		lg := l.withBaseLimit(fmt.Sprintf("protocol_peer_%s", pName), pLimits)
 		lg.Info().Msg("protocol peer limits set")

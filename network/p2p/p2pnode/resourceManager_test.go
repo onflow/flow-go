@@ -15,9 +15,11 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/internal/p2putils"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -212,6 +214,185 @@ func TestCreateStream_MaxSystemLimit(t *testing.T) {
 	base := baseCreateStreamInboundStreamResourceLimitConfig()
 	base.maxInboundStreamSystem = math.MaxInt
 	testCreateStreamInboundStreamResourceLimits(t, base)
+}
+
+func TestCreateStream_MaxStreamOnConnection(t *testing.T) {
+	idProvider := mockmodule.NewIdentityProvider(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+
+	sporkID := unittest.IdentifierFixture()
+
+	// sender nodes will have infinite stream limit to ensure that they can create as many streams as they want.
+	resourceManagerSnd, err := rcmgr.NewResourceManager(rcmgr.NewFixedLimiter(rcmgr.InfiniteLimits))
+	require.NoError(t, err)
+	sender, senderId := p2ptest.NodeFixture(t,
+		sporkID,
+		t.Name(),
+		idProvider,
+		p2ptest.WithResourceManager(resourceManagerSnd),
+		p2ptest.WithCreateStreamRetryDelay(10*time.Millisecond))
+
+	// receiver node will run with default limits and no scaling.
+	limits := rcmgr.DefaultLimits
+	infinite := rcmgr.InfiniteLimits.ToPartialLimitConfig()
+	libp2p.SetDefaultServiceLimits(&limits)
+	l := limits.AutoScale()
+	connInbound := rcmgr.LimitVal(1)
+	streamLimit := rcmgr.LimitVal(100_000)
+	partial := rcmgr.PartialLimitConfig{
+		System: rcmgr.ResourceLimits{
+			Memory:          infinite.PeerDefault.Memory,
+			Conns:           connInbound,
+			ConnsInbound:    connInbound,
+			Streams:         streamLimit,
+			StreamsInbound:  streamLimit,
+			StreamsOutbound: streamLimit,
+		},
+		AllowlistedSystem: rcmgr.ResourceLimits{
+			Memory:          infinite.PeerDefault.Memory,
+			Streams:         streamLimit,
+			StreamsInbound:  streamLimit,
+			StreamsOutbound: streamLimit,
+			Conns:           connInbound,
+			ConnsInbound:    connInbound,
+			ConnsOutbound:   1,
+			FD:              streamLimit,
+		},
+		AllowlistedTransient: rcmgr.ResourceLimits{
+			Memory:          infinite.PeerDefault.Memory,
+			Streams:         streamLimit,
+			StreamsInbound:  streamLimit,
+			StreamsOutbound: streamLimit,
+			Conns:           connInbound,
+			ConnsInbound:    connInbound,
+			ConnsOutbound:   1,
+			FD:              streamLimit,
+		},
+		Transient: rcmgr.ResourceLimits{
+			Memory:          infinite.PeerDefault.Memory,
+			Conns:           connInbound,
+			ConnsInbound:    connInbound,
+			Streams:         streamLimit,
+			StreamsInbound:  streamLimit,
+			StreamsOutbound: streamLimit,
+		},
+		ProtocolDefault: rcmgr.ResourceLimits{
+			Memory:          infinite.PeerDefault.Memory,
+			Conns:           connInbound,
+			ConnsInbound:    connInbound,
+			Streams:         streamLimit,
+			StreamsInbound:  streamLimit,
+			StreamsOutbound: streamLimit,
+		},
+		ProtocolPeerDefault: rcmgr.ResourceLimits{
+			Memory:          infinite.PeerDefault.Memory,
+			Conns:           connInbound,
+			ConnsInbound:    connInbound,
+			Streams:         streamLimit,
+			StreamsInbound:  streamLimit,
+			StreamsOutbound: streamLimit,
+		},
+		PeerDefault: rcmgr.ResourceLimits{
+			// Memory:          infinite.PeerDefault.Memory,
+			Conns:           connInbound,
+			ConnsInbound:    connInbound,
+			Streams:         streamLimit,
+			StreamsInbound:  streamLimit,
+			StreamsOutbound: streamLimit,
+		},
+		Conn: rcmgr.ResourceLimits{
+			Memory:          1,
+			FD:              1,
+			StreamsInbound:  0,
+			Streams:         0,
+			StreamsOutbound: 0,
+		},
+		Stream: rcmgr.ResourceLimits{
+			Memory:          1,
+			FD:              0,
+			StreamsInbound:  1,
+			StreamsOutbound: 1,
+			Streams:         1,
+		},
+	}
+	l = partial.Build(l)
+	p2pbuilder.NewLimitConfigLogger(unittest.Logger()).LogResourceManagerLimits(l)
+	resourceManagerRcv, err := rcmgr.NewResourceManager(rcmgr.NewFixedLimiter(l),
+		rcmgr.WithMetrics(metrics.NewLibP2PResourceManagerMetrics(unittest.Logger(), "private")))
+	require.NoError(t, err)
+	receiver, id2 := p2ptest.NodeFixture(t,
+		sporkID,
+		t.Name(),
+		idProvider,
+		p2ptest.WithResourceManager(resourceManagerRcv),
+		p2ptest.WithCreateStreamRetryDelay(10*time.Millisecond))
+
+	idProvider.On("ByPeerID", sender.ID()).Return(&senderId, true).Maybe()
+	idProvider.On("ByPeerID", receiver.ID()).Return(&id2, true).Maybe()
+
+	nodes := []p2p.LibP2PNode{sender, receiver}
+	ids := flow.IdentityList{&senderId, &id2}
+
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
+
+	p2ptest.LetNodesDiscoverEachOther(t, signalerCtx, nodes, ids)
+
+	loadLimit := int(streamLimit) - 10
+	wg := sync.WaitGroup{}
+	streamCtx, streamCtxCancel := context.WithCancel(ctx)
+	defer streamCtxCancel()
+
+	dontCheckErr := make(chan struct{})
+
+	for i := 0; i < loadLimit; i++ {
+		wg.Add(1)
+		go func() {
+			err := sender.OpenProtectedStream(ctx, receiver.ID(), t.Name(), func(stream network.Stream) error {
+				wg.Done()
+				<-streamCtx.Done()
+				return nil
+			})
+
+			select {
+			case <-dontCheckErr:
+			default:
+				if err != nil {
+					require.Contains(t, err.Error(), "context canceled")
+				}
+			}
+		}()
+	}
+
+	unittest.RequireReturnsBefore(t, wg.Wait, 10*time.Second, "could not create streams on time")
+	close(dontCheckErr)
+
+	require.Eventually(t, func() bool {
+		inbound := p2putils.CountStream(receiver.Host(), sender.ID(), p2putils.Direction(network.DirInbound))
+		outbound := p2putils.CountStream(sender.Host(), receiver.ID(), p2putils.Direction(network.DirOutbound))
+		inboundConnection := len(receiver.Host().Network().ConnsToPeer(sender.ID()))
+		outboundConnection := len(sender.Host().Network().ConnsToPeer(receiver.ID()))
+
+		if inbound < loadLimit {
+			fmt.Println("inbound", inbound, "outbound", outbound)
+			return false
+		}
+
+		if inbound != outbound {
+			fmt.Println("inbound", inbound, "outbound", outbound)
+			return false
+		}
+
+		if inboundConnection != outboundConnection {
+			fmt.Println("inboundConnection", inboundConnection, "outboundConnection", outboundConnection)
+			return false
+		}
+
+		fmt.Println("inbound", inbound, "outbound", outbound, "inboundConnection", inboundConnection, "outboundConnection", outboundConnection)
+		return true
+	}, 10*time.Second, 10*time.Millisecond, "could not create streams on time")
 }
 
 func TestCreateStream_DefaultConfigWithUnknownProtocol(t *testing.T) {
