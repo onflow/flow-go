@@ -29,15 +29,14 @@ func (_m *StateMutator) ApplyServiceEvents(seals []*flow.Seal) error {
 }
 
 // Build provides a mock function with given fields:
-func (_m *StateMutator) Build() (bool, *flow.ProtocolStateEntry, flow.Identifier, []func(*transaction.Tx) error, error) {
+func (_m *StateMutator) Build() (bool, *flow.ProtocolStateEntry, flow.Identifier, []func(*transaction.Tx) error) {
 	ret := _m.Called()
 
 	var r0 bool
 	var r1 *flow.ProtocolStateEntry
 	var r2 flow.Identifier
 	var r3 []func(*transaction.Tx) error
-	var r4 error
-	if rf, ok := ret.Get(0).(func() (bool, *flow.ProtocolStateEntry, flow.Identifier, []func(*transaction.Tx) error, error)); ok {
+	if rf, ok := ret.Get(0).(func() (bool, *flow.ProtocolStateEntry, flow.Identifier, []func(*transaction.Tx) error)); ok {
 		return rf()
 	}
 	if rf, ok := ret.Get(0).(func() bool); ok {
@@ -70,13 +69,7 @@ func (_m *StateMutator) Build() (bool, *flow.ProtocolStateEntry, flow.Identifier
 		}
 	}
 
-	if rf, ok := ret.Get(4).(func() error); ok {
-		r4 = rf()
-	} else {
-		r4 = ret.Error(4)
-	}
-
-	return r0, r1, r2, r3, r4
+	return r0, r1, r2, r3
 }
 
 type mockConstructorTestingTNewStateMutator interface {

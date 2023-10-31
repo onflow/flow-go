@@ -2687,7 +2687,7 @@ func calculateExpectedStateId(t *testing.T, mutableProtocolState realprotocol.Mu
 		err = stateMutator.ApplyServiceEvents(seals)
 		require.NoError(t, err)
 
-		_, _, expectedStateID, _, err := stateMutator.Build()
+		_, _, expectedStateID, _ := stateMutator.Build()
 		require.NoError(t, err)
 		return expectedStateID
 	}

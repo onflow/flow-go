@@ -75,7 +75,7 @@ func NewMutableProtocolState(
 	}
 }
 
-// Mutator instantiates a `StateMutator` based on the previous protocol state.
+// Mutator instantiates a `protocol.StateMutator` based on the previous protocol state.
 // Has to be called for each block to evolve the protocol state.
 // Expected errors during normal operations:
 //   - `storage.ErrNotFound` if no protocol state for parent block is known.
@@ -84,6 +84,6 @@ func (s *MutableProtocolState) Mutator(candidateView uint64, parentID flow.Ident
 	if err != nil {
 		return nil, fmt.Errorf("could not query parent protocol state at block (%x): %w", parentID, err)
 	}
-	stateMachine := NewStateMachine(candidateView, parentState)
-	return NewMutator(s.headers, s.results, s.setups, s.commits, stateMachine, s.params), nil
+	return newStateMutator(s.headers, s.results, s.setups, s.commits,
+		newStateMachine(candidateView, parentState), s.params), nil
 }

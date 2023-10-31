@@ -93,7 +93,7 @@ type StateMutator interface {
 	//  - stateID: the has commitment to the `updatedState`
 	//  - dbUpdates: database updates necessary for persisting the updated protocol state
 	// updated protocol state entry, state ID and a flag indicating if there were any changes.
-	Build() (hasChanges bool, updatedState *flow.ProtocolStateEntry, stateID flow.Identifier, dbUpdates []func(tx *transaction.Tx) error, err error)
+	Build() (hasChanges bool, updatedState *flow.ProtocolStateEntry, stateID flow.Identifier, dbUpdates []func(tx *transaction.Tx) error)
 
 	// ApplyServiceEvents handles applying state changes which occur as a result
 	// of service events being included in a block payload.

@@ -374,7 +374,7 @@ func (builder *EpochBuilder) addBlock(block *flow.Block) {
 	err = stateMutator.ApplyServiceEvents(block.Payload.Seals)
 	require.NoError(builder.t, err)
 
-	_, _, updatedStateId, _, err := stateMutator.Build()
+	_, _, updatedStateId, _ := stateMutator.Build()
 	require.NoError(builder.t, err)
 
 	block.Payload.ProtocolStateID = updatedStateId

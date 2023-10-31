@@ -519,7 +519,7 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, certi
 		return fmt.Errorf("could not process service events: %w", err)
 	}
 
-	hasChanges, updatedState, updatedStateID, dbUpdates, err := stateMutator.Build()
+	hasChanges, updatedState, updatedStateID, dbUpdates := stateMutator.Build()
 	if err != nil {
 		return fmt.Errorf("could not build updated protocol state: %w", err)
 	}

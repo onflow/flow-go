@@ -11,11 +11,11 @@ import (
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
-// Mutator implements protocol.StateMutator interface.
+// stateMutator implements protocol.StateMutator interface.
 // It has to be used for each block to update the protocol state, even if there are no state-changing
 // service events sealed in candidate block. This requirement is due to the fact that protocol state
 // is indexed by block ID, and we need to maintain such index.
-type Mutator struct {
+type stateMutator struct {
 	headers          storage.Headers
 	results          storage.ExecutionResults
 	setups           storage.EpochSetups
@@ -25,17 +25,17 @@ type Mutator struct {
 	pendingDbUpdates []func(tx *transaction.Tx) error
 }
 
-var _ protocol.StateMutator = (*Mutator)(nil)
+var _ protocol.StateMutator = (*stateMutator)(nil)
 
-func NewMutator(
+func newStateMutator(
 	headers storage.Headers,
 	results storage.ExecutionResults,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 	stateMachine ProtocolStateMachine,
 	params protocol.InstanceParams,
-) *Mutator {
-	return &Mutator{
+) *stateMutator {
+	return &stateMutator{
 		setups:       setups,
 		params:       params,
 		headers:      headers,
@@ -52,7 +52,7 @@ func NewMutator(
 //   - dbUpdates: database updates necessary for persisting the updated protocol state
 //
 // updated protocol state entry, state ID and a flag indicating if there were any changes.
-func (m *Mutator) Build() (hasChanges bool, updatedState *flow.ProtocolStateEntry, stateID flow.Identifier, dbUpdates []func(tx *transaction.Tx) error, err error) {
+func (m *stateMutator) Build() (hasChanges bool, updatedState *flow.ProtocolStateEntry, stateID flow.Identifier, dbUpdates []func(tx *transaction.Tx) error) {
 	updatedState, stateID, hasChanges = m.stateMachine.Build()
 	dbUpdates = m.pendingDbUpdates
 	return
@@ -62,7 +62,7 @@ func (m *Mutator) Build() (hasChanges bool, updatedState *flow.ProtocolStateEntr
 // of service events being included in a block payload.
 // All updates that are incorporated in service events are applied to the protocol state by mutating protocol state updater.
 // No errors are expected during normal operation.
-func (m *Mutator) ApplyServiceEvents(seals []*flow.Seal) error {
+func (m *stateMutator) ApplyServiceEvents(seals []*flow.Seal) error {
 	dbUpdates, err := m.handleServiceEvents(seals)
 	if err != nil {
 		return err
@@ -104,7 +104,7 @@ func (m *Mutator) ApplyServiceEvents(seals []*flow.Seal) error {
 //     This includes operations to insert service events for blocks that include them.
 //
 // No errors are expected during normal operation.
-func (m *Mutator) handleServiceEvents(seals []*flow.Seal) (dbUpdates []func(*transaction.Tx) error, err error) {
+func (m *stateMutator) handleServiceEvents(seals []*flow.Seal) (dbUpdates []func(*transaction.Tx) error, err error) {
 	epochFallbackTriggered, err := m.params.EpochFallbackTriggered()
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve epoch fallback status: %w", err)
