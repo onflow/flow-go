@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/md5" //nolint:gosec
 	"errors"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -38,6 +39,7 @@ type backendScripts struct {
 	nodeCommunicator  Communicator
 	scriptExecutor    execution.ScriptExecutor
 	scriptExecMode    ScriptExecutionMode
+	SignalCtx         irrecoverable.SignalerContext
 }
 
 // ExecuteScriptAtLatestBlock executes provided script at the latest sealed block.
@@ -49,6 +51,7 @@ func (b *backendScripts) ExecuteScriptAtLatestBlock(
 	latestHeader, err := b.state.Sealed().Head()
 	if err != nil {
 		// the latest sealed header MUST be available
+		b.SignalCtx.Throw(err)
 		return nil, status.Errorf(codes.Internal, "failed to get latest sealed header: %v", err)
 	}
 

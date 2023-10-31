@@ -129,6 +129,10 @@ func NewBuilder(log zerolog.Logger,
 		AddWorker(eng.serveREST).
 		AddWorker(finalizedCacheWorker).
 		AddWorker(backendNotifierWorker).
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			backend.HandleInconsistentProtocolState(ctx)
+			ready()
+		}).
 		AddWorker(eng.shutdownWorker).
 		Build()
 

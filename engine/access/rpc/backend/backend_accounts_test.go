@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"testing"
 
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
@@ -44,6 +45,9 @@ type BackendAccountsSuite struct {
 	block          *flow.Block
 	account        *flow.Account
 	failingAddress flow.Address
+
+	ctx    irrecoverable.SignalerContext
+	cancel context.CancelFunc
 }
 
 func TestBackendAccountsSuite(t *testing.T) {
@@ -72,9 +76,11 @@ func (s *BackendAccountsSuite) SetupTest() {
 	s.Require().NoError(err)
 
 	s.failingAddress = unittest.AddressFixture()
+	s.ctx, s.cancel = irrecoverable.NewMockSignalerContextWithCancel(s.T(), context.Background())
 }
 
 func (s *BackendAccountsSuite) defaultBackend() *backendAccounts {
+
 	return &backendAccounts{
 		log:               s.log,
 		state:             s.state,
@@ -82,6 +88,7 @@ func (s *BackendAccountsSuite) defaultBackend() *backendAccounts {
 		executionReceipts: s.receipts,
 		connFactory:       s.connectionFactory,
 		nodeCommunicator:  NewNodeCommunicator(false),
+		SignalCtx:         s.ctx,
 	}
 }
 
@@ -313,6 +320,36 @@ func (s *BackendAccountsSuite) TestGetAccountFromFailover_ReturnsENErrors() {
 
 	s.Run("GetAccountAtBlockHeight - fails with backend err", func() {
 		s.testGetAccountAtBlockHeight(ctx, backend, statusCode)
+	})
+}
+
+// TestGetAccountFromStorage_Fails tests that errors received from local storage are handled
+// and converted to the appropriate status code
+func (s *BackendAccountsSuite) TestGetAccountState_Fails() {
+	ctx := context.Background()
+
+	scriptExecutor := execmock.NewScriptExecutor(s.T())
+
+	backend := s.defaultBackend()
+	backend.scriptExecMode = ScriptExecutionModeLocalOnly
+	backend.scriptExecutor = scriptExecutor
+
+	s.Run(fmt.Sprintf("GetAccountAtLatestBlock - fails with %v", "head failed"), func() { //TODO: change
+		s.state.On("Sealed").Return(s.snapshot, nil).Once()
+		s.snapshot.On("Head").Return(nil, fmt.Errorf("head error")).Once()
+
+		//defer func() {
+		//	if r := recover(); r != nil {
+		//		// Check if the panic was due to runtime.Goexit().
+		//		if r != nil {
+		//			// Handle the case where runtime.Goexit was called.
+		//			s.T().Logf("Caught runtime.Goexit()")
+		//		}
+		//	}
+		//}()
+		//backend.GetAccountAtLatestBlock(ctx, s.failingAddress)
+
+		s.Assert().Panics(func() { backend.GetAccountAtLatestBlock(ctx, s.failingAddress) }, "head failed")
 	})
 }
 

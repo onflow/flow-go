@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/md5" //nolint:gosec
 	"fmt"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -75,7 +76,8 @@ type Backend struct {
 	connFactory       connection.ConnectionFactory
 
 	// cache the response to GetNodeVersionInfo since it doesn't change
-	nodeInfo *access.NodeVersionInfo
+	nodeInfo  *access.NodeVersionInfo
+	SignalCtx irrecoverable.SignalerContext
 }
 
 type Params struct {
@@ -216,6 +218,15 @@ func New(params Params) (*Backend, error) {
 	}
 
 	return b, nil
+}
+
+func (b *Backend) HandleInconsistentProtocolState(ctx irrecoverable.SignalerContext) {
+	b.backendTransactions.SignalCtx = ctx
+	b.backendAccounts.SignalCtx = ctx
+	b.backendBlockDetails.SignalCtx = ctx
+	b.backendBlockHeaders.SignalCtx = ctx
+	b.backendEvents.SignalCtx = ctx
+	b.backendScripts.SignalCtx = ctx
 }
 
 // NewCache constructs cache for storing connections to other nodes.
