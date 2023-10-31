@@ -2,19 +2,19 @@ package protocol_state
 
 import (
 	"errors"
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/storage/badger/transaction"
-	"github.com/onflow/flow-go/utils/rand"
-	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/require"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/mock"
 	protocolstatemock "github.com/onflow/flow-go/state/protocol/protocol_state/mock"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 	storagemock "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/utils/rand"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestProtocolStateMutator(t *testing.T) {
