@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/metrics"
-	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	unicastcache "github.com/onflow/flow-go/network/p2p/unicast/cache"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -59,8 +58,8 @@ func TestDialConfigCache_Adjust_Init(t *testing.T) {
 	require.NotNil(t, cache)
 	require.Zerof(t, cache.Size(), "cache size must be 0")
 
-	peerID1 := p2ptest.PeerIdFixture(t)
-	peerID2 := p2ptest.PeerIdFixture(t)
+	peerID1 := unittest.PeerIdFixture(t)
+	peerID2 := unittest.PeerIdFixture(t)
 
 	// Initializing the dial config for peerID1 through GetOrInit.
 	// dial config for peerID1 does not exist in the cache, so it must be initialized when using GetOrInit.
@@ -128,7 +127,7 @@ func TestDialConfigCache_Concurrent_Adjust(t *testing.T) {
 
 	peerIds := make([]peer.ID, sizeLimit)
 	for i := 0; i < int(sizeLimit); i++ {
-		peerId := p2ptest.PeerIdFixture(t)
+		peerId := unittest.PeerIdFixture(t)
 		require.NotContainsf(t, peerIds, peerId, "peer id must be unique")
 		peerIds[i] = peerId
 	}
@@ -188,7 +187,7 @@ func TestConcurrent_Adjust_And_Get_Is_Safe(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			peerId := p2ptest.PeerIdFixture(t)
+			peerId := unittest.PeerIdFixture(t)
 			dialTime := time.Now()
 			updatedConfig, err := cache.Adjust(peerId, func(cfg unicast.DialConfig) (unicast.DialConfig, error) {
 				cfg.DialRetryAttemptBudget = 1 // some random adjustment
@@ -210,7 +209,7 @@ func TestConcurrent_Adjust_And_Get_Is_Safe(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			wg.Done()
-			peerId := p2ptest.PeerIdFixture(t)
+			peerId := unittest.PeerIdFixture(t)
 			cfg, err := cache.GetOrInit(peerId)
 			require.NoError(t, err)                                                                  // concurrent retrieval must not fail.
 			require.Equal(t, dialConfigFixture().DialRetryAttemptBudget, cfg.DialRetryAttemptBudget) // dial config must be initialized with the default values.
@@ -238,7 +237,7 @@ func TestDialConfigCache_LRU_Eviction(t *testing.T) {
 
 	peerIds := make([]peer.ID, sizeLimit+1)
 	for i := 0; i < int(sizeLimit+1); i++ {
-		peerId := p2ptest.PeerIdFixture(t)
+		peerId := unittest.PeerIdFixture(t)
 		require.NotContainsf(t, peerIds, peerId, "peer id must be unique")
 		peerIds[i] = peerId
 	}
