@@ -240,7 +240,7 @@ func TestCreateStream_MaxStreamOnConnection(t *testing.T) {
 	libp2p.SetDefaultServiceLimits(&limits)
 	l := limits.AutoScale()
 	connInbound := rcmgr.LimitVal(1)
-	streamLimit := rcmgr.LimitVal(100_000)
+	streamLimit := rcmgr.LimitVal(10_000)
 	partial := rcmgr.PartialLimitConfig{
 		System: rcmgr.ResourceLimits{
 			Memory:          infinite.PeerDefault.Memory,
@@ -295,7 +295,7 @@ func TestCreateStream_MaxStreamOnConnection(t *testing.T) {
 			StreamsOutbound: streamLimit,
 		},
 		PeerDefault: rcmgr.ResourceLimits{
-			// Memory:          infinite.PeerDefault.Memory,
+			Memory:          infinite.PeerDefault.Memory,
 			Conns:           connInbound,
 			ConnsInbound:    connInbound,
 			Streams:         streamLimit,
@@ -303,11 +303,11 @@ func TestCreateStream_MaxStreamOnConnection(t *testing.T) {
 			StreamsOutbound: streamLimit,
 		},
 		Conn: rcmgr.ResourceLimits{
-			Memory:          1,
+			Memory:          infinite.PeerDefault.Memory,
 			FD:              1,
-			StreamsInbound:  0,
-			Streams:         0,
-			StreamsOutbound: 0,
+			StreamsInbound:  1000,
+			Streams:         1000,
+			StreamsOutbound: 1000,
 		},
 		Stream: rcmgr.ResourceLimits{
 			Memory:          1,
