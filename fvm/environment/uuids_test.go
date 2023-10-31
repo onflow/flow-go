@@ -115,8 +115,9 @@ func testUUIDGenerator(t *testing.T, blockHeader *flow.Header, txnIndex uint32) 
 	generator.maybeInitializePartition()
 
 	partition := generator.partition
-	partitionMinValue := uint64(partition) << 56
-	maxUint56 := uint64(72057594037927935) // (1 << 56) - 1
+	partitionMinValue := uint64(partition) << 40
+	maxUint56 := uint64(0xFFFFFFFFFFFFFF)
+	maxUint56Split := uint64(0xFFFF00FFFFFFFFFF)
 
 	t.Run(
 		fmt.Sprintf("basic get and set uint (partition: %d)", partition),
@@ -249,8 +250,8 @@ func testUUIDGenerator(t *testing.T, blockHeader *flow.Header, txnIndex uint32) 
 
 			value, err := uuids.GenerateUUID()
 			require.NoError(t, err)
-			require.Equal(t, value, partitionMinValue+maxUint56-1)
-			require.Equal(t, value, partitionMinValue|(maxUint56-1))
+			require.Equal(t, value, partitionMinValue+maxUint56Split-1)
+			require.Equal(t, value, partitionMinValue|(maxUint56Split-1))
 
 			value, err = uuids.getUint64()
 			require.NoError(t, err)
@@ -282,7 +283,7 @@ func TestUUIDGeneratorHardcodedPartitionIdGeneration(t *testing.T) {
 
 	value, err := uuids.GenerateUUID()
 	require.NoError(t, err)
-	require.Equal(t, value, uint64(0xde00000000000000))
+	require.Equal(t, value, uint64(0x0000de0000000000))
 
 	value, err = uuids.getUint64()
 	require.NoError(t, err)
@@ -290,7 +291,7 @@ func TestUUIDGeneratorHardcodedPartitionIdGeneration(t *testing.T) {
 
 	value, err = uuids.GenerateUUID()
 	require.NoError(t, err)
-	require.Equal(t, value, uint64(0xde00000000000001))
+	require.Equal(t, value, uint64(0x0000de0000000001))
 
 	value, err = uuids.getUint64()
 	require.NoError(t, err)
@@ -298,7 +299,7 @@ func TestUUIDGeneratorHardcodedPartitionIdGeneration(t *testing.T) {
 
 	value, err = uuids.GenerateUUID()
 	require.NoError(t, err)
-	require.Equal(t, value, uint64(0xde00000000000002))
+	require.Equal(t, value, uint64(0x0000de0000000002))
 
 	value, err = uuids.getUint64()
 	require.NoError(t, err)
@@ -306,7 +307,7 @@ func TestUUIDGeneratorHardcodedPartitionIdGeneration(t *testing.T) {
 
 	// pretend we increamented the counter up to cafBad
 	cafBad := uint64(0x1c2a3f4b5a6d70)
-	decafBad := uint64(0xde1c2a3f4b5a6d70)
+	decafBad := uint64(0x1c2ade3f4b5a6d70)
 
 	err = uuids.setUint56(cafBad)
 	require.NoError(t, err)
@@ -328,7 +329,7 @@ func TestUUIDGeneratorHardcodedPartitionIdGeneration(t *testing.T) {
 
 	value, err = uuids.GenerateUUID()
 	require.NoError(t, err)
-	require.Equal(t, value, uint64(0xdefffffffffffffd))
+	require.Equal(t, value, uint64(0xffffdefffffffffd))
 
 	value, err = uuids.getUint64()
 	require.NoError(t, err)
@@ -336,7 +337,7 @@ func TestUUIDGeneratorHardcodedPartitionIdGeneration(t *testing.T) {
 
 	value, err = uuids.GenerateUUID()
 	require.NoError(t, err)
-	require.Equal(t, value, uint64(0xdefffffffffffffe))
+	require.Equal(t, value, uint64(0xffffdefffffffffe))
 
 	value, err = uuids.getUint64()
 	require.NoError(t, err)
