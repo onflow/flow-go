@@ -32,7 +32,6 @@ type Client struct {
 	accountKey     *sdk.AccountKey
 	accountKeyPriv sdkcrypto.PrivateKey
 	signer         sdkcrypto.InMemorySigner
-	seqNo          uint64
 	Chain          flow.Chain
 	account        *sdk.Account
 }
@@ -63,7 +62,6 @@ func NewClientWithKey(accessAddr string, accountAddr sdk.Address, key sdkcrypto.
 		accountKeyPriv: key,
 		signer:         mySigner,
 		Chain:          chain,
-		seqNo:          accountKey.SequenceNumber,
 		account:        acc,
 	}
 	return tc, nil
@@ -101,8 +99,8 @@ func (c *Client) AccountKeyPriv() sdkcrypto.PrivateKey {
 }
 
 func (c *Client) GetSeqNumber() uint64 {
-	n := c.seqNo
-	c.seqNo++
+	n := c.accountKey.SequenceNumber
+	c.accountKey.SequenceNumber++
 	return n
 }
 
