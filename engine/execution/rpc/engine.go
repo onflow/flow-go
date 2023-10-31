@@ -545,11 +545,11 @@ func (h *handler) GetAccountAtBlockID(
 
 	value, err := h.engine.GetAccount(ctx, flowAddress, blockFlowID)
 	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			return nil, status.Errorf(codes.NotFound, "account with address %s not found", flowAddress)
-		}
 		if errors.Is(err, scripts.ErrStateCommitmentPruned) {
 			return nil, status.Errorf(codes.OutOfRange, "state for block ID %s not available", blockFlowID)
+		}
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, status.Errorf(codes.NotFound, "account with address %s not found", flowAddress)
 		}
 		if fvmerrors.IsAccountNotFoundError(err) {
 			return nil, status.Errorf(codes.NotFound, "account not found")
