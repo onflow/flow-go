@@ -285,7 +285,7 @@ func RunWithFullProtocolStateAndConsumer(t testing.TB, rootSnapshot protocol.Sna
 	})
 }
 
-func RunWithFullProtocolStateAndMetricsAndConsumer(t testing.TB, rootSnapshot protocol.Snapshot, metrics module.ComplianceMetrics, consumer protocol.Consumer, f func(*badger.DB, *pbadger.ParticipantState, protocol.StateMutator)) {
+func RunWithFullProtocolStateAndMetricsAndConsumer(t testing.TB, rootSnapshot protocol.Snapshot, metrics module.ComplianceMetrics, consumer protocol.Consumer, f func(*badger.DB, *pbadger.ParticipantState, protocol.MutableProtocolState)) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
@@ -320,15 +320,16 @@ func RunWithFullProtocolStateAndMetricsAndConsumer(t testing.TB, rootSnapshot pr
 			sealValidator,
 		)
 		require.NoError(t, err)
-		mutator := protocol_state.NewMutator(
+		mutableProtocolState := protocol_state.NewMutableProtocolState(
+			all.ProtocolState,
+			state.Params(),
 			all.Headers,
 			all.Results,
 			all.Setups,
 			all.EpochCommits,
-			all.ProtocolState,
 			state.Params(),
 		)
-		f(db, fullState, mutator)
+		f(db, fullState, mutableProtocolState)
 	})
 }
 
@@ -369,7 +370,7 @@ func RunWithFollowerProtocolStateAndHeaders(t testing.TB, rootSnapshot protocol.
 	})
 }
 
-func RunWithFullProtocolStateAndMutator(t testing.TB, rootSnapshot protocol.Snapshot, f func(*badger.DB, *pbadger.ParticipantState, protocol.StateMutator)) {
+func RunWithFullProtocolStateAndMutator(t testing.TB, rootSnapshot protocol.Snapshot, f func(*badger.DB, *pbadger.ParticipantState, protocol.MutableProtocolState)) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
@@ -406,14 +407,15 @@ func RunWithFullProtocolStateAndMutator(t testing.TB, rootSnapshot protocol.Snap
 			sealValidator,
 		)
 		require.NoError(t, err)
-		mutator := protocol_state.NewMutator(
+		mutableProtocolState := protocol_state.NewMutableProtocolState(
+			all.ProtocolState,
+			state.Params(),
 			all.Headers,
 			all.Results,
 			all.Setups,
 			all.EpochCommits,
-			all.ProtocolState,
 			state.Params(),
 		)
-		f(db, fullState, mutator)
+		f(db, fullState, mutableProtocolState)
 	})
 }

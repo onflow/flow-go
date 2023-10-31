@@ -37,6 +37,7 @@ type State struct {
 		setups  storage.EpochSetups
 		commits storage.EpochCommits
 	}
+	globalParams             protocol.GlobalParams
 	protocolStateSnapshotsDB storage.ProtocolState
 	protocolState            protocol.MutableProtocolState
 	versionBeacons           storage.VersionBeacons
@@ -689,7 +690,7 @@ func OpenState(
 
 func (state *State) Params() protocol.Params {
 	return Params{
-		GlobalParams:   state.protocolState.GlobalParams(),
+		GlobalParams:   state.globalParams,
 		InstanceParams: &InstanceParams{state: state},
 	}
 }
@@ -784,6 +785,7 @@ func newState(
 			setups:  setups,
 			commits: commits,
 		},
+		globalParams:             globalParams,
 		protocolStateSnapshotsDB: protocolStateSnapshots,
 		versionBeacons:           versionBeacons,
 		cachedFinal:              new(atomic.Pointer[cachedHeader]),

@@ -23,9 +23,9 @@ func TestFromSnapshot(t *testing.T) {
 	identities := unittest.IdentityListFixture(10, unittest.WithAllRoles())
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
 
-	util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, fullState *bprotocol.ParticipantState, mutator protocol.StateMutator) {
+	util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, fullState *bprotocol.ParticipantState, mutableState protocol.MutableProtocolState) {
 		state := fullState.FollowerState
-		epochBuilder := unittest.NewEpochBuilder(t, mutator, state)
+		epochBuilder := unittest.NewEpochBuilder(t, mutableState, state)
 		// build epoch 1 (prepare epoch 2)
 		epochBuilder.
 			BuildEpoch().

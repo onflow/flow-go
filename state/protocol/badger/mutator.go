@@ -529,9 +529,9 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, certi
 			"payload contains (%x) but after applying changes got %x", candidate.Payload.ProtocolStateID, updatedStateID)
 	}
 	if hasChanges {
-		dbUpdates = append(dbUpdates, m.protocolStateSnapshotsDB.StoreTx(updatedStateID, updatedState))
-		dbUpdates = append(dbUpdates, m.protocolStateSnapshotsDB.Index(blockID, updatedStateID))
+		dbUpdates = append(dbUpdates, operation.SkipDuplicatesTx(m.protocolStateSnapshotsDB.StoreTx(updatedStateID, updatedState)))
 	}
+	dbUpdates = append(dbUpdates, m.protocolStateSnapshotsDB.Index(blockID, updatedStateID))
 
 	// events is a queue of node-internal events (aka notifications) that are emitted after the database write succeeded
 	var events []func()
