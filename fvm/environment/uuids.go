@@ -14,9 +14,18 @@ import (
 	"github.com/onflow/flow-go/utils/slices"
 )
 
+// uuid is partitioned with 3rd byte for compatibility reasons.
+// (database types and Javascript safe integer limits)
+//
+// counter(C) is 7 bytes, paritition(P) is 1 byte
+// C7 C6 P C5 C4 C3 C2 C1
+//
+// Until resource ids start filling the bits above the 48th one, dapps will have enough time
+// to switch to a larger data type.
+
 const (
-	// The max value for any is uuid partition is MaxUint56, since the top
-	// 8 bits in the uuid are used for partitioning.
+	// The max value for any is uuid partition is MaxUint56, since one byte
+	// in the uuid is used for partitioning.
 	MaxUint56 = (uint64(1) << 56) - 1
 
 	// Start warning when there's only a single high bit left.  This should give
@@ -196,5 +205,6 @@ func (generator *uUIDGenerator) GenerateUUID() (uint64, error) {
 
 	// Since the partition counter only goes up to MaxUint56, we can use the
 	// upper 8 bits to represent which partition was used.
-	return (uint64(generator.partition) << 56) | value, nil
+	return (uint64(generator.partition) << 40) | (value & 0xFF_FFFF_FFFF) | ((value & 0xFF_FF00_0000_0000) << 8), nil
+
 }
