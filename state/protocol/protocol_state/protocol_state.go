@@ -45,6 +45,8 @@ func (s *ProtocolState) GlobalParams() protocol.GlobalParams {
 	return s.globalParams
 }
 
+// MutableProtocolState is an implementation of the mutable interface for protocol state, it allows to evolve the protocol state
+// by acting as factory for protocol.StateMutator which can be used to apply state-changing operations.
 type MutableProtocolState struct {
 	ProtocolState
 	headers storage.Headers
@@ -56,6 +58,7 @@ type MutableProtocolState struct {
 
 var _ protocol.MutableProtocolState = (*MutableProtocolState)(nil)
 
+// NewMutableProtocolState creates a new instance of MutableProtocolState.
 func NewMutableProtocolState(
 	protocolStateDB storage.ProtocolState,
 	globalParams protocol.GlobalParams,

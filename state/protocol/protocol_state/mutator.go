@@ -11,10 +11,12 @@ import (
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
-// stateMutator implements protocol.StateMutator interface.
-// It has to be used for each block to update the protocol state, even if there are no state-changing
-// service events sealed in candidate block. This requirement is due to the fact that protocol state
-// is indexed by block ID, and we need to maintain such index.
+// stateMutator is a stateful object to evolve the protocol state. It is instantiated from the parent block's protocol state.
+// State-changing operations can be iteratively applied and the stateMutator will internally evolve its in-memory state.
+// While the StateMutator does not modify the database, it internally tracks all necessary updates. Upon calling `Build`
+// the stateMutator returns the updated protocol state, its ID and all database updates necessary for persisting the updated
+// protocol state.
+// stateMutator locally tracks pending DB updates, which are returned as a slice of deferred DB updates when calling `Build`.
 type stateMutator struct {
 	headers          storage.Headers
 	results          storage.ExecutionResults
@@ -27,6 +29,7 @@ type stateMutator struct {
 
 var _ protocol.StateMutator = (*stateMutator)(nil)
 
+// newStateMutator creates a new instance of stateMutator.
 func newStateMutator(
 	headers storage.Headers,
 	results storage.ExecutionResults,
