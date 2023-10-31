@@ -14,6 +14,7 @@ import (
 var (
 	FlowEVMTestnetChainID = big.NewInt(666)
 	FlowEVMMainnetChainID = big.NewInt(777)
+	BlockLevelGasLimit    = uint64(math.MaxUint64)
 )
 
 // Config sets the required parameters
@@ -65,8 +66,8 @@ func defaultConfig() *Config {
 		BlockContext: &vm.BlockContext{
 			CanTransfer: core.CanTransfer,
 			Transfer:    core.Transfer,
-			GasLimit:    math.MaxUint64, // block gas limit
-			BaseFee:     big.NewInt(0),  //
+			GasLimit:    BlockLevelGasLimit, // block gas limit
+			BaseFee:     big.NewInt(0),      //
 			GetHash: func(n uint64) common.Hash { // default returns some random hash values
 				return common.BytesToHash(crypto.Keccak256([]byte(new(big.Int).SetUint64(n).String())))
 			},
