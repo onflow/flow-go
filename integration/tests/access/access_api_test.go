@@ -5,12 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"google.golang.org/grpc/codes"
-
-	"google.golang.org/grpc/status"
-
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/suite"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/onflow/cadence"
 
@@ -21,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/integration/tests/mvp"
+	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -183,7 +182,7 @@ func (s *AccessAPISuite) testGetAccount(client *client.Client) {
 		})
 		s.Require().NoError(err)
 		s.Assert().Equal(serviceAddress, account.Address)
-		s.Assert().NotZero(serviceAddress, account.Balance)
+		s.Assert().NotZero(account.Balance)
 	})
 
 	s.Run("get account block ID", func() {
@@ -192,7 +191,7 @@ func (s *AccessAPISuite) testGetAccount(client *client.Client) {
 		})
 		s.Require().NoError(err)
 		s.Assert().Equal(serviceAddress, account.Address)
-		s.Assert().NotZero(serviceAddress, account.Balance)
+		s.Assert().NotZero(account.Balance)
 	})
 
 	s.Run("get account block height", func() {
@@ -201,7 +200,15 @@ func (s *AccessAPISuite) testGetAccount(client *client.Client) {
 		})
 		s.Require().NoError(err)
 		s.Assert().Equal(serviceAddress, account.Address)
-		s.Assert().NotZero(serviceAddress, account.Balance)
+		s.Assert().NotZero(account.Balance)
+	})
+
+	s.Run("get newly created account", func() {
+		addr, err := utils.CreateFlowAccount(s.ctx, s.serviceClient)
+		s.Require().NoError(err)
+		acc, err := client.GetAccount(s.ctx, addr)
+		s.Require().NoError(err)
+		s.Assert().Equal(addr, acc.Address)
 	})
 }
 
