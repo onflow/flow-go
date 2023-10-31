@@ -80,7 +80,6 @@ func (s *Orchestrator) trackIngressEvents(event *insecure.IngressEvent) error {
 		s.unauthorizedEventsReceived.Inc()
 		s.Logger.Warn().Str("event_id", event.FlowProtocolEventID.String()).Msg("unauthorized ingress event received")
 	}
-
 	// track all authorized events sent during test
 	if expectedEvent, ok := s.authorizedEvents[event.FlowProtocolEventID]; ok {
 		// ensure event received intact no changes have been made to the underlying message
