@@ -109,7 +109,6 @@ type GossipSubRPCInspector interface {
 type GossipSubMsgValidationRpcInspector interface {
 	collection.ClusterEvents
 	GossipSubRPCInspector
-	InspectorTopicOracle
 }
 
 // Topic is the abstraction of the underlying pubsub topic that is used by the Flow network.

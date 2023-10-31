@@ -71,7 +71,6 @@ type GossipSubInvCtrlMsgNotifConsumer interface {
 type GossipSubInspectorSuite interface {
 	component.Component
 	CollectionClusterChangesConsumer
-	InspectorTopicOracle
 	// InspectFunc returns the inspect function that is used to inspect the gossipsub rpc messages.
 	// This function follows a dependency injection pattern, where the inspect function is injected into the gossipsu, and
 	// is called whenever a gossipsub rpc message is received.
@@ -82,10 +81,7 @@ type GossipSubInspectorSuite interface {
 	// pattern where the consumer is notified when a new notification is published.
 	// A consumer is only notified once for each notification, and only receives notifications that were published after it was added.
 	AddInvalidControlMessageConsumer(GossipSubInvCtrlMsgNotifConsumer)
-}
 
-// InspectorTopicOracle methods that allow implementations to set a topic oracle
-type InspectorTopicOracle interface {
 	// SetTopicOracle sets the topic oracle of the gossipsub inspector suite.
 	// The topic oracle is used to determine the list of topics that the node is subscribed to.
 	// If an oracle is not set, the node will not be able to determine the list of topics that the node is subscribed to.

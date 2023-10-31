@@ -6,12 +6,61 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/cadence/encoding/ccf"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/generator"
 )
+
+func TestConvertBlockExecutionDataEventPayloads(t *testing.T) {
+	// generators will produce identical event payloads (before encoding)
+	ccfEvents := generator.GetEventsWithEncoding(3, entities.EventEncodingVersion_CCF_V0)
+	jsonEvents := generator.GetEventsWithEncoding(3, entities.EventEncodingVersion_JSON_CDC_V0)
+
+	// generate BlockExecutionData with CCF encoded events
+	executionData := unittest.BlockExecutionDataFixture(
+		unittest.WithChunkExecutionDatas(
+			unittest.ChunkExecutionDataFixture(t, 1024, unittest.WithChunkEvents(ccfEvents)),
+			unittest.ChunkExecutionDataFixture(t, 1024, unittest.WithChunkEvents(ccfEvents)),
+		),
+	)
+
+	execDataMessage, err := convert.BlockExecutionDataToMessage(executionData)
+	require.NoError(t, err)
+
+	t.Run("regular convert does not modify payload encoding", func(t *testing.T) {
+		for _, chunk := range execDataMessage.GetChunkExecutionData() {
+			events := convert.MessagesToEvents(chunk.Events)
+			for i, e := range events {
+				assert.Equal(t, ccfEvents[i], e)
+
+				_, err := ccf.Decode(nil, e.Payload)
+				require.NoError(t, err)
+			}
+		}
+	})
+
+	t.Run("converted event payloads are encoded in jsoncdc", func(t *testing.T) {
+		err = convert.BlockExecutionDataEventPayloadsToVersion(execDataMessage, entities.EventEncodingVersion_JSON_CDC_V0)
+		require.NoError(t, err)
+
+		for _, chunk := range execDataMessage.GetChunkExecutionData() {
+			events := convert.MessagesToEvents(chunk.Events)
+			for i, e := range events {
+				assert.Equal(t, jsonEvents[i], e)
+
+				_, err := jsoncdc.Decode(nil, e.Payload)
+				require.NoError(t, err)
+			}
+		}
+	})
+}
 
 func TestConvertBlockExecutionData(t *testing.T) {
 	t.Parallel()

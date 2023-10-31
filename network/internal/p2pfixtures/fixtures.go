@@ -34,7 +34,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
 	"github.com/onflow/flow-go/network/p2p/tracer"
-	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -114,8 +113,7 @@ func CreateNode(t *testing.T, networkKey crypto.PrivateKey, sporkID flow.Identif
 	}
 	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
 
-	builder := p2pbuilder.NewNodeBuilder(
-		logger,
+	builder := p2pbuilder.NewNodeBuilder(logger,
 		&p2pconfig.MetricsConfig{
 			HeroCacheFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 			Metrics:          metrics.NewNoopCollector(),
@@ -132,12 +130,14 @@ func CreateNode(t *testing.T, networkKey crypto.PrivateKey, sporkID flow.Identif
 			MaxSize: uint32(1000),
 			Metrics: metrics.NewNoopCollector(),
 		},
-		meshTracer).
+		meshTracer,
+		&p2pconfig.UnicastConfig{
+			UnicastConfig: defaultFlowConfig.NetworkConfig.UnicastConfig,
+		}).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
 			return p2pdht.NewDHT(c, h, protocols.FlowDHTProtocolID(sporkID), zerolog.Nop(), metrics.NewNoopCollector())
 		}).
 		SetResourceManager(&network.NullResourceManager{}).
-		SetStreamCreationRetryInterval(unicast.DefaultRetryDelay).
 		SetGossipSubTracer(meshTracer).
 		SetGossipSubScoreTracerInterval(defaultFlowConfig.NetworkConfig.GossipSubConfig.ScoreTracerInterval)
 
@@ -309,7 +309,7 @@ func EnsureNoStreamCreation(t *testing.T, ctx context.Context, from []p2p.LibP2P
 				return nil
 			})
 			// ensures that other node has never received a connection from this node.
-			require.Equal(t, other.Host().Network().Connectedness(thisId), network.NotConnected)
+			require.Equal(t, network.NotConnected, other.Host().Network().Connectedness(thisId))
 			// a stream is established on top of a connection, so if there is no connection, there should be no stream.
 			require.Empty(t, other.Host().Network().ConnsToPeer(thisId))
 			// runs the error checkers if any.
