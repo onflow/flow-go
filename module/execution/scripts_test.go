@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/onflow/flow-go/fvm/errors"
+
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/rs/zerolog"
@@ -52,6 +54,30 @@ func Test_ExecuteScript(t *testing.T) {
 		assert.Equal(t, number, value.(cadence.Int).Value.Int64())
 	})
 
+	t.Run("Get Block", func(t *testing.T) {
+		blockchain := unittest.BlockchainFixture(10)
+		first := blockchain[0]
+		tree := bootstrapFVM()
+
+		scripts := newScripts(
+			t,
+			newBlockHeadersStorage(blockchain),
+			treeToRegisterAdapter(tree),
+		)
+
+		code := []byte(fmt.Sprintf(`pub fun main(): UInt64 {
+			getBlock(at: %d)!
+			return getCurrentBlock().height 
+		}`, first.Header.Height))
+
+		result, err := scripts.ExecuteAtBlockHeight(context.Background(), code, nil, first.Header.Height)
+		require.NoError(t, err)
+		val, err := jsoncdc.Decode(nil, result)
+		require.NoError(t, err)
+		// make sure that the returned block height matches the current one set
+		assert.Equal(t, first.Header.Height, val.(cadence.UInt64).ToGoValue())
+	})
+
 	t.Run("Handle not found Register", func(t *testing.T) {
 		blockchain := unittest.BlockchainFixture(10)
 		first := blockchain[0]
@@ -70,6 +96,54 @@ func Test_ExecuteScript(t *testing.T) {
 		result, err := scripts.ExecuteAtBlockHeight(context.Background(), code, nil, first.Header.Height)
 		require.True(t, strings.Contains(err.Error(), "invalid number of returned values for a single register"))
 		require.Nil(t, result)
+	})
+
+	t.Run("Valid Argument", func(t *testing.T) {
+		blockchain := unittest.BlockchainFixture(10)
+		first := blockchain[0]
+		tree := bootstrapFVM()
+
+		scripts := newScripts(
+			t,
+			newBlockHeadersStorage(blockchain),
+			treeToRegisterAdapter(tree),
+		)
+
+		code := []byte("pub fun main(foo: Int): Int { return foo }")
+		arg := cadence.NewInt(2)
+		encoded, err := jsoncdc.Encode(arg)
+		require.NoError(t, err)
+
+		result, err := scripts.ExecuteAtBlockHeight(
+			context.Background(),
+			code,
+			[][]byte{encoded},
+			first.Header.Height,
+		)
+		require.NoError(t, err)
+		assert.Equal(t, encoded, result)
+	})
+
+	t.Run("Invalid Argument", func(t *testing.T) {
+		blockchain := unittest.BlockchainFixture(10)
+		first := blockchain[0]
+		tree := bootstrapFVM()
+
+		scripts := newScripts(
+			t,
+			newBlockHeadersStorage(blockchain),
+			treeToRegisterAdapter(tree),
+		)
+
+		code := []byte("pub fun main(foo: Int): Int { return foo }")
+		invalid := [][]byte{[]byte("i")}
+
+		result, err := scripts.ExecuteAtBlockHeight(context.Background(), code, invalid, first.Header.Height)
+		assert.Nil(t, result)
+		var coded errors.CodedError
+		require.True(t, errors.As(err, &coded))
+		fmt.Println(coded.Code(), coded.Error())
+		assert.Equal(t, errors.ErrCodeInvalidArgumentError, coded.Code())
 	})
 }
 

@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/onflow/flow-go/fvm/environment"
+
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/execution/computation"
@@ -70,6 +72,8 @@ func NewScripts(
 	vm := fvm.NewVirtualMachine()
 
 	options := computation.DefaultFVMOptions(chainID, false, false)
+	blocks := environment.NewBlockFinder(header)
+	options = append(options, fvm.WithBlocks(blocks)) // add blocks for getBlocks calls in scripts
 	vmCtx := fvm.NewContext(options...)
 
 	derivedChainData, err := derived.NewDerivedChainData(derived.DefaultDerivedDataCacheSize)
@@ -98,7 +102,7 @@ func NewScripts(
 // A result value is returned encoded as byte array. An error will be returned if script
 // doesn't successfully execute.
 // Expected errors:
-// - storage.ErrNotFound if block or register value at height was not found.
+// - Script execution related errors
 // - ErrDataNotAvailable if the data for the block height is not available
 func (s *Scripts) ExecuteAtBlockHeight(
 	ctx context.Context,
@@ -117,7 +121,7 @@ func (s *Scripts) ExecuteAtBlockHeight(
 
 // GetAccountAtBlockHeight returns a Flow account by the provided address and block height.
 // Expected errors:
-// - storage.ErrNotFound if block or register value at height was not found.
+// - Script execution related errors
 // - ErrDataNotAvailable if the data for the block height is not available
 func (s *Scripts) GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error) {
 	snap, header, err := s.snapshotWithBlock(height)
