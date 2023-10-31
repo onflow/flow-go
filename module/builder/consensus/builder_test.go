@@ -418,9 +418,10 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.stateMutator = protocol.NewMutableProtocolState(bs.T())
 	bs.stateMutator.On("Mutator", mock.Anything, mock.Anything).Return(
 		func(_ uint64, _ flow.Identifier) realproto.StateMutator {
-			updater := protocol.NewStateMutator(bs.T())
-			updater.On("Build").Return(false, nil, flow.Identifier{}, nil)
-			return updater
+			stateMutator := protocol.NewStateMutator(bs.T())
+			stateMutator.On("ApplyServiceEvents", mock.Anything).Return(nil)
+			stateMutator.On("Build").Return(false, nil, flow.Identifier{}, nil, nil)
+			return stateMutator
 		}, func(_ uint64, _ flow.Identifier) error {
 			return nil
 		},
