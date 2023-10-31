@@ -70,29 +70,29 @@ func (epoch EpochHeights) CommittedRange() []uint64 {
 
 // EpochBuilder is a testing utility for building epochs into chain state.
 type EpochBuilder struct {
-	t          *testing.T
-	mutator    protocol.StateMutator
-	states     []protocol.FollowerState
-	blocksByID map[flow.Identifier]*flow.Block
-	blocks     []*flow.Block
-	built      map[uint64]*EpochHeights
-	setupOpts  []func(*flow.EpochSetup)  // options to apply to the EpochSetup event
-	commitOpts []func(*flow.EpochCommit) // options to apply to the EpochCommit event
+	t                    *testing.T
+	mutableProtocolState protocol.MutableProtocolState
+	states               []protocol.FollowerState
+	blocksByID           map[flow.Identifier]*flow.Block
+	blocks               []*flow.Block
+	built                map[uint64]*EpochHeights
+	setupOpts            []func(*flow.EpochSetup)  // options to apply to the EpochSetup event
+	commitOpts           []func(*flow.EpochCommit) // options to apply to the EpochCommit event
 }
 
 // NewEpochBuilder returns a new EpochBuilder which will build epochs using the
 // given states. At least one state must be provided. If more than one are
 // provided they must have the same initial state.
-func NewEpochBuilder(t *testing.T, mutator protocol.StateMutator, states ...protocol.FollowerState) *EpochBuilder {
+func NewEpochBuilder(t *testing.T, mutator protocol.MutableProtocolState, states ...protocol.FollowerState) *EpochBuilder {
 	require.True(t, len(states) >= 1, "must provide at least one state")
 
 	builder := &EpochBuilder{
-		t:          t,
-		mutator:    mutator,
-		states:     states,
-		blocksByID: make(map[flow.Identifier]*flow.Block),
-		blocks:     make([]*flow.Block, 0),
-		built:      make(map[uint64]*EpochHeights),
+		t:                    t,
+		mutableProtocolState: mutator,
+		states:               states,
+		blocksByID:           make(map[flow.Identifier]*flow.Block),
+		blocks:               make([]*flow.Block, 0),
+		built:                make(map[uint64]*EpochHeights),
 	}
 	return builder
 }
@@ -368,13 +368,14 @@ func (builder *EpochBuilder) BuildBlocks(n uint) {
 // addBlock adds the given block to the state by: extending the state,
 // finalizing the block, marking the block as valid, and caching the block.
 func (builder *EpochBuilder) addBlock(block *flow.Block) {
-	updater, err := builder.mutator.CreateUpdater(block.Header.View, block.Header.ParentID)
+	stateMutator, err := builder.mutableProtocolState.Mutator(block.Header.View, block.Header.ParentID)
 	require.NoError(builder.t, err)
 
-	_, err = builder.mutator.ApplyServiceEvents(updater, block.Payload.Seals)
+	err = stateMutator.ApplyServiceEvents(block.Payload.Seals)
 	require.NoError(builder.t, err)
 
-	_, updatedStateId, _ := updater.Build()
+	_, _, updatedStateId, _, err := stateMutator.Build()
+	require.NoError(builder.t, err)
 
 	block.Payload.ProtocolStateID = updatedStateId
 	block.Header.PayloadHash = block.Payload.Hash()

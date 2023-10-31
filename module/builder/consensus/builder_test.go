@@ -76,7 +76,7 @@ type BuilderSuite struct {
 	blockDB      *storage.Blocks
 	resultDB     *storage.ExecutionResults
 	receiptsDB   *storage.ExecutionReceipts
-	stateMutator *protocol.StateMutator
+	stateMutator *protocol.MutableProtocolState
 
 	guarPool *mempool.Guarantees
 	sealPool *mempool.IncorporatedResultSeals
@@ -415,17 +415,16 @@ func (bs *BuilderSuite) SetupTest() {
 	)
 
 	// setup mock state mutator, we don't need a real once since we are using mocked participant state.
-	bs.stateMutator = protocol.NewStateMutator(bs.T())
-	bs.stateMutator.On("CreateUpdater", mock.Anything, mock.Anything).Return(
-		func(_ uint64, _ flow.Identifier) realproto.StateUpdater {
-			updater := protocol.NewStateUpdater(bs.T())
-			updater.On("Build").Return(nil, flow.Identifier{}, false)
+	bs.stateMutator = protocol.NewMutableProtocolState(bs.T())
+	bs.stateMutator.On("Mutator", mock.Anything, mock.Anything).Return(
+		func(_ uint64, _ flow.Identifier) realproto.StateMutator {
+			updater := protocol.NewStateMutator(bs.T())
+			updater.On("Build").Return(false, nil, flow.Identifier{}, nil)
 			return updater
 		}, func(_ uint64, _ flow.Identifier) error {
 			return nil
 		},
 	)
-	bs.stateMutator.On("ApplyServiceEvents", mock.Anything, mock.Anything).Return(nil, nil)
 
 	// initialize the builder
 	bs.build, err = NewBuilder(

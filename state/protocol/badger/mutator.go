@@ -508,23 +508,30 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, certi
 		return fmt.Errorf("could not retrieve block header for %x: %w", parentID, err)
 	}
 
-	protocolStateUpdater, err := m.protocolStateMutator.CreateUpdater(candidate.Header.View, parentID)
+	stateMutator, err := m.protocolState.Mutator(candidate.Header.View, parentID)
 	if err != nil {
-		return fmt.Errorf("could not create protocol state updater for view %d: %w", candidate.Header.View, err)
+		return fmt.Errorf("could not create protocol state mutator for view %d: %w", candidate.Header.View, err)
 	}
 
 	// apply any state changes from service events sealed by this block
-	dbUpdates, err := m.protocolStateMutator.ApplyServiceEvents(protocolStateUpdater, candidate.Payload.Seals)
+	err = stateMutator.ApplyServiceEvents(candidate.Payload.Seals)
 	if err != nil {
 		return fmt.Errorf("could not process service events: %w", err)
 	}
 
-	commitStateDbUpdate, updatedStateID := m.protocolStateMutator.CommitProtocolState(blockID, protocolStateUpdater)
+	hasChanges, updatedState, updatedStateID, dbUpdates, err := stateMutator.Build()
+	if err != nil {
+		return fmt.Errorf("could not build updated protocol state: %w", err)
+	}
+
 	if updatedStateID != candidate.Payload.ProtocolStateID {
 		return state.NewInvalidExtensionErrorf("invalid protocol state transition detected, "+
 			"payload contains (%x) but after applying changes got %x", candidate.Payload.ProtocolStateID, updatedStateID)
 	}
-	dbUpdates = append(dbUpdates, commitStateDbUpdate)
+	if hasChanges {
+		dbUpdates = append(dbUpdates, m.protocolStateSnapshotsDB.StoreTx(updatedStateID, updatedState))
+		dbUpdates = append(dbUpdates, m.protocolStateSnapshotsDB.Index(blockID, updatedStateID))
+	}
 
 	// events is a queue of node-internal events (aka notifications) that are emitted after the database write succeeded
 	var events []func()

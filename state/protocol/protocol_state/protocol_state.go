@@ -2,7 +2,6 @@ package protocol_state
 
 import (
 	"fmt"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
@@ -43,4 +42,47 @@ func (s *ProtocolState) AtBlockID(blockID flow.Identifier) (protocol.DynamicProt
 // GlobalParams returns an interface which can be used to query global protocol parameters.
 func (s *ProtocolState) GlobalParams() protocol.GlobalParams {
 	return s.globalParams
+}
+
+type MutableProtocolState struct {
+	ProtocolState
+	headers storage.Headers
+	results storage.ExecutionResults
+	setups  storage.EpochSetups
+	commits storage.EpochCommits
+	params  protocol.InstanceParams
+}
+
+var _ protocol.MutableProtocolState = (*MutableProtocolState)(nil)
+
+func NewMutableProtocolState(
+	protocolStateDB storage.ProtocolState,
+	globalParams protocol.GlobalParams,
+	headers storage.Headers,
+	results storage.ExecutionResults,
+	setups storage.EpochSetups,
+	commits storage.EpochCommits,
+	params protocol.InstanceParams,
+) *MutableProtocolState {
+	return &MutableProtocolState{
+		ProtocolState: *NewProtocolState(protocolStateDB, globalParams),
+		headers:       headers,
+		results:       results,
+		setups:        setups,
+		commits:       commits,
+		params:        params,
+	}
+}
+
+// Mutator instantiates a `StateMutator` based on the previous protocol state.
+// Has to be called for each block to evolve the protocol state.
+// Expected errors during normal operations:
+//   - `storage.ErrNotFound` if no protocol state for parent block is known.
+func (s *MutableProtocolState) Mutator(candidateView uint64, parentID flow.Identifier) (protocol.StateMutator, error) {
+	parentState, err := s.protocolStateDB.ByBlockID(parentID)
+	if err != nil {
+		return nil, fmt.Errorf("could not query parent protocol state at block (%x): %w", parentID, err)
+	}
+	stateMachine := NewStateMachine(candidateView, parentState)
+	return NewMutator(s.headers, s.results, s.setups, s.commits, stateMachine, s.params), nil
 }

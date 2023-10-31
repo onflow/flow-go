@@ -44,7 +44,6 @@ type DynamicProtocolState interface {
 // ProtocolState is the read-only interface for protocol state, it allows to query information
 // on a per-block and per-epoch basis.
 type ProtocolState interface {
-
 	// ByEpoch returns an object with static protocol state information by epoch number.
 	// To be able to use this interface we need to observe both epoch setup and commit events.
 	// Not available for next epoch unless we have observed an EpochCommit event.
@@ -67,75 +66,38 @@ type ProtocolState interface {
 	GlobalParams() GlobalParams
 }
 
-// StateUpdater is a dedicated interface for updating protocol state.
-// It is used by the compliance layer to update protocol state when certain events that are stored in blocks are observed.
-type StateUpdater interface {
-	// Build returns updated protocol state entry, state ID and a flag indicating if there were any changes.
-	Build() (updatedState *flow.ProtocolStateEntry, stateID flow.Identifier, hasChanges bool)
-	// ProcessEpochSetup updates current protocol state with data from epoch setup event.
-	// Processing epoch setup event also affects identity table for current epoch.
-	// Observing an epoch setup event, transitions protocol state from staking to setup phase, we stop returning
-	// identities from previous+current epochs and start returning identities from current+next epochs.
-	// As a result of this operation protocol state for the next epoch will be created.
-	// Expected errors during normal operations:
-	// - `protocol.InvalidServiceEventError` if the service event is invalid or is not a valid state transition for the current protocol state
-	ProcessEpochSetup(epochSetup *flow.EpochSetup) error
-	// ProcessEpochCommit updates current protocol state with data from epoch commit event.
-	// Observing an epoch setup commit, transitions protocol state from setup to commit phase, at this point we have
-	// finished construction of the next epoch.
-	// As a result of this operation protocol state for next epoch will be committed.
-	// Expected errors during normal operations:
-	// - `protocol.InvalidServiceEventError` if the service event is invalid or is not a valid state transition for the current protocol state
-	ProcessEpochCommit(epochCommit *flow.EpochCommit) error
-	// UpdateIdentity updates identity table with new identity entry.
-	// Should pass identity which is already present in the table, otherwise an exception will be raised.
-	// TODO: This function currently modifies both current+next identities based on input.
-	//       This is incompatible with the design doc, and needs to be updated to modify current/next epoch separately
-	// No errors are expected during normal operations.
-	UpdateIdentity(updated *flow.DynamicIdentityEntry) error
-	// SetInvalidStateTransitionAttempted sets a flag indicating that invalid state transition was attempted.
-	// Such transition can be detected by compliance layer.
-	SetInvalidStateTransitionAttempted()
-	// TransitionToNextEpoch discards current protocol state and transitions to the next epoch.
-	// Epoch transition is only allowed when:
-	// - next epoch has been set up,
-	// - next epoch has been committed,
-	// - candidate block is in the next epoch.
-	// No errors are expected during normal operations.
-	TransitionToNextEpoch() error
-	// View returns the view that is associated with this state updater.
-	// StateUpdater is created for a view where protocol state changes will be applied.
-	View() uint64
-	// ParentState returns parent protocol state that is associated with this state updater.
-	ParentState() *flow.RichProtocolStateEntry
-}
+type MutableProtocolState interface {
+	ProtocolState
 
-// StateMutator is an interface for creating protocol state updaters and committing protocol state to the database.
-// It is used by the replica's compliance layer to update protocol state when certain events that are stored in blocks are observed.
-// It is used by the primary in the block building process to obtain a correct protocol state for a proposal.
-// Specifically, leader includes service events in the block payload; those service events when being processed by replica will mutate the protocol state, so
-// leader needs to include correct protocol state ID in the block payload otherwise replicas won't be able to verify the validity of the block.
-// He can do that by creating a state updater for the proposal, applying service events to it and get updated protocol state ID from updater.
-// It has to be used for each block that is added to the block tree to maintain a correct protocol state on a block-by-block basis.
-type StateMutator interface {
-	// CreateUpdater creates a protocol state updater based on previous protocol state.
-	// Has to be called for each block to correctly index the protocol state.
+	// Mutator instantiates a `StateMutator` based on the previous protocol state.
+	// Has to be called for each block to evolve the protocol state.
 	// Expected errors during normal operations:
 	//  * `storage.ErrNotFound` if no protocol state for parent block is known.
-	CreateUpdater(candidateView uint64, parentID flow.Identifier) (StateUpdater, error)
-	// CommitProtocolState commits the protocol state to the database.
-	// Has to be called for each block to correctly index the protocol state.
-	// No errors are expected during normal operations.
-	CommitProtocolState(blockID flow.Identifier, updater StateUpdater) (func(tx *transaction.Tx) error, flow.Identifier)
+	Mutator(candidateView uint64, parentID flow.Identifier) (StateMutator, error)
+}
+
+// StateMutator is a stateful object to evolve the protocol state. It is instantiated from the parent block's protocol state.
+// State-changing operations can be iteratively applied and the StateMutator will internally evolve its in-memory state.
+// While the StateMutator does not modify the database, it internally tracks all necessary updates. Upon calling `Build`
+// the StateMutator returns the updated protocol state, its ID and all database updates necessary for persisting the updated
+// protocol state.
+// The StateMutator is used by a replica's compliance layer to update protocol state when observing state-changing service in
+// blocks. It is used by the primary in the block building process to obtain the correct protocol state for a proposal.
+// Specifically, the leader may include state-changing service events in the block payload. The flow protocol prescribes that
+// the proposal needs to include the ID of the protocol state, _after_ processing the payload incl. all state-changing events.
+// Therefore, the leader instantiates a StateMutator, applies the service events to it and builds the updated protocol state ID.
+type StateMutator interface {
+	// Build returns:
+	//  - hasChanges: flag whether there were any changes; otherwise, `updatedState` and `stateID` equal the parent state
+	//  - updatedState: the ProtocolState after applying all updates
+	//  - stateID: the has commitment to the `updatedState`
+	//  - dbUpdates: database updates necessary for persisting the updated protocol state
+	// updated protocol state entry, state ID and a flag indicating if there were any changes.
+	Build() (hasChanges bool, updatedState *flow.ProtocolStateEntry, stateID flow.Identifier, dbUpdates []func(tx *transaction.Tx) error, err error)
+
 	// ApplyServiceEvents handles applying state changes which occur as a result
 	// of service events being included in a block payload.
 	// All updates that are incorporated in service events are applied to the protocol state by mutating protocol state updater.
-	//
-	// Return values:
-	//   - dbUpdates - If the service events are valid, or there are no service events,
-	//     this method returns a slice of Badger operations to apply while storing the block.
-	//     This includes operations to insert service events for blocks that include them.
-	//
 	// No errors are expected during normal operation.
-	ApplyServiceEvents(updater StateUpdater, seals []*flow.Seal) (dbUpdates []func(*transaction.Tx) error, err error)
+	ApplyServiceEvents(seals []*flow.Seal) error
 }

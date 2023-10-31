@@ -2,13 +2,12 @@ package protocol_state
 
 import (
 	"fmt"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-// Updater is a dedicated structure that encapsulates all logic for updating protocol state.
+// StateMachine is a dedicated structure that encapsulates all logic for updating protocol state.
 // Only protocol state updater knows how to update protocol state in a way that is consistent with the protocol.
 // Protocol state updater implements the following state changes:
 // - epoch setup: transitions current epoch from staking to setup phase, creates next epoch protocol state when processed.
@@ -17,7 +16,7 @@ import (
 // - setting an invalid state transition flag: sets an invalid state transition flag for current epoch and next epoch(if available).
 // All updates are applied to a copy of parent protocol state, so parent protocol state is not modified.
 // It is NOT safe to use in concurrent environment.
-type Updater struct {
+type StateMachine struct {
 	parentState *flow.RichProtocolStateEntry
 	state       *flow.ProtocolStateEntry
 	view        uint64
@@ -32,11 +31,11 @@ type Updater struct {
 	nextEpochIdentitiesLookup    map[flow.Identifier]*flow.DynamicIdentityEntry // lookup for nodes active in the next epoch, may be nil or empty
 }
 
-var _ protocol.StateUpdater = (*Updater)(nil)
+var _ ProtocolStateMachine = (*StateMachine)(nil)
 
-// NewUpdater creates a new protocol state updater.
-func NewUpdater(view uint64, parentState *flow.RichProtocolStateEntry) *Updater {
-	updater := &Updater{
+// NewStateMachine creates a new protocol state updater.
+func NewStateMachine(view uint64, parentState *flow.RichProtocolStateEntry) *StateMachine {
+	updater := &StateMachine{
 		parentState: parentState,
 		state:       parentState.ProtocolStateEntry.Copy(),
 		view:        view,
@@ -45,7 +44,7 @@ func NewUpdater(view uint64, parentState *flow.RichProtocolStateEntry) *Updater 
 }
 
 // Build returns updated protocol state entry, state ID and a flag indicating if there were any changes.
-func (u *Updater) Build() (updatedState *flow.ProtocolStateEntry, stateID flow.Identifier, hasChanges bool) {
+func (u *StateMachine) Build() (updatedState *flow.ProtocolStateEntry, stateID flow.Identifier, hasChanges bool) {
 	updatedState = u.state.Copy()
 	stateID = updatedState.ID()
 	hasChanges = stateID != u.parentState.ID()
@@ -60,7 +59,7 @@ func (u *Updater) Build() (updatedState *flow.ProtocolStateEntry, stateID flow.I
 // As a result of this operation protocol state for the next epoch will be created.
 // Expected errors during normal operations:
 // - `protocol.InvalidServiceEventError` if the service event is invalid or is not a valid state transition for the current protocol state
-func (u *Updater) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
+func (u *StateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
 	if u.state.InvalidStateTransitionAttempted {
 		return nil // won't process new events if we are in epoch fallback mode.
 	}
@@ -144,7 +143,7 @@ func (u *Updater) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
 // As a result of this operation protocol state for next epoch will be committed.
 // Expected errors during normal operations:
 // - `protocol.InvalidServiceEventError` if the service event is invalid or is not a valid state transition for the current protocol state
-func (u *Updater) ProcessEpochCommit(epochCommit *flow.EpochCommit) error {
+func (u *StateMachine) ProcessEpochCommit(epochCommit *flow.EpochCommit) error {
 	if u.state.InvalidStateTransitionAttempted {
 		return nil // won't process new events if we are going to enter epoch fallback mode
 	}
@@ -170,7 +169,7 @@ func (u *Updater) ProcessEpochCommit(epochCommit *flow.EpochCommit) error {
 // UpdateIdentity updates identity table with new identity entry.
 // Should pass identity which is already present in the table, otherwise an exception will be raised.
 // No errors are expected during normal operations.
-func (u *Updater) UpdateIdentity(updated *flow.DynamicIdentityEntry) error {
+func (u *StateMachine) UpdateIdentity(updated *flow.DynamicIdentityEntry) error {
 	u.ensureLookupPopulated()
 	prevEpochIdentity, foundInPrev := u.prevEpochIdentitiesLookup[updated.NodeID]
 	if foundInPrev {
@@ -191,7 +190,7 @@ func (u *Updater) UpdateIdentity(updated *flow.DynamicIdentityEntry) error {
 }
 
 // SetInvalidStateTransitionAttempted sets a flag indicating that invalid state transition was attempted.
-func (u *Updater) SetInvalidStateTransitionAttempted() {
+func (u *StateMachine) SetInvalidStateTransitionAttempted() {
 	u.state.InvalidStateTransitionAttempted = true
 }
 
@@ -202,7 +201,7 @@ func (u *Updater) SetInvalidStateTransitionAttempted() {
 // - invalid state transition has not been attempted,
 // - candidate block is in the next epoch.
 // No errors are expected during normal operations.
-func (u *Updater) TransitionToNextEpoch() error {
+func (u *StateMachine) TransitionToNextEpoch() error {
 	if u.state.InvalidStateTransitionAttempted {
 		return fmt.Errorf("invalid state transition has been attempted, no transition is allowed")
 	}
@@ -229,19 +228,19 @@ func (u *Updater) TransitionToNextEpoch() error {
 }
 
 // View returns the view that is associated with this state updater.
-// StateUpdater is created for a view where protocol state changes will be applied.
-func (u *Updater) View() uint64 {
+// The view of the StateUpdater equals the view of the block carrying the respective updates.
+func (u *StateMachine) View() uint64 {
 	return u.view
 }
 
 // ParentState returns parent protocol state that is associated with this state updater.
-func (u *Updater) ParentState() *flow.RichProtocolStateEntry {
+func (u *StateMachine) ParentState() *flow.RichProtocolStateEntry {
 	return u.parentState
 }
 
 // ensureLookupPopulated ensures that current and next epoch identities lookups are populated.
 // We use this to avoid populating lookups on every UpdateIdentity call.
-func (u *Updater) ensureLookupPopulated() {
+func (u *StateMachine) ensureLookupPopulated() {
 	if len(u.currentEpochIdentitiesLookup) > 0 {
 		return
 	}
@@ -251,7 +250,7 @@ func (u *Updater) ensureLookupPopulated() {
 // rebuildIdentityLookup re-generates lookups of *active* participants for
 // previous (optional, if u.state.PreviousEpoch ≠ nil), current (required) and
 // next epoch (optional, if u.state.NextEpoch ≠ nil).
-func (u *Updater) rebuildIdentityLookup() {
+func (u *StateMachine) rebuildIdentityLookup() {
 	if u.state.PreviousEpoch != nil {
 		u.prevEpochIdentitiesLookup = u.state.PreviousEpoch.ActiveIdentities.Lookup()
 	} else {

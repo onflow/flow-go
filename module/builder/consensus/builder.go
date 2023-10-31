@@ -23,21 +23,21 @@ import (
 // Builder is the builder for consensus block payloads. Upon providing a payload
 // hash, it also memorizes which entities were included into the payload.
 type Builder struct {
-	metrics           module.MempoolMetrics
-	tracer            module.Tracer
-	db                *badger.DB
-	state             protocol.ParticipantState
-	seals             storage.Seals
-	headers           storage.Headers
-	index             storage.Index
-	blocks            storage.Blocks
-	resultsDB         storage.ExecutionResults
-	receiptsDB        storage.ExecutionReceipts
-	guarPool          mempool.Guarantees
-	sealPool          mempool.IncorporatedResultSeals
-	recPool           mempool.ExecutionTree
-	protoStateMutator protocol.StateMutator
-	cfg               Config
+	metrics              module.MempoolMetrics
+	tracer               module.Tracer
+	db                   *badger.DB
+	state                protocol.ParticipantState
+	seals                storage.Seals
+	headers              storage.Headers
+	index                storage.Index
+	blocks               storage.Blocks
+	resultsDB            storage.ExecutionResults
+	receiptsDB           storage.ExecutionReceipts
+	guarPool             mempool.Guarantees
+	sealPool             mempool.IncorporatedResultSeals
+	recPool              mempool.ExecutionTree
+	mutableProtocolState protocol.MutableProtocolState
+	cfg                  Config
 }
 
 // NewBuilder creates a new block builder.
@@ -51,7 +51,7 @@ func NewBuilder(
 	blocks storage.Blocks,
 	resultsDB storage.ExecutionResults,
 	receiptsDB storage.ExecutionReceipts,
-	protoStateMutator protocol.StateMutator,
+	mutableProtocolState protocol.MutableProtocolState,
 	guarPool mempool.Guarantees,
 	sealPool mempool.IncorporatedResultSeals,
 	recPool mempool.ExecutionTree,
@@ -79,21 +79,21 @@ func NewBuilder(
 	}
 
 	b := &Builder{
-		metrics:           metrics,
-		db:                db,
-		tracer:            tracer,
-		state:             state,
-		headers:           headers,
-		seals:             seals,
-		index:             index,
-		blocks:            blocks,
-		resultsDB:         resultsDB,
-		receiptsDB:        receiptsDB,
-		guarPool:          guarPool,
-		sealPool:          sealPool,
-		recPool:           recPool,
-		protoStateMutator: protoStateMutator,
-		cfg:               cfg,
+		metrics:              metrics,
+		db:                   db,
+		tracer:               tracer,
+		state:                state,
+		headers:              headers,
+		seals:                seals,
+		index:                index,
+		blocks:               blocks,
+		resultsDB:            resultsDB,
+		receiptsDB:           receiptsDB,
+		guarPool:             guarPool,
+		sealPool:             sealPool,
+		recPool:              recPool,
+		mutableProtocolState: mutableProtocolState,
+		cfg:                  cfg,
 	}
 
 	err = b.repopulateExecutionTree()
@@ -635,15 +635,18 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 		return nil, fmt.Errorf("could not apply setter: %w", err)
 	}
 
-	updater, err := b.protoStateMutator.CreateUpdater(header.View, header.ParentID)
+	stateMutator, err := b.mutableProtocolState.Mutator(header.View, header.ParentID)
 	if err != nil {
-		return nil, fmt.Errorf("could not create protocol state updater for view %d: %w", header.View, err)
+		return nil, fmt.Errorf("could not create protocol state stateMutator for view %d: %w", header.View, err)
 	}
-	_, err = b.protoStateMutator.ApplyServiceEvents(updater, seals)
+	err = stateMutator.ApplyServiceEvents(seals)
 	if err != nil {
 		return nil, fmt.Errorf("could not apply service events as leader: %w", err)
 	}
-	_, protocolStateID, _ := updater.Build()
+	_, _, protocolStateID, _, err := stateMutator.Build()
+	if err != nil {
+		return nil, fmt.Errorf("could not build updated protocol state: %w", err)
+	}
 
 	proposal := &flow.Block{
 		Header: header,

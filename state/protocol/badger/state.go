@@ -37,9 +37,9 @@ type State struct {
 		setups  storage.EpochSetups
 		commits storage.EpochCommits
 	}
-	protocolStateMutator protocol.StateMutator
-	protocolState        protocol.ProtocolState
-	versionBeacons       storage.VersionBeacons
+	protocolStateSnapshotsDB storage.ProtocolState
+	protocolState            protocol.MutableProtocolState
+	versionBeacons           storage.VersionBeacons
 
 	// rootHeight marks the cutoff of the history this node knows about. We cache it in the state
 	// because it cannot change over the lifecycle of a protocol state instance. It is frequently
@@ -784,18 +784,18 @@ func newState(
 			setups:  setups,
 			commits: commits,
 		},
-		protocolState:        protocol_state.NewProtocolState(protocolStateSnapshots, globalParams),
-		protocolStateMutator: nil,
-		versionBeacons:       versionBeacons,
-		cachedFinal:          new(atomic.Pointer[cachedHeader]),
-		cachedSealed:         new(atomic.Pointer[cachedHeader]),
+		protocolStateSnapshotsDB: protocolStateSnapshots,
+		versionBeacons:           versionBeacons,
+		cachedFinal:              new(atomic.Pointer[cachedHeader]),
+		cachedSealed:             new(atomic.Pointer[cachedHeader]),
 	}
-	state.protocolStateMutator = protocol_state.NewMutator(
+	state.protocolState = protocol_state.NewMutableProtocolState(
+		protocolStateSnapshots,
+		globalParams,
 		headers,
 		results,
 		setups,
 		commits,
-		protocolStateSnapshots,
 		state.Params(),
 	)
 

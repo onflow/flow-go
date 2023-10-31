@@ -25,7 +25,7 @@ type UpdaterSuite struct {
 	parentBlock         *flow.Header
 	candidate           *flow.Header
 
-	updater *Updater
+	updater *StateMachine
 }
 
 func (s *UpdaterSuite) SetupTest() {
@@ -33,7 +33,7 @@ func (s *UpdaterSuite) SetupTest() {
 	s.parentBlock = unittest.BlockHeaderFixture(unittest.HeaderWithView(s.parentProtocolState.CurrentEpochSetup.FirstView + 1))
 	s.candidate = unittest.BlockHeaderWithParentFixture(s.parentBlock)
 
-	s.updater = NewUpdater(s.candidate.View, s.parentProtocolState)
+	s.updater = NewStateMachine(s.candidate.View, s.parentProtocolState)
 }
 
 // TestNewUpdater tests if the constructor correctly setups invariants for updater.
@@ -54,7 +54,7 @@ func (s *UpdaterSuite) TestTransitionToNextEpoch() {
 	candidate := unittest.BlockHeaderFixture(
 		unittest.HeaderWithView(s.parentProtocolState.CurrentEpochSetup.FinalView + 1))
 	// since the candidate block is from next epoch, updater should transition to next epoch
-	s.updater = NewUpdater(candidate.View, s.parentProtocolState)
+	s.updater = NewStateMachine(candidate.View, s.parentProtocolState)
 	err := s.updater.TransitionToNextEpoch()
 	require.NoError(s.T(), err)
 	updatedState, _, _ := s.updater.Build()
@@ -68,7 +68,7 @@ func (s *UpdaterSuite) TestTransitionToNextEpochNotAllowed() {
 		protocolState := unittest.ProtocolStateFixture()
 		candidate := unittest.BlockHeaderFixture(
 			unittest.HeaderWithView(protocolState.CurrentEpochSetup.FinalView + 1))
-		updater := NewUpdater(candidate.View, protocolState)
+		updater := NewStateMachine(candidate.View, protocolState)
 		err := updater.TransitionToNextEpoch()
 		require.Error(s.T(), err, "should not allow transition to next epoch if there is no next epoch protocol state")
 	})
@@ -79,7 +79,7 @@ func (s *UpdaterSuite) TestTransitionToNextEpochNotAllowed() {
 		})
 		candidate := unittest.BlockHeaderFixture(
 			unittest.HeaderWithView(protocolState.CurrentEpochSetup.FinalView + 1))
-		updater := NewUpdater(candidate.View, protocolState)
+		updater := NewStateMachine(candidate.View, protocolState)
 		err := updater.TransitionToNextEpoch()
 		require.Error(s.T(), err, "should not allow transition to next epoch if it is not committed")
 	})
@@ -89,7 +89,7 @@ func (s *UpdaterSuite) TestTransitionToNextEpochNotAllowed() {
 		})
 		candidate := unittest.BlockHeaderFixture(
 			unittest.HeaderWithView(protocolState.CurrentEpochSetup.FinalView + 1))
-		updater := NewUpdater(candidate.View, protocolState)
+		updater := NewStateMachine(candidate.View, protocolState)
 		err := updater.TransitionToNextEpoch()
 		require.Error(s.T(), err, "should not allow transition to next epoch if next block is not first block from next epoch")
 	})
@@ -97,7 +97,7 @@ func (s *UpdaterSuite) TestTransitionToNextEpochNotAllowed() {
 		protocolState := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
 		candidate := unittest.BlockHeaderFixture(
 			unittest.HeaderWithView(protocolState.CurrentEpochSetup.FinalView))
-		updater := NewUpdater(candidate.View, protocolState)
+		updater := NewStateMachine(candidate.View, protocolState)
 		err := updater.TransitionToNextEpoch()
 		require.Error(s.T(), err, "should not allow transition to next epoch if next block is not first block from next epoch")
 	})
@@ -124,7 +124,7 @@ func (s *UpdaterSuite) TestSetInvalidStateTransitionAttempted() {
 	// update protocol state with next epoch information
 	unittest.WithNextEpochProtocolState()(s.parentProtocolState)
 	// create new updater with next epoch information
-	s.updater = NewUpdater(s.candidate.View, s.parentProtocolState)
+	s.updater = NewStateMachine(s.candidate.View, s.parentProtocolState)
 
 	s.updater.SetInvalidStateTransitionAttempted()
 	updatedState, _, hasChanges := s.updater.Build()
@@ -152,7 +152,7 @@ func (s *UpdaterSuite) TestProcessEpochCommit() {
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 	})
 	s.Run("invalid state transition attempted", func() {
-		updater := NewUpdater(s.candidate.View, s.parentProtocolState)
+		updater := NewStateMachine(s.candidate.View, s.parentProtocolState)
 		setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
 			setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
 			setup.FirstView = s.parentProtocolState.CurrentEpochSetup.FinalView + 1
@@ -176,7 +176,7 @@ func (s *UpdaterSuite) TestProcessEpochCommit() {
 		require.Equal(s.T(), flow.ZeroID, newState.NextEpoch.CommitID, "operation must be no-op")
 	})
 	s.Run("happy path processing", func() {
-		updater := NewUpdater(s.candidate.View, s.parentProtocolState)
+		updater := NewStateMachine(s.candidate.View, s.parentProtocolState)
 		setup := unittest.EpochSetupFixture(
 			unittest.SetupWithCounter(s.parentProtocolState.CurrentEpochSetup.Counter+1),
 			unittest.WithFirstView(s.parentProtocolState.CurrentEpochSetup.FinalView+1),
@@ -197,7 +197,7 @@ func (s *UpdaterSuite) TestProcessEpochCommit() {
 			nil,
 		)
 		require.NoError(s.T(), err)
-		updater = NewUpdater(s.candidate.View+1, parentState)
+		updater = NewStateMachine(s.candidate.View+1, parentState)
 		commit := unittest.EpochCommitFixture(
 			unittest.CommitWithCounter(setup.Counter),
 			unittest.WithDKGFromParticipants(setup.Participants),
@@ -233,7 +233,7 @@ func (s *UpdaterSuite) TestUpdateIdentityUnknownIdentity() {
 func (s *UpdaterSuite) TestUpdateIdentityHappyPath() {
 	// update protocol state to have next epoch protocol state
 	unittest.WithNextEpochProtocolState()(s.parentProtocolState)
-	s.updater = NewUpdater(s.candidate.View, s.parentProtocolState)
+	s.updater = NewStateMachine(s.candidate.View, s.parentProtocolState)
 
 	currentEpochParticipants := s.parentProtocolState.CurrentEpochIdentityTable.Copy()
 	weightChanges, err := currentEpochParticipants.Sample(3)
@@ -291,7 +291,7 @@ func (s *UpdaterSuite) TestProcessEpochSetupInvariants() {
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 	})
 	s.Run("invalid state transition attempted", func() {
-		updater := NewUpdater(s.candidate.View, s.parentProtocolState)
+		updater := NewStateMachine(s.candidate.View, s.parentProtocolState)
 		setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
 			setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
 		})
@@ -303,7 +303,7 @@ func (s *UpdaterSuite) TestProcessEpochSetupInvariants() {
 		require.Nil(s.T(), updatedState.NextEpoch, "should not process epoch setup if invalid state transition attempted")
 	})
 	s.Run("processing second epoch setup", func() {
-		updater := NewUpdater(s.candidate.View, s.parentProtocolState)
+		updater := NewStateMachine(s.candidate.View, s.parentProtocolState)
 		setup := unittest.EpochSetupFixture(
 			unittest.SetupWithCounter(s.parentProtocolState.CurrentEpochSetup.Counter+1),
 			unittest.WithFirstView(s.parentProtocolState.CurrentEpochSetup.FinalView+1),
@@ -317,7 +317,7 @@ func (s *UpdaterSuite) TestProcessEpochSetupInvariants() {
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 	})
 	s.Run("participants not sorted", func() {
-		updater := NewUpdater(s.candidate.View, s.parentProtocolState)
+		updater := NewStateMachine(s.candidate.View, s.parentProtocolState)
 		setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
 			setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
 			var err error
@@ -332,7 +332,7 @@ func (s *UpdaterSuite) TestProcessEpochSetupInvariants() {
 		conflictingIdentity := s.parentProtocolState.ProtocolStateEntry.CurrentEpoch.ActiveIdentities[0]
 		conflictingIdentity.Dynamic.Ejected = true
 
-		updater := NewUpdater(s.candidate.View, s.parentProtocolState)
+		updater := NewStateMachine(s.candidate.View, s.parentProtocolState)
 		setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
 			setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
 			// using same identities as in previous epoch should result in an error since
@@ -469,7 +469,7 @@ func (s *UpdaterSuite) TestEpochSetupAfterIdentityChange() {
 
 	// now we can use it to construct updater for next block, which will process epoch setup event.
 	nextBlock := unittest.BlockHeaderWithParentFixture(s.candidate)
-	s.updater = NewUpdater(nextBlock.View, updatedRichProtocolState)
+	s.updater = NewStateMachine(nextBlock.View, updatedRichProtocolState)
 
 	setup := unittest.EpochSetupFixture(
 		unittest.SetupWithCounter(s.parentProtocolState.CurrentEpochSetup.Counter+1),
