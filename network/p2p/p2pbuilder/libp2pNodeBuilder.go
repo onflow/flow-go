@@ -55,11 +55,6 @@ const (
 	defaultMemoryLimitRatio = 0.2
 	// defaultFileDescriptorsRatio libp2p default
 	defaultFileDescriptorsRatio = 0.5
-	// defaultPeerBaseLimitConnsInbound default value for libp2p PeerBaseLimitConnsInbound. This limit
-	// restricts the amount of inbound connections from a peer to 1, forcing libp2p to reuse the connection.
-	// Without this limit peers can end up in a state where there exists n number of connections per peer which
-	// can lead to resource exhaustion of the libp2p node.
-	defaultPeerBaseLimitConnsInbound = 1
 
 	// defaultPeerScoringEnabled is the default value for enabling peer scoring.
 	defaultPeerScoringEnabled = true // enable peer scoring by default on node builder
@@ -119,7 +114,7 @@ func DefaultResourceManagerConfig() *ResourceManagerConfig {
 	return &ResourceManagerConfig{
 		MemoryLimitRatio:          defaultMemoryLimitRatio,
 		FileDescriptorsRatio:      defaultFileDescriptorsRatio,
-		PeerBaseLimitConnsInbound: defaultPeerBaseLimitConnsInbound,
+		PeerBaseLimitConnsInbound: 0, // it is set to zero by default to use the default value in the resource manager.
 	}
 }
 
@@ -315,8 +310,14 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		if err != nil {
 			return nil, fmt.Errorf("could not get allowed file descriptors: %w", err)
 		}
-		limits.PeerBaseLimit.ConnsInbound = builder.resourceManagerCfg.PeerBaseLimitConnsInbound
+
 		l := limits.Scale(mem, fd)
+
+		// caps the number of inbound connections per node to the limit in case the limit is lower than the default.
+		if builder.resourceManagerCfg.PeerBaseLimitConnsInbound > 0 && builder.resourceManagerCfg.PeerBaseLimitConnsInbound < l.PeerDefault.ConnsInbound {
+			l.PeerDefault.ConnsInbound = builder.resourceManagerCfg.PeerBaseLimitConnsInbound
+			builder.logger.Info().Int("limit", l.PeerDefault.ConnsInbound).Msg("peer inbound connection limit is overridden by the node builder")
+		}
 		mgr, err := rcmgr.NewResourceManager(rcmgr.NewFixedLimiter(l), rcmgr.WithMetrics(builder.metrics))
 		if err != nil {
 			return nil, fmt.Errorf("could not create libp2p resource manager: %w", err)
