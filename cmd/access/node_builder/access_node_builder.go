@@ -431,6 +431,10 @@ func (builder *FlowAccessNodeBuilder) buildFollowerEngine() *FlowAccessNodeBuild
 
 func (builder *FlowAccessNodeBuilder) buildSyncEngine() *FlowAccessNodeBuilder {
 	builder.Component("sync engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		spamConfig, err := synceng.NewSpamDetectionConfig()
+		if err != nil {
+			return nil, fmt.Errorf("could not initialize spam detection config: %w", err)
+		}
 		sync, err := synceng.New(
 			node.Logger,
 			node.Metrics.Engine,
@@ -441,7 +445,7 @@ func (builder *FlowAccessNodeBuilder) buildSyncEngine() *FlowAccessNodeBuilder {
 			builder.FollowerEng,
 			builder.SyncCore,
 			builder.SyncEngineParticipantsProviderFactory(),
-			synceng.NewSpamDetectionConfig(),
+			spamConfig,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create synchronization engine: %w", err)
@@ -623,7 +627,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				execDataCacheBackend,
 			)
 
-			builder.ExecutionDataRequester = edrequester.New(
+			r, err := edrequester.New(
 				builder.Logger,
 				metrics.NewExecutionDataRequesterCollector(),
 				builder.ExecutionDataDownloader,
@@ -635,6 +639,10 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				builder.executionDataConfig,
 				execDataDistributor,
 			)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create execution data requester: %w", err)
+			}
+			builder.ExecutionDataRequester = r
 
 			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.ExecutionDataRequester.OnBlockFinalized)
 
@@ -738,7 +746,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				builder.ExecutionIndexerCore = indexerCore
 
 				// execution state worker uses a jobqueue to process new execution data and indexes it by using the indexer.
-				builder.ExecutionIndexer = indexer.NewIndexer(
+				builder.ExecutionIndexer, err = indexer.NewIndexer(
 					builder.Logger,
 					registers.FirstHeight(),
 					registers,
@@ -747,6 +755,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					builder.ExecutionDataRequester.HighestConsecutiveHeight,
 					indexedBlockHeight,
 				)
+				if err != nil {
+					return nil, err
+				}
 
 				builder.RegistersAsyncStore.InitDataAvailable(builder.ExecutionIndexer, registers)
 
@@ -761,7 +772,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					builder.RootChainID,
 					query.NewProtocolStateWrapper(builder.State),
 					builder.Storage.Headers,
-					execution.IndexRegisterAdapter(builder.ExecutionIndexerCore.RegisterValues),
+					builder.ExecutionIndexerCore.RegisterValue,
 				)
 				if err != nil {
 					return nil, err

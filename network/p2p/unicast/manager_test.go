@@ -203,7 +203,7 @@ func TestManagerConfigValidation(t *testing.T) {
 // It tests that when there is no connection, it tries to connect to the peer some number of times (unicastmodel.MaxDialAttemptTimes), before
 // giving up.
 func TestUnicastManager_Connection_ConnectionBackoff(t *testing.T) {
-	peerID := p2ptest.PeerIdFixture(t)
+	peerID := unittest.PeerIdFixture(t)
 	mgr, streamFactory, connStatus, dialConfigCache := unicastManagerFixture(t)
 
 	cfg, err := config.DefaultConfig()
@@ -241,7 +241,7 @@ func TestUnicastManager_Connection_ConnectionBackoff(t *testing.T) {
 // TestUnicastManager_StreamFactory_Connection_SuccessfulConnection_And_Stream tests that when there is no connection, and CreateStream is successful on the first attempt for connection and stream creation,
 // it updates the last successful dial time and the consecutive successful stream counter.
 func TestUnicastManager_Connection_SuccessfulConnection_And_Stream(t *testing.T) {
-	peerID := p2ptest.PeerIdFixture(t)
+	peerID := unittest.PeerIdFixture(t)
 	mgr, streamFactory, connStatus, dialConfigCache := unicastManagerFixture(t)
 
 	cfg, err := config.DefaultConfig()
@@ -278,7 +278,7 @@ func TestUnicastManager_Connection_SuccessfulConnection_And_Stream(t *testing.T)
 // giving up.
 // It also checks the consecutive successful stream counter is reset when the stream creation fails, and the last successful dial time is updated.
 func TestUnicastManager_Connection_SuccessfulConnection_StreamBackoff(t *testing.T) {
-	peerID := p2ptest.PeerIdFixture(t)
+	peerID := unittest.PeerIdFixture(t)
 	mgr, streamFactory, connStatus, dialConfigCache := unicastManagerFixture(t)
 
 	cfg, err := config.DefaultConfig()
@@ -324,7 +324,7 @@ func TestUnicastManager_Connection_SuccessfulConnection_StreamBackoff(t *testing
 // giving up.
 func TestUnicastManager_StreamFactory_StreamBackoff(t *testing.T) {
 	mgr, streamFactory, connStatus, dialConfigCache := unicastManagerFixture(t)
-	peerID := p2ptest.PeerIdFixture(t)
+	peerID := unittest.PeerIdFixture(t)
 
 	cfg, err := config.DefaultConfig()
 	require.NoError(t, err)
@@ -356,7 +356,7 @@ func TestUnicastManager_StreamFactory_StreamBackoff(t *testing.T) {
 // it increments the consecutive successful stream counter in the dial config.
 func TestUnicastManager_Stream_ConsecutiveStreamCreation_Increment(t *testing.T) {
 	mgr, streamFactory, connStatus, dialConfigCache := unicastManagerFixture(t)
-	peerID := p2ptest.PeerIdFixture(t)
+	peerID := unittest.PeerIdFixture(t)
 
 	cfg, err := config.DefaultConfig()
 	require.NoError(t, err)
@@ -390,7 +390,7 @@ func TestUnicastManager_Stream_ConsecutiveStreamCreation_Increment(t *testing.T)
 // the consecutive successful stream counter in the dial config.
 func TestUnicastManager_Stream_ConsecutiveStreamCreation_Reset(t *testing.T) {
 	mgr, streamFactory, connStatus, dialConfigCache := unicastManagerFixture(t)
-	peerID := p2ptest.PeerIdFixture(t)
+	peerID := unittest.PeerIdFixture(t)
 
 	cfg, err := config.DefaultConfig()
 	require.NoError(t, err)
@@ -429,7 +429,7 @@ func TestUnicastManager_Stream_ConsecutiveStreamCreation_Reset(t *testing.T) {
 // TestUnicastManager_StreamFactory_ErrProtocolNotSupported tests that when there is a protocol not supported error, it does not retry creating a stream.
 func TestUnicastManager_StreamFactory_ErrProtocolNotSupported(t *testing.T) {
 	mgr, streamFactory, connStatus, _ := unicastManagerFixture(t)
-	peerID := p2ptest.PeerIdFixture(t)
+	peerID := unittest.PeerIdFixture(t)
 
 	connStatus.On("IsConnected", peerID).Return(true, nil) // connected
 	streamFactory.On("NewStream", mock.Anything, peerID, mock.Anything).
@@ -450,7 +450,7 @@ func TestUnicastManager_StreamFactory_ErrNoAddresses(t *testing.T) {
 	cfg, err := config.DefaultConfig()
 	require.NoError(t, err)
 
-	peerID := p2ptest.PeerIdFixture(t)
+	peerID := unittest.PeerIdFixture(t)
 	// mocks that the connection is not established.
 	connStatus.On("IsConnected", peerID).Return(false, nil)
 
@@ -484,7 +484,7 @@ func TestUnicastManager_Dial_ErrSecurityProtocolNegotiationFailed(t *testing.T) 
 	cfg, err := config.DefaultConfig()
 	require.NoError(t, err)
 
-	peerID := p2ptest.PeerIdFixture(t)
+	peerID := unittest.PeerIdFixture(t)
 	// mocks that the connection is not established.
 	connStatus.On("IsConnected", peerID).Return(false, nil)
 
@@ -514,7 +514,7 @@ func TestUnicastManager_Dial_ErrSecurityProtocolNegotiationFailed(t *testing.T) 
 // TestUnicastManager_Dial_ErrGaterDisallowedConnection tests that when there is a connection gater disallow listing error, it does not retry dialing.
 func TestUnicastManager_Dial_ErrGaterDisallowedConnection(t *testing.T) {
 	mgr, streamFactory, connStatus, dialConfigCache := unicastManagerFixture(t)
-	peerID := p2ptest.PeerIdFixture(t)
+	peerID := unittest.PeerIdFixture(t)
 	// mocks that the connection is not established.
 	connStatus.On("IsConnected", peerID).Return(false, nil)
 
@@ -548,7 +548,7 @@ func TestUnicastManager_Dial_ErrGaterDisallowedConnection(t *testing.T) {
 // it decrements the backoff budget for the remote peer.
 func TestUnicastManager_Connection_BackoffBudgetDecremented(t *testing.T) {
 	mgr, streamFactory, connStatus, dialConfigCache := unicastManagerFixture(t)
-	peerID := p2ptest.PeerIdFixture(t)
+	peerID := unittest.PeerIdFixture(t)
 
 	cfg, err := config.DefaultConfig()
 	require.NoError(t, err)
@@ -611,7 +611,7 @@ func TestUnicastManager_Connection_BackoffBudgetDecremented(t *testing.T) {
 // it decrements the backoff budget for the remote peer.
 func TestUnicastManager_Stream_BackoffBudgetDecremented(t *testing.T) {
 	mgr, streamFactory, connStatus, dialConfigCache := unicastManagerFixture(t)
-	peerID := p2ptest.PeerIdFixture(t)
+	peerID := unittest.PeerIdFixture(t)
 
 	cfg, err := config.DefaultConfig()
 	require.NoError(t, err)
@@ -674,7 +674,7 @@ func TestUnicastManager_Stream_BackoffBudgetDecremented(t *testing.T) {
 // it updates the last successful dial time and the consecutive successful stream counter.
 func TestUnicastManager_Stream_BackoffBudgetResetToDefault(t *testing.T) {
 	mgr, streamFactory, connStatus, dialConfigCache := unicastManagerFixture(t)
-	peerID := p2ptest.PeerIdFixture(t)
+	peerID := unittest.PeerIdFixture(t)
 
 	cfg, err := config.DefaultConfig()
 	require.NoError(t, err)
@@ -716,7 +716,7 @@ func TestUnicastManager_Stream_BackoffBudgetResetToDefault(t *testing.T) {
 // it updates the last successful dial time and the consecutive successful stream counter.
 func TestUnicastManager_Stream_BackoffConnectionBudgetResetToDefault(t *testing.T) {
 	mgr, streamFactory, connStatus, dialConfigCache := unicastManagerFixture(t)
-	peerID := p2ptest.PeerIdFixture(t)
+	peerID := unittest.PeerIdFixture(t)
 
 	cfg, err := config.DefaultConfig()
 	require.NoError(t, err)
@@ -763,7 +763,7 @@ func TestUnicastManager_Stream_BackoffConnectionBudgetResetToDefault(t *testing.
 // the unicast manager does not backoff if the dial attempt fails.
 func TestUnicastManager_Connection_NoBackoff_When_Budget_Is_Zero(t *testing.T) {
 	mgr, streamFactory, connStatus, dialConfigCache := unicastManagerFixture(t)
-	peerID := p2ptest.PeerIdFixture(t)
+	peerID := unittest.PeerIdFixture(t)
 
 	cfg, err := config.DefaultConfig()
 	require.NoError(t, err)
@@ -808,7 +808,7 @@ func TestUnicastManager_Connection_NoBackoff_When_Budget_Is_Zero(t *testing.T) {
 // zero rest threshold, the unicast manager does not backoff if the dial attempt fails.
 func TestUnicastManager_Stream_NoBackoff_When_Budget_Is_Zero(t *testing.T) {
 	mgr, streamFactory, connStatus, dialConfigCache := unicastManagerFixture(t)
-	peerID := p2ptest.PeerIdFixture(t)
+	peerID := unittest.PeerIdFixture(t)
 
 	cfg, err := config.DefaultConfig()
 	require.NoError(t, err)
@@ -911,7 +911,7 @@ func TestUnicastManager_Dial_In_Progress_Backoff(t *testing.T) {
 	}).Twice()
 	collector.On("OnPeerDialFailure", mock.Anything, mock.Anything).Once()
 
-	peerID := p2ptest.PeerIdFixture(t)
+	peerID := unittest.PeerIdFixture(t)
 	adjustedCfg, err := dialConfigCache.Adjust(peerID, func(dialConfig unicast.DialConfig) (unicast.DialConfig, error) {
 		dialConfig.DialRetryAttemptBudget = 0           // set the dial backoff budget to 0, meaning that the dial backoff budget is exhausted.
 		dialConfig.StreamCreationRetryAttemptBudget = 3 // set the stream backoff budget to 3, meaning that the stream backoff budget is exhausted after 1 attempt + 3 retries.
