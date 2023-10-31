@@ -201,7 +201,14 @@ func (executor *scriptExecutor) executeScript() error {
 
 	// TODO: how to clean up for the next script
 	if executor.ctx.EVMEnabled {
-		evm.SetupEnvironment(executor.ctx.Chain.ChainID(), executor.env, rt.Environment)
+		chain := executor.ctx.Chain
+		// TODO: handle error
+		evm.SetupEnvironment(
+			chain.ChainID(),
+			executor.env,
+			rt.Environment,
+			chain.ServiceAddress(),
+		)
 	}
 
 	value, err := rt.ExecuteScript(

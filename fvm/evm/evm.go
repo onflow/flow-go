@@ -1,24 +1,37 @@
 package evm
 
 import (
+	"fmt"
+
 	"github.com/onflow/cadence/runtime"
 
+	"github.com/onflow/flow-go/fvm/environment"
 	evm "github.com/onflow/flow-go/fvm/evm/emulator"
 	"github.com/onflow/flow-go/fvm/evm/emulator/database"
 	"github.com/onflow/flow-go/fvm/evm/handler"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
-	"github.com/onflow/flow-go/fvm/evm/stdlib/emulator"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
+
+func RootAccountAddress(chainID flow.ChainID) (flow.Address, error) {
+	// TODO handle other chains
+	switch chainID {
+	case flow.Emulator:
+		return chainID.Chain().AddressAtIndex(environment.EVMAccountIndex)
+	default:
+		return flow.Address{}, fmt.Errorf("unsupported chain %s", chainID)
+	}
+}
 
 func SetupEnvironment(
 	chainID flow.ChainID,
 	backend types.Backend,
 	env runtime.Environment,
+	service flow.Address,
 ) error {
 	// TODO: setup proper root address based on chainID
-	evmRootAddress, err := emulator.EVMRootAccountAddress(chainID)
+	evmRootAddress, err := RootAccountAddress(chainID)
 	if err != nil {
 		return err
 	}
@@ -34,10 +47,10 @@ func SetupEnvironment(
 	if err != nil {
 		return err
 	}
-	handler := handler.NewContractHandler(bs, backend, em)
-	// TODO: pass proper Flex type definition based on environment
-	flexTypeDefinition := emulator.FlexTypeDefinition
-	env.DeclareValue(stdlib.NewFlexStandardLibraryValue(nil, flexTypeDefinition, handler))
-	env.DeclareType(stdlib.NewFlexStandardLibraryType(flexTypeDefinition))
+
+	contractHandler := handler.NewContractHandler(bs, backend, em)
+
+	stdlib.SetupEnvironment(env, contractHandler, service)
+
 	return nil
 }

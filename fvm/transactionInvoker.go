@@ -92,7 +92,14 @@ func newTransactionExecutor(
 
 	// TODO: how to remove value and type runtime environment after decleration
 	if ctx.EVMEnabled {
-		evm.SetupEnvironment(ctx.Chain.ChainID(), env, cadenceRuntime.Environment)
+		chain := ctx.Chain
+		// TODO: handle error
+		evm.SetupEnvironment(
+			chain.ChainID(),
+			env,
+			cadenceRuntime.Environment,
+			chain.ServiceAddress(),
+		)
 	}
 
 	return &transactionExecutor{

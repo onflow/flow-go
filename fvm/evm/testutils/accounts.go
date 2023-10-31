@@ -106,5 +106,12 @@ func RunWithEOATestAccount(t *testing.T, led atree.Ledger, flowEVMRootAddress fl
 	_, err = blk.MintTo(account.Address(), new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1000)))
 	require.NoError(t, err)
 
+	blk2, err := e.NewReadOnlyBlockView(types.NewDefaultBlockContext(2))
+	require.NoError(t, err)
+
+	bal, err := blk2.BalanceOf(account.Address())
+	require.NoError(t, err)
+	require.Greater(t, bal.Uint64(), uint64(0))
+
 	f(account)
 }

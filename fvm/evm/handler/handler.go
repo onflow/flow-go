@@ -136,7 +136,9 @@ func (h ContractHandler) Run(rlpEncodedTx []byte, coinbase types.Address) bool {
 	}
 	if res == nil {
 		// fatal error
-		panic("empty result is retuned by emulator")
+		// TODO: fix me, Temp work around for now.
+		res = &types.Result{}
+		// panic("empty result is retuned by emulator")
 	}
 
 	res.Failed = failed
