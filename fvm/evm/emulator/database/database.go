@@ -17,6 +17,7 @@ import (
 const (
 	FlowEVMRootSlabKey = "RootSlabKey"
 	FlowEVMRootHashKey = "RootHash"
+	StorageIDSize      = 16
 )
 
 var (
@@ -36,8 +37,7 @@ type Database struct {
 	lock               sync.RWMutex // Ramtin: do we need this?
 }
 
-// New returns a wrapped map with all the required database interface methods
-// implemented.
+// NewDatabase returns a wrapped map that implements all the required database interface methods.
 func NewDatabase(led atree.Ledger, flowEVMRootAddress flow.Address) (*Database, error) {
 	baseStorage := atree.NewLedgerBaseStorage(led)
 
@@ -133,6 +133,23 @@ func (db *Database) delete(key []byte) error {
 	return nil
 }
 
+func (db *Database) applyBatch(b *batch) error {
+	db.lock.Lock()
+	defer db.lock.Unlock()
+	var err error
+	for _, keyvalue := range b.writes {
+		if err != nil {
+			return err
+		}
+		if keyvalue.delete {
+			err = db.delete(keyvalue.key)
+			continue
+		}
+		err = db.put(keyvalue.key, keyvalue.value)
+	}
+	return nil
+}
+
 func (db *Database) SetRootHash(root gethCommon.Hash) error {
 	err := db.led.SetValue(db.flowEVMRootAddress[:], []byte(FlowEVMRootHashKey), root[:])
 	if err != nil {
@@ -150,8 +167,7 @@ func (db *Database) GetRootHash() (gethCommon.Hash, error) {
 }
 
 func (db *Database) storeMapRoot() error {
-	storageIDSize := 16
-	rootIDBytes := make([]byte, storageIDSize)
+	rootIDBytes := make([]byte, StorageIDSize)
 	_, err := db.atreemap.StorageID().ToRawBytes(rootIDBytes)
 	if err != nil {
 		return err
@@ -189,7 +205,8 @@ func (db *Database) NewBatch() gethDB.Batch {
 // NewBatchWithSize creates a write-only database batch with pre-allocated buffer.
 func (db *Database) NewBatchWithSize(size int) gethDB.Batch {
 	return &batch{
-		db: db,
+		db:     db,
+		writes: make([]keyvalue, 0, size),
 	}
 }
 
@@ -227,7 +244,7 @@ func (db *Database) Len() int {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	return int(db.storage.Count())
+	return db.storage.Count()
 }
 
 // keyvalue is a key-value tuple tagged with a deletion field to allow creating
@@ -248,15 +265,17 @@ type batch struct {
 
 // Put inserts the given value into the batch for later committing.
 func (b *batch) Put(key, value []byte) error {
-	b.writes = append(b.writes, keyvalue{gethCommon.CopyBytes(key), gethCommon.CopyBytes(value), false})
-	b.size += len(key) + len(value)
-	return nil
+	return b.set(key, value, false)
 }
 
 // Delete inserts the a key removal into the batch for later committing.
 func (b *batch) Delete(key []byte) error {
-	b.writes = append(b.writes, keyvalue{gethCommon.CopyBytes(key), nil, true})
-	b.size += len(key)
+	return b.set(key, nil, false)
+}
+
+func (b *batch) set(key []byte, value []byte, delete bool) error {
+	b.writes = append(b.writes, keyvalue{gethCommon.CopyBytes(key), gethCommon.CopyBytes(value), delete})
+	b.size += len(key) + len(value)
 	return nil
 }
 
@@ -267,16 +286,7 @@ func (b *batch) ValueSize() int {
 
 // Write flushes any accumulated data to the memory database.
 func (b *batch) Write() error {
-	b.db.lock.Lock()
-	defer b.db.lock.Unlock()
-	for _, keyvalue := range b.writes {
-		if keyvalue.delete {
-			b.db.delete(keyvalue.key)
-			continue
-		}
-		b.db.put(keyvalue.key, keyvalue.value)
-	}
-	return nil
+	return b.db.applyBatch(b)
 }
 
 // Reset resets the batch for reuse.
