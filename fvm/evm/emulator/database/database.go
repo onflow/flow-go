@@ -69,6 +69,15 @@ func (db *Database) retrieveOrCreateMapRoot() error {
 		if err != nil {
 			return handleError(err)
 		}
+		rootIDBytes := make([]byte, StorageIDSize)
+		_, err := m.StorageID().ToRawBytes(rootIDBytes)
+		if err != nil {
+			return handleError(err)
+		}
+		err = db.led.SetValue(db.flowEVMRootAddress.Bytes(), []byte(FlowEVMRootSlabKey), rootIDBytes[:])
+		if err != nil {
+			return handleError(err)
+		}
 	} else {
 		storageID, err := atree.NewStorageIDFromRawBytes(rootIDBytes)
 		if err != nil {
@@ -80,19 +89,6 @@ func (db *Database) retrieveOrCreateMapRoot() error {
 		}
 	}
 	db.atreemap = m
-	return nil
-}
-
-func (db *Database) storeMapRoot() error {
-	rootIDBytes := make([]byte, StorageIDSize)
-	_, err := db.atreemap.StorageID().ToRawBytes(rootIDBytes)
-	if err != nil {
-		return handleError(err)
-	}
-	err = db.led.SetValue(db.flowEVMRootAddress.Bytes(), []byte(FlowEVMRootSlabKey), rootIDBytes[:])
-	if err != nil {
-		return handleError(err)
-	}
 	return nil
 }
 
@@ -239,11 +235,7 @@ func (db *Database) GetRootHash() (gethCommon.Hash, error) {
 
 // Commits the changes from atree into the underlying storage
 func (db *Database) Commit() error {
-	err := db.storeMapRoot()
-	if err != nil {
-		return types.NewFatalError(err)
-	}
-	err = db.storage.Commit()
+	err := db.storage.Commit()
 	if err != nil {
 		return types.NewFatalError(err)
 	}
