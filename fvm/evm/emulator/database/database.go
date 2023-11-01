@@ -24,11 +24,16 @@ const (
 // functionality it also supports batch writes and iterating over the keyspace in
 // binary-alphabetical order.
 type Database struct {
-	led                atree.Ledger
 	flowEVMRootAddress flow.Address
+	led                atree.Ledger
 	storage            *atree.PersistentSlabStorage
 	atreemap           *atree.OrderedMap
-	lock               sync.RWMutex // Ramtin: do we need this?
+	// Ramtin: other database implementations for EVM uses a lock
+	// to protect the storage against concurrent operations
+	// though one might do more research to see if we need
+	// these type of locking if the underlying structure (atree)
+	// has such protections or if EVM really needs it
+	lock sync.RWMutex
 }
 
 // NewDatabase returns a wrapped map that implements all the required database interface methods.
