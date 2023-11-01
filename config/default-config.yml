@@ -54,10 +54,9 @@ network-config:
   # Maximum allowed fraction of memory to be allocated by the libp2p resources in (0,1]
   libp2p-file-descriptors-ratio: 0.2 # libp2p default
   # The default value for libp2p PeerBaseLimitConnsInbound. This limit
-  # restricts the amount of inbound connections from a peer to 1, forcing libp2p to reuse the connection.
-  #	Without this limit peers can end up in a state where there exists n number of connections per peer which
-  #	can lead to resource exhaustion of the libp2p node.
-  libp2p-peer-base-limits-conns-inbound: 1
+  # restricts the amount of inbound connections from each remote peer, forcing libp2p to reuse the connection.
+  # We set this limit to zero by default to allow libp2p resource manager default limit value to be used.
+  libp2p-peer-base-limits-conns-inbound: 0
   # maximum number of inbound system-wide streams, across all peers and protocols
   # Note that streams are ephemeral and are created and destroyed intermittently.
   libp2p-inbound-stream-limit-system: 15_000
