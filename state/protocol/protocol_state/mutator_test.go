@@ -216,7 +216,7 @@ func (s *StateMutatorSuite) TestApplyServiceEventsSealsOrdered() {
 		seals = append(seals, seal)
 	}
 
-	// shuffle seals to make sure we order them
+	// shuffle seals to make sure they are not ordered in the payload, so `ApplyServiceEvents` needs to explicitly sort them.
 	require.NoError(s.T(), rand.Shuffle(uint(len(seals)), func(i, j uint) {
 		seals[i], seals[j] = seals[j], seals[i]
 	}))
