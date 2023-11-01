@@ -130,15 +130,15 @@ func (db *Database) put(key []byte, value []byte) error {
 	if err != nil {
 		return handleError(err)
 	}
-	
+
 	if id, ok := existingValueStorable.(atree.StorageIDStorable); ok {
 		// NOTE: deep remove isn't necessary because value is ByteStringValue (not container)
-		err := db.storage.Remove(id)
-	 	if err != nil {
-	  		return handleError(err)
+		err := db.storage.Remove(atree.StorageID(id))
+		if err != nil {
+			return handleError(err)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -169,22 +169,23 @@ func (db *Database) delete(key []byte) error {
 	if err != nil {
 		return handleError(err)
 	}
-	
+
 	if id, ok := removedMapKeyStorable.(atree.StorageIDStorable); ok {
 		// NOTE: deep remove isn't necessary because key is ByteStringValue (not container)
-		err := db.storage.Remove(id)
-	 	if err != nil {
-	  		return handleError(err)
+		err := db.storage.Remove(atree.StorageID(id))
+		if err != nil {
+			return handleError(err)
 		}
-	}	
-	
+	}
+
 	if id, ok := removedMapValueStorable.(atree.StorageIDStorable); ok {
 		// NOTE: deep remove isn't necessary because value is ByteStringValue (not container)
-		err := db.storage.Remove(id)
-	 	if err != nil {
-	  		return handleError(err)
+		err := db.storage.Remove(atree.StorageID(id))
+		if err != nil {
+			return handleError(err)
 		}
-	}		
+	}
+	return nil
 }
 
 // ApplyBatch applys changes from a batch into the database
