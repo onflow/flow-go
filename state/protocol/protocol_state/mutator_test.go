@@ -95,16 +95,9 @@ func (s *StateMutatorSuite) TestApplyServiceEvents_InvalidEpochSetup() {
 	s.params.On("EpochFallbackTriggered").Return(false, nil)
 	s.Run("invalid-epoch-setup", func() {
 		parentState := unittest.ProtocolStateFixture()
-		rootSetup := parentState.CurrentEpochSetup
-
 		s.stateMachine.On("ParentState").Return(parentState)
 
-		epochSetup := unittest.EpochSetupFixture(
-			unittest.WithParticipants(rootSetup.Participants),
-			unittest.SetupWithCounter(rootSetup.Counter+1),
-			unittest.WithFinalView(rootSetup.FinalView+1000),
-			unittest.WithFirstView(rootSetup.FinalView+1),
-		)
+		epochSetup := unittest.EpochSetupFixture()
 		result := unittest.ExecutionResultFixture(func(result *flow.ExecutionResult) {
 			result.ServiceEvents = []flow.ServiceEvent{epochSetup.ServiceEvent()}
 		})
@@ -122,16 +115,9 @@ func (s *StateMutatorSuite) TestApplyServiceEvents_InvalidEpochSetup() {
 	})
 	s.Run("process-epoch-setup-exception", func() {
 		parentState := unittest.ProtocolStateFixture()
-		rootSetup := parentState.CurrentEpochSetup
-
 		s.stateMachine.On("ParentState").Return(parentState)
 
-		epochSetup := unittest.EpochSetupFixture(
-			unittest.WithParticipants(rootSetup.Participants),
-			unittest.SetupWithCounter(rootSetup.Counter+1),
-			unittest.WithFinalView(rootSetup.FinalView+1000),
-			unittest.WithFirstView(rootSetup.FinalView+1),
-		)
+		epochSetup := unittest.EpochSetupFixture()
 		result := unittest.ExecutionResultFixture(func(result *flow.ExecutionResult) {
 			result.ServiceEvents = []flow.ServiceEvent{epochSetup.ServiceEvent()}
 		})
@@ -156,7 +142,6 @@ func (s *StateMutatorSuite) TestApplyServiceEvents_InvalidEpochCommit() {
 	s.params.On("EpochFallbackTriggered").Return(false, nil)
 	s.Run("invalid-epoch-commit", func() {
 		parentState := unittest.ProtocolStateFixture()
-
 		s.stateMachine.On("ParentState").Return(parentState)
 
 		epochCommit := unittest.EpochCommitFixture()
@@ -177,7 +162,6 @@ func (s *StateMutatorSuite) TestApplyServiceEvents_InvalidEpochCommit() {
 	})
 	s.Run("process-epoch-commit-exception", func() {
 		parentState := unittest.ProtocolStateFixture()
-
 		s.stateMachine.On("ParentState").Return(parentState)
 
 		epochCommit := unittest.EpochCommitFixture()
