@@ -15,6 +15,7 @@ var (
 	FlowEVMTestnetChainID = big.NewInt(666)
 	FlowEVMMainnetChainID = big.NewInt(777)
 	BlockLevelGasLimit    = uint64(math.MaxUint64)
+	zero                  = uint64(0)
 )
 
 // Config sets the required parameters
@@ -31,7 +32,13 @@ type Config struct {
 	DirectCallBaseGasUsage uint64
 }
 
-var zero = uint64(0)
+// DefaultChainConfig is the default chain config which
+// considers majority of EVM upgrades (e.g. Shanghai update) already been applied
+// this has done through setting the height of these changes
+// to zero nad setting the time for some other changes to zero
+// For the future changes of EVM, we need to update the EVM go mod version
+// and set a proper height for the specific release based on the Flow EVM heights
+// so it could gets activated at a desired time.
 var DefaultChainConfig = &params.ChainConfig{
 	ChainID: FlowEVMTestnetChainID, // default is testnet
 

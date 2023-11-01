@@ -8,13 +8,13 @@ import (
 
 var DefaultBlockNumberForEVMRules = big.NewInt(1) // anything bigger than 0
 
-// GetDefaultSigner returns the signer with default config
+// GetDefaultSigner returns a signer which is compatible with the default config
 func GetDefaultSigner() types.Signer {
 	cfg := NewConfig(WithBlockNumber(DefaultBlockNumberForEVMRules))
 	return GetSigner(cfg)
 }
 
-// GetSigner a signer compatible with this env
+// GetSigner returns a signer that is compatible with the given config
 func GetSigner(cfg *Config) types.Signer {
 	signer := types.MakeSigner(cfg.ChainConfig, cfg.BlockContext.BlockNumber, cfg.BlockContext.Time)
 	return signer
