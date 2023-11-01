@@ -1,6 +1,7 @@
 package database
 
 import (
+	stdErrors "errors"
 	"sync"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
@@ -337,12 +338,13 @@ func (b *batch) Replay(w gethDB.KeyValueWriter) error {
 }
 
 func handleError(err error) error {
-	// TODO add handle for Atree.UserErrors ?
 	if err == nil {
 		return nil
 	}
-	if errors.IsFailure(err) {
+	var atreeFatalError *atree.FatalError
+	if stdErrors.As(err, &atreeFatalError) || errors.IsFailure(err) {
 		return types.NewFatalError(err)
 	}
+	// the rest is user error
 	return err
 }
