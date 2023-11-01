@@ -11,11 +11,18 @@ import (
 
 const flowPackagePrefix = "github.com/onflow/flow-go/"
 const ciMatrixName = "dynamicMatrix"
+const ciDefaultRunner = "ubuntu-latest"
 
 // testMatrix represents a single GitHub Actions test matrix combination that consists of a name and a list of flow-go packages associated with that name.
 type testMatrix struct {
 	Name     string `json:"name"`
 	Packages string `json:"packages"`
+	Runner   string `json:"runner"`
+}
+
+type targets struct {
+	runners  map[string]string
+	packages map[string][]string
 }
 
 // Generates a list of packages to test that will be passed to GitHub Actions
@@ -47,14 +54,16 @@ func main() {
 	fmt.Println(testMatrixStr)
 }
 
-func generateTestMatrix(targetPackages map[string][]string, otherPackages []string) []testMatrix {
-
+func generateTestMatrix(targetPackages targets, otherPackages []string) []testMatrix {
 	var testMatrices []testMatrix
 
-	for names := range targetPackages {
+	for names := range targetPackages.packages {
+		//targetPackages.runners[names] = targetPackages.Runner
+
 		targetTestMatrix := testMatrix{
 			Name:     names,
-			Packages: strings.Join(targetPackages[names], " "),
+			Packages: strings.Join(targetPackages.packages[names], " "),
+			//Runner:   targetPackages.Runner,
 		}
 		testMatrices = append(testMatrices, targetTestMatrix)
 	}
@@ -63,6 +72,7 @@ func generateTestMatrix(targetPackages map[string][]string, otherPackages []stri
 	otherTestMatrix := testMatrix{
 		Name:     "others",
 		Packages: strings.Join(otherPackages, " "),
+		Runner:   ciDefaultRunner,
 	}
 
 	testMatrices = append(testMatrices, otherTestMatrix)
@@ -72,31 +82,48 @@ func generateTestMatrix(targetPackages map[string][]string, otherPackages []stri
 
 // listTargetPackages returns a map-list of target packages to run as separate CI jobs, based on a list of target package prefixes.
 // It also returns a list of the "seen" packages that can then be used to extract the remaining packages to run (in a separate CI job).
-func listTargetPackages(targetPackagePrefixes []string, allFlowPackages []string) (map[string][]string, map[string]string) {
+func listTargetPackages(targetPackagePrefixes []string, allFlowPackages []string) (targets, map[string]string) {
+	//func listTargetPackages(targetPackagePrefixes []string, allFlowPackages []string) (map[string][]string, map[string]string) {
 	targetPackages := make(map[string][]string)
+	targetRunners := make(map[string]string)
 
 	// Stores list of packages already seen / allocated to other lists. Needed for the last package which will
 	// have all the leftover packages that weren't allocated to a separate list (CI job).
 	// It's a map, not a list, to make it easier to check if a package was seen or not.
 	seenPackages := make(map[string]string)
 
+	//targetPackagePrefixRunner := ciDefaultRunner
+
 	// iterate over the target packages to run as separate CI jobs
 	for _, targetPackagePrefix := range targetPackagePrefixes {
 		var targetPackage []string
 
+		// assume package name specified without runner
+		targetPackagePrefixNoRunner := targetPackagePrefix
+
+		// check if specify CI runner to use for the package, otherwise use default
+		colonIndex := strings.Index(targetPackagePrefix, ":")
+		if colonIndex != -1 {
+			targetPackagePrefixNoRunner = targetPackagePrefix[:colonIndex] // strip out runner from package name
+			targetRunners[targetPackagePrefixNoRunner] = targetPackagePrefix[colonIndex+1:]
+		} else {
+			// use default CI runner if didn't specify runner
+			targetRunners[targetPackagePrefix] = ciDefaultRunner
+		}
+
 		// go through all packages to see which ones to pull out
 		for _, allPackage := range allFlowPackages {
-			if strings.HasPrefix(allPackage, flowPackagePrefix+targetPackagePrefix) {
+			if strings.HasPrefix(allPackage, flowPackagePrefix+targetPackagePrefixNoRunner) {
 				targetPackage = append(targetPackage, allPackage)
 				seenPackages[allPackage] = allPackage
 			}
 		}
 		if len(targetPackage) == 0 {
-			panic("no packages exist with prefix " + targetPackagePrefix)
+			panic("no packages exist with prefix " + targetPackagePrefixNoRunner)
 		}
-		targetPackages[targetPackagePrefix] = targetPackage
+		targetPackages[targetPackagePrefixNoRunner] = targetPackage
 	}
-	return targetPackages, seenPackages
+	return targets{targetRunners, targetPackages}, seenPackages
 }
 
 // listOtherPackages compiles the remaining packages that don't match any of the target packages.
