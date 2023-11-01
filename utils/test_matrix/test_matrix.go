@@ -57,13 +57,11 @@ func main() {
 func generateTestMatrix(targetPackages targets, otherPackages []string) []testMatrix {
 	var testMatrices []testMatrix
 
-	for names := range targetPackages.packages {
-		//targetPackages.runners[names] = targetPackages.Runner
-
+	for packageName := range targetPackages.packages {
 		targetTestMatrix := testMatrix{
-			Name:     names,
-			Packages: strings.Join(targetPackages.packages[names], " "),
-			//Runner:   targetPackages.Runner,
+			Name:     packageName,
+			Packages: strings.Join(targetPackages.packages[packageName], " "),
+			Runner:   targetPackages.runners[packageName],
 		}
 		testMatrices = append(testMatrices, targetTestMatrix)
 	}

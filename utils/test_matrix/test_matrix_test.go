@@ -29,25 +29,25 @@ func getAllFlowPackages() []string {
 // TestListTargetPackages_DefaultRunners tests that the target packages are included in the target packages and seen packages.
 // All packages use default CI runners.
 func TestListTargetPackages_DefaultRunners(t *testing.T) {
-	targetPackages, seenPackages := listTargetPackages([]string{"abc", "ghi"}, getAllFlowPackages())
-	require.Equal(t, 2, len(targetPackages.packages))
+	target, seenPackages := listTargetPackages([]string{"abc", "ghi"}, getAllFlowPackages())
+	require.Equal(t, 2, len(target.packages))
 
 	// check all TARGET packages
 	// there should be 4 packages that start with "abc"
-	require.Equal(t, 4, len(targetPackages.packages["abc"]))
-	require.Contains(t, targetPackages.packages["abc"], flowPackagePrefix+"abc")
-	require.Contains(t, targetPackages.packages["abc"], flowPackagePrefix+"abc/123")
-	require.Contains(t, targetPackages.packages["abc"], flowPackagePrefix+"abc/def")
-	require.Contains(t, targetPackages.packages["abc"], flowPackagePrefix+"abc/def/ghi")
+	require.Equal(t, 4, len(target.packages["abc"]))
+	require.Contains(t, target.packages["abc"], flowPackagePrefix+"abc")
+	require.Contains(t, target.packages["abc"], flowPackagePrefix+"abc/123")
+	require.Contains(t, target.packages["abc"], flowPackagePrefix+"abc/def")
+	require.Contains(t, target.packages["abc"], flowPackagePrefix+"abc/def/ghi")
 
 	// there should be 1 package that starts with "ghi"
-	require.Equal(t, 1, len(targetPackages.packages["ghi"]))
-	require.Contains(t, targetPackages.packages["ghi"], flowPackagePrefix+"ghi")
+	require.Equal(t, 1, len(target.packages["ghi"]))
+	require.Contains(t, target.packages["ghi"], flowPackagePrefix+"ghi")
 
 	// check all CI RUNNERS for each target package
-	require.Equal(t, 2, len(targetPackages.runners))
-	require.Equal(t, targetPackages.runners["abc"], ciDefaultRunner)
-	require.Equal(t, targetPackages.runners["ghi"], ciDefaultRunner)
+	require.Equal(t, 2, len(target.runners))
+	require.Equal(t, target.runners["abc"], ciDefaultRunner)
+	require.Equal(t, target.runners["ghi"], ciDefaultRunner)
 
 	// check all SEEN packages
 	// there should be 5 packages that start with "abc" or "ghi"
@@ -62,18 +62,18 @@ func TestListTargetPackages_DefaultRunners(t *testing.T) {
 // TestListTargetSubPackages_CustomRunners tests that if a subpackage is specified as a target package, then the sub package and
 // all children of the sub package are also included in the target packages.
 func TestListTargetSubPackages_CustomRunners(t *testing.T) {
-	targetPackages, seenPackages := listTargetPackages([]string{"abc/def:foo_runner"}, getAllFlowPackages())
-	require.Equal(t, 1, len(targetPackages.packages))
+	target, seenPackages := listTargetPackages([]string{"abc/def:foo_runner"}, getAllFlowPackages())
+	require.Equal(t, 1, len(target.packages))
 
 	// check all TARGET packages
 	// there should be 2 target subpackages that starts with "abc/def"
-	require.Equal(t, 2, len(targetPackages.packages["abc/def"]))
-	require.Contains(t, targetPackages.packages["abc/def"], flowPackagePrefix+"abc/def")
-	require.Contains(t, targetPackages.packages["abc/def"], flowPackagePrefix+"abc/def/ghi")
+	require.Equal(t, 2, len(target.packages["abc/def"]))
+	require.Contains(t, target.packages["abc/def"], flowPackagePrefix+"abc/def")
+	require.Contains(t, target.packages["abc/def"], flowPackagePrefix+"abc/def/ghi")
 
 	// check all CI RUNNERS for each target package
-	require.Equal(t, 1, len(targetPackages.runners))
-	require.Equal(t, targetPackages.runners["abc/def"], "foo_runner")
+	require.Equal(t, 1, len(target.runners))
+	require.Equal(t, target.runners["abc/def"], "foo_runner")
 
 	// check all SEEN packages
 	// there should be 2 seen subpackages that start with "abc/def"
@@ -106,22 +106,17 @@ func TestListOtherPackages(t *testing.T) {
 	require.Contains(t, otherPackages, flowPackagePrefix+"yz")
 }
 
-// TestGenerateTestMatrix tests that the test matrix is generated correctly where the target packages include top level
+// TestGenerateTestMatrix_CustomRunners tests that the test matrix is generated correctly where the target packages include top level
 // packages as well as sub packages.
-func TestGenerateTestMatrix(t *testing.T) {
-	targetPackages, seenPackages := listTargetPackages([]string{"abc/def", "def:foo-runner", "ghi"}, getAllFlowPackages())
-	require.Equal(t, 3, len(targetPackages.packages))
+func TestGenerateTestMatrix_CustomRunners(t *testing.T) {
+	target, seenPackages := listTargetPackages([]string{"abc/def", "def:foo-runner", "ghi"}, getAllFlowPackages())
+	require.Equal(t, 3, len(target.packages))
+	require.Equal(t, 3, len(target.runners))
 	require.Equal(t, 5, len(seenPackages))
-
-	// check that the target packages have correct CI runners
-	require.Equal(t, 3, len(targetPackages.runners))
-	require.Equal(t, targetPackages.runners["abc/def"], "ubuntu-latest")
-	require.Equal(t, targetPackages.runners["def"], "foo-runner")
-	require.Equal(t, targetPackages.runners["ghi"], "ubuntu-latest")
 
 	otherPackages := listOtherPackages(getAllFlowPackages(), seenPackages)
 
-	matrix := generateTestMatrix(targetPackages, otherPackages)
+	matrix := generateTestMatrix(target, otherPackages)
 
 	// should be 3 groups in test matrix: abc/def, def, ghi, others
 	require.Equal(t, 4, len(matrix))
