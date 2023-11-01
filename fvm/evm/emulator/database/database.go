@@ -250,8 +250,7 @@ func (db *Database) Commit() error {
 	return nil
 }
 
-// Close deallocates the internal map and ensures any consecutive data access op
-// fails with an error.
+// Close commits db changes
 func (db *Database) Close() error {
 	return db.Commit()
 }
