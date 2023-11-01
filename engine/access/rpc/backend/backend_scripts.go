@@ -298,6 +298,14 @@ func (b *backendScripts) compareScriptExecutionResults(
 	script []byte,
 	insecureScriptHash [md5.Size]byte,
 ) {
+	// record errors caused by missing local data
+	if localErr != nil && status.Code(localErr) == codes.OutOfRange {
+		b.metrics.ScriptExecutionNotIndexed()
+		b.logScriptExecutionComparison(execNodeResult, execErr, localResult, localErr, blockID, script, insecureScriptHash,
+			"script execution results do not match EN because data is not indexed yet")
+		return
+	}
+
 	// check errors first
 	if execErr != nil {
 		if execErr == localErr {
