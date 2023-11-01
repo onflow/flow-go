@@ -136,7 +136,7 @@ func (s *UpdaterSuite) TestSetInvalidStateTransitionAttempted() {
 // correctly behaves when invariants are violated.
 func (s *UpdaterSuite) TestProcessEpochCommit() {
 	s.Run("invalid counter", func() {
-		s.updater = NewUpdater(s.candidate.View, s.parentProtocolState)
+		s.updater = newStateMachine(s.candidate.View, s.parentProtocolState)
 		commit := unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
 			commit.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 10 // set invalid counter for next epoch
 		})
@@ -218,7 +218,7 @@ func (s *UpdaterSuite) TestProcessEpochCommit() {
 			"since we have observed invalid state transition")
 	})
 	s.Run("happy path processing", func() {
-		s.updater = NewUpdater(s.candidate.View, s.parentProtocolState)
+		s.updater = newStateMachine(s.candidate.View, s.parentProtocolState)
 		setup := unittest.EpochSetupFixture(
 			unittest.SetupWithCounter(s.parentProtocolState.CurrentEpochSetup.Counter+1),
 			unittest.WithFirstView(s.parentProtocolState.CurrentEpochSetup.FinalView+1),
@@ -239,7 +239,7 @@ func (s *UpdaterSuite) TestProcessEpochCommit() {
 			nil,
 		)
 		require.NoError(s.T(), err)
-		s.updater = NewUpdater(s.candidate.View+1, parentState)
+		s.updater = newStateMachine(s.candidate.View+1, parentState)
 		commit := unittest.EpochCommitFixture(
 			unittest.CommitWithCounter(setup.Counter),
 			unittest.WithDKGFromParticipants(setup.Participants),

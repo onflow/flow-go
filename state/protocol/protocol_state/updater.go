@@ -85,7 +85,7 @@ func (u *stateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
 // As a result of this operation protocol state for the next epoch will be created.
 // Expected errors during normal operations:
 // - `protocol.InvalidServiceEventError` if the service event is invalid or is not a valid state transition for the current protocol state
-func (u *Updater) processEpochSetup(epochSetup *flow.EpochSetup) error {
+func (u *stateMachine) processEpochSetup(epochSetup *flow.EpochSetup) error {
 	err := protocol.IsValidExtendingEpochSetup(epochSetup, u.parentState.CurrentEpochSetup, u.parentState.EpochStatus())
 	if err != nil {
 		return fmt.Errorf("invalid epoch setup event: %w", err)
@@ -183,7 +183,7 @@ func (u *stateMachine) ProcessEpochCommit(epochCommit *flow.EpochCommit) error {
 // As a result of this operation protocol state for next epoch will be committed.
 // Expected errors during normal operations:
 // - `protocol.InvalidServiceEventError` if the service event is invalid or is not a valid state transition for the current protocol state
-func (u *Updater) processEpochCommit(epochCommit *flow.EpochCommit) error {
+func (u *stateMachine) processEpochCommit(epochCommit *flow.EpochCommit) error {
 	if u.state.NextEpoch == nil {
 		return protocol.NewInvalidServiceEventErrorf("protocol state has been setup yet")
 	}
