@@ -133,9 +133,15 @@ func (db *Database) put(key []byte, value []byte) error {
 func (db *Database) Has(key []byte) (bool, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
+	return db.has(key)
+}
 
-	data, err := db.get(key)
-	return len(data) > 0, err
+func (db *Database) has(key []byte) (bool, error) {
+	has, err := db.atreemap.Has(compare, hashInputProvider, NewByteStringValue(key))
+	if err != nil {
+		return false, handleError(err)
+	}
+	return has, nil
 }
 
 // Delete removes the key from the key-value store.
@@ -331,6 +337,7 @@ func (b *batch) Replay(w gethDB.KeyValueWriter) error {
 }
 
 func handleError(err error) error {
+	// TODO add handle for Atree.UserErrors ?
 	if err == nil {
 		return nil
 	}
