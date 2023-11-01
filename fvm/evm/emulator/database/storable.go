@@ -374,30 +374,6 @@ func hashInputProvider(value atree.Value, buffer []byte) ([]byte, error) {
 	return nil, fmt.Errorf("value %T not supported for hash input", value)
 }
 
-type testTypeInfo struct {
-	value uint64
-}
-
-var _ atree.TypeInfo = testTypeInfo{}
-
-func (i testTypeInfo) Encode(e *cbor.StreamEncoder) error {
-	return e.EncodeUint64(i.value)
-}
-
-func (i testTypeInfo) Equal(other atree.TypeInfo) bool {
-	otherTestTypeInfo, ok := other.(testTypeInfo)
-	return ok && i.value == otherTestTypeInfo.value
-}
-
-func decodeTypeInfo(dec *cbor.StreamDecoder) (atree.TypeInfo, error) {
-	value, err := dec.DecodeUint64()
-	if err != nil {
-		return nil, err
-	}
-
-	return testTypeInfo{value: value}, nil
-}
-
 func NewPersistentSlabStorage(baseStorage atree.BaseStorage) (*atree.PersistentSlabStorage, error) {
 
 	encMode, err := cbor.EncOptions{}.EncMode()
@@ -431,4 +407,21 @@ func (emptyTypeInfo) Encode(e *cbor.StreamEncoder) error {
 func (i emptyTypeInfo) Equal(other atree.TypeInfo) bool {
 	_, ok := other.(emptyTypeInfo)
 	return ok
+}
+
+func decodeTypeInfo(dec *cbor.StreamDecoder) (atree.TypeInfo, error) {
+	ty, err := dec.NextType()
+	if err != nil {
+		return nil, err
+	}
+	switch ty {
+	case cbor.NilType:
+		err := dec.DecodeNil()
+		if err != nil {
+			return nil, err
+		}
+		return emptyTypeInfo{}, nil
+	}
+
+	return nil, fmt.Errorf("not supported type info")
 }
