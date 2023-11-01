@@ -436,7 +436,7 @@ func TestInMemoryRegisterStorePrune(t *testing.T) {
 //     ............ ^- C(X:3) <- D(X:4)
 //     Prune(A) should prune C and D, and GetUpdatedRegisters(C) should return out of range error,
 //     GetUpdatedRegisters(D) should return NotFound
-func TestPruneConflictingForks(t *testing.T) {
+func TestInMemoryRegisterPruneConflictingForks(t *testing.T) {
 	t.Parallel()
 	pruned := uint64(10)
 	lastID := unittest.IdentifierFixture()
@@ -492,7 +492,7 @@ func TestPruneConflictingForks(t *testing.T) {
 }
 
 // 11. Concurrency: SaveRegisters can happen concurrently with GetUpdatedRegisters, and GetRegister
-func TestConcurrentSaveAndGet(t *testing.T) {
+func TestInMemoryRegisterConcurrentSaveAndGet(t *testing.T) {
 	t.Parallel()
 	pruned := uint64(10)
 	lastID := unittest.IdentifierFixture()
@@ -548,7 +548,7 @@ func TestConcurrentSaveAndGet(t *testing.T) {
 }
 
 // 12. Concurrency: Prune can happen concurrently with GetUpdatedRegisters, and GetRegister
-func TestConcurrentSaveAndPrune(t *testing.T) {
+func TestInMemoryRegisterConcurrentSaveAndPrune(t *testing.T) {
 	t.Parallel()
 	pruned := uint64(10)
 	lastID := unittest.IdentifierFixture()
@@ -599,7 +599,7 @@ func TestConcurrentSaveAndPrune(t *testing.T) {
 	wg.Wait()
 }
 
-func TestErrPruned(t *testing.T) {
+func TestInMemoryRegisterErrPruned(t *testing.T) {
 	e := NewErrPruned(1, 2)
 	pe, ok := IsErrPruned(e)
 	require.True(t, ok)
