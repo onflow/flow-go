@@ -8,29 +8,45 @@ import (
 // The resource manager is used to limit the number of open connections and streams (as well as any other resources
 // used by libp2p) for each peer.
 type ResourceManagerConfig struct {
-	InboundStream             InboundStreamLimit `mapstructure:",squash"`
-	MemoryLimitRatio          float64            `mapstructure:"libp2p-memory-limit-ratio"`             // maximum allowed fraction of memory to be allocated by the libp2p resources in (0,1]
-	FileDescriptorsRatio      float64            `mapstructure:"libp2p-file-descriptors-ratio"`         // maximum allowed fraction of file descriptors to be allocated by the libp2p resources in (0,1]
-	PeerBaseLimitConnsInbound int                `mapstructure:"libp2p-peer-base-limits-conns-inbound"` // the maximum amount of allowed inbound connections per peer
+	Streams                   StreamsLimit                 `mapstructure:"libp2p-streams-limit"`                  // the limit for streams
+	InboundConn               ResourceManagerOverrideLimit `mapstructure:"libp2p-inbound-conns"`                  // the limit for inbound connections
+	OutboundConn              ResourceManagerOverrideLimit `mapstructure:"libp2p-outbound-conns"`                 // the limit for outbound connections
+	MemoryLimitRatio          float64                      `mapstructure:"libp2p-memory-limit-ratio"`             // maximum allowed fraction of memory to be allocated by the libp2p resources in (0,1]
+	FileDescriptorsRatio      float64                      `mapstructure:"libp2p-file-descriptors-ratio"`         // maximum allowed fraction of file descriptors to be allocated by the libp2p resources in (0,1]
+	PeerBaseLimitConnsInbound int                          `mapstructure:"libp2p-peer-base-limits-conns-inbound"` // the maximum amount of allowed inbound connections per peer
 }
 
-// InboundStreamLimit is the configuration for the inbound stream limit. The inbound stream limit is used to limit the
-// number of inbound streams that can be opened by the node.
-type InboundStreamLimit struct {
-	// the system-wide limit on the number of inbound streams
-	System int `validate:"gt=0" mapstructure:"libp2p-inbound-stream-limit-system"`
+// StreamsLimit is the resource manager limit for streams.
+type StreamsLimit struct {
+	// Inbound is the limit for inbound streams.
+	Inbound ResourceManagerOverrideLimit `mapstructure:"inbound"`
+	// Outbound is the limit for outbound streams.
+	Outbound ResourceManagerOverrideLimit `mapstructure:"outbound"`
+}
 
-	// Transient is the transient limit on the number of inbound streams (applied to streams that are not associated with a peer or protocol yet)
-	Transient int `validate:"gt=0" mapstructure:"libp2p-inbound-stream-limit-transient"`
+// ResourceManagerOverrideLimit is the configuration for the resource manager override limits.
+// Any value that is not set will be ignored and the default value will be used.
+type ResourceManagerOverrideLimit struct {
+	// System is the limit for the resource at the entire system. if not set, the default value will be used.
+	// For a specific limit, the system-wide dictates the maximum allowed value across all peers and protocols at the entire node level.
+	System int `validate:"gte=0" mapstructure:"system"`
 
-	// Protocol is the limit on the number of inbound streams per protocol (over all peers).
-	Protocol int `validate:"gt=0" mapstructure:"libp2p-inbound-stream-limit-protocol"`
+	// Transient is the limit for resources that have not fully taken yet; if not set, the default value will be used.
+	// For a specific limit, the transient limit dictates the maximum allowed value that are in transient state and not yet fully established
+	// at the entire node level.
+	Transient int `validate:"gte=0" mapstructure:"transient"`
 
-	// Peer is the limit on the number of inbound streams per peer (over all protocols).
-	Peer int `validate:"gt=0" mapstructure:"libp2p-inbound-stream-limit-peer"`
+	// Protocol is the limit at the protocol level; if not set, the default value will be used.
+	// For a specific limit, the protocol limit dictates the maximum allowed value across the entire node at the protocol level.
+	Protocol int `validate:"gte=0" mapstructure:"protocol"`
 
-	// ProtocolPeer is the limit on the number of inbound streams per protocol per peer.
-	ProtocolPeer int `validate:"gt=0" mapstructure:"libp2p-inbound-stream-limit-protocol-peer"`
+	// Peer is the limit at the peer level; if not set, the default value will be used.
+	// For a specific limit, the peer limit dictates the maximum allowed value across the entire node for that peer.
+	Peer int `validate:"gte=0" mapstructure:"peer"`
+
+	// ProtocolPeer is the limit at the protocol and peer level; if not set, the default value will be used.
+	// For a specific limit, the protocol peer limit dictates the maximum allowed value across the entire node for that peer on a specific protocol.
+	ProtocolPeer int `validate:"gte=0" mapstructure:"peer-protocol"`
 }
 
 // GossipSubConfig is the configuration for the GossipSub pubsub implementation.
