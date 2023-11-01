@@ -165,11 +165,12 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 // Error returns:
 //   - network.TransientError for any errors from the underlying Flow client
 //   - generic error in case of unexpected critical failures
-func (c *QCContractClient) Voted(ctx context.Context) (bool, error) {
+func (c *QCContractClient) Voted(ctx context.Context, referenceBlock flow.Identifier) (bool, error) {
 
 	// execute script to read if voted
 	template := templates.GenerateGetNodeHasVotedScript(c.env)
-	ret, err := c.FlowClient.ExecuteScriptAtLatestBlock(ctx, template, []cadence.Value{cadence.String(c.nodeID.String())})
+	ret, err := c.FlowClient.ExecuteScriptAtBlockID(ctx,
+		sdk.Identifier(referenceBlock), template, []cadence.Value{cadence.String(c.nodeID.String())})
 	if err != nil {
 		// we consider all errors from client network calls to be transient and non-critical
 		return false, network.NewTransientErrorf("could not execute voted script: %w", err)

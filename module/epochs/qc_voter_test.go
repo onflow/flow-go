@@ -49,21 +49,25 @@ func (suite *Suite) SetupTest() {
 	suite.signer = new(hotstuff.Signer)
 	suite.client = new(module.QCContractClient)
 
+	sealedHeader := unittest.BlockHeaderFixture()
+
 	suite.voted = false
-	suite.client.On("Voted", mock.Anything).Return(
-		func(_ context.Context) bool { return suite.voted },
-		func(_ context.Context) error { return nil },
-	)
+	suite.client.On("Voted", mock.Anything, sealedHeader.ID()).Return(
+		func(context.Context, flow.Identifier) bool { return suite.voted },
+		func(context.Context, flow.Identifier) error { return nil },
+	).Maybe()
 	suite.client.On("SubmitVote", mock.Anything, mock.Anything).Return(nil)
 
 	suite.state = new(protocol.State)
 	suite.snap = new(protocol.Snapshot)
 	suite.state.On("Final").Return(suite.snap)
+	suite.state.On("Sealed").Return(suite.snap)
 	suite.phase = flow.EpochPhaseSetup
 	suite.snap.On("Phase").Return(
 		func() flow.EpochPhase { return suite.phase },
 		func() error { return nil },
 	)
+	suite.snap.On("Head").Return(sealedHeader, nil)
 
 	suite.epoch = new(protocol.Epoch)
 	suite.counter = rand.Uint64()
@@ -111,7 +115,6 @@ func (suite *Suite) TestInvalidPhase() {
 
 // should succeed and exit if we've already voted
 func (suite *Suite) TestAlreadyVoted() {
-
 	suite.voted = true
 	err := suite.voter.Vote(context.Background(), suite.epoch)
 	suite.Assert().NoError(err)
