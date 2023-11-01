@@ -120,7 +120,6 @@ func WithGasPrice(gasPrice *big.Int) Option {
 }
 
 // WithBaseFee sets the the base fee for each transaction
-// ramtin: it think this is similar to inclusion fee but I need to validate
 func WithBaseFee(baseFee *big.Int) Option {
 	return func(c *Config) *Config {
 		c.BlockContext.BaseFee = baseFee

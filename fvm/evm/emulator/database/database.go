@@ -152,6 +152,7 @@ func (db *Database) delete(key []byte) error {
 	return handleError(err)
 }
 
+// ApplyBatch applys changes from a batch into the database
 func (db *Database) ApplyBatch(b *batch) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
@@ -173,6 +174,7 @@ func (db *Database) applyBatch(b *batch) error {
 	return nil
 }
 
+// SetRootHash sets the active root hash to a new one
 func (db *Database) SetRootHash(root gethCommon.Hash) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
@@ -184,6 +186,7 @@ func (db *Database) SetRootHash(root gethCommon.Hash) error {
 	return nil
 }
 
+// GetRootHash returns the active root hash
 func (db *Database) GetRootHash() (gethCommon.Hash, error) {
 	db.lock.Lock()
 	defer db.lock.Unlock()
@@ -198,7 +201,7 @@ func (db *Database) GetRootHash() (gethCommon.Hash, error) {
 	return gethCommon.Hash(data), nil
 }
 
-// Commits the changes from atree
+// Commits the changes from atree into the underlying storage
 func (db *Database) Commit() error {
 	err := db.storeMapRoot()
 	if err != nil {
@@ -233,28 +236,23 @@ func (db *Database) NewBatchWithSize(size int) gethDB.Batch {
 	}
 }
 
-// NewIterator creates a binary-alphabetical iterator over a subset
-// of database content with a particular key prefix, starting at a particular
-// initial key (or after, if it does not exist).
+// NewIterator is not supported in this database
+// if needed in the future we could implement it using atree iterators
 func (db *Database) NewIterator(prefix []byte, start []byte) gethDB.Iterator {
-	// Ramtin: we could implement this in the future if needed using atree iterator support
 	panic(types.ErrNotImplemented)
 }
 
-// NewSnapshot creates a database snapshot based on the current state.
-// The created snapshot will not be affected by all following mutations
-// happened on the database.
+// NewSnapshot is not supported
 func (db *Database) NewSnapshot() (gethDB.Snapshot, error) {
 	return nil, types.ErrNotImplemented
 }
 
-// Stat returns a particular internal stat of the database.
+// Stat method is not supported
 func (db *Database) Stat(property string) (string, error) {
 	return "", types.ErrNotImplemented
 }
 
-// Compact is not supported on a memory database, but there's no need either as
-// a memory database doesn't waste space anyway.
+// Compact is a no op
 func (db *Database) Compact(start []byte, limit []byte) error {
 	return nil
 }
