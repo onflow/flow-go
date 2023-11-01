@@ -365,7 +365,10 @@ func (h *Handler) GetAccount(
 ) (*access.GetAccountResponse, error) {
 	metadata := h.buildMetadataResponse()
 
-	address := flow.BytesToAddress(req.GetAddress())
+	address, err := convert.Address(req.GetAddress(), h.chain)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
+	}
 
 	account, err := h.api.GetAccount(ctx, address)
 	if err != nil {
@@ -392,7 +395,7 @@ func (h *Handler) GetAccountAtLatestBlock(
 
 	address, err := convert.Address(req.GetAddress(), h.chain)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
 	account, err := h.api.GetAccountAtLatestBlock(ctx, address)
@@ -419,7 +422,7 @@ func (h *Handler) GetAccountAtBlockHeight(
 
 	address, err := convert.Address(req.GetAddress(), h.chain)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
 	account, err := h.api.GetAccountAtBlockHeight(ctx, address, req.GetBlockHeight())
