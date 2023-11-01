@@ -180,8 +180,8 @@ func (s *InMemoryRegisterStore) GetUpdatedRegisters(height uint64, blockID flow.
 		return nil, err
 	}
 
-	// since the registerUpdates won't be updated, we don't need to hold the log when converting
-	// it from map into slice.
+	// since the registerUpdates won't be updated and registers for a block can only be set once,
+	// we don't need to hold the lock when converting it from map into slice.
 	registers := make([]flow.RegisterEntry, 0, len(registerUpdates))
 	for regID, reg := range registerUpdates {
 		registers = append(registers, flow.RegisterEntry{
@@ -219,8 +219,9 @@ func (s *InMemoryRegisterStore) Prune(height uint64, blockID flow.Identifier) er
 	s.Lock()
 	defer s.Unlock()
 
+	// prune each height starting at the lowest height in the fork. this will remove all blocks
+	// below the new pruned height along with any conflicting forks.
 	for i := len(finalizedFork) - 1; i >= 0; i-- {
-		// traverse from lower height to higher height
 		blockID := finalizedFork[i]
 
 		err := s.pruneByHeight(s.prunedHeight+1, blockID)
@@ -263,7 +264,8 @@ func (s *InMemoryRegisterStore) findFinalizedFork(height uint64, blockID flow.Id
 	prunedHeight := height
 	block := blockID
 
-	// finalized fork from pruned height to the last finalized height
+	// walk backwards from the provided finalized block to the last pruned block
+	// the result must be a chain from height/blockID to s.prunedHeight/s.prunedID
 	fork := make([]flow.Identifier, 0, height-s.prunedHeight)
 	for {
 		fork = append(fork, block)
@@ -310,6 +312,7 @@ func (s *InMemoryRegisterStore) removeBlock(height uint64, blockID flow.Identifi
 	delete(s.blockIDsByHeight[height], blockID)
 }
 
+// pruneFork prunes the provided block and all of its children
 func (s *InMemoryRegisterStore) pruneFork(height uint64, blockID flow.Identifier) {
 	s.removeBlock(height, blockID)
 	// all its children must be at height + 1, whose parent is blockID
