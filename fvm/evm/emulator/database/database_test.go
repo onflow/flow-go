@@ -3,12 +3,12 @@ package database_test
 import (
 	"testing"
 
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/evm/emulator/database"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/types"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 func TestDatabase(t *testing.T) {
