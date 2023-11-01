@@ -1,7 +1,6 @@
 package database
 
 import (
-	"errors"
 	"sync"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
@@ -10,6 +9,7 @@ import (
 
 	"github.com/onflow/atree"
 
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -20,15 +20,9 @@ const (
 	StorageIDSize      = 16
 )
 
-var (
-	errNotImplemented = types.NewFatalError(errors.New("not implemented yet"))
-)
-
 // Database is an ephemeral key-value store. Apart from basic data storage
 // functionality it also supports batch writes and iterating over the keyspace in
 // binary-alphabetical order.
-//
-// TODO: all database operational errors at the moments are labeled as fatal, we might revisit this
 type Database struct {
 	led                atree.Ledger
 	flowEVMRootAddress flow.Address
@@ -43,37 +37,59 @@ func NewDatabase(led atree.Ledger, flowEVMRootAddress flow.Address) (*Database, 
 
 	storage, err := NewPersistentSlabStorage(baseStorage)
 	if err != nil {
-		return nil, types.NewFatalError(err)
+		return nil, handleError(err)
 	}
 
-	rootIDBytes, err := led.GetValue(flowEVMRootAddress.Bytes(), []byte(FlowEVMRootSlabKey))
+	db := &Database{
+		led:                led,
+		flowEVMRootAddress: flowEVMRootAddress,
+		storage:            storage,
+	}
+
+	err = db.retrieveOrCreateMapRoot()
 	if err != nil {
-		return nil, types.NewFatalError(err)
+		return nil, err
+	}
+	return db, nil
+}
+
+func (db *Database) retrieveOrCreateMapRoot() error {
+	rootIDBytes, err := db.led.GetValue(db.flowEVMRootAddress.Bytes(), []byte(FlowEVMRootSlabKey))
+	if err != nil {
+		return handleError(err)
 	}
 
 	var m *atree.OrderedMap
 	if len(rootIDBytes) == 0 {
-		m, err = atree.NewMap(storage, atree.Address(flowEVMRootAddress), atree.NewDefaultDigesterBuilder(), typeInfo{})
+		m, err = atree.NewMap(db.storage, atree.Address(db.flowEVMRootAddress), atree.NewDefaultDigesterBuilder(), typeInfo{})
 		if err != nil {
-			return nil, types.NewFatalError(err)
+			return handleError(err)
 		}
 	} else {
 		storageID, err := atree.NewStorageIDFromRawBytes(rootIDBytes)
 		if err != nil {
-			return nil, types.NewFatalError(err)
+			return handleError(err)
 		}
-		m, err = atree.NewMapWithRootID(storage, storageID, atree.NewDefaultDigesterBuilder())
+		m, err = atree.NewMapWithRootID(db.storage, storageID, atree.NewDefaultDigesterBuilder())
 		if err != nil {
-			return nil, types.NewFatalError(err)
+			return handleError(err)
 		}
 	}
+	db.atreemap = m
+	return nil
+}
 
-	return &Database{
-		led:                led,
-		flowEVMRootAddress: flowEVMRootAddress,
-		storage:            storage,
-		atreemap:           m,
-	}, nil
+func (db *Database) storeMapRoot() error {
+	rootIDBytes := make([]byte, StorageIDSize)
+	_, err := db.atreemap.StorageID().ToRawBytes(rootIDBytes)
+	if err != nil {
+		return handleError(err)
+	}
+	err = db.led.SetValue(db.flowEVMRootAddress.Bytes(), []byte(FlowEVMRootSlabKey), rootIDBytes[:])
+	if err != nil {
+		return handleError(err)
+	}
+	return nil
 }
 
 // Get retrieves the given key if it's present in the key-value store.
@@ -81,17 +97,21 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
+	return db.get(key)
+}
+
+func (db *Database) get(key []byte) ([]byte, error) {
 	data, err := db.atreemap.Get(compare, hashInputProvider, NewByteStringValue(key))
 	if err != nil {
-		return nil, types.NewFatalError(err)
+		return nil, handleError(err)
 	}
 
 	v, err := data.StoredValue(db.atreemap.Storage)
 	if err != nil {
-		return nil, types.NewFatalError(err)
+		return nil, handleError(err)
 	}
 
-	return v.(ByteStringValue).Bytes(), err
+	return v.(ByteStringValue).Bytes(), nil
 }
 
 // Put inserts the given value into the key-value store.
@@ -103,19 +123,16 @@ func (db *Database) Put(key []byte, value []byte) error {
 
 func (db *Database) put(key []byte, value []byte) error {
 	_, err := db.atreemap.Set(compare, hashInputProvider, NewByteStringValue(key), NewByteStringValue(value))
-	return err
+	return handleError(err)
 }
 
-// Has retrieves if a key is present in the key-value store.
+// Has checks if a key is present in the key-value store.
 func (db *Database) Has(key []byte) (bool, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	data, err := db.Get(key)
-	if err != nil {
-		return false, types.NewFatalError(err)
-	}
-	return len(data) > 0, nil
+	data, err := db.get(key)
+	return len(data) > 0, err
 }
 
 // Delete removes the key from the key-value store.
@@ -127,15 +144,16 @@ func (db *Database) Delete(key []byte) error {
 
 func (db *Database) delete(key []byte) error {
 	_, _, err := db.atreemap.Remove(compare, hashInputProvider, NewByteStringValue(key))
-	if err != nil {
-		return types.NewFatalError(err)
-	}
-	return nil
+	return handleError(err)
+}
+
+func (db *Database) ApplyBatch(b *batch) error {
+	db.lock.Lock()
+	defer db.lock.Unlock()
+	return db.applyBatch(b)
 }
 
 func (db *Database) applyBatch(b *batch) error {
-	db.lock.Lock()
-	defer db.lock.Unlock()
 	var err error
 	for _, keyvalue := range b.writes {
 		if err != nil {
@@ -151,28 +169,28 @@ func (db *Database) applyBatch(b *batch) error {
 }
 
 func (db *Database) SetRootHash(root gethCommon.Hash) error {
+	db.lock.Lock()
+	defer db.lock.Unlock()
+
 	err := db.led.SetValue(db.flowEVMRootAddress[:], []byte(FlowEVMRootHashKey), root[:])
 	if err != nil {
-		return types.NewFatalError(err)
+		return handleError(err)
 	}
 	return nil
 }
 
 func (db *Database) GetRootHash() (gethCommon.Hash, error) {
-	data, err := db.led.GetValue(db.flowEVMRootAddress[:], []byte(FlowEVMRootHashKey))
-	if len(data) == 0 {
-		return gethTypes.EmptyRootHash, err
-	}
-	return gethCommon.Hash(data), err
-}
+	db.lock.Lock()
+	defer db.lock.Unlock()
 
-func (db *Database) storeMapRoot() error {
-	rootIDBytes := make([]byte, StorageIDSize)
-	_, err := db.atreemap.StorageID().ToRawBytes(rootIDBytes)
+	data, err := db.led.GetValue(db.flowEVMRootAddress[:], []byte(FlowEVMRootHashKey))
 	if err != nil {
-		return err
+		return gethCommon.Hash{}, handleError(err)
 	}
-	return db.led.SetValue(db.flowEVMRootAddress.Bytes(), []byte(FlowEVMRootSlabKey), rootIDBytes[:])
+	if len(data) == 0 {
+		return gethTypes.EmptyRootHash, nil
+	}
+	return gethCommon.Hash(data), nil
 }
 
 // Commits the changes from atree
@@ -215,19 +233,19 @@ func (db *Database) NewBatchWithSize(size int) gethDB.Batch {
 // initial key (or after, if it does not exist).
 func (db *Database) NewIterator(prefix []byte, start []byte) gethDB.Iterator {
 	// Ramtin: we could implement this in the future if needed using atree iterator support
-	panic(errNotImplemented)
+	panic(types.ErrNotImplemented)
 }
 
 // NewSnapshot creates a database snapshot based on the current state.
 // The created snapshot will not be affected by all following mutations
 // happened on the database.
 func (db *Database) NewSnapshot() (gethDB.Snapshot, error) {
-	return nil, errNotImplemented
+	return nil, types.ErrNotImplemented
 }
 
 // Stat returns a particular internal stat of the database.
 func (db *Database) Stat(property string) (string, error) {
-	return "", errNotImplemented
+	return "", types.ErrNotImplemented
 }
 
 // Compact is not supported on a memory database, but there's no need either as
@@ -286,7 +304,7 @@ func (b *batch) ValueSize() int {
 
 // Write flushes any accumulated data to the memory database.
 func (b *batch) Write() error {
-	return b.db.applyBatch(b)
+	return b.db.ApplyBatch(b)
 }
 
 // Reset resets the batch for reuse.
@@ -309,4 +327,14 @@ func (b *batch) Replay(w gethDB.KeyValueWriter) error {
 		}
 	}
 	return nil
+}
+
+func handleError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if errors.IsFailure(err) {
+		return types.NewFatalError(err)
+	}
+	return err
 }

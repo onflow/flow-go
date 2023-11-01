@@ -329,8 +329,7 @@ func (proc *procedure) withdrawFrom(address types.Address, amount *big.Int) (*ty
 func (proc *procedure) run(msg *gethCore.Message) (*types.Result, error) {
 	execResult, err := gethCore.NewStateTransition(proc.evm, msg, (*gethCore.GasPool)(&proc.config.BlockContext.GasLimit)).TransitionDb()
 	if err != nil {
-		// this is not a fatal error
-		// TODO: we might revist this later
+		// this is not a fatal error right now
 		return nil, types.NewEVMExecutionError(err)
 	}
 

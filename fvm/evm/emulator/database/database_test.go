@@ -13,7 +13,7 @@ import (
 
 func TestDatabase(t *testing.T) {
 
-	t.Run("test database", func(t *testing.T) {
+	t.Run("test basic database functionality", func(t *testing.T) {
 		testutils.RunWithTestBackend(t, func(backend types.Backend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(flowEVMRoot flow.Address) {
 				db, err := database.NewDatabase(backend, flowEVMRoot)

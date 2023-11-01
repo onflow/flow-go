@@ -25,6 +25,9 @@ var (
 	// is returned when the balance presented in attoflow has values that could
 	// be marginally lost on the conversion.
 	ErrBalanceConversion = errors.New("balance converion error")
+
+	// ErrNotImplemented is a fatal error when something is called that is not implemented
+	ErrNotImplemented = NewFatalError(errors.New("a functionality is called that is not implemented"))
 )
 
 // EVMExecutionError is a user-related error,
