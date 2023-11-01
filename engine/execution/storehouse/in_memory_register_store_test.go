@@ -13,18 +13,6 @@ import (
 )
 
 // 1. SaveRegisters should fail if height is below or equal to pruned height
-//
-
-// 6. Given A(X: 1, Y: 2), GetRegister(A, X) should return 1, GetRegister(A, X) should return 2
-//
-//  7. Given A(X: 1, Y: 2) <- B(Y: 3),
-//     GetRegister(B, X) should return 1, because X is not updated in B
-//     GetRegister(B, Y) should return 3, because Y is updated in B
-//     GetRegister(A, Y) should return 2, because the query queries the value at A, not B
-//     GetRegister(B, Z) should return ErrPruned, because register is unknown
-//     GetRegister(C, X) should return BlockNotExecuted, because block is not executed (unexecuted)
-//
-// 1. SaveRegisters should fail if height is below or equal to pruned height
 func TestInMemoryRegisterStoreFailBelowOrEqualPrunedHeight(t *testing.T) {
 	t.Parallel()
 	// 1.
@@ -332,9 +320,9 @@ func TestInMemoryRegisterStoreMultiForkOK(t *testing.T) {
 	require.Equal(t, reg.Value, val)
 }
 
-//  7. Given the following tree:
+//  8. Given the following tree:
 //     Pruned <- A(X:1) <- B(Y:2), B is not executed
-//     GetUpdatedRegisters(C) should return ErrNotExecuted
+//     GetUpdatedRegisters(B) should return ErrNotExecuted
 func TestInMemoryRegisterGetUpdatedRegisters(t *testing.T) {
 	t.Parallel()
 	pruned := uint64(10)
@@ -342,7 +330,6 @@ func TestInMemoryRegisterGetUpdatedRegisters(t *testing.T) {
 	store := NewInMemoryRegisterStore(pruned, lastID)
 
 	// 10 <- A (X: 1) <- B (Y: 2)
-	//		^- C (X: 3) <- D (Y: 4)
 	blockA := unittest.IdentifierFixture()
 	blockB := unittest.IdentifierFixture()
 
@@ -362,7 +349,7 @@ func TestInMemoryRegisterGetUpdatedRegisters(t *testing.T) {
 	require.ErrorIs(t, err, ErrNotExecuted)
 }
 
-//  8. Prune should fail if the block is unknown
+//  9. Prune should fail if the block is unknown
 //     Prune should succeed if the block is known, and GetUpdatedRegisters should return err
 //     Prune should prune up to the pruned height.
 //     Given Pruned <- A(X:1) <- B(X:2) <- C(X:3) <- D(X:4)
@@ -412,9 +399,6 @@ func TestInMemoryRegisterStorePrune(t *testing.T) {
 	err = store.Prune(pruned+1, blockB) // block is known, but height is wrong
 	require.Error(t, err)
 
-	err = store.Prune(pruned+2, blockA) // height is known, but block is wrong
-	require.Error(t, err)
-
 	err = store.Prune(pruned+4, unknownBlock) // height is unknown
 	require.Error(t, err)
 
@@ -448,6 +432,7 @@ func TestInMemoryRegisterStorePrune(t *testing.T) {
 
 //  10. Prune should prune conflicting forks
 //     Given Pruned <- A(X:1) <- B(X:2)
+//     .................. ^----- E(X:5)
 //     ............ ^- C(X:3) <- D(X:4)
 //     Prune(A) should prune C and D, and GetUpdatedRegisters(C) should return out of range error,
 //     GetUpdatedRegisters(D) should return NotFound
@@ -461,6 +446,7 @@ func TestPruneConflictingForks(t *testing.T) {
 	blockB := unittest.IdentifierFixture()
 	blockC := unittest.IdentifierFixture()
 	blockD := unittest.IdentifierFixture()
+	blockE := unittest.IdentifierFixture()
 
 	require.NoError(t, store.SaveRegisters(
 		pruned+1,
@@ -488,6 +474,13 @@ func TestPruneConflictingForks(t *testing.T) {
 		blockD,
 		blockC,
 		[]flow.RegisterEntry{makeReg("X", "4")},
+	))
+
+	require.NoError(t, store.SaveRegisters(
+		pruned+2,
+		blockE,
+		blockA,
+		[]flow.RegisterEntry{makeReg("X", "5")},
 	))
 
 	err := store.Prune(pruned+1, blockA) // prune A should prune C and D

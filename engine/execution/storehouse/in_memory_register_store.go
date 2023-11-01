@@ -63,7 +63,7 @@ func (s *InMemoryRegisterStore) SaveRegisters(
 	registers []flow.RegisterEntry,
 ) error {
 	// preprocess data before acquiring the lock
-	regs := make(map[flow.RegisterID]flow.RegisterValue)
+	regs := make(map[flow.RegisterID]flow.RegisterValue, len(registers))
 	for _, reg := range registers {
 		regs[reg.Key] = reg.Value
 	}
