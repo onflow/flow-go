@@ -15,15 +15,18 @@ import (
 
 func TestDatabase(t *testing.T) {
 
+	key1 := []byte("ABC")
+	key2 := []byte("DEF")
+	value1 := []byte{1, 2, 3, 4, 5, 6, 7, 8}
+	value2 := []byte{9, 10, 11}
+
 	t.Run("test basic database functionality", func(t *testing.T) {
 		testutils.RunWithTestBackend(t, func(backend types.Backend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(flowEVMRoot flow.Address) {
 				db, err := database.NewDatabase(backend, flowEVMRoot)
 				require.NoError(t, err)
 
-				key := []byte("ABC")
-				value := []byte{1, 2, 3, 4, 5, 6, 7, 8}
-				err = db.Put(key, value)
+				err = db.Put(key1, value1)
 				require.NoError(t, err)
 
 				err = db.Commit()
@@ -32,11 +35,59 @@ func TestDatabase(t *testing.T) {
 				newdb, err := database.NewDatabase(backend, flowEVMRoot)
 				require.NoError(t, err)
 
-				retValue, err := newdb.Get(key)
+				has, err := newdb.Has(key1)
+				require.NoError(t, err)
+				require.True(t, has)
+
+				retValue, err := newdb.Get(key1)
 				require.NoError(t, err)
 
-				require.Equal(t, value, retValue)
+				require.Equal(t, value1, retValue)
 
+				err = newdb.Delete(key1)
+				require.NoError(t, err)
+
+				has, err = newdb.Has(key1)
+				require.NoError(t, err)
+				require.False(t, has)
+			})
+		})
+	})
+
+	t.Run("test batch functionality", func(t *testing.T) {
+		testutils.RunWithTestBackend(t, func(backend types.Backend) {
+			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(flowEVMRoot flow.Address) {
+				db, err := database.NewDatabase(backend, flowEVMRoot)
+				require.NoError(t, err)
+
+				err = db.Put(key1, value1)
+				require.NoError(t, err)
+
+				has, err := db.Has(key1)
+				require.NoError(t, err)
+				require.True(t, has)
+
+				batch := db.NewBatch()
+				err = batch.Delete(key1)
+				require.NoError(t, err)
+
+				err = batch.Put(key2, value2)
+				require.NoError(t, err)
+
+				has, err = db.Has(key2)
+				require.NoError(t, err)
+				require.False(t, has)
+
+				err = batch.Write()
+				require.NoError(t, err)
+
+				retVal, err := db.Get(key2)
+				require.NoError(t, err)
+				require.Equal(t, value2, retVal)
+
+				has, err = db.Has(key1)
+				require.NoError(t, err)
+				require.False(t, has)
 			})
 		})
 	})
