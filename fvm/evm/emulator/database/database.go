@@ -21,7 +21,15 @@ const (
 	StorageIDSize      = 16
 )
 
-// Database is where EVM data is stored and is backed by Atree.
+// Database is where EVM data is stored.
+//
+// under the hood, databases uses an Atree map
+// stored under account `flowEVMRootAddress`
+// each key value pairs inserted into this map is
+// of type of ByteStringValue; we use this type instead
+// of atree array, given the EVM environment is not smart enough
+// to interact with a portion of the value and would load everything under a key
+// before opearting on it. This means it could lead to having large slabs for a single value.
 type Database struct {
 	flowEVMRootAddress flow.Address
 	led                atree.Ledger
