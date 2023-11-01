@@ -1,10 +1,12 @@
 package database_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm/emulator/database"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/types"
@@ -36,6 +38,38 @@ func TestDatabase(t *testing.T) {
 				require.Equal(t, value, retValue)
 
 			})
+		})
+	})
+
+	t.Run("test fatal error", func(t *testing.T) {
+		ledger := &testutils.TestValueStore{
+			GetValueFunc: func(_, _ []byte) ([]byte, error) {
+				return nil, fmt.Errorf("a fatal error")
+			},
+			SetValueFunc: func(owner, key, value []byte) error {
+				return nil
+			},
+		}
+		testutils.RunWithTestFlowEVMRootAddress(t, ledger, func(flowEVMRoot flow.Address) {
+			_, err := database.NewDatabase(ledger, flowEVMRoot)
+			require.Error(t, err)
+			require.True(t, types.IsAFatalError(err))
+		})
+	})
+
+	t.Run("test non fatal error", func(t *testing.T) {
+		ledger := &testutils.TestValueStore{
+			GetValueFunc: func(_, _ []byte) ([]byte, error) {
+				return nil, errors.NewLedgerInteractionLimitExceededError(0, 0)
+			},
+			SetValueFunc: func(owner, key, value []byte) error {
+				return nil
+			},
+		}
+		testutils.RunWithTestFlowEVMRootAddress(t, ledger, func(flowEVMRoot flow.Address) {
+			_, err := database.NewDatabase(ledger, flowEVMRoot)
+			require.Error(t, err)
+			require.False(t, types.IsAFatalError(err))
 		})
 	})
 
