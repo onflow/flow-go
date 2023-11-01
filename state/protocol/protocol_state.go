@@ -90,7 +90,7 @@ type StateMutator interface {
 	// Build returns:
 	//  - hasChanges: flag whether there were any changes; otherwise, `updatedState` and `stateID` equal the parent state
 	//  - updatedState: the ProtocolState after applying all updates
-	//  - stateID: the has commitment to the `updatedState`
+	//  - stateID: the hash commitment to the `updatedState`
 	//  - dbUpdates: database updates necessary for persisting the updated protocol state
 	// updated protocol state entry, state ID and a flag indicating if there were any changes.
 	Build() (hasChanges bool, updatedState *flow.ProtocolStateEntry, stateID flow.Identifier, dbUpdates []func(tx *transaction.Tx) error)

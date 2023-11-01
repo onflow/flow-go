@@ -520,9 +520,6 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, certi
 	}
 
 	hasChanges, updatedState, updatedStateID, dbUpdates := stateMutator.Build()
-	if err != nil {
-		return fmt.Errorf("could not build updated protocol state: %w", err)
-	}
 
 	if updatedStateID != candidate.Payload.ProtocolStateID {
 		return state.NewInvalidExtensionErrorf("invalid protocol state transition detected, "+

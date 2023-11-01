@@ -51,7 +51,7 @@ func newStateMutator(
 // Build returns:
 //   - hasChanges: flag whether there were any changes; otherwise, `updatedState` and `stateID` equal the parent state
 //   - updatedState: the ProtocolState after applying all updates
-//   - stateID: the has commitment to the `updatedState`
+//   - stateID: the hash commitment to the `updatedState`
 //   - dbUpdates: database updates necessary for persisting the updated protocol state
 //
 // updated protocol state entry, state ID and a flag indicating if there were any changes.
@@ -143,8 +143,7 @@ func (m *stateMutator) handleServiceEvents(seals []*flow.Seal) (dbUpdates []func
 	// epoch. In this case, we need to update the tentative protocol state.
 	// We need to validate whether all information is available in the protocol
 	// state to go to the next epoch when needed. In cases where there is a bug
-	// in the smart contract, it could be that this happens too late and the
-	// chain finalization should halt.
+	// in the smart contract, it could be that this happens too late and we should trigger epoch fallback mode.
 
 	// block payload may not specify seals in order, so order them by block height before processing
 	orderedSeals, err := protocol.OrderedSeals(seals, m.headers)
