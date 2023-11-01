@@ -219,6 +219,7 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Component("consensus committee", exeNode.LoadConsensusCommittee).
 		Component("follower core", exeNode.LoadFollowerCore).
 		Component("follower engine", exeNode.LoadFollowerEngine).
+		Component("register engine", exeNode.LoadRegisterEngine).
 		Component("collection requester engine", exeNode.LoadCollectionRequesterEngine).
 		Component("receipt provider engine", exeNode.LoadReceiptProviderEngine).
 		Component("synchronization engine", exeNode.LoadSynchronizationEngine).
@@ -817,6 +818,7 @@ func (exeNode *ExecutionNode) LoadRegisterStore(
 	if err != nil {
 		return err
 	}
+
 	exeNode.registerStore = registerStore
 	return nil
 }
@@ -1072,6 +1074,12 @@ func (exeNode *ExecutionNode) LoadFollowerEngine(
 	exeNode.followerDistributor.AddOnBlockFinalizedConsumer(exeNode.followerEng.OnFinalizedBlock)
 
 	return exeNode.followerEng, nil
+}
+
+func (exeNode *ExecutionNode) LoadRegisterEngine(node *NodeConfig) (module.ReadyDoneAware, error) {
+	e := storehouse.NewRegisterEngine(exeNode.registerStore)
+	exeNode.followerDistributor.AddOnBlockFinalizedConsumer(e.OnBlockFinalized)
+	return e, nil
 }
 
 func (exeNode *ExecutionNode) LoadCollectionRequesterEngine(
