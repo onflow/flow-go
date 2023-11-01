@@ -237,3 +237,39 @@ func TestContractInteraction(t *testing.T) {
 		})
 	})
 }
+
+func TestTransfers(t *testing.T) {
+	RunWithTestDB(t, func(db *database.Database) {
+		testAccount1 := types.NewAddressFromString("test1")
+		testAccount2 := types.NewAddressFromString("test2")
+
+		amount := big.NewInt(0).Mul(big.NewInt(1337), big.NewInt(gethParams.Ether))
+		amountToBeTransfered := big.NewInt(0).Mul(big.NewInt(100), big.NewInt(gethParams.Ether))
+
+		RunWithNewEmulator(t, db, func(em *emulator.Emulator) {
+			RunWithNewBlockView(t, em, func(blk types.BlockView) {
+				_, err := blk.MintTo(testAccount1, amount)
+				require.NoError(t, err)
+			})
+		})
+
+		RunWithNewEmulator(t, db, func(em *emulator.Emulator) {
+			RunWithNewBlockView(t, em, func(blk types.BlockView) {
+				_, err := blk.Transfer(testAccount1, testAccount2, amountToBeTransfered)
+				require.NoError(t, err)
+			})
+		})
+
+		RunWithNewEmulator(t, db, func(em *emulator.Emulator) {
+			RunWithNewReadOnlyBlockView(t, em, func(blk types.ReadOnlyBlockView) {
+				bal, err := blk.BalanceOf(testAccount2)
+				require.NoError(t, err)
+				require.Equal(t, amountToBeTransfered.Uint64(), bal.Uint64())
+
+				bal, err = blk.BalanceOf(testAccount1)
+				require.NoError(t, err)
+				require.Equal(t, new(big.Int).Sub(amount, amountToBeTransfered).Uint64(), bal.Uint64())
+			})
+		})
+	})
+}
