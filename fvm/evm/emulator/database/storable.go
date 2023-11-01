@@ -11,156 +11,6 @@ import (
 	"github.com/onflow/atree"
 )
 
-const (
-	cborTagUInt8Value  = 161
-	cborTagUInt64Value = 164
-)
-
-type Uint8Value uint8
-
-var _ atree.Value = Uint8Value(0)
-var _ atree.Storable = Uint8Value(0)
-
-func (v Uint8Value) ChildStorables() []atree.Storable {
-	return nil
-}
-
-func (v Uint8Value) StoredValue(_ atree.SlabStorage) (atree.Value, error) {
-	return v, nil
-}
-
-func (v Uint8Value) Storable(_ atree.SlabStorage, _ atree.Address, _ uint64) (atree.Storable, error) {
-	return v, nil
-}
-
-// Encode encodes UInt8Value as
-//
-//	cbor.Tag{
-//			Number:  cborTagUInt8Value,
-//			Content: uint8(v),
-//	}
-func (v Uint8Value) Encode(enc *atree.Encoder) error {
-	err := enc.CBOR.EncodeRawBytes([]byte{
-		// tag number
-		0xd8, cborTagUInt8Value,
-	})
-	if err != nil {
-		return err
-	}
-	return enc.CBOR.EncodeUint8(uint8(v))
-}
-
-func (v Uint8Value) getHashInput(scratch []byte) ([]byte, error) {
-
-	const cborTypePositiveInt = 0x00
-
-	buf := scratch
-	if len(scratch) < 4 {
-		buf = make([]byte, 4)
-	}
-
-	buf[0], buf[1] = 0xd8, cborTagUInt8Value // Tag number
-
-	if v <= 23 {
-		buf[2] = cborTypePositiveInt | byte(v)
-		return buf[:3], nil
-	}
-
-	buf[2] = cborTypePositiveInt | byte(24)
-	buf[3] = byte(v)
-	return buf[:4], nil
-}
-
-func (v Uint8Value) ByteSize() uint32 {
-	// tag number (2 bytes) + encoded content
-	return 2 + atree.GetUintCBORSize(uint64(v))
-}
-
-func (v Uint8Value) String() string {
-	return fmt.Sprintf("%d", uint8(v))
-}
-
-type Uint64Value uint64
-
-var _ atree.Value = Uint64Value(0)
-var _ atree.Storable = Uint64Value(0)
-
-func (v Uint64Value) ChildStorables() []atree.Storable {
-	return nil
-}
-
-func (v Uint64Value) StoredValue(_ atree.SlabStorage) (atree.Value, error) {
-	return v, nil
-}
-
-func (v Uint64Value) Storable(_ atree.SlabStorage, _ atree.Address, _ uint64) (atree.Storable, error) {
-	return v, nil
-}
-
-// Encode encodes UInt64Value as
-//
-//	cbor.Tag{
-//			Number:  cborTagUInt64Value,
-//			Content: uint64(v),
-//	}
-func (v Uint64Value) Encode(enc *atree.Encoder) error {
-	err := enc.CBOR.EncodeRawBytes([]byte{
-		// tag number
-		0xd8, cborTagUInt64Value,
-	})
-	if err != nil {
-		return err
-	}
-	return enc.CBOR.EncodeUint64(uint64(v))
-}
-
-func (v Uint64Value) getHashInput(scratch []byte) ([]byte, error) {
-	const cborTypePositiveInt = 0x00
-
-	buf := scratch
-	if len(buf) < 16 {
-		buf = make([]byte, 16)
-	}
-
-	buf[0], buf[1] = 0xd8, cborTagUInt64Value // Tag number
-
-	if v <= 23 {
-		buf[2] = cborTypePositiveInt | byte(v)
-		return buf[:3], nil
-	}
-
-	if v <= math.MaxUint8 {
-		buf[2] = cborTypePositiveInt | byte(24)
-		buf[3] = byte(v)
-		return buf[:4], nil
-	}
-
-	if v <= math.MaxUint16 {
-		buf[2] = cborTypePositiveInt | byte(25)
-		binary.BigEndian.PutUint16(buf[3:], uint16(v))
-		return buf[:5], nil
-	}
-
-	if v <= math.MaxUint32 {
-		buf[2] = cborTypePositiveInt | byte(26)
-		binary.BigEndian.PutUint32(buf[3:], uint32(v))
-		return buf[:7], nil
-	}
-
-	buf[2] = cborTypePositiveInt | byte(27)
-	binary.BigEndian.PutUint64(buf[3:], uint64(v))
-	return buf[:11], nil
-}
-
-func (v Uint64Value) ByteSize() uint32 {
-	// tag number (2 bytes) + encoded content
-	return 2 + atree.GetUintCBORSize(uint64(v))
-}
-
-func (v Uint64Value) String() string {
-	return fmt.Sprintf("%d", uint64(v))
-}
-
 type ByteStringValue struct {
 	data []byte
 	size uint32
@@ -296,23 +146,6 @@ func decodeStorable(dec *cbor.StreamDecoder, _ atree.StorageID) (atree.Storable,
 		case atree.CBORTagStorageID:
 			return atree.DecodeStorageIDStorable(dec)
 
-		case cborTagUInt8Value:
-			n, err := dec.DecodeUint64()
-			if err != nil {
-				return nil, err
-			}
-			if n > math.MaxUint8 {
-				return nil, fmt.Errorf("invalid data, got %d, expected max %d", n, math.MaxUint8)
-			}
-			return Uint8Value(n), nil
-
-		case cborTagUInt64Value:
-			n, err := dec.DecodeUint64()
-			if err != nil {
-				return nil, err
-			}
-			return Uint64Value(n), nil
-
 		default:
 			return nil, fmt.Errorf("invalid tag number %d", tagNumber)
 		}
@@ -324,20 +157,6 @@ func decodeStorable(dec *cbor.StreamDecoder, _ atree.StorageID) (atree.Storable,
 
 func compare(storage atree.SlabStorage, value atree.Value, storable atree.Storable) (bool, error) {
 	switch v := value.(type) {
-
-	case Uint8Value:
-		other, ok := storable.(Uint8Value)
-		if !ok {
-			return false, nil
-		}
-		return uint8(other) == uint8(v), nil
-
-	case Uint64Value:
-		other, ok := storable.(Uint64Value)
-		if !ok {
-			return false, nil
-		}
-		return uint64(other) == uint64(v), nil
 
 	case ByteStringValue:
 		other, ok := storable.(ByteStringValue)
@@ -363,10 +182,6 @@ func compare(storage atree.SlabStorage, value atree.Value, storable atree.Storab
 
 func hashInputProvider(value atree.Value, buffer []byte) ([]byte, error) {
 	switch v := value.(type) {
-	case Uint8Value:
-		return v.getHashInput(buffer)
-	case Uint64Value:
-		return v.getHashInput(buffer)
 	case ByteStringValue:
 		return v.getHashInput(buffer)
 	}
