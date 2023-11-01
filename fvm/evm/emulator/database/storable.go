@@ -425,7 +425,7 @@ type emptyTypeInfo struct{}
 var _ atree.TypeInfo = emptyTypeInfo{}
 
 func (emptyTypeInfo) Encode(e *cbor.StreamEncoder) error {
-	return e.EncodeUint8(255)
+	return e.EncodeNil()
 }
 
 func (i emptyTypeInfo) Equal(other atree.TypeInfo) bool {
