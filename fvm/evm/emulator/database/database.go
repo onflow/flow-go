@@ -20,9 +20,7 @@ const (
 	StorageIDSize      = 16
 )
 
-// Database is an ephemeral key-value store. Apart from basic data storage
-// functionality it also supports batch writes and iterating over the keyspace in
-// binary-alphabetical order.
+// Database is where EVM data is stored and is backed by Atree.
 type Database struct {
 	flowEVMRootAddress flow.Address
 	led                atree.Ledger
