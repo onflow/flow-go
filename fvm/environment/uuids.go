@@ -205,6 +205,7 @@ func (generator *uUIDGenerator) GenerateUUID() (uint64, error) {
 
 	// Since the partition counter only goes up to MaxUint56, we can use the
 	// 6th byte to represent which partition was used.
-	return (uint64(generator.partition) << 40) | (value & 0xFF_FFFF_FFFF) | ((value & 0xFF_FF00_0000_0000) << 8), nil
+	// (C7 C6) | P | (C5 C4 C3 C2 C1)
+	return ((value & 0xFF_FF00_0000_0000) << 8) | (uint64(generator.partition) << 40) | (value & 0xFF_FFFF_FFFF), nil
 
 }
