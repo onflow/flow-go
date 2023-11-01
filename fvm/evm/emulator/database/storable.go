@@ -364,7 +364,9 @@ func compare(storage atree.SlabStorage, value atree.Value, storable atree.Storab
 func hashInputProvider(value atree.Value, buffer []byte) ([]byte, error) {
 	switch v := value.(type) {
 	case Uint8Value:
+		return v.getHashInput(buffer)
 	case Uint64Value:
+		return v.getHashInput(buffer)
 	case ByteStringValue:
 		return v.getHashInput(buffer)
 	}

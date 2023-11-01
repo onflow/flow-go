@@ -4,9 +4,11 @@ import (
 	cryptoRand "crypto/rand"
 	"math/big"
 	"math/rand"
+	"testing"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/evm/types"
 )
@@ -98,19 +100,21 @@ func (em *TestEmulator) RunTransaction(tx *gethTypes.Transaction) (*types.Result
 	return em.RunTransactionFunc(tx)
 }
 
-func RandomCommonHash() gethCommon.Hash {
+func RandomCommonHash(t testing.TB) gethCommon.Hash {
 	ret := gethCommon.Hash{}
-	cryptoRand.Read(ret[:gethCommon.HashLength])
+	_, err := cryptoRand.Read(ret[:gethCommon.HashLength])
+	require.NoError(t, err)
 	return ret
 }
 
-func RandomAddress() types.Address {
-	return types.NewAddress(RandomCommonAddress())
+func RandomAddress(t testing.TB) types.Address {
+	return types.NewAddress(RandomCommonAddress(t))
 }
 
-func RandomCommonAddress() gethCommon.Address {
+func RandomCommonAddress(t testing.TB) gethCommon.Address {
 	ret := gethCommon.Address{}
-	cryptoRand.Read(ret[:gethCommon.AddressLength])
+	_, err := cryptoRand.Read(ret[:gethCommon.AddressLength])
+	require.NoError(t, err)
 	return ret
 }
 
@@ -118,21 +122,22 @@ func RandomGas(limit int64) uint64 {
 	return uint64(rand.Int63n(limit) + 1)
 }
 
-func RandomData() []byte {
+func RandomData(t testing.TB) []byte {
 	// byte size [1, 100]
 	size := rand.Intn(100) + 1
 	ret := make([]byte, size)
-	cryptoRand.Read(ret[:])
+	_, err := cryptoRand.Read(ret[:])
+	require.NoError(t, err)
 	return ret
 }
 
-func GetRandomLogFixture() *gethTypes.Log {
+func GetRandomLogFixture(t testing.TB) *gethTypes.Log {
 	return &gethTypes.Log{
-		Address: RandomCommonAddress(),
+		Address: RandomCommonAddress(t),
 		Topics: []gethCommon.Hash{
-			RandomCommonHash(),
-			RandomCommonHash(),
+			RandomCommonHash(t),
+			RandomCommonHash(t),
 		},
-		Data: RandomData(),
+		Data: RandomData(t),
 	}
 }

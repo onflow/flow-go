@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm/types"
@@ -21,7 +22,8 @@ var TestComputationLimit = uint(math.MaxUint64 - 1)
 
 func RunWithTestFlowEVMRootAddress(t testing.TB, backend types.Backend, f func(flow.Address)) {
 	as := environment.NewAccountStatus()
-	backend.SetValue(TestFlowEVMRootAddress[:], []byte(flow.AccountStatusKey), as.ToBytes())
+	err := backend.SetValue(TestFlowEVMRootAddress[:], []byte(flow.AccountStatusKey), as.ToBytes())
+	require.NoError(t, err)
 	f(TestFlowEVMRootAddress)
 }
 

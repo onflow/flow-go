@@ -47,7 +47,8 @@ func (a *EOATestAccount) PrepareSignAndEncodeTx(
 	tx := a.PrepareAndSignTx(t, to, data, amount, gasLimit, gasFee)
 	var b bytes.Buffer
 	writer := io.Writer(&b)
-	tx.EncodeRLP(writer)
+	err := tx.EncodeRLP(writer)
+	require.NoError(t, err)
 	return b.Bytes()
 }
 
