@@ -32,7 +32,7 @@ func TestListTargetPackages_DefaultRunners(t *testing.T) {
 	targetPackages, seenPackages := listTargetPackages([]string{"abc", "ghi"}, getAllFlowPackages())
 	require.Equal(t, 2, len(targetPackages.packages))
 
-	// check all the TARGET packages
+	// check all TARGET packages
 	// there should be 4 packages that start with "abc"
 	require.Equal(t, 4, len(targetPackages.packages["abc"]))
 	require.Contains(t, targetPackages.packages["abc"], flowPackagePrefix+"abc")
@@ -49,7 +49,7 @@ func TestListTargetPackages_DefaultRunners(t *testing.T) {
 	require.Equal(t, targetPackages.runners["abc"], ciDefaultRunner)
 	require.Equal(t, targetPackages.runners["ghi"], ciDefaultRunner)
 
-	// check all the SEEN packages
+	// check all SEEN packages
 	// there should be 5 packages that start with "abc" or "ghi"
 	require.Equal(t, 5, len(seenPackages))
 	require.Contains(t, seenPackages, flowPackagePrefix+"abc")
@@ -57,20 +57,25 @@ func TestListTargetPackages_DefaultRunners(t *testing.T) {
 	require.Contains(t, seenPackages, flowPackagePrefix+"abc/def")
 	require.Contains(t, seenPackages, flowPackagePrefix+"abc/def/ghi")
 	require.Contains(t, seenPackages, flowPackagePrefix+"ghi")
-
 }
 
-// TestListTargetSubPackages tests that if a subpackage is specified as a target package, then the sub package and
+// TestListTargetSubPackages_CustomRunners tests that if a subpackage is specified as a target package, then the sub package and
 // all children of the sub package are also included in the target packages.
-func TestListTargetSubPackages(t *testing.T) {
-	targetPackages, seenPackages := listTargetPackages([]string{"abc/def"}, getAllFlowPackages())
+func TestListTargetSubPackages_CustomRunners(t *testing.T) {
+	targetPackages, seenPackages := listTargetPackages([]string{"abc/def:foo_runner"}, getAllFlowPackages())
 	require.Equal(t, 1, len(targetPackages.packages))
 
+	// check all TARGET packages
 	// there should be 2 target subpackages that starts with "abc/def"
 	require.Equal(t, 2, len(targetPackages.packages["abc/def"]))
 	require.Contains(t, targetPackages.packages["abc/def"], flowPackagePrefix+"abc/def")
 	require.Contains(t, targetPackages.packages["abc/def"], flowPackagePrefix+"abc/def/ghi")
 
+	// check all CI RUNNERS for each target package
+	require.Equal(t, 1, len(targetPackages.runners))
+	require.Equal(t, targetPackages.runners["abc/def"], "foo_runner")
+
+	// check all SEEN packages
 	// there should be 2 seen subpackages that start with "abc/def"
 	require.Equal(t, 2, len(seenPackages))
 	require.Contains(t, seenPackages, flowPackagePrefix+"abc/def")
