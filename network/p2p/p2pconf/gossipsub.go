@@ -8,45 +8,51 @@ import (
 // The resource manager is used to limit the number of open connections and streams (as well as any other resources
 // used by libp2p) for each peer.
 type ResourceManagerConfig struct {
-	Streams                   StreamsLimit                 `mapstructure:"libp2p-streams-limit"`                  // the limit for streams
-	InboundConn               ResourceManagerOverrideLimit `mapstructure:"libp2p-inbound-conns"`                  // the limit for inbound connections
-	OutboundConn              ResourceManagerOverrideLimit `mapstructure:"libp2p-outbound-conns"`                 // the limit for outbound connections
+	Override                  ResourceManagerOverrideScope `mapstructure:"libp2p-resource-limit-override"`        // override limits for specific peers, protocols, etc.
 	MemoryLimitRatio          float64                      `mapstructure:"libp2p-memory-limit-ratio"`             // maximum allowed fraction of memory to be allocated by the libp2p resources in (0,1]
 	FileDescriptorsRatio      float64                      `mapstructure:"libp2p-file-descriptors-ratio"`         // maximum allowed fraction of file descriptors to be allocated by the libp2p resources in (0,1]
 	PeerBaseLimitConnsInbound int                          `mapstructure:"libp2p-peer-base-limits-conns-inbound"` // the maximum amount of allowed inbound connections per peer
 }
 
-// StreamsLimit is the resource manager limit for streams.
-type StreamsLimit struct {
-	// Inbound is the limit for inbound streams.
-	Inbound ResourceManagerOverrideLimit `mapstructure:"inbound"`
-	// Outbound is the limit for outbound streams.
-	Outbound ResourceManagerOverrideLimit `mapstructure:"outbound"`
+type ResourceManagerOverrideScope struct {
+	// System is the limit for the resource at the entire system.
+	// For a specific limit, the system-wide dictates the maximum allowed value across all peers and protocols at the entire node level.
+	System ResourceManagerOverrideLimit `mapstructure:"system"`
+
+	// Transient is the limit for the resource at the transient scope. Transient limits are used for resources that have not fully established and are under negotiation.
+	Transient ResourceManagerOverrideLimit `mapstructure:"transient"`
+
+	// Protocol is the limit for the resource at the protocol scope, e.g., DHT, GossipSub, etc. It dictates the maximum allowed resource across all peers for that protocol.
+	Protocol ResourceManagerOverrideLimit `mapstructure:"protocol"`
+
+	// Peer is the limit for the resource at the peer scope. It dictates the maximum allowed resource for a specific peer.
+	Peer ResourceManagerOverrideLimit `mapstructure:"peer"`
+
+	// Connection is the limit for the resource for a pair of (peer, protocol), e.g., (peer1, DHT), (peer1, GossipSub), etc. It dictates the maximum allowed resource for a protocol and a peer.
+	PeerProtocol ResourceManagerOverrideLimit `mapstructure:"peer-protocol"`
 }
 
-// ResourceManagerOverrideLimit is the configuration for the resource manager override limits.
+// ResourceManagerOverrideLimit is the configuration for the resource manager override limit at a certain scope.
 // Any value that is not set will be ignored and the default value will be used.
 type ResourceManagerOverrideLimit struct {
 	// System is the limit for the resource at the entire system. if not set, the default value will be used.
-	// For a specific limit, the system-wide dictates the maximum allowed value across all peers and protocols at the entire node level.
-	System int `validate:"gte=0" mapstructure:"system"`
+	// For a specific limit, the system-wide dictates the maximum allowed value across all peers and protocols at the entire node scope.
+	StreamInbound int `validate:"gte=0" mapstructure:"stream-inbound"`
 
-	// Transient is the limit for resources that have not fully taken yet; if not set, the default value will be used.
-	// For a specific limit, the transient limit dictates the maximum allowed value that are in transient state and not yet fully established
-	// at the entire node level.
-	Transient int `validate:"gte=0" mapstructure:"transient"`
+	// StreamOutbound is the max number of outbound streams allowed, at the resource scope.
+	StreamOutbound int `validate:"gte=0" mapstructure:"stream-outbound"`
 
-	// Protocol is the limit at the protocol level; if not set, the default value will be used.
-	// For a specific limit, the protocol limit dictates the maximum allowed value across the entire node at the protocol level.
-	Protocol int `validate:"gte=0" mapstructure:"protocol"`
+	// ConnectionInbound is the max number of inbound connections allowed, at the resource scope.
+	ConnectionInbound int `validate:"gte=0" mapstructure:"connection-inbound"`
 
-	// Peer is the limit at the peer level; if not set, the default value will be used.
-	// For a specific limit, the peer limit dictates the maximum allowed value across the entire node for that peer.
-	Peer int `validate:"gte=0" mapstructure:"peer"`
+	// ConnectionOutbound is the max number of outbound connections allowed, at the resource scope.
+	ConnectionOutbound int `validate:"gte=0" mapstructure:"connection-outbound"`
 
-	// ProtocolPeer is the limit at the protocol and peer level; if not set, the default value will be used.
-	// For a specific limit, the protocol peer limit dictates the maximum allowed value across the entire node for that peer on a specific protocol.
-	ProtocolPeer int `validate:"gte=0" mapstructure:"peer-protocol"`
+	// FD is the max number of file descriptors allowed, at the resource scope.
+	FD int `validate:"gte=0" mapstructure:"fd"`
+
+	// Memory is the max amount of memory allowed (bytes), at the resource scope.
+	Memory int `validate:"gte=0" mapstructure:"memory-bytes"`
 }
 
 // GossipSubConfig is the configuration for the GossipSub pubsub implementation.
