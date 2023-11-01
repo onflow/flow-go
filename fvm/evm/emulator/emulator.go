@@ -40,47 +40,47 @@ func newConfig(ctx types.BlockContext) *Config {
 	)
 }
 
-// BlockView constructs a new block view
+// NewReadOnlyBlockView constructs a new readonly block view
 func (em *Emulator) NewReadOnlyBlockView(ctx types.BlockContext) (types.ReadOnlyBlockView, error) {
 	execState, err := newState(em.Database)
-	return &BlockView{
+	return &ReadOnlyBlockView{
 		state: execState,
 	}, err
 }
 
-// BlockView constructs a new block
+// NewBlockView constructs a new block (mutable)
 func (em *Emulator) NewBlockView(ctx types.BlockContext) (types.BlockView, error) {
 	cfg := newConfig(ctx)
-	return &Block{
+	return &BlockView{
 		config:   cfg,
 		database: em.Database,
 	}, nil
 }
 
-type BlockView struct {
+type ReadOnlyBlockView struct {
 	state *gethState.StateDB
 }
 
 // BalanceOf returns the balance of the given account
-func (bv *BlockView) BalanceOf(address types.Address) (*big.Int, error) {
+func (bv *ReadOnlyBlockView) BalanceOf(address types.Address) (*big.Int, error) {
 	return bv.state.GetBalance(address.ToCommon()), nil
 }
 
 // CodeOf return the code of the given account
-func (bv *BlockView) CodeOf(address types.Address) (types.Code, error) {
+func (bv *ReadOnlyBlockView) CodeOf(address types.Address) (types.Code, error) {
 	return bv.state.GetCode(address.ToCommon()), nil
 }
 
 // TODO: allow block level to do multiple procedure per block
 // TODO: add block commit
-type Block struct {
+type BlockView struct {
 	config   *Config
 	database *database.Database
 }
 
 // MintTo mints tokens into the target address, if the address dees not
 // exist it would create it first.
-func (bl *Block) MintTo(
+func (bl *BlockView) MintTo(
 	address types.Address,
 	amount *big.Int,
 ) (*types.Result, error) {
@@ -97,7 +97,7 @@ func (bl *Block) MintTo(
 }
 
 // WithdrawFrom deduct the balance from the given address.
-func (bl *Block) WithdrawFrom(
+func (bl *BlockView) WithdrawFrom(
 	address types.Address,
 	amount *big.Int,
 ) (*types.Result, error) {
@@ -119,7 +119,7 @@ func (bl *Block) WithdrawFrom(
 //
 // Warning, This method should only be used for bridged accounts
 // where resource ownership has been verified
-func (bl *Block) Transfer(
+func (bl *BlockView) Transfer(
 	from, to types.Address,
 	value *big.Int,
 ) (*types.Result, error) {
@@ -143,7 +143,7 @@ func (bl *Block) Transfer(
 //
 // Warning, This method should only be used for bridged accounts
 // where resource ownership has been verified
-func (bl *Block) Deploy(
+func (bl *BlockView) Deploy(
 	caller types.Address,
 	code types.Code,
 	gasLimit uint64,
@@ -168,7 +168,7 @@ func (bl *Block) Deploy(
 //
 // Warning, This method should only be used for bridged accounts
 // where resource ownership has been verified
-func (bl *Block) Call(
+func (bl *BlockView) Call(
 	from, to types.Address,
 	data types.Data,
 	gasLimit uint64,
@@ -188,7 +188,7 @@ func (bl *Block) Call(
 }
 
 // RunTransaction runs an evm transaction
-func (bl *Block) RunTransaction(
+func (bl *BlockView) RunTransaction(
 	tx *gethTypes.Transaction,
 ) (*types.Result, error) {
 	proc, err := bl.newProcedure()
@@ -211,7 +211,7 @@ func (bl *Block) RunTransaction(
 	return res, bl.commit(res.StateRootHash)
 }
 
-func (bl *Block) newProcedure() (*procedure, error) {
+func (bl *BlockView) newProcedure() (*procedure, error) {
 	execState, err := newState(bl.database)
 	if err != nil {
 		return nil, err
@@ -231,7 +231,7 @@ func (bl *Block) newProcedure() (*procedure, error) {
 }
 
 // TODO errors returns here might not be fatal, what if we have hit the interaction limit ?
-func (bl *Block) commit(rootHash gethCommon.Hash) error {
+func (bl *BlockView) commit(rootHash gethCommon.Hash) error {
 	// sets root hash
 	err := bl.database.SetRootHash(rootHash)
 	if err != nil {
