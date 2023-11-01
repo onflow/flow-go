@@ -44,6 +44,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	rpcConnection "github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/access/state_stream"
+	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
@@ -127,7 +128,7 @@ type AccessNodeConfig struct {
 	apiRatelimits                map[string]int
 	apiBurstlimits               map[string]int
 	rpcConf                      rpc.Config
-	stateStreamConf              state_stream.Config
+	stateStreamConf              statestreambackend.Config
 	stateStreamFilterConf        map[string]int
 	ExecutionNodeAddress         string // deprecated
 	HistoricalAccessRPCs         []access.AccessAPIClient
@@ -191,7 +192,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			MaxMsgSize:     grpcutils.DefaultMaxMsgSize,
 			CompressorName: grpcutils.NoCompressor,
 		},
-		stateStreamConf: state_stream.Config{
+		stateStreamConf: statestreambackend.Config{
 			MaxExecutionDataMsgSize: grpcutils.DefaultMaxMsgSize,
 			ExecutionDataCacheSize:  state_stream.DefaultCacheSize,
 			ClientSendTimeout:       state_stream.DefaultSendTimeout,
@@ -199,6 +200,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			MaxGlobalStreams:        state_stream.DefaultMaxGlobalStreams,
 			EventFilterConfig:       state_stream.DefaultEventFilterConfig,
 			ResponseLimit:           state_stream.DefaultResponseLimit,
+			HeartbeatInterval:       state_stream.DefaultHeartbeatInterval,
 		},
 		stateStreamFilterConf:        nil,
 		ExecutionNodeAddress:         "localhost:9000",
@@ -277,14 +279,14 @@ type FlowAccessNodeBuilder struct {
 	RequestEng     *requester.Engine
 	FollowerEng    *followereng.ComplianceEngine
 	SyncEng        *synceng.Engine
-	StateStreamEng *state_stream.Engine
+	StateStreamEng *statestreambackend.Engine
 
 	// grpc servers
 	secureGrpcServer      *grpcserver.GrpcServer
 	unsecureGrpcServer    *grpcserver.GrpcServer
 	stateStreamGrpcServer *grpcserver.GrpcServer
 
-	stateStreamBackend *state_stream.StateStreamBackend
+	stateStreamBackend *statestreambackend.StateStreamBackend
 }
 
 func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilder {
@@ -428,6 +430,10 @@ func (builder *FlowAccessNodeBuilder) buildFollowerEngine() *FlowAccessNodeBuild
 
 func (builder *FlowAccessNodeBuilder) buildSyncEngine() *FlowAccessNodeBuilder {
 	builder.Component("sync engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		spamConfig, err := synceng.NewSpamDetectionConfig()
+		if err != nil {
+			return nil, fmt.Errorf("could not initialize spam detection config: %w", err)
+		}
 		sync, err := synceng.New(
 			node.Logger,
 			node.Metrics.Engine,
@@ -438,7 +444,7 @@ func (builder *FlowAccessNodeBuilder) buildSyncEngine() *FlowAccessNodeBuilder {
 			builder.FollowerEng,
 			builder.SyncCore,
 			builder.SyncEngineParticipantsProviderFactory(),
-			synceng.NewSpamDetectionConfig(),
+			spamConfig,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create synchronization engine: %w", err)
@@ -620,7 +626,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				execDataCacheBackend,
 			)
 
-			builder.ExecutionDataRequester = edrequester.New(
+			r, err := edrequester.New(
 				builder.Logger,
 				metrics.NewExecutionDataRequesterCollector(),
 				builder.ExecutionDataDownloader,
@@ -632,6 +638,10 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				builder.executionDataConfig,
 				execDataDistributor,
 			)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create execution data requester: %w", err)
+			}
+			builder.ExecutionDataRequester = r
 
 			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.ExecutionDataRequester.OnBlockFinalized)
 
@@ -735,7 +745,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				builder.ExecutionIndexerCore = indexerCore
 
 				// execution state worker uses a jobqueue to process new execution data and indexes it by using the indexer.
-				builder.ExecutionIndexer = indexer.NewIndexer(
+				builder.ExecutionIndexer, err = indexer.NewIndexer(
 					builder.Logger,
 					registers.FirstHeight(),
 					registers,
@@ -744,6 +754,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					builder.ExecutionDataRequester.HighestConsecutiveHeight,
 					indexedBlockHeight,
 				)
+				if err != nil {
+					return nil, err
+				}
 
 				// setup requester to notify indexer when new execution data is received
 				execDataDistributor.AddOnExecutionDataReceivedConsumer(builder.ExecutionIndexer.OnExecutionData)
@@ -756,7 +769,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					builder.RootChainID,
 					query.NewProtocolStateWrapper(builder.State),
 					builder.Storage.Headers,
-					execution.IndexRegisterAdapter(builder.ExecutionIndexerCore.RegisterValues),
+					builder.ExecutionIndexerCore.RegisterValue,
 				)
 				if err != nil {
 					return nil, err
@@ -788,7 +801,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			}
 			broadcaster := engine.NewBroadcaster()
 
-			builder.stateStreamBackend, err = state_stream.New(
+			builder.stateStreamBackend, err = statestreambackend.New(
 				node.Logger,
 				builder.stateStreamConf,
 				node.State,
@@ -804,7 +817,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				return nil, fmt.Errorf("could not create state stream backend: %w", err)
 			}
 
-			stateStreamEng, err := state_stream.NewEng(
+			stateStreamEng, err := statestreambackend.NewEng(
 				node.Logger,
 				builder.stateStreamConf,
 				executionDataStoreCache,
@@ -906,6 +919,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.DurationVar(&builder.stateStreamConf.ClientSendTimeout, "state-stream-send-timeout", defaultConfig.stateStreamConf.ClientSendTimeout, "maximum wait before timing out while sending a response to a streaming client e.g. 30s")
 		flags.UintVar(&builder.stateStreamConf.ClientSendBufferSize, "state-stream-send-buffer-size", defaultConfig.stateStreamConf.ClientSendBufferSize, "maximum number of responses to buffer within a stream")
 		flags.Float64Var(&builder.stateStreamConf.ResponseLimit, "state-stream-response-limit", defaultConfig.stateStreamConf.ResponseLimit, "max number of responses per second to send over streaming endpoints. this helps manage resources consumed by each client querying data not in the cache e.g. 3 or 0.5. 0 means no limit")
+		flags.Uint64Var(&builder.stateStreamConf.HeartbeatInterval, "state-stream-heartbeat-interval", defaultConfig.stateStreamConf.HeartbeatInterval, "default interval in blocks at which heartbeat messages should be sent. applied when client did not specify a value.")
 
 		// Execution Data Indexer
 		flags.BoolVar(&builder.executionDataIndexingEnabled, "execution-data-indexing-enabled", defaultConfig.executionDataIndexingEnabled, "whether to enable the execution data indexing")
@@ -1299,8 +1313,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.secureGrpcServer,
 				builder.unsecureGrpcServer,
 				builder.stateStreamBackend,
-				builder.stateStreamConf.EventFilterConfig,
-				builder.stateStreamConf.MaxGlobalStreams,
+				builder.stateStreamConf,
 			)
 			if err != nil {
 				return nil, err

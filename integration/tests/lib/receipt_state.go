@@ -12,7 +12,6 @@ import (
 )
 
 const receiptTimeout = 120 * time.Second
-const receiptStateTimeout = 120 * time.Second
 
 type ReceiptState struct {
 	sync.RWMutex
