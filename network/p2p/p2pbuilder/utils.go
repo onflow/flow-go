@@ -204,8 +204,14 @@ func ApplyInboundConnectionLimits(logger zerolog.Logger, concrete rcmgr.Concrete
 	partial := rcmgr.PartialLimitConfig{}
 	lg := logger.With().Logger()
 
-	if int(c.PeerDefault.ConnsInbound) > peerLimit {
-		lg = lg.With().Int("concrete_peer_inbound_conns", int(c.PeerDefault.ConnsInbound)).Int("partial_peer_inbound_conns", peerLimit).Logger()
+	if peerLimit > 0 {
+		// if peer limit is set, override the concrete limit with the peer limit.
+		lg = lg.With().
+			// concrete limit is the current limit, peer limit is the limit from the config file.
+			Bool("peer_inbound_conns_override", true).
+			Int("concrete_peer_inbound_conns", int(c.PeerDefault.ConnsInbound)).
+			Int("partial_peer_inbound_conns", peerLimit).
+			Logger()
 		partial.PeerDefault.ConnsInbound = rcmgr.LimitVal(peerLimit)
 	}
 
