@@ -107,19 +107,19 @@ func TestListOtherPackages(t *testing.T) {
 }
 
 // TestGenerateTestMatrix_CustomRunners tests that the test matrix is generated correctly where the target packages include top level
-// packages as well as sub packages.
+// packages as well as sub packages. It also tests having 2 different custom CI runners, as well as default runners.
 func TestGenerateTestMatrix_CustomRunners(t *testing.T) {
-	target, seenPackages := listTargetPackages([]string{"abc/def", "def:foo-runner", "ghi"}, getAllFlowPackages())
-	require.Equal(t, 3, len(target.packages))
-	require.Equal(t, 3, len(target.runners))
-	require.Equal(t, 5, len(seenPackages))
+	target, seenPackages := listTargetPackages([]string{"abc/def", "def:foo-runner", "ghi", "vwx/ghi:foo-runner2"}, getAllFlowPackages())
+	require.Equal(t, 4, len(target.packages))
+	require.Equal(t, 4, len(target.runners))
+	require.Equal(t, 6, len(seenPackages))
 
 	otherPackages := listOtherPackages(getAllFlowPackages(), seenPackages)
 
 	matrix := generateTestMatrix(target, otherPackages)
 
-	// should be 3 groups in test matrix: abc/def, def, ghi, others
-	require.Equal(t, 4, len(matrix))
+	// should be 4 groups in test matrix: abc/def, def, ghi, vwx/ghi, others
+	require.Equal(t, 5, len(matrix))
 
 	require.Contains(t, matrix, testMatrix{
 		Name:     "abc/def",
@@ -137,8 +137,13 @@ func TestGenerateTestMatrix_CustomRunners(t *testing.T) {
 		Runner:   "ubuntu-latest"},
 	)
 	require.Contains(t, matrix, testMatrix{
+		Name:     "vwx/ghi",
+		Packages: "github.com/onflow/flow-go/vwx/ghi",
+		Runner:   "foo-runner2"},
+	)
+	require.Contains(t, matrix, testMatrix{
 		Name:     "others",
-		Packages: "github.com/onflow/flow-go/abc github.com/onflow/flow-go/abc/123 github.com/onflow/flow-go/jkl github.com/onflow/flow-go/mno/abc github.com/onflow/flow-go/pqr github.com/onflow/flow-go/stu github.com/onflow/flow-go/vwx github.com/onflow/flow-go/vwx/ghi github.com/onflow/flow-go/yz",
+		Packages: "github.com/onflow/flow-go/abc github.com/onflow/flow-go/abc/123 github.com/onflow/flow-go/jkl github.com/onflow/flow-go/mno/abc github.com/onflow/flow-go/pqr github.com/onflow/flow-go/stu github.com/onflow/flow-go/vwx github.com/onflow/flow-go/yz",
 		Runner:   "ubuntu-latest"},
 	)
 }
