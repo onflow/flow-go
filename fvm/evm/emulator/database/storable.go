@@ -420,15 +420,15 @@ func NewPersistentSlabStorage(baseStorage atree.BaseStorage) (*atree.PersistentS
 
 }
 
-type typeInfo struct{}
+type emptyTypeInfo struct{}
 
-var _ atree.TypeInfo = typeInfo{}
+var _ atree.TypeInfo = emptyTypeInfo{}
 
-func (typeInfo) Encode(e *cbor.StreamEncoder) error {
+func (emptyTypeInfo) Encode(e *cbor.StreamEncoder) error {
 	return e.EncodeUint8(255)
 }
 
-func (i typeInfo) Equal(other atree.TypeInfo) bool {
+func (i emptyTypeInfo) Equal(other atree.TypeInfo) bool {
 	_, ok := other.(testTypeInfo)
 	return ok
 }

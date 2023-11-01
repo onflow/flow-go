@@ -65,7 +65,7 @@ func (db *Database) retrieveOrCreateMapRoot() error {
 
 	var m *atree.OrderedMap
 	if len(rootIDBytes) == 0 {
-		m, err = atree.NewMap(db.storage, atree.Address(db.flowEVMRootAddress), atree.NewDefaultDigesterBuilder(), typeInfo{})
+		m, err = atree.NewMap(db.storage, atree.Address(db.flowEVMRootAddress), atree.NewDefaultDigesterBuilder(), emptyTypeInfo{})
 		if err != nil {
 			return handleError(err)
 		}
