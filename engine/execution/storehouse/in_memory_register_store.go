@@ -30,11 +30,7 @@ func IsErrPruned(err error) (ErrPruned, bool) {
 	var e ErrPruned
 	ok := errors.As(err, &e)
 	if ok {
-		pe, ok := err.(ErrPruned)
-		if !ok {
-			return ErrPruned{}, false
-		}
-		return pe, true
+		return e, true
 	}
 	return ErrPruned{}, false
 }
