@@ -355,6 +355,35 @@ func (b *Backend) GetLatestProtocolStateSnapshot(_ context.Context) ([]byte, err
 	return convert.SnapshotToBytes(validSnapshot)
 }
 
+// GetProtocolStateSnapshotByBlockID returns the latest finalized snapshot by block id
+func (b *Backend) GetProtocolStateSnapshotByBlockID(ctx context.Context, blockID flow.Identifier) ([]byte, error) {
+	block, _, err := b.backendBlockDetails.GetBlockByID(ctx, blockID)
+	if err != nil {
+		return nil, err
+	}
+
+	snapshot := b.state.AtHeight(block.Header.Height)
+
+	validSnapshot, err := b.getValidSnapshot(snapshot, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	return convert.SnapshotToBytes(validSnapshot)
+}
+
+// GetProtocolStateSnapshotByHeight returns the latest finalized snapshot by block height
+func (b *Backend) GetProtocolStateSnapshotByHeight(_ context.Context, blockHeight uint64) ([]byte, error) {
+	snapshot := b.state.AtHeight(blockHeight)
+
+	validSnapshot, err := b.getValidSnapshot(snapshot, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	return convert.SnapshotToBytes(validSnapshot)
+}
+
 // executionNodesForBlockID returns upto maxNodesCnt number of randomly chosen execution node identities
 // which have executed the given block ID.
 // If no such execution node is found, an InsufficientExecutionReceipts error is returned.

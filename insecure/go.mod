@@ -287,3 +287,5 @@ require (
 )
 
 replace github.com/onflow/flow-go => ../
+
+replace github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20231017162044-5d0f9b6dfdb2 => github.com/AndriiDiachuk/flow/protobuf/go/flow v0.0.0-20231101114612-70243c40d6a7
