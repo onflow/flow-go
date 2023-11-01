@@ -429,6 +429,6 @@ func (emptyTypeInfo) Encode(e *cbor.StreamEncoder) error {
 }
 
 func (i emptyTypeInfo) Equal(other atree.TypeInfo) bool {
-	_, ok := other.(testTypeInfo)
+	_, ok := other.(emptyTypeInfo)
 	return ok
 }
