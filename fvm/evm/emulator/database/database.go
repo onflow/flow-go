@@ -126,8 +126,20 @@ func (db *Database) Put(key []byte, value []byte) error {
 }
 
 func (db *Database) put(key []byte, value []byte) error {
-	_, err := db.atreemap.Set(compare, hashInputProvider, NewByteStringValue(key), NewByteStringValue(value))
-	return handleError(err)
+	existingValueStorable, err := db.atreemap.Set(compare, hashInputProvider, NewByteStringValue(key), NewByteStringValue(value))
+	if err != nil {
+		return handleError(err)
+	}
+	
+	if id, ok := existingValueStorable.(atree.StorageIDStorable); ok {
+		// NOTE: deep remove isn't necessary because value is ByteStringValue (not container)
+		err := db.storage.Remove(id)
+	 	if err != nil {
+	  		return handleError(err)
+		}
+	}
+	
+	return nil
 }
 
 // Has checks if a key is present in the key-value store.
@@ -153,8 +165,26 @@ func (db *Database) Delete(key []byte) error {
 }
 
 func (db *Database) delete(key []byte) error {
-	_, _, err := db.atreemap.Remove(compare, hashInputProvider, NewByteStringValue(key))
-	return handleError(err)
+	removedMapKeyStorable, removedMapValueStorable, err := db.atreemap.Remove(compare, hashInputProvider, NewByteStringValue(key))
+	if err != nil {
+		return handleError(err)
+	}
+	
+	if id, ok := removedMapKeyStorable.(atree.StorageIDStorable); ok {
+		// NOTE: deep remove isn't necessary because key is ByteStringValue (not container)
+		err := db.storage.Remove(id)
+	 	if err != nil {
+	  		return handleError(err)
+		}
+	}	
+	
+	if id, ok := removedMapValueStorable.(atree.StorageIDStorable); ok {
+		// NOTE: deep remove isn't necessary because value is ByteStringValue (not container)
+		err := db.storage.Remove(id)
+	 	if err != nil {
+	  		return handleError(err)
+		}
+	}		
 }
 
 // ApplyBatch applys changes from a batch into the database
@@ -176,7 +206,7 @@ func (db *Database) applyBatch(b *batch) error {
 		}
 		err = db.put(keyvalue.key, keyvalue.value)
 	}
-	return nil
+	return err
 }
 
 // SetRootHash sets the active root hash to a new one
@@ -296,7 +326,7 @@ func (b *batch) Put(key, value []byte) error {
 
 // Delete inserts the a key removal into the batch for later committing.
 func (b *batch) Delete(key []byte) error {
-	return b.set(key, nil, false)
+	return b.set(key, nil, true)
 }
 
 func (b *batch) set(key []byte, value []byte, delete bool) error {
