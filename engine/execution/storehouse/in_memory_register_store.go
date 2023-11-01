@@ -209,6 +209,10 @@ func (s *InMemoryRegisterStore) getUpdatedRegisters(height uint64, blockID flow.
 
 // Prune prunes the register store to the given height
 // The pruned height must be an executed block, the caller should ensure that by calling SaveRegisters before.
+//
+// Pruning is done by walking up the finalized fork from `s.prunedHeight` to `height`. At each height, prune all
+// other forks that begin at that height. This ensures that data for all conflicting forks are freed
+//
 // TODO: It does not block the caller, the pruning work is done async
 func (s *InMemoryRegisterStore) Prune(height uint64, blockID flow.Identifier) error {
 	finalizedFork, err := s.findFinalizedFork(height, blockID)
