@@ -186,8 +186,8 @@ func ApplyInboundStreamLimits(logger zerolog.Logger, concrete rcmgr.ConcreteLimi
 }
 
 // ApplyInboundConnectionLimits applies the inbound connection limits to the concrete limit config. The concrete limit config is assumed coming from scaling the
-// base limit config by the scaling factor. The inbound connection limits are applied to the concrete limit config if the concrete limit config is greater than
-// the inbound connection limits.
+// base limit config by the scaling factor. The inbound connection limit is applied if its value is greater than 0. Otherwise, the inbound connection limit is
+// set by the concrete limit config.
 // The inbound limits are assumed coming from the config file.
 // Args:
 //
@@ -204,7 +204,7 @@ func ApplyInboundConnectionLimits(logger zerolog.Logger, concrete rcmgr.Concrete
 	partial := rcmgr.PartialLimitConfig{}
 	lg := logger.With().Logger()
 
-	if int(c.PeerDefault.ConnsInbound) > peerLimit {
+	if peerLimit > 0 {
 		lg = lg.With().Int("concrete_peer_inbound_conns", int(c.PeerDefault.ConnsInbound)).Int("partial_peer_inbound_conns", peerLimit).Logger()
 		partial.PeerDefault.ConnsInbound = rcmgr.LimitVal(peerLimit)
 	}

@@ -110,7 +110,7 @@ func TestAllowedFileDescriptorsScale(t *testing.T) {
 
 // TestApplyInboundStreamLimits tests that the inbound stream limits are applied correctly, i.e., the limits from the config file
 // are applied to the concrete limit config when the concrete limit config is greater than the limits from the config file.
-func TestApplyInboundStreamAndConnectionLimits(t *testing.T) {
+func TestApplyInboundStreamLimits(t *testing.T) {
 	cfg, err := config.DefaultConfig()
 	require.NoError(t, err)
 
@@ -173,7 +173,34 @@ func TestApplyInboundStreamAndConnectionLimits(t *testing.T) {
 	require.Equal(t, int(1), int(applied.ToPartialLimitConfig().Stream.StreamsInbound))
 	// system limit should not be overridden.
 	require.Equal(t, int(1), int(applied.ToPartialLimitConfig().System.StreamsInbound))
+}
 
-	// check that the applied peer base limit connections are overridden.
-	require.Equal(t, int(cfg.NetworkConfig.ResourceManagerConfig.PeerBaseLimitConnsInbound), int(applied.ToPartialLimitConfig().PeerDefault.ConnsInbound))
+// TestApplyInboundConnectionLimits tests that the inbound connection limits are applied correctly, i.e., the limits from the config file
+// are applied to the concrete limit config when the concrete limit config is set.
+func TestApplyInboundConnectionLimits(t *testing.T) {
+	cfg, err := config.DefaultConfig()
+	require.NoError(t, err)
+
+	// by default the peer base limit connections is set to 0 meaning that the libp2p default is used.
+	require.Equal(t, 0, int(cfg.NetworkConfig.ResourceManagerConfig.PeerBaseLimitConnsInbound))
+
+	mem, err := allowedMemory(cfg.NetworkConfig.ResourceManagerConfig.MemoryLimitRatio)
+	require.NoError(t, err)
+
+	fd, err := allowedFileDescriptors(cfg.NetworkConfig.FileDescriptorsRatio)
+	require.NoError(t, err)
+	limits := rcmgr.DefaultLimits
+	libp2p.SetDefaultServiceLimits(&limits)
+	scaled := limits.Scale(mem, fd)
+
+	// then applies the peer base limit connections from the config file.
+	applied1 := ApplyInboundConnectionLimits(unittest.Logger(), scaled, cfg.NetworkConfig.ResourceManagerConfig.PeerBaseLimitConnsInbound)
+	// since the peer base limit connections is set to 0, the libp2p default should be used, hence applied1 should be equal to scaled (i.e., the libp2p default).
+	require.Equal(t, int(scaled.ToPartialLimitConfig().PeerDefault.ConnsInbound), int(applied1.ToPartialLimitConfig().PeerDefault.ConnsInbound))
+	// default libp2p peer base limit connections should be greater than 0.
+	require.Greater(t, int(applied1.ToPartialLimitConfig().PeerDefault.ConnsInbound), 0)
+
+	// now set the peer base limit connections to 100, and test that it is applied correctly.
+	applied2 := ApplyInboundConnectionLimits(unittest.Logger(), scaled, 100)
+	require.Equal(t, int(100), int(applied2.ToPartialLimitConfig().PeerDefault.ConnsInbound))
 }
