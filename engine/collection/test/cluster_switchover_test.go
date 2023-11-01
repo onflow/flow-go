@@ -133,20 +133,21 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 		states = append(states, node.State)
 	}
 
-	// take first collection node and use its storage as data source for mutator
+	// take first collection node and use its storage as data source for stateMutator
 	refNode := tc.nodes[0]
-	mutator := protocol_state.NewMutator(
+	stateMutator := protocol_state.NewMutableProtocolState(
+		refNode.ProtocolStateSnapshots,
+		refNode.State.Params(),
 		refNode.Headers,
 		refNode.Results,
 		refNode.Setups,
 		refNode.EpochCommits,
-		refNode.ProtocolStateSnapshots,
 		refNode.State.Params(),
 	)
 
 	// when building new epoch we would like to replace fixture cluster QCs with real ones, for that we need
 	// to generate them using node infos
-	tc.builder = unittest.NewEpochBuilder(tc.T(), mutator, states...).UsingCommitOpts(func(commit *flow.EpochCommit) {
+	tc.builder = unittest.NewEpochBuilder(tc.T(), stateMutator, states...).UsingCommitOpts(func(commit *flow.EpochCommit) {
 		// build a lookup table for node infos
 		nodeInfoLookup := make(map[flow.Identifier]model.NodeInfo)
 		for _, nodeInfo := range tc.nodeInfos {

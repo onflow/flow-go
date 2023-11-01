@@ -460,7 +460,15 @@ func createNode(
 
 	seals := stdmap.NewIncorporatedResultSeals(sealLimit)
 
-	protocolStateMutator := protocol_state.NewMutator(headersDB, resultsDB, setupsDB, commitsDB, protocolStateDB, state.Params())
+	mutableProtocolState := protocol_state.NewMutableProtocolState(
+		protocolStateDB,
+		state.Params(),
+		headersDB,
+		resultsDB,
+		setupsDB,
+		commitsDB,
+		state.Params(),
+	)
 
 	// initialize the block builder
 	build, err := builder.NewBuilder(
@@ -473,7 +481,7 @@ func createNode(
 		blocksDB,
 		resultsDB,
 		receiptsDB,
-		protocolStateMutator,
+		mutableProtocolState,
 		guarantees,
 		consensusMempools.NewIncorporatedResultSeals(seals, receiptsDB),
 		receipts,

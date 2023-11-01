@@ -6,8 +6,6 @@ import (
 	flow "github.com/onflow/flow-go/model/flow"
 	mock "github.com/stretchr/testify/mock"
 
-	protocol "github.com/onflow/flow-go/state/protocol"
-
 	transaction "github.com/onflow/flow-go/storage/badger/transaction"
 )
 
@@ -16,84 +14,62 @@ type StateMutator struct {
 	mock.Mock
 }
 
-// ApplyServiceEvents provides a mock function with given fields: updater, seals
-func (_m *StateMutator) ApplyServiceEvents(updater protocol.StateUpdater, seals []*flow.Seal) ([]func(*transaction.Tx) error, error) {
-	ret := _m.Called(updater, seals)
+// ApplyServiceEvents provides a mock function with given fields: seals
+func (_m *StateMutator) ApplyServiceEvents(seals []*flow.Seal) error {
+	ret := _m.Called(seals)
 
-	var r0 []func(*transaction.Tx) error
-	var r1 error
-	if rf, ok := ret.Get(0).(func(protocol.StateUpdater, []*flow.Seal) ([]func(*transaction.Tx) error, error)); ok {
-		return rf(updater, seals)
-	}
-	if rf, ok := ret.Get(0).(func(protocol.StateUpdater, []*flow.Seal) []func(*transaction.Tx) error); ok {
-		r0 = rf(updater, seals)
+	var r0 error
+	if rf, ok := ret.Get(0).(func([]*flow.Seal) error); ok {
+		r0 = rf(seals)
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]func(*transaction.Tx) error)
-		}
+		r0 = ret.Error(0)
 	}
 
-	if rf, ok := ret.Get(1).(func(protocol.StateUpdater, []*flow.Seal) error); ok {
-		r1 = rf(updater, seals)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+	return r0
 }
 
-// CommitProtocolState provides a mock function with given fields: blockID, updater
-func (_m *StateMutator) CommitProtocolState(blockID flow.Identifier, updater protocol.StateUpdater) (func(*transaction.Tx) error, flow.Identifier) {
-	ret := _m.Called(blockID, updater)
+// Build provides a mock function with given fields:
+func (_m *StateMutator) Build() (bool, *flow.ProtocolStateEntry, flow.Identifier, []func(*transaction.Tx) error) {
+	ret := _m.Called()
 
-	var r0 func(*transaction.Tx) error
-	var r1 flow.Identifier
-	if rf, ok := ret.Get(0).(func(flow.Identifier, protocol.StateUpdater) (func(*transaction.Tx) error, flow.Identifier)); ok {
-		return rf(blockID, updater)
+	var r0 bool
+	var r1 *flow.ProtocolStateEntry
+	var r2 flow.Identifier
+	var r3 []func(*transaction.Tx) error
+	if rf, ok := ret.Get(0).(func() (bool, *flow.ProtocolStateEntry, flow.Identifier, []func(*transaction.Tx) error)); ok {
+		return rf()
 	}
-	if rf, ok := ret.Get(0).(func(flow.Identifier, protocol.StateUpdater) func(*transaction.Tx) error); ok {
-		r0 = rf(blockID, updater)
+	if rf, ok := ret.Get(0).(func() bool); ok {
+		r0 = rf()
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(func(*transaction.Tx) error)
-		}
+		r0 = ret.Get(0).(bool)
 	}
 
-	if rf, ok := ret.Get(1).(func(flow.Identifier, protocol.StateUpdater) flow.Identifier); ok {
-		r1 = rf(blockID, updater)
+	if rf, ok := ret.Get(1).(func() *flow.ProtocolStateEntry); ok {
+		r1 = rf()
 	} else {
 		if ret.Get(1) != nil {
-			r1 = ret.Get(1).(flow.Identifier)
+			r1 = ret.Get(1).(*flow.ProtocolStateEntry)
 		}
 	}
 
-	return r0, r1
-}
-
-// CreateUpdater provides a mock function with given fields: candidateView, parentID
-func (_m *StateMutator) CreateUpdater(candidateView uint64, parentID flow.Identifier) (protocol.StateUpdater, error) {
-	ret := _m.Called(candidateView, parentID)
-
-	var r0 protocol.StateUpdater
-	var r1 error
-	if rf, ok := ret.Get(0).(func(uint64, flow.Identifier) (protocol.StateUpdater, error)); ok {
-		return rf(candidateView, parentID)
-	}
-	if rf, ok := ret.Get(0).(func(uint64, flow.Identifier) protocol.StateUpdater); ok {
-		r0 = rf(candidateView, parentID)
+	if rf, ok := ret.Get(2).(func() flow.Identifier); ok {
+		r2 = rf()
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(protocol.StateUpdater)
+		if ret.Get(2) != nil {
+			r2 = ret.Get(2).(flow.Identifier)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(uint64, flow.Identifier) error); ok {
-		r1 = rf(candidateView, parentID)
+	if rf, ok := ret.Get(3).(func() []func(*transaction.Tx) error); ok {
+		r3 = rf()
 	} else {
-		r1 = ret.Error(1)
+		if ret.Get(3) != nil {
+			r3 = ret.Get(3).([]func(*transaction.Tx) error)
+		}
 	}
 
-	return r0, r1
+	return r0, r1, r2, r3
 }
 
 type mockConstructorTestingTNewStateMutator interface {

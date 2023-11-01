@@ -721,12 +721,13 @@ func main() {
 			return ctl, nil
 		}).
 		Component("consensus participant", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			protocolStateMutator := protocol_state.NewMutator(
+			mutableProtocolState := protocol_state.NewMutableProtocolState(
+				node.Storage.ProtocolState,
+				node.State.Params(),
 				node.Storage.Headers,
 				node.Storage.Results,
 				node.Storage.Setups,
 				node.Storage.EpochCommits,
-				node.Storage.ProtocolState,
 				node.State.Params(),
 			)
 			// initialize the block builder
@@ -741,7 +742,7 @@ func main() {
 				node.Storage.Blocks,
 				node.Storage.Results,
 				node.Storage.Receipts,
-				protocolStateMutator,
+				mutableProtocolState,
 				guarantees,
 				seals,
 				receipts,

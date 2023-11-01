@@ -57,3 +57,38 @@ func TestProtocolState_AtBlockID(t *testing.T) {
 		assert.Equal(t, expectedChainID, actualChainID)
 	})
 }
+
+// TestMutableProtocolState_Mutator tests happy path of creating a state mutator, and that `Mutator` returns an error
+// if the parent protocol state has not been found.
+func TestMutableProtocolState_Mutator(t *testing.T) {
+	protocolStateDB := storagemock.NewProtocolState(t)
+	globalParams := mock.NewGlobalParams(t)
+	headersDB := storagemock.NewHeaders(t)
+	resultsDB := storagemock.NewExecutionResults(t)
+	setupsDB := storagemock.NewEpochSetups(t)
+	commitsDB := storagemock.NewEpochCommits(t)
+	instanceParams := mock.NewInstanceParams(t)
+
+	mutableState := NewMutableProtocolState(protocolStateDB, globalParams,
+		headersDB,
+		resultsDB,
+		setupsDB,
+		commitsDB,
+		instanceParams)
+
+	t.Run("happy-path", func(t *testing.T) {
+		parentState := unittest.ProtocolStateFixture()
+		candidate := unittest.BlockHeaderFixture()
+		protocolStateDB.On("ByBlockID", candidate.ParentID).Return(parentState, nil)
+		mutator, err := mutableState.Mutator(candidate.View, candidate.ParentID)
+		require.NoError(t, err)
+		require.NotNil(t, mutator)
+	})
+	t.Run("parent-not-found", func(t *testing.T) {
+		candidate := unittest.BlockHeaderFixture()
+		protocolStateDB.On("ByBlockID", candidate.ParentID).Return(nil, storage.ErrNotFound)
+		mutator, err := mutableState.Mutator(candidate.View, candidate.ParentID)
+		require.ErrorIs(t, err, storage.ErrNotFound)
+		require.Nil(t, mutator)
+	})
+}

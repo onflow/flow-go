@@ -653,14 +653,15 @@ func bootstrapSystem(
 		bootstrapNodesInfo = append(bootstrapNodesInfo, verID)
 		identities = append(identities, verID.Identity())
 
-		mutator := protocol_state.NewMutator(
+		mutableProtocolState := protocol_state.NewMutableProtocolState(
+			stateFixture.Storage.ProtocolState,
+			stateFixture.State.Params(),
 			stateFixture.Storage.Headers,
 			stateFixture.Storage.Results,
 			stateFixture.Storage.Setups,
 			stateFixture.Storage.EpochCommits,
-			stateFixture.Storage.ProtocolState,
 			stateFixture.State.Params())
-		epochBuilder := unittest.NewEpochBuilder(t, mutator, stateFixture.State)
+		epochBuilder := unittest.NewEpochBuilder(t, mutableProtocolState, stateFixture.State)
 		epochBuilder.
 			UsingSetupOpts(unittest.WithParticipants(identities.ToSkeleton())).
 			BuildEpoch()

@@ -586,7 +586,7 @@ func TestExtendHeightTooLarge(t *testing.T) {
 	})
 }
 
-// TestExtendInconsistentParentView tests if mutator rejects block with invalid ParentView. ParentView must be consistent
+// TestExtendInconsistentParentView tests if mutableState rejects block with invalid ParentView. ParentView must be consistent
 // with view of block referred by ParentID.
 func TestExtendInconsistentParentView(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
@@ -861,15 +861,16 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		stateMutator := protocol_state.NewMutator(
+		mutableProtocolState := protocol_state.NewMutableProtocolState(
+			all.ProtocolState,
+			state.Params(),
 			all.Headers,
 			all.Results,
 			all.Setups,
 			all.EpochCommits,
-			all.ProtocolState,
 			state.Params(),
 		)
-		calculateExpectedStateId := calculateExpectedStateId(t, stateMutator)
+		calculateExpectedStateId := calculateExpectedStateId(t, mutableProtocolState)
 
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
@@ -1121,8 +1122,8 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 func TestExtendConflictingEpochEvents(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
-	util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, stateMutator realprotocol.StateMutator) {
-		calculateExpectedStateId := calculateExpectedStateId(t, stateMutator)
+	util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
+		calculateExpectedStateId := calculateExpectedStateId(t, mutableState)
 
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
@@ -1239,8 +1240,8 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 func TestExtendDuplicateEpochEvents(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
-	util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutator realprotocol.StateMutator) {
-		calculateExpectedStateId := calculateExpectedStateId(t, mutator)
+	util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
+		calculateExpectedStateId := calculateExpectedStateId(t, mutableState)
 
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
@@ -1394,14 +1395,14 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 
 	// expect a setup event with wrong counter to trigger EECC without error
 	t.Run("wrong counter (EECC)", func(t *testing.T) {
-		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutator realprotocol.StateMutator) {
+		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
 			block1, createSetup := setupState(t, db, state)
 
 			_, receipt, seal := createSetup(func(setup *flow.EpochSetup) {
 				setup.Counter = rand.Uint64()
 			})
 
-			receiptBlock, sealingBlock := unittest.SealBlock(t, state, mutator, block1, receipt, seal)
+			receiptBlock, sealingBlock := unittest.SealBlock(t, state, mutableState, block1, receipt, seal)
 			err := state.Finalize(context.Background(), receiptBlock.ID())
 			require.NoError(t, err)
 			// epoch fallback not triggered before finalization
@@ -1415,14 +1416,14 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 
 	// expect a setup event with wrong final view to trigger EECC without error
 	t.Run("invalid final view (EECC)", func(t *testing.T) {
-		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutator realprotocol.StateMutator) {
+		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
 			block1, createSetup := setupState(t, db, state)
 
 			_, receipt, seal := createSetup(func(setup *flow.EpochSetup) {
 				setup.FinalView = block1.Header.View
 			})
 
-			receiptBlock, sealingBlock := unittest.SealBlock(t, state, mutator, block1, receipt, seal)
+			receiptBlock, sealingBlock := unittest.SealBlock(t, state, mutableState, block1, receipt, seal)
 			err := state.Finalize(context.Background(), receiptBlock.ID())
 			require.NoError(t, err)
 			// epoch fallback not triggered before finalization
@@ -1436,14 +1437,14 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 
 	// expect a setup event with empty seed to trigger EECC without error
 	t.Run("empty seed (EECC)", func(t *testing.T) {
-		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutator realprotocol.StateMutator) {
+		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
 			block1, createSetup := setupState(t, db, state)
 
 			_, receipt, seal := createSetup(func(setup *flow.EpochSetup) {
 				setup.RandomSource = nil
 			})
 
-			receiptBlock, sealingBlock := unittest.SealBlock(t, state, mutator, block1, receipt, seal)
+			receiptBlock, sealingBlock := unittest.SealBlock(t, state, mutableState, block1, receipt, seal)
 			err := state.Finalize(context.Background(), receiptBlock.ID())
 			require.NoError(t, err)
 			// epoch fallback not triggered before finalization
@@ -1456,7 +1457,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 	})
 
 	t.Run("participants not ordered (EECC)", func(t *testing.T) {
-		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutator realprotocol.StateMutator) {
+		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
 			block1, createSetup := setupState(t, db, state)
 
 			_, receipt, seal := createSetup(func(setup *flow.EpochSetup) {
@@ -1465,7 +1466,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 				require.NoError(t, err)
 			})
 
-			receiptBlock, sealingBlock := unittest.SealBlock(t, state, mutator, block1, receipt, seal)
+			receiptBlock, sealingBlock := unittest.SealBlock(t, state, mutableState, block1, receipt, seal)
 			err := state.Finalize(context.Background(), receiptBlock.ID())
 			require.NoError(t, err)
 			// epoch fallback not triggered before finalization
@@ -1546,12 +1547,12 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 	}
 
 	t.Run("without setup (EECC)", func(t *testing.T) {
-		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutator realprotocol.StateMutator) {
+		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
 			block1, _, createCommit := setupState(t, state)
 
 			_, receipt, seal := createCommit(block1)
 
-			receiptBlock, sealingBlock := unittest.SealBlock(t, state, mutator, block1, receipt, seal)
+			receiptBlock, sealingBlock := unittest.SealBlock(t, state, mutableState, block1, receipt, seal)
 			err := state.Finalize(context.Background(), receiptBlock.ID())
 			require.NoError(t, err)
 			// epoch fallback not triggered before finalization
@@ -1565,12 +1566,12 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 
 	// expect a commit event with wrong counter to trigger EECC without error
 	t.Run("inconsistent counter (EECC)", func(t *testing.T) {
-		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutator realprotocol.StateMutator) {
+		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
 			block1, createSetup, createCommit := setupState(t, state)
 
 			// seal block 1, in which EpochSetup was emitted
 			epoch2Setup, setupReceipt, setupSeal := createSetup(block1)
-			epochSetupReceiptBlock, epochSetupSealingBlock := unittest.SealBlock(t, state, mutator, block1, setupReceipt, setupSeal)
+			epochSetupReceiptBlock, epochSetupSealingBlock := unittest.SealBlock(t, state, mutableState, block1, setupReceipt, setupSeal)
 			err := state.Finalize(context.Background(), epochSetupReceiptBlock.ID())
 			require.NoError(t, err)
 			err = state.Finalize(context.Background(), epochSetupSealingBlock.ID())
@@ -1584,7 +1585,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 				commit.Counter = epoch2Setup.Counter + 1
 			})
 
-			receiptBlock, sealingBlock := unittest.SealBlock(t, state, mutator, block3, receipt, seal)
+			receiptBlock, sealingBlock := unittest.SealBlock(t, state, mutableState, block3, receipt, seal)
 			err = state.Finalize(context.Background(), receiptBlock.ID())
 			require.NoError(t, err)
 			// epoch fallback not triggered before finalization
@@ -1598,12 +1599,12 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 
 	// expect a commit event with wrong cluster QCs to trigger EECC without error
 	t.Run("inconsistent cluster QCs (EECC)", func(t *testing.T) {
-		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutator realprotocol.StateMutator) {
+		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
 			block1, createSetup, createCommit := setupState(t, state)
 
 			// seal block 1, in which EpochSetup was emitted
 			_, setupReceipt, setupSeal := createSetup(block1)
-			epochSetupReceiptBlock, epochSetupSealingBlock := unittest.SealBlock(t, state, mutator, block1, setupReceipt, setupSeal)
+			epochSetupReceiptBlock, epochSetupSealingBlock := unittest.SealBlock(t, state, mutableState, block1, setupReceipt, setupSeal)
 			err := state.Finalize(context.Background(), epochSetupReceiptBlock.ID())
 			require.NoError(t, err)
 			err = state.Finalize(context.Background(), epochSetupSealingBlock.ID())
@@ -1617,7 +1618,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 				commit.ClusterQCs = append(commit.ClusterQCs, flow.ClusterQCVoteDataFromQC(unittest.QuorumCertificateWithSignerIDsFixture()))
 			})
 
-			receiptBlock, sealingBlock := unittest.SealBlock(t, state, mutator, block3, receipt, seal)
+			receiptBlock, sealingBlock := unittest.SealBlock(t, state, mutableState, block3, receipt, seal)
 			err = state.Finalize(context.Background(), receiptBlock.ID())
 			require.NoError(t, err)
 			// epoch fallback not triggered before finalization
@@ -1631,12 +1632,12 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 
 	// expect a commit event with wrong dkg participants to trigger EECC without error
 	t.Run("inconsistent DKG participants (EECC)", func(t *testing.T) {
-		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutator realprotocol.StateMutator) {
+		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
 			block1, createSetup, createCommit := setupState(t, state)
 
 			// seal block 1, in which EpochSetup was emitted
 			_, setupReceipt, setupSeal := createSetup(block1)
-			epochSetupReceiptBlock, epochSetupSealingBlock := unittest.SealBlock(t, state, mutator, block1, setupReceipt, setupSeal)
+			epochSetupReceiptBlock, epochSetupSealingBlock := unittest.SealBlock(t, state, mutableState, block1, setupReceipt, setupSeal)
 			err := state.Finalize(context.Background(), epochSetupReceiptBlock.ID())
 			require.NoError(t, err)
 			err = state.Finalize(context.Background(), epochSetupSealingBlock.ID())
@@ -1651,7 +1652,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 				commit.DKGParticipantKeys = append(commit.DKGParticipantKeys, unittest.KeyFixture(crypto.BLSBLS12381).PublicKey())
 			})
 
-			receiptBlock, sealingBlock := unittest.SealBlock(t, state, mutator, block3, receipt, seal)
+			receiptBlock, sealingBlock := unittest.SealBlock(t, state, mutableState, block3, receipt, seal)
 			err = state.Finalize(context.Background(), receiptBlock.ID())
 			require.NoError(t, err)
 			// epoch fallback not triggered before finalization
@@ -1755,7 +1756,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 		protoEventsMock.On("BlockFinalized", mock.Anything)
 		protoEventsMock.On("BlockProcessable", mock.Anything, mock.Anything)
 
-		util.RunWithFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *badger.DB, state *protocol.ParticipantState, _ realprotocol.StateMutator) {
+		util.RunWithFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *badger.DB, state *protocol.ParticipantState, _ realprotocol.MutableProtocolState) {
 			head, err := rootSnapshot.Head()
 			require.NoError(t, err)
 			result, _, err := rootSnapshot.SealedResult()
@@ -1815,7 +1816,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 		protoEventsMock.On("BlockFinalized", mock.Anything)
 		protoEventsMock.On("BlockProcessable", mock.Anything, mock.Anything)
 
-		util.RunWithFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *badger.DB, state *protocol.ParticipantState, mutator realprotocol.StateMutator) {
+		util.RunWithFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
 			head, err := rootSnapshot.Head()
 			require.NoError(t, err)
 			result, _, err := rootSnapshot.SealedResult()
@@ -1868,7 +1869,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 			seals := []*flow.Seal{seal1}
 			block3.SetPayload(flow.Payload{
 				Seals:           seals,
-				ProtocolStateID: calculateExpectedStateId(t, mutator)(block3.Header, seals),
+				ProtocolStateID: calculateExpectedStateId(t, mutableState)(block3.Header, seals),
 			})
 			err = state.Extend(context.Background(), block3)
 			require.NoError(t, err)
@@ -1914,7 +1915,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 		protoEventsMock.On("BlockFinalized", mock.Anything)
 		protoEventsMock.On("BlockProcessable", mock.Anything, mock.Anything)
 
-		util.RunWithFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *badger.DB, state *protocol.ParticipantState, mutator realprotocol.StateMutator) {
+		util.RunWithFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
 			head, err := rootSnapshot.Head()
 			require.NoError(t, err)
 			result, _, err := rootSnapshot.SealedResult()
@@ -1964,7 +1965,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 			seals := []*flow.Seal{seal1}
 			block3.SetPayload(flow.Payload{
 				Seals:           seals,
-				ProtocolStateID: calculateExpectedStateId(t, mutator)(block3.Header, seals),
+				ProtocolStateID: calculateExpectedStateId(t, mutableState)(block3.Header, seals),
 			})
 			err = state.Extend(context.Background(), block3)
 			require.NoError(t, err)
@@ -2678,15 +2679,16 @@ func getRootProtocolStateID(t *testing.T, rootSnapshot *inmem.Snapshot) flow.Ide
 }
 
 // calculateExpectedStateId is a utility function which makes easier to get expected protocol state ID after applying service events contained in seals.
-func calculateExpectedStateId(t *testing.T, stateMutator realprotocol.StateMutator) func(header *flow.Header, seals []*flow.Seal) flow.Identifier {
+func calculateExpectedStateId(t *testing.T, mutableProtocolState realprotocol.MutableProtocolState) func(header *flow.Header, seals []*flow.Seal) flow.Identifier {
 	return func(header *flow.Header, seals []*flow.Seal) flow.Identifier {
-		updater, err := stateMutator.CreateUpdater(header.View, header.ParentID)
+		stateMutator, err := mutableProtocolState.Mutator(header.View, header.ParentID)
 		require.NoError(t, err)
 
-		_, err = stateMutator.ApplyServiceEvents(updater, seals)
+		err = stateMutator.ApplyServiceEvents(seals)
 		require.NoError(t, err)
 
-		_, expectedStateID, _ := updater.Build()
+		_, _, expectedStateID, _ := stateMutator.Build()
+		require.NoError(t, err)
 		return expectedStateID
 	}
 }

@@ -316,7 +316,7 @@ func TestSealingSegment(t *testing.T) {
 	// ROOT <- B1 <- B2(R1) <- B3(S1)
 	// Expected sealing segment: [B1, B2, B3], extra blocks: [ROOT]
 	t.Run("non-root", func(t *testing.T) {
-		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState, mutator protocol.StateMutator) {
+		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState, mutableState protocol.MutableProtocolState) {
 			// build a block to seal
 			block1 := unittest.BlockWithParentFixture(head)
 			block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
@@ -337,7 +337,7 @@ func TestSealingSegment(t *testing.T) {
 			seals := []*flow.Seal{seal1}
 			block3.SetPayload(flow.Payload{
 				Seals:           seals,
-				ProtocolStateID: calculateExpectedStateId(t, mutator)(block3.Header, seals),
+				ProtocolStateID: calculateExpectedStateId(t, mutableState)(block3.Header, seals),
 			})
 			buildFinalizedBlock(t, state, block3)
 
@@ -774,7 +774,7 @@ func TestSealingSegment_FailureCases(t *testing.T) {
 			unittest.WithProtocolStateID(rootProtocolStateID),
 		))
 
-		multipleBlockSnapshot := snapshotAfter(t, sporkRootSnapshot, func(state *bprotocol.FollowerState, mutator protocol.StateMutator) protocol.Snapshot {
+		multipleBlockSnapshot := snapshotAfter(t, sporkRootSnapshot, func(state *bprotocol.FollowerState, mutableState protocol.MutableProtocolState) protocol.Snapshot {
 			for _, b := range []*flow.Block{b1, b2, b3} {
 				buildFinalizedBlock(t, state, b)
 			}
@@ -1125,11 +1125,11 @@ func TestSnapshot_EpochQuery(t *testing.T) {
 	result, _, err := rootSnapshot.SealedResult()
 	require.NoError(t, err)
 
-	util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState, mutator protocol.StateMutator) {
+	util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState, mutableState protocol.MutableProtocolState) {
 		epoch1Counter := result.ServiceEvents[0].Event.(*flow.EpochSetup).Counter
 		epoch2Counter := epoch1Counter + 1
 
-		epochBuilder := unittest.NewEpochBuilder(t, mutator, state)
+		epochBuilder := unittest.NewEpochBuilder(t, mutableState, state)
 		// build epoch 1 (prepare epoch 2)
 		epochBuilder.
 			BuildEpoch().
@@ -1216,9 +1216,9 @@ func TestSnapshot_EpochFirstView(t *testing.T) {
 	result, _, err := rootSnapshot.SealedResult()
 	require.NoError(t, err)
 
-	util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState, mutator protocol.StateMutator) {
+	util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState, mutableState protocol.MutableProtocolState) {
 
-		epochBuilder := unittest.NewEpochBuilder(t, mutator, state)
+		epochBuilder := unittest.NewEpochBuilder(t, mutableState, state)
 		// build epoch 1 (prepare epoch 2)
 		epochBuilder.
 			BuildEpoch().
@@ -1297,9 +1297,9 @@ func TestSnapshot_EpochHeightBoundaries(t *testing.T) {
 	head, err := rootSnapshot.Head()
 	require.NoError(t, err)
 
-	util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState, mutator protocol.StateMutator) {
+	util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState, mutableState protocol.MutableProtocolState) {
 
-		epochBuilder := unittest.NewEpochBuilder(t, mutator, state)
+		epochBuilder := unittest.NewEpochBuilder(t, mutableState, state)
 
 		epoch1FirstHeight := head.Height
 		t.Run("first epoch - EpochStaking phase", func(t *testing.T) {
@@ -1378,9 +1378,9 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 	epoch3Identities := unittest.IdentityListFixture(10, unittest.WithAllRoles())
 
 	rootSnapshot := unittest.RootSnapshotFixture(epoch1Identities)
-	util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState, mutator protocol.StateMutator) {
+	util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState, mutableState protocol.MutableProtocolState) {
 
-		epochBuilder := unittest.NewEpochBuilder(t, mutator, state)
+		epochBuilder := unittest.NewEpochBuilder(t, mutableState, state)
 		// build epoch 1 (prepare epoch 2)
 		epochBuilder.
 			UsingSetupOpts(unittest.WithParticipants(epoch2Identities.ToSkeleton())).

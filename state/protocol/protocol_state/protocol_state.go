@@ -44,3 +44,49 @@ func (s *ProtocolState) AtBlockID(blockID flow.Identifier) (protocol.DynamicProt
 func (s *ProtocolState) GlobalParams() protocol.GlobalParams {
 	return s.globalParams
 }
+
+// MutableProtocolState is an implementation of the mutable interface for protocol state, it allows to evolve the protocol state
+// by acting as factory for protocol.StateMutator which can be used to apply state-changing operations.
+type MutableProtocolState struct {
+	ProtocolState
+	headers storage.Headers
+	results storage.ExecutionResults
+	setups  storage.EpochSetups
+	commits storage.EpochCommits
+	params  protocol.InstanceParams
+}
+
+var _ protocol.MutableProtocolState = (*MutableProtocolState)(nil)
+
+// NewMutableProtocolState creates a new instance of MutableProtocolState.
+func NewMutableProtocolState(
+	protocolStateDB storage.ProtocolState,
+	globalParams protocol.GlobalParams,
+	headers storage.Headers,
+	results storage.ExecutionResults,
+	setups storage.EpochSetups,
+	commits storage.EpochCommits,
+	params protocol.InstanceParams,
+) *MutableProtocolState {
+	return &MutableProtocolState{
+		ProtocolState: *NewProtocolState(protocolStateDB, globalParams),
+		headers:       headers,
+		results:       results,
+		setups:        setups,
+		commits:       commits,
+		params:        params,
+	}
+}
+
+// Mutator instantiates a `protocol.StateMutator` based on the previous protocol state.
+// Has to be called for each block to evolve the protocol state.
+// Expected errors during normal operations:
+//   - `storage.ErrNotFound` if no protocol state for parent block is known.
+func (s *MutableProtocolState) Mutator(candidateView uint64, parentID flow.Identifier) (protocol.StateMutator, error) {
+	parentState, err := s.protocolStateDB.ByBlockID(parentID)
+	if err != nil {
+		return nil, fmt.Errorf("could not query parent protocol state at block (%x): %w", parentID, err)
+	}
+	return newStateMutator(s.headers, s.results, s.setups, s.commits,
+		newStateMachine(candidateView, parentState), s.params), nil
+}

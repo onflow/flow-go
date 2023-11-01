@@ -73,7 +73,7 @@ func FinalizedProtocolStateWithParticipants(participants flow.IdentityList) (
 // a receipt for the block (BR), the second (BS) containing a seal for the block.
 // B <- BR(Result_B) <- BS(Seal_B)
 // Returns the two generated blocks.
-func SealBlock(t *testing.T, st protocol.ParticipantState, mutator protocol.StateMutator, block *flow.Block, receipt *flow.ExecutionReceipt, seal *flow.Seal) (br *flow.Block, bs *flow.Block) {
+func SealBlock(t *testing.T, st protocol.ParticipantState, mutableProtocolState protocol.MutableProtocolState, block *flow.Block, receipt *flow.ExecutionReceipt, seal *flow.Seal) (br *flow.Block, bs *flow.Block) {
 
 	block2 := BlockWithParentFixture(block.Header)
 	block2.SetPayload(flow.Payload{
@@ -85,12 +85,14 @@ func SealBlock(t *testing.T, st protocol.ParticipantState, mutator protocol.Stat
 	require.NoError(t, err)
 
 	block3 := BlockWithParentFixture(block2.Header)
-	updater, err := mutator.CreateUpdater(block3.Header.View, block3.Header.ParentID)
+	stateMutator, err := mutableProtocolState.Mutator(block3.Header.View, block3.Header.ParentID)
 	require.NoError(t, err)
 	seals := []*flow.Seal{seal}
-	_, err = mutator.ApplyServiceEvents(updater, seals)
+	err = stateMutator.ApplyServiceEvents(seals)
 	require.NoError(t, err)
-	_, updatedStateId, _ := updater.Build()
+	_, _, updatedStateId, _ := stateMutator.Build()
+	require.NoError(t, err)
+
 	block3.SetPayload(flow.Payload{
 		Seals:           seals,
 		ProtocolStateID: updatedStateId,

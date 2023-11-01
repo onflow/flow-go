@@ -11,74 +11,70 @@ import (
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
-// Mutator implements protocol.StateMutator interface.
-// It has to be used for each block to update the protocol state, even if there are no state-changing
-// service events sealed in candidate block. This requirement is due to the fact that protocol state
-// is indexed by block ID, and we need to maintain such index.
-type Mutator struct {
-	headers         storage.Headers
-	results         storage.ExecutionResults
-	setups          storage.EpochSetups
-	commits         storage.EpochCommits
-	protocolStateDB storage.ProtocolState
-	params          protocol.InstanceParams
+// stateMutator is a stateful object to evolve the protocol state. It is instantiated from the parent block's protocol state.
+// State-changing operations can be iteratively applied and the stateMutator will internally evolve its in-memory state.
+// While the StateMutator does not modify the database, it internally tracks all necessary updates. Upon calling `Build`
+// the stateMutator returns the updated protocol state, its ID and all database updates necessary for persisting the updated
+// protocol state.
+// stateMutator locally tracks pending DB updates, which are returned as a slice of deferred DB updates when calling `Build`.
+type stateMutator struct {
+	headers          storage.Headers
+	results          storage.ExecutionResults
+	setups           storage.EpochSetups
+	commits          storage.EpochCommits
+	stateMachine     ProtocolStateMachine
+	params           protocol.InstanceParams
+	pendingDbUpdates []func(tx *transaction.Tx) error
 }
 
-var _ protocol.StateMutator = (*Mutator)(nil)
+var _ protocol.StateMutator = (*stateMutator)(nil)
 
-func NewMutator(
+// newStateMutator creates a new instance of stateMutator.
+func newStateMutator(
 	headers storage.Headers,
 	results storage.ExecutionResults,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
-	protocolStateDB storage.ProtocolState,
+	stateMachine ProtocolStateMachine,
 	params protocol.InstanceParams,
-) *Mutator {
-	return &Mutator{
-		headers:         headers,
-		results:         results,
-		setups:          setups,
-		commits:         commits,
-		protocolStateDB: protocolStateDB,
-		params:          params,
+) *stateMutator {
+	return &stateMutator{
+		setups:       setups,
+		params:       params,
+		headers:      headers,
+		results:      results,
+		commits:      commits,
+		stateMachine: stateMachine,
 	}
 }
 
-// CreateUpdater creates a new protocol state updater for the given candidate block.
-// Has to be called for each block to correctly index the protocol state.
-// Expected errors during normal operations:
-//   - `storage.ErrNotFound` if no protocol state for parent block is known.
-func (m *Mutator) CreateUpdater(candidateView uint64, parentID flow.Identifier) (protocol.StateUpdater, error) {
-	parentState, err := m.protocolStateDB.ByBlockID(parentID)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve protocol state for block (%v): %w", parentID, err)
-	}
-	return NewUpdater(candidateView, parentState), nil
-}
-
-// CommitProtocolState commits the protocol state updater as part of DB transaction.
-// Has to be called for each block to correctly index the protocol state.
-// No errors are expected during normal operations.
-func (m *Mutator) CommitProtocolState(blockID flow.Identifier, updater protocol.StateUpdater) (func(tx *transaction.Tx) error, flow.Identifier) {
-	updatedState, updatedStateID, hasChanges := updater.Build()
-	return func(tx *transaction.Tx) error {
-		if hasChanges {
-			err := m.protocolStateDB.StoreTx(updatedStateID, updatedState)(tx)
-			if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
-				return fmt.Errorf("could not store protocol state (%v): %w", updatedStateID, err)
-			}
-		}
-
-		err := m.protocolStateDB.Index(blockID, updatedStateID)(tx)
-		if err != nil {
-			return fmt.Errorf("could not index protocol state (%v) for block (%v): %w",
-				updatedStateID, blockID, err)
-		}
-		return nil
-	}, updatedStateID
+// Build returns:
+//   - hasChanges: flag whether there were any changes; otherwise, `updatedState` and `stateID` equal the parent state
+//   - updatedState: the ProtocolState after applying all updates
+//   - stateID: the hash commitment to the `updatedState`
+//   - dbUpdates: database updates necessary for persisting the updated protocol state
+//
+// updated protocol state entry, state ID and a flag indicating if there were any changes.
+func (m *stateMutator) Build() (hasChanges bool, updatedState *flow.ProtocolStateEntry, stateID flow.Identifier, dbUpdates []func(tx *transaction.Tx) error) {
+	updatedState, stateID, hasChanges = m.stateMachine.Build()
+	dbUpdates = m.pendingDbUpdates
+	return
 }
 
 // ApplyServiceEvents handles applying state changes which occur as a result
+// of service events being included in a block payload.
+// All updates that are incorporated in service events are applied to the protocol state by mutating protocol state updater.
+// No errors are expected during normal operation.
+func (m *stateMutator) ApplyServiceEvents(seals []*flow.Seal) error {
+	dbUpdates, err := m.handleServiceEvents(seals)
+	if err != nil {
+		return err
+	}
+	m.pendingDbUpdates = append(m.pendingDbUpdates, dbUpdates...)
+	return nil
+}
+
+// handleServiceEvents handles applying state changes which occur as a result
 // of service events being included in a block payload:
 //   - inserting incorporated service events
 //   - updating protocol state for the candidate block
@@ -111,13 +107,13 @@ func (m *Mutator) CommitProtocolState(blockID flow.Identifier, updater protocol.
 //     This includes operations to insert service events for blocks that include them.
 //
 // No errors are expected during normal operation.
-func (m *Mutator) ApplyServiceEvents(updater protocol.StateUpdater, seals []*flow.Seal) (dbUpdates []func(*transaction.Tx) error, err error) {
+func (m *stateMutator) handleServiceEvents(seals []*flow.Seal) (dbUpdates []func(*transaction.Tx) error, err error) {
 	epochFallbackTriggered, err := m.params.EpochFallbackTriggered()
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve epoch fallback status: %w", err)
 	}
 
-	parentProtocolState := updater.ParentState()
+	parentProtocolState := m.stateMachine.ParentState()
 	epochStatus := parentProtocolState.EpochStatus()
 	activeSetup := parentProtocolState.CurrentEpochSetup
 
@@ -132,10 +128,10 @@ func (m *Mutator) ApplyServiceEvents(updater protocol.StateUpdater, seals []*flo
 		return nil, fmt.Errorf("could not determine epoch phase: %w", err)
 	}
 	if phase == flow.EpochPhaseCommitted {
-		if updater.View() > activeSetup.FinalView {
+		if m.stateMachine.View() > activeSetup.FinalView {
 			// TODO: this is a temporary workaround to allow for the epoch transition to be triggered
 			// most likely it will be not needed when we refactor protocol state entries and define strict safety rules.
-			err = updater.TransitionToNextEpoch()
+			err = m.stateMachine.TransitionToNextEpoch()
 			if err != nil {
 				return nil, fmt.Errorf("could not transition protocol state to next epoch: %w", err)
 			}
@@ -147,8 +143,7 @@ func (m *Mutator) ApplyServiceEvents(updater protocol.StateUpdater, seals []*flo
 	// epoch. In this case, we need to update the tentative protocol state.
 	// We need to validate whether all information is available in the protocol
 	// state to go to the next epoch when needed. In cases where there is a bug
-	// in the smart contract, it could be that this happens too late and the
-	// chain finalization should halt.
+	// in the smart contract, it could be that this happens too late and we should trigger epoch fallback mode.
 
 	// block payload may not specify seals in order, so order them by block height before processing
 	orderedSeals, err := protocol.OrderedSeals(seals, m.headers)
@@ -168,11 +163,11 @@ func (m *Mutator) ApplyServiceEvents(updater protocol.StateUpdater, seals []*flo
 
 			switch ev := event.Event.(type) {
 			case *flow.EpochSetup:
-				err = updater.ProcessEpochSetup(ev)
+				err = m.stateMachine.ProcessEpochSetup(ev)
 				if err != nil {
 					if protocol.IsInvalidServiceEventError(err) {
 						// we have observed an invalid service event, which triggers epoch fallback mode
-						updater.SetInvalidStateTransitionAttempted()
+						m.stateMachine.SetInvalidStateTransitionAttempted()
 						return dbUpdates, nil
 					}
 					return nil, irrecoverable.NewExceptionf("could not process epoch setup event: %w", err)
@@ -182,11 +177,11 @@ func (m *Mutator) ApplyServiceEvents(updater protocol.StateUpdater, seals []*flo
 				dbUpdates = append(dbUpdates, m.setups.StoreTx(ev))
 
 			case *flow.EpochCommit:
-				err = updater.ProcessEpochCommit(ev)
+				err = m.stateMachine.ProcessEpochCommit(ev)
 				if err != nil {
 					if protocol.IsInvalidServiceEventError(err) {
 						// we have observed an invalid service event, which triggers epoch fallback mode
-						updater.SetInvalidStateTransitionAttempted()
+						m.stateMachine.SetInvalidStateTransitionAttempted()
 						return dbUpdates, nil
 					}
 					return nil, irrecoverable.NewExceptionf("could not process epoch commit event: %w", err)
