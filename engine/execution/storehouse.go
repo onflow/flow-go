@@ -26,9 +26,9 @@ type RegisterStore interface {
 	// 3. prune the height in InMemoryRegisterStore
 	OnBlockFinalized() error
 
-	// FinalizedAndExecutedHeight returns the height of the last finalized and executed block,
+	// LastFinalizedAndExecutedHeight returns the height of the last finalized and executed block,
 	// which has been saved in OnDiskRegisterStore
-	FinalizedAndExecutedHeight() uint64
+	LastFinalizedAndExecutedHeight() uint64
 
 	// IsBlockExecuted returns whether the given block is executed.
 	// If a block is not executed, it does not distinguish whether the block exists or not.

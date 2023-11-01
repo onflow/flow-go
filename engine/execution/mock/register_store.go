@@ -12,8 +12,8 @@ type RegisterStore struct {
 	mock.Mock
 }
 
-// FinalizedAndExecutedHeight provides a mock function with given fields:
-func (_m *RegisterStore) FinalizedAndExecutedHeight() uint64 {
+// LastFinalizedAndExecutedHeight provides a mock function with given fields:
+func (_m *RegisterStore) LastFinalizedAndExecutedHeight() uint64 {
 	ret := _m.Called()
 
 	var r0 uint64
