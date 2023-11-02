@@ -490,6 +490,9 @@ func TestInMemoryRegisterStore(t *testing.T) {
 		_, err = store.GetUpdatedRegisters(pruned+2, blockD)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "not found")
+
+		_, err = store.GetUpdatedRegisters(pruned+2, blockE)
+		require.NoError(t, err)
 	})
 
 	// 11. Concurrency: SaveRegisters can happen concurrently with GetUpdatedRegisters, and GetRegister
