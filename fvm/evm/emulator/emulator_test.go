@@ -228,15 +228,13 @@ func TestContractInteraction(t *testing.T) {
 				require.NoError(t, err)
 				require.Empty(t, res.ErrorMessage)
 
-				// TODO: check why nonce of zero is valid for tx but on check is 4 ?
-
 				// check the balance of coinbase
 				RunWithNewReadOnlyBlockView(t, env, func(blk2 types.ReadOnlyBlockView) {
 					bal, err := blk2.BalanceOf(ctx.GasFeeCollector)
 					require.NoError(t, err)
 					require.Greater(t, bal.Uint64(), coinbaseOrgBalance.Uint64())
 
-					nonce, err := blk2.NonceOf(testAccount)
+					nonce, err := blk2.NonceOf(fAddr)
 					require.NoError(t, err)
 					require.Equal(t, 1, int(nonce))
 				})
