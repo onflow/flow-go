@@ -6,9 +6,9 @@ import (
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/onflow/atree"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/atree"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm/emulator/database"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
