@@ -78,7 +78,7 @@ func (m *stateMutator) Build() (hasChanges bool, updatedState *flow.ProtocolStat
 //     there are no gaps in the seals.
 //   - The seals guarantee correctness of the sealed execution result, including the contained
 //     service events. This is actively checked by the verification node, whose aggregated
-//     approvals in the form of a seal attest to the correctness of the sealed execution result,
+//     approvals in the form of a seal attestation to the correctness of the sealed execution result,
 //     including the contained.
 //
 // Consensus nodes actively verify protocol compliance for any block proposal they receive,
@@ -103,7 +103,7 @@ func (m *stateMutator) Build() (hasChanges bool, updatedState *flow.ProtocolStat
 // C or its descendants.
 //
 // Error returns:
-//   - Per convention, the input seals from the block payload have already confirmed to be protocol compliant.
+//   - Per convention, the input seals from the block payload have already been confirmed to be protocol compliant.
 //     Hence, the service events in the sealed execution results represent the honest execution path.
 //     Therefore, the sealed service events should encode a valid evolution of the protocol state -- provided
 //     the system smart contracts are correct.
@@ -117,52 +117,10 @@ func (m *stateMutator) Build() (hasChanges bool, updatedState *flow.ProtocolStat
 //     in the node software or state corruption, i.e. case (b). This is the only scenario where the error return
 //     of this function is not nil. If such an exception is returned, continuing is not an option.
 func (m *stateMutator) ApplyServiceEvents(seals []*flow.Seal) error {
-	dbUpdates, err := m.handleServiceEvents(seals)
-	if err != nil {
-		return err
-	}
-	m.pendingDbUpdates = append(m.pendingDbUpdates, dbUpdates...)
-	return nil
-}
-
-// handleServiceEvents applies state changes which occur as a result
-// of service events being included in a block payload:
-//   - iterating over the sealed service events in order of increasing height
-//   - identifying state-changing service event and calling into the embedded
-//     ProtocolStateMachine to apply the respective state update
-//   - tracking deferred database updates necessary to persist the updated state
-//     and its data dependencies
-//
-// All updates only mutate the internal ProtocolStateMachine's in-memory copy of the
-// protocol state, without changing the parent state (i.e. the state we started from).
-//
-// Consider a chain where a service event is emitted during execution of block A.
-// Block B contains a receipt for A. Block C contains a seal for block A.
-//
-// A <- .. <- B(RA) <- .. <- C(SA)
-//
-// Service events are included within execution results, which are stored
-// opaquely as part of the block payload in block B. We only validate, process and persist
-// the typed service event to storage once we process C, the block containing the
-// seal for block A. This is because we rely on the sealing subsystem to validate
-// correctness of the service event before processing it.
-// Consequently, any change to the protocol state introduced by a service event
-// emitted during execution of block A would only become visible when querying
-// C or its descendants.
-//
-// All updates are only applied to the StateMutator's internal in-memory state, but not modify the Protocol State. 
-// All necessary updates to persist the updated state and its data dependencies are returned as slice of deferred DB updates.
-//
-// Return values:
-//   - dbUpdates - If the service events are valid, or there are no service events,
-//     this method returns a slice of Badger operations to apply while storing the block.
-//     This includes operations to insert service events for blocks that include them.
-//
-// No errors are expected during normal operation.
-func (m *stateMutator) handleServiceEvents(seals []*flow.Seal) (dbUpdates []func(*transaction.Tx) error, err error) {
+	var dbUpdates []func(tx *transaction.Tx) error
 	epochFallbackTriggered, err := m.params.EpochFallbackTriggered()
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve epoch fallback status: %w", err)
+		return fmt.Errorf("could not retrieve epoch fallback status: %w", err)
 	}
 
 	parentProtocolState := m.stateMachine.ParentState()
@@ -171,13 +129,13 @@ func (m *stateMutator) handleServiceEvents(seals []*flow.Seal) (dbUpdates []func
 
 	// never process service events after epoch fallback is triggered
 	if epochStatus.InvalidServiceEventIncorporated || epochFallbackTriggered {
-		return dbUpdates, nil
+		return nil
 	}
 
 	// perform protocol state transition to next epoch if next epoch is committed and we are at first block of epoch
 	phase, err := epochStatus.Phase()
 	if err != nil {
-		return nil, fmt.Errorf("could not determine epoch phase: %w", err)
+		return fmt.Errorf("could not determine epoch phase: %w", err)
 	}
 	if phase == flow.EpochPhaseCommitted {
 		if m.stateMachine.View() > activeSetup.FinalView {
@@ -185,7 +143,7 @@ func (m *stateMutator) handleServiceEvents(seals []*flow.Seal) (dbUpdates []func
 			// most likely it will be not needed when we refactor protocol state entries and define strict safety rules.
 			err = m.stateMachine.TransitionToNextEpoch()
 			if err != nil {
-				return nil, fmt.Errorf("could not transition protocol state to next epoch: %w", err)
+				return fmt.Errorf("could not transition protocol state to next epoch: %w", err)
 			}
 		}
 	}
@@ -201,18 +159,17 @@ func (m *stateMutator) handleServiceEvents(seals []*flow.Seal) (dbUpdates []func
 	orderedSeals, err := protocol.OrderedSeals(seals, m.headers)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			return nil, fmt.Errorf("ordering seals: parent payload contains seals for unknown block: %s", err.Error())
+			return fmt.Errorf("ordering seals: parent payload contains seals for unknown block: %s", err.Error())
 		}
-		return nil, fmt.Errorf("unexpected error ordering seals: %w", err)
+		return fmt.Errorf("unexpected error ordering seals: %w", err)
 	}
 	for _, seal := range orderedSeals {
 		result, err := m.results.ByID(seal.ResultID)
 		if err != nil {
-			return nil, fmt.Errorf("could not get result (id=%x) for seal (id=%x): %w", seal.ResultID, seal.ID(), err)
+			return fmt.Errorf("could not get result (id=%x) for seal (id=%x): %w", seal.ResultID, seal.ID(), err)
 		}
 
 		for _, event := range result.ServiceEvents {
-
 			switch ev := event.Event.(type) {
 			case *flow.EpochSetup:
 				err = m.stateMachine.ProcessEpochSetup(ev)
@@ -220,9 +177,9 @@ func (m *stateMutator) handleServiceEvents(seals []*flow.Seal) (dbUpdates []func
 					if protocol.IsInvalidServiceEventError(err) {
 						// we have observed an invalid service event, which triggers epoch fallback mode
 						m.stateMachine.SetInvalidStateTransitionAttempted()
-						return dbUpdates, nil
+						return nil
 					}
-					return nil, irrecoverable.NewExceptionf("could not process epoch setup event: %w", err)
+					return irrecoverable.NewExceptionf("could not process epoch setup event: %w", err)
 				}
 
 				// we'll insert the setup event when we insert the block
@@ -234,9 +191,9 @@ func (m *stateMutator) handleServiceEvents(seals []*flow.Seal) (dbUpdates []func
 					if protocol.IsInvalidServiceEventError(err) {
 						// we have observed an invalid service event, which triggers epoch fallback mode
 						m.stateMachine.SetInvalidStateTransitionAttempted()
-						return dbUpdates, nil
+						return nil
 					}
-					return nil, irrecoverable.NewExceptionf("could not process epoch commit event: %w", err)
+					return irrecoverable.NewExceptionf("could not process epoch commit event: %w", err)
 				}
 
 				// we'll insert the commit event when we insert the block
@@ -244,9 +201,11 @@ func (m *stateMutator) handleServiceEvents(seals []*flow.Seal) (dbUpdates []func
 			case *flow.VersionBeacon:
 				// do nothing for now
 			default:
-				return nil, fmt.Errorf("invalid service event type (type_name=%s, go_type=%T)", event.Type, ev)
+				return fmt.Errorf("invalid service event type (type_name=%s, go_type=%T)", event.Type, ev)
 			}
 		}
 	}
-	return
+
+	m.pendingDbUpdates = append(m.pendingDbUpdates, dbUpdates...)
+	return nil
 }
