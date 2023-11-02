@@ -54,7 +54,8 @@ func (s *Suite) TestEpochQuorumCertificate() {
 	s.StartVoting(clustering, clusterCount, nodesPerCluster)
 
 	// vote message to be signed with staking key
-	blockID := unittest.IdentifierFixture()
+	header := unittest.BlockHeaderFixture()
+	blockID := header.ID()
 	view := uint64(rand.Uint32())
 	voteMessage := hotstuffver.MakeVoteMessage(view, blockID)
 
@@ -90,10 +91,12 @@ func (s *Suite) TestEpochQuorumCertificate() {
 
 		snapshot := &protomock.Snapshot{}
 		snapshot.On("Phase").Return(flow.EpochPhaseSetup, nil)
+		snapshot.On("Head").Return(header, nil)
 
 		state := &protomock.State{}
 		state.On("CanonicalRootBlock").Return(rootBlock)
 		state.On("Final").Return(snapshot)
+		state.On("Sealed").Return(snapshot)
 
 		// create QC voter object to be used for voting for the root QC contract
 		voter := epochs.NewRootQCVoter(zerolog.Logger{}, local, hotSigner, state, []module.QCContractClient{client})
