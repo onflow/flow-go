@@ -91,7 +91,13 @@ func (s *Suite) TestEpochQuorumCertificate() {
 
 		snapshot := &protomock.Snapshot{}
 		snapshot.On("Phase").Return(flow.EpochPhaseSetup, nil)
-		snapshot.On("Head").Return(header, nil)
+		snapshot.On("Head").Return(func() (*flow.Header, error) {
+			block, err := s.blockchain.GetLatestBlock()
+			if err != nil {
+				return nil, err
+			}
+			return block.Header, nil
+		})
 
 		state := &protomock.State{}
 		state.On("CanonicalRootBlock").Return(rootBlock)
