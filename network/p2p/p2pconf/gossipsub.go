@@ -8,10 +8,9 @@ import (
 // The resource manager is used to limit the number of open connections and streams (as well as any other resources
 // used by libp2p) for each peer.
 type ResourceManagerConfig struct {
-	Override                  ResourceManagerOverrideScope `mapstructure:"libp2p-resource-limit-override"`        // override limits for specific peers, protocols, etc.
-	MemoryLimitRatio          float64                      `mapstructure:"libp2p-memory-limit-ratio"`             // maximum allowed fraction of memory to be allocated by the libp2p resources in (0,1]
-	FileDescriptorsRatio      float64                      `mapstructure:"libp2p-file-descriptors-ratio"`         // maximum allowed fraction of file descriptors to be allocated by the libp2p resources in (0,1]
-	PeerBaseLimitConnsInbound int                          `mapstructure:"libp2p-peer-base-limits-conns-inbound"` // the maximum amount of allowed inbound connections per peer
+	Override             ResourceManagerOverrideScope `mapstructure:"libp2p-resource-limit-override"` // override limits for specific peers, protocols, etc.
+	MemoryLimitRatio     float64                      `mapstructure:"libp2p-memory-limit-ratio"`      // maximum allowed fraction of memory to be allocated by the libp2p resources in (0,1]
+	FileDescriptorsRatio float64                      `mapstructure:"libp2p-file-descriptors-ratio"`  // maximum allowed fraction of file descriptors to be allocated by the libp2p resources in (0,1]
 }
 
 type ResourceManagerOverrideScope struct {
@@ -37,16 +36,16 @@ type ResourceManagerOverrideScope struct {
 type ResourceManagerOverrideLimit struct {
 	// System is the limit for the resource at the entire system. if not set, the default value will be used.
 	// For a specific limit, the system-wide dictates the maximum allowed value across all peers and protocols at the entire node scope.
-	StreamsInbound int `validate:"gte=0" mapstructure:"stream-inbound"`
+	StreamsInbound int `validate:"gte=0" mapstructure:"streams-inbound"`
 
 	// StreamsOutbound is the max number of outbound streams allowed, at the resource scope.
-	StreamsOutbound int `validate:"gte=0" mapstructure:"stream-outbound"`
+	StreamsOutbound int `validate:"gte=0" mapstructure:"streams-outbound"`
 
 	// ConnectionsInbound is the max number of inbound connections allowed, at the resource scope.
-	ConnectionsInbound int `validate:"gte=0" mapstructure:"connection-inbound"`
+	ConnectionsInbound int `validate:"gte=0" mapstructure:"connections-inbound"`
 
 	// ConnectionsOutbound is the max number of outbound connections allowed, at the resource scope.
-	ConnectionsOutbound int `validate:"gte=0" mapstructure:"connection-outbound"`
+	ConnectionsOutbound int `validate:"gte=0" mapstructure:"connections-outbound"`
 
 	// FD is the max number of file descriptors allowed, at the resource scope.
 	FD int `validate:"gte=0" mapstructure:"fd"`
