@@ -21,7 +21,7 @@ import (
 var blockNumber = big.NewInt(10)
 var defaultCtx = types.NewDefaultBlockContext(blockNumber.Uint64())
 
-func RunWithTestDB(t testing.TB, f func(*database.Database)) {
+func RunWithTestDB(t testing.TB, f func(types.Database)) {
 	testutils.RunWithTestBackend(t, func(backend types.Backend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(flowEVMRoot flow.Address) {
 			db, err := database.NewDatabase(backend, flowEVMRoot)
@@ -31,7 +31,7 @@ func RunWithTestDB(t testing.TB, f func(*database.Database)) {
 	})
 }
 
-func RunWithNewEmulator(t testing.TB, db *database.Database, f func(*emulator.Emulator)) {
+func RunWithNewEmulator(t testing.TB, db types.Database, f func(*emulator.Emulator)) {
 	env := emulator.NewEmulator(db)
 	f(env)
 }
@@ -49,7 +49,7 @@ func RunWithNewReadOnlyBlockView(t testing.TB, em *emulator.Emulator, f func(blk
 }
 
 func TestNativeTokenBridging(t *testing.T) {
-	RunWithTestDB(t, func(db *database.Database) {
+	RunWithTestDB(t, func(db types.Database) {
 		originalBalance := big.NewInt(10000)
 		testAccount := types.NewAddressFromString("test")
 
@@ -92,7 +92,7 @@ func TestNativeTokenBridging(t *testing.T) {
 }
 
 func TestContractInteraction(t *testing.T) {
-	RunWithTestDB(t, func(db *database.Database) {
+	RunWithTestDB(t, func(db types.Database) {
 
 		testContract := testutils.GetTestContract(t)
 
@@ -246,7 +246,7 @@ func TestContractInteraction(t *testing.T) {
 }
 
 func TestTransfers(t *testing.T) {
-	RunWithTestDB(t, func(db *database.Database) {
+	RunWithTestDB(t, func(db types.Database) {
 		testAccount1 := types.NewAddressFromString("test1")
 		testAccount2 := types.NewAddressFromString("test2")
 

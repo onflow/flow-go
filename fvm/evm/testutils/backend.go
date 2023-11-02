@@ -29,7 +29,7 @@ func RunWithTestFlowEVMRootAddress(t testing.TB, backend atree.Ledger, f func(fl
 
 func RunWithTestBackend(t testing.TB, f func(types.Backend)) {
 	tb := &testBackend{
-		TestValueStore:   getSimpleValueStore(),
+		TestValueStore:   GetSimpleValueStore(),
 		testEventEmitter: getSimpleEventEmitter(),
 		testMeter:        getSimpleMeter(),
 	}
@@ -48,7 +48,7 @@ func fullKey(owner, key []byte) string {
 	return string(owner) + "~" + string(key)
 }
 
-func getSimpleValueStore() *TestValueStore {
+func GetSimpleValueStore() *TestValueStore {
 	data := make(map[string][]byte)
 	allocator := make(map[string]uint64)
 
