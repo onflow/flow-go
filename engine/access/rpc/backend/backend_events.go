@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"time"
 
 	"github.com/onflow/flow/protobuf/go/flow/entities"
@@ -19,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -31,7 +31,7 @@ type backendEvents struct {
 	log               zerolog.Logger
 	maxHeightRange    uint
 	nodeCommunicator  Communicator
-	SignalCtx         irrecoverable.SignalerContext
+	ctx               irrecoverable.SignalerContext
 }
 
 // GetEventsForHeightRange retrieves events for all sealed blocks between the start block height and
@@ -56,7 +56,7 @@ func (b *backendEvents) GetEventsForHeightRange(
 	head, err := b.state.Sealed().Head()
 	if err != nil {
 		// sealed block must be in the store, so return an Internal code even if we got NotFound
-		b.SignalCtx.Throw(err)
+		b.ctx.Throw(err)
 		return nil, status.Errorf(codes.Internal, "failed to get events: %v", err)
 	}
 

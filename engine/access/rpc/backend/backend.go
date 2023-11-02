@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/md5" //nolint:gosec
 	"fmt"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -20,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/execution"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -221,12 +221,12 @@ func New(params Params) (*Backend, error) {
 }
 
 func (b *Backend) HandleInconsistentProtocolState(ctx irrecoverable.SignalerContext) {
-	b.backendTransactions.SignalCtx = ctx
-	b.backendAccounts.SignalCtx = ctx
-	b.backendBlockDetails.SignalCtx = ctx
-	b.backendBlockHeaders.SignalCtx = ctx
-	b.backendEvents.SignalCtx = ctx
-	b.backendScripts.SignalCtx = ctx
+	b.backendTransactions.ctx = ctx
+	b.backendAccounts.ctx = ctx
+	b.backendBlockDetails.ctx = ctx
+	b.backendBlockHeaders.ctx = ctx
+	b.backendEvents.ctx = ctx
+	b.backendScripts.ctx = ctx
 }
 
 // NewCache constructs cache for storing connections to other nodes.

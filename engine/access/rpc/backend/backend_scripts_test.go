@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/execution"
 	execmock "github.com/onflow/flow-go/module/execution/mock"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
@@ -59,6 +60,7 @@ type BackendScriptsSuite struct {
 	script        []byte
 	arguments     [][]byte
 	failingScript []byte
+	ctx           irrecoverable.SignalerContext
 }
 
 func TestBackendScriptsSuite(t *testing.T) {
@@ -85,6 +87,7 @@ func (s *BackendScriptsSuite) SetupTest() {
 	s.script = []byte("pub fun main() { return 1 }")
 	s.arguments = [][]byte{[]byte("arg1"), []byte("arg2")}
 	s.failingScript = []byte("pub fun main() { panic(\"!!\") }")
+	s.ctx = irrecoverable.NewMockSignalerContext(s.T(), context.Background())
 }
 
 func (s *BackendScriptsSuite) defaultBackend() *backendScripts {
@@ -100,6 +103,7 @@ func (s *BackendScriptsSuite) defaultBackend() *backendScripts {
 		loggedScripts:     loggedScripts,
 		connFactory:       s.connectionFactory,
 		nodeCommunicator:  NewNodeCommunicator(false),
+		ctx:               s.ctx,
 	}
 }
 
@@ -378,6 +382,29 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_ReturnsENErrors() {
 
 	s.Run("ExecuteScriptAtBlockHeight", func() {
 		s.testExecuteScriptAtBlockHeight(ctx, backend, statusCode)
+	})
+}
+
+// TestExecuteScriptAtLatestBlockFromStorage_InconsistentState tests that signaler context received error when node state is
+// inconsistent
+func (s *BackendScriptsSuite) TestExecuteScriptAtLatestBlockFromStorage_InconsistentState() {
+	ctx := context.Background()
+
+	scriptExecutor := execmock.NewScriptExecutor(s.T())
+
+	backend := s.defaultBackend()
+	backend.scriptExecMode = ScriptExecutionModeLocalOnly
+	backend.scriptExecutor = scriptExecutor
+
+	s.Run(fmt.Sprintf("ExecuteScriptAtLatestBlock - fails with %v", "inconsistent node`s state"), func() {
+		s.state.On("Sealed").Return(s.snapshot, nil)
+
+		err := fmt.Errorf("inconsistent node`s state")
+		s.snapshot.On("Head").Return(nil, err)
+		backend.ctx = irrecoverable.NewMockSignalerContextExpectError(s.T(), context.Background(), err)
+
+		_, err = backend.ExecuteScriptAtLatestBlock(ctx, s.script, s.arguments)
+		s.Require().Error(err)
 	})
 }
 

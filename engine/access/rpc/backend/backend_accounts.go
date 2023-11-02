@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -19,6 +18,7 @@ import (
 	fvmerrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/execution"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -32,7 +32,7 @@ type backendAccounts struct {
 	nodeCommunicator  Communicator
 	scriptExecutor    execution.ScriptExecutor
 	scriptExecMode    ScriptExecutionMode
-	SignalCtx         irrecoverable.SignalerContext
+	ctx               irrecoverable.SignalerContext
 }
 
 // GetAccount returns the account details at the latest sealed block.
@@ -45,7 +45,7 @@ func (b *backendAccounts) GetAccount(ctx context.Context, address flow.Address) 
 func (b *backendAccounts) GetAccountAtLatestBlock(ctx context.Context, address flow.Address) (*flow.Account, error) {
 	sealed, err := b.state.Sealed().Head()
 	if err != nil {
-		b.SignalCtx.Throw(err)
+		b.ctx.Throw(err)
 		return nil, status.Errorf(codes.Internal, "failed to get latest sealed header: %v", err)
 	}
 

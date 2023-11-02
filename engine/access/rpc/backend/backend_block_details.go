@@ -2,21 +2,21 @@ package backend
 
 import (
 	"context"
-	"github.com/onflow/flow-go/module/irrecoverable"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
 
 type backendBlockDetails struct {
-	blocks    storage.Blocks
-	state     protocol.State
-	SignalCtx irrecoverable.SignalerContext
+	blocks storage.Blocks
+	state  protocol.State
+	ctx    irrecoverable.SignalerContext
 }
 
 func (b *backendBlockDetails) GetLatestBlock(_ context.Context, isSealed bool) (*flow.Block, flow.BlockStatus, error) {
@@ -42,7 +42,7 @@ func (b *backendBlockDetails) GetLatestBlock(_ context.Context, isSealed bool) (
 		//   because this can cause DOS potential
 		// - Since the protocol state is widely shared, we assume that in practice another component will
 		//   observe the protocol state error and throw an exception.
-		b.SignalCtx.Throw(err)
+		b.ctx.Throw(err)
 		return nil, flow.BlockStatusUnknown, status.Errorf(codes.Internal, "could not get latest block: %v", err)
 	}
 
@@ -96,7 +96,7 @@ func (b *backendBlockDetails) getBlockStatus(block *flow.Block) (flow.BlockStatu
 		//   because this can cause DOS potential
 		// - Since the protocol state is widely shared, we assume that in practice another component will
 		//   observe the protocol state error and throw an exception.
-		b.SignalCtx.Throw(err)
+		b.ctx.Throw(err)
 		return flow.BlockStatusUnknown, status.Errorf(codes.Internal, "failed to find latest sealed header: %v", err)
 	}
 

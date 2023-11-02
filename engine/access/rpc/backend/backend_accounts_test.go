@@ -3,10 +3,8 @@ package backend
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"testing"
 
-	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
@@ -19,10 +17,13 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/execution"
 	execmock "github.com/onflow/flow-go/module/execution/mock"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
+
+	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 )
 
 type BackendAccountsSuite struct {
@@ -46,8 +47,7 @@ type BackendAccountsSuite struct {
 	account        *flow.Account
 	failingAddress flow.Address
 
-	ctx    irrecoverable.SignalerContext
-	cancel context.CancelFunc
+	ctx irrecoverable.SignalerContext
 }
 
 func TestBackendAccountsSuite(t *testing.T) {
@@ -76,7 +76,8 @@ func (s *BackendAccountsSuite) SetupTest() {
 	s.Require().NoError(err)
 
 	s.failingAddress = unittest.AddressFixture()
-	s.ctx, s.cancel = irrecoverable.NewMockSignalerContextWithCancel(s.T(), context.Background())
+
+	s.ctx = irrecoverable.NewMockSignalerContext(s.T(), context.Background())
 }
 
 func (s *BackendAccountsSuite) defaultBackend() *backendAccounts {
@@ -88,7 +89,7 @@ func (s *BackendAccountsSuite) defaultBackend() *backendAccounts {
 		executionReceipts: s.receipts,
 		connFactory:       s.connectionFactory,
 		nodeCommunicator:  NewNodeCommunicator(false),
-		SignalCtx:         s.ctx,
+		ctx:               s.ctx,
 	}
 }
 
@@ -323,9 +324,9 @@ func (s *BackendAccountsSuite) TestGetAccountFromFailover_ReturnsENErrors() {
 	})
 }
 
-// TestGetAccountFromStorage_Fails tests that errors received from local storage are handled
-// and converted to the appropriate status code
-func (s *BackendAccountsSuite) TestGetAccountState_Fails() {
+// TestGetAccountAtLatestBlock_InconsistentState tests that signaler context received error when node state is
+// inconsistent
+func (s *BackendAccountsSuite) TestGetAccountAtLatestBlockFromStorage_InconsistentState() {
 	ctx := context.Background()
 
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
@@ -334,22 +335,15 @@ func (s *BackendAccountsSuite) TestGetAccountState_Fails() {
 	backend.scriptExecMode = ScriptExecutionModeLocalOnly
 	backend.scriptExecutor = scriptExecutor
 
-	s.Run(fmt.Sprintf("GetAccountAtLatestBlock - fails with %v", "head failed"), func() { //TODO: change
-		s.state.On("Sealed").Return(s.snapshot, nil).Once()
-		s.snapshot.On("Head").Return(nil, fmt.Errorf("head error")).Once()
+	s.Run(fmt.Sprintf("GetAccountAtLatestBlock - fails with %v", "inconsistent node`s state"), func() {
+		s.state.On("Sealed").Return(s.snapshot, nil)
 
-		//defer func() {
-		//	if r := recover(); r != nil {
-		//		// Check if the panic was due to runtime.Goexit().
-		//		if r != nil {
-		//			// Handle the case where runtime.Goexit was called.
-		//			s.T().Logf("Caught runtime.Goexit()")
-		//		}
-		//	}
-		//}()
-		//backend.GetAccountAtLatestBlock(ctx, s.failingAddress)
+		err := fmt.Errorf("inconsistent node`s state")
+		s.snapshot.On("Head").Return(nil, err)
+		backend.ctx = irrecoverable.NewMockSignalerContextExpectError(s.T(), context.Background(), err)
 
-		s.Assert().Panics(func() { backend.GetAccountAtLatestBlock(ctx, s.failingAddress) }, "head failed")
+		_, err = backend.GetAccountAtLatestBlock(ctx, s.failingAddress)
+		s.Require().Error(err)
 	})
 }
 
