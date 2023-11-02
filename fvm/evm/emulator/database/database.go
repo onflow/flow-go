@@ -7,7 +7,6 @@ import (
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	gethDB "github.com/ethereum/go-ethereum/ethdb"
-
 	"github.com/onflow/atree"
 
 	"github.com/onflow/flow-go/fvm/errors"
