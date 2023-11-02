@@ -133,7 +133,7 @@ func decodeStorable(dec *cbor.StreamDecoder, _ atree.StorageID) (atree.Storable,
 		if err != nil {
 			return nil, err
 		}
-		return NewByteStringValue([]byte(s)), nil
+		return NewByteStringValue(s), nil
 
 	case cbor.TagType:
 		tagNumber, err := dec.DecodeTagNumber()

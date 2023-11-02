@@ -19,9 +19,8 @@ type TestDatabase struct {
 	CompactFunc          func(start []byte, limit []byte) error
 	NewSnapshotFunc      func() (gethDB.Snapshot, error)
 	CloseFunc            func() error
-	SetRootHashFunc      func(root gethCommon.Hash) error
 	GetRootHashFunc      func() (gethCommon.Hash, error)
-	CommitFunc           func() error
+	CommitFunc           func(roothash gethCommon.Hash) error
 }
 
 var _ types.Database = &TestDatabase{}
@@ -54,11 +53,11 @@ func (db *TestDatabase) Delete(key []byte) error {
 	return db.DeleteFunc(key)
 }
 
-func (db *TestDatabase) SetRootHash(root gethCommon.Hash) error {
-	if db.SetRootHashFunc == nil {
+func (db *TestDatabase) Commit(root gethCommon.Hash) error {
+	if db.CommitFunc == nil {
 		panic("method not set")
 	}
-	return db.SetRootHashFunc(root)
+	return db.CommitFunc(root)
 }
 
 func (db *TestDatabase) GetRootHash() (gethCommon.Hash, error) {
@@ -66,13 +65,6 @@ func (db *TestDatabase) GetRootHash() (gethCommon.Hash, error) {
 		panic("method not set")
 	}
 	return db.GetRootHashFunc()
-}
-
-func (db *TestDatabase) Commit() error {
-	if db.CommitFunc == nil {
-		panic("method not set")
-	}
-	return db.CommitFunc()
 }
 
 func (db *TestDatabase) Stat(property string) (string, error) {

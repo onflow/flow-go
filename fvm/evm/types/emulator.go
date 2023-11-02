@@ -70,12 +70,9 @@ type Emulator interface {
 type Database interface {
 	ethdb.KeyValueStore
 
-	// SetRootHash sets the active root hash to a new one
-	SetRootHash(root gethCommon.Hash) error
+	// Commit commits the changes
+	Commit(rootHash gethCommon.Hash) error
 
 	// GetRootHash returns the active root hash
 	GetRootHash() (gethCommon.Hash, error)
-
-	// Commit commits the changes
-	Commit() error
 }

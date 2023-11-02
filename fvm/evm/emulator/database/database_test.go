@@ -6,9 +6,9 @@ import (
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/onflow/atree"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/atree"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm/emulator/database"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
@@ -32,7 +32,7 @@ func TestDatabase(t *testing.T) {
 				err = db.Put(key1, value1)
 				require.NoError(t, err)
 
-				err = db.Commit()
+				err = db.Commit(gethTypes.EmptyRootHash)
 				require.NoError(t, err)
 
 				newdb, err := database.NewDatabase(backend, flowEVMRoot)
@@ -59,7 +59,7 @@ func TestDatabase(t *testing.T) {
 				require.Equal(t, gethTypes.EmptyRootHash, h)
 
 				newRoot := gethCommon.Hash{1, 2, 3}
-				err = newdb.SetRootHash(newRoot)
+				err = newdb.Commit(newRoot)
 				require.NoError(t, err)
 
 				h, err = newdb.GetRootHash()
