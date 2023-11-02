@@ -31,10 +31,11 @@ const (
 // to interact with a portion of the value and would load everything under a key
 // before opearting on it. This means it could lead to having large slabs for a single value.
 type Database struct {
-	flowEVMRootAddress flow.Address
-	led                atree.Ledger
-	storage            *atree.PersistentSlabStorage
-	atreemap           *atree.OrderedMap
+	flowEVMRootAddress    flow.Address
+	led                   atree.Ledger
+	storage               *atree.PersistentSlabStorage
+	atreemap              *atree.OrderedMap
+	rootIDBytesToBeStored []byte // if is empty means we don't need to store anything
 	// Ramtin: other database implementations for EVM uses a lock
 	// to protect the storage against concurrent operations
 	// though one might do more research to see if we need
@@ -84,10 +85,7 @@ func (db *Database) retrieveOrCreateMapRoot() error {
 		if err != nil {
 			return handleError(err)
 		}
-		err = db.led.SetValue(db.flowEVMRootAddress.Bytes(), []byte(FlowEVMRootSlabKey), rootIDBytes[:])
-		if err != nil {
-			return handleError(err)
-		}
+		db.rootIDBytesToBeStored = rootIDBytes
 	} else {
 		storageID, err := atree.NewStorageIDFromRawBytes(rootIDBytes)
 		if err != nil {
@@ -241,6 +239,14 @@ func (db *Database) Commit(root gethCommon.Hash) error {
 	err := db.storage.FastCommit(runtime.NumCPU())
 	if err != nil {
 		return types.NewFatalError(err)
+	}
+
+	// check if we have to store the rootID
+	if len(db.rootIDBytesToBeStored) > 0 {
+		err = db.led.SetValue(db.flowEVMRootAddress.Bytes(), []byte(FlowEVMRootSlabKey), db.rootIDBytesToBeStored[:])
+		if err != nil {
+			return handleError(err)
+		}
 	}
 
 	err = db.led.SetValue(db.flowEVMRootAddress[:], []byte(FlowEVMRootHashKey), root[:])
