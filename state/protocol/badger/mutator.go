@@ -514,7 +514,7 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, certi
 	}
 
 	// apply any state changes from service events sealed by this block
-	err = stateMutator.ApplyServiceEvents(candidate.Payload.Seals)
+	err = stateMutator.ApplyServiceEventsFromValidatedSeals(candidate.Payload.Seals)
 	if err != nil {
 		return fmt.Errorf("could not process service events: %w", err)
 	}

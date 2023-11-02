@@ -14,8 +14,8 @@ type StateMutator struct {
 	mock.Mock
 }
 
-// ApplyServiceEvents provides a mock function with given fields: seals
-func (_m *StateMutator) ApplyServiceEvents(seals []*flow.Seal) error {
+// ApplyServiceEventsFromValidatedSeals provides a mock function with given fields: seals
+func (_m *StateMutator) ApplyServiceEventsFromValidatedSeals(seals []*flow.Seal) error {
 	ret := _m.Called(seals)
 
 	var r0 error

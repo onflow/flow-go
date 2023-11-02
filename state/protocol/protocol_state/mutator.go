@@ -113,7 +113,7 @@ func (m *stateMutator) Build() (hasChanges bool, updatedState *flow.ProtocolStat
 //   - A consistency or sanity check failing within the StateMutator is likely the symptom of an internal bug
 //     in the node software or state corruption, i.e. case (b). This is the only scenario where the error return
 //     of this function is not nil. If such an exception is returned, continuing is not an option.
-func (m *stateMutator) ApplyServiceEvents(seals []*flow.Seal) error {
+func (m *stateMutator) ApplyServiceEventsFromValidatedSeals(seals []*flow.Seal) error {
 	parentProtocolState := m.stateMachine.ParentState()
 	invalidStateTransitionAttempted := parentProtocolState.InvalidStateTransitionAttempted
 

@@ -47,7 +47,7 @@ func (s *StateMutatorSuite) TestHappyPathNoChanges() {
 	parentState := unittest.ProtocolStateFixture()
 	s.stateMachine.On("ParentState").Return(parentState)
 	s.stateMachine.On("Build").Return(parentState.ProtocolStateEntry, parentState.ID(), false)
-	err := s.mutator.ApplyServiceEvents([]*flow.Seal{})
+	err := s.mutator.ApplyServiceEventsFromValidatedSeals([]*flow.Seal{})
 	require.NoError(s.T(), err)
 	hasChanges, updatedState, updatedStateID, dbUpdates := s.mutator.Build()
 	require.False(s.T(), hasChanges)
@@ -76,7 +76,7 @@ func (s *StateMutatorSuite) TestHappyPathHasChanges() {
 	s.stateMachine.On("ProcessEpochSetup", epochSetup).Return(nil).Once()
 	s.setupsDB.On("StoreTx", epochSetup).Return(func(*transaction.Tx) error { return nil }).Once()
 
-	err := s.mutator.ApplyServiceEvents([]*flow.Seal{seal})
+	err := s.mutator.ApplyServiceEventsFromValidatedSeals([]*flow.Seal{seal})
 	require.NoError(s.T(), err)
 
 	_, _, _, dbUpdates := s.mutator.Build()
@@ -111,7 +111,7 @@ func (s *StateMutatorSuite) TestApplyServiceEvents_InvalidEpochSetup() {
 		s.stateMachine.On("ProcessEpochSetup", epochSetup).Return(protocol.NewInvalidServiceEventErrorf("")).Once()
 		s.stateMachine.On("SetInvalidStateTransitionAttempted").Return().Once()
 
-		err := s.mutator.ApplyServiceEvents([]*flow.Seal{seal})
+		err := s.mutator.ApplyServiceEventsFromValidatedSeals([]*flow.Seal{seal})
 		require.NoError(s.T(), err)
 	})
 	s.Run("process-epoch-setup-exception", func() {
@@ -138,7 +138,7 @@ func (s *StateMutatorSuite) TestApplyServiceEvents_InvalidEpochSetup() {
 		exception := errors.New("exception")
 		s.stateMachine.On("ProcessEpochSetup", epochSetup).Return(exception).Once()
 
-		err := s.mutator.ApplyServiceEvents([]*flow.Seal{seal})
+		err := s.mutator.ApplyServiceEventsFromValidatedSeals([]*flow.Seal{seal})
 		require.Error(s.T(), err)
 		require.False(s.T(), protocol.IsInvalidServiceEventError(err))
 	})
@@ -165,7 +165,7 @@ func (s *StateMutatorSuite) TestApplyServiceEvents_InvalidEpochCommit() {
 		s.stateMachine.On("ProcessEpochCommit", epochCommit).Return(protocol.NewInvalidServiceEventErrorf("")).Once()
 		s.stateMachine.On("SetInvalidStateTransitionAttempted").Return().Once()
 
-		err := s.mutator.ApplyServiceEvents([]*flow.Seal{seal})
+		err := s.mutator.ApplyServiceEventsFromValidatedSeals([]*flow.Seal{seal})
 		require.NoError(s.T(), err)
 	})
 	s.Run("process-epoch-commit-exception", func() {
@@ -186,7 +186,7 @@ func (s *StateMutatorSuite) TestApplyServiceEvents_InvalidEpochCommit() {
 		exception := errors.New("exception")
 		s.stateMachine.On("ProcessEpochCommit", epochCommit).Return(exception).Once()
 
-		err := s.mutator.ApplyServiceEvents([]*flow.Seal{seal})
+		err := s.mutator.ApplyServiceEventsFromValidatedSeals([]*flow.Seal{seal})
 		require.Error(s.T(), err)
 		require.False(s.T(), protocol.IsInvalidServiceEventError(err))
 	})
@@ -208,12 +208,12 @@ func (s *StateMutatorSuite) TestApplyServiceEventsSealsOrdered() {
 		seals = append(seals, seal)
 	}
 
-	// shuffle seals to make sure they are not ordered in the payload, so `ApplyServiceEvents` needs to explicitly sort them.
+	// shuffle seals to make sure they are not ordered in the payload, so `ApplyServiceEventsFromValidatedSeals` needs to explicitly sort them.
 	require.NoError(s.T(), rand.Shuffle(uint(len(seals)), func(i, j uint) {
 		seals[i], seals[j] = seals[j], seals[i]
 	}))
 
-	err := s.mutator.ApplyServiceEvents(seals)
+	err := s.mutator.ApplyServiceEventsFromValidatedSeals(seals)
 	require.NoError(s.T(), err)
 
 	// assert that results were queried in order of executed block height
@@ -235,7 +235,7 @@ func (s *StateMutatorSuite) TestApplyServiceEventsTransitionToNextEpoch() {
 	// we are at the first block of the next epoch
 	s.stateMachine.On("View").Return(parentState.CurrentEpochSetup.FinalView + 1)
 	s.stateMachine.On("TransitionToNextEpoch").Return(nil).Once()
-	err := s.mutator.ApplyServiceEvents([]*flow.Seal{})
+	err := s.mutator.ApplyServiceEventsFromValidatedSeals([]*flow.Seal{})
 	require.NoError(s.T(), err)
 }
 
@@ -249,7 +249,7 @@ func (s *StateMutatorSuite) TestApplyServiceEventsTransitionToNextEpoch_Error() 
 	s.stateMachine.On("View").Return(parentState.CurrentEpochSetup.FinalView + 1)
 	exception := errors.New("exception")
 	s.stateMachine.On("TransitionToNextEpoch").Return(exception).Once()
-	err := s.mutator.ApplyServiceEvents([]*flow.Seal{})
+	err := s.mutator.ApplyServiceEventsFromValidatedSeals([]*flow.Seal{})
 	require.ErrorIs(s.T(), err, exception)
 	require.False(s.T(), protocol.IsInvalidServiceEventError(err))
 }
@@ -273,6 +273,6 @@ func (s *StateMutatorSuite) TestApplyServiceEvents_EpochFallbackTriggered() {
 	s.headersDB.On("ByBlockID", seal.BlockID).Return(block, nil)
 	s.resultsDB.On("ByID", seal.ResultID).Return(result, nil)
 
-	err := s.mutator.ApplyServiceEvents([]*flow.Seal{seal})
+	err := s.mutator.ApplyServiceEventsFromValidatedSeals([]*flow.Seal{seal})
 	require.NoError(s.T(), err)
 }

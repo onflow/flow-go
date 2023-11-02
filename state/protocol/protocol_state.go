@@ -95,7 +95,7 @@ type StateMutator interface {
 	// updated protocol state entry, state ID and a flag indicating if there were any changes.
 	Build() (hasChanges bool, updatedState *flow.ProtocolStateEntry, stateID flow.Identifier, dbUpdates []func(tx *transaction.Tx) error)
 
-	// ApplyServiceEvents applies the state changes that are delivered via
+	// ApplyServiceEventsFromValidatedSeals applies the state changes that are delivered via
 	// sealed service events:
 	//   - iterating over the sealed service events in order of increasing height
 	//   - identifying state-changing service event and calling into the embedded
@@ -150,5 +150,5 @@ type StateMutator interface {
 	//   - A consistency or sanity check failing within the StateMutator is likely the symptom of an internal bug
 	//     in the node software or state corruption, i.e. case (b). This is the only scenario where the error return
 	//     of this function is not nil. If such an exception is returned, continuing is not an option.
-	ApplyServiceEvents(seals []*flow.Seal) error
+	ApplyServiceEventsFromValidatedSeals(seals []*flow.Seal) error
 }
