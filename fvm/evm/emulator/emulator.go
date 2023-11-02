@@ -12,20 +12,19 @@ import (
 	gethVM "github.com/ethereum/go-ethereum/core/vm"
 	gethCrypto "github.com/ethereum/go-ethereum/crypto"
 
-	"github.com/onflow/flow-go/fvm/evm/emulator/database"
 	"github.com/onflow/flow-go/fvm/evm/types"
 )
 
 // Emulator handles operations against evm runtime
 type Emulator struct {
-	Database *database.Database
+	Database types.Database
 }
 
 var _ types.Emulator = &Emulator{}
 
 // NewEmulator constructs a new EVM Emulator
 func NewEmulator(
-	db *database.Database,
+	db types.Database,
 ) *Emulator {
 	return &Emulator{
 		Database: db,
@@ -84,7 +83,7 @@ func (bv *ReadOnlyBlockView) NonceOf(address types.Address) (uint64, error) {
 // TODO: add block commit
 type BlockView struct {
 	config   *Config
-	database *database.Database
+	database types.Database
 }
 
 // MintTo mints tokens into the target address, if the address dees not
@@ -136,12 +135,10 @@ func (bl *BlockView) Transfer(
 	if err != nil {
 		return nil, err
 	}
-
 	msg := directCallMessage(from, &to, value, nil, math.MaxUint64)
-
 	res, err := proc.run(msg)
 	if err != nil {
-		return nil, err
+		return res, err
 	}
 	res.TxType = types.DirectCallTxType
 	return res, bl.commit(res.StateRootHash)
@@ -162,12 +159,10 @@ func (bl *BlockView) Deploy(
 	if err != nil {
 		return nil, err
 	}
-
 	msg := directCallMessage(caller, nil, value, code, gasLimit)
-
 	res, err := proc.run(msg)
 	if err != nil {
-		return nil, err
+		return res, err
 	}
 	res.TxType = types.DirectCallTxType
 	return res, bl.commit(res.StateRootHash)
@@ -190,7 +185,7 @@ func (bl *BlockView) Call(
 	msg := directCallMessage(from, &to, value, data, gasLimit)
 	res, err := proc.run(msg)
 	if err != nil {
-		return nil, err
+		return res, err
 	}
 	res.TxType = types.DirectCallTxType
 	return res, bl.commit(res.StateRootHash)
@@ -200,6 +195,7 @@ func (bl *BlockView) Call(
 func (bl *BlockView) RunTransaction(
 	tx *gethTypes.Transaction,
 ) (*types.Result, error) {
+	var err error
 	proc, err := bl.newProcedure()
 	if err != nil {
 		return nil, err
@@ -208,6 +204,7 @@ func (bl *BlockView) RunTransaction(
 	msg, err := gethCore.TransactionToMessage(tx, GetSigner(bl.config), proc.config.BlockContext.BaseFee)
 	if err != nil {
 		// note that this is not a fatal error (e.g. due to bad signature)
+		// not a valid transaction
 		return nil, types.NewEVMExecutionError(err)
 	}
 
@@ -216,7 +213,7 @@ func (bl *BlockView) RunTransaction(
 
 	res, err := proc.run(msg)
 	if err != nil {
-		return nil, err
+		return res, err
 	}
 
 	res.TxType = tx.Type()
@@ -291,19 +288,18 @@ func (proc *procedure) commit() (gethCommon.Hash, error) {
 
 func (proc *procedure) mintTo(address types.Address, amount *big.Int) (*types.Result, error) {
 	var err error
-	faddr := address.ToCommon()
-	// minting from gas prespective is considered similar to transfer of tokens
+	addr := address.ToCommon()
 	res := &types.Result{
 		GasConsumed: proc.config.DirectCallBaseGasUsage,
 	}
 
-	// check account if not exist
-	if !proc.state.Exist(faddr) {
-		proc.state.CreateAccount(faddr)
+	// create account if not exist
+	if !proc.state.Exist(addr) {
+		proc.state.CreateAccount(addr)
 	}
 
 	// add balance
-	proc.state.AddBalance(faddr, amount)
+	proc.state.AddBalance(addr, amount)
 
 	// we don't need to increment any nonce, given the origin doesn't exist
 	res.StateRootHash, err = proc.commit()
@@ -314,25 +310,24 @@ func (proc *procedure) mintTo(address types.Address, amount *big.Int) (*types.Re
 func (proc *procedure) withdrawFrom(address types.Address, amount *big.Int) (*types.Result, error) {
 	var err error
 
-	faddr := address.ToCommon()
-	// token withdraw from gas prespective is considered similar to transfer of tokens
+	addr := address.ToCommon()
 	res := &types.Result{
 		GasConsumed: proc.config.DirectCallBaseGasUsage,
 	}
 
 	// check source balance
 	// if balance is lower than amount return
-	if proc.state.GetBalance(faddr).Cmp(amount) == -1 {
-		return nil, types.ErrInsufficientBalance
+	if proc.state.GetBalance(addr).Cmp(amount) == -1 {
+		return res, types.ErrInsufficientBalance
 	}
 
-	// add balance
-	proc.state.SubBalance(faddr, amount)
+	// sub balance
+	proc.state.SubBalance(addr, amount)
 
 	// we increment the nonce for source account cause
-	// withdraw counts as a transaction (similar to the way calls increment the nonce)
-	nonce := proc.state.GetNonce(faddr)
-	proc.state.SetNonce(faddr, nonce+1)
+	// withdraw counts as a transaction
+	nonce := proc.state.GetNonce(addr)
+	proc.state.SetNonce(addr, nonce+1)
 
 	res.StateRootHash, err = proc.commit()
 	return res, err
@@ -354,6 +349,7 @@ func (proc *procedure) run(msg *gethCore.Message) (*types.Result, error) {
 			return &res, err
 		}
 		// when pre-checks has failed (non-fatal errors)
+		res.Failed = true
 		res.ErrorMessage = err.Error()
 		err = types.NewEVMExecutionError(err)
 	}
@@ -405,7 +401,7 @@ func directCallMessage(
 
 // Ramtin: this is the part of the code that we have to update if we hit performance problems
 // the NewDatabase from the RawDB might have to change.
-func newState(database *database.Database) (*gethState.StateDB, error) {
+func newState(database types.Database) (*gethState.StateDB, error) {
 	root, err := database.GetRootHash()
 	if err != nil {
 		return nil, err

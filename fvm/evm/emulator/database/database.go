@@ -43,6 +43,8 @@ type Database struct {
 	lock sync.RWMutex
 }
 
+var _ types.Database = &Database{}
+
 // NewDatabase returns a wrapped map that implements all the required database interface methods.
 func NewDatabase(led atree.Ledger, flowEVMRootAddress flow.Address) (*Database, error) {
 	baseStorage := atree.NewLedgerBaseStorage(led)
@@ -242,6 +244,8 @@ func (db *Database) GetRootHash() (gethCommon.Hash, error) {
 }
 
 // Commits the changes from atree into the underlying storage
+//
+// this method can be merged as part of batcher
 func (db *Database) Commit() error {
 	err := db.storage.Commit()
 	if err != nil {
