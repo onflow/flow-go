@@ -115,10 +115,10 @@ func TestApplyInboundStreamAndConnectionLimits(t *testing.T) {
 	cfg, err := config.DefaultConfig()
 	require.NoError(t, err)
 
-	mem, err := allowedMemory(cfg.NetworkConfig.ResourceManagerConfig.MemoryLimitRatio)
+	mem, err := allowedMemory(cfg.NetworkConfig.ResourceManager.MemoryLimitRatio)
 	require.NoError(t, err)
 
-	fd, err := allowedFileDescriptors(cfg.NetworkConfig.FileDescriptorsRatio)
+	fd, err := allowedFileDescriptors(cfg.NetworkConfig.ResourceManager.FileDescriptorsRatio)
 	require.NoError(t, err)
 	limits := rcmgr.DefaultLimits
 	libp2p.SetDefaultServiceLimits(&limits)

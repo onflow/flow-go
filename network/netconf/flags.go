@@ -202,8 +202,8 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 		"the number of seconds a peer will be forced to wait before being allowed to successful reconnect to the node after being rate limited")
 	flags.Bool(dryRun, config.UnicastConfig.UnicastRateLimitersConfig.DryRun, "disable peer disconnects and connections gating when rate limiting peers")
 	// resource manager cli flags
-	flags.Float64(fileDescriptorsRatio, config.ResourceManagerConfig.FileDescriptorsRatio, "ratio of available file descriptors to be used by libp2p (in (0,1])")
-	flags.Float64(memoryLimitRatio, config.ResourceManagerConfig.MemoryLimitRatio, "ratio of available memory to be used by libp2p (in (0,1])")
+	flags.Float64(fileDescriptorsRatio, config.ResourceManager.FileDescriptorsRatio, "ratio of available file descriptors to be used by libp2p (in (0,1])")
+	flags.Float64(memoryLimitRatio, config.ResourceManager.MemoryLimitRatio, "ratio of available memory to be used by libp2p (in (0,1])")
 	// flags.Int(inboundStreamLimitSystem, config.ResourceManagerConfig.InboundStream.System, "the system-wide limit on the number of inbound streams")
 	// flags.Int(inboundStreamLimitPeer, config.ResourceManagerConfig.InboundStream.Peer, "the limit on the number of inbound streams per peer (over all protocols)")
 	// flags.Int(inboundStreamLimitProtocol, config.ResourceManagerConfig.InboundStream.Protocol, "the limit on the number of inbound streams per protocol (over all peers)")

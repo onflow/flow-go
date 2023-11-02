@@ -8,9 +8,9 @@ import (
 // The resource manager is used to limit the number of open connections and streams (as well as any other resources
 // used by libp2p) for each peer.
 type ResourceManagerConfig struct {
-	Override             ResourceManagerOverrideScope `mapstructure:"libp2p-resource-limit-override"` // override limits for specific peers, protocols, etc.
-	MemoryLimitRatio     float64                      `mapstructure:"libp2p-memory-limit-ratio"`      // maximum allowed fraction of memory to be allocated by the libp2p resources in (0,1]
-	FileDescriptorsRatio float64                      `mapstructure:"libp2p-file-descriptors-ratio"`  // maximum allowed fraction of file descriptors to be allocated by the libp2p resources in (0,1]
+	Override             ResourceManagerOverrideScope `mapstructure:"limits-override"`        // override limits for specific peers, protocols, etc.
+	MemoryLimitRatio     float64                      `mapstructure:"memory-limit-ratio"`     // maximum allowed fraction of memory to be allocated by the libp2p resources in (0,1]
+	FileDescriptorsRatio float64                      `mapstructure:"file-descriptors-ratio"` // maximum allowed fraction of file descriptors to be allocated by the libp2p resources in (0,1]
 }
 
 type ResourceManagerOverrideScope struct {
