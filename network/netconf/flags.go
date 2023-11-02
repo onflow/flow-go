@@ -35,7 +35,6 @@ const (
 	// resource manager config
 	memoryLimitRatio               = "libp2p-memory-limit-ratio"
 	fileDescriptorsRatio           = "libp2p-file-descriptors-ratio"
-	peerBaseLimitConnsInbound      = "libp2p-peer-base-limits-conns-inbound"
 	inboundStreamLimitSystem       = "libp2p-inbound-stream-limit-system"
 	inboundStreamLimitPeer         = "libp2p-inbound-stream-limit-peer"
 	inboundStreamLimitProtocol     = "libp2p-inbound-stream-limit-protocol"
@@ -111,7 +110,6 @@ func AllFlagNames() []string {
 		bandwidthBurstLimit,
 		memoryLimitRatio,
 		fileDescriptorsRatio,
-		peerBaseLimitConnsInbound,
 		inboundStreamLimitSystem,
 		inboundStreamLimitPeer,
 		inboundStreamLimitProtocol,
@@ -206,14 +204,13 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 	// resource manager cli flags
 	flags.Float64(fileDescriptorsRatio, config.ResourceManagerConfig.FileDescriptorsRatio, "ratio of available file descriptors to be used by libp2p (in (0,1])")
 	flags.Float64(memoryLimitRatio, config.ResourceManagerConfig.MemoryLimitRatio, "ratio of available memory to be used by libp2p (in (0,1])")
-	flags.Int(peerBaseLimitConnsInbound, config.ResourceManagerConfig.PeerBaseLimitConnsInbound, "the maximum amount of allowed inbound connections per peer")
-	flags.Int(inboundStreamLimitSystem, config.ResourceManagerConfig.InboundStream.System, "the system-wide limit on the number of inbound streams")
-	flags.Int(inboundStreamLimitPeer, config.ResourceManagerConfig.InboundStream.Peer, "the limit on the number of inbound streams per peer (over all protocols)")
-	flags.Int(inboundStreamLimitProtocol, config.ResourceManagerConfig.InboundStream.Protocol, "the limit on the number of inbound streams per protocol (over all peers)")
-	flags.Int(inboundStreamLimitProtocolPeer, config.ResourceManagerConfig.InboundStream.ProtocolPeer, "the limit on the number of inbound streams per protocol per peer")
-	flags.Int(inboundStreamLimitTransient,
-		config.ResourceManagerConfig.InboundStream.Transient,
-		"the transient limit on the number of inbound streams (applied to streams that are not associated with a peer or protocol yet)")
+	// flags.Int(inboundStreamLimitSystem, config.ResourceManagerConfig.InboundStream.System, "the system-wide limit on the number of inbound streams")
+	// flags.Int(inboundStreamLimitPeer, config.ResourceManagerConfig.InboundStream.Peer, "the limit on the number of inbound streams per peer (over all protocols)")
+	// flags.Int(inboundStreamLimitProtocol, config.ResourceManagerConfig.InboundStream.Protocol, "the limit on the number of inbound streams per protocol (over all peers)")
+	// flags.Int(inboundStreamLimitProtocolPeer, config.ResourceManagerConfig.InboundStream.ProtocolPeer, "the limit on the number of inbound streams per protocol per peer")
+	// flags.Int(inboundStreamLimitTransient,
+	// 	config.ResourceManagerConfig.InboundStream.Transient,
+	// 	"the transient limit on the number of inbound streams (applied to streams that are not associated with a peer or protocol yet)")
 
 	// connection manager
 	flags.Int(lowWatermark, config.ConnectionManagerConfig.LowWatermark, "low watermarking for libp2p connection manager")
@@ -257,9 +254,15 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 	flags.Bool(alspDisabled, config.AlspConfig.DisablePenalty, "disable the penalty mechanism of the alsp protocol. default value (recommended) is false")
 	flags.Uint32(alspSpamRecordCacheSize, config.AlspConfig.SpamRecordCacheSize, "size of spam record cache, recommended to be 10x the number of authorized nodes")
 	flags.Uint32(alspSpamRecordQueueSize, config.AlspConfig.SpamReportQueueSize, "size of spam report queue, recommended to be 100x the number of authorized nodes")
-	flags.Duration(alspHearBeatInterval, config.AlspConfig.HearBeatInterval, "interval between two consecutive heartbeat events at alsp, recommended to leave it as default unless you know what you are doing.")
-	flags.Float32(alspSyncEngineBatchRequestBaseProb, config.AlspConfig.SyncEngine.BatchRequestBaseProb, "base probability of creating a misbehavior report for a batch request message")
-	flags.Float32(alspSyncEngineRangeRequestBaseProb, config.AlspConfig.SyncEngine.RangeRequestBaseProb, "base probability of creating a misbehavior report for a range request message")
+	flags.Duration(alspHearBeatInterval,
+		config.AlspConfig.HearBeatInterval,
+		"interval between two consecutive heartbeat events at alsp, recommended to leave it as default unless you know what you are doing.")
+	flags.Float32(alspSyncEngineBatchRequestBaseProb,
+		config.AlspConfig.SyncEngine.BatchRequestBaseProb,
+		"base probability of creating a misbehavior report for a batch request message")
+	flags.Float32(alspSyncEngineRangeRequestBaseProb,
+		config.AlspConfig.SyncEngine.RangeRequestBaseProb,
+		"base probability of creating a misbehavior report for a range request message")
 	flags.Float32(alspSyncEngineSyncRequestProb, config.AlspConfig.SyncEngine.SyncRequestProb, "probability of creating a misbehavior report for a sync request message")
 
 	flags.Int(ihaveMaxSampleSize,
@@ -287,8 +290,12 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 		config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IWantRPCInspectionConfig.DuplicateMsgIDThreshold,
 		"max allowed duplicate message IDs in a single iWant control message")
 
-	flags.Int(rpcMessageMaxSampleSize, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.RpcMessageMaxSampleSize, "the max sample size used for RPC message validation. If the total number of RPC messages exceeds this value a sample will be taken but messages will not be truncated")
-	flags.Int(rpcMessageErrorThreshold, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.RpcMessageErrorThreshold, "the threshold at which an error will be returned if the number of invalid RPC messages exceeds this value")
+	flags.Int(rpcMessageMaxSampleSize,
+		config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.RpcMessageMaxSampleSize,
+		"the max sample size used for RPC message validation. If the total number of RPC messages exceeds this value a sample will be taken but messages will not be truncated")
+	flags.Int(rpcMessageErrorThreshold,
+		config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.RpcMessageErrorThreshold,
+		"the threshold at which an error will be returned if the number of invalid RPC messages exceeds this value")
 }
 
 // SetAliases this func sets an aliases for each CLI flag defined for network config overrides to it's corresponding
