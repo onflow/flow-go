@@ -26,6 +26,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	exeEng "github.com/onflow/flow-go/engine/execution"
+	"github.com/onflow/flow-go/engine/execution/scripts"
 	fvmerrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
@@ -543,13 +544,16 @@ func (h *handler) GetAccountAtBlockID(
 	}
 
 	value, err := h.engine.GetAccount(ctx, flowAddress, blockFlowID)
-	if errors.Is(err, storage.ErrNotFound) {
-		return nil, status.Errorf(codes.NotFound, "account with address %s not found", flowAddress)
-	}
-	if fvmerrors.IsAccountNotFoundError(err) {
-		return nil, status.Errorf(codes.NotFound, "account not found")
-	}
 	if err != nil {
+		if errors.Is(err, scripts.ErrStateCommitmentPruned) {
+			return nil, status.Errorf(codes.OutOfRange, "state for block ID %s not available", blockFlowID)
+		}
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, status.Errorf(codes.NotFound, "account with address %s not found", flowAddress)
+		}
+		if fvmerrors.IsAccountNotFoundError(err) {
+			return nil, status.Errorf(codes.NotFound, "account not found")
+		}
 		return nil, status.Errorf(codes.Internal, "failed to get account: %v", err)
 	}
 
