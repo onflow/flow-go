@@ -61,10 +61,61 @@ func (m *stateMutator) Build() (hasChanges bool, updatedState *flow.ProtocolStat
 	return
 }
 
-// ApplyServiceEvents handles applying state changes which occur as a result
-// of service events being included in a block payload.
-// All updates that are incorporated in service events are applied to the protocol state by mutating protocol state updater.
-// No errors are expected during normal operation.
+// ApplyServiceEvents applies the state changes that are delivered via
+// sealed service events:
+//   - iterating over the sealed service events in order of increasing height
+//   - identifying state-changing service event and calling into the embedded
+//     ProtocolStateMachine to apply the respective state update
+//   - tracking deferred database updates necessary to persist the updated state
+//     and its data dependencies
+//
+// All updates only mutate the `StateMutator`'s internal in-memory copy of the
+// protocol state, without changing the parent state (i.e. the state we started from).
+//
+// SAFETY REQUIREMENT:
+// The StateMutator assumes that the proposal has passed the following correctness checks!
+//   - The seals in the payload continuously follow the ancestry of this fork. Specifically,
+//     there are no gaps in the seals.
+//   - The seals guarantee correctness of the sealed execution result, including the contained
+//     service events. This is actively checked by the verification node, whose aggregated
+//     approvals in the form of a seal attest to the correctness of the sealed execution result,
+//     including the contained.
+//
+// Consensus nodes actively verify protocol compliance for any block proposal they receive,
+// including integrity of each seal individually as well as the seals continuously following the
+// fork. Light clients only process certified blocks, which guarantees that consensus nodes already
+// ran those checks and found the proposal to be valid.
+//
+// Details on SERVICE EVENTS:
+// Consider a chain where a service event is emitted during execution of block A.
+// Block B contains an execution receipt for A. Block C contains a seal for block
+// A's execution result.
+//
+//	A <- .. <- B(RA) <- .. <- C(SA)
+//
+// Service Events are included within execution results, which are stored
+// opaquely as part of the block payload in block B. We only validate, process and persist
+// the typed service event to storage once we process C, the block containing the
+// seal for block A. This is because we rely on the sealing subsystem to validate
+// correctness of the service event before processing it.
+// Consequently, any change to the protocol state introduced by a service event
+// emitted during execution of block A would only become visible when querying
+// C or its descendants.
+//
+// Error returns:
+//   - Per convention, the input seals from the block payload have already confirmed to be protocol compliant.
+//     Hence, the service events in the sealed execution results represent the honest execution path.
+//     Therefore, the sealed service events should encode a valid evolution of the protocol state -- provided
+//     the system smart contracts are correct.
+//   - As we can rule out byzantine attacks as the source of failures, the only remaining sources of problems
+//     can be (a) bugs in the system smart contracts or (b) bugs in the node implementation.
+//     A service event not representing a valid state transition despite all consistency checks passing
+//     is interpreted as case (a) and handled internally within the StateMutator. In short, we go into Epoch
+//     Fallback Mode by copying the parent state (a valid state snapshot) and setting the
+//     `InvalidStateTransitionAttempted` flag. All subsequent Epoch-lifecycle events are ignored.
+//   - A consistency or sanity check failing within the StateMutator is likely the symptom of an internal bug
+//     in the node software or state corruption, i.e. case (b). This is the only scenario where the error return
+//     of this function is not nil. If such an exception is returned, continuing is not an option.
 func (m *stateMutator) ApplyServiceEvents(seals []*flow.Seal) error {
 	dbUpdates, err := m.handleServiceEvents(seals)
 	if err != nil {
