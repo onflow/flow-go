@@ -37,16 +37,16 @@ type ResourceManagerOverrideScope struct {
 type ResourceManagerOverrideLimit struct {
 	// System is the limit for the resource at the entire system. if not set, the default value will be used.
 	// For a specific limit, the system-wide dictates the maximum allowed value across all peers and protocols at the entire node scope.
-	StreamInbound int `validate:"gte=0" mapstructure:"stream-inbound"`
+	StreamsInbound int `validate:"gte=0" mapstructure:"stream-inbound"`
 
-	// StreamOutbound is the max number of outbound streams allowed, at the resource scope.
-	StreamOutbound int `validate:"gte=0" mapstructure:"stream-outbound"`
+	// StreamsOutbound is the max number of outbound streams allowed, at the resource scope.
+	StreamsOutbound int `validate:"gte=0" mapstructure:"stream-outbound"`
 
-	// ConnectionInbound is the max number of inbound connections allowed, at the resource scope.
-	ConnectionInbound int `validate:"gte=0" mapstructure:"connection-inbound"`
+	// ConnectionsInbound is the max number of inbound connections allowed, at the resource scope.
+	ConnectionsInbound int `validate:"gte=0" mapstructure:"connection-inbound"`
 
-	// ConnectionOutbound is the max number of outbound connections allowed, at the resource scope.
-	ConnectionOutbound int `validate:"gte=0" mapstructure:"connection-outbound"`
+	// ConnectionsOutbound is the max number of outbound connections allowed, at the resource scope.
+	ConnectionsOutbound int `validate:"gte=0" mapstructure:"connection-outbound"`
 
 	// FD is the max number of file descriptors allowed, at the resource scope.
 	FD int `validate:"gte=0" mapstructure:"fd"`
