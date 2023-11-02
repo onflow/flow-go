@@ -147,10 +147,10 @@ func TestApplyInboundStreamAndConnectionLimits(t *testing.T) {
 	partial.PeerDefault = ApplyResourceLimitOverride(unittest.Logger(), ResourceScopePeer, scaled.ToPartialLimitConfig().PeerDefault, peerOverride)
 
 	final := partial.Build(scaled).ToPartialLimitConfig()
-	require.Equal(t, 456, int(final.System.StreamsOutbound))                                                     // should be overridden.
-	require.Equal(t, 789, int(final.System.ConnsInbound))                                                        // should be overridden.
-	require.Equal(t, 4560, int(final.System.FD))                                                                 // should be overridden.
-	require.Equal(t, 7890, int(final.System.Memory))                                                             // should be overridden.
-	require.Equal(t, scaled.ToPartialLimitConfig().System.StreamsInbound, int(final.PeerDefault.StreamsInbound)) // should NOT be overridden.
-	require.Equal(t, scaled.ToPartialLimitConfig().System.ConnsOutbound, int(final.PeerDefault.ConnsOutbound))   // should NOT be overridden.
+	require.Equal(t, 456, int(final.System.StreamsOutbound))                                           // should be overridden.
+	require.Equal(t, 789, int(final.System.ConnsInbound))                                              // should be overridden.
+	require.Equal(t, 4560, int(final.System.FD))                                                       // should be overridden.
+	require.Equal(t, 7890, int(final.System.Memory))                                                   // should be overridden.
+	require.Equal(t, scaled.ToPartialLimitConfig().System.StreamsInbound, final.System.StreamsInbound) // should NOT be overridden.
+	require.Equal(t, scaled.ToPartialLimitConfig().System.ConnsOutbound, final.System.ConnsOutbound)   // should NOT be overridden.
 }
