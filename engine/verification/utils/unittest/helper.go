@@ -660,7 +660,7 @@ func bootstrapSystem(
 			stateFixture.Storage.Results,
 			stateFixture.Storage.Setups,
 			stateFixture.Storage.EpochCommits,
-			stateFixture.State.Params())
+		)
 		epochBuilder := unittest.NewEpochBuilder(t, mutableProtocolState, stateFixture.State)
 		epochBuilder.
 			UsingSetupOpts(unittest.WithParticipants(identities.ToSkeleton())).

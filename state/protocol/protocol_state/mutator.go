@@ -23,7 +23,6 @@ type stateMutator struct {
 	setups           storage.EpochSetups
 	commits          storage.EpochCommits
 	stateMachine     ProtocolStateMachine
-	params           protocol.InstanceParams
 	pendingDbUpdates []func(tx *transaction.Tx) error
 }
 
@@ -36,11 +35,9 @@ func newStateMutator(
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 	stateMachine ProtocolStateMachine,
-	params protocol.InstanceParams,
 ) *stateMutator {
 	return &stateMutator{
 		setups:       setups,
-		params:       params,
 		headers:      headers,
 		results:      results,
 		commits:      commits,
@@ -117,27 +114,16 @@ func (m *stateMutator) Build() (hasChanges bool, updatedState *flow.ProtocolStat
 //     in the node software or state corruption, i.e. case (b). This is the only scenario where the error return
 //     of this function is not nil. If such an exception is returned, continuing is not an option.
 func (m *stateMutator) ApplyServiceEvents(seals []*flow.Seal) error {
-	var dbUpdates []func(tx *transaction.Tx) error
-	epochFallbackTriggered, err := m.params.EpochFallbackTriggered()
-	if err != nil {
-		return fmt.Errorf("could not retrieve epoch fallback status: %w", err)
-	}
-
 	parentProtocolState := m.stateMachine.ParentState()
-	epochStatus := parentProtocolState.EpochStatus()
-	activeSetup := parentProtocolState.CurrentEpochSetup
-
-	// never process service events after epoch fallback is triggered
-	if epochStatus.InvalidServiceEventIncorporated || epochFallbackTriggered {
-		return nil
-	}
+	invalidStateTransitionAttempted := parentProtocolState.InvalidStateTransitionAttempted
 
 	// perform protocol state transition to next epoch if next epoch is committed and we are at first block of epoch
-	phase, err := epochStatus.Phase()
+	phase, err := parentProtocolState.EpochStatus().Phase()
 	if err != nil {
 		return fmt.Errorf("could not determine epoch phase: %w", err)
 	}
-	if phase == flow.EpochPhaseCommitted {
+	if !invalidStateTransitionAttempted && phase == flow.EpochPhaseCommitted {
+		activeSetup := parentProtocolState.CurrentEpochSetup
 		if m.stateMachine.View() > activeSetup.FinalView {
 			// TODO: this is a temporary workaround to allow for the epoch transition to be triggered
 			// most likely it will be not needed when we refactor protocol state entries and define strict safety rules.
@@ -163,6 +149,7 @@ func (m *stateMutator) ApplyServiceEvents(seals []*flow.Seal) error {
 		}
 		return fmt.Errorf("unexpected error ordering seals: %w", err)
 	}
+	var dbUpdates []func(tx *transaction.Tx) error
 	for _, seal := range orderedSeals {
 		result, err := m.results.ByID(seal.ResultID)
 		if err != nil {
@@ -172,6 +159,9 @@ func (m *stateMutator) ApplyServiceEvents(seals []*flow.Seal) error {
 		for _, event := range result.ServiceEvents {
 			switch ev := event.Event.(type) {
 			case *flow.EpochSetup:
+				if invalidStateTransitionAttempted {
+					continue
+				}
 				err = m.stateMachine.ProcessEpochSetup(ev)
 				if err != nil {
 					if protocol.IsInvalidServiceEventError(err) {
@@ -186,6 +176,9 @@ func (m *stateMutator) ApplyServiceEvents(seals []*flow.Seal) error {
 				dbUpdates = append(dbUpdates, m.setups.StoreTx(ev))
 
 			case *flow.EpochCommit:
+				if invalidStateTransitionAttempted {
+					continue
+				}
 				err = m.stateMachine.ProcessEpochCommit(ev)
 				if err != nil {
 					if protocol.IsInvalidServiceEventError(err) {
@@ -205,7 +198,6 @@ func (m *stateMutator) ApplyServiceEvents(seals []*flow.Seal) error {
 			}
 		}
 	}
-
 	m.pendingDbUpdates = append(m.pendingDbUpdates, dbUpdates...)
 	return nil
 }

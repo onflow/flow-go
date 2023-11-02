@@ -868,7 +868,6 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 			all.Results,
 			all.Setups,
 			all.EpochCommits,
-			state.Params(),
 		)
 		calculateExpectedStateId := calculateExpectedStateId(t, mutableProtocolState)
 

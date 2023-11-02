@@ -467,7 +467,6 @@ func createNode(
 		resultsDB,
 		setupsDB,
 		commitsDB,
-		state.Params(),
 	)
 
 	// initialize the block builder

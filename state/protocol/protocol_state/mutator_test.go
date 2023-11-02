@@ -9,7 +9,6 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/state/protocol/mock"
 	protocolstatemock "github.com/onflow/flow-go/state/protocol/protocol_state/mock"
 	"github.com/onflow/flow-go/storage/badger/transaction"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -28,7 +27,6 @@ type StateMutatorSuite struct {
 	resultsDB       *storagemock.ExecutionResults
 	setupsDB        *storagemock.EpochSetups
 	commitsDB       *storagemock.EpochCommits
-	params          *mock.InstanceParams
 	stateMachine    *protocolstatemock.ProtocolStateMachine
 
 	mutator *stateMutator
@@ -40,14 +38,12 @@ func (s *StateMutatorSuite) SetupTest() {
 	s.resultsDB = storagemock.NewExecutionResults(s.T())
 	s.setupsDB = storagemock.NewEpochSetups(s.T())
 	s.commitsDB = storagemock.NewEpochCommits(s.T())
-	s.params = mock.NewInstanceParams(s.T())
 	s.stateMachine = protocolstatemock.NewProtocolStateMachine(s.T())
-	s.mutator = newStateMutator(s.headersDB, s.resultsDB, s.setupsDB, s.commitsDB, s.stateMachine, s.params)
+	s.mutator = newStateMutator(s.headersDB, s.resultsDB, s.setupsDB, s.commitsDB, s.stateMachine)
 }
 
 // TestHappyPathNoChanges tests that stateMutator doesn't cache any db updates when there are no changes.
 func (s *StateMutatorSuite) TestHappyPathNoChanges() {
-	s.params.On("EpochFallbackTriggered").Return(false, nil)
 	parentState := unittest.ProtocolStateFixture()
 	s.stateMachine.On("ParentState").Return(parentState)
 	s.stateMachine.On("Build").Return(parentState.ProtocolStateEntry, parentState.ID(), false)
@@ -62,7 +58,6 @@ func (s *StateMutatorSuite) TestHappyPathNoChanges() {
 
 // TestHappyPathHasChanges tests that stateMutator returns cached db updates when building protocol state after applying service events.
 func (s *StateMutatorSuite) TestHappyPathHasChanges() {
-	s.params.On("EpochFallbackTriggered").Return(false, nil)
 	parentState := unittest.ProtocolStateFixture()
 	s.stateMachine.On("ParentState").Return(parentState)
 	s.stateMachine.On("Build").Return(unittest.ProtocolStateFixture().ProtocolStateEntry,
@@ -92,7 +87,6 @@ func (s *StateMutatorSuite) TestHappyPathHasChanges() {
 // TestApplyServiceEvents_InvalidEpochSetup tests that handleServiceEvents rejects invalid epoch setup event and sets
 // InvalidStateTransitionAttempted flag in protocol.ProtocolStateMachine.
 func (s *StateMutatorSuite) TestApplyServiceEvents_InvalidEpochSetup() {
-	s.params.On("EpochFallbackTriggered").Return(false, nil)
 	s.Run("invalid-epoch-setup", func() {
 		parentState := unittest.ProtocolStateFixture()
 		rootSetup := parentState.CurrentEpochSetup
@@ -153,7 +147,6 @@ func (s *StateMutatorSuite) TestApplyServiceEvents_InvalidEpochSetup() {
 // TestApplyServiceEvents_InvalidEpochCommit tests that handleServiceEvents rejects invalid epoch commit event and sets
 // InvalidStateTransitionAttempted flag in protocol.ProtocolStateMachine.
 func (s *StateMutatorSuite) TestApplyServiceEvents_InvalidEpochCommit() {
-	s.params.On("EpochFallbackTriggered").Return(false, nil)
 	s.Run("invalid-epoch-commit", func() {
 		parentState := unittest.ProtocolStateFixture()
 
@@ -201,7 +194,6 @@ func (s *StateMutatorSuite) TestApplyServiceEvents_InvalidEpochCommit() {
 
 // TestApplyServiceEventsSealsOrdered tests that handleServiceEvents processes seals in order of block height.
 func (s *StateMutatorSuite) TestApplyServiceEventsSealsOrdered() {
-	s.params.On("EpochFallbackTriggered").Return(false, nil)
 	parentState := unittest.ProtocolStateFixture()
 	s.stateMachine.On("ParentState").Return(parentState)
 
@@ -238,7 +230,6 @@ func (s *StateMutatorSuite) TestApplyServiceEventsSealsOrdered() {
 // TestApplyServiceEventsTransitionToNextEpoch tests that handleServiceEvents transitions to the next epoch
 // when epoch has been committed, and we are at the first block of the next epoch.
 func (s *StateMutatorSuite) TestApplyServiceEventsTransitionToNextEpoch() {
-	s.params.On("EpochFallbackTriggered").Return(false, nil)
 	parentState := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
 	s.stateMachine.On("ParentState").Return(parentState)
 	// we are at the first block of the next epoch
@@ -251,7 +242,6 @@ func (s *StateMutatorSuite) TestApplyServiceEventsTransitionToNextEpoch() {
 // TestApplyServiceEventsTransitionToNextEpoch_Error tests that error that has been
 // observed in handleServiceEvents when transitioning to the next epoch is propagated to the caller.
 func (s *StateMutatorSuite) TestApplyServiceEventsTransitionToNextEpoch_Error() {
-	s.params.On("EpochFallbackTriggered").Return(false, nil)
 	parentState := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
 
 	s.stateMachine.On("ParentState").Return(parentState)
@@ -269,21 +259,20 @@ func (s *StateMutatorSuite) TestApplyServiceEventsTransitionToNextEpoch_Error() 
 // In second case we have observed an InvalidStateTransitionAttempted flag which is part of some fork but has not been finalized yet.
 // In both cases we shouldn't process any service events. This is asserted by using mocked state updater without any expected methods.
 func (s *StateMutatorSuite) TestApplyServiceEvents_EpochFallbackTriggered() {
-	s.Run("epoch-fallback-triggered", func() {
-		s.params.On("EpochFallbackTriggered").Return(true, nil)
-		parentState := unittest.ProtocolStateFixture()
-		s.stateMachine.On("ParentState").Return(parentState)
-		seals := unittest.Seal.Fixtures(2)
-		err := s.mutator.ApplyServiceEvents(seals)
-		require.NoError(s.T(), err)
+	parentState := unittest.ProtocolStateFixture()
+	parentState.InvalidStateTransitionAttempted = true
+	s.stateMachine.On("ParentState").Return(parentState)
+
+	epochCommit := unittest.EpochCommitFixture()
+	result := unittest.ExecutionResultFixture(func(result *flow.ExecutionResult) {
+		result.ServiceEvents = []flow.ServiceEvent{epochCommit.ServiceEvent()}
 	})
-	s.Run("invalid-service-event-incorporated", func() {
-		s.params.On("EpochFallbackTriggered").Return(false, nil)
-		parentState := unittest.ProtocolStateFixture()
-		parentState.InvalidStateTransitionAttempted = true
-		s.stateMachine.On("ParentState").Return(parentState)
-		seals := unittest.Seal.Fixtures(2)
-		err := s.mutator.ApplyServiceEvents(seals)
-		require.NoError(s.T(), err)
-	})
+
+	block := unittest.BlockHeaderFixture()
+	seal := unittest.Seal.Fixture(unittest.Seal.WithBlockID(block.ID()))
+	s.headersDB.On("ByBlockID", seal.BlockID).Return(block, nil)
+	s.resultsDB.On("ByID", seal.ResultID).Return(result, nil)
+
+	err := s.mutator.ApplyServiceEvents([]*flow.Seal{seal})
+	require.NoError(s.T(), err)
 }
