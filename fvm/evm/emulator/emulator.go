@@ -241,14 +241,8 @@ func (bl *BlockView) newProcedure() (*procedure, error) {
 
 // TODO errors returns here might not be fatal, what if we have hit the interaction limit ?
 func (bl *BlockView) commit(rootHash gethCommon.Hash) error {
-	// sets root hash
-	err := bl.database.SetRootHash(rootHash)
-	if err != nil {
-		return types.NewFatalError(err)
-	}
-
 	// commit atree changes back to the backend
-	err = bl.database.Commit()
+	err := bl.database.Commit(rootHash)
 	if err != nil {
 		return types.NewFatalError(err)
 	}
