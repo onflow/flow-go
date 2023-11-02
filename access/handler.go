@@ -585,7 +585,7 @@ func (h *Handler) GetLatestProtocolStateSnapshot(ctx context.Context, req *acces
 	}, nil
 }
 
-// GetProtocolStateSnapshotByBlockID returns the latest serializable Snapshot by blockID
+// GetProtocolStateSnapshotByBlockID returns serializable Snapshot by blockID
 func (h *Handler) GetProtocolStateSnapshotByBlockID(ctx context.Context, req *access.GetProtocolStateSnapshotByBlockIDRequest) (*access.ProtocolStateSnapshotResponse, error) {
 	metadata := h.buildMetadataResponse()
 
@@ -602,7 +602,7 @@ func (h *Handler) GetProtocolStateSnapshotByBlockID(ctx context.Context, req *ac
 	}, nil
 }
 
-// GetProtocolStateSnapshotByHeight returns the latest serializable Snapshot by block height
+// GetProtocolStateSnapshotByHeight returns serializable Snapshot by block height
 func (h *Handler) GetProtocolStateSnapshotByHeight(ctx context.Context, req *access.GetProtocolStateSnapshotByHeightRequest) (*access.ProtocolStateSnapshotResponse, error) {
 	metadata := h.buildMetadataResponse()
 
@@ -616,8 +616,6 @@ func (h *Handler) GetProtocolStateSnapshotByHeight(ctx context.Context, req *acc
 		Metadata:           metadata,
 	}, nil
 }
-
-
 
 // GetExecutionResultForBlockID returns the latest received execution result for the given block ID.
 // AN might receive multiple receipts with conflicting results for unsealed blocks.

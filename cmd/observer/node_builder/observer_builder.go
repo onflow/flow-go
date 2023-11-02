@@ -1000,7 +1000,11 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 				node.State,
 				node.Storage.Blocks,
 				node.Storage.Headers,
-				backend.NewNetworkAPI(node.State, node.RootChainID, backend.DefaultSnapshotHistoryLimit),
+				backend.NewNetworkAPI(
+					node.State,
+					node.RootChainID,
+					backend.DefaultSnapshotHistoryLimit,
+				),
 			)),
 		}
 

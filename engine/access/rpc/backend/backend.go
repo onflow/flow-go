@@ -355,7 +355,7 @@ func (b *Backend) GetLatestProtocolStateSnapshot(_ context.Context) ([]byte, err
 	return convert.SnapshotToBytes(validSnapshot)
 }
 
-// GetProtocolStateSnapshotByBlockID returns the latest finalized snapshot by block id
+// GetProtocolStateSnapshotByBlockID returns finalized snapshot by block id
 func (b *Backend) GetProtocolStateSnapshotByBlockID(ctx context.Context, blockID flow.Identifier) ([]byte, error) {
 	block, _, err := b.backendBlockDetails.GetBlockByID(ctx, blockID)
 	if err != nil {
@@ -372,7 +372,7 @@ func (b *Backend) GetProtocolStateSnapshotByBlockID(ctx context.Context, blockID
 	return convert.SnapshotToBytes(validSnapshot)
 }
 
-// GetProtocolStateSnapshotByHeight returns the latest finalized snapshot by block height
+// GetProtocolStateSnapshotByHeight returns finalized snapshot by block height
 func (b *Backend) GetProtocolStateSnapshotByHeight(_ context.Context, blockHeight uint64) ([]byte, error) {
 	snapshot := b.state.AtHeight(blockHeight)
 

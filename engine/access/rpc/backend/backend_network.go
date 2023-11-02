@@ -80,6 +80,47 @@ func (b *backendNetwork) GetLatestProtocolStateSnapshot(_ context.Context) ([]by
 	return data, nil
 }
 
+// GetProtocolStateSnapshotByBlockID returns serializable Snapshot by blockID
+func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(ctx context.Context, blockID flow.Identifier) ([]byte, error) {
+	snapshotByBlockId := b.state.AtBlockID(blockID)
+	head, _ := snapshotByBlockId.Head()
+
+	snapshotByHeight := b.state.AtHeight(head.Height)
+
+	if snapshotByHeight != snapshotByBlockId {
+		return nil, status.Errorf(codes.Internal, "Snapshot for non-finalized block ")
+	}
+
+	validSnapshot, err := b.getValidSnapshot(snapshotByBlockId, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := convert.SnapshotToBytes(validSnapshot)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to convert snapshot to bytes: %v", err)
+	}
+
+	return data, nil
+}
+
+// GetProtocolStateSnapshotByHeight returns serializable Snapshot by block height
+func (b *backendNetwork) GetProtocolStateSnapshotByHeight(ctx context.Context, blockHeight uint64) ([]byte, error) {
+	snapshot := b.state.AtHeight(blockHeight)
+
+	validSnapshot, err := b.getValidSnapshot(snapshot, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := convert.SnapshotToBytes(validSnapshot)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to convert snapshot to bytes: %v", err)
+	}
+
+	return data, nil
+}
+
 func (b *backendNetwork) isEpochOrPhaseDifferent(counter1, counter2 uint64, phase1, phase2 flow.EpochPhase) bool {
 	return counter1 != counter2 || phase1 != phase2
 }

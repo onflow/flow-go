@@ -13,6 +13,8 @@ import (
 type NetworkAPI interface {
 	GetNetworkParameters(ctx context.Context) access.NetworkParameters
 	GetLatestProtocolStateSnapshot(ctx context.Context) ([]byte, error)
+	GetProtocolStateSnapshotByBlockID(ctx context.Context, blockID flow.Identifier) ([]byte, error)
+	GetProtocolStateSnapshotByHeight(ctx context.Context, blockHeight uint64) ([]byte, error)
 	GetNodeVersionInfo(ctx context.Context) (*access.NodeVersionInfo, error)
 }
 

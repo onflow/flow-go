@@ -48,7 +48,6 @@ type API interface {
 	GetProtocolStateSnapshotByBlockID(ctx context.Context, blockID flow.Identifier) ([]byte, error)
 	GetProtocolStateSnapshotByHeight(ctx context.Context, blockHeight uint64) ([]byte, error)
 
-
 	GetExecutionResultForBlockID(ctx context.Context, blockID flow.Identifier) (*flow.ExecutionResult, error)
 	GetExecutionResultByID(ctx context.Context, id flow.Identifier) (*flow.ExecutionResult, error)
 }
