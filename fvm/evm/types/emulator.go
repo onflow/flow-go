@@ -37,6 +37,8 @@ func NewDefaultBlockContext(BlockNumber uint64) BlockContext {
 type ReadOnlyBlockView interface {
 	// BalanceOf returns the balance of this address
 	BalanceOf(address Address) (*big.Int, error)
+	// NonceOf returns the nonce of this address
+	NonceOf(address Address) (uint64, error)
 	// CodeOf returns the code for this address (if smart contract is deployed at this address)
 	CodeOf(address Address) (Code, error)
 }

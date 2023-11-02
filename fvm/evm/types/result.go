@@ -16,6 +16,8 @@ var DirectCallTxType = uint8(255)
 type Result struct {
 	// a boolean that is set to false if the execution has failed (non-fatal)
 	Failed bool
+	// execution error message returned by evm during execution
+	ErrorMessage string
 	// type of transaction defined by the evm package
 	// see DirectCallTxType as extra type we added type for direct calls.
 	TxType uint8
