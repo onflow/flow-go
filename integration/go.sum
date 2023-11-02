@@ -336,8 +336,8 @@ github.com/creack/pty v1.1.7/go.mod h1:lj5s0c3V2DBrqTV7llrYr5NG6My20zk30Fl46Y7Do
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
 github.com/cskr/pubsub v1.0.2 h1:vlOzMhl6PFn60gRlTQQsIfVwaPB/B/8MziK8FhEPt/0=
 github.com/cskr/pubsub v1.0.2/go.mod h1:/8MzYXk/NJAz782G8RPkFzXTZVu63VotefPnR9TIRis=
-github.com/dapperlabs/cadence-internal v0.42.2-patch.1 h1:yo/ydEmtVOZQlksPsy8+Jit7AmUOSyrj//L6VMzAQWc=
-github.com/dapperlabs/cadence-internal v0.42.2-patch.1/go.mod h1:raU8va8QRyTa/eUbhej4mbyW2ETePfSaywoo36MddgE=
+github.com/dapperlabs/cadence-internal v0.42.3-patch.1 h1:1PSOnR5pgH7hsVRhDP2yr7JlV6v5ptMn/kSa+RU0N6g=
+github.com/dapperlabs/cadence-internal v0.42.3-patch.1/go.mod h1:raU8va8QRyTa/eUbhej4mbyW2ETePfSaywoo36MddgE=
 github.com/dapperlabs/testingdock v0.4.4 h1:nDpnEjhs2gNv7rcb70PTfHlL3yr4eQycqp0+oFuhyNg=
 github.com/dapperlabs/testingdock v0.4.4/go.mod h1:HeTbuHG1J4yt4n7NlZSyuk5c5fmyz6hECbyV+36Ku7Q=
 github.com/dave/astrid v0.0.0-20170323122508-8c2895878b14/go.mod h1:Sth2QfxfATb/nW4EsrSi2KyJmbcniZ8TgTaji17D6ms=
