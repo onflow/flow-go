@@ -2,6 +2,7 @@ package database
 
 import (
 	stdErrors "errors"
+	"runtime"
 	"sync"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
@@ -215,18 +216,6 @@ func (db *Database) applyBatch(b *batch) error {
 	return err
 }
 
-// SetRootHash sets the active root hash to a new one
-func (db *Database) SetRootHash(root gethCommon.Hash) error {
-	db.lock.Lock()
-	defer db.lock.Unlock()
-
-	err := db.led.SetValue(db.flowEVMRootAddress[:], []byte(FlowEVMRootHashKey), root[:])
-	if err != nil {
-		return handleError(err)
-	}
-	return nil
-}
-
 // GetRootHash returns the active root hash
 func (db *Database) GetRootHash() (gethCommon.Hash, error) {
 	db.lock.Lock()
@@ -245,17 +234,25 @@ func (db *Database) GetRootHash() (gethCommon.Hash, error) {
 // Commits the changes from atree into the underlying storage
 //
 // this method can be merged as part of batcher
-func (db *Database) Commit() error {
-	err := db.storage.Commit()
+func (db *Database) Commit(root gethCommon.Hash) error {
+	db.lock.Lock()
+	defer db.lock.Unlock()
+
+	err := db.storage.FastCommit(runtime.NumCPU())
 	if err != nil {
 		return types.NewFatalError(err)
+	}
+
+	err = db.led.SetValue(db.flowEVMRootAddress[:], []byte(FlowEVMRootHashKey), root[:])
+	if err != nil {
+		return handleError(err)
 	}
 	return nil
 }
 
-// Close commits db changes
+// Close is a no-op
 func (db *Database) Close() error {
-	return db.Commit()
+	return nil
 }
 
 // NewBatch creates a write-only key-value store that buffers changes to its host
@@ -303,7 +300,7 @@ func (db *Database) Len() int {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	return db.storage.Count()
+	return int(db.atreemap.Count())
 }
 
 // keyvalue is a key-value tuple tagged with a deletion field to allow creating
@@ -350,6 +347,7 @@ func (b *batch) Write() error {
 
 // Reset resets the batch for reuse.
 func (b *batch) Reset() {
+	// TODO: reset writes elements to release memory if value is large.
 	b.writes = b.writes[:0]
 	b.size = 0
 }

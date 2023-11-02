@@ -32,7 +32,7 @@ func TestDatabase(t *testing.T) {
 				err = db.Put(key1, value1)
 				require.NoError(t, err)
 
-				err = db.Commit()
+				err = db.Commit(gethTypes.EmptyRootHash)
 				require.NoError(t, err)
 
 				newdb, err := database.NewDatabase(backend, flowEVMRoot)
@@ -59,7 +59,7 @@ func TestDatabase(t *testing.T) {
 				require.Equal(t, gethTypes.EmptyRootHash, h)
 
 				newRoot := gethCommon.Hash{1, 2, 3}
-				err = newdb.SetRootHash(newRoot)
+				err = newdb.Commit(newRoot)
 				require.NoError(t, err)
 
 				h, err = newdb.GetRootHash()
