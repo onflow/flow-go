@@ -125,10 +125,16 @@ func (m *stateMutator) ApplyServiceEvents(seals []*flow.Seal) error {
 	return nil
 }
 
-// handleServiceEvents handles applying state changes which occur as a result
+// handleServiceEvents applies state changes which occur as a result
 // of service events being included in a block payload:
-//   - inserting incorporated service events
-//   - updating protocol state for the candidate block
+//   - iterating over the sealed service events in order of increasing height
+//   - identifying state-changing service event and calling into the embedded
+//     ProtocolStateMachine to apply the respective state update
+//   - tracking deferred database updates necessary to persist the updated state
+//     and its data dependencies
+//
+// All updates only mutate the internal ProtocolStateMachine's in-memory copy of the
+// protocol state, without changing the parent state (i.e. the state we started from).
 //
 // Consider a chain where a service event is emitted during execution of block A.
 // Block B contains a receipt for A. Block C contains a seal for block A.
@@ -136,7 +142,7 @@ func (m *stateMutator) ApplyServiceEvents(seals []*flow.Seal) error {
 // A <- .. <- B(RA) <- .. <- C(SA)
 //
 // Service events are included within execution results, which are stored
-// opaquely as part of the block payload in block B. We only validate and insert
+// opaquely as part of the block payload in block B. We only validate, process and persist
 // the typed service event to storage once we process C, the block containing the
 // seal for block A. This is because we rely on the sealing subsystem to validate
 // correctness of the service event before processing it.
@@ -144,13 +150,8 @@ func (m *stateMutator) ApplyServiceEvents(seals []*flow.Seal) error {
 // emitted during execution of block A would only become visible when querying
 // C or its descendants.
 //
-// This method will only apply service-event-induced state changes when the
-// input block has the form of block C (ie. contains a seal for a block in
-// which a service event was emitted).
-//
-// All updates that are incorporated in service events are applied to the protocol state by mutating protocol state updater.
-// This method doesn't modify any data from self, all protocol state changes are applied to state updater.
-// All other changes are returned as slice of deferred DB updates.
+// All updates are only applied to the StateMutator's internal in-memory state, but not modify the Protocol State. 
+// All necessary updates to persist the updated state and its data dependencies are returned as slice of deferred DB updates.
 //
 // Return values:
 //   - dbUpdates - If the service events are valid, or there are no service events,

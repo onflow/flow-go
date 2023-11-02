@@ -78,7 +78,7 @@ type MutableProtocolState interface {
 
 // StateMutator is a stateful object to evolve the protocol state. It is instantiated from the parent block's protocol state.
 // State-changing operations can be iteratively applied and the StateMutator will internally evolve its in-memory state.
-// While the StateMutator does not modify the database, it internally tracks all necessary updates. Upon calling `Build`
+// While the StateMutator does not modify the database, it internally tracks all necessary updates. Upon calling `Build`,
 // the StateMutator returns the updated protocol state, its ID and all database updates necessary for persisting the updated
 // protocol state.
 // The StateMutator is used by a replica's compliance layer to update protocol state when observing state-changing service in
