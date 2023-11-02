@@ -908,6 +908,10 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 		{Topic: &validTopic, From: []byte(unknownPeerID)},
 		{Topic: &validTopic, From: []byte(ejectedIdentityPeerID)},
 	}
+	topic := channels.Topic(fmt.Sprintf("%s/%s", channels.PushBlocks, sporkID))
+	// first create 4 valid messages
+	publishMsgs := unittest.GossipSubMessageFixtures(4, topic.String(), unittest.WithFrom(spammer.SpammerNode.ID()))
+	publishMsgs = append(publishMsgs, invalidPublishMsgs...)
 	// ensure expected notifications are disseminated with expected error
 	inspectDisseminatedNotifyFunc := func(spammer *corruptlibp2p.GossipSubRouterSpammer) func(args mockery.Arguments) {
 		return func(args mockery.Arguments) {
@@ -946,7 +950,11 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 	})
 	// set topic oracle to return list with all topics to avoid hasSubscription failures and force topic validation
 	require.NoError(t, validationInspector.SetTopicOracle(func() []string {
-		return []string{validTopic, unknownTopic, malformedTopic, invalidSporkIDTopic}
+		topics := make([]string, len(publishMsgs))
+		for i := 0; i < len(publishMsgs); i++ {
+			topics[i] = publishMsgs[i].GetTopic()
+		}
+		return topics
 	}))
 
 	// after 7 errors encountered disseminate a notification
@@ -981,10 +989,6 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 
 	// prepare to spam - generate control messages
 	ctlMsg := spammer.GenerateCtlMessages(int(controlMessageCount))
-	topic := channels.Topic(fmt.Sprintf("%s/%s", channels.PushBlocks, sporkID))
-	// first create 4 valid messages
-	publishMsgs := unittest.GossipSubMessageFixtures(4, topic.String(), unittest.WithFrom(spammer.SpammerNode.ID()))
-	publishMsgs = append(publishMsgs, invalidPublishMsgs...)
 	// start spamming the victim peer
 	spammer.SpamControlMessage(t, victimNode, ctlMsg, publishMsgs...)
 
