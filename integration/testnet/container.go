@@ -11,6 +11,7 @@ import (
 	"github.com/dapperlabs/testingdock"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
@@ -287,7 +288,11 @@ func (c *Container) Pause() error {
 	ctx, cancel := context.WithTimeout(context.Background(), checkContainerTimeout)
 	defer cancel()
 
-	err := c.net.cli.ContainerStop(ctx, c.ID, &checkContainerTimeout)
+	timeout := int(checkContainerTimeout.Seconds())
+	err := c.net.cli.ContainerStop(ctx, c.ID,
+		container.StopOptions{
+			Timeout: &timeout,
+		})
 	if err != nil {
 		return fmt.Errorf("could not stop container with ID (%s): %w", c.ID, err)
 	}
