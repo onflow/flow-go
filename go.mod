@@ -98,7 +98,7 @@ require (
 )
 
 require (
-	github.com/cockroachdb/pebble v0.0.0-20230829171545-74d4bb649d92
+	github.com/cockroachdb/pebble v0.0.0-20230906160148-46873a6a7a06
 	github.com/coreos/go-semver v0.3.0
 	github.com/go-playground/validator/v10 v10.14.1
 	github.com/golang/snappy v0.0.5-0.20220116011046-fa5810519dcb
