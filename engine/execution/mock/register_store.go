@@ -12,20 +12,6 @@ type RegisterStore struct {
 	mock.Mock
 }
 
-// LastFinalizedAndExecutedHeight provides a mock function with given fields:
-func (_m *RegisterStore) LastFinalizedAndExecutedHeight() uint64 {
-	ret := _m.Called()
-
-	var r0 uint64
-	if rf, ok := ret.Get(0).(func() uint64); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(uint64)
-	}
-
-	return r0
-}
-
 // GetRegister provides a mock function with given fields: height, blockID, register
 func (_m *RegisterStore) GetRegister(height uint64, blockID flow.Identifier, register flow.RegisterID) ([]byte, error) {
 	ret := _m.Called(height, blockID, register)
@@ -74,6 +60,20 @@ func (_m *RegisterStore) IsBlockExecuted(height uint64, blockID flow.Identifier)
 	}
 
 	return r0, r1
+}
+
+// LastFinalizedAndExecutedHeight provides a mock function with given fields:
+func (_m *RegisterStore) LastFinalizedAndExecutedHeight() uint64 {
+	ret := _m.Called()
+
+	var r0 uint64
+	if rf, ok := ret.Get(0).(func() uint64); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	return r0
 }
 
 // OnBlockFinalized provides a mock function with given fields:
