@@ -57,20 +57,29 @@ func (em *Emulator) NewBlockView(ctx types.BlockContext) (types.BlockView, error
 	}, nil
 }
 
+// ReadOnlyBlockView provides a read only view of a block
+// could be used multiple times for queries
 type ReadOnlyBlockView struct {
 	state *gethState.StateDB
 }
 
-// BalanceOf returns the balance of the given account
+// BalanceOf returns the balance of the given address
 func (bv *ReadOnlyBlockView) BalanceOf(address types.Address) (*big.Int, error) {
 	return bv.state.GetBalance(address.ToCommon()), nil
 }
 
-// CodeOf return the code of the given account
+// CodeOf returns the code of the given address
 func (bv *ReadOnlyBlockView) CodeOf(address types.Address) (types.Code, error) {
 	return bv.state.GetCode(address.ToCommon()), nil
 }
 
+// NonceOf returns the nonce of the given address
+func (bv *ReadOnlyBlockView) NonceOf(address types.Address) (uint64, error) {
+	return bv.state.GetNonce(address.ToCommon()), nil
+}
+
+// BlockView allows mutation of the evm state as part of a block
+//
 // TODO: allow block level to do multiple procedure per block
 // TODO: add block commit
 type BlockView struct {
@@ -198,9 +207,12 @@ func (bl *BlockView) RunTransaction(
 
 	msg, err := gethCore.TransactionToMessage(tx, GetSigner(bl.config), proc.config.BlockContext.BaseFee)
 	if err != nil {
-		// note that this is not a fatal errro
+		// note that this is not a fatal error (e.g. due to bad signature)
 		return nil, types.NewEVMExecutionError(err)
 	}
+
+	// update tx context origin
+	proc.evm.TxContext.Origin = msg.From
 
 	res, err := proc.run(msg)
 	if err != nil {
@@ -327,30 +339,42 @@ func (proc *procedure) withdrawFrom(address types.Address, amount *big.Int) (*ty
 }
 
 func (proc *procedure) run(msg *gethCore.Message) (*types.Result, error) {
-	execResult, err := gethCore.NewStateTransition(proc.evm, msg, (*gethCore.GasPool)(&proc.config.BlockContext.GasLimit)).TransitionDb()
+	var res types.Result
+
+	gasPool := (*gethCore.GasPool)(&proc.config.BlockContext.GasLimit)
+	execResult, err := gethCore.NewStateTransition(
+		proc.evm,
+		msg,
+		gasPool,
+	).TransitionDb()
+
+	// if the error is a fatal error don't move forward
 	if err != nil {
-		// this is not a fatal error right now
-		return nil, types.NewEVMExecutionError(err)
+		if types.IsAFatalError(err) {
+			return &res, err
+		}
+		// when pre-checks has failed (non-fatal errors)
+		res.ErrorMessage = err.Error()
+		err = types.NewEVMExecutionError(err)
 	}
 
-	res := &types.Result{
-		ReturnedValue: execResult.ReturnData,
-		GasConsumed:   execResult.UsedGas,
-		Logs:          proc.state.Logs(),
-	}
-
-	// If the transaction created a contract, store the creation address in the receipt.
-	if msg.To == nil {
-		res.DeployedContractAddress = types.NewAddress(gethCrypto.CreateAddress(msg.From, msg.Nonce))
-	}
-
-	if execResult.Failed() {
-		return nil, types.NewEVMExecutionError(execResult.Err)
+	// if prechecks are passed, the exec result won't be nil
+	if execResult != nil {
+		res.ReturnedValue = execResult.ReturnData
+		res.GasConsumed = execResult.UsedGas
+		res.Logs = proc.state.Logs()
+		if execResult.Failed() { // collect vm errors
+			res.Failed = true
+			res.ErrorMessage = execResult.Err.Error()
+		}
+		// If the transaction created a contract, store the creation address in the receipt.
+		if msg.To == nil {
+			res.DeployedContractAddress = types.NewAddress(gethCrypto.CreateAddress(msg.From, msg.Nonce))
+		}
 	}
 
 	res.StateRootHash, err = proc.commit()
-
-	return res, err
+	return &res, err
 }
 
 func directCallMessage(
@@ -379,6 +403,8 @@ func directCallMessage(
 	}
 }
 
+// Ramtin: this is the part of the code that we have to update if we hit performance problems
+// the NewDatabase from the RawDB might have to change.
 func newState(database *database.Database) (*gethState.StateDB, error) {
 	root, err := database.GetRootHash()
 	if err != nil {

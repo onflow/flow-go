@@ -189,7 +189,7 @@ func TestContractInteraction(t *testing.T) {
 
 		})
 
-		t.Run("test sending transactions", func(t *testing.T) {
+		t.Run("test sending transactions (happy case)", func(t *testing.T) {
 			keyHex := "9c647b8b7c4e7c3490668fb6c11473619db80c93704c70893d3813af4090c39c"
 			key, _ := gethCrypto.HexToECDSA(keyHex)
 			address := gethCrypto.PubkeyToAddress(key.PublicKey) // 658bdf435d810c91414ec09147daa6db62406379
@@ -224,14 +224,21 @@ func TestContractInteraction(t *testing.T) {
 						gethCommon.Big1,        // gas price
 						nil,                    // data
 					), signer, key)
-				_, err = blk.RunTransaction(tx)
+				res, err := blk.RunTransaction(tx)
 				require.NoError(t, err)
+				require.Empty(t, res.ErrorMessage)
+
+				// TODO: check why nonce of zero is valid for tx but on check is 4 ?
 
 				// check the balance of coinbase
 				RunWithNewReadOnlyBlockView(t, env, func(blk2 types.ReadOnlyBlockView) {
 					bal, err := blk2.BalanceOf(ctx.GasFeeCollector)
 					require.NoError(t, err)
 					require.Greater(t, bal.Uint64(), coinbaseOrgBalance.Uint64())
+
+					nonce, err := blk2.NonceOf(testAccount)
+					require.NoError(t, err)
+					require.Equal(t, 1, int(nonce))
 				})
 			})
 		})

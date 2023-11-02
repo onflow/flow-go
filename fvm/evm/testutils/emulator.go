@@ -15,6 +15,7 @@ import (
 
 type TestEmulator struct {
 	BalanceOfFunc      func(address types.Address) (*big.Int, error)
+	NonceOfFunc        func(address types.Address) (uint64, error)
 	CodeOfFunc         func(address types.Address) (types.Code, error)
 	MintToFunc         func(address types.Address, amount *big.Int) (*types.Result, error)
 	WithdrawFromFunc   func(address types.Address, amount *big.Int) (*types.Result, error)
@@ -42,6 +43,14 @@ func (em *TestEmulator) BalanceOf(address types.Address) (*big.Int, error) {
 		panic("method not set")
 	}
 	return em.BalanceOfFunc(address)
+}
+
+// NonceOfFunc returns the nonce for this address
+func (em *TestEmulator) NonceOf(address types.Address) (uint64, error) {
+	if em.NonceOfFunc == nil {
+		panic("method not set")
+	}
+	return em.NonceOfFunc(address)
 }
 
 // CodeOf returns the code for this address (if smart contract is deployed at this address)
