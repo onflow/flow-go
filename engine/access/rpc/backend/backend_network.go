@@ -85,13 +85,13 @@ func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(ctx context.Context, 
 	snapshotByBlockId := b.state.AtBlockID(blockID)
 	head, _ := snapshotByBlockId.Head()
 
-	snapshotByHeight := b.state.AtHeight(head.Height)
-
-	if snapshotByHeight != snapshotByBlockId {
+	if head.ID() != blockID {
 		return nil, status.Errorf(codes.Internal, "Snapshot for non-finalized block ")
 	}
 
-	validSnapshot, err := b.getValidSnapshot(snapshotByBlockId, 0)
+	snapshotByHeight := b.state.AtHeight(head.Height)
+
+	validSnapshot, err := b.getValidSnapshot(snapshotByHeight, 0)
 	if err != nil {
 		return nil, err
 	}
