@@ -99,7 +99,7 @@ jobs:
           cache: true
       - name: Set Test Matrix
         id: set-test-matrix
-        run: go run utils/test_matrix/test_matrix.go admin cmd consensus engine:buildjet-16vcpu-ubuntu-2204 fvm ledger module network/test:buildjet-16vcpu-ubuntu-2204 network/p2p:buildjet-16vcpu-ubuntu-2204 utils
+        run: go run utils/test_matrix/test_matrix.go admin cmd consensus engine/access engine/collection engine/common engine/consensus engine/execution engine/verification fvm ledger module network/test:buildjet-16vcpu-ubuntu-2204 network/p2p:buildjet-16vcpu-ubuntu-2204 utils
 
   unit-test:
     name: Unit Tests (${{ matrix.targets.name }})
