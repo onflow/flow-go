@@ -110,7 +110,7 @@ func (err DatabaseError) Error() string {
 
 // IsDatabaseError returns true if the error or any underlying errors
 // is of the type EVM validation error
-func IsDatabaseError(err error) bool {
+func IsADatabaseError(err error) bool {
 	return errors.As(err, &DatabaseError{})
 }
 
