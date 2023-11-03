@@ -249,12 +249,8 @@ func (proc *procedure) run(msg *gethCore.Message, txType uint8) (*types.Result, 
 	).TransitionDb()
 	if err != nil {
 		res.Failed = true
-		// if the error is a fatal error return it
-		if types.IsAFatalError(err) {
-			return &res, err
-		}
-		// if is a non-fatal database error return it
-		if types.IsADatabaseError(err) {
+		// if the error is a fatal error or a non-fatal database error return it
+		if types.IsAFatalError(err) || types.IsADatabaseError(err) {
 			return &res, err
 		}
 		// otherwise is a validation error (pre-check failure)
