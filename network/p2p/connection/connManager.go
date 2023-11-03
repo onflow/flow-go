@@ -63,6 +63,10 @@ func (cm *ConnManager) Notifee() network.Notifiee {
 	return cm.n
 }
 
+func (cm *ConnManager) CheckLimit(l connmgr.GetConnLimiter) error {
+	return cm.basicConnMgr.CheckLimit(l)
+}
+
 func (cm *ConnManager) Protect(id peer.ID, tag string) {
 	cm.basicConnMgr.Protect(id, tag)
 }
