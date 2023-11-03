@@ -1,7 +1,6 @@
 package protocol_state
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
