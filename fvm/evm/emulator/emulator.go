@@ -46,7 +46,7 @@ func (em *Emulator) NewReadOnlyBlockView(ctx types.BlockContext) (types.ReadOnly
 	}, err
 }
 
-// NewBlockView constructs a new block (mutable)
+// NewBlockView constructs a new block view (mutable)
 func (em *Emulator) NewBlockView(ctx types.BlockContext) (types.BlockView, error) {
 	cfg := newConfig(ctx)
 	return &BlockView{
@@ -78,8 +78,8 @@ func (bv *ReadOnlyBlockView) NonceOf(address types.Address) (uint64, error) {
 
 // BlockView allows mutation of the evm state as part of a block
 //
-// TODO: allow block level to do multiple procedure per block
-// TODO: add block commit
+// TODO: allow  multiple calls per block view
+// TODO: add block level commit (separation of trie commit to storage)
 type BlockView struct {
 	config   *Config
 	database types.Database
@@ -164,7 +164,6 @@ type procedure struct {
 }
 
 // commit commits the changes to the state.
-// if error is returned is a fatal one.
 func (proc *procedure) commit() (gethCommon.Hash, error) {
 	// commits the changes from the journal into the in memory trie.
 	// in the future if we want to move this to the block level we could use finalize
@@ -178,7 +177,7 @@ func (proc *procedure) commit() (gethCommon.Hash, error) {
 	// the reason we have to do this, is the original database
 	// is designed to keep changes in memory until the state.Commit
 	// is called then the changes moves into the trie, but the trie
-	// would stay in memory for faster trasnaction execution. you
+	// would stay in memory for faster transaction execution. you
 	// have to explicitly ask the trie to commit to the underlying storage
 	err = proc.state.Database().TrieDB().Commit(newRoot, false)
 	if err != nil {
