@@ -381,4 +381,8 @@ func TestContinuati(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, value, uint64(0x0001010000000000))
 
+	value, err = uuids.GenerateUUID()
+	require.NoError(t, err)
+	require.Equal(t, value, uint64(0x0001010000000001))
+
 }
