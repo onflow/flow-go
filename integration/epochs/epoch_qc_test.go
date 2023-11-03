@@ -54,8 +54,7 @@ func (s *Suite) TestEpochQuorumCertificate() {
 	s.StartVoting(clustering, clusterCount, nodesPerCluster)
 
 	// vote message to be signed with staking key
-	header := unittest.BlockHeaderFixture()
-	blockID := header.ID()
+	blockID := unittest.IdentifierFixture()
 	view := uint64(rand.Uint32())
 	voteMessage := hotstuffver.MakeVoteMessage(view, blockID)
 
