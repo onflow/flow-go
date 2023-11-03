@@ -76,8 +76,7 @@ type Backend struct {
 	connFactory       connection.ConnectionFactory
 
 	// cache the response to GetNodeVersionInfo since it doesn't change
-	nodeInfo  *access.NodeVersionInfo
-	SignalCtx irrecoverable.SignalerContext
+	nodeInfo *access.NodeVersionInfo
 }
 
 type Params struct {

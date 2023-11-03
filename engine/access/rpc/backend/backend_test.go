@@ -25,6 +25,7 @@ import (
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
@@ -396,29 +397,41 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_HistoryLimit() {
 func (suite *Suite) TestGetLatestSealedBlockHeader() {
 	// setup the mocks
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
-
-	block := unittest.BlockHeaderFixture()
-	suite.snapshot.On("Head").Return(block, nil).Once()
-
 	suite.state.On("Sealed").Return(suite.snapshot, nil)
-	suite.snapshot.On("Head").Return(block, nil).Once()
 
 	params := suite.defaultBackendParams()
 
 	backend, err := New(params)
 	suite.Require().NoError(err)
 
-	// query the handler for the latest sealed block
-	header, stat, err := backend.GetLatestBlockHeader(context.Background(), true)
-	suite.checkResponse(header, err)
+	suite.Run("GetLatestSealedBlockHeader - happy path", func() {
+		block := unittest.BlockHeaderFixture()
+		suite.snapshot.On("Head").Return(block, nil).Once()
+		suite.snapshot.On("Head").Return(block, nil).Once()
 
-	// make sure we got the latest sealed block
-	suite.Require().Equal(block.ID(), header.ID())
-	suite.Require().Equal(block.Height, header.Height)
-	suite.Require().Equal(block.ParentID, header.ParentID)
-	suite.Require().Equal(stat, flow.BlockStatusSealed)
+		// query the handler for the latest sealed block
+		header, stat, err := backend.GetLatestBlockHeader(context.Background(), true)
+		suite.checkResponse(header, err)
 
-	suite.assertAllExpectations()
+		// make sure we got the latest sealed block
+		suite.Require().Equal(block.ID(), header.ID())
+		suite.Require().Equal(block.Height, header.Height)
+		suite.Require().Equal(block.ParentID, header.ParentID)
+		suite.Require().Equal(stat, flow.BlockStatusSealed)
+
+		suite.assertAllExpectations()
+	})
+
+	suite.Run(fmt.Sprintf("GetLatestSealedBlockHeader - fails with %v", "inconsistent node`s state"), func() {
+		err := fmt.Errorf("inconsistent node`s state")
+		suite.snapshot.On("Head").Return(nil, err)
+
+		// mock signaler context expect an error
+		backend.backendBlockHeaders.ctx = irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), err)
+
+		_, _, err = backend.GetLatestBlockHeader(context.Background(), true)
+		suite.Require().Error(err)
+	})
 }
 
 func (suite *Suite) TestGetTransaction() {
@@ -477,8 +490,6 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 	blockId := block.ID()
 	index := uint32(0)
 
-	suite.snapshot.On("Head").Return(block.Header, nil)
-
 	// block storage returns the corresponding block
 	suite.blocks.
 		On("ByID", blockId).
@@ -486,11 +497,11 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 
 	_, fixedENIDs := suite.setupReceipts(&block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
-	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
+	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil).Maybe()
 
 	// create a mock connection factory
 	connFactory := connectionmock.NewConnectionFactory(suite.T())
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil).Maybe()
 
 	exeEventReq := &execproto.GetTransactionByIndexRequest{
 		BlockId: blockId[:],
@@ -511,20 +522,31 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 
 	suite.execClient.
 		On("GetTransactionResultByIndex", ctx, exeEventReq).
-		Return(exeEventResp, nil).
-		Once()
+		Return(exeEventResp, nil)
 
-	result, err := backend.GetTransactionResultByIndex(ctx, blockId, index, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
-	suite.checkResponse(result, err)
-	suite.Assert().Equal(result.BlockHeight, block.Header.Height)
+	suite.Run("TestGetTransactionResultByIndex - happy path", func() {
+		suite.snapshot.On("Head").Return(block.Header, nil).Once()
+		result, err := backend.GetTransactionResultByIndex(ctx, blockId, index, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+		suite.checkResponse(result, err)
+		suite.Assert().Equal(result.BlockHeight, block.Header.Height)
 
-	suite.assertAllExpectations()
+		suite.assertAllExpectations()
+	})
+
+	suite.Run(fmt.Sprintf("TestGetTransactionResultByIndex - fails with %v", "inconsistent node`s state"), func() {
+		err := fmt.Errorf("inconsistent node`s state")
+		suite.snapshot.On("Head").Return(nil, err)
+
+		// mock signaler context expect an error
+		backend.backendTransactions.ctx = irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), err)
+
+		_, err = backend.GetTransactionResultByIndex(ctx, blockId, index, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+		suite.Require().Error(err)
+	})
 }
 
 func (suite *Suite) TestGetTransactionResultsByBlockID() {
-	head := unittest.BlockHeaderFixture()
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
-	suite.snapshot.On("Head").Return(head, nil).Maybe()
 
 	ctx := context.Background()
 	block := unittest.BlockFixture()
@@ -561,13 +583,28 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 
 	suite.execClient.
 		On("GetTransactionResultsByBlockID", ctx, exeEventReq).
-		Return(exeEventResp, nil).
-		Once()
+		Return(exeEventResp, nil)
 
-	result, err := backend.GetTransactionResultsByBlockID(ctx, blockId, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
-	suite.checkResponse(result, err)
+	suite.Run("GetTransactionResultsByBlockID - happy path", func() {
+		head := unittest.BlockHeaderFixture()
+		suite.snapshot.On("Head").Return(head, nil).Once()
 
-	suite.assertAllExpectations()
+		result, err := backend.GetTransactionResultsByBlockID(ctx, blockId, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+		suite.checkResponse(result, err)
+
+		suite.assertAllExpectations()
+	})
+
+	suite.Run(fmt.Sprintf("GetTransactionResultsByBlockID - fails with %v", "inconsistent node`s state"), func() {
+		err := fmt.Errorf("inconsistent node`s state")
+		suite.snapshot.On("Head").Return(nil, err)
+
+		// mock signaler context expect an error
+		backend.backendTransactions.ctx = irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), err)
+
+		_, err = backend.GetTransactionResultsByBlockID(ctx, blockId, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+		suite.Require().Error(err)
+	})
 }
 
 // TestTransactionStatusTransition tests that the status of transaction changes from Finalized to Sealed
@@ -944,40 +981,53 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 
-	// setup the mocks
-	expected := unittest.BlockFixture()
-	header := expected.Header
-
-	suite.snapshot.
-		On("Head").
-		Return(header, nil).Once()
-
-	headerClone := *header
-	headerClone.Height = 0
-
-	suite.snapshot.
-		On("Head").
-		Return(&headerClone, nil).
-		Once()
-
-	suite.blocks.
-		On("ByHeight", header.Height).
-		Return(&expected, nil)
-
 	params := suite.defaultBackendParams()
 
 	backend, err := New(params)
 	suite.Require().NoError(err)
 
-	// query the handler for the latest finalized header
-	actual, stat, err := backend.GetLatestBlock(context.Background(), false)
-	suite.checkResponse(actual, err)
+	suite.Run("GetLatestFinalizedBlock - happy path", func() {
+		// setup the mocks
+		expected := unittest.BlockFixture()
+		header := expected.Header
 
-	// make sure we got the latest header
-	suite.Require().Equal(expected, *actual)
-	suite.Assert().Equal(stat, flow.BlockStatusFinalized)
+		suite.snapshot.
+			On("Head").
+			Return(header, nil).Once()
 
-	suite.assertAllExpectations()
+		headerClone := *header
+		headerClone.Height = 0
+
+		suite.snapshot.
+			On("Head").
+			Return(&headerClone, nil).
+			Once()
+
+		suite.blocks.
+			On("ByHeight", header.Height).
+			Return(&expected, nil)
+
+		// query the handler for the latest finalized header
+		actual, stat, err := backend.GetLatestBlock(context.Background(), false)
+		suite.checkResponse(actual, err)
+
+		// make sure we got the latest header
+		suite.Require().Equal(expected, *actual)
+		suite.Assert().Equal(stat, flow.BlockStatusFinalized)
+
+		suite.assertAllExpectations()
+	})
+
+	suite.Run(fmt.Sprintf("GetLatestFinalizedBlock - fails with %v", "inconsistent node`s state"), func() {
+		err := fmt.Errorf("inconsistent node`s state")
+		suite.snapshot.On("Head").Return(nil, err)
+
+		// mock signaler context expect an error
+		backend.backendBlockDetails.ctx = irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), err)
+
+		_, _, err = backend.GetLatestBlock(context.Background(), false)
+		suite.Require().Error(err)
+	})
 }
 
 type mockCloser struct{}
@@ -1260,7 +1310,6 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 }
 
 func (suite *Suite) TestGetEventsForHeightRange() {
-
 	ctx := context.Background()
 	const minHeight uint64 = 5
 	const maxHeight uint64 = 10
@@ -1375,6 +1424,31 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 
 		return results
 	}
+
+	suite.Run("inconsistent node`s state", func() {
+		headHeight = maxHeight - 1
+		setupHeadHeight(headHeight)
+
+		// setup mocks
+		stateParams.On("SporkID").Return(unittest.IdentifierFixture(), nil)
+		stateParams.On("ProtocolVersion").Return(uint(unittest.Uint64InRange(10, 30)), nil)
+		stateParams.On("SporkRootBlockHeight").Return(headHeight, nil)
+		stateParams.On("SealedRoot").Return(head, nil)
+
+		params := suite.defaultBackendParams()
+		params.State = state
+
+		backend, err := New(params)
+		suite.Require().NoError(err)
+
+		backend.backendEvents.ctx = irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), err)
+		err = fmt.Errorf("inconsistent node`s state")
+		snapshot.On("Head").Return(nil, err)
+
+		_, err = backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight,
+			entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+		suite.Require().Error(err)
+	})
 
 	connFactory := suite.setupConnectionFactory()
 
