@@ -1,13 +1,13 @@
 package emulator_test
 
 import (
+	"fmt"
 	"math"
 	"math/big"
 	"testing"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
-	gethCrypto "github.com/ethereum/go-ethereum/crypto"
 	gethParams "github.com/ethereum/go-ethereum/params"
 	"github.com/stretchr/testify/require"
 
@@ -199,11 +199,8 @@ func TestContractInteraction(t *testing.T) {
 		})
 
 		t.Run("test sending transactions (happy case)", func(t *testing.T) {
-			keyHex := "9c647b8b7c4e7c3490668fb6c11473619db80c93704c70893d3813af4090c39c"
-			key, _ := gethCrypto.HexToECDSA(keyHex)
-			address := gethCrypto.PubkeyToAddress(key.PublicKey) // 658bdf435d810c91414ec09147daa6db62406379
-			fAddr := types.NewAddress(address)
-
+			account := testutils.GetTestEOAAccount(t, testutils.EOATestAccount1KeyHex)
+			fAddr := account.Address()
 			RunWithNewEmulator(t, db, func(env *emulator.Emulator) {
 				RunWithNewBlockView(t, env, func(blk types.BlockView) {
 					_, err := blk.DirectCall(types.NewDepositCall(fAddr, amount))
@@ -223,16 +220,15 @@ func TestContractInteraction(t *testing.T) {
 
 				blk, err := env.NewBlockView(ctx)
 				require.NoError(t, err)
-				signer := emulator.GetDefaultSigner()
-				tx, _ := gethTypes.SignTx(
-					gethTypes.NewTransaction(
-						0,                      // nonce
-						testAccount.ToCommon(), // to
-						big.NewInt(1000),       // amount
-						gethParams.TxGas,       // gas limit
-						gethCommon.Big1,        // gas price
-						nil,                    // data
-					), signer, key)
+				tx := account.PrepareAndSignTx(
+					t,
+					testAccount.ToCommon(), // to
+					nil,                    // data
+					big.NewInt(1000),       // amount
+					gethParams.TxGas,       // gas limit
+					gethCommon.Big1,        // gas fee
+
+				)
 				_, err = blk.RunTransaction(tx)
 				require.NoError(t, err)
 
@@ -248,6 +244,58 @@ func TestContractInteraction(t *testing.T) {
 				})
 			})
 		})
+		t.Run("test sending transactions (invalid nonce)", func(t *testing.T) {
+			account := testutils.GetTestEOAAccount(t, testutils.EOATestAccount1KeyHex)
+			fAddr := account.Address()
+			RunWithNewEmulator(t, db, func(env *emulator.Emulator) {
+				RunWithNewBlockView(t, env, func(blk types.BlockView) {
+					_, err := blk.DirectCall(types.NewDepositCall(fAddr, amount))
+					require.NoError(t, err)
+				})
+			})
+
+			RunWithNewEmulator(t, db, func(env *emulator.Emulator) {
+				ctx := types.NewDefaultBlockContext(blockNumber.Uint64())
+				blk, err := env.NewBlockView(ctx)
+				require.NoError(t, err)
+				tx := account.SignTx(t,
+					gethTypes.NewTransaction(
+						100,                    // nonce
+						testAccount.ToCommon(), // to
+						big.NewInt(1000),       // amount
+						gethParams.TxGas,       // gas limit
+						gethCommon.Big1,        // gas fee
+						nil,                    // data
+					),
+				)
+				_, err = blk.RunTransaction(tx)
+				require.Error(t, err)
+				require.True(t, types.IsEVMValidationError(err))
+			})
+		})
+
+		t.Run("test sending transactions (bad signature)", func(t *testing.T) {
+			RunWithNewEmulator(t, db, func(env *emulator.Emulator) {
+				ctx := types.NewDefaultBlockContext(blockNumber.Uint64())
+				blk, err := env.NewBlockView(ctx)
+				require.NoError(t, err)
+				tx := gethTypes.NewTx(&gethTypes.LegacyTx{
+					Nonce:    0,
+					GasPrice: gethCommon.Big1,
+					Gas:      gethParams.TxGas, // gas limit
+					To:       nil,              // to
+					Value:    big.NewInt(1000), // amount
+					Data:     nil,              // data
+					V:        big.NewInt(1),
+					R:        big.NewInt(2),
+					S:        big.NewInt(3),
+				})
+				_, err = blk.RunTransaction(tx)
+				require.Error(t, err)
+				require.True(t, types.IsEVMValidationError(err))
+			})
+		})
+
 	})
 }
 
@@ -282,6 +330,41 @@ func TestTransfers(t *testing.T) {
 				bal, err = blk.BalanceOf(testAccount1)
 				require.NoError(t, err)
 				require.Equal(t, new(big.Int).Sub(amount, amountToBeTransfered).Uint64(), bal.Uint64())
+			})
+		})
+	})
+}
+
+func TestDatabaseErrorHandling(t *testing.T) {
+
+	t.Run("test non-fatal db error handling", func(t *testing.T) {
+		db := &testutils.TestDatabase{
+			GetRootHashFunc: func() (gethCommon.Hash, error) {
+				return gethTypes.EmptyRootHash, types.NewDatabaseError(fmt.Errorf("some non-fatal error"))
+			},
+		}
+
+		RunWithNewEmulator(t, db, func(em *emulator.Emulator) {
+			RunWithNewBlockView(t, em, func(blk types.BlockView) {
+				_, err := blk.DirectCall(types.NewDepositCall(types.EmptyAddress, big.NewInt(1)))
+				require.Error(t, err)
+				require.True(t, types.IsADatabaseError(err))
+			})
+		})
+	})
+
+	t.Run("test fatal db error handling", func(t *testing.T) {
+		db := &testutils.TestDatabase{
+			GetRootHashFunc: func() (gethCommon.Hash, error) {
+				return gethTypes.EmptyRootHash, types.NewFatalError(fmt.Errorf("some non-fatal error"))
+			},
+		}
+
+		RunWithNewEmulator(t, db, func(em *emulator.Emulator) {
+			RunWithNewBlockView(t, em, func(blk types.BlockView) {
+				_, err := blk.DirectCall(types.NewDepositCall(types.EmptyAddress, big.NewInt(1)))
+				require.Error(t, err)
+				require.True(t, types.IsAFatalError(err))
 			})
 		})
 	})

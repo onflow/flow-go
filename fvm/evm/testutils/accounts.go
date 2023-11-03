@@ -60,22 +60,41 @@ func (a *EOATestAccount) PrepareAndSignTx(
 	gasLimit uint64,
 	gasFee *big.Int,
 ) *gethTypes.Transaction {
-
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
-	tx, err := gethTypes.SignTx(
+	tx := a.signTx(
+		t,
 		gethTypes.NewTransaction(
 			a.nonce,
 			to,
 			amount,
 			gasLimit,
 			gasFee,
-			data),
-		a.signer, a.key)
-	require.NoError(t, err)
+			data,
+		),
+	)
 	a.nonce++
 
+	return tx
+}
+
+func (a *EOATestAccount) SignTx(
+	t testing.TB,
+	tx *gethTypes.Transaction,
+) *gethTypes.Transaction {
+	a.lock.Lock()
+	defer a.lock.Unlock()
+
+	return a.signTx(t, tx)
+}
+
+func (a *EOATestAccount) signTx(
+	t testing.TB,
+	tx *gethTypes.Transaction,
+) *gethTypes.Transaction {
+	tx, err := gethTypes.SignTx(tx, a.signer, a.key)
+	require.NoError(t, err)
 	return tx
 }
 
