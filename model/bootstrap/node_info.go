@@ -395,7 +395,7 @@ func Sort(nodes []NodeInfo, order flow.IdentityOrder) []NodeInfo {
 	dup := make([]NodeInfo, len(nodes))
 	copy(dup, nodes)
 	sort.Slice(dup, func(i, j int) bool {
-		return order(dup[i].Identity(), dup[j].Identity())
+		return order(dup[i].Identity(), dup[j].Identity()) < 0
 	})
 	return dup
 }

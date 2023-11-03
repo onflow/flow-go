@@ -86,13 +86,18 @@ func (limiter TransactionStorageLimiter) getStorageCheckAddresses(
 		addresses = append(addresses, address)
 	}
 
-	slices.SortFunc(
-		addresses,
-		func(a flow.Address, b flow.Address) bool {
-			// reverse order to maintain compatibility with previous
-			// implementation.
-			return bytes.Compare(a[:], b[:]) >= 0
-		})
+	slices.SortFunc(addresses, func(a flow.Address, b flow.Address) int {
+		switch {
+		// reverse order to maintain compatibility with previous
+		// implementation.
+		case bytes.Compare(a[:], b[:]) < 0:
+			return +1
+		case bytes.Compare(a[:], b[:]) > 0:
+			return -1
+		default:
+			return 0
+		}
+	})
 	return addresses
 }
 

@@ -239,8 +239,15 @@ func (s *CacheSuite) TestConcurrentAdd() {
 	unittest.RequireReturnsBefore(s.T(), wg.Wait, time.Millisecond*500, "should submit blocks before timeout")
 
 	require.Len(s.T(), allCertifiedBlocks, len(blocks)-1)
-	slices.SortFunc(allCertifiedBlocks, func(lhs *flow.Block, rhs *flow.Block) bool {
-		return lhs.Header.Height < rhs.Header.Height
+	slices.SortFunc(allCertifiedBlocks, func(lhs *flow.Block, rhs *flow.Block) int {
+		switch {
+		case lhs.Header.View < rhs.Header.View:
+			return -1 // SortFunc expects cmp(lhs, rhs) < 0 if lhs < rhs
+		case lhs.Header.View > rhs.Header.View:
+			return 1 // SortFunc expects cmp(lhs, rhs) > 0 if lhs > rhs
+		default:
+			return 0 // SortFunc expects cmp(lhs, rhs) == 0 if lhs == rhs
+		}
 	})
 	require.Equal(s.T(), blocks[:len(blocks)-1], allCertifiedBlocks)
 }

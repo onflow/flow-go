@@ -289,7 +289,10 @@ func (iy *Identity) EqualTo(other *Identity) bool {
 type IdentityFilter func(*Identity) bool
 
 // IdentityOrder is a sort for identities.
-type IdentityOrder func(*Identity, *Identity) bool
+// It returns a negative number if the first identity should be ordered before the second,
+// a positive number if the first identity should be ordered after the second,
+// and zero if the two identities are equal in order.
+type IdentityOrder func(*Identity, *Identity) int
 
 // IdentityMapFunc is a modifier function for map operations for identities.
 // Identities are COPIED from the source slice.
@@ -524,8 +527,8 @@ func (il IdentityList) Union(other IdentityList) IdentityList {
 		}
 	}
 
-	slices.SortFunc(union, func(a, b *Identity) bool {
-		return bytes.Compare(a.NodeID[:], b.NodeID[:]) < 0
+	slices.SortFunc(union, func(a, b *Identity) int {
+		return bytes.Compare(a.NodeID[:], b.NodeID[:])
 	})
 
 	return union
