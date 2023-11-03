@@ -1,7 +1,6 @@
 package validation_test
 
 import (
-	"context"
 	"fmt"
 	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	"github.com/onflow/flow-go/network/p2p/p2pconf"
@@ -14,7 +13,6 @@ import (
 
 	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network"
@@ -32,7 +30,6 @@ func TestNewControlMsgValidationInspector(t *testing.T) {
 		require.NoError(t, err, "failed to get default flow config")
 		distributor := mockp2p.NewGossipSubInspectorNotifDistributor(t)
 		idProvider := mockmodule.NewIdentityProvider(t)
-		signalerCtx := irrecoverable.NewMockSignalerContext(t, context.Background())
 		inspector, err := validation.NewControlMsgValidationInspector(&validation.InspectorParams{
 			Logger:                  unittest.Logger(),
 			SporkID:                 sporkID,
@@ -594,7 +591,6 @@ func TestControlMessageValidationInspector_ActiveClustersChanged(t *testing.T) {
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(t, err, "failed to get default flow config")
 	distributor := mockp2p.NewGossipSubInspectorNotifDistributor(t)
-	signalerCtx := irrecoverable.NewMockSignalerContext(t, context.Background())
 	idProvider := mockmodule.NewIdentityProvider(t)
 	identity := unittest.IdentityFixture()
 	idProvider.On("ByPeerID", mock.AnythingOfType("peer.ID")).Return(identity, true).Times(5)
@@ -630,7 +626,6 @@ func inspectorFixture(t *testing.T, opts ...func(*validation.InspectorParams)) (
 	require.NoError(t, err, "failed to get default flow config")
 	distributor := mockp2p.NewGossipSubInspectorNotifDistributor(t)
 	idProvider := mockmodule.NewIdentityProvider(t)
-	signalerCtx := irrecoverable.NewMockSignalerContext(t, context.Background())
 	rpcTracker := mockp2p.NewRpcControlTracking(t)
 	params := &validation.InspectorParams{
 		Logger:                  unittest.Logger(),

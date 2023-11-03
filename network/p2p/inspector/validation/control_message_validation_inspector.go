@@ -242,6 +242,8 @@ func (c *ControlMsgValidationInspector) ProcessInspectRPCReq(req *InspectRPCRequ
 //
 // Returns:
 //   - error: if the peer ID cannot be created from bytes, sender is unknown or the identity is ejected.
+//
+// All errors returned from this function can be considered benign.
 func (c *ControlMsgValidationInspector) checkPubsubMessageSender(message *pubsub_pb.Message) error {
 	pid, err := peer.IDFromBytes(message.GetFrom())
 	if err != nil {

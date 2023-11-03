@@ -455,16 +455,34 @@ func GenerateRandomStringWithLen(commentLen uint) string {
 
 // PeerIdFixture creates a random and unique peer ID (libp2p node ID).
 func PeerIdFixture(t *testing.T) peer.ID {
-	key, err := generateNetworkingKey(IdentifierFixture())
+	peerID, err := peerIDFixture()
 	require.NoError(t, err)
+	return peerID
+}
 
+// PeerIdFixtureB benchmark PeerIDFixture.
+func PeerIdFixtureB(b *testing.B) peer.ID {
+	peerID, err := peerIDFixture()
+	require.NoError(b, err)
+	return peerID
+}
+
+func peerIDFixture() (peer.ID, error) {
+	key, err := generateNetworkingKey(IdentifierFixture())
+	if err != nil {
+		return "", err
+	}
 	pubKey, err := keyutils.LibP2PPublicKeyFromFlow(key.PublicKey())
-	require.NoError(t, err)
+	if err != nil {
+		return "", err
+	}
 
 	peerID, err := peer.IDFromPublicKey(pubKey)
-	require.NoError(t, err)
+	if err != nil {
+		return "", err
+	}
 
-	return peerID
+	return peerID, nil
 }
 
 // generateNetworkingKey generates a Flow ECDSA key using the given seed
