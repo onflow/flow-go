@@ -219,6 +219,8 @@ func New(params Params) (*Backend, error) {
 	return b, nil
 }
 
+// HandleInconsistentProtocolState is helper function that initializes an irrecoverable SignalerContext for backends
+// and makes it available to endpoints handling inconsistent or corrupted node's state.
 func (b *Backend) HandleInconsistentProtocolState(ctx irrecoverable.SignalerContext) {
 	b.backendTransactions.ctx = ctx
 	b.backendAccounts.ctx = ctx

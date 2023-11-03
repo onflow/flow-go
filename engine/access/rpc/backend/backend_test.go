@@ -422,6 +422,7 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 		suite.assertAllExpectations()
 	})
 
+	// tests that signaler context received error when node state is inconsistent
 	suite.Run(fmt.Sprintf("GetLatestSealedBlockHeader - fails with %v", "inconsistent node`s state"), func() {
 		err := fmt.Errorf("inconsistent node`s state")
 		suite.snapshot.On("Head").Return(nil, err)
@@ -533,6 +534,7 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 		suite.assertAllExpectations()
 	})
 
+	// tests that signaler context received error when node state is inconsistent
 	suite.Run(fmt.Sprintf("TestGetTransactionResultByIndex - fails with %v", "inconsistent node`s state"), func() {
 		err := fmt.Errorf("inconsistent node`s state")
 		suite.snapshot.On("Head").Return(nil, err)
@@ -595,6 +597,7 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 		suite.assertAllExpectations()
 	})
 
+	// tests that signaler context received error when node state is inconsistent
 	suite.Run(fmt.Sprintf("GetTransactionResultsByBlockID - fails with %v", "inconsistent node`s state"), func() {
 		err := fmt.Errorf("inconsistent node`s state")
 		suite.snapshot.On("Head").Return(nil, err)
@@ -1018,6 +1021,7 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 		suite.assertAllExpectations()
 	})
 
+	// tests that signaler context received error when node state is inconsistent
 	suite.Run(fmt.Sprintf("GetLatestFinalizedBlock - fails with %v", "inconsistent node`s state"), func() {
 		err := fmt.Errorf("inconsistent node`s state")
 		suite.snapshot.On("Head").Return(nil, err)
@@ -1425,6 +1429,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		return results
 	}
 
+	// tests that signaler context received error when node state is inconsistent
 	suite.Run("inconsistent node`s state", func() {
 		headHeight = maxHeight - 1
 		setupHeadHeight(headHeight)
