@@ -2,7 +2,6 @@ package protocol_state
 
 import (
 	"fmt"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
@@ -84,6 +83,26 @@ func (s *MutableProtocolState) Mutator(candidateView uint64, parentID flow.Ident
 	if err != nil {
 		return nil, fmt.Errorf("could not query parent protocol state at block (%x): %w", parentID, err)
 	}
-	return newStateMutator(s.headers, s.results, s.setups, s.commits,
-		newStateMachine(candidateView, parentState)), nil
+	var stateMachine ProtocolStateMachine
+	if parentState.InvalidStateTransitionAttempted {
+		stateMachine, err = newEpochFallbackStateMachine(candidateView, parentState)
+		if err != nil {
+			return nil, fmt.Errorf("could not create epoch fallback state machine at view (%d): %w", candidateView, err)
+		}
+	} else {
+		stateMachine, err = newStateMachine(candidateView, parentState)
+		if err != nil {
+			return nil, fmt.Errorf("could not create protocol state machine at view (%d): %w", candidateView, err)
+		}
+	}
+	return newStateMutator(
+		s.headers,
+		s.results,
+		s.setups,
+		s.commits,
+		stateMachine,
+		func(baseStateMachine ProtocolStateMachine) (ProtocolStateMachine, error) {
+			return transitionToEpochFallbackStateMachine(baseStateMachine)
+		},
+	), nil
 }

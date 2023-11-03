@@ -1,6 +1,9 @@
 package protocol_state
 
-import "github.com/onflow/flow-go/model/flow"
+import (
+	"fmt"
+	"github.com/onflow/flow-go/model/flow"
+)
 
 // ProtocolStateMachine implements a low-level interface for state-changing operations on the protocol state.
 // It is used by higher level logic to evolve the protocol state when certain events that are stored in blocks are observed.
@@ -30,9 +33,6 @@ type ProtocolStateMachine interface {
 	//       This is incompatible with the design doc, and needs to be updated to modify current/next epoch separately
 	// No errors are expected during normal operations.
 	UpdateIdentity(updated *flow.DynamicIdentityEntry) error
-	// SetInvalidStateTransitionAttempted sets a flag indicating that invalid state transition was attempted.
-	// Such transition can be detected by compliance layer.
-	SetInvalidStateTransitionAttempted()
 	// TransitionToNextEpoch discards current protocol state and transitions to the next epoch.
 	// Epoch transition is only allowed when:
 	// - next epoch has been set up,
@@ -45,4 +45,87 @@ type ProtocolStateMachine interface {
 	View() uint64
 	// ParentState returns parent protocol state that is associated with this state updater.
 	ParentState() *flow.RichProtocolStateEntry
+}
+
+type baseProtocolStateMachine struct {
+	parentState *flow.RichProtocolStateEntry
+	state       *flow.ProtocolStateEntry
+	view        uint64
+
+	// The following fields are maps from NodeID → DynamicIdentityEntry for the nodes that are *active* in the respective epoch.
+	// Active means that these nodes are authorized to contribute to extending the chain. Formally, a node is active if and only
+	// if it is listed in the EpochSetup event for the respective epoch. Note that map values are pointers, so writes to map values
+	// will modify the respective DynamicIdentityEntry in EpochStateContainer.
+
+	prevEpochIdentitiesLookup    map[flow.Identifier]*flow.DynamicIdentityEntry // lookup for nodes active in the previous epoch, may be nil or empty
+	currentEpochIdentitiesLookup map[flow.Identifier]*flow.DynamicIdentityEntry // lookup for nodes active in the current epoch, never nil or empty
+	nextEpochIdentitiesLookup    map[flow.Identifier]*flow.DynamicIdentityEntry // lookup for nodes active in the next epoch, may be nil or empty
+}
+
+// Build returns updated protocol state entry, state ID and a flag indicating if there were any changes.
+func (u *baseProtocolStateMachine) Build() (updatedState *flow.ProtocolStateEntry, stateID flow.Identifier, hasChanges bool) {
+	updatedState = u.state.Copy()
+	stateID = updatedState.ID()
+	hasChanges = stateID != u.parentState.ID()
+	return
+}
+
+// View returns the view that is associated with this state updater.
+// The view of the StateUpdater equals the view of the block carrying the respective updates.
+func (u *baseProtocolStateMachine) View() uint64 {
+	return u.view
+}
+
+// ParentState returns parent protocol state that is associated with this state updater.
+func (u *baseProtocolStateMachine) ParentState() *flow.RichProtocolStateEntry {
+	return u.parentState
+}
+
+// ensureLookupPopulated ensures that current and next epoch identities lookups are populated.
+// We use this to avoid populating lookups on every UpdateIdentity call.
+func (u *baseProtocolStateMachine) ensureLookupPopulated() {
+	if len(u.currentEpochIdentitiesLookup) > 0 {
+		return
+	}
+	u.rebuildIdentityLookup()
+}
+
+// rebuildIdentityLookup re-generates lookups of *active* participants for
+// previous (optional, if u.state.PreviousEpoch ≠ nil), current (required) and
+// next epoch (optional, if u.state.NextEpoch ≠ nil).
+func (u *baseProtocolStateMachine) rebuildIdentityLookup() {
+	if u.state.PreviousEpoch != nil {
+		u.prevEpochIdentitiesLookup = u.state.PreviousEpoch.ActiveIdentities.Lookup()
+	} else {
+		u.prevEpochIdentitiesLookup = nil
+	}
+	u.currentEpochIdentitiesLookup = u.state.CurrentEpoch.ActiveIdentities.Lookup()
+	if u.state.NextEpoch != nil {
+		u.nextEpochIdentitiesLookup = u.state.NextEpoch.ActiveIdentities.Lookup()
+	} else {
+		u.nextEpochIdentitiesLookup = nil
+	}
+}
+
+// UpdateIdentity updates identity table with new identity entry.
+// Should pass identity which is already present in the table, otherwise an exception will be raised.
+// No errors are expected during normal operations.
+func (u *baseProtocolStateMachine) UpdateIdentity(updated *flow.DynamicIdentityEntry) error {
+	u.ensureLookupPopulated()
+	prevEpochIdentity, foundInPrev := u.prevEpochIdentitiesLookup[updated.NodeID]
+	if foundInPrev {
+		prevEpochIdentity.Dynamic = updated.Dynamic
+	}
+	currentEpochIdentity, foundInCurrent := u.currentEpochIdentitiesLookup[updated.NodeID]
+	if foundInCurrent {
+		currentEpochIdentity.Dynamic = updated.Dynamic
+	}
+	nextEpochIdentity, foundInNext := u.nextEpochIdentitiesLookup[updated.NodeID]
+	if foundInNext {
+		nextEpochIdentity.Dynamic = updated.Dynamic
+	}
+	if !foundInPrev && !foundInCurrent && !foundInNext {
+		return fmt.Errorf("expected to find identity for prev, current or next epoch, but (%v) was not found", updated.NodeID)
+	}
+	return nil
 }
