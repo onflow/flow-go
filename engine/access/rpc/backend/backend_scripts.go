@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/md5" //nolint:gosec
 	"errors"
+	"strings"
 	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -300,11 +301,34 @@ func (b *backendScripts) compareScriptExecutionResults(
 	script []byte,
 	insecureScriptHash [md5.Size]byte,
 ) {
+	// record errors caused by missing local data
+	if localErr != nil && status.Code(localErr) == codes.OutOfRange {
+		b.metrics.ScriptExecutionNotIndexed()
+		b.logScriptExecutionComparison(execNodeResult, execErr, localResult, localErr, blockID, script, insecureScriptHash,
+			"script execution results do not match EN because data is not indexed yet")
+		return
+	}
+
 	// check errors first
 	if execErr != nil {
 		if execErr == localErr {
 			b.metrics.ScriptExecutionErrorMatch()
 			return
+		}
+
+		// error strings generally won't match since the code paths are slightly different
+		// check if the underlying error is the same
+		if status.Code(execErr) == status.Code(localErr) {
+			// both script execution implementations use the same engine, which adds
+			// "failed to execute script at block" to the message before returning. Any characters
+			// before this can be ignored. The string that comes after is the original error and
+			// should match.
+			execParts := strings.Split(execErr.Error(), "failed to execute script at block")
+			localParts := strings.Split(localErr.Error(), "failed to execute script at block")
+			if len(execParts) == 2 && len(localParts) == 2 && execParts[1] == localParts[1] {
+				b.metrics.ScriptExecutionErrorMatch()
+				return
+			}
 		}
 
 		b.metrics.ScriptExecutionErrorMismatch()

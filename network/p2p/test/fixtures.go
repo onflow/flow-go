@@ -3,7 +3,6 @@ package p2ptest
 import (
 	"bufio"
 	"context"
-	"crypto/rand"
 	crand "math/rand"
 	"sync"
 	"testing"
@@ -17,7 +16,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
 	discoveryBackoff "github.com/libp2p/go-libp2p/p2p/discovery/backoff"
-	mh "github.com/multiformats/go-multihash"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -733,19 +731,6 @@ func EnsurePubsubMessageExchangeFromNode(
 	}
 }
 
-// PeerIdFixture returns a random peer ID for testing.
-// peer ID is the identifier of a node on the libp2p network.
-func PeerIdFixture(t testing.TB) peer.ID {
-	buf := make([]byte, 16)
-	n, err := rand.Read(buf)
-	require.NoError(t, err)
-	require.Equal(t, 16, n)
-	h, err := mh.Sum(buf, mh.SHA2_256, -1)
-	require.NoError(t, err)
-
-	return peer.ID(h)
-}
-
 // EnsureNotConnectedBetweenGroups ensures no connection exists between the given groups of nodes.
 func EnsureNotConnectedBetweenGroups(t *testing.T, ctx context.Context, groupA []p2p.LibP2PNode, groupB []p2p.LibP2PNode) {
 	// ensure no connection from group A to group B
@@ -853,7 +838,7 @@ func EnsureNoPubsubExchangeBetweenGroups(
 func PeerIdSliceFixture(t *testing.T, n int) peer.IDSlice {
 	ids := make([]peer.ID, n)
 	for i := 0; i < n; i++ {
-		ids[i] = PeerIdFixture(t)
+		ids[i] = unittest.PeerIdFixture(t)
 	}
 	return ids
 }

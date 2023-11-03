@@ -8,6 +8,8 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/inspector"
+	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 )
 
 // GossipSubInspectorSuite encapsulates what is exposed to the libp2p node regarding the gossipsub RPC inspectors as
@@ -15,6 +17,7 @@ import (
 type GossipSubInspectorSuite struct {
 	component.Component
 	aggregatedInspector       *AggregateRPCInspector
+	validationInspector       *validation.ControlMsgValidationInspector
 	ctrlMsgInspectDistributor p2p.GossipSubInspectorNotifDistributor
 }
 
@@ -26,31 +29,34 @@ var _ p2p.GossipSubInspectorSuite = (*GossipSubInspectorSuite)(nil)
 // control messages is detected.
 // The suite is also a component, which is used to start and stop the rpc inspectors.
 // Args:
-//   - inspectors: the rpc inspectors that are used to inspect the gossipsub rpc messages.
+//   - metricsInspector: the control message metrics inspector.
+//   - validationInspector: the gossipsub validation control message validation inspector.
 //   - ctrlMsgInspectDistributor: the notification distributor that is used to notify consumers when a misbehaving peer
 //
 // regarding gossipsub control messages is detected.
 // Returns:
 //   - the new GossipSubInspectorSuite.
-func NewGossipSubInspectorSuite(inspectors []p2p.GossipSubRPCInspector, ctrlMsgInspectDistributor p2p.GossipSubInspectorNotifDistributor) *GossipSubInspectorSuite {
+func NewGossipSubInspectorSuite(metricsInspector *inspector.ControlMsgMetricsInspector, validationInspector *validation.ControlMsgValidationInspector, ctrlMsgInspectDistributor p2p.GossipSubInspectorNotifDistributor) *GossipSubInspectorSuite {
+	inspectors := []p2p.GossipSubRPCInspector{metricsInspector, validationInspector}
 	s := &GossipSubInspectorSuite{
 		ctrlMsgInspectDistributor: ctrlMsgInspectDistributor,
+		validationInspector:       validationInspector,
 		aggregatedInspector:       NewAggregateRPCInspector(inspectors...),
 	}
 
 	builder := component.NewComponentManagerBuilder()
-	for _, inspector := range inspectors {
-		inspector := inspector // capture loop variable
+	for _, rpcInspector := range inspectors {
+		rpcInspector := rpcInspector // capture loop variable
 		builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			inspector.Start(ctx)
+			rpcInspector.Start(ctx)
 
 			select {
 			case <-ctx.Done():
-			case <-inspector.Ready():
+			case <-rpcInspector.Ready():
 				ready()
 			}
 
-			<-inspector.Done()
+			<-rpcInspector.Done()
 		})
 	}
 
@@ -82,4 +88,14 @@ func (s *GossipSubInspectorSuite) ActiveClustersChanged(list flow.ChainIDList) {
 			r.ActiveClustersChanged(list)
 		}
 	}
+}
+
+// SetTopicOracle sets the topic oracle of the gossipsub inspector suite.
+// The topic oracle is used to determine the list of topics that the node is subscribed to.
+// If an oracle is not set, the node will not be able to determine the list of topics that the node is subscribed to.
+// Currently,  the only inspector that utilizes the topic oracle is the validation inspector.
+// This func is expected to be called once and will return an error on all subsequent calls.
+// All errors returned from this func are considered irrecoverable.
+func (s *GossipSubInspectorSuite) SetTopicOracle(topicOracle func() []string) error {
+	return s.validationInspector.SetTopicOracle(topicOracle)
 }
