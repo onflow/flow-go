@@ -7,8 +7,8 @@ import (
 )
 
 // Canonical represents the canonical ordering for identity lists.
-func Canonical(identity1 *flow.Identity, identity2 *flow.Identity) bool {
-	return IdentifierCanonical(identity1.NodeID, identity2.NodeID)
+func Canonical(identity1 *flow.Identity, identity2 *flow.Identity) int {
+	return IdentifierCompare(identity1.NodeID, identity2.NodeID)
 }
 
 // ByReferenceOrder return a function for sorting identities based on the order
