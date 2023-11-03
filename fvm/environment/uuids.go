@@ -18,6 +18,8 @@ import (
 // (database types and Javascript safe integer limits)
 //
 // counter(C) is 7 bytes, paritition(P) is 1 byte
+// uuid is assembled by first reading the counter from the register value of the partitioned register, 
+// and then left shifting the 6th and 7th byte, and placing the partition byte at 6th byte:
 // C7 C6 P C5 C4 C3 C2 C1
 //
 // Until resource ids start filling the bits above the 48th one, dapps will have enough time
