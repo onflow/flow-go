@@ -119,7 +119,7 @@ func TestDatabase(t *testing.T) {
 		testutils.RunWithTestFlowEVMRootAddress(t, ledger, func(flowEVMRoot flow.Address) {
 			_, err := database.NewDatabase(ledger, flowEVMRoot)
 			require.Error(t, err)
-			require.False(t, types.IsAFatalError(err))
+			require.True(t, types.IsADatabaseError(err))
 		})
 	})
 

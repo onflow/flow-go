@@ -63,7 +63,7 @@ func NewDatabase(led atree.Ledger, flowEVMRootAddress flow.Address) (*Database, 
 
 	err = db.retrieveOrCreateMapRoot()
 	if err != nil {
-		return nil, err
+		return nil, handleError(err)
 	}
 	return db, nil
 }
@@ -71,29 +71,29 @@ func NewDatabase(led atree.Ledger, flowEVMRootAddress flow.Address) (*Database, 
 func (db *Database) retrieveOrCreateMapRoot() error {
 	rootIDBytes, err := db.led.GetValue(db.flowEVMRootAddress.Bytes(), []byte(FlowEVMRootSlabKey))
 	if err != nil {
-		return handleError(err)
+		return err
 	}
 
 	var m *atree.OrderedMap
 	if len(rootIDBytes) == 0 {
 		m, err = atree.NewMap(db.storage, atree.Address(db.flowEVMRootAddress), atree.NewDefaultDigesterBuilder(), emptyTypeInfo{})
 		if err != nil {
-			return handleError(err)
+			return err
 		}
 		rootIDBytes := make([]byte, StorageIDSize)
 		_, err := m.StorageID().ToRawBytes(rootIDBytes)
 		if err != nil {
-			return handleError(err)
+			return err
 		}
 		db.rootIDBytesToBeStored = rootIDBytes
 	} else {
 		storageID, err := atree.NewStorageIDFromRawBytes(rootIDBytes)
 		if err != nil {
-			return handleError(err)
+			return err
 		}
 		m, err = atree.NewMapWithRootID(db.storage, storageID, atree.NewDefaultDigesterBuilder())
 		if err != nil {
-			return handleError(err)
+			return err
 		}
 	}
 	db.atreemap = m
@@ -105,18 +105,19 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
 
-	return db.get(key)
+	value, err := db.get(key)
+	return value, handleError(err)
 }
 
 func (db *Database) get(key []byte) ([]byte, error) {
 	data, err := db.atreemap.Get(compare, hashInputProvider, NewByteStringValue(key))
 	if err != nil {
-		return nil, handleError(err)
+		return nil, err
 	}
 
 	v, err := data.StoredValue(db.atreemap.Storage)
 	if err != nil {
-		return nil, handleError(err)
+		return nil, err
 	}
 
 	return v.(ByteStringValue).Bytes(), nil
@@ -126,20 +127,22 @@ func (db *Database) get(key []byte) ([]byte, error) {
 func (db *Database) Put(key []byte, value []byte) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
-	return db.put(key, value)
+
+	err := db.put(key, value)
+	return handleError(err)
 }
 
 func (db *Database) put(key []byte, value []byte) error {
 	existingValueStorable, err := db.atreemap.Set(compare, hashInputProvider, NewByteStringValue(key), NewByteStringValue(value))
 	if err != nil {
-		return handleError(err)
+		return err
 	}
 
 	if id, ok := existingValueStorable.(atree.StorageIDStorable); ok {
 		// NOTE: deep remove isn't necessary because value is ByteStringValue (not container)
 		err := db.storage.Remove(atree.StorageID(id))
 		if err != nil {
-			return handleError(err)
+			return err
 		}
 	}
 
@@ -150,13 +153,14 @@ func (db *Database) put(key []byte, value []byte) error {
 func (db *Database) Has(key []byte) (bool, error) {
 	db.lock.RLock()
 	defer db.lock.RUnlock()
-	return db.has(key)
+	has, err := db.has(key)
+	return has, handleError(err)
 }
 
 func (db *Database) has(key []byte) (bool, error) {
 	has, err := db.atreemap.Has(compare, hashInputProvider, NewByteStringValue(key))
 	if err != nil {
-		return false, handleError(err)
+		return false, err
 	}
 	return has, nil
 }
@@ -165,20 +169,21 @@ func (db *Database) has(key []byte) (bool, error) {
 func (db *Database) Delete(key []byte) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
-	return db.delete(key)
+	err := db.delete(key)
+	return handleError(err)
 }
 
 func (db *Database) delete(key []byte) error {
 	removedMapKeyStorable, removedMapValueStorable, err := db.atreemap.Remove(compare, hashInputProvider, NewByteStringValue(key))
 	if err != nil {
-		return handleError(err)
+		return err
 	}
 
 	if id, ok := removedMapKeyStorable.(atree.StorageIDStorable); ok {
 		// NOTE: deep remove isn't necessary because key is ByteStringValue (not container)
 		err := db.storage.Remove(atree.StorageID(id))
 		if err != nil {
-			return handleError(err)
+			return err
 		}
 	}
 
@@ -186,7 +191,7 @@ func (db *Database) delete(key []byte) error {
 		// NOTE: deep remove isn't necessary because value is ByteStringValue (not container)
 		err := db.storage.Remove(atree.StorageID(id))
 		if err != nil {
-			return handleError(err)
+			return err
 		}
 	}
 	return nil
@@ -196,7 +201,8 @@ func (db *Database) delete(key []byte) error {
 func (db *Database) ApplyBatch(b *batch) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
-	return db.applyBatch(b)
+	err := db.applyBatch(b)
+	return err
 }
 
 func (db *Database) applyBatch(b *batch) error {
@@ -219,6 +225,11 @@ func (db *Database) GetRootHash() (gethCommon.Hash, error) {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
+	hash, err := db.getRootHash()
+	return hash, handleError(err)
+}
+
+func (db *Database) getRootHash() (gethCommon.Hash, error) {
 	data, err := db.led.GetValue(db.flowEVMRootAddress[:], []byte(FlowEVMRootHashKey))
 	if err != nil {
 		return gethCommon.Hash{}, handleError(err)
@@ -236,22 +247,27 @@ func (db *Database) Commit(root gethCommon.Hash) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
+	err := db.commit(root)
+	return handleError(err)
+}
+
+func (db *Database) commit(root gethCommon.Hash) error {
 	err := db.storage.FastCommit(runtime.NumCPU())
 	if err != nil {
-		return types.NewFatalError(err)
+		return err
 	}
 
 	// check if we have to store the rootID
 	if len(db.rootIDBytesToBeStored) > 0 {
 		err = db.led.SetValue(db.flowEVMRootAddress.Bytes(), []byte(FlowEVMRootSlabKey), db.rootIDBytesToBeStored[:])
 		if err != nil {
-			return handleError(err)
+			return err
 		}
 	}
 
 	err = db.led.SetValue(db.flowEVMRootAddress[:], []byte(FlowEVMRootHashKey), root[:])
 	if err != nil {
-		return handleError(err)
+		return err
 	}
 	return nil
 }
@@ -382,6 +398,6 @@ func handleError(err error) error {
 	if stdErrors.As(err, &atreeFatalError) || errors.IsFailure(err) {
 		return types.NewFatalError(err)
 	}
-	// the rest is user error
-	return err
+	// wrap the non-fatal error with DB error
+	return types.NewDatabaseError(err)
 }
