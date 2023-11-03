@@ -193,7 +193,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        make:
+        include:
+          - name: Access Integration Tests
+            make: make -C integration access-tests
+            runner: ubuntu-latest
+          - name: BFT (Framework) Integration Tests
+            make: make -C integration bft-framework-tests
+            runner: buildjet-4vcpu-ubuntu-2204
+
+#        make:
 #          - make -C integration access-tests
 #          - make -C integration bft-framework-tests
 #          - make -C integration bft-protocol-tests
@@ -204,11 +212,11 @@ jobs:
 #          - make -C integration epochs-cohort2-tests
 #          - make -C integration execution-tests
 #          - make -C integration ghost-tests
-          - make -C integration mvp-tests
+#          - make -C integration mvp-tests
 #          - make -C integration network-tests
 #          - make -C integration verification-tests
 #          - make -C integration upgrades-tests
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
     steps:
     - name: Checkout repo
       uses: actions/checkout@v3
@@ -224,7 +232,7 @@ jobs:
       run: make crypto_setup_gopath
     - name: Docker build
       run: make docker-build-flow docker-build-flow-corrupt
-    - name: Run tests
+    - name: Run tests (${{ matrix.name }})
       # TODO(rbtz): re-enable when we fix exisiting races.
       #env:
       #  RACE_DETECTOR: 1
