@@ -327,7 +327,6 @@ func RunWithFullProtocolStateAndMetricsAndConsumer(t testing.TB, rootSnapshot pr
 			all.Results,
 			all.Setups,
 			all.EpochCommits,
-			state.Params(),
 		)
 		f(db, fullState, mutableProtocolState)
 	})
@@ -414,7 +413,6 @@ func RunWithFullProtocolStateAndMutator(t testing.TB, rootSnapshot protocol.Snap
 			all.Results,
 			all.Setups,
 			all.EpochCommits,
-			state.Params(),
 		)
 		f(db, fullState, mutableProtocolState)
 	})

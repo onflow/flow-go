@@ -868,7 +868,6 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 			all.Results,
 			all.Setups,
 			all.EpochCommits,
-			state.Params(),
 		)
 		calculateExpectedStateId := calculateExpectedStateId(t, mutableProtocolState)
 
@@ -2684,7 +2683,7 @@ func calculateExpectedStateId(t *testing.T, mutableProtocolState realprotocol.Mu
 		stateMutator, err := mutableProtocolState.Mutator(header.View, header.ParentID)
 		require.NoError(t, err)
 
-		err = stateMutator.ApplyServiceEvents(seals)
+		err = stateMutator.ApplyServiceEventsFromValidatedSeals(seals)
 		require.NoError(t, err)
 
 		_, _, expectedStateID, _ := stateMutator.Build()

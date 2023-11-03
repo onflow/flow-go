@@ -67,14 +67,14 @@ func TestMutableProtocolState_Mutator(t *testing.T) {
 	resultsDB := storagemock.NewExecutionResults(t)
 	setupsDB := storagemock.NewEpochSetups(t)
 	commitsDB := storagemock.NewEpochCommits(t)
-	instanceParams := mock.NewInstanceParams(t)
 
-	mutableState := NewMutableProtocolState(protocolStateDB, globalParams,
+	mutableState := NewMutableProtocolState(
+		protocolStateDB,
+		globalParams,
 		headersDB,
 		resultsDB,
 		setupsDB,
-		commitsDB,
-		instanceParams)
+		commitsDB)
 
 	t.Run("happy-path", func(t *testing.T) {
 		parentState := unittest.ProtocolStateFixture()

@@ -53,7 +53,6 @@ type MutableProtocolState struct {
 	results storage.ExecutionResults
 	setups  storage.EpochSetups
 	commits storage.EpochCommits
-	params  protocol.InstanceParams
 }
 
 var _ protocol.MutableProtocolState = (*MutableProtocolState)(nil)
@@ -66,7 +65,6 @@ func NewMutableProtocolState(
 	results storage.ExecutionResults,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
-	params protocol.InstanceParams,
 ) *MutableProtocolState {
 	return &MutableProtocolState{
 		ProtocolState: *NewProtocolState(protocolStateDB, globalParams),
@@ -74,7 +72,6 @@ func NewMutableProtocolState(
 		results:       results,
 		setups:        setups,
 		commits:       commits,
-		params:        params,
 	}
 }
 
@@ -88,5 +85,5 @@ func (s *MutableProtocolState) Mutator(candidateView uint64, parentID flow.Ident
 		return nil, fmt.Errorf("could not query parent protocol state at block (%x): %w", parentID, err)
 	}
 	return newStateMutator(s.headers, s.results, s.setups, s.commits,
-		newStateMachine(candidateView, parentState), s.params), nil
+		newStateMachine(candidateView, parentState)), nil
 }

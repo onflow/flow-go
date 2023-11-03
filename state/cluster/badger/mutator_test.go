@@ -108,7 +108,6 @@ func (suite *MutatorSuite) SetupTest() {
 		all.Results,
 		all.Setups,
 		all.EpochCommits,
-		state.Params(),
 	)
 
 	clusterStateRoot, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture(), suite.epochCounter)

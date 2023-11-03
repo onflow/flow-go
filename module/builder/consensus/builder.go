@@ -639,7 +639,7 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 	if err != nil {
 		return nil, fmt.Errorf("could not create protocol state stateMutator for view %d: %w", header.View, err)
 	}
-	err = stateMutator.ApplyServiceEvents(seals)
+	err = stateMutator.ApplyServiceEventsFromValidatedSeals(seals)
 	if err != nil {
 		return nil, fmt.Errorf("could not apply service events as leader: %w", err)
 	}

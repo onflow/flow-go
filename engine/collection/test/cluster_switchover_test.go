@@ -142,7 +142,6 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 		refNode.Results,
 		refNode.Setups,
 		refNode.EpochCommits,
-		refNode.State.Params(),
 	)
 
 	// when building new epoch we would like to replace fixture cluster QCs with real ones, for that we need

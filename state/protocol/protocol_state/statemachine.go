@@ -2,8 +2,10 @@ package protocol_state
 
 import "github.com/onflow/flow-go/model/flow"
 
-// ProtocolStateMachine is a dedicated interface for updating protocol state.
-// It is used by the compliance layer to update protocol state when certain events that are stored in blocks are observed.
+// ProtocolStateMachine implements a low-level interface for state-changing operations on the protocol state.
+// It is used by higher level logic to evolve the protocol state when certain events that are stored in blocks are observed.
+// The ProtocolStateMachine is stateful and internally tracks the current protocol state. A separate instance is created for
+// each block that is being processed.
 type ProtocolStateMachine interface {
 	// Build returns updated protocol state entry, state ID and a flag indicating if there were any changes.
 	Build() (updatedState *flow.ProtocolStateEntry, stateID flow.Identifier, hasChanges bool)

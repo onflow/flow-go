@@ -787,19 +787,18 @@ func newState(
 		},
 		globalParams:             globalParams,
 		protocolStateSnapshotsDB: protocolStateSnapshots,
-		versionBeacons:           versionBeacons,
-		cachedFinal:              new(atomic.Pointer[cachedHeader]),
-		cachedSealed:             new(atomic.Pointer[cachedHeader]),
+		protocolState: protocol_state.NewMutableProtocolState(
+			protocolStateSnapshots,
+			globalParams,
+			headers,
+			results,
+			setups,
+			commits,
+		),
+		versionBeacons: versionBeacons,
+		cachedFinal:    new(atomic.Pointer[cachedHeader]),
+		cachedSealed:   new(atomic.Pointer[cachedHeader]),
 	}
-	state.protocolState = protocol_state.NewMutableProtocolState(
-		protocolStateSnapshots,
-		globalParams,
-		headers,
-		results,
-		setups,
-		commits,
-		state.Params(),
-	)
 
 	return state
 }

@@ -8,9 +8,9 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-// stateMachine is a dedicated structure that encapsulates all logic for updating protocol state.
-// Only protocol state updater knows how to update protocol state in a way that is consistent with the protocol.
-// Protocol state updater implements the following state changes:
+// stateMachine is a dedicated structure that encapsulates all logic for evolving protocol state.
+// Only protocol state machine knows how to evolve the dynamic state in a way that is consistent with the protocol.
+// Protocol state machine implements the following state transitions:
 // - epoch setup: transitions current epoch from staking to setup phase, creates next epoch protocol state when processed.
 // - epoch commit: transitions current epoch from setup to commit phase, commits next epoch protocol state when processed.
 // - identity changes: updates identity table for current and next epoch(if available).
