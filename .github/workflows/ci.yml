@@ -148,17 +148,20 @@ jobs:
             make2: unittest
             retries: 1
             race: 1
+            runner: ubuntu-latest
           - name: insecure
             make1: install-tools
             make2: test
             retries: 3
             race: 0
+            runner: buildjet-4vcpu-ubuntu-2204
           - name: integration
             make1: install-tools
             make2: test
             retries: 3
             race: 0
-    runs-on: ubuntu-latest
+            runner: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
