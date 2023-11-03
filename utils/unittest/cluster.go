@@ -52,7 +52,7 @@ func ClusterAssignment(n uint, nodes flow.IdentityList) flow.AssignmentList {
 
 	// order, so the same list results in the same
 	sort.Slice(collectors, func(i, j int) bool {
-		return order.Canonical(collectors[i], collectors[j])
+		return order.Canonical(collectors[i], collectors[j]) < 0
 	})
 
 	assignments := make(flow.AssignmentList, n)
