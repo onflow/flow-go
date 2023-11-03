@@ -159,7 +159,7 @@ func (m *stateMutator) ApplyServiceEventsFromValidatedSeals(seals []*flow.Seal) 
 		}
 		results = append(results, result)
 	}
-	dbUpdates, err := m.applyServiceEventsFromOrderedResults(m.stateMachine, results)
+	dbUpdates, err := m.applyServiceEventsFromOrderedResults(results)
 	if err != nil {
 		if protocol.IsInvalidServiceEventError(err) {
 			dbUpdates, err = m.transitionToEpochFallbackMode(results)
@@ -174,13 +174,13 @@ func (m *stateMutator) ApplyServiceEventsFromValidatedSeals(seals []*flow.Seal) 
 	return nil
 }
 
-func (m *stateMutator) applyServiceEventsFromOrderedResults(stateMachine ProtocolStateMachine, results []*flow.ExecutionResult) ([]func(tx *transaction.Tx) error, error) {
+func (m *stateMutator) applyServiceEventsFromOrderedResults(results []*flow.ExecutionResult) ([]func(tx *transaction.Tx) error, error) {
 	var dbUpdates []func(tx *transaction.Tx) error
 	for _, result := range results {
 		for _, event := range result.ServiceEvents {
 			switch ev := event.Event.(type) {
 			case *flow.EpochSetup:
-				err := stateMachine.ProcessEpochSetup(ev)
+				err := m.stateMachine.ProcessEpochSetup(ev)
 				if err != nil {
 					return nil, fmt.Errorf("could not process epoch setup event: %w", err)
 				}
@@ -189,7 +189,7 @@ func (m *stateMutator) applyServiceEventsFromOrderedResults(stateMachine Protoco
 				dbUpdates = append(dbUpdates, m.setups.StoreTx(ev))
 
 			case *flow.EpochCommit:
-				err := stateMachine.ProcessEpochCommit(ev)
+				err := m.stateMachine.ProcessEpochCommit(ev)
 				if err != nil {
 					return nil, fmt.Errorf("could not process epoch commit event: %w", err)
 				}
@@ -211,7 +211,8 @@ func (m *stateMutator) transitionToEpochFallbackMode(results []*flow.ExecutionRe
 	if err != nil {
 		return nil, fmt.Errorf("could not transition to epoch fallback state machine: %w", err)
 	}
-	dbUpdates, err := m.applyServiceEventsFromOrderedResults(fallbackStateMachine, results)
+	m.stateMachine = fallbackStateMachine
+	dbUpdates, err := m.applyServiceEventsFromOrderedResults(results)
 	if err != nil {
 		return nil, irrecoverable.NewExceptionf("could not apply service events after transition to epoch fallback mode: %w", err)
 	}
