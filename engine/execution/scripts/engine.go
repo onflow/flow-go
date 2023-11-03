@@ -16,6 +16,7 @@ import (
 )
 
 // TODO(leo): move it.
+var ErrStateCommitmentPruned = fmt.Errorf("state commitment not found")
 
 // ScriptExecutionState is a subset of the `state.ExecutionState` interface purposed to only access the state
 // used for script execution and not mutate the execution state of the blockchain.
