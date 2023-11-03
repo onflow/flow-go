@@ -18,7 +18,7 @@ import (
 // (database types and Javascript safe integer limits)
 //
 // counter(C) is 7 bytes, paritition(P) is 1 byte
-// uuid is assembled by first reading the counter from the register value of the partitioned register, 
+// uuid is assembled by first reading the counter from the register value of the partitioned register,
 // and then left shifting the 6th and 7th byte, and placing the partition byte at 6th byte:
 // C7 C6 P C5 C4 C3 C2 C1
 //
@@ -195,12 +195,12 @@ func (generator *uUIDGenerator) GenerateUUID() (uint64, error) {
 
 	generator.maybeInitializePartition()
 
-	value, err := generator.getCounter()
+	counter, err := generator.getCounter()
 	if err != nil {
 		return 0, fmt.Errorf("cannot generate UUID: %w", err)
 	}
 
-	err = generator.setCounter(value + 1)
+	err = generator.setCounter(counter + 1)
 	if err != nil {
 		return 0, fmt.Errorf("cannot generate UUID: %w", err)
 	}
@@ -209,6 +209,6 @@ func (generator *uUIDGenerator) GenerateUUID() (uint64, error) {
 	// assemble a UUID value with the partition (P) and the counter (C).
 	// Note: partition (P) is represented by the 6th byte
 	// (C7 C6) | P | (C5 C4 C3 C2 C1)
-	return ((counter & 0xFF_FF00_0000_0000) << 8) | (uint64(generator.partition) << 40) | (counter & 0xFF_FFFF_FFFF), nil```
+	return ((counter & 0xFF_FF00_0000_0000) << 8) | (uint64(generator.partition) << 40) | (counter & 0xFF_FFFF_FFFF), nil
 
 }
