@@ -193,6 +193,18 @@ func (h *FlowAccessAPIRouter) GetLatestProtocolStateSnapshot(context context.Con
 	return res, err
 }
 
+func (h *FlowAccessAPIRouter) GetProtocolStateSnapshotByBlockID(context context.Context, req *access.GetProtocolStateSnapshotByBlockIDRequest) (*access.ProtocolStateSnapshotResponse, error) {
+	res, err := h.Observer.GetProtocolStateSnapshotByBlockID(context, req)
+	h.log("observer", "GetProtocolStateSnapshotByBlockID", err)
+	return res, err
+}
+
+func (h *FlowAccessAPIRouter) GetProtocolStateSnapshotByHeight(context context.Context, req *access.GetProtocolStateSnapshotByHeightRequest) (*access.ProtocolStateSnapshotResponse, error) {
+	res, err := h.Observer.GetProtocolStateSnapshotByHeight(context, req)
+	h.log("observer", "GetProtocolStateSnapshotByHeight", err)
+	return res, err
+}
+
 func (h *FlowAccessAPIRouter) GetExecutionResultForBlockID(context context.Context, req *access.GetExecutionResultForBlockIDRequest) (*access.ExecutionResultForBlockIDResponse, error) {
 	res, err := h.Upstream.GetExecutionResultForBlockID(context, req)
 	h.log("upstream", "GetExecutionResultForBlockID", err)
