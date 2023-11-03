@@ -18,6 +18,7 @@ on:
     branches:
       - master
 
+
 env:
   GO_VERSION: "1.20"
 
