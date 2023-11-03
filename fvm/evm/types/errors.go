@@ -86,6 +86,34 @@ func IsEVMValidationError(err error) bool {
 	return errors.As(err, &EVMValidationError{})
 }
 
+// DatabaseError is a non-fatal error, returned when a database operation
+// has failed (e.g. reaching storage interaction limit)
+type DatabaseError struct {
+	err error
+}
+
+// NewDatabaseError returns a new DatabaseError
+func NewDatabaseError(rootCause error) DatabaseError {
+	return DatabaseError{
+		err: rootCause,
+	}
+}
+
+// Unwrap unwraps the underlying evm error
+func (err DatabaseError) Unwrap() error {
+	return err.err
+}
+
+func (err DatabaseError) Error() string {
+	return fmt.Sprintf("database error: %v", err.err)
+}
+
+// IsDatabaseError returns true if the error or any underlying errors
+// is of the type EVM validation error
+func IsDatabaseError(err error) bool {
+	return errors.As(err, &DatabaseError{})
+}
+
 // FatalError is user for any error that is not user related and something
 // unusual has happend. Usually we stop the node when this happens
 // given it might have a non-deterministic root.
