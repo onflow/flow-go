@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
@@ -43,7 +42,7 @@ type QCContractClient interface {
 	// Error returns:
 	//   - network.TransientError for any errors from the underlying Flow client
 	//   - generic error in case of unexpected critical failures
-	Voted(ctx context.Context, referenceBlockID flow.Identifier) (bool, error)
+	Voted(ctx context.Context) (bool, error)
 }
 
 // EpochLookup enables looking up epochs by view.

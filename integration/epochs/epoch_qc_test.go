@@ -90,18 +90,10 @@ func (s *Suite) TestEpochQuorumCertificate() {
 
 		snapshot := &protomock.Snapshot{}
 		snapshot.On("Phase").Return(flow.EpochPhaseSetup, nil)
-		snapshot.On("Head").Return(func() (*flow.Header, error) {
-			block, err := s.blockchain.GetLatestBlock()
-			if err != nil {
-				return nil, err
-			}
-			return block.Header, nil
-		})
 
 		state := &protomock.State{}
 		state.On("CanonicalRootBlock").Return(rootBlock)
 		state.On("Final").Return(snapshot)
-		state.On("Sealed").Return(snapshot)
 
 		// create QC voter object to be used for voting for the root QC contract
 		voter := epochs.NewRootQCVoter(zerolog.Logger{}, local, hotSigner, state, []module.QCContractClient{client})

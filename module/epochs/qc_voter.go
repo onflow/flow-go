@@ -133,13 +133,8 @@ func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.Epoch) error 
 			return NewClusterQCNoVoteErrorf("could not submit vote because we we are not in EpochSetup phase (in %s phase instead)", phase)
 		}
 
-		sealed, err := voter.state.Sealed().Head()
-		if err != nil {
-			return fmt.Errorf("unexpected error - unable to get sealed block: %w", err)
-		}
-
 		// check whether we've already voted, if we have we can exit early
-		voted, err := qcContractClient.Voted(ctx, sealed.ID())
+		voted, err := qcContractClient.Voted(ctx)
 		if err != nil {
 			if network.IsTransientError(err) {
 				log.Warn().Err(err).Msg("unable to check vote status, retrying...")
