@@ -233,9 +233,8 @@ func TestContractInteraction(t *testing.T) {
 						gethCommon.Big1,        // gas price
 						nil,                    // data
 					), signer, key)
-				res, err := blk.RunTransaction(tx)
+				_, err = blk.RunTransaction(tx)
 				require.NoError(t, err)
-				require.Empty(t, res.ErrorMessage)
 
 				// check the balance of coinbase
 				RunWithNewReadOnlyBlockView(t, env, func(blk2 types.ReadOnlyBlockView) {

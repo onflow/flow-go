@@ -152,15 +152,9 @@ func (bl *BlockView) newProcedure() (*procedure, error) {
 	}, nil
 }
 
-// TODO errors returns here might not be fatal, what if we have hit the interaction limit ?
 func (bl *BlockView) commit(rootHash gethCommon.Hash) error {
 	// commit atree changes back to the backend
-	err := bl.database.Commit(rootHash)
-	if err != nil {
-		return types.NewFatalError(err)
-	}
-
-	return nil
+	return bl.database.Commit(rootHash)
 }
 
 type procedure struct {
@@ -177,7 +171,7 @@ func (proc *procedure) commit() (gethCommon.Hash, error) {
 	// to get the root hash
 	newRoot, err := proc.state.Commit(true)
 	if err != nil {
-		return gethTypes.EmptyRootHash, types.NewFatalError(err)
+		return gethTypes.EmptyRootHash, err
 	}
 
 	// flush the trie to the lower level db
@@ -188,7 +182,7 @@ func (proc *procedure) commit() (gethCommon.Hash, error) {
 	// have to explicitly ask the trie to commit to the underlying storage
 	err = proc.state.Database().TrieDB().Commit(newRoot, false)
 	if err != nil {
-		return gethTypes.EmptyRootHash, types.NewFatalError(err)
+		return gethTypes.EmptyRootHash, err
 	}
 	return newRoot, nil
 }
@@ -254,33 +248,35 @@ func (proc *procedure) run(msg *gethCore.Message, txType uint8) (*types.Result, 
 		gasPool,
 	).TransitionDb()
 	if err != nil {
-		// if the error is a fatal error don't move forward
+		res.Failed = true
+		// if the error is a fatal error return it
 		if types.IsAFatalError(err) {
 			return &res, err
 		}
-		// when pre-checks has failed (non-fatal errors)
-		res.Failed = true
-		res.ErrorMessage = err.Error()
-		// wrap error with EVM error
-		err = types.NewEVMExecutionError(err)
+		// if is a non-fatal database error return it
+		if types.IsADatabaseError(err) {
+			return &res, err
+		}
+		// otherwise is a validation error (pre-check failure)
+		// no state change, wrap the error and return
+		return &res, types.NewEVMValidationError(err)
 	}
 
 	// if prechecks are passed, the exec result won't be nil
 	if execResult != nil {
-		res.ReturnedValue = execResult.ReturnData
 		res.GasConsumed = execResult.UsedGas
-		res.Logs = proc.state.Logs()
-		if execResult.Failed() { // collect vm errors
+		if !execResult.Failed() { // collect vm errors
+			res.ReturnedValue = execResult.ReturnData
+			// If the transaction created a contract, store the creation address in the receipt.
+			if msg.To == nil {
+				res.DeployedContractAddress = types.NewAddress(gethCrypto.CreateAddress(msg.From, msg.Nonce))
+			}
+			res.Logs = proc.state.Logs()
+		} else {
 			res.Failed = true
-			res.ErrorMessage = execResult.Err.Error()
 			err = types.NewEVMExecutionError(execResult.Err)
 		}
-		// If the transaction created a contract, store the creation address in the receipt.
-		if msg.To == nil {
-			res.DeployedContractAddress = types.NewAddress(gethCrypto.CreateAddress(msg.From, msg.Nonce))
-		}
 	}
-
 	res.StateRootHash, err = proc.commit()
 	return &res, err
 }
