@@ -120,7 +120,7 @@ func (bl *BlockView) RunTransaction(
 	if err != nil {
 		// note that this is not a fatal error (e.g. due to bad signature)
 		// not a valid transaction
-		return nil, types.NewEVMExecutionError(err)
+		return nil, types.NewEVMValidationError(err)
 	}
 
 	// update tx context origin
