@@ -209,7 +209,6 @@ func TestAllFlagNames_AllResourceManagerFlags(t *testing.T) {
 // TestLoadLibP2PResourceManagerFlags validates that all libp2p-resource-manager flags from default-config.yml are settable by LoadLibP2PResourceManagerFlags.
 func TestLoadLibP2PResourceManagerFlags(t *testing.T) {
 	// create an instance of Config to pass to the loader function
-	// this would typically be loaded from your default configuration
 	var config netconf.Config
 
 	// initialize the FlagSet
