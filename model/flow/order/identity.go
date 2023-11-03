@@ -13,7 +13,7 @@ func Canonical(identity1 *flow.Identity, identity2 *flow.Identity) int {
 
 // ByReferenceOrder return a function for sorting identities based on the order
 // of the given nodeIDs
-func ByReferenceOrder(nodeIDs []flow.Identifier) func(*flow.Identity, *flow.Identity) bool {
+func ByReferenceOrder(nodeIDs []flow.Identifier) func(*flow.Identity, *flow.Identity) int {
 	indices := make(map[flow.Identifier]uint)
 	for index, nodeID := range nodeIDs {
 		_, ok := indices[nodeID]
@@ -22,8 +22,15 @@ func ByReferenceOrder(nodeIDs []flow.Identifier) func(*flow.Identity, *flow.Iden
 		}
 		indices[nodeID] = uint(index)
 	}
-	return func(identity1 *flow.Identity, identity2 *flow.Identity) bool {
-		return indices[identity1.NodeID] < indices[identity2.NodeID]
+	return func(identity1 *flow.Identity, identity2 *flow.Identity) int {
+		switch {
+		case indices[identity1.NodeID] < indices[identity2.NodeID]:
+			return -1
+		case indices[identity1.NodeID] > indices[identity2.NodeID]:
+			return 1
+		default:
+			return 0
+		}
 	}
 }
 
