@@ -6,6 +6,8 @@ import (
 
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+
+	"github.com/onflow/flow-go/network/p2p/p2pconf"
 )
 
 const (
@@ -48,9 +50,6 @@ const (
 	outboundConnectionLimit        = "connections-outbound"
 	fileDescriptorsLimit           = "fd"
 	memoryLimitBytes               = "memory-bytes"
-	memoryLimitRatio               = "libp2p-memory-limit-ratio"
-	fileDescriptorsRatio           = "libp2p-file-descriptors-ratio"
-	inboundStreamLimitSystem       = "libp2p-inbound-stream-limit-system"
 	inboundStreamLimitPeer         = "libp2p-inbound-stream-limit-peer"
 	inboundStreamLimitProtocol     = "libp2p-inbound-stream-limit-protocol"
 	inboundStreamLimitProtocolPeer = "libp2p-inbound-stream-limit-protocol-peer"
@@ -102,7 +101,7 @@ const (
 )
 
 func AllFlagNames() []string {
-	return []string{
+	allFlags := []string{
 		networkingConnectionPruning,
 		preferredUnicastsProtocols,
 		receivedMessageCacheSize,
@@ -123,9 +122,8 @@ func AllFlagNames() []string {
 		messageRateLimit,
 		bandwidthRateLimit,
 		bandwidthBurstLimit,
-		memoryLimitRatio,
-		fileDescriptorsRatio,
-		inboundStreamLimitSystem,
+		rootResourceManagerPrefix + "-" + memoryLimitRatioPrefix,
+		rootResourceManagerPrefix + "-" + fileDescriptorsRatioPrefix,
 		inboundStreamLimitPeer,
 		inboundStreamLimitProtocol,
 		inboundStreamLimitProtocolPeer,
@@ -166,6 +164,19 @@ func AllFlagNames() []string {
 		rpcMessageMaxSampleSize,
 		rpcMessageErrorThreshold,
 	}
+
+	for _, scope := range []string{systemScope, transientScope, protocolScope, peerScope, peerProtocolScope} {
+		for _, resource := range []string{inboundStreamLimit,
+			outboundStreamLimit,
+			inboundConnectionLimit,
+			outboundConnectionLimit,
+			fileDescriptorsLimit,
+			memoryLimitBytes} {
+			allFlags = append(allFlags, fmt.Sprintf("%s-%s-%s-%s", rootResourceManagerPrefix, limitsOverridePrefix, scope, resource))
+		}
+	}
+
+	return allFlags
 }
 
 // InitializeNetworkFlags initializes all CLI flags for the Flow network configuration on the provided pflag set.
@@ -216,16 +227,8 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 		config.UnicastConfig.UnicastRateLimitersConfig.LockoutDuration,
 		"the number of seconds a peer will be forced to wait before being allowed to successful reconnect to the node after being rate limited")
 	flags.Bool(dryRun, config.UnicastConfig.UnicastRateLimitersConfig.DryRun, "disable peer disconnects and connections gating when rate limiting peers")
-	// resource manager cli flags
-	flags.Float64(fileDescriptorsRatio, config.ResourceManager.FileDescriptorsRatio, "ratio of available file descriptors to be used by libp2p (in (0,1])")
-	flags.Float64(memoryLimitRatio, config.ResourceManager.MemoryLimitRatio, "ratio of available memory to be used by libp2p (in (0,1])")
-	// flags.Int(inboundStreamLimitSystem, config.ResourceManagerConfig.InboundStream.System, "the system-wide limit on the number of inbound streams")
-	// flags.Int(inboundStreamLimitPeer, config.ResourceManagerConfig.InboundStream.Peer, "the limit on the number of inbound streams per peer (over all protocols)")
-	// flags.Int(inboundStreamLimitProtocol, config.ResourceManagerConfig.InboundStream.Protocol, "the limit on the number of inbound streams per protocol (over all peers)")
-	// flags.Int(inboundStreamLimitProtocolPeer, config.ResourceManagerConfig.InboundStream.ProtocolPeer, "the limit on the number of inbound streams per protocol per peer")
-	// flags.Int(inboundStreamLimitTransient,
-	// 	config.ResourceManagerConfig.InboundStream.Transient,
-	// 	"the transient limit on the number of inbound streams (applied to streams that are not associated with a peer or protocol yet)")
+
+	LoadLibP2PResourceManagerFlags(flags, config)
 
 	// connection manager
 	flags.Int(lowWatermark, config.ConnectionManagerConfig.LowWatermark, "low watermarking for libp2p connection manager")
@@ -311,6 +314,50 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 	flags.Int(rpcMessageErrorThreshold,
 		config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.RpcMessageErrorThreshold,
 		"the threshold at which an error will be returned if the number of invalid RPC messages exceeds this value")
+}
+
+// LoadLibP2PResourceManagerFlags loads all CLI flags for the libp2p resource manager configuration on the provided pflag set.
+// Args:
+// *pflag.FlagSet: the pflag set of the Flow node.
+// *Config: the default network config used to set default values on the flags
+func LoadLibP2PResourceManagerFlags(flags *pflag.FlagSet, config *Config) {
+	flags.Float64(fmt.Sprintf("%s-%s", rootResourceManagerPrefix, fileDescriptorsRatioPrefix),
+		config.ResourceManager.FileDescriptorsRatio,
+		"ratio of available file descriptors to be used by libp2p (in (0,1])")
+	flags.Float64(fmt.Sprintf("%s-%s", rootResourceManagerPrefix, memoryLimitRatioPrefix),
+		config.ResourceManager.MemoryLimitRatio,
+		"ratio of available memory to be used by libp2p (in (0,1])")
+	loadLibP2PResourceManagerFlagsForScope(systemScope, flags, &config.ResourceManager.Override.System)
+	loadLibP2PResourceManagerFlagsForScope(transientScope, flags, &config.ResourceManager.Override.Transient)
+	loadLibP2PResourceManagerFlagsForScope(protocolScope, flags, &config.ResourceManager.Override.Protocol)
+	loadLibP2PResourceManagerFlagsForScope(peerScope, flags, &config.ResourceManager.Override.Peer)
+	loadLibP2PResourceManagerFlagsForScope(peerProtocolScope, flags, &config.ResourceManager.Override.PeerProtocol)
+}
+
+// loadLibP2PResourceManagerFlagsForScope loads all CLI flags for the libp2p resource manager configuration on the provided pflag set for the specific scope.
+// Args:
+// *p2pconf.ResourceScope: the resource scope to load flags for.
+// *pflag.FlagSet: the pflag set of the Flow node.
+// *Config: the default network config used to set default values on the flags.
+func loadLibP2PResourceManagerFlagsForScope(scope p2pconf.ResourceScope, flags *pflag.FlagSet, override *p2pconf.ResourceManagerOverrideLimit) {
+	flags.Int(fmt.Sprintf("%s-%s-%s-%s", rootResourceManagerPrefix, limitsOverridePrefix, scope, inboundStreamLimit),
+		override.StreamsInbound,
+		fmt.Sprintf("the limit on the number of inbound streams at %s scope, 0 means use the default value", scope))
+	flags.Int(fmt.Sprintf("%s-%s-%s-%s", rootResourceManagerPrefix, limitsOverridePrefix, scope, outboundStreamLimit),
+		override.StreamsOutbound,
+		fmt.Sprintf("the limit on the number of outbound streams at %s scope, 0 means use the default value", scope))
+	flags.Int(fmt.Sprintf("%s-%s-%s-%s", rootResourceManagerPrefix, limitsOverridePrefix, scope, inboundConnectionLimit),
+		override.ConnectionsInbound,
+		fmt.Sprintf("the limit on the number of inbound connections at %s scope, 0 means use the default value", scope))
+	flags.Int(fmt.Sprintf("%s-%s-%s-%s", rootResourceManagerPrefix, limitsOverridePrefix, scope, outboundConnectionLimit),
+		override.ConnectionsOutbound,
+		fmt.Sprintf("the limit on the number of outbound connections at %s scope, 0 means use the default value", scope))
+	flags.Int(fmt.Sprintf("%s-%s-%s-%s", rootResourceManagerPrefix, limitsOverridePrefix, scope, fileDescriptorsLimit),
+		override.FD,
+		fmt.Sprintf("the limit on the number of file descriptors at %s scope, 0 means use the default value", scope))
+	flags.Int(fmt.Sprintf("%s-%s-%s-%s", rootResourceManagerPrefix, limitsOverridePrefix, scope, memoryLimitBytes),
+		override.Memory,
+		fmt.Sprintf("the limit on the amount of memory (bytes) at %s scope, 0 means use the default value", scope))
 }
 
 // SetAliases this func sets an aliases for each CLI flag defined for network config overrides to it's corresponding
