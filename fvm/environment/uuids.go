@@ -119,8 +119,8 @@ func NewUUIDGenerator(
 	}
 }
 
-// getUint64 reads the uint64 value from the partitioned uuid register.
-func (generator *uUIDGenerator) getUint64() (uint64, error) {
+// getCounter reads the uint64 value from the partitioned uuid register.
+func (generator *uUIDGenerator) getCounter() (uint64, error) {
 	stateBytes, err := generator.txnState.Get(generator.registerId)
 	if err != nil {
 		return 0, fmt.Errorf(
@@ -133,8 +133,8 @@ func (generator *uUIDGenerator) getUint64() (uint64, error) {
 	return binary.BigEndian.Uint64(bytes), nil
 }
 
-// setUint56 sets a new uint56 value into the partitioned uuid register.
-func (generator *uUIDGenerator) setUint56(
+// setCounter sets a new uint56 value into the partitioned uuid register.
+func (generator *uUIDGenerator) setCounter(
 	value uint64,
 ) error {
 	if value > Uint56OverflowWarningThreshold {
@@ -195,12 +195,12 @@ func (generator *uUIDGenerator) GenerateUUID() (uint64, error) {
 
 	generator.maybeInitializePartition()
 
-	value, err := generator.getUint64()
+	value, err := generator.getCounter()
 	if err != nil {
 		return 0, fmt.Errorf("cannot generate UUID: %w", err)
 	}
 
-	err = generator.setUint56(value + 1)
+	err = generator.setCounter(value + 1)
 	if err != nil {
 		return 0, fmt.Errorf("cannot generate UUID: %w", err)
 	}
