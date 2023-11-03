@@ -10,26 +10,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/p2pconf"
 )
 
-// ResourceScope is the scope of the resource, e.g., system, transient, protocol, peer, peer-protocol.
-type ResourceScope string
-
-func (r ResourceScope) String() string {
-	return string(r)
-}
-
-const (
-	// ResourceScopeSystem is the system scope; the system scope dictates the maximum allowed value across all peers and protocols at the entire node level.
-	ResourceScopeSystem ResourceScope = "system"
-	// ResourceScopeTransient is the transient scope; the transient scope is used for resources that have not fully established and are under negotiation.
-	ResourceScopeTransient ResourceScope = "transient"
-	// ResourceScopeProtocol is the protocol scope; the protocol scope dictates the maximum allowed resource across all peers for that protocol.
-	ResourceScopeProtocol ResourceScope = "protocol"
-	// ResourceScopePeer is the peer scope; the peer scope dictates the maximum allowed resource for a specific peer.
-	ResourceScopePeer ResourceScope = "peer"
-	// ResourceScopePeerProtocol is the peer-protocol scope; the peer-protocol scope dictates the maximum allowed resource for a protocol and a peer.
-	ResourceScopePeerProtocol ResourceScope = "peer-protocol"
-)
-
 // BuildLibp2pResourceManagerLimits builds the resource manager limits for the libp2p node.
 // Args:
 //
@@ -56,11 +36,11 @@ func BuildLibp2pResourceManagerLimits(logger zerolog.Logger, config *p2pconf.Res
 	scaled := defaultLimits.Scale(mem, fd)
 	scaledP := scaled.ToPartialLimitConfig()
 	override := rcmgr.PartialLimitConfig{}
-	override.System = ApplyResourceLimitOverride(logger, ResourceScopeSystem, scaledP.System, config.Override.System)
-	override.Transient = ApplyResourceLimitOverride(logger, ResourceScopeTransient, scaledP.Transient, config.Override.Transient)
-	override.ProtocolDefault = ApplyResourceLimitOverride(logger, ResourceScopeProtocol, scaledP.ProtocolDefault, config.Override.Protocol)
-	override.PeerDefault = ApplyResourceLimitOverride(logger, ResourceScopePeer, scaledP.PeerDefault, config.Override.Peer)
-	override.ProtocolPeerDefault = ApplyResourceLimitOverride(logger, ResourceScopePeerProtocol, scaledP.ProtocolPeerDefault, config.Override.PeerProtocol)
+	override.System = ApplyResourceLimitOverride(logger, p2pconf.ResourceScopeSystem, scaledP.System, config.Override.System)
+	override.Transient = ApplyResourceLimitOverride(logger, p2pconf.ResourceScopeTransient, scaledP.Transient, config.Override.Transient)
+	override.ProtocolDefault = ApplyResourceLimitOverride(logger, p2pconf.ResourceScopeProtocol, scaledP.ProtocolDefault, config.Override.Protocol)
+	override.PeerDefault = ApplyResourceLimitOverride(logger, p2pconf.ResourceScopePeer, scaledP.PeerDefault, config.Override.Peer)
+	override.ProtocolPeerDefault = ApplyResourceLimitOverride(logger, p2pconf.ResourceScopePeerProtocol, scaledP.ProtocolPeerDefault, config.Override.PeerProtocol)
 
 	limits := override.Build(scaled)
 	logger.Info().
@@ -86,7 +66,7 @@ func BuildLibp2pResourceManagerLimits(logger zerolog.Logger, config *p2pconf.Res
 //
 //	the overridden limit.
 func ApplyResourceLimitOverride(logger zerolog.Logger,
-	resourceScope ResourceScope,
+	resourceScope p2pconf.ResourceScope,
 	original rcmgr.ResourceLimits,
 	override p2pconf.ResourceManagerOverrideLimit) rcmgr.ResourceLimits {
 	lg := logger.With().Logger()

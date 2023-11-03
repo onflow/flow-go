@@ -143,8 +143,8 @@ func TestApplyInboundStreamAndConnectionLimits(t *testing.T) {
 	}
 
 	partial := rcmgr.PartialLimitConfig{}
-	partial.System = ApplyResourceLimitOverride(unittest.Logger(), ResourceScopeSystem, scaled.ToPartialLimitConfig().System, systemOverride)
-	partial.PeerDefault = ApplyResourceLimitOverride(unittest.Logger(), ResourceScopePeer, scaled.ToPartialLimitConfig().PeerDefault, peerOverride)
+	partial.System = ApplyResourceLimitOverride(unittest.Logger(), p2pconf.ResourceScopeSystem, scaled.ToPartialLimitConfig().System, systemOverride)
+	partial.PeerDefault = ApplyResourceLimitOverride(unittest.Logger(), p2pconf.ResourceScopePeer, scaled.ToPartialLimitConfig().PeerDefault, peerOverride)
 
 	final := partial.Build(scaled).ToPartialLimitConfig()
 	require.Equal(t, 456, int(final.System.StreamsOutbound))                                           // should be overridden.

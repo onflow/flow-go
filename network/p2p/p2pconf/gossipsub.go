@@ -79,3 +79,23 @@ type GossipSubTracerConfig struct {
 	// RpcSentTrackerNumOfWorkers number of workers for rpc sent tracker worker pool.
 	RpcSentTrackerNumOfWorkers int `validate:"gt=0" mapstructure:"gossipsub-rpc-sent-tracker-workers"`
 }
+
+// ResourceScope is the scope of the resource, e.g., system, transient, protocol, peer, peer-protocol.
+type ResourceScope string
+
+func (r ResourceScope) String() string {
+	return string(r)
+}
+
+const (
+	// ResourceScopeSystem is the system scope; the system scope dictates the maximum allowed value across all peers and protocols at the entire node level.
+	ResourceScopeSystem ResourceScope = "system"
+	// ResourceScopeTransient is the transient scope; the transient scope is used for resources that have not fully established and are under negotiation.
+	ResourceScopeTransient ResourceScope = "transient"
+	// ResourceScopeProtocol is the protocol scope; the protocol scope dictates the maximum allowed resource across all peers for that protocol.
+	ResourceScopeProtocol ResourceScope = "protocol"
+	// ResourceScopePeer is the peer scope; the peer scope dictates the maximum allowed resource for a specific peer.
+	ResourceScopePeer ResourceScope = "peer"
+	// ResourceScopePeerProtocol is the peer-protocol scope; the peer-protocol scope dictates the maximum allowed resource for a protocol and a peer.
+	ResourceScopePeerProtocol ResourceScope = "peer-protocol"
+)
