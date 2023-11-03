@@ -1,7 +1,6 @@
 package emulator
 
 import (
-	"math"
 	"math/big"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
@@ -86,90 +85,21 @@ type BlockView struct {
 	database types.Database
 }
 
-// MintTo mints tokens into the target address, if the address dees not
-// exist it would create it first.
-func (bl *BlockView) MintTo(
-	address types.Address,
-	amount *big.Int,
-) (*types.Result, error) {
+// DirectCall executes a direct call
+func (bl *BlockView) DirectCall(call *types.DirectCall) (*types.Result, error) {
 	proc, err := bl.newProcedure()
 	if err != nil {
 		return nil, err
 	}
-	res, err := proc.mintTo(address, amount)
-	if err != nil {
-		return res, err
+	var res *types.Result
+	switch call.SubType {
+	case types.DepositCallSubType:
+		res, err = proc.mintTo(call.To, call.Value)
+	case types.WithdrawCallSubType:
+		res, err = proc.withdrawFrom(call.From, call.Value)
+	default:
+		res, err = proc.run(call.Message(), types.DirectCallTxType)
 	}
-	res.TxType = types.DirectCallTxType
-	return res, bl.commit(res.StateRootHash)
-}
-
-// WithdrawFrom deduct the balance from the given address.
-func (bl *BlockView) WithdrawFrom(
-	address types.Address,
-	amount *big.Int,
-) (*types.Result, error) {
-	proc, err := bl.newProcedure()
-	if err != nil {
-		return nil, err
-	}
-	res, err := proc.withdrawFrom(address, amount)
-	if err != nil {
-		return res, err
-	}
-	res.TxType = types.DirectCallTxType
-	return res, bl.commit(res.StateRootHash)
-}
-
-// Transfer transfers flow token from an bridged account to another account
-// this is a similar functionality as calling a call with empty data,
-// mostly provided for a easier interaction
-//
-// Warning, This method should only be used for bridged accounts
-// where resource ownership has been verified
-func (bl *BlockView) Transfer(
-	from, to types.Address,
-	value *big.Int,
-) (*types.Result, error) {
-	msg := directCallMessage(from, &to, value, nil, math.MaxUint64)
-	return bl.runDirectCall(msg)
-}
-
-// Deploy deploys a contract at the given address
-// the value passed to this method would be deposited on the contract account
-//
-// Warning, This method should only be used for bridged accounts
-// where resource ownership has been verified
-func (bl *BlockView) Deploy(
-	caller types.Address,
-	code types.Code,
-	gasLimit uint64,
-	value *big.Int,
-) (*types.Result, error) {
-	msg := directCallMessage(caller, nil, value, code, gasLimit)
-	return bl.runDirectCall(msg)
-}
-
-// Call calls a smart contract with the input
-//
-// Warning, This method should only be used for bridged accounts
-// where resource ownership has been verified
-func (bl *BlockView) Call(
-	from, to types.Address,
-	data types.Data,
-	gasLimit uint64,
-	value *big.Int,
-) (*types.Result, error) {
-	msg := directCallMessage(from, &to, value, data, gasLimit)
-	return bl.runDirectCall(msg)
-}
-
-func (bl *BlockView) runDirectCall(msg *gethCore.Message) (*types.Result, error) {
-	proc, err := bl.newProcedure()
-	if err != nil {
-		return nil, err
-	}
-	res, err := proc.run(msg, types.DirectCallTxType)
 	if err != nil {
 		return res, err
 	}
@@ -268,6 +198,7 @@ func (proc *procedure) mintTo(address types.Address, amount *big.Int) (*types.Re
 	addr := address.ToCommon()
 	res := &types.Result{
 		GasConsumed: proc.config.DirectCallBaseGasUsage,
+		TxType:      types.DirectCallTxType,
 	}
 
 	// create account if not exist
@@ -290,6 +221,7 @@ func (proc *procedure) withdrawFrom(address types.Address, amount *big.Int) (*ty
 	addr := address.ToCommon()
 	res := &types.Result{
 		GasConsumed: proc.config.DirectCallBaseGasUsage,
+		TxType:      types.DirectCallTxType,
 	}
 
 	// check source balance
@@ -351,32 +283,6 @@ func (proc *procedure) run(msg *gethCore.Message, txType uint8) (*types.Result, 
 
 	res.StateRootHash, err = proc.commit()
 	return &res, err
-}
-
-func directCallMessage(
-	from types.Address,
-	to *types.Address,
-	value *big.Int,
-	data []byte,
-	gasLimit uint64,
-) *gethCore.Message {
-	var t *gethCommon.Address
-	if to != nil {
-		tc := to.ToCommon()
-		t = &tc
-	}
-	return &gethCore.Message{
-		From:      from.ToCommon(),
-		To:        t,
-		Value:     value,
-		Data:      data,
-		GasLimit:  gasLimit,
-		GasPrice:  big.NewInt(0), // price is set to zero fo direct calls // TODO update me from the config
-		GasTipCap: big.NewInt(1), // TODO revisit this value (also known as maxPriorityFeePerGas)
-		GasFeeCap: big.NewInt(2), // TODO revisit this value (also known as maxFeePerGas)
-		// AccessList:        tx.AccessList(), // TODO revisit this value, the cost matter but performance might
-		SkipAccountChecks: true, // this would let us not set the nonce
-	}
 }
 
 // Ramtin: this is the part of the code that we have to update if we hit performance problems

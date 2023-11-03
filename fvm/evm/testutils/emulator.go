@@ -17,11 +17,7 @@ type TestEmulator struct {
 	BalanceOfFunc      func(address types.Address) (*big.Int, error)
 	NonceOfFunc        func(address types.Address) (uint64, error)
 	CodeOfFunc         func(address types.Address) (types.Code, error)
-	MintToFunc         func(address types.Address, amount *big.Int) (*types.Result, error)
-	WithdrawFromFunc   func(address types.Address, amount *big.Int) (*types.Result, error)
-	TransferFunc       func(from types.Address, to types.Address, value *big.Int) (*types.Result, error)
-	DeployFunc         func(caller types.Address, code types.Code, gasLimit uint64, value *big.Int) (*types.Result, error)
-	CallFunc           func(caller types.Address, to types.Address, data types.Data, gasLimit uint64, value *big.Int) (*types.Result, error)
+	DirectCallFunc     func(call *types.DirectCall) (*types.Result, error)
 	RunTransactionFunc func(tx *gethTypes.Transaction) (*types.Result, error)
 }
 
@@ -61,44 +57,12 @@ func (em *TestEmulator) CodeOf(address types.Address) (types.Code, error) {
 	return em.CodeOfFunc(address)
 }
 
-// MintTo mints new tokens to this address
-func (em *TestEmulator) MintTo(address types.Address, amount *big.Int) (*types.Result, error) {
-	if em.MintToFunc == nil {
+// DirectCall executes a direct call
+func (em *TestEmulator) DirectCall(call *types.DirectCall) (*types.Result, error) {
+	if em.DirectCallFunc == nil {
 		panic("method not set")
 	}
-	return em.MintToFunc(address, amount)
-}
-
-// WithdrawFrom withdraws tokens from this address
-func (em *TestEmulator) WithdrawFrom(address types.Address, amount *big.Int) (*types.Result, error) {
-	if em.WithdrawFromFunc == nil {
-		panic("method not set")
-	}
-	return em.WithdrawFromFunc(address, amount)
-}
-
-// Transfer transfers token between addresses
-func (em *TestEmulator) Transfer(from types.Address, to types.Address, value *big.Int) (*types.Result, error) {
-	if em.TransferFunc == nil {
-		panic("method not set")
-	}
-	return em.TransferFunc(from, to, value)
-}
-
-// Deploy deploys an smart contract
-func (em *TestEmulator) Deploy(caller types.Address, code types.Code, gasLimit uint64, value *big.Int) (*types.Result, error) {
-	if em.DeployFunc == nil {
-		panic("method not set")
-	}
-	return em.DeployFunc(caller, code, gasLimit, value)
-}
-
-// Call makes a call to a smart contract
-func (em *TestEmulator) Call(caller types.Address, to types.Address, data types.Data, gasLimit uint64, value *big.Int) (*types.Result, error) {
-	if em.CallFunc == nil {
-		panic("method not set")
-	}
-	return em.CallFunc(caller, to, data, gasLimit, value)
+	return em.DirectCallFunc(call)
 }
 
 // RunTransaction runs a transaction and collect gas fees to the coinbase account
