@@ -44,6 +44,11 @@ type ReadOnlyBlockView interface {
 }
 
 // BlockView allows evm calls in the context of a block
+// Errors returned by BlockView is one of these types
+// - Fatal error
+// - Database error (non-fatal)
+// - EVM validation error
+// - EVM execution error
 type BlockView interface {
 	// executes a direct call
 	DirectCall(call *DirectCall) (*Result, error)
@@ -60,6 +65,9 @@ type Emulator interface {
 	NewBlockView(ctx BlockContext) (BlockView, error)
 }
 
+// Errors returned by Database is one of these types
+// - Fatal error
+// - Database error (non-fatal)
 type Database interface {
 	ethdb.KeyValueStore
 
