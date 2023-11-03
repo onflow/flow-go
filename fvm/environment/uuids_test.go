@@ -350,3 +350,35 @@ func TestUUIDGeneratorHardcodedPartitionIdGeneration(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, value, maxUint56Minus2+2)
 }
+
+func TestContinuati(t *testing.T) {
+	txnState := state.NewTransactionState(nil, state.DefaultParameters())
+	uuids := NewUUIDGenerator(
+		tracing.NewTracerSpan(),
+		zerolog.Nop(),
+		NewMeter(txnState),
+		txnState,
+		nil,
+		0)
+
+	// Hardcoded the partition to check for exact bytes
+	uuids.initialized = true
+	uuids.partition = 0x01
+	uuids.registerId = flow.UUIDRegisterID(0x01)
+
+	value, err := uuids.GenerateUUID()
+	require.NoError(t, err)
+	require.Equal(t, value, uint64(0x0000010000000000))
+
+	err = uuids.setUint56(0xFFFFFFFFFF)
+	require.NoError(t, err)
+
+	value, err = uuids.GenerateUUID()
+	require.NoError(t, err)
+	require.Equal(t, value, uint64(0x000001FFFFFFFFFF))
+
+	value, err = uuids.GenerateUUID()
+	require.NoError(t, err)
+	require.Equal(t, value, uint64(0x0001010000000000))
+
+}
