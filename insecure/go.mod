@@ -217,7 +217,6 @@ require (
 	github.com/prometheus/procfs v0.9.0 // indirect
 	github.com/psiemens/sconfig v0.1.0 // indirect
 	github.com/quic-go/qpack v0.4.0 // indirect
-	github.com/quic-go/qtls-go1-19 v0.3.2 // indirect
 	github.com/quic-go/qtls-go1-20 v0.3.4 // indirect
 	github.com/quic-go/quic-go v0.39.3 // indirect
 	github.com/quic-go/webtransport-go v0.6.0 // indirect
@@ -260,6 +259,7 @@ require (
 	go.opentelemetry.io/proto/otlp v0.19.0 // indirect
 	go.uber.org/dig v1.17.1 // indirect
 	go.uber.org/fx v1.20.1 // indirect
+	go.uber.org/mock v0.3.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.26.0 // indirect
 	golang.org/x/crypto v0.14.0 // indirect
