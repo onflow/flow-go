@@ -35,25 +35,21 @@ const (
 	bandwidthRateLimit  = "unicast-bandwidth-rate-limit"
 	bandwidthBurstLimit = "unicast-bandwidth-burst-limit"
 	// resource manager config
-	rootResourceManagerPrefix      = "libp2p-resource-manager"
-	memoryLimitRatioPrefix         = "memory-limit-ratio"
-	fileDescriptorsRatioPrefix     = "file-descriptors-ratio"
-	limitsOverridePrefix           = "limits-override"
-	systemScope                    = "system"
-	transientScope                 = "transient"
-	protocolScope                  = "protocol"
-	peerScope                      = "peer"
-	peerProtocolScope              = "peer-protocol"
-	inboundStreamLimit             = "streams-inbound"
-	outboundStreamLimit            = "streams-outbound"
-	inboundConnectionLimit         = "connections-inbound"
-	outboundConnectionLimit        = "connections-outbound"
-	fileDescriptorsLimit           = "fd"
-	memoryLimitBytes               = "memory-bytes"
-	inboundStreamLimitPeer         = "libp2p-inbound-stream-limit-peer"
-	inboundStreamLimitProtocol     = "libp2p-inbound-stream-limit-protocol"
-	inboundStreamLimitProtocolPeer = "libp2p-inbound-stream-limit-protocol-peer"
-	inboundStreamLimitTransient    = "libp2p-inbound-stream-limit-transient"
+	rootResourceManagerPrefix  = "libp2p-resource-manager"
+	memoryLimitRatioPrefix     = "memory-limit-ratio"
+	fileDescriptorsRatioPrefix = "file-descriptors-ratio"
+	limitsOverridePrefix       = "limits-override"
+	systemScope                = "system"
+	transientScope             = "transient"
+	protocolScope              = "protocol"
+	peerScope                  = "peer"
+	peerProtocolScope          = "peer-protocol"
+	inboundStreamLimit         = "streams-inbound"
+	outboundStreamLimit        = "streams-outbound"
+	inboundConnectionLimit     = "connections-inbound"
+	outboundConnectionLimit    = "connections-outbound"
+	fileDescriptorsLimit       = "fd"
+	memoryLimitBytes           = "memory-bytes"
 
 	// connection manager
 	highWatermark = "libp2p-high-watermark"
@@ -124,10 +120,6 @@ func AllFlagNames() []string {
 		bandwidthBurstLimit,
 		rootResourceManagerPrefix + "-" + memoryLimitRatioPrefix,
 		rootResourceManagerPrefix + "-" + fileDescriptorsRatioPrefix,
-		inboundStreamLimitPeer,
-		inboundStreamLimitProtocol,
-		inboundStreamLimitProtocolPeer,
-		inboundStreamLimitTransient,
 		highWatermark,
 		lowWatermark,
 		gracePeriod,
