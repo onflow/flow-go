@@ -4,8 +4,6 @@ import (
 	"context"
 	"crypto/md5" //nolint:gosec
 	"fmt"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -372,7 +370,7 @@ func (b *Backend) GetProtocolStateSnapshotByBlockID(ctx context.Context, blockID
 	}
 
 	if snapshotHeadByHeight.ID() != blockID {
-		return nil, status.Errorf(codes.Internal, "Snapshot for non-finalized block ")
+		return nil, fmt.Errorf("failed to retreive snapshot for block ID %v", blockID)
 	}
 
 	validSnapshot, err := b.getValidSnapshot(snapshotByHeight, 0)
