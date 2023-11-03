@@ -529,6 +529,20 @@ func (e *Engine) handleCollection(entity flow.Entity) error {
 
 	light := collection.Light()
 
+	lg := e.log.With().
+		Hex("collection_id", logging.Entity(light)).
+		Logger()
+
+	start := time.Now()
+	txCount := 0
+	lg.Debug().Msg("handling collection")
+	defer func() {
+		lg.Debug().
+			Int("tx_count", txCount).
+			Dur("duration_ms", time.Since(start)).
+			Msg("handled collection")
+	}()
+
 	if ti, found := e.collectionsToMarkFinalized.ByID(light.ID()); found {
 		for _, t := range light.Transactions {
 			e.metrics.TransactionFinalized(t, ti)
@@ -552,9 +566,7 @@ func (e *Engine) handleCollection(entity flow.Entity) error {
 	if err != nil {
 		// ignore collection if already seen
 		if errors.Is(err, storage.ErrAlreadyExists) {
-			e.log.Debug().
-				Hex("collection_id", logging.Entity(light)).
-				Msg("collection is already seen")
+			lg.Debug().Msg("collection is already seen")
 			return nil
 		}
 		return err
@@ -566,6 +578,7 @@ func (e *Engine) handleCollection(entity flow.Entity) error {
 		if err != nil {
 			return fmt.Errorf("could not store transaction (%x): %w", tx.ID(), err)
 		}
+		txCount++
 	}
 
 	return nil
@@ -574,7 +587,10 @@ func (e *Engine) handleCollection(entity flow.Entity) error {
 func (e *Engine) OnCollection(originID flow.Identifier, entity flow.Entity) {
 	err := e.handleCollection(entity)
 	if err != nil {
-		e.log.Error().Err(err).Msg("could not handle collection")
+		e.log.Error().
+			Err(err).
+			Hex("collection_id", logging.Entity(entity)).
+			Msg("could not handle collection")
 		return
 	}
 }
