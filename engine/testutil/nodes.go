@@ -637,7 +637,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	require.NoError(t, err)
 
 	checkpointHeight := uint64(0)
-	require.NoError(t, esbootstrap.ImportRegistersFromCheckpoint(node.Log, checkpointFile, checkpointHeight, pebbledb))
+	require.NoError(t, esbootstrap.ImportRegistersFromCheckpoint(node.Log, checkpointFile, checkpointHeight, pebbledb, 2))
 
 	diskStore, err := storagepebble.NewRegisters(pebbledb)
 	require.NoError(t, err)

@@ -798,7 +798,7 @@ func (exeNode *ExecutionNode) LoadRegisterStore(
 
 		checkpointHeight := root.Height
 
-		err = bootstrap.ImportRegistersFromCheckpoint(node.Logger, checkpointFile, checkpointHeight, pebbledb)
+		err = bootstrap.ImportRegistersFromCheckpoint(node.Logger, checkpointFile, checkpointHeight, pebbledb, exeNode.exeConf.importCheckpointWorkerCount)
 		if err != nil {
 			return fmt.Errorf("could not import registers from checkpoint: %w", err)
 		}
