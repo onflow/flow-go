@@ -58,7 +58,7 @@ func (m *stateMutator) Build() (hasChanges bool, updatedState *flow.ProtocolStat
 	return
 }
 
-// ApplyServiceEvents applies the state changes that are delivered via
+// ApplyServiceEventsFromValidatedSeals applies the state changes that are delivered via
 // sealed service events:
 //   - iterating over the sealed service events in order of increasing height
 //   - identifying state-changing service event and calling into the embedded
@@ -75,7 +75,7 @@ func (m *stateMutator) Build() (hasChanges bool, updatedState *flow.ProtocolStat
 //     there are no gaps in the seals.
 //   - The seals guarantee correctness of the sealed execution result, including the contained
 //     service events. This is actively checked by the verification node, whose aggregated
-//     approvals in the form of a seal attestation to the correctness of the sealed execution result,
+//     approvals in the form of a seal attest to the correctness of the sealed execution result,
 //     including the contained.
 //
 // Consensus nodes actively verify protocol compliance for any block proposal they receive,
@@ -144,6 +144,9 @@ func (m *stateMutator) ApplyServiceEventsFromValidatedSeals(seals []*flow.Seal) 
 	// block payload may not specify seals in order, so order them by block height before processing
 	orderedSeals, err := protocol.OrderedSeals(seals, m.headers)
 	if err != nil {
+		// Per API contract, the input seals must have already passed verification, which necessitates
+		// successful ordering. Hence, calling protocol.OrderedSeals with the same inputs that succeeded
+		// earlier now failed. In all cases, this is an exception.
 		if errors.Is(err, storage.ErrNotFound) {
 			return fmt.Errorf("ordering seals: parent payload contains seals for unknown block: %s", err.Error())
 		}
