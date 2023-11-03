@@ -154,7 +154,8 @@ func (bl *BlockView) newProcedure() (*procedure, error) {
 
 func (bl *BlockView) commit(rootHash gethCommon.Hash) error {
 	// commit atree changes back to the backend
-	return bl.database.Commit(rootHash)
+	err := bl.database.Commit(rootHash)
+	return handleCommitError(err)
 }
 
 type procedure struct {
@@ -170,7 +171,7 @@ func (proc *procedure) commit() (gethCommon.Hash, error) {
 	// to get the root hash
 	newRoot, err := proc.state.Commit(true)
 	if err != nil {
-		return gethTypes.EmptyRootHash, err
+		return gethTypes.EmptyRootHash, handleCommitError(err)
 	}
 
 	// flush the trie to the lower level db
@@ -181,9 +182,22 @@ func (proc *procedure) commit() (gethCommon.Hash, error) {
 	// have to explicitly ask the trie to commit to the underlying storage
 	err = proc.state.Database().TrieDB().Commit(newRoot, false)
 	if err != nil {
-		return gethTypes.EmptyRootHash, err
+		return gethTypes.EmptyRootHash, handleCommitError(err)
 	}
 	return newRoot, nil
+}
+
+func handleCommitError(err error) error {
+	if err == nil {
+		return nil
+	}
+	// if known types (database errors) don't do anything and return
+	if types.IsAFatalError(err) || types.IsADatabaseError(err) {
+		return err
+	}
+
+	// else is a new fatal error
+	return types.NewFatalError(err)
 }
 
 func (proc *procedure) mintTo(address types.Address, amount *big.Int) (*types.Result, error) {
