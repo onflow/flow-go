@@ -156,24 +156,26 @@ func TestApplyResourceLimitOverride(t *testing.T) {
 	require.Equal(t, scaled.ToPartialLimitConfig().System.ConnsOutbound, final.System.ConnsOutbound)   // should NOT be overridden.
 }
 
+// TestBuildLibp2pResourceManagerLimits tests the BuildLibp2pResourceManagerLimits function.
+// It creates a default configuration and an overridden configuration, and tests overriding the default configuration.
 func TestBuildLibp2pResourceManagerLimits(t *testing.T) {
 	cfg, err := config.DefaultConfig()
 	require.NoError(t, err)
 
+	// the default concrete limits is built from the default configuration.
 	defaultConcreteLimits, err := BuildLibp2pResourceManagerLimits(unittest.Logger(), &cfg.NetworkConfig.ResourceManager)
 	require.NoError(t, err)
 
+	// now the test creates random override configs for each scope, and re-build the concrete limits.
 	cfg.NetworkConfig.ResourceManager.Override.System = unittest.LibP2PResourceLimitOverrideFixture()
 	cfg.NetworkConfig.ResourceManager.Override.Transient = unittest.LibP2PResourceLimitOverrideFixture()
 	cfg.NetworkConfig.ResourceManager.Override.Protocol = unittest.LibP2PResourceLimitOverrideFixture()
 	cfg.NetworkConfig.ResourceManager.Override.Peer = unittest.LibP2PResourceLimitOverrideFixture()
 	cfg.NetworkConfig.ResourceManager.Override.PeerProtocol = unittest.LibP2PResourceLimitOverrideFixture()
-
 	overriddenConcreteLimits, err := BuildLibp2pResourceManagerLimits(unittest.Logger(), &cfg.NetworkConfig.ResourceManager)
 	require.NoError(t, err)
 
-	require.NotEqual(t, defaultConcreteLimits, overriddenConcreteLimits)
-	op := overriddenConcreteLimits.ToPartialLimitConfig()
+	// this function will evaluate that the limits are override correctly on each scope using the override config.
 	requireEqual := func(t *testing.T, override p2pconf.ResourceManagerOverrideLimit, actual rcmgr.ResourceLimits) {
 		require.Equal(t, override.StreamsInbound, int(actual.StreamsInbound))
 		require.Equal(t, override.StreamsOutbound, int(actual.StreamsOutbound))
@@ -182,6 +184,15 @@ func TestBuildLibp2pResourceManagerLimits(t *testing.T) {
 		require.Equal(t, override.FD, int(actual.FD))
 		require.Equal(t, override.Memory, int(actual.Memory))
 	}
+
+	op := overriddenConcreteLimits.ToPartialLimitConfig()
+	requireEqual(t, cfg.NetworkConfig.ResourceManager.Override.System, op.System)
+	requireEqual(t, cfg.NetworkConfig.ResourceManager.Override.Transient, op.Transient)
+	requireEqual(t, cfg.NetworkConfig.ResourceManager.Override.Protocol, op.ProtocolDefault)
+	requireEqual(t, cfg.NetworkConfig.ResourceManager.Override.Peer, op.PeerDefault)
+	requireEqual(t, cfg.NetworkConfig.ResourceManager.Override.PeerProtocol, op.ProtocolPeerDefault)
+
+	// this function will evaluate that the default limits (before overriding) are not equal to the overridden limits.
 	requireNotEqual := func(t *testing.T, a rcmgr.ResourceLimits, b rcmgr.ResourceLimits) {
 		require.NotEqual(t, a.StreamsInbound, b.StreamsInbound)
 		require.NotEqual(t, a.StreamsOutbound, b.StreamsOutbound)
@@ -190,13 +201,6 @@ func TestBuildLibp2pResourceManagerLimits(t *testing.T) {
 		require.NotEqual(t, a.FD, b.FD)
 		require.NotEqual(t, a.Memory, b.Memory)
 	}
-
-	requireEqual(t, cfg.NetworkConfig.ResourceManager.Override.System, op.System)
-	requireEqual(t, cfg.NetworkConfig.ResourceManager.Override.Transient, op.Transient)
-	requireEqual(t, cfg.NetworkConfig.ResourceManager.Override.Protocol, op.ProtocolDefault)
-	requireEqual(t, cfg.NetworkConfig.ResourceManager.Override.Peer, op.PeerDefault)
-	requireEqual(t, cfg.NetworkConfig.ResourceManager.Override.PeerProtocol, op.ProtocolPeerDefault)
-
 	dp := defaultConcreteLimits.ToPartialLimitConfig()
 	requireNotEqual(t, dp.System, op.System)
 	requireNotEqual(t, dp.Transient, op.Transient)
