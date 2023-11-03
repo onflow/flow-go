@@ -43,8 +43,8 @@ type ReadOnlyBlockView interface {
 	CodeOf(address Address) (Code, error)
 }
 
-// BlockView allows evm calls in the context of a block
-// Errors returned by BlockView is one of these types
+// BlockView facilitates execution of a transaction or a direct evm  call in the context of a block
+// Errors returned by the methods are one of the followings:
 // - Fatal error
 // - Database error (non-fatal)
 // - EVM validation error
@@ -57,6 +57,7 @@ type BlockView interface {
 	RunTransaction(tx *gethTypes.Transaction) (*Result, error)
 }
 
+// Emulator emulates an evm-compatible chain
 type Emulator interface {
 	// constructs a new block view
 	NewReadOnlyBlockView(ctx BlockContext) (ReadOnlyBlockView, error)
@@ -65,7 +66,8 @@ type Emulator interface {
 	NewBlockView(ctx BlockContext) (BlockView, error)
 }
 
-// Errors returned by Database is one of these types
+// Database provides what Emulator needs for storing tries and accounts
+// Errors returned by the methods are one of the followings:
 // - Fatal error
 // - Database error (non-fatal)
 type Database interface {
