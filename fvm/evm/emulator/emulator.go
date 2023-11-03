@@ -98,7 +98,7 @@ func (bl *BlockView) MintTo(
 	}
 	res, err := proc.mintTo(address, amount)
 	if err != nil {
-		return nil, err
+		return res, err
 	}
 	res.TxType = types.DirectCallTxType
 	return res, bl.commit(res.StateRootHash)
@@ -115,7 +115,7 @@ func (bl *BlockView) WithdrawFrom(
 	}
 	res, err := proc.withdrawFrom(address, amount)
 	if err != nil {
-		return nil, err
+		return res, err
 	}
 	res.TxType = types.DirectCallTxType
 	return res, bl.commit(res.StateRootHash)
@@ -131,17 +131,8 @@ func (bl *BlockView) Transfer(
 	from, to types.Address,
 	value *big.Int,
 ) (*types.Result, error) {
-	proc, err := bl.newProcedure()
-	if err != nil {
-		return nil, err
-	}
 	msg := directCallMessage(from, &to, value, nil, math.MaxUint64)
-	res, err := proc.run(msg)
-	if err != nil {
-		return res, err
-	}
-	res.TxType = types.DirectCallTxType
-	return res, bl.commit(res.StateRootHash)
+	return bl.runDirectCall(msg)
 }
 
 // Deploy deploys a contract at the given address
@@ -155,17 +146,8 @@ func (bl *BlockView) Deploy(
 	gasLimit uint64,
 	value *big.Int,
 ) (*types.Result, error) {
-	proc, err := bl.newProcedure()
-	if err != nil {
-		return nil, err
-	}
 	msg := directCallMessage(caller, nil, value, code, gasLimit)
-	res, err := proc.run(msg)
-	if err != nil {
-		return res, err
-	}
-	res.TxType = types.DirectCallTxType
-	return res, bl.commit(res.StateRootHash)
+	return bl.runDirectCall(msg)
 }
 
 // Call calls a smart contract with the input
@@ -178,16 +160,19 @@ func (bl *BlockView) Call(
 	gasLimit uint64,
 	value *big.Int,
 ) (*types.Result, error) {
+	msg := directCallMessage(from, &to, value, data, gasLimit)
+	return bl.runDirectCall(msg)
+}
+
+func (bl *BlockView) runDirectCall(msg *gethCore.Message) (*types.Result, error) {
 	proc, err := bl.newProcedure()
 	if err != nil {
 		return nil, err
 	}
-	msg := directCallMessage(from, &to, value, data, gasLimit)
-	res, err := proc.run(msg)
+	res, err := proc.run(msg, types.DirectCallTxType)
 	if err != nil {
 		return res, err
 	}
-	res.TxType = types.DirectCallTxType
 	return res, bl.commit(res.StateRootHash)
 }
 
@@ -210,13 +195,11 @@ func (bl *BlockView) RunTransaction(
 
 	// update tx context origin
 	proc.evm.TxContext.Origin = msg.From
-
-	res, err := proc.run(msg)
+	res, err := proc.run(msg, tx.Type())
 	if err != nil {
 		return res, err
 	}
 
-	res.TxType = tx.Type()
 	return res, bl.commit(res.StateRootHash)
 }
 
@@ -327,8 +310,10 @@ func (proc *procedure) withdrawFrom(address types.Address, amount *big.Int) (*ty
 	return res, err
 }
 
-func (proc *procedure) run(msg *gethCore.Message) (*types.Result, error) {
-	var res types.Result
+func (proc *procedure) run(msg *gethCore.Message, txType uint8) (*types.Result, error) {
+	res := types.Result{
+		TxType: txType,
+	}
 
 	gasPool := (*gethCore.GasPool)(&proc.config.BlockContext.GasLimit)
 	execResult, err := gethCore.NewStateTransition(
@@ -336,15 +321,15 @@ func (proc *procedure) run(msg *gethCore.Message) (*types.Result, error) {
 		msg,
 		gasPool,
 	).TransitionDb()
-
-	// if the error is a fatal error don't move forward
 	if err != nil {
+		// if the error is a fatal error don't move forward
 		if types.IsAFatalError(err) {
 			return &res, err
 		}
 		// when pre-checks has failed (non-fatal errors)
 		res.Failed = true
 		res.ErrorMessage = err.Error()
+		// wrap error with EVM error
 		err = types.NewEVMExecutionError(err)
 	}
 
@@ -356,6 +341,7 @@ func (proc *procedure) run(msg *gethCore.Message) (*types.Result, error) {
 		if execResult.Failed() { // collect vm errors
 			res.Failed = true
 			res.ErrorMessage = execResult.Err.Error()
+			err = types.NewEVMExecutionError(execResult.Err)
 		}
 		// If the transaction created a contract, store the creation address in the receipt.
 		if msg.To == nil {
