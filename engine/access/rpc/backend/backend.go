@@ -375,7 +375,7 @@ func (b *Backend) GetProtocolStateSnapshotByBlockID(ctx context.Context, blockID
 		return nil, status.Errorf(codes.Internal, "Snapshot for non-finalized block ")
 	}
 
-	validSnapshot, err := b.getValidSnapshot(snapshotHeadByHeight, 0)
+	validSnapshot, err := b.getValidSnapshot(snapshotByHeight, 0)
 	if err != nil {
 		return nil, err
 	}
