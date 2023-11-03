@@ -1,7 +1,6 @@
 package protocol_state
 
 import (
-	"fmt"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -11,33 +10,16 @@ type epochFallbackStateMachine struct {
 
 var _ ProtocolStateMachine = (*epochFallbackStateMachine)(nil)
 
-func newEpochFallbackStateMachine(view uint64, parentState *flow.RichProtocolStateEntry) (*epochFallbackStateMachine, error) {
-	if !parentState.InvalidStateTransitionAttempted {
-		return nil, fmt.Errorf("fallback state machine can be created only if we have already entered epoch fallback mode")
-	}
+func newEpochFallbackStateMachine(view uint64, parentState *flow.RichProtocolStateEntry) *epochFallbackStateMachine {
+	state := parentState.ProtocolStateEntry.Copy()
+	state.InvalidStateTransitionAttempted = true
 	return &epochFallbackStateMachine{
 		baseProtocolStateMachine: baseProtocolStateMachine{
 			parentState: parentState,
-			state:       parentState.ProtocolStateEntry.Copy(),
+			state:       state,
 			view:        view,
 		},
-	}, nil
-}
-
-func transitionToEpochFallbackStateMachine(baseStateMachine ProtocolStateMachine) (*epochFallbackStateMachine, error) {
-	parentState := baseStateMachine.ParentState()
-	if parentState.InvalidStateTransitionAttempted {
-		return nil, fmt.Errorf("could not create epoch fallback state machine as we are already in epoch fallback")
 	}
-	state, _, _ := baseStateMachine.Build()
-	state.InvalidStateTransitionAttempted = true
-	return &epochFallbackStateMachine{
-		baseProtocolStateMachine{
-			parentState: parentState,
-			state:       state,
-			view:        baseStateMachine.View(),
-		},
-	}, nil
 }
 
 func (m *epochFallbackStateMachine) ProcessEpochSetup(_ *flow.EpochSetup) error {

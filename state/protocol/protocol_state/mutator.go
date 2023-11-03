@@ -9,7 +9,7 @@ import (
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
-type EpochFallbackStateMachineFactoryMethod = func(ProtocolStateMachine) (ProtocolStateMachine, error)
+type EpochFallbackStateMachineFactoryMethod = func() (ProtocolStateMachine, error)
 
 // stateMutator is a stateful object to evolve the protocol state. It is instantiated from the parent block's protocol state.
 // State-changing operations can be iteratively applied and the stateMutator will internally evolve its in-memory state.
@@ -118,14 +118,13 @@ func (m *stateMutator) Build() (hasChanges bool, updatedState *flow.ProtocolStat
 //     of this function is not nil. If such an exception is returned, continuing is not an option.
 func (m *stateMutator) ApplyServiceEventsFromValidatedSeals(seals []*flow.Seal) error {
 	parentProtocolState := m.stateMachine.ParentState()
-	invalidStateTransitionAttempted := parentProtocolState.InvalidStateTransitionAttempted
 
 	// perform protocol state transition to next epoch if next epoch is committed and we are at first block of epoch
 	phase, err := parentProtocolState.EpochStatus().Phase()
 	if err != nil {
 		return fmt.Errorf("could not determine epoch phase: %w", err)
 	}
-	if !invalidStateTransitionAttempted && phase == flow.EpochPhaseCommitted {
+	if phase == flow.EpochPhaseCommitted {
 		activeSetup := parentProtocolState.CurrentEpochSetup
 		if m.stateMachine.View() > activeSetup.FinalView {
 			// TODO: this is a temporary workaround to allow for the epoch transition to be triggered
@@ -152,43 +151,47 @@ func (m *stateMutator) ApplyServiceEventsFromValidatedSeals(seals []*flow.Seal) 
 		// earlier now failed. In all cases, this is an exception.
 		return irrecoverable.NewExceptionf("ordering already validated seals unexpectedly failed: %w", err)
 	}
-	var dbUpdates []func(tx *transaction.Tx) error
+	var results []*flow.ExecutionResult
 	for _, seal := range orderedSeals {
 		result, err := m.results.ByID(seal.ResultID)
 		if err != nil {
 			return fmt.Errorf("could not get result (id=%x) for seal (id=%x): %w", seal.ResultID, seal.ID(), err)
 		}
+		results = append(results, result)
+	}
+	dbUpdates, err := m.applyServiceEventsFromOrderedResults(m.stateMachine, results)
+	if err != nil {
+		if protocol.IsInvalidServiceEventError(err) {
+			dbUpdates, err = m.transitionToEpochFallbackMode(results)
+			if err != nil {
+				return irrecoverable.NewExceptionf("could not transition to epoch fallback mode: %w", err)
+			}
+		} else {
+			return irrecoverable.NewExceptionf("could not apply service events from ordered results: %w", err)
+		}
+	}
+	m.pendingDbUpdates = append(m.pendingDbUpdates, dbUpdates...)
+	return nil
+}
 
+func (m *stateMutator) applyServiceEventsFromOrderedResults(stateMachine ProtocolStateMachine, results []*flow.ExecutionResult) ([]func(tx *transaction.Tx) error, error) {
+	var dbUpdates []func(tx *transaction.Tx) error
+	for _, result := range results {
 		for _, event := range result.ServiceEvents {
 			switch ev := event.Event.(type) {
 			case *flow.EpochSetup:
-				err := m.stateMachine.ProcessEpochSetup(ev)
+				err := stateMachine.ProcessEpochSetup(ev)
 				if err != nil {
-					if protocol.IsInvalidServiceEventError(err) {
-						err = m.transitionToEpochFallbackMode()
-						if err != nil {
-							return fmt.Errorf("could not transition to epoch fallback mode: %w", err)
-						}
-						continue
-					}
-					return irrecoverable.NewExceptionf("could not process epoch setup event: %w", err)
+					return nil, fmt.Errorf("could not process epoch setup event: %w", err)
 				}
 
 				// we'll insert the setup event when we insert the block
 				dbUpdates = append(dbUpdates, m.setups.StoreTx(ev))
 
 			case *flow.EpochCommit:
-				err = m.stateMachine.ProcessEpochCommit(ev)
+				err := stateMachine.ProcessEpochCommit(ev)
 				if err != nil {
-					if protocol.IsInvalidServiceEventError(err) {
-						// we have observed an invalid service event, which triggers epoch fallback mode
-						err = m.transitionToEpochFallbackMode()
-						if err != nil {
-							return fmt.Errorf("could not transition to epoch fallback mode: %w", err)
-						}
-						continue
-					}
-					return irrecoverable.NewExceptionf("could not process epoch commit event: %w", err)
+					return nil, fmt.Errorf("could not process epoch commit event: %w", err)
 				}
 
 				// we'll insert the commit event when we insert the block
@@ -196,20 +199,21 @@ func (m *stateMutator) ApplyServiceEventsFromValidatedSeals(seals []*flow.Seal) 
 			case *flow.VersionBeacon:
 				// do nothing for now
 			default:
-				return fmt.Errorf("invalid service event type (type_name=%s, go_type=%T)", event.Type, ev)
+				return nil, fmt.Errorf("invalid service event type (type_name=%s, go_type=%T)", event.Type, ev)
 			}
 		}
-
 	}
-	m.pendingDbUpdates = append(m.pendingDbUpdates, dbUpdates...)
-	return nil
+	return dbUpdates, nil
 }
 
-func (m *stateMutator) transitionToEpochFallbackMode() error {
-	fallbackStateMachine, err := m.createEpochFallbackStateMachine(m.stateMachine)
+func (m *stateMutator) transitionToEpochFallbackMode(results []*flow.ExecutionResult) ([]func(tx *transaction.Tx) error, error) {
+	fallbackStateMachine, err := m.createEpochFallbackStateMachine()
 	if err != nil {
-		return fmt.Errorf("could not transition to epoch fallback state machine: %w", err)
+		return nil, fmt.Errorf("could not transition to epoch fallback state machine: %w", err)
 	}
-	m.stateMachine = fallbackStateMachine
-	return nil
+	dbUpdates, err := m.applyServiceEventsFromOrderedResults(fallbackStateMachine, results)
+	if err != nil {
+		return nil, irrecoverable.NewExceptionf("could not apply service events after transition to epoch fallback mode: %w", err)
+	}
+	return dbUpdates, nil
 }

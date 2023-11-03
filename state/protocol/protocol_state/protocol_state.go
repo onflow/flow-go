@@ -85,10 +85,7 @@ func (s *MutableProtocolState) Mutator(candidateView uint64, parentID flow.Ident
 	}
 	var stateMachine ProtocolStateMachine
 	if parentState.InvalidStateTransitionAttempted {
-		stateMachine, err = newEpochFallbackStateMachine(candidateView, parentState)
-		if err != nil {
-			return nil, fmt.Errorf("could not create epoch fallback state machine at view (%d): %w", candidateView, err)
-		}
+		stateMachine = newEpochFallbackStateMachine(candidateView, parentState)
 	} else {
 		stateMachine, err = newStateMachine(candidateView, parentState)
 		if err != nil {
@@ -101,8 +98,8 @@ func (s *MutableProtocolState) Mutator(candidateView uint64, parentID flow.Ident
 		s.setups,
 		s.commits,
 		stateMachine,
-		func(baseStateMachine ProtocolStateMachine) (ProtocolStateMachine, error) {
-			return transitionToEpochFallbackStateMachine(baseStateMachine)
+		func() (ProtocolStateMachine, error) {
+			return newEpochFallbackStateMachine(candidateView, parentState), nil
 		},
 	), nil
 }
