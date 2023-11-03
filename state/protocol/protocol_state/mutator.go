@@ -147,10 +147,7 @@ func (m *stateMutator) ApplyServiceEventsFromValidatedSeals(seals []*flow.Seal) 
 		// Per API contract, the input seals must have already passed verification, which necessitates
 		// successful ordering. Hence, calling protocol.OrderedSeals with the same inputs that succeeded
 		// earlier now failed. In all cases, this is an exception.
-		if errors.Is(err, storage.ErrNotFound) {
-			return fmt.Errorf("ordering seals: parent payload contains seals for unknown block: %s", err.Error())
-		}
-		return fmt.Errorf("unexpected error ordering seals: %w", err)
+		return irrecoverable.NewExceptionf("ordering already validated seals unexpectedly failed: %w", err)
 	}
 	var dbUpdates []func(tx *transaction.Tx) error
 	for _, seal := range orderedSeals {
