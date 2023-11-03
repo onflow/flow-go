@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/md5" //nolint:gosec
 	"fmt"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -357,14 +359,23 @@ func (b *Backend) GetLatestProtocolStateSnapshot(_ context.Context) ([]byte, err
 
 // GetProtocolStateSnapshotByBlockID returns finalized snapshot by block id
 func (b *Backend) GetProtocolStateSnapshotByBlockID(ctx context.Context, blockID flow.Identifier) ([]byte, error) {
-	block, _, err := b.backendBlockDetails.GetBlockByID(ctx, blockID)
+	snapshotByBlockId := b.state.AtBlockID(blockID)
+	snapshotHeadByBlockId, err := snapshotByBlockId.Head()
 	if err != nil {
 		return nil, err
 	}
 
-	snapshot := b.state.AtHeight(block.Header.Height)
+	snapshotByHeight := b.state.AtHeight(snapshotHeadByBlockId.Height)
+	snapshotHeadByHeight, err := snapshotByHeight.Head()
+	if err != nil {
+		return nil, err
+	}
 
-	validSnapshot, err := b.getValidSnapshot(snapshot, 0)
+	if snapshotHeadByHeight.ID() != blockID {
+		return nil, status.Errorf(codes.Internal, "Snapshot for non-finalized block ")
+	}
+
+	validSnapshot, err := b.getValidSnapshot(snapshotHeadByHeight, 0)
 	if err != nil {
 		return nil, err
 	}
