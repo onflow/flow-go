@@ -37,31 +37,42 @@ func (e *Loader) LoadUnexecuted(ctx context.Context) ([]flow.Identifier, error) 
 	lastExecuted := e.execState.GetHighestFinalizedExecuted()
 
 	// get finalized height
-	final, err := e.state.Final().Head()
+	finalized := e.state.Final()
+	final, err := finalized.Head()
 	if err != nil {
 		return nil, fmt.Errorf("could not get finalized block: %w", err)
 	}
 
 	// TODO: dynamically bootstrapped execution node will reload blocks from
-	unexecuted := make([]flow.Identifier, 0)
+	unexecutedFinalized := make([]flow.Identifier, 0)
 
 	// starting from the first unexecuted block, go through each unexecuted and finalized block
 	// reload its block to execution queues
+	// loading finalized blocks
 	for height := lastExecuted + 1; height <= final.Height; height++ {
 		header, err := e.getHeaderByHeight(height)
 		if err != nil {
 			return nil, fmt.Errorf("could not get header at height: %v, %w", height, err)
 		}
 
-		unexecuted = append(unexecuted, header.ID())
+		unexecutedFinalized = append(unexecutedFinalized, header.ID())
 	}
+
+	// loaded all pending blocks
+	pendings, err := finalized.Descendants()
+	if err != nil {
+		return nil, fmt.Errorf("could not get descendants of finalized block: %w", err)
+	}
+
+	unexecuted := append(unexecutedFinalized, pendings...)
 
 	e.log.Info().
 		Uint64("last_finalized", final.Height).
 		Uint64("last_finalized_executed", lastExecuted).
 		// Uint64("sealed_root_height", rootBlock.Height).
 		// Hex("sealed_root_id", logging.Entity(rootBlock)).
-		Int("total_finalized_unexecuted", len(unexecuted)).
+		Int("total_finalized_unexecuted", len(unexecutedFinalized)).
+		Int("total_unexecuted", len(unexecuted)).
 		Msgf("finalized unexecuted blocks")
 
 	return unexecuted, nil
