@@ -195,6 +195,18 @@ func (u *stateMachine) SetInvalidStateTransitionAttempted() {
 	u.state.InvalidStateTransitionAttempted = true
 }
 
+// IsInvalidStateTransitionAttempted returns true if and only if the state machine has left the
+// protocol-defined path of normal operation. The protocol implementation provides a
+// 'Epoch Fallback Mode' to account for the possibility of system smart contract bugs or systematic
+// bugs in the node implementation. If a state transition is attempted that does not match the
+// implementation's notion of normal operation, it goes into 'Epoch Fallback Mode'. In this state,
+// the network will continue to operate with the last known valid protocol state, but drop any epoch
+// lifecycle events. Ejection events are processed on a best-effort basis, because the network might
+// still need to eject misbehaving nodes despite being in Epoch Fallback Mode.
+func (u *stateMachine) IsInvalidStateTransitionAttempted() bool {
+	return u.state.InvalidStateTransitionAttempted
+}
+
 // TransitionToNextEpoch updates the notion of 'current epoch', 'previous' and 'next epoch' in the protocol
 // state. An epoch transition is only allowed when:
 // - next epoch has been set up,
