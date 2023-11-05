@@ -9,27 +9,22 @@ import (
 	"github.com/onflow/flow-go/model/flow/order"
 )
 
-// IsValidExtendingEpochSetup checks whether an epoch setup service being
-// added to the state is valid. In addition to intrinsic validity, we also
-// check that it is valid w.r.t. the previous epoch setup event, and the
-// current epoch status.
-// Assumes all inputs besides extendingSetup are already validated.
+// IsValidExtendingEpochSetup checks whether an EpochSetup service event being added to the state is valid.
+// In addition to intrinsic validity, we also check that it is valid w.r.t. the previous epoch setup event,
+// and the current epoch status.
+// CAUTION: This function assumes that all inputs besides extendingCommit are already validated.
 // Expected errors during normal operations:
 // * protocol.InvalidServiceEventError if the input service event is invalid to extend the currently active epoch status
 func IsValidExtendingEpochSetup(extendingSetup *flow.EpochSetup, activeSetup *flow.EpochSetup, status *flow.EpochStatus) error {
-	// We should only have a single epoch setup event per epoch.
-	if status.NextEpoch.SetupID != flow.ZeroID {
+	// Enforce EpochSetup is valid w.r.t to current epoch state
+	if status.NextEpoch.SetupID != flow.ZeroID { // We should only have a single epoch setup event per epoch.
 		// true iff EpochSetup event for NEXT epoch was already included before
 		return NewInvalidServiceEventErrorf("duplicate epoch setup service event: %x", status.NextEpoch.SetupID)
 	}
-
-	// The setup event should have the counter increased by one.
-	if extendingSetup.Counter != activeSetup.Counter+1 {
+	if extendingSetup.Counter != activeSetup.Counter+1 { // The setup event should have the counter increased by one.
 		return NewInvalidServiceEventErrorf("next epoch setup has invalid counter (%d => %d)", activeSetup.Counter, extendingSetup.Counter)
 	}
-
-	// The first view needs to be exactly one greater than the current epoch final view
-	if extendingSetup.FirstView != activeSetup.FinalView+1 {
+	if extendingSetup.FirstView != activeSetup.FinalView+1 { // The first view needs to be exactly one greater than the current epoch final view
 		return NewInvalidServiceEventErrorf(
 			"next epoch first view must be exactly 1 more than current epoch final view (%d != %d+1)",
 			extendingSetup.FirstView,
@@ -37,31 +32,37 @@ func IsValidExtendingEpochSetup(extendingSetup *flow.EpochSetup, activeSetup *fl
 		)
 	}
 
-	// Finally, the epoch setup event must contain all necessary information.
+	// Enforce the EpochSetup event is syntactically correct
 	err := VerifyEpochSetup(extendingSetup, true)
 	if err != nil {
 		return NewInvalidServiceEventErrorf("invalid epoch setup: %w", err)
 	}
-
 	return nil
 }
 
-// VerifyEpochSetup checks whether an `EpochSetup` event is syntactically correct.
-// The boolean parameter `verifyNetworkAddress` controls, whether we want to permit
-// nodes to share a networking address.
-// This is a side-effect-free function. Any error return indicates that the
-// EpochSetup event is not compliant with protocol rules.
+// VerifyEpochSetup checks whether an `EpochSetup` event is syntactically correct. The boolean parameter `verifyNetworkAddress`
+// controls, whether we want to permit nodes to share a networking address.
+// This is a side-effect-free function. Any error return indicates that the EpochSetup event is not compliant with protocol rules.
 func VerifyEpochSetup(setup *flow.EpochSetup, verifyNetworkAddress bool) error {
-	// STEP 1: general sanity checks
-	// the seed needs to be at least minimum length
+	// 1. CHECK: Enforce protocol compliance of Epoch parameters:
+	// - RandomSource of entropy in Epoch Setup event should the protocol-prescribed length
+	// - first view must be before final view
 	if len(setup.RandomSource) != flow.EpochSetupRandomSourceLength {
 		return fmt.Errorf("seed has incorrect length (%d != %d)", len(setup.RandomSource), flow.EpochSetupRandomSourceLength)
 	}
+	if setup.FirstView >= setup.FinalView {
+		return fmt.Errorf("first view (%d) must be before final view (%d)", setup.FirstView, setup.FinalView)
+	}
 
-	// STEP 2: sanity checks of all nodes listed as participants
-	// there should be no duplicate node IDs
+	// 2. CHECK: Enforce protocol compliance active participants:
+	// (a) each has a unique node ID,
+	// (b) each has a unique network address (if `verifyNetworkAddress` is true),
+	// (c) participants are sorted in canonical order.
+	//     Note that the system smart contracts manage the identity table as an unordered set! For the protocol state, we desire a fixed
+	//	   ordering to simplify various implementation details, like the DKG. Therefore, we order identities in `flow.EpochSetup` during
+	//	   conversion from cadence to Go in the function `convert.ServiceEvent(flow.ChainID, flow.Event)` in package `model/convert`
 	identLookup := make(map[flow.Identifier]struct{})
-	for _, participant := range setup.Participants {
+	for _, participant := range setup.Participants { // (a) enforce uniqueness of NodeIDs
 		_, ok := identLookup[participant.NodeID]
 		if ok {
 			return fmt.Errorf("duplicate node identifier (%x)", participant.NodeID)
@@ -69,8 +70,7 @@ func VerifyEpochSetup(setup *flow.EpochSetup, verifyNetworkAddress bool) error {
 		identLookup[participant.NodeID] = struct{}{}
 	}
 
-	if verifyNetworkAddress {
-		// there should be no duplicate node addresses
+	if verifyNetworkAddress { // (b) enforce uniqueness of networking address
 		addrLookup := make(map[string]struct{})
 		for _, participant := range setup.Participants {
 			_, ok := addrLookup[participant.Address]
@@ -81,83 +81,72 @@ func VerifyEpochSetup(setup *flow.EpochSetup, verifyNetworkAddress bool) error {
 		}
 	}
 
-	// the participants must be listed in canonical order
-	if !setup.Participants.Sorted(order.Canonical[flow.IdentitySkeleton]) {
+	if !setup.Participants.Sorted(order.Canonical[flow.IdentitySkeleton]) { // (c) enforce canonical ordering
 		return fmt.Errorf("participants are not canonically ordered")
 	}
 
-	// STEP 3: sanity checks for individual roles
-	// IMPORTANT: here we remove all nodes with zero weight, as they are allowed to partake
-	// in communication but not in respective node functions
+	// 3. CHECK: Enforce sufficient number of nodes for each role
+	// IMPORTANT: here we remove all nodes with zero weight, as they are allowed to partake in communication but not in respective node functions
 	activeParticipants := setup.Participants.Filter(filter.HasInitialWeight[flow.IdentitySkeleton](true))
-
-	// we need at least one node of each role
-	roles := make(map[flow.Role]uint)
+	activeNodeCountByRole := make(map[flow.Role]uint)
 	for _, participant := range activeParticipants {
-		roles[participant.Role]++
+		activeNodeCountByRole[participant.Role]++
 	}
-	if roles[flow.RoleConsensus] < 1 {
+	if activeNodeCountByRole[flow.RoleConsensus] < 1 {
 		return fmt.Errorf("need at least one consensus node")
 	}
-	if roles[flow.RoleCollection] < 1 {
+	if activeNodeCountByRole[flow.RoleCollection] < 1 {
 		return fmt.Errorf("need at least one collection node")
 	}
-	if roles[flow.RoleExecution] < 1 {
+	if activeNodeCountByRole[flow.RoleExecution] < 1 {
 		return fmt.Errorf("need at least one execution node")
 	}
-	if roles[flow.RoleVerification] < 1 {
+	if activeNodeCountByRole[flow.RoleVerification] < 1 {
 		return fmt.Errorf("need at least one verification node")
 	}
 
-	// first view must be before final view
-	if setup.FirstView >= setup.FinalView {
-		return fmt.Errorf("first view (%d) must be before final view (%d)", setup.FirstView, setup.FinalView)
-	}
-
-	// we need at least one collection cluster
-	if len(setup.Assignments) == 0 {
+	// 4. CHECK: Enforce protocol compliance of collector cluster assignment
+	//  (0) there is at least one collector cluster
+	//	(a) assignment only contains nodes with collector role and positive weight
+	//	(b) collectors have unique node IDs
+	//	(c) each collector is assigned exactly to one cluster and is only listed once within that cluster
+	//	(d) cluster contains at least one collector (i.e. is not empty)
+	//	(e) cluster is composed of known nodes
+	//	(f) cluster assignment lists the nodes in canonical ordering
+	if len(setup.Assignments) == 0 { // enforce (0): at least one cluster
 		return fmt.Errorf("need at least one collection cluster")
 	}
-
-	// the collection cluster assignments need to be valid
+	// Unpacking the cluster assignments (NodeIDs → IdentitySkeletons) enforces (a) - (f)
 	_, err := factory.NewClusterList(setup.Assignments, activeParticipants.Filter(filter.HasRole[flow.IdentitySkeleton](flow.RoleCollection)))
 	if err != nil {
 		return fmt.Errorf("invalid cluster assignments: %w", err)
 	}
-
 	return nil
 }
 
-// IsValidExtendingEpochCommit checks whether an epoch commit service being
-// added to the state is valid. In addition to intrinsic validity, we also
-// check that it is valid w.r.t. the previous epoch setup event, and the
-// current epoch status.
-// Assumes all inputs besides extendingCommit are already validated.
+// IsValidExtendingEpochCommit checks whether an EpochCommit service event being added to the state is valid.
+// In addition to intrinsic validity, we also check that it is valid w.r.t. the previous epoch setup event, and
+// the current epoch status.
+// CAUTION: This function assumes that all inputs besides extendingCommit are already validated.
 // Expected errors during normal operations:
 // * protocol.InvalidServiceEventError if the input service event is invalid to extend the currently active epoch status
 func IsValidExtendingEpochCommit(extendingCommit *flow.EpochCommit, extendingSetup *flow.EpochSetup, activeSetup *flow.EpochSetup, status *flow.EpochStatus) error {
-
-	// We should only have a single epoch commit event per epoch.
-	if status.NextEpoch.CommitID != flow.ZeroID {
-		// true iff EpochCommit event for NEXT epoch was already included before
+	// Enforce EpochSetup is valid w.r.t to current epoch state
+	if status.NextEpoch.CommitID != flow.ZeroID { // We should only have a single epoch commit event per epoch.
 		return NewInvalidServiceEventErrorf("duplicate epoch commit service event: %x", status.NextEpoch.CommitID)
 	}
-
-	// The epoch setup event needs to happen before the commit.
-	if status.NextEpoch.SetupID == flow.ZeroID {
+	if status.NextEpoch.SetupID == flow.ZeroID { // The epoch setup event needs to happen before the commit.
 		return NewInvalidServiceEventErrorf("missing epoch setup for epoch commit")
 	}
-
-	// The commit event should have the counter increased by one.
-	if extendingCommit.Counter != activeSetup.Counter+1 {
+	if extendingCommit.Counter != activeSetup.Counter+1 { // The commit event should have the counter increased by one.
 		return NewInvalidServiceEventErrorf("next epoch commit has invalid counter (%d => %d)", activeSetup.Counter, extendingCommit.Counter)
 	}
 
+	// Enforce the EpochSetup event is syntactically correct and compatible with the respective EpochSetup
 	err := IsValidEpochCommit(extendingCommit, extendingSetup)
 	if err != nil {
 		return NewInvalidServiceEventErrorf("invalid epoch commit: %s", err)
 	}
-
 	return nil
 }
 
@@ -166,7 +155,6 @@ func IsValidExtendingEpochCommit(extendingCommit *flow.EpochCommit, extendingSet
 // Expected errors during normal operations:
 // * protocol.InvalidServiceEventError if the EpochCommit is invalid
 func IsValidEpochCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error {
-
 	if len(setup.Assignments) != len(commit.ClusterQCs) {
 		return NewInvalidServiceEventErrorf("number of clusters (%d) does not number of QCs (%d)", len(setup.Assignments), len(commit.ClusterQCs))
 	}
@@ -184,6 +172,5 @@ func IsValidEpochCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error 
 	if len(participants) != len(commit.DKGParticipantKeys) {
 		return NewInvalidServiceEventErrorf("participant list (len=%d) does not match dkg key list (len=%d)", len(participants), len(commit.DKGParticipantKeys))
 	}
-
 	return nil
 }
