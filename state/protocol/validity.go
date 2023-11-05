@@ -59,8 +59,8 @@ func VerifyEpochSetup(setup *flow.EpochSetup, verifyNetworkAddress bool) error {
 	// (b) each has a unique network address (if `verifyNetworkAddress` is true),
 	// (c) participants are sorted in canonical order.
 	//     Note that the system smart contracts manage the identity table as an unordered set! For the protocol state, we desire a fixed
-	//	   ordering to simplify various implementation details, like the DKG. Therefore, we order identities in `flow.EpochSetup` during
-	//	   conversion from cadence to Go in the function `convert.ServiceEvent(flow.ChainID, flow.Event)` in package `model/convert`
+	//     ordering to simplify various implementation details, like the DKG. Therefore, we order identities in `flow.EpochSetup` during
+	//     conversion from cadence to Go in the function `convert.ServiceEvent(flow.ChainID, flow.Event)` in package `model/convert`
 	identLookup := make(map[flow.Identifier]struct{})
 	for _, participant := range setup.Participants { // (a) enforce uniqueness of NodeIDs
 		_, ok := identLookup[participant.NodeID]
