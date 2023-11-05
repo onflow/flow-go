@@ -84,6 +84,5 @@ func (s *MutableProtocolState) Mutator(candidateView uint64, parentID flow.Ident
 	if err != nil {
 		return nil, fmt.Errorf("could not query parent protocol state at block (%x): %w", parentID, err)
 	}
-	return newStateMutator(s.headers, s.results, s.setups, s.commits,
-		newStateMachine(candidateView, parentState)), nil
+	return newStateMutator(s.headers, s.results, s.setups, s.commits, newStateMachine(candidateView, parentState)), nil
 }
