@@ -106,13 +106,13 @@ func VerifyEpochSetup(setup *flow.EpochSetup, verifyNetworkAddress bool) error {
 	}
 
 	// 4. CHECK: Enforce protocol compliance of collector cluster assignment
-	//  (0) there is at least one collector cluster
-	//	(a) assignment only contains nodes with collector role and positive weight
-	//	(b) collectors have unique node IDs
-	//	(c) each collector is assigned exactly to one cluster and is only listed once within that cluster
-	//	(d) cluster contains at least one collector (i.e. is not empty)
-	//	(e) cluster is composed of known nodes
-	//	(f) cluster assignment lists the nodes in canonical ordering
+	//   (0) there is at least one collector cluster
+	//   (a) assignment only contains nodes with collector role and positive weight
+	//   (b) collectors have unique node IDs
+	//   (c) each collector is assigned exactly to one cluster and is only listed once within that cluster
+	//   (d) cluster contains at least one collector (i.e. is not empty)
+	//   (e) cluster is composed of known nodes
+	//   (f) cluster assignment lists the nodes in canonical ordering
 	if len(setup.Assignments) == 0 { // enforce (0): at least one cluster
 		return fmt.Errorf("need at least one collection cluster")
 	}
