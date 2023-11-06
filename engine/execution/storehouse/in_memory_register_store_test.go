@@ -42,8 +42,8 @@ func TestInMemoryRegisterStore(t *testing.T) {
 	//  2. SaveRegisters should fail if its parent block doesn't exist and it is not the pruned block
 	//     SaveRegisters should succeed if height is above pruned height and block is not saved,
 	//     the updates can be retrieved by GetUpdatedRegisters
-	//     GetRegister should return ErrPruned if the queried key is not updated since pruned height
-	//     GetRegister should return ErrPruned if the queried height is below pruned height
+	//     GetRegister should return PrunedError if the queried key is not updated since pruned height
+	//     GetRegister should return PrunedError if the queried height is below pruned height
 	//     GetRegister should return ErrNotExecuted if the block is unknown
 	t.Run("FailParentNotExist", func(t *testing.T) {
 		t.Parallel()
@@ -90,7 +90,7 @@ func TestInMemoryRegisterStore(t *testing.T) {
 		// unknown key
 		_, err = store.GetRegister(height, blockID, unknownKey)
 		require.Error(t, err)
-		pe, ok := IsErrPruned(err)
+		pe, ok := IsPrunedError(err)
 		require.True(t, ok)
 		require.Equal(t, pe.PrunedHeight, pruned)
 		require.Equal(t, pe.Height, height)
@@ -108,7 +108,7 @@ func TestInMemoryRegisterStore(t *testing.T) {
 		// too low height
 		_, err = store.GetRegister(height-1, unknownBlock, reg.Key)
 		require.Error(t, err)
-		pe, ok = IsErrPruned(err)
+		pe, ok = IsPrunedError(err)
 		require.True(t, ok)
 		require.Equal(t, pe.PrunedHeight, pruned)
 		require.Equal(t, pe.Height, height-1)
@@ -216,7 +216,7 @@ func TestInMemoryRegisterStore(t *testing.T) {
 	//     GetRegister(B, X) should return 1, because X is not updated in B
 	//     GetRegister(B, Y) should return 3, because Y is updated in B
 	//     GetRegister(A, Y) should return 2, because the query queries the value at A, not B
-	//     GetRegister(B, Z) should return ErrPruned, because register is unknown
+	//     GetRegister(B, Z) should return PrunedError, because register is unknown
 	//     GetRegister(C, X) should return BlockNotExecuted, because block is not executed (unexecuted)
 	t.Run("GetLatestValueOK", func(t *testing.T) {
 		t.Parallel()
@@ -260,7 +260,7 @@ func TestInMemoryRegisterStore(t *testing.T) {
 
 		_, err = store.GetRegister(pruned+2, blockB, unknownKey)
 		require.Error(t, err)
-		pe, ok := IsErrPruned(err)
+		pe, ok := IsPrunedError(err)
 		require.True(t, ok)
 		require.Equal(t, pe.PrunedHeight, pruned)
 		require.Equal(t, pe.Height, pruned+2)
@@ -415,7 +415,7 @@ func TestInMemoryRegisterStore(t *testing.T) {
 
 		_, err = store.GetRegister(pruned+1, blockA, reg.Key) // A is pruned
 		require.Error(t, err)
-		pe, ok := IsErrPruned(err)
+		pe, ok := IsPrunedError(err)
 		require.True(t, ok)
 		require.Equal(t, pe.PrunedHeight, pruned+1)
 		require.Equal(t, pe.Height, pruned+1)
@@ -603,9 +603,9 @@ func TestInMemoryRegisterStore(t *testing.T) {
 		wg.Wait()
 	})
 
-	t.Run("ErrPruned", func(t *testing.T) {
-		e := NewErrPruned(1, 2)
-		pe, ok := IsErrPruned(e)
+	t.Run("PrunedError", func(t *testing.T) {
+		e := NewPrunedError(1, 2)
+		pe, ok := IsPrunedError(e)
 		require.True(t, ok)
 		require.Equal(t, uint64(1), pe.Height)
 		require.Equal(t, uint64(2), pe.PrunedHeight)
