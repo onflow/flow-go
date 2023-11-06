@@ -283,7 +283,7 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 	initRecord, err := r.init()
 	if err != nil {
 		// the error is considered fatal as it means that we cannot generate a random initial decay.
-		lg.Fatal().Str("misbehavior_type", notification.MsgType.String()).Msg("unknown misbehaviour type")
+		lg.Fatal().Str("misbehavior_type", notification.MsgType.String()).Msg("failed to initialize app specific score record")
 	}
 	initialized := r.spamScoreCache.Add(notification.PeerID, initRecord)
 	if initialized {
