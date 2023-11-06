@@ -498,11 +498,11 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 
 	_, fixedENIDs := suite.setupReceipts(&block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
-	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil).Maybe()
+	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
 	// create a mock connection factory
 	connFactory := connectionmock.NewConnectionFactory(suite.T())
-	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil).Maybe()
+	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
 	exeEventReq := &execproto.GetTransactionByIndexRequest{
 		BlockId: blockId[:],
@@ -537,7 +537,7 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 	// tests that signaler context received error when node state is inconsistent
 	suite.Run(fmt.Sprintf("TestGetTransactionResultByIndex - fails with %v", "inconsistent node`s state"), func() {
 		err := fmt.Errorf("inconsistent node`s state")
-		suite.snapshot.On("Head").Return(nil, err)
+		suite.snapshot.On("Head").Return(nil, err).Once()
 
 		// mock signaler context expect an error
 		backend.backendTransactions.ctx = irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), err)
@@ -548,7 +548,7 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 }
 
 func (suite *Suite) TestGetTransactionResultsByBlockID() {
-	suite.state.On("Sealed").Return(suite.snapshot, nil)
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 
 	ctx := context.Background()
 	block := unittest.BlockFixture()
@@ -560,8 +560,8 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 		Return(&block, nil)
 
 	_, fixedENIDs := suite.setupReceipts(&block)
-	suite.state.On("Final").Return(suite.snapshot, nil)
-	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil).Maybe()
+	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
+	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
 	// create a mock connection factory
 	connFactory := connectionmock.NewConnectionFactory(suite.T())
@@ -588,8 +588,7 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 		Return(exeEventResp, nil)
 
 	suite.Run("GetTransactionResultsByBlockID - happy path", func() {
-		head := unittest.BlockHeaderFixture()
-		suite.snapshot.On("Head").Return(head, nil).Once()
+		suite.snapshot.On("Head").Return(block.Header, nil).Once()
 
 		result, err := backend.GetTransactionResultsByBlockID(ctx, blockId, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
 		suite.checkResponse(result, err)
