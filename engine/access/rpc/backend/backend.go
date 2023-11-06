@@ -356,7 +356,7 @@ func (b *Backend) GetLatestProtocolStateSnapshot(_ context.Context) ([]byte, err
 }
 
 // GetProtocolStateSnapshotByBlockID returns finalized snapshot by block id
-func (b *Backend) GetProtocolStateSnapshotByBlockID(ctx context.Context, blockID flow.Identifier) ([]byte, error) {
+func (b *Backend) GetProtocolStateSnapshotByBlockID(_ context.Context, blockID flow.Identifier) ([]byte, error) {
 	snapshotByBlockId := b.state.AtBlockID(blockID)
 	snapshotHeadByBlockId, err := snapshotByBlockId.Head()
 	if err != nil {

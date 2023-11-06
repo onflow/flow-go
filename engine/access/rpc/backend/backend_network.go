@@ -81,7 +81,7 @@ func (b *backendNetwork) GetLatestProtocolStateSnapshot(_ context.Context) ([]by
 }
 
 // GetProtocolStateSnapshotByBlockID returns serializable Snapshot by blockID
-func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(ctx context.Context, blockID flow.Identifier) ([]byte, error) {
+func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(_ context.Context, blockID flow.Identifier) ([]byte, error) {
 	snapshotByBlockId := b.state.AtBlockID(blockID)
 	snapshotHeadByBlockId, err := snapshotByBlockId.Head()
 	if err != nil {
@@ -112,7 +112,7 @@ func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(ctx context.Context, 
 }
 
 // GetProtocolStateSnapshotByHeight returns serializable Snapshot by block height
-func (b *backendNetwork) GetProtocolStateSnapshotByHeight(ctx context.Context, blockHeight uint64) ([]byte, error) {
+func (b *backendNetwork) GetProtocolStateSnapshotByHeight(_ context.Context, blockHeight uint64) ([]byte, error) {
 	snapshot := b.state.AtHeight(blockHeight)
 
 	validSnapshot, err := b.getValidSnapshot(snapshot, 0)
