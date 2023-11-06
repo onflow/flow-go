@@ -143,9 +143,9 @@ network-config:
   #  The lower bound on the decay value for a spam record when initialized.
   #  A random value in a range of InitDecayLowerBound and InitDecayUpperBound is used when initializing the decay
   #  of a spam record.
-  gossipsub-scoring-registry-init-decay-lowerbound: .5
+  gossipsub-scoring-registry-init-decay-lower-bound: .5
   #  The upper bound on the decay value for a spam record when initialized.
-  gossipsub-scoring-registry-init-decay-upperbound: .7
+  gossipsub-scoring-registry-init-decay-upper-bound: .7
   #  The threshold for which when the negative penalty is below this value the decay threshold will be increased by some amount. This will
   #  lead to malicious nodes having longer decays while honest nodes will have faster decays.
   gossipsub-scoring-registry-increase-decay-threshold: -99

@@ -71,8 +71,8 @@ const (
 	metricsInspectorCacheSize       = "gossipsub-rpc-metrics-inspector-cache-size"
 
 	// gossipsub scoring registry
-	scoringRegistryInitDecayLowerbound       = "gossipsub-scoring-registry-init-decay-lowerbound"
-	scoringRegistryInitDecayUpperbound       = "gossipsub-scoring-registry-init-decay-upperbound"
+	scoringRegistryInitDecayLowerbound       = "gossipsub-scoring-registry-init-decay-lower-bound"
+	scoringRegistryInitDecayUpperbound       = "gossipsub-scoring-registry-init-decay-upper-bound"
 	scoringRegistryIncreaseDecayThreshold    = "gossipsub-scoring-registry-increase-decay-threshold"
 	scoringRegistryDecayThresholdIncrementer = "gossipsub-scoring-registry-decay-threshold-incrementer"
 

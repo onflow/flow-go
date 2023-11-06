@@ -351,15 +351,15 @@ func DefaultDecayFunction() netcache.PreprocessorFunc {
 // InitAppScoreRecordStateFunc returns a func that will initialize the spac record state for a peer. The initial decay for the
 // spam record will be a random value between the lower and upper bounds provided.
 // Args:
-//   - decayLowerbound: the lower bound of the range for the initial random decay value
-//   - decayUpperbound: the upper bound of the range for the initial random decay value
+//   - decayLowerBound: the lower bound of the range for the initial random decay value
+//   - decayUpperBound: the upper bound of the range for the initial random decay value
 //
 // Returns:
 //   - callback func that initializes and returns a spam record.
-func InitAppScoreRecordStateFunc(decayLowerbound, decayUpperbound float64) func() p2p.GossipSubSpamRecord {
+func InitAppScoreRecordStateFunc(decayLowerBound, decayUpperBound float64) func() p2p.GossipSubSpamRecord {
 	return func() p2p.GossipSubSpamRecord {
 		return p2p.GossipSubSpamRecord{
-			Decay:   rand.Float64()*(decayUpperbound-decayLowerbound) + decayLowerbound,
+			Decay:   rand.Float64()*(decayUpperBound-decayLowerBound) + decayLowerBound,
 			Penalty: 0,
 		}
 	}

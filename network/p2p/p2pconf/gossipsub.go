@@ -33,9 +33,9 @@ type GossipSubScoringRegistryConfig struct {
 	// InitDecayLowerBound is the lower bound on the decay value for a spam record when initialized.
 	// A random value in a range of InitDecayLowerBound and InitDecayUpperBound is used when initializing the decay
 	// of a spam record.
-	InitDecayLowerBound float64 `validate:"gt=0,lt=1" mapstructure:"gossipsub-scoring-registry-init-decay-lowerbound"`
+	InitDecayLowerBound float64 `validate:"gt=0,lt=1,ltfield=InitDecayUpperBound" mapstructure:"gossipsub-scoring-registry-init-decay-lower-bound"`
 	// InitDecayUpperBound is the upper bound on the decay value for a spam record when initialized.
-	InitDecayUpperBound float64 `validate:"gt=0,lt=1,gtfield=InitDecayLowerBound" mapstructure:"gossipsub-scoring-registry-init-decay-upperbound"`
+	InitDecayUpperBound float64 `validate:"gt=0,lt=1,gtfield=InitDecayLowerBound" mapstructure:"gossipsub-scoring-registry-init-decay-upper-bound"`
 	// IncreaseDecayThreshold is the threshold for which when the negative penalty is below this value the decay threshold will be increased by some amount. This will
 	// lead to malicious nodes having longer decays while honest nodes will have faster decays.
 	IncreaseDecayThreshold float64 `validate:"gt=-100,lt=0" mapstructure:"gossipsub-scoring-registry-increase-decay-threshold"`
