@@ -2,9 +2,10 @@ package cohort1
 
 import (
 	"context"
-	"github.com/onflow/flow-go/integration/tests/mvp"
 	"testing"
 	"time"
+
+	"github.com/onflow/flow-go/integration/tests/mvp"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/suite"
