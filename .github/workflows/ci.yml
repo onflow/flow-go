@@ -243,9 +243,9 @@ jobs:
           - name: Access Cohort3 Integration Tests
             make: make -C integration access-cohort3-tests
             runner: ubuntu-latest
-#          - name: BFT (Framework) Integration Tests
-#            make: make -C integration bft-framework-tests
-#            runner: buildjet-8vcpu-ubuntu-2204
+          - name: BFT (Framework) Integration Tests
+            make: make -C integration bft-framework-tests
+            runner: buildjet-8vcpu-ubuntu-2204
           - name: BFT (Protocol) Integration Tests
             make: make -C integration bft-protocol-tests
             runner: ubuntu-latest
@@ -258,30 +258,30 @@ jobs:
           - name: Consensus Integration Tests
             make: make -C integration consensus-tests
             runner: ubuntu-latest
-#          - name: Epoch Cohort1 Integration Tests
-#            make: make -C integration epochs-cohort1-tests
-#            runner: buildjet-4vcpu-ubuntu-2204
-#          - name: Epoch Cohort2 Integration Tests
-#            make: make -C integration epochs-cohort2-tests
-#            runner: buildjet-4vcpu-ubuntu-2204
-#          - name: Execution Integration Tests
-#            make: make -C integration execution-tests
-#            runner: buildjet-4vcpu-ubuntu-2204
-#          - name: Ghost Integration Tests
-#            make: make -C integration ghost-tests
-#            runner: buildjet-4vcpu-ubuntu-2204
-#          - name: MVP Integration Tests
-#            make: make -C integration mvp-tests
-#            runner: buildjet-4vcpu-ubuntu-2204
-#          - name: Network Integration Tests
-#            make: make -C integration network-tests
-#            runner: buildjet-4vcpu-ubuntu-2204
+          - name: Epoch Cohort1 Integration Tests
+            make: make -C integration epochs-cohort1-tests
+            runner: buildjet-4vcpu-ubuntu-2204
+          - name: Epoch Cohort2 Integration Tests
+            make: make -C integration epochs-cohort2-tests
+            runner: buildjet-4vcpu-ubuntu-2204
+          - name: Execution Integration Tests
+            make: make -C integration execution-tests
+            runner: buildjet-4vcpu-ubuntu-2204
+          - name: Ghost Integration Tests
+            make: make -C integration ghost-tests
+            runner: buildjet-4vcpu-ubuntu-2204
+          - name: MVP Integration Tests
+            make: make -C integration mvp-tests
+            runner: buildjet-4vcpu-ubuntu-2204
+          - name: Network Integration Tests
+            make: make -C integration network-tests
+            runner: buildjet-4vcpu-ubuntu-2204
           - name: Verification Integration Tests
             make: make -C integration verification-tests
             runner: ubuntu-latest
-#          - name: Upgrade Integration Tests
-#            make: make -C integration upgrades-tests
-#            runner: buildjet-4vcpu-ubuntu-2204
+          - name: Upgrade Integration Tests
+            make: make -C integration upgrades-tests
+            runner: buildjet-4vcpu-ubuntu-2204
     runs-on: ${{ matrix.runner }}
     steps:
     - name: Checkout repo
