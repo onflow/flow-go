@@ -127,7 +127,7 @@ func TestContractInteraction(t *testing.T) {
 					require.NotNil(t, contractAddr)
 					retCode, err := blk.CodeOf(contractAddr)
 					require.NoError(t, err)
-					require.True(t, len(retCode) > 0)
+					require.NotEmpty(t, retCode)
 
 					retBalance, err := blk.BalanceOf(contractAddr)
 					require.NoError(t, err)

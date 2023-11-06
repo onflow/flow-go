@@ -233,7 +233,7 @@ func (proc *procedure) withdrawFrom(address types.Address, amount *big.Int) (*ty
 
 	// check source balance
 	// if balance is lower than amount return
-	if proc.state.GetBalance(addr).Cmp(amount) == -1 {
+	if proc.state.GetBalance(addr).Cmp(amount) < 0 {
 		return res, types.ErrInsufficientBalance
 	}
 

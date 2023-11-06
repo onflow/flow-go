@@ -108,7 +108,7 @@ func (err DatabaseError) Error() string {
 	return fmt.Sprintf("database error: %v", err.err)
 }
 
-// IsDatabaseError returns true if the error or any underlying errors
+// IsADatabaseError returns true if the error or any underlying errors
 // is of the type EVM validation error
 func IsADatabaseError(err error) bool {
 	return errors.As(err, &DatabaseError{})
