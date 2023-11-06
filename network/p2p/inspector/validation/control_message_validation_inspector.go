@@ -128,7 +128,7 @@ func NewControlMsgValidationInspector(params *InspectorParams) (*ControlMsgValid
 
 	store := queue.NewHeroStore(params.Config.CacheSize, params.Logger, inspectMsgQueueCacheCollector)
 
-	pool := worker.NewWorkerPoolBuilder[*InspectRPCRequest](lg, store, c.ProcessInspectRPCReq).Build()
+	pool := worker.NewWorkerPoolBuilder[*InspectRPCRequest](lg, store, c.processInspectRPCReq).Build()
 
 	c.workerPool = pool
 
@@ -157,6 +157,28 @@ func (c *ControlMsgValidationInspector) Start(parent irrecoverable.SignalerConte
 	c.Component.Start(parent)
 }
 
+// Name returns the name of the rpc inspector.
+func (c *ControlMsgValidationInspector) Name() string {
+	return rpcInspectorComponentName
+}
+
+// ActiveClustersChanged consumes cluster ID update protocol events.
+func (c *ControlMsgValidationInspector) ActiveClustersChanged(clusterIDList flow.ChainIDList) {
+	c.tracker.StoreActiveClusterIds(clusterIDList)
+}
+
+// SetTopicOracle Sets the topic oracle. The topic oracle is used to determine the list of topics that the node is subscribed to.
+// If an oracle is not set, the node will not be able to determine the list of topics that the node is subscribed to.
+// This func is expected to be called once and will return an error on all subsequent calls.
+// All errors returned from this func are considered irrecoverable.
+func (c *ControlMsgValidationInspector) SetTopicOracle(topicOracle func() []string) error {
+	if c.topicOracle != nil {
+		return fmt.Errorf("topic oracle already set")
+	}
+	c.topicOracle = topicOracle
+	return nil
+}
+
 // Inspect is called by gossipsub upon reception of a rpc from a remote  node.
 // It creates a new InspectRPCRequest for the RPC to be inspected async by the worker pool.
 // Args:
@@ -166,7 +188,7 @@ func (c *ControlMsgValidationInspector) Start(parent irrecoverable.SignalerConte
 // Returns:
 //   - error: if a new inspect rpc request cannot be created, all errors returned are considered irrecoverable.
 func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) error {
-	c.TruncateRPC(from, rpc)
+	c.truncateRPC(from, rpc)
 	// queue further async inspection
 	req, err := NewInspectRPCRequest(from, rpc)
 	if err != nil {
@@ -181,14 +203,14 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 	return nil
 }
 
-// ProcessInspectRPCReq func used by component workers to perform further inspection of RPC control messages that will validate ensure all control message
+// processInspectRPCReq func used by component workers to perform further inspection of RPC control messages that will validate ensure all control message
 // types are valid in the RPC.
 // Args:
 //   - req: the inspect rpc request.
 //
 // Returns:
 //   - error: no error is expected to be returned from this func as they are logged and distributed in invalid control message notifications.
-func (c *ControlMsgValidationInspector) ProcessInspectRPCReq(req *InspectRPCRequest) error {
+func (c *ControlMsgValidationInspector) processInspectRPCReq(req *InspectRPCRequest) error {
 	c.metrics.AsyncProcessingStarted()
 	start := time.Now()
 	defer func() {
@@ -258,7 +280,7 @@ func (c *ControlMsgValidationInspector) checkPubsubMessageSender(message *pubsub
 	return nil
 }
 
-// inspectGraftMessages performs topic validation on all grafts in the control message using the provided ValidateTopic func while tracking duplicates.
+// inspectGraftMessages performs topic validation on all grafts in the control message using the provided validateTopic func while tracking duplicates.
 // Args:
 // - from: peer ID of the sender.
 // - grafts: the list of grafts to inspect.
@@ -273,7 +295,7 @@ func (c *ControlMsgValidationInspector) inspectGraftMessages(from peer.ID, graft
 			return NewDuplicateTopicErr(topic.String(), p2pmsg.CtrlMsgGraft)
 		}
 		tracker.set(topic.String())
-		err := c.ValidateTopic(from, topic, activeClusterIDS)
+		err := c.validateTopic(from, topic, activeClusterIDS)
 		if err != nil {
 			return err
 		}
@@ -281,7 +303,7 @@ func (c *ControlMsgValidationInspector) inspectGraftMessages(from peer.ID, graft
 	return nil
 }
 
-// inspectPruneMessages performs topic validation on all prunes in the control message using the provided ValidateTopic func while tracking duplicates.
+// inspectPruneMessages performs topic validation on all prunes in the control message using the provided validateTopic func while tracking duplicates.
 // Args:
 // - from: peer ID of the sender.
 // - prunes: the list of iHaves to inspect.
@@ -298,7 +320,7 @@ func (c *ControlMsgValidationInspector) inspectPruneMessages(from peer.ID, prune
 			return NewDuplicateTopicErr(topic.String(), p2pmsg.CtrlMsgPrune)
 		}
 		tracker.set(topic.String())
-		err := c.ValidateTopic(from, topic, activeClusterIDS)
+		err := c.validateTopic(from, topic, activeClusterIDS)
 		if err != nil {
 			return err
 		}
@@ -306,7 +328,7 @@ func (c *ControlMsgValidationInspector) inspectPruneMessages(from peer.ID, prune
 	return nil
 }
 
-// inspectIHaveMessages performs topic validation on all ihaves in the control message using the provided ValidateTopic func while tracking duplicates.
+// inspectIHaveMessages performs topic validation on all ihaves in the control message using the provided validateTopic func while tracking duplicates.
 // Args:
 // - from: peer ID of the sender.
 // - iHaves: the list of iHaves to inspect.
@@ -334,7 +356,7 @@ func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihave
 			return NewDuplicateTopicErr(topic, p2pmsg.CtrlMsgIHave)
 		}
 		duplicateTopicTracker.set(topic)
-		err := c.ValidateTopic(from, channels.Topic(topic), activeClusterIDS)
+		err := c.validateTopic(from, channels.Topic(topic), activeClusterIDS)
 		if err != nil {
 			return err
 		}
@@ -466,7 +488,7 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 			}
 		}
 		topic := channels.Topic(message.GetTopic())
-		err := c.ValidateTopic(from, topic, activeClusterIDS)
+		err := c.validateTopic(from, topic, activeClusterIDS)
 		if err != nil {
 			errs = multierror.Append(errs, err)
 			continue
@@ -486,21 +508,21 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 	return nil, 0
 }
 
-// TruncateRPC truncates the RPC by truncating each control message type using the configured max sample size values.
+// truncateRPC truncates the RPC by truncating each control message type using the configured max sample size values.
 // Args:
 // - from: peer ID of the sender.
 // - rpc: the pubsub RPC.
-func (c *ControlMsgValidationInspector) TruncateRPC(from peer.ID, rpc *pubsub.RPC) {
+func (c *ControlMsgValidationInspector) truncateRPC(from peer.ID, rpc *pubsub.RPC) {
 	for _, ctlMsgType := range p2pmsg.ControlMessageTypes() {
 		switch ctlMsgType {
 		case p2pmsg.CtrlMsgGraft:
-			c.TruncateGraftMessages(rpc)
+			c.truncateGraftMessages(rpc)
 		case p2pmsg.CtrlMsgPrune:
-			c.TruncatePruneMessages(rpc)
+			c.truncatePruneMessages(rpc)
 		case p2pmsg.CtrlMsgIHave:
-			c.TruncateIHaveMessages(rpc)
+			c.truncateIHaveMessages(rpc)
 		case p2pmsg.CtrlMsgIWant:
-			c.TruncateIWantMessages(from, rpc)
+			c.truncateIWantMessages(from, rpc)
 		default:
 			// sanity check this should never happen
 			c.logAndThrowError(fmt.Errorf("unknown control message type encountered during RPC truncation"))
@@ -508,11 +530,11 @@ func (c *ControlMsgValidationInspector) TruncateRPC(from peer.ID, rpc *pubsub.RP
 	}
 }
 
-// TruncateGraftMessages truncates the Graft control messages in the RPC. If the total number of Grafts in the RPC exceeds the configured
+// truncateGraftMessages truncates the Graft control messages in the RPC. If the total number of Grafts in the RPC exceeds the configured
 // GraftPruneMessageMaxSampleSize the list of Grafts will be truncated.
 // Args:
 //   - rpc: the rpc message to truncate.
-func (c *ControlMsgValidationInspector) TruncateGraftMessages(rpc *pubsub.RPC) {
+func (c *ControlMsgValidationInspector) truncateGraftMessages(rpc *pubsub.RPC) {
 	grafts := rpc.GetControl().GetGraft()
 	totalGrafts := len(grafts)
 	if totalGrafts == 0 {
@@ -528,11 +550,11 @@ func (c *ControlMsgValidationInspector) TruncateGraftMessages(rpc *pubsub.RPC) {
 	rpc.Control.Graft = grafts[:sampleSize]
 }
 
-// TruncatePruneMessages truncates the Prune control messages in the RPC. If the total number of Prunes in the RPC exceeds the configured
+// truncatePruneMessages truncates the Prune control messages in the RPC. If the total number of Prunes in the RPC exceeds the configured
 // GraftPruneMessageMaxSampleSize the list of Prunes will be truncated.
 // Args:
 //   - rpc: the rpc message to truncate.
-func (c *ControlMsgValidationInspector) TruncatePruneMessages(rpc *pubsub.RPC) {
+func (c *ControlMsgValidationInspector) truncatePruneMessages(rpc *pubsub.RPC) {
 	prunes := rpc.GetControl().GetPrune()
 	totalPrunes := len(prunes)
 	if totalPrunes == 0 {
@@ -548,11 +570,11 @@ func (c *ControlMsgValidationInspector) TruncatePruneMessages(rpc *pubsub.RPC) {
 	rpc.Control.Prune = prunes[:sampleSize]
 }
 
-// TruncateIHaveMessages truncates the iHaves control messages in the RPC. If the total number of iHaves in the RPC exceeds the configured
+// truncateIHaveMessages truncates the iHaves control messages in the RPC. If the total number of iHaves in the RPC exceeds the configured
 // MaxSampleSize the list of iHaves will be truncated.
 // Args:
 //   - rpc: the rpc message to truncate.
-func (c *ControlMsgValidationInspector) TruncateIHaveMessages(rpc *pubsub.RPC) {
+func (c *ControlMsgValidationInspector) truncateIHaveMessages(rpc *pubsub.RPC) {
 	ihaves := rpc.GetControl().GetIhave()
 	totalIHaves := len(ihaves)
 	if totalIHaves == 0 {
@@ -567,14 +589,14 @@ func (c *ControlMsgValidationInspector) TruncateIHaveMessages(rpc *pubsub.RPC) {
 		ihaves[i], ihaves[j] = ihaves[j], ihaves[i]
 	})
 	rpc.Control.Ihave = ihaves[:sampleSize]
-	c.TruncateIHaveMessageIds(rpc)
+	c.truncateIHaveMessageIds(rpc)
 }
 
-// TruncateIHaveMessageIds truncates the message ids for each iHave control message in the RPC. If the total number of message ids in a single iHave exceeds the configured
+// truncateIHaveMessageIds truncates the message ids for each iHave control message in the RPC. If the total number of message ids in a single iHave exceeds the configured
 // MaxMessageIDSampleSize the list of message ids will be truncated. Before message ids are truncated the iHave control messages should have been truncated themselves.
 // Args:
 //   - rpc: the rpc message to truncate.
-func (c *ControlMsgValidationInspector) TruncateIHaveMessageIds(rpc *pubsub.RPC) {
+func (c *ControlMsgValidationInspector) truncateIHaveMessageIds(rpc *pubsub.RPC) {
 	for _, ihave := range rpc.GetControl().GetIhave() {
 		messageIDs := ihave.GetMessageIDs()
 		totalMessageIDs := len(messageIDs)
@@ -592,11 +614,11 @@ func (c *ControlMsgValidationInspector) TruncateIHaveMessageIds(rpc *pubsub.RPC)
 	}
 }
 
-// TruncateIWantMessages truncates the iWant control messages in the RPC. If the total number of iWants in the RPC exceeds the configured
+// truncateIWantMessages truncates the iWant control messages in the RPC. If the total number of iWants in the RPC exceeds the configured
 // MaxSampleSize the list of iWants will be truncated.
 // Args:
 //   - rpc: the rpc message to truncate.
-func (c *ControlMsgValidationInspector) TruncateIWantMessages(from peer.ID, rpc *pubsub.RPC) {
+func (c *ControlMsgValidationInspector) truncateIWantMessages(from peer.ID, rpc *pubsub.RPC) {
 	iWants := rpc.GetControl().GetIwant()
 	totalIWants := uint(len(iWants))
 	if totalIWants == 0 {
@@ -647,28 +669,6 @@ func (c *ControlMsgValidationInspector) truncateIWantMessageIds(from peer.ID, rp
 	}
 }
 
-// Name returns the name of the rpc inspector.
-func (c *ControlMsgValidationInspector) Name() string {
-	return rpcInspectorComponentName
-}
-
-// ActiveClustersChanged consumes cluster ID update protocol events.
-func (c *ControlMsgValidationInspector) ActiveClustersChanged(clusterIDList flow.ChainIDList) {
-	c.tracker.StoreActiveClusterIds(clusterIDList)
-}
-
-// SetTopicOracle Sets the topic oracle. The topic oracle is used to determine the list of topics that the node is subscribed to.
-// If an oracle is not set, the node will not be able to determine the list of topics that the node is subscribed to.
-// This func is expected to be called once and will return an error on all subsequent calls.
-// All errors returned from this func are considered irrecoverable.
-func (c *ControlMsgValidationInspector) SetTopicOracle(topicOracle func() []string) error {
-	if c.topicOracle != nil {
-		return fmt.Errorf("topic oracle already set")
-	}
-	c.topicOracle = topicOracle
-	return nil
-}
-
 // performSample performs sampling on the specified control message that will randomize
 // the items in the control message slice up to index sampleSize-1. Any error encountered during sampling is considered
 // irrecoverable and will cause the node to crash.
@@ -679,7 +679,7 @@ func (c *ControlMsgValidationInspector) performSample(ctrlMsg p2pmsg.ControlMess
 	}
 }
 
-// ValidateTopic ensures the topic is a valid flow topic/channel.
+// validateTopic ensures the topic is a valid flow topic/channel.
 // Expected error returns during normal operations:
 //   - channels.InvalidTopicErr: if topic is invalid.
 //   - ErrActiveClusterIdsNotSet: if the cluster ID provider is not set.
@@ -687,7 +687,7 @@ func (c *ControlMsgValidationInspector) performSample(ctrlMsg p2pmsg.ControlMess
 //
 // This func returns an exception in case of unexpected bug or state corruption if cluster prefixed topic validation
 // fails due to unexpected error returned when getting the active cluster IDS.
-func (c *ControlMsgValidationInspector) ValidateTopic(from peer.ID, topic channels.Topic, activeClusterIds flow.ChainIDList) error {
+func (c *ControlMsgValidationInspector) validateTopic(from peer.ID, topic channels.Topic, activeClusterIds flow.ChainIDList) error {
 	channel, ok := channels.ChannelFromTopic(topic)
 	if !ok {
 		return channels.NewInvalidTopicErr(topic, fmt.Errorf("failed to get channel from topic"))
