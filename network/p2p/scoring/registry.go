@@ -50,23 +50,27 @@ const (
 	iHaveMisbehaviourPenalty = -10
 	// iWantMisbehaviourPenalty is the penalty applied to the application specific penalty when a peer conducts a iWant misbehaviour.
 	iWantMisbehaviourPenalty = -10
+	// rpcPublishMessageMisbehaviourPenalty is the penalty applied to the application specific penalty when a peer conducts a RpcPublishMessageMisbehaviourPenalty misbehaviour.
+	rpcPublishMessageMisbehaviourPenalty = -10
 )
 
 // GossipSubCtrlMsgPenaltyValue is the penalty value for each control message type.
 type GossipSubCtrlMsgPenaltyValue struct {
-	Graft float64 // penalty value for an individual graft message misbehaviour.
-	Prune float64 // penalty value for an individual prune message misbehaviour.
-	IHave float64 // penalty value for an individual iHave message misbehaviour.
-	IWant float64 // penalty value for an individual iWant message misbehaviour.
+	Graft             float64 // penalty value for an individual graft message misbehaviour.
+	Prune             float64 // penalty value for an individual prune message misbehaviour.
+	IHave             float64 // penalty value for an individual iHave message misbehaviour.
+	IWant             float64 // penalty value for an individual iWant message misbehaviour.
+	RpcPublishMessage float64 // penalty value for an individual RpcPublishMessage message misbehaviour.
 }
 
 // DefaultGossipSubCtrlMsgPenaltyValue returns the default penalty value for each control message type.
 func DefaultGossipSubCtrlMsgPenaltyValue() GossipSubCtrlMsgPenaltyValue {
 	return GossipSubCtrlMsgPenaltyValue{
-		Graft: graftMisbehaviourPenalty,
-		Prune: pruneMisbehaviourPenalty,
-		IHave: iHaveMisbehaviourPenalty,
-		IWant: iWantMisbehaviourPenalty,
+		Graft:             graftMisbehaviourPenalty,
+		Prune:             pruneMisbehaviourPenalty,
+		IHave:             iHaveMisbehaviourPenalty,
+		IWant:             iWantMisbehaviourPenalty,
+		RpcPublishMessage: rpcPublishMessageMisbehaviourPenalty,
 	}
 }
 
@@ -289,6 +293,8 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 			record.Penalty += r.penalty.IHave
 		case p2pmsg.CtrlMsgIWant:
 			record.Penalty += r.penalty.IWant
+		case p2pmsg.RpcPublishMessage:
+			record.Penalty += r.penalty.RpcPublishMessage
 		default:
 			// the error is considered fatal as it means that we have an unsupported misbehaviour type, we should crash the node to prevent routing attack vulnerability.
 			lg.Fatal().Str("misbehavior_type", notification.MsgType.String()).Msg("unknown misbehaviour type")
