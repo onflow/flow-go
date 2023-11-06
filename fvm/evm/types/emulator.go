@@ -3,7 +3,9 @@ package types
 import (
 	"math/big"
 
+	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/ethdb"
 )
 
 var (
@@ -61,4 +63,14 @@ type Emulator interface {
 
 	// constructs a new block
 	NewBlockView(ctx BlockContext) (BlockView, error)
+}
+
+type Database interface {
+	ethdb.KeyValueStore
+
+	// Commit commits the changes
+	Commit(rootHash gethCommon.Hash) error
+
+	// GetRootHash returns the active root hash
+	GetRootHash() (gethCommon.Hash, error)
 }
