@@ -548,7 +548,7 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 }
 
 func (suite *Suite) TestGetTransactionResultsByBlockID() {
-	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+	suite.state.On("Sealed").Return(suite.snapshot, nil)
 
 	ctx := context.Background()
 	block := unittest.BlockFixture()
@@ -560,8 +560,8 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 		Return(&block, nil)
 
 	_, fixedENIDs := suite.setupReceipts(&block)
-	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
-	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
+	suite.state.On("Final").Return(suite.snapshot, nil)
+	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil).Maybe()
 
 	// create a mock connection factory
 	connFactory := connectionmock.NewConnectionFactory(suite.T())
@@ -600,7 +600,7 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	// tests that signaler context received error when node state is inconsistent
 	suite.Run(fmt.Sprintf("GetTransactionResultsByBlockID - fails with %v", "inconsistent node`s state"), func() {
 		err := fmt.Errorf("inconsistent node`s state")
-		suite.snapshot.On("Head").Return(nil, err)
+		suite.snapshot.On("Head").Return(nil, err).Once()
 
 		// mock signaler context expect an error
 		backend.backendTransactions.ctx = irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), err)
