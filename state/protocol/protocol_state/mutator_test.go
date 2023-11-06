@@ -3,6 +3,7 @@ package protocol_state
 import (
 	"errors"
 	"fmt"
+	"github.com/stretchr/testify/mock"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -139,6 +140,12 @@ func (s *StateMutatorSuite) TestApplyServiceEvents_InvalidEpochSetup() {
 // InvalidStateTransitionAttempted flag in protocol.ProtocolStateMachine.
 func (s *StateMutatorSuite) TestApplyServiceEvents_InvalidEpochCommit() {
 	s.Run("invalid-epoch-commit", func() {
+		s.mutator = newStateMutator(s.headersDB, s.resultsDB, s.setupsDB, s.commitsDB, s.stateMachine, func() (ProtocolStateMachine, error) {
+			epochFallbackStateMachine := protocolstatemock.NewProtocolStateMachine(s.T())
+			epochFallbackStateMachine.On("ProcessEpochCommit", mock.Anything).Return(nil)
+			return epochFallbackStateMachine, nil
+		})
+
 		parentState := unittest.ProtocolStateFixture()
 		s.stateMachine.On("ParentState").Return(parentState)
 
@@ -159,6 +166,12 @@ func (s *StateMutatorSuite) TestApplyServiceEvents_InvalidEpochCommit() {
 		require.NoError(s.T(), err)
 	})
 	s.Run("process-epoch-commit-exception", func() {
+		s.mutator = newStateMutator(s.headersDB, s.resultsDB, s.setupsDB, s.commitsDB, s.stateMachine, func() (ProtocolStateMachine, error) {
+			epochFallbackStateMachine := protocolstatemock.NewProtocolStateMachine(s.T())
+			epochFallbackStateMachine.On("ProcessEpochCommit", mock.Anything).Return(nil)
+			return epochFallbackStateMachine, nil
+		})
+
 		parentState := unittest.ProtocolStateFixture()
 		s.stateMachine.On("ParentState").Return(parentState)
 

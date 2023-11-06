@@ -152,13 +152,10 @@ func (u *stateMachine) ProcessEpochCommit(epochCommit *flow.EpochCommit) error {
 // state. An epoch transition is only allowed when:
 // - next epoch has been set up,
 // - next epoch has been committed,
-// - invalid state transition has not been attempted,
+// - invalid state transition has not been attempted(this is ensured by constructor),
 // - candidate block is in the next epoch.
 // No errors are expected during normal operations.
 func (u *stateMachine) TransitionToNextEpoch() error {
-	if u.state.InvalidStateTransitionAttempted {
-		return fmt.Errorf("invalid state transition has been attempted, no transition is allowed")
-	}
 	nextEpoch := u.state.NextEpoch
 	// Check if there is next epoch protocol state
 	if nextEpoch == nil {

@@ -89,17 +89,6 @@ func (s *UpdaterSuite) TestTransitionToNextEpochNotAllowed() {
 		err = updater.TransitionToNextEpoch()
 		require.Error(s.T(), err, "should not allow transition to next epoch if it is not committed")
 	})
-	s.Run("invalid state transition has been attempted", func() {
-		protocolState := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.RichProtocolStateEntry) {
-			entry.InvalidStateTransitionAttempted = true
-		})
-		candidate := unittest.BlockHeaderFixture(
-			unittest.HeaderWithView(protocolState.CurrentEpochSetup.FinalView + 1))
-		updater, err := newStateMachine(candidate.View, protocolState)
-		require.NoError(s.T(), err)
-		err = updater.TransitionToNextEpoch()
-		require.Error(s.T(), err, "should not allow transition to next epoch if next block is not first block from next epoch")
-	})
 	s.Run("candidate block is not from next epoch", func() {
 		protocolState := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
 		candidate := unittest.BlockHeaderFixture(
@@ -120,15 +109,15 @@ func (s *UpdaterSuite) TestBuild() {
 	require.Equal(s.T(), updatedState.ID(), stateID, "should return correct ID")
 
 	updatedDynamicIdentity := s.parentProtocolState.CurrentEpochIdentityTable[0].DynamicIdentity
-	s.parentProtocolState.CurrentEpochIdentityTable[0].Ejected = true
+	updatedDynamicIdentity.Ejected = true
 	err := s.updater.UpdateIdentity(&flow.DynamicIdentityEntry{
 		NodeID:  s.parentProtocolState.CurrentEpochIdentityTable[0].NodeID,
 		Dynamic: updatedDynamicIdentity,
 	})
 	require.NoError(s.T(), err)
 	updatedState, stateID, hasChanges = s.updater.Build()
-	require.NotEqual(s.T(), stateID, s.parentProtocolState.ID(), "should return same protocol state")
 	require.True(s.T(), hasChanges, "should have changes")
+	require.NotEqual(s.T(), stateID, s.parentProtocolState.ID(), "should return same protocol state")
 	require.Equal(s.T(), updatedState.ID(), stateID, "should return correct ID")
 }
 
@@ -205,8 +194,7 @@ func (s *UpdaterSuite) TestProcessEpochCommit() {
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 
 		newState, _, _ := s.updater.Build()
-		require.Equal(s.T(), flow.ZeroID, newState.NextEpoch.CommitID, "next epoch shouldn't be committed, "+
-			"since we have observed invalid state transition")
+		require.Equal(s.T(), commit.ID(), newState.NextEpoch.CommitID, "next epoch should be committed since we have observed, a valid event")
 	})
 	s.Run("happy path processing", func() {
 		s.updater, err = newStateMachine(s.candidate.View, s.parentProtocolState)
