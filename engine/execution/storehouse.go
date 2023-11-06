@@ -36,7 +36,7 @@ type RegisterStore interface {
 }
 
 type FinalizedReader interface {
-	GetFinalizedBlockIDAtHeight(height uint64) (flow.Identifier, error)
+	FinalizedBlockIDAtHeight(height uint64) (flow.Identifier, error)
 }
 
 // see implementation in engine/execution/storehouse/in_memory_register_store.go
@@ -45,7 +45,7 @@ type InMemoryRegisterStore interface {
 	PrunedHeight() uint64
 
 	GetRegister(height uint64, blockID flow.Identifier, register flow.RegisterID) (flow.RegisterValue, error)
-	GetUpdatedRegisters(height uint64, blockID flow.Identifier) ([]flow.RegisterEntry, error)
+	GetUpdatedRegisters(height uint64, blockID flow.Identifier) (flow.RegisterEntries, error)
 	SaveRegisters(
 		height uint64,
 		blockID flow.Identifier,
@@ -61,7 +61,7 @@ type OnDiskRegisterStore = storage.RegisterIndex
 type ExecutedFinalizedWAL interface {
 	Append(height uint64, registers []flow.RegisterEntry) error
 
-	// GetLatest returns the latest height in the WAL.
+	// Latest returns the latest height in the WAL.
 	Latest() (uint64, error)
 
 	GetReader(height uint64) WALReader
