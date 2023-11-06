@@ -75,7 +75,21 @@ type LibP2PNodeBuilder struct {
 	networkingType       flownet.NetworkingType // whether the node is running in private (staked) or public (unstaked) network
 }
 
-func NewNodeBuilder(logger zerolog.Logger, metricsConfig *p2pconfig.MetricsConfig, networkingType flownet.NetworkingType, address string, networkKey fcrypto.PrivateKey, sporkId flow.Identifier, idProvider module.IdentityProvider, scoringRegistryConfig p2pconf.GossipSubScoringRegistryConfig, rCfg *p2pconf.ResourceManagerConfig, rpcInspectorCfg *p2pconf.GossipSubRPCInspectorsConfig, peerManagerConfig *p2pconfig.PeerManagerConfig, disallowListCacheCfg *p2p.DisallowListCacheConfig, rpcTracker p2p.RpcControlTracking, unicastConfig *p2pconfig.UnicastConfig) *LibP2PNodeBuilder {
+func NewNodeBuilder(
+	logger zerolog.Logger,
+	metricsConfig *p2pconfig.MetricsConfig,
+	networkingType flownet.NetworkingType,
+	address string,
+	networkKey fcrypto.PrivateKey,
+	sporkId flow.Identifier,
+	idProvider module.IdentityProvider,
+	scoringRegistryConfig p2pconf.GossipSubScoringRegistryConfig,
+	rCfg *p2pconf.ResourceManagerConfig,
+	rpcInspectorCfg *p2pconf.GossipSubRPCInspectorsConfig,
+	peerManagerConfig *p2pconfig.PeerManagerConfig,
+	disallowListCacheCfg *p2p.DisallowListCacheConfig,
+	rpcTracker p2p.RpcControlTracking,
+	unicastConfig *p2pconfig.UnicastConfig) *LibP2PNodeBuilder {
 	return &LibP2PNodeBuilder{
 		logger:               logger,
 		sporkId:              sporkId,
