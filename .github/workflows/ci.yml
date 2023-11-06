@@ -197,7 +197,7 @@ jobs:
         include:
           - name: Access Integration Tests
             make: make -C integration access-tests
-            runner: buildjet-8vcpu-ubuntu-2204
+            runner: buildjet-4vcpu-ubuntu-2204
           - name: BFT (Framework) Integration Tests
             make: make -C integration bft-framework-tests
             runner: buildjet-8vcpu-ubuntu-2204
@@ -218,7 +218,7 @@ jobs:
             runner: buildjet-4vcpu-ubuntu-2204
           - name: Epoch Cohort2 Integration Tests
             make: make -C integration epochs-cohort2-tests
-            runner: ubuntu-latest
+            runner: buildjet-4vcpu-ubuntu-2204
           - name: Execution Integration Tests
             make: make -C integration execution-tests
             runner: buildjet-4vcpu-ubuntu-2204
