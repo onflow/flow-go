@@ -18,16 +18,20 @@ type ProtocolStateMachine interface {
 	// Observing an epoch setup event, transitions protocol state from staking to setup phase, we stop returning
 	// identities from previous+current epochs and start returning identities from current+next epochs.
 	// As a result of this operation protocol state for the next epoch will be created.
+	// Returned boolean indicates if event triggered a transition in the state machine or not.
+	// Implementors must never return (true, error).
 	// Expected errors during normal operations:
 	// - `protocol.InvalidServiceEventError` if the service event is invalid or is not a valid state transition for the current protocol state
-	ProcessEpochSetup(epochSetup *flow.EpochSetup) error
+	ProcessEpochSetup(epochSetup *flow.EpochSetup) (bool, error)
 	// ProcessEpochCommit updates current protocol state with data from epoch commit event.
 	// Observing an epoch setup commit, transitions protocol state from setup to commit phase, at this point we have
 	// finished construction of the next epoch.
 	// As a result of this operation protocol state for next epoch will be committed.
+	// Returned boolean indicates if event triggered a transition in the state machine or not.
+	// Implementors must never return (true, error).
 	// Expected errors during normal operations:
 	// - `protocol.InvalidServiceEventError` if the service event is invalid or is not a valid state transition for the current protocol state
-	ProcessEpochCommit(epochCommit *flow.EpochCommit) error
+	ProcessEpochCommit(epochCommit *flow.EpochCommit) (bool, error)
 	// UpdateIdentity updates identity table with new identity entry.
 	// Should pass identity which is already present in the table, otherwise an exception will be raised.
 	// TODO: This function currently modifies both current+next identities based on input.

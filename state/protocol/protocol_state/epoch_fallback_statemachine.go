@@ -22,14 +22,14 @@ func newEpochFallbackStateMachine(view uint64, parentState *flow.RichProtocolSta
 	}
 }
 
-func (m *epochFallbackStateMachine) ProcessEpochSetup(_ *flow.EpochSetup) error {
+func (m *epochFallbackStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (bool, error) {
 	// won't process if we are in fallback mode
-	return nil
+	return false, nil
 }
 
-func (m *epochFallbackStateMachine) ProcessEpochCommit(_ *flow.EpochCommit) error {
+func (m *epochFallbackStateMachine) ProcessEpochCommit(epochCommit *flow.EpochCommit) (bool, error) {
 	// won't process if we are in fallback mode
-	return nil
+	return false, nil
 }
 
 func (m *epochFallbackStateMachine) TransitionToNextEpoch() error {

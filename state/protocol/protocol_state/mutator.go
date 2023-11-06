@@ -187,22 +187,26 @@ func (m *stateMutator) applyServiceEventsFromOrderedResults(results []*flow.Exec
 		for _, event := range result.ServiceEvents {
 			switch ev := event.Event.(type) {
 			case *flow.EpochSetup:
-				err := m.stateMachine.ProcessEpochSetup(ev)
+				processed, err := m.stateMachine.ProcessEpochSetup(ev)
 				if err != nil {
 					return nil, fmt.Errorf("could not process epoch setup event: %w", err)
 				}
 
-				// we'll insert the setup event when we insert the block
-				dbUpdates = append(dbUpdates, m.setups.StoreTx(ev))
+				if processed {
+					// we'll insert the setup event when we insert the block
+					dbUpdates = append(dbUpdates, m.setups.StoreTx(ev))
+				}
 
 			case *flow.EpochCommit:
-				err := m.stateMachine.ProcessEpochCommit(ev)
+				processed, err := m.stateMachine.ProcessEpochCommit(ev)
 				if err != nil {
 					return nil, fmt.Errorf("could not process epoch commit event: %w", err)
 				}
 
-				// we'll insert the commit event when we insert the block
-				dbUpdates = append(dbUpdates, m.commits.StoreTx(ev))
+				if processed {
+					// we'll insert the commit event when we insert the block
+					dbUpdates = append(dbUpdates, m.commits.StoreTx(ev))
+				}
 			case *flow.VersionBeacon:
 				// do nothing for now
 			default:

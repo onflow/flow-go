@@ -141,7 +141,7 @@ func (s *UpdaterSuite) TestProcessEpochCommit() {
 		commit := unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
 			commit.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 10 // set invalid counter for next epoch
 		})
-		err := s.updater.ProcessEpochCommit(commit)
+		_, err := s.updater.ProcessEpochCommit(commit)
 		require.Error(s.T(), err)
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 	})
@@ -151,7 +151,7 @@ func (s *UpdaterSuite) TestProcessEpochCommit() {
 		commit := unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
 			commit.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
 		})
-		err := s.updater.ProcessEpochCommit(commit)
+		_, err := s.updater.ProcessEpochCommit(commit)
 		require.Error(s.T(), err)
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 	})
@@ -164,7 +164,7 @@ func (s *UpdaterSuite) TestProcessEpochCommit() {
 			unittest.WithFinalView(s.parentProtocolState.CurrentEpochSetup.FinalView+1000),
 		)
 		// processing setup event results in creating next epoch protocol state
-		err := s.updater.ProcessEpochSetup(setup)
+		_, err := s.updater.ProcessEpochSetup(setup)
 		require.NoError(s.T(), err)
 
 		updatedState, _, _ := s.updater.Build()
@@ -185,11 +185,11 @@ func (s *UpdaterSuite) TestProcessEpochCommit() {
 			unittest.WithDKGFromParticipants(setup.Participants),
 		)
 
-		err = s.updater.ProcessEpochCommit(commit)
+		_, err = s.updater.ProcessEpochCommit(commit)
 		require.NoError(s.T(), err)
 
 		// processing another epoch commit has to be an error since we have already processed one
-		err = s.updater.ProcessEpochCommit(commit)
+		_, err = s.updater.ProcessEpochCommit(commit)
 		require.Error(s.T(), err)
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 
@@ -205,7 +205,7 @@ func (s *UpdaterSuite) TestProcessEpochCommit() {
 			unittest.WithFinalView(s.parentProtocolState.CurrentEpochSetup.FinalView+1000),
 		)
 		// processing setup event results in creating next epoch protocol state
-		err := s.updater.ProcessEpochSetup(setup)
+		_, err := s.updater.ProcessEpochSetup(setup)
 		require.NoError(s.T(), err)
 
 		updatedState, _, _ := s.updater.Build()
@@ -226,7 +226,7 @@ func (s *UpdaterSuite) TestProcessEpochCommit() {
 			unittest.WithDKGFromParticipants(setup.Participants),
 		)
 
-		err = s.updater.ProcessEpochCommit(commit)
+		_, err = s.updater.ProcessEpochCommit(commit)
 		require.NoError(s.T(), err)
 
 		newState, _, _ := s.updater.Build()
@@ -306,7 +306,7 @@ func (s *UpdaterSuite) TestProcessEpochSetupInvariants() {
 		setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
 			setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 10 // set invalid counter for next epoch
 		})
-		err := s.updater.ProcessEpochSetup(setup)
+		_, err := s.updater.ProcessEpochSetup(setup)
 		require.Error(s.T(), err)
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 	})
@@ -318,10 +318,10 @@ func (s *UpdaterSuite) TestProcessEpochSetupInvariants() {
 			unittest.WithFirstView(s.parentProtocolState.CurrentEpochSetup.FinalView+1),
 			unittest.WithFinalView(s.parentProtocolState.CurrentEpochSetup.FinalView+1000),
 		)
-		err = updater.ProcessEpochSetup(setup)
+		_, err = updater.ProcessEpochSetup(setup)
 		require.NoError(s.T(), err)
 
-		err = updater.ProcessEpochSetup(setup)
+		_, err = updater.ProcessEpochSetup(setup)
 		require.Error(s.T(), err)
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 	})
@@ -334,7 +334,7 @@ func (s *UpdaterSuite) TestProcessEpochSetupInvariants() {
 			setup.Participants, err = setup.Participants.Shuffle()
 			require.NoError(s.T(), err)
 		})
-		err = updater.ProcessEpochSetup(setup)
+		_, err = updater.ProcessEpochSetup(setup)
 		require.Error(s.T(), err)
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 	})
@@ -352,7 +352,7 @@ func (s *UpdaterSuite) TestProcessEpochSetupInvariants() {
 			setup.Participants = s.parentProtocolState.CurrentEpochSetup.Participants
 		})
 
-		err = updater.ProcessEpochSetup(setup)
+		_, err = updater.ProcessEpochSetup(setup)
 		require.Error(s.T(), err)
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 	})
@@ -377,7 +377,7 @@ func (s *UpdaterSuite) TestProcessEpochSetupHappyPath() {
 	expectedNextEpochActiveIdentities := flow.DynamicIdentityEntryListFromIdentities(setupParticipants)
 
 	// process actual event
-	err := s.updater.ProcessEpochSetup(setup)
+	_, err := s.updater.ProcessEpochSetup(setup)
 	require.NoError(s.T(), err)
 
 	updatedState, _, hasChanges := s.updater.Build()
@@ -417,7 +417,7 @@ func (s *UpdaterSuite) TestProcessEpochSetupWithSameParticipants() {
 		unittest.WithFinalView(s.parentProtocolState.CurrentEpochSetup.FinalView+1000),
 		unittest.WithParticipants(setupParticipants.ToSkeleton()),
 	)
-	err = s.updater.ProcessEpochSetup(setup)
+	_, err = s.updater.ProcessEpochSetup(setup)
 	require.NoError(s.T(), err)
 	updatedState, _, _ := s.updater.Build()
 
@@ -497,7 +497,7 @@ func (s *UpdaterSuite) TestEpochSetupAfterIdentityChange() {
 		},
 	)
 
-	err = s.updater.ProcessEpochSetup(setup)
+	_, err = s.updater.ProcessEpochSetup(setup)
 	require.NoError(s.T(), err)
 
 	updatedState, _, _ = s.updater.Build()

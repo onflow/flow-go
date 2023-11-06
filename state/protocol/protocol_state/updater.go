@@ -46,15 +46,17 @@ func newStateMachine(view uint64, parentState *flow.RichProtocolStateEntry) (*st
 //   - we stop returning identities from previous+current epochs and instead returning identities from current+next epochs.
 //
 // As a result of this operation protocol state for the next epoch will be created.
+// Returned boolean indicates if event triggered a transition in the state machine or not.
+// Implementors must never return (true, error).
 // Expected errors during normal operations:
 // - `protocol.InvalidServiceEventError` if the service event is invalid or is not a valid state transition for the current protocol state
-func (u *stateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
+func (u *stateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (bool, error) {
 	err := protocol.IsValidExtendingEpochSetup(epochSetup, u.parentState.CurrentEpochSetup, u.parentState.EpochStatus())
 	if err != nil {
-		return fmt.Errorf("invalid epoch setup event: %w", err)
+		return false, fmt.Errorf("invalid epoch setup event: %w", err)
 	}
 	if u.state.NextEpoch != nil {
-		return protocol.NewInvalidServiceEventErrorf("repeated setup for epoch %d", epochSetup.Counter)
+		return false, protocol.NewInvalidServiceEventErrorf("repeated setup for epoch %d", epochSetup.Counter)
 	}
 
 	// When observing setup event for subsequent epoch, construct the EpochStateContainer for `ProtocolStateEntry.NextEpoch`.
@@ -91,14 +93,14 @@ func (u *stateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
 	for idx, nextEpochIdentitySkeleton := range epochSetup.Participants {
 		// sanity checking invariant (I):
 		if idx > 0 && !order.IdentifierCanonical(prevNodeID, nextEpochIdentitySkeleton.NodeID) {
-			return protocol.NewInvalidServiceEventErrorf("epoch setup event lists active participants not in canonical ordering")
+			return false, protocol.NewInvalidServiceEventErrorf("epoch setup event lists active participants not in canonical ordering")
 		}
 		prevNodeID = nextEpochIdentitySkeleton.NodeID
 
 		// sanity checking invariant (II.i):
 		currentEpochDynamicProperties, found := activeIdentitiesLookup[nextEpochIdentitySkeleton.NodeID]
 		if found && currentEpochDynamicProperties.Dynamic.Ejected { // invariance violated
-			return protocol.NewInvalidServiceEventErrorf("node %v is ejected in current epoch %d but readmitted by EpochSetup event for epoch %d", nextEpochIdentitySkeleton.NodeID, u.parentState.CurrentEpochSetup.Counter, epochSetup.Counter)
+			return false, protocol.NewInvalidServiceEventErrorf("node %v is ejected in current epoch %d but readmitted by EpochSetup event for epoch %d", nextEpochIdentitySkeleton.NodeID, u.parentState.CurrentEpochSetup.Counter, epochSetup.Counter)
 		}
 
 		nextEpochActiveIdentities = append(nextEpochActiveIdentities, &flow.DynamicIdentityEntry{
@@ -119,21 +121,23 @@ func (u *stateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
 
 	// subsequent epoch commit event and update identities afterwards.
 	u.nextEpochIdentitiesLookup = u.state.NextEpoch.ActiveIdentities.Lookup()
-	return nil
+	return true, nil
 }
 
 // ProcessEpochCommit updates current protocol state with data from epoch commit event.
 // Observing an epoch setup commit, transitions protocol state from setup to commit phase, at this point we have
 // finished construction of the next epoch.
 // As a result of this operation protocol state for next epoch will be committed.
+// Returned boolean indicates if event triggered a transition in the state machine or not.
+// Implementors must never return (true, error).
 // Expected errors during normal operations:
 // - `protocol.InvalidServiceEventError` if the service event is invalid or is not a valid state transition for the current protocol state
-func (u *stateMachine) ProcessEpochCommit(epochCommit *flow.EpochCommit) error {
+func (u *stateMachine) ProcessEpochCommit(epochCommit *flow.EpochCommit) (bool, error) {
 	if u.state.NextEpoch == nil {
-		return protocol.NewInvalidServiceEventErrorf("protocol state has been setup yet")
+		return false, protocol.NewInvalidServiceEventErrorf("protocol state has been setup yet")
 	}
 	if u.state.NextEpoch.CommitID != flow.ZeroID {
-		return protocol.NewInvalidServiceEventErrorf("protocol state has already a commit event")
+		return false, protocol.NewInvalidServiceEventErrorf("protocol state has already a commit event")
 	}
 	err := protocol.IsValidExtendingEpochCommit(
 		epochCommit,
@@ -141,11 +145,11 @@ func (u *stateMachine) ProcessEpochCommit(epochCommit *flow.EpochCommit) error {
 		u.parentState.CurrentEpochSetup,
 		u.parentState.EpochStatus())
 	if err != nil {
-		return fmt.Errorf("invalid epoch commit event: %w", err)
+		return false, fmt.Errorf("invalid epoch commit event: %w", err)
 	}
 
 	u.state.NextEpoch.CommitID = epochCommit.ID()
-	return nil
+	return true, nil
 }
 
 // TransitionToNextEpoch updates the notion of 'current epoch', 'previous' and 'next epoch' in the protocol
