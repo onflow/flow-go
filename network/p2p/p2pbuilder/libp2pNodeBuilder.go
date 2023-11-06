@@ -478,7 +478,16 @@ func DefaultNodeBuilder(
 	}
 	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
 
-	builder := NewNodeBuilder(logger, metricsCfg, networkingType, address, flowKey, sporkId, idProvider, gossipCfg.GossipSubScoringRegistryConfig, rCfg, rpcInspectorCfg, peerManagerCfg, disallowListCacheCfg, meshTracer, uniCfg).
+	builder := NewNodeBuilder(
+		logger, metricsCfg,
+		networkingType, address,
+		flowKey, sporkId, idProvider,
+		gossipCfg.GossipSubScoringRegistryConfig,
+		rCfg, rpcInspectorCfg,
+		peerManagerCfg,
+		disallowListCacheCfg,
+		meshTracer,
+		uniCfg).
 		SetBasicResolver(resolver).
 		SetConnectionManager(connManager).
 		SetConnectionGater(connGater).
