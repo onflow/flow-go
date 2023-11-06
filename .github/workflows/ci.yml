@@ -191,7 +191,7 @@ jobs:
 
   docker-build:
     name: Docker Build
-    runs-on: buildjet-8vcpu-ubuntu-2204
+    runs-on: buildjet-16vcpu-ubuntu-2204
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
@@ -208,11 +208,21 @@ jobs:
       - name: Docker build
         run: make docker-build-flow docker-build-flow-corrupt
       - name: Save Docker images
-        run: docker save flow:latest flow-corrupt:latest > docker-images.tar
+        run: docker save \
+          gcr.io/flow-container-registry/access:latest \
+          gcr.io/flow-container-registry/collection:latest \
+          gcr.io/flow-container-registry/consensus:latest \
+          gcr.io/flow-container-registry/execution:latest \
+          gcr.io/flow-container-registry/ghost:latest \
+          gcr.io/flow-container-registry/observer:latest \
+          gcr.io/flow-container-registry/verification:latest \
+          gcr.io/flow-container-registry/access-corrupted:latest \
+          gcr.io/flow-container-registry/execution-corrupted:latest \
+          gcr.io/flow-container-registry/verification-corrupted:latest > docker-images.tar
       - name: Cache Docker images
         uses: actions/cache@v3
         with:
-          path: docker/docker-images.tar
+          path: docker-images.tar
           # use the workflow run id as part of the cache key to ensure uniqueness
           key: ${{ runner.os }}-docker-images-${{ hashFiles('**/Dockerfile') }}-${{ github.run_id }}
 
@@ -288,11 +298,11 @@ jobs:
     - name: Load cached Docker images
       uses: actions/cache@v3
       with:
-        path: docker/docker-images.tar
+        path: docker-images.tar
         # use the same cache key as the docker-build job
         key: ${{ runner.os }}-docker-images-${{ hashFiles('**/Dockerfile') }}-${{ github.run_id }}
     - name: Load Docker images
-      run: docker load -i ./docker-images.tar
+      run: docker load -i docker-images.tar
 #    - name: Docker build
 #      run: make docker-build-flow docker-build-flow-corrupt
     - name: Run tests (${{ matrix.name }})
