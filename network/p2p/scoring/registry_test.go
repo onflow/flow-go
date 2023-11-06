@@ -275,7 +275,9 @@ func TestSpamPenaltyDecaysInCache(t *testing.T) {
 		penaltyValueFixtures().RpcPublishMessage
 	// the lower bound is the sum of the penalties with decay assuming the decay is applied 4 times to the sum of the penalties.
 	// in reality, the decay is applied 4 times to the first penalty, then 3 times to the second penalty, and so on.
-	scoreLowerBound := scoreUpperBound * math.Pow(scoring.InitAppScoreRecordStateFunc(scoringRegistryConfig.InitDecayLowerBound, scoringRegistryConfig.InitDecayUpperBound)().Decay, 4)
+	r, err := scoring.InitAppScoreRecordStateFunc(scoringRegistryConfig.InitDecayLowerBound, scoringRegistryConfig.InitDecayUpperBound)()
+	require.NoError(t, err)
+	scoreLowerBound := scoreUpperBound * math.Pow(r.Decay, 4)
 
 	// with decay, the penalty should be between the upper and lower bounds.
 	assert.Greater(t, score, scoreUpperBound)
@@ -290,11 +292,11 @@ func TestSpamPenaltyDecayToZero(t *testing.T) {
 		t,
 		withStakedIdentity(peerID),
 		withValidSubscriptions(peerID),
-		withInitFunction(func() p2p.GossipSubSpamRecord {
+		withInitFunction(func() (p2p.GossipSubSpamRecord, error) {
 			return p2p.GossipSubSpamRecord{
 				Decay:   0.02, // we choose a small decay value to speed up the test.
 				Penalty: 0,
-			}
+			}, nil
 		}))
 
 	// report a misbehavior for the peer id.
@@ -336,11 +338,11 @@ func TestPersistingUnknownIdentityPenalty(t *testing.T) {
 		t,
 		withUnknownIdentity(peerID), // the peer id has an unknown identity.
 		withValidSubscriptions(peerID),
-		withInitFunction(func() p2p.GossipSubSpamRecord {
+		withInitFunction(func() (p2p.GossipSubSpamRecord, error) {
 			return p2p.GossipSubSpamRecord{
 				Decay:   0.02, // we choose a small decay value to speed up the test.
 				Penalty: 0,
-			}
+			}, nil
 		}))
 
 	// initially, the app specific score should be the default unknown identity penalty.
@@ -393,11 +395,11 @@ func TestPersistingInvalidSubscriptionPenalty(t *testing.T) {
 		t,
 		withStakedIdentity(peerID),
 		withInvalidSubscriptions(peerID), // the peer id has an invalid subscription.
-		withInitFunction(func() p2p.GossipSubSpamRecord {
+		withInitFunction(func() (p2p.GossipSubSpamRecord, error) {
 			return p2p.GossipSubSpamRecord{
 				Decay:   0.02, // we choose a small decay value to speed up the test.
 				Penalty: 0,
-			}
+			}, nil
 		}))
 
 	// initially, the app specific score should be the default invalid subscription penalty.
@@ -506,7 +508,7 @@ func withInvalidSubscriptions(peer peer.ID) func(cfg *scoring.GossipSubAppSpecif
 	}
 }
 
-func withInitFunction(initFunction func() p2p.GossipSubSpamRecord) func(cfg *scoring.GossipSubAppSpecificScoreRegistryParams) {
+func withInitFunction(initFunction func() (p2p.GossipSubSpamRecord, error)) func(cfg *scoring.GossipSubAppSpecificScoreRegistryParams) {
 	return func(cfg *scoring.GossipSubAppSpecificScoreRegistryParams) {
 		cfg.Init = initFunction
 	}

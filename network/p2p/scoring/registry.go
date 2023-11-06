@@ -2,7 +2,6 @@ package scoring
 
 import (
 	"fmt"
-	"math/rand"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -15,6 +14,7 @@ import (
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"github.com/onflow/flow-go/utils/logging"
+	"github.com/onflow/flow-go/utils/rand"
 )
 
 const (
@@ -52,6 +52,8 @@ const (
 	iWantMisbehaviourPenalty = -10
 	// rpcPublishMessageMisbehaviourPenalty is the penalty applied to the application specific penalty when a peer conducts a RpcPublishMessageMisbehaviourPenalty misbehaviour.
 	rpcPublishMessageMisbehaviourPenalty = -10
+	// randomDecayFloatDensity used to generate a secure random Uint64 that is used to generate the random initial decay for app score records.
+	randomDecayFloatDensity = uint64(1000)
 )
 
 // GossipSubCtrlMsgPenaltyValue is the penalty value for each control message type.
@@ -88,7 +90,7 @@ type GossipSubAppSpecificScoreRegistry struct {
 	spamScoreCache p2p.GossipSubSpamRecordCache
 	penalty        GossipSubCtrlMsgPenaltyValue
 	// initial application specific penalty record, used to initialize the penalty cache entry.
-	init                      func() p2p.GossipSubSpamRecord
+	init                      func() (p2p.GossipSubSpamRecord, error)
 	validator                 p2p.SubscriptionValidator
 	initDecayLowerBound       float64
 	initDecayUpperBound       float64
@@ -114,7 +116,7 @@ type GossipSubAppSpecificScoreRegistryParams struct {
 
 	// Init is a factory function that returns a new GossipSubSpamRecord. It is used to initialize the spam record of
 	// a peer when the peer is first observed by the local peer.
-	Init func() p2p.GossipSubSpamRecord
+	Init func() (p2p.GossipSubSpamRecord, error)
 
 	// CacheFactory is a factory function that returns a new GossipSubSpamRecordCache. It is used to initialize the spamScoreCache.
 	// The cache is used to store the application specific penalty of peers.
@@ -277,8 +279,13 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 
 	// try initializing the application specific penalty for the peer if it is not yet initialized.
 	// this is done to avoid the case where the peer is not yet cached and the application specific penalty is not yet initialized.
-	// initialization is successful only if the peer is not yet cached.
-	initialized := r.spamScoreCache.Add(notification.PeerID, r.init())
+	// initialization is successful only if the peer is not yet cached. If any error is occurred during initialization we log a fatal error
+	initRecord, err := r.init()
+	if err != nil {
+		// the error is considered fatal as it means that we cannot generate a random initial decay.
+		lg.Fatal().Str("misbehavior_type", notification.MsgType.String()).Msg("unknown misbehaviour type")
+	}
+	initialized := r.spamScoreCache.Add(notification.PeerID, initRecord)
 	if initialized {
 		lg.Trace().Str("peer_id", p2plogging.PeerId(notification.PeerID)).Msg("application specific penalty initialized for peer")
 	}
@@ -362,11 +369,34 @@ func DefaultDecayFunction() netcache.PreprocessorFunc {
 //
 // Returns:
 //   - callback func that initializes and returns a spam record.
-func InitAppScoreRecordStateFunc(decayLowerBound, decayUpperBound float64) func() p2p.GossipSubSpamRecord {
-	return func() p2p.GossipSubSpamRecord {
-		return p2p.GossipSubSpamRecord{
-			Decay:   rand.Float64()*(decayUpperBound-decayLowerBound) + decayLowerBound,
-			Penalty: 0,
+func InitAppScoreRecordStateFunc(decayLowerBound, decayUpperBound float64) func() (p2p.GossipSubSpamRecord, error) {
+	return func() (p2p.GossipSubSpamRecord, error) {
+		decay, err := initialDecay(decayLowerBound, decayUpperBound)
+		if err != nil {
+			return p2p.GossipSubSpamRecord{}, err
 		}
+		return p2p.GossipSubSpamRecord{
+			Decay:   decay,
+			Penalty: 0,
+		}, nil
 	}
+}
+
+// initialDecay returns a secure random value between decayLowerBound and decayUpperBound.
+// Args:
+//   - decayLowerBound: the lower bound of the range for the initial random decay value
+//   - decayUpperBound: the upper bound of the range for the initial random decay value
+//
+// Returns:
+//   - float64: the random decay value
+//   - error: if any error occurs generating the secure random value
+//
+// All errors returned from this func are considered irrecoverable.
+func initialDecay(decayLowerBound, decayUpperBound float64) (float64, error) {
+	randomUint64, err := rand.Uint64n(randomDecayFloatDensity)
+	if err != nil {
+		return 0, fmt.Errorf("failed to generate random float between %f and %f", decayLowerBound, decayUpperBound)
+	}
+	randomFloat := float64(randomUint64) / float64(randomDecayFloatDensity)
+	return randomFloat*(decayUpperBound-decayLowerBound) + decayLowerBound, nil
 }
