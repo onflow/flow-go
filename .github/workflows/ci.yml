@@ -213,8 +213,6 @@ jobs:
           path: /tmp/docker-images.tar
           # use the workflow run id as part of the cache key to ensure uniqueness
           key: ${{ runner.os }}-docker-images-${{ hashFiles('**/Dockerfile') }}-${{ github.run_id }}
-      - name: Save Docker images
-        run: docker save flow:latest flow-corrupt:latest > /tmp/docker-images.tar
 
   integration-test:
     name: Integration Tests
