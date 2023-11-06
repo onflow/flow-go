@@ -39,19 +39,19 @@ func (_m *InMemoryRegisterStore) GetRegister(height uint64, blockID flow.Identif
 }
 
 // GetUpdatedRegisters provides a mock function with given fields: height, blockID
-func (_m *InMemoryRegisterStore) GetUpdatedRegisters(height uint64, blockID flow.Identifier) ([]flow.RegisterEntry, error) {
+func (_m *InMemoryRegisterStore) GetUpdatedRegisters(height uint64, blockID flow.Identifier) (flow.RegisterEntries, error) {
 	ret := _m.Called(height, blockID)
 
-	var r0 []flow.RegisterEntry
+	var r0 flow.RegisterEntries
 	var r1 error
-	if rf, ok := ret.Get(0).(func(uint64, flow.Identifier) ([]flow.RegisterEntry, error)); ok {
+	if rf, ok := ret.Get(0).(func(uint64, flow.Identifier) (flow.RegisterEntries, error)); ok {
 		return rf(height, blockID)
 	}
-	if rf, ok := ret.Get(0).(func(uint64, flow.Identifier) []flow.RegisterEntry); ok {
+	if rf, ok := ret.Get(0).(func(uint64, flow.Identifier) flow.RegisterEntries); ok {
 		r0 = rf(height, blockID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]flow.RegisterEntry)
+			r0 = ret.Get(0).(flow.RegisterEntries)
 		}
 	}
 

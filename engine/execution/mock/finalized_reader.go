@@ -12,8 +12,8 @@ type FinalizedReader struct {
 	mock.Mock
 }
 
-// GetFinalizedBlockIDAtHeight provides a mock function with given fields: height
-func (_m *FinalizedReader) GetFinalizedBlockIDAtHeight(height uint64) (flow.Identifier, error) {
+// FinalizedBlockIDAtHeight provides a mock function with given fields: height
+func (_m *FinalizedReader) FinalizedBlockIDAtHeight(height uint64) (flow.Identifier, error) {
 	ret := _m.Called(height)
 
 	var r0 flow.Identifier
