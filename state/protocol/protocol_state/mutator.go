@@ -2,6 +2,7 @@ package protocol_state
 
 import (
 	"fmt"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
@@ -177,7 +178,7 @@ func (m *stateMutator) ApplyServiceEventsFromValidatedSeals(seals []*flow.Seal) 
 // applyServiceEventsFromOrderedResults applies the service events contained within the list of results
 // to the pending state tracked by `stateMutator`.
 // Each result corresponds to one seal that was included in the payload of the block being processed by this `stateMutator`.
-// Results must be ordered by block height. 
+// Results must be ordered by block height.
 // Expected errors during normal operations:
 // - `protocol.InvalidServiceEventError` if any service event is invalid or is not a valid state transition for the current protocol state
 func (m *stateMutator) applyServiceEventsFromOrderedResults(results []*flow.ExecutionResult) ([]func(tx *transaction.Tx) error, error) {

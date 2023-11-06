@@ -190,6 +190,7 @@ func (s *UpdaterSuite) TestProcessEpochCommit() {
 		)
 		require.NoError(s.T(), err)
 		s.updater, err = newStateMachine(s.candidate.View+1, parentState)
+		require.NoError(s.T(), err)
 		commit := unittest.EpochCommitFixture(
 			unittest.CommitWithCounter(setup.Counter),
 			unittest.WithDKGFromParticipants(setup.Participants),
@@ -231,6 +232,7 @@ func (s *UpdaterSuite) TestProcessEpochCommit() {
 		)
 		require.NoError(s.T(), err)
 		s.updater, err = newStateMachine(s.candidate.View+1, parentState)
+		require.NoError(s.T(), err)
 		commit := unittest.EpochCommitFixture(
 			unittest.CommitWithCounter(setup.Counter),
 			unittest.WithDKGFromParticipants(setup.Participants),
@@ -491,6 +493,7 @@ func (s *UpdaterSuite) TestEpochSetupAfterIdentityChange() {
 	// now we can use it to construct updater for next block, which will process epoch setup event.
 	nextBlock := unittest.BlockHeaderWithParentFixture(s.candidate)
 	s.updater, err = newStateMachine(nextBlock.View, updatedRichProtocolState)
+	require.NoError(s.T(), err)
 
 	setup := unittest.EpochSetupFixture(
 		unittest.SetupWithCounter(s.parentProtocolState.CurrentEpochSetup.Counter+1),
