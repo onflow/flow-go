@@ -105,7 +105,7 @@ func TestRegisterStoreSaveRegistersShouldFail(t *testing.T) {
 // 2. IsBlockExecuted should return true
 //
 // if SaveRegisters with empty register, then
-// 1. FinalizedAndExecutedHeight should be updated
+// 1. LastFinalizedAndExecutedHeight should be updated
 // 2. IsBlockExecuted should return true
 func TestRegisterStoreSaveRegistersShouldOK(t *testing.T) {
 	t.Parallel()
@@ -183,7 +183,7 @@ func TestRegisterStoreIsBlockExecuted(t *testing.T) {
 
 		require.NoError(t, rs.OnBlockFinalized()) // notify 11 is finalized
 
-		require.Equal(t, rootHeight+1, rs.FinalizedAndExecutedHeight())
+		require.Equal(t, rootHeight+1, rs.LastFinalizedAndExecutedHeight())
 
 		executed, err := rs.IsBlockExecuted(rootHeight, headerByHeight[rootHeight].ID())
 		require.NoError(t, err)
@@ -314,9 +314,9 @@ func TestRegisterStoreReadingFromInMemStore(t *testing.T) {
 // Execute first then finalize later
 // SaveRegisters(1), SaveRegisters(2), SaveRegisters(3), then
 // OnBlockFinalized(1), OnBlockFinalized(2), OnBlockFinalized(3) should
-// 1. update FinalizedAndExecutedHeight
+// 1. update LastFinalizedAndExecutedHeight
 // 2. InMemoryRegisterStore should have correct pruned height
-// 3. NewRegisterStore with the same OnDiskRegisterStore again should return correct FinalizedAndExecutedHeight
+// 3. NewRegisterStore with the same OnDiskRegisterStore again should return correct LastFinalizedAndExecutedHeight
 func TestRegisterStoreExecuteFirstFinalizeLater(t *testing.T) {
 	t.Parallel()
 	withRegisterStore(t, func(
@@ -331,38 +331,38 @@ func TestRegisterStoreExecuteFirstFinalizeLater(t *testing.T) {
 		// save block 11
 		err := rs.SaveRegisters(headerByHeight[rootHeight+1], []flow.RegisterEntry{makeReg("X", "1")})
 		require.NoError(t, err)
-		require.Equal(t, rootHeight, rs.FinalizedAndExecutedHeight())
+		require.Equal(t, rootHeight, rs.LastFinalizedAndExecutedHeight())
 
 		// save block 12
 		err = rs.SaveRegisters(headerByHeight[rootHeight+2], []flow.RegisterEntry{makeReg("X", "2")})
 		require.NoError(t, err)
-		require.Equal(t, rootHeight, rs.FinalizedAndExecutedHeight())
+		require.Equal(t, rootHeight, rs.LastFinalizedAndExecutedHeight())
 
 		// save block 13
 		err = rs.SaveRegisters(headerByHeight[rootHeight+3], []flow.RegisterEntry{makeReg("X", "3")})
 		require.NoError(t, err)
-		require.Equal(t, rootHeight, rs.FinalizedAndExecutedHeight())
+		require.Equal(t, rootHeight, rs.LastFinalizedAndExecutedHeight())
 
 		require.NoError(t, finalized.MockFinal(rootHeight+1))
 		require.NoError(t, rs.OnBlockFinalized()) // notify 11 is finalized
-		require.Equal(t, rootHeight+1, rs.FinalizedAndExecutedHeight())
+		require.Equal(t, rootHeight+1, rs.LastFinalizedAndExecutedHeight())
 
 		require.NoError(t, finalized.MockFinal(rootHeight+2))
 		require.NoError(t, rs.OnBlockFinalized()) // notify 12 is finalized
-		require.Equal(t, rootHeight+2, rs.FinalizedAndExecutedHeight())
+		require.Equal(t, rootHeight+2, rs.LastFinalizedAndExecutedHeight())
 
 		require.NoError(t, finalized.MockFinal(rootHeight+3))
 		require.NoError(t, rs.OnBlockFinalized()) // notify 13 is finalized
-		require.Equal(t, rootHeight+3, rs.FinalizedAndExecutedHeight())
+		require.Equal(t, rootHeight+3, rs.LastFinalizedAndExecutedHeight())
 	})
 }
 
 // Finalize first then execute later
 // OnBlockFinalized(1), OnBlockFinalized(2), OnBlockFinalized(3), then
 // SaveRegisters(1), SaveRegisters(2), SaveRegisters(3) should
-// 1. update FinalizedAndExecutedHeight
+// 1. update LastFinalizedAndExecutedHeight
 // 2. InMemoryRegisterStore should have correct pruned height
-// 3. NewRegisterStore with the same OnDiskRegisterStore again should return correct FinalizedAndExecutedHeight
+// 3. NewRegisterStore with the same OnDiskRegisterStore again should return correct LastFinalizedAndExecutedHeight
 func TestRegisterStoreFinalizeFirstExecuteLater(t *testing.T) {
 	t.Parallel()
 	withRegisterStore(t, func(
@@ -376,36 +376,36 @@ func TestRegisterStoreFinalizeFirstExecuteLater(t *testing.T) {
 	) {
 		require.NoError(t, finalized.MockFinal(rootHeight+1))
 		require.NoError(t, rs.OnBlockFinalized()) // notify 11 is finalized
-		require.Equal(t, rootHeight, rs.FinalizedAndExecutedHeight(), fmt.Sprintf("FinalizedAndExecutedHeight: %d", rs.FinalizedAndExecutedHeight()))
+		require.Equal(t, rootHeight, rs.LastFinalizedAndExecutedHeight(), fmt.Sprintf("LastFinalizedAndExecutedHeight: %d", rs.LastFinalizedAndExecutedHeight()))
 
 		require.NoError(t, finalized.MockFinal(rootHeight+2))
 		require.NoError(t, rs.OnBlockFinalized()) // notify 12 is finalized
-		require.Equal(t, rootHeight, rs.FinalizedAndExecutedHeight(), fmt.Sprintf("FinalizedAndExecutedHeight: %d", rs.FinalizedAndExecutedHeight()))
+		require.Equal(t, rootHeight, rs.LastFinalizedAndExecutedHeight(), fmt.Sprintf("LastFinalizedAndExecutedHeight: %d", rs.LastFinalizedAndExecutedHeight()))
 
 		require.NoError(t, finalized.MockFinal(rootHeight+3))
 		require.NoError(t, rs.OnBlockFinalized()) // notify 13 is finalized
-		require.Equal(t, rootHeight, rs.FinalizedAndExecutedHeight())
+		require.Equal(t, rootHeight, rs.LastFinalizedAndExecutedHeight())
 
 		// save block 11
 		err := rs.SaveRegisters(headerByHeight[rootHeight+1], []flow.RegisterEntry{makeReg("X", "1")})
 		require.NoError(t, err)
-		require.Equal(t, rootHeight+1, rs.FinalizedAndExecutedHeight())
+		require.Equal(t, rootHeight+1, rs.LastFinalizedAndExecutedHeight())
 
 		// save block 12
 		err = rs.SaveRegisters(headerByHeight[rootHeight+2], []flow.RegisterEntry{makeReg("X", "2")})
 		require.NoError(t, err)
-		require.Equal(t, rootHeight+2, rs.FinalizedAndExecutedHeight())
+		require.Equal(t, rootHeight+2, rs.LastFinalizedAndExecutedHeight())
 
 		// save block 13
 		err = rs.SaveRegisters(headerByHeight[rootHeight+3], []flow.RegisterEntry{makeReg("X", "3")})
 		require.NoError(t, err)
-		require.Equal(t, rootHeight+3, rs.FinalizedAndExecutedHeight())
+		require.Equal(t, rootHeight+3, rs.LastFinalizedAndExecutedHeight())
 	})
 }
 
 // Finalize and Execute concurrently
 // SaveRegisters(1), SaveRegisters(2), ... SaveRegisters(100), happen concurrently with
-// OnBlockFinalized(1), OnBlockFinalized(2), ... OnBlockFinalized(100), should update FinalizedAndExecutedHeight
+// OnBlockFinalized(1), OnBlockFinalized(2), ... OnBlockFinalized(100), should update LastFinalizedAndExecutedHeight
 func TestRegisterStoreConcurrentFinalizeAndExecute(t *testing.T) {
 	t.Parallel()
 	withRegisterStore(t, func(
@@ -444,7 +444,7 @@ func TestRegisterStoreConcurrentFinalizeAndExecute(t *testing.T) {
 
 		wg.Wait() // wait until all heights are finalized
 
-		// after all heights are executed and finalized, the FinalizedAndExecutedHeight should be the last height
-		require.Equal(t, endHeight, rs.FinalizedAndExecutedHeight())
+		// after all heights are executed and finalized, the LastFinalizedAndExecutedHeight should be the last height
+		require.Equal(t, endHeight, rs.LastFinalizedAndExecutedHeight())
 	})
 }
