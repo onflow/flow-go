@@ -219,13 +219,13 @@ jobs:
           gcr.io/flow-container-registry/verification:latest \
           gcr.io/flow-container-registry/access-corrupted:latest \
           gcr.io/flow-container-registry/execution-corrupted:latest \
-          gcr.io/flow-container-registry/verification-corrupted:latest > docker-images.tar
+          gcr.io/flow-container-registry/verification-corrupted:latest > flow-docker-images.tar
       - name: Cache Docker images
-        uses: actions/cache@v3
+        uses: buildjet/cache@v3
         with:
-          path: docker-images.tar
+          path: flow-docker-images.tar
           # use the workflow run id as part of the cache key to ensure uniqueness
-          key: ${{ runner.os }}-docker-images-${{ hashFiles('**/Dockerfile') }}-${{ github.run_id }}
+          key: flow-docker-images-${{ hashFiles('**/Dockerfile') }}-${{ github.run_id }}
 
   integration-test:
     name: Integration Tests
@@ -297,13 +297,13 @@ jobs:
     - name: Build relic
       run: make crypto_setup_gopath
     - name: Load cached Docker images
-      uses: actions/cache@v3
+      uses: buildjet/cache@v3
       with:
-        path: docker-images.tar
+        path: flow-docker-images.tar
         # use the same cache key as the docker-build job
-        key: ${{ runner.os }}-docker-images-${{ hashFiles('**/Dockerfile') }}-${{ github.run_id }}
+        key: flow-docker-images-${{ hashFiles('**/Dockerfile') }}-${{ github.run_id }}
     - name: Load Docker images
-      run: docker load -i docker-images.tar
+      run: docker load -i flow-docker-images.tar
 #    - name: Docker build
 #      run: make docker-build-flow docker-build-flow-corrupt
     - name: Run tests (${{ matrix.name }})
