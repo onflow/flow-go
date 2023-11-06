@@ -361,18 +361,19 @@ func loadLibP2PResourceManagerFlagsForScope(scope p2pconf.ResourceScope, flags *
 // Args:
 // *viper.Viper: instance of the viper store to register network config aliases on.
 // Returns:
-// error: if a flag does not have a corresponding key in the viper store.
+// error: if a flag does not have a corresponding key in the viper store; all returned errors are fatal.
 func SetAliases(conf *viper.Viper) error {
 	m := make(map[string]string)
 	// create map of key -> full pathkey
 	// ie: "networking-connection-pruning" -> "network-config.networking-connection-pruning"
 	for _, key := range conf.AllKeys() {
 		s := strings.Split(key, ".")
-		// check len of s, we expect all network keys to have a single prefix "network-config"
-		// s should always contain only 2 elements
-		if len(s) == 2 {
-			m[s[1]] = key
-		}
+		// Each networking config has the format of network-config.key1.key2.key3... in the config file
+		// which is translated to key1-key2-key3... in the CLI flags
+		// Hence, we map the CLI flag name to the full key in the config store
+		// TODO: all networking flags should also be prefixed with "network-config". Hence, this
+		// mapping should be from network-config.key1.key2.key3... to network-config-key1-key2-key3...
+		m[strings.Join(s[1:], "-")] = key
 	}
 	// each flag name should correspond to exactly one key in our config store after it is loaded with the default config
 	for _, flagName := range AllFlagNames() {
