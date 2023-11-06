@@ -178,7 +178,15 @@ func (g *Builder) OverrideDefaultRpcInspectorSuiteFactory(factory p2p.GossipSubR
 // Returns:
 // - a new gossipsub builder.
 // Note: the builder is not thread-safe. It should only be used in the main thread.
-func NewGossipSubBuilder(logger zerolog.Logger, metricsCfg *p2pconfig.MetricsConfig, networkType network.NetworkingType, sporkId flow.Identifier, idProvider module.IdentityProvider, scoringRegistryConfig p2pconf.GossipSubScoringRegistryConfig, rpcInspectorConfig *p2pconf.GossipSubRPCInspectorsConfig, rpcTracker p2p.RpcControlTracking) *Builder {
+func NewGossipSubBuilder(
+	logger zerolog.Logger,
+	metricsCfg *p2pconfig.MetricsConfig,
+	networkType network.NetworkingType,
+	sporkId flow.Identifier,
+	idProvider module.IdentityProvider,
+	scoringRegistryConfig p2pconf.GossipSubScoringRegistryConfig,
+	rpcInspectorConfig *p2pconf.GossipSubRPCInspectorsConfig,
+	rpcTracker p2p.RpcControlTracking) *Builder {
 	lg := logger.With().
 		Str("component", "gossipsub").
 		Str("network-type", networkType.String()).

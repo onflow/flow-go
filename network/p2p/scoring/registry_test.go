@@ -438,7 +438,7 @@ func TestSpamRecordDecayAdjustment(t *testing.T) {
 	// initially, the spamRecords should not have the peer id.
 	assert.False(t, spamRecords.Has(peerID))
 
-	// evetually we should reach the max spam penalty during sustained misbehaviors from a peer
+	// eventually we should reach the max spam penalty during sustained misbehaviors from a peer
 	require.Eventually(t, func() bool {
 		reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 			PeerID:  peerID,

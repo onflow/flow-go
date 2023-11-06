@@ -54,7 +54,7 @@ func TestFlowConfig_Validate(t *testing.T) {
 	// set invalid config values
 	c.NetworkConfig.UnicastConfig.UnicastRateLimitersConfig.MessageRateLimit = -100
 	c.NetworkConfig.UnicastConfig.UnicastRateLimitersConfig.BandwidthRateLimit = -100
-	// InitDecayUpperBound should be greater than field InitDecayLowerBound
+	// expect validation error: InitDecayUpperBound should be greater than field InitDecayLowerBound
 	c.NetworkConfig.GossipSubConfig.GossipSubScoringRegistryConfig.InitDecayLowerBound = .9
 	c.NetworkConfig.GossipSubConfig.GossipSubScoringRegistryConfig.InitDecayUpperBound = .5
 	err := c.Validate()
