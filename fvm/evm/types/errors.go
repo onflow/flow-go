@@ -6,6 +6,9 @@ import (
 )
 
 var (
+	// ErrAccountDoesNotExist is returned when evm account doesn't exist
+	ErrAccountDoesNotExist = errors.New("account does not exist")
+
 	// ErrInsufficientBalance is returned when evm account doesn't have enough balance
 	ErrInsufficientBalance = errors.New("insufficient balance")
 

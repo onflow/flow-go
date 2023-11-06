@@ -231,8 +231,16 @@ func (proc *procedure) withdrawFrom(address types.Address, amount *big.Int) (*ty
 		TxType:      types.DirectCallTxType,
 	}
 
-	// check source balance
-	// if balance is lower than amount return
+	// check if account exists
+	// while this method is only called from bridged accounts
+	// it might be the case that someone creates a bridged account
+	// and never transfer tokens to and call for withdraw
+	if !proc.state.Exist(addr) {
+		return res, types.ErrAccountDoesNotExist
+	}
+
+	// check the source account balance
+	// if balance is lower than amount needed for withdrawal, error out
 	if proc.state.GetBalance(addr).Cmp(amount) < 0 {
 		return res, types.ErrInsufficientBalance
 	}
