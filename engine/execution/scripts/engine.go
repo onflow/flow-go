@@ -15,6 +15,8 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
+var ErrStateCommitmentPruned = fmt.Errorf("state commitment not found")
+
 type Engine struct {
 	unit          *engine.Unit
 	log           zerolog.Logger
@@ -63,7 +65,14 @@ func (e *Engine) ExecuteScriptAtBlockID(
 	// return early if state with the given state commitment is not in memory
 	// and already purged. This reduces allocations for scripts targeting old blocks.
 	if !e.execState.HasState(stateCommit) {
-		return nil, fmt.Errorf("failed to execute script at block (%s): state commitment not found (%s). this error usually happens if the reference block for this script is not set to a recent block", blockID.String(), hex.EncodeToString(stateCommit[:]))
+		return nil, fmt.Errorf(
+			"failed to execute script at block (%s): %w (%s). "+
+				"this error usually happens if the reference "+
+				"block for this script is not set to a recent block.",
+			blockID.String(),
+			ErrStateCommitmentPruned,
+			hex.EncodeToString(stateCommit[:]),
+		)
 	}
 
 	header, err := e.state.AtBlockID(blockID).Head()
@@ -117,10 +126,11 @@ func (e *Engine) GetAccount(
 	// and already purged. This reduces allocations for get accounts targeting old blocks.
 	if !e.execState.HasState(stateCommit) {
 		return nil, fmt.Errorf(
-			"failed to get account at block (%s): state commitment not "+
-				"found (%s). this error usually happens if the reference "+
+			"failed to get account at block (%s): %w (%s). "+
+				"this error usually happens if the reference "+
 				"block for this script is not set to a recent block.",
 			blockID.String(),
+			ErrStateCommitmentPruned,
 			hex.EncodeToString(stateCommit[:]))
 	}
 
