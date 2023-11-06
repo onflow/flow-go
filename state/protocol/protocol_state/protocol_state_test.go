@@ -27,7 +27,7 @@ func TestProtocolState_AtBlockID(t *testing.T) {
 
 	globalParams := mock.NewGlobalParams(t)
 	protocolState := NewProtocolState(protocolStateDB, globalParams)
-	t.Run("exists", func(t *testing.T) {
+	t.Run("retrieve state for existing blocks", func(t *testing.T) {
 		dynamicProtocolState, err := protocolState.AtBlockID(blockID)
 		require.NoError(t, err)
 
@@ -37,20 +37,20 @@ func TestProtocolState_AtBlockID(t *testing.T) {
 		require.NoError(t, err)
 		require.NotEqual(t, dynamicProtocolState.Identities(), other.Identities())
 	})
-	t.Run("not-exists", func(t *testing.T) {
+	t.Run("retrieve state for non-existing block yields storage.ErrNotFound error", func(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 		protocolStateDB.On("ByBlockID", blockID).Return(nil, storage.ErrNotFound).Once()
 		_, err := protocolState.AtBlockID(blockID)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 	})
-	t.Run("exception", func(t *testing.T) {
+	t.Run("exception during retrieve is propagated", func(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 		exception := errors.New("exception")
 		protocolStateDB.On("ByBlockID", blockID).Return(nil, exception).Once()
 		_, err := protocolState.AtBlockID(blockID)
 		require.ErrorIs(t, err, exception)
 	})
-	t.Run("global-params", func(t *testing.T) {
+	t.Run("retrieve global-params", func(t *testing.T) {
 		expectedChainID := flow.Testnet
 		globalParams.On("ChainID").Return(expectedChainID, nil).Once()
 		actualChainID := protocolState.GlobalParams().ChainID()
