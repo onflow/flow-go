@@ -37,7 +37,6 @@ func (b *backendBlockDetails) GetLatestBlock(_ context.Context, isSealed bool) (
 		// In the RPC engine, if we encounter an error from the protocol state indicating state corruption,
 		// we should halt processing requests, but do throw an exception which might cause a crash:
 		// - It is unsafe to process requests if we have an internally bad state.
-		//   TODO: https://github.com/onflow/flow-go/issues/4028
 		// - We would like to avoid throwing an exception as a result of an Access API request by policy
 		//   because this can cause DOS potential
 		// - Since the protocol state is widely shared, we assume that in practice another component will
@@ -91,7 +90,6 @@ func (b *backendBlockDetails) getBlockStatus(block *flow.Block) (flow.BlockStatu
 		// In the RPC engine, if we encounter an error from the protocol state indicating state corruption,
 		// we should halt processing requests, but do throw an exception which might cause a crash:
 		// - It is unsafe to process requests if we have an internally bad state.
-		//   TODO: https://github.com/onflow/flow-go/issues/4028
 		// - We would like to avoid throwing an exception as a result of an Access API request by policy
 		//   because this can cause DOS potential
 		// - Since the protocol state is widely shared, we assume that in practice another component will
