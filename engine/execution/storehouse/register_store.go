@@ -60,6 +60,13 @@ func NewRegisterStore(
 // 3. above pruned height, and is not executed
 // 4. above pruned height, and is executed, and register is updated
 // 5. above pruned height, and is executed, but register is not updated since pruned height
+// It returns:
+//   - (value, nil) if the register value is found at the given block
+//   - (nil, storage.ErrNotFound) if the register is not found
+//   - (nil, storage.ErrHeightNotIndexed) if the height is below the first height that is indexed.
+//   - (nil, storehouse.ErrNotExecuted) if the block is not executed yet
+//   - (nil, storehouse.ErrNotExecuted) if the block is conflicting iwth finalized block
+//   - (nil, err) for any other exceptions
 func (r *RegisterStore) GetRegister(height uint64, blockID flow.Identifier, register flow.RegisterID) (flow.RegisterValue, error) {
 	reg, err := r.memStore.GetRegister(height, blockID, register)
 	// the height might be lower than the lowest height in memStore,
