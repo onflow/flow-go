@@ -85,9 +85,7 @@ func (s *InMemoryRegisterStore) SaveRegisters(
 
 	// make sure parent is a known block or the pruned block, which forms a fork
 	_, ok = s.registersByBlockID[parentID]
-	if !ok {
-		// parent doesn't exist, check if it is the pruned block
-		if parentID != s.prunedID {
+	if !ok && parentID != s.prunedID {
 			return fmt.Errorf("saving registers for block %s, but its parent %s is not saved", blockID, parentID)
 		}
 	}
@@ -169,12 +167,11 @@ func (s *InMemoryRegisterStore) readRegisterAtBlockID(blockID flow.Identifier, r
 		return flow.RegisterValue{}, false
 	}
 
-	reg, ok := registers[register]
-	return reg, ok
+    return registers[register]
 }
 
 // GetUpdatedRegisters returns the updated registers of a block
-func (s *InMemoryRegisterStore) GetUpdatedRegisters(height uint64, blockID flow.Identifier) ([]flow.RegisterEntry, error) {
+func (s *InMemoryRegisterStore) GetUpdatedRegisters(height uint64, blockID flow.Identifier) (flow.RegisterEntries, error) {
 	registerUpdates, err := s.getUpdatedRegisters(height, blockID)
 	if err != nil {
 		return nil, err
