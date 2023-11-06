@@ -13,26 +13,26 @@ var _ execution.InMemoryRegisterStore = (*InMemoryRegisterStore)(nil)
 
 var ErrNotExecuted = fmt.Errorf("block is not executed")
 
-type ErrPruned struct {
+type PrunedError struct {
 	PrunedHeight uint64
 	Height       uint64
 }
 
-func NewErrPruned(height uint64, prunedHeight uint64) error {
-	return ErrPruned{Height: height, PrunedHeight: prunedHeight}
+func NewPrunedError(height uint64, prunedHeight uint64) error {
+	return PrunedError{Height: height, PrunedHeight: prunedHeight}
 }
 
-func (e ErrPruned) Error() string {
+func (e PrunedError) Error() string {
 	return fmt.Sprintf("block is pruned at height %d", e.Height)
 }
 
-func IsErrPruned(err error) (ErrPruned, bool) {
-	var e ErrPruned
+func IsPrunedError(err error) (PrunedError, bool) {
+	var e PrunedError
 	ok := errors.As(err, &e)
 	if ok {
 		return e, true
 	}
-	return ErrPruned{}, false
+	return PrunedError{}, false
 }
 
 type InMemoryRegisterStore struct {
@@ -86,8 +86,7 @@ func (s *InMemoryRegisterStore) SaveRegisters(
 	// make sure parent is a known block or the pruned block, which forms a fork
 	_, ok = s.registersByBlockID[parentID]
 	if !ok && parentID != s.prunedID {
-			return fmt.Errorf("saving registers for block %s, but its parent %s is not saved", blockID, parentID)
-		}
+		return fmt.Errorf("saving registers for block %s, but its parent %s is not saved", blockID, parentID)
 	}
 
 	// update registers for the block
@@ -109,14 +108,14 @@ func (s *InMemoryRegisterStore) SaveRegisters(
 
 // GetRegister will return the latest updated value of the given register
 // since the pruned height.
-// It returns ErrPruned if the register is unknown or not updated since the pruned height
+// It returns PrunedError if the register is unknown or not updated since the pruned height
 // Can't return ErrNotFound, since we can't distinguish between not found or not updated since the pruned height
 func (s *InMemoryRegisterStore) GetRegister(height uint64, blockID flow.Identifier, register flow.RegisterID) (flow.RegisterValue, error) {
 	s.RLock()
 	defer s.RUnlock()
 
 	if height <= s.prunedHeight {
-		return flow.RegisterValue{}, NewErrPruned(height, s.prunedHeight)
+		return flow.RegisterValue{}, NewPrunedError(height, s.prunedHeight)
 	}
 
 	_, ok := s.registersByBlockID[blockID]
@@ -141,11 +140,11 @@ func (s *InMemoryRegisterStore) GetRegister(height uint64, blockID flow.Identifi
 			// if the parent doesn't exist because the block itself is the pruned block,
 			// then it means the register is not updated since the pruned height.
 			// since we can't distinguish whether the register is not updated or not exist at all,
-			// we just return ErrPruned error along with the prunedHeight, so the
+			// we just return PrunedError error along with the prunedHeight, so the
 			// caller could check with OnDiskRegisterStore to find if this register has a updated value
 			// at earlier height.
 			if block == s.prunedID {
-				return flow.RegisterValue{}, NewErrPruned(height, s.prunedHeight)
+				return flow.RegisterValue{}, NewPrunedError(height, s.prunedHeight)
 			}
 
 			// in this case, it means the state of in-memory register store is inconsistent,
@@ -167,7 +166,8 @@ func (s *InMemoryRegisterStore) readRegisterAtBlockID(blockID flow.Identifier, r
 		return flow.RegisterValue{}, false
 	}
 
-    return registers[register]
+	value, ok := registers[register]
+	return value, ok
 }
 
 // GetUpdatedRegisters returns the updated registers of a block
