@@ -91,11 +91,6 @@ func (_m *ProtocolStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) e
 	return r0
 }
 
-// SetInvalidStateTransitionAttempted provides a mock function with given fields:
-func (_m *ProtocolStateMachine) SetInvalidStateTransitionAttempted() {
-	_m.Called()
-}
-
 // TransitionToNextEpoch provides a mock function with given fields:
 func (_m *ProtocolStateMachine) TransitionToNextEpoch() error {
 	ret := _m.Called()

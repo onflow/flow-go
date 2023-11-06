@@ -2,6 +2,7 @@ package protocol_state
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -39,7 +40,11 @@ func (s *StateMutatorSuite) SetupTest() {
 	s.setupsDB = storagemock.NewEpochSetups(s.T())
 	s.commitsDB = storagemock.NewEpochCommits(s.T())
 	s.stateMachine = protocolstatemock.NewProtocolStateMachine(s.T())
-	s.mutator = newStateMutator(s.headersDB, s.resultsDB, s.setupsDB, s.commitsDB, s.stateMachine)
+
+	s.mutator = newStateMutator(s.headersDB, s.resultsDB, s.setupsDB, s.commitsDB, s.stateMachine, func() (ProtocolStateMachine, error) {
+		require.Fail(s.T(), "entering epoch fallback is not expected")
+		return nil, fmt.Errorf("entering epoch fallback is not expected")
+	})
 }
 
 // TestHappyPathNoChanges tests that stateMutator doesn't cache any db updates when there are no changes.
