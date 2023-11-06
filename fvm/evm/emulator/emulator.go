@@ -294,7 +294,11 @@ func (proc *procedure) run(msg *gethCore.Message, txType uint8) (*types.Result, 
 			err = types.NewEVMExecutionError(execResult.Err)
 		}
 	}
-	res.StateRootHash, err = proc.commit()
+	var commitErr error
+	res.StateRootHash, commitErr = proc.commit()
+	if commitErr != nil {
+		return &res, commitErr
+	}
 	return &res, err
 }
 
