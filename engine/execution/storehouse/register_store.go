@@ -22,6 +22,8 @@ type RegisterStore struct {
 	finalizing *atomic.Bool // making sure only one goroutine is finalizing at a time
 }
 
+var _ execution.RegisterStore = (*RegisterStore)(nil)
+
 func NewRegisterStore(
 	diskStore execution.OnDiskRegisterStore,
 	wal execution.ExecutedFinalizedWAL,
@@ -109,6 +111,12 @@ func (r *RegisterStore) GetRegister(height uint64, blockID flow.Identifier, regi
 
 // SaveRegisters saves to InMemoryRegisterStore first, then trigger the same check as OnBlockFinalized
 // Depend on InMemoryRegisterStore.SaveRegisters
+// It returns:
+// - nil if the registers are saved successfully
+// - exception is the block is above the pruned height but does not connect to the pruned height (conflicting block).
+// - exception if the block is below the pruned height
+// - exception if the save block is saved again
+// - exception for any other exception
 func (r *RegisterStore) SaveRegisters(header *flow.Header, registers []flow.RegisterEntry) error {
 	err := r.memStore.SaveRegisters(header.Height, header.ID(), header.ParentID, registers)
 	if err != nil {
@@ -175,9 +183,9 @@ func (r *RegisterStore) onBlockFinalized() error {
 	return r.onBlockFinalized() // check again until there is no more finalized block
 }
 
-// FinalizedAndExecutedHeight returns the height of the last finalized and executed block,
+// LastFinalizedAndExecutedHeight returns the height of the last finalized and executed block,
 // which has been saved in OnDiskRegisterStore
-func (r *RegisterStore) FinalizedAndExecutedHeight() uint64 {
+func (r *RegisterStore) LastFinalizedAndExecutedHeight() uint64 {
 	// diskStore caches the latest height in memory
 	return r.diskStore.LatestHeight()
 }
