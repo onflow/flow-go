@@ -177,7 +177,7 @@ func (m *testMeter) MeterComputation(
 	return m.meterComputation(kind, intensity)
 }
 
-func (m *testMeter) HasComputationCapacity(
+func (m *testMeter) ComputationAvailable(
 	kind common.ComputationKind,
 	intensity uint,
 ) bool {

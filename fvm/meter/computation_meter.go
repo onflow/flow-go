@@ -96,6 +96,21 @@ func (m *ComputationMeter) MeterComputation(
 	return nil
 }
 
+// ComputationAvailable returns true if enough computation is left in the transaction for the given intensity and type
+func (m *ComputationMeter) ComputationAvailable(
+	kind common.ComputationKind,
+	intensity uint,
+) bool {
+	w, ok := m.params.computationWeights[kind]
+	// if not found return has capacity
+	// given the behaviour of MeterComputation is ignoring intensities without a set weight
+	if !ok {
+		return true
+	}
+	potentialComputationUsage := m.computationUsed + w*uint64(intensity)
+	return potentialComputationUsage <= m.params.computationLimit
+}
+
 // ComputationIntensities returns all the measured computational intensities
 func (m *ComputationMeter) ComputationIntensities() MeteredComputationIntensities {
 	return m.computationIntensities

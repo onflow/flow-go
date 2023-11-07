@@ -6,7 +6,7 @@ require (
 	cloud.google.com/go/bigquery v1.52.0
 	github.com/VividCortex/ewma v1.2.0
 	github.com/coreos/go-semver v0.3.0
-	github.com/dapperlabs/testingdock v0.4.5
+	github.com/dapperlabs/testingdock v0.4.5-0.20231020233342-a2853fe18724
 	github.com/dgraph-io/badger/v2 v2.2007.4
 	github.com/docker/docker v24.0.6+incompatible
 	github.com/docker/go-connections v0.4.0
