@@ -228,7 +228,8 @@ func (h *ContractHandler) EmitEvent(event *types.Event) {
 	// TODO add extra metering for rlp encoding
 	encoded, err := event.Payload.Encode()
 	handleError(err)
-	h.backend.EmitFlowEvent(event.Etype, encoded)
+	err = h.backend.EmitFlowEvent(event.Etype, encoded)
+	handleError(err)
 }
 
 func (h *ContractHandler) getBlockContext() types.BlockContext {
