@@ -37,26 +37,27 @@ func NewDefaultBlockContext(BlockNumber uint64) BlockContext {
 type ReadOnlyBlockView interface {
 	// BalanceOf returns the balance of this address
 	BalanceOf(address Address) (*big.Int, error)
+	// NonceOf returns the nonce of this address
+	NonceOf(address Address) (uint64, error)
 	// CodeOf returns the code for this address (if smart contract is deployed at this address)
 	CodeOf(address Address) (Code, error)
 }
 
-// BlockView allows evm calls in the context of a block
+// BlockView facilitates execution of a transaction or a direct evm  call in the context of a block
+// Errors returned by the methods are one of the followings:
+// - Fatal error
+// - Database error (non-fatal)
+// - EVM validation error
+// - EVM execution error
 type BlockView interface {
-	// MintTo mints new tokens to this address
-	MintTo(address Address, amount *big.Int) (*Result, error)
-	// WithdrawFrom withdraws tokens from this address
-	WithdrawFrom(address Address, amount *big.Int) (*Result, error)
-	// Transfer transfers token between addresses
-	Transfer(from Address, to Address, value *big.Int) (*Result, error)
-	// Deploy deploys an smart contract
-	Deploy(caller Address, code Code, gasLimit uint64, value *big.Int) (*Result, error)
-	// Call makes a call to a smart contract
-	Call(caller Address, to Address, data Data, gasLimit uint64, value *big.Int) (*Result, error)
-	// RunTransaction runs a transaction
+	// executes a direct call
+	DirectCall(call *DirectCall) (*Result, error)
+
+	// RunTransaction executes an evm transaction
 	RunTransaction(tx *gethTypes.Transaction) (*Result, error)
 }
 
+// Emulator emulates an evm-compatible chain
 type Emulator interface {
 	// constructs a new block view
 	NewReadOnlyBlockView(ctx BlockContext) (ReadOnlyBlockView, error)
@@ -65,6 +66,10 @@ type Emulator interface {
 	NewBlockView(ctx BlockContext) (BlockView, error)
 }
 
+// Database provides what Emulator needs for storing tries and accounts
+// Errors returned by the methods are one of the followings:
+// - Fatal error
+// - Database error (non-fatal)
 type Database interface {
 	ethdb.KeyValueStore
 

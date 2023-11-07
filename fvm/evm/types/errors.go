@@ -6,6 +6,9 @@ import (
 )
 
 var (
+	// ErrAccountDoesNotExist is returned when evm account doesn't exist
+	ErrAccountDoesNotExist = errors.New("account does not exist")
+
 	// ErrInsufficientBalance is returned when evm account doesn't have enough balance
 	ErrInsufficientBalance = errors.New("insufficient balance")
 
@@ -30,8 +33,8 @@ var (
 	ErrNotImplemented = NewFatalError(errors.New("a functionality is called that is not implemented"))
 )
 
-// EVMExecutionError is a user-related error,
-// emitted when a evm transaction execution or a contract call has been failed
+// EVMExecutionError is a non-fatal error, returned when execution of
+// an evm transaction or direct call has failed.
 type EVMExecutionError struct {
 	err error
 }
@@ -49,13 +52,41 @@ func (err EVMExecutionError) Unwrap() error {
 }
 
 func (err EVMExecutionError) Error() string {
-	return fmt.Sprintf("EVM execution failed: %v", err.err)
+	return fmt.Sprintf("EVM execution error: %v", err.err)
 }
 
-// IsEVMExecutionError returns true if the error or any wrapped error
-// is of type EVM execution error
+// IsEVMValidationError returns true if the error or any underlying errors
+// is of the type EVM execution error
 func IsEVMExecutionError(err error) bool {
 	return errors.As(err, &EVMExecutionError{})
+}
+
+// EVMValidationError is a non-fatal error, returned when validation steps of an EVM transaction
+// or direct call has failed.
+type EVMValidationError struct {
+	err error
+}
+
+// NewEVMValidationError returns a new EVMValidationError
+func NewEVMValidationError(rootCause error) EVMValidationError {
+	return EVMValidationError{
+		err: rootCause,
+	}
+}
+
+// Unwrap unwraps the underlying evm error
+func (err EVMValidationError) Unwrap() error {
+	return err.err
+}
+
+func (err EVMValidationError) Error() string {
+	return fmt.Sprintf("EVM validation error: %v", err.err)
+}
+
+// IsEVMValidationError returns true if the error or any underlying errors
+// is of the type EVM validation error
+func IsEVMValidationError(err error) bool {
+	return errors.As(err, &EVMValidationError{})
 }
 
 // DatabaseError is a non-fatal error, returned when a database operation
