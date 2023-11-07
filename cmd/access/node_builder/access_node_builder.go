@@ -727,10 +727,12 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					// this is only supported when bootstrapping a new register db, otherwise the
 					// register db will throw exceptions when indexing an already indexed height.
 					if builder.forceResetIndexerHeight {
+						builder.Logger.Info().Uint64("height", checkpointHeight).Msg("attempting to reset indexer start height")
 						err = indexedBlockHeight.SetProcessedIndex(checkpointHeight)
 						if err != nil && !errors.Is(err, storage.ErrNotFound) {
 							return nil, fmt.Errorf("could not reset indexed block height: %w", err)
 						}
+						builder.Logger.Info().Uint64("height", checkpointHeight).Msg("successfully reset indexer start height")
 					}
 				}
 
