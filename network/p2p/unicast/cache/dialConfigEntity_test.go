@@ -6,14 +6,14 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	unicastcache "github.com/onflow/flow-go/network/p2p/unicast/cache"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // TestDialConfigEntity tests the DialConfigEntity struct and its methods.
 func TestDialConfigEntity(t *testing.T) {
-	peerID := p2ptest.PeerIdFixture(t)
+	peerID := unittest.PeerIdFixture(t)
 
 	d := &unicastcache.DialConfigEntity{
 		PeerId: peerID,
@@ -40,7 +40,7 @@ func TestDialConfigEntity(t *testing.T) {
 
 	t.Run("ID is only calculated from peer.ID", func(t *testing.T) {
 		d2 := &unicastcache.DialConfigEntity{
-			PeerId:     p2ptest.PeerIdFixture(t),
+			PeerId:     unittest.PeerIdFixture(t),
 			DialConfig: d.DialConfig,
 		}
 		require.NotEqual(t, d.ID(), d2.ID()) // different peer id, different id.

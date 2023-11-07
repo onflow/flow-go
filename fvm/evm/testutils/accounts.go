@@ -42,12 +42,13 @@ func (a *EOATestAccount) PrepareSignAndEncodeTx(
 	data []byte,
 	amount *big.Int,
 	gasLimit uint64,
-	gasFee *big.Int,
+	gasPrice *big.Int,
 ) []byte {
-	tx := a.PrepareAndSignTx(t, to, data, amount, gasLimit, gasFee)
+	tx := a.PrepareAndSignTx(t, to, data, amount, gasLimit, gasPrice)
 	var b bytes.Buffer
 	writer := io.Writer(&b)
-	tx.EncodeRLP(writer)
+	err := tx.EncodeRLP(writer)
+	require.NoError(t, err)
 	return b.Bytes()
 }
 
@@ -57,24 +58,43 @@ func (a *EOATestAccount) PrepareAndSignTx(
 	data []byte,
 	amount *big.Int,
 	gasLimit uint64,
-	gasFee *big.Int,
+	gasPrice *big.Int,
 ) *gethTypes.Transaction {
-
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
-	tx, err := gethTypes.SignTx(
+	tx := a.signTx(
+		t,
 		gethTypes.NewTransaction(
 			a.nonce,
 			to,
 			amount,
 			gasLimit,
-			gasFee,
-			data),
-		a.signer, a.key)
-	require.NoError(t, err)
+			gasPrice,
+			data,
+		),
+	)
 	a.nonce++
 
+	return tx
+}
+
+func (a *EOATestAccount) SignTx(
+	t testing.TB,
+	tx *gethTypes.Transaction,
+) *gethTypes.Transaction {
+	a.lock.Lock()
+	defer a.lock.Unlock()
+
+	return a.signTx(t, tx)
+}
+
+func (a *EOATestAccount) signTx(
+	t testing.TB,
+	tx *gethTypes.Transaction,
+) *gethTypes.Transaction {
+	tx, err := gethTypes.SignTx(tx, a.signer, a.key)
+	require.NoError(t, err)
 	return tx
 }
 
@@ -103,7 +123,12 @@ func RunWithEOATestAccount(t *testing.T, led atree.Ledger, flowEVMRootAddress fl
 	blk, err := e.NewBlockView(types.NewDefaultBlockContext(2))
 	require.NoError(t, err)
 
-	_, err = blk.MintTo(account.Address(), new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1000)))
+	_, err = blk.DirectCall(
+		types.NewDepositCall(
+			account.Address(),
+			new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1000)),
+		),
+	)
 	require.NoError(t, err)
 
 	f(account)
