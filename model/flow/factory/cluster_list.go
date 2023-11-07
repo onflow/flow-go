@@ -8,7 +8,7 @@ import (
 )
 
 // NewClusterList creates a new cluster list based on the given cluster assignment and the provided list of identities.
-// the implementation enforces the following protocol rules and errors in case they are violated:
+// The implementation enforces the following protocol rules and errors in case they are violated:
 //
 //	(a) input `collectors` only contains collector nodes with positive weight
 //	(b) collectors have unique node IDs
