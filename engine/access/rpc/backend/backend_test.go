@@ -423,7 +423,7 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 	})
 
 	// tests that signaler context received error when node state is inconsistent
-	suite.Run(fmt.Sprintf("GetLatestSealedBlockHeader - fails with %v", "inconsistent node`s state"), func() {
+	suite.Run("GetLatestSealedBlockHeader - fails with inconsistent node`s state", func() {
 		err := fmt.Errorf("inconsistent node`s state")
 		suite.snapshot.On("Head").Return(nil, err)
 
@@ -535,7 +535,7 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 	})
 
 	// tests that signaler context received error when node state is inconsistent
-	suite.Run(fmt.Sprintf("TestGetTransactionResultByIndex - fails with %v", "inconsistent node`s state"), func() {
+	suite.Run("TestGetTransactionResultByIndex - fails with inconsistent node`s state", func() {
 		err := fmt.Errorf("inconsistent node`s state")
 		suite.snapshot.On("Head").Return(nil, err).Once()
 
@@ -551,7 +551,12 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 
 	ctx := context.Background()
+	params := suite.defaultBackendParams()
+
 	block := unittest.BlockFixture()
+	sporkRootBlockHeight, err := suite.state.Params().SporkRootBlockHeight()
+	suite.Require().NoError(err)
+	block.Header.Height = sporkRootBlockHeight + 1
 	blockId := block.ID()
 
 	// block storage returns the corresponding block
@@ -575,7 +580,6 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 		TransactionResults: []*execproto.GetTransactionResultResponse{{}},
 	}
 
-	params := suite.defaultBackendParams()
 	// the connection factory should be used to get the execution node client
 	params.ConnFactory = connFactory
 	params.FixedExecutionNodeIDs = (fixedENIDs.NodeIDs()).Strings()
@@ -597,7 +601,7 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	})
 
 	// tests that signaler context received error when node state is inconsistent
-	suite.Run(fmt.Sprintf("GetTransactionResultsByBlockID - fails with %v", "inconsistent node`s state"), func() {
+	suite.Run("GetTransactionResultsByBlockID - fails with inconsistent node`s state", func() {
 		err := fmt.Errorf("inconsistent node`s state")
 		suite.snapshot.On("Head").Return(nil, err).Once()
 
@@ -1021,7 +1025,7 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 	})
 
 	// tests that signaler context received error when node state is inconsistent
-	suite.Run(fmt.Sprintf("GetLatestFinalizedBlock - fails with %v", "inconsistent node`s state"), func() {
+	suite.Run("GetLatestFinalizedBlock - fails with inconsistent node`s state", func() {
 		err := fmt.Errorf("inconsistent node`s state")
 		suite.snapshot.On("Head").Return(nil, err)
 
