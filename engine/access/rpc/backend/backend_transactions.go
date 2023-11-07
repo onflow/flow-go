@@ -228,6 +228,7 @@ func (b *backendTransactions) GetTransactionResult(
 	txID flow.Identifier,
 	blockID flow.Identifier,
 	collectionID flow.Identifier,
+	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) (*access.TransactionResult, error) {
 	// look up transaction from storage
 	start := time.Now()
@@ -286,7 +287,7 @@ func (b *backendTransactions) GetTransactionResult(
 	// access node may not have the block if it hasn't yet been finalized, hence block can be nil at this point
 	if block != nil {
 		foundBlockID := block.ID()
-		transactionWasExecuted, events, statusCode, txError, err = b.lookupTransactionResult(ctx, txID, foundBlockID)
+		transactionWasExecuted, events, statusCode, txError, err = b.lookupTransactionResult(ctx, txID, foundBlockID, requiredEventEncodingVersion)
 		if err != nil {
 			return nil, rpc.ConvertError(err, "failed to retrieve result from any execution node", codes.Internal)
 		}
@@ -385,6 +386,7 @@ func (b *backendTransactions) retrieveBlock(
 func (b *backendTransactions) GetTransactionResultsByBlockID(
 	ctx context.Context,
 	blockID flow.Identifier,
+	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) ([]*access.TransactionResult, error) {
 	// TODO: consider using storage.Index.ByBlockID, the index contains collection id and seals ID
 	block, err := b.blocks.ByID(blockID)
@@ -434,8 +436,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 			if err != nil {
 				return nil, rpc.ConvertStorageError(err)
 			}
-
-			events, err := convert.MessagesToEventsFromVersion(txResult.GetEvents(), resp.GetEventEncodingVersion())
+			events, err := convert.MessagesToEventsWithEncodingConversion(txResult.GetEvents(), resp.GetEventEncodingVersion(), requiredEventEncodingVersion)
 			if err != nil {
 				return nil, status.Errorf(codes.Internal,
 					"failed to convert events to message in txID %x: %v", txID, err)
@@ -490,7 +491,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 			return nil, rpc.ConvertStorageError(err)
 		}
 
-		events, err := convert.MessagesToEventsFromVersion(systemTxResult.GetEvents(), resp.GetEventEncodingVersion())
+		events, err := convert.MessagesToEventsWithEncodingConversion(systemTxResult.GetEvents(), resp.GetEventEncodingVersion(), requiredEventEncodingVersion)
 		if err != nil {
 			return nil, rpc.ConvertError(err, "failed to convert events from system tx result", codes.Internal)
 		}
@@ -515,6 +516,7 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 	ctx context.Context,
 	blockID flow.Identifier,
 	index uint32,
+	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) (*access.TransactionResult, error) {
 	// TODO: https://github.com/onflow/flow-go/issues/2175 so caching doesn't cause a circular dependency
 	block, err := b.blocks.ByID(blockID)
@@ -547,7 +549,7 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	events, err := convert.MessagesToEventsFromVersion(resp.GetEvents(), resp.GetEventEncodingVersion())
+	events, err := convert.MessagesToEventsWithEncodingConversion(resp.GetEvents(), resp.GetEventEncodingVersion(), requiredEventEncodingVersion)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to convert events in blockID %x: %v", blockID, err)
 	}
@@ -664,9 +666,9 @@ func (b *backendTransactions) lookupTransactionResult(
 	ctx context.Context,
 	txID flow.Identifier,
 	blockID flow.Identifier,
+	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) (bool, []flow.Event, uint32, string, error) {
-
-	events, txStatus, message, err := b.getTransactionResultFromExecutionNode(ctx, blockID, txID[:])
+	events, txStatus, message, err := b.getTransactionResultFromExecutionNode(ctx, blockID, txID[:], requiredEventEncodingVersion)
 	if err != nil {
 		// if either the execution node reported no results or the execution node could not be chosen
 		if status.Code(err) == codes.NotFound {
@@ -749,6 +751,7 @@ func (b *backendTransactions) getTransactionResultFromExecutionNode(
 	ctx context.Context,
 	blockID flow.Identifier,
 	transactionID []byte,
+	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) ([]flow.Event, uint32, string, error) {
 
 	// create an execution API request for events at blockID and transactionID
@@ -771,7 +774,7 @@ func (b *backendTransactions) getTransactionResultFromExecutionNode(
 		return nil, 0, "", err
 	}
 
-	events, err := convert.MessagesToEventsFromVersion(resp.GetEvents(), resp.GetEventEncodingVersion())
+	events, err := convert.MessagesToEventsWithEncodingConversion(resp.GetEvents(), resp.GetEventEncodingVersion(), requiredEventEncodingVersion)
 	if err != nil {
 		return nil, 0, "", rpc.ConvertError(err, "failed to convert events to message", codes.Internal)
 	}

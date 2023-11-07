@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/libp2p/go-libp2p/core"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/rs/zerolog"
 
@@ -69,46 +69,95 @@ func ConnectednessToString(connectedness network.Connectedness) (string, bool) {
 
 }
 
-// FindOutboundStream finds an existing outbound stream to the target id if it exists by querying libp2p
-func FindOutboundStream(host host.Host, targetID peer.ID, protocol core.ProtocolID) (network.Stream, bool) {
-	streams := FilterStream(host, targetID, protocol, network.DirOutbound, false)
-	if len(streams) > 0 {
-		return streams[0], true
-	}
-	return nil, false
-}
-
 // CountStream finds total number of outbound stream to the target id
-func CountStream(host host.Host, targetID peer.ID, protocol core.ProtocolID, dir network.Direction) int {
-	streams := FilterStream(host, targetID, protocol, dir, true)
+func CountStream(host host.Host, targetID peer.ID, opts ...FilterOption) int {
+	streams := FilterStream(host, targetID, append(opts, All())...)
 	return len(streams)
 }
 
-// FilterStream finds one or all existing outbound streams to the target id if it exists.
-// if parameter all is true - all streams are found else the first stream found is returned
-func FilterStream(host host.Host, targetID peer.ID, protocol core.ProtocolID, dir network.Direction, all bool) []network.Stream {
+// FilterOptions holds the filtering options used in FilterStream.
+type FilterOptions struct {
+	// dir specifies the direction of the streams to be filtered.
+	// The default value is network.DirBoth, which considers both inbound and outbound streams.
+	dir network.Direction
 
+	// protocol specifies the protocol ID of the streams to be filtered.
+	// The default value is an empty string, which considers streams of all protocol IDs.
+	protocol protocol.ID
+
+	// all specifies whether to return all matching streams or just the first matching stream.
+	// The default value is false, which returns just the first matching stream.
+	all bool
+}
+
+// FilterOption defines a function type that modifies FilterOptions.
+type FilterOption func(*FilterOptions)
+
+// Direction is a FilterOption for setting the direction of the streams to be filtered.
+func Direction(dir network.Direction) FilterOption {
+	return func(opts *FilterOptions) {
+		opts.dir = dir
+	}
+}
+
+// Protocol is a FilterOption for setting the protocol ID of the streams to be filtered.
+func Protocol(protocol protocol.ID) FilterOption {
+	return func(opts *FilterOptions) {
+		opts.protocol = protocol
+	}
+}
+
+// All is a FilterOption for setting whether to return all matching streams or just the first matching stream.
+func All() FilterOption {
+	return func(opts *FilterOptions) {
+		opts.all = true
+	}
+}
+
+// FilterStream filters the streams to a target peer based on the provided options.
+// The default behavior is to consider all directions and protocols, and return just the first matching stream.
+// This behavior can be customized by providing FilterOption values.
+//
+// Usage:
+//
+//   - To find all outbound streams to a target peer with a specific protocol ID:
+//     streams := FilterStream(host, targetID, Direction(network.DirOutbound), Protocol(myProtocolID), All(true))
+//
+//   - To find the first inbound stream to a target peer, regardless of protocol ID:
+//     stream := FilterStream(host, targetID, Direction(network.DirInbound))
+//
+// host is the host from which to filter streams.
+// targetID is the ID of the target peer.
+// options is a variadic parameter that allows zero or more FilterOption values to be provided.
+//
+// It returns a slice of network.Stream values that match the filtering criteria.
+func FilterStream(host host.Host, targetID peer.ID, options ...FilterOption) []network.Stream {
 	var filteredStreams []network.Stream
+	const allProtocols = "*"
+	// default values
+	opts := FilterOptions{
+		dir:      network.DirUnknown, // by default, consider both inbound and outbound streams
+		protocol: allProtocols,       // by default, consider streams of all protocol IDs
+		all:      false,              // by default, return just the first matching stream
+	}
 
-	// choose the connection only if it is connected
+	// apply provided options
+	for _, option := range options {
+		option(&opts)
+	}
+
 	if host.Network().Connectedness(targetID) != network.Connected {
 		return filteredStreams
 	}
 
-	// get all connections
 	conns := host.Network().ConnsToPeer(targetID)
-
-	// find a connection which is in the connected state
 	for _, conn := range conns {
-
-		// get all streams
 		streams := conn.GetStreams()
 		for _, stream := range streams {
-
-			// choose a stream which is marked as outbound and is for the flow protocol
-			if stream.Stat().Direction == dir && stream.Protocol() == protocol {
+			if (opts.dir == network.DirUnknown || stream.Stat().Direction == opts.dir) &&
+				(opts.protocol == allProtocols || stream.Protocol() == opts.protocol) {
 				filteredStreams = append(filteredStreams, stream)
-				if !all {
+				if !opts.all {
 					return filteredStreams
 				}
 			}
@@ -159,7 +208,7 @@ func IPPortFromMultiAddress(addrs ...multiaddr.Multiaddr) (string, string, error
 			return "", "", err
 		}
 
-		//there should only be one valid IPv4 address
+		// there should only be one valid IPv4 address
 		return ipOrHostname, port, nil
 	}
 	return "", "", fmt.Errorf("ip address or hostname not found")
