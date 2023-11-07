@@ -224,7 +224,7 @@ jobs:
         uses: buildjet/cache@v3
         with:
           path: flow-docker-images.tar
-          # use the workflow run id as part of the cache key to ensure uniqueness
+          # use the workflow run id as part of the cache key to ensure these docker images will only be used for a single workflow run
           key: flow-docker-images-${{ hashFiles('**/Dockerfile') }}-${{ github.run_id }}
 
   integration-test:
@@ -245,7 +245,7 @@ jobs:
             runner: ubuntu-latest
           - name: BFT (Framework) Integration Tests
             make: make -C integration bft-framework-tests
-            runner: buildjet-8vcpu-ubuntu-2204
+            runner: ubuntu-latest
           - name: BFT (Protocol) Integration Tests
             make: make -C integration bft-protocol-tests
             runner: ubuntu-latest
@@ -260,28 +260,28 @@ jobs:
             runner: ubuntu-latest
           - name: Epoch Cohort1 Integration Tests
             make: make -C integration epochs-cohort1-tests
-            runner: buildjet-4vcpu-ubuntu-2204
+            runner: ubuntu-latest
           - name: Epoch Cohort2 Integration Tests
             make: make -C integration epochs-cohort2-tests
-            runner: buildjet-4vcpu-ubuntu-2204
+            runner: ubuntu-latest
           - name: Execution Integration Tests
             make: make -C integration execution-tests
-            runner: buildjet-4vcpu-ubuntu-2204
+            runner: ubuntu-latest
           - name: Ghost Integration Tests
             make: make -C integration ghost-tests
-            runner: buildjet-4vcpu-ubuntu-2204
+            runner: ubuntu-latest
           - name: MVP Integration Tests
             make: make -C integration mvp-tests
-            runner: buildjet-4vcpu-ubuntu-2204
+            runner: ubuntu-latest
           - name: Network Integration Tests
             make: make -C integration network-tests
-            runner: buildjet-4vcpu-ubuntu-2204
+            runner: ubuntu-latest
           - name: Verification Integration Tests
             make: make -C integration verification-tests
             runner: ubuntu-latest
           - name: Upgrade Integration Tests
             make: make -C integration upgrades-tests
-            runner: buildjet-4vcpu-ubuntu-2204
+            runner: ubuntu-latest
     runs-on: ${{ matrix.runner }}
     steps:
     - name: Checkout repo
