@@ -62,6 +62,7 @@ type ProtocolState interface {
 	// - (nil, storage.ErrNotFound) - if there is no protocol state associated with given block ID.
 	// - (nil, exception) - any other error should be treated as exception.
 	AtBlockID(blockID flow.Identifier) (DynamicProtocolState, error)
+
 	// GlobalParams returns params that are the same for all nodes in the network.
 	GlobalParams() GlobalParams
 }

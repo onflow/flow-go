@@ -8,15 +8,19 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-// stateMachine is a dedicated structure that encapsulates all logic for evolving protocol state.
-// Only protocol state machine knows how to evolve the dynamic state in a way that is consistent with the protocol.
-// Protocol state machine implements the following state transitions:
-// - epoch setup: transitions current epoch from staking to setup phase, creates next epoch protocol state when processed.
-// - epoch commit: transitions current epoch from setup to commit phase, commits next epoch protocol state when processed.
-// - identity changes: updates identity table for current and next epoch(if available).
-// - setting an invalid state transition flag: sets an invalid state transition flag for current epoch and next epoch(if available).
-// All updates are applied to a copy of parent protocol state, so parent protocol state is not modified.
-// It is NOT safe to use in concurrent environment.
+// stateMachine is a dedicated structure that encapsulates all logic for evolving protocol state, based on the content
+// of a new block. It guarantees protocol-compliant evolution of the protocol state by implementing the
+// following state transitions:
+//   - epoch setup: transitions current epoch from staking to setup phase, creates next epoch protocol state when processed.
+//   - epoch commit: transitions current epoch from setup to commit phase, commits next epoch protocol state when processed.
+//   - epoch transition: on the first block of the new epoch (Formally, the block's parent is still in the last epoch,
+//     while the new block has a view in the next epoch. Caution: the block's view is not necessarily the first view
+//     in the epoch, as there might be leader failures)
+//   - identity changes: updates identity table for previous (if available), current, and next epoch (if available).
+//   - setting an invalid state transition flag: sets an invalid state transition flag for current epoch and next epoch(if available).
+//
+// All updates are applied to a copy of parent protocol state, so parent protocol state is not modified. The stateMachine internally
+// tracks the current protocol state. A separate instance should be created for each block to processing the updates therein.
 type stateMachine struct {
 	parentState *flow.RichProtocolStateEntry
 	state       *flow.ProtocolStateEntry
