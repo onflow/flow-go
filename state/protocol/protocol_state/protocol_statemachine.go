@@ -9,7 +9,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-// stateMachine is a dedicated structure that encapsulates all logic for evolving protocol state.
+// protocolStateMachine is a dedicated structure that encapsulates all logic for evolving protocol state.
 // Only protocol state machine knows how to evolve the dynamic state in a way that is consistent with the protocol.
 // Protocol state machine implements the following state transitions:
 // - epoch setup: transitions current epoch from staking to setup phase, creates next epoch protocol state when processed.
@@ -18,26 +18,25 @@ import (
 // - setting an invalid state transition flag: sets an invalid state transition flag for current epoch and next epoch(if available).
 // All updates are applied to a copy of parent protocol state, so parent protocol state is not modified.
 // It is NOT safe to use in concurrent environment.
-type stateMachine struct {
+type protocolStateMachine struct {
 	baseProtocolStateMachine
 }
 
-var _ ProtocolStateMachine = (*stateMachine)(nil)
+var _ ProtocolStateMachine = (*protocolStateMachine)(nil)
 
-// newStateMachine creates a new protocol state stateMachine.
-func newStateMachine(view uint64, parentState *flow.RichProtocolStateEntry) (*stateMachine, error) {
+// newStateMachine creates a new protocol state protocolStateMachine.
+func newStateMachine(view uint64, parentState *flow.RichProtocolStateEntry) (*protocolStateMachine, error) {
 	if parentState.InvalidStateTransitionAttempted {
 		return nil, irrecoverable.NewExceptionf("created happy path protocol state machine at view (%d) for a parent state which has"+
 			"invalid state transition", view)
 	}
-	updater := &stateMachine{
+	return &protocolStateMachine{
 		baseProtocolStateMachine: baseProtocolStateMachine{
 			parentState: parentState,
 			state:       parentState.ProtocolStateEntry.Copy(),
 			view:        view,
 		},
-	}
-	return updater, nil
+	}, nil
 }
 
 // ProcessEpochSetup updates the protocol state with data from the epoch setup event.
@@ -50,7 +49,7 @@ func newStateMachine(view uint64, parentState *flow.RichProtocolStateEntry) (*st
 // Implementors must never return (true, error).
 // Expected errors during normal operations:
 // - `protocol.InvalidServiceEventError` if the service event is invalid or is not a valid state transition for the current protocol state
-func (u *stateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (bool, error) {
+func (u *protocolStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (bool, error) {
 	err := protocol.IsValidExtendingEpochSetup(epochSetup, u.parentState.CurrentEpochSetup, u.parentState.EpochStatus())
 	if err != nil {
 		return false, fmt.Errorf("invalid epoch setup event: %w", err)
@@ -132,7 +131,7 @@ func (u *stateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (bool, err
 // Implementors must never return (true, error).
 // Expected errors during normal operations:
 // - `protocol.InvalidServiceEventError` if the service event is invalid or is not a valid state transition for the current protocol state
-func (u *stateMachine) ProcessEpochCommit(epochCommit *flow.EpochCommit) (bool, error) {
+func (u *protocolStateMachine) ProcessEpochCommit(epochCommit *flow.EpochCommit) (bool, error) {
 	if u.state.NextEpoch == nil {
 		return false, protocol.NewInvalidServiceEventErrorf("protocol state has been setup yet")
 	}
@@ -159,7 +158,7 @@ func (u *stateMachine) ProcessEpochCommit(epochCommit *flow.EpochCommit) (bool, 
 // - invalid state transition has not been attempted(this is ensured by constructor),
 // - candidate block is in the next epoch.
 // No errors are expected during normal operations.
-func (u *stateMachine) TransitionToNextEpoch() error {
+func (u *protocolStateMachine) TransitionToNextEpoch() error {
 	nextEpoch := u.state.NextEpoch
 	// Check if there is next epoch protocol state
 	if nextEpoch == nil {

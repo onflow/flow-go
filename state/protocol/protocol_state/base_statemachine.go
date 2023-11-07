@@ -46,10 +46,10 @@ type ProtocolStateMachine interface {
 	// - candidate block is in the next epoch.
 	// No errors are expected during normal operations.
 	TransitionToNextEpoch() error
-	// View returns the view that is associated with this state stateMachine.
+	// View returns the view that is associated with this state protocolStateMachine.
 	// The view of the ProtocolStateMachine equals the view of the block carrying the respective updates.
 	View() uint64
-	// ParentState returns parent protocol state that is associated with this state stateMachine.
+	// ParentState returns parent protocol state that is associated with this state protocolStateMachine.
 	ParentState() *flow.RichProtocolStateEntry
 }
 
@@ -78,13 +78,13 @@ func (u *baseProtocolStateMachine) Build() (updatedState *flow.ProtocolStateEntr
 	return
 }
 
-// View returns the view that is associated with this state stateMachine.
-// The view of the StateUpdater equals the view of the block carrying the respective updates.
+// View returns the view that is associated with this state protocolStateMachine.
+// The view of the ProtocolStateMachine equals the view of the block carrying the respective updates.
 func (u *baseProtocolStateMachine) View() uint64 {
 	return u.view
 }
 
-// ParentState returns parent protocol state that is associated with this state stateMachine.
+// ParentState returns parent protocol state that is associated with this state protocolStateMachine.
 func (u *baseProtocolStateMachine) ParentState() *flow.RichProtocolStateEntry {
 	return u.parentState
 }
