@@ -2,6 +2,7 @@ package unicast
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	libp2pnet "github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
+	"github.com/libp2p/go-libp2p/p2p/net/swarm"
 	"github.com/rs/zerolog"
 	"github.com/sethvargo/go-retry"
 
@@ -294,8 +296,11 @@ func (m *Manager) createStreamWithRetry(ctx context.Context, peerID peer.ID, pro
 		// creates stream using stream factory
 		s, err = m.streamFactory.NewStream(ctx, peerID, protocolID)
 		if err != nil {
-			// if the stream creation failed due to invalid protocol id, skip the re-attempt
-			if stream.IsErrProtocolNotSupported(err) {
+			// if the stream creation failed due to invalid protocol id or no address, skip the re-attempt
+			if stream.IsErrProtocolNotSupported(err) ||
+				errors.Is(err, swarm.ErrNoAddresses) ||
+				stream.IsErrSecurityProtocolNegotiationFailed(err) ||
+				stream.IsErrGaterDisallowedConnection(err) {
 				return err
 			}
 			return retry.RetryableError(multierror.Append(errs, err))

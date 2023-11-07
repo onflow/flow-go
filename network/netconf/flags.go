@@ -20,11 +20,7 @@ const (
 	unicastMessageTimeout                     = "unicast-message-timeout"
 	unicastCreateStreamRetryDelay             = "unicast-create-stream-retry-delay"
 	unicastStreamZeroRetryResetThreshold      = "unicast-stream-zero-retry-reset-threshold"
-	unicastDialZeroRetryResetThreshold        = "unicast-dial-zero-retry-reset-threshold"
-	unicastMaxDialRetryAttemptTimes           = "unicast-max-dial-retry-attempt-times"
 	unicastMaxStreamCreationRetryAttemptTimes = "unicast-max-stream-creation-retry-attempt-times"
-	unicastDialInProgressBackoffDelay         = "unicast-dial-in-progress-backoff-delay"
-	unicastDialBackoffDelay                   = "unicast-dial-backoff-delay"
 	unicastDialConfigCacheSize                = "unicast-dial-config-cache-size"
 	dnsCacheTTL                               = "dns-cache-ttl"
 	disallowListNotificationCacheSize         = "disallow-list-notification-cache-size"
@@ -104,11 +100,7 @@ func AllFlagNames() []string {
 		peerUpdateInterval,
 		unicastMessageTimeout,
 		unicastCreateStreamRetryDelay,
-		unicastDialInProgressBackoffDelay,
-		unicastDialBackoffDelay,
 		unicastStreamZeroRetryResetThreshold,
-		unicastDialZeroRetryResetThreshold,
-		unicastMaxDialRetryAttemptTimes,
 		unicastMaxStreamCreationRetryAttemptTimes,
 		unicastDialConfigCacheSize,
 		dnsCacheTTL,
@@ -189,21 +181,9 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 		config.UnicastConfig.CreateStreamBackoffDelay,
 		"initial backoff delay between failing to establish a connection with another node and retrying, "+
 			"this delay increases exponentially with the number of subsequent failures to establish a connection.")
-	flags.Duration(unicastDialBackoffDelay,
-		config.UnicastConfig.DialInProgressBackoffDelay,
-		"initial backoff delay between failing to establish a connection with another node and retrying, "+
-			"this delay increases exponentially with the number of subsequent failures to establish a connection.")
-	flags.Duration(unicastDialInProgressBackoffDelay,
-		config.UnicastConfig.DialInProgressBackoffDelay,
-		"initial backoff delay for concurrent stream creations to a remote peer when there is no exising connection and a dial is in progress. "+
-			"this delay increases exponentially with the number of subsequent failure attempts")
 	flags.Uint64(unicastStreamZeroRetryResetThreshold,
 		config.UnicastConfig.StreamZeroRetryResetThreshold,
 		"reset stream creation retry budget from zero to the maximum after consecutive successful streams reach this threshold.")
-	flags.Duration(unicastDialZeroRetryResetThreshold,
-		config.UnicastConfig.DialZeroRetryResetThreshold,
-		"reset dial retry budget if the last successful dial is longer than this threshold.")
-	flags.Uint64(unicastMaxDialRetryAttemptTimes, config.UnicastConfig.MaxDialRetryAttemptTimes, "maximum attempts to establish a unicast connection.")
 	flags.Uint64(unicastMaxStreamCreationRetryAttemptTimes, config.UnicastConfig.MaxStreamCreationRetryAttemptTimes, "max attempts to create a unicast stream.")
 	flags.Uint32(unicastDialConfigCacheSize,
 		config.UnicastConfig.DialConfigCacheSize,

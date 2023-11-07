@@ -20,6 +20,12 @@ func (e ErrSecurityProtocolNegotiationFailed) Error() string {
 	return fmt.Errorf("failed to dial remote peer %s in stream factory invalid node ID: %w", p2plogging.PeerId(e.pid), e.err).Error()
 }
 
+// IsErrSecurityProtocolNegotiationFailed returns whether an error is ErrSecurityProtocolNegotiationFailed.
+func IsErrSecurityProtocolNegotiationFailed(err error) bool {
+	var e ErrSecurityProtocolNegotiationFailed
+	return errors.As(err, &e)
+}
+
 // NewSecurityProtocolNegotiationErr returns a new ErrSecurityProtocolNegotiationFailed.
 func NewSecurityProtocolNegotiationErr(pid peer.ID, err error) ErrSecurityProtocolNegotiationFailed {
 	return ErrSecurityProtocolNegotiationFailed{pid: pid, err: err}
