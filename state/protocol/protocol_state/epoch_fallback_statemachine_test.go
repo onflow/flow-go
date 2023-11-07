@@ -52,3 +52,13 @@ func (s *EpochFallbackStateMachineSuite) TestTransitionToNextEpoch() {
 	_, _, hasChanges := s.stateMachine.Build()
 	require.False(s.T(), hasChanges)
 }
+
+// TestNewEpochFallbackStateMachine tests that creating epoch fallback state machine sets
+// `InvalidStateTransitionAttempted` to true to record that we have entered epoch fallback mode(EFM).
+func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
+	s.parentProtocolState.InvalidStateTransitionAttempted = false
+	s.stateMachine = newEpochFallbackStateMachine(s.candidate.View, s.parentProtocolState)
+	updatedState, _, hasChanges := s.stateMachine.Build()
+	require.True(s.T(), hasChanges, "InvalidStateTransitionAttempted has to be updated")
+	require.True(s.T(), updatedState.InvalidStateTransitionAttempted, "InvalidStateTransitionAttempted has to be set")
+}
