@@ -210,13 +210,15 @@ func TestRegisters_Store_Versioning(t *testing.T) {
 	})
 }
 
+// TestRegisters_GetAndStoreEmptyOwner tests behavior of storing and retrieving registers with
+// an empty owner value, which is used for global state variables.
 func TestRegisters_GetAndStoreEmptyOwner(t *testing.T) {
 	t.Parallel()
 	height := uint64(2)
 	emptyOwnerKey := flow.RegisterID{Owner: "", Key: "uuid"}
 	zeroOwnerKey := flow.RegisterID{Owner: flow.EmptyAddress.Hex(), Key: "uuid"}
-	expectedValue := []byte("expectedValue")
-	unexpectedValue := []byte("unexpectedValue")
+	expectedValue := []byte("first value")
+	otherValue := []byte("other value")
 
 	t.Run("empty owner", func(t *testing.T) {
 		RunWithRegistersStorageAtInitialHeights(t, 1, 1, func(r *Registers) {
@@ -239,7 +241,7 @@ func TestRegisters_GetAndStoreEmptyOwner(t *testing.T) {
 
 			// Next, add the zero value, and make sure it is returned
 			entries = flow.RegisterEntries{
-				{Key: zeroOwnerKey, Value: unexpectedValue},
+				{Key: zeroOwnerKey, Value: otherValue},
 			}
 
 			err = r.Store(entries, height+1)
@@ -247,7 +249,7 @@ func TestRegisters_GetAndStoreEmptyOwner(t *testing.T) {
 
 			actual, err = r.Get(zeroOwnerKey, height+1)
 			assert.NoError(t, err)
-			assert.Equal(t, unexpectedValue, actual)
+			assert.Equal(t, otherValue, actual)
 		})
 	})
 
@@ -272,7 +274,7 @@ func TestRegisters_GetAndStoreEmptyOwner(t *testing.T) {
 
 			// Next, add the empty value, and make sure it is returned
 			entries = flow.RegisterEntries{
-				{Key: emptyOwnerKey, Value: unexpectedValue},
+				{Key: emptyOwnerKey, Value: otherValue},
 			}
 
 			err = r.Store(entries, height+1)
@@ -280,7 +282,7 @@ func TestRegisters_GetAndStoreEmptyOwner(t *testing.T) {
 
 			actual, err = r.Get(emptyOwnerKey, height+1)
 			assert.NoError(t, err)
-			assert.Equal(t, unexpectedValue, actual)
+			assert.Equal(t, otherValue, actual)
 		})
 	})
 }
