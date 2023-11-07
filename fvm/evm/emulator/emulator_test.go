@@ -56,8 +56,7 @@ func TestNativeTokenBridging(t *testing.T) {
 		t.Run("mint tokens to the first account", func(t *testing.T) {
 			RunWithNewEmulator(t, db, func(env *emulator.Emulator) {
 				RunWithNewBlockView(t, env, func(blk types.BlockView) {
-					amount := big.NewInt(10000)
-					res, err := blk.DirectCall(types.NewDepositCall(testAccount, amount))
+					res, err := blk.DirectCall(types.NewDepositCall(testAccount, originalBalance))
 					require.NoError(t, err)
 					require.Equal(t, defaultCtx.DirectCallBaseGasUsage, res.GasConsumed)
 				})
@@ -236,7 +235,8 @@ func TestContractInteraction(t *testing.T) {
 				RunWithNewReadOnlyBlockView(t, env, func(blk2 types.ReadOnlyBlockView) {
 					bal, err := blk2.BalanceOf(ctx.GasFeeCollector)
 					require.NoError(t, err)
-					require.Greater(t, bal.Uint64(), coinbaseOrgBalance.Uint64())
+					expected := gethParams.TxGas*gethCommon.Big1.Uint64() + gethCommon.Big1.Uint64()
+					require.Equal(t, expected, bal.Uint64())
 
 					nonce, err := blk2.NonceOf(fAddr)
 					require.NoError(t, err)

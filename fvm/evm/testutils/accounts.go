@@ -42,9 +42,9 @@ func (a *EOATestAccount) PrepareSignAndEncodeTx(
 	data []byte,
 	amount *big.Int,
 	gasLimit uint64,
-	gasFee *big.Int,
+	gasPrice *big.Int,
 ) []byte {
-	tx := a.PrepareAndSignTx(t, to, data, amount, gasLimit, gasFee)
+	tx := a.PrepareAndSignTx(t, to, data, amount, gasLimit, gasPrice)
 	var b bytes.Buffer
 	writer := io.Writer(&b)
 	err := tx.EncodeRLP(writer)
@@ -58,7 +58,7 @@ func (a *EOATestAccount) PrepareAndSignTx(
 	data []byte,
 	amount *big.Int,
 	gasLimit uint64,
-	gasFee *big.Int,
+	gasPrice *big.Int,
 ) *gethTypes.Transaction {
 	a.lock.Lock()
 	defer a.lock.Unlock()
@@ -70,7 +70,7 @@ func (a *EOATestAccount) PrepareAndSignTx(
 			to,
 			amount,
 			gasLimit,
-			gasFee,
+			gasPrice,
 			data,
 		),
 	)
