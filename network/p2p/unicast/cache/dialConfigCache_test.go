@@ -84,7 +84,7 @@ func TestDialConfigCache_Adjust_Init(t *testing.T) {
 	// retrieving an existing dial config must not change the cache size.
 	require.Equal(t, uint(2), cache.Size(), "cache size must be 2")
 	// config should be the same as the one returned by Adjust.
-	require.Equal(t, cfg.StreamCreationRetryAttemptBudget, dialConfigFixture().StreamCreationRetryAttemptBudget, "stream backoff must be 1")
+	require.Equal(t, cfg.StreamCreationRetryAttemptBudget, dialConfigFixture().StreamCreationRetryAttemptBudget+1, "stream backoff must be 2")
 
 	// Adjusting the dial config of peerID1 through Adjust.
 	// dial config for peerID1 already exists in the cache, so it must be adjusted when using Adjust.
@@ -92,7 +92,7 @@ func TestDialConfigCache_Adjust_Init(t *testing.T) {
 	require.NoError(t, err)
 	// adjusting an existing dial config must not change the cache size.
 	require.Equal(t, uint(2), cache.Size(), "cache size must be 2")
-	require.Equal(t, cfg.StreamCreationRetryAttemptBudget, dialConfigFixture().StreamCreationRetryAttemptBudget, "stream backoff must be 1")
+	require.Equal(t, cfg.StreamCreationRetryAttemptBudget, dialConfigFixture().StreamCreationRetryAttemptBudget+1, "stream backoff must be 2")
 
 	// Recurring adjustment of the dial config of peerID1 through Adjust.
 	// dial config for peerID1 already exists in the cache, so it must be adjusted when using Adjust.
@@ -100,7 +100,7 @@ func TestDialConfigCache_Adjust_Init(t *testing.T) {
 	require.NoError(t, err)
 	// adjusting an existing dial config must not change the cache size.
 	require.Equal(t, uint(2), cache.Size(), "cache size must be 2")
-	require.Equal(t, cfg.StreamCreationRetryAttemptBudget, dialConfigFixture().StreamCreationRetryAttemptBudget, "stream backoff must be 1")
+	require.Equal(t, cfg.StreamCreationRetryAttemptBudget, dialConfigFixture().StreamCreationRetryAttemptBudget+2, "stream backoff must be 3")
 }
 
 // TestDialConfigCache_Adjust tests the Adjust method of the DialConfigCache. It asserts that the dial config is adjusted,
