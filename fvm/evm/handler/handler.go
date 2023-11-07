@@ -308,6 +308,7 @@ func (a *Account) Withdraw(b types.Balance) *types.FLOWTokenVault {
 
 	// emit event
 	a.fch.EmitLastExecutedBlockEvent()
+	// TODO: check if this is working right, we might need to change order
 	a.fch.totalSupply -= b.ToAttoFlow().Uint64()
 	a.fch.updateLastExecutedBlock(res.StateRootHash, gethTypes.EmptyRootHash)
 	return types.NewFlowTokenVault(b)
