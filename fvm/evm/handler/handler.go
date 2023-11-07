@@ -24,13 +24,10 @@ import (
 // in the future we might benefit from a view style of access to db passed as
 // a param to the emulator.
 type ContractHandler struct {
-	blockchain        types.BlockChain
-	backend           types.Backend
-	emulator          types.Emulator
-	lastExecutedBlock *types.Block
-	uuidIndex         uint64
-	totalSupply       uint64
-	transactions      []gethCommon.Hash
+	blockchain    types.BlockChain
+	backend       types.Backend
+	emulator      types.Emulator
+	newBlockDraft *types.Block
 }
 
 var _ types.ContractHandler = &ContractHandler{}
@@ -40,36 +37,95 @@ func NewContractHandler(
 	backend types.Backend,
 	emulator types.Emulator,
 ) *ContractHandler {
-	lastExecutedBlock, err := blockchain.LatestBlock()
-	// fatal error
-	if err != nil {
-		panic(err)
-	}
-
 	return &ContractHandler{
-		blockchain:        blockchain,
-		backend:           backend,
-		emulator:          emulator,
-		lastExecutedBlock: lastExecutedBlock,
-		uuidIndex:         lastExecutedBlock.UUIDIndex,
-		totalSupply:       lastExecutedBlock.TotalSupply,
-		transactions:      make([]gethCommon.Hash, 0),
+		blockchain: blockchain,
+		backend:    backend,
+		emulator:   emulator,
 	}
 }
 
+// this method has been separated out to make NewContractHandler lighter
+// and lazy load these operations if needed
+func (h *ContractHandler) setupNewBlockDraft() {
+	lastExecutedBlock, err := h.blockchain.LatestBlock()
+	handleError(err)
+
+	parentHash, err := lastExecutedBlock.Hash()
+	if err != nil {
+		// this is a fatal error
+		panic(err)
+	}
+	h.newBlockDraft = &types.Block{
+		Height:            lastExecutedBlock.Height + 1,
+		ParentBlockHash:   parentHash,
+		UUIDIndex:         lastExecutedBlock.UUIDIndex,
+		TotalSupply:       lastExecutedBlock.TotalSupply,
+		TransactionHashes: make([]gethCommon.Hash, 0),
+	}
+}
+
+func (h *ContractHandler) allocateUUID() uint64 {
+	if h.newBlockDraft == nil {
+		h.setupNewBlockDraft()
+	}
+	uuid := h.newBlockDraft.UUIDIndex
+	h.newBlockDraft.UUIDIndex = uuid + 1
+	return uuid
+}
+
+func (h *ContractHandler) updateBlockDraftStateRoot(stateRoot gethCommon.Hash) {
+	if h.newBlockDraft == nil {
+		h.setupNewBlockDraft()
+	}
+	h.newBlockDraft.StateRoot = stateRoot
+}
+
+func (h *ContractHandler) updateBlockDraftTotalSupply(newValue uint64) {
+	if h.newBlockDraft == nil {
+		h.setupNewBlockDraft()
+	}
+	h.newBlockDraft.TotalSupply = newValue
+}
+
+func (h *ContractHandler) getBlockDraftTotalSupply() uint64 {
+	if h.newBlockDraft == nil {
+		h.setupNewBlockDraft()
+	}
+	return h.newBlockDraft.Height
+}
+
+func (h *ContractHandler) appendTxHashToBlockDraft(txHash gethCommon.Hash) {
+	if h.newBlockDraft == nil {
+		h.setupNewBlockDraft()
+	}
+	h.newBlockDraft.TransactionHashes = append(h.newBlockDraft.TransactionHashes, txHash)
+}
+
+func (h *ContractHandler) getBlockDraftHeight() uint64 {
+	if h.newBlockDraft == nil {
+		h.setupNewBlockDraft()
+	}
+	return h.newBlockDraft.Height
+}
+
+func (h *ContractHandler) commitBlockDraft() {
+	err := h.blockchain.AppendBlock(h.newBlockDraft)
+	handleError(err)
+	h.EmitEvent(types.NewBlockExecutedEvent(h.newBlockDraft))
+	// reset it
+	h.newBlockDraft = nil
+}
+
 // AllocateAddress allocates an address to be used by the bridged accounts
+//
+// TODO: future improvement: check for collision if account exist try a new account
+// TODO: if we allocate address but don't do anything else the state root would stay the same, does it cause issue?
+// maybe uuid index should be outside of the scope of a block
 func (h *ContractHandler) AllocateAddress() types.Address {
 	target := types.Address{}
 	// first 12 bytes would be zero
-	// the next 8 bytes would be incremented of uuid
-	binary.BigEndian.PutUint64(target[12:], h.lastExecutedBlock.UUIDIndex)
-	h.uuidIndex++
-
-	// TODO: if account exist try some new number
-	// if fe.State.Exist(target.ToCommon()) {
-	// }
-
-	h.updateLastExecutedBlock(h.lastExecutedBlock.StateRoot, gethTypes.EmptyRootHash)
+	// the next 8 bytes would be an increment of the UUID index
+	binary.BigEndian.PutUint64(target[12:], h.allocateUUID())
 	return target
 }
 
@@ -84,20 +140,6 @@ func (h ContractHandler) LastExecutedBlock() *types.Block {
 	block, err := h.blockchain.LatestBlock()
 	handleError(err)
 	return block
-}
-
-func (h *ContractHandler) updateLastExecutedBlock(stateRoot, eventRoot gethCommon.Hash) {
-	h.lastExecutedBlock = types.NewBlock(
-		h.lastExecutedBlock.Height+1,
-		h.uuidIndex,
-		h.totalSupply,
-		stateRoot,
-		eventRoot,
-		h.transactions,
-	)
-
-	err := h.blockchain.AppendBlock(h.lastExecutedBlock)
-	handleError(err)
 }
 
 // Run runs an rlpencoded evm transaction, collect the evm fees under the provided coinbase
@@ -125,7 +167,8 @@ func (h ContractHandler) Run(rlpEncodedTx []byte, coinbase types.Address) bool {
 	handleError(err)
 
 	res, err := blk.RunTransaction(&tx)
-	txHash := h.captureTx(&tx)
+	txHash := tx.Hash()
+	h.appendTxHashToBlockDraft(txHash)
 	h.meterGasUsage(res)
 
 	failed := false
@@ -145,20 +188,14 @@ func (h ContractHandler) Run(rlpEncodedTx []byte, coinbase types.Address) bool {
 
 	res.Failed = failed
 	h.EmitEvent(types.NewTransactionExecutedEvent(
-		h.lastExecutedBlock.Height+1,
+		h.getBlockDraftHeight(),
 		rlpEncodedTx,
 		txHash,
 		res,
 	))
-	h.EmitLastExecutedBlockEvent()
-	h.updateLastExecutedBlock(res.StateRootHash, gethTypes.EmptyRootHash)
+	h.updateBlockDraftStateRoot(res.StateRootHash)
+	h.commitBlockDraft()
 	return !failed
-}
-
-func (h *ContractHandler) captureTx(tx *gethTypes.Transaction) gethCommon.Hash {
-	hash := tx.Hash()
-	h.transactions = append(h.transactions, hash)
-	return hash
 }
 
 func (h *ContractHandler) captureCall(call *types.DirectCall) ([]byte, gethCommon.Hash) {
@@ -167,7 +204,7 @@ func (h *ContractHandler) captureCall(call *types.DirectCall) ([]byte, gethCommo
 		// this is fatal
 		panic(err)
 	}
-	h.transactions = append(h.transactions, hash)
+	h.appendTxHashToBlockDraft(hash)
 	encoded, err := call.Encode()
 	handleError(err)
 	return encoded, hash
@@ -194,15 +231,9 @@ func (h *ContractHandler) EmitEvent(event *types.Event) {
 	h.backend.EmitFlowEvent(event.Etype, encoded)
 }
 
-func (h *ContractHandler) EmitLastExecutedBlockEvent() {
-	block, err := h.blockchain.LatestBlock()
-	handleError(err)
-	h.EmitEvent(types.NewBlockExecutedEvent(block))
-}
-
 func (h *ContractHandler) getBlockContext() types.BlockContext {
 	return types.BlockContext{
-		BlockNumber:            h.lastExecutedBlock.Height + 1,
+		BlockNumber:            h.getBlockDraftHeight(),
 		DirectCallBaseGasUsage: types.DefaultDirectCallBaseGasUsage,
 	}
 }
@@ -260,17 +291,18 @@ func (a *Account) Deposit(v *types.FLOWTokenVault) {
 	encoded, callHash := a.fch.captureCall(call)
 	a.fch.EmitEvent(
 		types.NewTransactionExecutedEvent(
-			a.fch.lastExecutedBlock.Height+1,
+			a.fch.getBlockDraftHeight(),
 			encoded,
 			callHash,
 			res,
 		),
 	)
 	handleError(err)
-	// emit event
-	a.fch.EmitLastExecutedBlockEvent()
-	a.fch.totalSupply += v.Balance().ToAttoFlow().Uint64()
-	a.fch.updateLastExecutedBlock(res.StateRootHash, gethTypes.EmptyRootHash)
+	newBalance := a.fch.getBlockDraftTotalSupply() + v.Balance().ToAttoFlow().Uint64()
+	a.fch.updateBlockDraftTotalSupply(newBalance)
+	a.fch.updateBlockDraftStateRoot(res.StateRootHash)
+	a.fch.commitBlockDraft()
+
 }
 
 // Withdraw deducts the balance from the account and
@@ -278,8 +310,9 @@ func (a *Account) Deposit(v *types.FLOWTokenVault) {
 func (a *Account) Withdraw(b types.Balance) *types.FLOWTokenVault {
 	a.checkAuthorized()
 
+	totalSupply := a.fch.getBlockDraftTotalSupply()
 	// check balance of flex vault
-	if b.ToAttoFlow().Uint64() > a.fch.totalSupply {
+	if b.ToAttoFlow().Uint64() > totalSupply {
 		handleError(types.ErrInsufficientTotalSupply)
 	}
 
@@ -298,7 +331,7 @@ func (a *Account) Withdraw(b types.Balance) *types.FLOWTokenVault {
 	encoded, callHash := a.fch.captureCall(call)
 	a.fch.EmitEvent(
 		types.NewTransactionExecutedEvent(
-			a.fch.lastExecutedBlock.Height+1,
+			a.fch.getBlockDraftHeight(),
 			encoded,
 			callHash,
 			res,
@@ -307,10 +340,8 @@ func (a *Account) Withdraw(b types.Balance) *types.FLOWTokenVault {
 	handleError(err)
 
 	// emit event
-	a.fch.EmitLastExecutedBlockEvent()
-	// TODO: check if this is working right, we might need to change order
-	a.fch.totalSupply -= b.ToAttoFlow().Uint64()
-	a.fch.updateLastExecutedBlock(res.StateRootHash, gethTypes.EmptyRootHash)
+	a.fch.updateBlockDraftTotalSupply(totalSupply - b.ToAttoFlow().Uint64())
+	a.fch.updateBlockDraftStateRoot(res.StateRootHash)
 	return types.NewFlowTokenVault(b)
 }
 
@@ -378,15 +409,14 @@ func (a *Account) executeAndHandleCall(
 
 	a.fch.EmitEvent(
 		types.NewTransactionExecutedEvent(
-			a.fch.lastExecutedBlock.Height+1,
+			a.fch.getBlockDraftHeight(),
 			encoded,
 			callHash,
 			res,
 		),
 	)
-	a.fch.EmitLastExecutedBlockEvent()
-	// TODO: update this to calculate receipt hash
-	a.fch.updateLastExecutedBlock(res.StateRootHash, gethTypes.EmptyRootHash)
+	a.fch.updateBlockDraftStateRoot(res.StateRootHash)
+	a.fch.commitBlockDraft()
 	return res
 }
 
