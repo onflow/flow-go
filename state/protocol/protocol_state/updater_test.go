@@ -13,61 +13,69 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestUpdaterSuite(t *testing.T) {
-	suite.Run(t, new(UpdaterSuite))
+func TestProtocolStateMachine(t *testing.T) {
+	suite.Run(t, new(ProtocolStateMachineSuite))
 }
 
-// UpdaterSuite is a dedicated test suite for testing updater. It holds a minimal state to initialize updater.
-type UpdaterSuite struct {
+// BaseProtocolStateMachineSuite is a base test suite that holds common functionality for testing protocol state machines.
+// It reflects the portion of data which is present in baseProtocolStateMachine.
+type BaseProtocolStateMachineSuite struct {
 	suite.Suite
 
 	parentProtocolState *flow.RichProtocolStateEntry
 	parentBlock         *flow.Header
 	candidate           *flow.Header
-
-	updater *stateMachine
 }
 
-func (s *UpdaterSuite) SetupTest() {
+func (s *BaseProtocolStateMachineSuite) SetupTest() {
 	s.parentProtocolState = unittest.ProtocolStateFixture()
 	s.parentBlock = unittest.BlockHeaderFixture(unittest.HeaderWithView(s.parentProtocolState.CurrentEpochSetup.FirstView + 1))
 	s.candidate = unittest.BlockHeaderWithParentFixture(s.parentBlock)
+}
 
+// ProtocolStateMachineSuite is a dedicated test suite for testing happy path state machine.
+type ProtocolStateMachineSuite struct {
+	BaseProtocolStateMachineSuite
+	stateMachine *stateMachine
+}
+
+func (s *ProtocolStateMachineSuite) SetupTest() {
+	s.BaseProtocolStateMachineSuite.SetupTest()
 	var err error
-	s.updater, err = newStateMachine(s.candidate.View, s.parentProtocolState)
+	s.stateMachine, err = newStateMachine(s.candidate.View, s.parentProtocolState)
 	require.NoError(s.T(), err)
 }
 
-// TestNewUpdater tests if the constructor correctly setups invariants for updater.
-func (s *UpdaterSuite) TestNewUpdater() {
-	require.NotSame(s.T(), s.updater.parentState, s.updater.state, "except to take deep copy of parent state")
-	require.Nil(s.T(), s.updater.parentState.NextEpoch)
-	require.Nil(s.T(), s.updater.state.NextEpoch)
-	require.Equal(s.T(), s.candidate.View, s.updater.View())
-	require.Equal(s.T(), s.parentProtocolState, s.updater.ParentState())
+// TestNewUpdater tests if the constructor correctly setups invariants for stateMachine.
+func (s *ProtocolStateMachineSuite) TestNewUpdater() {
+	require.NotSame(s.T(), s.stateMachine.parentState, s.stateMachine.state, "except to take deep copy of parent state")
+	require.Nil(s.T(), s.stateMachine.parentState.NextEpoch)
+	require.Nil(s.T(), s.stateMachine.state.NextEpoch)
+	require.Equal(s.T(), s.candidate.View, s.stateMachine.View())
+	require.Equal(s.T(), s.parentProtocolState, s.stateMachine.ParentState())
 }
 
-// TestTransitionToNextEpoch tests a scenario where the updater processes first block from next epoch.
+// TestTransitionToNextEpoch tests a scenario where the stateMachine processes first block from next epoch.
 // It has to discard the parent state and build a new state with data from next epoch.
-func (s *UpdaterSuite) TestTransitionToNextEpoch() {
+func (s *ProtocolStateMachineSuite) TestTransitionToNextEpoch() {
 	// update protocol state with next epoch information
 	unittest.WithNextEpochProtocolState()(s.parentProtocolState)
 
 	candidate := unittest.BlockHeaderFixture(
 		unittest.HeaderWithView(s.parentProtocolState.CurrentEpochSetup.FinalView + 1))
 	var err error
-	// since the candidate block is from next epoch, updater should transition to next epoch
-	s.updater, err = newStateMachine(candidate.View, s.parentProtocolState)
+	// since the candidate block is from next epoch, stateMachine should transition to next epoch
+	s.stateMachine, err = newStateMachine(candidate.View, s.parentProtocolState)
 	require.NoError(s.T(), err)
-	err = s.updater.TransitionToNextEpoch()
+	err = s.stateMachine.TransitionToNextEpoch()
 	require.NoError(s.T(), err)
-	updatedState, _, _ := s.updater.Build()
+	updatedState, _, _ := s.stateMachine.Build()
 	require.Equal(s.T(), updatedState.CurrentEpoch.ID(), s.parentProtocolState.NextEpoch.ID(), "should transition into next epoch")
 	require.Nil(s.T(), updatedState.NextEpoch, "next epoch protocol state should be nil")
 }
 
 // TestTransitionToNextEpochNotAllowed tests different scenarios where transition to next epoch is not allowed.
-func (s *UpdaterSuite) TestTransitionToNextEpochNotAllowed() {
+func (s *ProtocolStateMachineSuite) TestTransitionToNextEpochNotAllowed() {
 	s.Run("no next epoch protocol state", func() {
 		protocolState := unittest.ProtocolStateFixture()
 		candidate := unittest.BlockHeaderFixture(
@@ -100,22 +108,22 @@ func (s *UpdaterSuite) TestTransitionToNextEpochNotAllowed() {
 	})
 }
 
-// TestBuild tests if the updater returns correct protocol state.
-func (s *UpdaterSuite) TestBuild() {
-	updatedState, stateID, hasChanges := s.updater.Build()
+// TestBuild tests if the stateMachine returns correct protocol state.
+func (s *ProtocolStateMachineSuite) TestBuild() {
+	updatedState, stateID, hasChanges := s.stateMachine.Build()
 	require.Equal(s.T(), stateID, s.parentProtocolState.ID(), "should return same protocol state")
 	require.False(s.T(), hasChanges, "should not have changes")
-	require.NotSame(s.T(), updatedState, s.updater.state, "should return a copy of protocol state")
+	require.NotSame(s.T(), updatedState, s.stateMachine.state, "should return a copy of protocol state")
 	require.Equal(s.T(), updatedState.ID(), stateID, "should return correct ID")
 
 	updatedDynamicIdentity := s.parentProtocolState.CurrentEpochIdentityTable[0].DynamicIdentity
 	updatedDynamicIdentity.Ejected = true
-	err := s.updater.UpdateIdentity(&flow.DynamicIdentityEntry{
+	err := s.stateMachine.UpdateIdentity(&flow.DynamicIdentityEntry{
 		NodeID:  s.parentProtocolState.CurrentEpochIdentityTable[0].NodeID,
 		Dynamic: updatedDynamicIdentity,
 	})
 	require.NoError(s.T(), err)
-	updatedState, stateID, hasChanges = s.updater.Build()
+	updatedState, stateID, hasChanges = s.stateMachine.Build()
 	require.True(s.T(), hasChanges, "should have changes")
 	require.NotEqual(s.T(), stateID, s.parentProtocolState.ID(), "should return same protocol state")
 	require.Equal(s.T(), updatedState.ID(), stateID, "should return correct ID")
@@ -123,40 +131,40 @@ func (s *UpdaterSuite) TestBuild() {
 
 // TestCreateStateMachineAfterInvalidStateTransitionAttempted tests if creating state machine after observing invalid state transition
 // results in error .
-func (s *UpdaterSuite) TestCreateStateMachineAfterInvalidStateTransitionAttempted() {
+func (s *ProtocolStateMachineSuite) TestCreateStateMachineAfterInvalidStateTransitionAttempted() {
 	s.parentProtocolState.InvalidStateTransitionAttempted = true
 	var err error
-	// create new updater with next epoch information
-	s.updater, err = newStateMachine(s.candidate.View, s.parentProtocolState)
+	// create new stateMachine with next epoch information
+	s.stateMachine, err = newStateMachine(s.candidate.View, s.parentProtocolState)
 	require.Error(s.T(), err)
 }
 
-// TestProcessEpochCommit tests if processing epoch commit event correctly updates internal state of updater and
+// TestProcessEpochCommit tests if processing epoch commit event correctly updates internal state of stateMachine and
 // correctly behaves when invariants are violated.
-func (s *UpdaterSuite) TestProcessEpochCommit() {
+func (s *ProtocolStateMachineSuite) TestProcessEpochCommit() {
 	var err error
 	s.Run("invalid counter", func() {
-		s.updater, err = newStateMachine(s.candidate.View, s.parentProtocolState)
+		s.stateMachine, err = newStateMachine(s.candidate.View, s.parentProtocolState)
 		require.NoError(s.T(), err)
 		commit := unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
 			commit.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 10 // set invalid counter for next epoch
 		})
-		_, err := s.updater.ProcessEpochCommit(commit)
+		_, err := s.stateMachine.ProcessEpochCommit(commit)
 		require.Error(s.T(), err)
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 	})
 	s.Run("no next epoch protocol state", func() {
-		s.updater, err = newStateMachine(s.candidate.View, s.parentProtocolState)
+		s.stateMachine, err = newStateMachine(s.candidate.View, s.parentProtocolState)
 		require.NoError(s.T(), err)
 		commit := unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
 			commit.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
 		})
-		_, err := s.updater.ProcessEpochCommit(commit)
+		_, err := s.stateMachine.ProcessEpochCommit(commit)
 		require.Error(s.T(), err)
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 	})
 	s.Run("conflicting epoch commit", func() {
-		s.updater, err = newStateMachine(s.candidate.View, s.parentProtocolState)
+		s.stateMachine, err = newStateMachine(s.candidate.View, s.parentProtocolState)
 		require.NoError(s.T(), err)
 		setup := unittest.EpochSetupFixture(
 			unittest.SetupWithCounter(s.parentProtocolState.CurrentEpochSetup.Counter+1),
@@ -164,10 +172,10 @@ func (s *UpdaterSuite) TestProcessEpochCommit() {
 			unittest.WithFinalView(s.parentProtocolState.CurrentEpochSetup.FinalView+1000),
 		)
 		// processing setup event results in creating next epoch protocol state
-		_, err := s.updater.ProcessEpochSetup(setup)
+		_, err := s.stateMachine.ProcessEpochSetup(setup)
 		require.NoError(s.T(), err)
 
-		updatedState, _, _ := s.updater.Build()
+		updatedState, _, _ := s.stateMachine.Build()
 
 		parentState, err := flow.NewRichProtocolStateEntry(updatedState,
 			s.parentProtocolState.PreviousEpochSetup,
@@ -178,26 +186,26 @@ func (s *UpdaterSuite) TestProcessEpochCommit() {
 			nil,
 		)
 		require.NoError(s.T(), err)
-		s.updater, err = newStateMachine(s.candidate.View+1, parentState)
+		s.stateMachine, err = newStateMachine(s.candidate.View+1, parentState)
 		require.NoError(s.T(), err)
 		commit := unittest.EpochCommitFixture(
 			unittest.CommitWithCounter(setup.Counter),
 			unittest.WithDKGFromParticipants(setup.Participants),
 		)
 
-		_, err = s.updater.ProcessEpochCommit(commit)
+		_, err = s.stateMachine.ProcessEpochCommit(commit)
 		require.NoError(s.T(), err)
 
 		// processing another epoch commit has to be an error since we have already processed one
-		_, err = s.updater.ProcessEpochCommit(commit)
+		_, err = s.stateMachine.ProcessEpochCommit(commit)
 		require.Error(s.T(), err)
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 
-		newState, _, _ := s.updater.Build()
+		newState, _, _ := s.stateMachine.Build()
 		require.Equal(s.T(), commit.ID(), newState.NextEpoch.CommitID, "next epoch should be committed since we have observed, a valid event")
 	})
 	s.Run("happy path processing", func() {
-		s.updater, err = newStateMachine(s.candidate.View, s.parentProtocolState)
+		s.stateMachine, err = newStateMachine(s.candidate.View, s.parentProtocolState)
 		require.NoError(s.T(), err)
 		setup := unittest.EpochSetupFixture(
 			unittest.SetupWithCounter(s.parentProtocolState.CurrentEpochSetup.Counter+1),
@@ -205,10 +213,10 @@ func (s *UpdaterSuite) TestProcessEpochCommit() {
 			unittest.WithFinalView(s.parentProtocolState.CurrentEpochSetup.FinalView+1000),
 		)
 		// processing setup event results in creating next epoch protocol state
-		_, err := s.updater.ProcessEpochSetup(setup)
+		_, err := s.stateMachine.ProcessEpochSetup(setup)
 		require.NoError(s.T(), err)
 
-		updatedState, _, _ := s.updater.Build()
+		updatedState, _, _ := s.stateMachine.Build()
 
 		parentState, err := flow.NewRichProtocolStateEntry(updatedState,
 			s.parentProtocolState.PreviousEpochSetup,
@@ -219,40 +227,41 @@ func (s *UpdaterSuite) TestProcessEpochCommit() {
 			nil,
 		)
 		require.NoError(s.T(), err)
-		s.updater, err = newStateMachine(s.candidate.View+1, parentState)
+		s.stateMachine, err = newStateMachine(s.candidate.View+1, parentState)
 		require.NoError(s.T(), err)
 		commit := unittest.EpochCommitFixture(
 			unittest.CommitWithCounter(setup.Counter),
 			unittest.WithDKGFromParticipants(setup.Participants),
 		)
 
-		_, err = s.updater.ProcessEpochCommit(commit)
+		_, err = s.stateMachine.ProcessEpochCommit(commit)
 		require.NoError(s.T(), err)
 
-		newState, _, _ := s.updater.Build()
+		newState, _, _ := s.stateMachine.Build()
 		require.Equal(s.T(), commit.ID(), newState.NextEpoch.CommitID, "next epoch should be committed")
 	})
 }
 
 // TestUpdateIdentityUnknownIdentity tests if updating the identity of unknown node results in an error.
-func (s *UpdaterSuite) TestUpdateIdentityUnknownIdentity() {
+func (s *ProtocolStateMachineSuite) TestUpdateIdentityUnknownIdentity() {
 	identity := &flow.DynamicIdentityEntry{
 		NodeID:  unittest.IdentifierFixture(),
 		Dynamic: flow.DynamicIdentity{},
 	}
-	err := s.updater.UpdateIdentity(identity)
+	err := s.stateMachine.UpdateIdentity(identity)
 	require.Error(s.T(), err, "should not be able to update data of unknown identity")
+	require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 
-	_, _, hasChanges := s.updater.Build()
+	_, _, hasChanges := s.stateMachine.Build()
 	require.False(s.T(), hasChanges, "should not have changes")
 }
 
 // TestUpdateIdentityHappyPath tests if identity updates are correctly processed and reflected in the resulting protocol state.
-func (s *UpdaterSuite) TestUpdateIdentityHappyPath() {
+func (s *ProtocolStateMachineSuite) TestUpdateIdentityHappyPath() {
 	// update protocol state to have next epoch protocol state
 	unittest.WithNextEpochProtocolState()(s.parentProtocolState)
 	var err error
-	s.updater, err = newStateMachine(s.candidate.View, s.parentProtocolState)
+	s.stateMachine, err = newStateMachine(s.candidate.View, s.parentProtocolState)
 	require.NoError(s.T(), err)
 
 	currentEpochParticipants := s.parentProtocolState.CurrentEpochIdentityTable.Copy()
@@ -271,13 +280,13 @@ func (s *UpdaterSuite) TestUpdateIdentityHappyPath() {
 
 	allUpdates := append(weightChanges, ejectedChanges...)
 	for _, update := range allUpdates {
-		err := s.updater.UpdateIdentity(&flow.DynamicIdentityEntry{
+		err := s.stateMachine.UpdateIdentity(&flow.DynamicIdentityEntry{
 			NodeID:  update.NodeID,
 			Dynamic: update.DynamicIdentity,
 		})
 		require.NoError(s.T(), err)
 	}
-	updatedState, _, hasChanges := s.updater.Build()
+	updatedState, _, hasChanges := s.stateMachine.Build()
 	require.True(s.T(), hasChanges, "should have changes")
 
 	// assert that all changes made in the previous epoch are preserved
@@ -301,12 +310,12 @@ func (s *UpdaterSuite) TestUpdateIdentityHappyPath() {
 }
 
 // TestProcessEpochSetupInvariants tests if processing epoch setup when invariants are violated doesn't update internal structures.
-func (s *UpdaterSuite) TestProcessEpochSetupInvariants() {
+func (s *ProtocolStateMachineSuite) TestProcessEpochSetupInvariants() {
 	s.Run("invalid counter", func() {
 		setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
 			setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 10 // set invalid counter for next epoch
 		})
-		_, err := s.updater.ProcessEpochSetup(setup)
+		_, err := s.stateMachine.ProcessEpochSetup(setup)
 		require.Error(s.T(), err)
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 	})
@@ -362,7 +371,7 @@ func (s *UpdaterSuite) TestProcessEpochSetupInvariants() {
 // It must produce valid identity table for current and next epochs.
 // For current epoch we should have identity table with all the nodes from the current epoch + nodes from the next epoch with 0 weight.
 // For next epoch we should have identity table with all the nodes from the next epoch + nodes from the current epoch with 0 weight.
-func (s *UpdaterSuite) TestProcessEpochSetupHappyPath() {
+func (s *ProtocolStateMachineSuite) TestProcessEpochSetupHappyPath() {
 	setupParticipants := unittest.IdentityListFixture(5, unittest.WithAllRoles()).Sort(order.Canonical[flow.Identity])
 	setupParticipants[0].InitialWeight = 13
 	setupParticipants[0].Weight = setupParticipants[0].InitialWeight
@@ -377,10 +386,10 @@ func (s *UpdaterSuite) TestProcessEpochSetupHappyPath() {
 	expectedNextEpochActiveIdentities := flow.DynamicIdentityEntryListFromIdentities(setupParticipants)
 
 	// process actual event
-	_, err := s.updater.ProcessEpochSetup(setup)
+	_, err := s.stateMachine.ProcessEpochSetup(setup)
 	require.NoError(s.T(), err)
 
-	updatedState, _, hasChanges := s.updater.Build()
+	updatedState, _, hasChanges := s.stateMachine.Build()
 	require.True(s.T(), hasChanges, "should have changes")
 	require.Equal(s.T(), s.parentProtocolState.PreviousEpoch.ActiveIdentities, updatedState.PreviousEpoch.ActiveIdentities,
 		"should not change active identities for previous epoch")
@@ -397,7 +406,7 @@ func (s *UpdaterSuite) TestProcessEpochSetupHappyPath() {
 // TestProcessEpochSetupWithSameParticipants tests that processing epoch setup with overlapping participants results in correctly
 // built updated protocol state. It should build a union of participants from current and next epoch for current and
 // next epoch protocol states respectively.
-func (s *UpdaterSuite) TestProcessEpochSetupWithSameParticipants() {
+func (s *ProtocolStateMachineSuite) TestProcessEpochSetupWithSameParticipants() {
 	participantsFromCurrentEpochSetup, err := flow.ComposeFullIdentities(s.parentProtocolState.CurrentEpochSetup.Participants,
 		s.parentProtocolState.CurrentEpoch.ActiveIdentities)
 	require.NoError(s.T(), err)
@@ -417,9 +426,9 @@ func (s *UpdaterSuite) TestProcessEpochSetupWithSameParticipants() {
 		unittest.WithFinalView(s.parentProtocolState.CurrentEpochSetup.FinalView+1000),
 		unittest.WithParticipants(setupParticipants.ToSkeleton()),
 	)
-	_, err = s.updater.ProcessEpochSetup(setup)
+	_, err = s.stateMachine.ProcessEpochSetup(setup)
 	require.NoError(s.T(), err)
-	updatedState, _, _ := s.updater.Build()
+	updatedState, _, _ := s.stateMachine.Build()
 
 	require.Equal(s.T(), s.parentProtocolState.CurrentEpoch.ActiveIdentities,
 		updatedState.CurrentEpoch.ActiveIdentities,
@@ -432,7 +441,7 @@ func (s *UpdaterSuite) TestProcessEpochSetupWithSameParticipants() {
 
 // TestEpochSetupAfterIdentityChange tests that after processing epoch an setup event, all previously made changes to the identity table
 // are preserved and reflected in the resulting protocol state.
-func (s *UpdaterSuite) TestEpochSetupAfterIdentityChange() {
+func (s *ProtocolStateMachineSuite) TestEpochSetupAfterIdentityChange() {
 	participantsFromCurrentEpochSetup := s.parentProtocolState.CurrentEpochIdentityTable.Filter(func(i *flow.Identity) bool {
 		_, exists := s.parentProtocolState.CurrentEpochSetup.Participants.ByNodeID(i.NodeID)
 		return exists
@@ -451,13 +460,13 @@ func (s *UpdaterSuite) TestEpochSetupAfterIdentityChange() {
 	}
 	allUpdates := append(weightChanges, ejectedChanges...)
 	for _, update := range allUpdates {
-		err := s.updater.UpdateIdentity(&flow.DynamicIdentityEntry{
+		err := s.stateMachine.UpdateIdentity(&flow.DynamicIdentityEntry{
 			NodeID:  update.NodeID,
 			Dynamic: update.DynamicIdentity,
 		})
 		require.NoError(s.T(), err)
 	}
-	updatedState, _, _ := s.updater.Build()
+	updatedState, _, _ := s.stateMachine.Build()
 
 	// Construct a valid flow.RichProtocolStateEntry for next block
 	// We do this by copying the parent protocol state and updating the identities manually
@@ -478,9 +487,9 @@ func (s *UpdaterSuite) TestEpochSetupAfterIdentityChange() {
 		toBeUpdated.DynamicIdentity = identity.DynamicIdentity
 	}
 
-	// now we can use it to construct updater for next block, which will process epoch setup event.
+	// now we can use it to construct stateMachine for next block, which will process epoch setup event.
 	nextBlock := unittest.BlockHeaderWithParentFixture(s.candidate)
-	s.updater, err = newStateMachine(nextBlock.View, updatedRichProtocolState)
+	s.stateMachine, err = newStateMachine(nextBlock.View, updatedRichProtocolState)
 	require.NoError(s.T(), err)
 
 	setup := unittest.EpochSetupFixture(
@@ -497,10 +506,10 @@ func (s *UpdaterSuite) TestEpochSetupAfterIdentityChange() {
 		},
 	)
 
-	_, err = s.updater.ProcessEpochSetup(setup)
+	_, err = s.stateMachine.ProcessEpochSetup(setup)
 	require.NoError(s.T(), err)
 
-	updatedState, _, _ = s.updater.Build()
+	updatedState, _, _ = s.stateMachine.Build()
 
 	// assert that all changes made in previous epoch are preserved
 	currentEpochLookup := updatedState.CurrentEpoch.ActiveIdentities.Lookup()

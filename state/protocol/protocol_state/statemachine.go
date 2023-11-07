@@ -1,7 +1,7 @@
 package protocol_state
 
 import (
-	"fmt"
+	"github.com/onflow/flow-go/state/protocol"
 
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -36,7 +36,8 @@ type ProtocolStateMachine interface {
 	// Should pass identity which is already present in the table, otherwise an exception will be raised.
 	// TODO: This function currently modifies both current+next identities based on input.
 	//       This is incompatible with the design doc, and needs to be updated to modify current/next epoch separately
-	// No errors are expected during normal operations.
+	// Expected errors during normal operations:
+	// - `protocol.InvalidServiceEventError` if the updated identity is not found in current and adjacent epochs.
 	UpdateIdentity(updated *flow.DynamicIdentityEntry) error
 	// TransitionToNextEpoch discards current protocol state and transitions to the next epoch.
 	// Epoch transition is only allowed when:
@@ -45,13 +46,15 @@ type ProtocolStateMachine interface {
 	// - candidate block is in the next epoch.
 	// No errors are expected during normal operations.
 	TransitionToNextEpoch() error
-	// View returns the view that is associated with this state updater.
+	// View returns the view that is associated with this state stateMachine.
 	// The view of the ProtocolStateMachine equals the view of the block carrying the respective updates.
 	View() uint64
-	// ParentState returns parent protocol state that is associated with this state updater.
+	// ParentState returns parent protocol state that is associated with this state stateMachine.
 	ParentState() *flow.RichProtocolStateEntry
 }
 
+// baseProtocolStateMachine implements common logic for evolving protocol state both in happy path and epoch fallback
+// operation modes. It partially implements `ProtocolStateMachine` and is used as building block for more complex implementations.
 type baseProtocolStateMachine struct {
 	parentState *flow.RichProtocolStateEntry
 	state       *flow.ProtocolStateEntry
@@ -75,13 +78,13 @@ func (u *baseProtocolStateMachine) Build() (updatedState *flow.ProtocolStateEntr
 	return
 }
 
-// View returns the view that is associated with this state updater.
+// View returns the view that is associated with this state stateMachine.
 // The view of the StateUpdater equals the view of the block carrying the respective updates.
 func (u *baseProtocolStateMachine) View() uint64 {
 	return u.view
 }
 
-// ParentState returns parent protocol state that is associated with this state updater.
+// ParentState returns parent protocol state that is associated with this state stateMachine.
 func (u *baseProtocolStateMachine) ParentState() *flow.RichProtocolStateEntry {
 	return u.parentState
 }
@@ -114,7 +117,8 @@ func (u *baseProtocolStateMachine) rebuildIdentityLookup() {
 
 // UpdateIdentity updates identity table with new identity entry.
 // Should pass identity which is already present in the table, otherwise an exception will be raised.
-// No errors are expected during normal operations.
+// Expected errors during normal operations:
+// - `protocol.InvalidServiceEventError` if the updated identity is not found in current and adjacent epochs.
 func (u *baseProtocolStateMachine) UpdateIdentity(updated *flow.DynamicIdentityEntry) error {
 	u.ensureLookupPopulated()
 	prevEpochIdentity, foundInPrev := u.prevEpochIdentitiesLookup[updated.NodeID]
@@ -130,7 +134,8 @@ func (u *baseProtocolStateMachine) UpdateIdentity(updated *flow.DynamicIdentityE
 		nextEpochIdentity.Dynamic = updated.Dynamic
 	}
 	if !foundInPrev && !foundInCurrent && !foundInNext {
-		return fmt.Errorf("expected to find identity for prev, current or next epoch, but (%v) was not found", updated.NodeID)
+		return protocol.NewInvalidServiceEventErrorf("expected to find identity for "+
+			"prev, current or next epoch, but (%v) was not found", updated.NodeID)
 	}
 	return nil
 }

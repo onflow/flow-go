@@ -24,7 +24,7 @@ type stateMachine struct {
 
 var _ ProtocolStateMachine = (*stateMachine)(nil)
 
-// newStateMachine creates a new protocol state updater.
+// newStateMachine creates a new protocol state stateMachine.
 func newStateMachine(view uint64, parentState *flow.RichProtocolStateEntry) (*stateMachine, error) {
 	if parentState.InvalidStateTransitionAttempted {
 		return nil, irrecoverable.NewExceptionf("created happy path protocol state machine at view (%d) for a parent state which has"+
