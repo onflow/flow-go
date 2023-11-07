@@ -13,6 +13,15 @@ func getAllFlowPackages() []string {
 		flowPackagePrefix + "abc/123",
 		flowPackagePrefix + "abc/def",
 		flowPackagePrefix + "abc/def/ghi",
+		flowPackagePrefix + "abc/def/ghi/jkl",
+		flowPackagePrefix + "abc/def/ghi/jkl/mno",
+		flowPackagePrefix + "abc/def/ghi/jkl/mno/pqr",
+		flowPackagePrefix + "abc/def/ghi/mno/abc",
+		flowPackagePrefix + "abc/def/ghi/mno/def",
+		flowPackagePrefix + "abc/def/ghi/mno/ghi",
+		flowPackagePrefix + "abc/def/jkl",
+		flowPackagePrefix + "abc/def/jkl/mno",
+		flowPackagePrefix + "abc/def/jkl/mno/pqr",
 		flowPackagePrefix + "def",
 		flowPackagePrefix + "def/abc",
 		flowPackagePrefix + "ghi",
@@ -148,35 +157,43 @@ func TestGenerateTestMatrix_CustomRunners(t *testing.T) {
 	)
 }
 
+// TestGenerateTestMatrix_SubSubPackages tests that the test matrix is generated correctly where the target packages
+// include 2nd and 3rd level sub packages. It also tests having 2 different custom CI runners, as well as default runners.
 func TestGenerateTestMatrix_SubSubPackages(t *testing.T) {
-	target, seenPackages := listTargetPackages([]string{"abc/def/ghi", "abc/def"}, getAllFlowPackages())
-	require.Equal(t, 2, len(target.packages))
-	require.Equal(t, 2, len(target.runners))
-	require.Equal(t, 2, len(seenPackages))
+	target, seenPackages := listTargetPackages([]string{"abc/def/ghi:foo-runner1", "abc/def/jkl:foo-runner2", "abc"}, getAllFlowPackages())
+	require.Equal(t, 3, len(target.packages))
+	require.Equal(t, 3, len(target.runners))
+	require.Equal(t, 13, len(seenPackages))
 
 	otherPackages := listOtherPackages(getAllFlowPackages(), seenPackages)
 
 	matrix := generateTestMatrix(target, otherPackages)
 
-	// should be 3 groups in test matrix: abc/def/ghi, abc/def, others
-	require.Equal(t, 3, len(matrix))
+	// should be 4 groups in test matrix: abc/def/ghi, abc/def/jkl, abc, others
+	require.Equal(t, 4, len(matrix))
 
 	require.Contains(t, matrix, testMatrix{
 		Name:     "abc/def/ghi",
-		Packages: "github.com/onflow/flow-go/abc/def/ghi",
-		Runner:   "ubuntu-latest"},
+		Packages: "github.com/onflow/flow-go/abc/def/ghi github.com/onflow/flow-go/abc/def/ghi/jkl github.com/onflow/flow-go/abc/def/ghi/jkl/mno github.com/onflow/flow-go/abc/def/ghi/jkl/mno/pqr github.com/onflow/flow-go/abc/def/ghi/mno/abc github.com/onflow/flow-go/abc/def/ghi/mno/def github.com/onflow/flow-go/abc/def/ghi/mno/ghi",
+		Runner:   "foo-runner1"},
 	)
 
 	require.Contains(t, matrix, testMatrix{
-		Name:     "abc/def",
-		Packages: "github.com/onflow/flow-go/abc/def",
+		Name:     "abc/def/jkl",
+		Packages: "github.com/onflow/flow-go/abc/def/jkl github.com/onflow/flow-go/abc/def/jkl/mno github.com/onflow/flow-go/abc/def/jkl/mno/pqr",
+		Runner:   "foo-runner2"},
+	)
+
+	// parent package should not have any packages from its sub packages because they were already included in the sub package groups
+	require.Contains(t, matrix, testMatrix{
+		Name:     "abc",
+		Packages: "github.com/onflow/flow-go/abc github.com/onflow/flow-go/abc/123 github.com/onflow/flow-go/abc/def",
 		Runner:   "ubuntu-latest"},
 	)
 
 	require.Contains(t, matrix, testMatrix{
 		Name:     "others",
-		Packages: "github.com/onflow/flow-go/abc github.com/onflow/flow-go/abc/123 github.com/onflow/flow-go/def github.com/onflow/flow-go/def/abc github.com/onflow/flow-go/ghi github.com/onflow/flow-go/jkl github.com/onflow/flow-go/mno/abc github.com/onflow/flow-go/pqr github.com/onflow/flow-go/stu github.com/onflow/flow-go/vwx github.com/onflow/flow-go/vwx/ghi github.com/onflow/flow-go/yz",
+		Packages: "github.com/onflow/flow-go/def github.com/onflow/flow-go/def/abc github.com/onflow/flow-go/ghi github.com/onflow/flow-go/jkl github.com/onflow/flow-go/mno/abc github.com/onflow/flow-go/pqr github.com/onflow/flow-go/stu github.com/onflow/flow-go/vwx github.com/onflow/flow-go/vwx/ghi github.com/onflow/flow-go/yz",
 		Runner:   "ubuntu-latest"},
 	)
-
 }
