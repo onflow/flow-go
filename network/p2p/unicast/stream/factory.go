@@ -3,6 +3,7 @@ package stream
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/libp2p/go-libp2p/core/host"
@@ -33,34 +34,6 @@ func (l *LibP2PStreamFactory) SetStreamHandler(pid protocol.ID, handler network.
 	l.host.SetStreamHandler(pid, handler)
 }
 
-// Connect connects host to peer with peerAddrInfo.
-// All errors returned from this function can be considered benign. We expect the following errors during normal operations:
-//   - ErrSecurityProtocolNegotiationFailed this indicates there was an issue upgrading the connection.
-//   - ErrGaterDisallowedConnection this indicates the connection was disallowed by the gater.
-//   - There may be other unexpected errors from libp2p but they should be considered benign.
-func (l *LibP2PStreamFactory) Connect(ctx context.Context, peerAddrInfo peer.AddrInfo) error {
-	// libp2p internally uses swarm dial - https://github.com/libp2p/go-libp2p-swarm/blob/master/swarm_dial.go
-	// to connect to a peer. Swarm dial adds a back off each time it fails connecting to a peer. While this is
-	// the desired behaviour for pub-sub (1-k style of communication) for 1-1 style we want to retry the connection
-	// immediately without backing off and fail-fast.
-	// Hence, explicitly cancel the dial back off (if any) and try connecting again
-	if swm, ok := l.host.Network().(*swarm.Swarm); ok {
-		swm.Backoff().Clear(peerAddrInfo.ID)
-	}
-
-	err := l.host.Connect(ctx, peerAddrInfo)
-	switch {
-	case err == nil:
-		return nil
-	case strings.Contains(err.Error(), protocolNegotiationFailedStr):
-		return NewSecurityProtocolNegotiationErr(peerAddrInfo.ID, err)
-	case errors.Is(err, swarm.ErrGaterDisallowedConnection):
-		return NewGaterDisallowedConnectionErr(err)
-	default:
-		return err
-	}
-}
-
 // NewStream establishes a new stream with the given peer using the provided protocol.ID on the libp2p host.
 // This function is a critical part of the network communication, facilitating the creation of a dedicated
 // bidirectional channel (stream) between two nodes in the network.
@@ -83,6 +56,10 @@ func (l *LibP2PStreamFactory) Connect(ctx context.Context, peerAddrInfo peer.Add
 //     two nodes cannot communicate using the requested protocol, and it must be handled by either retrying with
 //     a different protocol ID or by performing some form of negotiation or fallback.
 //
+//   - ErrSecurityProtocolNegotiationFailed this indicates there was an issue upgrading the connection.
+//
+//   - ErrGaterDisallowedConnection this indicates the connection was disallowed by the gater.
+//
 //   - Any other error returned by the libp2p host: This error indicates that the stream creation failed due to
 //     some unexpected error, which may be caused by a variety of reasons. This is NOT a critical error, and it
 //     can be handled by retrying the stream creation or by performing some other action. Crashing node upon this
@@ -100,11 +77,16 @@ func (l *LibP2PStreamFactory) Connect(ctx context.Context, peerAddrInfo peer.Add
 //     or nil if the operation is successful.
 func (l *LibP2PStreamFactory) NewStream(ctx context.Context, p peer.ID, pid protocol.ID) (network.Stream, error) {
 	s, err := l.host.NewStream(ctx, p, pid)
-	if err != nil {
-		if strings.Contains(err.Error(), protocolNotSupportedStr) {
-			return nil, NewProtocolNotSupportedErr(p, pid, err)
-		}
-		return nil, err
+	switch {
+	case err == nil:
+		return s, nil
+	case strings.Contains(err.Error(), protocolNotSupportedStr):
+		return nil, NewProtocolNotSupportedErr(p, pid, err)
+	case strings.Contains(err.Error(), protocolNegotiationFailedStr):
+		return nil, NewSecurityProtocolNegotiationErr(p, err)
+	case errors.Is(err, swarm.ErrGaterDisallowedConnection):
+		return nil, NewGaterDisallowedConnectionErr(err)
+	default:
+		return nil, fmt.Errorf("failed to create stream: %w", err)
 	}
-	return s, err
 }
