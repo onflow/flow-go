@@ -290,9 +290,6 @@ func (m *Manager) createStreamWithRetry(ctx context.Context, peerID peer.ID, pro
 		}
 
 		var err error
-		// add libp2p context value NoDial to prevent the underlying host from dialingComplete the peer while creating the stream
-		// we've already ensured that a connection already exists.
-		ctx = libp2pnet.WithNoDial(ctx, "application ensured connection to peer exists")
 		// creates stream using stream factory
 		s, err = m.streamFactory.NewStream(ctx, peerID, protocolID)
 		if err != nil {
