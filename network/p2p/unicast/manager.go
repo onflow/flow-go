@@ -244,14 +244,6 @@ func (m *Manager) createStream(ctx context.Context, peerID peer.ID, protocol pro
 	var err error
 	var s libp2pnet.Stream
 
-	// backoff delay for dial in progress errors; this backoff delay only kicks in if there is no connection to the peer
-	// and there is already a dial in progress to the peer.
-	backoff := retry.NewExponential(m.dialInProgressBackoffDelay)
-	// https://github.com/sethvargo/go-retry#maxretries retries counter starts at zero and library will make last attempt
-	// when retries == maxAttempts causing 1 more func invocation than expected.
-	maxRetries := dialCfg.StreamCreationRetryAttemptBudget
-	backoff = retry.WithMaxRetries(maxRetries, backoff)
-
 	s, err = m.createStreamWithRetry(ctx, peerID, protocol.ProtocolId(), dialCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create a stream to peer: %w", err)
