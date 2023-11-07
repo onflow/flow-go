@@ -147,3 +147,36 @@ func TestGenerateTestMatrix_CustomRunners(t *testing.T) {
 		Runner:   "ubuntu-latest"},
 	)
 }
+
+func TestGenerateTestMatrix_SubSubPackages(t *testing.T) {
+	target, seenPackages := listTargetPackages([]string{"abc/def/ghi", "abc/def"}, getAllFlowPackages())
+	require.Equal(t, 2, len(target.packages))
+	require.Equal(t, 2, len(target.runners))
+	require.Equal(t, 2, len(seenPackages))
+
+	otherPackages := listOtherPackages(getAllFlowPackages(), seenPackages)
+
+	matrix := generateTestMatrix(target, otherPackages)
+
+	// should be 4 groups in test matrix: abc/def, def, ghi, vwx/ghi, others
+	require.Equal(t, 3, len(matrix))
+
+	require.Contains(t, matrix, testMatrix{
+		Name:     "abc/def/ghi",
+		Packages: "github.com/onflow/flow-go/abc/def/ghi",
+		Runner:   "ubuntu-latest"},
+	)
+
+	require.Contains(t, matrix, testMatrix{
+		Name:     "abc/def",
+		Packages: "github.com/onflow/flow-go/abc/def",
+		Runner:   "ubuntu-latest"},
+	)
+
+	require.Contains(t, matrix, testMatrix{
+		Name:     "others",
+		Packages: "github.com/onflow/flow-go/abc github.com/onflow/flow-go/abc/123 github.com/onflow/flow-go/def github.com/onflow/flow-go/def/abc github.com/onflow/flow-go/ghi github.com/onflow/flow-go/jkl github.com/onflow/flow-go/mno/abc github.com/onflow/flow-go/pqr github.com/onflow/flow-go/stu github.com/onflow/flow-go/vwx github.com/onflow/flow-go/vwx/ghi github.com/onflow/flow-go/yz",
+		Runner:   "ubuntu-latest"},
+	)
+
+}
