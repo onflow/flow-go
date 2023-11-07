@@ -90,8 +90,6 @@ func listTargetPackages(targetPackagePrefixes []string, allFlowPackages []string
 	// It's a map, not a list, to make it easier to check if a package was seen or not.
 	seenPackages := make(map[string]string)
 
-	//targetPackagePrefixRunner := ciDefaultRunner
-
 	// iterate over the target packages to run as separate CI jobs
 	for _, targetPackagePrefix := range targetPackagePrefixes {
 		var targetPackage []string
@@ -112,6 +110,13 @@ func listTargetPackages(targetPackagePrefixes []string, allFlowPackages []string
 		// go through all packages to see which ones to pull out
 		for _, allPackage := range allFlowPackages {
 			if strings.HasPrefix(allPackage, flowPackagePrefix+targetPackagePrefixNoRunner) {
+				// if the package was already seen, don't append it to the list
+				// this is to support listing sub-sub packages in a CI job without duplicating those sub-sub packages
+				// in the parent package job
+				_, seen := seenPackages[allPackage]
+				if seen {
+					continue
+				}
 				targetPackage = append(targetPackage, allPackage)
 				seenPackages[allPackage] = allPackage
 			}

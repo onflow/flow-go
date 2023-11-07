@@ -158,7 +158,7 @@ func TestGenerateTestMatrix_SubSubPackages(t *testing.T) {
 
 	matrix := generateTestMatrix(target, otherPackages)
 
-	// should be 4 groups in test matrix: abc/def, def, ghi, vwx/ghi, others
+	// should be 3 groups in test matrix: abc/def/ghi, abc/def, others
 	require.Equal(t, 3, len(matrix))
 
 	require.Contains(t, matrix, testMatrix{
