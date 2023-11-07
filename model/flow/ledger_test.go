@@ -6,8 +6,10 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	"github.com/onflow/atree"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/atree"
 )
 
 // this benchmark can run with this command:
@@ -82,22 +84,35 @@ func TestRegisterID_IsInternalState(t *testing.T) {
 }
 
 func TestRegisterID_String(t *testing.T) {
-	// slab with 189 should result in \\xbd
-	slabIndex := atree.StorageIndex([8]byte{0, 0, 0, 0, 0, 0, 0, 189})
+	t.Run("atree slap", func(t *testing.T) {
+		// slab with 189 should result in \\xbd
+		slabIndex := atree.StorageIndex([8]byte{0, 0, 0, 0, 0, 0, 0, 189})
 
-	id := NewRegisterID(
-		string([]byte{1, 2, 3, 10}),
-		string(atree.SlabIndexToLedgerKey(slabIndex)))
-	require.False(t, utf8.ValidString(id.Key))
-	printable := id.String()
-	require.True(t, utf8.ValidString(printable))
-	require.Equal(t, "000000000102030a/$189", printable)
+		id := NewRegisterID(
+			string([]byte{1, 2, 3, 10}),
+			string(atree.SlabIndexToLedgerKey(slabIndex)))
+		require.False(t, utf8.ValidString(id.Key))
+		printable := id.String()
+		require.True(t, utf8.ValidString(printable))
+		require.Equal(t, "000000000102030a/$189", printable)
+	})
 
-	// non slab invalid utf-8
-	id = NewRegisterID("b\xc5y", "a\xc5z")
-	require.False(t, utf8.ValidString(id.Owner))
-	require.False(t, utf8.ValidString(id.Key))
-	printable = id.String()
-	require.True(t, utf8.ValidString(printable))
-	require.Equal(t, "000000000062c579/#61c57a", printable)
+	t.Run("non slab invalid utf-8", func(t *testing.T) {
+		id := NewRegisterID("b\xc5y", "a\xc5z")
+		require.False(t, utf8.ValidString(id.Owner))
+		require.False(t, utf8.ValidString(id.Key))
+		printable := id.String()
+		require.True(t, utf8.ValidString(printable))
+		require.Equal(t, "000000000062c579/#61c57a", printable)
+	})
+
+	t.Run("global register", func(t *testing.T) {
+		uuidRegisterID := UUIDRegisterID(0)
+		id := NewRegisterID(uuidRegisterID.Owner, uuidRegisterID.Key)
+		require.Equal(t, uuidRegisterID.Owner, id.Owner)
+		require.Equal(t, uuidRegisterID.Key, id.Key)
+		printable := id.String()
+		assert.True(t, utf8.ValidString(printable))
+		assert.Equal(t, "/#75756964", printable)
+	})
 }
