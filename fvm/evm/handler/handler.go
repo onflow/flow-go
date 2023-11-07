@@ -2,7 +2,6 @@ package handler
 
 import (
 	"bytes"
-	"encoding/binary"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
@@ -24,23 +23,26 @@ import (
 // in the future we might benefit from a view style of access to db passed as
 // a param to the emulator.
 type ContractHandler struct {
-	blockchain    types.BlockChain
-	backend       types.Backend
-	emulator      types.Emulator
-	newBlockDraft *types.Block
+	blockchain       types.BlockChain
+	backend          types.Backend
+	emulator         types.Emulator
+	addressAllocator types.AddressAllocator
+	newBlockDraft    *types.Block
 }
 
 var _ types.ContractHandler = &ContractHandler{}
 
 func NewContractHandler(
 	blockchain types.BlockChain,
+	addressAllocator types.AddressAllocator,
 	backend types.Backend,
 	emulator types.Emulator,
 ) *ContractHandler {
 	return &ContractHandler{
-		blockchain: blockchain,
-		backend:    backend,
-		emulator:   emulator,
+		blockchain:       blockchain,
+		addressAllocator: addressAllocator,
+		backend:          backend,
+		emulator:         emulator,
 	}
 }
 
@@ -58,19 +60,9 @@ func (h *ContractHandler) setupNewBlockDraft() {
 	h.newBlockDraft = &types.Block{
 		Height:            lastExecutedBlock.Height + 1,
 		ParentBlockHash:   parentHash,
-		UUIDIndex:         lastExecutedBlock.UUIDIndex,
 		TotalSupply:       lastExecutedBlock.TotalSupply,
 		TransactionHashes: make([]gethCommon.Hash, 0),
 	}
-}
-
-func (h *ContractHandler) allocateUUID() uint64 {
-	if h.newBlockDraft == nil {
-		h.setupNewBlockDraft()
-	}
-	uuid := h.newBlockDraft.UUIDIndex
-	h.newBlockDraft.UUIDIndex = uuid + 1
-	return uuid
 }
 
 func (h *ContractHandler) updateBlockDraftStateRoot(stateRoot gethCommon.Hash) {
@@ -117,15 +109,9 @@ func (h *ContractHandler) commitBlockDraft() {
 }
 
 // AllocateAddress allocates an address to be used by the bridged accounts
-//
-// TODO: future improvement: check for collision if account exist try a new account
-// TODO: if we allocate address but don't do anything else the state root would stay the same, does it cause issue?
-// maybe uuid index should be outside of the scope of a block
 func (h *ContractHandler) AllocateAddress() types.Address {
-	target := types.Address{}
-	// first 12 bytes would be zero
-	// the next 8 bytes would be an increment of the UUID index
-	binary.BigEndian.PutUint64(target[12:], h.allocateUUID())
+	target, err := h.addressAllocator.AllocateAddress()
+	handleError(err)
 	return target
 }
 

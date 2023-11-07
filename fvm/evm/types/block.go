@@ -15,9 +15,6 @@ type Block struct {
 	// Height returns the height of this block
 	Height uint64
 
-	// UUID Index
-	UUIDIndex uint64
-
 	// holds the total amount of the native token deposited in the evm side.
 	TotalSupply uint64
 
@@ -47,7 +44,6 @@ func NewBlock(height, uuidIndex, totalSupply uint64,
 ) *Block {
 	return &Block{
 		Height:            height,
-		UUIDIndex:         uuidIndex,
 		TotalSupply:       totalSupply,
 		StateRoot:         stateRoot,
 		ReceiptRoot:       receiptRoot,
@@ -65,7 +61,6 @@ func NewBlockFromBytes(encoded []byte) (*Block, error) {
 var GenesisBlock = &Block{
 	ParentBlockHash: gethCommon.Hash{},
 	Height:          uint64(0),
-	UUIDIndex:       uint64(1),
 	StateRoot:       gethTypes.EmptyRootHash,
 	ReceiptRoot:     gethTypes.EmptyRootHash,
 }

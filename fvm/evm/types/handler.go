@@ -44,3 +44,9 @@ type Backend interface {
 	environment.Meter
 	environment.EventEmitter
 }
+
+// AddressAllocator allocates addresses, used by the handler
+type AddressAllocator interface {
+	// AllocateAddress allocates an address to be used by a bridged account resource
+	AllocateAddress() (Address, error)
+}

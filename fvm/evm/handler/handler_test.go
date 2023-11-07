@@ -36,6 +36,9 @@ func TestHandler_TransactionRun(t *testing.T) {
 					bs, err := handler.NewBlockStore(backend, rootAddr)
 					require.NoError(t, err)
 
+					aa, err := handler.NewAddressAllocator(backend, rootAddr)
+					require.NoError(t, err)
+
 					result := &types.Result{
 						StateRootHash:           testutils.RandomCommonHash(t),
 						DeployedContractAddress: types.Address(testutils.RandomAddress(t)),
@@ -52,7 +55,8 @@ func TestHandler_TransactionRun(t *testing.T) {
 							return result, nil
 						},
 					}
-					handler := handler.NewContractHandler(bs, backend, em)
+
+					handler := handler.NewContractHandler(bs, aa, backend, em)
 
 					coinbase := types.NewAddress(gethCommon.Address{})
 
@@ -106,12 +110,15 @@ func TestHandler_TransactionRun(t *testing.T) {
 					bs, err := handler.NewBlockStore(backend, rootAddr)
 					require.NoError(t, err)
 
+					aa, err := handler.NewAddressAllocator(backend, rootAddr)
+					require.NoError(t, err)
+
 					em := &testutils.TestEmulator{
 						RunTransactionFunc: func(tx *gethTypes.Transaction) (*types.Result, error) {
 							return &types.Result{}, types.NewEVMExecutionError(fmt.Errorf("some sort of error"))
 						},
 					}
-					handler := handler.NewContractHandler(bs, backend, em)
+					handler := handler.NewContractHandler(bs, aa, backend, em)
 
 					coinbase := types.NewAddress(gethCommon.Address{})
 
@@ -162,12 +169,15 @@ func TestHandler_TransactionRun(t *testing.T) {
 				bs, err := handler.NewBlockStore(backend, rootAddr)
 				require.NoError(t, err)
 
+				aa, err := handler.NewAddressAllocator(backend, rootAddr)
+				require.NoError(t, err)
+
 				db, err := database.NewDatabase(backend, rootAddr)
 				require.NoError(t, err)
 
 				emulator := emulator.NewEmulator(db)
 
-				handler := handler.NewContractHandler(bs, backend, emulator)
+				handler := handler.NewContractHandler(bs, aa, backend, emulator)
 
 				eoa := testutils.GetTestEOAAccount(t, testutils.EOATestAccount1KeyHex)
 
@@ -224,7 +234,10 @@ func TestHandler_OpsWithoutEmulator(t *testing.T) {
 				bs, err := handler.NewBlockStore(backend, rootAddr)
 				require.NoError(t, err)
 
-				handler := handler.NewContractHandler(bs, backend, nil)
+				aa, err := handler.NewAddressAllocator(backend, rootAddr)
+				require.NoError(t, err)
+
+				handler := handler.NewContractHandler(bs, aa, backend, nil)
 				// test call last executed block without initialization
 				b := handler.LastExecutedBlock()
 				require.Equal(t, types.GenesisBlock, b)
@@ -233,10 +246,9 @@ func TestHandler_OpsWithoutEmulator(t *testing.T) {
 				addr := handler.AllocateAddress()
 				require.NotNil(t, addr)
 
-				// check if uuid index and block height has been incremented
+				// check if block height has been incremented
 				b = handler.LastExecutedBlock()
 				require.Equal(t, uint64(1), b.Height)
-				require.Equal(t, uint64(2), b.UUIDIndex)
 			})
 		})
 	})
@@ -247,7 +259,10 @@ func TestHandler_OpsWithoutEmulator(t *testing.T) {
 				blockchain, err := handler.NewBlockStore(backend, rootAddr)
 				require.NoError(t, err)
 
-				handler := handler.NewContractHandler(blockchain, backend, nil)
+				aa, err := handler.NewAddressAllocator(backend, rootAddr)
+				require.NoError(t, err)
+
+				handler := handler.NewContractHandler(blockchain, aa, backend, nil)
 				foa := handler.AllocateAddress()
 				require.NotNil(t, foa)
 
@@ -266,12 +281,15 @@ func TestHandler_BridgedAccount(t *testing.T) {
 				bs, err := handler.NewBlockStore(backend, rootAddr)
 				require.NoError(t, err)
 
+				aa, err := handler.NewAddressAllocator(backend, rootAddr)
+				require.NoError(t, err)
+
 				db, err := database.NewDatabase(backend, rootAddr)
 				require.NoError(t, err)
 
 				emulator := emulator.NewEmulator(db)
 
-				handler := handler.NewContractHandler(bs, backend, emulator)
+				handler := handler.NewContractHandler(bs, aa, backend, emulator)
 				foa := handler.AccountByAddress(handler.AllocateAddress(), true)
 				require.NotNil(t, foa)
 
@@ -340,10 +358,13 @@ func TestHandler_BridgedAccount(t *testing.T) {
 					bs, err := handler.NewBlockStore(backend, rootAddr)
 					require.NoError(t, err)
 
+					aa, err := handler.NewAddressAllocator(backend, rootAddr)
+					require.NoError(t, err)
+
 					// Withdraw calls are only possible within FOA accounts
 					assertPanic(t, types.IsAUnAuthroizedMethodCallError, func() {
 						em := &testutils.TestEmulator{}
-						handler := handler.NewContractHandler(bs, backend, em)
+						handler := handler.NewContractHandler(bs, aa, backend, em)
 
 						account := handler.AccountByAddress(testutils.RandomAddress(t), false)
 						account.Withdraw(types.Balance(1))
@@ -356,7 +377,7 @@ func TestHandler_BridgedAccount(t *testing.T) {
 								return &types.Result{}, types.NewEVMExecutionError(fmt.Errorf("some sort of error"))
 							},
 						}
-						handler := handler.NewContractHandler(bs, backend, em)
+						handler := handler.NewContractHandler(bs, aa, backend, em)
 						account := handler.AccountByAddress(testutils.RandomAddress(t), true)
 						account.Withdraw(types.Balance(1))
 					})
@@ -368,7 +389,7 @@ func TestHandler_BridgedAccount(t *testing.T) {
 								return &types.Result{}, types.NewEVMExecutionError(fmt.Errorf("some sort of error"))
 							},
 						}
-						handler := handler.NewContractHandler(bs, backend, em)
+						handler := handler.NewContractHandler(bs, aa, backend, em)
 						account := handler.AccountByAddress(testutils.RandomAddress(t), true)
 						account.Withdraw(types.Balance(0))
 					})
@@ -380,7 +401,7 @@ func TestHandler_BridgedAccount(t *testing.T) {
 								return &types.Result{}, types.NewFatalError(fmt.Errorf("some sort of fatal error"))
 							},
 						}
-						handler := handler.NewContractHandler(bs, backend, em)
+						handler := handler.NewContractHandler(bs, aa, backend, em)
 						account := handler.AccountByAddress(testutils.RandomAddress(t), true)
 						account.Withdraw(types.Balance(0))
 					})
@@ -396,6 +417,9 @@ func TestHandler_BridgedAccount(t *testing.T) {
 					bs, err := handler.NewBlockStore(backend, rootAddr)
 					require.NoError(t, err)
 
+					aa, err := handler.NewAddressAllocator(backend, rootAddr)
+					require.NoError(t, err)
+
 					// test non fatal error of emulator
 					assertPanic(t, types.IsEVMExecutionError, func() {
 						em := &testutils.TestEmulator{
@@ -403,7 +427,7 @@ func TestHandler_BridgedAccount(t *testing.T) {
 								return &types.Result{}, types.NewEVMExecutionError(fmt.Errorf("some sort of error"))
 							},
 						}
-						handler := handler.NewContractHandler(bs, backend, em)
+						handler := handler.NewContractHandler(bs, aa, backend, em)
 						account := handler.AccountByAddress(testutils.RandomAddress(t), true)
 						account.Deposit(types.NewFlowTokenVault(1))
 					})
@@ -415,7 +439,7 @@ func TestHandler_BridgedAccount(t *testing.T) {
 								return &types.Result{}, types.NewFatalError(fmt.Errorf("some sort of fatal error"))
 							},
 						}
-						handler := handler.NewContractHandler(bs, backend, em)
+						handler := handler.NewContractHandler(bs, aa, backend, em)
 						account := handler.AccountByAddress(testutils.RandomAddress(t), true)
 						account.Deposit(types.NewFlowTokenVault(1))
 					})
@@ -431,12 +455,15 @@ func TestHandler_BridgedAccount(t *testing.T) {
 				bs, err := handler.NewBlockStore(backend, rootAddr)
 				require.NoError(t, err)
 
+				aa, err := handler.NewAddressAllocator(backend, rootAddr)
+				require.NoError(t, err)
+
 				db, err := database.NewDatabase(backend, rootAddr)
 				require.NoError(t, err)
 
 				emulator := emulator.NewEmulator(db)
 
-				handler := handler.NewContractHandler(bs, backend, emulator)
+				handler := handler.NewContractHandler(bs, aa, backend, emulator)
 				foa := handler.AccountByAddress(handler.AllocateAddress(), true)
 				require.NotNil(t, foa)
 
