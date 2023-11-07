@@ -126,14 +126,6 @@ func WithGasPrice(gasPrice *big.Int) Option {
 	}
 }
 
-// WithBaseFee sets the the base fee for each transaction
-func WithBaseFee(baseFee *big.Int) Option {
-	return func(c *Config) *Config {
-		c.BlockContext.BaseFee = baseFee
-		return c
-	}
-}
-
 // WithGasLimit sets the gas limit of the transaction
 func WithGasLimit(gasLimit uint64) Option {
 	return func(c *Config) *Config {
