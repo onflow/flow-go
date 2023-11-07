@@ -62,17 +62,15 @@ func TestRegisterID_IsInternalState(t *testing.T) {
 		uuid := UUIDRegisterID(byte(i))
 		if i == 0 {
 			require.Equal(t, uuid.Key, UUIDKeyPrefix)
+			requireTrue("", UUIDKeyPrefix)
 		} else {
 			require.Equal(t, uuid.Key, fmt.Sprintf("%s_%d", UUIDKeyPrefix, i))
+			requireTrue("", fmt.Sprintf("%s_%d", UUIDKeyPrefix, i))
 		}
 		require.True(t, uuid.IsInternalState())
 	}
-	requireFalse("", UUIDKeyPrefix)
-	for i := 0; i < 256; i++ {
-		requireFalse("", fmt.Sprintf("%s_%d", UUIDKeyPrefix, i))
-	}
 	require.True(t, AddressStateRegisterID.IsInternalState())
-	requireFalse("", AddressStateKey)
+	requireTrue("", AddressStateKey)
 	requireFalse("", "other")
 	requireFalse("Address", UUIDKeyPrefix)
 	requireFalse("Address", AddressStateKey)
