@@ -47,16 +47,6 @@ type Manager struct {
 	// is the initial delay between each retry attempt. The delay is doubled after each retry attempt.
 	createStreamBackoffDelay time.Duration
 
-	// dialInProgressBackoffDelay is the backoff delay for parallel attempts on dialing to the same peer.
-	// When the unicast manager is invoked to create stream to the same peer concurrently while there is
-	// already an ongoing dialing attempt to the same peer, the unicast manager will wait for this backoff delay
-	// and retry creating the stream after the backoff delay has elapsed. This is to prevent the unicast manager
-	// from creating too many parallel dialing attempts to the same peer.
-	dialInProgressBackoffDelay time.Duration
-
-	// dialBackoffDelay is the backoff delay between retrying connection to the same peer.
-	dialBackoffDelay time.Duration
-
 	// dialConfigCache is a cache to store the dial config for each peer.
 	// TODO: encapsulation can be further improved by wrapping the dialConfigCache together with the dial config adjustment logic into a single struct.
 	dialConfigCache DialConfigCache
@@ -72,18 +62,6 @@ type Manager struct {
 	// Note that the counter is reset to 0 when the stream creation fails, so the value of for example 100 means that the stream creation is reliable enough that the recent
 	// 100 stream creations are all successful.
 	streamZeroBackoffResetThreshold uint64
-
-	// dialZeroBackoffResetThreshold is the threshold that determines when to reset the dial backoff budget to the default value.
-	//
-	// For example the threshold of 1 hour means that if the dial backoff budget is decreased to 0, then it will be reset to default value
-	// when it has been 1 hour since the last successful dial.
-	//
-	// This is to prevent the backoff budget from being reset too frequently, as the backoff budget is used to gauge the reliability of the dialing a remote peer.
-	// When the dial backoff budget is reset to the default value, it means that the dialing is reliable enough to be trusted again.
-	// This parameter mandates when the dialing is reliable enough to be trusted again; i.e., when it has been 1 hour since the last successful dial.
-	// Note that the last dial attempt timestamp is reset to zero when the dial fails, so the value of for example 1 hour means that the dialing to the remote peer is reliable enough that the last
-	// successful dial attempt was 1 hour ago.
-	dialZeroBackoffResetThreshold time.Duration
 
 	// maxStreamCreationAttemptTimes is the maximum number of attempts to be made to create a stream to a remote node over a direct unicast (1:1) connection before we give up.
 	maxStreamCreationAttemptTimes uint64

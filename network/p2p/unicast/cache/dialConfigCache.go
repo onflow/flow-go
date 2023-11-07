@@ -138,9 +138,7 @@ func (d *DialConfigCache) adjust(peerIdHash flow.Identifier, adjustFunc unicast.
 	}
 
 	return &unicast.DialConfig{
-		DialRetryAttemptBudget:           adjustedEntity.(DialConfigEntity).DialRetryAttemptBudget,
 		StreamCreationRetryAttemptBudget: adjustedEntity.(DialConfigEntity).StreamCreationRetryAttemptBudget,
-		LastSuccessfulDial:               adjustedEntity.(DialConfigEntity).LastSuccessfulDial,
 		ConsecutiveSuccessfulStream:      adjustedEntity.(DialConfigEntity).ConsecutiveSuccessfulStream,
 	}, nil
 }
@@ -185,9 +183,7 @@ func (d *DialConfigCache) get(peerIDHash flow.Identifier) (*unicast.DialConfig, 
 
 	// return a copy of the config (we do not want the caller to modify the config).
 	return &unicast.DialConfig{
-		DialRetryAttemptBudget:           cfg.DialRetryAttemptBudget,
 		StreamCreationRetryAttemptBudget: cfg.StreamCreationRetryAttemptBudget,
-		LastSuccessfulDial:               cfg.LastSuccessfulDial,
 		ConsecutiveSuccessfulStream:      cfg.ConsecutiveSuccessfulStream,
 	}, true
 }

@@ -2,7 +2,6 @@ package unicastcache_test
 
 import (
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -18,9 +17,7 @@ func TestDialConfigEntity(t *testing.T) {
 	d := &unicastcache.DialConfigEntity{
 		PeerId: peerID,
 		DialConfig: unicast.DialConfig{
-			DialRetryAttemptBudget:           10,
 			StreamCreationRetryAttemptBudget: 20,
-			LastSuccessfulDial:               time.Now(),
 			ConsecutiveSuccessfulStream:      30,
 		},
 	}
@@ -48,9 +45,7 @@ func TestDialConfigEntity(t *testing.T) {
 		d3 := &unicastcache.DialConfigEntity{
 			PeerId: d.PeerId,
 			DialConfig: unicast.DialConfig{
-				DialRetryAttemptBudget:           100,
 				StreamCreationRetryAttemptBudget: 200,
-				LastSuccessfulDial:               time.Now(),
 			},
 		}
 		require.Equal(t, d.ID(), d3.ID()) // same peer id, same id, even though the dial config is different.
