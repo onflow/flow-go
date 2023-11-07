@@ -393,6 +393,103 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_HistoryLimit() {
 	})
 }
 
+// TestGetProtocolStateSnapshotByBlockID tests our GetProtocolStateSnapshotByBlockID RPC endpoint
+func (suite *Suite) TestGetProtocolStateSnapshotByBlockID() {
+	identities := unittest.CompleteIdentitySet()
+	rootSnapshot := unittest.RootSnapshotFixture(identities)
+	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
+		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
+		// build epoch 1
+		// Blocks in current State
+		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- F(S_D) |commit|
+		epochBuilder.
+			BuildEpoch().
+			CompleteEpoch()
+
+		// get heights of each phase in built epochs
+		epoch1, ok := epochBuilder.EpochHeights(1)
+		require.True(suite.T(), ok)
+
+		// setup AtBlockID mock returns for State
+		for _, height := range epoch1.Range() {
+			snap := state.AtHeight(height)
+			blockHead, err := snap.Head()
+			suite.Require().NoError(err)
+
+			suite.state.On("AtHeight", height).Return(snap)
+			suite.state.On("AtBlockID", blockHead.ID()).Return(snap)
+		}
+
+		// Take snapshot at height of block D (epoch1.heights[2]) for valid segment and valid snapshot
+		// where its sealing segment is A <- B <- C
+		snap := state.AtHeight(epoch1.Range()[2])
+		blockHead, err := snap.Head()
+		suite.Require().NoError(err)
+		suite.state.On("Final").Return(snap).Once()
+
+		params := suite.defaultBackendParams()
+		params.MaxHeightRange = TEST_MAX_HEIGHT
+
+		backend, err := New(params)
+		suite.Require().NoError(err)
+
+		// query the handler for the latest finalized snapshot
+		bytes, err := backend.GetProtocolStateSnapshotByBlockID(context.Background(), blockHead.ID())
+		suite.Require().NoError(err)
+
+		// we expect the endpoint to return the snapshot at the same height we requested
+		// because it has a valid sealing segment with no Blocks spanning an epoch or phase transition
+		expectedSnapshotBytes, err := convert.SnapshotToBytes(snap)
+		suite.Require().NoError(err)
+		suite.Require().Equal(expectedSnapshotBytes, bytes)
+	})
+}
+
+// TestGetProtocolStateSnapshotByHeight tests our GetProtocolStateSnapshotByHeight RPC endpoint
+func (suite *Suite) TestGetProtocolStateSnapshotByHeight() {
+	identities := unittest.CompleteIdentitySet()
+	rootSnapshot := unittest.RootSnapshotFixture(identities)
+	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
+		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
+		// build epoch 1
+		// Blocks in current State
+		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- F(S_D) |commit|
+		epochBuilder.
+			BuildEpoch().
+			CompleteEpoch()
+
+		// get heights of each phase in built epochs
+		epoch1, ok := epochBuilder.EpochHeights(1)
+		require.True(suite.T(), ok)
+
+		// setup AtBlockID mock returns for State
+		for _, height := range epoch1.Range() {
+			suite.state.On("AtHeight", height).Return(state.AtHeight(height))
+		}
+
+		// Take snapshot at height of block D (epoch1.heights[2]) for valid segment and valid snapshot
+		// where its sealing segment is A <- B <- C
+		snap := state.AtHeight(epoch1.Range()[2])
+		suite.state.On("Final").Return(snap).Once()
+
+		params := suite.defaultBackendParams()
+		params.MaxHeightRange = TEST_MAX_HEIGHT
+
+		backend, err := New(params)
+		suite.Require().NoError(err)
+
+		// query the handler for the latest finalized snapshot
+		bytes, err := backend.GetProtocolStateSnapshotByHeight(context.Background(), epoch1.Range()[2])
+		suite.Require().NoError(err)
+
+		// we expect the endpoint to return the snapshot at the same height we requested
+		// because it has a valid sealing segment with no Blocks spanning an epoch or phase transition
+		expectedSnapshotBytes, err := convert.SnapshotToBytes(snap)
+		suite.Require().NoError(err)
+		suite.Require().Equal(expectedSnapshotBytes, bytes)
+	})
+}
+
 func (suite *Suite) TestGetLatestSealedBlockHeader() {
 	// setup the mocks
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
