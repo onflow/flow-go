@@ -82,7 +82,7 @@ func TestRegisterID_IsInternalState(t *testing.T) {
 }
 
 func TestRegisterID_String(t *testing.T) {
-	t.Run("atree slap", func(t *testing.T) {
+	t.Run("atree slab", func(t *testing.T) {
 		// slab with 189 should result in \\xbd
 		slabIndex := atree.StorageIndex([8]byte{0, 0, 0, 0, 0, 0, 0, 189})
 

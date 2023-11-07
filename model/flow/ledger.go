@@ -87,15 +87,14 @@ func CadenceRegisterID(owner []byte, key []byte) RegisterID {
 }
 
 func NewRegisterID(owner, key string) RegisterID {
-	if owner == "" {
-		return RegisterID{
-			Owner: "",
-			Key:   key,
-		}
+	ownerString := ""
+	
+	if len(owner) >0 {
+		ownerString = addressToOwner(BytesToAddress([]byte(owner)))
 	}
 
 	return RegisterID{
-		Owner: addressToOwner(BytesToAddress([]byte(owner))),
+		Owner: ownerString,
 		Key:   key,
 	}
 }
