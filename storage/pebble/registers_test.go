@@ -235,6 +235,7 @@ func TestRegisters_GetAndStoreEmptyOwner(t *testing.T) {
 
 			actual, err = r.Get(zeroOwnerKey, height)
 			assert.Error(t, err)
+			assert.Nil(t, actual)
 
 			// Next, add the zero value, and make sure it is returned
 			entries = flow.RegisterEntries{
@@ -267,6 +268,7 @@ func TestRegisters_GetAndStoreEmptyOwner(t *testing.T) {
 
 			actual, err = r.Get(emptyOwnerKey, height)
 			assert.Error(t, err)
+			assert.Nil(t, actual)
 
 			// Next, add the empty value, and make sure it is returned
 			entries = flow.RegisterEntries{
