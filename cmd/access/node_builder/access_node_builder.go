@@ -146,6 +146,7 @@ type AccessNodeConfig struct {
 	executionDataIndexingEnabled bool
 	registersDBPath              string
 	checkpointFile               string
+	forceResetIndexerHeight      bool
 }
 
 type PublicNetworkConfig struct {
@@ -722,6 +723,15 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					if err != nil {
 						return nil, fmt.Errorf("could not load checkpoint file: %w", err)
 					}
+
+					// this is only supported when bootstrapping a new register db, otherwise the
+					// register db will throw exceptions when indexing an already indexed height.
+					if builder.forceResetIndexerHeight {
+						err = indexedBlockHeight.SetProcessedIndex(checkpointHeight)
+						if err != nil && !errors.Is(err, storage.ErrNotFound) {
+							return nil, fmt.Errorf("could not reset indexed block height: %w", err)
+						}
+					}
 				}
 
 				registers, err := pStorage.NewRegisters(pdb)
@@ -926,6 +936,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.BoolVar(&builder.executionDataIndexingEnabled, "execution-data-indexing-enabled", defaultConfig.executionDataIndexingEnabled, "whether to enable the execution data indexing")
 		flags.StringVar(&builder.registersDBPath, "execution-state-dir", defaultConfig.registersDBPath, "directory to use for execution-state database")
 		flags.StringVar(&builder.checkpointFile, "execution-state-checkpoint", defaultConfig.checkpointFile, "execution-state checkpoint file")
+		flags.BoolVar(&builder.forceResetIndexerHeight, "execution-data-force-reset-indexer-height", false, "reset indexer processed height to root block. DO NOT use unless you know what you are doing")
 
 		// Script Execution
 		flags.StringVar(&builder.rpcConf.BackendConfig.ScriptExecutionMode, "script-execution-mode", defaultConfig.rpcConf.BackendConfig.ScriptExecutionMode, "mode to use when executing scripts. one of (local-only, execution-nodes-only, failover, compare)")
