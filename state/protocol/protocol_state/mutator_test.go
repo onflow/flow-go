@@ -2,7 +2,6 @@ package protocol_state
 
 import (
 	"errors"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -42,9 +41,9 @@ func (s *StateMutatorSuite) SetupTest() {
 	s.commitsDB = storagemock.NewEpochCommits(s.T())
 	s.stateMachine = protocolstatemock.NewProtocolStateMachine(s.T())
 
-	s.mutator = newStateMutator(s.headersDB, s.resultsDB, s.setupsDB, s.commitsDB, s.stateMachine, func() (ProtocolStateMachine, error) {
+	s.mutator = newStateMutator(s.headersDB, s.resultsDB, s.setupsDB, s.commitsDB, s.stateMachine, func() ProtocolStateMachine {
 		require.Fail(s.T(), "entering epoch fallback is not expected")
-		return nil, fmt.Errorf("entering epoch fallback is not expected")
+		return nil
 	})
 }
 
@@ -94,10 +93,10 @@ func (s *StateMutatorSuite) TestHappyPathHasChanges() {
 // InvalidStateTransitionAttempted flag in protocol.ProtocolStateMachine.
 func (s *StateMutatorSuite) TestApplyServiceEvents_InvalidEpochSetup() {
 	s.Run("invalid-epoch-setup", func() {
-		mutator := newStateMutator(s.headersDB, s.resultsDB, s.setupsDB, s.commitsDB, s.stateMachine, func() (ProtocolStateMachine, error) {
+		mutator := newStateMutator(s.headersDB, s.resultsDB, s.setupsDB, s.commitsDB, s.stateMachine, func() ProtocolStateMachine {
 			epochFallbackStateMachine := protocolstatemock.NewProtocolStateMachine(s.T())
 			epochFallbackStateMachine.On("ProcessEpochSetup", mock.Anything).Return(false, nil)
-			return epochFallbackStateMachine, nil
+			return epochFallbackStateMachine
 		})
 		parentState := unittest.ProtocolStateFixture()
 		s.stateMachine.On("ParentState").Return(parentState)
@@ -144,10 +143,10 @@ func (s *StateMutatorSuite) TestApplyServiceEvents_InvalidEpochSetup() {
 // InvalidStateTransitionAttempted flag in protocol.ProtocolStateMachine.
 func (s *StateMutatorSuite) TestApplyServiceEvents_InvalidEpochCommit() {
 	s.Run("invalid-epoch-commit", func() {
-		mutator := newStateMutator(s.headersDB, s.resultsDB, s.setupsDB, s.commitsDB, s.stateMachine, func() (ProtocolStateMachine, error) {
+		mutator := newStateMutator(s.headersDB, s.resultsDB, s.setupsDB, s.commitsDB, s.stateMachine, func() ProtocolStateMachine {
 			epochFallbackStateMachine := protocolstatemock.NewProtocolStateMachine(s.T())
 			epochFallbackStateMachine.On("ProcessEpochCommit", mock.Anything).Return(false, nil)
-			return epochFallbackStateMachine, nil
+			return epochFallbackStateMachine
 		})
 
 		parentState := unittest.ProtocolStateFixture()

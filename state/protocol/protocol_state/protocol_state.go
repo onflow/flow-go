@@ -99,8 +99,8 @@ func (s *MutableProtocolState) Mutator(candidateView uint64, parentID flow.Ident
 		s.setups,
 		s.commits,
 		stateMachine,
-		func() (ProtocolStateMachine, error) {
-			return newEpochFallbackStateMachine(candidateView, parentState), nil
+		func() ProtocolStateMachine {
+			return newEpochFallbackStateMachine(candidateView, parentState)
 		},
 	), nil
 }

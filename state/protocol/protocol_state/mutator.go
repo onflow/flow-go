@@ -10,7 +10,10 @@ import (
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
-type EpochFallbackStateMachineFactoryMethod = func() (ProtocolStateMachine, error)
+// EpochFallbackStateMachineFactoryMethod is a factory method for creating state machine for EFM.
+// When observing invalid epoch service event stateMutator will initialize entering in EFM by creating special state machine
+// and evolving protocol state using it.
+type EpochFallbackStateMachineFactoryMethod = func() ProtocolStateMachine
 
 // stateMutator is a stateful object to evolve the protocol state. It is instantiated from the parent block's protocol state.
 // State-changing operations can be iteratively applied and the stateMutator will internally evolve its in-memory state.
@@ -221,10 +224,7 @@ func (m *stateMutator) applyServiceEventsFromOrderedResults(results []*flow.Exec
 // This is implemented by switching to a different state machine implementation, which ignores all service events and epoch transitions.
 // At the moment, this is a one-way transition: once we enter EFM, the only way to return to normal is with a spork.
 func (m *stateMutator) transitionToEpochFallbackMode(results []*flow.ExecutionResult) ([]func(tx *transaction.Tx) error, error) {
-	fallbackStateMachine, err := m.createEpochFallbackStateMachine()
-	if err != nil {
-		return nil, fmt.Errorf("could not transition to epoch fallback state machine: %w", err)
-	}
+	fallbackStateMachine := m.createEpochFallbackStateMachine()
 	m.stateMachine = fallbackStateMachine
 	dbUpdates, err := m.applyServiceEventsFromOrderedResults(results)
 	if err != nil {
