@@ -671,9 +671,9 @@ func (c *ControlMsgValidationInspector) logAndDistributeAsyncInspectErrs(req *In
 
 	switch {
 	case IsErrActiveClusterIDsNotSet(err):
-		lg.Warn().Err(err).Msg("active cluster ids not set")
+		lg.Warn().Msg("active cluster ids not set")
 	case IsErrUnstakedPeer(err):
-		lg.Warn().Err(err).Msg("control message received from unstaked peer")
+		lg.Warn().Msg("control message received from unstaked peer")
 	default:
 		distErr := c.distributor.Distribute(p2p.NewInvalidControlMessageNotification(req.Peer, ctlMsgType, err))
 		if distErr != nil {
@@ -681,7 +681,7 @@ func (c *ControlMsgValidationInspector) logAndDistributeAsyncInspectErrs(req *In
 				Err(distErr).
 				Msg("failed to distribute invalid control message notification")
 		}
-		lg.Error().Err(err).Msg("rpc control message async inspection failed")
+		lg.Error().Msg("rpc control message async inspection failed")
 	}
 }
 
