@@ -3,19 +3,14 @@ package storehouse
 import (
 	"fmt"
 
+	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// TODO(leo): move it to upper level
-type ExtendableStorageSnapshot interface {
-	snapshot.StorageSnapshot
-	Extend(newCommit flow.StateCommitment, updatedRegisters flow.RegisterEntries) (ExtendableStorageSnapshot, error)
-	Commitment() flow.StateCommitment
-}
-
-var _ ExtendableStorageSnapshot = (*ExecutingBlockSnapshot)(nil)
+var _ execution.ExtendableStorageSnapshot = (*ExecutingBlockSnapshot)(nil)
 
 // ExecutingBlockSnapshot is a snapshot of the storage at an executed collection.
 // It starts with a storage snapshot at the end of previous block,
@@ -66,7 +61,7 @@ func (s *ExecutingBlockSnapshot) getFromUpdates(id flow.RegisterID) (flow.Regist
 // which contains the given trieUpdate
 // Usually it's used to create a new storage snapshot at the next executed collection.
 // The trieUpdate contains the register updates at the executed collection.
-func (s *ExecutingBlockSnapshot) Extend(newCommit flow.StateCommitment, updatedRegisters flow.RegisterEntries) (ExtendableStorageSnapshot, error) {
+func (s *ExecutingBlockSnapshot) Extend(newCommit flow.StateCommitment, updatedRegisters flow.RegisterEntries) (execution.ExtendableStorageSnapshot, error) {
 	updates := make(map[flow.RegisterID]flow.RegisterValue)
 
 	// add the old updates
@@ -86,36 +81,12 @@ func (s *ExecutingBlockSnapshot) Commitment() flow.StateCommitment {
 	return s.commitment
 }
 
-// TODO(leo): move it, copied from engine/execution/state/state.go to prevent cycle import
-const (
-	KeyPartOwner = uint16(0)
-	// @deprecated - controller was used only by the very first
-	// version of cadence for access controll which was retired later on
-	// KeyPartController = uint16(1)
-	KeyPartKey = uint16(2)
-)
-
-// TODO(leo): move it
-func KeyToRegisterID(key ledger.Key) (flow.RegisterID, error) {
-	if len(key.KeyParts) != 2 ||
-		key.KeyParts[0].Type != KeyPartOwner ||
-		key.KeyParts[1].Type != KeyPartKey {
-		return flow.RegisterID{}, fmt.Errorf("key not in expected format %s", key.String())
-	}
-
-	return flow.NewRegisterID(
-		string(key.KeyParts[0].Value),
-		string(key.KeyParts[1].Value),
-	), nil
-}
-
-// TODO(leo): move it
 func PayloadToRegister(payload *ledger.Payload) (flow.RegisterID, flow.RegisterValue, error) {
 	key, err := payload.Key()
 	if err != nil {
 		return flow.RegisterID{}, flow.RegisterValue{}, fmt.Errorf("could not parse register key from payload: %w", err)
 	}
-	regID, err := KeyToRegisterID(key)
+	regID, err := convert.LedgerKeyToRegisterID(key)
 	if err != nil {
 		return flow.RegisterID{}, flow.RegisterValue{}, fmt.Errorf("could not parse register key from payload: %w", err)
 	}
