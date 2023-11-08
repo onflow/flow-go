@@ -19,15 +19,19 @@ functionalities, hence, it operates on the notion of the `peer` (rather than Flo
 than `flow.Identifier`. It is the responsibility of the caller to provide the correct `peer.ID` of the remote
 node. 
 
-If there is existing connection between the local node and the remote node, the manager will try to establish
-a connection first, and then open a stream over the connection. The connection is assumed persistent, i.e., it
-will be kept until certain events such as Flow node shutdown, restart, disallow-listing of either ends of the connection
-by each other, etc. However, a stream is a one-time communication channel, i.e., it is assumed to be closed 
+The `UnicastManager` relies on the underlying libp2p node to establish the connection to the remote peer. Once the underlying
+libp2p node receives a stream creation request from the `UnicastManager`, it will try to establish a connection to the remote peer if 
+there is no existing connection to the peer. Otherwise, it will pick and re-use the best existing connection to the remote peer.
+Hence, the `UnicastManager` does not (and should not) care about the connection establishment, and rather relies on the underlying
+libp2p node to establish the connection. The `UnicastManager` only cares about the stream creation, and will return an error
+if the underlying libp2p node fails to establish a connection to the remote peer.
+
+
+A stream is a one-time communication channel, i.e., it is assumed to be closed 
 by the caller once the message is sent. The caller (i.e., the Flow node) does not necessarily re-use a stream, and the 
 `Manager` creates one stream per request (i.e., `CreateStream` invocation), which is typically a single message.
-However, we have certain safeguards in place to prevent nodes from establishing more than one connection to each other.
-That is why the `Manager` establishes the connection only when there is no existing connection between the nodes, and otherwise
-re-uses the existing connection.
+
+Note: the limit of number of streams and connections between nodes is set throught eh libp2p resource manager limits (see `config/default-config.yml`):
 
 Note: `pubsub` protocol also establishes connections between nodes to exchange gossip messages with each other.
 The connection type is the same between `pubsub` and `unicast` protocols, as they both consult the underlying LibP2P node to
