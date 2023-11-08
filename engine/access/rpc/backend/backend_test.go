@@ -3,8 +3,9 @@ package backend
 import (
 	"context"
 	"fmt"
-	statepkg "github.com/onflow/flow-go/state"
 	"testing"
+
+	statepkg "github.com/onflow/flow-go/state"
 
 	"github.com/dgraph-io/badger/v2"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
@@ -467,7 +468,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_NonFinalizedBlocks() {
 		newBlock := unittest.BlockWithParentFixture(snapHead)
 		ctx := context.Background()
 		// Adding new non finalized block to state
-		err =  state.Extend(ctx, newBlock)
+		err = state.Extend(ctx, newBlock)
 		suite.Require().NoError(err)
 
 		// setup AtHeight and AtBlockID mock returns for State
