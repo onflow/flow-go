@@ -10,8 +10,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestDialConfigEntity tests the UnicastConfigEntity struct and its methods.
-func TestDialConfigEntity(t *testing.T) {
+// TestUnicastConfigEntity tests the UnicastConfigEntity struct and its methods.
+func TestUnicastConfigEntity(t *testing.T) {
 	peerID := unittest.PeerIdFixture(t)
 
 	d := &unicastcache.UnicastConfigEntity{
@@ -48,6 +48,6 @@ func TestDialConfigEntity(t *testing.T) {
 				StreamCreationRetryAttemptBudget: 200,
 			},
 		}
-		require.Equal(t, d.ID(), d3.ID()) // same peer id, same id, even though the dial config is different.
+		require.Equal(t, d.ID(), d3.ID()) // same peer id, same id, even though the unicast config is different.
 	})
 }

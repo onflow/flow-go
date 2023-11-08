@@ -16,102 +16,102 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestNewDialConfigCache tests the creation of a new UnicastConfigCache.
+// TestNewUnicastConfigCache tests the creation of a new UnicastConfigCache.
 // It asserts that the cache is created and its size is 0.
-func TestNewDialConfigCache(t *testing.T) {
+func TestNewUnicastConfigCache(t *testing.T) {
 	sizeLimit := uint32(100)
 	logger := zerolog.Nop()
 	collector := metrics.NewNoopCollector()
-	cache := unicastcache.NewUnicastConfigCache(sizeLimit, logger, collector, dialConfigFixture)
+	cache := unicastcache.NewUnicastConfigCache(sizeLimit, logger, collector, unicastConfigFixture)
 	require.NotNil(t, cache)
 	require.Equalf(t, uint(0), cache.Size(), "cache size must be 0")
 }
 
-// dialConfigFixture returns a dial config fixture.
-// The dial config is initialized with the default values.
-func dialConfigFixture() unicast.Config {
+// unicastConfigFixture returns a unicast config fixture.
+// The unicast config is initialized with the default values.
+func unicastConfigFixture() unicast.Config {
 	return unicast.Config{
 		StreamCreationRetryAttemptBudget: 3,
 	}
 }
 
-// TestDialConfigCache_Adjust tests the Adjust method of the UnicastConfigCache. It asserts that the dial config is initialized, adjusted,
+// TestUnicastConfigCache_Adjust tests the Adjust method of the UnicastConfigCache. It asserts that the unicast config is initialized, adjusted,
 // and stored in the cache.
-func TestDialConfigCache_Adjust_Init(t *testing.T) {
+func TestUnicastConfigCache_Adjust_Init(t *testing.T) {
 	sizeLimit := uint32(100)
 	logger := zerolog.Nop()
 	collector := metrics.NewNoopCollector()
 
-	dialFactoryCalled := 0
-	dialConfigFactory := func() unicast.Config {
-		require.Less(t, dialFactoryCalled, 2, "dial config factory must be called at most twice")
-		dialFactoryCalled++
-		return dialConfigFixture()
+	unicastFactoryCalled := 0
+	unicastConfigFactory := func() unicast.Config {
+		require.Less(t, unicastFactoryCalled, 2, "unicast config factory must be called at most twice")
+		unicastFactoryCalled++
+		return unicastConfigFixture()
 	}
 	adjustFuncIncrement := func(cfg unicast.Config) (unicast.Config, error) {
 		cfg.StreamCreationRetryAttemptBudget++
 		return cfg, nil
 	}
 
-	cache := unicastcache.NewUnicastConfigCache(sizeLimit, logger, collector, dialConfigFactory)
+	cache := unicastcache.NewUnicastConfigCache(sizeLimit, logger, collector, unicastConfigFactory)
 	require.NotNil(t, cache)
 	require.Zerof(t, cache.Size(), "cache size must be 0")
 
 	peerID1 := unittest.PeerIdFixture(t)
 	peerID2 := unittest.PeerIdFixture(t)
 
-	// Initializing the dial config for peerID1 through GetOrInit.
-	// dial config for peerID1 does not exist in the cache, so it must be initialized when using GetOrInit.
+	// Initializing the unicast config for peerID1 through GetOrInit.
+	// unicast config for peerID1 does not exist in the cache, so it must be initialized when using GetOrInit.
 	cfg, err := cache.GetOrInit(peerID1)
 	require.NoError(t, err)
-	require.NotNil(t, cfg, "dial config must not be nil")
-	require.Equal(t, dialConfigFixture(), *cfg, "dial config must be initialized with the default values")
+	require.NotNil(t, cfg, "unicast config must not be nil")
+	require.Equal(t, unicastConfigFixture(), *cfg, "unicast config must be initialized with the default values")
 	require.Equal(t, uint(1), cache.Size(), "cache size must be 1")
 
-	// Initializing and adjusting the dial config for peerID2 through Adjust.
-	// dial config for peerID2 does not exist in the cache, so it must be initialized when using Adjust.
+	// Initializing and adjusting the unicast config for peerID2 through Adjust.
+	// unicast config for peerID2 does not exist in the cache, so it must be initialized when using Adjust.
 	cfg, err = cache.Adjust(peerID2, adjustFuncIncrement)
 	require.NoError(t, err)
-	// adjusting a non-existing dial config must not initialize the config.
+	// adjusting a non-existing unicast config must not initialize the config.
 	require.Equal(t, uint(2), cache.Size(), "cache size must be 2")
-	require.Equal(t, cfg.StreamCreationRetryAttemptBudget, dialConfigFixture().StreamCreationRetryAttemptBudget+1, "stream backoff must be 2")
+	require.Equal(t, cfg.StreamCreationRetryAttemptBudget, unicastConfigFixture().StreamCreationRetryAttemptBudget+1, "stream backoff must be 2")
 
-	// Retrieving the dial config of peerID2 through GetOrInit.
-	// retrieve the dial config for peerID2 and assert than it is initialized with the default values; and the adjust function is applied.
+	// Retrieving the unicast config of peerID2 through GetOrInit.
+	// retrieve the unicast config for peerID2 and assert than it is initialized with the default values; and the adjust function is applied.
 	cfg, err = cache.GetOrInit(peerID2)
-	require.NoError(t, err, "dial config must exist in the cache")
-	require.NotNil(t, cfg, "dial config must not be nil")
-	// retrieving an existing dial config must not change the cache size.
+	require.NoError(t, err, "unicast config must exist in the cache")
+	require.NotNil(t, cfg, "unicast config must not be nil")
+	// retrieving an existing unicast config must not change the cache size.
 	require.Equal(t, uint(2), cache.Size(), "cache size must be 2")
 	// config should be the same as the one returned by Adjust.
-	require.Equal(t, cfg.StreamCreationRetryAttemptBudget, dialConfigFixture().StreamCreationRetryAttemptBudget+1, "stream backoff must be 2")
+	require.Equal(t, cfg.StreamCreationRetryAttemptBudget, unicastConfigFixture().StreamCreationRetryAttemptBudget+1, "stream backoff must be 2")
 
-	// Adjusting the dial config of peerID1 through Adjust.
-	// dial config for peerID1 already exists in the cache, so it must be adjusted when using Adjust.
+	// Adjusting the unicast config of peerID1 through Adjust.
+	// unicast config for peerID1 already exists in the cache, so it must be adjusted when using Adjust.
 	cfg, err = cache.Adjust(peerID1, adjustFuncIncrement)
 	require.NoError(t, err)
-	// adjusting an existing dial config must not change the cache size.
+	// adjusting an existing unicast config must not change the cache size.
 	require.Equal(t, uint(2), cache.Size(), "cache size must be 2")
-	require.Equal(t, cfg.StreamCreationRetryAttemptBudget, dialConfigFixture().StreamCreationRetryAttemptBudget+1, "stream backoff must be 2")
+	require.Equal(t, cfg.StreamCreationRetryAttemptBudget, unicastConfigFixture().StreamCreationRetryAttemptBudget+1, "stream backoff must be 2")
 
-	// Recurring adjustment of the dial config of peerID1 through Adjust.
-	// dial config for peerID1 already exists in the cache, so it must be adjusted when using Adjust.
+	// Recurring adjustment of the unicast config of peerID1 through Adjust.
+	// unicast config for peerID1 already exists in the cache, so it must be adjusted when using Adjust.
 	cfg, err = cache.Adjust(peerID1, adjustFuncIncrement)
 	require.NoError(t, err)
-	// adjusting an existing dial config must not change the cache size.
+	// adjusting an existing unicast config must not change the cache size.
 	require.Equal(t, uint(2), cache.Size(), "cache size must be 2")
-	require.Equal(t, cfg.StreamCreationRetryAttemptBudget, dialConfigFixture().StreamCreationRetryAttemptBudget+2, "stream backoff must be 3")
+	require.Equal(t, cfg.StreamCreationRetryAttemptBudget, unicastConfigFixture().StreamCreationRetryAttemptBudget+2, "stream backoff must be 3")
 }
 
-// TestDialConfigCache_Adjust tests the Adjust method of the UnicastConfigCache. It asserts that the dial config is adjusted,
+// TestUnicastConfigCache_Adjust tests the Adjust method of the UnicastConfigCache. It asserts that the unicast config is adjusted,
 // and stored in the cache as expected under concurrent adjustments.
-func TestDialConfigCache_Concurrent_Adjust(t *testing.T) {
+func TestUnicastConfigCache_Concurrent_Adjust(t *testing.T) {
 	sizeLimit := uint32(100)
 	logger := zerolog.Nop()
 	collector := metrics.NewNoopCollector()
 
 	cache := unicastcache.NewUnicastConfigCache(sizeLimit, logger, collector, func() unicast.Config {
-		return unicast.Config{} // empty dial config
+		return unicast.Config{} // empty unicast config
 	})
 	require.NotNil(t, cache)
 	require.Zerof(t, cache.Size(), "cache size must be 0")
@@ -125,7 +125,7 @@ func TestDialConfigCache_Concurrent_Adjust(t *testing.T) {
 
 	wg := sync.WaitGroup{}
 	for i := 0; i < int(sizeLimit); i++ {
-		// adjusts the ith dial config for peerID i times, concurrently.
+		// adjusts the ith unicast config for peerID i times, concurrently.
 		for j := 0; j < i+1; j++ {
 			wg.Add(1)
 			go func(peerId peer.ID) {
@@ -144,7 +144,7 @@ func TestDialConfigCache_Concurrent_Adjust(t *testing.T) {
 	// assert that the cache size is equal to the size limit.
 	require.Equal(t, uint(sizeLimit), cache.Size(), "cache size must be equal to the size limit")
 
-	// assert that the dial config for each peer is adjusted i times, concurrently.
+	// assert that the unicast config for each peer is adjusted i times, concurrently.
 	for i := 0; i < int(sizeLimit); i++ {
 		wg.Add(1)
 		go func(j int) {
@@ -156,7 +156,7 @@ func TestDialConfigCache_Concurrent_Adjust(t *testing.T) {
 			require.Equal(t,
 				uint64(j+1),
 				cfg.StreamCreationRetryAttemptBudget,
-				fmt.Sprintf("peerId %s dial backoff must be adjusted %d times got: %d", peerID, j+1, cfg.StreamCreationRetryAttemptBudget))
+				fmt.Sprintf("peerId %s unicast backoff must be adjusted %d times got: %d", peerID, j+1, cfg.StreamCreationRetryAttemptBudget))
 		}(i)
 	}
 
@@ -165,19 +165,19 @@ func TestDialConfigCache_Concurrent_Adjust(t *testing.T) {
 
 // TestConcurrent_Adjust_And_Get_Is_Safe tests that concurrent adjustments and retrievals are safe, and do not cause error even if they cause eviction. The test stress tests the cache
 // with 2 * SizeLimit concurrent operations (SizeLimit times concurrent adjustments and SizeLimit times concurrent retrievals).
-// It asserts that the cache size is equal to the size limit, and the dial config for each peer is adjusted and retrieved correctly.
+// It asserts that the cache size is equal to the size limit, and the unicast config for each peer is adjusted and retrieved correctly.
 func TestConcurrent_Adjust_And_Get_Is_Safe(t *testing.T) {
 	sizeLimit := uint32(100)
 	logger := zerolog.Nop()
 	collector := metrics.NewNoopCollector()
 
-	cache := unicastcache.NewUnicastConfigCache(sizeLimit, logger, collector, dialConfigFixture)
+	cache := unicastcache.NewUnicastConfigCache(sizeLimit, logger, collector, unicastConfigFixture)
 	require.NotNil(t, cache)
 	require.Zerof(t, cache.Size(), "cache size must be 0")
 
 	wg := sync.WaitGroup{}
 	for i := 0; i < int(sizeLimit); i++ {
-		// concurrently adjusts the dial configs.
+		// concurrently adjusts the unicast configs.
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -193,7 +193,7 @@ func TestConcurrent_Adjust_And_Get_Is_Safe(t *testing.T) {
 		}()
 	}
 
-	// assert that the dial config for each peer is adjusted i times, concurrently.
+	// assert that the unicast config for each peer is adjusted i times, concurrently.
 	for i := 0; i < int(sizeLimit); i++ {
 		wg.Add(1)
 		go func() {
@@ -201,7 +201,7 @@ func TestConcurrent_Adjust_And_Get_Is_Safe(t *testing.T) {
 			peerId := unittest.PeerIdFixture(t)
 			cfg, err := cache.GetOrInit(peerId)
 			require.NoError(t, err) // concurrent retrieval must not fail.
-			require.Equal(t, dialConfigFixture().StreamCreationRetryAttemptBudget, cfg.StreamCreationRetryAttemptBudget)
+			require.Equal(t, unicastConfigFixture().StreamCreationRetryAttemptBudget, cfg.StreamCreationRetryAttemptBudget)
 			require.Equal(t, uint64(0), cfg.ConsecutiveSuccessfulStream)
 		}()
 	}
@@ -212,13 +212,13 @@ func TestConcurrent_Adjust_And_Get_Is_Safe(t *testing.T) {
 	require.Equal(t, uint(sizeLimit), cache.Size(), "cache size must be equal to the size limit")
 }
 
-// TestDialConfigCache_LRU_Eviction tests that the cache evicts the least recently used dial config when the cache size reaches the size limit.
-func TestDialConfigCache_LRU_Eviction(t *testing.T) {
+// TestUnicastConfigCache_LRU_Eviction tests that the cache evicts the least recently used unicast config when the cache size reaches the size limit.
+func TestUnicastConfigCache_LRU_Eviction(t *testing.T) {
 	sizeLimit := uint32(100)
 	logger := zerolog.Nop()
 	collector := metrics.NewNoopCollector()
 
-	cache := unicastcache.NewUnicastConfigCache(sizeLimit, logger, collector, dialConfigFixture)
+	cache := unicastcache.NewUnicastConfigCache(sizeLimit, logger, collector, unicastConfigFixture)
 	require.NotNil(t, cache)
 	require.Zerof(t, cache.Size(), "cache size must be 0")
 
@@ -249,10 +249,11 @@ func TestDialConfigCache_LRU_Eviction(t *testing.T) {
 
 	require.Equal(t, uint(sizeLimit), cache.Size(), "cache size must be equal to the size limit")
 
-	// querying the first peer id should return a fresh dial config, since it should be evicted due to LRU eviction, and the initiated with the default values.
+	// querying the first peer id should return a fresh unicast config,
+	// since it should be evicted due to LRU eviction, and the initiated with the default values.
 	cfg, err := cache.GetOrInit(peerIds[0])
 	require.NoError(t, err)
-	require.Equal(t, dialConfigFixture().StreamCreationRetryAttemptBudget, cfg.StreamCreationRetryAttemptBudget)
+	require.Equal(t, unicastConfigFixture().StreamCreationRetryAttemptBudget, cfg.StreamCreationRetryAttemptBudget)
 	require.Equal(t, uint64(0), cfg.ConsecutiveSuccessfulStream)
 
 	require.Equal(t, uint(sizeLimit), cache.Size(), "cache size must be equal to the size limit")
