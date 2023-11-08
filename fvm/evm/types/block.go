@@ -28,13 +28,20 @@ type Block struct {
 	TransactionHashes []gethCommon.Hash
 }
 
+// ToBytes encodes the block into bytes
 func (b *Block) ToBytes() ([]byte, error) {
 	return rlp.EncodeToBytes(b)
 }
 
+// Hash returns the hash of the block
 func (b *Block) Hash() (gethCommon.Hash, error) {
 	data, err := b.ToBytes()
 	return gethCommon.BytesToHash(data), err
+}
+
+// AppendTxHash appends a transaction hash to the list of transaction hashes of the block
+func (b *Block) AppendTxHash(txHash gethCommon.Hash) {
+	b.TransactionHashes = append(b.TransactionHashes, txHash)
 }
 
 // NewBlock constructs a new block
@@ -51,6 +58,7 @@ func NewBlock(height, uuidIndex, totalSupply uint64,
 	}
 }
 
+// NewBlockFromBytes constructs a new block from encoded data
 func NewBlockFromBytes(encoded []byte) (*Block, error) {
 	res := &Block{}
 	err := rlp.DecodeBytes(encoded, res)
@@ -63,16 +71,4 @@ var GenesisBlock = &Block{
 	Height:          uint64(0),
 	StateRoot:       gethTypes.EmptyRootHash,
 	ReceiptRoot:     gethTypes.EmptyRootHash,
-}
-
-// BlockChain stores the chain of blocks
-type BlockChain interface {
-	// Appends a block to the block chain
-	AppendBlock(block *Block) error
-
-	// LatestBlock returns the latest appended block
-	LatestBlock() (*Block, error)
-
-	// returns the hash of the block at the given height
-	BlockHash(height int) (gethCommon.Hash, error)
 }

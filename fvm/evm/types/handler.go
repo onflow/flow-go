@@ -1,6 +1,7 @@
 package types
 
 import (
+	gethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/onflow/flow-go/fvm/environment"
 )
 
@@ -48,4 +49,22 @@ type Backend interface {
 type AddressAllocator interface {
 	// AllocateAddress allocates an address to be used by a bridged account resource
 	AllocateAddress() (Address, error)
+}
+
+// BlockStore stores the chain of blocks
+type BlockStore interface {
+	// LatestBlock returns the latest appended block
+	LatestBlock() (*Block, error)
+
+	// returns the hash of the block at the given height
+	BlockHash(height int) (gethCommon.Hash, error)
+
+	// BlockProposal returns the block proposal
+	BlockProposal() (*Block, error)
+
+	// CommitBlockProposal commits the block proposal and update the chain of blocks
+	CommitBlockProposal() error
+
+	// Resets the block proposal
+	ResetBlockProposal() error
 }

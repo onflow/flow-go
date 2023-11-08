@@ -1,7 +1,7 @@
 package handler
 
 import (
-	gehtCommon "github.com/ethereum/go-ethereum/common"
+	gethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/onflow/atree"
 
 	"github.com/onflow/flow-go/fvm/evm/types"
@@ -11,11 +11,12 @@ import (
 var FlexLatestBlockKey = "LatestBlock"
 
 type BlockStore struct {
-	led         atree.Ledger
-	flexAddress flow.Address
+	led           atree.Ledger
+	flexAddress   flow.Address
+	blockProposal *types.Block
 }
 
-var _ types.BlockChain = &BlockStore{}
+var _ types.BlockStore = &BlockStore{}
 
 // NewBlockStore constructs a new block store
 func NewBlockStore(led atree.Ledger, flexAddress flow.Address) (*BlockStore, error) {
@@ -25,16 +26,56 @@ func NewBlockStore(led atree.Ledger, flexAddress flow.Address) (*BlockStore, err
 	}, nil
 }
 
-// AppendBlock appends a block to the chain
-func (bs *BlockStore) AppendBlock(block *types.Block) error {
-	blockBytes, err := block.ToBytes()
+// BlockProposal returns the block proposal to be updated by the handler
+func (bs *BlockStore) BlockProposal() (*types.Block, error) {
+	if bs.blockProposal != nil {
+		return bs.blockProposal, nil
+	}
+
+	lastExecutedBlock, err := bs.LatestBlock()
+	if err != nil {
+		return nil, err
+	}
+
+	parentHash, err := lastExecutedBlock.Hash()
+	if err != nil {
+		return nil, err
+	}
+
+	bs.blockProposal = &types.Block{
+		Height:            lastExecutedBlock.Height + 1,
+		ParentBlockHash:   parentHash,
+		TotalSupply:       lastExecutedBlock.TotalSupply,
+		TransactionHashes: make([]gethCommon.Hash, 0),
+	}
+	return bs.blockProposal, nil
+}
+
+// CommitBlockProposal commits the block proposal to the chain
+func (bs *BlockStore) CommitBlockProposal() error {
+	bp, err := bs.BlockProposal()
+	if err != nil {
+		return err
+	}
+
+	blockBytes, err := bp.ToBytes()
 	if err != nil {
 		return types.NewFatalError(err)
 	}
+
 	err = bs.led.SetValue(bs.flexAddress[:], []byte(FlexLatestBlockKey), blockBytes)
 	if err != nil {
 		return types.NewFatalError(err)
 	}
+
+	bs.blockProposal = nil
+
+	return nil
+}
+
+// ResetBlockProposal resets the block proposal
+func (bs *BlockStore) ResetBlockProposal() error {
+	bs.blockProposal = nil
 	return nil
 }
 
@@ -54,6 +95,6 @@ func (bs *BlockStore) LatestBlock() (*types.Block, error) {
 //
 // TODO: implement this properly to keep the last 256 block hashes
 // and connect use it inside the handler to pass as a config to the emulator
-func (bs *BlockStore) BlockHash(height int) (gehtCommon.Hash, error) {
-	return gehtCommon.Hash{}, nil
+func (bs *BlockStore) BlockHash(height int) (gethCommon.Hash, error) {
+	return gethCommon.Hash{}, nil
 }
