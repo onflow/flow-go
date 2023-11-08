@@ -320,9 +320,9 @@ func TestHandler_BridgedAccount(t *testing.T) {
 				require.Equal(t, zeroBalance, foa.Balance())
 
 				events := backend.Events()
-				require.Len(t, events, 3)
+				require.Len(t, events, 4)
 
-				// deposit event
+				// transaction event
 				event := events[0]
 				assert.Equal(t, event.Type, types.EventTypeTransactionExecuted)
 				ret := types.TransactionExecutedPayload{}
@@ -336,7 +336,7 @@ func TestHandler_BridgedAccount(t *testing.T) {
 				event = events[1]
 				assert.Equal(t, event.Type, types.EventTypeBlockExecuted)
 
-				// withdraw event
+				// transaction event
 				event = events[2]
 				assert.Equal(t, event.Type, types.EventTypeTransactionExecuted)
 				ret = types.TransactionExecutedPayload{}

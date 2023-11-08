@@ -328,6 +328,7 @@ func (a *Account) Withdraw(b types.Balance) *types.FLOWTokenVault {
 	// emit event
 	a.fch.updateBlockDraftTotalSupply(totalSupply - b.ToAttoFlow().Uint64())
 	a.fch.updateBlockDraftStateRoot(res.StateRootHash)
+	a.fch.commitBlockDraft()
 	return types.NewFlowTokenVault(b)
 }
 
