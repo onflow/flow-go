@@ -4,14 +4,13 @@ import (
 	"testing"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/fvm/evm/handler"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/stretchr/testify/require"
 )
-
-// TODO add test for fatal errors
 
 func TestAddressAllocator(t *testing.T) {
 
