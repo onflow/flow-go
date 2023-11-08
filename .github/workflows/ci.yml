@@ -236,7 +236,7 @@ jobs:
         include:
           - name: Access Cohort1 Integration Tests
             make: make -C integration access-cohort1-tests
-            runner: ubuntu-latest
+            runner: buildjet-4vcpu-ubuntu-2204
           - name: Access Cohort2 Integration Tests
             make: make -C integration access-cohort2-tests
             runner: ubuntu-latest
@@ -260,10 +260,10 @@ jobs:
             runner: ubuntu-latest
           - name: Epoch Cohort1 Integration Tests
             make: make -C integration epochs-cohort1-tests
-            runner: ubuntu-latest
+            runner: buildjet-4vcpu-ubuntu-2204
           - name: Epoch Cohort2 Integration Tests
             make: make -C integration epochs-cohort2-tests
-            runner: buildjet-4vcpu-ubuntu-2204
+            runner: buildjet-8vcpu-ubuntu-2204
           - name: Execution Integration Tests
             make: make -C integration execution-tests
             runner: ubuntu-latest
