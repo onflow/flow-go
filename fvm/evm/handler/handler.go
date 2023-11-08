@@ -46,6 +46,67 @@ func NewContractHandler(
 	}
 }
 
+// AllocateAddress allocates an address to be used by the bridged accounts
+func (h *ContractHandler) AllocateAddress() types.Address {
+	target, err := h.addressAllocator.AllocateAddress()
+	handleError(err)
+	return target
+}
+
+// AccountByAddress returns the account for the given address,
+// if isAuthorized is set, account is controlled by the FVM (bridged accounts)
+func (h *ContractHandler) AccountByAddress(addr types.Address, isAuthorized bool) types.Account {
+	return newAccount(h, addr, isAuthorized)
+}
+
+// LastExecutedBlock returns the last executed block
+func (h ContractHandler) LastExecutedBlock() *types.Block {
+	block, err := h.blockchain.LatestBlock()
+	handleError(err)
+	return block
+}
+
+// Run runs an rlpencoded evm transaction and
+// collects the gas fees and pay it to the coinbase address provided.
+func (h ContractHandler) Run(rlpEncodedTx []byte, coinbase types.Address) {
+
+	// step 1 - transaction decoding
+	err := h.backend.MeterComputation(environment.ComputationKindRLPDecoding, uint(len(rlpEncodedTx)))
+	handleError(err)
+
+	tx := gethTypes.Transaction{}
+	err = tx.DecodeRLP(
+		rlp.NewStream(
+			bytes.NewReader(rlpEncodedTx),
+			uint64(len(rlpEncodedTx))))
+	handleError(err)
+
+	// step 2 - run transaction
+	h.checkGasLimit(types.GasLimit(tx.Gas()))
+
+	ctx := h.getBlockContext()
+	ctx.GasFeeCollector = coinbase
+	blk, err := h.emulator.NewBlockView(ctx)
+	handleError(err)
+
+	res, err := blk.RunTransaction(&tx)
+	h.meterGasUsage(res)
+	handleError(err)
+
+	// step 3 - process block and emit events
+	txHash := tx.Hash()
+	h.appendTxHashToBlockDraft(txHash)
+
+	h.emitEvent(types.NewTransactionExecutedEvent(
+		h.getBlockDraftHeight(),
+		rlpEncodedTx,
+		txHash,
+		res,
+	))
+	h.updateBlockDraftStateRoot(res.StateRootHash)
+	h.commitBlockDraft()
+}
+
 // this method has been separated out to make NewContractHandler lighter
 // and lazy load these operations if needed
 func (h *ContractHandler) setupNewBlockDraft() {
@@ -103,81 +164,9 @@ func (h *ContractHandler) getBlockDraftHeight() uint64 {
 func (h *ContractHandler) commitBlockDraft() {
 	err := h.blockchain.AppendBlock(h.newBlockDraft)
 	handleError(err)
-	h.EmitEvent(types.NewBlockExecutedEvent(h.newBlockDraft))
+	h.emitEvent(types.NewBlockExecutedEvent(h.newBlockDraft))
 	// reset it
 	h.newBlockDraft = nil
-}
-
-// AllocateAddress allocates an address to be used by the bridged accounts
-func (h *ContractHandler) AllocateAddress() types.Address {
-	target, err := h.addressAllocator.AllocateAddress()
-	handleError(err)
-	return target
-}
-
-// AccountByAddress returns the account for the given address,
-// if isAuthorized is set, account is controlled by the FVM (bridged accounts)
-func (h *ContractHandler) AccountByAddress(addr types.Address, isAuthorized bool) types.Account {
-	return newAccount(h, addr, isAuthorized)
-}
-
-// LastExecutedBlock returns the last executed block
-func (h ContractHandler) LastExecutedBlock() *types.Block {
-	block, err := h.blockchain.LatestBlock()
-	handleError(err)
-	return block
-}
-
-// Run runs an rlpencoded evm transaction, collect the evm fees under the provided coinbase
-func (h ContractHandler) Run(rlpEncodedTx []byte, coinbase types.Address) {
-	// Decode transaction encoding
-	tx := gethTypes.Transaction{}
-
-	err := h.backend.MeterComputation(environment.ComputationKindRLPDecoding, uint(len(rlpEncodedTx)))
-	handleError(err)
-
-	err = tx.DecodeRLP(
-		rlp.NewStream(
-			bytes.NewReader(rlpEncodedTx),
-			uint64(len(rlpEncodedTx))))
-	handleError(err)
-
-	// check tx gas limit
-	gasLimit := tx.Gas()
-	h.checkGasLimit(types.GasLimit(gasLimit))
-
-	ctx := h.getBlockContext()
-	ctx.GasFeeCollector = coinbase
-
-	blk, err := h.emulator.NewBlockView(ctx)
-	handleError(err)
-
-	res, err := blk.RunTransaction(&tx)
-	handleError(err)
-	txHash := tx.Hash()
-	h.appendTxHashToBlockDraft(txHash)
-	h.meterGasUsage(res)
-
-	h.EmitEvent(types.NewTransactionExecutedEvent(
-		h.getBlockDraftHeight(),
-		rlpEncodedTx,
-		txHash,
-		res,
-	))
-	h.updateBlockDraftStateRoot(res.StateRootHash)
-	h.commitBlockDraft()
-}
-
-func (h *ContractHandler) captureCall(call *types.DirectCall) ([]byte, gethCommon.Hash) {
-	hash, err := call.Hash()
-	if err != nil {
-		// this is fatal
-		panic(err)
-	}
-	h.appendTxHashToBlockDraft(hash)
-	encoded, err := call.Encode()
-	handleError(err)
-	return encoded, hash
 }
 
 func (h ContractHandler) checkGasLimit(limit types.GasLimit) {
@@ -194,7 +183,7 @@ func (h ContractHandler) meterGasUsage(res *types.Result) {
 	}
 }
 
-func (h *ContractHandler) EmitEvent(event *types.Event) {
+func (h *ContractHandler) emitEvent(event *types.Event) {
 	// TODO add extra metering for rlp encoding
 	encoded, err := event.Payload.Encode()
 	handleError(err)
@@ -259,8 +248,10 @@ func (a *Account) Deposit(v *types.FLOWTokenVault) {
 	)
 	res, err := blk.DirectCall(call)
 	a.fch.meterGasUsage(res)
-	encoded, callHash := a.fch.captureCall(call)
-	a.fch.EmitEvent(
+	handleError(err)
+
+	encoded, callHash := a.captureCall(call)
+	a.fch.emitEvent(
 		types.NewTransactionExecutedEvent(
 			a.fch.getBlockDraftHeight(),
 			encoded,
@@ -268,7 +259,6 @@ func (a *Account) Deposit(v *types.FLOWTokenVault) {
 			res,
 		),
 	)
-	handleError(err)
 	newBalance := a.fch.getBlockDraftTotalSupply() + v.Balance().ToAttoFlow().Uint64()
 	a.fch.updateBlockDraftTotalSupply(newBalance)
 	a.fch.updateBlockDraftStateRoot(res.StateRootHash)
@@ -298,8 +288,10 @@ func (a *Account) Withdraw(b types.Balance) *types.FLOWTokenVault {
 	)
 	res, err := blk.DirectCall(call)
 	a.fch.meterGasUsage(res)
-	encoded, callHash := a.fch.captureCall(call)
-	a.fch.EmitEvent(
+	handleError(err)
+
+	encoded, callHash := a.captureCall(call)
+	a.fch.emitEvent(
 		types.NewTransactionExecutedEvent(
 			a.fch.getBlockDraftHeight(),
 			encoded,
@@ -307,7 +299,6 @@ func (a *Account) Withdraw(b types.Balance) *types.FLOWTokenVault {
 			res,
 		),
 	)
-	handleError(err)
 
 	// emit event
 	a.fch.updateBlockDraftTotalSupply(totalSupply - b.ToAttoFlow().Uint64())
@@ -375,10 +366,10 @@ func (a *Account) executeAndHandleCall(
 
 	res, err := blk.DirectCall(call)
 	a.fch.meterGasUsage(res)
-	encoded, callHash := a.fch.captureCall(call)
 	handleError(err)
 
-	a.fch.EmitEvent(
+	encoded, callHash := a.captureCall(call)
+	a.fch.emitEvent(
 		types.NewTransactionExecutedEvent(
 			a.fch.getBlockDraftHeight(),
 			encoded,
@@ -391,6 +382,18 @@ func (a *Account) executeAndHandleCall(
 	return res
 }
 
+func (a *Account) captureCall(call *types.DirectCall) ([]byte, gethCommon.Hash) {
+	hash, err := call.Hash()
+	if err != nil {
+		// this is fatal
+		panic(err)
+	}
+	a.fch.appendTxHashToBlockDraft(hash)
+	encoded, err := call.Encode()
+	handleError(err)
+	return encoded, hash
+}
+
 func (a *Account) checkAuthorized() {
 	// check if account is authorized (i.e. is a bridged account)
 	if !a.isAuthorized {
@@ -399,11 +402,13 @@ func (a *Account) checkAuthorized() {
 }
 
 func handleError(err error) {
-	if err != nil {
-		if types.IsAFatalError(err) {
-			// don't wrap it
-			panic(err)
-		}
-		panic(errors.NewEVMError(err))
+	if err == nil {
+		return
 	}
+
+	if types.IsAFatalError(err) {
+		// don't wrap it
+		panic(err)
+	}
+	panic(errors.NewEVMError(err))
 }
