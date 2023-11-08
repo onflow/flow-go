@@ -131,7 +131,7 @@ func (b *backendScripts) executeScript(
 		execResult, execDuration, execErr := b.executeScriptOnAvailableExecutionNodes(ctx, scriptRequest)
 
 		resultComparer := newScriptResultComparison(b.log, b.metrics, scriptRequest)
-		resultComparer.compare(
+		_ = resultComparer.compare(
 			newScriptResult(execResult, execDuration, execErr),
 			newScriptResult(localResult, localDuration, localErr),
 		)
@@ -149,7 +149,7 @@ func (b *backendScripts) executeScript(
 		localResult, localDuration, localErr := b.executeScriptLocally(ctx, scriptRequest)
 
 		resultComparer := newScriptResultComparison(b.log, b.metrics, scriptRequest)
-		resultComparer.compare(
+		_ = resultComparer.compare(
 			newScriptResult(execResult, execDuration, execErr),
 			newScriptResult(localResult, localDuration, localErr),
 		)
