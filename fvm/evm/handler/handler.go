@@ -200,6 +200,7 @@ func (a *Account) Deposit(v *types.FLOWTokenVault) {
 	encoded, callHash := a.processCall(call)
 
 	bp, err := a.fch.blockstore.BlockProposal()
+	handleError(err)
 	bp.AppendTxHash(callHash)
 	bp.StateRoot = res.StateRootHash
 	bp.TotalSupply += v.Balance().ToAttoFlow().Uint64()
@@ -224,6 +225,7 @@ func (a *Account) Withdraw(b types.Balance) *types.FLOWTokenVault {
 	a.checkAuthorized()
 
 	bp, err := a.fch.blockstore.BlockProposal()
+	handleError(err)
 
 	// check balance of flex vault
 	if b.ToAttoFlow().Uint64() > bp.TotalSupply {
@@ -334,6 +336,7 @@ func (a *Account) executeAndHandleCall(
 	// update block proposal
 	encoded, callHash := a.processCall(call)
 	bp, err := a.fch.blockstore.BlockProposal()
+	handleError(err)
 	bp.AppendTxHash(callHash)
 	bp.StateRoot = res.StateRootHash
 
