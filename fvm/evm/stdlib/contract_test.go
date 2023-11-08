@@ -23,7 +23,7 @@ type testContractHandler struct {
 	addressIndex      uint64
 	accountByAddress  func(types.Address, bool) types.Account
 	lastExecutedBlock func() *types.Block
-	run               func(tx []byte, coinbase types.Address) bool
+	run               func(tx []byte, coinbase types.Address)
 }
 
 var _ types.ContractHandler = &testContractHandler{}
@@ -52,11 +52,11 @@ func (t *testContractHandler) LastExecutedBlock() *types.Block {
 	return t.lastExecutedBlock()
 }
 
-func (t *testContractHandler) Run(tx []byte, coinbase types.Address) bool {
+func (t *testContractHandler) Run(tx []byte, coinbase types.Address) {
 	if t.run == nil {
 		panic("unexpected Run")
 	}
-	return t.run(tx, coinbase)
+	t.run(tx, coinbase)
 }
 
 type testFlowAccount struct {
@@ -357,7 +357,7 @@ func TestEVMRun(t *testing.T) {
 	runCalled := false
 
 	handler := &testContractHandler{
-		run: func(tx []byte, coinbase types.Address) bool {
+		run: func(tx []byte, coinbase types.Address) {
 			runCalled = true
 
 			assert.Equal(t, []byte{1, 2, 3}, tx)
@@ -368,7 +368,6 @@ func TestEVMRun(t *testing.T) {
 				coinbase,
 			)
 
-			return true
 		},
 	}
 

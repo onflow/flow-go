@@ -48,7 +48,12 @@ func SetupEnvironment(
 		return err
 	}
 
-	contractHandler := handler.NewContractHandler(bs, backend, em)
+	aa, err := handler.NewAddressAllocator(backend, evmRootAddress)
+	if err != nil {
+		return err
+	}
+
+	contractHandler := handler.NewContractHandler(bs, aa, backend, em)
 
 	stdlib.SetupEnvironment(env, contractHandler, service)
 
