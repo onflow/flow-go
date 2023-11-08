@@ -68,8 +68,9 @@ func TestHandler_TransactionRun(t *testing.T) {
 						100_000,
 						big.NewInt(1),
 					)
-					success := handler.Run(tx, coinbase)
-					require.True(t, success)
+
+					// successfully run (no-panic)
+					handler.Run(tx, coinbase)
 
 					// check gas usage
 					// TODO: uncomment and investigate me
@@ -145,7 +146,6 @@ func TestHandler_TransactionRun(t *testing.T) {
 					})
 
 					// tx execution failure
-					// TODO: if not using bool, we should expect panic
 					tx := eoa.PrepareSignAndEncodeTx(
 						t,
 						gethCommon.Address{},
@@ -155,8 +155,9 @@ func TestHandler_TransactionRun(t *testing.T) {
 						big.NewInt(1),
 					)
 
-					success := handler.Run([]byte(tx), coinbase)
-					require.False(t, success)
+					assertPanic(t, isNotFatal, func() {
+						handler.Run([]byte(tx), coinbase)
+					})
 				})
 			})
 		})
@@ -213,8 +214,8 @@ func TestHandler_TransactionRun(t *testing.T) {
 				account2 := handler.AccountByAddress(foa2, true)
 				require.Equal(t, types.Balance(0), account2.Balance())
 
-				success := handler.Run(tx, account2.Address())
-				require.True(t, success)
+				// no panic means success here
+				handler.Run(tx, account2.Address())
 				require.Equal(t, orgBalance.Sub(deduction).Add(addition), foa.Balance())
 
 				// fees has been collected to the coinbase

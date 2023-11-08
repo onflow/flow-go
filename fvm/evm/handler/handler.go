@@ -129,7 +129,7 @@ func (h ContractHandler) LastExecutedBlock() *types.Block {
 }
 
 // Run runs an rlpencoded evm transaction, collect the evm fees under the provided coinbase
-func (h ContractHandler) Run(rlpEncodedTx []byte, coinbase types.Address) bool {
+func (h ContractHandler) Run(rlpEncodedTx []byte, coinbase types.Address) {
 	// Decode transaction encoding
 	tx := gethTypes.Transaction{}
 
@@ -153,26 +153,11 @@ func (h ContractHandler) Run(rlpEncodedTx []byte, coinbase types.Address) bool {
 	handleError(err)
 
 	res, err := blk.RunTransaction(&tx)
+	handleError(err)
 	txHash := tx.Hash()
 	h.appendTxHashToBlockDraft(txHash)
 	h.meterGasUsage(res)
 
-	failed := false
-	if err != nil {
-		// if error is fatal panic here
-		if types.IsAFatalError(err) {
-			// don't wrap it
-			panic(err)
-		}
-		err = errors.NewEVMError(err)
-		failed = true
-	}
-	if res == nil {
-		// fatal error
-		panic("empty result is retuned by emulator")
-	}
-
-	res.Failed = failed
 	h.EmitEvent(types.NewTransactionExecutedEvent(
 		h.getBlockDraftHeight(),
 		rlpEncodedTx,
@@ -181,7 +166,6 @@ func (h ContractHandler) Run(rlpEncodedTx []byte, coinbase types.Address) bool {
 	))
 	h.updateBlockDraftStateRoot(res.StateRootHash)
 	h.commitBlockDraft()
-	return !failed
 }
 
 func (h *ContractHandler) captureCall(call *types.DirectCall) ([]byte, gethCommon.Hash) {

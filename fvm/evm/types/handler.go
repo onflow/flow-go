@@ -34,8 +34,7 @@ type ContractHandler interface {
 
 	// Run runs a transaction in the evm environment,
 	// collects the gas fees, and transfers the gas fees to the given coinbase account.
-	// Returns true if the transaction was successfully executed
-	Run(tx []byte, coinbase Address) bool
+	Run(tx []byte, coinbase Address)
 }
 
 // Backend passes the FVM functionality needed inside the handler
