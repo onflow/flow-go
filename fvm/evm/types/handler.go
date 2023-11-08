@@ -2,6 +2,7 @@ package types
 
 import (
 	gethCommon "github.com/ethereum/go-ethereum/common"
+
 	"github.com/onflow/flow-go/fvm/environment"
 )
 
