@@ -10,7 +10,7 @@ import (
 // DialConfigEntity is a struct that represents a dial config entry for storing in the dial config cache.
 // It implements the flow.Entity interface.
 type DialConfigEntity struct {
-	unicast.DialConfig
+	unicast.Config
 	PeerId peer.ID         // remote peer id; used as the "key" in the dial config cache.
 	id     flow.Identifier // cache the id for fast lookup (HeroCache).
 }

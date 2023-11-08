@@ -186,7 +186,7 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 		"reset stream creation retry budget from zero to the maximum after consecutive successful streams reach this threshold.")
 	flags.Uint64(unicastMaxStreamCreationRetryAttemptTimes, config.UnicastConfig.MaxStreamCreationRetryAttemptTimes, "max attempts to create a unicast stream.")
 	flags.Uint32(unicastDialConfigCacheSize,
-		config.UnicastConfig.DialConfigCacheSize,
+		config.UnicastConfig.ConfigCacheSize,
 		"cache size of the dial config cache, recommended to be big enough to accommodate the entire nodes in the network.")
 
 	// unicast stream handler rate limits

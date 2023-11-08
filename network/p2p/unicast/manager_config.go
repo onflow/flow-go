@@ -34,6 +34,6 @@ type ManagerConfig struct {
 	// MaxStreamCreationRetryAttemptTimes is the maximum number of attempts to be made to create a stream to a remote node over a direct unicast (1:1) connection before we give up.
 	MaxStreamCreationRetryAttemptTimes uint64 `validate:"gt=0"`
 
-	// DialConfigCacheFactory is a factory function to create a new dial config cache.
-	DialConfigCacheFactory DialConfigCacheFactory `validate:"required"`
+	// UnicastConfigCacheFactory is a factory function to create a new dial config cache.
+	UnicastConfigCacheFactory DialConfigCacheFactory `validate:"required"`
 }

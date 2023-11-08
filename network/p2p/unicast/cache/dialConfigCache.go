@@ -23,12 +23,12 @@ type DialConfigCache struct {
 	// TODO: remove this mutex after the HeroCache is fixed.
 	mutex      sync.RWMutex
 	peerCache  *stdmap.Backend
-	cfgFactory func() unicast.DialConfig // factory function that creates a new dial config.
+	cfgFactory func() unicast.Config // factory function that creates a new dial config.
 }
 
-var _ unicast.DialConfigCache = (*DialConfigCache)(nil)
+var _ unicast.ConfigCache = (*DialConfigCache)(nil)
 
-// NewDialConfigCache creates a new DialConfigCache.
+// NewConfigCache creates a new DialConfigCache.
 // Args:
 // - size: the maximum number of dial configs that the cache can hold.
 // - logger: the logger used by the cache.
@@ -40,11 +40,11 @@ var _ unicast.DialConfigCache = (*DialConfigCache)(nil)
 // expected to be small, size must be large enough to hold all the dial configs of the authorized nodes.
 // To avoid any crash-failure, the cache is configured to eject the least recently used configs when the cache is full.
 // Hence, we recommend setting the size to a large value to minimize the ejections.
-func NewDialConfigCache(
+func NewConfigCache(
 	size uint32,
 	logger zerolog.Logger,
 	collector module.HeroCacheMetrics,
-	cfgFactory func() unicast.DialConfig,
+	cfgFactory func() unicast.Config,
 ) *DialConfigCache {
 	return &DialConfigCache{
 		peerCache: stdmap.NewBackend(stdmap.WithBackData(herocache.NewCache(size,
@@ -65,7 +65,7 @@ func NewDialConfigCache(
 // - adjustFunc: the function that adjusts the dial config.
 // Returns:
 //   - error any returned error should be considered as an irrecoverable error and indicates a bug.
-func (d *DialConfigCache) Adjust(peerID peer.ID, adjustFunc unicast.DialConfigAdjustFunc) (*unicast.DialConfig, error) {
+func (d *DialConfigCache) Adjust(peerID peer.ID, adjustFunc unicast.DialConfigAdjustFunc) (*unicast.Config, error) {
 	d.mutex.Lock() // making optimistic adjustment atomic.
 	defer d.mutex.Unlock()
 
@@ -81,8 +81,8 @@ func (d *DialConfigCache) Adjust(peerID peer.ID, adjustFunc unicast.DialConfigAd
 			// two calls returns false, and the other call returns true. We do not care which call returns false, hence,
 			// we ignore the return value of the init function.
 			e := DialConfigEntity{
-				PeerId:     peerID,
-				DialConfig: d.cfgFactory(),
+				PeerId: peerID,
+				Config: d.cfgFactory(),
 			}
 
 			_ = d.peerCache.Add(e)
@@ -107,7 +107,7 @@ func (d *DialConfigCache) Adjust(peerID peer.ID, adjustFunc unicast.DialConfigAd
 // Returns:
 //   - error if the adjustFunc returns an error or if the config does not exist (ErrDialConfigNotFound). Except the ErrDialConfigNotFound,
 //     any other error should be treated as an irrecoverable error and indicates a bug.
-func (d *DialConfigCache) adjust(peerIdHash flow.Identifier, adjustFunc unicast.DialConfigAdjustFunc) (*unicast.DialConfig, error) {
+func (d *DialConfigCache) adjust(peerIdHash flow.Identifier, adjustFunc unicast.DialConfigAdjustFunc) (*unicast.Config, error) {
 	var rErr error
 	adjustedEntity, adjusted := d.peerCache.Adjust(peerIdHash, func(entity flow.Entity) flow.Entity {
 		cfgEntity, ok := entity.(DialConfigEntity)
@@ -118,14 +118,14 @@ func (d *DialConfigCache) adjust(peerIdHash flow.Identifier, adjustFunc unicast.
 		}
 
 		// adjust the dial config.
-		adjustedCfg, err := adjustFunc(cfgEntity.DialConfig)
+		adjustedCfg, err := adjustFunc(cfgEntity.Config)
 		if err != nil {
 			rErr = fmt.Errorf("adjust function failed: %w", err)
 			return entity // returns the original entity (reverse the adjustment).
 		}
 
 		// Return the adjusted config.
-		cfgEntity.DialConfig = adjustedCfg
+		cfgEntity.Config = adjustedCfg
 		return cfgEntity
 	})
 
@@ -137,7 +137,7 @@ func (d *DialConfigCache) adjust(peerIdHash flow.Identifier, adjustFunc unicast.
 		return nil, ErrDialConfigNotFound
 	}
 
-	return &unicast.DialConfig{
+	return &unicast.Config{
 		StreamCreationRetryAttemptBudget: adjustedEntity.(DialConfigEntity).StreamCreationRetryAttemptBudget,
 		ConsecutiveSuccessfulStream:      adjustedEntity.(DialConfigEntity).ConsecutiveSuccessfulStream,
 	}, nil
@@ -148,16 +148,16 @@ func (d *DialConfigCache) adjust(peerIdHash flow.Identifier, adjustFunc unicast.
 // Args:
 // - peerID: the peer id of the dial config.
 // Returns:
-//   - *DialConfig, the dial config for the given peer id.
+//   - *Config, the dial config for the given peer id.
 //   - error if the factory function returns an error. Any error should be treated as an irrecoverable error and indicates a bug.
-func (d *DialConfigCache) GetOrInit(peerID peer.ID) (*unicast.DialConfig, error) {
+func (d *DialConfigCache) GetOrInit(peerID peer.ID) (*unicast.Config, error) {
 	// first we translate the peer id to a flow id (taking
 	flowPeerId := PeerIdToFlowId(peerID)
 	cfg, ok := d.get(flowPeerId)
 	if !ok {
 		_ = d.peerCache.Add(DialConfigEntity{
-			PeerId:     peerID,
-			DialConfig: d.cfgFactory(),
+			PeerId: peerID,
+			Config: d.cfgFactory(),
 		})
 		cfg, ok = d.get(flowPeerId)
 		if !ok {
@@ -168,7 +168,7 @@ func (d *DialConfigCache) GetOrInit(peerID peer.ID) (*unicast.DialConfig, error)
 }
 
 // Get returns the dial config of the given peer ID.
-func (d *DialConfigCache) get(peerIDHash flow.Identifier) (*unicast.DialConfig, bool) {
+func (d *DialConfigCache) get(peerIDHash flow.Identifier) (*unicast.Config, bool) {
 	entity, ok := d.peerCache.ByID(peerIDHash)
 	if !ok {
 		return nil, false
@@ -182,7 +182,7 @@ func (d *DialConfigCache) get(peerIDHash flow.Identifier) (*unicast.DialConfig, 
 	}
 
 	// return a copy of the config (we do not want the caller to modify the config).
-	return &unicast.DialConfig{
+	return &unicast.Config{
 		StreamCreationRetryAttemptBudget: cfg.StreamCreationRetryAttemptBudget,
 		ConsecutiveSuccessfulStream:      cfg.ConsecutiveSuccessfulStream,
 	}, true

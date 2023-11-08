@@ -281,8 +281,8 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		Metrics:                            builder.metricsConfig.Metrics,
 		StreamZeroRetryResetThreshold:      builder.unicastConfig.StreamZeroRetryResetThreshold,
 		MaxStreamCreationRetryAttemptTimes: builder.unicastConfig.MaxStreamCreationRetryAttemptTimes,
-		DialConfigCacheFactory: func(configFactory func() unicast.DialConfig) unicast.DialConfigCache {
-			return unicastcache.NewDialConfigCache(builder.unicastConfig.DialConfigCacheSize,
+		UnicastConfigCacheFactory: func(configFactory func() unicast.Config) unicast.ConfigCache {
+			return unicastcache.NewConfigCache(builder.unicastConfig.ConfigCacheSize,
 				builder.logger,
 				metrics.DialConfigCacheMetricFactory(builder.metricsConfig.HeroCacheFactory, builder.networkingType),
 				configFactory)

@@ -22,15 +22,15 @@ func TestNewDialConfigCache(t *testing.T) {
 	sizeLimit := uint32(100)
 	logger := zerolog.Nop()
 	collector := metrics.NewNoopCollector()
-	cache := unicastcache.NewDialConfigCache(sizeLimit, logger, collector, dialConfigFixture)
+	cache := unicastcache.NewConfigCache(sizeLimit, logger, collector, dialConfigFixture)
 	require.NotNil(t, cache)
 	require.Equalf(t, uint(0), cache.Size(), "cache size must be 0")
 }
 
 // dialConfigFixture returns a dial config fixture.
 // The dial config is initialized with the default values.
-func dialConfigFixture() unicast.DialConfig {
-	return unicast.DialConfig{
+func dialConfigFixture() unicast.Config {
+	return unicast.Config{
 		StreamCreationRetryAttemptBudget: 3,
 	}
 }
@@ -43,17 +43,17 @@ func TestDialConfigCache_Adjust_Init(t *testing.T) {
 	collector := metrics.NewNoopCollector()
 
 	dialFactoryCalled := 0
-	dialConfigFactory := func() unicast.DialConfig {
+	dialConfigFactory := func() unicast.Config {
 		require.Less(t, dialFactoryCalled, 2, "dial config factory must be called at most twice")
 		dialFactoryCalled++
 		return dialConfigFixture()
 	}
-	adjustFuncIncrement := func(cfg unicast.DialConfig) (unicast.DialConfig, error) {
+	adjustFuncIncrement := func(cfg unicast.Config) (unicast.Config, error) {
 		cfg.StreamCreationRetryAttemptBudget++
 		return cfg, nil
 	}
 
-	cache := unicastcache.NewDialConfigCache(sizeLimit, logger, collector, dialConfigFactory)
+	cache := unicastcache.NewConfigCache(sizeLimit, logger, collector, dialConfigFactory)
 	require.NotNil(t, cache)
 	require.Zerof(t, cache.Size(), "cache size must be 0")
 
@@ -110,8 +110,8 @@ func TestDialConfigCache_Concurrent_Adjust(t *testing.T) {
 	logger := zerolog.Nop()
 	collector := metrics.NewNoopCollector()
 
-	cache := unicastcache.NewDialConfigCache(sizeLimit, logger, collector, func() unicast.DialConfig {
-		return unicast.DialConfig{} // empty dial config
+	cache := unicastcache.NewConfigCache(sizeLimit, logger, collector, func() unicast.Config {
+		return unicast.Config{} // empty dial config
 	})
 	require.NotNil(t, cache)
 	require.Zerof(t, cache.Size(), "cache size must be 0")
@@ -130,7 +130,7 @@ func TestDialConfigCache_Concurrent_Adjust(t *testing.T) {
 			wg.Add(1)
 			go func(peerId peer.ID) {
 				defer wg.Done()
-				_, err := cache.Adjust(peerId, func(cfg unicast.DialConfig) (unicast.DialConfig, error) {
+				_, err := cache.Adjust(peerId, func(cfg unicast.Config) (unicast.Config, error) {
 					cfg.StreamCreationRetryAttemptBudget++
 					return cfg, nil
 				})
@@ -171,7 +171,7 @@ func TestConcurrent_Adjust_And_Get_Is_Safe(t *testing.T) {
 	logger := zerolog.Nop()
 	collector := metrics.NewNoopCollector()
 
-	cache := unicastcache.NewDialConfigCache(sizeLimit, logger, collector, dialConfigFixture)
+	cache := unicastcache.NewConfigCache(sizeLimit, logger, collector, dialConfigFixture)
 	require.NotNil(t, cache)
 	require.Zerof(t, cache.Size(), "cache size must be 0")
 
@@ -182,7 +182,7 @@ func TestConcurrent_Adjust_And_Get_Is_Safe(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			peerId := unittest.PeerIdFixture(t)
-			updatedConfig, err := cache.Adjust(peerId, func(cfg unicast.DialConfig) (unicast.DialConfig, error) {
+			updatedConfig, err := cache.Adjust(peerId, func(cfg unicast.Config) (unicast.Config, error) {
 				cfg.StreamCreationRetryAttemptBudget = 2 // some random adjustment
 				cfg.ConsecutiveSuccessfulStream = 3      // some random adjustment
 				return cfg, nil
@@ -218,7 +218,7 @@ func TestDialConfigCache_LRU_Eviction(t *testing.T) {
 	logger := zerolog.Nop()
 	collector := metrics.NewNoopCollector()
 
-	cache := unicastcache.NewDialConfigCache(sizeLimit, logger, collector, dialConfigFixture)
+	cache := unicastcache.NewConfigCache(sizeLimit, logger, collector, dialConfigFixture)
 	require.NotNil(t, cache)
 	require.Zerof(t, cache.Size(), "cache size must be 0")
 
@@ -229,7 +229,7 @@ func TestDialConfigCache_LRU_Eviction(t *testing.T) {
 		peerIds[i] = peerId
 	}
 	for i := 0; i < int(sizeLimit+1); i++ {
-		updatedConfig, err := cache.Adjust(peerIds[i], func(cfg unicast.DialConfig) (unicast.DialConfig, error) {
+		updatedConfig, err := cache.Adjust(peerIds[i], func(cfg unicast.Config) (unicast.Config, error) {
 			cfg.StreamCreationRetryAttemptBudget = 2 // some random adjustment
 			cfg.ConsecutiveSuccessfulStream = 3      // some random adjustment
 			return cfg, nil

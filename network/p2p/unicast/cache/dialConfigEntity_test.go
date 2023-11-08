@@ -16,7 +16,7 @@ func TestDialConfigEntity(t *testing.T) {
 
 	d := &unicastcache.DialConfigEntity{
 		PeerId: peerID,
-		DialConfig: unicast.DialConfig{
+		Config: unicast.Config{
 			StreamCreationRetryAttemptBudget: 20,
 			ConsecutiveSuccessfulStream:      30,
 		},
@@ -37,14 +37,14 @@ func TestDialConfigEntity(t *testing.T) {
 
 	t.Run("ID is only calculated from peer.ID", func(t *testing.T) {
 		d2 := &unicastcache.DialConfigEntity{
-			PeerId:     unittest.PeerIdFixture(t),
-			DialConfig: d.DialConfig,
+			PeerId: unittest.PeerIdFixture(t),
+			Config: d.Config,
 		}
 		require.NotEqual(t, d.ID(), d2.ID()) // different peer id, different id.
 
 		d3 := &unicastcache.DialConfigEntity{
 			PeerId: d.PeerId,
-			DialConfig: unicast.DialConfig{
+			Config: unicast.Config{
 				StreamCreationRetryAttemptBudget: 200,
 			},
 		}
