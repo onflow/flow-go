@@ -199,16 +199,17 @@ func (executor *scriptExecutor) executeScript() error {
 	rt := executor.env.BorrowCadenceRuntime()
 	defer executor.env.ReturnCadenceRuntime(rt)
 
-	// TODO: how to clean up for the next script
 	if executor.ctx.EVMEnabled {
 		chain := executor.ctx.Chain
-		// TODO: handle error
-		evm.SetupEnvironment(
+		err := evm.SetupEnvironment(
 			chain.ChainID(),
 			executor.env,
 			rt.Environment,
 			chain.ServiceAddress(),
 		)
+		if err != nil {
+			return err
+		}
 	}
 
 	value, err := rt.ExecuteScript(
