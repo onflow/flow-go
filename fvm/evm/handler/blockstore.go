@@ -51,6 +51,7 @@ func (bs *BlockStore) LatestBlock() (*types.Block, error) {
 }
 
 // BlockHash returns the block hash for the last x blocks
+//
 // TODO: implement this properly to keep the last 256 block hashes
 // and connect use it inside the handler to pass as a config to the emulator
 func (bs *BlockStore) BlockHash(height int) (gehtCommon.Hash, error) {
