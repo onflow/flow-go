@@ -1,12 +1,68 @@
 package p2p
 
 import (
+	"github.com/hashicorp/go-multierror"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/onflow/flow-go/module/component"
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 )
+
+// InvCtrlMsgErrSeverity the severity of the invalid control message error. The gossip score penalty for an invalid control message error
+// is amplified by the severity of the error.
+type InvCtrlMsgErrSeverity float64
+
+const (
+	LowErrSeverity      InvCtrlMsgErrSeverity = .10
+	ModerateErrSeverity InvCtrlMsgErrSeverity = .15
+	HighErrSeverity     InvCtrlMsgErrSeverity = .20
+	CriticalErrSeverity InvCtrlMsgErrSeverity = .25
+)
+
+// InvCtrlMsgErrs list of InvCtrlMsgErr's
+type InvCtrlMsgErrs []InvCtrlMsgErr
+
+// InvCtrlMsgErr struct that wraps an error that occurred with during control message inspection and holds some metadata about the err such as the errors InvCtrlMsgErrSeverity.
+type InvCtrlMsgErr struct {
+	Err      error
+	Severity InvCtrlMsgErrSeverity
+}
+
+// InvCtrlMsgNotif is the notification sent to the consumer when an invalid control message is received.
+// It models the information that is available to the consumer about a misbehaving peer.
+type InvCtrlMsgNotif struct {
+	// PeerID is the ID of the peer that sent the invalid control message.
+	PeerID peer.ID
+	// Errors the errors that occurred during validation.
+	Errors InvCtrlMsgErrs
+	// MsgType the control message type.
+	MsgType p2pmsg.ControlMessageType
+}
+
+// Error returns all the errors in a single multi error.
+func (i *InvCtrlMsgNotif) Error() error {
+	var errs *multierror.Error
+	for _, err := range i.Errors {
+		errs = multierror.Append(errs, err.Err)
+	}
+	return errs.ErrorOrNil()
+}
+
+// NewInvalidControlMessageNotification returns a new *InvCtrlMsgNotif.
+// Args:
+// - peerID: peer ID of the sender.
+// - ctlMsgType: the control message type.
+// - errs: validation errors that occurred.
+// Returns:
+// - *InvCtrlMsgNotif: the invalid control message notification.
+func NewInvalidControlMessageNotification(peerID peer.ID, ctlMsgType p2pmsg.ControlMessageType, errs InvCtrlMsgErrs) *InvCtrlMsgNotif {
+	return &InvCtrlMsgNotif{
+		PeerID:  peerID,
+		Errors:  errs,
+		MsgType: ctlMsgType,
+	}
+}
 
 // GossipSubInspectorNotifDistributor is the interface for the distributor that distributes gossip sub inspector notifications.
 // It is used to distribute notifications to the consumers in an asynchronous manner and non-blocking manner.
@@ -22,26 +78,6 @@ type GossipSubInspectorNotifDistributor interface {
 	// AddConsumer must be concurrency safe. Once a consumer is added, it must be called for all future events.
 	// There is no guarantee that the consumer will be called for events that were already received by the distributor.
 	AddConsumer(GossipSubInvCtrlMsgNotifConsumer)
-}
-
-// InvCtrlMsgNotif is the notification sent to the consumer when an invalid control message is received.
-// It models the information that is available to the consumer about a misbehaving peer.
-type InvCtrlMsgNotif struct {
-	// PeerID is the ID of the peer that sent the invalid control message.
-	PeerID peer.ID
-	// Error the error that occurred during validation.
-	Error error
-	// MsgType the control message type.
-	MsgType p2pmsg.ControlMessageType
-}
-
-// NewInvalidControlMessageNotification returns a new *InvCtrlMsgNotif
-func NewInvalidControlMessageNotification(peerID peer.ID, ctlMsgType p2pmsg.ControlMessageType, err error) *InvCtrlMsgNotif {
-	return &InvCtrlMsgNotif{
-		PeerID:  peerID,
-		Error:   err,
-		MsgType: ctlMsgType,
-	}
 }
 
 // GossipSubInvCtrlMsgNotifConsumer is the interface for the consumer that consumes gossipsub inspector notifications.

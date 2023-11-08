@@ -40,15 +40,15 @@ const (
 	//     n > -3 / log( 0.99 )
 	//     n >  458.22
 	defaultDecay = 0.99 // default decay value for the application specific penalty.
-	// graftMisbehaviourPenalty is the penalty applied to the application specific penalty when a peer conducts a graft misbehaviour.
+	// graftMisbehaviourPenalty is the base penalty applied to the application specific penalty when a peer conducts a graft misbehaviour.
 	graftMisbehaviourPenalty = -10
-	// pruneMisbehaviourPenalty is the penalty applied to the application specific penalty when a peer conducts a prune misbehaviour.
+	// pruneMisbehaviourPenalty is the base penalty applied to the application specific penalty when a peer conducts a prune misbehaviour.
 	pruneMisbehaviourPenalty = -10
-	// iHaveMisbehaviourPenalty is the penalty applied to the application specific penalty when a peer conducts a iHave misbehaviour.
+	// iHaveMisbehaviourPenalty is the base penalty applied to the application specific penalty when a peer conducts a iHave misbehaviour.
 	iHaveMisbehaviourPenalty = -10
-	// iWantMisbehaviourPenalty is the penalty applied to the application specific penalty when a peer conducts a iWant misbehaviour.
+	// iWantMisbehaviourPenalty is the base penalty applied to the application specific penalty when a peer conducts a iWant misbehaviour.
 	iWantMisbehaviourPenalty = -10
-	// rpcPublishMessageMisbehaviourPenalty is the penalty applied to the application specific penalty when a peer conducts a RpcPublishMessageMisbehaviourPenalty misbehaviour.
+	// rpcPublishMessageMisbehaviourPenalty is the base penalty applied to the application specific penalty when a peer conducts a RpcPublishMessageMisbehaviourPenalty misbehaviour.
 	rpcPublishMessageMisbehaviourPenalty = -10
 )
 
@@ -246,7 +246,7 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 	// we use mutex to ensure the method is concurrency safe.
 
 	lg := r.logger.With().
-		Err(notification.Error).
+		Err(notification.Error()).
 		Str("peer_id", p2plogging.PeerId(notification.PeerID)).
 		Str("misbehavior_type", notification.MsgType.String()).Logger()
 
