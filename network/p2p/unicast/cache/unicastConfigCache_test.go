@@ -16,13 +16,13 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestNewDialConfigCache tests the creation of a new DialConfigCache.
+// TestNewDialConfigCache tests the creation of a new UnicastConfigCache.
 // It asserts that the cache is created and its size is 0.
 func TestNewDialConfigCache(t *testing.T) {
 	sizeLimit := uint32(100)
 	logger := zerolog.Nop()
 	collector := metrics.NewNoopCollector()
-	cache := unicastcache.NewConfigCache(sizeLimit, logger, collector, dialConfigFixture)
+	cache := unicastcache.NewUnicastConfigCache(sizeLimit, logger, collector, dialConfigFixture)
 	require.NotNil(t, cache)
 	require.Equalf(t, uint(0), cache.Size(), "cache size must be 0")
 }
@@ -35,7 +35,7 @@ func dialConfigFixture() unicast.Config {
 	}
 }
 
-// TestDialConfigCache_Adjust tests the Adjust method of the DialConfigCache. It asserts that the dial config is initialized, adjusted,
+// TestDialConfigCache_Adjust tests the Adjust method of the UnicastConfigCache. It asserts that the dial config is initialized, adjusted,
 // and stored in the cache.
 func TestDialConfigCache_Adjust_Init(t *testing.T) {
 	sizeLimit := uint32(100)
@@ -53,7 +53,7 @@ func TestDialConfigCache_Adjust_Init(t *testing.T) {
 		return cfg, nil
 	}
 
-	cache := unicastcache.NewConfigCache(sizeLimit, logger, collector, dialConfigFactory)
+	cache := unicastcache.NewUnicastConfigCache(sizeLimit, logger, collector, dialConfigFactory)
 	require.NotNil(t, cache)
 	require.Zerof(t, cache.Size(), "cache size must be 0")
 
@@ -103,14 +103,14 @@ func TestDialConfigCache_Adjust_Init(t *testing.T) {
 	require.Equal(t, cfg.StreamCreationRetryAttemptBudget, dialConfigFixture().StreamCreationRetryAttemptBudget+2, "stream backoff must be 3")
 }
 
-// TestDialConfigCache_Adjust tests the Adjust method of the DialConfigCache. It asserts that the dial config is adjusted,
+// TestDialConfigCache_Adjust tests the Adjust method of the UnicastConfigCache. It asserts that the dial config is adjusted,
 // and stored in the cache as expected under concurrent adjustments.
 func TestDialConfigCache_Concurrent_Adjust(t *testing.T) {
 	sizeLimit := uint32(100)
 	logger := zerolog.Nop()
 	collector := metrics.NewNoopCollector()
 
-	cache := unicastcache.NewConfigCache(sizeLimit, logger, collector, func() unicast.Config {
+	cache := unicastcache.NewUnicastConfigCache(sizeLimit, logger, collector, func() unicast.Config {
 		return unicast.Config{} // empty dial config
 	})
 	require.NotNil(t, cache)
@@ -171,7 +171,7 @@ func TestConcurrent_Adjust_And_Get_Is_Safe(t *testing.T) {
 	logger := zerolog.Nop()
 	collector := metrics.NewNoopCollector()
 
-	cache := unicastcache.NewConfigCache(sizeLimit, logger, collector, dialConfigFixture)
+	cache := unicastcache.NewUnicastConfigCache(sizeLimit, logger, collector, dialConfigFixture)
 	require.NotNil(t, cache)
 	require.Zerof(t, cache.Size(), "cache size must be 0")
 
@@ -218,7 +218,7 @@ func TestDialConfigCache_LRU_Eviction(t *testing.T) {
 	logger := zerolog.Nop()
 	collector := metrics.NewNoopCollector()
 
-	cache := unicastcache.NewConfigCache(sizeLimit, logger, collector, dialConfigFixture)
+	cache := unicastcache.NewUnicastConfigCache(sizeLimit, logger, collector, dialConfigFixture)
 	require.NotNil(t, cache)
 	require.Zerof(t, cache.Size(), "cache size must be 0")
 

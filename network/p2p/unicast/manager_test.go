@@ -28,7 +28,7 @@ func unicastManagerFixture(t *testing.T) (*unicast.Manager, *mockp2p.StreamFacto
 	cfg, err := config.DefaultConfig()
 	require.NoError(t, err)
 
-	unicastConfigCache := unicastcache.NewConfigCache(cfg.NetworkConfig.UnicastConfig.ConfigCacheSize,
+	unicastConfigCache := unicastcache.NewUnicastConfigCache(cfg.NetworkConfig.UnicastConfig.ConfigCacheSize,
 		unittest.Logger(),
 		metrics.NewNoopCollector(),
 		func() unicast.Config {
@@ -70,7 +70,7 @@ func TestManagerConfigValidation(t *testing.T) {
 		StreamZeroRetryResetThreshold:      cfg.NetworkConfig.UnicastConfig.StreamZeroRetryResetThreshold,
 		MaxStreamCreationRetryAttemptTimes: cfg.NetworkConfig.UnicastConfig.MaxStreamCreationRetryAttemptTimes,
 		UnicastConfigCacheFactory: func(func() unicast.Config) unicast.ConfigCache {
-			return unicastcache.NewConfigCache(cfg.NetworkConfig.UnicastConfig.ConfigCacheSize,
+			return unicastcache.NewUnicastConfigCache(cfg.NetworkConfig.UnicastConfig.ConfigCacheSize,
 				unittest.Logger(),
 				metrics.NewNoopCollector(),
 				func() unicast.Config {
