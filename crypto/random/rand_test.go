@@ -106,7 +106,6 @@ func TestUintN(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("basic uniformity", func(t *testing.T) {
-
 		maxN := uint64(1000)
 		mod := mrand.Uint64()
 		var n, classWidth uint64
@@ -123,7 +122,6 @@ func TestUintN(t *testing.T) {
 			return uint64(rng.UintN(mod)), nil
 		}
 		BasicDistributionTest(t, n, classWidth, uintNf)
-
 	})
 
 	t.Run("zero n", func(t *testing.T) {
@@ -228,52 +226,47 @@ func TestShuffle(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("basic uniformity", func(t *testing.T) {
-		listSize := 100
-		sampleSize := 80000
-		// the distribution of a particular element of the list, testElement
-		distribution := make([]float64, listSize)
-		testElement := rand.Intn(listSize)
-		// Slice to shuffle
-		list := make([]int, 0, listSize)
-		for i := 0; i < listSize; i++ {
-			list = append(list, i)
+		// compute n!
+		fact := func(n int) int {
+			f := 1
+			for i := 1; i <= n; i++ {
+				f *= i
+			}
+			return f
 		}
 
-		shuffleAndCount := func(t *testing.T) {
-			err = rng.Shuffle(listSize, func(i, j int) {
-				list[i], list[j] = list[j], list[i]
-			})
-			require.NoError(t, err)
-			has := make(map[int]struct{})
-			for j, e := range list {
-				// check for repetition
-				_, ok := has[e]
-				require.False(t, ok, "duplicated item")
-				has[e] = struct{}{}
-				// fill the distribution
-				if e == testElement {
-					distribution[j] += 1.0
-				}
-			}
-		}
-
-		t.Run("shuffle a random permutation", func(t *testing.T) {
-			for k := 0; k < sampleSize; k++ {
-				shuffleAndCount(t)
-			}
-			EvaluateDistributionUniformity(t, distribution)
-		})
-
-		t.Run("shuffle a same permutation", func(t *testing.T) {
-			for k := 0; k < sampleSize; k++ {
-				// reinit the permutation to the same value
+		for listSize := 2; listSize <= 6; listSize++ {
+			factN := uint64(fact(listSize))
+			t.Logf("permutation size is %d (factorial is %d)", listSize, factN)
+			t.Run("shuffle a random permutation", func(t *testing.T) {
+				list := make([]int, 0, listSize)
 				for i := 0; i < listSize; i++ {
-					list[i] = i
+					list = append(list, i)
 				}
-				shuffleAndCount(t)
-			}
-			EvaluateDistributionUniformity(t, distribution)
-		})
+				permEncoding := func() (uint64, error) {
+					err = rng.Shuffle(listSize, func(i, j int) {
+						list[i], list[j] = list[j], list[i]
+					})
+					return uint64(EncodePermutation(list)), err
+				}
+				BasicDistributionTest(t, factN, 1, permEncoding)
+			})
+
+			t.Run("shuffle a same permutation", func(t *testing.T) {
+				list := make([]int, listSize)
+				permEncoding := func() (uint64, error) {
+					// reinit the permutation to the same value
+					for i := 0; i < listSize; i++ {
+						list[i] = i
+					}
+					err = rng.Shuffle(listSize, func(i, j int) {
+						list[i], list[j] = list[j], list[i]
+					})
+					return uint64(EncodePermutation(list)), err
+				}
+				BasicDistributionTest(t, factN, 1, permEncoding)
+			})
+		}
 	})
 
 	t.Run("empty slice", func(t *testing.T) {

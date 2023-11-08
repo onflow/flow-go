@@ -5,9 +5,6 @@ import (
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 )
 
-// tx type 255 is used for direct calls from bridged accounts
-var DirectCallTxType = uint8(255)
-
 // Result captures the result of an interaction with the emulator (direct call or evm tx)
 // Its more comprehensive than typical evm receipt, usually
 // the receipt generation requires some extra calculation (e.g. Deployed contract address)
