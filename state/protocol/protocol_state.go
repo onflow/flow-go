@@ -154,7 +154,7 @@ type StateMutator interface {
 	//     A service event not representing a valid state transition despite all consistency checks passing
 	//     is interpreted as case (a) and handled internally within the StateMutator. In short, we go into Epoch
 	//     Fallback Mode by copying the parent state (a valid state snapshot) and setting the
-	//     `InvalidStateTransitionAttempted` flag. All subsequent Epoch-lifecycle events are ignored.
+	//     `InvalidEpochTransitionAttempted` flag. All subsequent Epoch-lifecycle events are ignored.
 	//   - A consistency or sanity check failing within the StateMutator is likely the symptom of an internal bug
 	//     in the node software or state corruption, i.e. case (b). This is the only scenario where the error return
 	//     of this function is not nil. If such an exception is returned, continuing is not an option.

@@ -28,11 +28,11 @@ type ProtocolStateEntry struct {
 	CurrentEpoch  EpochStateContainer  // minimal dynamic properties for current epoch
 	NextEpoch     *EpochStateContainer // minimal dynamic properties for next epoch [optional, nil iff we are in staking phase]
 
-	// InvalidStateTransitionAttempted encodes whether an invalid state transition
+	// InvalidEpochTransitionAttempted encodes whether an invalid epoch transition
 	// has been detected in this fork. Under normal operations, this value is false.
 	// The only possible state transition is false → true. When this happens,
 	// epoch fallback is triggered AFTER the fork is finalized.
-	InvalidStateTransitionAttempted bool
+	InvalidEpochTransitionAttempted bool
 }
 
 // EpochStateContainer holds the data pertaining to a _single_ epoch but no information about
@@ -230,12 +230,12 @@ func (e *ProtocolStateEntry) ID() Identifier {
 		PreviousEpochID                 Identifier
 		CurrentEpochID                  Identifier
 		NextEpochID                     Identifier
-		InvalidStateTransitionAttempted bool
+		InvalidEpochTransitionAttempted bool
 	}{
 		PreviousEpochID:                 e.PreviousEpoch.ID(),
 		CurrentEpochID:                  e.CurrentEpoch.ID(),
 		NextEpochID:                     e.NextEpoch.ID(),
-		InvalidStateTransitionAttempted: e.InvalidStateTransitionAttempted,
+		InvalidEpochTransitionAttempted: e.InvalidEpochTransitionAttempted,
 	}
 	return MakeID(body)
 }
@@ -250,7 +250,7 @@ func (e *ProtocolStateEntry) Copy() *ProtocolStateEntry {
 		PreviousEpoch:                   e.PreviousEpoch.Copy(),
 		CurrentEpoch:                    *e.CurrentEpoch.Copy(),
 		NextEpoch:                       e.NextEpoch.Copy(),
-		InvalidStateTransitionAttempted: e.InvalidStateTransitionAttempted,
+		InvalidEpochTransitionAttempted: e.InvalidEpochTransitionAttempted,
 	}
 }
 
@@ -280,7 +280,7 @@ func (e *ProtocolStateEntry) EpochStatus() *EpochStatus {
 		PreviousEpoch:                   e.PreviousEpoch.EventIDs(),
 		CurrentEpoch:                    e.CurrentEpoch.EventIDs(),
 		NextEpoch:                       e.NextEpoch.EventIDs(),
-		InvalidServiceEventIncorporated: e.InvalidStateTransitionAttempted,
+		InvalidEpochTransitionAttempted: e.InvalidEpochTransitionAttempted,
 	}
 }
 

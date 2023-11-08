@@ -14,11 +14,11 @@ type epochFallbackStateMachine struct {
 
 var _ ProtocolStateMachine = (*epochFallbackStateMachine)(nil)
 
-// newEpochFallbackStateMachine constructs a state machine for epoch fallback, it automatically sets InvalidStateTransitionAttempted
+// newEpochFallbackStateMachine constructs a state machine for epoch fallback, it automatically sets InvalidEpochTransitionAttempted
 // to true to mark that we have entered epoch fallback mode.
 func newEpochFallbackStateMachine(view uint64, parentState *flow.RichProtocolStateEntry) *epochFallbackStateMachine {
 	state := parentState.ProtocolStateEntry.Copy()
-	state.InvalidStateTransitionAttempted = true
+	state.InvalidEpochTransitionAttempted = true
 	return &epochFallbackStateMachine{
 		baseProtocolStateMachine: baseProtocolStateMachine{
 			parentState: parentState,

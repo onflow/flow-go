@@ -815,7 +815,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 // No errors are expected during normal operation.
 func (m *FollowerState) epochFallbackTriggeredByFinalizedBlock(block *flow.Header, epochStatus *flow.EpochStatus, currentEpochSetup *flow.EpochSetup) (bool, error) {
 	// 1. Epoch fallback is tentatively triggered on this fork
-	if epochStatus.InvalidServiceEventIncorporated {
+	if epochStatus.InvalidEpochTransitionAttempted {
 		return true, nil
 	}
 

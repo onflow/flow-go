@@ -132,7 +132,7 @@ func (s *ProtocolStateMachineSuite) TestBuild() {
 // TestCreateStateMachineAfterInvalidStateTransitionAttempted tests if creating state machine after observing invalid state transition
 // results in error .
 func (s *ProtocolStateMachineSuite) TestCreateStateMachineAfterInvalidStateTransitionAttempted() {
-	s.parentProtocolState.InvalidStateTransitionAttempted = true
+	s.parentProtocolState.InvalidEpochTransitionAttempted = true
 	var err error
 	// create new protocolStateMachine with next epoch information
 	s.stateMachine, err = newStateMachine(s.candidate.View, s.parentProtocolState)

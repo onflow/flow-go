@@ -93,7 +93,7 @@ func TestMutableProtocolState_Mutator(t *testing.T) {
 	})
 	t.Run("invalid-state-transition-triggered", func(t *testing.T) {
 		parentState := unittest.ProtocolStateFixture()
-		parentState.InvalidStateTransitionAttempted = true
+		parentState.InvalidEpochTransitionAttempted = true
 		candidate := unittest.BlockHeaderFixture()
 		protocolStateDB.On("ByBlockID", candidate.ParentID).Return(parentState, nil)
 		mutator, err := mutableState.Mutator(candidate.View, candidate.ParentID)

@@ -85,7 +85,7 @@ func (s *MutableProtocolState) Mutator(candidateView uint64, parentID flow.Ident
 		return nil, fmt.Errorf("could not query parent protocol state at block (%x): %w", parentID, err)
 	}
 	var stateMachine ProtocolStateMachine
-	if parentState.InvalidStateTransitionAttempted {
+	if parentState.InvalidEpochTransitionAttempted {
 		stateMachine = newEpochFallbackStateMachine(candidateView, parentState)
 	} else {
 		stateMachine, err = newStateMachine(candidateView, parentState)

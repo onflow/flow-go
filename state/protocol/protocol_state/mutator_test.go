@@ -90,7 +90,7 @@ func (s *StateMutatorSuite) TestHappyPathWithDbChanges() {
 }
 
 // TestApplyServiceEvents_InvalidEpochSetup tests that handleServiceEvents rejects invalid epoch setup event and sets
-// InvalidStateTransitionAttempted flag in protocol.ProtocolStateMachine.
+// InvalidEpochTransitionAttempted flag in protocol.ProtocolStateMachine.
 func (s *StateMutatorSuite) TestApplyServiceEvents_InvalidEpochSetup() {
 	s.Run("invalid-epoch-setup", func() {
 		mutator := newStateMutator(s.headersDB, s.resultsDB, s.setupsDB, s.commitsDB, s.stateMachine, func() ProtocolStateMachine {
@@ -140,7 +140,7 @@ func (s *StateMutatorSuite) TestApplyServiceEvents_InvalidEpochSetup() {
 }
 
 // TestApplyServiceEvents_InvalidEpochCommit tests that handleServiceEvents rejects invalid epoch commit event and sets
-// InvalidStateTransitionAttempted flag in protocol.ProtocolStateMachine.
+// InvalidEpochTransitionAttempted flag in protocol.ProtocolStateMachine.
 func (s *StateMutatorSuite) TestApplyServiceEvents_InvalidEpochCommit() {
 	s.Run("invalid-epoch-commit", func() {
 		mutator := newStateMutator(s.headersDB, s.resultsDB, s.setupsDB, s.commitsDB, s.stateMachine, func() ProtocolStateMachine {

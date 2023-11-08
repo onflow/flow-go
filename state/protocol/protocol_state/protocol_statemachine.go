@@ -18,7 +18,6 @@ import (
 //     while the new block has a view in the next epoch. Caution: the block's view is not necessarily the first view
 //     in the epoch, as there might be leader failures)
 //   - identity changes: updates identity table for previous (if available), current, and next epoch (if available).
-//   - setting an invalid state transition flag: sets an invalid state transition flag for current epoch and next epoch(if available).
 //
 // All updates are applied to a copy of parent protocol state, so parent protocol state is not modified. The stateMachine internally
 // tracks the current protocol state. A separate instance should be created for each block to processing the updates therein.
@@ -30,7 +29,7 @@ var _ ProtocolStateMachine = (*protocolStateMachine)(nil)
 
 // newStateMachine creates a new protocol state protocolStateMachine.
 func newStateMachine(view uint64, parentState *flow.RichProtocolStateEntry) (*protocolStateMachine, error) {
-	if parentState.InvalidStateTransitionAttempted {
+	if parentState.InvalidEpochTransitionAttempted {
 		return nil, irrecoverable.NewExceptionf("created happy path protocol state machine at view (%d) for a parent state which has"+
 			"invalid state transition", view)
 	}
@@ -179,7 +178,7 @@ func (u *protocolStateMachine) TransitionToNextEpoch() error {
 	u.state = &flow.ProtocolStateEntry{
 		PreviousEpoch:                   &u.state.CurrentEpoch,
 		CurrentEpoch:                    *u.state.NextEpoch,
-		InvalidStateTransitionAttempted: false,
+		InvalidEpochTransitionAttempted: false,
 	}
 	u.rebuildIdentityLookup()
 	return nil

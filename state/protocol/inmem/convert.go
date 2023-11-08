@@ -378,6 +378,6 @@ func ProtocolStateForBootstrapState(setup *flow.EpochSetup, commit *flow.EpochCo
 			ActiveIdentities: identities,
 		},
 		NextEpoch:                       nil,
-		InvalidStateTransitionAttempted: false,
+		InvalidEpochTransitionAttempted: false,
 	}
 }

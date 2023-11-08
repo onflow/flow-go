@@ -21,7 +21,7 @@ type EpochFallbackStateMachineSuite struct {
 
 func (s *EpochFallbackStateMachineSuite) SetupTest() {
 	s.BaseProtocolStateMachineSuite.SetupTest()
-	s.parentProtocolState.InvalidStateTransitionAttempted = true
+	s.parentProtocolState.InvalidEpochTransitionAttempted = true
 	s.stateMachine = newEpochFallbackStateMachine(s.candidate.View, s.parentProtocolState)
 }
 
@@ -54,11 +54,11 @@ func (s *EpochFallbackStateMachineSuite) TestTransitionToNextEpoch() {
 }
 
 // TestNewEpochFallbackStateMachine tests that creating epoch fallback state machine sets
-// `InvalidStateTransitionAttempted` to true to record that we have entered epoch fallback mode(EFM).
+// `InvalidEpochTransitionAttempted` to true to record that we have entered epoch fallback mode(EFM).
 func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
-	s.parentProtocolState.InvalidStateTransitionAttempted = false
+	s.parentProtocolState.InvalidEpochTransitionAttempted = false
 	s.stateMachine = newEpochFallbackStateMachine(s.candidate.View, s.parentProtocolState)
 	updatedState, _, hasChanges := s.stateMachine.Build()
-	require.True(s.T(), hasChanges, "InvalidStateTransitionAttempted has to be updated")
-	require.True(s.T(), updatedState.InvalidStateTransitionAttempted, "InvalidStateTransitionAttempted has to be set")
+	require.True(s.T(), hasChanges, "InvalidEpochTransitionAttempted has to be updated")
+	require.True(s.T(), updatedState.InvalidEpochTransitionAttempted, "InvalidEpochTransitionAttempted has to be set")
 }
