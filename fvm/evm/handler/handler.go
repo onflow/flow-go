@@ -165,6 +165,9 @@ func (a *Account) Address() types.Address {
 }
 
 // Balance returns the balance of this bridged account
+//
+// TODO: we might need to meter computation for read only operations as well
+// currently the storage limits is enforced
 func (a *Account) Balance() types.Balance {
 	ctx := a.fch.getBlockContext()
 
@@ -294,6 +297,7 @@ func (a *Account) executeAndHandleCall(
 	if deductSupplyDiff {
 		bp.TotalSupply -= totalSupplyDiff
 	} else {
+		// TODO: add overflow errors (even though we might never get there)
 		bp.TotalSupply += totalSupplyDiff
 	}
 
