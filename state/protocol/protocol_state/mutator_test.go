@@ -42,8 +42,8 @@ func (s *StateMutatorSuite) SetupTest() {
 	s.mutator = newStateMutator(s.headersDB, s.resultsDB, s.setupsDB, s.commitsDB, s.stateMachine)
 }
 
-// TestHappyPathNoChanges tests that stateMutator doesn't cache any db updates when there are no changes.
-func (s *StateMutatorSuite) TestHappyPathNoChanges() {
+// TestOnHappyPathNoDbChanges tests that stateMutator doesn't cache any db updates when there are no changes.
+func (s *StateMutatorSuite) TestOnHappyPathNoDbChanges() {
 	parentState := unittest.ProtocolStateFixture()
 	s.stateMachine.On("ParentState").Return(parentState)
 	s.stateMachine.On("Build").Return(parentState.ProtocolStateEntry, parentState.ID(), false)
@@ -56,8 +56,8 @@ func (s *StateMutatorSuite) TestHappyPathNoChanges() {
 	require.Empty(s.T(), dbUpdates)
 }
 
-// TestHappyPathHasChanges tests that stateMutator returns cached db updates when building protocol state after applying service events.
-func (s *StateMutatorSuite) TestHappyPathHasChanges() {
+// TestHappyPathWithDbChanges tests that stateMutator returns cached db updates when building protocol state after applying service events.
+func (s *StateMutatorSuite) TestHappyPathWithDbChanges() {
 	parentState := unittest.ProtocolStateFixture()
 	s.stateMachine.On("ParentState").Return(parentState)
 	s.stateMachine.On("Build").Return(unittest.ProtocolStateFixture().ProtocolStateEntry,
