@@ -83,7 +83,7 @@ func (h *ContractHandler) getBlockDraftTotalSupply() uint64 {
 	if h.newBlockDraft == nil {
 		h.setupNewBlockDraft()
 	}
-	return h.newBlockDraft.Height
+	return h.newBlockDraft.TotalSupply
 }
 
 func (h *ContractHandler) appendTxHashToBlockDraft(txHash gethCommon.Hash) {
@@ -289,7 +289,6 @@ func (a *Account) Deposit(v *types.FLOWTokenVault) {
 	a.fch.updateBlockDraftTotalSupply(newBalance)
 	a.fch.updateBlockDraftStateRoot(res.StateRootHash)
 	a.fch.commitBlockDraft()
-
 }
 
 // Withdraw deducts the balance from the account and
