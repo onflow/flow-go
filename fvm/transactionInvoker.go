@@ -97,7 +97,7 @@ func newTransactionExecutor(
 		evm.SetupEnvironment(
 			chain.ChainID(),
 			env,
-			cadenceRuntime.Environment,
+			cadenceRuntime.TxRuntimeEnv,
 			chain.ServiceAddress(),
 		)
 	}

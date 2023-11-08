@@ -204,7 +204,7 @@ func (executor *scriptExecutor) executeScript() error {
 		err := evm.SetupEnvironment(
 			chain.ChainID(),
 			executor.env,
-			rt.Environment,
+			rt.ScriptRuntimeEnv,
 			chain.ServiceAddress(),
 		)
 		if err != nil {
