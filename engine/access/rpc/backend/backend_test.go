@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 	"fmt"
+	statepkg "github.com/onflow/flow-go/state"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
@@ -410,7 +411,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID() {
 		epoch1, ok := epochBuilder.EpochHeights(1)
 		require.True(suite.T(), ok)
 
-		// setup AtBlockID mock returns for State
+		// setup AtBlockID and AtHeight mock returns for State
 		for _, height := range epoch1.Range() {
 			snap := state.AtHeight(height)
 			blockHead, err := snap.Head()
@@ -421,7 +422,6 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID() {
 		}
 
 		// Take snapshot at height of block D (epoch1.heights[2]) for valid segment and valid snapshot
-		// where its sealing segment is A <- B <- C
 		snap := state.AtHeight(epoch1.Range()[2])
 		blockHead, err := snap.Head()
 		suite.Require().NoError(err)
@@ -438,10 +438,53 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID() {
 		suite.Require().NoError(err)
 
 		// we expect the endpoint to return the snapshot at the same height we requested
-		// because it has a valid sealing segment with no Blocks spanning an epoch or phase transition
 		expectedSnapshotBytes, err := convert.SnapshotToBytes(snap)
 		suite.Require().NoError(err)
 		suite.Require().Equal(expectedSnapshotBytes, bytes)
+	})
+}
+
+// TestGetProtocolStateSnapshotByBlockID_Non_Finalized_Blocks tests our GetProtocolStateSnapshotByBlockID RPC endpoint
+// where non finalized block is added to state
+func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_NonFinalizedBlocks() {
+	identities := unittest.CompleteIdentitySet()
+	rootSnapshot := unittest.RootSnapshotFixture(identities)
+	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
+		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
+		// build epoch 1
+		// Blocks in current State
+		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- F(S_D) |commit|
+		epochBuilder.BuildEpoch()
+
+		// get heights of each phase in built epochs
+		epoch1, ok := epochBuilder.EpochHeights(1)
+		require.True(suite.T(), ok)
+
+		// Take snapshot at height of last block of epoch
+		snap := state.AtHeight(epoch1.CommittedFinal)
+		snapHead, err := snap.Head()
+		suite.Require().NoError(err)
+		newBlock := unittest.BlockWithParentFixture(snapHead)
+		ctx := context.Background()
+		// Adding new non finalized block to state
+		err =  state.Extend(ctx, newBlock)
+		suite.Require().NoError(err)
+
+		// setup AtHeight and AtBlockID mock returns for State
+		suite.state.On("AtHeight", newBlock.Header.Height).Return(state.AtHeight(newBlock.Header.Height))
+		suite.state.On("AtBlockID", newBlock.ID()).Return(state.AtBlockID(newBlock.ID()))
+
+		params := suite.defaultBackendParams()
+		params.MaxHeightRange = TEST_MAX_HEIGHT
+
+		backend, err := New(params)
+		suite.Require().NoError(err)
+
+		// query the handler for the snapshot for non finalized block
+		snapshotBytes, err := backend.GetProtocolStateSnapshotByBlockID(context.Background(), newBlock.ID())
+		suite.Require().Nil(snapshotBytes)
+		suite.Require().Error(err)
+		suite.Require().Equal(err.Error(), fmt.Errorf("unknown finalized height %d: %w", newBlock.Header.Height, statepkg.ErrUnknownSnapshotReference).Error())
 	})
 }
 
@@ -462,13 +505,12 @@ func (suite *Suite) TestGetProtocolStateSnapshotByHeight() {
 		epoch1, ok := epochBuilder.EpochHeights(1)
 		require.True(suite.T(), ok)
 
-		// setup AtBlockID mock returns for State
+		// setup AtHeight mock returns for State
 		for _, height := range epoch1.Range() {
 			suite.state.On("AtHeight", height).Return(state.AtHeight(height))
 		}
 
 		// Take snapshot at height of block D (epoch1.heights[2]) for valid segment and valid snapshot
-		// where its sealing segment is A <- B <- C
 		snap := state.AtHeight(epoch1.Range()[2])
 		suite.state.On("Final").Return(snap).Once()
 
@@ -483,7 +525,6 @@ func (suite *Suite) TestGetProtocolStateSnapshotByHeight() {
 		suite.Require().NoError(err)
 
 		// we expect the endpoint to return the snapshot at the same height we requested
-		// because it has a valid sealing segment with no Blocks spanning an epoch or phase transition
 		expectedSnapshotBytes, err := convert.SnapshotToBytes(snap)
 		suite.Require().NoError(err)
 		suite.Require().Equal(expectedSnapshotBytes, bytes)

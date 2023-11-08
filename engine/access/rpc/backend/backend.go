@@ -364,13 +364,9 @@ func (b *Backend) GetProtocolStateSnapshotByBlockID(_ context.Context, blockID f
 	}
 
 	snapshotByHeight := b.state.AtHeight(snapshotHeadByBlockId.Height)
-	snapshotHeadByHeight, err := snapshotByHeight.Head()
+	_, err = snapshotByHeight.Head()
 	if err != nil {
 		return nil, err
-	}
-
-	if snapshotHeadByHeight.ID() != blockID {
-		return nil, fmt.Errorf("failed to retreive snapshot for block ID %v", blockID)
 	}
 
 	validSnapshot, err := b.getValidSnapshot(snapshotByHeight, 0)
