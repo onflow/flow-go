@@ -89,24 +89,24 @@ Each time the `UnicastManager` is invoked on `CreateStream` to `pid` (`peer.ID`)
 If no unicast config record exists for `pid`, one is created with the default retry budgets. The `UnicastManager` then uses the retry budgets to decide
 whether to retry the stream creation attempt or not. If the retry budget for stream creation is exhausted, the `UnicastManager`
 will not retry the stream creation attempt, and returns an error to the caller. The caller can then decide to retry the request or not.
+Note that even when the retry budget is exhausted, the `UnicastManager` will try the stream creation attempt once, though it will not retry the attempt if it fails.
 
 #### Penalizing Malicious Remote Peer
-Each time the `UnicastManager` fails to dial or create a stream to a remote peer and exhausts the retry budget, it penalizes the remote peer as follows:
-- If the `UnicastManager` exhausts the retry budget for dialing, it will decrement the dial retry budget as well as the stream creation retry budget for the remote peer.
+Each time the `UnicastManager` fails to create a stream to a remote peer and exhausts the retry budget, it penalizes the remote peer as follows:
 - If the `UnicastManager` exhausts the retry budget for stream creation, it will decrement the stream creation retry budget for the remote peer.
-- If the retry budget reaches zero, the `UnicastManager` will only attempt once to dial or create a stream to the remote peer, and will not retry the attempt, and rather return an error to the caller.
-- When any of the budgets reaches zero, the `UnicastManager` will not decrement the budget anymore.
+- If the retry budget reaches zero, the `UnicastManager` will only attempt once to create a stream to the remote peer, and will not retry the attempt, and rather return an error to the caller.
+- When the budget reaches zero, the `UnicastManager` will not decrement the budget anymore.
 
 **Note:** `UnicastManager` is part of the networking layer of the Flow node, which is a lower-order component than
 the Flow protocol engines who call the `UnicastManager` to send messages to remote peers. Hence, the `UnicastManager` _must not_ outsmart
-the Flow protocol engines on deciding whether to _dial or create stream_ in the first place. This means that `UnicastManager` will attempt 
-to dial and create stream even to peers with zero retry budgets. However, `UnicastManager` does not retry attempts for the peers with zero budgets, and rather
+the Flow protocol engines on deciding whether to _create stream_ in the first place. This means that `UnicastManager` will attempt 
+to create stream even to peers with zero retry budgets. However, `UnicastManager` does not retry attempts for the peers with zero budgets, and rather
 returns an error immediately upon a failure. This is the responsibility of the Flow protocol engines to decide whether
 to send a message to a remote peer or not after a certain number of failures. 
 
 #### Restoring Retry Budgets
 
-The `UnicastManager` may reset the dial and stream creation budgets for a remote peers _from zero to the default values_ in the following cases:
+The `UnicastManager` may reset the stream creation budget for a remote peers _from zero to the default values_ in the following cases:
 
 - **Restoring Stream Creation Retry Budget**: To restore the stream creation budget from zero to the default value, the `UnicastManager` keeps track of the _consecutive_
   successful streams created to the remote peer. Everytime a stream is created successfully, the `UnicastManager` increments a counter for the remote peer. The counter is
@@ -119,12 +119,3 @@ The `UnicastManager` may reset the dial and stream creation budgets for a remote
   unicast-stream-zero-retry-reset-threshold: 100
     ```
   Reaching the threshold means that the remote peer is reliable enough to regain the default retry budget for stream creation.
-- **Restoring Dial Retry Budget**: To restore the dial retry budget from zero to the default value, the `UnicastManager` keeps track of the last successful
-  dial time to the remote peer. Every failed dialing attempt will reset the last successful dial time to zero. If the time since the last successful dialing attempt
-  reaches a certain threshold, the `UnicastManager` will reset the dial budget for the remote peer to the default value.
-  The threshold is configurable through the `config/default-config.yml` file:
-  Reaching the threshold means that either the `UnicastManager` has not dialed the remote peer for a long time, and the peer 
-  deserves a chance to regain its dial retry budget, or the remote peer maintains a persistent connection to the local peer, for a long time, and 
-  deserves a chance to regain its dial retry budget. Note that the networking layer enforces a maximum number of _one_ connection to a remote peer, hence
-  the remote peer cannot have multiple connections to the local peer. Also, connection establishment is assumed a more resource-intensive operation than the stream creation,  
-  hence, in contrast to the stream reliability that is measured by the number of consecutive successful streams, the dial reliability is measured by the time since the last successful dial.
