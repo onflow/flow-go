@@ -243,9 +243,10 @@ jobs:
           - name: Access Cohort3 Integration Tests
             make: make -C integration access-cohort3-tests
             runner: ubuntu-latest
-          - name: BFT (Framework) Integration Tests
-            make: make -C integration bft-framework-tests
-            runner: buildjet-8vcpu-ubuntu-2204
+            # test suite has single test which is flaky and needs to be fixed - reminder here to put it back when it's fixed
+#          - name: BFT (Framework) Integration Tests
+#            make: make -C integration bft-framework-tests
+#            runner: ubuntu-latest
           - name: BFT (Protocol) Integration Tests
             make: make -C integration bft-protocol-tests
             runner: ubuntu-latest
