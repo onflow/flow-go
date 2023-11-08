@@ -32,6 +32,9 @@ func NewAddressFromString(str string) Address {
 	return Address(gethCommon.BytesToAddress([]byte(str)))
 }
 
+// EmptyAddress is an empty evm address
+var EmptyAddress = Address(gethCommon.Address{})
+
 type GasLimit uint64
 
 type Code []byte
