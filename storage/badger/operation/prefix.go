@@ -60,8 +60,8 @@ const (
 	// codes for indexing multiple identifiers by identifier
 	// NOTE: 51 was used for identity indexes before epochs
 	codeBlockChildren          = 50 // index mapping block ID to children blocks
-	codePayloadGuarantees      = 52 // index mapping block ID to payload guarantees
 	codePayloadProtocolStateID = 51 // index mapping block ID to payload protocol state ID
+	codePayloadGuarantees      = 52 // index mapping block ID to payload guarantees
 	codePayloadSeals           = 53 // index mapping block ID to payload seals
 	codeCollectionBlock        = 54 // index mapping collection ID to block ID
 	codeOwnBlockReceipt        = 55 // index mapping block ID to execution receipt ID for execution nodes

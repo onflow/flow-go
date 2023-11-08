@@ -13,6 +13,7 @@ import (
 type ProtocolStateMachine interface {
 	// Build returns updated protocol state entry, state ID and a flag indicating if there were any changes.
 	Build() (updatedState *flow.ProtocolStateEntry, stateID flow.Identifier, hasChanges bool)
+
 	// ProcessEpochSetup updates current protocol state with data from epoch setup event.
 	// Processing epoch setup event also affects identity table for current epoch.
 	// Observing an epoch setup event, transitions protocol state from staking to setup phase, we stop returning
@@ -23,6 +24,7 @@ type ProtocolStateMachine interface {
 	// Expected errors during normal operations:
 	// - `protocol.InvalidServiceEventError` if the service event is invalid or is not a valid state transition for the current protocol state
 	ProcessEpochSetup(epochSetup *flow.EpochSetup) (bool, error)
+
 	// ProcessEpochCommit updates current protocol state with data from epoch commit event.
 	// Observing an epoch setup commit, transitions protocol state from setup to commit phase, at this point we have
 	// finished construction of the next epoch.
@@ -32,6 +34,7 @@ type ProtocolStateMachine interface {
 	// Expected errors during normal operations:
 	// - `protocol.InvalidServiceEventError` if the service event is invalid or is not a valid state transition for the current protocol state
 	ProcessEpochCommit(epochCommit *flow.EpochCommit) (bool, error)
+
 	// UpdateIdentity updates identity table with new identity entry.
 	// Should pass identity which is already present in the table, otherwise an exception will be raised.
 	// TODO: This function currently modifies both current+next identities based on input.
@@ -39,6 +42,7 @@ type ProtocolStateMachine interface {
 	// Expected errors during normal operations:
 	// - `protocol.InvalidServiceEventError` if the updated identity is not found in current and adjacent epochs.
 	UpdateIdentity(updated *flow.DynamicIdentityEntry) error
+
 	// TransitionToNextEpoch discards current protocol state and transitions to the next epoch.
 	// Epoch transition is only allowed when:
 	// - next epoch has been set up,
@@ -46,10 +50,12 @@ type ProtocolStateMachine interface {
 	// - candidate block is in the next epoch.
 	// No errors are expected during normal operations.
 	TransitionToNextEpoch() error
-	// View returns the view that is associated with this state protocolStateMachine.
+
+	// View returns the view that is associated with this state ProtocolStateMachine.
 	// The view of the ProtocolStateMachine equals the view of the block carrying the respective updates.
 	View() uint64
-	// ParentState returns parent protocol state that is associated with this state protocolStateMachine.
+
+	// ParentState returns parent protocol state that is associated with this state ProtocolStateMachine.
 	ParentState() *flow.RichProtocolStateEntry
 }
 

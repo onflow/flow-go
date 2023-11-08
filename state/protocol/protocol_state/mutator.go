@@ -17,10 +17,17 @@ type EpochFallbackStateMachineFactoryMethod = func() ProtocolStateMachine
 
 // stateMutator is a stateful object to evolve the protocol state. It is instantiated from the parent block's protocol state.
 // State-changing operations can be iteratively applied and the stateMutator will internally evolve its in-memory state.
-// While the StateMutator does not modify the database, it internally tracks all necessary updates. Upon calling `Build`
-// the stateMutator returns the updated protocol state, its ID and all database updates necessary for persisting the updated
-// protocol state.
-// stateMutator locally tracks pending DB updates, which are returned as a slice of deferred DB updates when calling `Build`.
+// While the StateMutator does not modify the database, it internally tracks the necessary database updates to persist its
+// dependencies (specifically EpochSetup and EpochCommit events). Upon calling `Build` the stateMutator returns the updated
+// protocol state, its ID and all database updates necessary for persisting the updated protocol state.
+//
+// The StateMutator is used by a replica's compliance layer to update protocol state when observing state-changing service in
+// blocks. It is used by the primary in the block building process to obtain the correct protocol state for a proposal.
+// Specifically, the leader may include state-changing service events in the block payload. The flow protocol prescribes that
+// the proposal needs to include the ID of the protocol state, _after_ processing the payload incl. all state-changing events.
+// Therefore, the leader instantiates a StateMutator, applies the service events to it and builds the updated protocol state ID.
+//
+// Not safe for concurrent use.
 type stateMutator struct {
 	headers                         storage.Headers
 	results                         storage.ExecutionResults
@@ -54,9 +61,12 @@ func newStateMutator(
 
 // Build returns:
 //   - hasChanges: flag whether there were any changes; otherwise, `updatedState` and `stateID` equal the parent state
-//   - updatedState: the ProtocolState after applying all updates
+//   - updatedState: the ProtocolState after applying all updates.
 //   - stateID: the hash commitment to the `updatedState`
-//   - dbUpdates: database updates necessary for persisting the updated protocol state
+//   - dbUpdates: database updates necessary for persisting the updated protocol state's *dependencies*.
+//     If hasChanges is false, updatedState is empty. Caution: persisting the `updatedState` itself and adding
+//     it to the relevant indices is _not_ in `dbUpdates`. Persisting and indexing `updatedState` is the responsibility
+//     of the calling code (specifically `FollowerState`).
 //
 // updated protocol state entry, state ID and a flag indicating if there were any changes.
 func (m *stateMutator) Build() (hasChanges bool, updatedState *flow.ProtocolStateEntry, stateID flow.Identifier, dbUpdates []func(tx *transaction.Tx) error) {
