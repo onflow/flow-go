@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"errors"
+	"fmt"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	model "github.com/onflow/flow-go/model/bootstrap"
@@ -30,6 +30,7 @@ func constructClusterAssignment(partnerNodes, internalNodes []model.NodeInfo) (f
 	internals := model.ToIdentityList(internalNodes).Filter(filter.HasRole(flow.RoleCollection))
 	nClusters := int(flagCollectionClusters)
 	nCollectors := len(partners) + len(internals)
+	log.Info().Msgf("constructing cluster assignments, nClusters: %v, partners: %v, internals: %v", nClusters, len(partners), len(internals))
 
 	// ensure we have at least as many collection nodes as clusters
 	if nCollectors < int(flagCollectionClusters) {
@@ -66,7 +67,7 @@ func constructClusterAssignment(partnerNodes, internalNodes []model.NodeInfo) (f
 	// check the 2/3 constraint: for every cluster `i`, constraint[i] must be strictly positive
 	for i := 0; i < nClusters; i++ {
 		if constraint[i] <= 0 {
-			return nil, nil, errors.New("there isn't enough internal nodes to have at least 2/3 internal nodes in each cluster")
+			return nil, nil, fmt.Errorf("there isn't enough internal nodes to have at least 2/3 internal nodes in each cluster: %v", constraint)
 		}
 	}
 
