@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 
 	"github.com/onflow/atree"
+
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
