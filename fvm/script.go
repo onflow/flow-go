@@ -206,7 +206,7 @@ func (executor *scriptExecutor) executeScript() error {
 		evm.SetupEnvironment(
 			chain.ChainID(),
 			executor.env,
-			rt.Environment,
+			rt.ScriptRuntimeEnv,
 			chain.ServiceAddress(),
 			FlowTokenAddress(chain),
 		)
