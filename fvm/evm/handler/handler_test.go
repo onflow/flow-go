@@ -237,15 +237,21 @@ func TestHandler_OpsWithoutEmulator(t *testing.T) {
 				aa, err := handler.NewAddressAllocator(backend, rootAddr)
 				require.NoError(t, err)
 
-				handler := handler.NewContractHandler(bs, aa, backend, nil)
+				db, err := database.NewDatabase(backend, testutils.TestFlowEVMRootAddress)
+				require.NoError(t, err)
+				emulator := emulator.NewEmulator(db)
+
+				handler := handler.NewContractHandler(bs, aa, backend, emulator)
 				// test call last executed block without initialization
 				b := handler.LastExecutedBlock()
 				require.Equal(t, types.GenesisBlock, b)
 
 				// do some changes
-				// TODO fix me
-				// addr := handler.Run("", types.EmptyAddress)
-				// require.NotNil(t, addr)
+				address := testutils.RandomAddress(t)
+				account := handler.AccountByAddress(address, true)
+				bal, err := types.NewBalanceFromAttoFlow(types.OneFlowInAttoFlow)
+				require.NoError(t, err)
+				account.Deposit(types.NewFlowTokenVault(bal))
 
 				// check if block height has been incremented
 				b = handler.LastExecutedBlock()
