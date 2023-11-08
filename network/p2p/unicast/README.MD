@@ -48,20 +48,21 @@ that the connection is persistent and will be kept open by the `PeerManager`.
 
 ## Backoff and Retry Attempts
 The flowchart below explains the abstract logic of the `UnicastManager` when it receives a `CreateStream` invocation.
-One a happy path, the `UnicastManager` expects a connection to the remote peer exists and hence it can successfully open a stream to the peer.
-However, there can be cases that the connection does not exist, the remote peer is not reliable for stream creation, or the remote peer acts
-maliciously and does not respond to connection and stream creation requests. In order to distinguish between the cases that the remote peer
+One a happy path, the `UnicastManager` successfully open a stream to the peer.
+However, there can be cases that the remote peer is not reliable for stream creation, or the remote peer acts
+maliciously and does not respond stream creation requests. In order to distinguish between the cases that the remote peer
 is not reliable and the cases that the remote peer is malicious, the `UnicastManager` uses a backoff and retry mechanism.
 
 ![retry.png](retry.png)
 
 ### Addressing Unreliable Remote Peer
-To address the unreliability of remote peer, upon an unsuccessful attempt to establish a connection or stream, the `UnicastManager` will wait for a certain amount of time before it tries to establish (i.e., the backoff mechanism),
-and will retry a certain number of times before it gives up (i.e., the retry mechanism). The backoff and retry parameters are configurable through runtime flags.
+To address the unreliability of remote peer, upon an unsuccessful attempt to establish a stream, the `UnicastManager` will wait for a certain 
+amount of time before it tries to establish (i.e., the backoff mechanism), and will retry a certain number of times before it gives up (i.e., the retry mechanism). 
+The backoff and retry parameters are configurable through runtime flags.
 If all backoff and retry attempts fail, the `UnicastManager` will return an error to the caller. The caller can then decide to retry the request or not.
-By default, `UnicastManager` retries each connection (dialing) attempt as well as stream creation attempt 3 times. Also, the backoff intervals for dialing and stream creation are initialized to 1 second and progress 
-exponentially with a factor of 2, i.e., the `i-th` retry attempt is made after `t * 2^(i-1)`, where `t` is the backoff interval. The formulation is the same for dialing and 
-stream creation. For example, if the backoff interval is 1s, the first attempt is made right-away, the first (retry) attempt is made after 1s * 2^(1 - 1) = 1s, the third (retry) attempt is made 
+By default, `UnicastManager` retries each stream creation attempt 3 times. Also, the backoff intervals for dialing and stream creation are initialized to 1 second and progress 
+exponentially with a factor of 2, i.e., the `i-th` retry attempt is made after `t * 2^(i-1)`, where `t` is the backoff interval. 
+For example, if the backoff interval is 1s, the first attempt is made right-away, the first (retry) attempt is made after 1s * 2^(1 - 1) = 1s, the third (retry) attempt is made 
 after `1s * 2^(2 - 1) = 2s`, and so on.
 
 These parameters are configured using the `config/default-config.yml` file:
@@ -70,21 +71,11 @@ These parameters are configured using the `config/default-config.yml` file:
   unicast-create-stream-retry-delay: 1s
 ```
 
-#### Addressing Concurrent Stream Creation Attempts
-There might be the case that multiple threads attempt to create a stream to the same remote peer concurrently, while there is no 
-existing connection to the remote peer. In such cases, the `UnicastManager` will let the first attempt to create a stream to the remote peer to proceed with dialing
-while it will backoff the concurrent attempts for a certain amount of time. The backoff delay is configurable through the `config/default-config.yml` file:
-This is done for several reasons including:
-- The resource manager of the remote peer may block the concurrent dial attempts if they exceed a certain threshold.
-- As a convention in networking layer, we don't desire more than one connection to a remote peer, and there are hard reactive constraints in place. 
-  However, as a soft proactive measure, we backoff concurrent dial attempts to the same remote peer to prevent multiple connections to the same peer.
-- Dialing is a resource-intensive operation, and we don't want to waste resources on concurrent dial attempts to the same remote peer.
-
 ### Addressing Malicious Remote Peer
 The backoff and retry mechanism is used to address the cases that the remote peer is not reliable. 
-However, there can be cases that the remote peer is malicious and does not respond to connection and stream creation requests.
-Such cases may cause the `UnicastManager` to wait for a long time before it gives up, resulting in a resource exhaustion and slow-down of the dialing node.
-To mitigate such cases, the `UnicastManager` uses a retry budget for the stream creation and dialing. The retry budgets are initialized 
+However, there can be cases that the remote peer is malicious and does not respond to stream creation requests.
+Such cases may cause the `UnicastManager` to wait for a long time before it gives up, resulting in a resource exhaustion and slow-down of the stream creation.
+To mitigate such cases, the `UnicastManager` uses a retry budget for the stream creation. The retry budgets are initialized 
 using the `config/default-config.yml` file:
 ```yaml
   # The maximum number of retry attempts for creating a unicast stream to a remote peer before giving up. If it is set to 3 for example, it means that if a peer fails to create
@@ -93,11 +84,11 @@ using the `config/default-config.yml` file:
   unicast-max-stream-creation-retry-attempt-times: 3
 ```
 
-As shown in the above snippet, both retry budgets for dialing and stream creation are set to 3 by default for every remote peer.
-Each time the `UnicastManager` is invoked on `CreateStream` to `pid` (`peer.ID`), it loads the retry budgets for `pid` from the dial config cache.
-If no dial config record exists for `pid`, one is created with the default retry budgets. The `UnicastManager` then uses the retry budgets to decide
-whether to retry the dialing or stream creation attempt or not. If the retry budget for dialing or stream creation is exhausted, the `UnicastManager`
-will not retry the dialing or stream creation attempt, respectively, and returns an error to the caller. The caller can then decide to retry the request or not.
+As shown in the above snippet, the stream creation is set to 3 by default for every remote peer.
+Each time the `UnicastManager` is invoked on `CreateStream` to `pid` (`peer.ID`), it loads the retry budgets for `pid` from the unicast config cache.
+If no unicast config record exists for `pid`, one is created with the default retry budgets. The `UnicastManager` then uses the retry budgets to decide
+whether to retry the stream creation attempt or not. If the retry budget for stream creation is exhausted, the `UnicastManager`
+will not retry the stream creation attempt, and returns an error to the caller. The caller can then decide to retry the request or not.
 
 #### Penalizing Malicious Remote Peer
 Each time the `UnicastManager` fails to dial or create a stream to a remote peer and exhausts the retry budget, it penalizes the remote peer as follows:
