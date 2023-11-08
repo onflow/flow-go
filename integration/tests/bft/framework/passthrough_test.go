@@ -1,8 +1,9 @@
 package framework
 
 import (
-	"github.com/onflow/flow-go/utils/unittest"
 	"testing"
+
+	"github.com/onflow/flow-go/utils/unittest"
 
 	"github.com/stretchr/testify/suite"
 

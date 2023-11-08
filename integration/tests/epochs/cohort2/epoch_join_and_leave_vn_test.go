@@ -1,9 +1,10 @@
 package cohort2
 
 import (
+	"testing"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
-	"testing"
 
 	"github.com/stretchr/testify/suite"
 
