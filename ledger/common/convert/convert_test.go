@@ -141,6 +141,7 @@ func TestPayloadToRegister(t *testing.T) {
 		regID, regValue, err := convert.PayloadToRegister(p)
 		require.NoError(t, err)
 		require.Equal(t, flow.NewRegisterID("", "uuid"), regID)
+		require.True(t, regID.IsInternalState())
 		require.Equal(t, value, regValue)
 	})
 
