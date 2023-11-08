@@ -71,7 +71,8 @@ const (
 	iwantCacheMissThreshold      = "gossipsub-rpc-iwant-cache-miss-threshold"
 	iwantCacheMissCheckSize      = "gossipsub-rpc-iwant-cache-miss-check-size"
 	iwantDuplicateMsgIDThreshold = "gossipsub-rpc-iwant-duplicate-message-id-threshold"
-
+	rpcMessageMaxSampleSize      = "gossipsub-rpc-message-max-sample-size"
+	rpcMessageErrorThreshold     = "gossipsub-rpc-message-error-threshold"
 	// gossipsub metrics inspector
 	metricsInspectorNumberOfWorkers = "gossipsub-rpc-metrics-inspector-workers"
 	metricsInspectorCacheSize       = "gossipsub-rpc-metrics-inspector-cache-size"
@@ -149,6 +150,8 @@ func AllFlagNames() []string {
 		controlMessageMaxSampleSize,
 		iwantDuplicateMsgIDThreshold,
 		iwantCacheMissCheckSize,
+		rpcMessageMaxSampleSize,
+		rpcMessageErrorThreshold,
 	}
 }
 
@@ -283,6 +286,9 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 	flags.Float64(iwantDuplicateMsgIDThreshold,
 		config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IWantRPCInspectionConfig.DuplicateMsgIDThreshold,
 		"max allowed duplicate message IDs in a single iWant control message")
+
+	flags.Int(rpcMessageMaxSampleSize, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.RpcMessageMaxSampleSize, "the max sample size used for RPC message validation. If the total number of RPC messages exceeds this value a sample will be taken but messages will not be truncated")
+	flags.Int(rpcMessageErrorThreshold, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.RpcMessageErrorThreshold, "the threshold at which an error will be returned if the number of invalid RPC messages exceeds this value")
 }
 
 // SetAliases this func sets an aliases for each CLI flag defined for network config overrides to it's corresponding
