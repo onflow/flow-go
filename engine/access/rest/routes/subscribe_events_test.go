@@ -350,10 +350,8 @@ func getSubscribeEventsRequest(t *testing.T,
 	req.Header.Set("Sec-Websocket-Version", "13")
 	req.Header.Set("Sec-Websocket-Key", key)
 
-	if header != nil {
-		for k, v := range header {
-			req.Header.Set(k, v[0])
-		}
+	for k, v := range header {
+		req.Header.Set(k, v[0])
 	}
 
 	return req, nil
