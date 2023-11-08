@@ -21,12 +21,37 @@ const (
 )
 
 // InvCtrlMsgErrs list of InvCtrlMsgErr's
-type InvCtrlMsgErrs []InvCtrlMsgErr
+type InvCtrlMsgErrs []*InvCtrlMsgErr
+
+func (i InvCtrlMsgErrs) Error() error {
+	var errs *multierror.Error
+	for _, err := range i {
+		errs = multierror.Append(errs, err.Err)
+	}
+	return errs.ErrorOrNil()
+}
+
+func (i InvCtrlMsgErrs) Len() int {
+	return len(i)
+}
 
 // InvCtrlMsgErr struct that wraps an error that occurred with during control message inspection and holds some metadata about the err such as the errors InvCtrlMsgErrSeverity.
 type InvCtrlMsgErr struct {
 	Err      error
 	Severity InvCtrlMsgErrSeverity
+}
+
+// NewInvCtrlMsgErr returns a new InvCtrlMsgErr.
+// Args:
+// - err: the error.
+// - severity: the error severity.
+// Returns:
+// - *InvCtrlMsgErr: the invalid control message error.
+func NewInvCtrlMsgErr(err error, severity InvCtrlMsgErrSeverity) *InvCtrlMsgErr {
+	return &InvCtrlMsgErr{
+		Err:      err,
+		Severity: severity,
+	}
 }
 
 // InvCtrlMsgNotif is the notification sent to the consumer when an invalid control message is received.
@@ -38,15 +63,6 @@ type InvCtrlMsgNotif struct {
 	Errors InvCtrlMsgErrs
 	// MsgType the control message type.
 	MsgType p2pmsg.ControlMessageType
-}
-
-// Error returns all the errors in a single multi error.
-func (i *InvCtrlMsgNotif) Error() error {
-	var errs *multierror.Error
-	for _, err := range i.Errors {
-		errs = multierror.Append(errs, err.Err)
-	}
-	return errs.ErrorOrNil()
 }
 
 // NewInvalidControlMessageNotification returns a new *InvCtrlMsgNotif.

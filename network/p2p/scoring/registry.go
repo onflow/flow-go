@@ -246,7 +246,7 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 	// we use mutex to ensure the method is concurrency safe.
 
 	lg := r.logger.With().
-		Err(notification.Error()).
+		Err(notification.Errors.Error()).
 		Str("peer_id", p2plogging.PeerId(notification.PeerID)).
 		Str("misbehavior_type", notification.MsgType.String()).Logger()
 

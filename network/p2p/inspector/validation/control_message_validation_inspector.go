@@ -165,36 +165,36 @@ func (c *ControlMsgValidationInspector) processInspectRPCReq(req *InspectRPCRequ
 	for _, ctrlMsgType := range p2pmsg.ControlMessageTypes() {
 		switch ctrlMsgType {
 		case p2pmsg.CtrlMsgGraft:
-			err := c.inspectGraftMessages(req.Peer, req.rpc.GetControl().GetGraft(), activeClusterIDS)
-			if err != nil {
-				c.logAndDistributeAsyncInspectErrs(req, p2pmsg.CtrlMsgGraft, err)
+			errs := c.inspectGraftMessages(req.Peer, req.rpc.GetControl().GetGraft(), activeClusterIDS)
+			if errs != nil {
+				c.logAndDistributeAsyncInspectErrs(req, p2pmsg.CtrlMsgGraft, errs)
 				return nil
 			}
 		case p2pmsg.CtrlMsgPrune:
-			err := c.inspectPruneMessages(req.Peer, req.rpc.GetControl().GetPrune(), activeClusterIDS)
-			if err != nil {
-				c.logAndDistributeAsyncInspectErrs(req, p2pmsg.CtrlMsgPrune, err)
+			errs := c.inspectPruneMessages(req.Peer, req.rpc.GetControl().GetPrune(), activeClusterIDS)
+			if errs != nil {
+				c.logAndDistributeAsyncInspectErrs(req, p2pmsg.CtrlMsgPrune, errs)
 				return nil
 			}
 		case p2pmsg.CtrlMsgIWant:
-			err := c.inspectIWantMessages(req.Peer, req.rpc.GetControl().GetIwant())
-			if err != nil {
-				c.logAndDistributeAsyncInspectErrs(req, p2pmsg.CtrlMsgIWant, err)
+			errs := c.inspectIWantMessages(req.Peer, req.rpc.GetControl().GetIwant())
+			if errs != nil {
+				c.logAndDistributeAsyncInspectErrs(req, p2pmsg.CtrlMsgIWant, errs)
 				return nil
 			}
 		case p2pmsg.CtrlMsgIHave:
-			err := c.inspectIHaveMessages(req.Peer, req.rpc.GetControl().GetIhave(), activeClusterIDS)
-			if err != nil {
-				c.logAndDistributeAsyncInspectErrs(req, p2pmsg.CtrlMsgIHave, err)
+			errs := c.inspectIHaveMessages(req.Peer, req.rpc.GetControl().GetIhave(), activeClusterIDS)
+			if errs != nil {
+				c.logAndDistributeAsyncInspectErrs(req, p2pmsg.CtrlMsgIHave, errs)
 				return nil
 			}
 		}
 	}
 
 	// inspect rpc publish messages after all control message validation has passed
-	err := c.inspectRpcPublishMessages(req.Peer, req.rpc.GetPublish(), activeClusterIDS)
-	if err != nil {
-		c.logAndDistributeAsyncInspectErrs(req, p2pmsg.RpcPublishMessage, err)
+	errs := c.inspectRpcPublishMessages(req.Peer, req.rpc.GetPublish(), activeClusterIDS)
+	if errs != nil {
+		c.logAndDistributeAsyncInspectErrs(req, p2pmsg.RpcPublishMessage, errs)
 		return nil
 	}
 
@@ -208,19 +208,33 @@ func (c *ControlMsgValidationInspector) processInspectRPCReq(req *InspectRPCRequ
 // - activeClusterIDS: the list of active cluster ids.
 // Returns:
 // - DuplicateTopicErr: if there are any duplicate topics in the list of grafts
-func (c *ControlMsgValidationInspector) inspectGraftMessages(from peer.ID, grafts []*pubsub_pb.ControlGraft, activeClusterIDS flow.ChainIDList) error {
+func (c *ControlMsgValidationInspector) inspectGraftMessages(from peer.ID, grafts []*pubsub_pb.ControlGraft, activeClusterIDS flow.ChainIDList) p2p.InvCtrlMsgErrs {
+	lg := c.logger.With().
+		Str("peer_id", p2plogging.PeerId(from)).
+		Int("sample_size", len(grafts)).
+		Logger()
 	tracker := make(duplicateStrTracker)
+	errs := make(p2p.InvCtrlMsgErrs, 0)
 	for _, graft := range grafts {
 		topic := channels.Topic(graft.GetTopicID())
 		if tracker.isDuplicate(topic.String()) {
-			return NewDuplicateTopicErr(topic.String(), p2pmsg.CtrlMsgGraft)
+			errs = append(errs, p2p.NewInvCtrlMsgErr(NewDuplicateTopicErr(topic.String(), p2pmsg.CtrlMsgGraft), p2p.ModerateErrSeverity))
 		}
 		tracker.set(topic.String())
 		err := c.validateTopic(from, topic, activeClusterIDS)
 		if err != nil {
-			return err
+			errs = append(errs, p2p.NewInvCtrlMsgErr(err, p2p.HighErrSeverity))
 		}
 	}
+
+	lg.Debug().
+		Int("error_count", errs.Len()).
+		Msg("graft control message validation complete")
+
+	if errs.Len() > 0 {
+		return errs
+	}
+
 	return nil
 }
 
@@ -233,19 +247,33 @@ func (c *ControlMsgValidationInspector) inspectGraftMessages(from peer.ID, graft
 //   - DuplicateTopicErr: if there are any duplicate topics found in the list of iHaves
 //     or any duplicate message ids found inside a single iHave.
 //   - error: if any error occurs while sampling or validating topics, all returned errors are benign and should not cause the node to crash.
-func (c *ControlMsgValidationInspector) inspectPruneMessages(from peer.ID, prunes []*pubsub_pb.ControlPrune, activeClusterIDS flow.ChainIDList) error {
+func (c *ControlMsgValidationInspector) inspectPruneMessages(from peer.ID, prunes []*pubsub_pb.ControlPrune, activeClusterIDS flow.ChainIDList) p2p.InvCtrlMsgErrs {
+	lg := c.logger.With().
+		Str("peer_id", p2plogging.PeerId(from)).
+		Int("sample_size", len(prunes)).
+		Logger()
 	tracker := make(duplicateStrTracker)
+	errs := make(p2p.InvCtrlMsgErrs, 0)
 	for _, prune := range prunes {
 		topic := channels.Topic(prune.GetTopicID())
 		if tracker.isDuplicate(topic.String()) {
-			return NewDuplicateTopicErr(topic.String(), p2pmsg.CtrlMsgPrune)
+			errs = append(errs, p2p.NewInvCtrlMsgErr(NewDuplicateTopicErr(topic.String(), p2pmsg.CtrlMsgPrune), p2p.ModerateErrSeverity))
 		}
 		tracker.set(topic.String())
 		err := c.validateTopic(from, topic, activeClusterIDS)
 		if err != nil {
-			return err
+			errs = append(errs, p2p.NewInvCtrlMsgErr(err, p2p.HighErrSeverity))
 		}
 	}
+
+	lg.Debug().
+		Int("error_count", errs.Len()).
+		Msg("prune control message validation complete")
+
+	if errs.Len() > 0 {
+		return errs
+	}
+
 	return nil
 }
 
@@ -258,7 +286,7 @@ func (c *ControlMsgValidationInspector) inspectPruneMessages(from peer.ID, prune
 //   - DuplicateTopicErr: if there are any duplicate topics found in the list of iHaves
 //     or any duplicate message ids found inside a single iHave.
 //   - error: if any error occurs while sampling or validating topics, all returned errors are benign and should not cause the node to crash.
-func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihaves []*pubsub_pb.ControlIHave, activeClusterIDS flow.ChainIDList) error {
+func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihaves []*pubsub_pb.ControlIHave, activeClusterIDS flow.ChainIDList) p2p.InvCtrlMsgErrs {
 	if len(ihaves) == 0 {
 		return nil
 	}
@@ -269,29 +297,36 @@ func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihave
 		Logger()
 	duplicateTopicTracker := make(duplicateStrTracker)
 	duplicateMessageIDTracker := make(duplicateStrTracker)
+	errs := make(p2p.InvCtrlMsgErrs, 0)
 	totalMessageIds := 0
 	for _, ihave := range ihaves {
 		messageIds := ihave.GetMessageIDs()
 		topic := ihave.GetTopicID()
 		if duplicateTopicTracker.isDuplicate(topic) {
-			return NewDuplicateTopicErr(topic, p2pmsg.CtrlMsgIHave)
+			errs = append(errs, p2p.NewInvCtrlMsgErr(NewDuplicateTopicErr(topic, p2pmsg.CtrlMsgIHave), p2p.ModerateErrSeverity))
 		}
 		duplicateTopicTracker.set(topic)
 		err := c.validateTopic(from, channels.Topic(topic), activeClusterIDS)
 		if err != nil {
-			return err
+			errs = append(errs, p2p.NewInvCtrlMsgErr(err, p2p.HighErrSeverity))
 		}
 
 		for _, messageID := range messageIds {
 			if duplicateMessageIDTracker.isDuplicate(messageID) {
-				return NewDuplicateTopicErr(messageID, p2pmsg.CtrlMsgIHave)
+				errs = append(errs, p2p.NewInvCtrlMsgErr(NewDuplicateMessageIDErr(messageID, p2pmsg.CtrlMsgIHave), p2p.HighErrSeverity))
 			}
 			duplicateMessageIDTracker.set(messageID)
 		}
 	}
 	lg.Debug().
 		Int("total_message_ids", totalMessageIds).
+		Int("error_count", errs.Len()).
 		Msg("ihave control message validation complete")
+
+	if errs.Len() > 0 {
+		return errs
+	}
+
 	return nil
 }
 
@@ -306,7 +341,7 @@ func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihave
 // Returns:
 // - DuplicateTopicErr: if there are any duplicate message ids found in any of the iWants.
 // - IWantCacheMissThresholdErr: if the rate of cache misses exceeds the configured allowed threshold.
-func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWants []*pubsub_pb.ControlIWant) error {
+func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWants []*pubsub_pb.ControlIWant) p2p.InvCtrlMsgErrs {
 	if len(iWants) == 0 {
 		return nil
 	}
@@ -318,6 +353,7 @@ func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWant
 		Logger()
 	sampleSize := uint(len(iWants))
 	tracker := make(duplicateStrTracker)
+	errs := make(p2p.InvCtrlMsgErrs, 0)
 	cacheMisses := 0
 	allowedCacheMissesThreshold := float64(sampleSize) * c.config.IWantRPCInspectionConfig.CacheMissThreshold
 	duplicates := 0
@@ -339,7 +375,7 @@ func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWant
 			if tracker.isDuplicate(messageID) {
 				duplicates++
 				if float64(duplicates) > allowedDuplicatesThreshold {
-					return NewIWantDuplicateMsgIDThresholdErr(duplicates, messageIDCount, c.config.IWantRPCInspectionConfig.DuplicateMsgIDThreshold)
+					errs = append(errs, p2p.NewInvCtrlMsgErr(NewIWantDuplicateMsgIDThresholdErr(duplicates, messageIDCount, c.config.IWantRPCInspectionConfig.DuplicateMsgIDThreshold), p2p.HighErrSeverity))
 				}
 			}
 			// check cache miss threshold
@@ -347,7 +383,7 @@ func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWant
 				cacheMisses++
 				if checkCacheMisses {
 					if float64(cacheMisses) > allowedCacheMissesThreshold {
-						return NewIWantCacheMissThresholdErr(cacheMisses, messageIDCount, c.config.IWantRPCInspectionConfig.CacheMissThreshold)
+						errs = append(errs, p2p.NewInvCtrlMsgErr(NewIWantCacheMissThresholdErr(cacheMisses, messageIDCount, c.config.IWantRPCInspectionConfig.CacheMissThreshold), p2p.HighErrSeverity))
 					}
 				}
 			}
@@ -360,7 +396,12 @@ func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWant
 		Int("total_message_ids", totalMessageIds).
 		Int("cache_misses", cacheMisses).
 		Int("duplicates", duplicates).
+		Int("error_count", errs.Len()).
 		Msg("iwant control message validation complete")
+
+	if errs.Len() > 0 {
+		return errs
+	}
 
 	return nil
 }
@@ -376,7 +417,7 @@ func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWant
 // - activeClusterIDS: the list of active cluster ids.
 // Returns:
 // - InvalidRpcPublishMessagesErr: if the amount of invalid messages exceeds the configured RpcMessageErrorThreshold.
-func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, messages []*pubsub_pb.Message, activeClusterIDS flow.ChainIDList) error {
+func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, messages []*pubsub_pb.Message, activeClusterIDS flow.ChainIDList) p2p.InvCtrlMsgErrs {
 	totalMessages := len(messages)
 	if totalMessages == 0 {
 		return nil
@@ -399,6 +440,7 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 		return false
 	}
 
+	invCtrlMsgErrs := make(p2p.InvCtrlMsgErrs, 0)
 	var errs *multierror.Error
 	for _, message := range messages[:sampleSize] {
 		topic := channels.Topic(message.GetTopic())
@@ -411,10 +453,14 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 			errs = multierror.Append(errs, fmt.Errorf("subscription for topic %s not found", topic))
 		}
 
-		// return an error when we exceed the error threshold
+		// capture error when we exceed the error threshold
 		if errs != nil && errs.Len() > c.config.RpcMessageErrorThreshold {
-			return NewInvalidRpcPublishMessagesErr(errs.ErrorOrNil(), errs.Len())
+			invCtrlMsgErrs = append(invCtrlMsgErrs, p2p.NewInvCtrlMsgErr(NewInvalidRpcPublishMessagesErr(errs.ErrorOrNil(), errs.Len()), p2p.ModerateErrSeverity))
 		}
+	}
+
+	if invCtrlMsgErrs.Len() > 0 {
+		return invCtrlMsgErrs
 	}
 
 	return nil
@@ -671,7 +717,12 @@ func (c *ControlMsgValidationInspector) validateClusterPrefixedTopic(from peer.I
 	// reject messages from unstaked nodes for cluster prefixed topics
 	nodeID, err := c.getFlowIdentifier(from)
 	if err != nil {
-		return err
+		lg.Warn().
+			Bool(logging.KeySuspicious, true).
+			Bool(logging.KeyNetworkingSecurity, true).
+			Err(err).
+			Msg("control message received from unstaked peer")
+		return nil
 	}
 
 	if len(activeClusterIds) == 0 {
@@ -745,27 +796,20 @@ func (c *ControlMsgValidationInspector) checkClusterPrefixHardThreshold(nodeID f
 }
 
 // logAndDistributeErr logs the provided error and attempts to disseminate an invalid control message validation notification for the error.
-func (c *ControlMsgValidationInspector) logAndDistributeAsyncInspectErrs(req *InspectRPCRequest, ctlMsgType p2pmsg.ControlMessageType, err error) {
+func (c *ControlMsgValidationInspector) logAndDistributeAsyncInspectErrs(req *InspectRPCRequest, ctlMsgType p2pmsg.ControlMessageType, errs p2p.InvCtrlMsgErrs) {
 	lg := c.logger.With().
 		Bool(logging.KeySuspicious, true).
 		Bool(logging.KeyNetworkingSecurity, true).
 		Str("peer_id", p2plogging.PeerId(req.Peer)).
 		Logger()
-
-	switch {
-	case IsErrActiveClusterIDsNotSet(err):
-		lg.Warn().Err(err).Msg("active cluster ids not set")
-	case IsErrUnstakedPeer(err):
-		lg.Warn().Err(err).Msg("control message received from unstaked peer")
-	default:
-		err = c.distributor.Distribute(p2p.NewInvalidControlMessageNotification(req.Peer, ctlMsgType, err))
-		if err != nil {
-			lg.Error().
-				Err(err).
-				Msg("failed to distribute invalid control message notification")
-		}
-		lg.Error().Err(err).Msg("rpc control message async inspection failed")
+	
+	err := c.distributor.Distribute(p2p.NewInvalidControlMessageNotification(req.Peer, ctlMsgType, errs))
+	if err != nil {
+		lg.Error().
+			Err(err).
+			Msg("failed to distribute invalid control message notification")
 	}
+	lg.Error().Err(errs.Error()).Msg("rpc control message async inspection failed")
 }
 
 func (c *ControlMsgValidationInspector) logAndThrowError(err error) {

@@ -196,7 +196,7 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 			require.True(t, ok)
 			require.Equal(t, expectedPeerID, notification.PeerID)
 			require.Contains(t, []p2pmsg.ControlMessageType{p2pmsg.CtrlMsgGraft, p2pmsg.CtrlMsgPrune, p2pmsg.CtrlMsgIHave}, notification.MsgType)
-			require.True(t, IsDuplicateTopicErr(notification.Error))
+			require.True(t, IsDuplicateTopicErr(notification.Errors[0].Err))
 		})
 
 		require.NoError(t, inspector.processInspectRPCReq(duplicateTopicGraftsReq))
@@ -547,6 +547,6 @@ func checkNotificationFunc(t *testing.T, expectedPeerID peer.ID, expectedMsgType
 		require.True(t, ok)
 		require.Equal(t, expectedPeerID, notification.PeerID)
 		require.Equal(t, expectedMsgType, notification.MsgType)
-		require.True(t, isExpectedErr(notification.Error))
+		require.True(t, isExpectedErr(notification.Errors[0].Err))
 	}
 }
