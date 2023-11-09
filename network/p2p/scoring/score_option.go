@@ -9,6 +9,8 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
@@ -292,7 +294,9 @@ const (
 )
 
 // ScoreOption is a functional option for configuring the peer scoring system.
+// TODO: rename it to ScoreManager.
 type ScoreOption struct {
+	component.Component
 	logger zerolog.Logger
 
 	peerScoreParams     *pubsub.PeerScoreParams
@@ -436,6 +440,24 @@ func NewScoreOption(cfg *ScoreOptionConfig, provider p2p.SubscriptionProvider) *
 	for _, topicParams := range cfg.topicParams {
 		topicParams(s.peerScoreParams.Topics)
 	}
+
+	s.Component = component.NewComponentManagerBuilder().AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		s.logger.Info().Msg("starting score registry")
+		scoreRegistry.Start(ctx)
+		select {
+		case <-ctx.Done():
+			s.logger.Warn().Msg("stopping score registry; context done")
+		case <-scoreRegistry.Ready():
+			s.logger.Info().Msg("score registry started")
+		}
+		ready()
+
+		<-ctx.Done()
+		s.logger.Info().Msg("stopping score registry")
+		<-scoreRegistry.Done()
+		s.logger.Info().Msg("score registry stopped")
+	}).Build()
+
 	return s
 }
 
