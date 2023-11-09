@@ -112,7 +112,7 @@ func EpochSetupFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochSetu
 	return event, expected
 }
 
-// EpochCommitFixture returns an EpochCommit service event as a Cadence event
+// EpochCommitFixtureByChainID returns an EpochCommit service event as a Cadence event
 // representation and as a protocol model representation.
 func EpochCommitFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochCommit) {
 
@@ -598,7 +598,7 @@ func createEpochCollectors() cadence.Array {
 	}).WithType(cadence.NewVariableSizedArrayType(clusterType))
 }
 
-func createEpochCommittedEvent() cadence.Event {
+func createEpochCommitEvent() cadence.Event {
 
 	clusterQCType := newFlowClusterQCClusterQCStructType()
 
@@ -657,7 +657,7 @@ func createEpochCommittedEvent() cadence.Event {
 			cadence.String("8c588266db5f5cda629e83f8aa04ae9413593fac19e4865d06d291c9d14fbdd9bdb86a7a12f9ef8590c79cb635e3163315d193087e9336092987150d0cd2b14ac6365f7dc93eec573752108b8c12368abb65f0652d9f644e5aed611c37926950"),
 			cadence.String("87a339e4e5c74f089da20a33f515d8c8f4464ab53ede5a74aa2432cd1ae66d522da0c122249ee176cd747ddc83ca81090498389384201614caf51eac392c1c0a916dfdcfbbdf7363f9552b6468434add3d3f6dc91a92bbe3ee368b59b7828488"),
 		}).WithType(cadence.NewVariableSizedArrayType(cadence.StringType{})),
-	}).WithType(newFlowEpochEpochCommittedEventType())
+	}).WithType(newFlowEpochEpochCommitEventType())
 }
 
 func createVersionBeaconEvent() cadence.Event {
@@ -894,7 +894,7 @@ func newFlowEpochEpochSetupEventType() *cadence.EventType {
 	}
 }
 
-func newFlowEpochEpochCommittedEventType() *cadence.EventType {
+func newFlowEpochEpochCommitEventType() *cadence.EventType {
 
 	// A.01cf0e2f2f715450.FlowEpoch.EpochCommitted
 
@@ -1050,7 +1050,7 @@ var EpochSetupFixtureCCF = func() []byte {
 }()
 
 var EpochCommitFixtureCCF = func() []byte {
-	b, err := ccf.Encode(createEpochCommittedEvent())
+	b, err := ccf.Encode(createEpochCommitEvent())
 	if err != nil {
 		panic(err)
 	}
