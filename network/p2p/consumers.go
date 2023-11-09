@@ -38,7 +38,11 @@ func (i InvCtrlMsgErrs) Len() int {
 // InvCtrlMsgErr struct that wraps an error that occurred with during control message inspection and holds some metadata about the err such as the errors InvCtrlMsgErrSeverity.
 type InvCtrlMsgErr struct {
 	Err      error
-	Severity InvCtrlMsgErrSeverity
+	severity InvCtrlMsgErrSeverity
+}
+
+func (i InvCtrlMsgErr) Severity() InvCtrlMsgErrSeverity {
+	return i.severity
 }
 
 // NewInvCtrlMsgErr returns a new InvCtrlMsgErr.
@@ -50,7 +54,7 @@ type InvCtrlMsgErr struct {
 func NewInvCtrlMsgErr(err error, severity InvCtrlMsgErrSeverity) *InvCtrlMsgErr {
 	return &InvCtrlMsgErr{
 		Err:      err,
-		Severity: severity,
+		severity: severity,
 	}
 }
 

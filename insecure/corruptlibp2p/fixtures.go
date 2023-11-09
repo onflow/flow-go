@@ -64,6 +64,20 @@ func WithIWant(iWantCount int, msgIdsPerIWant int) GossipSubCtrlOption {
 	}
 }
 
+// WithGrafts adds GRAFT control messages with each given topicID to the control message.
+func WithGrafts(topicIds ...string) GossipSubCtrlOption {
+	return func(msg *pubsubpb.ControlMessage) {
+		grafts := make([]*pubsubpb.ControlGraft, len(topicIds))
+		for i, topicId := range topicIds {
+			topicId := topicId
+			grafts[i] = &pubsubpb.ControlGraft{
+				TopicID: &topicId,
+			}
+		}
+		msg.Graft = grafts
+	}
+}
+
 // WithGraft adds GRAFT control messages with given topicID to the control message.
 func WithGraft(msgCount int, topicId string) GossipSubCtrlOption {
 	return func(msg *pubsubpb.ControlMessage) {
@@ -74,6 +88,20 @@ func WithGraft(msgCount int, topicId string) GossipSubCtrlOption {
 			}
 		}
 		msg.Graft = grafts
+	}
+}
+
+// WithPrunes adds PRUNE control messages with each given topicID to the control message.
+func WithPrunes(topicIds ...string) GossipSubCtrlOption {
+	return func(msg *pubsubpb.ControlMessage) {
+		prunes := make([]*pubsubpb.ControlPrune, len(topicIds))
+		for i, topicId := range topicIds {
+			topicId := topicId
+			prunes[i] = &pubsubpb.ControlPrune{
+				TopicID: &topicId,
+			}
+		}
+		msg.Prune = prunes
 	}
 }
 
