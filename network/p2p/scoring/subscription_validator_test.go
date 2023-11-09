@@ -71,8 +71,7 @@ func TestSubscriptionValidator_UnknownChannel(t *testing.T) {
 // topics based on its Flow protocol role, the subscription validator returns no error.
 func TestSubscriptionValidator_ValidSubscriptions(t *testing.T) {
 	sp := mockp2p.NewSubscriptionProvider(t)
-	sv := scoring.NewSubscriptionValidator()
-	require.NoError(t, sv.RegisterSubscriptionProvider(sp))
+	sv := scoring.NewSubscriptionValidator(unittest.Logger(), sp)
 
 	for _, role := range flow.Roles() {
 		peerId := p2pfixtures.PeerIdFixture(t)
