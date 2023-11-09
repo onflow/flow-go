@@ -155,7 +155,6 @@ jobs:
             test_category: integration-verification
           - target: upgrades-tests
             test_category: integration-upgrades
-
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
