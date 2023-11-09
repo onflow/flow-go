@@ -276,10 +276,7 @@ func defaultInspectorSuite(rpcTracker p2p.RpcControlTracking) p2p.GossipSubRpcIn
 		if err != nil {
 			return nil, fmt.Errorf("failed to create new control message valiadation inspector: %w", err)
 		}
-
-		return inspectorbuilder.NewGossipSubInspectorSuite(
-			[]p2p.GossipSubRPCInspector{metricsInspector, rpcValidationInspector},
-			notificationDistributor), nil
+		return inspectorbuilder.NewGossipSubInspectorSuite(metricsInspector, rpcValidationInspector, notificationDistributor), nil
 	}
 }
 
@@ -369,6 +366,18 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, e
 	gossipSub, err = g.gossipSubFactory(ctx, g.logger, g.h, gossipSubConfigs, inspectorSuite)
 	if err != nil {
 		return nil, fmt.Errorf("could not create gossipsub: %w", err)
+	}
+
+	err = inspectorSuite.SetTopicOracle(gossipSub.GetTopics)
+	if err != nil {
+		return nil, fmt.Errorf("could not set topic oracle on inspector suite: %w", err)
+	}
+
+	if scoreOpt != nil {
+		err := scoreOpt.SetSubscriptionProvider(scoring.NewSubscriptionProvider(g.logger, gossipSub))
+		if err != nil {
+			return nil, fmt.Errorf("could not set subscription provider: %w", err)
+		}
 	}
 
 	return gossipSub, nil

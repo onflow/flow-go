@@ -27,7 +27,6 @@ func init() {
 
 	Cmd.Flags().StringVar(&flagChunkDataPackDir, "chunk-data-pack-dir", "",
 		"directory that stores the chunk data pack")
-	_ = Cmd.MarkFlagRequired("chunk-data-pack-dir")
 }
 
 func run(*cobra.Command, []string) {
@@ -39,8 +38,10 @@ func run(*cobra.Command, []string) {
 
 	log.Info().Msg("ProtocolDB Truncated")
 
-	chunkdb := common.InitStorageWithTruncate(flagChunkDataPackDir, true)
-	defer chunkdb.Close()
+	if flagChunkDataPackDir != "" {
+		chunkdb := common.InitStorageWithTruncate(flagChunkDataPackDir, true)
+		defer chunkdb.Close()
 
-	log.Info().Msg("Truncated")
+		log.Info().Msg("Chunk Data Pack database Truncated")
+	}
 }

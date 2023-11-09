@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/md5" //nolint:gosec
 	"errors"
+	"strings"
 	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -101,33 +102,35 @@ func (b *backendScripts) executeScript(
 
 	switch b.scriptExecMode {
 	case ScriptExecutionModeExecutionNodesOnly:
-		return b.executeScriptOnAvailableExecutionNodes(ctx, blockID, script, arguments, insecureScriptHash)
+		result, _, err := b.executeScriptOnAvailableExecutionNodes(ctx, blockID, script, arguments, insecureScriptHash)
+		return result, err
 
 	case ScriptExecutionModeLocalOnly:
-		return b.executeScriptLocally(ctx, blockID, height, script, arguments, insecureScriptHash)
+		result, _, err := b.executeScriptLocally(ctx, blockID, height, script, arguments, insecureScriptHash)
+		return result, err
 
 	case ScriptExecutionModeFailover:
-		localResult, localErr := b.executeScriptLocally(ctx, blockID, height, script, arguments, insecureScriptHash)
+		localResult, localDuration, localErr := b.executeScriptLocally(ctx, blockID, height, script, arguments, insecureScriptHash)
 		if localErr == nil || isInvalidArgumentError(localErr) {
 			return localResult, localErr
 		}
-		execResult, execErr := b.executeScriptOnAvailableExecutionNodes(ctx, blockID, script, arguments, insecureScriptHash)
+		execResult, execDuration, execErr := b.executeScriptOnAvailableExecutionNodes(ctx, blockID, script, arguments, insecureScriptHash)
 
-		b.compareScriptExecutionResults(execResult, execErr, localResult, localErr, blockID, script, insecureScriptHash)
+		b.compareScriptExecutionResults(execResult, execDuration, execErr, localResult, localDuration, localErr, blockID, script, arguments, insecureScriptHash)
 
 		return execResult, execErr
 
 	case ScriptExecutionModeCompare:
-		execResult, execErr := b.executeScriptOnAvailableExecutionNodes(ctx, blockID, script, arguments, insecureScriptHash)
+		execResult, execDuration, execErr := b.executeScriptOnAvailableExecutionNodes(ctx, blockID, script, arguments, insecureScriptHash)
 		// we can only compare the results if there were either no errors or a cadence error
 		// since we cannot distinguish the EN error as caused by the block being pruned or some other reason,
 		// which may produce a valid RN output but an error for the EN
 		if execErr != nil && !isInvalidArgumentError(execErr) {
 			return nil, execErr
 		}
-		localResult, localErr := b.executeScriptLocally(ctx, blockID, height, script, arguments, insecureScriptHash)
+		localResult, localDuration, localErr := b.executeScriptLocally(ctx, blockID, height, script, arguments, insecureScriptHash)
 
-		b.compareScriptExecutionResults(execResult, execErr, localResult, localErr, blockID, script, insecureScriptHash)
+		b.compareScriptExecutionResults(execResult, execDuration, execErr, localResult, localDuration, localErr, blockID, script, arguments, insecureScriptHash)
 
 		// always return EN results
 		return execResult, execErr
@@ -145,7 +148,7 @@ func (b *backendScripts) executeScriptLocally(
 	script []byte,
 	arguments [][]byte,
 	insecureScriptHash [md5.Size]byte,
-) ([]byte, error) {
+) ([]byte, time.Duration, error) {
 	execStartTime := time.Now()
 
 	result, err := b.scriptExecutor.ExecuteAtBlockHeight(ctx, script, arguments, height)
@@ -173,7 +176,7 @@ func (b *backendScripts) executeScriptLocally(
 			b.metrics.ScriptExecutionErrorLocal()
 		}
 
-		return nil, convertedErr
+		return nil, execDuration, convertedErr
 	}
 
 	if b.log.GetLevel() == zerolog.DebugLevel && b.shouldLogScript(execEndTime, insecureScriptHash) {
@@ -186,7 +189,7 @@ func (b *backendScripts) executeScriptLocally(
 	// log execution time
 	b.metrics.ScriptExecuted(execDuration, len(script))
 
-	return result, nil
+	return result, execDuration, nil
 }
 
 // executeScriptOnAvailableExecutionNodes executes the provided script using available execution nodes.
@@ -196,11 +199,11 @@ func (b *backendScripts) executeScriptOnAvailableExecutionNodes(
 	script []byte,
 	arguments [][]byte,
 	insecureScriptHash [md5.Size]byte,
-) ([]byte, error) {
+) ([]byte, time.Duration, error) {
 	// find few execution nodes which have executed the block earlier and provided an execution receipt for it
 	executors, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to find script executors at blockId %v: %v", blockID.String(), err)
+		return nil, 0, status.Errorf(codes.Internal, "failed to find script executors at blockId %v: %v", blockID.String(), err)
 	}
 
 	lg := b.log.With().
@@ -209,21 +212,27 @@ func (b *backendScripts) executeScriptOnAvailableExecutionNodes(
 		Logger()
 
 	var result []byte
+	var execDuration time.Duration
 	errToReturn := b.nodeCommunicator.CallAvailableNode(
 		executors,
 		func(node *flow.Identity) error {
 			execStartTime := time.Now()
+
 			result, err = b.tryExecuteScriptOnExecutionNode(ctx, node.Address, blockID, script, arguments)
+
+			executionTime := time.Now()
+			execDuration = executionTime.Sub(execStartTime)
+
 			if err != nil {
 				return err
 			}
 
 			if b.log.GetLevel() == zerolog.DebugLevel {
-				executionTime := time.Now()
 				if b.shouldLogScript(executionTime, insecureScriptHash) {
 					lg.Debug().
 						Str("script_executor_addr", node.Address).
 						Str("script", string(script)).
+						Dur("execution_dur_ms", execDuration).
 						Msg("Successfully executed script")
 					b.loggedScripts.Add(insecureScriptHash, executionTime)
 				}
@@ -251,10 +260,10 @@ func (b *backendScripts) executeScriptOnAvailableExecutionNodes(
 			b.metrics.ScriptExecutionErrorOnExecutionNode()
 			b.log.Error().Err(errToReturn).Msg("script execution failed for execution node internal reasons")
 		}
-		return nil, rpc.ConvertError(errToReturn, "failed to execute script on execution nodes", codes.Internal)
+		return nil, execDuration, rpc.ConvertError(errToReturn, "failed to execute script on execution nodes", codes.Internal)
 	}
 
-	return result, nil
+	return result, execDuration, nil
 }
 
 // tryExecuteScriptOnExecutionNode attempts to execute the script on the given execution node.
@@ -290,13 +299,24 @@ func isInvalidArgumentError(scriptExecutionErr error) bool {
 
 func (b *backendScripts) compareScriptExecutionResults(
 	execNodeResult []byte,
+	execDuration time.Duration,
 	execErr error,
 	localResult []byte,
+	localDuration time.Duration,
 	localErr error,
 	blockID flow.Identifier,
 	script []byte,
+	arguments [][]byte,
 	insecureScriptHash [md5.Size]byte,
 ) {
+	// record errors caused by missing local data
+	if localErr != nil && status.Code(localErr) == codes.OutOfRange {
+		b.metrics.ScriptExecutionNotIndexed()
+		b.logScriptExecutionComparison(execNodeResult, execDuration, execErr, localResult, localDuration, localErr, blockID, script, arguments, insecureScriptHash,
+			"script execution results do not match EN because data is not indexed yet")
+		return
+	}
+
 	// check errors first
 	if execErr != nil {
 		if execErr == localErr {
@@ -304,8 +324,35 @@ func (b *backendScripts) compareScriptExecutionResults(
 			return
 		}
 
+		// error strings generally won't match since the code paths are slightly different
+		// check if the underlying error is the same
+		if status.Code(execErr) == status.Code(localErr) {
+			// both script execution implementations use the same engine, which adds
+			// "failed to execute script at block" to the message before returning. Any characters
+			// before this can be ignored. The string that comes after is the original error and
+			// should match.
+			execParts := strings.Split(execErr.Error(), "failed to execute script at block")
+			localParts := strings.Split(localErr.Error(), "failed to execute script at block")
+			if len(execParts) == 2 && len(localParts) == 2 {
+				if execParts[1] == localParts[1] {
+					b.metrics.ScriptExecutionErrorMatch()
+					return
+				}
+
+				// by default ENs are configured with longer script error size limits. check if the
+				// non-truncated parts match
+				localSubParts := strings.Split(localParts[1], " ... ")
+				if len(localSubParts) == 2 &&
+					strings.HasPrefix(execParts[1], localSubParts[0]) &&
+					strings.HasSuffix(execParts[1], localSubParts[1]) {
+					b.metrics.ScriptExecutionErrorMatch()
+					return
+				}
+			}
+		}
+
 		b.metrics.ScriptExecutionErrorMismatch()
-		b.logScriptExecutionComparison(execNodeResult, execErr, localResult, localErr, blockID, script, insecureScriptHash,
+		b.logScriptExecutionComparison(execNodeResult, execDuration, execErr, localResult, localDuration, localErr, blockID, script, arguments, insecureScriptHash,
 			"cadence errors from local execution do not match and EN")
 		return
 	}
@@ -316,37 +363,48 @@ func (b *backendScripts) compareScriptExecutionResults(
 	}
 
 	b.metrics.ScriptExecutionResultMismatch()
-	b.logScriptExecutionComparison(execNodeResult, execErr, localResult, localErr, blockID, script, insecureScriptHash,
+	b.logScriptExecutionComparison(execNodeResult, execDuration, execErr, localResult, localDuration, localErr, blockID, script, arguments, insecureScriptHash,
 		"script execution results from local execution do not match EN")
 }
 
 // logScriptExecutionComparison logs the script execution comparison between local execution and execution node
 func (b *backendScripts) logScriptExecutionComparison(
 	execNodeResult []byte,
+	execDuration time.Duration,
 	execErr error,
 	localResult []byte,
+	localDuration time.Duration,
 	localErr error,
 	blockID flow.Identifier,
 	script []byte,
+	arguments [][]byte,
 	insecureScriptHash [md5.Size]byte,
 	msg string,
 ) {
+	args := make([]string, len(arguments))
+	for i, arg := range arguments {
+		args[i] = string(arg)
+	}
+
 	lgCtx := b.log.With().
 		Hex("block_id", blockID[:]).
+		Hex("script_hash", insecureScriptHash[:]).
 		Str("script", string(script)).
-		Hex("script_hash", insecureScriptHash[:])
+		Strs("args", args)
 
 	if execErr != nil {
 		lgCtx = lgCtx.AnErr("execution_node_error", execErr)
 	} else {
 		lgCtx = lgCtx.Hex("execution_node_result", execNodeResult)
 	}
+	lgCtx = lgCtx.Dur("execution_node_duration_ms", execDuration)
 
 	if localErr != nil {
 		lgCtx = lgCtx.AnErr("local_error", localErr)
 	} else {
 		lgCtx = lgCtx.Hex("local_result", localResult)
 	}
+	lgCtx = lgCtx.Dur("local_duration_ms", localDuration)
 
 	lg := lgCtx.Logger()
 	lg.Debug().Msg(msg)
