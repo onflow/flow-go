@@ -184,7 +184,8 @@ func NewGossipSubBuilder(
 	networkType network.NetworkingType,
 	sporkId flow.Identifier,
 	idProvider module.IdentityProvider,
-	rpcInspectorConfig *p2pconf.GossipSubRPCInspectorsConfig, subscriptionProviderPrams *p2pconf.SubscriptionProviderParameters,
+	rpcInspectorConfig *p2pconf.GossipSubRPCInspectorsConfig,
+	subscriptionProviderPrams *p2pconf.SubscriptionProviderParameters,
 	rpcTracker p2p.RpcControlTracking) *Builder {
 	lg := logger.With().
 		Str("component", "gossipsub").
@@ -241,7 +242,8 @@ func defaultInspectorSuite(rpcTracker p2p.RpcControlTracking) p2p.GossipSubRpcIn
 		gossipSubMetrics module.GossipSubMetrics,
 		heroCacheMetricsFactory metrics.HeroCacheMetricsFactory,
 		networkType network.NetworkingType,
-		idProvider module.IdentityProvider) (p2p.GossipSubInspectorSuite, error) {
+		idProvider module.IdentityProvider,
+		topicProvider func() p2p.TopicProvider) (p2p.GossipSubInspectorSuite, error) {
 		metricsInspector := inspector.NewControlMsgMetricsInspector(
 			logger,
 			p2pnode.NewGossipSubControlMessageMetrics(gossipSubMetrics, logger),
@@ -272,7 +274,8 @@ func defaultInspectorSuite(rpcTracker p2p.RpcControlTracking) p2p.GossipSubRpcIn
 			clusterPrefixedCacheCollector,
 			idProvider,
 			gossipSubMetrics,
-			rpcTracker)
+			rpcTracker,
+			topicProvider)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create new control message valiadation inspector: %w", err)
 		}
@@ -317,7 +320,10 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, e
 		g.metricsCfg.Metrics,
 		g.metricsCfg.HeroCacheFactory,
 		g.networkType,
-		g.idProvider)
+		g.idProvider,
+		func() p2p.TopicProvider {
+			return gossipSub
+		})
 	if err != nil {
 		return nil, fmt.Errorf("could not create gossipsub inspector suite: %w", err)
 	}
@@ -366,18 +372,6 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, e
 	gossipSub, err = g.gossipSubFactory(ctx, g.logger, g.h, gossipSubConfigs, inspectorSuite)
 	if err != nil {
 		return nil, fmt.Errorf("could not create gossipsub: %w", err)
-	}
-
-	err = inspectorSuite.SetTopicOracle(gossipSub.GetTopics)
-	if err != nil {
-		return nil, fmt.Errorf("could not set topic oracle on inspector suite: %w", err)
-	}
-
-	if scoreOpt != nil {
-		err := scoreOpt.SetSubscriptionProvider(scoring.NewSubscriptionProvider(g.logger, gossipSub))
-		if err != nil {
-			return nil, fmt.Errorf("could not set subscription provider: %w", err)
-		}
 	}
 
 	return gossipSub, nil

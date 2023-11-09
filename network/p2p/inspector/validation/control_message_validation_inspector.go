@@ -56,7 +56,7 @@ type ControlMsgValidationInspector struct {
 	rateLimiters map[p2pmsg.ControlMessageType]p2p.BasicRateLimiter
 	rpcTracker   p2p.RpcControlTracking
 	// topicOracle callback used to retrieve the current subscribed topics of the libp2p node.
-	topicOracle func() []string
+	topicOracle func() p2p.TopicProvider
 }
 
 var _ component.Component = (*ControlMsgValidationInspector)(nil)
@@ -75,16 +75,31 @@ var _ protocol.Consumer = (*ControlMsgValidationInspector)(nil)
 // Returns:
 //   - *ControlMsgValidationInspector: a new control message validation inspector.
 //   - error: an error if there is any error while creating the inspector. All errors are irrecoverable and unexpected.
-func NewControlMsgValidationInspector(ctx irrecoverable.SignalerContext, logger zerolog.Logger, sporkID flow.Identifier, config *p2pconf.GossipSubRPCValidationInspectorConfigs, distributor p2p.GossipSubInspectorNotifDistributor, inspectMsgQueueCacheCollector module.HeroCacheMetrics, clusterPrefixedCacheCollector module.HeroCacheMetrics, idProvider module.IdentityProvider, inspectorMetrics module.GossipSubRpcValidationInspectorMetrics, rpcTracker p2p.RpcControlTracking) (*ControlMsgValidationInspector, error) {
+func NewControlMsgValidationInspector(ctx irrecoverable.SignalerContext,
+	logger zerolog.Logger,
+	sporkID flow.Identifier,
+	config *p2pconf.GossipSubRPCValidationInspectorConfigs,
+	distributor p2p.GossipSubInspectorNotifDistributor,
+	inspectMsgQueueCacheCollector module.HeroCacheMetrics,
+	clusterPrefixedCacheCollector module.HeroCacheMetrics,
+	idProvider module.IdentityProvider,
+	inspectorMetrics module.GossipSubRpcValidationInspectorMetrics,
+	rpcTracker p2p.RpcControlTracking,
+	topicProviderOracle func() p2p.TopicProvider) (*ControlMsgValidationInspector, error) {
 	lg := logger.With().Str("component", "gossip_sub_rpc_validation_inspector").Logger()
 
-	clusterPrefixedTracker, err := cache.NewClusterPrefixedMessagesReceivedTracker(logger, config.ClusterPrefixedControlMsgsReceivedCacheSize, clusterPrefixedCacheCollector, config.ClusterPrefixedControlMsgsReceivedCacheDecay)
+	clusterPrefixedTracker, err := cache.NewClusterPrefixedMessagesReceivedTracker(logger,
+		config.ClusterPrefixedControlMsgsReceivedCacheSize,
+		clusterPrefixedCacheCollector,
+		config.ClusterPrefixedControlMsgsReceivedCacheDecay)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cluster prefix topics received tracker")
 	}
 
 	if config.RpcMessageMaxSampleSize < config.RpcMessageErrorThreshold {
-		return nil, fmt.Errorf("rpc message max sample size must be greater than or equal to rpc message error threshold, got %d and %d respectively", config.RpcMessageMaxSampleSize, config.RpcMessageErrorThreshold)
+		return nil, fmt.Errorf("rpc message max sample size must be greater than or equal to rpc message error threshold, got %d and %d respectively",
+			config.RpcMessageMaxSampleSize,
+			config.RpcMessageErrorThreshold)
 	}
 
 	c := &ControlMsgValidationInspector{
@@ -98,6 +113,7 @@ func NewControlMsgValidationInspector(ctx irrecoverable.SignalerContext, logger 
 		idProvider:   idProvider,
 		metrics:      inspectorMetrics,
 		rateLimiters: make(map[p2pmsg.ControlMessageType]p2p.BasicRateLimiter),
+		topicOracle:  topicProviderOracle,
 	}
 
 	store := queue.NewHeroStore(config.CacheSize, logger, inspectMsgQueueCacheCollector)
@@ -389,7 +405,7 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 		messages[i], messages[j] = messages[j], messages[i]
 	})
 
-	subscribedTopics := c.topicOracle()
+	subscribedTopics := c.topicOracle().GetTopics()
 	hasSubscription := func(topic string) bool {
 		for _, subscribedTopic := range subscribedTopics {
 			if topic == subscribedTopic {
@@ -602,18 +618,6 @@ func (c *ControlMsgValidationInspector) Name() string {
 // ActiveClustersChanged consumes cluster ID update protocol events.
 func (c *ControlMsgValidationInspector) ActiveClustersChanged(clusterIDList flow.ChainIDList) {
 	c.tracker.StoreActiveClusterIds(clusterIDList)
-}
-
-// SetTopicOracle Sets the topic oracle. The topic oracle is used to determine the list of topics that the node is subscribed to.
-// If an oracle is not set, the node will not be able to determine the list of topics that the node is subscribed to.
-// This func is expected to be called once and will return an error on all subsequent calls.
-// All errors returned from this func are considered irrecoverable.
-func (c *ControlMsgValidationInspector) SetTopicOracle(topicOracle func() []string) error {
-	if c.topicOracle != nil {
-		return fmt.Errorf("topic oracle already set")
-	}
-	c.topicOracle = topicOracle
-	return nil
 }
 
 // performSample performs sampling on the specified control message that will randomize
