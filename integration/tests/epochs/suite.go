@@ -64,10 +64,16 @@ type Suite struct {
 	// Whether approvals are required for sealing (we only enable for VN tests because
 	// requiring approvals requires a longer DKG period to avoid flakiness)
 	RequiredSealApprovals uint // defaults to 0 (no approvals required)
+	// Consensus Node proposal duration
+	ConsensusProposalDuration time.Duration
 }
 
 // SetupTest is run automatically by the testing framework before each test case.
 func (s *Suite) SetupTest() {
+	// If unset, use default value 100ms
+	if s.ConsensusProposalDuration == 0 {
+		s.ConsensusProposalDuration = time.Millisecond * 100
+	}
 
 	minEpochLength := s.StakingAuctionLen + s.DKGPhaseLen*3 + 20
 	// ensure epoch lengths are set correctly
@@ -85,7 +91,7 @@ func (s *Suite) SetupTest() {
 		testnet.WithLogLevel(zerolog.WarnLevel)}
 
 	consensusConfigs := []func(config *testnet.NodeConfig){
-		testnet.WithAdditionalFlag("--cruise-ctl-fallback-proposal-duration=100ms"),
+		testnet.WithAdditionalFlag(fmt.Sprintf("--cruise-ctl-fallback-proposal-duration=%s", s.ConsensusProposalDuration)),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", s.RequiredSealApprovals)),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", s.RequiredSealApprovals)),
 		testnet.WithLogLevel(zerolog.WarnLevel)}
