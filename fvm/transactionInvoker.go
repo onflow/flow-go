@@ -90,7 +90,6 @@ func newTransactionExecutor(
 
 	cadenceRuntime := env.BorrowCadenceRuntime()
 
-	// TODO: how to remove value and type runtime environment after decleration
 	if ctx.EVMEnabled {
 		chain := ctx.Chain
 		// TODO: handle error
@@ -100,6 +99,7 @@ func newTransactionExecutor(
 			cadenceRuntime.TxRuntimeEnv,
 			chain.ServiceAddress(),
 		)
+
 	}
 
 	return &transactionExecutor{

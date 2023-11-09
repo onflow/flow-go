@@ -383,9 +383,9 @@ func TestEVMRun(t *testing.T) {
       import EVM from 0x1
 
       access(all)
-      fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): Bool {
+      fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]) {
           let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
-          return EVM.run(tx: tx, coinbase: coinbase)
+          EVM.run(tx: tx, coinbase: coinbase)
       }
     `)
 
@@ -438,7 +438,7 @@ func TestEVMRun(t *testing.T) {
 
 	// Run script
 
-	result, err := rt.ExecuteScript(
+	_, err = rt.ExecuteScript(
 		runtime.Script{
 			Source:    script,
 			Arguments: EncodeArgs([]cadence.Value{evmTx, coinbase}),
@@ -452,7 +452,6 @@ func TestEVMRun(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.True(t, runCalled)
-	assert.Equal(t, cadence.Bool(true), result)
 }
 
 func TestEVMCreateBridgedAccount(t *testing.T) {

@@ -83,8 +83,7 @@ func newInternalEVMTypeRunFunction(
 			cb := types.Address(coinbase)
 			handler.Run(transaction, cb)
 
-			// TODO: properly remove the return value
-			return interpreter.AsBoolValue(true)
+			return interpreter.Void
 		},
 	)
 }

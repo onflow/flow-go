@@ -7,7 +7,6 @@ import (
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/json"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm"
@@ -36,9 +35,9 @@ func TestEVMRun(t *testing.T) {
                           import EVM from %s
 
                           access(all)
-                          fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): Bool {
+                          fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]) {
                               let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
-                              return EVM.run(tx: tx, coinbase: coinbase)
+                              EVM.run(tx: tx, coinbase: coinbase)
                           }
                         `,
 							chain.ServiceAddress().HexWithPrefix(),
@@ -73,7 +72,6 @@ func TestEVMRun(t *testing.T) {
 							snapshot)
 						require.NoError(t, err)
 						require.NoError(t, output.Err)
-						assert.Equal(t, cadence.Bool(true), output.Value)
 
 						// TODO:
 						_ = executionSnapshot
