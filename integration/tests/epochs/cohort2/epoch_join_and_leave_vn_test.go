@@ -4,8 +4,6 @@ import (
 	"testing"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/utils/unittest"
-
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/integration/tests/epochs"
@@ -36,6 +34,5 @@ func (s *EpochJoinAndLeaveVNSuite) SetupTest() {
 // TestEpochJoinAndLeaveVN should update verification nodes and assert healthy network conditions
 // after the epoch transition completes. See health check function for details.
 func (s *EpochJoinAndLeaveVNSuite) TestEpochJoinAndLeaveVN() {
-	unittest.SkipUnless(s.T(), unittest.TEST_TODO, "flaky")
 	s.RunTestEpochJoinAndLeave(flow.RoleVerification, s.AssertNetworkHealthyAfterVNChange)
 }
