@@ -24,7 +24,7 @@ func TestInMemoryRegisterStore(t *testing.T) {
 			pruned-1, // below pruned pruned, will fail
 			unittest.IdentifierFixture(),
 			unittest.IdentifierFixture(),
-			[]flow.RegisterEntry{},
+			flow.RegisterEntries{},
 		)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "<= pruned height")
@@ -33,7 +33,7 @@ func TestInMemoryRegisterStore(t *testing.T) {
 			pruned, // equal to pruned height, will fail
 			lastID,
 			unittest.IdentifierFixture(),
-			[]flow.RegisterEntry{},
+			flow.RegisterEntries{},
 		)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "<= pruned height")
@@ -59,7 +59,7 @@ func TestInMemoryRegisterStore(t *testing.T) {
 			height,
 			blockID,
 			notExistParent, // should fail because parent doesn't exist
-			[]flow.RegisterEntry{reg},
+			flow.RegisterEntries{reg},
 		)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "but its parent")
@@ -79,7 +79,7 @@ func TestInMemoryRegisterStore(t *testing.T) {
 			height,
 			blockID,
 			lastID,
-			[]flow.RegisterEntry{reg},
+			flow.RegisterEntries{reg},
 		)
 		require.NoError(t, err)
 
@@ -128,7 +128,7 @@ func TestInMemoryRegisterStore(t *testing.T) {
 			height,
 			blockID,
 			lastID,
-			[]flow.RegisterEntry{reg},
+			flow.RegisterEntries{reg},
 		)
 		require.NoError(t, err)
 
@@ -137,7 +137,7 @@ func TestInMemoryRegisterStore(t *testing.T) {
 			height,
 			blockID,
 			lastID,
-			[]flow.RegisterEntry{reg},
+			flow.RegisterEntries{reg},
 		)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "already exists")
@@ -160,7 +160,7 @@ func TestInMemoryRegisterStore(t *testing.T) {
 			height,
 			blockA,
 			lastID,
-			[]flow.RegisterEntry{regA},
+			flow.RegisterEntries{regA},
 		)
 		require.NoError(t, err)
 
@@ -170,7 +170,7 @@ func TestInMemoryRegisterStore(t *testing.T) {
 			height,
 			blockB, // different block
 			lastID, // same parent
-			[]flow.RegisterEntry{regB},
+			flow.RegisterEntries{regB},
 		)
 		require.NoError(t, err)
 
@@ -199,7 +199,7 @@ func TestInMemoryRegisterStore(t *testing.T) {
 			height,
 			blockA,
 			lastID,
-			[]flow.RegisterEntry{regX, regY},
+			flow.RegisterEntries{regX, regY},
 		)
 		require.NoError(t, err)
 
@@ -232,7 +232,7 @@ func TestInMemoryRegisterStore(t *testing.T) {
 			pruned+1,
 			blockA,
 			lastID,
-			[]flow.RegisterEntry{regX, regY},
+			flow.RegisterEntries{regX, regY},
 		)
 		require.NoError(t, err)
 
@@ -242,7 +242,7 @@ func TestInMemoryRegisterStore(t *testing.T) {
 			pruned+2,
 			blockB,
 			blockA,
-			[]flow.RegisterEntry{regY3},
+			flow.RegisterEntries{regY3},
 		)
 		require.NoError(t, err)
 
@@ -291,28 +291,28 @@ func TestInMemoryRegisterStore(t *testing.T) {
 			pruned+1,
 			blockA,
 			lastID,
-			[]flow.RegisterEntry{makeReg("X", "1")},
+			flow.RegisterEntries{makeReg("X", "1")},
 		))
 
 		require.NoError(t, store.SaveRegisters(
 			pruned+2,
 			blockB,
 			blockA,
-			[]flow.RegisterEntry{makeReg("Y", "2")},
+			flow.RegisterEntries{makeReg("Y", "2")},
 		))
 
 		require.NoError(t, store.SaveRegisters(
 			pruned+1,
 			blockC,
 			lastID,
-			[]flow.RegisterEntry{makeReg("X", "3")},
+			flow.RegisterEntries{makeReg("X", "3")},
 		))
 
 		require.NoError(t, store.SaveRegisters(
 			pruned+2,
 			blockD,
 			blockC,
-			[]flow.RegisterEntry{makeReg("Y", "4")},
+			flow.RegisterEntries{makeReg("Y", "4")},
 		))
 
 		reg := makeReg("X", "3")
@@ -338,12 +338,12 @@ func TestInMemoryRegisterStore(t *testing.T) {
 			pruned+1,
 			blockA,
 			lastID,
-			[]flow.RegisterEntry{makeReg("X", "1")},
+			flow.RegisterEntries{makeReg("X", "1")},
 		))
 
 		reg, err := store.GetUpdatedRegisters(pruned+1, blockA)
 		require.NoError(t, err)
-		require.Equal(t, []flow.RegisterEntry{makeReg("X", "1")}, reg)
+		require.Equal(t, flow.RegisterEntries{makeReg("X", "1")}, reg)
 
 		_, err = store.GetUpdatedRegisters(pruned+2, blockB)
 		require.Error(t, err)
@@ -370,28 +370,28 @@ func TestInMemoryRegisterStore(t *testing.T) {
 			pruned+1,
 			blockA,
 			lastID,
-			[]flow.RegisterEntry{makeReg("X", "1")},
+			flow.RegisterEntries{makeReg("X", "1")},
 		))
 
 		require.NoError(t, store.SaveRegisters(
 			pruned+2,
 			blockB,
 			blockA,
-			[]flow.RegisterEntry{makeReg("X", "2")},
+			flow.RegisterEntries{makeReg("X", "2")},
 		))
 
 		require.NoError(t, store.SaveRegisters(
 			pruned+3,
 			blockC,
 			blockB,
-			[]flow.RegisterEntry{makeReg("X", "3")},
+			flow.RegisterEntries{makeReg("X", "3")},
 		))
 
 		require.NoError(t, store.SaveRegisters(
 			pruned+4,
 			blockD,
 			blockC,
-			[]flow.RegisterEntry{makeReg("X", "4")},
+			flow.RegisterEntries{makeReg("X", "4")},
 		))
 
 		err := store.Prune(pruned+1, unknownBlock) // block is unknown
@@ -453,35 +453,35 @@ func TestInMemoryRegisterStore(t *testing.T) {
 			pruned+1,
 			blockA,
 			lastID,
-			[]flow.RegisterEntry{makeReg("X", "1")},
+			flow.RegisterEntries{makeReg("X", "1")},
 		))
 
 		require.NoError(t, store.SaveRegisters(
 			pruned+2,
 			blockB,
 			blockA,
-			[]flow.RegisterEntry{makeReg("X", "2")},
+			flow.RegisterEntries{makeReg("X", "2")},
 		))
 
 		require.NoError(t, store.SaveRegisters(
 			pruned+1,
 			blockC,
 			lastID,
-			[]flow.RegisterEntry{makeReg("X", "3")},
+			flow.RegisterEntries{makeReg("X", "3")},
 		))
 
 		require.NoError(t, store.SaveRegisters(
 			pruned+2,
 			blockD,
 			blockC,
-			[]flow.RegisterEntry{makeReg("X", "4")},
+			flow.RegisterEntries{makeReg("X", "4")},
 		))
 
 		require.NoError(t, store.SaveRegisters(
 			pruned+2,
 			blockE,
 			blockA,
-			[]flow.RegisterEntry{makeReg("X", "5")},
+			flow.RegisterEntries{makeReg("X", "5")},
 		))
 
 		err := store.Prune(pruned+1, blockA) // prune A should prune C and D
@@ -520,7 +520,7 @@ func TestInMemoryRegisterStore(t *testing.T) {
 				height,
 				blocks[height],
 				blocks[height-1],
-				[]flow.RegisterEntry{makeReg("X", fmt.Sprintf("%v", height))},
+				flow.RegisterEntries{makeReg("X", fmt.Sprintf("%v", height))},
 			))
 
 			// concurrently query get registers for past registers
@@ -544,7 +544,7 @@ func TestInMemoryRegisterStore(t *testing.T) {
 				vals, err := store.GetUpdatedRegisters(rdHeight, blocks[rdHeight])
 				require.NoError(t, err)
 				r := makeReg("X", fmt.Sprintf("%v", rdHeight))
-				require.Equal(t, []flow.RegisterEntry{r}, vals)
+				require.Equal(t, flow.RegisterEntries{r}, vals)
 			}(i)
 		}
 
@@ -593,7 +593,7 @@ func TestInMemoryRegisterStore(t *testing.T) {
 				height,
 				blocks[height],
 				blocks[height-1],
-				[]flow.RegisterEntry{makeReg("X", fmt.Sprintf("%v", i))},
+				flow.RegisterEntries{makeReg("X", fmt.Sprintf("%v", i))},
 			))
 			savedHeights <- height
 		}
@@ -617,13 +617,7 @@ func randBetween(min, max uint64) uint64 {
 }
 
 func makeReg(key string, value string) flow.RegisterEntry {
-	return flow.RegisterEntry{
-		Key: flow.RegisterID{
-			Owner: "owner",
-			Key:   key,
-		},
-		Value: []byte(value),
-	}
+	return unittest.MakeOwnerReg(key, value)
 }
 
 var unknownBlock = unittest.IdentifierFixture()
