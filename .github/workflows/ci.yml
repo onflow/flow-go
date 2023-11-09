@@ -18,7 +18,6 @@ on:
     branches:
       - master
 
-
 env:
   GO_VERSION: "1.20"
 
@@ -161,7 +160,7 @@ jobs:
             make2: test
             retries: 3
             race: 0
-            runner: ubuntu-latest
+            runner: buildjet-4vcpu-ubuntu-2204
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout repo
