@@ -689,21 +689,3 @@ func (i *TestRuntimeInterface) InteractionUsed() (uint64, error) {
 
 	return i.OnInteractionUsed()
 }
-
-func (i *TestRuntimeInterface) onTransactionExecutionStart() {
-	i.invalidateUpdatedPrograms()
-}
-
-func (i *TestRuntimeInterface) onScriptExecutionStart() {
-	i.invalidateUpdatedPrograms()
-}
-
-func (i *TestRuntimeInterface) invalidateUpdatedPrograms() {
-	if i.updatedContractCode {
-		// iteration order does not matter
-		for location := range i.Programs { //nolint:maprange
-			delete(i.Programs, location)
-		}
-		i.updatedContractCode = false
-	}
-}
