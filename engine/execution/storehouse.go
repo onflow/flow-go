@@ -30,7 +30,7 @@ type RegisterStore interface {
 	// - exception for any other exception
 	SaveRegisters(header *flow.Header, registers []flow.RegisterEntry) error
 
-	// Depend on FinalizedReader's GetFinalizedBlockIDAtHeight
+	// Depend on FinalizedReader's FinalizedBlockIDAtHeight
 	// Depend on ExecutedFinalizedWAL.Append
 	// Depend on OnDiskRegisterStore.SaveRegisters
 	// OnBlockFinalized trigger the check of whether a block at the next height becomes finalized and executed.
@@ -57,6 +57,9 @@ type RegisterStore interface {
 }
 
 type FinalizedReader interface {
+	// FinalizedBlockIDAtHeight returns the block ID of the finalized block at the given height.
+	// It return storage.NotFound if the given height has not been finalized yet
+	// any other error returned are exceptions
 	FinalizedBlockIDAtHeight(height uint64) (flow.Identifier, error)
 }
 
