@@ -81,7 +81,6 @@ func generateTestMatrix(targetPackages targets, otherPackages []string) []testMa
 // listTargetPackages returns a map-list of target packages to run as separate CI jobs, based on a list of target package prefixes.
 // It also returns a list of the "seen" packages that can then be used to extract the remaining packages to run (in a separate CI job).
 func listTargetPackages(targetPackagePrefixes []string, allFlowPackages []string) (targets, map[string]string) {
-	//func listTargetPackages(targetPackagePrefixes []string, allFlowPackages []string) (map[string][]string, map[string]string) {
 	targetPackages := make(map[string][]string)
 	targetRunners := make(map[string]string)
 
