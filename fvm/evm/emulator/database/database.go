@@ -395,6 +395,7 @@ func handleError(err error) error {
 		return nil
 	}
 	var atreeFatalError *atree.FatalError
+	// if is a atree fatal error or fvm fatal error (the second one captures external errors)
 	if stdErrors.As(err, &atreeFatalError) || errors.IsFailure(err) {
 		return types.NewFatalError(err)
 	}

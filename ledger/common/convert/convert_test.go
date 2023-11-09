@@ -30,6 +30,26 @@ func TestLedgerKeyToRegisterID(t *testing.T) {
 	require.Equal(t, expectedRegisterID, registerID)
 }
 
+func TestLedgerKeyToRegisterID_Global(t *testing.T) {
+	key := ledger.Key{
+		KeyParts: []ledger.KeyPart{
+			{
+				Type:  convert.KeyPartOwner,
+				Value: []byte(""),
+			},
+			{
+				Type:  convert.KeyPartKey,
+				Value: []byte("uuid"),
+			},
+		},
+	}
+
+	expectedRegisterID := flow.UUIDRegisterID(0)
+	registerID, err := convert.LedgerKeyToRegisterID(key)
+	require.NoError(t, err)
+	require.Equal(t, expectedRegisterID, registerID)
+}
+
 func TestLedgerKeyToRegisterID_Error(t *testing.T) {
 	key := ledger.Key{
 		KeyParts: []ledger.KeyPart{
@@ -62,6 +82,25 @@ func TestRegisterIDToLedgerKey(t *testing.T) {
 			{
 				Type:  convert.KeyPartKey,
 				Value: []byte("key"),
+			},
+		},
+	}
+
+	key := convert.RegisterIDToLedgerKey(registerID)
+	require.Equal(t, expectedKey, key)
+}
+
+func TestRegisterIDToLedgerKey_Global(t *testing.T) {
+	registerID := flow.UUIDRegisterID(0)
+	expectedKey := ledger.Key{
+		KeyParts: []ledger.KeyPart{
+			{
+				Type:  convert.KeyPartOwner,
+				Value: []byte(""),
+			},
+			{
+				Type:  convert.KeyPartKey,
+				Value: []byte("uuid"),
 			},
 		},
 	}
