@@ -88,7 +88,6 @@ func RunWithNewTestVM(t *testing.T, chain flow.Chain, f func(fvm.Context, fvm.VM
 		fvm.WithChain(chain),
 		fvm.WithAuthorizationChecksEnabled(false),
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
-		fvm.WithEVMEnabled(true),
 	}
 	ctx := fvm.NewContext(opts...)
 
@@ -97,6 +96,7 @@ func RunWithNewTestVM(t *testing.T, chain flow.Chain, f func(fvm.Context, fvm.VM
 
 	baseBootstrapOpts := []fvm.BootstrapProcedureOption{
 		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
+		// fvm.WithEVMSetupEnabled(true),
 	}
 
 	executionSnapshot, _, err := vm.Run(
@@ -107,5 +107,5 @@ func RunWithNewTestVM(t *testing.T, chain flow.Chain, f func(fvm.Context, fvm.VM
 
 	snapshotTree = snapshotTree.Append(executionSnapshot)
 
-	f(ctx, vm, snapshotTree)
+	f(fvm.NewContextFromParent(ctx, fvm.WithEVMEnabled(true)), vm, snapshotTree)
 }

@@ -789,7 +789,7 @@ func (b *bootstrapExecutor) setupEVM(service flow.Address) {
 		stdlib.ContractName,
 	)
 	txError, err := b.invokeMetaTransaction(
-		b.ctx,
+		NewContextFromParent(b.ctx, WithEVMEnabled(true)),
 		Transaction(tx, 0),
 	)
 	panicOnMetaInvokeErrf("failed to deploy EVM contract: %s", txError, err)
@@ -991,7 +991,6 @@ func (b *bootstrapExecutor) invokeMetaTransaction(
 		WithAccountStorageLimit(false),
 		WithTransactionFeesEnabled(false),
 		WithAuthorizationChecksEnabled(false),
-		WithEVMEnabled(true),
 		WithSequenceNumberCheckAndIncrementEnabled(false),
 
 		// disable interaction and computation limits for bootstrapping
