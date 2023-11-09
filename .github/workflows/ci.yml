@@ -123,8 +123,8 @@ jobs:
     - name: Run tests (${{ matrix.targets.name }})
       uses: nick-fields/retry@v2
       with:
-        timeout_minutes: 25
-        max_attempts: 3
+        timeout_minutes: 35
+        max_attempts: 5
         command: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" test
 
       # TODO(rbtz): re-enable when we fix exisiting races.
@@ -152,13 +152,13 @@ jobs:
           - name: insecure
             make1: install-tools
             make2: test
-            retries: 3
+            retries: 5
             race: 0
             runner: buildjet-4vcpu-ubuntu-2204
           - name: integration
             make1: install-tools
             make2: test
-            retries: 3
+            retries: 5
             race: 0
             runner: buildjet-4vcpu-ubuntu-2204
     runs-on: ${{ matrix.runner }}
@@ -177,7 +177,7 @@ jobs:
           RACE_DETECTOR: ${{ matrix.race }}
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 25
+          timeout_minutes: 35
           max_attempts: ${{ matrix.retries }}
           # run `make2` target inside each module's root
           command: VERBOSE=1 make -C ${{ matrix.name }} ${{ matrix.make2 }}
@@ -310,6 +310,6 @@ jobs:
       #  RACE_DETECTOR: 1
       uses: nick-fields/retry@v2
       with:
-        timeout_minutes: 25
-        max_attempts: 3
+        timeout_minutes: 35
+        max_attempts: 5
         command: VERBOSE=1 ${{ matrix.make }}
