@@ -347,3 +347,5 @@ replace github.com/onflow/flow-go => ../
 replace github.com/onflow/flow-go/insecure => ../insecure
 
 replace github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20231018182244-e72527c55c63 => github.com/AndriiDiachuk/flow/protobuf/go/flow v0.0.0-20231101114612-70243c40d6a7
+replace github.com/onflow/flow-emulator v0.54.1-0.20231024204057-0273f8fe3807 => github.com/AndriiDiachuk/flow-emulator v0.0.0-20231109125242-acdf1bcd9b05
+
