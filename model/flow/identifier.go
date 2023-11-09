@@ -27,7 +27,7 @@ type Identifier [IdentifierLen]byte
 type IdentifierFilter func(Identifier) bool
 
 // IdentifierOrder is a sort for identifier
-type IdentifierOrder func(Identifier, Identifier) bool
+type IdentifierOrder func(Identifier, Identifier) int
 
 var (
 	// ZeroID is the lowest value in the 32-byte ID space.

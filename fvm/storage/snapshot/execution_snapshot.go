@@ -29,9 +29,12 @@ func (snapshot *ExecutionSnapshot) UpdatedRegisters() flow.RegisterEntries {
 		entries = append(entries, flow.RegisterEntry{Key: key, Value: value})
 	}
 
-	slices.SortFunc(entries, func(a, b flow.RegisterEntry) bool {
-		return (a.Key.Owner < b.Key.Owner) ||
-			(a.Key.Owner == b.Key.Owner && a.Key.Key < b.Key.Key)
+	slices.SortFunc(entries, func(a, b flow.RegisterEntry) int {
+		if (a.Key.Owner < b.Key.Owner) ||
+			(a.Key.Owner == b.Key.Owner && a.Key.Key < b.Key.Key) {
+			return -1
+		}
+		return 1
 	})
 
 	return entries

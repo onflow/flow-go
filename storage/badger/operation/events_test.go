@@ -2,8 +2,9 @@ package operation
 
 import (
 	"bytes"
-	"sort"
 	"testing"
+
+	"golang.org/x/exp/slices"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/require"
@@ -67,8 +68,8 @@ func TestRetrieveEventByBlockIDTxID(t *testing.T) {
 
 		assertFunc := func(err error, expected []flow.Event, actual []flow.Event) {
 			require.NoError(t, err)
-			sortEvent(expected)
-			sortEvent(actual)
+			slices.SortStableFunc(expected, sortEvent)
+			slices.SortStableFunc(actual, sortEvent)
 			require.Equal(t, expected, actual)
 		}
 
@@ -115,23 +116,11 @@ func TestRetrieveEventByBlockIDTxID(t *testing.T) {
 }
 
 // Event retrieval does not guarantee any order, hence a sort function to help compare expected and actual events
-func sortEvent(events []flow.Event) {
-	sort.Slice(events, func(i, j int) bool {
+func sortEvent(e1, e2 flow.Event) int {
+	tComp := bytes.Compare(e1.TransactionID[:], e2.TransactionID[:])
+	if tComp != 0 { // if transaction IDs are not same return
+		return tComp
+	}
 
-		tComp := bytes.Compare(events[i].TransactionID[:], events[j].TransactionID[:])
-		if tComp < 0 {
-			return true
-		}
-		if tComp > 0 {
-			return false
-		}
-
-		txIndex := events[i].TransactionIndex == events[j].TransactionIndex
-		if !txIndex {
-			return events[i].TransactionIndex < events[j].TransactionIndex
-		}
-
-		return events[i].EventIndex < events[j].EventIndex
-
-	})
+	return (int)(e1.TransactionIndex - e2.TransactionIndex)
 }

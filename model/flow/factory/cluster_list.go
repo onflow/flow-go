@@ -43,7 +43,7 @@ func NewClusterList(assignments flow.AssignmentList, collectors flow.IdentityLis
 			delete(lookup, participantID)
 
 			if i > 0 {
-				if !order.IdentifierCanonical(prev, participantID) {
+				if order.IdentifierCanonical(prev, participantID) > 0 {
 					return nil, fmt.Errorf("the assignments is not sorted in canonical order in cluster index %v, prev %v, next %v",
 						i, prev, participantID)
 				}

@@ -2,9 +2,9 @@ package flow
 
 import (
 	"bytes"
-	"sort"
 
 	"github.com/rs/zerolog/log"
+	"golang.org/x/exp/slices"
 )
 
 // IdentifierList defines a sortable list of identifiers
@@ -122,8 +122,8 @@ IDLoop:
 
 func (il IdentifierList) Sort(less IdentifierOrder) IdentifierList {
 	dup := il.Copy()
-	sort.Slice(dup, func(i int, j int) bool {
-		return less(dup[i], dup[j])
+	slices.SortFunc(dup, func(i Identifier, j Identifier) int {
+		return less(i, j)
 	})
 	return dup
 }
@@ -133,7 +133,7 @@ func (il IdentifierList) Sorted(less IdentifierOrder) bool {
 	for i := 0; i < len(il)-1; i++ {
 		a := il[i]
 		b := il[i+1]
-		if !less(a, b) {
+		if less(a, b) > 0 {
 			return false
 		}
 	}

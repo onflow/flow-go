@@ -2,12 +2,12 @@ package unittest
 
 import (
 	"fmt"
-	"sort"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/order"
+	"golang.org/x/exp/slices"
 )
 
 // TransactionForCluster generates a transaction that will be assigned to the
@@ -51,8 +51,8 @@ func ClusterAssignment(n uint, nodes flow.IdentityList) flow.AssignmentList {
 	collectors := nodes.Filter(filter.HasRole(flow.RoleCollection))
 
 	// order, so the same list results in the same
-	sort.Slice(collectors, func(i, j int) bool {
-		return order.Canonical(collectors[i], collectors[j])
+	slices.SortFunc(collectors, func(i, j *flow.Identity) int {
+		return order.Canonical(i, j)
 	})
 
 	assignments := make(flow.AssignmentList, n)

@@ -2,8 +2,9 @@ package verification_test
 
 import (
 	"bytes"
-	"sort"
 	"testing"
+
+	"golang.org/x/exp/slices"
 
 	"github.com/stretchr/testify/require"
 
@@ -49,11 +50,11 @@ func TestChunkDataPackRequestList_UniqueRequestInfo(t *testing.T) {
 
 	// pre-sorting these because the call to 'Union' will sort them, and the 'Equal' test requires
 	// that the order be the same
-	sort.Slice(thisChunkIDReqInfo.Agrees, func(p, q int) bool {
-		return bytes.Compare(thisChunkIDReqInfo.Agrees[p][:], thisChunkIDReqInfo.Agrees[q][:]) < 0
+	slices.SortStableFunc(thisChunkIDReqInfo.Agrees, func(p, q flow.Identifier) int {
+		return bytes.Compare(p[:], q[:])
 	})
-	sort.Slice(thisChunkIDReqInfo.Disagrees, func(p, q int) bool {
-		return bytes.Compare(thisChunkIDReqInfo.Disagrees[p][:], thisChunkIDReqInfo.Disagrees[q][:]) < 0
+	slices.SortStableFunc(thisChunkIDReqInfo.Disagrees, func(p, q flow.Identifier) int {
+		return bytes.Compare(p[:], q[:])
 	})
 
 	thisChunkIDReqInfo.Targets = thisChunkIDReqInfo.Targets.Sort(order.Canonical)

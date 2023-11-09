@@ -7,7 +7,7 @@ import (
 )
 
 // Canonical represents the canonical ordering for identity lists.
-func Canonical(identity1 *flow.Identity, identity2 *flow.Identity) bool {
+func Canonical(identity1 *flow.Identity, identity2 *flow.Identity) int {
 	return IdentifierCanonical(identity1.NodeID, identity2.NodeID)
 }
 
@@ -37,7 +37,7 @@ func IdentityListCanonical(identities flow.IdentityList) bool {
 	prev := identities[0].ID()
 	for i := 1; i < len(identities); i++ {
 		id := identities[i].ID()
-		if !IdentifierCanonical(prev, id) {
+		if IdentifierCanonical(prev, id) > 0 {
 			return false
 		}
 		prev = id
