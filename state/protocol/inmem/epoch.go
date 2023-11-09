@@ -2,6 +2,7 @@ package inmem
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
@@ -35,6 +36,10 @@ func (e Epoch) InitialIdentities() (flow.IdentityList, error) {
 }
 func (e Epoch) RandomSource() ([]byte, error) {
 	return e.enc.RandomSource, nil
+}
+
+func (e Epoch) TargetEndTime() (time.Time, error) {
+	return e.enc.TargetEndTime, nil
 }
 
 func (e Epoch) Clustering() (flow.ClusterList, error) {
@@ -141,6 +146,10 @@ func (es *setupEpoch) DKGPhase3FinalView() (uint64, error) {
 
 func (es *setupEpoch) FinalView() (uint64, error) {
 	return es.setupEvent.FinalView, nil
+}
+
+func (es *setupEpoch) TargetEndTime() (time.Time, error) {
+	return es.setupEvent.TargetEndTime, nil
 }
 
 func (es *setupEpoch) RandomSource() ([]byte, error) {

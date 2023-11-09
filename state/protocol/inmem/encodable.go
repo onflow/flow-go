@@ -4,6 +4,7 @@ import (
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
+	"time"
 )
 
 // EncodableSnapshot is the encoding format for protocol.Snapshot
@@ -36,6 +37,7 @@ type EncodableEpoch struct {
 	DKGPhase3FinalView uint64
 	FinalView          uint64
 	RandomSource       []byte
+	TargetEndTime      time.Time
 	InitialIdentities  flow.IdentityList
 	Clustering         flow.ClusterList
 	Clusters           []EncodableCluster

@@ -3,6 +3,7 @@ package invalid
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state"
@@ -87,6 +88,10 @@ func (u *Epoch) DKG() (protocol.DKG, error) {
 
 func (u *Epoch) RandomSource() ([]byte, error) {
 	return nil, u.err
+}
+
+func (u *Epoch) TargetEndTime() (time.Time, error) {
+	return time.Time{}, u.err
 }
 
 func (u *Epoch) FirstHeight() (uint64, error) {
