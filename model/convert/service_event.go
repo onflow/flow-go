@@ -3,6 +3,7 @@ package convert
 import (
 	"encoding/hex"
 	"fmt"
+	"time"
 
 	"github.com/coreos/go-semver/semver"
 	"github.com/onflow/cadence"
@@ -54,7 +55,7 @@ func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error)
 		return nil, invalidCadenceTypeError("payload", payload, cadence.Event{})
 	}
 
-	const expectedFieldCount = 9
+	const expectedFieldCount = 10
 	if len(cdcEvent.Fields) < expectedFieldCount {
 		return nil, fmt.Errorf(
 			"insufficient fields in EpochSetup event (%d < %d)",
@@ -78,6 +79,8 @@ func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error)
 	var dkgPhase3FinalView cadence.UInt64
 	var cdcClusters cadence.Array
 	var cdcParticipants cadence.Array
+	var targetEndTimeUnix cadence.UInt64
+
 	var foundFieldCount int
 
 	evt := cdcEvent.Type().(*cadence.EventType)
@@ -150,6 +153,17 @@ func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error)
 				)
 			}
 
+		case "targetEndTime":
+			foundFieldCount++
+			targetEndTimeUnix, ok = cdcEvent.Fields[i].(cadence.UInt64)
+			if !ok {
+				return nil, invalidCadenceTypeError(
+					"targetEndTime",
+					cdcEvent.Fields[i],
+					cadence.UInt64(0),
+				)
+			}
+
 		case "DKGPhase1FinalView":
 			foundFieldCount++
 			dkgPhase1FinalView, ok = cdcEvent.Fields[i].(cadence.UInt64)
@@ -217,6 +231,7 @@ func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error)
 			err,
 		)
 	}
+	setup.TargetEndTime = time.Unix(int64(targetEndTimeUnix), 0)
 
 	// parse cluster assignments
 	setup.Assignments, err = convertClusterAssignments(cdcClusters.Values)

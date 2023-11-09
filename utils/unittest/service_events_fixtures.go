@@ -4,6 +4,7 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/onflow/cadence/runtime/common"
+	"time"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -37,6 +38,7 @@ func EpochSetupFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochSetu
 		DKGPhase2FinalView: 160,
 		DKGPhase3FinalView: 170,
 		RandomSource:       randomSource,
+		TargetEndTime:      time.Unix(2000000000, 0),
 		Assignments: flow.AssignmentList{
 			{
 				flow.MustHexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000001"),
@@ -203,6 +205,9 @@ func createEpochSetupEvent() cadence.Event {
 
 		// DKGPhase3FinalView
 		cadence.UInt64(170),
+
+		// targetEndTime
+		cadence.UInt64(time.Unix(2000000000, 0).Unix()),
 	}).WithType(newFlowEpochEpochSetupEventType())
 }
 
@@ -879,6 +884,10 @@ func newFlowEpochEpochSetupEventType() *cadence.EventType {
 			},
 			{
 				Identifier: "DKGPhase3FinalView",
+				Type:       cadence.UInt64Type{},
+			},
+			{
+				Identifier: "targetEndTime",
 				Type:       cadence.UInt64Type{},
 			},
 		},
