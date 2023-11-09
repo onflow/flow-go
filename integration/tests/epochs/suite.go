@@ -451,18 +451,20 @@ func (s *Suite) getContainerToReplace(role flow.Role) *testnet.Container {
 
 // AwaitEpochPhase waits for the given phase, in the given epoch.
 func (s *Suite) AwaitEpochPhase(ctx context.Context, expectedEpoch uint64, expectedPhase flow.EpochPhase, waitFor, tick time.Duration) {
+	var actualEpoch uint64
+	var actualPhase flow.EpochPhase
 	condition := func() bool {
 		snapshot, err := s.Client.GetLatestProtocolSnapshot(ctx)
 		require.NoError(s.T(), err)
 
-		actualEpoch, err := snapshot.Epochs().Current().Counter()
+		actualEpoch, err = snapshot.Epochs().Current().Counter()
 		require.NoError(s.T(), err)
-		actualPhase, err := snapshot.Phase()
+		actualPhase, err = snapshot.Phase()
 		require.NoError(s.T(), err)
 
 		return actualEpoch == expectedEpoch && actualPhase == expectedPhase
 	}
-	require.Eventuallyf(s.T(), condition, waitFor, tick, "did not reach expectedEpoch %d phase %s within %s", expectedEpoch, expectedPhase, waitFor)
+	require.Eventuallyf(s.T(), condition, waitFor, tick, "did not reach expectedEpoch %d phase %s within %s. Last saw epoch=%d and phase=%s", expectedEpoch, expectedPhase, waitFor, actualEpoch, actualPhase)
 }
 
 // AssertInEpochPhase checks if we are in the phase of the given epoch.
@@ -640,7 +642,7 @@ func (s *Suite) RunTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 
 	// wait for epoch setup phase before we start our container and pause the old container
 	s.TimedLogf("waiting for EpochSetup phase of first epoch to begin")
-	s.AwaitEpochPhase(s.Ctx, 0, flow.EpochPhaseSetup, 3*time.Minute, 500*time.Millisecond)
+	s.AwaitEpochPhase(s.Ctx, 0, flow.EpochPhaseSetup, time.Minute, 500*time.Millisecond)
 	s.TimedLogf("successfully reached EpochSetup phase of first epoch")
 
 	// get the latest snapshot and start new container with it
