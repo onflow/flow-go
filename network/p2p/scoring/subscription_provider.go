@@ -2,7 +2,6 @@ package scoring
 
 import (
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/go-playground/validator/v10"
@@ -33,7 +32,6 @@ type SubscriptionProvider struct {
 	idProvider module.IdentityProvider
 
 	// allTopics is a list of all topics in the pubsub network that this node is subscribed to.
-	allTopicsLock           sync.RWMutex  // protects allTopics
 	allTopicsUpdate         atomic.Bool   // whether a goroutine is already updating the list of topics
 	allTopicsUpdateInterval time.Duration // the interval for updating the list of topics in the pubsub network that this node has subscribed to.
 }
