@@ -2,7 +2,9 @@ package execution
 
 import (
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/finalizedreader"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/pebble"
 )
 
 // RegisterStore is the interface for register store
@@ -58,6 +60,9 @@ type FinalizedReader interface {
 	FinalizedBlockIDAtHeight(height uint64) (flow.Identifier, error)
 }
 
+// finalizedreader.FinalizedReader is an implementation of FinalizedReader interface
+var _ FinalizedReader = (*finalizedreader.FinalizedReader)(nil)
+
 // see implementation in engine/execution/storehouse/in_memory_register_store.go
 type InMemoryRegisterStore interface {
 	Prune(finalizedHeight uint64, finalizedBlockID flow.Identifier) error
@@ -79,6 +84,9 @@ type InMemoryRegisterStore interface {
 }
 
 type OnDiskRegisterStore = storage.RegisterIndex
+
+// pebble.Registers is an implementation of OnDiskRegisterStore interface
+var _ OnDiskRegisterStore = (*pebble.Registers)(nil)
 
 type ExecutedFinalizedWAL interface {
 	Append(height uint64, registers []flow.RegisterEntry) error
