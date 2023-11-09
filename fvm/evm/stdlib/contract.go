@@ -289,16 +289,18 @@ const internalEVMTypeDepositFunctionName = "deposit"
 var internalEVMTypeDepositFunctionType = &sema.FunctionType{
 	Parameters: []sema.Parameter{
 		{
-			Label:          "to",
-			TypeAnnotation: sema.NewTypeAnnotation(evmAddressBytesType),
+			Label:          "from",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.AnyResourceType),
 		},
 		{
-			Label:          "amount",
-			TypeAnnotation: sema.NewTypeAnnotation(sema.UFix64Type),
+			Label:          "to",
+			TypeAnnotation: sema.NewTypeAnnotation(evmAddressBytesType),
 		},
 	},
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.VoidType),
 }
+
+const fungibleTokenVaultTypeBalanceFieldName = "balance"
 
 func newInternalEVMTypeDepositFunction(
 	gauge common.MemoryGauge,
@@ -311,9 +313,27 @@ func newInternalEVMTypeDepositFunction(
 			inter := invocation.Interpreter
 			locationRange := invocation.LocationRange
 
+			// Get from vault
+
+			fromValue, ok := invocation.Arguments[0].(*interpreter.CompositeValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			amountValue, ok := fromValue.GetField(
+				inter,
+				locationRange,
+				fungibleTokenVaultTypeBalanceFieldName,
+			).(interpreter.UFix64Value)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			amount := types.Balance(amountValue)
+
 			// Get to address
 
-			toAddressValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			toAddressValue, ok := invocation.Arguments[1].(*interpreter.ArrayValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
@@ -323,14 +343,10 @@ func newInternalEVMTypeDepositFunction(
 				panic(err)
 			}
 
-			// Get amount
-
-			amountValue, ok := invocation.Arguments[1].(interpreter.UFix64Value)
-			if !ok {
-				panic(errors.NewUnreachableError())
-			}
-
-			amount := types.Balance(amountValue)
+			// NOTE: We're intentionally not destroying the vault here,
+			// because the value of it is supposed to be "kept alive".
+			// Destroying would incorrectly be equivalent to a burn and decrease the total supply,
+			// and a withdrawal would then have to perform an actual mint of new tokens.
 
 			// Deposit
 

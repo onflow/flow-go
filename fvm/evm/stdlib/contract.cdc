@@ -20,10 +20,9 @@ contract EVM {
         access(all)
         fun deposit(from: @FlowToken.Vault) {
             let amount = from.balance
-            destroy from
             InternalEVM.deposit(
-                to: self.bytes,
-                amount: amount
+                from: <-from,
+                to: self.bytes
             )
         }
     }
