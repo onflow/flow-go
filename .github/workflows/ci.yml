@@ -220,7 +220,7 @@ jobs:
           gcr.io/flow-container-registry/execution-corrupted:latest \
           gcr.io/flow-container-registry/verification-corrupted:latest > flow-docker-images.tar
       - name: Cache Docker images
-        uses: buildjet/cache@v3
+        uses: actions/cache@v3
         with:
           path: flow-docker-images.tar
           # use the workflow run id as part of the cache key to ensure these docker images will only be used for a single workflow run
@@ -297,7 +297,7 @@ jobs:
     - name: Build relic
       run: make crypto_setup_gopath
     - name: Load cached Docker images
-      uses: buildjet/cache@v3
+      uses: actions/cache@v3
       with:
         path: flow-docker-images.tar
         # use the same cache key as the docker-build job
