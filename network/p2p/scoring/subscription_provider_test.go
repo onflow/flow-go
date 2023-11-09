@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
+	"github.com/onflow/flow-go/network/p2p"
 	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
 	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/utils/slices"
@@ -29,9 +30,11 @@ func TestSubscriptionProvider_GetSubscribedTopics(t *testing.T) {
 	cfg.NetworkConfig.SubscriptionProviderConfig.SubscriptionUpdateInterval = 100 * time.Millisecond
 
 	sp, err := scoring.NewSubscriptionProvider(&scoring.SubscriptionProviderConfig{
-		Logger:        unittest.Logger(),
-		TopicProvider: tp,
-		Params:        &cfg.NetworkConfig.SubscriptionProviderConfig,
+		Logger: unittest.Logger(),
+		TopicProviderOracle: func() p2p.TopicProvider {
+			return tp
+		},
+		Params: &cfg.NetworkConfig.SubscriptionProviderConfig,
 	})
 	require.NoError(t, err)
 
