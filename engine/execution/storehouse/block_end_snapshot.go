@@ -1,11 +1,13 @@
 package storehouse
 
 import (
+	"errors"
 	"sync"
 
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 )
 
 var _ snapshot.StorageSnapshot = (*BlockEndStateSnapshot)(nil)
@@ -35,22 +37,41 @@ func NewBlockEndStateSnapshot(
 	}
 }
 
+// Get returns the value of the register with the given register ID.
+// It returns:
+// - (value, nil) if the register exists
+// - (nil, storage.ErrNotFound) if the register does not exist
+// - (nil, storage.ErrHeightNotIndexed) if the height is below the first height that is indexed.
+// - (nil, storehouse.ErrNotExecuted) if the block is not executed yet
+// - (nil, storehouse.ErrNotExecuted) if the block is conflicting iwth finalized block
+// - (nil, err) for any other exceptions
 func (s *BlockEndStateSnapshot) Get(id flow.RegisterID) (flow.RegisterValue, error) {
 	value, ok := s.getFromCache(id)
 	if ok {
+		if value == nil {
+			return nil, storage.ErrNotFound
+		}
 		return value, nil
 	}
 
 	value, err := s.getFromStorage(id)
 	if err != nil {
-		return nil, err
+		if errors.Is(err, storage.ErrNotFound) {
+			// if the error is not found, we return a nil RegisterValue,
+			// in this case, the nil value can be cached, because the storage will not change it
+			value = nil
+		} else {
+			// if the error is not found, such as storage.ErrHeightNotIndexed, storehouse.ErrNotExecuted
+			// we return the error without caching
+			return nil, err
+		}
 	}
 
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
 	s.readCache[id] = value
-	return value, nil
+	return value, err
 }
 
 func (s *BlockEndStateSnapshot) getFromCache(id flow.RegisterID) (flow.RegisterValue, bool) {
