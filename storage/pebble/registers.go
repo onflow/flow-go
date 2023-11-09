@@ -59,9 +59,12 @@ func (s *Registers) Get(
 			fmt.Sprintf("height %d not indexed, indexed range is [%d-%d]", height, s.firstHeight, latestHeight),
 		)
 	}
-	iter := s.db.NewIter(&pebble.IterOptions{
+	iter, err := s.db.NewIter(&pebble.IterOptions{
 		UseL6Filters: true,
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	defer iter.Close()
 
