@@ -12,9 +12,11 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/p2pconf"
 	"github.com/onflow/flow-go/network/p2p/p2plogging"
+	"github.com/onflow/flow-go/network/p2p/scoring/internal"
 )
 
 // SubscriptionProvider provides a list of topics a peer is subscribed to.
@@ -37,10 +39,11 @@ type SubscriptionProvider struct {
 }
 
 type SubscriptionProviderConfig struct {
-	Logger              zerolog.Logger           `validate:"required"`
-	TopicProviderOracle func() p2p.TopicProvider `validate:"required"`
-	IdProvider          module.IdentityProvider  `validate:"required"`
-	Params              *p2pconf.SubscriptionProviderParameters
+	Logger                  zerolog.Logger                          `validate:"required"`
+	TopicProviderOracle     func() p2p.TopicProvider                `validate:"required"`
+	IdProvider              module.IdentityProvider                 `validate:"required"`
+	HeroCacheMetricsFactory metrics.HeroCacheMetricsFactory         `validate:"required"`
+	Params                  *p2pconf.SubscriptionProviderParameters `validate:"required"`
 }
 
 var _ p2p.SubscriptionProvider = (*SubscriptionProvider)(nil)
@@ -50,10 +53,15 @@ func NewSubscriptionProvider(cfg *SubscriptionProviderConfig) (*SubscriptionProv
 		return nil, fmt.Errorf("invalid subscription provider config: %w", err)
 	}
 
+	cacheMetrics := metrics.NewSubscriptionRecordCacheMetricsFactory(cfg.HeroCacheMetricsFactory)
+	cache := internal.NewSubscriptionRecordCache(cfg.Params.CacheSize, cfg.Logger, cacheMetrics)
+
 	p := &SubscriptionProvider{
 		logger:                  cfg.Logger.With().Str("module", "subscription_provider").Logger(),
 		topicProviderOracle:     cfg.TopicProviderOracle,
 		allTopicsUpdateInterval: cfg.Params.SubscriptionUpdateInterval,
+		idProvider:              cfg.IdProvider,
+		cache:                   cache,
 	}
 
 	builder := component.NewComponentManagerBuilder()
@@ -103,13 +111,13 @@ func (s *SubscriptionProvider) updateTopics(ctx irrecoverable.SignalerContext) {
 	for _, topic := range allTopics {
 		peers := s.topicProviderOracle().ListPeers(topic)
 
-		if _, authorized := s.idProvider.ByPeerID(peers[0]); !authorized {
-			// peer is not authorized (staked); hence it does not have a valid role in the network; and
-			// we skip the topic update for this peer (also avoiding sybil attacks on the cache).
-			continue
-		}
-
 		for _, p := range peers {
+			if _, authorized := s.idProvider.ByPeerID(p); !authorized {
+				// peer is not authorized (staked); hence it does not have a valid role in the network; and
+				// we skip the topic update for this peer (also avoiding sybil attacks on the cache).
+				continue
+			}
+
 			updatedTopics, err := s.cache.AddTopicForPeer(p, topic)
 			if err != nil {
 				// this is an irrecoverable error; hence, we crash the node.

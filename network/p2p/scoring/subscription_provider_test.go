@@ -7,10 +7,13 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/assert"
+	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/p2p"
 	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
@@ -25,6 +28,7 @@ func TestSubscriptionProvider_GetSubscribedTopics(t *testing.T) {
 	tp := mockp2p.NewTopicProvider(t)
 	cfg, err := config.DefaultConfig()
 	require.NoError(t, err)
+	idProvider := mock.NewIdentityProvider(t)
 
 	// set a low update interval to speed up the test
 	cfg.NetworkConfig.SubscriptionProviderConfig.SubscriptionUpdateInterval = 100 * time.Millisecond
@@ -34,7 +38,9 @@ func TestSubscriptionProvider_GetSubscribedTopics(t *testing.T) {
 		TopicProviderOracle: func() p2p.TopicProvider {
 			return tp
 		},
-		Params: &cfg.NetworkConfig.SubscriptionProviderConfig,
+		Params:                  &cfg.NetworkConfig.SubscriptionProviderConfig,
+		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
+		IdProvider:              idProvider,
 	})
 	require.NoError(t, err)
 
@@ -43,6 +49,8 @@ func TestSubscriptionProvider_GetSubscribedTopics(t *testing.T) {
 	peer1 := p2pfixtures.PeerIdFixture(t)
 	peer2 := p2pfixtures.PeerIdFixture(t)
 	peer3 := p2pfixtures.PeerIdFixture(t)
+
+	idProvider.On("ByPeerID", mockery.Anything).Return(unittest.IdentityFixture(), true).Maybe()
 
 	// mock peers 1 and 2 subscribed to topic 1 (along with other random peers)
 	tp.On("ListPeers", "topic1").Return(append([]peer.ID{peer1, peer2}, p2pfixtures.PeerIdsFixture(t, 10)...))

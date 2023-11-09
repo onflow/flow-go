@@ -55,7 +55,7 @@ func (s *SubscriptionRecordCache) GetSubscribedTopics(pid peer.ID) ([]string, bo
 	if !ok {
 		return nil, false
 	}
-	return e.(*SubscriptionRecordEntity).Topics, true
+	return e.(SubscriptionRecordEntity).Topics, true
 }
 
 // MoveToNextUpdateCycle moves the subscription cache to the next update cycle.
