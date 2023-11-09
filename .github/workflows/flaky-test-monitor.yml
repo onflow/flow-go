@@ -5,10 +5,9 @@ name: Flaky Test Monitor
 on:
   schedule:
     - cron: '0 */2 * * *' # every 2 hours
-#  push:
-#    paths:
-#      - '.github/workflows/flaky-test-monitor.yml'
-#      - '.github/workflows/ci.yml'
+  push:
+    paths:
+      - '.github/workflows/flaky-test-monitor.yml'
 
 env:
   BIGQUERY_DATASET: production_src_flow_test_metrics
