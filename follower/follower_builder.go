@@ -597,7 +597,7 @@ func (builder *FollowerServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 		networkKey,
 		builder.SporkID,
 		builder.IdentityProvider,
-		&builder.FlowConfig.NetworkConfig.ResourceManagerConfig,
+		&builder.FlowConfig.NetworkConfig.ResourceManager,
 		&builder.FlowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig,
 		p2pconfig.PeerManagerDisableConfig(), // disable peer manager for follower
 		&builder.FlowConfig.NetworkConfig.GossipSubConfig.SubscriptionProviderConfig,

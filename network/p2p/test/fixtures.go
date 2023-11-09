@@ -139,7 +139,7 @@ func NodeFixture(
 		parameters.Key,
 		sporkID,
 		parameters.IdProvider,
-		&defaultFlowConfig.NetworkConfig.ResourceManagerConfig,
+		&defaultFlowConfig.NetworkConfig.ResourceManager,
 		&parameters.FlowConfig.NetworkConfig.GossipSubRPCInspectorsConfig,
 		parameters.PeerManagerConfig,
 		&parameters.FlowConfig.NetworkConfig.GossipSubConfig.SubscriptionProviderConfig,
