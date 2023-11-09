@@ -23,15 +23,17 @@ func TestEVMRun(t *testing.T) {
 
 	t.Parallel()
 
-	RunWithTestBackend(t, func(backend types.Backend) {
-		RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
-			RunWithDeployedContract(t, backend, rootAddr, func(testContract *TestContract) {
-				RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *EOATestAccount) {
-					num := int64(12)
-					chain := flow.Emulator.Chain()
-					RunWithNewTestVM(t, chain, func(ctx fvm.Context, vm fvm.VM, snapshot snapshot.SnapshotTree) {
-						code := []byte(fmt.Sprintf(
-							`
+	t.Run("testing EVM.run (happy case)", func(t *testing.T) {
+		RunWithTestBackend(t, func(backend types.Backend) {
+			RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+				RunWithDeployedContract(t, backend, rootAddr, func(testContract *TestContract) {
+					RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *EOATestAccount) {
+						num := int64(12)
+						chain := flow.Emulator.Chain()
+
+						RunWithNewTestVM(t, chain, func(ctx fvm.Context, vm fvm.VM, snapshot snapshot.SnapshotTree) {
+							code := []byte(fmt.Sprintf(
+								`
                           import EVM from %s
 
                           access(all)
@@ -40,42 +42,39 @@ func TestEVMRun(t *testing.T) {
                               EVM.run(tx: tx, coinbase: coinbase)
                           }
                         `,
-							chain.ServiceAddress().HexWithPrefix(),
-						))
+								chain.ServiceAddress().HexWithPrefix(),
+							))
 
-						gasLimit := uint64(100_000)
+							gasLimit := uint64(100_000)
 
-						txBytes := testAccount.PrepareSignAndEncodeTx(t,
-							testContract.DeployedAt.ToCommon(),
-							testContract.MakeStoreCallData(t, big.NewInt(num)),
-							big.NewInt(0),
-							gasLimit,
-							big.NewInt(0),
-						)
+							txBytes := testAccount.PrepareSignAndEncodeTx(t,
+								testContract.DeployedAt.ToCommon(),
+								testContract.MakeStoreCallData(t, big.NewInt(num)),
+								big.NewInt(0),
+								gasLimit,
+								big.NewInt(0),
+							)
 
-						tx := cadence.NewArray(
-							ConvertToCadence(txBytes),
-						).WithType(stdlib.EVMTransactionBytesCadenceType)
+							tx := cadence.NewArray(
+								ConvertToCadence(txBytes),
+							).WithType(stdlib.EVMTransactionBytesCadenceType)
 
-						coinbase := cadence.NewArray(
-							ConvertToCadence(testAccount.Address().Bytes()),
-						).WithType(stdlib.EVMAddressBytesCadenceType)
+							coinbase := cadence.NewArray(
+								ConvertToCadence(testAccount.Address().Bytes()),
+							).WithType(stdlib.EVMAddressBytesCadenceType)
 
-						script := fvm.Script(code).WithArguments(
-							json.MustEncode(tx),
-							json.MustEncode(coinbase),
-						)
+							script := fvm.Script(code).WithArguments(
+								json.MustEncode(tx),
+								json.MustEncode(coinbase),
+							)
 
-						executionSnapshot, output, err := vm.Run(
-							ctx,
-							script,
-							snapshot)
-						require.NoError(t, err)
-						require.NoError(t, output.Err)
-
-						// TODO:
-						_ = executionSnapshot
-						// snapshot = snapshot.Append(executionSnapshot)
+							_, output, err := vm.Run(
+								ctx,
+								script,
+								snapshot)
+							require.NoError(t, err)
+							require.NoError(t, output.Err)
+						})
 					})
 				})
 			})
