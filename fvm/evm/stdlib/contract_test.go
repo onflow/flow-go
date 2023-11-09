@@ -115,6 +115,307 @@ func (t *testFlowAccount) Call(address types.Address, data types.Data, limit typ
 	return t.call(address, data, limit, balance)
 }
 
+func TestEVMEncodeABI(t *testing.T) {
+
+	t.Parallel()
+
+	handler := &testContractHandler{}
+
+	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
+
+	contractAddress := flow.BytesToAddress([]byte{0x1})
+
+	stdlib.SetupEnvironment(env, handler, contractAddress)
+
+	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+
+	script := []byte(`
+      import EVM from 0x1
+
+      access(all)
+      fun main(): [UInt8] {
+        return EVM.encodeABI(arguments: ["John", "Doe", UInt64(33)])
+      }
+    `)
+
+	accountCodes := map[common.Location][]byte{}
+	var events []cadence.Event
+
+	runtimeInterface := &TestRuntimeInterface{
+		Storage: NewTestLedger(nil, nil),
+		OnGetSigningAccounts: func() ([]runtime.Address, error) {
+			return []runtime.Address{runtime.Address(contractAddress)}, nil
+		},
+		OnResolveLocation: SingleIdentifierLocationResolver(t),
+		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+			accountCodes[location] = code
+			return nil
+		},
+		OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+			code = accountCodes[location]
+			return code, nil
+		},
+		OnEmitEvent: func(event cadence.Event) error {
+			events = append(events, event)
+			return nil
+		},
+		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+			return json.Decode(nil, b)
+		},
+	}
+
+	nextTransactionLocation := NewTransactionLocationGenerator()
+	nextScriptLocation := NewScriptLocationGenerator()
+
+	// Deploy EVM contract
+
+	err := rt.ExecuteTransaction(
+		runtime.Script{
+			Source: blueprints.DeployContractTransactionTemplate,
+			Arguments: EncodeArgs([]cadence.Value{
+				cadence.String(stdlib.ContractName),
+				cadence.String(stdlib.ContractCode),
+			}),
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: env,
+			Location:    nextTransactionLocation(),
+		},
+	)
+	require.NoError(t, err)
+
+	// Run script
+
+	result, err := rt.ExecuteScript(
+		runtime.Script{
+			Source:    script,
+			Arguments: [][]byte{},
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: env,
+			Location:    nextScriptLocation(),
+		},
+	)
+	require.NoError(t, err)
+
+	encodedABI := cadence.NewArray(
+		[]cadence.Value{
+			cadence.UInt8(0xef), cadence.UInt8(0x84), cadence.UInt8(0xad), cadence.UInt8(0x63),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x60),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0xa0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x21),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x4),
+			cadence.UInt8(0x4a), cadence.UInt8(0x6f), cadence.UInt8(0x68), cadence.UInt8(0x6e),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x3),
+			cadence.UInt8(0x44), cadence.UInt8(0x6f), cadence.UInt8(0x65), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0)},
+	).WithType(cadence.NewVariableSizedArrayType(cadence.TheUInt8Type))
+	assert.Equal(t,
+		encodedABI,
+		result,
+	)
+}
+
+func TestEVMDecodeABI(t *testing.T) {
+
+	t.Parallel()
+
+	handler := &testContractHandler{}
+
+	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
+
+	contractAddress := flow.BytesToAddress([]byte{0x1})
+
+	stdlib.SetupEnvironment(env, handler, contractAddress)
+
+	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+
+	script := []byte(`
+      import EVM from 0x1
+
+      access(all)
+      fun main(data: [UInt8]): Bool {
+		let unpacked = EVM.decodeABI(data: data)
+		assert(unpacked.length == 3, message: "".concat(unpacked.length.toString()))
+        return true
+      }
+    `)
+
+	accountCodes := map[common.Location][]byte{}
+	var events []cadence.Event
+
+	runtimeInterface := &TestRuntimeInterface{
+		Storage: NewTestLedger(nil, nil),
+		OnGetSigningAccounts: func() ([]runtime.Address, error) {
+			return []runtime.Address{runtime.Address(contractAddress)}, nil
+		},
+		OnResolveLocation: SingleIdentifierLocationResolver(t),
+		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+			accountCodes[location] = code
+			return nil
+		},
+		OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+			code = accountCodes[location]
+			return code, nil
+		},
+		OnEmitEvent: func(event cadence.Event) error {
+			events = append(events, event)
+			return nil
+		},
+		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+			return json.Decode(nil, b)
+		},
+	}
+
+	nextTransactionLocation := NewTransactionLocationGenerator()
+	nextScriptLocation := NewScriptLocationGenerator()
+
+	// Deploy EVM contract
+
+	err := rt.ExecuteTransaction(
+		runtime.Script{
+			Source: blueprints.DeployContractTransactionTemplate,
+			Arguments: EncodeArgs([]cadence.Value{
+				cadence.String(stdlib.ContractName),
+				cadence.String(stdlib.ContractCode),
+			}),
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: env,
+			Location:    nextTransactionLocation(),
+		},
+	)
+	require.NoError(t, err)
+
+	// Run script
+	encodedABI := cadence.NewArray(
+		[]cadence.Value{
+			cadence.UInt8(0xef), cadence.UInt8(0x84), cadence.UInt8(0xad), cadence.UInt8(0x63),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x60),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0xa0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x21),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x4),
+			cadence.UInt8(0x4a), cadence.UInt8(0x6f), cadence.UInt8(0x68), cadence.UInt8(0x6e),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x3),
+			cadence.UInt8(0x44), cadence.UInt8(0x6f), cadence.UInt8(0x65), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0),
+			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0)},
+	).WithType(cadence.NewVariableSizedArrayType(cadence.TheUInt8Type))
+
+	_, err = rt.ExecuteScript(
+		runtime.Script{
+			Source: script,
+			Arguments: EncodeArgs([]cadence.Value{
+				encodedABI,
+			}),
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: env,
+			Location:    nextScriptLocation(),
+		},
+	)
+	require.NoError(t, err)
+}
+
 func TestEVMAddressConstructionAndReturn(t *testing.T) {
 
 	t.Parallel()

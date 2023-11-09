@@ -2,7 +2,9 @@ package stdlib
 
 import (
 	_ "embed"
+	"strings"
 
+	gethABI "github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
@@ -26,6 +28,99 @@ var evmTransactionBytesType = sema.NewVariableSizedType(nil, sema.UInt8Type)
 var evmAddressBytesType = sema.NewConstantSizedType(nil, sema.UInt8Type, types.AddressLength)
 var evmAddressBytesStaticType = interpreter.ConvertSemaArrayTypeToStaticArrayType(nil, evmAddressBytesType)
 var EVMAddressBytesCadenceType = cadence.NewConstantSizedArrayType(types.AddressLength, cadence.TheUInt8Type)
+
+// EVM.encodeABI
+
+const internalEVMTypeEncodeABIFunctionName = "encodeABI"
+
+var internalEVMTypeEncodeABIFunctionType = &sema.FunctionType{
+	Parameters: []sema.Parameter{
+		{
+			Label: "arguments",
+			TypeAnnotation: sema.NewTypeAnnotation(
+				sema.NewVariableSizedType(nil, sema.AnyStructType),
+			),
+		},
+	},
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.ByteArrayType),
+}
+
+func newInternalEVMTypeEncodeABIFunction(
+	gauge common.MemoryGauge,
+) *interpreter.HostFunctionValue {
+	return interpreter.NewHostFunctionValue(
+		gauge,
+		internalEVMTypeEncodeABIFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			inter := invocation.Interpreter
+			locationRange := invocation.LocationRange
+
+			// TBD: This should probably be an input to the `EVM.encodeABI` function,
+			// not sure in what format though. Maybe: `"details(string,string,uint64)"`
+			const abiSpec = `[{"type": "function", "name": "details", "inputs": [{ "name": "name", "type": "string" }, { "name": "surname", "type": "string" }, { "name": "age", "type": "uint64" }]}]`
+
+			// Get `arguments` argument
+
+			argumentsValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			abi, err := gethABI.JSON(strings.NewReader(abiSpec))
+			if err != nil {
+				panic(err)
+			}
+
+			arguments := make([]interface{}, 0)
+			for i := 0; i < argumentsValue.Count(); i++ {
+				arg := argumentsValue.Get(inter, locationRange, i)
+				switch value := arg.(type) {
+				case *interpreter.StringValue:
+					arguments = append(arguments, value.Str)
+				case interpreter.UInt64Value:
+					arguments = append(arguments, uint64(value))
+				}
+			}
+			packed, err := abi.Pack("details", arguments...)
+			if err != nil {
+				panic(err)
+			}
+
+			return interpreter.ByteSliceToByteArrayValue(inter, packed)
+		},
+	)
+}
+
+// EVM.decodeABI
+
+const internalEVMTypeDecodeABIFunctionName = "decodeABI"
+
+var internalEVMTypeDecodeABIFunctionType = &sema.FunctionType{
+	Parameters: []sema.Parameter{
+		{
+			Label:          "data",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.ByteArrayType),
+		},
+	},
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(
+		sema.NewVariableSizedType(nil, sema.AnyStructType),
+	),
+}
+
+func newInternalEVMTypeDecodeABIFunction(
+	gauge common.MemoryGauge,
+) *interpreter.HostFunctionValue {
+	return interpreter.NewHostFunctionValue(
+		gauge,
+		internalEVMTypeDecodeABIFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			inter := invocation.Interpreter
+			// TODO
+
+			return interpreter.ByteSliceToByteArrayValue(inter, []byte{})
+		},
+	)
+}
 
 const internalEVMTypeRunFunctionName = "run"
 
@@ -286,6 +381,8 @@ func NewInternalEVMContractValue(
 			internalEVMTypeRunFunctionName:                  newInternalEVMTypeRunFunction(gauge, handler),
 			internalEVMTypeCreateBridgedAccountFunctionName: newInternalEVMTypeCreateBridgedAccountFunction(gauge, handler),
 			internalEVMTypeCallFunctionName:                 newInternalEVMTypeCallFunction(gauge, handler),
+			internalEVMTypeEncodeABIFunctionName:            newInternalEVMTypeEncodeABIFunction(gauge),
+			internalEVMTypeDecodeABIFunctionName:            newInternalEVMTypeDecodeABIFunction(gauge),
 		},
 		nil,
 		nil,
@@ -318,6 +415,18 @@ var InternalEVMContractType = func() *sema.CompositeType {
 			ty,
 			internalEVMTypeCallFunctionName,
 			internalEVMTypeCallFunctionType,
+			"",
+		),
+		sema.NewUnmeteredPublicFunctionMember(
+			ty,
+			internalEVMTypeEncodeABIFunctionName,
+			internalEVMTypeEncodeABIFunctionType,
+			"",
+		),
+		sema.NewUnmeteredPublicFunctionMember(
+			ty,
+			internalEVMTypeDecodeABIFunctionName,
+			internalEVMTypeDecodeABIFunctionType,
 			"",
 		),
 	})
