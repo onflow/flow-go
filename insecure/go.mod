@@ -20,4 +20,11 @@ require (
 	google.golang.org/protobuf v1.31.0
 )
 
+require (
+	github.com/dgraph-io/ristretto v0.1.0 // indirect
+	github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.4-0.20231016154253-a00dbf7c061f // indirect
+	github.com/onflow/flow-core-contracts/lib/go/templates v1.2.4-0.20231016154253-a00dbf7c061f // indirect
+	github.com/spf13/cobra v1.7.0 // indirect
+)
+
 replace github.com/onflow/flow-go => ../
