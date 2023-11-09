@@ -3,8 +3,9 @@ package cohort2
 import (
 	"testing"
 
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/onflow/flow-go/integration/tests/epochs"
 )
