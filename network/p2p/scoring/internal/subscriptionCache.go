@@ -132,6 +132,13 @@ func (s *SubscriptionRecordCache) addTopicForPeer(entityId flow.Identifier, topi
 			// valid for the current cycle).
 			record.Topics = make([]string, 0)
 		}
+		// check if the topic already exists; if it does, we do not need to update the record.
+		for _, t := range record.Topics {
+			if t == topic {
+				// topic already exists
+				return record
+			}
+		}
 		record.LastUpdatedCycle = currentCycle
 		record.Topics = append(record.Topics, topic)
 
