@@ -20,6 +20,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/access/rest/request"
 	"github.com/onflow/flow-go/engine/access/state_stream"
+	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	mockstatestream "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -33,6 +34,10 @@ type testType struct {
 	eventTypes []string
 	addresses  []string
 	contracts  []string
+
+	heartbeatInterval uint64
+
+	headers http.Header
 }
 
 var testEventTypes = []flow.EventType{
@@ -83,6 +88,7 @@ func (s *SubscribeEventsSuite) SetupTest() {
 //   - Subscribing to events from the root height.
 //   - Subscribing to events from a specific start height.
 //   - Subscribing to events from a specific start block ID.
+//   - Subscribing to events from the root height with custom heartbeat interval.
 //
 // Every scenario covers the following aspects:
 //   - Subscribing to all events.
@@ -93,19 +99,37 @@ func (s *SubscribeEventsSuite) SetupTest() {
 func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 	testVectors := []testType{
 		{
-			name:         "happy path - all events from root height",
-			startBlockID: flow.ZeroID,
-			startHeight:  request.EmptyHeight,
+			name:              "happy path - all events from root height",
+			startBlockID:      flow.ZeroID,
+			startHeight:       request.EmptyHeight,
+			heartbeatInterval: 1,
 		},
 		{
-			name:         "happy path - all events from startHeight",
-			startBlockID: flow.ZeroID,
-			startHeight:  s.blocks[0].Header.Height,
+			name:              "happy path - all events from startHeight",
+			startBlockID:      flow.ZeroID,
+			startHeight:       s.blocks[0].Header.Height,
+			heartbeatInterval: 1,
 		},
 		{
-			name:         "happy path - all events from startBlockID",
-			startBlockID: s.blocks[0].ID(),
-			startHeight:  request.EmptyHeight,
+			name:              "happy path - all events from startBlockID",
+			startBlockID:      s.blocks[0].ID(),
+			startHeight:       request.EmptyHeight,
+			heartbeatInterval: 1,
+		},
+		{
+			name:              "happy path - events from root height with custom heartbeat",
+			startBlockID:      flow.ZeroID,
+			startHeight:       request.EmptyHeight,
+			heartbeatInterval: 2,
+		},
+		{
+			name:              "happy path - all origins allowed",
+			startBlockID:      flow.ZeroID,
+			startHeight:       request.EmptyHeight,
+			heartbeatInterval: 1,
+			headers: http.Header{
+				"Origin": []string{"https://example.com"},
+			},
 		},
 	}
 	chain := flow.MonotonicEmulator.Chain()
@@ -121,6 +145,11 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 		t2.name = fmt.Sprintf("%s - some events", test.name)
 		t2.eventTypes = []string{string(testEventTypes[0])}
 		tests = append(tests, t2)
+
+		t3 := test
+		t3.name = fmt.Sprintf("%s - non existing events", test.name)
+		t3.eventTypes = []string{"A.0123456789abcdff.flow.event"}
+		tests = append(tests, t3)
 	}
 
 	for _, test := range tests {
@@ -136,11 +165,12 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 				test.contracts)
 			require.NoError(s.T(), err)
 
-			var expectedEventsResponses []*state_stream.EventsResponse
+			var expectedEventsResponses []*backend.EventsResponse
+			var subscriptionEventsResponses []*backend.EventsResponse
 			startBlockFound := test.startBlockID == flow.ZeroID
 
 			// construct expected event responses based on the provided test configuration
-			for _, block := range s.blocks {
+			for i, block := range s.blocks {
 				if startBlockFound || block.ID() == test.startBlockID {
 					startBlockFound = true
 					if test.startHeight == request.EmptyHeight || block.Header.Height >= test.startHeight {
@@ -151,12 +181,16 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 								eventsForBlock = append(eventsForBlock, event)
 							}
 						}
-						eventResponse := &state_stream.EventsResponse{
+						eventResponse := &backend.EventsResponse{
 							Height:  block.Header.Height,
 							BlockID: block.ID(),
 							Events:  eventsForBlock,
 						}
-						expectedEventsResponses = append(expectedEventsResponses, eventResponse)
+
+						if len(eventsForBlock) > 0 || (i+1)%int(test.heartbeatInterval) == 0 {
+							expectedEventsResponses = append(expectedEventsResponses, eventResponse)
+						}
+						subscriptionEventsResponses = append(subscriptionEventsResponses, eventResponse)
 					}
 				}
 			}
@@ -166,7 +200,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 			var chReadOnly <-chan interface{}
 			// Simulate sending a mock EventsResponse
 			go func() {
-				for _, eventResponse := range expectedEventsResponses {
+				for _, eventResponse := range subscriptionEventsResponses {
 					// Send the mock EventsResponse through the channel
 					ch <- eventResponse
 				}
@@ -185,7 +219,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 				On("SubscribeEvents", mocks.Anything, test.startBlockID, startHeight, filter).
 				Return(subscription)
 
-			req, err := getSubscribeEventsRequest(s.T(), test.startBlockID, test.startHeight, test.eventTypes, test.addresses, test.contracts)
+			req, err := getSubscribeEventsRequest(s.T(), test.startBlockID, test.startHeight, test.eventTypes, test.addresses, test.contracts, test.heartbeatInterval, test.headers)
 			require.NoError(s.T(), err)
 			respRecorder := newTestHijackResponseRecorder()
 			// closing the connection after 1 second
@@ -202,7 +236,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 	s.Run("returns error for block id and height", func() {
 		stateStreamBackend := mockstatestream.NewAPI(s.T())
-		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), s.blocks[0].Header.Height, nil, nil, nil)
+		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), s.blocks[0].Header.Height, nil, nil, nil, 1, nil)
 		require.NoError(s.T(), err)
 		respRecorder := newTestHijackResponseRecorder()
 		executeWsRequest(req, stateStreamBackend, respRecorder)
@@ -227,7 +261,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 			On("SubscribeEvents", mocks.Anything, invalidBlock.ID(), uint64(0), mocks.Anything).
 			Return(subscription)
 
-		req, err := getSubscribeEventsRequest(s.T(), invalidBlock.ID(), request.EmptyHeight, nil, nil, nil)
+		req, err := getSubscribeEventsRequest(s.T(), invalidBlock.ID(), request.EmptyHeight, nil, nil, nil, 1, nil)
 		require.NoError(s.T(), err)
 		respRecorder := newTestHijackResponseRecorder()
 		executeWsRequest(req, stateStreamBackend, respRecorder)
@@ -236,7 +270,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 
 	s.Run("returns error for invalid event filter", func() {
 		stateStreamBackend := mockstatestream.NewAPI(s.T())
-		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), request.EmptyHeight, []string{"foo"}, nil, nil)
+		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), request.EmptyHeight, []string{"foo"}, nil, nil, 1, nil)
 		require.NoError(s.T(), err)
 		respRecorder := newTestHijackResponseRecorder()
 		executeWsRequest(req, stateStreamBackend, respRecorder)
@@ -261,7 +295,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 			On("SubscribeEvents", mocks.Anything, s.blocks[0].ID(), uint64(0), mocks.Anything).
 			Return(subscription)
 
-		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), request.EmptyHeight, nil, nil, nil)
+		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), request.EmptyHeight, nil, nil, nil, 1, nil)
 		require.NoError(s.T(), err)
 		respRecorder := newTestHijackResponseRecorder()
 		executeWsRequest(req, stateStreamBackend, respRecorder)
@@ -275,6 +309,8 @@ func getSubscribeEventsRequest(t *testing.T,
 	eventTypes []string,
 	addresses []string,
 	contracts []string,
+	heartbeatInterval uint64,
+	header http.Header,
 ) (*http.Request, error) {
 	u, _ := url.Parse("/v1/subscribe_events")
 	q := u.Query()
@@ -297,6 +333,8 @@ func getSubscribeEventsRequest(t *testing.T,
 		q.Add(contractsQueryParams, strings.Join(contracts, ","))
 	}
 
+	q.Add(heartbeatIntervalQueryParam, fmt.Sprintf("%d", heartbeatInterval))
+
 	u.RawQuery = q.Encode()
 	key, err := generateWebSocketKey()
 	if err != nil {
@@ -305,11 +343,17 @@ func getSubscribeEventsRequest(t *testing.T,
 	}
 
 	req, err := http.NewRequest("GET", u.String(), nil)
+	require.NoError(t, err)
+
 	req.Header.Set("Connection", "upgrade")
 	req.Header.Set("Upgrade", "websocket")
 	req.Header.Set("Sec-Websocket-Version", "13")
 	req.Header.Set("Sec-Websocket-Key", key)
-	require.NoError(t, err)
+
+	for k, v := range header {
+		req.Header.Set(k, v[0])
+	}
+
 	return req, nil
 }
 
@@ -332,18 +376,18 @@ func requireError(t *testing.T, recorder *testHijackResponseRecorder, expected s
 // requireResponse validates that the response received from WebSocket communication matches the expected EventsResponses.
 // This function compares the BlockID, Events count, and individual event properties for each expected and actual
 // EventsResponse. It ensures that the response received from WebSocket matches the expected structure and content.
-func requireResponse(t *testing.T, recorder *testHijackResponseRecorder, expected []*state_stream.EventsResponse) {
+func requireResponse(t *testing.T, recorder *testHijackResponseRecorder, expected []*backend.EventsResponse) {
 	<-recorder.closed
 	// Convert the actual response from respRecorder to JSON bytes
 	actualJSON := recorder.responseBuff.Bytes()
 	// Define a regular expression pattern to match JSON objects
-	pattern := `\{"BlockID":".*?","Height":\d+,"Events":\[\{.*?\}\]\}`
+	pattern := `\{"BlockID":".*?","Height":\d+,"Events":\[(\{.*?})*\]\}`
 	matches := regexp.MustCompile(pattern).FindAll(actualJSON, -1)
 
 	// Unmarshal each matched JSON into []state_stream.EventsResponse
-	var actual []state_stream.EventsResponse
+	var actual []backend.EventsResponse
 	for _, match := range matches {
-		var response state_stream.EventsResponse
+		var response backend.EventsResponse
 		if err := json.Unmarshal(match, &response); err == nil {
 			actual = append(actual, response)
 		}

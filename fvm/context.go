@@ -330,6 +330,15 @@ func WithTransactionFeesEnabled(enabled bool) Option {
 	}
 }
 
+// WithRandomSourceHistoryCallAllowed enables or disables calling the `entropy` function
+// within cadence
+func WithRandomSourceHistoryCallAllowed(allowed bool) Option {
+	return func(ctx Context) Context {
+		ctx.RandomSourceHistoryCallAllowed = allowed
+		return ctx
+	}
+}
+
 // WithReusableCadenceRuntimePool set the (shared) RedusableCadenceRuntimePool
 // use for creating the cadence runtime.
 func WithReusableCadenceRuntimePool(

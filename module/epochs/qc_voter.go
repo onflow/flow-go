@@ -118,7 +118,7 @@ func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.Epoch) error 
 
 	clientIndex, qcContractClient := voter.getInitialContractClient()
 	onMaxConsecutiveRetries := func(totalAttempts int) {
-		voter.updateContractClient(clientIndex)
+		clientIndex, qcContractClient = voter.updateContractClient(clientIndex)
 		log.Warn().Msgf("retrying on attempt (%d) with fallback access node at index (%d)", totalAttempts, clientIndex)
 	}
 	backoff = retrymiddleware.AfterConsecutiveFailures(retryMaxConsecutiveFailures, backoff, onMaxConsecutiveRetries)

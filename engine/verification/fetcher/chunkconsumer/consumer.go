@@ -33,14 +33,17 @@ func NewChunkConsumer(
 	chunksQueue storage.ChunksQueue, // to read jobs (chunks) from
 	chunkProcessor fetcher.AssignedChunkProcessor, // to process jobs (chunks)
 	maxProcessing uint64, // max number of jobs to be processed in parallel
-) *ChunkConsumer {
+) (*ChunkConsumer, error) {
 	worker := NewWorker(chunkProcessor)
 	chunkProcessor.WithChunkConsumerNotifier(worker)
 
 	jobs := &ChunkJobs{locators: chunksQueue}
 
 	lg := log.With().Str("module", "chunk_consumer").Logger()
-	consumer := jobqueue.NewConsumer(lg, jobs, processedIndex, worker, maxProcessing, 0)
+	consumer, err := jobqueue.NewConsumer(lg, jobs, processedIndex, worker, maxProcessing, 0, DefaultJobIndex)
+	if err != nil {
+		return nil, err
+	}
 
 	chunkConsumer := &ChunkConsumer{
 		consumer:       consumer,
@@ -50,7 +53,7 @@ func NewChunkConsumer(
 
 	worker.consumer = chunkConsumer
 
-	return chunkConsumer
+	return chunkConsumer, nil
 }
 
 func (c *ChunkConsumer) NotifyJobIsDone(jobID module.JobID) {
@@ -68,7 +71,7 @@ func (c ChunkConsumer) Check() {
 }
 
 func (c *ChunkConsumer) Ready() <-chan struct{} {
-	err := c.consumer.Start(DefaultJobIndex)
+	err := c.consumer.Start()
 	if err != nil {
 		panic(fmt.Errorf("could not start the chunk consumer for match engine: %w", err))
 	}

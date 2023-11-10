@@ -60,6 +60,9 @@ func TestPeerWithSpamRecord(t *testing.T) {
 	t.Run("iwant", func(t *testing.T) {
 		testPeerWithSpamRecord(t, p2pmsg.CtrlMsgIWant, penaltyValueFixtures().IWant)
 	})
+	t.Run("RpcPublishMessage", func(t *testing.T) {
+		testPeerWithSpamRecord(t, p2pmsg.RpcPublishMessage, penaltyValueFixtures().RpcPublishMessage)
+	})
 }
 
 func testPeerWithSpamRecord(t *testing.T, messageType p2pmsg.ControlMessageType, expectedPenalty float64) {
@@ -108,6 +111,9 @@ func TestSpamRecord_With_UnknownIdentity(t *testing.T) {
 	})
 	t.Run("iwant", func(t *testing.T) {
 		testSpamRecordWithUnknownIdentity(t, p2pmsg.CtrlMsgIWant, penaltyValueFixtures().IWant)
+	})
+	t.Run("RpcPublishMessage", func(t *testing.T) {
+		testSpamRecordWithUnknownIdentity(t, p2pmsg.RpcPublishMessage, penaltyValueFixtures().RpcPublishMessage)
 	})
 }
 
@@ -158,6 +164,9 @@ func TestSpamRecord_With_SubscriptionPenalty(t *testing.T) {
 	})
 	t.Run("iwant", func(t *testing.T) {
 		testSpamRecordWithSubscriptionPenalty(t, p2pmsg.CtrlMsgIWant, penaltyValueFixtures().IWant)
+	})
+	t.Run("RpcPublishMessage", func(t *testing.T) {
+		testSpamRecordWithSubscriptionPenalty(t, p2pmsg.RpcPublishMessage, penaltyValueFixtures().RpcPublishMessage)
 	})
 }
 
@@ -232,6 +241,13 @@ func TestSpamPenaltyDecaysInCache(t *testing.T) {
 
 	time.Sleep(1 * time.Second) // wait for the penalty to decay.
 
+	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
+		PeerID:  peerID,
+		MsgType: p2pmsg.RpcPublishMessage,
+	})
+
+	time.Sleep(1 * time.Second) // wait for the penalty to decay.
+
 	// when the app specific penalty function is called for the first time, the decay functionality should be kicked in
 	// the cache, and the penalty should be updated. Note that since the penalty values are negative, the default staked identity
 	// reward is not applied. Hence, the penalty is only comprised of the penalties.
@@ -240,7 +256,8 @@ func TestSpamPenaltyDecaysInCache(t *testing.T) {
 	scoreUpperBound := penaltyValueFixtures().Prune +
 		penaltyValueFixtures().Graft +
 		penaltyValueFixtures().IHave +
-		penaltyValueFixtures().IWant
+		penaltyValueFixtures().IWant +
+		penaltyValueFixtures().RpcPublishMessage
 	// the lower bound is the sum of the penalties with decay assuming the decay is applied 4 times to the sum of the penalties.
 	// in reality, the decay is applied 4 times to the first penalty, then 3 times to the second penalty, and so on.
 	scoreLowerBound := scoreUpperBound * math.Pow(scoring.InitAppScoreRecordState().Decay, 4)
@@ -468,9 +485,10 @@ func newGossipSubAppSpecificScoreRegistry(t *testing.T, opts ...func(*scoring.Go
 // that the tests are not passing because of the default values.
 func penaltyValueFixtures() scoring.GossipSubCtrlMsgPenaltyValue {
 	return scoring.GossipSubCtrlMsgPenaltyValue{
-		Graft: -100,
-		Prune: -50,
-		IHave: -20,
-		IWant: -10,
+		Graft:             -100,
+		Prune:             -50,
+		IHave:             -20,
+		IWant:             -10,
+		RpcPublishMessage: -10,
 	}
 }

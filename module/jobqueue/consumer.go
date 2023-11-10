@@ -43,6 +43,8 @@ type Consumer struct {
 	processings      map[uint64]*jobStatus   // keep track of the status of each on going job
 	processingsIndex map[module.JobID]uint64 // lookup the index of the job, useful when fast forwarding the
 	// `processed` variable
+
+	started *atomic.Bool // only allow the consumer to be started once, and forbid calls to Check before Start
 }
 
 func NewConsumer(
@@ -52,7 +54,14 @@ func NewConsumer(
 	worker Worker,
 	maxProcessing uint64,
 	maxSearchAhead uint64,
-) *Consumer {
+	defaultIndex uint64,
+) (*Consumer, error) {
+
+	processedIndex, err := readProcessedIndex(log, progress, defaultIndex)
+	if err != nil {
+		return nil, fmt.Errorf("could not read processed index: %w", err)
+	}
+
 	return &Consumer{
 		log: log.With().Str("sub_module", "job_queue").Logger(),
 
@@ -68,52 +77,56 @@ func NewConsumer(
 		// init state variables
 		running:          false,
 		isChecking:       atomic.NewBool(false),
-		processedIndex:   0,
+		started:          atomic.NewBool(false),
+		processedIndex:   processedIndex,
 		processings:      make(map[uint64]*jobStatus),
 		processingsIndex: make(map[module.JobID]uint64),
-	}
+	}, nil
 }
 
-// Start starts consuming the jobs from the job queue.
-func (c *Consumer) Start(defaultIndex uint64) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if c.running {
-		return nil
-	}
-
-	c.running = true
-
+func readProcessedIndex(log zerolog.Logger, progress storage.ConsumerProgress, defaultIndex uint64) (uint64, error) {
 	// on startup, sync with storage for the processed index
 	// to ensure the consistency
-	processedIndex, err := c.progress.ProcessedIndex()
+	processedIndex, err := progress.ProcessedIndex()
 	if errors.Is(err, storage.ErrNotFound) {
-		err := c.progress.InitProcessedIndex(defaultIndex)
+		err := progress.InitProcessedIndex(defaultIndex)
 		if errors.Is(err, storage.ErrAlreadyExists) {
-			return fmt.Errorf("processed index has already been inited, no effect for the second time. default index: %v",
+			return 0, fmt.Errorf("processed index has already been inited, no effect for the second time. default index: %v",
 				defaultIndex)
 		}
 
 		if err != nil {
-			return fmt.Errorf("could not init processed index: %w", err)
+			return 0, fmt.Errorf("could not init processed index: %w", err)
 		}
 
-		processedIndex = defaultIndex
-
-		c.log.Warn().Uint64("processed index", processedIndex).
+		log.Warn().Uint64("processed index", processedIndex).
 			Msg("processed index not found, initialized.")
-	} else if err != nil {
-		return fmt.Errorf("could not read processed index: %w", err)
+		return defaultIndex, nil
 	}
 
-	c.processedIndex = processedIndex
+	if err != nil {
+		return 0, fmt.Errorf("could not read processed index: %w", err)
+	}
+
+	return processedIndex, nil
+}
+
+// Start starts consuming the jobs from the job queue.
+func (c *Consumer) Start() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if !c.started.CompareAndSwap(false, true) {
+		return fmt.Errorf("consumer has already been started")
+	}
+	c.running = true
+
+	c.log.Info().
+		Uint64("processed", c.processedIndex).
+		Msg("consumer started")
 
 	c.checkProcessable()
 
-	c.log.Info().
-		Uint64("processed", processedIndex).
-		Msg("consumer started")
 	return nil
 }
 
@@ -166,6 +179,12 @@ func (c *Consumer) NotifyJobIsDone(jobID module.JobID) uint64 {
 // since multiple checks at the same time are unnecessary, we could only keep one check by checking.
 // an atomic isChecking value.
 func (c *Consumer) Check() {
+	if !c.started.Load() {
+		// Check is not allowed before the consumer is started
+		c.log.Warn().Msg("ignoring Check before Start")
+		return
+	}
+
 	if !c.isChecking.CompareAndSwap(false, true) {
 		// other process is checking, we could exit and rely on that process to check
 		// processable jobs

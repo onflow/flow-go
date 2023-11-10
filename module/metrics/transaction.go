@@ -105,16 +105,16 @@ func NewTransactionCollector(
 			Buckets:   []float64{1, 100, 500, 1000, 2000, 5000},
 		}, []string{"script_size"}),
 		scriptExecutionErrorOnExecutor: promauto.NewCounterVec(prometheus.CounterOpts{
-			Name:      "script_execution_error_archive",
+			Name:      "script_execution_error_executor",
 			Namespace: namespaceAccess,
 			Subsystem: subsystemTransactionSubmission,
-			Help:      "histogram for the internal errors for executing a script for a block on the archive node",
+			Help:      "counter for the internal errors while executing a script",
 		}, []string{"source"}),
 		scriptExecutionComparison: promauto.NewCounterVec(prometheus.CounterOpts{
 			Name:      "script_execution_comparison",
 			Namespace: namespaceAccess,
 			Subsystem: subsystemTransactionSubmission,
-			Help:      "histogram for the comparison outcomes of executing a script on the archive and execution node",
+			Help:      "counter for the comparison outcomes of executing a script locally and on execution node",
 		}, []string{"outcome"}),
 		transactionResultDuration: promauto.NewHistogramVec(prometheus.HistogramOpts{
 			Name:      "transaction_result_fetched_duration",
@@ -150,9 +150,9 @@ func (tc *TransactionCollector) ScriptExecuted(dur time.Duration, size int) {
 	}).Observe(float64(dur.Milliseconds()))
 }
 
-func (tc *TransactionCollector) ScriptExecutionErrorOnArchiveNode() {
+func (tc *TransactionCollector) ScriptExecutionErrorLocal() {
 	// record the execution error count
-	tc.scriptExecutionErrorOnExecutor.WithLabelValues("archive").Inc()
+	tc.scriptExecutionErrorOnExecutor.WithLabelValues("local").Inc()
 }
 
 func (tc *TransactionCollector) ScriptExecutionErrorOnExecutionNode() {
@@ -177,6 +177,12 @@ func (tc *TransactionCollector) ScriptExecutionErrorMismatch() {
 func (tc *TransactionCollector) ScriptExecutionErrorMatch() {
 	// record the execution error count
 	tc.scriptExecutionComparison.WithLabelValues("error_match").Inc()
+}
+
+// ScriptExecutionNotIndexed records script execution matches where data for the block is not
+// indexed locally yet
+func (tc *TransactionCollector) ScriptExecutionNotIndexed() {
+	tc.scriptExecutionComparison.WithLabelValues("not_indexed").Inc()
 }
 
 // TransactionResult metrics
