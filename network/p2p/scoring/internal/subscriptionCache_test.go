@@ -129,3 +129,52 @@ func TestDuplicateTopics(t *testing.T) {
 	require.NoError(t, err, "adding duplicate topic to existing peer should not produce an error")
 	require.Equal(t, []string{topic}, updatedTopics, "duplicate topic should not be added")
 }
+
+// TestMoveUpdateCycle tests that (1) within one update cycle, "AddTopicForPeer" calls append the topics to the list of
+// subscribed topics for peer, (2) as long as there is no "AddTopicForPeer" call, moving to the next update cycle
+// does not change the subscribed topics for a peer, and (3) calling "AddTopicForPeer" after moving to the next update
+// cycle clears the subscribed topics for a peer and adds the new topic.
+func TestMoveUpdateCycle(t *testing.T) {
+	sizeLimit := uint32(100)
+	cache := internal.NewSubscriptionRecordCache(
+		sizeLimit,
+		unittest.Logger(),
+		metrics.NewSubscriptionRecordCacheMetricsFactory(metrics.NewNoopHeroCacheMetricsFactory()))
+
+	peerID := unittest.PeerIdFixture(t)
+	topic1 := "topic1"
+	topic2 := "topic2"
+	topic3 := "topic3"
+	topic4 := "topic4"
+
+	// adds topic1, topic2, and topic3 to the peer
+	topics, err := cache.AddTopicForPeer(peerID, topic1)
+	require.NoError(t, err, "adding first topic to existing peer should not produce an error")
+	require.Equal(t, []string{topic1}, topics, "updated topics should match the added topic")
+	topics, err = cache.AddTopicForPeer(peerID, topic2)
+	require.NoError(t, err, "adding second topic to existing peer should not produce an error")
+	require.Equal(t, []string{topic1, topic2}, topics, "updated topics should match the added topics")
+	topics, err = cache.AddTopicForPeer(peerID, topic3)
+	require.NoError(t, err, "adding third topic to existing peer should not produce an error")
+	require.Equal(t, []string{topic1, topic2, topic3}, topics, "updated topics should match the added topics")
+
+	// move to next update cycle
+	cache.MoveToNextUpdateCycle()
+	topics, found := cache.GetSubscribedTopics(peerID)
+	require.True(t, found, "existing peer should be found")
+	require.ElementsMatch(t, []string{topic1, topic2, topic3}, topics, "retrieved topics should match the added topics")
+
+	// add topic4 to the peer; since we moved to the next update cycle, the topics for the peer should be cleared
+	// and topic4 should be the only topic for the peer
+	topics, err = cache.AddTopicForPeer(peerID, topic4)
+	require.NoError(t, err, "adding fourth topic to existing peer should not produce an error")
+	require.Equal(t, []string{topic4}, topics, "updated topics should match the added topic")
+
+	// move to next update cycle
+	cache.MoveToNextUpdateCycle()
+
+	// since we did not add any topic to the peer, the topics for the peer should be the same as before
+	topics, found = cache.GetSubscribedTopics(peerID)
+	require.True(t, found, "existing peer should be found")
+	require.ElementsMatch(t, []string{topic4}, topics, "retrieved topics should match the added topics")
+}
