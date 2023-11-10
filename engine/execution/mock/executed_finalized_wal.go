@@ -15,11 +15,11 @@ type ExecutedFinalizedWAL struct {
 }
 
 // Append provides a mock function with given fields: height, registers
-func (_m *ExecutedFinalizedWAL) Append(height uint64, registers []flow.RegisterEntry) error {
+func (_m *ExecutedFinalizedWAL) Append(height uint64, registers flow.RegisterEntries) error {
 	ret := _m.Called(height, registers)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(uint64, []flow.RegisterEntry) error); ok {
+	if rf, ok := ret.Get(0).(func(uint64, flow.RegisterEntries) error); ok {
 		r0 = rf(height, registers)
 	} else {
 		r0 = ret.Error(0)

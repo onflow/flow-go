@@ -117,11 +117,11 @@ func (_m *InMemoryRegisterStore) PrunedHeight() uint64 {
 }
 
 // SaveRegisters provides a mock function with given fields: height, blockID, parentID, registers
-func (_m *InMemoryRegisterStore) SaveRegisters(height uint64, blockID flow.Identifier, parentID flow.Identifier, registers []flow.RegisterEntry) error {
+func (_m *InMemoryRegisterStore) SaveRegisters(height uint64, blockID flow.Identifier, parentID flow.Identifier, registers flow.RegisterEntries) error {
 	ret := _m.Called(height, blockID, parentID, registers)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(uint64, flow.Identifier, flow.Identifier, []flow.RegisterEntry) error); ok {
+	if rf, ok := ret.Get(0).(func(uint64, flow.Identifier, flow.Identifier, flow.RegisterEntries) error); ok {
 		r0 = rf(height, blockID, parentID, registers)
 	} else {
 		r0 = ret.Error(0)
