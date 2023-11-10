@@ -2752,3 +2752,15 @@ func LibP2PResourceLimitOverrideFixture() p2pconf.ResourceManagerOverrideLimit {
 		Memory:              rand.Intn(1000),
 	}
 }
+
+func RegisterEntryFixture() flow.RegisterEntry {
+	val := make([]byte, 4)
+	_, _ = crand.Read(val)
+	return flow.RegisterEntry{
+		Key: flow.RegisterID{
+			Owner: "owner",
+			Key:   "key1",
+		},
+		Value: val,
+	}
+}
