@@ -36,6 +36,13 @@ const internalEVMTypeEncodeABIFunctionName = "encodeABI"
 var internalEVMTypeEncodeABIFunctionType = &sema.FunctionType{
 	Parameters: []sema.Parameter{
 		{
+			Label:      sema.ArgumentLabelNotRequired,
+			Identifier: "abiSpec",
+			TypeAnnotation: sema.NewTypeAnnotation(
+				sema.StringType,
+			),
+		},
+		{
 			Label: "arguments",
 			TypeAnnotation: sema.NewTypeAnnotation(
 				sema.NewVariableSizedType(nil, sema.AnyStructType),
@@ -55,20 +62,23 @@ func newInternalEVMTypeEncodeABIFunction(
 			inter := invocation.Interpreter
 			locationRange := invocation.LocationRange
 
-			// TBD: This should probably be an input to the `EVM.encodeABI` function,
-			// not sure in what format though. Maybe: `"details(string,string,uint64)"`
-			const abiSpec = `[{"type": "function", "name": "details", "inputs": [{ "name": "name", "type": "string" }, { "name": "surname", "type": "string" }, { "name": "age", "type": "uint64" }], "outputs": []}]`
+			// Get `abiSpec` argument
 
-			// Get `arguments` argument
-
-			argumentsValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			abiSpec, ok := invocation.Arguments[0].(*interpreter.StringValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
 
-			abi, err := gethABI.JSON(strings.NewReader(abiSpec))
+			abi, err := gethABI.JSON(strings.NewReader(abiSpec.Str))
 			if err != nil {
 				panic(err)
+			}
+
+			// Get `arguments` argument
+
+			argumentsValue, ok := invocation.Arguments[1].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
 			}
 
 			arguments := make([]interface{}, 0)
@@ -98,6 +108,13 @@ const internalEVMTypeDecodeABIFunctionName = "decodeABI"
 var internalEVMTypeDecodeABIFunctionType = &sema.FunctionType{
 	Parameters: []sema.Parameter{
 		{
+			Label:      sema.ArgumentLabelNotRequired,
+			Identifier: "abiSpec",
+			TypeAnnotation: sema.NewTypeAnnotation(
+				sema.StringType,
+			),
+		},
+		{
 			Label:          "data",
 			TypeAnnotation: sema.NewTypeAnnotation(sema.ByteArrayType),
 		},
@@ -117,23 +134,26 @@ func newInternalEVMTypeDecodeABIFunction(
 			inter := invocation.Interpreter
 			locationRange := invocation.LocationRange
 
-			// TBD: This should probably be an input to the `EVM.encodeABI` function,
-			// not sure in what format though. Maybe: `"details(string,string,uint64)"`
-			const abiSpec = `[{"type": "function", "name": "details", "inputs": [{ "name": "name", "type": "string" }, { "name": "surname", "type": "string" }, { "name": "age", "type": "uint64" }], "outputs": []}]`
+			// Get `abiSpec` argument
+
+			abiSpec, ok := invocation.Arguments[0].(*interpreter.StringValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			abi, err := gethABI.JSON(strings.NewReader(abiSpec.Str))
+			if err != nil {
+				panic(err)
+			}
 
 			// Get `data` argument
 
-			dataValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			dataValue, ok := invocation.Arguments[1].(*interpreter.ArrayValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
 
 			data, err := interpreter.ByteArrayValueToByteSlice(inter, dataValue, locationRange)
-			if err != nil {
-				panic(err)
-			}
-
-			abi, err := gethABI.JSON(strings.NewReader(abiSpec))
 			if err != nil {
 				panic(err)
 			}

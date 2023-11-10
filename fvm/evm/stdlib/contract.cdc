@@ -106,12 +106,12 @@ contract EVM {
     }
 
     access(all)
-    fun encodeABI(arguments: [AnyStruct]): [UInt8] {
-        return InternalEVM.encodeABI(arguments: arguments)
+    fun encodeABI(_ abiSpec: String, arguments: [AnyStruct]): [UInt8] {
+        return InternalEVM.encodeABI(abiSpec, arguments: arguments)
     }
 
     access(all)
-    fun decodeABI(data: [UInt8]): [AnyStruct] {
-        return InternalEVM.decodeABI(data: data)
+    fun decodeABI(_ abiSpec: String, data: [UInt8]): [AnyStruct] {
+        return InternalEVM.decodeABI(abiSpec, data: data)
     }
 }

@@ -134,7 +134,8 @@ func TestEVMEncodeABI(t *testing.T) {
 
       access(all)
       fun main(): [UInt8] {
-        return EVM.encodeABI(arguments: ["John", "Doe", UInt64(33)])
+        let abiSpec = "[{\"type\": \"function\", \"name\": \"details\", \"inputs\": [{ \"name\": \"name\", \"type\": \"string\" }, { \"name\": \"surname\", \"type\": \"string\" }, { \"name\": \"age\", \"type\": \"uint64\" }], \"outputs\": []}]"
+        return EVM.encodeABI(abiSpec, arguments: ["John", "Doe", UInt64(33)])
       }
 	`)
 
@@ -285,7 +286,8 @@ func TestEVMDecodeABI(t *testing.T) {
 
       access(all)
       fun main(data: [UInt8]): Bool {
-        let unpacked = EVM.decodeABI(data: data)
+        let abiSpec = "[{\"type\": \"function\", \"name\": \"details\", \"inputs\": [{ \"name\": \"name\", \"type\": \"string\" }, { \"name\": \"surname\", \"type\": \"string\" }, { \"name\": \"age\", \"type\": \"uint64\" }], \"outputs\": []}]"
+        let unpacked = EVM.decodeABI(abiSpec, data: data)
         assert(unpacked.length == 3)
         assert((unpacked[0] as! String) == "John")
         assert((unpacked[1] as! String) == "Doe")
