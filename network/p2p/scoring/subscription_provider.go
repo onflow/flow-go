@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/p2pconf"
 	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"github.com/onflow/flow-go/network/p2p/scoring/internal"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 // SubscriptionProvider provides a list of topics a peer is subscribed to.
@@ -69,7 +70,7 @@ func NewSubscriptionProvider(cfg *SubscriptionProviderConfig) (*SubscriptionProv
 		func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			ready()
 			p.logger.Debug().
-				Dur("update_interval", cfg.Params.SubscriptionUpdateInterval).
+				Float64("update_interval_seconds", cfg.Params.SubscriptionUpdateInterval.Seconds()).
 				Msg("subscription provider started; starting update topics loop")
 			p.updateTopicsLoop(ctx)
 
@@ -117,6 +118,10 @@ func (s *SubscriptionProvider) updateTopics(ctx irrecoverable.SignalerContext) {
 			if _, authorized := s.idProvider.ByPeerID(p); !authorized {
 				// peer is not authorized (staked); hence it does not have a valid role in the network; and
 				// we skip the topic update for this peer (also avoiding sybil attacks on the cache).
+				s.logger.Debug().
+					Str("remote_peer_id", p2plogging.PeerId(p)).
+					Bool(logging.KeyNetworkingSecurity, true).
+					Msg("skipping topic update for unauthorized peer")
 				continue
 			}
 
