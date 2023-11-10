@@ -89,11 +89,11 @@ func TestRegisterStoreSaveRegistersShouldFail(t *testing.T) {
 		headerByHeight map[uint64]*flow.Header,
 	) {
 		wrongParent := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(rootHeight + 1))
-		err := rs.SaveRegisters(wrongParent, []flow.RegisterEntry{})
+		err := rs.SaveRegisters(wrongParent, flow.RegisterEntries{})
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "parent")
 
-		err = rs.SaveRegisters(headerByHeight[rootHeight], []flow.RegisterEntry{})
+		err = rs.SaveRegisters(headerByHeight[rootHeight], flow.RegisterEntries{})
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "pruned")
 	})
@@ -124,7 +124,7 @@ func TestRegisterStoreSaveRegistersShouldOK(t *testing.T) {
 
 		// save block 11
 		reg := makeReg("X", "1")
-		err = rs.SaveRegisters(headerByHeight[rootHeight+1], []flow.RegisterEntry{reg})
+		err = rs.SaveRegisters(headerByHeight[rootHeight+1], flow.RegisterEntries{reg})
 		require.NoError(t, err)
 
 		// should get value
@@ -138,7 +138,7 @@ func TestRegisterStoreSaveRegistersShouldOK(t *testing.T) {
 		require.True(t, executed)
 
 		// block 12 is empty
-		err = rs.SaveRegisters(headerByHeight[rootHeight+2], []flow.RegisterEntry{})
+		err = rs.SaveRegisters(headerByHeight[rootHeight+2], flow.RegisterEntries{})
 		require.NoError(t, err)
 
 		// should get same value
@@ -171,11 +171,11 @@ func TestRegisterStoreIsBlockExecuted(t *testing.T) {
 	) {
 		// save block 11
 		reg := makeReg("X", "1")
-		err := rs.SaveRegisters(headerByHeight[rootHeight+1], []flow.RegisterEntry{reg})
+		err := rs.SaveRegisters(headerByHeight[rootHeight+1], flow.RegisterEntries{reg})
 		require.NoError(t, err)
 
 		// save block 12
-		err = rs.SaveRegisters(headerByHeight[rootHeight+2], []flow.RegisterEntry{makeReg("X", "2")})
+		err = rs.SaveRegisters(headerByHeight[rootHeight+2], flow.RegisterEntries{makeReg("X", "2")})
 		require.NoError(t, err)
 
 		require.NoError(t, finalized.MockFinal(rootHeight+1))
@@ -217,15 +217,15 @@ func TestRegisterStoreReadingFromDisk(t *testing.T) {
 
 		// R <- 11 (X: 1, Y: 2) <- 12 (Y: 3) <- 13 (X: 4)
 		// save block 11
-		err := rs.SaveRegisters(headerByHeight[rootHeight+1], []flow.RegisterEntry{makeReg("X", "1"), makeReg("Y", "2")})
+		err := rs.SaveRegisters(headerByHeight[rootHeight+1], flow.RegisterEntries{makeReg("X", "1"), makeReg("Y", "2")})
 		require.NoError(t, err)
 
 		// save block 12
-		err = rs.SaveRegisters(headerByHeight[rootHeight+2], []flow.RegisterEntry{makeReg("Y", "3")})
+		err = rs.SaveRegisters(headerByHeight[rootHeight+2], flow.RegisterEntries{makeReg("Y", "3")})
 		require.NoError(t, err)
 
 		// save block 13
-		err = rs.SaveRegisters(headerByHeight[rootHeight+3], []flow.RegisterEntry{makeReg("X", "4")})
+		err = rs.SaveRegisters(headerByHeight[rootHeight+3], flow.RegisterEntries{makeReg("X", "4")})
 		require.NoError(t, err)
 
 		require.NoError(t, finalized.MockFinal(rootHeight+2))
@@ -267,16 +267,16 @@ func TestRegisterStoreReadingFromInMemStore(t *testing.T) {
 		//   ^- 11 (X: 4)
 
 		// save block 11
-		err := rs.SaveRegisters(headerByHeight[rootHeight+1], []flow.RegisterEntry{makeReg("X", "1"), makeReg("Y", "2")})
+		err := rs.SaveRegisters(headerByHeight[rootHeight+1], flow.RegisterEntries{makeReg("X", "1"), makeReg("Y", "2")})
 		require.NoError(t, err)
 
 		// save block 12
-		err = rs.SaveRegisters(headerByHeight[rootHeight+2], []flow.RegisterEntry{makeReg("Y", "3")})
+		err = rs.SaveRegisters(headerByHeight[rootHeight+2], flow.RegisterEntries{makeReg("Y", "3")})
 		require.NoError(t, err)
 
 		// save block 11 fork
 		block11Fork := unittest.BlockWithParentFixture(headerByHeight[rootHeight]).Header
-		err = rs.SaveRegisters(block11Fork, []flow.RegisterEntry{makeReg("X", "4")})
+		err = rs.SaveRegisters(block11Fork, flow.RegisterEntries{makeReg("X", "4")})
 		require.NoError(t, err)
 
 		val, err := rs.GetRegister(rootHeight+1, headerByHeight[rootHeight+1].ID(), makeReg("X", "1").Key)
@@ -328,17 +328,17 @@ func TestRegisterStoreExecuteFirstFinalizeLater(t *testing.T) {
 		headerByHeight map[uint64]*flow.Header,
 	) {
 		// save block 11
-		err := rs.SaveRegisters(headerByHeight[rootHeight+1], []flow.RegisterEntry{makeReg("X", "1")})
+		err := rs.SaveRegisters(headerByHeight[rootHeight+1], flow.RegisterEntries{makeReg("X", "1")})
 		require.NoError(t, err)
 		require.Equal(t, rootHeight, rs.LastFinalizedAndExecutedHeight())
 
 		// save block 12
-		err = rs.SaveRegisters(headerByHeight[rootHeight+2], []flow.RegisterEntry{makeReg("X", "2")})
+		err = rs.SaveRegisters(headerByHeight[rootHeight+2], flow.RegisterEntries{makeReg("X", "2")})
 		require.NoError(t, err)
 		require.Equal(t, rootHeight, rs.LastFinalizedAndExecutedHeight())
 
 		// save block 13
-		err = rs.SaveRegisters(headerByHeight[rootHeight+3], []flow.RegisterEntry{makeReg("X", "3")})
+		err = rs.SaveRegisters(headerByHeight[rootHeight+3], flow.RegisterEntries{makeReg("X", "3")})
 		require.NoError(t, err)
 		require.Equal(t, rootHeight, rs.LastFinalizedAndExecutedHeight())
 
@@ -386,17 +386,17 @@ func TestRegisterStoreFinalizeFirstExecuteLater(t *testing.T) {
 		require.Equal(t, rootHeight, rs.LastFinalizedAndExecutedHeight())
 
 		// save block 11
-		err := rs.SaveRegisters(headerByHeight[rootHeight+1], []flow.RegisterEntry{makeReg("X", "1")})
+		err := rs.SaveRegisters(headerByHeight[rootHeight+1], flow.RegisterEntries{makeReg("X", "1")})
 		require.NoError(t, err)
 		require.Equal(t, rootHeight+1, rs.LastFinalizedAndExecutedHeight())
 
 		// save block 12
-		err = rs.SaveRegisters(headerByHeight[rootHeight+2], []flow.RegisterEntry{makeReg("X", "2")})
+		err = rs.SaveRegisters(headerByHeight[rootHeight+2], flow.RegisterEntries{makeReg("X", "2")})
 		require.NoError(t, err)
 		require.Equal(t, rootHeight+2, rs.LastFinalizedAndExecutedHeight())
 
 		// save block 13
-		err = rs.SaveRegisters(headerByHeight[rootHeight+3], []flow.RegisterEntry{makeReg("X", "3")})
+		err = rs.SaveRegisters(headerByHeight[rootHeight+3], flow.RegisterEntries{makeReg("X", "3")})
 		require.NoError(t, err)
 		require.Equal(t, rootHeight+3, rs.LastFinalizedAndExecutedHeight())
 	})
@@ -436,7 +436,7 @@ func TestRegisterStoreConcurrentFinalizeAndExecute(t *testing.T) {
 				savedHeights <- height
 			}
 
-			err := rs.SaveRegisters(headerByHeight[height], []flow.RegisterEntry{makeReg("X", fmt.Sprintf("%d", height))})
+			err := rs.SaveRegisters(headerByHeight[height], flow.RegisterEntries{makeReg("X", fmt.Sprintf("%d", height))})
 			require.NoError(t, err)
 		}
 		close(savedHeights)

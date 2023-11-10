@@ -126,7 +126,7 @@ func (r *RegisterStore) getAndConvertNotFoundErr(register flow.RegisterID, heigh
 // - exception if the block is below the pruned height
 // - exception if the save block is saved again
 // - exception for any other exception
-func (r *RegisterStore) SaveRegisters(header *flow.Header, registers []flow.RegisterEntry) error {
+func (r *RegisterStore) SaveRegisters(header *flow.Header, registers flow.RegisterEntries) error {
 	err := r.memStore.SaveRegisters(header.Height, header.ID(), header.ParentID, registers)
 	if err != nil {
 		return fmt.Errorf("cannot save register to memStore: %w", err)
