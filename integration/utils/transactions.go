@@ -5,6 +5,8 @@ import (
 	_ "embed"
 	"fmt"
 
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
+
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
@@ -200,3 +202,8 @@ func CreateFlowAccount(ctx context.Context, client *testnet.Client) (sdk.Address
 
 	return addr, nil
 }
+
+// this is added to resolve the issue with chainhash ambiguous import,
+// the code is not used, but it's needed to force go.mod specify and retain chainhash version
+// workaround for issue: https://github.com/golang/go/issues/27899
+var _ = chainhash.Hash{}
