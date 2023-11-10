@@ -1,10 +1,11 @@
 package inmem
 
 import (
+	"time"
+
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
-	"time"
 )
 
 // EncodableSnapshot is the encoding format for protocol.Snapshot

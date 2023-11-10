@@ -1,8 +1,9 @@
 package protocol
 
 import (
-	"github.com/onflow/flow-go/model/flow"
 	"time"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // EpochQuery defines the different ways to query for epoch information
