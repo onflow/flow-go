@@ -28,7 +28,7 @@ func TestExtendingBlockSnapshot(t *testing.T) {
 		unknown := makeReg("unknown", "unknownV")
 		value, err = snap.Get(unknown.Key)
 		require.NoError(t, err)
-		require.Equal(t, nil, value)
+		require.Equal(t, []byte(nil), value)
 	})
 
 	t.Run("Extend snapshot", func(t *testing.T) {
@@ -57,7 +57,7 @@ func TestExtendingBlockSnapshot(t *testing.T) {
 		unknown := makeReg("unknown", "unknownV")
 		value, err = snap2.Get(unknown.Key)
 		require.NoError(t, err)
-		require.Equal(t, nil, value)
+		require.Equal(t, []byte(nil), value)
 
 		// should get updated value
 		value, err = snap2.Get(reg2.Key)
@@ -67,5 +67,5 @@ func TestExtendingBlockSnapshot(t *testing.T) {
 }
 
 func makeReg(key string, value string) flow.RegisterEntry {
-	panic("")
+	return unittest.MakeOwnerReg(key, value)
 }
