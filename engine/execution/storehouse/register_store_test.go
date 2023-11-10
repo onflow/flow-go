@@ -10,7 +10,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -69,9 +68,9 @@ func TestRegisterStoreGetRegisterFail(t *testing.T) {
 
 		// known block, unknown register
 		rootBlock := headerByHeight[rootHeight]
-		_, err = rs.GetRegister(rootHeight, rootBlock.ID(), unknownReg.Key)
-		require.Error(t, err)
-		require.ErrorIs(t, err, storage.ErrNotFound)
+		val, err := rs.GetRegister(rootHeight, rootBlock.ID(), unknownReg.Key)
+		require.NoError(t, err)
+		require.Nil(t, val)
 	})
 }
 

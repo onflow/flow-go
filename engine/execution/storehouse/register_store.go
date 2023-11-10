@@ -64,7 +64,7 @@ func NewRegisterStore(
 // 5. above pruned height, and is executed, but register is not updated since pruned height
 // It returns:
 //   - (value, nil) if the register value is found at the given block
-//   - (nil, storage.ErrNotFound) if the register is not found
+//   - (nil, nil) if the register is not found
 //   - (nil, storage.ErrHeightNotIndexed) if the height is below the first height that is indexed.
 //   - (nil, storehouse.ErrNotExecuted) if the block is not executed yet
 //   - (nil, storehouse.ErrNotExecuted) if the block is conflicting iwth finalized block
@@ -89,7 +89,7 @@ func (r *RegisterStore) GetRegister(height uint64, blockID flow.Identifier, regi
 	// then it means the block is connected to the pruned block of in memory store, which is
 	// a finalized block and executed block, so we can get its value from on disk store.
 	if height > prunedError.PrunedHeight {
-		return r.diskStore.Get(register, prunedError.PrunedHeight)
+		return r.getAndConvertNotFoundErr(register, prunedError.PrunedHeight)
 	}
 
 	// if the block is below the pruned height, then there are two cases:
@@ -105,8 +105,17 @@ func (r *RegisterStore) GetRegister(height uint64, blockID flow.Identifier, regi
 		// conflicting blocks are considered as un-executed
 		return flow.RegisterValue{}, fmt.Errorf("getting registers from conflicting block %v at height %v: %w", blockID, height, ErrNotExecuted)
 	}
-	return r.diskStore.Get(register, height)
+	return r.getAndConvertNotFoundErr(register, height)
+}
 
+// getAndConvertNotFoundErr returns nil if the register is not found from storage
+func (r *RegisterStore) getAndConvertNotFoundErr(register flow.RegisterID, height uint64) (flow.RegisterValue, error) {
+	val, err := r.diskStore.Get(register, height)
+	if errors.Is(err, storage.ErrNotFound) {
+		// FVM expects the error to be nil when register is not found
+		return nil, nil
+	}
+	return val, err
 }
 
 // SaveRegisters saves to InMemoryRegisterStore first, then trigger the same check as OnBlockFinalized
