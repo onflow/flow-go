@@ -390,7 +390,7 @@ func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
 	inspectorConfig := flowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs
-	// set hard threshold to 1 so that in the case of invalid cluster ID
+	// set hard threshold to 0 so that in the case of invalid cluster ID
 	// we force the inspector to return an error
 	inspectorConfig.ClusterPrefixHardThreshold = 0
 	inspectorConfig.NumberOfWorkers = 1
