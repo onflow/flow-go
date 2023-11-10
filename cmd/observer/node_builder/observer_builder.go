@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"google.golang.org/grpc/credentials"
 	"strings"
 	"time"
 
@@ -98,6 +99,7 @@ import (
 // For a node running as a standalone process, the config fields will be populated from the command line params,
 // while for a node running as a library, the config fields are expected to be initialized by the caller.
 type ObserverServiceConfig struct {
+	collectionGRPCPort        uint
 	bootstrapNodeAddresses    []string
 	bootstrapNodePublicKeys   []string
 	observerNetworkingKeyPath string
@@ -106,7 +108,6 @@ type ObserverServiceConfig struct {
 	apiBurstlimits            map[string]int
 	rpcConf                   rpc.Config
 	rpcMetricsEnabled         bool
-	apiTimeout                time.Duration
 	upstreamNodeAddresses     []string
 	upstreamNodePublicKeys    []string
 	upstreamIdentities        flow.IdentityList // the identity list of upstream peers the node uses to forward API requests to
@@ -115,6 +116,7 @@ type ObserverServiceConfig struct {
 // DefaultObserverServiceConfig defines all the default values for the ObserverServiceConfig
 func DefaultObserverServiceConfig() *ObserverServiceConfig {
 	return &ObserverServiceConfig{
+		collectionGRPCPort: 9000,
 		rpcConf: rpc.Config{
 			UnsecureGRPCListenAddr: "0.0.0.0:9000",
 			SecureGRPCListenAddr:   "0.0.0.0:9001",
@@ -144,7 +146,6 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 		bootstrapNodeAddresses:    []string{},
 		bootstrapNodePublicKeys:   []string{},
 		observerNetworkingKeyPath: cmd.NotSet,
-		apiTimeout:                3 * time.Second,
 		upstreamNodeAddresses:     []string{},
 		upstreamNodePublicKeys:    []string{},
 	}
@@ -468,6 +469,7 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 	builder.ExtraFlags(func(flags *pflag.FlagSet) {
 		defaultConfig := DefaultObserverServiceConfig()
 
+		flags.UintVar(&builder.collectionGRPCPort, "collection-ingress-port", defaultConfig.collectionGRPCPort, "the grpc ingress port for all collection nodes")
 		flags.StringVarP(&builder.rpcConf.UnsecureGRPCListenAddr, "rpc-addr", "r", defaultConfig.rpcConf.UnsecureGRPCListenAddr, "the address the unsecured gRPC server listens on")
 		flags.StringVar(&builder.rpcConf.SecureGRPCListenAddr, "secure-rpc-addr", defaultConfig.rpcConf.SecureGRPCListenAddr, "the address the secure gRPC server listens on")
 		flags.StringVarP(&builder.rpcConf.HTTPListenAddr, "http-addr", "h", defaultConfig.rpcConf.HTTPListenAddr, "the address the http proxy server listens on")
@@ -483,7 +485,6 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 		flags.StringVar(&builder.observerNetworkingKeyPath, "observer-networking-key-path", defaultConfig.observerNetworkingKeyPath, "path to the networking key for observer")
 		flags.StringSliceVar(&builder.bootstrapNodeAddresses, "bootstrap-node-addresses", defaultConfig.bootstrapNodeAddresses, "the network addresses of the bootstrap access node if this is an observer e.g. access-001.mainnet.flow.org:9653,access-002.mainnet.flow.org:9653")
 		flags.StringSliceVar(&builder.bootstrapNodePublicKeys, "bootstrap-node-public-keys", defaultConfig.bootstrapNodePublicKeys, "the networking public key of the bootstrap access node if this is an observer (in the same order as the bootstrap node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
-		flags.DurationVar(&builder.apiTimeout, "upstream-api-timeout", defaultConfig.apiTimeout, "tcp timeout for Flow API gRPC sockets to upstrem nodes")
 		flags.StringSliceVar(&builder.upstreamNodeAddresses, "upstream-node-addresses", defaultConfig.upstreamNodeAddresses, "the gRPC network addresses of the upstream access node. e.g. access-001.mainnet.flow.org:9000,access-002.mainnet.flow.org:9000")
 		flags.StringSliceVar(&builder.upstreamNodePublicKeys, "upstream-node-public-keys", defaultConfig.upstreamNodePublicKeys, "the networking public key of the upstream access node (in the same order as the upstream node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
 		flags.BoolVar(&builder.rpcMetricsEnabled, "rpc-metrics-enabled", defaultConfig.rpcMetricsEnabled, "whether to enable the rpc metrics")
@@ -898,6 +899,16 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		)
 		return nil
 	})
+	builder.Module("server certificate", func(node *cmd.NodeConfig) error {
+		// generate the server certificate that will be served by the GRPC server
+		x509Certificate, err := grpcutils.X509Certificate(node.NetworkKey)
+		if err != nil {
+			return err
+		}
+		tlsConfig := grpcutils.DefaultServerTLSConfig(x509Certificate)
+		builder.rpcConf.TransportCredentials = credentials.NewTLS(tlsConfig)
+		return nil
+	})
 	builder.Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		accessMetrics := builder.AccessMetrics
 		config := builder.rpcConf
@@ -914,7 +925,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		}
 
 		connFactory := &rpcConnection.ConnectionFactoryImpl{
-			CollectionGRPCPort:        0,
+			CollectionGRPCPort:        builder.collectionGRPCPort,
 			ExecutionGRPCPort:         0,
 			CollectionNodeGRPCTimeout: backendConfig.CollectionClientTimeout,
 			ExecutionNodeGRPCTimeout:  backendConfig.ExecutionClientTimeout,
@@ -957,8 +968,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		restHandler, err := restapiproxy.NewRestProxyHandler(
 			accessBackend,
 			builder.upstreamIdentities,
-			builder.apiTimeout,
-			config.MaxMsgSize,
+			connFactory,
 			builder.Logger,
 			observerCollector,
 			node.RootChainID.Chain())
@@ -987,7 +997,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		}
 
 		// upstream access node forwarder
-		forwarder, err := apiproxy.NewFlowAccessAPIForwarder(builder.upstreamIdentities, builder.apiTimeout, config.MaxMsgSize)
+		forwarder, err := apiproxy.NewFlowAccessAPIForwarder(builder.upstreamIdentities, connFactory)
 		if err != nil {
 			return nil, err
 		}

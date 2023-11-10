@@ -2,6 +2,7 @@ package connection
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/crypto"
 	"io"
 	"net"
 	"time"
@@ -15,8 +16,8 @@ import (
 
 // ConnectionFactory is an interface for creating access and execution API clients.
 type ConnectionFactory interface {
-	GetAccessAPIClient(address string) (access.AccessAPIClient, io.Closer, error)
-	GetAccessAPIClientWithPort(address string, port uint) (access.AccessAPIClient, io.Closer, error)
+	GetAccessAPIClient(address string, networkPubKey crypto.PublicKey) (access.AccessAPIClient, io.Closer, error)
+	GetAccessAPIClientWithPort(address string, port uint, networkPubKey crypto.PublicKey) (access.AccessAPIClient, io.Closer, error)
 	GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, io.Closer, error)
 }
 
@@ -26,8 +27,8 @@ type ProxyConnectionFactory struct {
 	targetAddress string
 }
 
-func (p *ProxyConnectionFactory) GetAccessAPIClient(address string) (access.AccessAPIClient, io.Closer, error) {
-	return p.ConnectionFactory.GetAccessAPIClient(p.targetAddress)
+func (p *ProxyConnectionFactory) GetAccessAPIClient(address string, networkPubKey crypto.PublicKey) (access.AccessAPIClient, io.Closer, error) {
+	return p.ConnectionFactory.GetAccessAPIClient(p.targetAddress, networkPubKey)
 }
 func (p *ProxyConnectionFactory) GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, io.Closer, error) {
 	return p.ConnectionFactory.GetExecutionAPIClient(p.targetAddress)
@@ -46,18 +47,18 @@ type ConnectionFactoryImpl struct {
 }
 
 // GetAccessAPIClient gets an access API client for the specified address using the default CollectionGRPCPort.
-func (cf *ConnectionFactoryImpl) GetAccessAPIClient(address string) (access.AccessAPIClient, io.Closer, error) {
-	return cf.GetAccessAPIClientWithPort(address, cf.CollectionGRPCPort)
+func (cf *ConnectionFactoryImpl) GetAccessAPIClient(address string, networkPubKey crypto.PublicKey) (access.AccessAPIClient, io.Closer, error) {
+	return cf.GetAccessAPIClientWithPort(address, cf.CollectionGRPCPort, networkPubKey)
 }
 
 // GetAccessAPIClientWithPort gets an access API client for the specified address and port.
-func (cf *ConnectionFactoryImpl) GetAccessAPIClientWithPort(address string, port uint) (access.AccessAPIClient, io.Closer, error) {
+func (cf *ConnectionFactoryImpl) GetAccessAPIClientWithPort(address string, port uint, networkPubKey crypto.PublicKey) (access.AccessAPIClient, io.Closer, error) {
 	grpcAddress, err := getGRPCAddress(address, port)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	conn, closer, err := cf.Manager.GetConnection(grpcAddress, cf.CollectionNodeGRPCTimeout, AccessClient)
+	conn, closer, err := cf.Manager.GetConnection(grpcAddress, cf.CollectionNodeGRPCTimeout, AccessClient, networkPubKey)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -72,7 +73,7 @@ func (cf *ConnectionFactoryImpl) GetExecutionAPIClient(address string) (executio
 		return nil, nil, err
 	}
 
-	conn, closer, err := cf.Manager.GetConnection(grpcAddress, cf.ExecutionNodeGRPCTimeout, ExecutionClient)
+	conn, closer, err := cf.Manager.GetConnection(grpcAddress, cf.ExecutionNodeGRPCTimeout, ExecutionClient, nil)
 	if err != nil {
 		return nil, nil, err
 	}

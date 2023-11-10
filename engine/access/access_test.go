@@ -319,8 +319,8 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 
 		// create a mock connection factory
 		connFactory := connectionmock.NewConnectionFactory(suite.T())
-		connFactory.On("GetAccessAPIClient", collNode1.Address).Return(col1ApiClient, &mockCloser{}, nil)
-		connFactory.On("GetAccessAPIClient", collNode2.Address).Return(col2ApiClient, &mockCloser{}, nil)
+		connFactory.On("GetAccessAPIClient", collNode1.Address, nil).Return(col1ApiClient, &mockCloser{}, nil)
+		connFactory.On("GetAccessAPIClient", collNode2.Address, nil).Return(col2ApiClient, &mockCloser{}, nil)
 
 		bnd, err := backend.New(backend.Params{State: suite.state,
 			Collections:          collections,

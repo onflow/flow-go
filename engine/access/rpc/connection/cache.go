@@ -1,6 +1,7 @@
 package connection
 
 import (
+	"github.com/onflow/flow-go/crypto"
 	"sync"
 	"time"
 
@@ -14,6 +15,7 @@ type CachedClient struct {
 	ClientConn     *grpc.ClientConn
 	Address        string
 	timeout        time.Duration
+	networkPubKey  crypto.PublicKey
 	closeRequested *atomic.Bool
 	wg             sync.WaitGroup
 	mu             sync.Mutex
@@ -73,7 +75,7 @@ func (c *Cache) Get(address string) (*CachedClient, bool) {
 // New entries are added to the cache with their mutex locked. This ensures that the caller gets
 // priority when working with the new client, allowing it to create the underlying connection.
 // Clients retrieved from the cache are returned without modifying their lock.
-func (c *Cache) GetOrAdd(address string, timeout time.Duration) (*CachedClient, bool) {
+func (c *Cache) GetOrAdd(address string, timeout time.Duration, networkPubKey crypto.PublicKey) (*CachedClient, bool) {
 	client := &CachedClient{}
 	client.mu.Lock()
 
@@ -84,6 +86,7 @@ func (c *Cache) GetOrAdd(address string, timeout time.Duration) (*CachedClient, 
 
 	client.Address = address
 	client.timeout = timeout
+
 	client.closeRequested = atomic.NewBool(false)
 
 	return client, false

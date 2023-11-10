@@ -3,6 +3,9 @@ package connection
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/crypto"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 	"io"
 	"time"
 
@@ -12,7 +15,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/connectivity"
-	"google.golang.org/grpc/credentials/insecure"
 	_ "google.golang.org/grpc/encoding/gzip" //required for gRPC compression
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/status"
@@ -26,11 +28,11 @@ import (
 // DefaultClientTimeout is used when making a GRPC request to a collection node or an execution node.
 const DefaultClientTimeout = 3 * time.Second
 
-// clientType is an enumeration type used to differentiate between different types of gRPC clients.
-type clientType int
+// ClientType is an enumeration type used to differentiate between different types of gRPC clients.
+type ClientType int
 
 const (
-	AccessClient clientType = iota
+	AccessClient ClientType = iota
 	ExecutionClient
 )
 
@@ -86,16 +88,20 @@ func NewManager(
 // GetConnection returns a gRPC client connection for the given grpcAddress and timeout.
 // If a cache is used, it retrieves a cached connection, otherwise creates a new connection.
 // It returns the client connection and an io.Closer to close the connection when done.
-func (m *Manager) GetConnection(grpcAddress string, timeout time.Duration, clientType clientType) (*grpc.ClientConn, io.Closer, error) {
+func (m *Manager) GetConnection(grpcAddress string,
+	timeout time.Duration,
+	clientType ClientType,
+	networkPubKey crypto.PublicKey,
+) (*grpc.ClientConn, io.Closer, error) {
 	if m.cache != nil {
-		conn, err := m.retrieveConnection(grpcAddress, timeout, clientType)
+		conn, err := m.retrieveConnection(grpcAddress, timeout, clientType, networkPubKey)
 		if err != nil {
 			return nil, nil, err
 		}
 		return conn, &noopCloser{}, nil
 	}
 
-	conn, err := m.createConnection(grpcAddress, timeout, nil, clientType)
+	conn, err := m.createConnection(grpcAddress, timeout, nil, clientType, networkPubKey)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -135,8 +141,12 @@ func (m *Manager) HasCache() bool {
 // retrieveConnection retrieves the CachedClient for the given grpcAddress from the cache or adds a new one if not present.
 // If the connection is already cached, it waits for the lock and returns the connection from the cache.
 // Otherwise, it creates a new connection and caches it.
-func (m *Manager) retrieveConnection(grpcAddress string, timeout time.Duration, clientType clientType) (*grpc.ClientConn, error) {
-	client, ok := m.cache.GetOrAdd(grpcAddress, timeout)
+func (m *Manager) retrieveConnection(grpcAddress string,
+	timeout time.Duration,
+	clientType ClientType,
+	networkPubKey crypto.PublicKey,
+) (*grpc.ClientConn, error) {
+	client, ok := m.cache.GetOrAdd(grpcAddress, timeout, networkPubKey)
 	if ok {
 		// The client was retrieved from the cache, wait for the lock
 		client.mu.Lock()
@@ -157,7 +167,7 @@ func (m *Manager) retrieveConnection(grpcAddress string, timeout time.Duration, 
 	}
 
 	// The connection is not cached or is closed, create a new connection and cache it
-	conn, err := m.createConnection(grpcAddress, timeout, client, clientType)
+	conn, err := m.createConnection(grpcAddress, timeout, client, clientType, networkPubKey)
 	if err != nil {
 		return nil, err
 	}
@@ -174,7 +184,13 @@ func (m *Manager) retrieveConnection(grpcAddress string, timeout time.Duration, 
 // createConnection creates a new gRPC connection to the remote node at the given address with the specified timeout.
 // If the cachedClient is not nil, it means a new entry in the cache is being created, so it's locked to give priority
 // to the caller working with the new client, allowing it to create the underlying connection.
-func (m *Manager) createConnection(address string, timeout time.Duration, cachedClient *CachedClient, clientType clientType) (*grpc.ClientConn, error) {
+func (m *Manager) createConnection(
+	address string,
+	timeout time.Duration,
+	cachedClient *CachedClient,
+	clientType ClientType,
+	networkPubKey crypto.PublicKey,
+) (*grpc.ClientConn, error) {
 	if timeout == 0 {
 		timeout = DefaultClientTimeout
 	}
@@ -212,12 +228,22 @@ func (m *Manager) createConnection(address string, timeout time.Duration, cached
 	// https://grpc.io/blog/grpc-on-http2/#keeping-connections-alive
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(int(m.maxMsgSize))))
-	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	opts = append(opts, grpc.WithKeepaliveParams(keepaliveParams))
 	opts = append(opts, grpc.WithChainUnaryInterceptor(connInterceptors...))
 
 	if m.compressorName != grpcutils.NoCompressor {
 		opts = append(opts, grpc.WithDefaultCallOptions(grpc.UseCompressor(m.compressorName)))
+	}
+
+	if networkPubKey != nil {
+		tlsConfig, err := grpcutils.DefaultClientTLSConfig(networkPubKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get default TLS client config using public flow networking key %s %w", networkPubKey.String(), err)
+		}
+		fmt.Println(fmt.Sprintf("connection with tls: %v", networkPubKey))
+		opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)))
+	} else {
+		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	}
 
 	conn, err := grpc.Dial(
@@ -292,7 +318,7 @@ func createClientTimeoutInterceptor(timeout time.Duration) grpc.UnaryClientInter
 // the corresponding client.
 func (m *Manager) createClientInvalidationInterceptor(
 	address string,
-	clientType clientType,
+	clientType ClientType,
 ) grpc.UnaryClientInterceptor {
 	if !m.circuitBreakerConfig.Enabled {
 		clientInvalidationInterceptor := func(

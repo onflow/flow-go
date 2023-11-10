@@ -2,19 +2,12 @@ package forwarder
 
 import (
 	"fmt"
-	"sync"
-	"time"
-
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/connectivity"
-	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/status"
-
-	rpcConnection "github.com/onflow/flow-go/engine/access/rpc/connection"
+	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/utils/grpcutils"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"io"
+	"sync"
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
 )
@@ -25,14 +18,13 @@ type Forwarder struct {
 	roundRobin  int
 	ids         flow.IdentityList
 	upstream    []access.AccessAPIClient
-	connections []*grpc.ClientConn
-	timeout     time.Duration
-	maxMsgSize  uint
+	closer      []io.Closer
+	connFactory connection.ConnectionFactory
 }
 
-func NewForwarder(identities flow.IdentityList, timeout time.Duration, maxMsgSize uint) (*Forwarder, error) {
-	forwarder := &Forwarder{maxMsgSize: maxMsgSize}
-	err := forwarder.setFlowAccessAPI(identities, timeout)
+func NewForwarder(identities flow.IdentityList, connectionFactory connection.ConnectionFactory) (*Forwarder, error) {
+	forwarder := &Forwarder{connFactory: connectionFactory}
+	err := forwarder.setFlowAccessAPI(identities)
 	return forwarder, err
 }
 
@@ -40,11 +32,10 @@ func NewForwarder(identities flow.IdentityList, timeout time.Duration, maxMsgSiz
 // It is used by Observer services, Blockchain Data Service, etc.
 // Make sure that this is just for observation and not a staked participant in the flow network.
 // This means that observers see a copy of the data but there is no interaction to ensure integrity from the root block.
-func (f *Forwarder) setFlowAccessAPI(accessNodeAddressAndPort flow.IdentityList, timeout time.Duration) error {
-	f.timeout = timeout
+func (f *Forwarder) setFlowAccessAPI(accessNodeAddressAndPort flow.IdentityList) error {
 	f.ids = accessNodeAddressAndPort
 	f.upstream = make([]access.AccessAPIClient, accessNodeAddressAndPort.Count())
-	f.connections = make([]*grpc.ClientConn, accessNodeAddressAndPort.Count())
+	f.closer = make([]io.Closer, accessNodeAddressAndPort.Count())
 	for i, identity := range accessNodeAddressAndPort {
 		// Store the faultTolerantClient setup parameters such as address, public, key and timeout, so that
 		// we can refresh the API on connection loss
@@ -65,54 +56,24 @@ func (f *Forwarder) setFlowAccessAPI(accessNodeAddressAndPort flow.IdentityList,
 // reconnectingClient returns an active client, or
 // creates one, if the last one is not ready anymore.
 func (f *Forwarder) reconnectingClient(i int) error {
-	timeout := f.timeout
+	identity := f.ids[i]
+	fmt.Println(fmt.Sprintf("identity.Address: %v", identity.Address))
+	fmt.Println(fmt.Sprintf("identity.NetworkPubKey: %v", identity.NetworkPubKey))
 
-	if f.connections[i] == nil || f.connections[i].GetState() != connectivity.Ready {
-		identity := f.ids[i]
-		var connection *grpc.ClientConn
-		var err error
-		if identity.NetworkPubKey == nil {
-			connection, err = grpc.Dial(
-				identity.Address,
-				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(int(f.maxMsgSize))),
-				grpc.WithTransportCredentials(insecure.NewCredentials()),
-				rpcConnection.WithClientTimeoutOption(timeout))
-			if err != nil {
-				return err
-			}
-		} else {
-			tlsConfig, err := grpcutils.DefaultClientTLSConfig(identity.NetworkPubKey)
-			if err != nil {
-				return fmt.Errorf("failed to get default TLS client config using public flow networking key %s %w", identity.NetworkPubKey.String(), err)
-			}
-
-			connection, err = grpc.Dial(
-				identity.Address,
-				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(int(f.maxMsgSize))),
-				grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)),
-				rpcConnection.WithClientTimeoutOption(timeout))
-			if err != nil {
-				return fmt.Errorf("cannot connect to %s %w", identity.Address, err)
-			}
-		}
-		connection.Connect()
-		time.Sleep(1 * time.Second)
-		state := connection.GetState()
-		if state != connectivity.Ready && state != connectivity.Connecting {
-			return fmt.Errorf("%v", state)
-		}
-		f.connections[i] = connection
-		f.upstream[i] = access.NewAccessAPIClient(connection)
+	accessApiClient, closer, err := f.connFactory.GetAccessAPIClient(identity.Address, identity.NetworkPubKey)
+	if err != nil {
+		return fmt.Errorf("failed to connect to access node at %s: %w", accessApiClient, err)
 	}
-
+	f.closer[i] = closer
+	f.upstream[i] = accessApiClient
 	return nil
 }
 
 // FaultTolerantClient implements an upstream connection that reconnects on errors
 // a reasonable amount of time.
-func (f *Forwarder) FaultTolerantClient() (access.AccessAPIClient, error) {
+func (f *Forwarder) FaultTolerantClient() (access.AccessAPIClient, io.Closer, error) {
 	if f.upstream == nil || len(f.upstream) == 0 {
-		return nil, status.Errorf(codes.Unimplemented, "method not implemented")
+		return nil, nil, status.Errorf(codes.Unimplemented, "method not implemented")
 	}
 
 	// Reasoning: A retry count of three gives an acceptable 5% failure ratio from a 37% failure ratio.
@@ -132,14 +93,12 @@ func (f *Forwarder) FaultTolerantClient() (access.AccessAPIClient, error) {
 		f.roundRobin = f.roundRobin % len(f.upstream)
 		err = f.reconnectingClient(f.roundRobin)
 		if err != nil {
+			fmt.Println(fmt.Sprintf("+++FaultTolerantClient err: %v", err))
 			continue
 		}
-		state := f.connections[f.roundRobin].GetState()
-		if state != connectivity.Ready && state != connectivity.Connecting {
-			continue
-		}
-		return f.upstream[f.roundRobin], nil
+		fmt.Println(fmt.Sprintf("FaultTolerantClient ok"))
+		return f.upstream[f.roundRobin], f.closer[f.roundRobin], nil
 	}
 
-	return nil, status.Errorf(codes.Unavailable, err.Error())
+	return nil, nil, status.Errorf(codes.Unavailable, err.Error())
 }

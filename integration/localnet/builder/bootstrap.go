@@ -455,6 +455,7 @@ func prepareObserverService(i int, observerName string, agPublicKey string) Serv
 		fmt.Sprintf("--secure-rpc-addr=%s:%s", observerName, testnet.GRPCSecurePort),
 		fmt.Sprintf("--http-addr=%s:%s", observerName, testnet.GRPCWebPort),
 		fmt.Sprintf("--rest-addr=%s:%s", observerName, testnet.RESTPort),
+		fmt.Sprintf("--collection-ingress-port=%s", testnet.GRPCPort),
 	)
 
 	service.AddExposedPorts(
