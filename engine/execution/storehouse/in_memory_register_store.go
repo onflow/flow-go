@@ -60,7 +60,7 @@ func (s *InMemoryRegisterStore) SaveRegisters(
 	height uint64,
 	blockID flow.Identifier,
 	parentID flow.Identifier,
-	registers []flow.RegisterEntry,
+	registers flow.RegisterEntries,
 ) error {
 	// preprocess data before acquiring the lock
 	regs := make(map[flow.RegisterID]flow.RegisterValue, len(registers))
@@ -179,7 +179,7 @@ func (s *InMemoryRegisterStore) GetUpdatedRegisters(height uint64, blockID flow.
 
 	// since the registerUpdates won't be updated and registers for a block can only be set once,
 	// we don't need to hold the lock when converting it from map into slice.
-	registers := make([]flow.RegisterEntry, 0, len(registerUpdates))
+	registers := make(flow.RegisterEntries, 0, len(registerUpdates))
 	for regID, reg := range registerUpdates {
 		registers = append(registers, flow.RegisterEntry{
 			Key:   regID,

@@ -26,7 +26,7 @@ type RegisterStore interface {
 	// - exception if the block is below the pruned height
 	// - exception if the save block is saved again
 	// - exception for any other exception
-	SaveRegisters(header *flow.Header, registers []flow.RegisterEntry) error
+	SaveRegisters(header *flow.Header, registers flow.RegisterEntries) error
 
 	// Depend on FinalizedReader's GetFinalizedBlockIDAtHeight
 	// Depend on ExecutedFinalizedWAL.Append
@@ -72,7 +72,7 @@ type InMemoryRegisterStore interface {
 		height uint64,
 		blockID flow.Identifier,
 		parentID flow.Identifier,
-		registers []flow.RegisterEntry,
+		registers flow.RegisterEntries,
 	) error
 
 	IsBlockExecuted(height uint64, blockID flow.Identifier) (bool, error)
@@ -81,7 +81,7 @@ type InMemoryRegisterStore interface {
 type OnDiskRegisterStore = storage.RegisterIndex
 
 type ExecutedFinalizedWAL interface {
-	Append(height uint64, registers []flow.RegisterEntry) error
+	Append(height uint64, registers flow.RegisterEntries) error
 
 	// Latest returns the latest height in the WAL.
 	Latest() (uint64, error)
@@ -92,5 +92,5 @@ type ExecutedFinalizedWAL interface {
 type WALReader interface {
 	// Next returns the next height and trie updates in the WAL.
 	// It returns EOF when there are no more entries.
-	Next() (height uint64, registers []flow.RegisterEntry, err error)
+	Next() (height uint64, registers flow.RegisterEntries, err error)
 }
