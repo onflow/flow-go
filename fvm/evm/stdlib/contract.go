@@ -57,7 +57,7 @@ func newInternalEVMTypeEncodeABIFunction(
 
 			// TBD: This should probably be an input to the `EVM.encodeABI` function,
 			// not sure in what format though. Maybe: `"details(string,string,uint64)"`
-			const abiSpec = `[{"type": "function", "name": "details", "inputs": [{ "name": "name", "type": "string" }, { "name": "surname", "type": "string" }, { "name": "age", "type": "uint64" }]}]`
+			const abiSpec = `[{"type": "function", "name": "details", "inputs": [{ "name": "name", "type": "string" }, { "name": "surname", "type": "string" }, { "name": "age", "type": "uint64" }], "outputs": []}]`
 
 			// Get `arguments` argument
 
@@ -115,9 +115,70 @@ func newInternalEVMTypeDecodeABIFunction(
 		internalEVMTypeDecodeABIFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
 			inter := invocation.Interpreter
-			// TODO
+			locationRange := invocation.LocationRange
 
-			return interpreter.ByteSliceToByteArrayValue(inter, []byte{})
+			// TBD: This should probably be an input to the `EVM.encodeABI` function,
+			// not sure in what format though. Maybe: `"details(string,string,uint64)"`
+			const abiSpec = `[{"type": "function", "name": "details", "inputs": [{ "name": "name", "type": "string" }, { "name": "surname", "type": "string" }, { "name": "age", "type": "uint64" }], "outputs": []}]`
+
+			// Get `data` argument
+
+			dataValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			data, err := interpreter.ByteArrayValueToByteSlice(inter, dataValue, locationRange)
+			if err != nil {
+				panic(err)
+			}
+
+			abi, err := gethABI.JSON(strings.NewReader(abiSpec))
+			if err != nil {
+				panic(err)
+			}
+
+			method, _ := abi.MethodById(data[0:4])
+			unpacked, err := method.Inputs.Unpack(data[4:])
+			if err != nil {
+				panic(err)
+			}
+
+			values := make([]interpreter.Value, 0)
+			for _, arg := range unpacked {
+				switch value := arg.(type) {
+				case string:
+					values = append(values, interpreter.NewStringValue(
+						inter,
+						common.NewStringMemoryUsage(len(value)),
+						func() string {
+							return value
+						},
+					))
+				case uint64:
+					values = append(values, interpreter.NewUInt64Value(
+						inter,
+						func() uint64 {
+							return value
+						},
+					))
+				}
+			}
+			arrayType := interpreter.NewVariableSizedStaticType(
+				inter,
+				interpreter.NewPrimitiveStaticType(
+					inter,
+					interpreter.PrimitiveStaticTypeAnyStruct,
+				),
+			)
+
+			return interpreter.NewArrayValue(
+				inter,
+				invocation.LocationRange,
+				arrayType,
+				common.ZeroAddress,
+				values...,
+			)
 		},
 	)
 }

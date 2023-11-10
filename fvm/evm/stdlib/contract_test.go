@@ -136,7 +136,7 @@ func TestEVMEncodeABI(t *testing.T) {
       fun main(): [UInt8] {
         return EVM.encodeABI(arguments: ["John", "Doe", UInt64(33)])
       }
-    `)
+	`)
 
 	accountCodes := map[common.Location][]byte{}
 	var events []cadence.Event
@@ -285,11 +285,14 @@ func TestEVMDecodeABI(t *testing.T) {
 
       access(all)
       fun main(data: [UInt8]): Bool {
-		let unpacked = EVM.decodeABI(data: data)
-		assert(unpacked.length == 3, message: "".concat(unpacked.length.toString()))
+        let unpacked = EVM.decodeABI(data: data)
+        assert(unpacked.length == 3)
+        assert((unpacked[0] as! String) == "John")
+        assert((unpacked[1] as! String) == "Doe")
+        assert((unpacked[2] as! UInt64) == UInt64(33))
         return true
       }
-    `)
+	`)
 
 	accountCodes := map[common.Location][]byte{}
 	var events []cadence.Event
@@ -400,7 +403,7 @@ func TestEVMDecodeABI(t *testing.T) {
 			cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0), cadence.UInt8(0x0)},
 	).WithType(cadence.NewVariableSizedArrayType(cadence.TheUInt8Type))
 
-	_, err = rt.ExecuteScript(
+	result, err := rt.ExecuteScript(
 		runtime.Script{
 			Source: script,
 			Arguments: EncodeArgs([]cadence.Value{
@@ -414,6 +417,8 @@ func TestEVMDecodeABI(t *testing.T) {
 		},
 	)
 	require.NoError(t, err)
+
+	assert.Equal(t, cadence.NewBool(true), result)
 }
 
 func TestEVMAddressConstructionAndReturn(t *testing.T) {
