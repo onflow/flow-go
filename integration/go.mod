@@ -5,6 +5,7 @@ go 1.20
 require (
 	cloud.google.com/go/bigquery v1.53.0
 	github.com/VividCortex/ewma v1.2.0
+	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.2
 	github.com/coreos/go-semver v0.3.0
 	github.com/dapperlabs/testingdock v0.4.5-0.20231020233342-a2853fe18724
 	github.com/dgraph-io/badger/v2 v2.2007.4
@@ -142,7 +143,6 @@ require (
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/golang/snappy v0.0.5-0.20220116011046-fa5810519dcb // indirect
 	github.com/google/flatbuffers v2.0.8+incompatible // indirect
-	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/gopacket v1.1.19 // indirect
 	github.com/google/pprof v0.0.0-20230602150820-91b7bce49751 // indirect
 	github.com/google/s2a-go v0.1.4 // indirect
