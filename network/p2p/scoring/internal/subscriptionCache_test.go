@@ -178,3 +178,49 @@ func TestMoveUpdateCycle(t *testing.T) {
 	require.True(t, found, "existing peer should be found")
 	require.ElementsMatch(t, []string{topic4}, topics, "retrieved topics should match the added topics")
 }
+
+// TestMoveUpdateCycleWithDifferentPeers tests that moving to the next update cycle does not affect the subscribed
+// topics for other peers.
+func TestMoveUpdateCycleWithDifferentPeers(t *testing.T) {
+	sizeLimit := uint32(100)
+	cache := internal.NewSubscriptionRecordCache(
+		sizeLimit,
+		unittest.Logger(),
+		metrics.NewSubscriptionRecordCacheMetricsFactory(metrics.NewNoopHeroCacheMetricsFactory()))
+
+	peer1 := unittest.PeerIdFixture(t)
+	peer2 := unittest.PeerIdFixture(t)
+	topic1 := "topic1"
+	topic2 := "topic2"
+
+	// add topic1 to peer1
+	topics, err := cache.AddTopicForPeer(peer1, topic1)
+	require.NoError(t, err, "adding first topic to peer1 should not produce an error")
+	require.Equal(t, []string{topic1}, topics, "updated topics should match the added topic")
+
+	// add topic2 to peer2
+	topics, err = cache.AddTopicForPeer(peer2, topic2)
+	require.NoError(t, err, "adding first topic to peer2 should not produce an error")
+	require.Equal(t, []string{topic2}, topics, "updated topics should match the added topic")
+
+	// move to next update cycle
+	cache.MoveToNextUpdateCycle()
+
+	// since we did not add any topic to the peers, the topics for the peers should be the same as before
+	topics, found := cache.GetSubscribedTopics(peer1)
+	require.True(t, found, "peer1 should be found")
+	require.ElementsMatch(t, []string{topic1}, topics, "retrieved topics should match the added topics")
+
+	topics, found = cache.GetSubscribedTopics(peer2)
+	require.True(t, found, "peer2 should be found")
+	require.ElementsMatch(t, []string{topic2}, topics, "retrieved topics should match the added topics")
+
+	// now add topic2 to peer1; it should overwrite the previous topics for peer1, but not affect the topics for peer2
+	topics, err = cache.AddTopicForPeer(peer1, topic2)
+	require.NoError(t, err, "adding second topic to peer1 should not produce an error")
+	require.Equal(t, []string{topic2}, topics, "updated topics should match the added topic")
+
+	topics, found = cache.GetSubscribedTopics(peer2)
+	require.True(t, found, "peer2 should be found")
+	require.ElementsMatch(t, []string{topic2}, topics, "retrieved topics should match the added topics")
+}
