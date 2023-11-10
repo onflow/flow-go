@@ -40,6 +40,40 @@ type IdentitySkeleton struct {
 	NetworkPubKey crypto.PublicKey
 }
 
+// EpochParticipationStatus represents the status of a node's participation. Depending on what changes were applied to
+// the protocol state, a node may be in one of four states:
+// * joining - the node was included in the epoch setup event(for next epoch) and is will be active in the next epoch.
+// * active - the node was included in the previous epoch setup and is actively participating in the current epoch.
+// * leaving - the node was active in the previous epoch and is leaving the network in the current epoch.
+// * ejected - represents a node that has been permanently removed from the network.
+// Only active nodes are allowed to perform certain tasks relative to other nodes.
+// Nodes which are registered to join at the next epoch will appear in the
+// identity table but aren't considered active until their first
+// epoch begins. Likewise, nodes which were registered in the previous epoch
+// but have left at the most recent epoch boundary will appear in the identity
+// table with leaving participation status.
+// A node may be ejected by either:
+//   - requesting self-ejection to protect its stake in case the node operator suspects
+//     the node's keys to be compromised
+//   - committing a serious protocol violation or multiple smaller misdemeanours.
+type EpochParticipationStatus int
+
+const (
+	EpochParticipationStatusJoining = iota
+	EpochParticipationStatusActive
+	EpochParticipationStatusLeaving
+	EpochParticipationStatusEjected
+)
+
+func (p EpochParticipationStatus) String() string {
+	return [...]string{
+		"EpochParticipationStatusJoining",
+		"EpochParticipationStatusActive",
+		"EpochParticipationStatusLeaving",
+		"EpochParticipationStatusEjected",
+	}[p]
+}
+
 // DynamicIdentity represents the dynamic part of public identity of one network participant (node).
 type DynamicIdentity struct {
 	// Weight represents the node's authority to perform certain tasks relative
@@ -57,10 +91,7 @@ type DynamicIdentity struct {
 	// table with zero weight.
 	Weight uint64
 	// Ejected represents whether a node has been permanently removed from the
-	// network. A node may be ejected by either:
-	// * requesting self-ejection to protect its stake in case the node operator suspects
-	//   the node's keys to be compromised
-	// * committing a serious protocol violation or multiple smaller misdemeanours
+	// network.
 	Ejected bool
 }
 
