@@ -5,8 +5,9 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/integration/tests/epochs"
 	"github.com/onflow/flow-go/model/flow"
+
+	"github.com/onflow/flow-go/integration/tests/epochs"
 )
 
 func TestEpochJoinAndLeaveVN(t *testing.T) {
