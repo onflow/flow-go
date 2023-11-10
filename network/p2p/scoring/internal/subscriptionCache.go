@@ -32,11 +32,7 @@ func NewSubscriptionRecordCache(sizeLimit uint32,
 	collector module.HeroCacheMetrics) *SubscriptionRecordCache {
 	backData := herocache.NewCache(sizeLimit,
 		herocache.DefaultOversizeFactor,
-		// this cache is supposed to keep the subscription for the authorized (staked) nodes. Since the number of such nodes is
-		// expected to be small, we do not eject any records from the cache. The cache size must be large enough to hold all
-		// the spam records of the authorized nodes. Also, this cache is keeping at most one record per origin id, so the
-		// size of the cache must be at least the number of authorized nodes.
-		heropool.NoEjection,
+		heropool.LRUEjection,
 		logger.With().Str("mempool", "subscription-records").Logger(),
 		collector)
 

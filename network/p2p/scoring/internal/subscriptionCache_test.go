@@ -1,11 +1,14 @@
 package internal_test
 
 import (
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/p2p/scoring/internal"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -23,8 +26,8 @@ func TestNewSubscriptionRecordCache(t *testing.T) {
 	require.IsType(t, &internal.SubscriptionRecordCache{}, cache, "cache should be of type *SubscriptionRecordCache")
 }
 
-// TestGetSubscribedTopics tests the retrieval of subscribed topics for a peer.
-func TestGetSubscribedTopics(t *testing.T) {
+// TestSubscriptionCache_GetSubscribedTopics tests the retrieval of subscribed topics for a peer.
+func TestSubscriptionCache_GetSubscribedTopics(t *testing.T) {
 	sizeLimit := uint32(100)
 	cache := internal.NewSubscriptionRecordCache(
 		sizeLimit,
@@ -54,9 +57,9 @@ func TestGetSubscribedTopics(t *testing.T) {
 	require.Nil(t, retrievedTopics, "retrieved topics for non-existent peer should be nil")
 }
 
-// TestMoveToNextUpdateCycle tests the increment of update cycles in SubscriptionRecordCache.
+// TestSubscriptionCache_MoveToNextUpdateCycle tests the increment of update cycles in SubscriptionRecordCache.
 // The first increment should set the cycle to 1, and the second increment should set the cycle to 2.
-func TestMoveToNextUpdateCycle(t *testing.T) {
+func TestSubscriptionCache_MoveToNextUpdateCycle(t *testing.T) {
 	sizeLimit := uint32(100)
 	cache := internal.NewSubscriptionRecordCache(
 		sizeLimit,
@@ -72,8 +75,8 @@ func TestMoveToNextUpdateCycle(t *testing.T) {
 	require.Equal(t, uint64(2), secondCycle, "second cycle should be 2 after second increment")
 }
 
-// TestAddTopicForPeer tests adding a topic for a peer.
-func TestAddTopicForPeer(t *testing.T) {
+// TestSubscriptionCache_TestAddTopicForPeer tests adding a topic for a peer.
+func TestSubscriptionCache_TestAddTopicForPeer(t *testing.T) {
 	sizeLimit := uint32(100)
 	cache := internal.NewSubscriptionRecordCache(
 		sizeLimit,
@@ -109,8 +112,8 @@ func TestAddTopicForPeer(t *testing.T) {
 	require.ElementsMatch(t, []string{firstTopic, secondTopic}, retrievedTopics, "retrieved topics should match the added topics")
 }
 
-// TestDuplicateTopic tests adding a duplicate topic for a peer. The duplicate topic should not be added.
-func TestDuplicateTopics(t *testing.T) {
+// TestSubscriptionCache_DuplicateTopics tests adding a duplicate topic for a peer. The duplicate topic should not be added.
+func TestSubscriptionCache_DuplicateTopics(t *testing.T) {
 	sizeLimit := uint32(100)
 	cache := internal.NewSubscriptionRecordCache(
 		sizeLimit,
@@ -130,11 +133,11 @@ func TestDuplicateTopics(t *testing.T) {
 	require.Equal(t, []string{topic}, updatedTopics, "duplicate topic should not be added")
 }
 
-// TestMoveUpdateCycle tests that (1) within one update cycle, "AddTopicForPeer" calls append the topics to the list of
+// TestSubscriptionCache_MoveUpdateCycle tests that (1) within one update cycle, "AddTopicForPeer" calls append the topics to the list of
 // subscribed topics for peer, (2) as long as there is no "AddTopicForPeer" call, moving to the next update cycle
 // does not change the subscribed topics for a peer, and (3) calling "AddTopicForPeer" after moving to the next update
 // cycle clears the subscribed topics for a peer and adds the new topic.
-func TestMoveUpdateCycle(t *testing.T) {
+func TestSubscriptionCache_MoveUpdateCycle(t *testing.T) {
 	sizeLimit := uint32(100)
 	cache := internal.NewSubscriptionRecordCache(
 		sizeLimit,
@@ -179,9 +182,9 @@ func TestMoveUpdateCycle(t *testing.T) {
 	require.ElementsMatch(t, []string{topic4}, topics, "retrieved topics should match the added topics")
 }
 
-// TestMoveUpdateCycleWithDifferentPeers tests that moving to the next update cycle does not affect the subscribed
+// TestSubscriptionCache_MoveUpdateCycleWithDifferentPeers tests that moving to the next update cycle does not affect the subscribed
 // topics for other peers.
-func TestMoveUpdateCycleWithDifferentPeers(t *testing.T) {
+func TestSubscriptionCache_MoveUpdateCycleWithDifferentPeers(t *testing.T) {
 	sizeLimit := uint32(100)
 	cache := internal.NewSubscriptionRecordCache(
 		sizeLimit,
@@ -223,4 +226,95 @@ func TestMoveUpdateCycleWithDifferentPeers(t *testing.T) {
 	topics, found = cache.GetSubscribedTopics(peer2)
 	require.True(t, found, "peer2 should be found")
 	require.ElementsMatch(t, []string{topic2}, topics, "retrieved topics should match the added topics")
+}
+
+// TestSubscriptionCache_ConcurrentUpdate tests subscription cache update in a concurrent environment.
+func TestSubscriptionCache_ConcurrentUpdate(t *testing.T) {
+	unittest.SkipUnless(t, unittest.TEST_TODO, "this test requires atomic AdjustOrGet method to be implemented for backend")
+	sizeLimit := uint32(100)
+	cache := internal.NewSubscriptionRecordCache(
+		sizeLimit,
+		unittest.Logger(),
+		metrics.NewSubscriptionRecordCacheMetricsFactory(metrics.NewNoopHeroCacheMetricsFactory()))
+
+	peerIds := p2pfixtures.PeerIdsFixture(t, 100)
+	topics := []string{"topic1", "topic2", "topic3"}
+
+	allUpdatesDone := sync.WaitGroup{}
+	for _, pid := range peerIds {
+		for _, topic := range topics {
+			pid := pid
+			topic := topic
+			allUpdatesDone.Add(1)
+			go func() {
+				defer allUpdatesDone.Done()
+				_, err := cache.AddTopicForPeer(pid, topic)
+				require.NoError(t, err, "adding topic to peer should not produce an error")
+			}()
+		}
+	}
+
+	unittest.RequireReturnsBefore(t, allUpdatesDone.Wait, 1*time.Second, "all updates did not finish in time")
+
+	// verify that all peers have all topics; concurrently
+	allTopicsVerified := sync.WaitGroup{}
+	for _, pid := range peerIds {
+		pid := pid
+		allTopicsVerified.Add(1)
+		go func() {
+			defer allTopicsVerified.Done()
+			topics, found := cache.GetSubscribedTopics(pid)
+			require.True(t, found, "peer should be found")
+			require.ElementsMatch(t, topics, topics, "retrieved topics should match the added topics")
+		}()
+	}
+
+	unittest.RequireReturnsBefore(t, allTopicsVerified.Wait, 1*time.Second, "all topics were not verified in time")
+}
+
+// TestSubscriptionCache_TestSizeLimit tests that the cache evicts the least recently used peer when the cache size limit is reached.
+func TestSubscriptionCache_TestSizeLimit(t *testing.T) {
+	sizeLimit := uint32(100)
+	cache := internal.NewSubscriptionRecordCache(
+		sizeLimit,
+		unittest.Logger(),
+		metrics.NewSubscriptionRecordCacheMetricsFactory(metrics.NewNoopHeroCacheMetricsFactory()))
+
+	peerIds := p2pfixtures.PeerIdsFixture(t, 100)
+	topics := []string{"topic1", "topic2", "topic3"}
+
+	// add topics to peers
+	for _, pid := range peerIds {
+		for _, topic := range topics {
+			_, err := cache.AddTopicForPeer(pid, topic)
+			require.NoError(t, err, "adding topic to peer should not produce an error")
+		}
+	}
+
+	// verify that all peers have all topics
+	for _, pid := range peerIds {
+		topics, found := cache.GetSubscribedTopics(pid)
+		require.True(t, found, "peer should be found")
+		require.ElementsMatch(t, topics, topics, "retrieved topics should match the added topics")
+	}
+
+	// add one more peer and verify that the first peer is evicted
+	newPeerID := unittest.PeerIdFixture(t)
+	_, err := cache.AddTopicForPeer(newPeerID, topics[0])
+	require.NoError(t, err, "adding topic to peer should not produce an error")
+
+	_, found := cache.GetSubscribedTopics(peerIds[0])
+	require.False(t, found, "peer should not be found")
+
+	// verify that all other peers still have all topics
+	for _, pid := range peerIds[1:] {
+		topics, found := cache.GetSubscribedTopics(pid)
+		require.True(t, found, "peer should be found")
+		require.ElementsMatch(t, topics, topics, "retrieved topics should match the added topics")
+	}
+
+	// verify that the new peer has the topic
+	topics, found = cache.GetSubscribedTopics(newPeerID)
+	require.True(t, found, "peer should be found")
+	require.ElementsMatch(t, topics, topics, "retrieved topics should match the added topics")
 }
