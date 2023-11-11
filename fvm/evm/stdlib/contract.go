@@ -80,7 +80,7 @@ func newInternalEVMTypeRunFunction(
 
 			// Run
 
-			cb := types.Address(coinbase)
+			cb := types.NewAddressFromBytes(coinbase)
 			handler.Run(transaction, cb)
 
 			return interpreter.Void
