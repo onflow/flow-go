@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/onflow/flow-go/fvm/errors"
+
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/rs/zerolog"
 
@@ -175,10 +177,11 @@ func (e *QueryExecutor) ExecuteScript(
 	}
 
 	if output.Err != nil {
-		return nil, fmt.Errorf("failed to execute script at block (%s): %s",
-			blockHeader.ID(),
-			summarizeLog(output.Err.Error(),
-				e.config.MaxErrorMessageSize))
+		return nil, errors.NewCodedError(
+			output.Err.Code(),
+			"failed to execute script at block (%s): %s", blockHeader.ID(),
+			summarizeLog(output.Err.Error(), e.config.MaxErrorMessageSize),
+		)
 	}
 
 	encodedValue, err = jsoncdc.Encode(output.Value)

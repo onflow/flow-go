@@ -577,6 +577,11 @@ type ExecutionStateIndexerMetrics interface {
 
 	// BlockReindexed records that a previously indexed block was indexed again.
 	BlockReindexed()
+
+	// InitializeLatestHeight records the latest height that has been indexed.
+	// This should only be used during startup. After startup, use BlockIndexed to record newly
+	// indexed heights.
+	InitializeLatestHeight(height uint64)
 }
 
 type RuntimeMetrics interface {
@@ -758,22 +763,34 @@ type ExecutionMetrics interface {
 }
 
 type BackendScriptsMetrics interface {
-	// Record the round trip time while executing a script
+	// ScriptExecuted records the round trip time while executing a script
 	ScriptExecuted(dur time.Duration, size int)
 
-	// ScriptExecutionErrorOnExecutionNode records script execution failures on Execution Nodes
-	ScriptExecutionErrorOnArchiveNode()
+	// ScriptExecutionErrorLocal records script execution failures from local execution
+	ScriptExecutionErrorLocal()
 
-	// ScriptExecutionErrorOnArchiveNode records script execution failures in Archive Nodes
+	// ScriptExecutionErrorOnExecutionNode records script execution failures on Execution Nodes
 	ScriptExecutionErrorOnExecutionNode()
 
+	// ScriptExecutionResultMismatch records script execution result mismatches between local and
+	// execution nodes
 	ScriptExecutionResultMismatch()
 
+	// ScriptExecutionResultMatch records script execution result matches between local and
+	// execution nodes
 	ScriptExecutionResultMatch()
 
+	// ScriptExecutionErrorMismatch records script execution error mismatches between local and
+	// execution nodes
 	ScriptExecutionErrorMismatch()
 
+	// ScriptExecutionErrorMatch records script execution error matches between local and
+	// execution nodes
 	ScriptExecutionErrorMatch()
+
+	// ScriptExecutionNotIndexed records script execution matches where data for the block is not
+	// indexed locally yet
+	ScriptExecutionNotIndexed()
 }
 
 type TransactionMetrics interface {

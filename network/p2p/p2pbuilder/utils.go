@@ -51,7 +51,7 @@ func (l *limitConfigLogger) withBaseLimit(prefix string, baseLimit rcmgr.Resourc
 		Str(fmt.Sprintf("%s_memory", prefix), fmt.Sprintf("%v", baseLimit.Memory)).Logger()
 }
 
-func (l *limitConfigLogger) logResourceManagerLimits(config rcmgr.ConcreteLimitConfig) {
+func (l *limitConfigLogger) LogResourceManagerLimits(config rcmgr.ConcreteLimitConfig) {
 	// PartialLimit config is the same as ConcreteLimit config, but with the exported fields.
 	pCfg := config.ToPartialLimitConfig()
 	l.logGlobalResourceLimits(pCfg)
