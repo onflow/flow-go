@@ -16,10 +16,10 @@ type Payload struct {
 	Seals    []*Seal
 	Receipts ExecutionReceiptMetaList
 	Results  ExecutionResultList
-	// ProtocolStateID is the root hash of protocol state.
-	// Per convention, this is the resulting state after applying all identity-changing operations potentially contained in the block.
-	// The block payload itself is validated wrt to the protocol state committed to by its parent. Thereby, we are only
-	// accepting protocol states that have been certified by a valid QC.
+	// ProtocolStateID is the root hash of protocol state. Per convention, this is the resulting
+	// state after applying all identity-changing operations potentially contained in the block.
+	// The block payload itself is validated wrt to the protocol state committed to by its parent.
+	// Thereby, we are only  accepting protocol states that have been certified by a valid QC.
 	ProtocolStateID Identifier
 }
 
