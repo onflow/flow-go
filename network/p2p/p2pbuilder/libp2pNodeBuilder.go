@@ -210,33 +210,18 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		builder.logger.Warn().
 			Msg("libp2p resource manager is overridden by the node builder, metrics may not be available")
 	} else {
-		// setting up default resource manager, by hooking in the resource manager metrics reporter.
-		limits := rcmgr.DefaultLimits
-		libp2p.SetDefaultServiceLimits(&limits)
-
-		mem, err := allowedMemory(builder.resourceManagerCfg.MemoryLimitRatio)
+		// scales the default limits by the allowed memory and file descriptors and applies the inbound connection and stream limits.
+		limits, err := BuildLibp2pResourceManagerLimits(builder.logger, builder.resourceManagerCfg)
 		if err != nil {
-			return nil, fmt.Errorf("could not get allowed memory: %w", err)
+			return nil, fmt.Errorf("could not build libp2p resource manager limits: %w", err)
 		}
-		fd, err := allowedFileDescriptors(builder.resourceManagerCfg.FileDescriptorsRatio)
-		if err != nil {
-			return nil, fmt.Errorf("could not get allowed file descriptors: %w", err)
-		}
-		limits.PeerBaseLimit.ConnsInbound = builder.resourceManagerCfg.PeerBaseLimitConnsInbound
-		l := limits.Scale(mem, fd)
-		mgr, err := rcmgr.NewResourceManager(rcmgr.NewFixedLimiter(l), rcmgr.WithMetrics(builder.metricsConfig.Metrics))
+		mgr, err := rcmgr.NewResourceManager(rcmgr.NewFixedLimiter(*limits), rcmgr.WithMetrics(builder.metricsConfig.Metrics))
 		if err != nil {
 			return nil, fmt.Errorf("could not create libp2p resource manager: %w", err)
 		}
-		builder.logger.Info().
-			Str("key", keyResourceManagerLimit).
-			Int64("allowed_memory", mem).
-			Int("allowed_file_descriptors", fd).
-			Msg("allowed memory and file descriptors are fetched from the system")
-		newLimitConfigLogger(builder.logger).logResourceManagerLimits(l)
 
 		opts = append(opts, libp2p.ResourceManager(mgr))
-		builder.logger.Info().Msg("libp2p resource manager is set to default with metrics")
+		builder.logger.Info().Msg("default libp2p resource manager is enabled with metrics")
 	}
 
 	if builder.connManager != nil {

@@ -51,6 +51,8 @@ const (
 	// clusterPrefixedPenaltyReductionFactor factor used to reduce the penalty for control message misbehaviours on cluster prefixed topics. This is allows a more lenient punishment for nodes
 	// that fall behind and may need to request old data.
 	clusterPrefixedPenaltyReductionFactor = .5
+	// rpcPublishMessageMisbehaviourPenalty is the penalty applied to the application specific penalty when a peer conducts a RpcPublishMessageMisbehaviourPenalty misbehaviour.
+	rpcPublishMessageMisbehaviourPenalty = -10
 )
 
 // GossipSubCtrlMsgPenaltyValue is the penalty value for each control message type.
@@ -62,6 +64,7 @@ type GossipSubCtrlMsgPenaltyValue struct {
 	// ClusterPrefixedPenaltyReductionFactor factor used to reduce the penalty for control message misbehaviours on cluster prefixed topics. This is allows a more lenient punishment for nodes
 	// that fall behind and may need to request old data.
 	ClusterPrefixedPenaltyReductionFactor float64
+	RpcPublishMessage                     float64 // penalty value for an individual RpcPublishMessage message misbehaviour.
 }
 
 // DefaultGossipSubCtrlMsgPenaltyValue returns the default penalty value for each control message type.
@@ -72,6 +75,7 @@ func DefaultGossipSubCtrlMsgPenaltyValue() GossipSubCtrlMsgPenaltyValue {
 		IHave:                                 iHaveMisbehaviourPenalty,
 		IWant:                                 iWantMisbehaviourPenalty,
 		ClusterPrefixedPenaltyReductionFactor: clusterPrefixedPenaltyReductionFactor,
+		RpcPublishMessage:                     rpcPublishMessageMisbehaviourPenalty,
 	}
 }
 
@@ -271,6 +275,8 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 			record.Penalty += r.penalty.IHave
 		case p2pmsg.CtrlMsgIWant:
 			record.Penalty += r.penalty.IWant
+		case p2pmsg.RpcPublishMessage:
+			record.Penalty += r.penalty.RpcPublishMessage
 		default:
 			// the error is considered fatal as it means that we have an unsupported misbehaviour type, we should crash the node to prevent routing attack vulnerability.
 			lg.Fatal().Str("misbehavior_type", notification.MsgType.String()).Msg("unknown misbehaviour type")

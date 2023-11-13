@@ -33,6 +33,8 @@ type InvCtrlMsgNotif struct {
 	Error error
 	// MsgType the control message type.
 	MsgType p2pmsg.ControlMessageType
+	// Count the number of errors.
+	Count uint64
 	// IsClusterPrefixed reports whether the error occurred on a cluster-prefixed topic within the control message.
 	// Notifications must be explicitly marked as cluster-prefixed or not because the penalty applied to the GossipSub score
 	// for an error on a cluster-prefixed topic is more lenient than the penalty applied to a non-cluster-prefixed topic.
@@ -42,11 +44,20 @@ type InvCtrlMsgNotif struct {
 }
 
 // NewInvalidControlMessageNotification returns a new *InvCtrlMsgNotif
-func NewInvalidControlMessageNotification(peerID peer.ID, ctlMsgType p2pmsg.ControlMessageType, err error, isClusterPrefixed bool) *InvCtrlMsgNotif {
+// Args:
+//   - peerID: peer id of the offender.
+//   - ctlMsgType: the control message type of the rpc message that caused the error.
+//   - err: the error that occurred.
+//   - count: the number of occurrences of the error.
+//
+// Returns:
+//   - *InvCtlMsgNotif: invalid control message notification.
+func NewInvalidControlMessageNotification(peerID peer.ID, ctlMsgType p2pmsg.ControlMessageType, err error, count uint64, isClusterPrefixed bool) *InvCtrlMsgNotif {
 	return &InvCtrlMsgNotif{
 		PeerID:            peerID,
 		Error:             err,
 		MsgType:           ctlMsgType,
+		Count:             count,
 		IsClusterPrefixed: isClusterPrefixed,
 	}
 }
@@ -77,4 +88,11 @@ type GossipSubInspectorSuite interface {
 	// pattern where the consumer is notified when a new notification is published.
 	// A consumer is only notified once for each notification, and only receives notifications that were published after it was added.
 	AddInvalidControlMessageConsumer(GossipSubInvCtrlMsgNotifConsumer)
+
+	// SetTopicOracle sets the topic oracle of the gossipsub inspector suite.
+	// The topic oracle is used to determine the list of topics that the node is subscribed to.
+	// If an oracle is not set, the node will not be able to determine the list of topics that the node is subscribed to.
+	// This func is expected to be called once and will return an error on all subsequent calls.
+	// All errors returned from this func are considered irrecoverable.
+	SetTopicOracle(topicOracle func() []string) error
 }

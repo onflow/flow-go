@@ -34,7 +34,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	rpcConnection "github.com/onflow/flow-go/engine/access/rpc/connection"
-	"github.com/onflow/flow-go/engine/access/state_stream"
+	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/common/follower"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/protocol"
@@ -394,6 +394,11 @@ func (builder *ObserverServiceBuilder) buildFollowerEngine() *ObserverServiceBui
 
 func (builder *ObserverServiceBuilder) buildSyncEngine() *ObserverServiceBuilder {
 	builder.Component("sync engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		spamConfig, err := synceng.NewSpamDetectionConfig()
+		if err != nil {
+			return nil, fmt.Errorf("could not initialize spam detection config: %w", err)
+		}
+
 		sync, err := synceng.New(
 			node.Logger,
 			node.Metrics.Engine,
@@ -404,7 +409,7 @@ func (builder *ObserverServiceBuilder) buildSyncEngine() *ObserverServiceBuilder
 			builder.FollowerEng,
 			builder.SyncCore,
 			builder.SyncEngineParticipantsProviderFactory(),
-			synceng.NewSpamDetectionConfig(),
+			spamConfig,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create synchronization engine: %w", err)
@@ -714,7 +719,7 @@ func (builder *ObserverServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 		networkKey,
 		builder.SporkID,
 		builder.IdentityProvider,
-		&builder.FlowConfig.NetworkConfig.ResourceManagerConfig,
+		&builder.FlowConfig.NetworkConfig.ResourceManager,
 		&builder.FlowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig,
 		p2pconfig.PeerManagerDisableConfig(), // disable peer manager for observer node.
 		&p2p.DisallowListCacheConfig{
@@ -961,6 +966,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			return nil, err
 		}
 
+		stateStreamConfig := statestreambackend.Config{}
 		engineBuilder, err := rpc.NewBuilder(
 			node.Logger,
 			node.State,
@@ -974,8 +980,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			builder.secureGrpcServer,
 			builder.unsecureGrpcServer,
 			nil, // state streaming is not supported
-			state_stream.DefaultEventFilterConfig,
-			0,
+			stateStreamConfig,
 		)
 		if err != nil {
 			return nil, err
