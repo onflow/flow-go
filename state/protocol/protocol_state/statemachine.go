@@ -35,7 +35,6 @@ type ProtocolStateMachine interface {
 	UpdateIdentity(updated *flow.DynamicIdentityEntry) error
 
 	// SetInvalidStateTransitionAttempted sets a flag indicating that invalid state transition was attempted.
-	// Such transition can be detected by compliance layer.
 	SetInvalidStateTransitionAttempted()
 
 	// TransitionToNextEpoch discards current protocol state and transitions to the next epoch.

@@ -91,7 +91,8 @@ func (s *UpdaterSuite) TestTransitionToNextEpochNotAllowed() {
 			unittest.HeaderWithView(protocolState.CurrentEpochSetup.FinalView + 1))
 		updater := newStateMachine(candidate.View, protocolState)
 		err := updater.TransitionToNextEpoch()
-		require.Error(s.T(), err, "should not allow transition to next epoch if next block is not first block from next epoch")
+		require.Error(s.T(), err, "should not allow transition to next epoch if we are in Epoch Fallback Mode, "+
+			"i.e. an invalid state transition was attempted")
 	})
 	s.Run("candidate block is not from next epoch", func() {
 		protocolState := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
@@ -99,7 +100,8 @@ func (s *UpdaterSuite) TestTransitionToNextEpochNotAllowed() {
 			unittest.HeaderWithView(protocolState.CurrentEpochSetup.FinalView))
 		updater := newStateMachine(candidate.View, protocolState)
 		err := updater.TransitionToNextEpoch()
-		require.Error(s.T(), err, "should not allow transition to next epoch if next block is not first block from next epoch")
+		require.Error(s.T(), err, "should not allow transition to next epoch if we are in Epoch Fallback Mode, "+
+			"i.e. an invalid state transition was attempted")
 	})
 }
 

@@ -22,7 +22,7 @@ func TestEpochSetupValidity(t *testing.T) {
 		// set an invalid final view for the first epoch
 		setup.FinalView = setup.FirstView
 
-		err := protocol.VerifyEpochSetup(setup, true)
+		err := protocol.IsValidEpochSetup(setup, true)
 		require.Error(t, err)
 	})
 
@@ -33,7 +33,7 @@ func TestEpochSetupValidity(t *testing.T) {
 		var err error
 		setup.Participants, err = setup.Participants.Shuffle()
 		require.NoError(t, err)
-		err = protocol.VerifyEpochSetup(setup, true)
+		err = protocol.IsValidEpochSetup(setup, true)
 		require.Error(t, err)
 	})
 
@@ -44,7 +44,7 @@ func TestEpochSetupValidity(t *testing.T) {
 		collector := participants.Filter(filter.HasRole[flow.Identity](flow.RoleCollection))[0]
 		setup.Assignments = append(setup.Assignments, []flow.Identifier{collector.NodeID})
 
-		err := protocol.VerifyEpochSetup(setup, true)
+		err := protocol.IsValidEpochSetup(setup, true)
 		require.Error(t, err)
 	})
 
@@ -53,7 +53,7 @@ func TestEpochSetupValidity(t *testing.T) {
 		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 		setup.RandomSource = unittest.SeedFixture(crypto.SeedMinLenDKG - 1)
 
-		err := protocol.VerifyEpochSetup(setup, true)
+		err := protocol.IsValidEpochSetup(setup, true)
 		require.Error(t, err)
 	})
 }

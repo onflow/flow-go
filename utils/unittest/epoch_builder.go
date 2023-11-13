@@ -366,7 +366,7 @@ func (builder *EpochBuilder) BuildBlocks(n uint) {
 }
 
 // addBlock adds the given block to the state by: extending the state,
-// finalizing the block, marking the block as valid, and caching the block.
+// finalizing the block, and caching the block.
 func (builder *EpochBuilder) addBlock(block *flow.Block) {
 	stateMutator, err := builder.mutableProtocolState.Mutator(block.Header.View, block.Header.ParentID)
 	require.NoError(builder.t, err)

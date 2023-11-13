@@ -33,17 +33,17 @@ func IsValidExtendingEpochSetup(extendingSetup *flow.EpochSetup, activeSetup *fl
 	}
 
 	// Enforce the EpochSetup event is syntactically correct
-	err := VerifyEpochSetup(extendingSetup, true)
+	err := IsValidEpochSetup(extendingSetup, true)
 	if err != nil {
 		return NewInvalidServiceEventErrorf("invalid epoch setup: %w", err)
 	}
 	return nil
 }
 
-// VerifyEpochSetup checks whether an `EpochSetup` event is syntactically correct. The boolean parameter `verifyNetworkAddress`
+// IsValidEpochSetup checks whether an `EpochSetup` event is syntactically correct. The boolean parameter `verifyNetworkAddress`
 // controls, whether we want to permit nodes to share a networking address.
 // This is a side-effect-free function. Any error return indicates that the EpochSetup event is not compliant with protocol rules.
-func VerifyEpochSetup(setup *flow.EpochSetup, verifyNetworkAddress bool) error {
+func IsValidEpochSetup(setup *flow.EpochSetup, verifyNetworkAddress bool) error {
 	// 1. CHECK: Enforce protocol compliance of Epoch parameters:
 	// - RandomSource of entropy in Epoch Setup event should the protocol-prescribed length
 	// - first view must be before final view
