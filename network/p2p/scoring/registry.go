@@ -134,12 +134,11 @@ type GossipSubAppSpecificScoreRegistryParams struct {
 	// InitDecayUpperBound is the upper bound on the decay value for a spam record when initialized.
 	InitDecayUpperBound float64
 
-	// IncreaseDecayThreshold is the threshold for which when the negative penalty is below this value the decay threshold will be increased by some amount. This will
-	// lead to malicious nodes having longer decays while honest nodes will have faster decays.
-	IncreaseDecayThreshold float64
+// SlowerDecayPenaltyThreshold defines the penalty level which the decay rate is reduced by `DecayRateDecremen` every time the penalty of a node falls below the threshold, thereby slowing down the decay process. This mechanism ensures that malicious nodes experience longer decay periods, while honest nodes benefit from quicker decay.
+SlowerDecayPenaltyThreshold float64
 
-	// DecayThresholdIncrementer is the amount the decay will be increased when the negative penalty score falls below the IncreaseDecayThreshold.
-	DecayThresholdIncrementer float64
+// DecayRateDecrement defines the value by which the decay rate is decreased every time the penalty is below the SlowerDecayPenaltyThreshold. A reduced decay rate extends the time it takes for penalties to diminish.
+DecayRateDecrement float64
 }
 
 // NewGossipSubAppSpecificScoreRegistry returns a new GossipSubAppSpecificScoreRegistry.
