@@ -2184,7 +2184,7 @@ func BootstrapFixtureWithChainID(
 		WithDKGFromParticipants(participants.ToSkeleton()),
 	)
 
-	root.SetPayload(flow.Payload{ProtocolStateID: inmem.ProtocolStateForBootstrapState(setup, commit).ID()})
+	root.SetPayload(flow.Payload{ProtocolStateID: inmem.ProtocolStateFromEpochServiceEvents(setup, commit).ID()})
 	stateCommit := GenesisStateCommitmentByChainID(chainID)
 
 	result := BootstrapExecutionResultFixture(root, stateCommit)

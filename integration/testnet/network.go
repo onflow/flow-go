@@ -1145,7 +1145,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		Header: rootHeader,
 	}
 	root.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(
-		inmem.ProtocolStateForBootstrapState(epochSetup, epochCommit).ID())))
+		inmem.ProtocolStateFromEpochServiceEvents(epochSetup, epochCommit).ID())))
 
 	cdcRandomSource, err := cadence.NewString(hex.EncodeToString(randomSource))
 	if err != nil {

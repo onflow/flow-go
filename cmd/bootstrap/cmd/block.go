@@ -33,7 +33,7 @@ func constructRootBlock(rootHeader *flow.Header, setup *flow.EpochSetup, commit 
 		Seals:           nil,
 		Receipts:        nil,
 		Results:         nil,
-		ProtocolStateID: inmem.ProtocolStateForBootstrapState(setup, commit).ID(),
+		ProtocolStateID: inmem.ProtocolStateFromEpochServiceEvents(setup, commit).ID(),
 	})
 	return block
 }

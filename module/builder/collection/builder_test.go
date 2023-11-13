@@ -86,7 +86,7 @@ func (suite *BuilderSuite) SetupTest() {
 	// ensure we don't enter a new epoch for tests that build many blocks
 	result.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView = root.Header.View + 100000
 	seal.ResultID = result.ID()
-	root.Payload.ProtocolStateID = inmem.ProtocolStateForBootstrapState(
+	root.Payload.ProtocolStateID = inmem.ProtocolStateFromEpochServiceEvents(
 		result.ServiceEvents[0].Event.(*flow.EpochSetup),
 		result.ServiceEvents[1].Event.(*flow.EpochCommit),
 	).ID()
@@ -95,7 +95,7 @@ func (suite *BuilderSuite) SetupTest() {
 	suite.epochCounter = rootSnapshot.Encodable().Epochs.Current.Counter
 
 	clusterQC := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(suite.genesis.ID()))
-	root.Payload.ProtocolStateID = inmem.ProtocolStateForBootstrapState(
+	root.Payload.ProtocolStateID = inmem.ProtocolStateFromEpochServiceEvents(
 		result.ServiceEvents[0].Event.(*flow.EpochSetup),
 		result.ServiceEvents[1].Event.(*flow.EpochCommit),
 	).ID()

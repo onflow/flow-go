@@ -281,7 +281,7 @@ func createRootBlockData(participantData *run.ParticipantData) (*flow.Block, *fl
 		},
 	)
 
-	root.SetPayload(flow.Payload{ProtocolStateID: inmem.ProtocolStateForBootstrapState(setup, commit).ID()})
+	root.SetPayload(flow.Payload{ProtocolStateID: inmem.ProtocolStateFromEpochServiceEvents(setup, commit).ID()})
 	result := unittest.BootstrapExecutionResultFixture(root, unittest.GenesisStateCommitment)
 	result.ServiceEvents = []flow.ServiceEvent{setup.ServiceEvent(), commit.ServiceEvent()}
 
