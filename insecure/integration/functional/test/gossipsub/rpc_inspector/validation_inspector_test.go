@@ -896,7 +896,7 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 	// create unknown topic
 	unknownTopic := channels.Topic(fmt.Sprintf("%s/%s", corruptlibp2p.GossipSubTopicIdFixture(), sporkID)).String()
 	// create malformed topic
-	malformedTopic := channels.Topic("!@#$%^&**((").String()
+	malformedTopic := channels.Topic(unittest.RandomStringFixture(t, 100)).String()
 	// a topics spork ID is considered invalid if it does not match the current spork ID
 	invalidSporkIDTopic := channels.Topic(fmt.Sprintf("%s/%s", channels.PushBlocks, unittest.IdentifierFixture())).String()
 
