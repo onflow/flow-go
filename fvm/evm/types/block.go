@@ -15,9 +15,6 @@ type Block struct {
 	// Height returns the height of this block
 	Height uint64
 
-	// UUID Index
-	UUIDIndex uint64
-
 	// holds the total amount of the native token deposited in the evm side.
 	TotalSupply uint64
 
@@ -26,28 +23,42 @@ type Block struct {
 
 	// ReceiptRoot returns the root hash of the receipts emitted in this block
 	ReceiptRoot gethCommon.Hash
+
+	// transaction hashes
+	TransactionHashes []gethCommon.Hash
 }
 
+// ToBytes encodes the block into bytes
 func (b *Block) ToBytes() ([]byte, error) {
 	return rlp.EncodeToBytes(b)
 }
 
+// Hash returns the hash of the block
 func (b *Block) Hash() (gethCommon.Hash, error) {
 	data, err := b.ToBytes()
 	return gethCommon.BytesToHash(data), err
 }
 
+// AppendTxHash appends a transaction hash to the list of transaction hashes of the block
+func (b *Block) AppendTxHash(txHash gethCommon.Hash) {
+	b.TransactionHashes = append(b.TransactionHashes, txHash)
+}
+
 // NewBlock constructs a new block
-func NewBlock(height, uuidIndex, totalSupply uint64, stateRoot, receiptRoot gethCommon.Hash) *Block {
+func NewBlock(height, uuidIndex, totalSupply uint64,
+	stateRoot, receiptRoot gethCommon.Hash,
+	txHashes []gethCommon.Hash,
+) *Block {
 	return &Block{
-		Height:      height,
-		UUIDIndex:   uuidIndex,
-		TotalSupply: totalSupply,
-		StateRoot:   stateRoot,
-		ReceiptRoot: receiptRoot,
+		Height:            height,
+		TotalSupply:       totalSupply,
+		StateRoot:         stateRoot,
+		ReceiptRoot:       receiptRoot,
+		TransactionHashes: txHashes,
 	}
 }
 
+// NewBlockFromBytes constructs a new block from encoded data
 func NewBlockFromBytes(encoded []byte) (*Block, error) {
 	res := &Block{}
 	err := rlp.DecodeBytes(encoded, res)
@@ -58,19 +69,6 @@ func NewBlockFromBytes(encoded []byte) (*Block, error) {
 var GenesisBlock = &Block{
 	ParentBlockHash: gethCommon.Hash{},
 	Height:          uint64(0),
-	UUIDIndex:       uint64(1),
 	StateRoot:       gethTypes.EmptyRootHash,
 	ReceiptRoot:     gethTypes.EmptyRootHash,
-}
-
-// BlockChain stores the chain of blocks
-type BlockChain interface {
-	// Appends a block to the block chain
-	AppendBlock(block *Block) error
-
-	// LatestBlock returns the latest appended block
-	LatestBlock() (*Block, error)
-
-	// returns the hash of the block at the given height
-	BlockHash(height int) (gethCommon.Hash, error)
 }
