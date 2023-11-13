@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"fmt"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
