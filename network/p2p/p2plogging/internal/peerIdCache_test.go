@@ -5,7 +5,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/p2p/p2plogging/internal"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -65,9 +64,9 @@ func TestPeerIdCache_EjectionScenarios(t *testing.T) {
 	assert.Equal(t, 0, cache.Size())
 
 	// add peer IDs to fill the cache
-	pid1 := p2pfixtures.PeerIdFixture(t)
-	pid2 := p2pfixtures.PeerIdFixture(t)
-	pid3 := p2pfixtures.PeerIdFixture(t)
+	pid1 := unittest.PeerIdFixture(t)
+	pid2 := unittest.PeerIdFixture(t)
+	pid3 := unittest.PeerIdFixture(t)
 
 	cache.PeerIdString(pid1)
 	assert.Equal(t, 1, cache.Size())
@@ -83,7 +82,7 @@ func TestPeerIdCache_EjectionScenarios(t *testing.T) {
 	assert.Equal(t, 3, cache.Size())
 
 	// add a new peer ID
-	pid4 := p2pfixtures.PeerIdFixture(t)
+	pid4 := unittest.PeerIdFixture(t)
 	cache.PeerIdString(pid4)
 	assert.Equal(t, 3, cache.Size())
 
