@@ -13,7 +13,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/integration/testnet"
@@ -144,34 +146,34 @@ func (s *ObserverSuite) TestObserverRPC() {
 	err = s.net.StopContainerByName(ctx, testnet.PrimaryAN)
 	require.NoError(t, err)
 
-	//t.Run("HandledByUpstream", func(t *testing.T) {
-	//	// verify that we receive Unavailable errors from all rpcs handled upstream
-	//	for _, rpc := range s.getRPCs() {
-	//		if _, local := s.localRpc[rpc.name]; local {
-	//			continue
-	//		}
-	//		t.Run(rpc.name, func(t *testing.T) {
-	//			err := rpc.call(ctx, observer)
-	//			assert.Equal(t, codes.Unavailable, status.Code(err))
-	//		})
-	//	}
-	//})
-	//
-	//t.Run("HandledByObserver", func(t *testing.T) {
-	//	// verify that we receive NotFound or no error from all rpcs handled locally
-	//	for _, rpc := range s.getRPCs() {
-	//		if _, local := s.localRpc[rpc.name]; !local {
-	//			continue
-	//		}
-	//		t.Run(rpc.name, func(t *testing.T) {
-	//			err := rpc.call(ctx, observer)
-	//			if err == nil {
-	//				return
-	//			}
-	//			assert.Equal(t, codes.NotFound, status.Code(err))
-	//		})
-	//	}
-	//})
+	t.Run("HandledByUpstream", func(t *testing.T) {
+		// verify that we receive Unavailable errors from all rpcs handled upstream
+		for _, rpc := range s.getRPCs() {
+			if _, local := s.localRpc[rpc.name]; local {
+				continue
+			}
+			t.Run(rpc.name, func(t *testing.T) {
+				err := rpc.call(ctx, observer)
+				assert.Equal(t, codes.Unavailable, status.Code(err))
+			})
+		}
+	})
+
+	t.Run("HandledByObserver", func(t *testing.T) {
+		// verify that we receive NotFound or no error from all rpcs handled locally
+		for _, rpc := range s.getRPCs() {
+			if _, local := s.localRpc[rpc.name]; !local {
+				continue
+			}
+			t.Run(rpc.name, func(t *testing.T) {
+				err := rpc.call(ctx, observer)
+				if err == nil {
+					return
+				}
+				assert.Equal(t, codes.NotFound, status.Code(err))
+			})
+		}
+	})
 }
 
 // TestObserverRest runs the following tests:

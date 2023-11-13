@@ -53,12 +53,9 @@ func (f *Forwarder) setFlowAccessAPI(accessNodeAddressAndPort flow.IdentityList)
 	return nil
 }
 
-// reconnectingClient returns an active client, or
-// creates one, if the last one is not ready anymore.
+// reconnectingClient returns an active client, or creates a new connection.
 func (f *Forwarder) reconnectingClient(i int) error {
 	identity := f.ids[i]
-	fmt.Println(fmt.Sprintf("identity.Address: %v", identity.Address))
-	fmt.Println(fmt.Sprintf("identity.NetworkPubKey: %v", identity.NetworkPubKey))
 
 	accessApiClient, closer, err := f.connFactory.GetAccessAPIClient(identity.Address, identity.NetworkPubKey)
 	if err != nil {

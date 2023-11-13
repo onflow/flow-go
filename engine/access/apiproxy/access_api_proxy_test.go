@@ -155,11 +155,9 @@ func TestNewFlowCachedAccessAPIProxy(t *testing.T) {
 	l := flow.IdentityList{{Address: unittest.IPPort("11634")}, {Address: unittest.IPPort("11635")}}
 	c := FlowAccessAPIForwarder{}
 	c.Forwarder, err = forwarder.NewForwarder(l, connectionFactory)
-
-	//TODO: check
-	//if err == nil {
-	//	t.Fatal(fmt.Errorf("should not start with one connection ready"))
-	//}
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Bring up 2nd upstream server
 	charlie2, _, err := newFlowLite("tcp", unittest.IPPort("11635"), done)

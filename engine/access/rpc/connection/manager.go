@@ -3,11 +3,12 @@ package connection
 import (
 	"context"
 	"fmt"
+	"io"
+	"time"
+
 	"github.com/onflow/flow-go/crypto"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
-	"io"
-	"time"
 
 	"github.com/sony/gobreaker"
 
@@ -240,7 +241,6 @@ func (m *Manager) createConnection(
 		if err != nil {
 			return nil, fmt.Errorf("failed to get default TLS client config using public flow networking key %s %w", networkPubKey.String(), err)
 		}
-		fmt.Println(fmt.Sprintf("connection with tls: %v", networkPubKey))
 		opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)))
 	} else {
 		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
