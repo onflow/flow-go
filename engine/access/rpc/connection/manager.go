@@ -368,6 +368,25 @@ func (m *Manager) createCircuitBreakerInterceptor() grpc.UnaryClientInterceptor 
 			// MaxRequests defines the max number of concurrent requests while the circuit breaker is in the HalfClosed
 			// state.
 			MaxRequests: m.circuitBreakerConfig.MaxRequests,
+			// IsSuccessful defines gRPC status codes that should be treated as a successful result for the circuit breaker.
+			IsSuccessful: func(err error) bool {
+				if se, ok := status.FromError(err); ok {
+					if se == nil {
+						return true
+					}
+
+					// There are several error cases that may occur during normal operation and should be considered
+					// as "successful" from the perspective of the circuit breaker.
+					return se.Code() == codes.OK ||
+						se.Code() == codes.Canceled ||
+						se.Code() == codes.InvalidArgument ||
+						se.Code() == codes.NotFound ||
+						se.Code() == codes.Unimplemented ||
+						se.Code() == codes.OutOfRange
+				}
+
+				return false
+			},
 		})
 
 		circuitBreakerInterceptor := func(
@@ -379,6 +398,7 @@ func (m *Manager) createCircuitBreakerInterceptor() grpc.UnaryClientInterceptor 
 			invoker grpc.UnaryInvoker,
 			opts ...grpc.CallOption,
 		) error {
+			var ignoredCBErr error
 			// The circuit breaker integration occurs here, where all invoked calls to the node pass through the
 			// CircuitBreaker.Execute method. This method counts successful and failed invocations, and switches to the
 			// "StateOpen" when the maximum failure threshold is reached. When the circuit breaker is in the "StateOpen"
@@ -390,6 +410,11 @@ func (m *Manager) createCircuitBreakerInterceptor() grpc.UnaryClientInterceptor 
 				err := invoker(ctx, method, req, reply, cc, opts...)
 				return nil, err
 			})
+
+			if ignoredCBErr != nil {
+				return ignoredCBErr
+			}
+
 			return err
 		}
 
