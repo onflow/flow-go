@@ -33,7 +33,11 @@ type InvCtrlMsgNotif struct {
 	Error error
 	// MsgType the control message type.
 	MsgType p2pmsg.ControlMessageType
-	// IsClusterPrefixed indicates if the error occurred on a cluster prefixed topic of the control message.
+	// IsClusterPrefixed reports whether the error occurred on a cluster-prefixed topic within the control message.
+	// Notifications must be explicitly marked as cluster-prefixed or not because the penalty applied to the GossipSub score
+	// for an error on a cluster-prefixed topic is more lenient than the penalty applied to a non-cluster-prefixed topic.
+	// This distinction ensures that nodes engaged in cluster-prefixed topic communication are not penalized too harshly,
+	// as such communication is vital to the progress of the chain.
 	IsClusterPrefixed bool
 }
 
