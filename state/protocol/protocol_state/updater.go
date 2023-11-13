@@ -68,7 +68,7 @@ func (u *stateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
 	if u.state.InvalidStateTransitionAttempted {
 		return nil // won't process new events if we are in epoch fallback mode.
 	}
-	err := protocol.IsValidExtendingEpochSetup(epochSetup, u.parentState.CurrentEpochSetup, u.parentState.EpochStatus())
+	err := protocol.IsValidExtendingEpochSetup(epochSetup, u.parentState.ProtocolStateEntry, u.parentState.CurrentEpochSetup)
 	if err != nil {
 		return fmt.Errorf("invalid epoch setup event: %w", err)
 	}
@@ -158,11 +158,7 @@ func (u *stateMachine) ProcessEpochCommit(epochCommit *flow.EpochCommit) error {
 	if u.state.NextEpoch.CommitID != flow.ZeroID {
 		return protocol.NewInvalidServiceEventErrorf("protocol state has already a commit event")
 	}
-	err := protocol.IsValidExtendingEpochCommit(
-		epochCommit,
-		u.parentState.NextEpochSetup,
-		u.parentState.CurrentEpochSetup,
-		u.parentState.EpochStatus())
+	err := protocol.IsValidExtendingEpochCommit(epochCommit, u.parentState.ProtocolStateEntry, u.parentState.NextEpochSetup)
 	if err != nil {
 		return fmt.Errorf("invalid epoch commit event: %w", err)
 	}
