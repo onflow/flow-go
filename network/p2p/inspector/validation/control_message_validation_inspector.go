@@ -490,13 +490,13 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 		topic := channels.Topic(message.GetTopic())
 		err := c.validateTopic(from, topic, activeClusterIDS)
 		if err != nil {
+			// we can skip checking for subscription of topic that failed validation and continue
 			errs = multierror.Append(errs, err)
 			continue
 		}
 
 		if !hasSubscription(topic.String()) {
 			errs = multierror.Append(errs, fmt.Errorf("subscription for topic %s not found", topic))
-			continue
 		}
 	}
 
