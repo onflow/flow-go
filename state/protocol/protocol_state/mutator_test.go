@@ -14,6 +14,7 @@ import (
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/rand"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestProtocolStateMutator(t *testing.T) {
@@ -56,7 +57,9 @@ func (s *StateMutatorSuite) TestOnHappyPathNoDbChanges() {
 	require.Empty(s.T(), dbUpdates)
 }
 
-// TestHappyPathWithDbChanges tests that stateMutator returns cached db updates when building protocol state after applying service events.
+// TestHappyPathWithDbChanges tests that `stateMutator` returns cached db updates when building protocol state after applying service events.
+// Whenever `stateMutator` successfully processes an epoch setup or epoch commit event, it has to create a deferred db update to store the event.
+// Deferred db updates are cached in `stateMutator` and returned when building protocol state when calling `Build`.
 func (s *StateMutatorSuite) TestHappyPathWithDbChanges() {
 	parentState := unittest.ProtocolStateFixture()
 	s.stateMachine.On("ParentState").Return(parentState)
@@ -64,8 +67,9 @@ func (s *StateMutatorSuite) TestHappyPathWithDbChanges() {
 		unittest.IdentifierFixture(), true)
 
 	epochSetup := unittest.EpochSetupFixture()
+	epochCommit := unittest.EpochCommitFixture()
 	result := unittest.ExecutionResultFixture(func(result *flow.ExecutionResult) {
-		result.ServiceEvents = []flow.ServiceEvent{epochSetup.ServiceEvent()}
+		result.ServiceEvents = []flow.ServiceEvent{epochSetup.ServiceEvent(), epochCommit.ServiceEvent()}
 	})
 
 	block := unittest.BlockHeaderFixture()
@@ -73,15 +77,36 @@ func (s *StateMutatorSuite) TestHappyPathWithDbChanges() {
 	s.headersDB.On("ByBlockID", seal.BlockID).Return(block, nil)
 	s.resultsDB.On("ByID", seal.ResultID).Return(result, nil)
 
+	epochSetupStored := mock.Mock{}
+	epochSetupStored.On("EpochSetupStored").Return()
 	s.stateMachine.On("ProcessEpochSetup", epochSetup).Return(nil).Once()
-	s.setupsDB.On("StoreTx", epochSetup).Return(func(*transaction.Tx) error { return nil }).Once()
+	s.setupsDB.On("StoreTx", epochSetup).Return(func(*transaction.Tx) error {
+		epochSetupStored.MethodCalled("EpochSetupStored")
+		return nil
+	}).Once()
+
+	epochCommitStored := mock.Mock{}
+	epochCommitStored.On("EpochCommitStored").Return()
+	s.stateMachine.On("ProcessEpochCommit", epochCommit).Return(nil).Once()
+	s.commitsDB.On("StoreTx", epochCommit).Return(func(*transaction.Tx) error {
+		epochCommitStored.MethodCalled("EpochCommitStored")
+		return nil
+	}).Once()
 
 	err := s.mutator.ApplyServiceEventsFromValidatedSeals([]*flow.Seal{seal})
 	require.NoError(s.T(), err)
 
 	_, _, _, dbUpdates := s.mutator.Build()
-	require.NoError(s.T(), err)
-	require.Len(s.T(), dbUpdates, 1)
+	// in next loop we assert that we have received expected deferred db updates by executing them
+	// and expecting that corresponding mock methods will be called
+	tx := &transaction.Tx{}
+	for _, dbUpdate := range dbUpdates {
+		err := dbUpdate(tx)
+		require.NoError(s.T(), err)
+	}
+	// make sure that mock methods were indeed called
+	epochSetupStored.AssertExpectations(s.T())
+	epochCommitStored.AssertExpectations(s.T())
 }
 
 // TestApplyServiceEvents_InvalidEpochSetup tests that handleServiceEvents rejects invalid epoch setup event and sets
