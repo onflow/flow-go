@@ -38,7 +38,11 @@ const (
 	//     n > log( 0.001 ) / log( 0.99 )
 	//     n > -3 / log( 0.99 )
 	//     n >  458.22
-	MaxDecay = 0.99 // default decay value for the application specific penalty.
+        // MinSpamPenaltyDecaySpeed is minimum the speed at which the spam penalty value of a peer is decayed. 
+        // The decay is applied geometrically, i.e., `newPenalty = oldPenalty * decay`, hence, the higher decay value 
+        // indicates a lower decay speed, i.e., it takes more number of heartbeat intervals to decay a penalty back to 
+        // zero when the decay value is high.  
+	MinSpamPenaltyDecaySpeed = 0.99
 	// skipDecayThreshold is the threshold for which when the negative penalty is above this value, the decay function will not be called.
 	// instead, the penalty will be set to 0. This is to prevent the penalty from keeping a small negative value for a long time.
 	skipDecayThreshold = -0.1
