@@ -62,6 +62,7 @@ func TestValidationInspector_InvalidTopicId_Detection(t *testing.T) {
 			count.Inc()
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
+			require.False(t, notification.IsClusterPrefixed, "IsClusterPrefixed is expected to be false, no RPC with cluster prefixed topic sent in this test")
 			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
 			require.True(t, channels.IsInvalidTopicErr(notification.Error))
 			switch notification.MsgType {
@@ -197,6 +198,7 @@ func TestValidationInspector_DuplicateTopicId_Detection(t *testing.T) {
 			count.Inc()
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
+			require.False(t, notification.IsClusterPrefixed, "IsClusterPrefixed is expected to be false, no RPC with cluster prefixed topic sent in this test")
 			require.True(t, validation.IsDuplicateTopicErr(notification.Error))
 			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
 			switch notification.MsgType {
@@ -302,6 +304,7 @@ func TestValidationInspector_IHaveDuplicateMessageId_Detection(t *testing.T) {
 			count.Inc()
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
+			require.False(t, notification.IsClusterPrefixed, "IsClusterPrefixed is expected to be false, no RPC with cluster prefixed topic sent in this test")
 			require.True(t, validation.IsDuplicateTopicErr(notification.Error))
 			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
 			require.True(t, notification.MsgType == p2pmsg.CtrlMsgIHave, fmt.Sprintf("unexpected control message type %s error: %s", notification.MsgType, notification.Error))
@@ -410,6 +413,7 @@ func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
 			count.Inc()
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
+			require.True(t, notification.IsClusterPrefixed)
 			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
 			require.True(t, channels.IsUnknownClusterIDErr(notification.Error))
 			switch notification.MsgType {
@@ -794,6 +798,7 @@ func TestValidationInspector_InspectIWants_CacheMissThreshold(t *testing.T) {
 		return func(args mockery.Arguments) {
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
+			require.False(t, notification.IsClusterPrefixed, "IsClusterPrefixed is expected to be false, no RPC with cluster prefixed topic sent in this test")
 			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
 			require.True(t, notification.MsgType == p2pmsg.CtrlMsgIWant, fmt.Sprintf("unexpected control message type %s error: %s", notification.MsgType, notification.Error))
 			require.True(t, validation.IsIWantCacheMissThresholdErr(notification.Error))
@@ -927,6 +932,7 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 		return func(args mockery.Arguments) {
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
+			require.False(t, notification.IsClusterPrefixed, "IsClusterPrefixed is expected to be false, no RPC with cluster prefixed topic sent in this test")
 			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
 			require.True(t, notification.MsgType == p2pmsg.RpcPublishMessage, fmt.Sprintf("unexpected control message type %s error: %s", notification.MsgType, notification.Error))
 			require.True(t, validation.IsInvalidRpcPublishMessagesErr(notification.Error))
