@@ -29,7 +29,7 @@ type stateMutator struct {
 	setups           storage.EpochSetups
 	commits          storage.EpochCommits
 	stateMachine     ProtocolStateMachine
-	pendingDbUpdates []func(tx *transaction.Tx) error
+	pendingDbUpdates transaction.DeferredDBUpdate
 }
 
 var _ protocol.StateMutator = (*stateMutator)(nil)
@@ -61,7 +61,7 @@ func newStateMutator(
 //     of the calling code (specifically `FollowerState`).
 //
 // updated protocol state entry, state ID and a flag indicating if there were any changes.
-func (m *stateMutator) Build() (hasChanges bool, updatedState *flow.ProtocolStateEntry, stateID flow.Identifier, dbUpdates []func(tx *transaction.Tx) error) {
+func (m *stateMutator) Build() (hasChanges bool, updatedState *flow.ProtocolStateEntry, stateID flow.Identifier, dbUpdates transaction.DeferredDBUpdate) {
 	updatedState, stateID, hasChanges = m.stateMachine.Build()
 	dbUpdates = m.pendingDbUpdates
 	return
@@ -158,7 +158,7 @@ func (m *stateMutator) ApplyServiceEventsFromValidatedSeals(seals []*flow.Seal) 
 		// earlier now failed. In all cases, this is an exception.
 		return irrecoverable.NewExceptionf("ordering already validated seals unexpectedly failed: %w", err)
 	}
-	var dbUpdates []func(tx *transaction.Tx) error
+	var dbUpdates transaction.DeferredDBUpdate
 	for _, seal := range orderedSeals {
 		result, err := m.results.ByID(seal.ResultID)
 		if err != nil {
