@@ -409,7 +409,6 @@ func (m *Manager) createCircuitBreakerInterceptor() grpc.UnaryClientInterceptor 
 				err := invoker(ctx, method, req, reply, cc, opts...)
 				return nil, err
 			})
-
 			return err
 		}
 
