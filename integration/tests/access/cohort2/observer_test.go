@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -39,6 +40,8 @@ type ObserverSuite struct {
 
 	cancel context.CancelFunc
 }
+
+var requestTimeout = 1500 * time.Millisecond
 
 func (s *ObserverSuite) TearDownTest() {
 	if s.net != nil {
