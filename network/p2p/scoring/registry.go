@@ -14,13 +14,13 @@ import (
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"github.com/onflow/flow-go/utils/logging"
-	"github.com/onflow/flow-go/utils/rand"
 )
 
 const (
-	// MaxDecay is the maximum decay value for the application specific penalty.
+	// MinSpamPenaltyDecaySpeed is minimum speed at which the spam penalty value of a peer is decayed.
 	// Spam record will be initialized with a decay value between .5 , .7 and this value will then be decayed up to .99 on consecutive misbehavior's,
-	// The maximum decay value decays the penalty by 1% every second.
+	// The maximum decay value decays the penalty by 1% every second. The decay is applied geometrically, i.e., `newPenalty = oldPenalty * decay`, hence, the higher decay value
+	// indicates a lower decay speed, i.e., it takes more heartbeat intervals to decay a penalty back to zero when the decay value is high.
 	// assume:
 	//     penalty = -100 (the maximum application specific penalty is -100)
 	//     skipDecayThreshold = -0.1
@@ -38,11 +38,11 @@ const (
 	//     n > log( 0.001 ) / log( 0.99 )
 	//     n > -3 / log( 0.99 )
 	//     n >  458.22
-        // MinSpamPenaltyDecaySpeed is minimum the speed at which the spam penalty value of a peer is decayed. 
-        // The decay is applied geometrically, i.e., `newPenalty = oldPenalty * decay`, hence, the higher decay value 
-        // indicates a lower decay speed, i.e., it takes more number of heartbeat intervals to decay a penalty back to 
-        // zero when the decay value is high.  
 	MinSpamPenaltyDecaySpeed = 0.99
+	// MaximumSpamRecordDecaySpeed represents the maximum rate at which the spam penalty value of a peer decays. Decay speeds increase
+	// during sustained malicious activity, leading to a slower recovery of the app-specific score for the penalized node. Conversely,
+	// decay speeds decrease, allowing faster recoveries, when nodes exhibit fleeting misbehavior.
+	MaximumSpamRecordDecaySpeed = 0.8
 	// skipDecayThreshold is the threshold for which when the negative penalty is above this value, the decay function will not be called.
 	// instead, the penalty will be set to 0. This is to prevent the penalty from keeping a small negative value for a long time.
 	skipDecayThreshold = -0.1
@@ -56,9 +56,9 @@ const (
 	iWantMisbehaviourPenalty = -10
 	// rpcPublishMessageMisbehaviourPenalty is the penalty applied to the application specific penalty when a peer conducts a RpcPublishMessageMisbehaviourPenalty misbehaviour.
 	rpcPublishMessageMisbehaviourPenalty = -10
-	// randomDecayFloatDensity used to generate a secure random Uint64 that is used to generate the random initial decay for app score records.
-	randomDecayFloatDensity = uint64(1000)
 )
+
+type SpamRecordInitFunc func() p2p.GossipSubSpamRecord
 
 // GossipSubCtrlMsgPenaltyValue is the penalty value for each control message type.
 type GossipSubCtrlMsgPenaltyValue struct {
@@ -94,7 +94,7 @@ type GossipSubAppSpecificScoreRegistry struct {
 	spamScoreCache p2p.GossipSubSpamRecordCache
 	penalty        GossipSubCtrlMsgPenaltyValue
 	// initial application specific penalty record, used to initialize the penalty cache entry.
-	init                      func() (p2p.GossipSubSpamRecord, error)
+	init                      SpamRecordInitFunc
 	validator                 p2p.SubscriptionValidator
 	initDecayLowerBound       float64
 	initDecayUpperBound       float64
@@ -120,7 +120,7 @@ type GossipSubAppSpecificScoreRegistryParams struct {
 
 	// Init is a factory function that returns a new GossipSubSpamRecord. It is used to initialize the spam record of
 	// a peer when the peer is first observed by the local peer.
-	Init func() (p2p.GossipSubSpamRecord, error)
+	Init SpamRecordInitFunc
 
 	// CacheFactory is a factory function that returns a new GossipSubSpamRecordCache. It is used to initialize the spamScoreCache.
 	// The cache is used to store the application specific penalty of peers.
@@ -284,11 +284,7 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 	// try initializing the application specific penalty for the peer if it is not yet initialized.
 	// this is done to avoid the case where the peer is not yet cached and the application specific penalty is not yet initialized.
 	// initialization is successful only if the peer is not yet cached. If any error is occurred during initialization we log a fatal error
-	initRecord, err := r.init()
-	if err != nil {
-		// the error is considered fatal as it means that we cannot generate a random initial decay.
-		lg.Fatal().Str("misbehavior_type", notification.MsgType.String()).Msg("failed to initialize app specific score record")
-	}
+	initRecord := r.init()
 	initialized := r.spamScoreCache.Add(notification.PeerID, initRecord)
 	if initialized {
 		lg.Trace().Str("peer_id", p2plogging.PeerId(notification.PeerID)).Msg("application specific penalty initialized for peer")
@@ -327,8 +323,8 @@ func DefaultDecayAdjustmentFunc(increaseDecayThreshold float64, decayThresholdIn
 	return func(record p2p.GossipSubSpamRecord, lastUpdated time.Time) (p2p.GossipSubSpamRecord, error) {
 		if record.Penalty <= increaseDecayThreshold {
 			decay := record.Decay + decayThresholdIncrementer
-			if decay > MaxDecay {
-				record.Decay = MaxDecay
+			if decay > MinSpamPenaltyDecaySpeed {
+				record.Decay = MinSpamPenaltyDecaySpeed
 			} else {
 				record.Decay = decay
 			}
@@ -365,42 +361,15 @@ func DefaultDecayFunction() netcache.PreprocessorFunc {
 	}
 }
 
-// InitAppScoreRecordStateFunc returns a func that will initialize the spac record state for a peer. The initial decay for the
-// spam record will be a random value between the lower and upper bounds provided.
-// Args:
-//   - decayLowerBound: the lower bound of the range for the initial random decay value
-//   - decayUpperBound: the upper bound of the range for the initial random decay value
-//
+// InitAppScoreRecordStateFunc returns a func that will initialize the spam record state for a peer. The initial decay for the
+// spam record will be the MaximumSpamRecordDecaySpeed, this will allow nodes that occasionally misbehave recover swiftly.
 // Returns:
 //   - callback func that initializes and returns a spam record.
-func InitAppScoreRecordStateFunc(decayLowerBound, decayUpperBound float64) func() (p2p.GossipSubSpamRecord, error) {
-	return func() (p2p.GossipSubSpamRecord, error) {
-		decay, err := initialDecay(decayLowerBound, decayUpperBound)
-		if err != nil {
-			return p2p.GossipSubSpamRecord{}, err
-		}
+func InitAppScoreRecordStateFunc() SpamRecordInitFunc {
+	return func() p2p.GossipSubSpamRecord {
 		return p2p.GossipSubSpamRecord{
-			Decay:   decay,
+			Decay:   MaximumSpamRecordDecaySpeed,
 			Penalty: 0,
-		}, nil
+		}
 	}
-}
-
-// initialDecay returns a secure random value between decayLowerBound and decayUpperBound.
-// Args:
-//   - decayLowerBound: the lower bound of the range for the initial random decay value
-//   - decayUpperBound: the upper bound of the range for the initial random decay value
-//
-// Returns:
-//   - float64: the random decay value
-//   - error: if any error occurs generating the secure random value
-//
-// All errors returned from this func are considered irrecoverable.
-func initialDecay(decayLowerBound, decayUpperBound float64) (float64, error) {
-	randomUint64, err := rand.Uint64n(randomDecayFloatDensity)
-	if err != nil {
-		return 0, fmt.Errorf("failed to generate random float between %f and %f", decayLowerBound, decayUpperBound)
-	}
-	randomFloat := float64(randomUint64) / float64(randomDecayFloatDensity)
-	return randomFloat*(decayUpperBound-decayLowerBound) + decayLowerBound, nil
 }

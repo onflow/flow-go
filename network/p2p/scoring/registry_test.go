@@ -219,10 +219,7 @@ func testSpamRecordWithSubscriptionPenalty(t *testing.T, messageType p2pmsg.Cont
 
 // TestSpamPenaltyDecaysInCache tests that the spam penalty records decay over time in the cache.
 func TestSpamPenaltyDecaysInCache(t *testing.T) {
-	flowConfig, err := config.DefaultConfig()
-	require.NoError(t, err)
-	scoringRegistryConfig := flowConfig.NetworkConfig.GossipSubConfig.GossipSubScoringRegistryConfig
-	peerID := peer.ID("peer-1")
+	peerID := unittest.PeerIdFixture(t)
 	reg, _ := newGossipSubAppSpecificScoreRegistry(t,
 		withStakedIdentity(peerID),
 		withValidSubscriptions(peerID))
@@ -275,8 +272,7 @@ func TestSpamPenaltyDecaysInCache(t *testing.T) {
 		penaltyValueFixtures().RpcPublishMessage
 	// the lower bound is the sum of the penalties with decay assuming the decay is applied 4 times to the sum of the penalties.
 	// in reality, the decay is applied 4 times to the first penalty, then 3 times to the second penalty, and so on.
-	r, err := scoring.InitAppScoreRecordStateFunc(scoringRegistryConfig.InitDecayLowerBound, scoringRegistryConfig.InitDecayUpperBound)()
-	require.NoError(t, err)
+	r := scoring.InitAppScoreRecordStateFunc()()
 	scoreLowerBound := scoreUpperBound * math.Pow(r.Decay, 4)
 
 	// with decay, the penalty should be between the upper and lower bounds.
@@ -440,7 +436,7 @@ func TestPersistingInvalidSubscriptionPenalty(t *testing.T) {
 }
 
 // TestSpamRecordDecayAdjustment ensures that spam record decay is increased each time a peers score reaches the scoring.IncreaseDecayThreshold eventually
-// sustained misbehavior will result in the spam record decay reaching the maximum value .99
+// sustained misbehavior will result in the spam record decay reaching the minimum decay speed .99
 func TestSpamRecordDecayAdjustment(t *testing.T) {
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
@@ -466,14 +462,14 @@ func TestSpamRecordDecayAdjustment(t *testing.T) {
 		record, err, ok := spamRecords.Get(peerID)
 		require.NoError(t, err)
 		require.True(t, ok)
-		return record.Decay == scoring.MaxDecay
+		return record.Decay == scoring.MaximumSpamRecordDecaySpeed
 	}, 10*time.Second, 500*time.Millisecond)
 
 	// the spam record decay should have reached max possible decay
 	record, err, ok := spamRecords.Get(peerID) // get the record from the spamRecords.
 	require.NoError(t, err)
 	require.True(t, ok)
-	assert.Equal(t, record.Decay, scoring.MaxDecay)
+	assert.Equal(t, record.Decay, scoring.MaximumSpamRecordDecaySpeed)
 }
 
 // withStakedIdentity returns a function that sets the identity provider to return an staked identity for the given peer id.
@@ -535,7 +531,7 @@ func newScoringRegistry(t *testing.T, config p2pconf.GossipSubScoringRegistryCon
 	)
 	cfg := &scoring.GossipSubAppSpecificScoreRegistryParams{
 		Logger:     unittest.Logger(),
-		Init:       scoring.InitAppScoreRecordStateFunc(config.InitDecayLowerBound, config.InitDecayUpperBound),
+		Init:       scoring.InitAppScoreRecordStateFunc,
 		Penalty:    penaltyValueFixtures(),
 		IdProvider: mock.NewIdentityProvider(t),
 		Validator:  mockp2p.NewSubscriptionValidator(t),
