@@ -398,7 +398,6 @@ func (m *Manager) createCircuitBreakerInterceptor() grpc.UnaryClientInterceptor 
 			invoker grpc.UnaryInvoker,
 			opts ...grpc.CallOption,
 		) error {
-			var ignoredCBErr error
 			// The circuit breaker integration occurs here, where all invoked calls to the node pass through the
 			// CircuitBreaker.Execute method. This method counts successful and failed invocations, and switches to the
 			// "StateOpen" when the maximum failure threshold is reached. When the circuit breaker is in the "StateOpen"
@@ -410,10 +409,6 @@ func (m *Manager) createCircuitBreakerInterceptor() grpc.UnaryClientInterceptor 
 				err := invoker(ctx, method, req, reply, cc, opts...)
 				return nil, err
 			})
-
-			if ignoredCBErr != nil {
-				return ignoredCBErr
-			}
 
 			return err
 		}
