@@ -3,6 +3,7 @@ package scoring_test
 import (
 	"fmt"
 	"math"
+	"sync"
 	"testing"
 	"time"
 
@@ -25,7 +26,7 @@ import (
 // app specific reward. This is the default reward for a staked peer that has valid subscriptions and has not been
 // penalized.
 func TestNoPenaltyRecord(t *testing.T) {
-	peerID := peer.ID("peer-1")
+	peerID := unittest.PeerIdFixture(t)
 	reg, spamRecords := newGossipSubAppSpecificScoreRegistry(
 		t,
 		withStakedIdentity(peerID),
@@ -49,27 +50,24 @@ func TestNoPenaltyRecord(t *testing.T) {
 // penalty value as the app specific score.
 func TestPeerWithSpamRecord(t *testing.T) {
 	t.Run("graft", func(t *testing.T) {
-		testPeerWithSpamRecord(t, p2pmsg.CtrlMsgGraft, penaltyValueFixtures().Graft, false)
+		testPeerWithSpamRecord(t, p2pmsg.CtrlMsgGraft, penaltyValueFixtures().Graft)
 	})
 	t.Run("prune", func(t *testing.T) {
-		testPeerWithSpamRecord(t, p2pmsg.CtrlMsgPrune, penaltyValueFixtures().Prune, false)
+		testPeerWithSpamRecord(t, p2pmsg.CtrlMsgPrune, penaltyValueFixtures().Prune)
 	})
 	t.Run("ihave", func(t *testing.T) {
-		testPeerWithSpamRecord(t, p2pmsg.CtrlMsgIHave, penaltyValueFixtures().IHave, false)
+		testPeerWithSpamRecord(t, p2pmsg.CtrlMsgIHave, penaltyValueFixtures().IHave)
 	})
 	t.Run("iwant", func(t *testing.T) {
-		testPeerWithSpamRecord(t, p2pmsg.CtrlMsgIWant, penaltyValueFixtures().IWant, false)
-	})
-	t.Run("cluster prefixed", func(t *testing.T) {
-		testPeerWithSpamRecord(t, p2pmsg.CtrlMsgIWant, penaltyValueFixtures().IWant*penaltyValueFixtures().ClusterPrefixedPenaltyReductionFactor, true)
+		testPeerWithSpamRecord(t, p2pmsg.CtrlMsgIWant, penaltyValueFixtures().IWant)
 	})
 	t.Run("RpcPublishMessage", func(t *testing.T) {
 		testPeerWithSpamRecord(t, p2pmsg.RpcPublishMessage, penaltyValueFixtures().RpcPublishMessage)
 	})
 }
 
-func testPeerWithSpamRecord(t *testing.T, messageType p2pmsg.ControlMessageType, expectedPenalty float64, isClusterPrefixed bool) {
-	peerID := peer.ID("peer-1")
+func testPeerWithSpamRecord(t *testing.T, messageType p2pmsg.ControlMessageType, expectedPenalty float64) {
+	peerID := unittest.PeerIdFixture(t)
 	reg, spamRecords := newGossipSubAppSpecificScoreRegistry(
 		t,
 		withStakedIdentity(peerID),
@@ -85,9 +83,8 @@ func testPeerWithSpamRecord(t *testing.T, messageType p2pmsg.ControlMessageType,
 
 	// report a misbehavior for the peer id.
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
-		PeerID:            peerID,
-		MsgType:           messageType,
-		IsClusterPrefixed: isClusterPrefixed,
+		PeerID:  peerID,
+		MsgType: messageType,
 	})
 
 	// the penalty should now be updated in the spamRecords
@@ -124,7 +121,7 @@ func TestSpamRecord_With_UnknownIdentity(t *testing.T) {
 // testSpamRecordWithUnknownIdentity tests the app specific penalty computation of the node when there is a spam record for the peer id and
 // the peer id has an unknown identity.
 func testSpamRecordWithUnknownIdentity(t *testing.T, messageType p2pmsg.ControlMessageType, expectedPenalty float64) {
-	peerID := peer.ID("peer-1")
+	peerID := unittest.PeerIdFixture(t)
 	reg, spamRecords := newGossipSubAppSpecificScoreRegistry(
 		t,
 		withUnknownIdentity(peerID),
@@ -177,7 +174,7 @@ func TestSpamRecord_With_SubscriptionPenalty(t *testing.T) {
 // testSpamRecordWithUnknownIdentity tests the app specific penalty computation of the node when there is a spam record for the peer id and
 // the peer id has an invalid subscription as well.
 func testSpamRecordWithSubscriptionPenalty(t *testing.T, messageType p2pmsg.ControlMessageType, expectedPenalty float64) {
-	peerID := peer.ID("peer-1")
+	peerID := unittest.PeerIdFixture(t)
 	reg, spamRecords := newGossipSubAppSpecificScoreRegistry(
 		t,
 		withStakedIdentity(peerID),
@@ -211,7 +208,7 @@ func testSpamRecordWithSubscriptionPenalty(t *testing.T, messageType p2pmsg.Cont
 
 // TestSpamPenaltyDecaysInCache tests that the spam penalty records decay over time in the cache.
 func TestSpamPenaltyDecaysInCache(t *testing.T) {
-	peerID := peer.ID("peer-1")
+	peerID := unittest.PeerIdFixture(t)
 	reg, _ := newGossipSubAppSpecificScoreRegistry(t,
 		withStakedIdentity(peerID),
 		withValidSubscriptions(peerID))
@@ -274,7 +271,7 @@ func TestSpamPenaltyDecaysInCache(t *testing.T) {
 // TestSpamPenaltyDecayToZero tests that the spam penalty decays to zero over time, and when the spam penalty of
 // a peer is set back to zero, its app specific penalty is also reset to the initial state.
 func TestSpamPenaltyDecayToZero(t *testing.T) {
-	peerID := peer.ID("peer-1")
+	peerID := unittest.PeerIdFixture(t)
 	reg, spamRecords := newGossipSubAppSpecificScoreRegistry(
 		t,
 		withStakedIdentity(peerID),
@@ -320,7 +317,7 @@ func TestSpamPenaltyDecayToZero(t *testing.T) {
 // TestPersistingUnknownIdentityPenalty tests that even though the spam penalty is decayed to zero, the unknown identity penalty
 // is persisted. This is because the unknown identity penalty is not decayed.
 func TestPersistingUnknownIdentityPenalty(t *testing.T) {
-	peerID := peer.ID("peer-1")
+	peerID := unittest.PeerIdFixture(t)
 	reg, spamRecords := newGossipSubAppSpecificScoreRegistry(
 		t,
 		withUnknownIdentity(peerID), // the peer id has an unknown identity.
@@ -377,7 +374,7 @@ func TestPersistingUnknownIdentityPenalty(t *testing.T) {
 // TestPersistingInvalidSubscriptionPenalty tests that even though the spam penalty is decayed to zero, the invalid subscription penalty
 // is persisted. This is because the invalid subscription penalty is not decayed.
 func TestPersistingInvalidSubscriptionPenalty(t *testing.T) {
-	peerID := peer.ID("peer-1")
+	peerID := unittest.PeerIdFixture(t)
 	reg, spamRecords := newGossipSubAppSpecificScoreRegistry(
 		t,
 		withStakedIdentity(peerID),
@@ -424,6 +421,63 @@ func TestPersistingInvalidSubscriptionPenalty(t *testing.T) {
 	assert.True(t, ok)
 	assert.NoError(t, err)
 	assert.Equal(t, 0.0, record.Penalty) // penalty should be zero.
+}
+
+// TestPeerSpamPenaltyClusterPrefixed evaluates the application-specific penalty calculation for a node when a spam record is present
+// for cluster-prefixed topics. In the case of an invalid control message notification marked as cluster-prefixed,
+// the application-specific penalty should be reduced by the default reduction factor. This test verifies the accurate computation
+// of the application-specific score under these conditions.
+func TestPeerSpamPenaltyClusterPrefixed(t *testing.T) {
+	peerID := unittest.PeerIdFixture(t)
+	reg, spamRecords := newGossipSubAppSpecificScoreRegistry(
+		t,
+		withStakedIdentity(peerID),
+		withValidSubscriptions(peerID))
+
+	// initially, the spamRecords should not have the peer id.
+	assert.False(t, spamRecords.Has(peerID))
+
+	// since the peer id does not have a spam record, the app specific score should be the max app specific reward, which
+	// is the default reward for a staked peer that has valid subscriptions.
+	score := reg.AppSpecificScoreFunc()(peerID)
+	assert.Equal(t, scoring.MaxAppSpecificReward, score)
+
+	// Report consecutive misbehavior's for the specified peer ID. Two misbehavior's are reported concurrently:
+	// 1. With IsClusterPrefixed set to false, ensuring the penalty applied to the application-specific score is not reduced.
+	// 2. With IsClusterPrefixed set to true, reducing the penalty added to the overall app-specific score by the default reduction factor.
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
+			PeerID:            peerID,
+			MsgType:           p2pmsg.CtrlMsgGraft,
+			IsClusterPrefixed: false,
+		})
+	}()
+	go func() {
+		defer wg.Done()
+		reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
+			PeerID:            peerID,
+			MsgType:           p2pmsg.CtrlMsgGraft,
+			IsClusterPrefixed: true,
+		})
+	}()
+	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "timed out waiting for goroutines to finish")
+
+	// expected penalty should be penaltyValueFixtures().Graft * (1  + clusterReductionFactor)
+	expectedPenalty := penaltyValueFixtures().Graft * (1 + penaltyValueFixtures().ClusterPrefixedPenaltyReductionFactor)
+
+	// the penalty should now be updated in the spamRecords
+	record, err, ok := spamRecords.Get(peerID) // get the record from the spamRecords.
+	assert.True(t, ok)
+	assert.NoError(t, err)
+	assert.Less(t, math.Abs(expectedPenalty-record.Penalty), 10e-3)
+	assert.Equal(t, scoring.InitAppScoreRecordState().Decay, record.Decay)
+	// this peer has a spam record, with no subscription penalty. Hence, the app specific score should only be the spam penalty,
+	// and the peer should be deprived of the default reward for its valid staked role.
+	score = reg.AppSpecificScoreFunc()(peerID)
+	assert.Less(t, math.Abs(expectedPenalty-score), 10e-3)
 }
 
 // withStakedIdentity returns a function that sets the identity provider to return an staked identity for the given peer id.

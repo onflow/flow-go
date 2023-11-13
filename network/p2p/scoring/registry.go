@@ -266,17 +266,18 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 	}
 
 	record, err := r.spamScoreCache.Update(notification.PeerID, func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
+		penalty := 0.0
 		switch notification.MsgType {
 		case p2pmsg.CtrlMsgGraft:
-			record.Penalty += r.penalty.Graft
+			penalty += r.penalty.Graft
 		case p2pmsg.CtrlMsgPrune:
-			record.Penalty += r.penalty.Prune
+			penalty += r.penalty.Prune
 		case p2pmsg.CtrlMsgIHave:
-			record.Penalty += r.penalty.IHave
+			penalty += r.penalty.IHave
 		case p2pmsg.CtrlMsgIWant:
-			record.Penalty += r.penalty.IWant
+			penalty += r.penalty.IWant
 		case p2pmsg.RpcPublishMessage:
-			record.Penalty += r.penalty.RpcPublishMessage
+			penalty += r.penalty.RpcPublishMessage
 		default:
 			// the error is considered fatal as it means that we have an unsupported misbehaviour type, we should crash the node to prevent routing attack vulnerability.
 			lg.Fatal().Str("misbehavior_type", notification.MsgType.String()).Msg("unknown misbehaviour type")
@@ -284,8 +285,10 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 
 		// reduce penalty for cluster prefixed topics allowing nodes that are potentially behind to catch up
 		if notification.IsClusterPrefixed {
-			record.Penalty *= r.penalty.ClusterPrefixedPenaltyReductionFactor
+			penalty *= r.penalty.ClusterPrefixedPenaltyReductionFactor
 		}
+
+		record.Penalty += penalty
 
 		return record
 	})
