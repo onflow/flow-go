@@ -7,8 +7,6 @@ import (
 	lru "github.com/hashicorp/golang-lru/v2"
 	"go.uber.org/atomic"
 	"google.golang.org/grpc"
-
-	"github.com/onflow/flow-go/crypto"
 )
 
 // CachedClient represents a gRPC client connection that is cached for reuse.
@@ -75,7 +73,7 @@ func (c *Cache) Get(address string) (*CachedClient, bool) {
 // New entries are added to the cache with their mutex locked. This ensures that the caller gets
 // priority when working with the new client, allowing it to create the underlying connection.
 // Clients retrieved from the cache are returned without modifying their lock.
-func (c *Cache) GetOrAdd(address string, timeout time.Duration, networkPubKey crypto.PublicKey) (*CachedClient, bool) {
+func (c *Cache) GetOrAdd(address string, timeout time.Duration) (*CachedClient, bool) {
 	client := &CachedClient{}
 	client.mu.Lock()
 

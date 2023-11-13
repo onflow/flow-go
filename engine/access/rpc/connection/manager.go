@@ -145,7 +145,7 @@ func (m *Manager) retrieveConnection(grpcAddress string,
 	clientType clientType,
 	networkPubKey crypto.PublicKey,
 ) (*grpc.ClientConn, error) {
-	client, ok := m.cache.GetOrAdd(grpcAddress, timeout, networkPubKey)
+	client, ok := m.cache.GetOrAdd(grpcAddress, timeout)
 	if ok {
 		// The client was retrieved from the cache, wait for the lock
 		client.mu.Lock()
