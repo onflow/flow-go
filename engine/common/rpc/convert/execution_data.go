@@ -13,9 +13,15 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 )
 
-// BlockExecutionDataEventPayloadsToJson converts all event payloads from CCF to JSON-CDC in place
-// This is a temporary workaround until a more robust solution is implemented
-func BlockExecutionDataEventPayloadsToJson(m *entities.BlockExecutionData) error {
+// BlockExecutionDataEventPayloadsToVersion converts all event payloads to version
+func BlockExecutionDataEventPayloadsToVersion(
+	m *entities.BlockExecutionData,
+	to entities.EventEncodingVersion,
+) error {
+	if to == entities.EventEncodingVersion_CCF_V0 {
+		return nil
+	}
+
 	for i, chunk := range m.ChunkExecutionData {
 		for j, e := range chunk.Events {
 			converted, err := CcfPayloadToJsonPayload(e.Payload)

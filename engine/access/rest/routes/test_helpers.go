@@ -17,23 +17,25 @@ import (
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/state_stream"
+	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 const (
-	ExpandableFieldPayload    = "payload"
-	ExpandableExecutionResult = "execution_result"
-	sealedHeightQueryParam    = "sealed"
-	finalHeightQueryParam     = "final"
-	startHeightQueryParam     = "start_height"
-	endHeightQueryParam       = "end_height"
-	heightQueryParam          = "height"
-	startBlockIdQueryParam    = "start_block_id"
-	eventTypesQueryParams     = "event_types"
-	addressesQueryParams      = "addresses"
-	contractsQueryParams      = "contracts"
+	ExpandableFieldPayload      = "payload"
+	ExpandableExecutionResult   = "execution_result"
+	sealedHeightQueryParam      = "sealed"
+	finalHeightQueryParam       = "final"
+	startHeightQueryParam       = "start_height"
+	endHeightQueryParam         = "end_height"
+	heightQueryParam            = "height"
+	startBlockIdQueryParam      = "start_block_id"
+	eventTypesQueryParams       = "event_types"
+	addressesQueryParams        = "addresses"
+	contractsQueryParams        = "contracts"
+	heartbeatIntervalQueryParam = "heartbeat_interval"
 )
 
 // fakeNetConn implements a mocked ws connection that can be injected in testing logic.
@@ -122,12 +124,16 @@ func executeRequest(req *http.Request, backend access.API) *httptest.ResponseRec
 
 func executeWsRequest(req *http.Request, stateStreamApi state_stream.API, responseRecorder *testHijackResponseRecorder) {
 	restCollector := metrics.NewNoopCollector()
+
+	config := backend.Config{
+		EventFilterConfig: state_stream.DefaultEventFilterConfig,
+		MaxGlobalStreams:  state_stream.DefaultMaxGlobalStreams,
+		HeartbeatInterval: state_stream.DefaultHeartbeatInterval,
+	}
+
 	router := NewRouterBuilder(unittest.Logger(), restCollector).AddWsRoutes(
 		stateStreamApi,
-		flow.Testnet.Chain(),
-		state_stream.DefaultEventFilterConfig,
-		state_stream.DefaultMaxGlobalStreams,
-	).Build()
+		flow.Testnet.Chain(), config).Build()
 	router.ServeHTTP(responseRecorder, req)
 }
 
