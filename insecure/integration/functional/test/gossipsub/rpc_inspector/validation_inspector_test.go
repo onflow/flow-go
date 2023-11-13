@@ -521,6 +521,7 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection(t *testing.T
 	})
 	logger := zerolog.New(os.Stdout).Level(zerolog.WarnLevel).Hook(hook)
 
+	inspectorIdProvider := mock.NewIdentityProvider(t)
 	idProvider := mock.NewIdentityProvider(t)
 	spammer := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkID, role, idProvider)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -534,7 +535,7 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection(t *testing.T
 		SporkID:                 sporkID,
 		Config:                  &inspectorConfig,
 		Distributor:             distributor,
-		IdProvider:              idProvider,
+		IdProvider:              inspectorIdProvider,
 		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 		InspectorMetrics:        metrics.NewNoopCollector(),
 		RpcTracker:              meshTracer,
@@ -553,7 +554,9 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection(t *testing.T
 			corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(corruptInspectorFunc)),
 	)
 	idProvider.On("ByPeerID", victimNode.ID()).Return(&victimIdentity, true).Maybe()
-	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Times(int(controlMessageCount + 2))
+	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Maybe()
+	// we expect controlMessageCount plus 1 extra call, this is due to messages that are exchanged when the nodes startup
+	inspectorIdProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Times(int(controlMessageCount + 1))
 	clusterPrefixedTopic := randomClusterPrefixedTopic()
 
 	// set topic oracle to return list with all topics to avoid hasSubscription failures and force topic validation
@@ -616,12 +619,13 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection(t *testing.T
 	distributor := mockp2p.NewGossipSubInspectorNotificationDistributor(t)
 	p2ptest.MockInspectorNotificationDistributorReadyDoneAware(distributor)
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
+	inspectorIdProvider := mock.NewIdentityProvider(t)
 	validationInspector, err := validation.NewControlMsgValidationInspector(&validation.InspectorParams{
 		Logger:                  logger,
 		SporkID:                 sporkID,
 		Config:                  &inspectorConfig,
 		Distributor:             distributor,
-		IdProvider:              idProvider,
+		IdProvider:              inspectorIdProvider,
 		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 		InspectorMetrics:        metrics.NewNoopCollector(),
 		RpcTracker:              meshTracer,
@@ -640,7 +644,10 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection(t *testing.T
 			corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(corruptInspectorFunc)),
 	)
 	idProvider.On("ByPeerID", victimNode.ID()).Return(&victimIdentity, true).Maybe()
-	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Times(int(controlMessageCount + 2))
+	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Maybe()
+	// we expect controlMessageCount plus 1 extra call, this is due to messages that are exchanged when the nodes startup
+	inspectorIdProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Times(int(controlMessageCount + 1))
+
 	clusterPrefixedTopic := randomClusterPrefixedTopic()
 	// set topic oracle to return list with all topics to avoid hasSubscription failures and force topic validation
 	require.NoError(t, validationInspector.SetTopicOracle(func() []string {
@@ -707,12 +714,13 @@ func TestValidationInspector_UnstakedNode_Detection(t *testing.T) {
 	distributor := mockp2p.NewGossipSubInspectorNotificationDistributor(t)
 	p2ptest.MockInspectorNotificationDistributorReadyDoneAware(distributor)
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
+	inspectorIdProvider := mock.NewIdentityProvider(t)
 	validationInspector, err := validation.NewControlMsgValidationInspector(&validation.InspectorParams{
 		Logger:                  logger,
 		SporkID:                 sporkID,
 		Config:                  &inspectorConfig,
 		Distributor:             distributor,
-		IdProvider:              idProvider,
+		IdProvider:              inspectorIdProvider,
 		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 		InspectorMetrics:        metrics.NewNoopCollector(),
 		RpcTracker:              meshTracer,
@@ -731,7 +739,9 @@ func TestValidationInspector_UnstakedNode_Detection(t *testing.T) {
 			corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(corruptInspectorFunc)),
 	)
 	idProvider.On("ByPeerID", victimNode.ID()).Return(&victimIdentity, true).Maybe()
-	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(nil, false).Times(4)
+	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Maybe()
+	// we expect 2 calls from notification inspection plus 1 extra call, this is due to messages that are exchanged when the nodes startup
+	inspectorIdProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(nil, false).Times(3)
 
 	// setup cluster prefixed topic with an invalid cluster ID
 	clusterID := flow.ChainID("known-cluster-id")
