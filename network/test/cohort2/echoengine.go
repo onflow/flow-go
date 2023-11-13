@@ -1,4 +1,4 @@
-package test
+package cohort2
 
 import (
 	"fmt"

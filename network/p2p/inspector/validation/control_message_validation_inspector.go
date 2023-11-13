@@ -805,30 +805,27 @@ func (c *ControlMsgValidationInspector) checkClusterPrefixHardThreshold(nodeID f
 //   - count: the number of occurrences of the error.
 func (c *ControlMsgValidationInspector) logAndDistributeAsyncInspectErrs(req *InspectRPCRequest, ctlMsgType p2pmsg.ControlMessageType, err error, count uint64) {
 	lg := c.logger.With().
+		Err(err).
+		Str("control_message_type", ctlMsgType.String()).
 		Bool(logging.KeySuspicious, true).
 		Bool(logging.KeyNetworkingSecurity, true).
+		Uint64("error_count", count).
 		Str("peer_id", p2plogging.PeerId(req.Peer)).
 		Logger()
 
 	switch {
 	case IsErrActiveClusterIDsNotSet(err):
-		lg.Warn().Err(err).Msg("active cluster ids not set")
+		lg.Warn().Msg("active cluster ids not set")
 	case IsErrUnstakedPeer(err):
-		lg.Warn().Err(err).Msg("control message received from unstaked peer")
+		lg.Warn().Msg("control message received from unstaked peer")
 	default:
-		notification := p2p.NewInvalidControlMessageNotification(req.Peer, ctlMsgType, err, count)
-		lg.Error().Err(notification.Error).
-			Str("control_msg_type", notification.MsgType.String()).
-			Uint64("err_count", count).
-			Msg("rpc control message async inspection failed")
-		err = c.distributor.Distribute(notification)
-		if err != nil {
-			lg.Fatal().
-				Err(err).
-				Str("notification_error", notification.Error.Error()).
-				Str("control_msg_type", notification.MsgType.String()).
+		distErr := c.distributor.Distribute(p2p.NewInvalidControlMessageNotification(req.Peer, ctlMsgType, err, count))
+		if distErr != nil {
+			lg.Error().
+				Err(distErr).
 				Msg("failed to distribute invalid control message notification")
 		}
+		lg.Error().Msg("rpc control message async inspection failed")
 	}
 }
 
