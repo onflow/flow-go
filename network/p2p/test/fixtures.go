@@ -17,6 +17,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/routing"
 	discoveryBackoff "github.com/libp2p/go-libp2p/p2p/discovery/backoff"
 	"github.com/rs/zerolog"
+	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/config"
@@ -41,7 +42,6 @@ import (
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
 	"github.com/onflow/flow-go/utils/logging"
 	"github.com/onflow/flow-go/utils/unittest"
-	mockery "github.com/stretchr/testify/mock"
 )
 
 const (
