@@ -6,20 +6,18 @@ import (
 	"io"
 	"time"
 
-	"github.com/onflow/flow-go/crypto"
-	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/credentials/insecure"
-
-	"github.com/sony/gobreaker"
-
 	"github.com/rs/zerolog"
+	"github.com/sony/gobreaker"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/connectivity"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 	_ "google.golang.org/grpc/encoding/gzip" //required for gRPC compression
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/crypto"
 	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/deflate" //required for gRPC compression
 	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/snappy"  //required for gRPC compression
 	"github.com/onflow/flow-go/module"
@@ -29,11 +27,11 @@ import (
 // DefaultClientTimeout is used when making a GRPC request to a collection node or an execution node.
 const DefaultClientTimeout = 3 * time.Second
 
-// ClientType is an enumeration type used to differentiate between different types of gRPC clients.
-type ClientType int
+// clientType is an enumeration type used to differentiate between different types of gRPC clients.
+type clientType int
 
 const (
-	AccessClient ClientType = iota
+	AccessClient clientType = iota
 	ExecutionClient
 )
 
@@ -91,7 +89,7 @@ func NewManager(
 // It returns the client connection and an io.Closer to close the connection when done.
 func (m *Manager) GetConnection(grpcAddress string,
 	timeout time.Duration,
-	clientType ClientType,
+	clientType clientType,
 	networkPubKey crypto.PublicKey,
 ) (*grpc.ClientConn, io.Closer, error) {
 	if m.cache != nil {
@@ -144,7 +142,7 @@ func (m *Manager) HasCache() bool {
 // Otherwise, it creates a new connection and caches it.
 func (m *Manager) retrieveConnection(grpcAddress string,
 	timeout time.Duration,
-	clientType ClientType,
+	clientType clientType,
 	networkPubKey crypto.PublicKey,
 ) (*grpc.ClientConn, error) {
 	client, ok := m.cache.GetOrAdd(grpcAddress, timeout, networkPubKey)
@@ -189,7 +187,7 @@ func (m *Manager) createConnection(
 	address string,
 	timeout time.Duration,
 	cachedClient *CachedClient,
-	clientType ClientType,
+	clientType clientType,
 	networkPubKey crypto.PublicKey,
 ) (*grpc.ClientConn, error) {
 	if timeout == 0 {
@@ -318,7 +316,7 @@ func createClientTimeoutInterceptor(timeout time.Duration) grpc.UnaryClientInter
 // the corresponding client.
 func (m *Manager) createClientInvalidationInterceptor(
 	address string,
-	clientType ClientType,
+	clientType clientType,
 ) grpc.UnaryClientInterceptor {
 	if !m.circuitBreakerConfig.Enabled {
 		clientInvalidationInterceptor := func(

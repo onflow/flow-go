@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"google.golang.org/grpc/credentials"
+
 	"strings"
 	"time"
 
@@ -16,6 +16,8 @@ import (
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
+
+	"google.golang.org/grpc/credentials"
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"

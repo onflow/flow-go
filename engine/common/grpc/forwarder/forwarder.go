@@ -2,12 +2,14 @@ package forwarder
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/engine/access/rpc/connection"
-	"github.com/onflow/flow-go/model/flow"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"io"
 	"sync"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
+	"github.com/onflow/flow-go/engine/access/rpc/connection"
+	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
 )
@@ -90,10 +92,8 @@ func (f *Forwarder) FaultTolerantClient() (access.AccessAPIClient, io.Closer, er
 		f.roundRobin = f.roundRobin % len(f.upstream)
 		err = f.reconnectingClient(f.roundRobin)
 		if err != nil {
-			fmt.Println(fmt.Sprintf("+++FaultTolerantClient err: %v", err))
 			continue
 		}
-		fmt.Println(fmt.Sprintf("FaultTolerantClient ok"))
 		return f.upstream[f.roundRobin], f.closer[f.roundRobin], nil
 	}
 

@@ -3,8 +3,6 @@ package apiproxy
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/engine/access/rpc/connection"
-	"github.com/onflow/flow-go/module/metrics"
 	"net"
 	"testing"
 	"time"
@@ -13,8 +11,10 @@ import (
 	"google.golang.org/grpc"
 	grpcinsecure "google.golang.org/grpc/credentials/insecure"
 
+	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/grpc/forwarder"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/grpcutils"
 	"github.com/onflow/flow-go/utils/unittest"
 )

@@ -2,16 +2,17 @@ package connection
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/crypto"
 	"io"
 	"net"
 	"time"
 
-	"github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/module"
+
+	"github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/flow/protobuf/go/flow/execution"
 )
 
 // ConnectionFactory is an interface for creating access and execution API clients.

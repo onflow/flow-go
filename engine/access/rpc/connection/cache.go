@@ -1,13 +1,14 @@
 package connection
 
 import (
-	"github.com/onflow/flow-go/crypto"
 	"sync"
 	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
 	"go.uber.org/atomic"
 	"google.golang.org/grpc"
+
+	"github.com/onflow/flow-go/crypto"
 )
 
 // CachedClient represents a gRPC client connection that is cached for reuse.
@@ -15,7 +16,6 @@ type CachedClient struct {
 	ClientConn     *grpc.ClientConn
 	Address        string
 	timeout        time.Duration
-	networkPubKey  crypto.PublicKey
 	closeRequested *atomic.Bool
 	wg             sync.WaitGroup
 	mu             sync.Mutex
@@ -86,7 +86,6 @@ func (c *Cache) GetOrAdd(address string, timeout time.Duration, networkPubKey cr
 
 	client.Address = address
 	client.timeout = timeout
-
 	client.closeRequested = atomic.NewBool(false)
 
 	return client, false

@@ -2,12 +2,14 @@ package apiproxy
 
 import (
 	"context"
-	"github.com/onflow/flow-go/engine/access/rpc/connection"
+
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow/protobuf/go/flow/access"
+
+	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/grpc/forwarder"
 	"github.com/onflow/flow-go/engine/protocol"
 	"github.com/onflow/flow-go/model/flow"
