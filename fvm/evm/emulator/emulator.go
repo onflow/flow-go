@@ -235,8 +235,11 @@ func (proc *procedure) withdrawFrom(address types.Address, amount *big.Int) (*ty
 	// while this method is only called from bridged accounts
 	// it might be the case that someone creates a bridged account
 	// and never transfer tokens to and call for withdraw
+	// TODO: we might revisit this apporach and
+	// 		return res, types.ErrAccountDoesNotExist
+	// instead
 	if !proc.state.Exist(addr) {
-		return res, types.ErrAccountDoesNotExist
+		proc.state.CreateAccount(addr)
 	}
 
 	// check the source account balance

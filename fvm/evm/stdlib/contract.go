@@ -332,13 +332,88 @@ func newInternalEVMTypeDepositFunction(
 
 			amount := types.Balance(amountValue)
 
-			// Call
+			// Deposit
 
 			const isAuthorized = false
 			account := handler.AccountByAddress(toAddress, isAuthorized)
 			account.Deposit(types.NewFlowTokenVault(amount))
 
 			return interpreter.Void
+		},
+	)
+}
+
+const internalEVMTypeWithdrawFunctionName = "withdraw"
+
+var internalEVMTypeWithdrawFunctionType = &sema.FunctionType{
+	Parameters: []sema.Parameter{
+		{
+			Label:          "from",
+			TypeAnnotation: sema.NewTypeAnnotation(evmAddressBytesType),
+		},
+		{
+			Label:          "amount",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.UFix64Type),
+		},
+	},
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.AnyResourceType),
+}
+
+func newInternalEVMTypeWithdrawFunction(
+	gauge common.MemoryGauge,
+	handler types.ContractHandler,
+) *interpreter.HostFunctionValue {
+	return interpreter.NewHostFunctionValue(
+		gauge,
+		internalEVMTypeCallFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			inter := invocation.Interpreter
+			locationRange := invocation.LocationRange
+
+			// Get from address
+
+			fromAddressValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			fromAddress, err := AddressBytesArrayValueToEVMAddress(inter, locationRange, fromAddressValue)
+			if err != nil {
+				panic(err)
+			}
+
+			// Get amount
+
+			amountValue, ok := invocation.Arguments[1].(interpreter.UFix64Value)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			amount := types.Balance(amountValue)
+
+			// Withdraw
+
+			const isAuthorized = true
+			account := handler.AccountByAddress(fromAddress, isAuthorized)
+			vault := account.Withdraw(amount)
+
+			// TODO: improve: maybe call actual constructor
+			return interpreter.NewCompositeValue(
+				inter,
+				locationRange,
+				common.NewAddressLocation(gauge, handler.FlowTokenAddress(), "FlowToken"),
+				"FlowToken.Vault",
+				common.CompositeKindResource,
+				[]interpreter.CompositeField{
+					{
+						Name: "balance",
+						Value: interpreter.NewUFix64Value(gauge, func() uint64 {
+							return uint64(vault.Balance())
+						}),
+					},
+				},
+				common.ZeroAddress,
+			)
 		},
 	)
 }
@@ -357,6 +432,7 @@ func NewInternalEVMContractValue(
 			internalEVMTypeCreateBridgedAccountFunctionName: newInternalEVMTypeCreateBridgedAccountFunction(gauge, handler),
 			internalEVMTypeCallFunctionName:                 newInternalEVMTypeCallFunction(gauge, handler),
 			internalEVMTypeDepositFunctionName:              newInternalEVMTypeDepositFunction(gauge, handler),
+			internalEVMTypeWithdrawFunctionName:             newInternalEVMTypeWithdrawFunction(gauge, handler),
 		},
 		nil,
 		nil,
@@ -395,6 +471,12 @@ var InternalEVMContractType = func() *sema.CompositeType {
 			ty,
 			internalEVMTypeDepositFunctionName,
 			internalEVMTypeDepositFunctionType,
+			"",
+		),
+		sema.NewUnmeteredPublicFunctionMember(
+			ty,
+			internalEVMTypeWithdrawFunctionName,
+			internalEVMTypeWithdrawFunctionType,
 			"",
 		),
 	})

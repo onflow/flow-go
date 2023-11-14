@@ -109,7 +109,7 @@ func RunWithNewTestVM(t *testing.T, chain flow.Chain, f func(fvm.Context, fvm.VM
 	f(fvm.NewContextFromParent(ctx, fvm.WithEVMEnabled(true)), vm, snapshotTree)
 }
 
-// TODO: test with actual amount
+// TODO: deposit non-zero amount
 func TestEVMAddressDeposit(t *testing.T) {
 
 	t.Parallel()
@@ -133,6 +133,55 @@ func TestEVMAddressDeposit(t *testing.T) {
                                    )
                                    let vault <- FlowToken.createEmptyVault() as! @FlowToken.Vault
                                    address.deposit(from: <-vault)
+                               }
+                            `,
+							chain.ServiceAddress().HexWithPrefix(),
+							fvm.FlowTokenAddress(chain).HexWithPrefix(),
+						))
+
+						script := fvm.Script(code)
+
+						executionSnapshot, output, err := vm.Run(
+							ctx,
+							script,
+							snapshot)
+						require.NoError(t, err)
+						require.NoError(t, output.Err)
+
+						// TODO:
+						_ = executionSnapshot
+					})
+				})
+			})
+		})
+	})
+}
+
+// TODO: deposit non-zero amount
+func TestBridgedAccountWithdraw(t *testing.T) {
+
+	t.Parallel()
+
+	RunWithTestBackend(t, func(backend types.Backend) {
+		RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+			RunWithDeployedContract(t, backend, rootAddr, func(testContract *TestContract) {
+				RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *EOATestAccount) {
+					chain := flow.Emulator.Chain()
+					RunWithNewTestVM(t, chain, func(ctx fvm.Context, vm fvm.VM, snapshot snapshot.SnapshotTree) {
+
+						code := []byte(fmt.Sprintf(
+							`
+                               import EVM from %s
+                               import FlowToken from %s
+
+                               access(all)
+                               fun main(): UFix64 {
+                                   let bridgedAccount <- EVM.createBridgedAccount()
+                                   let vault <- bridgedAccount.withdraw(balance: EVM.Balance(flow: 0.0))
+                                   let balance = vault.balance
+                                   destroy bridgedAccount
+                                   destroy vault
+                                   return balance
                                }
                             `,
 							chain.ServiceAddress().HexWithPrefix(),

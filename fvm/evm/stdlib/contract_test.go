@@ -20,11 +20,16 @@ import (
 )
 
 type testContractHandler struct {
+	flowTokenAddress  common.Address
 	allocateAddress   func() types.Address
 	addressIndex      uint64
 	accountByAddress  func(types.Address, bool) types.Account
 	lastExecutedBlock func() *types.Block
 	run               func(tx []byte, coinbase types.Address)
+}
+
+func (t *testContractHandler) FlowTokenAddress() common.Address {
+	return t.flowTokenAddress
 }
 
 var _ types.ContractHandler = &testContractHandler{}
@@ -714,6 +719,7 @@ func TestBridgedAccountCall(t *testing.T) {
 	require.Equal(t, expected, actual)
 }
 
+// TODO: deposit non-zero amount
 func TestEVMAddressDeposit(t *testing.T) {
 
 	t.Parallel()
@@ -730,7 +736,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 				address: fromAddress,
 				deposit: func(vault *types.FLOWTokenVault) {
 					deposited = true
-					assert.Zero(t, vault.Balance())
+					assert.Equal(t, types.Balance(0), vault.Balance())
 				},
 			}
 		},
@@ -806,4 +812,102 @@ func TestEVMAddressDeposit(t *testing.T) {
 	require.NoError(t, err)
 
 	require.True(t, deposited)
+}
+
+func TestBridgedAccountWithdraw(t *testing.T) {
+
+	t.Parallel()
+
+	var withdrew bool
+
+	contractsAddress := flow.BytesToAddress([]byte{0x1})
+
+	handler := &testContractHandler{
+		flowTokenAddress: common.Address(contractsAddress),
+		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
+			assert.Equal(t, types.Address{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
+			assert.True(t, isAuthorized)
+
+			return &testFlowAccount{
+				address: fromAddress,
+				withdraw: func(balance types.Balance) *types.FLOWTokenVault {
+					assert.Equal(t, types.Balance(0), balance)
+					withdrew = true
+					return types.NewFlowTokenVault(balance)
+				},
+			}
+		},
+	}
+
+	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
+
+	stdlib.SetupEnvironment(env, handler, contractsAddress)
+
+	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+
+	script := []byte(`
+      import EVM from 0x1
+      import FlowToken from 0x1
+
+      access(all)
+      fun main(): UFix64 {
+          let bridgedAccount <- EVM.createBridgedAccount()
+          let vault <- bridgedAccount.withdraw(balance: EVM.Balance(flow: 0.0))
+          let balance = vault.balance
+          destroy bridgedAccount
+          destroy vault
+          return balance
+      }
+   `)
+
+	accountCodes := map[common.Location][]byte{}
+	var events []cadence.Event
+
+	runtimeInterface := &TestRuntimeInterface{
+		Storage: NewTestLedger(nil, nil),
+		OnGetSigningAccounts: func() ([]runtime.Address, error) {
+			return []runtime.Address{runtime.Address(contractsAddress)}, nil
+		},
+		OnResolveLocation: SingleIdentifierLocationResolver(t),
+		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+			accountCodes[location] = code
+			return nil
+		},
+		OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+			code = accountCodes[location]
+			return code, nil
+		},
+		OnEmitEvent: func(event cadence.Event) error {
+			events = append(events, event)
+			return nil
+		},
+		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+			return json.Decode(nil, b)
+		},
+	}
+
+	nextTransactionLocation := NewTransactionLocationGenerator()
+	nextScriptLocation := NewScriptLocationGenerator()
+
+	// Deploy contracts
+
+	deployContracts(t, rt, contractsAddress, runtimeInterface, env, nextTransactionLocation)
+
+	// Run script
+
+	result, err := rt.ExecuteScript(
+		runtime.Script{
+			Source: script,
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: env,
+			Location:    nextScriptLocation(),
+		},
+	)
+	require.NoError(t, err)
+
+	require.Equal(t, cadence.UFix64(0), result)
+
+	require.True(t, withdrew)
 }

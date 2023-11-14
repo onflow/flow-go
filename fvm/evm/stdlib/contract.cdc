@@ -70,11 +70,17 @@ contract EVM {
             self.address().deposit(from: <-from)
         }
 
+        /// Withdraws the balance from the bridged account's balance
+        access(all)
+        fun withdraw(balance: Balance): @FlowToken.Vault {
+            let vault <- InternalEVM.withdraw(
+                from: self.addressBytes,
+                amount: balance.flow
+            ) as! @FlowToken.Vault
+            return <-vault
+        }
+
         // TODO:
-        // /// Withdraws the balance from the bridged account's balance
-        // access(all)
-        // fun withdraw(balance: Balance): @FlowToken.Vault
-        //
         // /// Deploys a contract to the EVM environment.
         // /// Returns the address of the newly deployed contract
         // access(all)
