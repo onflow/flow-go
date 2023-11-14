@@ -1,8 +1,6 @@
 package evm
 
 import (
-	"fmt"
-
 	"github.com/onflow/cadence/runtime"
 
 	"github.com/onflow/flow-go/fvm/environment"
@@ -15,13 +13,7 @@ import (
 )
 
 func RootAccountAddress(chainID flow.ChainID) (flow.Address, error) {
-	// TODO handle other chains
-	switch chainID {
-	case flow.Emulator, flow.Testnet:
-		return chainID.Chain().AddressAtIndex(environment.EVMAccountIndex)
-	default:
-		return flow.Address{}, fmt.Errorf("unsupported chain %s", chainID)
-	}
+	return chainID.Chain().AddressAtIndex(environment.EVMAccountIndex)
 }
 
 func SetupEnvironment(
