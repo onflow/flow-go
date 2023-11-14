@@ -270,6 +270,7 @@ func defaultInspectorSuite(rpcTracker p2p.RpcControlTracking) p2p.GossipSubRpcIn
 			InspectorMetrics:        gossipSubMetrics,
 			RpcTracker:              rpcTracker,
 			NetworkingType:          networkType,
+			TopicOracle:             topicProvider,
 		}
 		rpcValidationInspector, err := validation.NewControlMsgValidationInspector(params)
 		if err != nil {
