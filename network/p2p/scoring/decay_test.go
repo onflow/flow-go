@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/scoring"
 )
@@ -240,8 +241,10 @@ func TestDefaultDecayFunction(t *testing.T) {
 			},
 		},
 	}
-
-	decayFunc := scoring.DefaultDecayFunction()
+	flowConfig, err := config.DefaultConfig()
+	assert.NoError(t, err)
+	scoringRegistryConfig := flowConfig.NetworkConfig.GossipSubConfig.GossipSubScoringRegistryConfig
+	decayFunc := scoring.DefaultDecayFunction(scoringRegistryConfig.SlowerDecayPenaltyThreshold, scoringRegistryConfig.DecayRateDecrement)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := decayFunc(tt.args.record, tt.args.lastUpdated)

@@ -2,6 +2,7 @@ package scoring
 
 import (
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -94,10 +95,8 @@ type GossipSubAppSpecificScoreRegistry struct {
 	spamScoreCache p2p.GossipSubSpamRecordCache
 	penalty        GossipSubCtrlMsgPenaltyValue
 	// initial application specific penalty record, used to initialize the penalty cache entry.
-	init                        SpamRecordInitFunc
-	validator                   p2p.SubscriptionValidator
-	slowerDecayPenaltyThreshold float64
-	decayRateDecrement          float64
+	init      SpamRecordInitFunc
+	validator p2p.SubscriptionValidator
 }
 
 // GossipSubAppSpecificScoreRegistryConfig is the configuration for the GossipSubAppSpecificScoreRegistry.
@@ -123,12 +122,6 @@ type GossipSubAppSpecificScoreRegistryConfig struct {
 	// CacheFactory is a factory function that returns a new GossipSubSpamRecordCache. It is used to initialize the spamScoreCache.
 	// The cache is used to store the application specific penalty of peers.
 	CacheFactory func() p2p.GossipSubSpamRecordCache
-
-	// SlowerDecayPenaltyThreshold defines the penalty level which the decay rate is reduced by `DecayRateDecrement` every time the penalty of a node falls below the threshold, thereby slowing down the decay process. This mechanism ensures that malicious nodes experience longer decay periods, while honest nodes benefit from quicker decay.
-	SlowerDecayPenaltyThreshold float64
-
-	// DecayRateDecrement defines the value by which the decay rate is decreased every time the penalty is below the SlowerDecayPenaltyThreshold. A reduced decay rate extends the time it takes for penalties to diminish.
-	DecayRateDecrement float64
 }
 
 // NewGossipSubAppSpecificScoreRegistry returns a new GossipSubAppSpecificScoreRegistry.
@@ -141,14 +134,12 @@ type GossipSubAppSpecificScoreRegistryConfig struct {
 //	a new GossipSubAppSpecificScoreRegistry.
 func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegistryConfig) *GossipSubAppSpecificScoreRegistry {
 	reg := &GossipSubAppSpecificScoreRegistry{
-		logger:                      config.Logger.With().Str("module", "app_score_registry").Logger(),
-		spamScoreCache:              config.CacheFactory(),
-		penalty:                     config.Penalty,
-		init:                        config.Init,
-		validator:                   config.Validator,
-		idProvider:                  config.IdProvider,
-		slowerDecayPenaltyThreshold: config.SlowerDecayPenaltyThreshold,
-		decayRateDecrement:          config.DecayRateDecrement,
+		logger:         config.Logger.With().Str("module", "app_score_registry").Logger(),
+		spamScoreCache: config.CacheFactory(),
+		penalty:        config.Penalty,
+		init:           config.Init,
+		validator:      config.Validator,
+		idProvider:     config.IdProvider,
 	}
 
 	return reg
@@ -305,25 +296,10 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 		Msg("applied misbehaviour penalty and updated application specific penalty")
 }
 
-// DefaultDecayAdjustmentFunc will adjust the decay for a spam record if the record penalty has reached the IncreaseDecayThreshold.
-func DefaultDecayAdjustmentFunc(increaseDecayThreshold float64, decayThresholdIncrementer float64) netcache.PreprocessorFunc {
-	return func(record p2p.GossipSubSpamRecord, lastUpdated time.Time) (p2p.GossipSubSpamRecord, error) {
-		if record.Penalty <= increaseDecayThreshold {
-			decay := record.Decay + decayThresholdIncrementer
-			if decay > MinSpamPenaltyDecaySpeed {
-				record.Decay = MinSpamPenaltyDecaySpeed
-			} else {
-				record.Decay = decay
-			}
-		}
-		return record, nil
-	}
-}
-
 // DefaultDecayFunction is the default decay function that is used to decay the application specific penalty of a peer.
 // It is used if no decay function is provided in the configuration.
 // It decays the application specific penalty of a peer if it is negative.
-func DefaultDecayFunction() netcache.PreprocessorFunc {
+func DefaultDecayFunction(slowerDecayPenaltyThreshold, decayRateDecrement float64) netcache.PreprocessorFunc {
 	return func(record p2p.GossipSubSpamRecord, lastUpdated time.Time) (p2p.GossipSubSpamRecord, error) {
 		if record.Penalty >= 0 {
 			// no need to decay the penalty if it is positive, the reason is currently the app specific penalty
@@ -335,6 +311,7 @@ func DefaultDecayFunction() netcache.PreprocessorFunc {
 		if record.Penalty > skipDecayThreshold {
 			// penalty is negative but greater than the threshold, we set it to 0.
 			record.Penalty = 0
+			record.CanAdjustDecay = true // everytime the penalty is decayed to zero, the decay factor is adjustable
 			return record, nil
 		}
 
@@ -344,19 +321,24 @@ func DefaultDecayFunction() netcache.PreprocessorFunc {
 			return record, fmt.Errorf("could not decay application specific penalty: %w", err)
 		}
 		record.Penalty = penalty
+
+		if record.Penalty <= slowerDecayPenaltyThreshold && record.CanAdjustDecay {
+			// reduces the decay speed flooring at MinimumSpamRecordDecaySpeed
+			record.Decay = math.Min(record.Decay+decayRateDecrement, MinSpamPenaltyDecaySpeed)
+			// decay factor won't be decayed till the next time the penalty decays to zero.
+			record.CanAdjustDecay = false
+		}
+
 		return record, nil
 	}
 }
 
-// InitAppScoreRecordStateFunc returns a func that will initialize the spam record state for a peer. The initial decay for the
-// spam record will be the MaximumSpamRecordDecaySpeed, this will allow nodes that occasionally misbehave recover swiftly.
+// InitAppScoreRecordState initializes the gossipsub spam record state for a peer.
 // Returns:
-//   - callback func that initializes and returns a spam record.
-func InitAppScoreRecordStateFunc() SpamRecordInitFunc {
-	return func() p2p.GossipSubSpamRecord {
-		return p2p.GossipSubSpamRecord{
-			Decay:   MaximumSpamRecordDecaySpeed,
-			Penalty: 0,
-		}
+//   - a gossipsub spam record with the default decay value and 0 penalty.
+func InitAppScoreRecordState() p2p.GossipSubSpamRecord {
+	return p2p.GossipSubSpamRecord{
+		Decay:   MaximumSpamRecordDecaySpeed,
+		Penalty: 0,
 	}
 }

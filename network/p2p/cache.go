@@ -82,4 +82,10 @@ type GossipSubSpamRecord struct {
 	Decay float64
 	// Penalty is the application specific Penalty of the peer.
 	Penalty float64
+	// CanAdjustDecay is a boolean that indicates whether the Decay factor of the peer can be adjusted.
+	// The decay can be adjusted once every time the Penalty is decayed to zero.
+	// This should be initialized to be true when the peer is added to the cache.
+	// The value should be set to false when the Decay factor is adjusted.
+	// The value should be reset to true when the Penalty is decayed to zero.
+	CanAdjustDecay bool
 }
