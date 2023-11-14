@@ -91,10 +91,10 @@ func newInternalEVMTypeRunFunction(
 
 			// Run
 
-			cb := types.Address(coinbase)
-			res := handler.Run(transaction, cb)
+			cb := types.NewAddressFromBytes(coinbase)
+			handler.Run(transaction, cb)
 
-			return interpreter.AsBoolValue(res)
+			return interpreter.Void
 		},
 	)
 }

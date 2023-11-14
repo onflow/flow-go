@@ -76,6 +76,7 @@ type BootstrapParams struct {
 	minimumStorageReservation        cadence.UFix64
 	storagePerFlow                   cadence.UFix64
 	restrictedAccountCreationEnabled cadence.Bool
+	setupEVMEnabled                  cadence.Bool
 
 	// versionFreezePeriod is the number of blocks in the future where the version
 	// changes are frozen. The Node version beacon manages the freeze period,
@@ -207,6 +208,13 @@ func WithStorageMBPerFLOW(ratio cadence.UFix64) BootstrapProcedureOption {
 func WithRestrictedAccountCreationEnabled(enabled cadence.Bool) BootstrapProcedureOption {
 	return func(bp *BootstrapProcedure) *BootstrapProcedure {
 		bp.restrictedAccountCreationEnabled = enabled
+		return bp
+	}
+}
+
+func WithSetupEVMEnabled(enabled cadence.Bool) BootstrapProcedureOption {
+	return func(bp *BootstrapProcedure) *BootstrapProcedure {
+		bp.setupEVMEnabled = enabled
 		return bp
 	}
 }
@@ -790,7 +798,7 @@ func (b *bootstrapExecutor) setupEVM(serviceAddress, flowTokenAddress flow.Addre
 		stdlib.ContractName,
 	)
 	txError, err := b.invokeMetaTransaction(
-		b.ctx,
+		NewContextFromParent(b.ctx, WithEVMEnabled(true)),
 		Transaction(tx, 0),
 	)
 	panicOnMetaInvokeErrf("failed to deploy EVM contract: %s", txError, err)
@@ -995,7 +1003,6 @@ func (b *bootstrapExecutor) invokeMetaTransaction(
 		WithAccountStorageLimit(false),
 		WithTransactionFeesEnabled(false),
 		WithAuthorizationChecksEnabled(false),
-		WithEVMEnabled(true),
 		WithSequenceNumberCheckAndIncrementEnabled(false),
 
 		// disable interaction and computation limits for bootstrapping

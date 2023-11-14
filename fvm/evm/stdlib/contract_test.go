@@ -24,7 +24,7 @@ type testContractHandler struct {
 	addressIndex      uint64
 	accountByAddress  func(types.Address, bool) types.Account
 	lastExecutedBlock func() *types.Block
-	run               func(tx []byte, coinbase types.Address) bool
+	run               func(tx []byte, coinbase types.Address)
 }
 
 var _ types.ContractHandler = &testContractHandler{}
@@ -53,11 +53,11 @@ func (t *testContractHandler) LastExecutedBlock() *types.Block {
 	return t.lastExecutedBlock()
 }
 
-func (t *testContractHandler) Run(tx []byte, coinbase types.Address) bool {
+func (t *testContractHandler) Run(tx []byte, coinbase types.Address) {
 	if t.run == nil {
 		panic("unexpected Run")
 	}
-	return t.run(tx, coinbase)
+	t.run(tx, coinbase)
 }
 
 type testFlowAccount struct {
@@ -421,7 +421,7 @@ func TestEVMRun(t *testing.T) {
 	runCalled := false
 
 	handler := &testContractHandler{
-		run: func(tx []byte, coinbase types.Address) bool {
+		run: func(tx []byte, coinbase types.Address) {
 			runCalled = true
 
 			assert.Equal(t, []byte{1, 2, 3}, tx)
@@ -432,7 +432,6 @@ func TestEVMRun(t *testing.T) {
 				coinbase,
 			)
 
-			return true
 		},
 	}
 
@@ -448,9 +447,9 @@ func TestEVMRun(t *testing.T) {
       import EVM from 0x1
 
       access(all)
-      fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): Bool {
+      fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]) {
           let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
-          return EVM.run(tx: tx, coinbase: coinbase)
+          EVM.run(tx: tx, coinbase: coinbase)
       }
     `)
 
@@ -489,7 +488,7 @@ func TestEVMRun(t *testing.T) {
 
 	// Run script
 
-	result, err := rt.ExecuteScript(
+	_, err = rt.ExecuteScript(
 		runtime.Script{
 			Source:    script,
 			Arguments: EncodeArgs([]cadence.Value{evmTx, coinbase}),
@@ -503,7 +502,6 @@ func TestEVMRun(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.True(t, runCalled)
-	assert.Equal(t, cadence.Bool(true), result)
 }
 
 func TestEVMCreateBridgedAccount(t *testing.T) {

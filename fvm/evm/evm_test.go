@@ -7,7 +7,6 @@ import (
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/json"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm"
@@ -24,60 +23,58 @@ func TestEVMRun(t *testing.T) {
 
 	t.Parallel()
 
-	RunWithTestBackend(t, func(backend types.Backend) {
-		RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
-			RunWithDeployedContract(t, backend, rootAddr, func(testContract *TestContract) {
-				RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *EOATestAccount) {
-					num := int64(12)
-					chain := flow.Emulator.Chain()
-					RunWithNewTestVM(t, chain, func(ctx fvm.Context, vm fvm.VM, snapshot snapshot.SnapshotTree) {
-						code := []byte(fmt.Sprintf(
-							`
-                              import EVM from %s
+	t.Run("testing EVM.run (happy case)", func(t *testing.T) {
+		RunWithTestBackend(t, func(backend types.Backend) {
+			RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+				RunWithDeployedContract(t, backend, rootAddr, func(testContract *TestContract) {
+					RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *EOATestAccount) {
+						num := int64(12)
+						chain := flow.Emulator.Chain()
 
-                              access(all)
-                              fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): Bool {
-                                  let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
-                                  return EVM.run(tx: tx, coinbase: coinbase)
-                              }
-                            `,
-							chain.ServiceAddress().HexWithPrefix(),
-						))
+						RunWithNewTestVM(t, chain, func(ctx fvm.Context, vm fvm.VM, snapshot snapshot.SnapshotTree) {
+							code := []byte(fmt.Sprintf(
+								`
+                          import EVM from %s
 
-						gasLimit := uint64(100_000)
+                          access(all)
+                          fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]) {
+                              let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+                              EVM.run(tx: tx, coinbase: coinbase)
+                          }
+                        `,
+								chain.ServiceAddress().HexWithPrefix(),
+							))
 
-						txBytes := testAccount.PrepareSignAndEncodeTx(t,
-							testContract.DeployedAt.ToCommon(),
-							testContract.MakeStoreCallData(t, big.NewInt(num)),
-							big.NewInt(0),
-							gasLimit,
-							big.NewInt(0),
-						)
+							gasLimit := uint64(100_000)
 
-						tx := cadence.NewArray(
-							ConvertToCadence(txBytes),
-						).WithType(stdlib.EVMTransactionBytesCadenceType)
+							txBytes := testAccount.PrepareSignAndEncodeTx(t,
+								testContract.DeployedAt.ToCommon(),
+								testContract.MakeStoreCallData(t, big.NewInt(num)),
+								big.NewInt(0),
+								gasLimit,
+								big.NewInt(0),
+							)
 
-						coinbase := cadence.NewArray(
-							ConvertToCadence(testAccount.Address().Bytes()),
-						).WithType(stdlib.EVMAddressBytesCadenceType)
+							tx := cadence.NewArray(
+								ConvertToCadence(txBytes),
+							).WithType(stdlib.EVMTransactionBytesCadenceType)
 
-						script := fvm.Script(code).WithArguments(
-							json.MustEncode(tx),
-							json.MustEncode(coinbase),
-						)
+							coinbase := cadence.NewArray(
+								ConvertToCadence(testAccount.Address().Bytes()),
+							).WithType(stdlib.EVMAddressBytesCadenceType)
 
-						executionSnapshot, output, err := vm.Run(
-							ctx,
-							script,
-							snapshot)
-						require.NoError(t, err)
-						require.NoError(t, output.Err)
-						assert.Equal(t, cadence.Bool(true), output.Value)
+							script := fvm.Script(code).WithArguments(
+								json.MustEncode(tx),
+								json.MustEncode(coinbase),
+							)
 
-						// TODO:
-						_ = executionSnapshot
-						// snapshot = snapshot.Append(executionSnapshot)
+							_, output, err := vm.Run(
+								ctx,
+								script,
+								snapshot)
+							require.NoError(t, err)
+							require.NoError(t, output.Err)
+						})
 					})
 				})
 			})
@@ -90,7 +87,6 @@ func RunWithNewTestVM(t *testing.T, chain flow.Chain, f func(fvm.Context, fvm.VM
 		fvm.WithChain(chain),
 		fvm.WithAuthorizationChecksEnabled(false),
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
-		fvm.WithEVMEnabled(true),
 	}
 	ctx := fvm.NewContext(opts...)
 
@@ -99,6 +95,7 @@ func RunWithNewTestVM(t *testing.T, chain flow.Chain, f func(fvm.Context, fvm.VM
 
 	baseBootstrapOpts := []fvm.BootstrapProcedureOption{
 		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
+		fvm.WithSetupEVMEnabled(true),
 	}
 
 	executionSnapshot, _, err := vm.Run(
@@ -109,7 +106,7 @@ func RunWithNewTestVM(t *testing.T, chain flow.Chain, f func(fvm.Context, fvm.VM
 
 	snapshotTree = snapshotTree.Append(executionSnapshot)
 
-	f(ctx, vm, snapshotTree)
+	f(fvm.NewContextFromParent(ctx, fvm.WithEVMEnabled(true)), vm, snapshotTree)
 }
 
 // TODO: test with actual amount
