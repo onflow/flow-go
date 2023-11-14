@@ -58,7 +58,7 @@ func (h *ContractHandler) AccountByAddress(addr types.Address, isAuthorized bool
 }
 
 // LastExecutedBlock returns the last executed block
-func (h ContractHandler) LastExecutedBlock() *types.Block {
+func (h *ContractHandler) LastExecutedBlock() *types.Block {
 	block, err := h.blockstore.LatestBlock()
 	handleError(err)
 	return block
@@ -66,7 +66,7 @@ func (h ContractHandler) LastExecutedBlock() *types.Block {
 
 // Run runs an rlpencoded evm transaction and
 // collects the gas fees and pay it to the coinbase address provided.
-func (h ContractHandler) Run(rlpEncodedTx []byte, coinbase types.Address) {
+func (h *ContractHandler) Run(rlpEncodedTx []byte, coinbase types.Address) {
 	// step 1 - transaction decoding
 	encodedLen := uint(len(rlpEncodedTx))
 	err := h.backend.MeterComputation(environment.ComputationKindRLPDecoding, encodedLen)
@@ -113,14 +113,14 @@ func (h ContractHandler) Run(rlpEncodedTx []byte, coinbase types.Address) {
 	handleError(err)
 }
 
-func (h ContractHandler) checkGasLimit(limit types.GasLimit) {
+func (h *ContractHandler) checkGasLimit(limit types.GasLimit) {
 	// check gas limit against what has been left on the transaction side
 	if !h.backend.ComputationAvailable(environment.ComputationKindEVMGasUsage, uint(limit)) {
 		handleError(types.ErrInsufficientComputation)
 	}
 }
 
-func (h ContractHandler) meterGasUsage(res *types.Result) {
+func (h *ContractHandler) meterGasUsage(res *types.Result) {
 	if res != nil {
 		err := h.backend.MeterComputation(environment.ComputationKindEVMGasUsage, uint(res.GasConsumed))
 		handleError(err)
