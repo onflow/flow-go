@@ -4,21 +4,20 @@ import (
 	cryptoRand "crypto/rand"
 	"math/big"
 	"math/rand"
+	"testing"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/evm/types"
 )
 
 type TestEmulator struct {
 	BalanceOfFunc      func(address types.Address) (*big.Int, error)
+	NonceOfFunc        func(address types.Address) (uint64, error)
 	CodeOfFunc         func(address types.Address) (types.Code, error)
-	MintToFunc         func(address types.Address, amount *big.Int) (*types.Result, error)
-	WithdrawFromFunc   func(address types.Address, amount *big.Int) (*types.Result, error)
-	TransferFunc       func(from types.Address, to types.Address, value *big.Int) (*types.Result, error)
-	DeployFunc         func(caller types.Address, code types.Code, gasLimit uint64, value *big.Int) (*types.Result, error)
-	CallFunc           func(caller types.Address, to types.Address, data types.Data, gasLimit uint64, value *big.Int) (*types.Result, error)
+	DirectCallFunc     func(call *types.DirectCall) (*types.Result, error)
 	RunTransactionFunc func(tx *gethTypes.Transaction) (*types.Result, error)
 }
 
@@ -42,6 +41,14 @@ func (em *TestEmulator) BalanceOf(address types.Address) (*big.Int, error) {
 	return em.BalanceOfFunc(address)
 }
 
+// NonceOfFunc returns the nonce for this address
+func (em *TestEmulator) NonceOf(address types.Address) (uint64, error) {
+	if em.NonceOfFunc == nil {
+		panic("method not set")
+	}
+	return em.NonceOfFunc(address)
+}
+
 // CodeOf returns the code for this address (if smart contract is deployed at this address)
 func (em *TestEmulator) CodeOf(address types.Address) (types.Code, error) {
 	if em.CodeOfFunc == nil {
@@ -50,44 +57,12 @@ func (em *TestEmulator) CodeOf(address types.Address) (types.Code, error) {
 	return em.CodeOfFunc(address)
 }
 
-// MintTo mints new tokens to this address
-func (em *TestEmulator) MintTo(address types.Address, amount *big.Int) (*types.Result, error) {
-	if em.MintToFunc == nil {
+// DirectCall executes a direct call
+func (em *TestEmulator) DirectCall(call *types.DirectCall) (*types.Result, error) {
+	if em.DirectCallFunc == nil {
 		panic("method not set")
 	}
-	return em.MintToFunc(address, amount)
-}
-
-// WithdrawFrom withdraws tokens from this address
-func (em *TestEmulator) WithdrawFrom(address types.Address, amount *big.Int) (*types.Result, error) {
-	if em.WithdrawFromFunc == nil {
-		panic("method not set")
-	}
-	return em.WithdrawFromFunc(address, amount)
-}
-
-// Transfer transfers token between addresses
-func (em *TestEmulator) Transfer(from types.Address, to types.Address, value *big.Int) (*types.Result, error) {
-	if em.TransferFunc == nil {
-		panic("method not set")
-	}
-	return em.TransferFunc(from, to, value)
-}
-
-// Deploy deploys an smart contract
-func (em *TestEmulator) Deploy(caller types.Address, code types.Code, gasLimit uint64, value *big.Int) (*types.Result, error) {
-	if em.DeployFunc == nil {
-		panic("method not set")
-	}
-	return em.DeployFunc(caller, code, gasLimit, value)
-}
-
-// Call makes a call to a smart contract
-func (em *TestEmulator) Call(caller types.Address, to types.Address, data types.Data, gasLimit uint64, value *big.Int) (*types.Result, error) {
-	if em.CallFunc == nil {
-		panic("method not set")
-	}
-	return em.CallFunc(caller, to, data, gasLimit, value)
+	return em.DirectCallFunc(call)
 }
 
 // RunTransaction runs a transaction and collect gas fees to the coinbase account
@@ -98,19 +73,21 @@ func (em *TestEmulator) RunTransaction(tx *gethTypes.Transaction) (*types.Result
 	return em.RunTransactionFunc(tx)
 }
 
-func RandomCommonHash() gethCommon.Hash {
+func RandomCommonHash(t testing.TB) gethCommon.Hash {
 	ret := gethCommon.Hash{}
-	cryptoRand.Read(ret[:gethCommon.HashLength])
+	_, err := cryptoRand.Read(ret[:gethCommon.HashLength])
+	require.NoError(t, err)
 	return ret
 }
 
-func RandomAddress() types.Address {
-	return types.NewAddress(RandomCommonAddress())
+func RandomAddress(t testing.TB) types.Address {
+	return types.NewAddress(RandomCommonAddress(t))
 }
 
-func RandomCommonAddress() gethCommon.Address {
+func RandomCommonAddress(t testing.TB) gethCommon.Address {
 	ret := gethCommon.Address{}
-	cryptoRand.Read(ret[:gethCommon.AddressLength])
+	_, err := cryptoRand.Read(ret[:gethCommon.AddressLength])
+	require.NoError(t, err)
 	return ret
 }
 
@@ -118,21 +95,22 @@ func RandomGas(limit int64) uint64 {
 	return uint64(rand.Int63n(limit) + 1)
 }
 
-func RandomData() []byte {
+func RandomData(t testing.TB) []byte {
 	// byte size [1, 100]
 	size := rand.Intn(100) + 1
 	ret := make([]byte, size)
-	cryptoRand.Read(ret[:])
+	_, err := cryptoRand.Read(ret[:])
+	require.NoError(t, err)
 	return ret
 }
 
-func GetRandomLogFixture() *gethTypes.Log {
+func GetRandomLogFixture(t testing.TB) *gethTypes.Log {
 	return &gethTypes.Log{
-		Address: RandomCommonAddress(),
+		Address: RandomCommonAddress(t),
 		Topics: []gethCommon.Hash{
-			RandomCommonHash(),
-			RandomCommonHash(),
+			RandomCommonHash(t),
+			RandomCommonHash(t),
 		},
-		Data: RandomData(),
+		Data: RandomData(t),
 	}
 }

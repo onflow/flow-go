@@ -8,9 +8,9 @@ import (
 
 // Config encapsulation of configuration structs for all components related to the Flow network.
 type Config struct {
-	UnicastConfig                 `mapstructure:",squash"`
-	p2pconf.ResourceManagerConfig `mapstructure:",squash"`
-	ConnectionManagerConfig       `mapstructure:",squash"`
+	UnicastConfig           `mapstructure:",squash"`
+	ResourceManager         p2pconf.ResourceManagerConfig `mapstructure:"libp2p-resource-manager"`
+	ConnectionManagerConfig `mapstructure:",squash"`
 	// GossipSubConfig core gossipsub configuration.
 	p2pconf.GossipSubConfig `mapstructure:",squash"`
 	AlspConfig              `mapstructure:",squash"`

@@ -1,8 +1,6 @@
 package evm
 
 import (
-	"fmt"
-
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 
@@ -16,13 +14,7 @@ import (
 )
 
 func RootAccountAddress(chainID flow.ChainID) (flow.Address, error) {
-	// TODO handle other chains
-	switch chainID {
-	case flow.Emulator:
-		return chainID.Chain().AddressAtIndex(environment.EVMAccountIndex)
-	default:
-		return flow.Address{}, fmt.Errorf("unsupported chain %s", chainID)
-	}
+	return chainID.Chain().AddressAtIndex(environment.EVMAccountIndex)
 }
 
 func SetupEnvironment(
@@ -50,7 +42,12 @@ func SetupEnvironment(
 		return err
 	}
 
-	contractHandler := handler.NewContractHandler(common.Address(flowToken), bs, backend, em)
+	aa, err := handler.NewAddressAllocator(backend, evmRootAddress)
+	if err != nil {
+		return err
+	}
+
+	contractHandler := handler.NewContractHandler(common.Address(flowToken), bs, aa, backend, em)
 
 	stdlib.SetupEnvironment(env, contractHandler, service)
 
