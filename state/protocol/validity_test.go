@@ -132,3 +132,107 @@ func TestBootstrapInvalidEpochCommit(t *testing.T) {
 		require.Error(t, err)
 	})
 }
+
+// TestIsValidExtendingEpochSetup tests that implementation enforces the following protocol rules in case they are violated:
+// (a) We should only have a single epoch setup event per epoch.
+// (b) The setup event should have the counter increased by one
+// (c) The first view needs to be exactly one greater than the current epoch final view
+// additionally we require other conditions, but they are tested by separate test `TestEpochSetupValidity`.
+func TestIsValidExtendingEpochSetup(t *testing.T) {
+	t.Run("happy path", func(t *testing.T) {
+		protocolState := unittest.ProtocolStateFixture()
+		currentEpochSetup := protocolState.CurrentEpochSetup
+		extendingSetup := unittest.EpochSetupFixture(
+			unittest.WithFirstView(currentEpochSetup.FinalView+1),
+			unittest.WithFinalView(currentEpochSetup.FinalView+1000),
+			unittest.SetupWithCounter(currentEpochSetup.Counter+1),
+			unittest.WithParticipants(participants.ToSkeleton()),
+		)
+		err := protocol.IsValidExtendingEpochSetup(extendingSetup, protocolState.ProtocolStateEntry, currentEpochSetup)
+		require.NoError(t, err)
+	})
+	t.Run("(a) We should only have a single epoch setup event per epoch.", func(t *testing.T) {
+		protocolState := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
+		currentEpochSetup := protocolState.CurrentEpochSetup
+		extendingSetup := unittest.EpochSetupFixture(
+			unittest.WithFirstView(currentEpochSetup.FinalView+1),
+			unittest.WithFinalView(currentEpochSetup.FinalView+1000),
+			unittest.SetupWithCounter(currentEpochSetup.Counter+1),
+			unittest.WithParticipants(participants.ToSkeleton()),
+		)
+		err := protocol.IsValidExtendingEpochSetup(extendingSetup, protocolState.ProtocolStateEntry, currentEpochSetup)
+		require.Error(t, err)
+	})
+	t.Run("(b) The setup event should have the counter increased by one", func(t *testing.T) {
+		protocolState := unittest.ProtocolStateFixture()
+		currentEpochSetup := protocolState.CurrentEpochSetup
+		extendingSetup := unittest.EpochSetupFixture(
+			unittest.WithFirstView(currentEpochSetup.FinalView+1),
+			unittest.WithFinalView(currentEpochSetup.FinalView+1000),
+			unittest.SetupWithCounter(currentEpochSetup.Counter+2),
+			unittest.WithParticipants(participants.ToSkeleton()),
+		)
+		err := protocol.IsValidExtendingEpochSetup(extendingSetup, protocolState.ProtocolStateEntry, currentEpochSetup)
+		require.Error(t, err)
+	})
+	t.Run("(c) The first view needs to be exactly one greater than the current epoch final view", func(t *testing.T) {
+		protocolState := unittest.ProtocolStateFixture()
+		currentEpochSetup := protocolState.CurrentEpochSetup
+		extendingSetup := unittest.EpochSetupFixture(
+			unittest.WithFirstView(currentEpochSetup.FinalView+2),
+			unittest.WithFinalView(currentEpochSetup.FinalView+1000),
+			unittest.SetupWithCounter(currentEpochSetup.Counter+1),
+			unittest.WithParticipants(participants.ToSkeleton()),
+		)
+		err := protocol.IsValidExtendingEpochSetup(extendingSetup, protocolState.ProtocolStateEntry, currentEpochSetup)
+		require.Error(t, err)
+	})
+}
+
+// TestIsValidExtendingEpochCommit tests that implementation enforces the following protocol rules in case they are violated:
+// (a) The epoch setup event needs to happen before the commit.
+// (b) We should only have a single epoch commit event per epoch.
+// additionally we require other conditions, but they are tested by separate test `TestEpochCommitValidity`.
+func TestIsValidExtendingEpochCommit(t *testing.T) {
+	t.Run("happy path", func(t *testing.T) {
+		protocolState := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.RichProtocolStateEntry) {
+			entry.NextEpochCommit = nil
+			entry.NextEpoch.CommitID = flow.ZeroID
+		})
+
+		nextEpochSetup := protocolState.NextEpochSetup
+		extendingSetup := unittest.EpochCommitFixture(
+			unittest.CommitWithCounter(nextEpochSetup.Counter),
+			unittest.WithDKGFromParticipants(nextEpochSetup.Participants),
+		)
+		err := protocol.IsValidExtendingEpochCommit(extendingSetup, protocolState.ProtocolStateEntry, nextEpochSetup)
+		require.NoError(t, err)
+	})
+	t.Run("(a) The epoch setup event needs to happen before the commit", func(t *testing.T) {
+		protocolState := unittest.ProtocolStateFixture()
+		currentEpochSetup := protocolState.CurrentEpochSetup
+		nextEpochSetup := unittest.EpochSetupFixture(
+			unittest.WithFirstView(currentEpochSetup.FinalView+1),
+			unittest.WithFinalView(currentEpochSetup.FinalView+1000),
+			unittest.SetupWithCounter(currentEpochSetup.Counter+1),
+			unittest.WithParticipants(participants.ToSkeleton()),
+		)
+		extendingSetup := unittest.EpochCommitFixture(
+			unittest.CommitWithCounter(nextEpochSetup.Counter),
+			unittest.WithDKGFromParticipants(nextEpochSetup.Participants),
+		)
+		err := protocol.IsValidExtendingEpochCommit(extendingSetup, protocolState.ProtocolStateEntry, nextEpochSetup)
+		require.Error(t, err)
+	})
+	t.Run("We should only have a single epoch commit event per epoch", func(t *testing.T) {
+		protocolState := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
+
+		nextEpochSetup := protocolState.NextEpochSetup
+		extendingSetup := unittest.EpochCommitFixture(
+			unittest.CommitWithCounter(nextEpochSetup.Counter),
+			unittest.WithDKGFromParticipants(nextEpochSetup.Participants),
+		)
+		err := protocol.IsValidExtendingEpochCommit(extendingSetup, protocolState.ProtocolStateEntry, nextEpochSetup)
+		require.Error(t, err)
+	})
+}
