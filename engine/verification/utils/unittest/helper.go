@@ -35,6 +35,7 @@ import (
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/protocol"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"github.com/onflow/flow-go/utils/logging"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -495,6 +496,10 @@ func withConsumers(t *testing.T,
 	// hold any guarantees.
 	root, err := s.State.Final().Head()
 	require.NoError(t, err)
+	protocolState, err := s.State.Final().ProtocolState()
+	require.NoError(t, err)
+	protocolStateID := protocolState.Entry().ID()
+
 	chainID := root.ChainID
 	ops = append(ops, WithExecutorIDs(
 		participants.Filter(filter.HasRole[flow.Identity](flow.RoleExecution)).NodeIDs()), func(builder *CompleteExecutionReceiptBuilder) {
@@ -506,7 +511,7 @@ func withConsumers(t *testing.T,
 	//  - root block (block[0]) is executed with sources[0] (included in QC of child block[1])
 	//  - block[i] is executed with sources[i] (included in QC of child block[i+1])
 	sources := unittest.RandomSourcesFixture(30)
-	completeERs := CompleteExecutionReceiptChainFixture(t, root, blockCount, sources, ops...)
+	completeERs := CompleteExecutionReceiptChainFixture(t, root, protocolStateID, blockCount, sources, ops...)
 	blocks := ExtendStateWithFinalizedBlocks(t, completeERs, s.State)
 
 	// chunk assignment
@@ -648,7 +653,15 @@ func bootstrapSystem(
 		bootstrapNodesInfo = append(bootstrapNodesInfo, verID)
 		identities = append(identities, verID.Identity())
 
-		epochBuilder := unittest.NewEpochBuilder(t, stateFixture.State)
+		mutableProtocolState := protocol_state.NewMutableProtocolState(
+			stateFixture.Storage.ProtocolState,
+			stateFixture.State.Params(),
+			stateFixture.Storage.Headers,
+			stateFixture.Storage.Results,
+			stateFixture.Storage.Setups,
+			stateFixture.Storage.EpochCommits,
+		)
+		epochBuilder := unittest.NewEpochBuilder(t, mutableProtocolState, stateFixture.State)
 		epochBuilder.
 			UsingSetupOpts(unittest.WithParticipants(identities.ToSkeleton())).
 			BuildEpoch()

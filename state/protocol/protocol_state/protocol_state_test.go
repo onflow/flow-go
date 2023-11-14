@@ -27,7 +27,7 @@ func TestProtocolState_AtBlockID(t *testing.T) {
 
 	globalParams := mock.NewGlobalParams(t)
 	protocolState := NewProtocolState(protocolStateDB, globalParams)
-	t.Run("exists", func(t *testing.T) {
+	t.Run("retrieve state for existing blocks", func(t *testing.T) {
 		dynamicProtocolState, err := protocolState.AtBlockID(blockID)
 		require.NoError(t, err)
 
@@ -37,23 +37,58 @@ func TestProtocolState_AtBlockID(t *testing.T) {
 		require.NoError(t, err)
 		require.NotEqual(t, dynamicProtocolState.Identities(), other.Identities())
 	})
-	t.Run("not-exists", func(t *testing.T) {
+	t.Run("retrieve state for non-existing block yields storage.ErrNotFound error", func(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 		protocolStateDB.On("ByBlockID", blockID).Return(nil, storage.ErrNotFound).Once()
 		_, err := protocolState.AtBlockID(blockID)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 	})
-	t.Run("exception", func(t *testing.T) {
+	t.Run("exception during retrieve is propagated", func(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 		exception := errors.New("exception")
 		protocolStateDB.On("ByBlockID", blockID).Return(nil, exception).Once()
 		_, err := protocolState.AtBlockID(blockID)
 		require.ErrorIs(t, err, exception)
 	})
-	t.Run("global-params", func(t *testing.T) {
+	t.Run("retrieve global-params", func(t *testing.T) {
 		expectedChainID := flow.Testnet
 		globalParams.On("ChainID").Return(expectedChainID, nil).Once()
 		actualChainID := protocolState.GlobalParams().ChainID()
 		assert.Equal(t, expectedChainID, actualChainID)
+	})
+}
+
+// TestMutableProtocolState_Mutator tests happy path of creating a state mutator, and that `Mutator` returns an error
+// if the parent protocol state has not been found.
+func TestMutableProtocolState_Mutator(t *testing.T) {
+	protocolStateDB := storagemock.NewProtocolState(t)
+	globalParams := mock.NewGlobalParams(t)
+	headersDB := storagemock.NewHeaders(t)
+	resultsDB := storagemock.NewExecutionResults(t)
+	setupsDB := storagemock.NewEpochSetups(t)
+	commitsDB := storagemock.NewEpochCommits(t)
+
+	mutableState := NewMutableProtocolState(
+		protocolStateDB,
+		globalParams,
+		headersDB,
+		resultsDB,
+		setupsDB,
+		commitsDB)
+
+	t.Run("happy-path", func(t *testing.T) {
+		parentState := unittest.ProtocolStateFixture()
+		candidate := unittest.BlockHeaderFixture()
+		protocolStateDB.On("ByBlockID", candidate.ParentID).Return(parentState, nil)
+		mutator, err := mutableState.Mutator(candidate.View, candidate.ParentID)
+		require.NoError(t, err)
+		require.NotNil(t, mutator)
+	})
+	t.Run("parent-not-found", func(t *testing.T) {
+		candidate := unittest.BlockHeaderFixture()
+		protocolStateDB.On("ByBlockID", candidate.ParentID).Return(nil, storage.ErrNotFound)
+		mutator, err := mutableState.Mutator(candidate.View, candidate.ParentID)
+		require.ErrorIs(t, err, storage.ErrNotFound)
+		require.Nil(t, mutator)
 	})
 }

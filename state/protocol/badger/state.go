@@ -1,5 +1,3 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package badger
 
 import (
@@ -39,8 +37,9 @@ type State struct {
 		setups  storage.EpochSetups
 		commits storage.EpochCommits
 	}
+	globalParams             protocol.GlobalParams
 	protocolStateSnapshotsDB storage.ProtocolState
-	protocolState            protocol.ProtocolState
+	protocolState            protocol.MutableProtocolState
 	versionBeacons           storage.VersionBeacons
 
 	// rootHeight marks the cutoff of the history this node knows about. We cache it in the state
@@ -110,7 +109,6 @@ func Bootstrap(
 		return nil, fmt.Errorf("expected empty database")
 	}
 
-	protocolState := protocol_state.NewProtocolState(protocolStateSnapshotsDB, root.Params())
 	state := newState(
 		metrics,
 		db,
@@ -122,8 +120,8 @@ func Bootstrap(
 		setups,
 		commits,
 		protocolStateSnapshotsDB,
-		protocolState,
 		versionBeacons,
+		root.Params(),
 	)
 
 	if err := IsValidRootSnapshot(root, !config.SkipNetworkAddressValidation); err != nil {
@@ -467,10 +465,10 @@ func (state *State) bootstrapEpoch(epochs protocol.EpochQuery, verifyNetworkAddr
 				return fmt.Errorf("could not get previous epoch commit event: %w", err)
 			}
 
-			if err := verifyEpochSetup(setup, verifyNetworkAddress); err != nil {
+			if err := protocol.IsValidEpochSetup(setup, verifyNetworkAddress); err != nil {
 				return fmt.Errorf("invalid setup: %w", err)
 			}
-			if err := isValidEpochCommit(commit, setup); err != nil {
+			if err := protocol.IsValidEpochCommit(commit, setup); err != nil {
 				return fmt.Errorf("invalid commit: %w", err)
 			}
 
@@ -497,10 +495,10 @@ func (state *State) bootstrapEpoch(epochs protocol.EpochQuery, verifyNetworkAddr
 			return fmt.Errorf("could not get current epoch commit event: %w", err)
 		}
 
-		if err := verifyEpochSetup(setup, verifyNetworkAddress); err != nil {
+		if err := protocol.IsValidEpochSetup(setup, verifyNetworkAddress); err != nil {
 			return fmt.Errorf("invalid setup: %w", err)
 		}
-		if err := isValidEpochCommit(commit, setup); err != nil {
+		if err := protocol.IsValidEpochCommit(commit, setup); err != nil {
 			return fmt.Errorf("invalid commit: %w", err)
 		}
 
@@ -523,7 +521,7 @@ func (state *State) bootstrapEpoch(epochs protocol.EpochQuery, verifyNetworkAddr
 				return fmt.Errorf("could not get next epoch setup event: %w", err)
 			}
 
-			if err := verifyEpochSetup(setup, verifyNetworkAddress); err != nil {
+			if err := protocol.IsValidEpochSetup(setup, verifyNetworkAddress); err != nil {
 				return fmt.Errorf("invalid setup: %w", err)
 			}
 
@@ -534,7 +532,7 @@ func (state *State) bootstrapEpoch(epochs protocol.EpochQuery, verifyNetworkAddr
 				return fmt.Errorf("could not get next epoch commit event: %w", err)
 			}
 			if err == nil {
-				if err := isValidEpochCommit(commit, setup); err != nil {
+				if err := protocol.IsValidEpochCommit(commit, setup); err != nil {
 					return fmt.Errorf("invalid commit")
 				}
 				commits = append(commits, commit)
@@ -648,7 +646,6 @@ func OpenState(
 	if err != nil {
 		return nil, fmt.Errorf("could not read global params")
 	}
-	protocolStateReader := protocol_state.NewProtocolState(protocolState, globalParams)
 	state := newState(
 		metrics,
 		db,
@@ -660,8 +657,8 @@ func OpenState(
 		setups,
 		commits,
 		protocolState,
-		protocolStateReader,
 		versionBeacons,
+		globalParams,
 	) // populate the protocol state cache
 	err = state.populateCache()
 	if err != nil {
@@ -693,7 +690,7 @@ func OpenState(
 
 func (state *State) Params() protocol.Params {
 	return Params{
-		GlobalParams:   state.protocolState.GlobalParams(),
+		GlobalParams:   state.globalParams,
 		InstanceParams: &InstanceParams{state: state},
 	}
 }
@@ -769,11 +766,11 @@ func newState(
 	qcs storage.QuorumCertificates,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
-	protocolState storage.ProtocolState,
-	protocolStateReader protocol.ProtocolState,
+	protocolStateSnapshots storage.ProtocolState,
 	versionBeacons storage.VersionBeacons,
+	globalParams protocol.GlobalParams,
 ) *State {
-	return &State{
+	state := &State{
 		metrics: metrics,
 		db:      db,
 		headers: headers,
@@ -788,12 +785,22 @@ func newState(
 			setups:  setups,
 			commits: commits,
 		},
-		protocolStateSnapshotsDB: protocolState,
-		protocolState:            protocolStateReader,
-		versionBeacons:           versionBeacons,
-		cachedFinal:              new(atomic.Pointer[cachedHeader]),
-		cachedSealed:             new(atomic.Pointer[cachedHeader]),
+		globalParams:             globalParams,
+		protocolStateSnapshotsDB: protocolStateSnapshots,
+		protocolState: protocol_state.NewMutableProtocolState(
+			protocolStateSnapshots,
+			globalParams,
+			headers,
+			results,
+			setups,
+			commits,
+		),
+		versionBeacons: versionBeacons,
+		cachedFinal:    new(atomic.Pointer[cachedHeader]),
+		cachedSealed:   new(atomic.Pointer[cachedHeader]),
 	}
+
+	return state
 }
 
 // IsBootstrapped returns whether the database contains a bootstrapped state

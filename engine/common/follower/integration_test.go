@@ -86,6 +86,9 @@ func TestFollowerHappyPath(t *testing.T) {
 		require.NoError(t, err)
 		rootQC, err := rootSnapshot.QuorumCertificate()
 		require.NoError(t, err)
+		rootProtocolState, err := rootSnapshot.ProtocolState()
+		require.NoError(t, err)
+		rootProtocolStateID := rootProtocolState.Entry().ID()
 
 		// Hack EECC.
 		// Since root snapshot is created with 1000 views for first epoch, we will forcefully enter EECC to avoid errors
@@ -163,6 +166,7 @@ func TestFollowerHappyPath(t *testing.T) {
 		// ensure sequential block views - that way we can easily know which block will be finalized after the test
 		for i, block := range flowBlocks {
 			block.Header.View = block.Header.Height
+			block.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 			if i > 0 {
 				block.Header.ParentView = flowBlocks[i-1].Header.View
 				block.Header.ParentID = flowBlocks[i-1].Header.ID()

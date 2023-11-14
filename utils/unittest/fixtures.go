@@ -203,6 +203,7 @@ func FullBlockFixture() flow.Block {
 		ExecutionReceiptFixture(WithResult(payload.Results[0])).Meta(),
 		ExecutionReceiptFixture(WithResult(payload.Results[1])).Meta(),
 	}
+	payload.ProtocolStateID = IdentifierFixture()
 
 	header := block.Header
 	header.PayloadHash = payload.Hash()
@@ -285,6 +286,7 @@ func WithAllTheFixins(payload *flow.Payload) {
 		payload.Receipts = flow.ExecutionReceiptMetaList{receipt.Meta()}
 		payload.Results = flow.ExecutionResultList{&receipt.ExecutionResult}
 	}
+	payload.ProtocolStateID = IdentifierFixture()
 }
 
 func WithSeals(seals ...*flow.Seal) func(*flow.Payload) {
@@ -305,6 +307,12 @@ func WithReceipts(receipts ...*flow.ExecutionReceipt) func(*flow.Payload) {
 			payload.Receipts = append(payload.Receipts, receipt.Meta())
 			payload.Results = append(payload.Results, &receipt.ExecutionResult)
 		}
+	}
+}
+
+func WithProtocolStateID(stateID flow.Identifier) func(payload *flow.Payload) {
+	return func(payload *flow.Payload) {
+		payload.ProtocolStateID = stateID
 	}
 }
 
@@ -329,6 +337,16 @@ func WithExecutionResults(results ...*flow.ExecutionResult) func(*flow.Payload) 
 func BlockWithParentFixture(parent *flow.Header) *flow.Block {
 	payload := PayloadFixture()
 	header := BlockHeaderWithParentFixture(parent)
+	header.PayloadHash = payload.Hash()
+	return &flow.Block{
+		Header:  header,
+		Payload: &payload,
+	}
+}
+
+func BlockWithParentProtocolState(parent *flow.Block) *flow.Block {
+	payload := PayloadFixture(WithProtocolStateID(parent.Payload.ProtocolStateID))
+	header := BlockHeaderWithParentFixture(parent.Header)
 	header.PayloadHash = payload.Hash()
 	return &flow.Block{
 		Header:  header,
@@ -2166,7 +2184,9 @@ func BootstrapFixtureWithChainID(
 		WithDKGFromParticipants(participants.ToSkeleton()),
 	)
 
+	root.SetPayload(flow.Payload{ProtocolStateID: inmem.ProtocolStateFromEpochServiceEvents(setup, commit).ID()})
 	stateCommit := GenesisStateCommitmentByChainID(chainID)
+
 	result := BootstrapExecutionResultFixture(root, stateCommit)
 	result.ServiceEvents = []flow.ServiceEvent{
 		setup.ServiceEvent(),
@@ -2637,7 +2657,7 @@ func ProtocolStateFixture(options ...func(*flow.RichProtocolStateEntry)) *flow.R
 		setup.Counter = prevEpochSetup.Counter + 1
 		// reuse same participant for current epoch
 		sameParticipant := *prevEpochSetup.Participants[1]
-		setup.Participants[1] = &sameParticipant
+		setup.Participants = append(setup.Participants, &sameParticipant)
 		setup.Participants = setup.Participants.Sort(order.Canonical[flow.IdentitySkeleton])
 	})
 	currentEpochCommit := EpochCommitFixture(func(commit *flow.EpochCommit) {

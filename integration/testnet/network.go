@@ -1090,25 +1090,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	participants := bootstrap.ToIdentityList(stakedNodeInfos)
 
 	// generate root block
-	root := run.GenerateRootBlock(chainID, parentID, height, timestamp)
-
-	// generate QC
-	signerData, err := run.GenerateQCParticipantData(consensusNodes, consensusNodes, dkg)
-	if err != nil {
-		return nil, err
-	}
-	votes, err := run.GenerateRootBlockVotes(root, signerData)
-	if err != nil {
-		return nil, err
-	}
-	qc, invalidVotesErr, err := run.GenerateRootQC(root, votes, signerData, signerData.Identities())
-	if err != nil {
-		return nil, err
-	}
-
-	if len(invalidVotesErr) > 0 {
-		return nil, fmt.Errorf("has invalid votes: %v", invalidVotesErr)
-	}
+	rootHeader := run.GenerateRootHeader(chainID, parentID, height, timestamp)
 
 	// generate root blocks for each collector cluster
 	clusterRootBlocks, clusterAssignments, clusterQCs, err := setupClusterGenesisBlockQCs(networkConf.NClusters, epochCounter, stakedConfs)
@@ -1138,16 +1120,16 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		return nil, err
 	}
 
-	dkgOffsetView := root.Header.View + networkConf.ViewsInStakingAuction - 1
+	dkgOffsetView := rootHeader.View + networkConf.ViewsInStakingAuction - 1
 
 	// generate epoch service events
 	epochSetup := &flow.EpochSetup{
 		Counter:            epochCounter,
-		FirstView:          root.Header.View,
+		FirstView:          rootHeader.View,
 		DKGPhase1FinalView: dkgOffsetView + networkConf.ViewsInDKGPhase,
 		DKGPhase2FinalView: dkgOffsetView + networkConf.ViewsInDKGPhase*2,
 		DKGPhase3FinalView: dkgOffsetView + networkConf.ViewsInDKGPhase*3,
-		FinalView:          root.Header.View + networkConf.ViewsInEpoch - 1,
+		FinalView:          rootHeader.View + networkConf.ViewsInEpoch - 1,
 		Participants:       participants.ToSkeleton(),
 		Assignments:        clusterAssignments,
 		RandomSource:       randomSource,
@@ -1159,6 +1141,11 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		DKGGroupKey:        dkg.PubGroupKey,
 		DKGParticipantKeys: dkg.PubKeyShares,
 	}
+	root := &flow.Block{
+		Header: rootHeader,
+	}
+	root.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(
+		inmem.ProtocolStateFromEpochServiceEvents(epochSetup, epochCommit).ID())))
 
 	cdcRandomSource, err := cadence.NewString(hex.EncodeToString(randomSource))
 	if err != nil {
@@ -1201,6 +1188,24 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	seal, err := run.GenerateRootSeal(result)
 	if err != nil {
 		return nil, fmt.Errorf("generating root seal failed: %w", err)
+	}
+
+	// generate QC
+	signerData, err := run.GenerateQCParticipantData(consensusNodes, consensusNodes, dkg)
+	if err != nil {
+		return nil, err
+	}
+	votes, err := run.GenerateRootBlockVotes(root, signerData)
+	if err != nil {
+		return nil, err
+	}
+	qc, invalidVotesErr, err := run.GenerateRootQC(root, votes, signerData, signerData.Identities())
+	if err != nil {
+		return nil, err
+	}
+
+	if len(invalidVotesErr) > 0 {
+		return nil, fmt.Errorf("has invalid votes: %v", invalidVotesErr)
 	}
 
 	snapshot, err := inmem.SnapshotFromBootstrapStateWithParams(root, result, seal, qc, flow.DefaultProtocolVersion, networkConf.EpochCommitSafetyThreshold)

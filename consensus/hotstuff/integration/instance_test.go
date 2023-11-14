@@ -189,8 +189,8 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	in.committee.On("TimeoutThresholdForView", mock.Anything).Return(committees.WeightThresholdToTimeout(in.participants.ToSkeleton().TotalWeight()), nil)
 
 	// program the builder module behaviour
-	in.builder.On("BuildOn", mock.Anything, mock.Anything).Return(
-		func(parentID flow.Identifier, setter func(*flow.Header) error) *flow.Header {
+	in.builder.On("BuildOn", mock.Anything, mock.Anything, mock.Anything).Return(
+		func(parentID flow.Identifier, setter func(*flow.Header) error, sign func(*flow.Header) error) *flow.Header {
 			in.updatingBlocks.Lock()
 			defer in.updatingBlocks.Unlock()
 
@@ -207,10 +207,11 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 				Timestamp:   time.Now().UTC(),
 			}
 			require.NoError(t, setter(header))
+			require.NoError(t, sign(header))
 			in.headers[header.ID()] = header
 			return header
 		},
-		func(parentID flow.Identifier, setter func(*flow.Header) error) error {
+		func(parentID flow.Identifier, _ func(*flow.Header) error, _ func(*flow.Header) error) error {
 			in.updatingBlocks.RLock()
 			_, ok := in.headers[parentID]
 			in.updatingBlocks.RUnlock()

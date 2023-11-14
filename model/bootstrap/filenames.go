@@ -24,6 +24,7 @@ var (
 	FileNamePartnerWeights    = "partner-weights.json"
 
 	PathRootBlockData             = filepath.Join(DirnamePublicBootstrap, "root-block.json")
+	PathRootEpoch                 = filepath.Join(DirnamePublicBootstrap, "root-epoch.json")
 	PathRootProtocolStateSnapshot = filepath.Join(DirnamePublicBootstrap, "root-protocol-state-snapshot.json")
 
 	FilenameWALRootCheckpoint = "root.checkpoint"

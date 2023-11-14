@@ -6,15 +6,22 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd"
+	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/order"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 )
 
 var (
-	flagRootChain     string
-	flagRootParent    string
-	flagRootHeight    uint64
-	flagRootTimestamp string
+	flagRootChain                string
+	flagRootParent               string
+	flagRootHeight               uint64
+	flagRootTimestamp            string
+	flagEpochCounter             uint64
+	flagNumViewsInEpoch          uint64
+	flagNumViewsInStakingAuction uint64
+	flagNumViewsInDKGPhase       uint64
 )
 
 // rootBlockCmd represents the rootBlock command
@@ -47,6 +54,17 @@ func addRootBlockCmdFlags() {
 	cmd.MarkFlagRequired(rootBlockCmd, "internal-priv-dir")
 	cmd.MarkFlagRequired(rootBlockCmd, "partner-dir")
 	cmd.MarkFlagRequired(rootBlockCmd, "partner-weights")
+
+	// required parameters for generation of epoch setup and commit events
+	rootBlockCmd.Flags().Uint64Var(&flagEpochCounter, "epoch-counter", 0, "epoch counter for the epoch beginning with the root block")
+	rootBlockCmd.Flags().Uint64Var(&flagNumViewsInEpoch, "epoch-length", 4000, "length of each epoch measured in views")
+	rootBlockCmd.Flags().Uint64Var(&flagNumViewsInStakingAuction, "epoch-staking-phase-length", 100, "length of the epoch staking phase measured in views")
+	rootBlockCmd.Flags().Uint64Var(&flagNumViewsInDKGPhase, "epoch-dkg-phase-length", 1000, "length of each DKG phase measured in views")
+
+	cmd.MarkFlagRequired(rootBlockCmd, "epoch-counter")
+	cmd.MarkFlagRequired(rootBlockCmd, "epoch-length")
+	cmd.MarkFlagRequired(rootBlockCmd, "epoch-staking-phase-length")
+	cmd.MarkFlagRequired(rootBlockCmd, "epoch-dkg-phase-length")
 
 	// required parameters for generation of root block, root execution result and root block seal
 	rootBlockCmd.Flags().StringVar(&flagRootChain, "root-chain", "local", "chain ID for the root block (can be 'main', 'test', 'sandbox', 'bench', or 'local'")
@@ -92,8 +110,40 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	dkgData := runBeaconKG(model.FilterByRole(stakingNodes, flow.RoleConsensus))
 	log.Info().Msg("")
 
+	// create flow.IdentityList representation of the participant set
+	participants := model.ToIdentityList(stakingNodes).Sort(order.Canonical[flow.Identity])
+
+	log.Info().Msg("computing collection node clusters")
+	assignments, clusters, err := constructClusterAssignment(partnerNodes, internalNodes)
+	if err != nil {
+		log.Fatal().Err(err).Msg("unable to generate cluster assignment")
+	}
+	log.Info().Msg("")
+
+	log.Info().Msg("constructing root blocks for collection node clusters")
+	clusterBlocks := run.GenerateRootClusterBlocks(flagEpochCounter, clusters)
+	log.Info().Msg("")
+
+	log.Info().Msg("constructing root QCs for collection node clusters")
+	clusterQCs := constructRootQCsForClusters(clusters, internalNodes, clusterBlocks)
+	log.Info().Msg("")
+
+	log.Info().Msg("constructing root header")
+	header := constructRootHeader(flagRootChain, flagRootParent, flagRootHeight, flagRootTimestamp)
+	log.Info().Msg("")
+
+	log.Info().Msg("constructing epoch events")
+	epochSetup, epochCommit := constructRootEpochEvents(header.View, participants, assignments, clusterQCs, dkgData)
+	committedEpoch := inmem.NewCommittedEpoch(epochSetup, epochCommit)
+	encodableEpoch, err := inmem.FromEpoch(committedEpoch)
+	if err != nil {
+		log.Fatal().Msg("could not convert root epoch to encodable")
+	}
+	writeJSON(model.PathRootEpoch, encodableEpoch.Encodable())
+	log.Info().Msg("")
+
 	log.Info().Msg("constructing root block")
-	block := constructRootBlock(flagRootChain, flagRootParent, flagRootHeight, flagRootTimestamp)
+	block := constructRootBlock(header, epochSetup, epochCommit)
 	writeJSON(model.PathRootBlockData, block)
 	log.Info().Msg("")
 

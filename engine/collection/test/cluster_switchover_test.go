@@ -25,6 +25,7 @@ import (
 	bcluster "github.com/onflow/flow-go/state/cluster/badger"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -98,6 +99,7 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 	commit.ClusterQCs = rootClusterQCs
 
 	seal.ResultID = result.ID()
+	root.Payload.ProtocolStateID = inmem.ProtocolStateFromEpochServiceEvents(setup, commit).ID()
 	tc.root, err = inmem.SnapshotFromBootstrapState(root, result, seal, qc)
 	require.NoError(t, err)
 
@@ -130,9 +132,26 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 	for _, node := range tc.nodes {
 		states = append(states, node.State)
 	}
+
+	// take first collection node and use its storage as data source for stateMutator
+	refNode := tc.nodes[0]
+	stateMutator := protocol_state.NewMutableProtocolState(
+		refNode.ProtocolStateSnapshots,
+		refNode.State.Params(),
+		refNode.Headers,
+		refNode.Results,
+		refNode.Setups,
+		refNode.EpochCommits,
+	)
+
 	// when building new epoch we would like to replace fixture cluster QCs with real ones, for that we need
 	// to generate them using node infos
-	tc.builder = unittest.NewEpochBuilder(tc.T(), states...).UsingCommitOpts(func(commit *flow.EpochCommit) {
+	tc.builder = unittest.NewEpochBuilder(tc.T(), stateMutator, states...).UsingCommitOpts(func(commit *flow.EpochCommit) {
+		// build a lookup table for node infos
+		nodeInfoLookup := make(map[flow.Identifier]model.NodeInfo)
+		for _, nodeInfo := range tc.nodeInfos {
+			nodeInfoLookup[nodeInfo.NodeID] = nodeInfo
+		}
 
 		// replace cluster QCs, with real data
 		for i, clusterQC := range commit.ClusterQCs {

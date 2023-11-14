@@ -20,11 +20,14 @@ import (
 func AddVersionBeacon(t *testing.T, beacon *flow.VersionBeacon, state protocol.FollowerState) {
 
 	final, err := state.Final().Head()
-
 	require.NoError(t, err)
 
+	protocolState, err := state.Final().ProtocolState()
+	require.NoError(t, err)
+	protocolStateID := protocolState.Entry().ID()
+
 	A := BlockWithParentFixture(final)
-	A.SetPayload(flow.Payload{})
+	A.SetPayload(PayloadFixture(WithProtocolStateID(protocolStateID)))
 	addToState(t, state, A, true)
 
 	receiptA := ReceiptForBlockFixture(A)
@@ -32,8 +35,9 @@ func AddVersionBeacon(t *testing.T, beacon *flow.VersionBeacon, state protocol.F
 
 	B := BlockWithParentFixture(A.Header)
 	B.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceiptMeta{receiptA.Meta()},
-		Results:  []*flow.ExecutionResult{&receiptA.ExecutionResult},
+		Receipts:        []*flow.ExecutionReceiptMeta{receiptA.Meta()},
+		Results:         []*flow.ExecutionResult{&receiptA.ExecutionResult},
+		ProtocolStateID: protocolStateID,
 	})
 	addToState(t, state, B, true)
 
@@ -43,7 +47,8 @@ func AddVersionBeacon(t *testing.T, beacon *flow.VersionBeacon, state protocol.F
 
 	C := BlockWithParentFixture(B.Header)
 	C.SetPayload(flow.Payload{
-		Seals: sealsForB,
+		Seals:           sealsForB,
+		ProtocolStateID: protocolStateID,
 	})
 	addToState(t, state, C, true)
 }
