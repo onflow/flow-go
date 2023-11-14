@@ -99,7 +99,7 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 	commit.ClusterQCs = rootClusterQCs
 
 	seal.ResultID = result.ID()
-	root.Payload.ProtocolStateID = inmem.ProtocolStateForBootstrapState(setup, commit).ID()
+	root.Payload.ProtocolStateID = inmem.ProtocolStateFromEpochServiceEvents(setup, commit).ID()
 	tc.root, err = inmem.SnapshotFromBootstrapState(root, result, seal, qc)
 	require.NoError(t, err)
 

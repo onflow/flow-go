@@ -19,7 +19,7 @@ type scriptData struct {
 }
 
 type ExecuteScriptCommand struct {
-	scriptExecutor *execution.Scripts
+	scriptExecutor execution.ScriptExecutor
 }
 
 func (e *ExecuteScriptCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
@@ -91,7 +91,7 @@ func (e *ExecuteScriptCommand) Validator(req *admin.CommandRequest) error {
 	return nil
 }
 
-func NewExecuteScriptCommand(scripts *execution.Scripts) commands.AdminCommand {
+func NewExecuteScriptCommand(scripts execution.ScriptExecutor) commands.AdminCommand {
 	return &ExecuteScriptCommand{
 		scripts,
 	}

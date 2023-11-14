@@ -51,11 +51,11 @@ type ProtocolStateMachine interface {
 	// No errors are expected during normal operations.
 	TransitionToNextEpoch() error
 
-	// View returns the view that is associated with this state ProtocolStateMachine.
+	// View returns the view that is associated with this ProtocolStateMachine.
 	// The view of the ProtocolStateMachine equals the view of the block carrying the respective updates.
 	View() uint64
 
-	// ParentState returns parent protocol state that is associated with this state ProtocolStateMachine.
+	// ParentState returns parent protocol state that is associated with this ProtocolStateMachine.
 	ParentState() *flow.RichProtocolStateEntry
 }
 

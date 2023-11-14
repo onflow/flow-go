@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/hashicorp/go-multierror"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -54,10 +55,12 @@ type ControlMsgValidationInspector struct {
 	idProvider   module.IdentityProvider
 	rateLimiters map[p2pmsg.ControlMessageType]p2p.BasicRateLimiter
 	rpcTracker   p2p.RpcControlTracking
+	// topicOracle callback used to retrieve the current subscribed topics of the libp2p node.
+	topicOracle func() []string
 }
 
 var _ component.Component = (*ControlMsgValidationInspector)(nil)
-var _ p2p.GossipSubRPCInspector = (*ControlMsgValidationInspector)(nil)
+var _ p2p.GossipSubMsgValidationRpcInspector = (*ControlMsgValidationInspector)(nil)
 var _ protocol.Consumer = (*ControlMsgValidationInspector)(nil)
 
 // NewControlMsgValidationInspector returns new ControlMsgValidationInspector
@@ -78,6 +81,10 @@ func NewControlMsgValidationInspector(ctx irrecoverable.SignalerContext, logger 
 	clusterPrefixedTracker, err := cache.NewClusterPrefixedMessagesReceivedTracker(logger, config.ClusterPrefixedControlMsgsReceivedCacheSize, clusterPrefixedCacheCollector, config.ClusterPrefixedControlMsgsReceivedCacheDecay)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cluster prefix topics received tracker")
+	}
+
+	if config.RpcMessageMaxSampleSize < config.RpcMessageErrorThreshold {
+		return nil, fmt.Errorf("rpc message max sample size must be greater than or equal to rpc message error threshold, got %d and %d respectively", config.RpcMessageMaxSampleSize, config.RpcMessageErrorThreshold)
 	}
 
 	c := &ControlMsgValidationInspector{
@@ -115,6 +122,13 @@ func NewControlMsgValidationInspector(ctx irrecoverable.SignalerContext, logger 
 	return c, nil
 }
 
+func (c *ControlMsgValidationInspector) Start(parent irrecoverable.SignalerContext) {
+	if c.topicOracle == nil {
+		parent.Throw(fmt.Errorf("topic oracle not set"))
+	}
+	c.Component.Start(parent)
+}
+
 // Inspect is called by gossipsub upon reception of a rpc from a remote  node.
 // It creates a new InspectRPCRequest for the RPC to be inspected async by the worker pool.
 func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) error {
@@ -149,7 +163,6 @@ func (c *ControlMsgValidationInspector) processInspectRPCReq(req *InspectRPCRequ
 
 	activeClusterIDS := c.tracker.GetActiveClusterIds()
 	for _, ctrlMsgType := range p2pmsg.ControlMessageTypes() {
-		// iWant validation uses new sample size validation. This will be updated for all other control message types.
 		switch ctrlMsgType {
 		case p2pmsg.CtrlMsgGraft:
 			err := c.inspectGraftMessages(req.Peer, req.rpc.GetControl().GetGraft(), activeClusterIDS)
@@ -178,6 +191,13 @@ func (c *ControlMsgValidationInspector) processInspectRPCReq(req *InspectRPCRequ
 		}
 	}
 
+	// inspect rpc publish messages after all control message validation has passed
+	err := c.inspectRpcPublishMessages(req.Peer, req.rpc.GetPublish(), activeClusterIDS)
+	if err != nil {
+		c.logAndDistributeAsyncInspectErrs(req, p2pmsg.RpcPublishMessage, err)
+		return nil
+	}
+
 	return nil
 }
 
@@ -188,7 +208,6 @@ func (c *ControlMsgValidationInspector) processInspectRPCReq(req *InspectRPCRequ
 // - activeClusterIDS: the list of active cluster ids.
 // Returns:
 // - DuplicateTopicErr: if there are any duplicate topics in the list of grafts
-// - error: if any error occurs while sampling or validating topics, all returned errors are benign and should not cause the node to crash.
 func (c *ControlMsgValidationInspector) inspectGraftMessages(from peer.ID, grafts []*pubsub_pb.ControlGraft, activeClusterIDS flow.ChainIDList) error {
 	tracker := make(duplicateStrTracker)
 	for _, graft := range grafts {
@@ -287,7 +306,6 @@ func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihave
 // Returns:
 // - DuplicateTopicErr: if there are any duplicate message ids found in any of the iWants.
 // - IWantCacheMissThresholdErr: if the rate of cache misses exceeds the configured allowed threshold.
-// - error: if any error occurs while sampling or validating topics, all returned errors are benign and should not cause the node to crash.
 func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWants []*pubsub_pb.ControlIWant) error {
 	if len(iWants) == 0 {
 		return nil
@@ -343,6 +361,61 @@ func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWant
 		Int("cache_misses", cacheMisses).
 		Int("duplicates", duplicates).
 		Msg("iwant control message validation complete")
+
+	return nil
+}
+
+// inspectRpcPublishMessages inspects a sample of the RPC gossip messages and performs topic validation that ensures the following:
+// - Topics are known flow topics.
+// - Topics are valid flow topics.
+// - Topics are in the nodes subscribe topics list.
+// If more than half the topics in the sample contain invalid topics an error will be returned.
+// Args:
+// - from: peer ID of the sender.
+// - messages: rpc publish messages.
+// - activeClusterIDS: the list of active cluster ids.
+// Returns:
+// - InvalidRpcPublishMessagesErr: if the amount of invalid messages exceeds the configured RpcMessageErrorThreshold.
+func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, messages []*pubsub_pb.Message, activeClusterIDS flow.ChainIDList) error {
+	totalMessages := len(messages)
+	if totalMessages == 0 {
+		return nil
+	}
+	sampleSize := c.config.RpcMessageMaxSampleSize
+	if sampleSize > totalMessages {
+		sampleSize = totalMessages
+	}
+	c.performSample(p2pmsg.RpcPublishMessage, uint(totalMessages), uint(sampleSize), func(i, j uint) {
+		messages[i], messages[j] = messages[j], messages[i]
+	})
+
+	subscribedTopics := c.topicOracle()
+	hasSubscription := func(topic string) bool {
+		for _, subscribedTopic := range subscribedTopics {
+			if topic == subscribedTopic {
+				return true
+			}
+		}
+		return false
+	}
+
+	var errs *multierror.Error
+	for _, message := range messages[:sampleSize] {
+		topic := channels.Topic(message.GetTopic())
+		err := c.validateTopic(from, topic, activeClusterIDS)
+		if err != nil {
+			errs = multierror.Append(errs, err)
+		}
+
+		if !hasSubscription(topic.String()) {
+			errs = multierror.Append(errs, fmt.Errorf("subscription for topic %s not found", topic))
+		}
+
+		// return an error when we exceed the error threshold
+		if errs != nil && errs.Len() > c.config.RpcMessageErrorThreshold {
+			return NewInvalidRpcPublishMessagesErr(errs.ErrorOrNil(), errs.Len())
+		}
+	}
 
 	return nil
 }
@@ -529,6 +602,18 @@ func (c *ControlMsgValidationInspector) Name() string {
 // ActiveClustersChanged consumes cluster ID update protocol events.
 func (c *ControlMsgValidationInspector) ActiveClustersChanged(clusterIDList flow.ChainIDList) {
 	c.tracker.StoreActiveClusterIds(clusterIDList)
+}
+
+// SetTopicOracle Sets the topic oracle. The topic oracle is used to determine the list of topics that the node is subscribed to.
+// If an oracle is not set, the node will not be able to determine the list of topics that the node is subscribed to.
+// This func is expected to be called once and will return an error on all subsequent calls.
+// All errors returned from this func are considered irrecoverable.
+func (c *ControlMsgValidationInspector) SetTopicOracle(topicOracle func() []string) error {
+	if c.topicOracle != nil {
+		return fmt.Errorf("topic oracle already set")
+	}
+	c.topicOracle = topicOracle
+	return nil
 }
 
 // performSample performs sampling on the specified control message that will randomize

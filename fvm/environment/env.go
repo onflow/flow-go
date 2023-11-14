@@ -37,6 +37,7 @@ type Environment interface {
 
 	// EventEmitter
 	Events() flow.EventsList
+	EmitFlowEvent(etype flow.EventType, payload []byte) error
 	ServiceEvents() flow.EventsList
 	ConvertedServiceEvents() flow.ServiceEventList
 
@@ -68,6 +69,11 @@ type Environment interface {
 
 	// AccountInfo
 	GetAccount(address flow.Address) (*flow.Account, error)
+
+	// RandomSourceHistory is the current block's derived random source.
+	// This source is only used by the core-contract that tracks the random source
+	// history for commit-reveal schemes.
+	RandomSourceHistory() ([]byte, error)
 
 	// FlushPendingUpdates flushes pending updates from the stateful environment
 	// modules (i.e., ContractUpdater) to the state transaction, and return
