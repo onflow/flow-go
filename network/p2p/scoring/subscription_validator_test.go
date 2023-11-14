@@ -36,7 +36,7 @@ func TestSubscriptionValidator_NoSubscribedTopic(t *testing.T) {
 	sv := scoring.NewSubscriptionValidator(unittest.Logger(), sp)
 
 	// mocks peer 1 not subscribed to any topic.
-	peer1 := p2pfixtures.PeerIdFixture(t)
+	peer1 := unittest.PeerIdFixture(t)
 	sp.On("GetSubscribedTopics", peer1).Return([]string{})
 
 	// as peer 1 has not subscribed to any topic, the subscription validator should return no error regardless of the
@@ -53,7 +53,7 @@ func TestSubscriptionValidator_UnknownChannel(t *testing.T) {
 	sv := scoring.NewSubscriptionValidator(unittest.Logger(), sp)
 
 	// mocks peer 1 not subscribed to an unknown topic.
-	peer1 := p2pfixtures.PeerIdFixture(t)
+	peer1 := unittest.PeerIdFixture(t)
 	sp.On("GetSubscribedTopics", peer1).Return([]string{"unknown-topic-1", "unknown-topic-2"})
 
 	// as peer 1 has subscribed to unknown topics, the subscription validator should return an error
@@ -72,7 +72,7 @@ func TestSubscriptionValidator_ValidSubscriptions(t *testing.T) {
 	sv := scoring.NewSubscriptionValidator(unittest.Logger(), sp)
 
 	for _, role := range flow.Roles() {
-		peerId := p2pfixtures.PeerIdFixture(t)
+		peerId := unittest.PeerIdFixture(t)
 		// allowed channels for the role excluding the test channels.
 		allowedChannels := channels.ChannelsByRole(role).ExcludePattern(regexp.MustCompile("^(test).*"))
 		sporkID := unittest.IdentifierFixture()
@@ -109,7 +109,7 @@ func TestSubscriptionValidator_SubscribeToAllTopics(t *testing.T) {
 	}
 
 	for _, role := range flow.Roles() {
-		peerId := p2pfixtures.PeerIdFixture(t)
+		peerId := unittest.PeerIdFixture(t)
 		sp.On("GetSubscribedTopics", peerId).Return(allTopics)
 		err := sv.CheckSubscribedToAllowedTopics(peerId, role)
 		require.Error(t, err, role)
@@ -124,7 +124,7 @@ func TestSubscriptionValidator_InvalidSubscriptions(t *testing.T) {
 	sv := scoring.NewSubscriptionValidator(unittest.Logger(), sp)
 
 	for _, role := range flow.Roles() {
-		peerId := p2pfixtures.PeerIdFixture(t)
+		peerId := unittest.PeerIdFixture(t)
 		unauthorizedChannels := channels.Channels(). // all channels
 								ExcludeChannels(channels.ChannelsByRole(role)). // excluding the channels for the role
 								ExcludePattern(regexp.MustCompile("^(test).*")) // excluding the test channels.

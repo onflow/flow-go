@@ -17,6 +17,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/routing"
 	discoveryBackoff "github.com/libp2p/go-libp2p/p2p/discovery/backoff"
 	"github.com/rs/zerolog"
+	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/config"
@@ -32,6 +33,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
+	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
 	"github.com/onflow/flow-go/network/p2p/tracer"
@@ -821,4 +823,20 @@ func PeerIdSliceFixture(t *testing.T, n int) peer.IDSlice {
 func NewConnectionGater(idProvider module.IdentityProvider, allowListFilter p2p.PeerFilter) p2p.ConnectionGater {
 	filters := []p2p.PeerFilter{allowListFilter}
 	return connection.NewConnGater(unittest.Logger(), idProvider, connection.WithOnInterceptPeerDialFilters(filters), connection.WithOnInterceptSecuredFilters(filters))
+}
+
+// MockInspectorNotificationDistributorReadyDoneAware mocks the Ready and Done methods of the distributor to return a channel that is already closed,
+// so that the distributor is considered ready and done when the test needs.
+func MockInspectorNotificationDistributorReadyDoneAware(d *mockp2p.GossipSubInspectorNotificationDistributor) {
+	d.On("Start", mockery.Anything).Return().Maybe()
+	d.On("Ready").Return(func() <-chan struct{} {
+		ch := make(chan struct{})
+		close(ch)
+		return ch
+	}()).Maybe()
+	d.On("Done").Return(func() <-chan struct{} {
+		ch := make(chan struct{})
+		close(ch)
+		return ch
+	}()).Maybe()
 }
