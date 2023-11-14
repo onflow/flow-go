@@ -6,6 +6,8 @@ import (
 
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+
+	"github.com/onflow/flow-go/network/p2p/p2pconf"
 )
 
 const (
@@ -33,14 +35,21 @@ const (
 	bandwidthRateLimit  = "unicast-bandwidth-rate-limit"
 	bandwidthBurstLimit = "unicast-bandwidth-burst-limit"
 	// resource manager config
-	memoryLimitRatio               = "libp2p-memory-limit-ratio"
-	fileDescriptorsRatio           = "libp2p-file-descriptors-ratio"
-	peerBaseLimitConnsInbound      = "libp2p-peer-base-limits-conns-inbound"
-	inboundStreamLimitSystem       = "libp2p-inbound-stream-limit-system"
-	inboundStreamLimitPeer         = "libp2p-inbound-stream-limit-peer"
-	inboundStreamLimitProtocol     = "libp2p-inbound-stream-limit-protocol"
-	inboundStreamLimitProtocolPeer = "libp2p-inbound-stream-limit-protocol-peer"
-	inboundStreamLimitTransient    = "libp2p-inbound-stream-limit-transient"
+	rootResourceManagerPrefix  = "libp2p-resource-manager"
+	memoryLimitRatioPrefix     = "memory-limit-ratio"
+	fileDescriptorsRatioPrefix = "file-descriptors-ratio"
+	limitsOverridePrefix       = "limits-override"
+	systemScope                = "system"
+	transientScope             = "transient"
+	protocolScope              = "protocol"
+	peerScope                  = "peer"
+	peerProtocolScope          = "peer-protocol"
+	inboundStreamLimit         = "streams-inbound"
+	outboundStreamLimit        = "streams-outbound"
+	inboundConnectionLimit     = "connections-inbound"
+	outboundConnectionLimit    = "connections-outbound"
+	fileDescriptorsLimit       = "fd"
+	memoryLimitBytes           = "memory-bytes"
 
 	// connection manager
 	highWatermark = "libp2p-high-watermark"
@@ -71,7 +80,8 @@ const (
 	iwantCacheMissThreshold      = "gossipsub-rpc-iwant-cache-miss-threshold"
 	iwantCacheMissCheckSize      = "gossipsub-rpc-iwant-cache-miss-check-size"
 	iwantDuplicateMsgIDThreshold = "gossipsub-rpc-iwant-duplicate-message-id-threshold"
-
+	rpcMessageMaxSampleSize      = "gossipsub-rpc-message-max-sample-size"
+	rpcMessageErrorThreshold     = "gossipsub-rpc-message-error-threshold"
 	// gossipsub metrics inspector
 	metricsInspectorNumberOfWorkers = "gossipsub-rpc-metrics-inspector-workers"
 	metricsInspectorCacheSize       = "gossipsub-rpc-metrics-inspector-cache-size"
@@ -87,7 +97,7 @@ const (
 )
 
 func AllFlagNames() []string {
-	return []string{
+	allFlags := []string{
 		networkingConnectionPruning,
 		preferredUnicastsProtocols,
 		receivedMessageCacheSize,
@@ -108,14 +118,8 @@ func AllFlagNames() []string {
 		messageRateLimit,
 		bandwidthRateLimit,
 		bandwidthBurstLimit,
-		memoryLimitRatio,
-		fileDescriptorsRatio,
-		peerBaseLimitConnsInbound,
-		inboundStreamLimitSystem,
-		inboundStreamLimitPeer,
-		inboundStreamLimitProtocol,
-		inboundStreamLimitProtocolPeer,
-		inboundStreamLimitTransient,
+		rootResourceManagerPrefix + "-" + memoryLimitRatioPrefix,
+		rootResourceManagerPrefix + "-" + fileDescriptorsRatioPrefix,
 		highWatermark,
 		lowWatermark,
 		gracePeriod,
@@ -149,7 +153,22 @@ func AllFlagNames() []string {
 		controlMessageMaxSampleSize,
 		iwantDuplicateMsgIDThreshold,
 		iwantCacheMissCheckSize,
+		rpcMessageMaxSampleSize,
+		rpcMessageErrorThreshold,
 	}
+
+	for _, scope := range []string{systemScope, transientScope, protocolScope, peerScope, peerProtocolScope} {
+		for _, resource := range []string{inboundStreamLimit,
+			outboundStreamLimit,
+			inboundConnectionLimit,
+			outboundConnectionLimit,
+			fileDescriptorsLimit,
+			memoryLimitBytes} {
+			allFlags = append(allFlags, fmt.Sprintf("%s-%s-%s-%s", rootResourceManagerPrefix, limitsOverridePrefix, scope, resource))
+		}
+	}
+
+	return allFlags
 }
 
 // InitializeNetworkFlags initializes all CLI flags for the Flow network configuration on the provided pflag set.
@@ -200,17 +219,8 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 		config.UnicastConfig.UnicastRateLimitersConfig.LockoutDuration,
 		"the number of seconds a peer will be forced to wait before being allowed to successful reconnect to the node after being rate limited")
 	flags.Bool(dryRun, config.UnicastConfig.UnicastRateLimitersConfig.DryRun, "disable peer disconnects and connections gating when rate limiting peers")
-	// resource manager cli flags
-	flags.Float64(fileDescriptorsRatio, config.ResourceManagerConfig.FileDescriptorsRatio, "ratio of available file descriptors to be used by libp2p (in (0,1])")
-	flags.Float64(memoryLimitRatio, config.ResourceManagerConfig.MemoryLimitRatio, "ratio of available memory to be used by libp2p (in (0,1])")
-	flags.Int(peerBaseLimitConnsInbound, config.ResourceManagerConfig.PeerBaseLimitConnsInbound, "the maximum amount of allowed inbound connections per peer")
-	flags.Int(inboundStreamLimitSystem, config.ResourceManagerConfig.InboundStream.System, "the system-wide limit on the number of inbound streams")
-	flags.Int(inboundStreamLimitPeer, config.ResourceManagerConfig.InboundStream.Peer, "the limit on the number of inbound streams per peer (over all protocols)")
-	flags.Int(inboundStreamLimitProtocol, config.ResourceManagerConfig.InboundStream.Protocol, "the limit on the number of inbound streams per protocol (over all peers)")
-	flags.Int(inboundStreamLimitProtocolPeer, config.ResourceManagerConfig.InboundStream.ProtocolPeer, "the limit on the number of inbound streams per protocol per peer")
-	flags.Int(inboundStreamLimitTransient,
-		config.ResourceManagerConfig.InboundStream.Transient,
-		"the transient limit on the number of inbound streams (applied to streams that are not associated with a peer or protocol yet)")
+
+	LoadLibP2PResourceManagerFlags(flags, config)
 
 	// connection manager
 	flags.Int(lowWatermark, config.ConnectionManagerConfig.LowWatermark, "low watermarking for libp2p connection manager")
@@ -254,9 +264,15 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 	flags.Bool(alspDisabled, config.AlspConfig.DisablePenalty, "disable the penalty mechanism of the alsp protocol. default value (recommended) is false")
 	flags.Uint32(alspSpamRecordCacheSize, config.AlspConfig.SpamRecordCacheSize, "size of spam record cache, recommended to be 10x the number of authorized nodes")
 	flags.Uint32(alspSpamRecordQueueSize, config.AlspConfig.SpamReportQueueSize, "size of spam report queue, recommended to be 100x the number of authorized nodes")
-	flags.Duration(alspHearBeatInterval, config.AlspConfig.HearBeatInterval, "interval between two consecutive heartbeat events at alsp, recommended to leave it as default unless you know what you are doing.")
-	flags.Float32(alspSyncEngineBatchRequestBaseProb, config.AlspConfig.SyncEngine.BatchRequestBaseProb, "base probability of creating a misbehavior report for a batch request message")
-	flags.Float32(alspSyncEngineRangeRequestBaseProb, config.AlspConfig.SyncEngine.RangeRequestBaseProb, "base probability of creating a misbehavior report for a range request message")
+	flags.Duration(alspHearBeatInterval,
+		config.AlspConfig.HearBeatInterval,
+		"interval between two consecutive heartbeat events at alsp, recommended to leave it as default unless you know what you are doing.")
+	flags.Float32(alspSyncEngineBatchRequestBaseProb,
+		config.AlspConfig.SyncEngine.BatchRequestBaseProb,
+		"base probability of creating a misbehavior report for a batch request message")
+	flags.Float32(alspSyncEngineRangeRequestBaseProb,
+		config.AlspConfig.SyncEngine.RangeRequestBaseProb,
+		"base probability of creating a misbehavior report for a range request message")
 	flags.Float32(alspSyncEngineSyncRequestProb, config.AlspConfig.SyncEngine.SyncRequestProb, "probability of creating a misbehavior report for a sync request message")
 
 	flags.Int(ihaveMaxSampleSize,
@@ -283,6 +299,57 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 	flags.Float64(iwantDuplicateMsgIDThreshold,
 		config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IWantRPCInspectionConfig.DuplicateMsgIDThreshold,
 		"max allowed duplicate message IDs in a single iWant control message")
+
+	flags.Int(rpcMessageMaxSampleSize,
+		config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.RpcMessageMaxSampleSize,
+		"the max sample size used for RPC message validation. If the total number of RPC messages exceeds this value a sample will be taken but messages will not be truncated")
+	flags.Int(rpcMessageErrorThreshold,
+		config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.RpcMessageErrorThreshold,
+		"the threshold at which an error will be returned if the number of invalid RPC messages exceeds this value")
+}
+
+// LoadLibP2PResourceManagerFlags loads all CLI flags for the libp2p resource manager configuration on the provided pflag set.
+// Args:
+// *pflag.FlagSet: the pflag set of the Flow node.
+// *Config: the default network config used to set default values on the flags
+func LoadLibP2PResourceManagerFlags(flags *pflag.FlagSet, config *Config) {
+	flags.Float64(fmt.Sprintf("%s-%s", rootResourceManagerPrefix, fileDescriptorsRatioPrefix),
+		config.ResourceManager.FileDescriptorsRatio,
+		"ratio of available file descriptors to be used by libp2p (in (0,1])")
+	flags.Float64(fmt.Sprintf("%s-%s", rootResourceManagerPrefix, memoryLimitRatioPrefix),
+		config.ResourceManager.MemoryLimitRatio,
+		"ratio of available memory to be used by libp2p (in (0,1])")
+	loadLibP2PResourceManagerFlagsForScope(systemScope, flags, &config.ResourceManager.Override.System)
+	loadLibP2PResourceManagerFlagsForScope(transientScope, flags, &config.ResourceManager.Override.Transient)
+	loadLibP2PResourceManagerFlagsForScope(protocolScope, flags, &config.ResourceManager.Override.Protocol)
+	loadLibP2PResourceManagerFlagsForScope(peerScope, flags, &config.ResourceManager.Override.Peer)
+	loadLibP2PResourceManagerFlagsForScope(peerProtocolScope, flags, &config.ResourceManager.Override.PeerProtocol)
+}
+
+// loadLibP2PResourceManagerFlagsForScope loads all CLI flags for the libp2p resource manager configuration on the provided pflag set for the specific scope.
+// Args:
+// *p2pconf.ResourceScope: the resource scope to load flags for.
+// *pflag.FlagSet: the pflag set of the Flow node.
+// *Config: the default network config used to set default values on the flags.
+func loadLibP2PResourceManagerFlagsForScope(scope p2pconf.ResourceScope, flags *pflag.FlagSet, override *p2pconf.ResourceManagerOverrideLimit) {
+	flags.Int(fmt.Sprintf("%s-%s-%s-%s", rootResourceManagerPrefix, limitsOverridePrefix, scope, inboundStreamLimit),
+		override.StreamsInbound,
+		fmt.Sprintf("the limit on the number of inbound streams at %s scope, 0 means use the default value", scope))
+	flags.Int(fmt.Sprintf("%s-%s-%s-%s", rootResourceManagerPrefix, limitsOverridePrefix, scope, outboundStreamLimit),
+		override.StreamsOutbound,
+		fmt.Sprintf("the limit on the number of outbound streams at %s scope, 0 means use the default value", scope))
+	flags.Int(fmt.Sprintf("%s-%s-%s-%s", rootResourceManagerPrefix, limitsOverridePrefix, scope, inboundConnectionLimit),
+		override.ConnectionsInbound,
+		fmt.Sprintf("the limit on the number of inbound connections at %s scope, 0 means use the default value", scope))
+	flags.Int(fmt.Sprintf("%s-%s-%s-%s", rootResourceManagerPrefix, limitsOverridePrefix, scope, outboundConnectionLimit),
+		override.ConnectionsOutbound,
+		fmt.Sprintf("the limit on the number of outbound connections at %s scope, 0 means use the default value", scope))
+	flags.Int(fmt.Sprintf("%s-%s-%s-%s", rootResourceManagerPrefix, limitsOverridePrefix, scope, fileDescriptorsLimit),
+		override.FD,
+		fmt.Sprintf("the limit on the number of file descriptors at %s scope, 0 means use the default value", scope))
+	flags.Int(fmt.Sprintf("%s-%s-%s-%s", rootResourceManagerPrefix, limitsOverridePrefix, scope, memoryLimitBytes),
+		override.Memory,
+		fmt.Sprintf("the limit on the amount of memory (bytes) at %s scope, 0 means use the default value", scope))
 }
 
 // SetAliases this func sets an aliases for each CLI flag defined for network config overrides to it's corresponding
@@ -294,18 +361,19 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 // Args:
 // *viper.Viper: instance of the viper store to register network config aliases on.
 // Returns:
-// error: if a flag does not have a corresponding key in the viper store.
+// error: if a flag does not have a corresponding key in the viper store; all returned errors are fatal.
 func SetAliases(conf *viper.Viper) error {
 	m := make(map[string]string)
 	// create map of key -> full pathkey
 	// ie: "networking-connection-pruning" -> "network-config.networking-connection-pruning"
 	for _, key := range conf.AllKeys() {
 		s := strings.Split(key, ".")
-		// check len of s, we expect all network keys to have a single prefix "network-config"
-		// s should always contain only 2 elements
-		if len(s) == 2 {
-			m[s[1]] = key
-		}
+		// Each networking config has the format of network-config.key1.key2.key3... in the config file
+		// which is translated to key1-key2-key3... in the CLI flags
+		// Hence, we map the CLI flag name to the full key in the config store
+		// TODO: all networking flags should also be prefixed with "network-config". Hence, this
+		// mapping should be from network-config.key1.key2.key3... to network-config-key1-key2-key3...
+		m[strings.Join(s[1:], "-")] = key
 	}
 	// each flag name should correspond to exactly one key in our config store after it is loaded with the default config
 	for _, flagName := range AllFlagNames() {

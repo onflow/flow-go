@@ -177,10 +177,22 @@ func RunWithDeployedContract(t *testing.T, led atree.Ledger, flowEVMRootAddress 
 	require.NoError(t, err)
 
 	caller := types.NewAddress(gethCommon.Address{})
-	_, err = blk.MintTo(caller, new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1000)))
+	_, err = blk.DirectCall(
+		types.NewDepositCall(
+			caller,
+			new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1000)),
+		),
+	)
 	require.NoError(t, err)
 
-	res, err := blk.Deploy(caller, tc.ByteCode, math.MaxUint64, big.NewInt(0))
+	res, err := blk.DirectCall(
+		types.NewDeployCall(
+			caller,
+			tc.ByteCode,
+			math.MaxUint64,
+			big.NewInt(0),
+		),
+	)
 	require.NoError(t, err)
 
 	tc.SetDeployedAt(res.DeployedContractAddress)

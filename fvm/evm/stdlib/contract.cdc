@@ -128,7 +128,7 @@ contract EVM {
     /// Returns true if the transaction was successful,
     /// and returns false otherwise
     access(all)
-    fun run(tx: [UInt8], coinbase: EVMAddress): Bool {
-        return InternalEVM.run(tx: tx, coinbase: coinbase.bytes)
+    fun run(tx: [UInt8], coinbase: EVMAddress) {
+        InternalEVM.run(tx: tx, coinbase: coinbase.bytes)
     }
 }
