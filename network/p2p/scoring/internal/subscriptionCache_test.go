@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/p2p/scoring/internal"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -237,7 +236,7 @@ func TestSubscriptionCache_ConcurrentUpdate(t *testing.T) {
 		unittest.Logger(),
 		metrics.NewSubscriptionRecordCacheMetricsFactory(metrics.NewNoopHeroCacheMetricsFactory()))
 
-	peerIds := p2pfixtures.PeerIdsFixture(t, 100)
+	peerIds := unittest.PeerIdFixtures(t, 100)
 	topics := []string{"topic1", "topic2", "topic3"}
 
 	allUpdatesDone := sync.WaitGroup{}
@@ -280,7 +279,7 @@ func TestSubscriptionCache_TestSizeLimit(t *testing.T) {
 		unittest.Logger(),
 		metrics.NewSubscriptionRecordCacheMetricsFactory(metrics.NewNoopHeroCacheMetricsFactory()))
 
-	peerIds := p2pfixtures.PeerIdsFixture(t, 100)
+	peerIds := unittest.PeerIdFixtures(t, 100)
 	topics := []string{"topic1", "topic2", "topic3"}
 
 	// add topics to peers
