@@ -19,7 +19,6 @@ contract EVM {
         /// Deposits the given vault into the EVM account with the given address
         access(all)
         fun deposit(from: @FlowToken.Vault) {
-            let amount = from.balance
             InternalEVM.deposit(
                 from: <-from,
                 to: self.bytes
