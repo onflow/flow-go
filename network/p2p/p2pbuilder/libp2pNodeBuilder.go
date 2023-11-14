@@ -36,6 +36,7 @@ import (
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
 	gossipsubbuilder "github.com/onflow/flow-go/network/p2p/p2pbuilder/gossipsub"
 	"github.com/onflow/flow-go/network/p2p/p2pconf"
+	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/tracer"
@@ -238,6 +239,7 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		return nil, err
 	}
 	builder.gossipSubBuilder.SetHost(h)
+	lg := builder.logger.With().Str("local_peer_id", p2plogging.PeerId(h.ID())).Logger()
 
 	pCache, err := p2pnode.NewProtocolPeerCache(builder.logger, h)
 	if err != nil {
@@ -253,7 +255,7 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		peerUpdater, err := connection.NewPeerUpdater(
 			&connection.PeerUpdaterConfig{
 				PruneConnections: builder.peerManagerConfig.ConnectionPruning,
-				Logger:           builder.logger,
+				Logger:           lg,
 				Host:             connection.NewConnectorHost(h),
 				Connector:        connector,
 			})
@@ -261,21 +263,21 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 			return nil, fmt.Errorf("failed to create libp2p connector: %w", err)
 		}
 
-		peerManager = connection.NewPeerManager(builder.logger, builder.peerManagerConfig.UpdateInterval, peerUpdater)
+		peerManager = connection.NewPeerManager(lg, builder.peerManagerConfig.UpdateInterval, peerUpdater)
 
 		if builder.unicastConfig.RateLimiterDistributor != nil {
 			builder.unicastConfig.RateLimiterDistributor.AddConsumer(peerManager)
 		}
 	}
 
-	node := builder.createNode(builder.logger, h, pCache, peerManager, builder.disallowListCacheCfg)
+	node := builder.createNode(lg, h, pCache, peerManager, builder.disallowListCacheCfg)
 
 	if builder.connGater != nil {
 		builder.connGater.SetDisallowListOracle(node)
 	}
 
 	unicastManager, err := unicast.NewUnicastManager(&unicast.ManagerConfig{
-		Logger:                             builder.logger,
+		Logger:                             lg,
 		StreamFactory:                      stream.NewLibP2PStreamFactory(h),
 		SporkId:                            builder.sporkId,
 		ConnStatus:                         node,
@@ -289,7 +291,7 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		MaxDialRetryAttemptTimes:           builder.unicastConfig.MaxDialRetryAttemptTimes,
 		DialConfigCacheFactory: func(configFactory func() unicast.DialConfig) unicast.DialConfigCache {
 			return unicastcache.NewDialConfigCache(builder.unicastConfig.DialConfigCacheSize,
-				builder.logger,
+				lg,
 				metrics.DialConfigCacheMetricFactory(builder.metricsConfig.HeroCacheFactory, builder.networkingType),
 				configFactory)
 		},
@@ -311,7 +313,7 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 						ctx.Throw(fmt.Errorf("could not set routing system: %w", err))
 					}
 					builder.gossipSubBuilder.SetRoutingSystem(routingSystem)
-					builder.logger.Debug().Msg("routing system created")
+					lg.Debug().Msg("routing system created")
 				}
 				// gossipsub is created here, because it needs to be created during the node startup.
 				gossipSub, err := builder.gossipSubBuilder.Build(ctx)
