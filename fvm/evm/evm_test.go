@@ -108,3 +108,51 @@ func RunWithNewTestVM(t *testing.T, chain flow.Chain, f func(fvm.Context, fvm.VM
 
 	f(fvm.NewContextFromParent(ctx, fvm.WithEVMEnabled(true)), vm, snapshotTree)
 }
+
+// TODO: test with actual amount
+func TestEVMAddressDeposit(t *testing.T) {
+
+	t.Parallel()
+
+	RunWithTestBackend(t, func(backend types.Backend) {
+		RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+			RunWithDeployedContract(t, backend, rootAddr, func(testContract *TestContract) {
+				RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *EOATestAccount) {
+					chain := flow.Emulator.Chain()
+					RunWithNewTestVM(t, chain, func(ctx fvm.Context, vm fvm.VM, snapshot snapshot.SnapshotTree) {
+
+						code := []byte(fmt.Sprintf(
+							`
+                               import EVM from %s
+                               import FlowToken from %s
+
+                               access(all)
+                               fun main() {
+                                   let address = EVM.EVMAddress(
+                                       bytes: [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+                                   )
+                                   let vault <- FlowToken.createEmptyVault() as! @FlowToken.Vault
+                                   address.deposit(from: <-vault)
+                               }
+                            `,
+							chain.ServiceAddress().HexWithPrefix(),
+							fvm.FlowTokenAddress(chain).HexWithPrefix(),
+						))
+
+						script := fvm.Script(code)
+
+						executionSnapshot, output, err := vm.Run(
+							ctx,
+							script,
+							snapshot)
+						require.NoError(t, err)
+						require.NoError(t, output.Err)
+
+						// TODO:
+						_ = executionSnapshot
+					})
+				})
+			})
+		})
+	})
+}
