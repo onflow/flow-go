@@ -17,7 +17,7 @@ import (
 func RootAccountAddress(chainID flow.ChainID) (flow.Address, error) {
 	// TODO handle other chains
 	switch chainID {
-	case flow.Emulator:
+	case flow.Emulator, flow.Testnet:
 		return chainID.Chain().AddressAtIndex(environment.EVMAccountIndex)
 	default:
 		return flow.Address{}, fmt.Errorf("unsupported chain %s", chainID)
