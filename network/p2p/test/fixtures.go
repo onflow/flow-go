@@ -3,7 +3,6 @@ package p2ptest
 import (
 	"bufio"
 	"context"
-	"crypto/rand"
 	crand "math/rand"
 	"sync"
 	"testing"
@@ -17,8 +16,8 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
 	discoveryBackoff "github.com/libp2p/go-libp2p/p2p/discovery/backoff"
-	mh "github.com/multiformats/go-multihash"
 	"github.com/rs/zerolog"
+	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/config"
@@ -34,6 +33,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
+	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
 	"github.com/onflow/flow-go/network/p2p/tracer"
@@ -141,7 +141,7 @@ func NodeFixture(
 		parameters.Key,
 		sporkID,
 		parameters.IdProvider,
-		&defaultFlowConfig.NetworkConfig.ResourceManagerConfig,
+		&defaultFlowConfig.NetworkConfig.ResourceManager,
 		&parameters.FlowConfig.NetworkConfig.GossipSubRPCInspectorsConfig,
 		parameters.PeerManagerConfig,
 		&p2p.DisallowListCacheConfig{
@@ -733,19 +733,6 @@ func EnsurePubsubMessageExchangeFromNode(
 	}
 }
 
-// PeerIdFixture returns a random peer ID for testing.
-// peer ID is the identifier of a node on the libp2p network.
-func PeerIdFixture(t testing.TB) peer.ID {
-	buf := make([]byte, 16)
-	n, err := rand.Read(buf)
-	require.NoError(t, err)
-	require.Equal(t, 16, n)
-	h, err := mh.Sum(buf, mh.SHA2_256, -1)
-	require.NoError(t, err)
-
-	return peer.ID(h)
-}
-
 // EnsureNotConnectedBetweenGroups ensures no connection exists between the given groups of nodes.
 func EnsureNotConnectedBetweenGroups(t *testing.T, ctx context.Context, groupA []p2p.LibP2PNode, groupB []p2p.LibP2PNode) {
 	// ensure no connection from group A to group B
@@ -853,7 +840,7 @@ func EnsureNoPubsubExchangeBetweenGroups(
 func PeerIdSliceFixture(t *testing.T, n int) peer.IDSlice {
 	ids := make([]peer.ID, n)
 	for i := 0; i < n; i++ {
-		ids[i] = PeerIdFixture(t)
+		ids[i] = unittest.PeerIdFixture(t)
 	}
 	return ids
 }
@@ -866,4 +853,20 @@ func NewConnectionGater(idProvider module.IdentityProvider, allowListFilter p2p.
 		idProvider,
 		connection.WithOnInterceptPeerDialFilters(filters),
 		connection.WithOnInterceptSecuredFilters(filters))
+}
+
+// MockInspectorNotificationDistributorReadyDoneAware mocks the Ready and Done methods of the distributor to return a channel that is already closed,
+// so that the distributor is considered ready and done when the test needs.
+func MockInspectorNotificationDistributorReadyDoneAware(d *mockp2p.GossipSubInspectorNotificationDistributor) {
+	d.On("Start", mockery.Anything).Return().Maybe()
+	d.On("Ready").Return(func() <-chan struct{} {
+		ch := make(chan struct{})
+		close(ch)
+		return ch
+	}()).Maybe()
+	d.On("Done").Return(func() <-chan struct{} {
+		ch := make(chan struct{})
+		close(ch)
+		return ch
+	}()).Maybe()
 }
