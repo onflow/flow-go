@@ -789,22 +789,20 @@ func (b *bootstrapExecutor) setStakingAllowlist(
 }
 
 func (b *bootstrapExecutor) setupEVM(serviceAddress, flowTokenAddress flow.Address) {
-
-	b.createAccount(nil) // account for storage
-
-	tx := blueprints.DeployContractTransaction(
-		serviceAddress,
-		stdlib.ContractCode(flowTokenAddress),
-		stdlib.ContractName,
-	)
-	txError, err := b.invokeMetaTransaction(
-		NewContextFromParent(b.ctx, WithEVMEnabled(true)),
-		Transaction(tx, 0),
-	)
-	panicOnMetaInvokeErrf("failed to deploy EVM contract: %s", txError, err)
-	// TODO: clean up
-	// b.accounts.SetContract(stdlib.ContractName, service, stdlib.ContractCode)
-	// TODO: think about storage
+	if b.setupEVMEnabled {
+		b.createAccount(nil) // account for storage
+		tx := blueprints.DeployContractTransaction(
+			serviceAddress,
+			stdlib.ContractCode(flowTokenAddress),
+			stdlib.ContractName,
+		)
+		// WithEVMEnabled should only be used after we create an account for storage
+		txError, err := b.invokeMetaTransaction(
+			NewContextFromParent(b.ctx, WithEVMEnabled(true)),
+			Transaction(tx, 0),
+		)
+		panicOnMetaInvokeErrf("failed to deploy EVM contract: %s", txError, err)
+	}
 }
 
 func (b *bootstrapExecutor) registerNodes(service, fungibleToken, flowToken flow.Address) {
