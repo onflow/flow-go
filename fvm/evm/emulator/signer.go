@@ -6,16 +6,23 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
-var DefaultBlockNumberForEVMRules = big.NewInt(1) // anything bigger than 0
+var defaultBlockNumberForEVMRules = big.NewInt(1) // anything bigger than 0
 
-// GetDefaultSigner returns the signer with default config
+// GetDefaultSigner returns a signer which is compatible with the default config
 func GetDefaultSigner() types.Signer {
-	cfg := NewConfig(WithBlockNumber(DefaultBlockNumberForEVMRules))
+	cfg := NewConfig(WithBlockNumber(defaultBlockNumberForEVMRules))
 	return GetSigner(cfg)
 }
 
-// GetSigner a signer compatible with this env
+// GetSigner returns a evm signer object that is compatible with the given config
+//
+// Despite its misleading name, signer encapsulates transaction signature validation functionality and
+// does not provide actual signing functionality.
+// we kept the same name to be consistent with EVM naming.
 func GetSigner(cfg *Config) types.Signer {
-	signer := types.MakeSigner(cfg.ChainConfig, cfg.BlockContext.BlockNumber, cfg.BlockContext.Time)
-	return signer
+	return types.MakeSigner(
+		cfg.ChainConfig,
+		cfg.BlockContext.BlockNumber,
+		cfg.BlockContext.Time,
+	)
 }

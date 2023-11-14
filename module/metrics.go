@@ -787,6 +787,10 @@ type BackendScriptsMetrics interface {
 	// ScriptExecutionErrorMatch records script execution error matches between local and
 	// execution nodes
 	ScriptExecutionErrorMatch()
+
+	// ScriptExecutionNotIndexed records script execution matches where data for the block is not
+	// indexed locally yet
+	ScriptExecutionNotIndexed()
 }
 
 type TransactionMetrics interface {

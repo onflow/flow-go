@@ -88,21 +88,6 @@ func newTransactionExecutor(
 		ctx.EnvironmentParams,
 		txnState)
 
-	cadenceRuntime := env.BorrowCadenceRuntime()
-
-	// TODO: how to remove value and type runtime environment after decleration
-	if ctx.EVMEnabled {
-		chain := ctx.Chain
-		// TODO: handle error
-		evm.SetupEnvironment(
-			chain.ChainID(),
-			env,
-			cadenceRuntime.Environment,
-			chain.ServiceAddress(),
-			FlowTokenAddress(chain),
-		)
-	}
-
 	return &transactionExecutor{
 		TransactionExecutorParams: ctx.TransactionExecutorParams,
 		TransactionVerifier: TransactionVerifier{
@@ -115,7 +100,7 @@ func newTransactionExecutor(
 		env:                             env,
 		errs:                            errors.NewErrorsCollector(),
 		startedTransactionBodyExecution: false,
-		cadenceRuntime:                  cadenceRuntime,
+		cadenceRuntime:                  env.BorrowCadenceRuntime(),
 	}
 }
 
@@ -240,6 +225,21 @@ func (executor *transactionExecutor) execute() error {
 }
 
 func (executor *transactionExecutor) ExecuteTransactionBody() error {
+	// setup evm
+	if executor.ctx.EVMEnabled {
+		chain := executor.ctx.Chain
+		err := evm.SetupEnvironment(
+			chain.ChainID(),
+			executor.env,
+			executor.cadenceRuntime.TxRuntimeEnv,
+			chain.ServiceAddress(),
+			FlowTokenAddress(chain),
+		)
+		if err != nil {
+			return err
+		}
+	}
+
 	var invalidator derived.TransactionInvalidator
 	if !executor.errs.CollectedError() {
 

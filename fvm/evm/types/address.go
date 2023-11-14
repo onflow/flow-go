@@ -27,10 +27,18 @@ func (fa Address) ToCommon() gethCommon.Address {
 	return gethCommon.Address(fa)
 }
 
+// NewAddressFromBytes constructs a new address from bytes
+func NewAddressFromBytes(inp []byte) Address {
+	return Address(gethCommon.BytesToAddress(inp))
+}
+
 // NewAddressFromString constructs a new address from an string
 func NewAddressFromString(str string) Address {
-	return Address(gethCommon.BytesToAddress([]byte(str)))
+	return NewAddressFromBytes([]byte(str))
 }
+
+// EmptyAddress is an empty evm address
+var EmptyAddress = Address(gethCommon.Address{})
 
 type GasLimit uint64
 

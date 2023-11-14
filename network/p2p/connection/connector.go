@@ -59,7 +59,7 @@ var _ p2p.PeerUpdater = (*PeerUpdater)(nil)
 //   - error: an error if there is any error while creating the connector. The errors are irrecoverable and unexpected.
 func NewPeerUpdater(cfg *PeerUpdaterConfig) (*PeerUpdater, error) {
 	libP2PConnector := &PeerUpdater{
-		log:              cfg.Logger,
+		log:              cfg.Logger.With().Str("component", "peer-updater").Logger(),
 		connector:        cfg.Connector,
 		host:             cfg.Host,
 		pruneConnections: cfg.PruneConnections,

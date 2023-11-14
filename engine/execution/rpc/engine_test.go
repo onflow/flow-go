@@ -3,6 +3,7 @@ package rpc
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/rand"
 	"testing"
 
@@ -19,6 +20,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	mockEng "github.com/onflow/flow-go/engine/execution/mock"
+	"github.com/onflow/flow-go/engine/execution/scripts"
 	"github.com/onflow/flow-go/model/flow"
 	realstorage "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/mock"
@@ -323,6 +325,27 @@ func (suite *Suite) TestGetAccountAtBlockID() {
 
 		suite.Require().Error(err)
 		errors.Is(err, status.Error(codes.InvalidArgument, ""))
+	})
+
+	suite.Run("valid request for unavailable data", func() {
+		suite.commits.On("ByBlockID", id).Return(nil, nil).Once()
+
+		expectedErr := fmt.Errorf(
+			"failed to execute script at block (%s): %w (%s). "+
+				"this error usually happens if the reference "+
+				"block for this script is not set to a recent block.",
+			id,
+			scripts.ErrStateCommitmentPruned,
+			unittest.IdentifierFixture(),
+		)
+
+		mockEngine.On("GetAccount", mock.Anything, serviceAddress, id).Return(nil, expectedErr).Once()
+
+		req := createReq(id[:], serviceAddress.Bytes())
+
+		resp, err := handler.GetAccountAtBlockID(context.Background(), req)
+		suite.Assert().Nil(resp)
+		suite.Assert().Equal(codes.OutOfRange, status.Code(err))
 	})
 }
 

@@ -14,6 +14,8 @@ import (
 var (
 	FlowEVMTestnetChainID = big.NewInt(666)
 	FlowEVMMainnetChainID = big.NewInt(777)
+	BlockLevelGasLimit    = uint64(math.MaxUint64)
+	zero                  = uint64(0)
 )
 
 // Config sets the required parameters
@@ -30,7 +32,13 @@ type Config struct {
 	DirectCallBaseGasUsage uint64
 }
 
-var zero = uint64(0)
+// DefaultChainConfig is the default chain config which
+// considers majority of EVM upgrades (e.g. Shanghai update) already been applied
+// this has done through setting the height of these changes
+// to zero nad setting the time for some other changes to zero
+// For the future changes of EVM, we need to update the EVM go mod version
+// and set a proper height for the specific release based on the Flow EVM heights
+// so it could gets activated at a desired time.
 var DefaultChainConfig = &params.ChainConfig{
 	ChainID: FlowEVMTestnetChainID, // default is testnet
 
@@ -65,8 +73,8 @@ func defaultConfig() *Config {
 		BlockContext: &vm.BlockContext{
 			CanTransfer: core.CanTransfer,
 			Transfer:    core.Transfer,
-			GasLimit:    math.MaxUint64, // block gas limit
-			BaseFee:     big.NewInt(0),  //
+			GasLimit:    BlockLevelGasLimit, // block gas limit
+			BaseFee:     big.NewInt(0),
 			GetHash: func(n uint64) common.Hash { // default returns some random hash values
 				return common.BytesToHash(crypto.Keccak256([]byte(new(big.Int).SetUint64(n).String())))
 			},
@@ -114,15 +122,6 @@ func WithOrigin(origin common.Address) Option {
 func WithGasPrice(gasPrice *big.Int) Option {
 	return func(c *Config) *Config {
 		c.TxContext.GasPrice = gasPrice
-		return c
-	}
-}
-
-// WithBaseFee sets the the base fee for each transaction
-// ramtin: it think this is similar to inclusion fee but I need to validate
-func WithBaseFee(baseFee *big.Int) Option {
-	return func(c *Config) *Config {
-		c.BlockContext.BaseFee = baseFee
 		return c
 	}
 }
