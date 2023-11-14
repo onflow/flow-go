@@ -279,10 +279,10 @@ func (s *StateMutatorSuite) TestApplyServiceEventsTransitionToNextEpoch_Error() 
 	require.False(s.T(), protocol.IsInvalidServiceEventError(err))
 }
 
-// TestApplyServiceEvents_EpochFallbackTriggered tests two scenarios when network is in epoch fallback mode.
-// In first case we have observed a global flag that we have finalized fork with invalid event and network is in epoch fallback mode.
-// In second case we have observed an InvalidStateTransitionAttempted flag which is part of some fork but has not been finalized yet.
-// In both cases we shouldn't process any service events. This is asserted by using mocked state updater without any expected methods.
+// TestApplyServiceEvents_EpochFallbackTriggered tests the scenario, where the system has entered epoch fallback mode. This
+// happens when the protocol state observes an invalid state transition, in which case it sets the `InvalidStateTransitionAttempted`
+// flag to true. After this happened, we should not process any Epoch lifecycle service events. This is asserted by using mocked
+// state updater without any expected methods.
 func (s *StateMutatorSuite) TestApplyServiceEvents_EpochFallbackTriggered() {
 	parentState := unittest.ProtocolStateFixture()
 	parentState.InvalidStateTransitionAttempted = true
