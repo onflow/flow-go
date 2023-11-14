@@ -71,7 +71,7 @@ func (b *NodeCommunicator) CallAvailableNode(
 		}
 
 		if err == gobreaker.ErrOpenState {
-			if !nodeSelector.HasNext() && len(errs.Errors) == 0 {
+			if !nodeSelector.HasNext() && errs == nil {
 				errs = multierror.Append(errs, status.Error(codes.Unavailable, "there are no available nodes"))
 			}
 			continue
