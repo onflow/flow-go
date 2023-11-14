@@ -1605,7 +1605,7 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 		networkKey,
 		builder.SporkID,
 		builder.IdentityProvider,
-		&builder.FlowConfig.NetworkConfig.ResourceManagerConfig,
+		&builder.FlowConfig.NetworkConfig.ResourceManager,
 		&builder.FlowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig,
 		&p2pconfig.PeerManagerConfig{
 			// TODO: eventually, we need pruning enabled even on public network. However, it needs a modified version of
