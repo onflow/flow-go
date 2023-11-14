@@ -105,7 +105,7 @@ func TestValidationInspector_InvalidTopicId_Detection(t *testing.T) {
 			return topicProvider
 		},
 	})
-
+	require.NoError(t, err)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
 	victimNode, victimIdentity := p2ptest.NodeFixture(t,
 		sporkID,
@@ -969,6 +969,7 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 			return topicProvider
 		},
 	})
+	require.NoError(t, err)
 	// set topic oracle to return list with all topics to avoid hasSubscription failures and force topic validation
 	topics := make([]string, len(publishMsgs))
 	for i := 0; i < len(publishMsgs); i++ {
