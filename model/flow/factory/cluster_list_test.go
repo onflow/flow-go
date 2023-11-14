@@ -1,13 +1,13 @@
 package factory_test
 
 import (
-	"github.com/onflow/flow-go/model/flow/order"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
+	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
