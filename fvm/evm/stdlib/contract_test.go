@@ -488,7 +488,7 @@ func TestEVMRun(t *testing.T) {
 
 	// Run script
 
-	_, err = rt.ExecuteScript(
+	_, err := rt.ExecuteScript(
 		runtime.Script{
 			Source:    script,
 			Arguments: EncodeArgs([]cadence.Value{evmTx, coinbase}),
