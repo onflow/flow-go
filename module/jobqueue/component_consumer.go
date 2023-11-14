@@ -8,7 +8,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -34,7 +33,7 @@ func NewComponentConsumer(
 	processor JobProcessor, // method used to process jobs
 	maxProcessing uint64,
 	maxSearchAhead uint64,
-) *ComponentConsumer {
+) (*ComponentConsumer, error) {
 
 	c := &ComponentConsumer{
 		workSignal: workSignal,
@@ -48,20 +47,17 @@ func NewComponentConsumer(
 		func(id module.JobID) { c.NotifyJobIsDone(id) },
 		maxProcessing,
 	)
-	c.consumer = NewConsumer(c.log, c.jobs, progress, worker, maxProcessing, maxSearchAhead)
+
+	consumer, err := NewConsumer(log, jobs, progress, worker, maxProcessing, maxSearchAhead, defaultIndex)
+	if err != nil {
+		return nil, err
+	}
+	c.consumer = consumer
 
 	builder := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			worker.Start(ctx)
-			if err := util.WaitClosed(ctx, worker.Ready()); err != nil {
-				c.log.Info().Msg("job consumer startup aborted")
-				<-worker.Done()
-				c.log.Info().Msg("job consumer shutdown complete")
-				return
-			}
-
 			c.log.Info().Msg("job consumer starting")
-			err := c.consumer.Start(defaultIndex)
+			err := c.consumer.Start()
 			if err != nil {
 				ctx.Throw(fmt.Errorf("could not start consumer: %w", err))
 			}
@@ -73,20 +69,38 @@ func NewComponentConsumer(
 
 			// blocks until all running jobs have stopped
 			c.consumer.Stop()
+		}).
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			worker.Start(ctx)
+
+			select {
+			case <-ctx.Done():
+				c.log.Info().Msg("job consumer startup aborted")
+			case <-worker.Ready():
+				ready()
+			}
 
 			<-worker.Done()
 			c.log.Info().Msg("job consumer shutdown complete")
 		}).
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			// marking this ready first allows this worker to depend on the component's own Ready()
+			// channel to detect when other workers have started
 			ready()
-			c.processingLoop(ctx)
+
+			select {
+			case <-ctx.Done():
+				return
+			case <-c.Ready():
+				c.processingLoop(ctx)
+			}
 		})
 
 	cm := builder.Build()
 	c.cm = cm
 	c.Component = cm
 
-	return c
+	return c, nil
 }
 
 // SetPreNotifier sets a notification function that is invoked before marking a job as done in the

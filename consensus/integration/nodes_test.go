@@ -281,7 +281,7 @@ func createRootBlockData(participantData *run.ParticipantData) (*flow.Block, *fl
 		},
 	)
 
-	root.SetPayload(flow.Payload{ProtocolStateID: inmem.ProtocolStateForBootstrapState(setup, commit).ID()})
+	root.SetPayload(flow.Payload{ProtocolStateID: inmem.ProtocolStateFromEpochServiceEvents(setup, commit).ID()})
 	result := unittest.BootstrapExecutionResultFixture(root, unittest.GenesisStateCommitment)
 	result.ServiceEvents = []flow.ServiceEvent{setup.ServiceEvent(), commit.ServiceEvent()}
 
@@ -651,6 +651,9 @@ func createNode(
 	require.NoError(t, err)
 	idProvider := id.NewFixedIdentifierProvider(identities.NodeIDs())
 
+	spamConfig, err := synceng.NewSpamDetectionConfig()
+	require.NoError(t, err, "could not initialize spam detection config")
+
 	// initialize the synchronization engine
 	sync, err := synceng.New(
 		log,
@@ -662,7 +665,7 @@ func createNode(
 		comp,
 		syncCore,
 		idProvider,
-		synceng.NewSpamDetectionConfig(),
+		spamConfig,
 		func(cfg *synceng.Config) {
 			// use a small pool and scan interval for sync engine
 			cfg.ScanInterval = 500 * time.Millisecond

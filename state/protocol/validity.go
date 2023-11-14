@@ -15,35 +15,35 @@ import (
 // CAUTION: This function assumes that all inputs besides extendingCommit are already validated.
 // Expected errors during normal operations:
 // * protocol.InvalidServiceEventError if the input service event is invalid to extend the currently active epoch status
-func IsValidExtendingEpochSetup(extendingSetup *flow.EpochSetup, activeSetup *flow.EpochSetup, status *flow.EpochStatus) error {
+func IsValidExtendingEpochSetup(extendingSetup *flow.EpochSetup, protocolStateEntry *flow.ProtocolStateEntry, currentEpochSetupEvent *flow.EpochSetup) error {
 	// Enforce EpochSetup is valid w.r.t to current epoch state
-	if status.NextEpoch.SetupID != flow.ZeroID { // We should only have a single epoch setup event per epoch.
+	if protocolStateEntry.NextEpoch != nil { // We should only have a single epoch setup event per epoch.
 		// true iff EpochSetup event for NEXT epoch was already included before
-		return NewInvalidServiceEventErrorf("duplicate epoch setup service event: %x", status.NextEpoch.SetupID)
+		return NewInvalidServiceEventErrorf("duplicate epoch setup service event: %x", protocolStateEntry.NextEpoch.SetupID)
 	}
-	if extendingSetup.Counter != activeSetup.Counter+1 { // The setup event should have the counter increased by one.
-		return NewInvalidServiceEventErrorf("next epoch setup has invalid counter (%d => %d)", activeSetup.Counter, extendingSetup.Counter)
+	if extendingSetup.Counter != currentEpochSetupEvent.Counter+1 { // The setup event should have the counter increased by one.
+		return NewInvalidServiceEventErrorf("next epoch setup has invalid counter (%d => %d)", currentEpochSetupEvent.Counter, extendingSetup.Counter)
 	}
-	if extendingSetup.FirstView != activeSetup.FinalView+1 { // The first view needs to be exactly one greater than the current epoch final view
+	if extendingSetup.FirstView != currentEpochSetupEvent.FinalView+1 { // The first view needs to be exactly one greater than the current epoch final view
 		return NewInvalidServiceEventErrorf(
 			"next epoch first view must be exactly 1 more than current epoch final view (%d != %d+1)",
 			extendingSetup.FirstView,
-			activeSetup.FinalView,
+			currentEpochSetupEvent.FinalView,
 		)
 	}
 
 	// Enforce the EpochSetup event is syntactically correct
-	err := VerifyEpochSetup(extendingSetup, true)
+	err := IsValidEpochSetup(extendingSetup, true)
 	if err != nil {
 		return NewInvalidServiceEventErrorf("invalid epoch setup: %w", err)
 	}
 	return nil
 }
 
-// VerifyEpochSetup checks whether an `EpochSetup` event is syntactically correct. The boolean parameter `verifyNetworkAddress`
+// IsValidEpochSetup checks whether an `EpochSetup` event is syntactically correct. The boolean parameter `verifyNetworkAddress`
 // controls, whether we want to permit nodes to share a networking address.
 // This is a side-effect-free function. Any error return indicates that the EpochSetup event is not compliant with protocol rules.
-func VerifyEpochSetup(setup *flow.EpochSetup, verifyNetworkAddress bool) error {
+func IsValidEpochSetup(setup *flow.EpochSetup, verifyNetworkAddress bool) error {
 	// 1. CHECK: Enforce protocol compliance of Epoch parameters:
 	// - RandomSource of entropy in Epoch Setup event should the protocol-prescribed length
 	// - first view must be before final view
@@ -129,21 +129,18 @@ func VerifyEpochSetup(setup *flow.EpochSetup, verifyNetworkAddress bool) error {
 // the current epoch status.
 // CAUTION: This function assumes that all inputs besides extendingCommit are already validated.
 // Expected errors during normal operations:
-// * protocol.InvalidServiceEventError if the input service event is invalid to extend the currently active epoch status
-func IsValidExtendingEpochCommit(extendingCommit *flow.EpochCommit, extendingSetup *flow.EpochSetup, activeSetup *flow.EpochSetup, status *flow.EpochStatus) error {
-	// Enforce EpochSetup is valid w.r.t to current epoch state
-	if status.NextEpoch.CommitID != flow.ZeroID { // We should only have a single epoch commit event per epoch.
-		return NewInvalidServiceEventErrorf("duplicate epoch commit service event: %x", status.NextEpoch.CommitID)
-	}
-	if status.NextEpoch.SetupID == flow.ZeroID { // The epoch setup event needs to happen before the commit.
+// * protocol.InvalidServiceEventError if the input service event is invalid to extend the currently active epoch
+func IsValidExtendingEpochCommit(extendingCommit *flow.EpochCommit, protocolStateEntry *flow.ProtocolStateEntry, nextEpochSetupEvent *flow.EpochSetup) error {
+	// The epoch setup event needs to happen before the commit.
+	if protocolStateEntry.NextEpoch == nil {
 		return NewInvalidServiceEventErrorf("missing epoch setup for epoch commit")
 	}
-	if extendingCommit.Counter != activeSetup.Counter+1 { // The commit event should have the counter increased by one.
-		return NewInvalidServiceEventErrorf("next epoch commit has invalid counter (%d => %d)", activeSetup.Counter, extendingCommit.Counter)
+	// Enforce EpochSetup is valid w.r.t to current epoch state
+	if protocolStateEntry.NextEpoch.CommitID != flow.ZeroID { // We should only have a single epoch commit event per epoch.
+		return NewInvalidServiceEventErrorf("duplicate epoch commit service event: %x", protocolStateEntry.NextEpoch.CommitID)
 	}
-
 	// Enforce the EpochSetup event is syntactically correct and compatible with the respective EpochSetup
-	err := IsValidEpochCommit(extendingCommit, extendingSetup)
+	err := IsValidEpochCommit(extendingCommit, nextEpochSetupEvent)
 	if err != nil {
 		return NewInvalidServiceEventErrorf("invalid epoch commit: %s", err)
 	}

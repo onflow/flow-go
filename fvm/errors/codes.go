@@ -26,6 +26,7 @@ const (
 	FailureCodeParseRestrictedModeInvalidAccessFailure ErrorCode = 2006
 	FailureCodePayerBalanceCheckFailure                ErrorCode = 2007
 	FailureCodeDerivedDataCacheImplementationFailure   ErrorCode = 2008
+	FailureCodeRandomSourceFailure                     ErrorCode = 2009
 	// Deprecated: No longer used.
 	FailureCodeMetaTransactionFailure ErrorCode = 2100
 )
@@ -102,4 +103,7 @@ const (
 	ErrCodeContractNotFoundError ErrorCode = 1251
 	// Deprecated: No longer used.
 	ErrCodeContractNamesNotFoundError ErrorCode = 1252
+
+	// fvm std lib errors 1300-1400
+	ErrEVMExecutionError ErrorCode = 1300
 )

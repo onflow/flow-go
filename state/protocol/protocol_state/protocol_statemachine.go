@@ -53,7 +53,7 @@ func newStateMachine(view uint64, parentState *flow.RichProtocolStateEntry) (*pr
 // Expected errors during normal operations:
 // - `protocol.InvalidServiceEventError` if the service event is invalid or is not a valid state transition for the current protocol state
 func (u *protocolStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (bool, error) {
-	err := protocol.IsValidExtendingEpochSetup(epochSetup, u.parentState.CurrentEpochSetup, u.parentState.EpochStatus())
+	err := protocol.IsValidExtendingEpochSetup(epochSetup, u.parentState.ProtocolStateEntry, u.parentState.CurrentEpochSetup)
 	if err != nil {
 		return false, fmt.Errorf("invalid epoch setup event: %w", err)
 	}
@@ -141,11 +141,7 @@ func (u *protocolStateMachine) ProcessEpochCommit(epochCommit *flow.EpochCommit)
 	if u.state.NextEpoch.CommitID != flow.ZeroID {
 		return false, protocol.NewInvalidServiceEventErrorf("protocol state has already a commit event")
 	}
-	err := protocol.IsValidExtendingEpochCommit(
-		epochCommit,
-		u.parentState.NextEpochSetup,
-		u.parentState.CurrentEpochSetup,
-		u.parentState.EpochStatus())
+	err := protocol.IsValidExtendingEpochCommit(epochCommit, u.parentState.ProtocolStateEntry, u.parentState.NextEpochSetup)
 	if err != nil {
 		return false, fmt.Errorf("invalid epoch commit event: %w", err)
 	}

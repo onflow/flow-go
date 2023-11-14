@@ -9,18 +9,24 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	_ "google.golang.org/grpc/encoding/gzip" // required for gRPC compression
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/engine"
+	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/deflate" // required for gRPC compression
+	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/snappy"  // required for gRPC compression
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	exeEng "github.com/onflow/flow-go/engine/execution"
+	"github.com/onflow/flow-go/engine/execution/scripts"
 	fvmerrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
@@ -193,6 +199,7 @@ func (h *handler) ExecuteScriptAtBlockID(
 
 	value, err := h.engine.ExecuteScriptAtBlockID(ctx, req.GetScript(), req.GetArguments(), blockID)
 	if err != nil {
+		// todo check the error code instead
 		// return code 3 as this passes the litmus test in our context
 		return nil, status.Errorf(codes.InvalidArgument, "failed to execute script: %v", err)
 	}
@@ -278,7 +285,7 @@ func (h *handler) GetEventsForBlockIDs(
 
 	return &execution.GetEventsForBlockIDsResponse{
 		Results:              results,
-		EventEncodingVersion: execution.EventEncodingVersion_CCF_V0,
+		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
 	}, nil
 }
 
@@ -341,7 +348,7 @@ func (h *handler) GetTransactionResult(
 		StatusCode:           statusCode,
 		ErrorMessage:         errMsg,
 		Events:               events,
-		EventEncodingVersion: execution.EventEncodingVersion_CCF_V0,
+		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
 	}, nil
 }
 
@@ -400,7 +407,7 @@ func (h *handler) GetTransactionResultByIndex(
 		StatusCode:           statusCode,
 		ErrorMessage:         errMsg,
 		Events:               events,
-		EventEncodingVersion: execution.EventEncodingVersion_CCF_V0,
+		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
 	}, nil
 }
 
@@ -486,7 +493,7 @@ func (h *handler) GetTransactionResultsByBlockID(
 	// compose a response
 	return &execution.GetTransactionResultsResponse{
 		TransactionResults:   responseTxResults,
-		EventEncodingVersion: execution.EventEncodingVersion_CCF_V0,
+		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
 	}, nil
 }
 
@@ -537,13 +544,16 @@ func (h *handler) GetAccountAtBlockID(
 	}
 
 	value, err := h.engine.GetAccount(ctx, flowAddress, blockFlowID)
-	if errors.Is(err, storage.ErrNotFound) {
-		return nil, status.Errorf(codes.NotFound, "account with address %s not found", flowAddress)
-	}
-	if fvmerrors.IsAccountNotFoundError(err) {
-		return nil, status.Errorf(codes.NotFound, "account not found")
-	}
 	if err != nil {
+		if errors.Is(err, scripts.ErrStateCommitmentPruned) {
+			return nil, status.Errorf(codes.OutOfRange, "state for block ID %s not available", blockFlowID)
+		}
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, status.Errorf(codes.NotFound, "account with address %s not found", flowAddress)
+		}
+		if fvmerrors.IsAccountNotFoundError(err) {
+			return nil, status.Errorf(codes.NotFound, "account not found")
+		}
 		return nil, status.Errorf(codes.Internal, "failed to get account: %v", err)
 	}
 

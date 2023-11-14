@@ -323,7 +323,7 @@ func SnapshotFromBootstrapStateWithParams(
 		EpochCommitSafetyThreshold: epochCommitSafetyThreshold, // see protocol.Params for details
 	}
 
-	rootProtocolState := ProtocolStateForBootstrapState(setup, commit)
+	rootProtocolState := ProtocolStateFromEpochServiceEvents(setup, commit)
 	if rootProtocolState.ID() != root.Payload.ProtocolStateID {
 		return nil, fmt.Errorf("incorrect protocol state ID in root block, expected (%x) but got (%x)",
 			root.Payload.ProtocolStateID, rootProtocolState.ID())
@@ -350,7 +350,7 @@ func SnapshotFromBootstrapStateWithParams(
 	return snap, nil
 }
 
-// ProtocolStateForBootstrapState generates a protocol.ProtocolStateEntry for a root protocol state which is used for bootstrapping.
+// ProtocolStateFromEpochServiceEvents generates a protocol.ProtocolStateEntry for a root protocol state which is used for bootstrapping.
 //
 // CONTEXT: The EpochSetup event contains the IdentitySkeletons for each participant, thereby specifying active epoch members.
 // While ejection status and dynamic weight are not part of the EpochSetup event, we can supplement this information as follows:
@@ -359,7 +359,7 @@ func SnapshotFromBootstrapStateWithParams(
 //   - Therefore, the EpochSetup event contains the up-to-date snapshot of the epoch participants. Any weight changes or node ejection
 //     that happened before should be reflected in the EpochSetup event. Specifically, ejected
 //     nodes should be no longer listed in the EpochSetup event. Hence, when the EpochSetup event is emitted / processed, the Ejected flag is false for all epoch participants.
-func ProtocolStateForBootstrapState(setup *flow.EpochSetup, commit *flow.EpochCommit) *flow.ProtocolStateEntry {
+func ProtocolStateFromEpochServiceEvents(setup *flow.EpochSetup, commit *flow.EpochCommit) *flow.ProtocolStateEntry {
 	identities := make(flow.DynamicIdentityEntryList, 0, len(setup.Participants))
 	for _, identity := range setup.Participants {
 		identities = append(identities, &flow.DynamicIdentityEntry{
