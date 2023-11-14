@@ -94,17 +94,15 @@ type GossipSubAppSpecificScoreRegistry struct {
 	spamScoreCache p2p.GossipSubSpamRecordCache
 	penalty        GossipSubCtrlMsgPenaltyValue
 	// initial application specific penalty record, used to initialize the penalty cache entry.
-	init                      SpamRecordInitFunc
-	validator                 p2p.SubscriptionValidator
-	initDecayLowerBound       float64
-	initDecayUpperBound       float64
-	increaseDecayThreshold    float64
-	decayThresholdIncrementer float64
+	init                        SpamRecordInitFunc
+	validator                   p2p.SubscriptionValidator
+	slowerDecayPenaltyThreshold float64
+	decayRateDecrement          float64
 }
 
-// GossipSubAppSpecificScoreRegistryParams is the configuration for the GossipSubAppSpecificScoreRegistry.
+// GossipSubAppSpecificScoreRegistryConfig is the configuration for the GossipSubAppSpecificScoreRegistry.
 // The configuration is used to initialize the registry.
-type GossipSubAppSpecificScoreRegistryParams struct {
+type GossipSubAppSpecificScoreRegistryConfig struct {
 	Logger zerolog.Logger
 
 	// Validator is the subscription validator used to validate the subscriptions of peers, and determine if a peer is
@@ -126,41 +124,31 @@ type GossipSubAppSpecificScoreRegistryParams struct {
 	// The cache is used to store the application specific penalty of peers.
 	CacheFactory func() p2p.GossipSubSpamRecordCache
 
-	// InitDecayLowerBound is the lower bound on the decay value for a spam record when initialized.
-	// A random value in a range of InitDecayLowerBound and InitDecayUpperBound is used when initializing the decay
-	// of a spam record.
-	InitDecayLowerBound float64
+	// SlowerDecayPenaltyThreshold defines the penalty level which the decay rate is reduced by `DecayRateDecrement` every time the penalty of a node falls below the threshold, thereby slowing down the decay process. This mechanism ensures that malicious nodes experience longer decay periods, while honest nodes benefit from quicker decay.
+	SlowerDecayPenaltyThreshold float64
 
-	// InitDecayUpperBound is the upper bound on the decay value for a spam record when initialized.
-	InitDecayUpperBound float64
-
-// SlowerDecayPenaltyThreshold defines the penalty level which the decay rate is reduced by `DecayRateDecremen` every time the penalty of a node falls below the threshold, thereby slowing down the decay process. This mechanism ensures that malicious nodes experience longer decay periods, while honest nodes benefit from quicker decay.
-SlowerDecayPenaltyThreshold float64
-
-// DecayRateDecrement defines the value by which the decay rate is decreased every time the penalty is below the SlowerDecayPenaltyThreshold. A reduced decay rate extends the time it takes for penalties to diminish.
-DecayRateDecrement float64
+	// DecayRateDecrement defines the value by which the decay rate is decreased every time the penalty is below the SlowerDecayPenaltyThreshold. A reduced decay rate extends the time it takes for penalties to diminish.
+	DecayRateDecrement float64
 }
 
 // NewGossipSubAppSpecificScoreRegistry returns a new GossipSubAppSpecificScoreRegistry.
 // Args:
 //
-//	params: the parameters for the registry.
+//	config: the config for the registry.
 //
 // Returns:
 //
 //	a new GossipSubAppSpecificScoreRegistry.
-func NewGossipSubAppSpecificScoreRegistry(params *GossipSubAppSpecificScoreRegistryParams) *GossipSubAppSpecificScoreRegistry {
+func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegistryConfig) *GossipSubAppSpecificScoreRegistry {
 	reg := &GossipSubAppSpecificScoreRegistry{
-		logger:                    params.Logger.With().Str("module", "app_score_registry").Logger(),
-		spamScoreCache:            params.CacheFactory(),
-		penalty:                   params.Penalty,
-		init:                      params.Init,
-		validator:                 params.Validator,
-		idProvider:                params.IdProvider,
-		initDecayLowerBound:       params.InitDecayLowerBound,
-		initDecayUpperBound:       params.InitDecayUpperBound,
-		increaseDecayThreshold:    params.IncreaseDecayThreshold,
-		decayThresholdIncrementer: params.DecayThresholdIncrementer,
+		logger:                      config.Logger.With().Str("module", "app_score_registry").Logger(),
+		spamScoreCache:              config.CacheFactory(),
+		penalty:                     config.Penalty,
+		init:                        config.Init,
+		validator:                   config.Validator,
+		idProvider:                  config.IdProvider,
+		slowerDecayPenaltyThreshold: config.SlowerDecayPenaltyThreshold,
+		decayRateDecrement:          config.DecayRateDecrement,
 	}
 
 	return reg

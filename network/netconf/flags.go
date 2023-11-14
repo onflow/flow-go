@@ -78,10 +78,8 @@ const (
 	metricsInspectorCacheSize       = "gossipsub-rpc-metrics-inspector-cache-size"
 
 	// gossipsub scoring registry
-	scoringRegistryInitDecayLowerbound       = "gossipsub-scoring-registry-init-decay-lower-bound"
-	scoringRegistryInitDecayUpperbound       = "gossipsub-scoring-registry-init-decay-upper-bound"
-	scoringRegistryIncreaseDecayThreshold    = "gossipsub-scoring-registry-increase-decay-threshold"
-	scoringRegistryDecayThresholdIncrementer = "gossipsub-scoring-registry-decay-threshold-incrementer"
+	scoringRegistrySlowerDecayThreshold = "gossipsub-scoring-registry-slower-decay-threshold"
+	scoringRegistryDecayRateDecrement   = "gossipsub-scoring-registry-decay-rate-decrement"
 
 	alspDisabled            = "alsp-disable-penalty"
 	alspSpamRecordCacheSize = "alsp-spam-record-cache-size"
@@ -156,10 +154,8 @@ func AllFlagNames() []string {
 		controlMessageMaxSampleSize,
 		iwantDuplicateMsgIDThreshold,
 		iwantCacheMissCheckSize,
-		scoringRegistryInitDecayLowerbound,
-		scoringRegistryInitDecayUpperbound,
-		scoringRegistryIncreaseDecayThreshold,
-		scoringRegistryDecayThresholdIncrementer,
+		scoringRegistrySlowerDecayThreshold,
+		scoringRegistryDecayRateDecrement,
 		rpcMessageMaxSampleSize,
 		rpcMessageErrorThreshold,
 	}
@@ -272,10 +268,8 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 	flags.Float32(alspSyncEngineRangeRequestBaseProb, config.AlspConfig.SyncEngine.RangeRequestBaseProb, "base probability of creating a misbehavior report for a range request message")
 	flags.Float32(alspSyncEngineSyncRequestProb, config.AlspConfig.SyncEngine.SyncRequestProb, "probability of creating a misbehavior report for a sync request message")
 
-	flags.Float64(scoringRegistryInitDecayLowerbound, config.GossipSubConfig.GossipSubScoringRegistryConfig.InitDecayLowerBound, "the lower bound on the decay value for a spam record when initialized")
-	flags.Float64(scoringRegistryInitDecayUpperbound, config.GossipSubConfig.GossipSubScoringRegistryConfig.InitDecayUpperBound, "the upper bound on the decay value for a spam record when initialized")
-	flags.Float64(scoringRegistryIncreaseDecayThreshold, config.GossipSubConfig.GossipSubScoringRegistryConfig.IncreaseDecayThreshold, "the threshold for which when the negative penalty is below this value the decay threshold will be increased by some amount")
-	flags.Float64(scoringRegistryDecayThresholdIncrementer, config.GossipSubConfig.GossipSubScoringRegistryConfig.DecayThresholdIncrementer, "the amount the decay will be increased when the negative penalty score falls below the IncreaseDecayThreshold")
+	flags.Float64(scoringRegistrySlowerDecayThreshold, config.GossipSubConfig.GossipSubScoringRegistryConfig.SlowerDecayPenaltyThreshold, "the penalty level which the decay rate is reduced by --gossipsub-scoring-registry-decay-rate-decrement")
+	flags.Float64(scoringRegistryDecayRateDecrement, config.GossipSubConfig.GossipSubScoringRegistryConfig.DecayRateDecrement, "defines the value by which the decay rate is decreased every time the penalty is below the --gossipsub-scoring-registry-slower-decay-threshold.")
 
 	flags.Int(ihaveMaxSampleSize,
 		config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IHaveRPCInspectionConfig.MaxSampleSize,

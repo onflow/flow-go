@@ -389,11 +389,11 @@ func NewScoreOption(scoreRegistryConfig p2pconf.GossipSubScoringRegistryConfig, 
 			DebugSampler: throttledSampler,
 		})
 	validator := NewSubscriptionValidator()
-	scoreRegistry := NewGossipSubAppSpecificScoreRegistry(&GossipSubAppSpecificScoreRegistryParams{
+	scoreRegistry := NewGossipSubAppSpecificScoreRegistry(&GossipSubAppSpecificScoreRegistryConfig{
 		Logger:     logger,
 		Penalty:    DefaultGossipSubCtrlMsgPenaltyValue(),
 		Validator:  validator,
-		Init:       InitAppScoreRecordStateFunc(scoreRegistryConfig.InitDecayLowerBound, scoreRegistryConfig.InitDecayUpperBound),
+		Init:       InitAppScoreRecordStateFunc(),
 		IdProvider: scoreOptionConfig.provider,
 		CacheFactory: func() p2p.GossipSubSpamRecordCache {
 			return netcache.NewGossipSubSpamRecordCache(
@@ -403,6 +403,8 @@ func NewScoreOption(scoreRegistryConfig p2pconf.GossipSubScoringRegistryConfig, 
 				DefaultDecayAdjustmentFunc(scoreRegistryConfig.IncreaseDecayThreshold, scoreRegistryConfig.DecayThresholdIncrementer),
 				DefaultDecayFunction())
 		},
+		SlowerDecayPenaltyThreshold: ,
+		DecayRateDecrement: ,
 	})
 	s := &ScoreOption{
 		logger:          logger,

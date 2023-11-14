@@ -474,43 +474,43 @@ func TestSpamRecordDecayAdjustment(t *testing.T) {
 
 // withStakedIdentity returns a function that sets the identity provider to return an staked identity for the given peer id.
 // It is used for testing purposes, and causes the given peer id to benefit from the staked identity reward in GossipSub.
-func withStakedIdentity(peerId peer.ID) func(cfg *scoring.GossipSubAppSpecificScoreRegistryParams) {
-	return func(cfg *scoring.GossipSubAppSpecificScoreRegistryParams) {
+func withStakedIdentity(peerId peer.ID) func(cfg *scoring.GossipSubAppSpecificScoreRegistryConfig) {
+	return func(cfg *scoring.GossipSubAppSpecificScoreRegistryConfig) {
 		cfg.IdProvider.(*mock.IdentityProvider).On("ByPeerID", peerId).Return(unittest.IdentityFixture(), true).Maybe()
 	}
 }
 
 // withValidSubscriptions returns a function that sets the subscription validator to return nil for the given peer id.
 // It is used for testing purposes and causes the given peer id to never be penalized for subscribing to invalid topics.
-func withValidSubscriptions(peer peer.ID) func(cfg *scoring.GossipSubAppSpecificScoreRegistryParams) {
-	return func(cfg *scoring.GossipSubAppSpecificScoreRegistryParams) {
+func withValidSubscriptions(peer peer.ID) func(cfg *scoring.GossipSubAppSpecificScoreRegistryConfig) {
+	return func(cfg *scoring.GossipSubAppSpecificScoreRegistryConfig) {
 		cfg.Validator.(*mockp2p.SubscriptionValidator).On("CheckSubscribedToAllowedTopics", peer, testifymock.Anything).Return(nil).Maybe()
 	}
 }
 
 // withUnknownIdentity returns a function that sets the identity provider to return an error for the given peer id.
 // It is used for testing purposes, and causes the given peer id to be penalized for not having a staked identity.
-func withUnknownIdentity(peer peer.ID) func(cfg *scoring.GossipSubAppSpecificScoreRegistryParams) {
-	return func(cfg *scoring.GossipSubAppSpecificScoreRegistryParams) {
+func withUnknownIdentity(peer peer.ID) func(cfg *scoring.GossipSubAppSpecificScoreRegistryConfig) {
+	return func(cfg *scoring.GossipSubAppSpecificScoreRegistryConfig) {
 		cfg.IdProvider.(*mock.IdentityProvider).On("ByPeerID", peer).Return(nil, false).Maybe()
 	}
 }
 
 // withInvalidSubscriptions returns a function that sets the subscription validator to return an error for the given peer id.
 // It is used for testing purposes and causes the given peer id to be penalized for subscribing to invalid topics.
-func withInvalidSubscriptions(peer peer.ID) func(cfg *scoring.GossipSubAppSpecificScoreRegistryParams) {
-	return func(cfg *scoring.GossipSubAppSpecificScoreRegistryParams) {
+func withInvalidSubscriptions(peer peer.ID) func(cfg *scoring.GossipSubAppSpecificScoreRegistryConfig) {
+	return func(cfg *scoring.GossipSubAppSpecificScoreRegistryConfig) {
 		cfg.Validator.(*mockp2p.SubscriptionValidator).On("CheckSubscribedToAllowedTopics", peer, testifymock.Anything).Return(fmt.Errorf("invalid subscriptions")).Maybe()
 	}
 }
 
-func withInitFunction(initFunction func() (p2p.GossipSubSpamRecord, error)) func(cfg *scoring.GossipSubAppSpecificScoreRegistryParams) {
-	return func(cfg *scoring.GossipSubAppSpecificScoreRegistryParams) {
+func withInitFunction(initFunction scoring.SpamRecordInitFunc) func(cfg *scoring.GossipSubAppSpecificScoreRegistryConfig) {
+	return func(cfg *scoring.GossipSubAppSpecificScoreRegistryConfig) {
 		cfg.Init = initFunction
 	}
 }
 
-type scoringRegistryParamsOpt func(*scoring.GossipSubAppSpecificScoreRegistryParams)
+type scoringRegistryParamsOpt func(*scoring.GossipSubAppSpecificScoreRegistryConfig)
 
 // newGossipSubAppSpecificScoreRegistry returns a new instance of GossipSubAppSpecificScoreRegistry with default values
 // for the testing purposes.
@@ -529,7 +529,7 @@ func newScoringRegistry(t *testing.T, config p2pconf.GossipSubScoringRegistryCon
 		scoring.DefaultDecayAdjustmentFunc(config.IncreaseDecayThreshold, config.DecayThresholdIncrementer),
 		scoring.DefaultDecayFunction(),
 	)
-	cfg := &scoring.GossipSubAppSpecificScoreRegistryParams{
+	cfg := &scoring.GossipSubAppSpecificScoreRegistryConfig{
 		Logger:     unittest.Logger(),
 		Init:       scoring.InitAppScoreRecordStateFunc,
 		Penalty:    penaltyValueFixtures(),
