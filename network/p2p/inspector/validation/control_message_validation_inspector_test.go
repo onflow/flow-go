@@ -94,6 +94,7 @@ func TestNewControlMsgValidationInspector(t *testing.T) {
 		require.NoError(t, err, "failed to get default flow config")
 		distributor := mockp2p.NewGossipSubInspectorNotifDistributor(t)
 		idProvider := mockmodule.NewIdentityProvider(t)
+		topicProvider := internal.NewMockUpdatableTopicProvider()
 		inspector, err := validation.NewControlMsgValidationInspector(&validation.InspectorParams{
 			Logger:                  unittest.Logger(),
 			SporkID:                 sporkID,
@@ -104,6 +105,9 @@ func TestNewControlMsgValidationInspector(t *testing.T) {
 			InspectorMetrics:        metrics.NewNoopCollector(),
 			RpcTracker:              mockp2p.NewRpcControlTracking(t),
 			NetworkingType:          network.PublicNetwork,
+			TopicOracle: func() p2p.TopicProvider {
+				return topicProvider
+			},
 		})
 		require.NoError(t, err)
 		require.NotNil(t, inspector)
@@ -118,6 +122,7 @@ func TestNewControlMsgValidationInspector(t *testing.T) {
 			HeroCacheMetricsFactory: nil,
 			InspectorMetrics:        nil,
 			RpcTracker:              nil,
+			TopicOracle:             nil,
 		})
 		require.Nil(t, inspector)
 		require.Error(t, err)
@@ -129,6 +134,7 @@ func TestNewControlMsgValidationInspector(t *testing.T) {
 		require.Contains(t, s, "validation for 'InspectorMetrics' failed on the 'required'")
 		require.Contains(t, s, "validation for 'RpcTracker' failed on the 'required'")
 		require.Contains(t, s, "validation for 'NetworkingType' failed on the 'required'")
+		require.Contains(t, s, "validation for 'TopicOracle' failed on the 'required'")
 	})
 }
 
