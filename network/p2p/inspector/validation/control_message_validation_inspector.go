@@ -817,6 +817,7 @@ func (c *ControlMsgValidationInspector) logAndDistributeAsyncInspectErrs(req *In
 		Str("control_message_type", ctlMsgType.String()).
 		Bool(logging.KeySuspicious, true).
 		Bool(logging.KeyNetworkingSecurity, true).
+		Bool("is_cluster_prefixed", isClusterPrefixed).
 		Uint64("error_count", count).
 		Str("peer_id", p2plogging.PeerId(req.Peer)).
 		Logger()
