@@ -55,6 +55,36 @@ func TestEpochSetupValidity(t *testing.T) {
 		err := protocol.IsValidEpochSetup(setup, true)
 		require.Error(t, err)
 	})
+
+	t.Run("node role missing", func(t *testing.T) {
+		_, result, _ := unittest.BootstrapFixture(participants)
+		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
+		allWithoutExecutionNodes := setup.Participants.Filter(func(identitySkeleton *flow.IdentitySkeleton) bool {
+			return identitySkeleton.Role != flow.RoleExecution
+		})
+		setup.Participants = allWithoutExecutionNodes
+
+		err := protocol.IsValidEpochSetup(setup, true)
+		require.Error(t, err)
+	})
+
+	t.Run("network addresses are not unique", func(t *testing.T) {
+		_, result, _ := unittest.BootstrapFixture(participants)
+		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
+		setup.Participants[0].Address = setup.Participants[1].Address
+
+		err := protocol.IsValidEpochSetup(setup, true)
+		require.Error(t, err)
+	})
+
+	t.Run("no cluster assignment", func(t *testing.T) {
+		_, result, _ := unittest.BootstrapFixture(participants)
+		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
+		setup.Assignments = flow.AssignmentList{}
+
+		err := protocol.IsValidEpochSetup(setup, true)
+		require.Error(t, err)
+	})
 }
 
 func TestBootstrapInvalidEpochCommit(t *testing.T) {
