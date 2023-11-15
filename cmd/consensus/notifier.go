@@ -20,7 +20,7 @@ func createNotifier(log zerolog.Logger, metrics module.HotstuffMetrics) *pubsub.
 	metricsConsumer := metricsconsumer.NewMetricsConsumer(metrics)
 	logsConsumer := notifications.NewLogConsumer(log)
 	dis := pubsub.NewDistributor()
-	dis.AddParticipantConsumer(metricsConsumer)
-	dis.AddParticipantConsumer(logsConsumer)
+	dis.AddViewLifecycleConsumer(metricsConsumer)
+	dis.AddConsumer(logsConsumer)
 	return dis
 }

@@ -592,13 +592,7 @@ func main() {
 
 			logger := createLogger(node.Logger, node.RootChainID)
 			notificationsDistributor.AddTelemetryConsumer(notifications.NewTelemetryLogger(logger))
-
-			slashingViolationConsumer := notifications.NewSlashingViolationsLogger(nodeBuilder.Logger)
-			notifier.AddProposalViolationConsumer(slashingViolationConsumer)
-			notifier.AddVoteAggregationViolationConsumer(slashingViolationConsumer)
-			notifier.AddTimeoutAggregationViolationConsumer(slashingViolationConsumer)
-
-			notificationsDistributor.AddProposalViolationConsumer(slashingViolationConsumer)
+			notificationsDistributor.AddSlashingViolationsConsumer(notifications.NewSlashingViolationsLogger(nodeBuilder.Logger))
 
 			// initialize the persister
 			persist := persister.New(node.DB, node.RootChainID)

@@ -75,14 +75,15 @@ func (f *HotStuffFactory) CreateModules(
 	// setup metrics/logging with the new chain ID
 	log := f.createLogger(cluster)
 	metrics := f.createMetrics(cluster.ChainID())
-	telemetryConsumer := notifications.NewTelemetryLogger(log)
-	slashingConsumer := notifications.NewSlashingViolationsLogger(log)
-	notifier := pubsub.NewDistributor()
-	notifier.AddParticipantConsumer(notifications.NewLogConsumer(log))
-	notifier.AddParticipantConsumer(hotmetrics.NewMetricsConsumer(metrics))
-	notifier.AddViewLifecycleConsumer(telemetryConsumer)
-	notifier.AddProposalViolationConsumer(slashingConsumer)
 
+	// instantiate central pub-sum instance for all internal consensus notifications
+	notifier := pubsub.NewDistributor()
+	notifier.AddTelemetryConsumer(notifications.NewTelemetryLogger(log))
+	notifier.AddSlashingViolationsConsumer(notifications.NewSlashingViolationsLogger(log))
+	notifier.AddConsumer(notifications.NewLogConsumer(log))
+	notifier.AddViewLifecycleConsumer(hotmetrics.NewMetricsConsumer(metrics))
+
+	// instantiate cluster committee
 	var (
 		err       error
 		committee hotstuff.DynamicCommittee
@@ -114,13 +115,9 @@ func (f *HotStuffFactory) CreateModules(
 		return nil, nil, err
 	}
 
-	voteAggregationDistributor := pubsub.NewVoteAggregationDistributor()
-	voteAggregationDistributor.AddVoteCollectorConsumer(telemetryConsumer)
-	voteAggregationDistributor.AddVoteAggregationViolationConsumer(slashingConsumer)
-
 	verifier := verification.NewStakingVerifier()
 	validator := validatorImpl.NewMetricsWrapper(validatorImpl.New(committee, verifier), metrics)
-	voteProcessorFactory := votecollector.NewStakingVoteProcessorFactory(committee, voteAggregationDistributor.OnQcConstructedFromVotes)
+	voteProcessorFactory := votecollector.NewStakingVoteProcessorFactory(committee, notifier.OnQcConstructedFromVotes)
 	voteAggregator, err := consensus.NewVoteAggregator(
 		log,
 		metrics,
@@ -129,25 +126,21 @@ func (f *HotStuffFactory) CreateModules(
 		// since we don't want to aggregate votes for finalized view,
 		// the lowest retained view starts with the next view of the last finalized view.
 		finalizedBlock.View+1,
-		voteAggregationDistributor,
+		notifier,
 		voteProcessorFactory)
 	if err != nil {
 		return nil, nil, err
 	}
 	notifier.AddFinalizationConsumer(voteAggregator)
 
-	timeoutCollectorDistributor := pubsub.NewTimeoutAggregationDistributor()
-	timeoutCollectorDistributor.AddTimeoutCollectorConsumer(telemetryConsumer)
-	timeoutCollectorDistributor.AddTimeoutAggregationViolationConsumer(slashingConsumer)
-
-	timeoutProcessorFactory := timeoutcollector.NewTimeoutProcessorFactory(log, timeoutCollectorDistributor, committee, validator, msig.CollectorTimeoutTag)
+	timeoutProcessorFactory := timeoutcollector.NewTimeoutProcessorFactory(log, notifier, committee, validator, msig.CollectorTimeoutTag)
 	timeoutAggregator, err := consensus.NewTimeoutAggregator(
 		log,
 		metrics,
 		f.engineMetrics,
 		f.mempoolMetrics,
 		timeoutProcessorFactory,
-		timeoutCollectorDistributor,
+		notifier,
 		finalizedBlock.View+1)
 	if err != nil {
 		return nil, nil, err

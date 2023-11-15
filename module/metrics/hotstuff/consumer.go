@@ -13,11 +13,11 @@ import (
 // It depends on Metrics module to report metrics data.
 type MetricsConsumer struct {
 	// inherit from noop consumer in order to satisfy the full interface
-	notifications.NoopParticipantConsumer
+	notifications.NoopViewLifecycleConsumer
 	metrics module.HotstuffMetrics
 }
 
-var _ hotstuff.ParticipantConsumer = (*MetricsConsumer)(nil)
+var _ hotstuff.ViewLifecycleConsumer = (*MetricsConsumer)(nil)
 
 func NewMetricsConsumer(metrics module.HotstuffMetrics) *MetricsConsumer {
 	return &MetricsConsumer{

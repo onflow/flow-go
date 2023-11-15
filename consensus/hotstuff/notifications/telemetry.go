@@ -38,13 +38,9 @@ type TelemetryLogger struct {
 	noPathLogger zerolog.Logger
 }
 
-// Telemetry implements consumers for _all happy-path_ interfaces in consensus/hotstuff/notifications/telemetry.go:
-var _ hotstuff.ViewLifecycleConsumer = (*TelemetryLogger)(nil)
-var _ hotstuff.CommunicatorConsumer = (*TelemetryLogger)(nil)
-var _ hotstuff.FinalizationConsumer = (*TelemetryLogger)(nil)
-var _ hotstuff.VoteCollectorConsumer = (*TelemetryLogger)(nil)
-var _ hotstuff.TimeoutCollectorConsumer = (*TelemetryLogger)(nil)
-var _ hotstuff.TelemetryConsumer = (*TelemetryLogger)(nil)
+// TelemetryConsumer collects all consensus notifications emitted by `hotstuff.Consumer`, except for
+// protocol violations. This is encapsulated in the auxiliary interface `TelemetryConsumer` (package local).
+var _ TelemetryConsumer = (*TelemetryLogger)(nil)
 
 // NewTelemetryLogger creates consumer that reports telemetry events using logger backend.
 // Logger MUST include `chain` parameter as part of log context with corresponding chain ID to correctly map telemetry events to chain.

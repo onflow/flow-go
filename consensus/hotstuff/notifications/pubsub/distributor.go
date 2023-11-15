@@ -2,6 +2,7 @@ package pubsub
 
 import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 )
 
 // Distributor bundles _all_ hotstuff notifications and distributes them to the subscribed consumers.
@@ -30,12 +31,24 @@ func (d *Distributor) AddConsumer(consumer hotstuff.Consumer) {
 	d.AddTimeoutAggregationConsumer(consumer)
 }
 
-func (d *Distributor) AddTelemetryConsumer(consumer hotstuff.TelemetryConsumer) {
+// AddTelemetryConsumer subscribes the given `notifications.TelemetryConsumer` to all notifications emitted by `hotstuff.Consumer`,
+// except for protocol violations. Functionally, it corresponds to the `hotstuff.Consumer` *minus* the methods in
+// `ProposalViolationConsumer`, `VoteAggregationViolationConsumer`, `TimeoutAggregationViolationConsumer`.
+func (d *Distributor) AddTelemetryConsumer(consumer notifications.TelemetryConsumer) {
 	d.AddViewLifecycleConsumer(consumer)
 	d.AddCommunicatorConsumer(consumer)
 	d.AddFinalizationConsumer(consumer)
 	d.AddVoteCollectorConsumer(consumer)
 	d.AddTimeoutCollectorConsumer(consumer)
+}
+
+// AddSlashingViolationsConsumer  subscribes the given `notifications.SlashingViolationsConsumer` all consensus notifications
+// emitted by `hotstuff.Consumer` that are related to protocol violations. Functionally, this corresponds to the combined
+// events of `ProposalViolationConsumer`, `VoteAggregationViolationConsumer`, `TimeoutAggregationViolationConsumer`.
+func (d *Distributor) AddSlashingViolationsConsumer(consumer notifications.SlashingViolationsConsumer) {
+	d.AddProposalViolationConsumer(consumer)
+	d.AddVoteAggregationViolationConsumer(consumer)
+	d.AddTimeoutAggregationViolationConsumer(consumer)
 }
 
 // ParticipantDistributor distributes notifications to a list of consumers (event consumers).
