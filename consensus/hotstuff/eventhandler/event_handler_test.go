@@ -75,7 +75,7 @@ func (p *TestPaceMaker) LastViewTC() *flow.TimeoutCertificate {
 
 // using a real pacemaker for testing event handler
 func initPaceMaker(t require.TestingT, ctx context.Context, livenessData *hotstuff.LivenessData) hotstuff.PaceMaker {
-	notifier := &mocks.Consumer{}
+	notifier := &mocks.ParticipantConsumer{}
 	tc, err := timeout.NewConfig(time.Duration(minRepTimeout*1e6), time.Duration(maxRepTimeout*1e6), multiplicativeIncrease, happyPathMaxRoundFailures, time.Duration(maxRepTimeout*1e6))
 	require.NoError(t, err)
 	persist := &mocks.Persister{}
@@ -253,7 +253,7 @@ type EventHandlerSuite struct {
 	persist       *mocks.Persister
 	blockProducer *BlockProducer
 	committee     *Committee
-	notifier      *mocks.Consumer
+	notifier      *mocks.ParticipantConsumer
 	safetyRules   *SafetyRules
 
 	initView       uint64 // the current view at the beginning of the test case

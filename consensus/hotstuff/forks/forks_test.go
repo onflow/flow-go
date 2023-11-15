@@ -686,7 +686,7 @@ func TestNotifications(t *testing.T) {
 	require.Nil(t, err)
 
 	t.Run("consensus participant mode: ingest validated blocks", func(t *testing.T) {
-		notifier := &mocks.Consumer{}
+		notifier := &mocks.ParticipantConsumer{}
 		// 4 blocks including the genesis are incorporated
 		notifier.On("OnBlockIncorporated", mock.Anything).Return(nil).Times(4)
 		notifier.On("OnFinalizedBlock", blocks[0]).Once()
@@ -699,7 +699,7 @@ func TestNotifications(t *testing.T) {
 	})
 
 	t.Run("consensus follower mode: ingest certified blocks", func(t *testing.T) {
-		notifier := &mocks.Consumer{}
+		notifier := &mocks.ParticipantConsumer{}
 		// 4 blocks including the genesis are incorporated
 		notifier.On("OnBlockIncorporated", mock.Anything).Return(nil).Times(4)
 		notifier.On("OnFinalizedBlock", blocks[0]).Once()
@@ -743,9 +743,9 @@ func TestFinalizingMultipleBlocks(t *testing.T) {
 	// _eventually_ arriving. I.e. consumers expect notifications / events to be potentially lagging behind.
 	expectedFinalityProof := makeFinalityProof(t, blocks[3], blocks[4], blocks[5].QC)
 
-	setupForksAndAssertions := func() (*Forks, *mockmodule.Finalizer, *mocks.Consumer) {
+	setupForksAndAssertions := func() (*Forks, *mockmodule.Finalizer, *mocks.ParticipantConsumer) {
 		// initialize Forks with custom event consumers so we can check order of emitted events
-		notifier := &mocks.Consumer{}
+		notifier := &mocks.ParticipantConsumer{}
 		finalizationCallback := mockmodule.NewFinalizer(t)
 		notifier.On("OnBlockIncorporated", mock.Anything).Return(nil)
 		forks, err := New(builder.GenesisBlock(), finalizationCallback, notifier)
@@ -820,8 +820,8 @@ func TestFinalizingMultipleBlocks(t *testing.T) {
 
 //* ************************************* internal functions ************************************* */
 
-func newForks(t *testing.T) (*Forks, *mocks.Consumer) {
-	notifier := mocks.NewConsumer(t)
+func newForks(t *testing.T) (*Forks, *mocks.ParticipantConsumer) {
+	notifier := mocks.NewParticipantConsumer(t)
 	notifier.On("OnBlockIncorporated", mock.Anything).Return(nil).Maybe()
 	notifier.On("OnFinalizedBlock", mock.Anything).Maybe()
 	finalizationCallback := mockmodule.NewFinalizer(t)
