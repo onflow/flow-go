@@ -12,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/evm"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
@@ -224,6 +225,21 @@ func (executor *transactionExecutor) execute() error {
 }
 
 func (executor *transactionExecutor) ExecuteTransactionBody() error {
+	// setup evm
+	if executor.ctx.EVMEnabled {
+		chain := executor.ctx.Chain
+		err := evm.SetupEnvironment(
+			chain.ChainID(),
+			executor.env,
+			executor.cadenceRuntime.TxRuntimeEnv,
+			chain.ServiceAddress(),
+			FlowTokenAddress(chain),
+		)
+		if err != nil {
+			return err
+		}
+	}
+
 	var invalidator derived.TransactionInvalidator
 	if !executor.errs.CollectedError() {
 
