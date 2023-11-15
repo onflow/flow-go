@@ -819,11 +819,12 @@ func TestEVMAddressDeposit(t *testing.T) {
               .borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
           let minter <- admin.createNewMinter(allowedAmount: 1.23)
           let vault <- minter.mintTokens(amount: 1.23)
+          destroy minter
+
           let address = EVM.EVMAddress(
               bytes: [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
           )
           address.deposit(from: <-vault)
-          destroy minter
       }
    `)
 
@@ -888,6 +889,13 @@ func TestBridgedAccountWithdraw(t *testing.T) {
 
 	t.Parallel()
 
+	expectedDepositBalance, err := cadence.NewUFix64FromParts(2, 34000000)
+	require.NoError(t, err)
+
+	expectedWithdrawBalance, err := cadence.NewUFix64FromParts(1, 23000000)
+	require.NoError(t, err)
+
+	var deposited bool
 	var withdrew bool
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
@@ -896,12 +904,22 @@ func TestBridgedAccountWithdraw(t *testing.T) {
 		flowTokenAddress: common.Address(contractsAddress),
 		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
 			assert.Equal(t, types.Address{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
-			assert.True(t, isAuthorized)
+			assert.Equal(t, deposited, isAuthorized)
 
 			return &testFlowAccount{
 				address: fromAddress,
+				deposit: func(vault *types.FLOWTokenVault) {
+					deposited = true
+					assert.Equal(t,
+						types.Balance(expectedDepositBalance),
+						vault.Balance(),
+					)
+				},
 				withdraw: func(balance types.Balance) *types.FLOWTokenVault {
-					assert.Equal(t, types.Balance(0), balance)
+					assert.Equal(t,
+						types.Balance(expectedWithdrawBalance),
+						balance,
+					)
 					withdrew = true
 					return types.NewFlowTokenVault(balance)
 				},
@@ -920,11 +938,20 @@ func TestBridgedAccountWithdraw(t *testing.T) {
 
       access(all)
       fun main(): UFix64 {
+          let admin = getAuthAccount(0x1)
+              .borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+          let minter <- admin.createNewMinter(allowedAmount: 2.34)
+          let vault <- minter.mintTokens(amount: 2.34)
+          destroy minter
+
           let bridgedAccount <- EVM.createBridgedAccount()
-          let vault <- bridgedAccount.withdraw(balance: EVM.Balance(flow: 0.0))
-          let balance = vault.balance
+          bridgedAccount.address().deposit(from: <-vault)
+
+          let vault2 <- bridgedAccount.withdraw(balance: EVM.Balance(flow: 1.23))
+          let balance = vault2.balance
           destroy bridgedAccount
-          destroy vault
+          destroy vault2
+
           return balance
       }
    `)
@@ -983,9 +1010,9 @@ func TestBridgedAccountWithdraw(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	require.Equal(t, cadence.UFix64(0), result)
-
-	require.True(t, withdrew)
+	assert.True(t, deposited)
+	assert.True(t, withdrew)
+	assert.Equal(t, expectedWithdrawBalance, result)
 }
 
 func TestBridgedAccountDeploy(t *testing.T) {
