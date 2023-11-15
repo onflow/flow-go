@@ -27,16 +27,13 @@ type appSpecificScoreRecordEntity struct {
 var _ flow.Entity = (*appSpecificScoreRecordEntity)(nil)
 
 // ID returns the entity id of the subscription record, which is the hash of the peer id.
-// The ApplicationSpecificScoreCache uses the entity id as the key in the cache.
-func (a *appSpecificScoreRecordEntity) ID() flow.Identifier {
-	if a.entityId == flow.ZeroID {
-		a.entityId = flow.MakeID(a.PeerID)
-	}
+// The AppSpecificScoreCache uses the entity id as the key in the cache.
+func (a appSpecificScoreRecordEntity) ID() flow.Identifier {
 	return a.entityId
 }
 
 // Checksum returns the entity id of the subscription record, which is the hash of the peer id.
 // It is of no use in the cache, but it is implemented to satisfy the flow.Entity interface.
-func (a *appSpecificScoreRecordEntity) Checksum() flow.Identifier {
-	return a.ID()
+func (a appSpecificScoreRecordEntity) Checksum() flow.Identifier {
+	return a.entityId
 }

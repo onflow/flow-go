@@ -88,13 +88,14 @@ type GossipSubApplicationSpecificScoreCache interface {
 	Get(peerID peer.ID) (float64, time.Time, bool)
 
 	// Add adds the application specific score of a peer to the cache.
-	// The cache is expected to have an eject policy to remove the least recently used record when the cache is full,
-	// hence Add is expected to succeed always.
+	// If the peer already has a score in the cache, the score is updated.
 	// Args:
 	// - peerID: the peer ID of the peer in the GossipSub protocol.
 	// - score: the application specific score of the peer.
 	// - time: the time at which the score was last updated.
-	Add(peerID peer.ID, score float64, time time.Time)
+	// Returns:
+	// - error on failure to add the score. The returned error is irrecoverable and indicates an exception.
+	Add(peerID peer.ID, score float64, time time.Time) error
 }
 
 // GossipSubSpamRecord represents spam record of a peer in the GossipSub protocol.
