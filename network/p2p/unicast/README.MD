@@ -52,7 +52,7 @@ that the connection is persistent and will be kept open by the `PeerManager`.
 
 ## Backoff and Retry Attempts
 The flowchart below explains the abstract logic of the `UnicastManager` when it receives a `CreateStream` invocation.
-One a happy path, the `UnicastManager` successfully open a stream to the peer.
+On the happy path, the `UnicastManager` successfully opens a stream to the peer.
 However, there can be cases that the remote peer is not reliable for stream creation, or the remote peer acts
 maliciously and does not respond stream creation requests. In order to distinguish between the cases that the remote peer
 is not reliable and the cases that the remote peer is malicious, the `UnicastManager` uses a backoff and retry mechanism.
