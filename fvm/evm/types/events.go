@@ -21,6 +21,7 @@ type Event struct {
 	Payload EventPayload
 }
 
+// we might break this event into two (tx included /tx executed) if size becomes an issue
 type TransactionExecutedPayload struct {
 	BlockHeight uint64
 	TxEncoded   []byte
