@@ -289,16 +289,18 @@ const internalEVMTypeDepositFunctionName = "deposit"
 var internalEVMTypeDepositFunctionType = &sema.FunctionType{
 	Parameters: []sema.Parameter{
 		{
-			Label:          "to",
-			TypeAnnotation: sema.NewTypeAnnotation(evmAddressBytesType),
+			Label:          "from",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.AnyResourceType),
 		},
 		{
-			Label:          "amount",
-			TypeAnnotation: sema.NewTypeAnnotation(sema.UFix64Type),
+			Label:          "to",
+			TypeAnnotation: sema.NewTypeAnnotation(evmAddressBytesType),
 		},
 	},
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.VoidType),
 }
+
+const fungibleTokenVaultTypeBalanceFieldName = "balance"
 
 func newInternalEVMTypeDepositFunction(
 	gauge common.MemoryGauge,
@@ -311,14 +313,87 @@ func newInternalEVMTypeDepositFunction(
 			inter := invocation.Interpreter
 			locationRange := invocation.LocationRange
 
+			// Get from vault
+
+			fromValue, ok := invocation.Arguments[0].(*interpreter.CompositeValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			amountValue, ok := fromValue.GetField(
+				inter,
+				locationRange,
+				fungibleTokenVaultTypeBalanceFieldName,
+			).(interpreter.UFix64Value)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			amount := types.Balance(amountValue)
+
 			// Get to address
 
-			toAddressValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			toAddressValue, ok := invocation.Arguments[1].(*interpreter.ArrayValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
 
 			toAddress, err := AddressBytesArrayValueToEVMAddress(inter, locationRange, toAddressValue)
+			if err != nil {
+				panic(err)
+			}
+
+			// NOTE: We're intentionally not destroying the vault here,
+			// because the value of it is supposed to be "kept alive".
+			// Destroying would incorrectly be equivalent to a burn and decrease the total supply,
+			// and a withdrawal would then have to perform an actual mint of new tokens.
+
+			// Deposit
+
+			const isAuthorized = false
+			account := handler.AccountByAddress(toAddress, isAuthorized)
+			account.Deposit(types.NewFlowTokenVault(amount))
+
+			return interpreter.Void
+		},
+	)
+}
+
+const internalEVMTypeWithdrawFunctionName = "withdraw"
+
+var internalEVMTypeWithdrawFunctionType = &sema.FunctionType{
+	Parameters: []sema.Parameter{
+		{
+			Label:          "from",
+			TypeAnnotation: sema.NewTypeAnnotation(evmAddressBytesType),
+		},
+		{
+			Label:          "amount",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.UFix64Type),
+		},
+	},
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.AnyResourceType),
+}
+
+func newInternalEVMTypeWithdrawFunction(
+	gauge common.MemoryGauge,
+	handler types.ContractHandler,
+) *interpreter.HostFunctionValue {
+	return interpreter.NewHostFunctionValue(
+		gauge,
+		internalEVMTypeCallFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			inter := invocation.Interpreter
+			locationRange := invocation.LocationRange
+
+			// Get from address
+
+			fromAddressValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			fromAddress, err := AddressBytesArrayValueToEVMAddress(inter, locationRange, fromAddressValue)
 			if err != nil {
 				panic(err)
 			}
@@ -332,13 +407,117 @@ func newInternalEVMTypeDepositFunction(
 
 			amount := types.Balance(amountValue)
 
-			// Call
+			// Withdraw
 
-			const isAuthorized = false
-			account := handler.AccountByAddress(toAddress, isAuthorized)
-			account.Deposit(types.NewFlowTokenVault(amount))
+			const isAuthorized = true
+			account := handler.AccountByAddress(fromAddress, isAuthorized)
+			vault := account.Withdraw(amount)
 
-			return interpreter.Void
+			// TODO: improve: maybe call actual constructor
+			return interpreter.NewCompositeValue(
+				inter,
+				locationRange,
+				common.NewAddressLocation(gauge, handler.FlowTokenAddress(), "FlowToken"),
+				"FlowToken.Vault",
+				common.CompositeKindResource,
+				[]interpreter.CompositeField{
+					{
+						Name: "balance",
+						Value: interpreter.NewUFix64Value(gauge, func() uint64 {
+							return uint64(vault.Balance())
+						}),
+					},
+				},
+				common.ZeroAddress,
+			)
+		},
+	)
+}
+
+const internalEVMTypeDeployFunctionName = "deploy"
+
+var internalEVMTypeDeployFunctionType = &sema.FunctionType{
+	Parameters: []sema.Parameter{
+		{
+			Label:          "from",
+			TypeAnnotation: sema.NewTypeAnnotation(evmAddressBytesType),
+		},
+		{
+			Label:          "code",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.ByteArrayType),
+		},
+		{
+			Label:          "gasLimit",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.UInt64Type),
+		},
+		{
+			Label:          "value",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.UFix64Type),
+		},
+	},
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(evmAddressBytesType),
+}
+
+func newInternalEVMTypeDeployFunction(
+	gauge common.MemoryGauge,
+	handler types.ContractHandler,
+) *interpreter.HostFunctionValue {
+	return interpreter.NewHostFunctionValue(
+		gauge,
+		internalEVMTypeCallFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			inter := invocation.Interpreter
+			locationRange := invocation.LocationRange
+
+			// Get from address
+
+			fromAddressValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			fromAddress, err := AddressBytesArrayValueToEVMAddress(inter, locationRange, fromAddressValue)
+			if err != nil {
+				panic(err)
+			}
+
+			// Get code
+
+			codeValue, ok := invocation.Arguments[1].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			code, err := interpreter.ByteArrayValueToByteSlice(inter, codeValue, locationRange)
+			if err != nil {
+				panic(err)
+			}
+
+			// Get gas limit
+
+			gasLimitValue, ok := invocation.Arguments[2].(interpreter.UInt64Value)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			gasLimit := types.GasLimit(gasLimitValue)
+
+			// Get value
+
+			amountValue, ok := invocation.Arguments[3].(interpreter.UFix64Value)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			amount := types.Balance(amountValue)
+
+			// Deploy
+
+			const isAuthorized = true
+			account := handler.AccountByAddress(fromAddress, isAuthorized)
+			address := account.Deploy(code, gasLimit, amount)
+
+			return EVMAddressToAddressBytesArrayValue(inter, address)
 		},
 	)
 }
@@ -357,6 +536,8 @@ func NewInternalEVMContractValue(
 			internalEVMTypeCreateBridgedAccountFunctionName: newInternalEVMTypeCreateBridgedAccountFunction(gauge, handler),
 			internalEVMTypeCallFunctionName:                 newInternalEVMTypeCallFunction(gauge, handler),
 			internalEVMTypeDepositFunctionName:              newInternalEVMTypeDepositFunction(gauge, handler),
+			internalEVMTypeWithdrawFunctionName:             newInternalEVMTypeWithdrawFunction(gauge, handler),
+			internalEVMTypeDeployFunctionName:               newInternalEVMTypeDeployFunction(gauge, handler),
 		},
 		nil,
 		nil,
@@ -395,6 +576,18 @@ var InternalEVMContractType = func() *sema.CompositeType {
 			ty,
 			internalEVMTypeDepositFunctionName,
 			internalEVMTypeDepositFunctionType,
+			"",
+		),
+		sema.NewUnmeteredPublicFunctionMember(
+			ty,
+			internalEVMTypeWithdrawFunctionName,
+			internalEVMTypeWithdrawFunctionType,
+			"",
+		),
+		sema.NewUnmeteredPublicFunctionMember(
+			ty,
+			internalEVMTypeDeployFunctionName,
+			internalEVMTypeDeployFunctionType,
 			"",
 		),
 	})

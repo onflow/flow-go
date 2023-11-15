@@ -19,11 +19,9 @@ contract EVM {
         /// Deposits the given vault into the EVM account with the given address
         access(all)
         fun deposit(from: @FlowToken.Vault) {
-            let amount = from.balance
-            destroy from
             InternalEVM.deposit(
-                to: self.bytes,
-                amount: amount
+                from: <-from,
+                to: self.bytes
             )
         }
     }
@@ -70,19 +68,32 @@ contract EVM {
             self.address().deposit(from: <-from)
         }
 
-        // TODO:
-        // /// Withdraws the balance from the bridged account's balance
-        // access(all)
-        // fun withdraw(balance: Balance): @FlowToken.Vault
-        //
-        // /// Deploys a contract to the EVM environment.
-        // /// Returns the address of the newly deployed contract
-        // access(all)
-        // fun deploy(
-        //     code: [UInt8],
-        //     gasLimit: UInt64,
-        //     value: Balance
-        // ): EVMAddress
+        /// Withdraws the balance from the bridged account's balance
+        access(all)
+        fun withdraw(balance: Balance): @FlowToken.Vault {
+            let vault <- InternalEVM.withdraw(
+                from: self.addressBytes,
+                amount: balance.flow
+            ) as! @FlowToken.Vault
+            return <-vault
+        }
+
+        /// Deploys a contract to the EVM environment.
+        /// Returns the address of the newly deployed contract
+        access(all)
+        fun deploy(
+            code: [UInt8],
+            gasLimit: UInt64,
+            value: Balance
+        ): EVMAddress {
+            let addressBytes = InternalEVM.deploy(
+                from: self.addressBytes,
+                code: code,
+                gasLimit: gasLimit,
+                value: value.flow
+            )
+            return EVMAddress(bytes: addressBytes)
+        }
 
         /// Calls a function with the given data.
         /// The execution is limited by the given amount of gas
