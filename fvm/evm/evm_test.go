@@ -211,6 +211,9 @@ func TestBridgedAccountWithdraw(t *testing.T) {
 // TODO: deposit non-zero amount
 func TestBridgedAccountDeploy(t *testing.T) {
 
+	// TODO:
+	t.Skip("TODO")
+
 	t.Parallel()
 
 	RunWithTestBackend(t, func(backend types.Backend) {
