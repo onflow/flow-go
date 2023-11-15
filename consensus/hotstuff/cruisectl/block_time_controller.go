@@ -34,10 +34,11 @@ type TimedBlock struct {
 // epochInfo stores data about the current and next epoch. It is updated when we enter
 // the first view of a new epoch, or the EpochSetup phase of the current epoch.
 type epochInfo struct {
-	curEpochFirstView     uint64
-	curEpochFinalView     uint64    // F[v] - the final view of the epoch
-	curEpochTargetEndTime time.Time // T[v] - the target end time of the current epoch
-	nextEpochFinalView    *uint64
+	curEpochFirstView      uint64
+	curEpochFinalView      uint64    // F[v] - the final view of the epoch
+	curEpochTargetEndTime  time.Time // T[v] - the target end time of the current epoch
+	nextEpochFinalView     *uint64
+	nextEpochTargetEndTime time.Time
 }
 
 // targetViewTime returns τ[v], the ideal, steady-state view time for the current epoch.
@@ -68,7 +69,7 @@ func (epoch *epochInfo) fractionComplete(curView uint64) float64 {
 // interface, specifically `happyPathBlockTime` on the happy path. The purpose of the
 // `ProposalTiming` wrapper is to translate the raw controller output into a form
 // that is useful for the event handler. Edge cases, such as initialization or
-// EECC are implemented by other implementations of `ProposalTiming`.
+// epoch fallback are implemented by other implementations of `ProposalTiming`.
 type BlockTimeController struct {
 	component.Component
 	protocol.Consumer // consumes protocol state events
@@ -162,6 +163,12 @@ func (ctl *BlockTimeController) initEpochInfo(curView uint64) error {
 	}
 	ctl.curEpochFinalView = curEpochFinalView
 
+	curEpochTargetEndTime, err := curEpoch.TargetEndTime()
+	if err != nil {
+		return fmt.Errorf("could not initialize current epoch target end time: %w", err)
+	}
+	ctl.curEpochTargetEndTime = curEpochTargetEndTime
+
 	phase, err := finalSnapshot.Phase()
 	if err != nil {
 		return fmt.Errorf("could not check snapshot phase: %w", err)
@@ -172,6 +179,12 @@ func (ctl *BlockTimeController) initEpochInfo(curView uint64) error {
 			return fmt.Errorf("could not initialize next epoch final view: %w", err)
 		}
 		ctl.epochInfo.nextEpochFinalView = &nextEpochFinalView
+
+		nextEpochTargetEndTime, err := finalSnapshot.Epochs().Next().TargetEndTime()
+		if err != nil {
+			return fmt.Errorf("could not initialize next epoch target end time: %w", err)
+		}
+		ctl.nextEpochTargetEndTime = nextEpochTargetEndTime
 	}
 
 	ctl.curEpochTargetEndTime = ctl.config.TargetTransition.inferTargetEndTime(time.Now().UTC(), ctl.epochInfo.fractionComplete(curView))
@@ -197,8 +210,7 @@ func (ctl *BlockTimeController) initProposalTiming(curView uint64) {
 	ctl.storeProposalTiming(newPublishImmediately(curView, time.Now().UTC()))
 }
 
-// storeProposalTiming stores the latest ProposalTiming
-// Concurrency safe.
+// storeProposalTiming stores the latest ProposalTiming. Concurrency safe.
 func (ctl *BlockTimeController) storeProposalTiming(proposalTiming ProposalTiming) {
 	ctl.latestProposalTiming.Store(&proposalTiming)
 }
@@ -242,7 +254,7 @@ func (ctl *BlockTimeController) processEventsWorkerLogic(ctx irrecoverable.Signa
 		case <-ctl.epochFallbacks:
 			err := ctl.processEpochFallbackTriggered()
 			if err != nil {
-				ctl.log.Err(err).Msgf("fatal error processing epoch EECC event")
+				ctl.log.Err(err).Msgf("fatal error processing epoch fallback event")
 				ctx.Throw(err)
 			}
 		default:
@@ -270,7 +282,7 @@ func (ctl *BlockTimeController) processEventsWorkerLogic(ctx irrecoverable.Signa
 		case <-ctl.epochFallbacks:
 			err := ctl.processEpochFallbackTriggered()
 			if err != nil {
-				ctl.log.Err(err).Msgf("fatal error processing epoch EECC event")
+				ctl.log.Err(err).Msgf("fatal error processing epoch fallback event")
 				ctx.Throw(err)
 				return
 			}
@@ -321,6 +333,9 @@ func (ctl *BlockTimeController) checkForEpochTransition(tb TimedBlock) error {
 	if ctl.nextEpochFinalView == nil { // final view of epoch we are entering should be known
 		return fmt.Errorf("cannot transition without nextEpochFinalView set")
 	}
+	if ctl.nextEpochTargetEndTime.IsZero() {
+		return fmt.Errorf("cannot transition without nextEpochTargetEndTime set")
+	}
 	if view > *ctl.nextEpochFinalView { // the block's view should be within the upcoming epoch
 		return fmt.Errorf("sanity check failed: curView %d is beyond both current epoch (final view %d) and next epoch (final view %d)",
 			view, ctl.curEpochFinalView, *ctl.nextEpochFinalView)
@@ -329,7 +344,8 @@ func (ctl *BlockTimeController) checkForEpochTransition(tb TimedBlock) error {
 	ctl.curEpochFirstView = ctl.curEpochFinalView + 1
 	ctl.curEpochFinalView = *ctl.nextEpochFinalView
 	ctl.nextEpochFinalView = nil
-	ctl.curEpochTargetEndTime = ctl.config.TargetTransition.inferTargetEndTime(tb.Block.Timestamp, ctl.epochInfo.fractionComplete(view))
+	ctl.curEpochTargetEndTime = ctl.nextEpochTargetEndTime
+	ctl.nextEpochTargetEndTime = time.Time{}
 	return nil
 }
 
@@ -416,9 +432,14 @@ func (ctl *BlockTimeController) processEpochSetupPhaseStarted(snapshot protocol.
 	nextEpoch := snapshot.Epochs().Next()
 	finalView, err := nextEpoch.FinalView()
 	if err != nil {
-		return fmt.Errorf("could not get next epochInfo final view: %w", err)
+		return fmt.Errorf("could not get next epoch final view: %w", err)
+	}
+	targetEndTIme, err := nextEpoch.TargetEndTime()
+	if err != nil {
+		return fmt.Errorf("could not get next epoch target end time: %w", err)
 	}
 	ctl.epochInfo.nextEpochFinalView = &finalView
+	ctl.epochInfo.nextEpochTargetEndTime = targetEndTIme
 	return nil
 }
 
