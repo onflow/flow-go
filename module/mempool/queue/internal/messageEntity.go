@@ -1,8 +1,6 @@
 package internal
 
 import (
-	"github.com/rs/zerolog/log"
-
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -16,7 +14,6 @@ type MessageEntity struct {
 var _ flow.Entity = (*MessageEntity)(nil)
 
 func NewMessageEntity(msg *engine.Message) MessageEntity {
-	log.Debug().Str("component", "message_entity").Type("payload", msg.Payload).Msg("NewMessageEntity")
 	id := identifierOfMessage(msg)
 	return MessageEntity{
 		Msg: *msg,
