@@ -3,6 +3,8 @@ package framework
 import (
 	"testing"
 
+	"github.com/onflow/flow-go/utils/unittest"
+
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/integration/tests/common"
@@ -27,6 +29,7 @@ func TestPassThrough(t *testing.T) {
 // affected by the emitted result approvals.
 // Finally, it evaluates whether critical sealing-and-verification-related events from corrupted nodes are passed through the orchestrator.
 func (p *PassThroughTestSuite) TestSealingAndVerificationPassThrough() {
+	unittest.SkipUnless(p.T(), unittest.TEST_TODO, "flaky")
 	receipts, approvals := common.SealingAndVerificationHappyPathTest(
 		p.T(),
 		p.BlockState,

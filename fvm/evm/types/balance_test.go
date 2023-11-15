@@ -11,17 +11,14 @@ import (
 	"github.com/onflow/flow-go/fvm/evm/types"
 )
 
-var oneAttoFlow = big.NewInt(1)
-var oneFlow = new(big.Int).Mul(oneAttoFlow, big.NewInt(1e18))
-
 func TestBalance(t *testing.T) {
 	// test attoflow to flow
 
-	bal, err := types.NewBalanceFromAttoFlow(oneFlow)
+	bal, err := types.NewBalanceFromAttoFlow(types.OneFlowInAttoFlow)
 	require.NoError(t, err)
 
 	conv := bal.ToAttoFlow()
-	require.Equal(t, oneFlow, conv)
+	require.Equal(t, types.OneFlowInAttoFlow, conv)
 
 	// encoding decoding
 	ret, err := types.DecodeBalance(bal.Encode())

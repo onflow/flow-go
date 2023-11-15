@@ -258,22 +258,18 @@ func defaultInspectorSuite(rpcTracker p2p.RpcControlTracking) p2p.GossipSubRpcIn
 				queue.WithHeroStoreSizeLimit(inspectorCfg.GossipSubRPCInspectorNotificationCacheSize),
 				queue.WithHeroStoreCollector(metrics.RpcInspectorNotificationQueueMetricFactory(heroCacheMetricsFactory, networkType))}...)
 
-		inspectMsgQueueCacheCollector := metrics.GossipSubRPCInspectorQueueMetricFactory(heroCacheMetricsFactory, networkType)
-		clusterPrefixedCacheCollector := metrics.GossipSubRPCInspectorClusterPrefixedCacheMetricFactory(
-			heroCacheMetricsFactory,
-			networkType)
-		rpcValidationInspector, err := validation.NewControlMsgValidationInspector(
-			ctx,
-			logger,
-			sporkId,
-			&inspectorCfg.GossipSubRPCValidationInspectorConfigs,
-			notificationDistributor,
-			inspectMsgQueueCacheCollector,
-			clusterPrefixedCacheCollector,
-			idProvider,
-			gossipSubMetrics,
-			rpcTracker,
-		)
+		params := &validation.InspectorParams{
+			Logger:                  logger,
+			SporkID:                 sporkId,
+			Config:                  &inspectorCfg.GossipSubRPCValidationInspectorConfigs,
+			Distributor:             notificationDistributor,
+			HeroCacheMetricsFactory: heroCacheMetricsFactory,
+			IdProvider:              idProvider,
+			InspectorMetrics:        gossipSubMetrics,
+			RpcTracker:              rpcTracker,
+			NetworkingType:          networkType,
+		}
+		rpcValidationInspector, err := validation.NewControlMsgValidationInspector(params)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create new control message valiadation inspector: %w", err)
 		}

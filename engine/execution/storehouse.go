@@ -2,7 +2,9 @@ package execution
 
 import (
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/finalizedreader"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/pebble"
 )
 
 // RegisterStore is the interface for register store
@@ -26,9 +28,9 @@ type RegisterStore interface {
 	// - exception if the block is below the pruned height
 	// - exception if the save block is saved again
 	// - exception for any other exception
-	SaveRegisters(header *flow.Header, registers []flow.RegisterEntry) error
+	SaveRegisters(header *flow.Header, registers flow.RegisterEntries) error
 
-	// Depend on FinalizedReader's GetFinalizedBlockIDAtHeight
+	// Depend on FinalizedReader's FinalizedBlockIDAtHeight
 	// Depend on ExecutedFinalizedWAL.Append
 	// Depend on OnDiskRegisterStore.SaveRegisters
 	// OnBlockFinalized trigger the check of whether a block at the next height becomes finalized and executed.
@@ -55,8 +57,14 @@ type RegisterStore interface {
 }
 
 type FinalizedReader interface {
+	// FinalizedBlockIDAtHeight returns the block ID of the finalized block at the given height.
+	// It return storage.NotFound if the given height has not been finalized yet
+	// any other error returned are exceptions
 	FinalizedBlockIDAtHeight(height uint64) (flow.Identifier, error)
 }
+
+// finalizedreader.FinalizedReader is an implementation of FinalizedReader interface
+var _ FinalizedReader = (*finalizedreader.FinalizedReader)(nil)
 
 // see implementation in engine/execution/storehouse/in_memory_register_store.go
 type InMemoryRegisterStore interface {
@@ -72,7 +80,7 @@ type InMemoryRegisterStore interface {
 		height uint64,
 		blockID flow.Identifier,
 		parentID flow.Identifier,
-		registers []flow.RegisterEntry,
+		registers flow.RegisterEntries,
 	) error
 
 	IsBlockExecuted(height uint64, blockID flow.Identifier) (bool, error)
@@ -80,8 +88,11 @@ type InMemoryRegisterStore interface {
 
 type OnDiskRegisterStore = storage.RegisterIndex
 
+// pebble.Registers is an implementation of OnDiskRegisterStore interface
+var _ OnDiskRegisterStore = (*pebble.Registers)(nil)
+
 type ExecutedFinalizedWAL interface {
-	Append(height uint64, registers []flow.RegisterEntry) error
+	Append(height uint64, registers flow.RegisterEntries) error
 
 	// Latest returns the latest height in the WAL.
 	Latest() (uint64, error)
@@ -92,5 +103,5 @@ type ExecutedFinalizedWAL interface {
 type WALReader interface {
 	// Next returns the next height and trie updates in the WAL.
 	// It returns EOF when there are no more entries.
-	Next() (height uint64, registers []flow.RegisterEntry, err error)
+	Next() (height uint64, registers flow.RegisterEntries, err error)
 }
