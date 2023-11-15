@@ -93,5 +93,5 @@ func genesisCommitHexByChainID(chainID flow.ChainID) string {
 	if chainID == flow.Sandboxnet {
 		return "e1c08b17f9e5896f03fe28dd37ca396c19b26628161506924fbf785834646ea1"
 	}
-	return "8476b2a11c9bf11e70b82adfa2daee598ba08e6e7d40e78958768b7aed4e6a4d"
+	return "80d6a73ca02abd8900fa325edbb5014d91475409ae39fe0eb7925ef85d1647e3"
 }
