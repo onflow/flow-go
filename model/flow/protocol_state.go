@@ -379,11 +379,7 @@ func BuildIdentityTable(targetEpochIdentitySkeletons IdentitySkeletonList, targe
 	//     in the adjacent epoch, we use the IdentitySkeleton for the target epoch (for example,
 	//     to account for changes of keys, address, initial weight, etc).
 	//  2. Canonical ordering
-	allEpochParticipants := targetEpochParticipants.Union(adjacentEpochParticipants.Map(func(identity Identity) Identity {
-		identity.Weight = 0
-		return identity
-	}))
-
+	allEpochParticipants := targetEpochParticipants.Union(adjacentEpochParticipants)
 	return allEpochParticipants, nil
 }
 

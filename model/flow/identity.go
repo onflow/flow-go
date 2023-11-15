@@ -3,14 +3,11 @@ package flow
 import (
 	"encoding/json"
 	"fmt"
-	"io"
-	"regexp"
-	"strconv"
-
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/fxamacker/cbor/v2"
-	"github.com/pkg/errors"
 	"github.com/vmihailenco/msgpack"
+	"io"
+	"regexp"
 
 	"github.com/onflow/flow-go/crypto"
 )
@@ -59,7 +56,7 @@ type IdentitySkeleton struct {
 type EpochParticipationStatus int
 
 const (
-	EpochParticipationStatusJoining = iota
+	EpochParticipationStatusJoining EpochParticipationStatus = iota
 	EpochParticipationStatusActive
 	EpochParticipationStatusLeaving
 	EpochParticipationStatusEjected
@@ -74,25 +71,24 @@ func (p EpochParticipationStatus) String() string {
 	}[p]
 }
 
+func ParseEpochParticipationStatus(s string) (EpochParticipationStatus, error) {
+	switch s {
+	case EpochParticipationStatusJoining.String():
+		return EpochParticipationStatusJoining, nil
+	case EpochParticipationStatusActive.String():
+		return EpochParticipationStatusActive, nil
+	case EpochParticipationStatusLeaving.String():
+		return EpochParticipationStatusLeaving, nil
+	case EpochParticipationStatusEjected.String():
+		return EpochParticipationStatusEjected, nil
+	default:
+		return 0, fmt.Errorf("invalid epoch participation status")
+	}
+}
+
 // DynamicIdentity represents the dynamic part of public identity of one network participant (node).
 type DynamicIdentity struct {
-	// Weight represents the node's authority to perform certain tasks relative
-	// to other nodes.
-	//
-	// A node's weight is distinct from its stake. Stake represents the quantity
-	// of FLOW tokens held by the network in escrow during the course of the node's
-	// participation in the network. The stake is strictly managed by the service
-	// account smart contracts.
-	//
-	// Nodes which are registered to join at the next epoch will appear in the
-	// identity table but are considered to have zero weight up until their first
-	// epoch begins. Likewise, nodes which were registered in the previous epoch
-	// but have left at the most recent epoch boundary will appear in the identity
-	// table with zero weight.
-	Weight uint64
-	// Ejected represents whether a node has been permanently removed from the
-	// network.
-	Ejected bool
+	EpochParticipationStatus
 }
 
 // Identity is combined from static and dynamic part and represents the full public identity of one network participant (node).
@@ -101,44 +97,9 @@ type Identity struct {
 	DynamicIdentity
 }
 
-// ParseIdentity parses a string representation of an identity.
-func ParseIdentity(identity string) (*Identity, error) {
-
-	// use the regex to match the four parts of an identity
-	matches := rxid.FindStringSubmatch(identity)
-	if len(matches) != 6 {
-		return nil, errors.New("invalid identity string format")
-	}
-
-	// none of these will error as they are checked by the regex
-	var nodeID Identifier
-	nodeID, err := HexStringToIdentifier(matches[2])
-	if err != nil {
-		return nil, err
-	}
-	address := matches[3] + matches[4]
-	role, _ := ParseRole(matches[1])
-	weight, _ := strconv.ParseUint(matches[5], 10, 64)
-
-	// create the identity
-	iy := Identity{
-		IdentitySkeleton: IdentitySkeleton{
-			NodeID:        nodeID,
-			Address:       address,
-			Role:          role,
-			InitialWeight: weight,
-		},
-		DynamicIdentity: DynamicIdentity{
-			Weight: weight,
-		},
-	}
-
-	return &iy, nil
-}
-
 // String returns a string representation of the identity.
 func (iy Identity) String() string {
-	return fmt.Sprintf("%s-%s@%s=%d", iy.Role, iy.NodeID.String(), iy.Address, iy.Weight)
+	return fmt.Sprintf("%s-%s@%s=%s", iy.Role, iy.NodeID.String(), iy.Address, iy.EpochParticipationStatus.String())
 }
 
 // String returns a string representation of the identity.
@@ -198,8 +159,7 @@ type encodableIdentitySkeleton struct {
 
 type encodableIdentity struct {
 	encodableIdentitySkeleton
-	Weight  uint64
-	Ejected bool
+	ParticipationStatus string
 }
 
 func encodableSkeletonFromIdentity(iy IdentitySkeleton) encodableIdentitySkeleton {
@@ -221,8 +181,6 @@ func encodableSkeletonFromIdentity(iy IdentitySkeleton) encodableIdentitySkeleto
 func encodableFromIdentity(iy Identity) encodableIdentity {
 	return encodableIdentity{
 		encodableIdentitySkeleton: encodableSkeletonFromIdentity(iy.IdentitySkeleton),
-		Weight:                    iy.Weight,
-		Ejected:                   iy.Ejected,
 	}
 }
 
@@ -322,8 +280,11 @@ func identityFromEncodable(ie encodableIdentity, identity *Identity) error {
 	if err != nil {
 		return fmt.Errorf("could not decode identity skeleton: %w", err)
 	}
-	identity.Weight = ie.Weight
-	identity.Ejected = ie.Ejected
+	participationStatus, err := ParseEpochParticipationStatus(ie.ParticipationStatus)
+	if err != nil {
+		return fmt.Errorf("could not decode epoch participation status: %w", err)
+	}
+	identity.EpochParticipationStatus = participationStatus
 	return nil
 }
 
@@ -438,13 +399,7 @@ func (iy *IdentitySkeleton) EqualTo(other *IdentitySkeleton) bool {
 }
 
 func (iy *DynamicIdentity) EqualTo(other *DynamicIdentity) bool {
-	if iy.Weight != other.Weight {
-		return false
-	}
-	if iy.Ejected != other.Ejected {
-		return false
-	}
-	return true
+	return iy.EpochParticipationStatus == other.EpochParticipationStatus
 }
 
 func (iy *Identity) EqualTo(other *Identity) bool {
