@@ -59,6 +59,11 @@ const (
 	// expected to be necessary. Any failure to start a node within this timeout is likely to be
 	// caused by a bug in the code.
 	libp2pNodeShutdownTimeout = 10 * time.Second
+
+	// topicIDFixtureLen is the length of the topic ID fixture for testing.
+	topicIDFixtureLen = 10
+	// messageIDFixtureLen is the length of the message ID fixture for testing.
+	messageIDFixtureLen = 10
 )
 
 // NetworkingKeyFixtures is a test helper that generates a ECDSA flow key pair.
@@ -843,35 +848,30 @@ func MockInspectorNotificationDistributorReadyDoneAware(d *mockp2p.GossipSubInsp
 	}()).Maybe()
 }
 
-func GossipSubRpcFixture(msgCnt int) *pb.RPC {
+func GossipSubRpcFixture(t *testing.T, msgCnt int, opts ...GossipSubCtrlOption) *pb.RPC {
 	rand.Seed(uint64(time.Now().UnixNano()))
 
 	// creates a random number of Subscriptions
-	numSubscriptions := rand.Intn(10) // Up to 10 for example
+	numSubscriptions := 10
+	topicIdSize := 10
 	subscriptions := make([]*pb.RPC_SubOpts, numSubscriptions)
 	for i := 0; i < numSubscriptions; i++ {
 		subscribe := rand.Intn(2) == 1
-		topicID := randomString(10) // Generate a random string of length 10
+		topicID := unittest.RandomStringFixture(t, topicIdSize)
 		subscriptions[i] = &pb.RPC_SubOpts{
 			Subscribe: &subscribe,
 			Topicid:   &topicID,
 		}
 	}
 
+	// generates random messages
 	messages := make([]*pb.Message, msgCnt)
 	for i := 0; i < msgCnt; i++ {
-		messages[i] = &pb.Message{
-			From:      []byte(randomString(10)),
-			Data:      []byte(randomString(20)),
-			Seqno:     []byte(randomString(5)),
-			Topic:     stringPointer(randomString(10)),
-			Signature: []byte(randomString(15)),
-			Key:       []byte(randomString(15)),
-		}
+		messages[i] = GossipSubMessageFixture(t)
 	}
 
 	// Create a Control Message
-	controlMessages := GossipSubCtrlFixture()
+	controlMessages := GossipSubCtrlFixture(opts...)
 
 	// Create the RPC
 	rpc := &pb.RPC{
@@ -882,29 +882,6 @@ func GossipSubRpcFixture(msgCnt int) *pb.RPC {
 
 	return rpc
 }
-
-// Helper function to generate a random string of a given length
-func randomString(length int) string {
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	b := make([]byte, length)
-	for i := range b {
-		b[i] = charset[rand.Intn(len(charset))]
-	}
-	return string(b)
-}
-
-// Helper function to get a pointer to a string
-func stringPointer(s string) *string {
-	return &s
-}
-
-// Add the rest of the structure definitions here (RPC, RPC_SubOpts, Message, ControlMessage, etc.)
-const (
-	// topicIDFixtureLen is the length of the topic ID fixture for testing.
-	topicIDFixtureLen = 10
-	// messageIDFixtureLen is the length of the message ID fixture for testing.
-	messageIDFixtureLen = 10
-)
 
 type GossipSubCtrlOption func(*pb.ControlMessage)
 
