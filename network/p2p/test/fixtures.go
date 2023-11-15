@@ -9,6 +9,7 @@ import (
 	"time"
 
 	dht "github.com/libp2p/go-libp2p-kad-dht"
+	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/connmgr"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
@@ -19,6 +20,7 @@ import (
 	"github.com/rs/zerolog"
 	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/rand"
 
 	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/crypto"
@@ -839,4 +841,161 @@ func MockInspectorNotificationDistributorReadyDoneAware(d *mockp2p.GossipSubInsp
 		close(ch)
 		return ch
 	}()).Maybe()
+}
+
+func GossipSubRpcFixture(msgCnt int) *pb.RPC {
+	rand.Seed(uint64(time.Now().UnixNano()))
+
+	// creates a random number of Subscriptions
+	numSubscriptions := rand.Intn(10) // Up to 10 for example
+	subscriptions := make([]*pb.RPC_SubOpts, numSubscriptions)
+	for i := 0; i < numSubscriptions; i++ {
+		subscribe := rand.Intn(2) == 1
+		topicID := randomString(10) // Generate a random string of length 10
+		subscriptions[i] = &pb.RPC_SubOpts{
+			Subscribe: &subscribe,
+			Topicid:   &topicID,
+		}
+	}
+
+	messages := make([]*pb.Message, msgCnt)
+	for i := 0; i < msgCnt; i++ {
+		messages[i] = &pb.Message{
+			From:      []byte(randomString(10)),
+			Data:      []byte(randomString(20)),
+			Seqno:     []byte(randomString(5)),
+			Topic:     stringPointer(randomString(10)),
+			Signature: []byte(randomString(15)),
+			Key:       []byte(randomString(15)),
+		}
+	}
+
+	// Create a Control Message
+	controlMessages := GossipSubCtrlFixture()
+
+	// Create the RPC
+	rpc := &pb.RPC{
+		Subscriptions: subscriptions,
+		Publish:       messages,
+		Control:       controlMessages,
+	}
+
+	return rpc
+}
+
+// Helper function to generate a random string of a given length
+func randomString(length int) string {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	b := make([]byte, length)
+	for i := range b {
+		b[i] = charset[rand.Intn(len(charset))]
+	}
+	return string(b)
+}
+
+// Helper function to get a pointer to a string
+func stringPointer(s string) *string {
+	return &s
+}
+
+// Add the rest of the structure definitions here (RPC, RPC_SubOpts, Message, ControlMessage, etc.)
+const (
+	// topicIDFixtureLen is the length of the topic ID fixture for testing.
+	topicIDFixtureLen = 10
+	// messageIDFixtureLen is the length of the message ID fixture for testing.
+	messageIDFixtureLen = 10
+)
+
+type GossipSubCtrlOption func(*pb.ControlMessage)
+
+// GossipSubCtrlFixture returns a ControlMessage with the given options.
+func GossipSubCtrlFixture(opts ...GossipSubCtrlOption) *pb.ControlMessage {
+	msg := &pb.ControlMessage{}
+	for _, opt := range opts {
+		opt(msg)
+	}
+	return msg
+}
+
+// WithIHave adds iHave control messages of the given size and number to the control message.
+func WithIHave(msgCount, msgIDCount int, topicId string) GossipSubCtrlOption {
+	return func(msg *pb.ControlMessage) {
+		iHaves := make([]*pb.ControlIHave, msgCount)
+		for i := 0; i < msgCount; i++ {
+			iHaves[i] = &pb.ControlIHave{
+				TopicID:    &topicId,
+				MessageIDs: GossipSubMessageIdsFixture(msgIDCount),
+			}
+		}
+		msg.Ihave = iHaves
+	}
+}
+
+// WithIWant adds iWant control messages of the given size and number to the control message.
+// The message IDs are generated randomly.
+// Args:
+//
+//	msgCount: number of iWant messages to add.
+//	msgIdsPerIWant: number of message IDs to add to each iWant message.
+//
+// Returns:
+// A GossipSubCtrlOption that adds iWant messages to the control message.
+// Example: WithIWant(2, 3) will add 2 iWant messages, each with 3 message IDs.
+func WithIWant(iWantCount int, msgIdsPerIWant int) GossipSubCtrlOption {
+	return func(msg *pb.ControlMessage) {
+		iWants := make([]*pb.ControlIWant, iWantCount)
+		for i := 0; i < iWantCount; i++ {
+			iWants[i] = &pb.ControlIWant{
+				MessageIDs: GossipSubMessageIdsFixture(msgIdsPerIWant),
+			}
+		}
+		msg.Iwant = iWants
+	}
+}
+
+// WithGraft adds GRAFT control messages with given topicID to the control message.
+func WithGraft(msgCount int, topicId string) GossipSubCtrlOption {
+	return func(msg *pb.ControlMessage) {
+		grafts := make([]*pb.ControlGraft, msgCount)
+		for i := 0; i < msgCount; i++ {
+			grafts[i] = &pb.ControlGraft{
+				TopicID: &topicId,
+			}
+		}
+		msg.Graft = grafts
+	}
+}
+
+// WithPrune adds PRUNE control messages with given topicID to the control message.
+func WithPrune(msgCount int, topicId string) GossipSubCtrlOption {
+	return func(msg *pb.ControlMessage) {
+		prunes := make([]*pb.ControlPrune, msgCount)
+		for i := 0; i < msgCount; i++ {
+			prunes[i] = &pb.ControlPrune{
+				TopicID: &topicId,
+			}
+		}
+		msg.Prune = prunes
+	}
+}
+
+// gossipSubMessageIdFixture returns a random gossipSub message ID.
+func gossipSubMessageIdFixture() string {
+	// TODO: messageID length should be a parameter.
+	return unittest.GenerateRandomStringWithLen(messageIDFixtureLen)
+}
+
+// GossipSubTopicIdFixture returns a random gossipSub topic ID.
+func GossipSubTopicIdFixture() string {
+	// TODO: topicID length should be a parameter.
+	return unittest.GenerateRandomStringWithLen(topicIDFixtureLen)
+}
+
+// GossipSubMessageIdsFixture returns a slice of random gossipSub message IDs of the given size.
+func GossipSubMessageIdsFixture(count int) []string {
+	msgIds := make([]string, count)
+	for i := 0; i < count; i++ {
+		msgIds[i] = gossipSubMessageIdFixture()
+	}
+	return msgIds
 }
