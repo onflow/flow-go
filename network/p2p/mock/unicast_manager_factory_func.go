@@ -3,14 +3,13 @@
 package mockp2p
 
 import (
-	flow "github.com/onflow/flow-go/model/flow"
 	mock "github.com/stretchr/testify/mock"
+
+	flow "github.com/onflow/flow-go/model/flow"
 
 	module "github.com/onflow/flow-go/module"
 
 	p2p "github.com/onflow/flow-go/network/p2p"
-
-	stream "github.com/onflow/flow-go/network/p2p/unicast/stream"
 
 	time "time"
 
@@ -23,11 +22,11 @@ type UnicastManagerFactoryFunc struct {
 }
 
 // Execute provides a mock function with given fields: logger, streamFactory, sporkId, createStreamRetryDelay, connStatus, metrics
-func (_m *UnicastManagerFactoryFunc) Execute(logger zerolog.Logger, streamFactory stream.Factory, sporkId flow.Identifier, createStreamRetryDelay time.Duration, connStatus p2p.PeerConnections, metrics module.UnicastManagerMetrics) p2p.UnicastManager {
+func (_m *UnicastManagerFactoryFunc) Execute(logger zerolog.Logger, streamFactory p2p.StreamFactory, sporkId flow.Identifier, createStreamRetryDelay time.Duration, connStatus p2p.PeerConnections, metrics module.UnicastManagerMetrics) p2p.UnicastManager {
 	ret := _m.Called(logger, streamFactory, sporkId, createStreamRetryDelay, connStatus, metrics)
 
 	var r0 p2p.UnicastManager
-	if rf, ok := ret.Get(0).(func(zerolog.Logger, stream.Factory, flow.Identifier, time.Duration, p2p.PeerConnections, module.UnicastManagerMetrics) p2p.UnicastManager); ok {
+	if rf, ok := ret.Get(0).(func(zerolog.Logger, p2p.StreamFactory, flow.Identifier, time.Duration, p2p.PeerConnections, module.UnicastManagerMetrics) p2p.UnicastManager); ok {
 		r0 = rf(logger, streamFactory, sporkId, createStreamRetryDelay, connStatus, metrics)
 	} else {
 		if ret.Get(0) != nil {

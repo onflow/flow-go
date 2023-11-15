@@ -28,6 +28,7 @@ type Context struct {
 	// DisableMemoryAndInteractionLimits will override memory and interaction
 	// limits and set them to MaxUint64, effectively disabling these limits.
 	DisableMemoryAndInteractionLimits bool
+	EVMEnabled                        bool
 	ComputationLimit                  uint64
 	MemoryLimit                       uint64
 	MaxStateKeySize                   uint64
@@ -330,6 +331,15 @@ func WithTransactionFeesEnabled(enabled bool) Option {
 	}
 }
 
+// WithRandomSourceHistoryCallAllowed enables or disables calling the `entropy` function
+// within cadence
+func WithRandomSourceHistoryCallAllowed(allowed bool) Option {
+	return func(ctx Context) Context {
+		ctx.RandomSourceHistoryCallAllowed = allowed
+		return ctx
+	}
+}
+
 // WithReusableCadenceRuntimePool set the (shared) RedusableCadenceRuntimePool
 // use for creating the cadence runtime.
 func WithReusableCadenceRuntimePool(
@@ -354,6 +364,14 @@ func WithDerivedBlockData(derivedBlockData *derived.DerivedBlockData) Option {
 func WithEventEncoder(encoder environment.EventEncoder) Option {
 	return func(ctx Context) Context {
 		ctx.EventEncoder = encoder
+		return ctx
+	}
+}
+
+// WithEVMEnabled enables access to the evm environment
+func WithEVMEnabled(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.EVMEnabled = enabled
 		return ctx
 	}
 }

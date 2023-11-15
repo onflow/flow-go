@@ -24,23 +24,23 @@ type node struct {
 	port     uint
 }
 
-func (n *node) setupNode(t *testing.T) {
+func (n *node) setupNode(tb testing.TB) {
 	n.server = grpc.NewServer()
 	listener, err := net.Listen("tcp4", unittest.DefaultAddress)
-	assert.NoError(t, err)
+	assert.NoError(tb, err)
 	n.listener = listener
-	assert.Eventually(t, func() bool {
+	assert.Eventually(tb, func() bool {
 		return !strings.HasSuffix(listener.Addr().String(), ":0")
 	}, time.Second*4, 10*time.Millisecond)
 
 	_, port, err := net.SplitHostPort(listener.Addr().String())
-	assert.NoError(t, err)
+	assert.NoError(tb, err)
 	portAsUint, err := strconv.ParseUint(port, 10, 32)
-	assert.NoError(t, err)
+	assert.NoError(tb, err)
 	n.port = uint(portAsUint)
 }
 
-func (n *node) start(t *testing.T) {
+func (n *node) start(tb testing.TB) {
 	// using a wait group here to ensure the goroutine has started before returning. Otherwise,
 	// there's a race condition where the server is sometimes stopped before it has started
 	wg := sync.WaitGroup{}
@@ -48,12 +48,12 @@ func (n *node) start(t *testing.T) {
 	go func() {
 		wg.Done()
 		err := n.server.Serve(n.listener)
-		assert.NoError(t, err)
+		assert.NoError(tb, err)
 	}()
-	unittest.RequireReturnsBefore(t, wg.Wait, 10*time.Millisecond, "could not start goroutine on time")
+	unittest.RequireReturnsBefore(tb, wg.Wait, 10*time.Millisecond, "could not start goroutine on time")
 }
 
-func (n *node) stop(t *testing.T) {
+func (n *node) stop(tb testing.TB) {
 	if n.server != nil {
 		n.server.Stop()
 	}
@@ -64,16 +64,16 @@ type executionNode struct {
 	handler *mock.ExecutionAPIServer
 }
 
-func (en *executionNode) start(t *testing.T) {
-	en.setupNode(t)
+func (en *executionNode) start(tb testing.TB) {
+	en.setupNode(tb)
 	handler := new(mock.ExecutionAPIServer)
 	execution.RegisterExecutionAPIServer(en.server, handler)
 	en.handler = handler
-	en.node.start(t)
+	en.node.start(tb)
 }
 
-func (en *executionNode) stop(t *testing.T) {
-	en.node.stop(t)
+func (en *executionNode) stop(tb testing.TB) {
+	en.node.stop(tb)
 }
 
 type collectionNode struct {

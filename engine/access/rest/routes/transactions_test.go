@@ -15,6 +15,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest/models"
@@ -126,7 +128,7 @@ func TestGetTransactions(t *testing.T) {
 			Return(&tx.TransactionBody, nil)
 
 		backend.Mock.
-			On("GetTransactionResult", mocks.Anything, tx.ID(), flow.ZeroID, flow.ZeroID).
+			On("GetTransactionResult", mocks.Anything, tx.ID(), flow.ZeroID, flow.ZeroID, entities.EventEncodingVersion_JSON_CDC_V0).
 			Return(txr, nil)
 
 		req := getTransactionReq(tx.ID().String(), true, "", "")
@@ -250,7 +252,7 @@ func TestGetTransactionResult(t *testing.T) {
 		req := getTransactionResultReq(id.String(), "", "")
 
 		backend.Mock.
-			On("GetTransactionResult", mocks.Anything, id, flow.ZeroID, flow.ZeroID).
+			On("GetTransactionResult", mocks.Anything, id, flow.ZeroID, flow.ZeroID, entities.EventEncodingVersion_JSON_CDC_V0).
 			Return(txr, nil)
 
 		assertOKResponse(t, req, expected, backend)
@@ -262,7 +264,7 @@ func TestGetTransactionResult(t *testing.T) {
 		req := getTransactionResultReq(id.String(), bid.String(), "")
 
 		backend.Mock.
-			On("GetTransactionResult", mocks.Anything, id, bid, flow.ZeroID).
+			On("GetTransactionResult", mocks.Anything, id, bid, flow.ZeroID, entities.EventEncodingVersion_JSON_CDC_V0).
 			Return(txr, nil)
 
 		assertOKResponse(t, req, expected, backend)
@@ -273,7 +275,7 @@ func TestGetTransactionResult(t *testing.T) {
 		req := getTransactionResultReq(id.String(), "", cid.String())
 
 		backend.Mock.
-			On("GetTransactionResult", mocks.Anything, id, flow.ZeroID, cid).
+			On("GetTransactionResult", mocks.Anything, id, flow.ZeroID, cid, entities.EventEncodingVersion_JSON_CDC_V0).
 			Return(txr, nil)
 
 		assertOKResponse(t, req, expected, backend)
@@ -307,7 +309,7 @@ func TestGetTransactionResult(t *testing.T) {
 			txResult.CollectionID = cid
 			req := getTransactionResultReq(id.String(), "", "")
 			backend.Mock.
-				On("GetTransactionResult", mocks.Anything, id, flow.ZeroID, flow.ZeroID).
+				On("GetTransactionResult", mocks.Anything, id, flow.ZeroID, flow.ZeroID, entities.EventEncodingVersion_JSON_CDC_V0).
 				Return(txResult, nil).
 				Once()
 
