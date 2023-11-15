@@ -14,17 +14,17 @@ import (
 // collecting + aggregating timeouts to TCs).
 // Concurrently safe.
 type ParticipantDistributor struct {
-	consumers []hotstuff.ParticipantConsumer
+	consumers []hotstuff.ViewLifecycleConsumer
 	lock      sync.RWMutex
 }
 
-var _ hotstuff.ParticipantConsumer = (*ParticipantDistributor)(nil)
+var _ hotstuff.ViewLifecycleConsumer = (*ParticipantDistributor)(nil)
 
 func NewParticipantDistributor() *ParticipantDistributor {
 	return &ParticipantDistributor{}
 }
 
-func (d *ParticipantDistributor) AddParticipantConsumer(consumer hotstuff.ParticipantConsumer) {
+func (d *ParticipantDistributor) AddViewLifecycleConsumer(consumer hotstuff.ViewLifecycleConsumer) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 	d.consumers = append(d.consumers, consumer)

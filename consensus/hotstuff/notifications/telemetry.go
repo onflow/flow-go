@@ -39,7 +39,7 @@ type TelemetryConsumer struct {
 }
 
 // Telemetry implements consumers for _all happy-path_ interfaces in consensus/hotstuff/notifications/telemetry.go:
-var _ hotstuff.ParticipantConsumer = (*TelemetryConsumer)(nil)
+var _ hotstuff.ViewLifecycleConsumer = (*TelemetryConsumer)(nil)
 var _ hotstuff.CommunicatorConsumer = (*TelemetryConsumer)(nil)
 var _ hotstuff.FinalizationConsumer = (*TelemetryConsumer)(nil)
 var _ hotstuff.VoteCollectorConsumer = (*TelemetryConsumer)(nil)

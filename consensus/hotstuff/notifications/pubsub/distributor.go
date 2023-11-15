@@ -27,7 +27,7 @@ func NewDistributor() *Distributor {
 func (p *Distributor) AddConsumer(consumer hotstuff.Consumer) {
 	p.FollowerDistributor.AddFollowerConsumer(consumer)
 	p.CommunicatorDistributor.AddCommunicatorConsumer(consumer)
-	p.ParticipantDistributor.AddParticipantConsumer(consumer)
+	p.ParticipantDistributor.AddViewLifecycleConsumer(consumer)
 }
 
 // FollowerDistributor ingests consensus follower events and distributes it to consumers.

@@ -603,7 +603,7 @@ func main() {
 				mainMetrics,
 			)
 
-			notifier.AddParticipantConsumer(telemetryConsumer)
+			notifier.AddViewLifecycleConsumer(telemetryConsumer)
 			notifier.AddCommunicatorConsumer(telemetryConsumer)
 			notifier.AddFinalizationConsumer(telemetryConsumer)
 			notifier.AddFollowerConsumer(followerDistributor)

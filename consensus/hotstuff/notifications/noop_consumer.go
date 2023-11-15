@@ -13,7 +13,7 @@ import (
 type NoopConsumer struct {
 	NoopProposalViolationConsumer
 	NoopFinalizationConsumer
-	NoopParticipantConsumer
+	NoopViewLifecycleConsumer
 	NoopCommunicatorConsumer
 }
 
@@ -26,31 +26,31 @@ func NewNoopConsumer() *NoopConsumer {
 
 // no-op implementation of hotstuff.Consumer(but not nested interfaces)
 
-type NoopParticipantConsumer struct{}
+type NoopViewLifecycleConsumer struct{}
 
-func (*NoopParticipantConsumer) OnEventProcessed() {}
+func (*NoopViewLifecycleConsumer) OnEventProcessed() {}
 
-func (*NoopParticipantConsumer) OnStart(uint64) {}
+func (*NoopViewLifecycleConsumer) OnStart(uint64) {}
 
-func (*NoopParticipantConsumer) OnReceiveProposal(uint64, *model.Proposal) {}
+func (*NoopViewLifecycleConsumer) OnReceiveProposal(uint64, *model.Proposal) {}
 
-func (*NoopParticipantConsumer) OnReceiveQc(uint64, *flow.QuorumCertificate) {}
+func (*NoopViewLifecycleConsumer) OnReceiveQc(uint64, *flow.QuorumCertificate) {}
 
-func (*NoopParticipantConsumer) OnReceiveTc(uint64, *flow.TimeoutCertificate) {}
+func (*NoopViewLifecycleConsumer) OnReceiveTc(uint64, *flow.TimeoutCertificate) {}
 
-func (*NoopParticipantConsumer) OnPartialTc(uint64, *hotstuff.PartialTcCreated) {}
+func (*NoopViewLifecycleConsumer) OnPartialTc(uint64, *hotstuff.PartialTcCreated) {}
 
-func (*NoopParticipantConsumer) OnLocalTimeout(uint64) {}
+func (*NoopViewLifecycleConsumer) OnLocalTimeout(uint64) {}
 
-func (*NoopParticipantConsumer) OnViewChange(uint64, uint64) {}
+func (*NoopViewLifecycleConsumer) OnViewChange(uint64, uint64) {}
 
-func (*NoopParticipantConsumer) OnQcTriggeredViewChange(uint64, uint64, *flow.QuorumCertificate) {}
+func (*NoopViewLifecycleConsumer) OnQcTriggeredViewChange(uint64, uint64, *flow.QuorumCertificate) {}
 
-func (*NoopParticipantConsumer) OnTcTriggeredViewChange(uint64, uint64, *flow.TimeoutCertificate) {}
+func (*NoopViewLifecycleConsumer) OnTcTriggeredViewChange(uint64, uint64, *flow.TimeoutCertificate) {}
 
-func (*NoopParticipantConsumer) OnStartingTimeout(model.TimerInfo) {}
+func (*NoopViewLifecycleConsumer) OnStartingTimeout(model.TimerInfo) {}
 
-func (*NoopParticipantConsumer) OnCurrentViewDetails(uint64, uint64, flow.Identifier) {}
+func (*NoopViewLifecycleConsumer) OnCurrentViewDetails(uint64, uint64, flow.Identifier) {}
 
 // no-op implementation of hotstuff.FinalizationConsumer
 

@@ -80,7 +80,7 @@ func (f *HotStuffFactory) CreateModules(
 	notifier := pubsub.NewDistributor()
 	notifier.AddConsumer(notifications.NewLogConsumer(log))
 	notifier.AddConsumer(hotmetrics.NewMetricsConsumer(metrics))
-	notifier.AddParticipantConsumer(telemetryConsumer)
+	notifier.AddViewLifecycleConsumer(telemetryConsumer)
 	notifier.AddProposalViolationConsumer(slashingConsumer)
 
 	var (

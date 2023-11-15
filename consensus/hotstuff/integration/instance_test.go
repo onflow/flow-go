@@ -85,7 +85,7 @@ type Instance struct {
 
 type MockedCommunicatorConsumer struct {
 	notifications.NoopProposalViolationConsumer
-	notifications.NoopParticipantConsumer
+	notifications.NoopViewLifecycleConsumer
 	notifications.NoopFinalizationConsumer
 	*mocks.CommunicatorConsumer
 }

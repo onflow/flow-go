@@ -112,14 +112,14 @@ type FinalizationConsumer interface {
 	OnFinalizedBlock(*model.Block)
 }
 
-// ParticipantConsumer consumes outbound notifications produced by consensus participants
+// ViewLifecycleConsumer consumes outbound notifications produced by consensus participants
 // actively proposing blocks, voting, collecting & aggregating votes to QCs, and participating in
 // the pacemaker (sending timeouts, collecting & aggregating timeouts to TCs).
 // Implementations must:
 //   - be concurrency safe
 //   - be non-blocking
 //   - handle repetition of the same events (with some processing overhead).
-type ParticipantConsumer interface {
+type ViewLifecycleConsumer interface {
 	// OnEventProcessed notifications are produced by the EventHandler when it is done processing
 	// and hands control back to the EventLoop to wait for the next event.
 	// Prerequisites:
@@ -347,7 +347,7 @@ type FollowerConsumer interface {
 type Consumer interface {
 	FollowerConsumer
 	CommunicatorConsumer
-	ParticipantConsumer
+	ViewLifecycleConsumer
 }
 
 // VoteAggregationConsumer consumes outbound notifications produced by Vote Aggregation logic.
