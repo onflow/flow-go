@@ -96,7 +96,7 @@ func NewMockedCommunicatorConsumer() *MockedCommunicatorConsumer {
 	}
 }
 
-var _ hotstuff.Consumer = (*MockedCommunicatorConsumer)(nil)
+var _ hotstuff.ParticipantConsumer = (*MockedCommunicatorConsumer)(nil)
 var _ hotstuff.TimeoutCollectorConsumer = (*Instance)(nil)
 
 func NewInstance(t *testing.T, options ...Option) *Instance {

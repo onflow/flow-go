@@ -43,7 +43,7 @@ type EventHandler struct {
 	persist       hotstuff.Persister
 	committee     hotstuff.Replicas
 	safetyRules   hotstuff.SafetyRules
-	notifier      hotstuff.Consumer
+	notifier      hotstuff.ParticipantConsumer
 }
 
 var _ hotstuff.EventHandler = (*EventHandler)(nil)
@@ -57,7 +57,7 @@ func NewEventHandler(
 	persist hotstuff.Persister,
 	committee hotstuff.Replicas,
 	safetyRules hotstuff.SafetyRules,
-	notifier hotstuff.Consumer,
+	notifier hotstuff.ParticipantConsumer,
 ) (*EventHandler, error) {
 	e := &EventHandler{
 		log:           log.With().Str("hotstuff", "participant").Logger(),

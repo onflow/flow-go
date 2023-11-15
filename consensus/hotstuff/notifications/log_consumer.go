@@ -17,7 +17,7 @@ type LogConsumer struct {
 	log zerolog.Logger
 }
 
-var _ hotstuff.Consumer = (*LogConsumer)(nil)
+var _ hotstuff.ParticipantConsumer = (*LogConsumer)(nil)
 var _ hotstuff.TimeoutAggregationConsumer = (*LogConsumer)(nil)
 var _ hotstuff.VoteAggregationConsumer = (*LogConsumer)(nil)
 

@@ -13,7 +13,7 @@ type Distributor struct {
 	*ViewLifecycleDistributor
 }
 
-var _ hotstuff.Consumer = (*Distributor)(nil)
+var _ hotstuff.ParticipantConsumer = (*Distributor)(nil)
 
 func NewDistributor() *Distributor {
 	return &Distributor{
@@ -24,7 +24,7 @@ func NewDistributor() *Distributor {
 }
 
 // AddConsumer adds an event consumer to the Distributor
-func (p *Distributor) AddConsumer(consumer hotstuff.Consumer) {
+func (p *Distributor) AddConsumer(consumer hotstuff.ParticipantConsumer) {
 	p.FollowerDistributor.AddFollowerConsumer(consumer)
 	p.CommunicatorDistributor.AddCommunicatorConsumer(consumer)
 	p.ViewLifecycleDistributor.AddViewLifecycleConsumer(consumer)

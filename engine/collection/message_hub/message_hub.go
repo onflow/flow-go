@@ -61,14 +61,14 @@ type packedVote struct {
 //	   +----------------+         +------------+          +------+------------+
 //	          vote                     block                  timeout object
 //
-// MessageHub acts as communicator and handles hotstuff.Consumer communication events to send votes, broadcast timeouts
+// MessageHub acts as communicator and handles hotstuff.ParticipantConsumer communication events to send votes, broadcast timeouts
 // and proposals. It is responsible for communication between cluster consensus participants.
-// It implements hotstuff.Consumer interface and needs to be subscribed for notifications via pub/sub.
+// It implements hotstuff.ParticipantConsumer interface and needs to be subscribed for notifications via pub/sub.
 // All communicator events are handled on worker thread to prevent sender from blocking.
 // For outgoing messages processing logic looks like this:
 //
 //	+-------------------+      +------------+      +----------+      +------------------------+
-//	|  Cluster-Channel  |<-----| MessageHub |<-----| Consumer |<-----|        Hotstuff        |
+//	|  Cluster-Channel  |<-----| MessageHub |<-----| ParticipantConsumer |<-----|        Hotstuff        |
 //	+-------------------+      +------+-----+      +----------+      +------------------------+
 //	                                                  pub/sub          vote, timeout, proposal
 //

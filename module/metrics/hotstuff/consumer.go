@@ -17,7 +17,7 @@ type MetricsConsumer struct {
 	metrics module.HotstuffMetrics
 }
 
-var _ hotstuff.Consumer = (*MetricsConsumer)(nil)
+var _ hotstuff.ParticipantConsumer = (*MetricsConsumer)(nil)
 
 func NewMetricsConsumer(metrics module.HotstuffMetrics) *MetricsConsumer {
 	return &MetricsConsumer{

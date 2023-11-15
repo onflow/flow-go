@@ -335,7 +335,7 @@ type FollowerConsumer interface {
 	FinalizationConsumer
 }
 
-// Consumer consumes outbound notifications produced by consensus participants.
+// ParticipantConsumer consumes outbound notifications produced by consensus participants.
 // Notifications are consensus-internal state changes which are potentially relevant to
 // the larger node in which HotStuff is running. The notifications are emitted
 // in the order in which the HotStuff algorithm makes the respective steps.
@@ -344,7 +344,7 @@ type FollowerConsumer interface {
 //   - be concurrency safe
 //   - be non-blocking
 //   - handle repetition of the same events (with some processing overhead).
-type Consumer interface {
+type ParticipantConsumer interface {
 	FollowerConsumer
 	CommunicatorConsumer
 	ViewLifecycleConsumer

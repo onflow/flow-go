@@ -117,7 +117,7 @@ type Consensus struct {
 	committedEpochsCh      chan *flow.Header           // protocol events for newly committed epochs (the first block of the epoch is passed over the channel)
 	epochEmergencyFallback chan struct{}               // protocol event for epoch emergency fallback
 	isEpochFallbackHandled *atomic.Bool                // ensure we only inject fallback epoch once
-	events.Noop                                        // implements protocol.Consumer
+	events.Noop                                        // implements protocol.ParticipantConsumer
 	component.Component
 }
 

@@ -49,7 +49,7 @@ var _ hotstuff.ProposalDurationProvider = (*ActivePaceMaker)(nil)
 func New(
 	timeoutController *timeout.Controller,
 	proposalDurationProvider hotstuff.ProposalDurationProvider,
-	notifier hotstuff.Consumer,
+	notifier hotstuff.ParticipantConsumer,
 	persist hotstuff.Persister,
 	recovery ...recoveryInformation,
 ) (*ActivePaceMaker, error) {

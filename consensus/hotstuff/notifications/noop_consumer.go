@@ -17,14 +17,14 @@ type NoopConsumer struct {
 	NoopCommunicatorConsumer
 }
 
-var _ hotstuff.Consumer = (*NoopConsumer)(nil)
+var _ hotstuff.ParticipantConsumer = (*NoopConsumer)(nil)
 
 func NewNoopConsumer() *NoopConsumer {
 	nc := &NoopConsumer{}
 	return nc
 }
 
-// no-op implementation of hotstuff.Consumer(but not nested interfaces)
+// no-op implementation of hotstuff.ParticipantConsumer(but not nested interfaces)
 
 type NoopViewLifecycleConsumer struct{}
 

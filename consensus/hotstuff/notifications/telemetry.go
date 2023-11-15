@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// TelemetryConsumer implements the hotstuff.Consumer interface.
+// TelemetryConsumer implements the hotstuff.ParticipantConsumer interface.
 // consumes outbound notifications produced by the HotStuff state machine.
 // For this purpose, the TelemetryConsumer enriches the state machine's notifications:
 //   - The goal is to identify all events as belonging together that were emitted during
