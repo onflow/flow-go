@@ -9,22 +9,22 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// SlashingViolationsConsumer is an implementation of the notifications consumer that logs a
+// SlashingViolationsLogger is an implementation of the notifications consumer that logs a
 // message for any slashable offenses.
-type SlashingViolationsConsumer struct {
+type SlashingViolationsLogger struct {
 	log zerolog.Logger
 }
 
-var _ hotstuff.ProposalViolationConsumer = (*SlashingViolationsConsumer)(nil)
-var _ hotstuff.VoteAggregationViolationConsumer = (*SlashingViolationsConsumer)(nil)
-var _ hotstuff.TimeoutAggregationViolationConsumer = (*SlashingViolationsConsumer)(nil)
+var _ hotstuff.ProposalViolationConsumer = (*SlashingViolationsLogger)(nil)
+var _ hotstuff.VoteAggregationViolationConsumer = (*SlashingViolationsLogger)(nil)
+var _ hotstuff.TimeoutAggregationViolationConsumer = (*SlashingViolationsLogger)(nil)
 
-func NewSlashingViolationsConsumer(log zerolog.Logger) *SlashingViolationsConsumer {
-	return &SlashingViolationsConsumer{
+func NewSlashingViolationsLogger(log zerolog.Logger) *SlashingViolationsLogger {
+	return &SlashingViolationsLogger{
 		log: log,
 	}
 }
-func (c *SlashingViolationsConsumer) OnInvalidBlockDetected(err flow.Slashable[model.InvalidProposalError]) {
+func (c *SlashingViolationsLogger) OnInvalidBlockDetected(err flow.Slashable[model.InvalidProposalError]) {
 	block := err.Message.InvalidProposal.Block
 	c.log.Warn().
 		Bool(logging.KeySuspicious, true).
@@ -37,7 +37,7 @@ func (c *SlashingViolationsConsumer) OnInvalidBlockDetected(err flow.Slashable[m
 		Msgf("OnInvalidBlockDetected: %s", err.Message.Error())
 }
 
-func (c *SlashingViolationsConsumer) OnDoubleVotingDetected(vote1 *model.Vote, vote2 *model.Vote) {
+func (c *SlashingViolationsLogger) OnDoubleVotingDetected(vote1 *model.Vote, vote2 *model.Vote) {
 	c.log.Warn().
 		Uint64("vote_view", vote1.View).
 		Hex("voter_id", vote1.SignerID[:]).
@@ -47,7 +47,7 @@ func (c *SlashingViolationsConsumer) OnDoubleVotingDetected(vote1 *model.Vote, v
 		Msg("OnDoubleVotingDetected")
 }
 
-func (c *SlashingViolationsConsumer) OnInvalidVoteDetected(err model.InvalidVoteError) {
+func (c *SlashingViolationsLogger) OnInvalidVoteDetected(err model.InvalidVoteError) {
 	vote := err.Vote
 	c.log.Warn().
 		Uint64("vote_view", vote.View).
@@ -58,7 +58,7 @@ func (c *SlashingViolationsConsumer) OnInvalidVoteDetected(err model.InvalidVote
 		Msg("OnInvalidVoteDetected")
 }
 
-func (c *SlashingViolationsConsumer) OnDoubleTimeoutDetected(timeout *model.TimeoutObject, altTimeout *model.TimeoutObject) {
+func (c *SlashingViolationsLogger) OnDoubleTimeoutDetected(timeout *model.TimeoutObject, altTimeout *model.TimeoutObject) {
 	c.log.Warn().
 		Bool(logging.KeySuspicious, true).
 		Hex("timeout_creator", timeout.SignerID[:]).
@@ -68,7 +68,7 @@ func (c *SlashingViolationsConsumer) OnDoubleTimeoutDetected(timeout *model.Time
 		Msg("OnDoubleTimeoutDetected")
 }
 
-func (c *SlashingViolationsConsumer) OnInvalidTimeoutDetected(err model.InvalidTimeoutError) {
+func (c *SlashingViolationsLogger) OnInvalidTimeoutDetected(err model.InvalidTimeoutError) {
 	timeout := err.Timeout
 	c.log.Warn().
 		Uint64("timeout_view", timeout.View).
@@ -78,7 +78,7 @@ func (c *SlashingViolationsConsumer) OnInvalidTimeoutDetected(err model.InvalidT
 		Msg("OnInvalidTimeoutDetected")
 }
 
-func (c *SlashingViolationsConsumer) OnVoteForInvalidBlockDetected(vote *model.Vote, proposal *model.Proposal) {
+func (c *SlashingViolationsLogger) OnVoteForInvalidBlockDetected(vote *model.Vote, proposal *model.Proposal) {
 	c.log.Warn().
 		Uint64("vote_view", vote.View).
 		Hex("voted_block_id", vote.BlockID[:]).
@@ -88,7 +88,7 @@ func (c *SlashingViolationsConsumer) OnVoteForInvalidBlockDetected(vote *model.V
 		Msg("OnVoteForInvalidBlockDetected")
 }
 
-func (c *SlashingViolationsConsumer) OnDoubleProposeDetected(block1 *model.Block, block2 *model.Block) {
+func (c *SlashingViolationsLogger) OnDoubleProposeDetected(block1 *model.Block, block2 *model.Block) {
 	c.log.Warn().
 		Hex("proposer_id", block1.ProposerID[:]).
 		Uint64("block_view", block1.View).

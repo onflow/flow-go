@@ -448,7 +448,7 @@ func NewFlowObserverServiceBuilder(opts ...Option) *ObserverServiceBuilder {
 		FlowNodeBuilder:       cmd.FlowNode("observer"),
 		FollowerDistributor:   pubsub.NewFollowerDistributor(),
 	}
-	anb.FollowerDistributor.AddProposalViolationConsumer(notifications.NewSlashingViolationsConsumer(anb.Logger))
+	anb.FollowerDistributor.AddProposalViolationConsumer(notifications.NewSlashingViolationsLogger(anb.Logger))
 	// the observer gets a version of the root snapshot file that does not contain any node addresses
 	// hence skip all the root snapshot validations that involved an identity address
 	anb.FlowNodeBuilder.SkipNwAddressBasedValidations = true

@@ -844,7 +844,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 
 func FlowAccessNode(nodeBuilder *cmd.FlowNodeBuilder) *FlowAccessNodeBuilder {
 	dist := consensuspubsub.NewFollowerDistributor()
-	dist.AddProposalViolationConsumer(notifications.NewSlashingViolationsConsumer(nodeBuilder.Logger))
+	dist.AddProposalViolationConsumer(notifications.NewSlashingViolationsLogger(nodeBuilder.Logger))
 	return &FlowAccessNodeBuilder{
 		AccessNodeConfig:    DefaultAccessNodeConfig(),
 		FlowNodeBuilder:     nodeBuilder,
