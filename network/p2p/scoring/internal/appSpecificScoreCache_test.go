@@ -1,6 +1,7 @@
 package internal_test
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -44,4 +45,99 @@ func TestAppSpecificScoreCache(t *testing.T) {
 	require.True(t, found, "failed to find updated score in cache")
 	require.Equal(t, newScore, updatedScore, "updated score does not match expected")
 	require.Equal(t, updateTime.Add(time.Minute), updatedTime, "updated time does not match expected")
+}
+
+// TestAppSpecificScoreCache_Concurrent_Add_Get_Update tests the concurrent functionality of AppSpecificScoreCache;
+// specifically, it tests the Add and Get methods under concurrent access.
+func TestAppSpecificScoreCache_Concurrent_Add_Get_Update(t *testing.T) {
+	logger := zerolog.Nop()
+
+	cache := internal.NewAppSpecificScoreCache(10, logger, metrics.NewNoopCollector())
+	require.NotNil(t, cache, "failed to create AppSpecificScoreCache")
+
+	peerId1 := unittest.PeerIdFixture(t)
+	score1 := 5.0
+	lastUpdated1 := time.Now()
+
+	peerId2 := unittest.PeerIdFixture(t)
+	score2 := 10.0
+	lastUpdated2 := time.Now().Add(time.Minute)
+
+	wg := sync.WaitGroup{}
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		err := cache.Add(peerId1, score1, lastUpdated1)
+		require.Nil(t, err, "failed to add score1 to cache")
+	}()
+
+	go func() {
+		defer wg.Done()
+		err := cache.Add(peerId2, score2, lastUpdated2)
+		require.Nil(t, err, "failed to add score2 to cache")
+	}()
+
+	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "failed to add scores to cache")
+
+	// retrieve scores concurrently
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		retrievedScore, lastUpdated, found := cache.Get(peerId1)
+		require.True(t, found, "failed to find score1 in cache")
+		require.Equal(t, score1, retrievedScore, "retrieved score1 does not match expected")
+		require.Equal(t, lastUpdated1, lastUpdated, "retrieved update time1 does not match expected")
+	}()
+
+	go func() {
+		defer wg.Done()
+		retrievedScore, lastUpdated, found := cache.Get(peerId2)
+		require.True(t, found, "failed to find score2 in cache")
+		require.Equal(t, score2, retrievedScore, "retrieved score2 does not match expected")
+		require.Equal(t, lastUpdated2, lastUpdated, "retrieved update time2 does not match expected")
+	}()
+
+	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "failed to retrieve scores from cache")
+
+	// test cache update
+	newScore1 := 15.0
+	newScore2 := 20.0
+	lastUpdated1 = time.Now().Add(time.Minute)
+	lastUpdated2 = time.Now().Add(time.Minute)
+
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		err := cache.Add(peerId1, newScore1, lastUpdated1)
+		require.Nil(t, err, "failed to update score1 in cache")
+	}()
+
+	go func() {
+		defer wg.Done()
+		err := cache.Add(peerId2, newScore2, lastUpdated2)
+		require.Nil(t, err, "failed to update score2 in cache")
+	}()
+
+	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "failed to update scores in cache")
+
+	// retrieve updated scores concurrently
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		updatedScore, updatedTime, found := cache.Get(peerId1)
+		require.True(t, found, "failed to find updated score1 in cache")
+		require.Equal(t, newScore1, updatedScore, "updated score1 does not match expected")
+		require.Equal(t, lastUpdated1, updatedTime, "updated time1 does not match expected")
+	}()
+
+	go func() {
+		defer wg.Done()
+		updatedScore, updatedTime, found := cache.Get(peerId2)
+		require.True(t, found, "failed to find updated score2 in cache")
+		require.Equal(t, newScore2, updatedScore, "updated score2 does not match expected")
+		require.Equal(t, lastUpdated2, updatedTime, "updated time2 does not match expected")
+	}()
+
+	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "failed to retrieve updated scores from cache")
 }
