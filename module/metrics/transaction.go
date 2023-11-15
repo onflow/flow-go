@@ -179,6 +179,12 @@ func (tc *TransactionCollector) ScriptExecutionErrorMatch() {
 	tc.scriptExecutionComparison.WithLabelValues("error_match").Inc()
 }
 
+// ScriptExecutionNotIndexed records script execution matches where data for the block is not
+// indexed locally yet
+func (tc *TransactionCollector) ScriptExecutionNotIndexed() {
+	tc.scriptExecutionComparison.WithLabelValues("not_indexed").Inc()
+}
+
 // TransactionResult metrics
 
 func (tc *TransactionCollector) TransactionResultFetched(dur time.Duration, size int) {

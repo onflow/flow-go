@@ -54,7 +54,14 @@ func NewConsumer(
 	worker Worker,
 	maxProcessing uint64,
 	maxSearchAhead uint64,
-) *Consumer {
+	defaultIndex uint64,
+) (*Consumer, error) {
+
+	processedIndex, err := readProcessedIndex(log, progress, defaultIndex)
+	if err != nil {
+		return nil, fmt.Errorf("could not read processed index: %w", err)
+	}
+
 	return &Consumer{
 		log: log.With().Str("sub_module", "job_queue").Logger(),
 
@@ -71,14 +78,41 @@ func NewConsumer(
 		running:          false,
 		isChecking:       atomic.NewBool(false),
 		started:          atomic.NewBool(false),
-		processedIndex:   0,
+		processedIndex:   processedIndex,
 		processings:      make(map[uint64]*jobStatus),
 		processingsIndex: make(map[module.JobID]uint64),
+	}, nil
+}
+
+func readProcessedIndex(log zerolog.Logger, progress storage.ConsumerProgress, defaultIndex uint64) (uint64, error) {
+	// on startup, sync with storage for the processed index
+	// to ensure the consistency
+	processedIndex, err := progress.ProcessedIndex()
+	if errors.Is(err, storage.ErrNotFound) {
+		err := progress.InitProcessedIndex(defaultIndex)
+		if errors.Is(err, storage.ErrAlreadyExists) {
+			return 0, fmt.Errorf("processed index has already been inited, no effect for the second time. default index: %v",
+				defaultIndex)
+		}
+
+		if err != nil {
+			return 0, fmt.Errorf("could not init processed index: %w", err)
+		}
+
+		log.Warn().Uint64("processed index", processedIndex).
+			Msg("processed index not found, initialized.")
+		return defaultIndex, nil
 	}
+
+	if err != nil {
+		return 0, fmt.Errorf("could not read processed index: %w", err)
+	}
+
+	return processedIndex, nil
 }
 
 // Start starts consuming the jobs from the job queue.
-func (c *Consumer) Start(defaultIndex uint64) error {
+func (c *Consumer) Start() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -87,32 +121,8 @@ func (c *Consumer) Start(defaultIndex uint64) error {
 	}
 	c.running = true
 
-	// on startup, sync with storage for the processed index
-	// to ensure the consistency
-	processedIndex, err := c.progress.ProcessedIndex()
-	if errors.Is(err, storage.ErrNotFound) {
-		err := c.progress.InitProcessedIndex(defaultIndex)
-		if errors.Is(err, storage.ErrAlreadyExists) {
-			return fmt.Errorf("processed index has already been inited, no effect for the second time. default index: %v",
-				defaultIndex)
-		}
-
-		if err != nil {
-			return fmt.Errorf("could not init processed index: %w", err)
-		}
-
-		processedIndex = defaultIndex
-
-		c.log.Warn().Uint64("processed index", processedIndex).
-			Msg("processed index not found, initialized.")
-	} else if err != nil {
-		return fmt.Errorf("could not read processed index: %w", err)
-	}
-
-	c.processedIndex = processedIndex
-
 	c.log.Info().
-		Uint64("processed", processedIndex).
+		Uint64("processed", c.processedIndex).
 		Msg("consumer started")
 
 	c.checkProcessable()
