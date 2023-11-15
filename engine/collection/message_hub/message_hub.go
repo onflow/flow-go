@@ -67,10 +67,10 @@ type packedVote struct {
 // All communicator events are handled on worker thread to prevent sender from blocking.
 // For outgoing messages processing logic looks like this:
 //
-//	+-------------------+      +------------+      +----------+      +------------------------+
+//	+-------------------+      +------------+      +---------------------+      +------------------------+
 //	|  Cluster-Channel  |<-----| MessageHub |<-----| ParticipantConsumer |<-----|        Hotstuff        |
-//	+-------------------+      +------+-----+      +----------+      +------------------------+
-//	                                                  pub/sub          vote, timeout, proposal
+//	+-------------------+      +------+-----+      +---------------------+      +------------------------+
+//	                                                      pub/sub                 vote, timeout, proposal
 //
 // MessageHub is safe to use in concurrent environment.
 type MessageHub struct {
