@@ -46,7 +46,7 @@ type ActivePaceMakerTestSuite struct {
 	initialQC   *flow.QuorumCertificate
 	initialTC   *flow.TimeoutCertificate
 
-	notifier                 *mocks.Consumer
+	notifier                 *mocks.ParticipantConsumer
 	proposalDurationProvider hotstuff.ProposalDurationProvider
 	persist                  *mocks.Persister
 	paceMaker                *ActivePaceMaker
@@ -64,7 +64,7 @@ func (s *ActivePaceMakerTestSuite) SetupTest() {
 	require.NoError(s.T(), err)
 
 	// init consumer for notifications emitted by PaceMaker
-	s.notifier = mocks.NewConsumer(s.T())
+	s.notifier = mocks.NewParticipantConsumer(s.T())
 	s.notifier.On("OnStartingTimeout", expectedTimerInfo(s.initialView)).Return().Once()
 
 	// init Persister dependency for PaceMaker
