@@ -233,6 +233,7 @@ func (executor *transactionExecutor) ExecuteTransactionBody() error {
 			executor.env,
 			executor.cadenceRuntime.TxRuntimeEnv,
 			chain.ServiceAddress(),
+			FlowTokenAddress(chain),
 		)
 		if err != nil {
 			return err
