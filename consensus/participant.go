@@ -108,8 +108,8 @@ func NewParticipant(
 	}
 
 	// add observer, event loop needs to receive events from distributor
-	modules.VoteCollectorDistributor.AddVoteCollectorConsumer(loop)
-	modules.TimeoutCollectorDistributor.AddTimeoutCollectorConsumer(loop)
+	modules.Notifier.AddVoteCollectorConsumer(loop)
+	modules.Notifier.AddTimeoutCollectorConsumer(loop)
 
 	return loop, nil
 }

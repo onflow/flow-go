@@ -48,6 +48,7 @@ type VoteAggregator struct {
 }
 
 var _ hotstuff.VoteAggregator = (*VoteAggregator)(nil)
+var _ hotstuff.FinalizationConsumer = (*VoteAggregator)(nil)
 var _ component.Component = (*VoteAggregator)(nil)
 
 // NewVoteAggregator creates an instance of vote aggregator
@@ -361,3 +362,6 @@ func (va *VoteAggregator) finalizationProcessingLoop(ctx context.Context) {
 		}
 	}
 }
+
+// OnBlockIncorporated is a no-op, as the VoteAggregator only needs block finalization
+func (va *VoteAggregator) OnBlockIncorporated(block *model.Block) { /* no-op */ }

@@ -106,31 +106,31 @@ func main() {
 		insecureAccessAPI  bool
 		accessNodeIDS      []string
 
-		err                 error
-		mutableState        protocol.ParticipantState
-		beaconPrivateKey    *encodable.RandomBeaconPrivKey
-		guarantees          mempool.Guarantees
-		receipts            mempool.ExecutionTree
-		seals               mempool.IncorporatedResultSeals
-		pendingReceipts     mempool.PendingReceipts
-		receiptRequester    *requester.Engine
-		syncCore            *chainsync.Core
-		comp                *compliance.Engine
-		hot                 module.HotStuff
-		conMetrics          module.ConsensusMetrics
-		mainMetrics         module.HotstuffMetrics
-		receiptValidator    module.ReceiptValidator
-		chunkAssigner       *chmodule.ChunkAssigner
-		followerDistributor *pubsub.FollowerDistributor
-		dkgBrokerTunnel     *dkgmodule.BrokerTunnel
-		blockTimer          protocol.BlockTimer
-		proposalDurProvider hotstuff.ProposalDurationProvider
-		committee           *committees.Consensus
-		epochLookup         *epochs.EpochLookup
-		hotstuffModules     *consensus.HotstuffModules
-		dkgState            *bstorage.DKGState
-		safeBeaconKeys      *bstorage.SafeBeaconPrivateKeys
-		getSealingConfigs   module.SealingConfigsGetter
+		err                      error
+		mutableState             protocol.ParticipantState
+		beaconPrivateKey         *encodable.RandomBeaconPrivKey
+		guarantees               mempool.Guarantees
+		receipts                 mempool.ExecutionTree
+		seals                    mempool.IncorporatedResultSeals
+		pendingReceipts          mempool.PendingReceipts
+		receiptRequester         *requester.Engine
+		syncCore                 *chainsync.Core
+		comp                     *compliance.Engine
+		hot                      module.HotStuff
+		conMetrics               module.ConsensusMetrics
+		mainMetrics              module.HotstuffMetrics
+		receiptValidator         module.ReceiptValidator
+		chunkAssigner            *chmodule.ChunkAssigner
+		notificationsDistributor *pubsub.Distributor
+		dkgBrokerTunnel          *dkgmodule.BrokerTunnel
+		blockTimer               protocol.BlockTimer
+		proposalDurProvider      hotstuff.ProposalDurationProvider
+		committee                *committees.Consensus
+		epochLookup              *epochs.EpochLookup
+		hotstuffModules          *consensus.HotstuffModules
+		dkgState                 *bstorage.DKGState
+		safeBeaconKeys           *bstorage.SafeBeaconPrivateKeys
+		getSealingConfigs        module.SealingConfigsGetter
 	)
 	var deprecatedFlagBlockRateDelay time.Duration
 
@@ -405,7 +405,11 @@ func main() {
 			return err
 		}).
 		Module("follower distributor", func(node *cmd.NodeConfig) error {
-			followerDistributor = pubsub.NewFollowerDistributor()
+			// initialize a notifications distributor for HotStuff, including a subscription for consensus participant logs
+			notificationsDistributor = createNotifier(
+				createLogger(node.Logger, node.RootChainID), // logger containing chainID
+				mainMetrics,
+			)
 			return nil
 		}).
 		Module("machine account config", func(node *cmd.NodeConfig) error {
@@ -470,9 +474,7 @@ func main() {
 				getSealingConfigs,
 			)
 
-			// subscribe for finalization events from hotstuff
-			followerDistributor.AddOnBlockFinalizedConsumer(e.OnFinalizedBlock)
-			followerDistributor.AddOnBlockIncorporatedConsumer(e.OnBlockIncorporated)
+			notificationsDistributor.AddFinalizationConsumer(e) // subscribe for finalization events from hotstuff
 
 			return e, err
 		}).
@@ -526,9 +528,7 @@ func main() {
 
 			// subscribe engine to inputs from other node-internal components
 			receiptRequester.WithHandle(e.HandleReceipt)
-			followerDistributor.AddOnBlockFinalizedConsumer(e.OnFinalizedBlock)
-			followerDistributor.AddOnBlockIncorporatedConsumer(e.OnBlockIncorporated)
-
+			notificationsDistributor.AddFinalizationConsumer(e)
 			return e, err
 		}).
 		Component("ingestion engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -590,23 +590,15 @@ func main() {
 			)
 			signer = verification.NewMetricsWrapper(signer, mainMetrics) // wrapper for measuring time spent with crypto-related operations
 
-			// create consensus logger
 			logger := createLogger(node.Logger, node.RootChainID)
+			notificationsDistributor.AddTelemetryConsumer(notifications.NewTelemetryLogger(logger))
 
-			telemetryConsumer := notifications.NewTelemetryConsumer(logger)
 			slashingViolationConsumer := notifications.NewSlashingViolationsConsumer(nodeBuilder.Logger)
-			followerDistributor.AddProposalViolationConsumer(slashingViolationConsumer)
+			notifier.AddProposalViolationConsumer(slashingViolationConsumer)
+			notifier.AddVoteAggregationViolationConsumer(slashingViolationConsumer)
+			notifier.AddTimeoutAggregationViolationConsumer(slashingViolationConsumer)
 
-			// initialize a logging notifier for hotstuff
-			notifier := createNotifier(
-				logger,
-				mainMetrics,
-			)
-
-			notifier.AddViewLifecycleConsumer(telemetryConsumer)
-			notifier.AddCommunicatorConsumer(telemetryConsumer)
-			notifier.AddFinalizationConsumer(telemetryConsumer)
-			notifier.AddFollowerConsumer(followerDistributor)
+			notificationsDistributor.AddProposalViolationConsumer(slashingViolationConsumer)
 
 			// initialize the persister
 			persist := persister.New(node.DB, node.RootChainID)
@@ -620,7 +612,7 @@ func main() {
 				finalizedBlock,
 				node.Storage.Headers,
 				finalize,
-				notifier,
+				notificationsDistributor,
 				node.FinalizedRootBlock.Header,
 				node.RootQC,
 			)
@@ -628,13 +620,8 @@ func main() {
 				return nil, err
 			}
 
-			// create producer and connect it to consumers
-			voteAggregationDistributor := pubsub.NewVoteAggregationDistributor()
-			voteAggregationDistributor.AddVoteCollectorConsumer(telemetryConsumer)
-			voteAggregationDistributor.AddVoteAggregationViolationConsumer(slashingViolationConsumer)
-
 			validator := consensus.NewValidator(mainMetrics, wrappedCommittee)
-			voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(wrappedCommittee, voteAggregationDistributor.OnQcConstructedFromVotes)
+			voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(wrappedCommittee, notificationsDistributor.OnQcConstructedFromVotes)
 			lowestViewForVoteProcessing := finalizedBlock.View + 1
 			voteAggregator, err := consensus.NewVoteAggregator(
 				logger,
@@ -642,50 +629,41 @@ func main() {
 				node.Metrics.Engine,
 				node.Metrics.Mempool,
 				lowestViewForVoteProcessing,
-				voteAggregationDistributor,
-				voteProcessorFactory,
-				followerDistributor)
+				notificationsDistributor,
+				voteProcessorFactory)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize vote aggregator: %w", err)
 			}
-
-			// create producer and connect it to consumers
-			timeoutAggregationDistributor := pubsub.NewTimeoutAggregationDistributor()
-			timeoutAggregationDistributor.AddTimeoutCollectorConsumer(telemetryConsumer)
-			timeoutAggregationDistributor.AddTimeoutAggregationViolationConsumer(slashingViolationConsumer)
+			notificationsDistributor.AddFinalizationConsumer(voteAggregator)
 
 			timeoutProcessorFactory := timeoutcollector.NewTimeoutProcessorFactory(
 				logger,
-				timeoutAggregationDistributor,
+				notificationsDistributor,
 				committee,
 				validator,
-				msig.ConsensusTimeoutTag,
-			)
+				msig.ConsensusTimeoutTag)
 			timeoutAggregator, err := consensus.NewTimeoutAggregator(
 				logger,
 				mainMetrics,
 				node.Metrics.Engine,
 				node.Metrics.Mempool,
-				notifier,
 				timeoutProcessorFactory,
-				timeoutAggregationDistributor,
-				lowestViewForVoteProcessing,
-			)
+				notificationsDistributor,
+				lowestViewForVoteProcessing)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize timeout aggregator: %w", err)
 			}
+			notificationsDistributor.AddViewLifecycleConsumer(timeoutAggregator)
 
 			hotstuffModules = &consensus.HotstuffModules{
-				Notifier:                    notifier,
-				Committee:                   wrappedCommittee,
-				Signer:                      signer,
-				Persist:                     persist,
-				VoteCollectorDistributor:    voteAggregationDistributor.VoteCollectorDistributor,
-				TimeoutCollectorDistributor: timeoutAggregationDistributor.TimeoutCollectorDistributor,
-				Forks:                       forks,
-				Validator:                   validator,
-				VoteAggregator:              voteAggregator,
-				TimeoutAggregator:           timeoutAggregator,
+				Notifier:          notificationsDistributor,
+				Committee:         wrappedCommittee,
+				Signer:            signer,
+				Persist:           persist,
+				Forks:             forks,
+				Validator:         validator,
+				VoteAggregator:    voteAggregator,
+				TimeoutAggregator: timeoutAggregator,
 			}
 
 			return util.MergeReadyDone(voteAggregator, timeoutAggregator), nil
@@ -791,7 +769,7 @@ func main() {
 				node.Metrics.Mempool,
 				mainMetrics,
 				node.Metrics.Compliance,
-				followerDistributor,
+				notificationsDistributor,
 				node.Tracer,
 				node.Storage.Headers,
 				node.Storage.Payloads,
@@ -817,7 +795,7 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
 			}
-			followerDistributor.AddOnBlockFinalizedConsumer(comp.OnFinalizedBlock)
+			notificationsDistributor.AddOnBlockFinalizedConsumer(comp.OnFinalizedBlock)
 
 			return comp, nil
 		}).
@@ -861,7 +839,7 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
 			}
-			followerDistributor.AddFinalizationConsumer(sync)
+			notificationsDistributor.AddFinalizationConsumer(sync)
 
 			return sync, nil
 		}).

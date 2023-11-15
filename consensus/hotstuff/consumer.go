@@ -382,3 +382,18 @@ type Consumer interface {
 	VoteAggregationConsumer
 	TimeoutAggregationConsumer
 }
+
+// TelemetryConsumer collects all consensus notifications, except for protocol violations.
+// Functionally, it corresponds to the `Consumer` minus the methods in
+// `ProposalViolationConsumer`, `VoteAggregationViolationConsumer`, `TimeoutAggregationViolationConsumer`.
+// Implementations must:
+//   - be concurrency safe
+//   - be non-blocking
+//   - handle repetition of the same events (with some processing overhead).
+type TelemetryConsumer interface {
+	ViewLifecycleConsumer
+	CommunicatorConsumer
+	FinalizationConsumer
+	VoteCollectorConsumer
+	TimeoutCollectorConsumer
+}

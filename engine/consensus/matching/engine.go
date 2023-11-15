@@ -5,6 +5,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
@@ -41,6 +42,8 @@ type Engine struct {
 	pendingReceipts            *fifoqueue.FifoQueue
 	pendingIncorporatedBlocks  *fifoqueue.FifoQueue
 }
+
+var _ hotstuff.FinalizationConsumer = (*Engine)(nil)
 
 func NewEngine(
 	log zerolog.Logger,

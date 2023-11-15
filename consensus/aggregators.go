@@ -7,7 +7,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
-	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/timeoutaggregator"
 	"github.com/onflow/flow-go/consensus/hotstuff/timeoutcollector"
 	"github.com/onflow/flow-go/consensus/hotstuff/voteaggregator"
@@ -25,8 +24,7 @@ func NewVoteAggregator(
 	lowestRetainedView uint64,
 	notifier hotstuff.VoteAggregationConsumer,
 	voteProcessorFactory hotstuff.VoteProcessorFactory,
-	distributor *pubsub.FollowerDistributor,
-) (hotstuff.VoteAggregator, error) {
+) (*voteaggregator.VoteAggregator, error) {
 
 	createCollectorFactoryMethod := votecollector.NewStateMachineFactory(log, notifier, voteProcessorFactory.Create)
 	voteCollectors := voteaggregator.NewVoteCollectors(log, lowestRetainedView, workerpool.New(4), createCollectorFactoryMethod)
@@ -44,8 +42,6 @@ func NewVoteAggregator(
 	if err != nil {
 		return nil, fmt.Errorf("could not create vote aggregator: %w", err)
 	}
-	distributor.AddOnBlockFinalizedConsumer(aggregator.OnFinalizedBlock)
-
 	return aggregator, nil
 }
 
@@ -55,11 +51,10 @@ func NewTimeoutAggregator(log zerolog.Logger,
 	hotstuffMetrics module.HotstuffMetrics,
 	engineMetrics module.EngineMetrics,
 	mempoolMetrics module.MempoolMetrics,
-	notifier *pubsub.ParticipantDistributor,
 	timeoutProcessorFactory hotstuff.TimeoutProcessorFactory,
-	distributor *pubsub.TimeoutAggregationDistributor,
+	distributor hotstuff.TimeoutAggregationConsumer,
 	lowestRetainedView uint64,
-) (hotstuff.TimeoutAggregator, error) {
+) (*timeoutaggregator.TimeoutAggregator, error) {
 
 	timeoutCollectorFactory := timeoutcollector.NewTimeoutCollectorFactory(log, distributor, timeoutProcessorFactory)
 	collectors := timeoutaggregator.NewTimeoutCollectors(log, hotstuffMetrics, lowestRetainedView, timeoutCollectorFactory)
@@ -76,7 +71,5 @@ func NewTimeoutAggregator(log zerolog.Logger,
 	if err != nil {
 		return nil, fmt.Errorf("could not create timeout aggregator: %w", err)
 	}
-	notifier.AddParticipantConsumer(aggregator)
-
 	return aggregator, nil
 }

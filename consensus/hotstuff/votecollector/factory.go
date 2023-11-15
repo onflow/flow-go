@@ -69,7 +69,7 @@ func NewStakingVoteProcessorFactory(committee hotstuff.DynamicCommittee, onQCCre
 	}
 }
 
-// NewCombinedVoteProcessorFactory implements hotstuff.VoteProcessorFactory fo
+// NewCombinedVoteProcessorFactory implements hotstuff.VoteProcessorFactory for
 // participants of the Main Consensus committee.
 //
 // With their vote, members of the main consensus committee can contribute to hotstuff and

@@ -6,6 +6,7 @@ import (
 	"github.com/gammazero/workerpool"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
@@ -84,6 +85,8 @@ type Engine struct {
 	messageHandler             *engine.MessageHandler
 	rootHeader                 *flow.Header
 }
+
+var _ hotstuff.FinalizationConsumer = (*Engine)(nil)
 
 // NewEngine constructs new `Engine` which runs on it's own unit.
 func NewEngine(log zerolog.Logger,

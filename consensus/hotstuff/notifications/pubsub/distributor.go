@@ -25,9 +25,17 @@ func NewDistributor() *Distributor {
 
 // AddConsumer subscribes the given `hotstuff.Consumer` to all events
 func (d *Distributor) AddConsumer(consumer hotstuff.Consumer) {
-	d.ParticipantDistributor.AddParticipantConsumer(consumer)
-	d.VoteAggregationDistributor.AddVoteAggregationConsumer(consumer)
-	d.TimeoutAggregationDistributor.AddTimeoutAggregationConsumer(consumer)
+	d.AddParticipantConsumer(consumer)
+	d.AddVoteAggregationConsumer(consumer)
+	d.AddTimeoutAggregationConsumer(consumer)
+}
+
+func (d *Distributor) AddTelemetryConsumer(consumer hotstuff.TelemetryConsumer) {
+	d.AddViewLifecycleConsumer(consumer)
+	d.AddCommunicatorConsumer(consumer)
+	d.AddFinalizationConsumer(consumer)
+	d.AddVoteCollectorConsumer(consumer)
+	d.AddTimeoutCollectorConsumer(consumer)
 }
 
 // ParticipantDistributor distributes notifications to a list of consumers (event consumers).

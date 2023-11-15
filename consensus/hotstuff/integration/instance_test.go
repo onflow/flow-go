@@ -359,7 +359,7 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 		Int("index", int(index)).
 		Hex("node_id", in.localID[:]).
 		Logger()
-	notifier := pubsub.NewParticipantDistributor()
+	notifier := pubsub.NewDistributor()
 	logConsumer := notifications.NewLogConsumer(log)
 	notifier.AddParticipantConsumer(logConsumer)
 	notifier.AddParticipantConsumer(in.notifier)

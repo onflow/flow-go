@@ -31,7 +31,7 @@ const defaultTimeoutQueueCapacity = 1000
 // It's safe to use in concurrent environment.
 type TimeoutAggregator struct {
 	*component.ComponentManager
-	notifications.NoopParticipantConsumer
+	notifications.NoopViewLifecycleConsumer
 	log                    zerolog.Logger
 	hotstuffMetrics        module.HotstuffMetrics
 	engineMetrics          module.EngineMetrics
@@ -43,6 +43,7 @@ type TimeoutAggregator struct {
 }
 
 var _ hotstuff.TimeoutAggregator = (*TimeoutAggregator)(nil)
+var _ hotstuff.ViewLifecycleConsumer = (*TimeoutAggregator)(nil)
 var _ component.Component = (*TimeoutAggregator)(nil)
 
 // NewTimeoutAggregator creates an instance of timeout aggregator.
@@ -210,7 +211,7 @@ func (t *TimeoutAggregator) PruneUpToView(lowestRetainedView uint64) {
 	t.collectors.PruneUpToView(lowestRetainedView)
 }
 
-// OnViewChange implements the `OnViewChange` callback from the `hotstuff.ParticipantConsumer`.
+// OnViewChange implements the `OnViewChange` callback from the `hotstuff.ViewLifecycleConsumer`.
 // We notify the enteringViewProcessingLoop worker, which then prunes up to the active view.
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function

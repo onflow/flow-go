@@ -75,9 +75,9 @@ func (f *HotStuffFactory) CreateModules(
 	// setup metrics/logging with the new chain ID
 	log := f.createLogger(cluster)
 	metrics := f.createMetrics(cluster.ChainID())
-	telemetryConsumer := notifications.NewTelemetryConsumer(log)
+	telemetryConsumer := notifications.NewTelemetryLogger(log)
 	slashingConsumer := notifications.NewSlashingViolationsConsumer(log)
-	notifier := pubsub.NewParticipantDistributor()
+	notifier := pubsub.NewDistributor()
 	notifier.AddParticipantConsumer(notifications.NewLogConsumer(log))
 	notifier.AddParticipantConsumer(hotmetrics.NewMetricsConsumer(metrics))
 	notifier.AddViewLifecycleConsumer(telemetryConsumer)
@@ -130,12 +130,11 @@ func (f *HotStuffFactory) CreateModules(
 		// the lowest retained view starts with the next view of the last finalized view.
 		finalizedBlock.View+1,
 		voteAggregationDistributor,
-		voteProcessorFactory,
-		notifier.FollowerDistributor,
-	)
+		voteProcessorFactory)
 	if err != nil {
 		return nil, nil, err
 	}
+	notifier.AddFinalizationConsumer(voteAggregator)
 
 	timeoutCollectorDistributor := pubsub.NewTimeoutAggregationDistributor()
 	timeoutCollectorDistributor.AddTimeoutCollectorConsumer(telemetryConsumer)
@@ -147,26 +146,23 @@ func (f *HotStuffFactory) CreateModules(
 		metrics,
 		f.engineMetrics,
 		f.mempoolMetrics,
-		notifier,
 		timeoutProcessorFactory,
 		timeoutCollectorDistributor,
-		finalizedBlock.View+1,
-	)
+		finalizedBlock.View+1)
 	if err != nil {
 		return nil, nil, err
 	}
+	notifier.AddViewLifecycleConsumer(timeoutAggregator)
 
 	return &consensus.HotstuffModules{
-		Forks:                       forks,
-		Validator:                   validator,
-		Notifier:                    notifier,
-		Committee:                   committee,
-		Signer:                      signer,
-		Persist:                     persister.New(f.db, cluster.ChainID()),
-		VoteAggregator:              voteAggregator,
-		TimeoutAggregator:           timeoutAggregator,
-		VoteCollectorDistributor:    voteAggregationDistributor.VoteCollectorDistributor,
-		TimeoutCollectorDistributor: timeoutCollectorDistributor.TimeoutCollectorDistributor,
+		Forks:             forks,
+		Validator:         validator,
+		Notifier:          notifier,
+		Committee:         committee,
+		Signer:            signer,
+		Persist:           persister.New(f.db, cluster.ChainID()),
+		VoteAggregator:    voteAggregator,
+		TimeoutAggregator: timeoutAggregator,
 	}, metrics, nil
 }
 
