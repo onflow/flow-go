@@ -4,6 +4,32 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 )
 
+// Distributor bundles _all_ hotstuff notifications and distributes them to the subscribed consumers.
+//
+// It allows thread-safe subscription of multiple consumers to events.
+type Distributor struct {
+	*ParticipantDistributor
+	*VoteAggregationDistributor
+	*TimeoutAggregationDistributor
+}
+
+var _ hotstuff.Consumer = (*Distributor)(nil)
+
+func NewDistributor() *Distributor {
+	return &Distributor{
+		ParticipantDistributor:        NewParticipantDistributor(),
+		VoteAggregationDistributor:    NewVoteAggregationDistributor(),
+		TimeoutAggregationDistributor: NewTimeoutAggregationDistributor(),
+	}
+}
+
+// AddConsumer subscribes the given `hotstuff.Consumer` to all events
+func (d *Distributor) AddConsumer(consumer hotstuff.Consumer) {
+	d.ParticipantDistributor.AddParticipantConsumer(consumer)
+	d.VoteAggregationDistributor.AddVoteAggregationConsumer(consumer)
+	d.TimeoutAggregationDistributor.AddTimeoutAggregationConsumer(consumer)
+}
+
 // ParticipantDistributor distributes notifications to a list of consumers (event consumers).
 //
 // It allows thread-safe subscription of multiple consumers to events.

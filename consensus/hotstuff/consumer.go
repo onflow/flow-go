@@ -371,3 +371,14 @@ type TimeoutAggregationConsumer interface {
 	TimeoutAggregationViolationConsumer
 	TimeoutCollectorConsumer
 }
+
+// Consumer collects all notifications that the full consensus logic produces.
+// Implementations must:
+//   - be concurrency safe
+//   - be non-blocking
+//   - handle repetition of the same events (with some processing overhead).
+type Consumer interface {
+	ParticipantConsumer
+	VoteAggregationConsumer
+	TimeoutAggregationConsumer
+}
