@@ -778,6 +778,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 	t.Parallel()
 
 	expectedBalance, err := cadence.NewUFix64FromParts(1, 23000000)
+	require.NoError(t, err)
 
 	var deposited bool
 
