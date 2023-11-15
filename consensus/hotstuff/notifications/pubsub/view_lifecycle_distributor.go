@@ -8,29 +8,29 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// ParticipantDistributor ingests events from HotStuff's core logic and distributes them to
+// ViewLifecycleDistributor ingests events from HotStuff's core logic and distributes them to
 // consumers. This logic only runs inside active consensus participants proposing blocks, voting,
 // collecting + aggregating votes to QCs, and participating in the pacemaker (sending timeouts,
 // collecting + aggregating timeouts to TCs).
 // Concurrently safe.
-type ParticipantDistributor struct {
+type ViewLifecycleDistributor struct {
 	consumers []hotstuff.ViewLifecycleConsumer
 	lock      sync.RWMutex
 }
 
-var _ hotstuff.ViewLifecycleConsumer = (*ParticipantDistributor)(nil)
+var _ hotstuff.ViewLifecycleConsumer = (*ViewLifecycleDistributor)(nil)
 
-func NewParticipantDistributor() *ParticipantDistributor {
-	return &ParticipantDistributor{}
+func NewViewLifecycleDistributor() *ViewLifecycleDistributor {
+	return &ViewLifecycleDistributor{}
 }
 
-func (d *ParticipantDistributor) AddViewLifecycleConsumer(consumer hotstuff.ViewLifecycleConsumer) {
+func (d *ViewLifecycleDistributor) AddViewLifecycleConsumer(consumer hotstuff.ViewLifecycleConsumer) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 	d.consumers = append(d.consumers, consumer)
 }
 
-func (d *ParticipantDistributor) OnEventProcessed() {
+func (d *ViewLifecycleDistributor) OnEventProcessed() {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
 	for _, subscriber := range d.consumers {
@@ -38,7 +38,7 @@ func (d *ParticipantDistributor) OnEventProcessed() {
 	}
 }
 
-func (d *ParticipantDistributor) OnStart(currentView uint64) {
+func (d *ViewLifecycleDistributor) OnStart(currentView uint64) {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
 	for _, subscriber := range d.consumers {
@@ -46,7 +46,7 @@ func (d *ParticipantDistributor) OnStart(currentView uint64) {
 	}
 }
 
-func (d *ParticipantDistributor) OnReceiveProposal(currentView uint64, proposal *model.Proposal) {
+func (d *ViewLifecycleDistributor) OnReceiveProposal(currentView uint64, proposal *model.Proposal) {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
 	for _, subscriber := range d.consumers {
@@ -54,7 +54,7 @@ func (d *ParticipantDistributor) OnReceiveProposal(currentView uint64, proposal 
 	}
 }
 
-func (d *ParticipantDistributor) OnReceiveQc(currentView uint64, qc *flow.QuorumCertificate) {
+func (d *ViewLifecycleDistributor) OnReceiveQc(currentView uint64, qc *flow.QuorumCertificate) {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
 	for _, subscriber := range d.consumers {
@@ -62,7 +62,7 @@ func (d *ParticipantDistributor) OnReceiveQc(currentView uint64, qc *flow.Quorum
 	}
 }
 
-func (d *ParticipantDistributor) OnReceiveTc(currentView uint64, tc *flow.TimeoutCertificate) {
+func (d *ViewLifecycleDistributor) OnReceiveTc(currentView uint64, tc *flow.TimeoutCertificate) {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
 	for _, subscriber := range d.consumers {
@@ -70,7 +70,7 @@ func (d *ParticipantDistributor) OnReceiveTc(currentView uint64, tc *flow.Timeou
 	}
 }
 
-func (d *ParticipantDistributor) OnPartialTc(currentView uint64, partialTc *hotstuff.PartialTcCreated) {
+func (d *ViewLifecycleDistributor) OnPartialTc(currentView uint64, partialTc *hotstuff.PartialTcCreated) {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
 	for _, subscriber := range d.consumers {
@@ -78,7 +78,7 @@ func (d *ParticipantDistributor) OnPartialTc(currentView uint64, partialTc *hots
 	}
 }
 
-func (d *ParticipantDistributor) OnLocalTimeout(currentView uint64) {
+func (d *ViewLifecycleDistributor) OnLocalTimeout(currentView uint64) {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
 	for _, subscriber := range d.consumers {
@@ -86,7 +86,7 @@ func (d *ParticipantDistributor) OnLocalTimeout(currentView uint64) {
 	}
 }
 
-func (d *ParticipantDistributor) OnViewChange(oldView, newView uint64) {
+func (d *ViewLifecycleDistributor) OnViewChange(oldView, newView uint64) {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
 	for _, subscriber := range d.consumers {
@@ -94,7 +94,7 @@ func (d *ParticipantDistributor) OnViewChange(oldView, newView uint64) {
 	}
 }
 
-func (d *ParticipantDistributor) OnQcTriggeredViewChange(oldView uint64, newView uint64, qc *flow.QuorumCertificate) {
+func (d *ViewLifecycleDistributor) OnQcTriggeredViewChange(oldView uint64, newView uint64, qc *flow.QuorumCertificate) {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
 	for _, subscriber := range d.consumers {
@@ -102,7 +102,7 @@ func (d *ParticipantDistributor) OnQcTriggeredViewChange(oldView uint64, newView
 	}
 }
 
-func (d *ParticipantDistributor) OnTcTriggeredViewChange(oldView uint64, newView uint64, tc *flow.TimeoutCertificate) {
+func (d *ViewLifecycleDistributor) OnTcTriggeredViewChange(oldView uint64, newView uint64, tc *flow.TimeoutCertificate) {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
 	for _, subscriber := range d.consumers {
@@ -110,7 +110,7 @@ func (d *ParticipantDistributor) OnTcTriggeredViewChange(oldView uint64, newView
 	}
 }
 
-func (d *ParticipantDistributor) OnStartingTimeout(timerInfo model.TimerInfo) {
+func (d *ViewLifecycleDistributor) OnStartingTimeout(timerInfo model.TimerInfo) {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
 	for _, subscriber := range d.consumers {
@@ -118,7 +118,7 @@ func (d *ParticipantDistributor) OnStartingTimeout(timerInfo model.TimerInfo) {
 	}
 }
 
-func (d *ParticipantDistributor) OnCurrentViewDetails(currentView, finalizedView uint64, currentLeader flow.Identifier) {
+func (d *ViewLifecycleDistributor) OnCurrentViewDetails(currentView, finalizedView uint64, currentLeader flow.Identifier) {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
 	for _, subscriber := range d.consumers {

@@ -10,16 +10,16 @@ import (
 type Distributor struct {
 	*FollowerDistributor
 	*CommunicatorDistributor
-	*ParticipantDistributor
+	*ViewLifecycleDistributor
 }
 
 var _ hotstuff.Consumer = (*Distributor)(nil)
 
 func NewDistributor() *Distributor {
 	return &Distributor{
-		FollowerDistributor:     NewFollowerDistributor(),
-		CommunicatorDistributor: NewCommunicatorDistributor(),
-		ParticipantDistributor:  NewParticipantDistributor(),
+		FollowerDistributor:      NewFollowerDistributor(),
+		CommunicatorDistributor:  NewCommunicatorDistributor(),
+		ViewLifecycleDistributor: NewViewLifecycleDistributor(),
 	}
 }
 
@@ -27,7 +27,7 @@ func NewDistributor() *Distributor {
 func (p *Distributor) AddConsumer(consumer hotstuff.Consumer) {
 	p.FollowerDistributor.AddFollowerConsumer(consumer)
 	p.CommunicatorDistributor.AddCommunicatorConsumer(consumer)
-	p.ParticipantDistributor.AddViewLifecycleConsumer(consumer)
+	p.ViewLifecycleDistributor.AddViewLifecycleConsumer(consumer)
 }
 
 // FollowerDistributor ingests consensus follower events and distributes it to consumers.
