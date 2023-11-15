@@ -24,7 +24,7 @@ func TestMessageEntity_InspectRPCRequest_ID(t *testing.T) {
 	rpc2 := rpcs[1]
 	peerId1 := unittest.PeerIdFixture(t)
 
-	// Create two valid InspectRPCRequest structs from the same RPC structs and peer IDs
+	// creates two InspectRPCRequest structs with the same Nonce and PeerID fields
 	req1, err := validation.NewInspectRPCRequest(peerId1, &pubsub.RPC{
 		RPC: *rpc1,
 	})
@@ -37,9 +37,12 @@ func TestMessageEntity_InspectRPCRequest_ID(t *testing.T) {
 	// Set the Nonce field of the second InspectRPCRequest struct to the Nonce field of the first
 	req2.Nonce = req1.Nonce
 
+	// creates a third InspectRPCRequest struct with the same Nonce and PeerID fields as the first two
+	// but with a different RPC field
 	req3, err := validation.NewInspectRPCRequest(peerId1, &pubsub.RPC{
 		RPC: *rpc2,
 	})
+	require.NoError(t, err)
 	req3.Nonce = req1.Nonce
 
 	// now convert to MessageEntity
@@ -47,6 +50,8 @@ func TestMessageEntity_InspectRPCRequest_ID(t *testing.T) {
 	entity2 := internal.NewMessageEntity(&engine.Message{Payload: req2})
 	entity3 := internal.NewMessageEntity(&engine.Message{Payload: req3})
 
+	// as the Nonce and PeerID fields are the same, the ID of the MessageEntity should be the same accross all three
+	// in other words, the RPC field should not affect the ID
 	require.Equal(t, entity1.ID(), entity2.ID())
 	require.Equal(t, entity1.ID(), entity3.ID())
 }
