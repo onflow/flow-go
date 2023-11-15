@@ -287,7 +287,7 @@ func (es *EventHandlerSuite) SetupTest() {
 	es.persist.On("PutStarted", mock.Anything).Return(nil).Maybe()
 	es.blockProducer = &BlockProducer{proposerID: es.committee.Self()}
 	es.safetyRules = NewSafetyRules(es.T())
-	es.notifier = mocks.NewConsumer(es.T())
+	es.notifier = mocks.NewParticipantConsumer(es.T())
 	es.notifier.On("OnEventProcessed").Maybe()
 	es.notifier.On("OnEnteringView", mock.Anything, mock.Anything).Maybe()
 	es.notifier.On("OnStart", mock.Anything).Maybe()
