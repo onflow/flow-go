@@ -6,7 +6,7 @@ import (
 )
 
 type CounterConsumer struct {
-	notifications.NoopConsumer
+	notifications.NoopParticipantConsumer
 	total     uint
 	finalized func(uint)
 }

@@ -13,7 +13,7 @@ import (
 // It depends on Metrics module to report metrics data.
 type MetricsConsumer struct {
 	// inherit from noop consumer in order to satisfy the full interface
-	notifications.NoopConsumer
+	notifications.NoopParticipantConsumer
 	metrics module.HotstuffMetrics
 }
 

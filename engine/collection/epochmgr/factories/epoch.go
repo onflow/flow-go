@@ -188,7 +188,7 @@ func (factory *EpochComponentsFactory) Create(
 	if err != nil {
 		err = fmt.Errorf("could not create message hub: %w", err)
 	}
-	hotstuffModules.Notifier.AddConsumer(clusterMessageHub)
+	hotstuffModules.Notifier.AddParticipantConsumer(clusterMessageHub)
 	messageHub = clusterMessageHub
 
 	return

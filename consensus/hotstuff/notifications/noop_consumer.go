@@ -8,24 +8,23 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// NoopConsumer is an implementation of the notifications consumer that
+// NoopParticipantConsumer is a no-op implementation of hotstuff.ParticipantConsumer
 // doesn't do anything.
-type NoopConsumer struct {
+type NoopParticipantConsumer struct {
 	NoopProposalViolationConsumer
 	NoopFinalizationConsumer
 	NoopViewLifecycleConsumer
 	NoopCommunicatorConsumer
 }
 
-var _ hotstuff.ParticipantConsumer = (*NoopConsumer)(nil)
+var _ hotstuff.ParticipantConsumer = (*NoopParticipantConsumer)(nil)
 
-func NewNoopConsumer() *NoopConsumer {
-	nc := &NoopConsumer{}
+func NewNoopConsumer() *NoopParticipantConsumer {
+	nc := &NoopParticipantConsumer{}
 	return nc
 }
 
-// no-op implementation of hotstuff.ParticipantConsumer(but not nested interfaces)
-
+// NoopViewLifecycleConsumer is a no-op implementation of hotstuff.ViewLifecycleConsumer
 type NoopViewLifecycleConsumer struct{}
 
 func (*NoopViewLifecycleConsumer) OnEventProcessed() {}
@@ -52,8 +51,7 @@ func (*NoopViewLifecycleConsumer) OnStartingTimeout(model.TimerInfo) {}
 
 func (*NoopViewLifecycleConsumer) OnCurrentViewDetails(uint64, uint64, flow.Identifier) {}
 
-// no-op implementation of hotstuff.FinalizationConsumer
-
+// NoopFinalizationConsumer is a no-op implementation of hotstuff.FinalizationConsumer
 type NoopFinalizationConsumer struct{}
 
 var _ hotstuff.FinalizationConsumer = (*NoopFinalizationConsumer)(nil)
@@ -62,8 +60,7 @@ func (*NoopFinalizationConsumer) OnBlockIncorporated(*model.Block) {}
 
 func (*NoopFinalizationConsumer) OnFinalizedBlock(*model.Block) {}
 
-// no-op implementation of hotstuff.TimeoutCollectorConsumer
-
+// NoopTimeoutCollectorConsumer is a no-op implementation of hotstuff.TimeoutCollectorConsumer
 type NoopTimeoutCollectorConsumer struct{}
 
 var _ hotstuff.TimeoutCollectorConsumer = (*NoopTimeoutCollectorConsumer)(nil)
@@ -79,8 +76,7 @@ func (*NoopTimeoutCollectorConsumer) OnNewTcDiscovered(*flow.TimeoutCertificate)
 
 func (*NoopTimeoutCollectorConsumer) OnTimeoutProcessed(*model.TimeoutObject) {}
 
-// no-op implementation of hotstuff.CommunicatorConsumer
-
+// NoopCommunicatorConsumer is a no-op implementation of hotstuff.CommunicatorConsumer
 type NoopCommunicatorConsumer struct{}
 
 var _ hotstuff.CommunicatorConsumer = (*NoopCommunicatorConsumer)(nil)
@@ -91,8 +87,7 @@ func (*NoopCommunicatorConsumer) OnOwnTimeout(*model.TimeoutObject) {}
 
 func (*NoopCommunicatorConsumer) OnOwnProposal(*flow.Header, time.Time) {}
 
-// no-op implementation of hotstuff.VoteCollectorConsumer
-
+// NoopVoteCollectorConsumer is a no-op implementation of hotstuff.VoteCollectorConsumer
 type NoopVoteCollectorConsumer struct{}
 
 var _ hotstuff.VoteCollectorConsumer = (*NoopVoteCollectorConsumer)(nil)
@@ -101,8 +96,7 @@ func (*NoopVoteCollectorConsumer) OnQcConstructedFromVotes(*flow.QuorumCertifica
 
 func (*NoopVoteCollectorConsumer) OnVoteProcessed(*model.Vote) {}
 
-// no-op implementation of hotstuff.ProposalViolationConsumer
-
+// NoopProposalViolationConsumer is a no-op implementation of hotstuff.ProposalViolationConsumer
 type NoopProposalViolationConsumer struct{}
 
 var _ hotstuff.ProposalViolationConsumer = (*NoopProposalViolationConsumer)(nil)

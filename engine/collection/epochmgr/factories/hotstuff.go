@@ -77,9 +77,9 @@ func (f *HotStuffFactory) CreateModules(
 	metrics := f.createMetrics(cluster.ChainID())
 	telemetryConsumer := notifications.NewTelemetryConsumer(log)
 	slashingConsumer := notifications.NewSlashingViolationsConsumer(log)
-	notifier := pubsub.NewDistributor()
-	notifier.AddConsumer(notifications.NewLogConsumer(log))
-	notifier.AddConsumer(hotmetrics.NewMetricsConsumer(metrics))
+	notifier := pubsub.NewParticipantDistributor()
+	notifier.AddParticipantConsumer(notifications.NewLogConsumer(log))
+	notifier.AddParticipantConsumer(hotmetrics.NewMetricsConsumer(metrics))
 	notifier.AddViewLifecycleConsumer(telemetryConsumer)
 	notifier.AddProposalViolationConsumer(slashingConsumer)
 

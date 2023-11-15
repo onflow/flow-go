@@ -31,7 +31,7 @@ const defaultTimeoutQueueCapacity = 1000
 // It's safe to use in concurrent environment.
 type TimeoutAggregator struct {
 	*component.ComponentManager
-	notifications.NoopConsumer
+	notifications.NoopParticipantConsumer
 	log                    zerolog.Logger
 	hotstuffMetrics        module.HotstuffMetrics
 	engineMetrics          module.EngineMetrics

@@ -16,7 +16,7 @@ import (
 )
 
 type Engine struct {
-	notifications.NoopConsumer // satisfy the FinalizationConsumer interface
+	notifications.NoopParticipantConsumer // satisfy the FinalizationConsumer interface
 
 	unit      *engine.Unit
 	log       zerolog.Logger

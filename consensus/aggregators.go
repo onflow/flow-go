@@ -55,7 +55,7 @@ func NewTimeoutAggregator(log zerolog.Logger,
 	hotstuffMetrics module.HotstuffMetrics,
 	engineMetrics module.EngineMetrics,
 	mempoolMetrics module.MempoolMetrics,
-	notifier *pubsub.Distributor,
+	notifier *pubsub.ParticipantDistributor,
 	timeoutProcessorFactory hotstuff.TimeoutProcessorFactory,
 	distributor *pubsub.TimeoutAggregationDistributor,
 	lowestRetainedView uint64,
@@ -76,7 +76,7 @@ func NewTimeoutAggregator(log zerolog.Logger,
 	if err != nil {
 		return nil, fmt.Errorf("could not create timeout aggregator: %w", err)
 	}
-	notifier.AddConsumer(aggregator)
+	notifier.AddParticipantConsumer(aggregator)
 
 	return aggregator, nil
 }

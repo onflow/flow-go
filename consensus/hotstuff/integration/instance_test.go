@@ -359,10 +359,10 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 		Int("index", int(index)).
 		Hex("node_id", in.localID[:]).
 		Logger()
-	notifier := pubsub.NewDistributor()
+	notifier := pubsub.NewParticipantDistributor()
 	logConsumer := notifications.NewLogConsumer(log)
-	notifier.AddConsumer(logConsumer)
-	notifier.AddConsumer(in.notifier)
+	notifier.AddParticipantConsumer(logConsumer)
+	notifier.AddParticipantConsumer(in.notifier)
 
 	// initialize the block producer
 	in.producer, err = blockproducer.New(in.signer, in.committee, in.builder)

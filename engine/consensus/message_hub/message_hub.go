@@ -73,7 +73,7 @@ type packedVote struct {
 // MessageHub is safe to use in concurrent environment.
 type MessageHub struct {
 	*component.ComponentManager
-	notifications.NoopConsumer
+	notifications.NoopParticipantConsumer
 	log                        zerolog.Logger
 	me                         module.Local
 	engineMetrics              module.EngineMetrics

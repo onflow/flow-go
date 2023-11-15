@@ -15,7 +15,7 @@ type HotstuffModules struct {
 	Committee                   hotstuff.DynamicCommittee           // consensus committee
 	Signer                      hotstuff.Signer                     // signer of proposal & votes
 	Persist                     hotstuff.Persister                  // last state of consensus participant
-	Notifier                    *pubsub.Distributor                 // observer for hotstuff events
+	Notifier                    *pubsub.ParticipantDistributor      // observer for hotstuff events
 	VoteCollectorDistributor    *pubsub.VoteCollectorDistributor    // observer for vote aggregation events, used by leader
 	TimeoutCollectorDistributor *pubsub.TimeoutCollectorDistributor // observer for timeout aggregation events
 	Forks                       hotstuff.Forks                      // information about multiple forks

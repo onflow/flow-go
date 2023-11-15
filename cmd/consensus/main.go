@@ -837,7 +837,7 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("could not create consensus message hub: %w", err)
 			}
-			hotstuffModules.Notifier.AddConsumer(messageHub)
+			hotstuffModules.Notifier.AddParticipantConsumer(messageHub)
 			return messageHub, nil
 		}).
 		Component("sync engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {

@@ -4,27 +4,27 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 )
 
-// Distributor distributes notifications to a list of consumers (event consumers).
+// ParticipantDistributor distributes notifications to a list of consumers (event consumers).
 //
 // It allows thread-safe subscription of multiple consumers to events.
-type Distributor struct {
+type ParticipantDistributor struct {
 	*FollowerDistributor
 	*CommunicatorDistributor
 	*ViewLifecycleDistributor
 }
 
-var _ hotstuff.ParticipantConsumer = (*Distributor)(nil)
+var _ hotstuff.ParticipantConsumer = (*ParticipantDistributor)(nil)
 
-func NewDistributor() *Distributor {
-	return &Distributor{
+func NewParticipantDistributor() *ParticipantDistributor {
+	return &ParticipantDistributor{
 		FollowerDistributor:      NewFollowerDistributor(),
 		CommunicatorDistributor:  NewCommunicatorDistributor(),
 		ViewLifecycleDistributor: NewViewLifecycleDistributor(),
 	}
 }
 
-// AddConsumer adds an event consumer to the Distributor
-func (p *Distributor) AddConsumer(consumer hotstuff.ParticipantConsumer) {
+// AddParticipantConsumer adds an event consumer to the ParticipantDistributor
+func (p *ParticipantDistributor) AddParticipantConsumer(consumer hotstuff.ParticipantConsumer) {
 	p.FollowerDistributor.AddFollowerConsumer(consumer)
 	p.CommunicatorDistributor.AddCommunicatorConsumer(consumer)
 	p.ViewLifecycleDistributor.AddViewLifecycleConsumer(consumer)

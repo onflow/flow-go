@@ -541,7 +541,7 @@ func ConsensusNodes(t *testing.T, hub *stub.Hub, nNodes int, chainID flow.ChainI
 }
 
 type CheckerMock struct {
-	notifications.NoopConsumer // satisfy the FinalizationConsumer interface
+	notifications.NoopParticipantConsumer // satisfy the FinalizationConsumer interface
 }
 
 func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, syncThreshold int, chainID flow.ChainID) testmock.ExecutionNode {

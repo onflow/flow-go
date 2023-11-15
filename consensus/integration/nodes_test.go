@@ -435,9 +435,9 @@ func createNode(
 
 	// log with node index
 	logConsumer := notifications.NewLogConsumer(log)
-	hotstuffDistributor := pubsub.NewDistributor()
-	hotstuffDistributor.AddConsumer(counterConsumer)
-	hotstuffDistributor.AddConsumer(logConsumer)
+	hotstuffDistributor := pubsub.NewParticipantDistributor()
+	hotstuffDistributor.AddParticipantConsumer(counterConsumer)
+	hotstuffDistributor.AddParticipantConsumer(logConsumer)
 
 	require.Equal(t, participant.nodeInfo.NodeID, localID)
 	privateKeys, err := participant.nodeInfo.PrivateKeys()
@@ -664,7 +664,7 @@ func createNode(
 	)
 	require.NoError(t, err)
 
-	hotstuffDistributor.AddConsumer(messageHub)
+	hotstuffDistributor.AddParticipantConsumer(messageHub)
 
 	node.compliance = comp
 	node.sync = sync
