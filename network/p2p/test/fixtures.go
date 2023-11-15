@@ -848,6 +848,38 @@ func MockInspectorNotificationDistributorReadyDoneAware(d *mockp2p.GossipSubInsp
 	}()).Maybe()
 }
 
+// GossipSubRpcFixtures returns a slice of random message IDs for testing.
+// Args:
+// - t: *testing.T instance
+// - count: number of message IDs to generate
+// Returns:
+// - []string: slice of message IDs.
+// Note: evey other parameters that are not explicitly set are set to 10. This function suites applications that need to generate a large number of RPC messages with
+// filled random data. For a better control over the generated data, use GossipSubRpcFixture.
+func GossipSubRpcFixtures(t *testing.T, count int) []*pb.RPC {
+	c := 10
+	rpcs := make([]*pb.RPC, 0)
+	for i := 0; i < count; i++ {
+		rpcs = append(rpcs,
+			GossipSubRpcFixture(t,
+				c,
+				WithPrune(c, GossipSubTopicIdFixture()),
+				WithGraft(c, GossipSubTopicIdFixture()),
+				WithIHave(c, c, GossipSubTopicIdFixture()),
+				WithIWant(c, c)))
+	}
+	return rpcs
+}
+
+// GossipSubRpcFixture returns a random GossipSub RPC message. An RPC message is the GossipSub-level message that is exchanged between nodes.
+// It contains individual messages, subscriptions, and control messages.
+// Args:
+// - t: *testing.T instance
+// - msgCnt: number of messages to generate
+// - opts: options to customize control messages (not having an option means no control message).
+// Returns:
+// - *pb.RPC: a random GossipSub RPC message
+// Note: the message is not signed.
 func GossipSubRpcFixture(t *testing.T, msgCnt int, opts ...GossipSubCtrlOption) *pb.RPC {
 	rand.Seed(uint64(time.Now().UnixNano()))
 
