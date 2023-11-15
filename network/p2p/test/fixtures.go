@@ -999,3 +999,23 @@ func GossipSubMessageIdsFixture(count int) []string {
 	}
 	return msgIds
 }
+
+// GossipSubMessageFixture returns a random gossipSub message; this contains a single pubsub message that is exchanged between nodes.
+// The message is generated randomly.
+// Args:
+// - t: *testing.T instance
+// Returns:
+// - *pb.Message: a random gossipSub message
+// Note: the message is not signed.
+func GossipSubMessageFixture(t *testing.T) *pb.Message {
+	byteSize := 100
+	topic := unittest.RandomStringFixture(t, byteSize)
+	return &pb.Message{
+		From:      unittest.RandomBytes(byteSize),
+		Data:      unittest.RandomBytes(byteSize),
+		Seqno:     unittest.RandomBytes(byteSize),
+		Topic:     &topic,
+		Signature: unittest.RandomBytes(byteSize),
+		Key:       unittest.RandomBytes(byteSize),
+	}
+}
