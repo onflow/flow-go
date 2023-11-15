@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/storage"
 	storageMock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -91,9 +90,6 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, stop, sc.GetStopParameters())
 
-		// make execution check pretends block has been executed
-		execState.On("StateCommitmentByBlockID", testifyMock.Anything, testifyMock.Anything).Return(nil, nil)
-
 		// no stopping has started yet, block below stop height
 		header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(20))
 		sc.BlockFinalizedForTesting(header)
@@ -105,6 +101,10 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 
 		// block at stop height, it should be triggered stop
 		header = unittest.BlockHeaderFixture(unittest.WithHeaderHeight(37))
+
+		// make execution check pretends block has been executed
+		execState.On("IsBlockExecuted", header.Height-1, header.ParentID).Return(true, nil)
+
 		sc.BlockFinalizedForTesting(header)
 
 		// since we set shouldCrash to false, execution should be stopped
@@ -146,8 +146,8 @@ func TestExecutionFallingBehind(t *testing.T) {
 	require.Equal(t, stop, sc.GetStopParameters())
 
 	execState.
-		On("StateCommitmentByBlockID", testifyMock.Anything, headerC.ParentID).
-		Return(nil, storage.ErrNotFound)
+		On("IsBlockExecuted", headerC.Height-1, headerC.ParentID).
+		Return(false, nil)
 
 	// finalize blocks first
 	sc.BlockFinalizedForTesting(headerA)
@@ -215,8 +215,8 @@ func TestAddStopForPastBlocks(t *testing.T) {
 
 	// block is executed
 	execState.
-		On("StateCommitmentByBlockID", testifyMock.Anything, headerD.ParentID).
-		Return(nil, nil)
+		On("IsBlockExecuted", headerD.Height-1, headerD.ParentID).
+		Return(true, nil)
 
 	// set stop at 22, but finalization and execution is at 23
 	// so stop right away
@@ -262,8 +262,8 @@ func TestAddStopForPastBlocksExecutionFallingBehind(t *testing.T) {
 	)
 
 	execState.
-		On("StateCommitmentByBlockID", testifyMock.Anything, headerD.ParentID).
-		Return(nil, storage.ErrNotFound)
+		On("IsBlockExecuted", headerD.Height-1, headerD.ParentID).
+		Return(true, nil)
 
 	// finalize blocks first
 	sc.BlockFinalizedForTesting(headerA)
@@ -318,8 +318,8 @@ func TestStopControlWithVersionControl(t *testing.T) {
 
 		// setting this means all finalized blocks are considered already executed
 		execState.
-			On("StateCommitmentByBlockID", testifyMock.Anything, headerC.ParentID).
-			Return(nil, nil)
+			On("IsBlockExecuted", headerC.Height-1, headerC.ParentID).
+			Return(true, nil)
 
 		versionBeacons.
 			On("Highest", testifyMock.Anything).
@@ -741,11 +741,9 @@ func Test_StopControlWorkers(t *testing.T) {
 			Once()
 
 		execState := mock.NewExecutionState(t)
-		execState.On(
-			"StateCommitmentByBlockID",
-			testifyMock.Anything,
-			headerA.ID(),
-		).Return(flow.StateCommitment{}, nil).
+		execState.
+			On("IsBlockExecuted", headerA.Height, headerA.ID()).
+			Return(true, nil).
 			Once()
 
 		headers := &stopControlMockHeaders{
@@ -817,11 +815,9 @@ func Test_StopControlWorkers(t *testing.T) {
 			Once()
 
 		execState := mock.NewExecutionState(t)
-		execState.On(
-			"StateCommitmentByBlockID",
-			testifyMock.Anything,
-			headerB.ID(),
-		).Return(flow.StateCommitment{}, nil).
+		execState.
+			On("IsBlockExecuted", headerB.Height, headerB.ID()).
+			Return(true, nil).
 			Once()
 
 		headers := &stopControlMockHeaders{

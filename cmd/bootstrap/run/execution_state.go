@@ -31,6 +31,7 @@ func GenerateExecutionState(
 		checkpointsToKeep  = 1
 	)
 
+	// TODO: save to pebble disk
 	metricsCollector := &metrics.NoopCollector{}
 
 	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metricsCollector, dbDir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
@@ -54,7 +55,7 @@ func GenerateExecutionState(
 		<-compactor.Done()
 	}()
 
-	stateCommitment, err := bootstrap.
+	stateCommitment, _, err := bootstrap.
 		NewBootstrapper(zerolog.Nop()).
 		BootstrapLedger(
 			ledgerStorage,

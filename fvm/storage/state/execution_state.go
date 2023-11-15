@@ -167,7 +167,7 @@ func (state *ExecutionState) Get(id flow.RegisterID) (flow.RegisterValue, error)
 		// wrap error into a fatal error
 		getError := errors.NewLedgerFailure(err)
 		// wrap with more info
-		return nil, fmt.Errorf("failed to read %s: %w", id, getError)
+		return nil, fmt.Errorf("failed to read register %v: %w", id, getError)
 	}
 
 	err = state.meter.MeterStorageRead(id, value, state.enforceLimits)

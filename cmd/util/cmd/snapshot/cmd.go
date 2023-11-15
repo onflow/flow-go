@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 )
 
 var (
@@ -56,6 +57,12 @@ func run(*cobra.Command, []string) {
 	log := log.With().Uint64("block_height", flagHeight).Logger()
 
 	snap := state.AtHeight(flagHeight)
+
+	err = badgerState.IsValidRootSnapshotQCs(snap)
+	if err != nil {
+		log.Fatal().Err(err).Msg("invalid root snapshot QCs")
+	}
+
 	encoded, err := convert.SnapshotToBytes(snap)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to encode snapshot")

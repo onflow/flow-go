@@ -16,7 +16,9 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestBootstrapLedger(t *testing.T) {
+// Verify after bootstrapping the ledger, the state commitment is correct, equals
+// to a pre-defined value.
+func TestBootstrapLedger_StateCommitment(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dbDir string) {
 
 		chain := flow.Mainnet.Chain()
@@ -32,7 +34,7 @@ func TestBootstrapLedger(t *testing.T) {
 			<-compactor.Done()
 		}()
 
-		stateCommitment, err := NewBootstrapper(zerolog.Nop()).BootstrapLedger(
+		stateCommitment, _, err := NewBootstrapper(zerolog.Nop()).BootstrapLedger(
 			ls,
 			unittest.ServiceAccountPublicKey,
 			chain,
@@ -40,6 +42,7 @@ func TestBootstrapLedger(t *testing.T) {
 		)
 		require.NoError(t, err)
 
+		// compare with pre-defined value
 		expectedStateCommitment := unittest.GenesisStateCommitment
 
 		if !assert.Equal(t, expectedStateCommitment, stateCommitment) {
@@ -72,7 +75,7 @@ func TestBootstrapLedger_ZeroTokenSupply(t *testing.T) {
 			<-compactor.Done()
 		}()
 
-		stateCommitment, err := NewBootstrapper(zerolog.Nop()).BootstrapLedger(
+		stateCommitment, _, err := NewBootstrapper(zerolog.Nop()).BootstrapLedger(
 			ls,
 			unittest.ServiceAccountPublicKey,
 			chain,

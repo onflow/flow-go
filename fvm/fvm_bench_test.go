@@ -185,7 +185,7 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 		Address:    chain.ServiceAddress(),
 	}
 
-	initialCommit, err := bootstrapper.BootstrapLedger(
+	initialCommit, _, err := bootstrapper.BootstrapLedger(
 		ledger,
 		unittest.ServiceAccountPublicKey,
 		chain,
@@ -710,7 +710,7 @@ func setupReceiver(b *testing.B, be TestBenchBlockExecutor, nftAccount, batchNFT
 	setUpReceiverTemplate := `
 	import NonFungibleToken from 0x%s
 	import BatchNFT from 0x%s
-	
+
 	transaction {
 		prepare(signer: AuthAccount) {
 			signer.save(

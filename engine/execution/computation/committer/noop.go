@@ -1,6 +1,7 @@
 package committer
 
 import (
+	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
@@ -15,12 +16,17 @@ func NewNoopViewCommitter() *NoopViewCommitter {
 
 func (NoopViewCommitter) CommitView(
 	_ *snapshot.ExecutionSnapshot,
-	s flow.StateCommitment,
+	baseStorageSnapshot storehouse.ExtendableStorageSnapshot,
 ) (
 	flow.StateCommitment,
 	[]byte,
 	*ledger.TrieUpdate,
+	storehouse.ExtendableStorageSnapshot,
 	error,
 ) {
-	return s, nil, nil, nil
+
+	trieUpdate := &ledger.TrieUpdate{
+		RootHash: ledger.RootHash(baseStorageSnapshot.Commitment()),
+	}
+	return baseStorageSnapshot.Commitment(), []byte{}, trieUpdate, baseStorageSnapshot, nil
 }

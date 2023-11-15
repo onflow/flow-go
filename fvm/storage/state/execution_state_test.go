@@ -39,7 +39,7 @@ func TestExecutionState_Finalize(t *testing.T) {
 	require.Equal(
 		t,
 		map[flow.RegisterID]struct{}{
-			readId: struct{}{},
+			readId: {},
 		},
 		childSnapshot.ReadSet)
 

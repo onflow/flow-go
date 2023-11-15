@@ -18,7 +18,7 @@ PROFILE_UPLOADER=false
 TRACING=true
 EXTENSIVE_TRACING=false
 CADENCE_TRACING=false
-LOGLEVEL=DEBUG
+LOGLEVEL=INFO
 
 # The Git commit hash
 COMMIT=$(shell git rev-parse HEAD)

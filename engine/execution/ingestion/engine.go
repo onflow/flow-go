@@ -193,6 +193,8 @@ func (e *Engine) reloadUnexecutedBlocks() error {
 		blockByCollection *stdmap.BlockByCollectionBackdata,
 		executionQueues *stdmap.QueuesBackdata,
 	) error {
+		e.log.Info().Msg("reloading unexecuted finalized blocks and pending blocks")
+
 		for _, blockID := range unexecuted {
 			err := e.reloadBlock(blockByCollection, executionQueues, blockID)
 			if err != nil {
@@ -284,9 +286,9 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 	span, _ := e.tracer.StartBlockSpan(ctx, blockID, trace.EXEHandleBlock)
 	defer span.End()
 
-	executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, blockID)
+	executed, err := e.execState.IsBlockExecuted(block.Header.Height, blockID)
 	if err != nil {
-		return fmt.Errorf("could not check whether block is executed: %w", err)
+		return fmt.Errorf("could not check whether block is executed %v: %w", blockID, err)
 	}
 
 	if executed {
@@ -429,7 +431,11 @@ func (e *Engine) executeBlock(
 		return
 	}
 
-	snapshot := e.execState.NewStorageSnapshot(*executableBlock.StartState)
+	// powered by register store
+	snapshot := e.execState.NewStorageSnapshot(
+		executableBlock.Block.Header.ParentID,
+		executableBlock.Block.Header.Height-1,
+	)
 
 	computationResult, err := e.computationManager.ComputeBlock(
 		ctx,

@@ -27,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	computermock "github.com/onflow/flow-go/engine/execution/computation/computer/mock"
+	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
@@ -40,6 +41,7 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -69,22 +71,33 @@ type fakeCommitter struct {
 
 func (committer *fakeCommitter) CommitView(
 	view *snapshot.ExecutionSnapshot,
-	startState flow.StateCommitment,
+	baseStorageSnapshot storehouse.ExtendableStorageSnapshot,
 ) (
 	flow.StateCommitment,
 	[]byte,
 	*ledger.TrieUpdate,
+	storehouse.ExtendableStorageSnapshot,
 	error,
 ) {
+	trieUpdate := &ledger.TrieUpdate{}
+	trieUpdate.RootHash = ledger.RootHash(baseStorageSnapshot.Commitment())
+
 	committer.callCount++
 
-	endState := incStateCommitment(startState)
+	h := make([]byte, 32)
+	h[0] = byte(committer.callCount)
+	var newCommit flow.StateCommitment
+	copy(newCommit[:], h)
 
-	trieUpdate := &ledger.TrieUpdate{}
-	trieUpdate.RootHash[0] = byte(committer.callCount)
-	return endState,
+	newStorageSnapshot, err := baseStorageSnapshot.Extend(newCommit, flow.RegisterEntries{})
+	if err != nil {
+		return flow.DummyStateCommitment, nil, nil, nil, err
+	}
+
+	return newStorageSnapshot.Commitment(),
 		[]byte{byte(committer.callCount)},
 		trieUpdate,
+		newStorageSnapshot,
 		nil
 }
 
@@ -178,6 +191,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		// create a block with 1 collection with 2 transactions
 		block := generateBlock(1, 2, rag)
+		// block.StartState = &flow.StateCommitment{0}
 
 		parentBlockExecutionResultID := unittest.IdentifierFixture()
 		result, err := exe.ExecuteBlock(
@@ -269,12 +283,12 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			chunkDataPack1.Collection,
 			chunkExecutionData1.Collection)
 		assert.NotNil(t, chunkExecutionData1.TrieUpdate)
-		assert.Equal(t, byte(1), chunkExecutionData1.TrieUpdate.RootHash[0])
+		assert.Equal(t, byte(0), chunkExecutionData1.TrieUpdate.RootHash[0])
 
 		chunkExecutionData2 := result.ChunkExecutionDatas[1]
 		assert.NotNil(t, chunkExecutionData2.Collection)
 		assert.NotNil(t, chunkExecutionData2.TrieUpdate)
-		assert.Equal(t, byte(2), chunkExecutionData2.TrieUpdate.RootHash[0])
+		assert.Equal(t, byte(1), chunkExecutionData2.TrieUpdate.RootHash[0])
 
 		assert.GreaterOrEqual(t, vm.CallCount(), 3)
 		// if every transaction is retried once, then the call count should be
@@ -322,8 +336,11 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(noOpExecutor{}).
 			Once() // just system chunk
 
+		newCommit := unittest.StateCommitmentFixture()
+		trieUpdate := testutils.TrieUpdateFixture(1, 10, 20)
+		snapshot := storehouse.NewExecutingBlockSnapshot(snapshot.EmptyStorageSnapshot{}, newCommit)
 		committer.On("CommitView", mock.Anything, mock.Anything).
-			Return(nil, nil, nil, nil).
+			Return(newCommit, nil, trieUpdate, snapshot, nil).
 			Once() // just system chunk
 
 		result, err := exe.ExecuteBlock(
@@ -415,8 +432,11 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		// create an empty block
 		block := generateBlock(0, 0, rag)
 
+		newCommit := unittest.StateCommitmentFixture()
+		trieUpdate := testutils.TrieUpdateFixture(1, 10, 20)
+		snapshot := storehouse.NewExecutingBlockSnapshot(snapshot.EmptyStorageSnapshot{}, newCommit)
 		comm.On("CommitView", mock.Anything, mock.Anything).
-			Return(nil, nil, nil, nil).
+			Return(newCommit, nil, trieUpdate, snapshot, nil).
 			Once() // just system chunk
 
 		result, err := exe.ExecuteBlock(
@@ -482,8 +502,11 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		block := generateBlock(collectionCount, transactionsPerCollection, rag)
 		derivedBlockData := derived.NewEmptyDerivedBlockData(0)
 
+		newCommit := unittest.StateCommitmentFixture()
+		trieUpdate := testutils.TrieUpdateFixture(1, 10, 20)
+		snapshot := storehouse.NewExecutingBlockSnapshot(snapshot.EmptyStorageSnapshot{}, newCommit)
 		committer.On("CommitView", mock.Anything, mock.Anything).
-			Return(nil, nil, nil, nil).
+			Return(newCommit, nil, trieUpdate, snapshot, nil).
 			Times(collectionCount + 1)
 
 		result, err := exe.ExecuteBlock(
@@ -600,17 +623,17 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			// events to emit for each iteration/transaction
 			events := map[common.Location][]cadence.Event{
 				common.TransactionLocation(transactions[0].ID()): nil,
-				common.TransactionLocation(transactions[1].ID()): []cadence.Event{
+				common.TransactionLocation(transactions[1].ID()): {
 					serviceEventA,
-					cadence.Event{
+					{
 						EventType: &cadence.EventType{
 							Location:            stdlib.FlowLocation{},
 							QualifiedIdentifier: "what.ever",
 						},
 					},
 				},
-				common.TransactionLocation(transactions[2].ID()): []cadence.Event{
-					cadence.Event{
+				common.TransactionLocation(transactions[2].ID()): {
+					{
 						EventType: &cadence.EventType{
 							Location:            stdlib.FlowLocation{},
 							QualifiedIdentifier: "what.ever",
@@ -908,7 +931,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			metrics.NewNoopCollector(),
 			trace.NewNoopTracer(),
 			zerolog.Nop(),
-			committer.NewNoopViewCommitter(),
+			&fakeCommitter{
+				callCount: 0,
+			},
 			me,
 			prov,
 			nil,
@@ -965,8 +990,11 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		transactionsPerCollection := 3
 		block := generateBlock(collectionCount, transactionsPerCollection, rag)
 
+		newCommit := unittest.StateCommitmentFixture()
+		trieUpdate := testutils.TrieUpdateFixture(1, 10, 20)
+		snapshot := storehouse.NewExecutingBlockSnapshot(snapshot.EmptyStorageSnapshot{}, newCommit)
 		committer.On("CommitView", mock.Anything, mock.Anything).
-			Return(nil, nil, nil, nil).
+			Return(newCommit, nil, trieUpdate, snapshot, nil).
 			Times(collectionCount + 1)
 
 		_, err = exe.ExecuteBlock(
@@ -1196,8 +1224,11 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
 
 	committer := new(computermock.ViewCommitter)
+	newCommit := unittest.StateCommitmentFixture()
+	trieUpdate := testutils.TrieUpdateFixture(1, 10, 20)
+	snapshot := storehouse.NewExecutingBlockSnapshot(snapshot.EmptyStorageSnapshot{}, newCommit)
 	committer.On("CommitView", mock.Anything, mock.Anything).
-		Return(nil, nil, nil, nil).
+		Return(newCommit, nil, trieUpdate, snapshot, nil).
 		Times(1) // only system chunk
 
 	noopCollector := metrics.NewNoopCollector()
@@ -1338,7 +1369,7 @@ func generateBlockWithVisitor(
 	return &entity.ExecutableBlock{
 		Block:               &block,
 		CompleteCollections: completeCollections,
-		StartState:          unittest.StateCommitmentPointerFixture(),
+		StartState:          &flow.StateCommitment{0},
 	}
 }
 
