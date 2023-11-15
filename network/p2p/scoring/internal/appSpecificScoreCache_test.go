@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/metrics"
@@ -17,9 +16,7 @@ import (
 // specifically, it tests the Add and Get methods.
 // It does not test the eviction policy of the cache.
 func TestAppSpecificScoreCache(t *testing.T) {
-	logger := zerolog.Nop()
-
-	cache := internal.NewAppSpecificScoreCache(10, logger, metrics.NewNoopCollector())
+	cache := internal.NewAppSpecificScoreCache(10, unittest.Logger(), metrics.NewNoopCollector())
 	require.NotNil(t, cache, "failed to create AppSpecificScoreCache")
 
 	peerID := unittest.PeerIdFixture(t)
@@ -50,9 +47,7 @@ func TestAppSpecificScoreCache(t *testing.T) {
 // TestAppSpecificScoreCache_Concurrent_Add_Get_Update tests the concurrent functionality of AppSpecificScoreCache;
 // specifically, it tests the Add and Get methods under concurrent access.
 func TestAppSpecificScoreCache_Concurrent_Add_Get_Update(t *testing.T) {
-	logger := zerolog.Nop()
-
-	cache := internal.NewAppSpecificScoreCache(10, logger, metrics.NewNoopCollector())
+	cache := internal.NewAppSpecificScoreCache(10, unittest.Logger(), metrics.NewNoopCollector())
 	require.NotNil(t, cache, "failed to create AppSpecificScoreCache")
 
 	peerId1 := unittest.PeerIdFixture(t)
@@ -140,4 +135,32 @@ func TestAppSpecificScoreCache_Concurrent_Add_Get_Update(t *testing.T) {
 	}()
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "failed to retrieve updated scores from cache")
+}
+
+// TestAppSpecificScoreCache_Eviction tests the eviction policy of AppSpecificScoreCache;
+// specifically, it tests that the cache evicts the least recently used record when the cache is full.
+func TestAppSpecificScoreCache_Eviction(t *testing.T) {
+	cache := internal.NewAppSpecificScoreCache(10, unittest.Logger(), metrics.NewNoopCollector())
+	require.NotNil(t, cache, "failed to create AppSpecificScoreCache")
+
+	peerIds := unittest.PeerIdFixtures(t, 11)
+	scores := []float64{5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, -1, -2, -3, -4}
+	require.Equal(t, len(peerIds), len(scores), "peer ids and scores must have the same length")
+
+	// add scores to cache
+	for i := 0; i < len(peerIds); i++ {
+		err := cache.Add(peerIds[i], scores[i], time.Now())
+		require.Nil(t, err, "failed to add score to cache")
+	}
+
+	// retrieve scores from cache; the first score should have been evicted
+	for i := 1; i < len(peerIds); i++ {
+		retrievedScore, _, found := cache.Get(peerIds[i])
+		require.True(t, found, "failed to find score in cache")
+		require.Equal(t, scores[i], retrievedScore, "retrieved score does not match expected")
+	}
+
+	// the first score should not be in the cache
+	_, _, found := cache.Get(peerIds[0])
+	require.False(t, found, "score should not be in cache")
 }
