@@ -92,18 +92,6 @@ func HasInitialWeight[T flow.GenericIdentity](hasWeight bool) flow.IdentityFilte
 	}
 }
 
-// HasWeight filters Identities by their weight:
-// When `hasWeight == true`:
-//   - for an input identity i, the filter returns true if and only if i's weight is greater than zero
-//
-// When `hasWeight == false`:
-//   - for an input identity i, the filter returns true if and only if i's weight is zero
-func HasWeight(hasWeight bool) flow.IdentityFilter[flow.Identity] {
-	return func(identity *flow.Identity) bool {
-		return (identity.Weight > 0) == hasWeight
-	}
-}
-
 // Ejected is a filter that returns true if the node is ejected.
 func Ejected(identity *flow.Identity) bool {
 	return identity.Ejected
