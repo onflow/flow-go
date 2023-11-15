@@ -911,3 +911,126 @@ func TestBridgedAccountWithdraw(t *testing.T) {
 
 	require.True(t, withdrew)
 }
+
+func TestBridgedAccountDeploy(t *testing.T) {
+
+	t.Parallel()
+
+	var deployed bool
+
+	contractsAddress := flow.BytesToAddress([]byte{0x1})
+
+	expectedBalance, err := cadence.NewUFix64FromParts(1, 23000000)
+	require.NoError(t, err)
+
+	var handler *testContractHandler
+	handler = &testContractHandler{
+		flowTokenAddress: common.Address(contractsAddress),
+		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
+			assert.Equal(t, types.Address{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
+			assert.True(t, isAuthorized)
+
+			return &testFlowAccount{
+				address: fromAddress,
+				deploy: func(code types.Code, limit types.GasLimit, balance types.Balance) types.Address {
+					deployed = true
+					assert.Equal(t, types.Code{4, 5, 6}, code)
+					assert.Equal(t, types.GasLimit(9999), limit)
+					assert.Equal(t, types.Balance(expectedBalance), balance)
+
+					return handler.AllocateAddress()
+				},
+			}
+		},
+	}
+
+	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
+
+	stdlib.SetupEnvironment(env, handler, contractsAddress)
+
+	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+
+	script := []byte(`
+      import EVM from 0x1
+      import FlowToken from 0x1
+
+      access(all)
+      fun main(): [UInt8; 20] {
+          let bridgedAccount <- EVM.createBridgedAccount()
+          let address = bridgedAccount.deploy(
+              code: [4, 5, 6],
+              gasLimit: 9999,
+              value: EVM.Balance(flow: 1.23)
+          )
+          destroy bridgedAccount
+          return address.bytes
+      }
+   `)
+
+	accountCodes := map[common.Location][]byte{}
+	var events []cadence.Event
+
+	runtimeInterface := &TestRuntimeInterface{
+		Storage: NewTestLedger(nil, nil),
+		OnGetSigningAccounts: func() ([]runtime.Address, error) {
+			return []runtime.Address{runtime.Address(contractsAddress)}, nil
+		},
+		OnResolveLocation: SingleIdentifierLocationResolver(t),
+		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+			accountCodes[location] = code
+			return nil
+		},
+		OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+			code = accountCodes[location]
+			return code, nil
+		},
+		OnEmitEvent: func(event cadence.Event) error {
+			events = append(events, event)
+			return nil
+		},
+		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+			return json.Decode(nil, b)
+		},
+	}
+
+	nextTransactionLocation := NewTransactionLocationGenerator()
+	nextScriptLocation := NewScriptLocationGenerator()
+
+	// Deploy contracts
+
+	deployContracts(t, rt, contractsAddress, runtimeInterface, env, nextTransactionLocation)
+
+	// Run script
+
+	actual, err := rt.ExecuteScript(
+		runtime.Script{
+			Source: script,
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: env,
+			Location:    nextScriptLocation(),
+		},
+	)
+	require.NoError(t, err)
+
+	expected := cadence.NewArray([]cadence.Value{
+		cadence.UInt8(2), cadence.UInt8(0),
+		cadence.UInt8(0), cadence.UInt8(0),
+		cadence.UInt8(0), cadence.UInt8(0),
+		cadence.UInt8(0), cadence.UInt8(0),
+		cadence.UInt8(0), cadence.UInt8(0),
+		cadence.UInt8(0), cadence.UInt8(0),
+		cadence.UInt8(0), cadence.UInt8(0),
+		cadence.UInt8(0), cadence.UInt8(0),
+		cadence.UInt8(0), cadence.UInt8(0),
+		cadence.UInt8(0), cadence.UInt8(0),
+	}).WithType(cadence.NewConstantSizedArrayType(
+		types.AddressLength,
+		cadence.UInt8Type{},
+	))
+
+	require.Equal(t, expected, actual)
+
+	require.True(t, deployed)
+}

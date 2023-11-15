@@ -205,3 +205,59 @@ func TestBridgedAccountWithdraw(t *testing.T) {
 		})
 	})
 }
+
+// TODO: provide proper contract code
+// TODO: fund created bridged account with Flow tokens
+// TODO: deposit non-zero amount
+func TestBridgedAccountDeploy(t *testing.T) {
+
+	// TODO:
+	t.Skip("TODO")
+
+	t.Parallel()
+
+	RunWithTestBackend(t, func(backend types.Backend) {
+		RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+			RunWithDeployedContract(t, backend, rootAddr, func(testContract *TestContract) {
+				RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *EOATestAccount) {
+					chain := flow.Emulator.Chain()
+					RunWithNewTestVM(t, chain, func(ctx fvm.Context, vm fvm.VM, snapshot snapshot.SnapshotTree) {
+
+						code := []byte(fmt.Sprintf(
+							`
+                               import EVM from %s
+                               import FlowToken from %s
+
+                                access(all)
+                                fun main(): [UInt8; 20] {
+                                    let bridgedAccount <- EVM.createBridgedAccount()
+                                    let address = bridgedAccount.deploy(
+                                        code: [],
+                                        gasLimit: 9999,
+                                        value: EVM.Balance(flow: 0.0)
+                                    )
+                                    destroy bridgedAccount
+                                    return address.bytes
+                                }
+                            `,
+							chain.ServiceAddress().HexWithPrefix(),
+							fvm.FlowTokenAddress(chain).HexWithPrefix(),
+						))
+
+						script := fvm.Script(code)
+
+						executionSnapshot, output, err := vm.Run(
+							ctx,
+							script,
+							snapshot)
+						require.NoError(t, err)
+						require.NoError(t, output.Err)
+
+						// TODO:
+						_ = executionSnapshot
+					})
+				})
+			})
+		})
+	})
+}
