@@ -1,6 +1,8 @@
 package p2p
 
 import (
+	"time"
+
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 )
@@ -67,6 +69,32 @@ type GossipSubSpamRecordCache interface {
 	// Returns:
 	// - bool: true if the cache contains the GossipSubSpamRecord of the given peer, false otherwise.
 	Has(peerID peer.ID) bool
+}
+
+// GossipSubApplicationSpecificScoreCache is a cache for storing the application specific score of peers.
+// The application specific score of a peer is used to calculate the GossipSub score of the peer; it contains the spam penalty of the peer, staking score, and subscription penalty.
+// Note that none of the application specific scores, spam penalties, staking scores, and subscription penalties are shared publicly with other peers.
+// Rather they are solely used by the current peer to select the peers to which it will connect on a topic mesh.
+// The cache is expected to have an eject policy to remove the least recently used record when the cache is full.
+// Implementation must be thread-safe, but can be blocking.
+type GossipSubApplicationSpecificScoreCache interface {
+	// Get returns the application specific score of a peer from the cache.
+	// Args:
+	// - peerID: the peer ID of the peer in the GossipSub protocol.
+	// Returns:
+	// - float64: the application specific score of the peer.
+	// - time.Time: the time at which the score was last updated.
+	// - bool: true if the score was retrieved successfully, false otherwise.
+	Get(peerID peer.ID) (float64, time.Time, bool)
+
+	// Add adds the application specific score of a peer to the cache.
+	// The cache is expected to have an eject policy to remove the least recently used record when the cache is full,
+	// hence Add is expected to succeed always.
+	// Args:
+	// - peerID: the peer ID of the peer in the GossipSub protocol.
+	// - score: the application specific score of the peer.
+	// - time: the time at which the score was last updated.
+	Add(peerID peer.ID, score float64, time time.Time)
 }
 
 // GossipSubSpamRecord represents spam record of a peer in the GossipSub protocol.
