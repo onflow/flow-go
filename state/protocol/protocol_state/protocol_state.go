@@ -91,7 +91,7 @@ func (s *MutableProtocolState) Mutator(candidateView uint64, parentID flow.Ident
 		// ProtocolStateMachine for evolving the protocol state during EFM.
 		//
 		// Whenever invalid epoch state transition has been observed only epochFallbackStateMachines must be created for subsequent views.
-		// TODO for 'leaving Epoch Fallback via special service event': this might need to change.		
+		// TODO for 'leaving Epoch Fallback via special service event': this might need to change.
 		stateMachine = newEpochFallbackStateMachine(candidateView, parentState)
 	} else {
 		stateMachine, err = newStateMachine(candidateView, parentState)

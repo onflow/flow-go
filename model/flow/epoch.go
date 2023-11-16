@@ -416,7 +416,7 @@ type EpochStatus struct {
 	// is emitted when a block is finalized that changes this flag from false to true.
 	//
 	// Currently, the only possible state transition is false → true.
-	// TODO for 'leaving Epoch Fallback via special service event'	
+	// TODO for 'leaving Epoch Fallback via special service event'
 	InvalidEpochTransitionAttempted bool
 }
 

@@ -9,7 +9,7 @@ import (
 // events but still processes ejection events.
 //
 // Whenever invalid epoch state transition has been observed only epochFallbackStateMachines must be created for subsequent views.
-// TODO for 'leaving Epoch Fallback via special service event': this might need to change. 
+// TODO for 'leaving Epoch Fallback via special service event': this might need to change.
 type epochFallbackStateMachine struct {
 	baseProtocolStateMachine
 }
@@ -43,7 +43,7 @@ func (m *epochFallbackStateMachine) ProcessEpochCommit(_ *flow.EpochCommit) (boo
 }
 
 // TransitionToNextEpoch performs transition to next epoch, in epoch fallback no transitions are possible.
-// TODO for 'leaving Epoch Fallback via special service event' this might need to change. 
+// TODO for 'leaving Epoch Fallback via special service event' this might need to change.
 func (m *epochFallbackStateMachine) TransitionToNextEpoch() error {
 	// won't process if we are in fallback mode
 	return nil
