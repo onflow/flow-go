@@ -48,7 +48,7 @@ func (committer *LedgerViewCommitter) CommitView(
 		wg.Done()
 	}()
 
-	newCommit, trieUpdate, err1 = execState.CommitDelta(
+	newCommit, trieUpdate, newStorageSnapshot, err1 = execState.CommitDelta(
 		committer.ledger,
 		snapshot,
 		baseStorageSnapshot)
