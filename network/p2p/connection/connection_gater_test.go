@@ -74,7 +74,7 @@ func TestConnectionGating(t *testing.T) {
 		// although nodes have each other addresses, they are not in the allow-lists of each other.
 		// so they should not be able to connect to each other.
 		p2pfixtures.EnsureNoStreamCreationBetweenGroups(t, ctx, []p2p.LibP2PNode{node1}, []p2p.LibP2PNode{node2}, func(t *testing.T, err error) {
-			require.True(t, stream.IsErrGaterDisallowedConnection(err))
+			require.Truef(t, stream.IsErrGaterDisallowedConnection(err), "expected ErrGaterDisallowedConnection, got: %v", err)
 		})
 	})
 
@@ -89,7 +89,7 @@ func TestConnectionGating(t *testing.T) {
 		// from node2 -> node1 should also NOT work, since node 1 is not in node2's allow list for dialing!
 		p2pfixtures.EnsureNoStreamCreation(t, ctx, []p2p.LibP2PNode{node2}, []p2p.LibP2PNode{node1}, func(t *testing.T, err error) {
 			// dialing node-1 by node-2 should fail locally at the connection gater of node-2.
-			require.True(t, stream.IsErrGaterDisallowedConnection(err))
+			require.Truef(t, stream.IsErrGaterDisallowedConnection(err), "expected ErrGaterDisallowedConnection, got: %v", err)
 		})
 
 		// now node2 should be able to connect to node1.
