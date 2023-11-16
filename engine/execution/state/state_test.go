@@ -84,7 +84,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 			},
 		}
 
-		sc2, update, err := state.CommitDelta(l, executionSnapshot, sc1)
+		sc2, update, _, err := state.CommitDelta(l, executionSnapshot, sc1)
 		assert.NoError(t, err)
 
 		assert.Equal(t, sc1[:], update.RootHash[:])
@@ -144,7 +144,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 			},
 		}
 
-		sc2, _, err := state.CommitDelta(l, executionSnapshot1, sc1)
+		sc2, _, _, err := state.CommitDelta(l, executionSnapshot1, sc1)
 		assert.NoError(t, err)
 
 		// update value and get resulting state commitment
@@ -154,7 +154,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 			},
 		}
 
-		sc3, _, err := state.CommitDelta(l, executionSnapshot2, sc2)
+		sc3, _, _, err := state.CommitDelta(l, executionSnapshot2, sc2)
 		assert.NoError(t, err)
 
 		// create a view for previous state version
@@ -230,11 +230,11 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 			},
 		}
 
-		sc2, _, err := state.CommitDelta(l, executionSnapshot1, sc1)
+		sc2, _, _, err := state.CommitDelta(l, executionSnapshot1, sc1)
 		assert.NoError(t, err)
 
 		// committing for the second time should be OK
-		sc2Same, _, err := state.CommitDelta(l, executionSnapshot1, sc1)
+		sc2Same, _, _, err := state.CommitDelta(l, executionSnapshot1, sc1)
 		assert.NoError(t, err)
 
 		require.Equal(t, sc2, sc2Same)
