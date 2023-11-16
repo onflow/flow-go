@@ -64,36 +64,51 @@ func (_m *ProtocolStateMachine) ParentState() *flow.RichProtocolStateEntry {
 }
 
 // ProcessEpochCommit provides a mock function with given fields: epochCommit
-func (_m *ProtocolStateMachine) ProcessEpochCommit(epochCommit *flow.EpochCommit) error {
+func (_m *ProtocolStateMachine) ProcessEpochCommit(epochCommit *flow.EpochCommit) (bool, error) {
 	ret := _m.Called(epochCommit)
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.EpochCommit) error); ok {
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*flow.EpochCommit) (bool, error)); ok {
+		return rf(epochCommit)
+	}
+	if rf, ok := ret.Get(0).(func(*flow.EpochCommit) bool); ok {
 		r0 = rf(epochCommit)
 	} else {
-		r0 = ret.Error(0)
+		r0 = ret.Get(0).(bool)
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(*flow.EpochCommit) error); ok {
+		r1 = rf(epochCommit)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // ProcessEpochSetup provides a mock function with given fields: epochSetup
-func (_m *ProtocolStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) error {
+func (_m *ProtocolStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (bool, error) {
 	ret := _m.Called(epochSetup)
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.EpochSetup) error); ok {
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*flow.EpochSetup) (bool, error)); ok {
+		return rf(epochSetup)
+	}
+	if rf, ok := ret.Get(0).(func(*flow.EpochSetup) bool); ok {
 		r0 = rf(epochSetup)
 	} else {
-		r0 = ret.Error(0)
+		r0 = ret.Get(0).(bool)
 	}
 
-	return r0
-}
+	if rf, ok := ret.Get(1).(func(*flow.EpochSetup) error); ok {
+		r1 = rf(epochSetup)
+	} else {
+		r1 = ret.Error(1)
+	}
 
-// SetInvalidStateTransitionAttempted provides a mock function with given fields:
-func (_m *ProtocolStateMachine) SetInvalidStateTransitionAttempted() {
-	_m.Called()
+	return r0, r1
 }
 
 // TransitionToNextEpoch provides a mock function with given fields:

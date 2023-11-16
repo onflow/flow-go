@@ -378,6 +378,6 @@ func ProtocolStateFromEpochServiceEvents(setup *flow.EpochSetup, commit *flow.Ep
 			ActiveIdentities: identities,
 		},
 		NextEpoch:                       nil,
-		InvalidStateTransitionAttempted: false,
+		InvalidEpochTransitionAttempted: false,
 	}
 }

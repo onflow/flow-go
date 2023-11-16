@@ -9,7 +9,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// ProtocolState is an implementation of the read-only interface for protocol state, it allows to query information
+// ProtocolState is an implementation of the read-only interface for protocol state, it allows querying information
 // on a per-block and per-epoch basis.
 // It is backed by a storage.ProtocolState and an in-memory protocol.GlobalParams.
 type ProtocolState struct {
@@ -84,5 +84,18 @@ func (s *MutableProtocolState) Mutator(candidateView uint64, parentID flow.Ident
 	if err != nil {
 		return nil, fmt.Errorf("could not query parent protocol state at block (%x): %w", parentID, err)
 	}
-	return newStateMutator(s.headers, s.results, s.setups, s.commits, newStateMachine(candidateView, parentState)), nil
+	return newStateMutator(
+		s.headers,
+		s.results,
+		s.setups,
+		s.commits,
+		candidateView,
+		parentState,
+		func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
+			return newStateMachine(candidateView, parentState)
+		},
+		func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
+			return newEpochFallbackStateMachine(candidateView, parentState), nil
+		},
+	)
 }

@@ -10,6 +10,11 @@ import (
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
+// StateMachineFactoryMethod is a factory to create state machines for evolving the protocol state.
+// Currently, we have `protocolStateMachine` and `epochFallbackStateMachine` as ProtocolStateMachine
+// implementations, whose constructors both have the same signature as StateMachineFactoryMethod.
+type StateMachineFactoryMethod = func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error)
+
 // stateMutator is a stateful object to evolve the protocol state. It is instantiated from the parent block's protocol state.
 // State-changing operations can be iteratively applied and the stateMutator will internally evolve its in-memory state.
 // While the StateMutator does not modify the database, it internally tracks the necessary database updates to persist its
@@ -24,31 +29,60 @@ import (
 //
 // Not safe for concurrent use.
 type stateMutator struct {
-	headers          storage.Headers
-	results          storage.ExecutionResults
-	setups           storage.EpochSetups
-	commits          storage.EpochCommits
-	stateMachine     ProtocolStateMachine
-	pendingDbUpdates transaction.DeferredDBUpdate
+	headers                          storage.Headers
+	results                          storage.ExecutionResults
+	setups                           storage.EpochSetups
+	commits                          storage.EpochCommits
+	stateMachine                     ProtocolStateMachine
+	epochFallbackStateMachineFactory func() (ProtocolStateMachine, error)
+	pendingDbUpdates                 transaction.DeferredDBUpdate
 }
 
 var _ protocol.StateMutator = (*stateMutator)(nil)
 
 // newStateMutator creates a new instance of stateMutator.
+// stateMutator performs initialization of state machine depending on the operation mode of the protocol.
+// No errors are expected during normal operations.
 func newStateMutator(
 	headers storage.Headers,
 	results storage.ExecutionResults,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
-	stateMachine ProtocolStateMachine,
-) *stateMutator {
+	candidateView uint64,
+	parentState *flow.RichProtocolStateEntry,
+	happyPathStateMachineFactory StateMachineFactoryMethod,
+	epochFallbackStateMachineFactory StateMachineFactoryMethod,
+) (*stateMutator, error) {
+	var (
+		stateMachine ProtocolStateMachine
+		err          error
+	)
+	if parentState.InvalidEpochTransitionAttempted {
+		// InvalidEpochTransitionAttempted being true indicates that we have encountered an invalid epoch service event
+		// or an invalid state transition. In this case, the stateMutator enters EFM by utilizing a specialized
+		// ProtocolStateMachine for evolving the protocol state during EFM.
+		//
+		// Whenever invalid epoch state transition has been observed only epochFallbackStateMachines must be created for subsequent views.
+		// TODO for 'leaving Epoch Fallback via special service event': this might need to change.
+		stateMachine, err = epochFallbackStateMachineFactory(candidateView, parentState)
+	} else {
+		stateMachine, err = happyPathStateMachineFactory(candidateView, parentState)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize protocol state machine: %w", err)
+	}
+
 	return &stateMutator{
-		setups:       setups,
 		headers:      headers,
 		results:      results,
+		setups:       setups,
 		commits:      commits,
 		stateMachine: stateMachine,
-	}
+		// instead of storing arguments that later might be used when entering EFM, capture them in factory method.
+		epochFallbackStateMachineFactory: func() (ProtocolStateMachine, error) {
+			return epochFallbackStateMachineFactory(candidateView, parentState)
+		},
+	}, nil
 }
 
 // Build returns:
@@ -72,8 +106,9 @@ func (m *stateMutator) Build() (hasChanges bool, updatedState *flow.ProtocolStat
 //   - iterating over the sealed service events in order of increasing height
 //   - identifying state-changing service event and calling into the embedded
 //     ProtocolStateMachine to apply the respective state update
-//   - tracking deferred database updates necessary to persist the updated state
-//     and its data dependencies
+//   - tracking deferred database updates necessary to persist the updated
+//     protocol state's *dependencies*. Persisting and indexing `updatedState`
+//     is the responsibility of the calling code (specifically `FollowerState`)
 //
 // All updates only mutate the `StateMutator`'s internal in-memory copy of the
 // protocol state, without changing the parent state (i.e. the state we started from).
@@ -118,20 +153,19 @@ func (m *stateMutator) Build() (hasChanges bool, updatedState *flow.ProtocolStat
 //     A service event not representing a valid state transition despite all consistency checks passing
 //     is interpreted as case (a) and handled internally within the StateMutator. In short, we go into Epoch
 //     Fallback Mode by copying the parent state (a valid state snapshot) and setting the
-//     `InvalidStateTransitionAttempted` flag. All subsequent Epoch-lifecycle events are ignored.
+//     `InvalidEpochTransitionAttempted` flag. All subsequent Epoch-lifecycle events are ignored.
 //   - A consistency or sanity check failing within the StateMutator is likely the symptom of an internal bug
 //     in the node software or state corruption, i.e. case (b). This is the only scenario where the error return
 //     of this function is not nil. If such an exception is returned, continuing is not an option.
 func (m *stateMutator) ApplyServiceEventsFromValidatedSeals(seals []*flow.Seal) error {
 	parentProtocolState := m.stateMachine.ParentState()
-	invalidStateTransitionAttempted := parentProtocolState.InvalidStateTransitionAttempted
 
 	// perform protocol state transition to next epoch if next epoch is committed and we are at first block of epoch
 	phase, err := parentProtocolState.EpochStatus().Phase()
 	if err != nil {
 		return fmt.Errorf("could not determine epoch phase: %w", err)
 	}
-	if !invalidStateTransitionAttempted && phase == flow.EpochPhaseCommitted {
+	if phase == flow.EpochPhaseCommitted {
 		activeSetup := parentProtocolState.CurrentEpochSetup
 		if m.stateMachine.View() > activeSetup.FinalView {
 			// TODO: this is a temporary workaround to allow for the epoch transition to be triggered
@@ -158,55 +192,83 @@ func (m *stateMutator) ApplyServiceEventsFromValidatedSeals(seals []*flow.Seal) 
 		// earlier now failed. In all cases, this is an exception.
 		return irrecoverable.NewExceptionf("ordering already validated seals unexpectedly failed: %w", err)
 	}
-	var dbUpdates transaction.DeferredDBUpdate
+	results := make([]*flow.ExecutionResult, 0, len(orderedSeals))
 	for _, seal := range orderedSeals {
 		result, err := m.results.ByID(seal.ResultID)
 		if err != nil {
 			return fmt.Errorf("could not get result (id=%x) for seal (id=%x): %w", seal.ResultID, seal.ID(), err)
 		}
-
-		for _, event := range result.ServiceEvents {
-			switch ev := event.Event.(type) {
-			case *flow.EpochSetup:
-				if invalidStateTransitionAttempted {
-					continue
-				}
-				err = m.stateMachine.ProcessEpochSetup(ev)
-				if err != nil {
-					if protocol.IsInvalidServiceEventError(err) {
-						// we have observed an invalid service event, which triggers epoch fallback mode
-						m.stateMachine.SetInvalidStateTransitionAttempted()
-						return nil
-					}
-					return irrecoverable.NewExceptionf("could not process epoch setup event: %w", err)
-				}
-
-				// we'll insert the setup event when we insert the block
-				dbUpdates = append(dbUpdates, m.setups.StoreTx(ev))
-
-			case *flow.EpochCommit:
-				if invalidStateTransitionAttempted {
-					continue
-				}
-				err = m.stateMachine.ProcessEpochCommit(ev)
-				if err != nil {
-					if protocol.IsInvalidServiceEventError(err) {
-						// we have observed an invalid service event, which triggers epoch fallback mode
-						m.stateMachine.SetInvalidStateTransitionAttempted()
-						return nil
-					}
-					return irrecoverable.NewExceptionf("could not process epoch commit event: %w", err)
-				}
-
-				// we'll insert the commit event when we insert the block
-				dbUpdates = append(dbUpdates, m.commits.StoreTx(ev))
-			case *flow.VersionBeacon:
-				// do nothing for now
-			default:
-				return fmt.Errorf("invalid service event type (type_name=%s, go_type=%T)", event.Type, ev)
+		results = append(results, result)
+	}
+	dbUpdates, err := m.applyServiceEventsFromOrderedResults(results)
+	if err != nil {
+		if protocol.IsInvalidServiceEventError(err) {
+			dbUpdates, err = m.transitionToEpochFallbackMode(results)
+			if err != nil {
+				return irrecoverable.NewExceptionf("could not transition to epoch fallback mode: %w", err)
 			}
+		} else {
+			return irrecoverable.NewExceptionf("could not apply service events from ordered results: %w", err)
 		}
 	}
 	m.pendingDbUpdates = append(m.pendingDbUpdates, dbUpdates...)
 	return nil
+}
+
+// applyServiceEventsFromOrderedResults applies the service events contained within the list of results
+// to the pending state tracked by `stateMutator`.
+// Each result corresponds to one seal that was included in the payload of the block being processed by this `stateMutator`.
+// Results must be ordered by block height.
+// Expected errors during normal operations:
+// - `protocol.InvalidServiceEventError` if any service event is invalid or is not a valid state transition for the current protocol state
+func (m *stateMutator) applyServiceEventsFromOrderedResults(results []*flow.ExecutionResult) ([]func(tx *transaction.Tx) error, error) {
+	var dbUpdates transaction.DeferredDBUpdate
+	for _, result := range results {
+		for _, event := range result.ServiceEvents {
+			switch ev := event.Event.(type) {
+			case *flow.EpochSetup:
+				processed, err := m.stateMachine.ProcessEpochSetup(ev)
+				if err != nil {
+					return nil, fmt.Errorf("could not process epoch setup event: %w", err)
+				}
+
+				if processed {
+					// we'll insert the setup event when we insert the block
+					dbUpdates = append(dbUpdates, m.setups.StoreTx(ev))
+				}
+
+			case *flow.EpochCommit:
+				processed, err := m.stateMachine.ProcessEpochCommit(ev)
+				if err != nil {
+					return nil, fmt.Errorf("could not process epoch commit event: %w", err)
+				}
+
+				if processed {
+					// we'll insert the commit event when we insert the block
+					dbUpdates = append(dbUpdates, m.commits.StoreTx(ev))
+				}
+			case *flow.VersionBeacon:
+				// do nothing for now
+			default:
+				return nil, fmt.Errorf("invalid service event type (type_name=%s, go_type=%T)", event.Type, ev)
+			}
+		}
+	}
+	return dbUpdates, nil
+}
+
+// transitionToEpochFallbackMode transitions the protocol state to Epoch Fallback Mode (EFM).
+// This is implemented by switching to a different state machine implementation, which ignores all service events and epoch transitions.
+// At the moment, this is a one-way transition: once we enter EFM, the only way to return to normal is with a spork.
+func (m *stateMutator) transitionToEpochFallbackMode(results []*flow.ExecutionResult) ([]func(tx *transaction.Tx) error, error) {
+	var err error
+	m.stateMachine, err = m.epochFallbackStateMachineFactory()
+	if err != nil {
+		return nil, fmt.Errorf("could not create epoch fallback state machine: %w", err)
+	}
+	dbUpdates, err := m.applyServiceEventsFromOrderedResults(results)
+	if err != nil {
+		return nil, irrecoverable.NewExceptionf("could not apply service events after transition to epoch fallback mode: %w", err)
+	}
+	return dbUpdates, nil
 }

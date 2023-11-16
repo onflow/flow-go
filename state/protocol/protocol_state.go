@@ -108,8 +108,9 @@ type StateMutator interface {
 	//   - iterating over the sealed service events in order of increasing height
 	//   - identifying state-changing service event and calling into the embedded
 	//     ProtocolStateMachine to apply the respective state update
-	//   - tracking deferred database updates necessary to persist the updated state
-	//     and its data dependencies
+	//   - tracking deferred database updates necessary to persist the updated
+	//     protocol state's *dependencies*. Persisting and indexing `updatedState`
+	//     is the responsibility of the calling code (specifically `FollowerState`)
 	//
 	// All updates only mutate the `StateMutator`'s internal in-memory copy of the
 	// protocol state, without changing the parent state (i.e. the state we started from).
@@ -154,7 +155,7 @@ type StateMutator interface {
 	//     A service event not representing a valid state transition despite all consistency checks passing
 	//     is interpreted as case (a) and handled internally within the StateMutator. In short, we go into Epoch
 	//     Fallback Mode by copying the parent state (a valid state snapshot) and setting the
-	//     `InvalidStateTransitionAttempted` flag. All subsequent Epoch-lifecycle events are ignored.
+	//     `InvalidEpochTransitionAttempted` flag. All subsequent Epoch-lifecycle events are ignored.
 	//   - A consistency or sanity check failing within the StateMutator is likely the symptom of an internal bug
 	//     in the node software or state corruption, i.e. case (b). This is the only scenario where the error return
 	//     of this function is not nil. If such an exception is returned, continuing is not an option.

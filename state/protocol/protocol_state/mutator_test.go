@@ -2,6 +2,7 @@ package protocol_state
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -28,7 +29,9 @@ type StateMutatorSuite struct {
 	resultsDB       *storagemock.ExecutionResults
 	setupsDB        *storagemock.EpochSetups
 	commitsDB       *storagemock.EpochCommits
+	parentState     *flow.RichProtocolStateEntry
 	stateMachine    *protocolstatemock.ProtocolStateMachine
+	candidateView   uint64
 
 	mutator *stateMutator
 }
@@ -39,8 +42,27 @@ func (s *StateMutatorSuite) SetupTest() {
 	s.resultsDB = storagemock.NewExecutionResults(s.T())
 	s.setupsDB = storagemock.NewEpochSetups(s.T())
 	s.commitsDB = storagemock.NewEpochCommits(s.T())
+	s.parentState = unittest.ProtocolStateFixture()
+	s.candidateView = s.parentState.CurrentEpochSetup.FirstView + 1
 	s.stateMachine = protocolstatemock.NewProtocolStateMachine(s.T())
-	s.mutator = newStateMutator(s.headersDB, s.resultsDB, s.setupsDB, s.commitsDB, s.stateMachine)
+
+	var err error
+	s.mutator, err = newStateMutator(
+		s.headersDB,
+		s.resultsDB,
+		s.setupsDB,
+		s.commitsDB,
+		s.candidateView,
+		s.parentState,
+		func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
+			return s.stateMachine, nil
+		},
+		func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
+			require.Fail(s.T(), "entering epoch fallback is not expected")
+			return nil, fmt.Errorf("not expecting epoch fallback")
+		},
+	)
+	require.NoError(s.T(), err)
 }
 
 // TestOnHappyPathNoDbChanges tests that stateMutator doesn't cache any db updates when there are no changes.
@@ -79,7 +101,7 @@ func (s *StateMutatorSuite) TestHappyPathWithDbChanges() {
 
 	epochSetupStored := mock.Mock{}
 	epochSetupStored.On("EpochSetupStored").Return()
-	s.stateMachine.On("ProcessEpochSetup", epochSetup).Return(nil).Once()
+	s.stateMachine.On("ProcessEpochSetup", epochSetup).Return(true, nil).Once()
 	s.setupsDB.On("StoreTx", epochSetup).Return(func(*transaction.Tx) error {
 		epochSetupStored.MethodCalled("EpochSetupStored")
 		return nil
@@ -87,7 +109,7 @@ func (s *StateMutatorSuite) TestHappyPathWithDbChanges() {
 
 	epochCommitStored := mock.Mock{}
 	epochCommitStored.On("EpochCommitStored").Return()
-	s.stateMachine.On("ProcessEpochCommit", epochCommit).Return(nil).Once()
+	s.stateMachine.On("ProcessEpochCommit", epochCommit).Return(true, nil).Once()
 	s.commitsDB.On("StoreTx", epochCommit).Return(func(*transaction.Tx) error {
 		epochCommitStored.MethodCalled("EpochCommitStored")
 		return nil
@@ -110,20 +132,30 @@ func (s *StateMutatorSuite) TestHappyPathWithDbChanges() {
 }
 
 // TestApplyServiceEvents_InvalidEpochSetup tests that handleServiceEvents rejects invalid epoch setup event and sets
-// InvalidStateTransitionAttempted flag in protocol.ProtocolStateMachine.
+// InvalidEpochTransitionAttempted flag in protocol.ProtocolStateMachine.
 func (s *StateMutatorSuite) TestApplyServiceEvents_InvalidEpochSetup() {
 	s.Run("invalid-epoch-setup", func() {
+		mutator, err := newStateMutator(
+			s.headersDB,
+			s.resultsDB,
+			s.setupsDB,
+			s.commitsDB,
+			s.candidateView,
+			s.parentState,
+			func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
+				return s.stateMachine, nil
+			},
+			func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
+				epochFallbackStateMachine := protocolstatemock.NewProtocolStateMachine(s.T())
+				epochFallbackStateMachine.On("ProcessEpochSetup", mock.Anything).Return(false, nil)
+				return epochFallbackStateMachine, nil
+			},
+		)
+		require.NoError(s.T(), err)
 		parentState := unittest.ProtocolStateFixture()
-		rootSetup := parentState.CurrentEpochSetup
-
 		s.stateMachine.On("ParentState").Return(parentState)
 
-		epochSetup := unittest.EpochSetupFixture(
-			unittest.WithParticipants(rootSetup.Participants),
-			unittest.SetupWithCounter(rootSetup.Counter+1),
-			unittest.WithFinalView(rootSetup.FinalView+1000),
-			unittest.WithFirstView(rootSetup.FinalView+1),
-		)
+		epochSetup := unittest.EpochSetupFixture()
 		result := unittest.ExecutionResultFixture(func(result *flow.ExecutionResult) {
 			result.ServiceEvents = []flow.ServiceEvent{epochSetup.ServiceEvent()}
 		})
@@ -133,24 +165,16 @@ func (s *StateMutatorSuite) TestApplyServiceEvents_InvalidEpochSetup() {
 		s.headersDB.On("ByBlockID", seal.BlockID).Return(block, nil)
 		s.resultsDB.On("ByID", seal.ResultID).Return(result, nil)
 
-		s.stateMachine.On("ProcessEpochSetup", epochSetup).Return(protocol.NewInvalidServiceEventErrorf("")).Once()
-		s.stateMachine.On("SetInvalidStateTransitionAttempted").Return().Once()
+		s.stateMachine.On("ProcessEpochSetup", epochSetup).Return(false, protocol.NewInvalidServiceEventErrorf("")).Once()
 
-		err := s.mutator.ApplyServiceEventsFromValidatedSeals([]*flow.Seal{seal})
+		err = mutator.ApplyServiceEventsFromValidatedSeals([]*flow.Seal{seal})
 		require.NoError(s.T(), err)
 	})
 	s.Run("process-epoch-setup-exception", func() {
 		parentState := unittest.ProtocolStateFixture()
-		rootSetup := parentState.CurrentEpochSetup
-
 		s.stateMachine.On("ParentState").Return(parentState)
 
-		epochSetup := unittest.EpochSetupFixture(
-			unittest.WithParticipants(rootSetup.Participants),
-			unittest.SetupWithCounter(rootSetup.Counter+1),
-			unittest.WithFinalView(rootSetup.FinalView+1000),
-			unittest.WithFirstView(rootSetup.FinalView+1),
-		)
+		epochSetup := unittest.EpochSetupFixture()
 		result := unittest.ExecutionResultFixture(func(result *flow.ExecutionResult) {
 			result.ServiceEvents = []flow.ServiceEvent{epochSetup.ServiceEvent()}
 		})
@@ -161,7 +185,7 @@ func (s *StateMutatorSuite) TestApplyServiceEvents_InvalidEpochSetup() {
 		s.resultsDB.On("ByID", seal.ResultID).Return(result, nil)
 
 		exception := errors.New("exception")
-		s.stateMachine.On("ProcessEpochSetup", epochSetup).Return(exception).Once()
+		s.stateMachine.On("ProcessEpochSetup", epochSetup).Return(false, exception).Once()
 
 		err := s.mutator.ApplyServiceEventsFromValidatedSeals([]*flow.Seal{seal})
 		require.Error(s.T(), err)
@@ -170,11 +194,28 @@ func (s *StateMutatorSuite) TestApplyServiceEvents_InvalidEpochSetup() {
 }
 
 // TestApplyServiceEvents_InvalidEpochCommit tests that handleServiceEvents rejects invalid epoch commit event and sets
-// InvalidStateTransitionAttempted flag in protocol.ProtocolStateMachine.
+// InvalidEpochTransitionAttempted flag in protocol.ProtocolStateMachine.
 func (s *StateMutatorSuite) TestApplyServiceEvents_InvalidEpochCommit() {
 	s.Run("invalid-epoch-commit", func() {
-		parentState := unittest.ProtocolStateFixture()
+		mutator, err := newStateMutator(
+			s.headersDB,
+			s.resultsDB,
+			s.setupsDB,
+			s.commitsDB,
+			s.candidateView,
+			s.parentState,
+			func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
+				return s.stateMachine, nil
+			},
+			func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
+				epochFallbackStateMachine := protocolstatemock.NewProtocolStateMachine(s.T())
+				epochFallbackStateMachine.On("ProcessEpochCommit", mock.Anything).Return(false, nil)
+				return epochFallbackStateMachine, nil
+			},
+		)
+		require.NoError(s.T(), err)
 
+		parentState := unittest.ProtocolStateFixture()
 		s.stateMachine.On("ParentState").Return(parentState)
 
 		epochCommit := unittest.EpochCommitFixture()
@@ -187,15 +228,13 @@ func (s *StateMutatorSuite) TestApplyServiceEvents_InvalidEpochCommit() {
 		s.headersDB.On("ByBlockID", seal.BlockID).Return(block, nil)
 		s.resultsDB.On("ByID", seal.ResultID).Return(result, nil)
 
-		s.stateMachine.On("ProcessEpochCommit", epochCommit).Return(protocol.NewInvalidServiceEventErrorf("")).Once()
-		s.stateMachine.On("SetInvalidStateTransitionAttempted").Return().Once()
+		s.stateMachine.On("ProcessEpochCommit", epochCommit).Return(false, protocol.NewInvalidServiceEventErrorf("")).Once()
 
-		err := s.mutator.ApplyServiceEventsFromValidatedSeals([]*flow.Seal{seal})
+		err = mutator.ApplyServiceEventsFromValidatedSeals([]*flow.Seal{seal})
 		require.NoError(s.T(), err)
 	})
 	s.Run("process-epoch-commit-exception", func() {
 		parentState := unittest.ProtocolStateFixture()
-
 		s.stateMachine.On("ParentState").Return(parentState)
 
 		epochCommit := unittest.EpochCommitFixture()
@@ -209,7 +248,7 @@ func (s *StateMutatorSuite) TestApplyServiceEvents_InvalidEpochCommit() {
 		s.resultsDB.On("ByID", seal.ResultID).Return(result, nil)
 
 		exception := errors.New("exception")
-		s.stateMachine.On("ProcessEpochCommit", epochCommit).Return(exception).Once()
+		s.stateMachine.On("ProcessEpochCommit", epochCommit).Return(false, exception).Once()
 
 		err := s.mutator.ApplyServiceEventsFromValidatedSeals([]*flow.Seal{seal})
 		require.Error(s.T(), err)
@@ -277,27 +316,4 @@ func (s *StateMutatorSuite) TestApplyServiceEventsTransitionToNextEpoch_Error() 
 	err := s.mutator.ApplyServiceEventsFromValidatedSeals([]*flow.Seal{})
 	require.ErrorIs(s.T(), err, exception)
 	require.False(s.T(), protocol.IsInvalidServiceEventError(err))
-}
-
-// TestApplyServiceEvents_EpochFallbackTriggered tests the scenario, where the system has entered epoch fallback mode. This
-// happens when the protocol state observes an invalid state transition, in which case it sets the `InvalidStateTransitionAttempted`
-// flag to true. After this happened, we should not process any Epoch lifecycle service events. This is asserted by using mocked
-// state updater without any expected methods.
-func (s *StateMutatorSuite) TestApplyServiceEvents_EpochFallbackTriggered() {
-	parentState := unittest.ProtocolStateFixture()
-	parentState.InvalidStateTransitionAttempted = true
-	s.stateMachine.On("ParentState").Return(parentState)
-
-	epochCommit := unittest.EpochCommitFixture()
-	result := unittest.ExecutionResultFixture(func(result *flow.ExecutionResult) {
-		result.ServiceEvents = []flow.ServiceEvent{epochCommit.ServiceEvent()}
-	})
-
-	block := unittest.BlockHeaderFixture()
-	seal := unittest.Seal.Fixture(unittest.Seal.WithBlockID(block.ID()))
-	s.headersDB.On("ByBlockID", seal.BlockID).Return(block, nil)
-	s.resultsDB.On("ByID", seal.ResultID).Return(result, nil)
-
-	err := s.mutator.ApplyServiceEventsFromValidatedSeals([]*flow.Seal{seal})
-	require.NoError(s.T(), err)
 }

@@ -411,10 +411,13 @@ type EpochStatus struct {
 	PreviousEpoch EventIDs // EpochSetup and EpochCommit events for the previous epoch
 	CurrentEpoch  EventIDs // EpochSetup and EpochCommit events for the current epoch
 	NextEpoch     EventIDs // EpochSetup and EpochCommit events for the next epoch
-	// InvalidServiceEventIncorporated encodes whether an invalid service event is
-	// incorporated in this fork. When this happens, epoch fallback is triggered
-	// AFTER the fork is finalized.
-	InvalidServiceEventIncorporated bool
+	// InvalidEpochTransitionAttempted encodes whether an invalid epoch transition
+	// has been detected in this fork. Node-internally, the EpochFallback notification
+	// is emitted when a block is finalized that changes this flag from false to true.
+	//
+	// Currently, the only possible state transition is false → true.
+	// TODO for 'leaving Epoch Fallback via special service event'
+	InvalidEpochTransitionAttempted bool
 }
 
 // Copy returns a copy of the epoch status.

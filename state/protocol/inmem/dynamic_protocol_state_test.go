@@ -39,7 +39,7 @@ func TestDynamicProtocolStateAdapter(t *testing.T) {
 			CommitID: entry.CurrentEpoch.CommitID,
 		}, status.CurrentEpoch)
 		assert.Equal(t, flow.EventIDs{}, status.NextEpoch)
-		assert.False(t, status.InvalidServiceEventIncorporated)
+		assert.False(t, status.InvalidEpochTransitionAttempted)
 	})
 	t.Run("epoch-status-setup", func(t *testing.T) {
 		entry := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
@@ -57,7 +57,7 @@ func TestDynamicProtocolStateAdapter(t *testing.T) {
 			SetupID:  entry.NextEpoch.SetupID,
 			CommitID: flow.ZeroID,
 		}, status.NextEpoch)
-		assert.False(t, status.InvalidServiceEventIncorporated)
+		assert.False(t, status.InvalidEpochTransitionAttempted)
 	})
 	t.Run("epoch-status-commit", func(t *testing.T) {
 		entry := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
@@ -72,14 +72,14 @@ func TestDynamicProtocolStateAdapter(t *testing.T) {
 			SetupID:  entry.NextEpoch.SetupID,
 			CommitID: entry.NextEpoch.CommitID,
 		}, status.NextEpoch)
-		assert.False(t, status.InvalidServiceEventIncorporated)
+		assert.False(t, status.InvalidEpochTransitionAttempted)
 	})
 	t.Run("invalid-state-transition-attempted", func(t *testing.T) {
 		entry := unittest.ProtocolStateFixture(func(entry *flow.RichProtocolStateEntry) {
-			entry.InvalidStateTransitionAttempted = true
+			entry.InvalidEpochTransitionAttempted = true
 		})
 		adapter := inmem.NewDynamicProtocolStateAdapter(entry, globalParams)
 		status := adapter.EpochStatus()
-		assert.True(t, status.InvalidServiceEventIncorporated)
+		assert.True(t, status.InvalidEpochTransitionAttempted)
 	})
 }
