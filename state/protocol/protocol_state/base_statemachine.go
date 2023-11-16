@@ -12,6 +12,10 @@ import (
 // each block that is being processed.
 type ProtocolStateMachine interface {
 	// Build returns updated protocol state entry, state ID and a flag indicating if there were any changes.
+	// CAUTION:
+	// Do NOT call Build, if the ProtocolStateMachine instance has returned a `protocol.InvalidServiceEventError`
+	// at any time during its lifetime. After this error, the ProtocolStateMachine is left with a potentially
+	// dysfunctional state and should be discarded.
 	Build() (updatedState *flow.ProtocolStateEntry, stateID flow.Identifier, hasChanges bool)
 
 	// ProcessEpochSetup updates current protocol state with data from epoch setup event.
@@ -21,8 +25,10 @@ type ProtocolStateMachine interface {
 	// As a result of this operation protocol state for the next epoch will be created.
 	// Returned boolean indicates if event triggered a transition in the state machine or not.
 	// Implementors must never return (true, error).
-	// Expected errors during normal operations:
-	// - `protocol.InvalidServiceEventError` if the service event is invalid or is not a valid state transition for the current protocol state
+	// Expected errors indicating that we are leaving the happy-path of the epoch transitions
+	//   - `protocol.InvalidServiceEventError` - if the service event is invalid or is not a valid state transition for the current protocol state.
+	//     CAUTION: the protocolStateMachine is left with a potentially dysfunctional state when this error occurs. Do NOT call the Build method
+	//     after such error and discard the protocolStateMachine!
 	ProcessEpochSetup(epochSetup *flow.EpochSetup) (bool, error)
 
 	// ProcessEpochCommit updates current protocol state with data from epoch commit event.
@@ -31,8 +37,10 @@ type ProtocolStateMachine interface {
 	// As a result of this operation protocol state for next epoch will be committed.
 	// Returned boolean indicates if event triggered a transition in the state machine or not.
 	// Implementors must never return (true, error).
-	// Expected errors during normal operations:
-	// - `protocol.InvalidServiceEventError` if the service event is invalid or is not a valid state transition for the current protocol state
+	// Expected errors indicating that we are leaving the happy-path of the epoch transitions
+	//   - `protocol.InvalidServiceEventError` - if the service event is invalid or is not a valid state transition for the current protocol state.
+	//     CAUTION: the protocolStateMachine is left with a potentially dysfunctional state when this error occurs. Do NOT call the Build method
+	//     after such error and discard the protocolStateMachine!
 	ProcessEpochCommit(epochCommit *flow.EpochCommit) (bool, error)
 
 	// UpdateIdentity updates identity table with new identity entry.
@@ -77,6 +85,10 @@ type baseProtocolStateMachine struct {
 }
 
 // Build returns updated protocol state entry, state ID and a flag indicating if there were any changes.
+// CAUTION:
+// Do NOT call Build, if the ProtocolStateMachine instance has returned a `protocol.InvalidServiceEventError`
+// at any time during its lifetime. After this error, the ProtocolStateMachine is left with a potentially
+// dysfunctional state and should be discarded.
 func (u *baseProtocolStateMachine) Build() (updatedState *flow.ProtocolStateEntry, stateID flow.Identifier, hasChanges bool) {
 	updatedState = u.state.Copy()
 	stateID = updatedState.ID()
