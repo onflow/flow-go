@@ -449,8 +449,8 @@ func NewScoreOption(cfg *ScoreOptionConfig, provider p2p.SubscriptionProvider) *
 			s.logger.Warn().Msg("stopping score registry; context done")
 		case <-scoreRegistry.Ready():
 			s.logger.Info().Msg("score registry started")
+			ready()
 		}
-		ready()
 
 		<-ctx.Done()
 		s.logger.Info().Msg("stopping score registry")
