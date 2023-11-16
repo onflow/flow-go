@@ -53,7 +53,15 @@ func TestExtendingBlockSnapshot(t *testing.T) {
 		// should get un-changed value
 		value, err := snap2.Get(reg1.Key)
 		require.NoError(t, err)
-		require.Equal(t, reg1.Value, value)
+		require.Equal(t, []byte("val1"), value)
+
+		value, err = snap2.Get(reg2.Key)
+		require.NoError(t, err)
+		require.Equal(t, []byte("val22"), value)
+
+		value, err = snap2.Get(reg3.Key)
+		require.NoError(t, err)
+		require.Equal(t, []byte("val3"), value)
 
 		// should get nil for unknown register
 		unknown := makeReg("unknown", "unknownV")
@@ -61,26 +69,25 @@ func TestExtendingBlockSnapshot(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, []byte(nil), value)
 
-		// should get updated value
-		value, err = snap2.Get(reg2.Key)
-		require.NoError(t, err)
-		require.Equal(t, updatedReg2.Value, value)
-
+		// create snap3 with reg3 updated
+		// snap3: { key1: val1, key2: val22, key3: val33 }
 		updatedReg3 := makeReg("key3", "val33")
-		// snap3: { key1: val1, key2: val222, key3: val33 }
-		snap3 := snap1.Extend(unittest.StateCommitmentFixture(), map[flow.RegisterID]flow.RegisterValue{
+		snap3 := snap2.Extend(unittest.StateCommitmentFixture(), map[flow.RegisterID]flow.RegisterValue{
 			updatedReg3.Key: updatedReg3.Value,
 		})
 
-		// verify it's getting from the previous snapshot
+		// verify all keys
+		value, err = snap3.Get(reg1.Key)
+		require.NoError(t, err)
+		require.Equal(t, []byte("val1"), value)
+
 		value, err = snap3.Get(reg2.Key)
 		require.NoError(t, err)
-		require.Equal(t, updatedReg2.Value, value)
+		require.Equal(t, []byte("val22"), value)
 
 		value, err = snap3.Get(reg3.Key)
 		require.NoError(t, err)
-		require.Equal(t, updatedReg3.Value, value)
-
+		require.Equal(t, []byte("val33"), value)
 	})
 }
 
