@@ -26,7 +26,6 @@ type SubscriptionProvider struct {
 	logger              zerolog.Logger
 	topicProviderOracle func() p2p.TopicProvider
 
-	// allTopics is a list of all topics in the pubsub network
 	// TODO: we should add an expiry time to this cache and clean up the cache periodically
 	// to avoid leakage of stale topics.
 	cache SubscriptionCache
