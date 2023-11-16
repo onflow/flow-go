@@ -26,8 +26,8 @@ type ProtocolStateMachine interface {
 	ProcessEpochSetup(epochSetup *flow.EpochSetup) (bool, error)
 
 	// ProcessEpochCommit updates current protocol state with data from epoch commit event.
-	// Observing an epoch setup commit, transitions protocol state from setup to commit phase, at this point we have
-	// finished construction of the next epoch.
+	// Observing an epoch setup commit, transitions protocol state from setup to commit phase.
+	// At this point we have finished construction of the next epoch.
 	// As a result of this operation protocol state for next epoch will be committed.
 	// Returned boolean indicates if event triggered a transition in the state machine or not.
 	// Implementors must never return (true, error).
@@ -69,7 +69,7 @@ type baseProtocolStateMachine struct {
 	// The following fields are maps from NodeID → DynamicIdentityEntry for the nodes that are *active* in the respective epoch.
 	// Active means that these nodes are authorized to contribute to extending the chain. Formally, a node is active if and only
 	// if it is listed in the EpochSetup event for the respective epoch. Note that map values are pointers, so writes to map values
-	// will modify the respective DynamicIdentityEntry in EpochStateContainer.
+	// will modify the respective DynamicIdentityEntry in `state`.
 
 	prevEpochIdentitiesLookup    map[flow.Identifier]*flow.DynamicIdentityEntry // lookup for nodes active in the previous epoch, may be nil or empty
 	currentEpochIdentitiesLookup map[flow.Identifier]*flow.DynamicIdentityEntry // lookup for nodes active in the current epoch, never nil or empty

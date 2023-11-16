@@ -165,7 +165,7 @@ func (m *stateMutator) ApplyServiceEventsFromValidatedSeals(seals []*flow.Seal) 
 		// earlier now failed. In all cases, this is an exception.
 		return irrecoverable.NewExceptionf("ordering already validated seals unexpectedly failed: %w", err)
 	}
-	var results []*flow.ExecutionResult
+	results := make([]*flow.ExecutionResult, 0, len(orderedSeals))
 	for _, seal := range orderedSeals {
 		result, err := m.results.ByID(seal.ResultID)
 		if err != nil {

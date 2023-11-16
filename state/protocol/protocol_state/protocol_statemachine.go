@@ -30,8 +30,8 @@ var _ ProtocolStateMachine = (*protocolStateMachine)(nil)
 // newStateMachine creates a new protocol state protocolStateMachine.
 func newStateMachine(view uint64, parentState *flow.RichProtocolStateEntry) (*protocolStateMachine, error) {
 	if parentState.InvalidEpochTransitionAttempted {
-		return nil, irrecoverable.NewExceptionf("created happy path protocol state machine at view (%d) for a parent state which has"+
-			"invalid state transition", view)
+		return nil, irrecoverable.NewExceptionf("cannot create happy path protocol state machine at view (%d) for a parent state"+
+			"which is in Epoch Fallback Mode", view)
 	}
 	return &protocolStateMachine{
 		baseProtocolStateMachine: baseProtocolStateMachine{
