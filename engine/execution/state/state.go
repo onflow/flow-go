@@ -224,23 +224,34 @@ func (s *state) NewStorageSnapshot(
 
 type RegisterUpdatesHolder interface {
 	UpdatedRegisters() flow.RegisterEntries
+	UpdatedRegisterSet() map[flow.RegisterID]flow.RegisterValue
 }
 
-func CommitDelta(ldg ledger.Ledger, ruh RegisterUpdatesHolder, baseState flow.StateCommitment) (flow.StateCommitment, *ledger.TrieUpdate, error) {
-	keys, values := RegisterEntriesToKeysValues(ruh.UpdatedRegisters())
+func CommitDelta(
+	ldg ledger.Ledger,
+	ruh RegisterUpdatesHolder,
+	baseStorageSnapshot execution.ExtendableStorageSnapshot,
+) (flow.StateCommitment, *ledger.TrieUpdate, execution.ExtendableStorageSnapshot, error) {
 
+	updatedRegisters := ruh.UpdatedRegisters()
+	keys, values := RegisterEntriesToKeysValues(updatedRegisters)
+	baseState := baseStorageSnapshot.Commitment()
 	update, err := ledger.NewUpdate(ledger.State(baseState), keys, values)
 
 	if err != nil {
-		return flow.DummyStateCommitment, nil, fmt.Errorf("cannot create ledger update: %w", err)
+		return flow.DummyStateCommitment, nil, nil, fmt.Errorf("cannot create ledger update: %w", err)
 	}
 
-	commit, trieUpdate, err := ldg.Set(update)
+	newState, trieUpdate, err := ldg.Set(update)
 	if err != nil {
-		return flow.DummyStateCommitment, nil, err
+		return flow.DummyStateCommitment, nil, nil, fmt.Errorf("could not update ledger: %w", err)
 	}
 
-	return flow.StateCommitment(commit), trieUpdate, nil
+	newCommit := flow.StateCommitment(newState)
+
+	newStorageSnapshot := baseStorageSnapshot.Extend(newCommit, ruh.UpdatedRegisterSet())
+
+	return newCommit, trieUpdate, newStorageSnapshot, nil
 }
 
 func (s *state) HasState(commitment flow.StateCommitment) bool {
