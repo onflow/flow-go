@@ -72,6 +72,14 @@ func (s *SubscriptionRecordCache) GetSubscribedTopics(pid peer.ID) ([]string, bo
 // A new update cycle is started when the subscription cache is first created, and then every time the subscription cache
 // is updated. The update cycle is used to keep track of the last time the subscription cache was updated. It is used to
 // implement a notion of time in the subscription cache.
+// When the update cycle is moved forward, it means that all the updates made to the subscription cache so far are
+// considered out-of-date, and the new updates to the cache records should overwrite the old ones.
+// The expected behavior is that the update cycle is moved forward by the module that uses the subscription provider once
+// per each update on the "entire" cache (and not per each update on a single record).
+// In other words, assume a cache with 3 records: A, B, and C. If the module updates record A, then record B, and then
+// record C, the module should move the update cycle forward only once after updating record C, and then update record A
+// B, and C again. If the module moves the update cycle forward after updating record A, then again after updating
+// record B, and then again after updating record C, the cache will be in an inconsistent state.
 // Returns:
 // - uint64: the current update cycle.
 func (s *SubscriptionRecordCache) MoveToNextUpdateCycle() uint64 {
