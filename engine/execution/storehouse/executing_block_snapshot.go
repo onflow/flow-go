@@ -54,20 +54,12 @@ func (s *ExecutingBlockSnapshot) getFromUpdates(id flow.RegisterID) (flow.Regist
 }
 
 // Extend returns a new storage snapshot at the same block but but for a different state commitment,
-// which contains the given trieUpdate
+// which contains the given registerUpdates
 // Usually it's used to create a new storage snapshot at the next executed collection.
-// The trieUpdate contains the register updates at the executed collection.
-func (s *ExecutingBlockSnapshot) Extend(newCommit flow.StateCommitment, updatedRegisters flow.RegisterEntries) execution.ExtendableStorageSnapshot {
-	updates := make(map[flow.RegisterID]flow.RegisterValue)
-
-	// add the old updates
-	// overwrite with new updates
-	for _, entry := range updatedRegisters {
-		updates[entry.Key] = entry.Value
-	}
-
+// The registerUpdates contains the register updates at the executed collection.
+func (s *ExecutingBlockSnapshot) Extend(newCommit flow.StateCommitment, updates map[flow.RegisterID]flow.RegisterValue) execution.ExtendableStorageSnapshot {
 	return &ExecutingBlockSnapshot{
-		previous:        s.previous,
+		previous:        s,
 		commitment:      newCommit,
 		registerUpdates: updates,
 	}

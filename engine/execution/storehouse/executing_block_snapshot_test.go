@@ -39,14 +39,15 @@ func TestExtendingBlockSnapshot(t *testing.T) {
 			reg1.Key: reg1.Value,
 			reg2.Key: reg2.Value,
 		}
-		snap1Commit := unittest.StateCommitmentFixture()
-		snap1 := storehouse.NewExecutingBlockSnapshot(base, snap1Commit)
+		// snap1: { key1: val1, key2: val2 }
+		snap1 := storehouse.NewExecutingBlockSnapshot(base, unittest.StateCommitmentFixture())
 
 		updatedReg2 := makeReg("key2", "val22")
 		reg3 := makeReg("key3", "val3")
-		snap2Commit := unittest.StateCommitmentFixture()
-		snap2 := snap1.Extend(snap2Commit, flow.RegisterEntries{
-			updatedReg2, reg3,
+		// snap2: { key1: val1, key2: val22, key3: val3 }
+		snap2 := snap1.Extend(unittest.StateCommitmentFixture(), map[flow.RegisterID]flow.RegisterValue{
+			updatedReg2.Key: updatedReg2.Value,
+			reg3.Key:        reg3.Value,
 		})
 
 		// should get un-changed value
@@ -64,6 +65,22 @@ func TestExtendingBlockSnapshot(t *testing.T) {
 		value, err = snap2.Get(reg2.Key)
 		require.NoError(t, err)
 		require.Equal(t, updatedReg2.Value, value)
+
+		updatedReg3 := makeReg("key3", "val33")
+		// snap3: { key1: val1, key2: val222, key3: val33 }
+		snap3 := snap1.Extend(unittest.StateCommitmentFixture(), map[flow.RegisterID]flow.RegisterValue{
+			updatedReg3.Key: updatedReg3.Value,
+		})
+
+		// verify it's getting from the previous snapshot
+		value, err = snap3.Get(reg2.Key)
+		require.NoError(t, err)
+		require.Equal(t, updatedReg2.Value, value)
+
+		value, err = snap3.Get(reg3.Key)
+		require.NoError(t, err)
+		require.Equal(t, updatedReg3.Value, value)
+
 	})
 }
 

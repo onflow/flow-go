@@ -109,6 +109,6 @@ type WALReader interface {
 
 type ExtendableStorageSnapshot interface {
 	snapshot.StorageSnapshot
-	Extend(newCommit flow.StateCommitment, updatedRegisters flow.RegisterEntries) ExtendableStorageSnapshot
+	Extend(newCommit flow.StateCommitment, updatedRegisters map[flow.RegisterID]flow.RegisterValue) ExtendableStorageSnapshot
 	Commitment() flow.StateCommitment
 }
