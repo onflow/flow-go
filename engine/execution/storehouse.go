@@ -1,7 +1,6 @@
 package execution
 
 import (
-	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/finalizedreader"
 	"github.com/onflow/flow-go/storage"
@@ -105,10 +104,4 @@ type WALReader interface {
 	// Next returns the next height and trie updates in the WAL.
 	// It returns EOF when there are no more entries.
 	Next() (height uint64, registers flow.RegisterEntries, err error)
-}
-
-type ExtendableStorageSnapshot interface {
-	snapshot.StorageSnapshot
-	Extend(newCommit flow.StateCommitment, updatedRegisters map[flow.RegisterID]flow.RegisterValue) ExtendableStorageSnapshot
-	Commitment() flow.StateCommitment
 }
