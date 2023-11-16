@@ -5,11 +5,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"path/filepath"
-	"strings"
-
 	"github.com/onflow/cadence"
 	"github.com/spf13/cobra"
+	"path/filepath"
+	"strings"
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
@@ -48,6 +47,10 @@ var (
 	flagNumViewsInStakingAuction    uint64
 	flagNumViewsInDKGPhase          uint64
 	flagEpochCommitSafetyThreshold  uint64
+	// Epoch target end time config
+	flagEpochTargetEndTimeRefCounter   uint64
+	flagEpochTargetEndTimeRefTimestamp uint64
+	flagEpochTargetEndTimeDuration     uint64
 )
 
 // PartnerWeights is the format of the JSON file specifying partner node weights.
@@ -98,6 +101,11 @@ func addFinalizeCmdFlags() {
 	finalizeCmd.Flags().Uint64Var(&flagNumViewsInStakingAuction, "epoch-staking-phase-length", 100, "length of the epoch staking phase measured in views")
 	finalizeCmd.Flags().Uint64Var(&flagNumViewsInDKGPhase, "epoch-dkg-phase-length", 1000, "length of each DKG phase measured in views")
 	finalizeCmd.Flags().Uint64Var(&flagEpochCommitSafetyThreshold, "epoch-commit-safety-threshold", 500, "defines epoch commitment deadline")
+	// Epoch timing config - these values can be set identically to `EpochTimingConfig` in the FlowEpoch smart contract.
+	// See https://github.com/onflow/flow-core-contracts/blob/240579784e9bb8d97d91d0e3213614e25562c078/contracts/epochs/FlowEpoch.cdc#L259-L266
+	finalizeCmd.Flags().Uint64Var(&flagEpochTargetEndTimeRefCounter, "epoch-target-end-time-ref-counter", 0, "the reference epoch to use to compute the root epoch's target end time")
+	finalizeCmd.Flags().Uint64Var(&flagEpochTargetEndTimeRefTimestamp, "epoch-target-end-time-ref-timestamp", 0, "the end time of the reference epoch, specified in second-precision Unix time, to use to compute the root epoch's target end time")
+	finalizeCmd.Flags().Uint64Var(&flagEpochTargetEndTimeDuration, "epoch-target-end-time-duration", 0, "the duration of each epoch in seconds, used to compute the root epoch's target end time")
 	finalizeCmd.Flags().UintVar(&flagProtocolVersion, "protocol-version", flow.DefaultProtocolVersion, "major software version used for the duration of this spork")
 
 	cmd.MarkFlagRequired(finalizeCmd, "root-block")
@@ -108,6 +116,9 @@ func addFinalizeCmdFlags() {
 	cmd.MarkFlagRequired(finalizeCmd, "epoch-staking-phase-length")
 	cmd.MarkFlagRequired(finalizeCmd, "epoch-dkg-phase-length")
 	cmd.MarkFlagRequired(finalizeCmd, "epoch-commit-safety-threshold")
+	cmd.MarkFlagRequired(finalizeCmd, "epoch-target-end-time-ref-counter")
+	cmd.MarkFlagRequired(finalizeCmd, "epoch-target-end-time-ref-timestamp")
+	cmd.MarkFlagRequired(finalizeCmd, "epoch-target-end-time-duration")
 	cmd.MarkFlagRequired(finalizeCmd, "protocol-version")
 
 	// optional parameters to influence various aspects of identity generation
