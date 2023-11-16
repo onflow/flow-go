@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
 	ledgermock "github.com/onflow/flow-go/ledger/mock"
@@ -17,22 +18,6 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
 )
-
-// TODO: move to a common place
-const (
-	KeyPartOwner = uint16(0)
-	// @deprecated - controller was used only by the very first
-	// version of cadence for access controll which was retired later on
-	// KeyPartController = uint16(1)
-	KeyPartKey = uint16(2)
-)
-
-func RegisterIDToKey(reg flow.RegisterID) ledger.Key {
-	return ledger.NewKey([]ledger.KeyPart{
-		ledger.NewKeyPart(KeyPartOwner, []byte(reg.Owner)),
-		ledger.NewKeyPart(KeyPartKey, []byte(reg.Key)),
-	})
-}
 
 func TestLedgerViewCommitter(t *testing.T) {
 
@@ -49,7 +34,7 @@ func TestLedgerViewCommitter(t *testing.T) {
 		value := []byte{1}
 		startState := unittest.StateCommitmentFixture()
 
-		update, err := ledger.NewUpdate(ledger.State(startState), []ledger.Key{RegisterIDToKey(reg)}, []ledger.Value{value})
+		update, err := ledger.NewUpdate(ledger.State(startState), []ledger.Key{convert.RegisterIDToLedgerKey(reg)}, []ledger.Value{value})
 		require.NoError(t, err)
 
 		expectedTrieUpdate, err := pathfinder.UpdateToTrieUpdate(update, complete.DefaultPathFinderVersion)
