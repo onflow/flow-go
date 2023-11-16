@@ -26,7 +26,6 @@ type SubscriptionProvider struct {
 	logger              zerolog.Logger
 	topicProviderOracle func() p2p.TopicProvider
 
-	// allTopics is a list of all topics in the pubsub network
 	// TODO: we should add an expiry time to this cache and clean up the cache periodically
 	// to avoid leakage of stale topics.
 	cache SubscriptionCache
@@ -90,7 +89,10 @@ func (s *SubscriptionProvider) updateTopicsLoop(ctx irrecoverable.SignalerContex
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			s.updateTopics(ctx)
+			if err := s.updateTopics(); err != nil {
+				ctx.Throw(fmt.Errorf("update loop failed: %w", err))
+				return
+			}
 		}
 	}
 }
@@ -99,10 +101,15 @@ func (s *SubscriptionProvider) updateTopicsLoop(ctx irrecoverable.SignalerContex
 // Note that this method always returns the cached version of the subscribed topics while querying the
 // pubsub network for the list of topics in a goroutine. Hence, the first call to this method always returns an empty
 // list.
-func (s *SubscriptionProvider) updateTopics(ctx irrecoverable.SignalerContext) {
+// Args:
+// - ctx: the context of the caller.
+// Returns:
+// - error on failure to update the list of topics. The returned error is irrecoverable and indicates an exception.
+func (s *SubscriptionProvider) updateTopics() error {
 	if updateInProgress := s.allTopicsUpdate.CompareAndSwap(false, true); updateInProgress {
 		// another goroutine is already updating the list of topics
-		return
+		s.logger.Trace().Msg("skipping topic update; another update is already in progress")
+		return nil
 	}
 
 	// start of critical section; protected by updateInProgress atomic flag
@@ -128,7 +135,7 @@ func (s *SubscriptionProvider) updateTopics(ctx irrecoverable.SignalerContext) {
 			updatedTopics, err := s.cache.AddTopicForPeer(p, topic)
 			if err != nil {
 				// this is an irrecoverable error; hence, we crash the node.
-				ctx.Throw(fmt.Errorf("failed to update topics for peer %s: %w", p, err))
+				return fmt.Errorf("failed to update topics for peer %s: %w", p, err)
 			}
 			s.logger.Debug().
 				Str("remote_peer_id", p2plogging.PeerId(p)).
@@ -139,6 +146,7 @@ func (s *SubscriptionProvider) updateTopics(ctx irrecoverable.SignalerContext) {
 
 	// remove the update flag; end of critical section
 	s.allTopicsUpdate.Store(false)
+	return nil
 }
 
 // GetSubscribedTopics returns all the subscriptions of a peer within the pubsub network.

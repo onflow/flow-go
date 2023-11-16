@@ -28,9 +28,6 @@ var _ flow.Entity = (*SubscriptionRecordEntity)(nil)
 
 // ID returns the entity id of the subscription record, which is the hash of the peer id.
 func (s SubscriptionRecordEntity) ID() flow.Identifier {
-	if s.entityId == flow.ZeroID {
-		s.entityId = flow.MakeID(s.PeerID)
-	}
 	return s.entityId
 }
 

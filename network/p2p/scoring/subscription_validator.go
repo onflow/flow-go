@@ -30,11 +30,14 @@ func NewSubscriptionValidator(logger zerolog.Logger, provider p2p.SubscriptionPr
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			logger.Debug().Msg("starting subscription validator")
 			v.subscriptionProvider.Start(ctx)
-			<-v.subscriptionProvider.Ready()
-			logger.Debug().Msg("subscription validator started")
-			ready()
-
-			logger.Debug().Msg("subscription validator is ready")
+			select {
+			case <-ctx.Done():
+				logger.Debug().Msg("subscription validator is stopping")
+			case <-v.subscriptionProvider.Ready():
+				logger.Debug().Msg("subscription validator started")
+				ready()
+				logger.Debug().Msg("subscription validator is ready")
+			}
 
 			<-ctx.Done()
 			logger.Debug().Msg("subscription validator is stopping")
