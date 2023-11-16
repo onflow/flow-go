@@ -13,7 +13,7 @@ type RegisterStore interface {
 	// GetRegister first try to get the register from InMemoryRegisterStore, then OnDiskRegisterStore
 	// It returns:
 	//  - (value, nil) if the register value is found at the given block
-	//  - (nil, storage.ErrNotFound) if the register is not found
+	//  - (nil, nil) if the register is not found
 	//  - (nil, storage.ErrHeightNotIndexed) if the height is below the first height that is indexed.
 	//  - (nil, storehouse.ErrNotExecuted) if the block is not executed yet
 	//  - (nil, storehouse.ErrNotExecuted) if the block is conflicting iwth finalized block
