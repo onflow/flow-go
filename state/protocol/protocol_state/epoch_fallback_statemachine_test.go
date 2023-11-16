@@ -55,8 +55,10 @@ func (s *EpochFallbackStateMachineSuite) TestProcessEpochCommitIsNoop() {
 func (s *EpochFallbackStateMachineSuite) TestTransitionToNextEpoch() {
 	err := s.stateMachine.TransitionToNextEpoch()
 	require.NoError(s.T(), err)
-	_, _, hasChanges := s.stateMachine.Build()
+	updatedState, updateStateID, hasChanges := s.stateMachine.Build()
 	require.False(s.T(), hasChanges)
+	require.Equal(s.T(), updatedState.ID(), updateStateID)
+	require.Equal(s.T(), s.parentProtocolState.ID(), updateStateID)
 }
 
 // TestNewEpochFallbackStateMachine tests that creating epoch fallback state machine sets
@@ -67,7 +69,7 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 	require.Equal(s.T(), s.parentProtocolState.ID(), s.stateMachine.ParentState().ID())
 	require.Equal(s.T(), s.candidate.View, s.stateMachine.View())
 
-	updatedState, _, hasChanges := s.stateMachine.Build()
+	updatedState, stateID, hasChanges := s.stateMachine.Build()
 	require.True(s.T(), hasChanges, "InvalidEpochTransitionAttempted has to be updated")
 	require.True(s.T(), updatedState.InvalidEpochTransitionAttempted, "InvalidEpochTransitionAttempted has to be set")
 	require.Equal(s.T(), updatedState.ID(), stateID)

@@ -127,8 +127,8 @@ func (u *protocolStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (b
 }
 
 // ProcessEpochCommit updates current protocol state with data from epoch commit event.
-// Observing an epoch setup commit, transitions protocol state from setup to commit phase, at this point we have
-// finished construction of the next epoch.
+// Observing an epoch setup commit, transitions protocol state from setup to commit phase.
+// At this point, we have finished construction of the next epoch.
 // As a result of this operation protocol state for next epoch will be committed.
 // Returned boolean indicates if event triggered a transition in the state machine or not.
 // Implementors must never return (true, error).
@@ -154,7 +154,7 @@ func (u *protocolStateMachine) ProcessEpochCommit(epochCommit *flow.EpochCommit)
 // state. An epoch transition is only allowed when:
 // - next epoch has been set up,
 // - next epoch has been committed,
-// - invalid state transition has not been attempted(this is ensured by constructor),
+// - invalid state transition has not been attempted (this is ensured by constructor),
 // - candidate block is in the next epoch.
 // No errors are expected during normal operations.
 func (u *protocolStateMachine) TransitionToNextEpoch() error {

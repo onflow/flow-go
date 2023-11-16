@@ -108,8 +108,9 @@ type StateMutator interface {
 	//   - iterating over the sealed service events in order of increasing height
 	//   - identifying state-changing service event and calling into the embedded
 	//     ProtocolStateMachine to apply the respective state update
-	//   - tracking deferred database updates necessary to persist the updated state
-	//     and its data dependencies
+	//   - tracking deferred database updates necessary to persist the updated
+	//     protocol state's *dependencies*. Persisting and indexing `updatedState`
+	//     is the responsibility of the calling code (specifically `FollowerState`)
 	//
 	// All updates only mutate the `StateMutator`'s internal in-memory copy of the
 	// protocol state, without changing the parent state (i.e. the state we started from).

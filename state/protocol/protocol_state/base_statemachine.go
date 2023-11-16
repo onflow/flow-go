@@ -27,7 +27,7 @@ type ProtocolStateMachine interface {
 
 	// ProcessEpochCommit updates current protocol state with data from epoch commit event.
 	// Observing an epoch setup commit, transitions protocol state from setup to commit phase.
-	// At this point we have finished construction of the next epoch.
+	// At this point, we have finished construction of the next epoch.
 	// As a result of this operation protocol state for next epoch will be committed.
 	// Returned boolean indicates if event triggered a transition in the state machine or not.
 	// Implementors must never return (true, error).

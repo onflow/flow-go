@@ -65,7 +65,7 @@ func (s *ProtocolStateMachineSuite) TestTransitionToNextEpoch() {
 		unittest.HeaderWithView(s.parentProtocolState.CurrentEpochSetup.FinalView + 1))
 	var err error
 	// since the candidate block is from next epoch, protocolStateMachine should transition to next epoch
-	s.stateMachine, err = newStateMachine(candidate.View, s.parentProtocolState)
+	s.stateMachine, err = newStateMachine(candidate.View, s.parentProtocolState.Copy())
 	require.NoError(s.T(), err)
 	err = s.stateMachine.TransitionToNextEpoch()
 	require.NoError(s.T(), err)
@@ -121,7 +121,6 @@ func (s *ProtocolStateMachineSuite) TestBuild() {
 	require.Equal(s.T(), updatedState.ID(), stateID, "should return correct ID")
 	require.Equal(s.T(), s.parentProtocolState.ID(), s.stateMachine.ParentState().ID(), "should not modify parent protocol state")
 
-
 	updatedDynamicIdentity := s.parentProtocolState.CurrentEpochIdentityTable[0].DynamicIdentity
 	updatedDynamicIdentity.Ejected = true
 	err := s.stateMachine.UpdateIdentity(&flow.DynamicIdentityEntry{
@@ -142,7 +141,7 @@ func (s *ProtocolStateMachineSuite) TestCreateStateMachineAfterInvalidStateTrans
 	s.parentProtocolState.InvalidEpochTransitionAttempted = true
 	var err error
 	// create new protocolStateMachine with next epoch information
-	s.stateMachine, err = newStateMachine(s.candidate.View, s.parentProtocolState)
+	s.stateMachine, err = newStateMachine(s.candidate.View, s.parentProtocolState.Copy())
 	require.Error(s.T(), err)
 }
 
@@ -151,7 +150,7 @@ func (s *ProtocolStateMachineSuite) TestCreateStateMachineAfterInvalidStateTrans
 func (s *ProtocolStateMachineSuite) TestProcessEpochCommit() {
 	var err error
 	s.Run("invalid counter", func() {
-		s.stateMachine, err = newStateMachine(s.candidate.View, s.parentProtocolState)
+		s.stateMachine, err = newStateMachine(s.candidate.View, s.parentProtocolState.Copy())
 		require.NoError(s.T(), err)
 		commit := unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
 			commit.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 10 // set invalid counter for next epoch
@@ -161,7 +160,7 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochCommit() {
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 	})
 	s.Run("no next epoch protocol state", func() {
-		s.stateMachine, err = newStateMachine(s.candidate.View, s.parentProtocolState)
+		s.stateMachine, err = newStateMachine(s.candidate.View, s.parentProtocolState.Copy())
 		require.NoError(s.T(), err)
 		commit := unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
 			commit.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
@@ -171,7 +170,7 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochCommit() {
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 	})
 	s.Run("conflicting epoch commit", func() {
-		s.stateMachine, err = newStateMachine(s.candidate.View, s.parentProtocolState)
+		s.stateMachine, err = newStateMachine(s.candidate.View, s.parentProtocolState.Copy())
 		require.NoError(s.T(), err)
 		setup := unittest.EpochSetupFixture(
 			unittest.SetupWithCounter(s.parentProtocolState.CurrentEpochSetup.Counter+1),
@@ -212,7 +211,7 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochCommit() {
 		require.Equal(s.T(), commit.ID(), newState.NextEpoch.CommitID, "next epoch should be committed since we have observed, a valid event")
 	})
 	s.Run("happy path processing", func() {
-		s.stateMachine, err = newStateMachine(s.candidate.View, s.parentProtocolState)
+		s.stateMachine, err = newStateMachine(s.candidate.View, s.parentProtocolState.Copy())
 		require.NoError(s.T(), err)
 		setup := unittest.EpochSetupFixture(
 			unittest.SetupWithCounter(s.parentProtocolState.CurrentEpochSetup.Counter+1),
@@ -238,7 +237,7 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochCommit() {
 			nil,
 		)
 		require.NoError(s.T(), err)
-		s.stateMachine, err = newStateMachine(s.candidate.View+1, parentState)
+		s.stateMachine, err = newStateMachine(s.candidate.View+1, parentState.Copy())
 		require.NoError(s.T(), err)
 		commit := unittest.EpochCommitFixture(
 			unittest.CommitWithCounter(setup.Counter),
@@ -254,7 +253,8 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochCommit() {
 		require.Equal(s.T(), newState.ID(), newStateID)
 		require.NotEqual(s.T(), s.parentProtocolState.ID(), newState.ID())
 		require.NotEqual(s.T(), updatedState.ID(), newState.ID())
-		require.Equal(s.T(), s.parentProtocolState.ID(), s.stateMachine.ParentState().ID(), "should not modify parent protocol state")
+		require.Equal(s.T(), parentState.ID(), s.stateMachine.ParentState().ID(),
+			"should not modify parent protocol state")
 	})
 }
 
@@ -268,8 +268,10 @@ func (s *ProtocolStateMachineSuite) TestUpdateIdentityUnknownIdentity() {
 	require.Error(s.T(), err, "should not be able to update data of unknown identity")
 	require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 
-	_, _, hasChanges := s.stateMachine.Build()
+	updatedState, updatedStateID, hasChanges := s.stateMachine.Build()
 	require.False(s.T(), hasChanges, "should not have changes")
+	require.Equal(s.T(), updatedState.ID(), s.parentProtocolState.ID())
+	require.Equal(s.T(), updatedState.ID(), updatedStateID)
 }
 
 // TestUpdateIdentityHappyPath tests if identity updates are correctly processed and reflected in the resulting protocol state.
@@ -277,7 +279,7 @@ func (s *ProtocolStateMachineSuite) TestUpdateIdentityHappyPath() {
 	// update protocol state to have next epoch protocol state
 	unittest.WithNextEpochProtocolState()(s.parentProtocolState)
 	var err error
-	s.stateMachine, err = newStateMachine(s.candidate.View, s.parentProtocolState)
+	s.stateMachine, err = newStateMachine(s.candidate.View, s.parentProtocolState.Copy())
 	require.NoError(s.T(), err)
 
 	currentEpochParticipants := s.parentProtocolState.CurrentEpochIdentityTable.Copy()
@@ -302,8 +304,12 @@ func (s *ProtocolStateMachineSuite) TestUpdateIdentityHappyPath() {
 		})
 		require.NoError(s.T(), err)
 	}
-	updatedState, _, hasChanges := s.stateMachine.Build()
+	updatedState, updatedStateID, hasChanges := s.stateMachine.Build()
 	require.True(s.T(), hasChanges, "should have changes")
+	require.Equal(s.T(), updatedState.ID(), updatedStateID)
+	require.NotEqual(s.T(), s.parentProtocolState.ID(), updatedState.ID())
+	require.Equal(s.T(), s.parentProtocolState.ID(), s.stateMachine.ParentState().ID(),
+		"should not modify parent protocol state")
 
 	// assert that all changes made in the previous epoch are preserved
 	currentEpochLookup := updatedState.CurrentEpoch.ActiveIdentities.Lookup()
@@ -336,7 +342,7 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochSetupInvariants() {
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 	})
 	s.Run("processing second epoch setup", func() {
-		stateMachine, err := newStateMachine(s.candidate.View, s.parentProtocolState)
+		stateMachine, err := newStateMachine(s.candidate.View, s.parentProtocolState.Copy())
 		require.NoError(s.T(), err)
 		setup := unittest.EpochSetupFixture(
 			unittest.SetupWithCounter(s.parentProtocolState.CurrentEpochSetup.Counter+1),
@@ -351,7 +357,7 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochSetupInvariants() {
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 	})
 	s.Run("participants not sorted", func() {
-		stateMachine, err := newStateMachine(s.candidate.View, s.parentProtocolState)
+		stateMachine, err := newStateMachine(s.candidate.View, s.parentProtocolState.Copy())
 		require.NoError(s.T(), err)
 		setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
 			setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
@@ -367,7 +373,7 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochSetupInvariants() {
 		conflictingIdentity := s.parentProtocolState.ProtocolStateEntry.CurrentEpoch.ActiveIdentities[0]
 		conflictingIdentity.Dynamic.Ejected = true
 
-		stateMachine, err := newStateMachine(s.candidate.View, s.parentProtocolState)
+		stateMachine, err := newStateMachine(s.candidate.View, s.parentProtocolState.Copy())
 		require.NoError(s.T(), err)
 		setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
 			setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
