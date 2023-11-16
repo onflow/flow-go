@@ -103,7 +103,6 @@ func (s *BackendScriptsSuite) defaultBackend() *backendScripts {
 		loggedScripts:     loggedScripts,
 		connFactory:       s.connectionFactory,
 		nodeCommunicator:  NewNodeCommunicator(false),
-		ctx:               s.ctx,
 	}
 }
 
@@ -153,8 +152,6 @@ func (s *BackendScriptsSuite) setupENFailingResponse(blockID flow.Identifier, er
 // TestExecuteScriptOnExecutionNode_HappyPath tests that the backend successfully executes scripts
 // on execution nodes
 func (s *BackendScriptsSuite) TestExecuteScriptOnExecutionNode_HappyPath() {
-	ctx := context.Background()
-
 	s.setupExecutionNodes(s.block)
 	s.setupENSuccessResponse(s.block.ID())
 
@@ -162,23 +159,21 @@ func (s *BackendScriptsSuite) TestExecuteScriptOnExecutionNode_HappyPath() {
 	backend.scriptExecMode = ScriptExecutionModeExecutionNodesOnly
 
 	s.Run("GetAccount", func() {
-		s.testExecuteScriptAtLatestBlock(ctx, backend, codes.OK)
+		s.testExecuteScriptAtLatestBlock(s.ctx, backend, codes.OK)
 	})
 
 	s.Run("ExecuteScriptAtBlockID", func() {
-		s.testExecuteScriptAtBlockID(ctx, backend, codes.OK)
+		s.testExecuteScriptAtBlockID(s.ctx, backend, codes.OK)
 	})
 
 	s.Run("ExecuteScriptAtBlockHeight", func() {
-		s.testExecuteScriptAtBlockHeight(ctx, backend, codes.OK)
+		s.testExecuteScriptAtBlockHeight(s.ctx, backend, codes.OK)
 	})
 }
 
 // TestExecuteScriptOnExecutionNode_Fails tests that the backend returns an error when the execution
 // node returns an error
 func (s *BackendScriptsSuite) TestExecuteScriptOnExecutionNode_Fails() {
-	ctx := context.Background()
-
 	// use a status code that's not used in the API to make sure it's passed through
 	statusCode := codes.FailedPrecondition
 	errToReturn := status.Error(statusCode, "random error")
@@ -190,23 +185,21 @@ func (s *BackendScriptsSuite) TestExecuteScriptOnExecutionNode_Fails() {
 	backend.scriptExecMode = ScriptExecutionModeExecutionNodesOnly
 
 	s.Run("GetAccount", func() {
-		s.testExecuteScriptAtLatestBlock(ctx, backend, statusCode)
+		s.testExecuteScriptAtLatestBlock(s.ctx, backend, statusCode)
 	})
 
 	s.Run("ExecuteScriptAtBlockID", func() {
-		s.testExecuteScriptAtBlockID(ctx, backend, statusCode)
+		s.testExecuteScriptAtBlockID(s.ctx, backend, statusCode)
 	})
 
 	s.Run("ExecuteScriptAtBlockHeight", func() {
-		s.testExecuteScriptAtBlockHeight(ctx, backend, statusCode)
+		s.testExecuteScriptAtBlockHeight(s.ctx, backend, statusCode)
 	})
 }
 
 // TestExecuteScriptFromStorage_HappyPath tests that the backend successfully executes scripts using
 // the local storage
 func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_HappyPath() {
-	ctx := context.Background()
-
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
 	scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, s.script, s.arguments, s.block.Header.Height).
 		Return(expectedResponse, nil)
@@ -216,23 +209,21 @@ func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_HappyPath() {
 	backend.scriptExecutor = scriptExecutor
 
 	s.Run("GetAccount - happy path", func() {
-		s.testExecuteScriptAtLatestBlock(ctx, backend, codes.OK)
+		s.testExecuteScriptAtLatestBlock(s.ctx, backend, codes.OK)
 	})
 
 	s.Run("GetAccountAtLatestBlock - happy path", func() {
-		s.testExecuteScriptAtBlockID(ctx, backend, codes.OK)
+		s.testExecuteScriptAtBlockID(s.ctx, backend, codes.OK)
 	})
 
 	s.Run("GetAccountAtBlockHeight - happy path", func() {
-		s.testExecuteScriptAtBlockHeight(ctx, backend, codes.OK)
+		s.testExecuteScriptAtBlockHeight(s.ctx, backend, codes.OK)
 	})
 }
 
 // TestExecuteScriptFromStorage_Fails tests that errors received from local storage are handled
 // and converted to the appropriate status code
 func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_Fails() {
-	ctx := context.Background()
-
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
 
 	backend := s.defaultBackend()
@@ -270,15 +261,15 @@ func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_Fails() {
 			Return(nil, tt.err).Times(3)
 
 		s.Run(fmt.Sprintf("GetAccount - fails with %v", tt.err), func() {
-			s.testExecuteScriptAtLatestBlock(ctx, backend, tt.statusCode)
+			s.testExecuteScriptAtLatestBlock(s.ctx, backend, tt.statusCode)
 		})
 
 		s.Run(fmt.Sprintf("GetAccountAtLatestBlock - fails with %v", tt.err), func() {
-			s.testExecuteScriptAtBlockID(ctx, backend, tt.statusCode)
+			s.testExecuteScriptAtBlockID(s.ctx, backend, tt.statusCode)
 		})
 
 		s.Run(fmt.Sprintf("GetAccountAtBlockHeight - fails with %v", tt.err), func() {
-			s.testExecuteScriptAtBlockHeight(ctx, backend, tt.statusCode)
+			s.testExecuteScriptAtBlockHeight(s.ctx, backend, tt.statusCode)
 		})
 	}
 }
@@ -286,8 +277,6 @@ func (s *BackendScriptsSuite) TestExecuteScriptFromStorage_Fails() {
 // TestExecuteScriptWithFailover_HappyPath tests that when an error is returned executing a script
 // from local storage, the backend will attempt to run it on an execution node
 func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_HappyPath() {
-	ctx := context.Background()
-
 	errors := []error{
 		execution.ErrDataNotAvailable,
 		storage.ErrNotFound,
@@ -310,15 +299,15 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_HappyPath() {
 			Return(nil, errToReturn).Times(3)
 
 		s.Run(fmt.Sprintf("ExecuteScriptAtLatestBlock - recovers %v", errToReturn), func() {
-			s.testExecuteScriptAtLatestBlock(ctx, backend, codes.OK)
+			s.testExecuteScriptAtLatestBlock(s.ctx, backend, codes.OK)
 		})
 
 		s.Run(fmt.Sprintf("ExecuteScriptAtBlockID - recovers %v", errToReturn), func() {
-			s.testExecuteScriptAtBlockID(ctx, backend, codes.OK)
+			s.testExecuteScriptAtBlockID(s.ctx, backend, codes.OK)
 		})
 
 		s.Run(fmt.Sprintf("ExecuteScriptAtBlockHeight - recovers %v", errToReturn), func() {
-			s.testExecuteScriptAtBlockHeight(ctx, backend, codes.OK)
+			s.testExecuteScriptAtBlockHeight(s.ctx, backend, codes.OK)
 		})
 	}
 }
@@ -326,8 +315,6 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_HappyPath() {
 // TestExecuteScriptWithFailover_SkippedForInvalidArgument tests that failover is skipped for
 // FVM errors that result in InvalidArgument errors
 func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_SkippedForInvalidArgument() {
-	ctx := context.Background()
-
 	// configure local script executor to fail
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
 	scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, s.failingScript, s.arguments, s.block.Header.Height).
@@ -338,23 +325,21 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_SkippedForInvalidArg
 	backend.scriptExecutor = scriptExecutor
 
 	s.Run("ExecuteScriptAtLatestBlock", func() {
-		s.testExecuteScriptAtLatestBlock(ctx, backend, codes.InvalidArgument)
+		s.testExecuteScriptAtLatestBlock(s.ctx, backend, codes.InvalidArgument)
 	})
 
 	s.Run("ExecuteScriptAtBlockID", func() {
-		s.testExecuteScriptAtBlockID(ctx, backend, codes.InvalidArgument)
+		s.testExecuteScriptAtBlockID(s.ctx, backend, codes.InvalidArgument)
 	})
 
 	s.Run("ExecuteScriptAtBlockHeight", func() {
-		s.testExecuteScriptAtBlockHeight(ctx, backend, codes.InvalidArgument)
+		s.testExecuteScriptAtBlockHeight(s.ctx, backend, codes.InvalidArgument)
 	})
 }
 
 // TestExecuteScriptWithFailover_ReturnsENErrors tests that when an error is returned from the execution
 // node during a failover, it is returned to the caller.
 func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_ReturnsENErrors() {
-	ctx := context.Background()
-
 	// use a status code that's not used in the API to make sure it's passed through
 	statusCode := codes.FailedPrecondition
 	errToReturn := status.Error(statusCode, "random error")
@@ -373,23 +358,21 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_ReturnsENErrors() {
 	backend.scriptExecutor = scriptExecutor
 
 	s.Run("ExecuteScriptAtLatestBlock", func() {
-		s.testExecuteScriptAtLatestBlock(ctx, backend, statusCode)
+		s.testExecuteScriptAtLatestBlock(s.ctx, backend, statusCode)
 	})
 
 	s.Run("ExecuteScriptAtBlockID", func() {
-		s.testExecuteScriptAtBlockID(ctx, backend, statusCode)
+		s.testExecuteScriptAtBlockID(s.ctx, backend, statusCode)
 	})
 
 	s.Run("ExecuteScriptAtBlockHeight", func() {
-		s.testExecuteScriptAtBlockHeight(ctx, backend, statusCode)
+		s.testExecuteScriptAtBlockHeight(s.ctx, backend, statusCode)
 	})
 }
 
 // TestExecuteScriptAtLatestBlockFromStorage_InconsistentState tests that signaler context received error when node state is
 // inconsistent
 func (s *BackendScriptsSuite) TestExecuteScriptAtLatestBlockFromStorage_InconsistentState() {
-	ctx := context.Background()
-
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
 
 	backend := s.defaultBackend()
@@ -401,7 +384,7 @@ func (s *BackendScriptsSuite) TestExecuteScriptAtLatestBlockFromStorage_Inconsis
 
 		err := fmt.Errorf("inconsistent node`s state")
 		s.snapshot.On("Head").Return(nil, err)
-		backend.ctx = irrecoverable.NewMockSignalerContextExpectError(s.T(), context.Background(), err)
+		ctx := irrecoverable.NewMockSignalerContextExpectError(s.T(), context.Background(), err)
 
 		_, err = backend.ExecuteScriptAtLatestBlock(ctx, s.script, s.arguments)
 		s.Require().Error(err)

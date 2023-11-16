@@ -1,14 +1,18 @@
 package grpcserver
 
 import (
+	"context"
+
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/rs/zerolog"
+
+	"go.uber.org/atomic"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
-	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
-
 	"github.com/onflow/flow-go/engine/common/rpc"
+	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
 type Option func(*GrpcServerBuilder)
@@ -33,6 +37,7 @@ type GrpcServerBuilder struct {
 	log            zerolog.Logger
 	gRPCListenAddr string
 	server         *grpc.Server
+	signalerCtx    *atomic.Pointer[irrecoverable.SignalerContext]
 
 	transportCredentials         credentials.TransportCredentials // the GRPC credentials
 	stateStreamInterceptorEnable bool
@@ -57,12 +62,23 @@ func NewGrpcServerBuilder(log zerolog.Logger,
 		applyOption(grpcServerBuilder)
 	}
 
+	signalerCtx := atomic.NewPointer[irrecoverable.SignalerContext](nil)
+
 	// create a GRPC server to serve GRPC clients
 	grpcOpts := []grpc.ServerOption{
 		grpc.MaxRecvMsgSize(int(maxMsgSize)),
 		grpc.MaxSendMsgSize(int(maxMsgSize)),
 	}
 	var interceptors []grpc.UnaryServerInterceptor // ordered list of interceptors
+	interceptors = append(interceptors, func(ctx context.Context, req any, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp any, err error) {
+		if signalerCtx := signalerCtx.Load(); ctx != nil {
+			resp, err = handler(*signalerCtx, req)
+		} else {
+			resp, err = handler(ctx, req)
+		}
+		return
+	})
+
 	// if rpc metrics is enabled, first create the grpc metrics interceptor
 	if rpcMetricsEnabled {
 		interceptors = append(interceptors, grpc_prometheus.UnaryServerInterceptor)
@@ -98,10 +114,11 @@ func NewGrpcServerBuilder(log zerolog.Logger,
 	}
 	grpcServerBuilder.log = log
 	grpcServerBuilder.server = grpc.NewServer(grpcOpts...)
+	grpcServerBuilder.signalerCtx = signalerCtx
 
 	return grpcServerBuilder
 }
 
 func (b *GrpcServerBuilder) Build() *GrpcServer {
-	return NewGrpcServer(b.log, b.gRPCListenAddr, b.server)
+	return NewGrpcServer(b.log, b.gRPCListenAddr, b.server, b.signalerCtx)
 }

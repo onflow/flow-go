@@ -21,7 +21,6 @@ import (
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -43,8 +42,6 @@ type backendTransactions struct {
 	log                 zerolog.Logger
 	nodeCommunicator    Communicator
 	txResultCache       *lru.Cache[flow.Identifier, *access.TransactionResult]
-
-	ctx irrecoverable.SignalerContext
 }
 
 // SendTransaction forwards the transaction to the collection node
@@ -585,7 +582,7 @@ func (b *backendTransactions) deriveTransactionStatus(
 		// get the latest finalized block from the state
 		finalized, err := b.state.Final().Head()
 		if err != nil {
-			b.ctx.Throw(err)
+			//irrecoverable.Throw(ctx, err)
 			return flow.TransactionStatusUnknown, err
 		}
 		finalizedHeight := finalized.Height
@@ -630,7 +627,7 @@ func (b *backendTransactions) deriveTransactionStatus(
 	// get the latest sealed block from the State
 	sealed, err := b.state.Sealed().Head()
 	if err != nil {
-		b.ctx.Throw(err)
+		//irrecoverable.Throw(ctx, err)
 		return flow.TransactionStatusUnknown, err
 	}
 
@@ -746,7 +743,6 @@ func (b *backendTransactions) getHistoricalTransactionResult(
 func (b *backendTransactions) registerTransactionForRetry(tx *flow.TransactionBody) {
 	referenceBlock, err := b.state.AtBlockID(tx.ReferenceBlockID).Head()
 	if err != nil {
-		b.ctx.Throw(err)
 		return
 	}
 

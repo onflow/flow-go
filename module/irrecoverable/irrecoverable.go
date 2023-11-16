@@ -75,9 +75,10 @@ func Throw(ctx context.Context, err error) {
 	signalerAbleContext, ok := ctx.(SignalerContext)
 	if ok {
 		signalerAbleContext.Throw(err)
+	} else {
+		// Be spectacular on how this does not -but should- handle irrecoverables:
+		log.Fatalf("irrecoverable error signaler not found for context, please implement! Unhandled irrecoverable error %v", err)
 	}
-	// Be spectacular on how this does not -but should- handle irrecoverables:
-	log.Fatalf("irrecoverable error signaler not found for context, please implement! Unhandled irrecoverable error %v", err)
 }
 
 // WithSignallerAndCancel returns an irrecoverable context, the cancel

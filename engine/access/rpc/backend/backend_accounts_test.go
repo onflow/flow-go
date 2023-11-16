@@ -89,7 +89,6 @@ func (s *BackendAccountsSuite) defaultBackend() *backendAccounts {
 		executionReceipts: s.receipts,
 		connFactory:       s.connectionFactory,
 		nodeCommunicator:  NewNodeCommunicator(false),
-		ctx:               s.ctx,
 	}
 }
 
@@ -327,8 +326,6 @@ func (s *BackendAccountsSuite) TestGetAccountFromFailover_ReturnsENErrors() {
 // TestGetAccountAtLatestBlock_InconsistentState tests that signaler context received error when node state is
 // inconsistent
 func (s *BackendAccountsSuite) TestGetAccountAtLatestBlockFromStorage_InconsistentState() {
-	ctx := context.Background()
-
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
 
 	backend := s.defaultBackend()
@@ -340,7 +337,8 @@ func (s *BackendAccountsSuite) TestGetAccountAtLatestBlockFromStorage_Inconsiste
 
 		err := fmt.Errorf("inconsistent node`s state")
 		s.snapshot.On("Head").Return(nil, err)
-		backend.ctx = irrecoverable.NewMockSignalerContextExpectError(s.T(), context.Background(), err)
+
+		ctx := irrecoverable.NewMockSignalerContextExpectError(s.T(), context.Background(), err) //Uliana: всі ctx
 
 		_, err = backend.GetAccountAtLatestBlock(ctx, s.failingAddress)
 		s.Require().Error(err)

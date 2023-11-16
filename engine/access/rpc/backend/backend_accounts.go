@@ -32,7 +32,6 @@ type backendAccounts struct {
 	nodeCommunicator  Communicator
 	scriptExecutor    execution.ScriptExecutor
 	scriptExecMode    ScriptExecutionMode
-	ctx               irrecoverable.SignalerContext
 }
 
 // GetAccount returns the account details at the latest sealed block.
@@ -45,7 +44,7 @@ func (b *backendAccounts) GetAccount(ctx context.Context, address flow.Address) 
 func (b *backendAccounts) GetAccountAtLatestBlock(ctx context.Context, address flow.Address) (*flow.Account, error) {
 	sealed, err := b.state.Sealed().Head()
 	if err != nil {
-		b.ctx.Throw(err)
+		irrecoverable.Throw(ctx, err)
 		return nil, status.Errorf(codes.Internal, "failed to get latest sealed header: %v", err)
 	}
 

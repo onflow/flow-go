@@ -31,7 +31,6 @@ type backendEvents struct {
 	log               zerolog.Logger
 	maxHeightRange    uint
 	nodeCommunicator  Communicator
-	ctx               irrecoverable.SignalerContext
 }
 
 // GetEventsForHeightRange retrieves events for all sealed blocks between the start block height and
@@ -56,7 +55,7 @@ func (b *backendEvents) GetEventsForHeightRange(
 	head, err := b.state.Sealed().Head()
 	if err != nil {
 		// sealed block must be in the store, so return an Internal code even if we got NotFound
-		b.ctx.Throw(err)
+		irrecoverable.Throw(ctx, err)
 		return nil, status.Errorf(codes.Internal, "failed to get events: %v", err)
 	}
 

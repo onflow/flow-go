@@ -16,10 +16,9 @@ import (
 type backendBlockHeaders struct {
 	headers storage.Headers
 	state   protocol.State
-	ctx     irrecoverable.SignalerContext
 }
 
-func (b *backendBlockHeaders) GetLatestBlockHeader(_ context.Context, isSealed bool) (*flow.Header, flow.BlockStatus, error) {
+func (b *backendBlockHeaders) GetLatestBlockHeader(ctx context.Context, isSealed bool) (*flow.Header, flow.BlockStatus, error) {
 	var header *flow.Header
 	var err error
 
@@ -40,44 +39,44 @@ func (b *backendBlockHeaders) GetLatestBlockHeader(_ context.Context, isSealed b
 		//   because this can cause DOS potential
 		// - Since the protocol state is widely shared, we assume that in practice another component will
 		//   observe the protocol state error and throw an exception.
-		b.ctx.Throw(err)
+		irrecoverable.Throw(ctx, err)
 		return nil, flow.BlockStatusUnknown, status.Errorf(codes.Internal, "could not get latest block header: %v", err)
 	}
 
-	stat, err := b.getBlockStatus(header)
+	stat, err := b.getBlockStatus(ctx, header)
 	if err != nil {
 		return nil, stat, err
 	}
 	return header, stat, nil
 }
 
-func (b *backendBlockHeaders) GetBlockHeaderByID(_ context.Context, id flow.Identifier) (*flow.Header, flow.BlockStatus, error) {
+func (b *backendBlockHeaders) GetBlockHeaderByID(ctx context.Context, id flow.Identifier) (*flow.Header, flow.BlockStatus, error) {
 	header, err := b.headers.ByBlockID(id)
 	if err != nil {
 		return nil, flow.BlockStatusUnknown, rpc.ConvertStorageError(err)
 	}
 
-	stat, err := b.getBlockStatus(header)
+	stat, err := b.getBlockStatus(ctx, header)
 	if err != nil {
 		return nil, stat, err
 	}
 	return header, stat, nil
 }
 
-func (b *backendBlockHeaders) GetBlockHeaderByHeight(_ context.Context, height uint64) (*flow.Header, flow.BlockStatus, error) {
+func (b *backendBlockHeaders) GetBlockHeaderByHeight(ctx context.Context, height uint64) (*flow.Header, flow.BlockStatus, error) {
 	header, err := b.headers.ByHeight(height)
 	if err != nil {
 		return nil, flow.BlockStatusUnknown, rpc.ConvertStorageError(err)
 	}
 
-	stat, err := b.getBlockStatus(header)
+	stat, err := b.getBlockStatus(ctx, header)
 	if err != nil {
 		return nil, stat, err
 	}
 	return header, stat, nil
 }
 
-func (b *backendBlockHeaders) getBlockStatus(header *flow.Header) (flow.BlockStatus, error) {
+func (b *backendBlockHeaders) getBlockStatus(ctx context.Context, header *flow.Header) (flow.BlockStatus, error) {
 	sealed, err := b.state.Sealed().Head()
 	if err != nil {
 		// In the RPC engine, if we encounter an error from the protocol state indicating state corruption,
@@ -87,7 +86,7 @@ func (b *backendBlockHeaders) getBlockStatus(header *flow.Header) (flow.BlockSta
 		//   because this can cause DOS potential
 		// - Since the protocol state is widely shared, we assume that in practice another component will
 		//   observe the protocol state error and throw an exception.
-		b.ctx.Throw(err)
+		irrecoverable.Throw(ctx, err)
 		return flow.BlockStatusUnknown, status.Errorf(codes.Internal, "failed to find latest sealed header: %v", err)
 	}
 

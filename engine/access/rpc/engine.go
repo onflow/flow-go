@@ -129,10 +129,6 @@ func NewBuilder(log zerolog.Logger,
 		AddWorker(eng.serveREST).
 		AddWorker(finalizedCacheWorker).
 		AddWorker(backendNotifierWorker).
-		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			backend.HandleInconsistentProtocolState(ctx)
-			ready()
-		}).
 		AddWorker(eng.shutdownWorker).
 		Build()
 
@@ -233,6 +229,9 @@ func (e *Engine) serveREST(ctx irrecoverable.SignalerContext, ready component.Re
 		return
 	}
 	e.restServer = r
+	e.restServer.BaseContext = func(_ net.Listener) context.Context {
+		return ctx
+	}
 
 	l, err := net.Listen("tcp", e.config.RestConfig.ListenAddress)
 	if err != nil {

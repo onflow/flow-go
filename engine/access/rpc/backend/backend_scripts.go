@@ -38,7 +38,6 @@ type backendScripts struct {
 	nodeCommunicator  Communicator
 	scriptExecutor    execution.ScriptExecutor
 	scriptExecMode    ScriptExecutionMode
-	ctx               irrecoverable.SignalerContext
 }
 
 // scriptExecutionRequest encapsulates the data needed to execute a script to make it easier
@@ -74,7 +73,7 @@ func (b *backendScripts) ExecuteScriptAtLatestBlock(
 	latestHeader, err := b.state.Sealed().Head()
 	if err != nil {
 		// the latest sealed header MUST be available
-		b.ctx.Throw(err)
+		irrecoverable.Throw(ctx, err)
 		return nil, status.Errorf(codes.Internal, "failed to get latest sealed header: %v", err)
 	}
 

@@ -19,7 +19,6 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/execution"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -217,17 +216,6 @@ func New(params Params) (*Backend, error) {
 	}
 
 	return b, nil
-}
-
-// HandleInconsistentProtocolState is helper function that initializes an irrecoverable SignalerContext for backends
-// and makes it available to endpoints handling inconsistent or corrupted node's state.
-func (b *Backend) HandleInconsistentProtocolState(ctx irrecoverable.SignalerContext) {
-	b.backendTransactions.ctx = ctx
-	b.backendAccounts.ctx = ctx
-	b.backendBlockDetails.ctx = ctx
-	b.backendBlockHeaders.ctx = ctx
-	b.backendEvents.ctx = ctx
-	b.backendScripts.ctx = ctx
 }
 
 // NewCache constructs cache for storing connections to other nodes.

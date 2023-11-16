@@ -428,9 +428,9 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 		suite.snapshot.On("Head").Return(nil, err)
 
 		// mock signaler context expect an error
-		backend.backendBlockHeaders.ctx = irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), err)
+		ctx := irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), err)
 
-		_, _, err = backend.GetLatestBlockHeader(context.Background(), true)
+		_, _, err = backend.GetLatestBlockHeader(ctx, true)
 		suite.Require().Error(err)
 	})
 }
@@ -540,7 +540,7 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 		suite.snapshot.On("Head").Return(nil, err).Once()
 
 		// mock signaler context expect an error
-		backend.backendTransactions.ctx = irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), err)
+		ctx = irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), err)
 
 		_, err = backend.GetTransactionResultByIndex(ctx, blockId, index, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
 		suite.Require().Error(err)
@@ -606,7 +606,7 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 		suite.snapshot.On("Head").Return(nil, err).Once()
 
 		// mock signaler context expect an error
-		backend.backendTransactions.ctx = irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), err)
+		ctx = irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), err)
 
 		_, err = backend.GetTransactionResultsByBlockID(ctx, blockId, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
 		suite.Require().Error(err)
@@ -961,7 +961,6 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 // TestTransactionResultUnknown tests that the status of transaction is reported as unknown when it is not found in the
 // local storage
 func (suite *Suite) TestTransactionResultUnknown() {
-
 	ctx := context.Background()
 	txID := unittest.IdentifierFixture()
 
@@ -984,6 +983,8 @@ func (suite *Suite) TestTransactionResultUnknown() {
 }
 
 func (suite *Suite) TestGetLatestFinalizedBlock() {
+	ctx := context.Background()
+
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 
@@ -1030,9 +1031,9 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 		suite.snapshot.On("Head").Return(nil, err)
 
 		// mock signaler context expect an error
-		backend.backendBlockDetails.ctx = irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), err)
+		ctx = irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), err)
 
-		_, _, err = backend.GetLatestBlock(context.Background(), false)
+		_, _, err = backend.GetLatestBlock(ctx, false)
 		suite.Require().Error(err)
 	})
 }
@@ -1449,7 +1450,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		backend, err := New(params)
 		suite.Require().NoError(err)
 
-		backend.backendEvents.ctx = irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), err)
+		ctx = irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), err)
 		err = fmt.Errorf("inconsistent node`s state")
 		snapshot.On("Head").Return(nil, err)
 
