@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm/types"
@@ -19,15 +20,16 @@ import (
 var TestFlowEVMRootAddress = flow.BytesToAddress([]byte("FlowEVM"))
 var TestComputationLimit = uint(math.MaxUint64 - 1)
 
-func RunWithTestFlowEVMRootAddress(t testing.TB, backend types.Backend, f func(flow.Address)) {
+func RunWithTestFlowEVMRootAddress(t testing.TB, backend atree.Ledger, f func(flow.Address)) {
 	as := environment.NewAccountStatus()
-	backend.SetValue(TestFlowEVMRootAddress[:], []byte(flow.AccountStatusKey), as.ToBytes())
+	err := backend.SetValue(TestFlowEVMRootAddress[:], []byte(flow.AccountStatusKey), as.ToBytes())
+	require.NoError(t, err)
 	f(TestFlowEVMRootAddress)
 }
 
-func RunWithTestBackend(t testing.TB, f func(*TestBackend)) {
+func RunWithTestBackend(t testing.TB, f func(types.Backend)) {
 	tb := &TestBackend{
-		testValueStore:   getSimpleValueStore(),
+		TestValueStore:   GetSimpleValueStore(),
 		testEventEmitter: getSimpleEventEmitter(),
 		testMeter:        getSimpleMeter(),
 	}
@@ -46,41 +48,28 @@ func fullKey(owner, key []byte) string {
 	return string(owner) + "~" + string(key)
 }
 
-func getSimpleValueStore() *testValueStore {
+func GetSimpleValueStore() *TestValueStore {
 	data := make(map[string][]byte)
 	allocator := make(map[string]uint64)
-	return &testValueStore{
-		getValue: func(owner, key []byte) ([]byte, error) {
-			fk := fullKey(owner, key)
-			return data[fk], nil
+
+	return &TestValueStore{
+		GetValueFunc: func(owner, key []byte) ([]byte, error) {
+			return data[fullKey(owner, key)], nil
 		},
-		setValue: func(owner, key, value []byte) error {
-			fk := fullKey(owner, key)
-			data[fk] = value
+		SetValueFunc: func(owner, key, value []byte) error {
+			data[fullKey(owner, key)] = value
 			return nil
 		},
-		valueExists: func(owner, key []byte) (bool, error) {
-			fk := fullKey(owner, key)
-			data := data[fk]
-			return len(data) > 0, nil
+		ValueExistsFunc: func(owner, key []byte) (bool, error) {
+			return len(data[fullKey(owner, key)]) > 0, nil
 
 		},
-		allocateStorageIndex: func(owner []byte) (atree.StorageIndex, error) {
+		AllocateStorageIndexFunc: func(owner []byte) (atree.StorageIndex, error) {
 			index := allocator[string(owner)]
 			var data [8]byte
 			allocator[string(owner)] = index + 1
 			binary.BigEndian.PutUint64(data[:], index)
 			return atree.StorageIndex(data), nil
-		},
-		totalStorageSize: func() int {
-			size := 0
-			for k, v := range data {
-				size += len(k) + len(v)
-			}
-			for k := range allocator {
-				size += len(k) + 8
-			}
-			return size
 		},
 	}
 }
@@ -112,7 +101,7 @@ func getSimpleMeter() *testMeter {
 			}
 			return nil
 		},
-		computationAvailable: func(kind common.ComputationKind, intensity uint) bool {
+		hasComputationCapacity: func(kind common.ComputationKind, intensity uint) bool {
 			return compUsed+intensity < computationLimit
 		},
 		computationUsed: func() (uint64, error) {
@@ -122,73 +111,51 @@ func getSimpleMeter() *testMeter {
 }
 
 type TestBackend struct {
-	*testValueStore
+	*TestValueStore
 	*testMeter
 	*testEventEmitter
 }
 
-func (tb *TestBackend) TotalStorageSize() int {
-	if tb.totalStorageSize == nil {
-		panic("method not set")
-	}
-	return tb.totalStorageSize()
+type TestValueStore struct {
+	GetValueFunc             func(owner, key []byte) ([]byte, error)
+	SetValueFunc             func(owner, key, value []byte) error
+	ValueExistsFunc          func(owner, key []byte) (bool, error)
+	AllocateStorageIndexFunc func(owner []byte) (atree.StorageIndex, error)
 }
 
-func (tb *TestBackend) DropEvents() {
-	if tb.reset == nil {
+var _ environment.ValueStore = &TestValueStore{}
+
+func (vs *TestValueStore) GetValue(owner, key []byte) ([]byte, error) {
+	if vs.GetValueFunc == nil {
 		panic("method not set")
 	}
-	tb.reset()
+	return vs.GetValueFunc(owner, key)
 }
 
-type testValueStore struct {
-	getValue             func(owner, key []byte) ([]byte, error)
-	setValue             func(owner, key, value []byte) error
-	valueExists          func(owner, key []byte) (bool, error)
-	allocateStorageIndex func(owner []byte) (atree.StorageIndex, error)
-	totalStorageSize     func() int
-}
-
-var _ environment.ValueStore = &testValueStore{}
-
-func (vs *testValueStore) GetValue(owner, key []byte) ([]byte, error) {
-	if vs.getValue == nil {
+func (vs *TestValueStore) SetValue(owner, key, value []byte) error {
+	if vs.SetValueFunc == nil {
 		panic("method not set")
 	}
-	return vs.getValue(owner, key)
+	return vs.SetValueFunc(owner, key, value)
 }
 
-func (vs *testValueStore) SetValue(owner, key, value []byte) error {
-	if vs.setValue == nil {
+func (vs *TestValueStore) ValueExists(owner, key []byte) (bool, error) {
+	if vs.ValueExistsFunc == nil {
 		panic("method not set")
 	}
-	return vs.setValue(owner, key, value)
+	return vs.ValueExistsFunc(owner, key)
 }
 
-func (vs *testValueStore) ValueExists(owner, key []byte) (bool, error) {
-	if vs.valueExists == nil {
+func (vs *TestValueStore) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
+	if vs.AllocateStorageIndexFunc == nil {
 		panic("method not set")
 	}
-	return vs.valueExists(owner, key)
-}
-
-func (vs *testValueStore) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
-	if vs.allocateStorageIndex == nil {
-		panic("method not set")
-	}
-	return vs.allocateStorageIndex(owner)
-}
-
-func (vs *testValueStore) TotalStorageSize() int {
-	if vs.totalStorageSize == nil {
-		panic("method not set")
-	}
-	return vs.totalStorageSize()
+	return vs.AllocateStorageIndexFunc(owner)
 }
 
 type testMeter struct {
 	meterComputation       func(common.ComputationKind, uint) error
-	computationAvailable   func(common.ComputationKind, uint) bool
+	hasComputationCapacity func(common.ComputationKind, uint) bool
 	computationUsed        func() (uint64, error)
 	computationIntensities func() meter.MeteredComputationIntensities
 
@@ -217,10 +184,10 @@ func (m *testMeter) ComputationAvailable(
 	kind common.ComputationKind,
 	intensity uint,
 ) bool {
-	if m.computationAvailable == nil {
+	if m.hasComputationCapacity == nil {
 		panic("method not set")
 	}
-	return m.computationAvailable(kind, intensity)
+	return m.hasComputationCapacity(kind, intensity)
 }
 
 func (m *testMeter) ComputationIntensities() meter.MeteredComputationIntensities {

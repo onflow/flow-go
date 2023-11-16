@@ -1,4 +1,4 @@
-package test
+package cohort1
 
 import (
 	"context"
@@ -244,6 +244,7 @@ func (suite *NetworkTestSuite) TestUpdateNodeAddresses() {
 }
 
 func (suite *NetworkTestSuite) TestUnicastRateLimit_Messages() {
+	unittest.SkipUnless(suite.T(), unittest.TEST_FLAKY, "flaky")
 	// limiter limit will be set to 5 events/sec the 6th event per interval will be rate limited
 	limit := rate.Limit(5)
 

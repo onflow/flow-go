@@ -12,14 +12,13 @@ type Address gethCommon.Address
 // AddressLength holds the number of bytes used for each EVM address
 const AddressLength = gethCommon.AddressLength
 
-// EmptyAddress is an empty evm address
-var EmptyAddress = Address(gethCommon.Address{})
-
 // NewAddress constructs a new Address
 func NewAddress(addr gethCommon.Address) Address {
-	fa := Address(addr)
-	return fa
+	return Address(addr)
 }
+
+// EmptyAddress is an empty evm address
+var EmptyAddress = Address(gethCommon.Address{})
 
 // Bytes returns a byte slice for the address
 func (fa Address) Bytes() []byte {
@@ -31,9 +30,14 @@ func (fa Address) ToCommon() gethCommon.Address {
 	return gethCommon.Address(fa)
 }
 
+// NewAddressFromBytes constructs a new address from bytes
+func NewAddressFromBytes(inp []byte) Address {
+	return Address(gethCommon.BytesToAddress(inp))
+}
+
 // NewAddressFromString constructs a new address from an string
 func NewAddressFromString(str string) Address {
-	return Address(gethCommon.BytesToAddress([]byte(str)))
+	return NewAddressFromBytes([]byte(str))
 }
 
 type GasLimit uint64

@@ -3,7 +3,9 @@ package types
 import (
 	"math/big"
 
+	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/ethdb"
 )
 
 var (
@@ -35,11 +37,18 @@ func NewDefaultBlockContext(BlockNumber uint64) BlockContext {
 type ReadOnlyBlockView interface {
 	// BalanceOf returns the balance of this address
 	BalanceOf(address Address) (*big.Int, error)
+	// NonceOf returns the nonce of this address
+	NonceOf(address Address) (uint64, error)
 	// CodeOf returns the code for this address (if smart contract is deployed at this address)
 	CodeOf(address Address) (Code, error)
 }
 
-// BlockView allows evm calls in the context of a block
+// BlockView facilitates execution of a transaction or a direct evm  call in the context of a block
+// Errors returned by the methods are one of the followings:
+// - Fatal error
+// - Database error (non-fatal)
+// - EVM validation error
+// - EVM execution error
 type BlockView interface {
 	// executes a direct call
 	DirectCall(call *DirectCall) (*Result, error)
@@ -48,10 +57,25 @@ type BlockView interface {
 	RunTransaction(tx *gethTypes.Transaction) (*Result, error)
 }
 
+// Emulator emulates an evm-compatible chain
 type Emulator interface {
 	// constructs a new block view
 	NewReadOnlyBlockView(ctx BlockContext) (ReadOnlyBlockView, error)
 
 	// constructs a new block
 	NewBlockView(ctx BlockContext) (BlockView, error)
+}
+
+// Database provides what Emulator needs for storing tries and accounts
+// Errors returned by the methods are one of the followings:
+// - Fatal error
+// - Database error (non-fatal)
+type Database interface {
+	ethdb.KeyValueStore
+
+	// Commit commits the changes
+	Commit(rootHash gethCommon.Hash) error
+
+	// GetRootHash returns the active root hash
+	GetRootHash() (gethCommon.Hash, error)
 }

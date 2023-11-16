@@ -28,15 +28,17 @@ var randomSourceFunctionType = &sema.FunctionType{
 
 type ReusableCadenceRuntime struct {
 	runtime.Runtime
-	runtime.Environment
+	TxRuntimeEnv     runtime.Environment
+	ScriptRuntimeEnv runtime.Environment
 
 	fvmEnv Environment
 }
 
 func NewReusableCadenceRuntime(rt runtime.Runtime, config runtime.Config) *ReusableCadenceRuntime {
 	reusable := &ReusableCadenceRuntime{
-		Runtime:     rt,
-		Environment: runtime.NewBaseInterpreterEnvironment(config),
+		Runtime:          rt,
+		TxRuntimeEnv:     runtime.NewBaseInterpreterEnvironment(config),
+		ScriptRuntimeEnv: runtime.NewScriptInterpreterEnvironment(config),
 	}
 
 	// Declare the `randomSourceHistory` function. This function is **only** used by the
@@ -78,7 +80,7 @@ func NewReusableCadenceRuntime(rt runtime.Runtime, config runtime.Config) *Reusa
 		),
 	}
 
-	reusable.DeclareValue(blockRandomSource)
+	reusable.TxRuntimeEnv.DeclareValue(blockRandomSource, nil)
 
 	return reusable
 }
@@ -99,7 +101,7 @@ func (reusable *ReusableCadenceRuntime) ReadStored(
 		path,
 		runtime.Context{
 			Interface:   reusable.fvmEnv,
-			Environment: reusable.Environment,
+			Environment: reusable.TxRuntimeEnv,
 		},
 	)
 }
@@ -120,7 +122,7 @@ func (reusable *ReusableCadenceRuntime) InvokeContractFunction(
 		argumentTypes,
 		runtime.Context{
 			Interface:   reusable.fvmEnv,
-			Environment: reusable.Environment,
+			Environment: reusable.TxRuntimeEnv,
 		},
 	)
 }
@@ -134,7 +136,7 @@ func (reusable *ReusableCadenceRuntime) NewTransactionExecutor(
 		runtime.Context{
 			Interface:   reusable.fvmEnv,
 			Location:    location,
-			Environment: reusable.Environment,
+			Environment: reusable.TxRuntimeEnv,
 		},
 	)
 }
@@ -149,8 +151,9 @@ func (reusable *ReusableCadenceRuntime) ExecuteScript(
 	return reusable.Runtime.ExecuteScript(
 		script,
 		runtime.Context{
-			Interface: reusable.fvmEnv,
-			Location:  location,
+			Interface:   reusable.fvmEnv,
+			Location:    location,
+			Environment: reusable.ScriptRuntimeEnv,
 		},
 	)
 }

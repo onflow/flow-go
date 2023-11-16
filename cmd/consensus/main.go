@@ -604,6 +604,8 @@ func main() {
 			)
 
 			notifier.AddParticipantConsumer(telemetryConsumer)
+			notifier.AddCommunicatorConsumer(telemetryConsumer)
+			notifier.AddFinalizationConsumer(telemetryConsumer)
 			notifier.AddFollowerConsumer(followerDistributor)
 
 			// initialize the persister
@@ -839,6 +841,11 @@ func main() {
 			return messageHub, nil
 		}).
 		Component("sync engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			spamConfig, err := synceng.NewSpamDetectionConfig()
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize spam detection config: %w", err)
+			}
+
 			sync, err := synceng.New(
 				node.Logger,
 				node.Metrics.Engine,
@@ -849,7 +856,7 @@ func main() {
 				comp,
 				syncCore,
 				node.SyncEngineIdentifierProvider,
-				synceng.NewSpamDetectionConfig(),
+				spamConfig,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)

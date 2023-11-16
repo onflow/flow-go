@@ -391,7 +391,6 @@ func RunWithDeployedContract(t testing.TB, tc *TestContract, led atree.Ledger, f
 	require.NoError(t, err)
 
 	caller := types.NewAddress(gethCommon.Address{})
-
 	_, err = blk.DirectCall(
 		types.NewDepositCall(
 			caller,

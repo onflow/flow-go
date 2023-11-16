@@ -2,11 +2,10 @@ package handler
 
 import (
 	"bytes"
-	"encoding/binary"
 
-	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
@@ -24,183 +23,132 @@ import (
 // in the future we might benefit from a view style of access to db passed as
 // a param to the emulator.
 type ContractHandler struct {
-	blockchain        types.BlockChain
-	backend           types.Backend
-	emulator          types.Emulator
-	lastExecutedBlock *types.Block
-	uuidIndex         uint64
-	totalSupply       uint64
-	transactions      []gethCommon.Hash
+	flowTokenAddress common.Address
+	blockstore       types.BlockStore
+	addressAllocator types.AddressAllocator
+	backend          types.Backend
+	emulator         types.Emulator
+}
+
+func (h *ContractHandler) FlowTokenAddress() common.Address {
+	return h.flowTokenAddress
 }
 
 var _ types.ContractHandler = &ContractHandler{}
 
 func NewContractHandler(
-	blockchain types.BlockChain,
+	flowTokenAddress common.Address,
+	blockstore types.BlockStore,
+	addressAllocator types.AddressAllocator,
 	backend types.Backend,
 	emulator types.Emulator,
 ) *ContractHandler {
-	lastExecutedBlock, err := blockchain.LatestBlock()
-	// fatal error
-	if err != nil {
-		panic(err)
-	}
-
 	return &ContractHandler{
-		blockchain:        blockchain,
-		backend:           backend,
-		emulator:          emulator,
-		lastExecutedBlock: lastExecutedBlock,
-		uuidIndex:         lastExecutedBlock.UUIDIndex,
-		totalSupply:       lastExecutedBlock.TotalSupply,
-		transactions:      make([]gethCommon.Hash, 0),
+		flowTokenAddress: flowTokenAddress,
+		blockstore:       blockstore,
+		addressAllocator: addressAllocator,
+		backend:          backend,
+		emulator:         emulator,
 	}
 }
 
-// AllocateAddress allocates an address to be used by FOA resources
+// AllocateAddress allocates an address to be used by the bridged accounts
 func (h *ContractHandler) AllocateAddress() types.Address {
-	target := types.Address{}
-	// first 12 bytes would be zero
-	// the next 8 bytes would be incremented of uuid
-	binary.BigEndian.PutUint64(target[12:], h.lastExecutedBlock.UUIDIndex)
-	h.uuidIndex++
-
-	// TODO: if account exist try some new number
-	// if fe.State.Exist(target.ToCommon()) {
-	// }
-
-	h.updateLastExecutedBlock(h.lastExecutedBlock.StateRoot, gethTypes.EmptyRootHash)
+	target, err := h.addressAllocator.AllocateAddress()
+	handleError(err)
 	return target
 }
 
 // AccountByAddress returns the account for the given address,
-// if isAuthorized is set, account is controlled by the FVM and FOA resources
+// if isAuthorized is set, account is controlled by the FVM (bridged accounts)
 func (h *ContractHandler) AccountByAddress(addr types.Address, isAuthorized bool) types.Account {
 	return newAccount(h, addr, isAuthorized)
 }
 
 // LastExecutedBlock returns the last executed block
-func (h ContractHandler) LastExecutedBlock() *types.Block {
-	block, err := h.blockchain.LatestBlock()
+func (h *ContractHandler) LastExecutedBlock() *types.Block {
+	block, err := h.blockstore.LatestBlock()
 	handleError(err)
 	return block
 }
 
-func (h *ContractHandler) updateLastExecutedBlock(stateRoot, eventRoot gethCommon.Hash) {
-	h.lastExecutedBlock = types.NewBlock(
-		h.lastExecutedBlock.Height+1,
-		h.uuidIndex,
-		h.totalSupply,
-		stateRoot,
-		eventRoot,
-		h.transactions,
-	)
-
-	err := h.blockchain.AppendBlock(h.lastExecutedBlock)
+// Run runs an rlpencoded evm transaction and
+// collects the gas fees and pay it to the coinbase address provided.
+func (h *ContractHandler) Run(rlpEncodedTx []byte, coinbase types.Address) {
+	// step 1 - transaction decoding
+	encodedLen := uint(len(rlpEncodedTx))
+	err := h.backend.MeterComputation(environment.ComputationKindRLPDecoding, encodedLen)
 	handleError(err)
-}
 
-// Run runs an rlpencoded evm transaction, collect the evm fees under the provided coinbase
-func (h ContractHandler) Run(rlpEncodedTx []byte, coinbase types.Address) bool {
-	// Decode transaction encoding
 	tx := gethTypes.Transaction{}
-	// TODO: update the max limit on the encoded size to a meaningful value
-	err := tx.DecodeRLP(
+	err = tx.DecodeRLP(
 		rlp.NewStream(
 			bytes.NewReader(rlpEncodedTx),
-			uint64(len(rlpEncodedTx))))
+			uint64(encodedLen)))
 	handleError(err)
 
-	// check tx gas limit
-	gasLimit := tx.Gas()
-	h.checkGasLimit(types.GasLimit(gasLimit))
+	// step 2 - run transaction
+	h.checkGasLimit(types.GasLimit(tx.Gas()))
 
 	ctx := h.getBlockContext()
 	ctx.GasFeeCollector = coinbase
-
 	blk, err := h.emulator.NewBlockView(ctx)
 	handleError(err)
 
 	res, err := blk.RunTransaction(&tx)
-	txHash := h.captureTx(&tx)
 	h.meterGasUsage(res)
+	handleError(err)
 
-	failed := false
-	if err != nil {
-		// if error is fatal panic here
-		if types.IsAFatalError(err) {
-			// don't wrap it
-			panic(err)
-		}
-		err = errors.NewEVMError(err)
-		failed = true
-	}
-	if res == nil {
-		// fatal error
-		panic("empty result is retuned by emulator")
-	}
+	// step 3 - update block proposal
+	bp, err := h.blockstore.BlockProposal()
+	handleError(err)
 
-	res.Failed = failed
+	bp.StateRoot = res.StateRootHash
+	txHash := tx.Hash()
+	bp.AppendTxHash(txHash)
 
-	h.EmitEvent(types.NewTransactionExecutedEvent(
-		h.lastExecutedBlock.Height+1,
+	// step 4 - emit events
+	h.emitEvent(types.NewTransactionExecutedEvent(
+		bp.Height,
 		rlpEncodedTx,
 		txHash,
 		res,
 	))
-	h.EmitLastExecutedBlockEvent()
-	h.updateLastExecutedBlock(res.StateRootHash, gethTypes.EmptyRootHash)
-	return !failed
+	h.emitEvent(types.NewBlockExecutedEvent(bp))
+
+	// step 5 - commit block proposal
+	err = h.blockstore.CommitBlockProposal()
+	handleError(err)
 }
 
-func (h ContractHandler) checkGasLimit(limit types.GasLimit) {
+func (h *ContractHandler) checkGasLimit(limit types.GasLimit) {
 	// check gas limit against what has been left on the transaction side
 	if !h.backend.ComputationAvailable(environment.ComputationKindEVMGasUsage, uint(limit)) {
 		handleError(types.ErrInsufficientComputation)
 	}
 }
 
-func (h ContractHandler) meterGasUsage(res *types.Result) {
+func (h *ContractHandler) meterGasUsage(res *types.Result) {
 	if res != nil {
 		err := h.backend.MeterComputation(environment.ComputationKindEVMGasUsage, uint(res.GasConsumed))
 		handleError(err)
 	}
 }
 
-func (h *ContractHandler) EmitEvent(event *types.Event) {
+func (h *ContractHandler) emitEvent(event *types.Event) {
 	// TODO add extra metering for rlp encoding
 	encoded, err := event.Payload.Encode()
 	handleError(err)
-	h.backend.EmitFlowEvent(event.Etype, encoded)
-}
 
-func (h *ContractHandler) captureTx(tx *gethTypes.Transaction) gethCommon.Hash {
-	hash := tx.Hash()
-	h.transactions = append(h.transactions, hash)
-	return hash
-}
-
-func (h *ContractHandler) captureCall(call *types.DirectCall) ([]byte, gethCommon.Hash) {
-	hash, err := call.Hash()
-	if err != nil {
-		// this is fatal
-		panic(err)
-	}
-	h.transactions = append(h.transactions, hash)
-	encoded, err := call.Encode()
+	err = h.backend.EmitFlowEvent(event.Etype, encoded)
 	handleError(err)
-	return encoded, hash
-}
-
-func (h *ContractHandler) EmitLastExecutedBlockEvent() {
-	block, err := h.blockchain.LatestBlock()
-	handleError(err)
-	h.EmitEvent(types.NewBlockExecutedEvent(block))
 }
 
 func (h *ContractHandler) getBlockContext() types.BlockContext {
+	bp, err := h.blockstore.BlockProposal()
+	handleError(err)
 	return types.BlockContext{
-		BlockNumber:            h.lastExecutedBlock.Height + 1,
+		BlockNumber:            bp.Height,
 		DirectCallBaseGasUsage: types.DefaultDirectCallBaseGasUsage,
 	}
 }
@@ -226,6 +174,9 @@ func (a *Account) Address() types.Address {
 }
 
 // Balance returns the balance of this bridged account
+//
+// TODO: we might need to meter computation for read only operations as well
+// currently the storage limits is enforced
 func (a *Account) Balance() types.Balance {
 	ctx := a.fch.getBlockContext()
 
@@ -241,72 +192,39 @@ func (a *Account) Balance() types.Balance {
 }
 
 // Deposit deposits the token from the given vault into the flow evm main vault
-// and update the FOA balance with the new amount
+// and update the account balance with the new amount
 func (a *Account) Deposit(v *types.FLOWTokenVault) {
 	cfg := a.fch.getBlockContext()
 	a.fch.checkGasLimit(types.GasLimit(cfg.DirectCallBaseGasUsage))
-
-	blk, err := a.fch.emulator.NewBlockView(cfg)
-	handleError(err)
 
 	call := types.NewDepositCall(
 		a.address,
 		v.Balance().ToAttoFlow(),
 	)
-	res, err := blk.DirectCall(call)
-	a.fch.meterGasUsage(res)
-	encoded, callHash := a.fch.captureCall(call)
-	a.fch.EmitEvent(
-		types.NewTransactionExecutedEvent(
-			a.fch.lastExecutedBlock.Height+1,
-			encoded,
-			callHash,
-			res,
-		),
-	)
-	handleError(err)
-	// emit event
-	a.fch.EmitLastExecutedBlockEvent()
-	a.fch.totalSupply += v.Balance().ToAttoFlow().Uint64()
-	a.fch.updateLastExecutedBlock(res.StateRootHash, gethTypes.EmptyRootHash)
+	a.executeAndHandleCall(a.fch.getBlockContext(), call, v.Balance().ToAttoFlow().Uint64(), false)
 }
 
-// Withdraw deducts the balance from the FOA account and
+// Withdraw deducts the balance from the account and
 // withdraw and return flow token from the Flex main vault.
 func (a *Account) Withdraw(b types.Balance) *types.FLOWTokenVault {
 	a.checkAuthorized()
 
-	// check balance of flex vault
-	if b.ToAttoFlow().Uint64() > a.fch.totalSupply {
-		handleError(types.ErrInsufficientTotalSupply)
-	}
-
 	cfg := a.fch.getBlockContext()
 	a.fch.checkGasLimit(types.GasLimit(cfg.DirectCallBaseGasUsage))
-	blk, err := a.fch.emulator.NewBlockView(cfg)
+
+	// check balance of flex vault
+	bp, err := a.fch.blockstore.BlockProposal()
 	handleError(err)
+	if b.ToAttoFlow().Uint64() > bp.TotalSupply {
+		handleError(types.ErrInsufficientTotalSupply)
+	}
 
 	call := types.NewWithdrawCall(
 		a.address,
 		b.ToAttoFlow(),
 	)
-	res, err := blk.DirectCall(call)
-	a.fch.meterGasUsage(res)
-	encoded, callHash := a.fch.captureCall(call)
-	a.fch.EmitEvent(
-		types.NewTransactionExecutedEvent(
-			a.fch.lastExecutedBlock.Height+1,
-			encoded,
-			callHash,
-			res,
-		),
-	)
-	handleError(err)
+	a.executeAndHandleCall(a.fch.getBlockContext(), call, b.ToAttoFlow().Uint64(), true)
 
-	// emit event
-	a.fch.EmitLastExecutedBlockEvent()
-	a.fch.totalSupply -= b.ToAttoFlow().Uint64()
-	a.fch.updateLastExecutedBlock(res.StateRootHash, gethTypes.EmptyRootHash)
 	return types.NewFlowTokenVault(b)
 }
 
@@ -322,22 +240,23 @@ func (a *Account) Transfer(to types.Address, balance types.Balance) {
 		to,
 		balance.ToAttoFlow(),
 	)
-	a.executeAndHandleCall(ctx, call)
+	a.executeAndHandleCall(ctx, call, 0, false)
 }
 
 // Deploy deploys a contract to the EVM environment
 // the new deployed contract would be at the returned address and
-// the contract data is not controlled by the FOA accounts
+// the contract data is not controlled by the caller accounts
 func (a *Account) Deploy(code types.Code, gaslimit types.GasLimit, balance types.Balance) types.Address {
 	a.checkAuthorized()
 	a.fch.checkGasLimit(gaslimit)
+
 	call := types.NewDeployCall(
 		a.address,
 		code,
 		uint64(gaslimit),
 		balance.ToAttoFlow(),
 	)
-	res := a.executeAndHandleCall(a.fch.getBlockContext(), call)
+	res := a.executeAndHandleCall(a.fch.getBlockContext(), call, 0, false)
 	return types.Address(res.DeployedContractAddress)
 }
 
@@ -345,7 +264,6 @@ func (a *Account) Deploy(code types.Code, gaslimit types.GasLimit, balance types
 // it would limit the gas used according to the limit provided
 // given it doesn't goes beyond what Flow transaction allows.
 // the balance would be deducted from the OFA account and would be transferred to the target address
-// contract data is not controlled by the FOA accounts
 func (a *Account) Call(to types.Address, data types.Data, gaslimit types.GasLimit, balance types.Balance) types.Data {
 	a.checkAuthorized()
 	a.fch.checkGasLimit(gaslimit)
@@ -356,49 +274,78 @@ func (a *Account) Call(to types.Address, data types.Data, gaslimit types.GasLimi
 		uint64(gaslimit),
 		balance.ToAttoFlow(),
 	)
-	res := a.executeAndHandleCall(a.fch.getBlockContext(), call)
+	res := a.executeAndHandleCall(a.fch.getBlockContext(), call, 0, false)
 	return res.ReturnedValue
 }
 
 func (a *Account) executeAndHandleCall(
 	ctx types.BlockContext,
 	call *types.DirectCall,
+	totalSupplyDiff uint64,
+	deductSupplyDiff bool,
 ) *types.Result {
+	// execute the call
 	blk, err := a.fch.emulator.NewBlockView(ctx)
 	handleError(err)
 
 	res, err := blk.DirectCall(call)
 	a.fch.meterGasUsage(res)
-	encoded, callHash := a.fch.captureCall(call)
 	handleError(err)
 
-	a.fch.EmitEvent(
+	// update block proposal
+	callHash, err := call.Hash()
+	if err != nil {
+		err = types.NewFatalError(err)
+		handleError(err)
+	}
+
+	bp, err := a.fch.blockstore.BlockProposal()
+	handleError(err)
+	bp.AppendTxHash(callHash)
+	bp.StateRoot = res.StateRootHash
+	if deductSupplyDiff {
+		bp.TotalSupply -= totalSupplyDiff
+	} else {
+		// TODO: add overflow errors (even though we might never get there)
+		bp.TotalSupply += totalSupplyDiff
+	}
+
+	// emit events
+	encoded, err := call.Encode()
+	handleError(err)
+
+	a.fch.emitEvent(
 		types.NewTransactionExecutedEvent(
-			a.fch.lastExecutedBlock.Height+1,
+			bp.Height,
 			encoded,
 			callHash,
 			res,
 		),
 	)
-	a.fch.EmitLastExecutedBlockEvent()
-	// TODO: update this to calculate receipt hash
-	a.fch.updateLastExecutedBlock(res.StateRootHash, gethTypes.EmptyRootHash)
+	a.fch.emitEvent(types.NewBlockExecutedEvent(bp))
+
+	// commit block proposal
+	err = a.fch.blockstore.CommitBlockProposal()
+	handleError(err)
+
 	return res
 }
 
 func (a *Account) checkAuthorized() {
-	// check if account is authorized to to FOA related opeartions
+	// check if account is authorized (i.e. is a bridged account)
 	if !a.isAuthorized {
 		handleError(types.ErrUnAuthroizedMethodCall)
 	}
 }
 
 func handleError(err error) {
-	if err != nil {
-		if types.IsAFatalError(err) {
-			// don't wrap it
-			panic(err)
-		}
-		panic(errors.NewEVMError(err))
+	if err == nil {
+		return
 	}
+
+	if types.IsAFatalError(err) {
+		// don't wrap it
+		panic(err)
+	}
+	panic(errors.NewEVMError(err))
 }
