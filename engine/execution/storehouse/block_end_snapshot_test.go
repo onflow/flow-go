@@ -20,7 +20,7 @@ func TestBlockEndSnapshot(t *testing.T) {
 		header := unittest.BlockHeaderFixture()
 
 		// create mock for storage
-		store := &executionMock.RegisterStore{}
+		store := executionMock.NewRegisterStore(t)
 		reg := unittest.MakeOwnerReg("key", "value")
 		store.On("GetRegister", header.Height, header.ID(), reg.Key).Return(reg.Value, nil).Once()
 		snapshot := storehouse.NewBlockEndStateSnapshot(store, header.ID(), header.Height)
