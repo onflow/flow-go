@@ -1,7 +1,6 @@
 package handler_test
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -11,10 +10,10 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func BenchmarkStorage(b *testing.B) { benchmarkStorageGrowth(b, 10_000, 10_000) }
+func BenchmarkStorage(b *testing.B) { benchmarkStorageGrowth(b, 100, 100) }
 
 // benchmark
-func benchmarkStorageGrowth(b *testing.B, accountCount, mintCount int) {
+func benchmarkStorageGrowth(b *testing.B, accountCount, setupKittyCount int) {
 	testutils.RunWithTestBackend(b, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(b, backend, func(rootAddr flow.Address) {
 			testutils.RunWithDeployedContract(b,
@@ -25,14 +24,16 @@ func benchmarkStorageGrowth(b *testing.B, accountCount, mintCount int) {
 					db, handler := SetupHandler(b, backend, rootAddr)
 					numOfAccounts := 100000
 					accounts := make([]types.Account, numOfAccounts)
+					// setup several of accounts
+					// note that trie growth is the function of number of accounts
 					for i := 0; i < numOfAccounts; i++ {
 						account := handler.AccountByAddress(handler.AllocateAddress(), true)
 						account.Deposit(types.NewFlowTokenVault(types.Balance(100)))
 						accounts[i] = account
 					}
 					backend.DropEvents()
-					// random accounts reading the state
-					for i := 0; i < mintCount; i++ {
+					// mint kitties
+					for i := 0; i < setupKittyCount; i++ {
 						account := accounts[i%accountCount]
 						matronId := testutils.RandomBigInt(1000)
 						sireId := testutils.RandomBigInt(1000)
@@ -51,50 +52,31 @@ func benchmarkStorageGrowth(b *testing.B, accountCount, mintCount int) {
 							300_000_000,
 							types.Balance(0),
 						)
-						fmt.Println(i, ">> read:", db.BytesRetrieved(), " written:", db.BytesStored())
-						db.ResetReporter()
-
 						require.Equal(b, 2, len(backend.Events()))
-						backend.DropEvents()
-
-						db.DropCache()
+						backend.DropEvents() // this would make things lighter
 					}
 
-					fmt.Println("total storage size:", backend.TotalStorageSize())
+					// measure the impact of mint after the setup phase
+					db.ResetReporter()
+					db.DropCache()
 
-					// secondAccount := handler.AccountByAddress(handler.AllocateAddress(), true)
+					accounts[0].Call(
+						tc.DeployedAt,
+						tc.MakeCallData(b,
+							"CreateKitty",
+							testutils.RandomBigInt(1000),
+							testutils.RandomBigInt(1000),
+							testutils.RandomBigInt(1000),
+							testutils.RandomBigInt(1000),
+						),
+						300_000_000,
+						types.Balance(0),
+					)
 
-					// account.Call(
-					// 	tc.DeployedAt,
-					// 	tc.MakeCallData(b,
-					// 		"Transfer",
-					// 		account.Address().ToCommon(),
-					// 		secondAccount.Address().ToCommon(),
-					// 		big.NewInt(100),
-					// 	),
-					// 	300_000_000,
-					// 	types.Balance(0),
-					// )
-					// fmt.Println("random transfer", ">> read:", db.BytesRetrieved(), " written:", db.BytesStored())
-
-					// TODO add random transfers (to evaluate the assumptions)
-
-					b.Fatal("XXX")
+					b.ReportMetric(float64(db.BytesRetrieved()), "bytes_read")
+					b.ReportMetric(float64(db.BytesStored()), "bytes_written")
+					b.ReportMetric(float64(backend.TotalStorageSize()), "total_storage_size")
 				})
-
-			// TODO check events
 		})
 	})
-
-	// b.ReportMetric(float64(totalUpdateTimeMS/steps), "update_time_(ms)")
-	// b.ReportMetric(float64(totalUpdateTimeMS*1000000/totalRegOperation), "update_time_per_reg_(ns)")
-
-	// b.ReportMetric(float64(totalProofSize/steps), "proof_size_(MB)")
-	// b.ReportMetric(float64(totalPTrieConstTimeMS/steps), "ptrie_const_time_(ms)")
-
 }
-
-// account data is important
-
-// Trie growth is the function of number of accounts [so if is deployed per account we don't have issue]
-// it also doesn't grow that bad

@@ -70,6 +70,16 @@ func GetSimpleValueStore() *TestValueStore {
 			binary.BigEndian.PutUint64(data[:], index)
 			return atree.StorageIndex(data), nil
 		},
+		TotalStorageSizeFunc: func() int {
+			sum := 0
+			for key, value := range data {
+				sum += len(key) + len(value)
+			}
+			for key := range allocator {
+				sum += len(key) + 8
+			}
+			return sum
+		},
 	}
 }
 
