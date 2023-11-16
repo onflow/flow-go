@@ -69,18 +69,18 @@ func TestBlockEndSnapshot(t *testing.T) {
 		// test getting storage.ErrNotExecuted error
 		heightNotExecuted := unittest.MakeOwnerReg("height not executed", "height not executed")
 		counter := atomic.NewInt32(0)
-		mocked := store.On("GetRegister", header.Height, header.ID(), heightNotExecuted.Key)
-		mocked.Times(2) // the first time hit error, the second get value, the third time is cached
-		mocked.RunFn = func(args mock.Arguments) {
+	store.
+		On("GetRegister", header.Height, header.ID(), heightNotExecuted.Key).
+		Return(func(uint64, flow.Identifier, flow.RegisterID) (flow.RegisterValue, error) {
 			counter.Inc()
 			// the first call should return error
 			if counter.Load() == 1 {
-				mocked.ReturnArguments = mock.Arguments{nil, fmt.Errorf("fail: %w", storehouse.ErrNotExecuted)}
-				return
+				return nil, fmt.Errorf("fail: %w", storehouse.ErrNotExecuted)
 			}
 			// the second call, it returns value
-			mocked.ReturnArguments = mock.Arguments{heightNotExecuted.Value, nil}
-		}
+			return heightNotExecuted.Value, nil
+		}).
+		Times(2)
 
 		// first time should return error
 		_, err = snapshot.Get(heightNotExecuted.Key)
