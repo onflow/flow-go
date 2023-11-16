@@ -365,8 +365,7 @@ func ProtocolStateFromEpochServiceEvents(setup *flow.EpochSetup, commit *flow.Ep
 		identities = append(identities, &flow.DynamicIdentityEntry{
 			NodeID: identity.NodeID,
 			Dynamic: flow.DynamicIdentity{
-				Weight:  identity.InitialWeight,
-				Ejected: false,
+				EpochParticipationStatus: flow.EpochParticipationStatusActive,
 			},
 		})
 	}

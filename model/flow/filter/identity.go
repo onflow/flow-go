@@ -92,9 +92,11 @@ func HasInitialWeight[T flow.GenericIdentity](hasWeight bool) flow.IdentityFilte
 	}
 }
 
-// Ejected is a filter that returns true if the node is ejected.
-func Ejected(identity *flow.Identity) bool {
-	return identity.Ejected
+// HasParticipationStatus is a filter that returns true if the node epoch participation status matches the input.
+func HasParticipationStatus(status flow.EpochParticipationStatus) flow.IdentityFilter[flow.Identity] {
+	return func(identity *flow.Identity) bool {
+		return identity.EpochParticipationStatus == status
+	}
 }
 
 // HasRole returns a filter for nodes with one of the input roles.
@@ -111,10 +113,7 @@ func HasRole[T flow.GenericIdentity](roles ...flow.Role) flow.IdentityFilter[T] 
 
 // IsValidCurrentEpochParticipant is an identity filter for members of the
 // current epoch in good standing.
-var IsValidCurrentEpochParticipant = And(
-	HasWeight(true),
-	Not(Ejected), // ejection will change signer index
-)
+var IsValidCurrentEpochParticipant = HasParticipationStatus(flow.EpochParticipationStatusActive)
 
 // IsConsensusCommitteeMember is an identity filter for all members of the consensus committee.
 // Formally, a Node X is a Consensus Committee Member if and only if X is a consensus node with

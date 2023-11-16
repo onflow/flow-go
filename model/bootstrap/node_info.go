@@ -356,8 +356,7 @@ func (node NodeInfo) Identity() *flow.Identity {
 			NetworkPubKey: node.networkPubKey,
 		},
 		DynamicIdentity: flow.DynamicIdentity{
-			Weight:  node.Weight,
-			Ejected: false,
+			EpochParticipationStatus: flow.EpochParticipationStatusActive,
 		},
 	}
 	return identity
@@ -369,7 +368,7 @@ func NodeInfoFromIdentity(identity *flow.Identity) NodeInfo {
 		identity.NodeID,
 		identity.Role,
 		identity.Address,
-		identity.Weight,
+		identity.InitialWeight,
 		identity.NetworkPubKey,
 		identity.StakingPubKey)
 }
@@ -379,7 +378,7 @@ func PrivateNodeInfoFromIdentity(identity *flow.Identity, networkKey, stakingKey
 		identity.NodeID,
 		identity.Role,
 		identity.Address,
-		identity.Weight,
+		identity.InitialWeight,
 		networkKey,
 		stakingKey,
 	)

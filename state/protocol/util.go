@@ -17,8 +17,7 @@ func IsNodeAuthorizedAt(snapshot Snapshot, id flow.Identifier) (bool, error) {
 	return CheckNodeStatusAt(
 		snapshot,
 		id,
-		filter.HasWeight(true),
-		filter.Not(filter.Ejected),
+		filter.IsValidCurrentEpochParticipant,
 	)
 }
 
@@ -32,8 +31,7 @@ func IsNodeAuthorizedWithRoleAt(snapshot Snapshot, id flow.Identifier, role flow
 	return CheckNodeStatusAt(
 		snapshot,
 		id,
-		filter.HasWeight(true),
-		filter.Not(filter.Ejected),
+		filter.IsValidCurrentEpochParticipant,
 		filter.HasRole[flow.Identity](role),
 	)
 }

@@ -283,17 +283,9 @@ func TestIdentity_EqualTo(t *testing.T) {
 		require.False(t, b.EqualTo(a))
 	})
 
-	t.Run("Weight diff", func(t *testing.T) {
-		a := &flow.Identity{DynamicIdentity: flow.DynamicIdentity{Weight: 1}}
-		b := &flow.Identity{DynamicIdentity: flow.DynamicIdentity{Weight: 2}}
-
-		require.False(t, a.EqualTo(b))
-		require.False(t, b.EqualTo(a))
-	})
-
-	t.Run("Ejected diff", func(t *testing.T) {
-		a := &flow.Identity{DynamicIdentity: flow.DynamicIdentity{Ejected: true}}
-		b := &flow.Identity{DynamicIdentity: flow.DynamicIdentity{Ejected: false}}
+	t.Run("status diff", func(t *testing.T) {
+		a := &flow.Identity{DynamicIdentity: flow.DynamicIdentity{EpochParticipationStatus: flow.EpochParticipationStatusActive}}
+		b := &flow.Identity{DynamicIdentity: flow.DynamicIdentity{EpochParticipationStatus: flow.EpochParticipationStatusLeaving}}
 
 		require.False(t, a.EqualTo(b))
 		require.False(t, b.EqualTo(a))
@@ -326,8 +318,7 @@ func TestIdentity_EqualTo(t *testing.T) {
 				NetworkPubKey: pks[1],
 			},
 			DynamicIdentity: flow.DynamicIdentity{
-				Weight:  23,
-				Ejected: false,
+				EpochParticipationStatus: flow.EpochParticipationStatusActive,
 			},
 		}
 		b := &flow.Identity{
@@ -340,8 +331,7 @@ func TestIdentity_EqualTo(t *testing.T) {
 				NetworkPubKey: pks[1],
 			},
 			DynamicIdentity: flow.DynamicIdentity{
-				Weight:  23,
-				Ejected: false,
+				EpochParticipationStatus: flow.EpochParticipationStatusActive,
 			},
 		}
 
