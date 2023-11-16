@@ -11,6 +11,7 @@ import (
 )
 
 // RegistersAsyncStore has the same basic structure as access/backend.ScriptExecutor
+// TODO: use this interface for backend_scripts.go
 type RegistersAsyncStore struct {
 	registerIndex storage.RegisterIndex
 	reporter      state_synchronization.IndexReporter

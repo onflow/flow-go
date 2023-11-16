@@ -199,9 +199,16 @@ func (h *Handler) SubscribeEvents(request *executiondata.SubscribeEventsRequest,
 	}
 }
 
-func (h *Handler) GetRegisterValues(ctx context.Context, request *executiondata.GetRegisterValuesRequest) (*executiondata.GetRegisterValuesResponse, error) {
+func (h *Handler) GetRegisterValues(_ context.Context, request *executiondata.GetRegisterValuesRequest) (*executiondata.GetRegisterValuesResponse, error) {
 	// Convert data
-
+	registerIDs, err := convert.MessagesToRegisterIDs(request.GetRegisterIds())
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "could not convert register IDs: %v", err)
+	}
 	// get payload from store
-	return nil, nil
+	values, err := h.api.GetRegisterValues(registerIDs, request.GetBlockHeight())
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "could not get register values: %v", err)
+	}
+	return &executiondata.GetRegisterValuesResponse{Values: values}, nil
 }

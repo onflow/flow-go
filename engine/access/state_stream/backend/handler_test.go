@@ -8,12 +8,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	pb "google.golang.org/genproto/googleapis/bytestream"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
@@ -506,6 +509,75 @@ func TestEventStream(t *testing.T) {
 			handleExecutionDataStreamResponses(stream, test.eventVersion, test.expected)
 		})
 	}
+}
+
+// TestGetRegisterValues tests the register values.
+func TestGetRegisterValues(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	testHeight := uint64(1)
+
+	// load test register IDs + values
+	testIds := flow.RegisterIDs{
+		flow.UUIDRegisterID(0),
+		flow.AccountStatusRegisterID(unittest.AddressFixture()),
+		unittest.RegisterIDFixture(),
+	}
+	testValues := []flow.RegisterValue{
+		[]byte("uno"),
+		[]byte("dos"),
+		[]byte("tres"),
+	}
+	invalidIDs := append(testIds, flow.RegisterID{}) // valid + invalid IDs
+
+	api := ssmock.NewAPI(t)
+	api.On("GetRegisterValues", testIds, testHeight).Return(testValues, nil)
+	// wrong height
+	api.On("GetRegisterValues", testIds, testHeight+1).Return(nil, storage.ErrHeightNotIndexed)
+	// invalid register
+	api.On("GetRegisterValues", invalidIDs, testHeight).Return(nil, storage.ErrNotFound)
+	h := NewHandler(api, flow.Localnet.Chain(), makeConfig(1))
+
+	// invalid message
+	invalidMessage := &executiondata.GetRegisterValuesRequest{
+		RegisterIds: nil,
+	}
+	_, err := h.GetRegisterValues(ctx, invalidMessage)
+	require.Equal(t, status.Code(err), codes.InvalidArgument)
+
+	// valid registers
+	validRegisters := make([]*entities.RegisterID, len(testIds))
+	for i, id := range testIds {
+		validRegisters[i] = convert.RegisterIDToMessage(id)
+	}
+	req := &executiondata.GetRegisterValuesRequest{
+		RegisterIds: validRegisters,
+		BlockHeight: testHeight,
+	}
+	resp, err := h.GetRegisterValues(ctx, req)
+	require.NoError(t, err)
+	require.Equal(t, resp.GetValues(), testValues)
+
+	// unavailable registers (should be atomic)
+	unavailableRegisters := make([]*entities.RegisterID, len(invalidIDs))
+	for i, id := range invalidIDs {
+		unavailableRegisters[i] = convert.RegisterIDToMessage(id)
+	}
+	req = &executiondata.GetRegisterValuesRequest{
+		RegisterIds: unavailableRegisters,
+		BlockHeight: testHeight,
+	}
+	_, err = h.GetRegisterValues(ctx, req)
+	require.Equal(t, status.Code(err), codes.Internal)
+
+	// wrong height
+	req = &executiondata.GetRegisterValuesRequest{
+		RegisterIds: validRegisters,
+		BlockHeight: testHeight + 1,
+	}
+	_, err = h.GetRegisterValues(ctx, req)
+	require.Equal(t, status.Code(err), codes.Internal)
+
 }
 
 func makeConfig(maxGlobalStreams uint32) Config {

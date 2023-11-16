@@ -712,13 +712,13 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 
 					checkpointHeight := builder.SealedRootBlock.Header.Height
 
-					bootstrap, err := pStorage.NewRegisterBootstrap(pdb, checkpointFile, checkpointHeight, builder.Logger)
+					buutstrap, err := pStorage.NewRegisterBootstrap(pdb, checkpointFile, checkpointHeight, builder.Logger)
 					if err != nil {
 						return nil, fmt.Errorf("could not create registers bootstrapper: %w", err)
 					}
 
 					// TODO: find a way to hook a context up to this to allow a graceful shutdown
-					err = bootstrap.IndexCheckpointFile(context.Background())
+					err = buutstrap.IndexCheckpointFile(context.Background())
 					if err != nil {
 						return nil, fmt.Errorf("could not load checkpoint file: %w", err)
 					}
@@ -815,7 +815,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				executionDataStoreCache,
 				broadcaster,
 				builder.executionDataConfig.InitialBlockHeight,
-				highestAvailableHeight)
+				highestAvailableHeight,
+				builder.RegistersAsyncStore)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream backend: %w", err)
 			}

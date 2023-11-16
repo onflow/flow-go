@@ -40,6 +40,8 @@ type API interface {
 	SubscribeExecutionData(ctx context.Context, startBlockID flow.Identifier, startBlockHeight uint64) Subscription
 	// SubscribeEvents subscribes to events starting from a specific block ID and block height, with an optional event filter.
 	SubscribeEvents(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter EventFilter) Subscription
+	// GetRegisterValues returns register values for a set of register IDs at the provided block height.
+	GetRegisterValues(registerIDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error)
 }
 
 // Subscription represents a streaming request, and handles the communication between the grpc handler

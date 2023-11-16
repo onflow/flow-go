@@ -44,6 +44,32 @@ func (_m *API) GetExecutionDataByBlockID(ctx context.Context, blockID flow.Ident
 	return r0, r1
 }
 
+// GetRegisterValues provides a mock function with given fields: registerIDs, height
+func (_m *API) GetRegisterValues(registerIDs flow.RegisterIDs, height uint64) ([][]byte, error) {
+	ret := _m.Called(registerIDs, height)
+
+	var r0 [][]byte
+	var r1 error
+	if rf, ok := ret.Get(0).(func(flow.RegisterIDs, uint64) ([][]byte, error)); ok {
+		return rf(registerIDs, height)
+	}
+	if rf, ok := ret.Get(0).(func(flow.RegisterIDs, uint64) [][]byte); ok {
+		r0 = rf(registerIDs, height)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([][]byte)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(flow.RegisterIDs, uint64) error); ok {
+		r1 = rf(registerIDs, height)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // SubscribeEvents provides a mock function with given fields: ctx, startBlockID, startHeight, filter
 func (_m *API) SubscribeEvents(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter state_stream.EventFilter) state_stream.Subscription {
 	ret := _m.Called(ctx, startBlockID, startHeight, filter)

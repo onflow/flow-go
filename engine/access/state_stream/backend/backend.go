@@ -72,6 +72,7 @@ type StateStreamBackend struct {
 	broadcaster     *engine.Broadcaster
 	rootBlockHeight uint64
 	rootBlockID     flow.Identifier
+	registers       *RegistersAsyncStore
 
 	// highestHeight contains the highest consecutive block height for which we have received a
 	// new Execution Data notification.
@@ -90,6 +91,7 @@ func New(
 	broadcaster *engine.Broadcaster,
 	rootHeight uint64,
 	highestAvailableHeight uint64,
+	registers *RegistersAsyncStore,
 ) (*StateStreamBackend, error) {
 	logger := log.With().Str("module", "state_stream_api").Logger()
 
@@ -110,6 +112,7 @@ func New(
 		broadcaster:     broadcaster,
 		rootBlockHeight: rootHeight,
 		rootBlockID:     rootBlockID,
+		registers:       registers,
 		highestHeight:   counters.NewMonotonousCounter(highestAvailableHeight),
 	}
 
@@ -211,4 +214,10 @@ func (b *StateStreamBackend) getStartHeight(startBlockID flow.Identifier, startH
 // setHighestHeight sets the highest height for which execution data is available.
 func (b *StateStreamBackend) setHighestHeight(height uint64) bool {
 	return b.highestHeight.Set(height)
+}
+
+// GetRegisterValues returns the register values for the given register IDs at the given block height.
+// TODO: find a better home for this method.
+func (b *StateStreamBackend) GetRegisterValues(ids flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
+	return b.registers.RegisterValues(ids, height)
 }

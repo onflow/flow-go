@@ -38,12 +38,13 @@ var testEventTypes = []flow.EventType{
 type BackendExecutionDataSuite struct {
 	suite.Suite
 
-	state    *protocolmock.State
-	params   *protocolmock.Params
-	snapshot *protocolmock.Snapshot
-	headers  *storagemock.Headers
-	seals    *storagemock.Seals
-	results  *storagemock.ExecutionResults
+	state          *protocolmock.State
+	params         *protocolmock.Params
+	snapshot       *protocolmock.Snapshot
+	headers        *storagemock.Headers
+	seals          *storagemock.Seals
+	results        *storagemock.ExecutionResults
+	registersAsync *RegistersAsyncStore
 
 	bs                blobs.Blobstore
 	eds               execution_data.ExecutionDataStore
@@ -145,6 +146,8 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 		s.T().Logf("adding exec data for block %d %d %v => %v", i, block.Header.Height, block.ID(), result.ExecutionDataID)
 	}
 
+	s.registersAsync = NewRegistersAsyncStore()
+
 	s.state.On("Sealed").Return(s.snapshot, nil).Maybe()
 	s.snapshot.On("Head").Return(s.blocks[0].Header, nil).Maybe()
 
@@ -239,6 +242,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 		s.broadcaster,
 		rootBlock.Header.Height,
 		rootBlock.Header.Height, // initialize with no downloaded data
+		s.registersAsync,
 	)
 	require.NoError(s.T(), err)
 }
