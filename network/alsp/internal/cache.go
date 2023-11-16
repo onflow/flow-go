@@ -81,7 +81,6 @@ func (s *SpamRecordCache) Adjust(originId flow.Identifier, adjustFunc model.Reco
 	penalty, err := s.adjust(originId, adjustFunc)
 
 	switch {
-
 	case err == ErrSpamRecordNotFound:
 		// if the record does not exist, we initialize the record and try to adjust it again.
 		// Note: there is an edge case where the record is initialized by another goroutine between the two calls.

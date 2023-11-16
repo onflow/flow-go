@@ -64,6 +64,20 @@ type GossipSubConfig struct {
 
 	// PeerScoring is whether to enable GossipSub peer scoring.
 	PeerScoring bool `mapstructure:"gossipsub-peer-scoring-enabled"`
+
+	SubscriptionProviderConfig SubscriptionProviderParameters `mapstructure:",squash"`
+}
+
+type SubscriptionProviderParameters struct {
+	// SubscriptionUpdateInterval is the interval for updating the list of topics the node have subscribed to; as well as the list of all
+	// peers subscribed to each of those topics. This is used to penalize peers that have an invalid subscription based on their role.
+	SubscriptionUpdateInterval time.Duration `validate:"gt=0s" mapstructure:"gossipsub-subscription-provider-update-interval"`
+
+	// CacheSize is the size of the cache that keeps the list of peers subscribed to each topic as the local node.
+	// This is the local view of the current node towards the subscription status of other nodes in the system.
+	// The cache must be large enough to accommodate the maximum number of nodes in the system, otherwise the view of the local node will be incomplete
+	// due to cache eviction.
+	CacheSize uint32 `validate:"gt=0" mapstructure:"gossipsub-subscription-provider-cache-size"`
 }
 
 // GossipSubTracerConfig is the config for the gossipsub tracer. GossipSub tracer is used to trace the local mesh events and peer scores.

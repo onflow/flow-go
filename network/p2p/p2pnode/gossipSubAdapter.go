@@ -39,7 +39,11 @@ type GossipSubAdapter struct {
 
 var _ p2p.PubSubAdapter = (*GossipSubAdapter)(nil)
 
-func NewGossipSubAdapter(ctx context.Context, logger zerolog.Logger, h host.Host, cfg p2p.PubSubAdapterConfig, clusterChangeConsumer p2p.CollectionClusterChangesConsumer) (p2p.PubSubAdapter, error) {
+func NewGossipSubAdapter(ctx context.Context,
+	logger zerolog.Logger,
+	h host.Host,
+	cfg p2p.PubSubAdapterConfig,
+	clusterChangeConsumer p2p.CollectionClusterChangesConsumer) (p2p.PubSubAdapter, error) {
 	gossipSubConfig, ok := cfg.(*GossipSubAdapterConfig)
 	if !ok {
 		return nil, fmt.Errorf("invalid gossipsub config type: %T", cfg)
@@ -68,44 +72,78 @@ func NewGossipSubAdapter(ctx context.Context, logger zerolog.Logger, h host.Host
 	if scoreTracer := gossipSubConfig.ScoreTracer(); scoreTracer != nil {
 		builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			ready()
-			a.logger.Debug().Str("component", "gossipsub_score_tracer").Msg("starting score tracer")
+			a.logger.Info().Msg("starting score tracer")
 			scoreTracer.Start(ctx)
-			a.logger.Debug().Str("component", "gossipsub_score_tracer").Msg("score tracer started")
+			select {
+			case <-ctx.Done():
+				a.logger.Warn().Msg("aborting score tracer startup due to context done")
+			case <-scoreTracer.Ready():
+				a.logger.Info().Msg("score tracer is ready")
+			}
+			ready()
 
+			<-ctx.Done()
+			a.logger.Info().Msg("stopping score tracer")
 			<-scoreTracer.Done()
-			a.logger.Debug().Str("component", "gossipsub_score_tracer").Msg("score tracer stopped")
+			a.logger.Info().Msg("score tracer stopped")
 		})
 		a.peerScoreExposer = scoreTracer
 	}
 
 	if tracer := gossipSubConfig.PubSubTracer(); tracer != nil {
 		builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			ready()
-			a.logger.Debug().Str("component", "gossipsub_tracer").Msg("starting tracer")
+			a.logger.Info().Msg("starting pubsub tracer")
 			tracer.Start(ctx)
-			a.logger.Debug().Str("component", "gossipsub_tracer").Msg("tracer started")
+			select {
+			case <-ctx.Done():
+				a.logger.Warn().Msg("aborting pubsub tracer startup due to context done")
+			case <-tracer.Ready():
+				a.logger.Info().Msg("pubsub tracer is ready")
+			}
+			ready()
 
+			<-ctx.Done()
+			a.logger.Info().Msg("stopping pubsub tracer")
 			<-tracer.Done()
-			a.logger.Debug().Str("component", "gossipsub_tracer").Msg("tracer stopped")
+			a.logger.Info().Msg("pubsub tracer stopped")
 		})
 	}
 
 	if inspectorSuite := gossipSubConfig.InspectorSuiteComponent(); inspectorSuite != nil {
 		builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			a.logger.Debug().Str("component", "gossipsub_inspector_suite").Msg("starting inspector suite")
+			a.logger.Info().Msg("starting inspector suite")
 			inspectorSuite.Start(ctx)
-			a.logger.Debug().Str("component", "gossipsub_inspector_suite").Msg("inspector suite started")
-
 			select {
 			case <-ctx.Done():
-				a.logger.Debug().Str("component", "gossipsub_inspector_suite").Msg("inspector suite context done")
+				a.logger.Warn().Msg("aborting inspector suite startup due to context done")
 			case <-inspectorSuite.Ready():
-				ready()
-				a.logger.Debug().Str("component", "gossipsub_inspector_suite").Msg("inspector suite ready")
+				a.logger.Info().Msg("inspector suite is ready")
 			}
+			ready()
 
+			<-ctx.Done()
+			a.logger.Info().Msg("stopping inspector suite")
 			<-inspectorSuite.Done()
-			a.logger.Debug().Str("component", "gossipsub_inspector_suite").Msg("inspector suite stopped")
+			a.logger.Info().Msg("inspector suite stopped")
+		})
+	}
+
+	if scoringComponent := gossipSubConfig.ScoringComponent(); scoringComponent != nil {
+		builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			a.logger.Info().Msg("starting gossipsub scoring component")
+			scoringComponent.Start(ctx)
+			select {
+			case <-ctx.Done():
+				a.logger.Warn().Msg("aborting gossipsub scoring component startup due to context done")
+			case <-scoringComponent.Ready():
+				a.logger.Info().Msg("gossipsub scoring component is ready")
+			}
+			ready()
+
+			<-ctx.Done()
+			a.logger.Info().Msg("stopping gossipsub scoring component")
+			<-scoringComponent.Done()
+			a.logger.Info().Msg("gossipsub scoring component stopped")
 		})
 	}
 
