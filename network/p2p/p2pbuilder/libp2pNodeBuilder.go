@@ -279,17 +279,12 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		Logger:                             lg,
 		StreamFactory:                      stream.NewLibP2PStreamFactory(h),
 		SporkId:                            builder.sporkId,
-		ConnStatus:                         node,
 		CreateStreamBackoffDelay:           builder.unicastConfig.CreateStreamBackoffDelay,
-		DialBackoffDelay:                   builder.unicastConfig.DialBackoffDelay,
-		DialInProgressBackoffDelay:         builder.unicastConfig.DialInProgressBackoffDelay,
 		Metrics:                            builder.metricsConfig.Metrics,
 		StreamZeroRetryResetThreshold:      builder.unicastConfig.StreamZeroRetryResetThreshold,
-		DialZeroRetryResetThreshold:        builder.unicastConfig.DialZeroRetryResetThreshold,
 		MaxStreamCreationRetryAttemptTimes: builder.unicastConfig.MaxStreamCreationRetryAttemptTimes,
-		MaxDialRetryAttemptTimes:           builder.unicastConfig.MaxDialRetryAttemptTimes,
-		DialConfigCacheFactory: func(configFactory func() unicast.DialConfig) unicast.DialConfigCache {
-			return unicastcache.NewDialConfigCache(builder.unicastConfig.DialConfigCacheSize,
+		UnicastConfigCacheFactory: func(configFactory func() unicast.Config) unicast.ConfigCache {
+			return unicastcache.NewUnicastConfigCache(builder.unicastConfig.ConfigCacheSize,
 				lg,
 				metrics.DialConfigCacheMetricFactory(builder.metricsConfig.HeroCacheFactory, builder.networkingType),
 				configFactory)
