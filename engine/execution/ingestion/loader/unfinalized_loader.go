@@ -16,14 +16,14 @@ type UnfinalizedLoader struct {
 	log       zerolog.Logger
 	state     protocol.State
 	headers   storage.Headers // see comments on getHeaderByHeight for why we need it
-	execState state.ExecutionState
+	execState state.FinalizedExecutionState
 }
 
 func NewUnfinalizedLoader(
 	log zerolog.Logger,
 	state protocol.State,
 	headers storage.Headers,
-	execState state.ExecutionState,
+	execState state.FinalizedExecutionState,
 ) *UnfinalizedLoader {
 	return &UnfinalizedLoader{
 		log:       log.With().Str("component", "ingestion_engine_block_loader").Logger(),
