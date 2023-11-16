@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/stretchr/testify/require"
 )
 
 func BenchmarkStorage(b *testing.B) { benchmarkStorageGrowth(b, 10_000, 10_000) }
