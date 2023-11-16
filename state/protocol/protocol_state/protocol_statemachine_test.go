@@ -42,7 +42,7 @@ type ProtocolStateMachineSuite struct {
 func (s *ProtocolStateMachineSuite) SetupTest() {
 	s.BaseProtocolStateMachineSuite.SetupTest()
 	var err error
-	s.stateMachine, err = newStateMachine(s.candidate.View, s.parentProtocolState)
+	s.stateMachine, err = newStateMachine(s.candidate.View, s.parentProtocolState.Copy())
 	require.NoError(s.T(), err)
 }
 
@@ -69,7 +69,11 @@ func (s *ProtocolStateMachineSuite) TestTransitionToNextEpoch() {
 	require.NoError(s.T(), err)
 	err = s.stateMachine.TransitionToNextEpoch()
 	require.NoError(s.T(), err)
-	updatedState, _, _ := s.stateMachine.Build()
+	updatedState, stateID, hasChanges := s.stateMachine.Build()
+	require.True(s.T(), hasChanges)
+	require.NotEqual(s.T(), s.parentProtocolState.ID(), updatedState.ID())
+	require.Equal(s.T(), updatedState.ID(), stateID)
+	require.Equal(s.T(), s.parentProtocolState.ID(), s.stateMachine.ParentState().ID(), "should not modify parent protocol state")
 	require.Equal(s.T(), updatedState.CurrentEpoch.ID(), s.parentProtocolState.NextEpoch.ID(), "should transition into next epoch")
 	require.Nil(s.T(), updatedState.NextEpoch, "next epoch protocol state should be nil")
 }
@@ -115,6 +119,8 @@ func (s *ProtocolStateMachineSuite) TestBuild() {
 	require.False(s.T(), hasChanges, "should not have changes")
 	require.NotSame(s.T(), updatedState, s.stateMachine.state, "should return a copy of protocol state")
 	require.Equal(s.T(), updatedState.ID(), stateID, "should return correct ID")
+	require.Equal(s.T(), s.parentProtocolState.ID(), s.stateMachine.ParentState().ID(), "should not modify parent protocol state")
+
 
 	updatedDynamicIdentity := s.parentProtocolState.CurrentEpochIdentityTable[0].DynamicIdentity
 	updatedDynamicIdentity.Ejected = true
@@ -127,6 +133,7 @@ func (s *ProtocolStateMachineSuite) TestBuild() {
 	require.True(s.T(), hasChanges, "should have changes")
 	require.NotEqual(s.T(), stateID, s.parentProtocolState.ID(), "should return same protocol state")
 	require.Equal(s.T(), updatedState.ID(), stateID, "should return correct ID")
+	require.Equal(s.T(), s.parentProtocolState.ID(), s.stateMachine.ParentState().ID(), "should not modify parent protocol state")
 }
 
 // TestCreateStateMachineAfterInvalidStateTransitionAttempted tests if creating state machine after observing invalid state transition
@@ -216,7 +223,11 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochCommit() {
 		_, err := s.stateMachine.ProcessEpochSetup(setup)
 		require.NoError(s.T(), err)
 
-		updatedState, _, _ := s.stateMachine.Build()
+		updatedState, stateID, hasChanges := s.stateMachine.Build()
+		require.True(s.T(), hasChanges)
+		require.NotEqual(s.T(), s.parentProtocolState.ID(), updatedState.ID())
+		require.Equal(s.T(), updatedState.ID(), stateID)
+		require.Equal(s.T(), s.parentProtocolState.ID(), s.stateMachine.ParentState().ID(), "should not modify parent protocol state")
 
 		parentState, err := flow.NewRichProtocolStateEntry(updatedState,
 			s.parentProtocolState.PreviousEpochSetup,
@@ -237,8 +248,13 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochCommit() {
 		_, err = s.stateMachine.ProcessEpochCommit(commit)
 		require.NoError(s.T(), err)
 
-		newState, _, _ := s.stateMachine.Build()
+		newState, newStateID, newStateHasChanges := s.stateMachine.Build()
+		require.True(s.T(), newStateHasChanges)
 		require.Equal(s.T(), commit.ID(), newState.NextEpoch.CommitID, "next epoch should be committed")
+		require.Equal(s.T(), newState.ID(), newStateID)
+		require.NotEqual(s.T(), s.parentProtocolState.ID(), newState.ID())
+		require.NotEqual(s.T(), updatedState.ID(), newState.ID())
+		require.Equal(s.T(), s.parentProtocolState.ID(), s.stateMachine.ParentState().ID(), "should not modify parent protocol state")
 	})
 }
 
