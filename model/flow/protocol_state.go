@@ -30,8 +30,11 @@ type ProtocolStateEntry struct {
 
 	// InvalidEpochTransitionAttempted encodes whether an invalid epoch transition
 	// has been detected in this fork. Under normal operations, this value is false.
-	// The only possible state transition is false → true. When this happens,
-	// epoch fallback is triggered AFTER the fork is finalized.
+	// Node-internally, the EpochFallback notification is emitted when a block is
+	// finalized that changes this flag from false to true.
+	//
+	// Currently, the only possible state transition is false → true.
+	// TODO for 'leaving Epoch Fallback via special service event'
 	InvalidEpochTransitionAttempted bool
 }
 

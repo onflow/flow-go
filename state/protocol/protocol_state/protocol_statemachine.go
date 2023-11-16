@@ -30,8 +30,8 @@ var _ ProtocolStateMachine = (*protocolStateMachine)(nil)
 // newStateMachine creates a new protocol state protocolStateMachine.
 func newStateMachine(view uint64, parentState *flow.RichProtocolStateEntry) (*protocolStateMachine, error) {
 	if parentState.InvalidEpochTransitionAttempted {
-		return nil, irrecoverable.NewExceptionf("created happy path protocol state machine at view (%d) for a parent state which has"+
-			"invalid state transition", view)
+		return nil, irrecoverable.NewExceptionf("cannot create happy path protocol state machine at view (%d) for a parent state"+
+			"which is in Epoch Fallback Mode", view)
 	}
 	return &protocolStateMachine{
 		baseProtocolStateMachine: baseProtocolStateMachine{
@@ -50,8 +50,10 @@ func newStateMachine(view uint64, parentState *flow.RichProtocolStateEntry) (*pr
 // As a result of this operation protocol state for the next epoch will be created.
 // Returned boolean indicates if event triggered a transition in the state machine or not.
 // Implementors must never return (true, error).
-// Expected errors during normal operations:
-// - `protocol.InvalidServiceEventError` if the service event is invalid or is not a valid state transition for the current protocol state
+// Expected errors indicating that we are leaving the happy-path of the epoch transitions
+//   - `protocol.InvalidServiceEventError` - if the service event is invalid or is not a valid state transition for the current protocol state.
+//     CAUTION: the protocolStateMachine is left with a potentially dysfunctional state when this error occurs. Do NOT call the Build method
+//     after such error and discard the protocolStateMachine!
 func (u *protocolStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (bool, error) {
 	err := protocol.IsValidExtendingEpochSetup(epochSetup, u.parentState.ProtocolStateEntry, u.parentState.CurrentEpochSetup)
 	if err != nil {
@@ -127,13 +129,15 @@ func (u *protocolStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (b
 }
 
 // ProcessEpochCommit updates current protocol state with data from epoch commit event.
-// Observing an epoch setup commit, transitions protocol state from setup to commit phase, at this point we have
-// finished construction of the next epoch.
+// Observing an epoch setup commit, transitions protocol state from setup to commit phase.
+// At this point, we have finished construction of the next epoch.
 // As a result of this operation protocol state for next epoch will be committed.
 // Returned boolean indicates if event triggered a transition in the state machine or not.
 // Implementors must never return (true, error).
-// Expected errors during normal operations:
-// - `protocol.InvalidServiceEventError` if the service event is invalid or is not a valid state transition for the current protocol state
+// Expected errors indicating that we are leaving the happy-path of the epoch transitions
+//   - `protocol.InvalidServiceEventError` - if the service event is invalid or is not a valid state transition for the current protocol state.
+//     CAUTION: the protocolStateMachine is left with a potentially dysfunctional state when this error occurs. Do NOT call the Build method
+//     after such error and discard the protocolStateMachine!
 func (u *protocolStateMachine) ProcessEpochCommit(epochCommit *flow.EpochCommit) (bool, error) {
 	if u.state.NextEpoch == nil {
 		return false, protocol.NewInvalidServiceEventErrorf("protocol state has been setup yet")
@@ -154,7 +158,7 @@ func (u *protocolStateMachine) ProcessEpochCommit(epochCommit *flow.EpochCommit)
 // state. An epoch transition is only allowed when:
 // - next epoch has been set up,
 // - next epoch has been committed,
-// - invalid state transition has not been attempted(this is ensured by constructor),
+// - invalid state transition has not been attempted (this is ensured by constructor),
 // - candidate block is in the next epoch.
 // No errors are expected during normal operations.
 func (u *protocolStateMachine) TransitionToNextEpoch() error {
