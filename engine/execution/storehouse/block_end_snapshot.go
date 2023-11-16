@@ -43,7 +43,7 @@ func NewBlockEndStateSnapshot(
 // - (nil, storage.ErrNotFound) if the register does not exist
 // - (nil, storage.ErrHeightNotIndexed) if the height is below the first height that is indexed.
 // - (nil, storehouse.ErrNotExecuted) if the block is not executed yet
-// - (nil, storehouse.ErrNotExecuted) if the block is conflicting iwth finalized block
+// - (nil, storehouse.ErrNotExecuted) if the block is conflicting with finalized block
 // - (nil, err) for any other exceptions
 func (s *BlockEndStateSnapshot) Get(id flow.RegisterID) (flow.RegisterValue, error) {
 	value, ok := s.getFromCache(id)
@@ -61,7 +61,7 @@ func (s *BlockEndStateSnapshot) Get(id flow.RegisterID) (flow.RegisterValue, err
 			// in this case, the nil value can be cached, because the storage will not change it
 			value = nil
 		} else {
-			// if the error is not found, such as storage.ErrHeightNotIndexed, storehouse.ErrNotExecuted
+			// if the error is not ErrNotFound, such as storage.ErrHeightNotIndexed, storehouse.ErrNotExecuted
 			// we return the error without caching
 			return nil, err
 		}
