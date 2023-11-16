@@ -18,46 +18,25 @@ type StreamFactory struct {
 	mock.Mock
 }
 
-// Connect provides a mock function with given fields: _a0, _a1
-func (_m *StreamFactory) Connect(_a0 context.Context, _a1 peer.AddrInfo) error {
-	ret := _m.Called(_a0, _a1)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, peer.AddrInfo) error); ok {
-		r0 = rf(_a0, _a1)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // NewStream provides a mock function with given fields: _a0, _a1, _a2
-func (_m *StreamFactory) NewStream(_a0 context.Context, _a1 peer.ID, _a2 ...protocol.ID) (network.Stream, error) {
-	_va := make([]interface{}, len(_a2))
-	for _i := range _a2 {
-		_va[_i] = _a2[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, _a0, _a1)
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
+func (_m *StreamFactory) NewStream(_a0 context.Context, _a1 peer.ID, _a2 protocol.ID) (network.Stream, error) {
+	ret := _m.Called(_a0, _a1, _a2)
 
 	var r0 network.Stream
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, peer.ID, ...protocol.ID) (network.Stream, error)); ok {
-		return rf(_a0, _a1, _a2...)
+	if rf, ok := ret.Get(0).(func(context.Context, peer.ID, protocol.ID) (network.Stream, error)); ok {
+		return rf(_a0, _a1, _a2)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, peer.ID, ...protocol.ID) network.Stream); ok {
-		r0 = rf(_a0, _a1, _a2...)
+	if rf, ok := ret.Get(0).(func(context.Context, peer.ID, protocol.ID) network.Stream); ok {
+		r0 = rf(_a0, _a1, _a2)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(network.Stream)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, peer.ID, ...protocol.ID) error); ok {
-		r1 = rf(_a0, _a1, _a2...)
+	if rf, ok := ret.Get(1).(func(context.Context, peer.ID, protocol.ID) error); ok {
+		r1 = rf(_a0, _a1, _a2)
 	} else {
 		r1 = ret.Error(1)
 	}
