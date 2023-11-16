@@ -450,6 +450,7 @@ func NewScoreOption(cfg *ScoreOptionConfig, provider p2p.SubscriptionProvider) *
 		case <-scoreRegistry.Ready():
 			s.logger.Info().Msg("score registry started")
 			ready()
+			s.logger.Info().Msg("score registry ready")
 		}
 
 		<-ctx.Done()

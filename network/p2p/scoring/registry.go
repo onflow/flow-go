@@ -146,6 +146,7 @@ func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegis
 		case <-reg.validator.Ready():
 			reg.logger.Info().Msg("subscription validator started")
 			ready()
+			reg.logger.Info().Msg("subscription validator is ready")
 		}
 
 		<-ctx.Done()
