@@ -285,7 +285,6 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		MaxStreamCreationRetryAttemptTimes: builder.unicastConfig.MaxStreamCreationRetryAttemptTimes,
 		UnicastConfigCacheFactory: func(configFactory func() unicast.Config) unicast.ConfigCache {
 			return unicastcache.NewUnicastConfigCache(builder.unicastConfig.ConfigCacheSize,
-				builder.logger,
 				lg,
 				metrics.DialConfigCacheMetricFactory(builder.metricsConfig.HeroCacheFactory, builder.networkingType),
 				configFactory)
