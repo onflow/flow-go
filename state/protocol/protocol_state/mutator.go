@@ -10,10 +10,10 @@ import (
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
-// EpochFallbackStateMachineFactoryMethod is a factory method for creating state machine for EFM.
-// When observing invalid epoch service event stateMutator will initialize entering in EFM by creating special state machine
-// and evolving protocol state using it.
-type EpochFallbackStateMachineFactoryMethod = func() ProtocolStateMachine
+// StateMachineFactoryMethod is a factory to create state machines for evolving the protocol state.
+// Currently, we have `protocolStateMachine` and `epochFallbackStateMachine` as ProtocolStateMachine
+// implementations, whose constructors both have the same signature as StateMachineFactoryMethod.
+type StateMachineFactoryMethod = func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error)
 
 // stateMutator is a stateful object to evolve the protocol state. It is instantiated from the parent block's protocol state.
 // State-changing operations can be iteratively applied and the stateMutator will internally evolve its in-memory state.
@@ -29,34 +29,60 @@ type EpochFallbackStateMachineFactoryMethod = func() ProtocolStateMachine
 //
 // Not safe for concurrent use.
 type stateMutator struct {
-	headers                         storage.Headers
-	results                         storage.ExecutionResults
-	setups                          storage.EpochSetups
-	commits                         storage.EpochCommits
-	stateMachine                    ProtocolStateMachine
-	createEpochFallbackStateMachine EpochFallbackStateMachineFactoryMethod
-	pendingDbUpdates                transaction.DeferredDBUpdate
+	headers                          storage.Headers
+	results                          storage.ExecutionResults
+	setups                           storage.EpochSetups
+	commits                          storage.EpochCommits
+	stateMachine                     ProtocolStateMachine
+	epochFallbackStateMachineFactory func() (ProtocolStateMachine, error)
+	pendingDbUpdates                 transaction.DeferredDBUpdate
 }
 
 var _ protocol.StateMutator = (*stateMutator)(nil)
 
 // newStateMutator creates a new instance of stateMutator.
+// stateMutator performs initialization of state machine depending on the operation mode of the protocol.
+// No errors are expected during normal operations.
 func newStateMutator(
 	headers storage.Headers,
 	results storage.ExecutionResults,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
-	stateMachine ProtocolStateMachine,
-	createEpochFallbackStateMachine EpochFallbackStateMachineFactoryMethod,
-) *stateMutator {
-	return &stateMutator{
-		setups:                          setups,
-		headers:                         headers,
-		results:                         results,
-		commits:                         commits,
-		stateMachine:                    stateMachine,
-		createEpochFallbackStateMachine: createEpochFallbackStateMachine,
+	candidateView uint64,
+	parentState *flow.RichProtocolStateEntry,
+	happyPathStateMachineFactory StateMachineFactoryMethod,
+	epochFallbackStateMachineFactory StateMachineFactoryMethod,
+) (*stateMutator, error) {
+	var (
+		stateMachine ProtocolStateMachine
+		err          error
+	)
+	if parentState.InvalidEpochTransitionAttempted {
+		// InvalidEpochTransitionAttempted being true indicates that we have encountered an invalid epoch service event
+		// or an invalid state transition. In this case, the stateMutator enters EFM by utilizing a specialized
+		// ProtocolStateMachine for evolving the protocol state during EFM.
+		//
+		// Whenever invalid epoch state transition has been observed only epochFallbackStateMachines must be created for subsequent views.
+		// TODO for 'leaving Epoch Fallback via special service event': this might need to change.
+		stateMachine, err = epochFallbackStateMachineFactory(candidateView, parentState)
+	} else {
+		stateMachine, err = happyPathStateMachineFactory(candidateView, parentState)
 	}
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize protocol state machine: %w", err)
+	}
+
+	return &stateMutator{
+		headers:      headers,
+		results:      results,
+		setups:       setups,
+		commits:      commits,
+		stateMachine: stateMachine,
+		// instead of storing arguments that later might be used when entering EFM, capture them in factory method.
+		epochFallbackStateMachineFactory: func() (ProtocolStateMachine, error) {
+			return epochFallbackStateMachineFactory(candidateView, parentState)
+		},
+	}, nil
 }
 
 // Build returns:
@@ -235,8 +261,11 @@ func (m *stateMutator) applyServiceEventsFromOrderedResults(results []*flow.Exec
 // This is implemented by switching to a different state machine implementation, which ignores all service events and epoch transitions.
 // At the moment, this is a one-way transition: once we enter EFM, the only way to return to normal is with a spork.
 func (m *stateMutator) transitionToEpochFallbackMode(results []*flow.ExecutionResult) ([]func(tx *transaction.Tx) error, error) {
-	fallbackStateMachine := m.createEpochFallbackStateMachine()
-	m.stateMachine = fallbackStateMachine
+	var err error
+	m.stateMachine, err = m.epochFallbackStateMachineFactory()
+	if err != nil {
+		return nil, fmt.Errorf("could not create epoch fallback state machine: %w", err)
+	}
 	dbUpdates, err := m.applyServiceEventsFromOrderedResults(results)
 	if err != nil {
 		return nil, irrecoverable.NewExceptionf("could not apply service events after transition to epoch fallback mode: %w", err)

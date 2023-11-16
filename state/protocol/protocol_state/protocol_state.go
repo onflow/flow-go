@@ -9,7 +9,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// ProtocolState is an implementation of the read-only interface for protocol state, it allows to query information
+// ProtocolState is an implementation of the read-only interface for protocol state, it allows querying information
 // on a per-block and per-epoch basis.
 // It is backed by a storage.ProtocolState and an in-memory protocol.GlobalParams.
 type ProtocolState struct {
@@ -84,29 +84,18 @@ func (s *MutableProtocolState) Mutator(candidateView uint64, parentID flow.Ident
 	if err != nil {
 		return nil, fmt.Errorf("could not query parent protocol state at block (%x): %w", parentID, err)
 	}
-	var stateMachine ProtocolStateMachine
-	if parentState.InvalidEpochTransitionAttempted {
-		// InvalidEpochTransitionAttempted being true indicates that we have encountered an invalid epoch service event
-		// or an invalid state transition. In this case, the stateMutator enters EFM by utilizing a specialized
-		// ProtocolStateMachine for evolving the protocol state during EFM.
-		//
-		// Whenever invalid epoch state transition has been observed only epochFallbackStateMachines must be created for subsequent views.
-		// TODO for 'leaving Epoch Fallback via special service event': this might need to change.
-		stateMachine = newEpochFallbackStateMachine(candidateView, parentState)
-	} else {
-		stateMachine, err = newStateMachine(candidateView, parentState)
-		if err != nil {
-			return nil, fmt.Errorf("could not create protocol state machine at view (%d): %w", candidateView, err)
-		}
-	}
 	return newStateMutator(
 		s.headers,
 		s.results,
 		s.setups,
 		s.commits,
-		stateMachine,
-		func() ProtocolStateMachine {
-			return newEpochFallbackStateMachine(candidateView, parentState)
+		candidateView,
+		parentState,
+		func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
+			return newStateMachine(candidateView, parentState)
 		},
-	), nil
+		func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
+			return newEpochFallbackStateMachine(candidateView, parentState), nil
+		},
+	)
 }
