@@ -34,6 +34,7 @@ type Database struct {
 	flowEVMRootAddress    flow.Address
 	led                   atree.Ledger
 	storage               *atree.PersistentSlabStorage
+	baseStorage           *atree.LedgerBaseStorage
 	atreemap              *atree.OrderedMap
 	rootIDBytesToBeStored []byte // if is empty means we don't need to store anything
 	// Ramtin: other database implementations for EVM uses a lock
@@ -59,6 +60,7 @@ func NewDatabase(led atree.Ledger, flowEVMRootAddress flow.Address) (*Database, 
 		led:                led,
 		flowEVMRootAddress: flowEVMRootAddress,
 		storage:            storage,
+		baseStorage:        baseStorage,
 	}
 
 	err = db.retrieveOrCreateMapRoot()
@@ -323,6 +325,10 @@ func (db *Database) Len() int {
 	defer db.lock.RUnlock()
 
 	return int(db.atreemap.Count())
+}
+
+func (db *Database) BytesStored() int {
+	return db.baseStorage.BytesStored()
 }
 
 // keyvalue is a key-value tuple tagged with a deletion field to allow creating
