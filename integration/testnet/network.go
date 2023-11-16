@@ -18,6 +18,7 @@ import (
 	"github.com/dapperlabs/testingdock"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	dockercontainer "github.com/docker/docker/api/types/container"
 	dockerclient "github.com/docker/docker/client"
 	io_prometheus_client "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
@@ -75,6 +76,8 @@ const (
 	DefaultExecutionRootDir = "/data/exedb"
 	// DefaultExecutionDataServiceDir for the execution data service blobstore.
 	DefaultExecutionDataServiceDir = "/data/execution_data"
+	// DefaultExecutionStateDir for the execution data service blobstore.
+	DefaultExecutionStateDir = "/data/execution_state"
 	// DefaultChunkDataPackDir for the chunk data packs
 	DefaultChunkDataPackDir = "/data/chunk_data_pack"
 	// DefaultProfilerDir is the default directory for the profiler
@@ -690,7 +693,7 @@ func (net *FlowNetwork) StopContainerByName(ctx context.Context, containerName s
 	if container == nil {
 		return fmt.Errorf("%s container not found", containerName)
 	}
-	return net.cli.ContainerStop(ctx, container.ID, nil)
+	return net.cli.ContainerStop(ctx, container.ID, dockercontainer.StopOptions{})
 }
 
 type ObserverConfig struct {
