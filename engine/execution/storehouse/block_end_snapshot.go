@@ -70,6 +70,7 @@ func (s *BlockEndStateSnapshot) Get(id flow.RegisterID) (flow.RegisterValue, err
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
+	// TODO: consider adding a limit/eviction policy for the cache
 	s.readCache[id] = value
 	return value, err
 }
