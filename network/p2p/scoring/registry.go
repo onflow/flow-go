@@ -92,6 +92,8 @@ type GossipSubAppSpecificScoreRegistry struct {
 	init      func() p2p.GossipSubSpamRecord
 	validator p2p.SubscriptionValidator
 	scoreTTL  time.Duration
+	// appScoreCache is a cache that stores the application specific score of peers.
+	appScoreCache p2p.GossipSubApplicationSpecificScoreCache
 }
 
 // GossipSubAppSpecificScoreRegistryConfig is the configuration for the GossipSubAppSpecificScoreRegistry.
