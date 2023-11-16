@@ -17,8 +17,22 @@ import (
 
 var ErrTopicRecordNotFound = fmt.Errorf("topic record not found")
 
+// SubscriptionRecordCache manages the subscription records of peers in a network.
+// It uses a currentCycle counter to track the update cycles of the cache, ensuring the relevance of subscription data.
 type SubscriptionRecordCache struct {
-	c            *stdmap.Backend
+	c *stdmap.Backend
+
+	// currentCycle is an atomic counter used to track the update cycles of the subscription cache.
+	// It plays a critical role in maintaining the cache's data relevance and coherence.
+	// Each increment of currentCycle represents a new update cycle, signifying the cache's transition to a new state
+	// where only the most recent and relevant subscriptions are maintained. This design choice ensures that the cache
+	// does not retain stale or outdated subscription information, thereby reflecting the dynamic nature of peer
+	// subscriptions in the network. It is incremented every time the subscription cache is updated, either with new
+	// topic subscriptions or other update operations.
+	// The currentCycle is incremented atomically and externally by calling the MoveToNextUpdateCycle() function.
+	// This is called by the module that uses the subscription provider cache signaling that whatever updates it has
+	// made to the cache so far can be considered out-of-date, and the new updates to the cache records should
+	// overwrite the old ones.
 	currentCycle atomic.Uint64
 }
 
