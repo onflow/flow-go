@@ -22,7 +22,7 @@ var blockNumber = big.NewInt(10)
 var defaultCtx = types.NewDefaultBlockContext(blockNumber.Uint64())
 
 func RunWithTestDB(t testing.TB, f func(types.Database)) {
-	testutils.RunWithTestBackend(t, func(backend types.Backend) {
+	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(flowEVMRoot flow.Address) {
 			db, err := database.NewDatabase(backend, flowEVMRoot)
 			require.NoError(t, err)

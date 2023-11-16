@@ -163,7 +163,7 @@ type procedure struct {
 	config   *Config
 	evm      *gethVM.EVM
 	state    *gethState.StateDB
-	database *database.Database
+	database types.Database
 }
 
 // commit commits the changes to the state.

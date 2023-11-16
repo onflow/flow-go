@@ -372,6 +372,11 @@ func (b *batch) set(key []byte, value []byte, delete bool) error {
 	return nil
 }
 
+// DropCache drops the database read cache
+func (db *Database) DropCache() {
+	db.storage.DropCache()
+}
+
 // ValueSize retrieves the amount of data queued up for writing.
 func (b *batch) ValueSize() int {
 	return b.size

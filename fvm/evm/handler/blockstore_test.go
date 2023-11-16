@@ -13,7 +13,7 @@ import (
 
 func TestBlockStore(t *testing.T) {
 
-	testutils.RunWithTestBackend(t, func(backend types.Backend) {
+	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(root flow.Address) {
 			bs, err := handler.NewBlockStore(backend, root)
 			require.NoError(t, err)

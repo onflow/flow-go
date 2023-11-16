@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/environment"
-	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -27,7 +26,7 @@ func RunWithTestFlowEVMRootAddress(t testing.TB, backend atree.Ledger, f func(fl
 	f(TestFlowEVMRootAddress)
 }
 
-func RunWithTestBackend(t testing.TB, f func(types.Backend)) {
+func RunWithTestBackend(t testing.TB, f func(*TestBackend)) {
 	tb := &TestBackend{
 		TestValueStore:   GetSimpleValueStore(),
 		testEventEmitter: getSimpleEventEmitter(),
@@ -116,11 +115,26 @@ type TestBackend struct {
 	*testEventEmitter
 }
 
+func (tb *TestBackend) TotalStorageSize() int {
+	if tb.TotalStorageSizeFunc == nil {
+		panic("method not set")
+	}
+	return tb.TotalStorageSizeFunc()
+}
+
+func (tb *TestBackend) DropEvents() {
+	if tb.reset == nil {
+		panic("method not set")
+	}
+	tb.reset()
+}
+
 type TestValueStore struct {
 	GetValueFunc             func(owner, key []byte) ([]byte, error)
 	SetValueFunc             func(owner, key, value []byte) error
 	ValueExistsFunc          func(owner, key []byte) (bool, error)
 	AllocateStorageIndexFunc func(owner []byte) (atree.StorageIndex, error)
+	TotalStorageSizeFunc     func() int
 }
 
 var _ environment.ValueStore = &TestValueStore{}
@@ -151,6 +165,13 @@ func (vs *TestValueStore) AllocateStorageIndex(owner []byte) (atree.StorageIndex
 		panic("method not set")
 	}
 	return vs.AllocateStorageIndexFunc(owner)
+}
+
+func (vs *TestValueStore) TotalStorageSize() int {
+	if vs.TotalStorageSizeFunc == nil {
+		panic("method not set")
+	}
+	return vs.TotalStorageSizeFunc()
 }
 
 type testMeter struct {
