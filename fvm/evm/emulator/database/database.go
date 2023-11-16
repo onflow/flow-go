@@ -237,7 +237,7 @@ func (db *Database) getRootHash() (gethCommon.Hash, error) {
 	if len(data) == 0 {
 		return gethTypes.EmptyRootHash, nil
 	}
-	return gethCommon.Hash(data), nil
+	return gethCommon.BytesToHash(data), nil
 }
 
 // Commits the changes from atree into the underlying storage

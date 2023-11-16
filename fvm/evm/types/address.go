@@ -17,6 +17,9 @@ func NewAddress(addr gethCommon.Address) Address {
 	return Address(addr)
 }
 
+// EmptyAddress is an empty evm address
+var EmptyAddress = Address(gethCommon.Address{})
+
 // Bytes returns a byte slice for the address
 func (fa Address) Bytes() []byte {
 	return fa[:]
@@ -27,13 +30,15 @@ func (fa Address) ToCommon() gethCommon.Address {
 	return gethCommon.Address(fa)
 }
 
-// NewAddressFromString constructs a new address from an string
-func NewAddressFromString(str string) Address {
-	return Address(gethCommon.BytesToAddress([]byte(str)))
+// NewAddressFromBytes constructs a new address from bytes
+func NewAddressFromBytes(inp []byte) Address {
+	return Address(gethCommon.BytesToAddress(inp))
 }
 
-// EmptyAddress is an empty evm address
-var EmptyAddress = Address(gethCommon.Address{})
+// NewAddressFromString constructs a new address from an string
+func NewAddressFromString(str string) Address {
+	return NewAddressFromBytes([]byte(str))
+}
 
 type GasLimit uint64
 
