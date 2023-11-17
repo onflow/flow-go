@@ -89,6 +89,9 @@ func NewQueryExecutor(
 	derivedChainData *derived.DerivedChainData,
 	entropyPerBlock EntropyProviderPerBlock,
 ) *QueryExecutor {
+	if config.ComputationLimit > 0 {
+		vmCtx = fvm.NewContextFromParent(vmCtx, fvm.WithComputationLimit(config.ComputationLimit))
+	}
 	return &QueryExecutor{
 		config:           config,
 		logger:           logger,
@@ -172,7 +175,6 @@ func (e *QueryExecutor) ExecuteScript(
 			fvm.WithEntropyProvider(e.entropyPerBlock.AtBlockID(blockHeader.ID())),
 			fvm.WithDerivedBlockData(
 				e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.ID())),
-			fvm.WithComputationLimit(e.config.ComputationLimit),
 		),
 		fvm.NewScriptWithContextAndArgs(script, requestCtx, arguments...),
 		snapshot,
