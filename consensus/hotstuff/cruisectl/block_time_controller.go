@@ -68,7 +68,7 @@ func (epoch *epochInfo) fractionComplete(curView uint64) float64 {
 // This low-level controller output `(B0, x0, d)` is wrapped into a `ProposalTiming`
 // interface, specifically `happyPathBlockTime` on the happy path. The purpose of the
 // `ProposalTiming` wrapper is to translate the raw controller output into a form
-// that is useful for the event handler. Edge cases, such as initialization or
+// that is useful for the EventHandler. Edge cases, such as initialization or
 // epoch fallback are implemented by other implementations of `ProposalTiming`.
 type BlockTimeController struct {
 	component.Component
