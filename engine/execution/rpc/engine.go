@@ -26,7 +26,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	exeEng "github.com/onflow/flow-go/engine/execution"
-	"github.com/onflow/flow-go/engine/execution/scripts"
+	"github.com/onflow/flow-go/engine/execution/state"
 	fvmerrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
@@ -703,7 +703,7 @@ func (h *handler) GetAccountAtBlockID(
 
 	value, err := h.engine.GetAccount(ctx, flowAddress, blockFlowID)
 	if err != nil {
-		if errors.Is(err, scripts.ErrStateCommitmentPruned) {
+		if errors.Is(err, state.ErrStateCommitmentPruned) {
 			return nil, status.Errorf(codes.OutOfRange, "state for block ID %s not available", blockFlowID)
 		}
 		if errors.Is(err, storage.ErrNotFound) {

@@ -20,7 +20,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	mockEng "github.com/onflow/flow-go/engine/execution/mock"
-	"github.com/onflow/flow-go/engine/execution/scripts"
+	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/model/flow"
 	realstorage "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/mock"
@@ -335,7 +335,7 @@ func (suite *Suite) TestGetAccountAtBlockID() {
 				"this error usually happens if the reference "+
 				"block for this script is not set to a recent block.",
 			id,
-			scripts.ErrStateCommitmentPruned,
+			state.ErrStateCommitmentPruned,
 			unittest.IdentifierFixture(),
 		)
 
