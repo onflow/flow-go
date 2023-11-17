@@ -89,10 +89,6 @@ func NewQueryExecutor(
 	derivedChainData *derived.DerivedChainData,
 	entropyPerBlock EntropyProviderPerBlock,
 ) *QueryExecutor {
-	if config.ComputationLimit == 0 {
-		config.ComputationLimit = fvm.DefaultComputationLimit
-	}
-
 	return &QueryExecutor{
 		config:           config,
 		logger:           logger,
