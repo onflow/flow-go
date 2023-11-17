@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"time"
 
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/fxamacker/cbor/v2"
@@ -73,7 +72,7 @@ type EpochSetup struct {
 	Participants       IdentityList   // all participants of the epoch
 	Assignments        AssignmentList // cluster assignment for the epoch
 	RandomSource       []byte         // source of randomness for epoch-specific setup tasks
-	TargetEndTime      time.Time      // the desired real-world end time for the epoch
+	TargetEndTime      uint64         // desired real-world end time for the epoch in UNIX time [seconds]
 }
 
 func (setup *EpochSetup) ServiceEvent() ServiceEvent {

@@ -1,8 +1,6 @@
 package inmem
 
 import (
-	"time"
-
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
@@ -38,7 +36,7 @@ type EncodableEpoch struct {
 	DKGPhase3FinalView uint64
 	FinalView          uint64
 	RandomSource       []byte
-	TargetEndTime      time.Time
+	TargetEndTime      uint64 // desired real-world end time for the epoch in unix time [seconds]
 	InitialIdentities  flow.IdentityList
 	Clustering         flow.ClusterList
 	Clusters           []EncodableCluster
