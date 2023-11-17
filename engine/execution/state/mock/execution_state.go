@@ -44,6 +44,41 @@ func (_m *ExecutionState) ChunkDataPackByChunkID(_a0 flow.Identifier) (*flow.Chu
 	return r0, r1
 }
 
+// CreateStorageSnapshot provides a mock function with given fields: blockID
+func (_m *ExecutionState) CreateStorageSnapshot(blockID flow.Identifier) (snapshot.StorageSnapshot, *flow.Header, error) {
+	ret := _m.Called(blockID)
+
+	var r0 snapshot.StorageSnapshot
+	var r1 *flow.Header
+	var r2 error
+	if rf, ok := ret.Get(0).(func(flow.Identifier) (snapshot.StorageSnapshot, *flow.Header, error)); ok {
+		return rf(blockID)
+	}
+	if rf, ok := ret.Get(0).(func(flow.Identifier) snapshot.StorageSnapshot); ok {
+		r0 = rf(blockID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(snapshot.StorageSnapshot)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(flow.Identifier) *flow.Header); ok {
+		r1 = rf(blockID)
+	} else {
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*flow.Header)
+		}
+	}
+
+	if rf, ok := ret.Get(2).(func(flow.Identifier) error); ok {
+		r2 = rf(blockID)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
 // GetExecutionResultID provides a mock function with given fields: _a0, _a1
 func (_m *ExecutionState) GetExecutionResultID(_a0 context.Context, _a1 flow.Identifier) (flow.Identifier, error) {
 	ret := _m.Called(_a0, _a1)

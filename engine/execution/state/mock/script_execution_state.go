@@ -16,6 +16,41 @@ type ScriptExecutionState struct {
 	mock.Mock
 }
 
+// CreateStorageSnapshot provides a mock function with given fields: blockID
+func (_m *ScriptExecutionState) CreateStorageSnapshot(blockID flow.Identifier) (snapshot.StorageSnapshot, *flow.Header, error) {
+	ret := _m.Called(blockID)
+
+	var r0 snapshot.StorageSnapshot
+	var r1 *flow.Header
+	var r2 error
+	if rf, ok := ret.Get(0).(func(flow.Identifier) (snapshot.StorageSnapshot, *flow.Header, error)); ok {
+		return rf(blockID)
+	}
+	if rf, ok := ret.Get(0).(func(flow.Identifier) snapshot.StorageSnapshot); ok {
+		r0 = rf(blockID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(snapshot.StorageSnapshot)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(flow.Identifier) *flow.Header); ok {
+		r1 = rf(blockID)
+	} else {
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*flow.Header)
+		}
+	}
+
+	if rf, ok := ret.Get(2).(func(flow.Identifier) error); ok {
+		r2 = rf(blockID)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
 // HasState provides a mock function with given fields: _a0
 func (_m *ScriptExecutionState) HasState(_a0 flow.StateCommitment) bool {
 	ret := _m.Called(_a0)
