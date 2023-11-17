@@ -92,7 +92,7 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 		require.Equal(t, stop, sc.GetStopParameters())
 
 		// make execution check pretends block has been executed
-		execState.On("StateCommitmentByBlockID", testifyMock.Anything, testifyMock.Anything).Return(nil, nil)
+		execState.On("StateCommitmentByBlockID", testifyMock.Anything).Return(nil, nil)
 
 		// no stopping has started yet, block below stop height
 		header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(20))
@@ -146,7 +146,7 @@ func TestExecutionFallingBehind(t *testing.T) {
 	require.Equal(t, stop, sc.GetStopParameters())
 
 	execState.
-		On("StateCommitmentByBlockID", testifyMock.Anything, headerC.ParentID).
+		On("StateCommitmentByBlockID", headerC.ParentID).
 		Return(nil, storage.ErrNotFound)
 
 	// finalize blocks first
@@ -215,7 +215,7 @@ func TestAddStopForPastBlocks(t *testing.T) {
 
 	// block is executed
 	execState.
-		On("StateCommitmentByBlockID", testifyMock.Anything, headerD.ParentID).
+		On("StateCommitmentByBlockID", headerD.ParentID).
 		Return(nil, nil)
 
 	// set stop at 22, but finalization and execution is at 23
@@ -262,7 +262,7 @@ func TestAddStopForPastBlocksExecutionFallingBehind(t *testing.T) {
 	)
 
 	execState.
-		On("StateCommitmentByBlockID", testifyMock.Anything, headerD.ParentID).
+		On("StateCommitmentByBlockID", headerD.ParentID).
 		Return(nil, storage.ErrNotFound)
 
 	// finalize blocks first
@@ -318,7 +318,7 @@ func TestStopControlWithVersionControl(t *testing.T) {
 
 		// setting this means all finalized blocks are considered already executed
 		execState.
-			On("StateCommitmentByBlockID", testifyMock.Anything, headerC.ParentID).
+			On("StateCommitmentByBlockID", headerC.ParentID).
 			Return(nil, nil)
 
 		versionBeacons.
@@ -743,7 +743,6 @@ func Test_StopControlWorkers(t *testing.T) {
 		execState := mock.NewExecutionState(t)
 		execState.On(
 			"StateCommitmentByBlockID",
-			testifyMock.Anything,
 			headerA.ID(),
 		).Return(flow.StateCommitment{}, nil).
 			Once()
@@ -819,7 +818,6 @@ func Test_StopControlWorkers(t *testing.T) {
 		execState := mock.NewExecutionState(t)
 		execState.On(
 			"StateCommitmentByBlockID",
-			testifyMock.Anything,
 			headerB.ID(),
 		).Return(flow.StateCommitment{}, nil).
 			Once()

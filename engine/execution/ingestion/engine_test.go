@@ -742,7 +742,7 @@ func makeBlockWithCollection(parent *flow.Header, cols ...*flow.Collection) *ent
 }
 
 func (ctx *testingContext) mockStateCommitmentByBlockID(store *mocks.MockBlockStore) {
-	mocked := ctx.executionState.On("StateCommitmentByBlockID", mock.Anything, mock.Anything)
+	mocked := ctx.executionState.On("StateCommitmentByBlockID", mock.Anything)
 	// https://github.com/stretchr/testify/issues/350#issuecomment-570478958
 	mocked.RunFn = func(args mock.Arguments) {
 		blockID := args[1].(flow.Identifier)

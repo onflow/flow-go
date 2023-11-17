@@ -41,7 +41,6 @@ func newMockExecutionState(seal *flow.Seal, genesis *flow.Header) *mockExecution
 }
 
 func (es *mockExecutionState) StateCommitmentByBlockID(
-	ctx context.Context,
 	blockID flow.Identifier,
 ) (
 	flow.StateCommitment,

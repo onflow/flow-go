@@ -50,10 +50,21 @@ type ScriptExecutionState interface {
 	CreateStorageSnapshot(blockID flow.Identifier) (snapshot.StorageSnapshot, *flow.Header, error)
 
 	// StateCommitmentByBlockID returns the final state commitment for the provided block ID.
-	StateCommitmentByBlockID(context.Context, flow.Identifier) (flow.StateCommitment, error)
+	StateCommitmentByBlockID(flow.Identifier) (flow.StateCommitment, error)
 
 	// HasState returns true if the state with the given state commitment exists in memory
 	HasState(flow.StateCommitment) bool
+
+	// Any error returned is exception
+	IsBlockExecuted(height uint64, blockID flow.Identifier) (bool, error)
+}
+
+func IsParentExecuted(state ReadOnlyExecutionState, header *flow.Header) (bool, error) {
+	// sanity check, caller should not pass a root block
+	if header.Height == 0 {
+		return false, fmt.Errorf("root block does not have parent block")
+	}
+	return state.IsBlockExecuted(header.Height-1, header.ParentID)
 }
 
 // FinalizedExecutionState is an interface used to access the finalized execution state
@@ -301,7 +312,7 @@ func (s *state) HasState(commitment flow.StateCommitment) bool {
 	return s.ls.HasState(ledger.State(commitment))
 }
 
-func (s *state) StateCommitmentByBlockID(ctx context.Context, blockID flow.Identifier) (flow.StateCommitment, error) {
+func (s *state) StateCommitmentByBlockID(blockID flow.Identifier) (flow.StateCommitment, error) {
 	return s.commits.ByBlockID(blockID)
 }
 
@@ -449,10 +460,10 @@ func (s *state) GetHighestExecutedBlockID(ctx context.Context) (uint64, flow.Ide
 }
 
 // IsBlockExecuted returns true if the block is executed, which means registers, events,
-// results, statecommitment etc are all stored.
+// results, etc are all stored.
 // otherwise returns false
-func IsBlockExecuted(ctx context.Context, state ReadOnlyExecutionState, block flow.Identifier) (bool, error) {
-	_, err := state.StateCommitmentByBlockID(ctx, block)
+func (s *state) IsBlockExecuted(height uint64, blockID flow.Identifier) (bool, error) {
+	_, err := s.StateCommitmentByBlockID(blockID)
 
 	// statecommitment exists means the block has been executed
 	if err == nil {
