@@ -266,6 +266,10 @@ type RegisterUpdatesHolder interface {
 	UpdatedRegisterSet() map[flow.RegisterID]flow.RegisterValue
 }
 
+// CommitDelta takes a base storage snapshot and creates a new storage snapshot
+// with the register updates from the given RegisterUpdatesHolder
+// a new statecommitment is returned from the ledger, along with the trie update
+// any error returned are exceptions
 func CommitDelta(
 	ldg ledger.Ledger,
 	ruh RegisterUpdatesHolder,

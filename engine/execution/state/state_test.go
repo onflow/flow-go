@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	ledger2 "github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 
 	"github.com/onflow/flow-go/engine/execution/state"
@@ -69,46 +69,49 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState, l *ledger.Ledger)
 }
 
 func TestExecutionStateWithTrieStorage(t *testing.T) {
-	registerID1 := flow.NewRegisterID("fruit", "")
-
-	registerID2 := flow.NewRegisterID("vegetable", "")
-
 	t.Run("commit write and read new state", prepareTest(func(t *testing.T, es state.ExecutionState, l *ledger.Ledger) {
 		header1 := unittest.BlockHeaderFixture()
 		sc1, err := es.StateCommitmentByBlockID(context.Background(), header1.ID())
 		assert.NoError(t, err)
 
+		reg1 := unittest.MakeOwnerReg("fruit", "apple")
+		reg2 := unittest.MakeOwnerReg("vegetable", "carrot")
 		executionSnapshot := &snapshot.ExecutionSnapshot{
 			WriteSet: map[flow.RegisterID]flow.RegisterValue{
-				registerID1: flow.RegisterValue("apple"),
-				registerID2: flow.RegisterValue("carrot"),
+				reg1.Key: reg1.Value,
+				reg2.Key: reg2.Value,
 			},
 		}
 
-		sc2, update, _, err := state.CommitDelta(l, executionSnapshot,
+		sc2, update, sc2Snapshot, err := state.CommitDelta(l, executionSnapshot,
 			storehouse.NewExecutingBlockSnapshot(state.NewLedgerStorageSnapshot(l, sc1), sc1))
 		assert.NoError(t, err)
+
+		// validate new snapshot
+		val, err := sc2Snapshot.Get(reg1.Key)
+		require.NoError(t, err)
+		require.Equal(t, reg1.Value, val)
+
+		val, err = sc2Snapshot.Get(reg2.Key)
+		require.NoError(t, err)
+		require.Equal(t, reg2.Value, val)
 
 		assert.Equal(t, sc1[:], update.RootHash[:])
 		assert.Len(t, update.Paths, 2)
 		assert.Len(t, update.Payloads, 2)
 
-		key1 := ledger2.NewKey(
-			[]ledger2.KeyPart{
-				ledger2.NewKeyPart(0, []byte(registerID1.Owner)),
-				ledger2.NewKeyPart(2, []byte(registerID1.Key)),
-			})
+		// validate sc2
+		require.Equal(t, sc2, sc2Snapshot.Commitment())
+
+		key1 := convert.RegisterIDToLedgerKey(reg1.Key)
 		path1, err := pathfinder.KeyToPath(key1, ledger.DefaultPathFinderVersion)
 		assert.NoError(t, err)
 
-		key2 := ledger2.NewKey(
-			[]ledger2.KeyPart{
-				ledger2.NewKeyPart(0, []byte(registerID2.Owner)),
-				ledger2.NewKeyPart(2, []byte(registerID2.Key)),
-			})
+		key2 := convert.RegisterIDToLedgerKey(reg2.Key)
 		path2, err := pathfinder.KeyToPath(key2, ledger.DefaultPathFinderVersion)
 		assert.NoError(t, err)
 
+		// validate update
 		assert.Equal(t, path1, update.Paths[0])
 		assert.Equal(t, path2, update.Paths[1])
 
@@ -127,13 +130,16 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		header2 := unittest.BlockHeaderWithParentFixture(header1)
 		storageSnapshot := es.NewStorageSnapshot(sc2, header2.ID(), header2.Height)
 
-		b1, err := storageSnapshot.Get(registerID1)
+		b1, err := storageSnapshot.Get(reg1.Key)
 		assert.NoError(t, err)
-		b2, err := storageSnapshot.Get(registerID2)
+		b2, err := storageSnapshot.Get(reg2.Key)
 		assert.NoError(t, err)
 
 		assert.Equal(t, flow.RegisterValue("apple"), b1)
 		assert.Equal(t, flow.RegisterValue("carrot"), b2)
+
+		// verify has state
+		require.True(t, es.HasState(sc2))
 	}))
 
 	t.Run("commit write and read previous state", prepareTest(func(t *testing.T, es state.ExecutionState, l *ledger.Ledger) {
@@ -141,9 +147,10 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		sc1, err := es.StateCommitmentByBlockID(context.Background(), header1.ID())
 		assert.NoError(t, err)
 
+		reg1 := unittest.MakeOwnerReg("fruit", "apple")
 		executionSnapshot1 := &snapshot.ExecutionSnapshot{
 			WriteSet: map[flow.RegisterID]flow.RegisterValue{
-				registerID1: []byte("apple"),
+				reg1.Key: reg1.Value,
 			},
 		}
 
@@ -155,7 +162,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		// update value and get resulting state commitment
 		executionSnapshot2 := &snapshot.ExecutionSnapshot{
 			WriteSet: map[flow.RegisterID]flow.RegisterValue{
-				registerID1: []byte("orange"),
+				reg1.Key: flow.RegisterValue("orange"),
 			},
 		}
 
@@ -174,10 +181,10 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		assert.True(t, header2.ID() != (header3.ID()))
 
 		// fetch the value at both versions
-		b1, err := storageSnapshot3.Get(registerID1)
+		b1, err := storageSnapshot3.Get(reg1.Key)
 		assert.NoError(t, err)
 
-		b2, err := storageSnapshot4.Get(registerID1)
+		b2, err := storageSnapshot4.Get(reg1.Key)
 		assert.NoError(t, err)
 
 		assert.Equal(t, flow.RegisterValue("apple"), b1)
@@ -189,11 +196,13 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		sc1, err := es.StateCommitmentByBlockID(context.Background(), header1.ID())
 		assert.NoError(t, err)
 
+		reg1 := unittest.MakeOwnerReg("fruit", "apple")
+		reg2 := unittest.MakeOwnerReg("vegetable", "carrot")
 		// set initial value
 		executionSnapshot1 := &snapshot.ExecutionSnapshot{
 			WriteSet: map[flow.RegisterID]flow.RegisterValue{
-				registerID1: []byte("apple"),
-				registerID2: []byte("apple"),
+				reg1.Key: reg1.Value,
+				reg2.Key: reg2.Value,
 			},
 		}
 
@@ -205,7 +214,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		// update value and get resulting state commitment
 		executionSnapshot2 := &snapshot.ExecutionSnapshot{
 			WriteSet: map[flow.RegisterID]flow.RegisterValue{
-				registerID1: nil,
+				reg1.Key: nil,
 			},
 		}
 
@@ -221,10 +230,10 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		storageSnapshot4 := es.NewStorageSnapshot(sc3, header3.ID(), header3.Height)
 
 		// fetch the value at both versions
-		b1, err := storageSnapshot3.Get(registerID1)
+		b1, err := storageSnapshot3.Get(reg1.Key)
 		assert.NoError(t, err)
 
-		b2, err := storageSnapshot4.Get(registerID1)
+		b2, err := storageSnapshot4.Get(reg1.Key)
 		assert.NoError(t, err)
 
 		assert.Equal(t, flow.RegisterValue("apple"), b1)
@@ -236,11 +245,13 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		sc1, err := es.StateCommitmentByBlockID(context.Background(), flow.Identifier{})
 		assert.NoError(t, err)
 
+		reg1 := unittest.MakeOwnerReg("fruit", "apple")
+		reg2 := unittest.MakeOwnerReg("vegetable", "carrot")
 		// set initial value
 		executionSnapshot1 := &snapshot.ExecutionSnapshot{
 			WriteSet: map[flow.RegisterID]flow.RegisterValue{
-				registerID1: flow.RegisterValue("apple"),
-				registerID2: flow.RegisterValue("apple"),
+				reg1.Key: reg1.Value,
+				reg2.Key: reg2.Value,
 			},
 		}
 
@@ -257,5 +268,10 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 
 		require.Equal(t, sc2, sc2Same)
 	}))
+
+	// t.Run("create snapshot", prepareTest(func(t *testing.T, es state.ExecutionState, l *ledger.Ledger) {
+	// 	header := unittest.BlockHeaderFixture()
+	// 	s1, header1, err := es.CreateStorageSnapshot(header.ID())
+	// }))
 
 }
