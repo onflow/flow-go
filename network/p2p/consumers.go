@@ -81,11 +81,4 @@ type GossipSubInspectorSuite interface {
 	// pattern where the consumer is notified when a new notification is published.
 	// A consumer is only notified once for each notification, and only receives notifications that were published after it was added.
 	AddInvalidControlMessageConsumer(GossipSubInvCtrlMsgNotifConsumer)
-
-	// SetTopicOracle sets the topic oracle of the gossipsub inspector suite.
-	// The topic oracle is used to determine the list of topics that the node is subscribed to.
-	// If an oracle is not set, the node will not be able to determine the list of topics that the node is subscribed to.
-	// This func is expected to be called once and will return an error on all subsequent calls.
-	// All errors returned from this func are considered irrecoverable.
-	SetTopicOracle(topicOracle func() []string) error
 }

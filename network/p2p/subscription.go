@@ -7,10 +7,12 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/component"
 )
 
 // SubscriptionProvider provides a list of topics a peer is subscribed to.
 type SubscriptionProvider interface {
+	component.Component
 	// GetSubscribedTopics returns all the subscriptions of a peer within the pubsub network.
 	// Note that the current peer must be subscribed to the topic for it to the same topics in order
 	// to query for other peers, e.g., if current peer has subscribed to topics A and B, and peer1
@@ -22,9 +24,7 @@ type SubscriptionProvider interface {
 // SubscriptionValidator validates the subscription of a peer to a topic.
 // It is used to ensure that a peer is only subscribed to topics that it is allowed to subscribe to.
 type SubscriptionValidator interface {
-	// RegisterSubscriptionProvider registers the subscription provider with the subscription validator.
-	// If there is a subscription provider already registered, it will be replaced by the new one.
-	RegisterSubscriptionProvider(provider SubscriptionProvider) error
+	component.Component
 	// CheckSubscribedToAllowedTopics checks if a peer is subscribed to topics that it is allowed to subscribe to.
 	// Args:
 	// 	pid: the peer ID of the peer to check

@@ -110,6 +110,7 @@ type GossipSubRpcInspectorSuiteFactoryFunc func(
 	metrics.HeroCacheMetricsFactory,
 	flownet.NetworkingType,
 	module.IdentityProvider,
+	func() TopicProvider,
 ) (GossipSubInspectorSuite, error)
 
 // NodeBuilder is a builder pattern for creating a libp2p Node instance.
