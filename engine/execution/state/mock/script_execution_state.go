@@ -30,13 +30,13 @@ func (_m *ScriptExecutionState) HasState(_a0 flow.StateCommitment) bool {
 	return r0
 }
 
-// NewStorageSnapshot provides a mock function with given fields: _a0
-func (_m *ScriptExecutionState) NewStorageSnapshot(_a0 flow.StateCommitment) snapshot.StorageSnapshot {
-	ret := _m.Called(_a0)
+// NewStorageSnapshot provides a mock function with given fields: commit, blockID, height
+func (_m *ScriptExecutionState) NewStorageSnapshot(commit flow.StateCommitment, blockID flow.Identifier, height uint64) snapshot.StorageSnapshot {
+	ret := _m.Called(commit, blockID, height)
 
 	var r0 snapshot.StorageSnapshot
-	if rf, ok := ret.Get(0).(func(flow.StateCommitment) snapshot.StorageSnapshot); ok {
-		r0 = rf(_a0)
+	if rf, ok := ret.Get(0).(func(flow.StateCommitment, flow.Identifier, uint64) snapshot.StorageSnapshot); ok {
+		r0 = rf(commit, blockID, height)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(snapshot.StorageSnapshot)
