@@ -20,7 +20,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
-var _ ingestion.BlockLoader = (*loader.Loader)(nil)
+var _ ingestion.BlockLoader = (*loader.UnexecutedLoader)(nil)
 
 // ExecutionState is a mocked version of execution state that
 // simulates some of its behavior for testing purpose
@@ -93,7 +93,7 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		headers := storage.NewMockHeaders(ctrl)
 		headers.EXPECT().ByBlockID(genesis.ID()).Return(genesis.Header, nil)
 		log := unittest.Logger()
-		loader := loader.NewLoader(log, ps, headers, es)
+		loader := loader.NewUnexecutedLoader(log, ps, headers, es)
 
 		unexecuted, err := loader.LoadUnexecuted(context.Background())
 		require.NoError(t, err)
@@ -121,7 +121,7 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		headers := storage.NewMockHeaders(ctrl)
 		headers.EXPECT().ByBlockID(genesis.ID()).Return(genesis.Header, nil)
 		log := unittest.Logger()
-		loader := loader.NewLoader(log, ps, headers, es)
+		loader := loader.NewUnexecutedLoader(log, ps, headers, es)
 
 		unexecuted, err := loader.LoadUnexecuted(context.Background())
 		require.NoError(t, err)
@@ -149,7 +149,7 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		headers := storage.NewMockHeaders(ctrl)
 		headers.EXPECT().ByBlockID(genesis.ID()).Return(genesis.Header, nil)
 		log := unittest.Logger()
-		loader := loader.NewLoader(log, ps, headers, es)
+		loader := loader.NewUnexecutedLoader(log, ps, headers, es)
 
 		es.ExecuteBlock(t, blockA)
 		es.ExecuteBlock(t, blockB)
@@ -182,7 +182,7 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		headers := storage.NewMockHeaders(ctrl)
 		headers.EXPECT().ByBlockID(genesis.ID()).Return(genesis.Header, nil)
 		log := unittest.Logger()
-		loader := loader.NewLoader(log, ps, headers, es)
+		loader := loader.NewUnexecutedLoader(log, ps, headers, es)
 
 		// block C is the only finalized block, index its header by its height
 		headers.EXPECT().ByHeight(blockC.Header.Height).Return(blockC.Header, nil)
@@ -219,7 +219,7 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		headers := storage.NewMockHeaders(ctrl)
 		headers.EXPECT().ByBlockID(genesis.ID()).Return(genesis.Header, nil)
 		log := unittest.Logger()
-		loader := loader.NewLoader(log, ps, headers, es)
+		loader := loader.NewUnexecutedLoader(log, ps, headers, es)
 
 		// block C is finalized, index its header by its height
 		headers.EXPECT().ByHeight(blockC.Header.Height).Return(blockC.Header, nil)
@@ -255,7 +255,7 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		headers := storage.NewMockHeaders(ctrl)
 		headers.EXPECT().ByBlockID(genesis.ID()).Return(genesis.Header, nil)
 		log := unittest.Logger()
-		loader := loader.NewLoader(log, ps, headers, es)
+		loader := loader.NewUnexecutedLoader(log, ps, headers, es)
 
 		// block A is finalized, index its header by its height
 		headers.EXPECT().ByHeight(blockA.Header.Height).Return(blockA.Header, nil)
@@ -316,7 +316,7 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		headers := storage.NewMockHeaders(ctrl)
 		headers.EXPECT().ByBlockID(genesis.ID()).Return(genesis.Header, nil)
 		log := unittest.Logger()
-		loader := loader.NewLoader(log, ps, headers, es)
+		loader := loader.NewUnexecutedLoader(log, ps, headers, es)
 
 		// block C is finalized, index its header by its height
 		headers.EXPECT().ByHeight(blockC.Header.Height).Return(blockC.Header, nil)
