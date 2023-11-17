@@ -2,38 +2,34 @@ package emulator_test
 
 import (
 	"math/big"
+	"os"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/log"
+
 	"github.com/ethereum/go-ethereum/common"
-
-	"github.com/onflow/flow-go/fvm/evm/testutils"
-	"github.com/onflow/flow-go/fvm/evm/types"
-
-	"github.com/onflow/flow-go/model/flow"
-
 	gethRawDB "github.com/ethereum/go-ethereum/core/rawdb"
 	gethState "github.com/ethereum/go-ethereum/core/state"
 	"github.com/onflow/flow-go/fvm/evm/emulator/database"
+	"github.com/onflow/flow-go/fvm/evm/testutils"
+	"github.com/onflow/flow-go/fvm/evm/types"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/stretchr/testify/require"
 )
 
-func fullKey(owner, key []byte) string {
-	return string(owner) + "~" + string(key)
-}
-
-func BenchmarkStateBalance(b *testing.B) {
-
+func benchmarkStateSingleAccountBalanceChanges(b *testing.B, numberOfBalanceChanges int, debug bool) {
 	testutils.RunWithTestBackend(b, func(backend types.Backend) {
+		rootAddr := flow.Address{0x01}
+		testAddr := common.Address{0x02}
 
-		rootAddr := types.Address{0x01}
-		testAddr := types.Address{0x02}.ToCommon()
+		if debug {
+			log.Root().SetHandler(log.StreamHandler(os.Stdout, log.LogfmtFormat()))
+		}
 
-		//log.Root().SetHandler(log.StreamHandler(os.Stdout, log.LogfmtFormat()))
-
-		db, err := database.NewMeteredDatabase(backend, (flow.Address)(rootAddr.Bytes()))
+		db, err := database.NewMeteredDatabase(backend, rootAddr)
 		require.NoError(b, err)
 
-		root, err := db.GetRootHash()
+		rootHash, err := db.GetRootHash()
 		require.NoError(b, err)
 
 		stateDB := gethState.NewDatabase(gethRawDB.NewDatabase(db))
@@ -52,15 +48,20 @@ func BenchmarkStateBalance(b *testing.B) {
 			err = db.Commit(hash)
 			require.NoError(b, err)
 
+			db.DropCache()
+
 			return hash
 		}
 
-		hash := root
-		for i := 0; i < 1000; i++ {
-			hash = updateAccount(hash, big.NewInt(int64(i)))
-			b.ReportMetric((float64)(db.BytesStored()), "bytes_used")
+		for i := 0; i < numberOfBalanceChanges; i++ {
+			rootHash = updateAccount(rootHash, big.NewInt(int64(i)))
+			b.ReportMetric(float64(db.BytesStored()), "bytes_used")
+			b.ReportMetric(float64(db.BytesRetrieved()), "bytes_read")
 		}
 
 	})
+}
 
+func BenchmarkStateBalance(b *testing.B) {
+	benchmarkStateSingleAccountBalanceChanges(b, 1000, false)
 }
