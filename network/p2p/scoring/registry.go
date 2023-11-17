@@ -155,8 +155,9 @@ func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegis
 			reg.logger.Warn().Msg("aborting subscription validator startup, context cancelled")
 		case <-reg.validator.Ready():
 			reg.logger.Info().Msg("subscription validator started")
+			ready()
+			reg.logger.Info().Msg("subscription validator is ready")
 		}
-		ready()
 
 		<-ctx.Done()
 		reg.logger.Info().Msg("stopping subscription validator")
