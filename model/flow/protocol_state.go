@@ -186,6 +186,7 @@ func NewRichProtocolStateEntry(
 			protocolState.CurrentEpoch.ActiveIdentities,
 			previousEpochIdentitySkeletons,
 			previousEpochDynamicIdentities,
+			EpochParticipationStatusLeaving,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not build identity table for staking phase: %w", err)
@@ -206,6 +207,7 @@ func NewRichProtocolStateEntry(
 			protocolState.CurrentEpoch.ActiveIdentities,
 			nextEpochSetup.Participants,
 			nextEpoch.ActiveIdentities,
+			EpochParticipationStatusJoining,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not build identity table for setup/commit phase: %w", err)
@@ -216,6 +218,7 @@ func NewRichProtocolStateEntry(
 			nextEpoch.ActiveIdentities,
 			currentEpochSetup.Participants,
 			protocolState.CurrentEpoch.ActiveIdentities,
+			EpochParticipationStatusLeaving,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not build next epoch identity table: %w", err)
@@ -361,11 +364,18 @@ func (ll DynamicIdentityEntryList) Sort(less IdentifierOrder) DynamicIdentityEnt
 // (e.g. consider a spork comprising only a single epoch), in which case the respective inputs are nil or empty.
 //  3. [optional] An adjacent epoch's IdentitySkeletons as recorded in the adjacent epoch's setup event.
 //  4. [optional] An adjacent epoch's Dynamic Identities.
+//  5. An adjacent epoch's identities participation status, this could be joining or leaving depending on epoch phase.
 //
 // The function enforces that the input slices pertaining to the same epoch contain the same identities
 // (compared by nodeID) in the same order. Otherwise, an exception is returned.
 // No errors are expected during normal operation. All errors indicate inconsistent or invalid inputs.
-func BuildIdentityTable(targetEpochIdentitySkeletons IdentitySkeletonList, targetEpochDynamicIdentities DynamicIdentityEntryList, adjacentEpochIdentitySkeletons IdentitySkeletonList, adjacentEpochDynamicIdentities DynamicIdentityEntryList) (IdentityList, error) {
+func BuildIdentityTable(
+	targetEpochIdentitySkeletons IdentitySkeletonList,
+	targetEpochDynamicIdentities DynamicIdentityEntryList,
+	adjacentEpochIdentitySkeletons IdentitySkeletonList,
+	adjacentEpochDynamicIdentities DynamicIdentityEntryList,
+	adjacentIdentitiesStatus EpochParticipationStatus,
+) (IdentityList, error) {
 	targetEpochParticipants, err := ComposeFullIdentities(targetEpochIdentitySkeletons, targetEpochDynamicIdentities)
 	if err != nil {
 		return nil, fmt.Errorf("could not reconstruct participants for target epoch: %w", err)
@@ -382,7 +392,10 @@ func BuildIdentityTable(targetEpochIdentitySkeletons IdentitySkeletonList, targe
 	//     in the adjacent epoch, we use the IdentitySkeleton for the target epoch (for example,
 	//     to account for changes of keys, address, initial weight, etc).
 	//  2. Canonical ordering
-	allEpochParticipants := targetEpochParticipants.Union(adjacentEpochParticipants)
+	allEpochParticipants := targetEpochParticipants.Union(adjacentEpochParticipants.Map(func(identity Identity) Identity {
+		identity.EpochParticipationStatus = adjacentIdentitiesStatus
+		return identity
+	}))
 	return allEpochParticipants, nil
 }
 
