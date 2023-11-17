@@ -9,11 +9,12 @@ import (
 	gethRawDB "github.com/ethereum/go-ethereum/core/rawdb"
 	gethState "github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/fvm/evm/emulator/database"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/stretchr/testify/require"
 )
 
 func benchmarkStateSingleAccountBalanceChanges(b *testing.B, numberOfBalanceChanges int, debug bool) {

@@ -2,6 +2,7 @@ package database
 
 import (
 	"github.com/onflow/atree"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
