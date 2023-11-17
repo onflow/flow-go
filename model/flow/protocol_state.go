@@ -8,7 +8,7 @@ import (
 // DynamicIdentityEntry encapsulates nodeID and dynamic portion of identity.
 type DynamicIdentityEntry struct {
 	NodeID  Identifier
-	Dynamic DynamicIdentity
+	Ejected bool
 }
 
 type DynamicIdentityEntryList []*DynamicIdentityEntry
@@ -405,7 +405,7 @@ func DynamicIdentityEntryListFromIdentities(identities IdentityList) DynamicIden
 	for _, identity := range identities {
 		dynamicIdentities = append(dynamicIdentities, &DynamicIdentityEntry{
 			NodeID:  identity.NodeID,
-			Dynamic: identity.DynamicIdentity,
+			Ejected: identity.EpochParticipationStatus == EpochParticipationStatusEjected,
 		})
 	}
 	return dynamicIdentities
@@ -415,7 +415,10 @@ func DynamicIdentityEntryListFromIdentities(identities IdentityList) DynamicIden
 // It enforces that the input slices `skeletons` and `dynamics` list the same identities (compared by nodeID)
 // in the same order. Otherwise, an exception is returned.
 // No errors are expected during normal operations.
-func ComposeFullIdentities(skeletons IdentitySkeletonList, dynamics DynamicIdentityEntryList) (IdentityList, error) {
+func ComposeFullIdentities(
+	skeletons IdentitySkeletonList,
+	dynamics DynamicIdentityEntryList,
+) (IdentityList, error) {
 	// sanity check: list of skeletons and dynamic should be the same
 	if len(skeletons) != len(dynamics) {
 		return nil, fmt.Errorf("invalid number of identities to reconstruct: expected %d, got %d", len(skeletons), len(dynamics))
@@ -428,9 +431,15 @@ func ComposeFullIdentities(skeletons IdentitySkeletonList, dynamics DynamicIdent
 		if dynamics[i].NodeID != skeletons[i].NodeID {
 			return nil, fmt.Errorf("identites in protocol state are not consistently ordered: expected %s, got %s", skeletons[i].NodeID, dynamics[i].NodeID)
 		}
+		status := EpochParticipationStatusActive
+		if dynamics[i].Ejected {
+			status = EpochParticipationStatusEjected
+		}
 		result = append(result, &Identity{
 			IdentitySkeleton: *skeletons[i],
-			DynamicIdentity:  dynamics[i].Dynamic,
+			DynamicIdentity: DynamicIdentity{
+				EpochParticipationStatus: status,
+			},
 		})
 	}
 	return result, nil

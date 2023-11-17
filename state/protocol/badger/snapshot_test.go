@@ -207,7 +207,7 @@ func TestIdentities(t *testing.T) {
 			filters := []flow.IdentityFilter[flow.Identity]{
 				filter.HasRole[flow.Identity](flow.RoleCollection),
 				filter.HasNodeID[flow.Identity](sample.NodeIDs()...),
-				filter.HasWeight(true),
+				filter.IsValidCurrentEpochParticipant,
 			}
 
 			for _, filterfunc := range filters {
@@ -1431,9 +1431,8 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 
 					// should contain single next epoch identity with 0 weight
 					nextEpochIdentity := identities.Filter(filter.HasNodeID[flow.Identity](addedAtEpoch2.NodeID))[0]
-					assert.Equal(t, uint64(0), nextEpochIdentity.Weight) // should have 0 weight
-					nextEpochIdentity.Weight = addedAtEpoch2.Weight
-					assert.Equal(t, addedAtEpoch2, nextEpochIdentity) // should be equal besides weight
+					assert.Equal(t, flow.EpochParticipationStatusJoining, nextEpochIdentity.EpochParticipationStatus) // should have 0 weight
+					assert.Equal(t, addedAtEpoch2.IdentitySkeleton, nextEpochIdentity.IdentitySkeleton)               // should be equal besides dynamic portion
 				})
 			}
 		})
@@ -1452,9 +1451,8 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 
 			// should contain single previous epoch identity with 0 weight
 			lastEpochIdentity := identities.Filter(filter.HasNodeID[flow.Identity](removedAtEpoch2.NodeID))[0]
-			assert.Equal(t, uint64(0), lastEpochIdentity.Weight) // should have 0 weight
-			lastEpochIdentity.Weight = removedAtEpoch2.Weight    // overwrite weight
-			assert.Equal(t, removedAtEpoch2, lastEpochIdentity)  // should be equal besides weight
+			assert.Equal(t, flow.EpochParticipationStatusLeaving, lastEpochIdentity.EpochParticipationStatus) // should have leaving status
+			assert.Equal(t, removedAtEpoch2.IdentitySkeleton, lastEpochIdentity.IdentitySkeleton)             // should be equal besides dynamic portion
 		})
 
 		t.Run("should not include previous epoch after staking phase", func(t *testing.T) {
@@ -1479,9 +1477,8 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 					for _, expected := range epoch3Identities {
 						actual, exists := identities.ByNodeID(expected.NodeID)
 						require.True(t, exists)
-						assert.Equal(t, uint64(0), actual.Weight) // should have 0 weight
-						actual.Weight = expected.Weight           // overwrite weight
-						assert.Equal(t, expected, actual)         // should be equal besides weight
+						assert.Equal(t, flow.EpochParticipationStatusJoining, actual.EpochParticipationStatus) // should have 0 weight
+						assert.Equal(t, expected.IdentitySkeleton, actual.IdentitySkeleton)                    // should be equal besides dynamic portion
 					}
 				})
 			}

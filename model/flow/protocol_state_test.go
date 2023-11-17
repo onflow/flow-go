@@ -23,10 +23,8 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		identities := make(flow.DynamicIdentityEntryList, 0, len(setup.Participants))
 		for _, identity := range setup.Participants {
 			identities = append(identities, &flow.DynamicIdentityEntry{
-				NodeID: identity.NodeID,
-				Dynamic: flow.DynamicIdentity{
-					EpochParticipationStatus: flow.EpochParticipationStatusActive,
-				},
+				NodeID:  identity.NodeID,
+				Ejected: false,
 			})
 		}
 		stateEntry := &flow.ProtocolStateEntry{
@@ -185,14 +183,12 @@ func TestProtocolStateEntry_Copy(t *testing.T) {
 	assert.NotEqual(t, entry, cpy)
 
 	assert.Equal(t, entry.CurrentEpoch.ActiveIdentities[0], cpy.CurrentEpoch.ActiveIdentities[0])
-	cpy.CurrentEpoch.ActiveIdentities[0].Dynamic.EpochParticipationStatus = flow.EpochParticipationStatusEjected
+	cpy.CurrentEpoch.ActiveIdentities[0].Ejected = true
 	assert.NotEqual(t, entry.CurrentEpoch.ActiveIdentities[0], cpy.CurrentEpoch.ActiveIdentities[0])
 
 	cpy.CurrentEpoch.ActiveIdentities = append(cpy.CurrentEpoch.ActiveIdentities, &flow.DynamicIdentityEntry{
-		NodeID: unittest.IdentifierFixture(),
-		Dynamic: flow.DynamicIdentity{
-			EpochParticipationStatus: flow.EpochParticipationStatusActive,
-		},
+		NodeID:  unittest.IdentifierFixture(),
+		Ejected: false,
 	})
 	assert.NotEqual(t, entry.CurrentEpoch.ActiveIdentities, cpy.CurrentEpoch.ActiveIdentities)
 }

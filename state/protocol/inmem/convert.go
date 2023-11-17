@@ -359,15 +359,13 @@ func SnapshotFromBootstrapStateWithParams(
 //   - Therefore, the EpochSetup event contains the up-to-date snapshot of the epoch participants. Any node ejection
 //     that happened before should be reflected in the EpochSetup event. Specifically, ejected
 //     nodes should be no longer listed in the EpochSetup event.
-//     Hence, when the EpochSetup event is emitted / processed, the participation status is flow.EpochParticipationStatusActive for all epoch participants.
+//     Hence, when the EpochSetup event is emitted / processed, the ejected flag is false for all epoch participants.
 func ProtocolStateFromEpochServiceEvents(setup *flow.EpochSetup, commit *flow.EpochCommit) *flow.ProtocolStateEntry {
 	identities := make(flow.DynamicIdentityEntryList, 0, len(setup.Participants))
 	for _, identity := range setup.Participants {
 		identities = append(identities, &flow.DynamicIdentityEntry{
-			NodeID: identity.NodeID,
-			Dynamic: flow.DynamicIdentity{
-				EpochParticipationStatus: flow.EpochParticipationStatusActive,
-			},
+			NodeID:  identity.NodeID,
+			Ejected: false,
 		})
 	}
 	return &flow.ProtocolStateEntry{
