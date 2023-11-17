@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
@@ -48,6 +49,7 @@ var (
 	flagNumViewsInDKGPhase          uint64
 	flagEpochCommitSafetyThreshold  uint64
 	// Epoch target end time config
+	flagDefaultEpochTargetEndTime      bool
 	flagEpochTargetEndTimeRefCounter   uint64
 	flagEpochTargetEndTimeRefTimestamp uint64
 	flagEpochTargetEndTimeDuration     uint64
@@ -103,6 +105,13 @@ func addFinalizeCmdFlags() {
 	finalizeCmd.Flags().Uint64Var(&flagEpochCommitSafetyThreshold, "epoch-commit-safety-threshold", 500, "defines epoch commitment deadline")
 	// Epoch timing config - these values can be set identically to `EpochTimingConfig` in the FlowEpoch smart contract.
 	// See https://github.com/onflow/flow-core-contracts/blob/240579784e9bb8d97d91d0e3213614e25562c078/contracts/epochs/FlowEpoch.cdc#L259-L266
+	// Must specify either:
+	//   1. --epoch-default-target-end-time and no other `--epoch-target-end-time*` flags
+	//   2. All `--epoch-target-end-time*` flags except --epoch-default-target-end-time
+	//
+	// Use Option 1 for Benchnet, Localnet, etc.
+	// Use Option 2 for Mainnet, Testnet, Canary.
+	finalizeCmd.Flags().BoolVar(&flagDefaultEpochTargetEndTime, "epoch-default-target-end-time", false, "whether to use the default target end time")
 	finalizeCmd.Flags().Uint64Var(&flagEpochTargetEndTimeRefCounter, "epoch-target-end-time-ref-counter", 0, "the reference epoch to use to compute the root epoch's target end time")
 	finalizeCmd.Flags().Uint64Var(&flagEpochTargetEndTimeRefTimestamp, "epoch-target-end-time-ref-timestamp", 0, "the end time of the reference epoch, specified in second-precision Unix time, to use to compute the root epoch's target end time")
 	finalizeCmd.Flags().Uint64Var(&flagEpochTargetEndTimeDuration, "epoch-target-end-time-duration", 0, "the duration of each epoch in seconds, used to compute the root epoch's target end time")
@@ -671,6 +680,35 @@ func validateEpochConfig() error {
 	if epochCommitDeadline-dkgFinalView < defaultSafetyThreshold {
 		return fmt.Errorf("potentially unsafe epoch config: time between DKG end and epoch commitment deadline is smaller than expected (%d-%d < %d)",
 			epochCommitDeadline, dkgFinalView, defaultSafetyThreshold)
+	}
+	return nil
+}
+
+// validateEpochTimingConfig validates the epoch timing config flags.
+// You can either let the tool choose default values, or specify a value for each config.
+func validateEpochTimingConfig() error {
+	if flagDefaultEpochTargetEndTime {
+		// No other flags may be set
+		if !(flagEpochTargetEndTimeRefTimestamp == 0 && flagEpochTargetEndTimeDuration == 0 && flagEpochTargetEndTimeRefCounter == 0) {
+			return fmt.Errorf("invalid epoch timing config: cannot specify ANY of --epoch-target-end-time-ref-counter, --epoch-target-end-time-ref-timestamp, or --epoch-target-end-time-duration if using default timing config")
+		}
+		flagEpochTargetEndTimeRefCounter = flagEpochCounter
+		flagEpochTargetEndTimeDuration = flagNumViewsInEpoch
+		flagEpochTargetEndTimeRefTimestamp = uint64(time.Now().Unix()) + flagNumViewsInEpoch
+
+		rootEpochTargetEndTimeUNIX := epochTargetEndTime(flagEpochCounter, flagEpochTargetEndTimeRefCounter, flagEpochTargetEndTimeRefTimestamp, flagEpochTargetEndTimeDuration)
+		rootEpochTargetEndTime := time.Unix(int64(rootEpochTargetEndTimeUNIX), 0)
+		log.Info().Msgf("using default epoch timing config with root epoch target end time %s, which is in %s", rootEpochTargetEndTime, rootEpochTargetEndTime.Sub(time.Now()))
+	} else {
+		// All other flags must be set
+		// NOTE: it is valid for refCounter to be set to 0
+		if flagEpochTargetEndTimeRefTimestamp == 0 && flagEpochTargetEndTimeDuration == 0 {
+			return fmt.Errorf("invalid epoch timing config: must specify ALL of --epoch-target-end-time-ref-counter, --epoch-target-end-time-ref-timestamp, and --epoch-target-end-time-duration")
+		}
+
+		rootEpochTargetEndTimeUNIX := epochTargetEndTime(flagEpochCounter, flagEpochTargetEndTimeRefCounter, flagEpochTargetEndTimeRefTimestamp, flagEpochTargetEndTimeDuration)
+		rootEpochTargetEndTime := time.Unix(int64(rootEpochTargetEndTimeUNIX), 0)
+		log.Info().Msgf("using user-specified epoch timing config with root epoch target end time %s, which is in %s", rootEpochTargetEndTime, rootEpochTargetEndTime.Sub(time.Now()))
 	}
 	return nil
 }

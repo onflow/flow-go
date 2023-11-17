@@ -42,6 +42,7 @@ func constructRootResultAndSeal(
 		Participants:       participants.Sort(order.Canonical),
 		Assignments:        assignments,
 		RandomSource:       GenerateRandomSeed(flow.EpochSetupRandomSourceLength),
+		TargetEndTime:      0, // TODO
 	}
 
 	qcsWithSignerIDs := make([]*flow.QuorumCertificateWithSignerIDs, 0, len(clusterQCs))
@@ -77,4 +78,9 @@ func constructRootResultAndSeal(
 	}
 
 	return result, seal
+}
+
+// epochTargetEndTime computes the target end time for the given epoch, using the given config.
+func epochTargetEndTime(targetCounter, refCounter, refTimestamp, duration uint64) uint64 {
+	return refTimestamp + (targetCounter-refCounter)*duration
 }
