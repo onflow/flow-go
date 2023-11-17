@@ -65,7 +65,7 @@ func TestExecuteScriptAtBlockID(t *testing.T) {
 			ctx.stateCommitmentExist(blockA.ID(), *blockA.StartState)
 
 			ctx.state.On("AtBlockID", blockA.Block.ID()).Return(snapshot)
-			ctx.executionState.On("NewStorageSnapshot", *blockA.StartState).Return(nil)
+			ctx.executionState.On("NewStorageSnapshot", *blockA.StartState, blockA.Block.ID(), blockA.Block.Header.Height).Return(nil)
 
 			ctx.executionState.On("HasState", *blockA.StartState).Return(true)
 
