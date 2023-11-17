@@ -74,8 +74,8 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 	registerID2 := flow.NewRegisterID("vegetable", "")
 
 	t.Run("commit write and read new state", prepareTest(func(t *testing.T, es state.ExecutionState, l *ledger.Ledger) {
-		// TODO: use real block ID
-		sc1, err := es.StateCommitmentByBlockID(context.Background(), flow.Identifier{})
+		header1 := unittest.BlockHeaderFixture()
+		sc1, err := es.StateCommitmentByBlockID(context.Background(), header1.ID())
 		assert.NoError(t, err)
 
 		executionSnapshot := &snapshot.ExecutionSnapshot{
@@ -124,7 +124,8 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		assert.Equal(t, []byte("apple"), []byte(update.Payloads[0].Value()))
 		assert.Equal(t, []byte("carrot"), []byte(update.Payloads[1].Value()))
 
-		storageSnapshot := es.NewStorageSnapshot(sc2)
+		header2 := unittest.BlockHeaderWithParentFixture(header1)
+		storageSnapshot := es.NewStorageSnapshot(sc2, header2.ID(), header2.Height)
 
 		b1, err := storageSnapshot.Get(registerID1)
 		assert.NoError(t, err)
@@ -136,8 +137,8 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 	}))
 
 	t.Run("commit write and read previous state", prepareTest(func(t *testing.T, es state.ExecutionState, l *ledger.Ledger) {
-		// TODO: use real block ID
-		sc1, err := es.StateCommitmentByBlockID(context.Background(), flow.Identifier{})
+		header1 := unittest.BlockHeaderFixture()
+		sc1, err := es.StateCommitmentByBlockID(context.Background(), header1.ID())
 		assert.NoError(t, err)
 
 		executionSnapshot1 := &snapshot.ExecutionSnapshot{
@@ -161,11 +162,16 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		sc3, _, _, err := state.CommitDelta(l, executionSnapshot2, sc2Snapshot)
 		assert.NoError(t, err)
 
+		header2 := unittest.BlockHeaderWithParentFixture(header1)
 		// create a view for previous state version
-		storageSnapshot3 := es.NewStorageSnapshot(sc2)
+		storageSnapshot3 := es.NewStorageSnapshot(sc2, header2.ID(), header2.Height)
 
+		header3 := unittest.BlockHeaderWithParentFixture(header1)
 		// create a view for new state version
-		storageSnapshot4 := es.NewStorageSnapshot(sc3)
+		storageSnapshot4 := es.NewStorageSnapshot(sc3, header3.ID(), header3.Height)
+
+		// header2 and header3 are different blocks
+		assert.True(t, header2.ID() != (header3.ID()))
 
 		// fetch the value at both versions
 		b1, err := storageSnapshot3.Get(registerID1)
@@ -179,8 +185,8 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 	}))
 
 	t.Run("commit delta and read new state", prepareTest(func(t *testing.T, es state.ExecutionState, l *ledger.Ledger) {
-		// TODO: use real block ID
-		sc1, err := es.StateCommitmentByBlockID(context.Background(), flow.Identifier{})
+		header1 := unittest.BlockHeaderFixture()
+		sc1, err := es.StateCommitmentByBlockID(context.Background(), header1.ID())
 		assert.NoError(t, err)
 
 		// set initial value
@@ -206,11 +212,13 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		sc3, _, _, err := state.CommitDelta(l, executionSnapshot2, sc2Snapshot)
 		assert.NoError(t, err)
 
+		header2 := unittest.BlockHeaderWithParentFixture(header1)
 		// create a view for previous state version
-		storageSnapshot3 := es.NewStorageSnapshot(sc2)
+		storageSnapshot3 := es.NewStorageSnapshot(sc2, header2.ID(), header2.Height)
 
+		header3 := unittest.BlockHeaderWithParentFixture(header2)
 		// create a view for new state version
-		storageSnapshot4 := es.NewStorageSnapshot(sc3)
+		storageSnapshot4 := es.NewStorageSnapshot(sc3, header3.ID(), header3.Height)
 
 		// fetch the value at both versions
 		b1, err := storageSnapshot3.Get(registerID1)

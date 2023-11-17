@@ -80,7 +80,10 @@ func (e *Engine) ExecuteScriptAtBlockID(
 		return nil, fmt.Errorf("failed to get header (%s): %w", blockID, err)
 	}
 
-	blockSnapshot := e.execState.NewStorageSnapshot(stateCommit)
+	blockSnapshot := e.execState.NewStorageSnapshot(stateCommit,
+		blockID,
+		header.Height,
+	)
 
 	return e.queryExecutor.ExecuteScript(
 		ctx,
@@ -101,7 +104,15 @@ func (e *Engine) GetRegisterAtBlockID(
 		return nil, fmt.Errorf("failed to get state commitment for block (%s): %w", blockID, err)
 	}
 
-	blockSnapshot := e.execState.NewStorageSnapshot(stateCommit)
+	block, err := e.state.AtBlockID(blockID).Head()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get block (%s): %w", blockID, err)
+	}
+
+	blockSnapshot := e.execState.NewStorageSnapshot(stateCommit,
+		blockID,
+		block.Height,
+	)
 
 	id := flow.NewRegisterID(string(owner), string(key))
 	data, err := blockSnapshot.Get(id)
@@ -139,7 +150,7 @@ func (e *Engine) GetAccount(
 		return nil, fmt.Errorf("failed to get block (%s): %w", blockID, err)
 	}
 
-	blockSnapshot := e.execState.NewStorageSnapshot(stateCommit)
+	blockSnapshot := e.execState.NewStorageSnapshot(stateCommit, blockID, block.Height)
 
 	return e.queryExecutor.GetAccount(ctx, addr, block, blockSnapshot)
 }
