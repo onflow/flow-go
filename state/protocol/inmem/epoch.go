@@ -37,6 +37,13 @@ func (e Epoch) RandomSource() ([]byte, error) {
 	return e.enc.RandomSource, nil
 }
 
+// TargetEndTime returns the desired real-world end time for this epoch, represented as
+// Unix Time (in units of seconds). This target is specified by the FlowEpoch smart contract in
+// the EpochSetup event and used by the Cruise Control system to moderate the block rate.
+func (e Epoch) TargetEndTime() (uint64, error) {
+	return e.enc.TargetEndTime, nil
+}
+
 func (e Epoch) Clustering() (flow.ClusterList, error) {
 	return e.enc.Clustering, nil
 }
@@ -141,6 +148,13 @@ func (es *setupEpoch) DKGPhase3FinalView() (uint64, error) {
 
 func (es *setupEpoch) FinalView() (uint64, error) {
 	return es.setupEvent.FinalView, nil
+}
+
+// TargetEndTime returns the desired real-world end time for this epoch, represented as
+// Unix Time (in units of seconds). This target is specified by the FlowEpoch smart contract in
+// the EpochSetup event and used by the Cruise Control system to moderate the block rate.
+func (es *setupEpoch) TargetEndTime() (uint64, error) {
+	return es.setupEvent.TargetEndTime, nil
 }
 
 func (es *setupEpoch) RandomSource() ([]byte, error) {

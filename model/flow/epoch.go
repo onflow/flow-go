@@ -72,6 +72,7 @@ type EpochSetup struct {
 	Participants       IdentityList   // all participants of the epoch
 	Assignments        AssignmentList // cluster assignment for the epoch
 	RandomSource       []byte         // source of randomness for epoch-specific setup tasks
+	TargetEndTime      uint64         // desired real-world end time for the epoch in UNIX time [seconds]
 }
 
 func (setup *EpochSetup) ServiceEvent() ServiceEvent {
