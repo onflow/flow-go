@@ -549,7 +549,11 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 			blockID.String(),
 			err)
 	}
-	blockSnapshot := exeNode.executionState.NewStorageSnapshot(stateCommit)
+	header, err := node.State.AtBlockID(blockID).Head()
+	if err != nil {
+		return nil, fmt.Errorf("cannot get the header at latest executed block id %v: %w", blockID, err)
+	}
+	blockSnapshot := exeNode.executionState.NewStorageSnapshot(stateCommit, blockID, header.Height)
 
 	// Get the epoch counter from the smart contract at the last executed block.
 	contractEpochCounter, err := getContractEpochCounter(

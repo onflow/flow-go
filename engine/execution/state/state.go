@@ -36,8 +36,8 @@ type ReadOnlyExecutionState interface {
 // ScriptExecutionState is a subset of the `state.ExecutionState` interface purposed to only access the state
 // used for script execution and not mutate the execution state of the blockchain.
 type ScriptExecutionState interface {
-	// NewStorageSnapshot creates a new ready-only view at the given state commitment.
-	NewStorageSnapshot(flow.StateCommitment) snapshot.StorageSnapshot
+	// NewStorageSnapshot creates a new ready-only view at the given block.
+	NewStorageSnapshot(commit flow.StateCommitment, blockID flow.Identifier, height uint64) snapshot.StorageSnapshot
 
 	// StateCommitmentByBlockID returns the final state commitment for the provided block ID.
 	StateCommitmentByBlockID(context.Context, flow.Identifier) (flow.StateCommitment, error)
@@ -218,6 +218,8 @@ func (storage *LedgerStorageSnapshot) Get(
 
 func (s *state) NewStorageSnapshot(
 	commitment flow.StateCommitment,
+	blockID flow.Identifier,
+	height uint64,
 ) snapshot.StorageSnapshot {
 	return NewLedgerStorageSnapshot(s.ls, commitment)
 }
