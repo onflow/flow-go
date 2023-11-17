@@ -899,7 +899,6 @@ func (exeNode *ExecutionNode) LoadScriptsEngine(node *NodeConfig) (module.ReadyD
 
 	exeNode.scriptsEng = scripts.New(
 		node.Logger,
-		node.State,
 		exeNode.computationManager.QueryExecutor(),
 		exeNode.executionState,
 	)

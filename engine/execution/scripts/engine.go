@@ -11,13 +11,11 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/query"
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/state/protocol"
 )
 
 type Engine struct {
 	unit          *engine.Unit
 	log           zerolog.Logger
-	state         protocol.State
 	queryExecutor query.Executor
 	execState     state.ScriptExecutionState
 }
@@ -26,14 +24,12 @@ var _ execution.ScriptExecutor = (*Engine)(nil)
 
 func New(
 	logger zerolog.Logger,
-	state protocol.State,
 	queryExecutor query.Executor,
 	execState state.ScriptExecutionState,
 ) *Engine {
 	return &Engine{
 		unit:          engine.NewUnit(),
 		log:           logger.With().Str("engine", "scripts").Logger(),
-		state:         state,
 		execState:     execState,
 		queryExecutor: queryExecutor,
 	}
