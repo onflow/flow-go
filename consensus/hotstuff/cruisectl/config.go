@@ -10,7 +10,6 @@ import (
 func DefaultConfig() *Config {
 	return &Config{
 		TimingConfig{
-			TargetTransition:      DefaultEpochTransitionTime(),
 			FallbackProposalDelay: atomic.NewDuration(250 * time.Millisecond),
 			MinViewDuration:       atomic.NewDuration(600 * time.Millisecond),
 			MaxViewDuration:       atomic.NewDuration(1600 * time.Millisecond),
@@ -34,9 +33,6 @@ type Config struct {
 
 // TimingConfig specifies the BlockTimeController's limits of authority.
 type TimingConfig struct {
-	// TargetTransition defines the target time to transition epochs each week.
-	TargetTransition EpochTransitionTime
-
 	// FallbackProposalDelay is the minimal block construction delay. When used, it behaves like the
 	// old command line flag `block-rate-delay`. Specifically, the primary measures the duration from
 	// starting to construct its proposal to the proposal being ready to be published. If this
