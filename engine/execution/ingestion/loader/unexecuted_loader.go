@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
+// deprecated. Storehouse is going to use unfinalized loader instead
 type UnexecutedLoader struct {
 	log       zerolog.Logger
 	state     protocol.State
@@ -27,7 +28,7 @@ func NewUnexecutedLoader(
 	execState state.ExecutionState,
 ) *UnexecutedLoader {
 	return &UnexecutedLoader{
-		log:       log.With().Str("component", "ingestion_engine_block_loader").Logger(),
+		log:       log.With().Str("component", "ingestion_engine_unexecuted_loader").Logger(),
 		state:     state,
 		headers:   headers,
 		execState: execState,

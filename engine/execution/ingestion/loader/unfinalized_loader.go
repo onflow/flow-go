@@ -26,7 +26,7 @@ func NewUnfinalizedLoader(
 	execState state.FinalizedExecutionState,
 ) *UnfinalizedLoader {
 	return &UnfinalizedLoader{
-		log:       log.With().Str("component", "ingestion_engine_block_loader").Logger(),
+		log:       log.With().Str("component", "ingestion_engine_unfinalized_loader").Logger(),
 		state:     state,
 		headers:   headers,
 		execState: execState,
