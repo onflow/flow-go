@@ -1,6 +1,8 @@
 package state_test
 
 import (
+	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
@@ -19,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
+	storageerr "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -129,9 +132,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 
 		// verify has state
 		require.True(t, es.HasState(sc2))
-
-		// test CreateStorageSnapshot
-
+		require.False(t, es.HasState(unittest.StateCommitmentFixture()))
 	}))
 
 	t.Run("commit write and read previous state", prepareTest(func(
@@ -258,6 +259,65 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		assert.NoError(t, err)
 
 		require.Equal(t, sc2, sc2Same)
+	}))
+
+	t.Run("commit write and create snapshot", prepareTest(func(
+		t *testing.T, es state.ExecutionState, l *ledger.Ledger, headers *storage.Headers, stateCommitments *storage.Commits) {
+		header1 := unittest.BlockHeaderFixture()
+		header2 := unittest.BlockHeaderWithParentFixture(header1)
+		sc1 := flow.StateCommitment(l.InitialState())
+
+		reg1 := unittest.MakeOwnerReg("fruit", "apple")
+		reg2 := unittest.MakeOwnerReg("vegetable", "carrot")
+		executionSnapshot := &snapshot.ExecutionSnapshot{
+			WriteSet: map[flow.RegisterID]flow.RegisterValue{
+				reg1.Key: reg1.Value,
+				reg2.Key: reg2.Value,
+			},
+		}
+
+		sc2, _, _, err := state.CommitDelta(l, executionSnapshot,
+			storehouse.NewExecutingBlockSnapshot(state.NewLedgerStorageSnapshot(l, sc1), sc1))
+		assert.NoError(t, err)
+
+		// test CreateStorageSnapshot for known and executed block
+		headers.On("ByBlockID", header2.ID()).Return(header2, nil)
+		stateCommitments.On("ByBlockID", header2.ID()).Return(sc2, nil)
+		snapshot2, h2, err := es.CreateStorageSnapshot(header2.ID())
+		require.NoError(t, err)
+		require.Equal(t, header2.ID(), h2.ID())
+
+		val, err := snapshot2.Get(reg1.Key)
+		require.NoError(t, err)
+		require.Equal(t, val, reg1.Value)
+
+		val, err = snapshot2.Get(reg2.Key)
+		require.NoError(t, err)
+		require.Equal(t, val, reg2.Value)
+
+		// test CreateStorageSnapshot for unknown block
+		unknown := unittest.BlockHeaderFixture()
+		headers.On("ByBlockID", unknown.ID()).Return(nil, fmt.Errorf("unknown: %w", storageerr.ErrNotFound))
+		_, _, err = es.CreateStorageSnapshot(unknown.ID())
+		require.Error(t, err)
+		require.True(t, errors.Is(err, storageerr.ErrNotFound))
+
+		// test CreateStorageSnapshot for known and unexecuted block
+		unexecuted := unittest.BlockHeaderFixture()
+		headers.On("ByBlockID", unexecuted.ID()).Return(unexecuted, nil)
+		stateCommitments.On("ByBlockID", unexecuted.ID()).Return(nil, fmt.Errorf("not found: %w", storageerr.ErrNotFound))
+		_, _, err = es.CreateStorageSnapshot(unexecuted.ID())
+		require.Error(t, err)
+		require.True(t, errors.Is(err, state.ErrNotExecuted))
+
+		// test CreateStorageSnapshot for pruned block
+		pruned := unittest.BlockHeaderFixture()
+		prunedState := unittest.StateCommitmentFixture()
+		headers.On("ByBlockID", pruned.ID()).Return(pruned, nil)
+		stateCommitments.On("ByBlockID", pruned.ID()).Return(prunedState, nil)
+		_, _, err = es.CreateStorageSnapshot(pruned.ID())
+		require.Error(t, err)
+		require.True(t, errors.Is(err, state.ErrExecutionStatePruned))
 	}))
 
 }
