@@ -25,8 +25,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 			identities = append(identities, &flow.DynamicIdentityEntry{
 				NodeID: identity.NodeID,
 				Dynamic: flow.DynamicIdentity{
-					Weight:  identity.InitialWeight,
-					Ejected: false,
+					EpochParticipationStatus: flow.EpochParticipationStatusActive,
 				},
 			})
 		}
@@ -175,14 +174,13 @@ func TestProtocolStateEntry_Copy(t *testing.T) {
 	assert.NotEqual(t, entry, cpy)
 
 	assert.Equal(t, entry.CurrentEpoch.ActiveIdentities[0], cpy.CurrentEpoch.ActiveIdentities[0])
-	cpy.CurrentEpoch.ActiveIdentities[0].Dynamic.Weight = 123
+	cpy.CurrentEpoch.ActiveIdentities[0].Dynamic.EpochParticipationStatus = flow.EpochParticipationStatusEjected
 	assert.NotEqual(t, entry.CurrentEpoch.ActiveIdentities[0], cpy.CurrentEpoch.ActiveIdentities[0])
 
 	cpy.CurrentEpoch.ActiveIdentities = append(cpy.CurrentEpoch.ActiveIdentities, &flow.DynamicIdentityEntry{
 		NodeID: unittest.IdentifierFixture(),
 		Dynamic: flow.DynamicIdentity{
-			Weight:  100,
-			Ejected: false,
+			EpochParticipationStatus: flow.EpochParticipationStatusActive,
 		},
 	})
 	assert.NotEqual(t, entry.CurrentEpoch.ActiveIdentities, cpy.CurrentEpoch.ActiveIdentities)
@@ -193,7 +191,9 @@ func TestProtocolStateEntry_Copy(t *testing.T) {
 func TestBuildIdentityTable(t *testing.T) {
 	t.Run("happy-path-no-identities-overlap", func(t *testing.T) {
 		targetEpochIdentities := unittest.IdentityListFixture(10).Sort(order.Canonical[flow.Identity])
-		adjacentEpochIdentities := unittest.IdentityListFixture(10).Sort(order.Canonical[flow.Identity])
+		adjacentEpochIdentities := unittest.IdentityListFixture(10, func(identity *flow.Identity) {
+			identity.EpochParticipationStatus = flow.EpochParticipationStatusLeaving
+		}).Sort(order.Canonical[flow.Identity])
 
 		identityList, err := flow.BuildIdentityTable(
 			targetEpochIdentities.ToSkeleton(),
@@ -203,15 +203,14 @@ func TestBuildIdentityTable(t *testing.T) {
 		)
 		assert.NoError(t, err)
 
-		expectedIdentities := targetEpochIdentities.Union(adjacentEpochIdentities.Map(func(identity flow.Identity) flow.Identity {
-			identity.Weight = 0
-			return identity
-		}))
+		expectedIdentities := targetEpochIdentities.Union(adjacentEpochIdentities)
 		assert.Equal(t, expectedIdentities, identityList)
 	})
 	t.Run("happy-path-identities-overlap", func(t *testing.T) {
 		targetEpochIdentities := unittest.IdentityListFixture(10).Sort(order.Canonical[flow.Identity])
-		adjacentEpochIdentities := unittest.IdentityListFixture(10)
+		adjacentEpochIdentities := unittest.IdentityListFixture(10, func(identity *flow.Identity) {
+			identity.EpochParticipationStatus = flow.EpochParticipationStatusJoining
+		})
 		sampledIdentities, err := targetEpochIdentities.Sample(2)
 		// change address so we can assert that we take identities from target epoch and not adjacent epoch
 		for i, identity := range sampledIdentities.Copy() {
@@ -220,6 +219,8 @@ func TestBuildIdentityTable(t *testing.T) {
 		}
 		assert.NoError(t, err)
 
+		adjacentEpochIdentities = adjacentEpochIdentities.Sort(order.Canonical[flow.Identity])
+
 		identityList, err := flow.BuildIdentityTable(
 			targetEpochIdentities.ToSkeleton(),
 			flow.DynamicIdentityEntryListFromIdentities(targetEpochIdentities),
@@ -228,10 +229,7 @@ func TestBuildIdentityTable(t *testing.T) {
 		)
 		assert.NoError(t, err)
 
-		expectedIdentities := targetEpochIdentities.Union(adjacentEpochIdentities.Map(func(identity flow.Identity) flow.Identity {
-			identity.Weight = 0
-			return identity
-		}))
+		expectedIdentities := targetEpochIdentities.Union(adjacentEpochIdentities)
 		assert.Equal(t, expectedIdentities, identityList)
 	})
 	t.Run("target-epoch-identities-not-ordered", func(t *testing.T) {

@@ -62,13 +62,13 @@ const (
 	EpochParticipationStatusEjected
 )
 
-func (p EpochParticipationStatus) String() string {
+func (s EpochParticipationStatus) String() string {
 	return [...]string{
 		"EpochParticipationStatusJoining",
 		"EpochParticipationStatusActive",
 		"EpochParticipationStatusLeaving",
 		"EpochParticipationStatusEjected",
-	}[p]
+	}[s]
 }
 
 func ParseEpochParticipationStatus(s string) (EpochParticipationStatus, error) {
@@ -84,6 +84,15 @@ func ParseEpochParticipationStatus(s string) (EpochParticipationStatus, error) {
 	default:
 		return 0, fmt.Errorf("invalid epoch participation status")
 	}
+}
+
+func (s EpochParticipationStatus) EncodeRLP(w io.Writer) error {
+	encodable := s.String()
+	err := rlp.Encode(w, encodable)
+	if err != nil {
+		return fmt.Errorf("could not encode rlp: %w", err)
+	}
+	return nil
 }
 
 // DynamicIdentity represents the dynamic part of public identity of one network participant (node).
@@ -181,6 +190,7 @@ func encodableSkeletonFromIdentity(iy IdentitySkeleton) encodableIdentitySkeleto
 func encodableFromIdentity(iy Identity) encodableIdentity {
 	return encodableIdentity{
 		encodableIdentitySkeleton: encodableSkeletonFromIdentity(iy.IdentitySkeleton),
+		ParticipationStatus:       iy.EpochParticipationStatus.String(),
 	}
 }
 
