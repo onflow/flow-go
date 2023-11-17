@@ -86,7 +86,7 @@ func GetSimpleValueStore() *TestValueStore {
 func getSimpleEventEmitter() *testEventEmitter {
 	events := make(flow.EventsList, 0)
 	return &testEventEmitter{
-		emitFlowEvent: func(etype flow.EventType, payload []byte) error {
+		emitRawEvent: func(etype flow.EventType, payload []byte) error {
 			events = append(events, flow.Event{Type: etype, Payload: payload})
 			return nil
 		},
@@ -272,7 +272,7 @@ func (m *testMeter) TotalEmittedEventBytes() uint64 {
 
 type testEventEmitter struct {
 	emitEvent              func(event cadence.Event) error
-	emitFlowEvent          func(etype flow.EventType, payload []byte) error
+	emitRawEvent           func(etype flow.EventType, payload []byte) error
 	events                 func() flow.EventsList
 	serviceEvents          func() flow.EventsList
 	convertedServiceEvents func() flow.ServiceEventList
@@ -288,11 +288,11 @@ func (vs *testEventEmitter) EmitEvent(event cadence.Event) error {
 	return vs.emitEvent(event)
 }
 
-func (vs *testEventEmitter) EmitFlowEvent(etype flow.EventType, payload []byte) error {
-	if vs.emitFlowEvent == nil {
+func (vs *testEventEmitter) EmitRawEvent(etype flow.EventType, payload []byte) error {
+	if vs.emitRawEvent == nil {
 		panic("method not set")
 	}
-	return vs.emitFlowEvent(etype, payload)
+	return vs.emitRawEvent(etype, payload)
 }
 
 func (vs *testEventEmitter) Events() flow.EventsList {
