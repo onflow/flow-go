@@ -7,10 +7,13 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/engine/common/worker"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/mempool/queue"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/p2p"
 	netcache "github.com/onflow/flow-go/network/p2p/cache"
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
@@ -85,21 +88,40 @@ type GossipSubAppSpecificScoreRegistry struct {
 	component.Component
 	logger     zerolog.Logger
 	idProvider module.IdentityProvider
+
 	// spamScoreCache currently only holds the control message misbehaviour penalty (spam related penalty).
 	spamScoreCache p2p.GossipSubSpamRecordCache
-	penalty        GossipSubCtrlMsgPenaltyValue
+
+	penalty GossipSubCtrlMsgPenaltyValue
+
 	// initial application specific penalty record, used to initialize the penalty cache entry.
-	init      func() p2p.GossipSubSpamRecord
+	init func() p2p.GossipSubSpamRecord
+
 	validator p2p.SubscriptionValidator
-	scoreTTL  time.Duration
+
+	// scoreTTL is the time to live of the application specific score of a peer; the registry keeps a cached copy of the
+	// application specific score of a peer for this duration. When the duration expires, the application specific score
+	// of the peer is updated asynchronously. As long as the update is in progress, the cached copy of the application
+	// specific score of the peer is used even if it is expired.
+	scoreTTL time.Duration
+
 	// appScoreCache is a cache that stores the application specific score of peers.
 	appScoreCache p2p.GossipSubApplicationSpecificScoreCache
+
+	// appScoreUpdateWorkerPool is the worker pool for handling the application specific score update of peers in a non-blocking way.
+	appScoreUpdateWorkerPool *worker.Pool[peer.ID]
 }
 
 // GossipSubAppSpecificScoreRegistryConfig is the configuration for the GossipSubAppSpecificScoreRegistry.
 // The configuration is used to initialize the registry.
 type GossipSubAppSpecificScoreRegistryConfig struct {
 	Logger zerolog.Logger `validate:"required"`
+
+	// AppSpecificScoreNumWorkers is the number of workers in the worker pool for handling the application specific score update of peers in a non-blocking way.
+	AppSpecificScoreNumWorkers int `validate:"gt=0"`
+
+	// AppSpecificScoreWorkerPoolSize is the size of the worker pool for handling the application specific score update of peers in a non-blocking way.
+	AppSpecificScoreWorkerPoolSize uint32 `validate:"gt=0"`
 
 	// Validator is the subscription validator used to validate the subscriptions of peers, and determine if a peer is
 	// authorized to subscribe to a topic.
@@ -122,9 +144,15 @@ type GossipSubAppSpecificScoreRegistryConfig struct {
 	// specific score of the peer is used even if it is expired.
 	ScoreTTL time.Duration `validate:"required"`
 
-	// CacheFactory is a factory function that returns a new GossipSubSpamRecordCache. It is used to initialize the spamScoreCache.
+	// SpamRecordCacheFactory is a factory function that returns a new GossipSubSpamRecordCache. It is used to initialize the spamScoreCache.
 	// The cache is used to store the application specific penalty of peers.
-	CacheFactory func() p2p.GossipSubSpamRecordCache `validate:"required"`
+	SpamRecordCacheFactory func() p2p.GossipSubSpamRecordCache `validate:"required"`
+
+	// AppScoreCacheFactory is a factory function that returns a new GossipSubApplicationSpecificScoreCache. It is used to initialize the appScoreCache.
+	// The cache is used to store the application specific score of peers.
+	AppScoreCacheFactory func() p2p.GossipSubApplicationSpecificScoreCache `validate:"required"`
+
+	HeroCacheMetricsFactory metrics.HeroCacheMetricsFactory `validate:"required"`
 }
 
 // NewGossipSubAppSpecificScoreRegistry returns a new GossipSubAppSpecificScoreRegistry.
@@ -136,15 +164,23 @@ type GossipSubAppSpecificScoreRegistryConfig struct {
 //
 //	a new GossipSubAppSpecificScoreRegistry.
 func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegistryConfig) *GossipSubAppSpecificScoreRegistry {
+	lg := config.Logger.With().Str("module", "app_score_registry").Logger()
+	store := queue.NewHeroStore(config.AppSpecificScoreWorkerPoolSize, lg.With().Str("component", "app_specific_score_update").Logger(), config.HeroCacheMetricsFactory())
+
 	reg := &GossipSubAppSpecificScoreRegistry{
 		logger:         config.Logger.With().Str("module", "app_score_registry").Logger(),
-		spamScoreCache: config.CacheFactory(),
+		spamScoreCache: config.SpamRecordCacheFactory(),
+		appScoreCache:  config.AppScoreCacheFactory(),
 		penalty:        config.Penalty,
 		init:           config.Init,
 		validator:      config.Validator,
 		idProvider:     config.IdProvider,
 		scoreTTL:       config.ScoreTTL,
 	}
+
+	reg.appScoreUpdateWorkerPool = worker.NewWorkerPoolBuilder[peer.ID](lg.With().Str("component", "app_specific_score_update_worker_pool").Logger(),
+		store,
+		reg.processAppSpecificScoreUpdateWork).Build()
 
 	builder := component.NewComponentManagerBuilder()
 	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
@@ -164,6 +200,11 @@ func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegis
 		<-reg.validator.Done()
 		reg.logger.Info().Msg("subscription validator stopped")
 	})
+
+	for i := 0; i < config.AppSpecificScoreNumWorkers; i++ {
+		builder.AddWorker(reg.appScoreUpdateWorkerPool.WorkerLogic())
+	}
+
 	reg.Component = builder.Build()
 
 	return reg
@@ -181,23 +222,35 @@ var _ p2p.GossipSubInvCtrlMsgNotifConsumer = (*GossipSubAppSpecificScoreRegistry
 // Implementation must be thread-safe.
 func (r *GossipSubAppSpecificScoreRegistry) AppSpecificScoreFunc() func(peer.ID) float64 {
 	return func(pid peer.ID) float64 {
+		lg := r.logger.With().Str("remote_peer_id", p2plogging.PeerId(pid)).Logger()
 		appSpecificScore, lastUpdated, ok := r.appScoreCache.Get(pid)
-		if !ok || time.Since(lastUpdated) > r.scoreTTL {
-			appSpecificScore = r.computeAppSpecificScore(pid)
-			err := r.appScoreCache.Add(pid, appSpecificScore, time.Now())
-			if err != nil {
-				// the error is considered fatal as it means the cache is not working properly.
-				r.logger.Fatal().
-					Str("remote_peer_id", p2plogging.PeerId(pid)).
-					Err(err).
-					Msg("could not add application specific penalty for peer")
-			}
-			r.logger.Trace().
-				Str("remote_peer_id", p2plogging.PeerId(pid)).
+		switch {
+		case !ok:
+			// record not found in the cache, or expired; submit a worker to update it.
+			submitted := r.appScoreUpdateWorkerPool.Submit(pid)
+			lg.Trace().
+				Bool("worker_submitted", submitted).
+				Msg("application specific score not found in cache, submitting worker to update it")
+
+			return 0 // in the mean time, return 0, which is a neutral score.
+		case time.Since(lastUpdated) > r.scoreTTL:
+			// record found in the cache, but expired; submit a worker to update it.
+			submitted := r.appScoreUpdateWorkerPool.Submit(pid)
+			lg.Trace().
+				Bool("worker_submitted", submitted).
 				Float64("app_specific_score", appSpecificScore).
-				Msg("application specific penalty computed and cache updated")
+				Dur("score_ttl", r.scoreTTL).
+				Msg("application specific score expired, submitting worker to update it")
+
+			return appSpecificScore // in the mean time, return the expired score.
+		default:
+			// record found in the cache, check if it is expired.
+			r.logger.Trace().
+				Float64("app_specific_score", appSpecificScore).
+				Msg("application specific score found in cache")
+
+			return appSpecificScore
 		}
-		return appSpecificScore
 	}
 }
 
@@ -260,6 +313,26 @@ func (r *GossipSubAppSpecificScoreRegistry) computeAppSpecificScore(pid peer.ID)
 		Msg("application specific penalty computed")
 
 	return appSpecificScore
+}
+
+// processMisbehaviorReport is the worker function that is called by the worker pool to update the application specific score of a peer.
+// The function is called in a non-blocking way, and the worker pool is used to limit the number of concurrent executions of the function.
+// Args:
+// - pid: the peer ID of the peer in the GossipSub protocol.
+// Returns:
+// - error: an error if the update failed; any returned error is an irrecoverable error and indicates a bug or misconfiguration.
+func (r *GossipSubAppSpecificScoreRegistry) processAppSpecificScoreUpdateWork(p peer.ID) error {
+	appSpecificScore := r.computeAppSpecificScore(p)
+	err := r.appScoreCache.Add(p, appSpecificScore, time.Now())
+	if err != nil {
+		// the error is considered fatal as it means the cache is not working properly.
+		return fmt.Errorf("could not add application specific score %f for peer to cache: %w", appSpecificScore, err)
+	}
+	r.logger.Trace().
+		Str("remote_peer_id", p2plogging.PeerId(p)).
+		Float64("app_specific_score", appSpecificScore).
+		Msg("application specific penalty computed and cache updated")
+	return nil
 }
 
 func (r *GossipSubAppSpecificScoreRegistry) stakingScore(pid peer.ID) (float64, flow.Identifier, flow.Role) {
