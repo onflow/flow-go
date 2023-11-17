@@ -3,8 +3,6 @@ package convert
 import (
 	"encoding/hex"
 	"fmt"
-	"time"
-
 	"github.com/coreos/go-semver/semver"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
@@ -79,7 +77,7 @@ func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error)
 	var dkgPhase3FinalView cadence.UInt64
 	var cdcClusters cadence.Array
 	var cdcParticipants cadence.Array
-	var targetEndTimeUnix cadence.UInt64
+	var targetEndTimeUnix cadence.UInt64 // Unix time [seconds]
 
 	var foundFieldCount int
 
@@ -214,6 +212,7 @@ func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error)
 		DKGPhase1FinalView: uint64(dkgPhase1FinalView),
 		DKGPhase2FinalView: uint64(dkgPhase2FinalView),
 		DKGPhase3FinalView: uint64(dkgPhase3FinalView),
+		TargetEndTime:      uint64(targetEndTimeUnix),
 	}
 
 	// Cadence's unsafeRandom().toString() produces a string of variable length.
@@ -231,7 +230,6 @@ func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error)
 			err,
 		)
 	}
-	setup.TargetEndTime = time.Unix(int64(targetEndTimeUnix), 0)
 
 	// parse cluster assignments
 	setup.Assignments, err = convertClusterAssignments(cdcClusters.Values)

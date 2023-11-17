@@ -2,8 +2,6 @@ package inmem
 
 import (
 	"fmt"
-	"time"
-
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
@@ -38,7 +36,10 @@ func (e Epoch) RandomSource() ([]byte, error) {
 	return e.enc.RandomSource, nil
 }
 
-func (e Epoch) TargetEndTime() (time.Time, error) {
+// TargetEndTime returns the desired real-world end time for this epoch, represented as
+// Unix Time (in units of seconds). This target is specified by the FlowEpoch smart contract in
+// the EpochSetup event and used by the Cruise Control system to moderate the block rate.
+func (e Epoch) TargetEndTime() (uint64, error) {
 	return e.enc.TargetEndTime, nil
 }
 
@@ -148,7 +149,10 @@ func (es *setupEpoch) FinalView() (uint64, error) {
 	return es.setupEvent.FinalView, nil
 }
 
-func (es *setupEpoch) TargetEndTime() (time.Time, error) {
+// TargetEndTime returns the desired real-world end time for this epoch, represented as
+// Unix Time (in units of seconds). This target is specified by the FlowEpoch smart contract in
+// the EpochSetup event and used by the Cruise Control system to moderate the block rate.
+func (es *setupEpoch) TargetEndTime() (uint64, error) {
 	return es.setupEvent.TargetEndTime, nil
 }
 
