@@ -17,9 +17,6 @@ var weekdays = map[string]time.Weekday{
 	strings.ToLower(time.Saturday.String()):  time.Saturday,
 }
 
-// epochLength is the length of an epoch (7 days, or 1 week).
-const epochLength = time.Hour * 24 * 7
-
 var transitionFmt = "%s@%02d:%02d" // example: wednesday@08:00
 
 // EpochTransitionTime represents the target epoch transition time.

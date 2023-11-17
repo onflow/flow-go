@@ -45,6 +45,7 @@ type epochInfo struct {
 // For numerical stability, we avoid repetitive conversions between seconds and time.Duration.
 // Instead, internally within the controller, we work with float64 in units of seconds.
 func (epoch *epochInfo) targetViewTime() float64 {
+	// TODO we need to pass TargetDuration via service event as well :(
 	return epochLength.Seconds() / float64(epoch.curEpochFinalView-epoch.curEpochFirstView+1)
 }
 

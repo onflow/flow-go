@@ -29,7 +29,7 @@ type BlockTimeControllerSuite struct {
 	epochCounter           uint64
 	curEpochFirstView      uint64
 	curEpochFinalView      uint64
-	curEpochTargetEndTime  time.Time
+	curEpochTargetEndTime  uint64
 	epochFallbackTriggered bool
 
 	metrics  mockmodule.CruiseCtlMetrics
@@ -49,8 +49,8 @@ func TestBlockTimeController(t *testing.T) {
 	suite.Run(t, new(BlockTimeControllerSuite))
 }
 
-func (bs *BlockTimeControllerSuite) EpochDuration() time.Duration {
-	return time.Hour
+func (bs *BlockTimeControllerSuite) EpochDurationSeconds() uint64 {
+	return 60 * 60
 }
 
 // SetupTest initializes mocks and default values.
@@ -61,7 +61,7 @@ func (bs *BlockTimeControllerSuite) SetupTest() {
 	bs.epochCounter = uint64(0)
 	bs.curEpochFirstView = uint64(0)
 	bs.curEpochFinalView = uint64(60 * 60 * 60) // 1 view/sec for 1hr epoch
-	bs.curEpochTargetEndTime = time.Now().Add(bs.EpochDuration())
+	bs.curEpochTargetEndTime = uint64(time.Now().Unix()) + bs.EpochDurationSeconds()
 	bs.epochFallbackTriggered = false
 	setupMocks(bs)
 }
@@ -204,7 +204,7 @@ func (bs *BlockTimeControllerSuite) TestInit_EpochSetupPhase() {
 	nextEpoch := mockprotocol.NewEpoch(bs.T())
 	nextEpoch.On("Counter").Return(bs.epochCounter+1, nil)
 	nextEpoch.On("FinalView").Return(bs.curEpochFinalView*2, nil)
-	nextEpoch.On("TargetEndTime").Return(bs.curEpochTargetEndTime.Add(bs.EpochDuration()), nil)
+	nextEpoch.On("TargetEndTime").Return(bs.curEpochTargetEndTime+bs.EpochDurationSeconds(), nil)
 	bs.epochs.Add(nextEpoch)
 
 	bs.CreateAndStartController()
@@ -374,7 +374,7 @@ func (bs *BlockTimeControllerSuite) testOnBlockIncorporated_EpochTransition() {
 	nextEpoch := mockprotocol.NewEpoch(bs.T())
 	nextEpoch.On("Counter").Return(bs.epochCounter+1, nil)
 	nextEpoch.On("FinalView").Return(bs.curEpochFinalView*2, nil)
-	nextEpoch.On("TargetEndTime").Return(bs.curEpochTargetEndTime.Add(bs.EpochDuration()), nil)
+	nextEpoch.On("TargetEndTime").Return(bs.curEpochTargetEndTime+bs.EpochDurationSeconds(), nil)
 	bs.epochs.Add(nextEpoch)
 	bs.CreateAndStartController()
 	defer bs.StopController()
@@ -391,7 +391,7 @@ func (bs *BlockTimeControllerSuite) testOnBlockIncorporated_EpochTransition() {
 	// epoch boundaries should be updated
 	assert.Equal(bs.T(), bs.curEpochFinalView+1, bs.ctl.epochInfo.curEpochFirstView)
 	assert.Equal(bs.T(), bs.ctl.epochInfo.curEpochFinalView, bs.curEpochFinalView*2)
-	assert.Equal(bs.T(), bs.ctl.epochInfo.curEpochTargetEndTime, bs.curEpochTargetEndTime.Add(bs.EpochDuration()))
+	assert.Equal(bs.T(), bs.ctl.epochInfo.curEpochTargetEndTime, bs.curEpochTargetEndTime+bs.EpochDurationSeconds())
 	assert.Nil(bs.T(), bs.ctl.nextEpochFinalView)
 }
 
@@ -400,7 +400,7 @@ func (bs *BlockTimeControllerSuite) TestOnEpochSetupPhaseStarted() {
 	nextEpoch := mockprotocol.NewEpoch(bs.T())
 	nextEpoch.On("Counter").Return(bs.epochCounter+1, nil)
 	nextEpoch.On("FinalView").Return(bs.curEpochFinalView*2, nil)
-	nextEpoch.On("TargetEndTime").Return(bs.curEpochTargetEndTime.Add(bs.EpochDuration()), nil)
+	nextEpoch.On("TargetEndTime").Return(bs.curEpochTargetEndTime+bs.EpochDurationSeconds(), nil)
 	bs.epochs.Add(nextEpoch)
 	bs.CreateAndStartController()
 	defer bs.StopController()
@@ -412,14 +412,14 @@ func (bs *BlockTimeControllerSuite) TestOnEpochSetupPhaseStarted() {
 	}, time.Second, time.Millisecond)
 
 	assert.Equal(bs.T(), bs.curEpochFinalView*2, *bs.ctl.nextEpochFinalView)
-	assert.Equal(bs.T(), bs.curEpochTargetEndTime.Add(bs.EpochDuration()), bs.ctl.nextEpochTargetEndTime)
+	assert.Equal(bs.T(), bs.curEpochTargetEndTime+bs.EpochDurationSeconds(), bs.ctl.nextEpochTargetEndTime)
 
 	// duplicate events should be no-ops
 	for i := 0; i <= cap(bs.ctl.epochSetups); i++ {
 		bs.ctl.EpochSetupPhaseStarted(bs.epochCounter, header)
 	}
 	assert.Equal(bs.T(), bs.curEpochFinalView*2, *bs.ctl.nextEpochFinalView)
-	assert.Equal(bs.T(), bs.curEpochTargetEndTime.Add(bs.EpochDuration()), bs.ctl.nextEpochTargetEndTime)
+	assert.Equal(bs.T(), bs.curEpochTargetEndTime+bs.EpochDurationSeconds(), bs.ctl.nextEpochTargetEndTime)
 }
 
 // TestProposalDelay_AfterTargetTransitionTime tests the behaviour of the controller
@@ -431,10 +431,10 @@ func (bs *BlockTimeControllerSuite) TestProposalDelay_AfterTargetTransitionTime(
 	bs.CreateAndStartController()
 	defer bs.StopController()
 
-	lastProposalDelay := bs.EpochDuration() // start with large dummy value
+	lastProposalDelay := bs.EpochDurationSeconds() // start with large dummy value
 	for view := bs.initialView + 1; view < bs.ctl.curEpochFinalView; view++ {
 		// we have passed the target end time of the epoch
-		receivedParentBlockAt := bs.ctl.curEpochTargetEndTime.Add(time.Duration(view) * time.Second)
+		receivedParentBlockAt := time.Unix(int64(bs.ctl.curEpochTargetEndTime+view), 0)
 		timedBlock := makeTimedBlock(view, unittest.IdentifierFixture(), receivedParentBlockAt)
 		err := bs.ctl.measureViewDuration(timedBlock)
 		require.NoError(bs.T(), err)
@@ -444,7 +444,7 @@ func (bs *BlockTimeControllerSuite) TestProposalDelay_AfterTargetTransitionTime(
 		delay := pubTime.Sub(receivedParentBlockAt)
 
 		assert.LessOrEqual(bs.T(), delay, lastProposalDelay)
-		lastProposalDelay = delay
+		lastProposalDelay = uint64(delay.Seconds())
 
 		// transition views until the end of the epoch, or for 100 views
 		if view-bs.initialView >= 100 {
@@ -463,14 +463,14 @@ func (bs *BlockTimeControllerSuite) TestProposalDelay_BehindSchedule() {
 	bs.CreateAndStartController()
 	defer bs.StopController()
 
-	lastProposalDelay := bs.EpochDuration() // start with large dummy value
-	idealEnteredViewTime := bs.ctl.curEpochTargetEndTime.Add(-epochLength / 2)
+	lastProposalDelay := bs.EpochDurationSeconds() // start with large dummy value
+	idealEnteredViewTime := bs.ctl.curEpochTargetEndTime - (bs.EpochDurationSeconds() / 2)
 
 	// 1s behind of schedule
-	receivedParentBlockAt := idealEnteredViewTime.Add(time.Second)
+	receivedParentBlockAt := idealEnteredViewTime + 1
 	for view := bs.initialView + 1; view < bs.ctl.curEpochFinalView; view++ {
 		// hold the instantaneous error constant for each view
-		receivedParentBlockAt = receivedParentBlockAt.Add(seconds2Duration(bs.ctl.targetViewTime()))
+		receivedParentBlockAt = receivedParentBlockAt + uint64(bs.ctl.targetViewTime())
 		timedBlock := makeTimedBlock(view, unittest.IdentifierFixture(), receivedParentBlockAt)
 		err := bs.ctl.measureViewDuration(timedBlock)
 		require.NoError(bs.T(), err)
@@ -500,7 +500,7 @@ func (bs *BlockTimeControllerSuite) TestProposalDelay_AheadOfSchedule() {
 	defer bs.StopController()
 
 	lastProposalDelay := time.Duration(0) // start with large dummy value
-	idealEnteredViewTime := bs.ctl.curEpochTargetEndTime.Add(-bs.EpochDuration() / 2)
+	idealEnteredViewTime := bs.ctl.curEpochTargetEndTime - (bs.EpochDurationSeconds() / 2)
 	// 1s ahead of schedule
 	receivedParentBlockAt := idealEnteredViewTime.Add(-time.Second)
 	for view := bs.initialView + 1; view < bs.ctl.curEpochFinalView; view++ {
