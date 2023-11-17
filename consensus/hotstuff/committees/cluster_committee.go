@@ -62,8 +62,7 @@ func NewClusterCommittee(
 		clusterMemberFilter: filter.And[flow.Identity](
 			// adapt the identity filter to the identity skeleton filter
 			filter.Adapt(initialClusterMembersSelector),
-			filter.Not(filter.Ejected),
-			filter.HasWeight(true),
+			filter.IsValidCurrentEpochParticipant,
 		),
 		clusterMembers:           initialClusterMembers,
 		initialClusterIdentities: initialClusterIdentities,
@@ -185,21 +184,20 @@ func (c *Cluster) DKG(_ uint64) (hotstuff.DKG, error) {
 // composition at the time the cluster was specified by the epoch smart contract.
 //
 // CONTEXT: The EpochSetup event contains the IdentitySkeletons for each cluster, thereby specifying cluster membership.
-// While ejection status and dynamic weight are not part of the EpochSetup event, we can supplement this information as follows:
-//   - Per convention, service events are delivered (asynchronously) in an *order-preserving* manner. Furthermore, weight changes or
+// While ejection status is not part of the EpochSetup event, we can supplement this information as follows:
+//   - Per convention, service events are delivered (asynchronously) in an *order-preserving* manner. Furthermore,
 //     node ejection is also mediated by system smart contracts and delivered via service events.
-//   - Therefore, the EpochSetup event contains the up-to-date snapshot of the cluster members. Any weight changes or node ejection
-//     that happened before should be reflected in the EpochSetup event. Specifically, the initial weight should be reduced and ejected
-//     nodes should be no longer listed in the EpochSetup event. Hence, when the EpochSetup event is emitted / processed, the weight of
-//     all cluster members equals their InitialWeight and the Ejected flag is false.
+//   - Therefore, the EpochSetup event contains the up-to-date snapshot of the cluster members. Any node ejection
+//     that happened before should be reflected in the EpochSetup event. Specifically, ejected nodes
+//     should be no longer listed in the EpochSetup event. Hence, when the EpochSetup event is emitted / processed, the participation status of
+//     all cluster members equals flow.EpochParticipationStatusActive.
 func constructInitialClusterIdentities(clusterMembers flow.IdentitySkeletonList) flow.IdentityList {
 	initialClusterIdentities := make(flow.IdentityList, 0, len(clusterMembers))
 	for _, skeleton := range clusterMembers {
 		initialClusterIdentities = append(initialClusterIdentities, &flow.Identity{
 			IdentitySkeleton: *skeleton,
 			DynamicIdentity: flow.DynamicIdentity{
-				Weight:  skeleton.InitialWeight,
-				Ejected: false,
+				EpochParticipationStatus: flow.EpochParticipationStatusActive,
 			},
 		})
 	}

@@ -126,12 +126,12 @@ func (_m *ProtocolStateMachine) TransitionToNextEpoch() error {
 }
 
 // UpdateIdentity provides a mock function with given fields: updated
-func (_m *ProtocolStateMachine) UpdateIdentity(updated *flow.DynamicIdentityEntry) error {
-	ret := _m.Called(updated)
+func (_m *ProtocolStateMachine) EjectIdentity(nodeID flow.Identifier) error {
+	ret := _m.Called(nodeID)
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(*flow.DynamicIdentityEntry) error); ok {
-		r0 = rf(updated)
+		r0 = rf(nodeID)
 	} else {
 		r0 = ret.Error(0)
 	}

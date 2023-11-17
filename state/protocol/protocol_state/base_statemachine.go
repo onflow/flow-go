@@ -43,13 +43,11 @@ type ProtocolStateMachine interface {
 	//     after such error and discard the protocolStateMachine!
 	ProcessEpochCommit(epochCommit *flow.EpochCommit) (bool, error)
 
-	// UpdateIdentity updates identity table with new identity entry.
+	// EjectIdentity updates identity table by changing node's participation status to 'ejected'.
 	// Should pass identity which is already present in the table, otherwise an exception will be raised.
-	// TODO: This function currently modifies both current+next identities based on input.
-	//       This is incompatible with the design doc, and needs to be updated to modify current/next epoch separately
 	// Expected errors during normal operations:
 	// - `protocol.InvalidServiceEventError` if the updated identity is not found in current and adjacent epochs.
-	UpdateIdentity(updated *flow.DynamicIdentityEntry) error
+	EjectIdentity(nodeID flow.Identifier) error
 
 	// TransitionToNextEpoch discards current protocol state and transitions to the next epoch.
 	// Epoch transition is only allowed when:
@@ -133,27 +131,27 @@ func (u *baseProtocolStateMachine) rebuildIdentityLookup() {
 	}
 }
 
-// UpdateIdentity updates identity table with new identity entry.
+// EjectIdentity updates identity table by changing node's participation status to 'ejected'.
 // Should pass identity which is already present in the table, otherwise an exception will be raised.
 // Expected errors during normal operations:
 // - `protocol.InvalidServiceEventError` if the updated identity is not found in current and adjacent epochs.
-func (u *baseProtocolStateMachine) UpdateIdentity(updated *flow.DynamicIdentityEntry) error {
+func (u *baseProtocolStateMachine) EjectIdentity(nodeID flow.Identifier) error {
 	u.ensureLookupPopulated()
-	prevEpochIdentity, foundInPrev := u.prevEpochIdentitiesLookup[updated.NodeID]
+	prevEpochIdentity, foundInPrev := u.prevEpochIdentitiesLookup[nodeID]
 	if foundInPrev {
-		prevEpochIdentity.Dynamic = updated.Dynamic
+		prevEpochIdentity.Dynamic.EpochParticipationStatus = flow.EpochParticipationStatusEjected
 	}
-	currentEpochIdentity, foundInCurrent := u.currentEpochIdentitiesLookup[updated.NodeID]
+	currentEpochIdentity, foundInCurrent := u.currentEpochIdentitiesLookup[nodeID]
 	if foundInCurrent {
-		currentEpochIdentity.Dynamic = updated.Dynamic
+		currentEpochIdentity.Dynamic.EpochParticipationStatus = flow.EpochParticipationStatusEjected
 	}
-	nextEpochIdentity, foundInNext := u.nextEpochIdentitiesLookup[updated.NodeID]
+	nextEpochIdentity, foundInNext := u.nextEpochIdentitiesLookup[nodeID]
 	if foundInNext {
-		nextEpochIdentity.Dynamic = updated.Dynamic
+		nextEpochIdentity.Dynamic.EpochParticipationStatus = flow.EpochParticipationStatusEjected
 	}
 	if !foundInPrev && !foundInCurrent && !foundInNext {
 		return protocol.NewInvalidServiceEventErrorf("expected to find identity for "+
-			"prev, current or next epoch, but (%v) was not found", updated.NodeID)
+			"prev, current or next epoch, but (%v) was not found", nodeID)
 	}
 	return nil
 }

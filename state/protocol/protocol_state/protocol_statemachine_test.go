@@ -123,7 +123,7 @@ func (s *ProtocolStateMachineSuite) TestBuild() {
 
 	updatedDynamicIdentity := s.parentProtocolState.CurrentEpochIdentityTable[0].DynamicIdentity
 	updatedDynamicIdentity.Ejected = true
-	err := s.stateMachine.UpdateIdentity(&flow.DynamicIdentityEntry{
+	err := s.stateMachine.EjectIdentity(&flow.DynamicIdentityEntry{
 		NodeID:  s.parentProtocolState.CurrentEpochIdentityTable[0].NodeID,
 		Dynamic: updatedDynamicIdentity,
 	})
@@ -264,7 +264,7 @@ func (s *ProtocolStateMachineSuite) TestUpdateIdentityUnknownIdentity() {
 		NodeID:  unittest.IdentifierFixture(),
 		Dynamic: flow.DynamicIdentity{},
 	}
-	err := s.stateMachine.UpdateIdentity(identity)
+	err := s.stateMachine.EjectIdentity(identity)
 	require.Error(s.T(), err, "should not be able to update data of unknown identity")
 	require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 
@@ -298,7 +298,7 @@ func (s *ProtocolStateMachineSuite) TestUpdateIdentityHappyPath() {
 
 	allUpdates := append(weightChanges, ejectedChanges...)
 	for _, update := range allUpdates {
-		err := s.stateMachine.UpdateIdentity(&flow.DynamicIdentityEntry{
+		err := s.stateMachine.EjectIdentity(&flow.DynamicIdentityEntry{
 			NodeID:  update.NodeID,
 			Dynamic: update.DynamicIdentity,
 		})
@@ -482,7 +482,7 @@ func (s *ProtocolStateMachineSuite) TestEpochSetupAfterIdentityChange() {
 	}
 	allUpdates := append(weightChanges, ejectedChanges...)
 	for _, update := range allUpdates {
-		err := s.stateMachine.UpdateIdentity(&flow.DynamicIdentityEntry{
+		err := s.stateMachine.EjectIdentity(&flow.DynamicIdentityEntry{
 			NodeID:  update.NodeID,
 			Dynamic: update.DynamicIdentity,
 		})
