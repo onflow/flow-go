@@ -35,10 +35,10 @@ type TimedBlock struct {
 // the first view of a new epoch, or the EpochSetup phase of the current epoch.
 type epochInfo struct {
 	curEpochFirstView      uint64
-	curEpochFinalView      uint64    // F[v] - the final view of the epoch
-	curEpochTargetEndTime  time.Time // T[v] - the target end time of the current epoch
-	nextEpochFinalView     *uint64
-	nextEpochTargetEndTime time.Time
+	curEpochFinalView      uint64  // F[v] - the final view of the current epoch
+	curEpochTargetEndTime  uint64  // T[v] - the target end time of the current epoch, represented as Unix Time [seconds]
+	nextEpochFinalView     *uint64 // the final view of the next epoch
+	nextEpochTargetEndTime *uint64 // the target end time of the next epoch, represented as Unix Time [seconds]
 }
 
 // targetViewTime returns τ[v], the ideal, steady-state view time for the current epoch.
@@ -80,7 +80,9 @@ type BlockTimeController struct {
 	log     zerolog.Logger
 	metrics module.CruiseCtlMetrics
 
-	epochInfo              // scheduled transition view for current/next epoch
+	epochInfo // scheduled transition view for current/next epoch
+	// Currently, the only possible state transition for `epochFallbackTriggered` is false → true.
+	// TODO for 'leaving Epoch Fallback via special service event' this might need to change.
 	epochFallbackTriggered bool
 
 	incorporatedBlocks chan TimedBlock   // OnBlockIncorporated events, we desire these blocks to be processed in a timely manner and therefore use a small channel capacity
@@ -184,10 +186,8 @@ func (ctl *BlockTimeController) initEpochInfo(curView uint64) error {
 		if err != nil {
 			return fmt.Errorf("could not initialize next epoch target end time: %w", err)
 		}
-		ctl.nextEpochTargetEndTime = nextEpochTargetEndTime
+		ctl.nextEpochTargetEndTime = &nextEpochTargetEndTime
 	}
-
-	ctl.curEpochTargetEndTime = ctl.config.TargetTransition.inferTargetEndTime(time.Now().UTC(), ctl.epochInfo.fractionComplete(curView))
 
 	epochFallbackTriggered, err := ctl.state.Params().EpochFallbackTriggered()
 	if err != nil {
@@ -333,7 +333,7 @@ func (ctl *BlockTimeController) checkForEpochTransition(tb TimedBlock) error {
 	if ctl.nextEpochFinalView == nil { // final view of epoch we are entering should be known
 		return fmt.Errorf("cannot transition without nextEpochFinalView set")
 	}
-	if ctl.nextEpochTargetEndTime.IsZero() {
+	if ctl.nextEpochTargetEndTime == nil {
 		return fmt.Errorf("cannot transition without nextEpochTargetEndTime set")
 	}
 	if view > *ctl.nextEpochFinalView { // the block's view should be within the upcoming epoch
@@ -343,9 +343,9 @@ func (ctl *BlockTimeController) checkForEpochTransition(tb TimedBlock) error {
 
 	ctl.curEpochFirstView = ctl.curEpochFinalView + 1
 	ctl.curEpochFinalView = *ctl.nextEpochFinalView
+	ctl.curEpochTargetEndTime = *ctl.nextEpochTargetEndTime
 	ctl.nextEpochFinalView = nil
-	ctl.curEpochTargetEndTime = ctl.nextEpochTargetEndTime
-	ctl.nextEpochTargetEndTime = time.Time{}
+	ctl.nextEpochTargetEndTime = nil
 	return nil
 }
 
@@ -354,6 +354,7 @@ func (ctl *BlockTimeController) checkForEpochTransition(tb TimedBlock) error {
 // No errors are expected during normal operation.
 func (ctl *BlockTimeController) measureViewDuration(tb TimedBlock) error {
 	view := tb.Block.View
+	observationTimeUnix := uint64(tb.TimeObserved.Unix())
 	// if the controller is disabled, we don't update measurements and instead use a fallback timing
 	if !ctl.config.Enabled.Load() {
 		fallbackDelay := ctl.config.FallbackProposalDelay.Load()
@@ -380,11 +381,12 @@ func (ctl *BlockTimeController) measureViewDuration(tb TimedBlock) error {
 	// constructs the child (for first view of new epoch). The last view of the epoch ends, when the child proposal is published.
 	tau := ctl.targetViewTime()                                // τ - idealized target view time in units of seconds
 	viewDurationsRemaining := ctl.curEpochFinalView + 1 - view // k[v] - views remaining in current epoch
-	durationRemaining := ctl.curEpochTargetEndTime.Sub(tb.TimeObserved)
+
+	durationRemaining := ctl.curEpochTargetEndTime - observationTimeUnix
 
 	// Compute instantaneous error term: e[v] = k[v]·τ - T[v] i.e. the projected difference from target switchover
 	// and update PID controller's error terms. All UNITS in SECOND.
-	instErr := float64(viewDurationsRemaining)*tau - durationRemaining.Seconds()
+	instErr := float64(viewDurationsRemaining)*tau - float64(durationRemaining)
 	propErr := ctl.proportionalErr.AddObservation(instErr)
 	itgErr := ctl.integralErr.AddObservation(instErr)
 	drivErr := propErr - previousPropErr
@@ -400,7 +402,7 @@ func (ctl *BlockTimeController) measureViewDuration(tb TimedBlock) error {
 	ctl.log.Debug().
 		Uint64("last_observation", previousProposalTiming.ObservationView()).
 		Dur("duration_since_last_observation", tb.TimeObserved.Sub(previousProposalTiming.ObservationTime())).
-		Dur("projected_time_remaining", durationRemaining).
+		Dur("projected_time_remaining", time.Duration(durationRemaining)*time.Second).
 		Uint64("view_durations_remaining", viewDurationsRemaining).
 		Float64("inst_err", instErr).
 		Float64("proportional_err", propErr).
@@ -439,7 +441,7 @@ func (ctl *BlockTimeController) processEpochSetupPhaseStarted(snapshot protocol.
 		return fmt.Errorf("could not get next epoch target end time: %w", err)
 	}
 	ctl.epochInfo.nextEpochFinalView = &finalView
-	ctl.epochInfo.nextEpochTargetEndTime = targetEndTIme
+	ctl.epochInfo.nextEpochTargetEndTime = &targetEndTIme
 	return nil
 }
 

@@ -1,8 +1,6 @@
 package unittest
 
 import (
-	"time"
-
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/onflow/cadence/runtime/common"
@@ -39,7 +37,7 @@ func EpochSetupFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochSetu
 		DKGPhase2FinalView: 160,
 		DKGPhase3FinalView: 170,
 		RandomSource:       randomSource,
-		TargetEndTime:      time.Unix(2000000000, 0),
+		TargetEndTime:      2000000000,
 		Assignments: flow.AssignmentList{
 			{
 				flow.MustHexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000001"),
@@ -208,7 +206,7 @@ func createEpochSetupEvent() cadence.Event {
 		cadence.UInt64(170),
 
 		// targetEndTime
-		cadence.UInt64(time.Unix(2000000000, 0).Unix()),
+		cadence.UInt64(2000000000),
 	}).WithType(newFlowEpochEpochSetupEventType())
 }
 
