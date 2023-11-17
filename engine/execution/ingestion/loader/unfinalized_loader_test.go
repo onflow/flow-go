@@ -20,9 +20,10 @@ var _ ingestion.BlockLoader = (*loader.UnfinalizedLoader)(nil)
 func TestLoadingUnfinalizedBlocks(t *testing.T) {
 	ps := mocks.NewProtocolState()
 
-	// Genesis <- A <- B <- C (finalized)
-	chain, result, seal := unittest.ChainFixture(4)
-	genesis, blockA, blockB, blockC := chain[0], chain[1], chain[2], chain[3]
+	// Genesis <- A <- B <- C (finalized) <- D
+	chain, result, seal := unittest.ChainFixture(5)
+	genesis, blockA, blockB, blockC, blockD :=
+		chain[0], chain[1], chain[2], chain[3], chain[4]
 
 	logChain(chain)
 
@@ -30,6 +31,7 @@ func TestLoadingUnfinalizedBlocks(t *testing.T) {
 	require.NoError(t, ps.Extend(blockA))
 	require.NoError(t, ps.Extend(blockB))
 	require.NoError(t, ps.Extend(blockC))
+	require.NoError(t, ps.Extend(blockD))
 	require.NoError(t, ps.Finalize(blockC.ID()))
 
 	es := new(stateMock.FinalizedExecutionState)
@@ -48,5 +50,6 @@ func TestLoadingUnfinalizedBlocks(t *testing.T) {
 		blockA.ID(),
 		blockB.ID(),
 		blockC.ID(),
+		blockD.ID(),
 	}, unexecuted)
 }
