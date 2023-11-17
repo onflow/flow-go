@@ -327,10 +327,6 @@ func (db *Database) Len() int {
 	return int(db.atreemap.Count())
 }
 
-func (db *Database) BytesStored() int {
-	return db.baseStorage.BytesStored()
-}
-
 // keyvalue is a key-value tuple tagged with a deletion field to allow creating
 // memory-database write batches.
 type keyvalue struct {
