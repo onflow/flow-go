@@ -18,6 +18,7 @@ import (
 	"github.com/dapperlabs/testingdock"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	dockercontainer "github.com/docker/docker/api/types/container"
 	dockerclient "github.com/docker/docker/client"
 	io_prometheus_client "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
@@ -692,7 +693,7 @@ func (net *FlowNetwork) StopContainerByName(ctx context.Context, containerName s
 	if container == nil {
 		return fmt.Errorf("%s container not found", containerName)
 	}
-	return net.cli.ContainerStop(ctx, container.ID, nil)
+	return net.cli.ContainerStop(ctx, container.ID, dockercontainer.StopOptions{})
 }
 
 type ObserverConfig struct {

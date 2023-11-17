@@ -36,6 +36,8 @@ type testType struct {
 	contracts  []string
 
 	heartbeatInterval uint64
+
+	headers http.Header
 }
 
 var testEventTypes = []flow.EventType{
@@ -119,6 +121,15 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 			startBlockID:      flow.ZeroID,
 			startHeight:       request.EmptyHeight,
 			heartbeatInterval: 2,
+		},
+		{
+			name:              "happy path - all origins allowed",
+			startBlockID:      flow.ZeroID,
+			startHeight:       request.EmptyHeight,
+			heartbeatInterval: 1,
+			headers: http.Header{
+				"Origin": []string{"https://example.com"},
+			},
 		},
 	}
 	chain := flow.MonotonicEmulator.Chain()
@@ -208,7 +219,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 				On("SubscribeEvents", mocks.Anything, test.startBlockID, startHeight, filter).
 				Return(subscription)
 
-			req, err := getSubscribeEventsRequest(s.T(), test.startBlockID, test.startHeight, test.eventTypes, test.addresses, test.contracts, test.heartbeatInterval)
+			req, err := getSubscribeEventsRequest(s.T(), test.startBlockID, test.startHeight, test.eventTypes, test.addresses, test.contracts, test.heartbeatInterval, test.headers)
 			require.NoError(s.T(), err)
 			respRecorder := newTestHijackResponseRecorder()
 			// closing the connection after 1 second
@@ -225,7 +236,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 	s.Run("returns error for block id and height", func() {
 		stateStreamBackend := mockstatestream.NewAPI(s.T())
-		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), s.blocks[0].Header.Height, nil, nil, nil, 1)
+		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), s.blocks[0].Header.Height, nil, nil, nil, 1, nil)
 		require.NoError(s.T(), err)
 		respRecorder := newTestHijackResponseRecorder()
 		executeWsRequest(req, stateStreamBackend, respRecorder)
@@ -250,7 +261,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 			On("SubscribeEvents", mocks.Anything, invalidBlock.ID(), uint64(0), mocks.Anything).
 			Return(subscription)
 
-		req, err := getSubscribeEventsRequest(s.T(), invalidBlock.ID(), request.EmptyHeight, nil, nil, nil, 1)
+		req, err := getSubscribeEventsRequest(s.T(), invalidBlock.ID(), request.EmptyHeight, nil, nil, nil, 1, nil)
 		require.NoError(s.T(), err)
 		respRecorder := newTestHijackResponseRecorder()
 		executeWsRequest(req, stateStreamBackend, respRecorder)
@@ -259,7 +270,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 
 	s.Run("returns error for invalid event filter", func() {
 		stateStreamBackend := mockstatestream.NewAPI(s.T())
-		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), request.EmptyHeight, []string{"foo"}, nil, nil, 1)
+		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), request.EmptyHeight, []string{"foo"}, nil, nil, 1, nil)
 		require.NoError(s.T(), err)
 		respRecorder := newTestHijackResponseRecorder()
 		executeWsRequest(req, stateStreamBackend, respRecorder)
@@ -284,7 +295,7 @@ func (s *SubscribeEventsSuite) TestSubscribeEventsHandlesErrors() {
 			On("SubscribeEvents", mocks.Anything, s.blocks[0].ID(), uint64(0), mocks.Anything).
 			Return(subscription)
 
-		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), request.EmptyHeight, nil, nil, nil, 1)
+		req, err := getSubscribeEventsRequest(s.T(), s.blocks[0].ID(), request.EmptyHeight, nil, nil, nil, 1, nil)
 		require.NoError(s.T(), err)
 		respRecorder := newTestHijackResponseRecorder()
 		executeWsRequest(req, stateStreamBackend, respRecorder)
@@ -299,6 +310,7 @@ func getSubscribeEventsRequest(t *testing.T,
 	addresses []string,
 	contracts []string,
 	heartbeatInterval uint64,
+	header http.Header,
 ) (*http.Request, error) {
 	u, _ := url.Parse("/v1/subscribe_events")
 	q := u.Query()
@@ -331,11 +343,17 @@ func getSubscribeEventsRequest(t *testing.T,
 	}
 
 	req, err := http.NewRequest("GET", u.String(), nil)
+	require.NoError(t, err)
+
 	req.Header.Set("Connection", "upgrade")
 	req.Header.Set("Upgrade", "websocket")
 	req.Header.Set("Sec-Websocket-Version", "13")
 	req.Header.Set("Sec-Websocket-Key", key)
-	require.NoError(t, err)
+
+	for k, v := range header {
+		req.Header.Set(k, v[0])
+	}
+
 	return req, nil
 }
 

@@ -38,9 +38,14 @@ func DefaultEventEmitterParams() EventEmitterParams {
 // Note that scripts do not emit events, but must expose the API in compliance
 // with the runtime environment interface.
 type EventEmitter interface {
-	// Cadence's runtime API.  Note that the script variant will return
-	// OperationNotSupportedError.
+	// EmitEvent satisfies Cadence's runtime API.
+	// This will encode the cadence event and call EmitRawEvent.
+	//
+	// Note that the script variant will return OperationNotSupportedError.
 	EmitEvent(event cadence.Event) error
+
+	// EmitRawEvent is used to emit events that are not Cadence events.
+	EmitRawEvent(eventType flow.EventType, payload []byte) error
 
 	Events() flow.EventsList
 	ServiceEvents() flow.EventsList
@@ -72,6 +77,16 @@ func (emitter ParseRestrictedEventEmitter) EmitEvent(event cadence.Event) error 
 		event)
 }
 
+func (emitter ParseRestrictedEventEmitter) EmitRawEvent(eventType flow.EventType, payload []byte) error {
+	return parseRestrict2Arg(
+		emitter.txnState,
+		trace.FVMEnvEmitEvent,
+		emitter.impl.EmitRawEvent,
+		eventType,
+		payload,
+	)
+}
+
 func (emitter ParseRestrictedEventEmitter) Events() flow.EventsList {
 	return emitter.impl.Events()
 }
@@ -94,7 +109,11 @@ var _ EventEmitter = NoEventEmitter{}
 // where emitting an event does nothing.
 type NoEventEmitter struct{}
 
-func (NoEventEmitter) EmitEvent(event cadence.Event) error {
+func (NoEventEmitter) EmitEvent(cadence.Event) error {
+	return nil
+}
+
+func (NoEventEmitter) EmitRawEvent(flow.EventType, []byte) error {
 	return nil
 }
 
@@ -159,12 +178,10 @@ func (emitter *eventEmitter) EventCollection() *EventCollection {
 }
 
 func (emitter *eventEmitter) EmitEvent(event cadence.Event) error {
-	defer emitter.tracer.StartExtensiveTracingChildSpan(
-		trace.FVMEnvEmitEvent).End()
-
-	err := emitter.meter.MeterComputation(ComputationKindEmitEvent, 1)
+	defer emitter.tracer.StartExtensiveTracingChildSpan(trace.FVMEnvEncodeEvent).End()
+	err := emitter.meter.MeterComputation(ComputationKindEncodeEvent, 1)
 	if err != nil {
-		return fmt.Errorf("emit event failed: %w", err)
+		return fmt.Errorf("emit event, event encoding failed: %w", err)
 	}
 
 	payload, err := emitter.EventEncoder.Encode(event)
@@ -172,10 +189,18 @@ func (emitter *eventEmitter) EmitEvent(event cadence.Event) error {
 		return errors.NewEventEncodingError(err)
 	}
 
-	payloadSize := uint64(len(payload))
+	return emitter.EmitRawEvent(flow.EventType(event.EventType.ID()), payload)
+}
 
+func (emitter *eventEmitter) EmitRawEvent(eventType flow.EventType, payload []byte) error {
+	defer emitter.tracer.StartExtensiveTracingChildSpan(trace.FVMEnvEmitEvent).End()
+	payloadSize := len(payload)
+	err := emitter.meter.MeterComputation(ComputationKindEmitEvent, uint(payloadSize))
+	if err != nil {
+		return fmt.Errorf("emit event failed: %w", err)
+	}
 	flowEvent := flow.Event{
-		Type:             flow.EventType(event.EventType.ID()),
+		Type:             eventType,
 		TransactionID:    emitter.txID,
 		TransactionIndex: emitter.txIndex,
 		EventIndex:       emitter.eventCollection.TotalEventCounter(),
@@ -186,7 +211,7 @@ func (emitter *eventEmitter) EmitEvent(event cadence.Event) error {
 	isServiceAccount := emitter.payer == emitter.chain.ServiceAddress()
 
 	if emitter.ServiceEventCollectionEnabled {
-		ok, err := IsServiceEvent(event, emitter.chain.ChainID())
+		ok, err := IsServiceEvent(eventType, emitter.chain.ChainID())
 		if err != nil {
 			return fmt.Errorf("unable to check service event: %w", err)
 		}
@@ -194,7 +219,7 @@ func (emitter *eventEmitter) EmitEvent(event cadence.Event) error {
 			eventEmitError := emitter.eventCollection.AppendServiceEvent(
 				emitter.chain,
 				flowEvent,
-				payloadSize)
+				uint64(payloadSize))
 
 			// skip limit if payer is service account
 			// TODO skip only limit-related errors
@@ -206,13 +231,14 @@ func (emitter *eventEmitter) EmitEvent(event cadence.Event) error {
 		// as well.
 	}
 
-	eventEmitError := emitter.eventCollection.AppendEvent(flowEvent, payloadSize)
+	eventEmitError := emitter.eventCollection.AppendEvent(flowEvent, uint64(payloadSize))
 	// skip limit if payer is service account
 	if !isServiceAccount {
 		return eventEmitError
 	}
 
 	return nil
+
 }
 
 func (emitter *eventEmitter) Events() flow.EventsList {
@@ -291,7 +317,7 @@ func (collection *EventCollection) TotalEventCounter() uint32 {
 
 // IsServiceEvent determines whether or not an emitted Cadence event is
 // considered a service event for the given chain.
-func IsServiceEvent(event cadence.Event, chain flow.ChainID) (bool, error) {
+func IsServiceEvent(eventType flow.EventType, chain flow.ChainID) (bool, error) {
 
 	// retrieve the service event information for this chain
 	events, err := systemcontracts.ServiceEventsForChain(chain)
@@ -302,7 +328,6 @@ func IsServiceEvent(event cadence.Event, chain flow.ChainID) (bool, error) {
 			err)
 	}
 
-	eventType := flow.EventType(event.EventType.ID())
 	for _, serviceEvent := range events.All() {
 		if serviceEvent.EventType() == eventType {
 			return true, nil
