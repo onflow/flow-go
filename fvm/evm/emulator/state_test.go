@@ -2,7 +2,10 @@ package emulator_test
 
 import (
 	"math/big"
+	"os"
 	"testing"
+
+	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/ethereum/go-ethereum/common"
 	gethRawDB "github.com/ethereum/go-ethereum/core/rawdb"
@@ -15,9 +18,20 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func benchmarkStateAccountsBalanceChange(b *testing.B, numberOfAccounts int, numberOfUpdatesPerAccount int) {
+var rootAddr = flow.Address{0x01}
+
+// BenchmarkStateAccountsBalanceChange is designed to evaluate the impact of state modifications on storage size.
+// It measures the bytes used in the underlying storage, aiming to understand how storage size scales with changes in state.
+// During the test, each account balance is updated, with a focus on measuring any consequential changes to the state.
+// While the specific operation details are not crucial for this benchmark, the primary goal is to analyze how the storage
+// size evolves in response to state modifications. Users can specify the number of accounts on which the balance is updated.
+// Accounts will be automatically generated, and the benchmark allows users to determine the frequency of balance
+// updates across all accounts, including in-between state committing.
+func benchmarkStateAccountsBalanceChange(b *testing.B, numberOfAccounts int, numberOfUpdatesPerAccount int, debug bool) {
 	testutils.RunWithTestBackend(b, func(backend types.Backend) {
-		rootAddr := flow.Address{0x01}
+		if debug {
+			log.Root().SetHandler(log.StreamHandler(os.Stdout, log.LogfmtFormat()))
+		}
 
 		db, err := database.NewMeteredDatabase(backend, rootAddr)
 		require.NoError(b, err)
@@ -64,9 +78,9 @@ func benchmarkStateAccountsBalanceChange(b *testing.B, numberOfAccounts int, num
 }
 
 func BenchmarkStateBalanceSingleAccount(b *testing.B) {
-	benchmarkStateAccountsBalanceChange(b, 1, 10000)
+	benchmarkStateAccountsBalanceChange(b, 1, 10000, false)
 }
 
 func BenchmarkStateBalanceMultipleAccount(b *testing.B) {
-	benchmarkStateAccountsBalanceChange(b, 100, 100)
+	benchmarkStateAccountsBalanceChange(b, 100, 100, false)
 }
