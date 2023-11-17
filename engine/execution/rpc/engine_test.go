@@ -335,7 +335,7 @@ func (suite *Suite) TestGetAccountAtBlockID() {
 				"this error usually happens if the reference "+
 				"block for this script is not set to a recent block.",
 			id,
-			state.ErrStateCommitmentPruned,
+			state.ErrExecutionStatePruned,
 			unittest.IdentifierFixture(),
 		)
 

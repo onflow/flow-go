@@ -703,11 +703,14 @@ func (h *handler) GetAccountAtBlockID(
 
 	value, err := h.engine.GetAccount(ctx, flowAddress, blockFlowID)
 	if err != nil {
-		if errors.Is(err, state.ErrStateCommitmentPruned) {
+		if errors.Is(err, state.ErrExecutionStatePruned) {
 			return nil, status.Errorf(codes.OutOfRange, "state for block ID %s not available", blockFlowID)
 		}
+		if errors.Is(err, state.ErrNotExecuted) {
+			return nil, status.Errorf(codes.NotFound, "block %s has not been executed by node or was pruned", blockFlowID)
+		}
 		if errors.Is(err, storage.ErrNotFound) {
-			return nil, status.Errorf(codes.NotFound, "account with address %s not found", flowAddress)
+			return nil, status.Errorf(codes.NotFound, "block %s not found", blockFlowID)
 		}
 		if fvmerrors.IsAccountNotFoundError(err) {
 			return nil, status.Errorf(codes.NotFound, "account not found")

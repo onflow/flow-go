@@ -21,7 +21,8 @@ import (
 	"github.com/onflow/flow-go/storage/badger/procedure"
 )
 
-var ErrStateCommitmentPruned = fmt.Errorf("state commitment not found")
+var ErrExecutionStatePruned = fmt.Errorf("execution state is pruned")
+var ErrNotExecuted = fmt.Errorf("block not executed")
 
 // ReadOnlyExecutionState allows to read the execution state
 type ReadOnlyExecutionState interface {
@@ -44,7 +45,8 @@ type ScriptExecutionState interface {
 	// CreateStorageSnapshot creates a new ready-only view at the given block.
 	// It returns:
 	// - (nil, nil, storage.ErrNotFound) if block is unknown
-	// - (nil, nil, state.ErrStateCommitmentPruned) if the block is not executed or execution state has been pruned
+	// - (nil, nil, state.ErrNotExecuted) if block is not executed
+	// - (nil, nil, state.ErrExecutionStatePruned) if the execution state has been pruned
 	CreateStorageSnapshot(blockID flow.Identifier) (snapshot.StorageSnapshot, *flow.Header, error)
 
 	// StateCommitmentByBlockID returns the final state commitment for the provided block ID.
@@ -245,7 +247,7 @@ func (s *state) CreateStorageSnapshot(
 	if err != nil {
 		// statecommitment not exists means the block hasn't been executed yet
 		if errors.Is(err, storage.ErrNotFound) {
-			return nil, nil, fmt.Errorf("block %v is not executed: %w", blockID, ErrStateCommitmentPruned)
+			return nil, nil, fmt.Errorf("block %v is not executed: %w", blockID, ErrNotExecuted)
 		}
 
 		return nil, header, fmt.Errorf("cannot get commit by block ID: %w", err)
@@ -253,7 +255,7 @@ func (s *state) CreateStorageSnapshot(
 
 	// make sure we have trie state for this block
 	if !s.HasState(commit) {
-		return nil, header, fmt.Errorf("state not found for commit %x (block %v): %w", commit, blockID, ErrStateCommitmentPruned)
+		return nil, header, fmt.Errorf("state not found for commit %x (block %v): %w", commit, blockID, ErrExecutionStatePruned)
 	}
 
 	return s.NewStorageSnapshot(commit, blockID, header.Height), header, nil
