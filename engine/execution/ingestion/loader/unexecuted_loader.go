@@ -35,6 +35,8 @@ func NewUnexecutedLoader(
 	}
 }
 
+// LoadUnexecuted loads all unexecuted and validated blocks
+// any error returned are exceptions
 func (e *UnexecutedLoader) LoadUnexecuted(ctx context.Context) ([]flow.Identifier, error) {
 	// saving an executed block is currently not transactional, so it's possible
 	// the block is marked as executed but the receipt might not be saved during a crash.

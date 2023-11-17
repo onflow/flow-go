@@ -19,6 +19,7 @@ type UnfinalizedLoader struct {
 	execState state.FinalizedExecutionState
 }
 
+// NewUnfinalizedLoader creates a new loader that loads all unfinalized and validated blocks
 func NewUnfinalizedLoader(
 	log zerolog.Logger,
 	state protocol.State,
@@ -33,6 +34,8 @@ func NewUnfinalizedLoader(
 	}
 }
 
+// LoadUnexecuted loads all unfinalized and validated blocks
+// any error returned are exceptions
 func (e *UnfinalizedLoader) LoadUnexecuted(ctx context.Context) ([]flow.Identifier, error) {
 	lastExecuted := e.execState.GetHighestFinalizedExecuted()
 
