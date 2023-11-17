@@ -463,6 +463,8 @@ func (s *state) GetHighestExecutedBlockID(ctx context.Context) (uint64, flow.Ide
 // results, etc are all stored.
 // otherwise returns false
 func (s *state) IsBlockExecuted(height uint64, blockID flow.Identifier) (bool, error) {
+	// ledger-based execution state uses commitment to determine if a block has been executed
+	// TODO: storehouse-based execution state will check its storage to determine if a block has been executed
 	_, err := s.StateCommitmentByBlockID(blockID)
 
 	// statecommitment exists means the block has been executed
