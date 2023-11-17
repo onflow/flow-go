@@ -454,16 +454,9 @@ func GenerateRandomStringWithLen(commentLen uint) string {
 }
 
 // PeerIdFixture creates a random and unique peer ID (libp2p node ID).
-func PeerIdFixture(t *testing.T) peer.ID {
+func PeerIdFixture(tb testing.TB) peer.ID {
 	peerID, err := peerIDFixture()
-	require.NoError(t, err)
-	return peerID
-}
-
-// PeerIdFixtureB benchmark PeerIDFixture.
-func PeerIdFixtureB(b *testing.B) peer.ID {
-	peerID, err := peerIDFixture()
-	require.NoError(b, err)
+	require.NoError(tb, err)
 	return peerID
 }
 

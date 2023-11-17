@@ -62,7 +62,7 @@ func TestNativeTokenBridging(t *testing.T) {
 				})
 			})
 		})
-		t.Run("mint tokens withdraw", func(t *testing.T) {
+		t.Run("tokens withdraw", func(t *testing.T) {
 			amount := big.NewInt(1000)
 			RunWithNewEmulator(t, db, func(env *emulator.Emulator) {
 				RunWithNewReadOnlyBlockView(t, env, func(blk types.ReadOnlyBlockView) {
@@ -93,7 +93,7 @@ func TestNativeTokenBridging(t *testing.T) {
 func TestContractInteraction(t *testing.T) {
 	RunWithTestDB(t, func(db types.Database) {
 
-		testContract := testutils.GetTestContract(t)
+		testContract := testutils.GetStorageTestContract(t)
 
 		testAccount := types.NewAddressFromString("test")
 		amount := big.NewInt(0).Mul(big.NewInt(1337), big.NewInt(gethParams.Ether))
@@ -148,7 +148,7 @@ func TestContractInteraction(t *testing.T) {
 						types.NewContractCall(
 							testAccount,
 							contractAddr,
-							testContract.MakeStoreCallData(t, num),
+							testContract.MakeCallData(t, "store", num),
 							1_000_000,
 							big.NewInt(0), // this should be zero because the contract doesn't have receiver
 						),
@@ -164,7 +164,7 @@ func TestContractInteraction(t *testing.T) {
 						types.NewContractCall(
 							testAccount,
 							contractAddr,
-							testContract.MakeRetrieveCallData(t),
+							testContract.MakeCallData(t, "retrieve"),
 							1_000_000,
 							big.NewInt(0), // this should be zero because the contract doesn't have receiver
 						),
@@ -183,7 +183,7 @@ func TestContractInteraction(t *testing.T) {
 						types.NewContractCall(
 							testAccount,
 							contractAddr,
-							testContract.MakeBlockNumberCallData(t),
+							testContract.MakeCallData(t, "blockNumber"),
 							1_000_000,
 							big.NewInt(0), // this should be zero because the contract doesn't have receiver
 						),

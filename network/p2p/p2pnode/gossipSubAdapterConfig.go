@@ -116,6 +116,10 @@ func (g *GossipSubAdapterConfig) PubSubTracer() p2p.PubSubTracer {
 	return g.pubsubTracer
 }
 
+func (g *GossipSubAdapterConfig) ScoringComponent() component.Component {
+	return g.scoreOption
+}
+
 // InspectorSuiteComponent returns the component that manages the lifecycle of the inspector suite.
 // This is used to start and stop the inspector suite by the PubSubAdapter.
 // Args:

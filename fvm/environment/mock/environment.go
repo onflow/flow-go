@@ -440,8 +440,8 @@ func (_m *Environment) EmitEvent(_a0 cadence.Event) error {
 	return r0
 }
 
-// EmitFlowEvent provides a mock function with given fields: etype, payload
-func (_m *Environment) EmitFlowEvent(etype flow.EventType, payload []byte) error {
+// EmitRawEvent provides a mock function with given fields: etype, payload
+func (_m *Environment) EmitRawEvent(etype flow.EventType, payload []byte) error {
 	ret := _m.Called(etype, payload)
 
 	var r0 error

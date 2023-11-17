@@ -2,7 +2,6 @@ package unicastcache_test
 
 import (
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -11,16 +10,14 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestDialConfigEntity tests the DialConfigEntity struct and its methods.
-func TestDialConfigEntity(t *testing.T) {
+// TestUnicastConfigEntity tests the UnicastConfigEntity struct and its methods.
+func TestUnicastConfigEntity(t *testing.T) {
 	peerID := unittest.PeerIdFixture(t)
 
-	d := &unicastcache.DialConfigEntity{
+	d := &unicastcache.UnicastConfigEntity{
 		PeerId: peerID,
-		DialConfig: unicast.DialConfig{
-			DialRetryAttemptBudget:           10,
+		Config: unicast.Config{
 			StreamCreationRetryAttemptBudget: 20,
-			LastSuccessfulDial:               time.Now(),
 			ConsecutiveSuccessfulStream:      30,
 		},
 	}
@@ -39,20 +36,18 @@ func TestDialConfigEntity(t *testing.T) {
 	)
 
 	t.Run("ID is only calculated from peer.ID", func(t *testing.T) {
-		d2 := &unicastcache.DialConfigEntity{
-			PeerId:     unittest.PeerIdFixture(t),
-			DialConfig: d.DialConfig,
+		d2 := &unicastcache.UnicastConfigEntity{
+			PeerId: unittest.PeerIdFixture(t),
+			Config: d.Config,
 		}
 		require.NotEqual(t, d.ID(), d2.ID()) // different peer id, different id.
 
-		d3 := &unicastcache.DialConfigEntity{
+		d3 := &unicastcache.UnicastConfigEntity{
 			PeerId: d.PeerId,
-			DialConfig: unicast.DialConfig{
-				DialRetryAttemptBudget:           100,
+			Config: unicast.Config{
 				StreamCreationRetryAttemptBudget: 200,
-				LastSuccessfulDial:               time.Now(),
 			},
 		}
-		require.Equal(t, d.ID(), d3.ID()) // same peer id, same id, even though the dial config is different.
+		require.Equal(t, d.ID(), d3.ID()) // same peer id, same id, even though the unicast config is different.
 	})
 }

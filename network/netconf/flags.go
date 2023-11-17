@@ -20,11 +20,7 @@ const (
 	unicastMessageTimeout                     = "unicast-message-timeout"
 	unicastCreateStreamRetryDelay             = "unicast-create-stream-retry-delay"
 	unicastStreamZeroRetryResetThreshold      = "unicast-stream-zero-retry-reset-threshold"
-	unicastDialZeroRetryResetThreshold        = "unicast-dial-zero-retry-reset-threshold"
-	unicastMaxDialRetryAttemptTimes           = "unicast-max-dial-retry-attempt-times"
 	unicastMaxStreamCreationRetryAttemptTimes = "unicast-max-stream-creation-retry-attempt-times"
-	unicastDialInProgressBackoffDelay         = "unicast-dial-in-progress-backoff-delay"
-	unicastDialBackoffDelay                   = "unicast-dial-backoff-delay"
 	unicastDialConfigCacheSize                = "unicast-dial-config-cache-size"
 	dnsCacheTTL                               = "dns-cache-ttl"
 	disallowListNotificationCacheSize         = "disallow-list-notification-cache-size"
@@ -63,6 +59,9 @@ const (
 	rpcSentTrackerQueueCacheSize = "gossipsub-rpc-sent-tracker-queue-cache-size"
 	rpcSentTrackerNumOfWorkers   = "gossipsub-rpc-sent-tracker-workers"
 	scoreTracerInterval          = "gossipsub-score-tracer-interval"
+
+	gossipSubSubscriptionProviderUpdateInterval = "gossipsub-subscription-provider-update-interval"
+	gossipSubSubscriptionProviderCacheSize      = "gossipsub-subscription-provider-cache-size"
 
 	// gossipsub validation inspector
 	gossipSubRPCInspectorNotificationCacheSize                 = "gossipsub-rpc-inspector-notification-cache-size"
@@ -104,11 +103,7 @@ func AllFlagNames() []string {
 		peerUpdateInterval,
 		unicastMessageTimeout,
 		unicastCreateStreamRetryDelay,
-		unicastDialInProgressBackoffDelay,
-		unicastDialBackoffDelay,
 		unicastStreamZeroRetryResetThreshold,
-		unicastDialZeroRetryResetThreshold,
-		unicastMaxDialRetryAttemptTimes,
 		unicastMaxStreamCreationRetryAttemptTimes,
 		unicastDialConfigCacheSize,
 		dnsCacheTTL,
@@ -179,9 +174,13 @@ func AllFlagNames() []string {
 func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 	flags.Bool(networkingConnectionPruning, config.NetworkConnectionPruning, "enabling connection trimming")
 	flags.Duration(dnsCacheTTL, config.DNSCacheTTL, "time-to-live for dns cache")
-	flags.StringSlice(preferredUnicastsProtocols, config.PreferredUnicastProtocols, "preferred unicast protocols in ascending order of preference")
+	flags.StringSlice(
+		preferredUnicastsProtocols, config.PreferredUnicastProtocols, "preferred unicast protocols in ascending order of preference")
 	flags.Uint32(receivedMessageCacheSize, config.NetworkReceivedMessageCacheSize, "incoming message cache size at networking layer")
-	flags.Uint32(disallowListNotificationCacheSize, config.DisallowListNotificationCacheSize, "cache size for notification events from disallow list")
+	flags.Uint32(
+		disallowListNotificationCacheSize,
+		config.DisallowListNotificationCacheSize,
+		"cache size for notification events from disallow list")
 	flags.Duration(peerUpdateInterval, config.PeerUpdateInterval, "how often to refresh the peer connections for the node")
 	flags.Duration(unicastMessageTimeout, config.UnicastMessageTimeout, "how long a unicast transmission can take to complete")
 	// unicast manager options
@@ -189,24 +188,12 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 		config.UnicastConfig.CreateStreamBackoffDelay,
 		"initial backoff delay between failing to establish a connection with another node and retrying, "+
 			"this delay increases exponentially with the number of subsequent failures to establish a connection.")
-	flags.Duration(unicastDialBackoffDelay,
-		config.UnicastConfig.DialInProgressBackoffDelay,
-		"initial backoff delay between failing to establish a connection with another node and retrying, "+
-			"this delay increases exponentially with the number of subsequent failures to establish a connection.")
-	flags.Duration(unicastDialInProgressBackoffDelay,
-		config.UnicastConfig.DialInProgressBackoffDelay,
-		"initial backoff delay for concurrent stream creations to a remote peer when there is no exising connection and a dial is in progress. "+
-			"this delay increases exponentially with the number of subsequent failure attempts")
 	flags.Uint64(unicastStreamZeroRetryResetThreshold,
 		config.UnicastConfig.StreamZeroRetryResetThreshold,
 		"reset stream creation retry budget from zero to the maximum after consecutive successful streams reach this threshold.")
-	flags.Duration(unicastDialZeroRetryResetThreshold,
-		config.UnicastConfig.DialZeroRetryResetThreshold,
-		"reset dial retry budget if the last successful dial is longer than this threshold.")
-	flags.Uint64(unicastMaxDialRetryAttemptTimes, config.UnicastConfig.MaxDialRetryAttemptTimes, "maximum attempts to establish a unicast connection.")
 	flags.Uint64(unicastMaxStreamCreationRetryAttemptTimes, config.UnicastConfig.MaxStreamCreationRetryAttemptTimes, "max attempts to create a unicast stream.")
 	flags.Uint32(unicastDialConfigCacheSize,
-		config.UnicastConfig.DialConfigCacheSize,
+		config.UnicastConfig.ConfigCacheSize,
 		"cache size of the dial config cache, recommended to be big enough to accommodate the entire nodes in the network.")
 
 	// unicast stream handler rate limits
@@ -229,10 +216,22 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 	flags.Duration(silencePeriod, config.ConnectionManagerConfig.SilencePeriod, "silence period for libp2p connection manager")
 	flags.Bool(peerScoring, config.GossipSubConfig.PeerScoring, "enabling peer scoring on pubsub network")
 	flags.Duration(localMeshLogInterval, config.GossipSubConfig.LocalMeshLogInterval, "logging interval for local mesh in gossipsub")
-	flags.Duration(scoreTracerInterval, config.GossipSubConfig.ScoreTracerInterval, "logging interval for peer score tracer in gossipsub, set to 0 to disable")
-	flags.Uint32(rpcSentTrackerCacheSize, config.GossipSubConfig.RPCSentTrackerCacheSize, "cache size of the rpc sent tracker used by the gossipsub mesh tracer.")
-	flags.Uint32(rpcSentTrackerQueueCacheSize, config.GossipSubConfig.RPCSentTrackerQueueCacheSize, "cache size of the rpc sent tracker worker queue.")
-	flags.Int(rpcSentTrackerNumOfWorkers, config.GossipSubConfig.RpcSentTrackerNumOfWorkers, "number of workers for the rpc sent tracker worker pool.")
+	flags.Duration(
+		scoreTracerInterval,
+		config.GossipSubConfig.ScoreTracerInterval,
+		"logging interval for peer score tracer in gossipsub, set to 0 to disable")
+	flags.Uint32(
+		rpcSentTrackerCacheSize,
+		config.GossipSubConfig.RPCSentTrackerCacheSize,
+		"cache size of the rpc sent tracker used by the gossipsub mesh tracer.")
+	flags.Uint32(
+		rpcSentTrackerQueueCacheSize,
+		config.GossipSubConfig.RPCSentTrackerQueueCacheSize,
+		"cache size of the rpc sent tracker worker queue.")
+	flags.Int(
+		rpcSentTrackerNumOfWorkers,
+		config.GossipSubConfig.RpcSentTrackerNumOfWorkers,
+		"number of workers for the rpc sent tracker worker pool.")
 	// gossipsub RPC control message validation limits used for validation configuration and rate limiting
 	flags.Int(validationInspectorNumberOfWorkers,
 		config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.NumberOfWorkers,
@@ -300,12 +299,15 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 		config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IWantRPCInspectionConfig.DuplicateMsgIDThreshold,
 		"max allowed duplicate message IDs in a single iWant control message")
 
-	flags.Int(rpcMessageMaxSampleSize,
-		config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.RpcMessageMaxSampleSize,
-		"the max sample size used for RPC message validation. If the total number of RPC messages exceeds this value a sample will be taken but messages will not be truncated")
-	flags.Int(rpcMessageErrorThreshold,
-		config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.RpcMessageErrorThreshold,
-		"the threshold at which an error will be returned if the number of invalid RPC messages exceeds this value")
+	flags.Int(rpcMessageMaxSampleSize, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.RpcMessageMaxSampleSize, "the max sample size used for RPC message validation. If the total number of RPC messages exceeds this value a sample will be taken but messages will not be truncated")
+	flags.Int(rpcMessageErrorThreshold, config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.RpcMessageErrorThreshold, "the threshold at which an error will be returned if the number of invalid RPC messages exceeds this value")
+	flags.Duration(
+		gossipSubSubscriptionProviderUpdateInterval, config.GossipSubConfig.SubscriptionProviderConfig.SubscriptionUpdateInterval,
+		"interval for updating the list of subscribed topics for all peers in the gossipsub, recommended value is a few minutes")
+	flags.Uint32(
+		gossipSubSubscriptionProviderCacheSize,
+		config.GossipSubConfig.SubscriptionProviderConfig.CacheSize,
+		"size of the cache that keeps the list of topics each peer has subscribed to, recommended size is 10x the number of authorized nodes")
 }
 
 // LoadLibP2PResourceManagerFlags loads all CLI flags for the libp2p resource manager configuration on the provided pflag set.
@@ -379,7 +381,8 @@ func SetAliases(conf *viper.Viper) error {
 	for _, flagName := range AllFlagNames() {
 		fullKey, ok := m[flagName]
 		if !ok {
-			return fmt.Errorf("invalid network configuration missing configuration key flag name %s check config file and cli flags", flagName)
+			return fmt.Errorf(
+				"invalid network configuration missing configuration key flag name %s check config file and cli flags", flagName)
 		}
 		conf.RegisterAlias(fullKey, flagName)
 	}
