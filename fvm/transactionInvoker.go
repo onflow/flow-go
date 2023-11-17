@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/module/trace"
 )
 
@@ -228,12 +229,13 @@ func (executor *transactionExecutor) ExecuteTransactionBody() error {
 	// setup evm
 	if executor.ctx.EVMEnabled {
 		chain := executor.ctx.Chain
+		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 		err := evm.SetupEnvironment(
 			chain.ChainID(),
 			executor.env,
 			executor.cadenceRuntime.TxRuntimeEnv,
 			chain.ServiceAddress(),
-			FlowTokenAddress(chain),
+			sc.FlowToken.Address,
 		)
 		if err != nil {
 			return err

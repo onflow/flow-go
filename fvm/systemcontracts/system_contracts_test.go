@@ -13,18 +13,10 @@ import (
 // TestSystemContract_Address tests that we can retrieve a canonical address
 // for all accepted chains and contracts.
 func TestSystemContracts(t *testing.T) {
-	chains := []flow.ChainID{
-		flow.Mainnet,
-		flow.Testnet,
-		flow.Sandboxnet,
-		flow.Benchnet,
-		flow.Localnet,
-		flow.Emulator,
-	}
+	chains := flow.AllChainIDs()
 
 	for _, chain := range chains {
-		_, err := SystemContractsForChain(chain)
-		require.NoError(t, err)
+		require.NotPanics(t, func() { SystemContractsForChain(chain) })
 		checkSystemContracts(t, chain)
 	}
 }
@@ -34,47 +26,30 @@ func TestSystemContracts(t *testing.T) {
 func TestSystemContract_InvalidChainID(t *testing.T) {
 	invalidChain := flow.ChainID("invalid-chain")
 
-	_, err := SystemContractsForChain(invalidChain)
-	assert.Error(t, err)
+	require.Panics(t, func() { SystemContractsForChain(invalidChain) })
 }
 
 // TestServiceEvents tests that we can retrieve service events for all accepted
 // chains and contracts.
 func TestServiceEvents(t *testing.T) {
-	chains := []flow.ChainID{
-		flow.Mainnet,
-		flow.Testnet,
-		flow.Sandboxnet,
-		flow.Benchnet,
-		flow.Localnet,
-		flow.Emulator,
-	}
+	chains := flow.AllChainIDs()
 
 	for _, chain := range chains {
-		_, err := ServiceEventsForChain(chain)
+		require.NotPanics(t, func() { ServiceEventsForChain(chain) })
 		checkServiceEvents(t, chain)
-		require.NoError(t, err)
 	}
 }
 
 // TestServiceEventLookup_Consistency sanity checks consistency of the lookup
 // method, in case an update to ServiceEvents forgets to update the lookup.
 func TestServiceEventAll_Consistency(t *testing.T) {
-	chains := []flow.ChainID{
-		flow.Mainnet,
-		flow.Testnet,
-		flow.Sandboxnet,
-		flow.Benchnet,
-		flow.Localnet,
-		flow.Emulator,
-	}
+	chains := flow.AllChainIDs()
 
 	fields := reflect.TypeOf(ServiceEvents{}).NumField()
 	for _, chain := range chains {
-		events, err := ServiceEventsForChain(chain)
-		require.NoError(t, err)
+		events := ServiceEventsForChain(chain)
 
-		// ensure all events are returns
+		// ensure all events are present
 		all := events.All()
 		assert.Equal(t, fields, len(all))
 	}
@@ -85,39 +60,42 @@ func TestServiceEventAll_Consistency(t *testing.T) {
 func TestServiceEvents_InvalidChainID(t *testing.T) {
 	invalidChain := flow.ChainID("invalid-chain")
 
-	_, err := ServiceEventsForChain(invalidChain)
-	assert.Error(t, err)
+	require.Panics(t, func() { ServiceEventsForChain(invalidChain) })
 }
 
 func checkSystemContracts(t *testing.T, chainID flow.ChainID) {
-	contracts, err := SystemContractsForChain(chainID)
-	require.NoError(t, err)
+	contracts := SystemContractsForChain(chainID)
 
-	addresses, ok := contractAddressesByChainID[chainID]
-	require.True(t, ok, "missing chain %s", chainID.String())
+	address := func(name string) flow.Address {
+		f, ok := contractAddressFunc[name]
+		require.True(t, ok, "missing contract %s for chain %s", name, chainID.String())
+		return f(chainID)
+	}
 
 	// entries may not be empty
-	assert.NotEqual(t, flow.EmptyAddress, addresses[ContractNameEpoch])
-	assert.NotEqual(t, flow.EmptyAddress, addresses[ContractNameClusterQC])
-	assert.NotEqual(t, flow.EmptyAddress, addresses[ContractNameDKG])
-	assert.NotEqual(t, flow.EmptyAddress, addresses[ContractNameNodeVersionBeacon])
+	assert.NotEqual(t, flow.EmptyAddress, address(ContractNameEpoch))
+	assert.NotEqual(t, flow.EmptyAddress, address(ContractNameClusterQC))
+	assert.NotEqual(t, flow.EmptyAddress, address(ContractNameDKG))
+	assert.NotEqual(t, flow.EmptyAddress, address(ContractNameNodeVersionBeacon))
 
 	// entries must match internal mapping
-	assert.Equal(t, addresses[ContractNameEpoch], contracts.Epoch.Address)
-	assert.Equal(t, addresses[ContractNameClusterQC], contracts.ClusterQC.Address)
-	assert.Equal(t, addresses[ContractNameDKG], contracts.DKG.Address)
-	assert.Equal(t, addresses[ContractNameNodeVersionBeacon], contracts.NodeVersionBeacon.Address)
+	assert.Equal(t, address(ContractNameEpoch), contracts.Epoch.Address)
+	assert.Equal(t, address(ContractNameClusterQC), contracts.ClusterQC.Address)
+	assert.Equal(t, address(ContractNameDKG), contracts.DKG.Address)
+	assert.Equal(t, address(ContractNameNodeVersionBeacon), contracts.NodeVersionBeacon.Address)
 }
 
 func checkServiceEvents(t *testing.T, chainID flow.ChainID) {
-	events, err := ServiceEventsForChain(chainID)
-	require.NoError(t, err)
+	events := ServiceEventsForChain(chainID)
 
-	addresses, ok := contractAddressesByChainID[chainID]
-	require.True(t, ok, "missing chain %w", chainID.String())
+	address := func(name string) flow.Address {
+		f, ok := contractAddressFunc[name]
+		require.True(t, ok, "missing contract %s for chain %s", name, chainID.String())
+		return f(chainID)
+	}
 
-	epochContractAddr := addresses[ContractNameEpoch]
-	versionContractAddr := addresses[ContractNameNodeVersionBeacon]
+	epochContractAddr := address(ContractNameEpoch)
+	versionContractAddr := address(ContractNameNodeVersionBeacon)
 	// entries may not be empty
 	assert.NotEqual(t, flow.EmptyAddress, epochContractAddr)
 	assert.NotEqual(t, flow.EmptyAddress, versionContractAddr)

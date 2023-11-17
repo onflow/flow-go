@@ -32,6 +32,7 @@ import (
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/model/flow"
@@ -459,8 +460,11 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 		}
 	}
 
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
 	templateTx := func(rep int, prepare string) string {
-		return fmt.Sprintf(`
+		return fmt.Sprintf(
+			`
 			import FungibleToken from 0x%s
 			import FlowToken from 0x%s
 			import TestContract from 0x%s
@@ -473,7 +477,13 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 			%s
 					}
 				}
-			}`, fvm.FungibleTokenAddress(chain), fvm.FlowTokenAddress(chain), "754aed9de6197641", rep, prepare)
+			}`,
+			sc.FungibleToken.Address.Hex(),
+			sc.FlowToken.Address.Hex(),
+			"754aed9de6197641",
+			rep,
+			prepare,
+		)
 	}
 
 	b.Run("reference tx", func(b *testing.B) {

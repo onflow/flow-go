@@ -14,6 +14,7 @@ import (
 	. "github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -119,6 +120,8 @@ func TestEVMAddressDeposit(t *testing.T) {
 			RunWithDeployedContract(t, tc, backend, rootAddr, func(testContract *TestContract) {
 				RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *EOATestAccount) {
 					chain := flow.Emulator.Chain()
+					sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
 					RunWithNewTestVM(t, chain, func(ctx fvm.Context, vm fvm.VM, snapshot snapshot.SnapshotTree) {
 
 						code := []byte(fmt.Sprintf(
@@ -140,8 +143,8 @@ func TestEVMAddressDeposit(t *testing.T) {
                                    address.deposit(from: <-vault)
                                }
                             `,
-							chain.ServiceAddress().HexWithPrefix(),
-							fvm.FlowTokenAddress(chain).HexWithPrefix(),
+							sc.FlowServiceAccount.Address.HexWithPrefix(),
+							sc.FlowToken.Address.HexWithPrefix(),
 						))
 
 						script := fvm.Script(code)
@@ -172,6 +175,8 @@ func TestBridgedAccountWithdraw(t *testing.T) {
 			RunWithDeployedContract(t, tc, backend, rootAddr, func(testContract *TestContract) {
 				RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *EOATestAccount) {
 					chain := flow.Emulator.Chain()
+					sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
 					RunWithNewTestVM(t, chain, func(ctx fvm.Context, vm fvm.VM, snapshot snapshot.SnapshotTree) {
 
 						code := []byte(fmt.Sprintf(
@@ -198,8 +203,8 @@ func TestBridgedAccountWithdraw(t *testing.T) {
                                    return balance
                                }
                             `,
-							chain.ServiceAddress().HexWithPrefix(),
-							fvm.FlowTokenAddress(chain).HexWithPrefix(),
+							sc.FlowServiceAccount.Address.HexWithPrefix(),
+							sc.FlowToken.Address.HexWithPrefix(),
 						))
 
 						script := fvm.Script(code)
@@ -231,6 +236,8 @@ func TestBridgedAccountDeploy(t *testing.T) {
 			RunWithDeployedContract(t, tc, backend, rootAddr, func(testContract *TestContract) {
 				RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *EOATestAccount) {
 					chain := flow.Emulator.Chain()
+					sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
 					RunWithNewTestVM(t, chain, func(ctx fvm.Context, vm fvm.VM, snapshot snapshot.SnapshotTree) {
 
 						code := []byte(fmt.Sprintf(
@@ -258,8 +265,8 @@ func TestBridgedAccountDeploy(t *testing.T) {
                                    return address.bytes
                                 }
                             `,
-							chain.ServiceAddress().HexWithPrefix(),
-							fvm.FlowTokenAddress(chain).HexWithPrefix(),
+							sc.FlowServiceAccount.Address.HexWithPrefix(),
+							sc.FlowToken.Address.HexWithPrefix(),
 						))
 
 						script := fvm.Script(code)

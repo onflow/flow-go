@@ -556,8 +556,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			// create a block with 2 collections with 2 transactions each
 			block := generateBlock(collectionCount, transactionsPerCollection, rag)
 
-			serviceEvents, err := systemcontracts.ServiceEventsForChain(execCtx.Chain.ChainID())
-			require.NoError(t, err)
+			serviceEvents := systemcontracts.ServiceEventsForChain(execCtx.Chain.ChainID())
 
 			payload, err := ccf.Decode(nil, unittest.EpochSetupFixtureCCF)
 			require.NoError(t, err)
