@@ -1,11 +1,9 @@
 package state_test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/golang/mock/gomock"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -22,11 +20,10 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	storage "github.com/onflow/flow-go/storage/mock"
-	"github.com/onflow/flow-go/storage/mocks"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func prepareTest(f func(t *testing.T, es state.ExecutionState, l *ledger.Ledger)) func(*testing.T) {
+func prepareTest(f func(t *testing.T, es state.ExecutionState, l *ledger.Ledger, headers *storage.Headers, commits *storage.Commits)) func(*testing.T) {
 	return func(t *testing.T) {
 		unittest.RunWithBadgerDB(t, func(badgerDB *badger.DB) {
 			metricsCollector := &metrics.NoopCollector{}
@@ -40,39 +37,31 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState, l *ledger.Ledger)
 				<-compactor.Done()
 			}()
 
-			ctrl := gomock.NewController(t)
-
-			stateCommitments := mocks.NewMockCommits(ctrl)
-			blocks := mocks.NewMockBlocks(ctrl)
-			headers := mocks.NewMockHeaders(ctrl)
-			collections := mocks.NewMockCollections(ctrl)
-			events := mocks.NewMockEvents(ctrl)
-			serviceEvents := mocks.NewMockServiceEvents(ctrl)
-			txResults := mocks.NewMockTransactionResults(ctrl)
-
-			stateCommitment := ls.InitialState()
-
-			stateCommitments.EXPECT().ByBlockID(gomock.Any()).Return(flow.StateCommitment(stateCommitment), nil)
-
-			chunkDataPacks := new(storage.ChunkDataPacks)
-
-			results := new(storage.ExecutionResults)
-			myReceipts := new(storage.MyExecutionReceipts)
+			stateCommitments := storage.NewCommits(t)
+			headers := storage.NewHeaders(t)
+			blocks := storage.NewBlocks(t)
+			collections := storage.NewCollections(t)
+			events := storage.NewEvents(t)
+			serviceEvents := storage.NewServiceEvents(t)
+			txResults := storage.NewTransactionResults(t)
+			chunkDataPacks := storage.NewChunkDataPacks(t)
+			results := storage.NewExecutionResults(t)
+			myReceipts := storage.NewMyExecutionReceipts(t)
 
 			es := state.NewExecutionState(
 				ls, stateCommitments, blocks, headers, collections, chunkDataPacks, results, myReceipts, events, serviceEvents, txResults, badgerDB, trace.NewNoopTracer(),
 			)
 
-			f(t, es, ls)
+			f(t, es, ls, headers, stateCommitments)
 		})
 	}
 }
 
 func TestExecutionStateWithTrieStorage(t *testing.T) {
-	t.Run("commit write and read new state", prepareTest(func(t *testing.T, es state.ExecutionState, l *ledger.Ledger) {
+	t.Run("commit write and read new state", prepareTest(func(
+		t *testing.T, es state.ExecutionState, l *ledger.Ledger, headers *storage.Headers, stateCommitments *storage.Commits) {
 		header1 := unittest.BlockHeaderFixture()
-		sc1, err := es.StateCommitmentByBlockID(context.Background(), header1.ID())
-		assert.NoError(t, err)
+		sc1 := flow.StateCommitment(l.InitialState())
 
 		reg1 := unittest.MakeOwnerReg("fruit", "apple")
 		reg2 := unittest.MakeOwnerReg("vegetable", "carrot")
@@ -140,12 +129,15 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 
 		// verify has state
 		require.True(t, es.HasState(sc2))
+
+		// test CreateStorageSnapshot
+
 	}))
 
-	t.Run("commit write and read previous state", prepareTest(func(t *testing.T, es state.ExecutionState, l *ledger.Ledger) {
+	t.Run("commit write and read previous state", prepareTest(func(
+		t *testing.T, es state.ExecutionState, l *ledger.Ledger, headers *storage.Headers, stateCommitments *storage.Commits) {
 		header1 := unittest.BlockHeaderFixture()
-		sc1, err := es.StateCommitmentByBlockID(context.Background(), header1.ID())
-		assert.NoError(t, err)
+		sc1 := flow.StateCommitment(l.InitialState())
 
 		reg1 := unittest.MakeOwnerReg("fruit", "apple")
 		executionSnapshot1 := &snapshot.ExecutionSnapshot{
@@ -191,10 +183,10 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		assert.Equal(t, flow.RegisterValue("orange"), b2)
 	}))
 
-	t.Run("commit delta and read new state", prepareTest(func(t *testing.T, es state.ExecutionState, l *ledger.Ledger) {
+	t.Run("commit delta and read new state", prepareTest(func(
+		t *testing.T, es state.ExecutionState, l *ledger.Ledger, headers *storage.Headers, stateCommitments *storage.Commits) {
 		header1 := unittest.BlockHeaderFixture()
-		sc1, err := es.StateCommitmentByBlockID(context.Background(), header1.ID())
-		assert.NoError(t, err)
+		sc1 := flow.StateCommitment(l.InitialState())
 
 		reg1 := unittest.MakeOwnerReg("fruit", "apple")
 		reg2 := unittest.MakeOwnerReg("vegetable", "carrot")
@@ -240,10 +232,9 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		assert.Empty(t, b2)
 	}))
 
-	t.Run("commit delta and persist state commit for the second time should be OK", prepareTest(func(t *testing.T, es state.ExecutionState, l *ledger.Ledger) {
-		// TODO: use real block ID
-		sc1, err := es.StateCommitmentByBlockID(context.Background(), flow.Identifier{})
-		assert.NoError(t, err)
+	t.Run("commit delta and persist state commit for the second time should be OK", prepareTest(func(
+		t *testing.T, es state.ExecutionState, l *ledger.Ledger, headers *storage.Headers, stateCommitments *storage.Commits) {
+		sc1 := flow.StateCommitment(l.InitialState())
 
 		reg1 := unittest.MakeOwnerReg("fruit", "apple")
 		reg2 := unittest.MakeOwnerReg("vegetable", "carrot")
@@ -268,10 +259,5 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 
 		require.Equal(t, sc2, sc2Same)
 	}))
-
-	// t.Run("create snapshot", prepareTest(func(t *testing.T, es state.ExecutionState, l *ledger.Ledger) {
-	// 	header := unittest.BlockHeaderFixture()
-	// 	s1, header1, err := es.CreateStorageSnapshot(header.ID())
-	// }))
 
 }
