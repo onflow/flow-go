@@ -158,6 +158,10 @@ func finalize(cmd *cobra.Command, args []string) {
 	if err != nil {
 		log.Fatal().Err(err).Msg("invalid or unsafe epoch commit threshold config")
 	}
+	err = validateEpochTimingConfig()
+	if err != nil {
+		log.Fatal().Err(err).Msg("invalid epoch timing config")
+	}
 
 	log.Info().Msg("collecting partner network and staking keys")
 	partnerNodes := readPartnerNodeInfos()
@@ -696,17 +700,17 @@ func validateEpochTimingConfig() error {
 		flagEpochTargetEndTimeDuration = flagNumViewsInEpoch
 		flagEpochTargetEndTimeRefTimestamp = uint64(time.Now().Unix()) + flagNumViewsInEpoch
 
-		rootEpochTargetEndTimeUNIX := epochTargetEndTime(flagEpochCounter, flagEpochTargetEndTimeRefCounter, flagEpochTargetEndTimeRefTimestamp, flagEpochTargetEndTimeDuration)
+		rootEpochTargetEndTimeUNIX := epochTargetEndTime()
 		rootEpochTargetEndTime := time.Unix(int64(rootEpochTargetEndTimeUNIX), 0)
 		log.Info().Msgf("using default epoch timing config with root epoch target end time %s, which is in %s", rootEpochTargetEndTime, rootEpochTargetEndTime.Sub(time.Now()))
 	} else {
 		// All other flags must be set
 		// NOTE: it is valid for refCounter to be set to 0
-		if flagEpochTargetEndTimeRefTimestamp == 0 && flagEpochTargetEndTimeDuration == 0 {
+		if flagEpochTargetEndTimeRefTimestamp == 0 || flagEpochTargetEndTimeDuration == 0 {
 			return fmt.Errorf("invalid epoch timing config: must specify ALL of --epoch-target-end-time-ref-counter, --epoch-target-end-time-ref-timestamp, and --epoch-target-end-time-duration")
 		}
 
-		rootEpochTargetEndTimeUNIX := epochTargetEndTime(flagEpochCounter, flagEpochTargetEndTimeRefCounter, flagEpochTargetEndTimeRefTimestamp, flagEpochTargetEndTimeDuration)
+		rootEpochTargetEndTimeUNIX := epochTargetEndTime()
 		rootEpochTargetEndTime := time.Unix(int64(rootEpochTargetEndTimeUNIX), 0)
 		log.Info().Msgf("using user-specified epoch timing config with root epoch target end time %s, which is in %s", rootEpochTargetEndTime, rootEpochTargetEndTime.Sub(time.Now()))
 	}
