@@ -171,10 +171,33 @@ func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegis
 
 var _ p2p.GossipSubInvCtrlMsgNotifConsumer = (*GossipSubAppSpecificScoreRegistry)(nil)
 
-// AppSpecificScoreFunc returns the application specific penalty function that is called by the GossipSub protocol to determine the application specific penalty of a peer.
+// AppSpecificScoreFunc returns the application specific score function that is called by the GossipSub protocol to determine the application specific score of a peer.
+// The application specific score is part of the overall score of a peer, and is used to determine the peer's score based
+// This function reads the application specific score of a peer from the cache, and if the penalty is not found in the cache, it computes it.
+// If the score is not found in the cache, it is computed and added to the cache.
+// Also if the score is expired, it is computed and added to the cache.
+// Returns:
+// - func(peer.ID) float64: the application specific score function.
+// Implementation must be thread-safe.
 func (r *GossipSubAppSpecificScoreRegistry) AppSpecificScoreFunc() func(peer.ID) float64 {
 	return func(pid peer.ID) float64 {
-		return r.computeAppSpecificScore(pid)
+		appSpecificScore, lastUpdated, ok := r.appScoreCache.Get(pid)
+		if !ok || time.Since(lastUpdated) > r.scoreTTL {
+			appSpecificScore = r.computeAppSpecificScore(pid)
+			err := r.appScoreCache.Add(pid, appSpecificScore, time.Now())
+			if err != nil {
+				// the error is considered fatal as it means the cache is not working properly.
+				r.logger.Fatal().
+					Str("remote_peer_id", p2plogging.PeerId(pid)).
+					Err(err).
+					Msg("could not add application specific penalty for peer")
+			}
+			r.logger.Trace().
+				Str("remote_peer_id", p2plogging.PeerId(pid)).
+				Float64("app_specific_score", appSpecificScore).
+				Msg("application specific penalty computed and cache updated")
+		}
+		return appSpecificScore
 	}
 }
 
