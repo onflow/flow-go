@@ -1,4 +1,4 @@
-package backend
+package execution
 
 import (
 	"fmt"
@@ -11,7 +11,7 @@ import (
 )
 
 // RegistersAsyncStore has the same basic structure as access/backend.ScriptExecutor
-// TODO: use this interface for backend_scripts.go
+// TODO: use this implementation in the `scripts.ScriptExecutor` passed into the AccessAPI
 type RegistersAsyncStore struct {
 	registerIndex storage.RegisterIndex
 	reporter      state_synchronization.IndexReporter
@@ -43,17 +43,18 @@ func (r *RegistersAsyncStore) InitDataAvailable(
 // RegisterValues atomically gets the register values from the underlying storage.RegisterIndex
 // Expected errors:
 //   - storage.ErrHeightNotIndexed if the store is still bootstrapping or if the values at the height is not indexed yet
+//   - storage.ErrNotFound if the register does not exist at the height
 func (r *RegistersAsyncStore) RegisterValues(ids flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
 	if !r.isDataAvailable(height) {
 		return nil, storage.ErrHeightNotIndexed
 	}
 	result := make([]flow.RegisterValue, len(ids))
-	for idx, regId := range ids {
+	for i, regId := range ids {
 		val, err := r.registerIndex.Get(regId, height)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get register value for id %s: %w", regId.String(), err)
 		}
-		result[idx] = val
+		result[i] = val
 	}
 	return result, nil
 }

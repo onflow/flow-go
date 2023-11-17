@@ -8,6 +8,7 @@ import (
 
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
+	"github.com/onflow/flow-go/module/execution"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -44,7 +45,7 @@ type BackendExecutionDataSuite struct {
 	headers        *storagemock.Headers
 	seals          *storagemock.Seals
 	results        *storagemock.ExecutionResults
-	registersAsync *RegistersAsyncStore
+	registersAsync *execution.RegistersAsyncStore
 
 	bs                blobs.Blobstore
 	eds               execution_data.ExecutionDataStore
@@ -146,7 +147,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 		s.T().Logf("adding exec data for block %d %d %v => %v", i, block.Header.Height, block.ID(), result.ExecutionDataID)
 	}
 
-	s.registersAsync = NewRegistersAsyncStore()
+	s.registersAsync = execution.NewRegistersAsyncStore()
 
 	s.state.On("Sealed").Return(s.snapshot, nil).Maybe()
 	s.snapshot.On("Head").Return(s.blocks[0].Header, nil).Maybe()

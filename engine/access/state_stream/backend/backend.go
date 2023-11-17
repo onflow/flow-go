@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/module/execution"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -72,7 +74,7 @@ type StateStreamBackend struct {
 	broadcaster     *engine.Broadcaster
 	rootBlockHeight uint64
 	rootBlockID     flow.Identifier
-	registers       *RegistersAsyncStore
+	registers       *execution.RegistersAsyncStore
 
 	// highestHeight contains the highest consecutive block height for which we have received a
 	// new Execution Data notification.
@@ -91,7 +93,7 @@ func New(
 	broadcaster *engine.Broadcaster,
 	rootHeight uint64,
 	highestAvailableHeight uint64,
-	registers *RegistersAsyncStore,
+	registers *execution.RegistersAsyncStore,
 ) (*StateStreamBackend, error) {
 	logger := log.With().Str("module", "state_stream_api").Logger()
 
@@ -217,7 +219,13 @@ func (b *StateStreamBackend) setHighestHeight(height uint64) bool {
 }
 
 // GetRegisterValues returns the register values for the given register IDs at the given block height.
-// TODO: find a better home for this method.
 func (b *StateStreamBackend) GetRegisterValues(ids flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
-	return b.registers.RegisterValues(ids, height)
+	values, err := b.registers.RegisterValues(ids, height)
+	if errors.Is(err, storage.ErrHeightNotIndexed) {
+		return nil, status.Errorf(codes.OutOfRange, "register values for block %d is not available yet: %w", height, err)
+	}
+	if errors.Is(err, storage.ErrNotFound) {
+		return nil, status.Errorf(codes.NotFound, "register values for block %d is not available: %w", height, err)
+	}
+	return values, err
 }

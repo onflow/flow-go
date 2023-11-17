@@ -1447,8 +1447,8 @@ github.com/onflow/flow-go/crypto v0.24.9/go.mod h1:fqCzkIBBMRRkciVrvW21rECKq1oD7
 github.com/onflow/flow-nft/lib/go/contracts v1.1.0 h1:rhUDeD27jhLwOqQKI/23008CYfnqXErrJvc4EFRP2a0=
 github.com/onflow/flow-nft/lib/go/contracts v1.1.0/go.mod h1:YsvzYng4htDgRB9sa9jxdwoTuuhjK8WYWXTyLkIigZY=
 github.com/onflow/flow/protobuf/go/flow v0.2.2/go.mod h1:gQxYqCfkI8lpnKsmIjwtN2mV/N2PIwc1I+RUK4HPIc8=
-github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20231116203821-e1d2ab4f3ffa h1:Hm03UdvOswwzColJODyh7v8FWdwjv+6tbRogYiuYjY0=
-github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20231116203821-e1d2ab4f3ffa/go.mod h1:NA2pX2nw8zuaxfKphhKsk00kWLwfd+tv8mS23YXO4Sk=
+github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20231117154516-5baffff1524f h1:dlcSgqGS74FBnsukAq8SQmGiK6lTaTPHWc8bozK1Na4=
+github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20231117154516-5baffff1524f/go.mod h1:NA2pX2nw8zuaxfKphhKsk00kWLwfd+tv8mS23YXO4Sk=
 github.com/onflow/go-bitswap v0.0.0-20230703214630-6d3db958c73d h1:QcOAeEyF3iAUHv21LQ12sdcsr0yFrJGoGLyCAzYYtvI=
 github.com/onflow/go-bitswap v0.0.0-20230703214630-6d3db958c73d/go.mod h1:GCPpiyRoHncdqPj++zPr9ZOYBX4hpJ0pYZRYqSE8VKk=
 github.com/onflow/nft-storefront/lib/go/contracts v0.0.0-20221222181731-14b90207cead h1:2j1Unqs76Z1b95Gu4C3Y28hzNUHBix7wL490e61SMSw=

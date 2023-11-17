@@ -174,36 +174,29 @@ func TestConvertChunkExecutionData(t *testing.T) {
 
 func TestMessageToRegisterIDs(t *testing.T) {
 	tests := []struct {
-		name string
-		fn   func(*testing.T) flow.RegisterID
+		name  string
+		regID flow.RegisterID
 	}{
 		{
-			name: "service level register id",
-			fn: func(t *testing.T) flow.RegisterID {
-				return flow.UUIDRegisterID(0)
-			},
+			name:  "service level register id",
+			regID: flow.UUIDRegisterID(0),
 		},
 		{
-			name: "account level register id",
-			fn: func(t *testing.T) flow.RegisterID {
-				return flow.AccountStatusRegisterID(unittest.AddressFixture())
-			},
+			name:  "account level register id",
+			regID: flow.AccountStatusRegisterID(unittest.AddressFixture()),
 		},
 		{
-			name: "regular register id",
-			fn: func(t *testing.T) flow.RegisterID {
-				return unittest.RegisterIDFixture()
-			},
+			name:  "regular register id",
+			regID: unittest.RegisterIDFixture(),
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			registerID := test.fn(t)
-			registerIDMessage := convert.RegisterIDToMessage(registerID)
+			registerIDMessage := convert.RegisterIDToMessage(test.regID)
 			reConvertedRegisterID, err := convert.MessageToRegisterID(registerIDMessage)
 			require.NoError(t, err)
-			assert.Equal(t, registerID, *reConvertedRegisterID)
+			assert.Equal(t, test.regID, *reConvertedRegisterID)
 		})
 	}
 	_, err := convert.MessageToRegisterID(nil)

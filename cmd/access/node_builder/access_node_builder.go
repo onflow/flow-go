@@ -268,7 +268,7 @@ type FlowAccessNodeBuilder struct {
 	ExecutionIndexer           *indexer.Indexer
 	ExecutionIndexerCore       *indexer.IndexerCore
 	ScriptExecutor             *backend.ScriptExecutor
-	RegistersAsyncStore        *statestreambackend.RegistersAsyncStore
+	RegistersAsyncStore        *execution.RegistersAsyncStore
 
 	// The sync engine participants provider is the libp2p peer store for the access node
 	// which is not available until after the network has started.
@@ -1240,7 +1240,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Module("async register store", func(node *cmd.NodeConfig) error {
-			builder.RegistersAsyncStore = statestreambackend.NewRegistersAsyncStore()
+			builder.RegistersAsyncStore = execution.NewRegistersAsyncStore()
 			return nil
 		}).
 		Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
