@@ -174,11 +174,9 @@ func (e *QueryExecutor) ExecuteScript(
 			fvm.WithBlockHeader(blockHeader),
 			fvm.WithEntropyProvider(e.entropyPerBlock.AtBlockID(blockHeader.ID())),
 			fvm.WithDerivedBlockData(
-				e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.ID())),
-		),
+				e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.ID()))),
 		fvm.NewScriptWithContextAndArgs(script, requestCtx, arguments...),
-		snapshot,
-	)
+		snapshot)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute script (internal error): %w", err)
 	}
