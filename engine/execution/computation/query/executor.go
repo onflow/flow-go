@@ -54,6 +54,7 @@ type Executor interface {
 type QueryConfig struct {
 	LogTimeThreshold    time.Duration
 	ExecutionTimeLimit  time.Duration
+	ComputationLimit    uint64
 	MaxErrorMessageSize int
 }
 
@@ -61,6 +62,7 @@ func NewDefaultConfig() QueryConfig {
 	return QueryConfig{
 		LogTimeThreshold:    DefaultLogTimeThreshold,
 		ExecutionTimeLimit:  DefaultExecutionTimeLimit,
+		ComputationLimit:    fvm.DefaultComputationLimit,
 		MaxErrorMessageSize: DefaultMaxErrorMessageSize,
 	}
 }
@@ -87,6 +89,10 @@ func NewQueryExecutor(
 	derivedChainData *derived.DerivedChainData,
 	entropyPerBlock EntropyProviderPerBlock,
 ) *QueryExecutor {
+	if config.ComputationLimit == 0 {
+		config.ComputationLimit = fvm.DefaultComputationLimit
+	}
+
 	return &QueryExecutor{
 		config:           config,
 		logger:           logger,
@@ -169,9 +175,12 @@ func (e *QueryExecutor) ExecuteScript(
 			fvm.WithBlockHeader(blockHeader),
 			fvm.WithEntropyProvider(e.entropyPerBlock.AtBlockID(blockHeader.ID())),
 			fvm.WithDerivedBlockData(
-				e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.ID()))),
+				e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.ID())),
+			fvm.WithComputationLimit(e.config.ComputationLimit),
+		),
 		fvm.NewScriptWithContextAndArgs(script, requestCtx, arguments...),
-		snapshot)
+		snapshot,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute script (internal error): %w", err)
 	}
