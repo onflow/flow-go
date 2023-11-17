@@ -2,6 +2,7 @@ package inmem
 
 import (
 	"fmt"
+
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
