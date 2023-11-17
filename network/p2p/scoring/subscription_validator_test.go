@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
@@ -32,9 +33,7 @@ import (
 // any topic, the subscription validator returns no error.
 func TestSubscriptionValidator_NoSubscribedTopic(t *testing.T) {
 	sp := mockp2p.NewSubscriptionProvider(t)
-
-	sv := scoring.NewSubscriptionValidator()
-	require.NoError(t, sv.RegisterSubscriptionProvider(sp))
+	sv := scoring.NewSubscriptionValidator(unittest.Logger(), sp)
 
 	// mocks peer 1 not subscribed to any topic.
 	peer1 := unittest.PeerIdFixture(t)
@@ -51,8 +50,7 @@ func TestSubscriptionValidator_NoSubscribedTopic(t *testing.T) {
 // topic, the subscription validator returns an error.
 func TestSubscriptionValidator_UnknownChannel(t *testing.T) {
 	sp := mockp2p.NewSubscriptionProvider(t)
-	sv := scoring.NewSubscriptionValidator()
-	require.NoError(t, sv.RegisterSubscriptionProvider(sp))
+	sv := scoring.NewSubscriptionValidator(unittest.Logger(), sp)
 
 	// mocks peer 1 not subscribed to an unknown topic.
 	peer1 := unittest.PeerIdFixture(t)
@@ -71,8 +69,7 @@ func TestSubscriptionValidator_UnknownChannel(t *testing.T) {
 // topics based on its Flow protocol role, the subscription validator returns no error.
 func TestSubscriptionValidator_ValidSubscriptions(t *testing.T) {
 	sp := mockp2p.NewSubscriptionProvider(t)
-	sv := scoring.NewSubscriptionValidator()
-	require.NoError(t, sv.RegisterSubscriptionProvider(sp))
+	sv := scoring.NewSubscriptionValidator(unittest.Logger(), sp)
 
 	for _, role := range flow.Roles() {
 		peerId := unittest.PeerIdFixture(t)
@@ -102,8 +99,7 @@ func TestSubscriptionValidator_ValidSubscriptions(t *testing.T) {
 // is no longer true.
 func TestSubscriptionValidator_SubscribeToAllTopics(t *testing.T) {
 	sp := mockp2p.NewSubscriptionProvider(t)
-	sv := scoring.NewSubscriptionValidator()
-	require.NoError(t, sv.RegisterSubscriptionProvider(sp))
+	sv := scoring.NewSubscriptionValidator(unittest.Logger(), sp)
 
 	allChannels := channels.Channels().ExcludePattern(regexp.MustCompile("^(test).*"))
 	sporkID := unittest.IdentifierFixture()
@@ -125,8 +121,7 @@ func TestSubscriptionValidator_SubscribeToAllTopics(t *testing.T) {
 // topics based on its Flow protocol role, the subscription validator returns an error.
 func TestSubscriptionValidator_InvalidSubscriptions(t *testing.T) {
 	sp := mockp2p.NewSubscriptionProvider(t)
-	sv := scoring.NewSubscriptionValidator()
-	require.NoError(t, sv.RegisterSubscriptionProvider(sp))
+	sv := scoring.NewSubscriptionValidator(unittest.Logger(), sp)
 
 	for _, role := range flow.Roles() {
 		peerId := unittest.PeerIdFixture(t)
@@ -172,6 +167,11 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
+	cfg, err := config.DefaultConfig()
+	require.NoError(t, err)
+	// set a low update interval to speed up the test
+	cfg.NetworkConfig.SubscriptionProviderConfig.SubscriptionUpdateInterval = 100 * time.Millisecond
+
 	sporkId := unittest.IdentifierFixture()
 
 	idProvider := mock.NewIdentityProvider(t)
@@ -179,6 +179,7 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 	conNode, conId := p2ptest.NodeFixture(t, sporkId, t.Name(),
 		idProvider,
 		p2ptest.WithLogger(unittest.Logger()),
+		p2ptest.OverrideFlowConfig(cfg),
 		p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride),
 		p2ptest.WithRole(flow.RoleConsensus))
 
@@ -186,12 +187,14 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 	verNode1, verId1 := p2ptest.NodeFixture(t, sporkId, t.Name(),
 		idProvider,
 		p2ptest.WithLogger(unittest.Logger()),
+		p2ptest.OverrideFlowConfig(cfg),
 		p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride),
 		p2ptest.WithRole(flow.RoleVerification))
 
 	verNode2, verId2 := p2ptest.NodeFixture(t, sporkId, t.Name(),
 		idProvider,
 		p2ptest.WithLogger(unittest.Logger()),
+		p2ptest.OverrideFlowConfig(cfg),
 		p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride),
 		p2ptest.WithRole(flow.RoleVerification))
 
