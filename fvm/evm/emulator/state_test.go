@@ -2,13 +2,11 @@ package emulator_test
 
 import (
 	"math/big"
-	"os"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
 	gethRawDB "github.com/ethereum/go-ethereum/core/rawdb"
 	gethState "github.com/ethereum/go-ethereum/core/state"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/evm/emulator/database"
@@ -17,14 +15,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func benchmarkStateSingleAccountBalanceChanges(b *testing.B, numberOfBalanceChanges int, debug bool) {
+func benchmarkStateAccountsBalanceChange(b *testing.B, numberOfAccounts int, numberOfUpdatesPerAccount int) {
 	testutils.RunWithTestBackend(b, func(backend types.Backend) {
 		rootAddr := flow.Address{0x01}
-		testAddr := common.Address{0x02}
-
-		if debug {
-			log.Root().SetHandler(log.StreamHandler(os.Stdout, log.LogfmtFormat()))
-		}
 
 		db, err := database.NewMeteredDatabase(backend, rootAddr)
 		require.NoError(b, err)
@@ -34,13 +27,21 @@ func benchmarkStateSingleAccountBalanceChanges(b *testing.B, numberOfBalanceChan
 
 		stateDB := gethState.NewDatabase(gethRawDB.NewDatabase(db))
 
-		updateAccount := func(root common.Hash, balance *big.Int) common.Hash {
+		accounts := make([]common.Address, numberOfAccounts)
+		for i := range accounts {
+			accounts[i] = common.Address{byte(i)}
+		}
+
+		updateAccounts := func(root common.Hash, balance *big.Int) common.Hash {
 			state, err := gethState.New(root, stateDB, nil)
 			require.NoError(b, err)
 
-			state.SetBalance(testAddr, balance)
-			hash, err := state.Commit(true)
-			require.NoError(b, err)
+			var hash common.Hash
+			for _, addr := range accounts {
+				state.SetBalance(addr, balance)
+				hash, err = state.Commit(true)
+				require.NoError(b, err)
+			}
 
 			err = state.Database().TrieDB().Commit(hash, true)
 			require.NoError(b, err)
@@ -53,8 +54,8 @@ func benchmarkStateSingleAccountBalanceChanges(b *testing.B, numberOfBalanceChan
 			return hash
 		}
 
-		for i := 0; i < numberOfBalanceChanges; i++ {
-			rootHash = updateAccount(rootHash, big.NewInt(int64(i)))
+		for i := 0; i < numberOfUpdatesPerAccount; i++ {
+			rootHash = updateAccounts(rootHash, big.NewInt(int64(i)))
 			b.ReportMetric(float64(db.BytesStored()), "bytes_used")
 			b.ReportMetric(float64(db.BytesRetrieved()), "bytes_read")
 		}
@@ -62,6 +63,10 @@ func benchmarkStateSingleAccountBalanceChanges(b *testing.B, numberOfBalanceChan
 	})
 }
 
-func BenchmarkStateBalance(b *testing.B) {
-	benchmarkStateSingleAccountBalanceChanges(b, 1000, false)
+func BenchmarkStateBalanceSingleAccount(b *testing.B) {
+	benchmarkStateAccountsBalanceChange(b, 1, 10000)
+}
+
+func BenchmarkStateBalanceMultipleAccount(b *testing.B) {
+	benchmarkStateAccountsBalanceChange(b, 100, 100)
 }
