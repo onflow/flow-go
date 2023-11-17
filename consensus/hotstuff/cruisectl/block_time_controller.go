@@ -80,7 +80,9 @@ type BlockTimeController struct {
 	log     zerolog.Logger
 	metrics module.CruiseCtlMetrics
 
-	epochInfo              // scheduled transition view for current/next epoch
+	epochInfo // scheduled transition view for current/next epoch
+	// Currently, the only possible state transition for `epochFallbackTriggered` is false → true.
+	// TODO for 'leaving Epoch Fallback via special service event' this might need to change.
 	epochFallbackTriggered bool
 
 	incorporatedBlocks chan TimedBlock   // OnBlockIncorporated events, we desire these blocks to be processed in a timely manner and therefore use a small channel capacity
