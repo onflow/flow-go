@@ -90,7 +90,3 @@ func TestExtendingBlockSnapshot(t *testing.T) {
 		require.Equal(t, []byte("val33"), value)
 	})
 }
-
-func makeReg(key string, value string) flow.RegisterEntry {
-	return unittest.MakeOwnerReg(key, value)
-}
