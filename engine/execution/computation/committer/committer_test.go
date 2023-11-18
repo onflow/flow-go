@@ -25,16 +25,15 @@ func TestLedgerViewCommitter(t *testing.T) {
 	// and changes are saved in storage snapshot
 	t.Run("CommitView should return proof and statecommitment", func(t *testing.T) {
 
-		l := new(ledgermock.Ledger)
+		l := ledgermock.NewLedger(t)
 		committer := committer.NewLedgerViewCommitter(l, trace.NewNoopTracer())
 
 		// CommitDelta will call ledger.Set and ledger.Prove
 
-		reg := flow.NewRegisterID("owner", "key2")
-		value := []byte{1}
+		reg := unittest.MakeOwnerReg("key1", "val1")
 		startState := unittest.StateCommitmentFixture()
 
-		update, err := ledger.NewUpdate(ledger.State(startState), []ledger.Key{convert.RegisterIDToLedgerKey(reg)}, []ledger.Value{value})
+		update, err := ledger.NewUpdate(ledger.State(startState), []ledger.Key{convert.RegisterIDToLedgerKey(reg.Key)}, []ledger.Value{reg.Value})
 		require.NoError(t, err)
 
 		expectedTrieUpdate, err := pathfinder.UpdateToTrieUpdate(update, complete.DefaultPathFinderVersion)
@@ -55,9 +54,10 @@ func TestLedgerViewCommitter(t *testing.T) {
 			Once()
 
 			// previous block's storage snapshot
+		oldReg := unittest.MakeOwnerReg("key1", "oldvalue")
 		previousBlockSnapshot := storehouse.NewExecutingBlockSnapshot(
 			snapshot.MapStorageSnapshot{
-				flow.NewRegisterID("owner", "key1"): []byte{1},
+				oldReg.Key: oldReg.Value,
 			},
 			flow.StateCommitment(update.State()),
 		)
@@ -65,7 +65,7 @@ func TestLedgerViewCommitter(t *testing.T) {
 		// this block's register updates
 		blockUpdates := &snapshot.ExecutionSnapshot{
 			WriteSet: map[flow.RegisterID]flow.RegisterValue{
-				reg: value,
+				reg.Key: oldReg.Value,
 			},
 		}
 
