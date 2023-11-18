@@ -5,6 +5,7 @@ import (
 
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
@@ -22,21 +23,28 @@ import (
 // in the future we might benefit from a view style of access to db passed as
 // a param to the emulator.
 type ContractHandler struct {
+	flowTokenAddress common.Address
 	blockstore       types.BlockStore
+	addressAllocator types.AddressAllocator
 	backend          types.Backend
 	emulator         types.Emulator
-	addressAllocator types.AddressAllocator
+}
+
+func (h *ContractHandler) FlowTokenAddress() common.Address {
+	return h.flowTokenAddress
 }
 
 var _ types.ContractHandler = &ContractHandler{}
 
 func NewContractHandler(
+	flowTokenAddress common.Address,
 	blockstore types.BlockStore,
 	addressAllocator types.AddressAllocator,
 	backend types.Backend,
 	emulator types.Emulator,
 ) *ContractHandler {
 	return &ContractHandler{
+		flowTokenAddress: flowTokenAddress,
 		blockstore:       blockstore,
 		addressAllocator: addressAllocator,
 		backend:          backend,
@@ -131,7 +139,7 @@ func (h *ContractHandler) emitEvent(event *types.Event) {
 	// TODO add extra metering for rlp encoding
 	encoded, err := event.Payload.Encode()
 	handleError(err)
-	err = h.backend.EmitFlowEvent(event.Etype, encoded)
+	err = h.backend.EmitRawEvent(event.Etype, encoded)
 	handleError(err)
 }
 

@@ -80,6 +80,10 @@ func RandomCommonHash(t testing.TB) gethCommon.Hash {
 	return ret
 }
 
+func RandomBigInt(limit int64) *big.Int {
+	return big.NewInt(rand.Int63n(limit) + 1)
+}
+
 func RandomAddress(t testing.TB) types.Address {
 	return types.NewAddress(RandomCommonAddress(t))
 }

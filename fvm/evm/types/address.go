@@ -17,6 +17,9 @@ func NewAddress(addr gethCommon.Address) Address {
 	return Address(addr)
 }
 
+// EmptyAddress is an empty evm address
+var EmptyAddress = Address(gethCommon.Address{})
+
 // Bytes returns a byte slice for the address
 func (fa Address) Bytes() []byte {
 	return fa[:]
@@ -36,9 +39,6 @@ func NewAddressFromBytes(inp []byte) Address {
 func NewAddressFromString(str string) Address {
 	return NewAddressFromBytes([]byte(str))
 }
-
-// EmptyAddress is an empty evm address
-var EmptyAddress = Address(gethCommon.Address{})
 
 type GasLimit uint64
 

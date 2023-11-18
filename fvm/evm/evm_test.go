@@ -11,9 +11,8 @@ import (
 
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
+	"github.com/onflow/flow-go/fvm/evm/testutils"
 	. "github.com/onflow/flow-go/fvm/evm/testutils"
-
-	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -24,9 +23,10 @@ func TestEVMRun(t *testing.T) {
 	t.Parallel()
 
 	t.Run("testing EVM.run (happy case)", func(t *testing.T) {
-		RunWithTestBackend(t, func(backend types.Backend) {
+		RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 			RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
-				RunWithDeployedContract(t, backend, rootAddr, func(testContract *TestContract) {
+				tc := GetStorageTestContract(t)
+				RunWithDeployedContract(t, tc, backend, rootAddr, func(testContract *TestContract) {
 					RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *EOATestAccount) {
 						num := int64(12)
 						chain := flow.Emulator.Chain()
@@ -49,7 +49,7 @@ func TestEVMRun(t *testing.T) {
 
 							txBytes := testAccount.PrepareSignAndEncodeTx(t,
 								testContract.DeployedAt.ToCommon(),
-								testContract.MakeStoreCallData(t, big.NewInt(num)),
+								testContract.MakeCallData(t, "store", big.NewInt(num)),
 								big.NewInt(0),
 								gasLimit,
 								big.NewInt(0),
@@ -107,4 +107,175 @@ func RunWithNewTestVM(t *testing.T, chain flow.Chain, f func(fvm.Context, fvm.VM
 	snapshotTree = snapshotTree.Append(executionSnapshot)
 
 	f(fvm.NewContextFromParent(ctx, fvm.WithEVMEnabled(true)), vm, snapshotTree)
+}
+
+func TestEVMAddressDeposit(t *testing.T) {
+
+	t.Parallel()
+
+	RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+		RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+			tc := GetStorageTestContract(t)
+			RunWithDeployedContract(t, tc, backend, rootAddr, func(testContract *TestContract) {
+				RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *EOATestAccount) {
+					chain := flow.Emulator.Chain()
+					RunWithNewTestVM(t, chain, func(ctx fvm.Context, vm fvm.VM, snapshot snapshot.SnapshotTree) {
+
+						code := []byte(fmt.Sprintf(
+							`
+                               import EVM from %[1]s
+                               import FlowToken from %[2]s
+
+                               access(all)
+                               fun main() {
+                                   let admin = getAuthAccount(%[1]s)
+                                       .borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+                                   let minter <- admin.createNewMinter(allowedAmount: 1.23)
+                                   let vault <- minter.mintTokens(amount: 1.23)
+                                   destroy minter
+
+                                   let address = EVM.EVMAddress(
+                                       bytes: [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+                                   )
+                                   address.deposit(from: <-vault)
+                               }
+                            `,
+							chain.ServiceAddress().HexWithPrefix(),
+							fvm.FlowTokenAddress(chain).HexWithPrefix(),
+						))
+
+						script := fvm.Script(code)
+
+						executionSnapshot, output, err := vm.Run(
+							ctx,
+							script,
+							snapshot)
+						require.NoError(t, err)
+						require.NoError(t, output.Err)
+
+						// TODO:
+						_ = executionSnapshot
+					})
+				})
+			})
+		})
+	})
+}
+
+func TestBridgedAccountWithdraw(t *testing.T) {
+
+	t.Parallel()
+
+	RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+		RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+			tc := GetStorageTestContract(t)
+			RunWithDeployedContract(t, tc, backend, rootAddr, func(testContract *TestContract) {
+				RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *EOATestAccount) {
+					chain := flow.Emulator.Chain()
+					RunWithNewTestVM(t, chain, func(ctx fvm.Context, vm fvm.VM, snapshot snapshot.SnapshotTree) {
+
+						code := []byte(fmt.Sprintf(
+							`
+                               import EVM from %[1]s
+                               import FlowToken from %[2]s
+
+                               access(all)
+                               fun main(): UFix64 {
+                                   let admin = getAuthAccount(%[1]s)
+                                       .borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+                                   let minter <- admin.createNewMinter(allowedAmount: 2.34)
+                                   let vault <- minter.mintTokens(amount: 2.34)
+                                   destroy minter
+
+                                   let bridgedAccount <- EVM.createBridgedAccount()
+                                   bridgedAccount.address().deposit(from: <-vault)
+
+                                   let vault2 <- bridgedAccount.withdraw(balance: EVM.Balance(flow: 1.23))
+                                   let balance = vault2.balance
+                                   destroy bridgedAccount
+                                   destroy vault2
+
+                                   return balance
+                               }
+                            `,
+							chain.ServiceAddress().HexWithPrefix(),
+							fvm.FlowTokenAddress(chain).HexWithPrefix(),
+						))
+
+						script := fvm.Script(code)
+
+						executionSnapshot, output, err := vm.Run(
+							ctx,
+							script,
+							snapshot)
+						require.NoError(t, err)
+						require.NoError(t, output.Err)
+
+						// TODO:
+						_ = executionSnapshot
+					})
+				})
+			})
+		})
+	})
+}
+
+// TODO: provide proper contract code
+func TestBridgedAccountDeploy(t *testing.T) {
+
+	t.Parallel()
+
+	RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+		RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+			tc := GetStorageTestContract(t)
+			RunWithDeployedContract(t, tc, backend, rootAddr, func(testContract *TestContract) {
+				RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *EOATestAccount) {
+					chain := flow.Emulator.Chain()
+					RunWithNewTestVM(t, chain, func(ctx fvm.Context, vm fvm.VM, snapshot snapshot.SnapshotTree) {
+
+						code := []byte(fmt.Sprintf(
+							`
+                               import EVM from %[1]s
+                               import FlowToken from %[2]s
+
+                                access(all)
+                                fun main(): [UInt8; 20] {
+                                   let admin = getAuthAccount(%[1]s)
+                                       .borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+                                   let minter <- admin.createNewMinter(allowedAmount: 2.34)
+                                   let vault <- minter.mintTokens(amount: 2.34)
+                                   destroy minter
+
+                                   let bridgedAccount <- EVM.createBridgedAccount()
+                                   bridgedAccount.address().deposit(from: <-vault)
+
+                                   let address = bridgedAccount.deploy(
+                                       code: [],
+                                       gasLimit: 53000,
+                                       value: EVM.Balance(flow: 1.23)
+                                   )
+                                   destroy bridgedAccount
+                                   return address.bytes
+                                }
+                            `,
+							chain.ServiceAddress().HexWithPrefix(),
+							fvm.FlowTokenAddress(chain).HexWithPrefix(),
+						))
+
+						script := fvm.Script(code)
+
+						executionSnapshot, output, err := vm.Run(
+							ctx,
+							script,
+							snapshot)
+						require.NoError(t, err)
+						require.NoError(t, output.Err)
+
+						// TODO:
+						_ = executionSnapshot
+					})
+				})
+			})
+		})
+	})
 }

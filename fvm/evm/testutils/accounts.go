@@ -110,7 +110,7 @@ func GetTestEOAAccount(t testing.TB, keyHex string) *EOATestAccount {
 	}
 }
 
-func RunWithEOATestAccount(t *testing.T, led atree.Ledger, flowEVMRootAddress flow.Address, f func(*EOATestAccount)) {
+func RunWithEOATestAccount(t testing.TB, led atree.Ledger, flowEVMRootAddress flow.Address, f func(*EOATestAccount)) {
 	account := GetTestEOAAccount(t, EOATestAccount1KeyHex)
 
 	// fund account
