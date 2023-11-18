@@ -27,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	computermock "github.com/onflow/flow-go/engine/execution/computation/computer/mock"
+	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
@@ -330,8 +331,13 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(noOpExecutor{}).
 			Once() // just system chunk
 
+		snapshot := storehouse.NewExecutingBlockSnapshot(
+			snapshot.MapStorageSnapshot{},
+			unittest.StateCommitmentFixture(),
+		)
+
 		committer.On("CommitView", mock.Anything, mock.Anything).
-			Return(nil, nil, nil, nil).
+			Return(nil, nil, nil, snapshot, nil).
 			Once() // just system chunk
 
 		result, err := exe.ExecuteBlock(
@@ -423,8 +429,13 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		// create an empty block
 		block := generateBlock(0, 0, rag)
 
+		snapshot := storehouse.NewExecutingBlockSnapshot(
+			snapshot.MapStorageSnapshot{},
+			unittest.StateCommitmentFixture(),
+		)
+
 		comm.On("CommitView", mock.Anything, mock.Anything).
-			Return(nil, nil, nil, nil).
+			Return(nil, nil, nil, snapshot, nil).
 			Once() // just system chunk
 
 		result, err := exe.ExecuteBlock(
@@ -490,8 +501,13 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		block := generateBlock(collectionCount, transactionsPerCollection, rag)
 		derivedBlockData := derived.NewEmptyDerivedBlockData(0)
 
+		snapshot := storehouse.NewExecutingBlockSnapshot(
+			snapshot.MapStorageSnapshot{},
+			unittest.StateCommitmentFixture(),
+		)
+
 		committer.On("CommitView", mock.Anything, mock.Anything).
-			Return(nil, nil, nil, nil).
+			Return(nil, nil, nil, snapshot, nil).
 			Times(collectionCount + 1)
 
 		result, err := exe.ExecuteBlock(
@@ -973,8 +989,13 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		transactionsPerCollection := 3
 		block := generateBlock(collectionCount, transactionsPerCollection, rag)
 
+		snapshot := storehouse.NewExecutingBlockSnapshot(
+			snapshot.MapStorageSnapshot{},
+			unittest.StateCommitmentFixture(),
+		)
+
 		committer.On("CommitView", mock.Anything, mock.Anything).
-			Return(nil, nil, nil, nil).
+			Return(nil, nil, nil, snapshot, nil).
 			Times(collectionCount + 1)
 
 		_, err = exe.ExecuteBlock(
@@ -1204,8 +1225,13 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
 
 	committer := new(computermock.ViewCommitter)
+	snapshot := storehouse.NewExecutingBlockSnapshot(
+		snapshot.MapStorageSnapshot{},
+		unittest.StateCommitmentFixture(),
+	)
+
 	committer.On("CommitView", mock.Anything, mock.Anything).
-		Return(nil, nil, nil, nil).
+		Return(nil, nil, nil, snapshot, nil).
 		Times(1) // only system chunk
 
 	noopCollector := metrics.NewNoopCollector()
