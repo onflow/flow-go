@@ -165,7 +165,9 @@ type GossipSubAppSpecificScoreRegistryConfig struct {
 //	a new GossipSubAppSpecificScoreRegistry.
 func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegistryConfig) *GossipSubAppSpecificScoreRegistry {
 	lg := config.Logger.With().Str("module", "app_score_registry").Logger()
-	store := queue.NewHeroStore(config.AppSpecificScoreWorkerPoolSize, lg.With().Str("component", "app_specific_score_update").Logger(), config.HeroCacheMetricsFactory())
+	store := queue.NewHeroStore(config.AppSpecificScoreWorkerPoolSize,
+		lg.With().Str("component", "app_specific_score_update").Logger(),
+		metrics.GossipSubAppSpecificScoreUpdateQueueMetricFactory(config.HeroCacheMetricsFactory))
 
 	reg := &GossipSubAppSpecificScoreRegistry{
 		logger:         config.Logger.With().Str("module", "app_score_registry").Logger(),

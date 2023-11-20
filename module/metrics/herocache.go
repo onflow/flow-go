@@ -193,6 +193,18 @@ func GossipSubRPCInspectorClusterPrefixedCacheMetricFactory(f HeroCacheMetricsFa
 	return f(namespaceNetwork, r)
 }
 
+// GossipSubAppSpecificScoreUpdateQueueMetricFactory is the factory method for creating a new HeroCacheCollector for the
+// app-specific score update queue of the GossipSub peer scoring module. The app-specific score update queue is used to
+// queue the update requests for the app-specific score of peers. The update requests are queued in a worker pool and
+// processed asynchronously.
+// Args:
+// - f: the HeroCacheMetricsFactory to create the collector
+// Returns:
+// - a HeroCacheMetrics for the app-specific score update queue.
+func GossipSubAppSpecificScoreUpdateQueueMetricFactory(f HeroCacheMetricsFactory) module.HeroCacheMetrics {
+	return f(namespaceNetwork, ResourceNetworkingAppSpecificScoreUpdateQueue)
+}
+
 func CollectionNodeTransactionsCacheMetrics(registrar prometheus.Registerer, epoch uint64) *HeroCacheCollector {
 	return NewHeroCacheCollector(namespaceCollection, fmt.Sprintf("%s_%d", ResourceTransaction, epoch), registrar)
 }

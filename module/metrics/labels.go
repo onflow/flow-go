@@ -95,6 +95,7 @@ const (
 	ResourceNetworkingApplicationLayerSpamRecordCache  = "application_layer_spam_record_cache"
 	ResourceNetworkingApplicationLayerSpamReportQueue  = "application_layer_spam_report_queue"
 	ResourceNetworkingRpcClusterPrefixReceivedCache    = "rpc_cluster_prefixed_received_cache"
+	ResourceNetworkingAppSpecificScoreUpdateQueue      = "gossipsub_app_specific_score_update_queue"
 	ResourceNetworkingDisallowListCache                = "disallow_list_cache"
 	ResourceNetworkingRPCSentTrackerCache              = "gossipsub_rpc_sent_tracker_cache"
 	ResourceNetworkingRPCSentTrackerQueue              = "gossipsub_rpc_sent_tracker_queue"
