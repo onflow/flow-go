@@ -121,12 +121,8 @@ func (s *ProtocolStateMachineSuite) TestBuild() {
 	require.Equal(s.T(), updatedState.ID(), stateID, "should return correct ID")
 	require.Equal(s.T(), s.parentProtocolState.ID(), s.stateMachine.ParentState().ID(), "should not modify parent protocol state")
 
-	updatedDynamicIdentity := s.parentProtocolState.CurrentEpochIdentityTable[0].DynamicIdentity
-	updatedDynamicIdentity.Ejected = true
-	err := s.stateMachine.EjectIdentity(&flow.DynamicIdentityEntry{
-		NodeID:  s.parentProtocolState.CurrentEpochIdentityTable[0].NodeID,
-		Dynamic: updatedDynamicIdentity,
-	})
+	updatedDynamicIdentity := s.parentProtocolState.CurrentEpochIdentityTable[0].NodeID
+	err := s.stateMachine.EjectIdentity(updatedDynamicIdentity)
 	require.NoError(s.T(), err)
 	updatedState, stateID, hasChanges = s.stateMachine.Build()
 	require.True(s.T(), hasChanges, "should have changes")
@@ -260,11 +256,7 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochCommit() {
 
 // TestUpdateIdentityUnknownIdentity tests if updating the identity of unknown node results in an error.
 func (s *ProtocolStateMachineSuite) TestUpdateIdentityUnknownIdentity() {
-	identity := &flow.DynamicIdentityEntry{
-		NodeID:  unittest.IdentifierFixture(),
-		Dynamic: flow.DynamicIdentity{},
-	}
-	err := s.stateMachine.EjectIdentity(identity)
+	err := s.stateMachine.EjectIdentity(unittest.IdentifierFixture())
 	require.Error(s.T(), err, "should not be able to update data of unknown identity")
 	require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 
@@ -283,25 +275,11 @@ func (s *ProtocolStateMachineSuite) TestUpdateIdentityHappyPath() {
 	require.NoError(s.T(), err)
 
 	currentEpochParticipants := s.parentProtocolState.CurrentEpochIdentityTable.Copy()
-	weightChanges, err := currentEpochParticipants.Sample(3)
-	require.NoError(s.T(), err)
 	ejectedChanges, err := currentEpochParticipants.Sample(2)
 	require.NoError(s.T(), err)
-	require.Greater(s.T(), len(weightChanges), len(ejectedChanges),
-		"due to sampling and test setup we want to have more weight changes than ejected changes")
-	for i, identity := range weightChanges {
-		identity.DynamicIdentity.Weight = uint64(100 * i)
-	}
-	for _, identity := range ejectedChanges {
-		identity.Ejected = true
-	}
 
-	allUpdates := append(weightChanges, ejectedChanges...)
-	for _, update := range allUpdates {
-		err := s.stateMachine.EjectIdentity(&flow.DynamicIdentityEntry{
-			NodeID:  update.NodeID,
-			Dynamic: update.DynamicIdentity,
-		})
+	for _, update := range ejectedChanges {
+		err := s.stateMachine.EjectIdentity(update.NodeID)
 		require.NoError(s.T(), err)
 	}
 	updatedState, updatedStateID, hasChanges := s.stateMachine.Build()
@@ -315,17 +293,17 @@ func (s *ProtocolStateMachineSuite) TestUpdateIdentityHappyPath() {
 	currentEpochLookup := updatedState.CurrentEpoch.ActiveIdentities.Lookup()
 	nextEpochLookup := updatedState.NextEpoch.ActiveIdentities.Lookup()
 
-	for _, updated := range allUpdates {
+	for _, updated := range ejectedChanges {
 		currentEpochIdentity, foundInCurrentEpoch := currentEpochLookup[updated.NodeID]
 		if foundInCurrentEpoch {
 			require.Equal(s.T(), updated.NodeID, currentEpochIdentity.NodeID)
-			require.Equal(s.T(), updated.DynamicIdentity, currentEpochIdentity.Dynamic)
+			require.True(s.T(), currentEpochIdentity.Ejected)
 		}
 
 		nextEpochIdentity, foundInNextEpoch := nextEpochLookup[updated.NodeID]
 		if foundInNextEpoch {
 			require.Equal(s.T(), updated.NodeID, nextEpochIdentity.NodeID)
-			require.Equal(s.T(), updated.DynamicIdentity, nextEpochIdentity.Dynamic)
+			require.True(s.T(), nextEpochIdentity.Ejected)
 		}
 		require.True(s.T(), foundInCurrentEpoch || foundInNextEpoch, "identity should be found in either current or next epoch")
 	}
@@ -371,7 +349,7 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochSetupInvariants() {
 	})
 	s.Run("epoch setup state conflicts with protocol state", func() {
 		conflictingIdentity := s.parentProtocolState.ProtocolStateEntry.CurrentEpoch.ActiveIdentities[0]
-		conflictingIdentity.Dynamic.Ejected = true
+		conflictingIdentity.Ejected = true
 
 		stateMachine, err := newStateMachine(s.candidate.View, s.parentProtocolState.Copy())
 		require.NoError(s.T(), err)
@@ -396,7 +374,6 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochSetupInvariants() {
 func (s *ProtocolStateMachineSuite) TestProcessEpochSetupHappyPath() {
 	setupParticipants := unittest.IdentityListFixture(5, unittest.WithAllRoles()).Sort(order.Canonical[flow.Identity])
 	setupParticipants[0].InitialWeight = 13
-	setupParticipants[0].Weight = setupParticipants[0].InitialWeight
 	setup := unittest.EpochSetupFixture(
 		unittest.SetupWithCounter(s.parentProtocolState.CurrentEpochSetup.Counter+1),
 		unittest.WithFirstView(s.parentProtocolState.CurrentEpochSetup.FinalView+1),
@@ -468,24 +445,10 @@ func (s *ProtocolStateMachineSuite) TestEpochSetupAfterIdentityChange() {
 		_, exists := s.parentProtocolState.CurrentEpochSetup.Participants.ByNodeID(i.NodeID)
 		return exists
 	}).Sort(order.Canonical[flow.Identity])
-	weightChanges, err := participantsFromCurrentEpochSetup.Sample(3)
-	require.NoError(s.T(), err)
 	ejectedChanges, err := participantsFromCurrentEpochSetup.Sample(2)
 	require.NoError(s.T(), err)
-	require.Greater(s.T(), len(weightChanges), len(ejectedChanges),
-		"due to sampling and test setup we want to have more weight changes than ejected changes")
-	for i, identity := range weightChanges {
-		identity.DynamicIdentity.Weight = uint64(100 * (i + 1))
-	}
-	for _, identity := range ejectedChanges {
-		identity.Ejected = true
-	}
-	allUpdates := append(weightChanges, ejectedChanges...)
-	for _, update := range allUpdates {
-		err := s.stateMachine.EjectIdentity(&flow.DynamicIdentityEntry{
-			NodeID:  update.NodeID,
-			Dynamic: update.DynamicIdentity,
-		})
+	for _, update := range ejectedChanges {
+		err := s.stateMachine.EjectIdentity(update.NodeID)
 		require.NoError(s.T(), err)
 	}
 	updatedState, _, _ := s.stateMachine.Build()
@@ -504,9 +467,9 @@ func (s *ProtocolStateMachineSuite) TestEpochSetupAfterIdentityChange() {
 		NextEpochIdentityTable:    flow.IdentityList{},
 	}
 	// Update enriched data with the changes made to the low-level updated table
-	for _, identity := range allUpdates {
+	for _, identity := range ejectedChanges {
 		toBeUpdated, _ := updatedRichProtocolState.CurrentEpochIdentityTable.ByNodeID(identity.NodeID)
-		toBeUpdated.DynamicIdentity = identity.DynamicIdentity
+		toBeUpdated.EpochParticipationStatus = flow.EpochParticipationStatusEjected
 	}
 
 	// now we can use it to construct protocolStateMachine for next block, which will process epoch setup event.
@@ -523,7 +486,7 @@ func (s *ProtocolStateMachineSuite) TestEpochSetupAfterIdentityChange() {
 			// it's important to exclude ejected nodes, since we expect that service smart contract has emitted ejection operation
 			// and service events are delivered (asynchronously) in an *order-preserving* manner meaning if ejection has happened before
 			// epoch setup then there is no possible way that it will include ejected node unless there is a severe bug in the service contract.
-			setup.Participants = append(setup.Participants, weightChanges.ToSkeleton()...).Filter(
+			setup.Participants = setup.Participants.Filter(
 				filter.Not(filter.In(ejectedChanges.ToSkeleton()))).Sort(order.Canonical[flow.IdentitySkeleton])
 		},
 	)
@@ -540,27 +503,9 @@ func (s *ProtocolStateMachineSuite) TestEpochSetupAfterIdentityChange() {
 	for _, updated := range ejectedChanges {
 		currentEpochIdentity := currentEpochLookup[updated.NodeID]
 		require.Equal(s.T(), updated.NodeID, currentEpochIdentity.NodeID)
-		require.Equal(s.T(), updated.Ejected, currentEpochIdentity.Dynamic.Ejected)
+		require.True(s.T(), currentEpochIdentity.Ejected)
 
 		_, foundInNextEpoch := nextEpochLookup[updated.NodeID]
 		require.False(s.T(), foundInNextEpoch)
-	}
-
-	for _, updated := range weightChanges {
-		currentEpochIdentity := currentEpochLookup[updated.NodeID]
-		require.Equal(s.T(), updated.NodeID, currentEpochIdentity.NodeID)
-		require.Equal(s.T(), updated.DynamicIdentity.Weight, currentEpochIdentity.Dynamic.Weight)
-		require.NotEqual(s.T(), updated.InitialWeight, currentEpochIdentity.Dynamic.Weight,
-			"since we have updated weight it should not be equal to initial weight")
-
-		// it's possible that we have sampled weight and ejected changes for the same node so we need to check if it was ejected
-		if nextEpochIdentity, found := nextEpochLookup[updated.NodeID]; found {
-			require.Equal(s.T(), updated.NodeID, nextEpochIdentity.NodeID)
-			require.Equal(s.T(), updated.InitialWeight, nextEpochIdentity.Dynamic.Weight,
-				"we take information about weight from next epoc setup event")
-		} else {
-			_, wasEjected := ejectedChanges.ByNodeID(updated.NodeID)
-			require.True(s.T(), wasEjected, "only if node is ejected it could be missing from next epoch lookup")
-		}
 	}
 }
