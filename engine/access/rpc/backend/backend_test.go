@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 	"fmt"
+	statepkg "github.com/onflow/flow-go/state"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
@@ -26,7 +27,6 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-	statepkg "github.com/onflow/flow-go/state"
 	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/state/protocol/util"
@@ -484,7 +484,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_NonFinalizedBlocks() {
 		snapshotBytes, err := backend.GetProtocolStateSnapshotByBlockID(context.Background(), newBlock.ID())
 		suite.Require().Nil(snapshotBytes)
 		suite.Require().Error(err)
-		suite.Require().Equal(err.Error(), fmt.Errorf("unknown finalized height %d: %w", newBlock.Header.Height, statepkg.ErrUnknownSnapshotReference).Error())
+		suite.Require().Equal(err.Error(), status.Errorf(codes.NotFound, "failed to get a valid snapshot: %v", fmt.Errorf("unknown finalized height %d: %w", newBlock.Header.Height, statepkg.ErrUnknownSnapshotReference)).Error())
 	})
 }
 
