@@ -157,6 +157,10 @@ func FromEpoch(from protocol.Epoch) (*Epoch, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get random source: %w", err)
 	}
+	epoch.TargetEndTime, err = from.TargetEndTime()
+	if err != nil {
+		return nil, fmt.Errorf("could not get target end time: %w", err)
+	}
 	epoch.DKGPhase1FinalView, epoch.DKGPhase2FinalView, epoch.DKGPhase3FinalView, err = protocol.DKGPhaseViews(from)
 	if err != nil {
 		return nil, fmt.Errorf("could not get dkg final views")

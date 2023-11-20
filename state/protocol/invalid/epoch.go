@@ -89,6 +89,10 @@ func (u *Epoch) RandomSource() ([]byte, error) {
 	return nil, u.err
 }
 
+func (u *Epoch) TargetEndTime() (uint64, error) {
+	return 0, u.err
+}
+
 func (u *Epoch) FirstHeight() (uint64, error) {
 	return 0, u.err
 }
