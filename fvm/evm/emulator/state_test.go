@@ -14,7 +14,6 @@ import (
 
 	"github.com/onflow/flow-go/fvm/evm/emulator/database"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
-	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -28,7 +27,7 @@ var rootAddr = flow.Address{0x01}
 // Accounts will be automatically generated, and the benchmark allows users to determine the frequency of balance
 // updates across all accounts, including in-between state committing.
 func benchmarkStateAccountsBalanceChange(b *testing.B, numberOfAccounts int, numberOfUpdatesPerAccount int, debug bool) {
-	testutils.RunWithTestBackend(b, func(backend types.Backend) {
+	testutils.RunWithTestBackend(b, func(backend *testutils.TestBackend) {
 		if debug {
 			log.Root().SetHandler(log.StreamHandler(os.Stdout, log.LogfmtFormat()))
 		}
