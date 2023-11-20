@@ -50,13 +50,6 @@ func (epoch *epochInfo) targetViewTime() float64 {
 	return float64(epoch.curEpochTargetDuration) / float64(epoch.curEpochFinalView-epoch.curEpochFirstView+1)
 }
 
-// fractionComplete returns the percentage of views completed of the epoch for the given curView.
-// curView must be within the range [curEpochFirstView, curEpochFinalView]
-// Returns the completion percentage as a float between [0, 1]
-func (epoch *epochInfo) fractionComplete(curView uint64) float64 {
-	return float64(curView-epoch.curEpochFirstView) / float64(epoch.curEpochFinalView-epoch.curEpochFirstView)
-}
-
 // BlockTimeController dynamically adjusts the ProposalTiming of this node,
 // based on the measured view rate of the consensus committee as a whole, in
 // order to achieve a desired switchover time for each epoch.
