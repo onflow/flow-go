@@ -5,6 +5,7 @@ import (
 
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
@@ -22,21 +23,28 @@ import (
 // in the future we might benefit from a view style of access to db passed as
 // a param to the emulator.
 type ContractHandler struct {
+	flowTokenAddress common.Address
 	blockstore       types.BlockStore
+	addressAllocator types.AddressAllocator
 	backend          types.Backend
 	emulator         types.Emulator
-	addressAllocator types.AddressAllocator
+}
+
+func (h *ContractHandler) FlowTokenAddress() common.Address {
+	return h.flowTokenAddress
 }
 
 var _ types.ContractHandler = &ContractHandler{}
 
 func NewContractHandler(
+	flowTokenAddress common.Address,
 	blockstore types.BlockStore,
 	addressAllocator types.AddressAllocator,
 	backend types.Backend,
 	emulator types.Emulator,
 ) *ContractHandler {
 	return &ContractHandler{
+		flowTokenAddress: flowTokenAddress,
 		blockstore:       blockstore,
 		addressAllocator: addressAllocator,
 		backend:          backend,
@@ -58,7 +66,7 @@ func (h *ContractHandler) AccountByAddress(addr types.Address, isAuthorized bool
 }
 
 // LastExecutedBlock returns the last executed block
-func (h ContractHandler) LastExecutedBlock() *types.Block {
+func (h *ContractHandler) LastExecutedBlock() *types.Block {
 	block, err := h.blockstore.LatestBlock()
 	handleError(err)
 	return block
@@ -66,7 +74,7 @@ func (h ContractHandler) LastExecutedBlock() *types.Block {
 
 // Run runs an rlpencoded evm transaction and
 // collects the gas fees and pay it to the coinbase address provided.
-func (h ContractHandler) Run(rlpEncodedTx []byte, coinbase types.Address) {
+func (h *ContractHandler) Run(rlpEncodedTx []byte, coinbase types.Address) {
 	// step 1 - transaction decoding
 	encodedLen := uint(len(rlpEncodedTx))
 	err := h.backend.MeterComputation(environment.ComputationKindRLPDecoding, encodedLen)
@@ -113,14 +121,14 @@ func (h ContractHandler) Run(rlpEncodedTx []byte, coinbase types.Address) {
 	handleError(err)
 }
 
-func (h ContractHandler) checkGasLimit(limit types.GasLimit) {
+func (h *ContractHandler) checkGasLimit(limit types.GasLimit) {
 	// check gas limit against what has been left on the transaction side
 	if !h.backend.ComputationAvailable(environment.ComputationKindEVMGasUsage, uint(limit)) {
 		handleError(types.ErrInsufficientComputation)
 	}
 }
 
-func (h ContractHandler) meterGasUsage(res *types.Result) {
+func (h *ContractHandler) meterGasUsage(res *types.Result) {
 	if res != nil {
 		err := h.backend.MeterComputation(environment.ComputationKindEVMGasUsage, uint(res.GasConsumed))
 		handleError(err)
@@ -131,7 +139,7 @@ func (h *ContractHandler) emitEvent(event *types.Event) {
 	// TODO add extra metering for rlp encoding
 	encoded, err := event.Payload.Encode()
 	handleError(err)
-	err = h.backend.EmitFlowEvent(event.Etype, encoded)
+	err = h.backend.EmitRawEvent(event.Etype, encoded)
 	handleError(err)
 }
 

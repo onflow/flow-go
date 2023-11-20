@@ -112,7 +112,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	uploadMgr := uploader.NewManager(trace.NewNoopTracer())
 
 	fetcher := mocks.NewMockFetcher()
-	loader := loader.NewLoader(log, protocolState, headers, executionState)
+	loader := loader.NewUnexecutedLoader(log, protocolState, headers, executionState)
 
 	engine, err = New(
 		unit,

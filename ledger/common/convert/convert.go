@@ -48,3 +48,18 @@ func RegisterIDToLedgerKey(registerID flow.RegisterID) ledger.Key {
 	}
 	return newKey
 }
+
+// PayloadToRegister converts a payload to a register id and value
+func PayloadToRegister(payload *ledger.Payload) (flow.RegisterID, flow.RegisterValue, error) {
+	key, err := payload.Key()
+	if err != nil {
+		return flow.RegisterID{}, flow.RegisterValue{}, fmt.Errorf("could not parse register key from payload: %w", err)
+	}
+	regID, err := LedgerKeyToRegisterID(key)
+	if err != nil {
+		return flow.RegisterID{}, flow.RegisterValue{}, fmt.Errorf("could not convert register key into register id: %w", err)
+	}
+
+	return regID, payload.Value(), nil
+
+}

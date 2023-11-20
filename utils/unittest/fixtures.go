@@ -44,6 +44,7 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
+	"github.com/onflow/flow-go/network/p2p/p2pconf"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/dsl"
@@ -2704,14 +2705,14 @@ func P2PRPCFixture(opts ...RPCFixtureOpt) *pubsub.RPC {
 	return rpc
 }
 
-func WithTopic(topic string) func(*pubsub_pb.Message) {
+func WithFrom(pid peer.ID) func(*pubsub_pb.Message) {
 	return func(msg *pubsub_pb.Message) {
-		msg.Topic = &topic
+		msg.From = []byte(pid)
 	}
 }
 
 // GossipSubMessageFixture returns a gossip sub message fixture for the specified topic.
-func GossipSubMessageFixture(t *testing.T, s string, opts ...func(*pubsub_pb.Message)) *pubsub_pb.Message {
+func GossipSubMessageFixture(s string, opts ...func(*pubsub_pb.Message)) *pubsub_pb.Message {
 	pb := &pubsub_pb.Message{
 		From:      RandomBytes(32),
 		Data:      RandomBytes(32),
@@ -2729,10 +2730,47 @@ func GossipSubMessageFixture(t *testing.T, s string, opts ...func(*pubsub_pb.Mes
 }
 
 // GossipSubMessageFixtures returns a list of gossipsub message fixtures.
-func GossipSubMessageFixtures(t *testing.T, n int, topic string, opts ...func(*pubsub_pb.Message)) []*pubsub_pb.Message {
+func GossipSubMessageFixtures(n int, topic string, opts ...func(*pubsub_pb.Message)) []*pubsub_pb.Message {
 	msgs := make([]*pubsub_pb.Message, n)
 	for i := 0; i < n; i++ {
-		msgs[i] = GossipSubMessageFixture(t, topic, opts...)
+		msgs[i] = GossipSubMessageFixture(topic, opts...)
 	}
 	return msgs
+}
+
+// LibP2PResourceLimitOverrideFixture returns a random resource limit override for testing.
+// The values are not guaranteed to be valid between 0 and 1000.
+// Returns:
+//   - p2pconf.ResourceManagerOverrideLimit: a random resource limit override.
+func LibP2PResourceLimitOverrideFixture() p2pconf.ResourceManagerOverrideLimit {
+	return p2pconf.ResourceManagerOverrideLimit{
+		StreamsInbound:      rand.Intn(1000),
+		StreamsOutbound:     rand.Intn(1000),
+		ConnectionsInbound:  rand.Intn(1000),
+		ConnectionsOutbound: rand.Intn(1000),
+		FD:                  rand.Intn(1000),
+		Memory:              rand.Intn(1000),
+	}
+}
+
+func RegisterEntryFixture() flow.RegisterEntry {
+	val := make([]byte, 4)
+	_, _ = crand.Read(val)
+	return flow.RegisterEntry{
+		Key: flow.RegisterID{
+			Owner: "owner",
+			Key:   "key1",
+		},
+		Value: val,
+	}
+}
+
+func MakeOwnerReg(key string, value string) flow.RegisterEntry {
+	return flow.RegisterEntry{
+		Key: flow.RegisterID{
+			Owner: "owner",
+			Key:   key,
+		},
+		Value: []byte(value),
+	}
 }

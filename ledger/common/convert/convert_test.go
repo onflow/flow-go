@@ -108,3 +108,48 @@ func TestRegisterIDToLedgerKey_Global(t *testing.T) {
 	key := convert.RegisterIDToLedgerKey(registerID)
 	require.Equal(t, expectedKey, key)
 }
+
+func TestPayloadToRegister(t *testing.T) {
+	t.Run("can convert", func(t *testing.T) {
+		value := []byte("value")
+		p := ledger.NewPayload(
+			ledger.NewKey(
+				[]ledger.KeyPart{
+					ledger.NewKeyPart(convert.KeyPartOwner, []byte("owner")),
+					ledger.NewKeyPart(convert.KeyPartKey, []byte("key")),
+				},
+			),
+			value,
+		)
+		regID, regValue, err := convert.PayloadToRegister(p)
+		require.NoError(t, err)
+		require.Equal(t, flow.NewRegisterID("owner", "key"), regID)
+		require.Equal(t, value, regValue)
+	})
+
+	t.Run("global key", func(t *testing.T) {
+		value := []byte("1")
+		p := ledger.NewPayload(
+			ledger.NewKey(
+				[]ledger.KeyPart{
+					ledger.NewKeyPart(convert.KeyPartOwner, []byte("")),
+					ledger.NewKeyPart(convert.KeyPartKey, []byte("uuid")),
+				},
+			),
+			value,
+		)
+		regID, regValue, err := convert.PayloadToRegister(p)
+		require.NoError(t, err)
+		require.Equal(t, flow.NewRegisterID("", "uuid"), regID)
+		require.Equal(t, "", regID.Owner)
+		require.Equal(t, "uuid", regID.Key)
+		require.True(t, regID.IsInternalState())
+		require.Equal(t, value, regValue)
+	})
+
+	t.Run("empty payload", func(t *testing.T) {
+		p := ledger.EmptyPayload()
+		_, _, err := convert.PayloadToRegister(p)
+		require.Error(t, err)
+	})
+}
