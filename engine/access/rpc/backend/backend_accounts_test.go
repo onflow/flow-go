@@ -46,8 +46,6 @@ type BackendAccountsSuite struct {
 	block          *flow.Block
 	account        *flow.Account
 	failingAddress flow.Address
-
-	ctx irrecoverable.SignalerContext
 }
 
 func TestBackendAccountsSuite(t *testing.T) {
@@ -76,12 +74,9 @@ func (s *BackendAccountsSuite) SetupTest() {
 	s.Require().NoError(err)
 
 	s.failingAddress = unittest.AddressFixture()
-
-	s.ctx = irrecoverable.NewMockSignalerContext(s.T(), context.Background())
 }
 
 func (s *BackendAccountsSuite) defaultBackend() *backendAccounts {
-
 	return &backendAccounts{
 		log:               s.log,
 		state:             s.state,
