@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
-	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -341,52 +340,6 @@ func (b *Backend) GetNetworkParameters(_ context.Context) access.NetworkParamete
 	return access.NetworkParameters{
 		ChainID: b.chainID,
 	}
-}
-
-// GetLatestProtocolStateSnapshot returns the latest finalized snapshot
-func (b *Backend) GetLatestProtocolStateSnapshot(_ context.Context) ([]byte, error) {
-	snapshot := b.state.Final()
-
-	validSnapshot, err := b.getValidSnapshot(snapshot, 0)
-	if err != nil {
-		return nil, err
-	}
-
-	return convert.SnapshotToBytes(validSnapshot)
-}
-
-// GetProtocolStateSnapshotByBlockID returns finalized snapshot by block id
-func (b *Backend) GetProtocolStateSnapshotByBlockID(_ context.Context, blockID flow.Identifier) ([]byte, error) {
-	snapshotByBlockId := b.state.AtBlockID(blockID)
-	snapshotHeadByBlockId, err := snapshotByBlockId.Head()
-	if err != nil {
-		return nil, err
-	}
-
-	snapshotByHeight := b.state.AtHeight(snapshotHeadByBlockId.Height)
-	_, err = snapshotByHeight.Head()
-	if err != nil {
-		return nil, err
-	}
-
-	validSnapshot, err := b.getValidSnapshot(snapshotByHeight, 0)
-	if err != nil {
-		return nil, err
-	}
-
-	return convert.SnapshotToBytes(validSnapshot)
-}
-
-// GetProtocolStateSnapshotByHeight returns finalized snapshot by block height
-func (b *Backend) GetProtocolStateSnapshotByHeight(_ context.Context, blockHeight uint64) ([]byte, error) {
-	snapshot := b.state.AtHeight(blockHeight)
-
-	validSnapshot, err := b.getValidSnapshot(snapshot, 0)
-	if err != nil {
-		return nil, err
-	}
-
-	return convert.SnapshotToBytes(validSnapshot)
 }
 
 // executionNodesForBlockID returns upto maxNodesCnt number of randomly chosen execution node identities
