@@ -1998,6 +1998,7 @@ func EpochSetupFixture(opts ...func(setup *flow.EpochSetup)) *flow.EpochSetup {
 		DKGPhase1FinalView: 100,
 		DKGPhase2FinalView: 200,
 		DKGPhase3FinalView: 300,
+		TargetDuration:     60 * 60,
 		TargetEndTime:      uint64(time.Now().Add(time.Hour).Unix()),
 	}
 	for _, apply := range opts {

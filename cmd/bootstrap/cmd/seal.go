@@ -42,6 +42,7 @@ func constructRootResultAndSeal(
 		Participants:       participants.Sort(order.Canonical),
 		Assignments:        assignments,
 		RandomSource:       GenerateRandomSeed(flow.EpochSetupRandomSourceLength),
+		TargetDuration:     flagEpochTargetEndTimeDuration,
 		TargetEndTime:      epochTargetEndTime(),
 	}
 
