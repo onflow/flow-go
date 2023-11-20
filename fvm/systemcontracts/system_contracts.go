@@ -35,6 +35,9 @@ const (
 	ContractNameRandomBeaconHistory = "RandomBeaconHistory"
 	ContractNameFungibleToken       = "FungibleToken"
 	ContractNameFlowToken           = "FlowToken"
+	ContractNameNonFungibleToken    = "NonFungibleToken"
+	ContractNameMetadataViews       = "MetadataViews"
+	ContractNameViewResolver        = "ViewResolver"
 	ContractNameEVM                 = "EVM"
 
 	// Unqualified names of service events (not including address prefix or contract name)
@@ -71,6 +74,11 @@ var (
 	stakingContractAddressMainnet = flow.HexToAddress("8624b52f9ddcd04a")
 	// stakingContractAddressTestnet is the address of the FlowIDTableStaking contract on Testnet
 	stakingContractAddressTestnet = flow.HexToAddress("9eca2b38b18b5dfe")
+
+	// nftTokenAddressTestnet is the address of the NonFungibleToken contract on Testnet
+	nftTokenAddressMainnet = flow.HexToAddress("1d7e57aa55817448")
+	// nftTokenAddressTestnet is the address of the NonFungibleToken contract on Testnet
+	nftTokenAddressTestnet = flow.HexToAddress("631e88ae7f1d7c20")
 )
 
 // SystemContract represents a system contract on a particular chain.
@@ -110,11 +118,17 @@ type SystemContracts struct {
 	FlowServiceAccount  SystemContract
 	NodeVersionBeacon   SystemContract
 	RandomBeaconHistory SystemContract
+	FlowStorageFees     SystemContract
 
 	// token related contracts
 	FlowFees      SystemContract
 	FlowToken     SystemContract
 	FungibleToken SystemContract
+
+	// NFT related contracts
+	NonFungibleToken SystemContract
+	MetadataViews    SystemContract
+	ViewResolver     SystemContract
 
 	// EVM related contracts
 	EVM SystemContract
@@ -132,10 +146,15 @@ func (c SystemContracts) AsTemplateEnv() templates.Environment {
 		ServiceAccountAddress:      c.FlowServiceAccount.Address.Hex(),
 		NodeVersionBeaconAddress:   c.NodeVersionBeacon.Address.Hex(),
 		RandomBeaconHistoryAddress: c.RandomBeaconHistory.Address.Hex(),
+		StorageFeesAddress:         c.FlowStorageFees.Address.Hex(),
 
 		FlowFeesAddress:      c.FlowFees.Address.Hex(),
 		FlowTokenAddress:     c.FlowToken.Address.Hex(),
 		FungibleTokenAddress: c.FungibleToken.Address.Hex(),
+
+		// NonFungibleToken: c.NonFungibleToken.Address.Hex(),
+		// MetadataViews : c.MetadataViews.Address.Hex(),
+		// ViewResolver : c.ViewResolver.Address.Hex(),
 
 		// EVMAddress: c.EVM.Address.Hex(), // doesn't exist yet
 	}
@@ -152,10 +171,15 @@ func (c SystemContracts) All() []SystemContract {
 		c.FlowServiceAccount,
 		c.NodeVersionBeacon,
 		c.RandomBeaconHistory,
+		c.FlowStorageFees,
 
 		c.FlowFees,
 		c.FlowToken,
 		c.FungibleToken,
+
+		c.NonFungibleToken,
+		c.MetadataViews,
+		c.ViewResolver,
 
 		c.EVM,
 	}
@@ -235,6 +259,17 @@ func init() {
 		}
 	}
 
+	nftTokenAddressFunc := func(chain flow.ChainID) flow.Address {
+		switch chain {
+		case flow.Mainnet:
+			return nftTokenAddressMainnet
+		case flow.Testnet:
+			return nftTokenAddressTestnet
+		default:
+			return chain.Chain().ServiceAddress()
+		}
+	}
+
 	contractAddressFunc = map[string]func(id flow.ChainID) flow.Address{
 		ContractNameIDTableStaking: epochAddressFunc,
 		ContractNameEpoch:          epochAddressFunc,
@@ -244,10 +279,15 @@ func init() {
 		ContractNameNodeVersionBeacon:   serviceAddressFunc,
 		ContractNameRandomBeaconHistory: serviceAddressFunc,
 		ContractNameServiceAccount:      serviceAddressFunc,
+		ContractNameStorageFees:         serviceAddressFunc,
 
 		ContractNameFlowFees:      nthAddressFunc(FlowFeesAccountIndex),
 		ContractNameFungibleToken: nthAddressFunc(FungibleTokenAccountIndex),
 		ContractNameFlowToken:     nthAddressFunc(FlowTokenAccountIndex),
+
+		ContractNameNonFungibleToken: nftTokenAddressFunc,
+		ContractNameMetadataViews:    nftTokenAddressFunc,
+		ContractNameViewResolver:     nftTokenAddressFunc,
 
 		ContractNameEVM: nthAddressFunc(EVMAccountIndex),
 	}
@@ -276,10 +316,15 @@ func init() {
 			FlowServiceAccount:  contract(ContractNameServiceAccount),
 			NodeVersionBeacon:   contract(ContractNameNodeVersionBeacon),
 			RandomBeaconHistory: contract(ContractNameRandomBeaconHistory),
+			FlowStorageFees:     contract(ContractNameStorageFees),
 
 			FlowFees:      contract(ContractNameFlowFees),
 			FlowToken:     contract(ContractNameFlowToken),
 			FungibleToken: contract(ContractNameFungibleToken),
+
+			NonFungibleToken: contract(ContractNameNonFungibleToken),
+			MetadataViews:    contract(ContractNameMetadataViews),
+			ViewResolver:     contract(ContractNameViewResolver),
 
 			EVM: contract(ContractNameEVM),
 		}

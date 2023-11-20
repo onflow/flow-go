@@ -27,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/fvm/meter"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/fvm/storage/testutils"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -2924,4 +2925,29 @@ func TestEntropyCallExpectsNoParameters(t *testing.T) {
 			require.ErrorContains(t, output.Err, "too many arguments")
 		},
 		)(t)
+}
+
+func TestTransientNetworkCoreContractAddresses(t *testing.T) {
+
+	// This test ensures that the transient networks have the correct core contract addresses.
+	newVMTest().
+		run(
+			func(
+				t *testing.T,
+				vm fvm.VM,
+				chain flow.Chain,
+				ctx fvm.Context,
+				snapshotTree snapshot.SnapshotTree,
+			) {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
+				for _, contract := range sc.All() {
+					txnState := testutils.NewSimpleTransaction(snapshotTree)
+					accounts := environment.NewAccounts(txnState)
+
+					yes, err := accounts.ContractExists(contract.Name, contract.Address)
+					require.NoError(t, err)
+					require.True(t, yes, "contract %s does not exist", contract.Name)
+				}
+			})
 }
