@@ -13,28 +13,31 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-type Loader struct {
+// deprecated. Storehouse is going to use unfinalized loader instead
+type UnexecutedLoader struct {
 	log       zerolog.Logger
 	state     protocol.State
 	headers   storage.Headers // see comments on getHeaderByHeight for why we need it
 	execState state.ExecutionState
 }
 
-func NewLoader(
+func NewUnexecutedLoader(
 	log zerolog.Logger,
 	state protocol.State,
 	headers storage.Headers,
 	execState state.ExecutionState,
-) *Loader {
-	return &Loader{
-		log:       log.With().Str("component", "ingestion_engine_block_loader").Logger(),
+) *UnexecutedLoader {
+	return &UnexecutedLoader{
+		log:       log.With().Str("component", "ingestion_engine_unexecuted_loader").Logger(),
 		state:     state,
 		headers:   headers,
 		execState: execState,
 	}
 }
 
-func (e *Loader) LoadUnexecuted(ctx context.Context) ([]flow.Identifier, error) {
+// LoadUnexecuted loads all unexecuted and validated blocks
+// any error returned are exceptions
+func (e *UnexecutedLoader) LoadUnexecuted(ctx context.Context) ([]flow.Identifier, error) {
 	// saving an executed block is currently not transactional, so it's possible
 	// the block is marked as executed but the receipt might not be saved during a crash.
 	// in order to mitigate this problem, we always re-execute the last executed and finalized
@@ -104,7 +107,7 @@ func (e *Loader) LoadUnexecuted(ctx context.Context) ([]flow.Identifier, error) 
 	return blockIDs, nil
 }
 
-func (e *Loader) unexecutedBlocks(ctx context.Context) (
+func (e *UnexecutedLoader) unexecutedBlocks(ctx context.Context) (
 	finalized []flow.Identifier,
 	pending []flow.Identifier,
 	err error,
@@ -126,7 +129,7 @@ func (e *Loader) unexecutedBlocks(ctx context.Context) (
 	return finalized, pending, nil
 }
 
-func (e *Loader) finalizedUnexecutedBlocks(ctx context.Context, finalized protocol.Snapshot) (
+func (e *UnexecutedLoader) finalizedUnexecutedBlocks(ctx context.Context, finalized protocol.Snapshot) (
 	[]flow.Identifier,
 	error,
 ) {
@@ -196,7 +199,7 @@ func (e *Loader) finalizedUnexecutedBlocks(ctx context.Context, finalized protoc
 	return unexecuted, nil
 }
 
-func (e *Loader) pendingUnexecutedBlocks(ctx context.Context, finalized protocol.Snapshot) (
+func (e *UnexecutedLoader) pendingUnexecutedBlocks(ctx context.Context, finalized protocol.Snapshot) (
 	[]flow.Identifier,
 	error,
 ) {
@@ -224,7 +227,7 @@ func (e *Loader) pendingUnexecutedBlocks(ctx context.Context, finalized protocol
 // if the EN is dynamically bootstrapped, the finalized blocks at height range:
 // [ sealedRoot.Height, finalizedRoot.Height - 1] can not be retrieved from
 // protocol state, but only from headers
-func (e *Loader) getHeaderByHeight(height uint64) (*flow.Header, error) {
+func (e *UnexecutedLoader) getHeaderByHeight(height uint64) (*flow.Header, error) {
 	// we don't use protocol state because for dynamic boostrapped execution node
 	// the last executed and sealed block is below the finalized root block
 	return e.headers.ByHeight(height)

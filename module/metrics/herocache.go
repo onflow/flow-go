@@ -72,6 +72,10 @@ func NetworkReceiveCacheMetricsFactory(f HeroCacheMetricsFactory, networkType ne
 	return f(namespaceNetwork, r)
 }
 
+func NewSubscriptionRecordCacheMetricsFactory(f HeroCacheMetricsFactory) module.HeroCacheMetrics {
+	return f(namespaceNetwork, ResourceNetworkingSubscriptionRecordsCache)
+}
+
 // DisallowListCacheMetricsFactory is the factory method for creating a new HeroCacheCollector for the disallow list cache.
 // The disallow-list cache is used to keep track of peers that are disallow-listed and the reasons for it.
 // Args:
