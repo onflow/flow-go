@@ -305,40 +305,46 @@ type ScoreOption struct {
 	appScoreFunc        func(peer.ID) float64
 }
 
+// Parameters are the parameters for the score option.
+// Parameters are "numerical values" that are used to compute or build components that compute the score of a peer in GossipSub system.
+type Parameters struct {
+	AppSpecificScore AppSpecificScoreRegistryParams `validate:"required" mapstructure:"app-specific-score"`
+	// SpamRecordCacheSize is size of the cache used to store the spam records of peers.
+	// The spam records are used to penalize peers that send invalid messages.
+	SpamRecordCacheSize uint32 `validate:"gt=0" mapstructure:"spam-record-cache-size"`
+
+	// DecayInterval is the interval at which the counters associated with a peer behavior in GossipSub system are decayed.
+	DecayInterval time.Duration `validate:"gt=0s" mapstructure:"decay-interval"`
+}
+
 type ScoreOptionConfig struct {
 	logger                           zerolog.Logger
+	params                           Parameters
 	provider                         module.IdentityProvider
-	cacheSize                        uint32
-	cacheMetrics                     module.HeroCacheMetrics
+	heroCacheMetricsFactory          metrics.HeroCacheMetricsFactory
 	appScoreFunc                     func(peer.ID) float64
-	decayInterval                    time.Duration // the decay interval, when is set to 0, the default value will be used.
 	topicParams                      []func(map[string]*pubsub.TopicScoreParams)
 	registerNotificationConsumerFunc func(p2p.GossipSubInvCtrlMsgNotifConsumer)
 }
 
-func NewScoreOptionConfig(logger zerolog.Logger, idProvider module.IdentityProvider) *ScoreOptionConfig {
+// NewScoreOptionConfig creates a new configuration for the GossipSub peer scoring option.
+// Args:
+// - logger: the logger to use.
+// - hcMetricsFactory: HeroCache metrics factory to create metrics for the scoring-related caches.
+// - idProvider: the identity provider to use.
+// Returns:
+// - a new configuration for the GossipSub peer scoring option.
+func NewScoreOptionConfig(logger zerolog.Logger,
+	params Parameters,
+	hcMetricsFactory metrics.HeroCacheMetricsFactory,
+	idProvider module.IdentityProvider) *ScoreOptionConfig {
 	return &ScoreOptionConfig{
-		logger:       logger,
-		provider:     idProvider,
-		cacheSize:    defaultScoreCacheSize,
-		cacheMetrics: metrics.NewNoopCollector(), // no metrics by default
-		topicParams:  make([]func(map[string]*pubsub.TopicScoreParams), 0),
+		logger:                  logger.With().Str("module", "pubsub_score_option").Logger(),
+		provider:                idProvider,
+		params:                  params,
+		heroCacheMetricsFactory: hcMetricsFactory,
+		topicParams:             make([]func(map[string]*pubsub.TopicScoreParams), 0),
 	}
-}
-
-// SetCacheSize sets the size of the cache used to store the app specific penalty of peers.
-// If the cache size is not set, the default value will be used.
-// It is safe to call this method multiple times, the last call will be used.
-func (c *ScoreOptionConfig) SetCacheSize(size uint32) {
-	c.cacheSize = size
-}
-
-// SetCacheMetrics sets the cache metrics collector for the penalty option.
-// It is used to collect metrics for the app specific penalty cache. If the cache metrics collector is not set,
-// a no-op collector will be used.
-// It is safe to call this method multiple times, the last call will be used.
-func (c *ScoreOptionConfig) SetCacheMetrics(metrics module.HeroCacheMetrics) {
-	c.cacheMetrics = metrics
 }
 
 // OverrideAppSpecificScoreFunction sets the app specific penalty function for the penalty option.
@@ -366,21 +372,6 @@ func (c *ScoreOptionConfig) SetRegisterNotificationConsumerFunc(f func(p2p.Gossi
 	c.registerNotificationConsumerFunc = f
 }
 
-// OverrideDecayInterval overrides the decay interval for the penalty option. It is used to override the default
-// decay interval for the penalty option. The decay interval is the time interval that the decay values are applied and
-// peer scores are updated.
-// Note: It is always recommended to use the default value unless you know what you are doing. Hence, calling this method
-// is not recommended in production.
-// Args:
-//
-//	interval: the decay interval.
-//
-// Returns:
-// none
-func (c *ScoreOptionConfig) OverrideDecayInterval(interval time.Duration) {
-	c.decayInterval = interval
-}
-
 // NewScoreOption creates a new penalty option with the given configuration.
 func NewScoreOption(cfg *ScoreOptionConfig, provider p2p.SubscriptionProvider) (*ScoreOption, error) {
 	throttledSampler := logging.BurstSampler(MaxDebugLogs, time.Second)
@@ -393,13 +384,14 @@ func NewScoreOption(cfg *ScoreOptionConfig, provider p2p.SubscriptionProvider) (
 		})
 	validator := NewSubscriptionValidator(cfg.logger, provider)
 	scoreRegistry, err := NewGossipSubAppSpecificScoreRegistry(&GossipSubAppSpecificScoreRegistryConfig{
-		Logger:     logger,
-		Penalty:    DefaultGossipSubCtrlMsgPenaltyValue(),
-		Validator:  validator,
-		Init:       InitAppScoreRecordState,
-		IdProvider: cfg.provider,
+		Logger:                  logger,
+		Penalty:                 DefaultGossipSubCtrlMsgPenaltyValue(),
+		Validator:               validator,
+		Init:                    InitAppScoreRecordState,
+		IdProvider:              cfg.provider,
+		HeroCacheMetricsFactory: cfg.heroCacheMetricsFactory,
 		SpamRecordCacheFactory: func() p2p.GossipSubSpamRecordCache {
-			return netcache.NewGossipSubSpamRecordCache(cfg.cacheSize, cfg.logger, cfg.cacheMetrics, DefaultDecayFunction())
+			return netcache.NewGossipSubSpamRecordCache(cfg.params.SpamRecordCacheSize, cfg.logger, cfg.heroCacheMetricsFactory, DefaultDecayFunction())
 		},
 	})
 
@@ -424,13 +416,13 @@ func NewScoreOption(cfg *ScoreOptionConfig, provider p2p.SubscriptionProvider) (
 			Msg("app specific score function is overridden, should never happen in production")
 	}
 
-	if cfg.decayInterval > 0 {
+	if cfg.params.DecayInterval > 0 && cfg.params.DecayInterval != s.peerScoreParams.DecayInterval {
 		// overrides the default decay interval if the decay interval is set.
-		s.peerScoreParams.DecayInterval = cfg.decayInterval
+		s.peerScoreParams.DecayInterval = cfg.params.DecayInterval
 		s.logger.
 			Warn().
 			Str(logging.KeyNetworkingSecurity, "true").
-			Dur("decay_interval_ms", cfg.decayInterval).
+			Dur("decay_interval_ms", cfg.params.DecayInterval).
 			Msg("decay interval is overridden, should never happen in production")
 	}
 

@@ -32,7 +32,7 @@ import (
 type ControlMsgValidationInspectorSuite struct {
 	suite.Suite
 	sporkID             flow.Identifier
-	config              *p2pconf.GossipSubRPCValidationInspectorConfigs
+	config              *p2pconf.RpcValidationInspector
 	distributor         *mockp2p.GossipSubInspectorNotificationDistributor
 	params              *validation.InspectorParams
 	rpcTracker          *mockp2p.RpcControlTracking
@@ -587,12 +587,12 @@ func (suite *ControlMsgValidationInspectorSuite) TestControlMessageValidationIns
 			time.Sleep(time.Second)
 		})
 
-	suite.T().Run("inspectRpcPublishMessages should disseminate invalid control message notification when invalid pubsub messages count greater than configured RpcMessageErrorThreshold",
+	suite.T().Run("inspectRpcPublishMessages should disseminate invalid control message notification when invalid pubsub messages count greater than configured MessageErrorThreshold",
 		func(t *testing.T) {
 			suite.SetupTest()
 			defer suite.StopInspector()
 			// 5 invalid pubsub messages will force notification dissemination
-			suite.config.RpcMessageErrorThreshold = 4
+			suite.config.MessageErrorThreshold = 4
 			// create unknown topic
 			unknownTopic := channels.Topic(fmt.Sprintf("%s/%s", unittest.IdentifierFixture(), suite.sporkID)).String()
 			// create malformed topic
@@ -632,7 +632,7 @@ func (suite *ControlMsgValidationInspectorSuite) TestControlMessageValidationIns
 		suite.SetupTest()
 		defer suite.StopInspector()
 		// 5 invalid pubsub messages will force notification dissemination
-		suite.config.RpcMessageErrorThreshold = 4
+		suite.config.MessageErrorThreshold = 4
 		pubsubMsgs := unittest.GossipSubMessageFixtures(5, fmt.Sprintf("%s/%s", channels.TestNetworkChannel, suite.sporkID))
 		from := unittest.PeerIdFixture(t)
 		rpc := unittest.P2PRPCFixture(unittest.WithPubsubMessages(pubsubMsgs...))
@@ -648,7 +648,7 @@ func (suite *ControlMsgValidationInspectorSuite) TestControlMessageValidationIns
 		suite.SetupTest()
 		defer suite.StopInspector()
 		// 5 invalid pubsub messages will force notification dissemination
-		suite.config.RpcMessageErrorThreshold = 4
+		suite.config.MessageErrorThreshold = 4
 
 		pubsubMsgs := unittest.GossipSubMessageFixtures(10, "")
 		rpc := unittest.P2PRPCFixture(unittest.WithPubsubMessages(pubsubMsgs...))
@@ -691,7 +691,7 @@ func (suite *ControlMsgValidationInspectorSuite) TestControlMessageValidationIns
 		from := unittest.PeerIdFixture(t)
 		topic := fmt.Sprintf("%s/%s", channels.TestNetworkChannel, suite.sporkID)
 		suite.topicProviderOracle.UpdateTopics([]string{topic})
-		// default RpcMessageErrorThreshold is 500, 501 messages should trigger a notification
+		// default MessageErrorThreshold is 500, 501 messages should trigger a notification
 		pubsubMsgs := unittest.GossipSubMessageFixtures(501, topic, unittest.WithFrom(from))
 		suite.idProvider.On("ByPeerID", from).Return(nil, false).Times(501)
 		rpc := unittest.P2PRPCFixture(unittest.WithPubsubMessages(pubsubMsgs...))

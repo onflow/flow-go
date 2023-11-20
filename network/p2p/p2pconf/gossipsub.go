@@ -2,6 +2,8 @@ package p2pconf
 
 import (
 	"time"
+
+	"github.com/onflow/flow-go/network/p2p/scoring"
 )
 
 // ResourceManagerConfig returns the resource manager configuration for the libp2p node.
@@ -54,44 +56,80 @@ type ResourceManagerOverrideLimit struct {
 	Memory int `validate:"gte=0" mapstructure:"memory-bytes"`
 }
 
+// GossipSubConfig keys.
+const (
+	RpcInspectorKey         = "rpc-inspector"
+	RpcTracerKey            = "rpc-tracer"
+	PeerScoringKey          = "peer-scoring-enabled"
+	ScoreParamsKey          = "scoring-parameters"
+	SubscriptionProviderKey = "subscription-provider"
+)
+
+var GossipSubConfigKeys = []string{RpcInspectorKey, RpcTracerKey, PeerScoringKey, ScoreParamsKey, SubscriptionProviderKey}
+
 // GossipSubConfig is the configuration for the GossipSub pubsub implementation.
 type GossipSubConfig struct {
 	// GossipSubRPCInspectorsConfig configuration for all gossipsub RPC control message inspectors.
-	GossipSubRPCInspectorsConfig `mapstructure:",squash"`
+	RpcInspector GossipSubRPCInspectorsConfig `mapstructure:"rpc-inspector"`
 
-	// GossipSubTracerConfig is the configuration for the gossipsub tracer. GossipSub tracer is used to trace the local mesh events and peer scores.
-	GossipSubTracerConfig `mapstructure:",squash"`
+	// GossipSubTracerParameters is the configuration for the gossipsub tracer. GossipSub tracer is used to trace the local mesh events and peer scores.
+	RpcTracer GossipSubTracerParameters `mapstructure:"rpc-tracer"`
 
-	// PeerScoring is whether to enable GossipSub peer scoring.
-	PeerScoring bool `mapstructure:"gossipsub-peer-scoring-enabled"`
+	// ScoringParameters is whether to enable GossipSub peer scoring.
+	PeerScoringSwitch bool `mapstructure:"peer-scoring-enabled"`
 
-	SubscriptionProviderConfig SubscriptionProviderParameters `mapstructure:",squash"`
+	SubscriptionProvider SubscriptionProviderParameters `mapstructure:"subscription-provider"`
+
+	ScoringParameters scoring.Parameters `mapstructure:"scoring-parameters"`
 }
 
+// SubscriptionProviderParameters keys.
+const (
+	UpdateIntervalKey = "update-interval"
+	CacheSizeKey      = "cache-size"
+)
+
+var SubscriptionProviderParametersKeys = []string{UpdateIntervalKey, CacheSizeKey}
+
 type SubscriptionProviderParameters struct {
-	// SubscriptionUpdateInterval is the interval for updating the list of topics the node have subscribed to; as well as the list of all
+	// UpdateInterval is the interval for updating the list of topics the node have subscribed to; as well as the list of all
 	// peers subscribed to each of those topics. This is used to penalize peers that have an invalid subscription based on their role.
-	SubscriptionUpdateInterval time.Duration `validate:"gt=0s" mapstructure:"gossipsub-subscription-provider-update-interval"`
+	UpdateInterval time.Duration `validate:"gt=0s" mapstructure:"update-interval"`
 
 	// CacheSize is the size of the cache that keeps the list of peers subscribed to each topic as the local node.
 	// This is the local view of the current node towards the subscription status of other nodes in the system.
 	// The cache must be large enough to accommodate the maximum number of nodes in the system, otherwise the view of the local node will be incomplete
 	// due to cache eviction.
-	CacheSize uint32 `validate:"gt=0" mapstructure:"gossipsub-subscription-provider-cache-size"`
+	CacheSize uint32 `validate:"gt=0" mapstructure:"cache-size"`
 }
 
-// GossipSubTracerConfig is the config for the gossipsub tracer. GossipSub tracer is used to trace the local mesh events and peer scores.
-type GossipSubTracerConfig struct {
+// GossipSubTracerParameters keys.
+const (
+	LocalMeshLogIntervalKey         = "local-mesh-logging-interval"
+	ScoreTracerIntervalKey          = "score-tracer-interval"
+	RPCSentTrackerCacheSizeKey      = "rpc-sent-tracker-cache-size"
+	RPCSentTrackerQueueCacheSizeKey = "rpc-sent-tracker-queue-cache-size"
+	RPCSentTrackerNumOfWorkersKey   = "rpc-sent-tracker-workers"
+)
+
+var TracerParametersKeys = []string{LocalMeshLogIntervalKey,
+	ScoreTracerIntervalKey,
+	RPCSentTrackerCacheSizeKey,
+	RPCSentTrackerQueueCacheSizeKey,
+	RPCSentTrackerNumOfWorkersKey}
+
+// GossipSubTracerParameters is the config for the gossipsub tracer. GossipSub tracer is used to trace the local mesh events and peer scores.
+type GossipSubTracerParameters struct {
 	// LocalMeshLogInterval is the interval at which the local mesh is logged.
-	LocalMeshLogInterval time.Duration `validate:"gt=0s" mapstructure:"gossipsub-local-mesh-logging-interval"`
+	LocalMeshLogInterval time.Duration `validate:"gt=0s" mapstructure:"local-mesh-logging-interval"`
 	// ScoreTracerInterval is the interval at which the score tracer logs the peer scores.
-	ScoreTracerInterval time.Duration `validate:"gt=0s" mapstructure:"gossipsub-score-tracer-interval"`
+	ScoreTracerInterval time.Duration `validate:"gt=0s" mapstructure:"score-tracer-interval"`
 	// RPCSentTrackerCacheSize cache size of the rpc sent tracker used by the gossipsub mesh tracer.
-	RPCSentTrackerCacheSize uint32 `validate:"gt=0" mapstructure:"gossipsub-rpc-sent-tracker-cache-size"`
+	RPCSentTrackerCacheSize uint32 `validate:"gt=0" mapstructure:"rpc-sent-tracker-cache-size"`
 	// RPCSentTrackerQueueCacheSize cache size of the rpc sent tracker queue used for async tracking.
-	RPCSentTrackerQueueCacheSize uint32 `validate:"gt=0" mapstructure:"gossipsub-rpc-sent-tracker-queue-cache-size"`
+	RPCSentTrackerQueueCacheSize uint32 `validate:"gt=0" mapstructure:"rpc-sent-tracker-queue-cache-size"`
 	// RpcSentTrackerNumOfWorkers number of workers for rpc sent tracker worker pool.
-	RpcSentTrackerNumOfWorkers int `validate:"gt=0" mapstructure:"gossipsub-rpc-sent-tracker-workers"`
+	RpcSentTrackerNumOfWorkers int `validate:"gt=0" mapstructure:"rpc-sent-tracker-workers"`
 }
 
 // ResourceScope is the scope of the resource, e.g., system, transient, protocol, peer, peer-protocol.

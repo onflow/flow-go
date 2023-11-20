@@ -12,7 +12,7 @@ type Config struct {
 	ResourceManager         p2pconf.ResourceManagerConfig `mapstructure:"libp2p-resource-manager"`
 	ConnectionManagerConfig `mapstructure:",squash"`
 	// GossipSubConfig core gossipsub configuration.
-	p2pconf.GossipSubConfig `mapstructure:",squash"`
+	GossipSub p2pconf.GossipSubConfig `mapstructure:"gossipsub"`
 	AlspConfig              `mapstructure:",squash"`
 
 	// NetworkConnectionPruning determines whether connections to nodes

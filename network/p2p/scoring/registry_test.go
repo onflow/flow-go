@@ -466,7 +466,7 @@ func withInitFunction(initFunction func() p2p.GossipSubSpamRecord) func(cfg *sco
 // for the testing purposes.
 func newGossipSubAppSpecificScoreRegistry(t *testing.T, opts ...func(*scoring.GossipSubAppSpecificScoreRegistryConfig)) (*scoring.GossipSubAppSpecificScoreRegistry,
 	*netcache.GossipSubSpamRecordCache) {
-	cache := netcache.NewGossipSubSpamRecordCache(100, unittest.Logger(), metrics.NewNoopCollector(), scoring.DefaultDecayFunction())
+	cache := netcache.NewGossipSubSpamRecordCache(100, unittest.Logger(), metrics.NewNoopHeroCacheMetricsFactory(), scoring.DefaultDecayFunction())
 	cfg := &scoring.GossipSubAppSpecificScoreRegistryConfig{
 		Logger:     unittest.Logger(),
 		Init:       scoring.InitAppScoreRecordState,

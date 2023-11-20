@@ -91,6 +91,13 @@ func DisallowListCacheMetricsFactory(f HeroCacheMetricsFactory, networkingType n
 	return f(namespaceNetwork, r)
 }
 
+// GossipSubSpamRecordCacheMetricsFactory is the factory method for creating a new HeroCacheCollector for the spam record cache.
+// The spam record cache is used to keep track of peers that are spamming the network and the reasons for it.
+// Currently, the spam record cache is only used for the private network.
+func GossipSubSpamRecordCacheMetricsFactory(f HeroCacheMetricsFactory) module.HeroCacheMetrics {
+	return f(namespaceNetwork, ResourceNetworkingGossipSubSpamRecordCache)
+}
+
 func NetworkDnsTxtCacheMetricsFactory(registrar prometheus.Registerer) *HeroCacheCollector {
 	return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingDnsTxtCache, registrar)
 }

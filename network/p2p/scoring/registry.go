@@ -113,16 +113,28 @@ type GossipSubAppSpecificScoreRegistry struct {
 	appScoreUpdateWorkerPool *worker.Pool[peer.ID]
 }
 
+// AppSpecificScoreRegistryParams is the parameters for the GossipSubAppSpecificScoreRegistry.
+// Parameters are "numerical values" that are used to compute or build components that compute or maintain the application specific score of peers.
+type AppSpecificScoreRegistryParams struct {
+	// ScoreUpdateWorkerNum is the number of workers in the worker pool for handling the application specific score update of peers in a non-blocking way.
+	ScoreUpdateWorkerNum int `validate:"gt=0" mapstructure:"score-update-worker-num"`
+
+	// ScoreUpdateRequestQueueSize is the size of the worker pool for handling the application specific score update of peers in a non-blocking way.
+	ScoreUpdateRequestQueueSize uint32 `validate:"gt=0" mapstructure:"score-update-request-queue-size"`
+
+	// ScoreTTL is the time to live of the application specific score of a peer; the registry keeps a cached copy of the
+	// application specific score of a peer for this duration. When the duration expires, the application specific score
+	// of the peer is updated asynchronously. As long as the update is in progress, the cached copy of the application
+	// specific score of the peer is used even if it is expired.
+	ScoreTTL time.Duration `validate:"required" mapstructure:"score-ttl"`
+}
+
 // GossipSubAppSpecificScoreRegistryConfig is the configuration for the GossipSubAppSpecificScoreRegistry.
-// The configuration is used to initialize the registry.
+// Configurations are the "union of parameters and other components" that are used to compute or build components that compute or maintain the application specific score of peers.
 type GossipSubAppSpecificScoreRegistryConfig struct {
+	Parameters AppSpecificScoreRegistryParams `validate:"required"`
+
 	Logger zerolog.Logger `validate:"required"`
-
-	// AppSpecificScoreNumWorkers is the number of workers in the worker pool for handling the application specific score update of peers in a non-blocking way.
-	AppSpecificScoreNumWorkers int `validate:"gt=0"`
-
-	// AppSpecificScoreWorkerPoolSize is the size of the worker pool for handling the application specific score update of peers in a non-blocking way.
-	AppSpecificScoreWorkerPoolSize uint32 `validate:"gt=0"`
 
 	// Validator is the subscription validator used to validate the subscriptions of peers, and determine if a peer is
 	// authorized to subscribe to a topic.
@@ -138,12 +150,6 @@ type GossipSubAppSpecificScoreRegistryConfig struct {
 	// Init is a factory function that returns a new GossipSubSpamRecord. It is used to initialize the spam record of
 	// a peer when the peer is first observed by the local peer.
 	Init func() p2p.GossipSubSpamRecord `validate:"required"`
-
-	// ScoreTTL is the time to live of the application specific score of a peer; the registry keeps a cached copy of the
-	// application specific score of a peer for this duration. When the duration expires, the application specific score
-	// of the peer is updated asynchronously. As long as the update is in progress, the cached copy of the application
-	// specific score of the peer is used even if it is expired.
-	ScoreTTL time.Duration `validate:"required"`
 
 	// SpamRecordCacheFactory is a factory function that returns a new GossipSubSpamRecordCache. It is used to initialize the spamScoreCache.
 	// The cache is used to store the application specific penalty of peers.
@@ -172,7 +178,7 @@ func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegis
 	}
 
 	lg := config.Logger.With().Str("module", "app_score_registry").Logger()
-	store := queue.NewHeroStore(config.AppSpecificScoreWorkerPoolSize,
+	store := queue.NewHeroStore(config.Parameters.ScoreUpdateRequestQueueSize,
 		lg.With().Str("component", "app_specific_score_update").Logger(),
 		metrics.GossipSubAppSpecificScoreUpdateQueueMetricFactory(config.HeroCacheMetricsFactory))
 
@@ -184,7 +190,7 @@ func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegis
 		init:           config.Init,
 		validator:      config.Validator,
 		idProvider:     config.IdProvider,
-		scoreTTL:       config.ScoreTTL,
+		scoreTTL:       config.Parameters.ScoreTTL,
 	}
 
 	reg.appScoreUpdateWorkerPool = worker.NewWorkerPoolBuilder[peer.ID](lg.With().Str("component", "app_specific_score_update_worker_pool").Logger(),
@@ -210,13 +216,13 @@ func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegis
 		reg.logger.Info().Msg("subscription validator stopped")
 	})
 
-	for i := 0; i < config.AppSpecificScoreNumWorkers; i++ {
+	for i := 0; i < config.Parameters.ScoreUpdateWorkerNum; i++ {
 		builder.AddWorker(reg.appScoreUpdateWorkerPool.WorkerLogic())
 	}
 
 	reg.Component = builder.Build()
 
-	return reg
+	return reg, nil
 }
 
 var _ p2p.GossipSubInvCtrlMsgNotifConsumer = (*GossipSubAppSpecificScoreRegistry)(nil)

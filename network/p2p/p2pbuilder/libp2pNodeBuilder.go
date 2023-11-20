@@ -468,7 +468,7 @@ func DefaultNodeBuilder(
 		sporkId,
 		idProvider,
 		rCfg,
-		rpcInspectorCfg, peerManagerCfg, &gossipCfg.SubscriptionProviderConfig,
+		rpcInspectorCfg, peerManagerCfg, &gossipCfg.SubscriptionProvider,
 		disallowListCacheCfg,
 		meshTracer,
 		uniCfg).
@@ -477,7 +477,7 @@ func DefaultNodeBuilder(
 		SetConnectionGater(connGater).
 		SetCreateNode(DefaultCreateNodeFunc)
 
-	if gossipCfg.PeerScoring {
+	if gossipCfg.ScoringParameters {
 		// In production, we never override the default scoring config.
 		builder.EnableGossipSubScoringWithOverride(p2p.PeerScoringConfigNoOverride)
 	}

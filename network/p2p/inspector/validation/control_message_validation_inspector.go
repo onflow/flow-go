@@ -41,7 +41,7 @@ type ControlMsgValidationInspector struct {
 	sporkID flow.Identifier
 	metrics module.GossipSubRpcValidationInspectorMetrics
 	// config control message validation configurations.
-	config *p2pconf.GossipSubRPCValidationInspectorConfigs
+	config *p2pconf.RpcValidationInspector
 	// distributor used to disseminate invalid RPC message notifications.
 	distributor p2p.GossipSubInspectorNotifDistributor
 	// workerPool queue that stores *InspectRPCRequest that will be processed by component workers.
@@ -69,7 +69,7 @@ type InspectorParams struct {
 	// SporkID the current spork ID.
 	SporkID flow.Identifier `validate:"required"`
 	// Config inspector configuration.
-	Config *p2pconf.GossipSubRPCValidationInspectorConfigs `validate:"required"`
+	Config *p2pconf.RpcValidationInspector `validate:"required"`
 	// Distributor gossipsub inspector notification distributor.
 	Distributor p2p.GossipSubInspectorNotifDistributor `validate:"required"`
 	// HeroCacheMetricsFactory the metrics factory.
@@ -116,10 +116,10 @@ func NewControlMsgValidationInspector(params *InspectorParams) (*ControlMsgValid
 		return nil, fmt.Errorf("failed to create cluster prefix topics received tracker")
 	}
 
-	if params.Config.RpcMessageMaxSampleSize < params.Config.RpcMessageErrorThreshold {
+	if params.Config.MessageMaxSampleSize < params.Config.MessageErrorThreshold {
 		return nil, fmt.Errorf("rpc message max sample size must be greater than or equal to rpc message error threshold, got %d and %d respectively",
-			params.Config.RpcMessageMaxSampleSize,
-			params.Config.RpcMessageErrorThreshold)
+			params.Config.MessageMaxSampleSize,
+			params.Config.MessageErrorThreshold)
 	}
 
 	c := &ControlMsgValidationInspector{
@@ -135,7 +135,7 @@ func NewControlMsgValidationInspector(params *InspectorParams) (*ControlMsgValid
 		topicOracle:    params.TopicOracle,
 	}
 
-	store := queue.NewHeroStore(params.Config.CacheSize, params.Logger, inspectMsgQueueCacheCollector)
+	store := queue.NewHeroStore(params.Config.QueueSize, params.Logger, inspectMsgQueueCacheCollector)
 
 	pool := worker.NewWorkerPoolBuilder[*InspectRPCRequest](lg, store, c.processInspectRPCReq).Build()
 
@@ -458,7 +458,7 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 	if totalMessages == 0 {
 		return nil, 0
 	}
-	sampleSize := c.config.RpcMessageMaxSampleSize
+	sampleSize := c.config.MessageMaxSampleSize
 	if sampleSize > totalMessages {
 		sampleSize = totalMessages
 	}
@@ -498,7 +498,7 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 	}
 
 	// return an error when we exceed the error threshold
-	if errs != nil && errs.Len() > c.config.RpcMessageErrorThreshold {
+	if errs != nil && errs.Len() > c.config.MessageErrorThreshold {
 		return NewInvalidRpcPublishMessagesErr(errs.ErrorOrNil(), errs.Len()), uint64(errs.Len())
 	}
 

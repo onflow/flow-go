@@ -149,7 +149,7 @@ func NodeFixture(t *testing.T,
 		&parameters.FlowConfig.NetworkConfig.ResourceManager,
 		&parameters.FlowConfig.NetworkConfig.GossipSubRPCInspectorsConfig,
 		parameters.PeerManagerConfig,
-		&parameters.FlowConfig.NetworkConfig.GossipSubConfig.SubscriptionProviderConfig,
+		&parameters.FlowConfig.NetworkConfig.GossipSubConfig.SubscriptionProvider,
 		&p2p.DisallowListCacheConfig{
 			MaxSize: uint32(1000),
 			Metrics: metrics.NewNoopCollector(),

@@ -31,14 +31,14 @@ func TestSubscriptionProvider_GetSubscribedTopics(t *testing.T) {
 	idProvider := mock.NewIdentityProvider(t)
 
 	// set a low update interval to speed up the test
-	cfg.NetworkConfig.SubscriptionProviderConfig.SubscriptionUpdateInterval = 100 * time.Millisecond
+	cfg.NetworkConfig.SubscriptionProvider.SubscriptionUpdateInterval = 100 * time.Millisecond
 
 	sp, err := scoring.NewSubscriptionProvider(&scoring.SubscriptionProviderConfig{
 		Logger: unittest.Logger(),
 		TopicProviderOracle: func() p2p.TopicProvider {
 			return tp
 		},
-		Params:                  &cfg.NetworkConfig.SubscriptionProviderConfig,
+		Params:                  &cfg.NetworkConfig.SubscriptionProvider,
 		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 		IdProvider:              idProvider,
 	})
@@ -92,14 +92,14 @@ func TestSubscriptionProvider_GetSubscribedTopics_SkippingUnknownPeers(t *testin
 	idProvider := mock.NewIdentityProvider(t)
 
 	// set a low update interval to speed up the test
-	cfg.NetworkConfig.SubscriptionProviderConfig.SubscriptionUpdateInterval = 100 * time.Millisecond
+	cfg.NetworkConfig.SubscriptionProvider.SubscriptionUpdateInterval = 100 * time.Millisecond
 
 	sp, err := scoring.NewSubscriptionProvider(&scoring.SubscriptionProviderConfig{
 		Logger: unittest.Logger(),
 		TopicProviderOracle: func() p2p.TopicProvider {
 			return tp
 		},
-		Params:                  &cfg.NetworkConfig.SubscriptionProviderConfig,
+		Params:                  &cfg.NetworkConfig.SubscriptionProvider,
 		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 		IdProvider:              idProvider,
 	})

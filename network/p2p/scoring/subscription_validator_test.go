@@ -170,7 +170,7 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 	cfg, err := config.DefaultConfig()
 	require.NoError(t, err)
 	// set a low update interval to speed up the test
-	cfg.NetworkConfig.SubscriptionProviderConfig.SubscriptionUpdateInterval = 100 * time.Millisecond
+	cfg.NetworkConfig.SubscriptionProvider.SubscriptionUpdateInterval = 100 * time.Millisecond
 
 	sporkId := unittest.IdentifierFixture()
 

@@ -200,7 +200,7 @@ func NewGossipSubBuilder(
 		idProvider:                idProvider,
 		gossipSubFactory:          defaultGossipSubFactory(),
 		gossipSubConfigFunc:       defaultGossipSubAdapterConfig(),
-		scoreOptionConfig:         scoring.NewScoreOptionConfig(lg, idProvider),
+		scoreOptionConfig:         scoring.NewScoreOptionConfig(lg, metricsCfg.HeroCacheFactory, idProvider),
 		rpcInspectorConfig:        rpcInspectorConfig,
 		rpcInspectorSuiteFactory:  defaultInspectorSuite(rpcTracker),
 		subscriptionProviderParam: subscriptionProviderPrams,
@@ -257,7 +257,7 @@ func defaultInspectorSuite(rpcTracker p2p.RpcControlTracking) p2p.GossipSubRpcIn
 			}...)
 		notificationDistributor := distributor.DefaultGossipSubInspectorNotificationDistributor(
 			logger, []queue.HeroStoreConfigOption{
-				queue.WithHeroStoreSizeLimit(inspectorCfg.GossipSubRPCInspectorNotificationCacheSize),
+				queue.WithHeroStoreSizeLimit(inspectorCfg.NotificationCacheSize),
 				queue.WithHeroStoreCollector(metrics.RpcInspectorNotificationQueueMetricFactory(heroCacheMetricsFactory, networkType))}...)
 
 		params := &validation.InspectorParams{

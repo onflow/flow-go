@@ -59,7 +59,7 @@ func NewSubscriptionProvider(cfg *SubscriptionProviderConfig) (*SubscriptionProv
 	p := &SubscriptionProvider{
 		logger:                  cfg.Logger.With().Str("module", "subscription_provider").Logger(),
 		topicProviderOracle:     cfg.TopicProviderOracle,
-		allTopicsUpdateInterval: cfg.Params.SubscriptionUpdateInterval,
+		allTopicsUpdateInterval: cfg.Params.UpdateInterval,
 		idProvider:              cfg.IdProvider,
 		cache:                   cache,
 	}
@@ -69,7 +69,7 @@ func NewSubscriptionProvider(cfg *SubscriptionProviderConfig) (*SubscriptionProv
 		func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			ready()
 			p.logger.Debug().
-				Float64("update_interval_seconds", cfg.Params.SubscriptionUpdateInterval.Seconds()).
+				Float64("update_interval_seconds", cfg.Params.UpdateInterval.Seconds()).
 				Msg("subscription provider started; starting update topics loop")
 			p.updateTopicsLoop(ctx)
 
