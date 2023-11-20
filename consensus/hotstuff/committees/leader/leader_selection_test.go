@@ -23,7 +23,7 @@ var someSeed = []uint8{0x6A, 0x23, 0x41, 0xB7, 0x80, 0xE1, 0x64, 0x59,
 // We test that leader selection works for a committee of size one
 func TestSingleConsensusNode(t *testing.T) {
 
-	identity := unittest.IdentityFixture(unittest.WithWeight(8))
+	identity := unittest.IdentityFixture(unittest.WithInitialWeight(8))
 	rng := getPRG(t, someSeed)
 	selection, err := ComputeLeaderSelection(0, rng, 10, flow.IdentitySkeletonList{&identity.IdentitySkeleton})
 	require.NoError(t, err)
@@ -227,7 +227,7 @@ func TestDifferentSeedWillProduceDifferentSelection(t *testing.T) {
 
 	identities := unittest.IdentityListFixture(N_NODES)
 	for i, identity := range identities {
-		identity.Weight = uint64(i)
+		identity.InitialWeight = uint64(i)
 	}
 
 	rng1 := getPRG(t, someSeed)
@@ -309,7 +309,7 @@ func BenchmarkLeaderSelection(b *testing.B) {
 
 	identities := make(flow.IdentityList, 0, N_NODES)
 	for i := 0; i < N_NODES; i++ {
-		identities = append(identities, unittest.IdentityFixture(unittest.WithWeight(uint64(i))))
+		identities = append(identities, unittest.IdentityFixture(unittest.WithInitialWeight(uint64(i))))
 	}
 	skeletonIdentities := identities.ToSkeleton()
 	rng := getPRG(b, someSeed)
@@ -378,15 +378,15 @@ func TestZeroWeightNodeWillNotBeSelected(t *testing.T) {
 		fullIdentities[n].InitialWeight = 1
 		fullIdentities[m].InitialWeight = 1
 
-		// the following code check the zero weight node should not be selected
-		weightful := fullIdentities.Filter(filter.HasWeight(true)).ToSkeleton()
+		// the following code check the ejected nodes should not be selected
+		activeNodes := fullIdentities.Filter(filter.HasParticipationStatus(flow.EpochParticipationStatusActive)).ToSkeleton()
 		identities := fullIdentities.ToSkeleton()
 
 		count := 1000
 		selectionFromAll, err := ComputeLeaderSelection(0, rng, count, identities)
 		require.NoError(t, err)
 
-		selectionFromWeightful, err := ComputeLeaderSelection(0, rng_copy, count, weightful)
+		selectionFromWeightful, err := ComputeLeaderSelection(0, rng_copy, count, activeNodes)
 		require.NoError(t, err)
 
 		for i := 0; i < count; i++ {

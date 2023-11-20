@@ -39,8 +39,7 @@ func GenerateClusterRootQC(signers []bootstrap.NodeInfo, allCommitteeMembers flo
 		dynamicCommitteeMembers = append(dynamicCommitteeMembers, &flow.Identity{
 			IdentitySkeleton: *participant,
 			DynamicIdentity: flow.DynamicIdentity{
-				Weight:  participant.InitialWeight,
-				Ejected: false,
+				EpochParticipationStatus: flow.EpochParticipationStatusActive,
 			},
 		})
 	}

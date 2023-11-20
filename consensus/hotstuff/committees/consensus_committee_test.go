@@ -262,8 +262,8 @@ func (suite *ConsensusSuite) TestIdentitiesByBlock() {
 	t := suite.T()
 
 	realIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
-	zeroWeightConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus), unittest.WithWeight(0))
-	ejectedConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus), unittest.WithEjected(true))
+	zeroWeightConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus), unittest.WithParticipationStatus(flow.EpochParticipationStatusJoining))
+	ejectedConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus), unittest.WithParticipationStatus(flow.EpochParticipationStatusEjected))
 	validNonConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 	fakeID := unittest.IdentifierFixture()
 	blockID := unittest.IdentifierFixture()
@@ -329,7 +329,7 @@ func (suite *ConsensusSuite) TestIdentitiesByEpoch() {
 	realIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
 	zeroWeightConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus),
 		unittest.WithInitialWeight(0))
-	ejectedConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus), unittest.WithEjected(true))
+	ejectedConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus), unittest.WithParticipationStatus(flow.EpochParticipationStatusEjected))
 	validNonConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 	epoch1Identities := flow.IdentityList{realIdentity, zeroWeightConsensusIdentity, ejectedConsensusIdentity, validNonConsensusIdentity}
 

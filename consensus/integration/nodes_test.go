@@ -300,7 +300,7 @@ func createPrivateNodeIdentities(n int) []bootstrap.NodeInfo {
 			node.NodeID,
 			node.Role,
 			node.Address,
-			node.Weight,
+			node.InitialWeight,
 			networkPrivKey,
 			stakingPrivKey,
 		)

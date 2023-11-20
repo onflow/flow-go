@@ -55,7 +55,7 @@ func (s *TimeoutProcessorTestSuite) SetupTest() {
 	s.validator = mocks.NewValidator(s.T())
 	s.sigAggregator = mocks.NewTimeoutSignatureAggregator(s.T())
 	s.notifier = mocks.NewTimeoutCollectorConsumer(s.T())
-	s.participants = unittest.IdentityListFixture(11, unittest.WithWeight(s.sigWeight)).Sort(order.Canonical[flow.Identity]).ToSkeleton()
+	s.participants = unittest.IdentityListFixture(11, unittest.WithInitialWeight(s.sigWeight)).Sort(order.Canonical[flow.Identity]).ToSkeleton()
 	s.signer = s.participants[0]
 	s.view = (uint64)(rand.Uint32() + 100)
 	s.totalWeight = *atomic.NewUint64(0)
