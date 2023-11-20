@@ -73,8 +73,8 @@ func (s *ReceiptValidationSuite) TestReceiptNoIdentity() {
 	s.Assert().True(engine.IsInvalidInputError(err))
 }
 
-// TestReceiptFromZeroWeightNode tests that we reject receipt from node with zero weight
-func (s *ReceiptValidationSuite) TestReceiptFromZeroWeightNode() {
+// TestReceiptFromNonActiveNode tests that we reject receipt from non active node
+func (s *ReceiptValidationSuite) TestReceiptFromNonActiveNode() {
 	valSubgrph := s.ValidSubgraphFixture()
 	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID),
 		unittest.WithResult(valSubgrph.Result))
@@ -85,8 +85,8 @@ func (s *ReceiptValidationSuite) TestReceiptFromZeroWeightNode() {
 		mock.Anything,
 		mock.Anything).Return(true, nil).Maybe() // call optional, as validator might check weight first
 
-	// replace weight with invalid one
-	s.Identities[s.ExeID].Weight = 0
+	// replace participation status with 'leaving'.
+	s.Identities[s.ExeID].EpochParticipationStatus = flow.EpochParticipationStatusLeaving
 
 	err := s.receiptValidator.Validate(receipt)
 	s.Require().Error(err, "should reject invalid weight")

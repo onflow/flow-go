@@ -349,7 +349,7 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochSetupInvariants() {
 	})
 	s.Run("epoch setup state conflicts with protocol state", func() {
 		conflictingIdentity := s.parentProtocolState.ProtocolStateEntry.CurrentEpoch.ActiveIdentities[0]
-		conflictingIdentity.EpochParticipationStatus = flow.EpochParticipationStatusEjected
+		conflictingIdentity.Ejected = true
 
 		stateMachine, err := newStateMachine(s.candidate.View, s.parentProtocolState.Copy())
 		require.NoError(s.T(), err)

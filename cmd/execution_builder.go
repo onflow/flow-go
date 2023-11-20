@@ -315,7 +315,7 @@ func (exeNode *ExecutionNode) LoadBlobService(
 				return nil, fmt.Errorf("allowed node ID %s is not an access node", id.NodeID.String())
 			}
 
-			if id.Ejected {
+			if id.IsEjected() {
 				return nil, fmt.Errorf("allowed node ID %s is ejected", id.NodeID.String())
 			}
 
@@ -1056,7 +1056,7 @@ func (exeNode *ExecutionNode) LoadReceiptProviderEngine(
 		exeNode.exeConf.receiptRequestWorkers,
 		channels.ProvideReceiptsByBlockID,
 		filter.And(
-			filter.HasWeight(true),
+			filter.IsValidCurrentEpochParticipant,
 			filter.HasRole[flow.Identity](flow.RoleConsensus),
 		),
 		retrieve,

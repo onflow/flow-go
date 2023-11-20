@@ -139,15 +139,15 @@ func (u *baseProtocolStateMachine) EjectIdentity(nodeID flow.Identifier) error {
 	u.ensureLookupPopulated()
 	prevEpochIdentity, foundInPrev := u.prevEpochIdentitiesLookup[nodeID]
 	if foundInPrev {
-		prevEpochIdentity.EpochParticipationStatus = flow.EpochParticipationStatusEjected
+		prevEpochIdentity.Ejected = true
 	}
 	currentEpochIdentity, foundInCurrent := u.currentEpochIdentitiesLookup[nodeID]
 	if foundInCurrent {
-		currentEpochIdentity.EpochParticipationStatus = flow.EpochParticipationStatusEjected
+		currentEpochIdentity.Ejected = true
 	}
 	nextEpochIdentity, foundInNext := u.nextEpochIdentitiesLookup[nodeID]
 	if foundInNext {
-		nextEpochIdentity.EpochParticipationStatus = flow.EpochParticipationStatusEjected
+		nextEpochIdentity.Ejected = true
 	}
 	if !foundInPrev && !foundInCurrent && !foundInNext {
 		return protocol.NewInvalidServiceEventErrorf("expected to find identity for "+
