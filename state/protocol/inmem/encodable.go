@@ -36,6 +36,7 @@ type EncodableEpoch struct {
 	DKGPhase3FinalView uint64
 	FinalView          uint64
 	RandomSource       []byte
+	TargetDuration     uint64 // desired real-world end time for the epoch in seconds
 	TargetEndTime      uint64 // desired real-world end time for the epoch in unix time [seconds]
 	InitialIdentities  flow.IdentityList
 	Clustering         flow.ClusterList
