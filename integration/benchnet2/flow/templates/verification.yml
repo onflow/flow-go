@@ -33,7 +33,8 @@ spec:
         nodeType: verification
         owner: {{ $.Values.owner }}
         service: flow
-    spec:  
+    spec:
+      terminationGracePeriodSeconds: {{ .Values.collection.defaults.terminationGracePeriodSeconds }}    
       nodeSelector:
         iam.gke.io/gke-metadata-server-enabled: "true"
       serviceAccountName: "benchnet-configuration-reader"
