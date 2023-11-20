@@ -170,7 +170,7 @@ func (w *NodeDisallowListingWrapper) ByNodeID(identifier flow.Identifier) (*flow
 //   - If the node's identity is nil, there is nothing to do because we don't generate identities here.
 //   - If the node is already ejected, we don't have to check the disallowList.
 func (w *NodeDisallowListingWrapper) setEjectedIfBlocked(identity *flow.Identity) *flow.Identity {
-	if identity == nil || identity.EpochParticipationStatus == flow.EpochParticipationStatusEjected {
+	if identity == nil || identity.IsEjected() {
 		return identity
 	}
 

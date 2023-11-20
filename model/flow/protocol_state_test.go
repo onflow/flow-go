@@ -183,7 +183,7 @@ func TestProtocolStateEntry_Copy(t *testing.T) {
 	assert.NotEqual(t, entry, cpy)
 
 	assert.Equal(t, entry.CurrentEpoch.ActiveIdentities[0], cpy.CurrentEpoch.ActiveIdentities[0])
-	cpy.CurrentEpoch.ActiveIdentities[0].Ejected = true
+	cpy.CurrentEpoch.ActiveIdentities[0].EpochParticipationStatus = flow.EpochParticipationStatusEjected
 	assert.NotEqual(t, entry.CurrentEpoch.ActiveIdentities[0], cpy.CurrentEpoch.ActiveIdentities[0])
 
 	cpy.CurrentEpoch.ActiveIdentities = append(cpy.CurrentEpoch.ActiveIdentities, &flow.DynamicIdentityEntry{

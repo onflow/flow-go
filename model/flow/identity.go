@@ -106,6 +106,11 @@ type Identity struct {
 	DynamicIdentity
 }
 
+// IsEjected returns true if the node is ejected from the network.
+func (iy *DynamicIdentity) IsEjected() bool {
+	return iy.EpochParticipationStatus == EpochParticipationStatusEjected
+}
+
 // String returns a string representation of the identity.
 func (iy Identity) String() string {
 	return fmt.Sprintf("%s-%s@%s=%s", iy.Role, iy.NodeID.String(), iy.Address, iy.EpochParticipationStatus.String())

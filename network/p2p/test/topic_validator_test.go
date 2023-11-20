@@ -624,7 +624,7 @@ func TestAuthorizedSenderValidator_Ejected(t *testing.T) {
 	p2pfixtures.SubMustReceiveMessage(t, timedCtx, expectedReceivedData1, sub3)
 
 	// "eject" sn2 to ensure messages published by ejected nodes get rejected
-	identity2.Ejected = true
+	identity2.EpochParticipationStatus = flow.EpochParticipationStatusEjected
 
 	outgoingMessageScope3, err := message.NewOutgoingScope(
 		flow.IdentifierList{identity1.NodeID, identity2.NodeID},

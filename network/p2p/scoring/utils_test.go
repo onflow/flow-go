@@ -1,6 +1,7 @@
 package scoring_test
 
 import (
+	"github.com/onflow/flow-go/model/flow"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -29,7 +30,7 @@ func TestHasValidIdentity_Ejected(t *testing.T) {
 	idProvider := mock.NewIdentityProvider(t)
 
 	ejectedIdentity := unittest.IdentityFixture()
-	ejectedIdentity.Ejected = true
+	ejectedIdentity.EpochParticipationStatus = flow.EpochParticipationStatusEjected
 	peerId := p2pfixtures.PeerIdFixture(t)
 	idProvider.On("ByPeerID", peerId).Return(ejectedIdentity, true)
 
