@@ -109,7 +109,7 @@ func (r *Retry) retryTxsAtHeight(heightToRetry uint64) {
 			block = nil
 		}
 
-		// TODO: change context.Background() for SignalerContext
+		// TODO: change context.Background() to SignalerContext
 		// find the transaction status
 		status, err := r.backend.deriveTransactionStatus(context.Background(), tx, false, block)
 		if err != nil {
