@@ -10,7 +10,6 @@ import (
 func DefaultConfig() *Config {
 	return &Config{
 		TimingConfig{
-			TargetTransition:      DefaultEpochTransitionTime(),
 			FallbackProposalDelay: atomic.NewDuration(250 * time.Millisecond),
 			MinViewDuration:       atomic.NewDuration(600 * time.Millisecond),
 			MaxViewDuration:       atomic.NewDuration(1600 * time.Millisecond),
@@ -34,9 +33,6 @@ type Config struct {
 
 // TimingConfig specifies the BlockTimeController's limits of authority.
 type TimingConfig struct {
-	// TargetTransition defines the target time to transition epochs each week.
-	TargetTransition EpochTransitionTime
-
 	// FallbackProposalDelay is the minimal block construction delay. When used, it behaves like the
 	// old command line flag `block-rate-delay`. Specifically, the primary measures the duration from
 	// starting to construct its proposal to the proposal being ready to be published. If this
@@ -94,33 +90,32 @@ func (c *ControllerParams) beta() float64 {
 	return 1.0 / float64(c.N_itg)
 }
 
-func (ctl *TimingConfig) GetFallbackProposalDuration() time.Duration {
+func (ctl TimingConfig) GetFallbackProposalDuration() time.Duration {
 	return ctl.FallbackProposalDelay.Load()
 }
-func (ctl *TimingConfig) GetMaxViewDuration() time.Duration {
+func (ctl TimingConfig) GetMaxViewDuration() time.Duration {
 	return ctl.MaxViewDuration.Load()
 }
-func (ctl *TimingConfig) GetMinViewDuration() time.Duration {
+func (ctl TimingConfig) GetMinViewDuration() time.Duration {
 	return ctl.MinViewDuration.Load()
 }
-func (ctl *TimingConfig) GetEnabled() bool {
+func (ctl TimingConfig) GetEnabled() bool {
 	return ctl.Enabled.Load()
 }
 
-func (ctl *TimingConfig) SetFallbackProposalDuration(dur time.Duration) error {
+func (ctl TimingConfig) SetFallbackProposalDuration(dur time.Duration) error {
 	ctl.FallbackProposalDelay.Store(dur)
 	return nil
 }
-func (ctl *TimingConfig) SetMaxViewDuration(dur time.Duration) error {
+func (ctl TimingConfig) SetMaxViewDuration(dur time.Duration) error {
 	ctl.MaxViewDuration.Store(dur)
 	return nil
 }
-func (ctl *TimingConfig) SetMinViewDuration(dur time.Duration) error {
+func (ctl TimingConfig) SetMinViewDuration(dur time.Duration) error {
 	ctl.MinViewDuration.Store(dur)
 	return nil
-
 }
-func (ctl *TimingConfig) SetEnabled(enabled bool) error {
+func (ctl TimingConfig) SetEnabled(enabled bool) error {
 	ctl.Enabled.Store(enabled)
 	return nil
 }
