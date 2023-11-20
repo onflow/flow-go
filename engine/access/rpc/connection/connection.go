@@ -18,7 +18,7 @@ import (
 // ConnectionFactory is an interface for creating access and execution API clients.
 type ConnectionFactory interface {
 	GetAccessAPIClient(address string, networkPubKey crypto.PublicKey) (access.AccessAPIClient, io.Closer, error)
-	GetAccessAPIClientWithPort(address string, port uint, networkPubKey crypto.PublicKey) (access.AccessAPIClient, io.Closer, error)
+	GetAccessAPIClientWithPort(address string, networkPubKey crypto.PublicKey) (access.AccessAPIClient, io.Closer, error)
 	GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, io.Closer, error)
 }
 
@@ -49,17 +49,16 @@ type ConnectionFactoryImpl struct {
 
 // GetAccessAPIClient gets an access API client for the specified address using the default CollectionGRPCPort.
 func (cf *ConnectionFactoryImpl) GetAccessAPIClient(address string, networkPubKey crypto.PublicKey) (access.AccessAPIClient, io.Closer, error) {
-	return cf.GetAccessAPIClientWithPort(address, cf.CollectionGRPCPort, networkPubKey)
-}
-
-// GetAccessAPIClientWithPort gets an access API client for the specified address and port.
-func (cf *ConnectionFactoryImpl) GetAccessAPIClientWithPort(address string, port uint, networkPubKey crypto.PublicKey) (access.AccessAPIClient, io.Closer, error) {
-	grpcAddress, err := getGRPCAddress(address, port)
+	address, err := getGRPCAddress(address, cf.CollectionGRPCPort)
 	if err != nil {
 		return nil, nil, err
 	}
+	return cf.GetAccessAPIClientWithPort(address, networkPubKey)
+}
 
-	conn, closer, err := cf.Manager.GetConnection(grpcAddress, cf.CollectionNodeGRPCTimeout, AccessClient, networkPubKey)
+// GetAccessAPIClientWithPort gets an access API client for the specified address with port.
+func (cf *ConnectionFactoryImpl) GetAccessAPIClientWithPort(address string, networkPubKey crypto.PublicKey) (access.AccessAPIClient, io.Closer, error) {
+	conn, closer, err := cf.Manager.GetConnection(address, cf.CollectionNodeGRPCTimeout, AccessClient, networkPubKey)
 	if err != nil {
 		return nil, nil, err
 	}

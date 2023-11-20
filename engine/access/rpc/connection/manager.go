@@ -87,7 +87,8 @@ func NewManager(
 // GetConnection returns a gRPC client connection for the given grpcAddress and timeout.
 // If a cache is used, it retrieves a cached connection, otherwise creates a new connection.
 // It returns the client connection and an io.Closer to close the connection when done.
-func (m *Manager) GetConnection(grpcAddress string,
+func (m *Manager) GetConnection(
+	grpcAddress string,
 	timeout time.Duration,
 	clientType clientType,
 	networkPubKey crypto.PublicKey,
@@ -140,7 +141,8 @@ func (m *Manager) HasCache() bool {
 // retrieveConnection retrieves the CachedClient for the given grpcAddress from the cache or adds a new one if not present.
 // If the connection is already cached, it waits for the lock and returns the connection from the cache.
 // Otherwise, it creates a new connection and caches it.
-func (m *Manager) retrieveConnection(grpcAddress string,
+func (m *Manager) retrieveConnection(
+	grpcAddress string,
 	timeout time.Duration,
 	clientType clientType,
 	networkPubKey crypto.PublicKey,

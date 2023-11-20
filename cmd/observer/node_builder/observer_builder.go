@@ -100,7 +100,6 @@ import (
 // For a node running as a standalone process, the config fields will be populated from the command line params,
 // while for a node running as a library, the config fields are expected to be initialized by the caller.
 type ObserverServiceConfig struct {
-	collectionGRPCPort        uint
 	bootstrapNodeAddresses    []string
 	bootstrapNodePublicKeys   []string
 	observerNetworkingKeyPath string
@@ -117,7 +116,6 @@ type ObserverServiceConfig struct {
 // DefaultObserverServiceConfig defines all the default values for the ObserverServiceConfig
 func DefaultObserverServiceConfig() *ObserverServiceConfig {
 	return &ObserverServiceConfig{
-		collectionGRPCPort: 9000,
 		rpcConf: rpc.Config{
 			UnsecureGRPCListenAddr: "0.0.0.0:9000",
 			SecureGRPCListenAddr:   "0.0.0.0:9001",
@@ -470,7 +468,6 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 	builder.ExtraFlags(func(flags *pflag.FlagSet) {
 		defaultConfig := DefaultObserverServiceConfig()
 
-		flags.UintVar(&builder.collectionGRPCPort, "collection-ingress-port", defaultConfig.collectionGRPCPort, "the grpc ingress port for all collection nodes")
 		flags.StringVarP(&builder.rpcConf.UnsecureGRPCListenAddr, "rpc-addr", "r", defaultConfig.rpcConf.UnsecureGRPCListenAddr, "the address the unsecured gRPC server listens on")
 		flags.StringVar(&builder.rpcConf.SecureGRPCListenAddr, "secure-rpc-addr", defaultConfig.rpcConf.SecureGRPCListenAddr, "the address the secure gRPC server listens on")
 		flags.StringVarP(&builder.rpcConf.HTTPListenAddr, "http-addr", "h", defaultConfig.rpcConf.HTTPListenAddr, "the address the http proxy server listens on")
@@ -926,7 +923,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		}
 
 		connFactory := &rpcConnection.ConnectionFactoryImpl{
-			CollectionGRPCPort:        builder.collectionGRPCPort,
+			CollectionGRPCPort:        0,
 			ExecutionGRPCPort:         0,
 			CollectionNodeGRPCTimeout: backendConfig.CollectionClientTimeout,
 			ExecutionNodeGRPCTimeout:  backendConfig.ExecutionClientTimeout,

@@ -744,7 +744,6 @@ func (net *FlowNetwork) addObserver(t *testing.T, conf ObserverConfig) {
 				fmt.Sprintf("--upstream-node-addresses=%s", accessNode.ContainerAddr(GRPCSecurePort)),
 				fmt.Sprintf("--upstream-node-public-keys=%s", accessPublicKey),
 				fmt.Sprintf("--observer-networking-key-path=%s/private-root-information/%s_key", DefaultBootstrapDir, conf.ContainerName),
-				fmt.Sprintf("--collection-ingress-port=%s", GRPCSecurePort),
 			}, conf.AdditionalFlags...),
 		},
 		HostConfig: &container.HostConfig{

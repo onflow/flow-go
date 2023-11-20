@@ -54,34 +54,34 @@ func (_m *ConnectionFactory) GetAccessAPIClient(address string, networkPubKey cr
 	return r0, r1, r2
 }
 
-// GetAccessAPIClientWithPort provides a mock function with given fields: address, port, networkPubKey
-func (_m *ConnectionFactory) GetAccessAPIClientWithPort(address string, port uint, networkPubKey crypto.PublicKey) (access.AccessAPIClient, io.Closer, error) {
-	ret := _m.Called(address, port, networkPubKey)
+// GetAccessAPIClientWithPort provides a mock function with given fields: address, networkPubKey
+func (_m *ConnectionFactory) GetAccessAPIClientWithPort(address string, networkPubKey crypto.PublicKey) (access.AccessAPIClient, io.Closer, error) {
+	ret := _m.Called(address, networkPubKey)
 
 	var r0 access.AccessAPIClient
 	var r1 io.Closer
 	var r2 error
-	if rf, ok := ret.Get(0).(func(string, uint, crypto.PublicKey) (access.AccessAPIClient, io.Closer, error)); ok {
-		return rf(address, port, networkPubKey)
+	if rf, ok := ret.Get(0).(func(string, crypto.PublicKey) (access.AccessAPIClient, io.Closer, error)); ok {
+		return rf(address, networkPubKey)
 	}
-	if rf, ok := ret.Get(0).(func(string, uint, crypto.PublicKey) access.AccessAPIClient); ok {
-		r0 = rf(address, port, networkPubKey)
+	if rf, ok := ret.Get(0).(func(string, crypto.PublicKey) access.AccessAPIClient); ok {
+		r0 = rf(address, networkPubKey)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(access.AccessAPIClient)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(string, uint, crypto.PublicKey) io.Closer); ok {
-		r1 = rf(address, port, networkPubKey)
+	if rf, ok := ret.Get(1).(func(string, crypto.PublicKey) io.Closer); ok {
+		r1 = rf(address, networkPubKey)
 	} else {
 		if ret.Get(1) != nil {
 			r1 = ret.Get(1).(io.Closer)
 		}
 	}
 
-	if rf, ok := ret.Get(2).(func(string, uint, crypto.PublicKey) error); ok {
-		r2 = rf(address, port, networkPubKey)
+	if rf, ok := ret.Get(2).(func(string, crypto.PublicKey) error); ok {
+		r2 = rf(address, networkPubKey)
 	} else {
 		r2 = ret.Error(2)
 	}

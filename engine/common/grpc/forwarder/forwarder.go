@@ -14,13 +14,18 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/access"
 )
 
+// Upstream is a container for an individual upstream containing the id, client and closer for it
+type Upstream struct {
+	id     *flow.Identity
+	client access.AccessAPIClient
+	closer io.Closer
+}
+
 // Forwarder forwards all requests to a set of upstream access nodes or observers
 type Forwarder struct {
 	lock        sync.Mutex
 	roundRobin  int
-	ids         flow.IdentityList
-	upstream    []access.AccessAPIClient
-	closer      []io.Closer
+	upstream    []Upstream
 	connFactory connection.ConnectionFactory
 }
 
@@ -35,13 +40,11 @@ func NewForwarder(identities flow.IdentityList, connectionFactory connection.Con
 // Make sure that this is just for observation and not a staked participant in the flow network.
 // This means that observers see a copy of the data but there is no interaction to ensure integrity from the root block.
 func (f *Forwarder) setFlowAccessAPI(accessNodeAddressAndPort flow.IdentityList) error {
-	f.ids = accessNodeAddressAndPort
-	f.upstream = make([]access.AccessAPIClient, accessNodeAddressAndPort.Count())
-	f.closer = make([]io.Closer, accessNodeAddressAndPort.Count())
+	f.upstream = make([]Upstream, accessNodeAddressAndPort.Count())
 	for i, identity := range accessNodeAddressAndPort {
 		// Store the faultTolerantClient setup parameters such as address, public, key and timeout, so that
 		// we can refresh the API on connection loss
-		f.ids[i] = identity
+		f.upstream[i].id = identity
 
 		// We fail on any single error on startup, so that
 		// we identify bootstrapping errors early
@@ -57,14 +60,14 @@ func (f *Forwarder) setFlowAccessAPI(accessNodeAddressAndPort flow.IdentityList)
 
 // reconnectingClient returns an active client, or creates a new connection.
 func (f *Forwarder) reconnectingClient(i int) error {
-	identity := f.ids[i]
+	identity := f.upstream[i].id
 
-	accessApiClient, closer, err := f.connFactory.GetAccessAPIClient(identity.Address, identity.NetworkPubKey)
+	accessApiClient, closer, err := f.connFactory.GetAccessAPIClientWithPort(identity.Address, identity.NetworkPubKey)
 	if err != nil {
 		return fmt.Errorf("failed to connect to access node at %s: %w", accessApiClient, err)
 	}
-	f.closer[i] = closer
-	f.upstream[i] = accessApiClient
+	f.upstream[i].closer = closer
+	f.upstream[i].client = accessApiClient
 	return nil
 }
 
@@ -94,7 +97,7 @@ func (f *Forwarder) FaultTolerantClient() (access.AccessAPIClient, io.Closer, er
 		if err != nil {
 			continue
 		}
-		return f.upstream[f.roundRobin], f.closer[f.roundRobin], nil
+		return f.upstream[f.roundRobin].client, f.upstream[f.roundRobin].closer, nil
 	}
 
 	return nil, nil, status.Errorf(codes.Unavailable, err.Error())
