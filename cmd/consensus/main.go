@@ -604,6 +604,8 @@ func main() {
 			)
 
 			notifier.AddParticipantConsumer(telemetryConsumer)
+			notifier.AddCommunicatorConsumer(telemetryConsumer)
+			notifier.AddFinalizationConsumer(telemetryConsumer)
 			notifier.AddFollowerConsumer(followerDistributor)
 
 			// initialize the persister

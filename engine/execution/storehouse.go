@@ -1,6 +1,7 @@
 package execution
 
 import (
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/finalizedreader"
 	"github.com/onflow/flow-go/storage"
@@ -13,7 +14,7 @@ type RegisterStore interface {
 	// GetRegister first try to get the register from InMemoryRegisterStore, then OnDiskRegisterStore
 	// It returns:
 	//  - (value, nil) if the register value is found at the given block
-	//  - (nil, storage.ErrNotFound) if the register is not found
+	//  - (nil, nil) if the register is not found
 	//  - (nil, storage.ErrHeightNotIndexed) if the height is below the first height that is indexed.
 	//  - (nil, storehouse.ErrNotExecuted) if the block is not executed yet
 	//  - (nil, storehouse.ErrNotExecuted) if the block is conflicting iwth finalized block
@@ -104,4 +105,10 @@ type WALReader interface {
 	// Next returns the next height and trie updates in the WAL.
 	// It returns EOF when there are no more entries.
 	Next() (height uint64, registers flow.RegisterEntries, err error)
+}
+
+type ExtendableStorageSnapshot interface {
+	snapshot.StorageSnapshot
+	Extend(newCommit flow.StateCommitment, updatedRegisters map[flow.RegisterID]flow.RegisterValue) ExtendableStorageSnapshot
+	Commitment() flow.StateCommitment
 }

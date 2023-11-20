@@ -11,9 +11,8 @@ import (
 
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
+	"github.com/onflow/flow-go/fvm/evm/testutils"
 	. "github.com/onflow/flow-go/fvm/evm/testutils"
-
-	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -24,9 +23,10 @@ func TestEVMRun(t *testing.T) {
 	t.Parallel()
 
 	t.Run("testing EVM.run (happy case)", func(t *testing.T) {
-		RunWithTestBackend(t, func(backend types.Backend) {
+		RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 			RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
-				RunWithDeployedContract(t, backend, rootAddr, func(testContract *TestContract) {
+				tc := GetStorageTestContract(t)
+				RunWithDeployedContract(t, tc, backend, rootAddr, func(testContract *TestContract) {
 					RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *EOATestAccount) {
 						num := int64(12)
 						chain := flow.Emulator.Chain()
@@ -49,7 +49,7 @@ func TestEVMRun(t *testing.T) {
 
 							txBytes := testAccount.PrepareSignAndEncodeTx(t,
 								testContract.DeployedAt.ToCommon(),
-								testContract.MakeStoreCallData(t, big.NewInt(num)),
+								testContract.MakeCallData(t, "store", big.NewInt(num)),
 								big.NewInt(0),
 								gasLimit,
 								big.NewInt(0),
@@ -113,9 +113,10 @@ func TestEVMAddressDeposit(t *testing.T) {
 
 	t.Parallel()
 
-	RunWithTestBackend(t, func(backend types.Backend) {
+	RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 		RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
-			RunWithDeployedContract(t, backend, rootAddr, func(testContract *TestContract) {
+			tc := GetStorageTestContract(t)
+			RunWithDeployedContract(t, tc, backend, rootAddr, func(testContract *TestContract) {
 				RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *EOATestAccount) {
 					chain := flow.Emulator.Chain()
 					RunWithNewTestVM(t, chain, func(ctx fvm.Context, vm fvm.VM, snapshot snapshot.SnapshotTree) {
@@ -165,9 +166,10 @@ func TestBridgedAccountWithdraw(t *testing.T) {
 
 	t.Parallel()
 
-	RunWithTestBackend(t, func(backend types.Backend) {
+	RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 		RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
-			RunWithDeployedContract(t, backend, rootAddr, func(testContract *TestContract) {
+			tc := GetStorageTestContract(t)
+			RunWithDeployedContract(t, tc, backend, rootAddr, func(testContract *TestContract) {
 				RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *EOATestAccount) {
 					chain := flow.Emulator.Chain()
 					RunWithNewTestVM(t, chain, func(ctx fvm.Context, vm fvm.VM, snapshot snapshot.SnapshotTree) {
@@ -223,9 +225,10 @@ func TestBridgedAccountDeploy(t *testing.T) {
 
 	t.Parallel()
 
-	RunWithTestBackend(t, func(backend types.Backend) {
+	RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 		RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
-			RunWithDeployedContract(t, backend, rootAddr, func(testContract *TestContract) {
+			tc := GetStorageTestContract(t)
+			RunWithDeployedContract(t, tc, backend, rootAddr, func(testContract *TestContract) {
 				RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *EOATestAccount) {
 					chain := flow.Emulator.Chain()
 					RunWithNewTestVM(t, chain, func(ctx fvm.Context, vm fvm.VM, snapshot snapshot.SnapshotTree) {
