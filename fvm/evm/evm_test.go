@@ -11,8 +11,8 @@ import (
 
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
+	"github.com/onflow/flow-go/fvm/evm/testutils"
 	. "github.com/onflow/flow-go/fvm/evm/testutils"
-	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -23,7 +23,7 @@ func TestEVMRun(t *testing.T) {
 	t.Parallel()
 
 	t.Run("testing EVM.run (happy case)", func(t *testing.T) {
-		RunWithTestBackend(t, func(backend types.Backend) {
+		RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 			RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				tc := GetStorageTestContract(t)
 				RunWithDeployedContract(t, tc, backend, rootAddr, func(testContract *TestContract) {
@@ -113,7 +113,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 
 	t.Parallel()
 
-	RunWithTestBackend(t, func(backend types.Backend) {
+	RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 		RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 			tc := GetStorageTestContract(t)
 			RunWithDeployedContract(t, tc, backend, rootAddr, func(testContract *TestContract) {
@@ -166,7 +166,7 @@ func TestBridgedAccountWithdraw(t *testing.T) {
 
 	t.Parallel()
 
-	RunWithTestBackend(t, func(backend types.Backend) {
+	RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 		RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 			tc := GetStorageTestContract(t)
 			RunWithDeployedContract(t, tc, backend, rootAddr, func(testContract *TestContract) {
@@ -225,7 +225,7 @@ func TestBridgedAccountDeploy(t *testing.T) {
 
 	t.Parallel()
 
-	RunWithTestBackend(t, func(backend types.Backend) {
+	RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 		RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 			tc := GetStorageTestContract(t)
 			RunWithDeployedContract(t, tc, backend, rootAddr, func(testContract *TestContract) {
