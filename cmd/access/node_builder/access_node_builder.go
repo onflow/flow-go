@@ -146,6 +146,7 @@ type AccessNodeConfig struct {
 	executionDataIndexingEnabled bool
 	registersDBPath              string
 	checkpointFile               string
+	scriptExecutorConfig         query.QueryConfig
 }
 
 type PublicNetworkConfig struct {
@@ -232,6 +233,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		executionDataIndexingEnabled: false,
 		registersDBPath:              filepath.Join(homedir, ".flow", "execution_state"),
 		checkpointFile:               cmd.NotSet,
+		scriptExecutorConfig:         query.NewDefaultConfig(),
 	}
 }
 
@@ -770,6 +772,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					query.NewProtocolStateWrapper(builder.State),
 					builder.Storage.Headers,
 					builder.ExecutionIndexerCore.RegisterValue,
+					builder.scriptExecutorConfig,
 				)
 				if err != nil {
 					return nil, err
@@ -928,6 +931,11 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 
 		// Script Execution
 		flags.StringVar(&builder.rpcConf.BackendConfig.ScriptExecutionMode, "script-execution-mode", defaultConfig.rpcConf.BackendConfig.ScriptExecutionMode, "mode to use when executing scripts. one of (local-only, execution-nodes-only, failover, compare)")
+		flags.Uint64Var(&builder.scriptExecutorConfig.ComputationLimit, "script-execution-computation-limit", defaultConfig.scriptExecutorConfig.ComputationLimit, "maximum number of computation units a locally executed script can use. default: 100000")
+		flags.IntVar(&builder.scriptExecutorConfig.MaxErrorMessageSize, "script-execution-max-error-length", defaultConfig.scriptExecutorConfig.MaxErrorMessageSize, "maximum number characters to include in error message strings. additional characters are truncated. default: 1000")
+		flags.DurationVar(&builder.scriptExecutorConfig.LogTimeThreshold, "script-execution-log-time-threshold", defaultConfig.scriptExecutorConfig.LogTimeThreshold, "emit a log for any scripts that take over this threshold. default: 1s")
+		flags.DurationVar(&builder.scriptExecutorConfig.ExecutionTimeLimit, "script-execution-timeout", defaultConfig.scriptExecutorConfig.ExecutionTimeLimit, "timeout value for locally executed scripts. default: 10s")
+
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-observer is true")

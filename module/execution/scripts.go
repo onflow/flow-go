@@ -66,6 +66,7 @@ func NewScripts(
 	entropy query.EntropyProviderPerBlock,
 	header storage.Headers,
 	registerAtHeight RegisterAtHeight,
+	queryConf query.QueryConfig,
 ) (*Scripts, error) {
 	vm := fvm.NewVirtualMachine()
 
@@ -80,7 +81,7 @@ func NewScripts(
 	}
 
 	queryExecutor := query.NewQueryExecutor(
-		query.NewDefaultConfig(),
+		queryConf,
 		log,
 		metrics,
 		vm,
