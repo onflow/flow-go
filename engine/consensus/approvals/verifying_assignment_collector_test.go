@@ -229,9 +229,11 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult() {
 // by one or another reason
 func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIdentity() {
 
-	s.Run("verifier zero-weight", func() {
-		identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-		identity.Weight = 0 // zero weight
+	s.Run("verifier non-active", func() {
+		identity := unittest.IdentityFixture(
+			unittest.WithRole(flow.RoleVerification),
+			unittest.WithParticipationStatus(flow.EpochParticipationStatusJoining),
+		)
 
 		state := &protocol.State{}
 		state.On("AtBlockID", mock.Anything).Return(
@@ -250,8 +252,10 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 	})
 
 	s.Run("verifier-ejected", func() {
-		identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-		identity.Ejected = true // node ejected
+		identity := unittest.IdentityFixture(
+			unittest.WithRole(flow.RoleVerification),
+			unittest.WithParticipationStatus(flow.EpochParticipationStatusEjected),
+		)
 
 		state := &protocol.State{}
 		state.On("AtBlockID", mock.Anything).Return(

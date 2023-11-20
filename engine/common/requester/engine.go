@@ -90,14 +90,14 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net network.EngineReg
 	selector = filter.And(
 		selector,
 		filter.Not(filter.HasNodeID[flow.Identity](me.NodeID())),
-		filter.Not(filter.Ejected),
+		filter.Not(filter.HasParticipationStatus(flow.EpochParticipationStatusEjected)),
 	)
 
 	// make sure we don't send requests to unauthorized nodes
 	if cfg.ValidateStaking {
 		selector = filter.And(
 			selector,
-			filter.HasWeight(true),
+			filter.HasParticipationStatus(flow.EpochParticipationStatusActive),
 		)
 	}
 

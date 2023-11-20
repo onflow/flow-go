@@ -194,11 +194,11 @@ func newBlockHappyPath(t *testing.T) {
 // It also evaluates that the chunks queue is never called on any chunks of that receipt's result.
 func newBlockZeroWeight(t *testing.T) {
 
-	// creates an assigner engine for zero-weight verification node.
+	// creates an assigner engine for non-active verification node.
 	s := SetupTest(WithIdentity(
 		unittest.IdentityFixture(
 			unittest.WithRole(flow.RoleVerification),
-			unittest.WithWeight(0))))
+			unittest.WithParticipationStatus(flow.EpochParticipationStatusJoining))))
 	e := NewAssignerEngine(s)
 
 	// creates a container block, with a single receipt, that contains
