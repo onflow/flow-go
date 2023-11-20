@@ -67,7 +67,7 @@ func (s *MessageHubSuite) SetupTest() {
 	// initialize the paramaters
 	s.participants = unittest.IdentityListFixture(3,
 		unittest.WithRole(flow.RoleConsensus),
-		unittest.WithWeight(1000),
+		unittest.WithInitialWeight(1000),
 	)
 	s.myID = s.participants[0].NodeID
 	block := unittest.BlockFixture()

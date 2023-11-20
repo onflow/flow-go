@@ -397,8 +397,7 @@ func authorizedVerifiersAtBlock(state protocol.State, blockID flow.Identifier) (
 	authorizedVerifierList, err := state.AtBlockID(blockID).Identities(
 		filter.And(
 			filter.HasRole[flow.Identity](flow.RoleVerification),
-			filter.HasWeight(true),
-			filter.Not(filter.Ejected),
+			filter.IsValidCurrentEpochParticipant,
 		))
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve Identities for block %v: %w", blockID, err)

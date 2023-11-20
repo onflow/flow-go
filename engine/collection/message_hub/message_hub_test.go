@@ -70,7 +70,7 @@ func (s *MessageHubSuite) SetupTest() {
 	// initialize the paramaters
 	s.cluster = unittest.IdentityListFixture(3,
 		unittest.WithRole(flow.RoleCollection),
-		unittest.WithWeight(1000),
+		unittest.WithInitialWeight(1000),
 	)
 	s.myID = s.cluster[0].NodeID
 	s.clusterID = "cluster-id"
