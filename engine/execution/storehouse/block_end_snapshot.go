@@ -40,7 +40,7 @@ func NewBlockEndStateSnapshot(
 // Get returns the value of the register with the given register ID.
 // It returns:
 // - (value, nil) if the register exists
-// - (nil, storage.ErrNotFound) if the register does not exist
+// - (nil, nil) if the register does not exist
 // - (nil, storage.ErrHeightNotIndexed) if the height is below the first height that is indexed.
 // - (nil, storehouse.ErrNotExecuted) if the block is not executed yet
 // - (nil, storehouse.ErrNotExecuted) if the block is conflicting with finalized block
