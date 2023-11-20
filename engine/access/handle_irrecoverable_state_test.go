@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/antihax/optional"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -17,8 +18,12 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 
+	restclient "github.com/onflow/flow/openapi/go-client-generated"
+
 	"github.com/onflow/flow-go/crypto"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
+	"github.com/onflow/flow-go/engine/access/rest"
+	"github.com/onflow/flow-go/engine/access/rest/routes"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
@@ -58,8 +63,7 @@ type IrrecoverableStateTestSuite struct {
 	transactions *storagemock.Transactions
 	receipts     *storagemock.ExecutionReceipts
 
-	ctx    irrecoverable.SignalerContext
-	cancel context.CancelFunc
+	ctx irrecoverable.SignalerContext
 
 	// grpc servers
 	secureGrpcServer   *grpcserver.GrpcServer
@@ -110,6 +114,9 @@ func (suite *IrrecoverableStateTestSuite) SetupTest() {
 		UnsecureGRPCListenAddr: unittest.DefaultAddress,
 		SecureGRPCListenAddr:   unittest.DefaultAddress,
 		HTTPListenAddr:         unittest.DefaultAddress,
+		RestConfig: rest.Config{
+			ListenAddress: unittest.DefaultAddress,
+		},
 	}
 
 	// generate a server certificate that will be served by the GRPC server
@@ -137,8 +144,8 @@ func (suite *IrrecoverableStateTestSuite) SetupTest() {
 		nil,
 		nil).Build()
 
-	block := unittest.BlockHeaderFixture()
-	suite.snapshot.On("Head").Return(block, nil).Once()
+	blockHeader := unittest.BlockHeaderFixture()
+	suite.snapshot.On("Head").Return(blockHeader, nil).Once()
 
 	bnd, err := backend.New(backend.Params{
 		State:                suite.state,
@@ -179,8 +186,7 @@ func (suite *IrrecoverableStateTestSuite) SetupTest() {
 	err = fmt.Errorf("inconsistent node`s state")
 	ctx := irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), err)
 
-	suite.ctx, suite.cancel = irrecoverable.NewMockSignalerContextWithCancel(suite.T(), context.Background())
-	suite.rpcEng.Start(suite.ctx)
+	suite.rpcEng.Start(ctx)
 
 	suite.secureGrpcServer.Start(ctx)
 	suite.unsecureGrpcServer.Start(ctx)
@@ -197,16 +203,7 @@ func TestIrrecoverableState(t *testing.T) {
 	suite.Run(t, new(IrrecoverableStateTestSuite))
 }
 
-func (suite *IrrecoverableStateTestSuite) TearDownTest() {
-	if suite.cancel != nil {
-		suite.cancel()
-		unittest.AssertClosesBefore(suite.T(), suite.secureGrpcServer.Done(), 2*time.Second)
-		unittest.AssertClosesBefore(suite.T(), suite.unsecureGrpcServer.Done(), 2*time.Second)
-		unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Done(), 2*time.Second)
-	}
-}
-
-func (suite *IrrecoverableStateTestSuite) TestInconsistentNodeState() {
+func (suite *IrrecoverableStateTestSuite) TestGRPCInconsistentNodeState() {
 	err := fmt.Errorf("inconsistent node`s state")
 	suite.snapshot.On("Head").Return(nil, err)
 
@@ -214,13 +211,45 @@ func (suite *IrrecoverableStateTestSuite) TestInconsistentNodeState() {
 		suite.unsecureGrpcServer.GRPCAddress().String(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()))
 	assert.NoError(suite.T(), err)
-
 	defer io.Closer(conn).Close()
+
 	client := accessproto.NewAccessAPIClient(conn)
 
 	req := &accessproto.GetAccountAtLatestBlockRequest{
 		Address: unittest.AddressFixture().Bytes(),
 	}
-	_, err = client.GetAccountAtLatestBlock(context.Background(), req)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+
+	_, err = client.GetAccountAtLatestBlock(ctx, req)
 	suite.Require().Error(err)
+}
+
+func (suite *IrrecoverableStateTestSuite) TestRestInconsistentNodeState() {
+	collections := unittest.CollectionListFixture(1)
+	blockHeader := unittest.BlockWithGuaranteesFixture(
+		unittest.CollectionGuaranteesWithCollectionIDFixture(collections),
+	)
+	suite.blocks.On("ByID", blockHeader.ID()).Return(blockHeader, nil)
+
+	err := fmt.Errorf("inconsistent node`s state")
+	suite.snapshot.On("Head").Return(nil, err)
+
+	config := restclient.NewConfiguration()
+	config.BasePath = fmt.Sprintf("http://%s/v1", suite.rpcEng.RestApiAddress().String())
+	client := restclient.NewAPIClient(config)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+
+	_, _, err = client.BlocksApi.BlocksIdGet(ctx, []string{blockHeader.ID().String()}, optionsForBlocksIdGetOpts())
+	suite.Require().Error(err)
+}
+
+func optionsForBlocksIdGetOpts() *restclient.BlocksApiBlocksIdGetOpts {
+	return &restclient.BlocksApiBlocksIdGetOpts{
+		Expand:  optional.NewInterface([]string{routes.ExpandableFieldPayload}),
+		Select_: optional.NewInterface([]string{"header.id"}),
+	}
 }

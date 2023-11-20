@@ -338,9 +338,10 @@ func (s *BackendAccountsSuite) TestGetAccountAtLatestBlockFromStorage_Inconsiste
 		err := fmt.Errorf("inconsistent node`s state")
 		s.snapshot.On("Head").Return(nil, err)
 
-		ctx := irrecoverable.NewMockSignalerContextExpectError(s.T(), context.Background(), err) //Uliana: всі ctx
+		signalerCtx := irrecoverable.NewMockSignalerContextExpectError(s.T(), context.Background(), err)
+		valueCtx := context.WithValue(context.Background(), irrecoverable.SignalerContextKey{}, *signalerCtx)
 
-		_, err = backend.GetAccountAtLatestBlock(ctx, s.failingAddress)
+		_, err = backend.GetAccountAtLatestBlock(valueCtx, s.failingAddress)
 		s.Require().Error(err)
 	})
 }

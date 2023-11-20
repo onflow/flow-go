@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -315,7 +316,7 @@ func (b *backendTransactions) GetTransactionResult(
 	}
 
 	// derive status of the transaction
-	txStatus, err := b.deriveTransactionStatus(tx, transactionWasExecuted, block)
+	txStatus, err := b.deriveTransactionStatus(ctx, tx, transactionWasExecuted, block)
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
 	}
@@ -432,7 +433,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 			txResult := resp.TransactionResults[i]
 
 			// tx body is irrelevant to status if it's in an executed block
-			txStatus, err := b.deriveTransactionStatus(nil, true, block)
+			txStatus, err := b.deriveTransactionStatus(ctx, nil, true, block)
 			if err != nil {
 				return nil, rpc.ConvertStorageError(err)
 			}
@@ -486,7 +487,7 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 			return nil, status.Errorf(codes.Internal, "could not get system chunk transaction: %v", err)
 		}
 		systemTxResult := resp.TransactionResults[len(resp.TransactionResults)-1]
-		systemTxStatus, err := b.deriveTransactionStatus(systemTx, true, block)
+		systemTxStatus, err := b.deriveTransactionStatus(ctx, systemTx, true, block)
 		if err != nil {
 			return nil, rpc.ConvertStorageError(err)
 		}
@@ -544,7 +545,7 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 	}
 
 	// tx body is irrelevant to status if it's in an executed block
-	txStatus, err := b.deriveTransactionStatus(nil, true, block)
+	txStatus, err := b.deriveTransactionStatus(ctx, nil, true, block)
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
 	}
@@ -567,6 +568,7 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 
 // deriveTransactionStatus derives the transaction status based on current protocol state
 func (b *backendTransactions) deriveTransactionStatus(
+	ctx context.Context,
 	tx *flow.TransactionBody,
 	executed bool,
 	block *flow.Block,
@@ -582,7 +584,7 @@ func (b *backendTransactions) deriveTransactionStatus(
 		// get the latest finalized block from the state
 		finalized, err := b.state.Final().Head()
 		if err != nil {
-			//irrecoverable.Throw(ctx, err)
+			irrecoverable.Throw(ctx, err)
 			return flow.TransactionStatusUnknown, err
 		}
 		finalizedHeight := finalized.Height
@@ -627,7 +629,7 @@ func (b *backendTransactions) deriveTransactionStatus(
 	// get the latest sealed block from the State
 	sealed, err := b.state.Sealed().Head()
 	if err != nil {
-		//irrecoverable.Throw(ctx, err)
+		irrecoverable.Throw(ctx, err)
 		return flow.TransactionStatusUnknown, err
 	}
 

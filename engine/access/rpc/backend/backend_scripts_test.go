@@ -384,9 +384,11 @@ func (s *BackendScriptsSuite) TestExecuteScriptAtLatestBlockFromStorage_Inconsis
 
 		err := fmt.Errorf("inconsistent node`s state")
 		s.snapshot.On("Head").Return(nil, err)
-		ctx := irrecoverable.NewMockSignalerContextExpectError(s.T(), context.Background(), err)
 
-		_, err = backend.ExecuteScriptAtLatestBlock(ctx, s.script, s.arguments)
+		signalerCtx := irrecoverable.NewMockSignalerContextExpectError(s.T(), context.Background(), err)
+		valueCtx := context.WithValue(context.Background(), irrecoverable.SignalerContextKey{}, *signalerCtx)
+
+		_, err = backend.ExecuteScriptAtLatestBlock(valueCtx, s.script, s.arguments)
 		s.Require().Error(err)
 	})
 }

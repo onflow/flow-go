@@ -48,6 +48,8 @@ type SignalerContext interface {
 	sealed()         // private, to constrain builder to using WithSignaler
 }
 
+type SignalerContextKey struct{}
+
 // private, to force context derivation / WithSignaler
 type signalerCtx struct {
 	context.Context
@@ -72,7 +74,7 @@ func WithSignaler(parent context.Context) (SignalerContext, <-chan error) {
 // Throw can be a drop-in replacement anywhere we have a context.Context likely
 // to support Irrecoverables. Note: this is not a method
 func Throw(ctx context.Context, err error) {
-	signalerAbleContext, ok := ctx.(SignalerContext)
+	signalerAbleContext, ok := ctx.Value(SignalerContextKey{}).(SignalerContext)
 	if ok {
 		signalerAbleContext.Throw(err)
 	} else {

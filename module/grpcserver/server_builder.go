@@ -71,8 +71,9 @@ func NewGrpcServerBuilder(log zerolog.Logger,
 	}
 	var interceptors []grpc.UnaryServerInterceptor // ordered list of interceptors
 	interceptors = append(interceptors, func(ctx context.Context, req any, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp any, err error) {
-		if signalerCtx := signalerCtx.Load(); ctx != nil {
-			resp, err = handler(*signalerCtx, req)
+		if signalerCtx := signalerCtx.Load(); signalerCtx != nil {
+			valueCtx := context.WithValue(ctx, irrecoverable.SignalerContextKey{}, *signalerCtx)
+			resp, err = handler(valueCtx, req)
 		} else {
 			resp, err = handler(ctx, req)
 		}

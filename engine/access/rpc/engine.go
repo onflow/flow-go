@@ -230,7 +230,7 @@ func (e *Engine) serveREST(ctx irrecoverable.SignalerContext, ready component.Re
 	}
 	e.restServer = r
 	e.restServer.BaseContext = func(_ net.Listener) context.Context {
-		return ctx
+		return context.WithValue(ctx, irrecoverable.SignalerContextKey{}, ctx)
 	}
 
 	l, err := net.Listen("tcp", e.config.RestConfig.ListenAddress)

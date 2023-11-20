@@ -428,9 +428,10 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 		suite.snapshot.On("Head").Return(nil, err)
 
 		// mock signaler context expect an error
-		ctx := irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), err)
+		signalerCtx := irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), err)
+		valueCtx := context.WithValue(context.Background(), irrecoverable.SignalerContextKey{}, *signalerCtx)
 
-		_, _, err = backend.GetLatestBlockHeader(ctx, true)
+		_, _, err = backend.GetLatestBlockHeader(valueCtx, true)
 		suite.Require().Error(err)
 	})
 }
@@ -522,7 +523,7 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 	suite.Require().NoError(err)
 
 	suite.execClient.
-		On("GetTransactionResultByIndex", ctx, exeEventReq).
+		On("GetTransactionResultByIndex", mock.Anything, exeEventReq).
 		Return(exeEventResp, nil)
 
 	suite.Run("TestGetTransactionResultByIndex - happy path", func() {
@@ -540,9 +541,10 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 		suite.snapshot.On("Head").Return(nil, err).Once()
 
 		// mock signaler context expect an error
-		ctx = irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), err)
+		signalerCtx := irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), err)
+		valueCtx := context.WithValue(context.Background(), irrecoverable.SignalerContextKey{}, *signalerCtx)
 
-		_, err = backend.GetTransactionResultByIndex(ctx, blockId, index, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+		_, err = backend.GetTransactionResultByIndex(valueCtx, blockId, index, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
 		suite.Require().Error(err)
 	})
 }
@@ -588,7 +590,7 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	suite.Require().NoError(err)
 
 	suite.execClient.
-		On("GetTransactionResultsByBlockID", ctx, exeEventReq).
+		On("GetTransactionResultsByBlockID", mock.Anything, exeEventReq).
 		Return(exeEventResp, nil)
 
 	suite.Run("GetTransactionResultsByBlockID - happy path", func() {
@@ -600,15 +602,16 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 		suite.assertAllExpectations()
 	})
 
-	// tests that signaler context received error when node state is inconsistent
+	//tests that signaler context received error when node state is inconsistent
 	suite.Run("GetTransactionResultsByBlockID - fails with inconsistent node`s state", func() {
 		err := fmt.Errorf("inconsistent node`s state")
 		suite.snapshot.On("Head").Return(nil, err).Once()
 
 		// mock signaler context expect an error
-		ctx = irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), err)
+		signalerCtx := irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), err)
+		valueCtx := context.WithValue(context.Background(), irrecoverable.SignalerContextKey{}, *signalerCtx)
 
-		_, err = backend.GetTransactionResultsByBlockID(ctx, blockId, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+		_, err = backend.GetTransactionResultsByBlockID(valueCtx, blockId, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
 		suite.Require().Error(err)
 	})
 }
@@ -983,8 +986,6 @@ func (suite *Suite) TestTransactionResultUnknown() {
 }
 
 func (suite *Suite) TestGetLatestFinalizedBlock() {
-	ctx := context.Background()
-
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 
@@ -1031,9 +1032,10 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 		suite.snapshot.On("Head").Return(nil, err)
 
 		// mock signaler context expect an error
-		ctx = irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), err)
+		signalerCtx := irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), err)
+		valueCtx := context.WithValue(context.Background(), irrecoverable.SignalerContextKey{}, *signalerCtx)
 
-		_, _, err = backend.GetLatestBlock(ctx, false)
+		_, _, err = backend.GetLatestBlock(valueCtx, false)
 		suite.Require().Error(err)
 	})
 }
