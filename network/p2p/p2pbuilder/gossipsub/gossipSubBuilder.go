@@ -347,7 +347,10 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, e
 		}
 
 		g.scoreOptionConfig.SetRegisterNotificationConsumerFunc(inspectorSuite.AddInvalidControlMessageConsumer)
-		scoreOpt = scoring.NewScoreOption(g.scoreOptionConfig, subscriptionProvider)
+		scoreOpt, err = scoring.NewScoreOption(g.scoreOptionConfig, subscriptionProvider)
+		if err != nil {
+			return nil, fmt.Errorf("could not create gossipsub score option: %w", err)
+		}
 		gossipSubConfigs.WithScoreOption(scoreOpt)
 
 		if g.gossipSubScoreTracerInterval > 0 {

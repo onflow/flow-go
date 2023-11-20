@@ -382,7 +382,7 @@ func (c *ScoreOptionConfig) OverrideDecayInterval(interval time.Duration) {
 }
 
 // NewScoreOption creates a new penalty option with the given configuration.
-func NewScoreOption(cfg *ScoreOptionConfig, provider p2p.SubscriptionProvider) *ScoreOption {
+func NewScoreOption(cfg *ScoreOptionConfig, provider p2p.SubscriptionProvider) (*ScoreOption, error) {
 	throttledSampler := logging.BurstSampler(MaxDebugLogs, time.Second)
 	logger := cfg.logger.With().
 		Str("module", "pubsub_score_option").
@@ -392,7 +392,7 @@ func NewScoreOption(cfg *ScoreOptionConfig, provider p2p.SubscriptionProvider) *
 			DebugSampler: throttledSampler,
 		})
 	validator := NewSubscriptionValidator(cfg.logger, provider)
-	scoreRegistry := NewGossipSubAppSpecificScoreRegistry(&GossipSubAppSpecificScoreRegistryConfig{
+	scoreRegistry, err := NewGossipSubAppSpecificScoreRegistry(&GossipSubAppSpecificScoreRegistryConfig{
 		Logger:     logger,
 		Penalty:    DefaultGossipSubCtrlMsgPenaltyValue(),
 		Validator:  validator,
@@ -402,6 +402,11 @@ func NewScoreOption(cfg *ScoreOptionConfig, provider p2p.SubscriptionProvider) *
 			return netcache.NewGossipSubSpamRecordCache(cfg.cacheSize, cfg.logger, cfg.cacheMetrics, DefaultDecayFunction())
 		},
 	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create gossipsub app specific score registry: %w", err)
+	}
+
 	s := &ScoreOption{
 		logger:          logger,
 		validator:       validator,
@@ -459,7 +464,7 @@ func NewScoreOption(cfg *ScoreOptionConfig, provider p2p.SubscriptionProvider) *
 		s.logger.Info().Msg("score registry stopped")
 	}).Build()
 
-	return s
+	return s, nil
 }
 
 func (s *ScoreOption) BuildFlowPubSubScoreOption() (*pubsub.PeerScoreParams, *pubsub.PeerScoreThresholds) {

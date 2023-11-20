@@ -480,7 +480,11 @@ func newGossipSubAppSpecificScoreRegistry(t *testing.T, opts ...func(*scoring.Go
 	for _, opt := range opts {
 		opt(cfg)
 	}
-	return scoring.NewGossipSubAppSpecificScoreRegistry(cfg), cache
+
+	reg, err := scoring.NewGossipSubAppSpecificScoreRegistry(cfg)
+	require.NoError(t, err, "failed to create GossipSubAppSpecificScoreRegistry")
+
+	return reg, cache
 }
 
 // penaltyValueFixtures returns a set of penalty values for testing purposes.

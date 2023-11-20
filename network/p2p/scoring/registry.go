@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
 
@@ -163,7 +164,13 @@ type GossipSubAppSpecificScoreRegistryConfig struct {
 // Returns:
 //
 //	a new GossipSubAppSpecificScoreRegistry.
-func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegistryConfig) *GossipSubAppSpecificScoreRegistry {
+//
+// error: if the configuration is invalid, an error is returned; any returned error is an irrecoverable error and indicates a bug or misconfiguration.
+func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegistryConfig) (*GossipSubAppSpecificScoreRegistry, error) {
+	if err := validator.New().Struct(config); err != nil {
+		return nil, fmt.Errorf("invalid config: %w", err)
+	}
+
 	lg := config.Logger.With().Str("module", "app_score_registry").Logger()
 	store := queue.NewHeroStore(config.AppSpecificScoreWorkerPoolSize,
 		lg.With().Str("component", "app_specific_score_update").Logger(),
