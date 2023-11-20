@@ -196,6 +196,22 @@ func TestProtocolStateEntry_Copy(t *testing.T) {
 // TestBuildIdentityTable tests if BuildIdentityTable returns a correct identity, whenever we pass arguments with or without
 // overlap. It also tests if the function returns an error when the arguments are not ordered in the same order.
 func TestBuildIdentityTable(t *testing.T) {
+	t.Run("invalid-adjacent-identity-status", func(t *testing.T) {
+		targetEpochIdentities := unittest.IdentityListFixture(10).Sort(order.Canonical[flow.Identity])
+		adjacentEpochIdentities := unittest.IdentityListFixture(10).Sort(order.Canonical[flow.Identity])
+
+		for _, status := range []flow.EpochParticipationStatus{flow.EpochParticipationStatusActive, flow.EpochParticipationStatusEjected} {
+			identityList, err := flow.BuildIdentityTable(
+				targetEpochIdentities.ToSkeleton(),
+				flow.DynamicIdentityEntryListFromIdentities(targetEpochIdentities),
+				adjacentEpochIdentities.ToSkeleton(),
+				flow.DynamicIdentityEntryListFromIdentities(adjacentEpochIdentities),
+				status,
+			)
+			assert.Error(t, err)
+			assert.Empty(t, identityList)
+		}
+	})
 	t.Run("happy-path-no-identities-overlap", func(t *testing.T) {
 		targetEpochIdentities := unittest.IdentityListFixture(10).Sort(order.Canonical[flow.Identity])
 		adjacentEpochIdentities := unittest.IdentityListFixture(10).Sort(order.Canonical[flow.Identity])

@@ -376,6 +376,13 @@ func BuildIdentityTable(
 	adjacentEpochDynamicIdentities DynamicIdentityEntryList,
 	adjacentIdentitiesStatus EpochParticipationStatus,
 ) (IdentityList, error) {
+	if adjacentIdentitiesStatus != EpochParticipationStatusLeaving &&
+		adjacentIdentitiesStatus != EpochParticipationStatusJoining {
+		return nil, fmt.Errorf("invalid adjacent identity status, expect %s or %s, got %s",
+			EpochParticipationStatusLeaving.String(),
+			EpochParticipationStatusJoining.String(),
+			adjacentIdentitiesStatus)
+	}
 	targetEpochParticipants, err := ComposeFullIdentities(targetEpochIdentitySkeletons, targetEpochDynamicIdentities)
 	if err != nil {
 		return nil, fmt.Errorf("could not reconstruct participants for target epoch: %w", err)
