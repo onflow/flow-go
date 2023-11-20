@@ -72,6 +72,7 @@ type EpochSetup struct {
 	Participants       IdentityList   // all participants of the epoch
 	Assignments        AssignmentList // cluster assignment for the epoch
 	RandomSource       []byte         // source of randomness for epoch-specific setup tasks
+	TargetDuration     uint64         // desired real-world duration for the epoch [seconds]
 	TargetEndTime      uint64         // desired real-world end time for the epoch in UNIX time [seconds]
 }
 
