@@ -34,8 +34,8 @@ type DynamicProtocolState interface {
 	EpochStatus() *flow.EpochStatus
 	// Identities returns identities that can participate in current and next epochs.
 	// Set of Authorized identities are different depending on epoch state:
-	// staking phase - identities for current epoch + identities from previous epoch (with 0 weight)
-	// setup & commit phase - identities for current epoch + identities from next epoch (with 0 weight)
+	// staking phase - identities for current epoch + identities from previous epoch (with status `flow.EpochParticipationStatusLeaving`)
+	// setup & commit phase - identities for current epoch + identities from next epoch (with status `flow.EpochParticipationStatusJoining`)
 	Identities() flow.IdentityList
 	// GlobalParams returns params that are same for all nodes in the network.
 	GlobalParams() GlobalParams

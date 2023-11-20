@@ -17,7 +17,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// should be able to reach consensus when identity table contains nodes with 0 weight.
+// should be able to reach consensus when identity table contains nodes which are joining in next epoch.
 func TestUnweightedNode(t *testing.T) {
 	// stop after building 2 blocks to ensure we can tolerate 0-weight (joining next
 	// epoch) identities, but don't cross an epoch boundary
@@ -26,7 +26,7 @@ func TestUnweightedNode(t *testing.T) {
 	rootSnapshot := createRootSnapshot(t, participantsData)
 	consensusParticipants := NewConsensusParticipants(participantsData)
 
-	// add a consensus node to next epoch (it will have 0 weight in the current epoch)
+	// add a consensus node to next epoch (it will have `flow.EpochParticipationStatusJoining` status in the current epoch)
 	nextEpochParticipantsData := createConsensusIdentities(t, 1)
 	// epoch 2 identities includes:
 	// * same collection node from epoch 1, so cluster QCs are consistent

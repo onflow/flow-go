@@ -369,8 +369,8 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochSetupInvariants() {
 
 // TestProcessEpochSetupHappyPath tests if processing epoch setup when invariants are not violated updates internal structures.
 // It must produce valid identity table for current and next epochs.
-// For current epoch we should have identity table with all the nodes from the current epoch + nodes from the next epoch with 0 weight.
-// For next epoch we should have identity table with all the nodes from the next epoch + nodes from the current epoch with 0 weight.
+// For current epoch we should have identity table with all the nodes from the current epoch.
+// For next epoch we should have identity table with all the nodes from the next epoch.
 func (s *ProtocolStateMachineSuite) TestProcessEpochSetupHappyPath() {
 	setupParticipants := unittest.IdentityListFixture(5, unittest.WithAllRoles()).Sort(order.Canonical[flow.Identity])
 	setupParticipants[0].InitialWeight = 13

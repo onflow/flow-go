@@ -1429,10 +1429,12 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 					// all current epoch identities should match configuration from EpochSetup event
 					assert.ElementsMatch(t, epoch1Identities, identities.Filter(epoch1Identities.Selector()))
 
-					// should contain single next epoch identity with 0 weight
+					// should contain single next epoch identity with status `flow.EpochParticipationStatusJoining`
 					nextEpochIdentity := identities.Filter(filter.HasNodeID[flow.Identity](addedAtEpoch2.NodeID))[0]
-					assert.Equal(t, flow.EpochParticipationStatusJoining, nextEpochIdentity.EpochParticipationStatus) // should have 0 weight
-					assert.Equal(t, addedAtEpoch2.IdentitySkeleton, nextEpochIdentity.IdentitySkeleton)               // should be equal besides dynamic portion
+					assert.Equal(t, flow.EpochParticipationStatusJoining, nextEpochIdentity.EpochParticipationStatus,
+						"expect joining status since we are in setup & commit phase")
+					assert.Equal(t, addedAtEpoch2.IdentitySkeleton, nextEpochIdentity.IdentitySkeleton,
+						"expect skeleton to be identical")
 				})
 			}
 		})
@@ -1449,10 +1451,12 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 			// all current epoch identities should match configuration from EpochSetup event
 			assert.ElementsMatch(t, epoch2Identities, identities.Filter(epoch2Identities.Selector()))
 
-			// should contain single previous epoch identity with 0 weight
+			// should contain single previous epoch identity with status `flow.EpochParticipationStatusLeaving`.
 			lastEpochIdentity := identities.Filter(filter.HasNodeID[flow.Identity](removedAtEpoch2.NodeID))[0]
-			assert.Equal(t, flow.EpochParticipationStatusLeaving, lastEpochIdentity.EpochParticipationStatus) // should have leaving status
-			assert.Equal(t, removedAtEpoch2.IdentitySkeleton, lastEpochIdentity.IdentitySkeleton)             // should be equal besides dynamic portion
+			assert.Equal(t, flow.EpochParticipationStatusLeaving, lastEpochIdentity.EpochParticipationStatus,
+				"expect leaving status since we are in staking phase")
+			assert.Equal(t, removedAtEpoch2.IdentitySkeleton, lastEpochIdentity.IdentitySkeleton,
+				"expect skeleton to be identical")
 		})
 
 		t.Run("should not include previous epoch after staking phase", func(t *testing.T) {
@@ -1473,12 +1477,14 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 					// all current epoch identities should match configuration from EpochSetup event
 					assert.ElementsMatch(t, epoch2Identities, identities.Filter(epoch2Identities.Selector()))
 
-					// should contain next epoch identities with 0 weight
+					// should contain next epoch identities with status `flow.EpochParticipationStatusJoining`
 					for _, expected := range epoch3Identities {
 						actual, exists := identities.ByNodeID(expected.NodeID)
 						require.True(t, exists)
-						assert.Equal(t, flow.EpochParticipationStatusJoining, actual.EpochParticipationStatus) // should have 0 weight
-						assert.Equal(t, expected.IdentitySkeleton, actual.IdentitySkeleton)                    // should be equal besides dynamic portion
+						assert.Equal(t, flow.EpochParticipationStatusJoining, actual.EpochParticipationStatus,
+							"expect joining status since we are in setup & commit phase")
+						assert.Equal(t, expected.IdentitySkeleton, actual.IdentitySkeleton,
+							"expect skeleton to be identical")
 					}
 				})
 			}

@@ -167,11 +167,11 @@ func NewRichProtocolStateEntry(
 
 	// if we are in staking phase (i.e. protocolState.NextEpoch == nil):
 	//  (1) Full identity table for current epoch contains active identities from current epoch.
-	//      If previous epoch exists, we add nodes from previous epoch that are leaving in the current epoch with 0 weight.
+	//      If previous epoch exists, we add nodes from previous epoch that are leaving in the current epoch with `EpochParticipationStatusLeaving` status.
 	// otherwise, we are in epoch setup or epoch commit phase (i.e. protocolState.NextEpoch ≠ nil):
-	//  (2a) full identity table for current is active identities from current epoch + nodes joining in next epoch with 0 weight
+	//  (2a) full identity table for current is active identities from current epoch + nodes joining in next epoch with `EpochParticipationStatusJoining` status.
 	//  (2b) furthermore, we also build the full identity table for the next epoch's staking phase:
-	//    active identities from next epoch + nodes from current epoch that are leaving at the end of the current epoch with 0 weight
+	//    active identities from next epoch + nodes from current epoch that are leaving at the end of the current epoch with `flow.EpochParticipationStatusLeaving` status.
 	var err error
 	nextEpoch := protocolState.NextEpoch
 	if nextEpoch == nil { // in staking phase: build full identity table for current epoch according to (1)

@@ -73,7 +73,7 @@ func (s *ReceiptValidationSuite) TestReceiptNoIdentity() {
 	s.Assert().True(engine.IsInvalidInputError(err))
 }
 
-// TestReceiptFromNonActiveNode tests that we reject receipt from non active node
+// TestReceiptFromNonActiveNode tests that we reject receipt from non-active node
 func (s *ReceiptValidationSuite) TestReceiptFromNonActiveNode() {
 	valSubgrph := s.ValidSubgraphFixture()
 	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID),
