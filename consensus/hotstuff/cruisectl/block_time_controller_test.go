@@ -50,6 +50,7 @@ func TestBlockTimeController(t *testing.T) {
 	suite.Run(t, new(BlockTimeControllerSuite))
 }
 
+// EpochDurationSeconds returns the number of seconds in the epoch (1hr).
 func (bs *BlockTimeControllerSuite) EpochDurationSeconds() uint64 {
 	return 60 * 60
 }
