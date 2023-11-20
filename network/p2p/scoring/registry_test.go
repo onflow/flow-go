@@ -27,7 +27,7 @@ import (
 // app specific reward. This is the default reward for a staked peer that has valid subscriptions and has not been
 // penalized.
 func TestNoPenaltyRecord(t *testing.T) {
-	peerID := peer.ID("peer-1")
+	peerID := unittest.PeerIdFixture(t)
 	reg, spamRecords := newGossipSubAppSpecificScoreRegistry(
 		t,
 		withStakedIdentity(peerID),
@@ -68,7 +68,7 @@ func TestPeerWithSpamRecord(t *testing.T) {
 }
 
 func testPeerWithSpamRecord(t *testing.T, messageType p2pmsg.ControlMessageType, expectedPenalty float64) {
-	peerID := peer.ID("peer-1")
+	peerID := unittest.PeerIdFixture(t)
 	reg, spamRecords := newGossipSubAppSpecificScoreRegistry(
 		t,
 		withStakedIdentity(peerID),
@@ -122,7 +122,7 @@ func TestSpamRecord_With_UnknownIdentity(t *testing.T) {
 // testSpamRecordWithUnknownIdentity tests the app specific penalty computation of the node when there is a spam record for the peer id and
 // the peer id has an unknown identity.
 func testSpamRecordWithUnknownIdentity(t *testing.T, messageType p2pmsg.ControlMessageType, expectedPenalty float64) {
-	peerID := peer.ID("peer-1")
+	peerID := unittest.PeerIdFixture(t)
 	reg, spamRecords := newGossipSubAppSpecificScoreRegistry(
 		t,
 		withUnknownIdentity(peerID),
@@ -174,7 +174,7 @@ func TestSpamRecord_With_SubscriptionPenalty(t *testing.T) {
 // testSpamRecordWithUnknownIdentity tests the app specific penalty computation of the node when there is a spam record for the peer id and
 // the peer id has an invalid subscription as well.
 func testSpamRecordWithSubscriptionPenalty(t *testing.T, messageType p2pmsg.ControlMessageType, expectedPenalty float64) {
-	peerID := peer.ID("peer-1")
+	peerID := unittest.PeerIdFixture(t)
 	reg, spamRecords := newGossipSubAppSpecificScoreRegistry(
 		t,
 		withStakedIdentity(peerID),
@@ -271,7 +271,7 @@ func TestSpamPenaltyDecaysInCache(t *testing.T) {
 // TestSpamPenaltyDecayToZero tests that the spam penalty decays to zero over time, and when the spam penalty of
 // a peer is set back to zero, its app specific penalty is also reset to the initial state.
 func TestSpamPenaltyDecayToZero(t *testing.T) {
-	peerID := peer.ID("peer-1")
+	peerID := unittest.PeerIdFixture(t)
 	reg, spamRecords := newGossipSubAppSpecificScoreRegistry(
 		t,
 		withStakedIdentity(peerID),
@@ -317,7 +317,7 @@ func TestSpamPenaltyDecayToZero(t *testing.T) {
 // TestPersistingUnknownIdentityPenalty tests that even though the spam penalty is decayed to zero, the unknown identity penalty
 // is persisted. This is because the unknown identity penalty is not decayed.
 func TestPersistingUnknownIdentityPenalty(t *testing.T) {
-	peerID := peer.ID("peer-1")
+	peerID := unittest.PeerIdFixture(t)
 	reg, spamRecords := newGossipSubAppSpecificScoreRegistry(
 		t,
 		withUnknownIdentity(peerID), // the peer id has an unknown identity.
@@ -374,7 +374,7 @@ func TestPersistingUnknownIdentityPenalty(t *testing.T) {
 // TestPersistingInvalidSubscriptionPenalty tests that even though the spam penalty is decayed to zero, the invalid subscription penalty
 // is persisted. This is because the invalid subscription penalty is not decayed.
 func TestPersistingInvalidSubscriptionPenalty(t *testing.T) {
-	peerID := peer.ID("peer-1")
+	peerID := unittest.PeerIdFixture(t)
 	reg, spamRecords := newGossipSubAppSpecificScoreRegistry(
 		t,
 		withStakedIdentity(peerID),
@@ -425,40 +425,47 @@ func TestPersistingInvalidSubscriptionPenalty(t *testing.T) {
 
 // TestSpamRecordDecayAdjustment ensures that spam record decay is increased each time a peers score reaches the scoring.IncreaseDecayThreshold eventually
 // sustained misbehavior will result in the spam record decay reaching the minimum decay speed .99
-//func TestSpamRecordDecayAdjustment(t *testing.T) {
-//	flowConfig, err := config.DefaultConfig()
-//	require.NoError(t, err)
-//	scoringRegistryConfig := flowConfig.NetworkConfig.GossipSubConfig.GossipSubScoringRegistryConfig
-//	// increase configured decay threshold incrementer so that the decay is increased faster
-//	scoringRegistryConfig.DecayThresholdIncrementer = .1
-//	peerID := peer.ID("peer-1")
-//	reg, spamRecords := newScoringRegistry(
-//		t,
-//		scoringRegistryConfig,
-//		withStakedIdentity(peerID),
-//		withValidSubscriptions(peerID))
-//
-//	// initially, the spamRecords should not have the peer id.
-//	assert.False(t, spamRecords.Has(peerID))
-//
-//	// eventually we should reach the max spam penalty during sustained misbehaviors from a peer
-//	require.Eventually(t, func() bool {
-//		reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
-//			PeerID:  peerID,
-//			MsgType: p2pmsg.CtrlMsgGraft,
-//		})
-//		record, err, ok := spamRecords.Get(peerID)
-//		require.NoError(t, err)
-//		require.True(t, ok)
-//		return record.Decay == scoring.MaximumSpamRecordDecaySpeed
-//	}, 10*time.Second, 500*time.Millisecond)
-//
-//	// the spam record decay should have reached max possible decay
-//	record, err, ok := spamRecords.Get(peerID) // get the record from the spamRecords.
-//	require.NoError(t, err)
-//	require.True(t, ok)
-//	assert.Equal(t, record.Decay, scoring.MaximumSpamRecordDecaySpeed)
-//}
+func TestSpamRecordDecayAdjustment(t *testing.T) {
+	flowConfig, err := config.DefaultConfig()
+	require.NoError(t, err)
+	scoringRegistryConfig := flowConfig.NetworkConfig.GossipSubConfig.GossipSubScoringRegistryConfig
+	// increase configured DecayRateDecrement so that the decay time is increased faster
+	scoringRegistryConfig.DecayRateDecrement = .1
+
+	peerID := unittest.PeerIdFixture(t)
+	reg, spamRecords := newScoringRegistry(
+		t,
+		scoringRegistryConfig,
+		withStakedIdentity(peerID),
+		withValidSubscriptions(peerID))
+
+	// initially, the spamRecords should not have the peer id.
+	assert.False(t, spamRecords.Has(peerID))
+
+	// simulate sustained malicious activity, eventually the decay speed
+	// for a spam record should be reduced to the MinimumSpamPenaltyDecaySpeed
+	require.Eventually(t, func() bool {
+		reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
+			PeerID:  peerID,
+			MsgType: p2pmsg.CtrlMsgIWant,
+		})
+		record, err, ok := spamRecords.Get(peerID)
+		fmt.Println(record.Penalty, record.Decay, record.CanAdjustDecay)
+		require.NoError(t, err)
+		require.True(t, ok)
+		return record.Decay == scoring.MinimumSpamPenaltyDecaySpeed
+	}, 5*time.Second, 100*time.Millisecond)
+
+	// simulate sustained good behavior, each time the spam record is read from the cache
+	// using Get method the record penalty will be decayed until it is eventually reset to
+	// 0 at this point the decay speed for the record should be reset to MaximumSpamPenaltyDecaySpeed
+	require.Eventually(t, func() bool {
+		record, err, ok := spamRecords.Get(peerID)
+		require.NoError(t, err)
+		require.True(t, ok)
+		return record.Decay == scoring.MaximumSpamPenaltyDecaySpeed
+	}, 5*time.Second, 500*time.Millisecond)
+}
 
 // withStakedIdentity returns a function that sets the identity provider to return an staked identity for the given peer id.
 // It is used for testing purposes, and causes the given peer id to benefit from the staked identity reward in GossipSub.

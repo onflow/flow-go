@@ -241,6 +241,11 @@ func TestDefaultDecayFunction(t *testing.T) {
 			},
 		},
 	}
+
+	// add test cases
+	// update test cases to utilize new spam record fields
+	// penalty is below slower decay threshold, in this case decay speed should be adjusted
+
 	flowConfig, err := config.DefaultConfig()
 	assert.NoError(t, err)
 	scoringRegistryConfig := flowConfig.NetworkConfig.GossipSubConfig.GossipSubScoringRegistryConfig

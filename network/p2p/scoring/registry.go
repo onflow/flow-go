@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	// MinSpamPenaltyDecaySpeed is minimum speed at which the spam penalty value of a peer is decayed.
+	// MinimumSpamPenaltyDecaySpeed is minimum speed at which the spam penalty value of a peer is decayed.
 	// Spam record will be initialized with a decay value between .5 , .7 and this value will then be decayed up to .99 on consecutive misbehavior's,
 	// The maximum decay value decays the penalty by 1% every second. The decay is applied geometrically, i.e., `newPenalty = oldPenalty * decay`, hence, the higher decay value
 	// indicates a lower decay speed, i.e., it takes more heartbeat intervals to decay a penalty back to zero when the decay value is high.
@@ -39,11 +39,11 @@ const (
 	//     n > log( 0.001 ) / log( 0.99 )
 	//     n > -3 / log( 0.99 )
 	//     n >  458.22
-	MinSpamPenaltyDecaySpeed = 0.99
-	// MaximumSpamRecordDecaySpeed represents the maximum rate at which the spam penalty value of a peer decays. Decay speeds increase
+	MinimumSpamPenaltyDecaySpeed = 0.99
+	// MaximumSpamPenaltyDecaySpeed represents the maximum rate at which the spam penalty value of a peer decays. Decay speeds increase
 	// during sustained malicious activity, leading to a slower recovery of the app-specific score for the penalized node. Conversely,
 	// decay speeds decrease, allowing faster recoveries, when nodes exhibit fleeting misbehavior.
-	MaximumSpamRecordDecaySpeed = 0.8
+	MaximumSpamPenaltyDecaySpeed = 0.8
 	// skipDecayThreshold is the threshold for which when the negative penalty is above this value, the decay function will not be called.
 	// instead, the penalty will be set to 0. This is to prevent the penalty from keeping a small negative value for a long time.
 	skipDecayThreshold = -0.1
@@ -57,6 +57,9 @@ const (
 	iWantMisbehaviourPenalty = -10
 	// rpcPublishMessageMisbehaviourPenalty is the penalty applied to the application specific penalty when a peer conducts a RpcPublishMessageMisbehaviourPenalty misbehaviour.
 	rpcPublishMessageMisbehaviourPenalty = -10
+
+	decayAdjustable    = true
+	decayNotAdjustable = false
 )
 
 type SpamRecordInitFunc func() p2p.GossipSubSpamRecord
@@ -311,7 +314,8 @@ func DefaultDecayFunction(slowerDecayPenaltyThreshold, decayRateDecrement float6
 		if record.Penalty > skipDecayThreshold {
 			// penalty is negative but greater than the threshold, we set it to 0.
 			record.Penalty = 0
-			record.CanAdjustDecay = true // everytime the penalty is decayed to zero, the decay factor is adjustable
+			record.Decay = MaximumSpamPenaltyDecaySpeed
+			record.CanAdjustDecay = decayAdjustable // everytime the penalty is decayed to zero, the decay factor is adjustable
 			return record, nil
 		}
 
@@ -324,9 +328,9 @@ func DefaultDecayFunction(slowerDecayPenaltyThreshold, decayRateDecrement float6
 
 		if record.Penalty <= slowerDecayPenaltyThreshold && record.CanAdjustDecay {
 			// reduces the decay speed flooring at MinimumSpamRecordDecaySpeed
-			record.Decay = math.Min(record.Decay+decayRateDecrement, MinSpamPenaltyDecaySpeed)
+			record.Decay = math.Min(record.Decay+decayRateDecrement, MinimumSpamPenaltyDecaySpeed)
 			// decay factor won't be decayed till the next time the penalty decays to zero.
-			record.CanAdjustDecay = false
+			record.CanAdjustDecay = decayNotAdjustable
 		}
 
 		return record, nil
@@ -338,7 +342,8 @@ func DefaultDecayFunction(slowerDecayPenaltyThreshold, decayRateDecrement float6
 //   - a gossipsub spam record with the default decay value and 0 penalty.
 func InitAppScoreRecordState() p2p.GossipSubSpamRecord {
 	return p2p.GossipSubSpamRecord{
-		Decay:   MaximumSpamRecordDecaySpeed,
-		Penalty: 0,
+		Decay:          MaximumSpamPenaltyDecaySpeed,
+		Penalty:        0,
+		CanAdjustDecay: decayAdjustable,
 	}
 }
