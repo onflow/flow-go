@@ -49,7 +49,7 @@ type Builder struct {
 	subscriptionProviderParam *p2pconf.SubscriptionProviderParameters
 	idProvider                module.IdentityProvider
 	routingSystem             routing.Routing
-	rpcInspectorConfig        *p2pconf.GossipSubRPCInspectorsConfig
+	rpcInspectorConfig        *p2pconf.RpcInspectorParameters
 	rpcInspectorSuiteFactory  p2p.GossipSubRpcInspectorSuiteFactoryFunc
 }
 
@@ -184,7 +184,7 @@ func NewGossipSubBuilder(
 	networkType network.NetworkingType,
 	sporkId flow.Identifier,
 	idProvider module.IdentityProvider,
-	rpcInspectorConfig *p2pconf.GossipSubRPCInspectorsConfig,
+	rpcInspectorConfig *p2pconf.RpcInspectorParameters,
 	subscriptionProviderPrams *p2pconf.SubscriptionProviderParameters,
 	rpcTracker p2p.RpcControlTracking) *Builder {
 	lg := logger.With().
@@ -238,7 +238,7 @@ func defaultInspectorSuite(rpcTracker p2p.RpcControlTracking) p2p.GossipSubRpcIn
 		ctx irrecoverable.SignalerContext,
 		logger zerolog.Logger,
 		sporkId flow.Identifier,
-		inspectorCfg *p2pconf.GossipSubRPCInspectorsConfig,
+		inspectorCfg *p2pconf.RpcInspectorParameters,
 		gossipSubMetrics module.GossipSubMetrics,
 		heroCacheMetricsFactory metrics.HeroCacheMetricsFactory,
 		networkType network.NetworkingType,

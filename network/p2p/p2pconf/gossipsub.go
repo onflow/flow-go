@@ -69,8 +69,8 @@ var GossipSubConfigKeys = []string{RpcInspectorKey, RpcTracerKey, PeerScoringKey
 
 // GossipSubConfig is the configuration for the GossipSub pubsub implementation.
 type GossipSubConfig struct {
-	// GossipSubRPCInspectorsConfig configuration for all gossipsub RPC control message inspectors.
-	RpcInspector GossipSubRPCInspectorsConfig `mapstructure:"rpc-inspector"`
+	// RpcInspectorParameters configuration for all gossipsub RPC control message inspectors.
+	RpcInspector RpcInspectorParameters `mapstructure:"rpc-inspector"`
 
 	// GossipSubTracerParameters is the configuration for the gossipsub tracer. GossipSub tracer is used to trace the local mesh events and peer scores.
 	RpcTracer GossipSubTracerParameters `mapstructure:"rpc-tracer"`

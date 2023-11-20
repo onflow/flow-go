@@ -105,7 +105,7 @@ type GossipSubRpcInspectorSuiteFactoryFunc func(
 	irrecoverable.SignalerContext,
 	zerolog.Logger,
 	flow.Identifier,
-	*p2pconf.GossipSubRPCInspectorsConfig,
+	*p2pconf.RpcInspectorParameters,
 	module.GossipSubMetrics,
 	metrics.HeroCacheMetricsFactory,
 	flownet.NetworkingType,
