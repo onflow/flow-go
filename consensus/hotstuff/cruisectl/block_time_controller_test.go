@@ -660,17 +660,6 @@ func (bs *BlockTimeControllerSuite) Test_vs_PythonSimulation() {
 		proposalTiming := bs.ctl.GetProposalTiming()
 		tpt := proposalTiming.TargetPublicationTime(uint64(v+1), time.Now(), observedBlock.Block.BlockID) // value for `timeViewEntered` should be irrelevant here
 
-		/*
-			This test is failing with:
-			```
-			Error:      	Relative error is too high: 1e-05 (expected)
-			        	            	        < 0.2328132599339719 (actual)
-			        	Test:       	TestBlockTimeController/Test_vs_PythonSimulation
-			        	Messages:   	implementations deviate for view 1
-			```
-
-			Because by using unix time internal to the controller, we lose <1s precision when measuring view durations.
-		*/
 		controllerTargetedViewDuration := tpt.Sub(observedBlock.TimeObserved).Seconds()
 		bs.T().Logf("%d: ctl=%f\tref=%f\tdiff=%f", v, controllerTargetedViewDuration, ref.controllerTargetedViewDuration[v], controllerTargetedViewDuration-ref.controllerTargetedViewDuration[v])
 		require.InEpsilon(bs.T(), ref.controllerTargetedViewDuration[v], controllerTargetedViewDuration, 1e-5, "implementations deviate for view %d", v) // ideal view time
