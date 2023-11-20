@@ -35,9 +35,11 @@ type TimedBlock struct {
 // the first view of a new epoch, or the EpochSetup phase of the current epoch.
 type epochInfo struct {
 	curEpochFirstView      uint64
-	curEpochFinalView      uint64  // F[v] - the final view of the current epoch
+	curEpochFinalView      uint64 // F[v] - the final view of the current epoch
+	curEpochDuration       uint64
 	curEpochTargetEndTime  uint64  // T[v] - the target end time of the current epoch, represented as Unix Time [seconds]
 	nextEpochFinalView     *uint64 // the final view of the next epoch
+	nextEpochDuration      *uint64
 	nextEpochTargetEndTime *uint64 // the target end time of the next epoch, represented as Unix Time [seconds]
 }
 
@@ -46,7 +48,7 @@ type epochInfo struct {
 // Instead, internally within the controller, we work with float64 in units of seconds.
 func (epoch *epochInfo) targetViewTime() float64 {
 	// TODO we need to pass TargetDuration via service event as well :(
-	return epochLength.Seconds() / float64(epoch.curEpochFinalView-epoch.curEpochFirstView+1)
+	return float64(epoch.curEpochDuration) / float64(epoch.curEpochFinalView-epoch.curEpochFirstView+1)
 }
 
 // fractionComplete returns the percentage of views completed of the epoch for the given curView.

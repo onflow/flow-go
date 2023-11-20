@@ -471,16 +471,16 @@ func (bs *BlockTimeControllerSuite) TestProposalDelay_BehindSchedule() {
 	for view := bs.initialView + 1; view < bs.ctl.curEpochFinalView; view++ {
 		// hold the instantaneous error constant for each view
 		receivedParentBlockAt = receivedParentBlockAt + uint64(bs.ctl.targetViewTime())
-		timedBlock := makeTimedBlock(view, unittest.IdentifierFixture(), receivedParentBlockAt)
+		timedBlock := makeTimedBlock(view, unittest.IdentifierFixture(), time.Unix(int64(receivedParentBlockAt), 0))
 		err := bs.ctl.measureViewDuration(timedBlock)
 		require.NoError(bs.T(), err)
 
 		// compute proposal delay:
 		pubTime := bs.ctl.GetProposalTiming().TargetPublicationTime(view+1, time.Now().UTC(), timedBlock.Block.BlockID) // simulate building a child of `timedBlock`
-		delay := pubTime.Sub(receivedParentBlockAt)
+		delay := pubTime.Sub(time.Unix(int64(receivedParentBlockAt), 0))
 		// expecting decreasing GetProposalTiming
 		assert.LessOrEqual(bs.T(), delay, lastProposalDelay)
-		lastProposalDelay = delay
+		lastProposalDelay = delay.
 
 		// transition views until the end of the epoch, or for 100 views
 		if view-bs.initialView >= 100 {
