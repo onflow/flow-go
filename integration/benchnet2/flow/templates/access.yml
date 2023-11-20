@@ -34,7 +34,7 @@ spec:
         service: flow
         networkId: {{ $.Values.networkId }}
     spec:
-      terminationGracePeriodSeconds: {{ .Values.access.defaults.terminationGracePeriodSeconds }}
+      terminationGracePeriodSeconds: 180
       nodeSelector:
         iam.gke.io/gke-metadata-server-enabled: "true"
       serviceAccountName: "benchnet-configuration-reader"
