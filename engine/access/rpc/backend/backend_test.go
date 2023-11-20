@@ -3,8 +3,9 @@ package backend
 import (
 	"context"
 	"fmt"
-	statepkg "github.com/onflow/flow-go/state"
 	"testing"
+
+	statepkg "github.com/onflow/flow-go/state"
 
 	"github.com/dgraph-io/badger/v2"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
