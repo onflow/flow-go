@@ -1,11 +1,11 @@
 package scoring_test
 
 import (
-	"github.com/onflow/flow-go/model/flow"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/p2p/scoring"
