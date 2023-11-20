@@ -128,7 +128,7 @@ func deployContracts(
 	rt runtime.Runtime,
 	contractsAddress flow.Address,
 	runtimeInterface *TestRuntimeInterface,
-	env runtime.Environment,
+	transactionEnvironment runtime.Environment,
 	nextTransactionLocation func() common.TransactionLocation,
 ) {
 
@@ -203,7 +203,7 @@ func deployContracts(
 			},
 			runtime.Context{
 				Interface:   runtimeInterface,
-				Environment: env,
+				Environment: transactionEnvironment,
 				Location:    nextTransactionLocation(),
 			},
 		)
@@ -212,17 +212,40 @@ func deployContracts(
 
 }
 
+func newEVMTransactionEnvironment(handler types.ContractHandler, service flow.Address) runtime.Environment {
+	transactionEnvironment := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
+
+	stdlib.SetupEnvironment(
+		transactionEnvironment,
+		handler,
+		service,
+	)
+
+	return transactionEnvironment
+}
+
+func newEVMScriptEnvironment(handler types.ContractHandler, service flow.Address) runtime.Environment {
+	scriptEnvironment := runtime.NewScriptInterpreterEnvironment(runtime.Config{})
+
+	stdlib.SetupEnvironment(
+		scriptEnvironment,
+		handler,
+		service,
+	)
+
+	return scriptEnvironment
+}
+
 func TestEVMAddressConstructionAndReturn(t *testing.T) {
 
 	t.Parallel()
 
 	handler := &testContractHandler{}
 
-	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
-
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	stdlib.SetupEnvironment(env, handler, contractsAddress)
+	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewInterpreterRuntime(runtime.Config{})
 
@@ -279,7 +302,14 @@ func TestEVMAddressConstructionAndReturn(t *testing.T) {
 
 	// Deploy contracts
 
-	deployContracts(t, rt, contractsAddress, runtimeInterface, env, nextTransactionLocation)
+	deployContracts(
+		t,
+		rt,
+		contractsAddress,
+		runtimeInterface,
+		transactionEnvironment,
+		nextTransactionLocation,
+	)
 
 	// Run script
 
@@ -292,7 +322,7 @@ func TestEVMAddressConstructionAndReturn(t *testing.T) {
 		},
 		runtime.Context{
 			Interface:   runtimeInterface,
-			Environment: env,
+			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
 		},
 	)
@@ -317,11 +347,10 @@ func TestBalanceConstructionAndReturn(t *testing.T) {
 
 	handler := &testContractHandler{}
 
-	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
-
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	stdlib.SetupEnvironment(env, handler, contractsAddress)
+	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewInterpreterRuntime(runtime.Config{})
 
@@ -365,7 +394,14 @@ func TestBalanceConstructionAndReturn(t *testing.T) {
 
 	// Deploy contracts
 
-	deployContracts(t, rt, contractsAddress, runtimeInterface, env, nextTransactionLocation)
+	deployContracts(
+		t,
+		rt,
+		contractsAddress,
+		runtimeInterface,
+		transactionEnvironment,
+		nextTransactionLocation,
+	)
 
 	// Run script
 
@@ -381,7 +417,7 @@ func TestBalanceConstructionAndReturn(t *testing.T) {
 		},
 		runtime.Context{
 			Interface:   runtimeInterface,
-			Environment: env,
+			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
 		},
 	)
@@ -440,11 +476,10 @@ func TestEVMRun(t *testing.T) {
 		},
 	}
 
-	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
-
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	stdlib.SetupEnvironment(env, handler, contractsAddress)
+	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewInterpreterRuntime(runtime.Config{})
 
@@ -489,7 +524,14 @@ func TestEVMRun(t *testing.T) {
 
 	// Deploy contracts
 
-	deployContracts(t, rt, contractsAddress, runtimeInterface, env, nextTransactionLocation)
+	deployContracts(
+		t,
+		rt,
+		contractsAddress,
+		runtimeInterface,
+		transactionEnvironment,
+		nextTransactionLocation,
+	)
 
 	// Run script
 
@@ -500,7 +542,7 @@ func TestEVMRun(t *testing.T) {
 		},
 		runtime.Context{
 			Interface:   runtimeInterface,
-			Environment: env,
+			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
 		},
 	)
@@ -515,11 +557,10 @@ func TestEVMCreateBridgedAccount(t *testing.T) {
 
 	handler := &testContractHandler{}
 
-	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
-
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	stdlib.SetupEnvironment(env, handler, contractsAddress)
+	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewInterpreterRuntime(runtime.Config{})
 
@@ -570,7 +611,14 @@ func TestEVMCreateBridgedAccount(t *testing.T) {
 
 	// Deploy contracts
 
-	deployContracts(t, rt, contractsAddress, runtimeInterface, env, nextTransactionLocation)
+	deployContracts(
+		t,
+		rt,
+		contractsAddress,
+		runtimeInterface,
+		transactionEnvironment,
+		nextTransactionLocation,
+	)
 
 	// Run script
 
@@ -580,7 +628,7 @@ func TestEVMCreateBridgedAccount(t *testing.T) {
 		},
 		runtime.Context{
 			Interface:   runtimeInterface,
-			Environment: env,
+			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
 		},
 	)
@@ -636,11 +684,10 @@ func TestBridgedAccountCall(t *testing.T) {
 		},
 	}
 
-	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
-
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	stdlib.SetupEnvironment(env, handler, contractsAddress)
+	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewInterpreterRuntime(runtime.Config{})
 
@@ -694,7 +741,14 @@ func TestBridgedAccountCall(t *testing.T) {
 
 	// Deploy contracts
 
-	deployContracts(t, rt, contractsAddress, runtimeInterface, env, nextTransactionLocation)
+	deployContracts(
+		t,
+		rt,
+		contractsAddress,
+		runtimeInterface,
+		transactionEnvironment,
+		nextTransactionLocation,
+	)
 
 	// Run script
 
@@ -704,7 +758,7 @@ func TestBridgedAccountCall(t *testing.T) {
 		},
 		runtime.Context{
 			Interface:   runtimeInterface,
-			Environment: env,
+			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
 		},
 	)
@@ -719,10 +773,12 @@ func TestBridgedAccountCall(t *testing.T) {
 	require.Equal(t, expected, actual)
 }
 
-// TODO: deposit non-zero amount
 func TestEVMAddressDeposit(t *testing.T) {
 
 	t.Parallel()
+
+	expectedBalance, err := cadence.NewUFix64FromParts(1, 23000000)
+	require.NoError(t, err)
 
 	var deposited bool
 
@@ -736,17 +792,20 @@ func TestEVMAddressDeposit(t *testing.T) {
 				address: fromAddress,
 				deposit: func(vault *types.FLOWTokenVault) {
 					deposited = true
-					assert.Equal(t, types.Balance(0), vault.Balance())
+					assert.Equal(
+						t,
+						types.Balance(expectedBalance),
+						vault.Balance(),
+					)
 				},
 			}
 		},
 	}
 
-	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
-
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	stdlib.SetupEnvironment(env, handler, contractsAddress)
+	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewInterpreterRuntime(runtime.Config{})
 
@@ -756,10 +815,15 @@ func TestEVMAddressDeposit(t *testing.T) {
 
       access(all)
       fun main() {
+          let admin = getAuthAccount(0x1)
+              .borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+          let minter <- admin.createNewMinter(allowedAmount: 1.23)
+          let vault <- minter.mintTokens(amount: 1.23)
+          destroy minter
+
           let address = EVM.EVMAddress(
               bytes: [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
           )
-          let vault <- FlowToken.createEmptyVault() as! @FlowToken.Vault
           address.deposit(from: <-vault)
       }
    `)
@@ -795,17 +859,24 @@ func TestEVMAddressDeposit(t *testing.T) {
 
 	// Deploy contracts
 
-	deployContracts(t, rt, contractsAddress, runtimeInterface, env, nextTransactionLocation)
+	deployContracts(
+		t,
+		rt,
+		contractsAddress,
+		runtimeInterface,
+		transactionEnvironment,
+		nextTransactionLocation,
+	)
 
 	// Run script
 
-	_, err := rt.ExecuteScript(
+	_, err = rt.ExecuteScript(
 		runtime.Script{
 			Source: script,
 		},
 		runtime.Context{
 			Interface:   runtimeInterface,
-			Environment: env,
+			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
 		},
 	)
@@ -818,6 +889,13 @@ func TestBridgedAccountWithdraw(t *testing.T) {
 
 	t.Parallel()
 
+	expectedDepositBalance, err := cadence.NewUFix64FromParts(2, 34000000)
+	require.NoError(t, err)
+
+	expectedWithdrawBalance, err := cadence.NewUFix64FromParts(1, 23000000)
+	require.NoError(t, err)
+
+	var deposited bool
 	var withdrew bool
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
@@ -826,12 +904,22 @@ func TestBridgedAccountWithdraw(t *testing.T) {
 		flowTokenAddress: common.Address(contractsAddress),
 		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
 			assert.Equal(t, types.Address{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
-			assert.True(t, isAuthorized)
+			assert.Equal(t, deposited, isAuthorized)
 
 			return &testFlowAccount{
 				address: fromAddress,
+				deposit: func(vault *types.FLOWTokenVault) {
+					deposited = true
+					assert.Equal(t,
+						types.Balance(expectedDepositBalance),
+						vault.Balance(),
+					)
+				},
 				withdraw: func(balance types.Balance) *types.FLOWTokenVault {
-					assert.Equal(t, types.Balance(0), balance)
+					assert.Equal(t,
+						types.Balance(expectedWithdrawBalance),
+						balance,
+					)
 					withdrew = true
 					return types.NewFlowTokenVault(balance)
 				},
@@ -839,9 +927,8 @@ func TestBridgedAccountWithdraw(t *testing.T) {
 		},
 	}
 
-	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
-
-	stdlib.SetupEnvironment(env, handler, contractsAddress)
+	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewInterpreterRuntime(runtime.Config{})
 
@@ -851,11 +938,20 @@ func TestBridgedAccountWithdraw(t *testing.T) {
 
       access(all)
       fun main(): UFix64 {
+          let admin = getAuthAccount(0x1)
+              .borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+          let minter <- admin.createNewMinter(allowedAmount: 2.34)
+          let vault <- minter.mintTokens(amount: 2.34)
+          destroy minter
+
           let bridgedAccount <- EVM.createBridgedAccount()
-          let vault <- bridgedAccount.withdraw(balance: EVM.Balance(flow: 0.0))
-          let balance = vault.balance
+          bridgedAccount.address().deposit(from: <-vault)
+
+          let vault2 <- bridgedAccount.withdraw(balance: EVM.Balance(flow: 1.23))
+          let balance = vault2.balance
           destroy bridgedAccount
-          destroy vault
+          destroy vault2
+
           return balance
       }
    `)
@@ -891,7 +987,14 @@ func TestBridgedAccountWithdraw(t *testing.T) {
 
 	// Deploy contracts
 
-	deployContracts(t, rt, contractsAddress, runtimeInterface, env, nextTransactionLocation)
+	deployContracts(
+		t,
+		rt,
+		contractsAddress,
+		runtimeInterface,
+		transactionEnvironment,
+		nextTransactionLocation,
+	)
 
 	// Run script
 
@@ -901,15 +1004,15 @@ func TestBridgedAccountWithdraw(t *testing.T) {
 		},
 		runtime.Context{
 			Interface:   runtimeInterface,
-			Environment: env,
+			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
 		},
 	)
 	require.NoError(t, err)
 
-	require.Equal(t, cadence.UFix64(0), result)
-
-	require.True(t, withdrew)
+	assert.True(t, deposited)
+	assert.True(t, withdrew)
+	assert.Equal(t, expectedWithdrawBalance, result)
 }
 
 func TestBridgedAccountDeploy(t *testing.T) {
@@ -944,9 +1047,8 @@ func TestBridgedAccountDeploy(t *testing.T) {
 		},
 	}
 
-	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
-
-	stdlib.SetupEnvironment(env, handler, contractsAddress)
+	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
 
 	rt := runtime.NewInterpreterRuntime(runtime.Config{})
 
@@ -998,7 +1100,14 @@ func TestBridgedAccountDeploy(t *testing.T) {
 
 	// Deploy contracts
 
-	deployContracts(t, rt, contractsAddress, runtimeInterface, env, nextTransactionLocation)
+	deployContracts(
+		t,
+		rt,
+		contractsAddress,
+		runtimeInterface,
+		transactionEnvironment,
+		nextTransactionLocation,
+	)
 
 	// Run script
 
@@ -1008,7 +1117,7 @@ func TestBridgedAccountDeploy(t *testing.T) {
 		},
 		runtime.Context{
 			Interface:   runtimeInterface,
-			Environment: env,
+			Environment: scriptEnvironment,
 			Location:    nextScriptLocation(),
 		},
 	)

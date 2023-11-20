@@ -46,6 +46,11 @@ type ScriptExecutionState interface {
 	HasState(flow.StateCommitment) bool
 }
 
+// FinalizedExecutionState is an interface used to access the finalized execution state
+type FinalizedExecutionState interface {
+	GetHighestFinalizedExecuted() uint64
+}
+
 // TODO Many operations here are should be transactional, so we need to refactor this
 // to store a reference to DB and compose operations and procedures rather then
 // just being amalgamate of proxies for single transactions operation
