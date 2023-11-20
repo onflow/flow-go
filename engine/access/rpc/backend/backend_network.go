@@ -2,7 +2,9 @@ package backend
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/state"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -85,13 +87,21 @@ func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(_ context.Context, bl
 	snapshotByBlockId := b.state.AtBlockID(blockID)
 	snapshotHeadByBlockId, err := snapshotByBlockId.Head()
 	if err != nil {
-		return nil, err
+		if errors.Is(err, state.ErrUnknownSnapshotReference) {
+			return nil, status.Errorf(codes.NotFound, "failed to get a valid snapshot: %v", err)
+		}
+
+		return nil, status.Errorf(codes.Internal, "failed to get a valid snapshot: %v", err)
 	}
 
 	snapshotByHeight := b.state.AtHeight(snapshotHeadByBlockId.Height)
 	snapshotHeadByHeight, err := snapshotByHeight.Head()
 	if err != nil {
-		return nil, err
+		if errors.Is(err, state.ErrUnknownSnapshotReference) {
+			return nil, status.Errorf(codes.NotFound, "failed to get a valid snapshot: %v", err)
+		}
+
+		return nil, status.Errorf(codes.Internal, "failed to get a valid snapshot: %v", err)
 	}
 
 	if snapshotHeadByHeight.ID() != blockID {
@@ -100,7 +110,7 @@ func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(_ context.Context, bl
 
 	validSnapshot, err := b.getValidSnapshot(snapshotByHeight, 0)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.Internal, "failed to get a valid snapshot: %v", err)
 	}
 
 	data, err := convert.SnapshotToBytes(validSnapshot)
@@ -115,9 +125,18 @@ func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(_ context.Context, bl
 func (b *backendNetwork) GetProtocolStateSnapshotByHeight(_ context.Context, blockHeight uint64) ([]byte, error) {
 	snapshot := b.state.AtHeight(blockHeight)
 
+	_, err := snapshot.Head()
+	if err != nil {
+		if errors.Is(err, state.ErrUnknownSnapshotReference) {
+			return nil, status.Errorf(codes.NotFound, "failed to get a valid snapshot: %v", err)
+		}
+
+		return nil, status.Errorf(codes.Internal, "failed to get a valid snapshot: %v", err)
+	}
+
 	validSnapshot, err := b.getValidSnapshot(snapshot, 0)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.Internal, "failed to get a valid snapshot: %v", err)
 	}
 
 	data, err := convert.SnapshotToBytes(validSnapshot)
