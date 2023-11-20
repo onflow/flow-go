@@ -405,7 +405,7 @@ func DynamicIdentityEntryListFromIdentities(identities IdentityList) DynamicIden
 	for _, identity := range identities {
 		dynamicIdentities = append(dynamicIdentities, &DynamicIdentityEntry{
 			NodeID:  identity.NodeID,
-			Ejected: identity.EpochParticipationStatus == EpochParticipationStatusEjected,
+			Ejected: identity.IsEjected(),
 		})
 	}
 	return dynamicIdentities

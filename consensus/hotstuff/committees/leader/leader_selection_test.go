@@ -378,7 +378,7 @@ func TestZeroWeightNodeWillNotBeSelected(t *testing.T) {
 		fullIdentities[n].InitialWeight = 1
 		fullIdentities[m].InitialWeight = 1
 
-		// the following code check the ejected nodes should not be selected
+		// the following code check the non-active ejected nodes should not be selected
 		activeNodes := fullIdentities.Filter(filter.HasParticipationStatus(flow.EpochParticipationStatusActive)).ToSkeleton()
 		identities := fullIdentities.ToSkeleton()
 

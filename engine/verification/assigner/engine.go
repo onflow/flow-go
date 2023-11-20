@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/protocol"
@@ -275,7 +276,7 @@ func authorizedAsVerification(state protocol.State, blockID flow.Identifier, ide
 	}
 
 	// checks identity is an active epoch participant
-	if identity.EpochParticipationStatus != flow.EpochParticipationStatusActive {
+	if !filter.IsValidCurrentEpochParticipant(identity) {
 		return false, nil
 	}
 

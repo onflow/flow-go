@@ -5,6 +5,7 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
@@ -45,7 +46,7 @@ func ensureNodeHasWeightAndRole(identity *flow.Identity, expectedRole flow.Role)
 	}
 
 	// check if the identity is a valid epoch participant(is active in the current epoch + not ejected)
-	if identity.EpochParticipationStatus != flow.EpochParticipationStatusActive {
+	if !filter.IsValidCurrentEpochParticipant(identity) {
 		return engine.NewInvalidInputErrorf("node (%x) is not an active participant: %s", identity.NodeID,
 			identity.EpochParticipationStatus.String())
 	}

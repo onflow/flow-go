@@ -59,6 +59,7 @@ const (
 	EpochParticipationStatusEjected
 )
 
+// String returns string representation of enum value.
 func (s EpochParticipationStatus) String() string {
 	return [...]string{
 		"EpochParticipationStatusJoining",
@@ -68,6 +69,8 @@ func (s EpochParticipationStatus) String() string {
 	}[s]
 }
 
+// ParseEpochParticipationStatus converts string representation of EpochParticipationStatus into a typed value.
+// An exception will be returned if failed to convert.
 func ParseEpochParticipationStatus(s string) (EpochParticipationStatus, error) {
 	switch s {
 	case EpochParticipationStatusJoining.String():
@@ -83,6 +86,8 @@ func ParseEpochParticipationStatus(s string) (EpochParticipationStatus, error) {
 	}
 }
 
+// EncodeRLP performs RLP encoding of custom type, it's need to be able to hash structures that include EpochParticipationStatus.
+// No errors are expected during normal operations.
 func (s EpochParticipationStatus) EncodeRLP(w io.Writer) error {
 	encodable := s.String()
 	err := rlp.Encode(w, encodable)

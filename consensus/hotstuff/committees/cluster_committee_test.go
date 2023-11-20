@@ -97,6 +97,10 @@ func (suite *ClusterSuite) TestInvalidSigner() {
 
 	// a real cluster member which continues to be a valid member
 	realClusterMember := suite.members[1]
+	// a real cluster member which unstaked and is not active anymore
+	// and the test's reference block
+	realLeavingClusterMember := suite.members[2]
+	realLeavingClusterMember.EpochParticipationStatus = flow.EpochParticipationStatusLeaving
 	// a real cluster member which is ejected between cluster initialization and
 	// the test's reference block
 	realEjectedClusterMember := suite.members[3]
@@ -106,6 +110,7 @@ func (suite *ClusterSuite) TestInvalidSigner() {
 
 	suite.state.On("AtBlockID", refID).Return(suite.snap)
 	suite.snap.On("Identity", realClusterMember.NodeID).Return(realClusterMember, nil)
+	suite.snap.On("Identity", realLeavingClusterMember.NodeID).Return(realLeavingClusterMember, nil)
 	suite.snap.On("Identity", realEjectedClusterMember.NodeID).Return(realEjectedClusterMember, nil)
 	suite.snap.On("Identity", realNonClusterMember.NodeID).Return(realNonClusterMember, nil)
 	suite.snap.On("Identity", fakeID).Return(nil, protocol.IdentityNotFoundError{})
@@ -122,6 +127,18 @@ func (suite *ClusterSuite) TestInvalidSigner() {
 		suite.Run("by epoch", func() {
 			_, err := suite.com.IdentityByEpoch(rand.Uint64(), fakeID)
 			suite.Assert().True(model.IsInvalidSignerError(err))
+		})
+	})
+
+	suite.Run("should return ErrInvalidSigner for existent but not active cluster member", func() {
+		suite.Run("non-root block", func() {
+			_, err := suite.com.IdentityByBlock(nonRootBlockID, realLeavingClusterMember.NodeID)
+			suite.Assert().True(model.IsInvalidSignerError(err))
+		})
+		suite.Run("by epoch", func() {
+			actual, err := suite.com.IdentityByEpoch(rand.Uint64(), realLeavingClusterMember.NodeID)
+			suite.Require().NoError(err)
+			suite.Assert().Equal(realLeavingClusterMember.IdentitySkeleton, *actual)
 		})
 	})
 
