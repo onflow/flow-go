@@ -1,6 +1,8 @@
 package storehouse
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
@@ -59,6 +61,7 @@ func (s *ExecutingBlockSnapshot) getFromUpdates(id flow.RegisterID) (flow.Regist
 // The registerUpdates contains the register updates at the executed collection.
 func (s *ExecutingBlockSnapshot) Extend(newCommit flow.StateCommitment, updates map[flow.RegisterID]flow.RegisterValue) execution.ExtendableStorageSnapshot {
 	if len(updates) == 0 {
+		fmt.Println("=========extending")
 		return s
 	}
 

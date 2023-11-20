@@ -41,6 +41,9 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/convert"
+	"github.com/onflow/flow-go/ledger/common/pathfinder"
+	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -78,17 +81,33 @@ func (committer *fakeCommitter) CommitView(
 	execution.ExtendableStorageSnapshot,
 	error,
 ) {
-	trieUpdate := &ledger.TrieUpdate{}
-	trieUpdate.RootHash = ledger.RootHash(baseStorageSnapshot.Commitment())
-
 	committer.callCount++
 
-	h := make([]byte, 32)
-	h[0] = byte(committer.callCount)
-	var newCommit flow.StateCommitment
-	copy(newCommit[:], h)
+	startState := baseStorageSnapshot.Commitment()
+	endState := incStateCommitment(startState)
 
-	newStorageSnapshot := baseStorageSnapshot.Extend(newCommit, map[flow.RegisterID]flow.RegisterValue{})
+	reg := unittest.MakeOwnerReg("key", fmt.Sprintf("%v", committer.callCount))
+	regKey := convert.RegisterIDToLedgerKey(reg.Key)
+	path, err := pathfinder.KeyToPath(
+		regKey,
+		complete.DefaultPathFinderVersion,
+	)
+	if err != nil {
+		return flow.DummyStateCommitment, nil, nil, nil, err
+	}
+	trieUpdate := &ledger.TrieUpdate{
+		RootHash: ledger.RootHash(startState),
+		Paths: []ledger.Path{
+			path,
+		},
+		Payloads: []*ledger.Payload{
+			ledger.NewPayload(regKey, reg.Value),
+		},
+	}
+
+	newStorageSnapshot := baseStorageSnapshot.Extend(endState, map[flow.RegisterID]flow.RegisterValue{
+		reg.Key: reg.Value,
+	})
 
 	return newStorageSnapshot.Commitment(),
 		[]byte{byte(committer.callCount)},
@@ -278,12 +297,12 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			chunkDataPack1.Collection,
 			chunkExecutionData1.Collection)
 		assert.NotNil(t, chunkExecutionData1.TrieUpdate)
-		assert.Equal(t, byte(1), chunkExecutionData1.TrieUpdate.RootHash[0])
+		assert.Equal(t, ledger.RootHash(chunk1.StartState), chunkExecutionData1.TrieUpdate.RootHash)
 
 		chunkExecutionData2 := result.ChunkExecutionDatas[1]
 		assert.NotNil(t, chunkExecutionData2.Collection)
 		assert.NotNil(t, chunkExecutionData2.TrieUpdate)
-		assert.Equal(t, byte(2), chunkExecutionData2.TrieUpdate.RootHash[0])
+		assert.Equal(t, ledger.RootHash(chunk2.StartState), chunkExecutionData2.TrieUpdate.RootHash)
 
 		assert.GreaterOrEqual(t, vm.CallCount(), 3)
 		// if every transaction is retried once, then the call count should be
