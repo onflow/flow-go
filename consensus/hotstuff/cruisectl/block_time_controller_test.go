@@ -440,7 +440,7 @@ func (bs *BlockTimeControllerSuite) TestProposalDelay_AfterTargetTransitionTime(
 	lastProposalDelay := float64(bs.EpochDurationSeconds()) // start with large dummy value
 	for view := bs.initialView + 1; view < bs.ctl.curEpochFinalView; view++ {
 		// we have passed the target end time of the epoch
-		receivedParentBlockAt := time.Unix(int64(bs.ctl.curEpochTargetEndTime+view), 0)
+		receivedParentBlockAt := u2t(bs.ctl.curEpochTargetEndTime + view)
 		timedBlock := makeTimedBlock(view, unittest.IdentifierFixture(), receivedParentBlockAt)
 		err := bs.ctl.measureViewDuration(timedBlock)
 		require.NoError(bs.T(), err)
@@ -470,20 +470,20 @@ func (bs *BlockTimeControllerSuite) TestProposalDelay_BehindSchedule() {
 	defer bs.StopController()
 
 	lastProposalDelay := float64(bs.EpochDurationSeconds()) // start with large dummy value
-	idealEnteredViewTime := bs.ctl.curEpochTargetEndTime - (bs.EpochDurationSeconds() / 2)
+	idealEnteredViewTime := u2t(bs.ctl.curEpochTargetEndTime - (bs.EpochDurationSeconds() / 2))
 
 	// 1s behind of schedule
-	receivedParentBlockAt := idealEnteredViewTime + 1
+	receivedParentBlockAt := idealEnteredViewTime.Add(time.Second)
 	for view := bs.initialView + 1; view < bs.ctl.curEpochFinalView; view++ {
 		// hold the instantaneous error constant for each view
-		receivedParentBlockAt = receivedParentBlockAt + uint64(bs.ctl.targetViewTime())
-		timedBlock := makeTimedBlock(view, unittest.IdentifierFixture(), time.Unix(int64(receivedParentBlockAt), 0))
+		receivedParentBlockAt = receivedParentBlockAt.Add(f2d(bs.ctl.targetViewTime()))
+		timedBlock := makeTimedBlock(view, unittest.IdentifierFixture(), receivedParentBlockAt)
 		err := bs.ctl.measureViewDuration(timedBlock)
 		require.NoError(bs.T(), err)
 
 		// compute proposal delay:
 		pubTime := bs.ctl.GetProposalTiming().TargetPublicationTime(view+1, time.Now().UTC(), timedBlock.Block.BlockID) // simulate building a child of `timedBlock`
-		delay := pubTime.Sub(time.Unix(int64(receivedParentBlockAt), 0))
+		delay := pubTime.Sub(receivedParentBlockAt)
 		// expecting decreasing GetProposalTiming
 		assert.LessOrEqual(bs.T(), delay.Seconds(), lastProposalDelay, "got non-decreasing delay on view %d (initial view: %d)", view, bs.initialView)
 		lastProposalDelay = delay.Seconds()
@@ -512,13 +512,13 @@ func (bs *BlockTimeControllerSuite) TestProposalDelay_AheadOfSchedule() {
 	for view := bs.initialView + 1; view < bs.ctl.curEpochFinalView; view++ {
 		// hold the instantaneous error constant for each view
 		receivedParentBlockAt = receivedParentBlockAt + uint64(bs.ctl.targetViewTime())
-		timedBlock := makeTimedBlock(view, unittest.IdentifierFixture(), time.Unix(int64(receivedParentBlockAt), 0))
+		timedBlock := makeTimedBlock(view, unittest.IdentifierFixture(), u2t(receivedParentBlockAt))
 		err := bs.ctl.measureViewDuration(timedBlock)
 		require.NoError(bs.T(), err)
 
 		// compute proposal delay:
 		pubTime := bs.ctl.GetProposalTiming().TargetPublicationTime(view+1, time.Now().UTC(), timedBlock.Block.BlockID) // simulate building a child of `timedBlock`
-		delay := pubTime.Sub(time.Unix(int64(receivedParentBlockAt), 0))
+		delay := pubTime.Sub(u2t(receivedParentBlockAt))
 
 		// expecting increasing GetProposalTiming
 		assert.GreaterOrEqual(bs.T(), delay, lastProposalDelay)
@@ -562,7 +562,7 @@ func (bs *BlockTimeControllerSuite) TestMetrics() {
 		assert.Greater(bs.T(), output, time.Duration(0))
 	}).Once()
 
-	timedBlock := makeTimedBlock(view, unittest.IdentifierFixture(), time.Unix(int64(enteredViewAt), 0))
+	timedBlock := makeTimedBlock(view, unittest.IdentifierFixture(), u2t(enteredViewAt))
 	err := bs.ctl.measureViewDuration(timedBlock)
 	require.NoError(bs.T(), err)
 }
@@ -582,7 +582,7 @@ func (bs *BlockTimeControllerSuite) Test_vs_PythonSimulation() {
 	bs.initialView = 0
 	bs.curEpochFirstView, bs.curEpochFinalView = uint64(0), uint64(totalEpochViews-1) // views [0, .., totalEpochViews-1]
 	bs.curEpochTargetDuration = 7 * 24 * 60 * 60                                      // 1 week in seconds
-	bs.curEpochTargetEndTime = uint64(refT.Unix()) + bs.curEpochTargetDuration        // now + 1 week
+	bs.curEpochTargetEndTime = t2u(refT) + bs.curEpochTargetDuration                  // now + 1 week
 	bs.epochFallbackTriggered = false
 
 	bs.config = &Config{
@@ -638,7 +638,7 @@ func (bs *BlockTimeControllerSuite) Test_vs_PythonSimulation() {
 	// PART 3: run controller and ensure output matches pre-generated controller response from python ref implementation
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	// sanity checks:
-	require.Equal(bs.T(), uint64(604800), bs.ctl.curEpochTargetEndTime-uint64(refT.Unix()), "Epoch should end 1 week from now, i.e. 604800s")
+	require.Equal(bs.T(), uint64(604800), bs.ctl.curEpochTargetEndTime-t2u(refT), "Epoch should end 1 week from now, i.e. 604800s")
 	require.InEpsilon(bs.T(), ref.targetViewTime, bs.ctl.targetViewTime(), 1e-15) // ideal view time
 	require.Equal(bs.T(), len(ref.observedMinViewTimes), len(ref.realWorldViewDuration))
 
@@ -671,9 +671,10 @@ func (bs *BlockTimeControllerSuite) Test_vs_PythonSimulation() {
 			Because by using unix time internal to the controller, we lose <1s precision when measuring view durations.
 		*/
 		controllerTargetedViewDuration := tpt.Sub(observedBlock.TimeObserved).Seconds()
+		bs.T().Logf("%d: ctl=%f\tref=%f\tdiff=%f", v, controllerTargetedViewDuration, ref.controllerTargetedViewDuration[v], controllerTargetedViewDuration-ref.controllerTargetedViewDuration[v])
 		require.InEpsilon(bs.T(), ref.controllerTargetedViewDuration[v], controllerTargetedViewDuration, 1e-5, "implementations deviate for view %d", v) // ideal view time
 
-		observationTime = observationTime.Add(time.Duration(int64(ref.realWorldViewDuration[v] * float64(time.Second))))
+		observationTime = observationTime.Add(f2d(ref.realWorldViewDuration[v]))
 	}
 
 }
@@ -701,8 +702,4 @@ func captureControllerStateDigest(ctl *BlockTimeController) *controllerStateDige
 		integralErr:          ctl.integralErr,
 		latestProposalTiming: ctl.GetProposalTiming(),
 	}
-}
-
-func seconds2Duration(durationinDeconds float64) time.Duration {
-	return time.Duration(int64(durationinDeconds * float64(time.Second)))
 }

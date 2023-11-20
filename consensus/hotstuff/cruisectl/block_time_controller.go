@@ -373,7 +373,6 @@ func (ctl *BlockTimeController) checkForEpochTransition(tb TimedBlock) error {
 // No errors are expected during normal operation.
 func (ctl *BlockTimeController) measureViewDuration(tb TimedBlock) error {
 	view := tb.Block.View
-	observationTimeUnix := uint64(tb.TimeObserved.Unix())
 	// if the controller is disabled, we don't update measurements and instead use a fallback timing
 	if !ctl.config.Enabled.Load() {
 		fallbackDelay := ctl.config.FallbackProposalDelay.Load()
@@ -401,11 +400,11 @@ func (ctl *BlockTimeController) measureViewDuration(tb TimedBlock) error {
 	tau := ctl.targetViewTime()                                // τ - idealized target view time in units of seconds
 	viewDurationsRemaining := ctl.curEpochFinalView + 1 - view // k[v] - views remaining in current epoch
 
-	durationRemaining := ctl.curEpochTargetEndTime - observationTimeUnix
+	durationRemaining := u2t(ctl.curEpochTargetEndTime).Sub(tb.TimeObserved)
 
 	// Compute instantaneous error term: e[v] = k[v]·τ - T[v] i.e. the projected difference from target switchover
 	// and update PID controller's error terms. All UNITS in SECOND.
-	instErr := float64(viewDurationsRemaining)*tau - float64(durationRemaining)
+	instErr := float64(viewDurationsRemaining)*tau - durationRemaining.Seconds()
 	propErr := ctl.proportionalErr.AddObservation(instErr)
 	itgErr := ctl.integralErr.AddObservation(instErr)
 	drivErr := propErr - previousPropErr
@@ -414,26 +413,27 @@ func (ctl *BlockTimeController) measureViewDuration(tb TimedBlock) error {
 	u := propErr*ctl.config.KP + itgErr*ctl.config.KI + drivErr*ctl.config.KD
 
 	// compute the controller output for this observation
-	unconstrainedBlockTime := time.Duration((tau - u) * float64(time.Second)) // desired time between parent and child block, in units of seconds
+
+	unconstrainedBlockTime := f2d(tau - u) // desired time between parent and child block, in units of seconds
 	proposalTiming := newHappyPathBlockTime(tb, unconstrainedBlockTime, ctl.config.TimingConfig)
 	constrainedBlockTime := proposalTiming.ConstrainedBlockTime()
 
 	ctl.log.Debug().
 		Uint64("last_observation", previousProposalTiming.ObservationView()).
 		Dur("duration_since_last_observation", tb.TimeObserved.Sub(previousProposalTiming.ObservationTime())).
-		Dur("projected_time_remaining", time.Duration(durationRemaining)*time.Second).
+		Dur("projected_time_remaining", durationRemaining).
 		Uint64("view_durations_remaining", viewDurationsRemaining).
 		Float64("inst_err", instErr).
 		Float64("proportional_err", propErr).
 		Float64("integral_err", itgErr).
 		Float64("derivative_err", drivErr).
-		Dur("controller_output", time.Duration(u*float64(time.Second))).
+		Dur("controller_output", f2d(u)).
 		Dur("unconstrained_block_time", unconstrainedBlockTime).
 		Dur("constrained_block_time", constrainedBlockTime).
 		Msg("measured error upon view change")
 
 	ctl.metrics.PIDError(propErr, itgErr, drivErr)
-	ctl.metrics.ControllerOutput(time.Duration(u * float64(time.Second)))
+	ctl.metrics.ControllerOutput(f2d(u))
 	ctl.metrics.TargetProposalDuration(proposalTiming.ConstrainedBlockTime())
 
 	ctl.storeProposalTiming(proposalTiming)
@@ -507,4 +507,20 @@ func (ctl *BlockTimeController) EpochSetupPhaseStarted(_ uint64, first *flow.Hea
 // EpochEmergencyFallbackTriggered responds to epoch fallback mode being triggered.
 func (ctl *BlockTimeController) EpochEmergencyFallbackTriggered() {
 	ctl.epochFallbacks <- struct{}{}
+}
+
+// t2u converts a time.Time to UNIX time represented as a uint64.
+// Returned timestamp is precise to within one second of input.
+func t2u(t time.Time) uint64 {
+	return uint64(t.Unix())
+}
+
+// u2t converts a UNIX timestamp represented as a uint64 to a time.Time.
+func u2t(unix uint64) time.Time {
+	return time.Unix(int64(unix), 0)
+}
+
+// f2d converts a floating-point number of seconds to a time.Duration.
+func f2d(sec float64) time.Duration {
+	return time.Duration(int64(sec * float64(time.Second)))
 }
