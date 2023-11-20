@@ -78,8 +78,8 @@ const (
 	ErrCodeComputationLimitExceededError             ErrorCode = 1110
 	ErrCodeMemoryLimitExceededError                  ErrorCode = 1111
 	ErrCodeCouldNotDecodeExecutionParameterFromState ErrorCode = 1112
-	ErrCodeScriptExecutionCancelledError             ErrorCode = 1114
 	ErrCodeScriptExecutionTimedOutError              ErrorCode = 1113
+	ErrCodeScriptExecutionCancelledError             ErrorCode = 1114
 	ErrCodeEventEncodingError                        ErrorCode = 1115
 	ErrCodeInvalidInternalStateAccessError           ErrorCode = 1116
 	// 1117 was never deployed and is free to use
