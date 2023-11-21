@@ -71,6 +71,7 @@ func TestGossipSubMeshTracer(t *testing.T) {
 	collector := newLocalMeshTracerMetricsCollector(t)
 	// set the meshTracer to log at 1 second intervals for sake of testing.
 	defaultConfig.NetworkConfig.GossipSub.RpcTracer.LocalMeshLogInterval = 1 * time.Second
+	// disables peer scoring for sake of testing; so that unknown peers are not penalized and could be detected by the meshTracer.
 	defaultConfig.NetworkConfig.GossipSub.PeerScoringEnabled = false
 
 	tracerNode, tracerId := p2ptest.NodeFixture(
