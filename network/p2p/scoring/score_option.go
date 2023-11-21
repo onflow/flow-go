@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	netcache "github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/network/p2p/p2pconf"
+	"github.com/onflow/flow-go/network/p2p/scoring/internal"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -376,6 +377,9 @@ func NewScoreOption(cfg *ScoreOptionConfig, provider p2p.SubscriptionProvider) (
 		Init:                    InitAppScoreRecordState,
 		IdProvider:              cfg.provider,
 		HeroCacheMetricsFactory: cfg.heroCacheMetricsFactory,
+		AppScoreCacheFactory: func() p2p.GossipSubApplicationSpecificScoreCache {
+			return internal.NewAppSpecificScoreCache(cfg.params.SpamRecordCacheSize, cfg.logger, cfg.heroCacheMetricsFactory)
+		},
 		SpamRecordCacheFactory: func() p2p.GossipSubSpamRecordCache {
 			return netcache.NewGossipSubSpamRecordCache(cfg.params.SpamRecordCacheSize, cfg.logger, cfg.heroCacheMetricsFactory, DefaultDecayFunction())
 		},

@@ -76,6 +76,17 @@ func NewSubscriptionRecordCacheMetricsFactory(f HeroCacheMetricsFactory) module.
 	return f(namespaceNetwork, ResourceNetworkingSubscriptionRecordsCache)
 }
 
+// NewGossipSubApplicationSpecificScoreCacheMetrics is the factory method for creating a new HeroCacheCollector for the
+// application specific score cache of the GossipSub peer scoring module. The application specific score cache is used
+// to keep track of the application specific score of peers in GossipSub.
+// Args:
+// - f: the HeroCacheMetricsFactory to create the collector
+// Returns:
+// - a HeroCacheMetrics for the application specific score cache
+func NewGossipSubApplicationSpecificScoreCacheMetrics(f HeroCacheMetricsFactory) module.HeroCacheMetrics {
+	return f(namespaceNetwork, ResourceNetworkingGossipSubApplicationSpecificScoreCache)
+}
+
 // DisallowListCacheMetricsFactory is the factory method for creating a new HeroCacheCollector for the disallow list cache.
 // The disallow-list cache is used to keep track of peers that are disallow-listed and the reasons for it.
 // Args:

@@ -3,6 +3,7 @@ package p2ptest
 import (
 	"bufio"
 	"context"
+	"fmt"
 	crand "math/rand"
 	"sync"
 	"testing"
@@ -80,10 +81,9 @@ func NodeFixture(t *testing.T,
 	dhtPrefix string,
 	idProvider module.IdentityProvider,
 	opts ...NodeFixtureParameterOption) (p2p.LibP2PNode, flow.Identity) {
+
 	defaultFlowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
-
-	logger := unittest.Logger().Level(zerolog.WarnLevel)
 	require.NotNil(t, idProvider)
 	connectionGater := NewConnectionGater(idProvider, func(p peer.ID) error {
 		return nil
@@ -96,7 +96,7 @@ func NodeFixture(t *testing.T,
 		Unicasts:       nil,
 		Key:            NetworkingKeyFixtures(t),
 		Address:        unittest.DefaultAddress,
-		Logger:         logger,
+		Logger:         unittest.Logger().Level(zerolog.WarnLevel),
 		Role:           flow.RoleCollection,
 		IdProvider:     idProvider,
 		MetricsCfg: &p2pconfig.MetricsConfig{
@@ -120,7 +120,7 @@ func NodeFixture(t *testing.T,
 		unittest.WithAddress(parameters.Address),
 		unittest.WithRole(parameters.Role))
 
-	logger = parameters.Logger.With().Hex("node_id", logging.ID(identity.NodeID)).Logger()
+	logger := parameters.Logger.With().Hex("node_id", logging.ID(identity.NodeID)).Logger()
 
 	connManager, err := connection.NewConnManager(logger, parameters.MetricsCfg.Metrics, &parameters.FlowConfig.NetworkConfig.ConnectionManagerConfig)
 	require.NoError(t, err)
@@ -340,6 +340,7 @@ func WithPeerScoreParamsOption(cfg *p2p.PeerScoringConfigOverride) NodeFixturePa
 func WithLogger(logger zerolog.Logger) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
 		p.Logger = logger
+		fmt.Println("logger set")
 	}
 }
 
