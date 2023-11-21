@@ -40,17 +40,15 @@ type Builder struct {
 	subscriptionFilter           pubsub.SubscriptionFilter
 	gossipSubFactory             p2p.GossipSubFactoryFunc
 	gossipSubConfigFunc          p2p.GossipSubAdapterConfigFunc
-	gossipSubPeerScoring         bool          // whether to enable gossipsub peer scoring
 	gossipSubScoreTracerInterval time.Duration // the interval at which the gossipsub score tracer logs the peer scores.
 	// gossipSubTracer is a callback interface that is called by the gossipsub implementation upon
 	// certain events. Currently, we use it to log and observe the local mesh of the node.
-	gossipSubTracer           p2p.PubSubTracer
-	scoreOptionConfig         *scoring.ScoreOptionConfig
-	subscriptionProviderParam *p2pconf.SubscriptionProviderParameters
-	idProvider                module.IdentityProvider
-	routingSystem             routing.Routing
-	rpcInspectorConfig        *p2pconf.RpcInspectorParameters
-	rpcInspectorSuiteFactory  p2p.GossipSubRpcInspectorSuiteFactoryFunc
+	gossipSubTracer          p2p.PubSubTracer
+	scoreOptionConfig        *scoring.ScoreOptionConfig
+	idProvider               module.IdentityProvider
+	routingSystem            routing.Routing
+	rpcInspectorSuiteFactory p2p.GossipSubRpcInspectorSuiteFactoryFunc
+	gossipSubCfg             *p2pconf.GossipSubParameters
 }
 
 var _ p2p.GossipSubBuilder = (*Builder)(nil)
@@ -102,7 +100,7 @@ func (g *Builder) SetGossipSubConfigFunc(gossipSubConfigFunc p2p.GossipSubAdapte
 // Returns:
 // none
 func (g *Builder) EnableGossipSubScoringWithOverride(override *p2p.PeerScoringConfigOverride) {
-	g.gossipSubPeerScoring = true // TODO: we should enable peer scoring by default.
+	g.gossipSubCfg.PeerScoringEnabled = true // TODO: we should enable peer scoring by default.
 	if override == nil {
 		return
 	}
@@ -123,24 +121,10 @@ func (g *Builder) EnableGossipSubScoringWithOverride(override *p2p.PeerScoringCo
 	}
 }
 
-// SetGossipSubScoreTracerInterval sets the gossipsub score tracer interval of the builder.
-// If the gossipsub score tracer interval has already been set, a fatal error is logged.
-func (g *Builder) SetGossipSubScoreTracerInterval(gossipSubScoreTracerInterval time.Duration) {
-	if g.gossipSubScoreTracerInterval != time.Duration(0) {
-		g.logger.Fatal().Msg("gossipsub score tracer interval has already been set")
-		return
-	}
-	g.gossipSubScoreTracerInterval = gossipSubScoreTracerInterval
-}
-
 // SetGossipSubTracer sets the gossipsub tracer of the builder.
 // If the gossipsub tracer has already been set, a fatal error is logged.
 func (g *Builder) SetGossipSubTracer(gossipSubTracer p2p.PubSubTracer) {
-	if g.gossipSubTracer != nil {
-		g.logger.Fatal().Msg("gossipsub tracer has already been set")
-		return
-	}
-	g.gossipSubTracer = gossipSubTracer
+
 }
 
 // SetRoutingSystem sets the routing system of the builder.
@@ -171,32 +155,38 @@ func (g *Builder) OverrideDefaultRpcInspectorSuiteFactory(factory p2p.GossipSubR
 // Returns:
 // - a new gossipsub builder.
 // Note: the builder is not thread-safe. It should only be used in the main thread.
-func NewGossipSubBuilder(
-	logger zerolog.Logger,
-	metricsCfg *p2pconfig.MetricsConfig,
-	networkType network.NetworkingType,
-	sporkId flow.Identifier,
-	idProvider module.IdentityProvider,
-	rpcInspectorConfig *p2pconf.RpcInspectorParameters,
-	subscriptionProviderPrams *p2pconf.SubscriptionProviderParameters,
-	rpcTracker p2p.RpcControlTracking) *Builder {
+func NewGossipSubBuilder(logger zerolog.Logger, metricsCfg *p2pconfig.MetricsConfig, gossipSubCfg *p2pconf.GossipSubParameters,
+	networkType network.NetworkingType, sporkId flow.Identifier, idProvider module.IdentityProvider) *Builder {
 	lg := logger.With().
 		Str("component", "gossipsub").
 		Str("network-type", networkType.String()).
 		Logger()
 
+	meshTracerCfg := &tracer.GossipSubMeshTracerConfig{
+		Logger:                             lg,
+		Metrics:                            metricsCfg.Metrics,
+		IDProvider:                         idProvider,
+		LoggerInterval:                     gossipSubCfg.RpcTracer.LocalMeshLogInterval,
+		RpcSentTrackerCacheSize:            gossipSubCfg.RpcTracer.RPCSentTrackerCacheSize,
+		RpcSentTrackerWorkerQueueCacheSize: gossipSubCfg.RpcTracer.RPCSentTrackerQueueCacheSize,
+		RpcSentTrackerNumOfWorkers:         gossipSubCfg.RpcTracer.RpcSentTrackerNumOfWorkers,
+		HeroCacheMetricsFactory:            metricsCfg.HeroCacheFactory,
+		NetworkingType:                     networkType,
+	}
+	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
+
 	b := &Builder{
-		logger:                    lg,
-		metricsCfg:                metricsCfg,
-		sporkId:                   sporkId,
-		networkType:               networkType,
-		idProvider:                idProvider,
-		gossipSubFactory:          defaultGossipSubFactory(),
-		gossipSubConfigFunc:       defaultGossipSubAdapterConfig(),
-		scoreOptionConfig:         scoring.NewScoreOptionConfig(lg, metricsCfg.HeroCacheFactory, idProvider),
-		rpcInspectorConfig:        rpcInspectorConfig,
-		rpcInspectorSuiteFactory:  defaultInspectorSuite(rpcTracker),
-		subscriptionProviderParam: subscriptionProviderPrams,
+		logger:                   lg,
+		metricsCfg:               metricsCfg,
+		sporkId:                  sporkId,
+		networkType:              networkType,
+		idProvider:               idProvider,
+		gossipSubFactory:         defaultGossipSubFactory(),
+		gossipSubConfigFunc:      defaultGossipSubAdapterConfig(),
+		scoreOptionConfig:        scoring.NewScoreOptionConfig(lg, gossipSubCfg.ScoringParameters, metricsCfg.HeroCacheFactory, idProvider),
+		rpcInspectorSuiteFactory: defaultInspectorSuite(meshTracer),
+		gossipSubTracer:          meshTracer,
+		gossipSubCfg:             gossipSubCfg,
 	}
 
 	return b
@@ -304,9 +294,7 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, e
 
 	inspectorSuite, err := g.rpcInspectorSuiteFactory(
 		ctx,
-		g.logger,
-		g.sporkId,
-		g.rpcInspectorConfig,
+		g.logger, g.sporkId, &g.gossipSubCfg.RpcInspector,
 		g.metricsCfg.Metrics,
 		g.metricsCfg.HeroCacheFactory,
 		g.networkType,
@@ -321,7 +309,7 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, e
 
 	var scoreOpt *scoring.ScoreOption
 	var scoreTracer p2p.PeerScoreTracer
-	if g.gossipSubPeerScoring {
+	if g.gossipSubCfg.PeerScoringEnabled {
 		// wires the gossipsub score option to the subscription provider.
 		subscriptionProvider, err := scoring.NewSubscriptionProvider(&scoring.SubscriptionProviderConfig{
 			Logger: g.logger,
@@ -332,7 +320,7 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, e
 				return gossipSub
 			},
 			IdProvider:              g.idProvider,
-			Params:                  g.subscriptionProviderParam,
+			Params:                  &g.gossipSubCfg.SubscriptionProvider,
 			HeroCacheMetricsFactory: g.metricsCfg.HeroCacheFactory,
 		})
 		if err != nil {

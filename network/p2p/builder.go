@@ -2,7 +2,6 @@ package p2p
 
 import (
 	"context"
-	"time"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/connmgr"
@@ -54,14 +53,6 @@ type GossipSubBuilder interface {
 	// Returns:
 	// none
 	EnableGossipSubScoringWithOverride(*PeerScoringConfigOverride)
-
-	// SetGossipSubScoreTracerInterval sets the gossipsub score tracer interval of the builder.
-	// If the gossipsub score tracer interval has already been set, a fatal error is logged.
-	SetGossipSubScoreTracerInterval(time.Duration)
-
-	// SetGossipSubTracer sets the gossipsub tracer of the builder.
-	// If the gossipsub tracer has already been set, a fatal error is logged.
-	SetGossipSubTracer(PubSubTracer)
 
 	// SetRoutingSystem sets the routing system of the builder.
 	// If the routing system has already been set, a fatal error is logged.
@@ -134,8 +125,6 @@ type NodeBuilder interface {
 	EnableGossipSubScoringWithOverride(*PeerScoringConfigOverride) NodeBuilder
 	SetCreateNode(CreateNodeFunc) NodeBuilder
 	SetGossipSubFactory(GossipSubFactoryFunc, GossipSubAdapterConfigFunc) NodeBuilder
-	SetGossipSubTracer(PubSubTracer) NodeBuilder
-	SetGossipSubScoreTracerInterval(time.Duration) NodeBuilder
 	OverrideDefaultRpcInspectorSuiteFactory(GossipSubRpcInspectorSuiteFactoryFunc) NodeBuilder
 	Build() (LibP2PNode, error)
 }

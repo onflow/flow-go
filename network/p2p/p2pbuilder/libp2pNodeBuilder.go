@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"time"
 
 	"github.com/libp2p/go-libp2p"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -39,7 +38,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/subscription"
-	"github.com/onflow/flow-go/network/p2p/tracer"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	unicastcache "github.com/onflow/flow-go/network/p2p/unicast/cache"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
@@ -77,7 +75,7 @@ type LibP2PNodeBuilder struct {
 }
 
 func NewNodeBuilder(
-	logger zerolog.Logger,
+	logger zerolog.Logger, gossipSubCfg *p2pconf.GossipSubParameters,
 	metricsConfig *p2pconfig.MetricsConfig,
 	networkingType flownet.NetworkingType,
 	address string,
@@ -85,11 +83,8 @@ func NewNodeBuilder(
 	sporkId flow.Identifier,
 	idProvider module.IdentityProvider,
 	rCfg *p2pconf.ResourceManagerConfig,
-	rpcInspectorCfg *p2pconf.RpcInspectorParameters,
 	peerManagerConfig *p2pconfig.PeerManagerConfig,
-	subscriptionProviderParam *p2pconf.SubscriptionProviderParameters,
 	disallowListCacheCfg *p2p.DisallowListCacheConfig,
-	rpcTracker p2p.RpcControlTracking,
 	unicastConfig *p2pconfig.UnicastConfig,
 ) *LibP2PNodeBuilder {
 	return &LibP2PNodeBuilder{
@@ -103,12 +98,9 @@ func NewNodeBuilder(
 		disallowListCacheCfg: disallowListCacheCfg,
 		networkingType:       networkingType,
 		gossipSubBuilder: gossipsubbuilder.NewGossipSubBuilder(logger,
-			metricsConfig,
+			metricsConfig, gossipSubCfg,
 			networkingType,
-			sporkId,
-			idProvider,
-			rpcInspectorCfg, subscriptionProviderParam,
-			rpcTracker),
+			sporkId, idProvider),
 		peerManagerConfig: peerManagerConfig,
 		unicastConfig:     unicastConfig,
 	}
@@ -172,19 +164,8 @@ func (builder *LibP2PNodeBuilder) EnableGossipSubScoringWithOverride(config *p2p
 	return builder
 }
 
-func (builder *LibP2PNodeBuilder) SetGossipSubTracer(tracer p2p.PubSubTracer) p2p.NodeBuilder {
-	builder.gossipSubBuilder.SetGossipSubTracer(tracer)
-	builder.gossipSubTracer = tracer
-	return builder
-}
-
 func (builder *LibP2PNodeBuilder) SetCreateNode(f p2p.CreateNodeFunc) p2p.NodeBuilder {
 	builder.createNode = f
-	return builder
-}
-
-func (builder *LibP2PNodeBuilder) SetGossipSubScoreTracerInterval(interval time.Duration) p2p.NodeBuilder {
-	builder.gossipSubBuilder.SetGossipSubScoreTracerInterval(interval)
 	return builder
 }
 
@@ -447,30 +428,15 @@ func DefaultNodeBuilder(
 		connection.WithOnInterceptPeerDialFilters(append(peerFilters, connGaterCfg.InterceptPeerDialFilters...)),
 		connection.WithOnInterceptSecuredFilters(append(peerFilters, connGaterCfg.InterceptSecuredFilters...)))
 
-	meshTracerCfg := &tracer.GossipSubMeshTracerConfig{
-		Logger:                             logger,
-		Metrics:                            metricsCfg.Metrics,
-		IDProvider:                         idProvider,
-		LoggerInterval:                     gossipCfg.LocalMeshLogInterval,
-		RpcSentTrackerCacheSize:            gossipCfg.RPCSentTrackerCacheSize,
-		RpcSentTrackerWorkerQueueCacheSize: gossipCfg.RPCSentTrackerQueueCacheSize,
-		RpcSentTrackerNumOfWorkers:         gossipCfg.RpcSentTrackerNumOfWorkers,
-		HeroCacheMetricsFactory:            metricsCfg.HeroCacheFactory,
-		NetworkingType:                     flownet.PrivateNetwork,
-	}
-	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
-
-	builder := NewNodeBuilder(logger,
+	builder := NewNodeBuilder(logger, gossipCfg,
 		metricsCfg,
 		networkingType,
 		address,
 		flowKey,
 		sporkId,
 		idProvider,
-		rCfg,
-		rpcInspectorCfg, peerManagerCfg, &gossipCfg.SubscriptionProvider,
+		rCfg, peerManagerCfg,
 		disallowListCacheCfg,
-		meshTracer,
 		uniCfg).
 		SetBasicResolver(resolver).
 		SetConnectionManager(connManager).
@@ -481,9 +447,6 @@ func DefaultNodeBuilder(
 		// In production, we never override the default scoring config.
 		builder.EnableGossipSubScoringWithOverride(p2p.PeerScoringConfigNoOverride)
 	}
-
-	builder.SetGossipSubTracer(meshTracer)
-	builder.SetGossipSubScoreTracerInterval(gossipCfg.ScoreTracerInterval)
 
 	if role != "ghost" {
 		r, err := flow.ParseRole(role)

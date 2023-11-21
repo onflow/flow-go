@@ -62,7 +62,7 @@ func (suite *ControlMsgValidationInspectorSuite) SetupTest() {
 	params := &validation.InspectorParams{
 		Logger:                  unittest.Logger(),
 		SporkID:                 suite.sporkID,
-		Config:                  &flowConfig.NetworkConfig.GossipSubRPCValidationInspectorConfigs,
+		Config:                  &flowConfig.NetworkConfig.GossipSub.RpcInspector.Validation,
 		Distributor:             distributor,
 		IdProvider:              suite.idProvider,
 		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
@@ -98,7 +98,7 @@ func TestNewControlMsgValidationInspector(t *testing.T) {
 		inspector, err := validation.NewControlMsgValidationInspector(&validation.InspectorParams{
 			Logger:                  unittest.Logger(),
 			SporkID:                 sporkID,
-			Config:                  &flowConfig.NetworkConfig.GossipSubRPCValidationInspectorConfigs,
+			Config:                  &flowConfig.NetworkConfig.GossipSub.RpcInspector.Validation,
 			Distributor:             distributor,
 			IdProvider:              idProvider,
 			HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
@@ -203,22 +203,22 @@ func (suite *ControlMsgValidationInspectorSuite) TestControlMessageValidationIns
 		suite.rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
 		suite.rpcTracker.On("WasIHaveRPCSent", mock.AnythingOfType("string")).Return(true).Maybe()
 		suite.distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Twice()
-		suite.config.IHaveRPCInspectionConfig.MaxSampleSize = 100
+		suite.config.IHave.MaxSampleSize = 100
 		suite.inspector.Start(suite.signalerCtx)
 
 		// topic validation not performed so we can use random strings
 		iHavesGreaterThanMaxSampleSize := unittest.P2PRPCFixture(unittest.WithIHaves(unittest.P2PRPCIHaveFixtures(200,
 			unittest.IdentifierListFixture(200).Strings()...)...))
-		require.Greater(t, len(iHavesGreaterThanMaxSampleSize.GetControl().GetIhave()), suite.config.IHaveRPCInspectionConfig.MaxSampleSize)
+		require.Greater(t, len(iHavesGreaterThanMaxSampleSize.GetControl().GetIhave()), suite.config.IHave.MaxSampleSize)
 		iHavesLessThanMaxSampleSize := unittest.P2PRPCFixture(unittest.WithIHaves(unittest.P2PRPCIHaveFixtures(200, unittest.IdentifierListFixture(50).Strings()...)...))
-		require.Less(t, len(iHavesLessThanMaxSampleSize.GetControl().GetIhave()), suite.config.IHaveRPCInspectionConfig.MaxSampleSize)
+		require.Less(t, len(iHavesLessThanMaxSampleSize.GetControl().GetIhave()), suite.config.IHave.MaxSampleSize)
 
 		from := unittest.PeerIdFixture(t)
 		require.NoError(t, suite.inspector.Inspect(from, iHavesGreaterThanMaxSampleSize))
 		require.NoError(t, suite.inspector.Inspect(from, iHavesLessThanMaxSampleSize))
 		require.Eventually(t, func() bool {
 			// rpc with iHaves greater than configured max sample size should be truncated to MaxSampleSize
-			shouldBeTruncated := len(iHavesGreaterThanMaxSampleSize.GetControl().GetIhave()) == suite.config.IHaveRPCInspectionConfig.MaxSampleSize
+			shouldBeTruncated := len(iHavesGreaterThanMaxSampleSize.GetControl().GetIhave()) == suite.config.IHave.MaxSampleSize
 			// rpc with iHaves less than MaxSampleSize should not be truncated
 			shouldNotBeTruncated := len(iHavesLessThanMaxSampleSize.GetControl().GetIhave()) == 50
 			return shouldBeTruncated && shouldNotBeTruncated
@@ -231,7 +231,7 @@ func (suite *ControlMsgValidationInspectorSuite) TestControlMessageValidationIns
 		suite.rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
 		suite.rpcTracker.On("WasIHaveRPCSent", mock.AnythingOfType("string")).Return(true).Maybe()
 		suite.distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Twice()
-		suite.config.IHaveRPCInspectionConfig.MaxMessageIDSampleSize = 100
+		suite.config.IHave.MaxMessageIDSampleSize = 100
 		suite.inspector.Start(suite.signalerCtx)
 
 		// topic validation not performed so we can use random strings
@@ -245,7 +245,7 @@ func (suite *ControlMsgValidationInspectorSuite) TestControlMessageValidationIns
 		require.Eventually(t, func() bool {
 			for _, iHave := range iHavesGreaterThanMaxSampleSize.GetControl().GetIhave() {
 				// rpc with iHaves message ids greater than configured max sample size should be truncated to MaxSampleSize
-				if len(iHave.GetMessageIDs()) != suite.config.IHaveRPCInspectionConfig.MaxMessageIDSampleSize {
+				if len(iHave.GetMessageIDs()) != suite.config.IHave.MaxMessageIDSampleSize {
 					return false
 				}
 			}
@@ -264,20 +264,20 @@ func (suite *ControlMsgValidationInspectorSuite) TestControlMessageValidationIns
 		defer suite.StopInspector()
 		suite.rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
 		suite.rpcTracker.On("WasIHaveRPCSent", mock.AnythingOfType("string")).Return(true).Maybe()
-		suite.config.IWantRPCInspectionConfig.MaxSampleSize = 100
+		suite.config.IWant.MaxSampleSize = 100
 		suite.inspector.Start(suite.signalerCtx)
 
 		iWantsGreaterThanMaxSampleSize := unittest.P2PRPCFixture(unittest.WithIWants(unittest.P2PRPCIWantFixtures(200, 200)...))
-		require.Greater(t, uint(len(iWantsGreaterThanMaxSampleSize.GetControl().GetIwant())), suite.config.IWantRPCInspectionConfig.MaxSampleSize)
+		require.Greater(t, uint(len(iWantsGreaterThanMaxSampleSize.GetControl().GetIwant())), suite.config.IWant.MaxSampleSize)
 		iWantsLessThanMaxSampleSize := unittest.P2PRPCFixture(unittest.WithIWants(unittest.P2PRPCIWantFixtures(50, 200)...))
-		require.Less(t, uint(len(iWantsLessThanMaxSampleSize.GetControl().GetIwant())), suite.config.IWantRPCInspectionConfig.MaxSampleSize)
+		require.Less(t, uint(len(iWantsLessThanMaxSampleSize.GetControl().GetIwant())), suite.config.IWant.MaxSampleSize)
 
 		from := unittest.PeerIdFixture(t)
 		require.NoError(t, suite.inspector.Inspect(from, iWantsGreaterThanMaxSampleSize))
 		require.NoError(t, suite.inspector.Inspect(from, iWantsLessThanMaxSampleSize))
 		require.Eventually(t, func() bool {
 			// rpc with iWants greater than configured max sample size should be truncated to MaxSampleSize
-			shouldBeTruncated := len(iWantsGreaterThanMaxSampleSize.GetControl().GetIwant()) == int(suite.config.IWantRPCInspectionConfig.MaxSampleSize)
+			shouldBeTruncated := len(iWantsGreaterThanMaxSampleSize.GetControl().GetIwant()) == int(suite.config.IWant.MaxSampleSize)
 			// rpc with iWants less than MaxSampleSize should not be truncated
 			shouldNotBeTruncated := len(iWantsLessThanMaxSampleSize.GetControl().GetIwant()) == 50
 			return shouldBeTruncated && shouldNotBeTruncated
@@ -290,7 +290,7 @@ func (suite *ControlMsgValidationInspectorSuite) TestControlMessageValidationIns
 		suite.rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
 		suite.rpcTracker.On("WasIHaveRPCSent", mock.AnythingOfType("string")).Return(true).Maybe()
 		suite.distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Maybe()
-		suite.config.IWantRPCInspectionConfig.MaxMessageIDSampleSize = 100
+		suite.config.IWant.MaxMessageIDSampleSize = 100
 		suite.inspector.Start(suite.signalerCtx)
 
 		iWantsGreaterThanMaxSampleSize := unittest.P2PRPCFixture(unittest.WithIWants(unittest.P2PRPCIWantFixtures(10, 200)...))
@@ -302,7 +302,7 @@ func (suite *ControlMsgValidationInspectorSuite) TestControlMessageValidationIns
 		require.Eventually(t, func() bool {
 			for _, iWant := range iWantsGreaterThanMaxSampleSize.GetControl().GetIwant() {
 				// rpc with iWants message ids greater than configured max sample size should be truncated to MaxSampleSize
-				if len(iWant.GetMessageIDs()) != suite.config.IWantRPCInspectionConfig.MaxMessageIDSampleSize {
+				if len(iWant.GetMessageIDs()) != suite.config.IWant.MaxMessageIDSampleSize {
 					return false
 				}
 			}
@@ -535,9 +535,9 @@ func (suite *ControlMsgValidationInspectorSuite) TestControlMessageValidationIns
 			suite.SetupTest()
 			defer suite.StopInspector()
 			// set cache miss check size to 0 forcing the inspector to check the cache misses with only a single iWant
-			suite.config.CacheMissCheckSize = 0
+			suite.config.IWant.CacheMissCheckSize = 0
 			// set high cache miss threshold to ensure we only disseminate notification when it is exceeded
-			suite.config.IWantRPCInspectionConfig.CacheMissThreshold = .9
+			suite.config.IWant.CacheMissThreshold = .9
 			msgIds := unittest.IdentifierListFixture(100).Strings()
 			// oracle must be set even though iWant messages do not have topic IDs
 			inspectMsgRpc := unittest.P2PRPCFixture(unittest.WithIWants(unittest.P2PRPCIWantFixture(msgIds...)))
@@ -566,9 +566,9 @@ func (suite *ControlMsgValidationInspectorSuite) TestControlMessageValidationIns
 			defer suite.StopInspector()
 			defer suite.distributor.AssertNotCalled(t, "Distribute")
 			// if size of iwants not greater than 10 cache misses will not be checked
-			suite.config.CacheMissCheckSize = 10
+			suite.config.IWant.CacheMissCheckSize = 10
 			// set high cache miss threshold to ensure we only disseminate notification when it is exceeded
-			suite.config.IWantRPCInspectionConfig.CacheMissThreshold = .9
+			suite.config.IWant.CacheMissThreshold = .9
 			msgIds := unittest.IdentifierListFixture(100).Strings()
 			inspectMsgRpc := unittest.P2PRPCFixture(unittest.WithIWants(unittest.P2PRPCIWantFixture(msgIds...)))
 			suite.rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
@@ -756,7 +756,7 @@ func (suite *ControlMsgValidationInspectorSuite) TestNewControlMsgValidationInsp
 		defer suite.StopInspector()
 		defer suite.distributor.AssertNotCalled(t, "Distribute")
 		// set hard threshold to small number , ensure that a single unknown cluster prefix id does not cause a notification to be disseminated
-		suite.config.ClusterPrefixHardThreshold = 2
+		suite.config.ClusterPrefixedMessage.HardThreshold = 2
 		defer suite.distributor.AssertNotCalled(t, "Distribute")
 		clusterID := flow.ChainID(unittest.IdentifierFixture().String())
 		clusterPrefixedTopic := channels.Topic(fmt.Sprintf("%s/%s", channels.SyncCluster(clusterID), suite.sporkID)).String()
@@ -794,7 +794,7 @@ func (suite *ControlMsgValidationInspectorSuite) TestNewControlMsgValidationInsp
 		clusterPrefixedTopic := channels.Topic(fmt.Sprintf("%s/%s", channels.SyncCluster(clusterID), suite.sporkID)).String()
 		suite.topicProviderOracle.UpdateTopics([]string{clusterPrefixedTopic})
 		// the 11th unknown cluster ID error should cause an error
-		suite.config.ClusterPrefixHardThreshold = 10
+		suite.config.ClusterPrefixedMessage.HardThreshold = 10
 		from := unittest.PeerIdFixture(t)
 		identity := unittest.IdentityFixture()
 		suite.idProvider.On("ByPeerID", from).Return(identity, true).Times(11)
