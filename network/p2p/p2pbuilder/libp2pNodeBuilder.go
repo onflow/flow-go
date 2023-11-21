@@ -405,7 +405,6 @@ func DefaultNodeBuilder(
 	connGaterCfg *p2pconfig.ConnectionGaterConfig,
 	peerManagerCfg *p2pconfig.PeerManagerConfig,
 	gossipCfg *p2pconf.GossipSubParameters,
-	rpcInspectorCfg *p2pconf.RpcInspectorParameters,
 	rCfg *p2pconf.ResourceManagerConfig,
 	uniCfg *p2pconfig.UnicastConfig,
 	connMgrConfig *netconf.ConnectionManagerConfig,
