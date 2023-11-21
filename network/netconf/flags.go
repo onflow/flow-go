@@ -151,6 +151,11 @@ func AllFlagNames() []string {
 		BuildFlagName(gossipSub, p2pconf.RpcInspectorKey, p2pconf.ValidationConfigKey, p2pconf.MessageErrorThresholdKey),
 		BuildFlagName(gossipSub, p2pconf.SubscriptionProviderKey, p2pconf.UpdateIntervalKey),
 		BuildFlagName(gossipSub, p2pconf.SubscriptionProviderKey, p2pconf.CacheSizeKey),
+		BuildFlagName(gossipSub, p2pconf.ScoreParamsKey, p2pconf.AppSpecificScoreRegistryKey, p2pconf.ScoreUpdateWorkerNumKey),
+		BuildFlagName(gossipSub, p2pconf.ScoreParamsKey, p2pconf.AppSpecificScoreRegistryKey, p2pconf.ScoreUpdateRequestQueueSizeKey),
+		BuildFlagName(gossipSub, p2pconf.ScoreParamsKey, p2pconf.AppSpecificScoreRegistryKey, p2pconf.ScoreTTLKey),
+		BuildFlagName(gossipSub, p2pconf.ScoreParamsKey, p2pconf.SpamRecordCacheSizeKey),
+		BuildFlagName(gossipSub, p2pconf.ScoreParamsKey, p2pconf.DecayIntervalKey),
 	}
 
 	for _, scope := range []string{systemScope, transientScope, protocolScope, peerScope, peerProtocolScope} {
@@ -303,6 +308,21 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 	flags.Uint32(BuildFlagName(gossipSub, p2pconf.SubscriptionProviderKey, p2pconf.CacheSizeKey),
 		config.GossipSub.SubscriptionProvider.CacheSize,
 		"size of the cache that keeps the list of topics each peer has subscribed to, recommended size is 10x the number of authorized nodes")
+	flags.Int(BuildFlagName(gossipSub, p2pconf.ScoreParamsKey, p2pconf.AppSpecificScoreRegistryKey, p2pconf.ScoreUpdateWorkerNumKey),
+		config.GossipSub.ScoringParameters.AppSpecificScore.ScoreUpdateWorkerNum,
+		"number of workers for the app specific score update worker pool")
+	flags.Uint32(BuildFlagName(gossipSub, p2pconf.ScoreParamsKey, p2pconf.AppSpecificScoreRegistryKey, p2pconf.ScoreUpdateRequestQueueSizeKey),
+		config.GossipSub.ScoringParameters.AppSpecificScore.ScoreUpdateRequestQueueSize,
+		"size of the app specific score update worker pool queue")
+	flags.Duration(BuildFlagName(gossipSub, p2pconf.ScoreParamsKey, p2pconf.AppSpecificScoreRegistryKey, p2pconf.ScoreTTLKey),
+		config.GossipSub.ScoringParameters.AppSpecificScore.ScoreTTL,
+		"time to live for app specific scores; when expired a new request will be sent to the score update worker pool; till then the expired score will be used")
+	flags.Uint32(BuildFlagName(gossipSub, p2pconf.ScoreParamsKey, p2pconf.SpamRecordCacheSizeKey),
+		config.GossipSub.ScoringParameters.SpamRecordCacheSize,
+		"size of the spam record cache, recommended size is 10x the number of authorized nodes")
+	flags.Duration(BuildFlagName(gossipSub, p2pconf.ScoreParamsKey, p2pconf.DecayIntervalKey),
+		config.GossipSub.ScoringParameters.DecayInterval,
+		"interval at which the counters associated with a peer behavior in GossipSub system are decayed, recommended value is one minute")
 }
 
 // LoadLibP2PResourceManagerFlags loads all CLI flags for the libp2p resource manager configuration on the provided pflag set.

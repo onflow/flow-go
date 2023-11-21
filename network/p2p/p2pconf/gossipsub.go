@@ -63,8 +63,6 @@ const (
 	SubscriptionProviderKey = "subscription-provider"
 )
 
-var GossipSubConfigKeys = []string{RpcInspectorKey, RpcTracerKey, PeerScoringEnabledKey, ScoreParamsKey, SubscriptionProviderKey}
-
 // GossipSubParameters is the configuration for the GossipSubParameters pubsub implementation.
 type GossipSubParameters struct {
 	// RpcInspectorParameters configuration for all gossipsub RPC control message inspectors.
@@ -81,10 +79,16 @@ type GossipSubParameters struct {
 	ScoringParameters ScoringParameters `mapstructure:"scoring-parameters"`
 }
 
+const (
+	AppSpecificScoreRegistryKey = "app-specific-score"
+	SpamRecordCacheSizeKey      = "spam-record-cache-size"
+	DecayIntervalKey            = "decay-interval"
+)
+
 // Parameters are the parameters for the score option.
 // Parameters are "numerical values" that are used to compute or build components that compute the score of a peer in GossipSub system.
 type ScoringParameters struct {
-	AppSpecificScore AppSpecificScoreRegistryParams `validate:"required" mapstructure:"app-specific-score"`
+	AppSpecificScore AppSpecificScoreParameters `validate:"required" mapstructure:"app-specific-score"`
 	// SpamRecordCacheSize is size of the cache used to store the spam records of peers.
 	// The spam records are used to penalize peers that send invalid messages.
 	SpamRecordCacheSize uint32 `validate:"gt=0" mapstructure:"spam-record-cache-size"`
@@ -93,9 +97,15 @@ type ScoringParameters struct {
 	DecayInterval time.Duration `validate:"gt=0s" mapstructure:"decay-interval"`
 }
 
-// AppSpecificScoreRegistryParams is the parameters for the GossipSubAppSpecificScoreRegistry.
+const (
+	ScoreUpdateWorkerNumKey        = "score-update-worker-num"
+	ScoreUpdateRequestQueueSizeKey = "score-update-request-queue-size"
+	ScoreTTLKey                    = "score-ttl"
+)
+
+// AppSpecificScoreParameters is the parameters for the GossipSubAppSpecificScoreRegistry.
 // Parameters are "numerical values" that are used to compute or build components that compute or maintain the application specific score of peers.
-type AppSpecificScoreRegistryParams struct {
+type AppSpecificScoreParameters struct {
 	// ScoreUpdateWorkerNum is the number of workers in the worker pool for handling the application specific score update of peers in a non-blocking way.
 	ScoreUpdateWorkerNum int `validate:"gt=0" mapstructure:"score-update-worker-num"`
 
@@ -114,8 +124,6 @@ const (
 	UpdateIntervalKey = "update-interval"
 	CacheSizeKey      = "cache-size"
 )
-
-var SubscriptionProviderParametersKeys = []string{UpdateIntervalKey, CacheSizeKey}
 
 type SubscriptionProviderParameters struct {
 	// UpdateInterval is the interval for updating the list of topics the node have subscribed to; as well as the list of all
@@ -137,12 +145,6 @@ const (
 	RPCSentTrackerQueueCacheSizeKey = "rpc-sent-tracker-queue-cache-size"
 	RPCSentTrackerNumOfWorkersKey   = "rpc-sent-tracker-workers"
 )
-
-var TracerParametersKeys = []string{LocalMeshLogIntervalKey,
-	ScoreTracerIntervalKey,
-	RPCSentTrackerCacheSizeKey,
-	RPCSentTrackerQueueCacheSizeKey,
-	RPCSentTrackerNumOfWorkersKey}
 
 // GossipSubTracerParameters is the config for the gossipsub tracer. GossipSubParameters tracer is used to trace the local mesh events and peer scores.
 type GossipSubTracerParameters struct {

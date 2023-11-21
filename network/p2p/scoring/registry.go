@@ -117,7 +117,7 @@ type GossipSubAppSpecificScoreRegistry struct {
 // GossipSubAppSpecificScoreRegistryConfig is the configuration for the GossipSubAppSpecificScoreRegistry.
 // Configurations are the "union of parameters and other components" that are used to compute or build components that compute or maintain the application specific score of peers.
 type GossipSubAppSpecificScoreRegistryConfig struct {
-	Parameters p2pconf.AppSpecificScoreRegistryParams `validate:"required"`
+	Parameters p2pconf.AppSpecificScoreParameters `validate:"required"`
 
 	Logger zerolog.Logger `validate:"required"`
 
