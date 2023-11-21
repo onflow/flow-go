@@ -152,7 +152,7 @@ func (p *genericPRG) Shuffle(n int, swap func(i, j int)) error {
 	return p.Samples(n, n, swap)
 }
 
-// Samples picks randomly m elements out of n elemnts and places them
+// Samples picks randomly m elements out of n elements and places them
 // in random order at indices [0,m-1], the swapping being implemented in place.
 //
 // It implements the first (m) elements of Fisher-Yates Shuffle using `p` as a source of randoms.

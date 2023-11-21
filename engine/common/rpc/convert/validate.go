@@ -26,6 +26,20 @@ func Address(rawAddress []byte, chain flow.Chain) (flow.Address, error) {
 	return address, nil
 }
 
+func HexToAddress(hexAddress string, chain flow.Chain) (flow.Address, error) {
+	if len(hexAddress) == 0 {
+		return flow.EmptyAddress, status.Error(codes.InvalidArgument, "address cannot be empty")
+	}
+
+	address := flow.HexToAddress(hexAddress)
+
+	if !chain.IsValid(address) {
+		return flow.EmptyAddress, status.Errorf(codes.InvalidArgument, "address %s is invalid for chain %s", address, chain)
+	}
+
+	return address, nil
+}
+
 func BlockID(blockID []byte) (flow.Identifier, error) {
 	if len(blockID) != flow.IdentifierLen {
 		return flow.ZeroID, status.Error(codes.InvalidArgument, "invalid block id")

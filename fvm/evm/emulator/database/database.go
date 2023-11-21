@@ -34,6 +34,7 @@ type Database struct {
 	flowEVMRootAddress    flow.Address
 	led                   atree.Ledger
 	storage               *atree.PersistentSlabStorage
+	baseStorage           *atree.LedgerBaseStorage
 	atreemap              *atree.OrderedMap
 	rootIDBytesToBeStored []byte // if is empty means we don't need to store anything
 	// Ramtin: other database implementations for EVM uses a lock
@@ -57,6 +58,7 @@ func NewDatabase(led atree.Ledger, flowEVMRootAddress flow.Address) (*Database, 
 
 	db := &Database{
 		led:                led,
+		baseStorage:        baseStorage,
 		flowEVMRootAddress: flowEVMRootAddress,
 		storage:            storage,
 	}
@@ -237,7 +239,7 @@ func (db *Database) getRootHash() (gethCommon.Hash, error) {
 	if len(data) == 0 {
 		return gethTypes.EmptyRootHash, nil
 	}
-	return gethCommon.Hash(data), nil
+	return gethCommon.BytesToHash(data), nil
 }
 
 // Commits the changes from atree into the underlying storage
@@ -309,6 +311,19 @@ func (db *Database) Stat(property string) (string, error) {
 	return "", types.ErrNotImplemented
 }
 
+func (db *Database) BytesRetrieved() int {
+	return db.baseStorage.BytesRetrieved()
+}
+
+func (db *Database) BytesStored() int {
+	return db.baseStorage.BytesStored()
+}
+func (db *Database) ResetReporter() {
+	db.baseStorage.ResetReporter()
+}
+
+// Compact is not supported on a memory database, but there's no need either as
+// a memory database doesn't waste space anyway.
 // Compact is a no op
 func (db *Database) Compact(start []byte, limit []byte) error {
 	return nil
@@ -357,6 +372,11 @@ func (b *batch) set(key []byte, value []byte, delete bool) error {
 	return nil
 }
 
+// DropCache drops the database read cache
+func (db *Database) DropCache() {
+	db.storage.DropCache()
+}
+
 // ValueSize retrieves the amount of data queued up for writing.
 func (b *batch) ValueSize() int {
 	return b.size
@@ -395,6 +415,7 @@ func handleError(err error) error {
 		return nil
 	}
 	var atreeFatalError *atree.FatalError
+	// if is a atree fatal error or fvm fatal error (the second one captures external errors)
 	if stdErrors.As(err, &atreeFatalError) || errors.IsFailure(err) {
 		return types.NewFatalError(err)
 	}

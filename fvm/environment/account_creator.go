@@ -16,6 +16,7 @@ const (
 	FungibleTokenAccountIndex = 2
 	FlowTokenAccountIndex     = 3
 	FlowFeesAccountIndex      = 4
+	EVMAccountIndex           = 5
 )
 
 type AddressGenerator interface {

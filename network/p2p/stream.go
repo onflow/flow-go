@@ -12,14 +12,8 @@ import (
 // it can create libp2p streams with finer granularity.
 type StreamFactory interface {
 	SetStreamHandler(protocol.ID, network.StreamHandler)
-	// Connect connects host to peer with peerAddrInfo.
-	// All errors returned from this function can be considered benign. We expect the following errors during normal operations:
-	//   - ErrSecurityProtocolNegotiationFailed this indicates there was an issue upgrading the connection.
-	//   - ErrGaterDisallowedConnection this indicates the connection was disallowed by the gater.
-	//   - There may be other unexpected errors from libp2p but they should be considered benign.
-	Connect(context.Context, peer.AddrInfo) error
 	// NewStream creates a new stream on the libp2p host.
 	// Expected errors during normal operations:
 	//   - ErrProtocolNotSupported this indicates remote node is running on a different spork.
-	NewStream(context.Context, peer.ID, ...protocol.ID) (network.Stream, error)
+	NewStream(context.Context, peer.ID, protocol.ID) (network.Stream, error)
 }

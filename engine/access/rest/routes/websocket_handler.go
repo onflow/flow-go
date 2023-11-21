@@ -266,7 +266,12 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Upgrade the HTTP connection to a WebSocket connection
-	upgrader := websocket.Upgrader{}
+	upgrader := websocket.Upgrader{
+		// allow all origins by default, operators can override using a proxy
+		CheckOrigin: func(r *http.Request) bool {
+			return true
+		},
+	}
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		h.errorHandler(w, models.NewRestError(http.StatusInternalServerError, "webSocket upgrade error: ", err), logger)

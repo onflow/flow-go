@@ -71,6 +71,14 @@ func DefaultConfig() (*FlowConfig, error) {
 	return &flowConfig, nil
 }
 
+// RawViperConfig returns the raw viper config store.
+// Returns:
+//
+//	*viper.Viper: the raw viper config store.
+func RawViperConfig() *viper.Viper {
+	return conf
+}
+
 // BindPFlags binds the configuration to the cli pflag set. This should be called
 // after all pflags have been parsed. If the --config-file flag has been set the config will
 // be loaded from the specified config file.
