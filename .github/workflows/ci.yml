@@ -129,7 +129,7 @@ jobs:
 
   unit-test:
     name: Unit Tests (${{ matrix.targets.name }})
-    needs: [create-dynamic-test-matrix, get-modified-files]
+    needs: create-dynamic-test-matrix
     strategy:
       fail-fast: false
       matrix:
@@ -137,7 +137,6 @@ jobs:
     ## need to set image explicitly due to GitHub logging issue as described in https://github.com/onflow/flow-go/pull/3087#issuecomment-1234383202
     runs-on: ${{ matrix.targets.runner }}
     # only run this job if the modified files include any file in the package directory
-    if: contains(needs.get-modified-files.outputs.files, ${{ matrix.name }})
     steps:
     - name: Checkout repo
       uses: actions/checkout@v3
@@ -341,20 +340,3 @@ jobs:
         timeout_minutes: 35
         max_attempts: 5
         command: VERBOSE=1 ${{ matrix.make }}
-
-  # determine what subset of tests to run for in progress PRs
-  get-modified-files:
-    name: Get modified files
-    runs-on: ubuntu-latest
-    outputs:
-      files: ${{ steps.get_files.outputs.files }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-      - name: Get modified files
-        id: get_files
-        # get the commit hash of the current push, list the modified files in the commit, and set the output variable
-        run: |
-          commit=${{ github.event.after }}
-          files=$(git show --name-only $commit)
-          echo "::set-output name=files::$files"
