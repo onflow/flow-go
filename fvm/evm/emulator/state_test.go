@@ -1,7 +1,6 @@
 package emulator_test
 
 import (
-	"fmt"
 	"math/big"
 	"os"
 	"testing"
@@ -31,9 +30,6 @@ func benchmarkStateAccountsBalanceChange(b *testing.B, numberOfAccounts int, num
 	if debug {
 		log.Root().SetHandler(log.StreamHandler(os.Stdout, log.LogfmtFormat()))
 	}
-
-	f, err := os.OpenFile("./bench_10000", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
-	require.NoError(b, err)
 
 	store := testutils.GetSimpleValueStore()
 	db, err := database.NewMeteredDatabase(store, rootAddr)
@@ -67,11 +63,6 @@ func benchmarkStateAccountsBalanceChange(b *testing.B, numberOfAccounts int, num
 		require.NoError(b, err)
 
 		db.DropCache()
-
-		_, count := store.Metrics()
-		_, err = f.WriteString(fmt.Sprintf("%d\n", count))
-		require.NoError(b, err)
-
 		return hash
 	}
 
@@ -85,8 +76,6 @@ func benchmarkStateAccountsBalanceChange(b *testing.B, numberOfAccounts int, num
 		b.ReportMetric(float64(size)/1000000, "store_size_mb")
 		b.ReportMetric(float64(items), "store_items_count")
 	}
-
-	f.Close()
 }
 
 /*
