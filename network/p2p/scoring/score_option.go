@@ -379,7 +379,7 @@ func NewScoreOption(cfg *ScoreOptionConfig, provider p2p.SubscriptionProvider) (
 		SpamRecordCacheFactory: func() p2p.GossipSubSpamRecordCache {
 			return netcache.NewGossipSubSpamRecordCache(cfg.params.SpamRecordCacheSize, cfg.logger, cfg.heroCacheMetricsFactory, DefaultDecayFunction())
 		},
-		Parameters: cfg.params.AppSpecificScore,
+		// Parameters: cfg.params.AppSpecificScore,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create gossipsub app specific score registry: %w", err)
