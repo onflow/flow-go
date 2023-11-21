@@ -424,7 +424,7 @@ func TestPersistingInvalidSubscriptionPenalty(t *testing.T) {
 }
 
 // TestSpamRecordDecayAdjustment ensures that spam record decay is increased each time a peers score reaches the scoring.IncreaseDecayThreshold eventually
-// sustained misbehavior will result in the spam record decay reaching the minimum decay speed .99
+// sustained misbehavior will result in the spam record decay reaching the minimum decay speed .99, and the decay speed is reset to the max decay speed .8.
 func TestSpamRecordDecayAdjustment(t *testing.T) {
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
