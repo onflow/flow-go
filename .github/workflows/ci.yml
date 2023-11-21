@@ -137,7 +137,7 @@ jobs:
     ## need to set image explicitly due to GitHub logging issue as described in https://github.com/onflow/flow-go/pull/3087#issuecomment-1234383202
     runs-on: ${{ matrix.targets.runner }}
     # only run this job if the modified files include any file in the package directory
-    if: contains(needs.get-modified-files.outputs.files, '${{ matrix.targets.name }}')
+    if: contains(needs.get-modified-files.outputs.files, ${{ matrix.targets.name }})
     steps:
     - name: Checkout repo
       uses: actions/checkout@v3
