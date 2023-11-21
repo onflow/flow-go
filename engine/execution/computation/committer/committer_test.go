@@ -1,6 +1,7 @@
 package committer_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -44,13 +45,29 @@ func TestLedgerViewCommitter(t *testing.T) {
 
 		// mock ledger.Set
 		l.On("Set", mock.Anything).
-			Return(ledger.State(endState), expectedTrieUpdate, nil).
+			Return(func(update *ledger.Update) (newState ledger.State, trieUpdate *ledger.TrieUpdate, err error) {
+				if update.State().Equals(ledger.State(startState)) {
+					return ledger.State(endState), expectedTrieUpdate, nil
+				}
+				return ledger.DummyState, nil, fmt.Errorf("wrong update")
+			}).
 			Once()
 
 			// mock ledger.Prove
 		expectedProof := ledger.Proof([]byte{2, 3, 4})
 		l.On("Prove", mock.Anything).
-			Return(expectedProof, nil).
+			Return(func(query *ledger.Query) (proof ledger.Proof, err error) {
+				if query.Size() != 1 {
+					return nil, fmt.Errorf("wrong query size: %v", query.Size())
+				}
+
+				k := convert.RegisterIDToLedgerKey(reg.Key)
+				if !query.Keys()[0].Equals(&k) {
+					return nil, fmt.Errorf("in correct query key for prove: %v", query.Keys()[0])
+				}
+
+				return expectedProof, nil
+			}).
 			Once()
 
 			// previous block's storage snapshot
@@ -83,7 +100,6 @@ func TestLedgerViewCommitter(t *testing.T) {
 		require.Equal(t, []uint8(expectedProof), proof)
 		require.True(t, expectedTrieUpdate.Equals(trieUpdate))
 
-		// TOOD(leo): verify ledger.Set and ledger.Prove are called and received expected arguments
 	})
 
 }
