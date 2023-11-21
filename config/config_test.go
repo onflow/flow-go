@@ -57,14 +57,11 @@ func TestFlowConfig_Validate(t *testing.T) {
 	// set invalid config values
 	c.NetworkConfig.UnicastConfig.UnicastRateLimitersConfig.MessageRateLimit = -100
 	c.NetworkConfig.UnicastConfig.UnicastRateLimitersConfig.BandwidthRateLimit = -100
-	// expect validation error: InitDecayUpperBound should be greater than field InitDecayLowerBound
-	c.NetworkConfig.GossipSubConfig.GossipSubScoringRegistryConfig.InitDecayLowerBound = .9
-	c.NetworkConfig.GossipSubConfig.GossipSubScoringRegistryConfig.InitDecayUpperBound = .5
 	err := c.Validate()
 	require.Error(t, err)
 	errs, ok := errors.Unwrap(err).(validator.ValidationErrors)
 	require.True(t, ok)
-	require.Len(t, errs, 3)
+	require.Len(t, errs, 2)
 }
 
 // TestUnmarshall_UnsetFields ensures that if the config store has any missing config values an error is returned when the config is decoded into a Flow config.

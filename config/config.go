@@ -11,12 +11,12 @@ import (
 
 	"github.com/go-playground/validator/v10"
 	"github.com/mitchellh/mapstructure"
-	"github.com/onflow/flow-go/network/p2p/p2pconf"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
 	"github.com/onflow/flow-go/network/netconf"
+	"github.com/onflow/flow-go/network/p2p/p2pconf"
 )
 
 var (
