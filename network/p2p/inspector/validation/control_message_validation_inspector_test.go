@@ -51,7 +51,7 @@ func (suite *ControlMsgValidationInspectorSuite) SetupTest() {
 	suite.sporkID = unittest.IdentifierFixture()
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(suite.T(), err, "failed to get default flow config")
-	suite.config = &flowConfig.NetworkConfig.GossipSubRPCValidationInspectorConfigs
+	suite.config = &flowConfig.NetworkConfig.GossipSub.RpcInspector.Validation
 	distributor := mockp2p.NewGossipSubInspectorNotificationDistributor(suite.T())
 	p2ptest.MockInspectorNotificationDistributorReadyDoneAware(distributor)
 	suite.distributor = distributor

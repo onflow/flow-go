@@ -106,9 +106,6 @@ const (
 	// this threshold are dropped.
 	MaxDebugLogs = 50
 
-	// defaultScoreCacheSize is the default size of the cache used to store the app specific penalty of peers.
-	defaultScoreCacheSize = 1000
-
 	// defaultDecayInterval is the default decay interval for the overall score of a peer at the GossipSub scoring
 	// system. We set it to 1 minute so that it is not too short so that a malicious node can recover from a penalty
 	// and is not too long so that a well-behaved node can't recover from a penalty.

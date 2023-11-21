@@ -109,9 +109,9 @@ func NewControlMsgValidationInspector(params *InspectorParams) (*ControlMsgValid
 	clusterPrefixedCacheCollector := metrics.GossipSubRPCInspectorClusterPrefixedCacheMetricFactory(params.HeroCacheMetricsFactory, params.NetworkingType)
 
 	clusterPrefixedTracker, err := cache.NewClusterPrefixedMessagesReceivedTracker(params.Logger,
-		params.Config.ClusterPrefixedControlMsgsReceivedCacheSize,
+		params.Config.ClusterPrefixedMessage.ControlMsgsReceivedCacheSize,
 		clusterPrefixedCacheCollector,
-		params.Config.ClusterPrefixedControlMsgsReceivedCacheDecay)
+		params.Config.ClusterPrefixedMessage.ControlMsgsReceivedCacheDecay)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cluster prefix topics received tracker")
 	}
@@ -341,7 +341,7 @@ func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihave
 	lg := c.logger.With().
 		Str("peer_id", p2plogging.PeerId(from)).
 		Int("sample_size", len(ihaves)).
-		Int("max_sample_size", c.config.IHaveRPCInspectionConfig.MaxSampleSize).
+		Int("max_sample_size", c.config.IHave.MaxSampleSize).
 		Logger()
 	duplicateTopicTracker := make(duplicateStrTracker)
 	duplicateMessageIDTracker := make(duplicateStrTracker)
@@ -389,16 +389,16 @@ func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWant
 	lastHighest := c.rpcTracker.LastHighestIHaveRPCSize()
 	lg := c.logger.With().
 		Str("peer_id", p2plogging.PeerId(from)).
-		Uint("max_sample_size", c.config.IWantRPCInspectionConfig.MaxSampleSize).
+		Uint("max_sample_size", c.config.IWant.MaxSampleSize).
 		Int64("last_highest_ihave_rpc_size", lastHighest).
 		Logger()
 	sampleSize := uint(len(iWants))
 	tracker := make(duplicateStrTracker)
 	cacheMisses := 0
-	allowedCacheMissesThreshold := float64(sampleSize) * c.config.IWantRPCInspectionConfig.CacheMissThreshold
+	allowedCacheMissesThreshold := float64(sampleSize) * c.config.IWant.CacheMissThreshold
 	duplicates := 0
-	allowedDuplicatesThreshold := float64(sampleSize) * c.config.IWantRPCInspectionConfig.DuplicateMsgIDThreshold
-	checkCacheMisses := len(iWants) >= c.config.IWantRPCInspectionConfig.CacheMissCheckSize
+	allowedDuplicatesThreshold := float64(sampleSize) * c.config.IWant.DuplicateMsgIDThreshold
+	checkCacheMisses := len(iWants) >= c.config.IWant.CacheMissCheckSize
 	lg = lg.With().
 		Uint("iwant_sample_size", sampleSize).
 		Float64("allowed_cache_misses_threshold", allowedCacheMissesThreshold).
@@ -415,7 +415,7 @@ func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWant
 			if tracker.isDuplicate(messageID) {
 				duplicates++
 				if float64(duplicates) > allowedDuplicatesThreshold {
-					return NewIWantDuplicateMsgIDThresholdErr(duplicates, messageIDCount, c.config.IWantRPCInspectionConfig.DuplicateMsgIDThreshold)
+					return NewIWantDuplicateMsgIDThresholdErr(duplicates, messageIDCount, c.config.IWant.DuplicateMsgIDThreshold)
 				}
 			}
 			// check cache miss threshold
@@ -423,7 +423,7 @@ func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWant
 				cacheMisses++
 				if checkCacheMisses {
 					if float64(cacheMisses) > allowedCacheMissesThreshold {
-						return NewIWantCacheMissThresholdErr(cacheMisses, messageIDCount, c.config.IWantRPCInspectionConfig.CacheMissThreshold)
+						return NewIWantCacheMissThresholdErr(cacheMisses, messageIDCount, c.config.IWant.CacheMissThreshold)
 					}
 				}
 			}
@@ -577,7 +577,7 @@ func (c *ControlMsgValidationInspector) truncateIHaveMessages(rpc *pubsub.RPC) {
 	if totalIHaves == 0 {
 		return
 	}
-	sampleSize := c.config.IHaveRPCInspectionConfig.MaxSampleSize
+	sampleSize := c.config.IHave.MaxSampleSize
 	if sampleSize > totalIHaves {
 		sampleSize = totalIHaves
 	}
@@ -600,7 +600,7 @@ func (c *ControlMsgValidationInspector) truncateIHaveMessageIds(rpc *pubsub.RPC)
 		if totalMessageIDs == 0 {
 			return
 		}
-		sampleSize := c.config.IHaveRPCInspectionConfig.MaxMessageIDSampleSize
+		sampleSize := c.config.IHave.MaxMessageIDSampleSize
 		if sampleSize > totalMessageIDs {
 			sampleSize = totalMessageIDs
 		}
@@ -621,7 +621,7 @@ func (c *ControlMsgValidationInspector) truncateIWantMessages(from peer.ID, rpc 
 	if totalIWants == 0 {
 		return
 	}
-	sampleSize := c.config.IWantRPCInspectionConfig.MaxSampleSize
+	sampleSize := c.config.IWant.MaxSampleSize
 	if sampleSize > totalIWants {
 		sampleSize = totalIWants
 	}
@@ -640,15 +640,15 @@ func (c *ControlMsgValidationInspector) truncateIWantMessageIds(from peer.ID, rp
 	lastHighest := c.rpcTracker.LastHighestIHaveRPCSize()
 	lg := c.logger.With().
 		Str("peer_id", p2plogging.PeerId(from)).
-		Uint("max_sample_size", c.config.IWantRPCInspectionConfig.MaxSampleSize).
+		Uint("max_sample_size", c.config.IWant.MaxSampleSize).
 		Int64("last_highest_ihave_rpc_size", lastHighest).
 		Logger()
 
 	sampleSize := int(10 * lastHighest)
-	if sampleSize == 0 || sampleSize > c.config.IWantRPCInspectionConfig.MaxMessageIDSampleSize {
+	if sampleSize == 0 || sampleSize > c.config.IWant.MaxMessageIDSampleSize {
 		// invalid or 0 sample size is suspicious
 		lg.Warn().Str(logging.KeySuspicious, "true").Msg("zero or invalid sample size, using default max sample size")
-		sampleSize = c.config.IWantRPCInspectionConfig.MaxMessageIDSampleSize
+		sampleSize = c.config.IWant.MaxMessageIDSampleSize
 	}
 	for _, iWant := range rpc.GetControl().GetIwant() {
 		messageIDs := iWant.GetMessageIDs()
@@ -791,7 +791,7 @@ func (c *ControlMsgValidationInspector) checkClusterPrefixHardThreshold(nodeID f
 		// irrecoverable error encountered
 		c.logAndThrowError(fmt.Errorf("cluster prefixed control message gauge during hard threshold check failed for node %s: %w", nodeID, err))
 	}
-	return gauge <= c.config.ClusterPrefixHardThreshold
+	return gauge <= c.config.ClusterPrefixedMessage.HardThreshold
 }
 
 // logAndDistributeErr logs the provided error and attempts to disseminate an invalid control message validation notification for the error.

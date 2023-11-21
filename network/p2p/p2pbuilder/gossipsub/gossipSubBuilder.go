@@ -121,13 +121,6 @@ func (g *Builder) EnableGossipSubScoringWithOverride(override *p2p.PeerScoringCo
 			g.scoreOptionConfig.OverrideTopicScoreParams(topic, params)
 		}
 	}
-	if override.DecayInterval > 0 {
-		g.logger.Warn().
-			Str(logging.KeyNetworkingSecurity, "true").
-			Dur("decay_interval", override.DecayInterval).
-			Msg("overriding decay interval for gossipsub")
-		g.scoreOptionConfig.OverrideDecayInterval(override.DecayInterval)
-	}
 }
 
 // SetGossipSubScoreTracerInterval sets the gossipsub score tracer interval of the builder.
@@ -247,9 +240,9 @@ func defaultInspectorSuite(rpcTracker p2p.RpcControlTracking) p2p.GossipSubRpcIn
 		metricsInspector := inspector.NewControlMsgMetricsInspector(
 			logger,
 			p2pnode.NewGossipSubControlMessageMetrics(gossipSubMetrics, logger),
-			inspectorCfg.GossipSubRPCMetricsInspectorConfigs.NumberOfWorkers,
+			inspectorCfg.Metrics.NumberOfWorkers,
 			[]queue.HeroStoreConfigOption{
-				queue.WithHeroStoreSizeLimit(inspectorCfg.GossipSubRPCMetricsInspectorConfigs.CacheSize),
+				queue.WithHeroStoreSizeLimit(inspectorCfg.Metrics.CacheSize),
 				queue.WithHeroStoreCollector(
 					metrics.GossipSubRPCMetricsObserverInspectorQueueMetricFactory(
 						heroCacheMetricsFactory,
@@ -263,7 +256,7 @@ func defaultInspectorSuite(rpcTracker p2p.RpcControlTracking) p2p.GossipSubRpcIn
 		params := &validation.InspectorParams{
 			Logger:                  logger,
 			SporkID:                 sporkId,
-			Config:                  &inspectorCfg.GossipSubRPCValidationInspectorConfigs,
+			Config:                  &inspectorCfg.Validation,
 			Distributor:             notificationDistributor,
 			HeroCacheMetricsFactory: heroCacheMetricsFactory,
 			IdProvider:              idProvider,
