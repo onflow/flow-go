@@ -224,7 +224,7 @@ func finalize(cmd *cobra.Command, args []string) {
 	// if no root commit is specified, bootstrap an empty execution state
 	if flagRootCommit == "0000000000000000000000000000000000000000000000000000000000000000" {
 		generateEmptyExecutionState(
-			block.Header.ChainID,
+			block.Header,
 			assignments,
 			clusterQCs,
 			dkgData,
@@ -599,7 +599,7 @@ func loadRootProtocolSnapshot(path string) (*inmem.Snapshot, error) {
 // generateEmptyExecutionState generates a new empty execution state with the
 // given configuration. Sets the flagRootCommit variable for future reads.
 func generateEmptyExecutionState(
-	chainID flow.ChainID,
+	rootBlock *flow.Header,
 	assignments flow.AssignmentList,
 	clusterQCs []*flow.QuorumCertificate,
 	dkgData dkg.DKGData,
@@ -645,7 +645,8 @@ func generateEmptyExecutionState(
 	commit, err = run.GenerateExecutionState(
 		filepath.Join(flagOutdir, model.DirnameExecutionState),
 		serviceAccountPublicKey,
-		chainID.Chain(),
+		rootBlock.ChainID.Chain(),
+		fvm.WithRootBlock(rootBlock),
 		fvm.WithInitialTokenSupply(cdcInitialTokenSupply),
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
