@@ -710,7 +710,7 @@ func (c *ControlMsgValidationInspector) validateTopic(from peer.ID, topic channe
 //   - channels.UnknownClusterIDErr: if the topic contains a cluster ID prefix that is not in the active cluster IDs list.
 //
 // In the case where an ErrActiveClusterIdsNotSet or UnknownClusterIDErr is encountered and the cluster prefixed topic received
-// tracker for the peer is less than or equal to the configured ClusterPrefixHardThreshold an error will only be logged and not returned.
+// tracker for the peer is less than or equal to the configured HardThreshold an error will only be logged and not returned.
 // At the point where the hard threshold is crossed the error will be returned and the sender will start to be penalized.
 // Any errors encountered while incrementing or loading the cluster prefixed control message gauge for a peer will result in an irrecoverable error being thrown, these
 // errors are unexpected and irrecoverable indicating a bug.
@@ -782,7 +782,7 @@ func (c *ControlMsgValidationInspector) getFlowIdentifier(peerID peer.ID) (flow.
 }
 
 // checkClusterPrefixHardThreshold returns true if the cluster prefix received tracker count is less than
-// the configured ClusterPrefixHardThreshold, false otherwise.
+// the configured HardThreshold, false otherwise.
 // If any error is encountered while loading from the tracker this func will throw an error on the signaler context, these errors
 // are unexpected and irrecoverable indicating a bug.
 func (c *ControlMsgValidationInspector) checkClusterPrefixHardThreshold(nodeID flow.Identifier) bool {

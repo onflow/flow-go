@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 	netcache "github.com/onflow/flow-go/network/p2p/cache"
+	"github.com/onflow/flow-go/network/p2p/p2pconf"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -305,21 +306,9 @@ type ScoreOption struct {
 	appScoreFunc        func(peer.ID) float64
 }
 
-// Parameters are the parameters for the score option.
-// Parameters are "numerical values" that are used to compute or build components that compute the score of a peer in GossipSub system.
-type Parameters struct {
-	AppSpecificScore AppSpecificScoreRegistryParams `validate:"required" mapstructure:"app-specific-score"`
-	// SpamRecordCacheSize is size of the cache used to store the spam records of peers.
-	// The spam records are used to penalize peers that send invalid messages.
-	SpamRecordCacheSize uint32 `validate:"gt=0" mapstructure:"spam-record-cache-size"`
-
-	// DecayInterval is the interval at which the counters associated with a peer behavior in GossipSub system are decayed.
-	DecayInterval time.Duration `validate:"gt=0s" mapstructure:"decay-interval"`
-}
-
 type ScoreOptionConfig struct {
 	logger                           zerolog.Logger
-	params                           Parameters
+	params                           p2pconf.ScoringParameters
 	provider                         module.IdentityProvider
 	heroCacheMetricsFactory          metrics.HeroCacheMetricsFactory
 	appScoreFunc                     func(peer.ID) float64
@@ -335,7 +324,7 @@ type ScoreOptionConfig struct {
 // Returns:
 // - a new configuration for the GossipSub peer scoring option.
 func NewScoreOptionConfig(logger zerolog.Logger,
-	params Parameters,
+	params p2pconf.ScoringParameters,
 	hcMetricsFactory metrics.HeroCacheMetricsFactory,
 	idProvider module.IdentityProvider) *ScoreOptionConfig {
 	return &ScoreOptionConfig{

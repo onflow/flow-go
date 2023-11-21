@@ -2,8 +2,6 @@ package p2pconf
 
 import (
 	"time"
-
-	"github.com/onflow/flow-go/network/p2p/scoring"
 )
 
 // ResourceManagerConfig returns the resource manager configuration for the libp2p node.
@@ -23,13 +21,13 @@ type ResourceManagerOverrideScope struct {
 	// Transient is the limit for the resource at the transient scope. Transient limits are used for resources that have not fully established and are under negotiation.
 	Transient ResourceManagerOverrideLimit `mapstructure:"transient"`
 
-	// Protocol is the limit for the resource at the protocol scope, e.g., DHT, GossipSub, etc. It dictates the maximum allowed resource across all peers for that protocol.
+	// Protocol is the limit for the resource at the protocol scope, e.g., DHT, GossipSubParameters, etc. It dictates the maximum allowed resource across all peers for that protocol.
 	Protocol ResourceManagerOverrideLimit `mapstructure:"protocol"`
 
 	// Peer is the limit for the resource at the peer scope. It dictates the maximum allowed resource for a specific peer.
 	Peer ResourceManagerOverrideLimit `mapstructure:"peer"`
 
-	// Connection is the limit for the resource for a pair of (peer, protocol), e.g., (peer1, DHT), (peer1, GossipSub), etc. It dictates the maximum allowed resource for a protocol and a peer.
+	// Connection is the limit for the resource for a pair of (peer, protocol), e.g., (peer1, DHT), (peer1, GossipSubParameters), etc. It dictates the maximum allowed resource for a protocol and a peer.
 	PeerProtocol ResourceManagerOverrideLimit `mapstructure:"peer-protocol"`
 }
 
@@ -56,31 +54,59 @@ type ResourceManagerOverrideLimit struct {
 	Memory int `validate:"gte=0" mapstructure:"memory-bytes"`
 }
 
-// GossipSubConfig keys.
+// GossipSubParameters keys.
 const (
 	RpcInspectorKey         = "rpc-inspector"
 	RpcTracerKey            = "rpc-tracer"
-	PeerScoringKey          = "peer-scoring-enabled"
+	PeerScoringEnabledKey   = "peer-scoring-enabled"
 	ScoreParamsKey          = "scoring-parameters"
 	SubscriptionProviderKey = "subscription-provider"
 )
 
-var GossipSubConfigKeys = []string{RpcInspectorKey, RpcTracerKey, PeerScoringKey, ScoreParamsKey, SubscriptionProviderKey}
+var GossipSubConfigKeys = []string{RpcInspectorKey, RpcTracerKey, PeerScoringEnabledKey, ScoreParamsKey, SubscriptionProviderKey}
 
-// GossipSubConfig is the configuration for the GossipSub pubsub implementation.
-type GossipSubConfig struct {
+// GossipSubParameters is the configuration for the GossipSubParameters pubsub implementation.
+type GossipSubParameters struct {
 	// RpcInspectorParameters configuration for all gossipsub RPC control message inspectors.
 	RpcInspector RpcInspectorParameters `mapstructure:"rpc-inspector"`
 
-	// GossipSubTracerParameters is the configuration for the gossipsub tracer. GossipSub tracer is used to trace the local mesh events and peer scores.
+	// GossipSubTracerParameters is the configuration for the gossipsub tracer. GossipSubParameters tracer is used to trace the local mesh events and peer scores.
 	RpcTracer GossipSubTracerParameters `mapstructure:"rpc-tracer"`
 
-	// ScoringParameters is whether to enable GossipSub peer scoring.
-	PeerScoringSwitch bool `mapstructure:"peer-scoring-enabled"`
+	// ScoringParameters is whether to enable GossipSubParameters peer scoring.
+	PeerScoringEnabled bool `mapstructure:"peer-scoring-enabled"`
 
 	SubscriptionProvider SubscriptionProviderParameters `mapstructure:"subscription-provider"`
 
-	ScoringParameters scoring.Parameters `mapstructure:"scoring-parameters"`
+	ScoringParameters ScoringParameters `mapstructure:"scoring-parameters"`
+}
+
+// Parameters are the parameters for the score option.
+// Parameters are "numerical values" that are used to compute or build components that compute the score of a peer in GossipSub system.
+type ScoringParameters struct {
+	AppSpecificScore AppSpecificScoreRegistryParams `validate:"required" mapstructure:"app-specific-score"`
+	// SpamRecordCacheSize is size of the cache used to store the spam records of peers.
+	// The spam records are used to penalize peers that send invalid messages.
+	SpamRecordCacheSize uint32 `validate:"gt=0" mapstructure:"spam-record-cache-size"`
+
+	// DecayInterval is the interval at which the counters associated with a peer behavior in GossipSub system are decayed.
+	DecayInterval time.Duration `validate:"gt=0s" mapstructure:"decay-interval"`
+}
+
+// AppSpecificScoreRegistryParams is the parameters for the GossipSubAppSpecificScoreRegistry.
+// Parameters are "numerical values" that are used to compute or build components that compute or maintain the application specific score of peers.
+type AppSpecificScoreRegistryParams struct {
+	// ScoreUpdateWorkerNum is the number of workers in the worker pool for handling the application specific score update of peers in a non-blocking way.
+	ScoreUpdateWorkerNum int `validate:"gt=0" mapstructure:"score-update-worker-num"`
+
+	// ScoreUpdateRequestQueueSize is the size of the worker pool for handling the application specific score update of peers in a non-blocking way.
+	ScoreUpdateRequestQueueSize uint32 `validate:"gt=0" mapstructure:"score-update-request-queue-size"`
+
+	// ScoreTTL is the time to live of the application specific score of a peer; the registry keeps a cached copy of the
+	// application specific score of a peer for this duration. When the duration expires, the application specific score
+	// of the peer is updated asynchronously. As long as the update is in progress, the cached copy of the application
+	// specific score of the peer is used even if it is expired.
+	ScoreTTL time.Duration `validate:"required" mapstructure:"score-ttl"`
 }
 
 // SubscriptionProviderParameters keys.
@@ -118,7 +144,7 @@ var TracerParametersKeys = []string{LocalMeshLogIntervalKey,
 	RPCSentTrackerQueueCacheSizeKey,
 	RPCSentTrackerNumOfWorkersKey}
 
-// GossipSubTracerParameters is the config for the gossipsub tracer. GossipSub tracer is used to trace the local mesh events and peer scores.
+// GossipSubTracerParameters is the config for the gossipsub tracer. GossipSubParameters tracer is used to trace the local mesh events and peer scores.
 type GossipSubTracerParameters struct {
 	// LocalMeshLogInterval is the interval at which the local mesh is logged.
 	LocalMeshLogInterval time.Duration `validate:"gt=0s" mapstructure:"local-mesh-logging-interval"`

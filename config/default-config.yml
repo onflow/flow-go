@@ -154,7 +154,7 @@ network-config:
           # The max allowed duplicate message IDs in a single iWant control message. If the duplicate message threshold is exceeded an invalid control message
           # notification is disseminated and the sender will be penalized.
           duplicate-message-id-threshold: .15
-        cluster-prefixed-message:
+        cluster-prefixed-messages:
           # Cluster prefixed control message validation configs
           # The size of the cache used to track the amount of cluster prefixed topics received by peers
           tracker-cache-size: 100

@@ -30,7 +30,7 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// The Builder struct is used to configure and create a new GossipSub pubsub system.
+// The Builder struct is used to configure and create a new GossipSubParameters pubsub system.
 type Builder struct {
 	networkType                  network.NetworkingType
 	sporkId                      flow.Identifier
@@ -92,7 +92,7 @@ func (g *Builder) SetGossipSubConfigFunc(gossipSubConfigFunc p2p.GossipSubAdapte
 	g.gossipSubConfigFunc = gossipSubConfigFunc
 }
 
-// EnableGossipSubScoringWithOverride enables peer scoring for the GossipSub pubsub system with the given override.
+// EnableGossipSubScoringWithOverride enables peer scoring for the GossipSubParameters pubsub system with the given override.
 // Any existing peer scoring config attribute that is set in the override will override the default peer scoring config.
 // Anything that is left to nil or zero value in the override will be ignored and the default value will be used.
 // Note: it is not recommended to override the default peer scoring config in production unless you know what you are doing.
@@ -280,15 +280,15 @@ func defaultInspectorSuite(rpcTracker p2p.RpcControlTracking) p2p.GossipSubRpcIn
 	}
 }
 
-// Build creates a new GossipSub pubsub system.
-// It returns the newly created GossipSub pubsub system and any errors encountered during its creation.
+// Build creates a new GossipSubParameters pubsub system.
+// It returns the newly created GossipSubParameters pubsub system and any errors encountered during its creation.
 // Arguments:
 // - ctx: the irrecoverable context of the node.
 //
 // Returns:
-// - p2p.PubSubAdapter: a GossipSub pubsub system for the libp2p node.
-// - p2p.PeerScoreTracer: a peer score tracer for the GossipSub pubsub system (if enabled, otherwise nil).
-// - error: if an error occurs during the creation of the GossipSub pubsub system, it is returned. Otherwise, nil is returned.
+// - p2p.PubSubAdapter: a GossipSubParameters pubsub system for the libp2p node.
+// - p2p.PeerScoreTracer: a peer score tracer for the GossipSubParameters pubsub system (if enabled, otherwise nil).
+// - error: if an error occurs during the creation of the GossipSubParameters pubsub system, it is returned. Otherwise, nil is returned.
 // Note that on happy path, the returned error is nil. Any error returned is unexpected and should be handled as irrecoverable.
 func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, error) {
 	// placeholder for the gossipsub pubsub system that will be created (so that it can be passed around even

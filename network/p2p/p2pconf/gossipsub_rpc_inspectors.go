@@ -7,8 +7,6 @@ const (
 	NotificationCacheSizeKey = "notification-cache-size"
 )
 
-var RpcInspectorParametersKeys = []string{ValidationConfigKey, MetricsConfigKey, NotificationCacheSizeKey}
-
 // RpcInspectorParameters contains the "numerical values" for the gossipsub RPC control message inspectors parameters.
 type RpcInspectorParameters struct {
 	// RpcValidationInspector control message validation inspector validation configuration and limits.
@@ -27,17 +25,8 @@ const (
 	QueueSizeKey                      = "queue-size"
 	GraftPruneMessageMaxSampleSizeKey = "graft-and-prune-message-max-sample-size"
 	MessageMaxSampleSizeKey           = "message-max-sample-size"
-	MessageErrorThresholdKey          = "message-error-threshold"
+	MessageErrorThresholdKey          = "error-threshold"
 )
-
-var RpcValidationInspectorParamterKeys = []string{ClusterPrefixedMessageConfigKey,
-	IWantConfigKey,
-	IHaveConfigKey,
-	NumberOfWorkersKey,
-	QueueSizeKey,
-	GraftPruneMessageMaxSampleSizeKey,
-	MessageMaxSampleSizeKey,
-	MessageErrorThresholdKey}
 
 // RpcValidationInspector validation limits used for gossipsub RPC control message inspection.
 type RpcValidationInspector struct {
@@ -54,7 +43,7 @@ type RpcValidationInspector struct {
 	// RPCMessageMaxSampleSize the max sample size used for RPC message validation. If the total number of RPC messages exceeds this value a sample will be taken but messages will not be truncated.
 	MessageMaxSampleSize int `validate:"gte=1000" mapstructure:"message-max-sample-size"`
 	// RPCMessageErrorThreshold the threshold at which an error will be returned if the number of invalid RPC messages exceeds this value.
-	MessageErrorThreshold int `validate:"gte=500" mapstructure:"message-error-threshold"`
+	MessageErrorThreshold int `validate:"gte=500" mapstructure:"error-threshold"`
 }
 
 const (
@@ -64,8 +53,6 @@ const (
 	CacheMissCheckSizeKey      = "cache-miss-check-size"
 	DuplicateMsgIDThresholdKey = "duplicate-message-id-threshold"
 )
-
-var IWantRPCInspectionParametersKeys = []string{MaxSampleSizeKey, MaxMessageIDSampleSizeKey, CacheMissThresholdKey, CacheMissCheckSizeKey, DuplicateMsgIDThresholdKey}
 
 // IWantRPCInspectionParameters contains the "numerical values" for the iwant rpc control message inspection.
 type IWantRPCInspectionParameters struct {
@@ -85,8 +72,6 @@ type IWantRPCInspectionParameters struct {
 	DuplicateMsgIDThreshold float64 `validate:"gt=0" mapstructure:"duplicate-message-id-threshold"`
 }
 
-var IHaveRPCInspectionConfigKeys = []string{MaxSampleSizeKey, MaxMessageIDSampleSizeKey}
-
 // IHaveRpcInspectionParameters contains the "numerical values" for ihave rpc control inspection.
 type IHaveRpcInspectionParameters struct {
 	// MaxSampleSize max inspection sample size to use. If the number of ihave messages exceeds this configured value
@@ -103,27 +88,23 @@ const (
 	TrackerCacheDecayKey = "tracker-cache-decay"
 )
 
-var ClusterPrefixedMessageParameterKeys = []string{HardThresholdKey, TrackerCacheSizeKey, TrackerCacheDecayKey}
-
 // ClusterPrefixedMessageInspectionParameters contains the "numerical values" for cluster prefixed control message inspection.
 type ClusterPrefixedMessageInspectionParameters struct {
-	// ClusterPrefixHardThreshold the upper bound on the amount of cluster prefixed control messages that will be processed
+	// HardThreshold the upper bound on the amount of cluster prefixed control messages that will be processed
 	// before a node starts to get penalized. This allows LN nodes to process some cluster prefixed control messages during startup
 	// when the cluster ID's provider is set asynchronously. It also allows processing of some stale messages that may be sent by nodes
 	// that fall behind in the protocol. After the amount of cluster prefixed control messages processed exceeds this threshold the node
 	// will be pushed to the edge of the network mesh.
-	ClusterPrefixHardThreshold float64 `validate:"gte=0" mapstructure:"hard-threshold"`
-	// ClusterPrefixedControlMsgsReceivedCacheSize size of the cache used to track the amount of cluster prefixed topics received by peers.
-	ClusterPrefixedControlMsgsReceivedCacheSize uint32 `validate:"gt=0" mapstructure:"tracker-cache-size"`
-	// ClusterPrefixedControlMsgsReceivedCacheDecay decay val used for the geometric decay of cache counters used to keep track of cluster prefixed topics received by peers.
-	ClusterPrefixedControlMsgsReceivedCacheDecay float64 `validate:"gt=0" mapstructure:"tracker-cache-decay"`
+	HardThreshold float64 `validate:"gte=0" mapstructure:"hard-threshold"`
+	// ControlMsgsReceivedCacheSize size of the cache used to track the amount of cluster prefixed topics received by peers.
+	ControlMsgsReceivedCacheSize uint32 `validate:"gt=0" mapstructure:"tracker-cache-size"`
+	// ControlMsgsReceivedCacheDecay decay val used for the geometric decay of cache counters used to keep track of cluster prefixed topics received by peers.
+	ControlMsgsReceivedCacheDecay float64 `validate:"gt=0" mapstructure:"tracker-cache-decay"`
 }
 
 const (
 	NumberOfWorkersKey = "workers"
 )
-
-var RpcMetricsInspectorConfigsKeys = []string{NumberOfWorkersKey, CacheSizeKey}
 
 // RpcMetricsInspectorConfigs contains the "numerical values" for the gossipsub RPC control message metrics inspectors parameters.
 type RpcMetricsInspectorConfigs struct {

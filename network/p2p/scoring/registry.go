@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	netcache "github.com/onflow/flow-go/network/p2p/cache"
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
+	"github.com/onflow/flow-go/network/p2p/p2pconf"
 	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -113,26 +114,10 @@ type GossipSubAppSpecificScoreRegistry struct {
 	appScoreUpdateWorkerPool *worker.Pool[peer.ID]
 }
 
-// AppSpecificScoreRegistryParams is the parameters for the GossipSubAppSpecificScoreRegistry.
-// Parameters are "numerical values" that are used to compute or build components that compute or maintain the application specific score of peers.
-type AppSpecificScoreRegistryParams struct {
-	// ScoreUpdateWorkerNum is the number of workers in the worker pool for handling the application specific score update of peers in a non-blocking way.
-	ScoreUpdateWorkerNum int `validate:"gt=0" mapstructure:"score-update-worker-num"`
-
-	// ScoreUpdateRequestQueueSize is the size of the worker pool for handling the application specific score update of peers in a non-blocking way.
-	ScoreUpdateRequestQueueSize uint32 `validate:"gt=0" mapstructure:"score-update-request-queue-size"`
-
-	// ScoreTTL is the time to live of the application specific score of a peer; the registry keeps a cached copy of the
-	// application specific score of a peer for this duration. When the duration expires, the application specific score
-	// of the peer is updated asynchronously. As long as the update is in progress, the cached copy of the application
-	// specific score of the peer is used even if it is expired.
-	ScoreTTL time.Duration `validate:"required" mapstructure:"score-ttl"`
-}
-
 // GossipSubAppSpecificScoreRegistryConfig is the configuration for the GossipSubAppSpecificScoreRegistry.
 // Configurations are the "union of parameters and other components" that are used to compute or build components that compute or maintain the application specific score of peers.
 type GossipSubAppSpecificScoreRegistryConfig struct {
-	Parameters AppSpecificScoreRegistryParams `validate:"required"`
+	Parameters p2pconf.AppSpecificScoreRegistryParams `validate:"required"`
 
 	Logger zerolog.Logger `validate:"required"`
 
