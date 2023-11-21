@@ -505,7 +505,7 @@ func (h *handler) GetTransactionResultsByBlockID(
 func (h *handler) GetTransactionErrorMessage(
 	_ context.Context,
 	req *execution.GetTransactionErrorMessageRequest,
-) (*execution.GetTransactionErrorMessagesResponse, error) {
+) (*execution.GetTransactionErrorMessageResponse, error) {
 	reqBlockID := req.GetBlockId()
 	blockID, err := convert.BlockID(reqBlockID)
 	if err != nil {
@@ -528,7 +528,7 @@ func (h *handler) GetTransactionErrorMessage(
 		return nil, status.Errorf(codes.Internal, "failed to get transaction result: %v", err)
 	}
 
-	result := &execution.GetTransactionErrorMessagesResponse_Result{
+	result := &execution.GetTransactionErrorMessageResponse{
 		TransactionId: convert.IdentifierToMessage(txResult.TransactionID),
 	}
 
@@ -545,10 +545,7 @@ func (h *handler) GetTransactionErrorMessage(
 		}
 		result.ErrorMessage = cadenceErrMessage
 	}
-
-	return &execution.GetTransactionErrorMessagesResponse{
-		Results: []*execution.GetTransactionErrorMessagesResponse_Result{result},
-	}, nil
+	return result, nil
 }
 
 // GetTransactionErrorMessageByIndex implements a grpc handler for getting a transaction error message by block ID and tx index.
@@ -558,7 +555,7 @@ func (h *handler) GetTransactionErrorMessage(
 func (h *handler) GetTransactionErrorMessageByIndex(
 	_ context.Context,
 	req *execution.GetTransactionErrorMessageByIndexRequest,
-) (*execution.GetTransactionErrorMessagesResponse, error) {
+) (*execution.GetTransactionErrorMessageResponse, error) {
 	reqBlockID := req.GetBlockId()
 	blockID, err := convert.BlockID(reqBlockID)
 	if err != nil {
@@ -577,9 +574,8 @@ func (h *handler) GetTransactionErrorMessageByIndex(
 		return nil, status.Errorf(codes.Internal, "failed to get transaction result: %v", err)
 	}
 
-	result := &execution.GetTransactionErrorMessagesResponse_Result{
+	result := &execution.GetTransactionErrorMessageResponse{
 		TransactionId: convert.IdentifierToMessage(txResult.TransactionID),
-		Index:         index,
 	}
 
 	if len(txResult.ErrorMessage) > 0 {
@@ -595,10 +591,7 @@ func (h *handler) GetTransactionErrorMessageByIndex(
 		}
 		result.ErrorMessage = cadenceErrMessage
 	}
-
-	return &execution.GetTransactionErrorMessagesResponse{
-		Results: []*execution.GetTransactionErrorMessagesResponse_Result{result},
-	}, nil
+	return result, nil
 }
 
 // GetTransactionErrorMessagesByBlockID implements a grpc handler for getting transaction error messages by block ID.

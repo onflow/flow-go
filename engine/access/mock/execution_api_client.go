@@ -215,7 +215,7 @@ func (_m *ExecutionAPIClient) GetRegisterAtBlockID(ctx context.Context, in *exec
 }
 
 // GetTransactionErrorMessage provides a mock function with given fields: ctx, in, opts
-func (_m *ExecutionAPIClient) GetTransactionErrorMessage(ctx context.Context, in *execution.GetTransactionErrorMessageRequest, opts ...grpc.CallOption) (*execution.GetTransactionErrorMessagesResponse, error) {
+func (_m *ExecutionAPIClient) GetTransactionErrorMessage(ctx context.Context, in *execution.GetTransactionErrorMessageRequest, opts ...grpc.CallOption) (*execution.GetTransactionErrorMessageResponse, error) {
 	_va := make([]interface{}, len(opts))
 	for _i := range opts {
 		_va[_i] = opts[_i]
@@ -225,16 +225,16 @@ func (_m *ExecutionAPIClient) GetTransactionErrorMessage(ctx context.Context, in
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
-	var r0 *execution.GetTransactionErrorMessagesResponse
+	var r0 *execution.GetTransactionErrorMessageResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *execution.GetTransactionErrorMessageRequest, ...grpc.CallOption) (*execution.GetTransactionErrorMessagesResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *execution.GetTransactionErrorMessageRequest, ...grpc.CallOption) (*execution.GetTransactionErrorMessageResponse, error)); ok {
 		return rf(ctx, in, opts...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *execution.GetTransactionErrorMessageRequest, ...grpc.CallOption) *execution.GetTransactionErrorMessagesResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *execution.GetTransactionErrorMessageRequest, ...grpc.CallOption) *execution.GetTransactionErrorMessageResponse); ok {
 		r0 = rf(ctx, in, opts...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*execution.GetTransactionErrorMessagesResponse)
+			r0 = ret.Get(0).(*execution.GetTransactionErrorMessageResponse)
 		}
 	}
 
@@ -248,7 +248,7 @@ func (_m *ExecutionAPIClient) GetTransactionErrorMessage(ctx context.Context, in
 }
 
 // GetTransactionErrorMessageByIndex provides a mock function with given fields: ctx, in, opts
-func (_m *ExecutionAPIClient) GetTransactionErrorMessageByIndex(ctx context.Context, in *execution.GetTransactionErrorMessageByIndexRequest, opts ...grpc.CallOption) (*execution.GetTransactionErrorMessagesResponse, error) {
+func (_m *ExecutionAPIClient) GetTransactionErrorMessageByIndex(ctx context.Context, in *execution.GetTransactionErrorMessageByIndexRequest, opts ...grpc.CallOption) (*execution.GetTransactionErrorMessageResponse, error) {
 	_va := make([]interface{}, len(opts))
 	for _i := range opts {
 		_va[_i] = opts[_i]
@@ -258,16 +258,16 @@ func (_m *ExecutionAPIClient) GetTransactionErrorMessageByIndex(ctx context.Cont
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
-	var r0 *execution.GetTransactionErrorMessagesResponse
+	var r0 *execution.GetTransactionErrorMessageResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *execution.GetTransactionErrorMessageByIndexRequest, ...grpc.CallOption) (*execution.GetTransactionErrorMessagesResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *execution.GetTransactionErrorMessageByIndexRequest, ...grpc.CallOption) (*execution.GetTransactionErrorMessageResponse, error)); ok {
 		return rf(ctx, in, opts...)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *execution.GetTransactionErrorMessageByIndexRequest, ...grpc.CallOption) *execution.GetTransactionErrorMessagesResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *execution.GetTransactionErrorMessageByIndexRequest, ...grpc.CallOption) *execution.GetTransactionErrorMessageResponse); ok {
 		r0 = rf(ctx, in, opts...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*execution.GetTransactionErrorMessagesResponse)
+			r0 = ret.Get(0).(*execution.GetTransactionErrorMessageResponse)
 		}
 	}
 

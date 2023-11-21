@@ -171,19 +171,19 @@ func (_m *ExecutionAPIServer) GetRegisterAtBlockID(_a0 context.Context, _a1 *exe
 }
 
 // GetTransactionErrorMessage provides a mock function with given fields: _a0, _a1
-func (_m *ExecutionAPIServer) GetTransactionErrorMessage(_a0 context.Context, _a1 *execution.GetTransactionErrorMessageRequest) (*execution.GetTransactionErrorMessagesResponse, error) {
+func (_m *ExecutionAPIServer) GetTransactionErrorMessage(_a0 context.Context, _a1 *execution.GetTransactionErrorMessageRequest) (*execution.GetTransactionErrorMessageResponse, error) {
 	ret := _m.Called(_a0, _a1)
 
-	var r0 *execution.GetTransactionErrorMessagesResponse
+	var r0 *execution.GetTransactionErrorMessageResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *execution.GetTransactionErrorMessageRequest) (*execution.GetTransactionErrorMessagesResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *execution.GetTransactionErrorMessageRequest) (*execution.GetTransactionErrorMessageResponse, error)); ok {
 		return rf(_a0, _a1)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *execution.GetTransactionErrorMessageRequest) *execution.GetTransactionErrorMessagesResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *execution.GetTransactionErrorMessageRequest) *execution.GetTransactionErrorMessageResponse); ok {
 		r0 = rf(_a0, _a1)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*execution.GetTransactionErrorMessagesResponse)
+			r0 = ret.Get(0).(*execution.GetTransactionErrorMessageResponse)
 		}
 	}
 
@@ -197,19 +197,19 @@ func (_m *ExecutionAPIServer) GetTransactionErrorMessage(_a0 context.Context, _a
 }
 
 // GetTransactionErrorMessageByIndex provides a mock function with given fields: _a0, _a1
-func (_m *ExecutionAPIServer) GetTransactionErrorMessageByIndex(_a0 context.Context, _a1 *execution.GetTransactionErrorMessageByIndexRequest) (*execution.GetTransactionErrorMessagesResponse, error) {
+func (_m *ExecutionAPIServer) GetTransactionErrorMessageByIndex(_a0 context.Context, _a1 *execution.GetTransactionErrorMessageByIndexRequest) (*execution.GetTransactionErrorMessageResponse, error) {
 	ret := _m.Called(_a0, _a1)
 
-	var r0 *execution.GetTransactionErrorMessagesResponse
+	var r0 *execution.GetTransactionErrorMessageResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *execution.GetTransactionErrorMessageByIndexRequest) (*execution.GetTransactionErrorMessagesResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *execution.GetTransactionErrorMessageByIndexRequest) (*execution.GetTransactionErrorMessageResponse, error)); ok {
 		return rf(_a0, _a1)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *execution.GetTransactionErrorMessageByIndexRequest) *execution.GetTransactionErrorMessagesResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *execution.GetTransactionErrorMessageByIndexRequest) *execution.GetTransactionErrorMessageResponse); ok {
 		r0 = rf(_a0, _a1)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*execution.GetTransactionErrorMessagesResponse)
+			r0 = ret.Get(0).(*execution.GetTransactionErrorMessageResponse)
 		}
 	}
 

@@ -928,14 +928,9 @@ func (suite *Suite) TestGetTransactionErrorMessage() {
 	suite.Run("happy path - by tx id - no transaction error", func() {
 
 		// create the expected result
-		expectedResult := &execution.GetTransactionErrorMessagesResponse{
-			Results: []*execution.GetTransactionErrorMessagesResponse_Result{
-				{
-					TransactionId: convert.IdentifierToMessage(txID),
-					Index:         0,
-					ErrorMessage:  "",
-				},
-			},
+		expectedResult := &execution.GetTransactionErrorMessageResponse{
+			TransactionId: convert.IdentifierToMessage(txID),
+			ErrorMessage:  "",
 		}
 
 		// expect a call to lookup transaction result by block ID and transaction ID, return a result with no error
@@ -958,20 +953,15 @@ func (suite *Suite) TestGetTransactionErrorMessage() {
 		suite.Require().NoError(err)
 
 		// check that all fields in response are as expected
-		suite.ElementsMatch(expectedResult.Results, actualResult.Results)
+		suite.Equal(expectedResult, actualResult)
 	})
 
 	suite.Run("happy path - at index - no transaction error", func() {
 
 		// create the expected result
-		expectedResult := &execution.GetTransactionErrorMessagesResponse{
-			Results: []*execution.GetTransactionErrorMessagesResponse_Result{
-				{
-					TransactionId: convert.IdentifierToMessage(txID),
-					Index:         txIndex,
-					ErrorMessage:  "",
-				},
-			},
+		expectedResult := &execution.GetTransactionErrorMessageResponse{
+			TransactionId: convert.IdentifierToMessage(txID),
+			ErrorMessage:  "",
 		}
 
 		// expect a call to lookup transaction result by block ID and transaction ID, return a result with no error
@@ -994,20 +984,15 @@ func (suite *Suite) TestGetTransactionErrorMessage() {
 		suite.Require().NoError(err)
 
 		// check that all fields in response are as expected
-		suite.ElementsMatch(expectedResult.Results, actualResult.Results)
+		suite.Equal(expectedResult, actualResult)
 	})
 
 	suite.Run("happy path - by tx id - transaction error", func() {
 
 		// create the expected result
-		expectedResult := &execution.GetTransactionErrorMessagesResponse{
-			Results: []*execution.GetTransactionErrorMessagesResponse_Result{
-				{
-					TransactionId: convert.IdentifierToMessage(txID),
-					Index:         0,
-					ErrorMessage:  "runtime error",
-				},
-			},
+		expectedResult := &execution.GetTransactionErrorMessageResponse{
+			TransactionId: convert.IdentifierToMessage(txID),
+			ErrorMessage:  "runtime error",
 		}
 
 		// setup the storage to return a transaction error
@@ -1030,20 +1015,15 @@ func (suite *Suite) TestGetTransactionErrorMessage() {
 		suite.Require().NoError(err)
 
 		// check that all fields in response are as expected
-		suite.ElementsMatch(expectedResult.Results, actualResult.Results)
+		suite.Equal(expectedResult, actualResult)
 	})
 
 	suite.Run("happy path - at index - transaction error", func() {
 
 		// create the expected result
-		expectedResult := &execution.GetTransactionErrorMessagesResponse{
-			Results: []*execution.GetTransactionErrorMessagesResponse_Result{
-				{
-					TransactionId: convert.IdentifierToMessage(txID),
-					Index:         txIndex,
-					ErrorMessage:  "runtime error",
-				},
-			},
+		expectedResult := &execution.GetTransactionErrorMessageResponse{
+			TransactionId: convert.IdentifierToMessage(txID),
+			ErrorMessage:  "runtime error",
 		}
 
 		// setup the storage to return a transaction error
@@ -1066,7 +1046,7 @@ func (suite *Suite) TestGetTransactionErrorMessage() {
 		suite.Require().NoError(err)
 
 		// check that all fields in response are as expected
-		suite.ElementsMatch(expectedResult.Results, actualResult.Results)
+		suite.Equal(expectedResult, actualResult)
 	})
 
 	// failure path - nil transaction ID in the request results in an error
