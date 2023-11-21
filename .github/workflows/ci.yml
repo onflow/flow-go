@@ -117,7 +117,7 @@ jobs:
           ledger 
           module/dkg module:buildjet-4vcpu-ubuntu-2204 
           network/alsp
-          network/test/cohort1:buildjet-16vcpu-ubuntu-2204 
+          network/test/cohort1:buildjet-4vcpu-ubuntu-2204
           network/test/cohort2:buildjet-4vcpu-ubuntu-2204
           network/p2p/connection
           network/p2p/p2pnode:buildjet-4vcpu-ubuntu-2204 
@@ -217,7 +217,7 @@ jobs:
 
   docker-build:
     name: Docker Build
-    runs-on: buildjet-16vcpu-ubuntu-2204
+    runs-on: buildjet-4vcpu-ubuntu-2204
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
