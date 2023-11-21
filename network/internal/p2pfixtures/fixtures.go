@@ -33,7 +33,6 @@ import (
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
-	"github.com/onflow/flow-go/network/p2p/tracer"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -100,20 +99,9 @@ func CreateNode(t *testing.T, networkKey crypto.PrivateKey, sporkID flow.Identif
 	defaultFlowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
 
-	meshTracerCfg := &tracer.GossipSubMeshTracerConfig{
-		Logger:                             logger,
-		Metrics:                            metrics.NewNoopCollector(),
-		IDProvider:                         idProvider,
-		LoggerInterval:                     defaultFlowConfig.NetworkConfig.GossipSubConfig.LocalMeshLogInterval,
-		RpcSentTrackerCacheSize:            defaultFlowConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerCacheSize,
-		RpcSentTrackerWorkerQueueCacheSize: defaultFlowConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerQueueCacheSize,
-		RpcSentTrackerNumOfWorkers:         defaultFlowConfig.NetworkConfig.GossipSubConfig.RpcSentTrackerNumOfWorkers,
-		HeroCacheMetricsFactory:            metrics.NewNoopHeroCacheMetricsFactory(),
-		NetworkingType:                     flownet.PublicNetwork,
-	}
-	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
-
-	builder := p2pbuilder.NewNodeBuilder(logger,
+	builder := p2pbuilder.NewNodeBuilder(
+		logger,
+		&defaultFlowConfig.NetworkConfig.GossipSub,
 		&p2pconfig.MetricsConfig{
 			HeroCacheFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 			Metrics:          metrics.NewNoopCollector(),
@@ -124,23 +112,18 @@ func CreateNode(t *testing.T, networkKey crypto.PrivateKey, sporkID flow.Identif
 		sporkID,
 		idProvider,
 		&defaultFlowConfig.NetworkConfig.ResourceManager,
-		&defaultFlowConfig.NetworkConfig.GossipSubRPCInspectorsConfig,
 		p2pconfig.PeerManagerDisableConfig(),
-		&defaultFlowConfig.NetworkConfig.GossipSubConfig.SubscriptionProvider,
 		&p2p.DisallowListCacheConfig{
 			MaxSize: uint32(1000),
 			Metrics: metrics.NewNoopCollector(),
 		},
-		meshTracer,
 		&p2pconfig.UnicastConfig{
 			UnicastConfig: defaultFlowConfig.NetworkConfig.UnicastConfig,
 		}).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
 			return p2pdht.NewDHT(c, h, protocols.FlowDHTProtocolID(sporkID), zerolog.Nop(), metrics.NewNoopCollector())
 		}).
-		SetResourceManager(&network.NullResourceManager{}).
-		SetGossipSubTracer(meshTracer).
-		SetGossipSubScoreTracerInterval(defaultFlowConfig.NetworkConfig.GossipSubConfig.ScoreTracerInterval)
+		SetResourceManager(&network.NullResourceManager{})
 
 	for _, opt := range opts {
 		opt(builder)
