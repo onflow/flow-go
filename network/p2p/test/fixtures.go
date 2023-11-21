@@ -3,7 +3,6 @@ package p2ptest
 import (
 	"bufio"
 	"context"
-	"fmt"
 	crand "math/rand"
 	"sync"
 	"testing"
@@ -340,7 +339,6 @@ func WithPeerScoreParamsOption(cfg *p2p.PeerScoringConfigOverride) NodeFixturePa
 func WithLogger(logger zerolog.Logger) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
 		p.Logger = logger
-		fmt.Println("logger set")
 	}
 }
 
