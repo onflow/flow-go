@@ -170,6 +170,84 @@ func (_m *ExecutionAPIServer) GetRegisterAtBlockID(_a0 context.Context, _a1 *exe
 	return r0, r1
 }
 
+// GetTransactionErrorMessage provides a mock function with given fields: _a0, _a1
+func (_m *ExecutionAPIServer) GetTransactionErrorMessage(_a0 context.Context, _a1 *execution.GetTransactionErrorMessageRequest) (*execution.GetTransactionErrorMessagesResponse, error) {
+	ret := _m.Called(_a0, _a1)
+
+	var r0 *execution.GetTransactionErrorMessagesResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *execution.GetTransactionErrorMessageRequest) (*execution.GetTransactionErrorMessagesResponse, error)); ok {
+		return rf(_a0, _a1)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *execution.GetTransactionErrorMessageRequest) *execution.GetTransactionErrorMessagesResponse); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*execution.GetTransactionErrorMessagesResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *execution.GetTransactionErrorMessageRequest) error); ok {
+		r1 = rf(_a0, _a1)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetTransactionErrorMessageByIndex provides a mock function with given fields: _a0, _a1
+func (_m *ExecutionAPIServer) GetTransactionErrorMessageByIndex(_a0 context.Context, _a1 *execution.GetTransactionErrorMessageByIndexRequest) (*execution.GetTransactionErrorMessagesResponse, error) {
+	ret := _m.Called(_a0, _a1)
+
+	var r0 *execution.GetTransactionErrorMessagesResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *execution.GetTransactionErrorMessageByIndexRequest) (*execution.GetTransactionErrorMessagesResponse, error)); ok {
+		return rf(_a0, _a1)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *execution.GetTransactionErrorMessageByIndexRequest) *execution.GetTransactionErrorMessagesResponse); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*execution.GetTransactionErrorMessagesResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *execution.GetTransactionErrorMessageByIndexRequest) error); ok {
+		r1 = rf(_a0, _a1)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetTransactionErrorMessagesByBlockID provides a mock function with given fields: _a0, _a1
+func (_m *ExecutionAPIServer) GetTransactionErrorMessagesByBlockID(_a0 context.Context, _a1 *execution.GetTransactionErrorMessagesByBlockIDRequest) (*execution.GetTransactionErrorMessagesResponse, error) {
+	ret := _m.Called(_a0, _a1)
+
+	var r0 *execution.GetTransactionErrorMessagesResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *execution.GetTransactionErrorMessagesByBlockIDRequest) (*execution.GetTransactionErrorMessagesResponse, error)); ok {
+		return rf(_a0, _a1)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *execution.GetTransactionErrorMessagesByBlockIDRequest) *execution.GetTransactionErrorMessagesResponse); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*execution.GetTransactionErrorMessagesResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *execution.GetTransactionErrorMessagesByBlockIDRequest) error); ok {
+		r1 = rf(_a0, _a1)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetTransactionResult provides a mock function with given fields: _a0, _a1
 func (_m *ExecutionAPIServer) GetTransactionResult(_a0 context.Context, _a1 *execution.GetTransactionResultRequest) (*execution.GetTransactionResultResponse, error) {
 	ret := _m.Called(_a0, _a1)
