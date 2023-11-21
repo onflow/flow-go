@@ -18,7 +18,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	netcache "github.com/onflow/flow-go/network/p2p/cache"
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
-	"github.com/onflow/flow-go/network/p2p/p2pconf"
 	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -117,7 +116,7 @@ type GossipSubAppSpecificScoreRegistry struct {
 // GossipSubAppSpecificScoreRegistryConfig is the configuration for the GossipSubAppSpecificScoreRegistry.
 // Configurations are the "union of parameters and other components" that are used to compute or build components that compute or maintain the application specific score of peers.
 type GossipSubAppSpecificScoreRegistryConfig struct {
-	Parameters p2pconf.AppSpecificScoreParams `validate:"required"`
+	// Parameters p2pconf.AppSpecificScoreParams `validate:"required"`
 
 	Logger zerolog.Logger `validate:"required"`
 
@@ -163,7 +162,7 @@ func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegis
 	}
 
 	lg := config.Logger.With().Str("module", "app_score_registry").Logger()
-	store := queue.NewHeroStore(config.Parameters,
+	store := queue.NewHeroStore(0,
 		lg.With().Str("component", "app_specific_score_update").Logger(),
 		metrics.GossipSubAppSpecificScoreUpdateQueueMetricFactory(config.HeroCacheMetricsFactory))
 
@@ -175,7 +174,7 @@ func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegis
 		init:           config.Init,
 		validator:      config.Validator,
 		idProvider:     config.IdProvider,
-		scoreTTL:       config.Parameters,
+		scoreTTL:       0,
 	}
 
 	reg.appScoreUpdateWorkerPool = worker.NewWorkerPoolBuilder[peer.ID](lg.With().Str("component", "app_specific_score_update_worker_pool").Logger(),
@@ -201,7 +200,7 @@ func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegis
 		reg.logger.Info().Msg("subscription validator stopped")
 	})
 
-	for i := 0; i < config.Parameters.ScoreUpdateWorkerNum; i++ {
+	for i := 0; i < 0; i++ {
 		builder.AddWorker(reg.appScoreUpdateWorkerPool.WorkerLogic())
 	}
 
