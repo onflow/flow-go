@@ -56,15 +56,7 @@ func (s *BlockEndStateSnapshot) Get(id flow.RegisterID) (flow.RegisterValue, err
 
 	value, err := s.getFromStorage(id)
 	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			// if the error is not found, we return a nil RegisterValue,
-			// in this case, the nil value can be cached, because the storage will not change it
-			value = nil
-		} else {
-			// if the error is not ErrNotFound, such as storage.ErrHeightNotIndexed, storehouse.ErrNotExecuted
-			// we return the error without caching
-			return nil, err
-		}
+		return nil, err
 	}
 
 	s.mutex.Lock()
@@ -84,5 +76,16 @@ func (s *BlockEndStateSnapshot) getFromCache(id flow.RegisterID) (flow.RegisterV
 }
 
 func (s *BlockEndStateSnapshot) getFromStorage(id flow.RegisterID) (flow.RegisterValue, error) {
-	return s.storage.GetRegister(s.height, s.blockID, id)
+	value, err := s.storage.GetRegister(s.height, s.blockID, id)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			// if the error is not found, we return a nil RegisterValue,
+			// in this case, the nil value can be cached, because the storage will not change it
+			return nil, nil
+		}
+		// if the error is not ErrNotFound, such as storage.ErrHeightNotIndexed, storehouse.ErrNotExecuted
+		// we return the error without caching
+		return nil, err
+	}
+	return value, nil
 }

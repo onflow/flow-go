@@ -41,8 +41,7 @@ func TestBlockEndSnapshot(t *testing.T) {
 			Return(nil, fmt.Errorf("fail: %w", storage.ErrNotFound)).Once()
 
 		value, err = snapshot.Get(unknownReg.Key)
-		require.Error(t, err)
-		require.True(t, errors.Is(err, storage.ErrNotFound))
+		require.NoError(t, err)
 		require.Nil(t, value)
 
 		// test get non existing register from cache
