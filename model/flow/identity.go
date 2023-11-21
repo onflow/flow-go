@@ -36,10 +36,21 @@ type IdentitySkeleton struct {
 
 // EpochParticipationStatus represents the status of a node's participation. Depending on what changes were applied to
 // the protocol state, a node may be in one of four states:
-// * joining - the node was included in the epoch setup event(for next epoch) and is will be active in the next epoch.
-// * active - the node was included in the previous epoch setup and is actively participating in the current epoch.
-// * leaving - the node was active in the previous epoch and is leaving the network in the current epoch.
-// * ejected - represents a node that has been permanently removed from the network.
+//   - joining - the node is not active in the current epoch and will be active in the next epoch.
+//   - active - the node was included in the EpochSetup event for the current epoch and is actively participating in the current epoch.
+//   - leaving - the node was active in the previous epoch and will not be active in the next epoch.
+//   - ejected - the node has been permanently removed from the network.
+//
+//                      ┌───────────────┐
+//         ┌────────────┤ unregistered  │◄───────────┐
+//         │            └───────────────┘            │
+//   ┌─────▼─────┐        ┌───────────┐        ┌─────┴─────┐
+//   │  JOINING  ├───────►│  ACTIVE   ├───────►│  LEAVING  │
+//   └─────┬─────┘        └─────┬─────┘        └─────┬─────┘
+//         │              ┌─────▼─────┐              │
+//         └─────────────►│  EJECTED  │◄─────────────┘
+//                        └───────────┘
+//
 // Only active nodes are allowed to perform certain tasks relative to other nodes.
 // Nodes which are registered to join at the next epoch will appear in the
 // identity table but aren't considered active until their first
