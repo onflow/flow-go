@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // MockSignalerContext is a SignalerContext which will immediately fail a test if an error is thrown.
@@ -20,10 +20,10 @@ func (m MockSignalerContext) sealed() {}
 
 func (m MockSignalerContext) Throw(err error) {
 	if m.expectError != nil {
-		assert.EqualError(m.t, err, m.expectError.Error())
+		require.EqualError(m.t, err, m.expectError.Error())
 		return
 	}
-	m.t.Fatalf("mock signaler context received error: %v", err)
+	require.Failf(m.t, "mock signaler faced error", "mock signaler context received error: %v", err)
 }
 
 func NewMockSignalerContext(t *testing.T, ctx context.Context) *MockSignalerContext {

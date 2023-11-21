@@ -442,7 +442,7 @@ func DefaultNodeBuilder(
 		SetConnectionGater(connGater).
 		SetCreateNode(DefaultCreateNodeFunc)
 
-	if gossipCfg.ScoringParameters {
+	if gossipCfg.PeerScoringEnabled {
 		// In production, we never override the default scoring config.
 		builder.EnableGossipSubScoringWithOverride(p2p.PeerScoringConfigNoOverride)
 	}

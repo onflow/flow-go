@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 
+	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -72,6 +73,10 @@ func TestGossipSubScoreTracer(t *testing.T) {
 	topic1 := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 
 	// 3. Creates three nodes with different roles and sets their roles as consensus, access, and tracer, respectively.
+	cfg, err := config.DefaultConfig()
+	require.NoError(t, err)
+	// set the peer score log interval to 1 second for sake of testing.
+	cfg.NetworkConfig.GossipSub.RpcTracer.LocalMeshLogInterval = 1 * time.Second
 	tracerNode, tracerId := p2ptest.NodeFixture(
 		t,
 		sporkId,
@@ -82,7 +87,6 @@ func TestGossipSubScoreTracer(t *testing.T) {
 			c:             scoreMetrics,
 		}),
 		p2ptest.WithLogger(logger),
-		p2ptest.WithPeerScoreTracerInterval(1*time.Second), // set the peer score log interval to 1 second for sake of testing.
 		p2ptest.EnablePeerScoringWithOverride(&p2p.PeerScoringConfigOverride{
 			AppSpecificScoreParams: func(pid peer.ID) float64 {
 				id, ok := idProvider.ByPeerID(pid)
@@ -163,7 +167,7 @@ func TestGossipSubScoreTracer(t *testing.T) {
 	scoreMetrics.On("SetWarningStateCount", uint(0)).Return()
 
 	// 6. Subscribes the nodes to a common topic.
-	_, err := tracerNode.Subscribe(
+	_, err = tracerNode.Subscribe(
 		topic1,
 		validator.TopicValidator(
 			unittest.Logger(),
