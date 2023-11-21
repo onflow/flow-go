@@ -33,9 +33,15 @@ type DynamicProtocolState interface {
 	// EpochStatus returns the status of current epoch at given block based on the internal state of protocol.
 	EpochStatus() *flow.EpochStatus
 	// Identities returns identities that can participate in current and next epochs.
+	// Let P be the set of identities in the previous epoch, C be the set of identities in the current epoch,
+	// and N be the set of identities in the next epoch.
 	// Set of Authorized identities are different depending on epoch state:
-	// staking phase - identities for current epoch + identities from previous epoch (with status `flow.EpochParticipationStatusLeaving`)
-	// setup & commit phase - identities for current epoch + identities from next epoch (with status `flow.EpochParticipationStatusJoining`)
+	// EpochStaking phase:
+	//   - nodes in C with status `flow.EpochParticipationStatusActive`
+	//   - nodes in P-C with status `flow.EpochParticipationStatusLeaving`
+	// EpochSetup/EpochCommitted phase:
+	//   - nodes in C with status `flow.EpochParticipationStatusActive`
+	//   - nodes in N-C with status `flow.EpochParticipationStatusJoining`
 	Identities() flow.IdentityList
 	// GlobalParams returns params that are same for all nodes in the network.
 	GlobalParams() GlobalParams
