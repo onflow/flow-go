@@ -99,17 +99,45 @@ jobs:
           cache: true
       - name: Set Test Matrix
         id: set-test-matrix
-        run: go run utils/test_matrix/test_matrix.go admin cmd consensus engine/access engine/collection engine/common engine/consensus engine/execution/ingestion:buildjet-8vcpu-ubuntu-2204 engine/execution/computation engine/execution engine/verification engine:buildjet-4vcpu-ubuntu-2204 fvm ledger module/dkg module:buildjet-4vcpu-ubuntu-2204 network/alsp network/test/cohort1:buildjet-16vcpu-ubuntu-2204 network/test/cohort2:buildjet-4vcpu-ubuntu-2204 network/p2p/connection network/p2p/p2pnode:buildjet-4vcpu-ubuntu-2204 network/p2p/scoring network/p2p network state storage utils
+        run: |
+          go run utils/test_matrix/test_matrix.go 
+            admin 
+            cmd 
+            consensus 
+            engine/access 
+            engine/collection 
+            engine/common 
+            engine/consensus 
+            engine/execution/ingestion:buildjet-8vcpu-ubuntu-2204 
+            engine/execution/computation 
+            engine/execution 
+            engine/verification 
+            engine:buildjet-4vcpu-ubuntu-2204 
+            fvm 
+            ledger 
+            module/dkg module:buildjet-4vcpu-ubuntu-2204 
+            network/alsp 
+            network/test/cohort1:buildjet-16vcpu-ubuntu-2204 
+            network/test/cohort2:buildjet-4vcpu-ubuntu-2204 
+            network/p2p/connection 
+            network/p2p/p2pnode:buildjet-4vcpu-ubuntu-2204 
+            network/p2p/scoring network/p2p 
+            network 
+            state 
+            storage 
+            utils
 
   unit-test:
     name: Unit Tests (${{ matrix.targets.name }})
-    needs: create-dynamic-test-matrix
+    needs: [create-dynamic-test-matrix, get-modified-files]
     strategy:
       fail-fast: false
       matrix:
         targets: ${{ fromJSON(needs.create-dynamic-test-matrix.outputs.dynamic-matrix)}}
     ## need to set image explicitly due to GitHub logging issue as described in https://github.com/onflow/flow-go/pull/3087#issuecomment-1234383202
     runs-on: ${{ matrix.targets.runner }}
+    # only run this job if the modified files include any file in the package directory
+    if: contains(needs.get-modified-files.outputs.files, '${{ matrix.targets.name }}')
     steps:
     - name: Checkout repo
       uses: actions/checkout@v3
@@ -313,3 +341,20 @@ jobs:
         timeout_minutes: 35
         max_attempts: 5
         command: VERBOSE=1 ${{ matrix.make }}
+
+  # determine what subset of tests to run for in progress PRs
+  get-modified-files:
+    name: Get modified files
+    runs-on: ubuntu-latest
+    outputs:
+      files: ${{ steps.get_files.outputs.files }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Get modified files
+        id: get_files
+        # get the commit hash of the current push, list the modified files in the commit, and set the output variable
+        run: |
+          commit=${{ github.event.after }}
+          files=$(git show --name-only $commit)
+          echo "::set-output name=files::$files"
