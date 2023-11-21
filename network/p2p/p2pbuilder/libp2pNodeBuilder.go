@@ -68,7 +68,6 @@ type LibP2PNodeBuilder struct {
 	routingFactory       func(context.Context, host.Host) (routing.Routing, error)
 	peerManagerConfig    *p2pconfig.PeerManagerConfig
 	createNode           p2p.CreateNodeFunc
-	gossipSubTracer      p2p.PubSubTracer
 	disallowListCacheCfg *p2p.DisallowListCacheConfig
 	unicastConfig        *p2pconfig.UnicastConfig
 	networkingType       flownet.NetworkingType // whether the node is running in private (staked) or public (unstaked) network
