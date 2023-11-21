@@ -27,7 +27,7 @@ type Handler struct {
 // HandlerOption is used to hand over optional constructor parameters
 type HandlerOption func(*Handler)
 
-var _ access.AccessAPIServer = (*Handler)(nil)
+var _ access.AccessAPIServer =\=(*Handler)(nil)
 
 func NewHandler(api API, chain flow.Chain, finalizedHeader module.FinalizedHeaderCache, me module.Local, options ...HandlerOption) *Handler {
 	h := &Handler{
@@ -312,18 +312,14 @@ func (h *Handler) GetTransactionResultsByBlockID(
 
 func (h *Handler) GetSystemTransaction(
 	ctx context.Context,
-	_ *access.GetSystemTransactionRequest,
-) (*access.TransactionResultsResponse, error) {
+) (*access.TransactionResponse, error) {
 
-	params := h.api.GetNetworkParameters(ctx)
+	metadata := h.buildMetadataResponse()
 
-	chainId := string(params.ChainID)
-
-	transactions, err := h.api.GetSystemTransaction(ctx)
+	tx, err := h.api.GetSystemTransaction(ctx)
 	if err != nil {
 		return nil, err
 	}
-
 
 	return &access.TransactionResponse{
 		Transaction: convert.TransactionToMessage(*tx),
@@ -331,21 +327,27 @@ func (h *Handler) GetSystemTransaction(
 	}, nil
 }
 
-//func (h *Handler) GetSystemTransactionResult(
-//	ctx context.Context,
-//	req *access.GetSystemTransactionResultRequest,
-//) (*access.TransactionResultsResponse, error) {
-//	id, err := convert.BlockID(req.GetBlockId())
-//	if err != nil {
-//		return nil, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
-//	}
-//
-//	transactions, err := h.api.GetSystemTransactionResult(ctx, id)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//}
+func (h *Handler) GetSystemTransactionResult(
+	ctx context.Context,
+	req *access.GetSystemTransactionResultRequest,
+) (*access.TransactionResultResponse, error) {
+	metadata := h.buildMetadataResponse()
+
+	id, err := convert.BlockID(req.GetBlockId())
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
+	}
+
+	result, err := h.api.GetSystemTransactionResult(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	message := TransactionResultToMessage(result)
+	message.Metadata = metadata
+
+	return message, nil
+}
 
 func (h *Handler) GetTransactionsByBlockID(
 	ctx context.Context,
