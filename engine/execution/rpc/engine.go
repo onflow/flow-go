@@ -579,6 +579,7 @@ func (h *handler) GetTransactionErrorMessageByIndex(
 
 	result := &execution.GetTransactionErrorMessagesResponse_Result{
 		TransactionId: convert.IdentifierToMessage(txResult.TransactionID),
+		Index:         index,
 	}
 
 	if len(txResult.ErrorMessage) > 0 {
