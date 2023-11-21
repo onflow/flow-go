@@ -99,31 +99,31 @@ jobs:
           cache: true
       - name: Set Test Matrix
         id: set-test-matrix
-        run: |
+        run: >
           go run utils/test_matrix/test_matrix.go 
-            admin 
-            cmd 
-            consensus 
+            admin
+            cmd
+            consensus
             engine/access 
             engine/collection 
-            engine/common 
+            engine/common
             engine/consensus 
             engine/execution/ingestion:buildjet-8vcpu-ubuntu-2204 
-            engine/execution/computation 
-            engine/execution 
+            engine/execution/computation
+            engine/execution
             engine/verification 
             engine:buildjet-4vcpu-ubuntu-2204 
-            fvm 
+            fvm
             ledger 
             module/dkg module:buildjet-4vcpu-ubuntu-2204 
-            network/alsp 
+            network/alsp
             network/test/cohort1:buildjet-16vcpu-ubuntu-2204 
-            network/test/cohort2:buildjet-4vcpu-ubuntu-2204 
-            network/p2p/connection 
+            network/test/cohort2:buildjet-4vcpu-ubuntu-2204
+            network/p2p/connection
             network/p2p/p2pnode:buildjet-4vcpu-ubuntu-2204 
-            network/p2p/scoring network/p2p 
-            network 
-            state 
+            network/p2p/scoring network/p2p
+            network
+            state
             storage 
             utils
 
