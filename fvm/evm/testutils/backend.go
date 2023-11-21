@@ -80,6 +80,13 @@ func GetSimpleValueStore() *TestValueStore {
 			}
 			return sum
 		},
+		MetricsFunc: func() (size int, items int) {
+			for key, item := range data {
+				items++
+				size += len(item) + len([]byte(key))
+			}
+			return
+		},
 	}
 }
 
@@ -145,6 +152,7 @@ type TestValueStore struct {
 	ValueExistsFunc          func(owner, key []byte) (bool, error)
 	AllocateStorageIndexFunc func(owner []byte) (atree.StorageIndex, error)
 	TotalStorageSizeFunc     func() int
+	MetricsFunc              func() (size int, items int)
 }
 
 var _ environment.ValueStore = &TestValueStore{}
@@ -182,6 +190,13 @@ func (vs *TestValueStore) TotalStorageSize() int {
 		panic("method not set")
 	}
 	return vs.TotalStorageSizeFunc()
+}
+
+func (vs *TestValueStore) Metrics() (int, int) {
+	if vs.MetricsFunc == nil {
+		panic("method not set")
+	}
+	return vs.MetricsFunc()
 }
 
 type testMeter struct {
