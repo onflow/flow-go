@@ -161,6 +161,8 @@ network-config:
   gossipsub-scoring-registry-slower-decay-threshold: -99
   #  Defines the value by which the decay rate is decreased every time the penalty is below the gossipsub-scoring-registry-slower-decay-threshold. A reduced decay rate extends the time it takes for penalties to diminish.
   gossipsub-scoring-registry-decay-rate-decrement: .01
+  # Defines the interval at which the decay for a spam record is okay to be adjusted.
+  gossipsub-scoring-registry-decay-adjust-interval: 10m
   # Application layer spam prevention
   alsp-spam-record-cache-size: 1000
   alsp-spam-report-queue-size: 10_000

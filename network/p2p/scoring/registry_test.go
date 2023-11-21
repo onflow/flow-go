@@ -431,40 +431,61 @@ func TestSpamRecordDecayAdjustment(t *testing.T) {
 	scoringRegistryConfig := flowConfig.NetworkConfig.GossipSubConfig.GossipSubScoringRegistryConfig
 	// increase configured DecayRateDecrement so that the decay time is increased faster
 	scoringRegistryConfig.DecayRateDecrement = .1
+	scoringRegistryConfig.DecayAdjustInterval = time.Second
 
-	peerID := unittest.PeerIdFixture(t)
+	peer1 := unittest.PeerIdFixture(t)
+	peer2 := unittest.PeerIdFixture(t)
 	reg, spamRecords := newScoringRegistry(
 		t,
 		scoringRegistryConfig,
-		withStakedIdentity(peerID),
-		withValidSubscriptions(peerID))
+		withStakedIdentity(peer1),
+		withValidSubscriptions(peer1),
+		withStakedIdentity(peer2),
+		withValidSubscriptions(peer2))
 
-	// initially, the spamRecords should not have the peer id.
-	assert.False(t, spamRecords.Has(peerID))
+	// initially, the spamRecords should not have the peer ids.
+	assert.False(t, spamRecords.Has(peer1))
+	assert.False(t, spamRecords.Has(peer2))
 
-	// simulate sustained malicious activity, eventually the decay speed
+	// simulate sustained malicious activity from peer1, eventually the decay speed
 	// for a spam record should be reduced to the MinimumSpamPenaltyDecaySpeed
 	require.Eventually(t, func() bool {
 		reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
-			PeerID:  peerID,
-			MsgType: p2pmsg.CtrlMsgIWant,
+			PeerID:  peer1,
+			MsgType: p2pmsg.CtrlMsgPrune,
 		})
-		record, err, ok := spamRecords.Get(peerID)
-		fmt.Println(record.Penalty, record.Decay, record.CanAdjustDecay)
+		record, err, ok := spamRecords.Get(peer1)
 		require.NoError(t, err)
 		require.True(t, ok)
 		return record.Decay == scoring.MinimumSpamPenaltyDecaySpeed
-	}, 5*time.Second, 100*time.Millisecond)
+	}, 5*time.Second, 500*time.Millisecond)
 
-	// simulate sustained good behavior, each time the spam record is read from the cache
+	// initialize a spam record for peer2
+	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
+		PeerID:  peer2,
+		MsgType: p2pmsg.CtrlMsgPrune,
+	})
+	// reduce penalty and increase Decay to scoring.MinimumSpamPenaltyDecaySpeed
+	record, err := spamRecords.Update(peer2, func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
+		record.Penalty = -.1
+		record.Decay = scoring.MinimumSpamPenaltyDecaySpeed
+		return record
+	})
+	require.NoError(t, err)
+	require.True(t, record.Decay == scoring.MinimumSpamPenaltyDecaySpeed)
+	require.True(t, record.Penalty == -.1)
+	// simulate sustained good behavior from peer 2, each time the spam record is read from the cache
 	// using Get method the record penalty will be decayed until it is eventually reset to
 	// 0 at this point the decay speed for the record should be reset to MaximumSpamPenaltyDecaySpeed
+	// eventually after penalty reaches the skipDecaThreshold the record decay will be reset to scoring.MaximumSpamPenaltyDecaySpeed
 	require.Eventually(t, func() bool {
-		record, err, ok := spamRecords.Get(peerID)
+		record, err, ok := spamRecords.Get(peer2)
 		require.NoError(t, err)
 		require.True(t, ok)
-		return record.Decay == scoring.MaximumSpamPenaltyDecaySpeed
-	}, 5*time.Second, 500*time.Millisecond)
+		return record.Decay == scoring.MaximumSpamPenaltyDecaySpeed &&
+			record.Penalty == 0 &&
+			record.LastDecayAdjustment.IsZero()
+	}, 5*time.Second, time.Second)
 }
 
 // withStakedIdentity returns a function that sets the identity provider to return an staked identity for the given peer id.
@@ -521,7 +542,7 @@ func newScoringRegistry(t *testing.T, config p2pconf.GossipSubScoringRegistryCon
 		100,
 		unittest.Logger(),
 		metrics.NewNoopCollector(),
-		scoring.DefaultDecayFunction(config.SlowerDecayPenaltyThreshold, config.DecayRateDecrement),
+		scoring.DefaultDecayFunction(config.SlowerDecayPenaltyThreshold, config.DecayRateDecrement, config.DecayAdjustInterval),
 	)
 	cfg := &scoring.GossipSubAppSpecificScoreRegistryConfig{
 		Logger:     unittest.Logger(),

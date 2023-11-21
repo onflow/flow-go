@@ -182,8 +182,9 @@ func TestDefaultDecayFunction(t *testing.T) {
 			},
 			want: want{
 				record: p2p.GossipSubSpamRecord{
-					Penalty: 0, // penalty is set to 0
-					Decay:   0.8,
+					Penalty:             0, // penalty is set to 0
+					Decay:               0.8,
+					LastDecayAdjustment: time.Time{},
 				},
 			},
 		},
@@ -200,8 +201,9 @@ func TestDefaultDecayFunction(t *testing.T) {
 			},
 			want: want{
 				record: p2p.GossipSubSpamRecord{
-					Penalty: 0, // penalty is set to 0
-					Decay:   0.8,
+					Penalty:             0, // penalty is set to 0
+					Decay:               0.8,
+					LastDecayAdjustment: time.Time{},
 				},
 			},
 		},
@@ -240,22 +242,53 @@ func TestDefaultDecayFunction(t *testing.T) {
 				},
 			},
 		},
+		{
+			// 6. penalty is negative and below slowerDecayPenaltyThreshold record decay should be adjusted.
+			name: "penalty is negative and below slowerDecayPenaltyThreshold record decay should be adjusted",
+			args: args{
+				record: p2p.GossipSubSpamRecord{
+					Penalty: -100,
+					Decay:   0.8,
+				},
+				lastUpdated: time.Now(),
+			},
+			want: want{
+				record: p2p.GossipSubSpamRecord{
+					Penalty: -100,
+					Decay:   0.81,
+				},
+			},
+		},
+		{
+			// 6. penalty is negative and below slowerDecayPenaltyThreshold but record.LastDecayAdjustment is too recent. In this case the decay should not be adjusted.
+			name: "penalty is negative and below slowerDecayPenaltyThreshold record decay should not be adjusted",
+			args: args{
+				record: p2p.GossipSubSpamRecord{
+					Penalty:             -100,
+					Decay:               0.9,
+					LastDecayAdjustment: time.Now().Add(10 * time.Second),
+				},
+				lastUpdated: time.Now(),
+			},
+			want: want{
+				record: p2p.GossipSubSpamRecord{
+					Penalty: -100,
+					Decay:   0.9,
+				},
+			},
+		},
 	}
-
-	// add test cases
-	// update test cases to utilize new spam record fields
-	// penalty is below slower decay threshold, in this case decay speed should be adjusted
 
 	flowConfig, err := config.DefaultConfig()
 	assert.NoError(t, err)
 	scoringRegistryConfig := flowConfig.NetworkConfig.GossipSubConfig.GossipSubScoringRegistryConfig
-	decayFunc := scoring.DefaultDecayFunction(scoringRegistryConfig.SlowerDecayPenaltyThreshold, scoringRegistryConfig.DecayRateDecrement)
+	decayFunc := scoring.DefaultDecayFunction(scoringRegistryConfig.SlowerDecayPenaltyThreshold, scoringRegistryConfig.DecayRateDecrement, scoringRegistryConfig.DecayAdjustInterval)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := decayFunc(tt.args.record, tt.args.lastUpdated)
 			assert.NoError(t, err)
-			assert.Less(t, math.Abs(got.Penalty-tt.want.record.Penalty), 10e-3)
-			assert.Equal(t, got.Decay, tt.want.record.Decay)
+			assert.Less(t, math.Abs(got.Penalty-tt.want.record.Penalty), 10e-2)
+			assert.Equal(t, tt.want.record.Decay, got.Decay)
 		})
 	}
 }

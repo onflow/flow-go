@@ -400,7 +400,11 @@ func NewScoreOption(scoreRegistryConfig p2pconf.GossipSubScoringRegistryConfig, 
 				scoreOptionConfig.cacheSize,
 				scoreOptionConfig.logger,
 				scoreOptionConfig.cacheMetrics,
-				DefaultDecayFunction(scoreRegistryConfig.SlowerDecayPenaltyThreshold, scoreRegistryConfig.DecayRateDecrement))
+				DefaultDecayFunction(
+					scoreRegistryConfig.SlowerDecayPenaltyThreshold,
+					scoreRegistryConfig.DecayRateDecrement,
+					scoreRegistryConfig.DecayAdjustInterval,
+				))
 		},
 	})
 	s := &ScoreOption{

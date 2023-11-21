@@ -57,9 +57,6 @@ const (
 	iWantMisbehaviourPenalty = -10
 	// rpcPublishMessageMisbehaviourPenalty is the penalty applied to the application specific penalty when a peer conducts a RpcPublishMessageMisbehaviourPenalty misbehaviour.
 	rpcPublishMessageMisbehaviourPenalty = -10
-
-	decayAdjustable    = true
-	decayNotAdjustable = false
 )
 
 type SpamRecordInitFunc func() p2p.GossipSubSpamRecord
@@ -302,7 +299,7 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 // DefaultDecayFunction is the default decay function that is used to decay the application specific penalty of a peer.
 // It is used if no decay function is provided in the configuration.
 // It decays the application specific penalty of a peer if it is negative.
-func DefaultDecayFunction(slowerDecayPenaltyThreshold, decayRateDecrement float64) netcache.PreprocessorFunc {
+func DefaultDecayFunction(slowerDecayPenaltyThreshold, decayRateDecrement float64, decayAdjustInterval time.Duration) netcache.PreprocessorFunc {
 	return func(record p2p.GossipSubSpamRecord, lastUpdated time.Time) (p2p.GossipSubSpamRecord, error) {
 		if record.Penalty >= 0 {
 			// no need to decay the penalty if it is positive, the reason is currently the app specific penalty
@@ -315,7 +312,7 @@ func DefaultDecayFunction(slowerDecayPenaltyThreshold, decayRateDecrement float6
 			// penalty is negative but greater than the threshold, we set it to 0.
 			record.Penalty = 0
 			record.Decay = MaximumSpamPenaltyDecaySpeed
-			record.CanAdjustDecay = decayAdjustable // everytime the penalty is decayed to zero, the decay factor is adjustable
+			record.LastDecayAdjustment = time.Time{}
 			return record, nil
 		}
 
@@ -326,13 +323,13 @@ func DefaultDecayFunction(slowerDecayPenaltyThreshold, decayRateDecrement float6
 		}
 		record.Penalty = penalty
 
-		if record.Penalty <= slowerDecayPenaltyThreshold && record.CanAdjustDecay {
-			// reduces the decay speed flooring at MinimumSpamRecordDecaySpeed
-			record.Decay = math.Min(record.Decay+decayRateDecrement, MinimumSpamPenaltyDecaySpeed)
-			// decay factor won't be decayed till the next time the penalty decays to zero.
-			record.CanAdjustDecay = decayNotAdjustable
+		if record.Penalty <= slowerDecayPenaltyThreshold {
+			if time.Since(record.LastDecayAdjustment) > decayAdjustInterval || record.LastDecayAdjustment.IsZero() {
+				// reduces the decay speed flooring at MinimumSpamRecordDecaySpeed
+				record.Decay = math.Min(record.Decay+decayRateDecrement, MinimumSpamPenaltyDecaySpeed)
+				record.LastDecayAdjustment = time.Now()
+			}
 		}
-
 		return record, nil
 	}
 }
@@ -342,8 +339,8 @@ func DefaultDecayFunction(slowerDecayPenaltyThreshold, decayRateDecrement float6
 //   - a gossipsub spam record with the default decay value and 0 penalty.
 func InitAppScoreRecordState() p2p.GossipSubSpamRecord {
 	return p2p.GossipSubSpamRecord{
-		Decay:          MaximumSpamPenaltyDecaySpeed,
-		Penalty:        0,
-		CanAdjustDecay: decayAdjustable,
+		Decay:               MaximumSpamPenaltyDecaySpeed,
+		Penalty:             0,
+		LastDecayAdjustment: time.Now(),
 	}
 }

@@ -1,6 +1,8 @@
 package p2p
 
 import (
+	"time"
+
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 )
@@ -82,10 +84,10 @@ type GossipSubSpamRecord struct {
 	Decay float64
 	// Penalty is the application specific Penalty of the peer.
 	Penalty float64
-	// CanAdjustDecay is a boolean that indicates whether the Decay factor of the peer can be adjusted.
-	// The decay can be adjusted once every time the Penalty is decayed to zero.
-	// This should be initialized to be true when the peer is added to the cache.
-	// The value should be set to false when the Decay factor is adjusted.
-	// The value should be reset to true when the Penalty is decayed to zero.
-	CanAdjustDecay bool
+	// LastDecayAdjustment represents the timestamp of the last decay adjustment for the spam record.
+	// The spam record undergoes decay at regular intervals, either increasing or decreasing the decay.
+	// Increasing the decay leads to faster recovery of the peer score, while decreasing it results in slower recovery.
+	// This timestamp ensures that the decay speed of a malicious node is not inadvertently increased
+	// during periods of high message frequency.
+	LastDecayAdjustment time.Time
 }

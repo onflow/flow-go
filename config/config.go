@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-playground/validator/v10"
 	"github.com/mitchellh/mapstructure"
+	"github.com/onflow/flow-go/network/p2p/p2pconf"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -249,4 +250,8 @@ func initialize() {
 	// create validator, at this point you can register custom validation funcs
 	// struct tag translation etc.
 	validate = validator.New()
+	err := validate.RegisterValidation("ScoringRegistryDecayAdjustIntervalValidator", p2pconf.ScoringRegistryDecayAdjustIntervalValidator)
+	if err != nil {
+		panic(fmt.Errorf("failed to initialize flow config failed to register custom struct field validatior ScoringRegistryDecayAdjustIntervalValidator: %w", err))
+	}
 }
