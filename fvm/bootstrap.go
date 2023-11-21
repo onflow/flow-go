@@ -307,8 +307,6 @@ func (b *bootstrapExecutor) Preprocess() error {
 }
 
 func (b *bootstrapExecutor) Execute() error {
-	b.rootBlock = flow.Genesis(flow.ChainID(b.ctx.Chain.String())).Header
-
 	// initialize the account addressing state
 	b.accountCreator = environment.NewBootstrapAccountCreator(
 		b.txnState,
