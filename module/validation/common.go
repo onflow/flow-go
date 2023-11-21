@@ -47,7 +47,7 @@ func ensureNodeHasWeightAndRole(identity *flow.Identity, expectedRole flow.Role)
 
 	// check if the identity is a valid epoch participant(is active in the current epoch + not ejected)
 	if !filter.IsValidCurrentEpochParticipant(identity) {
-		return engine.NewInvalidInputErrorf("node (%x) is not an active participant: %s", identity.NodeID,
+		return engine.NewInvalidInputErrorf("node (%x) is not an active participant, instead has status: %s", identity.NodeID,
 			identity.EpochParticipationStatus.String())
 	}
 
