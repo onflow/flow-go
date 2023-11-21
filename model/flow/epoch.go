@@ -107,6 +107,12 @@ func (setup *EpochSetup) EqualTo(other *EpochSetup) bool {
 	if setup.FinalView != other.FinalView {
 		return false
 	}
+	if setup.TargetDuration != other.TargetDuration {
+		return false
+	}
+	if setup.TargetEndTime != other.TargetEndTime {
+		return false
+	}
 	if !setup.Participants.EqualTo(other.Participants) {
 		return false
 	}
