@@ -152,14 +152,14 @@ func TestGossipSubMeshTracer(t *testing.T) {
 	// eventually, the meshTracer should have the other nodes in its mesh.
 	assert.Eventually(t, func() bool {
 		topic1MeshSize := 0
-		for _, peer := range meshTracer.GetMeshPeers(topic1.String()) {
+		for _, peer := range meshTracer.GetLocalMeshPeers(topic1.String()) {
 			if peer == otherNode1.ID() || peer == otherNode2.ID() {
 				topic1MeshSize++
 			}
 		}
 
 		topic2MeshSize := 0
-		for _, peer := range meshTracer.GetMeshPeers(topic2.String()) {
+		for _, peer := range meshTracer.GetLocalMeshPeers(topic2.String()) {
 			if peer == otherNode1.ID() {
 				topic2MeshSize++
 			}
@@ -184,14 +184,14 @@ func TestGossipSubMeshTracer(t *testing.T) {
 
 	assert.Eventually(t, func() bool {
 		// eventually, the tracerNode should not have the other node in its mesh for topic1.
-		for _, peer := range meshTracer.GetMeshPeers(topic1.String()) {
+		for _, peer := range meshTracer.GetLocalMeshPeers(topic1.String()) {
 			if peer == otherNode1.ID() || peer == otherNode2.ID() || peer == unknownNode.ID() {
 				return false
 			}
 		}
 
 		// but the tracerNode should still have the otherNode1 in its mesh for topic2.
-		for _, peer := range meshTracer.GetMeshPeers(topic2.String()) {
+		for _, peer := range meshTracer.GetLocalMeshPeers(topic2.String()) {
 			if peer != otherNode1.ID() {
 				return false
 			}
