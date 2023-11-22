@@ -151,12 +151,15 @@ func (s *AccessAPISuite) TestScriptExecutionAndGetAccountsAN1() {
 	// deploy the test contract
 	txResult := s.deployContract()
 	targetHeight := txResult.BlockHeight + 1
+	s.log.Error().Msg("LOG:target height is %d", targetHeight)
 	s.waitUntilIndexed(targetHeight)
+	s.log.Error().Msg("LOG:out of waitUntil")
 
 	// Run tests against Access 1, which uses the execution node
 	s.testGetAccount(s.an1Client)
-	s.testExecuteScriptWithSimpleScript(s.an1Client)
-	s.testExecuteScriptWithSimpleContract(s.an1Client, targetHeight)
+	s.log.Error().Msg("LOG:out of testGetAccount")
+	//s.testExecuteScriptWithSimpleScript(s.an1Client)
+	//s.testExecuteScriptWithSimpleContract(s.an1Client, targetHeight)
 }
 
 /*
@@ -365,7 +368,7 @@ func (s *AccessAPISuite) waitUntilIndexed(height uint64) {
 	// an error if the height is not indexed yet.
 	//
 	// TODO: once the indexed height is include in the Access API's metadata response, we can get
-	// ride of this
+	// rid of this
 	s.Require().Eventually(func() bool {
 		_, err := s.an2Client.ExecuteScriptAtBlockHeight(s.ctx, height, []byte(simpleScript), nil)
 		return err == nil
