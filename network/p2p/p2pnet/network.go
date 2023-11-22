@@ -31,6 +31,7 @@ import (
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/blob"
+	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"github.com/onflow/flow-go/network/p2p/p2pnet/internal"
 	"github.com/onflow/flow-go/network/p2p/ping"
 	"github.com/onflow/flow-go/network/p2p/subscription"
@@ -809,7 +810,7 @@ func DefaultValidators(log zerolog.Logger, flowID flow.Identifier) []network.Mes
 func (n *Network) isProtocolParticipant() p2p.PeerFilter {
 	return func(p peer.ID) error {
 		if _, ok := n.Identity(p); !ok {
-			return fmt.Errorf("failed to get identity of unknown peer with peer id %s", p.String())
+			return fmt.Errorf("failed to get identity of unknown peer with peer id %s", p2plogging.PeerId(p))
 		}
 		return nil
 	}
@@ -885,7 +886,7 @@ func (n *Network) authorizedPeers() peer.IDSlice {
 			if err := filter(id); err != nil {
 				n.logger.Debug().
 					Err(err).
-					Str("peer_id", id.String()).
+					Str("peer_id", p2plogging.PeerId(id)).
 					Msg("filtering topology peer")
 
 				peerAllowed = false
@@ -990,7 +991,7 @@ func (n *Network) handleIncomingStream(s libp2pnet.Stream) {
 		// ignore messages if node does not have subscription to topic
 		if !n.libP2PNode.HasSubscription(topic) {
 			violation := &network.Violation{
-				Identity: nil, PeerID: remotePeer.String(), Channel: channel, Protocol: message.ProtocolTypeUnicast,
+				Identity: nil, PeerID: p2plogging.PeerId(remotePeer), Channel: channel, Protocol: message.ProtocolTypeUnicast,
 			}
 
 			msgCode, err := codec.MessageCodeFromPayload(msg.Payload)
@@ -1114,14 +1115,14 @@ func (n *Network) processUnicastStreamMessage(remotePeer peer.ID, msg *message.M
 	maxSize, err := UnicastMaxMsgSizeByCode(msg.Payload)
 	if err != nil {
 		n.slashingViolationsConsumer.OnUnknownMsgTypeError(&network.Violation{
-			Identity: nil, PeerID: remotePeer.String(), MsgType: "", Channel: channel, Protocol: message.ProtocolTypeUnicast, Err: err,
+			Identity: nil, PeerID: p2plogging.PeerId(remotePeer), MsgType: "", Channel: channel, Protocol: message.ProtocolTypeUnicast, Err: err,
 		})
 		return
 	}
 	if msg.Size() > maxSize {
 		// message size exceeded
 		n.logger.Error().
-			Str("peer_id", remotePeer.String()).
+			Str("peer_id", p2plogging.PeerId(remotePeer)).
 			Str("channel", msg.ChannelID).
 			Int("max_size", maxSize).
 			Int("size", msg.Size()).
@@ -1137,7 +1138,7 @@ func (n *Network) processUnicastStreamMessage(remotePeer peer.ID, msg *message.M
 			n.logger.
 				Error().
 				Err(err).
-				Str("peer_id", remotePeer.String()).
+				Str("peer_id", p2plogging.PeerId(remotePeer)).
 				Str("type", messageType).
 				Str("channel", msg.ChannelID).
 				Msg("unicast authorized sender validation failed")
@@ -1156,7 +1157,7 @@ func (n *Network) processAuthenticatedMessage(msg *message.Message, peerID peer.
 		// authenticated which means it must be known
 		n.logger.Error().
 			Err(err).
-			Str("peer_id", peerID.String()).
+			Str("peer_id", p2plogging.PeerId(peerID)).
 			Bool(logging.KeySuspicious, true).
 			Msg("dropped message from unknown peer")
 		return
@@ -1168,14 +1169,14 @@ func (n *Network) processAuthenticatedMessage(msg *message.Message, peerID peer.
 	case codec.IsErrUnknownMsgCode(err):
 		// slash peer if message contains unknown message code byte
 		violation := &network.Violation{
-			PeerID: peerID.String(), OriginID: originId, Channel: channel, Protocol: protocol, Err: err,
+			PeerID: p2plogging.PeerId(peerID), OriginID: originId, Channel: channel, Protocol: protocol, Err: err,
 		}
 		n.slashingViolationsConsumer.OnUnknownMsgTypeError(violation)
 		return
 	case codec.IsErrMsgUnmarshal(err) || codec.IsErrInvalidEncoding(err):
 		// slash if peer sent a message that could not be marshalled into the message type denoted by the message code byte
 		violation := &network.Violation{
-			PeerID: peerID.String(), OriginID: originId, Channel: channel, Protocol: protocol, Err: err,
+			PeerID: p2plogging.PeerId(peerID), OriginID: originId, Channel: channel, Protocol: protocol, Err: err,
 		}
 		n.slashingViolationsConsumer.OnInvalidMsgError(violation)
 		return
@@ -1185,7 +1186,7 @@ func (n *Network) processAuthenticatedMessage(msg *message.Message, peerID peer.
 		// collect slashing data because this could potentially lead to slashing
 		err = fmt.Errorf("unexpected error during message validation: %w", err)
 		violation := &network.Violation{
-			PeerID: peerID.String(), OriginID: originId, Channel: channel, Protocol: protocol, Err: err,
+			PeerID: p2plogging.PeerId(peerID), OriginID: originId, Channel: channel, Protocol: protocol, Err: err,
 		}
 		n.slashingViolationsConsumer.OnUnexpectedError(violation)
 		return
@@ -1195,7 +1196,7 @@ func (n *Network) processAuthenticatedMessage(msg *message.Message, peerID peer.
 	if err != nil {
 		n.logger.Error().
 			Err(err).
-			Str("peer_id", peerID.String()).
+			Str("peer_id", p2plogging.PeerId(peerID)).
 			Str("origin_id", originId.String()).
 			Msg("could not create incoming message scope")
 		return

@@ -60,6 +60,9 @@ func TestPeerWithSpamRecord(t *testing.T) {
 	t.Run("iwant", func(t *testing.T) {
 		testPeerWithSpamRecord(t, p2pmsg.CtrlMsgIWant, penaltyValueFixtures().IWant)
 	})
+	t.Run("RpcPublishMessage", func(t *testing.T) {
+		testPeerWithSpamRecord(t, p2pmsg.RpcPublishMessage, penaltyValueFixtures().RpcPublishMessage)
+	})
 }
 
 func testPeerWithSpamRecord(t *testing.T, messageType p2pmsg.ControlMessageType, expectedPenalty float64) {
@@ -81,7 +84,6 @@ func testPeerWithSpamRecord(t *testing.T, messageType p2pmsg.ControlMessageType,
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: messageType,
-		Count:   1,
 	})
 
 	// the penalty should now be updated in the spamRecords
@@ -110,6 +112,9 @@ func TestSpamRecord_With_UnknownIdentity(t *testing.T) {
 	t.Run("iwant", func(t *testing.T) {
 		testSpamRecordWithUnknownIdentity(t, p2pmsg.CtrlMsgIWant, penaltyValueFixtures().IWant)
 	})
+	t.Run("RpcPublishMessage", func(t *testing.T) {
+		testSpamRecordWithUnknownIdentity(t, p2pmsg.RpcPublishMessage, penaltyValueFixtures().RpcPublishMessage)
+	})
 }
 
 // testSpamRecordWithUnknownIdentity tests the app specific penalty computation of the node when there is a spam record for the peer id and
@@ -132,7 +137,6 @@ func testSpamRecordWithUnknownIdentity(t *testing.T, messageType p2pmsg.ControlM
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: messageType,
-		Count:   1,
 	})
 
 	// the penalty should now be updated.
@@ -161,6 +165,9 @@ func TestSpamRecord_With_SubscriptionPenalty(t *testing.T) {
 	t.Run("iwant", func(t *testing.T) {
 		testSpamRecordWithSubscriptionPenalty(t, p2pmsg.CtrlMsgIWant, penaltyValueFixtures().IWant)
 	})
+	t.Run("RpcPublishMessage", func(t *testing.T) {
+		testSpamRecordWithSubscriptionPenalty(t, p2pmsg.RpcPublishMessage, penaltyValueFixtures().RpcPublishMessage)
+	})
 }
 
 // testSpamRecordWithUnknownIdentity tests the app specific penalty computation of the node when there is a spam record for the peer id and
@@ -183,7 +190,6 @@ func testSpamRecordWithSubscriptionPenalty(t *testing.T, messageType p2pmsg.Cont
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: messageType,
-		Count:   1,
 	})
 
 	// the penalty should now be updated.
@@ -210,7 +216,6 @@ func TestSpamPenaltyDecaysInCache(t *testing.T) {
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: p2pmsg.CtrlMsgPrune,
-		Count:   1,
 	})
 
 	time.Sleep(1 * time.Second) // wait for the penalty to decay.
@@ -218,7 +223,6 @@ func TestSpamPenaltyDecaysInCache(t *testing.T) {
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: p2pmsg.CtrlMsgGraft,
-		Count:   1,
 	})
 
 	time.Sleep(1 * time.Second) // wait for the penalty to decay.
@@ -226,7 +230,6 @@ func TestSpamPenaltyDecaysInCache(t *testing.T) {
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: p2pmsg.CtrlMsgIHave,
-		Count:   1,
 	})
 
 	time.Sleep(1 * time.Second) // wait for the penalty to decay.
@@ -234,7 +237,13 @@ func TestSpamPenaltyDecaysInCache(t *testing.T) {
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: p2pmsg.CtrlMsgIWant,
-		Count:   1,
+	})
+
+	time.Sleep(1 * time.Second) // wait for the penalty to decay.
+
+	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
+		PeerID:  peerID,
+		MsgType: p2pmsg.RpcPublishMessage,
 	})
 
 	time.Sleep(1 * time.Second) // wait for the penalty to decay.
@@ -247,7 +256,8 @@ func TestSpamPenaltyDecaysInCache(t *testing.T) {
 	scoreUpperBound := penaltyValueFixtures().Prune +
 		penaltyValueFixtures().Graft +
 		penaltyValueFixtures().IHave +
-		penaltyValueFixtures().IWant
+		penaltyValueFixtures().IWant +
+		penaltyValueFixtures().RpcPublishMessage
 	// the lower bound is the sum of the penalties with decay assuming the decay is applied 4 times to the sum of the penalties.
 	// in reality, the decay is applied 4 times to the first penalty, then 3 times to the second penalty, and so on.
 	scoreLowerBound := scoreUpperBound * math.Pow(scoring.InitAppScoreRecordState().Decay, 4)
@@ -276,7 +286,6 @@ func TestSpamPenaltyDecayToZero(t *testing.T) {
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: p2pmsg.CtrlMsgGraft,
-		Count:   1,
 	})
 
 	// decays happen every second, so we wait for 1 second to make sure the penalty is updated.
@@ -326,7 +335,6 @@ func TestPersistingUnknownIdentityPenalty(t *testing.T) {
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: p2pmsg.CtrlMsgGraft,
-		Count:   1,
 	})
 
 	// with reported spam, the app specific score should be the default unknown identity + the spam penalty.
@@ -384,7 +392,6 @@ func TestPersistingInvalidSubscriptionPenalty(t *testing.T) {
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: p2pmsg.CtrlMsgGraft,
-		Count:   1,
 	})
 
 	// with reported spam, the app specific score should be the default invalid subscription penalty + the spam penalty.
@@ -478,9 +485,10 @@ func newGossipSubAppSpecificScoreRegistry(t *testing.T, opts ...func(*scoring.Go
 // that the tests are not passing because of the default values.
 func penaltyValueFixtures() scoring.GossipSubCtrlMsgPenaltyValue {
 	return scoring.GossipSubCtrlMsgPenaltyValue{
-		Graft: -100,
-		Prune: -50,
-		IHave: -20,
-		IWant: -10,
+		Graft:             -100,
+		Prune:             -50,
+		IHave:             -20,
+		IWant:             -10,
+		RpcPublishMessage: -10,
 	}
 }

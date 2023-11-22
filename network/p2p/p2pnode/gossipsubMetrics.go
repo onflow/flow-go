@@ -7,6 +7,7 @@ import (
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/p2plogging"
 )
 
 // GossipSubControlMessageMetrics is a metrics and observability wrapper component for the incoming RPCs to a
@@ -27,7 +28,7 @@ func NewGossipSubControlMessageMetrics(metrics module.GossipSubRouterMetrics, lo
 
 // ObserveRPC is invoked to record metrics on incoming RPC messages.
 func (o *GossipSubControlMessageMetrics) ObserveRPC(from peer.ID, rpc *pubsub.RPC) {
-	lg := o.logger.With().Str("peer_id", from.String()).Logger()
+	lg := o.logger.With().Str("peer_id", p2plogging.PeerId(from)).Logger()
 	includedMessages := len(rpc.GetPublish())
 
 	ctl := rpc.GetControl()

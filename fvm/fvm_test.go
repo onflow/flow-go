@@ -2814,3 +2814,99 @@ func TestStorageIterationWithBrokenValues(t *testing.T) {
 			},
 		)(t)
 }
+
+func TestEntropyCallOnlyOkIfAllowed(t *testing.T) {
+	source := testutil.EntropyProviderFixture(nil)
+
+	test := func(t *testing.T, allowed bool) {
+		newVMTest().
+			withBootstrapProcedureOptions().
+			withContextOptions(
+				fvm.WithRandomSourceHistoryCallAllowed(allowed),
+				fvm.WithEntropyProvider(source),
+			).
+			run(func(
+				t *testing.T,
+				vm fvm.VM,
+				chain flow.Chain,
+				ctx fvm.Context,
+				snapshotTree snapshot.SnapshotTree,
+			) {
+				txBody := flow.NewTransactionBody().
+					SetScript([]byte(`
+						transaction {
+						  prepare() {
+							randomSourceHistory()
+						  }
+						}
+					`)).
+					SetProposalKey(chain.ServiceAddress(), 0, 0).
+					SetPayer(chain.ServiceAddress())
+
+				err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
+				require.NoError(t, err)
+
+				_, output, err := vm.Run(
+					ctx,
+					fvm.Transaction(txBody, 0),
+					snapshotTree)
+				require.NoError(t, err)
+
+				if allowed {
+					require.NoError(t, output.Err)
+				} else {
+					require.Error(t, output.Err)
+					require.True(t, errors.HasErrorCode(output.Err, errors.ErrCodeOperationNotSupportedError))
+				}
+			},
+			)(t)
+	}
+
+	t.Run("enabled", func(t *testing.T) {
+		test(t, true)
+	})
+
+	t.Run("disabled", func(t *testing.T) {
+		test(t, false)
+	})
+}
+
+func TestEntropyCallExpectsNoParameters(t *testing.T) {
+	source := testutil.EntropyProviderFixture(nil)
+	newVMTest().
+		withBootstrapProcedureOptions().
+		withContextOptions(
+			fvm.WithRandomSourceHistoryCallAllowed(true),
+			fvm.WithEntropyProvider(source),
+		).
+		run(func(
+			t *testing.T,
+			vm fvm.VM,
+			chain flow.Chain,
+			ctx fvm.Context,
+			snapshotTree snapshot.SnapshotTree,
+		) {
+			txBody := flow.NewTransactionBody().
+				SetScript([]byte(`
+						transaction {
+						  prepare() {
+							randomSourceHistory("foo")
+						  }
+						}
+					`)).
+				SetProposalKey(chain.ServiceAddress(), 0, 0).
+				SetPayer(chain.ServiceAddress())
+
+			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
+			require.NoError(t, err)
+
+			_, output, err := vm.Run(
+				ctx,
+				fvm.Transaction(txBody, 0),
+				snapshotTree)
+			require.NoError(t, err)
+
+			require.ErrorContains(t, output.Err, "too many arguments")
+		},
+		)(t)
+}

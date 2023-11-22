@@ -12,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -71,7 +72,7 @@ func NewConnGater(log zerolog.Logger, identityProvider module.IdentityProvider, 
 
 // InterceptPeerDial - a callback which allows or disallows outbound connection
 func (c *ConnGater) InterceptPeerDial(p peer.ID) bool {
-	lg := c.log.With().Str("peer_id", p.String()).Logger()
+	lg := c.log.With().Str("peer_id", p2plogging.PeerId(p)).Logger()
 
 	disallowListCauses, disallowListed := c.disallowListOracle.IsDisallowListed(p)
 	if disallowListed {
@@ -108,7 +109,7 @@ func (c *ConnGater) InterceptPeerDial(p peer.ID) bool {
 		return false
 	}
 
-	lg.Info().Msg("outbound connection established")
+	lg.Debug().Msg("outbound connection established")
 	return true
 }
 
@@ -128,7 +129,7 @@ func (c *ConnGater) InterceptSecured(dir network.Direction, p peer.ID, addr netw
 	switch dir {
 	case network.DirInbound:
 		lg := c.log.With().
-			Str("peer_id", p.String()).
+			Str("peer_id", p2plogging.PeerId(p)).
 			Str("remote_address", addr.RemoteMultiaddr().String()).
 			Logger()
 
@@ -168,7 +169,7 @@ func (c *ConnGater) InterceptSecured(dir network.Direction, p peer.ID, addr netw
 			return false
 		}
 
-		lg.Info().Msg("inbound connection established")
+		lg.Debug().Msg("inbound connection established")
 		return true
 	default:
 		// outbound connection should have been already blocked before this call

@@ -30,6 +30,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"github.com/onflow/flow-go/utils/logging"
 
 	ipld "github.com/ipfs/go-ipld-format"
@@ -262,7 +263,7 @@ func AuthorizedRequester(
 	return func(peerID peer.ID, _ cid.Cid) bool {
 		lg := logger.With().
 			Str("component", "blob_service").
-			Str("peer_id", peerID.String()).
+			Str("peer_id", p2plogging.PeerId(peerID)).
 			Logger()
 
 		id, ok := identityProvider.ByPeerID(peerID)

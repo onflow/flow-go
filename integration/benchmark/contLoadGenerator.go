@@ -30,6 +30,7 @@ const (
 	EventHeavyLoadType    LoadType = "event-heavy"
 	LedgerHeavyLoadType   LoadType = "ledger-heavy"
 	ConstExecCostLoadType LoadType = "const-exec" // for an empty transactions with various tx arguments
+	ExecDataHeavyLoadType LoadType = "exec-data-heavy"
 )
 
 const lostTransactionThreshold = 90 * time.Second
@@ -179,7 +180,7 @@ func New(
 		lg.workFunc = lg.sendAddKeyTx
 	case ConstExecCostLoadType:
 		lg.workFunc = lg.sendConstExecCostTx
-	case CompHeavyLoadType, EventHeavyLoadType, LedgerHeavyLoadType:
+	case CompHeavyLoadType, EventHeavyLoadType, LedgerHeavyLoadType, ExecDataHeavyLoadType:
 		lg.workFunc = lg.sendFavContractTx
 	default:
 		return nil, fmt.Errorf("unknown load type: %s", loadParams.LoadType)
@@ -913,6 +914,8 @@ func (lg *ContLoadGenerator) sendFavContractTx(workerID int) {
 		txScript = EventHeavyScript(*lg.favContractAddress)
 	case LedgerHeavyLoadType:
 		txScript = LedgerHeavyScript(*lg.favContractAddress)
+	case ExecDataHeavyLoadType:
+		txScript = ExecDataHeavyScript(*lg.favContractAddress)
 	default:
 		log.Error().Msg("unknown load type")
 		return
@@ -944,7 +947,9 @@ func (lg *ContLoadGenerator) sendFavContractTx(workerID int) {
 		return
 	}
 	defer key.IncrementSequenceNumber()
+
 	<-ch
+	lg.workerStatsTracker.IncTxExecuted()
 }
 
 func (lg *ContLoadGenerator) sendTx(workerID int, tx *flowsdk.Transaction) (<-chan flowsdk.TransactionResult, error) {

@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	lru "github.com/hashicorp/golang-lru"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"go.uber.org/atomic"
 	"google.golang.org/grpc"
 )
@@ -21,29 +21,37 @@ type CachedClient struct {
 
 // Close closes the CachedClient connection. It marks the connection for closure and waits asynchronously for ongoing
 // requests to complete before closing the connection.
-func (s *CachedClient) Close() {
+func (cc *CachedClient) Close() {
 	// Mark the connection for closure
-	if swapped := s.closeRequested.CompareAndSwap(false, true); !swapped {
+	if !cc.closeRequested.CompareAndSwap(false, true) {
+		return
+	}
+
+	// Obtain the lock to ensure that any connection attempts have completed
+	cc.mu.Lock()
+	conn := cc.ClientConn
+	cc.mu.Unlock()
+
+	// If the initial connection attempt failed, ClientConn will be nil
+	if conn == nil {
 		return
 	}
 
 	// If there are ongoing requests, wait for them to complete asynchronously
-	go func() {
-		s.wg.Wait()
+	cc.wg.Wait()
 
-		// Close the connection
-		s.ClientConn.Close()
-	}()
+	// Close the connection
+	conn.Close()
 }
 
 // Cache represents a cache of CachedClient instances with a given maximum size.
 type Cache struct {
-	cache *lru.Cache
+	cache *lru.Cache[string, *CachedClient]
 	size  int
 }
 
 // NewCache creates a new Cache with the specified maximum size and the underlying LRU cache.
-func NewCache(cache *lru.Cache, size int) *Cache {
+func NewCache(cache *lru.Cache[string, *CachedClient], size int) *Cache {
 	return &Cache{
 		cache: cache,
 		size:  size,
@@ -57,7 +65,7 @@ func (c *Cache) Get(address string) (*CachedClient, bool) {
 	if !ok {
 		return nil, false
 	}
-	return val.(*CachedClient), true
+	return val, true
 }
 
 // GetOrAdd atomically gets the CachedClient for the given address from the cache, or adds a new one
@@ -71,7 +79,7 @@ func (c *Cache) GetOrAdd(address string, timeout time.Duration) (*CachedClient, 
 
 	val, existed, _ := c.cache.PeekOrAdd(address, client)
 	if existed {
-		return val.(*CachedClient), true
+		return val, true
 	}
 
 	client.Address = address

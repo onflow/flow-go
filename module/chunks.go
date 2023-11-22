@@ -26,7 +26,6 @@ type ChunkVerifier interface {
 		ch *verification.VerifiableChunkData,
 	) (
 		[]byte,
-		chmodels.ChunkFault,
 		error,
 	)
 }

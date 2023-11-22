@@ -112,7 +112,7 @@ When searching the tree in step 1, we skip all receipts that are in `M` on the f
 
 
 ## Further reading
-* [Lecture notes on directed Graphs](http://www.orcca.on.ca/~yxie/courses/cs2210b-2011/htmls/notes/16-directedgraph.pdf)
+* [Lecture notes on directed Graphs](http://web.archive.org/web/20180219025720/https://orcca.on.ca/~yxie/courses/cs2210b-2011/htmls/notes/16-directedgraph.pdf)
 * [Graph Algorithms and Network Flows](https://hochbaum.ieor.berkeley.edu/files/ieor266-2014.pdf)
 * Paper: [The Serial Transitive Closure Problem for Trees](https://www.math.ucsd.edu/~sbuss/ResearchWeb/transclosure/paper.pdf)
 

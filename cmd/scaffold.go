@@ -176,23 +176,56 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.UintVar(&fnb.BaseConfig.receiptsCacheSize, "receipts-cache-size", bstorage.DefaultCacheSize, "receipts cache size")
 
 	// dynamic node startup flags
-	fnb.flags.StringVar(&fnb.BaseConfig.DynamicStartupANPubkey, "dynamic-startup-access-publickey", "", "the public key of the trusted secure access node to connect to when using dynamic-startup, this access node must be staked")
-	fnb.flags.StringVar(&fnb.BaseConfig.DynamicStartupANAddress, "dynamic-startup-access-address", "", "the access address of the trusted secure access node to connect to when using dynamic-startup, this access node must be staked")
-	fnb.flags.StringVar(&fnb.BaseConfig.DynamicStartupEpochPhase, "dynamic-startup-epoch-phase", "EpochPhaseSetup", "the target epoch phase for dynamic startup <EpochPhaseStaking|EpochPhaseSetup|EpochPhaseCommitted")
-	fnb.flags.StringVar(&fnb.BaseConfig.DynamicStartupEpoch, "dynamic-startup-epoch", "current", "the target epoch for dynamic-startup, use \"current\" to start node in the current epoch")
-	fnb.flags.DurationVar(&fnb.BaseConfig.DynamicStartupSleepInterval, "dynamic-startup-sleep-interval", time.Minute, "the interval in which the node will check if it can start")
+	fnb.flags.StringVar(&fnb.BaseConfig.DynamicStartupANPubkey,
+		"dynamic-startup-access-publickey",
+		"",
+		"the public key of the trusted secure access node to connect to when using dynamic-startup, this access node must be staked")
+	fnb.flags.StringVar(&fnb.BaseConfig.DynamicStartupANAddress,
+		"dynamic-startup-access-address",
+		"",
+		"the access address of the trusted secure access node to connect to when using dynamic-startup, this access node must be staked")
+	fnb.flags.StringVar(&fnb.BaseConfig.DynamicStartupEpochPhase,
+		"dynamic-startup-epoch-phase",
+		"EpochPhaseSetup",
+		"the target epoch phase for dynamic startup <EpochPhaseStaking|EpochPhaseSetup|EpochPhaseCommitted")
+	fnb.flags.StringVar(&fnb.BaseConfig.DynamicStartupEpoch,
+		"dynamic-startup-epoch",
+		"current",
+		"the target epoch for dynamic-startup, use \"current\" to start node in the current epoch")
+	fnb.flags.DurationVar(&fnb.BaseConfig.DynamicStartupSleepInterval,
+		"dynamic-startup-sleep-interval",
+		time.Minute,
+		"the interval in which the node will check if it can start")
 
 	fnb.flags.BoolVar(&fnb.BaseConfig.InsecureSecretsDB, "insecure-secrets-db", false, "allow the node to start up without an secrets DB encryption key")
 	fnb.flags.BoolVar(&fnb.BaseConfig.HeroCacheMetricsEnable, "herocache-metrics-collector", false, "enables herocache metrics collection")
 
 	// sync core flags
-	fnb.flags.DurationVar(&fnb.BaseConfig.SyncCoreConfig.RetryInterval, "sync-retry-interval", defaultConfig.SyncCoreConfig.RetryInterval, "the initial interval before we retry a sync request, uses exponential backoff")
-	fnb.flags.UintVar(&fnb.BaseConfig.SyncCoreConfig.Tolerance, "sync-tolerance", defaultConfig.SyncCoreConfig.Tolerance, "determines how big of a difference in block heights we tolerate before actively syncing with range requests")
-	fnb.flags.UintVar(&fnb.BaseConfig.SyncCoreConfig.MaxAttempts, "sync-max-attempts", defaultConfig.SyncCoreConfig.MaxAttempts, "the maximum number of attempts we make for each requested block/height before discarding")
-	fnb.flags.UintVar(&fnb.BaseConfig.SyncCoreConfig.MaxSize, "sync-max-size", defaultConfig.SyncCoreConfig.MaxSize, "the maximum number of blocks we request in the same block request message")
-	fnb.flags.UintVar(&fnb.BaseConfig.SyncCoreConfig.MaxRequests, "sync-max-requests", defaultConfig.SyncCoreConfig.MaxRequests, "the maximum number of requests we send during each scanning period")
+	fnb.flags.DurationVar(&fnb.BaseConfig.SyncCoreConfig.RetryInterval,
+		"sync-retry-interval",
+		defaultConfig.SyncCoreConfig.RetryInterval,
+		"the initial interval before we retry a sync request, uses exponential backoff")
+	fnb.flags.UintVar(&fnb.BaseConfig.SyncCoreConfig.Tolerance,
+		"sync-tolerance",
+		defaultConfig.SyncCoreConfig.Tolerance,
+		"determines how big of a difference in block heights we tolerate before actively syncing with range requests")
+	fnb.flags.UintVar(&fnb.BaseConfig.SyncCoreConfig.MaxAttempts,
+		"sync-max-attempts",
+		defaultConfig.SyncCoreConfig.MaxAttempts,
+		"the maximum number of attempts we make for each requested block/height before discarding")
+	fnb.flags.UintVar(&fnb.BaseConfig.SyncCoreConfig.MaxSize,
+		"sync-max-size",
+		defaultConfig.SyncCoreConfig.MaxSize,
+		"the maximum number of blocks we request in the same block request message")
+	fnb.flags.UintVar(&fnb.BaseConfig.SyncCoreConfig.MaxRequests,
+		"sync-max-requests",
+		defaultConfig.SyncCoreConfig.MaxRequests,
+		"the maximum number of requests we send during each scanning period")
 
-	fnb.flags.Uint64Var(&fnb.BaseConfig.ComplianceConfig.SkipNewProposalsThreshold, "compliance-skip-proposals-threshold", defaultConfig.ComplianceConfig.SkipNewProposalsThreshold, "threshold at which new proposals are discarded rather than cached, if their height is this much above local finalized height")
+	fnb.flags.Uint64Var(&fnb.BaseConfig.ComplianceConfig.SkipNewProposalsThreshold,
+		"compliance-skip-proposals-threshold",
+		defaultConfig.ComplianceConfig.SkipNewProposalsThreshold,
+		"threshold at which new proposals are discarded rather than cached, if their height is this much above local finalized height")
 }
 
 func (fnb *FlowNodeBuilder) EnqueuePingService() {
@@ -276,21 +309,21 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 
 	// setup default rate limiter options
 	unicastRateLimiterOpts := []ratelimit.RateLimitersOption{
-		ratelimit.WithDisabledRateLimiting(fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastRateLimitersConfig.DryRun),
+		ratelimit.WithDisabledRateLimiting(fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastConfig.UnicastRateLimitersConfig.DryRun),
 		ratelimit.WithNotifier(fnb.UnicastRateLimiterDistributor),
 	}
 
 	// override noop unicast message rate limiter
-	if fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastRateLimitersConfig.MessageRateLimit > 0 {
+	if fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastConfig.UnicastRateLimitersConfig.MessageRateLimit > 0 {
 		unicastMessageRateLimiter := ratelimiter.NewRateLimiter(
-			rate.Limit(fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastRateLimitersConfig.MessageRateLimit),
-			fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastRateLimitersConfig.MessageRateLimit,
-			fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastRateLimitersConfig.LockoutDuration,
+			rate.Limit(fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastConfig.UnicastRateLimitersConfig.MessageRateLimit),
+			fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastConfig.UnicastRateLimitersConfig.MessageRateLimit,
+			fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastConfig.UnicastRateLimitersConfig.LockoutDuration,
 		)
 		unicastRateLimiterOpts = append(unicastRateLimiterOpts, ratelimit.WithMessageRateLimiter(unicastMessageRateLimiter))
 
 		// avoid connection gating and pruning during dry run
-		if !fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastRateLimitersConfig.DryRun {
+		if !fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastConfig.UnicastRateLimitersConfig.DryRun {
 			f := rateLimiterPeerFilter(unicastMessageRateLimiter)
 			// add IsRateLimited peerFilters to conn gater intercept secure peer and peer manager filters list
 			// don't allow rate limited peers to establishing incoming connections
@@ -301,16 +334,16 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	}
 
 	// override noop unicast bandwidth rate limiter
-	if fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastRateLimitersConfig.BandwidthRateLimit > 0 && fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastRateLimitersConfig.BandwidthBurstLimit > 0 {
+	if fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastConfig.UnicastRateLimitersConfig.BandwidthRateLimit > 0 && fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastConfig.UnicastRateLimitersConfig.BandwidthBurstLimit > 0 {
 		unicastBandwidthRateLimiter := ratelimit.NewBandWidthRateLimiter(
-			rate.Limit(fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastRateLimitersConfig.BandwidthRateLimit),
-			fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastRateLimitersConfig.BandwidthBurstLimit,
-			fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastRateLimitersConfig.LockoutDuration,
+			rate.Limit(fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastConfig.UnicastRateLimitersConfig.BandwidthRateLimit),
+			fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastConfig.UnicastRateLimitersConfig.BandwidthBurstLimit,
+			fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastConfig.UnicastRateLimitersConfig.LockoutDuration,
 		)
 		unicastRateLimiterOpts = append(unicastRateLimiterOpts, ratelimit.WithBandwidthRateLimiter(unicastBandwidthRateLimiter))
 
 		// avoid connection gating and pruning during dry run
-		if !fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastRateLimitersConfig.DryRun {
+		if !fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastConfig.UnicastRateLimitersConfig.DryRun {
 			f := rateLimiterPeerFilter(unicastBandwidthRateLimiter)
 			// add IsRateLimited peerFilters to conn gater intercept secure peer and peer manager filters list
 			connGaterInterceptSecureFilters = append(connGaterInterceptSecureFilters, f)
@@ -322,7 +355,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	unicastRateLimiters := ratelimit.NewRateLimiters(unicastRateLimiterOpts...)
 
 	uniCfg := &p2pconfig.UnicastConfig{
-		StreamRetryInterval:    fnb.FlowConfig.NetworkConfig.UnicastCreateStreamRetryDelay,
+		UnicastConfig:          fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastConfig,
 		RateLimiterDistributor: fnb.UnicastRateLimiterDistributor,
 	}
 
@@ -343,8 +376,11 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			myAddr = fnb.BaseConfig.BindAddr
 		}
 
-		builder, err := p2pbuilder.DefaultNodeBuilder(
-			fnb.Logger,
+		dhtActivationStatus, err := DhtSystemActivationStatus(fnb.NodeRole)
+		if err != nil {
+			return nil, fmt.Errorf("could not determine dht activation status: %w", err)
+		}
+		builder, err := p2pbuilder.DefaultNodeBuilder(fnb.Logger,
 			myAddr,
 			network.PrivateNetwork,
 			fnb.NetworkKey,
@@ -360,14 +396,14 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			peerManagerCfg,
 			&fnb.FlowConfig.NetworkConfig.GossipSubConfig,
 			&fnb.FlowConfig.NetworkConfig.GossipSubRPCInspectorsConfig,
-			&fnb.FlowConfig.NetworkConfig.ResourceManagerConfig,
+			&fnb.FlowConfig.NetworkConfig.ResourceManager,
 			uniCfg,
 			&fnb.FlowConfig.NetworkConfig.ConnectionManagerConfig,
 			&p2p.DisallowListCacheConfig{
 				MaxSize: fnb.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
 				Metrics: metrics.DisallowListCacheMetricsFactory(fnb.HeroCacheMetricsFactory(), network.PrivateNetwork),
-			})
-
+			},
+			dhtActivationStatus)
 		if err != nil {
 			return nil, fmt.Errorf("could not create libp2p node builder: %w", err)
 		}
@@ -1861,4 +1897,31 @@ func (fnb *FlowNodeBuilder) extraFlagsValidation() error {
 		}
 	}
 	return nil
+}
+
+// DhtSystemActivationStatus parses the given role string and returns the corresponding DHT system activation status.
+// Args:
+// - roleStr: the role string to parse.
+// Returns:
+// - DhtSystemActivation: the corresponding DHT system activation status.
+// - error: if the role string is invalid, returns an error.
+func DhtSystemActivationStatus(roleStr string) (p2pbuilder.DhtSystemActivation, error) {
+	if roleStr == "ghost" {
+		// ghost node is not a valid role, so we don't need to parse it
+		return p2pbuilder.DhtSystemDisabled, nil
+	}
+
+	role, err := flow.ParseRole(roleStr)
+	if err != nil && roleStr != "ghost" {
+		// ghost role is not a valid role, so we don't need to parse it
+		return p2pbuilder.DhtSystemDisabled, fmt.Errorf("could not parse node role: %w", err)
+	}
+	if role == flow.RoleAccess || role == flow.RoleExecution {
+		// Only access and execution nodes need to run DHT;
+		// Access nodes and execution nodes need DHT to run a blob service.
+		// Moreover, access nodes run a DHT to let un-staked (public) access nodes find each other on the public network.
+		return p2pbuilder.DhtSystemEnabled, nil
+	}
+
+	return p2pbuilder.DhtSystemDisabled, nil
 }

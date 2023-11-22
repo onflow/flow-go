@@ -879,3 +879,8 @@ func Test_StopControlWorkers(t *testing.T) {
 		unittest.AssertClosesBefore(t, sc.Done(), 10*time.Second)
 	})
 }
+
+func TestPatchedVersion(t *testing.T) {
+	require.True(t, semver.New("0.31.20").LessThan(*semver.New("0.31.21")))
+	require.True(t, semver.New("0.31.20-patch.1").LessThan(*semver.New("0.31.20"))) // be careful with this one
+}

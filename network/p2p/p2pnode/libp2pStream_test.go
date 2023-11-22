@@ -18,15 +18,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/network/p2p"
-	p2ptest "github.com/onflow/flow-go/network/p2p/test"
-
+	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/internal/p2putils"
-	"github.com/onflow/flow-go/network/p2p/p2pnode"
+	"github.com/onflow/flow-go/network/p2p"
+	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/utils"
@@ -44,12 +43,7 @@ func TestStreamClosing(t *testing.T) {
 	handler, streamCloseWG := mockStreamHandlerForMessages(t, ctx, count, msgRegex)
 	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
 	// Creates nodes
-	nodes, identities := p2ptest.NodesFixture(t,
-		unittest.IdentifierFixture(),
-		"test_stream_closing",
-		2,
-		idProvider,
-		p2ptest.WithDefaultStreamHandler(handler))
+	nodes, identities := p2ptest.NodesFixture(t, unittest.IdentifierFixture(), "test_stream_closing", 2, idProvider, p2ptest.WithDefaultStreamHandler(handler))
 	idProvider.SetIdentities(identities)
 
 	p2ptest.StartNodes(t, signalerCtx, nodes)
@@ -152,19 +146,14 @@ func testCreateStream(t *testing.T, sporkId flow.Identifier, unicasts []protocol
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
-	nodes, identities := p2ptest.NodesFixture(t,
-		sporkId,
-		"test_create_stream",
-		count,
-		idProvider,
-		p2ptest.WithPreferredUnicasts(unicasts))
+	nodes, identities := p2ptest.NodesFixture(t, sporkId, "test_create_stream", count, idProvider, p2ptest.WithPreferredUnicasts(unicasts))
 	idProvider.SetIdentities(identities)
 	p2ptest.StartNodes(t, signalerCtx, nodes)
 
 	id2 := identities[1]
 
 	// Assert that there is no outbound stream to the target yet
-	require.Equal(t, 0, p2putils.CountStream(nodes[0].Host(), nodes[1].ID(), protocolID, network.DirOutbound))
+	require.Equal(t, 0, p2putils.CountStream(nodes[0].Host(), nodes[1].ID(), p2putils.Protocol(protocolID), p2putils.Direction(network.DirOutbound)))
 
 	// Now attempt to create another 100 outbound stream to the same destination by calling CreateStream
 	streamCount := 100
@@ -193,7 +182,7 @@ func testCreateStream(t *testing.T, sporkId flow.Identifier, unicasts []protocol
 	}
 
 	require.Eventually(t, func() bool {
-		return streamCount == p2putils.CountStream(nodes[0].Host(), nodes[1].ID(), protocolID, network.DirOutbound)
+		return streamCount == p2putils.CountStream(nodes[0].Host(), nodes[1].ID(), p2putils.Protocol(protocolID), p2putils.Direction(network.DirOutbound))
 	}, 5*time.Second, 100*time.Millisecond, "could not create streams on time")
 
 	// checks that the number of connections is 1 despite the number of streams; i.e., all streams are created on the same connection
@@ -220,10 +209,13 @@ func TestCreateStream_FallBack(t *testing.T) {
 	idProvider := mockmodule.NewIdentityProvider(t)
 	thisNode, thisID := p2ptest.NodeFixture(t,
 		sporkId,
-		"test_create_stream_fallback",
+		t.Name(),
 		idProvider,
 		p2ptest.WithPreferredUnicasts([]protocols.ProtocolName{protocols.GzipCompressionUnicast}))
-	otherNode, otherId := p2ptest.NodeFixture(t, sporkId, "test_create_stream_fallback", idProvider)
+	otherNode, otherId := p2ptest.NodeFixture(t,
+		sporkId,
+		t.Name(),
+		idProvider)
 	identities := []flow.Identity{thisID, otherId}
 	nodes := []p2p.LibP2PNode{thisNode, otherNode}
 	for i, node := range nodes {
@@ -235,8 +227,8 @@ func TestCreateStream_FallBack(t *testing.T) {
 	// Assert that there is no outbound stream to the target yet (neither default nor preferred)
 	defaultProtocolId := protocols.FlowProtocolID(sporkId)
 	preferredProtocolId := protocols.FlowGzipProtocolId(sporkId)
-	require.Equal(t, 0, p2putils.CountStream(thisNode.Host(), otherNode.ID(), defaultProtocolId, network.DirOutbound))
-	require.Equal(t, 0, p2putils.CountStream(thisNode.Host(), otherNode.ID(), preferredProtocolId, network.DirOutbound))
+	require.Equal(t, 0, p2putils.CountStream(thisNode.Host(), otherNode.ID(), p2putils.Protocol(defaultProtocolId), p2putils.Direction(network.DirOutbound)))
+	require.Equal(t, 0, p2putils.CountStream(thisNode.Host(), otherNode.ID(), p2putils.Protocol(preferredProtocolId), p2putils.Direction(network.DirOutbound)))
 
 	// Now attempt to create another 100 outbound stream to the same destination by calling CreateStream
 	streamCount := 10
@@ -265,11 +257,11 @@ func TestCreateStream_FallBack(t *testing.T) {
 
 	// wait for the stream to be created on the default protocol id.
 	require.Eventually(t, func() bool {
-		return streamCount == p2putils.CountStream(nodes[0].Host(), nodes[1].ID(), defaultProtocolId, network.DirOutbound)
+		return streamCount == p2putils.CountStream(nodes[0].Host(), nodes[1].ID(), p2putils.Protocol(defaultProtocolId), p2putils.Direction(network.DirOutbound))
 	}, 5*time.Second, 100*time.Millisecond, "could not create streams on time")
 
 	// no stream must be created on the preferred protocol id
-	require.Equal(t, 0, p2putils.CountStream(thisNode.Host(), otherNode.ID(), preferredProtocolId, network.DirOutbound))
+	require.Equal(t, 0, p2putils.CountStream(thisNode.Host(), otherNode.ID(), p2putils.Protocol(preferredProtocolId), p2putils.Direction(network.DirOutbound)))
 
 	// checks that the number of connections is 1 despite the number of streams; i.e., all streams are created on the same connection
 	require.Len(t, nodes[0].Host().Network().Conns(), 1)
@@ -287,7 +279,11 @@ func TestCreateStreamIsConcurrencySafe(t *testing.T) {
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
 	// create two nodes
-	nodes, identities := p2ptest.NodesFixture(t, unittest.IdentifierFixture(), "test_create_stream_is_concurrency_safe", 2, idProvider)
+	nodes, identities := p2ptest.NodesFixture(t,
+		unittest.IdentifierFixture(),
+		t.Name(),
+		2,
+		idProvider)
 	require.Len(t, identities, 2)
 	idProvider.SetIdentities(flow.IdentityList{identities[0], identities[1]})
 	p2ptest.StartNodes(t, signalerCtx, nodes)
@@ -341,10 +337,9 @@ func TestNoBackoffWhenCreatingStream(t *testing.T) {
 	// Creates nodes
 	nodes, identities := p2ptest.NodesFixture(t,
 		unittest.IdentifierFixture(),
-		"test_no_backoff_when_create_stream",
+		t.Name(),
 		count,
-		idProvider,
-	)
+		idProvider)
 	node1 := nodes[0]
 	node2 := nodes[1]
 	idProvider.SetIdentities(flow.IdentityList{identities[0], identities[1]})
@@ -359,24 +354,28 @@ func TestNoBackoffWhenCreatingStream(t *testing.T) {
 	pInfo, err := utils.PeerAddressInfo(*id2)
 	require.NoError(t, err)
 	nodes[0].Host().Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.AddressTTL)
-	maxTimeToWait := p2pnode.MaxConnectAttempt * unicast.MaxRetryJitter * time.Millisecond
+
+	cfg, err := config.DefaultConfig()
+	require.NoError(t, err)
+
+	maxTimeToWait := time.Duration(cfg.NetworkConfig.UnicastConfig.MaxStreamCreationRetryAttemptTimes) * unicast.MaxRetryJitter * time.Millisecond
 
 	// need to add some buffer time so that RequireReturnsBefore waits slightly longer than maxTimeToWait to avoid
 	// a race condition
 	someGraceTime := 100 * time.Millisecond
 	totalWaitTime := maxTimeToWait + someGraceTime
 
-	//each CreateStream() call may try to connect up to MaxConnectAttempt (3) times.
+	// each CreateStream() call may try to connect up to MaxDialRetryAttemptTimes (3) times.
 
-	//there are 2 scenarios that we need to account for:
+	// there are 2 scenarios that we need to account for:
 	//
-	//1. machines where a timeout occurs on the first connection attempt - this can be due to local firewall rules or other processes running on the machine.
+	// 1. machines where a timeout occurs on the first connection attempt - this can be due to local firewall rules or other processes running on the machine.
 	//   In this case, we need to create a scenario where a backoff would have normally occured. This is why we initiate a second connection attempt.
 	//   Libp2p remembers the peer we are trying to connect to between CreateStream() calls and would have initiated a backoff if backoff wasn't turned off.
-	//   The second CreateStream() call will make a second connection attempt MaxConnectAttempt times and that should never result in a backoff error.
+	//   The second CreateStream() call will make a second connection attempt MaxDialRetryAttemptTimes times and that should never result in a backoff error.
 	//
-	//2. machines where a timeout does NOT occur on the first connection attempt - this is on CI machines and some local dev machines without a firewall / too many other processes.
-	//   In this case, there will be MaxConnectAttempt (3) connection attempts on the first CreateStream() call and MaxConnectAttempt (3) attempts on the second CreateStream() call.
+	// 2. machines where a timeout does NOT occur on the first connection attempt - this is on CI machines and some local dev machines without a firewall / too many other processes.
+	//   In this case, there will be MaxDialRetryAttemptTimes (3) connection attempts on the first CreateStream() call and MaxDialRetryAttemptTimes (3) attempts on the second CreateStream() call.
 
 	// make two separate stream creation attempt and assert that no connection back off happened
 	for i := 0; i < 2; i++ {
@@ -416,16 +415,14 @@ func testUnicastOverStream(t *testing.T, opts ...p2ptest.NodeFixtureParameterOpt
 	sporkId := unittest.IdentifierFixture()
 	idProvider := mockmodule.NewIdentityProvider(t)
 	streamHandler1, inbound1 := p2ptest.StreamHandlerFixture(t)
-	node1, id1 := p2ptest.NodeFixture(
-		t,
+	node1, id1 := p2ptest.NodeFixture(t,
 		sporkId,
 		t.Name(),
 		idProvider,
 		append(opts, p2ptest.WithDefaultStreamHandler(streamHandler1))...)
 
 	streamHandler2, inbound2 := p2ptest.StreamHandlerFixture(t)
-	node2, id2 := p2ptest.NodeFixture(
-		t,
+	node2, id2 := p2ptest.NodeFixture(t,
 		sporkId,
 		t.Name(),
 		idProvider,
@@ -441,8 +438,7 @@ func testUnicastOverStream(t *testing.T, opts ...p2ptest.NodeFixtureParameterOpt
 
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 
-	p2pfixtures.EnsureMessageExchangeOverUnicast(
-		t,
+	p2pfixtures.EnsureMessageExchangeOverUnicast(t,
 		ctx,
 		nodes,
 		[]chan string{inbound1, inbound2},
@@ -461,23 +457,19 @@ func TestUnicastOverStream_Fallback(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
 	idProvider := mockmodule.NewIdentityProvider(t)
 	streamHandler1, inbound1 := p2ptest.StreamHandlerFixture(t)
-	node1, id1 := p2ptest.NodeFixture(
-		t,
+	node1, id1 := p2ptest.NodeFixture(t,
 		sporkId,
 		t.Name(),
 		idProvider,
-		p2ptest.WithDefaultStreamHandler(streamHandler1),
-	)
+		p2ptest.WithDefaultStreamHandler(streamHandler1))
 
 	streamHandler2, inbound2 := p2ptest.StreamHandlerFixture(t)
-	node2, id2 := p2ptest.NodeFixture(
-		t,
+	node2, id2 := p2ptest.NodeFixture(t,
 		sporkId,
 		t.Name(),
 		idProvider,
 		p2ptest.WithDefaultStreamHandler(streamHandler2),
-		p2ptest.WithPreferredUnicasts([]protocols.ProtocolName{protocols.GzipCompressionUnicast}),
-	)
+		p2ptest.WithPreferredUnicasts([]protocols.ProtocolName{protocols.GzipCompressionUnicast}))
 
 	ids := flow.IdentityList{&id1, &id2}
 	nodes := []p2p.LibP2PNode{node1, node2}
@@ -489,7 +481,11 @@ func TestUnicastOverStream_Fallback(t *testing.T) {
 	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
-	p2pfixtures.EnsureMessageExchangeOverUnicast(t, ctx, nodes, []chan string{inbound1, inbound2}, p2pfixtures.LongStringMessageFactoryFixture(t))
+	p2pfixtures.EnsureMessageExchangeOverUnicast(
+		t,
+		ctx,
+		nodes,
+		[]chan string{inbound1, inbound2}, p2pfixtures.LongStringMessageFactoryFixture(t))
 }
 
 // TestCreateStreamTimeoutWithUnresponsiveNode tests that the CreateStream call does not block longer than the
@@ -501,10 +497,9 @@ func TestCreateStreamTimeoutWithUnresponsiveNode(t *testing.T) {
 	// creates a regular node
 	nodes, identities := p2ptest.NodesFixture(t,
 		unittest.IdentifierFixture(),
-		"test_create_stream_timeout_with_unresponsive_node",
+		t.Name(),
 		1,
-		idProvider,
-	)
+		idProvider)
 	require.Len(t, identities, 1)
 	idProvider.SetIdentities(identities)
 	p2ptest.StartNodes(t, signalerCtx, nodes)
@@ -533,8 +528,7 @@ func TestCreateStreamTimeoutWithUnresponsiveNode(t *testing.T) {
 				return nil
 			})
 			require.Error(t, err)
-		},
-		timeout+grace)
+		}, timeout+grace)
 }
 
 // TestCreateStreamIsConcurrent tests that CreateStream calls can be made concurrently such that one blocked call
@@ -546,10 +540,9 @@ func TestCreateStreamIsConcurrent(t *testing.T) {
 	// create two regular node
 	goodNodes, goodNodeIds := p2ptest.NodesFixture(t,
 		unittest.IdentifierFixture(),
-		"test_create_stream_is_concurrent",
+		t.Name(),
 		2,
-		idProvider,
-	)
+		idProvider)
 	require.Len(t, goodNodeIds, 2)
 	idProvider.SetIdentities(goodNodeIds)
 	p2ptest.StartNodes(t, signalerCtx, goodNodes)
@@ -576,9 +569,7 @@ func TestCreateStreamIsConcurrent(t *testing.T) {
 				require.Fail(t, "this should never be called")
 				return nil
 			})
-		},
-		1*time.Second,
-		"CreateStream attempt to the unresponsive peer did not block")
+		}, 1*time.Second, "CreateStream attempt to the unresponsive peer did not block")
 
 	// requires same peer can still connect to the other regular peer without being blocked
 	unittest.RequireReturnsBefore(t,
@@ -589,12 +580,12 @@ func TestCreateStreamIsConcurrent(t *testing.T) {
 				return nil
 			})
 			require.NoError(t, err)
-		},
-		1*time.Second, "creating stream to a responsive node failed while concurrently blocked on unresponsive node")
+		}, 1*time.Second, "creating stream to a responsive node failed while concurrently blocked on unresponsive node")
 
 	// requires the CreateStream call to the unresponsive node was blocked while we attempted the CreateStream to the
 	// good address
-	unittest.RequireNeverClosedWithin(t, blockedCallCh, 1*time.Millisecond,
+	unittest.RequireNeverClosedWithin(t,
+		blockedCallCh,
+		1*time.Millisecond,
 		"CreateStream attempt to the unresponsive peer did not block after connecting to good node")
-
 }

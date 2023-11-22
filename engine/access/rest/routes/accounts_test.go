@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest/middleware"
 	"github.com/onflow/flow-go/model/flow"
-
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -127,8 +126,7 @@ func TestAccessGetAccount(t *testing.T) {
 
 		for i, test := range tests {
 			req, _ := http.NewRequest("GET", test.url, nil)
-			rr, err := executeRequest(req, backend)
-			assert.NoError(t, err)
+			rr := executeRequest(req, backend)
 
 			assert.Equal(t, http.StatusBadRequest, rr.Code)
 			assert.JSONEq(t, test.out, rr.Body.String(), fmt.Sprintf("test #%d failed: %v", i, test))

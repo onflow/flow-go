@@ -45,6 +45,8 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
+	exeFetcher "github.com/onflow/flow-go/engine/execution/ingestion/fetcher"
+	"github.com/onflow/flow-go/engine/execution/ingestion/loader"
 	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
 	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 	executionprovider "github.com/onflow/flow-go/engine/execution/provider"
@@ -709,31 +711,28 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		true,
 	)
 
+	fetcher := exeFetcher.NewCollectionFetcher(node.Log, requestEngine, node.State, false)
+	loader := loader.NewUnexecutedLoader(node.Log, node.State, node.Headers, execState)
 	rootHead, rootQC := getRoot(t, &node)
 	ingestionEngine, err := ingestion.New(
 		unit,
 		node.Log,
 		node.Net,
 		node.Me,
-		requestEngine,
-		node.State,
+		fetcher,
 		node.Headers,
 		node.Blocks,
 		collectionsStorage,
-		eventsStorage,
-		serviceEventsStorage,
-		txResultStorage,
 		computationEngine,
 		pusherEngine,
 		execState,
 		node.Metrics,
 		node.Tracer,
 		false,
-		checkAuthorizedAtBlock,
 		nil,
 		uploader,
 		stopControl,
-		false,
+		loader,
 	)
 	require.NoError(t, err)
 	requestEngine.WithHandle(ingestionEngine.OnCollection)
@@ -774,6 +773,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	idCache, err := cache.NewProtocolStateIDCache(node.Log, node.State, events.NewDistributor())
 	require.NoError(t, err, "could not create finalized snapshot cache")
+	spamConfig, err := synchronization.NewSpamDetectionConfig()
+	require.NoError(t, err, "could not initialize spam detection config")
 	syncEngine, err := synchronization.New(
 		node.Log,
 		node.Metrics,
@@ -790,7 +791,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 			),
 			idCache,
 		),
-		synchronization.NewSpamDetectionConfig(),
+		spamConfig,
 		synchronization.WithPollInterval(time.Duration(0)),
 	)
 	require.NoError(t, err)
@@ -1056,12 +1057,13 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.ChunkConsumer == nil {
-		node.ChunkConsumer = chunkconsumer.NewChunkConsumer(node.Log,
+		node.ChunkConsumer, err = chunkconsumer.NewChunkConsumer(node.Log,
 			collector,
 			node.ProcessedChunkIndex,
 			node.ChunksQueue,
 			node.FetcherEngine,
 			chunkconsumer.DefaultChunkWorkers) // defaults number of workers to 3.
+		require.NoError(t, err)
 		err = mempoolCollector.Register(metrics.ResourceChunkConsumer, node.ChunkConsumer.Size)
 		require.NoError(t, err)
 	}

@@ -1,28 +1,15 @@
 package hash
 
 import (
-	"sync"
-
 	"github.com/onflow/flow-go/crypto/hash"
 )
 
-// DefaultHasher is the default hasher used by Flow.
-var DefaultHasher hash.Hasher
-
-type defaultHasher struct {
-	hash.Hasher
-	sync.Mutex
-}
-
-func (h *defaultHasher) ComputeHash(b []byte) hash.Hash {
-	h.Lock()
-	defer h.Unlock()
-	return h.Hasher.ComputeHash(b)
-}
-
-func init() {
-	DefaultHasher = &defaultHasher{
-		hash.NewSHA3_256(),
-		sync.Mutex{},
-	}
+// DefaultComputeHash is the default hasher used by Flow.
+//
+// `ComputeSHA3_256` can be used directly
+// to minimize heap allocations
+func DefaultComputeHash(data []byte) hash.Hash {
+	var res [hash.HashLenSHA3_256]byte
+	hash.ComputeSHA3_256(&res, data)
+	return hash.Hash(res[:])
 }

@@ -1,5 +1,9 @@
 package flow
 
+import (
+	"github.com/ipfs/go-cid"
+)
+
 type ChunkBody struct {
 	CollectionIndex uint
 
@@ -57,14 +61,19 @@ func (ch *Chunk) Checksum() Identifier {
 // ChunkDataPack holds all register touches (any read, or write).
 //
 // Note that we have to capture a read proof for each write before updating the registers.
-// `Proof` includes proofs for all registers read to execute the chunck.
+// `Proof` includes proofs for all registers read to execute the chunk.
 // Register proofs order must not be correlated to the order of register reads during
 // the chunk execution in order to enforce the SPoCK secret high entropy.
 type ChunkDataPack struct {
-	ChunkID    Identifier
-	StartState StateCommitment
-	Proof      StorageProof
-	Collection *Collection
+	ChunkID    Identifier      // ID of the chunk this data pack is for
+	StartState StateCommitment // commitment for starting state
+	Proof      StorageProof    // proof for all registers read during the chunk execution
+	Collection *Collection     // collection executed in this chunk
+
+	// ExecutionDataRoot is the root data structure of an execution_data.BlockExecutionData.
+	// It contains the necessary information for a verification node to validate that the
+	// BlockExecutionData produced is valid.
+	ExecutionDataRoot BlockExecutionDataRoot
 }
 
 // NewChunkDataPack returns an initialized chunk data pack.
@@ -73,12 +82,14 @@ func NewChunkDataPack(
 	startState StateCommitment,
 	proof StorageProof,
 	collection *Collection,
+	execDataRoot BlockExecutionDataRoot,
 ) *ChunkDataPack {
 	return &ChunkDataPack{
-		ChunkID:    chunkID,
-		StartState: startState,
-		Proof:      proof,
-		Collection: collection,
+		ChunkID:           chunkID,
+		StartState:        startState,
+		Proof:             proof,
+		Collection:        collection,
+		ExecutionDataRoot: execDataRoot,
 	}
 }
 
@@ -148,4 +159,22 @@ func (cl ChunkList) ByIndex(i uint64) (*Chunk, bool) {
 // interface that makes ChunkList sortable
 func (cl ChunkList) Len() int {
 	return len(cl)
+}
+
+// BlockExecutionDataRoot represents the root of a serialized execution_data.BlockExecutionData.
+// The hash of the serialized BlockExecutionDataRoot is the ExecutionDataID used within an
+// flow.ExecutionResult.
+// Context:
+//   - The trie updates in BlockExecutionDataRoot contain the _mutated_ registers only, which is
+//     helpful for clients to truslessly replicate the state.
+//   - In comparison, the chunk data packs contains all the register values at the chunk's starting
+//     state that were _touched_ (written and/or read). This is necessary for Verification Nodes to
+//     re-run the chunk the computation.
+type BlockExecutionDataRoot struct {
+	// BlockID is the ID of the block, whose result this execution data is for.
+	BlockID Identifier
+
+	// ChunkExecutionDataIDs is a list of the root CIDs for each serialized execution_data.ChunkExecutionData
+	// associated with this block.
+	ChunkExecutionDataIDs []cid.Cid
 }

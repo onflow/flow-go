@@ -4,13 +4,13 @@ import (
 	"context"
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/stretchr/testify/mock"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/metrics"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	realstorage "github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -38,26 +38,11 @@ func (suite *Suite) TestTransactionRetry() {
 	// collection storage returns a not found error
 	suite.collections.On("LightByTransactionID", transactionBody.ID()).Return(nil, realstorage.ErrNotFound)
 
-	// txID := transactionBody.ID()
-	// blockID := block.ID()
+	params := suite.defaultBackendParams()
+
 	// Setup Handler + Retry
-	backend := New(
-		Params{
-			State:                suite.state,
-			CollectionRPC:        suite.colClient,
-			Blocks:               suite.blocks,
-			Headers:              suite.headers,
-			Collections:          suite.collections,
-			Transactions:         suite.transactions,
-			ExecutionReceipts:    suite.receipts,
-			ExecutionResults:     suite.results,
-			ChainID:              suite.chainID,
-			AccessMetrics:        metrics.NewNoopCollector(),
-			MaxHeightRange:       DefaultMaxHeightRange,
-			SnapshotHistoryLimit: DefaultSnapshotHistoryLimit,
-			Log:                  suite.log,
-			Communicator:         NewNodeCommunicator(false),
-		})
+	backend, err := New(params)
+	suite.Require().NoError(err)
 
 	retry := newRetry().SetBackend(backend).Activate()
 	backend.retry = retry
@@ -127,24 +112,11 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 	suite.snapshot.On("Identities", mock.Anything).Return(enIDs, nil)
 	connFactory := suite.setupConnectionFactory()
 
-	backend := New(
-		Params{
-			State:                suite.state,
-			CollectionRPC:        suite.colClient,
-			Blocks:               suite.blocks,
-			Headers:              suite.headers,
-			Collections:          suite.collections,
-			Transactions:         suite.transactions,
-			ExecutionReceipts:    suite.receipts,
-			ExecutionResults:     suite.results,
-			ChainID:              suite.chainID,
-			ConnFactory:          connFactory,
-			AccessMetrics:        metrics.NewNoopCollector(),
-			MaxHeightRange:       DefaultMaxHeightRange,
-			SnapshotHistoryLimit: DefaultSnapshotHistoryLimit,
-			Log:                  suite.log,
-			Communicator:         NewNodeCommunicator(false),
-		})
+	params := suite.defaultBackendParams()
+	params.ConnFactory = connFactory
+
+	backend, err := New(params)
+	suite.Require().NoError(err)
 
 	retry := newRetry().SetBackend(backend).Activate()
 	backend.retry = retry
@@ -159,7 +131,13 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 		Times(len(enIDs)) // should call each EN once
 
 	// first call - when block under test is greater height than the sealed head, but execution node does not know about Tx
-	result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID)
+	result, err := backend.GetTransactionResult(
+		ctx,
+		txID,
+		flow.ZeroID,
+		flow.ZeroID,
+		entities.EventEncodingVersion_JSON_CDC_V0,
+	)
 	suite.checkResponse(result, err)
 
 	// status should be finalized since the sealed Blocks is smaller in height

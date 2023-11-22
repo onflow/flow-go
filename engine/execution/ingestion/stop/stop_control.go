@@ -622,10 +622,11 @@ func (s *StopControl) processNewVersionBeacons(
 		return
 	}
 
-	s.log.Info().
+	lg := s.log.With().
+		Str("node_version", s.nodeVersion.String()).
+		Str("beacon", vb.String()).
 		Uint64("vb_seal_height", vb.SealHeight).
-		Uint64("vb_sequence", vb.Sequence).
-		Msg("New version beacon found")
+		Uint64("vb_sequence", vb.Sequence).Logger()
 
 	// this is now the last handled version beacon
 	s.versionBeacon = vb
@@ -642,6 +643,10 @@ func (s *StopControl) processNewVersionBeacons(
 		return
 	}
 
+	lg.Info().
+		Uint64("stop_height", stopHeight).
+		Msg("New version beacon found")
+
 	var newStop = stopBoundary{
 		StopParameters: StopParameters{
 			StopBeforeHeight: stopHeight,
@@ -655,6 +660,7 @@ func (s *StopControl) processNewVersionBeacons(
 		// This is just informational and is expected to sometimes happen during
 		// normal operation. The causes for this are described here: validateStopChange.
 		s.log.Info().
+			Uint64("stop_height", stopHeight).
 			Err(err).
 			Msg("Cannot change stop boundary when detecting new version beacon")
 	}

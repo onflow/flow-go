@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
@@ -36,6 +38,7 @@ func (b *backendEvents) GetEventsForHeightRange(
 	ctx context.Context,
 	eventType string,
 	startHeight, endHeight uint64,
+	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) ([]flow.BlockEvents, error) {
 
 	if endHeight < startHeight {
@@ -77,7 +80,7 @@ func (b *backendEvents) GetEventsForHeightRange(
 		blockHeaders = append(blockHeaders, header)
 	}
 
-	return b.getBlockEventsFromExecutionNode(ctx, blockHeaders, eventType)
+	return b.getBlockEventsFromExecutionNode(ctx, blockHeaders, eventType, requiredEventEncodingVersion)
 }
 
 // GetEventsForBlockIDs retrieves events for all the specified block IDs that have the given type
@@ -85,6 +88,7 @@ func (b *backendEvents) GetEventsForBlockIDs(
 	ctx context.Context,
 	eventType string,
 	blockIDs []flow.Identifier,
+	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) ([]flow.BlockEvents, error) {
 
 	if uint(len(blockIDs)) > b.maxHeightRange {
@@ -103,13 +107,14 @@ func (b *backendEvents) GetEventsForBlockIDs(
 	}
 
 	// forward the request to the execution node
-	return b.getBlockEventsFromExecutionNode(ctx, blockHeaders, eventType)
+	return b.getBlockEventsFromExecutionNode(ctx, blockHeaders, eventType, requiredEventEncodingVersion)
 }
 
 func (b *backendEvents) getBlockEventsFromExecutionNode(
 	ctx context.Context,
 	blockHeaders []*flow.Header,
 	eventType string,
+	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) ([]flow.BlockEvents, error) {
 
 	// create an execution API request for events at block ID
@@ -149,7 +154,12 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 		Msg("successfully got events")
 
 	// convert execution node api result to access node api result
-	results, err := verifyAndConvertToAccessEvents(resp.GetResults(), blockHeaders, resp.GetEventEncodingVersion())
+	results, err := verifyAndConvertToAccessEvents(
+		resp.GetResults(),
+		blockHeaders,
+		resp.GetEventEncodingVersion(),
+		requiredEventEncodingVersion,
+	)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to verify retrieved events from execution node: %v", err)
 	}
@@ -162,7 +172,8 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 func verifyAndConvertToAccessEvents(
 	execEvents []*execproto.GetEventsForBlockIDsResponse_Result,
 	requestedBlockHeaders []*flow.Header,
-	version execproto.EventEncodingVersion,
+	from entities.EventEncodingVersion,
+	to entities.EventEncodingVersion,
 ) ([]flow.BlockEvents, error) {
 	if len(execEvents) != len(requestedBlockHeaders) {
 		return nil, errors.New("number of results does not match number of blocks requested")
@@ -186,10 +197,10 @@ func verifyAndConvertToAccessEvents(
 				result.GetBlockId())
 		}
 
-		events, err := convert.MessagesToEventsFromVersion(result.GetEvents(), version)
+		events, err := convert.MessagesToEventsWithEncodingConversion(result.GetEvents(), from, to)
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal events in event %d with encoding version %s: %w",
-				i, version.String(), err)
+				i, to.String(), err)
 		}
 
 		results[i] = flow.BlockEvents{

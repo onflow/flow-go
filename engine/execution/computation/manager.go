@@ -93,7 +93,7 @@ func New(
 	protoState protocol.State,
 	vmCtx fvm.Context,
 	committer computer.ViewCommitter,
-	executionDataProvider *provider.Provider,
+	executionDataProvider provider.Provider,
 	params ComputationConfig,
 ) (*Manager, error) {
 	log := logger.With().Str("engine", "computation").Logger()
@@ -106,25 +106,7 @@ func New(
 	}
 
 	chainID := vmCtx.Chain.ChainID()
-	options := []fvm.Option{
-		fvm.WithReusableCadenceRuntimePool(
-			reusableRuntime.NewReusableCadenceRuntimePool(
-				ReusableCadenceRuntimePoolSize,
-				runtime.Config{
-					TracingEnabled:        params.CadenceTracing,
-					AccountLinkingEnabled: true,
-					// Attachments are enabled everywhere except for Mainnet
-					AttachmentsEnabled: chainID != flow.Mainnet,
-					// Capability Controllers are enabled everywhere except for Mainnet
-					CapabilityControllersEnabled: chainID != flow.Mainnet,
-				},
-			)),
-	}
-
-	if params.ExtensiveTracing {
-		options = append(options, fvm.WithExtensiveTracing())
-	}
-
+	options := DefaultFVMOptions(chainID, params.CadenceTracing, params.ExtensiveTracing)
 	vmCtx = fvm.NewContextFromParent(vmCtx, options...)
 
 	blockComputer, err := computer.NewBlockComputer(
@@ -157,6 +139,7 @@ func New(
 		vm,
 		vmCtx,
 		derivedChainData,
+		query.NewProtocolStateWrapper(protoState),
 	)
 
 	e := Manager{
@@ -242,4 +225,28 @@ func (e *Manager) GetAccount(
 
 func (e *Manager) QueryExecutor() query.Executor {
 	return e.queryExecutor
+}
+
+func DefaultFVMOptions(chainID flow.ChainID, cadenceTracing bool, extensiveTracing bool) []fvm.Option {
+	options := []fvm.Option{
+		fvm.WithChain(chainID.Chain()),
+		fvm.WithReusableCadenceRuntimePool(
+			reusableRuntime.NewReusableCadenceRuntimePool(
+				ReusableCadenceRuntimePoolSize,
+				runtime.Config{
+					TracingEnabled:        cadenceTracing,
+					AccountLinkingEnabled: true,
+					// Attachments are enabled everywhere except for Mainnet
+					AttachmentsEnabled: chainID != flow.Mainnet,
+					// Capability Controllers are enabled everywhere except for Mainnet
+					CapabilityControllersEnabled: chainID != flow.Mainnet,
+				},
+			)),
+	}
+
+	if extensiveTracing {
+		options = append(options, fvm.WithExtensiveTracing())
+	}
+
+	return options
 }

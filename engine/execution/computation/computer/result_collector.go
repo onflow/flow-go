@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/result"
+	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -31,11 +32,12 @@ type ViewCommitter interface {
 	// CommitView commits an execution snapshot and collects proofs
 	CommitView(
 		*snapshot.ExecutionSnapshot,
-		flow.StateCommitment,
+		execution.ExtendableStorageSnapshot,
 	) (
-		flow.StateCommitment,
+		flow.StateCommitment, // TODO(leo): deprecate. see storehouse.ExtendableStorageSnapshot.Commitment()
 		[]byte,
 		*ledger.TrieUpdate,
+		execution.ExtendableStorageSnapshot,
 		error,
 	)
 }
@@ -66,7 +68,7 @@ type resultCollector struct {
 	spockHasher   hash.Hasher
 	receiptHasher hash.Hasher
 
-	executionDataProvider *provider.Provider
+	executionDataProvider provider.Provider
 
 	parentBlockExecutionResultID flow.Identifier
 
@@ -79,9 +81,10 @@ type resultCollector struct {
 	blockStats     module.ExecutionResultStats
 	blockMeter     *meter.Meter
 
-	currentCollectionStartTime time.Time
-	currentCollectionState     *state.ExecutionState
-	currentCollectionStats     module.ExecutionResultStats
+	currentCollectionStartTime       time.Time
+	currentCollectionState           *state.ExecutionState
+	currentCollectionStats           module.ExecutionResultStats
+	currentCollectionStorageSnapshot execution.ExtendableStorageSnapshot
 }
 
 func newResultCollector(
@@ -90,13 +93,14 @@ func newResultCollector(
 	metrics module.ExecutionMetrics,
 	committer ViewCommitter,
 	signer module.Local,
-	executionDataProvider *provider.Provider,
+	executionDataProvider provider.Provider,
 	spockHasher hash.Hasher,
 	receiptHasher hash.Hasher,
 	parentBlockExecutionResultID flow.Identifier,
 	block *entity.ExecutableBlock,
 	numTransactions int,
 	consumers []result.ExecutedCollectionConsumer,
+	previousBlockSnapshot snapshot.StorageSnapshot,
 ) *resultCollector {
 	numCollections := len(block.Collections()) + 1
 	now := time.Now()
@@ -122,6 +126,10 @@ func newResultCollector(
 		currentCollectionStats: module.ExecutionResultStats{
 			NumberOfCollections: 1,
 		},
+		currentCollectionStorageSnapshot: storehouse.NewExecutingBlockSnapshot(
+			previousBlockSnapshot,
+			*block.StartState,
+		),
 	}
 
 	go collector.runResultProcessor()
@@ -138,13 +146,18 @@ func (collector *resultCollector) commitCollection(
 		collector.blockSpan,
 		trace.EXECommitDelta).End()
 
-	startState := collector.result.CurrentEndState()
-	endState, proof, trieUpdate, err := collector.committer.CommitView(
+	startState := collector.currentCollectionStorageSnapshot.Commitment()
+
+	_, proof, trieUpdate, newSnapshot, err := collector.committer.CommitView(
 		collectionExecutionSnapshot,
-		startState)
+		collector.currentCollectionStorageSnapshot,
+	)
 	if err != nil {
 		return fmt.Errorf("commit view failed: %w", err)
 	}
+
+	endState := newSnapshot.Commitment()
+	collector.currentCollectionStorageSnapshot = newSnapshot
 
 	execColRes := collector.result.CollectionExecutionResultAt(collection.collectionIndex)
 	execColRes.UpdateExecutionSnapshot(collectionExecutionSnapshot)
@@ -155,11 +168,15 @@ func (collector *resultCollector) commitCollection(
 		return fmt.Errorf("hash events failed: %w", err)
 	}
 
+	txResults := execColRes.TransactionResults()
+	convertedTxResults := execution_data.ConvertTransactionResults(txResults)
+
 	col := collection.Collection()
 	chunkExecData := &execution_data.ChunkExecutionData{
-		Collection: &col,
-		Events:     events,
-		TrieUpdate: trieUpdate,
+		Collection:         &col,
+		Events:             events,
+		TrieUpdate:         trieUpdate,
+		TransactionResults: convertedTxResults,
 	}
 
 	collector.result.AppendCollectionAttestationResult(
@@ -358,7 +375,7 @@ func (collector *resultCollector) Finalize(
 		return nil, collector.processorError
 	}
 
-	executionDataID, err := collector.executionDataProvider.Provide(
+	executionDataID, executionDataRoot, err := collector.executionDataProvider.Provide(
 		ctx,
 		collector.result.Height(),
 		collector.result.BlockExecutionData)
@@ -383,6 +400,7 @@ func (collector *resultCollector) Finalize(
 	}
 
 	collector.result.ExecutionReceipt = executionReceipt
+	collector.result.ExecutionDataRoot = executionDataRoot
 
 	collector.metrics.ExecutionBlockExecuted(
 		time.Since(collector.blockStartTime),

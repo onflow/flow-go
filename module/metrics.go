@@ -112,6 +112,18 @@ type UnicastManagerMetrics interface {
 	// OnEstablishStreamFailure tracks the amount of time taken and number of retry attempts used when the unicast manager cannot establish
 	// a stream on the open connection between two peers.
 	OnEstablishStreamFailure(duration time.Duration, attempts int)
+
+	// OnDialRetryBudgetUpdated tracks the history of the dial retry budget updates.
+	OnDialRetryBudgetUpdated(budget uint64)
+
+	// OnStreamCreationRetryBudgetUpdated tracks the history of the stream creation retry budget updates.
+	OnStreamCreationRetryBudgetUpdated(budget uint64)
+
+	// OnDialRetryBudgetResetToDefault tracks the number of times the dial retry budget is reset to default.
+	OnDialRetryBudgetResetToDefault()
+
+	// OnStreamCreationRetryBudgetResetToDefault tracks the number of times the stream creation retry budget is reset to default.
+	OnStreamCreationRetryBudgetResetToDefault()
 }
 
 type GossipSubMetrics interface {
@@ -157,16 +169,11 @@ type GossipSubScoringMetrics interface {
 
 // GossipSubRpcValidationInspectorMetrics encapsulates the metrics collectors for the gossipsub rpc validation control message inspectors.
 type GossipSubRpcValidationInspectorMetrics interface {
-	// BlockingPreProcessingStarted increments the metric tracking the number of messages being pre-processed by the rpc validation inspector.
-	BlockingPreProcessingStarted(msgType string, sampleSize uint)
-	// BlockingPreProcessingFinished tracks the time spent by the rpc validation inspector to pre-process a message and decrements the metric tracking
-	// the number of messages being pre-processed by the rpc validation inspector.
-	BlockingPreProcessingFinished(msgType string, sampleSize uint, duration time.Duration)
 	// AsyncProcessingStarted increments the metric tracking the number of inspect message request being processed by workers in the rpc validator worker pool.
-	AsyncProcessingStarted(msgType string)
+	AsyncProcessingStarted()
 	// AsyncProcessingFinished tracks the time spent by a rpc validation inspector worker to process an inspect message request asynchronously and decrements the metric tracking
 	// the number of inspect message requests  being processed asynchronously by the rpc validation inspector workers.
-	AsyncProcessingFinished(msgType string, duration time.Duration)
+	AsyncProcessingFinished(duration time.Duration)
 }
 
 // NetworkInboundQueueMetrics encapsulates the metrics collectors for the inbound queue of the networking layer.
@@ -564,6 +571,19 @@ type ExecutionDataRequesterMetrics interface {
 	FetchRetried()
 }
 
+type ExecutionStateIndexerMetrics interface {
+	// BlockIndexed records metrics from indexing execution data from a single block.
+	BlockIndexed(height uint64, duration time.Duration, events, registers, transactionResults int)
+
+	// BlockReindexed records that a previously indexed block was indexed again.
+	BlockReindexed()
+
+	// InitializeLatestHeight records the latest height that has been indexed.
+	// This should only be used during startup. After startup, use BlockIndexed to record newly
+	// indexed heights.
+	InitializeLatestHeight(height uint64)
+}
+
 type RuntimeMetrics interface {
 	// RuntimeTransactionParsed reports the time spent parsing a single transaction
 	RuntimeTransactionParsed(dur time.Duration)
@@ -743,22 +763,34 @@ type ExecutionMetrics interface {
 }
 
 type BackendScriptsMetrics interface {
-	// Record the round trip time while executing a script
+	// ScriptExecuted records the round trip time while executing a script
 	ScriptExecuted(dur time.Duration, size int)
 
-	// ScriptExecutionErrorOnExecutionNode records script execution failures on Execution Nodes
-	ScriptExecutionErrorOnArchiveNode()
+	// ScriptExecutionErrorLocal records script execution failures from local execution
+	ScriptExecutionErrorLocal()
 
-	// ScriptExecutionErrorOnArchiveNode records script execution failures in Archive Nodes
+	// ScriptExecutionErrorOnExecutionNode records script execution failures on Execution Nodes
 	ScriptExecutionErrorOnExecutionNode()
 
+	// ScriptExecutionResultMismatch records script execution result mismatches between local and
+	// execution nodes
 	ScriptExecutionResultMismatch()
 
+	// ScriptExecutionResultMatch records script execution result matches between local and
+	// execution nodes
 	ScriptExecutionResultMatch()
 
+	// ScriptExecutionErrorMismatch records script execution error mismatches between local and
+	// execution nodes
 	ScriptExecutionErrorMismatch()
 
+	// ScriptExecutionErrorMatch records script execution error matches between local and
+	// execution nodes
 	ScriptExecutionErrorMatch()
+
+	// ScriptExecutionNotIndexed records script execution matches where data for the block is not
+	// indexed locally yet
+	ScriptExecutionNotIndexed()
 }
 
 type TransactionMetrics interface {

@@ -3,7 +3,6 @@
 package mock
 
 import (
-	chunks "github.com/onflow/flow-go/model/chunks"
 	mock "github.com/stretchr/testify/mock"
 
 	verification "github.com/onflow/flow-go/model/verification"
@@ -15,13 +14,12 @@ type ChunkVerifier struct {
 }
 
 // Verify provides a mock function with given fields: ch
-func (_m *ChunkVerifier) Verify(ch *verification.VerifiableChunkData) ([]byte, chunks.ChunkFault, error) {
+func (_m *ChunkVerifier) Verify(ch *verification.VerifiableChunkData) ([]byte, error) {
 	ret := _m.Called(ch)
 
 	var r0 []byte
-	var r1 chunks.ChunkFault
-	var r2 error
-	if rf, ok := ret.Get(0).(func(*verification.VerifiableChunkData) ([]byte, chunks.ChunkFault, error)); ok {
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*verification.VerifiableChunkData) ([]byte, error)); ok {
 		return rf(ch)
 	}
 	if rf, ok := ret.Get(0).(func(*verification.VerifiableChunkData) []byte); ok {
@@ -32,21 +30,13 @@ func (_m *ChunkVerifier) Verify(ch *verification.VerifiableChunkData) ([]byte, c
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(*verification.VerifiableChunkData) chunks.ChunkFault); ok {
+	if rf, ok := ret.Get(1).(func(*verification.VerifiableChunkData) error); ok {
 		r1 = rf(ch)
 	} else {
-		if ret.Get(1) != nil {
-			r1 = ret.Get(1).(chunks.ChunkFault)
-		}
+		r1 = ret.Error(1)
 	}
 
-	if rf, ok := ret.Get(2).(func(*verification.VerifiableChunkData) error); ok {
-		r2 = rf(ch)
-	} else {
-		r2 = ret.Error(2)
-	}
-
-	return r0, r1, r2
+	return r0, r1
 }
 
 type mockConstructorTestingTNewChunkVerifier interface {

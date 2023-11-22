@@ -33,8 +33,9 @@ func SystemChunkTransaction(chain flow.Chain) (*flow.TransactionBody, error) {
 			[]byte(templates.ReplaceAddresses(
 				systemChunkTransactionTemplate,
 				templates.Environment{
-					EpochAddress:             contracts.Epoch.Address.Hex(),
-					NodeVersionBeaconAddress: contracts.NodeVersionBeacon.Address.Hex(),
+					EpochAddress:               contracts.Epoch.Address.Hex(),
+					NodeVersionBeaconAddress:   contracts.NodeVersionBeacon.Address.Hex(),
+					RandomBeaconHistoryAddress: contracts.RandomBeaconHistory.Address.Hex(),
 				},
 			)),
 		).

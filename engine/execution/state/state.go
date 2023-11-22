@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/trace"
@@ -20,16 +21,12 @@ import (
 	"github.com/onflow/flow-go/storage/badger/procedure"
 )
 
+var ErrExecutionStatePruned = fmt.Errorf("execution state is pruned")
+var ErrNotExecuted = fmt.Errorf("block not executed")
+
 // ReadOnlyExecutionState allows to read the execution state
 type ReadOnlyExecutionState interface {
-	// NewStorageSnapshot creates a new ready-only view at the given state commitment.
-	NewStorageSnapshot(flow.StateCommitment) snapshot.StorageSnapshot
-
-	// StateCommitmentByBlockID returns the final state commitment for the provided block ID.
-	StateCommitmentByBlockID(context.Context, flow.Identifier) (flow.StateCommitment, error)
-
-	// HasState returns true if the state with the given state commitment exists in memory
-	HasState(flow.StateCommitment) bool
+	ScriptExecutionState
 
 	// ChunkDataPackByChunkID retrieve a chunk data pack given the chunk ID.
 	ChunkDataPackByChunkID(flow.Identifier) (*flow.ChunkDataPack, error)
@@ -37,6 +34,31 @@ type ReadOnlyExecutionState interface {
 	GetExecutionResultID(context.Context, flow.Identifier) (flow.Identifier, error)
 
 	GetHighestExecutedBlockID(context.Context) (uint64, flow.Identifier, error)
+}
+
+// ScriptExecutionState is a subset of the `state.ExecutionState` interface purposed to only access the state
+// used for script execution and not mutate the execution state of the blockchain.
+type ScriptExecutionState interface {
+	// NewStorageSnapshot creates a new ready-only view at the given block.
+	NewStorageSnapshot(commit flow.StateCommitment, blockID flow.Identifier, height uint64) snapshot.StorageSnapshot
+
+	// CreateStorageSnapshot creates a new ready-only view at the given block.
+	// It returns:
+	// - (nil, nil, storage.ErrNotFound) if block is unknown
+	// - (nil, nil, state.ErrNotExecuted) if block is not executed
+	// - (nil, nil, state.ErrExecutionStatePruned) if the execution state has been pruned
+	CreateStorageSnapshot(blockID flow.Identifier) (snapshot.StorageSnapshot, *flow.Header, error)
+
+	// StateCommitmentByBlockID returns the final state commitment for the provided block ID.
+	StateCommitmentByBlockID(context.Context, flow.Identifier) (flow.StateCommitment, error)
+
+	// HasState returns true if the state with the given state commitment exists in memory
+	HasState(flow.StateCommitment) bool
+}
+
+// FinalizedExecutionState is an interface used to access the finalized execution state
+type FinalizedExecutionState interface {
+	GetHighestFinalizedExecuted() uint64
 }
 
 // TODO Many operations here are should be transactional, so we need to refactor this
@@ -55,14 +77,6 @@ type ExecutionState interface {
 	) error
 }
 
-const (
-	KeyPartOwner = uint16(0)
-	// @deprecated - controller was used only by the very first
-	// version of cadence for access controll which was retired later on
-	// KeyPartController = uint16(1)
-	KeyPartKey = uint16(2)
-)
-
 type state struct {
 	tracer             module.Tracer
 	ls                 ledger.Ledger
@@ -77,13 +91,6 @@ type state struct {
 	serviceEvents      storage.ServiceEvents
 	transactionResults storage.TransactionResults
 	db                 *badger.DB
-}
-
-func RegisterIDToKey(reg flow.RegisterID) ledger.Key {
-	return ledger.NewKey([]ledger.KeyPart{
-		ledger.NewKeyPart(KeyPartOwner, []byte(reg.Owner)),
-		ledger.NewKeyPart(KeyPartKey, []byte(reg.Key)),
-	})
 }
 
 // NewExecutionState returns a new execution state access layer for the given ledger storage.
@@ -122,7 +129,7 @@ func NewExecutionState(
 
 func makeSingleValueQuery(commitment flow.StateCommitment, id flow.RegisterID) (*ledger.QuerySingleValue, error) {
 	return ledger.NewQuerySingleValue(ledger.State(commitment),
-		RegisterIDToKey(id),
+		convert.RegisterIDToLedgerKey(id),
 	)
 }
 
@@ -135,7 +142,7 @@ func RegisterEntriesToKeysValues(
 	keys := make([]ledger.Key, len(entries))
 	values := make([]ledger.Value, len(entries))
 	for i, entry := range entries {
-		keys[i] = RegisterIDToKey(entry.Key)
+		keys[i] = convert.RegisterIDToLedgerKey(entry.Key)
 		values[i] = entry.Value
 	}
 	return keys, values
@@ -221,29 +228,73 @@ func (storage *LedgerStorageSnapshot) Get(
 
 func (s *state) NewStorageSnapshot(
 	commitment flow.StateCommitment,
+	blockID flow.Identifier,
+	height uint64,
 ) snapshot.StorageSnapshot {
 	return NewLedgerStorageSnapshot(s.ls, commitment)
 }
 
-type RegisterUpdatesHolder interface {
-	UpdatedRegisters() flow.RegisterEntries
+func (s *state) CreateStorageSnapshot(
+	blockID flow.Identifier,
+) (snapshot.StorageSnapshot, *flow.Header, error) {
+	header, err := s.headers.ByBlockID(blockID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("cannot get header by block ID: %w", err)
+	}
+
+	// make sure the block is executed
+	commit, err := s.commits.ByBlockID(blockID)
+	if err != nil {
+		// statecommitment not exists means the block hasn't been executed yet
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, nil, fmt.Errorf("block %v is not executed: %w", blockID, ErrNotExecuted)
+		}
+
+		return nil, header, fmt.Errorf("cannot get commit by block ID: %w", err)
+	}
+
+	// make sure we have trie state for this block
+	if !s.HasState(commit) {
+		return nil, header, fmt.Errorf("state not found for commit %x (block %v): %w", commit, blockID, ErrExecutionStatePruned)
+	}
+
+	return s.NewStorageSnapshot(commit, blockID, header.Height), header, nil
 }
 
-func CommitDelta(ldg ledger.Ledger, ruh RegisterUpdatesHolder, baseState flow.StateCommitment) (flow.StateCommitment, *ledger.TrieUpdate, error) {
-	keys, values := RegisterEntriesToKeysValues(ruh.UpdatedRegisters())
+type RegisterUpdatesHolder interface {
+	UpdatedRegisters() flow.RegisterEntries
+	UpdatedRegisterSet() map[flow.RegisterID]flow.RegisterValue
+}
 
+// CommitDelta takes a base storage snapshot and creates a new storage snapshot
+// with the register updates from the given RegisterUpdatesHolder
+// a new statecommitment is returned from the ledger, along with the trie update
+// any error returned are exceptions
+func CommitDelta(
+	ldg ledger.Ledger,
+	ruh RegisterUpdatesHolder,
+	baseStorageSnapshot execution.ExtendableStorageSnapshot,
+) (flow.StateCommitment, *ledger.TrieUpdate, execution.ExtendableStorageSnapshot, error) {
+
+	updatedRegisters := ruh.UpdatedRegisters()
+	keys, values := RegisterEntriesToKeysValues(updatedRegisters)
+	baseState := baseStorageSnapshot.Commitment()
 	update, err := ledger.NewUpdate(ledger.State(baseState), keys, values)
 
 	if err != nil {
-		return flow.DummyStateCommitment, nil, fmt.Errorf("cannot create ledger update: %w", err)
+		return flow.DummyStateCommitment, nil, nil, fmt.Errorf("cannot create ledger update: %w", err)
 	}
 
-	commit, trieUpdate, err := ldg.Set(update)
+	newState, trieUpdate, err := ldg.Set(update)
 	if err != nil {
-		return flow.DummyStateCommitment, nil, err
+		return flow.DummyStateCommitment, nil, nil, fmt.Errorf("could not update ledger: %w", err)
 	}
 
-	return flow.StateCommitment(commit), trieUpdate, nil
+	newCommit := flow.StateCommitment(newState)
+
+	newStorageSnapshot := baseStorageSnapshot.Extend(newCommit, ruh.UpdatedRegisterSet())
+
+	return newCommit, trieUpdate, newStorageSnapshot, nil
 }
 
 func (s *state) HasState(commitment flow.StateCommitment) bool {
@@ -397,8 +448,9 @@ func (s *state) GetHighestExecutedBlockID(ctx context.Context) (uint64, flow.Ide
 	return height, blockID, nil
 }
 
-// IsBlockExecuted returns whether the block has been executed.
-// it checks whether the state commitment exists in execution state.
+// IsBlockExecuted returns true if the block is executed, which means registers, events,
+// results, statecommitment etc are all stored.
+// otherwise returns false
 func IsBlockExecuted(ctx context.Context, state ReadOnlyExecutionState, block flow.Identifier) (bool, error) {
 	_, err := state.StateCommitmentByBlockID(ctx, block)
 

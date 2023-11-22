@@ -47,8 +47,17 @@ func (_m *Routable) RoutingTable() *kbucket.RoutingTable {
 }
 
 // SetRouting provides a mock function with given fields: r
-func (_m *Routable) SetRouting(r routing.Routing) {
-	_m.Called(r)
+func (_m *Routable) SetRouting(r routing.Routing) error {
+	ret := _m.Called(r)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(routing.Routing) error); ok {
+		r0 = rf(r)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 type mockConstructorTestingTNewRoutable interface {

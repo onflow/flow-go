@@ -102,7 +102,7 @@ happy path is either
      Therefore, changing the set of specified sentinel errors is generally considered a breaking API change. 
 
 
-2. **All errors beyond the specified, benign sentinel errors ere considered unexpected failures, i.e. a symptom for potential state corruption.**       
+2. **All errors beyond the specified, benign sentinel errors are considered unexpected failures, i.e. a symptom of potential state corruption.**       
    * We employ a fundamental principle of [High Assurance Software Engineering](https://www.researchgate.net/publication/228563190_High_Assurance_Software_Development),
 where we treat everything beyond the known benign errors as critical failures. In unexpected failure cases, we assume that the vertex's in-memory state has been
 broken and proper functioning is no longer guaranteed. The only safe route of recovery is to restart the vertex from a previously persisted, safe state.

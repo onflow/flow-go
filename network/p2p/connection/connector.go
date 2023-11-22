@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/network/internal/p2putils"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"github.com/onflow/flow-go/utils/logging"
 	"github.com/onflow/flow-go/utils/rand"
 )
@@ -58,7 +59,7 @@ var _ p2p.PeerUpdater = (*PeerUpdater)(nil)
 //   - error: an error if there is any error while creating the connector. The errors are irrecoverable and unexpected.
 func NewPeerUpdater(cfg *PeerUpdaterConfig) (*PeerUpdater, error) {
 	libP2PConnector := &PeerUpdater{
-		log:              cfg.Logger,
+		log:              cfg.Logger.With().Str("component", "peer-updater").Logger(),
 		connector:        cfg.Connector,
 		host:             cfg.Host,
 		pruneConnections: cfg.PruneConnections,
@@ -99,7 +100,7 @@ func (l *PeerUpdater) connectToPeers(ctx context.Context, peerIDs peer.IDSlice) 
 
 	for _, peerID := range peerIDs {
 		if l.host.IsConnectedTo(peerID) {
-			l.log.Trace().Str("peer_id", peerID.String()).Msg("already connected to peer, skipping connection")
+			l.log.Trace().Str("peer_id", p2plogging.PeerId(peerID)).Msg("already connected to peer, skipping connection")
 			continue
 		}
 		peerCh <- peer.AddrInfo{ID: peerID}

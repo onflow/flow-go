@@ -10,6 +10,8 @@ import (
 
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/encoding/cbor"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data/internal"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/compressor"
 )
@@ -43,17 +45,20 @@ func init() {
 const (
 	codeRecursiveCIDs = iota + 1
 	codeExecutionDataRoot
-	codeChunkExecutionData
+	codeChunkExecutionDataV1
+	codeChunkExecutionDataV2 // includes transaction results
 )
 
 // getCode returns the header code for the given value's type.
 // It returns an error if the type is not supported.
 func getCode(v interface{}) (byte, error) {
 	switch v.(type) {
-	case *BlockExecutionDataRoot:
+	case *flow.BlockExecutionDataRoot:
 		return codeExecutionDataRoot, nil
+	case *internal.ChunkExecutionDataV1: // only used for backwards compatibility testing
+		return codeChunkExecutionDataV1, nil
 	case *ChunkExecutionData:
-		return codeChunkExecutionData, nil
+		return codeChunkExecutionDataV2, nil
 	case []cid.Cid:
 		return codeRecursiveCIDs, nil
 	default:
@@ -66,9 +71,9 @@ func getCode(v interface{}) (byte, error) {
 func getPrototype(code byte) (interface{}, error) {
 	switch code {
 	case codeExecutionDataRoot:
-		return &BlockExecutionDataRoot{}, nil
-	case codeChunkExecutionData:
-		return &ChunkExecutionData{}, nil
+		return &flow.BlockExecutionDataRoot{}, nil
+	case codeChunkExecutionDataV2, codeChunkExecutionDataV1:
+		return &ChunkExecutionData{}, nil // only return the latest version
 	case codeRecursiveCIDs:
 		return &[]cid.Cid{}, nil
 	default:

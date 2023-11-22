@@ -40,10 +40,11 @@ import (
 type ExecutionDataRequesterSuite struct {
 	suite.Suite
 
-	blobstore  blobs.Blobstore
-	datastore  datastore.Batching
-	db         *badger.DB
-	downloader *exedatamock.Downloader
+	blobstore   blobs.Blobstore
+	datastore   datastore.Batching
+	db          *badger.DB
+	downloader  *exedatamock.Downloader
+	distributor *requester.ExecutionDataDistributor
 
 	run edTestRun
 
@@ -405,6 +406,7 @@ func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun
 	state := suite.mockProtocolState(cfg.blocksByHeight)
 
 	suite.downloader = mockDownloader(cfg.executionDataEntries)
+	suite.distributor = requester.NewExecutionDataDistributor()
 
 	heroCache := herocache.NewBlockExecutionData(state_stream.DefaultCacheSize, logger, metrics)
 	cache := cache.NewExecutionDataCache(suite.downloader, headers, seals, results, heroCache)
@@ -413,7 +415,7 @@ func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun
 	processedHeight := bstorage.NewConsumerProgress(suite.db, module.ConsumeProgressExecutionDataRequesterBlockHeight)
 	processedNotification := bstorage.NewConsumerProgress(suite.db, module.ConsumeProgressExecutionDataRequesterNotification)
 
-	edr := requester.New(
+	edr, err := requester.New(
 		logger,
 		metrics,
 		suite.downloader,
@@ -429,7 +431,9 @@ func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun
 			RetryDelay:         cfg.retryDelay,
 			MaxRetryDelay:      cfg.maxRetryDelay,
 		},
+		suite.distributor,
 	)
+	require.NoError(suite.T(), err)
 
 	followerDistributor.AddOnBlockFinalizedConsumer(edr.OnBlockFinalized)
 
@@ -447,7 +451,7 @@ func (suite *ExecutionDataRequesterSuite) runRequesterTestHalts(edr state_synchr
 	fetchedExecutionData := cfg.FetchedExecutionData()
 
 	// collect all execution data notifications
-	edr.AddOnExecutionDataReceivedConsumer(suite.consumeExecutionDataNotifications(cfg, func() { close(testDone) }, fetchedExecutionData))
+	suite.distributor.AddOnExecutionDataReceivedConsumer(suite.consumeExecutionDataNotifications(cfg, func() { close(testDone) }, fetchedExecutionData))
 
 	edr.Start(signalerCtx)
 	unittest.RequireCloseBefore(suite.T(), edr.Ready(), cfg.waitTimeout, "timed out waiting for requester to be ready")
@@ -474,7 +478,7 @@ func (suite *ExecutionDataRequesterSuite) runRequesterTestPauseResume(edr state_
 	fetchedExecutionData := cfg.FetchedExecutionData()
 
 	// collect all execution data notifications
-	edr.AddOnExecutionDataReceivedConsumer(suite.consumeExecutionDataNotifications(cfg, func() { close(testDone) }, fetchedExecutionData))
+	suite.distributor.AddOnExecutionDataReceivedConsumer(suite.consumeExecutionDataNotifications(cfg, func() { close(testDone) }, fetchedExecutionData))
 
 	edr.Start(signalerCtx)
 	unittest.RequireCloseBefore(suite.T(), edr.Ready(), cfg.waitTimeout, "timed out waiting for requester to be ready")
@@ -512,7 +516,7 @@ func (suite *ExecutionDataRequesterSuite) runRequesterTest(edr state_synchroniza
 	fetchedExecutionData := cfg.FetchedExecutionData()
 
 	// collect all execution data notifications
-	edr.AddOnExecutionDataReceivedConsumer(suite.consumeExecutionDataNotifications(cfg, func() { close(testDone) }, fetchedExecutionData))
+	suite.distributor.AddOnExecutionDataReceivedConsumer(suite.consumeExecutionDataNotifications(cfg, func() { close(testDone) }, fetchedExecutionData))
 
 	edr.Start(signalerCtx)
 	unittest.RequireCloseBefore(suite.T(), edr.Ready(), cfg.waitTimeout, "timed out waiting for requester to be ready")
@@ -538,6 +542,11 @@ func (suite *ExecutionDataRequesterSuite) consumeExecutionDataNotifications(cfg 
 		}
 
 		fetchedExecutionData[ed.BlockID] = ed.BlockExecutionData
+		if _, ok := cfg.blocksByID[ed.BlockID]; !ok {
+			suite.T().Errorf("unknown execution data for block %s", ed.BlockID)
+			return
+		}
+
 		suite.T().Logf("notified of execution data for block %v height %d (%d/%d)", ed.BlockID, cfg.blocksByID[ed.BlockID].Header.Height, len(fetchedExecutionData), cfg.sealedCount)
 
 		if cfg.IsLastSeal(ed.BlockID) {
