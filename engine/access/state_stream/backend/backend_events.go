@@ -43,7 +43,7 @@ func (b EventsBackend) SubscribeEvents(ctx context.Context, startBlockID flow.Id
 
 	var responseFactory GetDataByHeightFunc
 	if b.useIndex {
-		responseFactory = b.getIndexResponseFactory(filter)
+		responseFactory = b.getStorageResponseFactory(filter)
 	} else {
 		responseFactory = b.getExecutionDataResponseFactory(filter)
 	}
@@ -80,14 +80,15 @@ func (b EventsBackend) getExecutionDataResponseFactory(filter state_stream.Event
 	}
 }
 
-func (b EventsBackend) getIndexResponseFactory(filter state_stream.EventFilter) GetDataByHeightFunc {
+func (b EventsBackend) getStorageResponseFactory(filter state_stream.EventFilter) GetDataByHeightFunc {
 	return func(ctx context.Context, height uint64) (interface{}, error) {
 		header, err := b.headers.ByHeight(height)
 		if err != nil {
 			return nil, fmt.Errorf("could not get header for height %d: %w", height, err)
 		}
+		blockID := header.ID()
 
-		events, err := b.events.ByBlockID(header.ID())
+		events, err := b.events.ByBlockID(blockID)
 		if err != nil {
 			return nil, fmt.Errorf("could not get events for block %d: %w", height, err)
 		}
@@ -95,12 +96,12 @@ func (b EventsBackend) getIndexResponseFactory(filter state_stream.EventFilter) 
 		events = filter.Filter(events)
 
 		b.log.Trace().
-			Hex("block_id", logging.ID(header.ID())).
+			Hex("block_id", logging.ID(blockID)).
 			Uint64("height", height).
 			Msgf("sending %d events", len(events))
 
 		return &EventsResponse{
-			BlockID: header.ID(),
+			BlockID: blockID,
 			Height:  height,
 			Events:  events,
 		}, nil
