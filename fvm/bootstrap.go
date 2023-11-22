@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/evm/stdlib"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/logical"
@@ -75,6 +76,7 @@ type BootstrapParams struct {
 	minimumStorageReservation        cadence.UFix64
 	storagePerFlow                   cadence.UFix64
 	restrictedAccountCreationEnabled cadence.Bool
+	setupEVMEnabled                  cadence.Bool
 
 	// versionFreezePeriod is the number of blocks in the future where the version
 	// changes are frozen. The Node version beacon manages the freeze period,
@@ -210,6 +212,13 @@ func WithRestrictedAccountCreationEnabled(enabled cadence.Bool) BootstrapProcedu
 	}
 }
 
+func WithSetupEVMEnabled(enabled cadence.Bool) BootstrapProcedureOption {
+	return func(bp *BootstrapProcedure) *BootstrapProcedure {
+		bp.setupEVMEnabled = enabled
+		return bp
+	}
+}
+
 func WithRestrictedContractDeployment(restricted *bool) BootstrapProcedureOption {
 	return func(bp *BootstrapProcedure) *BootstrapProcedure {
 		bp.restrictedContractDeployment = restricted
@@ -318,7 +327,9 @@ func (b *bootstrapExecutor) Execute() error {
 	service := b.createServiceAccount()
 
 	fungibleToken := b.deployFungibleToken()
-	flowToken := b.deployFlowToken(service, fungibleToken)
+	nonFungibleToken := b.deployNonFungibleToken(service)
+	b.deployMetadataViews(fungibleToken, nonFungibleToken)
+	flowToken := b.deployFlowToken(service, fungibleToken, nonFungibleToken)
 	storageFees := b.deployStorageFees(service, fungibleToken, flowToken)
 	feeContract := b.deployFlowFees(service, fungibleToken, flowToken, storageFees)
 
@@ -362,6 +373,8 @@ func (b *bootstrapExecutor) Execute() error {
 
 	b.deployVersionBeacon(service, b.versionFreezePeriod)
 
+	b.deployRandomBeaconHistory(service)
+
 	// deploy staking proxy contract to the service account
 	b.deployStakingProxyContract(service)
 
@@ -375,6 +388,9 @@ func (b *bootstrapExecutor) Execute() error {
 
 	// set the list of nodes which are allowed to stake in this network
 	b.setStakingAllowlist(service, b.identities.NodeIDs())
+
+	// sets up the EVM environment
+	b.setupEVM(service, flowToken)
 
 	return nil
 }
@@ -411,7 +427,46 @@ func (b *bootstrapExecutor) deployFungibleToken() flow.Address {
 	return fungibleToken
 }
 
-func (b *bootstrapExecutor) deployFlowToken(service, fungibleToken flow.Address) flow.Address {
+func (b *bootstrapExecutor) deployNonFungibleToken(deployTo flow.Address) flow.Address {
+
+	txError, err := b.invokeMetaTransaction(
+		b.ctx,
+		Transaction(
+			blueprints.DeployNonFungibleTokenContractTransaction(deployTo),
+			0),
+	)
+	panicOnMetaInvokeErrf("failed to deploy non-fungible token contract: %s", txError, err)
+	return deployTo
+}
+
+func (b *bootstrapExecutor) deployMetadataViews(fungibleToken, nonFungibleToken flow.Address) {
+
+	txError, err := b.invokeMetaTransaction(
+		b.ctx,
+		Transaction(
+			blueprints.DeployMetadataViewsContractTransaction(fungibleToken, nonFungibleToken),
+			0),
+	)
+	panicOnMetaInvokeErrf("failed to deploy metadata views contract: %s", txError, err)
+
+	txError, err = b.invokeMetaTransaction(
+		b.ctx,
+		Transaction(
+			blueprints.DeployViewResolverContractTransaction(nonFungibleToken),
+			0),
+	)
+	panicOnMetaInvokeErrf("failed to deploy view resolver contract: %s", txError, err)
+
+	txError, err = b.invokeMetaTransaction(
+		b.ctx,
+		Transaction(
+			blueprints.DeployFungibleTokenMetadataViewsContractTransaction(fungibleToken, nonFungibleToken),
+			0),
+	)
+	panicOnMetaInvokeErrf("failed to deploy fungible token metadata views contract: %s", txError, err)
+}
+
+func (b *bootstrapExecutor) deployFlowToken(service, fungibleToken, metadataViews flow.Address) flow.Address {
 	flowToken := b.createAccount(b.accountKeys.FlowTokenAccountPublicKeys)
 	txError, err := b.invokeMetaTransaction(
 		b.ctx,
@@ -419,6 +474,7 @@ func (b *bootstrapExecutor) deployFlowToken(service, fungibleToken flow.Address)
 			blueprints.DeployFlowTokenContractTransaction(
 				service,
 				fungibleToken,
+				metadataViews,
 				flowToken),
 			0),
 	)
@@ -732,6 +788,23 @@ func (b *bootstrapExecutor) setStakingAllowlist(
 	panicOnMetaInvokeErrf("failed to set staking allow-list: %s", txError, err)
 }
 
+func (b *bootstrapExecutor) setupEVM(serviceAddress, flowTokenAddress flow.Address) {
+	if b.setupEVMEnabled {
+		b.createAccount(nil) // account for storage
+		tx := blueprints.DeployContractTransaction(
+			serviceAddress,
+			stdlib.ContractCode(flowTokenAddress),
+			stdlib.ContractName,
+		)
+		// WithEVMEnabled should only be used after we create an account for storage
+		txError, err := b.invokeMetaTransaction(
+			NewContextFromParent(b.ctx, WithEVMEnabled(true)),
+			Transaction(tx, 0),
+		)
+		panicOnMetaInvokeErrf("failed to deploy EVM contract: %s", txError, err)
+	}
+}
+
 func (b *bootstrapExecutor) registerNodes(service, fungibleToken, flowToken flow.Address) {
 	for _, id := range b.identities {
 
@@ -801,6 +874,20 @@ func (b *bootstrapExecutor) deployVersionBeacon(
 		),
 	)
 	panicOnMetaInvokeErrf("failed to deploy NodeVersionBeacon contract: %s", txError, err)
+}
+
+func (b *bootstrapExecutor) deployRandomBeaconHistory(
+	service flow.Address,
+) {
+	tx := blueprints.DeployRandomBeaconHistoryTransaction(service)
+	txError, err := b.invokeMetaTransaction(
+		b.ctx,
+		Transaction(
+			tx,
+			0,
+		),
+	)
+	panicOnMetaInvokeErrf("failed to deploy RandomBeaconHistory history contract: %s", txError, err)
 }
 
 func (b *bootstrapExecutor) deployLockedTokensContract(

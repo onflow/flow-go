@@ -58,7 +58,7 @@ func benchmarkStoreCheckpoint(b *testing.B, version int, concurrent bool) {
 	}()
 
 	// Load checkpoint
-	tries, err := wal.LoadCheckpoint(*checkpointFile, &log)
+	tries, err := wal.LoadCheckpoint(*checkpointFile, log)
 	if err != nil {
 		b.Fatalf("cannot load checkpoint: %s", err)
 	}
@@ -69,12 +69,12 @@ func benchmarkStoreCheckpoint(b *testing.B, version int, concurrent bool) {
 	// Serialize checkpoint V5.
 	switch version {
 	case 5:
-		err = wal.StoreCheckpointV5(outputDir, fileName, &log, tries...)
+		err = wal.StoreCheckpointV5(outputDir, fileName, log, tries...)
 	case 6:
 		if concurrent {
-			err = wal.StoreCheckpointV6Concurrently(tries, outputDir, fileName, &log)
+			err = wal.StoreCheckpointV6Concurrently(tries, outputDir, fileName, log)
 		} else {
-			err = wal.StoreCheckpointV6SingleThread(tries, outputDir, fileName, &log)
+			err = wal.StoreCheckpointV6SingleThread(tries, outputDir, fileName, log)
 		}
 	}
 
@@ -102,7 +102,7 @@ func BenchmarkLoadCheckpoint(b *testing.B) {
 	b.ResetTimer()
 
 	// Load checkpoint
-	_, err = wal.LoadCheckpoint(*checkpointFile, &log)
+	_, err = wal.LoadCheckpoint(*checkpointFile, log)
 
 	b.StopTimer()
 	elapsed := time.Since(start)

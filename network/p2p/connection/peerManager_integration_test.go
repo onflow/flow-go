@@ -14,7 +14,6 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
@@ -23,7 +22,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestPeerManager_Integration tests the correctness of integration between PeerManager and Libp2pConnector over
+// TestPeerManager_Integration tests the correctness of integration between PeerManager and PeerUpdater over
 // a fully connected topology.
 // PeerManager should be able to connect to all peers using the connector, and must also tear down the connection to
 // peers that are excluded from its identity provider.
@@ -34,14 +33,11 @@ func TestPeerManager_Integration(t *testing.T) {
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
 	// create nodes
-	idProvider := mockmodule.NewIdentityProvider(t)
+	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
 	nodes, identities := p2ptest.NodesFixture(t, unittest.IdentifierFixture(), "test_peer_manager", count, idProvider)
-	for i, node := range nodes {
-		idProvider.On("ByPeerID", node.Host().ID()).Return(&identities[i], true).Maybe()
-
-	}
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	idProvider.SetIdentities(identities)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	thisNode := nodes[0]
 	topologyPeers := identities[1:]
@@ -53,19 +49,21 @@ func TestPeerManager_Integration(t *testing.T) {
 		thisNode.Host().Peerstore().SetAddrs(i.ID, i.Addrs, peerstore.PermanentAddrTTL)
 	}
 
+	connector, err := connection.DefaultLibp2pBackoffConnectorFactory()(thisNode.Host())
+	require.NoError(t, err)
 	// setup
-	connector, err := connection.NewLibp2pConnector(&connection.ConnectorConfig{
-		PruneConnections:        connection.PruningEnabled,
-		Logger:                  unittest.Logger(),
-		Host:                    connection.NewConnectorHost(thisNode.Host()),
-		BackoffConnectorFactory: connection.DefaultLibp2pBackoffConnectorFactory(thisNode.Host()),
+	peerUpdater, err := connection.NewPeerUpdater(&connection.PeerUpdaterConfig{
+		PruneConnections: connection.PruningEnabled,
+		Logger:           unittest.Logger(),
+		Host:             connection.NewConnectorHost(thisNode.Host()),
+		Connector:        connector,
 	})
 	require.NoError(t, err)
 
 	idTranslator, err := translator.NewFixedTableIdentityTranslator(identities)
 	require.NoError(t, err)
 
-	peerManager := connection.NewPeerManager(unittest.Logger(), connection.DefaultPeerUpdateInterval, connector)
+	peerManager := connection.NewPeerManager(unittest.Logger(), connection.DefaultPeerUpdateInterval, peerUpdater)
 	peerManager.SetPeersProvider(func() peer.IDSlice {
 		// peerManager is furnished with a full topology that connects to all nodes
 		// in the topologyPeers.

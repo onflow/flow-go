@@ -13,12 +13,18 @@ type ProtocolSpamRecord struct {
 	OriginId flow.Identifier
 
 	// Decay speed of Penalty for this misbehaving node. Each node may have a different Decay speed based on its behavior.
+	// Subsequent disallow listings of the node will decrease the Decay speed of the node so it will take longer to be allow-listed.
 	Decay float64
 
 	// CutoffCounter is a counter that is used to determine how many times the connections to the node has been cut due to
 	// its Penalty value dropping below the disallow-listing threshold.
 	// Note that the cutoff connections are recovered after a certain amount of time.
 	CutoffCounter uint64
+
+	// DisallowListed indicates whether the node is currently disallow-listed or not. When a node is in the disallow-list,
+	// the existing connections to the node are cut and no new connections are allowed to be established, neither incoming
+	// nor outgoing.
+	DisallowListed bool
 
 	// total Penalty value of the misbehaving node. Should be a negative value.
 	Penalty float64
@@ -44,10 +50,11 @@ type SpamRecordFactoryFunc func(flow.Identifier) ProtocolSpamRecord
 func SpamRecordFactory() SpamRecordFactoryFunc {
 	return func(originId flow.Identifier) ProtocolSpamRecord {
 		return ProtocolSpamRecord{
-			OriginId:      originId,
-			Decay:         InitialDecaySpeed,
-			CutoffCounter: uint64(0),
-			Penalty:       float64(0),
+			OriginId:       originId,
+			Decay:          InitialDecaySpeed,
+			DisallowListed: false,
+			CutoffCounter:  uint64(0),
+			Penalty:        float64(0),
 		}
 	}
 }

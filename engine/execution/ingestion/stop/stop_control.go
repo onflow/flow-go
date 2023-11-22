@@ -6,10 +6,12 @@ import (
 	"math"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/coreos/go-semver/semver"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
@@ -17,6 +19,11 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	psEvents "github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/storage"
+)
+
+const (
+	// TODO: figure out an appropriate graceful stop time (is 10 min. enough?)
+	DefaultMaxGracefulStopDuration = 10 * time.Minute
 )
 
 // StopControl is a specialized component used by ingestion.Engine to encapsulate
@@ -39,6 +46,9 @@ import (
 //     This means version boundaries were edited. The resulting stop
 //     height is the new one.
 type StopControl struct {
+	unit                    *engine.Unit
+	maxGracefulStopDuration time.Duration
+
 	// Stop control needs to consume BlockFinalized events.
 	// adding psEvents.Noop makes it a protocol.Consumer
 	psEvents.Noop
@@ -147,6 +157,8 @@ type StopControlHeaders interface {
 // See build.SemverV2 for more details. That is why nil is a valid input for node version
 // without a node version, the stop control can still be used for manual stopping.
 func NewStopControl(
+	unit *engine.Unit,
+	maxGracefulStopDuration time.Duration,
 	log zerolog.Logger,
 	exeState state.ReadOnlyExecutionState,
 	headers StopControlHeaders,
@@ -161,6 +173,8 @@ func NewStopControl(
 	blockFinalizedChan := make(chan *flow.Header, 1000)
 
 	sc := &StopControl{
+		unit:                    unit,
+		maxGracefulStopDuration: maxGracefulStopDuration,
 		log: log.With().
 			Str("component", "stop_control").
 			Logger(),
@@ -539,7 +553,17 @@ func (s *StopControl) stopExecution() {
 	log.Warn().Msg("Stopping as finalization reached requested stop")
 
 	if s.stopBoundary.ShouldCrash {
-		// TODO: crash more gracefully or at least in a more explicit way
+		log.Info().
+			Dur("max-graceful-stop-duration", s.maxGracefulStopDuration).
+			Msg("Attempting graceful stop as finalization reached requested stop")
+		doneChan := s.unit.Done()
+		select {
+		case <-doneChan:
+			log.Info().Msg("Engine gracefully stopped")
+		case <-time.After(s.maxGracefulStopDuration):
+			log.Info().
+				Msg("Engine did not stop within max graceful stop duration")
+		}
 		log.Fatal().Msg("Crashing as finalization reached requested stop")
 		return
 	}
@@ -598,10 +622,11 @@ func (s *StopControl) processNewVersionBeacons(
 		return
 	}
 
-	s.log.Info().
+	lg := s.log.With().
+		Str("node_version", s.nodeVersion.String()).
+		Str("beacon", vb.String()).
 		Uint64("vb_seal_height", vb.SealHeight).
-		Uint64("vb_sequence", vb.Sequence).
-		Msg("New version beacon found")
+		Uint64("vb_sequence", vb.Sequence).Logger()
 
 	// this is now the last handled version beacon
 	s.versionBeacon = vb
@@ -618,6 +643,10 @@ func (s *StopControl) processNewVersionBeacons(
 		return
 	}
 
+	lg.Info().
+		Uint64("stop_height", stopHeight).
+		Msg("New version beacon found")
+
 	var newStop = stopBoundary{
 		StopParameters: StopParameters{
 			StopBeforeHeight: stopHeight,
@@ -631,6 +660,7 @@ func (s *StopControl) processNewVersionBeacons(
 		// This is just informational and is expected to sometimes happen during
 		// normal operation. The causes for this are described here: validateStopChange.
 		s.log.Info().
+			Uint64("stop_height", stopHeight).
 			Err(err).
 			Msg("Cannot change stop boundary when detecting new version beacon")
 	}

@@ -24,8 +24,9 @@ type facadeEnvironment struct {
 	*ProgramLogger
 	EventEmitter
 
-	UnsafeRandomGenerator
+	RandomGenerator
 	CryptoLibrary
+	RandomSourceHistoryProvider
 
 	BlockInfo
 	AccountInfo
@@ -75,12 +76,8 @@ func newFacadeEnvironment(
 		ProgramLogger: logger,
 		EventEmitter:  NoEventEmitter{},
 
-		UnsafeRandomGenerator: NewUnsafeRandomGenerator(
-			tracer,
-			params.BlockHeader,
-			params.TxIndex,
-		),
-		CryptoLibrary: NewCryptoLibrary(tracer, meter),
+		CryptoLibrary:               NewCryptoLibrary(tracer, meter),
+		RandomSourceHistoryProvider: NewForbiddenRandomSourceHistoryProvider(),
 
 		BlockInfo: NewBlockInfo(
 			tracer,
@@ -107,8 +104,11 @@ func newFacadeEnvironment(
 
 		UUIDGenerator: NewUUIDGenerator(
 			tracer,
+			params.Logger,
 			meter,
-			txnState),
+			txnState,
+			params.BlockHeader,
+			params.TxIndex),
 		AccountLocalIDGenerator: NewAccountLocalIDGenerator(
 			tracer,
 			meter,
@@ -172,9 +172,12 @@ func NewScriptEnv(
 		params,
 		txnState,
 		NewCancellableMeter(ctx, txnState))
-
+	env.RandomGenerator = NewRandomGenerator(
+		tracer,
+		params.EntropyProvider,
+		params.ScriptInfoParams.ID[:],
+	)
 	env.addParseRestrictedChecks()
-
 	return env
 }
 
@@ -229,6 +232,19 @@ func NewTransactionEnvironment(
 		txnState,
 		env)
 
+	env.RandomGenerator = NewRandomGenerator(
+		tracer,
+		params.EntropyProvider,
+		params.TxId[:],
+	)
+
+	env.RandomSourceHistoryProvider = NewRandomSourceHistoryProvider(
+		tracer,
+		env.Meter,
+		params.EntropyProvider,
+		params.TransactionInfoParams.RandomSourceHistoryCallAllowed,
+	)
+
 	env.addParseRestrictedChecks()
 
 	return env
@@ -269,9 +285,12 @@ func (env *facadeEnvironment) addParseRestrictedChecks() {
 	env.TransactionInfo = NewParseRestrictedTransactionInfo(
 		env.txnState,
 		env.TransactionInfo)
-	env.UnsafeRandomGenerator = NewParseRestrictedUnsafeRandomGenerator(
+	env.RandomGenerator = NewParseRestrictedRandomGenerator(
 		env.txnState,
-		env.UnsafeRandomGenerator)
+		env.RandomGenerator)
+	env.RandomSourceHistoryProvider = NewParseRestrictedRandomSourceHistoryProvider(
+		env.txnState,
+		env.RandomSourceHistoryProvider)
 	env.UUIDGenerator = NewParseRestrictedUUIDGenerator(
 		env.txnState,
 		env.UUIDGenerator)

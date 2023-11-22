@@ -6,23 +6,27 @@ import (
 	"math/rand"
 	"os"
 	"os/exec"
+	"path"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v2"
-	"github.com/rs/zerolog"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
-	"github.com/onflow/flow-go/network/slashing"
+	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/topology"
 )
 
@@ -364,6 +368,18 @@ func TempBadgerDB(t testing.TB) (*badger.DB, string) {
 	return db, dir
 }
 
+func TempPebblePath(t *testing.T) string {
+	return path.Join(TempDir(t), "pebble"+strconv.Itoa(rand.Int())+".db")
+}
+
+func TempPebbleDBWithOpts(t testing.TB, opts *pebble.Options) (*pebble.DB, string) {
+	// create random path string for parallelization
+	dbpath := path.Join(TempDir(t), "pebble"+strconv.Itoa(rand.Int())+".db")
+	db, err := pebble.Open(dbpath, opts)
+	require.NoError(t, err)
+	return db, dbpath
+}
+
 func Concurrently(n int, f func(int)) {
 	var wg sync.WaitGroup
 	for i := 0; i < n; i++ {
@@ -437,7 +453,43 @@ func GenerateRandomStringWithLen(commentLen uint) string {
 	return string(bytes)
 }
 
-// NetworkSlashingViolationsConsumer returns a slashing violations consumer for network middleware
-func NetworkSlashingViolationsConsumer(logger zerolog.Logger, metrics module.NetworkSecurityMetrics) slashing.ViolationsConsumer {
-	return slashing.NewSlashingViolationsConsumer(logger, metrics)
+// PeerIdFixture creates a random and unique peer ID (libp2p node ID).
+func PeerIdFixture(tb testing.TB) peer.ID {
+	peerID, err := peerIDFixture()
+	require.NoError(tb, err)
+	return peerID
+}
+
+func peerIDFixture() (peer.ID, error) {
+	key, err := generateNetworkingKey(IdentifierFixture())
+	if err != nil {
+		return "", err
+	}
+	pubKey, err := keyutils.LibP2PPublicKeyFromFlow(key.PublicKey())
+	if err != nil {
+		return "", err
+	}
+
+	peerID, err := peer.IDFromPublicKey(pubKey)
+	if err != nil {
+		return "", err
+	}
+
+	return peerID, nil
+}
+
+// generateNetworkingKey generates a Flow ECDSA key using the given seed
+func generateNetworkingKey(s flow.Identifier) (crypto.PrivateKey, error) {
+	seed := make([]byte, crypto.KeyGenSeedMinLen)
+	copy(seed, s[:])
+	return crypto.GeneratePrivateKey(crypto.ECDSASecp256k1, seed)
+}
+
+// PeerIdFixtures creates random and unique peer IDs (libp2p node IDs).
+func PeerIdFixtures(t *testing.T, n int) []peer.ID {
+	peerIDs := make([]peer.ID, n)
+	for i := 0; i < n; i++ {
+		peerIDs[i] = PeerIdFixture(t)
+	}
+	return peerIDs
 }

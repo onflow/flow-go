@@ -16,21 +16,18 @@ import (
 
 type Seals struct {
 	db    *badger.DB
-	cache *Cache
+	cache *Cache[flow.Identifier, *flow.Seal]
 }
 
 func NewSeals(collector module.CacheMetrics, db *badger.DB) *Seals {
 
-	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {
-		sealID := key.(flow.Identifier)
-		seal := val.(*flow.Seal)
+	store := func(sealID flow.Identifier, seal *flow.Seal) func(*transaction.Tx) error {
 		return transaction.WithTx(operation.SkipDuplicates(operation.InsertSeal(sealID, seal)))
 	}
 
-	retrieve := func(key interface{}) func(*badger.Txn) (interface{}, error) {
-		sealID := key.(flow.Identifier)
-		var seal flow.Seal
-		return func(tx *badger.Txn) (interface{}, error) {
+	retrieve := func(sealID flow.Identifier) func(*badger.Txn) (*flow.Seal, error) {
+		return func(tx *badger.Txn) (*flow.Seal, error) {
+			var seal flow.Seal
 			err := operation.RetrieveSeal(sealID, &seal)(tx)
 			return &seal, err
 		}
@@ -38,8 +35,8 @@ func NewSeals(collector module.CacheMetrics, db *badger.DB) *Seals {
 
 	s := &Seals{
 		db: db,
-		cache: newCache(collector, metrics.ResourceSeal,
-			withLimit(flow.DefaultTransactionExpiry+100),
+		cache: newCache[flow.Identifier, *flow.Seal](collector, metrics.ResourceSeal,
+			withLimit[flow.Identifier, *flow.Seal](flow.DefaultTransactionExpiry+100),
 			withStore(store),
 			withRetrieve(retrieve)),
 	}
@@ -57,7 +54,7 @@ func (s *Seals) retrieveTx(sealID flow.Identifier) func(*badger.Txn) (*flow.Seal
 		if err != nil {
 			return nil, err
 		}
-		return val.(*flow.Seal), err
+		return val, err
 	}
 }
 

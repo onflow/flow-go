@@ -47,8 +47,8 @@ type Network struct {
 	codec                 flownet.Codec
 	mu                    sync.Mutex
 	me                    module.Local
-	flowNetwork           flownet.Network // original flow network of the node.
-	server                *grpc.Server    // touch point of orchestrator network to this factory.
+	flowNetwork           flownet.EngineRegistry // original flow network of the node.
+	server                *grpc.Server           // touch point of orchestrator network to this factory.
 	gRPCListenAddress     net.Addr
 	conduitFactory        insecure.CorruptConduitFactory
 	attackerInboundStream insecure.CorruptNetwork_ConnectAttackerServer // inbound stream to attack orchestrator
@@ -63,7 +63,7 @@ type Network struct {
 	approvalHasher hash.Hasher
 }
 
-var _ flownet.Network = (*Network)(nil)
+var _ flownet.EngineRegistry = (*Network)(nil)
 var _ insecure.EgressController = (*Network)(nil)
 var _ insecure.IngressController = (*Network)(nil)
 var _ insecure.CorruptNetworkServer = (*Network)(nil)
@@ -74,7 +74,7 @@ func NewCorruptNetwork(
 	address string,
 	me module.Local,
 	codec flownet.Codec,
-	flowNetwork flownet.Network,
+	flowNetwork flownet.EngineRegistry,
 	conduitFactory insecure.CorruptConduitFactory) (*Network, error) {
 	if chainId != flow.BftTestnet {
 		panic("illegal chain id for using corrupt network")

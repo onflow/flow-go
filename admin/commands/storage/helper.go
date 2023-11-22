@@ -112,10 +112,6 @@ func parseHeightRangeRequestData(req *admin.CommandRequest) (*heightRangeReqData
 		return nil, admin.NewInvalidAdminReqErrorf("end-height %v should not be smaller than start-height %v", endHeight, startHeight)
 	}
 
-	if endHeight-startHeight+1 > Max_Height_Range {
-		return nil, admin.NewInvalidAdminReqErrorf("getting transactions for more than %v blocks at a time might have an impact to node's performance and is not allowed", Max_Height_Range)
-	}
-
 	return &heightRangeReqData{
 		startHeight: startHeight,
 		endHeight:   endHeight,

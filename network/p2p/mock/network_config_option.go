@@ -3,7 +3,8 @@
 package mockp2p
 
 import (
-	p2p "github.com/onflow/flow-go/network/p2p"
+	p2p "github.com/onflow/flow-go/network/p2p/p2pnet"
+
 	mock "github.com/stretchr/testify/mock"
 )
 

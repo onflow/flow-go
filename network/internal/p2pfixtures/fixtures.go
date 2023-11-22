@@ -13,7 +13,6 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
-	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/multiformats/go-multiaddr"
@@ -21,21 +20,20 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/metrics"
+	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2putils"
-	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
-	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
-	inspectorbuilder "github.com/onflow/flow-go/network/p2p/p2pbuilder/inspector"
+	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
 	"github.com/onflow/flow-go/network/p2p/tracer"
-	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -96,34 +94,53 @@ func WithSubscriptionFilter(filter pubsub.SubscriptionFilter) nodeOpt {
 	}
 }
 
+// TODO: this should be replaced by node fixture: https://github.com/onflow/flow-go/blob/master/network/p2p/test/fixtures.go
 func CreateNode(t *testing.T, networkKey crypto.PrivateKey, sporkID flow.Identifier, logger zerolog.Logger, nodeIds flow.IdentityList, opts ...nodeOpt) p2p.LibP2PNode {
 	idProvider := id.NewFixedIdentityProvider(nodeIds)
-
-	meshTracer := tracer.NewGossipSubMeshTracer(
-		logger,
-		metrics.NewNoopCollector(),
-		idProvider,
-		p2pbuilder.DefaultGossipSubConfig().LocalMeshLogInterval)
-
-	met := metrics.NewNoopCollector()
-	rpcInspectorSuite, err := inspectorbuilder.NewGossipSubInspectorBuilder(logger, sporkID, inspectorbuilder.DefaultGossipSubRPCInspectorsConfig(), idProvider, met).Build()
+	defaultFlowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
 
-	builder := p2pbuilder.NewNodeBuilder(
-		logger,
-		met,
+	meshTracerCfg := &tracer.GossipSubMeshTracerConfig{
+		Logger:                             logger,
+		Metrics:                            metrics.NewNoopCollector(),
+		IDProvider:                         idProvider,
+		LoggerInterval:                     defaultFlowConfig.NetworkConfig.GossipSubConfig.LocalMeshLogInterval,
+		RpcSentTrackerCacheSize:            defaultFlowConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerCacheSize,
+		RpcSentTrackerWorkerQueueCacheSize: defaultFlowConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerQueueCacheSize,
+		RpcSentTrackerNumOfWorkers:         defaultFlowConfig.NetworkConfig.GossipSubConfig.RpcSentTrackerNumOfWorkers,
+		HeroCacheMetricsFactory:            metrics.NewNoopHeroCacheMetricsFactory(),
+		NetworkingType:                     flownet.PublicNetwork,
+	}
+	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
+
+	builder := p2pbuilder.NewNodeBuilder(logger,
+		&p2pconfig.MetricsConfig{
+			HeroCacheFactory: metrics.NewNoopHeroCacheMetricsFactory(),
+			Metrics:          metrics.NewNoopCollector(),
+		},
+		flownet.PrivateNetwork,
 		unittest.DefaultAddress,
 		networkKey,
 		sporkID,
-		p2pbuilder.DefaultResourceManagerConfig()).
+		idProvider,
+		&defaultFlowConfig.NetworkConfig.ResourceManager,
+		&defaultFlowConfig.NetworkConfig.GossipSubRPCInspectorsConfig,
+		p2pconfig.PeerManagerDisableConfig(),
+		&defaultFlowConfig.NetworkConfig.GossipSubConfig.SubscriptionProviderConfig,
+		&p2p.DisallowListCacheConfig{
+			MaxSize: uint32(1000),
+			Metrics: metrics.NewNoopCollector(),
+		},
+		meshTracer,
+		&p2pconfig.UnicastConfig{
+			UnicastConfig: defaultFlowConfig.NetworkConfig.UnicastConfig,
+		}).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
 			return p2pdht.NewDHT(c, h, protocols.FlowDHTProtocolID(sporkID), zerolog.Nop(), metrics.NewNoopCollector())
 		}).
-		SetResourceManager(testutils.NewResourceManager(t)).
-		SetStreamCreationRetryInterval(unicast.DefaultRetryDelay).
+		SetResourceManager(&network.NullResourceManager{}).
 		SetGossipSubTracer(meshTracer).
-		SetGossipSubScoreTracerInterval(p2pbuilder.DefaultGossipSubConfig().ScoreTracerInterval).
-		SetGossipSubRpcInspectorSuite(rpcInspectorSuite)
+		SetGossipSubScoreTracerInterval(defaultFlowConfig.NetworkConfig.GossipSubConfig.ScoreTracerInterval)
 
 	for _, opt := range opts {
 		opt(builder)
@@ -133,36 +150,6 @@ func CreateNode(t *testing.T, networkKey crypto.PrivateKey, sporkID flow.Identif
 	require.NoError(t, err)
 
 	return libp2pNode
-}
-
-// PeerIdFixture creates a random and unique peer ID (libp2p node ID).
-func PeerIdFixture(t *testing.T) peer.ID {
-	key, err := generateNetworkingKey(unittest.IdentifierFixture())
-	require.NoError(t, err)
-
-	pubKey, err := keyutils.LibP2PPublicKeyFromFlow(key.PublicKey())
-	require.NoError(t, err)
-
-	peerID, err := peer.IDFromPublicKey(pubKey)
-	require.NoError(t, err)
-
-	return peerID
-}
-
-// generateNetworkingKey generates a Flow ECDSA key using the given seed
-func generateNetworkingKey(s flow.Identifier) (crypto.PrivateKey, error) {
-	seed := make([]byte, crypto.KeyGenSeedMinLen)
-	copy(seed, s[:])
-	return crypto.GeneratePrivateKey(crypto.ECDSASecp256k1, seed)
-}
-
-// PeerIdsFixture creates random and unique peer IDs (libp2p node IDs).
-func PeerIdsFixture(t *testing.T, n int) []peer.ID {
-	peerIDs := make([]peer.ID, n)
-	for i := 0; i < n; i++ {
-		peerIDs[i] = PeerIdFixture(t)
-	}
-	return peerIDs
 }
 
 // SubMustNeverReceiveAnyMessage checks that the subscription never receives any message within the given timeout by the context.
@@ -234,13 +221,13 @@ func EnsureNotConnected(t *testing.T, ctx context.Context, from []p2p.LibP2PNode
 			if this == other {
 				require.Fail(t, "overlapping nodes in from and to lists")
 			}
-			thisId := this.Host().ID()
+			thisId := this.ID()
 			// we intentionally do not check the error here, with libp2p v0.24 connection gating at the "InterceptSecured" level
 			// does not cause the nodes to complain about the connection being rejected at the dialer side.
 			// Hence, we instead check for any trace of the connection being established in the receiver side.
-			_ = this.Host().Connect(ctx, other.Host().Peerstore().PeerInfo(other.Host().ID()))
+			_ = this.Host().Connect(ctx, other.Host().Peerstore().PeerInfo(other.ID()))
 			// ensures that other node has never received a connection from this node.
-			require.Equal(t, other.Host().Network().Connectedness(thisId), network.NotConnected)
+			require.Equal(t, network.NotConnected, other.Host().Network().Connectedness(thisId))
 			require.Empty(t, other.Host().Network().ConnsToPeer(thisId))
 		}
 	}
@@ -259,14 +246,18 @@ func EnsureMessageExchangeOverUnicast(t *testing.T, ctx context.Context, nodes [
 			if this == other {
 				continue
 			}
-			s, err := this.CreateStream(ctx, other.Host().ID())
-			require.NoError(t, err)
-			rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
-			_, err = rw.WriteString(msg)
+			err := this.OpenProtectedStream(ctx, other.ID(), t.Name(), func(stream network.Stream) error {
+				rw := bufio.NewReadWriter(bufio.NewReader(stream), bufio.NewWriter(stream))
+				_, err := rw.WriteString(msg)
+				require.NoError(t, err)
+
+				// Flush the stream
+				require.NoError(t, rw.Flush())
+
+				return nil
+			})
 			require.NoError(t, err)
 
-			// Flush the stream
-			require.NoError(t, rw.Flush())
 		}
 
 		// wait for the message to be received by all other nodes
@@ -305,8 +296,8 @@ func EnsureNoStreamCreation(t *testing.T, ctx context.Context, from []p2p.LibP2P
 			// we intentionally do not check the error here, with libp2p v0.24 connection gating at the "InterceptSecured" level
 			// does not cause the nodes to complain about the connection being rejected at the dialer side.
 			// Hence, we instead check for any trace of the connection being established in the receiver side.
-			otherId := other.Host().ID()
-			thisId := this.Host().ID()
+			otherId := other.ID()
+			thisId := this.ID()
 
 			// closes all connections from other node to this node in order to isolate the connection attempt.
 			for _, conn := range other.Host().Network().ConnsToPeer(thisId) {
@@ -314,9 +305,12 @@ func EnsureNoStreamCreation(t *testing.T, ctx context.Context, from []p2p.LibP2P
 			}
 			require.Empty(t, other.Host().Network().ConnsToPeer(thisId))
 
-			_, err := this.CreateStream(ctx, otherId)
+			err := this.OpenProtectedStream(ctx, otherId, t.Name(), func(stream network.Stream) error {
+				// no-op as the stream is never created.
+				return nil
+			})
 			// ensures that other node has never received a connection from this node.
-			require.Equal(t, other.Host().Network().Connectedness(thisId), network.NotConnected)
+			require.Equal(t, network.NotConnected, other.Host().Network().Connectedness(thisId))
 			// a stream is established on top of a connection, so if there is no connection, there should be no stream.
 			require.Empty(t, other.Host().Network().ConnsToPeer(thisId))
 			// runs the error checkers if any.
@@ -336,9 +330,11 @@ func EnsureStreamCreation(t *testing.T, ctx context.Context, from []p2p.LibP2PNo
 				require.Fail(t, "node is in both from and to lists")
 			}
 			// stream creation should pass without error
-			s, err := this.CreateStream(ctx, other.Host().ID())
+			err := this.OpenProtectedStream(ctx, other.ID(), t.Name(), func(stream network.Stream) error {
+				require.NotNil(t, stream)
+				return nil
+			})
 			require.NoError(t, err)
-			require.NotNil(t, s)
 		}
 	}
 }

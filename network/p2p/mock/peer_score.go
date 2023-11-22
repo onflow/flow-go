@@ -13,14 +13,10 @@ type PeerScore struct {
 }
 
 // PeerScoreExposer provides a mock function with given fields:
-func (_m *PeerScore) PeerScoreExposer() (p2p.PeerScoreExposer, bool) {
+func (_m *PeerScore) PeerScoreExposer() p2p.PeerScoreExposer {
 	ret := _m.Called()
 
 	var r0 p2p.PeerScoreExposer
-	var r1 bool
-	if rf, ok := ret.Get(0).(func() (p2p.PeerScoreExposer, bool)); ok {
-		return rf()
-	}
 	if rf, ok := ret.Get(0).(func() p2p.PeerScoreExposer); ok {
 		r0 = rf()
 	} else {
@@ -29,18 +25,7 @@ func (_m *PeerScore) PeerScoreExposer() (p2p.PeerScoreExposer, bool) {
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func() bool); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Get(1).(bool)
-	}
-
-	return r0, r1
-}
-
-// SetPeerScoreExposer provides a mock function with given fields: e
-func (_m *PeerScore) SetPeerScoreExposer(e p2p.PeerScoreExposer) {
-	_m.Called(e)
+	return r0
 }
 
 type mockConstructorTestingTNewPeerScore interface {

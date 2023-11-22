@@ -9,11 +9,11 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 )
 
-// DefaultConduitFactory is a wrapper around the network Adapter.
+// DefaultConduitFactory is a wrapper around the network ConduitAdapter.
 // It directly passes the incoming messages to the corresponding methods of the
-// network Adapter.
+// network ConduitAdapter.
 type DefaultConduitFactory struct {
-	adapter network.Adapter
+	adapter network.ConduitAdapter
 }
 
 var _ network.ConduitFactory = (*DefaultConduitFactory)(nil)
@@ -30,10 +30,10 @@ func NewDefaultConduitFactory() *DefaultConduitFactory {
 	return &DefaultConduitFactory{}
 }
 
-// RegisterAdapter sets the Adapter component of the factory.
-// The Adapter is a wrapper around the Network layer that only exposes the set of methods
+// RegisterAdapter sets the ConduitAdapter component of the factory.
+// The ConduitAdapter is a wrapper around the Network layer that only exposes the set of methods
 // that are needed by a conduit.
-func (d *DefaultConduitFactory) RegisterAdapter(adapter network.Adapter) error {
+func (d *DefaultConduitFactory) RegisterAdapter(adapter network.ConduitAdapter) error {
 	if d.adapter != nil {
 		return fmt.Errorf("could not register a new network adapter, one already exists")
 	}
@@ -44,7 +44,7 @@ func (d *DefaultConduitFactory) RegisterAdapter(adapter network.Adapter) error {
 }
 
 // NewConduit creates a conduit on the specified channel.
-// Prior to creating any conduit, the factory requires an Adapter to be registered with it.
+// Prior to creating any conduit, the factory requires an ConduitAdapter to be registered with it.
 func (d *DefaultConduitFactory) NewConduit(ctx context.Context, channel channels.Channel) (network.Conduit, error) {
 	if d.adapter == nil {
 		return nil, fmt.Errorf("could not create a new conduit, missing a registered network adapter")
@@ -67,7 +67,7 @@ type Conduit struct {
 	ctx     context.Context
 	cancel  context.CancelFunc
 	channel channels.Channel
-	adapter network.Adapter
+	adapter network.ConduitAdapter
 }
 
 var _ network.Conduit = (*Conduit)(nil)

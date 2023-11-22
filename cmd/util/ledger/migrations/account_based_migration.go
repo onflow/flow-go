@@ -6,6 +6,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/util"
 )
@@ -19,7 +20,7 @@ func PayloadToAccount(p ledger.Payload) (string, bool, error) {
 	if err != nil {
 		return "", false, fmt.Errorf("could not find key for payload: %w", err)
 	}
-	id, err := KeyToRegisterID(k)
+	id, err := convert.LedgerKeyToRegisterID(k)
 	if err != nil {
 		return "", false, fmt.Errorf("error converting key to register ID")
 	}
@@ -70,7 +71,7 @@ func MigrateByAccount(migrator AccountMigrator, allPayloads []ledger.Payload, nW
 	log.Info().Msgf("start grouping for a total of %v payloads", len(allPayloads))
 
 	var err error
-	logGrouping := util.LogProgress("grouping payload", len(allPayloads), &log.Logger)
+	logGrouping := util.LogProgress("grouping payload", len(allPayloads), log.Logger)
 	for i, payload := range allPayloads {
 		groups, err = PayloadGrouping(groups, payload)
 		if err != nil {
@@ -107,7 +108,7 @@ func MigrateGroupSequentially(
 ) (
 	[]ledger.Payload, error) {
 
-	logAccount := util.LogProgress("processing account group", len(payloadsByAccount), &log.Logger)
+	logAccount := util.LogProgress("processing account group", len(payloadsByAccount), log.Logger)
 
 	i := 0
 	migrated := make([]ledger.Payload, 0)
@@ -170,7 +171,7 @@ func MigrateGroupConcurrently(
 	}
 
 	// read job results
-	logAccount := util.LogProgress("processing account group", len(payloadsByAccount), &log.Logger)
+	logAccount := util.LogProgress("processing account group", len(payloadsByAccount), log.Logger)
 
 	migrated := make([]ledger.Payload, 0)
 

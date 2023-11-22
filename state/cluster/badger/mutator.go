@@ -181,7 +181,7 @@ func (m *MutableState) checkHeaderValidity(candidate *cluster.Block) error {
 // checkConnectsToFinalizedState validates that the candidate block connects to
 // the latest finalized state (ie. is not extending an orphaned fork).
 // Expected error returns:
-//   - state.UnverifiableExtensionError if the candidate extends an orphaned fork
+//   - state.OutdatedExtensionError if the candidate extends an orphaned fork
 func (m *MutableState) checkConnectsToFinalizedState(ctx extendContext) error {
 	header := ctx.candidate.Header
 	finalizedID := ctx.finalizedClusterBlock.ID()

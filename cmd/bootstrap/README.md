@@ -98,7 +98,6 @@ Each input is a config file specified as a command line parameter:
 #### Example
 ```bash
 go run -tags relic ./cmd/bootstrap finalize \
- --fast-kg \
   --root-chain main \
   --root-height 0 \
   --root-parent 0000000000000000000000000000000000000000000000000000000000000000 \

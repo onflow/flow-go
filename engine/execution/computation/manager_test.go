@@ -142,7 +142,9 @@ func TestComputeBlockWithStorage(t *testing.T) {
 		committer.NewNoopViewCommitter(),
 		me,
 		prov,
-		nil)
+		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
+		testMaxConcurrency)
 	require.NoError(t, err)
 
 	derivedChainData, err := derived.NewDerivedChainData(10)
@@ -193,6 +195,7 @@ func TestComputeBlock_Uploader(t *testing.T) {
 		Return(nil, nil)
 
 	computationResult := unittest2.ComputationResultFixture(
+		t,
 		unittest.IdentifierFixture(),
 		[][]flow.Identifier{
 			{unittest.IdentifierFixture()},
@@ -261,13 +264,14 @@ func TestExecuteScript(t *testing.T) {
 		metrics.NewNoopCollector(),
 		trace.NewNoopTracer(),
 		me,
-		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
 		execCtx,
 		committer.NewNoopViewCommitter(),
 		prov,
 		ComputationConfig{
 			QueryConfig:          query.NewDefaultConfig(),
 			DerivedDataCacheSize: derived.DefaultDerivedDataCacheSize,
+			MaxConcurrency:       1,
 		},
 	)
 	require.NoError(t, err)
@@ -325,13 +329,14 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 		metrics.NewNoopCollector(),
 		trace.NewNoopTracer(),
 		me,
-		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
 		execCtx,
 		committer.NewNoopViewCommitter(),
 		prov,
 		ComputationConfig{
 			QueryConfig:          query.NewDefaultConfig(),
 			DerivedDataCacheSize: derived.DefaultDerivedDataCacheSize,
+			MaxConcurrency:       1,
 		},
 	)
 	require.NoError(t, err)
@@ -370,13 +375,14 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 		metrics.NewNoopCollector(),
 		trace.NewNoopTracer(),
 		nil,
-		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
 		ctx,
 		committer.NewNoopViewCommitter(),
 		prov,
 		ComputationConfig{
 			QueryConfig:          query.NewDefaultConfig(),
 			DerivedDataCacheSize: derived.DefaultDerivedDataCacheSize,
+			MaxConcurrency:       1,
 			NewCustomVirtualMachine: func() fvm.VM {
 				return &PanickingVM{}
 			},
@@ -420,7 +426,7 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 		metrics.NewNoopCollector(),
 		trace.NewNoopTracer(),
 		nil,
-		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
 		ctx,
 		committer.NewNoopViewCommitter(),
 		prov,
@@ -430,6 +436,7 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 				ExecutionTimeLimit: query.DefaultExecutionTimeLimit,
 			},
 			DerivedDataCacheSize: 10,
+			MaxConcurrency:       1,
 			NewCustomVirtualMachine: func() fvm.VM {
 				return &LongRunningVM{duration: 2 * time.Millisecond}
 			},
@@ -473,7 +480,7 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 		metrics.NewNoopCollector(),
 		trace.NewNoopTracer(),
 		nil,
-		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
 		ctx,
 		committer.NewNoopViewCommitter(),
 		prov,
@@ -483,6 +490,7 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 				ExecutionTimeLimit: query.DefaultExecutionTimeLimit,
 			},
 			DerivedDataCacheSize: derived.DefaultDerivedDataCacheSize,
+			MaxConcurrency:       1,
 			NewCustomVirtualMachine: func() fvm.VM {
 				return &LongRunningVM{duration: 0}
 			},
@@ -640,7 +648,7 @@ func TestExecuteScriptTimeout(t *testing.T) {
 		metrics.NewNoopCollector(),
 		trace.NewNoopTracer(),
 		nil,
-		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
 		fvm.NewContext(),
 		committer.NewNoopViewCommitter(),
 		nil,
@@ -650,6 +658,7 @@ func TestExecuteScriptTimeout(t *testing.T) {
 				ExecutionTimeLimit: timeout,
 			},
 			DerivedDataCacheSize: derived.DefaultDerivedDataCacheSize,
+			MaxConcurrency:       1,
 		},
 	)
 
@@ -686,7 +695,7 @@ func TestExecuteScriptCancelled(t *testing.T) {
 		metrics.NewNoopCollector(),
 		trace.NewNoopTracer(),
 		nil,
-		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
 		fvm.NewContext(),
 		committer.NewNoopViewCommitter(),
 		nil,
@@ -696,6 +705,7 @@ func TestExecuteScriptCancelled(t *testing.T) {
 				ExecutionTimeLimit: timeout,
 			},
 			DerivedDataCacheSize: derived.DefaultDerivedDataCacheSize,
+			MaxConcurrency:       1,
 		},
 	)
 
@@ -827,7 +837,8 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 		me,
 		prov,
 		nil,
-	)
+		testutil.ProtocolStateWithSourceFixture(nil),
+		testMaxConcurrency)
 	require.NoError(t, err)
 
 	derivedChainData, err := derived.NewDerivedChainData(10)
@@ -895,7 +906,7 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 		metrics.NewExecutionCollector(ctx.Tracer),
 		trace.NewNoopTracer(),
 		nil,
-		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
 		ctx,
 		committer.NewNoopViewCommitter(),
 		nil,
@@ -905,6 +916,7 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 				ExecutionTimeLimit: timeout,
 			},
 			DerivedDataCacheSize: derived.DefaultDerivedDataCacheSize,
+			MaxConcurrency:       1,
 		},
 	)
 	vm := manager.vm

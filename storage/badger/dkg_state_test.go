@@ -4,7 +4,6 @@ import (
 	"errors"
 	"math/rand"
 	"testing"
-	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
@@ -53,7 +52,6 @@ func TestDKGState_BeaconKeys(t *testing.T) {
 		store, err := bstorage.NewDKGState(metrics, db)
 		require.NoError(t, err)
 
-		rand.Seed(time.Now().UnixNano())
 		epochCounter := rand.Uint64()
 
 		// attempt to get a non-existent key
@@ -96,7 +94,6 @@ func TestDKGState_EndState(t *testing.T) {
 		store, err := bstorage.NewDKGState(metrics, db)
 		require.NoError(t, err)
 
-		rand.Seed(time.Now().UnixNano())
 		epochCounter := rand.Uint64()
 		endState := flow.DKGEndStateNoKey
 

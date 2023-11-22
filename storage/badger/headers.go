@@ -18,39 +18,33 @@ import (
 // Headers implements a simple read-only header storage around a badger DB.
 type Headers struct {
 	db          *badger.DB
-	cache       *Cache
-	heightCache *Cache
+	cache       *Cache[flow.Identifier, *flow.Header]
+	heightCache *Cache[uint64, flow.Identifier]
 }
 
 func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 
-	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {
-		blockID := key.(flow.Identifier)
-		header := val.(*flow.Header)
+	store := func(blockID flow.Identifier, header *flow.Header) func(*transaction.Tx) error {
 		return transaction.WithTx(operation.InsertHeader(blockID, header))
 	}
 
 	// CAUTION: should only be used to index FINALIZED blocks by their
 	// respective height
-	storeHeight := func(key interface{}, val interface{}) func(*transaction.Tx) error {
-		height := key.(uint64)
-		id := val.(flow.Identifier)
+	storeHeight := func(height uint64, id flow.Identifier) func(*transaction.Tx) error {
 		return transaction.WithTx(operation.IndexBlockHeight(height, id))
 	}
 
-	retrieve := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
-		blockID := key.(flow.Identifier)
+	retrieve := func(blockID flow.Identifier) func(tx *badger.Txn) (*flow.Header, error) {
 		var header flow.Header
-		return func(tx *badger.Txn) (interface{}, error) {
+		return func(tx *badger.Txn) (*flow.Header, error) {
 			err := operation.RetrieveHeader(blockID, &header)(tx)
 			return &header, err
 		}
 	}
 
-	retrieveHeight := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
-		height := key.(uint64)
-		var id flow.Identifier
-		return func(tx *badger.Txn) (interface{}, error) {
+	retrieveHeight := func(height uint64) func(tx *badger.Txn) (flow.Identifier, error) {
+		return func(tx *badger.Txn) (flow.Identifier, error) {
+			var id flow.Identifier
 			err := operation.LookupBlockHeight(height, &id)(tx)
 			return id, err
 		}
@@ -58,13 +52,13 @@ func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 
 	h := &Headers{
 		db: db,
-		cache: newCache(collector, metrics.ResourceHeader,
-			withLimit(4*flow.DefaultTransactionExpiry),
+		cache: newCache[flow.Identifier, *flow.Header](collector, metrics.ResourceHeader,
+			withLimit[flow.Identifier, *flow.Header](4*flow.DefaultTransactionExpiry),
 			withStore(store),
 			withRetrieve(retrieve)),
 
-		heightCache: newCache(collector, metrics.ResourceFinalizedHeight,
-			withLimit(4*flow.DefaultTransactionExpiry),
+		heightCache: newCache[uint64, flow.Identifier](collector, metrics.ResourceFinalizedHeight,
+			withLimit[uint64, flow.Identifier](4*flow.DefaultTransactionExpiry),
 			withStore(storeHeight),
 			withRetrieve(retrieveHeight)),
 	}
@@ -82,7 +76,7 @@ func (h *Headers) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*flow.H
 		if err != nil {
 			return nil, err
 		}
-		return val.(*flow.Header), nil
+		return val, nil
 	}
 }
 
@@ -93,7 +87,7 @@ func (h *Headers) retrieveIdByHeightTx(height uint64) func(*badger.Txn) (flow.Id
 		if err != nil {
 			return flow.ZeroID, fmt.Errorf("failed to retrieve block ID for height %d: %w", height, err)
 		}
-		return blockID.(flow.Identifier), nil
+		return blockID, nil
 	}
 }
 

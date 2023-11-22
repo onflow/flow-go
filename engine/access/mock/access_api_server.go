@@ -353,6 +353,32 @@ func (_m *AccessAPIServer) GetEventsForHeightRange(_a0 context.Context, _a1 *acc
 	return r0, r1
 }
 
+// GetExecutionResultByID provides a mock function with given fields: _a0, _a1
+func (_m *AccessAPIServer) GetExecutionResultByID(_a0 context.Context, _a1 *access.GetExecutionResultByIDRequest) (*access.ExecutionResultByIDResponse, error) {
+	ret := _m.Called(_a0, _a1)
+
+	var r0 *access.ExecutionResultByIDResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetExecutionResultByIDRequest) (*access.ExecutionResultByIDResponse, error)); ok {
+		return rf(_a0, _a1)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetExecutionResultByIDRequest) *access.ExecutionResultByIDResponse); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*access.ExecutionResultByIDResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *access.GetExecutionResultByIDRequest) error); ok {
+		r1 = rf(_a0, _a1)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetExecutionResultForBlockID provides a mock function with given fields: _a0, _a1
 func (_m *AccessAPIServer) GetExecutionResultForBlockID(_a0 context.Context, _a1 *access.GetExecutionResultForBlockIDRequest) (*access.ExecutionResultForBlockIDResponse, error) {
 	ret := _m.Called(_a0, _a1)
@@ -501,6 +527,58 @@ func (_m *AccessAPIServer) GetNodeVersionInfo(_a0 context.Context, _a1 *access.G
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, *access.GetNodeVersionInfoRequest) error); ok {
+		r1 = rf(_a0, _a1)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetProtocolStateSnapshotByBlockID provides a mock function with given fields: _a0, _a1
+func (_m *AccessAPIServer) GetProtocolStateSnapshotByBlockID(_a0 context.Context, _a1 *access.GetProtocolStateSnapshotByBlockIDRequest) (*access.ProtocolStateSnapshotResponse, error) {
+	ret := _m.Called(_a0, _a1)
+
+	var r0 *access.ProtocolStateSnapshotResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetProtocolStateSnapshotByBlockIDRequest) (*access.ProtocolStateSnapshotResponse, error)); ok {
+		return rf(_a0, _a1)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetProtocolStateSnapshotByBlockIDRequest) *access.ProtocolStateSnapshotResponse); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*access.ProtocolStateSnapshotResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *access.GetProtocolStateSnapshotByBlockIDRequest) error); ok {
+		r1 = rf(_a0, _a1)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetProtocolStateSnapshotByHeight provides a mock function with given fields: _a0, _a1
+func (_m *AccessAPIServer) GetProtocolStateSnapshotByHeight(_a0 context.Context, _a1 *access.GetProtocolStateSnapshotByHeightRequest) (*access.ProtocolStateSnapshotResponse, error) {
+	ret := _m.Called(_a0, _a1)
+
+	var r0 *access.ProtocolStateSnapshotResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetProtocolStateSnapshotByHeightRequest) (*access.ProtocolStateSnapshotResponse, error)); ok {
+		return rf(_a0, _a1)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetProtocolStateSnapshotByHeightRequest) *access.ProtocolStateSnapshotResponse); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*access.ProtocolStateSnapshotResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *access.GetProtocolStateSnapshotByHeightRequest) error); ok {
 		r1 = rf(_a0, _a1)
 	} else {
 		r1 = ret.Error(1)

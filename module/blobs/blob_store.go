@@ -86,6 +86,10 @@ func (bs *blobstoreImpl) HashOnRead(enabled bool) {
 // BlockExecutionData IDs without storing the data.
 type NoopBlobstore struct{}
 
+func NewNoopBlobstore() *NoopBlobstore {
+	return &NoopBlobstore{}
+}
+
 func (n *NoopBlobstore) DeleteBlob(context.Context, cid.Cid) error {
 	return nil
 }

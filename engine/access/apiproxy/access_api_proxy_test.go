@@ -11,6 +11,7 @@ import (
 	"google.golang.org/grpc"
 	grpcinsecure "google.golang.org/grpc/credentials/insecure"
 
+	"github.com/onflow/flow-go/engine/common/grpc/forwarder"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/grpcutils"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -137,7 +138,8 @@ func TestNewFlowCachedAccessAPIProxy(t *testing.T) {
 	// Prepare a proxy that fails due to the second connection being idle
 	l := flow.IdentityList{{Address: unittest.IPPort("11634")}, {Address: unittest.IPPort("11635")}}
 	c := FlowAccessAPIForwarder{}
-	err = c.setFlowAccessAPI(l, time.Second)
+	c.Forwarder, err = forwarder.NewForwarder(l, time.Second, grpcutils.DefaultMaxMsgSize)
+
 	if err == nil {
 		t.Fatal(fmt.Errorf("should not start with one connection ready"))
 	}
@@ -153,7 +155,7 @@ func TestNewFlowCachedAccessAPIProxy(t *testing.T) {
 	// Prepare a proxy
 	l = flow.IdentityList{{Address: unittest.IPPort("11634")}, {Address: unittest.IPPort("11635")}}
 	c = FlowAccessAPIForwarder{}
-	err = c.setFlowAccessAPI(l, time.Second)
+	c.Forwarder, err = forwarder.NewForwarder(l, time.Second, grpcutils.DefaultMaxMsgSize)
 	if err != nil {
 		t.Fatal(err)
 	}

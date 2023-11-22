@@ -16,6 +16,7 @@ import (
 type GossipSubAdapterConfig struct {
 	options        []pubsub.Option
 	scoreTracer    p2p.PeerScoreTracer
+	scoreOption    p2p.ScoreOptionBuilder
 	pubsubTracer   p2p.PubSubTracer
 	inspectorSuite p2p.GossipSubInspectorSuite // currently only used to manage the lifecycle.
 }
@@ -60,7 +61,9 @@ func (g *GossipSubAdapterConfig) WithSubscriptionFilter(filter p2p.SubscriptionF
 // Returns:
 // -None
 func (g *GossipSubAdapterConfig) WithScoreOption(option p2p.ScoreOptionBuilder) {
-	g.options = append(g.options, option.BuildFlowPubSubScoreOption())
+	params, thresholds := option.BuildFlowPubSubScoreOption()
+	g.scoreOption = option
+	g.options = append(g.options, pubsub.WithPeerScore(params, thresholds))
 }
 
 // WithMessageIdFunction adds a message ID function option to the config.
@@ -111,6 +114,10 @@ func (g *GossipSubAdapterConfig) ScoreTracer() p2p.PeerScoreTracer {
 // - p2p.PubSubTracer: the tracer for the pubsub.
 func (g *GossipSubAdapterConfig) PubSubTracer() p2p.PubSubTracer {
 	return g.pubsubTracer
+}
+
+func (g *GossipSubAdapterConfig) ScoringComponent() component.Component {
+	return g.scoreOption
 }
 
 // InspectorSuiteComponent returns the component that manages the lifecycle of the inspector suite.
@@ -175,6 +182,24 @@ func convertTopicScoreSnapshot(snapshot map[string]*pubsub.TopicScoreSnapshot) m
 	}
 
 	return newSnapshot
+}
+
+// TopicScoreParamFunc returns the topic score param function. This function is used to get the topic score params for a topic.
+// The topic score params are used to set the topic parameters in GossipSub at the time of joining the topic.
+// Args:
+//   - None
+//
+// Returns:
+// - func(topic *pubsub.Topic) *pubsub.TopicScoreParams: the topic score param function if set, nil otherwise.
+// - bool: true if the topic score param function is set, false otherwise.
+func (g *GossipSubAdapterConfig) TopicScoreParamFunc() (func(topic *pubsub.Topic) *pubsub.TopicScoreParams, bool) {
+	if g.scoreOption != nil {
+		return func(topic *pubsub.Topic) *pubsub.TopicScoreParams {
+			return g.scoreOption.TopicScoreParams(topic)
+		}, true
+	}
+
+	return nil, false
 }
 
 // Build returns the libp2p pubsub options.

@@ -5,13 +5,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // TestCache_Exists tests existence checking items in the cache.
 func TestCache_Exists(t *testing.T) {
-	cache := newCache(metrics.NewNoopCollector(), "test")
+	cache := newCache[flow.Identifier, any](metrics.NewNoopCollector(), "test")
 
 	t.Run("non-existent", func(t *testing.T) {
 		key := unittest.IdentifierFixture()

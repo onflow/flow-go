@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"math/rand"
 	"regexp"
 	"strconv"
 
@@ -18,6 +17,7 @@ import (
 	"github.com/vmihailenco/msgpack"
 
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/utils/rand"
 )
 
 // DefaultInitialWeight is the default initial weight for a node identity.
@@ -461,40 +461,28 @@ func (il IdentityList) ByNetworkingKey(key crypto.PublicKey) (*Identity, bool) {
 	return nil, false
 }
 
-// Sample returns simple random sample from the `IdentityList`
-func (il IdentityList) Sample(size uint) IdentityList {
-	return il.sample(size, rand.Intn)
-}
-
-// DeterministicSample returns deterministic random sample from the `IdentityList` using the given seed
-func (il IdentityList) DeterministicSample(size uint, seed int64) IdentityList {
-	rng := rand.New(rand.NewSource(seed))
-	return il.sample(size, rng.Intn)
-}
-
-func (il IdentityList) sample(size uint, intn func(int) int) IdentityList {
+// Sample returns non-deterministic random sample from the `IdentityList`
+func (il IdentityList) Sample(size uint) (IdentityList, error) {
 	n := uint(len(il))
-	if size > n {
+	dup := make([]*Identity, 0, n)
+	dup = append(dup, il...)
+	if n < size {
 		size = n
 	}
-
-	dup := il.Copy()
-	for i := uint(0); i < size; i++ {
-		j := uint(intn(int(n - i)))
-		dup[i], dup[j+i] = dup[j+i], dup[i]
+	swap := func(i, j uint) {
+		dup[i], dup[j] = dup[j], dup[i]
 	}
-	return dup[:size]
+	err := rand.Samples(n, size, swap)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sample identity list: %w", err)
+	}
+	return dup[:size], nil
 }
 
-// DeterministicShuffle randomly and deterministically shuffles the identity
-// list, returning the shuffled list without modifying the receiver.
-func (il IdentityList) DeterministicShuffle(seed int64) IdentityList {
-	dup := il.Copy()
-	rng := rand.New(rand.NewSource(seed))
-	rng.Shuffle(len(il), func(i, j int) {
-		dup[i], dup[j] = dup[j], dup[i]
-	})
-	return dup
+// Shuffle randomly shuffles the identity list (non-deterministic),
+// and returns the shuffled list without modifying the receiver.
+func (il IdentityList) Shuffle() (IdentityList, error) {
+	return il.Sample(uint(len(il)))
 }
 
 // SamplePct returns a random sample from the receiver identity list. The
@@ -502,9 +490,9 @@ func (il IdentityList) DeterministicShuffle(seed int64) IdentityList {
 // if `pct>0`, so this will always select at least one identity.
 //
 // NOTE: The input must be between 0-1.
-func (il IdentityList) SamplePct(pct float64) IdentityList {
+func (il IdentityList) SamplePct(pct float64) (IdentityList, error) {
 	if pct <= 0 {
-		return IdentityList{}
+		return IdentityList{}, nil
 	}
 
 	count := float64(il.Count()) * pct

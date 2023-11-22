@@ -225,7 +225,7 @@ func GetTestData_Level1_1Count1FailRestPass() common.Level1Summary {
 	}
 }
 
-// GetTestData_Level1_1CountAllPass represents a level 1 summary (as exptected output from level 1 parser)
+// GetTestData_Level1_1CountAllPass represents a level 1 summary (as expected output from level 1 parser)
 // with multiple passed tests, count=1.
 func GetTestData_Level1_1CountAllPass() common.Level1Summary {
 	return []common.Level1TestResult{

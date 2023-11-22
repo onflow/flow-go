@@ -56,7 +56,7 @@ type Engine struct {
 // New creates a new requester engine, operating on the provided network channel, and requesting entities from a node
 // within the set obtained by applying the provided selector filter. The options allow customization of the parameters
 // related to the batch and retry logic.
-func New(log zerolog.Logger, metrics module.EngineMetrics, net network.Network, me module.Local, state protocol.State,
+func New(log zerolog.Logger, metrics module.EngineMetrics, net network.EngineRegistry, me module.Local, state protocol.State,
 	channel channels.Channel, selector flow.IdentityFilter, create CreateFunc, options ...OptionFunc) (*Engine, error) {
 
 	// initialize the default config
@@ -367,7 +367,11 @@ func (e *Engine) dispatchRequest() (bool, error) {
 			if len(providers) == 0 {
 				return false, fmt.Errorf("no valid providers available")
 			}
-			providerID = providers.Sample(1)[0].NodeID
+			id, err := providers.Sample(1)
+			if err != nil {
+				return false, fmt.Errorf("sampling failed: %w", err)
+			}
+			providerID = id[0].NodeID
 		}
 
 		// add item to list and set retry parameters

@@ -9,19 +9,19 @@ import (
 	"testing"
 	"time"
 
-	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/onflow/cadence"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/cadence"
-
 	sdk "github.com/onflow/flow-go-sdk"
-
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/bitutils"
@@ -41,9 +41,10 @@ import (
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/updatable_configs"
-	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
+	"github.com/onflow/flow-go/network/p2p/p2pconf"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/dsl"
@@ -233,6 +234,18 @@ func ClusterProposalFromBlock(block *cluster.Block) *messages.ClusterBlockPropos
 	return messages.NewClusterBlockProposal(block)
 }
 
+func BlockchainFixture(length int) []*flow.Block {
+	blocks := make([]*flow.Block, length)
+
+	genesis := BlockFixture()
+	blocks[0] = &genesis
+	for i := 1; i < length; i++ {
+		blocks[i] = BlockWithParentFixture(blocks[i-1].Header)
+	}
+
+	return blocks
+}
+
 // AsSlashable returns the input message T, wrapped as a flow.Slashable instance with a random origin ID.
 func AsSlashable[T any](msg T) flow.Slashable[T] {
 	slashable := flow.Slashable[T]{
@@ -264,7 +277,10 @@ func WithAllTheFixins(payload *flow.Payload) {
 	payload.Seals = Seal.Fixtures(3)
 	payload.Guarantees = CollectionGuaranteesFixture(4)
 	for i := 0; i < 10; i++ {
-		receipt := ExecutionReceiptFixture()
+		receipt := ExecutionReceiptFixture(
+			WithResult(ExecutionResultFixture(WithServiceEvents(3))),
+			WithSpocks(SignaturesFixture(3)),
+		)
 		payload.Receipts = flow.ExecutionReceiptMetaList{receipt.Meta()}
 		payload.Results = flow.ExecutionResultList{&receipt.ExecutionResult}
 	}
@@ -412,12 +428,6 @@ func BlockHeaderFixture(opts ...func(header *flow.Header)) *flow.Header {
 	return header
 }
 
-func CidFixture() cid.Cid {
-	data := make([]byte, 1024)
-	_, _ = rand.Read(data)
-	return blocks.NewBlock(data).Cid()
-}
-
 func BlockHeaderFixtureOnChain(
 	chainID flow.ChainID,
 	opts ...func(header *flow.Header),
@@ -464,6 +474,38 @@ func BlockHeaderWithParentFixture(parent *flow.Header) *flow.Header {
 		ParentView:         parent.View,
 		ParentVoterIndices: SignerIndicesFixture(4),
 		ParentVoterSigData: QCSigDataFixture(),
+		ProposerID:         IdentifierFixture(),
+		ProposerSigData:    SignatureFixture(),
+		LastViewTC:         lastViewTC,
+	}
+}
+
+func BlockHeaderWithParentWithSoRFixture(parent *flow.Header, source []byte) *flow.Header {
+	height := parent.Height + 1
+	view := parent.View + 1 + uint64(rand.Intn(10)) // Intn returns [0, n)
+	var lastViewTC *flow.TimeoutCertificate
+	if view != parent.View+1 {
+		newestQC := QuorumCertificateFixture(func(qc *flow.QuorumCertificate) {
+			qc.View = parent.View
+		})
+		lastViewTC = &flow.TimeoutCertificate{
+			View:          view - 1,
+			NewestQCViews: []uint64{newestQC.View},
+			NewestQC:      newestQC,
+			SignerIndices: SignerIndicesFixture(4),
+			SigData:       SignatureFixture(),
+		}
+	}
+	return &flow.Header{
+		ChainID:            parent.ChainID,
+		ParentID:           parent.ID(),
+		Height:             height,
+		PayloadHash:        IdentifierFixture(),
+		Timestamp:          time.Now().UTC(),
+		View:               view,
+		ParentView:         parent.View,
+		ParentVoterIndices: SignerIndicesFixture(4),
+		ParentVoterSigData: QCSigDataWithSoRFixture(source),
 		ProposerID:         IdentifierFixture(),
 		ProposerSigData:    SignatureFixture(),
 		LastViewTC:         lastViewTC,
@@ -710,6 +752,12 @@ func WithExecutorID(executorID flow.Identifier) func(*flow.ExecutionReceipt) {
 func WithResult(result *flow.ExecutionResult) func(*flow.ExecutionReceipt) {
 	return func(receipt *flow.ExecutionReceipt) {
 		receipt.ExecutionResult = *result
+	}
+}
+
+func WithSpocks(spocks []crypto.Signature) func(*flow.ExecutionReceipt) {
+	return func(receipt *flow.ExecutionReceipt) {
+		receipt.Spocks = spocks
 	}
 }
 
@@ -1270,8 +1318,7 @@ func ChunkStatusListFixture(
 	return statuses
 }
 
-func QCSigDataFixture() []byte {
-	packer := hotstuff.SigDataPacker{}
+func qcSignatureDataFixture() hotstuff.SignatureData {
 	sigType := RandomBytes(5)
 	for i := range sigType {
 		sigType[i] = sigType[i] % 2
@@ -1282,6 +1329,20 @@ func QCSigDataFixture() []byte {
 		AggregatedRandomBeaconSig:    SignatureFixture(),
 		ReconstructedRandomBeaconSig: SignatureFixture(),
 	}
+	return sigData
+}
+
+func QCSigDataFixture() []byte {
+	packer := hotstuff.SigDataPacker{}
+	sigData := qcSignatureDataFixture()
+	encoded, _ := packer.Encode(&sigData)
+	return encoded
+}
+
+func QCSigDataWithSoRFixture(sor []byte) []byte {
+	packer := hotstuff.SigDataPacker{}
+	sigData := qcSignatureDataFixture()
+	sigData.ReconstructedRandomBeaconSig = sor
 	encoded, _ := packer.Encode(&sigData)
 	return encoded
 }
@@ -1294,6 +1355,14 @@ func SignatureFixture() crypto.Signature {
 
 func SignaturesFixture(n int) []crypto.Signature {
 	var sigs []crypto.Signature
+	for i := 0; i < n; i++ {
+		sigs = append(sigs, SignatureFixture())
+	}
+	return sigs
+}
+
+func RandomSourcesFixture(n int) [][]byte {
+	var sigs [][]byte
 	for i := 0; i < n; i++ {
 		sigs = append(sigs, SignatureFixture())
 	}
@@ -1565,6 +1634,10 @@ func ChunkDataPackFixture(
 		StartState: StateCommitmentFixture(),
 		Proof:      []byte{'p'},
 		Collection: &coll,
+		ExecutionDataRoot: flow.BlockExecutionDataRoot{
+			BlockID:               IdentifierFixture(),
+			ChunkExecutionDataIDs: []cid.Cid{flow.IdToCid(IdentifierFixture())},
+		},
 	}
 
 	for _, opt := range opts {
@@ -1608,6 +1681,18 @@ func BlockEventsFixture(
 	n int,
 	types ...flow.EventType,
 ) flow.BlockEvents {
+	return flow.BlockEvents{
+		BlockID:        header.ID(),
+		BlockHeight:    header.Height,
+		BlockTimestamp: header.Timestamp,
+		Events:         EventsFixture(n, types...),
+	}
+}
+
+func EventsFixture(
+	n int,
+	types ...flow.EventType,
+) []flow.Event {
 	if len(types) == 0 {
 		types = []flow.EventType{"A.0x1.Foo.Bar", "A.0x2.Zoo.Moo", "A.0x3.Goo.Hoo"}
 	}
@@ -1617,12 +1702,7 @@ func BlockEventsFixture(
 		events[i] = EventFixture(types[i%len(types)], 0, uint32(i), IdentifierFixture(), 0)
 	}
 
-	return flow.BlockEvents{
-		BlockID:        header.ID(),
-		BlockHeight:    header.Height,
-		BlockTimestamp: header.Timestamp,
-		Events:         events,
-	}
+	return events
 }
 
 // EventFixture returns an event
@@ -2299,6 +2379,18 @@ func TransactionResultsFixture(n int) []flow.TransactionResult {
 	return results
 }
 
+func LightTransactionResultsFixture(n int) []flow.LightTransactionResult {
+	results := make([]flow.LightTransactionResult, 0, n)
+	for i := 0; i < n; i++ {
+		results = append(results, flow.LightTransactionResult{
+			TransactionID:   IdentifierFixture(),
+			Failed:          i%2 == 0,
+			ComputationUsed: Uint64InRange(1, 10_000),
+		})
+	}
+	return results
+}
+
 func AllowAllPeerFilter() func(peer.ID) error {
 	return func(_ peer.ID) error {
 		return nil
@@ -2360,7 +2452,7 @@ func GetFlowProtocolEventID(
 ) flow.Identifier {
 	payload, err := NetworkCodec().Encode(event)
 	require.NoError(t, err)
-	eventIDHash, err := network.EventId(channel, payload)
+	eventIDHash, err := message.EventId(channel, payload)
 	require.NoError(t, err)
 	return flow.HashToID(eventIDHash)
 }
@@ -2410,19 +2502,35 @@ func WithChunkEvents(events flow.EventsList) func(*execution_data.ChunkExecution
 	}
 }
 
+func WithTrieUpdate(trieUpdate *ledger.TrieUpdate) func(*execution_data.ChunkExecutionData) {
+	return func(conf *execution_data.ChunkExecutionData) {
+		conf.TrieUpdate = trieUpdate
+	}
+}
+
 func ChunkExecutionDataFixture(t *testing.T, minSize int, opts ...func(*execution_data.ChunkExecutionData)) *execution_data.ChunkExecutionData {
-	collection := CollectionFixture(1)
+	collection := CollectionFixture(5)
+	results := make([]flow.LightTransactionResult, len(collection.Transactions))
+	for i, tx := range collection.Transactions {
+		results[i] = flow.LightTransactionResult{
+			TransactionID:   tx.ID(),
+			Failed:          false,
+			ComputationUsed: uint64(i * 100),
+		}
+	}
+
 	ced := &execution_data.ChunkExecutionData{
-		Collection: &collection,
-		Events:     flow.EventsList{},
-		TrieUpdate: testutils.TrieUpdateFixture(1, 1, 8),
+		Collection:         &collection,
+		Events:             nil,
+		TrieUpdate:         testutils.TrieUpdateFixture(2, 1, 8),
+		TransactionResults: results,
 	}
 
 	for _, opt := range opts {
 		opt(ced)
 	}
 
-	if minSize <= 1 {
+	if minSize <= 1 || ced.TrieUpdate == nil {
 		return ced
 	}
 
@@ -2435,7 +2543,7 @@ func ChunkExecutionDataFixture(t *testing.T, minSize int, opts ...func(*executio
 		}
 
 		v := make([]byte, size)
-		_, err := rand.Read(v)
+		_, err := crand.Read(v)
 		require.NoError(t, err)
 
 		k, err := ced.TrieUpdate.Payloads[0].Key()
@@ -2443,5 +2551,226 @@ func ChunkExecutionDataFixture(t *testing.T, minSize int, opts ...func(*executio
 
 		ced.TrieUpdate.Payloads[0] = ledger.NewPayload(k, v)
 		size *= 2
+	}
+}
+
+func CreateSendTxHttpPayload(tx flow.TransactionBody) map[string]interface{} {
+	tx.Arguments = [][]uint8{} // fix how fixture creates nil values
+	auth := make([]string, len(tx.Authorizers))
+	for i, a := range tx.Authorizers {
+		auth[i] = a.String()
+	}
+
+	return map[string]interface{}{
+		"script":             util.ToBase64(tx.Script),
+		"arguments":          tx.Arguments,
+		"reference_block_id": tx.ReferenceBlockID.String(),
+		"gas_limit":          fmt.Sprintf("%d", tx.GasLimit),
+		"payer":              tx.Payer.String(),
+		"proposal_key": map[string]interface{}{
+			"address":         tx.ProposalKey.Address.String(),
+			"key_index":       fmt.Sprintf("%d", tx.ProposalKey.KeyIndex),
+			"sequence_number": fmt.Sprintf("%d", tx.ProposalKey.SequenceNumber),
+		},
+		"authorizers": auth,
+		"payload_signatures": []map[string]interface{}{{
+			"address":   tx.PayloadSignatures[0].Address.String(),
+			"key_index": fmt.Sprintf("%d", tx.PayloadSignatures[0].KeyIndex),
+			"signature": util.ToBase64(tx.PayloadSignatures[0].Signature),
+		}},
+		"envelope_signatures": []map[string]interface{}{{
+			"address":   tx.EnvelopeSignatures[0].Address.String(),
+			"key_index": fmt.Sprintf("%d", tx.EnvelopeSignatures[0].KeyIndex),
+			"signature": util.ToBase64(tx.EnvelopeSignatures[0].Signature),
+		}},
+	}
+}
+
+// P2PRPCGraftFixtures returns n number of control message rpc Graft fixtures.
+func P2PRPCGraftFixtures(topics ...string) []*pubsub_pb.ControlGraft {
+	n := len(topics)
+	grafts := make([]*pubsub_pb.ControlGraft, n)
+	for i := 0; i < n; i++ {
+		grafts[i] = P2PRPCGraftFixture(&topics[i])
+	}
+	return grafts
+}
+
+// P2PRPCGraftFixture returns a control message rpc Graft fixture.
+func P2PRPCGraftFixture(topic *string) *pubsub_pb.ControlGraft {
+	return &pubsub_pb.ControlGraft{
+		TopicID: topic,
+	}
+}
+
+// P2PRPCPruneFixtures returns n number of control message rpc Prune fixtures.
+func P2PRPCPruneFixtures(topics ...string) []*pubsub_pb.ControlPrune {
+	n := len(topics)
+	prunes := make([]*pubsub_pb.ControlPrune, n)
+	for i := 0; i < n; i++ {
+		prunes[i] = P2PRPCPruneFixture(&topics[i])
+	}
+	return prunes
+}
+
+// P2PRPCPruneFixture returns a control message rpc Prune fixture.
+func P2PRPCPruneFixture(topic *string) *pubsub_pb.ControlPrune {
+	return &pubsub_pb.ControlPrune{
+		TopicID: topic,
+	}
+}
+
+// P2PRPCIHaveFixtures returns n number of control message rpc iHave fixtures with m number of message ids each.
+func P2PRPCIHaveFixtures(m int, topics ...string) []*pubsub_pb.ControlIHave {
+	n := len(topics)
+	ihaves := make([]*pubsub_pb.ControlIHave, n)
+	for i := 0; i < n; i++ {
+		ihaves[i] = P2PRPCIHaveFixture(&topics[i], IdentifierListFixture(m).Strings()...)
+	}
+	return ihaves
+}
+
+// P2PRPCIHaveFixture returns a control message rpc iHave fixture.
+func P2PRPCIHaveFixture(topic *string, messageIds ...string) *pubsub_pb.ControlIHave {
+	return &pubsub_pb.ControlIHave{
+		TopicID:    topic,
+		MessageIDs: messageIds,
+	}
+}
+
+// P2PRPCIWantFixtures returns n number of control message rpc iWant fixtures with m number of message ids each.
+func P2PRPCIWantFixtures(n, m int) []*pubsub_pb.ControlIWant {
+	iwants := make([]*pubsub_pb.ControlIWant, n)
+	for i := 0; i < n; i++ {
+		iwants[i] = P2PRPCIWantFixture(IdentifierListFixture(m).Strings()...)
+	}
+	return iwants
+}
+
+// P2PRPCIWantFixture returns a control message rpc iWant fixture.
+func P2PRPCIWantFixture(messageIds ...string) *pubsub_pb.ControlIWant {
+	return &pubsub_pb.ControlIWant{
+		MessageIDs: messageIds,
+	}
+}
+
+type RPCFixtureOpt func(rpc *pubsub.RPC)
+
+// WithGrafts sets the grafts on the rpc control message.
+func WithGrafts(grafts ...*pubsub_pb.ControlGraft) RPCFixtureOpt {
+	return func(rpc *pubsub.RPC) {
+		rpc.Control.Graft = grafts
+	}
+}
+
+// WithPrunes sets the prunes on the rpc control message.
+func WithPrunes(prunes ...*pubsub_pb.ControlPrune) RPCFixtureOpt {
+	return func(rpc *pubsub.RPC) {
+		rpc.Control.Prune = prunes
+	}
+}
+
+// WithIHaves sets the iHaves on the rpc control message.
+func WithIHaves(iHaves ...*pubsub_pb.ControlIHave) RPCFixtureOpt {
+	return func(rpc *pubsub.RPC) {
+		rpc.Control.Ihave = iHaves
+	}
+}
+
+// WithIWants sets the iWants on the rpc control message.
+func WithIWants(iWants ...*pubsub_pb.ControlIWant) RPCFixtureOpt {
+	return func(rpc *pubsub.RPC) {
+		rpc.Control.Iwant = iWants
+	}
+}
+
+func WithPubsubMessages(msgs ...*pubsub_pb.Message) RPCFixtureOpt {
+	return func(rpc *pubsub.RPC) {
+		rpc.Publish = msgs
+	}
+}
+
+// P2PRPCFixture returns a pubsub RPC fixture. Currently, this fixture only sets the ControlMessage field.
+func P2PRPCFixture(opts ...RPCFixtureOpt) *pubsub.RPC {
+	rpc := &pubsub.RPC{
+		RPC: pubsub_pb.RPC{
+			Control: &pubsub_pb.ControlMessage{},
+		},
+	}
+
+	for _, opt := range opts {
+		opt(rpc)
+	}
+
+	return rpc
+}
+
+func WithFrom(pid peer.ID) func(*pubsub_pb.Message) {
+	return func(msg *pubsub_pb.Message) {
+		msg.From = []byte(pid)
+	}
+}
+
+// GossipSubMessageFixture returns a gossip sub message fixture for the specified topic.
+func GossipSubMessageFixture(s string, opts ...func(*pubsub_pb.Message)) *pubsub_pb.Message {
+	pb := &pubsub_pb.Message{
+		From:      RandomBytes(32),
+		Data:      RandomBytes(32),
+		Seqno:     RandomBytes(10),
+		Topic:     &s,
+		Signature: RandomBytes(100),
+		Key:       RandomBytes(32),
+	}
+
+	for _, opt := range opts {
+		opt(pb)
+	}
+
+	return pb
+}
+
+// GossipSubMessageFixtures returns a list of gossipsub message fixtures.
+func GossipSubMessageFixtures(n int, topic string, opts ...func(*pubsub_pb.Message)) []*pubsub_pb.Message {
+	msgs := make([]*pubsub_pb.Message, n)
+	for i := 0; i < n; i++ {
+		msgs[i] = GossipSubMessageFixture(topic, opts...)
+	}
+	return msgs
+}
+
+// LibP2PResourceLimitOverrideFixture returns a random resource limit override for testing.
+// The values are not guaranteed to be valid between 0 and 1000.
+// Returns:
+//   - p2pconf.ResourceManagerOverrideLimit: a random resource limit override.
+func LibP2PResourceLimitOverrideFixture() p2pconf.ResourceManagerOverrideLimit {
+	return p2pconf.ResourceManagerOverrideLimit{
+		StreamsInbound:      rand.Intn(1000),
+		StreamsOutbound:     rand.Intn(1000),
+		ConnectionsInbound:  rand.Intn(1000),
+		ConnectionsOutbound: rand.Intn(1000),
+		FD:                  rand.Intn(1000),
+		Memory:              rand.Intn(1000),
+	}
+}
+
+func RegisterEntryFixture() flow.RegisterEntry {
+	val := make([]byte, 4)
+	_, _ = crand.Read(val)
+	return flow.RegisterEntry{
+		Key: flow.RegisterID{
+			Owner: "owner",
+			Key:   "key1",
+		},
+		Value: val,
+	}
+}
+
+func MakeOwnerReg(key string, value string) flow.RegisterEntry {
+	return flow.RegisterEntry{
+		Key: flow.RegisterID{
+			Owner: "owner",
+			Key:   key,
+		},
+		Value: []byte(value),
 	}
 }

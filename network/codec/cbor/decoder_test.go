@@ -14,15 +14,11 @@ import (
 )
 
 func TestDecoder_Decode(t *testing.T) {
-	t.Parallel()
-
 	c := cbor.NewCodec()
 
 	blockProposal := unittest.ProposalFixture()
 
 	t.Run("decodes message successfully", func(t *testing.T) {
-		t.Parallel()
-
 		var buf bytes.Buffer
 
 		err := c.NewEncoder(&buf).Encode(blockProposal)
@@ -34,8 +30,6 @@ func TestDecoder_Decode(t *testing.T) {
 	})
 
 	t.Run("returns error when data is empty", func(t *testing.T) {
-		t.Parallel()
-
 		var buf bytes.Buffer
 		// empty buffer
 
@@ -45,8 +39,6 @@ func TestDecoder_Decode(t *testing.T) {
 	})
 
 	t.Run("returns error when data is empty - nil byte", func(t *testing.T) {
-		t.Parallel()
-
 		var buf bytes.Buffer
 
 		// nil byte
@@ -58,8 +50,6 @@ func TestDecoder_Decode(t *testing.T) {
 	})
 
 	t.Run("returns error when data is empty - cbor nil", func(t *testing.T) {
-		t.Parallel()
-
 		var buf bytes.Buffer
 
 		// explicit cbor encoding of nil
@@ -72,8 +62,6 @@ func TestDecoder_Decode(t *testing.T) {
 	})
 
 	t.Run("returns error when data is empty - cbor empty []byte", func(t *testing.T) {
-		t.Parallel()
-
 		var buf bytes.Buffer
 
 		// explicit cbor encoding of an empty byte slice
@@ -86,8 +74,6 @@ func TestDecoder_Decode(t *testing.T) {
 	})
 
 	t.Run("returns error when message code is invalid", func(t *testing.T) {
-		t.Parallel()
-
 		var buf bytes.Buffer
 
 		// the first byte is the message code, the remaining bytes are the message
@@ -113,8 +99,6 @@ func TestDecoder_Decode(t *testing.T) {
 	})
 
 	t.Run("returns error when unmarshalling fails - empty", func(t *testing.T) {
-		t.Parallel()
-
 		var buf bytes.Buffer
 
 		err := cborcodec.NewCodec().NewEncoder(&buf).Encode([]byte{codec.CodeBlockProposal.Uint8()})
@@ -126,8 +110,6 @@ func TestDecoder_Decode(t *testing.T) {
 	})
 
 	t.Run("returns error when unmarshalling fails - wrong type", func(t *testing.T) {
-		t.Parallel()
-
 		// first encode the message to bytes with an incorrect type
 		var data bytes.Buffer
 		_ = data.WriteByte(codec.CodeCollectionGuarantee.Uint8())
@@ -147,8 +129,6 @@ func TestDecoder_Decode(t *testing.T) {
 	})
 
 	t.Run("returns error when unmarshalling fails - corrupt", func(t *testing.T) {
-		t.Parallel()
-
 		// first encode the message to bytes
 		var data bytes.Buffer
 		_ = data.WriteByte(codec.CodeBlockProposal.Uint8())

@@ -6,6 +6,8 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
@@ -17,8 +19,6 @@ var (
 	ErrDisconnectedBatch = errors.New("batch must be a sequence of connected blocks")
 )
 
-// OnEquivocation is a callback to report observing two different blocks with the same view.
-type OnEquivocation func(first *flow.Block, other *flow.Block)
 type BlocksByID map[flow.Identifier]*flow.Block
 
 // batchContext contains contextual data for batch of blocks. Per convention, a batch is
@@ -49,8 +49,8 @@ type Cache struct {
 	byView   map[uint64]BlocksByID          // lookup of blocks by their respective view; used to detect equivocation
 	byParent map[flow.Identifier]BlocksByID // lookup of blocks by their parentID, for finding a block's known children
 
-	onEquivocation OnEquivocation                   // when message equivocation has been detected report it using this callback
-	lowestView     counters.StrictMonotonousCounter // lowest view that the cache accepts blocks for
+	notifier   hotstuff.ProposalViolationConsumer // equivocations will be reported using this notifier
+	lowestView counters.StrictMonotonousCounter   // lowest view that the cache accepts blocks for
 }
 
 // Peek performs lookup of cached block by blockID.
@@ -66,7 +66,7 @@ func (c *Cache) Peek(blockID flow.Identifier) *flow.Block {
 }
 
 // NewCache creates new instance of Cache
-func NewCache(log zerolog.Logger, limit uint32, collector module.HeroCacheMetrics, onEquivocation OnEquivocation) *Cache {
+func NewCache(log zerolog.Logger, limit uint32, collector module.HeroCacheMetrics, notifier hotstuff.ProposalViolationConsumer) *Cache {
 	// We consume ejection event from HeroCache to here to drop ejected blocks from our secondary indices.
 	distributor := NewDistributor()
 	cache := &Cache{
@@ -78,9 +78,9 @@ func NewCache(log zerolog.Logger, limit uint32, collector module.HeroCacheMetric
 			collector,
 			herocache.WithTracer(distributor),
 		),
-		byView:         make(map[uint64]BlocksByID),
-		byParent:       make(map[flow.Identifier]BlocksByID),
-		onEquivocation: onEquivocation,
+		byView:   make(map[uint64]BlocksByID),
+		byParent: make(map[flow.Identifier]BlocksByID),
+		notifier: notifier,
 	}
 	distributor.AddConsumer(cache.handleEjectedEntity)
 	return cache
@@ -183,7 +183,7 @@ func (c *Cache) AddBlocks(batch []*flow.Block) (certifiedBatch []*flow.Block, ce
 
 	// report equivocations
 	for _, pair := range bc.equivocatingBlocks {
-		c.onEquivocation(pair[0], pair[1])
+		c.notifier.OnDoubleProposeDetected(model.BlockFromFlow(pair[0].Header), model.BlockFromFlow(pair[1].Header))
 	}
 
 	if len(certifiedBatch) < 1 {

@@ -49,11 +49,11 @@ func (b *backendBlockDetails) GetLatestBlock(_ context.Context, isSealed bool) (
 		return nil, flow.BlockStatusUnknown, status.Errorf(codes.Internal, "could not get latest block: %v", err)
 	}
 
-	status, err := b.getBlockStatus(block)
+	stat, err := b.getBlockStatus(block)
 	if err != nil {
-		return nil, status, err
+		return nil, stat, err
 	}
-	return block, status, nil
+	return block, stat, nil
 }
 
 func (b *backendBlockDetails) GetBlockByID(_ context.Context, id flow.Identifier) (*flow.Block, flow.BlockStatus, error) {
@@ -62,11 +62,11 @@ func (b *backendBlockDetails) GetBlockByID(_ context.Context, id flow.Identifier
 		return nil, flow.BlockStatusUnknown, rpc.ConvertStorageError(err)
 	}
 
-	status, err := b.getBlockStatus(block)
+	stat, err := b.getBlockStatus(block)
 	if err != nil {
-		return nil, status, err
+		return nil, stat, err
 	}
-	return block, status, nil
+	return block, stat, nil
 }
 
 func (b *backendBlockDetails) GetBlockByHeight(_ context.Context, height uint64) (*flow.Block, flow.BlockStatus, error) {
@@ -75,11 +75,11 @@ func (b *backendBlockDetails) GetBlockByHeight(_ context.Context, height uint64)
 		return nil, flow.BlockStatusUnknown, rpc.ConvertStorageError(err)
 	}
 
-	status, err := b.getBlockStatus(block)
+	stat, err := b.getBlockStatus(block)
 	if err != nil {
-		return nil, status, err
+		return nil, stat, err
 	}
-	return block, status, nil
+	return block, stat, nil
 }
 
 func (b *backendBlockDetails) getBlockStatus(block *flow.Block) (flow.BlockStatus, error) {

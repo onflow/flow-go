@@ -8,7 +8,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/encoding/ccf"
 
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -163,4 +165,177 @@ func TestDecodeCadenceValue(t *testing.T) {
 			},
 		)
 	}
+}
+
+func TestVersionBeaconEventConversion(t *testing.T) {
+	versionBoundaryType := unittest.NewNodeVersionBeaconVersionBoundaryStructType()
+	semverType := unittest.NewNodeVersionBeaconSemverStructType()
+	eventType := unittest.NewNodeVersionBeaconVersionBeaconEventType()
+
+	type vbTestCase struct {
+		name                 string
+		event                cadence.Event
+		converted            *flow.VersionBeacon
+		expectAndHandleError func(t *testing.T, err error)
+	}
+
+	runVersionBeaconTestCase := func(t *testing.T, test vbTestCase) {
+		chainID := flow.Emulator
+		t.Run(test.name, func(t *testing.T) {
+			events, err := systemcontracts.ServiceEventsForChain(chainID)
+			if err != nil {
+				panic(err)
+			}
+
+			event := unittest.EventFixture(events.VersionBeacon.EventType(), 1, 1, unittest.IdentifierFixture(), 0)
+			event.Payload, err = ccf.Encode(test.event)
+			require.NoError(t, err)
+
+			// convert Cadence types to Go types
+			serviceEvent, err := convert.ServiceEvent(chainID, event)
+
+			if test.expectAndHandleError != nil {
+				require.Error(t, err)
+				test.expectAndHandleError(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, event)
+
+			// cast event type to version beacon
+			actual, ok := serviceEvent.Event.(*flow.VersionBeacon)
+			require.True(t, ok)
+
+			require.Equal(t, test.converted, actual)
+		})
+	}
+
+	runVersionBeaconTestCase(t,
+		vbTestCase{
+			name: "with pre-release",
+			event: cadence.NewEvent(
+				[]cadence.Value{
+					// versionBoundaries
+					cadence.NewArray(
+						[]cadence.Value{
+							cadence.NewStruct(
+								[]cadence.Value{
+									// blockHeight
+									cadence.UInt64(44),
+									// version
+									cadence.NewStruct(
+										[]cadence.Value{
+											// major
+											cadence.UInt8(2),
+											// minor
+											cadence.UInt8(13),
+											// patch
+											cadence.UInt8(7),
+											// preRelease
+											cadence.NewOptional(cadence.String("test")),
+										},
+									).WithType(semverType),
+								},
+							).WithType(versionBoundaryType),
+						},
+					).WithType(cadence.NewVariableSizedArrayType(versionBoundaryType)),
+					// sequence
+					cadence.UInt64(5),
+				},
+			).WithType(eventType),
+			converted: &flow.VersionBeacon{
+				VersionBoundaries: []flow.VersionBoundary{
+					{
+						BlockHeight: 44,
+						Version:     "2.13.7-test",
+					},
+				},
+				Sequence: 5,
+			},
+		},
+	)
+
+	runVersionBeaconTestCase(t,
+		vbTestCase{
+			name: "without pre-release",
+			event: cadence.NewEvent(
+				[]cadence.Value{
+					// versionBoundaries
+					cadence.NewArray(
+						[]cadence.Value{
+							cadence.NewStruct(
+								[]cadence.Value{
+									// blockHeight
+									cadence.UInt64(44),
+									// version
+									cadence.NewStruct(
+										[]cadence.Value{
+											// major
+											cadence.UInt8(2),
+											// minor
+											cadence.UInt8(13),
+											// patch
+											cadence.UInt8(7),
+											// preRelease
+											cadence.NewOptional(nil),
+										},
+									).WithType(semverType),
+								},
+							).WithType(versionBoundaryType),
+						},
+					).WithType(cadence.NewVariableSizedArrayType(versionBoundaryType)),
+					// sequence
+					cadence.UInt64(5),
+				},
+			).WithType(eventType),
+			converted: &flow.VersionBeacon{
+				VersionBoundaries: []flow.VersionBoundary{
+					{
+						BlockHeight: 44,
+						Version:     "2.13.7",
+					},
+				},
+				Sequence: 5,
+			},
+		},
+	)
+	runVersionBeaconTestCase(t,
+		vbTestCase{
+			name: "invalid pre-release",
+			event: cadence.NewEvent(
+				[]cadence.Value{
+					// versionBoundaries
+					cadence.NewArray(
+						[]cadence.Value{
+							cadence.NewStruct(
+								[]cadence.Value{
+									// blockHeight
+									cadence.UInt64(44),
+									// version
+									cadence.NewStruct(
+										[]cadence.Value{
+											// major
+											cadence.UInt8(2),
+											// minor
+											cadence.UInt8(13),
+											// patch
+											cadence.UInt8(7),
+											// preRelease
+											cadence.NewOptional(cadence.String("/slashes.not.allowed")),
+										},
+									).WithType(semverType),
+								},
+							).WithType(versionBoundaryType),
+						},
+					).WithType(cadence.NewVariableSizedArrayType(versionBoundaryType)),
+					// sequence
+					cadence.UInt64(5),
+				},
+			).WithType(eventType),
+			expectAndHandleError: func(t *testing.T, err error) {
+				require.ErrorContains(t, err, "failed to validate pre-release")
+			},
+		},
+	)
 }

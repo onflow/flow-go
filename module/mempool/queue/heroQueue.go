@@ -19,7 +19,8 @@ type HeroQueue struct {
 	sizeLimit uint
 }
 
-func NewHeroQueue(sizeLimit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics) *HeroQueue {
+func NewHeroQueue(sizeLimit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics,
+) *HeroQueue {
 	return &HeroQueue{
 		cache: herocache.NewCache(
 			sizeLimit,

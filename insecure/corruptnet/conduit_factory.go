@@ -18,7 +18,7 @@ const networkingProtocolTCP = "tcp"
 // ConduitFactory implements a corrupt conduit factory, that creates corrupt conduits.
 type ConduitFactory struct {
 	logger           zerolog.Logger
-	adapter          network.Adapter
+	adapter          network.ConduitAdapter
 	egressController insecure.EgressController
 }
 
@@ -36,10 +36,10 @@ func NewCorruptConduitFactory(logger zerolog.Logger, chainId flow.ChainID) *Cond
 	return factory
 }
 
-// RegisterAdapter sets the Adapter component of the factory.
-// The Adapter is a wrapper around the Network layer that only exposes the set of methods
+// RegisterAdapter sets the ConduitAdapter component of the factory.
+// The ConduitAdapter is a wrapper around the Network layer that only exposes the set of methods
 // that are needed by a conduit.
-func (c *ConduitFactory) RegisterAdapter(adapter network.Adapter) error {
+func (c *ConduitFactory) RegisterAdapter(adapter network.ConduitAdapter) error {
 	if c.adapter != nil {
 		return fmt.Errorf("could not register a new network adapter, one already exists")
 	}
@@ -61,7 +61,7 @@ func (c *ConduitFactory) RegisterEgressController(controller insecure.EgressCont
 }
 
 // NewConduit creates a conduit on the specified channel.
-// Prior to creating any conduit, the factory requires an Adapter to be registered with it.
+// Prior to creating any conduit, the factory requires an ConduitAdapter to be registered with it.
 func (c *ConduitFactory) NewConduit(ctx context.Context, channel channels.Channel) (network.Conduit, error) {
 	if c.adapter == nil {
 		return nil, fmt.Errorf("could not create a new conduit, missing a registered network adapter")

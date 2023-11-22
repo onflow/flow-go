@@ -31,9 +31,3 @@ type Transaction interface {
 	// transaction is not committed.
 	Commit() (*snapshot.ExecutionSnapshot, error)
 }
-
-// TODO(patrick): implement proper transaction.
-type SerialTransaction struct {
-	state.NestedTransactionPreparer
-	*derived.DerivedTransactionData
-}

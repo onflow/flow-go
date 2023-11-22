@@ -112,7 +112,7 @@ func Test_EncodeSignerToIndicesAndSigType(t *testing.T) {
 		// create committee
 		committeeIdentities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).Sort(order.Canonical)
 		committee := committeeIdentities.NodeIDs()
-		stakingSigners, beaconSigners := sampleSigners(committee, numStakingSigners, numRandomBeaconSigners)
+		stakingSigners, beaconSigners := sampleSigners(t, committee, numStakingSigners, numRandomBeaconSigners)
 
 		// encode
 		prefixed, sigTypes, err := signature.EncodeSignerToIndicesAndSigType(committee, stakingSigners, beaconSigners)
@@ -150,7 +150,7 @@ func Test_DecodeSigTypeToStakingAndBeaconSigners(t *testing.T) {
 		// create committee
 		committeeIdentities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).Sort(order.Canonical)
 		committee := committeeIdentities.NodeIDs()
-		stakingSigners, beaconSigners := sampleSigners(committee, numStakingSigners, numRandomBeaconSigners)
+		stakingSigners, beaconSigners := sampleSigners(t, committee, numStakingSigners, numRandomBeaconSigners)
 
 		// encode
 		signerIndices, sigTypes, err := signature.EncodeSignerToIndicesAndSigType(committee, stakingSigners, beaconSigners)
@@ -276,7 +276,8 @@ func Test_EncodeSignersToIndices(t *testing.T) {
 		// create committee
 		identities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).Sort(order.Canonical)
 		committee := identities.NodeIDs()
-		signers := committee.Sample(uint(numSigners))
+		signers, err := committee.Sample(uint(numSigners))
+		require.NoError(t, err)
 
 		// encode
 		prefixed, err := signature.EncodeSignersToIndices(committee, signers)
@@ -305,7 +306,8 @@ func Test_DecodeSignerIndicesToIdentifiers(t *testing.T) {
 		// create committee
 		identities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).Sort(order.Canonical)
 		committee := identities.NodeIDs()
-		signers := committee.Sample(uint(numSigners))
+		signers, err := committee.Sample(uint(numSigners))
+		require.NoError(t, err)
 		sort.Sort(signers)
 
 		// encode
@@ -340,7 +342,8 @@ func Test_DecodeSignerIndicesToIdentities(t *testing.T) {
 
 		// create committee
 		identities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).Sort(order.Canonical)
-		signers := identities.Sample(uint(numSigners))
+		signers, err := identities.Sample(uint(numSigners))
+		require.NoError(t, err)
 
 		// encode
 		signerIndices, err := signature.EncodeSignersToIndices(identities.NodeIDs(), signers.NodeIDs())
@@ -356,6 +359,7 @@ func Test_DecodeSignerIndicesToIdentities(t *testing.T) {
 // sampleSigners takes `committee` and samples to _disjoint_ subsets
 // (`stakingSigners` and `randomBeaconSigners`) with the specified cardinality
 func sampleSigners(
+	t *rapid.T,
 	committee flow.IdentifierList,
 	numStakingSigners int,
 	numRandomBeaconSigners int,
@@ -364,9 +368,12 @@ func sampleSigners(
 		panic(fmt.Sprintf("Cannot sample %d nodes out of a committee is size %d", numStakingSigners+numRandomBeaconSigners, len(committee)))
 	}
 
-	stakingSigners = committee.Sample(uint(numStakingSigners))
+	var err error
+	stakingSigners, err = committee.Sample(uint(numStakingSigners))
+	require.NoError(t, err)
 	remaining := committee.Filter(id.Not(id.In(stakingSigners...)))
-	randomBeaconSigners = remaining.Sample(uint(numRandomBeaconSigners))
+	randomBeaconSigners, err = remaining.Sample(uint(numRandomBeaconSigners))
+	require.NoError(t, err)
 	return
 }
 

@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/evm"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/model/flow"
@@ -23,7 +25,7 @@ type ScriptProcedure struct {
 }
 
 func Script(code []byte) *ScriptProcedure {
-	scriptHash := hash.DefaultHasher.ComputeHash(code)
+	scriptHash := hash.DefaultComputeHash(code)
 
 	return &ScriptProcedure{
 		Script:         code,
@@ -57,7 +59,7 @@ func NewScriptWithContextAndArgs(
 	reqContext context.Context,
 	args ...[]byte,
 ) *ScriptProcedure {
-	scriptHash := hash.DefaultHasher.ComputeHash(code)
+	scriptHash := hash.DefaultComputeHash(code)
 	return &ScriptProcedure{
 		ID:             flow.HashToID(scriptHash),
 		Script:         code,
@@ -120,6 +122,10 @@ func newScriptExecutor(
 	proc *ScriptProcedure,
 	txnState storage.TransactionPreparer,
 ) *scriptExecutor {
+	// update `ctx.EnvironmentParams` with the script info before
+	// creating the executor
+	scriptInfo := environment.NewScriptInfoParams(proc.Script, proc.Arguments)
+	ctx.EnvironmentParams.SetScriptInfoParams(scriptInfo)
 	return &scriptExecutor{
 		ctx:      ctx,
 		proc:     proc,
@@ -193,16 +199,32 @@ func (executor *scriptExecutor) executeScript() error {
 	rt := executor.env.BorrowCadenceRuntime()
 	defer executor.env.ReturnCadenceRuntime(rt)
 
+	if executor.ctx.EVMEnabled {
+		chain := executor.ctx.Chain
+		err := evm.SetupEnvironment(
+			chain.ChainID(),
+			executor.env,
+			rt.ScriptRuntimeEnv,
+			chain.ServiceAddress(),
+			FlowTokenAddress(chain),
+		)
+		if err != nil {
+			return err
+		}
+	}
+
 	value, err := rt.ExecuteScript(
 		runtime.Script{
 			Source:    executor.proc.Script,
 			Arguments: executor.proc.Arguments,
 		},
-		common.ScriptLocation(executor.proc.ID))
+		common.ScriptLocation(executor.proc.ID),
+	)
+	populateErr := executor.output.PopulateEnvironmentValues(executor.env)
 	if err != nil {
-		return err
+		return multierror.Append(err, populateErr)
 	}
 
 	executor.output.Value = value
-	return executor.output.PopulateEnvironmentValues(executor.env)
+	return populateErr
 }

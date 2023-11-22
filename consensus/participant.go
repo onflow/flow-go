@@ -27,6 +27,7 @@ import (
 func NewParticipant(
 	log zerolog.Logger,
 	metrics module.HotstuffMetrics,
+	mempoolMetrics module.MempoolMetrics,
 	builder module.Builder,
 	finalized *flow.Header,
 	pending []*flow.Header,
@@ -101,7 +102,7 @@ func NewParticipant(
 	}
 
 	// initialize and return the event loop
-	loop, err := eventloop.NewEventLoop(log, metrics, eventHandler, cfg.StartupTime)
+	loop, err := eventloop.NewEventLoop(log, metrics, mempoolMetrics, eventHandler, cfg.StartupTime)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize event loop: %w", err)
 	}

@@ -5,6 +5,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // ProposalViolationDistributor ingests notifications about HotStuff-protocol violations and
@@ -28,7 +29,7 @@ func (d *ProposalViolationDistributor) AddProposalViolationConsumer(consumer hot
 	d.consumers = append(d.consumers, consumer)
 }
 
-func (d *ProposalViolationDistributor) OnInvalidBlockDetected(err model.InvalidProposalError) {
+func (d *ProposalViolationDistributor) OnInvalidBlockDetected(err flow.Slashable[model.InvalidProposalError]) {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
 	for _, subscriber := range d.consumers {

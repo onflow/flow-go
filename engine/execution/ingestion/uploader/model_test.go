@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -29,11 +30,22 @@ func Test_ComputationResultToBlockDataConversion(t *testing.T) {
 		assert.Equal(t, result, *blockData.TxResults[i])
 	}
 
-	// ramtin: warning returned events are not preserving orders,
-	// but since we are going to depricate this part of logic,
-	// I'm not going to spend more time fixing this mess
+	// Since returned events are not preserving orders,
+	// use map with event.ID() as key to confirm all events
+	// are included.
 	allEvents := cr.AllEvents()
 	require.Equal(t, len(allEvents), len(blockData.Events))
+
+	eventsInBlockData := make(map[flow.Identifier]flow.Event)
+	for _, e := range blockData.Events {
+		eventsInBlockData[e.ID()] = *e
+	}
+
+	for _, expectedEvent := range allEvents {
+		event, ok := eventsInBlockData[expectedEvent.ID()]
+		require.True(t, ok)
+		require.Equal(t, expectedEvent, event)
+	}
 
 	assert.Equal(t, len(expectedTrieUpdates), len(blockData.TrieUpdates))
 

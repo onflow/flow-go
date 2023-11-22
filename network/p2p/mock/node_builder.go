@@ -13,8 +13,6 @@ import (
 
 	mock "github.com/stretchr/testify/mock"
 
-	module "github.com/onflow/flow-go/module"
-
 	network "github.com/libp2p/go-libp2p/core/network"
 
 	p2p "github.com/onflow/flow-go/network/p2p"
@@ -57,13 +55,29 @@ func (_m *NodeBuilder) Build() (p2p.LibP2PNode, error) {
 	return r0, r1
 }
 
-// EnableGossipSubPeerScoring provides a mock function with given fields: _a0, _a1
-func (_m *NodeBuilder) EnableGossipSubPeerScoring(_a0 module.IdentityProvider, _a1 *p2p.PeerScoringConfig) p2p.NodeBuilder {
-	ret := _m.Called(_a0, _a1)
+// EnableGossipSubScoringWithOverride provides a mock function with given fields: _a0
+func (_m *NodeBuilder) EnableGossipSubScoringWithOverride(_a0 *p2p.PeerScoringConfigOverride) p2p.NodeBuilder {
+	ret := _m.Called(_a0)
 
 	var r0 p2p.NodeBuilder
-	if rf, ok := ret.Get(0).(func(module.IdentityProvider, *p2p.PeerScoringConfig) p2p.NodeBuilder); ok {
-		r0 = rf(_a0, _a1)
+	if rf, ok := ret.Get(0).(func(*p2p.PeerScoringConfigOverride) p2p.NodeBuilder); ok {
+		r0 = rf(_a0)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(p2p.NodeBuilder)
+		}
+	}
+
+	return r0
+}
+
+// OverrideDefaultRpcInspectorSuiteFactory provides a mock function with given fields: _a0
+func (_m *NodeBuilder) OverrideDefaultRpcInspectorSuiteFactory(_a0 p2p.GossipSubRpcInspectorSuiteFactoryFunc) p2p.NodeBuilder {
+	ret := _m.Called(_a0)
+
+	var r0 p2p.NodeBuilder
+	if rf, ok := ret.Get(0).(func(p2p.GossipSubRpcInspectorSuiteFactoryFunc) p2p.NodeBuilder); ok {
+		r0 = rf(_a0)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(p2p.NodeBuilder)
@@ -90,11 +104,11 @@ func (_m *NodeBuilder) SetBasicResolver(_a0 madns.BasicResolver) p2p.NodeBuilder
 }
 
 // SetConnectionGater provides a mock function with given fields: _a0
-func (_m *NodeBuilder) SetConnectionGater(_a0 connmgr.ConnectionGater) p2p.NodeBuilder {
+func (_m *NodeBuilder) SetConnectionGater(_a0 p2p.ConnectionGater) p2p.NodeBuilder {
 	ret := _m.Called(_a0)
 
 	var r0 p2p.NodeBuilder
-	if rf, ok := ret.Get(0).(func(connmgr.ConnectionGater) p2p.NodeBuilder); ok {
+	if rf, ok := ret.Get(0).(func(p2p.ConnectionGater) p2p.NodeBuilder); ok {
 		r0 = rf(_a0)
 	} else {
 		if ret.Get(0) != nil {
@@ -153,22 +167,6 @@ func (_m *NodeBuilder) SetGossipSubFactory(_a0 p2p.GossipSubFactoryFunc, _a1 p2p
 	return r0
 }
 
-// SetGossipSubRpcInspectorSuite provides a mock function with given fields: _a0
-func (_m *NodeBuilder) SetGossipSubRpcInspectorSuite(_a0 p2p.GossipSubInspectorSuite) p2p.NodeBuilder {
-	ret := _m.Called(_a0)
-
-	var r0 p2p.NodeBuilder
-	if rf, ok := ret.Get(0).(func(p2p.GossipSubInspectorSuite) p2p.NodeBuilder); ok {
-		r0 = rf(_a0)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(p2p.NodeBuilder)
-		}
-	}
-
-	return r0
-}
-
 // SetGossipSubScoreTracerInterval provides a mock function with given fields: _a0
 func (_m *NodeBuilder) SetGossipSubScoreTracerInterval(_a0 time.Duration) p2p.NodeBuilder {
 	ret := _m.Called(_a0)
@@ -201,38 +199,6 @@ func (_m *NodeBuilder) SetGossipSubTracer(_a0 p2p.PubSubTracer) p2p.NodeBuilder 
 	return r0
 }
 
-// SetPeerManagerOptions provides a mock function with given fields: _a0, _a1
-func (_m *NodeBuilder) SetPeerManagerOptions(_a0 bool, _a1 time.Duration) p2p.NodeBuilder {
-	ret := _m.Called(_a0, _a1)
-
-	var r0 p2p.NodeBuilder
-	if rf, ok := ret.Get(0).(func(bool, time.Duration) p2p.NodeBuilder); ok {
-		r0 = rf(_a0, _a1)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(p2p.NodeBuilder)
-		}
-	}
-
-	return r0
-}
-
-// SetRateLimiterDistributor provides a mock function with given fields: _a0
-func (_m *NodeBuilder) SetRateLimiterDistributor(_a0 p2p.UnicastRateLimiterDistributor) p2p.NodeBuilder {
-	ret := _m.Called(_a0)
-
-	var r0 p2p.NodeBuilder
-	if rf, ok := ret.Get(0).(func(p2p.UnicastRateLimiterDistributor) p2p.NodeBuilder); ok {
-		r0 = rf(_a0)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(p2p.NodeBuilder)
-		}
-	}
-
-	return r0
-}
-
 // SetResourceManager provides a mock function with given fields: _a0
 func (_m *NodeBuilder) SetResourceManager(_a0 network.ResourceManager) p2p.NodeBuilder {
 	ret := _m.Called(_a0)
@@ -255,22 +221,6 @@ func (_m *NodeBuilder) SetRoutingSystem(_a0 func(context.Context, host.Host) (ro
 
 	var r0 p2p.NodeBuilder
 	if rf, ok := ret.Get(0).(func(func(context.Context, host.Host) (routing.Routing, error)) p2p.NodeBuilder); ok {
-		r0 = rf(_a0)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(p2p.NodeBuilder)
-		}
-	}
-
-	return r0
-}
-
-// SetStreamCreationRetryInterval provides a mock function with given fields: _a0
-func (_m *NodeBuilder) SetStreamCreationRetryInterval(_a0 time.Duration) p2p.NodeBuilder {
-	ret := _m.Called(_a0)
-
-	var r0 p2p.NodeBuilder
-	if rf, ok := ret.Get(0).(func(time.Duration) p2p.NodeBuilder); ok {
 		r0 = rf(_a0)
 	} else {
 		if ret.Get(0) != nil {

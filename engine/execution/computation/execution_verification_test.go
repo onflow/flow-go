@@ -45,6 +45,10 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+const (
+	testVerifyMaxConcurrency = 2
+)
+
 var chain = flow.Emulator.Chain()
 
 // In the following tests the system transaction is expected to fail, as the epoch related things are not set up properly.
@@ -765,6 +769,9 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 	myIdentity.StakingPubKey = sk.PublicKey()
 	me := mocklocal.NewMockLocal(sk, myIdentity.ID(), t)
 
+	// used by computer to generate the prng used in the service tx
+	stateForRandomSource := testutil.ProtocolStateWithSourceFixture(nil)
+
 	blockComputer, err := computer.NewBlockComputer(
 		vm,
 		fvmContext,
@@ -774,7 +781,9 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 		ledgerCommiter,
 		me,
 		prov,
-		nil)
+		nil,
+		stateForRandomSource,
+		testVerifyMaxConcurrency)
 	require.NoError(t, err)
 
 	executableBlock := unittest.ExecutableBlockFromTransactions(chain.ChainID(), txs)
@@ -837,15 +846,17 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 			ChunkDataPack:     chdps[i],
 			EndState:          chunk.EndState,
 			TransactionOffset: offsetForChunk,
+			// returns the same RandomSource used by the computer
+			Snapshot: stateForRandomSource.AtBlockID(chunk.BlockID),
 		}
 	}
 
 	require.Len(t, vcds, len(txs)+1) // +1 for system chunk
 
 	for _, vcd := range vcds {
-		_, fault, err := verifier.Verify(vcd)
+		spockSecret, err := verifier.Verify(vcd)
 		assert.NoError(t, err)
-		assert.Nil(t, fault)
+		assert.NotNil(t, spockSecret)
 	}
 
 	return computationResult

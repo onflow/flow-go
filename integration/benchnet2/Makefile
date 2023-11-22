@@ -1,5 +1,6 @@
 # default value of the Docker base registry URL which can be overriden when invoking the Makefile
 DOCKER_REGISTRY := us-west1-docker.pkg.dev/dl-flow-benchnet-automation/benchnet
+CONFIGURATION_BUCKET := flow-benchnet-automation
 
 # default values that callers can override when calling target
 ACCESS = 1
@@ -33,7 +34,7 @@ gen-bootstrap: clone-flow
 	cd flow-go/cmd/bootstrap && go run -tags relic . keygen --machine-account --config ../../../bootstrap/conf/node-config.json -o ../../../bootstrap/keys
 	echo {} > ./bootstrap/conf/partner-stakes.json
 	mkdir ./bootstrap/partner-nodes
-	cd flow-go/cmd/bootstrap && go run -tags relic . rootblock  --root-chain bench --root-height 0 --root-parent 0000000000000000000000000000000000000000000000000000000000000000 --config ../../../bootstrap/conf/node-config.json -o ../../../bootstrap/ --fast-kg --partner-dir ../../../bootstrap/partner-nodes --partner-weights ../../../bootstrap/conf/partner-stakes.json --internal-priv-dir ../../../bootstrap/keys/private-root-information
+	cd flow-go/cmd/bootstrap && go run -tags relic . rootblock  --root-chain bench --root-height 0 --root-parent 0000000000000000000000000000000000000000000000000000000000000000 --config ../../../bootstrap/conf/node-config.json -o ../../../bootstrap/ --partner-dir ../../../bootstrap/partner-nodes --partner-weights ../../../bootstrap/conf/partner-stakes.json --internal-priv-dir ../../../bootstrap/keys/private-root-information
 	cd flow-go/cmd/bootstrap && go run -tags relic . finalize --root-commit 0000000000000000000000000000000000000000000000000000000000000000 --service-account-public-key-json "{\"PublicKey\":\"R7MTEDdLclRLrj2MI1hcp4ucgRTpR15PCHAWLM5nks6Y3H7+PGkfZTP2di2jbITooWO4DD1yqaBSAVK8iQ6i0A==\",\"SignAlgo\":2,\"HashAlgo\":1,\"SeqNumber\":0,\"Weight\":1000}" --config ../../../bootstrap/conf/node-config.json -o ../../../bootstrap/ --partner-dir ../../../bootstrap/partner-nodes --partner-weights ../../../bootstrap/conf/partner-stakes.json --collection-clusters 1 --epoch-counter 0 --epoch-length 30000 --epoch-staking-phase-length 20000 --epoch-dkg-phase-length 2000 --genesis-token-supply="1000000000.0" --protocol-version=0 --internal-priv-dir ../../../bootstrap/keys/private-root-information --dkg-data ../../../bootstrap/private-root-information/root-dkg-data.priv.json --root-block ../../../bootstrap/public-root-information/root-block.json --root-block-votes-dir ../../../bootstrap/public-root-information/root-block-votes/ --epoch-commit-safety-threshold=1000
 
 gen-helm-l1:
@@ -55,7 +56,7 @@ deploy-all: validate gen-helm-values k8s-secrets-create helm-deploy
 clean-all: validate k8s-delete k8s-delete-secrets clean-bootstrap clean-gen-helm clean-flow
 
 # target to be used in workflow as local clean up will not be needed
-remote-clean-all: validate k8s-delete-secrets k8s-delete
+remote-clean-all: validate delete-configuration k8s-delete
 
 clean-bootstrap:
 	rm -rf ./bootstrap
@@ -64,18 +65,19 @@ clean-gen-helm:
 	rm -f values.yml
 	rm -f template-data.json
 
-k8s-secrets-create:
-	bash ./create-secrets.sh ${NETWORK_ID} ${NAMESPACE}
+upload-bootstrap:
+	tar -cvf ${NETWORK_ID}.tar -C ./bootstrap .
+	gsutil cp ${NETWORK_ID}.tar gs://${CONFIGURATION_BUCKET}/${NETWORK_ID}.tar
 
 helm-deploy:
-	helm upgrade --install -f ./values.yml ${NETWORK_ID} ./flow --set ingress.enabled=true --set networkId="${NETWORK_ID}" --set owner="${OWNER}" --debug --namespace ${NAMESPACE} --wait
+	helm upgrade --install -f ./values.yml ${NETWORK_ID} ./flow --set ingress.enabled=true --set networkId="${NETWORK_ID}" --set owner="${OWNER}" --set configurationBucket="${CONFIGURATION_BUCKET}" --debug --namespace ${NAMESPACE} --wait
 
 k8s-delete:
 	helm delete ${NETWORK_ID} --namespace ${NAMESPACE}
 	kubectl delete pvc -l networkId=${NETWORK_ID} --namespace ${NAMESPACE}
 
-k8s-delete-secrets:
-	kubectl delete secrets -l networkId=${NETWORK_ID} --namespace ${NAMESPACE}
+delete-configuration:
+	gsutil rm gs://${CONFIGURATION_BUCKET}/${NETWORK_ID}.tar
 
 k8s-pod-health: validate
 	kubectl get pods --namespace ${NAMESPACE}

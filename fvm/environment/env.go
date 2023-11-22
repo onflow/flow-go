@@ -32,11 +32,12 @@ type Environment interface {
 	TransactionInfo
 
 	// ProgramLogger
-	Logger() *zerolog.Logger
+	Logger() zerolog.Logger
 	Logs() []string
 
 	// EventEmitter
 	Events() flow.EventsList
+	EmitRawEvent(etype flow.EventType, payload []byte) error
 	ServiceEvents() flow.EventsList
 	ConvertedServiceEvents() flow.ServiceEventList
 
@@ -69,6 +70,11 @@ type Environment interface {
 	// AccountInfo
 	GetAccount(address flow.Address) (*flow.Account, error)
 
+	// RandomSourceHistory is the current block's derived random source.
+	// This source is only used by the core-contract that tracks the random source
+	// history for commit-reveal schemes.
+	RandomSourceHistory() ([]byte, error)
+
 	// FlushPendingUpdates flushes pending updates from the stateful environment
 	// modules (i.e., ContractUpdater) to the state transaction, and return
 	// the updated contract keys.
@@ -97,6 +103,9 @@ type EnvironmentParams struct {
 
 	BlockInfoParams
 	TransactionInfoParams
+	ScriptInfoParams
+
+	EntropyProvider
 
 	ContractUpdaterParams
 }
@@ -113,4 +122,8 @@ func DefaultEnvironmentParams() EnvironmentParams {
 		TransactionInfoParams: DefaultTransactionInfoParams(),
 		ContractUpdaterParams: DefaultContractUpdaterParams(),
 	}
+}
+
+func (env *EnvironmentParams) SetScriptInfoParams(info *ScriptInfoParams) {
+	env.ScriptInfoParams = *info
 }

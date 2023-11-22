@@ -14,7 +14,7 @@ import (
 // QuorumCertificates implements persistent storage for quorum certificates.
 type QuorumCertificates struct {
 	db    *badger.DB
-	cache *Cache
+	cache *Cache[flow.Identifier, *flow.QuorumCertificate]
 }
 
 var _ storage.QuorumCertificates = (*QuorumCertificates)(nil)
@@ -22,15 +22,13 @@ var _ storage.QuorumCertificates = (*QuorumCertificates)(nil)
 // NewQuorumCertificates Creates QuorumCertificates instance which is a database of quorum certificates
 // which supports storing, caching and retrieving by block ID.
 func NewQuorumCertificates(collector module.CacheMetrics, db *badger.DB, cacheSize uint) *QuorumCertificates {
-	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {
-		qc := val.(*flow.QuorumCertificate)
+	store := func(_ flow.Identifier, qc *flow.QuorumCertificate) func(*transaction.Tx) error {
 		return transaction.WithTx(operation.InsertQuorumCertificate(qc))
 	}
 
-	retrieve := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
-		blockID := key.(flow.Identifier)
-		var qc flow.QuorumCertificate
-		return func(tx *badger.Txn) (interface{}, error) {
+	retrieve := func(blockID flow.Identifier) func(tx *badger.Txn) (*flow.QuorumCertificate, error) {
+		return func(tx *badger.Txn) (*flow.QuorumCertificate, error) {
+			var qc flow.QuorumCertificate
 			err := operation.RetrieveQuorumCertificate(blockID, &qc)(tx)
 			return &qc, err
 		}
@@ -38,8 +36,8 @@ func NewQuorumCertificates(collector module.CacheMetrics, db *badger.DB, cacheSi
 
 	return &QuorumCertificates{
 		db: db,
-		cache: newCache(collector, metrics.ResourceQC,
-			withLimit(cacheSize),
+		cache: newCache[flow.Identifier, *flow.QuorumCertificate](collector, metrics.ResourceQC,
+			withLimit[flow.Identifier, *flow.QuorumCertificate](cacheSize),
 			withStore(store),
 			withRetrieve(retrieve)),
 	}
@@ -61,6 +59,6 @@ func (q *QuorumCertificates) retrieveTx(blockID flow.Identifier) func(*badger.Tx
 		if err != nil {
 			return nil, err
 		}
-		return val.(*flow.QuorumCertificate), nil
+		return val, nil
 	}
 }

@@ -24,7 +24,7 @@ func getEvent() interface{} {
 
 type Suite struct {
 	suite.Suite
-	net          network.Network
+	net          network.EngineRegistry
 	targetNodeID flow.Identifier
 	proxyNet     *proxy.ProxyNetwork
 	con          *mocknetwork.Conduit

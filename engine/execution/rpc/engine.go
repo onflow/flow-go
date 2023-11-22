@@ -9,23 +9,31 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	_ "google.golang.org/grpc/encoding/gzip" // required for gRPC compression
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/engine"
+	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/deflate" // required for gRPC compression
+	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/snappy"  // required for gRPC compression
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	exeEng "github.com/onflow/flow-go/engine/execution"
+	"github.com/onflow/flow-go/engine/execution/state"
 	fvmerrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
+
+const DefaultMaxBlockRange = 300
 
 // Config defines the configurable options for the gRPC server.
 type Config struct {
@@ -98,6 +106,7 @@ func New(
 			transactionResults:   txResults,
 			commits:              commits,
 			log:                  log,
+			maxBlockRange:        DefaultMaxBlockRange,
 		},
 		server: server,
 		config: config,
@@ -157,12 +166,16 @@ type handler struct {
 	transactionResults   storage.TransactionResults
 	log                  zerolog.Logger
 	commits              storage.Commits
+	maxBlockRange        int
 }
 
-var _ execution.ExecutionAPIServer = &handler{}
+var _ execution.ExecutionAPIServer = (*handler)(nil)
 
 // Ping responds to requests when the server is up.
-func (h *handler) Ping(_ context.Context, _ *execution.PingRequest) (*execution.PingResponse, error) {
+func (h *handler) Ping(
+	_ context.Context,
+	_ *execution.PingRequest,
+) (*execution.PingResponse, error) {
 	return &execution.PingResponse{}, nil
 }
 
@@ -176,8 +189,17 @@ func (h *handler) ExecuteScriptAtBlockID(
 		return nil, err
 	}
 
+	// return a more user friendly error if block has not been executed
+	if _, err = h.commits.ByBlockID(blockID); err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, status.Errorf(codes.NotFound, "block %s has not been executed by node or was pruned", blockID)
+		}
+		return nil, status.Errorf(codes.Internal, "state commitment for block ID %s could not be retrieved", blockID)
+	}
+
 	value, err := h.engine.ExecuteScriptAtBlockID(ctx, req.GetScript(), req.GetArguments(), blockID)
 	if err != nil {
+		// todo check the error code instead
 		// return code 3 as this passes the litmus test in our context
 		return nil, status.Errorf(codes.InvalidArgument, "failed to execute script: %v", err)
 	}
@@ -214,8 +236,10 @@ func (h *handler) GetRegisterAtBlockID(
 	return res, nil
 }
 
-func (h *handler) GetEventsForBlockIDs(_ context.Context,
-	req *execution.GetEventsForBlockIDsRequest) (*execution.GetEventsForBlockIDsResponse, error) {
+func (h *handler) GetEventsForBlockIDs(
+	_ context.Context,
+	req *execution.GetEventsForBlockIDsRequest,
+) (*execution.GetEventsForBlockIDsResponse, error) {
 
 	// validate request
 	blockIDs := req.GetBlockIds()
@@ -229,6 +253,10 @@ func (h *handler) GetEventsForBlockIDs(_ context.Context,
 		return nil, err
 	}
 
+	if len(blockIDs) > h.maxBlockRange {
+		return nil, status.Errorf(codes.InvalidArgument, "too many block IDs requested: %d > %d", len(blockIDs), h.maxBlockRange)
+	}
+
 	results := make([]*execution.GetEventsForBlockIDsResponse_Result, len(blockIDs))
 
 	// collect all the events and create a EventsResponse_Result for each block
@@ -236,7 +264,7 @@ func (h *handler) GetEventsForBlockIDs(_ context.Context,
 		// Check if block has been executed
 		if _, err := h.commits.ByBlockID(bID); err != nil {
 			if errors.Is(err, storage.ErrNotFound) {
-				return nil, status.Errorf(codes.NotFound, "state commitment for block ID %s does not exist", bID)
+				return nil, status.Errorf(codes.NotFound, "block %s has not been executed by node or was pruned", bID)
 			}
 			return nil, status.Errorf(codes.Internal, "state commitment for block ID %s could not be retrieved", bID)
 		}
@@ -257,7 +285,7 @@ func (h *handler) GetEventsForBlockIDs(_ context.Context,
 
 	return &execution.GetEventsForBlockIDsResponse{
 		Results:              results,
-		EventEncodingVersion: execution.EventEncodingVersion_CCF_V0,
+		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
 	}, nil
 }
 
@@ -320,7 +348,7 @@ func (h *handler) GetTransactionResult(
 		StatusCode:           statusCode,
 		ErrorMessage:         errMsg,
 		Events:               events,
-		EventEncodingVersion: execution.EventEncodingVersion_CCF_V0,
+		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
 	}, nil
 }
 
@@ -379,7 +407,7 @@ func (h *handler) GetTransactionResultByIndex(
 		StatusCode:           statusCode,
 		ErrorMessage:         errMsg,
 		Events:               events,
-		EventEncodingVersion: execution.EventEncodingVersion_CCF_V0,
+		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
 	}, nil
 }
 
@@ -392,6 +420,15 @@ func (h *handler) GetTransactionResultsByBlockID(
 	blockID, err := convert.BlockID(reqBlockID)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid blockID: %v", err)
+	}
+
+	// must verify block was locally executed first since transactionResults.ByBlockID will return
+	// an empty slice if block does not exist
+	if _, err = h.commits.ByBlockID(blockID); err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, status.Errorf(codes.NotFound, "block %s has not been executed by node or was pruned", blockID)
+		}
+		return nil, status.Errorf(codes.Internal, "state commitment for block ID %s could not be retrieved", blockID)
 	}
 
 	// Get all tx results
@@ -456,13 +493,173 @@ func (h *handler) GetTransactionResultsByBlockID(
 	// compose a response
 	return &execution.GetTransactionResultsResponse{
 		TransactionResults:   responseTxResults,
-		EventEncodingVersion: execution.EventEncodingVersion_CCF_V0,
+		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
+	}, nil
+}
+
+// GetTransactionErrorMessage implements a grpc handler for getting a transaction error message by block ID and tx ID.
+// Expected error codes during normal operations:
+// - codes.InvalidArgument - invalid blockID, tx ID.
+// - codes.NotFound - transaction result by tx ID not found.
+func (h *handler) GetTransactionErrorMessage(
+	_ context.Context,
+	req *execution.GetTransactionErrorMessageRequest,
+) (*execution.GetTransactionErrorMessageResponse, error) {
+	reqBlockID := req.GetBlockId()
+	blockID, err := convert.BlockID(reqBlockID)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid blockID: %v", err)
+	}
+
+	reqTxID := req.GetTransactionId()
+	txID, err := convert.TransactionID(reqTxID)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid transactionID: %v", err)
+	}
+
+	// lookup any transaction error that might have occurred
+	txResult, err := h.transactionResults.ByBlockIDTransactionID(blockID, txID)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, status.Error(codes.NotFound, "transaction result not found")
+		}
+
+		return nil, status.Errorf(codes.Internal, "failed to get transaction result: %v", err)
+	}
+
+	result := &execution.GetTransactionErrorMessageResponse{
+		TransactionId: convert.IdentifierToMessage(txResult.TransactionID),
+	}
+
+	if len(txResult.ErrorMessage) > 0 {
+		cadenceErrMessage := txResult.ErrorMessage
+		if !utf8.ValidString(cadenceErrMessage) {
+			h.log.Warn().
+				Str("block_id", blockID.String()).
+				Str("transaction_id", txID.String()).
+				Str("error_mgs", fmt.Sprintf("%q", cadenceErrMessage)).
+				Msg("invalid character in Cadence error message")
+			// convert non UTF-8 string to a UTF-8 string for safe GRPC marshaling
+			cadenceErrMessage = strings.ToValidUTF8(txResult.ErrorMessage, "?")
+		}
+		result.ErrorMessage = cadenceErrMessage
+	}
+	return result, nil
+}
+
+// GetTransactionErrorMessageByIndex implements a grpc handler for getting a transaction error message by block ID and tx index.
+// Expected error codes during normal operations:
+// - codes.InvalidArgument - invalid blockID.
+// - codes.NotFound - transaction result at index not found.
+func (h *handler) GetTransactionErrorMessageByIndex(
+	_ context.Context,
+	req *execution.GetTransactionErrorMessageByIndexRequest,
+) (*execution.GetTransactionErrorMessageResponse, error) {
+	reqBlockID := req.GetBlockId()
+	blockID, err := convert.BlockID(reqBlockID)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid blockID: %v", err)
+	}
+
+	index := req.GetIndex()
+
+	// lookup any transaction error that might have occurred
+	txResult, err := h.transactionResults.ByBlockIDTransactionIndex(blockID, index)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, status.Error(codes.NotFound, "transaction result not found")
+		}
+
+		return nil, status.Errorf(codes.Internal, "failed to get transaction result: %v", err)
+	}
+
+	result := &execution.GetTransactionErrorMessageResponse{
+		TransactionId: convert.IdentifierToMessage(txResult.TransactionID),
+	}
+
+	if len(txResult.ErrorMessage) > 0 {
+		cadenceErrMessage := txResult.ErrorMessage
+		if !utf8.ValidString(cadenceErrMessage) {
+			h.log.Warn().
+				Str("block_id", blockID.String()).
+				Str("transaction_id", txResult.TransactionID.String()).
+				Str("error_mgs", fmt.Sprintf("%q", cadenceErrMessage)).
+				Msg("invalid character in Cadence error message")
+			// convert non UTF-8 string to a UTF-8 string for safe GRPC marshaling
+			cadenceErrMessage = strings.ToValidUTF8(txResult.ErrorMessage, "?")
+		}
+		result.ErrorMessage = cadenceErrMessage
+	}
+	return result, nil
+}
+
+// GetTransactionErrorMessagesByBlockID implements a grpc handler for getting transaction error messages by block ID.
+// Only failed transactions will be returned.
+// Expected error codes during normal operations:
+// - codes.InvalidArgument - invalid blockID.
+// - codes.NotFound - block was not executed or was pruned.
+func (h *handler) GetTransactionErrorMessagesByBlockID(
+	_ context.Context,
+	req *execution.GetTransactionErrorMessagesByBlockIDRequest,
+) (*execution.GetTransactionErrorMessagesResponse, error) {
+	reqBlockID := req.GetBlockId()
+	blockID, err := convert.BlockID(reqBlockID)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid blockID: %v", err)
+	}
+
+	// must verify block was locally executed first since transactionResults.ByBlockID will return
+	// an empty slice if block does not exist
+	if _, err = h.commits.ByBlockID(blockID); err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, status.Errorf(codes.NotFound, "block %s has not been executed by node or was pruned", blockID)
+		}
+		return nil, status.Errorf(codes.Internal, "state commitment for block ID %s could not be retrieved", blockID)
+	}
+
+	// Get all tx results
+	txResults, err := h.transactionResults.ByBlockID(blockID)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, status.Error(codes.NotFound, "transaction results not found")
+		}
+
+		return nil, status.Errorf(codes.Internal, "failed to get transaction results: %v", err)
+	}
+
+	var results []*execution.GetTransactionErrorMessagesResponse_Result
+	for index, txResult := range txResults {
+		if len(txResult.ErrorMessage) == 0 {
+			continue
+		}
+		txIndex := uint32(index)
+		cadenceErrMessage := txResult.ErrorMessage
+		if !utf8.ValidString(cadenceErrMessage) {
+			h.log.Warn().
+				Str("block_id", blockID.String()).
+				Uint32("index", txIndex).
+				Str("error_mgs", fmt.Sprintf("%q", cadenceErrMessage)).
+				Msg("invalid character in Cadence error message")
+			// convert non UTF-8 string to a UTF-8 string for safe GRPC marshaling
+			cadenceErrMessage = strings.ToValidUTF8(txResult.ErrorMessage, "?")
+		}
+		results = append(results, &execution.GetTransactionErrorMessagesResponse_Result{
+			TransactionId: convert.IdentifierToMessage(txResult.TransactionID),
+			Index:         txIndex,
+			ErrorMessage:  cadenceErrMessage,
+		})
+	}
+
+	return &execution.GetTransactionErrorMessagesResponse{
+		Results: results,
 	}, nil
 }
 
 // eventResult creates EventsResponse_Result from flow.Event for the given blockID
-func (h *handler) eventResult(blockID flow.Identifier,
-	flowEvents []flow.Event) (*execution.GetEventsForBlockIDsResponse_Result, error) {
+func (h *handler) eventResult(
+	blockID flow.Identifier,
+	flowEvents []flow.Event,
+) (*execution.GetEventsForBlockIDsResponse_Result, error) {
 
 	// convert events to event message
 	events := convert.EventsToMessages(flowEvents)
@@ -496,14 +693,28 @@ func (h *handler) GetAccountAtBlockID(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
+	// return a more user friendly error if block has not been executed
+	if _, err = h.commits.ByBlockID(blockFlowID); err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, status.Errorf(codes.NotFound, "block %s has not been executed by node or was pruned", blockFlowID)
+		}
+		return nil, status.Errorf(codes.Internal, "state commitment for block ID %s could not be retrieved", blockFlowID)
+	}
+
 	value, err := h.engine.GetAccount(ctx, flowAddress, blockFlowID)
-	if errors.Is(err, storage.ErrNotFound) {
-		return nil, status.Errorf(codes.NotFound, "account with address %s not found", flowAddress)
-	}
-	if fvmerrors.IsAccountNotFoundError(err) {
-		return nil, status.Errorf(codes.NotFound, "account not found")
-	}
 	if err != nil {
+		if errors.Is(err, state.ErrExecutionStatePruned) {
+			return nil, status.Errorf(codes.OutOfRange, "state for block ID %s not available", blockFlowID)
+		}
+		if errors.Is(err, state.ErrNotExecuted) {
+			return nil, status.Errorf(codes.NotFound, "block %s has not been executed by node or was pruned", blockFlowID)
+		}
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, status.Errorf(codes.NotFound, "block %s not found", blockFlowID)
+		}
+		if fvmerrors.IsAccountNotFoundError(err) {
+			return nil, status.Errorf(codes.NotFound, "account not found")
+		}
 		return nil, status.Errorf(codes.Internal, "failed to get account: %v", err)
 	}
 
@@ -540,7 +751,10 @@ func (h *handler) GetLatestBlockHeader(
 		header, err = h.state.Final().Head()
 	}
 	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "not found: %v", err)
+		// this header MUST exist in the db, otherwise the node likely has inconsistent state.
+		// Don't crash as a result of an external API request, but other components will likely panic.
+		h.log.Err(err).Msg("failed to get latest block header. potentially inconsistent protocol state.")
+		return nil, status.Errorf(codes.Internal, "unable to get latest header: %v", err)
 	}
 
 	return h.blockHeaderResponse(header)

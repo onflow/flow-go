@@ -87,7 +87,7 @@ type Engine struct {
 // New creates a new access ingestion engine
 func New(
 	log zerolog.Logger,
-	net network.Network,
+	net network.EngineRegistry,
 	state protocol.State,
 	me module.Local,
 	request module.Requester,

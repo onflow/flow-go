@@ -11,10 +11,12 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/config"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
-	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
+	"github.com/onflow/flow-go/network/netconf"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/utils"
@@ -54,8 +56,10 @@ var isNotProtected = fun{
 func TestConnectionManagerProtection(t *testing.T) {
 
 	log := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
+	flowConfig, err := config.DefaultConfig()
+	require.NoError(t, err)
 	noopMetrics := metrics.NewNoopCollector()
-	connManager, err := connection.NewConnManager(log, noopMetrics, connection.DefaultConnManagerConfig())
+	connManager, err := connection.NewConnManager(log, noopMetrics, &flowConfig.NetworkConfig.ConnectionManagerConfig)
 	require.NoError(t, err)
 
 	testCases := [][]fun{
@@ -102,7 +106,7 @@ func TestConnectionManager_Watermarking(t *testing.T) {
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	defer cancel()
 
-	cfg := &connection.ManagerConfig{
+	cfg := &netconf.ConnectionManagerConfig{
 		HighWatermark: 4,                      // whenever the number of connections exceeds 4, connection manager prune connections.
 		LowWatermark:  2,                      // connection manager prune connections until the number of connections is 2.
 		GracePeriod:   500 * time.Millisecond, // extra connections will be pruned if they are older than a second (just for testing).
@@ -113,25 +117,25 @@ func TestConnectionManager_Watermarking(t *testing.T) {
 		metrics.NewNoopCollector(),
 		cfg)
 	require.NoError(t, err)
-	idProvider := mockmodule.NewIdentityProvider(t)
+	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
 	thisNode, identity := p2ptest.NodeFixture(
 		t,
 		sporkId,
 		t.Name(),
 		idProvider,
 		p2ptest.WithConnectionManager(thisConnMgr))
-	idProvider.On("ByPeerID", thisNode.Host().ID()).Return(&identity, true).Maybe()
+	idProvider.SetIdentities(flow.IdentityList{&identity})
 
 	otherNodes, _ := p2ptest.NodesFixture(t, sporkId, t.Name(), 5, idProvider)
 
 	nodes := append(otherNodes, thisNode)
 
-	p2ptest.StartNodes(t, signalerCtx, nodes, 100*time.Millisecond)
-	defer p2ptest.StopNodes(t, nodes, cancel, 100*time.Millisecond)
+	p2ptest.StartNodes(t, signalerCtx, nodes)
+	defer p2ptest.StopNodes(t, nodes, cancel)
 
 	// connect this node to all other nodes.
 	for _, otherNode := range otherNodes {
-		require.NoError(t, thisNode.Host().Connect(ctx, otherNode.Host().Peerstore().PeerInfo(otherNode.Host().ID())))
+		require.NoError(t, thisNode.Host().Connect(ctx, otherNode.Host().Peerstore().PeerInfo(otherNode.ID())))
 	}
 
 	// ensures this node is connected to all other nodes (based on the number of connections).
@@ -149,8 +153,8 @@ func TestConnectionManager_Watermarking(t *testing.T) {
 
 	// connects this node to one of the other nodes that is pruned by connection manager.
 	for _, otherNode := range otherNodes {
-		if len(thisNode.Host().Network().ConnsToPeer(otherNode.Host().ID())) == 0 {
-			require.NoError(t, thisNode.Host().Connect(ctx, otherNode.Host().Peerstore().PeerInfo(otherNode.Host().ID())))
+		if len(thisNode.Host().Network().ConnsToPeer(otherNode.ID())) == 0 {
+			require.NoError(t, thisNode.Host().Connect(ctx, otherNode.Host().Peerstore().PeerInfo(otherNode.ID())))
 			break // we only need to connect to one node.
 		}
 	}

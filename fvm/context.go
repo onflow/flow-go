@@ -28,6 +28,7 @@ type Context struct {
 	// DisableMemoryAndInteractionLimits will override memory and interaction
 	// limits and set them to MaxUint64, effectively disabling these limits.
 	DisableMemoryAndInteractionLimits bool
+	EVMEnabled                        bool
 	ComputationLimit                  uint64
 	MemoryLimit                       uint64
 	MaxStateKeySize                   uint64
@@ -160,10 +161,19 @@ func WithEventCollectionSizeLimit(limit uint64) Option {
 	}
 }
 
+// WithEntropyProvider sets the entropy provider of a virtual machine context.
+//
+// The VM uses the input to provide entropy to the Cadence runtime randomness functions.
+func WithEntropyProvider(source environment.EntropyProvider) Option {
+	return func(ctx Context) Context {
+		ctx.EntropyProvider = source
+		return ctx
+	}
+}
+
 // WithBlockHeader sets the block header for a virtual machine context.
 //
-// The VM uses the header to provide current block information to the Cadence runtime,
-// as well as to seed the pseudorandom number generator.
+// The VM uses the header to provide current block information to the Cadence runtime.
 func WithBlockHeader(header *flow.Header) Option {
 	return func(ctx Context) Context {
 		ctx.BlockHeader = header
@@ -321,6 +331,15 @@ func WithTransactionFeesEnabled(enabled bool) Option {
 	}
 }
 
+// WithRandomSourceHistoryCallAllowed enables or disables calling the `entropy` function
+// within cadence
+func WithRandomSourceHistoryCallAllowed(allowed bool) Option {
+	return func(ctx Context) Context {
+		ctx.RandomSourceHistoryCallAllowed = allowed
+		return ctx
+	}
+}
+
 // WithReusableCadenceRuntimePool set the (shared) RedusableCadenceRuntimePool
 // use for creating the cadence runtime.
 func WithReusableCadenceRuntimePool(
@@ -345,6 +364,14 @@ func WithDerivedBlockData(derivedBlockData *derived.DerivedBlockData) Option {
 func WithEventEncoder(encoder environment.EventEncoder) Option {
 	return func(ctx Context) Context {
 		ctx.EventEncoder = encoder
+		return ctx
+	}
+}
+
+// WithEVMEnabled enables access to the evm environment
+func WithEVMEnabled(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.EVMEnabled = enabled
 		return ctx
 	}
 }

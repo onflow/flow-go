@@ -23,7 +23,7 @@ func TestRateLimiter_Allow(t *testing.T) {
 	require.NoError(t, err)
 
 	// setup rate limiter
-	rateLimiter := NewRateLimiter(limit, burst, 1)
+	rateLimiter := NewRateLimiter(limit, burst, time.Second)
 
 	require.True(t, rateLimiter.Allow(peerID, 0))
 
@@ -49,7 +49,7 @@ func TestRateLimiter_IsRateLimited(t *testing.T) {
 	require.NoError(t, err)
 
 	// setup rate limiter
-	rateLimiter := NewRateLimiter(limit, burst, 1)
+	rateLimiter := NewRateLimiter(limit, burst, time.Second)
 
 	require.False(t, rateLimiter.IsRateLimited(peerID))
 	require.True(t, rateLimiter.Allow(peerID, 0))

@@ -23,11 +23,11 @@
 /module/chunking/** @ramtinms
 /integration/tests/verification @ramtinms @yhassanzadeh13
 
-# Ledger Stream 
+# Ledger Stream
 /ledger/** @ramtinms @AlexHentschel
 
-# FVM Stream 
-/fvm/**  @ramtinms @janezpodhostnik @pattyshack
+# FVM Stream
+/fvm/**  @ramtinms @janezpodhostnik
 
 # Networking Stream
 /network/** @yhassanzadeh13
@@ -45,10 +45,7 @@
 /tools/test_monitor/** @gomisha
 
 # Performance Stream
-/integration/benchmark/** @SaveTheRbtz @gomisha
-/integration/localnet/** @SaveTheRbtz
-/module/profiler/** @SaveTheRbtz @pattyshack
-/module/tracer.go @SaveTheRbtz @pattyshack
+/integration/benchmark/** @gomisha
 
 # Execution Sync
 /module/executiondatasync/** @peterargue

@@ -17,7 +17,7 @@ type BlockRequester interface {
 	// RequestHeight indicates that the given block height should be queued for retrieval.
 	RequestHeight(height uint64)
 
-	// Manually Prune requests
+	// Prune manually prunes requests
 	Prune(final *flow.Header)
 }
 

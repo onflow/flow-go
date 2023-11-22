@@ -62,7 +62,7 @@ func NewTimeoutAggregator(log zerolog.Logger,
 ) (hotstuff.TimeoutAggregator, error) {
 
 	timeoutCollectorFactory := timeoutcollector.NewTimeoutCollectorFactory(log, distributor, timeoutProcessorFactory)
-	collectors := timeoutaggregator.NewTimeoutCollectors(log, lowestRetainedView, timeoutCollectorFactory)
+	collectors := timeoutaggregator.NewTimeoutCollectors(log, hotstuffMetrics, lowestRetainedView, timeoutCollectorFactory)
 
 	// initialize the timeout aggregator
 	aggregator, err := timeoutaggregator.NewTimeoutAggregator(

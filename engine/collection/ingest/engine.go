@@ -46,7 +46,7 @@ type Engine struct {
 // New creates a new collection ingest engine.
 func New(
 	log zerolog.Logger,
-	net network.Network,
+	net network.EngineRegistry,
 	state protocol.State,
 	engMetrics module.EngineMetrics,
 	mempoolMetrics module.MempoolMetrics,

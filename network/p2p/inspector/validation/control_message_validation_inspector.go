@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/go-playground/validator/v10"
+	"github.com/hashicorp/go-multierror"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -16,10 +18,13 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/util"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/inspector/internal/cache"
+	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
+	"github.com/onflow/flow-go/network/p2p/p2pconf"
+	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/utils/logging"
@@ -31,15 +36,16 @@ import (
 type ControlMsgValidationInspector struct {
 	component.Component
 	events.Noop
+	ctx     irrecoverable.SignalerContext
 	logger  zerolog.Logger
 	sporkID flow.Identifier
 	metrics module.GossipSubRpcValidationInspectorMetrics
 	// config control message validation configurations.
-	config *ControlMsgValidationInspectorConfig
+	config *p2pconf.GossipSubRPCValidationInspectorConfigs
 	// distributor used to disseminate invalid RPC message notifications.
 	distributor p2p.GossipSubInspectorNotifDistributor
-	// workerPool queue that stores *InspectMsgRequest that will be processed by component workers.
-	workerPool *worker.Pool[*InspectMsgRequest]
+	// workerPool queue that stores *InspectRPCRequest that will be processed by component workers.
+	workerPool *worker.Pool[*InspectRPCRequest]
 	// tracker is a map that associates the hash of a peer's ID with the
 	// number of cluster-prefix topic control messages received from that peer. It helps in tracking
 	// and managing the rate of incoming control messages from each peer, ensuring that the system
@@ -50,81 +56,102 @@ type ControlMsgValidationInspector struct {
 	// In such cases, the inspector will allow a configured number of these messages from the corresponding peer.
 	tracker    *cache.ClusterPrefixedMessagesReceivedTracker
 	idProvider module.IdentityProvider
+	rpcTracker p2p.RpcControlTracking
+	// networkingType indicates public or private network, rpc publish messages are inspected for unstaked senders when running the private network.
+	networkingType network.NetworkingType
+	// topicOracle callback used to retrieve the current subscribed topics of the libp2p node.
+	topicOracle func() p2p.TopicProvider
+}
+
+type InspectorParams struct {
+	// Logger the logger used by the inspector.
+	Logger zerolog.Logger `validate:"required"`
+	// SporkID the current spork ID.
+	SporkID flow.Identifier `validate:"required"`
+	// Config inspector configuration.
+	Config *p2pconf.GossipSubRPCValidationInspectorConfigs `validate:"required"`
+	// Distributor gossipsub inspector notification distributor.
+	Distributor p2p.GossipSubInspectorNotifDistributor `validate:"required"`
+	// HeroCacheMetricsFactory the metrics factory.
+	HeroCacheMetricsFactory metrics.HeroCacheMetricsFactory `validate:"required"`
+	// IdProvider identity provider is used to get the flow identifier for a peer.
+	IdProvider module.IdentityProvider `validate:"required"`
+	// InspectorMetrics metrics for the validation inspector.
+	InspectorMetrics module.GossipSubRpcValidationInspectorMetrics `validate:"required"`
+	// RpcTracker tracker used to track iHave RPC's sent and last size.
+	RpcTracker p2p.RpcControlTracking `validate:"required"`
+	// NetworkingType the networking type of the node.
+	NetworkingType network.NetworkingType `validate:"required"`
+	// TopicOracle callback used to retrieve the current subscribed topics of the libp2p node.
+	// It is set as a callback to avoid circular dependencies between the topic oracle and the inspector.
+	TopicOracle func() p2p.TopicProvider `validate:"required"`
 }
 
 var _ component.Component = (*ControlMsgValidationInspector)(nil)
-var _ p2p.GossipSubRPCInspector = (*ControlMsgValidationInspector)(nil)
+var _ p2p.GossipSubMsgValidationRpcInspector = (*ControlMsgValidationInspector)(nil)
 var _ protocol.Consumer = (*ControlMsgValidationInspector)(nil)
 
 // NewControlMsgValidationInspector returns new ControlMsgValidationInspector
 // Args:
-//   - logger: the logger used by the inspector.
-//   - sporkID: the current spork ID.
-//   - config: inspector configuration.
-//   - distributor: gossipsub inspector notification distributor.
-//   - clusterPrefixedCacheCollector: metrics collector for the underlying cluster prefix received tracker cache.
-//   - idProvider: identity provider is used to get the flow identifier for a peer.
+//   - *InspectorParams: params used to create the inspector.
 //
 // Returns:
 //   - *ControlMsgValidationInspector: a new control message validation inspector.
 //   - error: an error if there is any error while creating the inspector. All errors are irrecoverable and unexpected.
-func NewControlMsgValidationInspector(
-	logger zerolog.Logger,
-	sporkID flow.Identifier,
-	config *ControlMsgValidationInspectorConfig,
-	distributor p2p.GossipSubInspectorNotifDistributor,
-	clusterPrefixedCacheCollector module.HeroCacheMetrics,
-	idProvider module.IdentityProvider,
-	inspectorMetrics module.GossipSubRpcValidationInspectorMetrics) (*ControlMsgValidationInspector, error) {
-	lg := logger.With().Str("component", "gossip_sub_rpc_validation_inspector").Logger()
+func NewControlMsgValidationInspector(params *InspectorParams) (*ControlMsgValidationInspector, error) {
+	err := validator.New().Struct(params)
+	if err != nil {
+		return nil, fmt.Errorf("inspector params validation failed: %w", err)
+	}
+	lg := params.Logger.With().Str("component", "gossip_sub_rpc_validation_inspector").Logger()
 
-	tracker, err := cache.NewClusterPrefixedMessagesReceivedTracker(logger, config.ClusterPrefixedControlMsgsReceivedCacheSize, clusterPrefixedCacheCollector, config.ClusterPrefixedControlMsgsReceivedCacheDecay)
+	inspectMsgQueueCacheCollector := metrics.GossipSubRPCInspectorQueueMetricFactory(params.HeroCacheMetricsFactory, params.NetworkingType)
+	clusterPrefixedCacheCollector := metrics.GossipSubRPCInspectorClusterPrefixedCacheMetricFactory(params.HeroCacheMetricsFactory, params.NetworkingType)
+
+	clusterPrefixedTracker, err := cache.NewClusterPrefixedMessagesReceivedTracker(params.Logger,
+		params.Config.ClusterPrefixedControlMsgsReceivedCacheSize,
+		clusterPrefixedCacheCollector,
+		params.Config.ClusterPrefixedControlMsgsReceivedCacheDecay)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cluster prefix topics received tracker")
 	}
 
+	if params.Config.RpcMessageMaxSampleSize < params.Config.RpcMessageErrorThreshold {
+		return nil, fmt.Errorf("rpc message max sample size must be greater than or equal to rpc message error threshold, got %d and %d respectively",
+			params.Config.RpcMessageMaxSampleSize,
+			params.Config.RpcMessageErrorThreshold)
+	}
+
 	c := &ControlMsgValidationInspector{
-		logger:      lg,
-		sporkID:     sporkID,
-		config:      config,
-		distributor: distributor,
-		tracker:     tracker,
-		idProvider:  idProvider,
-		metrics:     inspectorMetrics,
+		logger:         lg,
+		sporkID:        params.SporkID,
+		config:         params.Config,
+		distributor:    params.Distributor,
+		tracker:        clusterPrefixedTracker,
+		rpcTracker:     params.RpcTracker,
+		idProvider:     params.IdProvider,
+		metrics:        params.InspectorMetrics,
+		networkingType: params.NetworkingType,
+		topicOracle:    params.TopicOracle,
 	}
 
-	cfg := &queue.HeroStoreConfig{
-		SizeLimit: DefaultControlMsgValidationInspectorQueueCacheSize,
-		Collector: metrics.NewNoopCollector(),
-	}
+	store := queue.NewHeroStore(params.Config.CacheSize, params.Logger, inspectMsgQueueCacheCollector)
 
-	for _, opt := range config.InspectMsgStoreOpts {
-		opt(cfg)
-	}
-
-	store := queue.NewHeroStore(cfg.SizeLimit, logger, cfg.Collector)
-	pool := worker.NewWorkerPoolBuilder[*InspectMsgRequest](lg, store, c.processInspectMsgReq).Build()
+	pool := worker.NewWorkerPoolBuilder[*InspectRPCRequest](lg, store, c.processInspectRPCReq).Build()
 
 	c.workerPool = pool
 
 	builder := component.NewComponentManagerBuilder()
 	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-		distributor.Start(ctx)
+		c.ctx = ctx
+		c.distributor.Start(ctx)
 		select {
 		case <-ctx.Done():
-		case <-distributor.Ready():
+		case <-c.distributor.Ready():
 			ready()
 		}
-		<-distributor.Done()
+		<-c.distributor.Done()
 	})
-	// start rate limiters cleanup loop in workers
-	for _, conf := range c.config.allCtrlMsgValidationConfig() {
-		validationConfig := conf
-		builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			ready()
-			validationConfig.RateLimiter.Start(ctx)
-		})
-	}
 	for i := 0; i < c.config.NumberOfWorkers; i++ {
 		builder.AddWorker(pool.WorkerLogic())
 	}
@@ -132,69 +159,11 @@ func NewControlMsgValidationInspector(
 	return c, nil
 }
 
-// Inspect is called by gossipsub upon reception of an rpc from a remote node.
-// It examines the provided message to ensure it adheres to the expected
-// format and conventions. If the message passes validation, the method returns
-// a nil error. If an issue is found, the method returns an error detailing
-// the specific issue encountered.
-// The returned error can be of two types:
-//  1. Expected errors: These are issues that are expected to occur during normal
-//     operation, such as invalid messages or messages that don't follow the
-//     conventions. These errors should be handled gracefully by the caller.
-//  2. Exceptions: These are unexpected issues, such as internal system errors
-//     or misconfigurations, that may require immediate attention or a change in
-//     the system's behavior. The caller should log and handle these errors
-//     accordingly.
-//
-// The returned error is returned to the gossipsub node which causes the rejection of rpc (for non-nil errors).
-func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) error {
-	control := rpc.GetControl()
-	for _, ctrlMsgType := range p2p.ControlMessageTypes() {
-		lg := c.logger.With().
-			Str("peer_id", from.String()).
-			Str("ctrl_msg_type", string(ctrlMsgType)).Logger()
-		validationConfig, ok := c.config.getCtrlMsgValidationConfig(ctrlMsgType)
-		if !ok {
-			lg.Trace().Msg("validation configuration for control type does not exists skipping")
-			continue
-		}
-
-		switch ctrlMsgType {
-		case p2p.CtrlMsgGraft, p2p.CtrlMsgPrune:
-			// normal pre-processing
-			err := c.blockingPreprocessingRpc(from, validationConfig, control)
-			if err != nil {
-				lg.Error().
-					Err(err).
-					Msg("could not pre-process rpc, aborting")
-				return fmt.Errorf("could not pre-process rpc, aborting: %w", err)
-			}
-		case p2p.CtrlMsgIHave:
-			// iHave specific pre-processing
-			sampleSize := util.SampleN(len(control.GetIhave()), validationConfig.IHaveInspectionMaxSampleSize, validationConfig.IHaveSyncInspectSampleSizePercentage)
-			err := c.blockingIHaveSamplePreprocessing(from, validationConfig, control, sampleSize)
-			if err != nil {
-				lg.Error().
-					Err(err).
-					Msg("could not pre-process rpc, aborting")
-				return fmt.Errorf("could not pre-process rpc, aborting: %w", err)
-			}
-		}
-
-		// queue further async inspection
-		req, err := NewInspectMsgRequest(from, validationConfig, control)
-		if err != nil {
-			lg.Error().
-				Err(err).
-				Str("peer_id", from.String()).
-				Str("ctrl_msg_type", string(ctrlMsgType)).
-				Msg("failed to get inspect message request")
-			return fmt.Errorf("failed to get inspect message request: %w", err)
-		}
-		c.workerPool.Submit(req)
+func (c *ControlMsgValidationInspector) Start(parent irrecoverable.SignalerContext) {
+	if c.topicOracle == nil {
+		parent.Throw(fmt.Errorf("control message validation inspector topic oracle not set"))
 	}
-
-	return nil
+	c.Component.Start(parent)
 }
 
 // Name returns the name of the rpc inspector.
@@ -202,280 +171,509 @@ func (c *ControlMsgValidationInspector) Name() string {
 	return rpcInspectorComponentName
 }
 
-// ClusterIdsUpdated consumes cluster ID update protocol events.
+// ActiveClustersChanged consumes cluster ID update protocol events.
 func (c *ControlMsgValidationInspector) ActiveClustersChanged(clusterIDList flow.ChainIDList) {
 	c.tracker.StoreActiveClusterIds(clusterIDList)
 }
 
-// blockingPreprocessingRpc ensures the RPC control message count does not exceed the configured discard threshold.
-// Expected error returns during normal operations:
-//   - ErrDiscardThreshold: if control message count exceeds the configured discard threshold.
+// Inspect is called by gossipsub upon reception of a rpc from a remote  node.
+// It creates a new InspectRPCRequest for the RPC to be inspected async by the worker pool.
+// Args:
+//   - from: the sender.
+//   - rpc: the control message RPC.
 //
-// blockingPreprocessingRpc generic pre-processing validation func that ensures the RPC control message count does not exceed the configured hard threshold.
-func (c *ControlMsgValidationInspector) blockingPreprocessingRpc(from peer.ID, validationConfig *CtrlMsgValidationConfig, controlMessage *pubsub_pb.ControlMessage) error {
-	if validationConfig.ControlMsg != p2p.CtrlMsgGraft && validationConfig.ControlMsg != p2p.CtrlMsgPrune {
-		return fmt.Errorf("unexpected control message type %s encountered during blocking pre-processing rpc, expected %s or %s", validationConfig.ControlMsg, p2p.CtrlMsgGraft, p2p.CtrlMsgPrune)
-	}
-	count := c.getCtrlMsgCount(validationConfig.ControlMsg, controlMessage)
-	lg := c.logger.With().
-		Uint64("ctrl_msg_count", count).
-		Str("peer_id", from.String()).
-		Str("ctrl_msg_type", string(validationConfig.ControlMsg)).Logger()
-
-	c.metrics.BlockingPreProcessingStarted(validationConfig.ControlMsg.String(), uint(count))
-	start := time.Now()
-	defer func() {
-		c.metrics.BlockingPreProcessingFinished(validationConfig.ControlMsg.String(), uint(count), time.Since(start))
-	}()
-
-	// if Count greater than hard threshold drop message and penalize
-	if count > validationConfig.HardThreshold {
-		hardThresholdErr := NewHardThresholdErr(validationConfig.ControlMsg, count, validationConfig.HardThreshold)
-		lg.Warn().
-			Err(hardThresholdErr).
-			Uint64("upper_threshold", hardThresholdErr.hardThreshold).
-			Bool(logging.KeySuspicious, true).
-			Msg("rejecting rpc control message")
-		err := c.distributor.Distribute(p2p.NewInvalidControlMessageNotification(from, validationConfig.ControlMsg, count, hardThresholdErr))
-		if err != nil {
-			lg.Error().
-				Err(err).
-				Bool(logging.KeySuspicious, true).
-				Msg("failed to distribute invalid control message notification")
-			return err
-		}
-		return hardThresholdErr
-	}
-
-	return nil
-}
-
-// blockingPreprocessingSampleRpc blocking pre-processing of a sample of iHave control messages.
-func (c *ControlMsgValidationInspector) blockingIHaveSamplePreprocessing(from peer.ID, validationConfig *CtrlMsgValidationConfig, controlMessage *pubsub_pb.ControlMessage, sampleSize uint) error {
-	c.metrics.BlockingPreProcessingStarted(p2p.CtrlMsgIHave.String(), sampleSize)
-	start := time.Now()
-	defer func() {
-		c.metrics.BlockingPreProcessingFinished(p2p.CtrlMsgIHave.String(), sampleSize, time.Since(start))
-	}()
-	err := c.blockingPreprocessingSampleRpc(from, validationConfig, controlMessage, sampleSize)
+// Returns:
+//   - error: if a new inspect rpc request cannot be created, all errors returned are considered irrecoverable.
+func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) error {
+	c.truncateRPC(from, rpc)
+	// queue further async inspection
+	req, err := NewInspectRPCRequest(from, rpc)
 	if err != nil {
-		return fmt.Errorf("failed to pre-process a sample of iHave messages: %w", err)
+		c.logger.Error().
+			Err(err).
+			Bool(logging.KeyNetworkingSecurity, true).
+			Str("peer_id", p2plogging.PeerId(from)).
+			Msg("failed to get inspect RPC request")
+		return fmt.Errorf("failed to get inspect RPC request: %w", err)
 	}
+	c.workerPool.Submit(req)
 	return nil
 }
 
-// blockingPreprocessingSampleRpc blocking pre-processing validation func that performs some pre-validation of RPC control messages.
-// If the RPC control message count exceeds the configured hard threshold we perform synchronous topic validation on a subset
-// of the control messages. This is used for control message types that do not have an upper bound on the amount of messages a node can send.
-func (c *ControlMsgValidationInspector) blockingPreprocessingSampleRpc(from peer.ID, validationConfig *CtrlMsgValidationConfig, controlMessage *pubsub_pb.ControlMessage, sampleSize uint) error {
-	if validationConfig.ControlMsg != p2p.CtrlMsgIHave && validationConfig.ControlMsg != p2p.CtrlMsgIWant {
-		return fmt.Errorf("unexpected control message type %s encountered during blocking pre-processing sample rpc, expected %s or %s", validationConfig.ControlMsg, p2p.CtrlMsgIHave, p2p.CtrlMsgIWant)
-	}
+// processInspectRPCReq func used by component workers to perform further inspection of RPC control messages that will validate ensure all control message
+// types are valid in the RPC.
+// Args:
+//   - req: the inspect rpc request.
+//
+// Returns:
+//   - error: no error is expected to be returned from this func as they are logged and distributed in invalid control message notifications.
+func (c *ControlMsgValidationInspector) processInspectRPCReq(req *InspectRPCRequest) error {
+	c.metrics.AsyncProcessingStarted()
+	start := time.Now()
+	defer func() {
+		c.metrics.AsyncProcessingFinished(time.Since(start))
+	}()
+
 	activeClusterIDS := c.tracker.GetActiveClusterIds()
-	count := c.getCtrlMsgCount(validationConfig.ControlMsg, controlMessage)
-	lg := c.logger.With().
-		Uint64("ctrl_msg_count", count).
-		Str("peer_id", from.String()).
-		Str("ctrl_msg_type", string(validationConfig.ControlMsg)).Logger()
-	// if count greater than hard threshold perform synchronous topic validation on random subset of the iHave messages
-	if count > validationConfig.HardThreshold {
-		// for iHave control message topic validation we only validate a random subset of the messages
-		// shuffle the ihave messages to perform random validation on a subset of size sampleSize
-		err := c.sampleCtrlMessages(p2p.CtrlMsgIHave, controlMessage, sampleSize)
-		if err != nil {
-			return fmt.Errorf("failed to sample ihave messages: %w", err)
-		}
-		err = c.validateTopicsSample(from, validationConfig, controlMessage, activeClusterIDS, sampleSize)
-		if err != nil {
-			lg.Warn().
-				Err(err).
-				Bool(logging.KeySuspicious, true).
-				Msg("topic validation pre-processing failed rejecting rpc control message")
-			disErr := c.distributor.Distribute(p2p.NewInvalidControlMessageNotification(from, validationConfig.ControlMsg, count, err))
-			if disErr != nil {
-				lg.Error().
-					Err(disErr).
-					Bool(logging.KeySuspicious, true).
-					Msg("failed to distribute invalid control message notification")
-				return disErr
+	for _, ctrlMsgType := range p2pmsg.ControlMessageTypes() {
+		switch ctrlMsgType {
+		case p2pmsg.CtrlMsgGraft:
+			err := c.inspectGraftMessages(req.Peer, req.rpc.GetControl().GetGraft(), activeClusterIDS)
+			if err != nil {
+				c.logAndDistributeAsyncInspectErrs(req, p2pmsg.CtrlMsgGraft, err, 1)
+				return nil
 			}
-			return err
+		case p2pmsg.CtrlMsgPrune:
+			err := c.inspectPruneMessages(req.Peer, req.rpc.GetControl().GetPrune(), activeClusterIDS)
+			if err != nil {
+				c.logAndDistributeAsyncInspectErrs(req, p2pmsg.CtrlMsgPrune, err, 1)
+				return nil
+			}
+		case p2pmsg.CtrlMsgIWant:
+			err := c.inspectIWantMessages(req.Peer, req.rpc.GetControl().GetIwant())
+			if err != nil {
+				c.logAndDistributeAsyncInspectErrs(req, p2pmsg.CtrlMsgIWant, err, 1)
+				return nil
+			}
+		case p2pmsg.CtrlMsgIHave:
+			err := c.inspectIHaveMessages(req.Peer, req.rpc.GetControl().GetIhave(), activeClusterIDS)
+			if err != nil {
+				c.logAndDistributeAsyncInspectErrs(req, p2pmsg.CtrlMsgIHave, err, 1)
+				return nil
+			}
 		}
 	}
 
-	// pre-processing validation passed, perform ihave sampling again
-	// to randomize async validation to avoid data race that can occur when
-	// performing the sampling asynchronously.
-	// for iHave control message topic validation we only validate a random subset of the messages
-	err := c.sampleCtrlMessages(p2p.CtrlMsgIHave, controlMessage, sampleSize)
+	// inspect rpc publish messages after all control message validation has passed
+	err, errCount := c.inspectRpcPublishMessages(req.Peer, req.rpc.GetPublish(), activeClusterIDS)
 	if err != nil {
-		return fmt.Errorf("failed to sample ihave messages: %w", err)
-	}
-	return nil
-}
-
-// sampleCtrlMessages performs sampling on the specified control message that will randomize
-// the items in the control message slice up to index sampleSize-1.
-func (c *ControlMsgValidationInspector) sampleCtrlMessages(ctrlMsgType p2p.ControlMessageType, ctrlMsg *pubsub_pb.ControlMessage, sampleSize uint) error {
-	switch ctrlMsgType {
-	case p2p.CtrlMsgIHave:
-		iHaves := ctrlMsg.GetIhave()
-		swap := func(i, j uint) {
-			iHaves[i], iHaves[j] = iHaves[j], iHaves[i]
-		}
-		err := flowrand.Samples(uint(len(iHaves)), sampleSize, swap)
-		if err != nil {
-			return fmt.Errorf("failed to get random sample of ihave control messages: %w", err)
-		}
-	}
-	return nil
-}
-
-// processInspectMsgReq func used by component workers to perform further inspection of control messages that will check if the messages are rate limited
-// and ensure all topic IDS are valid when the amount of messages is above the configured safety threshold.
-func (c *ControlMsgValidationInspector) processInspectMsgReq(req *InspectMsgRequest) error {
-	c.metrics.AsyncProcessingStarted(req.validationConfig.ControlMsg.String())
-	start := time.Now()
-	defer func() {
-		c.metrics.AsyncProcessingFinished(req.validationConfig.ControlMsg.String(), time.Since(start))
-	}()
-
-	count := c.getCtrlMsgCount(req.validationConfig.ControlMsg, req.ctrlMsg)
-	lg := c.logger.With().
-		Str("peer_id", req.Peer.String()).
-		Str("ctrl_msg_type", string(req.validationConfig.ControlMsg)).
-		Uint64("ctrl_msg_count", count).Logger()
-	var validationErr error
-	switch {
-	case !req.validationConfig.RateLimiter.Allow(req.Peer, int(count)): // check if Peer RPC messages are rate limited
-		validationErr = NewRateLimitedControlMsgErr(req.validationConfig.ControlMsg)
-	case count > req.validationConfig.SafetyThreshold:
-		// check if Peer RPC messages Count greater than safety threshold further inspect each message individually
-		validationErr = c.validateTopics(req.Peer, req.validationConfig, req.ctrlMsg)
-	default:
-		lg.Trace().
-			Uint64("hard_threshold", req.validationConfig.HardThreshold).
-			Uint64("safety_threshold", req.validationConfig.SafetyThreshold).
-			Msg(fmt.Sprintf("control message %s inspection passed %d is below configured safety threshold", req.validationConfig.ControlMsg, count))
+		c.logAndDistributeAsyncInspectErrs(req, p2pmsg.RpcPublishMessage, err, errCount)
 		return nil
 	}
-	if validationErr != nil {
-		lg.Error().
-			Err(validationErr).
-			Bool(logging.KeySuspicious, true).
-			Msg("rpc control message async inspection failed")
-		err := c.distributor.Distribute(p2p.NewInvalidControlMessageNotification(req.Peer, req.validationConfig.ControlMsg, count, validationErr))
-		if err != nil {
-			lg.Error().
-				Err(err).
-				Bool(logging.KeySuspicious, true).
-				Msg("failed to distribute invalid control message notification")
-		}
-	}
+
 	return nil
 }
 
-// getCtrlMsgCount returns the amount of specified control message type in the rpc ControlMessage.
-func (c *ControlMsgValidationInspector) getCtrlMsgCount(ctrlMsgType p2p.ControlMessageType, ctrlMsg *pubsub_pb.ControlMessage) uint64 {
-	switch ctrlMsgType {
-	case p2p.CtrlMsgGraft:
-		return uint64(len(ctrlMsg.GetGraft()))
-	case p2p.CtrlMsgPrune:
-		return uint64(len(ctrlMsg.GetPrune()))
-	case p2p.CtrlMsgIHave:
-		return uint64(len(ctrlMsg.GetIhave()))
-	default:
-		return 0
-	}
-}
-
-// validateTopics ensures all topics in the specified control message are valid flow topic/channel and no duplicate topics exist.
-// Expected error returns during normal operations:
-//   - channels.InvalidTopicErr: if topic is invalid.
-//   - ErrDuplicateTopic: if a duplicate topic ID is encountered.
-func (c *ControlMsgValidationInspector) validateTopics(from peer.ID, validationConfig *CtrlMsgValidationConfig, ctrlMsg *pubsub_pb.ControlMessage) error {
-	activeClusterIDS := c.tracker.GetActiveClusterIds()
-	switch validationConfig.ControlMsg {
-	case p2p.CtrlMsgGraft:
-		return c.validateGrafts(from, ctrlMsg, activeClusterIDS)
-	case p2p.CtrlMsgPrune:
-		return c.validatePrunes(from, ctrlMsg, activeClusterIDS)
-	case p2p.CtrlMsgIHave:
-		return c.validateIhaves(from, validationConfig, ctrlMsg, activeClusterIDS)
-	default:
-		// sanity check
-		// This should never happen validateTopics is only used to validate GRAFT and PRUNE control message types
-		// if any other control message type is encountered here this indicates invalid state irrecoverable error.
-		c.logger.Fatal().Msg(fmt.Sprintf("encountered invalid control message type in validate topics expected %s, %s or %s got %s", p2p.CtrlMsgGraft, p2p.CtrlMsgPrune, p2p.CtrlMsgIHave, validationConfig.ControlMsg))
-	}
-	return nil
-}
-
-// validateGrafts performs topic validation on all grafts in the control message using the provided validateTopic func while tracking duplicates.
-func (c *ControlMsgValidationInspector) validateGrafts(from peer.ID, ctrlMsg *pubsub_pb.ControlMessage, activeClusterIDS flow.ChainIDList) error {
-	tracker := make(duplicateTopicTracker)
-	for _, graft := range ctrlMsg.GetGraft() {
-		topic := channels.Topic(graft.GetTopicID())
-		if tracker.isDuplicate(topic) {
-			return NewDuplicateTopicErr(topic)
-		}
-		tracker.set(topic)
-		err := c.validateTopic(from, topic, activeClusterIDS)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// validatePrunes performs topic validation on all prunes in the control message using the provided validateTopic func while tracking duplicates.
-func (c *ControlMsgValidationInspector) validatePrunes(from peer.ID, ctrlMsg *pubsub_pb.ControlMessage, activeClusterIDS flow.ChainIDList) error {
-	tracker := make(duplicateTopicTracker)
-	for _, prune := range ctrlMsg.GetPrune() {
-		topic := channels.Topic(prune.GetTopicID())
-		if tracker.isDuplicate(topic) {
-			return NewDuplicateTopicErr(topic)
-		}
-		tracker.set(topic)
-		err := c.validateTopic(from, topic, activeClusterIDS)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// validateIhaves performs topic validation on all ihaves in the control message using the provided validateTopic func while tracking duplicates.
-func (c *ControlMsgValidationInspector) validateIhaves(from peer.ID, validationConfig *CtrlMsgValidationConfig, ctrlMsg *pubsub_pb.ControlMessage, activeClusterIDS flow.ChainIDList) error {
-	sampleSize := util.SampleN(len(ctrlMsg.GetIhave()), validationConfig.IHaveInspectionMaxSampleSize, validationConfig.IHaveAsyncInspectSampleSizePercentage)
-	return c.validateTopicsSample(from, validationConfig, ctrlMsg, activeClusterIDS, sampleSize)
-}
-
-// validateTopicsSample samples a subset of topics from the specified control message and ensures the sample contains only valid flow topic/channel and no duplicate topics exist.
-// Sample size ensures liveness of the network when validating messages with no upper bound on the amount of messages that may be received.
+// checkPubsubMessageSender checks the sender of the sender of pubsub message to ensure they are not unstaked, or ejected.
+// This check is only required on private networks.
+// Args:
+//   - message: the pubsub message.
+//
+// Returns:
+//   - error: if the peer ID cannot be created from bytes, sender is unknown or the identity is ejected.
+//
 // All errors returned from this function can be considered benign.
-func (c *ControlMsgValidationInspector) validateTopicsSample(from peer.ID, validationConfig *CtrlMsgValidationConfig, ctrlMsg *pubsub_pb.ControlMessage, activeClusterIDS flow.ChainIDList, sampleSize uint) error {
-	tracker := make(duplicateTopicTracker)
-	switch validationConfig.ControlMsg {
-	case p2p.CtrlMsgIHave:
-		for i := uint(0); i < sampleSize; i++ {
-			topic := channels.Topic(ctrlMsg.Ihave[i].GetTopicID())
-			if tracker.isDuplicate(topic) {
-				return NewDuplicateTopicErr(topic)
-			}
-			tracker.set(topic)
-			err := c.validateTopic(from, topic, activeClusterIDS)
-			if err != nil {
-				return err
-			}
+func (c *ControlMsgValidationInspector) checkPubsubMessageSender(message *pubsub_pb.Message) error {
+	pid, err := peer.IDFromBytes(message.GetFrom())
+	if err != nil {
+		return fmt.Errorf("failed to get peer ID from bytes: %w", err)
+	}
+	if id, ok := c.idProvider.ByPeerID(pid); !ok {
+		return fmt.Errorf("received rpc publish message from unstaked peer: %s", pid)
+	} else if id.Ejected {
+		return fmt.Errorf("received rpc publish message from ejected peer: %s", pid)
+	}
+
+	return nil
+}
+
+// inspectGraftMessages performs topic validation on all grafts in the control message using the provided validateTopic func while tracking duplicates.
+// Args:
+// - from: peer ID of the sender.
+// - grafts: the list of grafts to inspect.
+// - activeClusterIDS: the list of active cluster ids.
+// Returns:
+// - DuplicateTopicErr: if there are any duplicate topics in the list of grafts
+func (c *ControlMsgValidationInspector) inspectGraftMessages(from peer.ID, grafts []*pubsub_pb.ControlGraft, activeClusterIDS flow.ChainIDList) error {
+	tracker := make(duplicateStrTracker)
+	for _, graft := range grafts {
+		topic := channels.Topic(graft.GetTopicID())
+		if tracker.isDuplicate(topic.String()) {
+			return NewDuplicateTopicErr(topic.String(), p2pmsg.CtrlMsgGraft)
 		}
-	default:
-		// sanity check
-		// This should never happen validateTopicsSample is only used to validate IHAVE control message types
-		// if any other control message type is encountered here this indicates invalid state irrecoverable error.
-		c.logger.Fatal().Msg(fmt.Sprintf("encountered invalid control message type in validate topics sample expected %s got %s", p2p.CtrlMsgIHave, validationConfig.ControlMsg))
+		tracker.set(topic.String())
+		err := c.validateTopic(from, topic, activeClusterIDS)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
+}
+
+// inspectPruneMessages performs topic validation on all prunes in the control message using the provided validateTopic func while tracking duplicates.
+// Args:
+// - from: peer ID of the sender.
+// - prunes: the list of iHaves to inspect.
+// - activeClusterIDS: the list of active cluster ids.
+// Returns:
+//   - DuplicateTopicErr: if there are any duplicate topics found in the list of iHaves
+//     or any duplicate message ids found inside a single iHave.
+//   - error: if any error occurs while sampling or validating topics, all returned errors are benign and should not cause the node to crash.
+func (c *ControlMsgValidationInspector) inspectPruneMessages(from peer.ID, prunes []*pubsub_pb.ControlPrune, activeClusterIDS flow.ChainIDList) error {
+	tracker := make(duplicateStrTracker)
+	for _, prune := range prunes {
+		topic := channels.Topic(prune.GetTopicID())
+		if tracker.isDuplicate(topic.String()) {
+			return NewDuplicateTopicErr(topic.String(), p2pmsg.CtrlMsgPrune)
+		}
+		tracker.set(topic.String())
+		err := c.validateTopic(from, topic, activeClusterIDS)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// inspectIHaveMessages performs topic validation on all ihaves in the control message using the provided validateTopic func while tracking duplicates.
+// Args:
+// - from: peer ID of the sender.
+// - iHaves: the list of iHaves to inspect.
+// - activeClusterIDS: the list of active cluster ids.
+// Returns:
+//   - DuplicateTopicErr: if there are any duplicate topics found in the list of iHaves
+//     or any duplicate message ids found inside a single iHave.
+//   - error: if any error occurs while sampling or validating topics, all returned errors are benign and should not cause the node to crash.
+func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihaves []*pubsub_pb.ControlIHave, activeClusterIDS flow.ChainIDList) error {
+	if len(ihaves) == 0 {
+		return nil
+	}
+	lg := c.logger.With().
+		Str("peer_id", p2plogging.PeerId(from)).
+		Int("sample_size", len(ihaves)).
+		Int("max_sample_size", c.config.IHaveRPCInspectionConfig.MaxSampleSize).
+		Logger()
+	duplicateTopicTracker := make(duplicateStrTracker)
+	duplicateMessageIDTracker := make(duplicateStrTracker)
+	totalMessageIds := 0
+	for _, ihave := range ihaves {
+		messageIds := ihave.GetMessageIDs()
+		topic := ihave.GetTopicID()
+		if duplicateTopicTracker.isDuplicate(topic) {
+			return NewDuplicateTopicErr(topic, p2pmsg.CtrlMsgIHave)
+		}
+		duplicateTopicTracker.set(topic)
+		err := c.validateTopic(from, channels.Topic(topic), activeClusterIDS)
+		if err != nil {
+			return err
+		}
+
+		for _, messageID := range messageIds {
+			if duplicateMessageIDTracker.isDuplicate(messageID) {
+				return NewDuplicateTopicErr(messageID, p2pmsg.CtrlMsgIHave)
+			}
+			duplicateMessageIDTracker.set(messageID)
+		}
+	}
+	lg.Debug().
+		Int("total_message_ids", totalMessageIds).
+		Msg("ihave control message validation complete")
+	return nil
+}
+
+// inspectIWantMessages inspects RPC iWant control messages. This func will sample the iWants and perform validation on each iWant in the sample.
+// Ensuring that the following are true:
+// - Each iWant corresponds to an iHave that was sent.
+// - Each topic in the iWant sample is a valid topic.
+// If the number of iWants that do not have a corresponding iHave exceed the configured threshold an error is returned.
+// Args:
+// - from: peer ID of the sender.
+// - iWant: the list of iWant control messages.
+// Returns:
+// - DuplicateTopicErr: if there are any duplicate message ids found in any of the iWants.
+// - IWantCacheMissThresholdErr: if the rate of cache misses exceeds the configured allowed threshold.
+func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWants []*pubsub_pb.ControlIWant) error {
+	if len(iWants) == 0 {
+		return nil
+	}
+	lastHighest := c.rpcTracker.LastHighestIHaveRPCSize()
+	lg := c.logger.With().
+		Str("peer_id", p2plogging.PeerId(from)).
+		Uint("max_sample_size", c.config.IWantRPCInspectionConfig.MaxSampleSize).
+		Int64("last_highest_ihave_rpc_size", lastHighest).
+		Logger()
+	sampleSize := uint(len(iWants))
+	tracker := make(duplicateStrTracker)
+	cacheMisses := 0
+	allowedCacheMissesThreshold := float64(sampleSize) * c.config.IWantRPCInspectionConfig.CacheMissThreshold
+	duplicates := 0
+	allowedDuplicatesThreshold := float64(sampleSize) * c.config.IWantRPCInspectionConfig.DuplicateMsgIDThreshold
+	checkCacheMisses := len(iWants) >= c.config.IWantRPCInspectionConfig.CacheMissCheckSize
+	lg = lg.With().
+		Uint("iwant_sample_size", sampleSize).
+		Float64("allowed_cache_misses_threshold", allowedCacheMissesThreshold).
+		Float64("allowed_duplicates_threshold", allowedDuplicatesThreshold).Logger()
+
+	lg.Trace().Msg("validating sample of message ids from iwant control message")
+
+	totalMessageIds := 0
+	for _, iWant := range iWants {
+		messageIds := iWant.GetMessageIDs()
+		messageIDCount := uint(len(messageIds))
+		for _, messageID := range messageIds {
+			// check duplicate allowed threshold
+			if tracker.isDuplicate(messageID) {
+				duplicates++
+				if float64(duplicates) > allowedDuplicatesThreshold {
+					return NewIWantDuplicateMsgIDThresholdErr(duplicates, messageIDCount, c.config.IWantRPCInspectionConfig.DuplicateMsgIDThreshold)
+				}
+			}
+			// check cache miss threshold
+			if !c.rpcTracker.WasIHaveRPCSent(messageID) {
+				cacheMisses++
+				if checkCacheMisses {
+					if float64(cacheMisses) > allowedCacheMissesThreshold {
+						return NewIWantCacheMissThresholdErr(cacheMisses, messageIDCount, c.config.IWantRPCInspectionConfig.CacheMissThreshold)
+					}
+				}
+			}
+			tracker.set(messageID)
+			totalMessageIds++
+		}
+	}
+
+	lg.Debug().
+		Int("total_message_ids", totalMessageIds).
+		Int("cache_misses", cacheMisses).
+		Int("duplicates", duplicates).
+		Msg("iwant control message validation complete")
+
+	return nil
+}
+
+// inspectRpcPublishMessages inspects a sample of the RPC gossip messages and performs topic validation that ensures the following:
+// - Topics are known flow topics.
+// - Topics are valid flow topics.
+// - Topics are in the nodes subscribe topics list.
+// If more than half the topics in the sample contain invalid topics an error will be returned.
+// Args:
+// - from: peer ID of the sender.
+// - messages: rpc publish messages.
+// - activeClusterIDS: the list of active cluster ids.
+// Returns:
+// - InvalidRpcPublishMessagesErr: if the amount of invalid messages exceeds the configured RPCMessageErrorThreshold.
+// - int: the number of invalid pubsub messages
+func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, messages []*pubsub_pb.Message, activeClusterIDS flow.ChainIDList) (error, uint64) {
+	totalMessages := len(messages)
+	if totalMessages == 0 {
+		return nil, 0
+	}
+	sampleSize := c.config.RpcMessageMaxSampleSize
+	if sampleSize > totalMessages {
+		sampleSize = totalMessages
+	}
+	c.performSample(p2pmsg.RpcPublishMessage, uint(totalMessages), uint(sampleSize), func(i, j uint) {
+		messages[i], messages[j] = messages[j], messages[i]
+	})
+
+	subscribedTopics := c.topicOracle().GetTopics()
+	hasSubscription := func(topic string) bool {
+		for _, subscribedTopic := range subscribedTopics {
+			if topic == subscribedTopic {
+				return true
+			}
+		}
+		return false
+	}
+	var errs *multierror.Error
+	for _, message := range messages[:sampleSize] {
+		if c.networkingType == network.PrivateNetwork {
+			err := c.checkPubsubMessageSender(message)
+			if err != nil {
+				errs = multierror.Append(errs, err)
+				continue
+			}
+		}
+		topic := channels.Topic(message.GetTopic())
+		err := c.validateTopic(from, topic, activeClusterIDS)
+		if err != nil {
+			// we can skip checking for subscription of topic that failed validation and continue
+			errs = multierror.Append(errs, err)
+			continue
+		}
+
+		if !hasSubscription(topic.String()) {
+			errs = multierror.Append(errs, fmt.Errorf("subscription for topic %s not found", topic))
+		}
+	}
+
+	// return an error when we exceed the error threshold
+	if errs != nil && errs.Len() > c.config.RpcMessageErrorThreshold {
+		return NewInvalidRpcPublishMessagesErr(errs.ErrorOrNil(), errs.Len()), uint64(errs.Len())
+	}
+
+	return nil, 0
+}
+
+// truncateRPC truncates the RPC by truncating each control message type using the configured max sample size values.
+// Args:
+// - from: peer ID of the sender.
+// - rpc: the pubsub RPC.
+func (c *ControlMsgValidationInspector) truncateRPC(from peer.ID, rpc *pubsub.RPC) {
+	for _, ctlMsgType := range p2pmsg.ControlMessageTypes() {
+		switch ctlMsgType {
+		case p2pmsg.CtrlMsgGraft:
+			c.truncateGraftMessages(rpc)
+		case p2pmsg.CtrlMsgPrune:
+			c.truncatePruneMessages(rpc)
+		case p2pmsg.CtrlMsgIHave:
+			c.truncateIHaveMessages(rpc)
+		case p2pmsg.CtrlMsgIWant:
+			c.truncateIWantMessages(from, rpc)
+		default:
+			// sanity check this should never happen
+			c.logAndThrowError(fmt.Errorf("unknown control message type encountered during RPC truncation"))
+		}
+	}
+}
+
+// truncateGraftMessages truncates the Graft control messages in the RPC. If the total number of Grafts in the RPC exceeds the configured
+// GraftPruneMessageMaxSampleSize the list of Grafts will be truncated.
+// Args:
+//   - rpc: the rpc message to truncate.
+func (c *ControlMsgValidationInspector) truncateGraftMessages(rpc *pubsub.RPC) {
+	grafts := rpc.GetControl().GetGraft()
+	totalGrafts := len(grafts)
+	if totalGrafts == 0 {
+		return
+	}
+	sampleSize := c.config.GraftPruneMessageMaxSampleSize
+	if sampleSize > totalGrafts {
+		sampleSize = totalGrafts
+	}
+	c.performSample(p2pmsg.CtrlMsgGraft, uint(totalGrafts), uint(sampleSize), func(i, j uint) {
+		grafts[i], grafts[j] = grafts[j], grafts[i]
+	})
+	rpc.Control.Graft = grafts[:sampleSize]
+}
+
+// truncatePruneMessages truncates the Prune control messages in the RPC. If the total number of Prunes in the RPC exceeds the configured
+// GraftPruneMessageMaxSampleSize the list of Prunes will be truncated.
+// Args:
+//   - rpc: the rpc message to truncate.
+func (c *ControlMsgValidationInspector) truncatePruneMessages(rpc *pubsub.RPC) {
+	prunes := rpc.GetControl().GetPrune()
+	totalPrunes := len(prunes)
+	if totalPrunes == 0 {
+		return
+	}
+	sampleSize := c.config.GraftPruneMessageMaxSampleSize
+	if sampleSize > totalPrunes {
+		sampleSize = totalPrunes
+	}
+	c.performSample(p2pmsg.CtrlMsgPrune, uint(totalPrunes), uint(sampleSize), func(i, j uint) {
+		prunes[i], prunes[j] = prunes[j], prunes[i]
+	})
+	rpc.Control.Prune = prunes[:sampleSize]
+}
+
+// truncateIHaveMessages truncates the iHaves control messages in the RPC. If the total number of iHaves in the RPC exceeds the configured
+// MaxSampleSize the list of iHaves will be truncated.
+// Args:
+//   - rpc: the rpc message to truncate.
+func (c *ControlMsgValidationInspector) truncateIHaveMessages(rpc *pubsub.RPC) {
+	ihaves := rpc.GetControl().GetIhave()
+	totalIHaves := len(ihaves)
+	if totalIHaves == 0 {
+		return
+	}
+	sampleSize := c.config.IHaveRPCInspectionConfig.MaxSampleSize
+	if sampleSize > totalIHaves {
+		sampleSize = totalIHaves
+	}
+
+	c.performSample(p2pmsg.CtrlMsgIHave, uint(totalIHaves), uint(sampleSize), func(i, j uint) {
+		ihaves[i], ihaves[j] = ihaves[j], ihaves[i]
+	})
+	rpc.Control.Ihave = ihaves[:sampleSize]
+	c.truncateIHaveMessageIds(rpc)
+}
+
+// truncateIHaveMessageIds truncates the message ids for each iHave control message in the RPC. If the total number of message ids in a single iHave exceeds the configured
+// MaxMessageIDSampleSize the list of message ids will be truncated. Before message ids are truncated the iHave control messages should have been truncated themselves.
+// Args:
+//   - rpc: the rpc message to truncate.
+func (c *ControlMsgValidationInspector) truncateIHaveMessageIds(rpc *pubsub.RPC) {
+	for _, ihave := range rpc.GetControl().GetIhave() {
+		messageIDs := ihave.GetMessageIDs()
+		totalMessageIDs := len(messageIDs)
+		if totalMessageIDs == 0 {
+			return
+		}
+		sampleSize := c.config.IHaveRPCInspectionConfig.MaxMessageIDSampleSize
+		if sampleSize > totalMessageIDs {
+			sampleSize = totalMessageIDs
+		}
+		c.performSample(p2pmsg.CtrlMsgIHave, uint(totalMessageIDs), uint(sampleSize), func(i, j uint) {
+			messageIDs[i], messageIDs[j] = messageIDs[j], messageIDs[i]
+		})
+		ihave.MessageIDs = messageIDs[:sampleSize]
+	}
+}
+
+// truncateIWantMessages truncates the iWant control messages in the RPC. If the total number of iWants in the RPC exceeds the configured
+// MaxSampleSize the list of iWants will be truncated.
+// Args:
+//   - rpc: the rpc message to truncate.
+func (c *ControlMsgValidationInspector) truncateIWantMessages(from peer.ID, rpc *pubsub.RPC) {
+	iWants := rpc.GetControl().GetIwant()
+	totalIWants := uint(len(iWants))
+	if totalIWants == 0 {
+		return
+	}
+	sampleSize := c.config.IWantRPCInspectionConfig.MaxSampleSize
+	if sampleSize > totalIWants {
+		sampleSize = totalIWants
+	}
+	c.performSample(p2pmsg.CtrlMsgIWant, totalIWants, sampleSize, func(i, j uint) {
+		iWants[i], iWants[j] = iWants[j], iWants[i]
+	})
+	rpc.Control.Iwant = iWants[:sampleSize]
+	c.truncateIWantMessageIds(from, rpc)
+}
+
+// truncateIWantMessageIds truncates the message ids for each iWant control message in the RPC. If the total number of message ids in a single iWant exceeds the configured
+// MaxMessageIDSampleSize the list of message ids will be truncated. Before message ids are truncated the iWant control messages should have been truncated themselves.
+// Args:
+//   - rpc: the rpc message to truncate.
+func (c *ControlMsgValidationInspector) truncateIWantMessageIds(from peer.ID, rpc *pubsub.RPC) {
+	lastHighest := c.rpcTracker.LastHighestIHaveRPCSize()
+	lg := c.logger.With().
+		Str("peer_id", p2plogging.PeerId(from)).
+		Uint("max_sample_size", c.config.IWantRPCInspectionConfig.MaxSampleSize).
+		Int64("last_highest_ihave_rpc_size", lastHighest).
+		Logger()
+
+	sampleSize := int(10 * lastHighest)
+	if sampleSize == 0 || sampleSize > c.config.IWantRPCInspectionConfig.MaxMessageIDSampleSize {
+		// invalid or 0 sample size is suspicious
+		lg.Warn().Str(logging.KeySuspicious, "true").Msg("zero or invalid sample size, using default max sample size")
+		sampleSize = c.config.IWantRPCInspectionConfig.MaxMessageIDSampleSize
+	}
+	for _, iWant := range rpc.GetControl().GetIwant() {
+		messageIDs := iWant.GetMessageIDs()
+		totalMessageIDs := len(messageIDs)
+		if totalMessageIDs == 0 {
+			return
+		}
+		if sampleSize > totalMessageIDs {
+			sampleSize = totalMessageIDs
+		}
+		c.performSample(p2pmsg.CtrlMsgIWant, uint(totalMessageIDs), uint(sampleSize), func(i, j uint) {
+			messageIDs[i], messageIDs[j] = messageIDs[j], messageIDs[i]
+		})
+		iWant.MessageIDs = messageIDs[:sampleSize]
+	}
+}
+
+// performSample performs sampling on the specified control message that will randomize
+// the items in the control message slice up to index sampleSize-1. Any error encountered during sampling is considered
+// irrecoverable and will cause the node to crash.
+func (c *ControlMsgValidationInspector) performSample(ctrlMsg p2pmsg.ControlMessageType, totalSize, sampleSize uint, swap func(i, j uint)) {
+	err := flowrand.Samples(totalSize, sampleSize, swap)
+	if err != nil {
+		c.logAndThrowError(fmt.Errorf("failed to get random sample of %s control messages: %w", ctrlMsg, err))
+	}
 }
 
 // validateTopic ensures the topic is a valid flow topic/channel.
@@ -514,11 +712,11 @@ func (c *ControlMsgValidationInspector) validateTopic(from peer.ID, topic channe
 // In the case where an ErrActiveClusterIdsNotSet or UnknownClusterIDErr is encountered and the cluster prefixed topic received
 // tracker for the peer is less than or equal to the configured ClusterPrefixHardThreshold an error will only be logged and not returned.
 // At the point where the hard threshold is crossed the error will be returned and the sender will start to be penalized.
-// Any errors encountered while incrementing or loading the cluster prefixed control message gauge for a peer will result in a fatal log, these
+// Any errors encountered while incrementing or loading the cluster prefixed control message gauge for a peer will result in an irrecoverable error being thrown, these
 // errors are unexpected and irrecoverable indicating a bug.
 func (c *ControlMsgValidationInspector) validateClusterPrefixedTopic(from peer.ID, topic channels.Topic, activeClusterIds flow.ChainIDList) error {
 	lg := c.logger.With().
-		Str("from", from.String()).
+		Str("from", p2plogging.PeerId(from)).
 		Logger()
 	// reject messages from unstaked nodes for cluster prefixed topics
 	nodeID, err := c.getFlowIdentifier(from)
@@ -528,9 +726,10 @@ func (c *ControlMsgValidationInspector) validateClusterPrefixedTopic(from peer.I
 
 	if len(activeClusterIds) == 0 {
 		// cluster IDs have not been updated yet
-		_, err = c.tracker.Inc(nodeID)
-		if err != nil {
-			return err
+		_, incErr := c.tracker.Inc(nodeID)
+		if incErr != nil {
+			// irrecoverable error encountered
+			c.logAndThrowError(fmt.Errorf("error encountered while incrementing the cluster prefixed control message gauge %s: %w", nodeID, err))
 		}
 
 		// if the amount of messages received is below our hard threshold log the error and return nil.
@@ -552,10 +751,7 @@ func (c *ControlMsgValidationInspector) validateClusterPrefixedTopic(from peer.I
 			// behind and needs to catchup increment to topics received cache.
 			_, incErr := c.tracker.Inc(nodeID)
 			if incErr != nil {
-				// irrecoverable error encountered
-				c.logger.Fatal().Err(incErr).
-					Str("node_id", nodeID.String()).
-					Msg("unexpected irrecoverable error encountered while incrementing the cluster prefixed control message gauge")
+				c.logAndThrowError(fmt.Errorf("error encountered while incrementing the cluster prefixed control message gauge %s: %w", nodeID, err))
 			}
 			// if the amount of messages received is below our hard threshold log the error and return nil.
 			if c.checkClusterPrefixHardThreshold(nodeID) {
@@ -587,15 +783,58 @@ func (c *ControlMsgValidationInspector) getFlowIdentifier(peerID peer.ID) (flow.
 
 // checkClusterPrefixHardThreshold returns true if the cluster prefix received tracker count is less than
 // the configured ClusterPrefixHardThreshold, false otherwise.
-// If any error is encountered while loading from the tracker this func will emit a fatal level log, these errors
+// If any error is encountered while loading from the tracker this func will throw an error on the signaler context, these errors
 // are unexpected and irrecoverable indicating a bug.
 func (c *ControlMsgValidationInspector) checkClusterPrefixHardThreshold(nodeID flow.Identifier) bool {
 	gauge, err := c.tracker.Load(nodeID)
 	if err != nil {
 		// irrecoverable error encountered
-		c.logger.Fatal().Err(err).
-			Str("node_id", nodeID.String()).
-			Msg("unexpected irrecoverable error encountered while loading the cluster prefixed control message gauge during hard threshold check")
+		c.logAndThrowError(fmt.Errorf("cluster prefixed control message gauge during hard threshold check failed for node %s: %w", nodeID, err))
 	}
 	return gauge <= c.config.ClusterPrefixHardThreshold
+}
+
+// logAndDistributeErr logs the provided error and attempts to disseminate an invalid control message validation notification for the error.
+// Args:
+//   - req: inspect rpc request that failed validation.
+//   - ctlMsgType: the control message type of the rpc message that caused the error.
+//   - err: the error that occurred.
+//   - count: the number of occurrences of the error.
+func (c *ControlMsgValidationInspector) logAndDistributeAsyncInspectErrs(req *InspectRPCRequest, ctlMsgType p2pmsg.ControlMessageType, err error, count uint64) {
+	lg := c.logger.With().
+		Err(err).
+		Str("control_message_type", ctlMsgType.String()).
+		Bool(logging.KeySuspicious, true).
+		Bool(logging.KeyNetworkingSecurity, true).
+		Uint64("error_count", count).
+		Str("peer_id", p2plogging.PeerId(req.Peer)).
+		Logger()
+
+	switch {
+	case IsErrActiveClusterIDsNotSet(err):
+		lg.Warn().Msg("active cluster ids not set")
+	case IsErrUnstakedPeer(err):
+		lg.Warn().Msg("control message received from unstaked peer")
+	default:
+		distErr := c.distributor.Distribute(p2p.NewInvalidControlMessageNotification(req.Peer, ctlMsgType, err, count))
+		if distErr != nil {
+			lg.Error().
+				Err(distErr).
+				Msg("failed to distribute invalid control message notification")
+		}
+		lg.Error().Msg("rpc control message async inspection failed")
+	}
+}
+
+// logAndThrowError logs and throws irrecoverable errors on the context.
+// Args:
+//
+//	err: the error encountered.
+func (c *ControlMsgValidationInspector) logAndThrowError(err error) {
+	c.logger.Error().
+		Err(err).
+		Bool(logging.KeySuspicious, true).
+		Bool(logging.KeyNetworkingSecurity, true).
+		Msg("unexpected irrecoverable error encountered")
+	c.ctx.Throw(err)
 }

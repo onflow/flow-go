@@ -305,9 +305,9 @@ func TestQueue(t *testing.T) {
 		builder.WriteString(fmt.Sprintf("Highest: %v\n", f.ID()))
 		builder.WriteString("Size: 4, Height: 3\n")
 		builder.WriteString(fmt.Sprintf("Node(height: %v): %v (children: 1)\n", a.Height(), a.ID()))
-		builder.WriteString(fmt.Sprintf("Node(height: %v): %v (children: 1)\n", c.Height(), c.ID()))
-		builder.WriteString(fmt.Sprintf("Node(height: %v): %v (children: 1)\n", d.Height(), d.ID()))
-		builder.WriteString(fmt.Sprintf("Node(height: %v): %v (children: 0)\n", f.Height(), f.ID()))
+		builder.WriteString(fmt.Sprintf("|- Node(height: %v): %v (children: 1)\n", c.Height(), c.ID()))
+		builder.WriteString(fmt.Sprintf("   |- Node(height: %v): %v (children: 1)\n", d.Height(), d.ID()))
+		builder.WriteString(fmt.Sprintf("      |- Node(height: %v): %v (children: 0)\n", f.Height(), f.ID()))
 		require.Equal(t, builder.String(), queue.String())
 	})
 }

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
@@ -426,7 +425,9 @@ func TestBootstrap_InvalidIdentities(t *testing.T) {
 		root := unittest.RootSnapshotFixture(participants)
 		// randomly shuffle the identities so they are not canonically ordered
 		encodable := root.Encodable()
-		encodable.Identities = participants.DeterministicShuffle(time.Now().UnixNano())
+		var err error
+		encodable.Identities, err = participants.Shuffle()
+		require.NoError(t, err)
 		root = inmem.SnapshotFromEncodable(encodable)
 		bootstrap(t, root, func(state *bprotocol.State, err error) {
 			assert.Error(t, err)

@@ -29,7 +29,6 @@ import (
 	modulemock "github.com/onflow/flow-go/module/mock"
 	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol/inmem"
-	"github.com/onflow/flow-go/state/protocol/seed"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -945,10 +944,10 @@ func TestReadRandomSourceFromPackedQCV2(t *testing.T) {
 	qc, err := buildQCWithPackerAndSigData(packer, block, blockSigData)
 	require.NoError(t, err)
 
-	randomSource, err := seed.FromParentQCSignature(qc.SigData)
+	randomSource, err := model.BeaconSignature(qc)
 	require.NoError(t, err)
 
-	randomSourceAgain, err := seed.FromParentQCSignature(qc.SigData)
+	randomSourceAgain, err := model.BeaconSignature(qc)
 	require.NoError(t, err)
 
 	// verify the random source is deterministic

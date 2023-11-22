@@ -193,11 +193,10 @@ func CreateFlowAccount(ctx context.Context, client *testnet.Client) (sdk.Address
 	}
 
 	// createAccount will submit a create account transaction and wait for it to be sealed
-	addr, err := client.CreateAccount(ctx, fullAccountKey, client.Account(), client.SDKServiceAddress(), sdk.Identifier(latestBlockID))
+	addr, err := client.CreateAccount(ctx, fullAccountKey, sdk.Identifier(latestBlockID))
 	if err != nil {
 		return sdk.EmptyAddress, fmt.Errorf("failed to create account: %w", err)
 	}
 
-	client.Account().Keys[0].SequenceNumber++
 	return addr, nil
 }

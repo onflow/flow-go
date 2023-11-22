@@ -6,14 +6,14 @@ import (
 )
 
 type Network struct {
-	network.Network
+	network.EngineRegistry
 	from channels.Channel
 	to   channels.Channel
 }
 
-var _ network.Network = (*Network)(nil)
+var _ network.EngineRegistry = (*Network)(nil)
 
-func NewNetwork(net network.Network, from channels.Channel, to channels.Channel) *Network {
+func NewNetwork(net network.EngineRegistry, from channels.Channel, to channels.Channel) *Network {
 	return &Network{net, from, to}
 }
 
@@ -25,5 +25,5 @@ func (n *Network) convert(channel channels.Channel) channels.Channel {
 }
 
 func (n *Network) Register(channel channels.Channel, engine network.MessageProcessor) (network.Conduit, error) {
-	return n.Network.Register(n.convert(channel), engine)
+	return n.EngineRegistry.Register(n.convert(channel), engine)
 }

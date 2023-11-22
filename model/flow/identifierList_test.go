@@ -5,7 +5,6 @@ import (
 	"math/rand"
 	"sort"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -21,7 +20,7 @@ func TestIdentifierListSort(t *testing.T) {
 	var ids flow.IdentifierList = unittest.IdentifierListFixture(count)
 
 	// shuffles array before sorting to enforce some pseudo-randomness
-	rand.Seed(time.Now().UnixNano())
+
 	rand.Shuffle(ids.Len(), ids.Swap)
 
 	sort.Sort(ids)

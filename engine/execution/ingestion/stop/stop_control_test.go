@@ -10,6 +10,7 @@ import (
 	testifyMock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/execution/state/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -24,6 +25,8 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 
 	t.Run("when processing block at stop height", func(t *testing.T) {
 		sc := NewStopControl(
+			engine.NewUnit(),
+			time.Second,
 			unittest.Logger(),
 			nil,
 			nil,
@@ -68,6 +71,8 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 		execState := mock.NewExecutionState(t)
 
 		sc := NewStopControl(
+			engine.NewUnit(),
+			time.Second,
 			unittest.Logger(),
 			execState,
 			nil,
@@ -122,6 +127,8 @@ func TestExecutionFallingBehind(t *testing.T) {
 	headerD := unittest.BlockHeaderWithParentFixture(headerC) // 23
 
 	sc := NewStopControl(
+		engine.NewUnit(),
+		time.Second,
 		unittest.Logger(),
 		execState,
 		nil,
@@ -184,6 +191,8 @@ func TestAddStopForPastBlocks(t *testing.T) {
 	}
 
 	sc := NewStopControl(
+		engine.NewUnit(),
+		time.Second,
 		unittest.Logger(),
 		execState,
 		headers,
@@ -240,6 +249,8 @@ func TestAddStopForPastBlocksExecutionFallingBehind(t *testing.T) {
 	}
 
 	sc := NewStopControl(
+		engine.NewUnit(),
+		time.Second,
 		unittest.Logger(),
 		execState,
 		headers,
@@ -293,6 +304,8 @@ func TestStopControlWithVersionControl(t *testing.T) {
 		}
 
 		sc := NewStopControl(
+			engine.NewUnit(),
+			time.Second,
 			unittest.Logger(),
 			execState,
 			headers,
@@ -395,6 +408,8 @@ func TestStopControlWithVersionControl(t *testing.T) {
 		}
 
 		sc := NewStopControl(
+			engine.NewUnit(),
+			time.Second,
 			unittest.Logger(),
 			execState,
 			headers,
@@ -471,6 +486,8 @@ func TestStopControlWithVersionControl(t *testing.T) {
 		}
 
 		sc := NewStopControl(
+			engine.NewUnit(),
+			time.Second,
 			unittest.Logger(),
 			execState,
 			headers,
@@ -547,6 +564,8 @@ func TestStopControlWithVersionControl(t *testing.T) {
 		}
 
 		sc := NewStopControl(
+			engine.NewUnit(),
+			time.Second,
 			unittest.Logger(),
 			execState,
 			headers,
@@ -599,6 +618,8 @@ func TestStopControlWithVersionControl(t *testing.T) {
 func TestStartingStopped(t *testing.T) {
 
 	sc := NewStopControl(
+		engine.NewUnit(),
+		time.Second,
 		unittest.Logger(),
 		nil,
 		nil,
@@ -618,6 +639,8 @@ func TestStoppedStateRejectsAllBlocksAndChanged(t *testing.T) {
 	execState := mock.NewExecutionState(t)
 
 	sc := NewStopControl(
+		engine.NewUnit(),
+		time.Second,
 		unittest.Logger(),
 		execState,
 		nil,
@@ -646,6 +669,8 @@ func Test_StopControlWorkers(t *testing.T) {
 	t.Run("start and stop, stopped = true", func(t *testing.T) {
 
 		sc := NewStopControl(
+			engine.NewUnit(),
+			time.Second,
 			unittest.Logger(),
 			nil,
 			nil,
@@ -671,6 +696,8 @@ func Test_StopControlWorkers(t *testing.T) {
 	t.Run("start and stop, stopped = false", func(t *testing.T) {
 
 		sc := NewStopControl(
+			engine.NewUnit(),
+			time.Second,
 			unittest.Logger(),
 			nil,
 			nil,
@@ -732,6 +759,8 @@ func Test_StopControlWorkers(t *testing.T) {
 		// boundary but was restarted without being upgraded to the new version.
 		// In this case, the node should start as stopped.
 		sc := NewStopControl(
+			engine.NewUnit(),
+			time.Second,
 			unittest.Logger(),
 			execState,
 			headers,
@@ -805,6 +834,8 @@ func Test_StopControlWorkers(t *testing.T) {
 
 		// The stop is set by a previous version beacon and is in one blocks time.
 		sc := NewStopControl(
+			engine.NewUnit(),
+			time.Second,
 			unittest.Logger(),
 			execState,
 			headers,
@@ -847,4 +878,9 @@ func Test_StopControlWorkers(t *testing.T) {
 		cancel()
 		unittest.AssertClosesBefore(t, sc.Done(), 10*time.Second)
 	})
+}
+
+func TestPatchedVersion(t *testing.T) {
+	require.True(t, semver.New("0.31.20").LessThan(*semver.New("0.31.21")))
+	require.True(t, semver.New("0.31.20-patch.1").LessThan(*semver.New("0.31.20"))) // be careful with this one
 }

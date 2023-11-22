@@ -72,6 +72,25 @@ func NetworkReceiveCacheMetricsFactory(f HeroCacheMetricsFactory, networkType ne
 	return f(namespaceNetwork, r)
 }
 
+func NewSubscriptionRecordCacheMetricsFactory(f HeroCacheMetricsFactory) module.HeroCacheMetrics {
+	return f(namespaceNetwork, ResourceNetworkingSubscriptionRecordsCache)
+}
+
+// DisallowListCacheMetricsFactory is the factory method for creating a new HeroCacheCollector for the disallow list cache.
+// The disallow-list cache is used to keep track of peers that are disallow-listed and the reasons for it.
+// Args:
+// - f: the HeroCacheMetricsFactory to create the collector
+// - networkingType: the networking type of the cache, i.e., whether it is used for the public or the private network
+// Returns:
+// - a HeroCacheMetrics for the disallow list cache
+func DisallowListCacheMetricsFactory(f HeroCacheMetricsFactory, networkingType network.NetworkingType) module.HeroCacheMetrics {
+	r := ResourceNetworkingDisallowListCache
+	if networkingType == network.PublicNetwork {
+		r = PrependPublicPrefix(r)
+	}
+	return f(namespaceNetwork, r)
+}
+
 func NetworkDnsTxtCacheMetricsFactory(registrar prometheus.Registerer) *HeroCacheCollector {
 	return NewHeroCacheCollector(namespaceNetwork, ResourceNetworkingDnsTxtCache, registrar)
 }
@@ -105,6 +124,14 @@ func ApplicationLayerSpamRecordCacheMetricFactory(f HeroCacheMetricsFactory, net
 	return f(namespaceNetwork, r)
 }
 
+func DialConfigCacheMetricFactory(f HeroCacheMetricsFactory, networkType network.NetworkingType) module.HeroCacheMetrics {
+	r := ResourceNetworkingUnicastDialConfigCache
+	if networkType == network.PublicNetwork {
+		r = PrependPublicPrefix(r)
+	}
+	return f(namespaceNetwork, r)
+}
+
 func ApplicationLayerSpamRecordQueueMetricsFactory(f HeroCacheMetricsFactory, networkType network.NetworkingType) module.HeroCacheMetrics {
 	r := ResourceNetworkingApplicationLayerSpamReportQueue
 	if networkType == network.PublicNetwork {
@@ -125,6 +152,24 @@ func GossipSubRPCMetricsObserverInspectorQueueMetricFactory(f HeroCacheMetricsFa
 func GossipSubRPCInspectorQueueMetricFactory(f HeroCacheMetricsFactory, networkType network.NetworkingType) module.HeroCacheMetrics {
 	// we don't use the public prefix for the metrics here for sake of backward compatibility of metric name.
 	r := ResourceNetworkingRpcValidationInspectorQueue
+	if networkType == network.PublicNetwork {
+		r = PrependPublicPrefix(r)
+	}
+	return f(namespaceNetwork, r)
+}
+
+func GossipSubRPCSentTrackerMetricFactory(f HeroCacheMetricsFactory, networkType network.NetworkingType) module.HeroCacheMetrics {
+	// we don't use the public prefix for the metrics here for sake of backward compatibility of metric name.
+	r := ResourceNetworkingRPCSentTrackerCache
+	if networkType == network.PublicNetwork {
+		r = PrependPublicPrefix(r)
+	}
+	return f(namespaceNetwork, r)
+}
+
+func GossipSubRPCSentTrackerQueueMetricFactory(f HeroCacheMetricsFactory, networkType network.NetworkingType) module.HeroCacheMetrics {
+	// we don't use the public prefix for the metrics here for sake of backward compatibility of metric name.
+	r := ResourceNetworkingRPCSentTrackerQueue
 	if networkType == network.PublicNetwork {
 		r = PrependPublicPrefix(r)
 	}

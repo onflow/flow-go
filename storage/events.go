@@ -6,6 +6,8 @@ import (
 
 // Events represents persistent storage for events.
 type Events interface {
+	// Store will store events for the given block ID
+	Store(blockID flow.Identifier, blockEvents []flow.EventsList) error
 
 	// BatchStore will store events for the given block ID in a given batch
 	BatchStore(blockID flow.Identifier, events []flow.EventsList, batch BatchStorage) error

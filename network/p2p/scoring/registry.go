@@ -9,8 +9,12 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/p2p"
 	netcache "github.com/onflow/flow-go/network/p2p/cache"
+	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
+	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -46,23 +50,27 @@ const (
 	iHaveMisbehaviourPenalty = -10
 	// iWantMisbehaviourPenalty is the penalty applied to the application specific penalty when a peer conducts a iWant misbehaviour.
 	iWantMisbehaviourPenalty = -10
+	// rpcPublishMessageMisbehaviourPenalty is the penalty applied to the application specific penalty when a peer conducts a RpcPublishMessageMisbehaviourPenalty misbehaviour.
+	rpcPublishMessageMisbehaviourPenalty = -10
 )
 
 // GossipSubCtrlMsgPenaltyValue is the penalty value for each control message type.
 type GossipSubCtrlMsgPenaltyValue struct {
-	Graft float64 // penalty value for an individual graft message misbehaviour.
-	Prune float64 // penalty value for an individual prune message misbehaviour.
-	IHave float64 // penalty value for an individual iHave message misbehaviour.
-	IWant float64 // penalty value for an individual iWant message misbehaviour.
+	Graft             float64 // penalty value for an individual graft message misbehaviour.
+	Prune             float64 // penalty value for an individual prune message misbehaviour.
+	IHave             float64 // penalty value for an individual iHave message misbehaviour.
+	IWant             float64 // penalty value for an individual iWant message misbehaviour.
+	RpcPublishMessage float64 // penalty value for an individual RpcPublishMessage message misbehaviour.
 }
 
 // DefaultGossipSubCtrlMsgPenaltyValue returns the default penalty value for each control message type.
 func DefaultGossipSubCtrlMsgPenaltyValue() GossipSubCtrlMsgPenaltyValue {
 	return GossipSubCtrlMsgPenaltyValue{
-		Graft: graftMisbehaviourPenalty,
-		Prune: pruneMisbehaviourPenalty,
-		IHave: iHaveMisbehaviourPenalty,
-		IWant: iWantMisbehaviourPenalty,
+		Graft:             graftMisbehaviourPenalty,
+		Prune:             pruneMisbehaviourPenalty,
+		IHave:             iHaveMisbehaviourPenalty,
+		IWant:             iWantMisbehaviourPenalty,
+		RpcPublishMessage: rpcPublishMessageMisbehaviourPenalty,
 	}
 }
 
@@ -74,6 +82,7 @@ func DefaultGossipSubCtrlMsgPenaltyValue() GossipSubCtrlMsgPenaltyValue {
 // Similar to the GossipSub score, the application specific score is meant to be private to the local peer, and is not
 // shared with other peers in the network.
 type GossipSubAppSpecificScoreRegistry struct {
+	component.Component
 	logger     zerolog.Logger
 	idProvider module.IdentityProvider
 	// spamScoreCache currently only holds the control message misbehaviour penalty (spam related penalty).
@@ -127,6 +136,26 @@ func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegis
 		idProvider:     config.IdProvider,
 	}
 
+	builder := component.NewComponentManagerBuilder()
+	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		reg.logger.Info().Msg("starting subscription validator")
+		reg.validator.Start(ctx)
+		select {
+		case <-ctx.Done():
+			reg.logger.Warn().Msg("aborting subscription validator startup, context cancelled")
+		case <-reg.validator.Ready():
+			reg.logger.Info().Msg("subscription validator started")
+			ready()
+			reg.logger.Info().Msg("subscription validator is ready")
+		}
+
+		<-ctx.Done()
+		reg.logger.Info().Msg("stopping subscription validator")
+		<-reg.validator.Done()
+		reg.logger.Info().Msg("subscription validator stopped")
+	})
+	reg.Component = builder.Build()
+
 	return reg
 }
 
@@ -137,13 +166,13 @@ func (r *GossipSubAppSpecificScoreRegistry) AppSpecificScoreFunc() func(peer.ID)
 	return func(pid peer.ID) float64 {
 		appSpecificScore := float64(0)
 
-		lg := r.logger.With().Str("peer_id", pid.String()).Logger()
+		lg := r.logger.With().Str("peer_id", p2plogging.PeerId(pid)).Logger()
 		// (1) spam penalty: the penalty is applied to the application specific penalty when a peer conducts a spamming misbehaviour.
 		spamRecord, err, spamRecordExists := r.spamScoreCache.Get(pid)
 		if err != nil {
 			// the error is considered fatal as it means the cache is not working properly.
 			// we should not continue with the execution as it may lead to routing attack vulnerability.
-			r.logger.Fatal().Str("peer_id", pid.String()).Err(err).Msg("could not get application specific penalty for peer")
+			r.logger.Fatal().Str("peer_id", p2plogging.PeerId(pid)).Err(err).Msg("could not get application specific penalty for peer")
 			return appSpecificScore // unreachable, but added to avoid proceeding with the execution if log level is changed.
 		}
 
@@ -188,7 +217,7 @@ func (r *GossipSubAppSpecificScoreRegistry) AppSpecificScoreFunc() func(peer.ID)
 }
 
 func (r *GossipSubAppSpecificScoreRegistry) stakingScore(pid peer.ID) (float64, flow.Identifier, flow.Role) {
-	lg := r.logger.With().Str("peer_id", pid.String()).Logger()
+	lg := r.logger.With().Str("peer_id", p2plogging.PeerId(pid)).Logger()
 
 	// checks if peer has a valid Flow protocol identity.
 	flowId, err := HasValidFlowIdentity(r.idProvider, pid)
@@ -223,7 +252,7 @@ func (r *GossipSubAppSpecificScoreRegistry) subscriptionPenalty(pid peer.ID, flo
 	// checks if peer has any subscription violation.
 	if err := r.validator.CheckSubscribedToAllowedTopics(pid, role); err != nil {
 		r.logger.Err(err).
-			Str("peer_id", pid.String()).
+			Str("peer_id", p2plogging.PeerId(pid)).
 			Hex("flow_id", logging.ID(flowId)).
 			Bool(logging.KeySuspicious, true).
 			Msg("invalid subscription detected, penalizing peer")
@@ -240,7 +269,8 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 	// we use mutex to ensure the method is concurrency safe.
 
 	lg := r.logger.With().
-		Str("peer_id", notification.PeerID.String()).
+		Err(notification.Error).
+		Str("peer_id", p2plogging.PeerId(notification.PeerID)).
 		Str("misbehavior_type", notification.MsgType.String()).Logger()
 
 	// try initializing the application specific penalty for the peer if it is not yet initialized.
@@ -248,27 +278,27 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 	// initialization is successful only if the peer is not yet cached.
 	initialized := r.spamScoreCache.Add(notification.PeerID, r.init())
 	if initialized {
-		lg.Trace().Str("peer_id", notification.PeerID.String()).Msg("application specific penalty initialized for peer")
+		lg.Trace().Str("peer_id", p2plogging.PeerId(notification.PeerID)).Msg("application specific penalty initialized for peer")
 	}
 
 	record, err := r.spamScoreCache.Update(notification.PeerID, func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
 		switch notification.MsgType {
-		case p2p.CtrlMsgGraft:
+		case p2pmsg.CtrlMsgGraft:
 			record.Penalty += r.penalty.Graft
-		case p2p.CtrlMsgPrune:
+		case p2pmsg.CtrlMsgPrune:
 			record.Penalty += r.penalty.Prune
-		case p2p.CtrlMsgIHave:
+		case p2pmsg.CtrlMsgIHave:
 			record.Penalty += r.penalty.IHave
-		case p2p.CtrlMsgIWant:
+		case p2pmsg.CtrlMsgIWant:
 			record.Penalty += r.penalty.IWant
+		case p2pmsg.RpcPublishMessage:
+			record.Penalty += r.penalty.RpcPublishMessage
 		default:
 			// the error is considered fatal as it means that we have an unsupported misbehaviour type, we should crash the node to prevent routing attack vulnerability.
 			lg.Fatal().Str("misbehavior_type", notification.MsgType.String()).Msg("unknown misbehaviour type")
 		}
-
 		return record
 	})
-
 	if err != nil {
 		// any returned error from adjust is non-recoverable and fatal, we crash the node.
 		lg.Fatal().Err(err).Msg("could not adjust application specific penalty for peer")

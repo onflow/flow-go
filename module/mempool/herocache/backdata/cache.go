@@ -108,12 +108,14 @@ type Cache struct {
 // The default overSizeFactor factor is different in the package code because slotsPerBucket is > 3.
 const DefaultOversizeFactor = uint32(8)
 
-func NewCache(sizeLimit uint32,
+func NewCache(
+	sizeLimit uint32,
 	oversizeFactor uint32,
 	ejectionMode heropool.EjectionMode,
 	logger zerolog.Logger,
 	collector module.HeroCacheMetrics,
-	opts ...CacheOpt) *Cache {
+	opts ...CacheOpt,
+) *Cache {
 
 	// total buckets.
 	capacity := uint64(sizeLimit * oversizeFactor)
@@ -135,7 +137,7 @@ func NewCache(sizeLimit uint32,
 		sizeLimit:              sizeLimit,
 		buckets:                make([]slotBucket, bucketNum),
 		ejectionMode:           ejectionMode,
-		entities:               heropool.NewHeroPool(sizeLimit, ejectionMode),
+		entities:               heropool.NewHeroPool(sizeLimit, ejectionMode, logger),
 		availableSlotHistogram: make([]uint64, slotsPerBucket+1), // +1 is to account for empty buckets as well.
 		interactionCounter:     atomic.NewUint64(0),
 		lastTelemetryDump:      atomic.NewInt64(0),
@@ -267,7 +269,7 @@ func (c *Cache) Clear() {
 	defer c.logTelemetry()
 
 	c.buckets = make([]slotBucket, c.bucketNum)
-	c.entities = heropool.NewHeroPool(c.sizeLimit, c.ejectionMode)
+	c.entities = heropool.NewHeroPool(c.sizeLimit, c.ejectionMode, c.logger)
 	c.availableSlotHistogram = make([]uint64, slotsPerBucket+1)
 	c.interactionCounter = atomic.NewUint64(0)
 	c.lastTelemetryDump = atomic.NewInt64(0)
@@ -483,7 +485,7 @@ func (c *Cache) logTelemetry() {
 			Logger()
 	}
 
-	lg.Info().Msg("logging telemetry")
+	lg.Debug().Msg("logging telemetry")
 	c.lastTelemetryDump.Store(runtimeNano())
 }
 

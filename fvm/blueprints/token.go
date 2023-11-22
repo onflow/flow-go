@@ -22,6 +22,42 @@ func DeployFungibleTokenContractTransaction(fungibleToken flow.Address) *flow.Tr
 		contractName)
 }
 
+func DeployNonFungibleTokenContractTransaction(nonFungibleToken flow.Address) *flow.TransactionBody {
+	contract := contracts.NonFungibleToken()
+	contractName := "NonFungibleToken"
+	return DeployContractTransaction(
+		nonFungibleToken,
+		contract,
+		contractName)
+}
+
+func DeployMetadataViewsContractTransaction(fungibleToken, nonFungibleToken flow.Address) *flow.TransactionBody {
+	contract := contracts.MetadataViews(fungibleToken.HexWithPrefix(), nonFungibleToken.HexWithPrefix())
+	contractName := "MetadataViews"
+	return DeployContractTransaction(
+		nonFungibleToken,
+		contract,
+		contractName)
+}
+
+func DeployViewResolverContractTransaction(nonFungibleToken flow.Address) *flow.TransactionBody {
+	contract := contracts.ViewResolver()
+	contractName := "ViewResolver"
+	return DeployContractTransaction(
+		nonFungibleToken,
+		contract,
+		contractName)
+}
+
+func DeployFungibleTokenMetadataViewsContractTransaction(fungibleToken, nonFungibleToken flow.Address) *flow.TransactionBody {
+	contract := contracts.FungibleTokenMetadataViews(fungibleToken.Hex(), nonFungibleToken.Hex())
+	contractName := "FungibleTokenMetadataViews"
+	return DeployContractTransaction(
+		fungibleToken,
+		contract,
+		contractName)
+}
+
 //go:embed scripts/deployFlowTokenTransactionTemplate.cdc
 var deployFlowTokenTransactionTemplate string
 
@@ -31,8 +67,8 @@ var createFlowTokenMinterTransactionTemplate string
 //go:embed scripts/mintFlowTokenTransactionTemplate.cdc
 var mintFlowTokenTransactionTemplate string
 
-func DeployFlowTokenContractTransaction(service, fungibleToken, flowToken flow.Address) *flow.TransactionBody {
-	contract := contracts.FlowToken(fungibleToken.HexWithPrefix())
+func DeployFlowTokenContractTransaction(service, fungibleToken, metadataViews, flowToken flow.Address) *flow.TransactionBody {
+	contract := contracts.FlowToken(fungibleToken.HexWithPrefix(), metadataViews.HexWithPrefix(), metadataViews.HexWithPrefix())
 
 	return flow.NewTransactionBody().
 		SetScript([]byte(deployFlowTokenTransactionTemplate)).

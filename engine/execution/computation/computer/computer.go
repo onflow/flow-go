@@ -3,6 +3,7 @@ package computer
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/attribute"
@@ -15,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/errors"
 	"github.com/onflow/flow-go/fvm/storage/logical"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
@@ -22,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -106,14 +109,16 @@ type blockComputer struct {
 	log                   zerolog.Logger
 	systemChunkCtx        fvm.Context
 	committer             ViewCommitter
-	executionDataProvider *provider.Provider
+	executionDataProvider provider.Provider
 	signer                module.Local
 	spockHasher           hash.Hasher
 	receiptHasher         hash.Hasher
 	colResCons            []result.ExecutedCollectionConsumer
+	protocolState         protocol.State
+	maxConcurrency        int
 }
 
-func SystemChunkContext(vmCtx fvm.Context, logger zerolog.Logger) fvm.Context {
+func SystemChunkContext(vmCtx fvm.Context) fvm.Context {
 	return fvm.NewContextFromParent(
 		vmCtx,
 		fvm.WithContractDeploymentRestricted(false),
@@ -124,6 +129,8 @@ func SystemChunkContext(vmCtx fvm.Context, logger zerolog.Logger) fvm.Context {
 		fvm.WithServiceEventCollectionEnabled(),
 		fvm.WithEventCollectionSizeLimit(SystemChunkEventCollectionMaxSize),
 		fvm.WithMemoryAndInteractionLimitsDisabled(),
+		// only the system transaction is allowed to call the block entropy provider
+		fvm.WithRandomSourceHistoryCallAllowed(true),
 	)
 }
 
@@ -136,10 +143,15 @@ func NewBlockComputer(
 	logger zerolog.Logger,
 	committer ViewCommitter,
 	signer module.Local,
-	executionDataProvider *provider.Provider,
+	executionDataProvider provider.Provider,
 	colResCons []result.ExecutedCollectionConsumer,
+	state protocol.State,
+	maxConcurrency int,
 ) (BlockComputer, error) {
-	systemChunkCtx := SystemChunkContext(vmCtx, logger)
+	if maxConcurrency < 1 {
+		return nil, fmt.Errorf("invalid maxConcurrency: %d", maxConcurrency)
+	}
+	systemChunkCtx := SystemChunkContext(vmCtx)
 	vmCtx = fvm.NewContextFromParent(
 		vmCtx,
 		fvm.WithMetricsReporter(metrics),
@@ -157,6 +169,8 @@ func NewBlockComputer(
 		spockHasher:           utils.NewSPOCKHasher(),
 		receiptHasher:         utils.NewExecutionReceiptHasher(),
 		colResCons:            colResCons,
+		protocolState:         state,
+		maxConcurrency:        maxConcurrency,
 	}, nil
 }
 
@@ -191,12 +205,21 @@ func (e *blockComputer) queueTransactionRequests(
 	rawCollections []*entity.CompleteCollection,
 	systemTxnBody *flow.TransactionBody,
 	requestQueue chan TransactionRequest,
+	numTxns int,
 ) {
 	txnIndex := uint32(0)
 
 	collectionCtx := fvm.NewContextFromParent(
 		e.vmCtx,
-		fvm.WithBlockHeader(blockHeader))
+		fvm.WithBlockHeader(blockHeader),
+		// `protocol.Snapshot` implements `EntropyProvider` interface
+		// Note that `Snapshot` possible errors for RandomSource() are:
+		// - storage.ErrNotFound if the QC is unknown.
+		// - state.ErrUnknownSnapshotReference if the snapshot reference block is unknown
+		// However, at this stage, snapshot reference block should be known and the QC should also be known,
+		// so no error is expected in normal operations, as required by `EntropyProvider`.
+		fvm.WithEntropyProvider(e.protocolState.AtBlockID(blockId)),
+	)
 
 	for idx, collection := range rawCollections {
 		collectionLogger := collectionCtx.Logger.With().
@@ -229,12 +252,22 @@ func (e *blockComputer) queueTransactionRequests(
 
 	systemCtx := fvm.NewContextFromParent(
 		e.systemChunkCtx,
-		fvm.WithBlockHeader(blockHeader))
+		fvm.WithBlockHeader(blockHeader),
+		// `protocol.Snapshot` implements `EntropyProvider` interface
+		// Note that `Snapshot` possible errors for RandomSource() are:
+		// - storage.ErrNotFound if the QC is unknown.
+		// - state.ErrUnknownSnapshotReference if the snapshot reference block is unknown
+		// However, at this stage, snapshot reference block should be known and the QC should also be known,
+		// so no error is expected in normal operations, as required by `EntropyProvider`.
+		fvm.WithEntropyProvider(e.protocolState.AtBlockID(blockId)),
+	)
 	systemCollectionLogger := systemCtx.Logger.With().
 		Str("block_id", blockIdStr).
 		Uint64("height", blockHeader.Height).
 		Bool("system_chunk", true).
 		Bool("system_transaction", true).
+		Int("num_collections", len(rawCollections)).
+		Int("num_txs", numTxns).
 		Logger()
 	systemCollectionInfo := collectionInfo{
 		blockId:         blockId,
@@ -313,7 +346,9 @@ func (e *blockComputer) executeBlock(
 		parentBlockExecutionResultID,
 		block,
 		numTxns,
-		e.colResCons)
+		e.colResCons,
+		baseSnapshot,
+	)
 	defer collector.Stop()
 
 	requestQueue := make(chan TransactionRequest, numTxns)
@@ -330,18 +365,27 @@ func (e *blockComputer) executeBlock(
 		block.Block.Header,
 		rawCollections,
 		systemTxn,
-		requestQueue)
+		requestQueue,
+		numTxns,
+	)
 	close(requestQueue)
 
-	for request := range requestQueue {
-		request.ctx.Logger.Info().Msg("executing transaction")
-		err := e.executeTransaction(
+	wg := &sync.WaitGroup{}
+	wg.Add(e.maxConcurrency)
+
+	for i := 0; i < e.maxConcurrency; i++ {
+		go e.executeTransactions(
 			blockSpan,
 			database,
-			request)
-		if err != nil {
-			return nil, err
-		}
+			requestQueue,
+			wg)
+	}
+
+	wg.Wait()
+
+	err = database.Error()
+	if err != nil {
+		return nil, err
 	}
 
 	res, err := collector.Finalize(ctx)
@@ -358,15 +402,53 @@ func (e *blockComputer) executeBlock(
 	return res, nil
 }
 
+func (e *blockComputer) executeTransactions(
+	blockSpan otelTrace.Span,
+	database *transactionCoordinator,
+	requestQueue chan TransactionRequest,
+	wg *sync.WaitGroup,
+) {
+	defer wg.Done()
+
+	for request := range requestQueue {
+		attempt := 0
+		for {
+			request.ctx.Logger.Info().
+				Int("attempt", attempt).
+				Msg("executing transaction")
+
+			attempt += 1
+			err := e.executeTransaction(blockSpan, database, request, attempt)
+
+			if errors.IsRetryableConflictError(err) {
+				request.ctx.Logger.Info().
+					Int("attempt", attempt).
+					Str("conflict_error", err.Error()).
+					Msg("conflict detected. retrying transaction")
+				continue
+			}
+
+			if err != nil {
+				database.AbortAllOutstandingTransactions(err)
+				return
+			}
+
+			break // process next transaction
+		}
+	}
+}
+
 func (e *blockComputer) executeTransaction(
 	blockSpan otelTrace.Span,
 	database *transactionCoordinator,
 	request TransactionRequest,
+	attempt int,
 ) error {
 	txn, err := e.executeTransactionInternal(
 		blockSpan,
 		database,
-		request)
+		request,
+		attempt)
 	if err != nil {
 		prefix := ""
 		if request.isSystemTransaction {
@@ -397,6 +479,7 @@ func (e *blockComputer) executeTransactionInternal(
 	blockSpan otelTrace.Span,
 	database *transactionCoordinator,
 	request TransactionRequest,
+	attempt int,
 ) (
 	*transaction,
 	error,
@@ -414,13 +497,22 @@ func (e *blockComputer) executeTransactionInternal(
 
 	request.ctx = fvm.NewContextFromParent(request.ctx, fvm.WithSpan(txSpan))
 
-	txn, err := database.NewTransaction(request)
+	txn, err := database.NewTransaction(request, attempt)
 	if err != nil {
 		return nil, err
 	}
 	defer txn.Cleanup()
 
 	err = txn.Preprocess()
+	if err != nil {
+		return txn, err
+	}
+
+	// Validating here gives us an opportunity to early abort/retry the
+	// transaction in case the conflict is detectable after preprocessing.
+	// This is strictly an optimization and hence we don't need to wait for
+	// updates (removing this validate call won't impact correctness).
+	err = txn.Validate()
 	if err != nil {
 		return txn, err
 	}
@@ -433,6 +525,21 @@ func (e *blockComputer) executeTransactionInternal(
 	err = txn.Finalize()
 	if err != nil {
 		return txn, err
+	}
+
+	// Snapshot time smaller than execution time indicates there are outstanding
+	// transaction(s) that must be committed before this transaction can be
+	// committed.
+	for txn.SnapshotTime() < request.ExecutionTime() {
+		err = txn.WaitForUpdates()
+		if err != nil {
+			return txn, err
+		}
+
+		err = txn.Validate()
+		if err != nil {
+			return txn, err
+		}
 	}
 
 	return txn, txn.Commit()

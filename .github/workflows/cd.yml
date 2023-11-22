@@ -14,19 +14,22 @@ jobs:
     - name: Setup Go
       uses: actions/setup-go@v4
       with:
-        go-version: '1.19'
+        go-version: "1.20"
     - name: Checkout repo
       uses: actions/checkout@v2
     - name: Build relic
       run: make crypto_setup_gopath
     # Provide Google Service Account credentials to Github Action, allowing interaction with the Google Container Registry
     # Logging in as github-actions@dl-flow.iam.gserviceaccount.com
-    - name: Docker login
-      uses: docker/login-action@v1
+    - id: auth
+      uses: google-github-actions/auth@v1
       with:
-        registry: gcr.io
-        username: _json_key
-        password: ${{ secrets.GCR_SERVICE_KEY }}
+        credentials_json: ${{ secrets.GCR_SERVICE_KEY_SECRET }}
+    - name: Set up Google Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+    - name: Authenticate docker with gcloud
+      run: |
+        gcloud auth configure-docker
     - name: Docker build
       run: |
         make docker-build-flow

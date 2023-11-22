@@ -12,22 +12,19 @@ import (
 
 type EpochSetups struct {
 	db    *badger.DB
-	cache *Cache
+	cache *Cache[flow.Identifier, *flow.EpochSetup]
 }
 
 // NewEpochSetups instantiates a new EpochSetups storage.
 func NewEpochSetups(collector module.CacheMetrics, db *badger.DB) *EpochSetups {
 
-	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {
-		id := key.(flow.Identifier)
-		setup := val.(*flow.EpochSetup)
+	store := func(id flow.Identifier, setup *flow.EpochSetup) func(*transaction.Tx) error {
 		return transaction.WithTx(operation.SkipDuplicates(operation.InsertEpochSetup(id, setup)))
 	}
 
-	retrieve := func(key interface{}) func(*badger.Txn) (interface{}, error) {
-		id := key.(flow.Identifier)
-		var setup flow.EpochSetup
-		return func(tx *badger.Txn) (interface{}, error) {
+	retrieve := func(id flow.Identifier) func(*badger.Txn) (*flow.EpochSetup, error) {
+		return func(tx *badger.Txn) (*flow.EpochSetup, error) {
+			var setup flow.EpochSetup
 			err := operation.RetrieveEpochSetup(id, &setup)(tx)
 			return &setup, err
 		}
@@ -35,8 +32,8 @@ func NewEpochSetups(collector module.CacheMetrics, db *badger.DB) *EpochSetups {
 
 	es := &EpochSetups{
 		db: db,
-		cache: newCache(collector, metrics.ResourceEpochSetup,
-			withLimit(4*flow.DefaultTransactionExpiry),
+		cache: newCache[flow.Identifier, *flow.EpochSetup](collector, metrics.ResourceEpochSetup,
+			withLimit[flow.Identifier, *flow.EpochSetup](4*flow.DefaultTransactionExpiry),
 			withStore(store),
 			withRetrieve(retrieve)),
 	}
@@ -54,7 +51,7 @@ func (es *EpochSetups) retrieveTx(setupID flow.Identifier) func(tx *badger.Txn) 
 		if err != nil {
 			return nil, err
 		}
-		return val.(*flow.EpochSetup), nil
+		return val, nil
 	}
 }
 

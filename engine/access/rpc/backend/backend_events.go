@@ -7,12 +7,14 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/hashicorp/go-multierror"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -24,9 +26,10 @@ type backendEvents struct {
 	headers           storage.Headers
 	executionReceipts storage.ExecutionReceipts
 	state             protocol.State
-	connFactory       ConnectionFactory
+	connFactory       connection.ConnectionFactory
 	log               zerolog.Logger
 	maxHeightRange    uint
+	nodeCommunicator  Communicator
 }
 
 // GetEventsForHeightRange retrieves events for all sealed blocks between the start block height and
@@ -35,6 +38,7 @@ func (b *backendEvents) GetEventsForHeightRange(
 	ctx context.Context,
 	eventType string,
 	startHeight, endHeight uint64,
+	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) ([]flow.BlockEvents, error) {
 
 	if endHeight < startHeight {
@@ -76,7 +80,7 @@ func (b *backendEvents) GetEventsForHeightRange(
 		blockHeaders = append(blockHeaders, header)
 	}
 
-	return b.getBlockEventsFromExecutionNode(ctx, blockHeaders, eventType)
+	return b.getBlockEventsFromExecutionNode(ctx, blockHeaders, eventType, requiredEventEncodingVersion)
 }
 
 // GetEventsForBlockIDs retrieves events for all the specified block IDs that have the given type
@@ -84,6 +88,7 @@ func (b *backendEvents) GetEventsForBlockIDs(
 	ctx context.Context,
 	eventType string,
 	blockIDs []flow.Identifier,
+	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) ([]flow.BlockEvents, error) {
 
 	if uint(len(blockIDs)) > b.maxHeightRange {
@@ -102,13 +107,14 @@ func (b *backendEvents) GetEventsForBlockIDs(
 	}
 
 	// forward the request to the execution node
-	return b.getBlockEventsFromExecutionNode(ctx, blockHeaders, eventType)
+	return b.getBlockEventsFromExecutionNode(ctx, blockHeaders, eventType, requiredEventEncodingVersion)
 }
 
 func (b *backendEvents) getBlockEventsFromExecutionNode(
 	ctx context.Context,
 	blockHeaders []*flow.Header,
 	eventType string,
+	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) ([]flow.BlockEvents, error) {
 
 	// create an execution API request for events at block ID
@@ -148,7 +154,12 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 		Msg("successfully got events")
 
 	// convert execution node api result to access node api result
-	results, err := verifyAndConvertToAccessEvents(resp.GetResults(), blockHeaders, resp.GetEventEncodingVersion())
+	results, err := verifyAndConvertToAccessEvents(
+		resp.GetResults(),
+		blockHeaders,
+		resp.GetEventEncodingVersion(),
+		requiredEventEncodingVersion,
+	)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to verify retrieved events from execution node: %v", err)
 	}
@@ -161,7 +172,8 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 func verifyAndConvertToAccessEvents(
 	execEvents []*execproto.GetEventsForBlockIDsResponse_Result,
 	requestedBlockHeaders []*flow.Header,
-	version execproto.EventEncodingVersion,
+	from entities.EventEncodingVersion,
+	to entities.EventEncodingVersion,
 ) ([]flow.BlockEvents, error) {
 	if len(execEvents) != len(requestedBlockHeaders) {
 		return nil, errors.New("number of results does not match number of blocks requested")
@@ -185,10 +197,10 @@ func verifyAndConvertToAccessEvents(
 				result.GetBlockId())
 		}
 
-		events, err := convert.MessagesToEventsFromVersion(result.GetEvents(), version)
+		events, err := convert.MessagesToEventsWithEncodingConversion(result.GetEvents(), from, to)
 		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshall events in event %d with encoding version %s: %w",
-				i, version.String(), err)
+			return nil, fmt.Errorf("failed to unmarshal events in event %d with encoding version %s: %w",
+				i, to.String(), err)
 		}
 
 		results[i] = flow.BlockEvents{
@@ -209,31 +221,37 @@ func verifyAndConvertToAccessEvents(
 func (b *backendEvents) getEventsFromAnyExeNode(ctx context.Context,
 	execNodes flow.IdentityList,
 	req *execproto.GetEventsForBlockIDsRequest) (*execproto.GetEventsForBlockIDsResponse, *flow.Identity, error) {
-	var errors *multierror.Error
-	// try to get events from one of the execution nodes
-	for _, execNode := range execNodes {
-		start := time.Now()
-		resp, err := b.tryGetEvents(ctx, execNode, req)
-		duration := time.Since(start)
+	var resp *execproto.GetEventsForBlockIDsResponse
+	var execNode *flow.Identity
+	errToReturn := b.nodeCommunicator.CallAvailableNode(
+		execNodes,
+		func(node *flow.Identity) error {
+			var err error
+			start := time.Now()
+			resp, err = b.tryGetEvents(ctx, node, req)
+			duration := time.Since(start)
 
-		logger := b.log.With().
-			Str("execution_node", execNode.String()).
-			Str("event", req.GetType()).
-			Int("blocks", len(req.BlockIds)).
-			Int64("rtt_ms", duration.Milliseconds()).
-			Logger()
+			logger := b.log.With().
+				Str("execution_node", node.String()).
+				Str("event", req.GetType()).
+				Int("blocks", len(req.BlockIds)).
+				Int64("rtt_ms", duration.Milliseconds()).
+				Logger()
 
-		if err == nil {
-			// return if any execution node replied successfully
-			logger.Debug().Msg("Successfully got events")
-			return resp, execNode, nil
-		}
+			if err == nil {
+				// return if any execution node replied successfully
+				logger.Debug().Msg("Successfully got events")
+				execNode = node
+				return nil
+			}
 
-		logger.Err(err).Msg("failed to execute GetEvents")
+			logger.Err(err).Msg("failed to execute GetEvents")
+			return err
+		},
+		nil,
+	)
 
-		errors = multierror.Append(errors, err)
-	}
-	return nil, nil, errors.ErrorOrNil()
+	return resp, execNode, errToReturn
 }
 
 func (b *backendEvents) tryGetEvents(ctx context.Context,
@@ -247,9 +265,6 @@ func (b *backendEvents) tryGetEvents(ctx context.Context,
 
 	resp, err := execRPCClient.GetEventsForBlockIDs(ctx, req)
 	if err != nil {
-		if status.Code(err) == codes.Unavailable {
-			b.connFactory.InvalidateExecutionAPIClient(execNode.Address)
-		}
 		return nil, err
 	}
 	return resp, nil

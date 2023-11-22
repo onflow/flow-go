@@ -3,7 +3,6 @@ package connection
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/libp2p/go-libp2p/core/connmgr"
 	"github.com/libp2p/go-libp2p/core/network"
@@ -12,34 +11,9 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/network/netconf"
 	"github.com/onflow/flow-go/network/p2p/connection/internal"
 )
-
-const (
-	// defaultHighWatermark is the default value for the high watermark (i.e., max number of connections).
-	// We assume a complete topology graph with maximum of 500 nodes.
-	defaultHighWatermark = 500
-
-	// defaultLowWatermark is the default value for the low watermark (i.e., min number of connections).
-	// We assume a complete topology graph with minimum of 450 nodes.
-	defaultLowWatermark = 450
-
-	// defaultGracePeriod is the default value for the grace period (i.e., time to wait before pruning a new connection).
-	defaultGracePeriod = 1 * time.Minute
-
-	// defaultSilencePeriod is the default value for the silence period (i.e., time to wait before start pruning connections).
-	defaultSilencePeriod = 10 * time.Second
-)
-
-// DefaultConnManagerConfig returns the default configuration for the connection manager.
-func DefaultConnManagerConfig() *ManagerConfig {
-	return &ManagerConfig{
-		HighWatermark: defaultHighWatermark,
-		LowWatermark:  defaultLowWatermark,
-		GracePeriod:   defaultGracePeriod,
-		SilencePeriod: defaultSilencePeriod,
-	}
-}
 
 // ConnManager provides an implementation of Libp2p's ConnManager interface (https://pkg.go.dev/github.com/libp2p/go-libp2p/core/connmgr#ConnManager)
 // It is called back by libp2p when certain events occur such as opening/closing a stream, opening/closing connection etc.
@@ -53,33 +27,11 @@ type ConnManager struct {
 
 var _ connmgr.ConnManager = (*ConnManager)(nil)
 
-type ManagerConfig struct {
-	// HighWatermark and LowWatermark govern the number of connections are maintained by the ConnManager.
-	// When the peer count exceeds the HighWatermark, as many peers will be pruned (and
-	// their connections terminated) until LowWatermark peers remain. In other words, whenever the
-	// peer count is x > HighWatermark, the ConnManager will prune x - LowWatermark peers.
-	// The pruning algorithm is as follows:
-	// 1. The ConnManager will not prune any peers that have been connected for less than GracePeriod.
-	// 2. The ConnManager will not prune any peers that are protected.
-	// 3. The ConnManager will sort the peers based on their number of streams and direction of connections, and
-	// prunes the peers with the least number of streams. If there are ties, the peer with the incoming connection
-	// will be pruned. If both peers have incoming connections, and there are still ties, one of the peers will be
-	// pruned at random.
-	// Algorithm implementation is in https://github.com/libp2p/go-libp2p/blob/master/p2p/net/connmgr/connmgr.go#L262-L318
-	HighWatermark int // naming from libp2p
-	LowWatermark  int // naming from libp2p
-
-	// SilencePeriod is the time to wait before start pruning connections.
-	SilencePeriod time.Duration // naming from libp2p
-	// GracePeriod is the time to wait before pruning a new connection.
-	GracePeriod time.Duration // naming from libp2p
-}
-
 // NewConnManager creates a new connection manager.
 // It errors if creating the basic connection manager of libp2p fails.
 // The error is not benign, and we should crash the node if it happens.
 // It is a malpractice to start the node without connection manager.
-func NewConnManager(logger zerolog.Logger, metric module.LibP2PConnectionMetrics, cfg *ManagerConfig) (*ConnManager, error) {
+func NewConnManager(logger zerolog.Logger, metric module.LibP2PConnectionMetrics, cfg *netconf.ConnectionManagerConfig) (*ConnManager, error) {
 	basic, err := libp2pconnmgr.NewConnManager(
 		cfg.LowWatermark,
 		cfg.HighWatermark,

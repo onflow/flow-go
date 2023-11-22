@@ -10,6 +10,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -45,9 +46,10 @@ type NetworkCollector struct {
 	dnsLookupRequestDroppedCount prometheus.Counter
 	routingTableSize             prometheus.Gauge
 
-	// authorization, rate limiting metrics
+	// security metrics
 	unAuthorizedMessagesCount       *prometheus.CounterVec
 	rateLimitedUnicastMessagesCount *prometheus.CounterVec
+	violationReportSkippedCount     prometheus.Counter
 
 	prefix string
 }
@@ -85,7 +87,7 @@ func NewNetworkCollector(logger zerolog.Logger, opts ...NetworkCollectorOpt) *Ne
 			Subsystem: subsystemGossip,
 			Name:      nc.prefix + "outbound_message_size_bytes",
 			Help:      "size of the outbound network message",
-			Buckets:   []float64{KiB, 100 * KiB, 500 * KiB, 1 * MiB, 2 * MiB, 4 * MiB},
+			Buckets:   []float64{KiB, 100 * KiB, 1 * MiB},
 		}, []string{LabelChannel, LabelProtocol, LabelMessage},
 	)
 
@@ -95,7 +97,7 @@ func NewNetworkCollector(logger zerolog.Logger, opts ...NetworkCollectorOpt) *Ne
 			Subsystem: subsystemGossip,
 			Name:      nc.prefix + "inbound_message_size_bytes",
 			Help:      "size of the inbound network message",
-			Buckets:   []float64{KiB, 100 * KiB, 500 * KiB, 1 * MiB, 2 * MiB, 4 * MiB},
+			Buckets:   []float64{KiB, 100 * KiB, 1 * MiB},
 		}, []string{LabelChannel, LabelProtocol, LabelMessage},
 	)
 
@@ -245,6 +247,15 @@ func NewNetworkCollector(logger zerolog.Logger, opts ...NetworkCollectorOpt) *Ne
 		}, []string{LabelNodeRole, LabelMessage, LabelChannel, LabelRateLimitReason},
 	)
 
+	nc.violationReportSkippedCount = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemSecurity,
+			Name:      nc.prefix + "slashing_violation_reports_skipped_count",
+			Help:      "number of slashing violations consumer violations that were not reported for misbehavior because the identity of the sender not known",
+		},
+	)
+
 	return nc
 }
 
@@ -349,7 +360,7 @@ func (nc *NetworkCollector) OnUnauthorizedMessage(role, msgType, topic, offense 
 // OnRateLimitedPeer tracks the number of rate limited messages seen on the network.
 func (nc *NetworkCollector) OnRateLimitedPeer(peerID peer.ID, role, msgType, topic, reason string) {
 	nc.logger.Warn().
-		Str("peer_id", peerID.String()).
+		Str("peer_id", p2plogging.PeerId(peerID)).
 		Str("role", role).
 		Str("message_type", msgType).
 		Str("topic", topic).
@@ -357,4 +368,10 @@ func (nc *NetworkCollector) OnRateLimitedPeer(peerID peer.ID, role, msgType, top
 		Bool(logging.KeySuspicious, true).
 		Msg("unicast peer rate limited")
 	nc.rateLimitedUnicastMessagesCount.WithLabelValues(role, msgType, topic, reason).Inc()
+}
+
+// OnViolationReportSkipped tracks the number of slashing violations consumer violations that were not
+// reported for misbehavior when the identity of the sender not known.
+func (nc *NetworkCollector) OnViolationReportSkipped() {
+	nc.violationReportSkippedCount.Inc()
 }

@@ -1,3 +1,11 @@
+// Package epochs contains common functionality for the epoch integration test suite.
+// Individual tests exist in sub-directories of this: cohort1, cohort2...
+// Each cohort is run as a separate, sequential CI job. Since the epoch tests are long
+// and resource-heavy, we split them into several cohorts, which can be run in parallel.
+//
+// If a new cohort is added in the future, it must be added to:
+//   - ci.yml, flaky-test-monitor.yml, bors.toml (ensure new cohort of tests is run)
+//   - Makefile (include new cohort in integration-test directive, etc.)
 package epochs
 
 import (
@@ -32,7 +40,7 @@ import (
 
 // nodeUpdateValidation func that will be used to validate the health of the network
 // after an identity table change during an epoch transition. This is used in
-// tandem with runTestEpochJoinAndLeave.
+// tandem with RunTestEpochJoinAndLeave.
 // NOTE: The snapshot must reference a block within the second epoch.
 type nodeUpdateValidation func(ctx context.Context, env templates.Environment, snapshot *inmem.Snapshot, info *StakedNodeOperationInfo)
 
@@ -40,12 +48,13 @@ type nodeUpdateValidation func(ctx context.Context, env templates.Environment, s
 type Suite struct {
 	suite.Suite
 	lib.TestnetStateTracker
-	ctx     context.Context
 	cancel  context.CancelFunc
 	log     zerolog.Logger
 	net     *testnet.FlowNetwork
 	ghostID flow.Identifier
-	client  *testnet.Client
+
+	Client *testnet.Client
+	Ctx    context.Context
 
 	// Epoch config (lengths in views)
 	StakingAuctionLen          uint64
@@ -55,16 +64,22 @@ type Suite struct {
 	// Whether approvals are required for sealing (we only enable for VN tests because
 	// requiring approvals requires a longer DKG period to avoid flakiness)
 	RequiredSealApprovals uint // defaults to 0 (no approvals required)
+	// Consensus Node proposal duration
+	ConsensusProposalDuration time.Duration
 }
 
 // SetupTest is run automatically by the testing framework before each test case.
 func (s *Suite) SetupTest() {
+	// If unset, use default value 100ms
+	if s.ConsensusProposalDuration == 0 {
+		s.ConsensusProposalDuration = time.Millisecond * 100
+	}
 
 	minEpochLength := s.StakingAuctionLen + s.DKGPhaseLen*3 + 20
 	// ensure epoch lengths are set correctly
 	require.Greater(s.T(), s.EpochLen, minEpochLength+s.EpochCommitSafetyThreshold, "epoch too short")
 
-	s.ctx, s.cancel = context.WithCancel(context.Background())
+	s.Ctx, s.cancel = context.WithCancel(context.Background())
 	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
 	s.log.Info().Msg("================> SetupTest")
 	defer func() {
@@ -76,7 +91,7 @@ func (s *Suite) SetupTest() {
 		testnet.WithLogLevel(zerolog.WarnLevel)}
 
 	consensusConfigs := []func(config *testnet.NodeConfig){
-		testnet.WithAdditionalFlag("--cruise-ctl-fallback-proposal-duration=100ms"),
+		testnet.WithAdditionalFlag(fmt.Sprintf("--cruise-ctl-fallback-proposal-duration=%s", s.ConsensusProposalDuration)),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", s.RequiredSealApprovals)),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", s.RequiredSealApprovals)),
 		testnet.WithLogLevel(zerolog.WarnLevel)}
@@ -107,24 +122,24 @@ func (s *Suite) SetupTest() {
 	s.net = testnet.PrepareFlowNetwork(s.T(), netConf, flow.Localnet)
 
 	// start the network
-	s.net.Start(s.ctx)
+	s.net.Start(s.Ctx)
 
 	// start tracking blocks
-	s.Track(s.T(), s.ctx, s.Ghost())
+	s.Track(s.T(), s.Ctx, s.Ghost())
 
 	// use AN1 for test-related queries - the AN join/leave test will replace AN2
 	client, err := s.net.ContainerByName(testnet.PrimaryAN).TestnetClient()
 	require.NoError(s.T(), err)
 
-	s.client = client
+	s.Client = client
 
 	// log network info periodically to aid in debugging future flaky tests
-	go lib.LogStatusPeriodically(s.T(), s.ctx, s.log, s.client, 5*time.Second)
+	go lib.LogStatusPeriodically(s.T(), s.Ctx, s.log, s.Client, 5*time.Second)
 }
 
 func (s *Suite) Ghost() *client.GhostClient {
 	client, err := s.net.ContainerByID(s.ghostID).GhostClient()
-	require.NoError(s.T(), err, "could not get ghost client")
+	require.NoError(s.T(), err, "could not get ghost Client")
 	return client
 }
 
@@ -182,17 +197,17 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 		SetHashAlgo(sdkcrypto.SHA2_256).
 		SetWeight(sdk.AccountKeyWeightThreshold)
 
-	_, stakeAmount, err := s.client.TokenAmountByRole(role)
+	_, stakeAmount, err := s.Client.TokenAmountByRole(role)
 	require.NoError(s.T(), err)
 	containerName := s.getTestContainerName(role)
 
-	latestBlockID, err := s.client.GetLatestBlockID(ctx)
+	latestBlockID, err := s.Client.GetLatestBlockID(ctx)
 	require.NoError(s.T(), err)
 
 	// create and register node
 	tx, err := utils.MakeCreateAndSetupNodeTx(
 		env,
-		s.client.Account(),
+		s.Client.Account(),
 		sdk.Identifier(latestBlockID),
 		fullStakingAcctKey,
 		fmt.Sprintf("%f", stakeAmount+10.0),
@@ -205,14 +220,14 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 	)
 	require.NoError(s.T(), err)
 
-	err = s.client.SignAndSendTransaction(ctx, tx)
+	err = s.Client.SignAndSendTransaction(ctx, tx)
 	require.NoError(s.T(), err)
-	result, err := s.client.WaitForSealed(ctx, tx.ID())
+	result, err := s.Client.WaitForSealed(ctx, tx.ID())
 	require.NoError(s.T(), err)
-	s.client.Account().Keys[0].SequenceNumber++
+	s.Client.Account().Keys[0].SequenceNumber++
 	require.NoError(s.T(), result.Error)
 
-	accounts := s.client.CreatedAccounts(result)
+	accounts := s.Client.CreatedAccounts(result)
 	stakingAccountAddress := accounts[0]
 	var machineAccountAddr sdk.Address
 	if role == flow.RoleCollection || role == flow.RoleConsensus {
@@ -283,29 +298,29 @@ func (s *Suite) submitAdminRemoveNodeTx(ctx context.Context,
 	env templates.Environment,
 	nodeID flow.Identifier,
 ) (*sdk.TransactionResult, error) {
-	latestBlockID, err := s.client.GetLatestBlockID(ctx)
+	latestBlockID, err := s.Client.GetLatestBlockID(ctx)
 	require.NoError(s.T(), err)
 
 	closeStakeTx, err := utils.MakeAdminRemoveNodeTx(
 		env,
-		s.client.Account(),
+		s.Client.Account(),
 		0,
 		sdk.Identifier(latestBlockID),
 		nodeID,
 	)
 	require.NoError(s.T(), err)
 
-	err = s.client.SignAndSendTransaction(ctx, closeStakeTx)
+	err = s.Client.SignAndSendTransaction(ctx, closeStakeTx)
 	require.NoError(s.T(), err)
 
-	result, err := s.client.WaitForSealed(ctx, closeStakeTx.ID())
+	result, err := s.Client.WaitForSealed(ctx, closeStakeTx.ID())
 	require.NoError(s.T(), err)
-	s.client.Account().Keys[0].SequenceNumber++
+	s.Client.Account().Keys[0].SequenceNumber++
 	return result, nil
 }
 
 func (s *Suite) ExecuteGetProposedTableScript(ctx context.Context, env templates.Environment, nodeID flow.Identifier) cadence.Value {
-	v, err := s.client.ExecuteScriptBytes(ctx, templates.GenerateReturnProposedTableScript(env), []cadence.Value{})
+	v, err := s.Client.ExecuteScriptBytes(ctx, templates.GenerateReturnProposedTableScript(env), []cadence.Value{})
 	require.NoError(s.T(), err)
 	return v
 }
@@ -314,14 +329,14 @@ func (s *Suite) ExecuteGetProposedTableScript(ctx context.Context, env templates
 func (s *Suite) ExecuteGetNodeInfoScript(ctx context.Context, env templates.Environment, nodeID flow.Identifier) cadence.Value {
 	cdcNodeID, err := cadence.NewString(nodeID.String())
 	require.NoError(s.T(), err)
-	v, err := s.client.ExecuteScriptBytes(ctx, templates.GenerateGetNodeInfoScript(env), []cadence.Value{cdcNodeID})
+	v, err := s.Client.ExecuteScriptBytes(ctx, templates.GenerateGetNodeInfoScript(env), []cadence.Value{cdcNodeID})
 	require.NoError(s.T(), err)
 	return v
 }
 
 // SubmitSetApprovedListTx adds a node to the approved node list, this must be done when a node joins the protocol during the epoch staking phase
 func (s *Suite) SubmitSetApprovedListTx(ctx context.Context, env templates.Environment, identities ...flow.Identifier) *sdk.TransactionResult {
-	latestBlockID, err := s.client.GetLatestBlockID(ctx)
+	latestBlockID, err := s.Client.GetLatestBlockID(ctx)
 	require.NoError(s.T(), err)
 
 	idTableAddress := sdk.HexToAddress(env.IDTableAddress)
@@ -329,25 +344,25 @@ func (s *Suite) SubmitSetApprovedListTx(ctx context.Context, env templates.Envir
 		SetScript(templates.GenerateSetApprovedNodesScript(env)).
 		SetGasLimit(9999).
 		SetReferenceBlockID(sdk.Identifier(latestBlockID)).
-		SetProposalKey(s.client.SDKServiceAddress(), 0, s.client.Account().Keys[0].SequenceNumber).
-		SetPayer(s.client.SDKServiceAddress()).
+		SetProposalKey(s.Client.SDKServiceAddress(), 0, s.Client.Account().Keys[0].SequenceNumber).
+		SetPayer(s.Client.SDKServiceAddress()).
 		AddAuthorizer(idTableAddress)
 	err = tx.AddArgument(blueprints.SetStakingAllowlistTxArg(identities))
 	require.NoError(s.T(), err)
 
-	err = s.client.SignAndSendTransaction(ctx, tx)
+	err = s.Client.SignAndSendTransaction(ctx, tx)
 	require.NoError(s.T(), err)
 
-	result, err := s.client.WaitForSealed(ctx, tx.ID())
+	result, err := s.Client.WaitForSealed(ctx, tx.ID())
 	require.NoError(s.T(), err)
-	s.client.Account().Keys[0].SequenceNumber++
+	s.Client.Account().Keys[0].SequenceNumber++
 
 	return result
 }
 
 // ExecuteReadApprovedNodesScript executes the return proposal table script and returns a list of approved nodes
 func (s *Suite) ExecuteReadApprovedNodesScript(ctx context.Context, env templates.Environment) cadence.Value {
-	v, err := s.client.ExecuteScriptBytes(ctx, templates.GenerateGetApprovedNodesScript(env), []cadence.Value{})
+	v, err := s.Client.ExecuteScriptBytes(ctx, templates.GenerateGetApprovedNodesScript(env), []cadence.Value{})
 	require.NoError(s.T(), err)
 
 	return v
@@ -363,7 +378,7 @@ func (s *Suite) getTestContainerName(role flow.Role) string {
 // and checks that the info.NodeID is in both list
 func (s *Suite) assertNodeApprovedAndProposed(ctx context.Context, env templates.Environment, info *StakedNodeOperationInfo) {
 	// ensure node ID in approved list
-	//approvedNodes := s.ExecuteReadApprovedNodesScript(ctx, env)
+	//approvedNodes := s.ExecuteReadApprovedNodesScript(Ctx, env)
 	//require.Containsf(s.T(), approvedNodes.(cadence.Array).Values, cadence.String(info.NodeID.String()), "expected new node to be in approved nodes list: %x", info.NodeID)
 
 	// Access Nodes go through a separate selection process, so they do not immediately
@@ -442,23 +457,25 @@ func (s *Suite) getContainerToReplace(role flow.Role) *testnet.Container {
 
 // AwaitEpochPhase waits for the given phase, in the given epoch.
 func (s *Suite) AwaitEpochPhase(ctx context.Context, expectedEpoch uint64, expectedPhase flow.EpochPhase, waitFor, tick time.Duration) {
+	var actualEpoch uint64
+	var actualPhase flow.EpochPhase
 	condition := func() bool {
-		snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
+		snapshot, err := s.Client.GetLatestProtocolSnapshot(ctx)
 		require.NoError(s.T(), err)
 
-		actualEpoch, err := snapshot.Epochs().Current().Counter()
+		actualEpoch, err = snapshot.Epochs().Current().Counter()
 		require.NoError(s.T(), err)
-		actualPhase, err := snapshot.Phase()
+		actualPhase, err = snapshot.Phase()
 		require.NoError(s.T(), err)
 
 		return actualEpoch == expectedEpoch && actualPhase == expectedPhase
 	}
-	require.Eventuallyf(s.T(), condition, waitFor, tick, "did not reach expectedEpoch %d phase %s within %s", expectedEpoch, expectedPhase, waitFor)
+	require.Eventuallyf(s.T(), condition, waitFor, tick, "did not reach expectedEpoch %d phase %s within %s. Last saw epoch=%d and phase=%s", expectedEpoch, expectedPhase, waitFor, actualEpoch, actualPhase)
 }
 
 // AssertInEpochPhase checks if we are in the phase of the given epoch.
 func (s *Suite) AssertInEpochPhase(ctx context.Context, expectedEpoch uint64, expectedPhase flow.EpochPhase) {
-	snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
+	snapshot, err := s.Client.GetLatestProtocolSnapshot(ctx)
 	require.NoError(s.T(), err)
 	actualEpoch, err := snapshot.Epochs().Current().Counter()
 	require.NoError(s.T(), err)
@@ -474,7 +491,7 @@ func (s *Suite) AssertInEpochPhase(ctx context.Context, expectedEpoch uint64, ex
 
 // AssertInEpoch requires actual epoch counter is equal to counter provided.
 func (s *Suite) AssertInEpoch(ctx context.Context, expectedEpoch uint64) {
-	snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
+	snapshot, err := s.Client.GetLatestProtocolSnapshot(ctx)
 	require.NoError(s.T(), err)
 	actualEpoch, err := snapshot.Epochs().Current().Counter()
 	require.NoError(s.T(), err)
@@ -516,7 +533,7 @@ func (s *Suite) AwaitFinalizedView(ctx context.Context, view uint64, waitFor, ti
 
 // getLatestSealedHeader retrieves the latest sealed block, as reported in LatestSnapshot.
 func (s *Suite) getLatestSealedHeader(ctx context.Context) *flow.Header {
-	snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
+	snapshot, err := s.Client.GetLatestProtocolSnapshot(ctx)
 	require.NoError(s.T(), err)
 	segment, err := snapshot.SealingSegment()
 	require.NoError(s.T(), err)
@@ -526,36 +543,36 @@ func (s *Suite) getLatestSealedHeader(ctx context.Context) *flow.Header {
 
 // getLatestFinalizedHeader retrieves the latest finalized block, as reported in LatestSnapshot.
 func (s *Suite) getLatestFinalizedHeader(ctx context.Context) *flow.Header {
-	snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
+	snapshot, err := s.Client.GetLatestProtocolSnapshot(ctx)
 	require.NoError(s.T(), err)
 	finalized, err := snapshot.Head()
 	require.NoError(s.T(), err)
 	return finalized
 }
 
-// submitSmokeTestTransaction will submit a create account transaction to smoke test network
+// SubmitSmokeTestTransaction will submit a create account transaction to smoke test network
 // This ensures a single transaction can be sealed by the network.
-func (s *Suite) submitSmokeTestTransaction(ctx context.Context) {
-	_, err := utils.CreateFlowAccount(ctx, s.client)
+func (s *Suite) SubmitSmokeTestTransaction(ctx context.Context) {
+	_, err := utils.CreateFlowAccount(ctx, s.Client)
 	require.NoError(s.T(), err)
 }
 
-// assertNetworkHealthyAfterANChange performs a basic network health check after replacing an access node.
+// AssertNetworkHealthyAfterANChange performs a basic network health check after replacing an access node.
 //  1. Check that there is no problem connecting directly to the AN provided and retrieve a protocol snapshot
 //  2. Check that the chain moved at least 20 blocks from when the node was bootstrapped by comparing
 //     head of the rootSnapshot with the head of the snapshot we retrieved directly from the AN
 //  3. Check that we can execute a script on the AN
 //
 // TODO test sending and observing result of a transaction via the new AN (blocked by https://github.com/onflow/flow-go/issues/3642)
-func (s *Suite) assertNetworkHealthyAfterANChange(ctx context.Context, env templates.Environment, snapshotInSecondEpoch *inmem.Snapshot, info *StakedNodeOperationInfo) {
+func (s *Suite) AssertNetworkHealthyAfterANChange(ctx context.Context, env templates.Environment, snapshotInSecondEpoch *inmem.Snapshot, info *StakedNodeOperationInfo) {
 
 	// get snapshot directly from new AN and compare head with head from the
 	// snapshot that was used to bootstrap the node
 	client, err := s.net.ContainerByName(info.ContainerName).TestnetClient()
 	require.NoError(s.T(), err)
 
-	// overwrite client to point to the new AN (since we have stopped the initial AN at this point)
-	s.client = client
+	// overwrite Client to point to the new AN (since we have stopped the initial AN at this point)
+	s.Client = client
 	// assert atleast 20 blocks have been finalized since the node replacement
 	s.AwaitSealedBlockHeightExceedsSnapshot(ctx, snapshotInSecondEpoch, 10, 30*time.Second, time.Millisecond*100)
 
@@ -565,25 +582,25 @@ func (s *Suite) assertNetworkHealthyAfterANChange(ctx context.Context, env templ
 	require.Contains(s.T(), proposedTable.(cadence.Array).Values, cadence.String(info.NodeID.String()), "expected node ID to be present in proposed table returned by new AN.")
 }
 
-// assertNetworkHealthyAfterVNChange performs a basic network health check after replacing a verification node.
+// AssertNetworkHealthyAfterVNChange performs a basic network health check after replacing a verification node.
 //  1. Ensure sealing continues into the second epoch (post-replacement) by observing
 //     at least 10 blocks of sealing progress within the epoch
-func (s *Suite) assertNetworkHealthyAfterVNChange(ctx context.Context, _ templates.Environment, snapshotInSecondEpoch *inmem.Snapshot, _ *StakedNodeOperationInfo) {
+func (s *Suite) AssertNetworkHealthyAfterVNChange(ctx context.Context, _ templates.Environment, snapshotInSecondEpoch *inmem.Snapshot, _ *StakedNodeOperationInfo) {
 	s.AwaitSealedBlockHeightExceedsSnapshot(ctx, snapshotInSecondEpoch, 10, 30*time.Second, time.Millisecond*100)
 }
 
-// assertNetworkHealthyAfterLNChange performs a basic network health check after replacing a collection node.
+// AssertNetworkHealthyAfterLNChange performs a basic network health check after replacing a collection node.
 //  1. Submit transaction to network that will target the newly staked LN by making
 //     sure the reference block ID is after the first epoch.
-func (s *Suite) assertNetworkHealthyAfterLNChange(ctx context.Context, _ templates.Environment, _ *inmem.Snapshot, _ *StakedNodeOperationInfo) {
+func (s *Suite) AssertNetworkHealthyAfterLNChange(ctx context.Context, _ templates.Environment, _ *inmem.Snapshot, _ *StakedNodeOperationInfo) {
 	// At this point we have reached the second epoch and our new LN is the only LN in the network.
 	// To validate the LN joined the network successfully and is processing transactions we create
 	// an account, which submits a transaction and verifies it is sealed.
-	s.submitSmokeTestTransaction(ctx)
+	s.SubmitSmokeTestTransaction(ctx)
 }
 
-// assertNetworkHealthyAfterSNChange performs a basic network health check after replacing a consensus node.
-// The runTestEpochJoinAndLeave function running prior to this health check already asserts that we successfully:
+// AssertNetworkHealthyAfterSNChange performs a basic network health check after replacing a consensus node.
+// The RunTestEpochJoinAndLeave function running prior to this health check already asserts that we successfully:
 //  1. enter the second epoch (DKG succeeds; epoch fallback is not triggered)
 //  2. seal at least the first block within the second epoch (consensus progresses into second epoch).
 //
@@ -591,11 +608,11 @@ func (s *Suite) assertNetworkHealthyAfterLNChange(ctx context.Context, _ templat
 // therefore the newly joined consensus node must be participating in consensus.
 //
 // In addition, here, we submit a transaction and verify that it is sealed.
-func (s *Suite) assertNetworkHealthyAfterSNChange(ctx context.Context, _ templates.Environment, _ *inmem.Snapshot, _ *StakedNodeOperationInfo) {
-	s.submitSmokeTestTransaction(ctx)
+func (s *Suite) AssertNetworkHealthyAfterSNChange(ctx context.Context, _ templates.Environment, _ *inmem.Snapshot, _ *StakedNodeOperationInfo) {
+	s.SubmitSmokeTestTransaction(ctx)
 }
 
-// runTestEpochJoinAndLeave coordinates adding and removing one node with the given
+// RunTestEpochJoinAndLeave coordinates adding and removing one node with the given
 // role during the first epoch, then running the network health validation function
 // once the network has successfully transitioned into the second epoch.
 //
@@ -603,13 +620,13 @@ func (s *Suite) assertNetworkHealthyAfterSNChange(ctx context.Context, _ templat
 // * that nodes can stake and join the network at an epoch boundary
 // * that nodes can unstake and leave the network at an epoch boundary
 // * role-specific network health validation after the swap has completed
-func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth nodeUpdateValidation) {
+func (s *Suite) RunTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth nodeUpdateValidation) {
 
 	env := utils.LocalnetEnv()
 
 	var containerToReplace *testnet.Container
 
-	// replace access_2, avoid replacing access_1 the container used for client connections
+	// replace access_2, avoid replacing access_1 the container used for Client connections
 	if role == flow.RoleAccess {
 		containerToReplace = s.net.ContainerByName("access_2")
 		require.NotNil(s.T(), containerToReplace)
@@ -621,21 +638,21 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 
 	// staking our new node and add get the corresponding container for that node
 	s.TimedLogf("staking joining node with role %s", role.String())
-	info, testContainer := s.StakeNewNode(s.ctx, env, role)
+	info, testContainer := s.StakeNewNode(s.Ctx, env, role)
 	s.TimedLogf("successfully staked joining node: %s", info.NodeID)
 
 	// use admin transaction to remove node, this simulates a node leaving the network
 	s.TimedLogf("removing node %s with role %s", containerToReplace.Config.NodeID, role.String())
-	s.removeNodeFromProtocol(s.ctx, env, containerToReplace.Config.NodeID)
+	s.removeNodeFromProtocol(s.Ctx, env, containerToReplace.Config.NodeID)
 	s.TimedLogf("successfully removed node: %s", containerToReplace.Config.NodeID)
 
 	// wait for epoch setup phase before we start our container and pause the old container
 	s.TimedLogf("waiting for EpochSetup phase of first epoch to begin")
-	s.AwaitEpochPhase(s.ctx, 0, flow.EpochPhaseSetup, 3*time.Minute, 500*time.Millisecond)
+	s.AwaitEpochPhase(s.Ctx, 0, flow.EpochPhaseSetup, time.Minute, 500*time.Millisecond)
 	s.TimedLogf("successfully reached EpochSetup phase of first epoch")
 
 	// get the latest snapshot and start new container with it
-	rootSnapshot, err := s.client.GetLatestProtocolSnapshot(s.ctx)
+	rootSnapshot, err := s.Client.GetLatestProtocolSnapshot(s.Ctx)
 	require.NoError(s.T(), err)
 
 	header, err := rootSnapshot.Head()
@@ -649,14 +666,14 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 		segment.Sealed().Header.View, segment.Highest().Header.View)
 
 	testContainer.WriteRootSnapshot(rootSnapshot)
-	testContainer.Container.Start(s.ctx)
+	testContainer.Container.Start(s.Ctx)
 
 	epoch1FinalView, err := rootSnapshot.Epochs().Current().FinalView()
 	require.NoError(s.T(), err)
 
 	// wait for at least the first block of the next epoch to be sealed before we pause our container to replace
 	s.TimedLogf("waiting for epoch transition (finalized view %d) before pausing container", epoch1FinalView+1)
-	s.AwaitFinalizedView(s.ctx, epoch1FinalView+1, 4*time.Minute, 500*time.Millisecond)
+	s.AwaitFinalizedView(s.Ctx, epoch1FinalView+1, 4*time.Minute, 500*time.Millisecond)
 	s.TimedLogf("observed finalized view %d -> pausing container", epoch1FinalView+1)
 
 	// make sure container to replace is not a member of epoch 2
@@ -664,17 +681,17 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 
 	// assert transition to second epoch happened as expected
 	// if counter is still 0, epoch emergency fallback was triggered and we can fail early
-	s.AssertInEpoch(s.ctx, 1)
+	s.AssertInEpoch(s.Ctx, 1)
 
 	err = containerToReplace.Pause()
 	require.NoError(s.T(), err)
 
 	// retrieve a snapshot after observing that we have entered the second epoch
-	secondEpochSnapshot, err := s.client.GetLatestProtocolSnapshot(s.ctx)
+	secondEpochSnapshot, err := s.Client.GetLatestProtocolSnapshot(s.Ctx)
 	require.NoError(s.T(), err)
 
 	// make sure the network is healthy after adding new node
-	checkNetworkHealth(s.ctx, env, secondEpochSnapshot, info)
+	checkNetworkHealth(s.Ctx, env, secondEpochSnapshot, info)
 }
 
 // DynamicEpochTransitionSuite  is the suite used for epoch transitions tests

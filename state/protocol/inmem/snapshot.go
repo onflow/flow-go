@@ -1,9 +1,9 @@
 package inmem
 
 import (
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/state/protocol/seed"
 )
 
 // Snapshot is a memory-backed implementation of protocol.Snapshot. The snapshot
@@ -57,7 +57,7 @@ func (s Snapshot) Phase() (flow.EpochPhase, error) {
 }
 
 func (s Snapshot) RandomSource() ([]byte, error) {
-	return seed.FromParentQCSignature(s.enc.QuorumCertificate.SigData)
+	return model.BeaconSignature(s.enc.QuorumCertificate)
 }
 
 func (s Snapshot) Epochs() protocol.EpochQuery {

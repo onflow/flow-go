@@ -7,7 +7,6 @@ import (
 	"errors"
 	"math/rand"
 	"testing"
-	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
@@ -21,15 +20,11 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
-	"github.com/onflow/flow-go/state/protocol/seed"
+	"github.com/onflow/flow-go/state/protocol/prg"
 	"github.com/onflow/flow-go/state/protocol/util"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 )
-
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
 
 // TestUnknownReferenceBlock tests queries for snapshots which should be unknown.
 // We use this fixture:
@@ -195,16 +190,18 @@ func TestIdentities(t *testing.T) {
 		})
 
 		t.Run("single identity", func(t *testing.T) {
-			expected := identities.Sample(1)[0]
+			expected := identities[rand.Intn(len(identities))]
 			actual, err := state.Final().Identity(expected.NodeID)
 			require.NoError(t, err)
 			assert.Equal(t, expected, actual)
 		})
 
 		t.Run("filtered", func(t *testing.T) {
+			sample, err := identities.SamplePct(0.1)
+			require.NoError(t, err)
 			filters := []flow.IdentityFilter{
 				filter.HasRole(flow.RoleCollection),
-				filter.HasNodeID(identities.SamplePct(0.1).NodeIDs()...),
+				filter.HasNodeID(sample.NodeIDs()...),
 				filter.HasWeight(true),
 			}
 
@@ -940,7 +937,7 @@ func TestQuorumCertificate(t *testing.T) {
 			assert.NoError(t, err)
 			randomSeed, err := state.AtBlockID(head.ID()).RandomSource()
 			assert.NoError(t, err)
-			assert.Equal(t, len(randomSeed), seed.RandomSourceLength)
+			assert.Equal(t, len(randomSeed), prg.RandomSourceLength)
 		})
 	})
 
@@ -1246,7 +1243,7 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 	// 1 identity added at epoch 2 that was not present in epoch 1
 	addedAtEpoch2 := unittest.IdentityFixture()
 	// 1 identity removed in epoch 2 that was present in epoch 1
-	removedAtEpoch2 := epoch1Identities.Sample(1)[0]
+	removedAtEpoch2 := epoch1Identities[rand.Intn(len(epoch1Identities))]
 	// epoch 2 has partial overlap with epoch 1
 	epoch2Identities := append(
 		epoch1Identities.Filter(filter.Not(filter.HasNodeID(removedAtEpoch2.NodeID))),

@@ -106,7 +106,7 @@ func TestFollowerHappyPath(t *testing.T) {
 		validator.On("ValidateProposal", mock.Anything).Return(nil)
 
 		// initialize the follower loop
-		followerLoop, err := hotstuff.NewFollowerLoop(unittest.Logger(), forks)
+		followerLoop, err := hotstuff.NewFollowerLoop(unittest.Logger(), metrics, forks)
 		require.NoError(t, err)
 
 		syncCore := module.NewBlockRequester(t)

@@ -2,7 +2,10 @@ package heropool
 
 import (
 	"fmt"
+	"math"
 	"testing"
+
+	"github.com/onflow/flow-go/utils/rand"
 
 	"github.com/stretchr/testify/require"
 
@@ -215,6 +218,151 @@ func TestInvalidateEntity(t *testing.T) {
 	}
 }
 
+// TestAddAndRemoveEntities checks health of heroPool for scenario where entitites are stored and removed in a predetermined order.
+// LRUEjection, NoEjection and RandomEjection are tested. RandomEjection doesn't allow to provide a final state of the pool to check.
+func TestAddAndRemoveEntities(t *testing.T) {
+	for _, tc := range []struct {
+		limit               uint32       // capacity of the pool
+		entityCount         uint32       // total entities to be stored
+		ejectionMode        EjectionMode // ejection mode
+		numberOfOperations  int
+		probabilityOfAdding float32
+	}{
+		{
+			limit:               500,
+			entityCount:         1000,
+			ejectionMode:        LRUEjection,
+			numberOfOperations:  1000,
+			probabilityOfAdding: 0.8,
+		},
+		{
+			limit:               500,
+			entityCount:         1000,
+			ejectionMode:        NoEjection,
+			numberOfOperations:  1000,
+			probabilityOfAdding: 0.8,
+		},
+		{
+			limit:               500,
+			entityCount:         1000,
+			ejectionMode:        RandomEjection,
+			numberOfOperations:  1000,
+			probabilityOfAdding: 0.8,
+		},
+	} {
+		t.Run(fmt.Sprintf("%d-limit-%d-entities", tc.limit, tc.entityCount), func(t *testing.T) {
+			testAddRemoveEntities(t, tc.limit, tc.entityCount, tc.ejectionMode, tc.numberOfOperations, tc.probabilityOfAdding)
+		})
+	}
+}
+
+// testAddRemoveEntities adds and removes randomly elements in the pool, probabilityOfAdding and its counterpart 1-probabilityOfAdding are probabilities
+// for an operation to be add or remove. Current timestamp is taken as a seed for the random number generator.
+func testAddRemoveEntities(t *testing.T, limit uint32, entityCount uint32, ejectionMode EjectionMode, numberOfOperations int, probabilityOfAdding float32) {
+
+	require.GreaterOrEqual(t, entityCount, 2*limit, "entityCount must be greater or equal to 2*limit to test add/remove operations")
+
+	randomIntN := func(length int) int {
+		random, err := rand.Uintn(uint(length))
+		require.NoError(t, err)
+		return int(random)
+	}
+
+	pool := NewHeroPool(limit, ejectionMode, unittest.Logger())
+	entities := unittest.EntityListFixture(uint(entityCount))
+	// retryLimit is the max number of retries to find an entity that is not already in the pool to add it.
+	// The test fails if it reaches this limit.
+	retryLimit := 100
+	// an array of random owner Ids.
+	ownerIds := make([]uint64, entityCount)
+	// generate ownerId to index in the entities array.
+	for i := 0; i < int(entityCount); i++ {
+		randomOwnerId, err := rand.Uint64()
+		require.Nil(t, err)
+		ownerIds[i] = randomOwnerId
+	}
+	// this map maintains entities currently stored in the pool.
+	addedEntities := make(map[flow.Identifier]int)
+	addedEntitiesInPool := make(map[flow.Identifier]EIndex)
+	for i := 0; i < numberOfOperations; i++ {
+		// choose between Add and Remove with a probability of probabilityOfAdding and 1-probabilityOfAdding respectively.
+		if float32(randomIntN(math.MaxInt32))/math.MaxInt32 < probabilityOfAdding || len(addedEntities) == 0 {
+			// keeps finding an entity to add until it finds one that is not already in the pool.
+			found := false
+			for retryTime := 0; retryTime < retryLimit; retryTime++ {
+				toAddIndex := randomIntN(int(entityCount))
+				_, found = addedEntities[entities[toAddIndex].ID()]
+				if !found {
+					// found an entity that is not in the pool, add it.
+					indexInThePool, _, ejectedEntity := pool.Add(entities[toAddIndex].ID(), entities[toAddIndex], ownerIds[toAddIndex])
+					if ejectionMode != NoEjection || len(addedEntities) < int(limit) {
+						// when there is an ejection mode in place, or the pool is not full, the index should be valid.
+						require.NotEqual(t, InvalidIndex, indexInThePool)
+					}
+					require.LessOrEqual(t, len(addedEntities), int(limit), "pool should not contain more elements than its limit")
+					if ejectionMode != NoEjection && len(addedEntities) == int(limit) {
+						// when there is an ejection mode in place, the ejected entity should be valid.
+						require.NotNil(t, ejectedEntity)
+					}
+					if ejectionMode != NoEjection && len(addedEntities) >= int(limit) {
+						// when there is an ejection mode in place, the ejected entity should be valid.
+						require.NotNil(t, ejectedEntity)
+					}
+					if indexInThePool != InvalidIndex {
+						entityId := entities[toAddIndex].ID()
+						// tracks the index of the entity in the pool and the index of the entity in the entities array.
+						addedEntities[entityId] = int(toAddIndex)
+						addedEntitiesInPool[entityId] = indexInThePool
+						// any entity added to the pool should be in the pool, and must be retrievable.
+						actualFlowId, actualEntity, actualOwnerId := pool.Get(indexInThePool)
+						require.Equal(t, entityId, actualFlowId)
+						require.Equal(t, entities[toAddIndex], actualEntity, "pool returned a different entity than the one added")
+						require.Equal(t, ownerIds[toAddIndex], actualOwnerId, "pool returned a different owner than the one added")
+					}
+					if ejectedEntity != nil {
+						require.Contains(t, addedEntities, ejectedEntity.ID(), "pool ejected an entity that was not added before")
+						delete(addedEntities, ejectedEntity.ID())
+						delete(addedEntitiesInPool, ejectedEntity.ID())
+					}
+					break
+				}
+			}
+			require.Falsef(t, found, "could not find an entity to add after %d retries", retryLimit)
+		} else {
+			// randomly select an index of an entity to remove.
+			entityToRemove := randomIntN(len(addedEntities))
+			i := 0
+			var indexInPoolToRemove EIndex = 0
+			var indexInEntitiesArray int = 0
+			for k, v := range addedEntities {
+				if i == entityToRemove {
+					indexInPoolToRemove = addedEntitiesInPool[k]
+					indexInEntitiesArray = v
+					break
+				}
+				i++
+			}
+			// remove the selected entity from the pool.
+			removedEntity := pool.Remove(indexInPoolToRemove)
+			expectedRemovedEntityId := entities[indexInEntitiesArray].ID()
+			require.Equal(t, expectedRemovedEntityId, removedEntity.ID(), "removed wrong entity")
+			delete(addedEntities, expectedRemovedEntityId)
+			delete(addedEntitiesInPool, expectedRemovedEntityId)
+			actualFlowId, actualEntity, _ := pool.Get(indexInPoolToRemove)
+			require.Equal(t, flow.ZeroID, actualFlowId)
+			require.Equal(t, nil, actualEntity)
+		}
+	}
+	for k, v := range addedEntities {
+		indexInPool := addedEntitiesInPool[k]
+		actualFlowId, actualEntity, actualOwnerId := pool.Get(indexInPool)
+		require.Equal(t, entities[v].ID(), actualFlowId)
+		require.Equal(t, entities[v], actualEntity)
+		require.Equal(t, ownerIds[v], actualOwnerId)
+	}
+	require.Equalf(t, len(addedEntities), int(pool.Size()), "pool size is not correct, expected %d, actual %d", len(addedEntities), pool.Size())
+}
+
 // testInvalidatingHead keeps invalidating the head and evaluates the linked-list keeps updating its head
 // and remains connected.
 func testInvalidatingHead(t *testing.T, pool *Pool, entities []*unittest.MockEntity) {
@@ -232,17 +380,17 @@ func testInvalidatingHead(t *testing.T, pool *Pool, entities []*unittest.MockEnt
 		// size of list should be decremented after each invalidation.
 		require.Equal(t, uint32(totalEntitiesStored-i-1), pool.Size())
 		// invalidated head should be appended to free entities
-		require.Equal(t, pool.free.tail.getSliceIndex(), EIndex(i))
+		require.Equal(t, pool.states[stateFree].tail, EIndex(i))
 
 		if freeListInitialSize != 0 {
 			// number of entities is below limit, hence free list is not empty.
 			// invalidating used head must not change the free head.
-			require.Equal(t, EIndex(totalEntitiesStored), pool.free.head.getSliceIndex())
+			require.Equal(t, EIndex(totalEntitiesStored), pool.states[stateFree].head)
 		} else {
 			// number of entities is greater than or equal to limit, hence free list is empty.
 			// free head must be updated to the first invalidated head (index 0),
 			// and must be kept there for entire test (as we invalidate head not tail).
-			require.Equal(t, EIndex(0), pool.free.head.getSliceIndex())
+			require.Equal(t, EIndex(0), pool.states[stateFree].head)
 		}
 
 		// except when the list is empty, head must be updated after invalidation,
@@ -251,14 +399,14 @@ func testInvalidatingHead(t *testing.T, pool *Pool, entities []*unittest.MockEnt
 		if i != totalEntitiesStored-1 {
 			// used linked-list
 			tailAccessibleFromHead(t,
-				pool.used.head.getSliceIndex(),
-				pool.used.tail.getSliceIndex(),
+				pool.states[stateUsed].head,
+				pool.states[stateUsed].tail,
 				pool,
 				pool.Size())
 
 			headAccessibleFromTail(t,
-				pool.used.head.getSliceIndex(),
-				pool.used.tail.getSliceIndex(),
+				pool.states[stateUsed].head,
+				pool.states[stateUsed].tail,
 				pool,
 				pool.Size())
 
@@ -266,14 +414,14 @@ func testInvalidatingHead(t *testing.T, pool *Pool, entities []*unittest.MockEnt
 			//
 			// after invalidating each item, size of free linked-list is incremented by one.
 			tailAccessibleFromHead(t,
-				pool.free.head.getSliceIndex(),
-				pool.free.tail.getSliceIndex(),
+				pool.states[stateFree].head,
+				pool.states[stateFree].tail,
 				pool,
 				uint32(i+1+freeListInitialSize))
 
 			headAccessibleFromTail(t,
-				pool.free.head.getSliceIndex(),
-				pool.free.tail.getSliceIndex(),
+				pool.states[stateFree].head,
+				pool.states[stateFree].tail,
 				pool,
 				uint32(i+1+freeListInitialSize))
 		}
@@ -287,21 +435,23 @@ func testInvalidatingHead(t *testing.T, pool *Pool, entities []*unittest.MockEnt
 			// used tail should point to the last element in pool, since we are
 			// invalidating head.
 			require.Equal(t, entities[totalEntitiesStored-1].ID(), usedTail.id)
-			require.Equal(t, EIndex(totalEntitiesStored-1), pool.used.tail.getSliceIndex())
+			require.Equal(t, EIndex(totalEntitiesStored-1), pool.states[stateUsed].tail)
 
 			// used head must point to the next element in the pool,
 			// i.e., invalidating head moves it forward.
 			require.Equal(t, entities[i+1].ID(), usedHead.id)
-			require.Equal(t, EIndex(i+1), pool.used.head.getSliceIndex())
+			require.Equal(t, EIndex(i+1), pool.states[stateUsed].head)
 		} else {
 			// pool is empty
 			// used head and tail must be nil and their corresponding
 			// pointer indices must be undefined.
 			require.Nil(t, usedHead)
 			require.Nil(t, usedTail)
-			require.True(t, pool.used.tail.isUndefined())
-			require.True(t, pool.used.head.isUndefined())
+			require.True(t, pool.states[stateUsed].size == 0)
+			require.Equal(t, pool.states[stateUsed].tail, InvalidIndex)
+			require.Equal(t, pool.states[stateUsed].head, InvalidIndex)
 		}
+		checkEachEntityIsInFreeOrUsedState(t, pool)
 	}
 }
 
@@ -311,25 +461,25 @@ func testInvalidatingTail(t *testing.T, pool *Pool, entities []*unittest.MockEnt
 	offset := len(pool.poolEntities) - size
 	for i := 0; i < size; i++ {
 		// invalidates tail index
-		tailIndex := pool.used.tail.getSliceIndex()
+		tailIndex := pool.states[stateUsed].tail
 		require.Equal(t, EIndex(size-1-i), tailIndex)
 
 		pool.invalidateEntityAtIndex(tailIndex)
 		// old head index must be invalidated
 		require.True(t, pool.isInvalidated(tailIndex))
 		// unclaimed head should be appended to free entities
-		require.Equal(t, pool.free.tail.getSliceIndex(), tailIndex)
+		require.Equal(t, pool.states[stateFree].tail, tailIndex)
 
 		if offset != 0 {
 			// number of entities is below limit
 			// free must head keeps pointing to first empty index after
 			// adding all entities.
-			require.Equal(t, EIndex(size), pool.free.head.getSliceIndex())
+			require.Equal(t, EIndex(size), pool.states[stateFree].head)
 		} else {
 			// number of entities is greater than or equal to limit
 			// free head must be updated to last element in the pool (size - 1),
 			// and must be kept there for entire test (as we invalidate tail not head).
-			require.Equal(t, EIndex(size-1), pool.free.head.getSliceIndex())
+			require.Equal(t, EIndex(size-1), pool.states[stateFree].head)
 		}
 
 		// size of pool should be shrunk after each invalidation.
@@ -342,27 +492,27 @@ func testInvalidatingTail(t *testing.T, pool *Pool, entities []*unittest.MockEnt
 
 			// used linked-list
 			tailAccessibleFromHead(t,
-				pool.used.head.getSliceIndex(),
-				pool.used.tail.getSliceIndex(),
+				pool.states[stateUsed].head,
+				pool.states[stateUsed].tail,
 				pool,
 				pool.Size())
 
 			headAccessibleFromTail(t,
-				pool.used.head.getSliceIndex(),
-				pool.used.tail.getSliceIndex(),
+				pool.states[stateUsed].head,
+				pool.states[stateUsed].tail,
 				pool,
 				pool.Size())
 
 			// free linked-list
 			tailAccessibleFromHead(t,
-				pool.free.head.getSliceIndex(),
-				pool.free.tail.getSliceIndex(),
+				pool.states[stateFree].head,
+				pool.states[stateFree].tail,
 				pool,
 				uint32(i+1+offset))
 
 			headAccessibleFromTail(t,
-				pool.free.head.getSliceIndex(),
-				pool.free.tail.getSliceIndex(),
+				pool.states[stateFree].head,
+				pool.states[stateFree].tail,
 				pool,
 				uint32(i+1+offset))
 		}
@@ -374,52 +524,55 @@ func testInvalidatingTail(t *testing.T, pool *Pool, entities []*unittest.MockEnt
 			//
 			// used tail should move backward after each invalidation
 			require.Equal(t, entities[size-i-2].ID(), usedTail.id)
-			require.Equal(t, EIndex(size-i-2), pool.used.tail.getSliceIndex())
+			require.Equal(t, EIndex(size-i-2), pool.states[stateUsed].tail)
 
 			// used head must point to the first element in the pool,
 			require.Equal(t, entities[0].ID(), usedHead.id)
-			require.Equal(t, EIndex(0), pool.used.head.getSliceIndex())
+			require.Equal(t, EIndex(0), pool.states[stateUsed].head)
 		} else {
 			// pool is empty
 			// used head and tail must be nil and their corresponding
 			// pointer indices must be undefined.
 			require.Nil(t, usedHead)
 			require.Nil(t, usedTail)
-			require.True(t, pool.used.tail.isUndefined())
-			require.True(t, pool.used.head.isUndefined())
+			require.True(t, pool.states[stateUsed].size == 0)
+			require.Equal(t, pool.states[stateUsed].head, InvalidIndex)
+			require.Equal(t, pool.states[stateUsed].tail, InvalidIndex)
 		}
+		checkEachEntityIsInFreeOrUsedState(t, pool)
 	}
 }
 
 // testInitialization evaluates the state of an initialized pool before adding any element to it.
 func testInitialization(t *testing.T, pool *Pool, _ []*unittest.MockEntity) {
-	// head and tail of "used" linked-list must be undefined at initialization time, since we have no elements in the list.
-	require.True(t, pool.used.head.isUndefined())
-	require.True(t, pool.used.tail.isUndefined())
+	// "used" linked-list must have a zero size, since we have no elements in the list.
+	require.True(t, pool.states[stateUsed].size == 0)
+	require.Equal(t, pool.states[stateUsed].head, InvalidIndex)
+	require.Equal(t, pool.states[stateUsed].tail, InvalidIndex)
 
 	for i := 0; i < len(pool.poolEntities); i++ {
 		if i == 0 {
-			// head of "free" linked-list should point to index 0 of entities slice.
-			require.Equal(t, EIndex(i), pool.free.head.getSliceIndex())
+			// head of "free" linked-list should point to InvalidIndex of entities slice.
+			require.Equal(t, EIndex(i), pool.states[stateFree].head)
 			// previous element of head must be undefined (linked-list head feature).
-			require.True(t, pool.poolEntities[i].node.prev.isUndefined())
+			require.Equal(t, pool.poolEntities[i].node.prev, InvalidIndex)
 		}
 
 		if i != 0 {
 			// except head, any element should point back to its previous index in slice.
-			require.Equal(t, EIndex(i-1), pool.poolEntities[i].node.prev.getSliceIndex())
+			require.Equal(t, EIndex(i-1), pool.poolEntities[i].node.prev)
 		}
 
 		if i != len(pool.poolEntities)-1 {
 			// except tail, any element should point forward to its next index in slice.
-			require.Equal(t, EIndex(i+1), pool.poolEntities[i].node.next.getSliceIndex())
+			require.Equal(t, EIndex(i+1), pool.poolEntities[i].node.next)
 		}
 
 		if i == len(pool.poolEntities)-1 {
 			// tail of "free" linked-list should point to the last index in entities slice.
-			require.Equal(t, EIndex(i), pool.free.tail.getSliceIndex())
+			require.Equal(t, EIndex(i), pool.states[stateFree].tail)
 			// next element of tail must be undefined.
-			require.True(t, pool.poolEntities[i].node.next.isUndefined())
+			require.Equal(t, pool.poolEntities[i].node.next, InvalidIndex)
 		}
 	}
 }
@@ -492,7 +645,7 @@ func testAddingEntities(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.
 			if i >= len(pool.poolEntities) {
 				require.False(t, slotAvailable)
 				require.Nil(t, ejectedEntity)
-				require.Equal(t, entityIndex, EIndex(0))
+				require.Equal(t, entityIndex, InvalidIndex)
 
 				// when pool is full and with NoEjection, the head must keep pointing to the first added element.
 				headEntity, headExists := pool.Head()
@@ -515,30 +668,31 @@ func testAddingEntities(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.
 			}
 			require.Equal(t, pool.poolEntities[expectedUsedHead].entity, usedHead.entity)
 			// head must be healthy and point back to undefined.
-			require.True(t, usedHead.node.prev.isUndefined())
+			require.Equal(t, usedHead.node.prev, InvalidIndex)
 		}
 
 		if ejectionMode != NoEjection || i < len(pool.poolEntities) {
 			// new entity must be successfully added to tail of used linked-list
 			require.Equal(t, entitiesToBeAdded[i], usedTail.entity)
 			// used tail must be healthy and point back to undefined.
-			require.True(t, usedTail.node.next.isUndefined())
+			require.Equal(t, usedTail.node.next, InvalidIndex)
 		}
 
 		if ejectionMode == NoEjection && i >= len(pool.poolEntities) {
 			// used tail must not move
 			require.Equal(t, entitiesToBeAdded[len(pool.poolEntities)-1], usedTail.entity)
 			// used tail must be healthy and point back to undefined.
-			require.True(t, usedTail.node.next.isUndefined())
+			// This is not needed anymore as tail's next is now ignored
+			require.Equal(t, usedTail.node.next, InvalidIndex)
 		}
 
 		// free head
 		if i < len(pool.poolEntities)-1 {
 			// as long as we are below limit, after adding i element, free head
 			// should move to i+1 element.
-			require.Equal(t, EIndex(i+1), pool.free.head.getSliceIndex())
+			require.Equal(t, EIndex(i+1), pool.states[stateFree].head)
 			// head must be healthy and point back to undefined.
-			require.True(t, freeHead.node.prev.isUndefined())
+			require.Equal(t, freeHead.node.prev, InvalidIndex)
 		} else {
 			// once we go beyond limit,
 			// we run out of free slots,
@@ -552,9 +706,9 @@ func testAddingEntities(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.
 			// must keep pointing to last index of the array-based linked-list. In other
 			// words, adding element must not change free tail (since only free head is
 			// updated).
-			require.Equal(t, EIndex(len(pool.poolEntities)-1), pool.free.tail.getSliceIndex())
+			require.Equal(t, EIndex(len(pool.poolEntities)-1), pool.states[stateFree].tail)
 			// head tail be healthy and point next to undefined.
-			require.True(t, freeTail.node.next.isUndefined())
+			require.Equal(t, freeTail.node.next, InvalidIndex)
 		} else {
 			// once we go beyond limit, we run out of free slots, and
 			// free tail must be kept at undefined.
@@ -572,13 +726,13 @@ func testAddingEntities(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.
 			usedTraverseStep = uint32(len(pool.poolEntities))
 		}
 		tailAccessibleFromHead(t,
-			pool.used.head.getSliceIndex(),
-			pool.used.tail.getSliceIndex(),
+			pool.states[stateUsed].head,
+			pool.states[stateUsed].tail,
 			pool,
 			usedTraverseStep)
 		headAccessibleFromTail(t,
-			pool.used.head.getSliceIndex(),
-			pool.used.tail.getSliceIndex(),
+			pool.states[stateUsed].head,
+			pool.states[stateUsed].tail,
 			pool,
 			usedTraverseStep)
 
@@ -596,15 +750,17 @@ func testAddingEntities(t *testing.T, pool *Pool, entitiesToBeAdded []*unittest.
 			freeTraverseStep = uint32(0)
 		}
 		tailAccessibleFromHead(t,
-			pool.free.head.getSliceIndex(),
-			pool.free.tail.getSliceIndex(),
+			pool.states[stateFree].head,
+			pool.states[stateFree].tail,
 			pool,
 			freeTraverseStep)
 		headAccessibleFromTail(t,
-			pool.free.head.getSliceIndex(),
-			pool.free.tail.getSliceIndex(),
+			pool.states[stateFree].head,
+			pool.states[stateFree].tail,
 			pool,
 			freeTraverseStep)
+
+		checkEachEntityIsInFreeOrUsedState(t, pool)
 	}
 }
 
@@ -645,10 +801,10 @@ func withTestScenario(t *testing.T,
 	ejectionMode EjectionMode,
 	helpers ...func(*testing.T, *Pool, []*unittest.MockEntity)) {
 
-	pool := NewHeroPool(limit, ejectionMode)
+	pool := NewHeroPool(limit, ejectionMode, unittest.Logger())
 
 	// head on underlying linked-list value should be uninitialized
-	require.True(t, pool.used.head.isUndefined())
+	require.True(t, pool.states[stateUsed].size == 0)
 	require.Equal(t, pool.Size(), uint32(0))
 
 	entities := unittest.EntityListFixture(uint(entityCount))
@@ -673,8 +829,8 @@ func tailAccessibleFromHead(t *testing.T, headSliceIndex EIndex, tailSliceIndex 
 		_, ok := seen[index]
 		require.False(t, ok, "duplicate identifiers found")
 
-		require.False(t, pool.poolEntities[index].node.next.isUndefined(), "tail not found, and reached end of list")
-		index = pool.poolEntities[index].node.next.getSliceIndex()
+		require.NotEqual(t, pool.poolEntities[index].node.next, InvalidIndex, "tail not found, and reached end of list")
+		index = pool.poolEntities[index].node.next
 	}
 }
 
@@ -693,6 +849,31 @@ func headAccessibleFromTail(t *testing.T, headSliceIndex EIndex, tailSliceIndex 
 		_, ok := seen[index]
 		require.False(t, ok, "duplicate identifiers found")
 
-		index = pool.poolEntities[index].node.prev.getSliceIndex()
+		index = pool.poolEntities[index].node.prev
 	}
+}
+
+// checkEachEntityIsInFreeOrUsedState checks if each entity in the pool belongs exactly to one of the state lists.
+func checkEachEntityIsInFreeOrUsedState(t *testing.T, pool *Pool) {
+	pool_capacity := len(pool.poolEntities)
+	// check size
+	require.Equal(t, int(pool.states[stateFree].size+pool.states[stateUsed].size), pool_capacity, "Pool capacity is not equal to the sum of used and free sizes")
+	// check elelments
+	nodesInFree := discoverEntitiesBelongingToStateList(t, pool, stateFree)
+	nodesInUsed := discoverEntitiesBelongingToStateList(t, pool, stateUsed)
+	for i := 0; i < pool_capacity; i++ {
+		require.False(t, !nodesInFree[i] && !nodesInUsed[i], "Node is not in any state list")
+		require.False(t, nodesInFree[i] && nodesInUsed[i], "Node is in two state lists at the same time")
+	}
+}
+
+// discoverEntitiesBelongingToStateList discovers all entities in the pool that belong to the given list.
+func discoverEntitiesBelongingToStateList(t *testing.T, pool *Pool, stateType StateIndex) []bool {
+	result := make([]bool, len(pool.poolEntities))
+	for node_index := pool.states[stateType].head; node_index != InvalidIndex; {
+		require.False(t, result[node_index], "A node is present two times in the same state list")
+		result[node_index] = true
+		node_index = pool.poolEntities[node_index].node.next
+	}
+	return result
 }

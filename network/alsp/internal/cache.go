@@ -44,7 +44,7 @@ func NewSpamRecordCache(sizeLimit uint32, logger zerolog.Logger, collector modul
 		// the spam records of the authorized nodes. Also, this cache is keeping at most one record per origin id, so the
 		// size of the cache must be at least the number of authorized nodes.
 		heropool.NoEjection,
-		logger.With().Str("mempool", "aslp=spam-records").Logger(),
+		logger.With().Str("mempool", "aslp-spam-records").Logger(),
 		collector)
 
 	return &SpamRecordCache{
@@ -81,7 +81,6 @@ func (s *SpamRecordCache) Adjust(originId flow.Identifier, adjustFunc model.Reco
 	penalty, err := s.adjust(originId, adjustFunc)
 
 	switch {
-
 	case err == ErrSpamRecordNotFound:
 		// if the record does not exist, we initialize the record and try to adjust it again.
 		// Note: there is an edge case where the record is initialized by another goroutine between the two calls.
@@ -166,10 +165,11 @@ func (s *SpamRecordCache) Get(originId flow.Identifier) (*model.ProtocolSpamReco
 
 	// return a copy of the record (we do not want the caller to modify the record).
 	return &model.ProtocolSpamRecord{
-		OriginId:      record.OriginId,
-		Decay:         record.Decay,
-		CutoffCounter: record.CutoffCounter,
-		Penalty:       record.Penalty,
+		OriginId:       record.OriginId,
+		Decay:          record.Decay,
+		CutoffCounter:  record.CutoffCounter,
+		Penalty:        record.Penalty,
+		DisallowListed: record.DisallowListed,
 	}, true
 }
 

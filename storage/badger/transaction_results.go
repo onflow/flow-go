@@ -14,11 +14,13 @@ import (
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
+var _ storage.TransactionResults = (*TransactionResults)(nil)
+
 type TransactionResults struct {
 	db         *badger.DB
-	cache      *Cache
-	indexCache *Cache
-	blockCache *Cache
+	cache      *Cache[string, flow.TransactionResult]
+	indexCache *Cache[string, flow.TransactionResult]
+	blockCache *Cache[string, []flow.TransactionResult]
 }
 
 func KeyFromBlockIDTransactionID(blockID flow.Identifier, txID flow.Identifier) string {
@@ -83,43 +85,43 @@ func KeyToBlockID(key string) (flow.Identifier, error) {
 }
 
 func NewTransactionResults(collector module.CacheMetrics, db *badger.DB, transactionResultsCacheSize uint) *TransactionResults {
-	retrieve := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
+	retrieve := func(key string) func(tx *badger.Txn) (flow.TransactionResult, error) {
 		var txResult flow.TransactionResult
-		return func(tx *badger.Txn) (interface{}, error) {
+		return func(tx *badger.Txn) (flow.TransactionResult, error) {
 
-			blockID, txID, err := KeyToBlockIDTransactionID(key.(string))
+			blockID, txID, err := KeyToBlockIDTransactionID(key)
 			if err != nil {
-				return nil, fmt.Errorf("could not convert key: %w", err)
+				return flow.TransactionResult{}, fmt.Errorf("could not convert key: %w", err)
 			}
 
 			err = operation.RetrieveTransactionResult(blockID, txID, &txResult)(tx)
 			if err != nil {
-				return nil, handleError(err, flow.TransactionResult{})
+				return flow.TransactionResult{}, handleError(err, flow.TransactionResult{})
 			}
 			return txResult, nil
 		}
 	}
-	retrieveIndex := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
+	retrieveIndex := func(key string) func(tx *badger.Txn) (flow.TransactionResult, error) {
 		var txResult flow.TransactionResult
-		return func(tx *badger.Txn) (interface{}, error) {
+		return func(tx *badger.Txn) (flow.TransactionResult, error) {
 
-			blockID, txIndex, err := KeyToBlockIDIndex(key.(string))
+			blockID, txIndex, err := KeyToBlockIDIndex(key)
 			if err != nil {
-				return nil, fmt.Errorf("could not convert index key: %w", err)
+				return flow.TransactionResult{}, fmt.Errorf("could not convert index key: %w", err)
 			}
 
 			err = operation.RetrieveTransactionResultByIndex(blockID, txIndex, &txResult)(tx)
 			if err != nil {
-				return nil, handleError(err, flow.TransactionResult{})
+				return flow.TransactionResult{}, handleError(err, flow.TransactionResult{})
 			}
 			return txResult, nil
 		}
 	}
-	retrieveForBlock := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
+	retrieveForBlock := func(key string) func(tx *badger.Txn) ([]flow.TransactionResult, error) {
 		var txResults []flow.TransactionResult
-		return func(tx *badger.Txn) (interface{}, error) {
+		return func(tx *badger.Txn) ([]flow.TransactionResult, error) {
 
-			blockID, err := KeyToBlockID(key.(string))
+			blockID, err := KeyToBlockID(key)
 			if err != nil {
 				return nil, fmt.Errorf("could not convert index key: %w", err)
 			}
@@ -133,19 +135,19 @@ func NewTransactionResults(collector module.CacheMetrics, db *badger.DB, transac
 	}
 	return &TransactionResults{
 		db: db,
-		cache: newCache(collector, metrics.ResourceTransactionResults,
-			withLimit(transactionResultsCacheSize),
-			withStore(noopStore),
+		cache: newCache[string, flow.TransactionResult](collector, metrics.ResourceTransactionResults,
+			withLimit[string, flow.TransactionResult](transactionResultsCacheSize),
+			withStore(noopStore[string, flow.TransactionResult]),
 			withRetrieve(retrieve),
 		),
-		indexCache: newCache(collector, metrics.ResourceTransactionResultIndices,
-			withLimit(transactionResultsCacheSize),
-			withStore(noopStore),
+		indexCache: newCache[string, flow.TransactionResult](collector, metrics.ResourceTransactionResultIndices,
+			withLimit[string, flow.TransactionResult](transactionResultsCacheSize),
+			withStore(noopStore[string, flow.TransactionResult]),
 			withRetrieve(retrieveIndex),
 		),
-		blockCache: newCache(collector, metrics.ResourceTransactionResultIndices,
-			withLimit(transactionResultsCacheSize),
-			withStore(noopStore),
+		blockCache: newCache[string, []flow.TransactionResult](collector, metrics.ResourceTransactionResultIndices,
+			withLimit[string, []flow.TransactionResult](transactionResultsCacheSize),
+			withStore(noopStore[string, []flow.TransactionResult]),
 			withRetrieve(retrieveForBlock),
 		),
 	}
@@ -190,13 +192,9 @@ func (tr *TransactionResults) ByBlockIDTransactionID(blockID flow.Identifier, tx
 	tx := tr.db.NewTransaction(false)
 	defer tx.Discard()
 	key := KeyFromBlockIDTransactionID(blockID, txID)
-	val, err := tr.cache.Get(key)(tx)
+	transactionResult, err := tr.cache.Get(key)(tx)
 	if err != nil {
 		return nil, err
-	}
-	transactionResult, ok := val.(flow.TransactionResult)
-	if !ok {
-		return nil, fmt.Errorf("could not convert transaction result: %w", err)
 	}
 	return &transactionResult, nil
 }
@@ -206,13 +204,9 @@ func (tr *TransactionResults) ByBlockIDTransactionIndex(blockID flow.Identifier,
 	tx := tr.db.NewTransaction(false)
 	defer tx.Discard()
 	key := KeyFromBlockIDIndex(blockID, txIndex)
-	val, err := tr.indexCache.Get(key)(tx)
+	transactionResult, err := tr.indexCache.Get(key)(tx)
 	if err != nil {
 		return nil, err
-	}
-	transactionResult, ok := val.(flow.TransactionResult)
-	if !ok {
-		return nil, fmt.Errorf("could not convert transaction result: %w", err)
 	}
 	return &transactionResult, nil
 }
@@ -222,13 +216,9 @@ func (tr *TransactionResults) ByBlockID(blockID flow.Identifier) ([]flow.Transac
 	tx := tr.db.NewTransaction(false)
 	defer tx.Discard()
 	key := KeyFromBlockID(blockID)
-	val, err := tr.blockCache.Get(key)(tx)
+	transactionResults, err := tr.blockCache.Get(key)(tx)
 	if err != nil {
 		return nil, err
-	}
-	transactionResults, ok := val.([]flow.TransactionResult)
-	if !ok {
-		return nil, fmt.Errorf("could not convert transaction result: %w", err)
 	}
 	return transactionResults, nil
 }

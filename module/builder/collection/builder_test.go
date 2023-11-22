@@ -5,7 +5,6 @@ import (
 	"math/rand"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
@@ -62,9 +61,6 @@ type BuilderSuite struct {
 // runs before each test runs
 func (suite *BuilderSuite) SetupTest() {
 	var err error
-
-	// seed the RNG
-	rand.Seed(time.Now().UnixNano())
 
 	suite.genesis = model.Genesis()
 	suite.chainID = suite.genesis.Header.ChainID

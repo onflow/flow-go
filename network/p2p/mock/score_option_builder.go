@@ -3,6 +3,7 @@
 package mockp2p
 
 import (
+	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
 	mock "github.com/stretchr/testify/mock"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -14,15 +15,80 @@ type ScoreOptionBuilder struct {
 }
 
 // BuildFlowPubSubScoreOption provides a mock function with given fields:
-func (_m *ScoreOptionBuilder) BuildFlowPubSubScoreOption() pubsub.Option {
+func (_m *ScoreOptionBuilder) BuildFlowPubSubScoreOption() (*pubsub.PeerScoreParams, *pubsub.PeerScoreThresholds) {
 	ret := _m.Called()
 
-	var r0 pubsub.Option
-	if rf, ok := ret.Get(0).(func() pubsub.Option); ok {
+	var r0 *pubsub.PeerScoreParams
+	var r1 *pubsub.PeerScoreThresholds
+	if rf, ok := ret.Get(0).(func() (*pubsub.PeerScoreParams, *pubsub.PeerScoreThresholds)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() *pubsub.PeerScoreParams); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(pubsub.Option)
+			r0 = ret.Get(0).(*pubsub.PeerScoreParams)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func() *pubsub.PeerScoreThresholds); ok {
+		r1 = rf()
+	} else {
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*pubsub.PeerScoreThresholds)
+		}
+	}
+
+	return r0, r1
+}
+
+// Done provides a mock function with given fields:
+func (_m *ScoreOptionBuilder) Done() <-chan struct{} {
+	ret := _m.Called()
+
+	var r0 <-chan struct{}
+	if rf, ok := ret.Get(0).(func() <-chan struct{}); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(<-chan struct{})
+		}
+	}
+
+	return r0
+}
+
+// Ready provides a mock function with given fields:
+func (_m *ScoreOptionBuilder) Ready() <-chan struct{} {
+	ret := _m.Called()
+
+	var r0 <-chan struct{}
+	if rf, ok := ret.Get(0).(func() <-chan struct{}); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(<-chan struct{})
+		}
+	}
+
+	return r0
+}
+
+// Start provides a mock function with given fields: _a0
+func (_m *ScoreOptionBuilder) Start(_a0 irrecoverable.SignalerContext) {
+	_m.Called(_a0)
+}
+
+// TopicScoreParams provides a mock function with given fields: _a0
+func (_m *ScoreOptionBuilder) TopicScoreParams(_a0 *pubsub.Topic) *pubsub.TopicScoreParams {
+	ret := _m.Called(_a0)
+
+	var r0 *pubsub.TopicScoreParams
+	if rf, ok := ret.Get(0).(func(*pubsub.Topic) *pubsub.TopicScoreParams); ok {
+		r0 = rf(_a0)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*pubsub.TopicScoreParams)
 		}
 	}
 

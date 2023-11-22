@@ -8,24 +8,31 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool"
 )
 
 type TransactionCollector struct {
-	transactionTimings         mempool.TransactionTimings
-	log                        zerolog.Logger
-	logTimeToFinalized         bool
-	logTimeToExecuted          bool
-	logTimeToFinalizedExecuted bool
-	timeToFinalized            prometheus.Summary
-	timeToExecuted             prometheus.Summary
-	timeToFinalizedExecuted    prometheus.Summary
-	transactionSubmission      *prometheus.CounterVec
-	scriptExecutedDuration     *prometheus.HistogramVec
-	transactionResultDuration  *prometheus.HistogramVec
-	scriptSize                 prometheus.Histogram
-	transactionSize            prometheus.Histogram
+	transactionTimings             mempool.TransactionTimings
+	log                            zerolog.Logger
+	logTimeToFinalized             bool
+	logTimeToExecuted              bool
+	logTimeToFinalizedExecuted     bool
+	timeToFinalized                prometheus.Summary
+	timeToExecuted                 prometheus.Summary
+	timeToFinalizedExecuted        prometheus.Summary
+	transactionSubmission          *prometheus.CounterVec
+	transactionSize                prometheus.Histogram
+	scriptExecutedDuration         *prometheus.HistogramVec
+	scriptExecutionErrorOnExecutor *prometheus.CounterVec
+	scriptExecutionComparison      *prometheus.CounterVec
+	scriptSize                     prometheus.Histogram
+	transactionResultDuration      *prometheus.HistogramVec
 }
+
+// interface check
+var _ module.BackendScriptsMetrics = (*TransactionCollector)(nil)
+var _ module.TransactionMetrics = (*TransactionCollector)(nil)
 
 func NewTransactionCollector(
 	log zerolog.Logger,
@@ -97,6 +104,18 @@ func NewTransactionCollector(
 			Help:      "histogram for the duration in ms of the round trip time for executing a script",
 			Buckets:   []float64{1, 100, 500, 1000, 2000, 5000},
 		}, []string{"script_size"}),
+		scriptExecutionErrorOnExecutor: promauto.NewCounterVec(prometheus.CounterOpts{
+			Name:      "script_execution_error_executor",
+			Namespace: namespaceAccess,
+			Subsystem: subsystemTransactionSubmission,
+			Help:      "counter for the internal errors while executing a script",
+		}, []string{"source"}),
+		scriptExecutionComparison: promauto.NewCounterVec(prometheus.CounterOpts{
+			Name:      "script_execution_comparison",
+			Namespace: namespaceAccess,
+			Subsystem: subsystemTransactionSubmission,
+			Help:      "counter for the comparison outcomes of executing a script locally and on execution node",
+		}, []string{"outcome"}),
 		transactionResultDuration: promauto.NewHistogramVec(prometheus.HistogramOpts{
 			Name:      "transaction_result_fetched_duration",
 			Namespace: namespaceAccess,
@@ -121,6 +140,8 @@ func NewTransactionCollector(
 	return tc
 }
 
+// Script exec metrics
+
 func (tc *TransactionCollector) ScriptExecuted(dur time.Duration, size int) {
 	// record the execute script duration and script size
 	tc.scriptSize.Observe(float64(size / 1024))
@@ -128,6 +149,43 @@ func (tc *TransactionCollector) ScriptExecuted(dur time.Duration, size int) {
 		"script_size": tc.sizeLabel(size),
 	}).Observe(float64(dur.Milliseconds()))
 }
+
+func (tc *TransactionCollector) ScriptExecutionErrorLocal() {
+	// record the execution error count
+	tc.scriptExecutionErrorOnExecutor.WithLabelValues("local").Inc()
+}
+
+func (tc *TransactionCollector) ScriptExecutionErrorOnExecutionNode() {
+	// record the execution error count
+	tc.scriptExecutionErrorOnExecutor.WithLabelValues("execution").Inc()
+}
+
+func (tc *TransactionCollector) ScriptExecutionResultMismatch() {
+	// record the execution error count
+	tc.scriptExecutionComparison.WithLabelValues("result_mismatch").Inc()
+}
+
+func (tc *TransactionCollector) ScriptExecutionResultMatch() {
+	// record the execution error count
+	tc.scriptExecutionComparison.WithLabelValues("result_match").Inc()
+}
+func (tc *TransactionCollector) ScriptExecutionErrorMismatch() {
+	// record the execution error count
+	tc.scriptExecutionComparison.WithLabelValues("error_mismatch").Inc()
+}
+
+func (tc *TransactionCollector) ScriptExecutionErrorMatch() {
+	// record the execution error count
+	tc.scriptExecutionComparison.WithLabelValues("error_match").Inc()
+}
+
+// ScriptExecutionNotIndexed records script execution matches where data for the block is not
+// indexed locally yet
+func (tc *TransactionCollector) ScriptExecutionNotIndexed() {
+	tc.scriptExecutionComparison.WithLabelValues("not_indexed").Inc()
+}
+
+// TransactionResult metrics
 
 func (tc *TransactionCollector) TransactionResultFetched(dur time.Duration, size int) {
 	// record the transaction result duration and transaction script/payload size

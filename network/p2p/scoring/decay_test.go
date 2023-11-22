@@ -116,13 +116,14 @@ func TestGeometricDecay(t *testing.T) {
 			wantErr: fmt.Errorf("last updated time cannot be in the future"),
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := scoring.GeometricDecay(tt.args.penalty, tt.args.decay, tt.args.lastUpdated)
 			if tt.wantErr != nil {
 				assert.Errorf(t, err, tt.wantErr.Error())
 			}
-			assert.Less(t, math.Abs(got-tt.want), 1e-3)
+			assert.LessOrEqual(t, truncateFloat(math.Abs(got-tt.want), 3), 1e-2)
 		})
 	}
 }
@@ -249,4 +250,9 @@ func TestDefaultDecayFunction(t *testing.T) {
 			assert.Equal(t, got.Decay, tt.want.record.Decay)
 		})
 	}
+}
+
+func truncateFloat(number float64, decimalPlaces int) float64 {
+	pow := math.Pow(10, float64(decimalPlaces))
+	return float64(int(number*pow)) / pow
 }

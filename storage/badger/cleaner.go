@@ -3,7 +3,6 @@
 package badger
 
 import (
-	"math/rand"
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
@@ -12,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/utils/rand"
 )
 
 // Cleaner uses component.ComponentManager to implement module.Startable and module.ReadyDoneAware
@@ -82,7 +82,17 @@ func (c *Cleaner) gcWorkerRoutine(ctx irrecoverable.SignalerContext, ready compo
 // We add 20% jitter into the interval, so that we don't risk nodes syncing their GC calls over time.
 // Therefore GC is run every X seconds, where X is uniformly sampled from [interval, interval*1.2]
 func (c *Cleaner) nextWaitDuration() time.Duration {
-	return time.Duration(c.interval.Nanoseconds() + rand.Int63n(c.interval.Nanoseconds()/5))
+	jitter, err := rand.Uint64n(uint64(c.interval.Nanoseconds() / 5))
+	if err != nil {
+		// if randomness fails, do not use a jitter for this instance.
+		// TODO: address the error properly and not swallow it.
+		// In this specific case, `utils/rand` only errors if the system randomness fails
+		// which is a symptom of a wider failure. Many other node components would catch such
+		// a failure.
+		c.log.Warn().Msg("jitter is zero beacuse system randomness has failed")
+		jitter = 0
+	}
+	return time.Duration(c.interval.Nanoseconds() + int64(jitter))
 }
 
 // runGC runs garbage collection for badger DB, handles sentinel errors and reports metrics.

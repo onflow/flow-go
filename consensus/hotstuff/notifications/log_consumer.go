@@ -46,16 +46,17 @@ func (lc *LogConsumer) OnFinalizedBlock(block *model.Block) {
 		Msg("block finalized")
 }
 
-func (lc *LogConsumer) OnInvalidBlockDetected(err model.InvalidProposalError) {
-	invalidBlock := err.InvalidProposal.Block
+func (lc *LogConsumer) OnInvalidBlockDetected(err flow.Slashable[model.InvalidProposalError]) {
+	invalidBlock := err.Message.InvalidProposal.Block
 	lc.log.Warn().
 		Str(logging.KeySuspicious, "true").
+		Hex("origin_id", err.OriginID[:]).
 		Uint64("block_view", invalidBlock.View).
 		Hex("proposer_id", invalidBlock.ProposerID[:]).
 		Hex("block_id", invalidBlock.BlockID[:]).
 		Uint64("qc_block_view", invalidBlock.QC.View).
 		Hex("qc_block_id", invalidBlock.QC.BlockID[:]).
-		Msgf("invalid block detected: %s", err.Error())
+		Msgf("invalid block detected: %s", err.Message.Error())
 }
 
 func (lc *LogConsumer) OnDoubleProposeDetected(block *model.Block, alt *model.Block) {

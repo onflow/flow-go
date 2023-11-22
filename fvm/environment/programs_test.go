@@ -44,6 +44,8 @@ var (
 
 	contractA0Code = `
 		pub contract A {
+			pub struct interface Foo{}
+			
 			pub fun hello(): String {
         		return "bad version"
     		}
@@ -52,6 +54,8 @@ var (
 
 	contractACode = `
 		pub contract A {
+			pub struct interface Foo{}
+
 			pub fun hello(): String {
         		return "hello from A"
     		}
@@ -60,9 +64,23 @@ var (
 
 	contractA2Code = `
 		pub contract A2 {
+			pub struct interface Foo{}
+
 			pub fun hello(): String {
         		return "hello from A2"
     		}
+		}
+	`
+
+	contractABreakingCode = `
+		pub contract A {
+			pub struct interface Foo{
+				pub fun hello()
+			}
+	
+			pub fun hello(): String {
+	  		return "hello from A with breaking change"
+			}
 		}
 	`
 
@@ -70,6 +88,8 @@ var (
 		import 0xa
 
 		pub contract B {
+			pub struct Bar : A.Foo {}
+
 			pub fun hello(): String {
        			return "hello from B but also ".concat(A.hello())
     		}
@@ -81,6 +101,8 @@ var (
 		import A from 0xa
 
 		pub contract C {
+            pub struct Bar : A.Foo {}
+
 			pub fun hello(): String {
 	   			return "hello from C, ".concat(B.hello())
 			}
@@ -187,7 +209,7 @@ func Test_Programs(t *testing.T) {
 
 	})
 	t.Run("register touches are captured for simple contract A", func(t *testing.T) {
-		fmt.Println("---------- Real transaction here ------------")
+		t.Log("---------- Real transaction here ------------")
 
 		// run a TX using contract A
 
@@ -370,7 +392,7 @@ func Test_Programs(t *testing.T) {
 	})
 
 	t.Run("deploying new contract A2 invalidates B because of * imports", func(t *testing.T) {
-		// deploy contract B
+		// deploy contract A2
 		executionSnapshot, output, err := vm.Run(
 			context,
 			fvm.Transaction(
@@ -738,6 +760,79 @@ func Test_ProgramsDoubleCounting(t *testing.T) {
 		// hit A2 because interpreting B because interpreting C because interpreting transaction
 		require.Equal(t, 7, metrics.CacheHits)
 		require.Equal(t, 0, metrics.CacheMisses)
+	})
+
+	t.Run("update A to breaking change and ensure cache state", func(t *testing.T) {
+		// deploy contract A
+		executionSnapshot, output, err := vm.Run(
+			context,
+			fvm.Transaction(
+				updateContractTx("A", contractABreakingCode, addressA),
+				derivedBlockData.NextTxIndexForTestingOnly()),
+			snapshotTree)
+		require.NoError(t, err)
+		require.NoError(t, output.Err)
+
+		snapshotTree = snapshotTree.Append(executionSnapshot)
+
+		entryA := derivedBlockData.GetProgramForTestingOnly(contractALocation)
+		entryB := derivedBlockData.GetProgramForTestingOnly(contractBLocation)
+		entryC := derivedBlockData.GetProgramForTestingOnly(contractCLocation)
+
+		require.Nil(t, entryA)
+		require.Nil(t, entryB)
+		require.Nil(t, entryC)
+
+		cached := derivedBlockData.CachedPrograms()
+		require.Equal(t, 1, cached)
+	})
+
+	callCAfterItsBroken := func(snapshotTree snapshot.SnapshotTree) snapshot.SnapshotTree {
+		procCallC := fvm.Transaction(
+			flow.NewTransactionBody().SetScript(
+				[]byte(
+					`
+					import A from 0xa
+					import B from 0xb
+					import C from 0xc
+					transaction {
+						prepare() {
+							log(C.hello())
+						}
+					}`,
+				)),
+			derivedBlockData.NextTxIndexForTestingOnly())
+
+		executionSnapshot, output, err := vm.Run(
+			context,
+			procCallC,
+			snapshotTree)
+		require.NoError(t, err)
+		require.Error(t, output.Err)
+
+		entryA := derivedBlockData.GetProgramForTestingOnly(contractALocation)
+		entryA2 := derivedBlockData.GetProgramForTestingOnly(contractA2Location)
+		entryB := derivedBlockData.GetProgramForTestingOnly(contractBLocation)
+		entryC := derivedBlockData.GetProgramForTestingOnly(contractCLocation)
+
+		require.NotNil(t, entryA)
+		require.NotNil(t, entryA2) // loaded due to "*" import in B
+		require.Nil(t, entryB)     // failed to load
+		require.Nil(t, entryC)     // failed to load
+
+		cached := derivedBlockData.CachedPrograms()
+		require.Equal(t, 2, cached)
+
+		return snapshotTree.Append(executionSnapshot)
+	}
+
+	t.Run("Call C when broken", func(t *testing.T) {
+		metrics.Reset()
+		snapshotTree = callCAfterItsBroken(snapshotTree)
+
+		// miss A, hit A, hit A2, hit A, hit A2, hit A
+		require.Equal(t, 5, metrics.CacheHits)
+		require.Equal(t, 1, metrics.CacheMisses)
 	})
 
 }

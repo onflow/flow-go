@@ -10,12 +10,12 @@ import (
 )
 
 // retryFrequency has to be less than TransactionExpiry or else this module does nothing
-const retryFrequency uint64 = 120 // blocks
+const retryFrequency uint64 = 120 // Blocks
 
 // Retry implements a simple retry mechanism for transaction submission.
 type Retry struct {
 	mu sync.RWMutex
-	// pending transactions
+	// pending Transactions
 	transactionByReferencBlockHeight map[uint64]map[flow.Identifier]*flow.TransactionBody
 	backend                          *Backend
 	active                           bool
@@ -47,7 +47,7 @@ func (r *Retry) Retry(height uint64) {
 		return
 	}
 
-	// naive cleanup for now, prune every 120 blocks
+	// naive cleanup for now, prune every 120 Blocks
 	if height%retryFrequency == 0 {
 		r.prune(height)
 	}
@@ -84,7 +84,7 @@ func (r *Retry) RegisterTransaction(height uint64, tx *flow.TransactionBody) {
 func (r *Retry) prune(height uint64) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	// If height is less than the default, there will be no expired transactions
+	// If height is less than the default, there will be no expired Transactions
 	if height < flow.DefaultTransactionExpiry {
 		return
 	}

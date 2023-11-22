@@ -29,7 +29,10 @@ import (
 
 type ProviderEngine interface {
 	network.MessageProcessor
-	BroadcastExecutionReceipt(context.Context, *flow.ExecutionReceipt) error
+	// BroadcastExecutionReceipt broadcasts an execution receipt to all nodes in the network.
+	// It skips broadcasting the receipt if the block is sealed, or the node is not authorized at the block.
+	// It returns true if the receipt is broadcasted, false otherwise.
+	BroadcastExecutionReceipt(context.Context, uint64, *flow.ExecutionReceipt) (bool, error)
 }
 
 const (
@@ -73,7 +76,7 @@ type Engine struct {
 func New(
 	logger zerolog.Logger,
 	tracer module.Tracer,
-	net network.Network,
+	net network.EngineRegistry,
 	state protocol.State,
 	execState state.ReadOnlyExecutionState,
 	metrics module.ExecutionMetrics,
@@ -354,10 +357,36 @@ func (e *Engine) deliverChunkDataResponse(chunkDataPack *flow.ChunkDataPack, req
 	lg.Info().Msg("chunk data pack request successfully replied")
 }
 
-func (e *Engine) BroadcastExecutionReceipt(ctx context.Context, receipt *flow.ExecutionReceipt) error {
+// BroadcastExecutionReceipt broadcasts an execution receipt to all nodes in the network.
+// It skips broadcasting the receipt if the block is sealed, or the node is not authorized at the block.
+// It returns true if the receipt is broadcasted, false otherwise.
+func (e *Engine) BroadcastExecutionReceipt(ctx context.Context, height uint64, receipt *flow.ExecutionReceipt) (bool, error) {
+	// if the receipt is for a sealed block, then no need to broadcast it.
+	lastSealed, err := e.state.Sealed().Head()
+	if err != nil {
+		return false, fmt.Errorf("could not get sealed block before broadcasting: %w", err)
+	}
+
+	isExecutedBlockSealed := height <= lastSealed.Height
+
+	if isExecutedBlockSealed {
+		// no need to braodcast the receipt if the block is sealed
+		return false, nil
+	}
+
+	blockID := receipt.ExecutionResult.BlockID
+	authorizedAtBlock, err := e.checkAuthorizedAtBlock(blockID)
+	if err != nil {
+		return false, fmt.Errorf("could not check staking status: %w", err)
+	}
+
+	if !authorizedAtBlock {
+		return false, nil
+	}
+
 	finalState, err := receipt.ExecutionResult.FinalStateCommitment()
 	if err != nil {
-		return fmt.Errorf("could not get final state: %w", err)
+		return false, fmt.Errorf("could not get final state: %w", err)
 	}
 
 	span, _ := e.tracer.StartSpanFromContext(ctx, trace.EXEBroadcastExecutionReceipt)
@@ -372,13 +401,13 @@ func (e *Engine) BroadcastExecutionReceipt(ctx context.Context, receipt *flow.Ex
 	identities, err := e.state.Final().Identities(filter.HasRole(flow.RoleAccess, flow.RoleConsensus,
 		flow.RoleVerification))
 	if err != nil {
-		return fmt.Errorf("could not get consensus and verification identities: %w", err)
+		return false, fmt.Errorf("could not get consensus and verification identities: %w", err)
 	}
 
 	err = e.receiptCon.Publish(receipt, identities.NodeIDs()...)
 	if err != nil {
-		return fmt.Errorf("could not submit execution receipts: %w", err)
+		return false, fmt.Errorf("could not submit execution receipts: %w", err)
 	}
 
-	return nil
+	return true, nil
 }

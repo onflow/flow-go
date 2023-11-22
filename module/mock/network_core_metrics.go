@@ -5,6 +5,8 @@ package mock
 import (
 	mock "github.com/stretchr/testify/mock"
 
+	peer "github.com/libp2p/go-libp2p/core/peer"
+
 	time "time"
 )
 
@@ -46,6 +48,21 @@ func (_m *NetworkCoreMetrics) MessageRemoved(priority int) {
 // OnMisbehaviorReported provides a mock function with given fields: channel, misbehaviorType
 func (_m *NetworkCoreMetrics) OnMisbehaviorReported(channel string, misbehaviorType string) {
 	_m.Called(channel, misbehaviorType)
+}
+
+// OnRateLimitedPeer provides a mock function with given fields: pid, role, msgType, topic, reason
+func (_m *NetworkCoreMetrics) OnRateLimitedPeer(pid peer.ID, role string, msgType string, topic string, reason string) {
+	_m.Called(pid, role, msgType, topic, reason)
+}
+
+// OnUnauthorizedMessage provides a mock function with given fields: role, msgType, topic, offense
+func (_m *NetworkCoreMetrics) OnUnauthorizedMessage(role string, msgType string, topic string, offense string) {
+	_m.Called(role, msgType, topic, offense)
+}
+
+// OnViolationReportSkipped provides a mock function with given fields:
+func (_m *NetworkCoreMetrics) OnViolationReportSkipped() {
+	_m.Called()
 }
 
 // OutboundMessageSent provides a mock function with given fields: sizeBytes, topic, protocol, messageType

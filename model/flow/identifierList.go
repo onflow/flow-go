@@ -2,7 +2,6 @@ package flow
 
 import (
 	"bytes"
-	"math/rand"
 	"sort"
 
 	"github.com/rs/zerolog/log"
@@ -103,15 +102,8 @@ func (il IdentifierList) Union(other IdentifierList) IdentifierList {
 	return union
 }
 
-// DeterministicSample returns deterministic random sample from the `IdentifierList` using the given seed
-func (il IdentifierList) DeterministicSample(size uint, seed int64) IdentifierList {
-	rand.Seed(seed)
-	return il.Sample(size)
-}
-
 // Sample returns random sample of length 'size' of the ids
-// [Fisher-Yates shuffle](https://en.wikipedia.org/wiki/Fisher–Yates_shuffle).
-func (il IdentifierList) Sample(size uint) IdentifierList {
+func (il IdentifierList) Sample(size uint) (IdentifierList, error) {
 	return Sample(size, il...)
 }
 

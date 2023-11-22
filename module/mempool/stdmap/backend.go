@@ -23,12 +23,12 @@ type Backend struct {
 }
 
 // NewBackend creates a new memory pool backend.
-// This is using EjectTrueRandomFast()
+// This is using EjectRandomFast()
 func NewBackend(options ...OptionFunc) *Backend {
 	b := Backend{
 		backData:           backdata.NewMapBackData(),
 		guaranteedCapacity: uint(math.MaxUint32),
-		batchEject:         EjectTrueRandomFast,
+		batchEject:         EjectRandomFast,
 		eject:              nil,
 		ejectionCallbacks:  nil,
 	}
@@ -185,14 +185,14 @@ func (b *Backend) reduce() {
 	//defer binstat.Leave(bs)
 
 	// we keep reducing the cache size until we are at limit again
-	// this was a loop, but the loop is now in EjectTrueRandomFast()
+	// this was a loop, but the loop is now in EjectRandomFast()
 	// the ejections are batched, so this call to eject() may not actually
 	// do anything until the batch threshold is reached (currently 128)
 	if b.backData.Size() > b.guaranteedCapacity {
 		// get the key from the eject function
 		// we don't do anything if there is an error
 		if b.batchEject != nil {
-			_ = b.batchEject(b)
+			_, _ = b.batchEject(b)
 		} else {
 			_, _, _ = b.eject(b)
 		}

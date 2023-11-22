@@ -363,7 +363,6 @@ func prepareCollectionService(container testnet.ContainerConfig, i int, n int) S
 
 	timeout := 1200*time.Millisecond + collectionDelay
 	service.Command = append(service.Command,
-		fmt.Sprintf("--hotstuff-proposal-time=%s", collectionDelay),
 		fmt.Sprintf("--hotstuff-min-timeout=%s", timeout),
 		fmt.Sprintf("--ingress-addr=%s:%s", container.ContainerName, testnet.GRPCPort),
 		"--insecure-access-api=false",
@@ -396,6 +395,7 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 		fmt.Sprintf("--cadence-tracing=%t", cadenceTracing),
 		fmt.Sprintf("--extensive-tracing=%t", extesiveTracing),
 		"--execution-data-dir=/data/execution-data",
+		"--chunk-data-pack-dir=/data/chunk-data-pack",
 	)
 
 	service.Volumes = append(service.Volumes,
@@ -454,12 +454,14 @@ func prepareObserverService(i int, observerName string, agPublicKey string) Serv
 		fmt.Sprintf("--rpc-addr=%s:%s", observerName, testnet.GRPCPort),
 		fmt.Sprintf("--secure-rpc-addr=%s:%s", observerName, testnet.GRPCSecurePort),
 		fmt.Sprintf("--http-addr=%s:%s", observerName, testnet.GRPCWebPort),
+		fmt.Sprintf("--rest-addr=%s:%s", observerName, testnet.RESTPort),
 	)
 
 	service.AddExposedPorts(
 		testnet.GRPCPort,
 		testnet.GRPCSecurePort,
 		testnet.GRPCWebPort,
+		testnet.RESTPort,
 	)
 
 	// observer services rely on the access gateway
@@ -517,7 +519,7 @@ func defaultService(name, role, dataDir, profilerDir string, i int) Service {
 			Dockerfile: "cmd/Dockerfile",
 			Args: map[string]string{
 				"TARGET":  fmt.Sprintf("./cmd/%s", role),
-				"VERSION": build.Semver(),
+				"VERSION": build.Version(),
 				"COMMIT":  build.Commit(),
 				"GOARCH":  runtime.GOARCH,
 			},

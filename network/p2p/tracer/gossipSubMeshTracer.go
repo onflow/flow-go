@@ -13,7 +13,11 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/p2plogging"
+	"github.com/onflow/flow-go/network/p2p/tracer/internal"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -23,6 +27,12 @@ const (
 
 	// MeshLogIntervalWarnMsg is the message logged by the tracer every logInterval if there are unknown peers in the mesh.
 	MeshLogIntervalWarnMsg = "unknown peers in topic mesh peers of local node since last heartbeat"
+
+	// defaultLastHighestIHaveRPCSizeResetInterval is the interval that we reset the tracker of max ihave size sent back
+	// to a default. We use ihave message max size to determine the health of requested iwants from remote peers. However,
+	// we don't desire an ihave size anomaly to persist forever, hence, we reset it back to a default every minute.
+	// The choice of the interval to be a minute is in harmony with the GossipSub decay interval.
+	defaultLastHighestIHaveRPCSizeResetInterval = time.Minute
 )
 
 // The GossipSubMeshTracer component in the GossipSub pubsub.RawTracer that is designed to track the local
@@ -43,29 +53,62 @@ type GossipSubMeshTracer struct {
 	idProvider     module.IdentityProvider
 	loggerInterval time.Duration
 	metrics        module.GossipSubLocalMeshMetrics
+	rpcSentTracker *internal.RPCSentTracker
 }
 
 var _ p2p.PubSubTracer = (*GossipSubMeshTracer)(nil)
 
-func NewGossipSubMeshTracer(
-	logger zerolog.Logger,
-	metrics module.GossipSubLocalMeshMetrics,
-	idProvider module.IdentityProvider,
-	loggerInterval time.Duration) *GossipSubMeshTracer {
+type GossipSubMeshTracerConfig struct {
+	network.NetworkingType
+	metrics.HeroCacheMetricsFactory
+	Logger                             zerolog.Logger
+	Metrics                            module.GossipSubLocalMeshMetrics
+	IDProvider                         module.IdentityProvider
+	LoggerInterval                     time.Duration
+	RpcSentTrackerCacheSize            uint32
+	RpcSentTrackerWorkerQueueCacheSize uint32
+	RpcSentTrackerNumOfWorkers         int
+}
 
+// NewGossipSubMeshTracer creates a new *GossipSubMeshTracer.
+// Args:
+// - *GossipSubMeshTracerConfig: the mesh tracer config.
+// Returns:
+// - *GossipSubMeshTracer: new mesh tracer.
+func NewGossipSubMeshTracer(config *GossipSubMeshTracerConfig) *GossipSubMeshTracer {
+	lg := config.Logger.With().Str("component", "gossipsub_topology_tracer").Logger()
+	rpcSentTracker := internal.NewRPCSentTracker(&internal.RPCSentTrackerConfig{
+		Logger:                             lg,
+		RPCSentCacheSize:                   config.RpcSentTrackerCacheSize,
+		RPCSentCacheCollector:              metrics.GossipSubRPCSentTrackerMetricFactory(config.HeroCacheMetricsFactory, config.NetworkingType),
+		WorkerQueueCacheCollector:          metrics.GossipSubRPCSentTrackerQueueMetricFactory(config.HeroCacheMetricsFactory, config.NetworkingType),
+		WorkerQueueCacheSize:               config.RpcSentTrackerWorkerQueueCacheSize,
+		NumOfWorkers:                       config.RpcSentTrackerNumOfWorkers,
+		LastHighestIhavesSentResetInterval: defaultLastHighestIHaveRPCSizeResetInterval,
+	})
 	g := &GossipSubMeshTracer{
 		RawTracer:      NewGossipSubNoopTracer(),
 		topicMeshMap:   make(map[string]map[peer.ID]struct{}),
-		idProvider:     idProvider,
-		metrics:        metrics,
-		logger:         logger.With().Str("component", "gossip_sub_topology_tracer").Logger(),
-		loggerInterval: loggerInterval,
+		idProvider:     config.IDProvider,
+		metrics:        config.Metrics,
+		logger:         lg,
+		loggerInterval: config.LoggerInterval,
+		rpcSentTracker: rpcSentTracker,
 	}
 
 	g.Component = component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			ready()
 			g.logLoop(ctx)
+		}).
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			ready()
+			lg.Debug().Msg("starting rpc sent tracker")
+			g.rpcSentTracker.Start(ctx)
+			lg.Debug().Msg("rpc sent tracker started")
+
+			<-g.rpcSentTracker.Done()
+			lg.Debug().Msg("rpc sent tracker stopped")
 		}).
 		Build()
 
@@ -89,7 +132,7 @@ func (t *GossipSubMeshTracer) Graft(p peer.ID, topic string) {
 	t.topicMeshMu.Lock()
 	defer t.topicMeshMu.Unlock()
 
-	lg := t.logger.With().Str("topic", topic).Str("peer_id", p.String()).Logger()
+	lg := t.logger.With().Str("topic", topic).Str("peer_id", p2plogging.PeerId(p)).Logger()
 
 	if _, ok := t.topicMeshMap[topic]; !ok {
 		t.topicMeshMap[topic] = make(map[peer.ID]struct{})
@@ -108,7 +151,7 @@ func (t *GossipSubMeshTracer) Graft(p peer.ID, topic string) {
 		return
 	}
 
-	lg.Info().Hex("flow_id", logging.ID(id.NodeID)).Str("role", id.Role.String()).Msg("grafted peer")
+	lg.Debug().Hex("flow_id", logging.ID(id.NodeID)).Str("role", id.Role.String()).Msg("grafted peer")
 }
 
 // Prune is called when a peer is removed from a topic mesh. The tracer uses this to track the mesh peers.
@@ -116,7 +159,7 @@ func (t *GossipSubMeshTracer) Prune(p peer.ID, topic string) {
 	t.topicMeshMu.Lock()
 	defer t.topicMeshMu.Unlock()
 
-	lg := t.logger.With().Str("topic", topic).Str("peer_id", p.String()).Logger()
+	lg := t.logger.With().Str("topic", topic).Str("peer_id", p2plogging.PeerId(p)).Logger()
 
 	if _, ok := t.topicMeshMap[topic]; !ok {
 		return
@@ -136,7 +179,26 @@ func (t *GossipSubMeshTracer) Prune(p peer.ID, topic string) {
 		return
 	}
 
-	lg.Info().Hex("flow_id", logging.ID(id.NodeID)).Str("role", id.Role.String()).Msg("pruned peer")
+	lg.Debug().Hex("flow_id", logging.ID(id.NodeID)).Str("role", id.Role.String()).Msg("pruned peer")
+}
+
+// SendRPC is called when a RPC is sent. Currently, the GossipSubMeshTracer tracks iHave RPC messages that have been sent.
+// This function can be updated to track other control messages in the future as required.
+func (t *GossipSubMeshTracer) SendRPC(rpc *pubsub.RPC, _ peer.ID) {
+	err := t.rpcSentTracker.Track(rpc)
+	if err != nil {
+		t.logger.Err(err).Bool(logging.KeyNetworkingSecurity, true).Msg("failed to track sent pubsbub rpc")
+	}
+}
+
+// WasIHaveRPCSent returns true if an iHave control message for the messageID was sent, otherwise false.
+func (t *GossipSubMeshTracer) WasIHaveRPCSent(messageID string) bool {
+	return t.rpcSentTracker.WasIHaveRPCSent(messageID)
+}
+
+// LastHighestIHaveRPCSize returns the last highest RPC iHave message sent.
+func (t *GossipSubMeshTracer) LastHighestIHaveRPCSize() int64 {
+	return t.rpcSentTracker.LastHighestIHaveRPCSize()
 }
 
 // logLoop logs the mesh peers of the local node for each topic at a regular interval.
@@ -179,11 +241,11 @@ func (t *GossipSubMeshTracer) logPeers() {
 
 			if !exists {
 				shouldWarn = true
-				topicPeers = topicPeers.Str(strconv.Itoa(peerIndex), fmt.Sprintf("pid=%s, flow_id=unknown, role=unknown", p.String()))
+				topicPeers = topicPeers.Str(strconv.Itoa(peerIndex), fmt.Sprintf("pid=%s, flow_id=unknown, role=unknown", p2plogging.PeerId(p)))
 				continue
 			}
 
-			topicPeers = topicPeers.Str(strconv.Itoa(peerIndex), fmt.Sprintf("pid=%s, flow_id=%x, role=%s", p.String(), id.NodeID, id.Role.String()))
+			topicPeers = topicPeers.Str(strconv.Itoa(peerIndex), fmt.Sprintf("pid=%s, flow_id=%x, role=%s", p2plogging.PeerId(p), id.NodeID, id.Role.String()))
 		}
 
 		lg := t.logger.With().
@@ -198,6 +260,6 @@ func (t *GossipSubMeshTracer) logPeers() {
 				Msg(MeshLogIntervalWarnMsg)
 			continue
 		}
-		lg.Info().Msg(MeshLogIntervalMsg)
+		lg.Debug().Msg(MeshLogIntervalMsg)
 	}
 }

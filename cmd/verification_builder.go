@@ -201,7 +201,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				node.Logger,
 				collector,
 				node.Tracer,
-				node.Network,
+				node.EngineRegistry,
 				node.State,
 				node.Me,
 				chunkVerifier,
@@ -214,7 +214,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			requesterEngine, err = requester.New(
 				node.Logger,
 				node.State,
-				node.Network,
+				node.EngineRegistry,
 				node.Tracer,
 				collector,
 				chunkRequests,
@@ -245,13 +245,17 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				v.verConf.stopAtHeight)
 
 			// requester and fetcher engines are started by chunk consumer
-			chunkConsumer = chunkconsumer.NewChunkConsumer(
+			chunkConsumer, err = chunkconsumer.NewChunkConsumer(
 				node.Logger,
 				collector,
 				processedChunkIndex,
 				chunkQueue,
 				fetcherEngine,
 				v.verConf.chunkWorkers)
+
+			if err != nil {
+				return nil, fmt.Errorf("could not create chunk consumer: %w", err)
+			}
 
 			err = node.Metrics.Mempool.Register(metrics.ResourceChunkConsumer, chunkConsumer.Size)
 			if err != nil {
@@ -336,6 +340,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			// so that it gets notified upon each new finalized block
 			followerCore, err = flowconsensus.NewFollower(
 				node.Logger,
+				node.Metrics.Mempool,
 				node.Storage.Headers,
 				final,
 				followerDistributor,
@@ -378,7 +383,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 
 			followerEng, err = followereng.NewComplianceLayer(
 				node.Logger,
-				node.Network,
+				node.EngineRegistry,
 				node.Me,
 				node.Metrics.Engine,
 				node.Storage.Headers,
@@ -394,16 +399,22 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			return followerEng, nil
 		}).
 		Component("sync engine", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+			spamConfig, err := commonsync.NewSpamDetectionConfig()
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize spam detection config: %w", err)
+			}
+
 			sync, err := commonsync.New(
 				node.Logger,
 				node.Metrics.Engine,
-				node.Network,
+				node.EngineRegistry,
 				node.Me,
 				node.State,
 				node.Storage.Blocks,
 				followerEng,
 				syncCore,
 				node.SyncEngineIdentifierProvider,
+				spamConfig,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)

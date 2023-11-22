@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
@@ -14,6 +15,10 @@ import (
 )
 
 var _ commands.AdminCommand = (*ReadRangeClusterBlocksCommand)(nil)
+
+// 10001 instead of 10000, because 10000 won't allow a range from 10000 to 20000,
+// which is easier to type than [10001, 20000]
+const Max_Range_Cluster_Block_Limit = uint64(10001)
 
 type ReadRangeClusterBlocksCommand struct {
 	db       *badger.DB
@@ -38,6 +43,12 @@ func (c *ReadRangeClusterBlocksCommand) Handler(ctx context.Context, req *admin.
 	reqData, err := parseHeightRangeRequestData(req)
 	if err != nil {
 		return nil, err
+	}
+
+	log.Info().Str("module", "admin-tool").Msgf("read range cluster blocks, data: %v", reqData)
+
+	if reqData.Range() > Max_Range_Cluster_Block_Limit {
+		return nil, admin.NewInvalidAdminReqErrorf("getting for more than %v blocks at a time might have an impact to node's performance and is not allowed", Max_Range_Cluster_Block_Limit)
 	}
 
 	clusterBlocks := storage.NewClusterBlocks(

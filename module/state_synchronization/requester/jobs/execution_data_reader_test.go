@@ -3,7 +3,6 @@ package jobs
 import (
 	"context"
 	"errors"
-	"math/rand"
 	"testing"
 	"time"
 
@@ -46,7 +45,6 @@ type ExecutionDataReaderSuite struct {
 
 func TestExecutionDataReaderSuite(t *testing.T) {
 	t.Parallel()
-	rand.Seed(time.Now().UnixMilli())
 	suite.Run(t, new(ExecutionDataReaderSuite))
 }
 
@@ -101,8 +99,8 @@ func (suite *ExecutionDataReaderSuite) reset() {
 	suite.reader = NewExecutionDataReader(
 		cache,
 		suite.fetchTimeout,
-		func() uint64 {
-			return suite.highestAvailableHeight()
+		func() (uint64, error) {
+			return suite.highestAvailableHeight(), nil
 		},
 	)
 }

@@ -85,7 +85,7 @@ func extractExecutionState(
 	var migrations []ledger.Migration
 	newState := ledger.State(targetHash)
 
-	// migrate the trie if there migrations
+	// migrate the trie if there are migrations
 	newTrie, err := led.MigrateAt(
 		newState,
 		migrations,
@@ -97,7 +97,8 @@ func extractExecutionState(
 	}
 
 	// create reporter
-	reporter := reporters.NewExportReporter(log,
+	reporter := reporters.NewExportReporter(
+		log,
 		func() flow.StateCommitment { return targetHash },
 	)
 
@@ -141,7 +142,7 @@ func createCheckpoint(
 		return ledger.State(hash.DummyHash), fmt.Errorf("could not create output dir %s: %w", outputDir, err)
 	}
 
-	err = wal.StoreCheckpointV6Concurrently([]*trie.MTrie{newTrie}, outputDir, outputFile, &log)
+	err = wal.StoreCheckpointV6Concurrently([]*trie.MTrie{newTrie}, outputDir, outputFile, log)
 
 	// Writing the checkpoint takes time to write and copy.
 	// Without relying on an exit code or stdout, we need to know when the copy is complete.

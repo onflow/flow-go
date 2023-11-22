@@ -1,3 +1,4 @@
+// Package bft provides testing facilities for Flow BFT protocols.
 package bft
 
 import (
@@ -18,6 +19,19 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// BaseSuite serves as a base test suite offering various utility functions
+// and default setup/teardown steps. It facilitates the creation of Flow networks
+// with pre-configured nodes and allows for easier interaction with the network,
+// reducing boilerplate code in individual tests.
+//
+// BaseSuite comes with a lot of functionality out-of-the-box, including the ability to:
+// - Create a bare-minimum Flow network.
+// - Start and stop the network.
+// - Track messages over testnet using TestnetStateTracker.
+// - Tear down the testnet environment.
+// - Handle Ghost nodes and Orchestrator network.
+//
+// BaseSuite embeds testify's Suite to leverage setup, teardown, and assertion capabilities.
 type BaseSuite struct {
 	suite.Suite
 	Log                     zerolog.Logger
@@ -30,32 +44,34 @@ type BaseSuite struct {
 	OrchestratorNetwork     *orchestrator.Network
 }
 
-// Ghost returns a client to interact with the Ghost node on testnet.
+// Ghost returns a client to interact with the Ghost node on the testnet.
+// It is essential for observing the messages exchanged in the network.
 func (b *BaseSuite) Ghost() *client.GhostClient {
-	client, err := b.Net.ContainerByID(b.GhostID).GhostClient()
+	c, err := b.Net.ContainerByID(b.GhostID).GhostClient()
 	require.NoError(b.T(), err, "could not get ghost client")
-	return client
+	return c
 }
 
 // AccessClient returns a client to interact with the access node api on testnet.
 func (b *BaseSuite) AccessClient() *testnet.Client {
-	client, err := b.Net.ContainerByName(testnet.PrimaryAN).TestnetClient()
+	c, err := b.Net.ContainerByName(testnet.PrimaryAN).TestnetClient()
 	require.NoError(b.T(), err, "could not get access client")
-	return client
+	return c
 }
 
-// SetupSuite sets up node configs to run a bare minimum Flow network to function correctly.
+// SetupSuite initializes the BaseSuite, setting up a bare-minimum Flow network.
+// It configures nodes with roles such as access, consensus, verification, execution,
+// and collection. It also sets up a Ghost node for observing messages exchanged on the network.
 func (b *BaseSuite) SetupSuite() {
 	b.Log = unittest.LoggerForTest(b.Suite.T(), zerolog.InfoLevel)
 
-	// setup access nodes
+	// setup single access node
 	b.NodeConfigs = append(b.NodeConfigs,
-		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
 		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
 	)
 
 	// setup consensus nodes
-	for _, nodeID := range unittest.IdentifierListFixture(4) {
+	for _, nodeID := range unittest.IdentifierListFixture(3) {
 		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus,
 			testnet.WithID(nodeID),
 			testnet.WithLogLevel(zerolog.FatalLevel),
@@ -66,9 +82,8 @@ func (b *BaseSuite) SetupSuite() {
 		b.NodeConfigs = append(b.NodeConfigs, nodeConfig)
 	}
 
-	// setup verification nodes
+	// setup single verification node
 	b.NodeConfigs = append(b.NodeConfigs,
-		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel)),
 		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel)),
 	)
 
@@ -96,7 +111,8 @@ func (b *BaseSuite) SetupSuite() {
 	b.NodeConfigs = append(b.NodeConfigs, ghostConfig)
 }
 
-// TearDownSuite tears down the test network of Flow as well as the BFT testing orchestrator network.
+// TearDownSuite cleans up the resources, stopping both the Flow network and the
+// orchestrator network if they have been initialized.
 func (b *BaseSuite) TearDownSuite() {
 	b.Net.Remove()
 	b.Cancel()
@@ -106,7 +122,10 @@ func (b *BaseSuite) TearDownSuite() {
 	}
 }
 
-// StartCorruptedNetwork starts the corrupted network with the configured node configs, this func should be used after test suite is setup.
+// StartCorruptedNetwork initializes and starts a corrupted Flow network.
+// This should be called after the test suite is set up. The function accepts
+// configurations like the name of the network, the number of views in the staking auction,
+// the number of views in an epoch, and a function to attack the orchestrator.
 func (b *BaseSuite) StartCorruptedNetwork(name string, viewsInStakingAuction, viewsInEpoch uint64, attackOrchestrator func() insecure.AttackOrchestrator) {
 	// generates, initializes, and starts the Flow network
 	netConfig := testnet.NewNetworkConfig(

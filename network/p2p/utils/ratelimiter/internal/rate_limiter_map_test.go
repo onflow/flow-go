@@ -15,7 +15,6 @@ import (
 
 // TestLimiterMap_get checks true is returned for stored items and false for missing items.
 func TestLimiterMap_get(t *testing.T) {
-	t.Parallel()
 	m := internal.NewLimiterMap(time.Second, time.Second)
 	peerID := peer.ID("id")
 	m.Store(peerID, rate.NewLimiter(0, 0))
@@ -28,7 +27,6 @@ func TestLimiterMap_get(t *testing.T) {
 
 // TestLimiterMap_remove checks the map removes keys as expected.
 func TestLimiterMap_remove(t *testing.T) {
-	t.Parallel()
 	m := internal.NewLimiterMap(time.Second, time.Second)
 	peerID := peer.ID("id")
 	m.Store(peerID, rate.NewLimiter(0, 0))
@@ -43,8 +41,6 @@ func TestLimiterMap_remove(t *testing.T) {
 
 // TestLimiterMap_cleanup checks the map removes expired keys as expected.
 func TestLimiterMap_cleanup(t *testing.T) {
-	t.Parallel()
-
 	// set fake ttl to 10 minutes
 	ttl := 10 * time.Minute
 
@@ -92,8 +88,6 @@ func TestLimiterMap_cleanup(t *testing.T) {
 
 // TestLimiterMap_cleanupLoopCtxCanceled checks that the Cleanup loop runs when ctx is canceled before cleanup loop exits.
 func TestLimiterMap_cleanupLoopCtxCanceled(t *testing.T) {
-	t.Parallel()
-
 	// set fake ttl to 10 minutes
 	ttl := 10 * time.Minute
 

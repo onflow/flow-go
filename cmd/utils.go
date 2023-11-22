@@ -6,15 +6,10 @@ import (
 	"path/filepath"
 
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/mempool/queue"
-	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/distributor"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/io"
 )
@@ -67,14 +62,4 @@ func rateLimiterPeerFilter(rateLimiter p2p.RateLimiter) p2p.PeerFilter {
 
 		return nil
 	}
-}
-
-// BuildDisallowListNotificationDisseminator builds the disallow list notification distributor.
-func BuildDisallowListNotificationDisseminator(size uint32, metricsRegistry prometheus.Registerer, logger zerolog.Logger, metricsEnabled bool) p2p.DisallowListNotificationDistributor {
-	heroStoreOpts := []queue.HeroStoreConfigOption{queue.WithHeroStoreSizeLimit(size)}
-	if metricsEnabled {
-		collector := metrics.DisallowListNotificationQueueMetricFactory(metricsRegistry)
-		heroStoreOpts = append(heroStoreOpts, queue.WithHeroStoreCollector(collector))
-	}
-	return distributor.DefaultDisallowListNotificationDistributor(logger, heroStoreOpts...)
 }

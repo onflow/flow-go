@@ -14,12 +14,13 @@ import (
 
 var _ commands.AdminCommand = (*GetTransactionsCommand)(nil)
 
-// max number of block height to query transactions from
-var Max_Height_Range = uint64(1000)
-
 type heightRangeReqData struct {
 	startHeight uint64
 	endHeight   uint64
+}
+
+func (d heightRangeReqData) Range() uint64 {
+	return d.endHeight - d.startHeight + 1
 }
 
 type GetTransactionsCommand struct {
@@ -38,6 +39,11 @@ func NewGetTransactionsCommand(state protocol.State, payloads storage.Payloads, 
 
 func (c *GetTransactionsCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
 	data := req.ValidatorData.(*heightRangeReqData)
+
+	limit := uint64(10001)
+	if data.Range() > limit {
+		return nil, admin.NewInvalidAdminReqErrorf("getting transactions for more than %v blocks at a time might have an impact to node's performance and is not allowed", limit)
+	}
 
 	finder := &transactions.Finder{
 		State:       c.state,

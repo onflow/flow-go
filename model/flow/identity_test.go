@@ -2,10 +2,8 @@ package flow_test
 
 import (
 	"encoding/json"
-	"math/rand"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -198,28 +196,35 @@ func TestIdentityList_Union(t *testing.T) {
 func TestSample(t *testing.T) {
 	t.Run("Sample max", func(t *testing.T) {
 		il := unittest.IdentityListFixture(10)
-		require.Equal(t, uint(10), il.Sample(10).Count())
+		sam, err := il.Sample(10)
+		require.NoError(t, err)
+		require.Equal(t, uint(10), sam.Count())
 	})
 
 	t.Run("Sample oversized", func(t *testing.T) {
 		il := unittest.IdentityListFixture(10)
-		require.Equal(t, uint(10), il.Sample(11).Count())
+		sam, err := il.Sample(11)
+		require.NoError(t, err)
+		require.Equal(t, uint(10), sam.Count())
 	})
 }
 
 func TestShuffle(t *testing.T) {
 	t.Run("should be shuffled", func(t *testing.T) {
 		il := unittest.IdentityListFixture(15) // ~1/billion chance of shuffling to input state
-		shuffled := il.DeterministicShuffle(rand.Int63())
+		shuffled, err := il.Shuffle()
+		require.NoError(t, err)
 		assert.Equal(t, len(il), len(shuffled))
 		assert.ElementsMatch(t, il, shuffled)
 	})
-	t.Run("should be deterministic", func(t *testing.T) {
+	t.Run("should not be deterministic", func(t *testing.T) {
 		il := unittest.IdentityListFixture(10)
-		seed := rand.Int63()
-		shuffled1 := il.DeterministicShuffle(seed)
-		shuffled2 := il.DeterministicShuffle(seed)
-		assert.Equal(t, shuffled1, shuffled2)
+		shuffled1, err := il.Shuffle()
+		require.NoError(t, err)
+		shuffled2, err := il.Shuffle()
+		require.NoError(t, err)
+		assert.NotEqual(t, shuffled1, shuffled2)
+		assert.ElementsMatch(t, shuffled1, shuffled2)
 	})
 }
 
@@ -238,7 +243,8 @@ func TestIdentity_ID(t *testing.T) {
 
 func TestIdentity_Sort(t *testing.T) {
 	il := unittest.IdentityListFixture(20)
-	random := il.DeterministicShuffle(time.Now().UnixNano())
+	random, err := il.Shuffle()
+	require.NoError(t, err)
 	assert.False(t, random.Sorted(order.Canonical))
 
 	canonical := il.Sort(order.Canonical)

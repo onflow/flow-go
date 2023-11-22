@@ -18,6 +18,41 @@ func (_m *BackendScriptsMetrics) ScriptExecuted(dur time.Duration, size int) {
 	_m.Called(dur, size)
 }
 
+// ScriptExecutionErrorLocal provides a mock function with given fields:
+func (_m *BackendScriptsMetrics) ScriptExecutionErrorLocal() {
+	_m.Called()
+}
+
+// ScriptExecutionErrorMatch provides a mock function with given fields:
+func (_m *BackendScriptsMetrics) ScriptExecutionErrorMatch() {
+	_m.Called()
+}
+
+// ScriptExecutionErrorMismatch provides a mock function with given fields:
+func (_m *BackendScriptsMetrics) ScriptExecutionErrorMismatch() {
+	_m.Called()
+}
+
+// ScriptExecutionErrorOnExecutionNode provides a mock function with given fields:
+func (_m *BackendScriptsMetrics) ScriptExecutionErrorOnExecutionNode() {
+	_m.Called()
+}
+
+// ScriptExecutionNotIndexed provides a mock function with given fields:
+func (_m *BackendScriptsMetrics) ScriptExecutionNotIndexed() {
+	_m.Called()
+}
+
+// ScriptExecutionResultMatch provides a mock function with given fields:
+func (_m *BackendScriptsMetrics) ScriptExecutionResultMatch() {
+	_m.Called()
+}
+
+// ScriptExecutionResultMismatch provides a mock function with given fields:
+func (_m *BackendScriptsMetrics) ScriptExecutionResultMismatch() {
+	_m.Called()
+}
+
 type mockConstructorTestingTNewBackendScriptsMetrics interface {
 	mock.TestingT
 	Cleanup(func())

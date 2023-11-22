@@ -1,14 +1,12 @@
 package validation
 
-import "github.com/onflow/flow-go/network/channels"
+type duplicateStrTracker map[string]struct{}
 
-type duplicateTopicTracker map[channels.Topic]struct{}
-
-func (d duplicateTopicTracker) set(topic channels.Topic) {
-	d[topic] = struct{}{}
+func (d duplicateStrTracker) set(s string) {
+	d[s] = struct{}{}
 }
 
-func (d duplicateTopicTracker) isDuplicate(topic channels.Topic) bool {
-	_, ok := d[topic]
+func (d duplicateStrTracker) isDuplicate(s string) bool {
+	_, ok := d[s]
 	return ok
 }

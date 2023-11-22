@@ -23,9 +23,9 @@ func (_m *AccessMetrics) AddInflightRequests(ctx context.Context, props metrics.
 	_m.Called(ctx, props, quantity)
 }
 
-// AddTotalRequests provides a mock function with given fields: ctx, service, id
-func (_m *AccessMetrics) AddTotalRequests(ctx context.Context, service string, id string) {
-	_m.Called(ctx, service, id)
+// AddTotalRequests provides a mock function with given fields: ctx, method, routeName
+func (_m *AccessMetrics) AddTotalRequests(ctx context.Context, method string, routeName string) {
+	_m.Called(ctx, method, routeName)
 }
 
 // ConnectionAddedToPool provides a mock function with given fields:
@@ -71,6 +71,41 @@ func (_m *AccessMetrics) ObserveHTTPResponseSize(ctx context.Context, props metr
 // ScriptExecuted provides a mock function with given fields: dur, size
 func (_m *AccessMetrics) ScriptExecuted(dur time.Duration, size int) {
 	_m.Called(dur, size)
+}
+
+// ScriptExecutionErrorLocal provides a mock function with given fields:
+func (_m *AccessMetrics) ScriptExecutionErrorLocal() {
+	_m.Called()
+}
+
+// ScriptExecutionErrorMatch provides a mock function with given fields:
+func (_m *AccessMetrics) ScriptExecutionErrorMatch() {
+	_m.Called()
+}
+
+// ScriptExecutionErrorMismatch provides a mock function with given fields:
+func (_m *AccessMetrics) ScriptExecutionErrorMismatch() {
+	_m.Called()
+}
+
+// ScriptExecutionErrorOnExecutionNode provides a mock function with given fields:
+func (_m *AccessMetrics) ScriptExecutionErrorOnExecutionNode() {
+	_m.Called()
+}
+
+// ScriptExecutionNotIndexed provides a mock function with given fields:
+func (_m *AccessMetrics) ScriptExecutionNotIndexed() {
+	_m.Called()
+}
+
+// ScriptExecutionResultMatch provides a mock function with given fields:
+func (_m *AccessMetrics) ScriptExecutionResultMatch() {
+	_m.Called()
+}
+
+// ScriptExecutionResultMismatch provides a mock function with given fields:
+func (_m *AccessMetrics) ScriptExecutionResultMismatch() {
+	_m.Called()
 }
 
 // TotalConnectionsInPool provides a mock function with given fields: connectionCount, connectionPoolSize

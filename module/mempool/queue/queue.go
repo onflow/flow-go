@@ -171,16 +171,27 @@ func (q *Queue) Dismount() (Blockify, []*Queue) {
 }
 
 func (q *Queue) String() string {
-	var builder strings.Builder
+	builder := new(strings.Builder)
 	builder.WriteString(fmt.Sprintf("Header: %v\n", q.Head.Item.ID()))
 	builder.WriteString(fmt.Sprintf("Highest: %v\n", q.Highest.Item.ID()))
 	builder.WriteString(fmt.Sprintf("Size: %v, Height: %v\n", q.Size(), q.Height()))
-	for _, node := range q.Nodes {
-		builder.WriteString(fmt.Sprintf("Node(height: %v): %v (children: %v)\n",
-			node.Item.Height(),
-			node.Item.ID(),
-			len(node.Children),
-		))
-	}
+	builder.WriteString(fmt.Sprintf("Node(height: %v): %v (children: %v)\n",
+		q.Head.Item.Height(),
+		q.Head.Item.ID(),
+		len(q.Head.Children),
+	))
+	printChildren(builder, q.Head, "")
 	return builder.String()
+}
+
+func printChildren(builder *strings.Builder, n *Node, prefix string) {
+	for _, child := range n.Children {
+		builder.WriteString(fmt.Sprintf("%s Node(height: %v): %v (children: %v)\n",
+			prefix+"|-",
+			child.Item.Height(),
+			child.Item.ID(),
+			len(child.Children),
+		))
+		printChildren(builder, child, prefix+"   ")
+	}
 }

@@ -92,7 +92,7 @@ var _ consensus.Compliance = (*ComplianceEngine)(nil)
 // interface `complianceCore` (this package) for detailed documentation of the algorithm.
 func NewComplianceLayer(
 	log zerolog.Logger,
-	net network.Network,
+	net network.EngineRegistry,
 	me module.Local,
 	engMetrics module.EngineMetrics,
 	headers storage.Headers,

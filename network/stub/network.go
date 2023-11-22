@@ -41,8 +41,8 @@ func WithConduitFactory(factory network.ConduitFactory) func(*Network) {
 	}
 }
 
-var _ network.Network = (*Network)(nil)
-var _ network.Adapter = (*Network)(nil)
+var _ network.EngineRegistry = (*Network)(nil)
+var _ network.ConduitAdapter = (*Network)(nil)
 
 // NewNetwork create a mocked Network.
 // The committee has the identity of the node already, so only `committee` is needed
@@ -160,7 +160,11 @@ func (n *Network) PublishOnChannel(channel channels.Channel, event interface{}, 
 // Engines attached to the same channel on other nodes. The targeted nodes are selected based on the selector.
 // In this test helper implementation, multicast uses submit method under the hood.
 func (n *Network) MulticastOnChannel(channel channels.Channel, event interface{}, num uint, targetIDs ...flow.Identifier) error {
-	targetIDs = flow.Sample(num, targetIDs...)
+	var err error
+	targetIDs, err = flow.Sample(num, targetIDs...)
+	if err != nil {
+		return fmt.Errorf("sampling failed: %w", err)
+	}
 	return n.submit(channel, event, targetIDs...)
 }
 
@@ -306,6 +310,6 @@ func (n *Network) StopConDev() {
 	close(n.qCD)
 }
 
-func (n *Network) ReportMisbehaviorOnChannel(channel channels.Channel, report network.MisbehaviorReport) {
+func (n *Network) ReportMisbehaviorOnChannel(_ channels.Channel, _ network.MisbehaviorReport) {
 	// no-op for stub network.
 }

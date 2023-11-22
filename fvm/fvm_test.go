@@ -2023,6 +2023,87 @@ func TestScriptAccountKeyMutationsFailure(t *testing.T) {
 	)
 }
 
+func TestScriptExecutionLimit(t *testing.T) {
+
+	t.Parallel()
+
+	script := fvm.Script([]byte(`
+		pub fun main() {
+			var s: Int256 = 1024102410241024
+			var i: Int256 = 0
+			var a: Int256 = 7
+			var b: Int256 = 5
+			var c: Int256 = 2
+
+			while i < 150000 {
+				s = s * a
+				s = s / b
+				s = s / c
+				i = i + 1
+			}
+		}
+	`))
+
+	bootstrapProcedureOptions := []fvm.BootstrapProcedureOption{
+		fvm.WithTransactionFee(fvm.DefaultTransactionFees),
+		fvm.WithExecutionMemoryLimit(math.MaxUint32),
+		fvm.WithExecutionEffortWeights(map[common.ComputationKind]uint64{
+			common.ComputationKindStatement:          1569,
+			common.ComputationKindLoop:               1569,
+			common.ComputationKindFunctionInvocation: 1569,
+			environment.ComputationKindGetValue:      808,
+			environment.ComputationKindCreateAccount: 2837670,
+			environment.ComputationKindSetValue:      765,
+		}),
+		fvm.WithExecutionMemoryWeights(meter.DefaultMemoryWeights),
+		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+	}
+
+	t.Run("Exceeding computation limit",
+		newVMTest().withBootstrapProcedureOptions(
+			bootstrapProcedureOptions...,
+		).withContextOptions(
+			fvm.WithTransactionFeesEnabled(true),
+			fvm.WithAccountStorageLimit(true),
+			fvm.WithComputationLimit(10000),
+		).run(
+			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
+				scriptCtx := fvm.NewContextFromParent(ctx)
+
+				_, output, err := vm.Run(scriptCtx, script, snapshotTree)
+				require.NoError(t, err)
+				require.Error(t, output.Err)
+				require.True(t, errors.IsComputationLimitExceededError(output.Err))
+				require.ErrorContains(t, output.Err, "computation exceeds limit (10000)")
+				require.GreaterOrEqual(t, output.ComputationUsed, uint64(10000))
+				require.GreaterOrEqual(t, output.MemoryEstimate, uint64(548020260))
+			},
+		),
+	)
+
+	t.Run("Sufficient computation limit",
+		newVMTest().withBootstrapProcedureOptions(
+			bootstrapProcedureOptions...,
+		).withContextOptions(
+			fvm.WithTransactionFeesEnabled(true),
+			fvm.WithAccountStorageLimit(true),
+			fvm.WithComputationLimit(20000),
+		).run(
+			func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
+				scriptCtx := fvm.NewContextFromParent(ctx)
+
+				_, output, err := vm.Run(scriptCtx, script, snapshotTree)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+				require.GreaterOrEqual(t, output.ComputationUsed, uint64(17955))
+				require.GreaterOrEqual(t, output.MemoryEstimate, uint64(984017413))
+			},
+		),
+	)
+}
+
 func TestInteractionLimit(t *testing.T) {
 	type testCase struct {
 		name             string
@@ -2596,9 +2677,38 @@ func TestStorageIterationWithBrokenValues(t *testing.T) {
 
 				contractB := fmt.Sprintf(`
 				    import A from %s
+
 				    pub contract B {
 						pub struct Bar : A.Foo {}
+
+						pub struct interface Foo2{}
 					}`,
+					accounts[0].HexWithPrefix(),
+				)
+
+				contractC := fmt.Sprintf(`
+				    import B from %s
+				    import A from %s
+
+				    pub contract C {
+						pub struct Bar : A.Foo, B.Foo2 {}
+
+						pub struct interface Foo3{}
+					}`,
+					accounts[0].HexWithPrefix(),
+					accounts[0].HexWithPrefix(),
+				)
+
+				contractD := fmt.Sprintf(`
+				    import C from %s
+				    import B from %s
+				    import A from %s
+
+				    pub contract D {
+						pub struct Bar : A.Foo, B.Foo2, C.Foo3 {}
+					}`,
+					accounts[0].HexWithPrefix(),
+					accounts[0].HexWithPrefix(),
 					accounts[0].HexWithPrefix(),
 				)
 
@@ -2640,25 +2750,46 @@ func TestStorageIterationWithBrokenValues(t *testing.T) {
 					[]byte(contractB),
 				))
 
-				// Store values, including `B.Bar()`
+				// Deploy `C`
+				runTransaction(utils.DeploymentTransaction(
+					"C",
+					[]byte(contractC),
+				))
+
+				// Deploy `D`
+				runTransaction(utils.DeploymentTransaction(
+					"D",
+					[]byte(contractD),
+				))
+
+				// Store values
 				runTransaction([]byte(fmt.Sprintf(
 					`
+					import D from %s
+					import C from %s
 					import B from %s
+
 					transaction {
 						prepare(signer: AuthAccount) {
 							signer.save("Hello, World!", to: /storage/first)
 							signer.save(["one", "two", "three"], to: /storage/second)
-							signer.save(B.Bar(), to: /storage/third)
+							signer.save(D.Bar(), to: /storage/third)
+							signer.save(C.Bar(), to: /storage/fourth)
+							signer.save(B.Bar(), to: /storage/fifth)
 
 							signer.link<&String>(/private/a, target:/storage/first)
 							signer.link<&[String]>(/private/b, target:/storage/second)
-							signer.link<&B.Bar>(/private/c, target:/storage/third)
+							signer.link<&D.Bar>(/private/c, target:/storage/third)
+							signer.link<&C.Bar>(/private/d, target:/storage/fourth)
+							signer.link<&B.Bar>(/private/e, target:/storage/fifth)
 						}
 					}`,
 					accounts[0].HexWithPrefix(),
+					accounts[0].HexWithPrefix(),
+					accounts[0].HexWithPrefix(),
 				)))
 
-				// Update `A`, so that `B` is now broken.
+				// Update `A`. `B`, `C` and `D` are now broken.
 				runTransaction(utils.UpdateTransaction(
 					"A",
 					[]byte(updatedContractA),
@@ -2673,7 +2804,7 @@ func TestStorageIterationWithBrokenValues(t *testing.T) {
 							account.forEachPrivate(fun (path: PrivatePath, type: Type): Bool {
 								account.getCapability<&AnyStruct>(path).borrow()!
 								total = total + 1
-                                return true
+                              return true
 							})
 
 							assert(total == 2, message:"found ".concat(total.toString()))
@@ -2681,5 +2812,101 @@ func TestStorageIterationWithBrokenValues(t *testing.T) {
 					}`,
 				))
 			},
+		)(t)
+}
+
+func TestEntropyCallOnlyOkIfAllowed(t *testing.T) {
+	source := testutil.EntropyProviderFixture(nil)
+
+	test := func(t *testing.T, allowed bool) {
+		newVMTest().
+			withBootstrapProcedureOptions().
+			withContextOptions(
+				fvm.WithRandomSourceHistoryCallAllowed(allowed),
+				fvm.WithEntropyProvider(source),
+			).
+			run(func(
+				t *testing.T,
+				vm fvm.VM,
+				chain flow.Chain,
+				ctx fvm.Context,
+				snapshotTree snapshot.SnapshotTree,
+			) {
+				txBody := flow.NewTransactionBody().
+					SetScript([]byte(`
+						transaction {
+						  prepare() {
+							randomSourceHistory()
+						  }
+						}
+					`)).
+					SetProposalKey(chain.ServiceAddress(), 0, 0).
+					SetPayer(chain.ServiceAddress())
+
+				err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
+				require.NoError(t, err)
+
+				_, output, err := vm.Run(
+					ctx,
+					fvm.Transaction(txBody, 0),
+					snapshotTree)
+				require.NoError(t, err)
+
+				if allowed {
+					require.NoError(t, output.Err)
+				} else {
+					require.Error(t, output.Err)
+					require.True(t, errors.HasErrorCode(output.Err, errors.ErrCodeOperationNotSupportedError))
+				}
+			},
+			)(t)
+	}
+
+	t.Run("enabled", func(t *testing.T) {
+		test(t, true)
+	})
+
+	t.Run("disabled", func(t *testing.T) {
+		test(t, false)
+	})
+}
+
+func TestEntropyCallExpectsNoParameters(t *testing.T) {
+	source := testutil.EntropyProviderFixture(nil)
+	newVMTest().
+		withBootstrapProcedureOptions().
+		withContextOptions(
+			fvm.WithRandomSourceHistoryCallAllowed(true),
+			fvm.WithEntropyProvider(source),
+		).
+		run(func(
+			t *testing.T,
+			vm fvm.VM,
+			chain flow.Chain,
+			ctx fvm.Context,
+			snapshotTree snapshot.SnapshotTree,
+		) {
+			txBody := flow.NewTransactionBody().
+				SetScript([]byte(`
+						transaction {
+						  prepare() {
+							randomSourceHistory("foo")
+						  }
+						}
+					`)).
+				SetProposalKey(chain.ServiceAddress(), 0, 0).
+				SetPayer(chain.ServiceAddress())
+
+			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
+			require.NoError(t, err)
+
+			_, output, err := vm.Run(
+				ctx,
+				fvm.Transaction(txBody, 0),
+				snapshotTree)
+			require.NoError(t, err)
+
+			require.ErrorContains(t, output.Err, "too many arguments")
+		},
 		)(t)
 }

@@ -1,71 +1,351 @@
 package environment
 
 import (
+	"fmt"
 	"testing"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/tracing"
+	"github.com/onflow/flow-go/model/flow"
 )
 
-func TestUUIDs_GetAndSetUUID(t *testing.T) {
-	txnState := state.NewTransactionState(nil, state.DefaultParameters())
-	uuidsA := NewUUIDGenerator(
-		tracing.NewTracerSpan(),
-		NewMeter(txnState),
-		txnState)
+func TestUUIDPartition(t *testing.T) {
+	blockHeader := &flow.Header{}
 
-	uuid, err := uuidsA.getUUID() // start from zero
-	require.NoError(t, err)
-	require.Equal(t, uint64(0), uuid)
+	usedPartitions := map[byte]struct{}{}
 
-	err = uuidsA.setUUID(5)
-	require.NoError(t, err)
+	// With enough samples, all partitions should be used.  (The first 1500 blocks
+	// only uses 254 partitions)
+	for numBlocks := 0; numBlocks < 2000; numBlocks++ {
+		blockId := blockHeader.ID()
 
-	// create new UUIDs instance
-	uuidsB := NewUUIDGenerator(
-		tracing.NewTracerSpan(),
-		NewMeter(txnState),
-		txnState)
-	uuid, err = uuidsB.getUUID() // should read saved value
-	require.NoError(t, err)
+		partition0 := uuidPartition(blockId, 0)
+		usedPartitions[partition0] = struct{}{}
 
-	require.Equal(t, uint64(5), uuid)
+		for txnIndex := 0; txnIndex < 256; txnIndex++ {
+			partition := uuidPartition(blockId, uint32(txnIndex))
+
+			// Ensure neighboring transactions uses neighoring partitions.
+			require.Equal(t, partition, partition0+byte(txnIndex))
+
+			// Ensure wrap around.
+			for i := 0; i < 5; i++ {
+				require.Equal(
+					t,
+					partition,
+					uuidPartition(blockId, uint32(txnIndex+i*256)))
+			}
+		}
+
+		blockHeader.ParentID = blockId
+	}
+
+	require.Len(t, usedPartitions, 256)
 }
 
-func Test_GenerateUUID(t *testing.T) {
+func TestUUIDGeneratorInitializePartitionNoHeader(t *testing.T) {
+	for txnIndex := uint32(0); txnIndex < 256; txnIndex++ {
+		uuids := NewUUIDGenerator(
+			tracing.NewTracerSpan(),
+			zerolog.Nop(),
+			nil,
+			nil,
+			nil,
+			txnIndex)
+		require.False(t, uuids.initialized)
+
+		uuids.maybeInitializePartition()
+
+		require.True(t, uuids.initialized)
+		require.Equal(t, uuids.partition, byte(0))
+		require.Equal(t, uuids.registerId, flow.UUIDRegisterID(byte(0)))
+	}
+}
+
+func TestUUIDGeneratorInitializePartition(t *testing.T) {
+	blockHeader := &flow.Header{}
+
+	for numBlocks := 0; numBlocks < 10; numBlocks++ {
+		blockId := blockHeader.ID()
+
+		for txnIndex := uint32(0); txnIndex < 256; txnIndex++ {
+			uuids := NewUUIDGenerator(
+				tracing.NewTracerSpan(),
+				zerolog.Nop(),
+				nil,
+				nil,
+				blockHeader,
+				txnIndex)
+			require.False(t, uuids.initialized)
+
+			uuids.maybeInitializePartition()
+
+			require.True(t, uuids.initialized)
+
+			expectedPartition := uuidPartition(blockId, txnIndex)
+
+			require.Equal(t, uuids.partition, expectedPartition)
+			require.Equal(
+				t,
+				uuids.registerId,
+				flow.UUIDRegisterID(expectedPartition))
+		}
+
+		blockHeader.ParentID = blockId
+	}
+}
+
+func TestUUIDGeneratorIdGeneration(t *testing.T) {
+	for txnIndex := uint32(0); txnIndex < 256; txnIndex++ {
+		testUUIDGenerator(t, &flow.Header{}, txnIndex)
+	}
+}
+
+func testUUIDGenerator(t *testing.T, blockHeader *flow.Header, txnIndex uint32) {
+	generator := NewUUIDGenerator(
+		tracing.NewTracerSpan(),
+		zerolog.Nop(),
+		nil,
+		nil,
+		blockHeader,
+		txnIndex)
+	generator.maybeInitializePartition()
+
+	partition := generator.partition
+	partitionMinValue := uint64(partition) << 56
+	maxUint56 := uint64(72057594037927935) // (1 << 56) - 1
+
+	t.Run(
+		fmt.Sprintf("basic get and set uint (partition: %d)", partition),
+		func(t *testing.T) {
+			txnState := state.NewTransactionState(nil, state.DefaultParameters())
+			uuidsA := NewUUIDGenerator(
+				tracing.NewTracerSpan(),
+				zerolog.Nop(),
+				NewMeter(txnState),
+				txnState,
+				blockHeader,
+				txnIndex)
+			uuidsA.maybeInitializePartition()
+
+			uuid, err := uuidsA.getUint64() // start from zero
+			require.NoError(t, err)
+			require.Equal(t, uint64(0), uuid)
+
+			err = uuidsA.setUint56(5)
+			require.NoError(t, err)
+
+			// create new UUIDs instance
+			uuidsB := NewUUIDGenerator(
+				tracing.NewTracerSpan(),
+				zerolog.Nop(),
+				NewMeter(txnState),
+				txnState,
+				blockHeader,
+				txnIndex)
+			uuidsB.maybeInitializePartition()
+
+			uuid, err = uuidsB.getUint64() // should read saved value
+			require.NoError(t, err)
+
+			require.Equal(t, uint64(5), uuid)
+		})
+
+	t.Run(
+		fmt.Sprintf("basic id generation (partition: %d)", partition),
+		func(t *testing.T) {
+			txnState := state.NewTransactionState(nil, state.DefaultParameters())
+			genA := NewUUIDGenerator(
+				tracing.NewTracerSpan(),
+				zerolog.Nop(),
+				NewMeter(txnState),
+				txnState,
+				blockHeader,
+				txnIndex)
+
+			uuidA, err := genA.GenerateUUID()
+			require.NoError(t, err)
+			uuidB, err := genA.GenerateUUID()
+			require.NoError(t, err)
+			uuidC, err := genA.GenerateUUID()
+			require.NoError(t, err)
+
+			require.Equal(t, partitionMinValue, uuidA)
+			require.Equal(t, partitionMinValue+1, uuidB)
+			require.Equal(t, partitionMinValue|1, uuidB)
+			require.Equal(t, partitionMinValue+2, uuidC)
+			require.Equal(t, partitionMinValue|2, uuidC)
+
+			// Create new generator instance from same ledger
+			genB := NewUUIDGenerator(
+				tracing.NewTracerSpan(),
+				zerolog.Nop(),
+				NewMeter(txnState),
+				txnState,
+				blockHeader,
+				txnIndex)
+
+			uuidD, err := genB.GenerateUUID()
+			require.NoError(t, err)
+			uuidE, err := genB.GenerateUUID()
+			require.NoError(t, err)
+			uuidF, err := genB.GenerateUUID()
+			require.NoError(t, err)
+
+			require.Equal(t, partitionMinValue+3, uuidD)
+			require.Equal(t, partitionMinValue|3, uuidD)
+			require.Equal(t, partitionMinValue+4, uuidE)
+			require.Equal(t, partitionMinValue|4, uuidE)
+			require.Equal(t, partitionMinValue+5, uuidF)
+			require.Equal(t, partitionMinValue|5, uuidF)
+		})
+
+	t.Run(
+		fmt.Sprintf("setUint56 overflows (partition: %d)", partition),
+		func(t *testing.T) {
+			txnState := state.NewTransactionState(nil, state.DefaultParameters())
+			uuids := NewUUIDGenerator(
+				tracing.NewTracerSpan(),
+				zerolog.Nop(),
+				NewMeter(txnState),
+				txnState,
+				blockHeader,
+				txnIndex)
+			uuids.maybeInitializePartition()
+
+			err := uuids.setUint56(maxUint56)
+			require.NoError(t, err)
+
+			value, err := uuids.getUint64()
+			require.NoError(t, err)
+			require.Equal(t, value, maxUint56)
+
+			err = uuids.setUint56(maxUint56 + 1)
+			require.ErrorContains(t, err, "overflowed")
+
+			value, err = uuids.getUint64()
+			require.NoError(t, err)
+			require.Equal(t, value, maxUint56)
+		})
+
+	t.Run(
+		fmt.Sprintf("id generation overflows (partition: %d)", partition),
+		func(t *testing.T) {
+			txnState := state.NewTransactionState(nil, state.DefaultParameters())
+			uuids := NewUUIDGenerator(
+				tracing.NewTracerSpan(),
+				zerolog.Nop(),
+				NewMeter(txnState),
+				txnState,
+				blockHeader,
+				txnIndex)
+			uuids.maybeInitializePartition()
+
+			err := uuids.setUint56(maxUint56 - 1)
+			require.NoError(t, err)
+
+			value, err := uuids.GenerateUUID()
+			require.NoError(t, err)
+			require.Equal(t, value, partitionMinValue+maxUint56-1)
+			require.Equal(t, value, partitionMinValue|(maxUint56-1))
+
+			value, err = uuids.getUint64()
+			require.NoError(t, err)
+			require.Equal(t, value, maxUint56)
+
+			_, err = uuids.GenerateUUID()
+			require.ErrorContains(t, err, "overflowed")
+
+			value, err = uuids.getUint64()
+			require.NoError(t, err)
+			require.Equal(t, value, maxUint56)
+		})
+}
+
+func TestUUIDGeneratorHardcodedPartitionIdGeneration(t *testing.T) {
 	txnState := state.NewTransactionState(nil, state.DefaultParameters())
-	genA := NewUUIDGenerator(
+	uuids := NewUUIDGenerator(
 		tracing.NewTracerSpan(),
+		zerolog.Nop(),
 		NewMeter(txnState),
-		txnState)
+		txnState,
+		nil,
+		0)
 
-	uuidA, err := genA.GenerateUUID()
+	// Hardcoded the partition to check for exact bytes
+	uuids.initialized = true
+	uuids.partition = 0xde
+	uuids.registerId = flow.UUIDRegisterID(0xde)
+
+	value, err := uuids.GenerateUUID()
 	require.NoError(t, err)
-	uuidB, err := genA.GenerateUUID()
+	require.Equal(t, value, uint64(0xde00000000000000))
+
+	value, err = uuids.getUint64()
 	require.NoError(t, err)
-	uuidC, err := genA.GenerateUUID()
+	require.Equal(t, value, uint64(1))
+
+	value, err = uuids.GenerateUUID()
+	require.NoError(t, err)
+	require.Equal(t, value, uint64(0xde00000000000001))
+
+	value, err = uuids.getUint64()
+	require.NoError(t, err)
+	require.Equal(t, value, uint64(2))
+
+	value, err = uuids.GenerateUUID()
+	require.NoError(t, err)
+	require.Equal(t, value, uint64(0xde00000000000002))
+
+	value, err = uuids.getUint64()
+	require.NoError(t, err)
+	require.Equal(t, value, uint64(3))
+
+	// pretend we increamented the counter up to cafBad
+	cafBad := uint64(0x1c2a3f4b5a6d70)
+	decafBad := uint64(0xde1c2a3f4b5a6d70)
+
+	err = uuids.setUint56(cafBad)
 	require.NoError(t, err)
 
-	require.Equal(t, uint64(0), uuidA)
-	require.Equal(t, uint64(1), uuidB)
-	require.Equal(t, uint64(2), uuidC)
+	for i := 0; i < 5; i++ {
+		value, err = uuids.GenerateUUID()
+		require.NoError(t, err)
+		require.Equal(t, value, decafBad+uint64(i))
+	}
 
-	// Create new generator instance from same ledger
-	genB := NewUUIDGenerator(
-		tracing.NewTracerSpan(),
-		NewMeter(txnState),
-		txnState)
+	value, err = uuids.getUint64()
+	require.NoError(t, err)
+	require.Equal(t, value, cafBad+uint64(5))
 
-	uuidD, err := genB.GenerateUUID()
-	require.NoError(t, err)
-	uuidE, err := genB.GenerateUUID()
-	require.NoError(t, err)
-	uuidF, err := genB.GenerateUUID()
+	// pretend we increamented the counter up to overflow - 2
+	maxUint56Minus2 := uint64(0xfffffffffffffd)
+	err = uuids.setUint56(maxUint56Minus2)
 	require.NoError(t, err)
 
-	require.Equal(t, uint64(3), uuidD)
-	require.Equal(t, uint64(4), uuidE)
-	require.Equal(t, uint64(5), uuidF)
+	value, err = uuids.GenerateUUID()
+	require.NoError(t, err)
+	require.Equal(t, value, uint64(0xdefffffffffffffd))
+
+	value, err = uuids.getUint64()
+	require.NoError(t, err)
+	require.Equal(t, value, maxUint56Minus2+1)
+
+	value, err = uuids.GenerateUUID()
+	require.NoError(t, err)
+	require.Equal(t, value, uint64(0xdefffffffffffffe))
+
+	value, err = uuids.getUint64()
+	require.NoError(t, err)
+	require.Equal(t, value, maxUint56Minus2+2)
+
+	_, err = uuids.GenerateUUID()
+	require.ErrorContains(t, err, "overflowed")
+
+	value, err = uuids.getUint64()
+	require.NoError(t, err)
+	require.Equal(t, value, maxUint56Minus2+2)
 }

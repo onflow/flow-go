@@ -47,8 +47,6 @@ import (
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
@@ -161,14 +159,8 @@ func main() {
 		flags.StringToIntVar(&apiRatelimits, "api-rate-limits", map[string]int{}, "per second rate limits for GRPC API methods e.g. Ping=300,SendTransaction=500 etc. note limits apply globally to all clients.")
 		flags.StringToIntVar(&apiBurstlimits, "api-burst-limits", map[string]int{}, "burst limits for gRPC API methods e.g. Ping=100,SendTransaction=100 etc. note limits apply globally to all clients.")
 
-		// gossipsub rpc validation inspector cluster prefixed control messages received flags
-		flags.Uint32Var(&nodeBuilder.BaseConfig.GossipSubConfig.RpcInspector.ValidationInspectorConfigs.ClusterPrefixedControlMsgsReceivedCacheSize, "gossipsub-cluster-prefix-tracker-cache-size", validation.DefaultClusterPrefixedControlMsgsReceivedCacheSize, "cache size for gossipsub RPC validation inspector cluster prefix received tracker.")
-		flags.Float64Var(&nodeBuilder.BaseConfig.GossipSubConfig.RpcInspector.ValidationInspectorConfigs.ClusterPrefixedControlMsgsReceivedCacheDecay, "gossipsub-cluster-prefix-tracker-cache-decay", validation.DefaultClusterPrefixedControlMsgsReceivedCacheDecay, "the decay value used to decay cluster prefix received topics received cached counters.")
-		flags.Float64Var(&nodeBuilder.BaseConfig.GossipSubConfig.RpcInspector.ValidationInspectorConfigs.ClusterPrefixHardThreshold, "gossipsub-rpc-cluster-prefixed-hard-threshold", validation.DefaultClusterPrefixedMsgDropThreshold, "the maximum number of cluster-prefixed control messages allowed to be processed when the active cluster id is unset or a mismatch is detected, exceeding this threshold will result in node penalization by gossipsub.")
-
 		// deprecated flags
-		flags.DurationVar(&deprecatedFlagBlockRateDelay, "block-rate-delay", 0,
-			"the delay to broadcast block proposal in order to control block production rate")
+		flags.DurationVar(&deprecatedFlagBlockRateDelay, "block-rate-delay", 0, "the delay to broadcast block proposal in order to control block production rate")
 	}).ValidateFlags(func() error {
 		if startupTimeString != cmd.NotSet {
 			t, err := time.Parse(time.RFC3339, startupTimeString)
@@ -303,6 +295,7 @@ func main() {
 			// creates a consensus follower with noop consumer as the notifier
 			followerCore, err = consensus.NewFollower(
 				node.Logger,
+				node.Metrics.Mempool,
 				node.Storage.Headers,
 				finalizer,
 				followerDistributor,
@@ -345,7 +338,7 @@ func main() {
 
 			followerEng, err = followereng.NewComplianceLayer(
 				node.Logger,
-				node.Network,
+				node.EngineRegistry,
 				node.Me,
 				node.Metrics.Engine,
 				node.Storage.Headers,
@@ -361,18 +354,23 @@ func main() {
 			return followerEng, nil
 		}).
 		Component("main chain sync engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			spamConfig, err := consync.NewSpamDetectionConfig()
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize spam detection config: %w", err)
+			}
 
 			// create a block synchronization engine to handle follower getting out of sync
 			sync, err := consync.New(
 				node.Logger,
 				node.Metrics.Engine,
-				node.Network,
+				node.EngineRegistry,
 				node.Me,
 				node.State,
 				node.Storage.Blocks,
 				followerEng,
 				mainChainSyncCore,
 				node.SyncEngineIdentifierProvider,
+				spamConfig,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
@@ -384,7 +382,7 @@ func main() {
 		Component("ingestion engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			ing, err = ingest.New(
 				node.Logger,
-				node.Network,
+				node.EngineRegistry,
 				node.State,
 				node.Metrics.Engine,
 				node.Metrics.Mempool,
@@ -422,7 +420,7 @@ func main() {
 			return provider.New(
 				node.Logger,
 				node.Metrics.Engine,
-				node.Network,
+				node.EngineRegistry,
 				node.Me,
 				node.State,
 				collectionRequestQueue,
@@ -438,7 +436,7 @@ func main() {
 		Component("pusher engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			push, err = pusher.New(
 				node.Logger,
-				node.Network,
+				node.EngineRegistry,
 				node.State,
 				node.Metrics.Engine,
 				colMetrics,
@@ -485,7 +483,7 @@ func main() {
 
 			complianceEngineFactory, err := factories.NewComplianceEngineFactory(
 				node.Logger,
-				node.Network,
+				node.EngineRegistry,
 				node.Me,
 				colMetrics,
 				node.Metrics.Engine,
@@ -506,7 +504,7 @@ func main() {
 			syncFactory, err := factories.NewSyncEngineFactory(
 				node.Logger,
 				node.Metrics.Engine,
-				node.Network,
+				node.EngineRegistry,
 				node.Me,
 			)
 			if err != nil {
@@ -560,7 +558,7 @@ func main() {
 
 			messageHubFactory := factories.NewMessageHubFactory(
 				node.Logger,
-				node.Network,
+				node.EngineRegistry,
 				node.Me,
 				node.Metrics.Engine,
 				node.State,
@@ -599,13 +597,7 @@ func main() {
 
 			// register the manager for protocol events
 			node.ProtocolEvents.AddConsumer(manager)
-
-			for _, rpcInspector := range node.GossipSubRpcInspectorSuite.Inspectors() {
-				if r, ok := rpcInspector.(p2p.GossipSubMsgValidationRpcInspector); ok {
-					clusterEvents.AddConsumer(r)
-				}
-			}
-
+			clusterEvents.AddConsumer(node.LibP2PNode)
 			return manager, err
 		})
 

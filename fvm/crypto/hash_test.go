@@ -1,7 +1,7 @@
 package crypto_test
 
 import (
-	"math/rand"
+	"crypto/rand"
 	"testing"
 
 	"crypto/sha256"

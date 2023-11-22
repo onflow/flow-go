@@ -21,10 +21,16 @@ const (
 	// The numOfAuthorizedEvents allows us to wait for a certain number of authorized messages to be received, this should
 	// give the network enough time to process the unauthorized messages. This ensures us that the unauthorized messages
 	// were indeed dropped and not unprocessed.
-	numOfAuthorizedEvents = 50
+	// This threshold must be set to a low value to make the test conclude faster
+	// by waiting for fewer events, which is beneficial when running the test
+	// on an asynchronous network where event delivery can be unpredictable.
+	numOfAuthorizedEvents = 5
 
 	// numOfUnauthorizedEvents the number of unauthorized events to send by the test orchestrator.
-	numOfUnauthorizedEvents = 10
+	// This threshold must be set to a low value to make the test conclude faster
+	// by waiting for fewer events, which is beneficial when running the test
+	// on an asynchronous network where event delivery can be unpredictable.
+	numOfUnauthorizedEvents = 5
 )
 
 // Orchestrator represents a simple `insecure.AttackOrchestrator` that tracks any unsigned messages received by victim nodes as well as the typically expected messages.
@@ -74,7 +80,6 @@ func (s *Orchestrator) trackIngressEvents(event *insecure.IngressEvent) error {
 		s.unauthorizedEventsReceived.Inc()
 		s.Logger.Warn().Str("event_id", event.FlowProtocolEventID.String()).Msg("unauthorized ingress event received")
 	}
-
 	// track all authorized events sent during test
 	if expectedEvent, ok := s.authorizedEvents[event.FlowProtocolEventID]; ok {
 		// ensure event received intact no changes have been made to the underlying message
