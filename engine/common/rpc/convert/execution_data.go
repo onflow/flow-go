@@ -316,11 +316,11 @@ func messageToTrustedTransaction(
 	return *t, nil
 }
 
-func MessageToRegisterID(m *entities.RegisterID) (*flow.RegisterID, error) {
+func MessageToRegisterID(m *entities.RegisterID) (flow.RegisterID, error) {
 	if m == nil {
-		return nil, ErrEmptyMessage
+		return flow.RegisterID{}, ErrEmptyMessage
 	}
-	return &flow.RegisterID{
+	return flow.RegisterID{
 		Owner: m.GetOwner(),
 		Key:   m.GetKey(),
 	}, nil
@@ -337,7 +337,7 @@ func MessagesToRegisterIDs(m []*entities.RegisterID) (flow.RegisterIDs, error) {
 		if err != nil {
 			return nil, err
 		}
-		result[i] = *regId
+		result[i] = regId
 	}
 	return result, nil
 }

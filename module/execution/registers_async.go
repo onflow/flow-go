@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"sync"
 
+	"go.uber.org/atomic"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/storage"
-	"go.uber.org/atomic"
 )
 
 // RegistersAsyncStore has the same basic structure as access/backend.ScriptExecutor
