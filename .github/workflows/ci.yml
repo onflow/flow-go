@@ -118,7 +118,7 @@ jobs:
           module/dkg
           module:buildjet-4vcpu-ubuntu-2204 
           network/alsp
-          network/test:buildjet-4vcpu-ubuntu-2204
+          network/test:buildjet-8vcpu-ubuntu-2204
           network/p2p/connection
           network/p2p/p2pnode:buildjet-4vcpu-ubuntu-2204 
           network/p2p/scoring network/p2p
