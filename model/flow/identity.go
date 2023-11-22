@@ -36,20 +36,20 @@ type IdentitySkeleton struct {
 
 // EpochParticipationStatus represents the status of a node's participation. Depending on what changes were applied to
 // the protocol state, a node may be in one of four states:
-//   - joining - the node is not active in the current epoch and will be active in the next epoch.
-//   - active - the node was included in the EpochSetup event for the current epoch and is actively participating in the current epoch.
-//   - leaving - the node was active in the previous epoch and will not be active in the next epoch.
-//   - ejected - the node has been permanently removed from the network.
+// /   - joining - the node is not active in the current epoch and will be active in the next epoch.
+// /   - active - the node was included in the EpochSetup event for the current epoch and is actively participating in the current epoch.
+// /   - leaving - the node was active in the previous epoch and will not be active in the next epoch.
+// /   - ejected - the node has been permanently removed from the network.
 //
-//                      ┌───────────────┐
-//         ┌────────────┤ unregistered  │◄───────────┐
-//         │            └───────────────┘            │
-//   ┌─────▼─────┐        ┌───────────┐        ┌─────┴─────┐
-//   │  JOINING  ├───────►│  ACTIVE   ├───────►│  LEAVING  │
-//   └─────┬─────┘        └─────┬─────┘        └─────┬─────┘
-//         │              ┌─────▼─────┐              │
-//         └─────────────►│  EJECTED  │◄─────────────┘
-//                        └───────────┘
+//	                   ┌───────────────┐
+//	      ┌────────────┤ unregistered  │◄───────────┐
+//	      │            └───────────────┘            │
+//	┌─────▼─────┐        ┌───────────┐        ┌─────┴─────┐
+//	│  JOINING  ├───────►│  ACTIVE   ├───────►│  LEAVING  │
+//	└─────┬─────┘        └─────┬─────┘        └─────┬─────┘
+//	      │              ┌─────▼─────┐              │
+//	      └─────────────►│  EJECTED  │◄─────────────┘
+//	                     └───────────┘
 //
 // Only active nodes are allowed to perform certain tasks relative to other nodes.
 // Nodes which are registered to join at the next epoch will appear in the
