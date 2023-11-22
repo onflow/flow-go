@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/module/execution"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	executiondataproto "github.com/onflow/flow/protobuf/go/flow/executiondata"
 	"github.com/rs/zerolog"
@@ -27,6 +26,7 @@ import (
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
+	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	"github.com/onflow/flow-go/module/grpcserver"
