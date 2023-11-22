@@ -232,14 +232,15 @@ func (c *ControlMsgValidationInspector) inspectGraftMessages(from peer.ID, graft
 		}
 	}
 
-	lg.Debug().
-		Int("error_count", errs.Len()).
-		Msg("graft control message validation complete")
-
+	lg = lg.With().Int("error_count", errs.Len()).Logger()
 	if errs.Len() > 0 {
+		lg.Debug().
+			Bool(logging.KeySuspicious, true).
+			Msg("graft control message validation failed")
 		return errs
 	}
 
+	lg.Debug().Msg("graft control message validation complete")
 	return nil
 }
 
@@ -276,14 +277,15 @@ func (c *ControlMsgValidationInspector) inspectPruneMessages(from peer.ID, prune
 		}
 	}
 
-	lg.Debug().
-		Int("error_count", errs.Len()).
-		Msg("prune control message validation complete")
-
+	lg = lg.With().Int("error_count", errs.Len()).Logger()
 	if errs.Len() > 0 {
+		lg.Debug().
+			Bool(logging.KeySuspicious, true).
+			Msg("prune control message validation failed")
 		return errs
 	}
 
+	lg.Debug().Msg("prune control message validation complete")
 	return nil
 }
 
@@ -333,15 +335,20 @@ func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihave
 			duplicateMessageIDTracker.set(messageID)
 		}
 	}
-	lg.Debug().
+
+	lg = lg.With().
 		Int("total_message_ids", totalMessageIds).
 		Int("error_count", errs.Len()).
-		Msg("ihave control message validation complete")
+		Logger()
 
 	if errs.Len() > 0 {
+		lg.Debug().
+			Bool(logging.KeySuspicious, true).
+			Msg("ihave control message validation failed")
 		return errs
 	}
 
+	lg.Debug().Msg("ihave control message validation complete")
 	return nil
 }
 
@@ -408,17 +415,20 @@ func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWant
 		}
 	}
 
-	lg.Debug().
+	lg = lg.With().
 		Int("total_message_ids", totalMessageIds).
 		Int("cache_misses", cacheMisses).
 		Int("duplicates", duplicates).
 		Int("error_count", errs.Len()).
-		Msg("iwant control message validation complete")
+		Logger()
 
 	if errs.Len() > 0 {
+		lg.Debug().
+			Bool(logging.KeySuspicious, true).
+			Msg("iwant control message validation failed")
 		return errs
 	}
-
+	lg.Debug().Msg("iwant control message validation completed")
 	return nil
 }
 
@@ -442,6 +452,11 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 	if sampleSize > totalMessages {
 		sampleSize = totalMessages
 	}
+	lg := c.logger.With().
+		Str("peer_id", p2plogging.PeerId(from)).
+		Int("sample_size", sampleSize).
+		Int("max_sample_size", c.config.IHaveRPCInspectionConfig.MaxSampleSize).
+		Logger()
 	c.performSample(p2pmsg.RpcPublishMessage, uint(totalMessages), uint(sampleSize), func(i, j uint) {
 		messages[i], messages[j] = messages[j], messages[i]
 	})
@@ -477,10 +492,17 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 		}
 	}
 
+	lg = lg.With().
+		Int("error_count", invCtrlMsgErrs.Len()).
+		Logger()
 	if invCtrlMsgErrs.Len() > 0 {
+		lg.Debug().
+			Bool(logging.KeySuspicious, true).
+			Msg("rpc publish messages validation failed")
 		return invCtrlMsgErrs
 	}
 
+	lg.Debug().Msg("rpc publish messages validation completed")
 	return nil
 }
 
