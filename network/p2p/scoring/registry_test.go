@@ -72,11 +72,12 @@ func TestScoreRegistry_FreshStart(t *testing.T) {
 	unittest.RequireCloseBefore(t, reg.Done(), 1*time.Second, "failed to stop GossipSubAppSpecificScoreRegistry")
 }
 
-// TestScoreRegistry_PeerWithSpamRecord tests the app specific penalty computation of the node when there is a spam record for the peer id.
-// It tests the state that a staked peer with a valid role and valid subscriptions has spam records.
-// Since the peer has spam records, it should "eventually" be deprived of the default reward for its staked role, and only have the
-// penalty value as the app specific score. The "eventually" comes from the fact that the app specific score is updated asynchronously
-// in the cache, and the cache is updated when the app specific score function is called by GossipSub.
+// TestScoreRegistry_PeerWithSpamRecord is a test suite designed to assess the app-specific penalty computation
+// in a scenario where a peer with a staked identity and valid subscriptions has a spam record. The suite runs multiple
+// sub-tests, each targeting a specific type of control message (graft, prune, ihave, iwant, RpcPublishMessage). The focus
+// is on the impact of spam records on the app-specific score, specifically how such records negate the default reward
+// a staked peer would otherwise receive, leaving only the penalty as the app-specific score. This testing reflects the
+// asynchronous nature of app-specific score updates in GossipSub's cache.
 func TestScoreRegistry_PeerWithSpamRecord(t *testing.T) {
 	t.Run("graft", func(t *testing.T) {
 		testScoreRegistryPeerWithSpamRecord(t, p2pmsg.CtrlMsgGraft, penaltyValueFixtures().Graft)
@@ -95,6 +96,17 @@ func TestScoreRegistry_PeerWithSpamRecord(t *testing.T) {
 	})
 }
 
+// testScoreRegistryPeerWithSpamRecord conducts an individual test within the TestScoreRegistry_PeerWithSpamRecord suite.
+// It evaluates the ScoreRegistry's handling of a staked peer with valid subscriptions when a spam record is present for
+// the peer ID. The function simulates the process of starting the registry, recording a misbehavior, and then verifying the
+// updates to the spam records and app-specific score cache based on the type of control message received.
+// Parameters:
+// - t *testing.T: The test context.
+// - messageType p2pmsg.ControlMessageType: The type of control message being tested.
+// - expectedPenalty float64: The expected penalty value for the given control message type.
+// This function specifically tests how the ScoreRegistry updates a peer's app-specific score in response to spam records,
+// emphasizing the removal of the default reward for staked peers with valid roles and focusing on the asynchronous update
+// mechanism of the app-specific score in the cache.
 func testScoreRegistryPeerWithSpamRecord(t *testing.T, messageType p2pmsg.ControlMessageType, expectedPenalty float64) {
 	peerID := peer.ID("peer-1")
 
@@ -160,27 +172,39 @@ func testScoreRegistryPeerWithSpamRecord(t *testing.T, messageType p2pmsg.Contro
 	unittest.RequireCloseBefore(t, reg.Done(), 1*time.Second, "failed to stop GossipSubAppSpecificScoreRegistry")
 }
 
-func TestSpamRecord_With_UnknownIdentity(t *testing.T) {
+// TestScoreRegistry_SpamRecordWithUnknownIdentity is a test suite for verifying the behavior of the ScoreRegistry
+// when handling spam records associated with unknown identities. It tests various scenarios based on different control
+// message types, including graft, prune, ihave, iwant, and RpcPublishMessage. Each sub-test validates the app-specific
+// penalty computation and updates to the score registry when a peer with an unknown identity sends these control messages.
+func TestScoreRegistry_SpamRecordWithUnknownIdentity(t *testing.T) {
 	t.Run("graft", func(t *testing.T) {
-		testSpamRecordWithUnknownIdentity(t, p2pmsg.CtrlMsgGraft, penaltyValueFixtures().Graft)
+		testScoreRegistrySpamRecordWithUnknownIdentity(t, p2pmsg.CtrlMsgGraft, penaltyValueFixtures().Graft)
 	})
 	t.Run("prune", func(t *testing.T) {
-		testSpamRecordWithUnknownIdentity(t, p2pmsg.CtrlMsgPrune, penaltyValueFixtures().Prune)
+		testScoreRegistrySpamRecordWithUnknownIdentity(t, p2pmsg.CtrlMsgPrune, penaltyValueFixtures().Prune)
 	})
 	t.Run("ihave", func(t *testing.T) {
-		testSpamRecordWithUnknownIdentity(t, p2pmsg.CtrlMsgIHave, penaltyValueFixtures().IHave)
+		testScoreRegistrySpamRecordWithUnknownIdentity(t, p2pmsg.CtrlMsgIHave, penaltyValueFixtures().IHave)
 	})
 	t.Run("iwant", func(t *testing.T) {
-		testSpamRecordWithUnknownIdentity(t, p2pmsg.CtrlMsgIWant, penaltyValueFixtures().IWant)
+		testScoreRegistrySpamRecordWithUnknownIdentity(t, p2pmsg.CtrlMsgIWant, penaltyValueFixtures().IWant)
 	})
 	t.Run("RpcPublishMessage", func(t *testing.T) {
-		testSpamRecordWithUnknownIdentity(t, p2pmsg.RpcPublishMessage, penaltyValueFixtures().RpcPublishMessage)
+		testScoreRegistrySpamRecordWithUnknownIdentity(t, p2pmsg.RpcPublishMessage, penaltyValueFixtures().RpcPublishMessage)
 	})
 }
 
-// testSpamRecordWithUnknownIdentity tests the app specific penalty computation of the node when there is a spam record for the peer id and
-// the peer id has an unknown identity.
-func testSpamRecordWithUnknownIdentity(t *testing.T, messageType p2pmsg.ControlMessageType, expectedPenalty float64) {
+// testScoreRegistrySpamRecordWithUnknownIdentity tests the app-specific penalty computation of the node when there
+// is a spam record for a peer ID with an unknown identity. It examines the functionality of the GossipSubAppSpecificScoreRegistry
+// under various conditions, including the initialization state, spam record creation, and the impact of different control message types.
+// Parameters:
+// - t *testing.T: The testing context.
+// - messageType p2pmsg.ControlMessageType: The type of control message being tested.
+// - expectedPenalty float64: The expected penalty value for the given control message type.
+// The function simulates the process of starting the registry, reporting a misbehavior for the peer ID, and verifying the
+// updates to the spam records and app-specific score cache. It ensures that the penalties are correctly computed and applied
+// based on the given control message type and the state of the peer ID (unknown identity and spam record presence).
+func testScoreRegistrySpamRecordWithUnknownIdentity(t *testing.T, messageType p2pmsg.ControlMessageType, expectedPenalty float64) {
 	peerID := peer.ID("peer-1")
 	reg, spamRecords, appScoreCache := newGossipSubAppSpecificScoreRegistry(
 		t,
@@ -193,7 +217,7 @@ func testSpamRecordWithUnknownIdentity(t *testing.T, messageType p2pmsg.ControlM
 	reg.Start(signalerCtx)
 	unittest.RequireCloseBefore(t, reg.Ready(), 1*time.Second, "failed to start GossipSubAppSpecificScoreRegistry")
 
-	// initially, the spamRecords should not have the peer id; ; also the app specific score record should not be in the cache.
+	// initially, the spamRecords should not have the peer id; also the app specific score record should not be in the cache.
 	require.False(t, spamRecords.Has(peerID))
 	score, updated, exists := appScoreCache.Get(peerID) // get the score from the cache.
 	require.False(t, exists)
@@ -222,6 +246,7 @@ func testSpamRecordWithUnknownIdentity(t *testing.T, messageType p2pmsg.ControlM
 	require.Less(t, math.Abs(expectedPenalty-record.Penalty), 10e-3)        // penalty should be updated to -10, we account for decay.
 	require.Equal(t, scoring.InitAppScoreRecordState().Decay, record.Decay) // decay should be initialized to the initial state.
 
+	queryTime := time.Now()
 	// eventually, the app specific score should be updated in the cache.
 	require.Eventually(t, func() bool {
 		// calling the app specific score function when there is no app specific score in the cache should eventually update the cache.
@@ -229,53 +254,86 @@ func testSpamRecordWithUnknownIdentity(t *testing.T, messageType p2pmsg.ControlM
 		// the peer has spam record as well as an unknown identity. Hence, the app specific score should be the spam penalty
 		// and the staking penalty.
 		// As the app specific score in the cache and spam penalty in the spamRecords are updated at different times, we account for 0.1% error.
-		return math.Abs(expectedPenalty+scoring.DefaultUnknownIdentityPenalty-score)/math.Max(expectedPenalty+scoring.DefaultUnknownIdentityPenalty, score) < 0.001
+		nominator := math.Abs(expectedPenalty + scoring.DefaultUnknownIdentityPenalty - score)
+		denominator := math.Max(expectedPenalty+scoring.DefaultUnknownIdentityPenalty, score)
+		return math.Abs(nominator/denominator) < 0.001
 	}, 5*time.Second, 100*time.Millisecond)
 
 	// the app specific score should now be updated in the cache.
 	score, updated, exists = appScoreCache.Get(peerID) // get the score from the cache.
 	require.True(t, exists)
-	// require.True(t, updated.After(queryTime))
-	require.True(t, math.Abs(expectedPenalty+scoring.DefaultUnknownIdentityPenalty-score)/math.Max(expectedPenalty+scoring.DefaultUnknownIdentityPenalty, score) < 0.001)
+	require.True(t, updated.After(queryTime))
+
+	nominator := math.Abs(expectedPenalty + scoring.DefaultUnknownIdentityPenalty - score)
+	denominator := math.Max(expectedPenalty+scoring.DefaultUnknownIdentityPenalty, score)
+	require.True(t, math.Abs(nominator/denominator) < 0.001)
 
 	// stop the registry.
 	cancel()
 	unittest.RequireCloseBefore(t, reg.Done(), 1*time.Second, "failed to stop GossipSubAppSpecificScoreRegistry")
 }
 
-func TestSpamRecord_With_SubscriptionPenalty(t *testing.T) {
+// TestScoreRegistry_SpamRecordWithSubscriptionPenalty is a test suite for verifying the behavior of the ScoreRegistry
+// in handling spam records associated with invalid subscriptions. It encompasses a series of sub-tests, each focusing on
+// a different control message type: graft, prune, ihave, iwant, and RpcPublishMessage. These sub-tests are designed to
+// validate the appropriate application of penalties in the ScoreRegistry when a peer with an invalid subscription is involved
+// in spam activities, as indicated by these control messages.
+func TestScoreRegistry_SpamRecordWithSubscriptionPenalty(t *testing.T) {
 	t.Run("graft", func(t *testing.T) {
-		testSpamRecordWithSubscriptionPenalty(t, p2pmsg.CtrlMsgGraft, penaltyValueFixtures().Graft)
+		testScoreRegistrySpamRecordWithSubscriptionPenalty(t, p2pmsg.CtrlMsgGraft, penaltyValueFixtures().Graft)
 	})
 	t.Run("prune", func(t *testing.T) {
-		testSpamRecordWithSubscriptionPenalty(t, p2pmsg.CtrlMsgPrune, penaltyValueFixtures().Prune)
+		testScoreRegistrySpamRecordWithSubscriptionPenalty(t, p2pmsg.CtrlMsgPrune, penaltyValueFixtures().Prune)
 	})
 	t.Run("ihave", func(t *testing.T) {
-		testSpamRecordWithSubscriptionPenalty(t, p2pmsg.CtrlMsgIHave, penaltyValueFixtures().IHave)
+		testScoreRegistrySpamRecordWithSubscriptionPenalty(t, p2pmsg.CtrlMsgIHave, penaltyValueFixtures().IHave)
 	})
 	t.Run("iwant", func(t *testing.T) {
-		testSpamRecordWithSubscriptionPenalty(t, p2pmsg.CtrlMsgIWant, penaltyValueFixtures().IWant)
+		testScoreRegistrySpamRecordWithSubscriptionPenalty(t, p2pmsg.CtrlMsgIWant, penaltyValueFixtures().IWant)
 	})
 	t.Run("RpcPublishMessage", func(t *testing.T) {
-		testSpamRecordWithSubscriptionPenalty(t, p2pmsg.RpcPublishMessage, penaltyValueFixtures().RpcPublishMessage)
+		testScoreRegistrySpamRecordWithSubscriptionPenalty(t, p2pmsg.RpcPublishMessage, penaltyValueFixtures().RpcPublishMessage)
 	})
 }
 
-// testSpamRecordWithUnknownIdentity tests the app specific penalty computation of the node when there is a spam record for the peer id and
-// the peer id has an invalid subscription as well.
-func testSpamRecordWithSubscriptionPenalty(t *testing.T, messageType p2pmsg.ControlMessageType, expectedPenalty float64) {
+// testScoreRegistrySpamRecordWithSubscriptionPenalty tests the application-specific penalty computation in the ScoreRegistry
+// when a spam record exists for a peer ID that also has an invalid subscription. The function simulates the process of
+// initializing the registry, handling spam records, and updating penalties based on various control message types.
+// Parameters:
+// - t *testing.T: The testing context.
+// - messageType p2pmsg.ControlMessageType: The type of control message being tested.
+// - expectedPenalty float64: The expected penalty value for the given control message type.
+// The function focuses on evaluating the registry's response to spam activities (as represented by control messages) from a
+// peer with invalid subscriptions. It verifies that penalties are accurately computed and applied, taking into account both
+// the spam record and the invalid subscription status of the peer.
+func testScoreRegistrySpamRecordWithSubscriptionPenalty(t *testing.T, messageType p2pmsg.ControlMessageType, expectedPenalty float64) {
 	peerID := peer.ID("peer-1")
-	reg, spamRecords, _ := newGossipSubAppSpecificScoreRegistry(
+	reg, spamRecords, appScoreCache := newGossipSubAppSpecificScoreRegistry(
 		t,
 		withStakedIdentity(peerID),
 		withInvalidSubscriptions(peerID))
 
-	// initially, the spamRecords should not have the peer id.
-	assert.False(t, spamRecords.Has(peerID))
+	// starts the registry.
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+	reg.Start(signalerCtx)
+	unittest.RequireCloseBefore(t, reg.Ready(), 1*time.Second, "failed to start GossipSubAppSpecificScoreRegistry")
+
+	// initially, the spamRecords should not have the peer id; also the app specific score record should not be in the cache.
+	require.False(t, spamRecords.Has(peerID))
+	score, updated, exists := appScoreCache.Get(peerID) // get the score from the cache.
+	require.False(t, exists)
+	require.Equal(t, time.Time{}, updated)
+	require.Equal(t, float64(0), score)
 
 	// peer does not have spam record, but has invalid subscription. Hence, the app specific score should be subscription penalty.
-	score := reg.AppSpecificScoreFunc()(peerID)
-	require.Equal(t, scoring.DefaultInvalidSubscriptionPenalty, score)
+	// eventually the app specific score should be updated in the cache to the penalty value for subscription penalty.
+	require.Eventually(t, func() bool {
+		// calling the app specific score function when there is no app specific score in the cache should eventually update the cache.
+		score := reg.AppSpecificScoreFunc()(peerID)
+		// peer does not have spam record, but has an invalid subscription penalty.
+		return scoring.DefaultInvalidSubscriptionPenalty == score
+	}, 5*time.Second, 100*time.Millisecond)
 
 	// report a misbehavior for the peer id.
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
@@ -290,10 +348,31 @@ func testSpamRecordWithSubscriptionPenalty(t *testing.T, messageType p2pmsg.Cont
 	assert.Less(t, math.Abs(expectedPenalty-record.Penalty), 10e-3)
 	assert.Equal(t, scoring.InitAppScoreRecordState().Decay, record.Decay) // decay should be initialized to the initial state.
 
-	// the peer has spam record as well as an unknown identity. Hence, the app specific score should be the spam penalty
-	// and the staking penalty.
-	score = reg.AppSpecificScoreFunc()(peerID)
-	assert.Less(t, math.Abs(expectedPenalty+scoring.DefaultInvalidSubscriptionPenalty-score), 10e-3)
+	queryTime := time.Now()
+	// eventually, the app specific score should be updated in the cache.
+	require.Eventually(t, func() bool {
+		// calling the app specific score function when there is no app specific score in the cache should eventually update the cache.
+		score := reg.AppSpecificScoreFunc()(peerID)
+		// the peer has spam record as well as an unknown identity. Hence, the app specific score should be the spam penalty
+		// and the staking penalty.
+		// As the app specific score in the cache and spam penalty in the spamRecords are updated at different times, we account for 0.1% error.
+		nominator := math.Abs(expectedPenalty + scoring.DefaultInvalidSubscriptionPenalty - score)
+		denominator := math.Max(expectedPenalty+scoring.DefaultInvalidSubscriptionPenalty, score)
+		return math.Abs(nominator/denominator) < 0.001
+	}, 5*time.Second, 100*time.Millisecond)
+
+	// the app specific score should now be updated in the cache.
+	score, updated, exists = appScoreCache.Get(peerID) // get the score from the cache.
+	require.True(t, exists)
+	require.True(t, updated.After(queryTime))
+
+	nominator := math.Abs(expectedPenalty + scoring.DefaultInvalidSubscriptionPenalty - score)
+	denominator := math.Max(expectedPenalty+scoring.DefaultInvalidSubscriptionPenalty, score)
+	require.True(t, math.Abs(nominator/denominator) < 0.001)
+
+	// stop the registry.
+	cancel()
+	unittest.RequireCloseBefore(t, reg.Done(), 1*time.Second, "failed to stop GossipSubAppSpecificScoreRegistry")
 }
 
 // TestSpamPenaltyDecaysInCache tests that the spam penalty records decay over time in the cache.
@@ -563,7 +642,7 @@ func newGossipSubAppSpecificScoreRegistry(t *testing.T, opts ...func(*scoring.Go
 	flowCfg, err := config.DefaultConfig()
 	require.NoError(t, err)
 	// overrides the default values for testing purposes.
-	flowCfg.NetworkConfig.GossipSub.ScoringParameters.AppSpecificScore.ScoreTTL = 100 * time.Second
+	flowCfg.NetworkConfig.GossipSub.ScoringParameters.AppSpecificScore.ScoreTTL = 100 * time.Millisecond
 
 	validator := mockp2p.NewSubscriptionValidator(t)
 	validator.On("Start", testifymock.Anything).Return().Maybe()

@@ -175,7 +175,8 @@ func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory fun
 	blkTopicSnapshot, ok := topicsSnapshot[blockTopic.String()]
 	require.True(t, ok)
 
-	// ensure that the topic snapshot of the spammer contains a record of at least (60%) of the spam messages sent. The 60% is to account for the messages that were delivered before the score was updated, after the spammer is PRUNED, as well as to account for decay.
+	// ensure that the topic snapshot of the spammer contains a record of at least (60%) of the spam messages sent. The 60% is to account for the messages that were
+	// delivered before the score was updated, after the spammer is PRUNED, as well as to account for decay.
 	require.True(t,
 		blkTopicSnapshot.InvalidMessageDeliveries > 0.6*float64(totalSpamMessages),
 		"invalid message deliveries must be greater than %f. invalid message deliveries: %f",
