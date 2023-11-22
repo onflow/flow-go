@@ -3,11 +3,11 @@ package validation
 import (
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/module"
 
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/fork"
