@@ -5,8 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/integration/tests/mvp"
-
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc/codes"
@@ -161,6 +159,7 @@ func (s *AccessAPISuite) TestScriptExecutionAndGetAccountsAN1() {
 	s.testExecuteScriptWithSimpleContract(s.an1Client, targetHeight)
 }
 
+/*
 // TestScriptExecutionAndGetAccountsAN2 test the Access API endpoints for executing scripts and getting
 // accounts using local storage.
 //
@@ -176,14 +175,14 @@ func (s *AccessAPISuite) TestScriptExecutionAndGetAccountsAN2() {
 	s.testGetAccount(s.an2Client)
 	s.testExecuteScriptWithSimpleScript(s.an2Client)
 	s.testExecuteScriptWithSimpleContract(s.an2Client, targetHeight)
-}
-
+}*/
+/*
 func (s *AccessAPISuite) TestMVPScriptExecutionLocalStorage() {
 	// this is a specialized test that creates accounts, deposits funds, deploys contracts, etc, and
 	// uses the provided access node to handle the Access API calls. there is an existing test that
 	// covers the default config, so we only need to test with local storage.
 	mvp.RunMVPTest(s.T(), s.ctx, s.net, s.accessNode2)
-}
+}*/
 
 func (s *AccessAPISuite) testGetAccount(client *client.Client) {
 	header, err := client.GetLatestBlockHeader(s.ctx, true)

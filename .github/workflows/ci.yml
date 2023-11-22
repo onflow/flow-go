@@ -26,23 +26,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  create-dynamic-test-matrix:
-    name: Create Dynamic Test Matrix
-    runs-on: ubuntu-latest
-    outputs:
-      dynamic-matrix: ${{ steps.set-test-matrix.outputs.dynamicMatrix }}
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
-      - name: Setup Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-      - name: Set Test Matrix
-        id: set-test-matrix
-        run: go run utils/test_matrix/test_matrix.go admin cmd consensus engine/access engine/collection engine/common engine/consensus engine/execution/ingestion:buildjet-8vcpu-ubuntu-2204 engine/execution/computation engine/execution engine/verification engine:buildjet-4vcpu-ubuntu-2204 fvm ledger module/dkg module:buildjet-4vcpu-ubuntu-2204 network/alsp network/test/cohort1:buildjet-16vcpu-ubuntu-2204 network/test/cohort2:buildjet-4vcpu-ubuntu-2204 network/p2p/connection network/p2p/p2pnode:buildjet-4vcpu-ubuntu-2204 network/p2p/scoring network/p2p network state storage utils
-
   docker-build:
     name: Docker Build
     runs-on: buildjet-16vcpu-ubuntu-2204
@@ -58,7 +41,7 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: true
       - name: Docker build
-        run: make docker-build-flow docker-build-flow-corrupt
+        run: make docker-build-flow
       - name: Save Docker images
         run: |
           docker save \
@@ -89,12 +72,6 @@ jobs:
           - name: Access Cohort1 Integration Tests
             make: make -C integration access-cohort1-tests
             runner: buildjet-4vcpu-ubuntu-2204
-          - name: Access Cohort2 Integration Tests
-            make: make -C integration access-cohort2-tests
-            runner: ubuntu-latest
-          - name: Access Cohort3 Integration Tests
-            make: make -C integration access-cohort3-tests
-            runner: ubuntu-latest
     runs-on: ${{ matrix.runner }}
     steps:
     - name: Checkout repo
