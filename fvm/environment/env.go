@@ -37,6 +37,7 @@ type Environment interface {
 
 	// EventEmitter
 	Events() flow.EventsList
+	EmitRawEvent(etype flow.EventType, payload []byte) error
 	ServiceEvents() flow.EventsList
 	ConvertedServiceEvents() flow.ServiceEventList
 

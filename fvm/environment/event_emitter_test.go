@@ -27,7 +27,7 @@ func Test_IsServiceEvent(t *testing.T) {
 
 	t.Run("correct", func(t *testing.T) {
 		for _, event := range events.All() {
-			isServiceEvent, err := environment.IsServiceEvent(cadence.Event{
+			event := cadence.Event{
 				EventType: &cadence.EventType{
 					Location: common.AddressLocation{
 						Address: common.MustBytesToAddress(
@@ -35,14 +35,16 @@ func Test_IsServiceEvent(t *testing.T) {
 					},
 					QualifiedIdentifier: event.QualifiedIdentifier(),
 				},
-			}, chain)
+			}
+
+			isServiceEvent, err := environment.IsServiceEvent(flow.EventType(event.Type().ID()), chain)
 			require.NoError(t, err)
 			assert.True(t, isServiceEvent)
 		}
 	})
 
 	t.Run("wrong chain", func(t *testing.T) {
-		isServiceEvent, err := environment.IsServiceEvent(cadence.Event{
+		event := cadence.Event{
 			EventType: &cadence.EventType{
 				Location: common.AddressLocation{
 					Address: common.MustBytesToAddress(
@@ -50,13 +52,15 @@ func Test_IsServiceEvent(t *testing.T) {
 				},
 				QualifiedIdentifier: events.EpochCommit.QualifiedIdentifier(),
 			},
-		}, chain)
+		}
+
+		isServiceEvent, err := environment.IsServiceEvent(flow.EventType(event.Type().ID()), chain)
 		require.NoError(t, err)
 		assert.False(t, isServiceEvent)
 	})
 
 	t.Run("wrong type", func(t *testing.T) {
-		isServiceEvent, err := environment.IsServiceEvent(cadence.Event{
+		event := cadence.Event{
 			EventType: &cadence.EventType{
 				Location: common.AddressLocation{
 					Address: common.MustBytesToAddress(
@@ -64,7 +68,9 @@ func Test_IsServiceEvent(t *testing.T) {
 				},
 				QualifiedIdentifier: "SomeContract.SomeEvent",
 			},
-		}, chain)
+		}
+
+		isServiceEvent, err := environment.IsServiceEvent(flow.EventType(event.Type().ID()), chain)
 		require.NoError(t, err)
 		assert.False(t, isServiceEvent)
 	})
@@ -150,6 +156,21 @@ func Test_EmitEvent_Limit(t *testing.T) {
 		require.Error(t, err)
 	})
 
+	t.Run("emit raw event - exceeding limit", func(t *testing.T) {
+		flowEvent := flow.Event{
+			Type:    "sometype",
+			Payload: []byte{1, 2, 3, 4, 5},
+		}
+
+		eventSize := uint64(len(flowEvent.Payload))
+		eventEmitter := createTestEventEmitterWithLimit(
+			flow.Emulator,
+			flow.Emulator.Chain().NewAddressGenerator().CurrentAddress(),
+			eventSize-1)
+
+		err := eventEmitter.EmitRawEvent(flowEvent.Type, flowEvent.Payload)
+		require.Error(t, err)
+	})
 }
 
 func createTestEventEmitterWithLimit(chain flow.ChainID, address flow.Address, eventEmitLimit uint64) environment.EventEmitter {
