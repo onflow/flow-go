@@ -127,7 +127,7 @@ jobs:
           - name: Access Cohort3 Integration Tests
             make: make -C integration access-cohort3-tests
             runner: ubuntu-latest
-   runs-on: ${{ matrix.runner }}
+    runs-on: ${{ matrix.runner }}
     steps:
     - name: Checkout repo
       uses: actions/checkout@v3
