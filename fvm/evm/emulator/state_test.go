@@ -32,7 +32,7 @@ func testBalanceUpdates(
 	numberOfUpdatesPerAccount int,
 	debug bool,
 ) {
-	//t.Skip() // don't run in a normal test suite
+	t.Skip() // don't run in a normal test suite
 
 	if debug {
 		log.Root().SetHandler(log.StreamHandler(os.Stdout, log.LogfmtFormat()))
