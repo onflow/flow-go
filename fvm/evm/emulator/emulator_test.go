@@ -22,7 +22,7 @@ var blockNumber = big.NewInt(10)
 var defaultCtx = types.NewDefaultBlockContext(blockNumber.Uint64())
 
 func RunWithTestDB(t testing.TB, f func(types.Database)) {
-	testutils.RunWithTestBackend(t, func(backend types.Backend) {
+	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(flowEVMRoot flow.Address) {
 			db, err := database.NewDatabase(backend, flowEVMRoot)
 			require.NoError(t, err)
@@ -366,6 +366,33 @@ func TestDatabaseErrorHandling(t *testing.T) {
 				require.Error(t, err)
 				require.True(t, types.IsAFatalError(err))
 			})
+		})
+	})
+}
+
+func TestStorageNoSideEffect(t *testing.T) {
+	t.Skip("we need to fix this issue  ")
+
+	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(flowEVMRoot flow.Address) {
+			db, err := database.NewDatabase(backend, flowEVMRoot)
+			require.NoError(t, err)
+
+			em := emulator.NewEmulator(db)
+			testAccount := types.NewAddressFromString("test")
+
+			amount := big.NewInt(100)
+			RunWithNewBlockView(t, em, func(blk types.BlockView) {
+				_, err = blk.DirectCall(types.NewDepositCall(testAccount, amount))
+				require.NoError(t, err)
+			})
+
+			orgSize := backend.TotalStorageSize()
+			RunWithNewBlockView(t, em, func(blk types.BlockView) {
+				_, err = blk.DirectCall(types.NewDepositCall(testAccount, amount))
+				require.NoError(t, err)
+			})
+			require.Equal(t, orgSize, backend.TotalStorageSize())
 		})
 	})
 }

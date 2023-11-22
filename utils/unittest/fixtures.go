@@ -2772,3 +2772,13 @@ func RegisterEntryFixture() flow.RegisterEntry {
 		Value: val,
 	}
 }
+
+func MakeOwnerReg(key string, value string) flow.RegisterEntry {
+	return flow.RegisterEntry{
+		Key: flow.RegisterID{
+			Owner: "owner",
+			Key:   key,
+		},
+		Value: []byte(value),
+	}
+}

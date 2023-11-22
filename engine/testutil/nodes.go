@@ -712,7 +712,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	)
 
 	fetcher := exeFetcher.NewCollectionFetcher(node.Log, requestEngine, node.State, false)
-	loader := loader.NewLoader(node.Log, node.State, node.Headers, execState)
+	loader := loader.NewUnexecutedLoader(node.Log, node.State, node.Headers, execState)
 	rootHead, rootQC := getRoot(t, &node)
 	ingestionEngine, err := ingestion.New(
 		unit,
