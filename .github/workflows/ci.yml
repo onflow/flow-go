@@ -114,8 +114,9 @@ jobs:
           engine/verification 
           engine:buildjet-4vcpu-ubuntu-2204 
           fvm
-          ledger 
-          module/dkg module:buildjet-4vcpu-ubuntu-2204 
+          ledger
+          module/dkg
+          module:buildjet-4vcpu-ubuntu-2204 
           network/alsp
           network/test/cohort1:buildjet-4vcpu-ubuntu-2204
           network/test/cohort2:buildjet-4vcpu-ubuntu-2204
