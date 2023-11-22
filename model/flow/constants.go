@@ -61,6 +61,13 @@ const DefaultRequiredApprovalsForSealConstruction = uint(1)
 //   - Full protocol should be +2/3 of all currently authorized verifiers.
 const DefaultRequiredApprovalsForSealValidation = 0
 
+// DefaultRequiredReceiptsCommittingToExecutionResult is the default number of receipts that should be committing to an execution
+// result which is being incorporated into a candidate block.
+// ATTENTION:
+// For each result in the candidate block, there must be k receipts included in the candidate block, with k strictly larger than 0.
+// This value has to be strictly larger than 0, otherwise leader can incorporate a result which was not executed.
+const DefaultRequiredReceiptsCommittingToExecutionResult = 1
+
 // DefaultChunkAssignmentAlpha is the default number of verifiers that should be
 // assigned to each chunk.
 const DefaultChunkAssignmentAlpha = 3
