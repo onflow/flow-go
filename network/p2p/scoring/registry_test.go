@@ -54,10 +54,7 @@ func TestNoPenaltyRecord(t *testing.T) {
 		score := reg.AppSpecificScoreFunc()(peerID)
 		// since the peer id does not have a spam record, the app specific score should be the max app specific reward, which
 		// is the default reward for a staked peer that has valid subscriptions.
-		if score == scoring.MaxAppSpecificReward {
-			return true
-		}
-		return false
+		return score == scoring.MaxAppSpecificReward
 	}, 5*time.Second, 100*time.Millisecond)
 
 	// still the spamRecords should not have the peer id (as there is no spam record for the peer id).
