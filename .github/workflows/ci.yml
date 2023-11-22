@@ -52,9 +52,6 @@ jobs:
           gcr.io/flow-container-registry/ghost:latest \
           gcr.io/flow-container-registry/observer:latest \
           gcr.io/flow-container-registry/verification:latest \
-          gcr.io/flow-container-registry/access-corrupted:latest \
-          gcr.io/flow-container-registry/execution-corrupted:latest \
-          gcr.io/flow-container-registry/verification-corrupted:latest > flow-docker-images.tar
       - name: Cache Docker images
         uses: actions/cache@v3
         with:
