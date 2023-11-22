@@ -576,7 +576,7 @@ func (b *backendTransactions) GetSystemTransaction(ctx context.Context) (*flow.T
 }
 
 // GetSystemTransactionResult returns system transaction result
-func (b *backendTransactions) GetSystemTransactionResult(ctx context.Context, blockID flow.Identifier) (*access.TransactionResult, error) {
+func (b *backendTransactions) GetSystemTransactionResult(ctx context.Context, blockID flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) (*access.TransactionResult, error) {
 	block, err := b.blocks.ByID(blockID)
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
@@ -622,7 +622,6 @@ func (b *backendTransactions) GetSystemTransactionResult(ctx context.Context, bl
 		TransactionID: systemTx.ID(),
 		BlockHeight:   block.Header.Height,
 	}, nil
-
 }
 
 // deriveTransactionStatus derives the transaction status based on current protocol state

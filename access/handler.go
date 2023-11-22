@@ -27,7 +27,7 @@ type Handler struct {
 // HandlerOption is used to hand over optional constructor parameters
 type HandlerOption func(*Handler)
 
-var _ access.AccessAPIServer =\=(*Handler)(nil)
+var _ access.AccessAPIServer = (*Handler)(nil)
 
 func NewHandler(api API, chain flow.Chain, finalizedHeader module.FinalizedHeaderCache, me module.Local, options ...HandlerOption) *Handler {
 	h := &Handler{
@@ -338,7 +338,9 @@ func (h *Handler) GetSystemTransactionResult(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
 	}
 
-	result, err := h.api.GetSystemTransactionResult(ctx, id)
+	eventEncodingVersion := req.GetEventEncodingVersion()
+
+	result, err := h.api.GetSystemTransactionResult(ctx, id, eventEncodingVersion)
 	if err != nil {
 		return nil, err
 	}
