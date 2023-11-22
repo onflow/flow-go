@@ -493,7 +493,7 @@ func (s *StopControl) blockFinalized(
 		Msgf("Found ID of the block that should be executed last")
 
 	// check if the parent block has been executed then stop right away
-	executed, err := s.exeState.IsBlockExecuted(h.Height, h.ParentID)
+	executed, err := s.exeState.IsBlockExecuted(h.Height-1, h.ParentID)
 	if err != nil {
 		handleErr(fmt.Errorf(
 			"failed to check if the block has been executed: %w",
