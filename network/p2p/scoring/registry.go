@@ -258,22 +258,29 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 		lg.Trace().Str("peer_id", p2plogging.PeerId(notification.PeerID)).Msg("application specific penalty initialized for peer")
 	}
 
+	basePenalty := float64(0)
+	switch notification.MsgType {
+	case p2pmsg.CtrlMsgGraft:
+		basePenalty += r.penalty.Graft
+	case p2pmsg.CtrlMsgPrune:
+		basePenalty += r.penalty.Prune
+	case p2pmsg.CtrlMsgIHave:
+		basePenalty += r.penalty.IHave
+	case p2pmsg.CtrlMsgIWant:
+		basePenalty += r.penalty.IWant
+	case p2pmsg.RpcPublishMessage:
+		basePenalty += r.penalty.RpcPublishMessage
+	default:
+		// the error is considered fatal as it means that we have an unsupported misbehaviour type, we should crash the node to prevent routing attack vulnerability.
+		lg.Fatal().Str("misbehavior_type", notification.MsgType.String()).Msg("unknown misbehaviour type")
+	}
+	// apply the base penalty to the application specific penalty.
+	appliedPenalty := float64(0)
+	for _, err := range notification.Errors {
+		appliedPenalty += float64(err.Severity()) * basePenalty
+	}
 	record, err := r.spamScoreCache.Update(notification.PeerID, func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
-		switch notification.MsgType {
-		case p2pmsg.CtrlMsgGraft:
-			record.Penalty += r.penalty.Graft
-		case p2pmsg.CtrlMsgPrune:
-			record.Penalty += r.penalty.Prune
-		case p2pmsg.CtrlMsgIHave:
-			record.Penalty += r.penalty.IHave
-		case p2pmsg.CtrlMsgIWant:
-			record.Penalty += r.penalty.IWant
-		case p2pmsg.RpcPublishMessage:
-			record.Penalty += r.penalty.RpcPublishMessage
-		default:
-			// the error is considered fatal as it means that we have an unsupported misbehaviour type, we should crash the node to prevent routing attack vulnerability.
-			lg.Fatal().Str("misbehavior_type", notification.MsgType.String()).Msg("unknown misbehaviour type")
-		}
+		record.Penalty += appliedPenalty
 		return record
 	})
 	if err != nil {
