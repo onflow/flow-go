@@ -123,10 +123,7 @@ func testPeerWithSpamRecord(t *testing.T, messageType p2pmsg.ControlMessageType,
 		score := reg.AppSpecificScoreFunc()(peerID)
 		// since the peer id does not have a spam record, the app specific score should be the max app specific reward, which
 		// is the default reward for a staked peer that has valid subscriptions.
-		if scoring.MaxAppSpecificReward == score {
-			return true
-		}
-		return false
+		return scoring.MaxAppSpecificReward == score
 	}, 5*time.Second, 100*time.Millisecond)
 
 	// report a misbehavior for the peer id.
@@ -150,10 +147,7 @@ func testPeerWithSpamRecord(t *testing.T, messageType p2pmsg.ControlMessageType,
 		// this peer has a spam record, with no subscription penalty. Hence, the app specific score should only be the spam penalty,
 		// and the peer should be deprived of the default reward for its valid staked role.
 		// As the app specific score in the cache and spam penalty in the spamRecords are updated at different times, we account for 0.1% error.
-		if math.Abs(expectedPenalty-score)/math.Max(expectedPenalty, score) < 0.001 {
-			return true
-		}
-		return false
+		return math.Abs(expectedPenalty-score)/math.Max(expectedPenalty, score) < 0.001
 	}, 5*time.Second, 100*time.Millisecond)
 
 	// the app specific score should now be updated in the cache.
