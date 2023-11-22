@@ -540,16 +540,10 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 			"cannot get the latest executed block id: %w",
 			err)
 	}
-	stateCommit, err := exeNode.executionState.StateCommitmentByBlockID(
-		ctx,
-		blockID)
+	blockSnapshot, _, err := exeNode.executionState.CreateStorageSnapshot(blockID)
 	if err != nil {
-		return nil, fmt.Errorf(
-			"cannot get the state commitment at latest executed block id %s: %w",
-			blockID.String(),
-			err)
+		return nil, fmt.Errorf("cannot create a storage snapshot at block %v: %w", blockID, err)
 	}
-	blockSnapshot := exeNode.executionState.NewStorageSnapshot(stateCommit)
 
 	// Get the epoch counter from the smart contract at the last executed block.
 	contractEpochCounter, err := getContractEpochCounter(
@@ -905,7 +899,6 @@ func (exeNode *ExecutionNode) LoadScriptsEngine(node *NodeConfig) (module.ReadyD
 
 	exeNode.scriptsEng = scripts.New(
 		node.Logger,
-		node.State,
 		exeNode.computationManager.QueryExecutor(),
 		exeNode.executionState,
 	)
