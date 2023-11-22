@@ -242,6 +242,35 @@ jobs:
           path: flow-docker-access.tar
           # use the workflow run id as part of the cache key to ensure these docker images will only be used for a single workflow run
           key: flow-docker-images-access-${{ github.run_id }}
+
+  docker-build-consensus:
+    name: Docker Build Consensus
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+        with:
+          # all tags are needed for integration tests
+          fetch-depth: 0
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: Build relic
+        run: make crypto_setup_gopath
+      - name: Docker build
+        run: make docker-build-consensus
+      - name: Save Docker image
+        run: docker save gcr.io/flow-container-registry/consensus:latest > flow-docker-consensus.tar
+      - name: Cache Docker image
+        uses: actions/cache@v3
+        with:
+          path: flow-docker-consensus.tar
+          # use the workflow run id as part of the cache key to ensure these docker images will only be used for a single workflow run
+          key: flow-docker-images-consensus-${{ github.run_id }}
+
   docker-build-execution:
     name: Docker Build Execution
     runs-on: ubuntu-latest
@@ -269,6 +298,7 @@ jobs:
           path: flow-docker-execution.tar
           # use the workflow run id as part of the cache key to ensure these docker images will only be used for a single workflow run
           key: flow-docker-images-execution-${{ github.run_id }}
+
   docker-build1:
     name: Docker Build 1
     runs-on: ubuntu-latest
@@ -287,12 +317,11 @@ jobs:
       - name: Build relic
         run: make crypto_setup_gopath
       - name: Docker build
-        run: make docker-build-collection docker-build-consensus docker-build-ghost docker-build-observer docker-build-verification
+        run: make docker-build-collection docker-build-ghost docker-build-observer docker-build-verification
       - name: Save Docker images
         run: |
           docker save \
           gcr.io/flow-container-registry/collection:latest \
-          gcr.io/flow-container-registry/consensus:latest \
           gcr.io/flow-container-registry/ghost:latest \
           gcr.io/flow-container-registry/observer:latest \
           gcr.io/flow-container-registry/verification:latest > flow-docker-images1.tar
@@ -302,6 +331,7 @@ jobs:
           path: flow-docker-images1.tar
           # use the workflow run id as part of the cache key to ensure these docker images will only be used for a single workflow run
           key: flow-docker-images1-${{ github.run_id }}
+
   docker-build2:
     name: Docker Build 2
     runs-on: ubuntu-latest
@@ -336,7 +366,7 @@ jobs:
 
   integration-test:
     name: Integration Tests
-    needs: [docker-build-access, docker-build-execution, docker-build1, docker-build2]
+    needs: [docker-build-access, docker-build-consensus, docker-build-execution, docker-build1, docker-build2]
     strategy:
       fail-fast: false
       matrix:
@@ -410,6 +440,12 @@ jobs:
         path: flow-docker-access.tar
         # use the same cache key as the docker-build1 job
         key: flow-docker-images-access-${{ github.run_id }}
+    - name: Load cached Consensus Docker image
+      uses: actions/cache@v3
+      with:
+        path: flow-docker-consensus.tar
+        # use the same cache key as the docker-build1 job
+        key: flow-docker-images-consensus-${{ github.run_id }}
     - name: Load cached Execution Docker image
       uses: actions/cache@v3
       with:
