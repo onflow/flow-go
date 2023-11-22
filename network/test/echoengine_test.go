@@ -1,4 +1,4 @@
-package cohort2
+package test
 
 import (
 	"context"
