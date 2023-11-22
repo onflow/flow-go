@@ -651,7 +651,28 @@ func (suite *Suite) TestGetTransactionResult() {
 
 		// expect a storage call for the invalid tx ID but return an error
 		txResults := storage.NewTransactionResults(suite.T())
-		txResults.On("ByBlockIDTransactionID", bID, wrongTxID).Return(nil, status.Error(codes.Internal, "")).Once()
+		txResults.On("ByBlockIDTransactionID", bID, wrongTxID).Return(nil, realstorage.ErrNotFound).Once()
+
+		handler := createHandler(txResults)
+
+		_, err := handler.GetTransactionResult(context.Background(), req)
+
+		// check that an error was received
+		suite.Require().Error(err)
+		errors.Is(err, status.Error(codes.NotFound, ""))
+	})
+
+	// failure path - non-existent transaction ID in request results in an exception
+	suite.Run("request with non-existent transaction ID, exception", func() {
+
+		wrongTxID := unittest.IdentifierFixture()
+
+		// create an API request with the invalid transaction ID
+		req := concoctReq(bID[:], wrongTxID[:])
+
+		// expect a storage call for the invalid tx ID but return an exception
+		txResults := storage.NewTransactionResults(suite.T())
+		txResults.On("ByBlockIDTransactionID", bID, wrongTxID).Return(nil, errors.New("internal-error")).Once()
 
 		handler := createHandler(txResults)
 
@@ -672,7 +693,28 @@ func (suite *Suite) TestGetTransactionResult() {
 
 		// expect a storage call for the invalid tx ID but return an error
 		txResults := storage.NewTransactionResults(suite.T())
-		txResults.On("ByBlockIDTransactionIndex", bID, wrongTxIndex).Return(nil, status.Error(codes.Internal, "")).Once()
+		txResults.On("ByBlockIDTransactionIndex", bID, wrongTxIndex).Return(nil, realstorage.ErrNotFound).Once()
+
+		handler := createHandler(txResults)
+
+		_, err := handler.GetTransactionResultByIndex(context.Background(), req)
+
+		// check that an error was received
+		suite.Require().Error(err)
+		errors.Is(err, status.Error(codes.NotFound, ""))
+	})
+
+	// failure path - non-existent transaction index in request results in an exception
+	suite.Run("request with non-existent transaction index, exception", func() {
+
+		wrongTxIndex := txIndex + 1
+
+		// create an API request with the invalid transaction ID
+		req := concoctIndexReq(bID[:], wrongTxIndex)
+
+		// expect a storage call for the invalid tx ID but return an exception
+		txResults := storage.NewTransactionResults(suite.T())
+		txResults.On("ByBlockIDTransactionIndex", bID, wrongTxIndex).Return(nil, errors.New("internal-error")).Once()
 
 		handler := createHandler(txResults)
 
@@ -1107,7 +1149,28 @@ func (suite *Suite) TestGetTransactionErrorMessage() {
 
 		// expect a storage call for the invalid tx ID but return an error
 		txResults := storage.NewTransactionResults(suite.T())
-		txResults.On("ByBlockIDTransactionID", bID, wrongTxID).Return(nil, status.Error(codes.Internal, "")).Once()
+		txResults.On("ByBlockIDTransactionID", bID, wrongTxID).Return(nil, realstorage.ErrNotFound).Once()
+
+		handler := createHandler(txResults)
+
+		_, err := handler.GetTransactionErrorMessage(context.Background(), req)
+
+		// check that an error was received
+		suite.Require().Error(err)
+		errors.Is(err, status.Error(codes.NotFound, ""))
+	})
+
+	// failure path - non-existent transaction ID in request results in an exception
+	suite.Run("request with non-existent transaction ID, exception", func() {
+
+		wrongTxID := unittest.IdentifierFixture()
+
+		// create an API request with the invalid transaction ID
+		req := concoctReq(bID[:], wrongTxID[:])
+
+		// expect a storage call for the invalid tx ID but return an exception
+		txResults := storage.NewTransactionResults(suite.T())
+		txResults.On("ByBlockIDTransactionID", bID, wrongTxID).Return(nil, errors.New("internal-error")).Once()
 
 		handler := createHandler(txResults)
 
@@ -1128,7 +1191,28 @@ func (suite *Suite) TestGetTransactionErrorMessage() {
 
 		// expect a storage call for the invalid tx ID but return an error
 		txResults := storage.NewTransactionResults(suite.T())
-		txResults.On("ByBlockIDTransactionIndex", bID, wrongTxIndex).Return(nil, status.Error(codes.Internal, "")).Once()
+		txResults.On("ByBlockIDTransactionIndex", bID, wrongTxIndex).Return(nil, realstorage.ErrNotFound).Once()
+
+		handler := createHandler(txResults)
+
+		_, err := handler.GetTransactionErrorMessageByIndex(context.Background(), req)
+
+		// check that an error was received
+		suite.Require().Error(err)
+		errors.Is(err, status.Error(codes.NotFound, ""))
+	})
+
+	// failure path - non-existent transaction index in request results in an exception
+	suite.Run("request with non-existent transaction index, exception", func() {
+
+		wrongTxIndex := txIndex + 1
+
+		// create an API request with the invalid transaction ID
+		req := concoctIndexReq(bID[:], wrongTxIndex)
+
+		// expect a storage call for the invalid tx ID but return an exception
+		txResults := storage.NewTransactionResults(suite.T())
+		txResults.On("ByBlockIDTransactionIndex", bID, wrongTxIndex).Return(nil, errors.New("internal-error")).Once()
 
 		handler := createHandler(txResults)
 
