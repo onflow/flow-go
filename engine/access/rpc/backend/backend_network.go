@@ -70,7 +70,7 @@ func (b *backendNetwork) GetNodeVersionInfo(ctx context.Context) (*access.NodeVe
 func (b *backendNetwork) GetLatestProtocolStateSnapshot(_ context.Context) ([]byte, error) {
 	snapshot := b.state.Final()
 
-	validSnapshot, err := b.getValidSnapshot(snapshot, 0)
+	validSnapshot, err := b.getValidSnapshot(snapshot, 0, true)
 	if err != nil {
 		return nil, err
 	}
@@ -108,9 +108,11 @@ func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(_ context.Context, bl
 		return nil, status.Errorf(codes.InvalidArgument, "failed to retrieve snapshot for block: block not finalized")
 	}
 
-	validSnapshot, err := b.isValidSnapshot(snapshotByHeight)
+	validSnapshot, err := b.getValidSnapshot(snapshotByHeight, 0, false)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to get a valid snapshot: %v", err)
+		if errors.Is(err, SnapshotPhaseMismatchError) {
+			return nil, status.Errorf(codes.InvalidArgument, "failed to retrieve snapshot for block, try again with different block: %v", err)
+		}
 	}
 
 	data, err := convert.SnapshotToBytes(validSnapshot)
@@ -134,9 +136,11 @@ func (b *backendNetwork) GetProtocolStateSnapshotByHeight(_ context.Context, blo
 		return nil, status.Errorf(codes.Internal, "failed to get a valid snapshot: %v", err)
 	}
 
-	validSnapshot, err := b.isValidSnapshot(snapshot)
+	validSnapshot, err := b.getValidSnapshot(snapshot, 0, false)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to get a valid snapshot: %v", err)
+		if errors.Is(err, SnapshotPhaseMismatchError) {
+			return nil, status.Errorf(codes.InvalidArgument, "failed to get a valid snapshot: %v", err)
+		}
 	}
 
 	data, err := convert.SnapshotToBytes(validSnapshot)
@@ -157,7 +161,9 @@ func (b *backendNetwork) isEpochOrPhaseDifferent(counter1, counter2 uint64, phas
 // If a snapshot does contain an invalid sealing segment query the state
 // by height of each block in the segment and return a snapshot at the point
 // where the transition happens.
-func (b *backendNetwork) getValidSnapshot(snapshot protocol.Snapshot, blocksVisited int) (protocol.Snapshot, error) {
+// Expected error returns during normal operations:
+// * SnapshotPhaseMismatchError - snapshot does contain a valid sealing segment
+func (b *backendNetwork) getValidSnapshot(snapshot protocol.Snapshot, blocksVisited int, findNextValidSnapshot bool) (protocol.Snapshot, error) {
 	segment, err := snapshot.SealingSegment()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sealing segment: %w", err)
@@ -176,6 +182,10 @@ func (b *backendNetwork) getValidSnapshot(snapshot protocol.Snapshot, blocksVisi
 	// Check if the counters and phase are different this indicates that the sealing segment
 	// of the snapshot requested spans either an epoch transition or phase transition.
 	if b.isEpochOrPhaseDifferent(counterAtHighest, counterAtLowest, phaseAtHighest, phaseAtLowest) {
+		if !findNextValidSnapshot {
+			return nil, SnapshotPhaseMismatchError
+		}
+
 		// Visit each node in strict order of decreasing height starting at head
 		// to find the block that straddles the transition boundary.
 		for i := len(segment.Blocks) - 1; i >= 0; i-- {
@@ -196,37 +206,9 @@ func (b *backendNetwork) getValidSnapshot(snapshot protocol.Snapshot, blocksVisi
 			// Check if this block straddles the transition boundary, if it does return the snapshot
 			// at that block height.
 			if b.isEpochOrPhaseDifferent(counterAtHighest, counterAtBlock, phaseAtHighest, phaseAtBlock) {
-				return b.getValidSnapshot(b.state.AtHeight(segment.Blocks[i].Header.Height), blocksVisited)
+				return b.getValidSnapshot(b.state.AtHeight(segment.Blocks[i].Header.Height), blocksVisited, true)
 			}
 		}
-	}
-
-	return snapshot, nil
-}
-
-// isValidSnapshot will return a valid snapshot that has a sealing segment which
-// 1. does not contain any blocks that span an epoch transition
-// 2. does not contain any blocks that span an epoch phase transition
-func (b *backendNetwork) isValidSnapshot(snapshot protocol.Snapshot) (protocol.Snapshot, error) {
-	segment, err := snapshot.SealingSegment()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get sealing segment: %w", err)
-	}
-
-	counterAtHighest, phaseAtHighest, err := b.getCounterAndPhase(segment.Highest().Header.Height)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get counter and phase at highest block in the segment: %w", err)
-	}
-
-	counterAtLowest, phaseAtLowest, err := b.getCounterAndPhase(segment.Sealed().Header.Height)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get counter and phase at lowest block in the segment: %w", err)
-	}
-
-	// Check if the counters and phase are different this indicates that the sealing segment
-	// of the snapshot requested spans either an epoch transition or phase transition.
-	if b.isEpochOrPhaseDifferent(counterAtHighest, counterAtLowest, phaseAtHighest, phaseAtLowest) {
-		return nil, fmt.Errorf("snapshot does contain an invalid sealing segment")
 	}
 
 	return snapshot, nil

@@ -7,6 +7,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+var SnapshotPhaseMismatchError = errors.New("snapshot does contain a valid sealing segment")
+
 // InsufficientExecutionReceipts indicates that no execution receipt were found for a given block ID
 type InsufficientExecutionReceipts struct {
 	blockID      flow.Identifier
