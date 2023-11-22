@@ -102,6 +102,10 @@ type state struct {
 	serviceEvents      storage.ServiceEvents
 	transactionResults storage.TransactionResults
 	db                 *badger.DB
+
+	// when it is not-nil, registers are stored in both register store and ledger
+	// and register queries will send to the register store instead of ledger
+	registerStore execution.RegisterStore
 }
 
 // NewExecutionState returns a new execution state access layer for the given ledger storage.
@@ -119,6 +123,7 @@ func NewExecutionState(
 	transactionResults storage.TransactionResults,
 	db *badger.DB,
 	tracer module.Tracer,
+	registerStore execution.RegisterStore,
 ) ExecutionState {
 	return &state{
 		tracer:             tracer,
@@ -134,6 +139,7 @@ func NewExecutionState(
 		serviceEvents:      serviceEvents,
 		transactionResults: transactionResults,
 		db:                 db,
+		registerStore:      registerStore,
 	}
 
 }
