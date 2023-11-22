@@ -355,8 +355,8 @@ jobs:
           # use the workflow run id as part of the cache key to ensure these docker images will only be used for a single workflow run
           key: flow-docker-images-ghost-${{ github.run_id }}
 
-  docker-build1:
-    name: Docker Build 1
+  docker-build-observer:
+    name: Docker Build Observer
     runs-on: ubuntu-latest
     if: github.event.pull_request.draft == false
     steps:
@@ -373,18 +373,43 @@ jobs:
       - name: Build relic
         run: make crypto_setup_gopath
       - name: Docker build
-        run: make docker-build-ghost docker-build-observer docker-build-verification
+        run: make docker-build-observer
       - name: Save Docker images
-        run: |
-          docker save \
-          gcr.io/flow-container-registry/observer:latest \
-          gcr.io/flow-container-registry/verification:latest > flow-docker-images1.tar
+        run: docker save gcr.io/flow-container-registry/observer:latest > flow-docker-observer.tar
       - name: Cache Docker images 1
         uses: actions/cache@v3
         with:
-          path: flow-docker-images1.tar
+          path: flow-docker-observer.tar
           # use the workflow run id as part of the cache key to ensure these docker images will only be used for a single workflow run
-          key: flow-docker-images1-${{ github.run_id }}
+          key: flow-docker-observer-${{ github.run_id }}
+
+  docker-build-verification:
+    name: Docker Build Verification
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+        with:
+          # all tags are needed for integration tests
+          fetch-depth: 0
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: Build relic
+        run: make crypto_setup_gopath
+      - name: Docker build
+        run: make docker-build-verification
+      - name: Save Docker image
+        run: docker save gcr.io/flow-container-registry/verification:latest > flow-docker-verification.tar
+      - name: Cache Docker image
+        uses: actions/cache@v3
+        with:
+          path: flow-docker-verification.tar
+          # use the workflow run id as part of the cache key to ensure these docker images will only be used for a single workflow run
+          key: flow-docker-images-verification-${{ github.run_id }}
 
   docker-build2:
     name: Docker Build 2
@@ -420,7 +445,7 @@ jobs:
 
   integration-test:
     name: Integration Tests
-    needs: [docker-build-access, docker-build-collection, docker-build-consensus, docker-build-execution, docker-build-ghost, docker-build1, docker-build2]
+    needs: [docker-build-access, docker-build-collection, docker-build-consensus, docker-build-execution, docker-build-ghost, docker-build-observer, docker-build-verification, docker-build2]
     strategy:
       fail-fast: false
       matrix:
@@ -492,38 +517,37 @@ jobs:
       uses: actions/cache@v3
       with:
         path: flow-docker-access.tar
-        # use the same cache key as the docker-build1 job
         key: flow-docker-images-access-${{ github.run_id }}
     - name: Load cached Collection Docker image
       uses: actions/cache@v3
       with:
         path: flow-docker-collection.tar
-        # use the same cache key as the docker-build1 job
         key: flow-docker-images-collection-${{ github.run_id }}
     - name: Load cached Consensus Docker image
       uses: actions/cache@v3
       with:
         path: flow-docker-consensus.tar
-        # use the same cache key as the docker-build1 job
         key: flow-docker-images-consensus-${{ github.run_id }}
     - name: Load cached Execution Docker image
       uses: actions/cache@v3
       with:
         path: flow-docker-execution.tar
-        # use the same cache key as the docker-build1 job
         key: flow-docker-images-execution-${{ github.run_id }}
     - name: Load cached Ghost Docker image
       uses: actions/cache@v3
       with:
         path: flow-docker-ghost.tar
-        # use the same cache key as the docker-build1 job
         key: flow-docker-images-ghost-${{ github.run_id }}
+    - name: Load cached Verification Docker image
+      uses: actions/cache@v3
+      with:
+        path: flow-docker-verification.tar
+        key: flow-docker-images-verification-${{ github.run_id }}
     - name: Load cached Docker images 1
       uses: actions/cache@v3
       with:
-        path: flow-docker-images1.tar
-        # use the same cache key as the docker-build1 job
-        key: flow-docker-images1-${{ github.run_id }}
+        path: flow-docker-observer.tar
+        key: flow-docker-observer-${{ github.run_id }}
     - name: Load cached Docker images 2
       uses: actions/cache@v3
       with:
@@ -532,7 +556,6 @@ jobs:
         key: flow-docker-images2-${{ github.run_id }}
 
     - name: Load Docker images
-#      run: docker load -i flow-docker-images1.tar
       run: |
         for f in *.tar; do
           docker load -i $f
