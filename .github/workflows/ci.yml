@@ -393,7 +393,7 @@ jobs:
 
   integration-test:
     name: Integration Tests
-    needs: [docker-build-access, docker-build-consensus, docker-build-execution, docker-build1, docker-build2]
+    needs: [docker-build-access, docker-build-collection, docker-build-consensus, docker-build-execution, docker-build1, docker-build2]
     strategy:
       fail-fast: false
       matrix:
