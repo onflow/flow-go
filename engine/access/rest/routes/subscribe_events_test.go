@@ -14,6 +14,8 @@ import (
 
 	"golang.org/x/exp/slices"
 
+	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 	mocks "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -24,6 +26,7 @@ import (
 	mockstatestream "github.com/onflow/flow-go/engine/access/state_stream/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/generator"
 )
 
 type testType struct {
@@ -66,6 +69,9 @@ func (s *SubscribeEventsSuite) SetupTest() {
 	s.blocks = make([]*flow.Block, 0, blockCount)
 	s.blockEvents = make(map[flow.Identifier]flow.EventsList, blockCount)
 
+	// by default, events are in CCF encoding
+	eventsGenerator := generator.EventGenerator(generator.WithEncoding(entities.EventEncodingVersion_CCF_V0))
+
 	for i := 0; i < blockCount; i++ {
 		block := unittest.BlockWithParentFixture(parent)
 		// update for next iteration
@@ -73,6 +79,11 @@ func (s *SubscribeEventsSuite) SetupTest() {
 
 		result := unittest.ExecutionResultFixture()
 		blockEvents := unittest.BlockEventsFixture(block.Header, (i%len(testEventTypes))*3+1, testEventTypes...)
+
+		// update payloads with valid CCF encoded data
+		for i := range blockEvents.Events {
+			blockEvents.Events[i].Payload = eventsGenerator.New().Payload
+		}
 
 		s.blocks = append(s.blocks, block)
 		s.blockEvents[block.ID()] = blockEvents.Events
@@ -411,6 +422,10 @@ func requireResponse(t *testing.T, recorder *testHijackResponseRecorder, expecte
 			require.Equal(t, expectedEvent.TransactionIndex, actualEvent.TransactionIndex)
 			require.Equal(t, expectedEvent.EventIndex, actualEvent.EventIndex)
 			require.Equal(t, expectedEvent.Payload, actualEvent.Payload)
+
+			// payload must decode to valid json-cdc encoded data
+			_, err := jsoncdc.Decode(nil, actualEvent.Payload)
+			require.NoError(t, err)
 		}
 	}
 }
