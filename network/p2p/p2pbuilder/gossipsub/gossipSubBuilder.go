@@ -121,12 +121,6 @@ func (g *Builder) EnableGossipSubScoringWithOverride(override *p2p.PeerScoringCo
 	}
 }
 
-// SetGossipSubTracer sets the gossipsub tracer of the builder.
-// If the gossipsub tracer has already been set, a fatal error is logged.
-func (g *Builder) SetGossipSubTracer(gossipSubTracer p2p.PubSubTracer) {
-
-}
-
 // SetRoutingSystem sets the routing system of the builder.
 // If the routing system has already been set, a fatal error is logged.
 func (g *Builder) SetRoutingSystem(routingSystem routing.Routing) {
