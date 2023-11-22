@@ -11,7 +11,6 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	"github.com/onflow/flow-go/engine/execution/ingestion/loader"
-	"github.com/onflow/flow-go/engine/execution/state"
 	stateMock "github.com/onflow/flow-go/engine/execution/state/mock"
 	"github.com/onflow/flow-go/model/flow"
 	storageerr "github.com/onflow/flow-go/storage"
@@ -57,9 +56,8 @@ func (es *mockExecutionState) StateCommitmentByBlockID(
 }
 
 func (es *mockExecutionState) ExecuteBlock(t *testing.T, block *flow.Block) {
-	parentExecuted, err := state.IsBlockExecuted(
-		context.Background(),
-		es,
+	parentExecuted, err := es.IsBlockExecuted(
+		block.Header.Height,
 		block.Header.ParentID)
 	require.NoError(t, err)
 	require.True(t, parentExecuted, "parent block not executed")
