@@ -5,12 +5,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/onflow/cadence"
-	"github.com/spf13/cobra"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/onflow/cadence"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
@@ -26,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/io"
+	"github.com/spf13/cobra"
 )
 
 var (
@@ -703,7 +703,7 @@ func validateEpochTimingConfig() error {
 
 		rootEpochTargetEndTimeUNIX := epochTargetEndTime()
 		rootEpochTargetEndTime := time.Unix(int64(rootEpochTargetEndTimeUNIX), 0)
-		log.Info().Msgf("using default epoch timing config with root epoch target end time %s, which is in %s", rootEpochTargetEndTime, rootEpochTargetEndTime.Sub(time.Now()))
+		log.Info().Msgf("using default epoch timing config with root epoch target end time %s, which is in %s", rootEpochTargetEndTime, time.Until(rootEpochTargetEndTime))
 	} else {
 		// All other flags must be set
 		// NOTE: it is valid for refCounter to be set to 0
@@ -713,7 +713,7 @@ func validateEpochTimingConfig() error {
 
 		rootEpochTargetEndTimeUNIX := epochTargetEndTime()
 		rootEpochTargetEndTime := time.Unix(int64(rootEpochTargetEndTimeUNIX), 0)
-		log.Info().Msgf("using user-specified epoch timing config with root epoch target end time %s, which is in %s", rootEpochTargetEndTime, rootEpochTargetEndTime.Sub(time.Now()))
+		log.Info().Msgf("using user-specified epoch timing config with root epoch target end time %s, which is in %s", rootEpochTargetEndTime, time.Until(rootEpochTargetEndTime))
 	}
 	return nil
 }
