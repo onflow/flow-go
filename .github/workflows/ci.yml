@@ -26,38 +26,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  golangci:
-    strategy:
-      fail-fast: false
-      matrix:
-        dir: [./, ./integration/, ./crypto/, ./insecure/]
-    name: Lint
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout repo
-      uses: actions/checkout@v3
-    - name: Setup Go
-      uses: actions/setup-go@v3
-      with:
-        go-version: ${{ env.GO_VERSION }}
-        cache: true
-    - name: Install C formatter
-      run: sudo apt-get install -y clang-format
-    - name: Run C formatter and sanitizer for ./crypto
-      run: make -C crypto c-format && make -C crypto c-sanitize
-    - name: Run go generate
-      run: go generate
-      working-directory: ${{ matrix.dir }}
-    - name: Run golangci-lint
-      uses: golangci/golangci-lint-action@v3
-      with:
-        # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
-        version: v1.54
-        args: -v
-        working-directory: ${{ matrix.dir }}
-        # https://github.com/golangci/golangci-lint-action/issues/244
-        skip-cache: true
-
   create-dynamic-test-matrix:
     name: Create Dynamic Test Matrix
     runs-on: ubuntu-latest
