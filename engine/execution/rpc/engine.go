@@ -169,7 +169,7 @@ type handler struct {
 	maxBlockRange        int
 }
 
-var _ execution.ExecutionAPIServer = &handler{}
+var _ execution.ExecutionAPIServer = (*handler)(nil)
 
 // Ping responds to requests when the server is up.
 func (h *handler) Ping(
@@ -494,6 +494,164 @@ func (h *handler) GetTransactionResultsByBlockID(
 	return &execution.GetTransactionResultsResponse{
 		TransactionResults:   responseTxResults,
 		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
+	}, nil
+}
+
+// GetTransactionErrorMessage implements a grpc handler for getting a transaction error message by block ID and tx ID.
+// Expected error codes during normal operations:
+// - codes.InvalidArgument - invalid blockID, tx ID.
+// - codes.NotFound - transaction result by tx ID not found.
+func (h *handler) GetTransactionErrorMessage(
+	_ context.Context,
+	req *execution.GetTransactionErrorMessageRequest,
+) (*execution.GetTransactionErrorMessageResponse, error) {
+	reqBlockID := req.GetBlockId()
+	blockID, err := convert.BlockID(reqBlockID)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid blockID: %v", err)
+	}
+
+	reqTxID := req.GetTransactionId()
+	txID, err := convert.TransactionID(reqTxID)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid transactionID: %v", err)
+	}
+
+	// lookup any transaction error that might have occurred
+	txResult, err := h.transactionResults.ByBlockIDTransactionID(blockID, txID)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, status.Error(codes.NotFound, "transaction result not found")
+		}
+
+		return nil, status.Errorf(codes.Internal, "failed to get transaction result: %v", err)
+	}
+
+	result := &execution.GetTransactionErrorMessageResponse{
+		TransactionId: convert.IdentifierToMessage(txResult.TransactionID),
+	}
+
+	if len(txResult.ErrorMessage) > 0 {
+		cadenceErrMessage := txResult.ErrorMessage
+		if !utf8.ValidString(cadenceErrMessage) {
+			h.log.Warn().
+				Str("block_id", blockID.String()).
+				Str("transaction_id", txID.String()).
+				Str("error_mgs", fmt.Sprintf("%q", cadenceErrMessage)).
+				Msg("invalid character in Cadence error message")
+			// convert non UTF-8 string to a UTF-8 string for safe GRPC marshaling
+			cadenceErrMessage = strings.ToValidUTF8(txResult.ErrorMessage, "?")
+		}
+		result.ErrorMessage = cadenceErrMessage
+	}
+	return result, nil
+}
+
+// GetTransactionErrorMessageByIndex implements a grpc handler for getting a transaction error message by block ID and tx index.
+// Expected error codes during normal operations:
+// - codes.InvalidArgument - invalid blockID.
+// - codes.NotFound - transaction result at index not found.
+func (h *handler) GetTransactionErrorMessageByIndex(
+	_ context.Context,
+	req *execution.GetTransactionErrorMessageByIndexRequest,
+) (*execution.GetTransactionErrorMessageResponse, error) {
+	reqBlockID := req.GetBlockId()
+	blockID, err := convert.BlockID(reqBlockID)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid blockID: %v", err)
+	}
+
+	index := req.GetIndex()
+
+	// lookup any transaction error that might have occurred
+	txResult, err := h.transactionResults.ByBlockIDTransactionIndex(blockID, index)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, status.Error(codes.NotFound, "transaction result not found")
+		}
+
+		return nil, status.Errorf(codes.Internal, "failed to get transaction result: %v", err)
+	}
+
+	result := &execution.GetTransactionErrorMessageResponse{
+		TransactionId: convert.IdentifierToMessage(txResult.TransactionID),
+	}
+
+	if len(txResult.ErrorMessage) > 0 {
+		cadenceErrMessage := txResult.ErrorMessage
+		if !utf8.ValidString(cadenceErrMessage) {
+			h.log.Warn().
+				Str("block_id", blockID.String()).
+				Str("transaction_id", txResult.TransactionID.String()).
+				Str("error_mgs", fmt.Sprintf("%q", cadenceErrMessage)).
+				Msg("invalid character in Cadence error message")
+			// convert non UTF-8 string to a UTF-8 string for safe GRPC marshaling
+			cadenceErrMessage = strings.ToValidUTF8(txResult.ErrorMessage, "?")
+		}
+		result.ErrorMessage = cadenceErrMessage
+	}
+	return result, nil
+}
+
+// GetTransactionErrorMessagesByBlockID implements a grpc handler for getting transaction error messages by block ID.
+// Only failed transactions will be returned.
+// Expected error codes during normal operations:
+// - codes.InvalidArgument - invalid blockID.
+// - codes.NotFound - block was not executed or was pruned.
+func (h *handler) GetTransactionErrorMessagesByBlockID(
+	_ context.Context,
+	req *execution.GetTransactionErrorMessagesByBlockIDRequest,
+) (*execution.GetTransactionErrorMessagesResponse, error) {
+	reqBlockID := req.GetBlockId()
+	blockID, err := convert.BlockID(reqBlockID)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid blockID: %v", err)
+	}
+
+	// must verify block was locally executed first since transactionResults.ByBlockID will return
+	// an empty slice if block does not exist
+	if _, err = h.commits.ByBlockID(blockID); err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, status.Errorf(codes.NotFound, "block %s has not been executed by node or was pruned", blockID)
+		}
+		return nil, status.Errorf(codes.Internal, "state commitment for block ID %s could not be retrieved", blockID)
+	}
+
+	// Get all tx results
+	txResults, err := h.transactionResults.ByBlockID(blockID)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, status.Error(codes.NotFound, "transaction results not found")
+		}
+
+		return nil, status.Errorf(codes.Internal, "failed to get transaction results: %v", err)
+	}
+
+	var results []*execution.GetTransactionErrorMessagesResponse_Result
+	for index, txResult := range txResults {
+		if len(txResult.ErrorMessage) == 0 {
+			continue
+		}
+		txIndex := uint32(index)
+		cadenceErrMessage := txResult.ErrorMessage
+		if !utf8.ValidString(cadenceErrMessage) {
+			h.log.Warn().
+				Str("block_id", blockID.String()).
+				Uint32("index", txIndex).
+				Str("error_mgs", fmt.Sprintf("%q", cadenceErrMessage)).
+				Msg("invalid character in Cadence error message")
+			// convert non UTF-8 string to a UTF-8 string for safe GRPC marshaling
+			cadenceErrMessage = strings.ToValidUTF8(txResult.ErrorMessage, "?")
+		}
+		results = append(results, &execution.GetTransactionErrorMessagesResponse_Result{
+			TransactionId: convert.IdentifierToMessage(txResult.TransactionID),
+			Index:         txIndex,
+			ErrorMessage:  cadenceErrMessage,
+		})
+	}
+
+	return &execution.GetTransactionErrorMessagesResponse{
+		Results: results,
 	}, nil
 }
 
