@@ -41,7 +41,7 @@ func (r *RegistersAsyncStore) InitDataAvailable(
 	})
 }
 
-// RegisterValues atomically gets the register values from the underlying storage.RegisterIndex
+// RegisterValues gets the register values from the underlying storage.RegisterIndex
 // Expected errors:
 //   - storage.ErrHeightNotIndexed if the store is still bootstrapping or if the values at the height is not indexed yet
 //   - storage.ErrNotFound if the register does not exist at the height

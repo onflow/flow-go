@@ -63,7 +63,6 @@ func TestInitDataAvailable(t *testing.T) {
 		require.ErrorIs(t, err, storage.ErrHeightNotIndexed)
 	})
 
-	// no register value available, correct error returned
 	t.Run("no register value available correct error returned", func(t *testing.T) {
 		registersAsync := NewRegistersAsyncStore()
 		require.False(t, registersAsync.initialized.Load())
