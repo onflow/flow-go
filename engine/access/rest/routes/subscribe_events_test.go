@@ -182,26 +182,35 @@ func (s *SubscribeEventsSuite) TestSubscribeEvents() {
 
 			// construct expected event responses based on the provided test configuration
 			for i, block := range s.blocks {
-				if startBlockFound || block.ID() == test.startBlockID {
+				blockID := block.ID()
+				if startBlockFound || blockID == test.startBlockID {
 					startBlockFound = true
 					if test.startHeight == request.EmptyHeight || block.Header.Height >= test.startHeight {
-						eventsForBlock := flow.EventsList{}
-						for _, event := range s.blockEvents[block.ID()] {
+						// track 2 lists, one for the expected results and one that is passed back
+						// from the subscription to the handler. These cannot be shared since the
+						// response struct is passed by reference from the mock to the handler, so
+						// a bug within the handler could go unnoticed
+						expectedEvents := flow.EventsList{}
+						subscriptionEvents := flow.EventsList{}
+						for _, event := range s.blockEvents[blockID] {
 							if slices.Contains(test.eventTypes, string(event.Type)) ||
-								len(test.eventTypes) == 0 { //Include all events
-								eventsForBlock = append(eventsForBlock, event)
+								len(test.eventTypes) == 0 { // Include all events
+								expectedEvents = append(expectedEvents, event)
+								subscriptionEvents = append(subscriptionEvents, event)
 							}
 						}
-						eventResponse := &backend.EventsResponse{
+						if len(expectedEvents) > 0 || (i+1)%int(test.heartbeatInterval) == 0 {
+							expectedEventsResponses = append(expectedEventsResponses, &backend.EventsResponse{
+								Height:  block.Header.Height,
+								BlockID: blockID,
+								Events:  expectedEvents,
+							})
+						}
+						subscriptionEventsResponses = append(subscriptionEventsResponses, &backend.EventsResponse{
 							Height:  block.Header.Height,
-							BlockID: block.ID(),
-							Events:  eventsForBlock,
-						}
-
-						if len(eventsForBlock) > 0 || (i+1)%int(test.heartbeatInterval) == 0 {
-							expectedEventsResponses = append(expectedEventsResponses, eventResponse)
-						}
-						subscriptionEventsResponses = append(subscriptionEventsResponses, eventResponse)
+							BlockID: blockID,
+							Events:  subscriptionEvents,
+						})
 					}
 				}
 			}
@@ -421,7 +430,7 @@ func requireResponse(t *testing.T, recorder *testHijackResponseRecorder, expecte
 			require.Equal(t, expectedEvent.TransactionID, actualEvent.TransactionID)
 			require.Equal(t, expectedEvent.TransactionIndex, actualEvent.TransactionIndex)
 			require.Equal(t, expectedEvent.EventIndex, actualEvent.EventIndex)
-			require.Equal(t, expectedEvent.Payload, actualEvent.Payload)
+			// payload is not expected to match, but it should decode
 
 			// payload must decode to valid json-cdc encoded data
 			_, err := jsoncdc.Decode(nil, actualEvent.Payload)

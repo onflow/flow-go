@@ -161,7 +161,6 @@ func (wsController *WebsocketController) writeEvents(sub state_stream.Subscripti
 
 			// EventsResponse contains CCF encoded events, and this API returns JSON-CDC events.
 			// convert event payload formats.
-			events := make([]flow.Event, len(resp.Events))
 			for i, e := range resp.Events {
 				payload, err := convert.CcfPayloadToJsonPayload(e.Payload)
 				if err != nil {
@@ -169,9 +168,8 @@ func (wsController *WebsocketController) writeEvents(sub state_stream.Subscripti
 					wsController.wsErrorHandler(err)
 					return
 				}
-				events[i].Payload = payload
+				resp.Events[i].Payload = payload
 			}
-			resp.Events = events
 
 			// Write the response to the WebSocket connection
 			err = wsController.conn.WriteJSON(event)
