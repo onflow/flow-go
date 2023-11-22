@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
+	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -219,13 +220,18 @@ func (s *AccessAPISuite) testGetAccount(client *client.Client) {
 		s.Assert().NotZero(account.Balance)
 	})
 
-	/*s.Run("get newly created account", func() {
+	s.Run("get newly created account", func() {
 		addr, err := utils.CreateFlowAccount(s.ctx, s.serviceClient)
 		s.Require().NoError(err)
-		acc, err := client.GetAccount(s.ctx, addr)
+		/*acc, err := client.GetAccount(s.ctx, addr)
+		s.Require().NoError(err)
+		s.Assert().Equal(addr, acc.Address)*/
+		acc, err := s.waitAccountsUntilIndexed(func() (*sdk.Account, error) {
+			return client.GetAccount(s.ctx, addr)
+		})
 		s.Require().NoError(err)
 		s.Assert().Equal(addr, acc.Address)
-	})*/
+	})
 }
 
 func (s *AccessAPISuite) testExecuteScriptWithSimpleScript(client *client.Client) {
