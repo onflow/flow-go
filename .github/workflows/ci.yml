@@ -218,6 +218,7 @@ jobs:
   docker-build:
     name: Docker Build
     runs-on: buildjet-16vcpu-ubuntu-2204
+    if: github.event.pull_request.draft == false
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
