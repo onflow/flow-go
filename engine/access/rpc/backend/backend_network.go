@@ -85,28 +85,27 @@ func (b *backendNetwork) GetLatestProtocolStateSnapshot(_ context.Context) ([]by
 
 // GetProtocolStateSnapshotByBlockID returns serializable Snapshot by blockID
 func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(_ context.Context, blockID flow.Identifier) ([]byte, error) {
-	snapshotByBlockId := b.state.AtBlockID(blockID)
-	snapshotHeadByBlockId, err := snapshotByBlockId.Head()
+	snapshotHeadByBlockId, err := b.state.AtBlockID(blockID).Head()
 	if err != nil {
 		if errors.Is(err, state.ErrUnknownSnapshotReference) {
-			return nil, status.Errorf(codes.NotFound, "failed to get a valid snapshot: %v", err)
+			return nil, status.Errorf(codes.NotFound, "failed to get a valid snapshot: block not found")
 		}
 
-		return nil, status.Errorf(codes.Internal, "failed to get a valid snapshot: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to get a valid snapshot: block not found")
 	}
 
 	snapshotByHeight := b.state.AtHeight(snapshotHeadByBlockId.Height)
 	snapshotHeadByHeight, err := snapshotByHeight.Head()
 	if err != nil {
 		if errors.Is(err, state.ErrUnknownSnapshotReference) {
-			return nil, status.Errorf(codes.NotFound, "failed to get a valid snapshot: %v", err)
+			return nil, status.Errorf(codes.InvalidArgument, "failed to retrieve snapshot for block by height: block not finalized")
 		}
 
 		return nil, status.Errorf(codes.Internal, "failed to get a valid snapshot: %v", err)
 	}
 
 	if snapshotHeadByHeight.ID() != blockID {
-		return nil, status.Errorf(codes.Internal, "failed to retreive snapshot for block ID %v", blockID)
+		return nil, status.Errorf(codes.InvalidArgument, "failed to retrieve snapshot for block: block not finalized")
 	}
 
 	validSnapshot, err := b.isValidSnapshot(snapshotByHeight)
