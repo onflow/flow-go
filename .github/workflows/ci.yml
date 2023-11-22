@@ -310,7 +310,7 @@ jobs:
 
   integration-test:
     name: Integration Tests
-    needs: [docker-build1, docker-build2]
+    needs: [docker-build-access, docker-build1, docker-build2]
     strategy:
       fail-fast: false
       matrix:
