@@ -220,28 +220,28 @@ func WithChainID(chainID flow.ChainID) func(tx *sdk.Transaction) {
 
 // LogStatus logs current information about the test network state.
 func LogStatus(t *testing.T, ctx context.Context, log zerolog.Logger, client *testnet.Client) {
+	// retrieves latest FINALIZED snapshot
 	snapshot, err := client.GetLatestProtocolSnapshot(ctx)
 	if err != nil {
-		log.Err(err).Msg("failed to get sealed snapshot")
-		return
-	}
-	finalized, err := client.GetLatestFinalizedBlockHeader(ctx)
-	if err != nil {
-		log.Err(err).Msg("failed to get finalized header")
+		log.Err(err).Msg("failed to get finalized snapshot")
 		return
 	}
 
-	sealed, err := snapshot.Head()
+	sealingSegment, err := snapshot.SealingSegment()
 	require.NoError(t, err)
+	sealed := sealingSegment.Sealed()
+	finalized := sealingSegment.Finalized()
+
 	phase, err := snapshot.Phase()
 	require.NoError(t, err)
 	epoch := snapshot.Epochs().Current()
 	counter, err := epoch.Counter()
 	require.NoError(t, err)
 
-	log.Info().Uint64("final_height", finalized.Height).
-		Uint64("sealed_height", sealed.Height).
-		Uint64("sealed_view", sealed.View).
+	log.Info().Uint64("final_height", finalized.Header.Height).
+		Uint64("final_view", finalized.Header.View).
+		Uint64("sealed_height", sealed.Header.Height).
+		Uint64("sealed_view", sealed.Header.View).
 		Str("cur_epoch_phase", phase.String()).
 		Uint64("cur_epoch_counter", counter).
 		Msg("test run status")

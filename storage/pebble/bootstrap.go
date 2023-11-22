@@ -127,15 +127,15 @@ func (b *RegisterBootstrap) indexCheckpointFileWorker(ctx context.Context) error
 }
 
 // IndexCheckpointFile indexes the checkpoint file in the Dir provided
-func (b *RegisterBootstrap) IndexCheckpointFile(ctx context.Context) error {
+func (b *RegisterBootstrap) IndexCheckpointFile(ctx context.Context, workerCount int) error {
 	cct, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	g, gCtx := errgroup.WithContext(cct)
 
 	start := time.Now()
-	b.log.Info().Msg("indexing registers from checkpoint")
-	for i := 0; i < pebbleBootstrapWorkerCount; i++ {
+	b.log.Info().Msgf("indexing registers from checkpoint with %v worker", workerCount)
+	for i := 0; i < workerCount; i++ {
 		g.Go(func() error {
 			return b.indexCheckpointFileWorker(gCtx)
 		})

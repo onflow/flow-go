@@ -6,6 +6,7 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 
+	"github.com/onflow/flow-go/engine/execution"
 	execState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
@@ -31,25 +32,26 @@ func NewLedgerViewCommitter(
 
 func (committer *LedgerViewCommitter) CommitView(
 	snapshot *snapshot.ExecutionSnapshot,
-	baseState flow.StateCommitment,
+	baseStorageSnapshot execution.ExtendableStorageSnapshot,
 ) (
 	newCommit flow.StateCommitment,
 	proof []byte,
 	trieUpdate *ledger.TrieUpdate,
+	newStorageSnapshot execution.ExtendableStorageSnapshot,
 	err error,
 ) {
 	var err1, err2 error
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		proof, err2 = committer.collectProofs(snapshot, baseState)
+		proof, err2 = committer.collectProofs(snapshot, baseStorageSnapshot)
 		wg.Done()
 	}()
 
-	newCommit, trieUpdate, err1 = execState.CommitDelta(
+	newCommit, trieUpdate, newStorageSnapshot, err1 = execState.CommitDelta(
 		committer.ledger,
 		snapshot,
-		baseState)
+		baseStorageSnapshot)
 	wg.Wait()
 
 	if err1 != nil {
@@ -63,11 +65,12 @@ func (committer *LedgerViewCommitter) CommitView(
 
 func (committer *LedgerViewCommitter) collectProofs(
 	snapshot *snapshot.ExecutionSnapshot,
-	baseState flow.StateCommitment,
+	baseStorageSnapshot execution.ExtendableStorageSnapshot,
 ) (
 	proof []byte,
 	err error,
 ) {
+	baseState := baseStorageSnapshot.Commitment()
 	// Reason for including AllRegisterIDs (read and written registers) instead of ReadRegisterIDs (only read registers):
 	// AllRegisterIDs returns deduplicated register IDs that were touched by both
 	// reads and writes during the block execution.

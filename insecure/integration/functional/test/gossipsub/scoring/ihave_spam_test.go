@@ -34,8 +34,6 @@ import (
 // Also, per hearbeat (i.e., decay interval), the spammer is allowed to send at most 5000 ihave messages (gossip sub parameter) on aggregate, and
 // excess messages are dropped (without being counted as broken promises).
 func TestGossipSubIHaveBrokenPromises_Below_Threshold(t *testing.T) {
-	t.Parallel()
-
 	role := flow.RoleConsensus
 	sporkId := unittest.IdentifierFixture()
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
@@ -152,8 +150,6 @@ func TestGossipSubIHaveBrokenPromises_Below_Threshold(t *testing.T) {
 // Second round of attack makes spammers broken promises above the threshold of 10 RPCs, hence a degradation of the spammers score.
 // Third round of attack makes spammers broken promises to around 20 RPCs above the threshold, which causes the graylisting of the spammer node.
 func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
-	t.Parallel()
-
 	role := flow.RoleConsensus
 	sporkId := unittest.IdentifierFixture()
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
