@@ -84,8 +84,8 @@ jobs:
         scandir: './crypto'
         ignore: 'relic'
 
-  create-dynamic-test-matrix:
-    name: Create Dynamic Test Matrix
+  dynamic-test-matrix:
+    name: Dynamic Test Matrix
     runs-on: ubuntu-latest
     outputs:
       dynamic-matrix: ${{ steps.set-test-matrix.outputs.dynamicMatrix }}
@@ -129,11 +129,11 @@ jobs:
 
   unit-test:
     name: Unit Tests (${{ matrix.targets.name }})
-    needs: create-dynamic-test-matrix
+    needs: dynamic-test-matrix
     strategy:
       fail-fast: false
       matrix:
-        targets: ${{ fromJSON(needs.create-dynamic-test-matrix.outputs.dynamic-matrix)}}
+        targets: ${{ fromJSON(needs.dynamic-test-matrix.outputs.dynamic-matrix)}}
     ## need to set image explicitly due to GitHub logging issue as described in https://github.com/onflow/flow-go/pull/3087#issuecomment-1234383202
     runs-on: ${{ matrix.targets.runner }}
     # only run this job if the modified files include any file in the package directory
