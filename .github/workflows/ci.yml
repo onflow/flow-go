@@ -215,9 +215,9 @@ jobs:
           flags: unittests
           name: codecov-umbrella
 
-  docker-build:
-    name: Docker Build
-    runs-on: buildjet-16vcpu-ubuntu-2204
+  docker-build1:
+    name: Docker Build 1
+    runs-on: ubuntu-latest
     if: github.event.pull_request.draft == false
     steps:
       - name: Checkout repo
@@ -233,7 +233,7 @@ jobs:
       - name: Build relic
         run: make crypto_setup_gopath
       - name: Docker build
-        run: make docker-build-flow docker-build-flow-corrupt
+        run: make docker-build-flow
       - name: Save Docker images
         run: |
           docker save \
@@ -244,19 +244,37 @@ jobs:
           gcr.io/flow-container-registry/ghost:latest \
           gcr.io/flow-container-registry/observer:latest \
           gcr.io/flow-container-registry/verification:latest > flow-docker-images1.tar
-          
-          docker save \
-          gcr.io/flow-container-registry/access-corrupted:latest \
-          gcr.io/flow-container-registry/execution-corrupted:latest \
-          gcr.io/flow-container-registry/verification-corrupted:latest > flow-docker-images2.tar
-
       - name: Cache Docker images 1
         uses: actions/cache@v3
         with:
           path: flow-docker-images1.tar
           # use the workflow run id as part of the cache key to ensure these docker images will only be used for a single workflow run
           key: flow-docker-images1-${{ github.run_id }}
-
+  docker-build2:
+    name: Docker Build 2
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+        with:
+          # all tags are needed for integration tests
+          fetch-depth: 0
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: Build relic
+        run: make crypto_setup_gopath
+      - name: Docker build
+        run: make docker-build-flow-corrupt
+      - name: Save Docker images
+        run: |
+          docker save \
+          gcr.io/flow-container-registry/access-corrupted:latest \
+          gcr.io/flow-container-registry/execution-corrupted:latest \
+          gcr.io/flow-container-registry/verification-corrupted:latest > flow-docker-images2.tar
       - name: Cache Docker images 2
         uses: actions/cache@v3
         with:
@@ -266,7 +284,7 @@ jobs:
 
   integration-test:
     name: Integration Tests
-    needs: docker-build
+    needs: [docker-build1, docker-build2]
     strategy:
       fail-fast: false
       matrix:
@@ -338,13 +356,13 @@ jobs:
       uses: actions/cache@v3
       with:
         path: flow-docker-images1.tar
-        # use the same cache key as the docker-build job
+        # use the same cache key as the docker-build1 job
         key: flow-docker-images1-${{ github.run_id }}
     - name: Load cached Docker images 2
       uses: actions/cache@v3
       with:
         path: flow-docker-images2.tar
-        # use the same cache key as the docker-build job
+        # use the same cache key as the docker-build2 job
         key: flow-docker-images2-${{ github.run_id }}
 
     - name: Load Docker images
