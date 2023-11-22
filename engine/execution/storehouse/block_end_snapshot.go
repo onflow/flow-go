@@ -48,9 +48,6 @@ func NewBlockEndStateSnapshot(
 func (s *BlockEndStateSnapshot) Get(id flow.RegisterID) (flow.RegisterValue, error) {
 	value, ok := s.getFromCache(id)
 	if ok {
-		if value == nil {
-			return nil, storage.ErrNotFound
-		}
 		return value, nil
 	}
 

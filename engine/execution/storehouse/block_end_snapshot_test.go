@@ -46,8 +46,8 @@ func TestBlockEndSnapshot(t *testing.T) {
 
 		// test get non existing register from cache
 		_, err = snapshot.Get(unknownReg.Key)
-		require.Error(t, err)
-		require.True(t, errors.Is(err, storage.ErrNotFound))
+		require.NoError(t, err)
+		require.Nil(t, value)
 
 		// test getting storage.ErrHeightNotIndexed error
 		heightNotIndexed := unittest.MakeOwnerReg("height not index", "height not index")
