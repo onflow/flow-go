@@ -498,7 +498,6 @@ func (h *handler) GetTransactionResultsByBlockID(
 }
 
 // GetTransactionErrorMessage implements a grpc handler for getting a transaction error message by block ID and tx ID.
-// WARNING: we don't fill tx index in response since it's not available without iterating over all tx results.
 // Expected error codes during normal operations:
 // - codes.InvalidArgument - invalid blockID, tx ID.
 // - codes.NotFound - transaction result by tx ID not found.
