@@ -108,7 +108,7 @@ jobs:
           engine/collection 
           engine/common
           engine/consensus 
-          engine/execution/ingestion:buildjet-8vcpu-ubuntu-2204 
+          engine/execution/ingestion:buildjet-4vcpu-ubuntu-2204 
           engine/execution/computation
           engine/execution
           engine/verification 
@@ -217,7 +217,7 @@ jobs:
 
   docker-build:
     name: Docker Build
-    runs-on: ubuntu-latest
+    runs-on: buildjet-4vcpu-ubuntu-2204
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
