@@ -182,7 +182,8 @@ func (b *backendEvents) getBlockEventsFromStorage(
 				continue
 			}
 
-			if requiredEventEncodingVersion == entities.EventEncodingVersion_CCF_V0 {
+			// events are encoded in CCF format in storage. convert to JSON-CDC if requested
+			if requiredEventEncodingVersion == entities.EventEncodingVersion_JSON_CDC_V0 {
 				payload, err := convert.CcfPayloadToJsonPayload(e.Payload)
 				if err != nil {
 					return nil, nil, rpc.ConvertError(err, "failed to convert event payload", codes.Internal)
