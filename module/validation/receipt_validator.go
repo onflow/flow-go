@@ -3,6 +3,7 @@ package validation
 import (
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/module"
 
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
@@ -17,20 +18,24 @@ import (
 // receiptValidator holds all needed context for checking
 // receipt validity against current protocol state.
 type receiptValidator struct {
-	headers         storage.Headers
-	seals           storage.Seals
-	state           protocol.State
-	index           storage.Index
-	results         storage.ExecutionResults
-	signatureHasher hash.Hasher
+	headers                                    storage.Headers
+	seals                                      storage.Seals
+	state                                      protocol.State
+	index                                      storage.Index
+	results                                    storage.ExecutionResults
+	signatureHasher                            hash.Hasher
+	requiredReceiptsIncludedForExecutionResult uint
 }
+
+var _ module.ReceiptValidator = (*receiptValidator)(nil)
 
 func NewReceiptValidator(state protocol.State,
 	headers storage.Headers,
 	index storage.Index,
 	results storage.ExecutionResults,
 	seals storage.Seals,
-) *receiptValidator {
+	requiredReceiptsIncludedForExecutionResult uint,
+) module.ReceiptValidator {
 	rv := &receiptValidator{
 		state:           state,
 		headers:         headers,
@@ -38,8 +43,8 @@ func NewReceiptValidator(state protocol.State,
 		results:         results,
 		signatureHasher: signature.NewBLSHasher(signature.ExecutionReceiptTag),
 		seals:           seals,
+		requiredReceiptsIncludedForExecutionResult: requiredReceiptsIncludedForExecutionResult,
 	}
-
 	return rv
 }
 
@@ -272,11 +277,29 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 		return fmt.Errorf("internal error while traversing the ancestor fork of unsealed blocks: %w", err)
 	}
 
+	// tracks the number of receipts committing to each result.
+	// it's ok to only index receipts at this point, because we will perform
+	// all needed checks after we have validated all results.
+	receiptsByResult := make(map[flow.Identifier]uint)
+	for _, receipt := range payload.Receipts {
+		receiptsByResult[receipt.ResultID]++
+	}
+
 	// first validate all results that were included into payload
-	// if one of results is invalid we fail the whole check because it could be violating
-	// parent-children relationship
+	// if one of results is invalid we fail the whole check because it could be violating parent-children relationship
+	// each execution
 	for i, result := range payload.Results {
 		resultID := result.ID()
+
+		// check if there are enough execution receipts included in the payload corresponding to the execution result
+		if numberOfReceipts, hasReceipt := receiptsByResult[resultID]; hasReceipt {
+			if numberOfReceipts < v.requiredReceiptsIncludedForExecutionResult {
+				return engine.NewInvalidInputErrorf("execution result %v has only %d receipts, but at least %d are required",
+					resultID, numberOfReceipts, v.requiredReceiptsIncludedForExecutionResult)
+			}
+		} else {
+			return engine.NewInvalidInputErrorf("no receipts for result %v at index %d", resultID, i)
+		}
 
 		// check for duplicated results
 		if _, isDuplicate := executionTree[resultID]; isDuplicate {
