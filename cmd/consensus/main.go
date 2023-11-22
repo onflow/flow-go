@@ -88,6 +88,7 @@ func main() {
 		chunkAlpha                            uint
 		requiredApprovalsForSealVerification  uint
 		requiredApprovalsForSealConstruction  uint
+		requiredReceiptsCommittingToResult    uint
 		emergencySealing                      bool
 		dkgControllerConfig                   dkgmodule.ControllerConfig
 		dkgMessagingEngineConfig              = dkgeng.DefaultMessagingEngineConfig()
@@ -158,6 +159,7 @@ func main() {
 		flags.UintVar(&chunkAlpha, "chunk-alpha", flow.DefaultChunkAssignmentAlpha, "number of verifiers that should be assigned to each chunk")
 		flags.UintVar(&requiredApprovalsForSealVerification, "required-verification-seal-approvals", flow.DefaultRequiredApprovalsForSealValidation, "minimum number of approvals that are required to verify a seal")
 		flags.UintVar(&requiredApprovalsForSealConstruction, "required-construction-seal-approvals", flow.DefaultRequiredApprovalsForSealConstruction, "minimum number of approvals that are required to construct a seal")
+		flags.UintVar(&requiredReceiptsCommittingToResult, "required-receipts-committing-to-result", flow.DefaultRequiredReceiptsCommittingToExecutionResult, "minimum number of receipts that are required to be included in the block for each execution result")
 		flags.BoolVar(&emergencySealing, "emergency-sealing-active", flow.DefaultEmergencySealingActive, "(de)activation of emergency sealing")
 		flags.BoolVar(&insecureAccessAPI, "insecure-access-api", false, "required if insecure GRPC connection should be used")
 		flags.StringSliceVar(&accessNodeIDS, "access-node-ids", []string{}, fmt.Sprintf("array of access node IDs sorted in priority order where the first ID in this array will get the first connection attempt and each subsequent ID after serves as a fallback. Minimum length %d. Use '*' for all IDs in protocol state.", common.DefaultAccessNodeIDSMinimum))
@@ -265,7 +267,8 @@ func main() {
 				node.Storage.Headers,
 				node.Storage.Index,
 				node.Storage.Results,
-				node.Storage.Seals)
+				node.Storage.Seals,
+				requiredReceiptsCommittingToResult)
 
 			sealValidator := validation.NewSealValidator(
 				node.State,

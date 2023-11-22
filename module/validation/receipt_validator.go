@@ -16,7 +16,7 @@ import (
 )
 
 // receiptValidator holds all needed context for checking
-// receipt validity against current protocol state.
+// receipt validity against the current protocol state.
 type receiptValidator struct {
 	headers                                    storage.Headers
 	seals                                      storage.Seals
