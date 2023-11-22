@@ -280,10 +280,7 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 	// tracks the number of receipts committing to each result.
 	// it's ok to only index receipts at this point, because we will perform
 	// all needed checks after we have validated all results.
-	receiptsByResult := make(map[flow.Identifier]uint)
-	for _, receipt := range payload.Receipts {
-		receiptsByResult[receipt.ResultID]++
-	}
+	receiptsByResult := payload.Receipts.GroupByResultID()
 
 	// first validate all results that were included into payload
 	// if one of results is invalid we fail the whole check because it could be violating parent-children relationship
@@ -292,10 +289,11 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 		resultID := result.ID()
 
 		// check if there are enough execution receipts included in the payload corresponding to the execution result
-		if numberOfReceipts, hasReceipt := receiptsByResult[resultID]; hasReceipt {
-			if numberOfReceipts < v.requiredReceiptsIncludedForExecutionResult {
+		receiptsForResult := uint(len(receiptsByResult.GetGroup(resultID)))
+		if receiptsForResult > 0 {
+			if receiptsForResult < v.requiredReceiptsIncludedForExecutionResult {
 				return engine.NewInvalidInputErrorf("execution result %v has only %d receipts, but at least %d are required",
-					resultID, numberOfReceipts, v.requiredReceiptsIncludedForExecutionResult)
+					resultID, receiptsForResult, v.requiredReceiptsIncludedForExecutionResult)
 			}
 		} else {
 			return engine.NewInvalidInputErrorf("no receipts for result %v at index %d", resultID, i)
