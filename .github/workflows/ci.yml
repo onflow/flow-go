@@ -243,16 +243,26 @@ jobs:
           gcr.io/flow-container-registry/execution:latest \
           gcr.io/flow-container-registry/ghost:latest \
           gcr.io/flow-container-registry/observer:latest \
-          gcr.io/flow-container-registry/verification:latest \
+          gcr.io/flow-container-registry/verification:latest > flow-docker-images1.tar
+          
+          docker save \
           gcr.io/flow-container-registry/access-corrupted:latest \
           gcr.io/flow-container-registry/execution-corrupted:latest \
-          gcr.io/flow-container-registry/verification-corrupted:latest > flow-docker-images.tar
-      - name: Cache Docker images
+          gcr.io/flow-container-registry/verification-corrupted:latest > flow-docker-images2.tar
+
+      - name: Cache Docker images 1
         uses: actions/cache@v3
         with:
-          path: flow-docker-images.tar
+          path: flow-docker-images1.tar
           # use the workflow run id as part of the cache key to ensure these docker images will only be used for a single workflow run
-          key: flow-docker-images-${{ hashFiles('**/Dockerfile') }}-${{ github.run_id }}
+          key: flow-docker-images1-${{ github.run_id }}
+
+      - name: Cache Docker images 2
+        uses: actions/cache@v3
+        with:
+          path: flow-docker-images2.tar
+          # use the workflow run id as part of the cache key to ensure these docker images will only be used for a single workflow run
+          key: flow-docker-images2-${{ github.run_id }}
 
   integration-test:
     name: Integration Tests
@@ -324,14 +334,25 @@ jobs:
         cache: true
     - name: Build relic
       run: make crypto_setup_gopath
-    - name: Load cached Docker images
+    - name: Load cached Docker images 1
       uses: actions/cache@v3
       with:
-        path: flow-docker-images.tar
+        path: flow-docker-images1.tar
         # use the same cache key as the docker-build job
-        key: flow-docker-images-${{ hashFiles('**/Dockerfile') }}-${{ github.run_id }}
+        key: flow-docker-images1-${{ github.run_id }}
+    - name: Load cached Docker images 2
+      uses: actions/cache@v3
+      with:
+        path: flow-docker-images2.tar
+        # use the same cache key as the docker-build job
+        key: flow-docker-images2-${{ github.run_id }}
+
     - name: Load Docker images
-      run: docker load -i flow-docker-images.tar
+#      run: docker load -i flow-docker-images1.tar
+      run: |
+        for f in *.tar; do
+          docker load -i $f
+        done
     - name: Run tests (${{ matrix.name }})
       # TODO(rbtz): re-enable when we fix exisiting races.
       #env:
