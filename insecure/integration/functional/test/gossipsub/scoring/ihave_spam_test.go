@@ -67,6 +67,7 @@ func TestGossipSubIHaveBrokenPromises_Below_Threshold(t *testing.T) {
 	require.NoError(t, err)
 	// we override the decay interval to 1 second so that the score is updated within 1 second intervals.
 	conf.NetworkConfig.GossipSub.ScoringParameters.DecayInterval = 1 * time.Second
+	conf.NetworkConfig.GossipSub.RpcTracer.ScoreTracerInterval = 1 * time.Second
 	victimNode, victimIdentity := p2ptest.NodeFixture(
 		t,
 		sporkId,
@@ -74,7 +75,6 @@ func TestGossipSubIHaveBrokenPromises_Below_Threshold(t *testing.T) {
 		idProvider,
 		p2ptest.WithRole(role),
 		p2ptest.OverrideFlowConfig(conf),
-		p2ptest.WithPeerScoreTracerInterval(1*time.Second),
 		p2ptest.EnablePeerScoringWithOverride(&p2p.PeerScoringConfigOverride{
 			TopicScoreParams: map[channels.Topic]*pubsub.TopicScoreParams{
 				blockTopic: blockTopicOverrideParams,
@@ -198,6 +198,7 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 	conf.NetworkConfig.GossipSub.RpcInspector.Validation.IHave.MaxMessageIDSampleSize = 10000
 	// we override the decay interval to 1 second so that the score is updated within 1 second intervals.
 	conf.NetworkConfig.GossipSub.ScoringParameters.DecayInterval = 1 * time.Second
+	conf.NetworkConfig.GossipSub.RpcTracer.ScoreTracerInterval = 1 * time.Second
 
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
@@ -215,7 +216,6 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 		idProvider,
 		p2ptest.OverrideFlowConfig(conf),
 		p2ptest.WithRole(role),
-		p2ptest.WithPeerScoreTracerInterval(1*time.Second),
 		p2ptest.EnablePeerScoringWithOverride(&p2p.PeerScoringConfigOverride{
 			TopicScoreParams: map[channels.Topic]*pubsub.TopicScoreParams{
 				blockTopic: blockTopicOverrideParams,

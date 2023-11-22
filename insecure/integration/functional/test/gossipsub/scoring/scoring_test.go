@@ -107,13 +107,17 @@ func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory fun
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
+	cfg, err := config.DefaultConfig()
+	require.NoError(t, err)
+	// we override the decay interval to 1 second so that the score is updated within 1 second intervals.
+	cfg.NetworkConfig.GossipSub.RpcTracer.ScoreTracerInterval = 1 * time.Second
 	victimNode, victimIdentity := p2ptest.NodeFixture(
 		t,
 		sporkId,
 		t.Name(),
 		idProvider,
 		p2ptest.WithRole(role),
-		p2ptest.WithPeerScoreTracerInterval(1*time.Second),
+		p2ptest.OverrideFlowConfig(cfg),
 		p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride),
 	)
 
@@ -213,13 +217,14 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_SingleTopic(t *testing.T) {
 	require.NoError(t, err)
 	// we override the decay interval to 1 second so that the score is updated within 1 second intervals.
 	conf.NetworkConfig.GossipSub.ScoringParameters.DecayInterval = 1 * time.Second
+	conf.NetworkConfig.GossipSub.RpcTracer.ScoreTracerInterval = 1 * time.Second
 	thisNode, thisId := p2ptest.NodeFixture( // this node is the one that will be penalizing the under-performer node.
 		t,
 		sporkId,
 		t.Name(),
 		idProvider,
 		p2ptest.WithRole(role),
-		p2ptest.WithPeerScoreTracerInterval(1*time.Second),
+		p2ptest.OverrideFlowConfig(conf),
 		p2ptest.EnablePeerScoringWithOverride(
 			&p2p.PeerScoringConfigOverride{
 				TopicScoreParams: map[channels.Topic]*pubsub.TopicScoreParams{
@@ -322,13 +327,14 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_TwoTopics(t *testing.T) {
 	require.NoError(t, err)
 	// we override the decay interval to 1 second so that the score is updated within 1 second intervals.
 	conf.NetworkConfig.GossipSub.ScoringParameters.DecayInterval = 1 * time.Second
+	conf.NetworkConfig.GossipSub.RpcTracer.ScoreTracerInterval = 1 * time.Second
 	thisNode, thisId := p2ptest.NodeFixture( // this node is the one that will be penalizing the under-performer node.
 		t,
 		sporkId,
 		t.Name(),
 		idProvider,
 		p2ptest.WithRole(role),
-		p2ptest.WithPeerScoreTracerInterval(1*time.Second),
+		p2ptest.OverrideFlowConfig(conf),
 		p2ptest.EnablePeerScoringWithOverride(
 			&p2p.PeerScoringConfigOverride{
 				TopicScoreParams: map[channels.Topic]*pubsub.TopicScoreParams{
@@ -433,6 +439,7 @@ func TestGossipSubMeshDeliveryScoring_Replay_Will_Not_Counted(t *testing.T) {
 	require.NoError(t, err)
 	// we override the decay interval to 1 second so that the score is updated within 1 second intervals.
 	conf.NetworkConfig.GossipSub.ScoringParameters.DecayInterval = 1 * time.Second
+	conf.NetworkConfig.GossipSub.RpcTracer.ScoreTracerInterval = 1 * time.Second
 	blockTopicOverrideParams := scoring.DefaultTopicScoreParams()
 	blockTopicOverrideParams.MeshMessageDeliveriesActivation = 1 * time.Second // we start observing the mesh message deliveries after 1 second of the node startup.
 	thisNode, thisId := p2ptest.NodeFixture(                                   // this node is the one that will be penalizing the under-performer node.
@@ -442,7 +449,6 @@ func TestGossipSubMeshDeliveryScoring_Replay_Will_Not_Counted(t *testing.T) {
 		idProvider,
 		p2ptest.WithRole(role),
 		p2ptest.OverrideFlowConfig(conf),
-		p2ptest.WithPeerScoreTracerInterval(1*time.Second),
 		p2ptest.EnablePeerScoringWithOverride(
 			&p2p.PeerScoringConfigOverride{
 				TopicScoreParams: map[channels.Topic]*pubsub.TopicScoreParams{

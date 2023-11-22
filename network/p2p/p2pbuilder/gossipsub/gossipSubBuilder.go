@@ -3,7 +3,6 @@ package gossipsubbuilder
 import (
 	"context"
 	"fmt"
-	"time"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -32,15 +31,14 @@ import (
 
 // The Builder struct is used to configure and create a new GossipSubParameters pubsub system.
 type Builder struct {
-	networkType                  network.NetworkingType
-	sporkId                      flow.Identifier
-	logger                       zerolog.Logger
-	metricsCfg                   *p2pconfig.MetricsConfig
-	h                            host.Host
-	subscriptionFilter           pubsub.SubscriptionFilter
-	gossipSubFactory             p2p.GossipSubFactoryFunc
-	gossipSubConfigFunc          p2p.GossipSubAdapterConfigFunc
-	gossipSubScoreTracerInterval time.Duration // the interval at which the gossipsub score tracer logs the peer scores.
+	networkType         network.NetworkingType
+	sporkId             flow.Identifier
+	logger              zerolog.Logger
+	metricsCfg          *p2pconfig.MetricsConfig
+	h                   host.Host
+	subscriptionFilter  pubsub.SubscriptionFilter
+	gossipSubFactory    p2p.GossipSubFactoryFunc
+	gossipSubConfigFunc p2p.GossipSubAdapterConfigFunc
 	// gossipSubTracer is a callback interface that is called by the gossipsub implementation upon
 	// certain events. Currently, we use it to log and observe the local mesh of the node.
 	gossipSubTracer          p2p.PubSubTracer
@@ -328,8 +326,8 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, e
 		}
 		gossipSubConfigs.WithScoreOption(scoreOpt)
 
-		if g.gossipSubScoreTracerInterval > 0 {
-			scoreTracer = tracer.NewGossipSubScoreTracer(g.logger, g.idProvider, g.metricsCfg.Metrics, g.gossipSubScoreTracerInterval)
+		if g.gossipSubCfg.RpcTracer.ScoreTracerInterval > 0 {
+			scoreTracer = tracer.NewGossipSubScoreTracer(g.logger, g.idProvider, g.metricsCfg.Metrics, g.gossipSubCfg.RpcTracer.ScoreTracerInterval)
 			gossipSubConfigs.WithScoreTracer(scoreTracer)
 		}
 	} else {
