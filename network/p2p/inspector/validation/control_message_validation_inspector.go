@@ -823,9 +823,7 @@ func (c *ControlMsgValidationInspector) logAndDistributeAsyncInspectErrs(req *In
 
 	err := c.distributor.Distribute(p2p.NewInvalidControlMessageNotification(req.Peer, ctlMsgType, errs))
 	if err != nil {
-		lg.Error().
-			Err(err).
-			Msg("failed to distribute invalid control message notification")
+		c.logAndThrowError(fmt.Errorf("failed to distribute invalid control message notification: %w", err))
 	}
 	lg.Error().Err(errs.Error()).Msg("rpc control message async inspection failed")
 }
