@@ -215,6 +215,33 @@ jobs:
           flags: unittests
           name: codecov-umbrella
 
+  docker-build-access:
+    name: Docker Build Access
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+        with:
+          # all tags are needed for integration tests
+          fetch-depth: 0
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: Build relic
+        run: make crypto_setup_gopath
+      - name: Docker build
+        run: make docker-build-access
+      - name: Save Docker images
+        run: docker save gcr.io/flow-container-registry/access:latest > flow-docker-access.tar
+      - name: Cache Docker Access image
+        uses: actions/cache@v3
+        with:
+          path: flow-docker-access.tar
+          # use the workflow run id as part of the cache key to ensure these docker images will only be used for a single workflow run
+          key: flow-docker-images-access-${{ github.run_id }}
   docker-build1:
     name: Docker Build 1
     runs-on: ubuntu-latest
@@ -237,7 +264,6 @@ jobs:
       - name: Save Docker images
         run: |
           docker save \
-          gcr.io/flow-container-registry/access:latest \
           gcr.io/flow-container-registry/collection:latest \
           gcr.io/flow-container-registry/consensus:latest \
           gcr.io/flow-container-registry/execution:latest \
@@ -352,6 +378,12 @@ jobs:
         cache: true
     - name: Build relic
       run: make crypto_setup_gopath
+    - name: Load cached Access Docker image
+      uses: actions/cache@v3
+      with:
+        path: flow-docker-access.tar
+        # use the same cache key as the docker-build1 job
+        key: flow-docker-images-access-${{ github.run_id }}
     - name: Load cached Docker images 1
       uses: actions/cache@v3
       with:
