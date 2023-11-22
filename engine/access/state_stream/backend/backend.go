@@ -222,7 +222,7 @@ func (b *StateStreamBackend) setHighestHeight(height uint64) bool {
 func (b *StateStreamBackend) GetRegisterValues(ids flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
 	values, err := b.registers.RegisterValues(ids, height)
 	if errors.Is(err, storage.ErrHeightNotIndexed) {
-		return nil, status.Errorf(codes.OutOfRange, "register values for block %d is not available yet", height)
+		return nil, status.Errorf(codes.OutOfRange, "register values for block %d is not available", height)
 	}
 	if errors.Is(err, storage.ErrNotFound) {
 		return nil, status.Errorf(codes.NotFound, "register values for block %d is not available", height)

@@ -335,7 +335,7 @@ func MessagesToRegisterIDs(m []*entities.RegisterID) (flow.RegisterIDs, error) {
 	for i, entry := range m {
 		regId, err := MessageToRegisterID(entry)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to convert register id %d: %w", i, err)
 		}
 		result[i] = regId
 	}

@@ -53,7 +53,7 @@ func (r *RegistersAsyncStore) RegisterValues(ids flow.RegisterIDs, height uint64
 	for i, regId := range ids {
 		val, err := r.registerIndex.Get(regId, height)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get register value for id %s: %w", regId.String(), err)
+			return nil, fmt.Errorf("failed to get register value for id %d: %w", i, err)
 		}
 		result[i] = val
 	}

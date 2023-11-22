@@ -563,7 +563,8 @@ func TestGetRegisterValues(t *testing.T) {
 
 	t.Run("unavailable registers", func(t *testing.T) {
 		api := ssmock.NewAPI(t)
-		api.On("GetRegisterValues", invalidIDs, testHeight).Return(nil, storage.ErrNotFound)
+		expectedErr := status.Errorf(codes.NotFound, "could not get register values: %v", storage.ErrNotFound)
+		api.On("GetRegisterValues", invalidIDs, testHeight).Return(nil, expectedErr)
 		h := NewHandler(api, flow.Localnet.Chain(), makeConfig(1))
 		unavailableRegisters := make([]*entities.RegisterID, len(invalidIDs))
 		for i, id := range invalidIDs {
@@ -576,13 +577,14 @@ func TestGetRegisterValues(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		_, err := h.GetRegisterValues(ctx, req)
-		require.Equal(t, status.Code(err), codes.Internal)
+		require.Equal(t, status.Code(err), codes.NotFound)
 
 	})
 
 	t.Run("wrong height", func(t *testing.T) {
 		api := ssmock.NewAPI(t)
-		api.On("GetRegisterValues", testIds, testHeight+1).Return(nil, storage.ErrHeightNotIndexed)
+		expectedErr := status.Errorf(codes.OutOfRange, "could not get register values: %v", storage.ErrHeightNotIndexed)
+		api.On("GetRegisterValues", testIds, testHeight+1).Return(nil, expectedErr)
 		h := NewHandler(api, flow.Localnet.Chain(), makeConfig(1))
 		validRegisters := make([]*entities.RegisterID, len(testIds))
 		for i, id := range testIds {
@@ -595,7 +597,7 @@ func TestGetRegisterValues(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		_, err := h.GetRegisterValues(ctx, req)
-		require.Equal(t, status.Code(err), codes.Internal)
+		require.Equal(t, status.Code(err), codes.OutOfRange)
 	})
 
 }
