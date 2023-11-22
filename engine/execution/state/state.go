@@ -21,6 +21,9 @@ import (
 	"github.com/onflow/flow-go/storage/badger/procedure"
 )
 
+var ErrExecutionStatePruned = fmt.Errorf("execution state is pruned")
+var ErrNotExecuted = fmt.Errorf("block not executed")
+
 // ReadOnlyExecutionState allows to read the execution state
 type ReadOnlyExecutionState interface {
 	ScriptExecutionState
@@ -36,8 +39,15 @@ type ReadOnlyExecutionState interface {
 // ScriptExecutionState is a subset of the `state.ExecutionState` interface purposed to only access the state
 // used for script execution and not mutate the execution state of the blockchain.
 type ScriptExecutionState interface {
-	// NewStorageSnapshot creates a new ready-only view at the given state commitment.
-	NewStorageSnapshot(flow.StateCommitment) snapshot.StorageSnapshot
+	// NewStorageSnapshot creates a new ready-only view at the given block.
+	NewStorageSnapshot(commit flow.StateCommitment, blockID flow.Identifier, height uint64) snapshot.StorageSnapshot
+
+	// CreateStorageSnapshot creates a new ready-only view at the given block.
+	// It returns:
+	// - (nil, nil, storage.ErrNotFound) if block is unknown
+	// - (nil, nil, state.ErrNotExecuted) if block is not executed
+	// - (nil, nil, state.ErrExecutionStatePruned) if the execution state has been pruned
+	CreateStorageSnapshot(blockID flow.Identifier) (snapshot.StorageSnapshot, *flow.Header, error)
 
 	// StateCommitmentByBlockID returns the final state commitment for the provided block ID.
 	StateCommitmentByBlockID(context.Context, flow.Identifier) (flow.StateCommitment, error)
@@ -218,29 +228,73 @@ func (storage *LedgerStorageSnapshot) Get(
 
 func (s *state) NewStorageSnapshot(
 	commitment flow.StateCommitment,
+	blockID flow.Identifier,
+	height uint64,
 ) snapshot.StorageSnapshot {
 	return NewLedgerStorageSnapshot(s.ls, commitment)
 }
 
-type RegisterUpdatesHolder interface {
-	UpdatedRegisters() flow.RegisterEntries
+func (s *state) CreateStorageSnapshot(
+	blockID flow.Identifier,
+) (snapshot.StorageSnapshot, *flow.Header, error) {
+	header, err := s.headers.ByBlockID(blockID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("cannot get header by block ID: %w", err)
+	}
+
+	// make sure the block is executed
+	commit, err := s.commits.ByBlockID(blockID)
+	if err != nil {
+		// statecommitment not exists means the block hasn't been executed yet
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, nil, fmt.Errorf("block %v is not executed: %w", blockID, ErrNotExecuted)
+		}
+
+		return nil, header, fmt.Errorf("cannot get commit by block ID: %w", err)
+	}
+
+	// make sure we have trie state for this block
+	if !s.HasState(commit) {
+		return nil, header, fmt.Errorf("state not found for commit %x (block %v): %w", commit, blockID, ErrExecutionStatePruned)
+	}
+
+	return s.NewStorageSnapshot(commit, blockID, header.Height), header, nil
 }
 
-func CommitDelta(ldg ledger.Ledger, ruh RegisterUpdatesHolder, baseState flow.StateCommitment) (flow.StateCommitment, *ledger.TrieUpdate, error) {
-	keys, values := RegisterEntriesToKeysValues(ruh.UpdatedRegisters())
+type RegisterUpdatesHolder interface {
+	UpdatedRegisters() flow.RegisterEntries
+	UpdatedRegisterSet() map[flow.RegisterID]flow.RegisterValue
+}
 
+// CommitDelta takes a base storage snapshot and creates a new storage snapshot
+// with the register updates from the given RegisterUpdatesHolder
+// a new statecommitment is returned from the ledger, along with the trie update
+// any error returned are exceptions
+func CommitDelta(
+	ldg ledger.Ledger,
+	ruh RegisterUpdatesHolder,
+	baseStorageSnapshot execution.ExtendableStorageSnapshot,
+) (flow.StateCommitment, *ledger.TrieUpdate, execution.ExtendableStorageSnapshot, error) {
+
+	updatedRegisters := ruh.UpdatedRegisters()
+	keys, values := RegisterEntriesToKeysValues(updatedRegisters)
+	baseState := baseStorageSnapshot.Commitment()
 	update, err := ledger.NewUpdate(ledger.State(baseState), keys, values)
 
 	if err != nil {
-		return flow.DummyStateCommitment, nil, fmt.Errorf("cannot create ledger update: %w", err)
+		return flow.DummyStateCommitment, nil, nil, fmt.Errorf("cannot create ledger update: %w", err)
 	}
 
-	commit, trieUpdate, err := ldg.Set(update)
+	newState, trieUpdate, err := ldg.Set(update)
 	if err != nil {
-		return flow.DummyStateCommitment, nil, err
+		return flow.DummyStateCommitment, nil, nil, fmt.Errorf("could not update ledger: %w", err)
 	}
 
-	return flow.StateCommitment(commit), trieUpdate, nil
+	newCommit := flow.StateCommitment(newState)
+
+	newStorageSnapshot := baseStorageSnapshot.Extend(newCommit, ruh.UpdatedRegisterSet())
+
+	return newCommit, trieUpdate, newStorageSnapshot, nil
 }
 
 func (s *state) HasState(commitment flow.StateCommitment) bool {
