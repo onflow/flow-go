@@ -10,6 +10,7 @@ import (
 	entitiesproto "github.com/onflow/flow/protobuf/go/flow/entities"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
+	"github.com/sony/gobreaker"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -1976,6 +1977,55 @@ func (suite *Suite) TestGetTransactionResultByIndexAndBlockIdEventEncodingVersio
 			}
 		})
 	}
+}
+
+// TestNodeCommunicator tests special case for node communicator, when only one node available and communicator gets
+// gobreaker.ErrOpenState
+func (suite *Suite) TestNodeCommunicator() {
+	head := unittest.BlockHeaderFixture()
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+	suite.snapshot.On("Head").Return(head, nil).Maybe()
+
+	ctx := context.Background()
+	block := unittest.BlockFixture()
+	blockId := block.ID()
+
+	// block storage returns the corresponding block
+	suite.blocks.
+		On("ByID", blockId).
+		Return(&block, nil)
+
+	_, fixedENIDs := suite.setupReceipts(&block)
+	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
+	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
+
+	// create a mock connection factory
+	connFactory := connectionmock.NewConnectionFactory(suite.T())
+	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+
+	exeEventReq := &execproto.GetTransactionsByBlockIDRequest{
+		BlockId: blockId[:],
+	}
+
+	params := suite.defaultBackendParams()
+	// the connection factory should be used to get the execution node client
+	params.ConnFactory = connFactory
+	params.FixedExecutionNodeIDs = (fixedENIDs.NodeIDs()).Strings()
+	// Left only one preferred execution node
+	params.PreferredExecutionNodeIDs = []string{fixedENIDs[0].NodeID.String()}
+
+	backend, err := New(params)
+	suite.Require().NoError(err)
+
+	// Simulate closed circuit breaker error
+	suite.execClient.
+		On("GetTransactionResultsByBlockID", ctx, exeEventReq).
+		Return(nil, gobreaker.ErrOpenState).
+		Once()
+
+	result, err := backend.GetTransactionResultsByBlockID(ctx, blockId, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+	suite.Assert().Nil(result)
+	suite.Assert().Error(err)
 }
 
 func (suite *Suite) assertAllExpectations() {
