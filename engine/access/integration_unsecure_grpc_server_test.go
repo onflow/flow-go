@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/module/execution"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	executiondataproto "github.com/onflow/flow/protobuf/go/flow/executiondata"
 	"github.com/rs/zerolog"
@@ -67,6 +68,7 @@ type SameGRPCPortTestSuite struct {
 	receipts     *storagemock.ExecutionReceipts
 	seals        *storagemock.Seals
 	results      *storagemock.ExecutionResults
+	registers    *execution.RegistersAsyncStore
 
 	ctx    irrecoverable.SignalerContext
 	cancel context.CancelFunc
@@ -90,6 +92,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
 	params := new(protocol.Params)
+	suite.registers = execution.NewRegistersAsyncStore()
 
 	suite.epochQuery = new(protocol.EpochQuery)
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
@@ -245,6 +248,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		nil,
 		rootBlock.Header.Height,
 		rootBlock.Header.Height,
+		suite.registers,
 	)
 	assert.NoError(suite.T(), err)
 

@@ -196,7 +196,7 @@ func TestMessageToRegisterIDs(t *testing.T) {
 			registerIDMessage := convert.RegisterIDToMessage(test.regID)
 			reConvertedRegisterID, err := convert.MessageToRegisterID(registerIDMessage)
 			require.NoError(t, err)
-			assert.Equal(t, test.regID, *reConvertedRegisterID)
+			assert.Equal(t, test.regID, reConvertedRegisterID)
 		})
 	}
 	_, err := convert.MessageToRegisterID(nil)
