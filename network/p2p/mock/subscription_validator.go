@@ -4,9 +4,9 @@ package mockp2p
 
 import (
 	flow "github.com/onflow/flow-go/model/flow"
-	mock "github.com/stretchr/testify/mock"
+	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
 
-	p2p "github.com/onflow/flow-go/network/p2p"
+	mock "github.com/stretchr/testify/mock"
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
 )
@@ -30,18 +30,41 @@ func (_m *SubscriptionValidator) CheckSubscribedToAllowedTopics(pid peer.ID, rol
 	return r0
 }
 
-// RegisterSubscriptionProvider provides a mock function with given fields: provider
-func (_m *SubscriptionValidator) RegisterSubscriptionProvider(provider p2p.SubscriptionProvider) error {
-	ret := _m.Called(provider)
+// Done provides a mock function with given fields:
+func (_m *SubscriptionValidator) Done() <-chan struct{} {
+	ret := _m.Called()
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(p2p.SubscriptionProvider) error); ok {
-		r0 = rf(provider)
+	var r0 <-chan struct{}
+	if rf, ok := ret.Get(0).(func() <-chan struct{}); ok {
+		r0 = rf()
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(<-chan struct{})
+		}
 	}
 
 	return r0
+}
+
+// Ready provides a mock function with given fields:
+func (_m *SubscriptionValidator) Ready() <-chan struct{} {
+	ret := _m.Called()
+
+	var r0 <-chan struct{}
+	if rf, ok := ret.Get(0).(func() <-chan struct{}); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(<-chan struct{})
+		}
+	}
+
+	return r0
+}
+
+// Start provides a mock function with given fields: _a0
+func (_m *SubscriptionValidator) Start(_a0 irrecoverable.SignalerContext) {
+	_m.Called(_a0)
 }
 
 type mockConstructorTestingTNewSubscriptionValidator interface {

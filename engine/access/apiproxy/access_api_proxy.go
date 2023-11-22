@@ -42,6 +42,16 @@ func (h *FlowAccessAPIRouter) log(handler, rpc string, err error) {
 	logger.Info().Msg("request succeeded")
 }
 
+// TODO: this is implemented in https://github.com/onflow/flow-go/pull/4957, remove when merged
+func (h *FlowAccessAPIRouter) GetProtocolStateSnapshotByBlockID(ctx context.Context, request *access.GetProtocolStateSnapshotByBlockIDRequest) (*access.ProtocolStateSnapshotResponse, error) {
+	panic("implement me")
+}
+
+// TODO: this is implemented in https://github.com/onflow/flow-go/pull/4957, remove when merged
+func (h *FlowAccessAPIRouter) GetProtocolStateSnapshotByHeight(ctx context.Context, request *access.GetProtocolStateSnapshotByHeightRequest) (*access.ProtocolStateSnapshotResponse, error) {
+	panic("implement me")
+}
+
 // Ping pings the service. It is special in the sense that it responds successful,
 // only if all underlying services are ready.
 func (h *FlowAccessAPIRouter) Ping(context context.Context, req *access.PingRequest) (*access.PingResponse, error) {
@@ -129,6 +139,18 @@ func (h *FlowAccessAPIRouter) GetTransactionsByBlockID(context context.Context, 
 
 func (h *FlowAccessAPIRouter) GetTransactionResultByIndex(context context.Context, req *access.GetTransactionByIndexRequest) (*access.TransactionResultResponse, error) {
 	res, err := h.Upstream.GetTransactionResultByIndex(context, req)
+	h.log("upstream", "GetTransactionResultByIndex", err)
+	return res, err
+}
+
+func (h *FlowAccessAPIRouter) GetSystemTransaction(context context.Context, req *access.GetSystemTransactionRequest) (*access.TransactionResponse, error) {
+	res, err := h.Upstream.GetSystemTransaction(context, req)
+	h.log("upstream", "GetTransactionResultByIndex", err)
+	return res, err
+}
+
+func (h *FlowAccessAPIRouter) GetSystemTransactionResult(context context.Context, req *access.GetSystemTransactionResultRequest) (*access.TransactionResultResponse, error) {
+	res, err := h.Upstream.GetSystemTransactionResult(context, req)
 	h.log("upstream", "GetTransactionResultByIndex", err)
 	return res, err
 }
@@ -329,6 +351,24 @@ func (h *FlowAccessAPIForwarder) GetTransactionResult(context context.Context, r
 		return nil, err
 	}
 	return upstream.GetTransactionResult(context, req)
+}
+
+func (h *FlowAccessAPIForwarder) GetSystemTransaction(context context.Context, req *access.GetSystemTransactionRequest) (*access.TransactionResponse, error) {
+	// This is a passthrough request
+	upstream, err := h.FaultTolerantClient()
+	if err != nil {
+		return nil, err
+	}
+	return upstream.GetSystemTransaction(context, req)
+}
+
+func (h *FlowAccessAPIForwarder) GetSystemTransactionResult(context context.Context, req *access.GetSystemTransactionResultRequest) (*access.TransactionResultResponse, error) {
+	// This is a passthrough request
+	upstream, err := h.FaultTolerantClient()
+	if err != nil {
+		return nil, err
+	}
+	return upstream.GetSystemTransactionResult(context, req)
 }
 
 func (h *FlowAccessAPIForwarder) GetTransactionResultByIndex(context context.Context, req *access.GetTransactionByIndexRequest) (*access.TransactionResultResponse, error) {

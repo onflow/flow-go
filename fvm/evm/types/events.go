@@ -1,6 +1,7 @@
 package types
 
 import (
+	gethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -9,8 +10,6 @@ import (
 const (
 	EventTypeBlockExecuted       flow.EventType = "evm.BlockExecuted"
 	EventTypeTransactionExecuted flow.EventType = "evm.TransactionExecuted"
-	EventTypeFlowTokenDeposit    flow.EventType = "evm.FlowTokenDeposit"
-	EventTypeFlowTokenWithdrawal flow.EventType = "evm.FlowTokenWithdrawal"
 )
 
 type EventPayload interface {
@@ -22,37 +21,11 @@ type Event struct {
 	Payload EventPayload
 }
 
-type FlowTokenEventPayload struct {
-	Address Address
-	Amount  Balance
-}
-
-func (p *FlowTokenEventPayload) Encode() ([]byte, error) {
-	return rlp.EncodeToBytes(p)
-}
-
-func NewFlowTokenDepositEvent(address Address, amount Balance) *Event {
-	return &Event{
-		Etype: EventTypeFlowTokenDeposit,
-		Payload: &FlowTokenEventPayload{
-			Address: address,
-			Amount:  amount,
-		},
-	}
-}
-
-func NewFlowTokenWithdrawalEvent(address Address, amount Balance) *Event {
-	return &Event{
-		Etype: EventTypeFlowTokenWithdrawal,
-		Payload: &FlowTokenEventPayload{
-			Address: address,
-			Amount:  amount,
-		},
-	}
-}
-
+// we might break this event into two (tx included /tx executed) if size becomes an issue
 type TransactionExecutedPayload struct {
 	BlockHeight uint64
+	TxEncoded   []byte
+	TxHash      gethCommon.Hash
 	Result      *Result
 }
 
@@ -62,12 +35,16 @@ func (p *TransactionExecutedPayload) Encode() ([]byte, error) {
 
 func NewTransactionExecutedEvent(
 	height uint64,
+	txEncoded []byte,
+	txHash gethCommon.Hash,
 	result *Result,
 ) *Event {
 	return &Event{
 		Etype: EventTypeTransactionExecuted,
 		Payload: &TransactionExecutedPayload{
 			BlockHeight: height,
+			TxEncoded:   txEncoded,
+			TxHash:      txHash,
 			Result:      result,
 		},
 	}

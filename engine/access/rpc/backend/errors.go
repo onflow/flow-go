@@ -21,4 +21,3 @@ func IsInsufficientExecutionReceipts(err error) bool {
 	var errInsufficientExecutionReceipts InsufficientExecutionReceipts
 	return errors.As(err, &errInsufficientExecutionReceipts)
 }
-

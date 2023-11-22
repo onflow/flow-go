@@ -7,7 +7,10 @@ import (
 	"github.com/onflow/cadence"
 )
 
-var SmallestAcceptableBalanceValueInAttoFlow = new(big.Int).SetInt64(1e10)
+var (
+	SmallestAcceptableBalanceValueInAttoFlow = new(big.Int).SetInt64(1e10)
+	OneFlowInAttoFlow                        = new(big.Int).SetInt64(1e18)
+)
 
 // Balance represents the balance of an address
 // in the evm environment, balances are kept in attoflow (1e10^-18 flow),
