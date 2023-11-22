@@ -151,7 +151,7 @@ func (s *AccessAPISuite) TestScriptExecutionAndGetAccountsAN1() {
 	// deploy the test contract
 	txResult := s.deployContract()
 	targetHeight := txResult.BlockHeight + 1
-	s.log.Error().Msg("LOG:target height is %d", targetHeight)
+	s.log.Error().Msgf("LOG:target height is %d", targetHeight)
 	s.waitUntilIndexed(targetHeight)
 	s.log.Error().Msg("LOG:out of waitUntil")
 
