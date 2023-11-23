@@ -71,6 +71,7 @@ func GetSimpleValueStore() *TestValueStore {
 			binary.BigEndian.PutUint64(data[:], index)
 			return atree.StorageIndex(data), nil
 		},
+		Data: data,
 	}
 }
 
@@ -118,6 +119,7 @@ type TestValueStore struct {
 	SetValueFunc             func(owner, key, value []byte) error
 	ValueExistsFunc          func(owner, key []byte) (bool, error)
 	AllocateStorageIndexFunc func(owner []byte) (atree.StorageIndex, error)
+	Data                     map[string][]byte
 }
 
 var _ environment.ValueStore = &TestValueStore{}
