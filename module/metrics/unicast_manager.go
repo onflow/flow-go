@@ -120,6 +120,22 @@ func NewUnicastManagerMetrics(prefix string) *UnicastManagerMetrics {
 		},
 	)
 
+	uc.streamCreationRetryBudgetResetToDefault = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
+			Name:      uc.prefix + "stream_creation_retry_budget_reset_to_default_total",
+			Help:      "the number of times the stream creation retry budget is reset to default by the unicast manager",
+		})
+
+	uc.dialRetryBudgetResetToDefault = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
+			Name:      uc.prefix + "dial_retry_budget_reset_to_default_total",
+			Help:      "the number of times the dial retry budget is reset to default by the unicast manager",
+		})
+
 	return uc
 }
 

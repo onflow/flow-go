@@ -139,8 +139,7 @@ func (h *ContractHandler) emitEvent(event *types.Event) {
 	// TODO add extra metering for rlp encoding
 	encoded, err := event.Payload.Encode()
 	handleError(err)
-
-	err = h.backend.EmitFlowEvent(event.Etype, encoded)
+	err = h.backend.EmitRawEvent(event.Etype, encoded)
 	handleError(err)
 }
 
