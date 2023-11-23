@@ -17,6 +17,12 @@ on:
   merge_group:
     branches:
       - master
+  workflow_dispatch:
+    inputs:
+      custom_runners:
+        description: 'Run custom runners integration jobs (true/false)'
+        required: true
+        default: 'false'
 
 env:
   GO_VERSION: "1.20"
@@ -438,7 +444,18 @@ jobs:
         for f in *.tar; do
           docker load -i $f
         done
-    - name: Run tests (${{ matrix.name }})
+    - name: Run tests (${{ matrix.name }}) - Default Runner
+      if: matrix.runner == 'ubuntu-latest'
+      # TODO(rbtz): re-enable when we fix exisiting races.
+      #env:
+      #  RACE_DETECTOR: 1
+      uses: nick-fields/retry@v2
+      with:
+        timeout_minutes: 35
+        max_attempts: 5
+        command: VERBOSE=1 ${{ matrix.make }}
+    - name: Run tests (${{ matrix.name }}) - Custom Runner
+      if: matrix.runner != 'ubuntu-latest' && github.event.inputs.custom_runner == 'true'
       # TODO(rbtz): re-enable when we fix exisiting races.
       #env:
       #  RACE_DETECTOR: 1
