@@ -1056,7 +1056,7 @@ func (exeNode *ExecutionNode) LoadReceiptProviderEngine(
 		exeNode.exeConf.receiptRequestWorkers,
 		channels.ProvideReceiptsByBlockID,
 		filter.And(
-			filter.IsValidCurrentEpochParticipant,
+			filter.IsValidCurrentEpochParticipantOrJoining,
 			filter.HasRole[flow.Identity](flow.RoleConsensus),
 		),
 		retrieve,

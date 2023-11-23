@@ -116,6 +116,9 @@ func HasRole[T flow.GenericIdentity](roles ...flow.Role) flow.IdentityFilter[T] 
 // Effective it means that node is an active identity in current epoch and has not been ejected.
 var IsValidCurrentEpochParticipant = HasParticipationStatus(flow.EpochParticipationStatusActive)
 
+// IsValidCurrentEpochParticipantOrJoining is an identity filter for members of the current epoch or that are going to join in next epoch.
+var IsValidCurrentEpochParticipantOrJoining = Or(IsValidCurrentEpochParticipant, HasParticipationStatus(flow.EpochParticipationStatusJoining))
+
 // IsConsensusCommitteeMember is an identity filter for all members of the consensus committee.
 // Formally, a Node X is a Consensus Committee Member if and only if X is a consensus node with
 // positive initial stake. This is specified by the EpochSetup Event and remains static

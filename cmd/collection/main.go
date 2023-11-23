@@ -427,7 +427,7 @@ func main() {
 				collectionProviderWorkers,
 				channels.ProvideCollections,
 				filter.And(
-					filter.IsValidCurrentEpochParticipant,
+					filter.IsValidCurrentEpochParticipantOrJoining,
 					filter.HasRole[flow.Identity](flow.RoleAccess, flow.RoleExecution),
 				),
 				retrieve,
