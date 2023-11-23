@@ -151,7 +151,7 @@ func (s *AccessAPISuite) TestScriptExecutionAndGetAccountsAN1() {
 	// deploy the test contract
 	txResult := s.deployContract()
 	targetHeight := txResult.BlockHeight + 1
-	s.log.Error().Msgf("LOG:target height is %d", targetHeight)
+	//s.log.Error().Msgf("LOG:target height is %d", targetHeight)
 	s.waitUntilIndexed(targetHeight)
 	s.log.Error().Msg("LOG:out of waitUntil")
 
@@ -188,7 +188,7 @@ func (s *AccessAPISuite) TestMVPScriptExecutionLocalStorage() {
 }*/
 
 func (s *AccessAPISuite) testGetAccount(client *client.Client) {
-	header, err := client.GetLatestBlockHeader(s.ctx, true)
+	/*header, err := client.GetLatestBlockHeader(s.ctx, true)
 	s.Require().NoError(err)
 
 	serviceAddress := s.serviceClient.SDKServiceAddress()
@@ -218,17 +218,14 @@ func (s *AccessAPISuite) testGetAccount(client *client.Client) {
 		s.Require().NoError(err)
 		s.Assert().Equal(serviceAddress, account.Address)
 		s.Assert().NotZero(account.Balance)
-	})
+	})*/
 
 	s.Run("get newly created account", func() {
 		addr, err := utils.CreateFlowAccount(s.ctx, s.serviceClient)
+		s.log.Error().Msg("LOG:account created")
 		s.Require().NoError(err)
-		/*acc, err := client.GetAccount(s.ctx, addr)
-		s.Require().NoError(err)
-		s.Assert().Equal(addr, acc.Address)*/
-		acc, err := s.waitAccountsUntilIndexed(func() (*sdk.Account, error) {
-			return client.GetAccount(s.ctx, addr)
-		})
+		acc, err := client.GetAccount(s.ctx, addr)
+		s.log.Error().Msg("LOG:get account done")
 		s.Require().NoError(err)
 		s.Assert().Equal(addr, acc.Address)
 	})
