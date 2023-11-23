@@ -5,14 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
-	"testing"
-	"time"
-
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
+	"net/http"
+	"testing"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -40,8 +38,6 @@ type ObserverSuite struct {
 
 	cancel context.CancelFunc
 }
-
-var requestTimeout = 1500 * time.Millisecond
 
 func (s *ObserverSuite) TearDownTest() {
 	if s.net != nil {
@@ -81,7 +77,6 @@ func (s *ObserverSuite) SetupTest() {
 
 		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.InfoLevel),
 			testnet.WithAdditionalFlag("--supports-observer=true"),
-			testnet.WithAdditionalFlag(fmt.Sprintf("--collection-client-timeout=%s", requestTimeout.String())),
 		),
 
 		// need one dummy execution node
