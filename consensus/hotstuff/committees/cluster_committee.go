@@ -189,8 +189,8 @@ func (c *Cluster) DKG(_ uint64) (hotstuff.DKG, error) {
 //     node ejection is also mediated by system smart contracts and delivered via service events.
 //   - Therefore, the EpochSetup event contains the up-to-date snapshot of the cluster members. Any node ejection
 //     that happened before should be reflected in the EpochSetup event. Specifically, ejected nodes
-//     should be no longer listed in the EpochSetup event. Hence, when the EpochSetup event is emitted / processed, the participation status of
-//     all cluster members equals flow.EpochParticipationStatusActive.
+//     should be no longer listed in the EpochSetup event. Hence, when the EpochSetup event is emitted / processed,
+//     the participation status of all cluster members equals flow.EpochParticipationStatusActive.
 func constructInitialClusterIdentities(clusterMembers flow.IdentitySkeletonList) flow.IdentityList {
 	initialClusterIdentities := make(flow.IdentityList, 0, len(clusterMembers))
 	for _, skeleton := range clusterMembers {
