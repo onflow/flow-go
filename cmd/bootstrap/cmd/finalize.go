@@ -701,16 +701,18 @@ func validateEpochTimingConfig() error {
 		flagEpochTargetEndTimeDuration = flagNumViewsInEpoch
 		flagEpochTargetEndTimeRefTimestamp = uint64(time.Now().Unix()) + flagNumViewsInEpoch
 
+		// compute target end time for initial (root) epoch from flags
 		rootEpochTargetEndTimeUNIX := epochTargetEndTime()
 		rootEpochTargetEndTime := time.Unix(int64(rootEpochTargetEndTimeUNIX), 0)
 		log.Info().Msgf("using default epoch timing config with root epoch target end time %s, which is in %s", rootEpochTargetEndTime, time.Until(rootEpochTargetEndTime))
 	} else {
 		// All other flags must be set
-		// NOTE: it is valid for refCounter to be set to 0
+		// NOTE: it is valid for flagEpochTargetEndTimeRefCounter to be set to 0
 		if flagEpochTargetEndTimeRefTimestamp == 0 || flagEpochTargetEndTimeDuration == 0 {
 			return fmt.Errorf("invalid epoch timing config: must specify ALL of --epoch-target-end-time-ref-counter, --epoch-target-end-time-ref-timestamp, and --epoch-target-end-time-duration")
 		}
 
+		// compute target end time for initial (root) epoch from flags
 		rootEpochTargetEndTimeUNIX := epochTargetEndTime()
 		rootEpochTargetEndTime := time.Unix(int64(rootEpochTargetEndTimeUNIX), 0)
 		log.Info().Msgf("using user-specified epoch timing config with root epoch target end time %s, which is in %s", rootEpochTargetEndTime, time.Until(rootEpochTargetEndTime))
