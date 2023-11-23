@@ -328,7 +328,7 @@ jobs:
           key: flow-docker-images-execution-${{ github.run_id }}
 
   docker-build-ghost:
-    uses: ./.github/workflows/docker-build.yml
+    uses: on-flow/flow-go/.github/workflows/docker-build.yml
     with:
       name: ghost
       make: docker-build-ghost
