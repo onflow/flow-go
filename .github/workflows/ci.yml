@@ -222,6 +222,13 @@ jobs:
       name: access
       make: docker-build-access
 
+  docker-build-access-corrupt:
+    name: Docker Build Corrupt Access
+    uses: ./.github/workflows/docker-build.yml
+    with:
+      name: access-corrupt
+      make: docker-build-access-corrupt
+
   docker-build-collection:
     name: Docker Build Collection
     uses: ./.github/workflows/docker-build.yml
@@ -286,7 +293,6 @@ jobs:
       - name: Save Docker images
         run: |
           docker save \
-          gcr.io/flow-container-registry/access-corrupted:latest \
           gcr.io/flow-container-registry/execution-corrupted:latest \
           gcr.io/flow-container-registry/verification-corrupted:latest > flow-docker-images2.tar
       - name: Cache Docker images 2
@@ -298,7 +304,7 @@ jobs:
 
   integration-test:
     name: Integration Tests
-    needs: [docker-build-access, docker-build-collection, docker-build-consensus, docker-build-execution, docker-build-ghost, docker-build-observer, docker-build-verification, docker-build2]
+    needs: [docker-build-access, docker-build-access-corrupt, docker-build-collection, docker-build-consensus, docker-build-execution, docker-build-ghost, docker-build-observer, docker-build-verification, docker-build2]
     strategy:
       fail-fast: false
       matrix:
@@ -319,9 +325,11 @@ jobs:
           - name: BFT (Protocol) Integration Tests
             make: make -C integration bft-protocol-tests
             runner: buildjet-4vcpu-ubuntu-2204
+            corrupt: true
           - name: BFT (Gossipsub) Integration Tests
             make: make -C integration bft-gossipsub-tests
             runner: ubuntu-latest
+            corrupt: true
           - name: Collection Integration Tests
             make: make -C integration collection-tests
             runner: ubuntu-latest
@@ -371,6 +379,14 @@ jobs:
       with:
         path: flow-docker-access.tar
         key: flow-docker-images-access-${{ github.run_id }}
+
+    - name: Load cached Corrupt Access Docker image
+      if: ${{ matrix.corrupt }} == true
+      uses: actions/cache@v3
+      with:
+        path: flow-docker-access-corrupt.tar
+        key: flow-docker-images-access-corrupt-${{ github.run_id }}
+
     - name: Load cached Collection Docker image
       uses: actions/cache@v3
       with:

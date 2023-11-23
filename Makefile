@@ -463,7 +463,7 @@ docker-build-flow: docker-build-collection docker-build-consensus docker-build-e
 docker-build-flow-without-netgo: docker-build-collection-without-netgo docker-build-consensus-without-netgo docker-build-execution-without-netgo docker-build-verification-without-netgo docker-build-access-without-netgo docker-build-observer-without-netgo
 
 .PHONY: docker-build-flow-corrupt
-docker-build-flow-corrupt: docker-build-execution-corrupt docker-build-verification-corrupt docker-build-access-corrupt
+docker-build-flow-corrupt: docker-build-access-corrupt docker-build-execution-corrupt docker-build-verification-corrupt
 
 .PHONY: docker-build-benchnet
 docker-build-benchnet: docker-build-flow docker-build-loader
