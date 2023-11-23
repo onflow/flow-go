@@ -194,19 +194,19 @@ func createFlowAccount(ctx context.Context, client *testnet.Client, log zerolog.
 		SetHashAlgo(sdkcrypto.SHA2_256).
 		SetWeight(sdk.AccountKeyWeightThreshold)
 
-	s.log.Error().Msg("LOG:before latest block")
+	log.Error().Msg("LOG:before latest block")
 	latestBlockID, err := client.GetLatestBlockID(ctx)
 	if err != nil {
 		return sdk.EmptyAddress, fmt.Errorf("failed to get latest block id: %w", err)
 	}
-	s.log.Error().Msgf("LOG: latest block %d", latestBlockID.Height())
+	log.Error().Msgf("LOG: latest block %d", latestBlockID.Height())
 
 	// createAccount will submit a create account transaction and wait for it to be sealed
 	addr, err := client.CreateAccount(ctx, fullAccountKey, sdk.Identifier(latestBlockID))
 	if err != nil {
 		return sdk.EmptyAddress, fmt.Errorf("failed to create account: %w", err)
 	}
-	s.log.Error().Msgf("LOG: account created in function")
+	log.Error().Msgf("LOG: account created in function")
 
 	return addr, nil
 }
