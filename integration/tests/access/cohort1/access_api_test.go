@@ -213,8 +213,8 @@ func createFlowAccount(ctx context.Context, client *testnet.Client, log zerolog.
 }
 
 func (s *AccessAPISuite) testGetAccount(client *client.Client) {
-	/*header, err := client.GetLatestBlockHeader(s.ctx, true)
-	s.Require().NoError(err)
+	//header, err := client.GetLatestBlockHeader(s.ctx, true)
+	//s.Require().NoError(err)
 
 	serviceAddress := s.serviceClient.SDKServiceAddress()
 
@@ -227,7 +227,7 @@ func (s *AccessAPISuite) testGetAccount(client *client.Client) {
 		s.Assert().NotZero(account.Balance)
 	})
 
-	s.Run("get account block ID", func() {
+	/*s.Run("get account block ID", func() {
 		account, err := s.waitAccountsUntilIndexed(func() (*sdk.Account, error) {
 			return client.GetAccountAtLatestBlock(s.ctx, serviceAddress)
 		})
