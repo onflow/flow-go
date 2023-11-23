@@ -3,10 +3,14 @@ package backend
 import (
 	"context"
 	"fmt"
-
 	"github.com/dgraph-io/badger/v2"
+	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	"github.com/onflow/flow-go/fvm/blueprints"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
+	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
@@ -40,8 +44,8 @@ func (suite *Suite) withPreConfiguredState(f func(snap protocol.Snapshot)) {
 			suite.state.On("AtHeight", epoch1.Range()).Return(state.AtHeight(height))
 		}
 
-		snap := state.AtHeight(epoch1.Range()[0])
-		suite.state.On("Final").Return(snap).Once()
+		snap := state.AtHeight(epoch1.FinalHeight())
+		suite.state.On("Final").Return(snap)
 		suite.communicator.On("CallAvailableNode",
 			mock.Anything,
 			mock.Anything,
@@ -326,5 +330,196 @@ func (suite *Suite) TestGetTransactionResultUnknownFromCache() {
 		suite.Require().Equal(uint(flow.TransactionStatusUnknown), resp2.StatusCode)
 
 		suite.historicalAccessClient.AssertExpectations(suite.T())
+	})
+}
+
+// TestGetSystemTransaction_HappyPath returns system transaction using GetSystemTransaction call
+func (suite *Suite) TestGetSystemTransaction_HappyPath() {
+	suite.withPreConfiguredState(func(snap protocol.Snapshot) {
+		suite.state.On("Sealed").Return(snap, nil).Maybe()
+
+		params := suite.defaultBackendParams()
+		backend, err := New(params)
+		suite.Require().NoError(err)
+
+		res, err := backend.GetSystemTransaction(context.Background())
+		suite.Require().NoError(err)
+
+		systemTx, err := blueprints.SystemChunkTransaction(suite.chainID.Chain())
+		suite.Require().NoError(err)
+
+		suite.Require().Equal(systemTx, res)
+	})
+}
+
+// TestGetSystemTransactionResult_HappyPath returns system transaction result for required block id
+func (suite *Suite) TestGetSystemTransactionResult_HappyPath() {
+	suite.withPreConfiguredState(func(snap protocol.Snapshot) {
+		suite.state.On("Sealed").Return(snap, nil).Maybe()
+		lastBlock, err := snap.Head()
+		suite.Require().NoError(err)
+		identities, err := snap.Identities(filter.Any)
+		suite.Require().NoError(err)
+
+		block := unittest.BlockWithParentFixture(lastBlock)
+		blockID := block.ID()
+		suite.state.On("AtBlockID", blockID).Return(
+			unittest.StateSnapshotForKnownBlock(block.Header, identities.Lookup()), nil).Once()
+
+		suite.blocks.
+			On("ByID", blockID).
+			Return(block, nil).
+			Once()
+
+		receipt1 := unittest.ReceiptForBlockFixture(block)
+		suite.receipts.
+			On("ByBlockID", block.ID()).
+			Return(flow.ExecutionReceiptList{receipt1}, nil)
+
+		params := suite.defaultBackendParams()
+		connFactory := connectionmock.NewConnectionFactory(suite.T())
+		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+		params.ConnFactory = connFactory
+
+		exeEventReq := &execproto.GetTransactionsByBlockIDRequest{
+			BlockId: blockID[:],
+		}
+
+		eventsPerBlock := 10
+		eventMessages := make([]*entities.Event, eventsPerBlock)
+
+		exeEventResp := &execproto.GetTransactionResultsResponse{
+			TransactionResults: []*execproto.GetTransactionResultResponse{{
+				Events:               eventMessages,
+				EventEncodingVersion: entities.EventEncodingVersion_JSON_CDC_V0,
+			}},
+		}
+
+		suite.execClient.
+			On("GetTransactionResultsByBlockID", mock.Anything, exeEventReq).
+			Return(exeEventResp, nil).
+			Once()
+
+		backend, err := New(params)
+		suite.Require().NoError(err)
+
+		res, err := backend.GetSystemTransactionResult(
+			context.Background(),
+			block.ID(),
+			entities.EventEncodingVersion_JSON_CDC_V0,
+		)
+		suite.Require().NoError(err)
+
+		systemTx, err := blueprints.SystemChunkTransaction(suite.chainID.Chain())
+		suite.Require().NoError(err)
+
+		suite.Require().Equal(flow.TransactionStatusExecuted, res.Status)
+		suite.Require().Equal(systemTx.ID(), res.TransactionID)
+		suite.Require().Equal(convert.MessagesToEvents(eventMessages), res.Events)
+	})
+}
+
+// TestGetSystemTransactionResult_BlockNotFound returns err key not found when block not found
+func (suite *Suite) TestGetSystemTransactionResult_BlockNotFound() {
+	suite.withPreConfiguredState(func(snap protocol.Snapshot) {
+		suite.state.On("Sealed").Return(snap, nil).Maybe()
+		lastBlock, err := snap.Head()
+		suite.Require().NoError(err)
+		identities, err := snap.Identities(filter.Any)
+		suite.Require().NoError(err)
+
+		block := unittest.BlockWithParentFixture(lastBlock)
+		blockID := block.ID()
+		suite.state.On("AtBlockID", blockID).Return(
+			unittest.StateSnapshotForKnownBlock(block.Header, identities.Lookup()), nil).Once()
+
+		suite.blocks.
+			On("ByID", blockID).
+			Return(nil, storage.ErrNotFound).
+			Once()
+
+		receipt1 := unittest.ReceiptForBlockFixture(block)
+		suite.receipts.
+			On("ByBlockID", block.ID()).
+			Return(flow.ExecutionReceiptList{receipt1}, nil)
+
+		params := suite.defaultBackendParams()
+
+		backend, err := New(params)
+		suite.Require().NoError(err)
+
+		res, err := backend.GetSystemTransactionResult(
+			context.Background(),
+			block.ID(),
+			entities.EventEncodingVersion_JSON_CDC_V0,
+		)
+
+		suite.Require().Nil(res)
+		suite.Require().Error(err)
+		suite.Require().Equal(err, status.Errorf(codes.NotFound, "not found: %v", fmt.Errorf("key not found")))
+	})
+}
+
+// TestGetSystemTransactionResult_FailedEncodingConversion returns err failed to convert events from system tx result
+// when passing wrong format
+func (suite *Suite) TestGetSystemTransactionResult_FailedEncodingConversion() {
+	suite.withPreConfiguredState(func(snap protocol.Snapshot) {
+		suite.state.On("Sealed").Return(snap, nil).Maybe()
+		lastBlock, err := snap.Head()
+		suite.Require().NoError(err)
+		identities, err := snap.Identities(filter.Any)
+		suite.Require().NoError(err)
+
+		block := unittest.BlockWithParentFixture(lastBlock)
+		blockID := block.ID()
+		suite.state.On("AtBlockID", blockID).Return(
+			unittest.StateSnapshotForKnownBlock(block.Header, identities.Lookup()), nil).Once()
+
+		suite.blocks.
+			On("ByID", blockID).
+			Return(block, nil).
+			Once()
+
+		receipt1 := unittest.ReceiptForBlockFixture(block)
+		suite.receipts.
+			On("ByBlockID", block.ID()).
+			Return(flow.ExecutionReceiptList{receipt1}, nil)
+
+		params := suite.defaultBackendParams()
+		connFactory := connectionmock.NewConnectionFactory(suite.T())
+		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+		params.ConnFactory = connFactory
+
+		exeEventReq := &execproto.GetTransactionsByBlockIDRequest{
+			BlockId: blockID[:],
+		}
+
+		eventsPerBlock := 10
+		eventMessages := make([]*entities.Event, eventsPerBlock)
+
+		exeEventResp := &execproto.GetTransactionResultsResponse{
+			TransactionResults: []*execproto.GetTransactionResultResponse{{
+				Events:               eventMessages,
+				EventEncodingVersion: entities.EventEncodingVersion_JSON_CDC_V0,
+			}},
+		}
+
+		suite.execClient.
+			On("GetTransactionResultsByBlockID", mock.Anything, exeEventReq).
+			Return(exeEventResp, nil).
+			Once()
+
+		backend, err := New(params)
+		suite.Require().NoError(err)
+
+		res, err := backend.GetSystemTransactionResult(
+			context.Background(),
+			block.ID(),
+			entities.EventEncodingVersion_CCF_V0,
+		)
+
+		suite.Require().Nil(res)
+		suite.Require().Error(err)
+		suite.Require().Equal(err, status.Errorf(codes.Internal, "failed to convert events from system tx result: %v", fmt.Errorf("conversion from format JSON_CDC_V0 to CCF_V0 is not supported")))
 	})
 }
