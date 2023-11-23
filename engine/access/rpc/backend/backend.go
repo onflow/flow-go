@@ -88,6 +88,7 @@ type Params struct {
 	Transactions              storage.Transactions
 	ExecutionReceipts         storage.ExecutionReceipts
 	ExecutionResults          storage.ExecutionResults
+	LightTransactionResults   storage.LightTransactionResults
 	ChainID                   flow.ChainID
 	AccessMetrics             module.AccessMetrics
 	ConnFactory               connection.ConnectionFactory
@@ -151,6 +152,7 @@ func New(params Params) (*Backend, error) {
 			collections:          params.Collections,
 			blocks:               params.Blocks,
 			transactions:         params.Transactions,
+			results:              params.LightTransactionResults,
 			executionReceipts:    params.ExecutionReceipts,
 			transactionValidator: configureTransactionValidator(params.State, params.ChainID),
 			transactionMetrics:   params.AccessMetrics,

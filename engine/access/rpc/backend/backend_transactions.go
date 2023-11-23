@@ -31,6 +31,7 @@ type backendTransactions struct {
 	executionReceipts    storage.ExecutionReceipts
 	collections          storage.Collections
 	blocks               storage.Blocks
+	results              storage.LightTransactionResults
 	state                protocol.State
 	chainID              flow.ChainID
 	transactionMetrics   module.TransactionMetrics
@@ -38,10 +39,11 @@ type backendTransactions struct {
 	retry                *Retry
 	connFactory          connection.ConnectionFactory
 
-	previousAccessNodes []accessproto.AccessAPIClient
-	log                 zerolog.Logger
-	nodeCommunicator    Communicator
-	txResultCache       *lru.Cache[flow.Identifier, *access.TransactionResult]
+	previousAccessNodes  []accessproto.AccessAPIClient
+	log                  zerolog.Logger
+	nodeCommunicator     Communicator
+	txResultCache        *lru.Cache[flow.Identifier, *access.TransactionResult]
+	txErrorMessagesCache *lru.Cache[flow.Identifier, string] // cache for transactions error messages, indexed by hash(block_id, tx_id).
 }
 
 // SendTransaction forwards the transaction to the collection node
@@ -954,4 +956,147 @@ func (b *backendTransactions) tryGetTransactionResultByIndex(
 	}
 
 	return resp, nil
+}
+
+// lookupTransactionErrorMessage returns transaction error message for specified transaction.
+func (b *backendTransactions) lookupTransactionErrorMessage(
+	ctx context.Context,
+	blockID flow.Identifier,
+	transactionID flow.Identifier,
+) (string, error) {
+	cacheKey := flow.MakeIDFromFingerPrint(append(blockID[:], transactionID[:]...))
+	value, cached := b.txErrorMessagesCache.Get(cacheKey)
+	if cached {
+		return value, nil
+	}
+
+	txResult, err := b.results.ByBlockIDTransactionID(blockID, transactionID)
+	if err != nil {
+		return "", rpc.ConvertStorageError(err)
+	}
+
+	// nothing to do tx has not failed
+	if !txResult.Failed {
+		return "", nil
+	}
+
+	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
+	if err != nil {
+		if IsInsufficientExecutionReceipts(err) {
+			return "", status.Errorf(codes.NotFound, err.Error())
+		}
+		return "", rpc.ConvertError(err, "failed to retrieve error message from any execution node", codes.Internal)
+	}
+	req := &execproto.GetTransactionErrorMessageRequest{
+		BlockId:       convert.IdentifierToMessage(blockID),
+		TransactionId: convert.IdentifierToMessage(transactionID),
+	}
+
+	resp, err := b.getTransactionErrorMessageFromAnyEN(ctx, execNodes, req)
+	if err != nil {
+		return "", fmt.Errorf("could not fetch error message from ENs: %w", err)
+	}
+	value = resp.ErrorMessage
+	b.txErrorMessagesCache.Add(cacheKey, value)
+	return value, nil
+}
+
+// getTransactionErrorMessageFromAnyEN
+func (b *backendTransactions) getTransactionErrorMessageFromAnyEN(
+	ctx context.Context,
+	execNodes flow.IdentityList,
+	req *execproto.GetTransactionErrorMessageRequest,
+) (*execproto.GetTransactionErrorMessageResponse, error) {
+	var errToReturn error
+
+	defer func() {
+		// log the errors
+		if errToReturn != nil {
+			b.log.Err(errToReturn).Msg("failed to get transaction error message from execution nodes")
+		}
+	}()
+
+	// if we were passed 0 execution nodes add a specific error
+	if len(execNodes) == 0 {
+		return nil, errors.New("zero execution nodes")
+	}
+
+	var resp *execproto.GetTransactionErrorMessageResponse
+	errToReturn = b.nodeCommunicator.CallAvailableNode(
+		execNodes,
+		func(node *flow.Identity) error {
+			var err error
+			resp, err = b.tryGetTransactionErrorMessageFromEN(ctx, node, req)
+			if err == nil {
+				b.log.Debug().
+					Str("execution_node", node.String()).
+					Hex("block_id", req.GetBlockId()).
+					Hex("transaction_id", req.GetTransactionId()).
+					Msg("Successfully got transaction error message from any node")
+				return nil
+			}
+			return err
+		},
+		nil,
+	)
+
+	return resp, errToReturn
+}
+
+// tryGetTransactionErrorMessageFromEN performs a grpc call to the specified execution node and returns response.
+func (b *backendTransactions) tryGetTransactionErrorMessageFromEN(
+	ctx context.Context,
+	execNode *flow.Identity,
+	req *execproto.GetTransactionErrorMessageRequest,
+) (*execproto.GetTransactionErrorMessageResponse, error) {
+	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
+	if err != nil {
+		return nil, err
+	}
+	defer closer.Close()
+
+	resp, err := execRPCClient.GetTransactionErrorMessage(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
+}
+
+func (b *backendTransactions) tryGetTransactionErrorMessageByIndexFromEN(
+	ctx context.Context,
+	execNode *flow.Identity,
+	req *execproto.GetTransactionErrorMessageByIndexRequest,
+) (*execproto.GetTransactionErrorMessageResponse, error) {
+	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
+	if err != nil {
+		return nil, err
+	}
+	defer closer.Close()
+
+	resp, err := execRPCClient.GetTransactionErrorMessageByIndex(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
+}
+
+func (b *backendTransactions) tryGetTransactionErrorMessagesByBlockIDFromEN(
+	ctx context.Context,
+	execNode *flow.Identity,
+	req *execproto.GetTransactionErrorMessagesByBlockIDRequest,
+) ([]*execproto.GetTransactionErrorMessagesResponse_Result, error) {
+	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
+	if err != nil {
+		return nil, err
+	}
+	defer closer.Close()
+
+	resp, err := execRPCClient.GetTransactionErrorMessagesByBlockID(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp.Results, nil
 }
