@@ -108,6 +108,7 @@ type ObserverServiceConfig struct {
 	apiBurstlimits            map[string]int
 	rpcConf                   rpc.Config
 	rpcMetricsEnabled         bool
+	apiTimeout                time.Duration
 	upstreamNodeAddresses     []string
 	upstreamNodePublicKeys    []string
 	upstreamIdentities        flow.IdentityList // the identity list of upstream peers the node uses to forward API requests to
@@ -145,6 +146,7 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 		bootstrapNodeAddresses:    []string{},
 		bootstrapNodePublicKeys:   []string{},
 		observerNetworkingKeyPath: cmd.NotSet,
+		apiTimeout:                3 * time.Second,
 		upstreamNodeAddresses:     []string{},
 		upstreamNodePublicKeys:    []string{},
 	}
@@ -483,6 +485,7 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 		flags.StringVar(&builder.observerNetworkingKeyPath, "observer-networking-key-path", defaultConfig.observerNetworkingKeyPath, "path to the networking key for observer")
 		flags.StringSliceVar(&builder.bootstrapNodeAddresses, "bootstrap-node-addresses", defaultConfig.bootstrapNodeAddresses, "the network addresses of the bootstrap access node if this is an observer e.g. access-001.mainnet.flow.org:9653,access-002.mainnet.flow.org:9653")
 		flags.StringSliceVar(&builder.bootstrapNodePublicKeys, "bootstrap-node-public-keys", defaultConfig.bootstrapNodePublicKeys, "the networking public key of the bootstrap access node if this is an observer (in the same order as the bootstrap node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
+		flags.DurationVar(&builder.apiTimeout, "upstream-api-timeout", defaultConfig.apiTimeout, "tcp timeout for Flow API gRPC sockets to upstrem nodes")
 		flags.StringSliceVar(&builder.upstreamNodeAddresses, "upstream-node-addresses", defaultConfig.upstreamNodeAddresses, "the gRPC network addresses of the upstream access node. e.g. access-001.mainnet.flow.org:9000,access-002.mainnet.flow.org:9000")
 		flags.StringSliceVar(&builder.upstreamNodePublicKeys, "upstream-node-public-keys", defaultConfig.upstreamNodePublicKeys, "the networking public key of the upstream access node (in the same order as the upstream node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
 		flags.BoolVar(&builder.rpcMetricsEnabled, "rpc-metrics-enabled", defaultConfig.rpcMetricsEnabled, "whether to enable the rpc metrics")
@@ -925,8 +928,8 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		connFactory := &rpcConnection.ConnectionFactoryImpl{
 			CollectionGRPCPort:        0,
 			ExecutionGRPCPort:         0,
-			CollectionNodeGRPCTimeout: backendConfig.CollectionClientTimeout,
-			ExecutionNodeGRPCTimeout:  backendConfig.ExecutionClientTimeout,
+			CollectionNodeGRPCTimeout: builder.apiTimeout,
+			ExecutionNodeGRPCTimeout:  builder.apiTimeout,
 			AccessMetrics:             accessMetrics,
 			Log:                       node.Logger,
 			Manager: rpcConnection.NewManager(
