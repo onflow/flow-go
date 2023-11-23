@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -194,7 +195,7 @@ func (b *backendTransactions) GetTransaction(ctx context.Context, txID flow.Iden
 }
 
 func (b *backendTransactions) GetTransactionsByBlockID(
-	ctx context.Context,
+	_ context.Context,
 	blockID flow.Identifier,
 ) ([]*flow.TransactionBody, error) {
 	var transactions []*flow.TransactionBody
@@ -316,8 +317,11 @@ func (b *backendTransactions) GetTransactionResult(
 	}
 
 	// derive status of the transaction
-	txStatus, err := b.deriveTransactionStatus(ctx, tx, transactionWasExecuted, block)
+	txStatus, err := b.deriveTransactionStatus(tx, transactionWasExecuted, block)
 	if err != nil {
+		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
+			irrecoverable.Throw(ctx, err)
+		}
 		return nil, rpc.ConvertStorageError(err)
 	}
 
@@ -433,8 +437,11 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 			txResult := resp.TransactionResults[i]
 
 			// tx body is irrelevant to status if it's in an executed block
-			txStatus, err := b.deriveTransactionStatus(ctx, nil, true, block)
+			txStatus, err := b.deriveTransactionStatus(nil, true, block)
 			if err != nil {
+				if !errors.Is(err, state.ErrUnknownSnapshotReference) {
+					irrecoverable.Throw(ctx, err)
+				}
 				return nil, rpc.ConvertStorageError(err)
 			}
 			events, err := convert.MessagesToEventsWithEncodingConversion(txResult.GetEvents(), resp.GetEventEncodingVersion(), requiredEventEncodingVersion)
@@ -487,8 +494,11 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 			return nil, status.Errorf(codes.Internal, "could not get system chunk transaction: %v", err)
 		}
 		systemTxResult := resp.TransactionResults[len(resp.TransactionResults)-1]
-		systemTxStatus, err := b.deriveTransactionStatus(ctx, systemTx, true, block)
+		systemTxStatus, err := b.deriveTransactionStatus(systemTx, true, block)
 		if err != nil {
+			if !errors.Is(err, state.ErrUnknownSnapshotReference) {
+				irrecoverable.Throw(ctx, err)
+			}
 			return nil, rpc.ConvertStorageError(err)
 		}
 
@@ -545,8 +555,11 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 	}
 
 	// tx body is irrelevant to status if it's in an executed block
-	txStatus, err := b.deriveTransactionStatus(ctx, nil, true, block)
+	txStatus, err := b.deriveTransactionStatus(nil, true, block)
 	if err != nil {
+		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
+			irrecoverable.Throw(ctx, err)
+		}
 		return nil, rpc.ConvertStorageError(err)
 	}
 
@@ -567,13 +580,15 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 }
 
 // deriveTransactionStatus derives the transaction status based on current protocol state
+
+// Error returns:
+//   - ErrUnknownSnapshotReference - block referenced by transaction has not been found.
+//   - all other errors are unexpected and potentially symptoms of internal implementation bugs or state corruption (fatal).
 func (b *backendTransactions) deriveTransactionStatus(
-	ctx context.Context,
 	tx *flow.TransactionBody,
 	executed bool,
 	block *flow.Block,
 ) (flow.TransactionStatus, error) {
-
 	if block == nil {
 		// Not in a block, let's see if it's expired
 		referenceBlock, err := b.state.AtBlockID(tx.ReferenceBlockID).Head()
@@ -584,7 +599,6 @@ func (b *backendTransactions) deriveTransactionStatus(
 		// get the latest finalized block from the state
 		finalized, err := b.state.Final().Head()
 		if err != nil {
-			irrecoverable.Throw(ctx, err)
 			return flow.TransactionStatusUnknown, err
 		}
 		finalizedHeight := finalized.Height
@@ -629,7 +643,6 @@ func (b *backendTransactions) deriveTransactionStatus(
 	// get the latest sealed block from the State
 	sealed, err := b.state.Sealed().Head()
 	if err != nil {
-		irrecoverable.Throw(ctx, err)
 		return flow.TransactionStatusUnknown, err
 	}
 
@@ -651,6 +664,9 @@ func (b *backendTransactions) isExpired(refHeight, compareToHeight uint64) bool 
 	return compareToHeight-refHeight > flow.DefaultTransactionExpiry
 }
 
+// Error returns:
+//   - ErrNotFound - collection referenced by transaction or block by a collection has not been found.
+//   - all other errors are unexpected and potentially symptoms of internal implementation bugs or state corruption (fatal).
 func (b *backendTransactions) lookupBlock(txID flow.Identifier) (*flow.Block, error) {
 
 	collection, err := b.collections.LightByTransactionID(txID)
@@ -786,8 +802,8 @@ func (b *backendTransactions) getTransactionResultFromExecutionNode(
 	return events, resp.GetStatusCode(), resp.GetErrorMessage(), nil
 }
 
-func (b *backendTransactions) NotifyFinalizedBlockHeight(height uint64) {
-	b.retry.Retry(height)
+func (b *backendTransactions) ProcessFinalizedBlockHeight(height uint64) error {
+	return b.retry.Retry(height)
 }
 
 func (b *backendTransactions) getTransactionResultFromAnyExeNode(

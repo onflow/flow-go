@@ -113,7 +113,7 @@ func NewBuilder(log zerolog.Logger,
 		stateStreamBackend:        stateStreamBackend,
 		stateStreamConfig:         stateStreamConfig,
 	}
-	backendNotifierActor, backendNotifierWorker := events.NewFinalizationActor(eng.notifyBackendOnBlockFinalized)
+	backendNotifierActor, backendNotifierWorker := events.NewFinalizationActor(eng.processOnFinalizedBlock)
 	eng.backendNotifierActor = backendNotifierActor
 
 	eng.Component = component.NewComponentManagerBuilder().
@@ -171,12 +171,11 @@ func (e *Engine) OnFinalizedBlock(block *model.Block) {
 	e.backendNotifierActor.OnFinalizedBlock(block)
 }
 
-// notifyBackendOnBlockFinalized is invoked by the FinalizationActor when a new block is finalized.
-// It notifies the backend of the newly finalized block.
-func (e *Engine) notifyBackendOnBlockFinalized(_ *model.Block) error {
+// processOnFinalizedBlock is invoked by the FinalizationActor when a new block is finalized.
+// It informs the backend of the newly finalized block.
+func (e *Engine) processOnFinalizedBlock(_ *model.Block) error {
 	finalizedHeader := e.finalizedHeaderCache.Get()
-	e.backend.NotifyFinalizedBlockHeight(finalizedHeader.Height)
-	return nil
+	return e.backend.ProcessFinalizedBlockHeight(finalizedHeader.Height)
 }
 
 // RestApiAddress returns the listen address of the REST API server.
