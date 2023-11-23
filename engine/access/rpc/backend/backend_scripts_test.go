@@ -35,6 +35,8 @@ var (
 
 	cadenceErr    = fvmerrors.NewCodedError(fvmerrors.ErrCodeCadenceRunTimeError, "cadence error")
 	fvmFailureErr = fvmerrors.NewCodedError(fvmerrors.FailureCodeBlockFinderFailure, "fvm error")
+	ctxCancelErr  = fvmerrors.NewCodedError(fvmerrors.ErrCodeScriptExecutionCancelledError, "context canceled error")
+	timeoutErr    = fvmerrors.NewCodedError(fvmerrors.ErrCodeScriptExecutionTimedOutError, "timeout error")
 )
 
 // Create a suite similar to GetAccount that covers each of the modes
@@ -320,31 +322,49 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_HappyPath() {
 	}
 }
 
-// TestExecuteScriptWithFailover_SkippedForInvalidArgument tests that failover is skipped for
-// FVM errors that result in InvalidArgument errors
-func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_SkippedForInvalidArgument() {
+// TestExecuteScriptWithFailover_SkippedForCorrectCodes tests that failover is skipped for
+// FVM errors that result in InvalidArgument or Canceled errors
+func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_SkippedForCorrectCodes() {
 	ctx := context.Background()
 
 	// configure local script executor to fail
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
-	scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, s.failingScript, s.arguments, s.block.Header.Height).
-		Return(nil, cadenceErr)
 
 	backend := s.defaultBackend()
 	backend.scriptExecMode = ScriptExecutionModeFailover
 	backend.scriptExecutor = scriptExecutor
 
-	s.Run("ExecuteScriptAtLatestBlock", func() {
-		s.testExecuteScriptAtLatestBlock(ctx, backend, codes.InvalidArgument)
-	})
+	testCases := []struct {
+		err        error
+		statusCode codes.Code
+	}{
+		{
+			err:        cadenceErr,
+			statusCode: codes.InvalidArgument,
+		},
+		{
+			err:        ctxCancelErr,
+			statusCode: codes.Canceled,
+		},
+	}
 
-	s.Run("ExecuteScriptAtBlockID", func() {
-		s.testExecuteScriptAtBlockID(ctx, backend, codes.InvalidArgument)
-	})
+	for _, tt := range testCases {
+		scriptExecutor.On("ExecuteAtBlockHeight", mock.Anything, s.failingScript, s.arguments, s.block.Header.Height).
+			Return(nil, tt.err).
+			Times(3)
 
-	s.Run("ExecuteScriptAtBlockHeight", func() {
-		s.testExecuteScriptAtBlockHeight(ctx, backend, codes.InvalidArgument)
-	})
+		s.Run(fmt.Sprintf("ExecuteScriptAtLatestBlock - %s", tt.statusCode), func() {
+			s.testExecuteScriptAtLatestBlock(ctx, backend, tt.statusCode)
+		})
+
+		s.Run(fmt.Sprintf("ExecuteScriptAtBlockID - %s", tt.statusCode), func() {
+			s.testExecuteScriptAtBlockID(ctx, backend, tt.statusCode)
+		})
+
+		s.Run(fmt.Sprintf("ExecuteScriptAtBlockHeight - %s", tt.statusCode), func() {
+			s.testExecuteScriptAtBlockHeight(ctx, backend, tt.statusCode)
+		})
+	}
 }
 
 // TestExecuteScriptWithFailover_ReturnsENErrors tests that when an error is returned from the execution
