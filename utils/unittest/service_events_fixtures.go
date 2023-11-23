@@ -37,6 +37,7 @@ func EpochSetupFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochSetu
 		DKGPhase2FinalView: 160,
 		DKGPhase3FinalView: 170,
 		RandomSource:       randomSource,
+		TargetDuration:     200,
 		TargetEndTime:      2000000000,
 		Assignments: flow.AssignmentList{
 			{
@@ -204,6 +205,9 @@ func createEpochSetupEvent() cadence.Event {
 
 		// DKGPhase3FinalView
 		cadence.UInt64(170),
+
+		// targetDuration
+		cadence.UInt64(200),
 
 		// targetEndTime
 		cadence.UInt64(2000000000),
@@ -883,6 +887,10 @@ func newFlowEpochEpochSetupEventType() *cadence.EventType {
 			},
 			{
 				Identifier: "DKGPhase3FinalView",
+				Type:       cadence.UInt64Type{},
+			},
+			{
+				Identifier: "targetDuration",
 				Type:       cadence.UInt64Type{},
 			},
 			{
