@@ -305,12 +305,15 @@ jobs:
           - name: Access Cohort1 Integration Tests
             make: make -C integration access-cohort1-tests
             runner: buildjet-4vcpu-ubuntu-2204
+            corrupt: false
           - name: Access Cohort2 Integration Tests
             make: make -C integration access-cohort2-tests
             runner: ubuntu-latest
+            corrupt: false
           - name: Access Cohort3 Integration Tests
             make: make -C integration access-cohort3-tests
             runner: ubuntu-latest
+            corrupt: false
             # test suite has single test which is flaky and needs to be fixed - reminder here to put it back when it's fixed
 #          - name: BFT (Framework) Integration Tests
 #            make: make -C integration bft-framework-tests
@@ -326,33 +329,43 @@ jobs:
           - name: Collection Integration Tests
             make: make -C integration collection-tests
             runner: ubuntu-latest
+            corrupt: false
           - name: Consensus Integration Tests
             make: make -C integration consensus-tests
             runner: ubuntu-latest
+            corrupt: false
           - name: Epoch Cohort1 Integration Tests
             make: make -C integration epochs-cohort1-tests
             runner: buildjet-4vcpu-ubuntu-2204
+            corrupt: false
           - name: Epoch Cohort2 Integration Tests
             make: make -C integration epochs-cohort2-tests
             runner: buildjet-4vcpu-ubuntu-2204
+            corrupt: false
           - name: Execution Integration Tests
             make: make -C integration execution-tests
             runner: ubuntu-latest
+            corrupt: false
           - name: Ghost Integration Tests
             make: make -C integration ghost-tests
             runner: ubuntu-latest
+            corrupt: false
           - name: MVP Integration Tests
             make: make -C integration mvp-tests
             runner: ubuntu-latest
+            corrupt: false
           - name: Network Integration Tests
             make: make -C integration network-tests
             runner: ubuntu-latest
+            corrupt: false
           - name: Verification Integration Tests
             make: make -C integration verification-tests
             runner: ubuntu-latest
+            corrupt: false
           - name: Upgrade Integration Tests
             make: make -C integration upgrades-tests
             runner: ubuntu-latest
+            corrupt: false
     runs-on: ${{ matrix.runner }}
     steps:
     - name: Checkout repo
@@ -411,25 +424,17 @@ jobs:
       with:
         path: flow-docker-verification.tar
         key: flow-docker-images-verification-${{ github.run_id }}
-    - name: Load cached Docker images 1
+    - name: Load cached Observer Docker image
       uses: actions/cache@v3
       with:
         path: flow-docker-observer.tar
-        key: flow-docker-observer-${{ github.run_id }}
+        key: flow-docker-images-observer-${{ github.run_id }}
     - name: Load cached Corrupt Verification Docker image
       if: ${{ matrix.corrupt }} == true
       uses: actions/cache@v3
       with:
         path: flow-docker-verification-corrupt.tar
         key: flow-docker-images-verification-corrupt-${{ github.run_id }}
-
-    - name: Load cached Docker images 2
-      uses: actions/cache@v3
-      with:
-        path: flow-docker-images2.tar
-        # use the same cache key as the docker-build2 job
-        key: flow-docker-images2-${{ github.run_id }}
-
     - name: Load Docker images
       run: |
         for f in *.tar; do
