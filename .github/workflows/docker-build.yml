@@ -1,14 +1,5 @@
 on:
   workflow_call:
-  merge_group:
-    branches:
-      - master
-
-jobs:
-  docker-build:
-    name: Docker Build ${{ inputs.name }}
-    runs-on: ubuntu-latest
-    if: github.event.pull_request.draft == false
     inputs:
       name:
         description: 'The name of the docker image'
@@ -16,6 +7,12 @@ jobs:
       make:
         description: 'The make command to build the docker image'
         required: true
+
+jobs:
+  docker-build:
+    name: Docker Build ${{ inputs.name }}
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
