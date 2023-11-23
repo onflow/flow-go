@@ -19,14 +19,14 @@ import (
 
 var rootAddr = flow.Address{0x01}
 
-// testBalanceUpdates is designed to evaluate the impact of state modifications on storage size.
+// testSimpleAccountStateUpdate is designed to evaluate the impact of state modifications on storage size.
 // It measures the bytes used in the underlying storage, aiming to understand how storage size scales with changes in state.
 // During the test, each account balance is updated, with a focus on measuring any consequential changes to the state.
 // While the specific operation details are not crucial for this benchmark, the primary goal is to analyze how the storage
 // size evolves in response to state modifications. Users can specify the number of accounts on which the balance is updated.
 // Accounts will be automatically generated, and the benchmark allows users to determine the frequency of balance
 // updates across all accounts, including in-between state committing.
-func testBalanceUpdates(
+func testSimpleAccountStateUpdate(
 	t *testing.T,
 	numberOfAccounts int,
 	numberOfUpdatesPerAccount int,
@@ -95,7 +95,7 @@ storage_items 16855058
 storage_size_bytes 15911
 */
 func TestStateBalanceSingleAccount(t *testing.T) {
-	testBalanceUpdates(t, 1, 1000, false)
+	testSimpleAccountStateUpdate(t, 1, 1000, false)
 }
 
 /*
@@ -105,5 +105,5 @@ storage_items 6006558
 storage_size_bytes 6673
 */
 func TestStateBalanceMultipleAccounts(t *testing.T) {
-	testBalanceUpdates(t, 1000, 100, false)
+	testSimpleAccountStateUpdate(t, 1000, 100, false)
 }
