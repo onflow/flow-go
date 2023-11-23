@@ -158,7 +158,7 @@ func finalize(cmd *cobra.Command, args []string) {
 	if err != nil {
 		log.Fatal().Err(err).Msg("invalid or unsafe epoch commit threshold config")
 	}
-	err = validateEpochTimingConfig()
+	err = validateOrPopulateEpochTimingConfig()
 	if err != nil {
 		log.Fatal().Err(err).Msg("invalid epoch timing config")
 	}
@@ -689,24 +689,24 @@ func validateEpochConfig() error {
 	return nil
 }
 
-// validateEpochTimingConfig validates the epoch timing config flags. In case the 
-// `flagDefaultEpochTargetEndTime` value has been set, the function derives the values for 
+// validateOrPopulateEpochTimingConfig validates the epoch timing config flags. In case the
+// `flagDefaultEpochTargetEndTime` value has been set, the function derives the values for
 // `flagEpochTargetEndTimeRefCounter`, `flagEpochTargetEndTimeDuration`, and `flagEpochTargetEndTimeRefTimestamp`
 // from the configuration. Otherwise, it enforces that compatible values for the respective parameters have been
-// specified (and errors otherwise). Therefore, after `validateEpochTimingConfig` ran, 
+// specified (and errors otherwise). Therefore, after `validateOrPopulateEpochTimingConfig` ran,
 // the targeted end time for the epoch can be computed via `epochTargetEndTime()`.
 // You can either let the tool choose default values, or specify a value for each config.
-func validateEpochTimingConfig() error {
+func validateOrPopulateEpochTimingConfig() error {
 	if flagDefaultEpochTargetEndTime {
 		// No other flags may be set
 		if !(flagEpochTargetEndTimeRefTimestamp == 0 && flagEpochTargetEndTimeDuration == 0 && flagEpochTargetEndTimeRefCounter == 0) {
 			return fmt.Errorf("invalid epoch timing config: cannot specify ANY of --epoch-target-end-time-ref-counter, --epoch-target-end-time-ref-timestamp, or --epoch-target-end-time-duration if using default timing config")
 		}
 		flagEpochTargetEndTimeRefCounter = flagEpochCounter
-		flagEpochTargetEndTimeDuration = flagNumViewsInEpoch
+		flagEpochTargetEndTimeDuration = flagNumViewsInEpoch // default to 1 view/s
 		flagEpochTargetEndTimeRefTimestamp = uint64(time.Now().Unix()) + flagNumViewsInEpoch
 
-		// compute target end time for initial (root) epoch from flags
+		// compute target end time for initial (root) epoch from flags: `TargetEndTime = now() + TargetDuration`
 		rootEpochTargetEndTimeUNIX := epochTargetEndTime()
 		rootEpochTargetEndTime := time.Unix(int64(rootEpochTargetEndTimeUNIX), 0)
 		log.Info().Msgf("using default epoch timing config with root epoch target end time %s, which is in %s", rootEpochTargetEndTime, time.Until(rootEpochTargetEndTime))
@@ -717,7 +717,7 @@ func validateEpochTimingConfig() error {
 			return fmt.Errorf("invalid epoch timing config: must specify ALL of --epoch-target-end-time-ref-counter, --epoch-target-end-time-ref-timestamp, and --epoch-target-end-time-duration")
 		}
 
-		// compute target end time for initial (root) epoch from flags
+		// compute target end time for initial (root) epoch from flags: `TargetEndTime = now() + TargetDuration`
 		rootEpochTargetEndTimeUNIX := epochTargetEndTime()
 		rootEpochTargetEndTime := time.Unix(int64(rootEpochTargetEndTimeUNIX), 0)
 		log.Info().Msgf("using user-specified epoch timing config with root epoch target end time %s, which is in %s", rootEpochTargetEndTime, time.Until(rootEpochTargetEndTime))

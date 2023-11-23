@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"encoding/hex"
-
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/flow"
@@ -84,8 +83,11 @@ func constructRootResultAndSeal(
 // epochTargetEndTime computes the target end time for the given epoch, using the given config.
 // CAUTION: the variables `flagEpochTargetEndTimeRefCounter`, `flagEpochTargetEndTimeDuration`, and
 // `flagEpochTargetEndTimeRefTimestamp` must contain proper values. You can either specify a value for
-// each config parameter or use the function `validateEpochTimingConfig()` to populate the varaibles 
+// each config parameter or use the function `validateOrPopulateEpochTimingConfig()` to populate the varaibles
 // from defaults.
 func epochTargetEndTime() uint64 {
+	if flagEpochTargetEndTimeRefTimestamp == 0 || flagEpochTargetEndTimeDuration == 0 {
+		panic("invalid epoch timing config: must specify ALL of --epoch-target-end-time-ref-counter, --epoch-target-end-time-ref-timestamp, and --epoch-target-end-time-duration")
+	}
 	return flagEpochTargetEndTimeRefTimestamp + (flagEpochCounter-flagEpochTargetEndTimeRefCounter)*flagEpochTargetEndTimeDuration
 }

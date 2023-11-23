@@ -135,11 +135,11 @@ func TestEpochTimingConfig(t *testing.T) {
 		flagDefaultEpochTargetEndTime = true
 		for _, flag := range flags {
 			*flag = rand.Uint64()%100 + 1
-			err := validateEpochTimingConfig()
+			err := validateOrPopulateEpochTimingConfig()
 			assert.Error(t, err)
 			*flag = 0 // set the flag back to 0
 		}
-		err := validateEpochTimingConfig()
+		err := validateOrPopulateEpochTimingConfig()
 		assert.NoError(t, err)
 	})
 
@@ -149,14 +149,14 @@ func TestEpochTimingConfig(t *testing.T) {
 		for _, flag := range flags {
 			*flag = rand.Uint64()%100 + 1
 		}
-		err := validateEpochTimingConfig()
+		err := validateOrPopulateEpochTimingConfig()
 		assert.NoError(t, err)
 
 		// Next, check that validation fails if any one flag is not set
 		// NOTE: we do not include refCounter here, because it is allowed to be zero.
 		for _, flag := range []*uint64{&flagEpochTargetEndTimeRefTimestamp, &flagEpochTargetEndTimeDuration} {
 			*flag = 0
-			err := validateEpochTimingConfig()
+			err := validateOrPopulateEpochTimingConfig()
 			assert.Error(t, err)
 			*flag = rand.Uint64()%100 + 1 // set the flag back to a non-zero value
 		}
