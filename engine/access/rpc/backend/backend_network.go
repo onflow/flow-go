@@ -98,7 +98,8 @@ func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(_ context.Context, bl
 	snapshotHeadByHeight, err := snapshotByHeight.Head()
 	if err != nil {
 		if errors.Is(err, state.ErrUnknownSnapshotReference) {
-			return nil, status.Errorf(codes.InvalidArgument, "failed to retrieve snapshot for block by height: block not finalized")
+			return nil, status.Errorf(codes.InvalidArgument,
+				"failed to retrieve snapshot for block by height %d: block not finalized", snapshotHeadByBlockId.Height)
 		}
 
 		return nil, status.Errorf(codes.Internal, "failed to get a valid snapshot: %v", err)
@@ -162,7 +163,8 @@ func (b *backendNetwork) isEpochOrPhaseDifferent(counter1, counter2 uint64, phas
 // by height of each block in the segment and return a snapshot at the point
 // where the transition happens.
 // Expected error returns during normal operations:
-// * SnapshotPhaseMismatchError - snapshot does contain a valid sealing segment
+// * SnapshotPhaseMismatchError - snapshot does not contain a valid sealing segment
+// All other errors should be treated as exceptions.
 func (b *backendNetwork) getValidSnapshot(snapshot protocol.Snapshot, blocksVisited int, findNextValidSnapshot bool) (protocol.Snapshot, error) {
 	segment, err := snapshot.SealingSegment()
 	if err != nil {

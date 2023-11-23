@@ -3,9 +3,8 @@ package backend
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/state/protocol/invalid"
 	"testing"
-
-	statepkg "github.com/onflow/flow-go/state"
 
 	"github.com/dgraph-io/badger/v2"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
@@ -28,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
+	realstate "github.com/onflow/flow-go/state"
 	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/state/protocol/util"
@@ -451,28 +451,18 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_NonFinalizedBlocks() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
 	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
-		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
-		// build epoch 1
-		// Blocks in current State
-		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- F(S_D) |commit|
-		epochBuilder.BuildEpoch()
-
-		// get heights of each phase in built epochs
-		epoch1, ok := epochBuilder.EpochHeights(1)
-		require.True(suite.T(), ok)
-
-		// Take snapshot at height of last block of epoch
-		snap := state.AtHeight(epoch1.CommittedFinal)
-		snapHead, err := snap.Head()
+		rootBlock, err := rootSnapshot.Head()
 		suite.Require().NoError(err)
-		newBlock := unittest.BlockWithParentFixture(snapHead)
+		// create a new block with root block as parent
+		newBlock := unittest.BlockWithParentFixture(rootBlock)
 		ctx := context.Background()
-		// Adding new non finalized block to state
+		// add new block to the chain state
 		err = state.Extend(ctx, newBlock)
 		suite.Require().NoError(err)
 
-		// setup AtHeight and AtBlockID mock returns for State
-		suite.state.On("AtHeight", newBlock.Header.Height).Return(state.AtHeight(newBlock.Header.Height))
+		// since block was not yet finalized AtHeight must return an invalid snapshot
+		suite.state.On("AtHeight", newBlock.Header.Height).Return(invalid.NewSnapshot(realstate.ErrUnknownSnapshotReference))
+		// since block was added to the block tree it must be queryable by block ID
 		suite.state.On("AtBlockID", newBlock.ID()).Return(state.AtBlockID(newBlock.ID()))
 
 		params := suite.defaultBackendParams()
@@ -482,15 +472,163 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_NonFinalizedBlocks() {
 		suite.Require().NoError(err)
 
 		// query the handler for the snapshot for non finalized block
-		snapshotBytes, err := backend.GetProtocolStateSnapshotByBlockID(context.Background(), newBlock.ID())
+		snapshotBytes, err := backend.GetProtocolStateSnapshotByBlockID(ctx, newBlock.ID())
 		suite.Require().Nil(snapshotBytes)
 		suite.Require().Error(err)
-		suite.Require().Equal(err.Error(), status.Errorf(codes.NotFound, "failed to get a valid snapshot: %v", fmt.Errorf("unknown finalized height %d: %w", newBlock.Header.Height, statepkg.ErrUnknownSnapshotReference)).Error())
+		suite.Require().Equal(status.Errorf(codes.InvalidArgument, "failed to get a valid snapshot: %v",
+			fmt.Errorf("unknown finalized height %d: %w", newBlock.Header.Height, realstate.ErrUnknownSnapshotReference)).Error(),
+			err.Error())
+	})
+}
+
+// TestGetProtocolStateSnapshotByBlockID_Non_Finalized_Blocks tests our GetProtocolStateSnapshotByBlockID RPC endpoint
+// where non finalized block is added to state
+func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_InvalidSegment() {
+	identities := unittest.CompleteIdentitySet()
+	rootSnapshot := unittest.RootSnapshotFixture(identities)
+	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
+		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
+		// build epoch 1
+		// Blocks in current State
+		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- F(S_D) |commit|
+		epochBuilder.
+			BuildEpoch().
+			CompleteEpoch()
+
+		// get heights of each phase in built epochs
+		epoch1, ok := epochBuilder.EpochHeights(1)
+		require.True(suite.T(), ok)
+
+		// setup AtBlockID and AtHeight mock returns for State
+		for _, height := range epoch1.Range() {
+			snap := state.AtHeight(height)
+			blockHead, err := snap.Head()
+			suite.Require().NoError(err)
+
+			suite.state.On("AtHeight", height).Return(snap)
+			suite.state.On("AtBlockID", blockHead.ID()).Return(snap)
+		}
+
+		backend, err := New(suite.defaultBackendParams())
+		suite.Require().NoError(err)
+
+		suite.T().Run("sealing segment between phases", func(t *testing.T) {
+			// Take snapshot at height of block D (epoch1.heights[2]) for valid segment and valid snapshot
+			snap := state.AtHeight(epoch1.SetupRange()[0])
+			block, err := snap.Head()
+			suite.Require().NoError(err)
+
+			bytes, err := backend.GetProtocolStateSnapshotByBlockID(context.Background(), block.ID())
+			suite.Require().Error(err)
+			suite.Require().Empty(bytes)
+		})
+
+		suite.T().Run("sealing segment between epochs", func(t *testing.T) {
+			// Take snapshot at height of block D (epoch1.heights[2]) for valid segment and valid snapshot
+			snap := state.Final()
+			epochCounter, err := snap.Epochs().Current().Counter()
+			suite.Require().NoError(err)
+			suite.Require().Equal(epoch1.Counter+1, epochCounter, "expect to be in next epoch")
+			block, err := snap.Head()
+			suite.Require().NoError(err)
+
+			suite.state.On("AtBlockID", block.ID()).Return(snap)
+			suite.state.On("AtHeight", block.Height).Return(snap)
+			bytes, err := backend.GetProtocolStateSnapshotByBlockID(context.Background(), block.ID())
+			suite.Require().Error(err)
+			suite.Require().Empty(bytes)
+		})
 	})
 }
 
 // TestGetProtocolStateSnapshotByHeight tests our GetProtocolStateSnapshotByHeight RPC endpoint
 func (suite *Suite) TestGetProtocolStateSnapshotByHeight() {
+	identities := unittest.CompleteIdentitySet()
+	rootSnapshot := unittest.RootSnapshotFixture(identities)
+	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
+		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
+		// build epoch 1
+		// Blocks in current State
+		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- F(S_D) |commit|
+		epochBuilder.
+			BuildEpoch().
+			CompleteEpoch()
+
+		// get heights of each phase in built epochs
+		epoch1, ok := epochBuilder.EpochHeights(1)
+		require.True(suite.T(), ok)
+
+		// setup AtHeight mock returns for State
+		for _, height := range epoch1.Range() {
+			suite.state.On("AtHeight", height).Return(state.AtHeight(height))
+		}
+
+		// Take snapshot at height of block D (epoch1.heights[2]) for valid segment and valid snapshot
+		snap := state.AtHeight(epoch1.Range()[2])
+		suite.state.On("Final").Return(snap).Once()
+
+		params := suite.defaultBackendParams()
+		params.MaxHeightRange = TEST_MAX_HEIGHT
+
+		backend, err := New(params)
+		suite.Require().NoError(err)
+
+		// query the handler for the latest finalized snapshot
+		bytes, err := backend.GetProtocolStateSnapshotByHeight(context.Background(), epoch1.Range()[2])
+		suite.Require().NoError(err)
+
+		// we expect the endpoint to return the snapshot at the same height we requested
+		expectedSnapshotBytes, err := convert.SnapshotToBytes(snap)
+		suite.Require().NoError(err)
+		suite.Require().Equal(expectedSnapshotBytes, bytes)
+	})
+}
+
+// TestGetProtocolStateSnapshotByHeight tests our GetProtocolStateSnapshotByHeight RPC endpoint
+func (suite *Suite) TestGetProtocolStateSnapshotByHeight_NonFinalizedBlocks() {
+	identities := unittest.CompleteIdentitySet()
+	rootSnapshot := unittest.RootSnapshotFixture(identities)
+	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
+		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
+		// build epoch 1
+		// Blocks in current State
+		// P <- A(S_P-1) <- B(S_P) <- C(S_A) <- D(S_B) |setup| <- E(S_C) <- F(S_D) |commit|
+		epochBuilder.
+			BuildEpoch().
+			CompleteEpoch()
+
+		// get heights of each phase in built epochs
+		epoch1, ok := epochBuilder.EpochHeights(1)
+		require.True(suite.T(), ok)
+
+		// setup AtHeight mock returns for State
+		for _, height := range epoch1.Range() {
+			suite.state.On("AtHeight", height).Return(state.AtHeight(height))
+		}
+
+		// Take snapshot at height of block D (epoch1.heights[2]) for valid segment and valid snapshot
+		snap := state.AtHeight(epoch1.Range()[2])
+		suite.state.On("Final").Return(snap).Once()
+
+		params := suite.defaultBackendParams()
+		params.MaxHeightRange = TEST_MAX_HEIGHT
+
+		backend, err := New(params)
+		suite.Require().NoError(err)
+
+		// query the handler for the latest finalized snapshot
+		bytes, err := backend.GetProtocolStateSnapshotByHeight(context.Background(), epoch1.Range()[2])
+		suite.Require().NoError(err)
+
+		// we expect the endpoint to return the snapshot at the same height we requested
+		expectedSnapshotBytes, err := convert.SnapshotToBytes(snap)
+		suite.Require().NoError(err)
+		suite.Require().Equal(expectedSnapshotBytes, bytes)
+	})
+}
+
+// TestGetProtocolStateSnapshotByHeight tests our GetProtocolStateSnapshotByHeight RPC endpoint
+func (suite *Suite) TestGetProtocolStateSnapshotByHeight_InvalidSegments() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
 	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
