@@ -2,6 +2,8 @@ package leader
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/prg"
@@ -20,7 +22,7 @@ func SelectionForCluster(cluster protocol.Cluster, epoch protocol.Epoch) (*Leade
 		return nil, fmt.Errorf("inconsistent counter between epoch (%d) and cluster (%d)", counter, cluster.EpochCounter())
 	}
 
-	identities := cluster.Members()
+	identities := cluster.Members().Filter(filter.HasInitialWeight[flow.IdentitySkeleton](true))
 	// get the random source of the current epoch
 	randomSeed, err := epoch.RandomSource()
 	if err != nil {

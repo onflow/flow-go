@@ -49,10 +49,9 @@ func NewClusterCommittee(
 		return nil, fmt.Errorf("could not compute leader selection for cluster: %w", err)
 	}
 
-	initialClusterMembers := cluster.Members()
-	totalWeight := initialClusterMembers.TotalWeight()
-	initialClusterMembersSelector := initialClusterMembers.Selector()
-	initialClusterIdentities := constructInitialClusterIdentities(initialClusterMembers)
+	initialClusterIdentities := constructInitialClusterIdentities(cluster.Members())
+	totalWeight := initialClusterIdentities.TotalWeight()
+	initialClusterMembersSelector := initialClusterIdentities.Selector()
 
 	com := &Cluster{
 		state:     state,
@@ -61,10 +60,10 @@ func NewClusterCommittee(
 		selection: selection,
 		clusterMemberFilter: filter.And[flow.Identity](
 			// adapt the identity filter to the identity skeleton filter
-			filter.Adapt(initialClusterMembersSelector),
+			initialClusterMembersSelector,
 			filter.IsValidCurrentEpochParticipant,
 		),
-		clusterMembers:           initialClusterMembers,
+		clusterMembers:           initialClusterIdentities.ToSkeleton(),
 		initialClusterIdentities: initialClusterIdentities,
 		weightThresholdForQC:     WeightThresholdToBuildQC(totalWeight),
 		weightThresholdForTO:     WeightThresholdToTimeout(totalWeight),
@@ -202,6 +201,7 @@ func constructInitialClusterIdentities(clusterMembers flow.IdentitySkeletonList)
 		if skeleton.InitialWeight == 0 {
 			continue
 		}
+		initialClusterIdentities = append(initialClusterIdentities, &flow.Identity{
 			IdentitySkeleton: *skeleton,
 			DynamicIdentity: flow.DynamicIdentity{
 				EpochParticipationStatus: flow.EpochParticipationStatusActive,
