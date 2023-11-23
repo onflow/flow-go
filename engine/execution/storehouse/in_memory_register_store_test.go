@@ -604,7 +604,7 @@ func TestInMemoryRegisterStore(t *testing.T) {
 	})
 
 	t.Run("PrunedError", func(t *testing.T) {
-		e := NewPrunedError(1, 2)
+		e := NewPrunedError(1, 2, unittest.IdentifierFixture())
 		pe, ok := IsPrunedError(e)
 		require.True(t, ok)
 		require.Equal(t, uint64(1), pe.Height)
