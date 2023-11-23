@@ -155,11 +155,11 @@ func (s *AccessAPISuite) TestScriptExecutionAndGetAccountsAN1() {
 	targetHeight := txResult.BlockHeight + 1
 	s.log.Error().Msgf("LOG:target height is %d", targetHeight)
 	s.waitUntilIndexed(targetHeight)
-	s.log.Error().Msg("LOG:out of waitUntil")
+	s.log.Error().Msg("LOG:TestScriptExecutionAndGetAccountsAN1: out of waitUntil")
 
 	// Run tests against Access 1, which uses the execution node
 	s.testGetAccount(s.an1Client)
-	s.log.Error().Msg("LOG:out of testGetAccount")
+	s.log.Error().Msg("LOG:TestScriptExecutionAndGetAccountsAN1: out of testGetAccount")
 	//s.testExecuteScriptWithSimpleScript(s.an1Client)
 	//s.testExecuteScriptWithSimpleContract(s.an1Client, targetHeight)
 }
@@ -195,19 +195,19 @@ func createFlowAccount(ctx context.Context, client *testnet.Client, log zerolog.
 		SetHashAlgo(sdkcrypto.SHA2_256).
 		SetWeight(sdk.AccountKeyWeightThreshold)
 
-	log.Error().Msg("LOG:before latest block")
+	log.Error().Msg("LOG:createFlowAccount:before latest block")
 	latestBlockID, err := client.GetLatestBlockID(ctx)
 	if err != nil {
 		return sdk.EmptyAddress, fmt.Errorf("failed to get latest block id: %w", err)
 	}
-	log.Error().Msg("LOG: latest block")
+	log.Error().Msg("LOG:createFlowAccount:after latest block")
 
 	// createAccount will submit a create account transaction and wait for it to be sealed
 	addr, err := client.CreateAccount(ctx, fullAccountKey, sdk.Identifier(latestBlockID))
 	if err != nil {
 		return sdk.EmptyAddress, fmt.Errorf("failed to create account: %w", err)
 	}
-	log.Error().Msgf("LOG: account created in function")
+	log.Error().Msgf("LOG:createFlowAccount:account created in function")
 
 	return addr, nil
 }
@@ -227,7 +227,7 @@ func (s *AccessAPISuite) testGetAccount(client *client.Client) {
 		s.Assert().NotZero(account.Balance)
 	})
 
-	/*s.Run("get account block ID", func() {
+	s.Run("get account block ID", func() {
 		account, err := s.waitAccountsUntilIndexed(func() (*sdk.Account, error) {
 			return client.GetAccountAtLatestBlock(s.ctx, serviceAddress)
 		})
@@ -243,14 +243,14 @@ func (s *AccessAPISuite) testGetAccount(client *client.Client) {
 		s.Require().NoError(err)
 		s.Assert().Equal(serviceAddress, account.Address)
 		s.Assert().NotZero(account.Balance)
-	})*/
+	})
 
 	s.Run("get newly created account", func() {
 		addr, err := createFlowAccount(s.ctx, s.serviceClient, s.log)
-		s.log.Error().Msg("LOG:account created")
+		s.log.Error().Msg("LOG:testGetAccount:account created")
 		s.Require().NoError(err)
 		acc, err := client.GetAccount(s.ctx, addr)
-		s.log.Error().Msg("LOG:get account done")
+		s.log.Error().Msg("LOG:testGetAccount:get account done")
 		s.Require().NoError(err)
 		s.Assert().Equal(addr, acc.Address)
 	})
