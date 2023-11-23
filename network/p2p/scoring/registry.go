@@ -310,7 +310,7 @@ func (r *GossipSubAppSpecificScoreRegistry) computeAppSpecificScore(pid peer.ID)
 
 	lg.Trace().
 		Float64("total_app_specific_score", appSpecificScore).
-		Msg("application specific penalty computed")
+		Msg("application specific score computed")
 
 	return appSpecificScore
 }
@@ -331,7 +331,7 @@ func (r *GossipSubAppSpecificScoreRegistry) processAppSpecificScoreUpdateWork(p 
 	r.logger.Trace().
 		Str("remote_peer_id", p2plogging.PeerId(p)).
 		Float64("app_specific_score", appSpecificScore).
-		Msg("application specific penalty computed and cache updated")
+		Msg("application specific score computed and cache updated")
 	return nil
 }
 
@@ -424,7 +424,7 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 	}
 
 	lg.Debug().
-		Float64("app_specific_score", record.Penalty).
+		Float64("spam_record_penalty", record.Penalty).
 		Msg("applied misbehaviour penalty and updated application specific penalty")
 }
 

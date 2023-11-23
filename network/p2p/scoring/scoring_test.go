@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"testing"
+	"time"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -12,6 +13,7 @@ import (
 	mocktestify "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
@@ -98,12 +100,19 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 		// override the gossipsub rpc inspector suite factory to return the mock inspector suite
 		return inspectorSuite1, nil
 	}
+
+	cfg, err := config.DefaultConfig()
+	require.NoError(t, err)
+
+	cfg.NetworkConfig.GossipSub.ScoringParameters.AppSpecificScore.ScoreTTL = 10 * time.Millisecond // speed up the test
+
 	node1, id1 := p2ptest.NodeFixture(
 		t,
 		sporkId,
 		t.Name(),
 		idProvider,
 		p2ptest.WithRole(flow.RoleConsensus),
+		p2ptest.OverrideFlowConfig(cfg),
 		p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride),
 		p2ptest.OverrideGossipSubRpcInspectorSuiteFactory(factory))
 
@@ -113,6 +122,7 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 		t.Name(),
 		idProvider,
 		p2ptest.WithRole(flow.RoleConsensus),
+		p2ptest.OverrideFlowConfig(cfg),
 		p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride))
 
 	ids := flow.IdentityList{&id1, &id2}
@@ -145,6 +155,8 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 			Error:   fmt.Errorf("invalid control message"),
 		})
 	}
+
+	time.Sleep(1 * time.Second) // wait for app-specific score to be updated in the cache (remember that we need at least 100 ms for the score to be updated (ScoreTTL))
 
 	// checks no GossipSubParameters message exchange should no longer happen between node1 and node2.
 	p2ptest.EnsureNoPubsubExchangeBetweenGroups(

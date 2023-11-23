@@ -33,6 +33,7 @@ func TestScoreRegistry_FreshStart(t *testing.T) {
 	peerID := peer.ID("peer-1")
 
 	reg, spamRecords, appScoreCache := newGossipSubAppSpecificScoreRegistry(t,
+		withScoreTTL(100*time.Millisecond), // refresh cached app-specific score every 100 milliseconds to speed up the test.
 		withStakedIdentity(peerID),
 		withValidSubscriptions(peerID))
 
@@ -112,6 +113,7 @@ func testScoreRegistryPeerWithSpamRecord(t *testing.T, messageType p2pmsg.Contro
 
 	reg, spamRecords, appScoreCache := newGossipSubAppSpecificScoreRegistry(
 		t,
+		withScoreTTL(100*time.Millisecond), // refresh cached app-specific score every 100 milliseconds to speed up the test.
 		withStakedIdentity(peerID),
 		withValidSubscriptions(peerID))
 
@@ -208,6 +210,7 @@ func testScoreRegistrySpamRecordWithUnknownIdentity(t *testing.T, messageType p2
 	peerID := peer.ID("peer-1")
 	reg, spamRecords, appScoreCache := newGossipSubAppSpecificScoreRegistry(
 		t,
+		withScoreTTL(100*time.Millisecond), // refresh cached app-specific score every 100 milliseconds to speed up the test.
 		withUnknownIdentity(peerID),
 		withValidSubscriptions(peerID))
 
@@ -310,6 +313,7 @@ func testScoreRegistrySpamRecordWithSubscriptionPenalty(t *testing.T, messageTyp
 	peerID := peer.ID("peer-1")
 	reg, spamRecords, appScoreCache := newGossipSubAppSpecificScoreRegistry(
 		t,
+		withScoreTTL(100*time.Millisecond), // refresh cached app-specific score every 100 milliseconds to speed up the test.
 		withStakedIdentity(peerID),
 		withInvalidSubscriptions(peerID))
 
@@ -376,11 +380,18 @@ func testScoreRegistrySpamRecordWithSubscriptionPenalty(t *testing.T, messageTyp
 }
 
 // TestSpamPenaltyDecaysInCache tests that the spam penalty records decay over time in the cache.
-func TestSpamPenaltyDecaysInCache(t *testing.T) {
+func TestScoreRegistry_SpamPenaltyDecaysInCache(t *testing.T) {
 	peerID := peer.ID("peer-1")
 	reg, _, _ := newGossipSubAppSpecificScoreRegistry(t,
+		withScoreTTL(100*time.Millisecond), // refresh cached app-specific score every 100 milliseconds to speed up the test.
 		withStakedIdentity(peerID),
 		withValidSubscriptions(peerID))
+
+	// starts the registry.
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+	reg.Start(signalerCtx)
+	unittest.RequireCloseBefore(t, reg.Ready(), 1*time.Second, "failed to start GossipSubAppSpecificScoreRegistry")
 
 	// report a misbehavior for the peer id.
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
@@ -418,10 +429,6 @@ func TestSpamPenaltyDecaysInCache(t *testing.T) {
 
 	time.Sleep(1 * time.Second) // wait for the penalty to decay.
 
-	// when the app specific penalty function is called for the first time, the decay functionality should be kicked in
-	// the cache, and the penalty should be updated. Note that since the penalty values are negative, the default staked identity
-	// reward is not applied. Hence, the penalty is only comprised of the penalties.
-	score := reg.AppSpecificScoreFunc()(peerID)
 	// the upper bound is the sum of the penalties without decay.
 	scoreUpperBound := penaltyValueFixtures().Prune +
 		penaltyValueFixtures().Graft +
@@ -432,17 +439,28 @@ func TestSpamPenaltyDecaysInCache(t *testing.T) {
 	// in reality, the decay is applied 4 times to the first penalty, then 3 times to the second penalty, and so on.
 	scoreLowerBound := scoreUpperBound * math.Pow(scoring.InitAppScoreRecordState().Decay, 4)
 
-	// with decay, the penalty should be between the upper and lower bounds.
-	assert.Greater(t, score, scoreUpperBound)
-	assert.Less(t, score, scoreLowerBound)
+	// eventually, the app specific score should be updated in the cache.
+	require.Eventually(t, func() bool {
+		// when the app specific penalty function is called for the first time, the decay functionality should be kicked in
+		// the cache, and the penalty should be updated. Note that since the penalty values are negative, the default staked identity
+		// reward is not applied. Hence, the penalty is only comprised of the penalties.
+		score := reg.AppSpecificScoreFunc()(peerID)
+		// with decay, the penalty should be between the upper and lower bounds.
+		return score > scoreUpperBound && score < scoreLowerBound
+	}, 5*time.Second, 100*time.Millisecond)
+
+	// stop the registry.
+	cancel()
+	unittest.RequireCloseBefore(t, reg.Done(), 1*time.Second, "failed to stop GossipSubAppSpecificScoreRegistry")
 }
 
 // TestSpamPenaltyDecayToZero tests that the spam penalty decays to zero over time, and when the spam penalty of
 // a peer is set back to zero, its app specific penalty is also reset to the initial state.
-func TestSpamPenaltyDecayToZero(t *testing.T) {
+func TestScoreRegistry_SpamPenaltyDecayToZero(t *testing.T) {
 	peerID := peer.ID("peer-1")
 	reg, spamRecords, _ := newGossipSubAppSpecificScoreRegistry(
 		t,
+		withScoreTTL(100*time.Millisecond), // refresh cached app-specific score every 100 milliseconds to speed up the test.
 		withStakedIdentity(peerID),
 		withValidSubscriptions(peerID),
 		withInitFunction(func() p2p.GossipSubSpamRecord {
@@ -451,6 +469,12 @@ func TestSpamPenaltyDecayToZero(t *testing.T) {
 				Penalty: 0,
 			}
 		}))
+
+	// starts the registry.
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+	reg.Start(signalerCtx)
+	unittest.RequireCloseBefore(t, reg.Ready(), 1*time.Second, "failed to start GossipSubAppSpecificScoreRegistry")
 
 	// report a misbehavior for the peer id.
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
@@ -461,9 +485,11 @@ func TestSpamPenaltyDecayToZero(t *testing.T) {
 	// decays happen every second, so we wait for 1 second to make sure the penalty is updated.
 	time.Sleep(1 * time.Second)
 	// the penalty should now be updated, it should be still negative but greater than the penalty value (due to decay).
-	score := reg.AppSpecificScoreFunc()(peerID)
-	require.Less(t, score, float64(0))                      // the penalty should be less than zero.
-	require.Greater(t, score, penaltyValueFixtures().Graft) // the penalty should be less than the penalty value due to decay.
+	require.Eventually(t, func() bool {
+		score := reg.AppSpecificScoreFunc()(peerID)
+		// the penalty should be less than zero and greater than the penalty value (due to decay).
+		return score < 0 && score > penaltyValueFixtures().Graft
+	}, 5*time.Second, 100*time.Millisecond)
 
 	require.Eventually(t, func() bool {
 		// the spam penalty should eventually decay to zero.
@@ -481,15 +507,20 @@ func TestSpamPenaltyDecayToZero(t *testing.T) {
 	assert.True(t, ok)
 	assert.NoError(t, err)
 	assert.Equal(t, 0.0, record.Penalty) // penalty should be zero.
+
+	// stop the registry.
+	cancel()
+	unittest.RequireCloseBefore(t, reg.Done(), 1*time.Second, "failed to stop GossipSubAppSpecificScoreRegistry")
 }
 
 // TestPersistingUnknownIdentityPenalty tests that even though the spam penalty is decayed to zero, the unknown identity penalty
 // is persisted. This is because the unknown identity penalty is not decayed.
-func TestPersistingUnknownIdentityPenalty(t *testing.T) {
+func TestScoreRegistry_PersistingUnknownIdentityPenalty(t *testing.T) {
 	peerID := peer.ID("peer-1")
 	reg, spamRecords, _ := newGossipSubAppSpecificScoreRegistry(
 		t,
-		withUnknownIdentity(peerID), // the peer id has an unknown identity.
+		withScoreTTL(100*time.Millisecond), // refresh cached app-specific score every 100 milliseconds to speed up the test.
+		withUnknownIdentity(peerID),        // the peer id has an unknown identity.
 		withValidSubscriptions(peerID),
 		withInitFunction(func() p2p.GossipSubSpamRecord {
 			return p2p.GossipSubSpamRecord{
@@ -498,8 +529,17 @@ func TestPersistingUnknownIdentityPenalty(t *testing.T) {
 			}
 		}))
 
+	// starts the registry.
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+	reg.Start(signalerCtx)
+	unittest.RequireCloseBefore(t, reg.Ready(), 1*time.Second, "failed to start GossipSubAppSpecificScoreRegistry")
+
 	// initially, the app specific score should be the default unknown identity penalty.
-	require.Equal(t, scoring.DefaultUnknownIdentityPenalty, reg.AppSpecificScoreFunc()(peerID))
+	require.Eventually(t, func() bool {
+		score := reg.AppSpecificScoreFunc()(peerID)
+		return score == scoring.DefaultUnknownIdentityPenalty
+	}, 5*time.Second, 100*time.Millisecond)
 
 	// report a misbehavior for the peer id.
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
@@ -507,20 +547,17 @@ func TestPersistingUnknownIdentityPenalty(t *testing.T) {
 		MsgType: p2pmsg.CtrlMsgGraft,
 	})
 
-	// with reported spam, the app specific score should be the default unknown identity + the spam penalty.
-	diff := math.Abs(scoring.DefaultUnknownIdentityPenalty + penaltyValueFixtures().Graft - reg.AppSpecificScoreFunc()(peerID))
-	normalizedDiff := diff / (scoring.DefaultUnknownIdentityPenalty + penaltyValueFixtures().Graft)
-	require.NotZero(t, normalizedDiff, "difference between the expected and actual app specific score should not be zero")
-	require.Less(t,
-		normalizedDiff,
-		0.01, "normalized difference between the expected and actual app specific score should be less than 1%")
-
 	// decays happen every second, so we wait for 1 second to make sure the penalty is updated.
 	time.Sleep(1 * time.Second)
+
 	// the penalty should now be updated, it should be still negative but greater than the penalty value (due to decay).
-	score := reg.AppSpecificScoreFunc()(peerID)
-	require.Less(t, score, float64(0))                                                            // the penalty should be less than zero.
-	require.Greater(t, score, penaltyValueFixtures().Graft+scoring.DefaultUnknownIdentityPenalty) // the penalty should be less than the penalty value due to decay.
+	require.Eventually(t, func() bool {
+		score := reg.AppSpecificScoreFunc()(peerID)
+		// Ideally, the score should be the sum of the default invalid subscription penalty and the graft penalty, however,
+		// due to exponential decay of the spam penalty and asynchronous update the app specific score; score should be in the range of [scoring.
+		// (scoring.DefaultUnknownIdentityPenalty+penaltyValueFixtures().Graft, scoring.DefaultUnknownIdentityPenalty).
+		return score < scoring.DefaultUnknownIdentityPenalty && score > scoring.DefaultUnknownIdentityPenalty+penaltyValueFixtures().Graft
+	}, 5*time.Second, 100*time.Millisecond)
 
 	require.Eventually(t, func() bool {
 		// the spam penalty should eventually decay to zero.
@@ -538,14 +575,19 @@ func TestPersistingUnknownIdentityPenalty(t *testing.T) {
 	assert.True(t, ok)
 	assert.NoError(t, err)
 	assert.Equal(t, 0.0, record.Penalty) // penalty should be zero.
+
+	// stop the registry.
+	cancel()
+	unittest.RequireCloseBefore(t, reg.Done(), 1*time.Second, "failed to stop GossipSubAppSpecificScoreRegistry")
 }
 
 // TestPersistingInvalidSubscriptionPenalty tests that even though the spam penalty is decayed to zero, the invalid subscription penalty
 // is persisted. This is because the invalid subscription penalty is not decayed.
-func TestPersistingInvalidSubscriptionPenalty(t *testing.T) {
+func TestScoreRegistry_PersistingInvalidSubscriptionPenalty(t *testing.T) {
 	peerID := peer.ID("peer-1")
 	reg, spamRecords, _ := newGossipSubAppSpecificScoreRegistry(
 		t,
+		withScoreTTL(100*time.Millisecond), // refresh cached app-specific score every 100 milliseconds to speed up the test.
 		withStakedIdentity(peerID),
 		withInvalidSubscriptions(peerID), // the peer id has an invalid subscription.
 		withInitFunction(func() p2p.GossipSubSpamRecord {
@@ -555,8 +597,17 @@ func TestPersistingInvalidSubscriptionPenalty(t *testing.T) {
 			}
 		}))
 
+	// starts the registry.
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+	reg.Start(signalerCtx)
+	unittest.RequireCloseBefore(t, reg.Ready(), 1*time.Second, "failed to start GossipSubAppSpecificScoreRegistry")
+
 	// initially, the app specific score should be the default invalid subscription penalty.
-	require.Equal(t, scoring.DefaultUnknownIdentityPenalty, reg.AppSpecificScoreFunc()(peerID))
+	require.Eventually(t, func() bool {
+		score := reg.AppSpecificScoreFunc()(peerID)
+		return score == scoring.DefaultInvalidSubscriptionPenalty
+	}, 5*time.Second, 100*time.Millisecond)
 
 	// report a misbehavior for the peer id.
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
@@ -565,14 +616,13 @@ func TestPersistingInvalidSubscriptionPenalty(t *testing.T) {
 	})
 
 	// with reported spam, the app specific score should be the default invalid subscription penalty + the spam penalty.
-	require.Less(t, math.Abs(scoring.DefaultInvalidSubscriptionPenalty+penaltyValueFixtures().Graft-reg.AppSpecificScoreFunc()(peerID)), 10e-3)
-
-	// decays happen every second, so we wait for 1 second to make sure the penalty is updated.
-	time.Sleep(1 * time.Second)
-	// the penalty should now be updated, it should be still negative but greater than the penalty value (due to decay).
-	score := reg.AppSpecificScoreFunc()(peerID)
-	require.Less(t, score, float64(0))                                                                // the penalty should be less than zero.
-	require.Greater(t, score, penaltyValueFixtures().Graft+scoring.DefaultInvalidSubscriptionPenalty) // the penalty should be less than the penalty value due to decay.
+	require.Eventually(t, func() bool {
+		score := reg.AppSpecificScoreFunc()(peerID)
+		// Ideally, the score should be the sum of the default invalid subscription penalty and the graft penalty, however,
+		// due to exponential decay of the spam penalty and asynchronous update the app specific score; score should be in the range of [scoring.
+		// (DefaultInvalidSubscriptionPenalty+penaltyValueFixtures().Graft, scoring.DefaultInvalidSubscriptionPenalty).
+		return score < scoring.DefaultInvalidSubscriptionPenalty && score > scoring.DefaultInvalidSubscriptionPenalty+penaltyValueFixtures().Graft
+	}, 5*time.Second, 100*time.Millisecond)
 
 	require.Eventually(t, func() bool {
 		// the spam penalty should eventually decay to zero.
@@ -590,6 +640,10 @@ func TestPersistingInvalidSubscriptionPenalty(t *testing.T) {
 	assert.True(t, ok)
 	assert.NoError(t, err)
 	assert.Equal(t, 0.0, record.Penalty) // penalty should be zero.
+
+	// stop the registry.
+	cancel()
+	unittest.RequireCloseBefore(t, reg.Done(), 1*time.Second, "failed to stop GossipSubAppSpecificScoreRegistry")
 }
 
 // withStakedIdentity returns a function that sets the identity provider to return an staked identity for the given peer id.
@@ -632,8 +686,33 @@ func withInitFunction(initFunction func() p2p.GossipSubSpamRecord) func(cfg *sco
 	}
 }
 
-// newGossipSubAppSpecificScoreRegistry returns a new instance of GossipSubAppSpecificScoreRegistry with default values
-// for the testing purposes.
+func withScoreTTL(scoreTTL time.Duration) func(cfg *scoring.GossipSubAppSpecificScoreRegistryConfig) {
+	return func(cfg *scoring.GossipSubAppSpecificScoreRegistryConfig) {
+		cfg.Parameters.ScoreTTL = scoreTTL
+	}
+}
+
+// newGossipSubAppSpecificScoreRegistry creates a new instance of GossipSubAppSpecificScoreRegistry along with its associated
+// GossipSubSpamRecordCache and AppSpecificScoreCache. This function is primarily used in testing scenarios to set up a controlled
+// environment for evaluating the behavior of the GossipSub scoring mechanism.
+//
+// The function accepts a variable number of options to configure the GossipSubAppSpecificScoreRegistryConfig, allowing for
+// customization of the registry's behavior in tests. These options can modify various aspects of the configuration, such as
+// penalty values, identity providers, validators, and caching mechanisms.
+//
+// Parameters:
+// - t *testing.T: The test context, used for asserting the absence of errors during the setup.
+// - opts ...func(*scoring.GossipSubAppSpecificScoreRegistryConfig): A variadic set of functions that modify the registry's configuration.
+//
+// Returns:
+// - *scoring.GossipSubAppSpecificScoreRegistry: The configured GossipSub application-specific score registry.
+// - *netcache.GossipSubSpamRecordCache: The cache used for storing spam records.
+// - *internal.AppSpecificScoreCache: The cache for storing application-specific scores.
+//
+// This function initializes and configures the scoring registry with default and test-specific settings. It sets up a spam record cache
+// and an application-specific score cache with predefined sizes and functionalities. The function also configures the scoring parameters
+// with test-specific values, particularly modifying the ScoreTTL value for the purpose of the tests. The creation and configuration of
+// the GossipSubAppSpecificScoreRegistry are validated to ensure no errors occur during the process.
 func newGossipSubAppSpecificScoreRegistry(t *testing.T, opts ...func(*scoring.GossipSubAppSpecificScoreRegistryConfig)) (*scoring.GossipSubAppSpecificScoreRegistry,
 	*netcache.GossipSubSpamRecordCache,
 	*internal.AppSpecificScoreCache) {
@@ -641,8 +720,6 @@ func newGossipSubAppSpecificScoreRegistry(t *testing.T, opts ...func(*scoring.Go
 	appSpecificScoreCache := internal.NewAppSpecificScoreCache(100, unittest.Logger(), metrics.NewNoopHeroCacheMetricsFactory())
 	flowCfg, err := config.DefaultConfig()
 	require.NoError(t, err)
-	// overrides the default values for testing purposes.
-	flowCfg.NetworkConfig.GossipSub.ScoringParameters.AppSpecificScore.ScoreTTL = 100 * time.Millisecond
 
 	validator := mockp2p.NewSubscriptionValidator(t)
 	validator.On("Start", testifymock.Anything).Return().Maybe()
