@@ -5,12 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"testing"
+
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
-	"net/http"
-	"testing"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
