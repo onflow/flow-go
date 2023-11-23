@@ -275,8 +275,12 @@ func (s *state) CreateStorageSnapshot(
 	}
 
 	// make sure we have trie state for this block
-	// TOOD: change to hasState(commit, blockID, height)
-	if !s.hasState(commit) {
+	hasState, err := s.hasState(commit, blockID, header.Height)
+	if err != nil {
+		return nil, header, fmt.Errorf("cannot check state for commit %x (block %v): %w", commit, blockID, err)
+	}
+
+	if !hasState {
 		return nil, header, fmt.Errorf("state not found for commit %x (block %v): %w", commit, blockID, ErrExecutionStatePruned)
 	}
 
@@ -319,8 +323,15 @@ func CommitDelta(
 	return newCommit, trieUpdate, newStorageSnapshot, nil
 }
 
-func (s *state) hasState(commitment flow.StateCommitment) bool {
-	return s.ls.HasState(ledger.State(commitment))
+func (s *state) hasState(commitment flow.StateCommitment, blockID flow.Identifier, height uint64) (bool, error) {
+	ledgerHasState := s.ls.HasState(ledger.State(commitment))
+	if !ledgerHasState {
+		return false, nil
+	}
+	if !s.enableRegisterStore {
+		return true, nil
+	}
+	return s.registerStore.IsBlockExecuted(height, blockID)
 }
 
 func (s *state) StateCommitmentByBlockID(blockID flow.Identifier) (flow.StateCommitment, error) {

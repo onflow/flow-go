@@ -16,6 +16,7 @@ func NewFinalizedReader(headers storage.Headers) *FinalizedReader {
 }
 
 func (r *FinalizedReader) FinalizedBlockIDAtHeight(height uint64) (flow.Identifier, error) {
+	// TODO: cache the last 1000 blocks
 	header, err := r.headers.ByHeight(height)
 	if err != nil {
 		return flow.ZeroID, err
