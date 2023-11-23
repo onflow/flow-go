@@ -250,6 +250,13 @@ jobs:
       name: execution
       make: docker-build-execution
 
+  docker-build-execution-corrupt:
+    name: Docker Build Corrupt Execution
+    uses: ./.github/workflows/docker-build.yml
+    with:
+      name: execution-corrupt
+      make: docker-build-execution-corrupt
+
   docker-build-ghost:
     name: Docker Build Ghost
     uses: ./.github/workflows/docker-build.yml
@@ -293,8 +300,7 @@ jobs:
       - name: Save Docker images
         run: |
           docker save \
-          gcr.io/flow-container-registry/execution-corrupted:latest \
-          gcr.io/flow-container-registry/verification-corrupted:latest > flow-docker-images2.tar
+          gcr.io/flow-container-registry/verification-corrupt:latest > flow-docker-images2.tar
       - name: Cache Docker images 2
         uses: actions/cache@v3
         with:
