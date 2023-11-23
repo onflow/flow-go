@@ -103,7 +103,7 @@ func addFinalizeCmdFlags() {
 	finalizeCmd.Flags().Uint64Var(&flagNumViewsInStakingAuction, "epoch-staking-phase-length", 100, "length of the epoch staking phase measured in views")
 	finalizeCmd.Flags().Uint64Var(&flagNumViewsInDKGPhase, "epoch-dkg-phase-length", 1000, "length of each DKG phase measured in views")
 	finalizeCmd.Flags().Uint64Var(&flagEpochCommitSafetyThreshold, "epoch-commit-safety-threshold", 500, "defines epoch commitment deadline")
-	// Epoch timing config - these values can be set identically to `EpochTimingConfig` in the FlowEpoch smart contract.
+	// Epoch timing config - these values must be set identically to `EpochTimingConfig` in the FlowEpoch smart contract.
 	// See https://github.com/onflow/flow-core-contracts/blob/240579784e9bb8d97d91d0e3213614e25562c078/contracts/epochs/FlowEpoch.cdc#L259-L266
 	// Must specify either:
 	//   1. --epoch-default-target-end-time and no other `--epoch-target-end-time*` flags
@@ -689,7 +689,12 @@ func validateEpochConfig() error {
 	return nil
 }
 
-// validateEpochTimingConfig validates the epoch timing config flags.
+// validateEpochTimingConfig validates the epoch timing config flags. In case the 
+// `flagDefaultEpochTargetEndTime` value has been set, the function derives the values for 
+// `flagEpochTargetEndTimeRefCounter`, `flagEpochTargetEndTimeDuration`, and `flagEpochTargetEndTimeRefTimestamp`
+// from the configuration. Otherwise, it enforces that compatible values for the respective parameters have been
+// specified (and errors otherwise). Therefore, after `validateEpochTimingConfig` ran, 
+// the targeted end time for the epoch can be computed via `epochTargetEndTime()`.
 // You can either let the tool choose default values, or specify a value for each config.
 func validateEpochTimingConfig() error {
 	if flagDefaultEpochTargetEndTime {
