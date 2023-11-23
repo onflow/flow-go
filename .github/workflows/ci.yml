@@ -217,115 +217,31 @@ jobs:
 
   docker-build-access:
     name: Docker Build Access
-    runs-on: ubuntu-latest
-    if: github.event.pull_request.draft == false
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
-        with:
-          # all tags are needed for integration tests
-          fetch-depth: 0
-      - name: Setup Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-      - name: Build relic
-        run: make crypto_setup_gopath
-      - name: Docker build
-        run: make docker-build-access
-      - name: Save Docker image
-        run: docker save gcr.io/flow-container-registry/access:latest > flow-docker-access.tar
-      - name: Cache Docker image
-        uses: actions/cache@v3
-        with:
-          path: flow-docker-access.tar
-          # use the workflow run id as part of the cache key to ensure these docker images will only be used for a single workflow run
-          key: flow-docker-images-access-${{ github.run_id }}
+    uses: ./.github/workflows/docker-build.yml
+    with:
+      name: access
+      make: docker-build-access
 
   docker-build-collection:
     name: Docker Build Collection
-    runs-on: ubuntu-latest
-    if: github.event.pull_request.draft == false
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
-        with:
-          # all tags are needed for integration tests
-          fetch-depth: 0
-      - name: Setup Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-      - name: Build relic
-        run: make crypto_setup_gopath
-      - name: Docker build
-        run: make docker-build-collection
-      - name: Save Docker image
-        run: docker save gcr.io/flow-container-registry/collection:latest > flow-docker-collection.tar
-      - name: Cache Docker image
-        uses: actions/cache@v3
-        with:
-          path: flow-docker-collection.tar
-          # use the workflow run id as part of the cache key to ensure these docker images will only be used for a single workflow run
-          key: flow-docker-images-collection-${{ github.run_id }}
+    uses: ./.github/workflows/docker-build.yml
+    with:
+      name: collection
+      make: docker-build-collection
 
   docker-build-consensus:
     name: Docker Build Consensus
-    runs-on: ubuntu-latest
-    if: github.event.pull_request.draft == false
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
-        with:
-          # all tags are needed for integration tests
-          fetch-depth: 0
-      - name: Setup Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-      - name: Build relic
-        run: make crypto_setup_gopath
-      - name: Docker build
-        run: make docker-build-consensus
-      - name: Save Docker image
-        run: docker save gcr.io/flow-container-registry/consensus:latest > flow-docker-consensus.tar
-      - name: Cache Docker image
-        uses: actions/cache@v3
-        with:
-          path: flow-docker-consensus.tar
-          # use the workflow run id as part of the cache key to ensure these docker images will only be used for a single workflow run
-          key: flow-docker-images-consensus-${{ github.run_id }}
+    uses: ./.github/workflows/docker-build.yml
+    with:
+      name: consensus
+      make: docker-build-consensus
 
   docker-build-execution:
     name: Docker Build Execution
-    runs-on: ubuntu-latest
-    if: github.event.pull_request.draft == false
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
-        with:
-          # all tags are needed for integration tests
-          fetch-depth: 0
-      - name: Setup Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-      - name: Build relic
-        run: make crypto_setup_gopath
-      - name: Docker build
-        run: make docker-build-execution
-      - name: Save Docker image
-        run: docker save gcr.io/flow-container-registry/execution:latest > flow-docker-execution.tar
-      - name: Cache Docker image
-        uses: actions/cache@v3
-        with:
-          path: flow-docker-execution.tar
-          # use the workflow run id as part of the cache key to ensure these docker images will only be used for a single workflow run
-          key: flow-docker-images-execution-${{ github.run_id }}
+    uses: ./.github/workflows/docker-build.yml
+    with:
+      name: execution
+      make: docker-build-execution
 
   docker-build-ghost:
     name: Docker Build Ghost
@@ -336,59 +252,17 @@ jobs:
 
   docker-build-observer:
     name: Docker Build Observer
-    runs-on: ubuntu-latest
-    if: github.event.pull_request.draft == false
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
-        with:
-          # all tags are needed for integration tests
-          fetch-depth: 0
-      - name: Setup Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-      - name: Build relic
-        run: make crypto_setup_gopath
-      - name: Docker build
-        run: make docker-build-observer
-      - name: Save Docker images
-        run: docker save gcr.io/flow-container-registry/observer:latest > flow-docker-observer.tar
-      - name: Cache Docker images 1
-        uses: actions/cache@v3
-        with:
-          path: flow-docker-observer.tar
-          # use the workflow run id as part of the cache key to ensure these docker images will only be used for a single workflow run
-          key: flow-docker-observer-${{ github.run_id }}
+    uses: ./.github/workflows/docker-build.yml
+    with:
+      name: observer
+      make: docker-build-observer
 
   docker-build-verification:
     name: Docker Build Verification
-    runs-on: ubuntu-latest
-    if: github.event.pull_request.draft == false
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
-        with:
-          # all tags are needed for integration tests
-          fetch-depth: 0
-      - name: Setup Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-      - name: Build relic
-        run: make crypto_setup_gopath
-      - name: Docker build
-        run: make docker-build-verification
-      - name: Save Docker image
-        run: docker save gcr.io/flow-container-registry/verification:latest > flow-docker-verification.tar
-      - name: Cache Docker image
-        uses: actions/cache@v3
-        with:
-          path: flow-docker-verification.tar
-          # use the workflow run id as part of the cache key to ensure these docker images will only be used for a single workflow run
-          key: flow-docker-images-verification-${{ github.run_id }}
+    uses: ./.github/workflows/docker-build.yml
+    with:
+      name: verification
+      make: docker-build-verification
 
   docker-build2:
     name: Docker Build 2
