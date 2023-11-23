@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/environment"
-	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -27,8 +26,8 @@ func RunWithTestFlowEVMRootAddress(t testing.TB, backend atree.Ledger, f func(fl
 	f(TestFlowEVMRootAddress)
 }
 
-func RunWithTestBackend(t testing.TB, f func(types.Backend)) {
-	tb := &testBackend{
+func RunWithTestBackend(t testing.TB, f func(*TestBackend)) {
+	tb := &TestBackend{
 		TestValueStore:   GetSimpleValueStore(),
 		testEventEmitter: getSimpleEventEmitter(),
 		testMeter:        getSimpleMeter(),
@@ -71,18 +70,31 @@ func GetSimpleValueStore() *TestValueStore {
 			binary.BigEndian.PutUint64(data[:], index)
 			return atree.StorageIndex(data), nil
 		},
+		TotalStorageSizeFunc: func() int {
+			sum := 0
+			for key, value := range data {
+				sum += len(key) + len(value)
+			}
+			for key := range allocator {
+				sum += len(key) + 8
+			}
+			return sum
+		},
 	}
 }
 
 func getSimpleEventEmitter() *testEventEmitter {
 	events := make(flow.EventsList, 0)
 	return &testEventEmitter{
-		emitFlowEvent: func(etype flow.EventType, payload []byte) error {
+		emitRawEvent: func(etype flow.EventType, payload []byte) error {
 			events = append(events, flow.Event{Type: etype, Payload: payload})
 			return nil
 		},
 		events: func() flow.EventsList {
 			return events
+		},
+		reset: func() {
+			events = make(flow.EventsList, 0)
 		},
 	}
 }
@@ -107,10 +119,24 @@ func getSimpleMeter() *testMeter {
 	}
 }
 
-type testBackend struct {
+type TestBackend struct {
 	*TestValueStore
 	*testMeter
 	*testEventEmitter
+}
+
+func (tb *TestBackend) TotalStorageSize() int {
+	if tb.TotalStorageSizeFunc == nil {
+		panic("method not set")
+	}
+	return tb.TotalStorageSizeFunc()
+}
+
+func (tb *TestBackend) DropEvents() {
+	if tb.reset == nil {
+		panic("method not set")
+	}
+	tb.reset()
 }
 
 type TestValueStore struct {
@@ -118,6 +144,7 @@ type TestValueStore struct {
 	SetValueFunc             func(owner, key, value []byte) error
 	ValueExistsFunc          func(owner, key []byte) (bool, error)
 	AllocateStorageIndexFunc func(owner []byte) (atree.StorageIndex, error)
+	TotalStorageSizeFunc     func() int
 }
 
 var _ environment.ValueStore = &TestValueStore{}
@@ -148,6 +175,13 @@ func (vs *TestValueStore) AllocateStorageIndex(owner []byte) (atree.StorageIndex
 		panic("method not set")
 	}
 	return vs.AllocateStorageIndexFunc(owner)
+}
+
+func (vs *TestValueStore) TotalStorageSize() int {
+	if vs.TotalStorageSizeFunc == nil {
+		panic("method not set")
+	}
+	return vs.TotalStorageSizeFunc()
 }
 
 type testMeter struct {
@@ -238,7 +272,7 @@ func (m *testMeter) TotalEmittedEventBytes() uint64 {
 
 type testEventEmitter struct {
 	emitEvent              func(event cadence.Event) error
-	emitFlowEvent          func(etype flow.EventType, payload []byte) error
+	emitRawEvent           func(etype flow.EventType, payload []byte) error
 	events                 func() flow.EventsList
 	serviceEvents          func() flow.EventsList
 	convertedServiceEvents func() flow.ServiceEventList
@@ -254,11 +288,11 @@ func (vs *testEventEmitter) EmitEvent(event cadence.Event) error {
 	return vs.emitEvent(event)
 }
 
-func (vs *testEventEmitter) EmitFlowEvent(etype flow.EventType, payload []byte) error {
-	if vs.emitFlowEvent == nil {
+func (vs *testEventEmitter) EmitRawEvent(etype flow.EventType, payload []byte) error {
+	if vs.emitRawEvent == nil {
 		panic("method not set")
 	}
-	return vs.emitFlowEvent(etype, payload)
+	return vs.emitRawEvent(etype, payload)
 }
 
 func (vs *testEventEmitter) Events() flow.EventsList {
