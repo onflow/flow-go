@@ -36,10 +36,10 @@ type TimedBlock struct {
 type epochInfo struct {
 	curEpochFirstView       uint64
 	curEpochFinalView       uint64 // F[v] - the final view of the current epoch
-	curEpochTargetDuration  uint64
+	curEpochTargetDuration  uint64 // desired total duration of current epoch in seconds
 	curEpochTargetEndTime   uint64  // T[v] - the target end time of the current epoch, represented as Unix Time [seconds]
 	nextEpochFinalView      *uint64 // the final view of the next epoch
-	nextEpochTargetDuration *uint64
+	nextEpochTargetDuration *uint64 // desired total duration of next epoch in seconds, or nil if epoch has not yet been set up
 	nextEpochTargetEndTime  *uint64 // the target end time of the next epoch, represented as Unix Time [seconds]
 }
 
@@ -390,10 +390,9 @@ func (ctl *BlockTimeController) measureViewDuration(tb TimedBlock) error {
 	// In accordance with this convention, observing the proposal for the last view of an epoch, marks the start of the last view.
 	// By observing the proposal, nodes enter the last view, verify the block, vote for it, the primary aggregates the votes,
 	// constructs the child (for first view of new epoch). The last view of the epoch ends, when the child proposal is published.
-	tau := ctl.targetViewTime()                                // τ - idealized target view time in units of seconds
-	viewDurationsRemaining := ctl.curEpochFinalView + 1 - view // k[v] - views remaining in current epoch
-
-	durationRemaining := u2t(ctl.curEpochTargetEndTime).Sub(tb.TimeObserved)
+	tau := ctl.targetViewTime()                                // τ: idealized target view time in units of seconds
+	viewDurationsRemaining := ctl.curEpochFinalView + 1 - view // k[v]: views remaining in current epoch
+	durationRemaining := u2t(ctl.curEpochTargetEndTime).Sub(tb.TimeObserved) // Γ[v] = T[v] - t[v], with t[v] ≡ tb.TimeObserved the time when observing the block that trigged the view change
 
 	// Compute instantaneous error term: e[v] = k[v]·τ - T[v] i.e. the projected difference from target switchover
 	// and update PID controller's error terms. All UNITS in SECOND.
@@ -406,7 +405,6 @@ func (ctl *BlockTimeController) measureViewDuration(tb TimedBlock) error {
 	u := propErr*ctl.config.KP + itgErr*ctl.config.KI + drivErr*ctl.config.KD
 
 	// compute the controller output for this observation
-
 	unconstrainedBlockTime := f2d(tau - u) // desired time between parent and child block, in units of seconds
 	proposalTiming := newHappyPathBlockTime(tb, unconstrainedBlockTime, ctl.config.TimingConfig)
 	constrainedBlockTime := proposalTiming.ConstrainedBlockTime()
