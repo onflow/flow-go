@@ -194,7 +194,14 @@ func (c *Cluster) DKG(_ uint64) (hotstuff.DKG, error) {
 func constructInitialClusterIdentities(clusterMembers flow.IdentitySkeletonList) flow.IdentityList {
 	initialClusterIdentities := make(flow.IdentityList, 0, len(clusterMembers))
 	for _, skeleton := range clusterMembers {
-		initialClusterIdentities = append(initialClusterIdentities, &flow.Identity{
+		// CONVENTION: we allow the Epoch setup event to specify nodes with `InitialWeight=0`.
+		// The consensus leader selection allows zero-weighted nodes among the weighted participants. In
+		// accordance with their weight, zero-weighted nodes have zero probability to be selected as leader.
+		// Conceptually, zero-weighted consensus nodes can exist, but accordance with their weight they
+		// cannot contribute to advancing the protocol. Therefore, we do not consider them a valid signer.
+		if skeleton.InitialWeight == 0 {
+			continue
+		}
 			IdentitySkeleton: *skeleton,
 			DynamicIdentity: flow.DynamicIdentity{
 				EpochParticipationStatus: flow.EpochParticipationStatusActive,
