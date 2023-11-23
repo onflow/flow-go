@@ -275,6 +275,7 @@ func (s *state) CreateStorageSnapshot(
 	}
 
 	// make sure we have trie state for this block
+	// TOOD: change to hasState(commit, blockID, height)
 	if !s.hasState(commit) {
 		return nil, header, fmt.Errorf("state not found for commit %x (block %v): %w", commit, blockID, ErrExecutionStatePruned)
 	}
