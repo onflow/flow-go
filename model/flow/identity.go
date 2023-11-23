@@ -41,14 +41,14 @@ type IdentitySkeleton struct {
 // /   - leaving - the node was active in the previous epoch but is not active in the current epoch.
 // /   - ejected - the node has been permanently removed from the network.
 //
-//          EpochSetup
-//	      ┌────────────⬤ unregistered ◯◄───────────┐
-//	┌─────▼─────┐        ┌───────────┐        ┌─────┴─────┐
-//	│  JOINING  ├───────►│  ACTIVE   ├───────►│  LEAVING  │
-//	└─────┬─────┘        └─────┬─────┘        └─────┬─────┘
-//	      │              ┌─────▼─────┐              │
-//	      └─────────────►│  EJECTED  │◄─────────────┘
-//	                     └───────────┘
+// /            EpochSetup
+// /	      ┌────────────⬤ unregistered ◯◄────────────┐
+// /	┌─────▼─────┐        ┌───────────┐        ┌─────┴─────┐
+// /	│  JOINING  ├───────►│  ACTIVE   ├───────►│  LEAVING  │
+// /	└─────┬─────┘        └─────┬─────┘        └─────┬─────┘
+// /	      │              ┌─────▼─────┐              │
+// /          └─────────────►│  EJECTED  │◄─────────────┘
+// /                         └───────────┘
 //
 // Only active nodes are allowed to perform certain tasks relative to other nodes.
 // Nodes which are registered to join at the next epoch will appear in the

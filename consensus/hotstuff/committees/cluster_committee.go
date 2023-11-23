@@ -59,7 +59,6 @@ func NewClusterCommittee(
 		me:        me,
 		selection: selection,
 		clusterMemberFilter: filter.And[flow.Identity](
-			// adapt the identity filter to the identity skeleton filter
 			initialClusterMembersSelector,
 			filter.IsValidCurrentEpochParticipant,
 		),
@@ -179,8 +178,7 @@ func (c *Cluster) DKG(_ uint64) (hotstuff.DKG, error) {
 }
 
 // constructInitialClusterIdentities extends the IdentitySkeletons of the cluster members to their full Identities
-// (in canonical order).  at time of cluster initialization by Epoch smart contract. This represents the cluster
-// composition at the time the cluster was specified by the epoch smart contract.
+// (in canonical order), at the time of cluster initialization by EpochSetup event. This represents the cluster
 //
 // CONTEXT: The EpochSetup event contains the IdentitySkeletons for each cluster, thereby specifying cluster membership.
 // While ejection status is not part of the EpochSetup event, we can supplement this information as follows:
