@@ -2,6 +2,7 @@ package cohort1
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -15,10 +16,10 @@ import (
 	sdk "github.com/onflow/flow-go-sdk"
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
-	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -151,7 +152,7 @@ func (s *AccessAPISuite) TestScriptExecutionAndGetAccountsAN1() {
 	// deploy the test contract
 	txResult := s.deployContract()
 	targetHeight := txResult.BlockHeight + 1
-	//s.log.Error().Msgf("LOG:target height is %d", targetHeight)
+	s.log.Error().Msgf("LOG:target height is %d", targetHeight)
 	s.waitUntilIndexed(targetHeight)
 	s.log.Error().Msg("LOG:out of waitUntil")
 
@@ -187,6 +188,29 @@ func (s *AccessAPISuite) TestMVPScriptExecutionLocalStorage() {
 	mvp.RunMVPTest(s.T(), s.ctx, s.net, s.accessNode2)
 }*/
 
+func createFlowAccount(ctx context.Context, client *testnet.Client, log zerolog.Logger) (sdk.Address, error) {
+	fullAccountKey := sdk.NewAccountKey().
+		SetPublicKey(unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLen).PublicKey()).
+		SetHashAlgo(sdkcrypto.SHA2_256).
+		SetWeight(sdk.AccountKeyWeightThreshold)
+
+	s.log.Error().Msg("LOG:before latest block")
+	latestBlockID, err := client.GetLatestBlockID(ctx)
+	if err != nil {
+		return sdk.EmptyAddress, fmt.Errorf("failed to get latest block id: %w", err)
+	}
+	s.log.Error().Msgf("LOG: latest block %d", latestBlockID.Height())
+
+	// createAccount will submit a create account transaction and wait for it to be sealed
+	addr, err := client.CreateAccount(ctx, fullAccountKey, sdk.Identifier(latestBlockID))
+	if err != nil {
+		return sdk.EmptyAddress, fmt.Errorf("failed to create account: %w", err)
+	}
+	s.log.Error().Msgf("LOG: account created in function")
+
+	return addr, nil
+}
+
 func (s *AccessAPISuite) testGetAccount(client *client.Client) {
 	/*header, err := client.GetLatestBlockHeader(s.ctx, true)
 	s.Require().NoError(err)
@@ -221,7 +245,7 @@ func (s *AccessAPISuite) testGetAccount(client *client.Client) {
 	})*/
 
 	s.Run("get newly created account", func() {
-		addr, err := utils.CreateFlowAccount(s.ctx, s.serviceClient)
+		addr, err := createFlowAccount(s.ctx, s.serviceClient, s.log)
 		s.log.Error().Msg("LOG:account created")
 		s.Require().NoError(err)
 		acc, err := client.GetAccount(s.ctx, addr)
