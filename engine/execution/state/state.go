@@ -53,9 +53,6 @@ type ScriptExecutionState interface {
 	// StateCommitmentByBlockID returns the final state commitment for the provided block ID.
 	StateCommitmentByBlockID(flow.Identifier) (flow.StateCommitment, error)
 
-	// HasState returns true if the state with the given state commitment exists in memory
-	HasState(flow.StateCommitment) bool
-
 	// Any error returned is exception
 	IsBlockExecuted(height uint64, blockID flow.Identifier) (bool, error)
 }
@@ -278,7 +275,7 @@ func (s *state) CreateStorageSnapshot(
 	}
 
 	// make sure we have trie state for this block
-	if !s.HasState(commit) {
+	if !s.hasState(commit) {
 		return nil, header, fmt.Errorf("state not found for commit %x (block %v): %w", commit, blockID, ErrExecutionStatePruned)
 	}
 
@@ -321,7 +318,7 @@ func CommitDelta(
 	return newCommit, trieUpdate, newStorageSnapshot, nil
 }
 
-func (s *state) HasState(commitment flow.StateCommitment) bool {
+func (s *state) hasState(commitment flow.StateCommitment) bool {
 	return s.ls.HasState(ledger.State(commitment))
 }
 

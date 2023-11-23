@@ -750,7 +750,12 @@ func (exeNode *ExecutionNode) LoadStopControl(
 func (exeNode *ExecutionNode) LoadRegisterStore(
 	node *NodeConfig,
 ) error {
+	if !exeNode.exeConf.enableStorehouse {
+		node.Logger.Info().Msg("register store disabled")
+		return nil
+	}
 
+	node.Logger.Info().Msgf("register store enabled, open pebble db at: %v", exeNode.exeConf.registerDir)
 	pebbledb, err := storagepebble.OpenRegisterPebbleDB(exeNode.exeConf.registerDir)
 
 	if err != nil {
@@ -770,6 +775,8 @@ func (exeNode *ExecutionNode) LoadRegisterStore(
 	if err != nil {
 		return fmt.Errorf("could not check if registers db is bootstrapped: %w", err)
 	}
+
+	node.Logger.Info().Msgf("register store bootstrapped: %v", bootstrapped)
 
 	if !bootstrapped {
 		checkpointFile := path.Join(exeNode.exeConf.triedir, modelbootstrap.FilenameWALRootCheckpoint)
