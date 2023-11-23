@@ -94,6 +94,25 @@ func (er *BlockExecutionResult) AllConvertedServiceEvents() flow.ServiceEventLis
 	return res
 }
 
+// AllUpdatedRegisters returns all updated unique register entries
+// Note: order is not determinstic
+func (er *BlockExecutionResult) AllUpdatedRegisters() []flow.RegisterEntry {
+	updates := make(map[flow.RegisterID]flow.RegisterValue)
+	for _, ce := range er.collectionExecutionResults {
+		for regID, regVal := range ce.executionSnapshot.WriteSet {
+			updates[regID] = regVal
+		}
+	}
+	res := make([]flow.RegisterEntry, 0)
+	for regID, regVal := range updates {
+		res = append(res, flow.RegisterEntry{
+			Key:   regID,
+			Value: regVal,
+		})
+	}
+	return res
+}
+
 // BlockAttestationResult holds collection attestation results
 type BlockAttestationResult struct {
 	*BlockExecutionResult

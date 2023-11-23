@@ -9,6 +9,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/engine/execution"
+	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
@@ -103,9 +104,10 @@ type state struct {
 	transactionResults storage.TransactionResults
 	db                 *badger.DB
 
-	// when it is not-nil, registers are stored in both register store and ledger
-	// and register queries will send to the register store instead of ledger
 	registerStore execution.RegisterStore
+	// when it is true, registers are stored in both register store and ledger
+	// and register queries will send to the register store instead of ledger
+	enableRegisterStore bool
 }
 
 // NewExecutionState returns a new execution state access layer for the given ledger storage.
@@ -124,22 +126,24 @@ func NewExecutionState(
 	db *badger.DB,
 	tracer module.Tracer,
 	registerStore execution.RegisterStore,
+	enableRegisterStore bool,
 ) ExecutionState {
 	return &state{
-		tracer:             tracer,
-		ls:                 ls,
-		commits:            commits,
-		blocks:             blocks,
-		headers:            headers,
-		collections:        collections,
-		chunkDataPacks:     chunkDataPacks,
-		results:            results,
-		myReceipts:         myReceipts,
-		events:             events,
-		serviceEvents:      serviceEvents,
-		transactionResults: transactionResults,
-		db:                 db,
-		registerStore:      registerStore,
+		tracer:              tracer,
+		ls:                  ls,
+		commits:             commits,
+		blocks:              blocks,
+		headers:             headers,
+		collections:         collections,
+		chunkDataPacks:      chunkDataPacks,
+		results:             results,
+		myReceipts:          myReceipts,
+		events:              events,
+		serviceEvents:       serviceEvents,
+		transactionResults:  transactionResults,
+		db:                  db,
+		registerStore:       registerStore,
+		enableRegisterStore: enableRegisterStore,
 	}
 
 }
@@ -248,6 +252,9 @@ func (s *state) NewStorageSnapshot(
 	blockID flow.Identifier,
 	height uint64,
 ) snapshot.StorageSnapshot {
+	if s.enableRegisterStore {
+		return storehouse.NewBlockEndStateSnapshot(s.registerStore, blockID, height)
+	}
 	return NewLedgerStorageSnapshot(s.ls, commitment)
 }
 
@@ -354,6 +361,18 @@ func (s *state) SaveExecutionResults(
 	err := s.saveExecutionResults(ctx, result)
 	if err != nil {
 		return fmt.Errorf("could not save execution results: %w", err)
+	}
+
+	if s.enableRegisterStore {
+		// save registers to register store
+		err = s.registerStore.SaveRegisters(
+			result.BlockExecutionResult.ExecutableBlock.Block.Header,
+			result.BlockExecutionResult.AllUpdatedRegisters(),
+		)
+
+		if err != nil {
+			return fmt.Errorf("could not save updated registers: %w", err)
+		}
 	}
 
 	//outside batch because it requires read access
@@ -465,12 +484,20 @@ func (s *state) GetHighestExecutedBlockID(ctx context.Context) (uint64, flow.Ide
 	return height, blockID, nil
 }
 
+func (s *state) GetHighestFinalizedExecuted() uint64 {
+	// TODO: check if non-register store mode would call this
+	return s.registerStore.LastFinalizedAndExecutedHeight()
+}
+
 // IsBlockExecuted returns true if the block is executed, which means registers, events,
 // results, etc are all stored.
 // otherwise returns false
 func (s *state) IsBlockExecuted(height uint64, blockID flow.Identifier) (bool, error) {
+	if s.enableRegisterStore {
+		return s.registerStore.IsBlockExecuted(height, blockID)
+	}
+
 	// ledger-based execution state uses commitment to determine if a block has been executed
-	// TODO: storehouse-based execution state will check its storage to determine if a block has been executed
 	_, err := s.StateCommitmentByBlockID(blockID)
 
 	// statecommitment exists means the block has been executed
@@ -484,4 +511,5 @@ func (s *state) IsBlockExecuted(height uint64, blockID flow.Identifier) (bool, e
 	}
 
 	return false, err
+
 }
