@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
+	"github.com/onflow/flow-go/integration/tests/mvp"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -167,6 +168,7 @@ func (s *AccessAPISuite) TestScriptExecutionAndGetAccountsAN1() {
 //
 // Note: not combining AN1, AN2 tests together because that causes a drastic increase in test run times. test cases are read-only
 // and should not interfere with each other.
+/*
 func (s *AccessAPISuite) TestScriptExecutionAndGetAccountsAN2() {
 	// deploy the test contract
 	txResult := s.deployContract()
@@ -178,14 +180,14 @@ func (s *AccessAPISuite) TestScriptExecutionAndGetAccountsAN2() {
 	s.testExecuteScriptWithSimpleScript(s.an2Client)
 	s.testExecuteScriptWithSimpleContract(s.an2Client, targetHeight)
 }
+*/
 
-/*
 func (s *AccessAPISuite) TestMVPScriptExecutionLocalStorage() {
 	// this is a specialized test that creates accounts, deposits funds, deploys contracts, etc, and
 	// uses the provided access node to handle the Access API calls. there is an existing test that
 	// covers the default config, so we only need to test with local storage.
 	mvp.RunMVPTest(s.T(), s.ctx, s.net, s.accessNode2)
-}*/
+}
 
 func createFlowAccount(ctx context.Context, client *testnet.Client, log zerolog.Logger) (sdk.Address, error) {
 	fullAccountKey := sdk.NewAccountKey().
