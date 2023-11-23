@@ -1,4 +1,5 @@
 on:
+  workflow_call:
   merge_group:
     branches:
       - master
