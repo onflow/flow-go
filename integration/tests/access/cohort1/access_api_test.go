@@ -160,8 +160,8 @@ func (s *AccessAPISuite) TestScriptExecutionAndGetAccountsAN1() {
 	// Run tests against Access 1, which uses the execution node
 	s.testGetAccount(s.an1Client)
 	s.log.Error().Msg("LOG:TestScriptExecutionAndGetAccountsAN1: out of testGetAccount")
-	//s.testExecuteScriptWithSimpleScript(s.an1Client)
-	//s.testExecuteScriptWithSimpleContract(s.an1Client, targetHeight)
+	s.testExecuteScriptWithSimpleScript(s.an1Client)
+	s.testExecuteScriptWithSimpleContract(s.an1Client, targetHeight)
 }
 
 /*
