@@ -1,3 +1,8 @@
+on:
+  merge_group:
+    branches:
+      - master
+
 jobs:
   docker-build:
     name: Docker Build ${{ inputs.name }}
