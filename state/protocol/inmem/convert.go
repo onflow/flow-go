@@ -159,7 +159,7 @@ func FromEpoch(from protocol.Epoch) (*Epoch, error) {
 	}
 	epoch.TargetDuration, err = from.TargetDuration()
 	if err != nil {
-		return nil, fmt.Errorf("could not get target duration: %w", err)
+		return nil, fmt.Errorf("could not get target epoch duration: %w", err)
 	}
 	epoch.TargetEndTime, err = from.TargetEndTime()
 	if err != nil {
