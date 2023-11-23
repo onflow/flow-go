@@ -34,16 +34,15 @@ type IdentitySkeleton struct {
 	NetworkPubKey crypto.PublicKey
 }
 
-// EpochParticipationStatus represents the status of a node's participation. Depending on what changes were applied to
-// the protocol state, a node may be in one of four states:
+// EpochParticipationStatus represents the status of a node's participation. Depending on what
+// changes were applied to the protocol state, a node may be in one of four states:
 // /   - joining - the node is not active in the current epoch and will be active in the next epoch.
 // /   - active - the node was included in the EpochSetup event for the current epoch and is actively participating in the current epoch.
-// /   - leaving - the node was active in the previous epoch and will not be active in the next epoch.
+// /   - leaving - the node was active in the previous epoch but is not active in the current epoch.
 // /   - ejected - the node has been permanently removed from the network.
 //
-//	                   ┌───────────────┐
-//	      ┌────────────┤ unregistered  │◄───────────┐
-//	      │            └───────────────┘            │
+//          EpochSetup
+//	      ┌────────────⬤ unregistered ◯◄───────────┐
 //	┌─────▼─────┐        ┌───────────┐        ┌─────┴─────┐
 //	│  JOINING  ├───────►│  ACTIVE   ├───────►│  LEAVING  │
 //	└─────┬─────┘        └─────┬─────┘        └─────┬─────┘
