@@ -90,31 +90,45 @@ func (c *ControllerParams) beta() float64 {
 	return 1.0 / float64(c.N_itg)
 }
 
+// GetFallbackProposalDuration returns the proposal duration used when Cruise Control is not active.
 func (ctl TimingConfig) GetFallbackProposalDuration() time.Duration {
 	return ctl.FallbackProposalDelay.Load()
 }
+
+// GetMaxViewDuration returns the max view duration returned by the controller.
 func (ctl TimingConfig) GetMaxViewDuration() time.Duration {
 	return ctl.MaxViewDuration.Load()
 }
+
+// GetMinViewDuration returns the min view duration returned by the controller.
 func (ctl TimingConfig) GetMinViewDuration() time.Duration {
 	return ctl.MinViewDuration.Load()
 }
+
+// GetEnabled returns whether the controller is enabled.
 func (ctl TimingConfig) GetEnabled() bool {
 	return ctl.Enabled.Load()
 }
 
+// SetFallbackProposalDuration sets the proposal duration used when Cruise Control is not active.
 func (ctl TimingConfig) SetFallbackProposalDuration(dur time.Duration) error {
 	ctl.FallbackProposalDelay.Store(dur)
 	return nil
 }
+
+// SetMaxViewDuration sets the max view duration returned by the controller.
 func (ctl TimingConfig) SetMaxViewDuration(dur time.Duration) error {
 	ctl.MaxViewDuration.Store(dur)
 	return nil
 }
+
+// SetMinViewDuration sets the min view duration returned by the controller.
 func (ctl TimingConfig) SetMinViewDuration(dur time.Duration) error {
 	ctl.MinViewDuration.Store(dur)
 	return nil
 }
+
+// SetEnabled sets whether the controller is enabled.
 func (ctl TimingConfig) SetEnabled(enabled bool) error {
 	ctl.Enabled.Store(enabled)
 	return nil
