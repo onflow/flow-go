@@ -15,6 +15,7 @@ import (
 
 	sdk "github.com/onflow/flow-go-sdk"
 	client "github.com/onflow/flow-go-sdk/access/grpc"
+	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
@@ -199,7 +200,7 @@ func createFlowAccount(ctx context.Context, client *testnet.Client, log zerolog.
 	if err != nil {
 		return sdk.EmptyAddress, fmt.Errorf("failed to get latest block id: %w", err)
 	}
-	log.Error().Msgf("LOG: latest block %d", latestBlockID.Height())
+	log.Error().Msg("LOG: latest block")
 
 	// createAccount will submit a create account transaction and wait for it to be sealed
 	addr, err := client.CreateAccount(ctx, fullAccountKey, sdk.Identifier(latestBlockID))
