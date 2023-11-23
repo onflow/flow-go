@@ -426,7 +426,6 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID() {
 		snap := state.AtHeight(epoch1.Range()[2])
 		blockHead, err := snap.Head()
 		suite.Require().NoError(err)
-		suite.state.On("Final").Return(snap).Once()
 
 		params := suite.defaultBackendParams()
 		params.MaxHeightRange = TEST_MAX_HEIGHT
@@ -475,14 +474,14 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_NonFinalizedBlocks() {
 		snapshotBytes, err := backend.GetProtocolStateSnapshotByBlockID(ctx, newBlock.ID())
 		suite.Require().Nil(snapshotBytes)
 		suite.Require().Error(err)
-		suite.Require().Equal(status.Errorf(codes.InvalidArgument, "failed to get a valid snapshot: %v",
-			fmt.Errorf("unknown finalized height %d: %w", newBlock.Header.Height, realstate.ErrUnknownSnapshotReference)).Error(),
+		suite.Require().Equal(status.Errorf(codes.InvalidArgument, "failed to retrieve snapshot for block by height %v",
+			fmt.Errorf("%d: %v", newBlock.Header.Height, "block not finalized")).Error(),
 			err.Error())
 	})
 }
 
-// TestGetProtocolStateSnapshotByBlockID_Non_Finalized_Blocks tests our GetProtocolStateSnapshotByBlockID RPC endpoint
-// where non finalized block is added to state
+// TestGetProtocolStateSnapshotByBlockID_InvalidSegment tests our GetProtocolStateSnapshotByBlockID RPC endpoint
+// for invalid segment between phases and between epochs
 func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_InvalidSegment() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
@@ -513,7 +512,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_InvalidSegment() {
 		suite.Require().NoError(err)
 
 		suite.T().Run("sealing segment between phases", func(t *testing.T) {
-			// Take snapshot at height of block D (epoch1.heights[2]) for valid segment and valid snapshot
+			// Take snapshot at height of first block of setup phase
 			snap := state.AtHeight(epoch1.SetupRange()[0])
 			block, err := snap.Head()
 			suite.Require().NoError(err)
@@ -521,10 +520,14 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_InvalidSegment() {
 			bytes, err := backend.GetProtocolStateSnapshotByBlockID(context.Background(), block.ID())
 			suite.Require().Error(err)
 			suite.Require().Empty(bytes)
+			suite.Require().Equal(status.Errorf(codes.InvalidArgument, "failed to retrieve snapshot for block, try again with different block: %v",
+				SnapshotPhaseMismatchError).Error(),
+				err.Error())
 		})
 
 		suite.T().Run("sealing segment between epochs", func(t *testing.T) {
-			// Take snapshot at height of block D (epoch1.heights[2]) for valid segment and valid snapshot
+			// Take snapshot at height of latest finalized block
+
 			snap := state.Final()
 			epochCounter, err := snap.Epochs().Current().Counter()
 			suite.Require().NoError(err)
@@ -534,14 +537,19 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_InvalidSegment() {
 
 			suite.state.On("AtBlockID", block.ID()).Return(snap)
 			suite.state.On("AtHeight", block.Height).Return(snap)
+
 			bytes, err := backend.GetProtocolStateSnapshotByBlockID(context.Background(), block.ID())
 			suite.Require().Error(err)
 			suite.Require().Empty(bytes)
+			suite.Require().Equal(status.Errorf(codes.InvalidArgument, "failed to retrieve snapshot for block, try again with different block: %v",
+				SnapshotPhaseMismatchError).Error(),
+				err.Error())
 		})
 	})
 }
 
 // TestGetProtocolStateSnapshotByHeight tests our GetProtocolStateSnapshotByHeight RPC endpoint
+// where non finalized block is added to state
 func (suite *Suite) TestGetProtocolStateSnapshotByHeight() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
@@ -565,7 +573,6 @@ func (suite *Suite) TestGetProtocolStateSnapshotByHeight() {
 
 		// Take snapshot at height of block D (epoch1.heights[2]) for valid segment and valid snapshot
 		snap := state.AtHeight(epoch1.Range()[2])
-		suite.state.On("Final").Return(snap).Once()
 
 		params := suite.defaultBackendParams()
 		params.MaxHeightRange = TEST_MAX_HEIGHT
@@ -584,7 +591,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByHeight() {
 	})
 }
 
-// TestGetProtocolStateSnapshotByHeight tests our GetProtocolStateSnapshotByHeight RPC endpoint
+// TestGetProtocolStateSnapshotByHeight_NonFinalizedBlocks tests our GetProtocolStateSnapshotByHeight RPC endpoint
 func (suite *Suite) TestGetProtocolStateSnapshotByHeight_NonFinalizedBlocks() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
@@ -628,6 +635,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByHeight_NonFinalizedBlocks() {
 }
 
 // TestGetProtocolStateSnapshotByHeight tests our GetProtocolStateSnapshotByHeight RPC endpoint
+// for invalid segment
 func (suite *Suite) TestGetProtocolStateSnapshotByHeight_InvalidSegments() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
