@@ -2026,6 +2026,7 @@ func (suite *Suite) TestNodeCommunicator() {
 	result, err := backend.GetTransactionResultsByBlockID(ctx, blockId, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
 	suite.Assert().Nil(result)
 	suite.Assert().Error(err)
+	suite.Assert().Equal(codes.Unavailable, status.Code(err))
 }
 
 func (suite *Suite) assertAllExpectations() {
