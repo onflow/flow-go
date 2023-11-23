@@ -386,7 +386,7 @@ jobs:
         path: flow-docker-access.tar
         key: flow-docker-images-access-${{ github.run_id }}
     - name: Load cached Corrupt Access Docker image
-      if: ${{ matrix.corrupt }} == true
+      if: matrix.corrupt == true
       uses: actions/cache@v3
       with:
         path: flow-docker-access-corrupt.tar
@@ -407,7 +407,7 @@ jobs:
         path: flow-docker-execution.tar
         key: flow-docker-images-execution-${{ github.run_id }}
     - name: Load cached Corrupt Execution Docker image
-      if: ${{ matrix.corrupt }} == true
+      if: matrix.corrupt == true
       uses: actions/cache@v3
       with:
         path: flow-docker-execution-corrupt.tar
@@ -428,7 +428,7 @@ jobs:
         path: flow-docker-verification.tar
         key: flow-docker-images-verification-${{ github.run_id }}
     - name: Load cached Corrupt Verification Docker image
-      if: ${{ matrix.corrupt }} == true
+      if: matrix.corrupt == true
       uses: actions/cache@v3
       with:
         path: flow-docker-verification-corrupt.tar
