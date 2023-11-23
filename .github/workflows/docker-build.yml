@@ -4,9 +4,11 @@ on:
       name:
         description: 'The name of the docker image'
         required: true
+        type: string
       make:
         description: 'The make command to build the docker image'
         required: true
+        type: string
 
 jobs:
   docker-build:
