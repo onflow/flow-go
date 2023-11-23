@@ -6,6 +6,8 @@ import (
 	"math"
 	"testing"
 
+	"golang.org/x/exp/maps"
+
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime/common"
@@ -71,21 +73,17 @@ func GetSimpleValueStore() *TestValueStore {
 			return atree.StorageIndex(data), nil
 		},
 		TotalStorageSizeFunc: func() int {
-			sum := 0
-			for key, value := range data {
-				sum += len(key) + len(value)
-			}
-			for key := range allocator {
-				sum += len(key) + 8
-			}
-			return sum
-		},
-		MetricsFunc: func() (size int, items int) {
+			size := 0
 			for key, item := range data {
-				items++
 				size += len(item) + len([]byte(key))
 			}
-			return
+			for key := range allocator {
+				size += len(key) + 8
+			}
+			return size
+		},
+		TotalStorageItemsFunc: func() int {
+			return len(maps.Keys(data)) + len(maps.Keys(allocator))
 		},
 	}
 }
@@ -152,7 +150,7 @@ type TestValueStore struct {
 	ValueExistsFunc          func(owner, key []byte) (bool, error)
 	AllocateStorageIndexFunc func(owner []byte) (atree.StorageIndex, error)
 	TotalStorageSizeFunc     func() int
-	MetricsFunc              func() (size int, items int)
+	TotalStorageItemsFunc    func() int
 }
 
 var _ environment.ValueStore = &TestValueStore{}
@@ -192,11 +190,11 @@ func (vs *TestValueStore) TotalStorageSize() int {
 	return vs.TotalStorageSizeFunc()
 }
 
-func (vs *TestValueStore) Metrics() (int, int) {
-	if vs.MetricsFunc == nil {
+func (vs *TestValueStore) TotalStorageItems() int {
+	if vs.TotalStorageItemsFunc == nil {
 		panic("method not set")
 	}
-	return vs.MetricsFunc()
+	return vs.TotalStorageItemsFunc()
 }
 
 type testMeter struct {
