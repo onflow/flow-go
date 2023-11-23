@@ -385,14 +385,12 @@ jobs:
       with:
         path: flow-docker-access.tar
         key: flow-docker-images-access-${{ github.run_id }}
-
     - name: Load cached Corrupt Access Docker image
       if: ${{ matrix.corrupt }} == true
       uses: actions/cache@v3
       with:
         path: flow-docker-access-corrupt.tar
         key: flow-docker-images-access-corrupt-${{ github.run_id }}
-
     - name: Load cached Collection Docker image
       uses: actions/cache@v3
       with:
@@ -419,23 +417,23 @@ jobs:
       with:
         path: flow-docker-ghost.tar
         key: flow-docker-images-ghost-${{ github.run_id }}
-    - name: Load cached Verification Docker image
-      uses: actions/cache@v3
-      with:
-        path: flow-docker-verification.tar
-        key: flow-docker-images-verification-${{ github.run_id }}
     - name: Load cached Observer Docker image
       uses: actions/cache@v3
       with:
         path: flow-docker-observer.tar
         key: flow-docker-images-observer-${{ github.run_id }}
+    - name: Load cached Verification Docker image
+      uses: actions/cache@v3
+      with:
+        path: flow-docker-verification.tar
+        key: flow-docker-images-verification-${{ github.run_id }}
     - name: Load cached Corrupt Verification Docker image
       if: ${{ matrix.corrupt }} == true
       uses: actions/cache@v3
       with:
         path: flow-docker-verification-corrupt.tar
         key: flow-docker-images-verification-corrupt-${{ github.run_id }}
-    - name: Load Docker images
+    - name: Load Docker images from tars
       run: |
         for f in *.tar; do
           docker load -i $f
