@@ -6,7 +6,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
-	state_synchronization "github.com/onflow/flow-go/module/state_synchronization/mock"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -33,12 +32,10 @@ func TestInitDataAvailable(t *testing.T) {
 		registers := storagemock.NewRegisterIndex(t)
 		registers.On("Get", registerID, firstHeight).Return(registerValue1, nil)
 		registers.On("Get", registerID, latestHeight).Return(registerValue2, nil)
+		registers.On("FirstHeight").Return(firstHeight)
+		registers.On("LatestHeight").Return(latestHeight)
 
-		indexReporter := state_synchronization.NewIndexReporter(t)
-		indexReporter.On("LowestIndexedHeight").Return(firstHeight)
-		indexReporter.On("HighestIndexedHeight").Return(latestHeight)
-
-		registersAsync.InitDataAvailable(indexReporter, registers)
+		registersAsync.InitDataAvailable(registers)
 		require.True(t, registersAsync.initialized.Load())
 		val1, err := registersAsync.RegisterValues([]flow.RegisterID{registerID}, firstHeight)
 		require.NoError(t, err)
@@ -53,11 +50,9 @@ func TestInitDataAvailable(t *testing.T) {
 		registersAsync := NewRegistersAsyncStore()
 		require.False(t, registersAsync.initialized.Load())
 		registers := storagemock.NewRegisterIndex(t)
+		registers.On("LatestHeight").Return(latestHeight)
 
-		indexReporter := state_synchronization.NewIndexReporter(t)
-		indexReporter.On("HighestIndexedHeight").Return(latestHeight)
-
-		registersAsync.InitDataAvailable(indexReporter, registers)
+		registersAsync.InitDataAvailable(registers)
 		require.True(t, registersAsync.initialized.Load())
 		_, err := registersAsync.RegisterValues([]flow.RegisterID{registerID}, latestHeight+1)
 		require.ErrorIs(t, err, storage.ErrHeightNotIndexed)
@@ -68,12 +63,10 @@ func TestInitDataAvailable(t *testing.T) {
 		require.False(t, registersAsync.initialized.Load())
 		registers := storagemock.NewRegisterIndex(t)
 		registers.On("Get", invalidRegisterID, latestHeight).Return(nil, storage.ErrNotFound)
+		registers.On("FirstHeight").Return(firstHeight)
+		registers.On("LatestHeight").Return(latestHeight)
 
-		indexReporter := state_synchronization.NewIndexReporter(t)
-		indexReporter.On("LowestIndexedHeight").Return(firstHeight)
-		indexReporter.On("HighestIndexedHeight").Return(latestHeight)
-
-		registersAsync.InitDataAvailable(indexReporter, registers)
+		registersAsync.InitDataAvailable(registers)
 		require.True(t, registersAsync.initialized.Load())
 		_, err := registersAsync.RegisterValues([]flow.RegisterID{invalidRegisterID}, latestHeight)
 		require.ErrorIs(t, err, storage.ErrNotFound)

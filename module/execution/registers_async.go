@@ -7,7 +7,6 @@ import (
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -15,7 +14,6 @@ import (
 // TODO: use this implementation in the `scripts.ScriptExecutor` passed into the AccessAPI
 type RegistersAsyncStore struct {
 	registerIndex storage.RegisterIndex
-	reporter      state_synchronization.IndexReporter
 	initialized   *atomic.Bool
 	init          sync.Once
 }
@@ -31,12 +29,10 @@ func NewRegistersAsyncStore() *RegistersAsyncStore {
 // calls to GetRegisterValues will return a storage.ErrHeightNotIndexed,
 // since we can't disambiguate between the underlying store before bootstrapping or just simply being behind sync
 func (r *RegistersAsyncStore) InitDataAvailable(
-	indexReporter state_synchronization.IndexReporter,
 	registers storage.RegisterIndex,
 ) {
 	r.init.Do(func() {
 		defer r.initialized.Store(true)
-		r.reporter = indexReporter
 		r.registerIndex = registers
 	})
 }
@@ -62,5 +58,5 @@ func (r *RegistersAsyncStore) RegisterValues(ids flow.RegisterIDs, height uint64
 
 func (r *RegistersAsyncStore) isDataAvailable(height uint64) bool {
 	return r.initialized.Load() &&
-		height <= r.reporter.HighestIndexedHeight() && height >= r.reporter.LowestIndexedHeight()
+		height <= r.registerIndex.LatestHeight() && height >= r.registerIndex.FirstHeight()
 }
