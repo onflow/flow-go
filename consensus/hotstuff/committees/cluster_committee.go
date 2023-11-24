@@ -49,9 +49,9 @@ func NewClusterCommittee(
 		return nil, fmt.Errorf("could not compute leader selection for cluster: %w", err)
 	}
 
-	initialClusterIdentities := constructInitialClusterIdentities(cluster.Members())
+	initialClusterIdentities := constructContributingClusterParticipants(cluster.Members()) // drops nodes with `InitialWeight=0`
+	initialClusterMembersSelector := initialClusterIdentities.Selector()                    // hence, any node accepted by this selector has `InitialWeight>0`
 	totalWeight := initialClusterIdentities.TotalWeight()
-	initialClusterMembersSelector := initialClusterIdentities.Selector()
 
 	com := &Cluster{
 		state:     state,
@@ -177,8 +177,16 @@ func (c *Cluster) DKG(_ uint64) (hotstuff.DKG, error) {
 	panic("queried DKG of cluster committee")
 }
 
-// constructInitialClusterIdentities extends the IdentitySkeletons of the cluster members to their full Identities
-// (in canonical order), at the time of cluster initialization by EpochSetup event. This represents the cluster
+// constructContributingClusterParticipants extends the IdentitySkeletons of the cluster members to their full Identities
+// at the time of cluster initialization by EpochSetup event.
+// IMPORTANT CONVENTIONS:
+//  1. clusterMembers with zero `InitialWeight` are _not included_ as "contributing" cluster participants.
+//     In accordance with their zero weight, they cannot contribute to advancing the cluster consensus.
+//     For example, the consensus leader selection allows zero-weighted nodes among the weighted participants,
+//     but these nodes have zero probability to be selected as leader. Similarly, they cannot meaningfully contribute
+//     votes or Timeouts to QCs or TC, due to their zero weight. Therefore, we do not consider them a valid signer.
+//  2. This operation maintains the relative order. In other words, if `clusterMembers` is in canonical order,
+//     then the output `IdentityList` is also canonically ordered.
 //
 // CONTEXT: The EpochSetup event contains the IdentitySkeletons for each cluster, thereby specifying cluster membership.
 // While ejection status is not part of the EpochSetup event, we can supplement this information as follows:
@@ -188,14 +196,9 @@ func (c *Cluster) DKG(_ uint64) (hotstuff.DKG, error) {
 //     that happened before should be reflected in the EpochSetup event. Specifically, ejected nodes
 //     should be no longer listed in the EpochSetup event. Hence, when the EpochSetup event is emitted / processed,
 //     the participation status of all cluster members equals flow.EpochParticipationStatusActive.
-func constructInitialClusterIdentities(clusterMembers flow.IdentitySkeletonList) flow.IdentityList {
+func constructContributingClusterParticipants(clusterMembers flow.IdentitySkeletonList) flow.IdentityList {
 	initialClusterIdentities := make(flow.IdentityList, 0, len(clusterMembers))
 	for _, skeleton := range clusterMembers {
-		// CONVENTION: we allow the Epoch setup event to specify nodes with `InitialWeight=0`.
-		// The consensus leader selection allows zero-weighted nodes among the weighted participants. In
-		// accordance with their weight, zero-weighted nodes have zero probability to be selected as leader.
-		// Conceptually, zero-weighted consensus nodes can exist, but accordance with their weight they
-		// cannot contribute to advancing the protocol. Therefore, we do not consider them a valid signer.
 		if skeleton.InitialWeight == 0 {
 			continue
 		}
