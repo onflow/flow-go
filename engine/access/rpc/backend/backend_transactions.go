@@ -566,7 +566,7 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 }
 
 // GetSystemTransaction returns system transaction
-func (b *backendTransactions) GetSystemTransaction(ctx context.Context) (*flow.TransactionBody, error) {
+func (b *backendTransactions) GetSystemTransaction(ctx context.Context, _ flow.Identifier) (*flow.TransactionBody, error) {
 	systemTx, err := blueprints.SystemChunkTransaction(b.chainID.Chain())
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "could not get system chunk transaction: %v", err)

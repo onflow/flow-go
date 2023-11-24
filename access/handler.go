@@ -322,12 +322,16 @@ func (h *Handler) GetTransactionResultsByBlockID(
 
 func (h *Handler) GetSystemTransaction(
 	ctx context.Context,
-	_ *access.GetSystemTransactionRequest,
+	req *access.GetSystemTransactionRequest,
 ) (*access.TransactionResponse, error) {
-
 	metadata := h.buildMetadataResponse()
 
-	tx, err := h.api.GetSystemTransaction(ctx)
+	id, err := convert.BlockID(req.GetBlockId())
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
+	}
+
+	tx, err := h.api.GetSystemTransaction(ctx, id)
 	if err != nil {
 		return nil, err
 	}

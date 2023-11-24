@@ -343,7 +343,10 @@ func (suite *Suite) TestGetSystemTransaction_HappyPath() {
 		backend, err := New(params)
 		suite.Require().NoError(err)
 
-		res, err := backend.GetSystemTransaction(context.Background())
+		block := unittest.BlockFixture()
+		blockID := block.ID()
+
+		res, err := backend.GetSystemTransaction(context.Background(), blockID)
 		suite.Require().NoError(err)
 
 		systemTx, err := blueprints.SystemChunkTransaction(suite.chainID.Chain())
