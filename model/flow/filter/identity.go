@@ -121,7 +121,7 @@ var IsValidCurrentEpochParticipantOrJoining = Or(IsValidCurrentEpochParticipant,
 
 // IsConsensusCommitteeMember is an identity filter for all members of the consensus committee.
 // Formally, a Node X is a Consensus Committee Member if and only if X is a consensus node with
-// positive initial stake. This is specified by the EpochSetup Event and remains static
+// positive initial weight. This is specified by the EpochSetup Event and remains static
 // throughout the epoch.
 var IsConsensusCommitteeMember = And(
 	HasRole[flow.IdentitySkeleton](flow.RoleConsensus),
