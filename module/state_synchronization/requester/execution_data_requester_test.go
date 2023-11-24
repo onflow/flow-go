@@ -415,7 +415,7 @@ func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun
 	processedHeight := bstorage.NewConsumerProgress(suite.db, module.ConsumeProgressExecutionDataRequesterBlockHeight)
 	processedNotification := bstorage.NewConsumerProgress(suite.db, module.ConsumeProgressExecutionDataRequesterNotification)
 
-	edr := requester.New(
+	edr, err := requester.New(
 		logger,
 		metrics,
 		suite.downloader,
@@ -433,6 +433,7 @@ func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun
 		},
 		suite.distributor,
 	)
+	require.NoError(suite.T(), err)
 
 	followerDistributor.AddOnBlockFinalizedConsumer(edr.OnBlockFinalized)
 

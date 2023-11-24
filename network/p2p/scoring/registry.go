@@ -9,6 +9,8 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/p2p"
 	netcache "github.com/onflow/flow-go/network/p2p/cache"
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
@@ -48,23 +50,27 @@ const (
 	iHaveMisbehaviourPenalty = -10
 	// iWantMisbehaviourPenalty is the penalty applied to the application specific penalty when a peer conducts a iWant misbehaviour.
 	iWantMisbehaviourPenalty = -10
+	// rpcPublishMessageMisbehaviourPenalty is the penalty applied to the application specific penalty when a peer conducts a RpcPublishMessageMisbehaviourPenalty misbehaviour.
+	rpcPublishMessageMisbehaviourPenalty = -10
 )
 
 // GossipSubCtrlMsgPenaltyValue is the penalty value for each control message type.
 type GossipSubCtrlMsgPenaltyValue struct {
-	Graft float64 // penalty value for an individual graft message misbehaviour.
-	Prune float64 // penalty value for an individual prune message misbehaviour.
-	IHave float64 // penalty value for an individual iHave message misbehaviour.
-	IWant float64 // penalty value for an individual iWant message misbehaviour.
+	Graft             float64 // penalty value for an individual graft message misbehaviour.
+	Prune             float64 // penalty value for an individual prune message misbehaviour.
+	IHave             float64 // penalty value for an individual iHave message misbehaviour.
+	IWant             float64 // penalty value for an individual iWant message misbehaviour.
+	RpcPublishMessage float64 // penalty value for an individual RpcPublishMessage message misbehaviour.
 }
 
 // DefaultGossipSubCtrlMsgPenaltyValue returns the default penalty value for each control message type.
 func DefaultGossipSubCtrlMsgPenaltyValue() GossipSubCtrlMsgPenaltyValue {
 	return GossipSubCtrlMsgPenaltyValue{
-		Graft: graftMisbehaviourPenalty,
-		Prune: pruneMisbehaviourPenalty,
-		IHave: iHaveMisbehaviourPenalty,
-		IWant: iWantMisbehaviourPenalty,
+		Graft:             graftMisbehaviourPenalty,
+		Prune:             pruneMisbehaviourPenalty,
+		IHave:             iHaveMisbehaviourPenalty,
+		IWant:             iWantMisbehaviourPenalty,
+		RpcPublishMessage: rpcPublishMessageMisbehaviourPenalty,
 	}
 }
 
@@ -76,6 +82,7 @@ func DefaultGossipSubCtrlMsgPenaltyValue() GossipSubCtrlMsgPenaltyValue {
 // Similar to the GossipSub score, the application specific score is meant to be private to the local peer, and is not
 // shared with other peers in the network.
 type GossipSubAppSpecificScoreRegistry struct {
+	component.Component
 	logger     zerolog.Logger
 	idProvider module.IdentityProvider
 	// spamScoreCache currently only holds the control message misbehaviour penalty (spam related penalty).
@@ -128,6 +135,26 @@ func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegis
 		validator:      config.Validator,
 		idProvider:     config.IdProvider,
 	}
+
+	builder := component.NewComponentManagerBuilder()
+	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		reg.logger.Info().Msg("starting subscription validator")
+		reg.validator.Start(ctx)
+		select {
+		case <-ctx.Done():
+			reg.logger.Warn().Msg("aborting subscription validator startup, context cancelled")
+		case <-reg.validator.Ready():
+			reg.logger.Info().Msg("subscription validator started")
+			ready()
+			reg.logger.Info().Msg("subscription validator is ready")
+		}
+
+		<-ctx.Done()
+		reg.logger.Info().Msg("stopping subscription validator")
+		<-reg.validator.Done()
+		reg.logger.Info().Msg("subscription validator stopped")
+	})
+	reg.Component = builder.Build()
 
 	return reg
 }
@@ -264,6 +291,8 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 			record.Penalty += r.penalty.IHave
 		case p2pmsg.CtrlMsgIWant:
 			record.Penalty += r.penalty.IWant
+		case p2pmsg.RpcPublishMessage:
+			record.Penalty += r.penalty.RpcPublishMessage
 		default:
 			// the error is considered fatal as it means that we have an unsupported misbehaviour type, we should crash the node to prevent routing attack vulnerability.
 			lg.Fatal().Str("misbehavior_type", notification.MsgType.String()).Msg("unknown misbehaviour type")

@@ -38,6 +38,11 @@ func (_m *BackendScriptsMetrics) ScriptExecutionErrorOnExecutionNode() {
 	_m.Called()
 }
 
+// ScriptExecutionNotIndexed provides a mock function with given fields:
+func (_m *BackendScriptsMetrics) ScriptExecutionNotIndexed() {
+	_m.Called()
+}
+
 // ScriptExecutionResultMatch provides a mock function with given fields:
 func (_m *BackendScriptsMetrics) ScriptExecutionResultMatch() {
 	_m.Called()

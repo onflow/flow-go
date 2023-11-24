@@ -11,7 +11,7 @@ import (
 
 func RunWithRegistersStorageAtInitialHeights(tb testing.TB, first uint64, latest uint64, f func(r *Registers)) {
 	unittest.RunWithTempDir(tb, func(dir string) {
-		db := newBootstrappedRegistersWithPathForTest(tb, dir, first, latest)
+		db := NewBootstrappedRegistersWithPathForTest(tb, dir, first, latest)
 		r, err := NewRegisters(db)
 		require.NoError(tb, err)
 
@@ -21,7 +21,7 @@ func RunWithRegistersStorageAtInitialHeights(tb testing.TB, first uint64, latest
 	})
 }
 
-func newBootstrappedRegistersWithPathForTest(tb testing.TB, dir string, first, latest uint64) *pebble.DB {
+func NewBootstrappedRegistersWithPathForTest(tb testing.TB, dir string, first, latest uint64) *pebble.DB {
 	db, err := OpenRegisterPebbleDB(dir)
 	require.NoError(tb, err)
 

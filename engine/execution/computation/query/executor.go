@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/onflow/flow-go/fvm/errors"
+
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/rs/zerolog"
 
@@ -52,6 +54,7 @@ type Executor interface {
 type QueryConfig struct {
 	LogTimeThreshold    time.Duration
 	ExecutionTimeLimit  time.Duration
+	ComputationLimit    uint64
 	MaxErrorMessageSize int
 }
 
@@ -59,6 +62,7 @@ func NewDefaultConfig() QueryConfig {
 	return QueryConfig{
 		LogTimeThreshold:    DefaultLogTimeThreshold,
 		ExecutionTimeLimit:  DefaultExecutionTimeLimit,
+		ComputationLimit:    fvm.DefaultComputationLimit,
 		MaxErrorMessageSize: DefaultMaxErrorMessageSize,
 	}
 }
@@ -85,6 +89,9 @@ func NewQueryExecutor(
 	derivedChainData *derived.DerivedChainData,
 	entropyPerBlock EntropyProviderPerBlock,
 ) *QueryExecutor {
+	if config.ComputationLimit > 0 {
+		vmCtx = fvm.NewContextFromParent(vmCtx, fvm.WithComputationLimit(config.ComputationLimit))
+	}
 	return &QueryExecutor{
 		config:           config,
 		logger:           logger,
@@ -175,10 +182,11 @@ func (e *QueryExecutor) ExecuteScript(
 	}
 
 	if output.Err != nil {
-		return nil, fmt.Errorf("failed to execute script at block (%s): %s",
-			blockHeader.ID(),
-			summarizeLog(output.Err.Error(),
-				e.config.MaxErrorMessageSize))
+		return nil, errors.NewCodedError(
+			output.Err.Code(),
+			"failed to execute script at block (%s): %s", blockHeader.ID(),
+			summarizeLog(output.Err.Error(), e.config.MaxErrorMessageSize),
+		)
 	}
 
 	encodedValue, err = jsoncdc.Encode(output.Value)

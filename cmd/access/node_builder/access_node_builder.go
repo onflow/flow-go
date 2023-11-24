@@ -146,6 +146,7 @@ type AccessNodeConfig struct {
 	executionDataIndexingEnabled bool
 	registersDBPath              string
 	checkpointFile               string
+	scriptExecutorConfig         query.QueryConfig
 }
 
 type PublicNetworkConfig struct {
@@ -232,6 +233,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		executionDataIndexingEnabled: false,
 		registersDBPath:              filepath.Join(homedir, ".flow", "execution_state"),
 		checkpointFile:               cmd.NotSet,
+		scriptExecutorConfig:         query.NewDefaultConfig(),
 	}
 }
 
@@ -430,6 +432,10 @@ func (builder *FlowAccessNodeBuilder) buildFollowerEngine() *FlowAccessNodeBuild
 
 func (builder *FlowAccessNodeBuilder) buildSyncEngine() *FlowAccessNodeBuilder {
 	builder.Component("sync engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		spamConfig, err := synceng.NewSpamDetectionConfig()
+		if err != nil {
+			return nil, fmt.Errorf("could not initialize spam detection config: %w", err)
+		}
 		sync, err := synceng.New(
 			node.Logger,
 			node.Metrics.Engine,
@@ -440,7 +446,7 @@ func (builder *FlowAccessNodeBuilder) buildSyncEngine() *FlowAccessNodeBuilder {
 			builder.FollowerEng,
 			builder.SyncCore,
 			builder.SyncEngineParticipantsProviderFactory(),
-			synceng.NewSpamDetectionConfig(),
+			spamConfig,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create synchronization engine: %w", err)
@@ -622,7 +628,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				execDataCacheBackend,
 			)
 
-			builder.ExecutionDataRequester = edrequester.New(
+			r, err := edrequester.New(
 				builder.Logger,
 				metrics.NewExecutionDataRequesterCollector(),
 				builder.ExecutionDataDownloader,
@@ -634,6 +640,10 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				builder.executionDataConfig,
 				execDataDistributor,
 			)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create execution data requester: %w", err)
+			}
+			builder.ExecutionDataRequester = r
 
 			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.ExecutionDataRequester.OnBlockFinalized)
 
@@ -709,7 +719,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					}
 
 					// TODO: find a way to hook a context up to this to allow a graceful shutdown
-					err = bootstrap.IndexCheckpointFile(context.Background())
+					workerCount := 10
+					err = bootstrap.IndexCheckpointFile(context.Background(), workerCount)
 					if err != nil {
 						return nil, fmt.Errorf("could not load checkpoint file: %w", err)
 					}
@@ -737,7 +748,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				builder.ExecutionIndexerCore = indexerCore
 
 				// execution state worker uses a jobqueue to process new execution data and indexes it by using the indexer.
-				builder.ExecutionIndexer = indexer.NewIndexer(
+				builder.ExecutionIndexer, err = indexer.NewIndexer(
 					builder.Logger,
 					registers.FirstHeight(),
 					registers,
@@ -746,6 +757,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					builder.ExecutionDataRequester.HighestConsecutiveHeight,
 					indexedBlockHeight,
 				)
+				if err != nil {
+					return nil, err
+				}
 
 				// setup requester to notify indexer when new execution data is received
 				execDataDistributor.AddOnExecutionDataReceivedConsumer(builder.ExecutionIndexer.OnExecutionData)
@@ -758,7 +772,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					builder.RootChainID,
 					query.NewProtocolStateWrapper(builder.State),
 					builder.Storage.Headers,
-					execution.IndexRegisterAdapter(builder.ExecutionIndexerCore.RegisterValues),
+					builder.ExecutionIndexerCore.RegisterValue,
+					builder.scriptExecutorConfig,
 				)
 				if err != nil {
 					return nil, err
@@ -917,6 +932,11 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 
 		// Script Execution
 		flags.StringVar(&builder.rpcConf.BackendConfig.ScriptExecutionMode, "script-execution-mode", defaultConfig.rpcConf.BackendConfig.ScriptExecutionMode, "mode to use when executing scripts. one of (local-only, execution-nodes-only, failover, compare)")
+		flags.Uint64Var(&builder.scriptExecutorConfig.ComputationLimit, "script-execution-computation-limit", defaultConfig.scriptExecutorConfig.ComputationLimit, "maximum number of computation units a locally executed script can use. default: 100000")
+		flags.IntVar(&builder.scriptExecutorConfig.MaxErrorMessageSize, "script-execution-max-error-length", defaultConfig.scriptExecutorConfig.MaxErrorMessageSize, "maximum number characters to include in error message strings. additional characters are truncated. default: 1000")
+		flags.DurationVar(&builder.scriptExecutorConfig.LogTimeThreshold, "script-execution-log-time-threshold", defaultConfig.scriptExecutorConfig.LogTimeThreshold, "emit a log for any scripts that take over this threshold. default: 1s")
+		flags.DurationVar(&builder.scriptExecutorConfig.ExecutionTimeLimit, "script-execution-timeout", defaultConfig.scriptExecutorConfig.ExecutionTimeLimit, "timeout value for locally executed scripts. default: 10s")
+
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-observer is true")
@@ -1542,7 +1562,7 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 		networkKey,
 		builder.SporkID,
 		builder.IdentityProvider,
-		&builder.FlowConfig.NetworkConfig.ResourceManagerConfig,
+		&builder.FlowConfig.NetworkConfig.ResourceManager,
 		&builder.FlowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig,
 		&p2pconfig.PeerManagerConfig{
 			// TODO: eventually, we need pruning enabled even on public network. However, it needs a modified version of
@@ -1551,6 +1571,7 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 			UpdateInterval:    builder.FlowConfig.NetworkConfig.PeerUpdateInterval,
 			ConnectorFactory:  connection.DefaultLibp2pBackoffConnectorFactory(),
 		},
+		&builder.FlowConfig.NetworkConfig.GossipSubConfig.SubscriptionProviderConfig,
 		&p2p.DisallowListCacheConfig{
 			MaxSize: builder.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
 			Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),

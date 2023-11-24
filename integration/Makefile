@@ -24,9 +24,18 @@ ci-integration-test: access-tests ghost-tests mvp-tests epochs-cohort1-tests epo
 test:
 	$(CGO_FLAG) go test $(if $(VERBOSE),-v,) -coverprofile=$(COVER_PROFILE) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) `go list ./... | grep -v -e integration/tests`
 
-.PHONY: access-tests
-access-tests:
-	$(CGO_FLAG) go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) ./tests/access/...
+.PHONY: access-cohort1-tests
+access-cohort1-tests:
+	$(CGO_FLAG) go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) ./tests/access/cohort1/...
+
+.PHONY: access-cohort2-tests
+access-cohort2-tests:
+	$(CGO_FLAG) go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) ./tests/access/cohort2/...
+
+.PHONY: access-cohort3-tests
+access-cohort3-tests:
+	$(CGO_FLAG) go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) ./tests/access/cohort3/...
+
 
 .PHONY: collection-tests
 collection-tests:

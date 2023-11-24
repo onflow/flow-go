@@ -93,6 +93,11 @@ func (_m *AccessMetrics) ScriptExecutionErrorOnExecutionNode() {
 	_m.Called()
 }
 
+// ScriptExecutionNotIndexed provides a mock function with given fields:
+func (_m *AccessMetrics) ScriptExecutionNotIndexed() {
+	_m.Called()
+}
+
 // ScriptExecutionResultMatch provides a mock function with given fields:
 func (_m *AccessMetrics) ScriptExecutionResultMatch() {
 	_m.Called()

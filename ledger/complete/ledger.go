@@ -198,12 +198,17 @@ func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
 // Set updates the ledger given an update.
 // It returns the state after update and errors (if any)
 func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, trieUpdate *ledger.TrieUpdate, err error) {
-	start := time.Now()
-
 	if update.Size() == 0 {
-		// return current state root unchanged
-		return update.State(), nil, nil
+		return update.State(),
+			&ledger.TrieUpdate{
+				RootHash: ledger.RootHash(update.State()),
+				Paths:    []ledger.Path{},
+				Payloads: []*ledger.Payload{},
+			},
+			nil
 	}
+
+	start := time.Now()
 
 	trieUpdate, err = pathfinder.UpdateToTrieUpdate(update, l.pathFinderVersion)
 	if err != nil {

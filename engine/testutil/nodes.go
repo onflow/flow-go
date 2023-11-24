@@ -712,7 +712,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	)
 
 	fetcher := exeFetcher.NewCollectionFetcher(node.Log, requestEngine, node.State, false)
-	loader := loader.NewLoader(node.Log, node.State, node.Headers, execState)
+	loader := loader.NewUnexecutedLoader(node.Log, node.State, node.Headers, execState)
 	rootHead, rootQC := getRoot(t, &node)
 	ingestionEngine, err := ingestion.New(
 		unit,
@@ -773,6 +773,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	idCache, err := cache.NewProtocolStateIDCache(node.Log, node.State, events.NewDistributor())
 	require.NoError(t, err, "could not create finalized snapshot cache")
+	spamConfig, err := synchronization.NewSpamDetectionConfig()
+	require.NoError(t, err, "could not initialize spam detection config")
 	syncEngine, err := synchronization.New(
 		node.Log,
 		node.Metrics,
@@ -789,7 +791,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 			),
 			idCache,
 		),
-		synchronization.NewSpamDetectionConfig(),
+		spamConfig,
 		synchronization.WithPollInterval(time.Duration(0)),
 	)
 	require.NoError(t, err)
@@ -1055,12 +1057,13 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.ChunkConsumer == nil {
-		node.ChunkConsumer = chunkconsumer.NewChunkConsumer(node.Log,
+		node.ChunkConsumer, err = chunkconsumer.NewChunkConsumer(node.Log,
 			collector,
 			node.ProcessedChunkIndex,
 			node.ChunksQueue,
 			node.FetcherEngine,
 			chunkconsumer.DefaultChunkWorkers) // defaults number of workers to 3.
+		require.NoError(t, err)
 		err = mempoolCollector.Register(metrics.ResourceChunkConsumer, node.ChunkConsumer.Size)
 		require.NoError(t, err)
 	}

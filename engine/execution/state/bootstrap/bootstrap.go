@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
@@ -36,9 +37,10 @@ func (b *Bootstrapper) BootstrapLedger(
 	chain flow.Chain,
 	opts ...fvm.BootstrapProcedureOption,
 ) (flow.StateCommitment, error) {
+	startCommit := flow.StateCommitment(ledger.InitialState())
 	storageSnapshot := state.NewLedgerStorageSnapshot(
 		ledger,
-		flow.StateCommitment(ledger.InitialState()))
+		startCommit)
 
 	vm := fvm.NewVirtualMachine()
 
@@ -58,10 +60,11 @@ func (b *Bootstrapper) BootstrapLedger(
 		return flow.DummyStateCommitment, err
 	}
 
-	newStateCommitment, _, err := state.CommitDelta(
+	newStateCommitment, _, _, err := state.CommitDelta(
 		ledger,
 		executionSnapshot,
-		flow.StateCommitment(ledger.InitialState()))
+		storehouse.NewExecutingBlockSnapshot(storageSnapshot, startCommit),
+	)
 	if err != nil {
 		return flow.DummyStateCommitment, err
 	}

@@ -8,9 +8,9 @@ import (
 
 // Config encapsulation of configuration structs for all components related to the Flow network.
 type Config struct {
-	UnicastConfig                 UnicastConfig `mapstructure:",squash"`
-	p2pconf.ResourceManagerConfig `mapstructure:",squash"`
-	ConnectionManagerConfig       `mapstructure:",squash"`
+	UnicastConfig           `mapstructure:",squash"`
+	ResourceManager         p2pconf.ResourceManagerConfig `mapstructure:"libp2p-resource-manager"`
+	ConnectionManagerConfig `mapstructure:",squash"`
 	// GossipSubConfig core gossipsub configuration.
 	p2pconf.GossipSubConfig `mapstructure:",squash"`
 	AlspConfig              `mapstructure:",squash"`
@@ -33,18 +33,9 @@ type Config struct {
 type UnicastConfig struct {
 	// UnicastRateLimitersConfig configuration for all unicast rate limiters.
 	UnicastRateLimitersConfig `mapstructure:",squash"`
+
 	// CreateStreamBackoffDelay initial delay used in the exponential backoff for create stream retries.
 	CreateStreamBackoffDelay time.Duration `validate:"gt=0s" mapstructure:"unicast-create-stream-retry-delay"`
-
-	// DialInProgressBackoffDelay is the backoff delay for parallel attempts on dialing to the same peer.
-	// When the unicast manager is invoked to create stream to the same peer concurrently while there is
-	// already an ongoing dialing attempt to the same peer, the unicast manager will wait for this backoff delay
-	// and retry creating the stream after the backoff delay has elapsed. This is to prevent the unicast manager
-	// from creating too many parallel dialing attempts to the same peer.
-	DialInProgressBackoffDelay time.Duration `validate:"gt=0s" mapstructure:"unicast-dial-in-progress-backoff-delay"`
-
-	// DialBackoffDelay is the backoff delay between retrying connection to the same peer.
-	DialBackoffDelay time.Duration `validate:"gt=0s" mapstructure:"unicast-dial-backoff-delay"`
 
 	// StreamZeroRetryResetThreshold is the threshold that determines when to reset the stream creation retry budget to the default value.
 	//
@@ -58,25 +49,11 @@ type UnicastConfig struct {
 	// 100 stream creations are all successful.
 	StreamZeroRetryResetThreshold uint64 `validate:"gt=0" mapstructure:"unicast-stream-zero-retry-reset-threshold"`
 
-	// DialZeroRetryResetThreshold is the threshold that determines when to reset the dial retry budget to the default value.
-	// For example the threshold of 1 hour means that if the dial retry budget is decreased to 0, then it will be reset to default value
-	// when it has been 1 hour since the last successful dial.
-	//
-	// This is to prevent the retry budget from being reset too frequently, as the retry budget is used to gauge the reliability of the dialing a remote peer.
-	// When the dial retry budget is reset to the default value, it means that the dialing is reliable enough to be trusted again.
-	// This parameter mandates when the dialing is reliable enough to be trusted again; i.e., when it has been 1 hour since the last successful dial.
-	// Note that the last dial attempt timestamp is reset to zero when the dial fails, so the value of for example 1 hour means that the dialing to the remote peer is reliable enough that the last
-	// successful dial attempt was 1 hour ago.
-	DialZeroRetryResetThreshold time.Duration `validate:"gt=0s" mapstructure:"unicast-dial-zero-retry-reset-threshold"`
-
-	// MaxDialRetryAttemptTimes is the maximum number of attempts to be made to connect to a remote node to establish a unicast (1:1) connection before we give up.
-	MaxDialRetryAttemptTimes uint64 `validate:"gt=0" mapstructure:"unicast-max-dial-retry-attempt-times"`
-
 	// MaxStreamCreationRetryAttemptTimes is the maximum number of attempts to be made to create a stream to a remote node over a direct unicast (1:1) connection before we give up.
 	MaxStreamCreationRetryAttemptTimes uint64 `validate:"gt=1" mapstructure:"unicast-max-stream-creation-retry-attempt-times"`
 
-	// DialConfigCacheSize is the cache size of the dial config cache that keeps the individual dial config for each peer.
-	DialConfigCacheSize uint32 `validate:"gt=0" mapstructure:"unicast-dial-config-cache-size"`
+	// ConfigCacheSize is the cache size of the dial config cache that keeps the individual dial config for each peer.
+	ConfigCacheSize uint32 `validate:"gt=0" mapstructure:"unicast-dial-config-cache-size"`
 }
 
 // UnicastRateLimitersConfig unicast rate limiter configuration for the message and bandwidth rate limiters.
@@ -114,4 +91,24 @@ type AlspConfig struct {
 	// HeartBeatInterval is the interval between heartbeats sent by the ALSP module. The heartbeats are recurring
 	// events that are used to perform critical ALSP tasks, such as updating the spam records cache.
 	HearBeatInterval time.Duration `mapstructure:"alsp-heart-beat-interval"`
+
+	SyncEngine SyncEngineAlspConfig `mapstructure:",squash"`
+}
+
+// SyncEngineAlspConfig is the ALSP config for the SyncEngine.
+type SyncEngineAlspConfig struct {
+	// BatchRequestBaseProb is the base probability in [0,1] that's used in creating the final probability of creating a
+	// misbehavior report for a BatchRequest message. This is why the word "base" is used in the name of this field,
+	// since it's not the final probability and there are other factors that determine the final probability.
+	// The reason for this is that we want to increase the probability of creating a misbehavior report for a large batch.
+	BatchRequestBaseProb float32 `validate:"gte=0,lte=1" mapstructure:"alsp-sync-engine-batch-request-base-prob"`
+
+	// RangeRequestBaseProb is the base probability in [0,1] that's used in creating the final probability of creating a
+	// misbehavior report for a RangeRequest message. This is why the word "base" is used in the name of this field,
+	// since it's not the final probability and there are other factors that determine the final probability.
+	// The reason for this is that we want to increase the probability of creating a misbehavior report for a large range.
+	RangeRequestBaseProb float32 `validate:"gte=0,lte=1" mapstructure:"alsp-sync-engine-range-request-base-prob"`
+
+	// SyncRequestProb is the probability in [0,1] of creating a misbehavior report for a SyncRequest message.
+	SyncRequestProb float32 `validate:"gte=0,lte=1" mapstructure:"alsp-sync-engine-sync-request-prob"`
 }

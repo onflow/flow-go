@@ -24,6 +24,16 @@ type Handler struct {
 	me                   module.Local
 }
 
+// TODO: this is implemented in https://github.com/onflow/flow-go/pull/4957, remove when merged
+func (h *Handler) GetProtocolStateSnapshotByBlockID(ctx context.Context, request *access.GetProtocolStateSnapshotByBlockIDRequest) (*access.ProtocolStateSnapshotResponse, error) {
+	panic("implement me")
+}
+
+// TODO: this is implemented in https://github.com/onflow/flow-go/pull/4957, remove when merged
+func (h *Handler) GetProtocolStateSnapshotByHeight(ctx context.Context, request *access.GetProtocolStateSnapshotByHeightRequest) (*access.ProtocolStateSnapshotResponse, error) {
+	panic("implement me")
+}
+
 // HandlerOption is used to hand over optional constructor parameters
 type HandlerOption func(*Handler)
 
@@ -117,7 +127,7 @@ func (h *Handler) GetBlockHeaderByID(
 ) (*access.BlockHeaderResponse, error) {
 	id, err := convert.BlockID(req.GetId())
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
 	}
 	header, status, err := h.api.GetBlockHeaderByID(ctx, id)
 	if err != nil {
@@ -157,7 +167,7 @@ func (h *Handler) GetBlockByID(
 ) (*access.BlockResponse, error) {
 	id, err := convert.BlockID(req.GetId())
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
 	}
 	block, status, err := h.api.GetBlockByID(ctx, id)
 	if err != nil {
@@ -175,7 +185,7 @@ func (h *Handler) GetCollectionByID(
 
 	id, err := convert.CollectionID(req.GetId())
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid collection id: %v", err)
 	}
 
 	col, err := h.api.GetCollectionByID(ctx, id)
@@ -230,7 +240,7 @@ func (h *Handler) GetTransaction(
 
 	id, err := convert.TransactionID(req.GetId())
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid transaction id: %v", err)
 	}
 
 	tx, err := h.api.GetTransaction(ctx, id)
@@ -253,7 +263,7 @@ func (h *Handler) GetTransactionResult(
 
 	transactionID, err := convert.TransactionID(req.GetId())
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid transaction id: %v", err)
 	}
 
 	blockId := flow.ZeroID
@@ -261,7 +271,7 @@ func (h *Handler) GetTransactionResult(
 	if requestBlockId != nil {
 		blockId, err = convert.BlockID(requestBlockId)
 		if err != nil {
-			return nil, err
+			return nil, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
 		}
 	}
 
@@ -270,11 +280,12 @@ func (h *Handler) GetTransactionResult(
 	if requestCollectionId != nil {
 		collectionId, err = convert.CollectionID(requestCollectionId)
 		if err != nil {
-			return nil, err
+			return nil, status.Errorf(codes.InvalidArgument, "invalid collection id: %v", err)
 		}
 	}
 
-	result, err := h.api.GetTransactionResult(ctx, transactionID, blockId, collectionId)
+	eventEncodingVersion := req.GetEventEncodingVersion()
+	result, err := h.api.GetTransactionResult(ctx, transactionID, blockId, collectionId, eventEncodingVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -293,10 +304,12 @@ func (h *Handler) GetTransactionResultsByBlockID(
 
 	id, err := convert.BlockID(req.GetBlockId())
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
 	}
 
-	results, err := h.api.GetTransactionResultsByBlockID(ctx, id)
+	eventEncodingVersion := req.GetEventEncodingVersion()
+
+	results, err := h.api.GetTransactionResultsByBlockID(ctx, id, eventEncodingVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -315,7 +328,7 @@ func (h *Handler) GetTransactionsByBlockID(
 
 	id, err := convert.BlockID(req.GetBlockId())
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
 	}
 
 	transactions, err := h.api.GetTransactionsByBlockID(ctx, id)
@@ -339,10 +352,12 @@ func (h *Handler) GetTransactionResultByIndex(
 
 	blockID, err := convert.BlockID(req.GetBlockId())
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
 	}
 
-	result, err := h.api.GetTransactionResultByIndex(ctx, blockID, req.GetIndex())
+	eventEncodingVersion := req.GetEventEncodingVersion()
+
+	result, err := h.api.GetTransactionResultByIndex(ctx, blockID, req.GetIndex(), eventEncodingVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -360,7 +375,10 @@ func (h *Handler) GetAccount(
 ) (*access.GetAccountResponse, error) {
 	metadata := h.buildMetadataResponse()
 
-	address := flow.BytesToAddress(req.GetAddress())
+	address, err := convert.Address(req.GetAddress(), h.chain)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
+	}
 
 	account, err := h.api.GetAccount(ctx, address)
 	if err != nil {
@@ -387,7 +405,7 @@ func (h *Handler) GetAccountAtLatestBlock(
 
 	address, err := convert.Address(req.GetAddress(), h.chain)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
 	account, err := h.api.GetAccountAtLatestBlock(ctx, address)
@@ -414,7 +432,7 @@ func (h *Handler) GetAccountAtBlockHeight(
 
 	address, err := convert.Address(req.GetAddress(), h.chain)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
 	account, err := h.api.GetAccountAtBlockHeight(ctx, address, req.GetBlockHeight())
@@ -513,7 +531,9 @@ func (h *Handler) GetEventsForHeightRange(
 	startHeight := req.GetStartHeight()
 	endHeight := req.GetEndHeight()
 
-	results, err := h.api.GetEventsForHeightRange(ctx, eventType, startHeight, endHeight)
+	eventEncodingVersion := req.GetEventEncodingVersion()
+
+	results, err := h.api.GetEventsForHeightRange(ctx, eventType, startHeight, endHeight, eventEncodingVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -545,7 +565,9 @@ func (h *Handler) GetEventsForBlockIDs(
 		return nil, err
 	}
 
-	results, err := h.api.GetEventsForBlockIDs(ctx, eventType, blockIDs)
+	eventEncodingVersion := req.GetEventEncodingVersion()
+
+	results, err := h.api.GetEventsForBlockIDs(ctx, eventType, blockIDs, eventEncodingVersion)
 	if err != nil {
 		return nil, err
 	}

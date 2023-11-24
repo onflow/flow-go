@@ -354,6 +354,10 @@ func main() {
 			return followerEng, nil
 		}).
 		Component("main chain sync engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			spamConfig, err := consync.NewSpamDetectionConfig()
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize spam detection config: %w", err)
+			}
 
 			// create a block synchronization engine to handle follower getting out of sync
 			sync, err := consync.New(
@@ -366,7 +370,7 @@ func main() {
 				followerEng,
 				mainChainSyncCore,
 				node.SyncEngineIdentifierProvider,
-				consync.NewSpamDetectionConfig(),
+				spamConfig,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
