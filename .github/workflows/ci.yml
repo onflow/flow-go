@@ -337,16 +337,16 @@ jobs:
             make: make -C integration epochs-an-tests
             runner: ubuntu-latest
             corrupt: false
-          - name: Epoch Static Integration Tests
-            make: make -C integration epochs-static-tests
+          - name: Epoch LN Integration Tests
+            make: make -C integration epochs-ln-tests
             runner: ubuntu-latest
             corrupt: false
           - name: Epoch SN Integration Tests
             make: make -C integration epochs-sn-tests
             runner: ubuntu-latest
             corrupt: false
-          - name: Epoch LN Integration Tests
-            make: make -C integration epochs-ln-tests
+          - name: Epoch Static Integration Tests
+            make: make -C integration epochs-static-tests
             runner: ubuntu-latest
             corrupt: false
           - name: Epoch VN Integration Tests
