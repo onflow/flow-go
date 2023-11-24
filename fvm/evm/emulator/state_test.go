@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math/big"
+	"os"
 	"strings"
 	"testing"
 
@@ -77,6 +78,8 @@ func (s *storageTest) newAddress() common.Address {
 	return addr
 }
 
+// run the provided runner with a newly created state which gets comitted after the runner
+// is finished. Storage metrics are being recorded with each run.
 func (s *storageTest) run(runner func(state *gethState.StateDB)) error {
 	state, err := gethState.New(s.hash, s.stateDB, nil)
 	if err != nil {
@@ -110,6 +113,8 @@ func (s *storageTest) run(runner func(state *gethState.StateDB)) error {
 	return nil
 }
 
+// metrics offers adding custom metrics as well as plotting the metrics on the provided x-axis
+// as well as generating csv export for visualisation.
 type metrics struct {
 	data   map[string]int
 	charts map[string][][2]int
@@ -153,17 +158,22 @@ func (m *metrics) chartCSV(name string) string {
 }
 
 func Test_AccountCreations(t *testing.T) {
+	if os.Getenv("benchmark") == "" {
+		t.Skip("Skipping benchmarking")
+	}
+
 	tester, err := newStorageTest()
 	require.NoError(t, err)
 
 	accountChart := "accounts,storage_size"
-	maxAccounts := 100_000
+	maxAccounts := 50_000
 	for i := 0; i < maxAccounts; i++ {
 		err = tester.run(func(state *gethState.StateDB) {
 			state.AddBalance(tester.newAddress(), big.NewInt(100))
 		})
 		require.NoError(t, err)
-		if i%100 == 0 {
+
+		if i%50 == 0 { // plot with resolution
 			tester.metrics.plot(accountChart, i, tester.metrics.get(storageBytesMetric))
 		}
 	}
@@ -174,8 +184,13 @@ func Test_AccountCreations(t *testing.T) {
 }
 
 func Test_AccountContractInteraction(t *testing.T) {
+	if os.Getenv("benchmark") == "" {
+		t.Skip("Skipping benchmarking")
+	}
+
 	tester, err := newStorageTest()
 	require.NoError(t, err)
+	interactionChart := "interactions,storage_size_bytes"
 
 	// build test contract storage state
 	contractState := make(map[common.Hash]common.Hash)
@@ -188,7 +203,7 @@ func Test_AccountContractInteraction(t *testing.T) {
 	// build test contract code, aprox kitty contract size
 	code := make([]byte, 50000)
 
-	interactions := 1000
+	interactions := 50000
 	for i := 0; i < interactions; i++ {
 		err = tester.run(func(state *gethState.StateDB) {
 			// create a new account
@@ -204,9 +219,15 @@ func Test_AccountContractInteraction(t *testing.T) {
 			// simulate interaction with contract state and account balance for fees
 			state.SetState(contractAddr, common.HexToHash("0x03"), common.HexToHash("0x40"))
 			state.AddBalance(accAddr, big.NewInt(1))
-
-			fmt.Println(i, tester.metrics)
 		})
 		require.NoError(t, err)
+
+		if i%50 == 0 { // plot with resolution
+			tester.metrics.plot(interactionChart, i, tester.metrics.get(storageBytesMetric))
+		}
 	}
+
+	csv := tester.metrics.chartCSV(interactionChart)
+	err = io.WriteFile("./interactions_storage_size.csv", []byte(csv))
+	require.NoError(t, err)
 }
