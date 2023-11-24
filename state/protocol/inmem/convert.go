@@ -157,6 +157,10 @@ func FromEpoch(from protocol.Epoch) (*Epoch, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get random source: %w", err)
 	}
+	epoch.TargetDuration, err = from.TargetDuration()
+	if err != nil {
+		return nil, fmt.Errorf("could not get target epoch duration: %w", err)
+	}
 	epoch.TargetEndTime, err = from.TargetEndTime()
 	if err != nil {
 		return nil, fmt.Errorf("could not get target end time: %w", err)
