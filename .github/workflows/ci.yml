@@ -323,7 +323,7 @@ jobs:
             corrupt: true
           - name: BFT (Gossipsub) Integration Tests
             make: make -C integration bft-gossipsub-tests
-            runner: buildjet-4vcpu-ubuntu-2204
+            runner: buildjet-16vcpu-ubuntu-2204
             corrupt: true
           - name: Collection Integration Tests
             make: make -C integration collection-tests
@@ -335,11 +335,11 @@ jobs:
             corrupt: false
           - name: Epoch Cohort1 Integration Tests
             make: make -C integration epochs-cohort1-tests
-            runner: buildjet-4vcpu-ubuntu-2204
+            runner: buildjet-8vcpu-ubuntu-2204
             corrupt: false
           - name: Epoch Cohort2 Integration Tests
             make: make -C integration epochs-cohort2-tests
-            runner: buildjet-4vcpu-ubuntu-2204
+            runner: buildjet-8vcpu-ubuntu-2204
             corrupt: false
           - name: Execution Integration Tests
             make: make -C integration execution-tests
