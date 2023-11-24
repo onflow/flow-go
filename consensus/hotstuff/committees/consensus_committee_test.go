@@ -262,9 +262,17 @@ func (suite *ConsensusSuite) TestIdentitiesByBlock() {
 	t := suite.T()
 
 	realIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
-	nonActiveConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus), unittest.WithParticipationStatus(flow.EpochParticipationStatusJoining))
+	joiningConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus), unittest.WithParticipationStatus(flow.EpochParticipationStatusJoining))
+	leavingConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus), unittest.WithParticipationStatus(flow.EpochParticipationStatusLeaving))
 	ejectedConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus), unittest.WithParticipationStatus(flow.EpochParticipationStatusEjected))
 	validNonConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+	validConsensusIdentities := []*flow.Identity{
+		realIdentity,
+		joiningConsensusIdentity,
+		leavingConsensusIdentity,
+		validNonConsensusIdentity,
+		ejectedConsensusIdentity,
+	}
 	fakeID := unittest.IdentifierFixture()
 	blockID := unittest.IdentifierFixture()
 
@@ -273,10 +281,10 @@ func (suite *ConsensusSuite) TestIdentitiesByBlock() {
 	suite.epochs.Add(currEpoch)
 
 	suite.state.On("AtBlockID", blockID).Return(suite.snapshot)
-	suite.snapshot.On("Identity", realIdentity.NodeID).Return(realIdentity, nil)
-	suite.snapshot.On("Identity", nonActiveConsensusIdentity.NodeID).Return(nonActiveConsensusIdentity, nil)
-	suite.snapshot.On("Identity", ejectedConsensusIdentity.NodeID).Return(ejectedConsensusIdentity, nil)
-	suite.snapshot.On("Identity", validNonConsensusIdentity.NodeID).Return(validNonConsensusIdentity, nil)
+	for _, identity := range validConsensusIdentities {
+		identity := identity
+		suite.snapshot.On("Identity", identity.NodeID).Return(identity, nil)
+	}
 	suite.snapshot.On("Identity", fakeID).Return(nil, protocol.IdentityNotFoundError{})
 
 	suite.CreateAndStartCommittee()
@@ -287,8 +295,13 @@ func (suite *ConsensusSuite) TestIdentitiesByBlock() {
 	})
 
 	t.Run("existent but non-committee-member identity should return InvalidSignerError", func(t *testing.T) {
-		t.Run("zero-weight consensus node", func(t *testing.T) {
-			_, err := suite.committee.IdentityByBlock(blockID, nonActiveConsensusIdentity.NodeID)
+		t.Run("joining consensus node", func(t *testing.T) {
+			_, err := suite.committee.IdentityByBlock(blockID, joiningConsensusIdentity.NodeID)
+			require.True(t, model.IsInvalidSignerError(err))
+		})
+
+		t.Run("leaving consensus node", func(t *testing.T) {
+			_, err := suite.committee.IdentityByBlock(blockID, leavingConsensusIdentity.NodeID)
 			require.True(t, model.IsInvalidSignerError(err))
 		})
 
