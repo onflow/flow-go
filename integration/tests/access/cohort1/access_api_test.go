@@ -68,9 +68,6 @@ func (s *AccessAPISuite) SetupTest() {
 		s.log.Info().Msg("================> Finish SetupTest")
 	}()
 
-	// slow down consensus, as sealing tends to lag behind
-	s.ConsensusProposalDuration = time.Millisecond * 250
-
 	// access node
 	defaultAccessConfig := testnet.NewNodeConfig(
 		flow.RoleAccess,
@@ -91,7 +88,7 @@ func (s *AccessAPISuite) SetupTest() {
 	)
 
 	consensusConfigs := []func(config *testnet.NodeConfig){
-		testnet.WithAdditionalFlag("--cruise-ctl-fallback-proposal-duration=100ms"),
+		testnet.WithAdditionalFlag("--cruise-ctl-fallback-proposal-duration=250ms"),
 		testnet.WithAdditionalFlagf("--required-verification-seal-approvals=%d", 1),
 		testnet.WithAdditionalFlagf("--required-construction-seal-approvals=%d", 1),
 		testnet.WithLogLevel(zerolog.FatalLevel),
