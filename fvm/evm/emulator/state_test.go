@@ -1,10 +1,13 @@
 package emulator_test
 
 import (
+	"encoding/binary"
 	"fmt"
 	"math/big"
 	"os"
 	"testing"
+
+	"github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/ethereum/go-ethereum/trie"
 	"github.com/ethereum/go-ethereum/trie/triedb/pathdb"
@@ -95,21 +98,10 @@ func benchmarkStateAccountsBalanceChange(
 		rootHash = updateAccounts(uint64(i), rootHash, big.NewInt(int64(i)))
 	}
 
-	items, size := storageDataMetrics(backend.Data)
 	fmt.Println("bytes_written", db.BytesStored())
 	fmt.Println("bytes_read", db.BytesRetrieved())
-	fmt.Println("storage_items", items)
-	fmt.Println("storage_size_bytes", size)
-	fmt.Println("storage_size_mb", size/1000000)
-}
-
-// calcualte storage data entries count and total storage size
-func storageDataMetrics(data map[string][]byte) (entries int, size int) {
-	for _, item := range data {
-		entries++
-		size += len(item)
-	}
-	return
+	fmt.Println("storage_items", backend.TotalStorageItems())
+	fmt.Println("storage_size_bytes", backend.TotalStorageSize())
 }
 
 func TestStateBalanceSingleAccountSingle(t *testing.T) {
@@ -126,23 +118,147 @@ func TestStateBalanceSingleAccount(t *testing.T) {
 	})
 }
 
-/**
-itterations := 100000
-accounts := 100
+func testComplexStateUpdates(t *testing.T, numberOfAccounts int, numberOfContracts int, debug bool, pathDB bool) {
+	//t.Skip() // don't run in a normal test suite
 
-=== RUN   TestStateBalanceSingleAccount/Hash_Database
-bytes_written 45,536,241,344
-bytes_read 81,988,466,951
-storage_items 2,467,497
-storage_size_bytes 2303955180
-storage_size_mb 2303
-    --- PASS: TestStateBalanceSingleAccount/Hash_Database (394.44s)
+	if debug {
+		log.Root().SetHandler(log.StreamHandler(os.Stdout, log.LogfmtFormat()))
+	}
 
-=== RUN   TestStateBalanceSingleAccount/Path_Database
-bytes_written 23,433,911,134
-bytes_read 23,537,907,384
-storage_items 411,266
-storage_size_bytes 12040969
-storage_size_mb 12
-    --- PASS: TestStateBalanceSingleAccount/Path_Database (230.82s)
-*/
+	backend := testutils.GetSimpleValueStore()
+
+	db, err := database.NewMeteredDatabase(backend, rootAddr)
+	require.NoError(t, err)
+
+	hash, err := db.GetRootHash()
+	require.NoError(t, err)
+
+	rawDB := gethRawDB.NewDatabase(db)
+
+	var config *trie.Config
+	if pathDB {
+		config = &trie.Config{
+			PathDB: &pathdb.Config{},
+		}
+	}
+
+	stateDB := gethState.NewDatabaseWithConfig(rawDB, config)
+
+	newAddress := addressGenerator()
+	block := uint64(0)
+
+	// create accounts
+	accounts := make([]common.Address, numberOfAccounts)
+	hash, err = withNewState(block, hash, stateDB, db, func(state *gethState.StateDB) {
+		for i := range accounts {
+			addr := newAddress()
+			state.SetBalance(addr, big.NewInt(int64(i*10)))
+			accounts[i] = addr
+		}
+	})
+
+	// create test contracts
+	contracts := make([]common.Address, numberOfContracts)
+	contractsCode := [][]byte{
+		make([]byte, 500),   // small contract
+		make([]byte, 5000),  // aprox erc20 size
+		make([]byte, 50000), // aprox kitty contract size
+	}
+
+	// build test storage
+	contractState := make(map[common.Hash]common.Hash)
+	for i := 0; i < 10; i++ {
+		h := common.HexToHash(fmt.Sprintf("%d", i))
+		v := common.HexToHash(fmt.Sprintf("%d %s", i, make([]byte, 32)))
+		contractState[h] = v
+	}
+
+	block++
+	hash, err = withNewState(block, hash, stateDB, db, func(state *gethState.StateDB) {
+		for i := range contracts {
+			addr := newAddress()
+			state.SetBalance(addr, big.NewInt(int64(i)))
+			code := contractsCode[i%len(contractsCode)]
+			state.SetCode(addr, code)
+			state.SetStorage(addr, contractState)
+			contracts[i] = addr
+		}
+	})
+
+	for _, addr := range contracts {
+		block++
+		hash, err = withNewState(block, hash, stateDB, db, func(state *gethState.StateDB) {
+			state.SetState(addr, common.HexToHash("0x03"), common.HexToHash("0x40"))
+		})
+	}
+
+	for _, addr := range accounts {
+		block++
+		hash, err = withNewState(block, hash, stateDB, db, func(state *gethState.StateDB) {
+			state.AddBalance(addr, big.NewInt(int64(2)))
+		})
+	}
+
+	t.Logf("bytes_written: %d", db.BytesStored())
+	t.Logf("bytes_read: %d", db.BytesRetrieved())
+	t.Logf("storage_items: %d", backend.TotalStorageItems())
+	t.Logf("storage_size_bytes: %d", backend.TotalStorageSize())
+}
+
+func addressGenerator() func() common.Address {
+	i := uint64(0)
+
+	return func() common.Address {
+		i++
+		var addr common.Address
+		binary.BigEndian.PutUint64(addr[12:], i)
+		return addr
+	}
+}
+
+func withNewState(
+	block uint64,
+	hash common.Hash,
+	stateDB gethState.Database,
+	db *database.MeteredDatabase,
+	f func(state *gethState.StateDB),
+) (common.Hash, error) {
+	state, err := gethState.New(hash, stateDB, nil)
+	if err != nil {
+		return types.EmptyRootHash, err
+	}
+
+	f(state)
+
+	hash, err = state.Commit(block, true)
+	if err != nil {
+		return types.EmptyRootHash, err
+	}
+
+	err = state.Database().TrieDB().Commit(hash, true)
+	if err != nil {
+		return types.EmptyRootHash, err
+	}
+
+	err = db.Commit(hash)
+	if err != nil {
+		return types.EmptyRootHash, err
+	}
+
+	db.DropCache()
+
+	return hash, nil
+}
+
+func TestComplexState(t *testing.T) {
+	for i := 0; i < 10; i++ {
+		numberTests := 10000 * i
+		t.Run(fmt.Sprintf("PathDB - %d Accounts and %d Contracts"), func(t *testing.T) {
+			testComplexStateUpdates(t, 100000, 100000, false, true)
+		})
+
+		t.Run("HashDB - 1,000 Accounts and 1,000 Contracts", func(t *testing.T) {
+			testComplexStateUpdates(t, 100000, 100000, false, false)
+		})
+	}
+}
