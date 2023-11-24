@@ -306,7 +306,7 @@ jobs:
             runner: buildjet-4vcpu-ubuntu-2204
             corrupt: false
           - name: Access Cohort2 Integration Tests
-            make: make -C integration access-sn-tests
+            make: make -C integration access-cohort2-tests
             runner: ubuntu-latest
             corrupt: false
           - name: Access Cohort3 Integration Tests
