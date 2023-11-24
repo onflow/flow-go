@@ -10,10 +10,10 @@ endif
 
 # Run the integration test suite
 .PHONY: integration-test
-integration-test: access-tests ghost-tests mvp-tests execution-tests verification-tests upgrades-tests collection-tests epochs-cohort1-tests epochs-cohort2-tests epochs-vn-tests network-tests consensus-tests
+integration-test: access-tests ghost-tests mvp-tests execution-tests verification-tests upgrades-tests collection-tests epochs-an-tests epochs-cohort1-tests epochs-cohort2-tests epochs-vn-tests network-tests consensus-tests
 
 .PHONY: ci-integration-test
-ci-integration-test: access-tests ghost-tests mvp-tests epochs-cohort1-tests epochs-cohort2-tests epochs-vn-tests consensus-tests execution-tests verification-tests upgrades-tests network-tests collection-tests
+ci-integration-test: access-tests ghost-tests mvp-tests epochs-an-tests epochs-cohort1-tests epochs-cohort2-tests epochs-vn-tests consensus-tests execution-tests verification-tests upgrades-tests network-tests collection-tests
 
 ############################################################################################
 # CAUTION: DO NOT MODIFY THE TARGETS BELOW! DOING SO WILL BREAK THE FLAKY TEST MONITOR
@@ -44,6 +44,11 @@ collection-tests:
 .PHONY: consensus-tests
 consensus-tests:
 	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/consensus/...
+
+.PHONY: epochs-an-tests
+epochs-an-tests:
+	# Use a higher timeout of 20m for the suite of tests which span full epochs
+	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic -timeout 20m ./tests/epochs/an/...
 
 .PHONY: epochs-cohort1-tests
 epochs-cohort1-tests:

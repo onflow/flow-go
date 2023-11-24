@@ -333,6 +333,10 @@ jobs:
             make: make -C integration consensus-tests
             runner: ubuntu-latest
             corrupt: false
+          - name: Epoch AN Integration Tests
+            make: make -C integration epochs-an-tests
+            runner: ubuntu-latest
+            corrupt: false
           - name: Epoch Cohort1 Integration Tests
             make: make -C integration epochs-cohort1-tests
             runner: buildjet-8vcpu-ubuntu-2204
