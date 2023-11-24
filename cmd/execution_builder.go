@@ -799,7 +799,9 @@ func (exeNode *ExecutionNode) LoadRegisterStore(
 		return fmt.Errorf("could not create registers storage: %w", err)
 	}
 
-	reader := finalizedreader.NewFinalizedReader(node.Storage.Headers)
+	reader := finalizedreader.NewFinalizedReader(node.Storage.Headers, node.LastFinalizedHeader.Height)
+	node.ProtocolEvents.AddConsumer(reader)
+
 	registerStore, err := storehouse.NewRegisterStore(
 		diskStore,
 		nil, // TODO: replace with real WAL

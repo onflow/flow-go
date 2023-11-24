@@ -1,27 +1,41 @@
 package finalizedreader
 
 import (
+	"fmt"
+
+	"go.uber.org/atomic"
+
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
 
 type FinalizedReader struct {
-	headers storage.Headers
+	protocol.Consumer
+	lastHeight *atomic.Uint64
+	headers    storage.Headers
 }
 
-func NewFinalizedReader(headers storage.Headers) *FinalizedReader {
+func NewFinalizedReader(headers storage.Headers, lastHeight uint64) *FinalizedReader {
 	return &FinalizedReader{
-		headers: headers,
+		lastHeight: atomic.NewUint64(lastHeight),
+		headers:    headers,
 	}
 }
 
 func (r *FinalizedReader) FinalizedBlockIDAtHeight(height uint64) (flow.Identifier, error) {
-	// TODO: cache the last finalized height to return early if
-	// the queried height is above the last finalized height
+	if height > r.lastHeight.Load() {
+		return flow.ZeroID, fmt.Errorf("height not finalized (%v): %w", height, storage.ErrNotFound)
+	}
+
 	header, err := r.headers.ByHeight(height)
 	if err != nil {
 		return flow.ZeroID, err
 	}
 
 	return header.ID(), nil
+}
+
+func (r *FinalizedReader) BlockFinalized(h *flow.Header) {
+	r.lastHeight.Store(h.Height)
 }
