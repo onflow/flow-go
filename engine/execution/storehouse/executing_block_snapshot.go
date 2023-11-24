@@ -58,6 +58,12 @@ func (s *ExecutingBlockSnapshot) getFromUpdates(id flow.RegisterID) (flow.Regist
 // Usually it's used to create a new storage snapshot at the next executed collection.
 // The registerUpdates contains the register updates at the executed collection.
 func (s *ExecutingBlockSnapshot) Extend(newCommit flow.StateCommitment, updates map[flow.RegisterID]flow.RegisterValue) execution.ExtendableStorageSnapshot {
+	// if there is no update, we can return the original snapshot directly
+	// instead of wrapping it with a new ExecutingBlockSnapshot that has no update
+	if len(updates) == 0 {
+		return s
+	}
+
 	return &ExecutingBlockSnapshot{
 		previous:        s,
 		commitment:      newCommit,

@@ -346,7 +346,9 @@ func (e *blockComputer) executeBlock(
 		parentBlockExecutionResultID,
 		block,
 		numTxns,
-		e.colResCons)
+		e.colResCons,
+		baseSnapshot,
+	)
 	defer collector.Stop()
 
 	requestQueue := make(chan TransactionRequest, numTxns)
