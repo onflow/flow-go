@@ -390,7 +390,6 @@ func (ctl *BlockTimeController) measureViewDuration(tb TimedBlock) error {
 	// In accordance with this convention, observing the proposal for the last view of an epoch, marks the start of the last view.
 	// By observing the proposal, nodes enter the last view, verify the block, vote for it, the primary aggregates the votes,
 	// constructs the child (for first view of new epoch). The last view of the epoch ends, when the child proposal is published.
-
 	tau := ctl.targetViewTime()                                                    // τ: idealized target view time in units of seconds
 	viewDurationsRemaining := ctl.curEpochFinalView + 1 - view                     // k[v]: views remaining in current epoch
 	durationRemaining := unix2time(ctl.curEpochTargetEndTime).Sub(tb.TimeObserved) // Γ[v] = T[v] - t[v], with t[v] ≡ tb.TimeObserved the time when observing the block that trigged the view change
