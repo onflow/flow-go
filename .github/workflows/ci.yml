@@ -103,15 +103,15 @@ jobs:
           admin
           cmd
           consensus
-          engine/access 
-          engine/collection 
+          engine/access
+          engine/collection
           engine/common
-          engine/consensus 
+          engine/consensus
           engine/execution/ingestion:buildjet-8vcpu-ubuntu-2204 
           engine/execution/computation
           engine/execution
-          engine/verification 
-          engine:buildjet-4vcpu-ubuntu-2204 
+          engine/verification
+          engine:buildjet-4vcpu-ubuntu-2204
           fvm
           ledger
           module/dkg
@@ -119,11 +119,11 @@ jobs:
           network/alsp
           network/test:buildjet-8vcpu-ubuntu-2204
           network/p2p/connection
-          network/p2p/p2pnode:buildjet-4vcpu-ubuntu-2204 
+          network/p2p/p2pnode:buildjet-4vcpu-ubuntu-2204
           network/p2p/scoring network/p2p
           network
           state
-          storage 
+          storage
           utils
 
   unit-test:
@@ -340,6 +340,10 @@ jobs:
           - name: Epoch Cohort2 Integration Tests
             make: make -C integration epochs-cohort2-tests
             runner: buildjet-8vcpu-ubuntu-2204
+            corrupt: false
+          - name: Epoch VN Integration Tests
+            make: make -C integration epochs-vn-tests
+            runner: ubuntu-latest
             corrupt: false
           - name: Execution Integration Tests
             make: make -C integration execution-tests
