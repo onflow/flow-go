@@ -30,7 +30,6 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"fmt"
-	"time"
 
 	"golang.org/x/crypto/hkdf"
 
@@ -190,8 +189,6 @@ func (pk *pubKeyBLSBLS12381) Verify(s Signature, data []byte, kmac hash.Hasher) 
 	if pk.isIdentity {
 		return false, nil
 	}
-
-	time.Sleep(2 * time.Millisecond)
 
 	verif := C.bls_verify((*C.E2)(&pk.point),
 		(*C.uchar)(&s[0]),

@@ -68,6 +68,9 @@ func (s *AccessAPISuite) SetupTest() {
 		s.log.Info().Msg("================> Finish SetupTest")
 	}()
 
+	// slow down consensus, as sealing tends to lag behind
+	s.ConsensusProposalDuration = time.Millisecond * 250
+
 	// access node
 	defaultAccessConfig := testnet.NewNodeConfig(
 		flow.RoleAccess,
