@@ -1,5 +1,5 @@
 // Package epochs contains common functionality for the epoch integration test suite.
-// Individual tests exist in sub-directories of this: cohort1, cohort2...
+// Individual tests exist in sub-directories of this: an, ln, static, sn, vn...
 // Each cohort is run as a separate, sequential CI job. Since the epoch tests are long
 // and resource-heavy, we split them into several cohorts, which can be run in parallel.
 //

@@ -1,4 +1,4 @@
-package cohort1
+package static
 
 import (
 	"testing"
