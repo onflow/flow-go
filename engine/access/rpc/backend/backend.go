@@ -100,6 +100,7 @@ type Params struct {
 	SnapshotHistoryLimit      int
 	Communicator              Communicator
 	TxResultCacheSize         uint
+	TxErrorMessagesCacheSize  uint
 	ScriptExecutor            execution.ScriptExecutor
 	ScriptExecutionMode       ScriptExecutionMode
 }
@@ -122,6 +123,15 @@ func New(params Params) (*Backend, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to init cache for transaction results: %w", err)
 		}
+	}
+
+	txErrorMessagesCacheSize := params.TxErrorMessagesCacheSize
+	if txErrorMessagesCacheSize == 0 {
+		txErrorMessagesCacheSize = 1000 // use a default value in case it wasn't configured
+	}
+	txErrorMessagesCache, err := lru.New[flow.Identifier, string](int(txErrorMessagesCacheSize))
+	if err != nil {
+		return nil, fmt.Errorf("failed to init cache for transaction error messages: %w", err)
 	}
 
 	// initialize node version info
@@ -162,6 +172,7 @@ func New(params Params) (*Backend, error) {
 			log:                  params.Log,
 			nodeCommunicator:     params.Communicator,
 			txResultCache:        txResCache,
+			txErrorMessagesCache: txErrorMessagesCache,
 		},
 		backendEvents: backendEvents{
 			state:             params.State,

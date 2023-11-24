@@ -1071,7 +1071,7 @@ func (b *backendTransactions) lookupTransactionErrorMessagesByBlockID(
 	}
 	result := make(map[flow.Identifier]string, len(resp))
 	for _, value := range resp {
-		cacheKey := flow.MakeIDFromFingerPrint(append(blockID[:], value.TransactionId[:]...))
+		cacheKey := flow.MakeIDFromFingerPrint(append(req.BlockId, value.TransactionId...))
 		b.txErrorMessagesCache.Add(cacheKey, value.ErrorMessage)
 		result[convert.MessageToIdentifier(value.TransactionId)] = value.ErrorMessage
 	}
