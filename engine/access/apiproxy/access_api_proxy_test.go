@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	grpcinsecure "google.golang.org/grpc/credentials/insecure"
 
@@ -136,12 +137,18 @@ func TestNewFlowCachedAccessAPIProxy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// Bring up 2nd upstream server
+	charlie2, _, err := newFlowLite("tcp", unittest.IPPort("11635"), done)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// create the factory
 	connectionFactory := new(connection.ConnectionFactoryImpl)
 	// set metrics reporting
 	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
 	connectionFactory.CollectionNodeGRPCTimeout = time.Second
-	connectionFactory.CollectionGRPCPort = 11634
 	connectionFactory.Manager = connection.NewManager(
 		nil,
 		unittest.Logger(),
@@ -159,36 +166,29 @@ func TestNewFlowCachedAccessAPIProxy(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Bring up 2nd upstream server
-	charlie2, _, err := newFlowLite("tcp", unittest.IPPort("11635"), done)
+	ctx := context.Background()
+
+	// Wait until proxy call passes
+	_, err = c.Ping(ctx, &access.PingRequest{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	background := context.Background()
+	// get and close first connection
+	_, closer, err := c.Forwarder.FaultTolerantClient()
+	assert.NoError(t, err)
+	closer.Close()
 
-	// Prepare a proxy
-	l = flow.IdentityList{{Address: unittest.IPPort("11634")}, {Address: unittest.IPPort("11635")}}
-	c = FlowAccessAPIForwarder{}
-	c.Forwarder, err = forwarder.NewForwarder(l, connectionFactory)
+	// connection factory created a new gRPC connection which was closed before
+	// if creation fails should use second connection
+	// Wait until proxy call passes
+	_, err = c.Ping(ctx, &access.PingRequest{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Wait until proxy call passes
-	_, err = c.Ping(background, &access.PingRequest{})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Wait until proxy call passes
-	_, err = c.Ping(background, &access.PingRequest{})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Wait until proxy call passes
-	_, err = c.Ping(background, &access.PingRequest{})
+	_, err = c.Ping(ctx, &access.PingRequest{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -197,7 +197,7 @@ func TestNewFlowCachedAccessAPIProxy(t *testing.T) {
 	charlie2.Stop()
 
 	// Wait until proxy call fails
-	_, err = c.Ping(background, &access.PingRequest{})
+	_, err = c.Ping(ctx, &access.PingRequest{})
 	if err == nil {
 		t.Fatal(fmt.Errorf("should fail on no connections"))
 	}
