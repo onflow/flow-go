@@ -762,7 +762,10 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					return nil, err
 				}
 
-				builder.RegistersAsyncStore.InitDataAvailable(registers)
+				err = builder.RegistersAsyncStore.InitDataAvailable(registers)
+				if err != nil {
+					return nil, err
+				}
 
 				// setup requester to notify indexer when new execution data is received
 				execDataDistributor.AddOnExecutionDataReceivedConsumer(builder.ExecutionIndexer.OnExecutionData)

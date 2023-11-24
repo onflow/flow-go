@@ -2,7 +2,6 @@ package execution
 
 import (
 	"fmt"
-	"sync"
 
 	"go.uber.org/atomic"
 
@@ -13,28 +12,22 @@ import (
 // RegistersAsyncStore has the same basic structure as access/backend.ScriptExecutor
 // TODO: use this implementation in the `scripts.ScriptExecutor` passed into the AccessAPI
 type RegistersAsyncStore struct {
-	registerIndex storage.RegisterIndex
-	initialized   *atomic.Bool
-	init          sync.Once
+	registerIndex atomic.Pointer[storage.RegisterIndex]
 }
 
 func NewRegistersAsyncStore() *RegistersAsyncStore {
-	return &RegistersAsyncStore{
-		initialized: atomic.NewBool(false),
-	}
+	return &RegistersAsyncStore{atomic.Pointer[storage.RegisterIndex]{}}
 }
 
-// InitDataAvailable follows the same pattern of backend.ScriptExecutor
-// This method can be called at any time after the RegistersAsyncStore object is created and
-// calls to GetRegisterValues will return a storage.ErrHeightNotIndexed,
+// InitDataAvailable initializes the underlying storage.RegisterIndex
+// This method can be called at any time after the RegistersAsyncStore object is created and before RegisterValues is called
 // since we can't disambiguate between the underlying store before bootstrapping or just simply being behind sync
-func (r *RegistersAsyncStore) InitDataAvailable(
-	registers storage.RegisterIndex,
-) {
-	r.init.Do(func() {
-		defer r.initialized.Store(true)
-		r.registerIndex = registers
-	})
+func (r *RegistersAsyncStore) InitDataAvailable(registers storage.RegisterIndex) error {
+	if r.registerIndex.CompareAndSwap(nil, r.registerIndex.Load()) {
+		r.registerIndex.Store(&registers)
+		return nil
+	}
+	return fmt.Errorf("registers already initialized")
 }
 
 // RegisterValues gets the register values from the underlying storage.RegisterIndex
@@ -46,8 +39,9 @@ func (r *RegistersAsyncStore) RegisterValues(ids flow.RegisterIDs, height uint64
 		return nil, storage.ErrHeightNotIndexed
 	}
 	result := make([]flow.RegisterValue, len(ids))
+	registerStore := *r.registerIndex.Load()
 	for i, regId := range ids {
-		val, err := r.registerIndex.Get(regId, height)
+		val, err := registerStore.Get(regId, height)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get register value for id %d: %w", i, err)
 		}
@@ -57,6 +51,9 @@ func (r *RegistersAsyncStore) RegisterValues(ids flow.RegisterIDs, height uint64
 }
 
 func (r *RegistersAsyncStore) isDataAvailable(height uint64) bool {
-	return r.initialized.Load() &&
-		height <= r.registerIndex.LatestHeight() && height >= r.registerIndex.FirstHeight()
+	if r.registerIndex.Load() != nil {
+		registerStore := *r.registerIndex.Load()
+		return height <= registerStore.LatestHeight() && height >= registerStore.FirstHeight()
+	}
+	return false
 }
