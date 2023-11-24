@@ -130,9 +130,14 @@ var IsConsensusCommitteeMember = And(
 
 // IsVotingConsensusCommitteeMember is an identity filter for all members of
 // the consensus committee allowed to vote.
+// Formally, a Node X has authority to vote in the consensus process, if and only if
+//  1. Node X is an active member of the current epoch AND
+//  2. X is a consensus node with positive initial weight in the current Epoch. This
+//     is specified by the EpochSetup Event for the current epoch and remains static
+//     throughout the epoch.
 var IsVotingConsensusCommitteeMember = And[flow.Identity](
-	HasRole[flow.Identity](flow.RoleConsensus),
-	IsValidCurrentEpochParticipant,
+	IsValidCurrentEpochParticipant,    // enforces 1.
+	Adapt(IsConsensusCommitteeMember), // enforces 2.
 )
 
 // IsValidDKGParticipant is an identity filter for all DKG participants. It is

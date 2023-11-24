@@ -49,8 +49,8 @@ func NewClusterCommittee(
 		return nil, fmt.Errorf("could not compute leader selection for cluster: %w", err)
 	}
 
-	initialClusterIdentities := constructContributingClusterParticipants(cluster.Members()) // drops nodes with `InitialWeight=0`
-	initialClusterMembersSelector := initialClusterIdentities.Selector()                    // hence, any node accepted by this selector has `InitialWeight>0`
+	initialClusterIdentities := votingClusterParticipants(cluster.Members()) // drops nodes with `InitialWeight=0`
+	initialClusterMembersSelector := initialClusterIdentities.Selector()     // hence, any node accepted by this selector has `InitialWeight>0`
 	totalWeight := initialClusterIdentities.TotalWeight()
 
 	com := &Cluster{
@@ -177,7 +177,7 @@ func (c *Cluster) DKG(_ uint64) (hotstuff.DKG, error) {
 	panic("queried DKG of cluster committee")
 }
 
-// constructContributingClusterParticipants extends the IdentitySkeletons of the cluster members to their full Identities
+// votingClusterParticipants extends the IdentitySkeletons of the cluster members to their full Identities
 // at the time of cluster initialization by EpochSetup event.
 // IMPORTANT CONVENTIONS:
 //  1. clusterMembers with zero `InitialWeight` are _not included_ as "contributing" cluster participants.
@@ -196,7 +196,7 @@ func (c *Cluster) DKG(_ uint64) (hotstuff.DKG, error) {
 //     that happened before should be reflected in the EpochSetup event. Specifically, ejected nodes
 //     should be no longer listed in the EpochSetup event. Hence, when the EpochSetup event is emitted / processed,
 //     the participation status of all cluster members equals flow.EpochParticipationStatusActive.
-func constructContributingClusterParticipants(clusterMembers flow.IdentitySkeletonList) flow.IdentityList {
+func votingClusterParticipants(clusterMembers flow.IdentitySkeletonList) flow.IdentityList {
 	initialClusterIdentities := make(flow.IdentityList, 0, len(clusterMembers))
 	for _, skeleton := range clusterMembers {
 		if skeleton.InitialWeight == 0 {
