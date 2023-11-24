@@ -306,7 +306,7 @@ jobs:
             runner: buildjet-4vcpu-ubuntu-2204
             corrupt: false
           - name: Access Cohort2 Integration Tests
-            make: make -C integration access-cohort2-tests
+            make: make -C integration access-sn-tests
             runner: ubuntu-latest
             corrupt: false
           - name: Access Cohort3 Integration Tests
@@ -341,9 +341,9 @@ jobs:
             make: make -C integration epochs-static-tests
             runner: ubuntu-latest
             corrupt: false
-          - name: Epoch Cohort2 Integration Tests
-            make: make -C integration epochs-cohort2-tests
-            runner: buildjet-8vcpu-ubuntu-2204
+          - name: Epoch SN Integration Tests
+            make: make -C integration epochs-sn-tests
+            runner: ubuntu-latest
             corrupt: false
           - name: Epoch LN Integration Tests
             make: make -C integration epochs-ln-tests
