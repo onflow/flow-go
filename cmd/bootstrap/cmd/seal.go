@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"encoding/hex"
+
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/flow"

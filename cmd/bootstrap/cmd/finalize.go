@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/onflow/cadence"
+	"github.com/spf13/cobra"
+
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
@@ -25,7 +27,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/io"
-	"github.com/spf13/cobra"
 )
 
 var (
@@ -53,7 +54,6 @@ var (
 	flagEpochTimingRefCounter        uint64
 	flagEpochTimingRefTimestamp      uint64
 	flagEpochTimingDuration          uint64
-	flagEpochTimingNetworkStartTime  time.Time
 )
 
 // PartnerWeights is the format of the JSON file specifying partner node weights.
