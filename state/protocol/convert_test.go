@@ -22,7 +22,10 @@ func TestToEpochSetup(t *testing.T) {
 
 func TestToEpochCommit(t *testing.T) {
 	setup := unittest.EpochSetupFixture()
-	expected := unittest.EpochCommitFixture(unittest.CommitWithCounter(setup.Counter))
+	expected := unittest.EpochCommitFixture(
+		unittest.CommitWithCounter(setup.Counter),
+		unittest.WithDKGFromParticipants(setup.Participants),
+		unittest.WithClusterQCsFromAssignments(setup.Assignments))
 	epoch := inmem.NewCommittedEpoch(setup, expected)
 
 	got, err := protocol.ToEpochCommit(epoch)
