@@ -345,6 +345,10 @@ jobs:
             make: make -C integration epochs-cohort2-tests
             runner: buildjet-8vcpu-ubuntu-2204
             corrupt: false
+          - name: Epoch LN Integration Tests
+            make: make -C integration epochs-ln-tests
+            runner: ubuntu-latest
+            corrupt: false
           - name: Epoch VN Integration Tests
             make: make -C integration epochs-vn-tests
             runner: ubuntu-latest
