@@ -13,24 +13,14 @@ type GossipSubRpcValidationInspectorMetrics struct {
 	mock.Mock
 }
 
-// AsyncProcessingFinished provides a mock function with given fields: msgType, duration
-func (_m *GossipSubRpcValidationInspectorMetrics) AsyncProcessingFinished(msgType string, duration time.Duration) {
-	_m.Called(msgType, duration)
+// AsyncProcessingFinished provides a mock function with given fields: duration
+func (_m *GossipSubRpcValidationInspectorMetrics) AsyncProcessingFinished(duration time.Duration) {
+	_m.Called(duration)
 }
 
-// AsyncProcessingStarted provides a mock function with given fields: msgType
-func (_m *GossipSubRpcValidationInspectorMetrics) AsyncProcessingStarted(msgType string) {
-	_m.Called(msgType)
-}
-
-// BlockingPreProcessingFinished provides a mock function with given fields: msgType, sampleSize, duration
-func (_m *GossipSubRpcValidationInspectorMetrics) BlockingPreProcessingFinished(msgType string, sampleSize uint, duration time.Duration) {
-	_m.Called(msgType, sampleSize, duration)
-}
-
-// BlockingPreProcessingStarted provides a mock function with given fields: msgType, sampleSize
-func (_m *GossipSubRpcValidationInspectorMetrics) BlockingPreProcessingStarted(msgType string, sampleSize uint) {
-	_m.Called(msgType, sampleSize)
+// AsyncProcessingStarted provides a mock function with given fields:
+func (_m *GossipSubRpcValidationInspectorMetrics) AsyncProcessingStarted() {
+	_m.Called()
 }
 
 type mockConstructorTestingTNewGossipSubRpcValidationInspectorMetrics interface {

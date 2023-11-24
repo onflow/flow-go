@@ -16,8 +16,6 @@ import (
 	"github.com/stretchr/testify/require"
 	goassert "gotest.tools/assert"
 
-	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -31,44 +29,13 @@ func getExecutionDataStore(blobstore blobs.Blobstore, serializer execution_data.
 	return execution_data.NewExecutionDataStore(blobstore, serializer)
 }
 
-func generateChunkExecutionData(t *testing.T, minSerializedSize uint64) *execution_data.ChunkExecutionData {
-	ced := &execution_data.ChunkExecutionData{
-		TrieUpdate: testutils.TrieUpdateFixture(1, 1, 8),
-	}
-
-	size := 1
-
-	for {
-		buf := &bytes.Buffer{}
-		require.NoError(t, execution_data.DefaultSerializer.Serialize(buf, ced))
-
-		if buf.Len() >= int(minSerializedSize) {
-			t.Logf("Chunk execution data size: %d", buf.Len())
-			return ced
-		}
-
-		v := make([]byte, size)
-		_, _ = rand.Read(v)
-
-		k, err := ced.TrieUpdate.Payloads[0].Key()
-		require.NoError(t, err)
-
-		ced.TrieUpdate.Payloads[0] = ledger.NewPayload(k, v)
-		size *= 2
-	}
-}
-
 func generateBlockExecutionData(t *testing.T, numChunks int, minSerializedSizePerChunk uint64) *execution_data.BlockExecutionData {
-	bed := &execution_data.BlockExecutionData{
-		BlockID:             unittest.IdentifierFixture(),
-		ChunkExecutionDatas: make([]*execution_data.ChunkExecutionData, numChunks),
-	}
-
+	ceds := make([]*execution_data.ChunkExecutionData, numChunks)
 	for i := 0; i < numChunks; i++ {
-		bed.ChunkExecutionDatas[i] = generateChunkExecutionData(t, minSerializedSizePerChunk)
+		ceds[i] = unittest.ChunkExecutionDataFixture(t, int(minSerializedSizePerChunk))
 	}
 
-	return bed
+	return unittest.BlockExecutionDataFixture(unittest.WithChunkExecutionDatas(ceds...))
 }
 
 func getAllKeys(t *testing.T, bs blobs.Blobstore) []cid.Cid {

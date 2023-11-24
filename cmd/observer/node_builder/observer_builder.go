@@ -34,6 +34,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	rpcConnection "github.com/onflow/flow-go/engine/access/rpc/connection"
+	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/common/follower"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/protocol"
@@ -127,7 +128,6 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 				MaxHeightRange:            backend.DefaultMaxHeightRange,
 				PreferredExecutionNodeIDs: nil,
 				FixedExecutionNodeIDs:     nil,
-				ArchiveAddressList:        nil,
 			},
 			RestConfig: rest.Config{
 				ListenAddress: "",
@@ -135,7 +135,8 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 				ReadTimeout:   rest.DefaultReadTimeout,
 				IdleTimeout:   rest.DefaultIdleTimeout,
 			},
-			MaxMsgSize: grpcutils.DefaultMaxMsgSize,
+			MaxMsgSize:     grpcutils.DefaultMaxMsgSize,
+			CompressorName: grpcutils.NoCompressor,
 		},
 		rpcMetricsEnabled:         false,
 		apiRatelimits:             nil,
@@ -393,6 +394,11 @@ func (builder *ObserverServiceBuilder) buildFollowerEngine() *ObserverServiceBui
 
 func (builder *ObserverServiceBuilder) buildSyncEngine() *ObserverServiceBuilder {
 	builder.Component("sync engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		spamConfig, err := synceng.NewSpamDetectionConfig()
+		if err != nil {
+			return nil, fmt.Errorf("could not initialize spam detection config: %w", err)
+		}
+
 		sync, err := synceng.New(
 			node.Logger,
 			node.Metrics.Engine,
@@ -403,7 +409,7 @@ func (builder *ObserverServiceBuilder) buildSyncEngine() *ObserverServiceBuilder
 			builder.FollowerEng,
 			builder.SyncCore,
 			builder.SyncEngineParticipantsProviderFactory(),
-			synceng.NewSpamDetectionConfig(),
+			spamConfig,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create synchronization engine: %w", err)
@@ -713,14 +719,18 @@ func (builder *ObserverServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 		networkKey,
 		builder.SporkID,
 		builder.IdentityProvider,
-		&builder.FlowConfig.NetworkConfig.ResourceManagerConfig,
+		&builder.FlowConfig.NetworkConfig.ResourceManager,
 		&builder.FlowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig,
 		p2pconfig.PeerManagerDisableConfig(), // disable peer manager for observer node.
+		&builder.FlowConfig.NetworkConfig.GossipSubConfig.SubscriptionProviderConfig,
 		&p2p.DisallowListCacheConfig{
 			MaxSize: builder.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
 			Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
 		},
-		meshTracer).
+		meshTracer,
+		&p2pconfig.UnicastConfig{
+			UnicastConfig: builder.FlowConfig.NetworkConfig.UnicastConfig,
+		}).
 		SetSubscriptionFilter(
 			subscription.NewRoleBasedFilter(
 				subscription.UnstakedRole, builder.IdentityProvider,
@@ -734,7 +744,6 @@ func (builder *ObserverServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 				dht.BootstrapPeers(pis...),
 			)
 		}).
-		SetStreamCreationRetryInterval(builder.FlowConfig.NetworkConfig.UnicastCreateStreamRetryDelay).
 		SetGossipSubTracer(meshTracer).
 		SetGossipSubScoreTracerInterval(builder.FlowConfig.NetworkConfig.GossipSubConfig.ScoreTracerInterval).
 		Build()
@@ -894,17 +903,15 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		accessMetrics := builder.AccessMetrics
 		config := builder.rpcConf
 		backendConfig := config.BackendConfig
-
-		backendCache, cacheSize, err := backend.NewCache(node.Logger,
-			accessMetrics,
-			config.BackendConfig.ConnectionPoolSize)
-		if err != nil {
-			return nil, fmt.Errorf("could not initialize backend cache: %w", err)
-		}
+		cacheSize := int(backendConfig.ConnectionPoolSize)
 
 		var connBackendCache *rpcConnection.Cache
-		if backendCache != nil {
-			connBackendCache = rpcConnection.NewCache(backendCache, int(cacheSize))
+		if cacheSize > 0 {
+			backendCache, err := backend.NewCache(node.Logger, accessMetrics, cacheSize)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize backend cache: %w", err)
+			}
+			connBackendCache = rpcConnection.NewCache(backendCache, cacheSize)
 		}
 
 		connFactory := &rpcConnection.ConnectionFactoryImpl{
@@ -920,10 +927,11 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 				accessMetrics,
 				config.MaxMsgSize,
 				backendConfig.CircuitBreakerConfig,
+				config.CompressorName,
 			),
 		}
 
-		accessBackend := backend.New(backend.Params{
+		accessBackend, err := backend.New(backend.Params{
 			State:                     node.State,
 			Blocks:                    node.Storage.Blocks,
 			Headers:                   node.Storage.Headers,
@@ -940,10 +948,11 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			FixedExecutionNodeIDs:     backendConfig.FixedExecutionNodeIDs,
 			Log:                       node.Logger,
 			SnapshotHistoryLimit:      backend.DefaultSnapshotHistoryLimit,
-			ArchiveAddressList:        backendConfig.ArchiveAddressList,
 			Communicator:              backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
-			ScriptExecValidation:      backendConfig.ScriptExecValidation,
 		})
+		if err != nil {
+			return nil, fmt.Errorf("could not initialize backend: %w", err)
+		}
 
 		observerCollector := metrics.NewObserverCollector()
 		restHandler, err := restapiproxy.NewRestProxyHandler(
@@ -958,6 +967,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			return nil, err
 		}
 
+		stateStreamConfig := statestreambackend.Config{}
 		engineBuilder, err := rpc.NewBuilder(
 			node.Logger,
 			node.State,
@@ -970,6 +980,8 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			restHandler,
 			builder.secureGrpcServer,
 			builder.unsecureGrpcServer,
+			nil, // state streaming is not supported
+			stateStreamConfig,
 		)
 		if err != nil {
 			return nil, err

@@ -278,6 +278,20 @@ func (_m *Environment) CheckPayerBalanceAndGetMaxTxFees(payer flow.Address, incl
 	return r0, r1
 }
 
+// ComputationAvailable provides a mock function with given fields: _a0, _a1
+func (_m *Environment) ComputationAvailable(_a0 common.ComputationKind, _a1 uint) bool {
+	ret := _m.Called(_a0, _a1)
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(common.ComputationKind, uint) bool); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
 // ComputationIntensities provides a mock function with given fields:
 func (_m *Environment) ComputationIntensities() meter.MeteredComputationIntensities {
 	ret := _m.Called()
@@ -419,6 +433,20 @@ func (_m *Environment) EmitEvent(_a0 cadence.Event) error {
 	var r0 error
 	if rf, ok := ret.Get(0).(func(cadence.Event) error); ok {
 		r0 = rf(_a0)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// EmitRawEvent provides a mock function with given fields: etype, payload
+func (_m *Environment) EmitRawEvent(etype flow.EventType, payload []byte) error {
+	ret := _m.Called(etype, payload)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(flow.EventType, []byte) error); ok {
+		r0 = rf(etype, payload)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -1091,6 +1119,46 @@ func (_m *Environment) ProgramLog(_a0 string) error {
 	return r0
 }
 
+// RandomSourceHistory provides a mock function with given fields:
+func (_m *Environment) RandomSourceHistory() ([]byte, error) {
+	ret := _m.Called()
+
+	var r0 []byte
+	var r1 error
+	if rf, ok := ret.Get(0).(func() ([]byte, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() []byte); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]byte)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ReadRandom provides a mock function with given fields: _a0
+func (_m *Environment) ReadRandom(_a0 []byte) error {
+	ret := _m.Called(_a0)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func([]byte) error); ok {
+		r0 = rf(_a0)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // RecordTrace provides a mock function with given fields: operation, location, duration, attrs
 func (_m *Environment) RecordTrace(operation string, location common.Location, duration time.Duration, attrs []attribute.KeyValue) {
 	_m.Called(operation, location, duration, attrs)
@@ -1315,30 +1383,6 @@ func (_m *Environment) TxIndex() uint32 {
 	}
 
 	return r0
-}
-
-// UnsafeRandom provides a mock function with given fields:
-func (_m *Environment) UnsafeRandom() (uint64, error) {
-	ret := _m.Called()
-
-	var r0 uint64
-	var r1 error
-	if rf, ok := ret.Get(0).(func() (uint64, error)); ok {
-		return rf()
-	}
-	if rf, ok := ret.Get(0).(func() uint64); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(uint64)
-	}
-
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
 }
 
 // UpdateAccountContractCode provides a mock function with given fields: location, code

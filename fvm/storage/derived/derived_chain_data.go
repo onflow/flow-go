@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/hashicorp/golang-lru/simplelru"
+	"github.com/hashicorp/golang-lru/v2/simplelru"
 
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -21,11 +21,11 @@ type DerivedChainData struct {
 	// on Get.
 	mutex sync.Mutex
 
-	lru *simplelru.LRU
+	lru *simplelru.LRU[flow.Identifier, *DerivedBlockData]
 }
 
 func NewDerivedChainData(chainCacheSize uint) (*DerivedChainData, error) {
-	lru, err := simplelru.NewLRU(int(chainCacheSize), nil)
+	lru, err := simplelru.NewLRU[flow.Identifier, *DerivedBlockData](int(chainCacheSize), nil)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create LRU cache: %w", err)
 	}
@@ -40,7 +40,7 @@ func (chain *DerivedChainData) unsafeGet(
 ) *DerivedBlockData {
 	currentEntry, ok := chain.lru.Get(currentBlockId)
 	if ok {
-		return currentEntry.(*DerivedBlockData)
+		return currentEntry
 	}
 
 	return nil
@@ -70,7 +70,7 @@ func (chain *DerivedChainData) GetOrCreateDerivedBlockData(
 	var current *DerivedBlockData
 	parentEntry, ok := chain.lru.Get(parentBlockId)
 	if ok {
-		current = parentEntry.(*DerivedBlockData).NewChildDerivedBlockData()
+		current = parentEntry.NewChildDerivedBlockData()
 	} else {
 		current = NewEmptyDerivedBlockData(0)
 	}

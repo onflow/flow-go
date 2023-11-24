@@ -122,16 +122,6 @@ func (_m *ConnectionFactory) GetExecutionAPIClient(address string) (execution.Ex
 	return r0, r1, r2
 }
 
-// InvalidateAccessAPIClient provides a mock function with given fields: address
-func (_m *ConnectionFactory) InvalidateAccessAPIClient(address string) {
-	_m.Called(address)
-}
-
-// InvalidateExecutionAPIClient provides a mock function with given fields: address
-func (_m *ConnectionFactory) InvalidateExecutionAPIClient(address string) {
-	_m.Called(address)
-}
-
 type mockConstructorTestingTNewConnectionFactory interface {
 	mock.TestingT
 	Cleanup(func())

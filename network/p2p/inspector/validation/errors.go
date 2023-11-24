@@ -52,68 +52,45 @@ func IsIWantCacheMissThresholdErr(err error) bool {
 	return errors.As(err, &e)
 }
 
-// ErrHardThreshold indicates that the amount of RPC messages received exceeds hard threshold.
-type ErrHardThreshold struct {
-	// controlMsg the control message type.
-	controlMsg p2pmsg.ControlMessageType
-	// amount the amount of control messages.
-	amount uint64
-	// hardThreshold configured hard threshold.
-	hardThreshold uint64
+// DuplicateTopicErr error that indicates a duplicate has been detected. This can be duplicate topic or message ID tracking.
+type DuplicateTopicErr struct {
+	topic   string
+	msgType p2pmsg.ControlMessageType
 }
 
-func (e ErrHardThreshold) Error() string {
-	return fmt.Sprintf("number of %s messges received exceeds the configured hard threshold: received %d hard threshold %d", e.controlMsg, e.amount, e.hardThreshold)
+func (e DuplicateTopicErr) Error() string {
+	return fmt.Sprintf("duplicate topic foud in %s control message type: %s", e.msgType, e.topic)
 }
 
-// NewHardThresholdErr returns a new ErrHardThreshold.
-func NewHardThresholdErr(controlMsg p2pmsg.ControlMessageType, amount, hardThreshold uint64) ErrHardThreshold {
-	return ErrHardThreshold{controlMsg: controlMsg, amount: amount, hardThreshold: hardThreshold}
+// NewDuplicateTopicErr returns a new DuplicateTopicErr.
+func NewDuplicateTopicErr(topic string, msgType p2pmsg.ControlMessageType) DuplicateTopicErr {
+	return DuplicateTopicErr{topic, msgType}
 }
 
-// IsErrHardThreshold returns true if an error is ErrHardThreshold
-func IsErrHardThreshold(err error) bool {
-	var e ErrHardThreshold
+// IsDuplicateTopicErr returns true if an error is DuplicateTopicErr.
+func IsDuplicateTopicErr(err error) bool {
+	var e DuplicateTopicErr
 	return errors.As(err, &e)
 }
 
-// ErrRateLimitedControlMsg indicates the specified RPC control message is rate limited for the specified peer.
-type ErrRateLimitedControlMsg struct {
-	controlMsg p2pmsg.ControlMessageType
+// DuplicateMessageIDErr error that indicates a duplicate message ID has been detected in a IHAVE or IWANT control message.
+type DuplicateMessageIDErr struct {
+	id      string
+	msgType p2pmsg.ControlMessageType
 }
 
-func (e ErrRateLimitedControlMsg) Error() string {
-	return fmt.Sprintf("control message %s is rate limited for peer", e.controlMsg)
+func (e DuplicateMessageIDErr) Error() string {
+	return fmt.Sprintf("duplicate message ID foud in %s control message type: %s", e.msgType, e.id)
 }
 
-// NewRateLimitedControlMsgErr returns a new ErrValidationLimit.
-func NewRateLimitedControlMsgErr(controlMsg p2pmsg.ControlMessageType) ErrRateLimitedControlMsg {
-	return ErrRateLimitedControlMsg{controlMsg: controlMsg}
+// NewDuplicateMessageIDErr returns a new DuplicateMessageIDErr.
+func NewDuplicateMessageIDErr(id string, msgType p2pmsg.ControlMessageType) DuplicateMessageIDErr {
+	return DuplicateMessageIDErr{id, msgType}
 }
 
-// IsErrRateLimitedControlMsg returns whether an error is ErrRateLimitedControlMsg.
-func IsErrRateLimitedControlMsg(err error) bool {
-	var e ErrRateLimitedControlMsg
-	return errors.As(err, &e)
-}
-
-// DuplicateFoundErr error that indicates a duplicate has been detected. This can be duplicate topic or message ID tracking.
-type DuplicateFoundErr struct {
-	err error
-}
-
-func (e DuplicateFoundErr) Error() string {
-	return e.err.Error()
-}
-
-// NewDuplicateFoundErr returns a new DuplicateFoundErr.
-func NewDuplicateFoundErr(err error) DuplicateFoundErr {
-	return DuplicateFoundErr{err}
-}
-
-// IsDuplicateFoundErr returns true if an error is DuplicateFoundErr.
-func IsDuplicateFoundErr(err error) bool {
-	var e DuplicateFoundErr
+// IsDuplicateMessageIDErr returns true if an error is DuplicateMessageIDErr.
+func IsDuplicateMessageIDErr(err error) bool {
+	var e DuplicateMessageIDErr
 	return errors.As(err, &e)
 }
 
@@ -154,5 +131,28 @@ func NewUnstakedPeerErr(err error) ErrUnstakedPeer {
 // IsErrUnstakedPeer returns true if an error is ErrUnstakedPeer.
 func IsErrUnstakedPeer(err error) bool {
 	var e ErrUnstakedPeer
+	return errors.As(err, &e)
+}
+
+// InvalidRpcPublishMessagesErr error indicates that rpc publish message validation failed.
+type InvalidRpcPublishMessagesErr struct {
+	// err the original error returned by the calling func.
+	err error
+	// count the number of times this err was encountered.
+	count int
+}
+
+func (e InvalidRpcPublishMessagesErr) Error() string {
+	return fmt.Errorf("rpc publish messages validation failed %d error(s) encountered: %w", e.count, e.err).Error()
+}
+
+// NewInvalidRpcPublishMessagesErr returns a new InvalidRpcPublishMessagesErr.
+func NewInvalidRpcPublishMessagesErr(err error, count int) InvalidRpcPublishMessagesErr {
+	return InvalidRpcPublishMessagesErr{err: err, count: count}
+}
+
+// IsInvalidRpcPublishMessagesErr returns true if an error is InvalidRpcPublishMessagesErr.
+func IsInvalidRpcPublishMessagesErr(err error) bool {
+	var e InvalidRpcPublishMessagesErr
 	return errors.As(err, &e)
 }

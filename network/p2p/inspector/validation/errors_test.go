@@ -27,58 +27,34 @@ func TestErrActiveClusterIDsNotSetRoundTrip(t *testing.T) {
 	assert.False(t, IsErrActiveClusterIDsNotSet(dummyErr), "IsErrActiveClusterIDsNotSet should return false for non-ErrActiveClusterIdsNotSet error")
 }
 
-// TestErrHardThresholdRoundTrip ensures correct error formatting for ErrHardThreshold.
-func TestErrHardThresholdRoundTrip(t *testing.T) {
-	controlMsg := p2pmsg.CtrlMsgGraft
-	amount := uint64(100)
-	hardThreshold := uint64(500)
-	err := NewHardThresholdErr(controlMsg, amount, hardThreshold)
-
-	// tests the error message formatting.
-	expectedErrMsg := fmt.Sprintf("number of %s messges received exceeds the configured hard threshold: received %d hard threshold %d", controlMsg, amount, hardThreshold)
-	assert.Equal(t, expectedErrMsg, err.Error(), "the error message should be correctly formatted")
-
-	// tests the IsErrHardThreshold function.
-	assert.True(t, IsErrHardThreshold(err), "IsErrHardThreshold should return true for ErrHardThreshold error")
-
-	// test IsErrHardThreshold with a different error type.
+// TestErrDuplicateTopicRoundTrip ensures correct error formatting for DuplicateTopicErr.
+func TestDuplicateTopicErrRoundTrip(t *testing.T) {
+	expectedErrorMsg := fmt.Sprintf("duplicate topic foud in %s control message type: %s", p2pmsg.CtrlMsgGraft, channels.TestNetworkChannel)
+	err := NewDuplicateTopicErr(channels.TestNetworkChannel.String(), p2pmsg.CtrlMsgGraft)
+	assert.Equal(t, expectedErrorMsg, err.Error(), "the error message should be correctly formatted")
+	// tests the IsDuplicateTopicErr function.
+	assert.True(t, IsDuplicateTopicErr(err), "IsDuplicateTopicErr should return true for DuplicateTopicErr error")
+	// test IsDuplicateTopicErr with a different error type.
 	dummyErr := fmt.Errorf("dummy error")
-	assert.False(t, IsErrHardThreshold(dummyErr), "IsErrHardThreshold should return false for non-ErrHardThreshold error")
+	assert.False(t, IsDuplicateTopicErr(dummyErr), "IsDuplicateTopicErr should return false for non-DuplicateTopicErr error")
 }
 
-// TestErrRateLimitedControlMsgRoundTrip ensures correct error formatting for ErrRateLimitedControlMsg.
-func TestErrRateLimitedControlMsgRoundTrip(t *testing.T) {
-	controlMsg := p2pmsg.CtrlMsgGraft
-	err := NewRateLimitedControlMsgErr(controlMsg)
-
-	// tests the error message formatting.
-	expectedErrMsg := fmt.Sprintf("control message %s is rate limited for peer", controlMsg)
-	assert.Equal(t, expectedErrMsg, err.Error(), "the error message should be correctly formatted")
-
-	// tests the IsErrRateLimitedControlMsg function.
-	assert.True(t, IsErrRateLimitedControlMsg(err), "IsErrRateLimitedControlMsg should return true for ErrRateLimitedControlMsg error")
-
-	// test IsErrRateLimitedControlMsg with a different error type.
+// TestErrDuplicateTopicRoundTrip ensures correct error formatting for DuplicateTopicErr.
+func TestDuplicateMessageIDErrRoundTrip(t *testing.T) {
+	msgID := "flow-1804flkjnafo"
+	expectedErrMsg1 := fmt.Sprintf("duplicate message ID foud in %s control message type: %s", p2pmsg.CtrlMsgIHave, msgID)
+	expectedErrMsg2 := fmt.Sprintf("duplicate message ID foud in %s control message type: %s", p2pmsg.CtrlMsgIWant, msgID)
+	err := NewDuplicateMessageIDErr(msgID, p2pmsg.CtrlMsgIHave)
+	assert.Equal(t, expectedErrMsg1, err.Error(), "the error message should be correctly formatted")
+	// tests the IsDuplicateTopicErr function.
+	assert.True(t, IsDuplicateMessageIDErr(err), "IsDuplicateMessageIDErr should return true for DuplicateMessageIDErr error")
+	err = NewDuplicateMessageIDErr(msgID, p2pmsg.CtrlMsgIWant)
+	assert.Equal(t, expectedErrMsg2, err.Error(), "the error message should be correctly formatted")
+	// tests the IsDuplicateTopicErr function.
+	assert.True(t, IsDuplicateMessageIDErr(err), "IsDuplicateMessageIDErr should return true for DuplicateMessageIDErr error")
+	// test IsDuplicateMessageIDErr with a different error type.
 	dummyErr := fmt.Errorf("dummy error")
-	assert.False(t, IsErrRateLimitedControlMsg(dummyErr), "IsErrRateLimitedControlMsg should return false for non-ErrRateLimitedControlMsg error")
-}
-
-// TestErrDuplicateTopicRoundTrip ensures correct error formatting for DuplicateFoundErr.
-func TestErrDuplicateTopicRoundTrip(t *testing.T) {
-	topic := channels.Topic("topic")
-	e := fmt.Errorf("duplicate topic found: %s", topic.String())
-	err := NewDuplicateFoundErr(e)
-
-	// tests the error message formatting.
-	expectedErrMsg := e.Error()
-	assert.Equal(t, expectedErrMsg, err.Error(), "the error message should be correctly formatted")
-
-	// tests the IsDuplicateFoundErr function.
-	assert.True(t, IsDuplicateFoundErr(err), "IsDuplicateFoundErr should return true for DuplicateFoundErr error")
-
-	// test IsDuplicateFoundErr with a different error type.
-	dummyErr := fmt.Errorf("dummy error")
-	assert.False(t, IsDuplicateFoundErr(dummyErr), "IsDuplicateFoundErr should return false for non-DuplicateFoundErr error")
+	assert.False(t, IsDuplicateMessageIDErr(dummyErr), "IsDuplicateMessageIDErr should return false for non-DuplicateMessageIDErr error")
 }
 
 // TestIWantCacheMissThresholdErrRoundTrip ensures correct error formatting for IWantCacheMissThresholdErr.
@@ -108,7 +84,24 @@ func TestIWantDuplicateMsgIDThresholdErrRoundTrip(t *testing.T) {
 	// tests the IsIWantDuplicateMsgIDThresholdErr function.
 	assert.True(t, IsIWantDuplicateMsgIDThresholdErr(err), "IsIWantDuplicateMsgIDThresholdErr should return true for IWantDuplicateMsgIDThresholdErr error")
 
-	// test IsDuplicateFoundErr with a different error type.
+	// test IsIWantDuplicateMsgIDThresholdErr with a different error type.
 	dummyErr := fmt.Errorf("dummy error")
 	assert.False(t, IsIWantDuplicateMsgIDThresholdErr(dummyErr), "IsIWantDuplicateMsgIDThresholdErr should return false for non-IWantDuplicateMsgIDThresholdErr error")
+}
+
+// TestInvalidRpcPublishMessagesErrRoundTrip ensures correct error formatting for InvalidRpcPublishMessagesErr.
+func TestInvalidRpcPublishMessagesErrRoundTrip(t *testing.T) {
+	wrappedErr := fmt.Errorf("invalid topic")
+	err := NewInvalidRpcPublishMessagesErr(wrappedErr, 1)
+
+	// tests the error message formatting.
+	expectedErrMsg := "rpc publish messages validation failed 1 error(s) encountered: invalid topic"
+	assert.Equal(t, expectedErrMsg, err.Error(), "the error message should be correctly formatted")
+
+	// tests the IsInvalidRpcPublishMessagesErr function.
+	assert.True(t, IsInvalidRpcPublishMessagesErr(err), "IsInvalidRpcPublishMessagesErr should return true for InvalidRpcPublishMessagesErr error")
+
+	// test IsInvalidRpcPublishMessagesErr with a different error type.
+	dummyErr := fmt.Errorf("dummy error")
+	assert.False(t, IsInvalidRpcPublishMessagesErr(dummyErr), "IsInvalidRpcPublishMessagesErr should return false for non-InvalidRpcPublishMessagesErr error")
 }

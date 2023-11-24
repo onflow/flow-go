@@ -9,12 +9,14 @@ import (
 
 	executionState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/ledger/partial"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestFunctionalityWithCompleteTrie(t *testing.T) {
@@ -127,7 +129,7 @@ func TestProofsForEmptyRegisters(t *testing.T) {
 	// Read one register during execution.
 	registerID := flow.NewRegisterID("b", "nk")
 	allKeys := []ledger.Key{
-		executionState.RegisterIDToKey(registerID),
+		convert.RegisterIDToLedgerKey(registerID),
 	}
 
 	newState := updated.State()
@@ -142,7 +144,7 @@ func TestProofsForEmptyRegisters(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, pled.InitialState(), emptyState)
 
-	query, err := ledger.NewQuery(newState, []ledger.Key{executionState.RegisterIDToKey(registerID)})
+	query, err := ledger.NewQuery(newState, []ledger.Key{convert.RegisterIDToLedgerKey(registerID)})
 	require.NoError(t, err)
 
 	results, err := pled.Get(query)
@@ -150,5 +152,20 @@ func TestProofsForEmptyRegisters(t *testing.T) {
 	require.Len(t, results, 1)
 
 	require.Empty(t, results[0])
+}
 
+func TestEmptyLedger(t *testing.T) {
+	l, err := complete.NewLedger(&fixtures.NoopWAL{}, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+	require.NoError(t, err)
+
+	u, err := ledger.NewUpdate(
+		ledger.State(unittest.StateCommitmentFixture()),
+		[]ledger.Key{},
+		[]ledger.Value{},
+	)
+	require.NoError(t, err)
+	newState, trieUpdate, err := l.Set(u)
+	require.NoError(t, err)
+	require.True(t, trieUpdate.IsEmpty())
+	require.Equal(t, u.State(), newState)
 }

@@ -42,7 +42,6 @@ func init() {
 	_ = Cmd.MarkFlagRequired("output-dir")
 
 	Cmd.Flags().StringVar(&flagChain, "chain", "", "Chain name")
-	_ = Cmd.MarkFlagRequired("chain")
 
 	Cmd.Flags().StringVar(&flagStateCommitment, "state-commitment", "",
 		"state commitment (hex-encoded, 64 characters)")

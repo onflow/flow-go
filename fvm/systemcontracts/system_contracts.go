@@ -23,13 +23,14 @@ const (
 
 	// Unqualified names of system smart contracts (not including address prefix)
 
-	ContractNameEpoch             = "FlowEpoch"
-	ContractNameClusterQC         = "FlowClusterQC"
-	ContractNameDKG               = "FlowDKG"
-	ContractNameServiceAccount    = "FlowServiceAccount"
-	ContractNameFlowFees          = "FlowFees"
-	ContractNameStorageFees       = "FlowStorageFees"
-	ContractNameNodeVersionBeacon = "NodeVersionBeacon"
+	ContractNameEpoch               = "FlowEpoch"
+	ContractNameClusterQC           = "FlowClusterQC"
+	ContractNameDKG                 = "FlowDKG"
+	ContractNameServiceAccount      = "FlowServiceAccount"
+	ContractNameFlowFees            = "FlowFees"
+	ContractNameStorageFees         = "FlowStorageFees"
+	ContractNameNodeVersionBeacon   = "NodeVersionBeacon"
+	ContractNameRandomBeaconHistory = "RandomBeaconHistory"
 
 	// Unqualified names of service events (not including address prefix or contract name)
 
@@ -75,10 +76,11 @@ func (se ServiceEvent) EventType() flow.EventType {
 
 // SystemContracts is a container for all system contracts on a particular chain.
 type SystemContracts struct {
-	Epoch             SystemContract
-	ClusterQC         SystemContract
-	DKG               SystemContract
-	NodeVersionBeacon SystemContract
+	Epoch               SystemContract
+	ClusterQC           SystemContract
+	DKG                 SystemContract
+	NodeVersionBeacon   SystemContract
+	RandomBeaconHistory SystemContract
 }
 
 // ServiceEvents is a container for all service events on a particular chain.
@@ -120,6 +122,10 @@ func SystemContractsForChain(chainID flow.ChainID) (*SystemContracts, error) {
 		NodeVersionBeacon: SystemContract{
 			Address: addresses[ContractNameNodeVersionBeacon],
 			Name:    ContractNameNodeVersionBeacon,
+		},
+		RandomBeaconHistory: SystemContract{
+			Address: addresses[ContractNameRandomBeaconHistory],
+			Name:    ContractNameRandomBeaconHistory,
 		},
 	}
 
@@ -168,6 +174,11 @@ var (
 	stakingContractAddressMainnet = flow.HexToAddress("8624b52f9ddcd04a")
 	// stakingContractAddressTestnet is the address of the FlowIDTableStaking contract on Testnet
 	stakingContractAddressTestnet = flow.HexToAddress("9eca2b38b18b5dfe")
+
+	serviceAddressMainnet    = flow.Mainnet.Chain().ServiceAddress()
+	serviceAddressTestnet    = flow.Testnet.Chain().ServiceAddress()
+	serviceAddressSandboxnet = flow.Sandboxnet.Chain().ServiceAddress()
+	serviceAddressEmulator   = flow.Emulator.Chain().ServiceAddress()
 )
 
 func init() {
@@ -176,40 +187,44 @@ func init() {
 	// Main Flow network
 	// All system contracts are deployed to the account of the staking contract
 	mainnet := map[string]flow.Address{
-		ContractNameEpoch:             stakingContractAddressMainnet,
-		ContractNameClusterQC:         stakingContractAddressMainnet,
-		ContractNameDKG:               stakingContractAddressMainnet,
-		ContractNameNodeVersionBeacon: flow.Mainnet.Chain().ServiceAddress(),
+		ContractNameEpoch:               stakingContractAddressMainnet,
+		ContractNameClusterQC:           stakingContractAddressMainnet,
+		ContractNameDKG:                 stakingContractAddressMainnet,
+		ContractNameNodeVersionBeacon:   serviceAddressMainnet,
+		ContractNameRandomBeaconHistory: serviceAddressMainnet,
 	}
 	contractAddressesByChainID[flow.Mainnet] = mainnet
 
 	// Long-lived test networks
 	// All system contracts are deployed to the account of the staking contract
 	testnet := map[string]flow.Address{
-		ContractNameEpoch:             stakingContractAddressTestnet,
-		ContractNameClusterQC:         stakingContractAddressTestnet,
-		ContractNameDKG:               stakingContractAddressTestnet,
-		ContractNameNodeVersionBeacon: flow.Testnet.Chain().ServiceAddress(),
+		ContractNameEpoch:               stakingContractAddressTestnet,
+		ContractNameClusterQC:           stakingContractAddressTestnet,
+		ContractNameDKG:                 stakingContractAddressTestnet,
+		ContractNameNodeVersionBeacon:   serviceAddressTestnet,
+		ContractNameRandomBeaconHistory: serviceAddressTestnet,
 	}
 	contractAddressesByChainID[flow.Testnet] = testnet
 
 	// Sandboxnet test network
 	// All system contracts are deployed to the service account
 	sandboxnet := map[string]flow.Address{
-		ContractNameEpoch:             flow.Sandboxnet.Chain().ServiceAddress(),
-		ContractNameClusterQC:         flow.Sandboxnet.Chain().ServiceAddress(),
-		ContractNameDKG:               flow.Sandboxnet.Chain().ServiceAddress(),
-		ContractNameNodeVersionBeacon: flow.Sandboxnet.Chain().ServiceAddress(),
+		ContractNameEpoch:               serviceAddressSandboxnet,
+		ContractNameClusterQC:           serviceAddressSandboxnet,
+		ContractNameDKG:                 serviceAddressSandboxnet,
+		ContractNameNodeVersionBeacon:   serviceAddressSandboxnet,
+		ContractNameRandomBeaconHistory: serviceAddressSandboxnet,
 	}
 	contractAddressesByChainID[flow.Sandboxnet] = sandboxnet
 
 	// Transient test networks
 	// All system contracts are deployed to the service account
 	transient := map[string]flow.Address{
-		ContractNameEpoch:             flow.Emulator.Chain().ServiceAddress(),
-		ContractNameClusterQC:         flow.Emulator.Chain().ServiceAddress(),
-		ContractNameDKG:               flow.Emulator.Chain().ServiceAddress(),
-		ContractNameNodeVersionBeacon: flow.Emulator.Chain().ServiceAddress(),
+		ContractNameEpoch:               serviceAddressEmulator,
+		ContractNameClusterQC:           serviceAddressEmulator,
+		ContractNameDKG:                 serviceAddressEmulator,
+		ContractNameNodeVersionBeacon:   serviceAddressEmulator,
+		ContractNameRandomBeaconHistory: serviceAddressEmulator,
 	}
 	contractAddressesByChainID[flow.Emulator] = transient
 	contractAddressesByChainID[flow.Localnet] = transient

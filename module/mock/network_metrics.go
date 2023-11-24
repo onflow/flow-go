@@ -50,14 +50,14 @@ func (_m *NetworkMetrics) AllowStream(p peer.ID, dir network.Direction) {
 	_m.Called(p, dir)
 }
 
-// AsyncProcessingFinished provides a mock function with given fields: msgType, duration
-func (_m *NetworkMetrics) AsyncProcessingFinished(msgType string, duration time.Duration) {
-	_m.Called(msgType, duration)
+// AsyncProcessingFinished provides a mock function with given fields: duration
+func (_m *NetworkMetrics) AsyncProcessingFinished(duration time.Duration) {
+	_m.Called(duration)
 }
 
-// AsyncProcessingStarted provides a mock function with given fields: msgType
-func (_m *NetworkMetrics) AsyncProcessingStarted(msgType string) {
-	_m.Called(msgType)
+// AsyncProcessingStarted provides a mock function with given fields:
+func (_m *NetworkMetrics) AsyncProcessingStarted() {
+	_m.Called()
 }
 
 // BlockConn provides a mock function with given fields: dir, usefd
@@ -98,16 +98,6 @@ func (_m *NetworkMetrics) BlockServicePeer(svc string, p peer.ID) {
 // BlockStream provides a mock function with given fields: p, dir
 func (_m *NetworkMetrics) BlockStream(p peer.ID, dir network.Direction) {
 	_m.Called(p, dir)
-}
-
-// BlockingPreProcessingFinished provides a mock function with given fields: msgType, sampleSize, duration
-func (_m *NetworkMetrics) BlockingPreProcessingFinished(msgType string, sampleSize uint, duration time.Duration) {
-	_m.Called(msgType, sampleSize, duration)
-}
-
-// BlockingPreProcessingStarted provides a mock function with given fields: msgType, sampleSize
-func (_m *NetworkMetrics) BlockingPreProcessingStarted(msgType string, sampleSize uint) {
-	_m.Called(msgType, sampleSize)
 }
 
 // DNSLookupDuration provides a mock function with given fields: duration
@@ -178,6 +168,16 @@ func (_m *NetworkMetrics) OnDNSCacheMiss() {
 // OnDNSLookupRequestDropped provides a mock function with given fields:
 func (_m *NetworkMetrics) OnDNSLookupRequestDropped() {
 	_m.Called()
+}
+
+// OnDialRetryBudgetResetToDefault provides a mock function with given fields:
+func (_m *NetworkMetrics) OnDialRetryBudgetResetToDefault() {
+	_m.Called()
+}
+
+// OnDialRetryBudgetUpdated provides a mock function with given fields: budget
+func (_m *NetworkMetrics) OnDialRetryBudgetUpdated(budget uint64) {
+	_m.Called(budget)
 }
 
 // OnEstablishStreamFailure provides a mock function with given fields: duration, attempts
@@ -283,6 +283,16 @@ func (_m *NetworkMetrics) OnStreamCreated(duration time.Duration, attempts int) 
 // OnStreamCreationFailure provides a mock function with given fields: duration, attempts
 func (_m *NetworkMetrics) OnStreamCreationFailure(duration time.Duration, attempts int) {
 	_m.Called(duration, attempts)
+}
+
+// OnStreamCreationRetryBudgetResetToDefault provides a mock function with given fields:
+func (_m *NetworkMetrics) OnStreamCreationRetryBudgetResetToDefault() {
+	_m.Called()
+}
+
+// OnStreamCreationRetryBudgetUpdated provides a mock function with given fields: budget
+func (_m *NetworkMetrics) OnStreamCreationRetryBudgetUpdated(budget uint64) {
+	_m.Called(budget)
 }
 
 // OnStreamEstablished provides a mock function with given fields: duration, attempts

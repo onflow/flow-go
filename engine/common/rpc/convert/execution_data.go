@@ -13,6 +13,27 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 )
 
+// BlockExecutionDataEventPayloadsToVersion converts all event payloads to version
+func BlockExecutionDataEventPayloadsToVersion(
+	m *entities.BlockExecutionData,
+	to entities.EventEncodingVersion,
+) error {
+	if to == entities.EventEncodingVersion_CCF_V0 {
+		return nil
+	}
+
+	for i, chunk := range m.ChunkExecutionData {
+		for j, e := range chunk.Events {
+			converted, err := CcfPayloadToJsonPayload(e.Payload)
+			if err != nil {
+				return fmt.Errorf("failed to convert payload for event %d to json: %w", j, err)
+			}
+			m.ChunkExecutionData[i].Events[j].Payload = converted
+		}
+	}
+	return nil
+}
+
 // BlockExecutionDataToMessage converts a BlockExecutionData to a protobuf message
 func BlockExecutionDataToMessage(data *execution_data.BlockExecutionData) (
 	*entities.BlockExecutionData,
@@ -77,10 +98,23 @@ func ChunkExecutionDataToMessage(data *execution_data.ChunkExecutionData) (
 		return nil, err
 	}
 
+	var results []*entities.ExecutionDataTransactionResult
+	if len(data.TransactionResults) > 0 {
+		results = make([]*entities.ExecutionDataTransactionResult, len(data.TransactionResults))
+		for i, result := range data.TransactionResults {
+			results[i] = &entities.ExecutionDataTransactionResult{
+				TransactionId:   IdentifierToMessage(result.TransactionID),
+				Failed:          result.Failed,
+				ComputationUsed: result.ComputationUsed,
+			}
+		}
+	}
+
 	return &entities.ChunkExecutionData{
-		Collection: collection,
-		Events:     events,
-		TrieUpdate: trieUpdate,
+		Collection:         collection,
+		Events:             events,
+		TrieUpdate:         trieUpdate,
+		TransactionResults: results,
 	}, nil
 }
 
@@ -107,10 +141,23 @@ func MessageToChunkExecutionData(
 		events = nil
 	}
 
+	var results []flow.LightTransactionResult
+	if len(m.GetTransactionResults()) > 0 {
+		results = make([]flow.LightTransactionResult, len(m.GetTransactionResults()))
+		for i, result := range m.GetTransactionResults() {
+			results[i] = flow.LightTransactionResult{
+				TransactionID:   MessageToIdentifier(result.GetTransactionId()),
+				Failed:          result.GetFailed(),
+				ComputationUsed: result.GetComputationUsed(),
+			}
+		}
+	}
+
 	return &execution_data.ChunkExecutionData{
-		Collection: collection,
-		Events:     events,
-		TrieUpdate: trieUpdate,
+		Collection:         collection,
+		Events:             events,
+		TrieUpdate:         trieUpdate,
+		TransactionResults: results,
 	}, nil
 }
 
@@ -190,6 +237,10 @@ func messageToTrustedCollection(
 	chain flow.Chain,
 ) (*flow.Collection, error) {
 	messages := m.GetTransactions()
+	if len(messages) == 0 {
+		return &flow.Collection{}, nil
+	}
+
 	transactions := make([]*flow.TransactionBody, len(messages))
 	for i, message := range messages {
 		transaction, err := messageToTrustedTransaction(message, chain)
@@ -197,10 +248,6 @@ func messageToTrustedCollection(
 			return nil, fmt.Errorf("could not convert transaction %d: %w", i, err)
 		}
 		transactions[i] = &transaction
-	}
-
-	if len(transactions) == 0 {
-		return nil, nil
 	}
 
 	return &flow.Collection{Transactions: transactions}, nil

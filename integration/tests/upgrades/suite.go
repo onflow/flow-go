@@ -83,10 +83,12 @@ func (s *Suite) SetupTest() {
 			testnet.WithLogLevel(zerolog.WarnLevel),
 			testnet.WithID(s.exe1ID),
 			testnet.WithAdditionalFlag("--extensive-logging=true"),
+			testnet.WithAdditionalFlag("--max-graceful-stop-duration=1s"),
 		),
 		testnet.NewNodeConfig(
 			flow.RoleExecution,
 			testnet.WithLogLevel(zerolog.WarnLevel),
+			testnet.WithAdditionalFlag("--max-graceful-stop-duration=1s"),
 		),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),

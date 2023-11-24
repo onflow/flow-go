@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -135,11 +134,7 @@ type executionDataRequester struct {
 	notificationConsumer *jobqueue.ComponentConsumer
 
 	execDataCache *cache.ExecutionDataCache
-
-	// List of callbacks to call when ExecutionData is successfully fetched for a block
-	consumers []state_synchronization.OnExecutionDataReceivedConsumer
-
-	consumerMu sync.RWMutex
+	distributor   *ExecutionDataDistributor
 }
 
 var _ state_synchronization.ExecutionDataRequester = (*executionDataRequester)(nil)
@@ -155,7 +150,8 @@ func New(
 	state protocol.State,
 	headers storage.Headers,
 	cfg ExecutionDataConfig,
-) state_synchronization.ExecutionDataRequester {
+	distributor *ExecutionDataDistributor,
+) (state_synchronization.ExecutionDataRequester, error) {
 	e := &executionDataRequester{
 		log:                  log.With().Str("component", "execution_data_requester").Logger(),
 		downloader:           downloader,
@@ -164,6 +160,7 @@ func New(
 		headers:              headers,
 		config:               cfg,
 		finalizationNotifier: engine.NewNotifier(),
+		distributor:          distributor,
 	}
 
 	executionDataNotifier := engine.NewNotifier()
@@ -182,7 +179,7 @@ func New(
 	// from `processedHeight + 1`. If the database is empty, rootHeight will be used to init the
 	// last processed height. Once the execution data is fetched and stored, it notifies
 	// `executionDataNotifier`.
-	e.blockConsumer = jobqueue.NewComponentConsumer(
+	blockConsumer, err := jobqueue.NewComponentConsumer(
 		e.log.With().Str("module", "block_consumer").Logger(),
 		e.finalizationNotifier.Channel(), // to listen to finalization events to find newly sealed blocks
 		processedHeight,                  // read and persist the downloaded height
@@ -192,6 +189,10 @@ func New(
 		fetchWorkers,                     // the number of concurrent workers
 		e.config.MaxSearchAhead,          // max number of unsent notifications to allow before pausing new fetches
 	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create block consumer: %w", err)
+	}
+	e.blockConsumer = blockConsumer
 
 	// notifies notificationConsumer when new ExecutionData blobs are available
 	// SetPostNotifier will notify executionDataNotifier AFTER e.blockConsumer.LastProcessedIndex is updated.
@@ -209,7 +210,9 @@ func New(
 		// here by the notification job consumer to discover new jobs.
 		// Note: we don't want to notify notificationConsumer for a block if it has not downloaded
 		// execution data yet.
-		e.blockConsumer.LastProcessedIndex,
+		func() (uint64, error) {
+			return e.blockConsumer.LastProcessedIndex(), nil
+		},
 	)
 
 	// notificationConsumer consumes `OnExecutionDataFetched` events, and ensures its consumer
@@ -223,7 +226,7 @@ func New(
 	// `e.consumers`.
 	// Note: the `e.consumers` will be guaranteed to receive at least one `OnExecutionDataFetched` event
 	// for each sealed block in consecutive block height order.
-	e.notificationConsumer = jobqueue.NewComponentConsumer(
+	e.notificationConsumer, err = jobqueue.NewComponentConsumer(
 		e.log.With().Str("module", "notification_consumer").Logger(),
 		executionDataNotifier.Channel(), // listen for notifications from the block consumer
 		processedNotifications,          // read and persist the notified height
@@ -233,13 +236,16 @@ func New(
 		1,                               // use a single worker to ensure notification is delivered in consecutive order
 		0,                               // search ahead limit controlled by worker count
 	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create notification consumer: %w", err)
+	}
 
 	e.Component = component.NewComponentManagerBuilder().
 		AddWorker(e.runBlockConsumer).
 		AddWorker(e.runNotificationConsumer).
 		Build()
 
-	return e
+	return e, nil
 }
 
 // OnBlockFinalized accepts block finalization notifications from the FollowerDistributor
@@ -259,18 +265,6 @@ func (e *executionDataRequester) HighestConsecutiveHeight() (uint64, error) {
 	}
 
 	return e.blockConsumer.LastProcessedIndex(), nil
-}
-
-// AddOnExecutionDataReceivedConsumer adds a callback to be called when a new ExecutionData is received
-// Callback Implementations must:
-//   - be concurrency safe
-//   - be non-blocking
-//   - handle repetition of the same events (with some processing overhead).
-func (e *executionDataRequester) AddOnExecutionDataReceivedConsumer(fn state_synchronization.OnExecutionDataReceivedConsumer) {
-	e.consumerMu.Lock()
-	defer e.consumerMu.Unlock()
-
-	e.consumers = append(e.consumers, fn)
 }
 
 // runBlockConsumer runs the blockConsumer component
@@ -434,19 +428,10 @@ func (e *executionDataRequester) processNotificationJob(ctx irrecoverable.Signal
 		Msgf("notifying for block")
 
 	// send notifications
-	e.notifyConsumers(entry.ExecutionData)
+	e.distributor.OnExecutionDataReceived(entry.ExecutionData)
 	jobComplete()
 
 	e.metrics.NotificationSent(entry.Height)
-}
-
-func (e *executionDataRequester) notifyConsumers(executionData *execution_data.BlockExecutionDataEntity) {
-	e.consumerMu.RLock()
-	defer e.consumerMu.RUnlock()
-
-	for _, fn := range e.consumers {
-		fn(executionData)
-	}
 }
 
 func isInvalidBlobError(err error) bool {

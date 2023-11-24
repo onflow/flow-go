@@ -3,6 +3,7 @@ package scoring
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
 
+	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/insecure/corruptlibp2p"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -32,8 +34,6 @@ import (
 // Also, per hearbeat (i.e., decay interval), the spammer is allowed to send at most 5000 ihave messages (gossip sub parameter) on aggregate, and
 // excess messages are dropped (without being counted as broken promises).
 func TestGossipSubIHaveBrokenPromises_Below_Threshold(t *testing.T) {
-	t.Parallel()
-
 	role := flow.RoleConsensus
 	sporkId := unittest.IdentifierFixture()
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
@@ -103,7 +103,9 @@ func TestGossipSubIHaveBrokenPromises_Below_Threshold(t *testing.T) {
 		if !ok {
 			return false
 		}
-		if behavioralPenalty < 9 { // ideally it must be 10 (one per RPC), but we give it a buffer of 1 to account for decays and floating point errors.
+		// We set 7.5 as the threshold to compensate for the scoring decay in between RPC's being processed by the inspector
+		// ideally it must be 10 (one per RPC), but we give it a buffer of 1 to account for decays and floating point errors.
+		if behavioralPenalty < 7.5 {
 			return false
 		}
 
@@ -148,8 +150,6 @@ func TestGossipSubIHaveBrokenPromises_Below_Threshold(t *testing.T) {
 // Second round of attack makes spammers broken promises above the threshold of 10 RPCs, hence a degradation of the spammers score.
 // Third round of attack makes spammers broken promises to around 20 RPCs above the threshold, which causes the graylisting of the spammer node.
 func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
-	t.Parallel()
-
 	role := flow.RoleConsensus
 	sporkId := unittest.IdentifierFixture()
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
@@ -169,6 +169,14 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 		return nil
 	})
 
+	conf, err := config.DefaultConfig()
+	require.NoError(t, err)
+	// overcompensate for RPC truncation
+	conf.NetworkConfig.GossipSubRPCInspectorsConfig.IHaveRPCInspectionConfig.MaxSampleSize = 10000
+	conf.NetworkConfig.GossipSubRPCInspectorsConfig.IHaveRPCInspectionConfig.MaxMessageIDSampleSize = 10000
+	conf.NetworkConfig.GossipSubRPCInspectorsConfig.IWantRPCInspectionConfig.MaxSampleSize = 10000
+	conf.NetworkConfig.GossipSubRPCInspectorsConfig.IWantRPCInspectionConfig.MaxMessageIDSampleSize = 10000
+
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	// we override some of the default scoring parameters in order to speed up the test in a time-efficient manner.
@@ -183,6 +191,7 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 		sporkId,
 		t.Name(),
 		idProvider,
+		p2ptest.OverrideFlowConfig(conf),
 		p2ptest.WithRole(role),
 		p2ptest.WithPeerScoreTracerInterval(1*time.Second),
 		p2ptest.EnablePeerScoringWithOverride(&p2p.PeerScoringConfigOverride{
@@ -221,9 +230,10 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 		if !ok {
 			return false
 		}
+		// We set 7.5 as the threshold to compensate for the scoring decay in between RPC's being processed by the inspector
 		// ideally it must be 10 (one per RPC), but we give it a buffer of 1 to account for decays and floating point errors.
 		// note that we intentionally override the decay speed to be 60-times faster in this test.
-		if behavioralPenalty < 9 {
+		if behavioralPenalty < 7.5 {
 			return false
 		}
 
@@ -326,7 +336,7 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 // - receivedIWants: a map to keep track of the iWants received by the victim node (exclusive to TestGossipSubIHaveBrokenPromises).
 // - victimNode: the victim node.
 func spamIHaveBrokenPromise(t *testing.T, spammer *corruptlibp2p.GossipSubRouterSpammer, topic string, receivedIWants *unittest.ProtectedMap[string, struct{}], victimNode p2p.LibP2PNode) {
-	spamMsgs := spammer.GenerateCtlMessages(10, corruptlibp2p.WithIHave(10, 50, topic))
+	spamMsgs := spammer.GenerateCtlMessages(1, corruptlibp2p.WithIHave(1, 500, topic))
 	var sentIHaves []string
 	for _, msg := range spamMsgs {
 		for _, iHave := range msg.Ihave {
@@ -336,13 +346,20 @@ func spamIHaveBrokenPromise(t *testing.T, spammer *corruptlibp2p.GossipSubRouter
 			}
 		}
 	}
-	require.Len(t, sentIHaves, 5000, "sanity check failed, we should have 5000 iHave message ids, actual: %d", len(sentIHaves))
 
-	// spams the victim node with 1000 spam iHave messages, since iHave messages are for junk message ids, there will be no
-	// reply from spammer to victim over the iWants. Hence, the victim must count this towards 10 broken promises.
+	// spams the victim node with spam iHave messages, since iHave messages are for junk message ids, there will be no
+	// reply from spammer to victim over the iWants. Hence, the victim must count this towards 10 broken promises eventually.
 	// This sums up to 10 broken promises (1 per RPC).
-	spammer.SpamControlMessage(t, victimNode, spamMsgs, p2ptest.PubsubMessageFixture(t, p2ptest.WithTopic(topic)))
+	var wg sync.WaitGroup
+	for i := 0; i < 50; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			spammer.SpamControlMessage(t, victimNode, spamMsgs, p2ptest.PubsubMessageFixture(t, p2ptest.WithTopic(topic)))
+		}()
+	}
 
+	unittest.AssertReturnsBefore(t, wg.Wait, 3*time.Second, "could not send RPCs on time")
 	// wait till all the spam iHaves are responded with iWants.
 	require.Eventually(t, func() bool {
 		for _, msgId := range sentIHaves {

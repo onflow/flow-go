@@ -38,10 +38,24 @@ func TestFindPeerWithDHT(t *testing.T) {
 
 	sporkId := unittest.IdentifierFixture()
 	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
-	dhtServerNodes, serverIDs := p2ptest.NodesFixture(t, sporkId, "dht_test", 2, idProvider, p2ptest.WithDHTOptions(dht.AsServer()))
+	dhtServerNodes, serverIDs := p2ptest.NodesFixture(
+		t,
+		sporkId,
+		"dht_test",
+		2,
+		idProvider,
+		p2ptest.WithRole(flow.RoleExecution),
+		p2ptest.WithDHTOptions(dht.AsServer()))
 	require.Len(t, dhtServerNodes, 2)
 
-	dhtClientNodes, clientIDs := p2ptest.NodesFixture(t, sporkId, "dht_test", count-2, idProvider, p2ptest.WithDHTOptions(dht.AsClient()))
+	dhtClientNodes, clientIDs := p2ptest.NodesFixture(
+		t,
+		sporkId,
+		"dht_test",
+		count-2,
+		idProvider,
+		p2ptest.WithRole(flow.RoleExecution),
+		p2ptest.WithDHTOptions(dht.AsClient()))
 
 	nodes := append(dhtServerNodes, dhtClientNodes...)
 	idProvider.SetIdentities(append(serverIDs, clientIDs...))
@@ -59,23 +73,25 @@ func TestFindPeerWithDHT(t *testing.T) {
 	}
 
 	// wait for clients to connect to DHT servers and update their routing tables
-	require.Eventually(t, func() bool {
-		for i, clientNode := range dhtClientNodes {
-			if clientNode.RoutingTable().Find(getDhtServerAddr(uint(i%2)).ID) == "" {
-				return false
+	require.Eventually(
+		t, func() bool {
+			for i, clientNode := range dhtClientNodes {
+				if clientNode.RoutingTable().Find(getDhtServerAddr(uint(i%2)).ID) == "" {
+					return false
+				}
 			}
-		}
-		return true
-	}, time.Second*5, ticksForAssertEventually, "nodes failed to connect")
+			return true
+		}, time.Second*5, ticksForAssertEventually, "nodes failed to connect")
 
 	// connect the two DHT servers to each other
 	err := dhtServerNodes[0].Host().Connect(ctx, getDhtServerAddr(1))
 	require.NoError(t, err)
 
 	// wait for the first server to connect to the second and update its routing table
-	require.Eventually(t, func() bool {
-		return dhtServerNodes[0].RoutingTable().Find(getDhtServerAddr(1).ID) != ""
-	}, time.Second*5, ticksForAssertEventually, "dht servers failed to connect")
+	require.Eventually(
+		t, func() bool {
+			return dhtServerNodes[0].RoutingTable().Find(getDhtServerAddr(1).ID) != ""
+		}, time.Second*5, ticksForAssertEventually, "dht servers failed to connect")
 
 	// check that all even numbered clients can create streams with all odd numbered clients
 	for i := 0; i < len(dhtClientNodes); i += 2 {
@@ -86,14 +102,16 @@ func TestFindPeerWithDHT(t *testing.T) {
 
 			// Try to create a stream from client i to client j. This should resort to a DHT
 			// lookup since client i does not know client j's address.
-			unittest.RequireReturnsBefore(t, func() {
-				err = dhtClientNodes[i].OpenProtectedStream(ctx, dhtClientNodes[j].ID(), t.Name(), func(stream network.Stream) error {
-					// do nothing
-					require.NotNil(t, stream)
-					return nil
-				})
-				require.NoError(t, err)
-			}, 1*time.Second, "could not create stream on time")
+			unittest.RequireReturnsBefore(
+				t, func() {
+					err = dhtClientNodes[i].OpenProtectedStream(
+						ctx, dhtClientNodes[j].ID(), t.Name(), func(stream network.Stream) error {
+							// do nothing
+							require.NotNil(t, stream)
+							return nil
+						})
+					require.NoError(t, err)
+				}, 1*time.Second, "could not create stream on time")
 		}
 	}
 }
@@ -128,12 +146,26 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 	topic := channels.TopicFromChannel(channels.TestNetworkChannel, sporkId)
 	idProvider := mockmodule.NewIdentityProvider(t)
 	// create one node running the DHT Server (mimicking the staked AN)
-	dhtServerNodes, serverIDs := p2ptest.NodesFixture(t, sporkId, "dht_test", 1, idProvider, p2ptest.WithDHTOptions(dht.AsServer()))
+	dhtServerNodes, serverIDs := p2ptest.NodesFixture(
+		t,
+		sporkId,
+		"dht_test",
+		1,
+		idProvider,
+		p2ptest.WithRole(flow.RoleExecution),
+		p2ptest.WithDHTOptions(dht.AsServer()))
 	require.Len(t, dhtServerNodes, 1)
 	dhtServerNode := dhtServerNodes[0]
 
 	// crate other nodes running the DHT Client (mimicking the unstaked ANs)
-	dhtClientNodes, clientIDs := p2ptest.NodesFixture(t, sporkId, "dht_test", count-1, idProvider, p2ptest.WithDHTOptions(dht.AsClient()))
+	dhtClientNodes, clientIDs := p2ptest.NodesFixture(
+		t,
+		sporkId,
+		"dht_test",
+		count-1,
+		idProvider,
+		p2ptest.WithRole(flow.RoleExecution),
+		p2ptest.WithDHTOptions(dht.AsClient()))
 
 	ids := append(serverIDs, clientIDs...)
 	nodes := append(dhtServerNodes, dhtClientNodes...)

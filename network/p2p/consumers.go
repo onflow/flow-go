@@ -29,25 +29,33 @@ type GossipSubInspectorNotifDistributor interface {
 type InvCtrlMsgNotif struct {
 	// PeerID is the ID of the peer that sent the invalid control message.
 	PeerID peer.ID
-	// MsgType is the type of control message that was received.
+	// Error the error that occurred during validation.
+	Error error
+	// MsgType the control message type.
 	MsgType p2pmsg.ControlMessageType
-	// Count is the number of invalid control messages received from the peer that is reported in this notification.
+	// Count the number of errors.
 	Count uint64
-	// Err any error associated with the invalid control message.
-	Err error
 }
 
 // NewInvalidControlMessageNotification returns a new *InvCtrlMsgNotif
-func NewInvalidControlMessageNotification(peerID peer.ID, msgType p2pmsg.ControlMessageType, count uint64, err error) *InvCtrlMsgNotif {
+// Args:
+//   - peerID: peer id of the offender.
+//   - ctlMsgType: the control message type of the rpc message that caused the error.
+//   - err: the error that occurred.
+//   - count: the number of occurrences of the error.
+//
+// Returns:
+//   - *InvCtlMsgNotif: invalid control message notification.
+func NewInvalidControlMessageNotification(peerID peer.ID, ctlMsgType p2pmsg.ControlMessageType, err error, count uint64) *InvCtrlMsgNotif {
 	return &InvCtrlMsgNotif{
 		PeerID:  peerID,
-		MsgType: msgType,
+		Error:   err,
+		MsgType: ctlMsgType,
 		Count:   count,
-		Err:     err,
 	}
 }
 
-// GossipSubInvCtrlMsgNotifConsumer is the interface for the consumer that consumes gossip sub inspector notifications.
+// GossipSubInvCtrlMsgNotifConsumer is the interface for the consumer that consumes gossipsub inspector notifications.
 // It is used to consume notifications in an asynchronous manner.
 // The implementation must be concurrency safe, but can be blocking. This is due to the fact that the consumer is called
 // asynchronously by the distributor.
@@ -68,7 +76,7 @@ type GossipSubInspectorSuite interface {
 	// is called whenever a gossipsub rpc message is received.
 	InspectFunc() func(peer.ID, *pubsub.RPC) error
 
-	// AddInvCtrlMsgNotifConsumer adds a consumer to the invalid control message notification distributor.
+	// AddInvalidControlMessageConsumer adds a consumer to the invalid control message notification distributor.
 	// This consumer is notified when a misbehaving peer regarding gossipsub control messages is detected. This follows a pub/sub
 	// pattern where the consumer is notified when a new notification is published.
 	// A consumer is only notified once for each notification, and only receives notifications that were published after it was added.

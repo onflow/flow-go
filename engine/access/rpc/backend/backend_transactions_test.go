@@ -14,7 +14,6 @@ import (
 
 	acc "github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/state/protocol"
 	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/util"
@@ -69,21 +68,19 @@ func (suite *Suite) TestGetTransactionResultReturnsUnknown() {
 			On("ByID", tx.ID()).
 			Return(nil, storage.ErrNotFound)
 
-		backend := New(
-			Params{
-				State:                suite.state,
-				CollectionRPC:        suite.colClient,
-				Blocks:               suite.blocks,
-				Transactions:         suite.transactions,
-				ExecutionReceipts:    suite.receipts,
-				ChainID:              suite.chainID,
-				AccessMetrics:        metrics.NewNoopCollector(),
-				MaxHeightRange:       DefaultMaxHeightRange,
-				Log:                  suite.log,
-				SnapshotHistoryLimit: DefaultSnapshotHistoryLimit,
-				Communicator:         suite.communicator,
-			})
-		res, err := backend.GetTransactionResult(context.Background(), tx.ID(), block.ID(), coll.ID())
+		params := suite.defaultBackendParams()
+		params.Communicator = suite.communicator
+
+		backend, err := New(params)
+		suite.Require().NoError(err)
+
+		res, err := backend.GetTransactionResult(
+			context.Background(),
+			tx.ID(),
+			block.ID(),
+			coll.ID(),
+			entities.EventEncodingVersion_JSON_CDC_V0,
+		)
 		suite.Require().NoError(err)
 		suite.Require().Equal(res.Status, flow.TransactionStatusUnknown)
 	})
@@ -110,21 +107,19 @@ func (suite *Suite) TestGetTransactionResultReturnsTransactionError() {
 
 		suite.state.On("AtBlockID", block.ID()).Return(snap, nil).Once()
 
-		backend := New(
-			Params{
-				State:                suite.state,
-				CollectionRPC:        suite.colClient,
-				Blocks:               suite.blocks,
-				Transactions:         suite.transactions,
-				ExecutionReceipts:    suite.receipts,
-				ChainID:              suite.chainID,
-				AccessMetrics:        metrics.NewNoopCollector(),
-				MaxHeightRange:       DefaultMaxHeightRange,
-				Log:                  suite.log,
-				SnapshotHistoryLimit: DefaultSnapshotHistoryLimit,
-				Communicator:         suite.communicator,
-			})
-		_, err := backend.GetTransactionResult(context.Background(), tx.ID(), block.ID(), coll.ID())
+		params := suite.defaultBackendParams()
+		params.Communicator = suite.communicator
+
+		backend, err := New(params)
+		suite.Require().NoError(err)
+
+		_, err = backend.GetTransactionResult(
+			context.Background(),
+			tx.ID(),
+			block.ID(),
+			coll.ID(),
+			entities.EventEncodingVersion_JSON_CDC_V0,
+		)
 		suite.Require().Equal(err, status.Errorf(codes.Internal, "failed to find: %v", fmt.Errorf("some other error")))
 
 	})
@@ -155,22 +150,20 @@ func (suite *Suite) TestGetTransactionResultReturnsValidTransactionResultFromHis
 			On("GetTransactionResult", mock.Anything, mock.Anything).
 			Return(&transactionResultResponse, nil).Once()
 
-		backend := New(
-			Params{
-				State:                 suite.state,
-				CollectionRPC:         suite.colClient,
-				HistoricalAccessNodes: []access.AccessAPIClient{suite.historicalAccessClient},
-				Blocks:                suite.blocks,
-				Transactions:          suite.transactions,
-				ExecutionReceipts:     suite.receipts,
-				ChainID:               suite.chainID,
-				AccessMetrics:         metrics.NewNoopCollector(),
-				MaxHeightRange:        DefaultMaxHeightRange,
-				Log:                   suite.log,
-				SnapshotHistoryLimit:  DefaultSnapshotHistoryLimit,
-				Communicator:          suite.communicator,
-			})
-		resp, err := backend.GetTransactionResult(context.Background(), tx.ID(), block.ID(), coll.ID())
+		params := suite.defaultBackendParams()
+		params.HistoricalAccessNodes = []access.AccessAPIClient{suite.historicalAccessClient}
+		params.Communicator = suite.communicator
+
+		backend, err := New(params)
+		suite.Require().NoError(err)
+
+		resp, err := backend.GetTransactionResult(
+			context.Background(),
+			tx.ID(),
+			block.ID(),
+			coll.ID(),
+			entities.EventEncodingVersion_JSON_CDC_V0,
+		)
 		suite.Require().NoError(err)
 		suite.Require().Equal(flow.TransactionStatusExecuted, resp.Status)
 		suite.Require().Equal(uint(flow.TransactionStatusExecuted), resp.StatusCode)
@@ -206,30 +199,34 @@ func (suite *Suite) TestGetTransactionResultFromCache() {
 			On("GetTransactionResult", mock.AnythingOfType("*context.emptyCtx"), mock.AnythingOfType("*access.GetTransactionRequest")).
 			Return(&transactionResultResponse, nil).Once()
 
-		backend := New(Params{
-			State:                 suite.state,
-			CollectionRPC:         suite.colClient,
-			HistoricalAccessNodes: []access.AccessAPIClient{suite.historicalAccessClient},
-			Blocks:                suite.blocks,
-			Transactions:          suite.transactions,
-			ExecutionReceipts:     suite.receipts,
-			ChainID:               suite.chainID,
-			AccessMetrics:         metrics.NewNoopCollector(),
-			MaxHeightRange:        DefaultMaxHeightRange,
-			Log:                   suite.log,
-			SnapshotHistoryLimit:  DefaultSnapshotHistoryLimit,
-			Communicator:          suite.communicator,
-			TxResultCacheSize:     10,
-		})
+		params := suite.defaultBackendParams()
+		params.HistoricalAccessNodes = []access.AccessAPIClient{suite.historicalAccessClient}
+		params.Communicator = suite.communicator
+		params.TxResultCacheSize = 10
+
+		backend, err := New(params)
+		suite.Require().NoError(err)
 
 		coll := flow.CollectionFromTransactions([]*flow.Transaction{tx})
 
-		resp, err := backend.GetTransactionResult(context.Background(), tx.ID(), block.ID(), coll.ID())
+		resp, err := backend.GetTransactionResult(
+			context.Background(),
+			tx.ID(),
+			block.ID(),
+			coll.ID(),
+			entities.EventEncodingVersion_JSON_CDC_V0,
+		)
 		suite.Require().NoError(err)
 		suite.Require().Equal(flow.TransactionStatusExecuted, resp.Status)
 		suite.Require().Equal(uint(flow.TransactionStatusExecuted), resp.StatusCode)
 
-		resp2, err := backend.GetTransactionResult(context.Background(), tx.ID(), block.ID(), coll.ID())
+		resp2, err := backend.GetTransactionResult(
+			context.Background(),
+			tx.ID(),
+			block.ID(),
+			coll.ID(),
+			entities.EventEncodingVersion_JSON_CDC_V0,
+		)
 		suite.Require().NoError(err)
 		suite.Require().Equal(flow.TransactionStatusExecuted, resp2.Status)
 		suite.Require().Equal(uint(flow.TransactionStatusExecuted), resp2.StatusCode)
@@ -246,25 +243,23 @@ func (suite *Suite) TestGetTransactionResultCacheNonExistent() {
 			On("GetTransactionResult", mock.AnythingOfType("*context.emptyCtx"), mock.AnythingOfType("*access.GetTransactionRequest")).
 			Return(nil, status.Errorf(codes.NotFound, "no known transaction with ID %s", tx.ID())).Once()
 
-		backend := New(Params{
-			State:                 suite.state,
-			CollectionRPC:         suite.colClient,
-			HistoricalAccessNodes: []access.AccessAPIClient{suite.historicalAccessClient},
-			Blocks:                suite.blocks,
-			Transactions:          suite.transactions,
-			ExecutionReceipts:     suite.receipts,
-			ChainID:               suite.chainID,
-			AccessMetrics:         metrics.NewNoopCollector(),
-			MaxHeightRange:        DefaultMaxHeightRange,
-			Log:                   suite.log,
-			SnapshotHistoryLimit:  DefaultSnapshotHistoryLimit,
-			Communicator:          suite.communicator,
-			TxResultCacheSize:     10,
-		})
+		params := suite.defaultBackendParams()
+		params.HistoricalAccessNodes = []access.AccessAPIClient{suite.historicalAccessClient}
+		params.Communicator = suite.communicator
+		params.TxResultCacheSize = 10
+
+		backend, err := New(params)
+		suite.Require().NoError(err)
 
 		coll := flow.CollectionFromTransactions([]*flow.Transaction{tx})
 
-		resp, err := backend.GetTransactionResult(context.Background(), tx.ID(), block.ID(), coll.ID())
+		resp, err := backend.GetTransactionResult(
+			context.Background(),
+			tx.ID(),
+			block.ID(),
+			coll.ID(),
+			entities.EventEncodingVersion_JSON_CDC_V0,
+		)
 		suite.Require().NoError(err)
 		suite.Require().Equal(flow.TransactionStatusUnknown, resp.Status)
 		suite.Require().Equal(uint(flow.TransactionStatusUnknown), resp.StatusCode)
@@ -279,7 +274,6 @@ func (suite *Suite) TestGetTransactionResultCacheNonExistent() {
 		})
 
 		suite.historicalAccessClient.AssertExpectations(suite.T())
-
 	})
 }
 
@@ -290,25 +284,23 @@ func (suite *Suite) TestGetTransactionResultUnknownFromCache() {
 			On("GetTransactionResult", mock.AnythingOfType("*context.emptyCtx"), mock.AnythingOfType("*access.GetTransactionRequest")).
 			Return(nil, status.Errorf(codes.NotFound, "no known transaction with ID %s", tx.ID())).Once()
 
-		backend := New(Params{
-			State:                 suite.state,
-			CollectionRPC:         suite.colClient,
-			HistoricalAccessNodes: []access.AccessAPIClient{suite.historicalAccessClient},
-			Blocks:                suite.blocks,
-			Transactions:          suite.transactions,
-			ExecutionReceipts:     suite.receipts,
-			ChainID:               suite.chainID,
-			AccessMetrics:         metrics.NewNoopCollector(),
-			MaxHeightRange:        DefaultMaxHeightRange,
-			Log:                   suite.log,
-			SnapshotHistoryLimit:  DefaultSnapshotHistoryLimit,
-			Communicator:          suite.communicator,
-			TxResultCacheSize:     10,
-		})
+		params := suite.defaultBackendParams()
+		params.HistoricalAccessNodes = []access.AccessAPIClient{suite.historicalAccessClient}
+		params.Communicator = suite.communicator
+		params.TxResultCacheSize = 10
+
+		backend, err := New(params)
+		suite.Require().NoError(err)
 
 		coll := flow.CollectionFromTransactions([]*flow.Transaction{tx})
 
-		resp, err := backend.GetTransactionResult(context.Background(), tx.ID(), block.ID(), coll.ID())
+		resp, err := backend.GetTransactionResult(
+			context.Background(),
+			tx.ID(),
+			block.ID(),
+			coll.ID(),
+			entities.EventEncodingVersion_JSON_CDC_V0,
+		)
 		suite.Require().NoError(err)
 		suite.Require().Equal(flow.TransactionStatusUnknown, resp.Status)
 		suite.Require().Equal(uint(flow.TransactionStatusUnknown), resp.StatusCode)
@@ -322,12 +314,17 @@ func (suite *Suite) TestGetTransactionResultUnknownFromCache() {
 			StatusCode: uint(txStatus),
 		})
 
-		resp2, err := backend.GetTransactionResult(context.Background(), tx.ID(), block.ID(), coll.ID())
+		resp2, err := backend.GetTransactionResult(
+			context.Background(),
+			tx.ID(),
+			block.ID(),
+			coll.ID(),
+			entities.EventEncodingVersion_JSON_CDC_V0,
+		)
 		suite.Require().NoError(err)
 		suite.Require().Equal(flow.TransactionStatusUnknown, resp2.Status)
 		suite.Require().Equal(uint(flow.TransactionStatusUnknown), resp2.StatusCode)
 
 		suite.historicalAccessClient.AssertExpectations(suite.T())
-
 	})
 }

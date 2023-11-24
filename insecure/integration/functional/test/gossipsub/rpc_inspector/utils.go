@@ -36,7 +36,7 @@ func startNodesAndEnsureConnected(t *testing.T, ctx irrecoverable.SignalerContex
 	})
 }
 
-func stopTestComponents(t *testing.T, cancel context.CancelFunc, nodes []p2p.LibP2PNode, components ...module.ReadyDoneAware) {
+func stopComponents(t *testing.T, cancel context.CancelFunc, nodes []p2p.LibP2PNode, components ...module.ReadyDoneAware) {
 	p2ptest.StopNodes(t, nodes, cancel)
 	unittest.RequireComponentsDoneBefore(t, time.Second, components...)
 }
@@ -56,22 +56,6 @@ func withExpectedNotificationDissemination(expectedNumOfTotalNotif int, f onNoti
 			Run(f(spammer)).
 			Return(nil)
 	}
-}
-
-// mockDistributorReadyDoneAware mocks the Ready and Done methods of the distributor to return a channel that is already closed,
-// so that the distributor is considered ready and done when the test needs.
-func mockDistributorReadyDoneAware(d *mockp2p.GossipSubInspectorNotificationDistributor) {
-	d.On("Start", mockery.Anything).Return().Maybe()
-	d.On("Ready").Return(func() <-chan struct{} {
-		ch := make(chan struct{})
-		close(ch)
-		return ch
-	}()).Maybe()
-	d.On("Done").Return(func() <-chan struct{} {
-		ch := make(chan struct{})
-		close(ch)
-		return ch
-	}()).Maybe()
 }
 
 func meshTracerFixture(flowConfig *config.FlowConfig, idProvider module.IdentityProvider) *tracer.GossipSubMeshTracer {

@@ -12,11 +12,23 @@ import (
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/middleware"
 	"github.com/onflow/flow-go/engine/access/rest/models"
+	"github.com/onflow/flow-go/engine/access/state_stream"
+	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )
 
-func NewRouter(backend access.API, logger zerolog.Logger, chain flow.Chain, restCollector module.RestMetrics) (*mux.Router, error) {
+// RouterBuilder is a utility for building HTTP routers with common middleware and routes.
+type RouterBuilder struct {
+	logger      zerolog.Logger
+	router      *mux.Router
+	v1SubRouter *mux.Router
+}
+
+// NewRouterBuilder creates a new RouterBuilder instance with common middleware and a v1 sub-router.
+func NewRouterBuilder(
+	logger zerolog.Logger,
+	restCollector module.RestMetrics) *RouterBuilder {
 	router := mux.NewRouter().StrictSlash(true)
 	v1SubRouter := router.PathPrefix("/v1").Subrouter()
 
@@ -26,17 +38,48 @@ func NewRouter(backend access.API, logger zerolog.Logger, chain flow.Chain, rest
 	v1SubRouter.Use(middleware.QuerySelect())
 	v1SubRouter.Use(middleware.MetricsMiddleware(restCollector))
 
-	linkGenerator := models.NewLinkGeneratorImpl(v1SubRouter)
+	return &RouterBuilder{
+		logger:      logger,
+		router:      router,
+		v1SubRouter: v1SubRouter,
+	}
+}
 
+// AddRestRoutes adds rest routes to the router.
+func (b *RouterBuilder) AddRestRoutes(backend access.API, chain flow.Chain) *RouterBuilder {
+	linkGenerator := models.NewLinkGeneratorImpl(b.v1SubRouter)
 	for _, r := range Routes {
-		h := NewHandler(logger, backend, r.Handler, linkGenerator, chain)
-		v1SubRouter.
+		h := NewHandler(b.logger, backend, r.Handler, linkGenerator, chain)
+		b.v1SubRouter.
 			Methods(r.Method).
 			Path(r.Pattern).
 			Name(r.Name).
 			Handler(h)
 	}
-	return router, nil
+	return b
+}
+
+// AddWsRoutes adds WebSocket routes to the router.
+func (b *RouterBuilder) AddWsRoutes(
+	stateStreamApi state_stream.API,
+	chain flow.Chain,
+	stateStreamConfig backend.Config,
+) *RouterBuilder {
+
+	for _, r := range WSRoutes {
+		h := NewWSHandler(b.logger, stateStreamApi, r.Handler, chain, stateStreamConfig)
+		b.v1SubRouter.
+			Methods(r.Method).
+			Path(r.Pattern).
+			Name(r.Name).
+			Handler(h)
+	}
+
+	return b
+}
+
+func (b *RouterBuilder) Build() *mux.Router {
+	return b.router
 }
 
 type route struct {
@@ -44,6 +87,13 @@ type route struct {
 	Method  string
 	Pattern string
 	Handler ApiHandlerFunc
+}
+
+type wsroute struct {
+	Name    string
+	Method  string
+	Pattern string
+	Handler SubscribeHandlerFunc
 }
 
 var Routes = []route{{
@@ -123,11 +173,21 @@ var Routes = []route{{
 	Handler: GetNodeVersionInfo,
 }}
 
+var WSRoutes = []wsroute{{
+	Method:  http.MethodGet,
+	Pattern: "/subscribe_events",
+	Name:    "subscribeEvents",
+	Handler: SubscribeEvents,
+}}
+
 var routeUrlMap = map[string]string{}
 var routeRE = regexp.MustCompile(`(?i)/v1/(\w+)(/(\w+)(/(\w+))?)?`)
 
 func init() {
 	for _, r := range Routes {
+		routeUrlMap[r.Pattern] = r.Name
+	}
+	for _, r := range WSRoutes {
 		routeUrlMap[r.Pattern] = r.Name
 	}
 }

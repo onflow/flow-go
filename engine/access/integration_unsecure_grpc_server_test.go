@@ -12,6 +12,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -22,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/access/state_stream"
+	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -55,7 +57,7 @@ type SameGRPCPortTestSuite struct {
 	chainID        flow.ChainID
 	metrics        *metrics.NoopCollector
 	rpcEng         *rpc.Engine
-	stateStreamEng *state_stream.Engine
+	stateStreamEng *statestreambackend.Engine
 
 	// storage
 	blocks       *storagemock.Blocks
@@ -87,10 +89,12 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	suite.net = new(network.EngineRegistry)
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
+	params := new(protocol.Params)
 
 	suite.epochQuery = new(protocol.EpochQuery)
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
+	suite.state.On("Params").Return(params)
 	suite.snapshot.On("Epochs").Return(suite.epochQuery).Maybe()
 	suite.blocks = new(storagemock.Blocks)
 	suite.headers = new(storagemock.Headers)
@@ -140,6 +144,11 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		suite.blockMap[block.Header.Height] = block
 	}
 
+	params.On("SporkID").Return(unittest.IdentifierFixture(), nil)
+	params.On("ProtocolVersion").Return(uint(unittest.Uint64InRange(10, 30)), nil)
+	params.On("SporkRootBlockHeight").Return(rootBlock.Header.Height, nil)
+	params.On("SealedRoot").Return(rootBlock.Header, nil)
+
 	// generate a server certificate that will be served by the GRPC server
 	networkingKey := unittest.NetworkingPrivKeyFixture()
 	x509Certificate, err := grpcutils.X509Certificate(networkingKey)
@@ -166,7 +175,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	block := unittest.BlockHeaderFixture()
 	suite.snapshot.On("Head").Return(block, nil)
 
-	bnd := backend.New(backend.Params{
+	bnd, err := backend.New(backend.Params{
 		State:                suite.state,
 		CollectionRPC:        suite.collClient,
 		Blocks:               suite.blocks,
@@ -180,7 +189,9 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		SnapshotHistoryLimit: 0,
 		Communicator:         backend.NewNodeCommunicator(false),
 	})
+	require.NoError(suite.T(), err)
 
+	stateStreamConfig := statestreambackend.Config{}
 	// create rpc engine builder
 	rpcEngBuilder, err := rpc.NewBuilder(
 		suite.log,
@@ -194,6 +205,8 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		bnd,
 		suite.secureGrpcServer,
 		suite.unsecureGrpcServer,
+		nil,
+		stateStreamConfig,
 	)
 	assert.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
@@ -215,25 +228,36 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		},
 	).Maybe()
 
-	conf := state_stream.Config{
+	conf := statestreambackend.Config{
 		ClientSendTimeout:    state_stream.DefaultSendTimeout,
 		ClientSendBufferSize: state_stream.DefaultSendBufferSize,
 	}
 
-	// create state stream engine
-	suite.stateStreamEng, err = state_stream.NewEng(
+	stateStreamBackend, err := statestreambackend.New(
 		suite.log,
 		conf,
-		nil,
-		suite.execDataCache,
 		suite.state,
 		suite.headers,
 		suite.seals,
 		suite.results,
+		nil,
+		suite.execDataCache,
+		nil,
+		rootBlock.Header.Height,
+		rootBlock.Header.Height,
+	)
+	assert.NoError(suite.T(), err)
+
+	// create state stream engine
+	suite.stateStreamEng, err = statestreambackend.NewEng(
+		suite.log,
+		conf,
+		suite.execDataCache,
+		suite.headers,
 		suite.chainID,
-		rootBlock.Header.Height,
-		rootBlock.Header.Height,
 		suite.unsecureGrpcServer,
+		stateStreamBackend,
+		nil,
 	)
 	assert.NoError(suite.T(), err)
 
