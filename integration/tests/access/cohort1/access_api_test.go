@@ -145,7 +145,6 @@ func (s *AccessAPISuite) SetupTest() {
 	}, 30*time.Second, 1*time.Second)
 }
 
-/*
 // TestScriptExecutionAndGetAccountsAN1 test the Access API endpoints for executing scripts and getting
 // accounts using execution nodes.
 //
@@ -161,14 +160,14 @@ func (s *AccessAPISuite) TestScriptExecutionAndGetAccountsAN1() {
 	s.testGetAccount(s.an1Client)
 	s.testExecuteScriptWithSimpleScript(s.an1Client)
 	s.testExecuteScriptWithSimpleContract(s.an1Client, targetHeight)
-}*/
+}
 
 // TestScriptExecutionAndGetAccountsAN2 test the Access API endpoints for executing scripts and getting
 // accounts using local storage.
 //
 // Note: not combining AN1, AN2 tests together because that causes a drastic increase in test run times. test cases are read-only
 // and should not interfere with each other.
-/*
+
 func (s *AccessAPISuite) TestScriptExecutionAndGetAccountsAN2() {
 	// deploy the test contract
 	txResult := s.deployContract()
@@ -180,7 +179,6 @@ func (s *AccessAPISuite) TestScriptExecutionAndGetAccountsAN2() {
 	s.testExecuteScriptWithSimpleScript(s.an2Client)
 	s.testExecuteScriptWithSimpleContract(s.an2Client, targetHeight)
 }
-*/
 
 func (s *AccessAPISuite) TestMVPScriptExecutionLocalStorage() {
 	// this is a specialized test that creates accounts, deposits funds, deploys contracts, etc, and
