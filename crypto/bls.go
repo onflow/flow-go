@@ -190,10 +190,28 @@ func (pk *pubKeyBLSBLS12381) Verify(s Signature, data []byte, kmac hash.Hasher) 
 		return false, nil
 	}
 
-	verif := C.bls_verify((*C.E2)(&pk.point),
+	verif1 := C.bls_verify((*C.E2)(&pk.point),
 		(*C.uchar)(&s[0]),
 		(*C.uchar)(&h[0]),
 		(C.int)(len(h)))
+
+	verif2 := C.bls_verify((*C.E2)(&pk.point),
+		(*C.uchar)(&s[0]),
+		(*C.uchar)(&h[0]),
+		(C.int)(len(h)))
+
+	verif3 := C.bls_verify((*C.E2)(&pk.point),
+		(*C.uchar)(&s[0]),
+		(*C.uchar)(&h[0]),
+		(C.int)(len(h)))
+
+	verif := verif1
+	if verif1 == invalid {
+		verif = verif2
+	}
+	if verif == invalid {
+		verif = verif3
+	}
 
 	switch verif {
 	case invalid:
