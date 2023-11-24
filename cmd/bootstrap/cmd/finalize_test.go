@@ -79,7 +79,7 @@ func TestFinalize_HappyPath(t *testing.T) {
 		flagNumViewsInEpoch = 100_000
 		flagNumViewsInStakingAuction = 50_000
 		flagNumViewsInDKGPhase = 2_000
-		flagDefaultEpochTargetEndTime = true
+		flagUseDefaultEpochTargetEndTime = true
 		flagEpochCommitSafetyThreshold = 1_000
 		flagRootBlock = filepath.Join(bootDir, model.PathRootBlockData)
 		flagDKGDataPath = filepath.Join(bootDir, model.PathRootDKGData)
@@ -124,15 +124,15 @@ func TestClusterAssignment(t *testing.T) {
 func TestEpochTimingConfig(t *testing.T) {
 	// Reset flags after test is completed
 	defer func(_flagDefault bool, _flagRefCounter, _flagRefTs, _flagDur uint64) {
-		flagDefaultEpochTargetEndTime = _flagDefault
-		flagEpochTargetEndTimeRefCounter = _flagRefCounter
-		flagEpochTargetEndTimeRefTimestamp = _flagRefTs
-		flagEpochTargetEndTimeDuration = _flagDur
-	}(flagDefaultEpochTargetEndTime, flagEpochTargetEndTimeRefCounter, flagEpochTargetEndTimeRefTimestamp, flagEpochTargetEndTimeDuration)
+		flagUseDefaultEpochTargetEndTime = _flagDefault
+		flagEpochTimingRefCounter = _flagRefCounter
+		flagEpochTimingRefTimestamp = _flagRefTs
+		flagEpochTimingDuration = _flagDur
+	}(flagUseDefaultEpochTargetEndTime, flagEpochTimingRefCounter, flagEpochTimingRefTimestamp, flagEpochTimingDuration)
 
-	flags := []*uint64{&flagEpochTargetEndTimeRefCounter, &flagEpochTargetEndTimeRefTimestamp, &flagEpochTargetEndTimeDuration}
+	flags := []*uint64{&flagEpochTimingRefCounter, &flagEpochTimingRefTimestamp, &flagEpochTimingDuration}
 	t.Run("if default is set, no other flag may be set", func(t *testing.T) {
-		flagDefaultEpochTargetEndTime = true
+		flagUseDefaultEpochTargetEndTime = true
 		for _, flag := range flags {
 			*flag = rand.Uint64()%100 + 1
 			err := validateOrPopulateEpochTimingConfig()
@@ -144,7 +144,7 @@ func TestEpochTimingConfig(t *testing.T) {
 	})
 
 	t.Run("if default is not set, all other flags must be set", func(t *testing.T) {
-		flagDefaultEpochTargetEndTime = false
+		flagUseDefaultEpochTargetEndTime = false
 		// First set all required flags and ensure validation passes
 		for _, flag := range flags {
 			*flag = rand.Uint64()%100 + 1
@@ -154,7 +154,7 @@ func TestEpochTimingConfig(t *testing.T) {
 
 		// Next, check that validation fails if any one flag is not set
 		// NOTE: we do not include refCounter here, because it is allowed to be zero.
-		for _, flag := range []*uint64{&flagEpochTargetEndTimeRefTimestamp, &flagEpochTargetEndTimeDuration} {
+		for _, flag := range []*uint64{&flagEpochTimingRefTimestamp, &flagEpochTimingDuration} {
 			*flag = 0
 			err := validateOrPopulateEpochTimingConfig()
 			assert.Error(t, err)
