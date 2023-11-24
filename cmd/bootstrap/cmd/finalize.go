@@ -53,6 +53,7 @@ var (
 	flagEpochTimingRefCounter        uint64
 	flagEpochTimingRefTimestamp      uint64
 	flagEpochTimingDuration          uint64
+	flagEpochTimingNetworkStartTime  time.Time
 )
 
 // PartnerWeights is the format of the JSON file specifying partner node weights.
@@ -706,7 +707,7 @@ func validateOrPopulateEpochTimingConfig() error {
 		flagEpochTimingDuration = flagNumViewsInEpoch // default to 1 view/s
 		flagEpochTimingRefTimestamp = uint64(time.Now().Unix()) + flagNumViewsInEpoch
 
-		// compute target end time for initial (root) epoch from flags: `TargetEndTime = now() + TargetDuration`
+		// compute target end time for initial (root) epoch from flags: `TargetEndTime = RefTimestamp + (RootEpochCounter - RefEpochCounter) * Duration`
 		rootEpochTargetEndTimeUNIX := rootEpochTargetEndTime()
 		rootEpochTargetEndTime := time.Unix(int64(rootEpochTargetEndTimeUNIX), 0)
 		log.Info().Msgf("using default epoch timing config with root epoch target end time %s, which is in %s", rootEpochTargetEndTime, time.Until(rootEpochTargetEndTime))
@@ -720,7 +721,7 @@ func validateOrPopulateEpochTimingConfig() error {
 			return fmt.Errorf("invalid epoch timing config: reference epoch counter must be before root epoch counter")
 		}
 
-		// compute target end time for initial (root) epoch from flags: `TargetEndTime = now() + TargetDuration`
+		// compute target end time for initial (root) epoch from flags: `TargetEndTime = RefTimestamp + (RootEpochCounter - RefEpochCounter) * Duration`
 		rootEpochTargetEndTimeUNIX := rootEpochTargetEndTime()
 		rootEpochTargetEndTime := time.Unix(int64(rootEpochTargetEndTimeUNIX), 0)
 		log.Info().Msgf("using user-specified epoch timing config with root epoch target end time %s, which is in %s", rootEpochTargetEndTime, time.Until(rootEpochTargetEndTime))
