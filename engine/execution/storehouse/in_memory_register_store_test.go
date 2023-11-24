@@ -617,13 +617,7 @@ func randBetween(min, max uint64) uint64 {
 }
 
 func makeReg(key string, value string) flow.RegisterEntry {
-	return flow.RegisterEntry{
-		Key: flow.RegisterID{
-			Owner: "owner",
-			Key:   key,
-		},
-		Value: []byte(value),
-	}
+	return unittest.MakeOwnerReg(key, value)
 }
 
 var unknownBlock = unittest.IdentifierFixture()

@@ -429,7 +429,10 @@ func (e *Engine) executeBlock(
 		return
 	}
 
-	snapshot := e.execState.NewStorageSnapshot(*executableBlock.StartState)
+	snapshot := e.execState.NewStorageSnapshot(*executableBlock.StartState,
+		executableBlock.ID(),
+		executableBlock.Block.Header.Height,
+	)
 
 	computationResult, err := e.computationManager.ComputeBlock(
 		ctx,
