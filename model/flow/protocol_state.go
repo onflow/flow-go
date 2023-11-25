@@ -165,13 +165,13 @@ func NewRichProtocolStateEntry(
 		return nil, fmt.Errorf("supplied current epoch's commit event (%x) does not match commitment (%x) in ProtocolStateEntry", currentEpochCommit.ID(), protocolState.CurrentEpoch.CommitID)
 	}
 
-	// if we are in staking phase (i.e. protocolState.NextEpoch == nil):
-	//  (1) Full identity table for current epoch contains active identities from current epoch.
+	// If we are in staking phase (i.e. protocolState.NextEpoch == nil):
+	//  (1) Full identity table contains active identities from current epoch.
 	//      If previous epoch exists, we add nodes from previous epoch that are leaving in the current epoch with `EpochParticipationStatusLeaving` status.
-	// otherwise, we are in epoch setup or epoch commit phase (i.e. protocolState.NextEpoch ≠ nil):
-	//  (2a) full identity table for current is active identities from current epoch + nodes joining in next epoch with `EpochParticipationStatusJoining` status.
-	//  (2b) furthermore, we also build the full identity table for the next epoch's staking phase:
-	//    active identities from next epoch + nodes from current epoch that are leaving at the end of the current epoch with `flow.EpochParticipationStatusLeaving` status.
+	// Otherwise, we are in epoch setup or epoch commit phase (i.e. protocolState.NextEpoch ≠ nil):
+	//  (2a) Full identity table contains active identities from current epoch + nodes joining in next epoch with `EpochParticipationStatusJoining` status.
+	//  (2b) Furthermore, we also build the full identity table for the next epoch's staking phase:
+	//       active identities from next epoch + nodes from current epoch that are leaving at the end of the current epoch with `flow.EpochParticipationStatusLeaving` status.
 	var err error
 	nextEpoch := protocolState.NextEpoch
 	if nextEpoch == nil { // in staking phase: build full identity table for current epoch according to (1)

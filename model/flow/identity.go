@@ -42,7 +42,7 @@ type IdentitySkeleton struct {
 // /   - ejected - the node has been permanently removed from the network.
 //
 // /            EpochSetup
-// /	      ┌────────────⬤ unregistered ◯◄────────────┐
+// /	      ┌────────────⬤ unregistered ◯◄───────────┐
 // /	┌─────▼─────┐        ┌───────────┐        ┌─────┴─────┐
 // /	│  JOINING  ├───────►│  ACTIVE   ├───────►│  LEAVING  │
 // /	└─────┬─────┘        └─────┬─────┘        └─────┬─────┘
