@@ -322,8 +322,9 @@ func (h *MessageHub) sendOwnProposal(header *flow.Header) error {
 	log.Debug().Msg("processing proposal broadcast request from hotstuff")
 
 	// Retrieve all consensus nodes (excluding myself).
-	// CAUTION: We must include also nodes with weight zero, because otherwise
-	//          new consensus nodes for the next epoch are left out.
+	// CAUTION: We must also include nodes that are joining, because otherwise new consensus
+	//          nodes for the next epoch are left out. As most nodes might be interested in
+	//          new proposals, we simply broadcast to all non-ejected nodes (excluding myself).
 	// Note: retrieving the final state requires a time-intensive database read.
 	//       Therefore, we execute this in a separate routine, because
 	//       `OnOwnTimeout` is directly called by the consensus core logic.
