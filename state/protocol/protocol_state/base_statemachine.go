@@ -1,9 +1,8 @@
 package protocol_state
 
 import (
-	"github.com/onflow/flow-go/state/protocol"
-
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 // ProtocolStateMachine implements a low-level interface for state-changing operations on the protocol state.

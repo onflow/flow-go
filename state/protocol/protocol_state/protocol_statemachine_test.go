@@ -126,7 +126,7 @@ func (s *ProtocolStateMachineSuite) TestBuild() {
 	require.NoError(s.T(), err)
 	updatedState, stateID, hasChanges = s.stateMachine.Build()
 	require.True(s.T(), hasChanges, "should have changes")
-	require.NotEqual(s.T(), stateID, s.parentProtocolState.ID(), "should return same protocol state")
+	require.NotEqual(s.T(), stateID, s.parentProtocolState.ID(), "protocol state was modified but still has same ID")
 	require.Equal(s.T(), updatedState.ID(), stateID, "should return correct ID")
 	require.Equal(s.T(), s.parentProtocolState.ID(), s.stateMachine.ParentState().ID(), "should not modify parent protocol state")
 }
@@ -368,9 +368,9 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochSetupInvariants() {
 }
 
 // TestProcessEpochSetupHappyPath tests if processing epoch setup when invariants are not violated updates internal structures.
-// It must produce valid identity table for current and next epochs.
-// For current epoch we should have identity table with all the nodes from the current epoch.
-// For next epoch we should have identity table with all the nodes from the next epoch.
+// We test correct construction of the *active identities* for the current and next epoch. Specifically, observing an EpochSetup
+// event should leave `PreviousEpoch` and `CurrentEpoch`'s EpochStateContainer unchanged.
+// The next epoch's EpochStateContainer should reference the EpochSetup event and hold the respective ActiveIdentities.
 func (s *ProtocolStateMachineSuite) TestProcessEpochSetupHappyPath() {
 	setupParticipants := unittest.IdentityListFixture(5, unittest.WithAllRoles()).Sort(order.Canonical[flow.Identity])
 	setupParticipants[0].InitialWeight = 13
@@ -390,14 +390,13 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochSetupHappyPath() {
 
 	updatedState, _, hasChanges := s.stateMachine.Build()
 	require.True(s.T(), hasChanges, "should have changes")
-	require.Equal(s.T(), s.parentProtocolState.PreviousEpoch.ActiveIdentities, updatedState.PreviousEpoch.ActiveIdentities,
-		"should not change active identities for previous epoch")
-	require.Equal(s.T(), s.parentProtocolState.CurrentEpoch.ActiveIdentities, updatedState.CurrentEpoch.ActiveIdentities,
-		"should not change active identities for current epoch")
+	require.Equal(s.T(), s.parentProtocolState.PreviousEpoch, updatedState.PreviousEpoch, "previous epoch's EpochStateContainer should not change")
+	require.Equal(s.T(), s.parentProtocolState.CurrentEpoch, updatedState.CurrentEpoch, "current epoch's EpochStateContainer should not change")
 	nextEpoch := updatedState.NextEpoch
 	require.NotNil(s.T(), nextEpoch, "should have next epoch protocol state")
 	require.Equal(s.T(), nextEpoch.SetupID, setup.ID(),
 		"should have correct setup ID for next protocol state")
+	require.Equal(s.T(), nextEpoch.CommitID, flow.ZeroID, "ID for EpochCommit event should still be nil")
 	require.Equal(s.T(), expectedNextEpochActiveIdentities, nextEpoch.ActiveIdentities,
 		"should have filled active identities for next epoch")
 }
