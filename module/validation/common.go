@@ -31,7 +31,7 @@ func identityForNode(state protocol.State, blockID flow.Identifier, nodeID flow.
 // ensureNodeHasWeightAndRole checks whether, at the given block, `nodeID`
 //   - has _positive_ weight
 //   - and has the expected role
-//   - and is not ejected
+//   - is an active participant of the current epoch and not ejected (i.e. has `EpochParticipationStatusActive`)
 //
 // Returns the following errors:
 //   - sentinel engine.InvalidInputError if any of the above-listed conditions are violated.
