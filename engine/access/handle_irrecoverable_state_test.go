@@ -203,6 +203,7 @@ func TestIrrecoverableState(t *testing.T) {
 	suite.Run(t, new(IrrecoverableStateTestSuite))
 }
 
+// TestGRPCInconsistentNodeState tests the behavior when gRPC encounters an inconsistent node state.
 func (suite *IrrecoverableStateTestSuite) TestGRPCInconsistentNodeState() {
 	err := fmt.Errorf("inconsistent node`s state")
 	suite.snapshot.On("Head").Return(nil, err)
@@ -226,6 +227,7 @@ func (suite *IrrecoverableStateTestSuite) TestGRPCInconsistentNodeState() {
 	suite.Require().Error(err)
 }
 
+// TestRestInconsistentNodeState tests the behavior when the REST API encounters an inconsistent node state.
 func (suite *IrrecoverableStateTestSuite) TestRestInconsistentNodeState() {
 	collections := unittest.CollectionListFixture(1)
 	blockHeader := unittest.BlockWithGuaranteesFixture(
@@ -247,6 +249,7 @@ func (suite *IrrecoverableStateTestSuite) TestRestInconsistentNodeState() {
 	suite.Require().Error(err)
 }
 
+// optionsForBlocksIdGetOpts returns options for the BlocksApi.BlocksIdGet function.
 func optionsForBlocksIdGetOpts() *restclient.BlocksApiBlocksIdGetOpts {
 	return &restclient.BlocksApiBlocksIdGetOpts{
 		Expand:  optional.NewInterface([]string{routes.ExpandableFieldPayload}),
