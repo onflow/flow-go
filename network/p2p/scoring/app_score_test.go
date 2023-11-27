@@ -146,6 +146,8 @@ func TestFullGossipSubConnectivityAmongHonestNodesWithMaliciousMajority(t *testi
 		RpcSentTrackerCacheSize:            defaultConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerCacheSize,
 		RpcSentTrackerWorkerQueueCacheSize: defaultConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerQueueCacheSize,
 		RpcSentTrackerNumOfWorkers:         defaultConfig.NetworkConfig.GossipSubConfig.RpcSentTrackerNumOfWorkers,
+		DuplicateMessageTrackerCacheSize:   defaultConfig.NetworkConfig.GossipSubConfig.DuplicateMessageTrackerCacheSize,
+		DuplicateMessageTrackerGuageDecay:  defaultConfig.NetworkConfig.GossipSubConfig.DuplicateMessageTrackerGuageDecay,
 	}
 
 	con1NodeTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg) // mesh tracer for con1

@@ -76,6 +76,8 @@ func TestGossipSubMeshTracer(t *testing.T) {
 		RpcSentTrackerCacheSize:            defaultConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerCacheSize,
 		RpcSentTrackerWorkerQueueCacheSize: defaultConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerQueueCacheSize,
 		RpcSentTrackerNumOfWorkers:         defaultConfig.NetworkConfig.GossipSubConfig.RpcSentTrackerNumOfWorkers,
+		DuplicateMessageTrackerCacheSize:   defaultConfig.NetworkConfig.GossipSubConfig.DuplicateMessageTrackerCacheSize,
+		DuplicateMessageTrackerGuageDecay:  defaultConfig.NetworkConfig.GossipSubConfig.DuplicateMessageTrackerGuageDecay,
 	}
 	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
 	tracerNode, tracerId := p2ptest.NodeFixture(

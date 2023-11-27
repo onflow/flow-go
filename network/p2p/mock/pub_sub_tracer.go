@@ -54,6 +54,20 @@ func (_m *PubSubTracer) DuplicateMessage(msg *pubsub.Message) {
 	_m.Called(msg)
 }
 
+// DuplicateMessageCount provides a mock function with given fields: peerID
+func (_m *PubSubTracer) DuplicateMessageCount(peerID peer.ID) float64 {
+	ret := _m.Called(peerID)
+
+	var r0 float64
+	if rf, ok := ret.Get(0).(func(peer.ID) float64); ok {
+		r0 = rf(peerID)
+	} else {
+		r0 = ret.Get(0).(float64)
+	}
+
+	return r0
+}
+
 // Graft provides a mock function with given fields: p, topic
 func (_m *PubSubTracer) Graft(p peer.ID, topic string) {
 	_m.Called(p, topic)

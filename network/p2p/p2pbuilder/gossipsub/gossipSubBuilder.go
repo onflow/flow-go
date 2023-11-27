@@ -188,7 +188,7 @@ func NewGossipSubBuilder(
 	idProvider module.IdentityProvider,
 	rpcInspectorConfig *p2pconf.GossipSubRPCInspectorsConfig,
 	subscriptionProviderPrams *p2pconf.SubscriptionProviderParameters,
-	meshTracer *tracer.GossipSubMeshTracer) *Builder {
+	tracer p2p.PubSubTracer) *Builder {
 	lg := logger.With().
 		Str("component", "gossipsub").
 		Str("network-type", networkType.String()).
@@ -202,9 +202,9 @@ func NewGossipSubBuilder(
 		idProvider:                idProvider,
 		gossipSubFactory:          defaultGossipSubFactory(),
 		gossipSubConfigFunc:       defaultGossipSubAdapterConfig(),
-		scoreOptionConfig:         scoring.NewScoreOptionConfig(lg, idProvider, meshTracer.DuplicateMessageCount),
+		scoreOptionConfig:         scoring.NewScoreOptionConfig(lg, idProvider, tracer.DuplicateMessageCount),
 		rpcInspectorConfig:        rpcInspectorConfig,
-		rpcInspectorSuiteFactory:  defaultInspectorSuite(meshTracer),
+		rpcInspectorSuiteFactory:  defaultInspectorSuite(tracer),
 		subscriptionProviderParam: subscriptionProviderPrams,
 	}
 

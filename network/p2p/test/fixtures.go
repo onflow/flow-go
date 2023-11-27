@@ -93,6 +93,8 @@ func NodeFixture(t *testing.T,
 		RpcSentTrackerCacheSize:            defaultFlowConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerCacheSize,
 		RpcSentTrackerWorkerQueueCacheSize: defaultFlowConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerQueueCacheSize,
 		RpcSentTrackerNumOfWorkers:         defaultFlowConfig.NetworkConfig.GossipSubConfig.RpcSentTrackerNumOfWorkers,
+		DuplicateMessageTrackerCacheSize:   defaultFlowConfig.NetworkConfig.GossipSubConfig.DuplicateMessageTrackerCacheSize,
+		DuplicateMessageTrackerGuageDecay:  defaultFlowConfig.NetworkConfig.GossipSubConfig.DuplicateMessageTrackerGuageDecay,
 	}
 
 	parameters := &NodeFixtureParameters{

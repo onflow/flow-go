@@ -108,6 +108,8 @@ func CreateNode(t *testing.T, networkKey crypto.PrivateKey, sporkID flow.Identif
 		RpcSentTrackerCacheSize:            defaultFlowConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerCacheSize,
 		RpcSentTrackerWorkerQueueCacheSize: defaultFlowConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerQueueCacheSize,
 		RpcSentTrackerNumOfWorkers:         defaultFlowConfig.NetworkConfig.GossipSubConfig.RpcSentTrackerNumOfWorkers,
+		DuplicateMessageTrackerCacheSize:   defaultFlowConfig.NetworkConfig.GossipSubConfig.DuplicateMessageTrackerCacheSize,
+		DuplicateMessageTrackerGuageDecay:  defaultFlowConfig.NetworkConfig.GossipSubConfig.DuplicateMessageTrackerGuageDecay,
 		HeroCacheMetricsFactory:            metrics.NewNoopHeroCacheMetricsFactory(),
 		NetworkingType:                     flownet.PublicNetwork,
 	}

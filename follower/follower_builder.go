@@ -581,6 +581,8 @@ func (builder *FollowerServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 		RpcSentTrackerCacheSize:            builder.FlowConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerCacheSize,
 		RpcSentTrackerWorkerQueueCacheSize: builder.FlowConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerQueueCacheSize,
 		RpcSentTrackerNumOfWorkers:         builder.FlowConfig.NetworkConfig.GossipSubConfig.RpcSentTrackerNumOfWorkers,
+		DuplicateMessageTrackerCacheSize:   builder.FlowConfig.NetworkConfig.GossipSubConfig.DuplicateMessageTrackerCacheSize,
+		DuplicateMessageTrackerGuageDecay:  builder.FlowConfig.NetworkConfig.GossipSubConfig.DuplicateMessageTrackerGuageDecay,
 		HeroCacheMetricsFactory:            builder.HeroCacheMetricsFactory(),
 		NetworkingType:                     network.PublicNetwork,
 	}

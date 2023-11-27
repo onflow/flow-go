@@ -172,6 +172,8 @@ type PubSubTracer interface {
 	component.Component
 	pubsub.RawTracer
 	RpcControlTracking
+	// DuplicateMessageCount returns the current duplicate message count for the peer.
+	DuplicateMessageCount(peerID peer.ID) float64
 }
 
 // RpcControlTracking is the abstraction of the underlying libp2p control message tracker used to track message ids advertised by the iHave control messages.

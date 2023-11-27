@@ -89,7 +89,7 @@ func NewNodeBuilder(
 	peerManagerConfig *p2pconfig.PeerManagerConfig,
 	subscriptionProviderParam *p2pconf.SubscriptionProviderParameters,
 	disallowListCacheCfg *p2p.DisallowListCacheConfig,
-	meshTracer *tracer.GossipSubMeshTracer,
+	tracer p2p.PubSubTracer,
 	unicastConfig *p2pconfig.UnicastConfig,
 ) *LibP2PNodeBuilder {
 	return &LibP2PNodeBuilder{
@@ -108,7 +108,7 @@ func NewNodeBuilder(
 			sporkId,
 			idProvider,
 			rpcInspectorCfg, subscriptionProviderParam,
-			meshTracer),
+			tracer),
 		peerManagerConfig: peerManagerConfig,
 		unicastConfig:     unicastConfig,
 	}
@@ -455,6 +455,8 @@ func DefaultNodeBuilder(
 		RpcSentTrackerCacheSize:            gossipCfg.RPCSentTrackerCacheSize,
 		RpcSentTrackerWorkerQueueCacheSize: gossipCfg.RPCSentTrackerQueueCacheSize,
 		RpcSentTrackerNumOfWorkers:         gossipCfg.RpcSentTrackerNumOfWorkers,
+		DuplicateMessageTrackerCacheSize:   gossipCfg.DuplicateMessageTrackerCacheSize,
+		DuplicateMessageTrackerGuageDecay:  gossipCfg.DuplicateMessageTrackerGuageDecay,
 		HeroCacheMetricsFactory:            metricsCfg.HeroCacheFactory,
 		NetworkingType:                     flownet.PrivateNetwork,
 	}
