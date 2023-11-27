@@ -141,7 +141,7 @@ func (b *backendNetwork) GetProtocolStateSnapshotByHeight(_ context.Context, blo
 	validSnapshot, err := b.getValidSnapshot(snapshot, 0, false)
 	if err != nil {
 		if errors.Is(err, SnapshotPhaseMismatchError) {
-			return nil, status.Errorf(codes.InvalidArgument, "failed to get a valid snapshot: %v", err)
+			return nil, status.Errorf(codes.InvalidArgument, "failed to retrieve snapshot for block, try again with different block: %v", err)
 		}
 		return nil, status.Errorf(codes.Internal, "failed to get a valid snapshot: %v", err)
 	}
