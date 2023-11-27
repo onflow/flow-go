@@ -290,8 +290,8 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 		lg.Fatal().Err(err).Msg("could not adjust application specific penalty for peer")
 	}
 
-	lg.Warn().
-		//Float64("applied_penalty", appliedPenalty).
+	lg.Debug().
+		Float64("applied_penalty", appliedPenalty).
 		Float64("app_specific_score", record.Penalty).
 		Msg("applied misbehaviour penalty and updated application specific penalty")
 }
