@@ -1133,6 +1133,16 @@ func TestValidationInspector_MultiErrorNotification(t *testing.T) {
 	withExpectedNotificationDissemination(expectedNumOfTotalNotif, inspectDisseminatedNotifyFunc)(distributor, spammer)
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
 
+	inspectorMetrics := mock.NewGossipSubRpcValidationInspectorMetrics(t)
+	inspectorMetrics.On("AsyncProcessingStarted")
+	inspectorMetrics.On("AsyncProcessingFinished", mockery.AnythingOfType("time.Duration"))
+	inspectorMetrics.On("InvalidControlMessageNotificationErrors", mockery.AnythingOfType("int")).Run(func(args mockery.Arguments) {
+		count, ok := args.Get(0).(int)
+		require.True(t, ok)
+		// count is expected to be 3 for graft, prune and ihave messages that have been configured with 3 invalid topics.
+		// 1 for iwant control message with a single duplicate message ID error.
+		require.True(t, count == 3 || count == 1)
+	})
 	validationInspector, err := validation.NewControlMsgValidationInspector(&validation.InspectorParams{
 		Logger:                  unittest.Logger(),
 		SporkID:                 sporkID,
@@ -1140,7 +1150,7 @@ func TestValidationInspector_MultiErrorNotification(t *testing.T) {
 		Distributor:             distributor,
 		IdProvider:              idProvider,
 		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
-		InspectorMetrics:        metrics.NewNoopCollector(),
+		InspectorMetrics:        inspectorMetrics,
 		RpcTracker:              meshTracer,
 		NetworkingType:          network.PrivateNetwork,
 		TopicOracle: func() p2p.TopicProvider {
@@ -1194,10 +1204,10 @@ func TestValidationInspector_MultiErrorNotification(t *testing.T) {
 	spammer.SpamControlMessage(t, victimNode, iwants)
 	unittest.RequireCloseBefore(t, done, 5*time.Second, "failed to inspect RPC messages on time")
 
-	// ensure we receive the expected number of invalid control message notifications for graft and prune control message types
-	// we send 3 messages with 3 diff invalid topics
 	require.Equal(t, uint64(1), invGraftCount.Load())
 	require.Equal(t, uint64(1), invPruneCount.Load())
+	require.Equal(t, uint64(1), invIWantCount.Load())
+	require.Equal(t, uint64(1), invIHaveCount.Load())
 }
 
 // TestGossipSubSpamMitigationIntegration tests that the spam mitigation feature of GossipSub is working as expected.
