@@ -217,6 +217,11 @@ func (r *GossipSubAppSpecificScoreRegistry) AppSpecificScoreFunc() func(peer.ID)
 		// (5) duplicate messages penalty: the duplicate messages penalty is applied to the application specific penalty as long
 		// as the number of duplicate messages detected for a peer is greater than 0. This counter is decayed overtime, thus sustained
 		// good behavior should eventually lead to the duplicate messages penalty applied being 0.
+		duplicateMessagesPenalty := r.duplicateMessagePenalty(pid)
+		lg = lg.With().Float64("duplicate_messages_penalty", duplicateMessagesPenalty).Logger()
+		if duplicateMessagesPenalty < 0 {
+			appSpecificScore += duplicateMessagesPenalty
+		}
 
 		lg.Trace().
 			Float64("total_app_specific_score", appSpecificScore).
@@ -270,6 +275,16 @@ func (r *GossipSubAppSpecificScoreRegistry) subscriptionPenalty(pid peer.ID, flo
 	}
 
 	return 0
+}
+
+// duplicateMessagePenalty returns the duplicate message penalty for a peer.
+func (r *GossipSubAppSpecificScoreRegistry) duplicateMessagePenalty(pid peer.ID) float64 {
+	duplicateMessageCount := r.getDuplicateMessageCount(pid)
+	duplicateMessagePenalty := duplicateMessageCount * DefaultDuplicateMessagePenalty
+	if duplicateMessagePenalty > MaxAppSpecificPenalty {
+		return MaxAppSpecificPenalty
+	}
+	return duplicateMessagePenalty
 }
 
 // OnInvalidControlMessageNotification is called when a new invalid control message notification is distributed.
