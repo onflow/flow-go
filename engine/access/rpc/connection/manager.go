@@ -398,6 +398,25 @@ func (m *Manager) createCircuitBreakerInterceptor() grpc.UnaryClientInterceptor 
 			// MaxRequests defines the max number of concurrent requests while the circuit breaker is in the HalfClosed
 			// state.
 			MaxRequests: m.circuitBreakerConfig.MaxRequests,
+			// IsSuccessful defines gRPC status codes that should be treated as a successful result for the circuit breaker.
+			IsSuccessful: func(err error) bool {
+				if se, ok := status.FromError(err); ok {
+					if se == nil {
+						return true
+					}
+
+					// There are several error cases that may occur during normal operation and should be considered
+					// as "successful" from the perspective of the circuit breaker.
+					switch se.Code() {
+					case codes.OK, codes.Canceled, codes.InvalidArgument, codes.NotFound, codes.Unimplemented, codes.OutOfRange:
+						return true
+					default:
+						return false
+					}
+				}
+
+				return false
+			},
 		})
 
 		circuitBreakerInterceptor := func(
