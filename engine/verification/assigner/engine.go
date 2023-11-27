@@ -275,8 +275,8 @@ func authorizedAsVerification(state protocol.State, blockID flow.Identifier, ide
 		return false, fmt.Errorf("node has an invalid role. expected: %s, got: %s", flow.RoleVerification, identity.Role)
 	}
 
-	// checks identity is an active epoch participant
-	if !filter.IsValidCurrentEpochParticipant(identity) {
+	// checks identity is an active epoch participant with positive weight
+	if !filter.IsValidCurrentEpochParticipant(identity) || identity.InitialWeight == 0 {
 		return false, nil
 	}
 
