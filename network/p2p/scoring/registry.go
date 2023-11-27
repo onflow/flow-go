@@ -87,7 +87,9 @@ type GossipSubAppSpecificScoreRegistry struct {
 	idProvider module.IdentityProvider
 	// spamScoreCache currently only holds the control message misbehaviour penalty (spam related penalty).
 	spamScoreCache p2p.GossipSubSpamRecordCache
-	penalty        GossipSubCtrlMsgPenaltyValue
+	// duplicateMessageCache tracks a gauge of the number of duplicate messages detected for each peer.
+	duplicateMessageCache p2p.GossipSubDuplicateMessageTrackerCache
+	penalty               GossipSubCtrlMsgPenaltyValue
 	// initial application specific penalty record, used to initialize the penalty cache entry.
 	init      func() p2p.GossipSubSpamRecord
 	validator p2p.SubscriptionValidator
@@ -113,9 +115,13 @@ type GossipSubAppSpecificScoreRegistryConfig struct {
 	// a peer when the peer is first observed by the local peer.
 	Init func() p2p.GossipSubSpamRecord
 
-	// CacheFactory is a factory function that returns a new GossipSubSpamRecordCache. It is used to initialize the spamScoreCache.
+	// GossipSubSpamRecordCacheFactory is a factory function that returns a new GossipSubSpamRecordCache. It is used to initialize the spamScoreCache.
 	// The cache is used to store the application specific penalty of peers.
-	CacheFactory func() p2p.GossipSubSpamRecordCache
+	GossipSubSpamRecordCacheFactory func() p2p.GossipSubSpamRecordCache
+
+	// GossipSubDuplicateMessageTrackerCacheFactory is a factory function that returns a new GossipSubDuplicateMessageTrackerCache. It is used to initialize the duplicateMessageCache.
+	// The cache is used to store the number of duplicate messages detected from each peer.
+	GossipSubDuplicateMessageTrackerCacheFactory func() p2p.GossipSubDuplicateMessageTrackerCache
 }
 
 // NewGossipSubAppSpecificScoreRegistry returns a new GossipSubAppSpecificScoreRegistry.
@@ -128,12 +134,13 @@ type GossipSubAppSpecificScoreRegistryConfig struct {
 //	a new GossipSubAppSpecificScoreRegistry.
 func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegistryConfig) *GossipSubAppSpecificScoreRegistry {
 	reg := &GossipSubAppSpecificScoreRegistry{
-		logger:         config.Logger.With().Str("module", "app_score_registry").Logger(),
-		spamScoreCache: config.CacheFactory(),
-		penalty:        config.Penalty,
-		init:           config.Init,
-		validator:      config.Validator,
-		idProvider:     config.IdProvider,
+		logger:                config.Logger.With().Str("module", "app_score_registry").Logger(),
+		spamScoreCache:        config.GossipSubSpamRecordCacheFactory(),
+		duplicateMessageCache: config.GossipSubDuplicateMessageTrackerCacheFactory(),
+		penalty:               config.Penalty,
+		init:                  config.Init,
+		validator:             config.Validator,
+		idProvider:            config.IdProvider,
 	}
 
 	builder := component.NewComponentManagerBuilder()
@@ -267,7 +274,6 @@ func (r *GossipSubAppSpecificScoreRegistry) subscriptionPenalty(pid peer.ID, flo
 // The implementation must be concurrency safe, but can be blocking.
 func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(notification *p2p.InvCtrlMsgNotif) {
 	// we use mutex to ensure the method is concurrency safe.
-
 	lg := r.logger.With().
 		Err(notification.Error).
 		Str("peer_id", p2plogging.PeerId(notification.PeerID)).

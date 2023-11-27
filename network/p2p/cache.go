@@ -83,3 +83,27 @@ type GossipSubSpamRecord struct {
 	// Penalty is the application specific Penalty of the peer.
 	Penalty float64
 }
+
+// GossipSubDuplicateMessageTrackerCache is a cache used to store the current count of duplicate messages detected
+// from a peer. This count is utilized to calculate a penalty for duplicate messages, which is then applied
+// to the peer's application-specific score. The duplicate message tracker decays over time to prevent perpetual
+// penalization of a peer.
+type GossipSubDuplicateMessageTrackerCache interface {
+	// Inc increments the number of duplicate messages detected for the peer. This func is used in conjunction with the GossipSubMeshTracer and is invoked
+	// each time the DuplicateMessage callback is invoked.
+	// Args:
+	// - peerID: the peer ID of the peer in the GossipSub protocol.
+	//
+	// Returns:
+	// - float64: updated value for the duplicate message tracker.
+	// - error: if any error was encountered during record adjustments in cache.
+	Inc(peerId peer.ID) (float64, error)
+	// Get returns the current number of duplicate messages encountered from a peer. The counter is decayed before being
+	// returned.
+	// Args:
+	// - peerID: the peer ID of the peer in the GossipSub protocol.
+	//
+	// Returns:
+	// - float64: updated value for the duplicate message tracker.
+	Get(peerId peer.ID) (float64, bool, error)
+}

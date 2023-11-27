@@ -463,21 +463,25 @@ func withInitFunction(initFunction func() p2p.GossipSubSpamRecord) func(cfg *sco
 // newGossipSubAppSpecificScoreRegistry returns a new instance of GossipSubAppSpecificScoreRegistry with default values
 // for the testing purposes.
 func newGossipSubAppSpecificScoreRegistry(t *testing.T, opts ...func(*scoring.GossipSubAppSpecificScoreRegistryConfig)) (*scoring.GossipSubAppSpecificScoreRegistry, *netcache.GossipSubSpamRecordCache) {
-	cache := netcache.NewGossipSubSpamRecordCache(100, unittest.Logger(), metrics.NewNoopCollector(), scoring.DefaultDecayFunction())
+	gossipSubSpamRecordCache := netcache.NewGossipSubSpamRecordCache(100, unittest.Logger(), metrics.NewNoopCollector(), scoring.DefaultDecayFunction())
+	gossipSubDuplicateMessageTrackerCache := netcache.NewGossipSubDuplicateMessageTrackerCache(100, .99, unittest.Logger(), metrics.NewNoopCollector())
 	cfg := &scoring.GossipSubAppSpecificScoreRegistryConfig{
 		Logger:     unittest.Logger(),
 		Init:       scoring.InitAppScoreRecordState,
 		Penalty:    penaltyValueFixtures(),
 		IdProvider: mock.NewIdentityProvider(t),
 		Validator:  mockp2p.NewSubscriptionValidator(t),
-		CacheFactory: func() p2p.GossipSubSpamRecordCache {
-			return cache
+		GossipSubSpamRecordCacheFactory: func() p2p.GossipSubSpamRecordCache {
+			return gossipSubSpamRecordCache
+		},
+		GossipSubDuplicateMessageTrackerCacheFactory: func() p2p.GossipSubDuplicateMessageTrackerCache {
+			return gossipSubDuplicateMessageTrackerCache
 		},
 	}
 	for _, opt := range opts {
 		opt(cfg)
 	}
-	return scoring.NewGossipSubAppSpecificScoreRegistry(cfg), cache
+	return scoring.NewGossipSubAppSpecificScoreRegistry(cfg), gossipSubSpamRecordCache
 }
 
 // penaltyValueFixtures returns a set of penalty values for testing purposes.
