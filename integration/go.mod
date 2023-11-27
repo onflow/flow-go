@@ -20,7 +20,7 @@ require (
 	github.com/ipfs/go-ds-badger2 v0.1.3
 	github.com/ipfs/go-ipfs-blockstore v1.3.0
 	github.com/onflow/cadence v0.42.5
-  github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.4-0.20231120143830-9e8417b56122
+	github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.4-0.20231120143830-9e8417b56122
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.2.4-0.20231111185227-240579784e9b
 	github.com/onflow/flow-emulator v0.58.0
 	github.com/onflow/flow-go v0.32.7
