@@ -794,15 +794,9 @@ func (s *ReceiptValidationSuite) TestValidateReceiptResultWithoutReceipt() {
 }
 
 // TestValidateReceiptResultHasEnoughReceipts tests a case where a leader incorporates an execution result
-// into their proposal, which has multiple receipts and ReceiptValidator.
+// into their proposal, which has multiple receipts and ReceiptValidator accepts it as valid payload.
 func (s *ReceiptValidationSuite) TestValidateReceiptResultHasEnoughReceipts() {
-	s.receiptValidator = NewReceiptValidator(
-		s.State,
-		s.HeadersDB,
-		s.IndexDB,
-		s.ResultsDB,
-		s.SealsDB,
-	)
+	k := uint(5)
 	// assuming signatures are all good
 	s.publicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
@@ -829,9 +823,22 @@ func (s *ReceiptValidationSuite) TestValidateReceiptResultHasEnoughReceipts() {
 	}
 	s.PersistedResults[result0.ID()] = result0
 
+	candidateReceipts := []*flow.ExecutionReceiptMeta{receiptB.Meta()}
+	// add k-1 more receipts for the same execution result
+	for i := uint(1); i < k; i++ {
+		// use base receipt and change the executor ID, we don't care about signatures since we are not validating them
+		receipt := *receiptB.Meta()
+		// create a mock executor which submitted the receipt
+		executor := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution), unittest.WithStakingPubKey(s.publicKey))
+		receipt.ExecutorID = executor.NodeID
+		// update local identity table so the receipt is considered valid
+		s.Identities[executor.NodeID] = executor
+		candidateReceipts = append(candidateReceipts, &receipt)
+	}
+
 	candidate := unittest.BlockWithParentFixture(blockB.Header)
 	candidate.Payload = &flow.Payload{
-		Receipts: []*flow.ExecutionReceiptMeta{receiptB.Meta()},
+		Receipts: candidateReceipts,
 		Results:  []*flow.ExecutionResult{&receiptB.ExecutionResult},
 	}
 
