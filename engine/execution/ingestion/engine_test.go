@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 
 	enginePkg "github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/execution"
@@ -171,9 +172,10 @@ func TestExecuteOneBlock(t *testing.T) {
 		blockA := makeBlockWithCollection(store.RootBlock, &col)
 		result := store.CreateBlockAndMockResult(t, blockA)
 
+		ctx.mockIsBlockExecuted(store)
 		ctx.mockStateCommitmentByBlockID(store)
 		ctx.mockGetExecutionResultID(store)
-		ctx.executionState.On("NewStorageSnapshot", mock.Anything).Return(nil)
+		ctx.executionState.On("NewStorageSnapshot", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 		// receive block
 		err := ctx.engine.handleBlock(context.Background(), blockA.Block)
@@ -226,9 +228,10 @@ func TestExecuteBlocks(t *testing.T) {
 		store.CreateBlockAndMockResult(t, blockA)
 		store.CreateBlockAndMockResult(t, blockB)
 
+		ctx.mockIsBlockExecuted(store)
 		ctx.mockStateCommitmentByBlockID(store)
 		ctx.mockGetExecutionResultID(store)
-		ctx.executionState.On("NewStorageSnapshot", mock.Anything).Return(nil)
+		ctx.executionState.On("NewStorageSnapshot", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		ctx.providerEngine.On("BroadcastExecutionReceipt", mock.Anything, mock.Anything, mock.Anything).Return(false, nil)
 
 		// receive block
@@ -275,9 +278,10 @@ func TestExecuteNextBlockIfCollectionIsReady(t *testing.T) {
 		// C2 is available in storage
 		require.NoError(t, ctx.collections.Store(&col2))
 
+		ctx.mockIsBlockExecuted(store)
 		ctx.mockStateCommitmentByBlockID(store)
 		ctx.mockGetExecutionResultID(store)
-		ctx.executionState.On("NewStorageSnapshot", mock.Anything).Return(nil)
+		ctx.executionState.On("NewStorageSnapshot", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 		// receiving block A and B will not trigger any execution
 		// because A is missing collection C1, B is waiting for A to be executed
@@ -319,9 +323,10 @@ func TestExecuteBlockOnlyOnce(t *testing.T) {
 		blockA := makeBlockWithCollection(store.RootBlock, &col)
 		store.CreateBlockAndMockResult(t, blockA)
 
+		ctx.mockIsBlockExecuted(store)
 		ctx.mockStateCommitmentByBlockID(store)
 		ctx.mockGetExecutionResultID(store)
-		ctx.executionState.On("NewStorageSnapshot", mock.Anything).Return(nil)
+		ctx.executionState.On("NewStorageSnapshot", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 		// receive block
 		err := ctx.engine.handleBlock(context.Background(), blockA.Block)
@@ -375,9 +380,10 @@ func TestExecuteForkConcurrently(t *testing.T) {
 		store.CreateBlockAndMockResult(t, blockA)
 		store.CreateBlockAndMockResult(t, blockB)
 
+		ctx.mockIsBlockExecuted(store)
 		ctx.mockStateCommitmentByBlockID(store)
 		ctx.mockGetExecutionResultID(store)
-		ctx.executionState.On("NewStorageSnapshot", mock.Anything).Return(nil)
+		ctx.executionState.On("NewStorageSnapshot", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 		// receive blocks
 		err := ctx.engine.handleBlock(context.Background(), blockA.Block)
@@ -425,9 +431,10 @@ func TestExecuteBlockInOrder(t *testing.T) {
 		store.CreateBlockAndMockResult(t, blockB)
 		store.CreateBlockAndMockResult(t, blockC)
 
+		ctx.mockIsBlockExecuted(store)
 		ctx.mockStateCommitmentByBlockID(store)
 		ctx.mockGetExecutionResultID(store)
-		ctx.executionState.On("NewStorageSnapshot", mock.Anything).Return(nil)
+		ctx.executionState.On("NewStorageSnapshot", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 		// receive blocks
 		err := ctx.engine.handleBlock(context.Background(), blockA.Block)
@@ -495,9 +502,10 @@ func TestStopAtHeightWhenFinalizedBeforeExecuted(t *testing.T) {
 		})
 		require.NoError(t, err)
 
+		ctx.mockIsBlockExecuted(store)
 		ctx.mockStateCommitmentByBlockID(store)
 		ctx.mockGetExecutionResultID(store)
-		ctx.executionState.On("NewStorageSnapshot", mock.Anything).Return(nil)
+		ctx.executionState.On("NewStorageSnapshot", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 		// receive blocks
 		err = ctx.engine.handleBlock(context.Background(), blockA.Block)
@@ -562,9 +570,10 @@ func TestStopAtHeightWhenExecutedBeforeFinalized(t *testing.T) {
 		})
 		require.NoError(t, err)
 
+		ctx.mockIsBlockExecuted(store)
 		ctx.mockStateCommitmentByBlockID(store)
 		ctx.mockGetExecutionResultID(store)
-		ctx.executionState.On("NewStorageSnapshot", mock.Anything).Return(nil)
+		ctx.executionState.On("NewStorageSnapshot", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 		ctx.providerEngine.On("BroadcastExecutionReceipt", mock.Anything, mock.Anything, mock.Anything).Return(false, nil)
 		ctx.mockComputeBlock(store)
@@ -623,9 +632,10 @@ func TestStopAtHeightWhenExecutionFinalization(t *testing.T) {
 		})
 		require.NoError(t, err)
 
+		ctx.mockIsBlockExecuted(store)
 		ctx.mockStateCommitmentByBlockID(store)
 		ctx.mockGetExecutionResultID(store)
-		ctx.executionState.On("NewStorageSnapshot", mock.Anything).Return(nil)
+		ctx.executionState.On("NewStorageSnapshot", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 		ctx.providerEngine.On("BroadcastExecutionReceipt", mock.Anything, mock.Anything, mock.Anything).Return(false, nil)
 		ctx.mockComputeBlock(store)
@@ -678,9 +688,10 @@ func TestExecutedBlockUploadedFailureDoesntBlock(t *testing.T) {
 		blockA := makeBlockWithCollection(store.RootBlock, &col)
 		result := store.CreateBlockAndMockResult(t, blockA)
 
+		ctx.mockIsBlockExecuted(store)
 		ctx.mockStateCommitmentByBlockID(store)
 		ctx.mockGetExecutionResultID(store)
-		ctx.executionState.On("NewStorageSnapshot", mock.Anything).Return(nil)
+		ctx.executionState.On("NewStorageSnapshot", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 		// receive block
 		err := ctx.engine.handleBlock(context.Background(), blockA.Block)
@@ -741,63 +752,63 @@ func makeBlockWithCollection(parent *flow.Header, cols ...*flow.Collection) *ent
 	return executableBlock
 }
 
+func (ctx *testingContext) mockIsBlockExecuted(store *mocks.MockBlockStore) {
+	ctx.executionState.On("IsBlockExecuted", mock.Anything, mock.Anything).
+		Return(func(height uint64, blockID flow.Identifier) (bool, error) {
+			_, err := store.GetExecuted(blockID)
+			if err != nil {
+				return false, nil
+			}
+			return true, nil
+		})
+}
+
 func (ctx *testingContext) mockStateCommitmentByBlockID(store *mocks.MockBlockStore) {
-	mocked := ctx.executionState.On("StateCommitmentByBlockID", mock.Anything, mock.Anything)
-	// https://github.com/stretchr/testify/issues/350#issuecomment-570478958
-	mocked.RunFn = func(args mock.Arguments) {
-		blockID := args[1].(flow.Identifier)
-		result, err := store.GetExecuted(blockID)
-		if err != nil {
-			mocked.ReturnArguments = mock.Arguments{flow.StateCommitment{}, storageerr.ErrNotFound}
-			return
-		}
-		mocked.ReturnArguments = mock.Arguments{result.Result.CurrentEndState(), nil}
-	}
+	ctx.executionState.On("StateCommitmentByBlockID", mock.Anything).
+		Return(func(blockID flow.Identifier) (flow.StateCommitment, error) {
+			result, err := store.GetExecuted(blockID)
+			if err != nil {
+				return flow.StateCommitment{}, storageerr.ErrNotFound
+			}
+			return result.Result.CurrentEndState(), nil
+		})
 }
 
 func (ctx *testingContext) mockGetExecutionResultID(store *mocks.MockBlockStore) {
+	ctx.executionState.On("GetExecutionResultID", mock.Anything, mock.Anything).
+		Return(func(ctx context.Context, blockID flow.Identifier) (flow.Identifier, error) {
+			blockResult, err := store.GetExecuted(blockID)
+			if err != nil {
+				return flow.ZeroID, storageerr.ErrNotFound
+			}
 
-	mocked := ctx.executionState.On("GetExecutionResultID", mock.Anything, mock.Anything)
-	mocked.RunFn = func(args mock.Arguments) {
-		blockID := args[1].(flow.Identifier)
-		blockResult, err := store.GetExecuted(blockID)
-		if err != nil {
-			mocked.ReturnArguments = mock.Arguments{nil, storageerr.ErrNotFound}
-			return
-		}
-
-		mocked.ReturnArguments = mock.Arguments{
-			blockResult.Result.ExecutionReceipt.ExecutionResult.ID(), nil}
-	}
+			return blockResult.Result.ExecutionReceipt.ExecutionResult.ID(), nil
+		})
 }
 
 func (ctx *testingContext) mockComputeBlock(store *mocks.MockBlockStore) {
-	mocked := ctx.computationManager.On("ComputeBlock", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
-	mocked.RunFn = func(args mock.Arguments) {
-		block := args[2].(*entity.ExecutableBlock)
-		blockResult, ok := store.ResultByBlock[block.ID()]
-		if !ok {
-			mocked.ReturnArguments = mock.Arguments{nil, fmt.Errorf("block %s not found", block.ID())}
-			return
-		}
-		mocked.ReturnArguments = mock.Arguments{blockResult.Result, nil}
-	}
+	ctx.computationManager.On("ComputeBlock", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(func(ctx context.Context,
+			parentBlockExecutionResultID flow.Identifier,
+			block *entity.ExecutableBlock,
+			snapshot snapshot.StorageSnapshot) (
+			*execution.ComputationResult, error) {
+			blockResult, ok := store.ResultByBlock[block.ID()]
+			if !ok {
+				return nil, fmt.Errorf("block %s not found", block.ID())
+			}
+			return blockResult.Result, nil
+		})
 }
 
 func (ctx *testingContext) mockSaveExecutionResults(store *mocks.MockBlockStore, wg *sync.WaitGroup) {
-	mocked := ctx.executionState.
-		On("SaveExecutionResults", mock.Anything, mock.Anything)
-
-	mocked.RunFn = func(args mock.Arguments) {
-		result := args[1].(*execution.ComputationResult)
-
-		err := store.MarkExecuted(result)
-		if err != nil {
-			mocked.ReturnArguments = mock.Arguments{err}
-			wg.Done()
-			return
-		}
-		mocked.ReturnArguments = mock.Arguments{nil}
-		wg.Done()
-	}
+	ctx.executionState.On("SaveExecutionResults", mock.Anything, mock.Anything).
+		Return(func(ctx context.Context, result *execution.ComputationResult) error {
+			defer wg.Done()
+			err := store.MarkExecuted(result)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
 }

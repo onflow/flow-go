@@ -61,5 +61,4 @@ func PayloadToRegister(payload *ledger.Payload) (flow.RegisterID, flow.RegisterV
 	}
 
 	return regID, payload.Value(), nil
-
 }
