@@ -145,13 +145,13 @@ func (h *FlowAccessAPIRouter) GetTransactionResultByIndex(context context.Contex
 
 func (h *FlowAccessAPIRouter) GetSystemTransaction(context context.Context, req *access.GetSystemTransactionRequest) (*access.TransactionResponse, error) {
 	res, err := h.Upstream.GetSystemTransaction(context, req)
-	h.log("upstream", "GetTransactionResultByIndex", err)
+	h.log("upstream", "GetSystemTransaction", err)
 	return res, err
 }
 
 func (h *FlowAccessAPIRouter) GetSystemTransactionResult(context context.Context, req *access.GetSystemTransactionResultRequest) (*access.TransactionResultResponse, error) {
 	res, err := h.Upstream.GetSystemTransactionResult(context, req)
-	h.log("upstream", "GetTransactionResultByIndex", err)
+	h.log("upstream", "GetSystemTransactionResult", err)
 	return res, err
 }
 

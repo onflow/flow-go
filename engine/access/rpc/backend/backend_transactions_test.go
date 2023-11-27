@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
@@ -24,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/util"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/generator"
 )
 
 func (suite *Suite) withPreConfiguredState(f func(snap protocol.Snapshot)) {
@@ -389,14 +391,16 @@ func (suite *Suite) TestGetSystemTransactionResult_HappyPath() {
 			BlockId: blockID[:],
 		}
 
-		eventsPerBlock := 10
-		eventMessages := make([]*entities.Event, eventsPerBlock)
+		exeNodeEventEncodingVersion := entities.EventEncodingVersion_CCF_V0
+		events := generator.GetEventsWithEncoding(1, exeNodeEventEncodingVersion)
+		eventMessages := convert.EventsToMessages(events)
 
 		exeEventResp := &execproto.GetTransactionResultsResponse{
 			TransactionResults: []*execproto.GetTransactionResultResponse{{
 				Events:               eventMessages,
-				EventEncodingVersion: entities.EventEncodingVersion_JSON_CDC_V0,
+				EventEncodingVersion: exeNodeEventEncodingVersion,
 			}},
+			EventEncodingVersion: exeNodeEventEncodingVersion,
 		}
 
 		suite.execClient.
@@ -419,7 +423,15 @@ func (suite *Suite) TestGetSystemTransactionResult_HappyPath() {
 
 		suite.Require().Equal(flow.TransactionStatusExecuted, res.Status)
 		suite.Require().Equal(systemTx.ID(), res.TransactionID)
-		suite.Require().Equal(convert.MessagesToEvents(eventMessages), res.Events)
+
+		_, err = jsoncdc.Decode(nil, res.Events[0].Payload)
+		suite.Require().NoError(err)
+
+		events, err = convert.MessagesToEventsWithEncodingConversion(eventMessages,
+			exeNodeEventEncodingVersion,
+			entities.EventEncodingVersion_JSON_CDC_V0)
+		suite.Require().NoError(err)
+		suite.Require().Equal(events, res.Events)
 	})
 }
 
@@ -524,6 +536,7 @@ func (suite *Suite) TestGetSystemTransactionResult_FailedEncodingConversion() {
 
 		suite.Require().Nil(res)
 		suite.Require().Error(err)
-		suite.Require().Equal(err, status.Errorf(codes.Internal, "failed to convert events from system tx result: %v", fmt.Errorf("conversion from format JSON_CDC_V0 to CCF_V0 is not supported")))
+		suite.Require().Equal(err, status.Errorf(codes.Internal, "failed to convert events from system tx result: %v",
+			fmt.Errorf("conversion from format JSON_CDC_V0 to CCF_V0 is not supported")))
 	})
 }
