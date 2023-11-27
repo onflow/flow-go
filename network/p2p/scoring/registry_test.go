@@ -473,6 +473,9 @@ func newGossipSubAppSpecificScoreRegistry(t *testing.T, opts ...func(*scoring.Go
 		GossipSubSpamRecordCacheFactory: func() p2p.GossipSubSpamRecordCache {
 			return gossipSubSpamRecordCache
 		},
+		GetDuplicateMessageCount: func(id peer.ID) float64 {
+			return 0
+		},
 	}
 	for _, opt := range opts {
 		opt(cfg)
