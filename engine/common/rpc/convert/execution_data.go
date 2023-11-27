@@ -13,9 +13,6 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 )
 
-var MaxRegisterIDsPerRequest = 100
-var ErrTooManyRegisterIds = status.Errorf(codes.InvalidArgument, "too many register ids, maximum allowed: %d", MaxRegisterIDsPerRequest)
-
 // BlockExecutionDataEventPayloadsToVersion converts all event payloads to version
 func BlockExecutionDataEventPayloadsToVersion(
 	m *entities.BlockExecutionData,
@@ -333,9 +330,6 @@ func MessageToRegisterID(m *entities.RegisterID) (flow.RegisterID, error) {
 func MessagesToRegisterIDs(m []*entities.RegisterID) (flow.RegisterIDs, error) {
 	if m == nil {
 		return nil, ErrEmptyMessage
-	}
-	if len(m) > MaxRegisterIDsPerRequest {
-		return nil, ErrTooManyRegisterIds
 	}
 	result := make(flow.RegisterIDs, len(m))
 	for i, entry := range m {
