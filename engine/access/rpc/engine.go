@@ -211,6 +211,7 @@ func (e *Engine) serveGRPCWebProxyWorker(ctx irrecoverable.SignalerContext, read
 
 // serveREST is a worker routine which starts the HTTP REST server.
 // The ready callback is called after the server address is bound and set.
+// Note: The original REST BaseContext is discarded, and the irrecoverable.SignalerContext is used for error handling.
 func (e *Engine) serveREST(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	if e.config.RestConfig.ListenAddress == "" {
 		e.log.Debug().Msg("no REST API address specified - not starting the server")
@@ -228,6 +229,8 @@ func (e *Engine) serveREST(ctx irrecoverable.SignalerContext, ready component.Re
 		return
 	}
 	e.restServer = r
+
+	// Set up the irrecoverable.SignalerContext for error handling in the REST server.
 	e.restServer.BaseContext = func(_ net.Listener) context.Context {
 		return context.WithValue(ctx, irrecoverable.SignalerContextKey{}, ctx)
 	}

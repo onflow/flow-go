@@ -23,7 +23,7 @@ type Retry struct {
 	transactionByReferencBlockHeight map[uint64]map[flow.Identifier]*flow.TransactionBody
 	backend                          *Backend
 	active                           bool
-	log                              zerolog.Logger
+	log                              zerolog.Logger // default logger
 }
 
 func newRetry(log zerolog.Logger) *Retry {

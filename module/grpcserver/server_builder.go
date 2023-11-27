@@ -43,7 +43,20 @@ type GrpcServerBuilder struct {
 	stateStreamInterceptorEnable bool
 }
 
-// NewGrpcServerBuilder helps to build a new grpc server.
+// NewGrpcServerBuilder creates a new builder for configuring and initializing a gRPC server.
+//
+// The builder is configured with the provided parameters such as logger, gRPC server address, maximum message size,
+// API rate limits, and additional options. The builder also sets up the necessary interceptors, including handling
+// irrecoverable errors using the irrecoverable.SignalerContext. The gRPC server can be configured with options such
+// as maximum message sizes and interceptors for handling RPC calls.
+//
+// If RPC metrics are enabled, the builder adds the gRPC Prometheus interceptor for collecting metrics. Additionally,
+// it can enable a state stream interceptor based on the configuration. Rate limiting interceptors can be added based
+// on specified API rate limits. Logging and custom interceptors are applied, and the final gRPC server is returned.
+//
+// If transport credentials are provided, a secure gRPC server is created; otherwise, an unsecured server is initialized.
+//
+// Note: The gRPC server is created with the specified options and is ready for further configuration or starting.
 func NewGrpcServerBuilder(log zerolog.Logger,
 	gRPCListenAddr string,
 	maxMsgSize uint,
@@ -70,6 +83,15 @@ func NewGrpcServerBuilder(log zerolog.Logger,
 		grpc.MaxSendMsgSize(int(maxMsgSize)),
 	}
 	var interceptors []grpc.UnaryServerInterceptor // ordered list of interceptors
+	// This interceptor is responsible for ensuring that irrecoverable errors are properly propagated using
+	// the irrecoverable.SignalerContext. It replaces the original gRPC context with a new one that includes
+	// the irrecoverable.SignalerContextKey if available, allowing the server to handle error conditions indicating
+	// an inconsistent or corrupted node state. If no irrecoverable.SignalerContext is present, the original context
+	// is used to process the gRPC request.
+	//
+	// The interceptor follows the grpc.UnaryServerInterceptor signature, where it takes the incoming gRPC context,
+	// request, unary server information, and handler function. It returns the response and error after handling
+	// the request. This mechanism ensures consistent error handling for gRPC requests across the server.
 	interceptors = append(interceptors, func(ctx context.Context, req any, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp any, err error) {
 		if signalerCtx := signalerCtx.Load(); signalerCtx != nil {
 			valueCtx := context.WithValue(ctx, irrecoverable.SignalerContextKey{}, *signalerCtx)
