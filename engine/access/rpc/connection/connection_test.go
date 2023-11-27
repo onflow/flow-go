@@ -59,7 +59,7 @@ func TestProxyAccessAPI(t *testing.T) {
 	}
 
 	// get a collection API client
-	client, conn, err := proxyConnectionFactory.GetAccessAPIClient("foo")
+	client, conn, err := proxyConnectionFactory.GetAccessAPIClient("foo", nil)
 	defer conn.Close()
 	assert.NoError(t, err)
 
@@ -155,7 +155,7 @@ func TestProxyAccessAPIConnectionReuse(t *testing.T) {
 	}
 
 	// get a collection API client
-	_, closer, err := proxyConnectionFactory.GetAccessAPIClient("foo")
+	_, closer, err := proxyConnectionFactory.GetAccessAPIClient("foo", nil)
 	assert.Equal(t, connectionCache.Len(), 1)
 	assert.NoError(t, err)
 	assert.Nil(t, closer.Close())
@@ -308,7 +308,7 @@ func TestCollectionNodeClientTimeout(t *testing.T) {
 	)
 
 	// create the collection API client
-	client, _, err := connectionFactory.GetAccessAPIClient(cn.listener.Addr().String())
+	client, _, err := connectionFactory.GetAccessAPIClient(cn.listener.Addr().String(), nil)
 	assert.NoError(t, err)
 
 	ctx := context.Background()
@@ -361,22 +361,22 @@ func TestConnectionPoolFull(t *testing.T) {
 
 	// get a collection API client
 	// Create and add first client to cache
-	_, _, err := connectionFactory.GetAccessAPIClient(cn1Address)
+	_, _, err := connectionFactory.GetAccessAPIClient(cn1Address, nil)
 	assert.Equal(t, connectionCache.Len(), 1)
 	assert.NoError(t, err)
 
 	// Create and add second client to cache
-	_, _, err = connectionFactory.GetAccessAPIClient(cn2Address)
+	_, _, err = connectionFactory.GetAccessAPIClient(cn2Address, nil)
 	assert.Equal(t, connectionCache.Len(), 2)
 	assert.NoError(t, err)
 
 	// Peek first client from cache. "recently used"-ness will not be updated, so it will be wiped out first.
-	_, _, err = connectionFactory.GetAccessAPIClient(cn1Address)
+	_, _, err = connectionFactory.GetAccessAPIClient(cn1Address, nil)
 	assert.Equal(t, connectionCache.Len(), 2)
 	assert.NoError(t, err)
 
 	// Create and add third client to cache, firs client will be removed from cache
-	_, _, err = connectionFactory.GetAccessAPIClient(cn3Address)
+	_, _, err = connectionFactory.GetAccessAPIClient(cn3Address, nil)
 	assert.Equal(t, connectionCache.Len(), 2)
 	assert.NoError(t, err)
 
@@ -436,7 +436,7 @@ func TestConnectionPoolStale(t *testing.T) {
 	}
 
 	// get a collection API client
-	client, _, err := proxyConnectionFactory.GetAccessAPIClient("foo")
+	client, _, err := proxyConnectionFactory.GetAccessAPIClient("foo", nil)
 	assert.Equal(t, connectionCache.Len(), 1)
 	assert.NoError(t, err)
 	// close connection to simulate something "going wrong" with our stored connection
@@ -451,7 +451,7 @@ func TestConnectionPoolStale(t *testing.T) {
 	assert.Error(t, err)
 
 	// re-access, should replace stale connection in cache with new one
-	_, _, _ = proxyConnectionFactory.GetAccessAPIClient("foo")
+	_, _, _ = proxyConnectionFactory.GetAccessAPIClient("foo", nil)
 	assert.Equal(t, connectionCache.Len(), 1)
 
 	var conn *grpc.ClientConn
@@ -620,7 +620,7 @@ func TestEvictingCacheClients(t *testing.T) {
 
 	clientAddress := cn.listener.Addr().String()
 	// Create the execution API client
-	client, _, err := connectionFactory.GetAccessAPIClient(clientAddress)
+	client, _, err := connectionFactory.GetAccessAPIClient(clientAddress, nil)
 	require.NoError(t, err)
 
 	ctx := context.Background()
@@ -955,7 +955,7 @@ func TestCircuitBreakerCollectionNode(t *testing.T) {
 	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
 
 	// Create the collection API client.
-	client, _, err := connectionFactory.GetAccessAPIClient(cn.listener.Addr().String())
+	client, _, err := connectionFactory.GetAccessAPIClient(cn.listener.Addr().String(), nil)
 	assert.NoError(t, err)
 
 	req := &access.PingRequest{}

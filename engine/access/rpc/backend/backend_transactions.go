@@ -140,7 +140,7 @@ func (b *backendTransactions) sendTransactionToCollector(ctx context.Context,
 	tx *flow.TransactionBody,
 	collectionNodeAddr string) error {
 
-	collectionRPC, closer, err := b.connFactory.GetAccessAPIClient(collectionNodeAddr)
+	collectionRPC, closer, err := b.connFactory.GetAccessAPIClient(collectionNodeAddr, nil)
 	if err != nil {
 		return fmt.Errorf("failed to connect to collection node at %s: %w", collectionNodeAddr, err)
 	}
