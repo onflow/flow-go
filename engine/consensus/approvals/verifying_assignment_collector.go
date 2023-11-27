@@ -397,6 +397,7 @@ func authorizedVerifiersAtBlock(state protocol.State, blockID flow.Identifier) (
 	authorizedVerifierList, err := state.AtBlockID(blockID).Identities(
 		filter.And(
 			filter.HasRole[flow.Identity](flow.RoleVerification),
+			filter.HasInitialWeight[flow.Identity](true),
 			filter.IsValidCurrentEpochParticipant,
 		))
 	if err != nil {
