@@ -22,7 +22,7 @@ var blockNumber = big.NewInt(10)
 var defaultCtx = types.NewDefaultBlockContext(blockNumber.Uint64())
 
 func RunWithTestDB(t testing.TB, f func(types.Database)) {
-	testutils.RunWithTestBackend(t, func(backend types.Backend) {
+	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(flowEVMRoot flow.Address) {
 			db, err := database.NewDatabase(backend, flowEVMRoot)
 			require.NoError(t, err)
@@ -62,7 +62,7 @@ func TestNativeTokenBridging(t *testing.T) {
 				})
 			})
 		})
-		t.Run("mint tokens withdraw", func(t *testing.T) {
+		t.Run("tokens withdraw", func(t *testing.T) {
 			amount := big.NewInt(1000)
 			RunWithNewEmulator(t, db, func(env *emulator.Emulator) {
 				RunWithNewReadOnlyBlockView(t, env, func(blk types.ReadOnlyBlockView) {
@@ -93,7 +93,7 @@ func TestNativeTokenBridging(t *testing.T) {
 func TestContractInteraction(t *testing.T) {
 	RunWithTestDB(t, func(db types.Database) {
 
-		testContract := testutils.GetTestContract(t)
+		testContract := testutils.GetStorageTestContract(t)
 
 		testAccount := types.NewAddressFromString("test")
 		amount := big.NewInt(0).Mul(big.NewInt(1337), big.NewInt(gethParams.Ether))
@@ -148,7 +148,7 @@ func TestContractInteraction(t *testing.T) {
 						types.NewContractCall(
 							testAccount,
 							contractAddr,
-							testContract.MakeStoreCallData(t, num),
+							testContract.MakeCallData(t, "store", num),
 							1_000_000,
 							big.NewInt(0), // this should be zero because the contract doesn't have receiver
 						),
@@ -164,7 +164,7 @@ func TestContractInteraction(t *testing.T) {
 						types.NewContractCall(
 							testAccount,
 							contractAddr,
-							testContract.MakeRetrieveCallData(t),
+							testContract.MakeCallData(t, "retrieve"),
 							1_000_000,
 							big.NewInt(0), // this should be zero because the contract doesn't have receiver
 						),
@@ -183,7 +183,7 @@ func TestContractInteraction(t *testing.T) {
 						types.NewContractCall(
 							testAccount,
 							contractAddr,
-							testContract.MakeBlockNumberCallData(t),
+							testContract.MakeCallData(t, "blockNumber"),
 							1_000_000,
 							big.NewInt(0), // this should be zero because the contract doesn't have receiver
 						),
@@ -366,6 +366,33 @@ func TestDatabaseErrorHandling(t *testing.T) {
 				require.Error(t, err)
 				require.True(t, types.IsAFatalError(err))
 			})
+		})
+	})
+}
+
+func TestStorageNoSideEffect(t *testing.T) {
+	t.Skip("we need to fix this issue  ")
+
+	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(flowEVMRoot flow.Address) {
+			db, err := database.NewDatabase(backend, flowEVMRoot)
+			require.NoError(t, err)
+
+			em := emulator.NewEmulator(db)
+			testAccount := types.NewAddressFromString("test")
+
+			amount := big.NewInt(100)
+			RunWithNewBlockView(t, em, func(blk types.BlockView) {
+				_, err = blk.DirectCall(types.NewDepositCall(testAccount, amount))
+				require.NoError(t, err)
+			})
+
+			orgSize := backend.TotalStorageSize()
+			RunWithNewBlockView(t, em, func(blk types.BlockView) {
+				_, err = blk.DirectCall(types.NewDepositCall(testAccount, amount))
+				require.NoError(t, err)
+			})
+			require.Equal(t, orgSize, backend.TotalStorageSize())
 		})
 	})
 }
