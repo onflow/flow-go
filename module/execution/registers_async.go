@@ -23,8 +23,7 @@ func NewRegistersAsyncStore() *RegistersAsyncStore {
 // This method can be called at any time after the RegistersAsyncStore object is created and before RegisterValues is called
 // since we can't disambiguate between the underlying store before bootstrapping or just simply being behind sync
 func (r *RegistersAsyncStore) InitDataAvailable(registers storage.RegisterIndex) error {
-	if r.registerIndex.CompareAndSwap(nil, r.registerIndex.Load()) {
-		r.registerIndex.Store(&registers)
+	if r.registerIndex.CompareAndSwap(nil, &registers) {
 		return nil
 	}
 	return fmt.Errorf("registers already initialized")
