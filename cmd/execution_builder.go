@@ -316,7 +316,10 @@ func (exeNode *ExecutionNode) LoadBlobService(
 			}
 
 			if id.IsEjected() {
-				return nil, fmt.Errorf("allowed node ID %s is ejected", id.NodeID.String())
+				exeNode.builder.Logger.Warn().
+					Str("node_id", idHex).
+					Msg("removing Access Node from the set of nodes authorized to request Execution Data, because it is ejected")
+				continue
 			}
 
 			allowedANs[anID] = true

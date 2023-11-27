@@ -44,7 +44,10 @@ func ensureNodeHasWeightAndRole(identity *flow.Identity, expectedRole flow.Role)
 	if identity.Role != expectedRole {
 		return engine.NewInvalidInputErrorf("expected node %x to have role %s but got %s", identity.NodeID, expectedRole, identity.Role)
 	}
-
+	// check if the identity has non-zero weight
+	if identity.InitialWeight == 0 {
+		return engine.NewInvalidInputErrorf("node %x has zero weight", identity.NodeID)
+	}
 	// check if the identity is a valid epoch participant(is active in the current epoch + not ejected)
 	if !filter.IsValidCurrentEpochParticipant(identity) {
 		return engine.NewInvalidInputErrorf("node (%x) is not an active participant, instead has status: %s", identity.NodeID,

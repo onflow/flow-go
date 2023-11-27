@@ -233,10 +233,11 @@ func (h *MessageHub) sendOwnTimeout(timeout *model.TimeoutObject) error {
 	log.Info().Msg("processing timeout broadcast request from hotstuff")
 
 	// Retrieve all consensus nodes (excluding myself).
-	// CAUTION: We must include also nodes with weight zero, because otherwise
+	// CAUTION: We must include consensus nodes that are joining, because otherwise
+	//          TCs might not be constructed at epoch switchover.
 	//          TCs might not be constructed at epoch switchover.
 	recipients, err := h.state.Final().Identities(filter.And(
-		filter.Not(filter.HasParticipationStatus(flow.EpochParticipationStatusEjected)),
+		filter.IsValidCurrentEpochParticipantOrJoining,
 		filter.HasRole[flow.Identity](flow.RoleConsensus),
 		filter.Not(filter.HasNodeID[flow.Identity](h.me.NodeID())),
 	))
