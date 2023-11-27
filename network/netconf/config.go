@@ -13,6 +13,7 @@ type Config struct {
 	ConnectionManagerConfig `mapstructure:",squash"`
 	// GossipSubConfig core gossipsub configuration.
 	p2pconf.GossipSubConfig `mapstructure:",squash"`
+	GossipsubScorePenalties p2pconf.GossipSubScorePenalties `mapstructure:"gossipsub-score-penalty"`
 	AlspConfig              `mapstructure:",squash"`
 
 	// NetworkConnectionPruning determines whether connections to nodes

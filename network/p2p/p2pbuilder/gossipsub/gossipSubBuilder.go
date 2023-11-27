@@ -51,6 +51,7 @@ type Builder struct {
 	routingSystem             routing.Routing
 	rpcInspectorConfig        *p2pconf.GossipSubRPCInspectorsConfig
 	rpcInspectorSuiteFactory  p2p.GossipSubRpcInspectorSuiteFactoryFunc
+	gossipSubScorePenalties   *p2pconf.GossipSubScorePenalties
 }
 
 var _ p2p.GossipSubBuilder = (*Builder)(nil)
@@ -186,7 +187,8 @@ func NewGossipSubBuilder(
 	idProvider module.IdentityProvider,
 	rpcInspectorConfig *p2pconf.GossipSubRPCInspectorsConfig,
 	subscriptionProviderPrams *p2pconf.SubscriptionProviderParameters,
-	rpcTracker p2p.RpcControlTracking) *Builder {
+	rpcTracker p2p.RpcControlTracking,
+	gossipSubScorePenalties *p2pconf.GossipSubScorePenalties) *Builder {
 	lg := logger.With().
 		Str("component", "gossipsub").
 		Str("network-type", networkType.String()).
@@ -204,6 +206,7 @@ func NewGossipSubBuilder(
 		rpcInspectorConfig:        rpcInspectorConfig,
 		rpcInspectorSuiteFactory:  defaultInspectorSuite(rpcTracker),
 		subscriptionProviderParam: subscriptionProviderPrams,
+		gossipSubScorePenalties:   gossipSubScorePenalties,
 	}
 
 	return b
@@ -347,7 +350,7 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, e
 		}
 
 		g.scoreOptionConfig.SetRegisterNotificationConsumerFunc(inspectorSuite.AddInvalidControlMessageConsumer)
-		scoreOpt = scoring.NewScoreOption(g.scoreOptionConfig, subscriptionProvider)
+		scoreOpt = scoring.NewScoreOption(g.scoreOptionConfig, g.gossipSubScorePenalties, subscriptionProvider)
 		gossipSubConfigs.WithScoreOption(scoreOpt)
 
 		if g.gossipSubScoreTracerInterval > 0 {

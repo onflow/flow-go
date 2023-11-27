@@ -380,30 +380,37 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		if err != nil {
 			return nil, fmt.Errorf("could not determine dht activation status: %w", err)
 		}
-		builder, err := p2pbuilder.DefaultNodeBuilder(fnb.Logger,
-			myAddr,
-			network.PrivateNetwork,
-			fnb.NetworkKey,
-			fnb.SporkID,
-			fnb.IdentityProvider,
-			&p2pconfig.MetricsConfig{
-				Metrics:          fnb.Metrics.Network,
-				HeroCacheFactory: fnb.HeroCacheMetricsFactory(),
+		defaultNodeBuilderParams := &p2pbuilder.DefaultNodeBuilderParams{
+			LibP2PNodeBuilderParams: &p2pbuilder.LibP2PNodeBuilderParams{
+				Logger: fnb.Logger,
+				MetricsConfig: &p2pconfig.MetricsConfig{
+					Metrics:          fnb.Metrics.Network,
+					HeroCacheFactory: fnb.HeroCacheMetricsFactory(),
+				},
+				NetworkingType:            network.PrivateNetwork,
+				Address:                   myAddr,
+				NetworkKey:                fnb.NetworkKey,
+				SporkId:                   fnb.SporkID,
+				IdProvider:                fnb.IdentityProvider,
+				RCfg:                      &fnb.FlowConfig.NetworkConfig.ResourceManager,
+				RpcInspectorCfg:           &fnb.FlowConfig.NetworkConfig.GossipSubRPCInspectorsConfig,
+				PeerManagerConfig:         peerManagerCfg,
+				SubscriptionProviderParam: &fnb.FlowConfig.NetworkConfig.GossipSubConfig.SubscriptionProviderConfig,
+				DisallowListCacheCfg: &p2p.DisallowListCacheConfig{
+					MaxSize: fnb.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
+					Metrics: metrics.DisallowListCacheMetricsFactory(fnb.HeroCacheMetricsFactory(), network.PrivateNetwork),
+				},
+				UnicastConfig:           uniCfg,
+				GossipSubScorePenalties: &fnb.FlowConfig.NetworkConfig.GossipsubScorePenalties,
 			},
-			fnb.Resolver,
-			fnb.BaseConfig.NodeRole,
-			connGaterCfg,
-			peerManagerCfg,
-			&fnb.FlowConfig.NetworkConfig.GossipSubConfig,
-			&fnb.FlowConfig.NetworkConfig.GossipSubRPCInspectorsConfig,
-			&fnb.FlowConfig.NetworkConfig.ResourceManager,
-			uniCfg,
-			&fnb.FlowConfig.NetworkConfig.ConnectionManagerConfig,
-			&p2p.DisallowListCacheConfig{
-				MaxSize: fnb.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
-				Metrics: metrics.DisallowListCacheMetricsFactory(fnb.HeroCacheMetricsFactory(), network.PrivateNetwork),
-			},
-			dhtActivationStatus)
+			Resolver:            fnb.Resolver,
+			Role:                fnb.BaseConfig.NodeRole,
+			ConnGaterCfg:        connGaterCfg,
+			GossipCfg:           &fnb.FlowConfig.NetworkConfig.GossipSubConfig,
+			ConnMgrConfig:       &fnb.FlowConfig.NetworkConfig.ConnectionManagerConfig,
+			DhtSystemActivation: dhtActivationStatus,
+		}
+		builder, err := p2pbuilder.DefaultNodeBuilder(defaultNodeBuilderParams)
 		if err != nil {
 			return nil, fmt.Errorf("could not create libp2p node builder: %w", err)
 		}

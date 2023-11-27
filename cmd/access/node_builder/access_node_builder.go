@@ -1552,34 +1552,37 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 		NetworkingType:                     network.PublicNetwork,
 	}
 	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
-
-	libp2pNode, err := p2pbuilder.NewNodeBuilder(builder.Logger, &p2pconfig.MetricsConfig{
-		HeroCacheFactory: builder.HeroCacheMetricsFactory(),
-		Metrics:          networkMetrics,
-	},
-		network.PublicNetwork,
-		bindAddress,
-		networkKey,
-		builder.SporkID,
-		builder.IdentityProvider,
-		&builder.FlowConfig.NetworkConfig.ResourceManager,
-		&builder.FlowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig,
-		&p2pconfig.PeerManagerConfig{
+	params := &p2pbuilder.LibP2PNodeBuilderParams{
+		Logger: builder.Logger,
+		MetricsConfig: &p2pconfig.MetricsConfig{
+			HeroCacheFactory: builder.HeroCacheMetricsFactory(),
+			Metrics:          networkMetrics,
+		},
+		NetworkingType:  network.PublicNetwork,
+		Address:         bindAddress,
+		NetworkKey:      networkKey,
+		SporkId:         builder.SporkID,
+		IdProvider:      builder.IdentityProvider,
+		RCfg:            &builder.FlowConfig.NetworkConfig.ResourceManager,
+		RpcInspectorCfg: &builder.FlowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig,
+		PeerManagerConfig: &p2pconfig.PeerManagerConfig{
 			// TODO: eventually, we need pruning enabled even on public network. However, it needs a modified version of
 			// the peer manager that also operate on the public identities.
 			ConnectionPruning: connection.PruningDisabled,
 			UpdateInterval:    builder.FlowConfig.NetworkConfig.PeerUpdateInterval,
 			ConnectorFactory:  connection.DefaultLibp2pBackoffConnectorFactory(),
 		},
-		&builder.FlowConfig.NetworkConfig.GossipSubConfig.SubscriptionProviderConfig,
-		&p2p.DisallowListCacheConfig{
+		SubscriptionProviderParam: &builder.FlowConfig.NetworkConfig.GossipSubConfig.SubscriptionProviderConfig,
+		DisallowListCacheCfg: &p2p.DisallowListCacheConfig{
 			MaxSize: builder.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
 			Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
 		},
-		meshTracer,
-		&p2pconfig.UnicastConfig{
+		UnicastConfig: &p2pconfig.UnicastConfig{
 			UnicastConfig: builder.FlowConfig.NetworkConfig.UnicastConfig,
-		}).
+		},
+		GossipSubScorePenalties: &builder.FlowConfig.NetworkConfig.GossipsubScorePenalties,
+	}
+	libp2pNode, err := p2pbuilder.NewNodeBuilder(params, meshTracer).
 		SetBasicResolver(builder.Resolver).
 		SetSubscriptionFilter(subscription.NewRoleBasedFilter(flow.RoleAccess, builder.IdentityProvider)).
 		SetConnectionManager(connManager).

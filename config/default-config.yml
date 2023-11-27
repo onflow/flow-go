@@ -191,6 +191,13 @@ network-config:
   gossipsub-rpc-metrics-inspector-workers: 1
   # The size of the queue used by worker pool for the control message metrics inspector
   gossipsub-rpc-metrics-inspector-cache-size: 100
+  # The penalty values for each gossipsub RPC control message type
+  gossipsub-score-penalty:
+    graft: -0.1
+    prune: -0.1
+    iHave: -0.1
+    iWant: -0.1
+    publish: -0.1
   # Application layer spam prevention
   alsp-spam-record-cache-size: 1000
   alsp-spam-report-queue-size: 10_000

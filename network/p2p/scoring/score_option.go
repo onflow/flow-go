@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 	netcache "github.com/onflow/flow-go/network/p2p/cache"
+	"github.com/onflow/flow-go/network/p2p/p2pconf"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -382,7 +383,7 @@ func (c *ScoreOptionConfig) OverrideDecayInterval(interval time.Duration) {
 }
 
 // NewScoreOption creates a new penalty option with the given configuration.
-func NewScoreOption(cfg *ScoreOptionConfig, provider p2p.SubscriptionProvider) *ScoreOption {
+func NewScoreOption(cfg *ScoreOptionConfig, scorePenalties *p2pconf.GossipSubScorePenalties, provider p2p.SubscriptionProvider) *ScoreOption {
 	throttledSampler := logging.BurstSampler(MaxDebugLogs, time.Second)
 	logger := cfg.logger.With().
 		Str("module", "pubsub_score_option").
@@ -392,9 +393,16 @@ func NewScoreOption(cfg *ScoreOptionConfig, provider p2p.SubscriptionProvider) *
 			DebugSampler: throttledSampler,
 		})
 	validator := NewSubscriptionValidator(cfg.logger, provider)
+	penaltyValues := GossipSubCtrlMsgPenaltyValue{
+		Graft:             scorePenalties.Graft,
+		Prune:             scorePenalties.Prune,
+		IHave:             scorePenalties.IHave,
+		IWant:             scorePenalties.IWant,
+		RpcPublishMessage: scorePenalties.Publish,
+	}
 	scoreRegistry := NewGossipSubAppSpecificScoreRegistry(&GossipSubAppSpecificScoreRegistryConfig{
 		Logger:     logger,
-		Penalty:    DefaultGossipSubCtrlMsgPenaltyValue(),
+		Penalty:    penaltyValues,
 		Validator:  validator,
 		Init:       InitAppScoreRecordState,
 		IdProvider: cfg.provider,
