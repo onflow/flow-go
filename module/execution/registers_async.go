@@ -35,11 +35,11 @@ func (r *RegistersAsyncStore) InitDataAvailable(registers storage.RegisterIndex)
 //   - storage.ErrHeightNotIndexed if the store is still bootstrapping or if the values at the height is not indexed yet
 //   - storage.ErrNotFound if the register does not exist at the height
 func (r *RegistersAsyncStore) RegisterValues(ids flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
-	if !r.isDataAvailable(height) {
+	registerStore, isAvailable := r.isDataAvailable(height)
+	if !isAvailable {
 		return nil, storage.ErrHeightNotIndexed
 	}
 	result := make([]flow.RegisterValue, len(ids))
-	registerStore := *r.registerIndex.Load()
 	for i, regId := range ids {
 		val, err := registerStore.Get(regId, height)
 		if err != nil {
@@ -50,10 +50,11 @@ func (r *RegistersAsyncStore) RegisterValues(ids flow.RegisterIDs, height uint64
 	return result, nil
 }
 
-func (r *RegistersAsyncStore) isDataAvailable(height uint64) bool {
-	if r.registerIndex.Load() != nil {
-		registerStore := *r.registerIndex.Load()
-		return height <= registerStore.LatestHeight() && height >= registerStore.FirstHeight()
+func (r *RegistersAsyncStore) isDataAvailable(height uint64) (storage.RegisterIndex, bool) {
+	str := r.registerIndex.Load()
+	if str != nil {
+		registerStore := *str
+		return registerStore, height <= registerStore.LatestHeight() && height >= registerStore.FirstHeight()
 	}
-	return false
+	return nil, false
 }
