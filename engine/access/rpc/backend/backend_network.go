@@ -102,7 +102,7 @@ func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(_ context.Context, bl
 				"failed to retrieve snapshot for block by height %d: block not finalized", snapshotHeadByBlockId.Height)
 		}
 
-		return nil, status.Errorf(codes.Internal, "failed to get a valid snapshot: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to find snapshot: %v", err)
 	}
 
 	if snapshotHeadByHeight.ID() != blockID {
