@@ -60,6 +60,9 @@ const (
 	rpcSentTrackerNumOfWorkers   = "gossipsub-rpc-sent-tracker-workers"
 	scoreTracerInterval          = "gossipsub-score-tracer-interval"
 
+	duplicateMessageTrackerCacheSize = "gossipsub-duplicate-message-cache-tracker-size"
+	duplicateMessageTrackerDecay     = "gossipsub-duplicate-message-cache-tracker-decay"
+
 	gossipSubSubscriptionProviderUpdateInterval = "gossipsub-subscription-provider-update-interval"
 	gossipSubSubscriptionProviderCacheSize      = "gossipsub-subscription-provider-cache-size"
 
@@ -150,6 +153,8 @@ func AllFlagNames() []string {
 		iwantCacheMissCheckSize,
 		rpcMessageMaxSampleSize,
 		rpcMessageErrorThreshold,
+		duplicateMessageTrackerCacheSize,
+		duplicateMessageTrackerDecay,
 	}
 
 	for _, scope := range []string{systemScope, transientScope, protocolScope, peerScope, peerProtocolScope} {
@@ -228,6 +233,14 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 		rpcSentTrackerQueueCacheSize,
 		config.GossipSubConfig.RPCSentTrackerQueueCacheSize,
 		"cache size of the rpc sent tracker worker queue.")
+	flags.Uint32(
+		duplicateMessageTrackerCacheSize,
+		config.GossipSubConfig.DuplicateMessageTrackerCacheSize,
+		"cache size of the gossipsub duplicate message tracker.")
+	flags.Float64(
+		duplicateMessageTrackerDecay,
+		config.GossipSubConfig.DuplicateMessageTrackerGuageDecay,
+		"decay rate for the peer duplicate message counters.")
 	flags.Int(
 		rpcSentTrackerNumOfWorkers,
 		config.GossipSubConfig.RpcSentTrackerNumOfWorkers,

@@ -175,6 +175,8 @@ func (g *Builder) OverrideDefaultRpcInspectorSuiteFactory(factory p2p.GossipSubR
 // - sporkId: the spork id of the node.
 // - idProvider: the identity provider of the node.
 // - rpcInspectorConfig: the rpc inspector config of the node.
+// - subscriptionProviderPrams: the subscription provider params of the node.
+// - meshTracer: gossipsub mesh tracer.
 // Returns:
 // - a new gossipsub builder.
 // Note: the builder is not thread-safe. It should only be used in the main thread.
@@ -186,7 +188,7 @@ func NewGossipSubBuilder(
 	idProvider module.IdentityProvider,
 	rpcInspectorConfig *p2pconf.GossipSubRPCInspectorsConfig,
 	subscriptionProviderPrams *p2pconf.SubscriptionProviderParameters,
-	rpcTracker p2p.RpcControlTracking) *Builder {
+	meshTracer *tracer.GossipSubMeshTracer) *Builder {
 	lg := logger.With().
 		Str("component", "gossipsub").
 		Str("network-type", networkType.String()).
@@ -200,9 +202,9 @@ func NewGossipSubBuilder(
 		idProvider:                idProvider,
 		gossipSubFactory:          defaultGossipSubFactory(),
 		gossipSubConfigFunc:       defaultGossipSubAdapterConfig(),
-		scoreOptionConfig:         scoring.NewScoreOptionConfig(lg, idProvider),
+		scoreOptionConfig:         scoring.NewScoreOptionConfig(lg, idProvider, meshTracer.DuplicateMessageCount),
 		rpcInspectorConfig:        rpcInspectorConfig,
-		rpcInspectorSuiteFactory:  defaultInspectorSuite(rpcTracker),
+		rpcInspectorSuiteFactory:  defaultInspectorSuite(meshTracer),
 		subscriptionProviderParam: subscriptionProviderPrams,
 	}
 

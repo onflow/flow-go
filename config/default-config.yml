@@ -235,3 +235,7 @@ network-config:
   # Probability in [0,1] of creating a misbehavior report for a SyncRequest message.
   # create misbehavior report for 1% of SyncRequest messages
   alsp-sync-engine-sync-request-prob: 0.01
+  # Cache size of the gossipsub duplicate message tracker.
+  gossipsub-duplicate-message-cache-tracker-size: 1000
+  # Decay rate for the peer duplicate message counters.
+  gossipsub-duplicate-message-cache-tracker-decay: .99

@@ -1,4 +1,4 @@
-package cache
+package internal
 
 import (
 	"fmt"
@@ -12,7 +12,6 @@ import (
 	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/scoring"
 )
 
@@ -24,18 +23,9 @@ type GossipSubDuplicateMessageTrackerCache struct {
 	// the in-memory and thread-safe cache for storing the spam records of peers.
 	c *stdmap.Backend
 
-	// Optional: the pre-processors to be called upon reading or updating a record in the cache.
-	// The pre-processors are called in the order they are added to the cache.
-	// The pre-processors are used to perform any necessary pre-processing on the record before returning it.
-	// Primary use case is to perform recordDecay operations on the record before reading or updating it. In this way, a
-	// record is only decayed when it is read or updated without the need to explicitly iterating over the cache.
-	preprocessFns []PreprocessorFunc
-
 	// recordDecay the recordDecay for the counters stored in the cache. This recordDecay is applied to the counter before it is returned from the cache.
 	recordDecay float64
 }
-
-var _ p2p.GossipSubDuplicateMessageTrackerCache = (*GossipSubDuplicateMessageTrackerCache)(nil)
 
 // NewGossipSubDuplicateMessageTrackerCache returns a new HeroCache-based duplicate message counter cache.
 // Args:
@@ -47,7 +37,7 @@ var _ p2p.GossipSubDuplicateMessageTrackerCache = (*GossipSubDuplicateMessageTra
 //
 // Returns:
 //   - *GossipSubDuplicateMessageTrackerCache: the newly created cache with a HeroCache-based backend.
-func NewGossipSubDuplicateMessageTrackerCache(sizeLimit uint32, decay float64, logger zerolog.Logger, collector module.HeroCacheMetrics, prFns ...PreprocessorFunc) *GossipSubDuplicateMessageTrackerCache {
+func NewGossipSubDuplicateMessageTrackerCache(sizeLimit uint32, decay float64, logger zerolog.Logger, collector module.HeroCacheMetrics) *GossipSubDuplicateMessageTrackerCache {
 	backData := herocache.NewCache(sizeLimit,
 		herocache.DefaultOversizeFactor,
 		// we should not evict any record from the cache,
@@ -56,9 +46,8 @@ func NewGossipSubDuplicateMessageTrackerCache(sizeLimit uint32, decay float64, l
 		logger.With().Str("mempool", "gossipsub-duplicate-message-counter-cache").Logger(),
 		collector)
 	return &GossipSubDuplicateMessageTrackerCache{
-		recordDecay:   decay,
-		c:             stdmap.NewBackend(stdmap.WithBackData(backData)),
-		preprocessFns: prFns,
+		recordDecay: decay,
+		c:           stdmap.NewBackend(stdmap.WithBackData(backData)),
 	}
 }
 
@@ -142,9 +131,9 @@ func (g *GossipSubDuplicateMessageTrackerCache) decayAdjustment(counter Duplicat
 // - bool: true if the counter was initialized, false otherwise.
 // - error: if any error was encountered during record adjustments in cache.
 // No errors are expected during normal operation.
-func (g *GossipSubDuplicateMessageTrackerCache) Get(peerId peer.ID) (float64, bool, error) {
+func (g *GossipSubDuplicateMessageTrackerCache) Get(peerId peer.ID) (float64, error) {
 	if g.init(peerId) {
-		return 0, true, nil
+		return 0, nil
 	}
 	var err error
 	entityID := flow.HashToID([]byte(peerId))
@@ -155,14 +144,14 @@ func (g *GossipSubDuplicateMessageTrackerCache) Get(peerId peer.ID) (float64, bo
 		return entity
 	})
 	if err != nil {
-		return 0, false, fmt.Errorf("unexpected error while applying recordDecay adjustment for peerID %s: %w", peerId, err)
+		return 0, fmt.Errorf("unexpected error while applying recordDecay adjustment for peerID %s: %w", peerId, err)
 	}
 	if !adjusted {
-		return 0, false, fmt.Errorf("unexpected error record not found for  peerID %s, even after an init attempt", peerId)
+		return 0, fmt.Errorf("unexpected error record not found for  peerID %s, even after an init attempt", peerId)
 	}
 
 	record := duplicateMessagesCounter(adjustedEntity)
-	return record.Gauge, true, nil
+	return record.Gauge, nil
 }
 
 // DuplicateMessagesCounter cache record that keeps track of the amount of duplicate messages received from a peer.

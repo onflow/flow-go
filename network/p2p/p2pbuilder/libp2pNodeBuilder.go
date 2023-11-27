@@ -89,7 +89,7 @@ func NewNodeBuilder(
 	peerManagerConfig *p2pconfig.PeerManagerConfig,
 	subscriptionProviderParam *p2pconf.SubscriptionProviderParameters,
 	disallowListCacheCfg *p2p.DisallowListCacheConfig,
-	rpcTracker p2p.RpcControlTracking,
+	meshTracer *tracer.GossipSubMeshTracer,
 	unicastConfig *p2pconfig.UnicastConfig,
 ) *LibP2PNodeBuilder {
 	return &LibP2PNodeBuilder{
@@ -108,7 +108,7 @@ func NewNodeBuilder(
 			sporkId,
 			idProvider,
 			rpcInspectorCfg, subscriptionProviderParam,
-			rpcTracker),
+			meshTracer),
 		peerManagerConfig: peerManagerConfig,
 		unicastConfig:     unicastConfig,
 	}

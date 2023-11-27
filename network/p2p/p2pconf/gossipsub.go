@@ -92,6 +92,10 @@ type GossipSubTracerConfig struct {
 	RPCSentTrackerQueueCacheSize uint32 `validate:"gt=0" mapstructure:"gossipsub-rpc-sent-tracker-queue-cache-size"`
 	// RpcSentTrackerNumOfWorkers number of workers for rpc sent tracker worker pool.
 	RpcSentTrackerNumOfWorkers int `validate:"gt=0" mapstructure:"gossipsub-rpc-sent-tracker-workers"`
+	// DuplicateMessageTrackerCacheSize cache size of the gossipsub duplicate message tracker.
+	DuplicateMessageTrackerCacheSize uint32 `validate:"gt=0" mapstructure:"gossipsub-duplicate-message-cache-tracker-size"`
+	// DuplicateMessageTrackerGuageDecay decay rate for the peer duplicate message counters.
+	DuplicateMessageTrackerGuageDecay float64 `validate:"gt=0,lt=1" mapstructure:"gossipsub-duplicate-message-cache-tracker-decay"`
 }
 
 // ResourceScope is the scope of the resource, e.g., system, transient, protocol, peer, peer-protocol.

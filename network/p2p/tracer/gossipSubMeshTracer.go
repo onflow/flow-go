@@ -47,13 +47,14 @@ type GossipSubMeshTracer struct {
 	component.Component
 	pubsub.RawTracer
 
-	topicMeshMu    sync.RWMutex                    // to protect topicMeshMap
-	topicMeshMap   map[string]map[peer.ID]struct{} // map of local mesh peers by topic.
-	logger         zerolog.Logger
-	idProvider     module.IdentityProvider
-	loggerInterval time.Duration
-	metrics        module.GossipSubLocalMeshMetrics
-	rpcSentTracker *internal.RPCSentTracker
+	topicMeshMu                  sync.RWMutex                    // to protect topicMeshMap
+	topicMeshMap                 map[string]map[peer.ID]struct{} // map of local mesh peers by topic.
+	logger                       zerolog.Logger
+	idProvider                   module.IdentityProvider
+	loggerInterval               time.Duration
+	metrics                      module.GossipSubLocalMeshMetrics
+	rpcSentTracker               *internal.RPCSentTracker
+	duplicateMessageTrackerCache *internal.GossipSubDuplicateMessageTrackerCache
 }
 
 var _ p2p.PubSubTracer = (*GossipSubMeshTracer)(nil)
@@ -68,6 +69,8 @@ type GossipSubMeshTracerConfig struct {
 	RpcSentTrackerCacheSize            uint32
 	RpcSentTrackerWorkerQueueCacheSize uint32
 	RpcSentTrackerNumOfWorkers         int
+	DuplicateMessageTrackerCacheSize   uint32
+	DuplicateMessageTrackerGuageDecay  float64
 }
 
 // NewGossipSubMeshTracer creates a new *GossipSubMeshTracer.
@@ -94,6 +97,12 @@ func NewGossipSubMeshTracer(config *GossipSubMeshTracerConfig) *GossipSubMeshTra
 		logger:         lg,
 		loggerInterval: config.LoggerInterval,
 		rpcSentTracker: rpcSentTracker,
+		duplicateMessageTrackerCache: internal.NewGossipSubDuplicateMessageTrackerCache(
+			config.DuplicateMessageTrackerCacheSize,
+			config.DuplicateMessageTrackerGuageDecay,
+			config.Logger,
+			metrics.GossipSubDuplicateMessageTrackerCacheMetricFactory(config.HeroCacheMetricsFactory, config.NetworkingType),
+		),
 	}
 
 	g.Component = component.NewComponentManagerBuilder().
@@ -182,13 +191,30 @@ func (t *GossipSubMeshTracer) Prune(p peer.ID, topic string) {
 	lg.Debug().Hex("flow_id", logging.ID(id.NodeID)).Str("role", id.Role.String()).Msg("pruned peer")
 }
 
-// SendRPC is called when a RPC is sent. Currently, the GossipSubMeshTracer tracks iHave RPC messages that have been sent.
+// SendRPC is called when an RPC is sent. Currently, the GossipSubMeshTracer tracks iHave RPC messages that have been sent.
 // This function can be updated to track other control messages in the future as required.
 func (t *GossipSubMeshTracer) SendRPC(rpc *pubsub.RPC, _ peer.ID) {
 	err := t.rpcSentTracker.Track(rpc)
 	if err != nil {
 		t.logger.Err(err).Bool(logging.KeyNetworkingSecurity, true).Msg("failed to track sent pubsbub rpc")
 	}
+}
+
+// DuplicateMessage is invoked when a duplicate message is dropped.
+func (t *GossipSubMeshTracer) DuplicateMessage(msg *pubsub.Message) {
+	peerID := msg.ReceivedFrom
+	count, err := t.duplicateMessageTrackerCache.Inc(msg.ReceivedFrom)
+	if err != nil {
+		t.logger.Err(err).
+			Bool(logging.KeyNetworkingSecurity, true).
+			Str("peer_id", peerID.String()).
+			Msg("failed to increment gossipsub duplicate message tracker count for peer")
+		return
+	}
+	t.logger.Debug().
+		Str("peer_id", peerID.String()).
+		Float64("duplicate_message_count", count).
+		Msg("gossipsub duplicate message tracker incremented for peer")
 }
 
 // WasIHaveRPCSent returns true if an iHave control message for the messageID was sent, otherwise false.
@@ -199,6 +225,19 @@ func (t *GossipSubMeshTracer) WasIHaveRPCSent(messageID string) bool {
 // LastHighestIHaveRPCSize returns the last highest RPC iHave message sent.
 func (t *GossipSubMeshTracer) LastHighestIHaveRPCSize() int64 {
 	return t.rpcSentTracker.LastHighestIHaveRPCSize()
+}
+
+// DuplicateMessageCount returns the current duplicate message count for the peer.
+func (t *GossipSubMeshTracer) DuplicateMessageCount(peerID peer.ID) float64 {
+	count, err := t.duplicateMessageTrackerCache.Get(peerID)
+	if err != nil {
+		t.logger.Err(err).
+			Bool(logging.KeyNetworkingSecurity, true).
+			Str("peer_id", peerID.String()).
+			Msg("failed to get duplicate message count for peer")
+		return 0
+	}
+	return count
 }
 
 // logLoop logs the mesh peers of the local node for each topic at a regular interval.

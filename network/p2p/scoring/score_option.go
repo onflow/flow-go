@@ -314,15 +314,17 @@ type ScoreOptionConfig struct {
 	decayInterval                    time.Duration // the decay interval, when is set to 0, the default value will be used.
 	topicParams                      []func(map[string]*pubsub.TopicScoreParams)
 	registerNotificationConsumerFunc func(p2p.GossipSubInvCtrlMsgNotifConsumer)
+	getDuplicateMessageCount         func(id peer.ID) float64
 }
 
-func NewScoreOptionConfig(logger zerolog.Logger, idProvider module.IdentityProvider) *ScoreOptionConfig {
+func NewScoreOptionConfig(logger zerolog.Logger, idProvider module.IdentityProvider, getDuplicateMessageCount func(id peer.ID) float64) *ScoreOptionConfig {
 	return &ScoreOptionConfig{
-		logger:       logger,
-		provider:     idProvider,
-		cacheSize:    defaultScoreCacheSize,
-		cacheMetrics: metrics.NewNoopCollector(), // no metrics by default
-		topicParams:  make([]func(map[string]*pubsub.TopicScoreParams), 0),
+		logger:                   logger,
+		provider:                 idProvider,
+		cacheSize:                defaultScoreCacheSize,
+		cacheMetrics:             metrics.NewNoopCollector(), // no metrics by default
+		topicParams:              make([]func(map[string]*pubsub.TopicScoreParams), 0),
+		getDuplicateMessageCount: getDuplicateMessageCount,
 	}
 }
 
@@ -401,9 +403,7 @@ func NewScoreOption(cfg *ScoreOptionConfig, provider p2p.SubscriptionProvider) *
 		GossipSubSpamRecordCacheFactory: func() p2p.GossipSubSpamRecordCache {
 			return netcache.NewGossipSubSpamRecordCache(cfg.cacheSize, cfg.logger, cfg.cacheMetrics, DefaultDecayFunction())
 		},
-		GossipSubDuplicateMessageTrackerCacheFactory: func() p2p.GossipSubDuplicateMessageTrackerCache {
-			return netcache.NewGossipSubDuplicateMessageTrackerCache(cfg.cacheSize, defaultDecay, cfg.logger, cfg.cacheMetrics)
-		},
+		GetDuplicateMessageCount: cfg.getDuplicateMessageCount,
 	})
 	s := &ScoreOption{
 		logger:          logger,

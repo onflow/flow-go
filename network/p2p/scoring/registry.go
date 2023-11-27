@@ -87,9 +87,9 @@ type GossipSubAppSpecificScoreRegistry struct {
 	idProvider module.IdentityProvider
 	// spamScoreCache currently only holds the control message misbehaviour penalty (spam related penalty).
 	spamScoreCache p2p.GossipSubSpamRecordCache
-	// duplicateMessageCache tracks a gauge of the number of duplicate messages detected for each peer.
-	duplicateMessageCache p2p.GossipSubDuplicateMessageTrackerCache
-	penalty               GossipSubCtrlMsgPenaltyValue
+	// getDuplicateMessageCount callback used to get a gauge of the number of duplicate messages detected for each peer.
+	getDuplicateMessageCount func(id peer.ID) float64
+	penalty                  GossipSubCtrlMsgPenaltyValue
 	// initial application specific penalty record, used to initialize the penalty cache entry.
 	init      func() p2p.GossipSubSpamRecord
 	validator p2p.SubscriptionValidator
@@ -119,9 +119,8 @@ type GossipSubAppSpecificScoreRegistryConfig struct {
 	// The cache is used to store the application specific penalty of peers.
 	GossipSubSpamRecordCacheFactory func() p2p.GossipSubSpamRecordCache
 
-	// GossipSubDuplicateMessageTrackerCacheFactory is a factory function that returns a new GossipSubDuplicateMessageTrackerCache. It is used to initialize the duplicateMessageCache.
-	// The cache is used to store the number of duplicate messages detected from each peer.
-	GossipSubDuplicateMessageTrackerCacheFactory func() p2p.GossipSubDuplicateMessageTrackerCache
+	// GetDuplicateMessageCount callback used to get a gauge of the number of duplicate messages detected for each peer.
+	GetDuplicateMessageCount func(id peer.ID) float64
 }
 
 // NewGossipSubAppSpecificScoreRegistry returns a new GossipSubAppSpecificScoreRegistry.
@@ -134,13 +133,13 @@ type GossipSubAppSpecificScoreRegistryConfig struct {
 //	a new GossipSubAppSpecificScoreRegistry.
 func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegistryConfig) *GossipSubAppSpecificScoreRegistry {
 	reg := &GossipSubAppSpecificScoreRegistry{
-		logger:                config.Logger.With().Str("module", "app_score_registry").Logger(),
-		spamScoreCache:        config.GossipSubSpamRecordCacheFactory(),
-		duplicateMessageCache: config.GossipSubDuplicateMessageTrackerCacheFactory(),
-		penalty:               config.Penalty,
-		init:                  config.Init,
-		validator:             config.Validator,
-		idProvider:            config.IdProvider,
+		logger:                   config.Logger.With().Str("module", "app_score_registry").Logger(),
+		spamScoreCache:           config.GossipSubSpamRecordCacheFactory(),
+		getDuplicateMessageCount: config.GetDuplicateMessageCount,
+		penalty:                  config.Penalty,
+		init:                     config.Init,
+		validator:                config.Validator,
+		idProvider:               config.IdProvider,
 	}
 
 	builder := component.NewComponentManagerBuilder()
@@ -214,6 +213,10 @@ func (r *GossipSubAppSpecificScoreRegistry) AppSpecificScoreFunc() func(peer.ID)
 			lg = lg.With().Float64("staking_reward", stakingScore).Logger()
 			appSpecificScore += stakingScore
 		}
+
+		// (5) duplicate messages penalty: the duplicate messages penalty is applied to the application specific penalty as long
+		// as the number of duplicate messages detected for a peer is greater than 0. This counter is decayed overtime, thus sustained
+		// good behavior should eventually lead to the duplicate messages penalty applied being 0.
 
 		lg.Trace().
 			Float64("total_app_specific_score", appSpecificScore).
