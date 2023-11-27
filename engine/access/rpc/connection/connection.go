@@ -19,11 +19,14 @@ import (
 type ConnectionFactory interface {
 	// GetAccessAPIClient gets an access API client for the specified address using the default CollectionGRPCPort, networkPubKey is optional,
 	// and it is used for secure gRPC connection. Can be nil for an unsecured connection.
+	// The returned io.Closer should close the connection after the call if no error occurred during client creation.
 	GetAccessAPIClient(address string, networkPubKey crypto.PublicKey) (access.AccessAPIClient, io.Closer, error)
 	// GetAccessAPIClientWithPort gets an access API client for the specified address with port, networkPubKey is optional,
 	// and it is used for secure gRPC connection. Can be nil for an unsecured connection.
+	// The returned io.Closer should close the connection after the call if no error occurred during client creation.
 	GetAccessAPIClientWithPort(address string, networkPubKey crypto.PublicKey) (access.AccessAPIClient, io.Closer, error)
 	// GetExecutionAPIClient gets an execution API client for the specified address using the default ExecutionGRPCPort.
+	// The returned io.Closer should close the connection after the call if no error occurred during client creation.
 	GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, io.Closer, error)
 }
 
@@ -33,9 +36,15 @@ type ProxyConnectionFactory struct {
 	targetAddress string
 }
 
+// GetAccessAPIClient gets an access API client for a target address using the default CollectionGRPCPort.
+// The networkPubKey is the public key used for a secure gRPC connection. It can be nil for an unsecured connection.
+// The returned io.Closer should close the connection after the call if no error occurred during client creation.
 func (p *ProxyConnectionFactory) GetAccessAPIClient(address string, networkPubKey crypto.PublicKey) (access.AccessAPIClient, io.Closer, error) {
 	return p.ConnectionFactory.GetAccessAPIClient(p.targetAddress, networkPubKey)
 }
+
+// GetExecutionAPIClient gets an execution API client for a target address using the default ExecutionGRPCPort.
+// The returned io.Closer should close the connection after the call if no error occurred during client creation.
 func (p *ProxyConnectionFactory) GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, io.Closer, error) {
 	return p.ConnectionFactory.GetExecutionAPIClient(p.targetAddress)
 }
@@ -54,6 +63,7 @@ type ConnectionFactoryImpl struct {
 
 // GetAccessAPIClient gets an access API client for the specified address using the default CollectionGRPCPort.
 // The networkPubKey is the public key used for secure gRPC connection. Can be nil for an unsecured connection.
+// The returned io.Closer should close the connection after the call if no error occurred during client creation.
 func (cf *ConnectionFactoryImpl) GetAccessAPIClient(address string, networkPubKey crypto.PublicKey) (access.AccessAPIClient, io.Closer, error) {
 	address, err := getGRPCAddress(address, cf.CollectionGRPCPort)
 	if err != nil {
@@ -64,6 +74,7 @@ func (cf *ConnectionFactoryImpl) GetAccessAPIClient(address string, networkPubKe
 
 // GetAccessAPIClientWithPort gets an access API client for the specified address with port.
 // The networkPubKey is the public key used for secure gRPC connection. Can be nil for an unsecured connection.
+// The returned io.Closer should close the connection after the call if no error occurred during client creation.
 func (cf *ConnectionFactoryImpl) GetAccessAPIClientWithPort(address string, networkPubKey crypto.PublicKey) (access.AccessAPIClient, io.Closer, error) {
 	conn, closer, err := cf.Manager.GetConnection(address, cf.CollectionNodeGRPCTimeout, AccessClient, networkPubKey)
 	if err != nil {
@@ -74,6 +85,7 @@ func (cf *ConnectionFactoryImpl) GetAccessAPIClientWithPort(address string, netw
 }
 
 // GetExecutionAPIClient gets an execution API client for the specified address using the default ExecutionGRPCPort.
+// The returned io.Closer should close the connection after the call if no error occurred during client creation.
 func (cf *ConnectionFactoryImpl) GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, io.Closer, error) {
 	grpcAddress, err := getGRPCAddress(address, cf.ExecutionGRPCPort)
 	if err != nil {
