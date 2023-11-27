@@ -11,7 +11,7 @@ require (
 	github.com/libp2p/go-libp2p-pubsub v0.9.3
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/onflow/flow-go v0.31.1-0.20230718164039-e3411eff1e9d
-	github.com/onflow/flow-go/crypto v0.24.9
+	github.com/onflow/flow-go/crypto v0.24.10
 	github.com/rs/zerolog v1.29.0
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.8.4
@@ -199,8 +199,8 @@ require (
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/onflow/atree v0.6.0 // indirect
 	github.com/onflow/cadence v0.42.5 // indirect
-	github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.4-0.20231120143830-9e8417b56122 // indirect
-	github.com/onflow/flow-core-contracts/lib/go/templates v1.2.4-0.20231111185227-240579784e9b // indirect
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.0 // indirect
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.15.0 // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20230711213910-baad011d2b13 // indirect
 	github.com/onflow/flow-go-sdk v0.41.16 // indirect
 	github.com/onflow/flow-nft/lib/go/contracts v1.1.0 // indirect

@@ -42,6 +42,8 @@ func constructRootResultAndSeal(
 		Participants:       participants.Sort(order.Canonical),
 		Assignments:        assignments,
 		RandomSource:       GenerateRandomSeed(flow.EpochSetupRandomSourceLength),
+		TargetDuration:     flagEpochTimingDuration,
+		TargetEndTime:      rootEpochTargetEndTime(),
 	}
 
 	qcsWithSignerIDs := make([]*flow.QuorumCertificateWithSignerIDs, 0, len(clusterQCs))
@@ -77,4 +79,19 @@ func constructRootResultAndSeal(
 	}
 
 	return result, seal
+}
+
+// rootEpochTargetEndTime computes the target end time for the given epoch, using the given config.
+// CAUTION: the variables `flagEpochTimingRefCounter`, `flagEpochTimingDuration`, and
+// `flagEpochTimingRefTimestamp` must contain proper values. You can either specify a value for
+// each config parameter or use the function `validateOrPopulateEpochTimingConfig()` to populate the varaibles
+// from defaults.
+func rootEpochTargetEndTime() uint64 {
+	if flagEpochTimingRefTimestamp == 0 || flagEpochTimingDuration == 0 {
+		panic("invalid epoch timing config: must specify ALL of --epoch-target-end-time-ref-counter, --epoch-target-end-time-ref-timestamp, and --epoch-target-end-time-duration")
+	}
+	if flagEpochCounter < flagEpochTimingRefCounter {
+		panic("invalid epoch timing config: reference epoch counter must be before root epoch counter")
+	}
+	return flagEpochTimingRefTimestamp + (flagEpochCounter-flagEpochTimingRefCounter)*flagEpochTimingDuration
 }

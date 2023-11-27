@@ -390,9 +390,9 @@ func (ctl *BlockTimeController) measureViewDuration(tb TimedBlock) error {
 	// In accordance with this convention, observing the proposal for the last view of an epoch, marks the start of the last view.
 	// By observing the proposal, nodes enter the last view, verify the block, vote for it, the primary aggregates the votes,
 	// constructs the child (for first view of new epoch). The last view of the epoch ends, when the child proposal is published.
-	tau := ctl.targetViewTime()                                              // τ: idealized target view time in units of seconds
-	viewDurationsRemaining := ctl.curEpochFinalView + 1 - view               // k[v]: views remaining in current epoch
-	durationRemaining := u2t(ctl.curEpochTargetEndTime).Sub(tb.TimeObserved) // Γ[v] = T[v] - t[v], with t[v] ≡ tb.TimeObserved the time when observing the block that trigged the view change
+	tau := ctl.targetViewTime()                                                    // τ: idealized target view time in units of seconds
+	viewDurationsRemaining := ctl.curEpochFinalView + 1 - view                     // k[v]: views remaining in current epoch
+	durationRemaining := unix2time(ctl.curEpochTargetEndTime).Sub(tb.TimeObserved) // Γ[v] = T[v] - t[v], with t[v] ≡ tb.TimeObserved the time when observing the block that trigged the view change
 
 	// Compute instantaneous error term: e[v] = k[v]·τ - T[v] i.e. the projected difference from target switchover
 	// and update PID controller's error terms. All UNITS in SECOND.
@@ -405,7 +405,7 @@ func (ctl *BlockTimeController) measureViewDuration(tb TimedBlock) error {
 	u := propErr*ctl.config.KP + itgErr*ctl.config.KI + drivErr*ctl.config.KD
 
 	// compute the controller output for this observation
-	unconstrainedBlockTime := f2d(tau - u) // desired time between parent and child block, in units of seconds
+	unconstrainedBlockTime := sec2dur(tau - u) // desired time between parent and child block, in units of seconds
 	proposalTiming := newHappyPathBlockTime(tb, unconstrainedBlockTime, ctl.config.TimingConfig)
 	constrainedBlockTime := proposalTiming.ConstrainedBlockTime()
 
@@ -418,13 +418,13 @@ func (ctl *BlockTimeController) measureViewDuration(tb TimedBlock) error {
 		Float64("proportional_err", propErr).
 		Float64("integral_err", itgErr).
 		Float64("derivative_err", drivErr).
-		Dur("controller_output", f2d(u)).
+		Dur("controller_output", sec2dur(u)).
 		Dur("unconstrained_block_time", unconstrainedBlockTime).
 		Dur("constrained_block_time", constrainedBlockTime).
 		Msg("measured error upon view change")
 
 	ctl.metrics.PIDError(propErr, itgErr, drivErr)
-	ctl.metrics.ControllerOutput(f2d(u))
+	ctl.metrics.ControllerOutput(sec2dur(u))
 	ctl.metrics.TargetProposalDuration(proposalTiming.ConstrainedBlockTime())
 
 	ctl.storeProposalTiming(proposalTiming)
@@ -500,18 +500,18 @@ func (ctl *BlockTimeController) EpochEmergencyFallbackTriggered() {
 	ctl.epochFallbacks <- struct{}{}
 }
 
-// t2u converts a time.Time to UNIX time represented as a uint64.
+// time2unix converts a time.Time to UNIX time represented as a uint64.
 // Returned timestamp is precise to within one second of input.
-func t2u(t time.Time) uint64 {
+func time2unix(t time.Time) uint64 {
 	return uint64(t.Unix())
 }
 
-// u2t converts a UNIX timestamp represented as a uint64 to a time.Time.
-func u2t(unix uint64) time.Time {
+// unix2time converts a UNIX timestamp represented as a uint64 to a time.Time.
+func unix2time(unix uint64) time.Time {
 	return time.Unix(int64(unix), 0)
 }
 
-// f2d converts a floating-point number of seconds to a time.Duration.
-func f2d(sec float64) time.Duration {
+// sec2dur converts a floating-point number of seconds to a time.Duration.
+func sec2dur(sec float64) time.Duration {
 	return time.Duration(int64(sec * float64(time.Second)))
 }

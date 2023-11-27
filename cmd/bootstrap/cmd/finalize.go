@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/onflow/cadence"
 	"github.com/spf13/cobra"
@@ -48,6 +49,11 @@ var (
 	flagNumViewsInStakingAuction    uint64
 	flagNumViewsInDKGPhase          uint64
 	flagEpochCommitSafetyThreshold  uint64
+	// Epoch target end time config
+	flagUseDefaultEpochTargetEndTime bool
+	flagEpochTimingRefCounter        uint64
+	flagEpochTimingRefTimestamp      uint64
+	flagEpochTimingDuration          uint64
 )
 
 // PartnerWeights is the format of the JSON file specifying partner node weights.
@@ -98,6 +104,18 @@ func addFinalizeCmdFlags() {
 	finalizeCmd.Flags().Uint64Var(&flagNumViewsInStakingAuction, "epoch-staking-phase-length", 100, "length of the epoch staking phase measured in views")
 	finalizeCmd.Flags().Uint64Var(&flagNumViewsInDKGPhase, "epoch-dkg-phase-length", 1000, "length of each DKG phase measured in views")
 	finalizeCmd.Flags().Uint64Var(&flagEpochCommitSafetyThreshold, "epoch-commit-safety-threshold", 500, "defines epoch commitment deadline")
+	// Epoch timing config - these values must be set identically to `EpochTimingConfig` in the FlowEpoch smart contract.
+	// See https://github.com/onflow/flow-core-contracts/blob/240579784e9bb8d97d91d0e3213614e25562c078/contracts/epochs/FlowEpoch.cdc#L259-L266
+	// Must specify either:
+	//   1. --use-default-epoch-timing and no other `--epoch-timing*` flags
+	//   2. All `--epoch-timing*` flags except --use-default-epoch-timing
+	//
+	// Use Option 1 for Benchnet, Localnet, etc.
+	// Use Option 2 for Mainnet, Testnet, Canary.
+	finalizeCmd.Flags().BoolVar(&flagUseDefaultEpochTargetEndTime, "use-default-epoch-timing", false, "whether to use the default target end time")
+	finalizeCmd.Flags().Uint64Var(&flagEpochTimingRefCounter, "epoch-timing-ref-counter", 0, "the reference epoch to use to compute the root epoch's target end time")
+	finalizeCmd.Flags().Uint64Var(&flagEpochTimingRefTimestamp, "epoch-timing-ref-timestamp", 0, "the end time of the reference epoch, specified in second-precision Unix time, to use to compute the root epoch's target end time")
+	finalizeCmd.Flags().Uint64Var(&flagEpochTimingDuration, "epoch-timing-duration", 0, "the duration of each epoch in seconds, used to compute the root epoch's target end time")
 	finalizeCmd.Flags().UintVar(&flagProtocolVersion, "protocol-version", flow.DefaultProtocolVersion, "major software version used for the duration of this spork")
 
 	cmd.MarkFlagRequired(finalizeCmd, "root-block")
@@ -108,6 +126,9 @@ func addFinalizeCmdFlags() {
 	cmd.MarkFlagRequired(finalizeCmd, "epoch-staking-phase-length")
 	cmd.MarkFlagRequired(finalizeCmd, "epoch-dkg-phase-length")
 	cmd.MarkFlagRequired(finalizeCmd, "epoch-commit-safety-threshold")
+	cmd.MarkFlagRequired(finalizeCmd, "epoch-timing-ref-counter")
+	cmd.MarkFlagRequired(finalizeCmd, "epoch-timing-ref-timestamp")
+	cmd.MarkFlagRequired(finalizeCmd, "epoch-timing-duration")
 	cmd.MarkFlagRequired(finalizeCmd, "protocol-version")
 
 	// optional parameters to influence various aspects of identity generation
@@ -137,6 +158,10 @@ func finalize(cmd *cobra.Command, args []string) {
 	err := validateEpochConfig()
 	if err != nil {
 		log.Fatal().Err(err).Msg("invalid or unsafe epoch commit threshold config")
+	}
+	err = validateOrPopulateEpochTimingConfig()
+	if err != nil {
+		log.Fatal().Err(err).Msg("invalid epoch timing config")
 	}
 
 	log.Info().Msg("collecting partner network and staking keys")
@@ -200,7 +225,7 @@ func finalize(cmd *cobra.Command, args []string) {
 	// if no root commit is specified, bootstrap an empty execution state
 	if flagRootCommit == "0000000000000000000000000000000000000000000000000000000000000000" {
 		generateEmptyExecutionState(
-			block.Header.ChainID,
+			block.Header,
 			assignments,
 			clusterQCs,
 			dkgData,
@@ -575,7 +600,7 @@ func loadRootProtocolSnapshot(path string) (*inmem.Snapshot, error) {
 // generateEmptyExecutionState generates a new empty execution state with the
 // given configuration. Sets the flagRootCommit variable for future reads.
 func generateEmptyExecutionState(
-	chainID flow.ChainID,
+	rootBlock *flow.Header,
 	assignments flow.AssignmentList,
 	clusterQCs []*flow.QuorumCertificate,
 	dkgData dkg.DKGData,
@@ -621,7 +646,8 @@ func generateEmptyExecutionState(
 	commit, err = run.GenerateExecutionState(
 		filepath.Join(flagOutdir, model.DirnameExecutionState),
 		serviceAccountPublicKey,
-		chainID.Chain(),
+		rootBlock.ChainID.Chain(),
+		fvm.WithRootBlock(rootBlock),
 		fvm.WithInitialTokenSupply(cdcInitialTokenSupply),
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
@@ -660,6 +686,45 @@ func validateEpochConfig() error {
 	if epochCommitDeadline-dkgFinalView < defaultSafetyThreshold {
 		return fmt.Errorf("potentially unsafe epoch config: time between DKG end and epoch commitment deadline is smaller than expected (%d-%d < %d)",
 			epochCommitDeadline, dkgFinalView, defaultSafetyThreshold)
+	}
+	return nil
+}
+
+// validateOrPopulateEpochTimingConfig validates the epoch timing config flags. In case the
+// `flagUseDefaultEpochTargetEndTime` value has been set, the function derives the values for
+// `flagEpochTimingRefCounter`, `flagEpochTimingDuration`, and `flagEpochTimingRefTimestamp`
+// from the configuration. Otherwise, it enforces that compatible values for the respective parameters have been
+// specified (and errors otherwise). Therefore, after `validateOrPopulateEpochTimingConfig` ran,
+// the targeted end time for the epoch can be computed via `rootEpochTargetEndTime()`.
+// You can either let the tool choose default values, or specify a value for each config.
+func validateOrPopulateEpochTimingConfig() error {
+	if flagUseDefaultEpochTargetEndTime {
+		// No other flags may be set
+		if !(flagEpochTimingRefTimestamp == 0 && flagEpochTimingDuration == 0 && flagEpochTimingRefCounter == 0) {
+			return fmt.Errorf("invalid epoch timing config: cannot specify ANY of --epoch-timing-ref-counter, --epoch-timing-ref-timestamp, or --epoch-timing-duration if using default timing config")
+		}
+		flagEpochTimingRefCounter = flagEpochCounter
+		flagEpochTimingDuration = flagNumViewsInEpoch // default to 1 view/s
+		flagEpochTimingRefTimestamp = uint64(time.Now().Unix()) + flagNumViewsInEpoch
+
+		// compute target end time for initial (root) epoch from flags: `TargetEndTime = RefTimestamp + (RootEpochCounter - RefEpochCounter) * Duration`
+		rootEpochTargetEndTimeUNIX := rootEpochTargetEndTime()
+		rootEpochTargetEndTime := time.Unix(int64(rootEpochTargetEndTimeUNIX), 0)
+		log.Info().Msgf("using default epoch timing config with root epoch target end time %s, which is in %s", rootEpochTargetEndTime, time.Until(rootEpochTargetEndTime))
+	} else {
+		// All other flags must be set
+		// NOTE: it is valid for flagEpochTimingRefCounter to be set to 0
+		if flagEpochTimingRefTimestamp == 0 || flagEpochTimingDuration == 0 {
+			return fmt.Errorf("invalid epoch timing config: must specify ALL of --epoch-timing-ref-counter, --epoch-timing-ref-timestamp, and --epoch-timing-duration")
+		}
+		if flagEpochCounter < flagEpochTimingRefCounter {
+			return fmt.Errorf("invalid epoch timing config: reference epoch counter must be before root epoch counter")
+		}
+
+		// compute target end time for initial (root) epoch from flags: `TargetEndTime = RefTimestamp + (RootEpochCounter - RefEpochCounter) * Duration`
+		rootEpochTargetEndTimeUNIX := rootEpochTargetEndTime()
+		rootEpochTargetEndTime := time.Unix(int64(rootEpochTargetEndTimeUNIX), 0)
+		log.Info().Msgf("using user-specified epoch timing config with root epoch target end time %s, which is in %s", rootEpochTargetEndTime, time.Until(rootEpochTargetEndTime))
 	}
 	return nil
 }
