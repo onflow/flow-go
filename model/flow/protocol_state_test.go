@@ -201,7 +201,7 @@ func TestBuildIdentityTable(t *testing.T) {
 		adjacentEpochIdentities := unittest.IdentityListFixture(10).Sort(order.Canonical[flow.Identity])
 
 		// Per convention, BuildIdentityTable only accepts EpochParticipationStatusLeaving or EpochParticipationStatusJoining
-		// for the *adjacent* epoch, because these are the only sensible values.  
+		// for the *adjacent* epoch, because these are the only sensible values.
 		for _, status := range []flow.EpochParticipationStatus{flow.EpochParticipationStatusActive, flow.EpochParticipationStatusEjected} {
 			identityList, err := flow.BuildIdentityTable(
 				targetEpochIdentities.ToSkeleton(),

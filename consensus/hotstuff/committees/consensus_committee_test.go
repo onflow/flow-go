@@ -282,8 +282,8 @@ func (suite *ConsensusSuite) TestIdentitiesByBlock() {
 
 	suite.state.On("AtBlockID", blockID).Return(suite.snapshot)
 	for _, identity := range validConsensusIdentities {
-   	i := identity // copy
-   	suite.snapshot.On("Identity", i.NodeID).Return(i, nil)
+		i := identity // copy
+		suite.snapshot.On("Identity", i.NodeID).Return(i, nil)
 	}
 	suite.snapshot.On("Identity", fakeID).Return(nil, protocol.IdentityNotFoundError{})
 
