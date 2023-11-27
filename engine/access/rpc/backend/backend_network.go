@@ -132,7 +132,7 @@ func (b *backendNetwork) GetProtocolStateSnapshotByHeight(_ context.Context, blo
 	_, err := snapshot.Head()
 	if err != nil {
 		if errors.Is(err, state.ErrUnknownSnapshotReference) {
-			return nil, status.Errorf(codes.NotFound, "failed to get a valid snapshot: %v", err)
+			return nil, status.Errorf(codes.NotFound, "failed to find snapshot: %v", err)
 		}
 
 		return nil, status.Errorf(codes.Internal, "failed to get a valid snapshot: %v", err)
