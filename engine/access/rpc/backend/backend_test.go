@@ -651,7 +651,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByHeight_InvalidSegment() {
 		backend, err := New(suite.defaultBackendParams())
 		suite.Require().NoError(err)
 
-		// // query the handler for the snapshot with invalid segment
+		// query the handler for the snapshot with invalid segment
 		bytes, err := backend.GetProtocolStateSnapshotByHeight(context.Background(), epoch1.SetupRange()[0])
 
 		suite.Require().Nil(bytes)
