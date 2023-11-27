@@ -4,10 +4,9 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pubsubpb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
-	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
-
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
+	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
 )
 
 const (
@@ -29,6 +28,15 @@ func GossipSubCtrlFixture(opts ...GossipSubCtrlOption) *pubsubpb.ControlMessage 
 }
 
 // WithIHave adds iHave control messages of the given size and number to the control message.
+// The message IDs are generated randomly.
+// Args:
+//
+//	msgCount: number of iWant messages to add.
+//	msgIDCount: number of message IDs to add to each iWant message.
+//
+// Returns:
+// A GossipSubCtrlOption that adds iWant messages to the control message.
+// Example: WithIHave(2, 3, channels.Pushblocks) will add 2 iHave messages, each with 3 message IDs on the push-blocks topic.
 func WithIHave(msgCount, msgIDCount int, topicId string) GossipSubCtrlOption {
 	return func(msg *pubsubpb.ControlMessage) {
 		iHaves := make([]*pubsubpb.ControlIHave, msgCount)
@@ -42,7 +50,47 @@ func WithIHave(msgCount, msgIDCount int, topicId string) GossipSubCtrlOption {
 	}
 }
 
-// WithIWant adds iWant control messages of the given size and number to the control message.
+// WithIHaves adds an iHave control message for each topic ID.
+// The message IDs are generated randomly.
+// Args:
+//
+//	msgIDCount: number of message IDs to add to each iHave message.
+//	topicIds: list of topic ids to make an iHave message for.
+//
+// Returns:
+// A GossipSubCtrlOption that adds iHave messages to the control message.
+// Example: WithIHaves(3, channels.Pushblocks, channels.TestNetwork, channels.Topic("some channel")) will add an iHave message for each topic, each with 3 message IDs.
+func WithIHaves(msgIDCount int, topicIds ...string) GossipSubCtrlOption {
+	return func(msg *pubsubpb.ControlMessage) {
+		iHaves := make([]*pubsubpb.ControlIHave, len(topicIds))
+		for i, topicId := range topicIds {
+			topicId := topicId
+			iHaves[i] = &pubsubpb.ControlIHave{
+				TopicID:    &topicId,
+				MessageIDs: GossipSubMessageIdsFixture(msgIDCount),
+			}
+		}
+		msg.Ihave = iHaves
+	}
+}
+
+// WithIWant adds an iWant control message for with the provided message IDs.
+// Args:
+//
+//	msgIds: list of message ids.
+//
+// Returns:
+// A GossipSubCtrlOption that adds iWant messages to the control message.
+// Example: WithIWant("message_id_1", "message_id_2", "message_id_3", "message_id_4) will add an iWant message for each topic, each with 3 message IDs.
+func WithIWant(msgIds ...string) GossipSubCtrlOption {
+	return func(msg *pubsubpb.ControlMessage) {
+		msg.Iwant = []*pubsubpb.ControlIWant{{
+			MessageIDs: msgIds,
+		}}
+	}
+}
+
+// WithIWants adds iWant control messages of the given size and number to the control message.
 // The message IDs are generated randomly.
 // Args:
 //
@@ -51,8 +99,8 @@ func WithIHave(msgCount, msgIDCount int, topicId string) GossipSubCtrlOption {
 //
 // Returns:
 // A GossipSubCtrlOption that adds iWant messages to the control message.
-// Example: WithIWant(2, 3) will add 2 iWant messages, each with 3 message IDs.
-func WithIWant(iWantCount int, msgIdsPerIWant int) GossipSubCtrlOption {
+// Example: WithIWants(2, 3) will add 2 iWant messages, each with 3 message IDs.
+func WithIWants(iWantCount int, msgIdsPerIWant int) GossipSubCtrlOption {
 	return func(msg *pubsubpb.ControlMessage) {
 		iWants := make([]*pubsubpb.ControlIWant, iWantCount)
 		for i := 0; i < iWantCount; i++ {
