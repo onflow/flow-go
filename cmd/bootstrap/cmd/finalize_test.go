@@ -146,9 +146,10 @@ func TestEpochTimingConfig(t *testing.T) {
 	t.Run("if default is not set, all other flags must be set", func(t *testing.T) {
 		flagUseDefaultEpochTargetEndTime = false
 		// First set all required flags and ensure validation passes
-		for _, flag := range flags {
-			*flag = rand.Uint64()%100 + 1
-		}
+		flagEpochTimingRefCounter = rand.Uint64() % flagEpochCounter
+		flagEpochTimingDuration = rand.Uint64()%100_000 + 1
+		flagEpochTimingRefTimestamp = rand.Uint64()
+
 		err := validateOrPopulateEpochTimingConfig()
 		assert.NoError(t, err)
 
