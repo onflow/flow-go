@@ -114,6 +114,7 @@ func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(_ context.Context, bl
 		if errors.Is(err, SnapshotPhaseMismatchError) {
 			return nil, status.Errorf(codes.InvalidArgument, "failed to retrieve snapshot for block, try again with different block: %v", err)
 		}
+		return nil, status.Errorf(codes.Internal, "failed to get a valid snapshot: %v", err)
 	}
 
 	data, err := convert.SnapshotToBytes(validSnapshot)
