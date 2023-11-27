@@ -13,7 +13,7 @@ func DefaultConfig() *Config {
 			FallbackProposalDelay: atomic.NewDuration(250 * time.Millisecond),
 			MinViewDuration:       atomic.NewDuration(600 * time.Millisecond),
 			MaxViewDuration:       atomic.NewDuration(1600 * time.Millisecond),
-			Enabled:               atomic.NewBool(false),
+			Enabled:               atomic.NewBool(true),
 		},
 		ControllerParams{
 			N_ewma: 5,

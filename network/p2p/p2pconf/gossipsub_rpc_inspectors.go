@@ -40,7 +40,7 @@ type IWantRPCInspectionConfig struct {
 	// If the cache miss threshold is exceeded an invalid control message notification is disseminated and the sender will be penalized.
 	CacheMissThreshold float64 `validate:"gt=0" mapstructure:"gossipsub-rpc-iwant-cache-miss-threshold"`
 	// CacheMissCheckSize the iWants size at which message id cache misses will be checked.
-	CacheMissCheckSize int `validate:"gte=1000" mapstructure:"gossipsub-rpc-iwant-cache-miss-check-size"`
+	CacheMissCheckSize int `validate:"gt=0" mapstructure:"gossipsub-rpc-iwant-cache-miss-check-size"`
 	// DuplicateMsgIDThreshold maximum allowed duplicate message IDs in a single iWant control message.
 	// If the duplicate message threshold is exceeded an invalid control message notification is disseminated and the sender will be penalized.
 	DuplicateMsgIDThreshold float64 `validate:"gt=0" mapstructure:"gossipsub-rpc-iwant-duplicate-message-id-threshold"`
@@ -63,7 +63,7 @@ type ClusterPrefixedMessageConfig struct {
 	// when the cluster ID's provider is set asynchronously. It also allows processing of some stale messages that may be sent by nodes
 	// that fall behind in the protocol. After the amount of cluster prefixed control messages processed exceeds this threshold the node
 	// will be pushed to the edge of the network mesh.
-	ClusterPrefixHardThreshold float64 `validate:"gt=0" mapstructure:"gossipsub-rpc-cluster-prefixed-hard-threshold"`
+	ClusterPrefixHardThreshold float64 `validate:"gte=0" mapstructure:"gossipsub-rpc-cluster-prefixed-hard-threshold"`
 	// ClusterPrefixedControlMsgsReceivedCacheSize size of the cache used to track the amount of cluster prefixed topics received by peers.
 	ClusterPrefixedControlMsgsReceivedCacheSize uint32 `validate:"gt=0" mapstructure:"gossipsub-cluster-prefix-tracker-cache-size"`
 	// ClusterPrefixedControlMsgsReceivedCacheDecay decay val used for the geometric decay of cache counters used to keep track of cluster prefixed topics received by peers.

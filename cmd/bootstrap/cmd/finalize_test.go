@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"encoding/hex"
+	"math/rand"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -16,7 +17,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-const finalizeHappyPathLogs = "collecting partner network and staking keys" +
+const finalizeHappyPathLogs = "using default epoch timing config with root epoch target end time.*" +
+	"collecting partner network and staking keys" +
 	`read \d+ partner node configuration files` +
 	`read \d+ weights for partner nodes` +
 	"generating internal private networking and staking keys" +
@@ -77,6 +79,7 @@ func TestFinalize_HappyPath(t *testing.T) {
 		flagNumViewsInEpoch = 100_000
 		flagNumViewsInStakingAuction = 50_000
 		flagNumViewsInDKGPhase = 2_000
+		flagUseDefaultEpochTargetEndTime = true
 		flagEpochCommitSafetyThreshold = 1_000
 		flagRootBlock = filepath.Join(bootDir, model.PathRootBlockData)
 		flagDKGDataPath = filepath.Join(bootDir, model.PathRootDKGData)
@@ -116,6 +119,49 @@ func TestClusterAssignment(t *testing.T) {
 	require.Error(t, err)
 	// revert the flag value
 	flagCollectionClusters = tmp
+}
+
+func TestEpochTimingConfig(t *testing.T) {
+	// Reset flags after test is completed
+	defer func(_flagDefault bool, _flagRefCounter, _flagRefTs, _flagDur uint64) {
+		flagUseDefaultEpochTargetEndTime = _flagDefault
+		flagEpochTimingRefCounter = _flagRefCounter
+		flagEpochTimingRefTimestamp = _flagRefTs
+		flagEpochTimingDuration = _flagDur
+	}(flagUseDefaultEpochTargetEndTime, flagEpochTimingRefCounter, flagEpochTimingRefTimestamp, flagEpochTimingDuration)
+
+	flags := []*uint64{&flagEpochTimingRefCounter, &flagEpochTimingRefTimestamp, &flagEpochTimingDuration}
+	t.Run("if default is set, no other flag may be set", func(t *testing.T) {
+		flagUseDefaultEpochTargetEndTime = true
+		for _, flag := range flags {
+			*flag = rand.Uint64()%100 + 1
+			err := validateOrPopulateEpochTimingConfig()
+			assert.Error(t, err)
+			*flag = 0 // set the flag back to 0
+		}
+		err := validateOrPopulateEpochTimingConfig()
+		assert.NoError(t, err)
+	})
+
+	t.Run("if default is not set, all other flags must be set", func(t *testing.T) {
+		flagUseDefaultEpochTargetEndTime = false
+		// First set all required flags and ensure validation passes
+		flagEpochTimingRefCounter = rand.Uint64() % flagEpochCounter
+		flagEpochTimingDuration = rand.Uint64()%100_000 + 1
+		flagEpochTimingRefTimestamp = rand.Uint64()
+
+		err := validateOrPopulateEpochTimingConfig()
+		assert.NoError(t, err)
+
+		// Next, check that validation fails if any one flag is not set
+		// NOTE: we do not include refCounter here, because it is allowed to be zero.
+		for _, flag := range []*uint64{&flagEpochTimingRefTimestamp, &flagEpochTimingDuration} {
+			*flag = 0
+			err := validateOrPopulateEpochTimingConfig()
+			assert.Error(t, err)
+			*flag = rand.Uint64()%100 + 1 // set the flag back to a non-zero value
+		}
+	})
 }
 
 // Check about the number of internal/partner nodes in each cluster. The identites
