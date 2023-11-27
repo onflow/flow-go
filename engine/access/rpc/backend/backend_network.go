@@ -91,7 +91,7 @@ func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(_ context.Context, bl
 			return nil, status.Errorf(codes.NotFound, "failed to get a valid snapshot: block not found")
 		}
 
-		return nil, status.Errorf(codes.Internal, "failed to get block: %v", err)
+		return nil, status.Errorf(codes.Internal, "could not get header by blockID: %v", err)
 	}
 
 	snapshotByHeight := b.state.AtHeight(snapshotHeadByBlockId.Height)
@@ -143,7 +143,6 @@ func (b *backendNetwork) GetProtocolStateSnapshotByHeight(_ context.Context, blo
 		if errors.Is(err, SnapshotPhaseMismatchError) {
 			return nil, status.Errorf(codes.InvalidArgument, "failed to retrieve snapshot for block, try again with different block: %v", err)
 		}
-		return nil, status.Errorf(codes.Internal, "failed to get a valid snapshot: %v", err)
 		return nil, status.Errorf(codes.Internal, "failed to get a valid snapshot: %v", err)
 	}
 
