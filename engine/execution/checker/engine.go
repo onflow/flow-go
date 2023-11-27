@@ -82,7 +82,7 @@ func (e *Engine) checkLastSealed(finalizedID flow.Identifier) error {
 	blockID := seal.BlockID
 	sealedCommit := seal.FinalState
 
-	mycommit, err := e.execState.StateCommitmentByBlockID(e.unit.Ctx(), blockID)
+	mycommit, err := e.execState.StateCommitmentByBlockID(blockID)
 	if errors.Is(err, storage.ErrNotFound) {
 		// have not executed the sealed block yet
 		// in other words, this can't detect execution fork, if the execution is behind

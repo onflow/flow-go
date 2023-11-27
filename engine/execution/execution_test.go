@@ -437,10 +437,10 @@ func TestFailedTxWillNotChangeStateCommitment(t *testing.T) {
 	})
 	exe1Node.AssertHighestExecutedBlock(t, block1.Header)
 
-	scExe1Genesis, err := exe1Node.ExecutionState.StateCommitmentByBlockID(context.Background(), genesis.ID())
+	scExe1Genesis, err := exe1Node.ExecutionState.StateCommitmentByBlockID(genesis.ID())
 	assert.NoError(t, err)
 
-	scExe1Block1, err := exe1Node.ExecutionState.StateCommitmentByBlockID(context.Background(), block1.ID())
+	scExe1Block1, err := exe1Node.ExecutionState.StateCommitmentByBlockID(block1.ID())
 	assert.NoError(t, err)
 	assert.NotEqual(t, scExe1Genesis, scExe1Block1)
 
@@ -461,7 +461,7 @@ func TestFailedTxWillNotChangeStateCommitment(t *testing.T) {
 	// exe2Node.AssertHighestExecutedBlock(t, block3.Header)
 
 	// verify state commitment of block 2 is the same as block 1, since tx failed on seq number verification
-	scExe1Block2, err := exe1Node.ExecutionState.StateCommitmentByBlockID(context.Background(), block2.ID())
+	scExe1Block2, err := exe1Node.ExecutionState.StateCommitmentByBlockID(block2.ID())
 	assert.NoError(t, err)
 	// TODO this is no longer valid because the system chunk can change the state
 	//assert.Equal(t, scExe1Block1, scExe1Block2)
