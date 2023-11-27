@@ -42,7 +42,7 @@ type ProtocolStateMachine interface {
 	//     after such error and discard the protocolStateMachine!
 	ProcessEpochCommit(epochCommit *flow.EpochCommit) (bool, error)
 
-	// EjectIdentity updates identity table by changing node's participation status to 'ejected'.
+	// EjectIdentity updates identity table by changing the node's participation status to 'ejected'.
 	// Should pass identity which is already present in the table, otherwise an exception will be raised.
 	// Expected errors during normal operations:
 	// - `protocol.InvalidServiceEventError` if the updated identity is not found in current and adjacent epochs.
@@ -130,7 +130,7 @@ func (u *baseProtocolStateMachine) rebuildIdentityLookup() {
 	}
 }
 
-// EjectIdentity updates identity table by changing node's participation status to 'ejected'.
+// EjectIdentity updates identity table by changing the node's participation status to 'ejected'.
 // Should pass identity which is already present in the table, otherwise an exception will be raised.
 // Expected errors during normal operations:
 // - `protocol.InvalidServiceEventError` if the updated identity is not found in current and adjacent epochs.

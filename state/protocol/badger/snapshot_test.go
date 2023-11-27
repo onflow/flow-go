@@ -205,6 +205,7 @@ func TestIdentities(t *testing.T) {
 			filters := []flow.IdentityFilter[flow.Identity]{
 				filter.HasRole[flow.Identity](flow.RoleCollection),
 				filter.HasNodeID[flow.Identity](sample.NodeIDs()...),
+				filter.HasInitialWeight[flow.Identity](true),
 				filter.IsValidCurrentEpochParticipant,
 			}
 
@@ -1427,7 +1428,7 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 					// all current epoch identities should match configuration from EpochSetup event
 					assert.ElementsMatch(t, epoch1Identities, identities.Filter(epoch1Identities.Selector()))
 
-					// should contain single next epoch identity with status `flow.EpochParticipationStatusJoining`
+					// should contain single identity for next epoch with status `flow.EpochParticipationStatusJoining`
 					nextEpochIdentity := identities.Filter(filter.HasNodeID[flow.Identity](addedAtEpoch2.NodeID))[0]
 					assert.Equal(t, flow.EpochParticipationStatusJoining, nextEpochIdentity.EpochParticipationStatus,
 						"expect joining status since we are in setup & commit phase")
@@ -1449,7 +1450,7 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 			// all current epoch identities should match configuration from EpochSetup event
 			assert.ElementsMatch(t, epoch2Identities, identities.Filter(epoch2Identities.Selector()))
 
-			// should contain single previous epoch identity with status `flow.EpochParticipationStatusLeaving`.
+			// should contain single identity from previous epoch with status `flow.EpochParticipationStatusLeaving`
 			lastEpochIdentity := identities.Filter(filter.HasNodeID[flow.Identity](removedAtEpoch2.NodeID))[0]
 			assert.Equal(t, flow.EpochParticipationStatusLeaving, lastEpochIdentity.EpochParticipationStatus,
 				"expect leaving status since we are in staking phase")
@@ -1475,7 +1476,7 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 					// all current epoch identities should match configuration from EpochSetup event
 					assert.ElementsMatch(t, epoch2Identities, identities.Filter(epoch2Identities.Selector()))
 
-					// should contain next epoch identities with status `flow.EpochParticipationStatusJoining`
+					// should contain next epoch's identities with status `flow.EpochParticipationStatusJoining`
 					for _, expected := range epoch3Identities {
 						actual, exists := identities.ByNodeID(expected.NodeID)
 						require.True(t, exists)
