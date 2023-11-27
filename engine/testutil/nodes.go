@@ -463,7 +463,6 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Index,
 		resultsDB,
 		node.Seals,
-		flow.DefaultRequiredReceiptsCommittingToExecutionResult,
 	)
 
 	sealingEngine, err := sealing.NewEngine(

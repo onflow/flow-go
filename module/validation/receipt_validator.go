@@ -18,13 +18,12 @@ import (
 // receiptValidator holds all needed context for checking
 // receipt validity against the current protocol state.
 type receiptValidator struct {
-	headers                                    storage.Headers
-	seals                                      storage.Seals
-	state                                      protocol.State
-	index                                      storage.Index
-	results                                    storage.ExecutionResults
-	signatureHasher                            hash.Hasher
-	requiredReceiptsIncludedForExecutionResult uint
+	headers         storage.Headers
+	seals           storage.Seals
+	state           protocol.State
+	index           storage.Index
+	results         storage.ExecutionResults
+	signatureHasher hash.Hasher
 }
 
 var _ module.ReceiptValidator = (*receiptValidator)(nil)
@@ -34,7 +33,6 @@ func NewReceiptValidator(state protocol.State,
 	index storage.Index,
 	results storage.ExecutionResults,
 	seals storage.Seals,
-	requiredReceiptsIncludedForExecutionResult uint,
 ) module.ReceiptValidator {
 	rv := &receiptValidator{
 		state:           state,
@@ -43,7 +41,6 @@ func NewReceiptValidator(state protocol.State,
 		results:         results,
 		signatureHasher: signature.NewBLSHasher(signature.ExecutionReceiptTag),
 		seals:           seals,
-		requiredReceiptsIncludedForExecutionResult: requiredReceiptsIncludedForExecutionResult,
 	}
 	return rv
 }
@@ -290,12 +287,7 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 
 		// check if there are enough execution receipts included in the payload corresponding to the execution result
 		receiptsForResult := uint(len(receiptsByResult.GetGroup(resultID)))
-		if receiptsForResult > 0 {
-			if receiptsForResult < v.requiredReceiptsIncludedForExecutionResult {
-				return engine.NewInvalidInputErrorf("execution result %v has only %d receipts, but at least %d are required",
-					resultID, receiptsForResult, v.requiredReceiptsIncludedForExecutionResult)
-			}
-		} else {
+		if receiptsForResult == 0 {
 			return engine.NewInvalidInputErrorf("no receipts for result %v at index %d", resultID, i)
 		}
 

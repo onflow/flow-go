@@ -35,7 +35,6 @@ func (s *ReceiptValidationSuite) SetupTest() {
 		s.IndexDB,
 		s.ResultsDB,
 		s.SealsDB,
-		1,
 	)
 }
 
@@ -794,16 +793,15 @@ func (s *ReceiptValidationSuite) TestValidateReceiptResultWithoutReceipt() {
 	s.Require().True(engine.IsInvalidInputError(err))
 }
 
-// TestValidateReceiptResultHasNotEnoughReceipts tests a case when a malicious leader incorporates an execution result
-// into their proposal, which has a receipt, but ReceiptValidator is configured to accept at least 2 receipts per execution result.
-func (s *ReceiptValidationSuite) TestValidateReceiptResultHasNotEnoughReceipts() {
+// TestValidateReceiptResultHasEnoughReceipts tests a case where a leader incorporates an execution result
+// into their proposal, which has multiple receipts and ReceiptValidator.
+func (s *ReceiptValidationSuite) TestValidateReceiptResultHasEnoughReceipts() {
 	s.receiptValidator = NewReceiptValidator(
 		s.State,
 		s.HeadersDB,
 		s.IndexDB,
 		s.ResultsDB,
 		s.SealsDB,
-		2, // at least 2 receipts per execution result
 	)
 	// assuming signatures are all good
 	s.publicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
@@ -834,69 +832,6 @@ func (s *ReceiptValidationSuite) TestValidateReceiptResultHasNotEnoughReceipts()
 	candidate := unittest.BlockWithParentFixture(blockB.Header)
 	candidate.Payload = &flow.Payload{
 		Receipts: []*flow.ExecutionReceiptMeta{receiptB.Meta()},
-		Results:  []*flow.ExecutionResult{&receiptB.ExecutionResult},
-	}
-
-	err := s.receiptValidator.ValidatePayload(candidate)
-	s.Require().Error(err)
-	s.Require().True(engine.IsInvalidInputError(err))
-}
-
-// TestValidateReceiptResultHasEnoughReceipts tests a case where a leader incorporates an execution result
-// into their proposal, which has multiple receipts and ReceiptValidator,
-// is configured to accept at least 2 receipts per execution result.
-func (s *ReceiptValidationSuite) TestValidateReceiptResultHasEnoughReceipts() {
-	k := uint(5)
-	s.receiptValidator = NewReceiptValidator(
-		s.State,
-		s.HeadersDB,
-		s.IndexDB,
-		s.ResultsDB,
-		s.SealsDB,
-		k, // at least 2 receipts per execution result
-	)
-	// assuming signatures are all good
-	s.publicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
-
-	// G <- A <- B
-	blocks, result0, seal := unittest.ChainFixture(2)
-	s.SealsIndex[blocks[0].ID()] = seal
-
-	receipts := unittest.ReceiptChainFor(blocks, result0)
-	blockA, blockB := blocks[1], blocks[2]
-	receiptA, receiptB := receipts[1], receipts[2]
-
-	blockA.Payload.Receipts = []*flow.ExecutionReceiptMeta{}
-	blockB.Payload.Receipts = []*flow.ExecutionReceiptMeta{receiptA.Meta()}
-	blockB.Payload.Results = []*flow.ExecutionResult{&receiptA.ExecutionResult}
-	// update block header so that blocks are chained together
-	unittest.ReconnectBlocksAndReceipts(blocks, receipts)
-	// assuming all receipts are executed by the correct executor
-	for _, r := range receipts {
-		r.ExecutorID = s.ExeID
-	}
-
-	for _, b := range blocks {
-		s.Extend(b)
-	}
-	s.PersistedResults[result0.ID()] = result0
-
-	candidateReceipts := []*flow.ExecutionReceiptMeta{receiptB.Meta()}
-	// add k-1 more receipts for the same execution result
-	for i := uint(1); i < k; i++ {
-		// use base receipt and change the executor ID, we don't care about signatures since we are not validating them
-		receipt := *receiptB.Meta()
-		// create a mock executor which submitted the receipt
-		executor := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution), unittest.WithStakingPubKey(s.publicKey))
-		receipt.ExecutorID = executor.NodeID
-		// update local identity table so the receipt is considered valid
-		s.Identities[executor.NodeID] = executor
-		candidateReceipts = append(candidateReceipts, &receipt)
-	}
-
-	candidate := unittest.BlockWithParentFixture(blockB.Header)
-	candidate.Payload = &flow.Payload{
-		Receipts: candidateReceipts,
 		Results:  []*flow.ExecutionResult{&receiptB.ExecutionResult},
 	}
 
