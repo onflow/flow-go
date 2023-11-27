@@ -377,12 +377,12 @@ func (m *Manager) createCircuitBreakerInterceptor() grpc.UnaryClientInterceptor 
 
 					// There are several error cases that may occur during normal operation and should be considered
 					// as "successful" from the perspective of the circuit breaker.
-					return se.Code() == codes.OK ||
-						se.Code() == codes.Canceled ||
-						se.Code() == codes.InvalidArgument ||
-						se.Code() == codes.NotFound ||
-						se.Code() == codes.Unimplemented ||
-						se.Code() == codes.OutOfRange
+					switch se.Code() {
+					case codes.OK, codes.Canceled, codes.InvalidArgument, codes.NotFound, codes.Unimplemented, codes.OutOfRange:
+						return true
+					default:
+						return false
+					}
 				}
 
 				return false
