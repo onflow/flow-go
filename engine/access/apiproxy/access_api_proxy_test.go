@@ -144,19 +144,22 @@ func TestNewFlowCachedAccessAPIProxy(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	metrics := metrics.NewNoopCollector()
+
 	// create the factory
-	connectionFactory := new(connection.ConnectionFactoryImpl)
-	// set metrics reporting
-	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
-	connectionFactory.CollectionNodeGRPCTimeout = time.Second
-	connectionFactory.Manager = connection.NewManager(
-		nil,
-		unittest.Logger(),
-		connectionFactory.AccessMetrics,
-		grpcutils.DefaultMaxMsgSize,
-		connection.CircuitBreakerConfig{},
-		grpcutils.NoCompressor,
-	)
+	connectionFactory := &connection.ConnectionFactoryImpl{
+		// set metrics reporting
+		AccessMetrics:             metrics,
+		CollectionNodeGRPCTimeout: time.Second,
+		Manager: connection.NewManager(
+			nil,
+			unittest.Logger(),
+			metrics,
+			grpcutils.DefaultMaxMsgSize,
+			connection.CircuitBreakerConfig{},
+			grpcutils.NoCompressor,
+		),
+	}
 
 	// Prepare a proxy that fails due to the second connection being idle
 	l := flow.IdentityList{{Address: unittest.IPPort("11634")}, {Address: unittest.IPPort("11635")}}

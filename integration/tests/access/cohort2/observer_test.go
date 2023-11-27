@@ -74,8 +74,6 @@ func (s *ObserverSuite) SetupTest() {
 
 	nodeConfigs := []testnet.NodeConfig{
 		// access node with unstaked nodes supported
-		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.InfoLevel)),
-
 		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.InfoLevel),
 			testnet.WithAdditionalFlag("--supports-observer=true"),
 		),

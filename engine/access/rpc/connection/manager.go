@@ -87,6 +87,7 @@ func NewManager(
 // GetConnection returns a gRPC client connection for the given grpcAddress and timeout.
 // If a cache is used, it retrieves a cached connection, otherwise creates a new connection.
 // It returns the client connection and an io.Closer to close the connection when done.
+// The networkPubKey is the public key used for creating secure gRPC connection. Can be nil for an unsecured connection.
 func (m *Manager) GetConnection(
 	grpcAddress string,
 	timeout time.Duration,
@@ -141,6 +142,7 @@ func (m *Manager) HasCache() bool {
 // retrieveConnection retrieves the CachedClient for the given grpcAddress from the cache or adds a new one if not present.
 // If the connection is already cached, it waits for the lock and returns the connection from the cache.
 // Otherwise, it creates a new connection and caches it.
+// The networkPubKey is the public key used for retrieving secure gRPC connection. Can be nil for an unsecured connection.
 func (m *Manager) retrieveConnection(
 	grpcAddress string,
 	timeout time.Duration,
@@ -185,6 +187,8 @@ func (m *Manager) retrieveConnection(
 // createConnection creates a new gRPC connection to the remote node at the given address with the specified timeout.
 // If the cachedClient is not nil, it means a new entry in the cache is being created, so it's locked to give priority
 // to the caller working with the new client, allowing it to create the underlying connection.
+// The networkPubKey is optional and configures a connection level security for gRPC connection. If it is not nil,
+// it means that it used for creating secure gRPC connection. If it is nil, it means unsecure gRPC connection is being created.
 func (m *Manager) createConnection(
 	address string,
 	timeout time.Duration,

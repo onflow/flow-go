@@ -17,8 +17,13 @@ import (
 
 // ConnectionFactory is an interface for creating access and execution API clients.
 type ConnectionFactory interface {
+	// GetAccessAPIClient gets an access API client for the specified address using the default CollectionGRPCPort, networkPubKey is optional,
+	// and it is used for secure gRPC connection. Can be nil for an unsecured connection.
 	GetAccessAPIClient(address string, networkPubKey crypto.PublicKey) (access.AccessAPIClient, io.Closer, error)
+	// GetAccessAPIClientWithPort gets an access API client for the specified address with port, networkPubKey is optional,
+	// and it is used for secure gRPC connection. Can be nil for an unsecured connection.
 	GetAccessAPIClientWithPort(address string, networkPubKey crypto.PublicKey) (access.AccessAPIClient, io.Closer, error)
+	// GetExecutionAPIClient gets an execution API client for the specified address using the default ExecutionGRPCPort.
 	GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, io.Closer, error)
 }
 
@@ -48,6 +53,7 @@ type ConnectionFactoryImpl struct {
 }
 
 // GetAccessAPIClient gets an access API client for the specified address using the default CollectionGRPCPort.
+// The networkPubKey is the public key used for secure gRPC connection. Can be nil for an unsecured connection.
 func (cf *ConnectionFactoryImpl) GetAccessAPIClient(address string, networkPubKey crypto.PublicKey) (access.AccessAPIClient, io.Closer, error) {
 	address, err := getGRPCAddress(address, cf.CollectionGRPCPort)
 	if err != nil {
@@ -57,6 +63,7 @@ func (cf *ConnectionFactoryImpl) GetAccessAPIClient(address string, networkPubKe
 }
 
 // GetAccessAPIClientWithPort gets an access API client for the specified address with port.
+// The networkPubKey is the public key used for secure gRPC connection. Can be nil for an unsecured connection.
 func (cf *ConnectionFactoryImpl) GetAccessAPIClientWithPort(address string, networkPubKey crypto.PublicKey) (access.AccessAPIClient, io.Closer, error) {
 	conn, closer, err := cf.Manager.GetConnection(address, cf.CollectionNodeGRPCTimeout, AccessClient, networkPubKey)
 	if err != nil {

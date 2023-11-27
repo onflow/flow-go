@@ -16,9 +16,9 @@ import (
 
 // Upstream is a container for an individual upstream containing the id, client and closer for it
 type Upstream struct {
-	id     *flow.Identity
-	client access.AccessAPIClient
-	closer io.Closer
+	id     *flow.Identity         // the public identity of one network participant (node)
+	client access.AccessAPIClient // client with gRPC connection
+	closer io.Closer              // closer for client connection, should use to close the connection when done
 }
 
 // Forwarder forwards all requests to a set of upstream access nodes or observers
@@ -66,6 +66,7 @@ func (f *Forwarder) reconnectingClient(i int) error {
 	if err != nil {
 		return fmt.Errorf("failed to connect to access node at %s: %w", accessApiClient, err)
 	}
+	// closer is not nil iff err is nil, should use to close the connection when done
 	f.upstream[i].closer = closer
 	f.upstream[i].client = accessApiClient
 	return nil
