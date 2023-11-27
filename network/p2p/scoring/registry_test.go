@@ -3,6 +3,7 @@ package scoring_test
 import (
 	"fmt"
 	"math"
+	"math/rand"
 	"testing"
 	"time"
 
@@ -65,7 +66,7 @@ func TestPeerWithSpamRecord(t *testing.T) {
 	})
 }
 
-func testPeerWithSpamRecord(t *testing.T, messageType p2pmsg.ControlMessageType, expectedPenalty float64) {
+func testPeerWithSpamRecord(t *testing.T, messageType p2pmsg.ControlMessageType, basePenalty float64) {
 	peerID := peer.ID("peer-1")
 	reg, spamRecords := newGossipSubAppSpecificScoreRegistry(
 		t,
@@ -75,15 +76,17 @@ func testPeerWithSpamRecord(t *testing.T, messageType p2pmsg.ControlMessageType,
 	// initially, the spamRecords should not have the peer id.
 	assert.False(t, spamRecords.Has(peerID))
 
+	errSeverity := randomErrSeverity()
 	// since the peer id does not have a spam record, the app specific score should be the max app specific reward, which
 	// is the default reward for a staked peer that has valid subscriptions.
 	score := reg.AppSpecificScoreFunc()(peerID)
 	assert.Equal(t, scoring.MaxAppSpecificReward, score)
-
+	expectedPenalty := float64(errSeverity) * basePenalty
 	// report a misbehavior for the peer id.
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: messageType,
+		Errors:  p2p.InvCtrlMsgErrs{p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid graft"), errSeverity)},
 	})
 
 	// the penalty should now be updated in the spamRecords
@@ -119,7 +122,7 @@ func TestSpamRecord_With_UnknownIdentity(t *testing.T) {
 
 // testSpamRecordWithUnknownIdentity tests the app specific penalty computation of the node when there is a spam record for the peer id and
 // the peer id has an unknown identity.
-func testSpamRecordWithUnknownIdentity(t *testing.T, messageType p2pmsg.ControlMessageType, expectedPenalty float64) {
+func testSpamRecordWithUnknownIdentity(t *testing.T, messageType p2pmsg.ControlMessageType, basePenalty float64) {
 	peerID := peer.ID("peer-1")
 	reg, spamRecords := newGossipSubAppSpecificScoreRegistry(
 		t,
@@ -128,17 +131,17 @@ func testSpamRecordWithUnknownIdentity(t *testing.T, messageType p2pmsg.ControlM
 
 	// initially, the spamRecords should not have the peer id.
 	assert.False(t, spamRecords.Has(peerID))
-
+	errSeverity := randomErrSeverity()
 	// peer does not have spam record, but has an unknown identity. Hence, the app specific score should be the staking penalty.
 	score := reg.AppSpecificScoreFunc()(peerID)
 	require.Equal(t, scoring.DefaultUnknownIdentityPenalty, score)
-
 	// report a misbehavior for the peer id.
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: messageType,
+		Errors:  p2p.InvCtrlMsgErrs{p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid graft"), errSeverity)},
 	})
-
+	expectedPenalty := basePenalty * float64(errSeverity)
 	// the penalty should now be updated.
 	record, err, ok := spamRecords.Get(peerID) // get the record from the spamRecords.
 	assert.True(t, ok)
@@ -172,7 +175,7 @@ func TestSpamRecord_With_SubscriptionPenalty(t *testing.T) {
 
 // testSpamRecordWithUnknownIdentity tests the app specific penalty computation of the node when there is a spam record for the peer id and
 // the peer id has an invalid subscription as well.
-func testSpamRecordWithSubscriptionPenalty(t *testing.T, messageType p2pmsg.ControlMessageType, expectedPenalty float64) {
+func testSpamRecordWithSubscriptionPenalty(t *testing.T, messageType p2pmsg.ControlMessageType, basePenalty float64) {
 	peerID := peer.ID("peer-1")
 	reg, spamRecords := newGossipSubAppSpecificScoreRegistry(
 		t,
@@ -185,13 +188,14 @@ func testSpamRecordWithSubscriptionPenalty(t *testing.T, messageType p2pmsg.Cont
 	// peer does not have spam record, but has invalid subscription. Hence, the app specific score should be subscription penalty.
 	score := reg.AppSpecificScoreFunc()(peerID)
 	require.Equal(t, scoring.DefaultInvalidSubscriptionPenalty, score)
-
+	errSeverity := randomErrSeverity()
 	// report a misbehavior for the peer id.
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: messageType,
+		Errors:  p2p.InvCtrlMsgErrs{p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid graft"), errSeverity)},
 	})
-
+	expectedPenalty := basePenalty * float64(errSeverity)
 	// the penalty should now be updated.
 	record, err, ok := spamRecords.Get(peerID) // get the record from the spamRecords.
 	assert.True(t, ok)
@@ -211,11 +215,12 @@ func TestSpamPenaltyDecaysInCache(t *testing.T) {
 	reg, _ := newGossipSubAppSpecificScoreRegistry(t,
 		withStakedIdentity(peerID),
 		withValidSubscriptions(peerID))
-
+	errSeverity := randomErrSeverity()
 	// report a misbehavior for the peer id.
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: p2pmsg.CtrlMsgPrune,
+		Errors:  p2p.InvCtrlMsgErrs{p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid graft"), errSeverity)},
 	})
 
 	time.Sleep(1 * time.Second) // wait for the penalty to decay.
@@ -223,6 +228,7 @@ func TestSpamPenaltyDecaysInCache(t *testing.T) {
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: p2pmsg.CtrlMsgGraft,
+		Errors:  p2p.InvCtrlMsgErrs{p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid graft"), errSeverity)},
 	})
 
 	time.Sleep(1 * time.Second) // wait for the penalty to decay.
@@ -230,6 +236,7 @@ func TestSpamPenaltyDecaysInCache(t *testing.T) {
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: p2pmsg.CtrlMsgIHave,
+		Errors:  p2p.InvCtrlMsgErrs{p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid graft"), errSeverity)},
 	})
 
 	time.Sleep(1 * time.Second) // wait for the penalty to decay.
@@ -237,6 +244,7 @@ func TestSpamPenaltyDecaysInCache(t *testing.T) {
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: p2pmsg.CtrlMsgIWant,
+		Errors:  p2p.InvCtrlMsgErrs{p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid graft"), errSeverity)},
 	})
 
 	time.Sleep(1 * time.Second) // wait for the penalty to decay.
@@ -244,6 +252,7 @@ func TestSpamPenaltyDecaysInCache(t *testing.T) {
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: p2pmsg.RpcPublishMessage,
+		Errors:  p2p.InvCtrlMsgErrs{p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid graft"), errSeverity)},
 	})
 
 	time.Sleep(1 * time.Second) // wait for the penalty to decay.
@@ -253,11 +262,11 @@ func TestSpamPenaltyDecaysInCache(t *testing.T) {
 	// reward is not applied. Hence, the penalty is only comprised of the penalties.
 	score := reg.AppSpecificScoreFunc()(peerID)
 	// the upper bound is the sum of the penalties without decay.
-	scoreUpperBound := penaltyValueFixtures().Prune +
-		penaltyValueFixtures().Graft +
-		penaltyValueFixtures().IHave +
-		penaltyValueFixtures().IWant +
-		penaltyValueFixtures().RpcPublishMessage
+	scoreUpperBound := (penaltyValueFixtures().Prune * float64(errSeverity)) +
+		(penaltyValueFixtures().Graft * float64(errSeverity)) +
+		(penaltyValueFixtures().IHave * float64(errSeverity)) +
+		(penaltyValueFixtures().IWant * float64(errSeverity)) +
+		(penaltyValueFixtures().RpcPublishMessage * float64(errSeverity))
 	// the lower bound is the sum of the penalties with decay assuming the decay is applied 4 times to the sum of the penalties.
 	// in reality, the decay is applied 4 times to the first penalty, then 3 times to the second penalty, and so on.
 	scoreLowerBound := scoreUpperBound * math.Pow(scoring.InitAppScoreRecordState().Decay, 4)
@@ -286,6 +295,7 @@ func TestSpamPenaltyDecayToZero(t *testing.T) {
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: p2pmsg.CtrlMsgGraft,
+		Errors:  p2p.InvCtrlMsgErrs{p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid graft"), randomErrSeverity())},
 	})
 
 	// decays happen every second, so we wait for 1 second to make sure the penalty is updated.
@@ -387,22 +397,23 @@ func TestPersistingInvalidSubscriptionPenalty(t *testing.T) {
 
 	// initially, the app specific score should be the default invalid subscription penalty.
 	require.Equal(t, scoring.DefaultUnknownIdentityPenalty, reg.AppSpecificScoreFunc()(peerID))
-
+	errSeverity := randomErrSeverity()
 	// report a misbehavior for the peer id.
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: p2pmsg.CtrlMsgGraft,
+		Errors:  p2p.InvCtrlMsgErrs{p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid graft"), errSeverity)},
 	})
-
+	expectedPenalty := penaltyValueFixtures().Graft * float64(errSeverity)
 	// with reported spam, the app specific score should be the default invalid subscription penalty + the spam penalty.
-	require.Less(t, math.Abs(scoring.DefaultInvalidSubscriptionPenalty+penaltyValueFixtures().Graft-reg.AppSpecificScoreFunc()(peerID)), 10e-3)
+	require.Less(t, math.Abs(scoring.DefaultInvalidSubscriptionPenalty+expectedPenalty-reg.AppSpecificScoreFunc()(peerID)), 10e-3)
 
 	// decays happen every second, so we wait for 1 second to make sure the penalty is updated.
 	time.Sleep(1 * time.Second)
 	// the penalty should now be updated, it should be still negative but greater than the penalty value (due to decay).
 	score := reg.AppSpecificScoreFunc()(peerID)
-	require.Less(t, score, float64(0))                                                                // the penalty should be less than zero.
-	require.Greater(t, score, penaltyValueFixtures().Graft+scoring.DefaultInvalidSubscriptionPenalty) // the penalty should be less than the penalty value due to decay.
+	require.Less(t, score, float64(0))                                                   // the penalty should be less than zero.
+	require.Greater(t, score, expectedPenalty+scoring.DefaultInvalidSubscriptionPenalty) // the penalty should be less than the penalty value due to decay.
 
 	require.Eventually(t, func() bool {
 		// the spam penalty should eventually decay to zero.
@@ -420,6 +431,113 @@ func TestPersistingInvalidSubscriptionPenalty(t *testing.T) {
 	assert.True(t, ok)
 	assert.NoError(t, err)
 	assert.Equal(t, 0.0, record.Penalty) // penalty should be zero.
+}
+
+// TestInvalidControlMessageMultiErrorScoreCalculation tests that invalid control message penalties are calculated as expected when notifications
+// contain multiple errors with multiple different severity levels.
+func TestInvalidControlMessageMultiErrorScoreCalculation(t *testing.T) {
+	peerIds := unittest.PeerIdFixtures(t, 4)
+	reg, spamRecords := newGossipSubAppSpecificScoreRegistry(
+		t,
+		withStakedIdentity(peerIds[0]),
+		withStakedIdentity(peerIds[1]),
+		withStakedIdentity(peerIds[2]),
+		withStakedIdentity(peerIds[3]),
+		withValidSubscriptions(peerIds[0]),
+		withValidSubscriptions(peerIds[1]),
+		withValidSubscriptions(peerIds[2]),
+		withValidSubscriptions(peerIds[3]))
+
+	for _, peerID := range peerIds {
+		// initially, the spamRecords should not have the peer id.
+		assert.False(t, spamRecords.Has(peerID))
+		// since the peer id does not have a spam record, the app specific score should be the max app specific reward, which
+		// is the default reward for a staked peer that has valid subscriptions.
+		score := reg.AppSpecificScoreFunc()(peerID)
+		assert.Equal(t, scoring.MaxAppSpecificReward, score)
+	}
+
+	type testCase struct {
+		notification    *p2p.InvCtrlMsgNotif
+		expectedPenalty float64
+	}
+	penaltyValues := penaltyValueFixtures()
+	testCases := []*testCase{
+		// single error with, with random severity
+		{
+			notification: &p2p.InvCtrlMsgNotif{
+				PeerID:  peerIds[0],
+				MsgType: p2pmsg.CtrlMsgGraft,
+				Errors: p2p.InvCtrlMsgErrs{
+					p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid graft"), p2p.HighErrSeverity),
+				},
+			},
+			expectedPenalty: penaltyValues.Graft * float64(p2p.HighErrSeverity),
+		},
+		// multiple errors with, with same severity
+		{
+			notification: &p2p.InvCtrlMsgNotif{
+				PeerID:  peerIds[1],
+				MsgType: p2pmsg.CtrlMsgPrune,
+				Errors: p2p.InvCtrlMsgErrs{
+					p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid prune"), p2p.ModerateErrSeverity),
+					p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid prune"), p2p.ModerateErrSeverity),
+					p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid prune"), p2p.ModerateErrSeverity),
+				},
+			},
+			expectedPenalty: (penaltyValues.Prune * float64(p2p.ModerateErrSeverity)) * 3,
+		},
+		// multiple errors with, with random severity's
+		{
+			notification: &p2p.InvCtrlMsgNotif{
+				PeerID:  peerIds[2],
+				MsgType: p2pmsg.CtrlMsgIHave,
+				Errors: p2p.InvCtrlMsgErrs{
+					p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid ihave"), p2p.CriticalErrSeverity),
+					p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid ihave"), p2p.HighErrSeverity),
+					p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid ihave"), p2p.ModerateErrSeverity),
+					p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid ihave"), p2p.LowErrSeverity),
+				},
+			},
+			expectedPenalty: (penaltyValues.IHave * float64(p2p.CriticalErrSeverity)) +
+				(penaltyValues.IHave * float64(p2p.HighErrSeverity)) +
+				(penaltyValues.IHave * float64(p2p.ModerateErrSeverity)) +
+				(penaltyValues.IHave * float64(p2p.LowErrSeverity)),
+		},
+		// multiple errors with, with random severity's iwant
+		{
+			notification: &p2p.InvCtrlMsgNotif{
+				PeerID:  peerIds[3],
+				MsgType: p2pmsg.CtrlMsgIWant,
+				Errors: p2p.InvCtrlMsgErrs{
+					p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid iwant"), p2p.CriticalErrSeverity),
+					p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid iwant"), p2p.HighErrSeverity),
+					p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid iwant"), p2p.ModerateErrSeverity),
+					p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid iwant"), p2p.LowErrSeverity),
+				},
+			},
+			expectedPenalty: (penaltyValues.IWant * float64(p2p.CriticalErrSeverity)) +
+				(penaltyValues.IWant * float64(p2p.HighErrSeverity)) +
+				(penaltyValues.IWant * float64(p2p.ModerateErrSeverity)) +
+				(penaltyValues.IWant * float64(p2p.LowErrSeverity)),
+		},
+	}
+
+	for _, tCase := range testCases {
+		// report a misbehavior for the peer id.
+		reg.OnInvalidControlMessageNotification(tCase.notification)
+		// the penalty should now be updated in the spamRecords
+		record, err, ok := spamRecords.Get(tCase.notification.PeerID) // get the record from the spamRecords.
+		assert.True(t, ok)
+		assert.NoError(t, err)
+		assert.Less(t, math.Abs(tCase.expectedPenalty-record.Penalty), 10e-3)  // penalty should be updated to -10.
+		assert.Equal(t, scoring.InitAppScoreRecordState().Decay, record.Decay) // decay should be initialized to the initial state.
+
+		// this peer has a spam record, with no subscription penalty. Hence, the app specific score should only be the spam penalty,
+		// and the peer should be deprived of the default reward for its valid staked role.
+		score := reg.AppSpecificScoreFunc()(tCase.notification.PeerID)
+		assert.Less(t, math.Abs(tCase.expectedPenalty-score), 10e-3)
+	}
 }
 
 // withStakedIdentity returns a function that sets the identity provider to return an staked identity for the given peer id.
@@ -491,4 +609,8 @@ func penaltyValueFixtures() scoring.GossipSubCtrlMsgPenaltyValue {
 		IWant:             -10,
 		RpcPublishMessage: -10,
 	}
+}
+
+func randomErrSeverity() p2p.InvCtrlMsgErrSeverity {
+	return []p2p.InvCtrlMsgErrSeverity{p2p.LowErrSeverity, p2p.ModerateErrSeverity, p2p.HighErrSeverity, p2p.CriticalErrSeverity}[rand.Intn(4)]
 }

@@ -14,13 +14,16 @@ type GossipSubRpcValidationInspectorMetrics struct {
 	prefix                                 string
 	rpcCtrlMsgInAsyncPreProcessingGauge    prometheus.Gauge
 	rpcCtrlMsgAsyncProcessingTimeHistogram prometheus.Histogram
+	invalidCtrlMessageErrorCountHistogram  prometheus.Histogram
 }
 
 var _ module.GossipSubRpcValidationInspectorMetrics = (*GossipSubRpcValidationInspectorMetrics)(nil)
 
 // NewGossipSubRPCValidationInspectorMetrics returns a new *GossipSubRpcValidationInspectorMetrics.
 func NewGossipSubRPCValidationInspectorMetrics(prefix string) *GossipSubRpcValidationInspectorMetrics {
-	gc := &GossipSubRpcValidationInspectorMetrics{prefix: prefix}
+	gc := &GossipSubRpcValidationInspectorMetrics{
+		prefix: prefix,
+	}
 	gc.rpcCtrlMsgInAsyncPreProcessingGauge = promauto.NewGauge(
 		prometheus.GaugeOpts{
 			Namespace: namespaceNetwork,
@@ -38,7 +41,15 @@ func NewGossipSubRPCValidationInspectorMetrics(prefix string) *GossipSubRpcValid
 			Buckets:   []float64{.1, 1},
 		},
 	)
-
+	gc.invalidCtrlMessageErrorCountHistogram = promauto.NewHistogram(
+		prometheus.HistogramOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
+			Name:      gc.prefix + "rpc_invalid_control_message_error_count",
+			Help:      "total number of errors in a single invalid control message notification",
+			Buckets:   []float64{25, 50, 100, 1000},
+		},
+	)
 	return gc
 }
 
@@ -52,4 +63,9 @@ func (c *GossipSubRpcValidationInspectorMetrics) AsyncProcessingStarted() {
 func (c *GossipSubRpcValidationInspectorMetrics) AsyncProcessingFinished(duration time.Duration) {
 	c.rpcCtrlMsgInAsyncPreProcessingGauge.Dec()
 	c.rpcCtrlMsgAsyncProcessingTimeHistogram.Observe(duration.Seconds())
+}
+
+// InvalidControlMessageNotificationErrors tracks the number of errors in each invalid control message notification over time.
+func (c *GossipSubRpcValidationInspectorMetrics) InvalidControlMessageNotificationErrors(count int) {
+	c.rpcCtrlMsgAsyncProcessingTimeHistogram.Observe(float64(count))
 }

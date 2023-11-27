@@ -174,6 +174,8 @@ type GossipSubRpcValidationInspectorMetrics interface {
 	// AsyncProcessingFinished tracks the time spent by a rpc validation inspector worker to process an inspect message request asynchronously and decrements the metric tracking
 	// the number of inspect message requests  being processed asynchronously by the rpc validation inspector workers.
 	AsyncProcessingFinished(duration time.Duration)
+	// InvalidControlMessageNotificationErrors tracks the number of errors in each invalid control message notification over time.
+	InvalidControlMessageNotificationErrors(count int)
 }
 
 // NetworkInboundQueueMetrics encapsulates the metrics collectors for the inbound queue of the networking layer.

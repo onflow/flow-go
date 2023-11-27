@@ -307,8 +307,9 @@ func (nc *NoopCollector) OnIPColocationFactorUpdated(f float64)                 
 func (nc *NoopCollector) OnAppSpecificScoreUpdated(f float64)                              {}
 func (nc *NoopCollector) OnOverallPeerScoreUpdated(f float64)                              {}
 
-func (nc *NoopCollector) AsyncProcessingStarted()               {}
-func (nc *NoopCollector) AsyncProcessingFinished(time.Duration) {}
+func (nc *NoopCollector) AsyncProcessingStarted()                     {}
+func (nc *NoopCollector) AsyncProcessingFinished(time.Duration)       {}
+func (nc *NoopCollector) InvalidControlMessageNotificationErrors(int) {}
 
 func (nc *NoopCollector) OnMisbehaviorReported(string, string) {}
 func (nc *NoopCollector) OnViolationReportSkipped()            {}

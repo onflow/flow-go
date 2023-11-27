@@ -71,6 +71,14 @@ const (
 	validationInspectorClusterPrefixedTopicsReceivedCacheDecay = "gossipsub-cluster-prefix-tracker-cache-decay"
 	validationInspectorClusterPrefixHardThreshold              = "gossipsub-rpc-cluster-prefixed-hard-threshold"
 
+	// gossipsub score penalties
+	rootScorePenaltiesPrefix = "gossipsub-score-penalty"
+	graftPenalty             = "graft"
+	prunePenalty             = "prune"
+	iHavePenalty             = "ihave"
+	iWantPenalty             = "iwant"
+	publishPenalty           = "publish"
+
 	ihaveMaxSampleSize           = "gossipsub-rpc-ihave-max-sample-size"
 	ihaveMaxMessageIDSampleSize  = "gossipsub-rpc-ihave-max-message-id-sample-size"
 	controlMessageMaxSampleSize  = "gossipsub-rpc-graft-and-prune-message-max-sample-size"
@@ -150,6 +158,11 @@ func AllFlagNames() []string {
 		iwantCacheMissCheckSize,
 		rpcMessageMaxSampleSize,
 		rpcMessageErrorThreshold,
+		rootScorePenaltiesPrefix + "-" + graftPenalty,
+		rootScorePenaltiesPrefix + "-" + prunePenalty,
+		rootScorePenaltiesPrefix + "-" + iHavePenalty,
+		rootScorePenaltiesPrefix + "-" + iWantPenalty,
+		rootScorePenaltiesPrefix + "-" + publishPenalty,
 	}
 
 	for _, scope := range []string{systemScope, transientScope, protocolScope, peerScope, peerProtocolScope} {
@@ -308,6 +321,22 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 		gossipSubSubscriptionProviderCacheSize,
 		config.GossipSubConfig.SubscriptionProviderConfig.CacheSize,
 		"size of the cache that keeps the list of topics each peer has subscribed to, recommended size is 10x the number of authorized nodes")
+
+	flags.Float64(fmt.Sprintf("%s-%s", rootScorePenaltiesPrefix, graftPenalty),
+		config.GossipsubScorePenalties.Graft,
+		"the penalty value for GRAFT control messages")
+	flags.Float64(fmt.Sprintf("%s-%s", rootScorePenaltiesPrefix, prunePenalty),
+		config.GossipsubScorePenalties.Prune,
+		"the penalty value for PRUNE control messages")
+	flags.Float64(fmt.Sprintf("%s-%s", rootScorePenaltiesPrefix, iHavePenalty),
+		config.GossipsubScorePenalties.IHave,
+		"the penalty value for IHAVE control messages")
+	flags.Float64(fmt.Sprintf("%s-%s", rootScorePenaltiesPrefix, iWantPenalty),
+		config.GossipsubScorePenalties.IWant,
+		"the penalty value for IWANT control messages")
+	flags.Float64(fmt.Sprintf("%s-%s", rootScorePenaltiesPrefix, publishPenalty),
+		config.GossipsubScorePenalties.Publish,
+		"the penalty value for messages published with a control message")
 }
 
 // LoadLibP2PResourceManagerFlags loads all CLI flags for the libp2p resource manager configuration on the provided pflag set.

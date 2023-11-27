@@ -120,6 +120,11 @@ func (_m *NetworkMetrics) InboundMessageReceived(sizeBytes int, topic string, _a
 	_m.Called(sizeBytes, topic, _a2, messageType)
 }
 
+// InvalidControlMessageNotificationErrors provides a mock function with given fields: count
+func (_m *NetworkMetrics) InvalidControlMessageNotificationErrors(count int) {
+	_m.Called(count)
+}
+
 // MessageAdded provides a mock function with given fields: priority
 func (_m *NetworkMetrics) MessageAdded(priority int) {
 	_m.Called(priority)

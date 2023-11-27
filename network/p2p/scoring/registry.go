@@ -42,16 +42,6 @@ const (
 	//     n > -3 / log( 0.99 )
 	//     n >  458.22
 	defaultDecay = 0.99 // default decay value for the application specific penalty.
-	// graftMisbehaviourPenalty is the base penalty applied to the application specific penalty when a peer conducts a graft misbehaviour.
-	graftMisbehaviourPenalty = -10
-	// pruneMisbehaviourPenalty is the base penalty applied to the application specific penalty when a peer conducts a prune misbehaviour.
-	pruneMisbehaviourPenalty = -10
-	// iHaveMisbehaviourPenalty is the base penalty applied to the application specific penalty when a peer conducts a iHave misbehaviour.
-	iHaveMisbehaviourPenalty = -10
-	// iWantMisbehaviourPenalty is the base penalty applied to the application specific penalty when a peer conducts a iWant misbehaviour.
-	iWantMisbehaviourPenalty = -10
-	// rpcPublishMessageMisbehaviourPenalty is the base penalty applied to the application specific penalty when a peer conducts a RpcPublishMessageMisbehaviourPenalty misbehaviour.
-	rpcPublishMessageMisbehaviourPenalty = -10
 )
 
 // GossipSubCtrlMsgPenaltyValue is the penalty value for each control message type.
@@ -61,17 +51,6 @@ type GossipSubCtrlMsgPenaltyValue struct {
 	IHave             float64 // penalty value for an individual iHave message misbehaviour.
 	IWant             float64 // penalty value for an individual iWant message misbehaviour.
 	RpcPublishMessage float64 // penalty value for an individual RpcPublishMessage message misbehaviour.
-}
-
-// DefaultGossipSubCtrlMsgPenaltyValue returns the default penalty value for each control message type.
-func DefaultGossipSubCtrlMsgPenaltyValue() GossipSubCtrlMsgPenaltyValue {
-	return GossipSubCtrlMsgPenaltyValue{
-		Graft:             graftMisbehaviourPenalty,
-		Prune:             pruneMisbehaviourPenalty,
-		IHave:             iHaveMisbehaviourPenalty,
-		IWant:             iWantMisbehaviourPenalty,
-		RpcPublishMessage: rpcPublishMessageMisbehaviourPenalty,
-	}
 }
 
 // GossipSubAppSpecificScoreRegistry is the registry for the application specific score of peers in the GossipSub protocol.
@@ -312,6 +291,7 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 	}
 
 	lg.Debug().
+		Float64("applied_penalty", appliedPenalty).
 		Float64("app_specific_score", record.Penalty).
 		Msg("applied misbehaviour penalty and updated application specific penalty")
 }

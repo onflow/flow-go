@@ -131,24 +131,26 @@ func NodeFixture(t *testing.T,
 
 	connManager, err := connection.NewConnManager(logger, parameters.MetricsCfg.Metrics, &parameters.FlowConfig.NetworkConfig.ConnectionManagerConfig)
 	require.NoError(t, err)
-
-	builder := p2pbuilder.NewNodeBuilder(logger,
-		parameters.MetricsCfg,
-		parameters.NetworkingType,
-		parameters.Address,
-		parameters.Key,
-		sporkID,
-		parameters.IdProvider,
-		&parameters.FlowConfig.NetworkConfig.ResourceManager,
-		&parameters.FlowConfig.NetworkConfig.GossipSubRPCInspectorsConfig,
-		parameters.PeerManagerConfig,
-		&parameters.FlowConfig.NetworkConfig.GossipSubConfig.SubscriptionProviderConfig,
-		&p2p.DisallowListCacheConfig{
+	libP2PNodeBuilderParams := &p2pbuilder.LibP2PNodeBuilderParams{
+		Logger:                    logger,
+		MetricsConfig:             parameters.MetricsCfg,
+		NetworkingType:            parameters.NetworkingType,
+		Address:                   parameters.Address,
+		NetworkKey:                parameters.Key,
+		SporkId:                   sporkID,
+		IdProvider:                parameters.IdProvider,
+		RCfg:                      &parameters.FlowConfig.NetworkConfig.ResourceManager,
+		RpcInspectorCfg:           &parameters.FlowConfig.NetworkConfig.GossipSubRPCInspectorsConfig,
+		PeerManagerConfig:         parameters.PeerManagerConfig,
+		SubscriptionProviderParam: &parameters.FlowConfig.NetworkConfig.GossipSubConfig.SubscriptionProviderConfig,
+		DisallowListCacheCfg: &p2p.DisallowListCacheConfig{
 			MaxSize: uint32(1000),
 			Metrics: metrics.NewNoopCollector(),
 		},
-		parameters.PubSubTracer,
-		parameters.UnicastConfig).
+		UnicastConfig:           parameters.UnicastConfig,
+		GossipSubScorePenalties: &parameters.FlowConfig.NetworkConfig.GossipsubScorePenalties,
+	}
+	builder := p2pbuilder.NewNodeBuilder(libP2PNodeBuilderParams, parameters.PubSubTracer).
 		SetConnectionManager(connManager).
 		SetCreateNode(p2pbuilder.DefaultCreateNodeFunc).
 		SetResourceManager(parameters.ResourceManager)

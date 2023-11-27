@@ -112,29 +112,31 @@ func CreateNode(t *testing.T, networkKey crypto.PrivateKey, sporkID flow.Identif
 		NetworkingType:                     flownet.PublicNetwork,
 	}
 	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
-
-	builder := p2pbuilder.NewNodeBuilder(logger,
-		&p2pconfig.MetricsConfig{
+	params := &p2pbuilder.LibP2PNodeBuilderParams{
+		Logger: logger,
+		MetricsConfig: &p2pconfig.MetricsConfig{
 			HeroCacheFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 			Metrics:          metrics.NewNoopCollector(),
 		},
-		flownet.PrivateNetwork,
-		unittest.DefaultAddress,
-		networkKey,
-		sporkID,
-		idProvider,
-		&defaultFlowConfig.NetworkConfig.ResourceManager,
-		&defaultFlowConfig.NetworkConfig.GossipSubRPCInspectorsConfig,
-		p2pconfig.PeerManagerDisableConfig(),
-		&defaultFlowConfig.NetworkConfig.GossipSubConfig.SubscriptionProviderConfig,
-		&p2p.DisallowListCacheConfig{
+		NetworkingType:            flownet.PrivateNetwork,
+		Address:                   unittest.DefaultAddress,
+		NetworkKey:                networkKey,
+		SporkId:                   sporkID,
+		IdProvider:                idProvider,
+		RCfg:                      &defaultFlowConfig.NetworkConfig.ResourceManager,
+		RpcInspectorCfg:           &defaultFlowConfig.NetworkConfig.GossipSubRPCInspectorsConfig,
+		PeerManagerConfig:         p2pconfig.PeerManagerDisableConfig(),
+		SubscriptionProviderParam: &defaultFlowConfig.NetworkConfig.GossipSubConfig.SubscriptionProviderConfig,
+		DisallowListCacheCfg: &p2p.DisallowListCacheConfig{
 			MaxSize: uint32(1000),
 			Metrics: metrics.NewNoopCollector(),
 		},
-		meshTracer,
-		&p2pconfig.UnicastConfig{
+		UnicastConfig: &p2pconfig.UnicastConfig{
 			UnicastConfig: defaultFlowConfig.NetworkConfig.UnicastConfig,
-		}).
+		},
+		GossipSubScorePenalties: &defaultFlowConfig.NetworkConfig.GossipsubScorePenalties,
+	}
+	builder := p2pbuilder.NewNodeBuilder(params, meshTracer).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
 			return p2pdht.NewDHT(c, h, protocols.FlowDHTProtocolID(sporkID), zerolog.Nop(), metrics.NewNoopCollector())
 		}).

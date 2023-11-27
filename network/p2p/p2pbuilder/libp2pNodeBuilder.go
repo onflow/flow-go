@@ -76,41 +76,47 @@ type LibP2PNodeBuilder struct {
 	networkingType       flownet.NetworkingType // whether the node is running in private (staked) or public (unstaked) network
 }
 
-func NewNodeBuilder(
-	logger zerolog.Logger,
-	metricsConfig *p2pconfig.MetricsConfig,
-	networkingType flownet.NetworkingType,
-	address string,
-	networkKey fcrypto.PrivateKey,
-	sporkId flow.Identifier,
-	idProvider module.IdentityProvider,
-	rCfg *p2pconf.ResourceManagerConfig,
-	rpcInspectorCfg *p2pconf.GossipSubRPCInspectorsConfig,
-	peerManagerConfig *p2pconfig.PeerManagerConfig,
-	subscriptionProviderParam *p2pconf.SubscriptionProviderParameters,
-	disallowListCacheCfg *p2p.DisallowListCacheConfig,
-	rpcTracker p2p.RpcControlTracking,
-	unicastConfig *p2pconfig.UnicastConfig,
-) *LibP2PNodeBuilder {
+// LibP2PNodeBuilderParams parameters required to create a new *LibP2PNodeBuilder with NewNodeBuilder.
+type LibP2PNodeBuilderParams struct {
+	Logger                    zerolog.Logger
+	MetricsConfig             *p2pconfig.MetricsConfig
+	NetworkingType            flownet.NetworkingType
+	Address                   string
+	NetworkKey                fcrypto.PrivateKey
+	SporkId                   flow.Identifier
+	IdProvider                module.IdentityProvider
+	RCfg                      *p2pconf.ResourceManagerConfig
+	RpcInspectorCfg           *p2pconf.GossipSubRPCInspectorsConfig
+	PeerManagerConfig         *p2pconfig.PeerManagerConfig
+	SubscriptionProviderParam *p2pconf.SubscriptionProviderParameters
+	DisallowListCacheCfg      *p2p.DisallowListCacheConfig
+	UnicastConfig             *p2pconfig.UnicastConfig
+	GossipSubScorePenalties   *p2pconf.GossipSubScorePenalties
+}
+
+func NewNodeBuilder(params *LibP2PNodeBuilderParams, rpcTracking p2p.RpcControlTracking) *LibP2PNodeBuilder {
 	return &LibP2PNodeBuilder{
-		logger:               logger,
-		sporkId:              sporkId,
-		address:              address,
-		networkKey:           networkKey,
+		logger:               params.Logger,
+		sporkId:              params.SporkId,
+		address:              params.Address,
+		networkKey:           params.NetworkKey,
 		createNode:           DefaultCreateNodeFunc,
-		metricsConfig:        metricsConfig,
-		resourceManagerCfg:   rCfg,
-		disallowListCacheCfg: disallowListCacheCfg,
-		networkingType:       networkingType,
-		gossipSubBuilder: gossipsubbuilder.NewGossipSubBuilder(logger,
-			metricsConfig,
-			networkingType,
-			sporkId,
-			idProvider,
-			rpcInspectorCfg, subscriptionProviderParam,
-			rpcTracker),
-		peerManagerConfig: peerManagerConfig,
-		unicastConfig:     unicastConfig,
+		metricsConfig:        params.MetricsConfig,
+		resourceManagerCfg:   params.RCfg,
+		disallowListCacheCfg: params.DisallowListCacheCfg,
+		networkingType:       params.NetworkingType,
+		gossipSubBuilder: gossipsubbuilder.NewGossipSubBuilder(params.Logger,
+			params.MetricsConfig,
+			params.NetworkingType,
+			params.SporkId,
+			params.IdProvider,
+			params.RpcInspectorCfg,
+			params.SubscriptionProviderParam,
+			rpcTracking,
+			params.GossipSubScorePenalties,
+		),
+		peerManagerConfig: params.PeerManagerConfig,
+		unicastConfig:     params.UnicastConfig,
 	}
 }
 
@@ -410,92 +416,72 @@ func DefaultCreateNodeFunc(
 	return p2pnode.NewNode(logger, host, pCache, peerManager, disallowListCacheCfg)
 }
 
-// DefaultNodeBuilder returns a node builder.
-func DefaultNodeBuilder(
-	logger zerolog.Logger,
-	address string,
-	networkingType flownet.NetworkingType,
-	flowKey fcrypto.PrivateKey,
-	sporkId flow.Identifier,
-	idProvider module.IdentityProvider,
-	metricsCfg *p2pconfig.MetricsConfig,
-	resolver madns.BasicResolver,
-	role string,
-	connGaterCfg *p2pconfig.ConnectionGaterConfig,
-	peerManagerCfg *p2pconfig.PeerManagerConfig,
-	gossipCfg *p2pconf.GossipSubConfig,
-	rpcInspectorCfg *p2pconf.GossipSubRPCInspectorsConfig,
-	rCfg *p2pconf.ResourceManagerConfig,
-	uniCfg *p2pconfig.UnicastConfig,
-	connMgrConfig *netconf.ConnectionManagerConfig,
-	disallowListCacheCfg *p2p.DisallowListCacheConfig,
-	dhtSystemActivation DhtSystemActivation,
-) (p2p.NodeBuilder, error) {
+type DefaultNodeBuilderParams struct {
+	*LibP2PNodeBuilderParams
+	Resolver            madns.BasicResolver
+	Role                string
+	ConnGaterCfg        *p2pconfig.ConnectionGaterConfig
+	GossipCfg           *p2pconf.GossipSubConfig
+	ConnMgrConfig       *netconf.ConnectionManagerConfig
+	DhtSystemActivation DhtSystemActivation
+}
 
-	connManager, err := connection.NewConnManager(logger, metricsCfg.Metrics, connMgrConfig)
+// DefaultNodeBuilder returns a node builder.
+func DefaultNodeBuilder(params *DefaultNodeBuilderParams) (p2p.NodeBuilder, error) {
+
+	connManager, err := connection.NewConnManager(params.Logger, params.MetricsConfig.Metrics, params.ConnMgrConfig)
 	if err != nil {
 		return nil, fmt.Errorf("could not create connection manager: %w", err)
 	}
 
 	// set the default connection gater peer filters for both InterceptPeerDial and InterceptSecured callbacks
-	peerFilter := notEjectedPeerFilter(idProvider)
+	peerFilter := notEjectedPeerFilter(params.IdProvider)
 	peerFilters := []p2p.PeerFilter{peerFilter}
 
 	connGater := connection.NewConnGater(
-		logger,
-		idProvider,
-		connection.WithOnInterceptPeerDialFilters(append(peerFilters, connGaterCfg.InterceptPeerDialFilters...)),
-		connection.WithOnInterceptSecuredFilters(append(peerFilters, connGaterCfg.InterceptSecuredFilters...)))
+		params.Logger,
+		params.IdProvider,
+		connection.WithOnInterceptPeerDialFilters(append(peerFilters, params.ConnGaterCfg.InterceptPeerDialFilters...)),
+		connection.WithOnInterceptSecuredFilters(append(peerFilters, params.ConnGaterCfg.InterceptSecuredFilters...)))
 
 	meshTracerCfg := &tracer.GossipSubMeshTracerConfig{
-		Logger:                             logger,
-		Metrics:                            metricsCfg.Metrics,
-		IDProvider:                         idProvider,
-		LoggerInterval:                     gossipCfg.LocalMeshLogInterval,
-		RpcSentTrackerCacheSize:            gossipCfg.RPCSentTrackerCacheSize,
-		RpcSentTrackerWorkerQueueCacheSize: gossipCfg.RPCSentTrackerQueueCacheSize,
-		RpcSentTrackerNumOfWorkers:         gossipCfg.RpcSentTrackerNumOfWorkers,
-		HeroCacheMetricsFactory:            metricsCfg.HeroCacheFactory,
+		Logger:                             params.Logger,
+		Metrics:                            params.MetricsConfig.Metrics,
+		IDProvider:                         params.IdProvider,
+		LoggerInterval:                     params.GossipCfg.LocalMeshLogInterval,
+		RpcSentTrackerCacheSize:            params.GossipCfg.RPCSentTrackerCacheSize,
+		RpcSentTrackerWorkerQueueCacheSize: params.GossipCfg.RPCSentTrackerQueueCacheSize,
+		RpcSentTrackerNumOfWorkers:         params.GossipCfg.RpcSentTrackerNumOfWorkers,
+		HeroCacheMetricsFactory:            params.MetricsConfig.HeroCacheFactory,
 		NetworkingType:                     flownet.PrivateNetwork,
 	}
 	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
 
-	builder := NewNodeBuilder(logger,
-		metricsCfg,
-		networkingType,
-		address,
-		flowKey,
-		sporkId,
-		idProvider,
-		rCfg,
-		rpcInspectorCfg, peerManagerCfg, &gossipCfg.SubscriptionProviderConfig,
-		disallowListCacheCfg,
-		meshTracer,
-		uniCfg).
-		SetBasicResolver(resolver).
+	builder := NewNodeBuilder(params.LibP2PNodeBuilderParams, meshTracer).
+		SetBasicResolver(params.Resolver).
 		SetConnectionManager(connManager).
 		SetConnectionGater(connGater).
 		SetCreateNode(DefaultCreateNodeFunc)
 
-	if gossipCfg.PeerScoring {
+	if params.GossipCfg.PeerScoring {
 		// In production, we never override the default scoring config.
 		builder.EnableGossipSubScoringWithOverride(p2p.PeerScoringConfigNoOverride)
 	}
 
 	builder.SetGossipSubTracer(meshTracer)
-	builder.SetGossipSubScoreTracerInterval(gossipCfg.ScoreTracerInterval)
+	builder.SetGossipSubScoreTracerInterval(params.GossipCfg.ScoreTracerInterval)
 
-	if role != "ghost" {
-		r, err := flow.ParseRole(role)
+	if params.Role != "ghost" {
+		r, err := flow.ParseRole(params.Role)
 		if err != nil {
 			return nil, fmt.Errorf("could not parse role: %w", err)
 		}
-		builder.SetSubscriptionFilter(subscription.NewRoleBasedFilter(r, idProvider))
+		builder.SetSubscriptionFilter(subscription.NewRoleBasedFilter(r, params.IdProvider))
 
-		if dhtSystemActivation == DhtSystemEnabled {
+		if params.DhtSystemActivation == DhtSystemEnabled {
 			builder.SetRoutingSystem(
 				func(ctx context.Context, host host.Host) (routing.Routing, error) {
-					return dht.NewDHT(ctx, host, protocols.FlowDHTProtocolID(sporkId), logger, metricsCfg.Metrics, dht.AsServer())
+					return dht.NewDHT(ctx, host, protocols.FlowDHTProtocolID(params.SporkId), params.Logger, params.MetricsConfig.Metrics, dht.AsServer())
 				})
 		}
 	}

@@ -585,30 +585,31 @@ func (builder *FollowerServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 		NetworkingType:                     network.PublicNetwork,
 	}
 	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
-
-	node, err := p2pbuilder.NewNodeBuilder(
-		builder.Logger,
-		&p2pconfig.MetricsConfig{
+	params := &p2pbuilder.LibP2PNodeBuilderParams{
+		Logger: builder.Logger,
+		MetricsConfig: &p2pconfig.MetricsConfig{
 			HeroCacheFactory: builder.HeroCacheMetricsFactory(),
 			Metrics:          builder.Metrics.Network,
 		},
-		network.PublicNetwork,
-		builder.BaseConfig.BindAddr,
-		networkKey,
-		builder.SporkID,
-		builder.IdentityProvider,
-		&builder.FlowConfig.NetworkConfig.ResourceManager,
-		&builder.FlowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig,
-		p2pconfig.PeerManagerDisableConfig(), // disable peer manager for follower
-		&builder.FlowConfig.NetworkConfig.GossipSubConfig.SubscriptionProviderConfig,
-		&p2p.DisallowListCacheConfig{
+		NetworkingType:            network.PublicNetwork,
+		Address:                   builder.BaseConfig.BindAddr,
+		NetworkKey:                networkKey,
+		SporkId:                   builder.SporkID,
+		IdProvider:                builder.IdentityProvider,
+		RCfg:                      &builder.FlowConfig.NetworkConfig.ResourceManager,
+		RpcInspectorCfg:           &builder.FlowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig,
+		PeerManagerConfig:         p2pconfig.PeerManagerDisableConfig(),
+		SubscriptionProviderParam: &builder.FlowConfig.NetworkConfig.GossipSubConfig.SubscriptionProviderConfig,
+		DisallowListCacheCfg: &p2p.DisallowListCacheConfig{
 			MaxSize: builder.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
 			Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
 		},
-		meshTracer,
-		&p2pconfig.UnicastConfig{
+		UnicastConfig: &p2pconfig.UnicastConfig{
 			UnicastConfig: builder.FlowConfig.NetworkConfig.UnicastConfig,
-		}).
+		},
+		GossipSubScorePenalties: &builder.FlowConfig.NetworkConfig.GossipsubScorePenalties,
+	}
+	node, err := p2pbuilder.NewNodeBuilder(params, meshTracer).
 		SetSubscriptionFilter(
 			subscription.NewRoleBasedFilter(
 				subscription.UnstakedRole, builder.IdentityProvider,

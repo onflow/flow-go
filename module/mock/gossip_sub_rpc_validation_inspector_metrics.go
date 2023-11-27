@@ -23,6 +23,11 @@ func (_m *GossipSubRpcValidationInspectorMetrics) AsyncProcessingStarted() {
 	_m.Called()
 }
 
+// InvalidControlMessageNotificationErrors provides a mock function with given fields: count
+func (_m *GossipSubRpcValidationInspectorMetrics) InvalidControlMessageNotificationErrors(count int) {
+	_m.Called(count)
+}
+
 type mockConstructorTestingTNewGossipSubRpcValidationInspectorMetrics interface {
 	mock.TestingT
 	Cleanup(func())

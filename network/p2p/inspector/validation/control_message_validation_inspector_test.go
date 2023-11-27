@@ -726,6 +726,81 @@ func (suite *ControlMsgValidationInspectorSuite) TestControlMessageValidationIns
 		// sleep for 1 second to ensure rpc's are processed
 		time.Sleep(time.Second)
 	})
+	suite.T().Run("rpc inspection should disseminate invalid control message notification with multiple errors when a control message contains multiple errors",
+		func(t *testing.T) {
+			suite.SetupTest()
+			defer suite.StopInspector()
+			// create unknown topic
+			unknownTopic, malformedTopic, invalidSporkIDTopic := invalidTopics(t, suite.sporkID)
+			validTopic := fmt.Sprintf("%s/%s", channels.PushBlocks, suite.sporkID)
+			// avoid unknown topics errors
+			suite.topicProviderOracle.UpdateTopics([]string{unknownTopic, malformedTopic, invalidSporkIDTopic, validTopic})
+			duplicateMessageID := unittest.GenerateRandomStringWithLen(10)
+			invalidGrafts := []*pubsub_pb.ControlGraft{unittest.P2PRPCGraftFixture(&unknownTopic), unittest.P2PRPCGraftFixture(&malformedTopic), unittest.P2PRPCGraftFixture(&invalidSporkIDTopic)}
+			invalidPrunes := []*pubsub_pb.ControlPrune{unittest.P2PRPCPruneFixture(&unknownTopic), unittest.P2PRPCPruneFixture(&malformedTopic), unittest.P2PRPCPruneFixture(&invalidSporkIDTopic)}
+			invalidIHaves := []*pubsub_pb.ControlIHave{
+				unittest.P2PRPCIHaveFixture(&unknownTopic, unittest.GenerateRandomStringsWithLen(10, 10)...),
+				unittest.P2PRPCIHaveFixture(&malformedTopic, unittest.GenerateRandomStringsWithLen(10, 10)...),
+				unittest.P2PRPCIHaveFixture(&invalidSporkIDTopic, unittest.GenerateRandomStringsWithLen(10, 10)...),
+				unittest.P2PRPCIHaveFixture(&validTopic, duplicateMessageID, duplicateMessageID)}
+			invalidIWants := []*pubsub_pb.ControlIWant{unittest.P2PRPCIWantFixture(duplicateMessageID, duplicateMessageID)}
+
+			graftsReq := unittest.P2PRPCFixture(unittest.WithGrafts(invalidGrafts...))
+			prunesReq := unittest.P2PRPCFixture(unittest.WithPrunes(invalidPrunes...))
+			ihavesReq := unittest.P2PRPCFixture(unittest.WithIHaves(invalidIHaves...))
+			iwantsReq := unittest.P2PRPCFixture(unittest.WithIWants(invalidIWants...))
+
+			from := unittest.PeerIdFixture(t)
+			ensureIsInvalidTopicErr := func(errors p2p.InvCtrlMsgErrs) {
+				for _, err := range errors {
+					require.True(t, channels.IsInvalidTopicErr(err.Err))
+				}
+			}
+			suite.distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Times(4).Run(func(args mock.Arguments) {
+				notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
+				require.True(t, ok)
+				require.Equal(t, from, notification.PeerID)
+				switch notification.MsgType {
+				case p2pmsg.CtrlMsgGraft:
+					require.Equal(t, len(invalidGrafts), notification.Errors.Len())
+					ensureIsInvalidTopicErr(notification.Errors)
+				case p2pmsg.CtrlMsgPrune:
+					require.Equal(t, len(invalidPrunes), notification.Errors.Len())
+					ensureIsInvalidTopicErr(notification.Errors)
+				case p2pmsg.CtrlMsgIHave:
+					require.Equal(t, len(invalidIHaves), notification.Errors.Len())
+					for _, err := range notification.Errors {
+						switch {
+						case channels.IsInvalidTopicErr(err.Err):
+							continue
+						case validation.IsDuplicateMessageIDErr(err.Err):
+							continue
+						default:
+							require.Fail(suite.T(), fmt.Sprintf("unexpected error encountered %s for iHave control message", err.Err))
+						}
+					}
+				case p2pmsg.CtrlMsgIWant:
+					require.Equal(t, len(invalidIWants), notification.Errors.Len())
+					require.True(suite.T(), validation.IsIWantDuplicateMsgIDThresholdErr(notification.Errors[0].Err))
+				default:
+					require.Fail(suite.T(), fmt.Sprintf("unexpected control message type: %s", notification.MsgType))
+				}
+			})
+			suite.rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
+			suite.rpcTracker.On("WasIHaveRPCSent", mock.AnythingOfType("string")).Return(true).Run(func(args mock.Arguments) {
+				id, ok := args[0].(string)
+				require.True(t, ok)
+				require.Contains(t, duplicateMessageID, id)
+			})
+			suite.inspector.Start(suite.signalerCtx)
+
+			require.NoError(t, suite.inspector.Inspect(from, graftsReq))
+			require.NoError(t, suite.inspector.Inspect(from, prunesReq))
+			require.NoError(t, suite.inspector.Inspect(from, ihavesReq))
+			require.NoError(t, suite.inspector.Inspect(from, iwantsReq))
+			// sleep for 1 second to ensure rpc's is processed
+			time.Sleep(time.Second)
+		})
 }
 
 // TestNewControlMsgValidationInspector_validateClusterPrefixedTopic ensures cluster prefixed topics are validated as expected.

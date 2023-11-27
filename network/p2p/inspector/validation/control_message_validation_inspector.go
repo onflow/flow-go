@@ -905,6 +905,7 @@ func (c *ControlMsgValidationInspector) logAndDistributeAsyncInspectErrs(req *In
 	if err != nil {
 		c.logAndThrowError(fmt.Errorf("failed to distribute invalid control message notification: %w", err))
 	}
+	c.metrics.InvalidControlMessageNotificationErrors(errs.Len())
 	lg.Error().Err(errs.Error()).Msg("rpc control message async inspection failed")
 }
 
