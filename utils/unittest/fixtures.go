@@ -2707,14 +2707,14 @@ func P2PRPCFixture(opts ...RPCFixtureOpt) *pubsub.RPC {
 	return rpc
 }
 
-func WithTopic(topic string) func(*pubsub_pb.Message) {
+func WithFrom(pid peer.ID) func(*pubsub_pb.Message) {
 	return func(msg *pubsub_pb.Message) {
-		msg.Topic = &topic
+		msg.From = []byte(pid)
 	}
 }
 
 // GossipSubMessageFixture returns a gossip sub message fixture for the specified topic.
-func GossipSubMessageFixture(t *testing.T, s string, opts ...func(*pubsub_pb.Message)) *pubsub_pb.Message {
+func GossipSubMessageFixture(s string, opts ...func(*pubsub_pb.Message)) *pubsub_pb.Message {
 	pb := &pubsub_pb.Message{
 		From:      RandomBytes(32),
 		Data:      RandomBytes(32),
@@ -2732,10 +2732,10 @@ func GossipSubMessageFixture(t *testing.T, s string, opts ...func(*pubsub_pb.Mes
 }
 
 // GossipSubMessageFixtures returns a list of gossipsub message fixtures.
-func GossipSubMessageFixtures(t *testing.T, n int, topic string, opts ...func(*pubsub_pb.Message)) []*pubsub_pb.Message {
+func GossipSubMessageFixtures(n int, topic string, opts ...func(*pubsub_pb.Message)) []*pubsub_pb.Message {
 	msgs := make([]*pubsub_pb.Message, n)
 	for i := 0; i < n; i++ {
-		msgs[i] = GossipSubMessageFixture(t, topic, opts...)
+		msgs[i] = GossipSubMessageFixture(topic, opts...)
 	}
 	return msgs
 }
@@ -2752,5 +2752,27 @@ func LibP2PResourceLimitOverrideFixture() p2pconf.ResourceManagerOverrideLimit {
 		ConnectionsOutbound: rand.Intn(1000),
 		FD:                  rand.Intn(1000),
 		Memory:              rand.Intn(1000),
+	}
+}
+
+func RegisterEntryFixture() flow.RegisterEntry {
+	val := make([]byte, 4)
+	_, _ = crand.Read(val)
+	return flow.RegisterEntry{
+		Key: flow.RegisterID{
+			Owner: "owner",
+			Key:   "key1",
+		},
+		Value: val,
+	}
+}
+
+func MakeOwnerReg(key string, value string) flow.RegisterEntry {
+	return flow.RegisterEntry{
+		Key: flow.RegisterID{
+			Owner: "owner",
+			Key:   key,
+		},
+		Value: []byte(value),
 	}
 }
