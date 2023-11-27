@@ -323,19 +323,19 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 		"size of the cache that keeps the list of topics each peer has subscribed to, recommended size is 10x the number of authorized nodes")
 
 	flags.Float64(fmt.Sprintf("%s-%s", rootScorePenaltiesPrefix, graftPenalty),
-		config.ResourceManager.FileDescriptorsRatio,
+		config.GossipsubScorePenalties.Graft,
 		"the penalty value for GRAFT control messages")
 	flags.Float64(fmt.Sprintf("%s-%s", rootScorePenaltiesPrefix, prunePenalty),
-		config.ResourceManager.FileDescriptorsRatio,
+		config.GossipsubScorePenalties.Prune,
 		"the penalty value for PRUNE control messages")
 	flags.Float64(fmt.Sprintf("%s-%s", rootScorePenaltiesPrefix, iHavePenalty),
-		config.ResourceManager.FileDescriptorsRatio,
+		config.GossipsubScorePenalties.IHave,
 		"the penalty value for IHAVE control messages")
 	flags.Float64(fmt.Sprintf("%s-%s", rootScorePenaltiesPrefix, iWantPenalty),
-		config.ResourceManager.FileDescriptorsRatio,
+		config.GossipsubScorePenalties.IWant,
 		"the penalty value for IWANT control messages")
 	flags.Float64(fmt.Sprintf("%s-%s", rootScorePenaltiesPrefix, publishPenalty),
-		config.ResourceManager.FileDescriptorsRatio,
+		config.GossipsubScorePenalties.Publish,
 		"the penalty value for messages published with a control message")
 }
 
