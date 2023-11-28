@@ -708,7 +708,7 @@ func (c *ControlMsgValidationInspector) validateTopic(from peer.ID, topic channe
 	// non cluster prefixed topic validation
 	err := channels.IsValidNonClusterFlowTopic(topic, c.sporkID)
 	if err != nil {
-		return err, false
+		return err, p2p.CtrlMsgNonClusterTopicType
 	}
 	return nil, false
 }
