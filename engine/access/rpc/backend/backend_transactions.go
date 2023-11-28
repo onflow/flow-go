@@ -602,7 +602,12 @@ func (b *backendTransactions) GetSystemTransactionResult(ctx context.Context, bl
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "could not get system chunk transaction: %v", err)
 	}
+
 	systemTxResult := resp.TransactionResults[len(resp.TransactionResults)-1]
+	//systemTxID := systemTx.ID()
+	//if systemTxResult. != systemTxID {
+	//	// bail out with internal error
+	//}
 	systemTxStatus, err := b.deriveTransactionStatus(systemTx, true, block)
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)

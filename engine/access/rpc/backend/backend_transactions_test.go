@@ -284,7 +284,7 @@ func (suite *Suite) TestGetTransactionResultCacheNonExistent() {
 	})
 }
 
-// TestGetTransactionResultUnknownFromCache retrieve unknown result from cache
+// TestGetTransactionResultUnknownFromCache retrieve unknown result from cache.
 func (suite *Suite) TestGetTransactionResultUnknownFromCache() {
 	suite.withGetTransactionCachingTestSetup(func(block *flow.Block, tx *flow.Transaction) {
 		suite.historicalAccessClient.

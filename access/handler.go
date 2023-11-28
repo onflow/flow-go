@@ -353,9 +353,7 @@ func (h *Handler) GetSystemTransactionResult(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
 	}
 
-	eventEncodingVersion := req.GetEventEncodingVersion()
-
-	result, err := h.api.GetSystemTransactionResult(ctx, id, eventEncodingVersion)
+	result, err := h.api.GetSystemTransactionResult(ctx, id, req.GetEventEncodingVersion())
 	if err != nil {
 		return nil, err
 	}
