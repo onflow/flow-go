@@ -47,6 +47,12 @@ func (r *Retry) SetBackend(b *Backend) *Retry {
 	return r
 }
 
+// Retry attempts to resend transactions for a specified block height.
+// It performs cleanup operations, including pruning old transactions, and retries sending
+// transactions that are still pending.
+// The method takes a block height as input. If the provided height is lower than
+// flow.DefaultTransactionExpiry, no retries are performed, and the method returns nil.
+// No errors expected during normal operations.
 func (r *Retry) Retry(height uint64) error {
 	// No need to retry if height is lower than DefaultTransactionExpiry
 	if height < flow.DefaultTransactionExpiry {
@@ -94,6 +100,12 @@ func (r *Retry) prune(height uint64) {
 	}
 }
 
+// retryTxsAtHeight retries transactions at a specific block height.
+// It looks up transactions at the specified height and retries sending
+// raw transactions for those that are still pending. It also cleans up
+// transactions that are no longer pending or have an unknown status.
+// Error returns:
+//   - errors are unexpected and potentially symptoms of internal implementation bugs or state corruption (fatal).
 func (r *Retry) retryTxsAtHeight(heightToRetry uint64) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()

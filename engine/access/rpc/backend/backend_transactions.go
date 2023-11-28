@@ -801,6 +801,10 @@ func (b *backendTransactions) getTransactionResultFromExecutionNode(
 	return events, resp.GetStatusCode(), resp.GetErrorMessage(), nil
 }
 
+// ATTENTION: might be a source of problems in future. We run this code on finalization gorotuine,
+// potentially lagging finalization events if operations take long time.
+// We might need to move this logic on dedicated goroutine and provide a way to skip finalization events if they are delivered
+// too often for this engine. An example of similar approach - https://github.com/onflow/flow-go/blob/master/engine/common/follower/compliance_engine.go#L201.
 // No errors expected during normal operations.
 func (b *backendTransactions) ProcessFinalizedBlockHeight(height uint64) error {
 	return b.retry.Retry(height)
