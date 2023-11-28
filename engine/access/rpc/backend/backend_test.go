@@ -429,11 +429,15 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 		suite.snapshot.On("Head").Return(nil, err)
 
 		// mock signaler context expect an error
-		signalerCtx := irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), err)
+		signCtxErr := fmt.Errorf("failed to lookup sealed header: %w", err)
+		signalerCtx := irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), signCtxErr)
 		valueCtx := context.WithValue(context.Background(), irrecoverable.SignalerContextKey{}, *signalerCtx)
 
-		_, _, err = backend.GetLatestBlockHeader(valueCtx, true)
+		actualHeader, actualStatus, err := backend.GetLatestBlockHeader(valueCtx, true)
 		suite.Require().Error(err)
+		suite.Require().Equal(codes.Internal, status.Code(err))
+		suite.Require().Nil(actualHeader)
+		suite.Require().Equal(flow.BlockStatusUnknown, actualStatus)
 	})
 }
 
@@ -542,11 +546,14 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 		suite.snapshot.On("Head").Return(nil, err).Once()
 
 		// mock signaler context expect an error
-		signalerCtx := irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), err)
+		signCtxErr := fmt.Errorf("failed to lookup sealed header: %w", err)
+		signalerCtx := irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), signCtxErr)
 		valueCtx := context.WithValue(context.Background(), irrecoverable.SignalerContextKey{}, *signalerCtx)
 
-		_, err = backend.GetTransactionResultByIndex(valueCtx, blockId, index, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+		actual, err := backend.GetTransactionResultByIndex(valueCtx, blockId, index, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
 		suite.Require().Error(err)
+		suite.Require().Equal(codes.Internal, status.Code(err))
+		suite.Require().Nil(actual)
 	})
 }
 
@@ -609,11 +616,14 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 		suite.snapshot.On("Head").Return(nil, err).Once()
 
 		// mock signaler context expect an error
-		signalerCtx := irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), err)
+		signCtxErr := fmt.Errorf("failed to lookup sealed header: %w", err)
+		signalerCtx := irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), signCtxErr)
 		valueCtx := context.WithValue(context.Background(), irrecoverable.SignalerContextKey{}, *signalerCtx)
 
-		_, err = backend.GetTransactionResultsByBlockID(valueCtx, blockId, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
+		actual, err := backend.GetTransactionResultsByBlockID(valueCtx, blockId, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
 		suite.Require().Error(err)
+		suite.Require().Equal(codes.Internal, status.Code(err))
+		suite.Require().Nil(actual)
 	})
 }
 
@@ -1033,11 +1043,15 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 		suite.snapshot.On("Head").Return(nil, err)
 
 		// mock signaler context expect an error
-		signalerCtx := irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), err)
+		signCtxErr := fmt.Errorf("failed to lookup final header: %w", err)
+		signalerCtx := irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), signCtxErr)
 		valueCtx := context.WithValue(context.Background(), irrecoverable.SignalerContextKey{}, *signalerCtx)
 
-		_, _, err = backend.GetLatestBlock(valueCtx, false)
+		actualBlock, actualStatus, err := backend.GetLatestBlock(valueCtx, false)
 		suite.Require().Error(err)
+		suite.Require().Equal(codes.Internal, status.Code(err))
+		suite.Require().Nil(actualBlock)
+		suite.Require().Equal(flow.BlockStatusUnknown, actualStatus)
 	})
 }
 
@@ -1341,11 +1355,6 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 	stateParams.On("FinalizedRoot").Return(rootHeader, nil)
 	state.On("Params").Return(stateParams).Maybe()
 
-	// mock snapshot to return head backend
-	snapshot.On("Head").Return(
-		func() *flow.Header { return head },
-		func() error { return nil },
-	)
 	snapshot.On("Identities", mock.Anything).Return(
 		func(_ flow.IdentityFilter) flow.IdentityList {
 			return nodeIdentities
@@ -1453,16 +1462,26 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		backend, err := New(params)
 		suite.Require().NoError(err)
 
-		ctx = irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), err)
 		err = fmt.Errorf("inconsistent node`s state")
-		snapshot.On("Head").Return(nil, err)
+		snapshot.On("Head").Return(nil, err).Once()
 
-		_, err = backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight,
+		signCtxErr := fmt.Errorf("failed to lookup sealed header: %w", err)
+		signalerCtx := irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), signCtxErr)
+		valueCtx := context.WithValue(context.Background(), irrecoverable.SignalerContextKey{}, *signalerCtx)
+
+		actual, err := backend.GetEventsForHeightRange(valueCtx, string(flow.EventAccountCreated), minHeight, maxHeight,
 			entitiesproto.EventEncodingVersion_JSON_CDC_V0)
 		suite.Require().Error(err)
+		suite.Require().Equal(codes.Internal, status.Code(err))
+		suite.Require().Nil(actual)
 	})
 
 	connFactory := suite.setupConnectionFactory()
+	// mock snapshot to return head backend
+	snapshot.On("Head").Return(
+		func() *flow.Header { return head },
+		func() error { return nil },
+	)
 
 	//suite.state = state
 	suite.Run("invalid request max height < min height", func() {

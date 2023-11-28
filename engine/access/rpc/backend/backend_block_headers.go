@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"fmt"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -25,9 +26,15 @@ func (b *backendBlockHeaders) GetLatestBlockHeader(ctx context.Context, isSealed
 	if isSealed {
 		// get the latest seal header from storage
 		header, err = b.state.Sealed().Head()
+		if err != nil {
+			err = fmt.Errorf("failed to lookup sealed header: %w", err)
+		}
 	} else {
 		// get the finalized header from state
 		header, err = b.state.Final().Head()
+		if err != nil {
+			err = fmt.Errorf("failed to lookup final header: %w", err)
+		}
 	}
 
 	if err != nil {
@@ -86,7 +93,7 @@ func (b *backendBlockHeaders) getBlockStatus(ctx context.Context, header *flow.H
 		//   because this can cause DOS potential
 		// - Since the protocol state is widely shared, we assume that in practice another component will
 		//   observe the protocol state error and throw an exception.
-		irrecoverable.Throw(ctx, err)
+		irrecoverable.Throw(ctx, fmt.Errorf("failed to lookup sealed header: %w", err))
 		return flow.BlockStatusUnknown, status.Errorf(codes.Internal, "failed to find latest sealed header: %v", err)
 	}
 

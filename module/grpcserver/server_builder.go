@@ -93,8 +93,8 @@ func NewGrpcServerBuilder(log zerolog.Logger,
 	// request, unary server information, and handler function. It returns the response and error after handling
 	// the request. This mechanism ensures consistent error handling for gRPC requests across the server.
 	interceptors = append(interceptors, func(ctx context.Context, req any, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp any, err error) {
-		if signalerCtx := signalerCtx.Load(); signalerCtx != nil {
-			valueCtx := context.WithValue(ctx, irrecoverable.SignalerContextKey{}, *signalerCtx)
+		if sigCtx := signalerCtx.Load(); sigCtx != nil {
+			valueCtx := context.WithValue(ctx, irrecoverable.SignalerContextKey{}, *sigCtx)
 			resp, err = handler(valueCtx, req)
 		} else {
 			resp, err = handler(ctx, req)

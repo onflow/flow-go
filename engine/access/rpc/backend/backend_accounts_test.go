@@ -333,11 +333,14 @@ func (s *BackendAccountsSuite) TestGetAccountAtLatestBlockFromStorage_Inconsiste
 		err := fmt.Errorf("inconsistent node`s state")
 		s.snapshot.On("Head").Return(nil, err)
 
-		signalerCtx := irrecoverable.NewMockSignalerContextExpectError(s.T(), context.Background(), err)
+		signCtxErr := fmt.Errorf("failed to lookup sealed header: %w", err)
+		signalerCtx := irrecoverable.NewMockSignalerContextExpectError(s.T(), context.Background(), signCtxErr)
 		valueCtx := context.WithValue(context.Background(), irrecoverable.SignalerContextKey{}, *signalerCtx)
 
-		_, err = backend.GetAccountAtLatestBlock(valueCtx, s.failingAddress)
+		actual, err := backend.GetAccountAtLatestBlock(valueCtx, s.failingAddress)
 		s.Require().Error(err)
+		s.Require().Equal(codes.Internal, status.Code(err))
+		s.Require().Nil(actual)
 	})
 }
 

@@ -599,7 +599,7 @@ func (b *backendTransactions) deriveTransactionStatus(
 		// get the latest finalized block from the state
 		finalized, err := b.state.Final().Head()
 		if err != nil {
-			return flow.TransactionStatusUnknown, err
+			return flow.TransactionStatusUnknown, fmt.Errorf("failed to lookup final header: %w", err)
 		}
 		finalizedHeight := finalized.Height
 
@@ -643,7 +643,7 @@ func (b *backendTransactions) deriveTransactionStatus(
 	// get the latest sealed block from the State
 	sealed, err := b.state.Sealed().Head()
 	if err != nil {
-		return flow.TransactionStatusUnknown, err
+		return flow.TransactionStatusUnknown, fmt.Errorf("failed to lookup sealed header: %w", err)
 	}
 
 	if block.Header.Height > sealed.Height {
