@@ -405,8 +405,11 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochSetupHappyPath() {
 // built updated protocol state. It should build a union of participants from current and next epoch for current and
 // next epoch protocol states respectively.
 func (s *ProtocolStateMachineSuite) TestProcessEpochSetupWithSameParticipants() {
-	participantsFromCurrentEpochSetup, err := flow.ComposeFullIdentities(s.parentProtocolState.CurrentEpochSetup.Participants,
-		s.parentProtocolState.CurrentEpoch.ActiveIdentities)
+	participantsFromCurrentEpochSetup, err := flow.ComposeFullIdentities(
+		s.parentProtocolState.CurrentEpochSetup.Participants,
+		s.parentProtocolState.CurrentEpoch.ActiveIdentities,
+		flow.EpochParticipationStatusActive,
+	)
 	require.NoError(s.T(), err)
 	// Function `ComposeFullIdentities` verified that `Participants` and `ActiveIdentities` have identical ordering w.r.t nodeID.
 	// By construction, `participantsFromCurrentEpochSetup` lists the full Identities in the same ordering as `Participants` and

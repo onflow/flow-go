@@ -383,11 +383,11 @@ func BuildIdentityTable(
 			EpochParticipationStatusJoining.String(),
 			adjacentIdentitiesStatus)
 	}
-	targetEpochParticipants, err := ComposeFullIdentities(targetEpochIdentitySkeletons, targetEpochDynamicIdentities)
+	targetEpochParticipants, err := ComposeFullIdentities(targetEpochIdentitySkeletons, targetEpochDynamicIdentities, EpochParticipationStatusActive)
 	if err != nil {
 		return nil, fmt.Errorf("could not reconstruct participants for target epoch: %w", err)
 	}
-	adjacentEpochParticipants, err := ComposeFullIdentities(adjacentEpochIdentitySkeletons, adjacentEpochDynamicIdentities)
+	adjacentEpochParticipants, err := ComposeFullIdentities(adjacentEpochIdentitySkeletons, adjacentEpochDynamicIdentities, adjacentIdentitiesStatus)
 	if err != nil {
 		return nil, fmt.Errorf("could not reconstruct participants for adjacent epoch: %w", err)
 	}
@@ -399,11 +399,7 @@ func BuildIdentityTable(
 	//     in the adjacent epoch, we use the IdentitySkeleton for the target epoch (for example,
 	//     to account for changes of keys, address, initial weight, etc).
 	//  2. Canonical ordering
-	allEpochParticipants := targetEpochParticipants.Union(adjacentEpochParticipants.Map(func(identity Identity) Identity {
-		identity.EpochParticipationStatus = adjacentIdentitiesStatus
-		return identity
-	}))
-	return allEpochParticipants, nil
+	return targetEpochParticipants.Union(adjacentEpochParticipants), nil
 }
 
 // DynamicIdentityEntryListFromIdentities converts IdentityList to DynamicIdentityEntryList.
@@ -420,11 +416,13 @@ func DynamicIdentityEntryListFromIdentities(identities IdentityList) DynamicIden
 
 // ComposeFullIdentities combines identity skeletons and dynamic identities to produce a flow.IdentityList.
 // It enforces that the input slices `skeletons` and `dynamics` list the same identities (compared by nodeID)
-// in the same order. Otherwise, an exception is returned.
+// in the same order. Otherwise, an exception is returned. For each identity i, we set
+// `i.EpochParticipationStatus` to the `defaultEpochParticipationStatus` _unless_ i is ejected.
 // No errors are expected during normal operations.
 func ComposeFullIdentities(
 	skeletons IdentitySkeletonList,
 	dynamics DynamicIdentityEntryList,
+	defaultEpochParticipationStatus EpochParticipationStatus,
 ) (IdentityList, error) {
 	// sanity check: list of skeletons and dynamic should be the same
 	if len(skeletons) != len(dynamics) {
@@ -438,7 +436,7 @@ func ComposeFullIdentities(
 		if dynamics[i].NodeID != skeletons[i].NodeID {
 			return nil, fmt.Errorf("identites in protocol state are not consistently ordered: expected %s, got %s", skeletons[i].NodeID, dynamics[i].NodeID)
 		}
-		status := EpochParticipationStatusActive
+		status := defaultEpochParticipationStatus
 		if dynamics[i].Ejected {
 			status = EpochParticipationStatusEjected
 		}
