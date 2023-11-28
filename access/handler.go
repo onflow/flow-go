@@ -320,50 +320,6 @@ func (h *Handler) GetTransactionResultsByBlockID(
 	return message, nil
 }
 
-func (h *Handler) GetSystemTransaction(
-	ctx context.Context,
-	req *access.GetSystemTransactionRequest,
-) (*access.TransactionResponse, error) {
-	metadata := h.buildMetadataResponse()
-
-	id, err := convert.BlockID(req.GetBlockId())
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
-	}
-
-	tx, err := h.api.GetSystemTransaction(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-
-	return &access.TransactionResponse{
-		Transaction: convert.TransactionToMessage(*tx),
-		Metadata:    metadata,
-	}, nil
-}
-
-func (h *Handler) GetSystemTransactionResult(
-	ctx context.Context,
-	req *access.GetSystemTransactionResultRequest,
-) (*access.TransactionResultResponse, error) {
-	metadata := h.buildMetadataResponse()
-
-	id, err := convert.BlockID(req.GetBlockId())
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid block id: %v", err)
-	}
-
-	result, err := h.api.GetSystemTransactionResult(ctx, id, req.GetEventEncodingVersion())
-	if err != nil {
-		return nil, err
-	}
-
-	message := TransactionResultToMessage(result)
-	message.Metadata = metadata
-
-	return message, nil
-}
-
 func (h *Handler) GetTransactionsByBlockID(
 	ctx context.Context,
 	req *access.GetTransactionsByBlockIDRequest,

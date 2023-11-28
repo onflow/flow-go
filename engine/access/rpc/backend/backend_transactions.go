@@ -565,66 +565,6 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 	}, nil
 }
 
-// GetSystemTransaction returns system transaction
-func (b *backendTransactions) GetSystemTransaction(ctx context.Context, _ flow.Identifier) (*flow.TransactionBody, error) {
-	systemTx, err := blueprints.SystemChunkTransaction(b.chainID.Chain())
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "could not get system chunk transaction: %v", err)
-	}
-
-	return systemTx, nil
-}
-
-// GetSystemTransactionResult returns system transaction result
-func (b *backendTransactions) GetSystemTransactionResult(ctx context.Context, blockID flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) (*access.TransactionResult, error) {
-	block, err := b.blocks.ByID(blockID)
-	if err != nil {
-		return nil, rpc.ConvertStorageError(err)
-	}
-
-	req := &execproto.GetTransactionsByBlockIDRequest{
-		BlockId: blockID[:],
-	}
-	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
-	if err != nil {
-		if IsInsufficientExecutionReceipts(err) {
-			return nil, status.Errorf(codes.NotFound, err.Error())
-		}
-		return nil, rpc.ConvertError(err, "failed to retrieve result from any execution node", codes.Internal)
-	}
-
-	resp, err := b.getTransactionResultsByBlockIDFromAnyExeNode(ctx, execNodes, req)
-	if err != nil {
-		return nil, rpc.ConvertError(err, "failed to retrieve result from execution node", codes.Internal)
-	}
-
-	systemTx, err := blueprints.SystemChunkTransaction(b.chainID.Chain())
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "could not get system chunk transaction: %v", err)
-	}
-
-	systemTxResult := resp.TransactionResults[len(resp.TransactionResults)-1]
-	systemTxStatus, err := b.deriveTransactionStatus(systemTx, true, block)
-	if err != nil {
-		return nil, rpc.ConvertStorageError(err)
-	}
-
-	events, err := convert.MessagesToEventsWithEncodingConversion(systemTxResult.GetEvents(), resp.GetEventEncodingVersion(), requiredEventEncodingVersion)
-	if err != nil {
-		return nil, rpc.ConvertError(err, "failed to convert events from system tx result", codes.Internal)
-	}
-
-	return &access.TransactionResult{
-		Status:        systemTxStatus,
-		StatusCode:    uint(systemTxResult.GetStatusCode()),
-		Events:        events,
-		ErrorMessage:  systemTxResult.GetErrorMessage(),
-		BlockID:       blockID,
-		TransactionID: systemTx.ID(),
-		BlockHeight:   block.Header.Height,
-	}, nil
-}
-
 // deriveTransactionStatus derives the transaction status based on current protocol state
 func (b *backendTransactions) deriveTransactionStatus(
 	tx *flow.TransactionBody,

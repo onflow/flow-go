@@ -144,18 +144,6 @@ func (h *FlowAccessAPIRouter) GetTransactionResultByIndex(context context.Contex
 	return res, err
 }
 
-func (h *FlowAccessAPIRouter) GetSystemTransaction(context context.Context, req *access.GetSystemTransactionRequest) (*access.TransactionResponse, error) {
-	res, err := h.Upstream.GetSystemTransaction(context, req)
-	h.log("upstream", "GetSystemTransaction", err)
-	return res, err
-}
-
-func (h *FlowAccessAPIRouter) GetSystemTransactionResult(context context.Context, req *access.GetSystemTransactionResultRequest) (*access.TransactionResultResponse, error) {
-	res, err := h.Upstream.GetSystemTransactionResult(context, req)
-	h.log("upstream", "GetSystemTransactionResult", err)
-	return res, err
-}
-
 func (h *FlowAccessAPIRouter) GetAccount(context context.Context, req *access.GetAccountRequest) (*access.GetAccountResponse, error) {
 	res, err := h.Upstream.GetAccount(context, req)
 	h.log("upstream", "GetAccount", err)
@@ -364,26 +352,6 @@ func (h *FlowAccessAPIForwarder) GetTransactionResult(context context.Context, r
 	}
 	defer closer.Close()
 	return upstream.GetTransactionResult(context, req)
-}
-
-func (h *FlowAccessAPIForwarder) GetSystemTransaction(context context.Context, req *access.GetSystemTransactionRequest) (*access.TransactionResponse, error) {
-	// This is a passthrough request
-	upstream, closer, err := h.FaultTolerantClient()
-	if err != nil {
-		return nil, err
-	}
-	defer closer.Close()
-	return upstream.GetSystemTransaction(context, req)
-}
-
-func (h *FlowAccessAPIForwarder) GetSystemTransactionResult(context context.Context, req *access.GetSystemTransactionResultRequest) (*access.TransactionResultResponse, error) {
-	// This is a passthrough request
-	upstream, closer, err := h.FaultTolerantClient()
-	if err != nil {
-		return nil, err
-	}
-	defer closer.Close()
-	return upstream.GetSystemTransactionResult(context, req)
 }
 
 func (h *FlowAccessAPIForwarder) GetTransactionResultByIndex(context context.Context, req *access.GetTransactionByIndexRequest) (*access.TransactionResultResponse, error) {
