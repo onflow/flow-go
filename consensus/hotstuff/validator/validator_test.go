@@ -584,7 +584,7 @@ func (qs *QCSuite) SetupTest() {
 	// create a list of 10 nodes with 1-weight each
 	qs.participants = unittest.IdentityListFixture(10,
 		unittest.WithRole(flow.RoleConsensus),
-		unittest.WithWeight(1),
+		unittest.WithInitialWeight(1),
 	).Sort(order.Canonical[flow.Identity]).ToSkeleton()
 
 	// signers are a qualified majority at 7
@@ -742,7 +742,7 @@ func (s *TCSuite) SetupTest() {
 	// create a list of 10 nodes with 1-weight each
 	s.participants = unittest.IdentityListFixture(10,
 		unittest.WithRole(flow.RoleConsensus),
-		unittest.WithWeight(1),
+		unittest.WithInitialWeight(1),
 	).Sort(order.Canonical[flow.Identity]).ToSkeleton()
 
 	// signers are a qualified majority at 7

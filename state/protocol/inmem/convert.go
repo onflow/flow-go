@@ -353,21 +353,19 @@ func SnapshotFromBootstrapStateWithParams(
 // ProtocolStateFromEpochServiceEvents generates a protocol.ProtocolStateEntry for a root protocol state which is used for bootstrapping.
 //
 // CONTEXT: The EpochSetup event contains the IdentitySkeletons for each participant, thereby specifying active epoch members.
-// While ejection status and dynamic weight are not part of the EpochSetup event, we can supplement this information as follows:
+// While ejection status is not part of the EpochSetup event, we can supplement this information as follows:
 //   - Per convention, service events are delivered (asynchronously) in an *order-preserving* manner. Furthermore,
 //     node ejection is also mediated by system smart contracts and delivered via service events.
-//   - Therefore, the EpochSetup event contains the up-to-date snapshot of the epoch participants. Any weight changes or node ejection
+//   - Therefore, the EpochSetup event contains the up-to-date snapshot of the epoch participants. Any node ejection
 //     that happened before should be reflected in the EpochSetup event. Specifically, ejected
-//     nodes should be no longer listed in the EpochSetup event. Hence, when the EpochSetup event is emitted / processed, the Ejected flag is false for all epoch participants.
+//     nodes should be no longer listed in the EpochSetup event.
+//     Hence, when the EpochSetup event is emitted / processed, the ejected flag is false for all epoch participants.
 func ProtocolStateFromEpochServiceEvents(setup *flow.EpochSetup, commit *flow.EpochCommit) *flow.ProtocolStateEntry {
 	identities := make(flow.DynamicIdentityEntryList, 0, len(setup.Participants))
 	for _, identity := range setup.Participants {
 		identities = append(identities, &flow.DynamicIdentityEntry{
-			NodeID: identity.NodeID,
-			Dynamic: flow.DynamicIdentity{
-				Weight:  identity.InitialWeight,
-				Ejected: false,
-			},
+			NodeID:  identity.NodeID,
+			Ejected: false,
 		})
 	}
 	return &flow.ProtocolStateEntry{

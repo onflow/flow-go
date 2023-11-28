@@ -74,7 +74,7 @@ func createSignerData(t *testing.T, n int) *ParticipantData {
 			identity.NodeID,
 			identity.Role,
 			identity.Address,
-			identity.Weight,
+			identity.InitialWeight,
 			networkingKeys[i],
 			stakingKeys[i],
 		)

@@ -80,7 +80,7 @@ var (
 //
 // NOTE: The protocol state includes nodes from the previous/next epoch that should
 // be included in network communication. We omit any nodes that have been ejected.
-var NotEjectedFilter = filter.Not(filter.Ejected)
+var NotEjectedFilter = filter.Not(filter.HasParticipationStatus(flow.EpochParticipationStatusEjected))
 
 // Network serves as the comprehensive networking layer that integrates three interfaces within Flow; Underlay, EngineRegistry, and ConduitAdapter.
 // It is responsible for creating conduits through which engines can send and receive messages to and from other engines on the network, as well as registering other services

@@ -23,11 +23,8 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		identities := make(flow.DynamicIdentityEntryList, 0, len(setup.Participants))
 		for _, identity := range setup.Participants {
 			identities = append(identities, &flow.DynamicIdentityEntry{
-				NodeID: identity.NodeID,
-				Dynamic: flow.DynamicIdentity{
-					Weight:  identity.InitialWeight,
-					Ejected: false,
-				},
+				NodeID:  identity.NodeID,
+				Ejected: false,
 			})
 		}
 		stateEntry := &flow.ProtocolStateEntry{
@@ -49,7 +46,13 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 			nil,
 		)
 		assert.NoError(t, err)
-		expectedIdentities, err := flow.BuildIdentityTable(setup.Participants, identities, nil, nil)
+		expectedIdentities, err := flow.BuildIdentityTable(
+			setup.Participants,
+			identities,
+			nil,
+			nil,
+			flow.EpochParticipationStatusLeaving,
+		)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedIdentities, entry.CurrentEpochIdentityTable, "should be equal to current epoch setup participants")
 	})
@@ -75,6 +78,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 			stateEntry.CurrentEpoch.ActiveIdentities,
 			stateEntry.PreviousEpochSetup.Participants,
 			stateEntry.PreviousEpoch.ActiveIdentities,
+			flow.EpochParticipationStatusLeaving,
 		)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedIdentities, richEntry.CurrentEpochIdentityTable, "should be equal to current epoch setup participants + previous epoch setup participants")
@@ -106,6 +110,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 			stateEntry.CurrentEpoch.ActiveIdentities,
 			stateEntry.NextEpochSetup.Participants,
 			stateEntry.NextEpoch.ActiveIdentities,
+			flow.EpochParticipationStatusJoining,
 		)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedIdentities, richEntry.CurrentEpochIdentityTable, "should be equal to current epoch setup participants + next epoch setup participants")
@@ -115,6 +120,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 			stateEntry.NextEpoch.ActiveIdentities,
 			stateEntry.CurrentEpochSetup.Participants,
 			stateEntry.CurrentEpoch.ActiveIdentities,
+			flow.EpochParticipationStatusLeaving,
 		)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedIdentities, richEntry.NextEpochIdentityTable, "should be equal to next epoch setup participants + current epoch setup participants")
@@ -144,6 +150,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 			stateEntry.CurrentEpoch.ActiveIdentities,
 			stateEntry.NextEpochSetup.Participants,
 			stateEntry.NextEpoch.ActiveIdentities,
+			flow.EpochParticipationStatusJoining,
 		)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedIdentities, richEntry.CurrentEpochIdentityTable, "should be equal to current epoch setup participants + next epoch setup participants")
@@ -152,6 +159,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 			stateEntry.NextEpoch.ActiveIdentities,
 			stateEntry.CurrentEpochSetup.Participants,
 			stateEntry.CurrentEpoch.ActiveIdentities,
+			flow.EpochParticipationStatusLeaving,
 		)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedIdentities, richEntry.NextEpochIdentityTable, "should be equal to next epoch setup participants + current epoch setup participants")
@@ -175,15 +183,12 @@ func TestProtocolStateEntry_Copy(t *testing.T) {
 	assert.NotEqual(t, entry, cpy)
 
 	assert.Equal(t, entry.CurrentEpoch.ActiveIdentities[0], cpy.CurrentEpoch.ActiveIdentities[0])
-	cpy.CurrentEpoch.ActiveIdentities[0].Dynamic.Weight = 123
+	cpy.CurrentEpoch.ActiveIdentities[0].Ejected = true
 	assert.NotEqual(t, entry.CurrentEpoch.ActiveIdentities[0], cpy.CurrentEpoch.ActiveIdentities[0])
 
 	cpy.CurrentEpoch.ActiveIdentities = append(cpy.CurrentEpoch.ActiveIdentities, &flow.DynamicIdentityEntry{
-		NodeID: unittest.IdentifierFixture(),
-		Dynamic: flow.DynamicIdentity{
-			Weight:  100,
-			Ejected: false,
-		},
+		NodeID:  unittest.IdentifierFixture(),
+		Ejected: false,
 	})
 	assert.NotEqual(t, entry.CurrentEpoch.ActiveIdentities, cpy.CurrentEpoch.ActiveIdentities)
 }
@@ -191,6 +196,24 @@ func TestProtocolStateEntry_Copy(t *testing.T) {
 // TestBuildIdentityTable tests if BuildIdentityTable returns a correct identity, whenever we pass arguments with or without
 // overlap. It also tests if the function returns an error when the arguments are not ordered in the same order.
 func TestBuildIdentityTable(t *testing.T) {
+	t.Run("invalid-adjacent-identity-status", func(t *testing.T) {
+		targetEpochIdentities := unittest.IdentityListFixture(10).Sort(order.Canonical[flow.Identity])
+		adjacentEpochIdentities := unittest.IdentityListFixture(10).Sort(order.Canonical[flow.Identity])
+
+		// Per convention, BuildIdentityTable only accepts EpochParticipationStatusLeaving or EpochParticipationStatusJoining
+		// for the *adjacent* epoch, because these are the only sensible values.
+		for _, status := range []flow.EpochParticipationStatus{flow.EpochParticipationStatusActive, flow.EpochParticipationStatusEjected} {
+			identityList, err := flow.BuildIdentityTable(
+				targetEpochIdentities.ToSkeleton(),
+				flow.DynamicIdentityEntryListFromIdentities(targetEpochIdentities),
+				adjacentEpochIdentities.ToSkeleton(),
+				flow.DynamicIdentityEntryListFromIdentities(adjacentEpochIdentities),
+				status,
+			)
+			assert.Error(t, err)
+			assert.Empty(t, identityList)
+		}
+	})
 	t.Run("happy-path-no-identities-overlap", func(t *testing.T) {
 		targetEpochIdentities := unittest.IdentityListFixture(10).Sort(order.Canonical[flow.Identity])
 		adjacentEpochIdentities := unittest.IdentityListFixture(10).Sort(order.Canonical[flow.Identity])
@@ -200,11 +223,12 @@ func TestBuildIdentityTable(t *testing.T) {
 			flow.DynamicIdentityEntryListFromIdentities(targetEpochIdentities),
 			adjacentEpochIdentities.ToSkeleton(),
 			flow.DynamicIdentityEntryListFromIdentities(adjacentEpochIdentities),
+			flow.EpochParticipationStatusLeaving,
 		)
 		assert.NoError(t, err)
 
 		expectedIdentities := targetEpochIdentities.Union(adjacentEpochIdentities.Map(func(identity flow.Identity) flow.Identity {
-			identity.Weight = 0
+			identity.EpochParticipationStatus = flow.EpochParticipationStatusLeaving
 			return identity
 		}))
 		assert.Equal(t, expectedIdentities, identityList)
@@ -219,17 +243,19 @@ func TestBuildIdentityTable(t *testing.T) {
 			adjacentEpochIdentities = append(adjacentEpochIdentities, identity)
 		}
 		assert.NoError(t, err)
+		adjacentEpochIdentities = adjacentEpochIdentities.Sort(order.Canonical[flow.Identity])
 
 		identityList, err := flow.BuildIdentityTable(
 			targetEpochIdentities.ToSkeleton(),
 			flow.DynamicIdentityEntryListFromIdentities(targetEpochIdentities),
 			adjacentEpochIdentities.ToSkeleton(),
 			flow.DynamicIdentityEntryListFromIdentities(adjacentEpochIdentities),
+			flow.EpochParticipationStatusJoining,
 		)
 		assert.NoError(t, err)
 
 		expectedIdentities := targetEpochIdentities.Union(adjacentEpochIdentities.Map(func(identity flow.Identity) flow.Identity {
-			identity.Weight = 0
+			identity.EpochParticipationStatus = flow.EpochParticipationStatusJoining
 			return identity
 		}))
 		assert.Equal(t, expectedIdentities, identityList)
@@ -246,6 +272,7 @@ func TestBuildIdentityTable(t *testing.T) {
 			targetEpochDynamicIdentities,
 			adjacentEpochIdentities.ToSkeleton(),
 			flow.DynamicIdentityEntryListFromIdentities(adjacentEpochIdentities),
+			flow.EpochParticipationStatusLeaving,
 		)
 		assert.Error(t, err)
 		assert.Empty(t, identityList)
@@ -262,6 +289,7 @@ func TestBuildIdentityTable(t *testing.T) {
 			flow.DynamicIdentityEntryListFromIdentities(targetEpochIdentities),
 			adjacentEpochIdentitySkeletons,
 			adjacentEpochDynamicIdentities,
+			flow.EpochParticipationStatusLeaving,
 		)
 		assert.Error(t, err)
 		assert.Empty(t, identityList)

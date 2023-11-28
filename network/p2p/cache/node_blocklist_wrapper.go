@@ -134,15 +134,15 @@ func (w *NodeDisallowListingWrapper) Identities(filter flow.IdentityFilter[flow.
 		return identities
 	}
 
-	// Iterate over all returned identities and set ejected flag to true. We
-	// copy both the return slice and identities of blocked nodes to avoid
+	// Iterate over all returned identities and set the `EpochParticipationStatus` to `flow.EpochParticipationStatusEjected`.
+	// We copy both the return slice and identities of blocked nodes to avoid
 	// any possibility of accidentally modifying the wrapped IdentityProvider
 	idtx := make(flow.IdentityList, 0, len(identities))
 	w.m.RLock()
 	for _, identity := range identities {
 		if w.disallowList.Contains(identity.NodeID) {
-			var i = *identity // shallow copy is sufficient, because `Ejected` flag is in top-level struct
-			i.Ejected = true
+			var i = *identity // shallow copy is sufficient, because `EpochParticipationStatus` is a value type in DynamicIdentity which is also a value type.
+			i.EpochParticipationStatus = flow.EpochParticipationStatusEjected
 			if filter(&i) { // we need to check the filter here again, because the filter might drop ejected nodes and we are modifying the ejected status here
 				idtx = append(idtx, &i)
 			}
@@ -170,7 +170,7 @@ func (w *NodeDisallowListingWrapper) ByNodeID(identifier flow.Identifier) (*flow
 //   - If the node's identity is nil, there is nothing to do because we don't generate identities here.
 //   - If the node is already ejected, we don't have to check the disallowList.
 func (w *NodeDisallowListingWrapper) setEjectedIfBlocked(identity *flow.Identity) *flow.Identity {
-	if identity == nil || identity.Ejected {
+	if identity == nil || identity.IsEjected() {
 		return identity
 	}
 
@@ -181,11 +181,12 @@ func (w *NodeDisallowListingWrapper) setEjectedIfBlocked(identity *flow.Identity
 		return identity
 	}
 
-	// For blocked nodes, we want to return their `Identity` with the `Ejected` flag
-	// set to true. Caution: we need to copy the `Identity` before we override `Ejected`, as we
+	// For blocked nodes, we want to return their `Identity` with the `EpochParticipationStatus`
+	// set to `flow.EpochParticipationStatusEjected`.
+	// Caution: we need to copy the `Identity` before we override `EpochParticipationStatus`, as we
 	// would otherwise potentially change the wrapped IdentityProvider.
-	var i = *identity // shallow copy is sufficient, because `Ejected` flag is in top-level struct
-	i.Ejected = true
+	var i = *identity // shallow copy is sufficient, because `EpochParticipationStatus` is a value type in DynamicIdentity which is also a value type.
+	i.EpochParticipationStatus = flow.EpochParticipationStatusEjected
 	return &i
 }
 

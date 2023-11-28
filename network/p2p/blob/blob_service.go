@@ -281,7 +281,7 @@ func AuthorizedRequester(
 			Logger()
 
 		// TODO: when execution data verification is enabled, add verification nodes here
-		if (id.Role != flow.RoleExecution && id.Role != flow.RoleAccess) || id.Ejected {
+		if (id.Role != flow.RoleExecution && id.Role != flow.RoleAccess) || id.IsEjected() {
 			lg.Warn().
 				Bool(logging.KeySuspicious, true).
 				Msg("rejecting request from peer: unauthorized")

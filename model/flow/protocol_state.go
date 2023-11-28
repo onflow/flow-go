@@ -8,7 +8,7 @@ import (
 // DynamicIdentityEntry encapsulates nodeID and dynamic portion of identity.
 type DynamicIdentityEntry struct {
 	NodeID  Identifier
-	Dynamic DynamicIdentity
+	Ejected bool
 }
 
 type DynamicIdentityEntryList []*DynamicIdentityEntry
@@ -165,13 +165,13 @@ func NewRichProtocolStateEntry(
 		return nil, fmt.Errorf("supplied current epoch's commit event (%x) does not match commitment (%x) in ProtocolStateEntry", currentEpochCommit.ID(), protocolState.CurrentEpoch.CommitID)
 	}
 
-	// if we are in staking phase (i.e. protocolState.NextEpoch == nil):
-	//  (1) Full identity table for current epoch contains active identities from current epoch.
-	//      If previous epoch exists, we add nodes from previous epoch that are leaving in the current epoch with 0 weight.
-	// otherwise, we are in epoch setup or epoch commit phase (i.e. protocolState.NextEpoch ≠ nil):
-	//  (2a) full identity table for current is active identities from current epoch + nodes joining in next epoch with 0 weight
-	//  (2b) furthermore, we also build the full identity table for the next epoch's staking phase:
-	//    active identities from next epoch + nodes from current epoch that are leaving at the end of the current epoch with 0 weight
+	// If we are in staking phase (i.e. protocolState.NextEpoch == nil):
+	//  (1) Full identity table contains active identities from current epoch.
+	//      If previous epoch exists, we add nodes from previous epoch that are leaving in the current epoch with `EpochParticipationStatusLeaving` status.
+	// Otherwise, we are in epoch setup or epoch commit phase (i.e. protocolState.NextEpoch ≠ nil):
+	//  (2a) Full identity table contains active identities from current epoch + nodes joining in next epoch with `EpochParticipationStatusJoining` status.
+	//  (2b) Furthermore, we also build the full identity table for the next epoch's staking phase:
+	//       active identities from next epoch + nodes from current epoch that are leaving at the end of the current epoch with `flow.EpochParticipationStatusLeaving` status.
 	var err error
 	nextEpoch := protocolState.NextEpoch
 	if nextEpoch == nil { // in staking phase: build full identity table for current epoch according to (1)
@@ -186,6 +186,7 @@ func NewRichProtocolStateEntry(
 			protocolState.CurrentEpoch.ActiveIdentities,
 			previousEpochIdentitySkeletons,
 			previousEpochDynamicIdentities,
+			EpochParticipationStatusLeaving,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not build identity table for staking phase: %w", err)
@@ -206,6 +207,7 @@ func NewRichProtocolStateEntry(
 			protocolState.CurrentEpoch.ActiveIdentities,
 			nextEpochSetup.Participants,
 			nextEpoch.ActiveIdentities,
+			EpochParticipationStatusJoining,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not build identity table for setup/commit phase: %w", err)
@@ -216,6 +218,7 @@ func NewRichProtocolStateEntry(
 			nextEpoch.ActiveIdentities,
 			currentEpochSetup.Participants,
 			protocolState.CurrentEpoch.ActiveIdentities,
+			EpochParticipationStatusLeaving,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not build next epoch identity table: %w", err)
@@ -361,16 +364,30 @@ func (ll DynamicIdentityEntryList) Sort(less IdentifierOrder) DynamicIdentityEnt
 // (e.g. consider a spork comprising only a single epoch), in which case the respective inputs are nil or empty.
 //  3. [optional] An adjacent epoch's IdentitySkeletons as recorded in the adjacent epoch's setup event.
 //  4. [optional] An adjacent epoch's Dynamic Identities.
+//  5. An adjacent epoch's identities participation status, this could be joining or leaving depending on epoch phase.
 //
 // The function enforces that the input slices pertaining to the same epoch contain the same identities
 // (compared by nodeID) in the same order. Otherwise, an exception is returned.
 // No errors are expected during normal operation. All errors indicate inconsistent or invalid inputs.
-func BuildIdentityTable(targetEpochIdentitySkeletons IdentitySkeletonList, targetEpochDynamicIdentities DynamicIdentityEntryList, adjacentEpochIdentitySkeletons IdentitySkeletonList, adjacentEpochDynamicIdentities DynamicIdentityEntryList) (IdentityList, error) {
-	targetEpochParticipants, err := ComposeFullIdentities(targetEpochIdentitySkeletons, targetEpochDynamicIdentities)
+func BuildIdentityTable(
+	targetEpochIdentitySkeletons IdentitySkeletonList,
+	targetEpochDynamicIdentities DynamicIdentityEntryList,
+	adjacentEpochIdentitySkeletons IdentitySkeletonList,
+	adjacentEpochDynamicIdentities DynamicIdentityEntryList,
+	adjacentIdentitiesStatus EpochParticipationStatus,
+) (IdentityList, error) {
+	if adjacentIdentitiesStatus != EpochParticipationStatusLeaving &&
+		adjacentIdentitiesStatus != EpochParticipationStatusJoining {
+		return nil, fmt.Errorf("invalid adjacent identity status, expect %s or %s, got %s",
+			EpochParticipationStatusLeaving.String(),
+			EpochParticipationStatusJoining.String(),
+			adjacentIdentitiesStatus)
+	}
+	targetEpochParticipants, err := ComposeFullIdentities(targetEpochIdentitySkeletons, targetEpochDynamicIdentities, EpochParticipationStatusActive)
 	if err != nil {
 		return nil, fmt.Errorf("could not reconstruct participants for target epoch: %w", err)
 	}
-	adjacentEpochParticipants, err := ComposeFullIdentities(adjacentEpochIdentitySkeletons, adjacentEpochDynamicIdentities)
+	adjacentEpochParticipants, err := ComposeFullIdentities(adjacentEpochIdentitySkeletons, adjacentEpochDynamicIdentities, adjacentIdentitiesStatus)
 	if err != nil {
 		return nil, fmt.Errorf("could not reconstruct participants for adjacent epoch: %w", err)
 	}
@@ -382,12 +399,7 @@ func BuildIdentityTable(targetEpochIdentitySkeletons IdentitySkeletonList, targe
 	//     in the adjacent epoch, we use the IdentitySkeleton for the target epoch (for example,
 	//     to account for changes of keys, address, initial weight, etc).
 	//  2. Canonical ordering
-	allEpochParticipants := targetEpochParticipants.Union(adjacentEpochParticipants.Map(func(identity Identity) Identity {
-		identity.Weight = 0
-		return identity
-	}))
-
-	return allEpochParticipants, nil
+	return targetEpochParticipants.Union(adjacentEpochParticipants), nil
 }
 
 // DynamicIdentityEntryListFromIdentities converts IdentityList to DynamicIdentityEntryList.
@@ -396,7 +408,7 @@ func DynamicIdentityEntryListFromIdentities(identities IdentityList) DynamicIden
 	for _, identity := range identities {
 		dynamicIdentities = append(dynamicIdentities, &DynamicIdentityEntry{
 			NodeID:  identity.NodeID,
-			Dynamic: identity.DynamicIdentity,
+			Ejected: identity.IsEjected(),
 		})
 	}
 	return dynamicIdentities
@@ -404,9 +416,14 @@ func DynamicIdentityEntryListFromIdentities(identities IdentityList) DynamicIden
 
 // ComposeFullIdentities combines identity skeletons and dynamic identities to produce a flow.IdentityList.
 // It enforces that the input slices `skeletons` and `dynamics` list the same identities (compared by nodeID)
-// in the same order. Otherwise, an exception is returned.
+// in the same order. Otherwise, an exception is returned. For each identity i, we set
+// `i.EpochParticipationStatus` to the `defaultEpochParticipationStatus` _unless_ i is ejected.
 // No errors are expected during normal operations.
-func ComposeFullIdentities(skeletons IdentitySkeletonList, dynamics DynamicIdentityEntryList) (IdentityList, error) {
+func ComposeFullIdentities(
+	skeletons IdentitySkeletonList,
+	dynamics DynamicIdentityEntryList,
+	defaultEpochParticipationStatus EpochParticipationStatus,
+) (IdentityList, error) {
 	// sanity check: list of skeletons and dynamic should be the same
 	if len(skeletons) != len(dynamics) {
 		return nil, fmt.Errorf("invalid number of identities to reconstruct: expected %d, got %d", len(skeletons), len(dynamics))
@@ -419,9 +436,15 @@ func ComposeFullIdentities(skeletons IdentitySkeletonList, dynamics DynamicIdent
 		if dynamics[i].NodeID != skeletons[i].NodeID {
 			return nil, fmt.Errorf("identites in protocol state are not consistently ordered: expected %s, got %s", skeletons[i].NodeID, dynamics[i].NodeID)
 		}
+		status := defaultEpochParticipationStatus
+		if dynamics[i].Ejected {
+			status = EpochParticipationStatusEjected
+		}
 		result = append(result, &Identity{
 			IdentitySkeleton: *skeletons[i],
-			DynamicIdentity:  dynamics[i].Dynamic,
+			DynamicIdentity: DynamicIdentity{
+				EpochParticipationStatus: status,
+			},
 		})
 	}
 	return result, nil

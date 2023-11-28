@@ -228,12 +228,10 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult() {
 // TestProcessIncorporatedResult_InvalidIdentity tests a few scenarios where verifier identity is not correct
 // by one or another reason
 func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIdentity() {
-
-	s.Run("verifier zero-weight", func() {
-		identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-		identity.Weight = 0 // zero weight
-
-		state := &protocol.State{}
+	// mocks state to return invalid identity and creates assignment collector that will use it
+	// creating assignment collector with invalid identity should result in error
+	assertInvalidIdentity := func(identity *flow.Identity) {
+		state := protocol.NewState(s.T())
 		state.On("AtBlockID", mock.Anything).Return(
 			func(blockID flow.Identifier) realproto.Snapshot {
 				return unittest.StateSnapshotForKnownBlock(
@@ -247,45 +245,41 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 			s.SigHasher, s.Conduit, s.RequestTracker, 1)
 		require.Error(s.T(), err)
 		require.Nil(s.T(), collector)
+	}
+
+	s.Run("verifier-zero-weight", func() {
+		identity := unittest.IdentityFixture(
+			unittest.WithRole(flow.RoleVerification),
+			unittest.WithParticipationStatus(flow.EpochParticipationStatusActive),
+			unittest.WithInitialWeight(0),
+		)
+		assertInvalidIdentity(identity)
 	})
-
-	s.Run("verifier-ejected", func() {
-		identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-		identity.Ejected = true // node ejected
-
-		state := &protocol.State{}
-		state.On("AtBlockID", mock.Anything).Return(
-			func(blockID flow.Identifier) realproto.Snapshot {
-				return unittest.StateSnapshotForKnownBlock(
-					s.Block,
-					map[flow.Identifier]*flow.Identity{identity.NodeID: identity},
-				)
-			},
+	s.Run("verifier-leaving", func() {
+		identity := unittest.IdentityFixture(
+			unittest.WithRole(flow.RoleVerification),
+			unittest.WithParticipationStatus(flow.EpochParticipationStatusLeaving),
 		)
-
-		collector, err := newVerifyingAssignmentCollector(unittest.Logger(), s.WorkerPool, s.IncorporatedResult.Result, state, s.Headers, s.Assigner, s.SealsPL,
-			s.SigHasher, s.Conduit, s.RequestTracker, 1)
-		require.Nil(s.T(), collector)
-		require.Error(s.T(), err)
+		assertInvalidIdentity(identity)
+	})
+	s.Run("verifier-joining", func() {
+		identity := unittest.IdentityFixture(
+			unittest.WithRole(flow.RoleVerification),
+			unittest.WithParticipationStatus(flow.EpochParticipationStatusJoining),
+		)
+		assertInvalidIdentity(identity)
+	})
+	s.Run("verifier-ejected", func() {
+		identity := unittest.IdentityFixture(
+			unittest.WithRole(flow.RoleVerification),
+			unittest.WithParticipationStatus(flow.EpochParticipationStatusEjected),
+		)
+		assertInvalidIdentity(identity)
 	})
 	s.Run("verifier-invalid-role", func() {
 		// invalid role
 		identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
-
-		state := &protocol.State{}
-		state.On("AtBlockID", mock.Anything).Return(
-			func(blockID flow.Identifier) realproto.Snapshot {
-				return unittest.StateSnapshotForKnownBlock(
-					s.Block,
-					map[flow.Identifier]*flow.Identity{identity.NodeID: identity},
-				)
-			},
-		)
-
-		collector, err := newVerifyingAssignmentCollector(unittest.Logger(), s.WorkerPool, s.IncorporatedResult.Result, state, s.Headers, s.Assigner, s.SealsPL,
-			s.SigHasher, s.Conduit, s.RequestTracker, 1)
-		require.Nil(s.T(), collector)
-		require.Error(s.T(), err)
+		assertInvalidIdentity(identity)
 	})
 }
 

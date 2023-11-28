@@ -73,8 +73,11 @@ func (s *ReceiptValidationSuite) TestReceiptNoIdentity() {
 	s.Assert().True(engine.IsInvalidInputError(err))
 }
 
-// TestReceiptFromZeroWeightNode tests that we reject receipt from node with zero weight
-func (s *ReceiptValidationSuite) TestReceiptFromZeroWeightNode() {
+// TestReceiptFromNonActiveNode tests that we reject receipt from an execution node which is not authorized to participate:
+// - execution node is joining
+// - execution node is leaving
+// - execution node has zero initial weight.
+func (s *ReceiptValidationSuite) TestReceiptFromNonAuthorizedNode() {
 	valSubgrph := s.ValidSubgraphFixture()
 	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID),
 		unittest.WithResult(valSubgrph.Result))
@@ -85,12 +88,31 @@ func (s *ReceiptValidationSuite) TestReceiptFromZeroWeightNode() {
 		mock.Anything,
 		mock.Anything).Return(true, nil).Maybe() // call optional, as validator might check weight first
 
-	// replace weight with invalid one
-	s.Identities[s.ExeID].Weight = 0
+	s.Run("execution-node-leaving", func() {
+		// replace EN participation status
+		s.Identities[s.ExeID].EpochParticipationStatus = flow.EpochParticipationStatusLeaving
 
-	err := s.receiptValidator.Validate(receipt)
-	s.Require().Error(err, "should reject invalid weight")
-	s.Assert().True(engine.IsInvalidInputError(err))
+		err := s.receiptValidator.Validate(receipt)
+		s.Require().Error(err, "should reject invalid weight")
+		s.Assert().True(engine.IsInvalidInputError(err))
+	})
+	s.Run("execution-node-joining", func() {
+		// replace EN participation status
+		s.Identities[s.ExeID].EpochParticipationStatus = flow.EpochParticipationStatusJoining
+
+		err := s.receiptValidator.Validate(receipt)
+		s.Require().Error(err, "should reject invalid weight")
+		s.Assert().True(engine.IsInvalidInputError(err))
+	})
+	s.Run("execution-node-zero-weight", func() {
+		// replace EN participation status and initial weight
+		s.Identities[s.ExeID].EpochParticipationStatus = flow.EpochParticipationStatusActive
+		s.Identities[s.ExeID].InitialWeight = 0
+
+		err := s.receiptValidator.Validate(receipt)
+		s.Require().Error(err, "should reject invalid weight")
+		s.Assert().True(engine.IsInvalidInputError(err))
+	})
 }
 
 // TestReceiptInvalidRole tests that we reject receipt with invalid execution node role

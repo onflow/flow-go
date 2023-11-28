@@ -103,16 +103,13 @@ func (u *protocolStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (b
 
 		// sanity checking invariant (II.i):
 		currentEpochDynamicProperties, found := activeIdentitiesLookup[nextEpochIdentitySkeleton.NodeID]
-		if found && currentEpochDynamicProperties.Dynamic.Ejected { // invariance violated
+		if found && currentEpochDynamicProperties.Ejected { // invariance violated
 			return false, protocol.NewInvalidServiceEventErrorf("node %v is ejected in current epoch %d but readmitted by EpochSetup event for epoch %d", nextEpochIdentitySkeleton.NodeID, u.parentState.CurrentEpochSetup.Counter, epochSetup.Counter)
 		}
 
 		nextEpochActiveIdentities = append(nextEpochActiveIdentities, &flow.DynamicIdentityEntry{
-			NodeID: nextEpochIdentitySkeleton.NodeID,
-			Dynamic: flow.DynamicIdentity{
-				Weight:  nextEpochIdentitySkeleton.InitialWeight, // according to invariant (II.ii)
-				Ejected: false,
-			},
+			NodeID:  nextEpochIdentitySkeleton.NodeID,
+			Ejected: false, // according to invariant (II.i)
 		})
 	}
 

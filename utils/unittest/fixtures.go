@@ -1051,16 +1051,10 @@ func WithInitialWeight(weight uint64) func(*flow.Identity) {
 	}
 }
 
-// WithWeight sets the weight on an identity fixture.
-func WithWeight(weight uint64) func(*flow.Identity) {
+// WithParticipationStatus sets the epoch participation status on an identity fixture.
+func WithParticipationStatus(status flow.EpochParticipationStatus) func(*flow.Identity) {
 	return func(identity *flow.Identity) {
-		identity.Weight = weight
-	}
-}
-
-func WithEjected(ejected bool) func(*flow.Identity) {
-	return func(identity *flow.Identity) {
-		identity.Ejected = ejected
+		identity.EpochParticipationStatus = status
 	}
 }
 
@@ -1095,7 +1089,7 @@ func NodeConfigFixture(opts ...func(*flow.Identity)) bootstrap.NodeConfig {
 	return bootstrap.NodeConfig{
 		Role:    identity.Role,
 		Address: identity.Address,
-		Weight:  identity.Weight,
+		Weight:  identity.InitialWeight,
 	}
 }
 
@@ -1144,8 +1138,7 @@ func IdentityFixture(opts ...func(*flow.Identity)) *flow.Identity {
 			StakingPubKey: stakingKey.PublicKey(),
 		},
 		DynamicIdentity: flow.DynamicIdentity{
-			Weight:  1000,
-			Ejected: false,
+			EpochParticipationStatus: flow.EpochParticipationStatusActive,
 		},
 	}
 	for _, apply := range opts {
@@ -2610,8 +2603,7 @@ func RootProtocolStateFixture() *flow.RichProtocolStateEntry {
 		allIdentities = append(allIdentities, &flow.Identity{
 			IdentitySkeleton: *identity,
 			DynamicIdentity: flow.DynamicIdentity{
-				Weight:  identity.InitialWeight,
-				Ejected: false,
+				EpochParticipationStatus: flow.EpochParticipationStatusActive,
 			},
 		})
 	}
@@ -2670,8 +2662,7 @@ func ProtocolStateFixture(options ...func(*flow.RichProtocolStateEntry)) *flow.R
 			epochIdentities = append(epochIdentities, &flow.Identity{
 				IdentitySkeleton: *identity,
 				DynamicIdentity: flow.DynamicIdentity{
-					Weight:  identity.InitialWeight,
-					Ejected: false,
+					EpochParticipationStatus: flow.EpochParticipationStatusActive,
 				},
 			})
 		}
@@ -2680,7 +2671,8 @@ func ProtocolStateFixture(options ...func(*flow.RichProtocolStateEntry)) *flow.R
 
 	prevEpochIdentities := buildDefaultIdentities(prevEpochSetup)
 	currentEpochIdentities := buildDefaultIdentities(currentEpochSetup)
-	allIdentities := currentEpochIdentities.Union(prevEpochIdentities.Map(mapfunc.WithWeight(0)))
+	allIdentities := currentEpochIdentities.Union(
+		prevEpochIdentities.Map(mapfunc.WithEpochParticipationStatus(flow.EpochParticipationStatusLeaving)))
 
 	entry := &flow.RichProtocolStateEntry{
 		ProtocolStateEntry: &flow.ProtocolStateEntry{
@@ -2739,8 +2731,7 @@ func WithNextEpochProtocolState() func(entry *flow.RichProtocolStateEntry) {
 			nextEpochParticipants = append(nextEpochParticipants, &flow.Identity{
 				IdentitySkeleton: *identity,
 				DynamicIdentity: flow.DynamicIdentity{
-					Weight:  identity.InitialWeight,
-					Ejected: false,
+					EpochParticipationStatus: flow.EpochParticipationStatusActive,
 				},
 			})
 		}
@@ -2751,8 +2742,10 @@ func WithNextEpochProtocolState() func(entry *flow.RichProtocolStateEntry) {
 			return found
 		}).Sort(order.Canonical[flow.Identity])
 
-		entry.CurrentEpochIdentityTable = currentEpochParticipants.Union(nextEpochParticipants.Map(mapfunc.WithWeight(0)))
-		entry.NextEpochIdentityTable = nextEpochParticipants.Union(currentEpochParticipants.Map(mapfunc.WithWeight(0)))
+		entry.CurrentEpochIdentityTable = currentEpochParticipants.Union(
+			nextEpochParticipants.Map(mapfunc.WithEpochParticipationStatus(flow.EpochParticipationStatusJoining)))
+		entry.NextEpochIdentityTable = nextEpochParticipants.Union(
+			currentEpochParticipants.Map(mapfunc.WithEpochParticipationStatus(flow.EpochParticipationStatusLeaving)))
 
 		entry.NextEpoch = &flow.EpochStateContainer{
 			SetupID:          nextEpochSetup.ID(),

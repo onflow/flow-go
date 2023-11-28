@@ -4,12 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"regexp"
-	"strconv"
 
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/fxamacker/cbor/v2"
-	"github.com/pkg/errors"
 	"github.com/vmihailenco/msgpack"
 
 	"github.com/onflow/flow-go/crypto"
@@ -18,9 +15,6 @@ import (
 // DefaultInitialWeight is the default initial weight for a node identity.
 // It is equal to the default initial weight in the FlowIDTableStaking smart contract.
 const DefaultInitialWeight = 100
-
-// rxid is the regex for parsing node identity entries.
-var rxid = regexp.MustCompile(`^(collection|consensus|execution|verification|access)-([0-9a-fA-F]{64})@([\w\d]+|[\w\d][\w\d\-]*[\w\d](?:\.*[\w\d][\w\d\-]*[\w\d])*|[\w\d][\w\d\-]*[\w\d])(:[\d]+)?=(\d{1,20})$`)
 
 // IdentitySkeleton represents the static part of a network participant's (i.e. node's) public identity.
 type IdentitySkeleton struct {
@@ -40,28 +34,82 @@ type IdentitySkeleton struct {
 	NetworkPubKey crypto.PublicKey
 }
 
+// EpochParticipationStatus represents the status of a node's participation. Depending on what
+// changes were applied to the protocol state, a node may be in one of four states:
+// /   - joining - the node is not active in the current epoch and will be active in the next epoch.
+// /   - active - the node was included in the EpochSetup event for the current epoch and is actively participating in the current epoch.
+// /   - leaving - the node was active in the previous epoch but is not active in the current epoch.
+// /   - ejected - the node has been permanently removed from the network.
+//
+// /            EpochSetup
+// /	      ┌────────────⬤ unregistered ◯◄───────────┐
+// /	┌─────▼─────┐        ┌───────────┐        ┌─────┴─────┐
+// /	│  JOINING  ├───────►│  ACTIVE   ├───────►│  LEAVING  │
+// /	└─────┬─────┘        └─────┬─────┘        └─────┬─────┘
+// /	      │              ┌─────▼─────┐              │
+// /          └─────────────►│  EJECTED  │◄─────────────┘
+// /                         └───────────┘
+//
+// Only active nodes are allowed to perform certain tasks relative to other nodes.
+// Nodes which are registered to join at the next epoch will appear in the
+// identity table but aren't considered active until their first
+// epoch begins. Likewise, nodes which were registered in the previous epoch
+// but have left at the most recent epoch boundary will appear in the identity
+// table with leaving participation status.
+// A node may be ejected by either:
+//   - requesting self-ejection to protect its stake in case the node operator suspects
+//     the node's keys to be compromised
+//   - committing a serious protocol violation or multiple smaller misdemeanours.
+type EpochParticipationStatus int
+
+const (
+	EpochParticipationStatusJoining EpochParticipationStatus = iota
+	EpochParticipationStatusActive
+	EpochParticipationStatusLeaving
+	EpochParticipationStatusEjected
+)
+
+// String returns string representation of enum value.
+func (s EpochParticipationStatus) String() string {
+	return [...]string{
+		"EpochParticipationStatusJoining",
+		"EpochParticipationStatusActive",
+		"EpochParticipationStatusLeaving",
+		"EpochParticipationStatusEjected",
+	}[s]
+}
+
+// ParseEpochParticipationStatus converts string representation of EpochParticipationStatus into a typed value.
+// An exception will be returned if failed to convert.
+func ParseEpochParticipationStatus(s string) (EpochParticipationStatus, error) {
+	switch s {
+	case EpochParticipationStatusJoining.String():
+		return EpochParticipationStatusJoining, nil
+	case EpochParticipationStatusActive.String():
+		return EpochParticipationStatusActive, nil
+	case EpochParticipationStatusLeaving.String():
+		return EpochParticipationStatusLeaving, nil
+	case EpochParticipationStatusEjected.String():
+		return EpochParticipationStatusEjected, nil
+	default:
+		return 0, fmt.Errorf("invalid epoch participation status")
+	}
+}
+
+// EncodeRLP performs RLP encoding of custom type, it's need to be able to hash structures that include EpochParticipationStatus.
+// No errors are expected during normal operations.
+func (s EpochParticipationStatus) EncodeRLP(w io.Writer) error {
+	encodable := s.String()
+	err := rlp.Encode(w, encodable)
+	if err != nil {
+		return fmt.Errorf("could not encode rlp: %w", err)
+	}
+	return nil
+}
+
 // DynamicIdentity represents the dynamic part of public identity of one network participant (node).
 type DynamicIdentity struct {
-	// Weight represents the node's authority to perform certain tasks relative
-	// to other nodes.
-	//
-	// A node's weight is distinct from its stake. Stake represents the quantity
-	// of FLOW tokens held by the network in escrow during the course of the node's
-	// participation in the network. The stake is strictly managed by the service
-	// account smart contracts.
-	//
-	// Nodes which are registered to join at the next epoch will appear in the
-	// identity table but are considered to have zero weight up until their first
-	// epoch begins. Likewise, nodes which were registered in the previous epoch
-	// but have left at the most recent epoch boundary will appear in the identity
-	// table with zero weight.
-	Weight uint64
-	// Ejected represents whether a node has been permanently removed from the
-	// network. A node may be ejected by either:
-	// * requesting self-ejection to protect its stake in case the node operator suspects
-	//   the node's keys to be compromised
-	// * committing a serious protocol violation or multiple smaller misdemeanours
-	Ejected bool
+	EpochParticipationStatus
 }
 
 // Identity is combined from static and dynamic part and represents the full public identity of one network participant (node).
@@ -70,44 +118,14 @@ type Identity struct {
 	DynamicIdentity
 }
 
-// ParseIdentity parses a string representation of an identity.
-func ParseIdentity(identity string) (*Identity, error) {
-
-	// use the regex to match the four parts of an identity
-	matches := rxid.FindStringSubmatch(identity)
-	if len(matches) != 6 {
-		return nil, errors.New("invalid identity string format")
-	}
-
-	// none of these will error as they are checked by the regex
-	var nodeID Identifier
-	nodeID, err := HexStringToIdentifier(matches[2])
-	if err != nil {
-		return nil, err
-	}
-	address := matches[3] + matches[4]
-	role, _ := ParseRole(matches[1])
-	weight, _ := strconv.ParseUint(matches[5], 10, 64)
-
-	// create the identity
-	iy := Identity{
-		IdentitySkeleton: IdentitySkeleton{
-			NodeID:        nodeID,
-			Address:       address,
-			Role:          role,
-			InitialWeight: weight,
-		},
-		DynamicIdentity: DynamicIdentity{
-			Weight: weight,
-		},
-	}
-
-	return &iy, nil
+// IsEjected returns true if the node is ejected from the network.
+func (iy *DynamicIdentity) IsEjected() bool {
+	return iy.EpochParticipationStatus == EpochParticipationStatusEjected
 }
 
 // String returns a string representation of the identity.
 func (iy Identity) String() string {
-	return fmt.Sprintf("%s-%s@%s=%d", iy.Role, iy.NodeID.String(), iy.Address, iy.Weight)
+	return fmt.Sprintf("%s-%s@%s=%s", iy.Role, iy.NodeID.String(), iy.Address, iy.EpochParticipationStatus.String())
 }
 
 // String returns a string representation of the identity.
@@ -167,8 +185,7 @@ type encodableIdentitySkeleton struct {
 
 type encodableIdentity struct {
 	encodableIdentitySkeleton
-	Weight  uint64
-	Ejected bool
+	ParticipationStatus string
 }
 
 func encodableSkeletonFromIdentity(iy IdentitySkeleton) encodableIdentitySkeleton {
@@ -190,8 +207,7 @@ func encodableSkeletonFromIdentity(iy IdentitySkeleton) encodableIdentitySkeleto
 func encodableFromIdentity(iy Identity) encodableIdentity {
 	return encodableIdentity{
 		encodableIdentitySkeleton: encodableSkeletonFromIdentity(iy.IdentitySkeleton),
-		Weight:                    iy.Weight,
-		Ejected:                   iy.Ejected,
+		ParticipationStatus:       iy.EpochParticipationStatus.String(),
 	}
 }
 
@@ -291,8 +307,11 @@ func identityFromEncodable(ie encodableIdentity, identity *Identity) error {
 	if err != nil {
 		return fmt.Errorf("could not decode identity skeleton: %w", err)
 	}
-	identity.Weight = ie.Weight
-	identity.Ejected = ie.Ejected
+	participationStatus, err := ParseEpochParticipationStatus(ie.ParticipationStatus)
+	if err != nil {
+		return fmt.Errorf("could not decode epoch participation status: %w", err)
+	}
+	identity.EpochParticipationStatus = participationStatus
 	return nil
 }
 
@@ -407,13 +426,7 @@ func (iy *IdentitySkeleton) EqualTo(other *IdentitySkeleton) bool {
 }
 
 func (iy *DynamicIdentity) EqualTo(other *DynamicIdentity) bool {
-	if iy.Weight != other.Weight {
-		return false
-	}
-	if iy.Ejected != other.Ejected {
-		return false
-	}
-	return true
+	return iy.EpochParticipationStatus == other.EpochParticipationStatus
 }
 
 func (iy *Identity) EqualTo(other *Identity) bool {

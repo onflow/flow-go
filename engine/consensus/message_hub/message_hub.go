@@ -233,10 +233,11 @@ func (h *MessageHub) sendOwnTimeout(timeout *model.TimeoutObject) error {
 	log.Info().Msg("processing timeout broadcast request from hotstuff")
 
 	// Retrieve all consensus nodes (excluding myself).
-	// CAUTION: We must include also nodes with weight zero, because otherwise
+	// CAUTION: We must include consensus nodes that are joining, because otherwise
+	//          TCs might not be constructed at epoch switchover.
 	//          TCs might not be constructed at epoch switchover.
 	recipients, err := h.state.Final().Identities(filter.And(
-		filter.Not(filter.Ejected),
+		filter.IsValidCurrentEpochParticipantOrJoining,
 		filter.HasRole[flow.Identity](flow.RoleConsensus),
 		filter.Not(filter.HasNodeID[flow.Identity](h.me.NodeID())),
 	))
@@ -322,13 +323,14 @@ func (h *MessageHub) sendOwnProposal(header *flow.Header) error {
 	log.Debug().Msg("processing proposal broadcast request from hotstuff")
 
 	// Retrieve all consensus nodes (excluding myself).
-	// CAUTION: We must include also nodes with weight zero, because otherwise
-	//          new consensus nodes for the next epoch are left out.
+	// CAUTION: We must also include nodes that are joining, because otherwise new consensus
+	//          nodes for the next epoch are left out. As most nodes might be interested in
+	//          new proposals, we simply broadcast to all non-ejected nodes (excluding myself).
 	// Note: retrieving the final state requires a time-intensive database read.
 	//       Therefore, we execute this in a separate routine, because
 	//       `OnOwnTimeout` is directly called by the consensus core logic.
 	allIdentities, err := h.state.AtBlockID(header.ParentID).Identities(filter.And(
-		filter.Not(filter.Ejected),
+		filter.Not(filter.HasParticipationStatus(flow.EpochParticipationStatusEjected)),
 		filter.Not(filter.HasNodeID[flow.Identity](h.me.NodeID())),
 	))
 	if err != nil {

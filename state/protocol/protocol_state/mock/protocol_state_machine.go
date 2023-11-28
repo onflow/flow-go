@@ -47,6 +47,20 @@ func (_m *ProtocolStateMachine) Build() (*flow.ProtocolStateEntry, flow.Identifi
 	return r0, r1, r2
 }
 
+// EjectIdentity provides a mock function with given fields: nodeID
+func (_m *ProtocolStateMachine) EjectIdentity(nodeID flow.Identifier) error {
+	ret := _m.Called(nodeID)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(flow.Identifier) error); ok {
+		r0 = rf(nodeID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // ParentState provides a mock function with given fields:
 func (_m *ProtocolStateMachine) ParentState() *flow.RichProtocolStateEntry {
 	ret := _m.Called()
@@ -118,20 +132,6 @@ func (_m *ProtocolStateMachine) TransitionToNextEpoch() error {
 	var r0 error
 	if rf, ok := ret.Get(0).(func() error); ok {
 		r0 = rf()
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// UpdateIdentity provides a mock function with given fields: updated
-func (_m *ProtocolStateMachine) UpdateIdentity(updated *flow.DynamicIdentityEntry) error {
-	ret := _m.Called(updated)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.DynamicIdentityEntry) error); ok {
-		r0 = rf(updated)
 	} else {
 		r0 = ret.Error(0)
 	}

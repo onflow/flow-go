@@ -92,21 +92,11 @@ func HasInitialWeight[T flow.GenericIdentity](hasWeight bool) flow.IdentityFilte
 	}
 }
 
-// HasWeight filters Identities by their weight:
-// When `hasWeight == true`:
-//   - for an input identity i, the filter returns true if and only if i's weight is greater than zero
-//
-// When `hasWeight == false`:
-//   - for an input identity i, the filter returns true if and only if i's weight is zero
-func HasWeight(hasWeight bool) flow.IdentityFilter[flow.Identity] {
+// HasParticipationStatus is a filter that returns true if the node epoch participation status matches the input.
+func HasParticipationStatus(status flow.EpochParticipationStatus) flow.IdentityFilter[flow.Identity] {
 	return func(identity *flow.Identity) bool {
-		return (identity.Weight > 0) == hasWeight
+		return identity.EpochParticipationStatus == status
 	}
-}
-
-// Ejected is a filter that returns true if the node is ejected.
-func Ejected(identity *flow.Identity) bool {
-	return identity.Ejected
 }
 
 // HasRole returns a filter for nodes with one of the input roles.
@@ -123,14 +113,15 @@ func HasRole[T flow.GenericIdentity](roles ...flow.Role) flow.IdentityFilter[T] 
 
 // IsValidCurrentEpochParticipant is an identity filter for members of the
 // current epoch in good standing.
-var IsValidCurrentEpochParticipant = And(
-	HasWeight(true),
-	Not(Ejected), // ejection will change signer index
-)
+// Effective it means that node is an active identity in current epoch and has not been ejected.
+var IsValidCurrentEpochParticipant = HasParticipationStatus(flow.EpochParticipationStatusActive)
+
+// IsValidCurrentEpochParticipantOrJoining is an identity filter for members of the current epoch or that are going to join in next epoch.
+var IsValidCurrentEpochParticipantOrJoining = Or(IsValidCurrentEpochParticipant, HasParticipationStatus(flow.EpochParticipationStatusJoining))
 
 // IsConsensusCommitteeMember is an identity filter for all members of the consensus committee.
 // Formally, a Node X is a Consensus Committee Member if and only if X is a consensus node with
-// positive initial stake. This is specified by the EpochSetup Event and remains static
+// positive initial weight. This is specified by the EpochSetup Event and remains static
 // throughout the epoch.
 var IsConsensusCommitteeMember = And(
 	HasRole[flow.IdentitySkeleton](flow.RoleConsensus),
@@ -139,9 +130,14 @@ var IsConsensusCommitteeMember = And(
 
 // IsVotingConsensusCommitteeMember is an identity filter for all members of
 // the consensus committee allowed to vote.
+// Formally, a Node X has authority to vote in the consensus process, if and only if
+//  1. Node X is an active member of the current epoch AND
+//  2. X is a consensus node with positive initial weight in the current Epoch. This
+//     is specified by the EpochSetup Event for the current epoch and remains static
+//     throughout the epoch.
 var IsVotingConsensusCommitteeMember = And[flow.Identity](
-	HasRole[flow.Identity](flow.RoleConsensus),
-	IsValidCurrentEpochParticipant,
+	IsValidCurrentEpochParticipant,    // enforces 1.
+	Adapt(IsConsensusCommitteeMember), // enforces 2.
 )
 
 // IsValidDKGParticipant is an identity filter for all DKG participants. It is

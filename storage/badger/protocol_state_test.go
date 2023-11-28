@@ -209,7 +209,11 @@ func assertRichProtocolStateValidity(t *testing.T, state *flow.RichProtocolState
 
 		// invariant: ComposeFullIdentities ensures that we can build full identities of previous epoch's active participants. This step also confirms that the
 		// previous epoch's `Participants` [IdentitySkeletons] and `ActiveIdentities` [DynamicIdentity properties] list the same nodes in canonical ordering.
-		previousEpochParticipants, err = flow.ComposeFullIdentities(state.PreviousEpochSetup.Participants, state.PreviousEpoch.ActiveIdentities)
+		previousEpochParticipants, err = flow.ComposeFullIdentities(
+			state.PreviousEpochSetup.Participants,
+			state.PreviousEpoch.ActiveIdentities,
+			flow.EpochParticipationStatusActive,
+		)
 		assert.NoError(t, err, "should be able to reconstruct previous epoch active participants")
 		// Function `ComposeFullIdentities` verified that `Participants` and `ActiveIdentities` have identical ordering w.r.t nodeID.
 		// By construction, `participantsFromCurrentEpochSetup` lists the full Identities in the same ordering as `Participants` and
@@ -220,7 +224,11 @@ func assertRichProtocolStateValidity(t *testing.T, state *flow.RichProtocolState
 
 	// invariant: ComposeFullIdentities ensures that we can build full identities of current epoch's *active* participants. This step also confirms that the
 	// current epoch's `Participants` [IdentitySkeletons] and `ActiveIdentities` [DynamicIdentity properties] list the same nodes in canonical ordering.
-	participantsFromCurrentEpochSetup, err := flow.ComposeFullIdentities(state.CurrentEpochSetup.Participants, state.CurrentEpoch.ActiveIdentities)
+	participantsFromCurrentEpochSetup, err := flow.ComposeFullIdentities(
+		state.CurrentEpochSetup.Participants,
+		state.CurrentEpoch.ActiveIdentities,
+		flow.EpochParticipationStatusActive,
+	)
 	assert.NoError(t, err, "should be able to reconstruct current epoch active participants")
 	require.True(t, participantsFromCurrentEpochSetup.Sorted(order.Canonical[flow.Identity]), "participants in current epoch's setup event are not in canonical order")
 
@@ -232,12 +240,16 @@ func assertRichProtocolStateValidity(t *testing.T, state *flow.RichProtocolState
 		// setup/commit phase
 		// invariant: ComposeFullIdentities ensures that we can build full identities of next epoch's *active* participants. This step also confirms that the
 		// next epoch's `Participants` [IdentitySkeletons] and `ActiveIdentities` [DynamicIdentity properties] list the same nodes in canonical ordering.
-		participantsFromNextEpochSetup, err = flow.ComposeFullIdentities(state.NextEpochSetup.Participants, state.NextEpoch.ActiveIdentities)
+		participantsFromNextEpochSetup, err = flow.ComposeFullIdentities(
+			state.NextEpochSetup.Participants,
+			state.NextEpoch.ActiveIdentities,
+			flow.EpochParticipationStatusActive,
+		)
 		assert.NoError(t, err, "should be able to reconstruct next epoch active participants")
-		allIdentities = participantsFromCurrentEpochSetup.Union(participantsFromNextEpochSetup.Map(mapfunc.WithWeight(0)))
+		allIdentities = participantsFromCurrentEpochSetup.Union(participantsFromNextEpochSetup.Copy().Map(mapfunc.WithEpochParticipationStatus(flow.EpochParticipationStatusJoining)))
 	} else {
 		// staking phase
-		allIdentities = participantsFromCurrentEpochSetup.Union(previousEpochParticipants.Map(mapfunc.WithWeight(0)))
+		allIdentities = participantsFromCurrentEpochSetup.Union(previousEpochParticipants.Copy().Map(mapfunc.WithEpochParticipationStatus(flow.EpochParticipationStatusLeaving)))
 	}
 	assert.Equal(t, allIdentities, state.CurrentEpochIdentityTable, "identities should be a full identity table for the current epoch, without duplicates")
 	require.True(t, allIdentities.Sorted(order.Canonical[flow.Identity]), "current epoch's identity table is not in canonical order")
@@ -258,6 +270,6 @@ func assertRichProtocolStateValidity(t *testing.T, state *flow.RichProtocolState
 	// invariants for `NextEpochIdentityTable`:
 	//  - full identity table containing *active* nodes for next epoch + weight-zero identities of current epoch
 	//  - Identities are sorted in canonical order. Without duplicates. Never nil.
-	allIdentities = participantsFromNextEpochSetup.Union(participantsFromCurrentEpochSetup.Map(mapfunc.WithWeight(0)))
+	allIdentities = participantsFromNextEpochSetup.Union(participantsFromCurrentEpochSetup.Copy().Map(mapfunc.WithEpochParticipationStatus(flow.EpochParticipationStatusLeaving)))
 	assert.Equal(t, allIdentities, state.NextEpochIdentityTable, "identities should be a full identity table for the next epoch, without duplicates")
 }
