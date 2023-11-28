@@ -325,7 +325,7 @@ func (c *ControlMsgValidationInspector) inspectPruneMessages(from peer.ID, prune
 		tracker.set(topic.String())
 		err, ctrlMsgType := c.validateTopic(from, topic, activeClusterIDS)
 		if err != nil {
-			return err, isClusterPrefixed
+			return err, ctrlMsgType
 		}
 	}
 	return nil, false
