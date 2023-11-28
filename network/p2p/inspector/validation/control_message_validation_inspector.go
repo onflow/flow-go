@@ -315,7 +315,7 @@ func (c *ControlMsgValidationInspector) inspectGraftMessages(from peer.ID, graft
 //     or any duplicate message ids found inside a single iHave.
 //   - error: if any error occurs while sampling or validating topics, all returned errors are benign and should not cause the node to crash.
 //   - bool: true if an error is returned and the topic that failed validation was a cluster prefixed topic, false otherwise.
-func (c *ControlMsgValidationInspector) inspectPruneMessages(from peer.ID, prunes []*pubsub_pb.ControlPrune, activeClusterIDS flow.ChainIDList) (error, bool) {
+func (c *ControlMsgValidationInspector) inspectPruneMessages(from peer.ID, prunes []*pubsub_pb.ControlPrune, activeClusterIDS flow.ChainIDList) (error, p2p.CtrlMsgTopicType) {
 	tracker := make(duplicateStrTracker)
 	for _, prune := range prunes {
 		topic := channels.Topic(prune.GetTopicID())
