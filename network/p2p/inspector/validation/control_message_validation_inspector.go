@@ -697,7 +697,7 @@ func (c *ControlMsgValidationInspector) performSample(ctrlMsg p2pmsg.ControlMess
 func (c *ControlMsgValidationInspector) validateTopic(from peer.ID, topic channels.Topic, activeClusterIds flow.ChainIDList) (error, p2p.CtrlMsgTopicType) {
 	channel, ok := channels.ChannelFromTopic(topic)
 	if !ok {
-		return channels.NewInvalidTopicErr(topic, fmt.Errorf("failed to get channel from topic")), false
+		return channels.NewInvalidTopicErr(topic, fmt.Errorf("failed to get channel from topic")), p2p.CtrlMsgNonClusterTopicType
 	}
 
 	// handle cluster prefixed topics
