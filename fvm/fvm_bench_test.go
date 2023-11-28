@@ -720,8 +720,9 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 		)
 	})
 
-	b.Run("evm", func(b *testing.B) {
-
+	benchEvm := func(control bool) {
+		// This is the same as the evm benchmark but without the EVM.run call
+		// This way we can observe the cost of just the EVM.run call
 		benchTransaction(
 			b,
 			func(b *testing.B, context benchTransactionContext) string {
@@ -747,62 +748,38 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 						gasLimit,
 						big.NewInt(0),
 					)
-					transactionBody += fmt.Sprintf(`
+					if control {
+						transactionBody += fmt.Sprintf(`
 						let txBytes%[1]d = "%[2]s".decodeHex()
 						EVM.run(tx: txBytes%[1]d, coinbase: coinbase)
 						`,
-						i,
-						hex.EncodeToString(txBytes),
-					)
+							i,
+							hex.EncodeToString(txBytes),
+						)
+					} else {
+						// don't run the EVM transaction but do the hex conversion
+						transactionBody += fmt.Sprintf(`
+						let txBytes%[1]d = "%[2]s".decodeHex()
+						//EVM.run(tx: txBytes%[1]d, coinbase: coinbase)
+						`,
+							i,
+							hex.EncodeToString(txBytes),
+						)
+					}
+
 				}
 
 				return templateTx(1, transactionBody)
 			},
 		)
+	}
+
+	b.Run("evm", func(b *testing.B) {
+		benchEvm(false)
 	})
 
 	b.Run("evm control", func(b *testing.B) {
-		// This is the same as the evm benchmark but without the EVM.run call
-		// This way we can observe the cost of just the EVM.run call
-
-		benchTransaction(
-			b,
-			func(b *testing.B, context benchTransactionContext) string {
-				coinbaseBytes := context.EvmTestAccount.Address().Bytes()
-				transactionBody := fmt.Sprintf(`
-				                    let coinbaseBytesRaw = "%s".decodeHex()
-					let coinbaseBytes: [UInt8; 20] = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
-					for j, v in coinbaseBytesRaw {
-						coinbaseBytes[j] = v
-					}
-					let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
-				`, hex.EncodeToString(coinbaseBytes))
-
-				num := int64(12)
-				gasLimit := uint64(100_000)
-
-				// add 10 EVM transactions to the Flow transaction body
-				for i := 0; i < 100; i++ {
-					txBytes := context.EvmTestAccount.PrepareSignAndEncodeTx(b,
-						context.EvmTestContract.DeployedAt.ToCommon(),
-						context.EvmTestContract.MakeCallData(b, "store", big.NewInt(num)),
-						big.NewInt(0),
-						gasLimit,
-						big.NewInt(0),
-					)
-					// don't run the EVM transaction but do the hex conversion
-					transactionBody += fmt.Sprintf(`
-						let txBytes%[1]d = "%[2]s".decodeHex()
-						// EVM.run(tx: txBytes%[1]d, coinbase: coinbase)
-						`,
-						i,
-						hex.EncodeToString(txBytes),
-					)
-				}
-
-				return templateTx(1, transactionBody)
-			},
-		)
+		benchEvm(true)
 	})
 
 }
