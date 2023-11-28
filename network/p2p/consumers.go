@@ -58,7 +58,7 @@ func NewInvalidControlMessageNotification(peerID peer.ID, ctlMsgType p2pmsg.Cont
 		Error:             err,
 		MsgType:           ctlMsgType,
 		Count:             count,
-		IsClusterPrefixed: isClusterPrefixed,
+		TopicType: topicType,
 	}
 }
 
