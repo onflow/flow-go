@@ -48,7 +48,7 @@ const (
 	iHaveMisbehaviourPenalty = -10
 	// iWantMisbehaviourPenalty is the penalty applied to the application specific penalty when a peer conducts a iWant misbehaviour.
 	iWantMisbehaviourPenalty = -10
-	// clusterPrefixedPenaltyReductionFactor factor used to reduce the penalty for control message misbehaviours on cluster prefixed topics. This is allows a more lenient punishment for nodes
+	// clusterPrefixedPenaltyReductionFactor factor used to reduce the penalty for control message misbehaviours on cluster prefixed topics. This allows a more lenient punishment for nodes
 	// that fall behind and may need to request old data.
 	clusterPrefixedPenaltyReductionFactor = .5
 	// rpcPublishMessageMisbehaviourPenalty is the penalty applied to the application specific penalty when a peer conducts a RpcPublishMessageMisbehaviourPenalty misbehaviour.
