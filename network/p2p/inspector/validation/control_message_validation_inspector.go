@@ -328,7 +328,7 @@ func (c *ControlMsgValidationInspector) inspectPruneMessages(from peer.ID, prune
 			return err, ctrlMsgType
 		}
 	}
-	return nil, false
+	return nil, p2p.CtrlMsgNonClusterTopicType
 }
 
 // inspectIHaveMessages performs topic validation on all ihaves in the control message using the provided validateTopic func while tracking duplicates.
