@@ -424,12 +424,12 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 	})
 
 	// tests that signaler context received error when node state is inconsistent
-	suite.Run("GetLatestSealedBlockHeader - fails with inconsistent node`s state", func() {
-		err := fmt.Errorf("inconsistent node`s state")
+	suite.Run("GetLatestSealedBlockHeader - fails with inconsistent node's state", func() {
+		err := fmt.Errorf("inconsistent node's state")
 		suite.snapshot.On("Head").Return(nil, err)
 
 		// mock signaler context expect an error
-		signCtxErr := fmt.Errorf("failed to lookup sealed header: %w", err)
+		signCtxErr := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
 		signalerCtx := irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), signCtxErr)
 		valueCtx := context.WithValue(context.Background(), irrecoverable.SignalerContextKey{}, *signalerCtx)
 
@@ -541,12 +541,12 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 	})
 
 	// tests that signaler context received error when node state is inconsistent
-	suite.Run("TestGetTransactionResultByIndex - fails with inconsistent node`s state", func() {
-		err := fmt.Errorf("inconsistent node`s state")
+	suite.Run("TestGetTransactionResultByIndex - fails with inconsistent node's state", func() {
+		err := fmt.Errorf("inconsistent node's state")
 		suite.snapshot.On("Head").Return(nil, err).Once()
 
 		// mock signaler context expect an error
-		signCtxErr := fmt.Errorf("failed to lookup sealed header: %w", err)
+		signCtxErr := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
 		signalerCtx := irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), signCtxErr)
 		valueCtx := context.WithValue(context.Background(), irrecoverable.SignalerContextKey{}, *signalerCtx)
 
@@ -611,12 +611,12 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	})
 
 	//tests that signaler context received error when node state is inconsistent
-	suite.Run("GetTransactionResultsByBlockID - fails with inconsistent node`s state", func() {
-		err := fmt.Errorf("inconsistent node`s state")
+	suite.Run("GetTransactionResultsByBlockID - fails with inconsistent node's state", func() {
+		err := fmt.Errorf("inconsistent node's state")
 		suite.snapshot.On("Head").Return(nil, err).Once()
 
 		// mock signaler context expect an error
-		signCtxErr := fmt.Errorf("failed to lookup sealed header: %w", err)
+		signCtxErr := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
 		signalerCtx := irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), signCtxErr)
 		valueCtx := context.WithValue(context.Background(), irrecoverable.SignalerContextKey{}, *signalerCtx)
 
@@ -1038,12 +1038,12 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 	})
 
 	// tests that signaler context received error when node state is inconsistent
-	suite.Run("GetLatestFinalizedBlock - fails with inconsistent node`s state", func() {
-		err := fmt.Errorf("inconsistent node`s state")
+	suite.Run("GetLatestFinalizedBlock - fails with inconsistent node's state", func() {
+		err := fmt.Errorf("inconsistent node's state")
 		suite.snapshot.On("Head").Return(nil, err)
 
 		// mock signaler context expect an error
-		signCtxErr := fmt.Errorf("failed to lookup final header: %w", err)
+		signCtxErr := irrecoverable.NewExceptionf("failed to lookup final header: %w", err)
 		signalerCtx := irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), signCtxErr)
 		valueCtx := context.WithValue(context.Background(), irrecoverable.SignalerContextKey{}, *signalerCtx)
 
@@ -1446,7 +1446,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 	}
 
 	// tests that signaler context received error when node state is inconsistent
-	suite.Run("inconsistent node`s state", func() {
+	suite.Run("inconsistent node's state", func() {
 		headHeight = maxHeight - 1
 		setupHeadHeight(headHeight)
 
@@ -1462,10 +1462,10 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		backend, err := New(params)
 		suite.Require().NoError(err)
 
-		err = fmt.Errorf("inconsistent node`s state")
+		err = fmt.Errorf("inconsistent node's state")
 		snapshot.On("Head").Return(nil, err).Once()
 
-		signCtxErr := fmt.Errorf("failed to lookup sealed header: %w", err)
+		signCtxErr := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
 		signalerCtx := irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), signCtxErr)
 		valueCtx := context.WithValue(context.Background(), irrecoverable.SignalerContextKey{}, *signalerCtx)
 

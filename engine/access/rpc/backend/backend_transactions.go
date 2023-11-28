@@ -580,7 +580,6 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 }
 
 // deriveTransactionStatus derives the transaction status based on current protocol state
-
 // Error returns:
 //   - ErrUnknownSnapshotReference - block referenced by transaction has not been found.
 //   - all other errors are unexpected and potentially symptoms of internal implementation bugs or state corruption (fatal).
@@ -599,7 +598,7 @@ func (b *backendTransactions) deriveTransactionStatus(
 		// get the latest finalized block from the state
 		finalized, err := b.state.Final().Head()
 		if err != nil {
-			return flow.TransactionStatusUnknown, fmt.Errorf("failed to lookup final header: %w", err)
+			return flow.TransactionStatusUnknown, irrecoverable.NewExceptionf("failed to lookup final header: %w", err)
 		}
 		finalizedHeight := finalized.Height
 
@@ -643,7 +642,7 @@ func (b *backendTransactions) deriveTransactionStatus(
 	// get the latest sealed block from the State
 	sealed, err := b.state.Sealed().Head()
 	if err != nil {
-		return flow.TransactionStatusUnknown, fmt.Errorf("failed to lookup sealed header: %w", err)
+		return flow.TransactionStatusUnknown, irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
 	}
 
 	if block.Header.Height > sealed.Height {

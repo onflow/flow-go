@@ -5,9 +5,7 @@ import (
 
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/rs/zerolog"
-
 	"go.uber.org/atomic"
-
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
@@ -75,6 +73,10 @@ func NewGrpcServerBuilder(log zerolog.Logger,
 		applyOption(grpcServerBuilder)
 	}
 
+	// we use an atomic pointer to setup an interceptor for handling irrecoverable errors, the necessity of this approach
+	// is dictated by complex startup order of grpc server and other services. At the point where we need to register
+	// an interceptor we don't have an `irrecoverable.SignalerContext`, it becomes available only when we start
+	// the server but at that point we can't register interceptors anymore, so we inject it using this approach.
 	signalerCtx := atomic.NewPointer[irrecoverable.SignalerContext](nil)
 
 	// create a GRPC server to serve GRPC clients

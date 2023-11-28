@@ -327,13 +327,13 @@ func (s *BackendAccountsSuite) TestGetAccountAtLatestBlockFromStorage_Inconsiste
 	backend.scriptExecMode = ScriptExecutionModeLocalOnly
 	backend.scriptExecutor = scriptExecutor
 
-	s.Run(fmt.Sprintf("GetAccountAtLatestBlock - fails with %v", "inconsistent node`s state"), func() {
+	s.Run(fmt.Sprintf("GetAccountAtLatestBlock - fails with %v", "inconsistent node's state"), func() {
 		s.state.On("Sealed").Return(s.snapshot, nil)
 
-		err := fmt.Errorf("inconsistent node`s state")
+		err := fmt.Errorf("inconsistent node's state")
 		s.snapshot.On("Head").Return(nil, err)
 
-		signCtxErr := fmt.Errorf("failed to lookup sealed header: %w", err)
+		signCtxErr := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
 		signalerCtx := irrecoverable.NewMockSignalerContextExpectError(s.T(), context.Background(), signCtxErr)
 		valueCtx := context.WithValue(context.Background(), irrecoverable.SignalerContextKey{}, *signalerCtx)
 

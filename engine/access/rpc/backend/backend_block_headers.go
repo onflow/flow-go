@@ -2,7 +2,6 @@ package backend
 
 import (
 	"context"
-	"fmt"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -27,13 +26,13 @@ func (b *backendBlockHeaders) GetLatestBlockHeader(ctx context.Context, isSealed
 		// get the latest seal header from storage
 		header, err = b.state.Sealed().Head()
 		if err != nil {
-			err = fmt.Errorf("failed to lookup sealed header: %w", err)
+			err = irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
 		}
 	} else {
 		// get the finalized header from state
 		header, err = b.state.Final().Head()
 		if err != nil {
-			err = fmt.Errorf("failed to lookup final header: %w", err)
+			err = irrecoverable.NewExceptionf("failed to lookup final header: %w", err)
 		}
 	}
 
@@ -47,7 +46,7 @@ func (b *backendBlockHeaders) GetLatestBlockHeader(ctx context.Context, isSealed
 		// - Since the protocol state is widely shared, we assume that in practice another component will
 		//   observe the protocol state error and throw an exception.
 		irrecoverable.Throw(ctx, err)
-		return nil, flow.BlockStatusUnknown, status.Errorf(codes.Internal, "could not get latest block header: %v", err)
+		return nil, flow.BlockStatusUnknown, status.Errorf(codes.Internal, err.Error())
 	}
 
 	stat, err := b.getBlockStatus(ctx, header)
@@ -83,6 +82,7 @@ func (b *backendBlockHeaders) GetBlockHeaderByHeight(ctx context.Context, height
 	return header, stat, nil
 }
 
+// No errors are expected during normal operations.
 func (b *backendBlockHeaders) getBlockStatus(ctx context.Context, header *flow.Header) (flow.BlockStatus, error) {
 	sealed, err := b.state.Sealed().Head()
 	if err != nil {
@@ -93,8 +93,9 @@ func (b *backendBlockHeaders) getBlockStatus(ctx context.Context, header *flow.H
 		//   because this can cause DOS potential
 		// - Since the protocol state is widely shared, we assume that in practice another component will
 		//   observe the protocol state error and throw an exception.
-		irrecoverable.Throw(ctx, fmt.Errorf("failed to lookup sealed header: %w", err))
-		return flow.BlockStatusUnknown, status.Errorf(codes.Internal, "failed to find latest sealed header: %v", err)
+		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
+		irrecoverable.Throw(ctx, err)
+		return flow.BlockStatusUnknown, status.Errorf(codes.Internal, err.Error())
 	}
 
 	if header.Height > sealed.Height {

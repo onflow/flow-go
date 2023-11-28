@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/md5" //nolint:gosec
 	"errors"
-	"fmt"
 	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -74,8 +73,9 @@ func (b *backendScripts) ExecuteScriptAtLatestBlock(
 	latestHeader, err := b.state.Sealed().Head()
 	if err != nil {
 		// the latest sealed header MUST be available
-		irrecoverable.Throw(ctx, fmt.Errorf("failed to lookup sealed header: %w", err))
-		return nil, status.Errorf(codes.Internal, "failed to get latest sealed header: %v", err)
+		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
+		irrecoverable.Throw(ctx, err)
+		return nil, status.Errorf(codes.Internal, err.Error())
 	}
 
 	return b.executeScript(ctx, newScriptExecutionRequest(latestHeader.ID(), latestHeader.Height, script, arguments))

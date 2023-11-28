@@ -171,8 +171,8 @@ func (e *Engine) OnFinalizedBlock(block *model.Block) {
 	e.backendNotifierActor.OnFinalizedBlock(block)
 }
 
-// processOnFinalizedBlock is invoked by the FinalizationActor when a new block is finalized.
-// It informs the backend of the newly finalized block.
+// The input to this callback is treated as trusted.
+// No errors expected during normal operations.
 func (e *Engine) processOnFinalizedBlock(_ *model.Block) error {
 	finalizedHeader := e.finalizedHeaderCache.Get()
 	return e.backend.ProcessFinalizedBlockHeight(finalizedHeader.Height)
