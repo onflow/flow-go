@@ -171,6 +171,8 @@ func (e *Engine) OnFinalizedBlock(block *model.Block) {
 	e.backendNotifierActor.OnFinalizedBlock(block)
 }
 
+// processOnFinalizedBlock is invoked by the FinalizationActor when a new block is finalized.
+// It informs the backend of the newly finalized block.
 // The input to this callback is treated as trusted.
 // No errors expected during normal operations.
 func (e *Engine) processOnFinalizedBlock(_ *model.Block) error {
@@ -232,7 +234,7 @@ func (e *Engine) serveREST(ctx irrecoverable.SignalerContext, ready component.Re
 
 	// Set up the irrecoverable.SignalerContext for error handling in the REST server.
 	e.restServer.BaseContext = func(_ net.Listener) context.Context {
-		return context.WithValue(ctx, irrecoverable.SignalerContextKey{}, ctx)
+		return irrecoverable.WithSignalerContext(ctx, ctx)
 	}
 
 	l, err := net.Listen("tcp", e.config.RestConfig.ListenAddress)

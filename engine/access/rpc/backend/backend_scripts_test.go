@@ -418,10 +418,10 @@ func (s *BackendScriptsSuite) TestExecuteScriptAtLatestBlockFromStorage_Inconsis
 		s.snapshot.On("Head").Return(nil, err)
 
 		signCtxErr := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
-		signalerCtx := irrecoverable.NewMockSignalerContextExpectError(s.T(), context.Background(), signCtxErr)
-		valueCtx := context.WithValue(context.Background(), irrecoverable.SignalerContextKey{}, *signalerCtx)
+		signalerCtx := irrecoverable.WithSignalerContext(context.Background(),
+			irrecoverable.NewMockSignalerContextExpectError(s.T(), context.Background(), signCtxErr))
 
-		actual, err := backend.ExecuteScriptAtLatestBlock(valueCtx, s.script, s.arguments)
+		actual, err := backend.ExecuteScriptAtLatestBlock(signalerCtx, s.script, s.arguments)
 		s.Require().Error(err)
 		s.Require().Equal(codes.Internal, status.Code(err))
 		s.Require().Nil(actual)

@@ -801,6 +801,7 @@ func (b *backendTransactions) getTransactionResultFromExecutionNode(
 	return events, resp.GetStatusCode(), resp.GetErrorMessage(), nil
 }
 
+// No errors expected during normal operations.
 func (b *backendTransactions) ProcessFinalizedBlockHeight(height uint64) error {
 	return b.retry.Retry(height)
 }
