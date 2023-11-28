@@ -2,7 +2,7 @@ package backend
 
 import (
 	"context"
-	"sync"
+	"math"
 
 	"go.uber.org/atomic"
 
@@ -21,25 +21,41 @@ type ScriptExecutor struct {
 	// initialized is used to signal that the index and executor are ready
 	initialized *atomic.Bool
 
-	// init is used to ensure that the object is initialized only once
-	init sync.Once
+	// minHeight and maxHeight are used to limit the block range that can be queried using local execution
+	// to ensure only blocks that are compatible with the node's current software version are allowed.
+	// Note: this is a temporary solution for cadence/fvm upgrades while version beacon support is added
+	minHeight *atomic.Uint64
+	maxHeight *atomic.Uint64
 }
 
 func NewScriptExecutor() *ScriptExecutor {
 	return &ScriptExecutor{
 		initialized: atomic.NewBool(false),
+		minHeight:   atomic.NewUint64(0),
+		maxHeight:   atomic.NewUint64(math.MaxUint64),
 	}
+}
+
+// SetMinExecutableHeight sets the lowest block height (inclusive) that can be queried using local execution
+// Use this to limit the executable block range supported by the node's current software version.
+func (s *ScriptExecutor) SetMinExecutableHeight(height uint64) {
+	s.minHeight.Store(height)
+}
+
+// SetMaxExecutableHeight sets the highest block height (inclusive) that can be queried using local execution
+// Use this to limit the executable block range supported by the node's current software version.
+func (s *ScriptExecutor) SetMaxExecutableHeight(height uint64) {
+	s.maxHeight.Store(height)
 }
 
 // InitReporter initializes the indexReporter and script executor
 // This method can be called at any time after the ScriptExecutor object is created. Any requests
 // made to the other methods will return execution.ErrDataNotAvailable until this method is called.
 func (s *ScriptExecutor) InitReporter(indexReporter state_synchronization.IndexReporter, scriptExecutor *execution.Scripts) {
-	s.init.Do(func() {
-		defer s.initialized.Store(true)
+	if s.initialized.CompareAndSwap(false, true) {
 		s.indexReporter = indexReporter
 		s.scriptExecutor = scriptExecutor
-	})
+	}
 }
 
 // ExecuteAtBlockHeight executes provided script at the provided block height against a local execution state.
@@ -71,5 +87,9 @@ func (s *ScriptExecutor) GetAccountAtBlockHeight(ctx context.Context, address fl
 }
 
 func (s *ScriptExecutor) isDataAvailable(height uint64) bool {
-	return s.initialized.Load() && height <= s.indexReporter.HighestIndexedHeight() && height >= s.indexReporter.LowestIndexedHeight()
+	return s.initialized.Load() &&
+		height <= s.indexReporter.HighestIndexedHeight() &&
+		height >= s.indexReporter.LowestIndexedHeight() &&
+		height <= s.maxHeight.Load() &&
+		height >= s.minHeight.Load()
 }
