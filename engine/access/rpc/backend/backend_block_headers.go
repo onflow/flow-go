@@ -3,9 +3,6 @@ package backend
 import (
 	"context"
 
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -46,7 +43,7 @@ func (b *backendBlockHeaders) GetLatestBlockHeader(ctx context.Context, isSealed
 		// - Since the protocol state is widely shared, we assume that in practice another component will
 		//   observe the protocol state error and throw an exception.
 		irrecoverable.Throw(ctx, err)
-		return nil, flow.BlockStatusUnknown, status.Errorf(codes.Internal, err.Error())
+		return nil, flow.BlockStatusUnknown, err
 	}
 
 	stat, err := b.getBlockStatus(ctx, header)
@@ -95,7 +92,7 @@ func (b *backendBlockHeaders) getBlockStatus(ctx context.Context, header *flow.H
 		//   observe the protocol state error and throw an exception.
 		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
 		irrecoverable.Throw(ctx, err)
-		return flow.BlockStatusUnknown, status.Errorf(codes.Internal, err.Error())
+		return flow.BlockStatusUnknown, err
 	}
 
 	if header.Height > sealed.Height {

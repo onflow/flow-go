@@ -224,8 +224,9 @@ func (suite *IrrecoverableStateTestSuite) TestGRPCInconsistentNodeState() {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 
-	_, err = client.GetAccountAtLatestBlock(ctx, req)
+	actual, err := client.GetAccountAtLatestBlock(ctx, req)
 	suite.Require().Error(err)
+	suite.Require().Nil(actual)
 }
 
 // TestRestInconsistentNodeState tests the behavior when the REST API encounters an inconsistent node state.
@@ -246,8 +247,9 @@ func (suite *IrrecoverableStateTestSuite) TestRestInconsistentNodeState() {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 
-	_, _, err = client.BlocksApi.BlocksIdGet(ctx, []string{blockHeader.ID().String()}, optionsForBlocksIdGetOpts())
+	actual, _, err := client.BlocksApi.BlocksIdGet(ctx, []string{blockHeader.ID().String()}, optionsForBlocksIdGetOpts())
 	suite.Require().Error(err)
+	suite.Require().Nil(actual)
 }
 
 // optionsForBlocksIdGetOpts returns options for the BlocksApi.BlocksIdGet function.

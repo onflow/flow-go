@@ -435,7 +435,6 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 
 		actualHeader, actualStatus, err := backend.GetLatestBlockHeader(signalerCtx, true)
 		suite.Require().Error(err)
-		suite.Require().Equal(codes.Internal, status.Code(err))
 		suite.Require().Nil(actualHeader)
 		suite.Require().Equal(flow.BlockStatusUnknown, actualStatus)
 	})
@@ -552,7 +551,6 @@ func (suite *Suite) TestGetTransactionResultByIndex() {
 
 		actual, err := backend.GetTransactionResultByIndex(signalerCtx, blockId, index, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
 		suite.Require().Error(err)
-		suite.Require().Equal(codes.Internal, status.Code(err))
 		suite.Require().Nil(actual)
 	})
 }
@@ -622,7 +620,6 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 
 		actual, err := backend.GetTransactionResultsByBlockID(signalerCtx, blockId, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
 		suite.Require().Error(err)
-		suite.Require().Equal(codes.Internal, status.Code(err))
 		suite.Require().Nil(actual)
 	})
 }
@@ -1049,7 +1046,6 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 
 		actualBlock, actualStatus, err := backend.GetLatestBlock(signalerCtx, false)
 		suite.Require().Error(err)
-		suite.Require().Equal(codes.Internal, status.Code(err))
 		suite.Require().Nil(actualBlock)
 		suite.Require().Equal(flow.BlockStatusUnknown, actualStatus)
 	})
@@ -1472,7 +1468,6 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		actual, err := backend.GetEventsForHeightRange(signalerCtx, string(flow.EventAccountCreated), minHeight, maxHeight,
 			entitiesproto.EventEncodingVersion_JSON_CDC_V0)
 		suite.Require().Error(err)
-		suite.Require().Equal(codes.Internal, status.Code(err))
 		suite.Require().Nil(actual)
 	})
 

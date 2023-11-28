@@ -423,7 +423,6 @@ func (s *BackendScriptsSuite) TestExecuteScriptAtLatestBlockFromStorage_Inconsis
 
 		actual, err := backend.ExecuteScriptAtLatestBlock(signalerCtx, s.script, s.arguments)
 		s.Require().Error(err)
-		s.Require().Equal(codes.Internal, status.Code(err))
 		s.Require().Nil(actual)
 	})
 }

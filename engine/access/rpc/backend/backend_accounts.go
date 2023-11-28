@@ -46,7 +46,7 @@ func (b *backendAccounts) GetAccountAtLatestBlock(ctx context.Context, address f
 	if err != nil {
 		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
 		irrecoverable.Throw(ctx, err)
-		return nil, status.Errorf(codes.Internal, err.Error())
+		return nil, err
 	}
 
 	sealedBlockID := sealed.ID()

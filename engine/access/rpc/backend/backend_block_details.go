@@ -48,7 +48,7 @@ func (b *backendBlockDetails) GetLatestBlock(ctx context.Context, isSealed bool)
 		// - Since the protocol state is widely shared, we assume that in practice another component will
 		//   observe the protocol state error and throw an exception.
 		irrecoverable.Throw(ctx, err)
-		return nil, flow.BlockStatusUnknown, status.Errorf(codes.Internal, err.Error())
+		return nil, flow.BlockStatusUnknown, err
 	}
 
 	// since we are querying a finalized or sealed block, we can use the height index and save an ID computation
@@ -103,7 +103,7 @@ func (b *backendBlockDetails) getBlockStatus(ctx context.Context, block *flow.Bl
 		//   observe the protocol state error and throw an exception.
 		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
 		irrecoverable.Throw(ctx, err)
-		return flow.BlockStatusUnknown, status.Errorf(codes.Internal, err.Error())
+		return flow.BlockStatusUnknown, err
 	}
 
 	if block.Header.Height > sealed.Height {

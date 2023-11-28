@@ -75,7 +75,7 @@ func (b *backendScripts) ExecuteScriptAtLatestBlock(
 		// the latest sealed header MUST be available
 		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
 		irrecoverable.Throw(ctx, err)
-		return nil, status.Errorf(codes.Internal, err.Error())
+		return nil, err
 	}
 
 	return b.executeScript(ctx, newScriptExecutionRequest(latestHeader.ID(), latestHeader.Height, script, arguments))

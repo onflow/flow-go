@@ -338,7 +338,6 @@ func (s *BackendAccountsSuite) TestGetAccountAtLatestBlockFromStorage_Inconsiste
 
 		actual, err := backend.GetAccountAtLatestBlock(signalerCtx, s.failingAddress)
 		s.Require().Error(err)
-		s.Require().Equal(codes.Internal, status.Code(err))
 		s.Require().Nil(actual)
 	})
 }

@@ -57,7 +57,7 @@ func (b *backendEvents) GetEventsForHeightRange(
 		// sealed block must be in the store, so return an Internal code even if we got NotFound
 		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
 		irrecoverable.Throw(ctx, err)
-		return nil, status.Errorf(codes.Internal, err.Error())
+		return nil, err
 	}
 
 	// start height should not be beyond the last sealed height
