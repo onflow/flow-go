@@ -86,9 +86,9 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 	s.execDataCache = cache.NewExecutionDataCache(s.eds, s.headers, s.seals, s.results, s.execDataHeroCache)
 
 	conf := Config{
-		ClientSendTimeout:    state_stream.DefaultSendTimeout,
-		ClientSendBufferSize: state_stream.DefaultSendBufferSize,
-		MaxRegisterIDsPerMsg: state_stream.DefaultMaxRegisterIDsPerMsg,
+		ClientSendTimeout:       state_stream.DefaultSendTimeout,
+		ClientSendBufferSize:    state_stream.DefaultSendBufferSize,
+		RegisterIDsRequestLimit: state_stream.DefaultRegisterIDsRequestLimit,
 	}
 
 	var err error
@@ -457,7 +457,7 @@ func (s *BackendExecutionDataSuite) TestGetRegisterValuesErrors() {
 	})
 
 	s.Run("returns error if too many registers are requested", func() {
-		_, err := s.backend.GetRegisterValues(make(flow.RegisterIDs, s.backend.maxRegistersPerMsg+1), s.backend.rootBlockHeight)
+		_, err := s.backend.GetRegisterValues(make(flow.RegisterIDs, s.backend.registerRequestLimit+1), s.backend.rootBlockHeight)
 		require.Equal(s.T(), codes.InvalidArgument, status.Code(err))
 	})
 }

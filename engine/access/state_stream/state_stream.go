@@ -31,8 +31,8 @@ const (
 	// DefaultHeartbeatInterval specifies the block interval at which heartbeat messages should be sent.
 	DefaultHeartbeatInterval = 1
 
-	// DefaultMaxRegisterIDsRequestLimit defines the default limit of register IDs for a single request to the get register endpoint
-	DefaultMaxRegisterIDsRequestLimit = 100
+	// DefaultRegisterIDsRequestLimit defines the default limit of register IDs for a single request to the get register endpoint
+	DefaultRegisterIDsRequestLimit = 100
 )
 
 // API represents an interface that defines methods for interacting with a blockchain's execution data and events.
