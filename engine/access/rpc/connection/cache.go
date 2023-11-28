@@ -22,13 +22,15 @@ type CachedClient struct {
 // Close closes the CachedClient connection. It marks the connection for closure and waits asynchronously for ongoing
 // requests to complete before closing the connection.
 func (cc *CachedClient) Close() {
+	cc.mu.Lock()
+
 	// Mark the connection for closure
+	// Note: this must be called within the lock since it is initialized after inserting into the cache
 	if !cc.closeRequested.CompareAndSwap(false, true) {
+		cc.mu.Unlock()
 		return
 	}
 
-	// Obtain the lock to ensure that any connection attempts have completed
-	cc.mu.Lock()
 	conn := cc.ClientConn
 	cc.mu.Unlock()
 
