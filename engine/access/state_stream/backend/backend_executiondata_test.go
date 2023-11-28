@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
+	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	"github.com/onflow/flow-go/module/mempool/herocache"
@@ -38,12 +39,13 @@ var testEventTypes = []flow.EventType{
 type BackendExecutionDataSuite struct {
 	suite.Suite
 
-	state    *protocolmock.State
-	params   *protocolmock.Params
-	snapshot *protocolmock.Snapshot
-	headers  *storagemock.Headers
-	seals    *storagemock.Seals
-	results  *storagemock.ExecutionResults
+	state          *protocolmock.State
+	params         *protocolmock.Params
+	snapshot       *protocolmock.Snapshot
+	headers        *storagemock.Headers
+	seals          *storagemock.Seals
+	results        *storagemock.ExecutionResults
+	registersAsync *execution.RegistersAsyncStore
 
 	bs                blobs.Blobstore
 	eds               execution_data.ExecutionDataStore
@@ -145,6 +147,8 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 		s.T().Logf("adding exec data for block %d %d %v => %v", i, block.Header.Height, block.ID(), result.ExecutionDataID)
 	}
 
+	s.registersAsync = execution.NewRegistersAsyncStore()
+
 	s.state.On("Sealed").Return(s.snapshot, nil).Maybe()
 	s.snapshot.On("Head").Return(s.blocks[0].Header, nil).Maybe()
 
@@ -239,6 +243,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 		s.broadcaster,
 		rootBlock.Header.Height,
 		rootBlock.Header.Height, // initialize with no downloaded data
+		s.registersAsync,
 	)
 	require.NoError(s.T(), err)
 }
