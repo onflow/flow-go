@@ -702,7 +702,7 @@ func (c *ControlMsgValidationInspector) validateTopic(from peer.ID, topic channe
 
 	// handle cluster prefixed topics
 	if channels.IsClusterChannel(channel) {
-		return c.validateClusterPrefixedTopic(from, topic, activeClusterIds), true
+		return c.validateClusterPrefixedTopic(from, topic, activeClusterIds), p2p.CtrlMsgTopicTypeClusterPrefixed
 	}
 
 	// non cluster prefixed topic validation
