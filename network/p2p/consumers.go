@@ -52,7 +52,7 @@ type InvCtrlMsgNotif struct {
 //
 // Returns:
 //   - *InvCtlMsgNotif: invalid control message notification.
-func NewInvalidControlMessageNotification(peerID peer.ID, ctlMsgType p2pmsg.ControlMessageType, err error, count uint64, isClusterPrefixed bool) *InvCtrlMsgNotif {
+func NewInvalidControlMessageNotification(peerID peer.ID, ctlMsgType p2pmsg.ControlMessageType, err error, count uint64, topicType CtrlMsgTopicType) *InvCtrlMsgNotif {
 	return &InvCtrlMsgNotif{
 		PeerID:            peerID,
 		Error:             err,
