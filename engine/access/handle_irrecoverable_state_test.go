@@ -184,7 +184,8 @@ func (suite *IrrecoverableStateTestSuite) SetupTest() {
 	assert.NoError(suite.T(), err)
 
 	err = fmt.Errorf("inconsistent node`s state")
-	ctx := irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), err)
+	signCtxErr := fmt.Errorf("failed to lookup sealed header: %w", err)
+	ctx := irrecoverable.NewMockSignalerContextExpectError(suite.T(), context.Background(), signCtxErr)
 
 	suite.rpcEng.Start(ctx)
 
