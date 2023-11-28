@@ -343,7 +343,7 @@ func (c *ControlMsgValidationInspector) inspectPruneMessages(from peer.ID, prune
 //   - bool: true if an error is returned and the topic that failed validation was a cluster prefixed topic, false otherwise.
 func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihaves []*pubsub_pb.ControlIHave, activeClusterIDS flow.ChainIDList) (error, p2p.CtrlMsgTopicType) {
 	if len(ihaves) == 0 {
-		return nil, false
+		return nil, p2p.CtrlMsgNonClusterTopicType
 	}
 	lg := c.logger.With().
 		Str("peer_id", p2plogging.PeerId(from)).
