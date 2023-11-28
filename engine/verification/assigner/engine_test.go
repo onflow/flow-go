@@ -131,8 +131,8 @@ func TestAssignerEngine(t *testing.T) {
 	t.Run("new block happy path", func(t *testing.T) {
 		newBlockHappyPath(t)
 	})
-	t.Run("new block zero-weight", func(t *testing.T) {
-		newBlockZeroWeight(t)
+	t.Run("new block invalid identity", func(t *testing.T) {
+		newBlockVerifierNotAuthorized(t)
 	})
 	t.Run("new block zero chunk", func(t *testing.T) {
 		newBlockNoChunk(t)
@@ -189,47 +189,71 @@ func newBlockHappyPath(t *testing.T) {
 		s.notifier)
 }
 
-// newBlockZeroWeight evaluates that when verification node has zero weight at a reference block,
-// it drops the corresponding execution receipts for that block without performing any chunk assignment.
+// newBlockVerifierNotAuthorized evaluates that when verification node is not authorized to participate at reference block, it includes next cases:
+// - verification node is joining
+// - verification node is leaving
+// - verification node has zero initial weight.
+// It drops the corresponding execution receipts for that block without performing any chunk assignment.
 // It also evaluates that the chunks queue is never called on any chunks of that receipt's result.
-func newBlockZeroWeight(t *testing.T) {
+func newBlockVerifierNotAuthorized(t *testing.T) {
 
-	// creates an assigner engine for non-active verification node.
-	s := SetupTest(WithIdentity(
-		unittest.IdentityFixture(
+	assertIdentityAtReferenceBlock := func(identity *flow.Identity) {
+		// creates an assigner engine for non-active verification node.
+		s := SetupTest(WithIdentity(identity))
+		e := NewAssignerEngine(s)
+
+		// creates a container block, with a single receipt, that contains
+		// no assigned chunk to verification node.
+		containerBlock, _ := createContainerBlock(
+			vertestutils.WithChunks( // all chunks assigned to some (random) identifiers, but not this verification node
+				vertestutils.WithAssignee(unittest.IdentifierFixture()),
+				vertestutils.WithAssignee(unittest.IdentifierFixture()),
+				vertestutils.WithAssignee(unittest.IdentifierFixture())))
+		result := containerBlock.Payload.Results[0]
+		s.mockStateAtBlockID(result.BlockID)
+
+		// once assigner engine is done processing the block, it should notify the processing notifier.
+		s.notifier.On("Notify", containerBlock.ID()).Return().Once()
+
+		// sends block containing receipt to assigner engine
+		s.metrics.On("OnFinalizedBlockArrivedAtAssigner", containerBlock.Header.Height).Return().Once()
+		s.metrics.On("OnExecutionResultReceivedAtAssignerEngine").Return().Once()
+		e.ProcessFinalizedBlock(containerBlock)
+
+		// when the node has zero-weight at reference block id, chunk assigner should not be called,
+		// and nothing should be passed to chunks queue, and
+		// job listener should not be notified.
+		s.chunksQueue.AssertNotCalled(t, "StoreChunkLocator")
+		s.newChunkListener.AssertNotCalled(t, "Check")
+		s.assigner.AssertNotCalled(t, "Assign")
+
+		mock.AssertExpectationsForObjects(t,
+			s.metrics,
+			s.assigner,
+			s.notifier)
+	}
+
+	t.Run("verifier-joining", func(t *testing.T) {
+		identity := unittest.IdentityFixture(
 			unittest.WithRole(flow.RoleVerification),
-			unittest.WithParticipationStatus(flow.EpochParticipationStatusJoining))))
-	e := NewAssignerEngine(s)
-
-	// creates a container block, with a single receipt, that contains
-	// no assigned chunk to verification node.
-	containerBlock, _ := createContainerBlock(
-		vertestutils.WithChunks( // all chunks assigned to some (random) identifiers, but not this verification node
-			vertestutils.WithAssignee(unittest.IdentifierFixture()),
-			vertestutils.WithAssignee(unittest.IdentifierFixture()),
-			vertestutils.WithAssignee(unittest.IdentifierFixture())))
-	result := containerBlock.Payload.Results[0]
-	s.mockStateAtBlockID(result.BlockID)
-
-	// once assigner engine is done processing the block, it should notify the processing notifier.
-	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
-
-	// sends block containing receipt to assigner engine
-	s.metrics.On("OnFinalizedBlockArrivedAtAssigner", containerBlock.Header.Height).Return().Once()
-	s.metrics.On("OnExecutionResultReceivedAtAssignerEngine").Return().Once()
-	e.ProcessFinalizedBlock(containerBlock)
-
-	// when the node has zero-weight at reference block id, chunk assigner should not be called,
-	// and nothing should be passed to chunks queue, and
-	// job listener should not be notified.
-	s.chunksQueue.AssertNotCalled(t, "StoreChunkLocator")
-	s.newChunkListener.AssertNotCalled(t, "Check")
-	s.assigner.AssertNotCalled(t, "Assign")
-
-	mock.AssertExpectationsForObjects(t,
-		s.metrics,
-		s.assigner,
-		s.notifier)
+			unittest.WithParticipationStatus(flow.EpochParticipationStatusJoining),
+		)
+		assertIdentityAtReferenceBlock(identity)
+	})
+	t.Run("verifier-leaving", func(t *testing.T) {
+		identity := unittest.IdentityFixture(
+			unittest.WithRole(flow.RoleVerification),
+			unittest.WithParticipationStatus(flow.EpochParticipationStatusLeaving),
+		)
+		assertIdentityAtReferenceBlock(identity)
+	})
+	t.Run("verifier-zero-weight", func(t *testing.T) {
+		identity := unittest.IdentityFixture(
+			unittest.WithRole(flow.RoleVerification),
+			unittest.WithInitialWeight(0),
+		)
+		assertIdentityAtReferenceBlock(identity)
+	})
 }
 
 // newBlockNoChunk evaluates passing a new finalized block to assigner engine that contains

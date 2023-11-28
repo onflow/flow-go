@@ -378,15 +378,15 @@ func TestZeroWeightNodeWillNotBeSelected(t *testing.T) {
 		fullIdentities[n].InitialWeight = 1
 		fullIdentities[m].InitialWeight = 1
 
-		// the following code check the non-active ejected nodes should not be selected
-		activeNodes := fullIdentities.Filter(filter.HasParticipationStatus(flow.EpochParticipationStatusActive)).ToSkeleton()
-		identities := fullIdentities.ToSkeleton()
+		// the following code checks that zero-weight nodes are not selected (selection probability is proportional to weight)
+		votingConsensusNodes := fullIdentities.Filter(filter.HasInitialWeight[flow.Identity](true)).ToSkeleton()
+		allEpochConsensusNodes := fullIdentities.ToSkeleton() // including zero-weight nodes
 
 		count := 1000
-		selectionFromAll, err := ComputeLeaderSelection(0, rng, count, identities)
+		selectionFromAll, err := ComputeLeaderSelection(0, rng, count, allEpochConsensusNodes)
 		require.NoError(t, err)
 
-		selectionFromWeightful, err := ComputeLeaderSelection(0, rng_copy, count, activeNodes)
+		selectionFromWeightful, err := ComputeLeaderSelection(0, rng_copy, count, votingConsensusNodes)
 		require.NoError(t, err)
 
 		for i := 0; i < count; i++ {

@@ -341,7 +341,27 @@ func TestChunkResponse_InvalidChunkDataPack(t *testing.T) {
 				identity.EpochParticipationStatus = flow.EpochParticipationStatusJoining
 				mockStateAtBlockIDForIdentities(state, blockID, flow.IdentityList{&identity})
 			},
-			msg: "non-active-origin-id",
+			msg: "participation-status-joining-origin-id",
+		},
+		{
+			alterChunkDataResponse: func(cdp *flow.ChunkDataPack) {
+				// we don't alter chunk data pack content
+			},
+			mockStateFunc: func(identity flow.Identity, state *protocol.State, blockID flow.Identifier) {
+				identity.EpochParticipationStatus = flow.EpochParticipationStatusLeaving
+				mockStateAtBlockIDForIdentities(state, blockID, flow.IdentityList{&identity})
+			},
+			msg: "participation-status-leaving-origin-id",
+		},
+		{
+			alterChunkDataResponse: func(cdp *flow.ChunkDataPack) {
+				// we don't alter chunk data pack content
+			},
+			mockStateFunc: func(identity flow.Identity, state *protocol.State, blockID flow.Identifier) {
+				identity.InitialWeight = 0
+				mockStateAtBlockIDForIdentities(state, blockID, flow.IdentityList{&identity})
+			},
+			msg: "zero-weight-origin-id",
 		},
 		{
 			alterChunkDataResponse: func(cdp *flow.ChunkDataPack) {
