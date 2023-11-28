@@ -228,9 +228,10 @@ func TestIndexer_Failure(t *testing.T) {
 
 	// make sure the error returned is as expected
 	expectedErr := fmt.Errorf(
-		"failed to index block data at height %d: could not index register payloads at height %d: error persisting data",
+		"failed to index block data at height %d: %w",
 		test.blocks[lastIndexedIndex].Header.Height+1,
-		test.blocks[lastIndexedIndex].Header.Height+1,
+		fmt.Errorf(
+			"could not index register payloads at height %d: %w", test.blocks[lastIndexedIndex].Header.Height+1, fmt.Errorf("error persisting data")),
 	)
 
 	_, cancel := context.WithCancel(context.Background())
