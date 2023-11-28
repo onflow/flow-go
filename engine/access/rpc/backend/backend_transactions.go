@@ -581,7 +581,7 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 
 // deriveTransactionStatus derives the transaction status based on current protocol state
 // Error returns:
-//   - ErrUnknownSnapshotReference - block referenced by transaction has not been found.
+//   - state.ErrUnknownSnapshotReference - block referenced by transaction has not been found.
 //   - all other errors are unexpected and potentially symptoms of internal implementation bugs or state corruption (fatal).
 func (b *backendTransactions) deriveTransactionStatus(
 	tx *flow.TransactionBody,
