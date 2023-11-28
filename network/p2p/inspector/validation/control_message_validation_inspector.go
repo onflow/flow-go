@@ -294,7 +294,7 @@ func (c *ControlMsgValidationInspector) inspectGraftMessages(from peer.ID, graft
 	for _, graft := range grafts {
 		topic := channels.Topic(graft.GetTopicID())
 		if tracker.isDuplicate(topic.String()) {
-			return NewDuplicateTopicErr(topic.String(), p2pmsg.CtrlMsgGraft), false
+			return NewDuplicateTopicErr(topic.String(), p2pmsg.CtrlMsgGraft), p2p.CtrlMsgNonClusterTopicType
 		}
 		tracker.set(topic.String())
 		err, isClusterPrefixed := c.validateTopic(from, topic, activeClusterIDS)
