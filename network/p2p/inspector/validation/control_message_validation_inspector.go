@@ -710,7 +710,7 @@ func (c *ControlMsgValidationInspector) validateTopic(from peer.ID, topic channe
 	if err != nil {
 		return err, p2p.CtrlMsgNonClusterTopicType
 	}
-	return nil, false
+	return nil, p2p.CtrlMsgTopicTypeClusterPrefixed
 }
 
 // validateClusterPrefixedTopic validates cluster prefixed topics.
