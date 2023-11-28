@@ -92,12 +92,21 @@ func (r *RegisterStore) GetRegister(height uint64, blockID flow.Identifier, regi
 		return r.getAndConvertNotFoundErr(register, prunedError.PrunedHeight)
 	}
 
-	// if the block is below the pruned height, then there are two cases:
+	// if the block is below or equal to the pruned height, then there are two cases:
 	// the block is a finalized block, or a conflicting block.
 	// In order to distinguish, we need to query the finalized block ID at that height
-	finalizedID, err := r.finalized.FinalizedBlockIDAtHeight(height)
-	if err != nil {
-		return nil, fmt.Errorf("cannot get finalized block ID at height %d: %w", height, err)
+
+	var finalizedID flow.Identifier
+	if height == prunedError.PrunedHeight {
+		// if the block is at the pruned height, then the finalized ID is the pruned ID from in memory store,
+		// this saves a DB query
+		finalizedID = prunedError.PrunedID
+	} else {
+		// if the block is below the pruned height, we query the finalized ID from the finalized reader
+		finalizedID, err = r.finalized.FinalizedBlockIDAtHeight(height)
+		if err != nil {
+			return nil, fmt.Errorf("cannot get finalized block ID at height %d: %w", height, err)
+		}
 	}
 
 	isConflictingBlock := blockID != finalizedID
