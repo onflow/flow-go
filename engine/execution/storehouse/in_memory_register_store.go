@@ -15,11 +15,12 @@ var ErrNotExecuted = fmt.Errorf("block is not executed")
 
 type PrunedError struct {
 	PrunedHeight uint64
+	PrunedID     flow.Identifier
 	Height       uint64
 }
 
-func NewPrunedError(height uint64, prunedHeight uint64) error {
-	return PrunedError{Height: height, PrunedHeight: prunedHeight}
+func NewPrunedError(height uint64, prunedHeight uint64, prunedID flow.Identifier) error {
+	return PrunedError{Height: height, PrunedHeight: prunedHeight, PrunedID: prunedID}
 }
 
 func (e PrunedError) Error() string {
@@ -115,7 +116,7 @@ func (s *InMemoryRegisterStore) GetRegister(height uint64, blockID flow.Identifi
 	defer s.RUnlock()
 
 	if height <= s.prunedHeight {
-		return flow.RegisterValue{}, NewPrunedError(height, s.prunedHeight)
+		return flow.RegisterValue{}, NewPrunedError(height, s.prunedHeight, s.prunedID)
 	}
 
 	_, ok := s.registersByBlockID[blockID]
@@ -144,7 +145,7 @@ func (s *InMemoryRegisterStore) GetRegister(height uint64, blockID flow.Identifi
 			// caller could check with OnDiskRegisterStore to find if this register has a updated value
 			// at earlier height.
 			if block == s.prunedID {
-				return flow.RegisterValue{}, NewPrunedError(height, s.prunedHeight)
+				return flow.RegisterValue{}, NewPrunedError(height, s.prunedHeight, s.prunedID)
 			}
 
 			// in this case, it means the state of in-memory register store is inconsistent,
