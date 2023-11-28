@@ -3,6 +3,7 @@ package access
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	"io"
 	"os"
 	"testing"
@@ -12,7 +13,6 @@ import (
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -32,7 +32,6 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
-	"github.com/onflow/flow-go/network"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/grpcutils"
@@ -46,7 +45,7 @@ type IrrecoverableStateTestSuite struct {
 	snapshot   *protocol.Snapshot
 	epochQuery *protocol.EpochQuery
 	log        zerolog.Logger
-	net        *network.EngineRegistry
+	net        *mocknetwork.EngineRegistry
 	request    *module.Requester
 	collClient *accessmock.AccessAPIClient
 	execClient *accessmock.ExecutionAPIClient
@@ -72,40 +71,38 @@ type IrrecoverableStateTestSuite struct {
 
 func (suite *IrrecoverableStateTestSuite) SetupTest() {
 	suite.log = zerolog.New(os.Stdout)
-	suite.net = new(network.EngineRegistry)
-	suite.state = new(protocol.State)
-	suite.snapshot = new(protocol.Snapshot)
+	suite.net = mocknetwork.NewEngineRegistry(suite.T())
+	suite.state = protocol.NewState(suite.T())
+	suite.snapshot = protocol.NewSnapshot(suite.T())
 
 	rootHeader := unittest.BlockHeaderFixture()
-	params := new(protocol.Params)
+	params := protocol.NewParams(suite.T())
 	params.On("SporkID").Return(unittest.IdentifierFixture(), nil)
 	params.On("ProtocolVersion").Return(uint(unittest.Uint64InRange(10, 30)), nil)
 	params.On("SporkRootBlockHeight").Return(rootHeader.Height, nil)
 	params.On("SealedRoot").Return(rootHeader, nil)
 
-	suite.epochQuery = new(protocol.EpochQuery)
+	suite.epochQuery = protocol.NewEpochQuery(suite.T())
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("Params").Return(params, nil).Maybe()
 	suite.snapshot.On("Epochs").Return(suite.epochQuery).Maybe()
-	suite.blocks = new(storagemock.Blocks)
-	suite.headers = new(storagemock.Headers)
-	suite.transactions = new(storagemock.Transactions)
-	suite.collections = new(storagemock.Collections)
-	suite.receipts = new(storagemock.ExecutionReceipts)
+	suite.blocks = storagemock.NewBlocks(suite.T())
+	suite.headers = storagemock.NewHeaders(suite.T())
+	suite.transactions = storagemock.NewTransactions(suite.T())
+	suite.collections = storagemock.NewCollections(suite.T())
+	suite.receipts = storagemock.NewExecutionReceipts(suite.T())
 
-	suite.collClient = new(accessmock.AccessAPIClient)
-	suite.execClient = new(accessmock.ExecutionAPIClient)
+	suite.collClient = accessmock.NewAccessAPIClient(suite.T())
+	suite.execClient = accessmock.NewExecutionAPIClient(suite.T())
 
-	suite.request = new(module.Requester)
-	suite.request.On("EntityByID", mock.Anything, mock.Anything)
-
-	suite.me = new(module.Local)
+	suite.request = module.NewRequester(suite.T())
+	suite.me = module.NewLocal(suite.T())
 
 	accessIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
 	suite.me.
 		On("NodeID").
-		Return(accessIdentity.NodeID)
+		Return(accessIdentity.NodeID).Maybe()
 
 	suite.chainID = flow.Testnet
 	suite.metrics = metrics.NewNoopCollector()
