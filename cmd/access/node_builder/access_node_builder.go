@@ -990,8 +990,8 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			if builder.stateStreamConf.ResponseLimit < 0 {
 				return errors.New("state-stream-response-limit must be greater than or equal to 0")
 			}
-			if builder.stateStreamConf.MaxRegisterIDsPerMsg == 0 {
-				return errors.New("state-stream-max-register-values must be greater than or equal to 0")
+			if builder.stateStreamConf.MaxRegisterIDsPerMsg <= 0 {
+				return errors.New("state-stream-max-register-values must be greater than 0")
 			}
 		}
 		if builder.rpcConf.BackendConfig.CircuitBreakerConfig.Enabled {

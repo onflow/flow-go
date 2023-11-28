@@ -439,19 +439,25 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataHandlesErrors() {
 }
 
 func (s *BackendExecutionDataSuite) TestGetRegisterValuesErrors() {
+	s.Run("normal case", func() {
+		res, err := s.backend.GetRegisterValues(flow.RegisterIDs{unittest.RegisterIDFixture()}, s.backend.rootBlockHeight)
+		require.NoError(s.T(), err)
+		require.NotEmpty(s.T(), res)
+	})
+
 	s.Run("returns error if block height is out of range", func() {
 		_, err := s.backend.GetRegisterValues(flow.RegisterIDs{unittest.RegisterIDFixture()}, s.backend.rootBlockHeight+1)
-		assert.Equal(s.T(), codes.OutOfRange, status.Code(err))
+		require.Equal(s.T(), codes.OutOfRange, status.Code(err))
 	})
 
 	s.Run("returns error if register path is not indexed", func() {
 		falseID := flow.RegisterIDs{flow.RegisterID{Owner: "ha", Key: "ha"}}
 		_, err := s.backend.GetRegisterValues(falseID, s.backend.rootBlockHeight)
-		assert.Equal(s.T(), codes.NotFound, status.Code(err))
+		require.Equal(s.T(), codes.NotFound, status.Code(err))
 	})
 
 	s.Run("returns error if too many registers are requested", func() {
 		_, err := s.backend.GetRegisterValues(make(flow.RegisterIDs, s.backend.maxRegistersPerMsg+1), s.backend.rootBlockHeight)
-		assert.Equal(s.T(), codes.InvalidArgument, status.Code(err))
+		require.Equal(s.T(), codes.InvalidArgument, status.Code(err))
 	})
 }
