@@ -360,7 +360,7 @@ func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihave
 			return NewDuplicateTopicErr(topic, p2pmsg.CtrlMsgIHave), p2p.CtrlMsgNonClusterTopicType
 		}
 		duplicateTopicTracker.set(topic)
-		err, isClusterPrefixed := c.validateTopic(from, channels.Topic(topic), activeClusterIDS)
+		err, ctrlMsgType := c.validateTopic(from, channels.Topic(topic), activeClusterIDS)
 		if err != nil {
 			return err, isClusterPrefixed
 		}
