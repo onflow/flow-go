@@ -448,9 +448,10 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 		for _, account := range accounts {
 			addrs = append(addrs, account.Address)
 		}
-		evmAddress, err := chain.AddressAtIndex(environment.EVMAccountIndex)
-		require.NoError(b, err)
-		addrs = append(addrs, evmAddress)
+		// TODO (JanezP): fix when the evm account has a receiver
+		//evmAddress, err := chain.AddressAtIndex(environment.EVMAccountIndex)
+		//require.NoError(b, err)
+		//addrs = append(addrs, evmAddress)
 
 		// fund all accounts so not to run into storage problems
 		fundAccounts(b, blockExecutor, cadence.UFix64(1_000_000_000_000), addrs...)
@@ -720,7 +721,7 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 		)
 	})
 
-	benchEvm := func(control bool) {
+	benchEvm := func(b *testing.B, control bool) {
 		// This is the same as the evm benchmark but without the EVM.run call
 		// This way we can observe the cost of just the EVM.run call
 		benchTransaction(
@@ -775,11 +776,11 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 	}
 
 	b.Run("evm", func(b *testing.B) {
-		benchEvm(false)
+		benchEvm(b, false)
 	})
 
 	b.Run("evm control", func(b *testing.B) {
-		benchEvm(true)
+		benchEvm(b, true)
 	})
 
 }
