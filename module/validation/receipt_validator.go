@@ -285,7 +285,8 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 	for i, result := range payload.Results {
 		resultID := result.ID()
 
-		// check if there are enough execution receipts included in the payload corresponding to the execution result
+		// Every included result must be accompanied by a receipt with a corresponding `ResultID`, in the same block.
+		// If a result is included without a corresponding receipt, it cannot be attributed to any executor.
 		receiptsForResult := uint(len(receiptsByResult.GetGroup(resultID)))
 		if receiptsForResult == 0 {
 			return engine.NewInvalidInputErrorf("no receipts for result %v at index %d", resultID, i)
