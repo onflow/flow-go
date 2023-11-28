@@ -83,9 +83,18 @@ func (b *backendNetwork) GetLatestProtocolStateSnapshot(_ context.Context) ([]by
 	return data, nil
 }
 
-// GetProtocolStateSnapshotByBlockID returns serializable Snapshot by blockID
+// GetProtocolStateSnapshotByBlockID returns serializable Snapshot for a block, by blockID.
+// The requested block must be finalized, otherwise an error is returned.
+// Expected errors during normal operation:
+//   - status.Error[codes.NotFound] - No block with the given ID was found
+//   - status.Error[codes.InvalidArgument] - We will never return a snapshot for this block ID:
+//     1. A block was found, but it is not finalized and is below the finalized height, so it will never be finalized.
+//     2. A block was found, however its sealing segment spans an epoch phase transition, yielding an invalid snapshot.
+//   - status.Error[codes.FailedPrecondition] - A block was found, but it is not finalized and is above the finalized height.
+//     The block may or may not be finalized in the future; the client can retry later.
 func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(_ context.Context, blockID flow.Identifier) ([]byte, error) {
-	snapshotHeadByBlockId, err := b.state.AtBlockID(blockID).Head()
+	snapshot := b.state.AtBlockID(blockID)
+	snapshotHeadByBlockId, err := snapshot.Head()
 	if err != nil {
 		if errors.Is(err, state.ErrUnknownSnapshotReference) {
 			return nil, status.Errorf(codes.NotFound, "failed to get a valid snapshot: block not found")
@@ -96,6 +105,7 @@ func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(_ context.Context, bl
 
 	snapshotByHeight := b.state.AtHeight(snapshotHeadByBlockId.Height)
 	snapshotHeadByHeight, err := snapshotByHeight.Head()
+
 	if err != nil {
 		if errors.Is(err, state.ErrUnknownSnapshotReference) {
 			return nil, status.Errorf(codes.InvalidArgument,
@@ -111,7 +121,7 @@ func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(_ context.Context, bl
 
 	validSnapshot, err := b.getValidSnapshot(snapshotByHeight, 0, false)
 	if err != nil {
-		if errors.Is(err, SnapshotPhaseMismatchError) {
+		if errors.Is(err, ErrSnapshotPhaseMismatch) {
 			return nil, status.Errorf(codes.InvalidArgument, "failed to retrieve snapshot for block, try again with different block: "+
 				"%v", err)
 		}
@@ -126,7 +136,13 @@ func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(_ context.Context, bl
 	return data, nil
 }
 
-// GetProtocolStateSnapshotByHeight returns serializable Snapshot by block height
+// GetProtocolStateSnapshotByHeight returns serializable Snapshot by block height.
+// The block must be finalized (otherwise the by-height query is ambiguous).
+// Expected errors during normal operation:
+//   - status.Error[codes.NotFound] - No block with the given height was found.
+//     The block height may or may not be finalized in the future; the client can retry later.
+//   - status.Error[codes.InvalidArgument] - A block was found, however its sealing segment spans an epoch phase transition,
+//     yielding an invalid snapshot. Therefore we will never return a snapshot for this block height.
 func (b *backendNetwork) GetProtocolStateSnapshotByHeight(_ context.Context, blockHeight uint64) ([]byte, error) {
 	snapshot := b.state.AtHeight(blockHeight)
 
@@ -141,7 +157,7 @@ func (b *backendNetwork) GetProtocolStateSnapshotByHeight(_ context.Context, blo
 
 	validSnapshot, err := b.getValidSnapshot(snapshot, 0, false)
 	if err != nil {
-		if errors.Is(err, SnapshotPhaseMismatchError) {
+		if errors.Is(err, ErrSnapshotPhaseMismatch) {
 			return nil, status.Errorf(codes.InvalidArgument, "failed to retrieve snapshot for block, try again with different block: "+
 				"%v", err)
 		}
@@ -167,7 +183,7 @@ func (b *backendNetwork) isEpochOrPhaseDifferent(counter1, counter2 uint64, phas
 // by height of each block in the segment and return a snapshot at the point
 // where the transition happens.
 // Expected error returns during normal operations:
-// * SnapshotPhaseMismatchError - snapshot does not contain a valid sealing segment
+// * ErrSnapshotPhaseMismatch - snapshot does not contain a valid sealing segment
 // All other errors should be treated as exceptions.
 func (b *backendNetwork) getValidSnapshot(snapshot protocol.Snapshot, blocksVisited int, findNextValidSnapshot bool) (protocol.Snapshot, error) {
 	segment, err := snapshot.SealingSegment()
@@ -189,7 +205,7 @@ func (b *backendNetwork) getValidSnapshot(snapshot protocol.Snapshot, blocksVisi
 	// of the snapshot requested spans either an epoch transition or phase transition.
 	if b.isEpochOrPhaseDifferent(counterAtHighest, counterAtLowest, phaseAtHighest, phaseAtLowest) {
 		if !findNextValidSnapshot {
-			return nil, SnapshotPhaseMismatchError
+			return nil, ErrSnapshotPhaseMismatch
 		}
 
 		// Visit each node in strict order of decreasing height starting at head

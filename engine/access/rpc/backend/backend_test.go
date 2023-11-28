@@ -522,7 +522,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_InvalidSegment() {
 			suite.Require().Error(err)
 			suite.Require().Empty(bytes)
 			suite.Require().Equal(status.Errorf(codes.InvalidArgument, "failed to retrieve snapshot for block, try again with different block: %v",
-				SnapshotPhaseMismatchError).Error(),
+				ErrSnapshotPhaseMismatch).Error(),
 				err.Error())
 		})
 
@@ -542,7 +542,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_InvalidSegment() {
 			suite.Require().Error(err)
 			suite.Require().Empty(bytes)
 			suite.Require().Equal(status.Errorf(codes.InvalidArgument, "failed to retrieve snapshot for block, try again with different block: %v",
-				SnapshotPhaseMismatchError).Error(),
+				ErrSnapshotPhaseMismatch).Error(),
 				err.Error())
 		})
 	})
@@ -658,7 +658,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByHeight_InvalidSegment() {
 		suite.Require().Nil(bytes)
 		suite.Require().Error(err)
 		suite.Require().Equal(status.Errorf(codes.InvalidArgument, "failed to get a valid snapshot: %v",
-			SnapshotPhaseMismatchError).Error(),
+			ErrSnapshotPhaseMismatch).Error(),
 			err.Error())
 	})
 }
