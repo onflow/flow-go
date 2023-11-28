@@ -152,11 +152,14 @@ func (c SystemContracts) AsTemplateEnv() templates.Environment {
 		FlowTokenAddress:     c.FlowToken.Address.Hex(),
 		FungibleTokenAddress: c.FungibleToken.Address.Hex(),
 
+		// The following contracts dont exist on the template env yet
+		// that is not a problem, but they are still listed here for completeness.
+
 		// NonFungibleToken: c.NonFungibleToken.Address.Hex(),
 		// MetadataViews : c.MetadataViews.Address.Hex(),
 		// ViewResolver : c.ViewResolver.Address.Hex(),
 
-		// EVMAddress: c.EVM.Address.Hex(), // doesn't exist yet
+		// EVMAddress: c.EVM.Address.Hex(),
 	}
 }
 
