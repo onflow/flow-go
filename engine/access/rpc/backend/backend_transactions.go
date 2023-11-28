@@ -664,7 +664,7 @@ func (b *backendTransactions) isExpired(refHeight, compareToHeight uint64) bool 
 }
 
 // Error returns:
-//   - ErrNotFound - collection referenced by transaction or block by a collection has not been found.
+//   - `storage.ErrNotFound` - collection referenced by transaction or block by a collection has not been found.
 //   - all other errors are unexpected and potentially symptoms of internal implementation bugs or state corruption (fatal).
 func (b *backendTransactions) lookupBlock(txID flow.Identifier) (*flow.Block, error) {
 
