@@ -65,7 +65,7 @@ func WithSignaler(parent context.Context) (SignalerContext, <-chan error) {
 	return &signalerCtx{parent, sig}, errChan
 }
 
-// WithSignalerContext converts a SignalerContext to a context.Context with the same underlying context
+// WithSignalerContext wraps `SignalerContext` using `context.WithValue` so it can later be used with `Throw`.
 func WithSignalerContext(parent context.Context, ctx SignalerContext) context.Context {
 	return context.WithValue(parent, SignalerContextKey{}, ctx)
 }
