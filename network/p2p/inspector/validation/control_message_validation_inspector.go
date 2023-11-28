@@ -289,7 +289,7 @@ func (c *ControlMsgValidationInspector) checkPubsubMessageSender(message *pubsub
 // - DuplicateTopicErr: if there are any duplicate topics in the list of grafts
 // - error: if any error occurs while sampling or validating topics, all returned errors are benign and should not cause the node to crash.
 // - bool: true if an error is returned and the topic that failed validation was a cluster prefixed topic, false otherwise.
-func (c *ControlMsgValidationInspector) inspectGraftMessages(from peer.ID, grafts []*pubsub_pb.ControlGraft, activeClusterIDS flow.ChainIDList) (error, bool) {
+func (c *ControlMsgValidationInspector) inspectGraftMessages(from peer.ID, grafts []*pubsub_pb.ControlGraft, activeClusterIDS flow.ChainIDList) (error, p2p.CtrlMsgTopicType) {
 	tracker := make(duplicateStrTracker)
 	for _, graft := range grafts {
 		topic := channels.Topic(graft.GetTopicID())
