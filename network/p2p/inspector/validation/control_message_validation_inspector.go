@@ -362,7 +362,7 @@ func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihave
 		duplicateTopicTracker.set(topic)
 		err, ctrlMsgType := c.validateTopic(from, channels.Topic(topic), activeClusterIDS)
 		if err != nil {
-			return err, isClusterPrefixed
+			return err, ctrlMsgType
 		}
 
 		for _, messageID := range messageIds {
