@@ -375,7 +375,7 @@ func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihave
 	lg.Debug().
 		Int("total_message_ids", totalMessageIds).
 		Msg("ihave control message validation complete")
-	return nil, false
+	return nil, p2p.CtrlMsgNonClusterTopicType
 }
 
 // inspectIWantMessages inspects RPC iWant control messages. This func will sample the iWants and perform validation on each iWant in the sample.
