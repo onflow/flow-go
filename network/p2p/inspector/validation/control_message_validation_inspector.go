@@ -299,7 +299,7 @@ func (c *ControlMsgValidationInspector) inspectGraftMessages(from peer.ID, graft
 		tracker.set(topic.String())
 		err, ctrlMsgType := c.validateTopic(from, topic, activeClusterIDS)
 		if err != nil {
-			return err, isClusterPrefixed
+			return err, ctrlMsgType
 		}
 	}
 	return nil, false
