@@ -38,8 +38,8 @@ type Config struct {
 	// MaxGlobalStreams defines the global max number of streams that can be open at the same time.
 	MaxGlobalStreams uint32
 
-	// MaxRegisterIdsPerMsg defines the max number of register IDs that can be received in a single request.
-	MaxRegisterIdsPerMsg uint32
+	// MaxRegisterIDsPerMsg defines the max number of register IDs that can be received in a single request.
+	MaxRegisterIDsPerMsg uint32
 
 	// ExecutionDataCacheSize is the max number of objects for the execution data cache.
 	ExecutionDataCacheSize uint32
@@ -119,7 +119,7 @@ func New(
 		rootBlockHeight:    rootHeight,
 		rootBlockID:        rootBlockID,
 		registers:          registers,
-		maxRegistersPerMsg: int(config.MaxRegisterIdsPerMsg),
+		maxRegistersPerMsg: int(config.MaxRegisterIDsPerMsg),
 		highestHeight:      counters.NewMonotonousCounter(highestAvailableHeight),
 	}
 
@@ -229,6 +229,7 @@ func (b *StateStreamBackend) GetRegisterValues(ids flow.RegisterIDs, height uint
 		return nil, status.Errorf(codes.InvalidArgument, "number of register IDs exceeds limit of %d", b.maxRegistersPerMsg)
 	}
 	values, err := b.registers.RegisterValues(ids, height)
+	print(err.Error())
 	if errors.Is(err, storage.ErrHeightNotIndexed) {
 		return nil, status.Errorf(codes.OutOfRange, "register values for block %d is not available", height)
 	}

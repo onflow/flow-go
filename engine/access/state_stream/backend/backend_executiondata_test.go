@@ -45,6 +45,7 @@ type BackendExecutionDataSuite struct {
 	headers        *storagemock.Headers
 	seals          *storagemock.Seals
 	results        *storagemock.ExecutionResults
+	registers      *storagemock.RegisterIndex
 	registersAsync *execution.RegistersAsyncStore
 
 	bs                blobs.Blobstore
@@ -87,6 +88,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 	conf := Config{
 		ClientSendTimeout:    state_stream.DefaultSendTimeout,
 		ClientSendBufferSize: state_stream.DefaultSendBufferSize,
+		MaxRegisterIDsPerMsg: state_stream.DefaultMaxRegisterIDsPerMsg,
 	}
 
 	var err error
@@ -148,6 +150,18 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 	}
 
 	s.registersAsync = execution.NewRegistersAsyncStore()
+	s.registers = storagemock.NewRegisterIndex(s.T())
+	err = s.registersAsync.InitDataAvailable(s.registers)
+	require.NoError(s.T(), err)
+	s.registers.On("LatestHeight").Return(rootBlock.Header.Height).Maybe()
+	s.registers.On("FirstHeight").Return(rootBlock.Header.Height).Maybe()
+	s.registers.On("Get", mock.AnythingOfType("RegisterID"), mock.AnythingOfType("uint64")).Return(
+		func(id flow.RegisterID, height uint64) (flow.RegisterValue, error) {
+			if id == unittest.RegisterIDFixture() {
+				return flow.RegisterValue{}, nil
+			}
+			return nil, storage.ErrNotFound
+		}).Maybe()
 
 	s.state.On("Sealed").Return(s.snapshot, nil).Maybe()
 	s.snapshot.On("Head").Return(s.blocks[0].Header, nil).Maybe()
@@ -421,5 +435,23 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataHandlesErrors() {
 
 		sub := s.backend.SubscribeExecutionData(subCtx, flow.ZeroID, s.blocks[len(s.blocks)-1].Header.Height+10)
 		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()))
+	})
+}
+
+func (s *BackendExecutionDataSuite) TestGetRegisterValuesErrors() {
+	s.Run("returns error if block height is out of range", func() {
+		_, err := s.backend.GetRegisterValues(flow.RegisterIDs{unittest.RegisterIDFixture()}, s.backend.rootBlockHeight+1)
+		assert.Equal(s.T(), codes.OutOfRange, status.Code(err))
+	})
+
+	s.Run("returns error if register path is not indexed", func() {
+		falseID := flow.RegisterIDs{flow.RegisterID{Owner: "ha", Key: "ha"}}
+		_, err := s.backend.GetRegisterValues(falseID, s.backend.rootBlockHeight)
+		assert.Equal(s.T(), codes.NotFound, status.Code(err))
+	})
+
+	s.Run("returns error if too many registers are requested", func() {
+		_, err := s.backend.GetRegisterValues(make(flow.RegisterIDs, s.backend.maxRegistersPerMsg+1), s.backend.rootBlockHeight)
+		assert.Equal(s.T(), codes.InvalidArgument, status.Code(err))
 	})
 }

@@ -202,7 +202,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			EventFilterConfig:       state_stream.DefaultEventFilterConfig,
 			ResponseLimit:           state_stream.DefaultResponseLimit,
 			HeartbeatInterval:       state_stream.DefaultHeartbeatInterval,
-			MaxRegisterIdsPerMsg:    state_stream.DefaultMaxRegisterIdsPerMsg,
+			MaxRegisterIDsPerMsg:    state_stream.DefaultMaxRegisterIdsPerMsg,
 		},
 		stateStreamFilterConf:        nil,
 		ExecutionNodeAddress:         "localhost:9000",
@@ -990,7 +990,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			if builder.stateStreamConf.ResponseLimit < 0 {
 				return errors.New("state-stream-response-limit must be greater than or equal to 0")
 			}
-			if builder.stateStreamConf.HeartbeatInterval == 0 {
+			if builder.stateStreamConf.MaxRegisterIDsPerMsg == 0 {
 				return errors.New("state-stream-max-register-values must be greater than or equal to 0")
 			}
 		}
