@@ -302,7 +302,7 @@ func (c *ControlMsgValidationInspector) inspectGraftMessages(from peer.ID, graft
 			return err, ctrlMsgType
 		}
 	}
-	return nil, false
+	return nil, p2p.CtrlMsgNonClusterTopicType
 }
 
 // inspectPruneMessages performs topic validation on all prunes in the control message using the provided validateTopic func while tracking duplicates.
