@@ -694,7 +694,7 @@ func (c *ControlMsgValidationInspector) performSample(ctrlMsg p2pmsg.ControlMess
 //
 // This func returns an exception in case of unexpected bug or state corruption if cluster prefixed topic validation
 // fails due to unexpected error returned when getting the active cluster IDS.
-func (c *ControlMsgValidationInspector) validateTopic(from peer.ID, topic channels.Topic, activeClusterIds flow.ChainIDList) (error, bool) {
+func (c *ControlMsgValidationInspector) validateTopic(from peer.ID, topic channels.Topic, activeClusterIds flow.ChainIDList) (error, p2p.CtrlMsgTopicType) {
 	channel, ok := channels.ChannelFromTopic(topic)
 	if !ok {
 		return channels.NewInvalidTopicErr(topic, fmt.Errorf("failed to get channel from topic")), false
