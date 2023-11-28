@@ -48,7 +48,7 @@ type SignalerContext interface {
 	sealed()         // private, to constrain builder to using WithSignaler
 }
 
-// SignalerContextKey represents the key type for retrieving a SignalerContext from a context.Context.
+// SignalerContextKey represents the key type for retrieving a SignalerContext from a value `context.Context`.
 type SignalerContextKey struct{}
 
 // private, to force context derivation / WithSignaler
