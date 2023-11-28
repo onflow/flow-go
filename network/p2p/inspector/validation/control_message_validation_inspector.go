@@ -323,7 +323,7 @@ func (c *ControlMsgValidationInspector) inspectPruneMessages(from peer.ID, prune
 			return NewDuplicateTopicErr(topic.String(), p2pmsg.CtrlMsgPrune), false
 		}
 		tracker.set(topic.String())
-		err, isClusterPrefixed := c.validateTopic(from, topic, activeClusterIDS)
+		err, ctrlMsgType := c.validateTopic(from, topic, activeClusterIDS)
 		if err != nil {
 			return err, isClusterPrefixed
 		}
