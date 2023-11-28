@@ -28,4 +28,4 @@ To upgrade the BLST version:
 - [ ] solve all breaking changes that may occur.
 - [ ] update the commit version on this `./blst_src/README`.
 
-Note that Flow crypto is using non exported internal functions from BLST. Checking for interfaces breaking changes in BLST should done along with auditing changes between the old and new versions. This includes checking logical changes and assumptions beyond interfaces, and assessing their security and performance impact on protocols implemented in Flow crypto.
+Note that Flow crypto is using non exported internal functions from BLST. Checking for interfaces breaking changes in BLST should be done along with auditing changes between the old and new versions. This includes checking logical changes and assumptions beyond interfaces, and assessing their security and performance impact on protocols implemented in Flow crypto.

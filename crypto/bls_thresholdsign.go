@@ -33,8 +33,6 @@ import (
 
 // blsThresholdSignatureParticipant implements ThresholdSignatureParticipant
 // based on the BLS signature scheme
-var _ ThresholdSignatureParticipant = (*blsThresholdSignatureParticipant)(nil)
-
 type blsThresholdSignatureParticipant struct {
 	// embed the follower
 	*blsThresholdSignatureInspector
@@ -44,10 +42,10 @@ type blsThresholdSignatureParticipant struct {
 	myPrivateKey PrivateKey
 }
 
+var _ ThresholdSignatureParticipant = (*blsThresholdSignatureParticipant)(nil)
+
 // blsThresholdSignatureInspector implements ThresholdSignatureInspector
 // based on the BLS signature scheme
-var _ ThresholdSignatureInspector = (*blsThresholdSignatureInspector)(nil)
-
 type blsThresholdSignatureInspector struct {
 	// size of the group
 	size int
@@ -72,6 +70,8 @@ type blsThresholdSignatureInspector struct {
 	lock sync.RWMutex
 }
 
+var _ ThresholdSignatureInspector = (*blsThresholdSignatureInspector)(nil)
+
 // NewBLSThresholdSignatureParticipant creates a new instance of Threshold signature Participant using BLS.
 // A participant is able to participate in a threshold signing protocol as well as following the
 // protocol.
@@ -82,8 +82,8 @@ type blsThresholdSignatureInspector struct {
 // participant is indexed by `myIndex` and holds the input private key
 // where n is the length of the public key shares slice.
 //
-// The function returns
-//   - (nil, invalidInputsError) if:
+// The function returns:
+// - (nil, invalidInputsError) if:
 //   - n is not in [`ThresholdSignMinSize`, `ThresholdSignMaxSize`]
 //   - threshold value is not in interval [1, n-1]
 //   - input private key and public key at my index do not match
@@ -138,8 +138,8 @@ func NewBLSThresholdSignatureParticipant(
 // Participants are defined by their public key share, and are indexed from 0 to n-1
 // where n is the length of the public key shares slice.
 //
-// The function returns
-//   - (nil, invalidInputsError) if:
+// The function returns:
+// - (nil, invalidInputsError) if:
 //   - n is not in [`ThresholdSignMinSize`, `ThresholdSignMaxSize`]
 //   - threshold value is not in interval [1, n-1]
 //   - (nil, notBLSKeyError) at least one public key is not of type pubKeyBLSBLS12381
@@ -535,8 +535,8 @@ func EnoughShares(threshold int, sharesNumber int) (bool, error) {
 // BLSThresholdKeyGen is a key generation for a BLS-based
 // threshold signature scheme with a trusted dealer.
 //
-// The function returns :
-//   - (nil, nil, nil, invalidInputsErrorf) if:
+// The function returns:
+// - (nil, nil, nil, invalidInputsErrorf) if:
 //   - seed is too short
 //   - n is not in [`ThresholdSignMinSize`, `ThresholdSignMaxSize`]
 //   - threshold value is not in interval [1, n-1]

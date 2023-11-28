@@ -63,25 +63,34 @@ func BenchmarkScalarMult(b *testing.B) {
 	// G1 generator multiplication
 	// Note that generator and random point multiplications
 	// are implemented with the same algorithm
-	b.Run("G1", func(b *testing.B) {
-		var res pointE1
+	var res pointE1
+	b.Run("G1 gen", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			generatorScalarMultG1(&res, &expo)
 		}
-		b.StopTimer()
+	})
+
+	// E1 random point multiplication
+	// Note that generator and random point multiplications
+	// are implemented with the same algorithm
+	b.Run("E1 rand", func(b *testing.B) {
+		var res pointE1
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			res.scalarMultE1(&res, &expo)
+		}
 	})
 
 	// G2 generator multiplication
 	// Note that generator and random point multiplications
 	// are implemented with the same algorithm
-	b.Run("G2", func(b *testing.B) {
+	b.Run("G2 gen", func(b *testing.B) {
 		var res pointE2
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			generatorScalarMultG2(&res, &expo)
 		}
-		b.StopTimer()
 	})
 }
 
@@ -133,7 +142,6 @@ func BenchmarkMapToG1(b *testing.B) {
 		p = mapToG1(input)
 	}
 	require.NotNil(b, p)
-	b.StopTimer()
 }
 
 // test subgroup membership check in G1 and G2
@@ -175,7 +183,6 @@ func BenchmarkSubgroupCheck(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			_ = checkMembershipG1(&p) // G1
 		}
-		b.StopTimer()
 	})
 
 	b.Run("G2", func(b *testing.B) {
@@ -185,7 +192,6 @@ func BenchmarkSubgroupCheck(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			_ = checkMembershipG2(&p) // G2
 		}
-		b.StopTimer()
 	})
 }
 
@@ -214,7 +220,7 @@ func TestReadWriteG1(t *testing.T) {
 	t.Run("infinity", func(t *testing.T) {
 		var p, q pointE1
 		seed := make([]byte, frBytesLen)
-		unsafeMapToG1(&p, seed) // this results in the infinity point
+		unsafeMapToG1(&p, seed) // this results in the infinity point given how `unsafeMapToG1` works with an empty scalar
 		writePointE1(bytes, &p)
 		require.True(t, IsBLSSignatureIdentity(bytes)) // sanity check
 		err := readPointE1(&q, bytes)
