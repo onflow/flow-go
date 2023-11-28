@@ -368,19 +368,21 @@ func (h *FlowAccessAPIForwarder) GetTransactionResult(context context.Context, r
 
 func (h *FlowAccessAPIForwarder) GetSystemTransaction(context context.Context, req *access.GetSystemTransactionRequest) (*access.TransactionResponse, error) {
 	// This is a passthrough request
-	upstream, err := h.FaultTolerantClient()
+	upstream, closer, err := h.FaultTolerantClient()
 	if err != nil {
 		return nil, err
 	}
+	defer closer.Close()
 	return upstream.GetSystemTransaction(context, req)
 }
 
 func (h *FlowAccessAPIForwarder) GetSystemTransactionResult(context context.Context, req *access.GetSystemTransactionResultRequest) (*access.TransactionResultResponse, error) {
 	// This is a passthrough request
-	upstream, err := h.FaultTolerantClient()
+	upstream, closer, err := h.FaultTolerantClient()
 	if err != nil {
 		return nil, err
 	}
+	defer closer.Close()
 	return upstream.GetSystemTransactionResult(context, req)
 }
 
