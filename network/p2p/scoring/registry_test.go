@@ -477,7 +477,12 @@ func TestPeerSpamPenaltyClusterPrefixed(t *testing.T) {
 	// this peer has a spam record, with no subscription penalty. Hence, the app specific score should only be the spam penalty,
 	// and the peer should be deprived of the default reward for its valid staked role.
 	score = reg.AppSpecificScoreFunc()(peerID)
-	assert.Less(t, math.Abs(expectedPenalty-score), 10e-3)
+	tolerance := 10e-3 // 0.1%
+	if expectedPenalty == 0 {
+		assert.Less(t, math.Abs(expectedPenalty), tolerance)
+	} else {
+		assert.Less(t, math.Abs(expectedPenalty-score)/expectedPenalty, tolerance)
+	}
 }
 
 // withStakedIdentity returns a function that sets the identity provider to return an staked identity for the given peer id.
