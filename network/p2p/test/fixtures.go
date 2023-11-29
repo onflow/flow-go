@@ -154,7 +154,7 @@ func NodeFixture(t *testing.T,
 			MaxSize: uint32(1000),
 			Metrics: metrics.NewNoopCollector(),
 		},
-		parameters.PubSubTracer, 
+		parameters.PubSubTracer,
 		parameters.UnicastConfig).
 		SetConnectionManager(connManager).
 		SetCreateNode(p2pbuilder.DefaultCreateNodeFunc).

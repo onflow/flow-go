@@ -593,7 +593,7 @@ func (builder *FollowerServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 		},
 		network.PublicNetwork,
 		builder.BaseConfig.BindAddr,
-		networkKey, 
+		networkKey,
 		builder.SporkID,
 		builder.IdentityProvider,
 		builder.FlowConfig.NetworkConfig.GossipSubConfig.GossipSubScoringRegistryConfig,
