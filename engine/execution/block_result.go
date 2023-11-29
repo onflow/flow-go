@@ -103,7 +103,7 @@ func (er *BlockExecutionResult) AllUpdatedRegisters() []flow.RegisterEntry {
 			updates[regID] = regVal
 		}
 	}
-	res := make([]flow.RegisterEntry, 0)
+	res := make([]flow.RegisterEntry, 0, len(updates))
 	for regID, regVal := range updates {
 		res = append(res, flow.RegisterEntry{
 			Key:   regID,
