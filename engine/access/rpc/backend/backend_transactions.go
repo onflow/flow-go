@@ -1044,6 +1044,9 @@ func (b *backendTransactions) tryGetTransactionResultByIndex(
 // lookupTransactionErrorMessage returns transaction error message for specified transaction.
 // If an error message for transaction can be found in the cache then it will be used to serve the request, otherwise
 // an RPC call will be made to the EN to fetch that error message, fetched value will be cached in the LRU cache.
+// Expected errors during normal operation:
+//   - InsufficientExecutionReceipts - found insufficient receipts for given block ID.
+//   - status.Error - remote GRPC call to EN has failed.
 func (b *backendTransactions) lookupTransactionErrorMessage(
 	ctx context.Context,
 	blockID flow.Identifier,
@@ -1060,7 +1063,7 @@ func (b *backendTransactions) lookupTransactionErrorMessage(
 		if IsInsufficientExecutionReceipts(err) {
 			return "", status.Errorf(codes.NotFound, err.Error())
 		}
-		return "", rpc.ConvertError(err, "failed to retrieve error message from any execution node", codes.Internal)
+		return "", rpc.ConvertError(err, "failed to select execution nodes", codes.Internal)
 	}
 	req := &execproto.GetTransactionErrorMessageRequest{
 		BlockId:       convert.IdentifierToMessage(blockID),
@@ -1079,6 +1082,10 @@ func (b *backendTransactions) lookupTransactionErrorMessage(
 // lookupTransactionErrorMessageByIndex returns transaction error message for specified transaction using its index.
 // If an error message for transaction can be found in cache then it will be used to serve the request, otherwise
 // an RPC call will be made to the EN to fetch that error message, fetched value will be cached in the LRU cache.
+// Expected errors during normal operation:
+//   - status.Error[codes.NotFound] - transaction result for given block ID and tx index is not available.
+//   - InsufficientExecutionReceipts - found insufficient receipts for given block ID.
+//   - status.Error - remote GRPC call to EN has failed.
 func (b *backendTransactions) lookupTransactionErrorMessageByIndex(
 	ctx context.Context,
 	blockID flow.Identifier,
@@ -1100,7 +1107,7 @@ func (b *backendTransactions) lookupTransactionErrorMessageByIndex(
 		if IsInsufficientExecutionReceipts(err) {
 			return "", status.Errorf(codes.NotFound, err.Error())
 		}
-		return "", rpc.ConvertError(err, "failed to retrieve error message from any execution node", codes.Internal)
+		return "", rpc.ConvertError(err, "failed to select execution nodes", codes.Internal)
 	}
 	req := &execproto.GetTransactionErrorMessageByIndexRequest{
 		BlockId: convert.IdentifierToMessage(blockID),
@@ -1118,6 +1125,10 @@ func (b *backendTransactions) lookupTransactionErrorMessageByIndex(
 
 // lookupTransactionErrorMessagesByBlockID returns all error messages for failed transactions by blockID.
 // An RPC call will be made to the EN to fetch missing errors messages, fetched value will be cached in the LRU cache.
+// Expected errors during normal operation:
+//   - status.Error[codes.NotFound] - transaction results for given block ID are not available.
+//   - InsufficientExecutionReceipts - found insufficient receipts for given block ID.
+//   - status.Error - remote GRPC call to EN has failed.
 func (b *backendTransactions) lookupTransactionErrorMessagesByBlockID(
 	ctx context.Context,
 	blockID flow.Identifier,
@@ -1150,7 +1161,7 @@ func (b *backendTransactions) lookupTransactionErrorMessagesByBlockID(
 		if IsInsufficientExecutionReceipts(err) {
 			return nil, status.Errorf(codes.NotFound, err.Error())
 		}
-		return nil, rpc.ConvertError(err, "failed to retrieve error message from any execution node", codes.Internal)
+		return nil, rpc.ConvertError(err, "failed to select execution nodes", codes.Internal)
 	}
 	req := &execproto.GetTransactionErrorMessagesByBlockIDRequest{
 		BlockId: convert.IdentifierToMessage(blockID),
@@ -1169,21 +1180,23 @@ func (b *backendTransactions) lookupTransactionErrorMessagesByBlockID(
 	return result, nil
 }
 
-// getTransactionErrorMessageFromAnyEN performs an RPC call using available nodes passed as argument.
+// getTransactionErrorMessageFromAnyEN performs an RPC call using available nodes passed as argument. List of nodes must be non-empty otherwise an error will be returned.
+// Expected errors during normal operation:
+//   - status.Error - GRPC call failed, some of possible codes are:
+//      - codes.NotFound - request cannot be served by EN because of absence of data.
+//      - codes.Unavailable - remote node is not unavailable.
 func (b *backendTransactions) getTransactionErrorMessageFromAnyEN(
 	ctx context.Context,
 	execNodes flow.IdentityList,
 	req *execproto.GetTransactionErrorMessageRequest,
 ) (*execproto.GetTransactionErrorMessageResponse, error) {
-	var errToReturn error
-
 	// if we were passed 0 execution nodes add a specific error
 	if len(execNodes) == 0 {
 		return nil, errors.New("zero execution nodes")
 	}
 
 	var resp *execproto.GetTransactionErrorMessageResponse
-	errToReturn = b.nodeCommunicator.CallAvailableNode(
+	errToReturn := b.nodeCommunicator.CallAvailableNode(
 		execNodes,
 		func(node *flow.Identity) error {
 			var err error
@@ -1209,21 +1222,23 @@ func (b *backendTransactions) getTransactionErrorMessageFromAnyEN(
 	return resp, errToReturn
 }
 
-// getTransactionErrorMessageFromAnyEN performs an RPC call using available nodes passed as argument.
+// getTransactionErrorMessageFromAnyEN performs an RPC call using available nodes passed as argument. List of nodes must be non-empty otherwise an error will be returned.
+// Expected errors during normal operation:
+//   - status.Error - GRPC call failed, some of possible codes are:
+//      - codes.NotFound - request cannot be served by EN because of absence of data.
+//      - codes.Unavailable - remote node is not unavailable.
 func (b *backendTransactions) getTransactionErrorMessageByIndexFromAnyEN(
 	ctx context.Context,
 	execNodes flow.IdentityList,
 	req *execproto.GetTransactionErrorMessageByIndexRequest,
 ) (*execproto.GetTransactionErrorMessageResponse, error) {
-	var errToReturn error
-
 	// if we were passed 0 execution nodes add a specific error
 	if len(execNodes) == 0 {
 		return nil, errors.New("zero execution nodes")
 	}
 
 	var resp *execproto.GetTransactionErrorMessageResponse
-	errToReturn = b.nodeCommunicator.CallAvailableNode(
+	errToReturn := b.nodeCommunicator.CallAvailableNode(
 		execNodes,
 		func(node *flow.Identity) error {
 			var err error
@@ -1247,21 +1262,23 @@ func (b *backendTransactions) getTransactionErrorMessageByIndexFromAnyEN(
 	return resp, errToReturn
 }
 
-// getTransactionErrorMessagesFromAnyEN performs an RPC call using available nodes passed as argument.
+// getTransactionErrorMessagesFromAnyEN performs an RPC call using available nodes passed as argument. List of nodes must be non-empty otherwise an error will be returned.
+// Expected errors during normal operation:
+//   - status.Error - GRPC call failed, some of possible codes are:
+//      - codes.NotFound - request cannot be served by EN because of absence of data.
+//      - codes.Unavailable - remote node is not unavailable.
 func (b *backendTransactions) getTransactionErrorMessagesFromAnyEN(
 	ctx context.Context,
 	execNodes flow.IdentityList,
 	req *execproto.GetTransactionErrorMessagesByBlockIDRequest,
 ) ([]*execproto.GetTransactionErrorMessagesResponse_Result, error) {
-	var errToReturn error
-
 	// if we were passed 0 execution nodes add a specific error
 	if len(execNodes) == 0 {
 		return nil, errors.New("zero execution nodes")
 	}
 
 	var resp *execproto.GetTransactionErrorMessagesResponse
-	errToReturn = b.nodeCommunicator.CallAvailableNode(
+	errToReturn := b.nodeCommunicator.CallAvailableNode(
 		execNodes,
 		func(node *flow.Identity) error {
 			var err error
@@ -1286,7 +1303,12 @@ func (b *backendTransactions) getTransactionErrorMessagesFromAnyEN(
 	return resp.GetResults(), errToReturn
 }
 
+// Expected errors during normal operation:
+//   - status.Error - GRPC call failed, some of possible codes are:
+//      - codes.NotFound - request cannot be served by EN because of absence of data.
+//      - codes.Unavailable - remote node is not unavailable.
 // tryGetTransactionErrorMessageFromEN performs a grpc call to the specified execution node and returns response.
+
 func (b *backendTransactions) tryGetTransactionErrorMessageFromEN(
 	ctx context.Context,
 	execNode *flow.Identity,
@@ -1297,11 +1319,14 @@ func (b *backendTransactions) tryGetTransactionErrorMessageFromEN(
 		return nil, err
 	}
 	defer closer.Close()
-
 	return execRPCClient.GetTransactionErrorMessage(ctx, req)
 }
 
 // tryGetTransactionErrorMessageByIndexFromEN performs a grpc call to the specified execution node and returns response.
+// Expected errors during normal operation:
+//   - status.Error - GRPC call failed, some of possible codes are:
+//      - codes.NotFound - request cannot be served by EN because of absence of data.
+//      - codes.Unavailable - remote node is not unavailable.
 func (b *backendTransactions) tryGetTransactionErrorMessageByIndexFromEN(
 	ctx context.Context,
 	execNode *flow.Identity,
@@ -1316,6 +1341,10 @@ func (b *backendTransactions) tryGetTransactionErrorMessageByIndexFromEN(
 }
 
 // tryGetTransactionErrorMessagesByBlockIDFromEN performs a grpc call to the specified execution node and returns response.
+// Expected errors during normal operation:
+//   - status.Error - GRPC call failed, some of possible codes are:
+//      - codes.NotFound - request cannot be served by EN because of absence of data.
+//      - codes.Unavailable - remote node is not unavailable.
 func (b *backendTransactions) tryGetTransactionErrorMessagesByBlockIDFromEN(
 	ctx context.Context,
 	execNode *flow.Identity,
@@ -1326,6 +1355,5 @@ func (b *backendTransactions) tryGetTransactionErrorMessagesByBlockIDFromEN(
 		return nil, err
 	}
 	defer closer.Close()
-
 	return execRPCClient.GetTransactionErrorMessagesByBlockID(ctx, req)
 }
