@@ -450,7 +450,7 @@ func TestSpamRecordDecayAdjustment(t *testing.T) {
 	// is the default reward for a staked peer that has valid subscriptions.
 	assert.Equal(t, scoring.MaxAppSpecificReward, reg.AppSpecificScoreFunc()(peer1))
 	assert.Equal(t, scoring.MaxAppSpecificReward, reg.AppSpecificScoreFunc()(peer2))
-	
+
 	// simulate sustained malicious activity from peer1, eventually the decay speed
 	// for a spam record should be reduced to the MinimumSpamPenaltyDecayFactor
 	require.Eventually(t, func() bool {
@@ -490,6 +490,18 @@ func TestSpamRecordDecayAdjustment(t *testing.T) {
 			record.Penalty == 0 &&
 			record.LastDecayAdjustment.IsZero()
 	}, 5*time.Second, time.Second)
+
+	// ensure decay can be reduced again after recovery for peerID 2
+	require.Eventually(t, func() bool {
+		reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
+			PeerID:  peer2,
+			MsgType: p2pmsg.CtrlMsgPrune,
+		})
+		record, err, ok := spamRecords.Get(peer1)
+		require.NoError(t, err)
+		require.True(t, ok)
+		return record.Decay == scoring.MinimumSpamPenaltyDecayFactor
+	}, 5*time.Second, 500*time.Millisecond)
 }
 
 // withStakedIdentity returns a function that sets the identity provider to return an staked identity for the given peer id.
