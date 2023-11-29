@@ -107,7 +107,7 @@ type Params struct {
 
 // New creates backend instance
 func New(params Params) (*Backend, error) {
-	retry := newRetry()
+	retry := newRetry(params.Log)
 	if params.RetryEnabled {
 		retry.Activate()
 	}
