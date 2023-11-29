@@ -1568,17 +1568,19 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 	}
 	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
 
-	libp2pNode, err := p2pbuilder.NewNodeBuilder(builder.Logger, &p2pconfig.MetricsConfig{
-		HeroCacheFactory: builder.HeroCacheMetricsFactory(),
-		Metrics:          networkMetrics,
-	},
+	libp2pNode, err := p2pbuilder.NewNodeBuilder(builder.Logger,
+		&p2pconfig.MetricsConfig{
+			HeroCacheFactory: builder.HeroCacheMetricsFactory(),
+			Metrics:          networkMetrics,
+		},
 		network.PublicNetwork,
 		bindAddress,
 		networkKey,
 		builder.SporkID,
 		builder.IdentityProvider,
+		builder.FlowConfig.NetworkConfig.GossipSubConfig.GossipSubScoringRegistryConfig,
 		&builder.FlowConfig.NetworkConfig.ResourceManager,
-		&builder.FlowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig,
+		&builder.FlowConfig.NetworkConfig.GossipSubConfig,
 		&p2pconfig.PeerManagerConfig{
 			// TODO: eventually, we need pruning enabled even on public network. However, it needs a modified version of
 			// the peer manager that also operate on the public identities.
@@ -1586,7 +1588,6 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 			UpdateInterval:    builder.FlowConfig.NetworkConfig.PeerUpdateInterval,
 			ConnectorFactory:  connection.DefaultLibp2pBackoffConnectorFactory(),
 		},
-		&builder.FlowConfig.NetworkConfig.GossipSubConfig.SubscriptionProviderConfig,
 		&p2p.DisallowListCacheConfig{
 			MaxSize: builder.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
 			Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
