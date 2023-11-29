@@ -139,17 +139,17 @@ func NodeFixture(t *testing.T,
 	connManager, err := connection.NewConnManager(logger, parameters.MetricsCfg.Metrics, &parameters.FlowConfig.NetworkConfig.ConnectionManagerConfig)
 	require.NoError(t, err)
 
-	builder := p2pbuilder.NewNodeBuilder(logger,
-		parameters.MetricsCfg,
+	builder := p2pbuilder.NewNodeBuilder(
+		logger, parameters.MetricsCfg,
 		parameters.NetworkingType,
 		parameters.Address,
 		parameters.Key,
 		sporkID,
 		parameters.IdProvider,
+		defaultFlowConfig.NetworkConfig.GossipSubConfig.GossipSubScoringRegistryConfig,
 		&parameters.FlowConfig.NetworkConfig.ResourceManager,
-		&parameters.FlowConfig.NetworkConfig.GossipSubRPCInspectorsConfig,
+		&parameters.FlowConfig.NetworkConfig.GossipSubConfig,
 		parameters.PeerManagerConfig,
-		&parameters.FlowConfig.NetworkConfig.GossipSubConfig.SubscriptionProviderConfig,
 		&p2p.DisallowListCacheConfig{
 			MaxSize: uint32(1000),
 			Metrics: metrics.NewNoopCollector(),
