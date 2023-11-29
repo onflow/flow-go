@@ -8,6 +8,7 @@ import (
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module"
@@ -45,14 +46,13 @@ const (
 // Additionally, it allows users to configure the logging interval.
 type GossipSubMeshTracer struct {
 	component.Component
-	pubsub.RawTracer
 
 	topicMeshMu    sync.RWMutex                    // to protect topicMeshMap
 	topicMeshMap   map[string]map[peer.ID]struct{} // map of local mesh peers by topic.
 	logger         zerolog.Logger
 	idProvider     module.IdentityProvider
 	loggerInterval time.Duration
-	metrics        module.GossipSubLocalMeshMetrics
+	metrics        module.LocalGossipSubRouterMetrics
 	rpcSentTracker *internal.RPCSentTracker
 }
 
@@ -62,7 +62,7 @@ type GossipSubMeshTracerConfig struct {
 	network.NetworkingType
 	metrics.HeroCacheMetricsFactory
 	Logger                             zerolog.Logger
-	Metrics                            module.GossipSubLocalMeshMetrics
+	Metrics                            module.LocalGossipSubRouterMetrics
 	IDProvider                         module.IdentityProvider
 	LoggerInterval                     time.Duration
 	RpcSentTrackerCacheSize            uint32
@@ -87,7 +87,6 @@ func NewGossipSubMeshTracer(config *GossipSubMeshTracerConfig) *GossipSubMeshTra
 		LastHighestIhavesSentResetInterval: defaultLastHighestIHaveRPCSizeResetInterval,
 	})
 	g := &GossipSubMeshTracer{
-		RawTracer:      NewGossipSubNoopTracer(),
 		topicMeshMap:   make(map[string]map[peer.ID]struct{}),
 		idProvider:     config.IDProvider,
 		metrics:        config.Metrics,
@@ -129,6 +128,7 @@ func (t *GossipSubMeshTracer) GetMeshPeers(topic string) []peer.ID {
 
 // Graft is called when a peer is added to a topic mesh. The tracer uses this to track the mesh peers.
 func (t *GossipSubMeshTracer) Graft(p peer.ID, topic string) {
+	t.metrics.OnPeerGraftTopic(topic)
 	t.topicMeshMu.Lock()
 	defer t.topicMeshMu.Unlock()
 
@@ -156,6 +156,7 @@ func (t *GossipSubMeshTracer) Graft(p peer.ID, topic string) {
 
 // Prune is called when a peer is removed from a topic mesh. The tracer uses this to track the mesh peers.
 func (t *GossipSubMeshTracer) Prune(p peer.ID, topic string) {
+	t.metrics.OnPeerPruneTopic(topic)
 	t.topicMeshMu.Lock()
 	defer t.topicMeshMu.Unlock()
 
@@ -182,13 +183,207 @@ func (t *GossipSubMeshTracer) Prune(p peer.ID, topic string) {
 	lg.Debug().Hex("flow_id", logging.ID(id.NodeID)).Str("role", id.Role.String()).Msg("pruned peer")
 }
 
-// SendRPC is called when a RPC is sent. Currently, the GossipSubMeshTracer tracks iHave RPC messages that have been sent.
+// SendRPC is called by GossipSub when a RPC is sent. Currently, the GossipSubMeshTracer tracks iHave RPC messages that have been sent.
 // This function can be updated to track other control messages in the future as required.
-func (t *GossipSubMeshTracer) SendRPC(rpc *pubsub.RPC, _ peer.ID) {
+func (t *GossipSubMeshTracer) SendRPC(rpc *pubsub.RPC, p peer.ID) {
 	err := t.rpcSentTracker.Track(rpc)
 	if err != nil {
 		t.logger.Err(err).Bool(logging.KeyNetworkingSecurity, true).Msg("failed to track sent pubsbub rpc")
 	}
+
+	msgCount, ihaveCount, iwantCount, graftCount, pruneCount := 0, 0, 0, 0, 0
+	if rpc.Control != nil {
+		ihaveCount = len(rpc.Control.Ihave)
+		iwantCount = len(rpc.Control.Iwant)
+		graftCount = len(rpc.Control.Graft)
+		pruneCount = len(rpc.Control.Prune)
+	}
+	msgCount = len(rpc.Publish)
+	t.metrics.OnRpcReceived(msgCount, ihaveCount, iwantCount, graftCount, pruneCount)
+	t.logger.Trace().
+		Str("remote_peer_id", p2plogging.PeerId(p)).
+		Int("subscription_option_count", len(rpc.Subscriptions)).
+		Int("publish_message_count", msgCount).
+		Int("ihave_size", ihaveCount).
+		Int("iwant_size", iwantCount).
+		Int("graft_size", graftCount).
+		Int("prune_size", pruneCount).
+		Msg("sent pubsub rpc")
+
+	t.metrics.OnRpcSent(msgCount, ihaveCount, iwantCount, graftCount, pruneCount)
+}
+
+func (t *GossipSubMeshTracer) AddPeer(p peer.ID, proto protocol.ID) {
+	t.logger.Trace().
+		Str("local_peer_id", p2plogging.PeerId(p)).
+		Str("protocol", string(proto)).
+		Msg("peer added")
+	t.metrics.OnPeerAddedToProtocol(string(proto))
+}
+
+func (t *GossipSubMeshTracer) RemovePeer(p peer.ID) {
+	t.logger.Trace().
+		Str("local_peer_id", p2plogging.PeerId(p)).
+		Msg("peer removed")
+	t.metrics.OnPeerRemovedFromProtocol()
+}
+
+func (t *GossipSubMeshTracer) Join(topic string) {
+	t.logger.Trace().
+		Str("topic", topic).
+		Msg("local peer joined topic")
+	t.metrics.OnLocalPeerJoinedTopic(topic)
+}
+
+func (t *GossipSubMeshTracer) Leave(topic string) {
+	t.logger.Trace().
+		Str("topic", topic).
+		Msg("local peer left topic")
+	t.metrics.OnLocalPeerLeftTopic(topic)
+}
+
+func (t *GossipSubMeshTracer) ValidateMessage(msg *pubsub.Message) {
+	lg := t.logger.With().Logger()
+
+	if msg.Topic != nil {
+		lg = lg.With().Str("topic", *msg.Topic).Logger()
+	}
+	from, err := peer.IDFromBytes(msg.From)
+	if err == nil {
+		lg = lg.With().Str("remote_peer_id", p2plogging.PeerId(from)).Logger()
+	}
+	lg.Trace().
+		Str("received_from", p2plogging.PeerId(msg.ReceivedFrom)).
+		Int("message_size", len(msg.Data)).
+		Msg("received pubsub message")
+	t.metrics.OnMessageEnteredValidation()
+}
+
+func (t *GossipSubMeshTracer) DeliverMessage(msg *pubsub.Message) {
+	lg := t.logger.With().Logger()
+
+	if msg.Topic != nil {
+		lg = lg.With().Str("topic", *msg.Topic).Logger()
+	}
+	from, err := peer.IDFromBytes(msg.From)
+	if err == nil {
+		lg = lg.With().Str("remote_peer_id", p2plogging.PeerId(from)).Logger()
+	}
+	lg.Trace().
+		Str("received_from", p2plogging.PeerId(msg.ReceivedFrom)).
+		Int("message_size", len(msg.Data)).
+		Msg("delivered pubsub message")
+}
+
+// RejectMessage is called by GossipSub as a callback when a message is rejected by the local node.
+func (t *GossipSubMeshTracer) RejectMessage(msg *pubsub.Message, reason string) {
+	lg := t.logger.With().Logger()
+
+	if msg.Topic != nil {
+		lg = lg.With().Str("topic", *msg.Topic).Logger()
+	}
+	from, err := peer.IDFromBytes(msg.From)
+	if err == nil {
+		lg = lg.With().Str("remote_peer_id", p2plogging.PeerId(from)).Logger()
+	}
+	size := len(msg.Data)
+	lg.Trace().
+		Str("received_from", p2plogging.PeerId(msg.ReceivedFrom)).
+		Int("message_size", size).
+		Msg("rejected pubsub message")
+	t.metrics.OnMessageRejected(size, reason)
+}
+
+// DuplicateMessage is called by GossipSub as a callback when a duplicate message is received by the local node.
+func (t *GossipSubMeshTracer) DuplicateMessage(msg *pubsub.Message) {
+	lg := t.logger.With().Logger()
+
+	if msg.Topic != nil {
+		lg = lg.With().Str("topic", *msg.Topic).Logger()
+	}
+	from, err := peer.IDFromBytes(msg.From)
+	if err == nil {
+		lg = lg.With().Str("remote_peer_id", p2plogging.PeerId(from)).Logger()
+	}
+
+	size := len(msg.Data)
+	t.metrics.OnMessageDuplicate(size)
+	lg.Trace().
+		Str("received_from", p2plogging.PeerId(msg.ReceivedFrom)).
+		Int("message_size", size).
+		Msg("received duplicate pubsub message")
+}
+
+// ThrottlePeer is called by GossipSub when a peer is throttled by the local node, i.e., the local node is not accepting any
+// pubsub message from the peer but may still accept control messages.
+func (t *GossipSubMeshTracer) ThrottlePeer(p peer.ID) {
+	t.logger.Warn().
+		Bool(logging.KeyNetworkingSecurity, true).
+		Str("remote_peer_id", p2plogging.PeerId(p)).
+		Msg("throttled peer")
+	t.metrics.OnPeerThrottled()
+}
+
+// RecvRPC is called by GossipSub as a callback when an inbound RPC message is received by the local node,
+// note that the RPC already passed the RPC inspection, hence its statistics may be different from the RPC inspector metrics, as
+// the RPC inspector metrics are updated before the RPC inspection, and the RPC may gone through truncation or rejection.
+// This callback tracks the RPC messages as they are completely received by the local GossipSub router.
+func (t *GossipSubMeshTracer) RecvRPC(rpc *pubsub.RPC) {
+	msgCount, ihaveCount, iwantCount, graftCount, pruneCount := 0, 0, 0, 0, 0
+	if rpc.Control != nil {
+		ihaveCount = len(rpc.Control.Ihave)
+		iwantCount = len(rpc.Control.Iwant)
+		graftCount = len(rpc.Control.Graft)
+		pruneCount = len(rpc.Control.Prune)
+	}
+	msgCount = len(rpc.Publish)
+	t.metrics.OnRpcReceived(msgCount, ihaveCount, iwantCount, graftCount, pruneCount)
+	t.logger.Trace().
+		Int("subscription_option_count", len(rpc.Subscriptions)).
+		Int("publish_message_count", msgCount).
+		Int("ihave_size", ihaveCount).
+		Int("iwant_size", iwantCount).
+		Int("graft_size", graftCount).
+		Int("prune_size", pruneCount).
+		Msg("received pubsub rpc")
+}
+
+// DropRPC is called by GossipSub as a callback when an outbound RPC message is dropped by the local node, typically because the local node
+// outbound message queue is full; or the RPC is big and the local node cannot fragment it.
+func (t *GossipSubMeshTracer) DropRPC(rpc *pubsub.RPC, p peer.ID) {
+	msgCount, ihaveCount, iwantCount, graftCount, pruneCount := 0, 0, 0, 0, 0
+	if rpc.Control != nil {
+		ihaveCount = len(rpc.Control.Ihave)
+		iwantCount = len(rpc.Control.Iwant)
+		graftCount = len(rpc.Control.Graft)
+		pruneCount = len(rpc.Control.Prune)
+	}
+	msgCount = len(rpc.Publish)
+	t.metrics.OnRpcReceived(msgCount, ihaveCount, iwantCount, graftCount, pruneCount)
+	t.logger.Warn().
+		Bool(logging.KeyNetworkingSecurity, true).
+		Str("remote_peer_id", p2plogging.PeerId(p)).
+		Int("subscription_option_count", len(rpc.Subscriptions)).
+		Int("publish_message_count", msgCount).
+		Int("ihave_size", ihaveCount).
+		Int("iwant_size", iwantCount).
+		Int("graft_size", graftCount).
+		Int("prune_size", pruneCount).
+		Msg("received pubsub rpc")
+
+	t.metrics.OnRpcDropped(msgCount, ihaveCount, iwantCount, graftCount, pruneCount)
+}
+
+// UndeliverableMessage is called by GossipSub as a callback when a message is dropped by the local node, typically because the local node
+// outbound message queue is full; or the message is big and the local node cannot fragment it.
+func (t *GossipSubMeshTracer) UndeliverableMessage(msg *pubsub.Message) {
+	t.logger.Warn().
+		Bool(logging.KeyNetworkingSecurity, true).
+		Str("topic", *msg.Topic).
+		Str("remote_peer_id", p2plogging.PeerId(msg.ReceivedFrom)).
+		Int("message_size", len(msg.Data)).
+		Msg("undeliverable pubsub message")
+	t.metrics.OnUndeliveredMessage()
 }
 
 // WasIHaveRPCSent returns true if an iHave control message for the messageID was sent, otherwise false.

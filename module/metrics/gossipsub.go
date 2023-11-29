@@ -152,13 +152,29 @@ func (nc *GossipSubMetrics) OnPublishedGossipMessagesReceived(count int) {
 	nc.receivedPublishMessageCount.Add(float64(count))
 }
 
-// GossipSubLocalMeshMetrics is a metrics collector for the local mesh of GossipSub protocol.
-type GossipSubLocalMeshMetrics struct {
-	localMeshSize prometheus.GaugeVec
+// LocalGossipSubRouterMetrics encapsulates the metrics collectors for GossipSub router of the local node.
+// It gives a lens into the local node's view of the GossipSub protocol.
+type LocalGossipSubRouterMetrics struct {
+	localMeshSize                 prometheus.GaugeVec
+	peerAddedOnProtocolCount      prometheus.CounterVec
+	peerRemovedFromProtocolCount  prometheus.Counter
+	localPeerJoinedTopicCount     prometheus.CounterVec
+	localPeerLeftTopicCount       prometheus.CounterVec
+	peerGraftTopicCount           prometheus.CounterVec
+	peerPruneTopicCount           prometheus.CounterVec
+	messageEnteredValidationCount prometheus.Counter
+	messageDeliveredCount         prometheus.Counter
+	messageRejectedCount          prometheus.CounterVec
+	messageDuplicateSize          prometheus.Histogram
+	peerThrottledCount            prometheus.Counter
+	rpcRecCount                   prometheus.Counter
+	rpcSentCount                  prometheus.Counter
+	rpcDroppedCount               prometheus.Counter
+	undeliveredMessageCount       prometheus.Counter
 }
 
-func NewGossipSubLocalMeshMetrics(prefix string) *GossipSubLocalMeshMetrics {
-	return &GossipSubLocalMeshMetrics{
+func NewGossipSubLocalMeshMetrics(prefix string) *LocalGossipSubRouterMetrics {
+	return &LocalGossipSubRouterMetrics{
 		localMeshSize: *promauto.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Namespace: namespaceNetwork,
@@ -168,12 +184,203 @@ func NewGossipSubLocalMeshMetrics(prefix string) *GossipSubLocalMeshMetrics {
 			},
 			[]string{LabelChannel},
 		),
+		peerAddedOnProtocolCount: *promauto.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
+			Name:      prefix + "gossipsub_added_peer_on_protocol_total",
+			Help:      "number of peers added to the local gossipsub router on a gossipsub protocol",
+		}, []string{LabelProtocol}),
+		peerRemovedFromProtocolCount: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
+			Name:      prefix + "gossipsub_removed_peer_total",
+			Help:      "number of peers removed from the local gossipsub router on a gossipsub protocol due to unavailability or blacklisting",
+		}),
+		localPeerJoinedTopicCount: *promauto.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
+			Name:      prefix + "gossipsub_joined_topic_total",
+			Help:      "number of times the local node joined (i.e., subscribed) to a topic",
+		}, []string{LabelChannel}),
+		localPeerLeftTopicCount: *promauto.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
+			Name:      prefix + "gossipsub_left_topic_total",
+			Help:      "number of times the local node left (i.e., unsubscribed) from a topic",
+		}, []string{LabelChannel}),
+		peerGraftTopicCount: *promauto.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
+			Name:      prefix + "gossipsub_graft_topic_total",
+			Help:      "number of peers grafted to a topic on the local mesh of the node",
+		}, []string{LabelChannel}),
+		peerPruneTopicCount: *promauto.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
+			Name:      prefix + "gossipsub_prune_topic_total",
+			Help:      "number of peers pruned from a topic on the local mesh of the node",
+		}, []string{LabelChannel}),
+		messageEnteredValidationCount: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
+			Name:      prefix + "gossipsub_message_entered_validation_total",
+			Help:      "number of messages entered internal validation pipeline of gossipsub",
+		}),
+		messageDeliveredCount: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
+			Name:      prefix + "gossipsub_message_delivered_total",
+			Help:      "number of messages delivered to all subscribers of the topic",
+		}),
+		messageRejectedCount: *promauto.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
+			Name:      prefix + "gossipsub_message_rejected_total",
+			Help:      "number of messages rejected by the validation pipeline",
+		}, []string{LabelRejectionReason}),
+		messageDuplicateSize: prometheus.NewHistogram(prometheus.HistogramOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
+			Buckets:   []float64{KiB, 100 * KiB, 1 * MiB},
+			Name:      prefix + "gossipsub_duplicate_message_size_bytes",
+			Help:      "size of messages that are duplicates of already received messages",
+		}),
+		peerThrottledCount: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
+			Name:      prefix + "gossipsub_peer_throttled_total",
+			Help:      "number of peers that are throttled by the local node, i.e., the local node is not accepting any pubsub message from the peer but may still accept control messages",
+		}),
+		rpcRecCount: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
+			Name:      prefix + "gossipsub_rpc_received_total",
+			Help:      "number of rpc messages received and processed by the router (i.e., passed rpc inspection)",
+		}),
+		rpcSentCount: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
+			Name:      prefix + "gossipsub_rpc_sent_total",
+			Help:      "number of rpc messages sent by the router",
+		}),
+		rpcDroppedCount: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
+			Name:      prefix + "gossipsub_rpc_dropped_total",
+			Help:      "number of outbound rpc messages dropped, typically because the outbound message queue is full",
+		}),
+		undeliveredMessageCount: prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
+			Name:      prefix + "gossipsub_undelivered_message_total",
+			Help:      "number of undelivered messages, i.e., messages that are not delivered to at least one subscriber",
+		}),
 	}
 }
 
-var _ module.GossipSubLocalMeshMetrics = (*GossipSubLocalMeshMetrics)(nil)
+var _ module.LocalGossipSubRouterMetrics = (*LocalGossipSubRouterMetrics)(nil)
 
 // OnLocalMeshSizeUpdated updates the local mesh size metric.
-func (g *GossipSubLocalMeshMetrics) OnLocalMeshSizeUpdated(topic string, size int) {
+func (g *LocalGossipSubRouterMetrics) OnLocalMeshSizeUpdated(topic string, size int) {
 	g.localMeshSize.WithLabelValues(topic).Set(float64(size))
+}
+
+// OnPeerAddedToProtocol is called when the local node receives a stream from a peer on a gossipsub-related protocol.
+// Args:
+//
+//	protocol: the protocol name that the peer is connected to.
+func (g *LocalGossipSubRouterMetrics) OnPeerAddedToProtocol(protocol string) {
+	g.peerAddedOnProtocolCount.WithLabelValues(protocol).Inc()
+}
+
+// OnPeerRemovedFromProtocol is called when the local considers a remote peer blacklisted or unavailable.
+func (g *LocalGossipSubRouterMetrics) OnPeerRemovedFromProtocol() {
+	g.peerRemovedFromProtocolCount.Inc()
+}
+
+// OnLocalPeerJoinedTopic is called when the local node subscribes to a gossipsub topic.
+// Args:
+//
+//	topic: the topic that the local peer subscribed to.
+func (g *LocalGossipSubRouterMetrics) OnLocalPeerJoinedTopic(topic string) {
+	g.localPeerJoinedTopicCount.WithLabelValues(topic).Inc()
+}
+
+// OnLocalPeerLeftTopic is called when the local node unsubscribes from a gossipsub topic.
+// Args:
+//
+//	topic: the topic that the local peer has unsubscribed from.
+func (g *LocalGossipSubRouterMetrics) OnLocalPeerLeftTopic(topic string) {
+	g.localPeerLeftTopicCount.WithLabelValues(topic).Inc()
+}
+
+// OnPeerGraftTopic is called when the local node receives a GRAFT message from a remote peer on a topic.
+// Note: the received GRAFT at this point is considered passed the RPC inspection, and is accepted by the local node.
+func (g *LocalGossipSubRouterMetrics) OnPeerGraftTopic(topic string) {
+	g.peerGraftTopicCount.WithLabelValues(topic).Inc()
+}
+
+// OnPeerPruneTopic is called when the local node receives a PRUNE message from a remote peer on a topic.
+// Note: the received PRUNE at this point is considered passed the RPC inspection, and is accepted by the local node.
+func (g *LocalGossipSubRouterMetrics) OnPeerPruneTopic(topic string) {
+	g.peerPruneTopicCount.WithLabelValues(topic).Inc()
+}
+
+// OnMessageEnteredValidation is called when a received pubsub message enters the validation pipeline. It is the
+// internal validation pipeline of GossipSub protocol. The message may be rejected or accepted by the validation
+// pipeline.
+func (g *LocalGossipSubRouterMetrics) OnMessageEnteredValidation() {
+	g.messageEnteredValidationCount.Inc()
+}
+
+// OnMessageRejected is called when a received pubsub message is rejected by the validation pipeline.
+// Args:
+//
+//	reason: the reason for rejection.
+func (g *LocalGossipSubRouterMetrics) OnMessageRejected(int size, reason string) {
+	g.messageRejectedCount.WithLabelValues(reason).Inc()
+}
+
+// OnMessageDuplicate is called when a received pubsub message is a duplicate of a previously received message, and
+// is dropped.
+// Args:
+//
+//	size: the size of the duplicate message.
+func (g *LocalGossipSubRouterMetrics) OnMessageDuplicate(size int) {
+	g.messageDuplicateSize.Observe(float64(size))
+}
+
+// OnPeerThrottled is called when a peer is throttled by the local node, i.e., the local node is not accepting any
+// pubsub message from the peer but may still accept control messages.
+func (g *LocalGossipSubRouterMetrics) OnPeerThrottled() {
+	g.peerThrottledCount.Inc()
+}
+
+// OnRpcReceived is called when an RPC message is received by the local node. The received RPC is considered
+// passed the RPC inspection, and is accepted by the local node.
+func (g *LocalGossipSubRouterMetrics) OnRpcReceived(int, int, int, int, int) {
+	g.rpcRecCount.Inc()
+}
+
+// OnRpcSent is called when an RPC message is sent by the local node.
+// Note: the sent RPC is considered passed the RPC inspection, and is accepted by the local node.
+func (g *LocalGossipSubRouterMetrics) OnRpcSent(msgCount int, iHaveCount int, iWantCount int, graftCount int, pruneCount int) {
+	g.rpcSentCount.Inc()
+}
+
+// OnRpcDropped is called when an outbound RPC message is dropped by the local node, typically because the local node
+// outbound message queue is full; or the RPC is big and the local node cannot fragment it.
+func (g *LocalGossipSubRouterMetrics) OnRpcDropped(msgCount int, iHaveCount int, iWantCount int, graftCount int, pruneCount int) {
+	g.rpcDroppedCount.Inc()
+}
+
+// OnUndeliveredMessage is called when a message is not delivered at least one subscriber of the topic, for example when
+// the subscriber is too slow to process the message.
+func (g *LocalGossipSubRouterMetrics) OnUndeliveredMessage() {
+	g.undeliveredMessageCount.Inc()
+}
+
+// OnMessageDelivered is called when a message is delivered to all subscribers of the topic.
+func (g *LocalGossipSubRouterMetrics) OnMessageDelivered() {
+	g.messageDeliveredCount.Inc()
 }
