@@ -602,7 +602,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			serviceEvents, err := systemcontracts.ServiceEventsForChain(execCtx.Chain.ChainID())
 			require.NoError(t, err)
 
-			payload, err := ccf.Decode(nil, unittest.EpochSetupFixtureCCF)
+			randomSource := unittest.EpochSetupRandomSourceFixture()
+			payload, err := ccf.Decode(nil, unittest.EpochSetupFixtureCCF(randomSource))
 			require.NoError(t, err)
 
 			serviceEventA, ok := payload.(cadence.Event)

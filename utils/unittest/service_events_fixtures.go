@@ -1,6 +1,9 @@
 package unittest
 
 import (
+	"crypto/rand"
+	"encoding/hex"
+
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/onflow/cadence/runtime/common"
@@ -12,6 +15,15 @@ import (
 
 // This file contains service event fixtures for testing purposes.
 
+func EpochSetupRandomSourceFixture() []byte {
+	source := make([]byte, flow.EpochSetupRandomSourceLength)
+	_, err := rand.Read(source)
+	if err != nil {
+		panic(err)
+	}
+	return source
+}
+
 // EpochSetupFixtureByChainID returns an EpochSetup service event as a Cadence event
 // representation and as a protocol model representation.
 func EpochSetupFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochSetup) {
@@ -21,13 +33,8 @@ func EpochSetupFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochSetu
 	}
 
 	event := EventFixture(events.EpochSetup.EventType(), 1, 1, IdentifierFixture(), 0)
-	event.Payload = EpochSetupFixtureCCF
-
-	// randomSource is [0,0,...,1,2,3,4]
-	randomSource := make([]uint8, flow.EpochSetupRandomSourceLength)
-	for i := 0; i < 4; i++ {
-		randomSource[flow.EpochSetupRandomSourceLength-1-i] = uint8(4 - i)
-	}
+	randomSource := EpochSetupRandomSourceFixture()
+	event.Payload = EpochSetupFixtureCCF(randomSource)
 
 	expected := &flow.EpochSetup{
 		Counter:            1,
@@ -174,7 +181,8 @@ func VersionBeaconFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.Versio
 	return event, expected
 }
 
-func createEpochSetupEvent() cadence.Event {
+func createEpochSetupEvent(randomSource []byte) cadence.Event {
+	randomSourceHex := hex.EncodeToString(randomSource)
 
 	return cadence.NewEvent([]cadence.Value{
 		// counter
@@ -193,7 +201,7 @@ func createEpochSetupEvent() cadence.Event {
 		createEpochCollectors(),
 
 		// randomSource
-		cadence.String("01020304"),
+		cadence.String(randomSourceHex),
 
 		// DKGPhase1FinalView
 		cadence.UInt64(150),
@@ -1028,8 +1036,8 @@ func ufix64FromString(s string) cadence.UFix64 {
 	return f
 }
 
-var EpochSetupFixtureCCF = func() []byte {
-	b, err := ccf.Encode(createEpochSetupEvent())
+func EpochSetupFixtureCCF(randomSource []byte) []byte {
+	b, err := ccf.Encode(createEpochSetupEvent(randomSource))
 	if err != nil {
 		panic(err)
 	}
@@ -1038,7 +1046,7 @@ var EpochSetupFixtureCCF = func() []byte {
 		panic(err)
 	}
 	return b
-}()
+}
 
 var EpochCommitFixtureCCF = func() []byte {
 	b, err := ccf.Encode(createEpochCommittedEvent())
