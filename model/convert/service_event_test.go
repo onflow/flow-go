@@ -40,6 +40,21 @@ func TestEventConversion(t *testing.T) {
 	)
 
 	t.Run(
+		"epoch setup invalid random source", func(t *testing.T) {
+
+			fixture, _ := unittest.EpochSetupFixtureByChainID(chainID)
+			// update the random source in event fixture
+			randomSource := unittest.EpochSetupRandomSourceFixture()
+			fixture.Payload = unittest.EpochSetupFixtureCCF(randomSource[:flow.EpochSetupRandomSourceLength-1])
+
+			// convert Cadence types to Go types
+			event, err := convert.ServiceEvent(chainID, fixture)
+			require.Error(t, err)
+			require.Nil(t, event)
+		},
+	)
+
+	t.Run(
 		"epoch commit", func(t *testing.T) {
 
 			fixture, expected := unittest.EpochCommitFixtureByChainID(chainID)
