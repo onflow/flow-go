@@ -290,6 +290,20 @@ func (e *ProtocolStateEntry) EpochStatus() *EpochStatus {
 	}
 }
 
+func (e *ProtocolStateEntry) EpochPhase() EpochPhase {
+	if e.NextEpoch == nil {
+		return EpochPhaseStaking
+	}
+	if e.NextEpoch.CommitID == ZeroID {
+		return EpochPhaseSetup
+	}
+	}
+	if es.NextEpoch.CommitID == ZeroID {
+		return EpochPhaseSetup, nil
+	}
+	return EpochPhaseCommitted, nil
+}
+
 func (ll DynamicIdentityEntryList) Lookup() map[Identifier]*DynamicIdentityEntry {
 	result := make(map[Identifier]*DynamicIdentityEntry, len(ll))
 	for _, entry := range ll {
