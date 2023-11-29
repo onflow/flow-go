@@ -346,23 +346,6 @@ func (suite *Suite) TestLookupTransactionErrorMessage_HappyPath() {
 	failedTx := unittest.TransactionFixture()
 	failedTxId := failedTx.ID()
 
-	nonFailedTx := unittest.TransactionFixture()
-	nonFailedTxID := nonFailedTx.ID()
-
-	suite.transactionResults.On("ByBlockIDTransactionID", blockId, failedTxId).
-		Return(&flow.LightTransactionResult{
-			TransactionID:   failedTxId,
-			Failed:          true,
-			ComputationUsed: 0,
-		}, nil).Once()
-
-	suite.transactionResults.On("ByBlockIDTransactionID", blockId, nonFailedTxID).
-		Return(&flow.LightTransactionResult{
-			TransactionID:   nonFailedTxID,
-			Failed:          false,
-			ComputationUsed: 0,
-		}, nil).Once()
-
 	_, fixedENIDs := suite.setupReceipts(&block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
@@ -379,10 +362,6 @@ func (suite *Suite) TestLookupTransactionErrorMessage_HappyPath() {
 	backend, err := New(params)
 	suite.Require().NoError(err)
 
-	errMsg, err := backend.lookupTransactionErrorMessage(context.Background(), blockId, nonFailedTxID)
-	suite.Require().NoError(err)
-	suite.Require().Empty(errMsg)
-
 	expectedErrorMsg := "some error"
 
 	exeEventReq := &execproto.GetTransactionErrorMessageRequest{
@@ -397,7 +376,7 @@ func (suite *Suite) TestLookupTransactionErrorMessage_HappyPath() {
 
 	suite.execClient.On("GetTransactionErrorMessage", mock.Anything, exeEventReq).Return(exeEventResp, nil).Once()
 
-	errMsg, err = backend.lookupTransactionErrorMessage(context.Background(), blockId, failedTxId)
+	errMsg, err := backend.lookupTransactionErrorMessage(context.Background(), blockId, failedTxId)
 	suite.Require().NoError(err)
 	suite.Require().Equal(expectedErrorMsg, errMsg)
 
@@ -409,29 +388,6 @@ func (suite *Suite) TestLookupTransactionErrorMessage_HappyPath() {
 	suite.assertAllExpectations()
 }
 
-// TestLookupTransactionErrorMessage_UnknownTransaction tests lookup of a transaction error message, when a transaction result
-// has not been synced yet, in this case nothing we can do but return an error.
-func (suite *Suite) TestLookupTransactionErrorMessage_UnknownTransaction() {
-	block := unittest.BlockFixture()
-	blockId := block.ID()
-	failedTx := unittest.TransactionFixture()
-	failedTxId := failedTx.ID()
-
-	suite.transactionResults.On("ByBlockIDTransactionID", blockId, failedTxId).
-		Return(nil, storage.ErrNotFound).Once()
-
-	params := suite.defaultBackendParams()
-	backend, err := New(params)
-	suite.Require().NoError(err)
-
-	errMsg, err := backend.lookupTransactionErrorMessage(context.Background(), blockId, failedTxId)
-	suite.Require().Error(err)
-	suite.Require().Equal(codes.NotFound, status.Code(err))
-	suite.Require().Empty(errMsg)
-
-	suite.assertAllExpectations()
-}
-
 // TestLookupTransactionErrorMessage_FailedToFetch tests lookup of a transaction error message, when a transaction result
 // is not in the cache and needs to be fetched from EN, but the EN fails to return it.
 func (suite *Suite) TestLookupTransactionErrorMessage_FailedToFetch() {
@@ -439,13 +395,6 @@ func (suite *Suite) TestLookupTransactionErrorMessage_FailedToFetch() {
 	blockId := block.ID()
 	failedTx := unittest.TransactionFixture()
 	failedTxId := failedTx.ID()
-
-	suite.transactionResults.On("ByBlockIDTransactionID", blockId, failedTxId).
-		Return(&flow.LightTransactionResult{
-			TransactionID:   failedTxId,
-			Failed:          true,
-			ComputationUsed: 0,
-		}, nil).Once()
 
 	_, fixedENIDs := suite.setupReceipts(&block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
@@ -484,23 +433,12 @@ func (suite *Suite) TestLookupTransactionErrorMessageByIndex_HappyPath() {
 	failedTxId := failedTx.ID()
 	failedTxIndex := rand.Uint32()
 
-	nonFailedTx := unittest.TransactionFixture()
-	nonFailedTxID := nonFailedTx.ID()
-	nonFailedTxIndex := rand.Uint32()
-
 	suite.transactionResults.On("ByBlockIDTransactionIndex", blockId, failedTxIndex).
 		Return(&flow.LightTransactionResult{
 			TransactionID:   failedTxId,
 			Failed:          true,
 			ComputationUsed: 0,
 		}, nil).Twice()
-
-	suite.transactionResults.On("ByBlockIDTransactionIndex", blockId, nonFailedTxIndex).
-		Return(&flow.LightTransactionResult{
-			TransactionID:   nonFailedTxID,
-			Failed:          false,
-			ComputationUsed: 0,
-		}, nil).Once()
 
 	_, fixedENIDs := suite.setupReceipts(&block)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
@@ -518,15 +456,11 @@ func (suite *Suite) TestLookupTransactionErrorMessageByIndex_HappyPath() {
 	backend, err := New(params)
 	suite.Require().NoError(err)
 
-	errMsg, err := backend.lookupTransactionErrorMessageByIndex(context.Background(), blockId, nonFailedTxIndex)
-	suite.Require().NoError(err)
-	suite.Require().Empty(errMsg)
-
 	expectedErrorMsg := "some error"
 
-	exeEventReq := &execproto.GetTransactionErrorMessageRequest{
-		BlockId:       blockId[:],
-		TransactionId: failedTxId[:],
+	exeEventReq := &execproto.GetTransactionErrorMessageByIndexRequest{
+		BlockId: blockId[:],
+		Index:   failedTxIndex,
 	}
 
 	exeEventResp := &execproto.GetTransactionErrorMessageResponse{
@@ -534,9 +468,9 @@ func (suite *Suite) TestLookupTransactionErrorMessageByIndex_HappyPath() {
 		ErrorMessage:  expectedErrorMsg,
 	}
 
-	suite.execClient.On("GetTransactionErrorMessage", mock.Anything, exeEventReq).Return(exeEventResp, nil).Once()
+	suite.execClient.On("GetTransactionErrorMessageByIndex", mock.Anything, exeEventReq).Return(exeEventResp, nil).Once()
 
-	errMsg, err = backend.lookupTransactionErrorMessageByIndex(context.Background(), blockId, failedTxIndex)
+	errMsg, err := backend.lookupTransactionErrorMessageByIndex(context.Background(), blockId, failedTxIndex)
 	suite.Require().NoError(err)
 	suite.Require().Equal(expectedErrorMsg, errMsg)
 
@@ -602,7 +536,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByIndex_FailedToFetch() {
 	backend, err := New(params)
 	suite.Require().NoError(err)
 
-	suite.execClient.On("GetTransactionErrorMessage", mock.Anything, mock.Anything).Return(nil,
+	suite.execClient.On("GetTransactionErrorMessageByIndex", mock.Anything, mock.Anything).Return(nil,
 		status.Error(codes.Unavailable, "")).Twice()
 
 	errMsg, err := backend.lookupTransactionErrorMessageByIndex(context.Background(), blockId, failedTxIndex)

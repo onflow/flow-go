@@ -360,7 +360,6 @@ func (b *backendTransactions) lookupCollectionIDInBlock(
 // retrieveBlock function returns a block based on the input argument. The block ID lookup has the highest priority,
 // followed by the collection ID lookup. If both are missing, the default lookup by transaction ID is performed.
 func (b *backendTransactions) retrieveBlock(
-
 	// the requested block or collection was not found. If looking up the block based solely on the txID returns
 	// not found, then no error is returned.
 	blockID flow.Identifier,
@@ -1066,11 +1065,6 @@ func (b *backendTransactions) lookupTransactionErrorMessageByIndex(
 		return "", rpc.ConvertStorageError(err)
 	}
 
-	// nothing to do tx has not failed
-	if !txResult.Failed {
-		return "", nil
-	}
-
 	cacheKey := flow.MakeIDFromFingerPrint(append(blockID[:], txResult.TransactionID[:]...))
 	value, cached := b.txErrorMessagesCache.Get(cacheKey)
 	if cached {
@@ -1084,12 +1078,12 @@ func (b *backendTransactions) lookupTransactionErrorMessageByIndex(
 		}
 		return "", rpc.ConvertError(err, "failed to retrieve error message from any execution node", codes.Internal)
 	}
-	req := &execproto.GetTransactionErrorMessageRequest{
-		BlockId:       convert.IdentifierToMessage(blockID),
-		TransactionId: convert.IdentifierToMessage(txResult.TransactionID),
+	req := &execproto.GetTransactionErrorMessageByIndexRequest{
+		BlockId: convert.IdentifierToMessage(blockID),
+		Index:   index,
 	}
 
-	resp, err := b.getTransactionErrorMessageFromAnyEN(ctx, execNodes, req)
+	resp, err := b.getTransactionErrorMessageByIndexFromAnyEN(ctx, execNodes, req)
 	if err != nil {
 		return "", fmt.Errorf("could not fetch error message from ENs: %w", err)
 	}
@@ -1191,6 +1185,44 @@ func (b *backendTransactions) getTransactionErrorMessageFromAnyEN(
 	return resp, errToReturn
 }
 
+// getTransactionErrorMessageFromAnyEN performs an RPC call using available nodes passed as argument.
+func (b *backendTransactions) getTransactionErrorMessageByIndexFromAnyEN(
+	ctx context.Context,
+	execNodes flow.IdentityList,
+	req *execproto.GetTransactionErrorMessageByIndexRequest,
+) (*execproto.GetTransactionErrorMessageResponse, error) {
+	var errToReturn error
+
+	// if we were passed 0 execution nodes add a specific error
+	if len(execNodes) == 0 {
+		return nil, errors.New("zero execution nodes")
+	}
+
+	var resp *execproto.GetTransactionErrorMessageResponse
+	errToReturn = b.nodeCommunicator.CallAvailableNode(
+		execNodes,
+		func(node *flow.Identity) error {
+			var err error
+			resp, err = b.tryGetTransactionErrorMessageByIndexFromEN(ctx, node, req)
+			if err == nil {
+				b.log.Debug().
+					Str("execution_node", node.String()).
+					Hex("block_id", req.GetBlockId()).
+					Uint32("index", req.GetIndex()).
+					Msg("Successfully got transaction error message by index from any node")
+				return nil
+			}
+			return err
+		},
+		nil,
+	)
+	if errToReturn != nil {
+		b.log.Err(errToReturn).Msg("failed to get transaction error message by index from execution nodes")
+	}
+
+	return resp, errToReturn
+}
+
 // getTransactionErrorMessagesFromAnyEN performs an RPC call using available nodes passed as argument.
 func (b *backendTransactions) getTransactionErrorMessagesFromAnyEN(
 	ctx context.Context,
@@ -1204,7 +1236,7 @@ func (b *backendTransactions) getTransactionErrorMessagesFromAnyEN(
 		return nil, errors.New("zero execution nodes")
 	}
 
-	var resp []*execproto.GetTransactionErrorMessagesResponse_Result
+	var resp *execproto.GetTransactionErrorMessagesResponse
 	errToReturn = b.nodeCommunicator.CallAvailableNode(
 		execNodes,
 		func(node *flow.Identity) error {
@@ -1227,7 +1259,7 @@ func (b *backendTransactions) getTransactionErrorMessagesFromAnyEN(
 		b.log.Err(errToReturn).Msg("failed to get transaction error messages from execution nodes")
 	}
 
-	return resp, errToReturn
+	return resp.GetResults(), errToReturn
 }
 
 // tryGetTransactionErrorMessageFromEN performs a grpc call to the specified execution node and returns response.
@@ -1245,22 +1277,31 @@ func (b *backendTransactions) tryGetTransactionErrorMessageFromEN(
 	return execRPCClient.GetTransactionErrorMessage(ctx, req)
 }
 
+// tryGetTransactionErrorMessageByIndexFromEN performs a grpc call to the specified execution node and returns response.
+func (b *backendTransactions) tryGetTransactionErrorMessageByIndexFromEN(
+	ctx context.Context,
+	execNode *flow.Identity,
+	req *execproto.GetTransactionErrorMessageByIndexRequest,
+) (*execproto.GetTransactionErrorMessageResponse, error) {
+	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
+	if err != nil {
+		return nil, err
+	}
+	defer closer.Close()
+	return execRPCClient.GetTransactionErrorMessageByIndex(ctx, req)
+}
+
 // tryGetTransactionErrorMessagesByBlockIDFromEN performs a grpc call to the specified execution node and returns response.
 func (b *backendTransactions) tryGetTransactionErrorMessagesByBlockIDFromEN(
 	ctx context.Context,
 	execNode *flow.Identity,
 	req *execproto.GetTransactionErrorMessagesByBlockIDRequest,
-) ([]*execproto.GetTransactionErrorMessagesResponse_Result, error) {
+) (*execproto.GetTransactionErrorMessagesResponse, error) {
 	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
 	if err != nil {
 		return nil, err
 	}
 	defer closer.Close()
 
-	resp, err := execRPCClient.GetTransactionErrorMessagesByBlockID(ctx, req)
-	if err != nil {
-		return nil, err
-	}
-
-	return resp.Results, nil
+	return execRPCClient.GetTransactionErrorMessagesByBlockID(ctx, req)
 }
