@@ -587,6 +587,58 @@ func (_m *AccessAPIServer) GetProtocolStateSnapshotByHeight(_a0 context.Context,
 	return r0, r1
 }
 
+// GetSystemTransaction provides a mock function with given fields: _a0, _a1
+func (_m *AccessAPIServer) GetSystemTransaction(_a0 context.Context, _a1 *access.GetSystemTransactionRequest) (*access.TransactionResponse, error) {
+	ret := _m.Called(_a0, _a1)
+
+	var r0 *access.TransactionResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetSystemTransactionRequest) (*access.TransactionResponse, error)); ok {
+		return rf(_a0, _a1)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetSystemTransactionRequest) *access.TransactionResponse); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*access.TransactionResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *access.GetSystemTransactionRequest) error); ok {
+		r1 = rf(_a0, _a1)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetSystemTransactionResult provides a mock function with given fields: _a0, _a1
+func (_m *AccessAPIServer) GetSystemTransactionResult(_a0 context.Context, _a1 *access.GetSystemTransactionResultRequest) (*access.TransactionResultResponse, error) {
+	ret := _m.Called(_a0, _a1)
+
+	var r0 *access.TransactionResultResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetSystemTransactionResultRequest) (*access.TransactionResultResponse, error)); ok {
+		return rf(_a0, _a1)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetSystemTransactionResultRequest) *access.TransactionResultResponse); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*access.TransactionResultResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *access.GetSystemTransactionResultRequest) error); ok {
+		r1 = rf(_a0, _a1)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetTransaction provides a mock function with given fields: _a0, _a1
 func (_m *AccessAPIServer) GetTransaction(_a0 context.Context, _a1 *access.GetTransactionRequest) (*access.TransactionResponse, error) {
 	ret := _m.Called(_a0, _a1)
