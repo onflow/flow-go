@@ -93,6 +93,8 @@ const (
 	alspSyncEngineBatchRequestBaseProb = "alsp-sync-engine-batch-request-base-prob"
 	alspSyncEngineRangeRequestBaseProb = "alsp-sync-engine-range-request-base-prob"
 	alspSyncEngineSyncRequestProb      = "alsp-sync-engine-sync-request-prob"
+
+	scoringRegistryStartupSilencePeriod = "gossipsub-scoring-registry-startup-silence-period"
 )
 
 func AllFlagNames() []string {
@@ -150,6 +152,7 @@ func AllFlagNames() []string {
 		iwantCacheMissCheckSize,
 		rpcMessageMaxSampleSize,
 		rpcMessageErrorThreshold,
+		scoringRegistryStartupSilencePeriod,
 	}
 
 	for _, scope := range []string{systemScope, transientScope, protocolScope, peerScope, peerProtocolScope} {
@@ -308,6 +311,10 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 		gossipSubSubscriptionProviderCacheSize,
 		config.GossipSubConfig.SubscriptionProviderConfig.CacheSize,
 		"size of the cache that keeps the list of topics each peer has subscribed to, recommended size is 10x the number of authorized nodes")
+	flags.Duration(
+		scoringRegistryStartupSilencePeriod,
+		config.GossipSubConfig.ScoringRegistryStartupSilencePeriod,
+		"the duration of time, after the node startup, during which the scoring registry remains inactive before penalizing nodes.")
 }
 
 // LoadLibP2PResourceManagerFlags loads all CLI flags for the libp2p resource manager configuration on the provided pflag set.

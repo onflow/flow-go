@@ -66,6 +66,16 @@ type GossipSubConfig struct {
 	PeerScoring bool `mapstructure:"gossipsub-peer-scoring-enabled"`
 
 	SubscriptionProviderConfig SubscriptionProviderParameters `mapstructure:",squash"`
+
+	// ScoringRegistryStartupSilencePeriod defines the duration of time, after the node startup,
+	// during which the scoring registry remains inactive before penalizing nodes.
+	// Throughout this startup silence period, the application-specific penalty
+	// for all nodes will be set to 0, and any invalid control message notifications
+	// will be ignored.
+	//
+	// This configuration allows nodes to stabilize and initialize before
+	// applying penalties or responding processing invalid control message notifications.
+	ScoringRegistryStartupSilencePeriod time.Duration `validate:"gt=10m" mapstructure:"gossipsub-scoring-registry-startup-silence-period"`
 }
 
 type SubscriptionProviderParameters struct {
