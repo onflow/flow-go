@@ -1032,16 +1032,6 @@ func (b *backendTransactions) lookupTransactionErrorMessage(
 		return value, nil
 	}
 
-	txResult, err := b.results.ByBlockIDTransactionID(blockID, transactionID)
-	if err != nil {
-		return "", rpc.ConvertStorageError(err)
-	}
-
-	// nothing to do tx has not failed
-	if !txResult.Failed {
-		return "", nil
-	}
-
 	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
 	if err != nil {
 		if IsInsufficientExecutionReceipts(err) {
@@ -1169,13 +1159,6 @@ func (b *backendTransactions) getTransactionErrorMessageFromAnyEN(
 ) (*execproto.GetTransactionErrorMessageResponse, error) {
 	var errToReturn error
 
-	defer func() {
-		// log the errors
-		if errToReturn != nil {
-			b.log.Err(errToReturn).Msg("failed to get transaction error message from execution nodes")
-		}
-	}()
-
 	// if we were passed 0 execution nodes add a specific error
 	if len(execNodes) == 0 {
 		return nil, errors.New("zero execution nodes")
@@ -1200,6 +1183,11 @@ func (b *backendTransactions) getTransactionErrorMessageFromAnyEN(
 		nil,
 	)
 
+	// log the errors
+	if errToReturn != nil {
+		b.log.Err(errToReturn).Msg("failed to get transaction error message from execution nodes")
+	}
+
 	return resp, errToReturn
 }
 
@@ -1210,13 +1198,6 @@ func (b *backendTransactions) getTransactionErrorMessagesFromAnyEN(
 	req *execproto.GetTransactionErrorMessagesByBlockIDRequest,
 ) ([]*execproto.GetTransactionErrorMessagesResponse_Result, error) {
 	var errToReturn error
-
-	defer func() {
-		// log the errors
-		if errToReturn != nil {
-			b.log.Err(errToReturn).Msg("failed to get transaction error messages from execution nodes")
-		}
-	}()
 
 	// if we were passed 0 execution nodes add a specific error
 	if len(execNodes) == 0 {
@@ -1241,6 +1222,11 @@ func (b *backendTransactions) getTransactionErrorMessagesFromAnyEN(
 		nil,
 	)
 
+	// log the errors
+	if errToReturn != nil {
+		b.log.Err(errToReturn).Msg("failed to get transaction error messages from execution nodes")
+	}
+
 	return resp, errToReturn
 }
 
@@ -1256,12 +1242,7 @@ func (b *backendTransactions) tryGetTransactionErrorMessageFromEN(
 	}
 	defer closer.Close()
 
-	resp, err := execRPCClient.GetTransactionErrorMessage(ctx, req)
-	if err != nil {
-		return nil, err
-	}
-
-	return resp, nil
+	return execRPCClient.GetTransactionErrorMessage(ctx, req)
 }
 
 // tryGetTransactionErrorMessagesByBlockIDFromEN performs a grpc call to the specified execution node and returns response.
