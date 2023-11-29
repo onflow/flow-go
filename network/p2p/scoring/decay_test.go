@@ -277,6 +277,24 @@ func TestDefaultDecayFunction(t *testing.T) {
 				},
 			},
 		},
+				{
+			// 8. penalty is negative and below slowerDecayPenaltyThreshold; and LastDecayAdjustment time passed the decay adjust interval. record decay should be adjusted.
+			name: "penalty is negative and below slowerDecayPenaltyThreshold and LastDecayAdjustment time passed the decay adjust interval. Record decay should be adjusted",
+			args: args{
+				record: p2p.GossipSubSpamRecord{
+					Penalty:             -100,
+					Decay:               0.8,
+					LastDecayAdjustment: time.Now().Add(-flowConfig.NetworkConfig.GossipSubConfig.GossipSubScoringRegistryConfig.DecayAdjustInterval),
+				},
+				lastUpdated: time.Now(),
+			},
+			want: want{
+				record: p2p.GossipSubSpamRecord{
+					Penalty: -100,
+					Decay:   0.81,
+				},
+			},
+		},
 	}
 
 	flowConfig, err := config.DefaultConfig()
