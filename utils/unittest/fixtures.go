@@ -1427,6 +1427,14 @@ func TransactionDSLFixture(chain flow.Chain) dsl.Transaction {
 	}
 }
 
+// RegisterIDFixture returns a RegisterID with a fixed key and owner
+func RegisterIDFixture() flow.RegisterID {
+	return flow.RegisterID{
+		Owner: "owner",
+		Key:   "key",
+	}
+}
+
 // VerifiableChunkDataFixture returns a complete verifiable chunk with an
 // execution receipt referencing the block/collections.
 func VerifiableChunkDataFixture(chunkIndex uint64) *verification.VerifiableChunkData {
@@ -2762,5 +2770,15 @@ func RegisterEntryFixture() flow.RegisterEntry {
 			Key:   "key1",
 		},
 		Value: val,
+	}
+}
+
+func MakeOwnerReg(key string, value string) flow.RegisterEntry {
+	return flow.RegisterEntry{
+		Key: flow.RegisterID{
+			Owner: "owner",
+			Key:   key,
+		},
+		Value: []byte(value),
 	}
 }

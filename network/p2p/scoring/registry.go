@@ -9,6 +9,8 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/p2p"
 	netcache "github.com/onflow/flow-go/network/p2p/cache"
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
@@ -87,6 +89,7 @@ func DefaultGossipSubCtrlMsgPenaltyValue() GossipSubCtrlMsgPenaltyValue {
 // Similar to the GossipSub score, the application specific score is meant to be private to the local peer, and is not
 // shared with other peers in the network.
 type GossipSubAppSpecificScoreRegistry struct {
+	component.Component
 	logger     zerolog.Logger
 	idProvider module.IdentityProvider
 	// spamScoreCache currently only holds the control message misbehaviour penalty (spam related penalty).
@@ -139,6 +142,26 @@ func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegis
 		validator:      config.Validator,
 		idProvider:     config.IdProvider,
 	}
+
+	builder := component.NewComponentManagerBuilder()
+	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		reg.logger.Info().Msg("starting subscription validator")
+		reg.validator.Start(ctx)
+		select {
+		case <-ctx.Done():
+			reg.logger.Warn().Msg("aborting subscription validator startup, context cancelled")
+		case <-reg.validator.Ready():
+			reg.logger.Info().Msg("subscription validator started")
+			ready()
+			reg.logger.Info().Msg("subscription validator is ready")
+		}
+
+		<-ctx.Done()
+		reg.logger.Info().Msg("stopping subscription validator")
+		<-reg.validator.Done()
+		reg.logger.Info().Msg("subscription validator stopped")
+	})
+	reg.Component = builder.Build()
 
 	return reg
 }

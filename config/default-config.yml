@@ -33,18 +33,6 @@ network-config:
   # retry a unicast stream to a remote peer 3 times, the peer will give up and will not retry creating a unicast stream to that remote peer.
   # When it is set to zero it means that the peer will not retry creating a unicast stream to a remote peer if it fails.
   unicast-max-stream-creation-retry-attempt-times: 3
-  # The number of seconds that the local peer waits since the last successful dial to a remote peer before resetting the unicast dial retry budget from zero to the maximum default.
-  # If it is set to 3600s (1h) for example, it means that if it has passed at least one hour since the last successful dial, and the remote peer has a zero dial retry budget,
-  # the unicast dial retry budget for that remote peer will be reset to the maximum default.
-  unicast-dial-zero-retry-reset-threshold: 3600s
-  # The maximum number of retry attempts for dialing a remote peer before giving up. If it is set to 3 for example, it means that if a peer fails to dial a remote peer 3 times,
-  # the peer will give up and will not retry dialing that remote peer.
-  unicast-max-dial-retry-attempt-times: 3
-  # The backoff delay used in the exponential backoff for consecutive failed unicast dial attempts to a remote peer.
-  unicast-dial-backoff-delay: 1s
-  # The backoff delay used in the exponential backoff for backing off concurrent create stream attempts to the same remote peer
-  # when there is no available connections to that remote peer and a dial is in progress.
-  unicast-dial-in-progress-backoff-delay: 1s
   # The size of the dial config cache used to keep track of the dial config for each remote peer. The dial config is used to keep track of the dial retry budget for each remote peer.
   # Recommended to set it to the maximum number of remote peers in the network.
   unicast-dial-config-cache-size: 10_000
@@ -146,6 +134,15 @@ network-config:
   gossipsub-rpc-sent-tracker-workers: 5
   # Peer scoring is the default value for enabling peer scoring
   gossipsub-peer-scoring-enabled: true
+  # The interval for updating the list of subscribed peers to all topics in gossipsub. This is used to keep track of subscriptions
+  # violations and penalize peers accordingly. Recommended value is in the order of a few minutes to avoid contentions; as the operation
+  # reads all topics and all peers subscribed to each topic.
+  gossipsub-subscription-provider-update-interval: 10m
+  # The size of cache for keeping the list of all peers subscribed to each topic (same as the local node). This cache is the local node's
+  # view of the network and is used to detect subscription violations and penalize peers accordingly. Recommended to be big enough to
+  # keep the entire network's size. Otherwise, the local node's view of the network will be incomplete due to cache eviction.
+  # Recommended size is 10x the number of peers in the network.
+  gossipsub-subscription-provider-cache-size: 10000
 
   # Gossipsub rpc inspectors configs
   # The size of the queue for notifications about invalid RPC messages

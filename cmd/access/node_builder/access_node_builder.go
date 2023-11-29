@@ -146,6 +146,7 @@ type AccessNodeConfig struct {
 	executionDataIndexingEnabled bool
 	registersDBPath              string
 	checkpointFile               string
+	scriptExecutorConfig         query.QueryConfig
 }
 
 type PublicNetworkConfig struct {
@@ -232,6 +233,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		executionDataIndexingEnabled: false,
 		registersDBPath:              filepath.Join(homedir, ".flow", "execution_state"),
 		checkpointFile:               cmd.NotSet,
+		scriptExecutorConfig:         query.NewDefaultConfig(),
 	}
 }
 
@@ -268,6 +270,7 @@ type FlowAccessNodeBuilder struct {
 	ExecutionIndexer           *indexer.Indexer
 	ExecutionIndexerCore       *indexer.IndexerCore
 	ScriptExecutor             *backend.ScriptExecutor
+	RegistersAsyncStore        *execution.RegistersAsyncStore
 
 	// The sync engine participants provider is the libp2p peer store for the access node
 	// which is not available until after the network has started.
@@ -711,14 +714,14 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 
 					checkpointHeight := builder.SealedRootBlock.Header.Height
 
-					bootstrap, err := pStorage.NewRegisterBootstrap(pdb, checkpointFile, checkpointHeight, builder.Logger)
+					buutstrap, err := pStorage.NewRegisterBootstrap(pdb, checkpointFile, checkpointHeight, builder.Logger)
 					if err != nil {
 						return nil, fmt.Errorf("could not create registers bootstrapper: %w", err)
 					}
 
 					// TODO: find a way to hook a context up to this to allow a graceful shutdown
 					workerCount := 10
-					err = bootstrap.IndexCheckpointFile(context.Background(), workerCount)
+					err = buutstrap.IndexCheckpointFile(context.Background(), workerCount)
 					if err != nil {
 						return nil, fmt.Errorf("could not load checkpoint file: %w", err)
 					}
@@ -759,6 +762,11 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					return nil, err
 				}
 
+				err = builder.RegistersAsyncStore.InitDataAvailable(registers)
+				if err != nil {
+					return nil, err
+				}
+
 				// setup requester to notify indexer when new execution data is received
 				execDataDistributor.AddOnExecutionDataReceivedConsumer(builder.ExecutionIndexer.OnExecutionData)
 
@@ -771,6 +779,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					query.NewProtocolStateWrapper(builder.State),
 					builder.Storage.Headers,
 					builder.ExecutionIndexerCore.RegisterValue,
+					builder.scriptExecutorConfig,
 				)
 				if err != nil {
 					return nil, err
@@ -813,7 +822,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				executionDataStoreCache,
 				broadcaster,
 				builder.executionDataConfig.InitialBlockHeight,
-				highestAvailableHeight)
+				highestAvailableHeight,
+				builder.RegistersAsyncStore)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream backend: %w", err)
 			}
@@ -929,6 +939,11 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 
 		// Script Execution
 		flags.StringVar(&builder.rpcConf.BackendConfig.ScriptExecutionMode, "script-execution-mode", defaultConfig.rpcConf.BackendConfig.ScriptExecutionMode, "mode to use when executing scripts. one of (local-only, execution-nodes-only, failover, compare)")
+		flags.Uint64Var(&builder.scriptExecutorConfig.ComputationLimit, "script-execution-computation-limit", defaultConfig.scriptExecutorConfig.ComputationLimit, "maximum number of computation units a locally executed script can use. default: 100000")
+		flags.IntVar(&builder.scriptExecutorConfig.MaxErrorMessageSize, "script-execution-max-error-length", defaultConfig.scriptExecutorConfig.MaxErrorMessageSize, "maximum number characters to include in error message strings. additional characters are truncated. default: 1000")
+		flags.DurationVar(&builder.scriptExecutorConfig.LogTimeThreshold, "script-execution-log-time-threshold", defaultConfig.scriptExecutorConfig.LogTimeThreshold, "emit a log for any scripts that take over this threshold. default: 1s")
+		flags.DurationVar(&builder.scriptExecutorConfig.ExecutionTimeLimit, "script-execution-timeout", defaultConfig.scriptExecutorConfig.ExecutionTimeLimit, "timeout value for locally executed scripts. default: 10s")
+
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-observer is true")
@@ -1234,6 +1249,10 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 		}).
 		Module("backend script executor", func(node *cmd.NodeConfig) error {
 			builder.ScriptExecutor = backend.NewScriptExecutor()
+			return nil
+		}).
+		Module("async register store", func(node *cmd.NodeConfig) error {
+			builder.RegistersAsyncStore = execution.NewRegistersAsyncStore()
 			return nil
 		}).
 		Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -1563,6 +1582,7 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 			UpdateInterval:    builder.FlowConfig.NetworkConfig.PeerUpdateInterval,
 			ConnectorFactory:  connection.DefaultLibp2pBackoffConnectorFactory(),
 		},
+		&builder.FlowConfig.NetworkConfig.GossipSubConfig.SubscriptionProviderConfig,
 		&p2p.DisallowListCacheConfig{
 			MaxSize: builder.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
 			Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),

@@ -60,7 +60,7 @@ type ControlMsgValidationInspector struct {
 	// networkingType indicates public or private network, rpc publish messages are inspected for unstaked senders when running the private network.
 	networkingType network.NetworkingType
 	// topicOracle callback used to retrieve the current subscribed topics of the libp2p node.
-	topicOracle func() []string
+	topicOracle func() p2p.TopicProvider
 }
 
 type InspectorParams struct {
@@ -82,6 +82,9 @@ type InspectorParams struct {
 	RpcTracker p2p.RpcControlTracking `validate:"required"`
 	// NetworkingType the networking type of the node.
 	NetworkingType network.NetworkingType `validate:"required"`
+	// TopicOracle callback used to retrieve the current subscribed topics of the libp2p node.
+	// It is set as a callback to avoid circular dependencies between the topic oracle and the inspector.
+	TopicOracle func() p2p.TopicProvider `validate:"required"`
 }
 
 var _ component.Component = (*ControlMsgValidationInspector)(nil)
@@ -105,13 +108,18 @@ func NewControlMsgValidationInspector(params *InspectorParams) (*ControlMsgValid
 	inspectMsgQueueCacheCollector := metrics.GossipSubRPCInspectorQueueMetricFactory(params.HeroCacheMetricsFactory, params.NetworkingType)
 	clusterPrefixedCacheCollector := metrics.GossipSubRPCInspectorClusterPrefixedCacheMetricFactory(params.HeroCacheMetricsFactory, params.NetworkingType)
 
-	clusterPrefixedTracker, err := cache.NewClusterPrefixedMessagesReceivedTracker(params.Logger, params.Config.ClusterPrefixedControlMsgsReceivedCacheSize, clusterPrefixedCacheCollector, params.Config.ClusterPrefixedControlMsgsReceivedCacheDecay)
+	clusterPrefixedTracker, err := cache.NewClusterPrefixedMessagesReceivedTracker(params.Logger,
+		params.Config.ClusterPrefixedControlMsgsReceivedCacheSize,
+		clusterPrefixedCacheCollector,
+		params.Config.ClusterPrefixedControlMsgsReceivedCacheDecay)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cluster prefix topics received tracker")
 	}
 
 	if params.Config.RpcMessageMaxSampleSize < params.Config.RpcMessageErrorThreshold {
-		return nil, fmt.Errorf("rpc message max sample size must be greater than or equal to rpc message error threshold, got %d and %d respectively", params.Config.RpcMessageMaxSampleSize, params.Config.RpcMessageErrorThreshold)
+		return nil, fmt.Errorf("rpc message max sample size must be greater than or equal to rpc message error threshold, got %d and %d respectively",
+			params.Config.RpcMessageMaxSampleSize,
+			params.Config.RpcMessageErrorThreshold)
 	}
 
 	c := &ControlMsgValidationInspector{
@@ -124,6 +132,7 @@ func NewControlMsgValidationInspector(params *InspectorParams) (*ControlMsgValid
 		idProvider:     params.IdProvider,
 		metrics:        params.InspectorMetrics,
 		networkingType: params.NetworkingType,
+		topicOracle:    params.TopicOracle,
 	}
 
 	store := queue.NewHeroStore(params.Config.CacheSize, params.Logger, inspectMsgQueueCacheCollector)
@@ -165,18 +174,6 @@ func (c *ControlMsgValidationInspector) Name() string {
 // ActiveClustersChanged consumes cluster ID update protocol events.
 func (c *ControlMsgValidationInspector) ActiveClustersChanged(clusterIDList flow.ChainIDList) {
 	c.tracker.StoreActiveClusterIds(clusterIDList)
-}
-
-// SetTopicOracle Sets the topic oracle. The topic oracle is used to determine the list of topics that the node is subscribed to.
-// If an oracle is not set, the node will not be able to determine the list of topics that the node is subscribed to.
-// This func is expected to be called once and will return an error on all subsequent calls.
-// All errors returned from this func are considered irrecoverable.
-func (c *ControlMsgValidationInspector) SetTopicOracle(topicOracle func() []string) error {
-	if c.topicOracle != nil {
-		return fmt.Errorf("topic oracle already set")
-	}
-	c.topicOracle = topicOracle
-	return nil
 }
 
 // Inspect is called by gossipsub upon reception of a rpc from a remote  node.
@@ -473,7 +470,7 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 		messages[i], messages[j] = messages[j], messages[i]
 	})
 
-	subscribedTopics := c.topicOracle()
+	subscribedTopics := c.topicOracle().GetTopics()
 	hasSubscription := func(topic string) bool {
 		for _, subscribedTopic := range subscribedTopics {
 			if topic == subscribedTopic {

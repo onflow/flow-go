@@ -36,7 +36,9 @@ var _ p2p.GossipSubInspectorSuite = (*GossipSubInspectorSuite)(nil)
 // regarding gossipsub control messages is detected.
 // Returns:
 //   - the new GossipSubInspectorSuite.
-func NewGossipSubInspectorSuite(metricsInspector *inspector.ControlMsgMetricsInspector, validationInspector *validation.ControlMsgValidationInspector, ctrlMsgInspectDistributor p2p.GossipSubInspectorNotifDistributor) *GossipSubInspectorSuite {
+func NewGossipSubInspectorSuite(metricsInspector *inspector.ControlMsgMetricsInspector,
+	validationInspector *validation.ControlMsgValidationInspector,
+	ctrlMsgInspectDistributor p2p.GossipSubInspectorNotifDistributor) *GossipSubInspectorSuite {
 	inspectors := []p2p.GossipSubRPCInspector{metricsInspector, validationInspector}
 	s := &GossipSubInspectorSuite{
 		ctrlMsgInspectDistributor: ctrlMsgInspectDistributor,
@@ -88,14 +90,4 @@ func (s *GossipSubInspectorSuite) ActiveClustersChanged(list flow.ChainIDList) {
 			r.ActiveClustersChanged(list)
 		}
 	}
-}
-
-// SetTopicOracle sets the topic oracle of the gossipsub inspector suite.
-// The topic oracle is used to determine the list of topics that the node is subscribed to.
-// If an oracle is not set, the node will not be able to determine the list of topics that the node is subscribed to.
-// Currently,  the only inspector that utilizes the topic oracle is the validation inspector.
-// This func is expected to be called once and will return an error on all subsequent calls.
-// All errors returned from this func are considered irrecoverable.
-func (s *GossipSubInspectorSuite) SetTopicOracle(topicOracle func() []string) error {
-	return s.validationInspector.SetTopicOracle(topicOracle)
 }
