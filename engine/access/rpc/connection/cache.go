@@ -74,17 +74,17 @@ func (c *Cache) Get(address string) (*CachedClient, bool) {
 // priority when working with the new client, allowing it to create the underlying connection.
 // Clients retrieved from the cache are returned without modifying their lock.
 func (c *Cache) GetOrAdd(address string, timeout time.Duration) (*CachedClient, bool) {
-	client := &CachedClient{}
+	client := &CachedClient{
+		Address:        address,
+		timeout:        timeout,
+		closeRequested: atomic.NewBool(false),
+	}
 	client.mu.Lock()
 
 	val, existed, _ := c.cache.PeekOrAdd(address, client)
 	if existed {
 		return val, true
 	}
-
-	client.Address = address
-	client.timeout = timeout
-	client.closeRequested = atomic.NewBool(false)
 
 	return client, false
 }
