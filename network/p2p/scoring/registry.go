@@ -189,14 +189,14 @@ func (r *GossipSubAppSpecificScoreRegistry) Start(parent irrecoverable.SignalerC
 // AppSpecificScoreFunc returns the application specific penalty function that is called by the GossipSub protocol to determine the application specific penalty of a peer.
 func (r *GossipSubAppSpecificScoreRegistry) AppSpecificScoreFunc() func(peer.ID) float64 {
 	return func(pid peer.ID) float64 {
-		appSpecificScorePenalty := float64(0)
+		appSpecificScore := float64(0)
 
 		lg := r.logger.With().Str("peer_id", p2plogging.PeerId(pid)).Logger()
 
 		// during startup silence period avoid penalizing nodes
 		if !r.afterSilencePeriod() {
 			lg.Debug().Msg("returning 0 app specific score penalty for node during silence period")
-			return appSpecificScorePenalty
+			return appSpecificScore
 		}
 
 		// (1) spam penalty: the penalty is applied to the application specific penalty when a peer conducts a spamming misbehaviour.
@@ -205,12 +205,12 @@ func (r *GossipSubAppSpecificScoreRegistry) AppSpecificScoreFunc() func(peer.ID)
 			// the error is considered fatal as it means the cache is not working properly.
 			// we should not continue with the execution as it may lead to routing attack vulnerability.
 			r.logger.Fatal().Str("peer_id", p2plogging.PeerId(pid)).Err(err).Msg("could not get application specific penalty for peer")
-			return appSpecificScorePenalty // unreachable, but added to avoid proceeding with the execution if log level is changed.
+			return appSpecificScore // unreachable, but added to avoid proceeding with the execution if log level is changed.
 		}
 
 		if spamRecordExists {
 			lg = lg.With().Float64("spam_penalty", spamRecord.Penalty).Logger()
-			appSpecificScorePenalty += spamRecord.Penalty
+			appSpecificScore += spamRecord.Penalty
 		}
 
 		// (2) staking score: for staked peers, a default positive reward is applied only if the peer has no penalty on spamming and subscription.
@@ -219,7 +219,7 @@ func (r *GossipSubAppSpecificScoreRegistry) AppSpecificScoreFunc() func(peer.ID)
 		if stakingScore < 0 {
 			lg = lg.With().Float64("staking_penalty", stakingScore).Logger()
 			// staking penalty is applied right away.
-			appSpecificScorePenalty += stakingScore
+			appSpecificScore += stakingScore
 		}
 
 		if stakingScore >= 0 {
@@ -230,21 +230,21 @@ func (r *GossipSubAppSpecificScoreRegistry) AppSpecificScoreFunc() func(peer.ID)
 			subscriptionPenalty := r.subscriptionPenalty(pid, flowId, role)
 			lg = lg.With().Float64("subscription_penalty", subscriptionPenalty).Logger()
 			if subscriptionPenalty < 0 {
-				appSpecificScorePenalty += subscriptionPenalty
+				appSpecificScore += subscriptionPenalty
 			}
 		}
 
 		// (4) staking reward: for staked peers, a default positive reward is applied only if the peer has no penalty on spamming and subscription.
-		if stakingScore > 0 && appSpecificScorePenalty == float64(0) {
+		if stakingScore > 0 && appSpecificScore == float64(0) {
 			lg = lg.With().Float64("staking_reward", stakingScore).Logger()
-			appSpecificScorePenalty += stakingScore
+			appSpecificScore += stakingScore
 		}
 
 		lg.Trace().
-			Float64("total_app_specific_score", appSpecificScorePenalty).
+			Float64("total_app_specific_score", appSpecificScore).
 			Msg("application specific penalty computed")
 
-		return appSpecificScorePenalty
+		return appSpecificScore
 	}
 }
 
