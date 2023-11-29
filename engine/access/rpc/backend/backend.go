@@ -125,11 +125,7 @@ func New(params Params) (*Backend, error) {
 		}
 	}
 
-	txErrorMessagesCacheSize := params.TxErrorMessagesCacheSize
-	if txErrorMessagesCacheSize == 0 {
-		txErrorMessagesCacheSize = 1000 // use a default value in case it wasn't configured
-	}
-	txErrorMessagesCache, err := lru.New[flow.Identifier, string](int(txErrorMessagesCacheSize))
+	txErrorMessagesCache, err := lru.New[flow.Identifier, string](int(params.TxErrorMessagesCacheSize))
 	if err != nil {
 		return nil, fmt.Errorf("failed to init cache for transaction error messages: %w", err)
 	}

@@ -600,7 +600,7 @@ func (suite *Suite) TestLookupTransactionErrorMessages_HappyPath() {
 				TransactionId: r.TransactionID[:],
 				ErrorMessage:  errMsg,
 			})
-			expectedResults[r.TransactionID] = fmt.Sprintf("%s.%s", expectedErrorMsg, r.TransactionID)
+			expectedResults[r.TransactionID] = errMsg
 		}
 	}
 
