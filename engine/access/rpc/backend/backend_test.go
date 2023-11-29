@@ -414,7 +414,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID() {
 		epoch1, ok := epochBuilder.EpochHeights(1)
 		require.True(suite.T(), ok)
 
-		// setup AtBlockID and AtHeight mock returns for State
+		// setup AtBlockID, AtHeight and BlockIDByHeight mock returns for State
 		for _, height := range epoch1.Range() {
 			snap := state.AtHeight(height)
 			blockHead, err := snap.Head()
@@ -462,24 +462,39 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_NonFinalizedBlocks() {
 		err = state.Extend(ctx, newBlock)
 		suite.Require().NoError(err)
 
-		// since block was not yet finalized AtHeight must return an invalid snapshot
-		suite.state.On("AtHeight", newBlock.Header.Height).Return(invalid.NewSnapshot(realstate.ErrUnknownSnapshotReference))
-		// since block was added to the block tree it must be queryable by block ID
-		suite.state.On("AtBlockID", newBlock.ID()).Return(state.AtBlockID(newBlock.ID()))
-
 		params := suite.defaultBackendParams()
 		params.MaxHeightRange = TEST_MAX_HEIGHT
 
 		backend, err := New(params)
 		suite.Require().NoError(err)
 
-		// query the handler for the snapshot for non finalized block
-		snapshotBytes, err := backend.GetProtocolStateSnapshotByBlockID(ctx, newBlock.ID())
-		suite.Require().Nil(snapshotBytes)
-		suite.Require().Error(err)
-		suite.Require().Equal(status.Errorf(codes.InvalidArgument, "failed to retrieve snapshot for block by height %v",
-			fmt.Errorf("%d: %v", newBlock.Header.Height, "block not finalized")).Error(),
-			err.Error())
+		suite.T().Run("block exists, but no block has been finalized at its height.", func(t *testing.T) {
+			// since block was not yet finalized AtHeight must return an invalid snapshot
+			suite.state.On("AtHeight", newBlock.Header.Height).Return(invalid.NewSnapshot(realstate.ErrUnknownSnapshotReference))
+			// since block was added to the block tree it must be queryable by block ID
+			suite.state.On("AtBlockID", newBlock.ID()).Return(state.AtBlockID(newBlock.ID()))
+			suite.headers.On("BlockIDByHeight", newBlock.Header.Height).Return(newBlock.ID(), nil)
+
+			// query the handler for the snapshot for non finalized block
+			snapshotBytes, err := backend.GetProtocolStateSnapshotByBlockID(ctx, newBlock.ID())
+			suite.Require().Nil(snapshotBytes)
+			suite.Require().Error(err)
+			suite.Require().Equal(codes.Internal, status.Code(err))
+		})
+
+		suite.T().Run("failed to get a valid snapshot", func(t *testing.T) {
+			// since block was not yet finalized AtHeight must return an invalid snapshot
+			suite.state.On("AtHeight", newBlock.Header.Height).Return(invalid.NewSnapshot(realstate.ErrUnknownSnapshotReference))
+			// since block was added to the block tree it must be queryable by block ID
+			suite.state.On("AtBlockID", newBlock.ID()).Return(state.AtBlockID(newBlock.ID()))
+			suite.headers.On("BlockIDByHeight", mock.Anything).Return(flow.ZeroID, storage.ErrNotFound)
+
+			// query the handler for the snapshot for non finalized block
+			snapshotBytes, err := backend.GetProtocolStateSnapshotByBlockID(ctx, newBlock.ID())
+			suite.Require().Nil(snapshotBytes)
+			suite.Require().Error(err)
+			suite.Require().Equal(codes.FailedPrecondition, status.Code(err))
+		})
 	})
 }
 
@@ -509,6 +524,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_InvalidSegment() {
 
 			suite.state.On("AtHeight", height).Return(snap)
 			suite.state.On("AtBlockID", blockHead.ID()).Return(snap)
+			suite.headers.On("BlockIDByHeight", height).Return(blockHead.ID(), nil)
 		}
 
 		backend, err := New(suite.defaultBackendParams())
@@ -539,6 +555,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_InvalidSegment() {
 
 			suite.state.On("AtBlockID", block.ID()).Return(snap)
 			suite.state.On("AtHeight", block.Height).Return(snap)
+			suite.headers.On("BlockIDByHeight", block.Height).Return(block.ID(), nil)
 
 			bytes, err := backend.GetProtocolStateSnapshotByBlockID(context.Background(), block.ID())
 			suite.Require().Error(err)
