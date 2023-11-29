@@ -591,13 +591,16 @@ func (suite *Suite) TestLookupTransactionErrorMessages_HappyPath() {
 	}
 
 	exeEventResp := &execproto.GetTransactionErrorMessagesResponse{}
+	expectedResults := make(map[flow.Identifier]string)
 	for _, result := range resultsByBlockID {
 		r := result
 		if r.Failed {
+			errMsg := fmt.Sprintf("%s.%s", expectedErrorMsg, r.TransactionID)
 			exeEventResp.Results = append(exeEventResp.Results, &execproto.GetTransactionErrorMessagesResponse_Result{
 				TransactionId: r.TransactionID[:],
-				ErrorMessage:  fmt.Sprintf("%s.%s", expectedErrorMsg, r.TransactionID),
+				ErrorMessage:  errMsg,
 			})
+			expectedResults[r.TransactionID] = fmt.Sprintf("%s.%s", expectedErrorMsg, r.TransactionID)
 		}
 	}
 
@@ -607,24 +610,22 @@ func (suite *Suite) TestLookupTransactionErrorMessages_HappyPath() {
 
 	errMessages, err := backend.lookupTransactionErrorMessagesByBlockID(context.Background(), blockId)
 	suite.Require().NoError(err)
-	for _, expectedResult := range resultsByBlockID {
-		if expectedResult.Failed {
-			errMsg, ok := errMessages[expectedResult.TransactionID]
-			suite.Require().True(ok)
-			suite.Assert().Equal(fmt.Sprintf("%s.%s", expectedErrorMsg, expectedResult.TransactionID), errMsg)
-		}
+	suite.Require().Len(errMessages, len(exeEventResp.Results))
+	for _, expectedResult := range exeEventResp.Results {
+		errMsg, ok := errMessages[convert.MessageToIdentifier(expectedResult.TransactionId)]
+		suite.Require().True(ok)
+		suite.Assert().Equal(expectedResult.ErrorMessage, errMsg)
 	}
 
 	// ensure the transaction error message is cached after retrieval; we do this by mocking the grpc call
 	// only once
 	errMessages, err = backend.lookupTransactionErrorMessagesByBlockID(context.Background(), blockId)
 	suite.Require().NoError(err)
-	for _, expectedResult := range resultsByBlockID {
-		if expectedResult.Failed {
-			errMsg, ok := errMessages[expectedResult.TransactionID]
-			suite.Require().True(ok)
-			suite.Assert().Equal(fmt.Sprintf("%s.%s", expectedErrorMsg, expectedResult.TransactionID), errMsg)
-		}
+	suite.Require().Len(errMessages, len(exeEventResp.Results))
+	for _, expectedResult := range exeEventResp.Results {
+		errMsg, ok := errMessages[convert.MessageToIdentifier(expectedResult.TransactionId)]
+		suite.Require().True(ok)
+		suite.Assert().Equal(expectedResult.ErrorMessage, errMsg)
 	}
 	suite.assertAllExpectations()
 }
