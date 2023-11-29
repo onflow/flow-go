@@ -16,6 +16,8 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
+	"google.golang.org/grpc/credentials"
+
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
@@ -898,6 +900,16 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		)
 		return nil
 	})
+	builder.Module("server certificate", func(node *cmd.NodeConfig) error {
+		// generate the server certificate that will be served by the GRPC server
+		x509Certificate, err := grpcutils.X509Certificate(node.NetworkKey)
+		if err != nil {
+			return err
+		}
+		tlsConfig := grpcutils.DefaultServerTLSConfig(x509Certificate)
+		builder.rpcConf.TransportCredentials = credentials.NewTLS(tlsConfig)
+		return nil
+	})
 	builder.Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		accessMetrics := builder.AccessMetrics
 		config := builder.rpcConf
@@ -916,8 +928,8 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		connFactory := &rpcConnection.ConnectionFactoryImpl{
 			CollectionGRPCPort:        0,
 			ExecutionGRPCPort:         0,
-			CollectionNodeGRPCTimeout: backendConfig.CollectionClientTimeout,
-			ExecutionNodeGRPCTimeout:  backendConfig.ExecutionClientTimeout,
+			CollectionNodeGRPCTimeout: builder.apiTimeout,
+			ExecutionNodeGRPCTimeout:  builder.apiTimeout,
 			AccessMetrics:             accessMetrics,
 			Log:                       node.Logger,
 			Manager: rpcConnection.NewManager(
@@ -957,8 +969,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		restHandler, err := restapiproxy.NewRestProxyHandler(
 			accessBackend,
 			builder.upstreamIdentities,
-			builder.apiTimeout,
-			config.MaxMsgSize,
+			connFactory,
 			builder.Logger,
 			observerCollector,
 			node.RootChainID.Chain())
@@ -987,7 +998,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		}
 
 		// upstream access node forwarder
-		forwarder, err := apiproxy.NewFlowAccessAPIForwarder(builder.upstreamIdentities, builder.apiTimeout, config.MaxMsgSize)
+		forwarder, err := apiproxy.NewFlowAccessAPIForwarder(builder.upstreamIdentities, connFactory)
 		if err != nil {
 			return nil, err
 		}
