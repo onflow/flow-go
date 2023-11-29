@@ -309,5 +309,3 @@ require (
 	lukechampine.com/blake3 v1.2.1 // indirect
 	nhooyr.io/websocket v1.8.7 // indirect
 )
-
-replace github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20231018182244-e72527c55c63 => github.com/AndriiDiachuk/flow/protobuf/go/flow v0.0.0-20231101114612-70243c40d6a7
