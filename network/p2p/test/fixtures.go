@@ -229,6 +229,26 @@ func NodeFixture(t *testing.T,
 	return n, *identity
 }
 
+// RegisterPeerProviders registers the peer provider for all the nodes in the input slice.
+// All node ids are registered as the peers provider for all the nodes.
+// This means that every node will be connected to every other node by the peer manager.
+// This is useful for suppressing the "peer provider not set" verbose warning logs in tests scenarios where
+// it is desirable to have all nodes connected to each other.
+// Args:
+// - t: testing.T- the test object; not used, but included in the signature to defensively prevent misuse of the test utility in production.
+// - nodes: nodes to register the peer provider for, each node will be connected to all other nodes.
+func RegisterPeerProviders(_ *testing.T, nodes []p2p.LibP2PNode) {
+	ids := peer.IDSlice{}
+	for _, node := range nodes {
+		ids = append(ids, node.ID())
+	}
+	for _, node := range nodes {
+		node.WithPeersProvider(func() peer.IDSlice {
+			return ids
+		})
+	}
+}
+
 type NodeFixtureParameterOption func(*NodeFixtureParameters)
 
 type NodeFixtureParameters struct {
