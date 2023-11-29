@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	// MinimumSpamPenaltyDecaySpeed is minimum speed at which the spam penalty value of a peer is decayed.
+	// MinimumSpamPenaltyDecayFactor is minimum speed at which the spam penalty value of a peer is decayed.
 	// Spam record will be initialized with a decay value between .5 , .7 and this value will then be decayed up to .99 on consecutive misbehavior's,
 	// The maximum decay value decays the penalty by 1% every second. The decay is applied geometrically, i.e., `newPenalty = oldPenalty * decay`, hence, the higher decay value
 	// indicates a lower decay speed, i.e., it takes more heartbeat intervals to decay a penalty back to zero when the decay value is high.
@@ -41,11 +41,11 @@ const (
 	//     n > log( 0.001 ) / log( 0.99 )
 	//     n > -3 / log( 0.99 )
 	//     n >  458.22
-	MinimumSpamPenaltyDecaySpeed = 0.99
-	// MaximumSpamPenaltyDecaySpeed represents the maximum rate at which the spam penalty value of a peer decays. Decay speeds increase
+	MinimumSpamPenaltyDecayFactor = 0.99
+	// MaximumSpamPenaltyDecayFactor represents the maximum rate at which the spam penalty value of a peer decays. Decay speeds increase
 	// during sustained malicious activity, leading to a slower recovery of the app-specific score for the penalized node. Conversely,
 	// decay speeds decrease, allowing faster recoveries, when nodes exhibit fleeting misbehavior.
-	MaximumSpamPenaltyDecaySpeed = 0.8
+	MaximumSpamPenaltyDecayFactor = 0.8
 	// skipDecayThreshold is the threshold for which when the negative penalty is above this value, the decay function will not be called.
 	// instead, the penalty will be set to 0. This is to prevent the penalty from keeping a small negative value for a long time.
 	skipDecayThreshold = -0.1
@@ -334,7 +334,7 @@ func DefaultDecayFunction(slowerDecayPenaltyThreshold, decayRateDecrement float6
 		if record.Penalty > skipDecayThreshold {
 			// penalty is negative but greater than the threshold, we set it to 0.
 			record.Penalty = 0
-			record.Decay = MaximumSpamPenaltyDecaySpeed
+			record.Decay = MaximumSpamPenaltyDecayFactor
 			record.LastDecayAdjustment = time.Time{}
 			return record, nil
 		}
@@ -349,7 +349,7 @@ func DefaultDecayFunction(slowerDecayPenaltyThreshold, decayRateDecrement float6
 		if record.Penalty <= slowerDecayPenaltyThreshold {
 			if time.Since(record.LastDecayAdjustment) > decayAdjustInterval || record.LastDecayAdjustment.IsZero() {
 				// reduces the decay speed flooring at MinimumSpamRecordDecaySpeed
-				record.Decay = math.Min(record.Decay+decayRateDecrement, MinimumSpamPenaltyDecaySpeed)
+				record.Decay = math.Min(record.Decay+decayRateDecrement, MinimumSpamPenaltyDecayFactor)
 				record.LastDecayAdjustment = time.Now()
 			}
 		}
@@ -362,7 +362,7 @@ func DefaultDecayFunction(slowerDecayPenaltyThreshold, decayRateDecrement float6
 //   - a gossipsub spam record with the default decay value and 0 penalty.
 func InitAppScoreRecordState() p2p.GossipSubSpamRecord {
 	return p2p.GossipSubSpamRecord{
-		Decay:               MaximumSpamPenaltyDecaySpeed,
+		Decay:               MaximumSpamPenaltyDecayFactor,
 		Penalty:             0,
 		LastDecayAdjustment: time.Now(),
 	}

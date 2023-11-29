@@ -448,7 +448,7 @@ func TestSpamRecordDecayAdjustment(t *testing.T) {
 	assert.False(t, spamRecords.Has(peer2))
 
 	// simulate sustained malicious activity from peer1, eventually the decay speed
-	// for a spam record should be reduced to the MinimumSpamPenaltyDecaySpeed
+	// for a spam record should be reduced to the MinimumSpamPenaltyDecayFactor
 	require.Eventually(t, func() bool {
 		reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 			PeerID:  peer1,
@@ -457,7 +457,7 @@ func TestSpamRecordDecayAdjustment(t *testing.T) {
 		record, err, ok := spamRecords.Get(peer1)
 		require.NoError(t, err)
 		require.True(t, ok)
-		return record.Decay == scoring.MinimumSpamPenaltyDecaySpeed
+		return record.Decay == scoring.MinimumSpamPenaltyDecayFactor
 	}, 5*time.Second, 500*time.Millisecond)
 
 	// initialize a spam record for peer2
@@ -465,24 +465,24 @@ func TestSpamRecordDecayAdjustment(t *testing.T) {
 		PeerID:  peer2,
 		MsgType: p2pmsg.CtrlMsgPrune,
 	})
-	// reduce penalty and increase Decay to scoring.MinimumSpamPenaltyDecaySpeed
+	// reduce penalty and increase Decay to scoring.MinimumSpamPenaltyDecayFactor
 	record, err := spamRecords.Update(peer2, func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
 		record.Penalty = -.1
-		record.Decay = scoring.MinimumSpamPenaltyDecaySpeed
+		record.Decay = scoring.MinimumSpamPenaltyDecayFactor
 		return record
 	})
 	require.NoError(t, err)
-	require.True(t, record.Decay == scoring.MinimumSpamPenaltyDecaySpeed)
+	require.True(t, record.Decay == scoring.MinimumSpamPenaltyDecayFactor)
 	require.True(t, record.Penalty == -.1)
 	// simulate sustained good behavior from peer 2, each time the spam record is read from the cache
 	// using Get method the record penalty will be decayed until it is eventually reset to
-	// 0 at this point the decay speed for the record should be reset to MaximumSpamPenaltyDecaySpeed
-	// eventually after penalty reaches the skipDecaThreshold the record decay will be reset to scoring.MaximumSpamPenaltyDecaySpeed
+	// 0 at this point the decay speed for the record should be reset to MaximumSpamPenaltyDecayFactor
+	// eventually after penalty reaches the skipDecaThreshold the record decay will be reset to scoring.MaximumSpamPenaltyDecayFactor
 	require.Eventually(t, func() bool {
 		record, err, ok := spamRecords.Get(peer2)
 		require.NoError(t, err)
 		require.True(t, ok)
-		return record.Decay == scoring.MaximumSpamPenaltyDecaySpeed &&
+		return record.Decay == scoring.MaximumSpamPenaltyDecayFactor &&
 			record.Penalty == 0 &&
 			record.LastDecayAdjustment.IsZero()
 	}, 5*time.Second, time.Second)
