@@ -1,4 +1,4 @@
-package test
+package cohort2
 
 import (
 	"context"
@@ -40,7 +40,6 @@ type EchoEngineTestSuite struct {
 
 // TestEchoEngineTestSuite runs all the test methods in this test suit
 func TestEchoEngineTestSuite(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_FLAKY, "this should be revisited once network/test is running in a separate CI job, runs fine locally")
 	suite.Run(t, new(EchoEngineTestSuite))
 }
 

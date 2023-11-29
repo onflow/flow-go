@@ -1,9 +1,11 @@
-package access
+package cohort1
 
 import (
 	"context"
 	"testing"
 	"time"
+
+	"github.com/onflow/flow-go/integration/tests/mvp"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/suite"
@@ -18,7 +20,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
-	"github.com/onflow/flow-go/integration/tests/mvp"
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -143,12 +144,29 @@ func (s *AccessAPISuite) SetupTest() {
 	}, 30*time.Second, 1*time.Second)
 }
 
-// TestScriptExecutionAndGetAccounts test the Access API endpoints for executing scripts and getting
-// accounts using both local storage and execution nodes.
+// TestScriptExecutionAndGetAccountsAN1 test the Access API endpoints for executing scripts and getting
+// accounts using execution nodes.
 //
-// Note: combining all tests together to reduce setup/teardown time. test cases are read-only
+// Note: not combining AN1, AN2 tests together because that causes a drastic increase in test run times. test cases are read-only
 // and should not interfere with each other.
-func (s *AccessAPISuite) TestScriptExecutionAndGetAccounts() {
+func (s *AccessAPISuite) TestScriptExecutionAndGetAccountsAN1() {
+	// deploy the test contract
+	txResult := s.deployContract()
+	targetHeight := txResult.BlockHeight + 1
+	s.waitUntilIndexed(targetHeight)
+
+	// Run tests against Access 1, which uses the execution node
+	s.testGetAccount(s.an1Client)
+	s.testExecuteScriptWithSimpleScript(s.an1Client)
+	s.testExecuteScriptWithSimpleContract(s.an1Client, targetHeight)
+}
+
+// TestScriptExecutionAndGetAccountsAN2 test the Access API endpoints for executing scripts and getting
+// accounts using local storage.
+//
+// Note: not combining AN1, AN2 tests together because that causes a drastic increase in test run times. test cases are read-only
+// and should not interfere with each other.
+func (s *AccessAPISuite) TestScriptExecutionAndGetAccountsAN2() {
 	// deploy the test contract
 	txResult := s.deployContract()
 	targetHeight := txResult.BlockHeight + 1
@@ -158,15 +176,12 @@ func (s *AccessAPISuite) TestScriptExecutionAndGetAccounts() {
 	s.testGetAccount(s.an2Client)
 	s.testExecuteScriptWithSimpleScript(s.an2Client)
 	s.testExecuteScriptWithSimpleContract(s.an2Client, targetHeight)
+}
 
-	// Run tests against Access 1, which uses the execution node
-	s.testGetAccount(s.an1Client)
-	s.testExecuteScriptWithSimpleScript(s.an1Client)
-	s.testExecuteScriptWithSimpleContract(s.an1Client, targetHeight)
-
+func (s *AccessAPISuite) TestMVPScriptExecutionLocalStorage() {
 	// this is a specialized test that creates accounts, deposits funds, deploys contracts, etc, and
 	// uses the provided access node to handle the Access API calls. there is an existing test that
-	// covers the default config, so we only need to test with local storage here.
+	// covers the default config, so we only need to test with local storage.
 	mvp.RunMVPTest(s.T(), s.ctx, s.net, s.accessNode2)
 }
 
