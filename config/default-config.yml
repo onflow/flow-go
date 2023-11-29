@@ -191,8 +191,7 @@ network-config:
   gossipsub-rpc-metrics-inspector-workers: 1
   # The size of the queue used by worker pool for the control message metrics inspector
   gossipsub-rpc-metrics-inspector-cache-size: 100
-  #  The penalty level which the decay rate is reduced by `DecayRateDecrement` every time the penalty of a node falls below the threshold, thereby slowing down the decay process.
-  #  This mechanism ensures that malicious nodes experience longer decay periods, while honest nodes benefit from quicker decay.
+# Threshold level for penalty. At each evaluation period, when a node's penalty is below this value, the decay rate slows down, ensuring longer decay periods for malicious nodes and quicker decay for honest ones.
   gossipsub-app-specific-penalty-decay-slowdown-threshold: -99
   #  Defines the value by which the decay rate is decreased every time the penalty is below the gossipsub-scoring-registry-slower-decay-threshold. A reduced decay rate extends the time it takes for penalties to diminish.
   gossipsub-app-specific-penalty-decay-rate-reduction-factor: .01
