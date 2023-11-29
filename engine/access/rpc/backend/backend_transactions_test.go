@@ -412,6 +412,7 @@ func (suite *Suite) TestLookupTransactionErrorMessage_FailedToFetch() {
 	backend, err := New(params)
 	suite.Require().NoError(err)
 
+	// lookup should try each of the 2 ENs in fixedENIDs
 	suite.execClient.On("GetTransactionErrorMessage", mock.Anything, mock.Anything).Return(nil,
 		status.Error(codes.Unavailable, "")).Twice()
 
@@ -536,6 +537,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByIndex_FailedToFetch() {
 	backend, err := New(params)
 	suite.Require().NoError(err)
 
+	// lookup should try each of the 2 ENs in fixedENIDs
 	suite.execClient.On("GetTransactionErrorMessageByIndex", mock.Anything, mock.Anything).Return(nil,
 		status.Error(codes.Unavailable, "")).Twice()
 

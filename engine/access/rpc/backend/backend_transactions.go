@@ -1217,9 +1217,10 @@ func (b *backendTransactions) getTransactionErrorMessageFromAnyEN(
 	// log the errors
 	if errToReturn != nil {
 		b.log.Err(errToReturn).Msg("failed to get transaction error message from execution nodes")
+		return nil, errToReturn
 	}
 
-	return resp, errToReturn
+	return resp, nil
 }
 
 // getTransactionErrorMessageFromAnyEN performs an RPC call using available nodes passed as argument. List of nodes must be non-empty otherwise an error will be returned.
@@ -1257,9 +1258,10 @@ func (b *backendTransactions) getTransactionErrorMessageByIndexFromAnyEN(
 	)
 	if errToReturn != nil {
 		b.log.Err(errToReturn).Msg("failed to get transaction error message by index from execution nodes")
+		return nil, errToReturn
 	}
 
-	return resp, errToReturn
+	return resp, nil
 }
 
 // getTransactionErrorMessagesFromAnyEN performs an RPC call using available nodes passed as argument. List of nodes must be non-empty otherwise an error will be returned.
@@ -1298,9 +1300,10 @@ func (b *backendTransactions) getTransactionErrorMessagesFromAnyEN(
 	// log the errors
 	if errToReturn != nil {
 		b.log.Err(errToReturn).Msg("failed to get transaction error messages from execution nodes")
+		return nil, errToReturn
 	}
 
-	return resp.GetResults(), errToReturn
+	return resp.GetResults(), nil
 }
 
 // Expected errors during normal operation:
