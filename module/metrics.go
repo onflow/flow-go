@@ -48,9 +48,20 @@ type NetworkSecurityMetrics interface {
 	OnViolationReportSkipped()
 }
 
-// GossipSubRouterMetrics encapsulates the metrics collectors for GossipSubRouter module of the networking layer.
-// It mostly collects the metrics related to the control message exchange between nodes over the GossipSub protocol.
-type GossipSubRouterMetrics interface {
+// GossipSubRpcInspectorMetrics encapsulates the metrics collectors for GossipSub RPC Inspector module of the networking layer.
+// The RPC inspector is the entry point of the GossipSub protocol. It inspects the incoming RPC messages and decides
+// whether to accept, prune, or reject the RPC message.
+// The GossipSubRpcInspectorMetrics tracks the number of RPC messages received by the local node from other nodes over
+// the GossipSub protocol. It also tracks the number of control messages included in the RPC messages, i.e., IHAVE, IWANT,
+// GRAFT, PRUNE. It also tracks the number of actual messages included in the RPC messages.
+// The GossipSubRpcInspectorMetrics differs from LocalGossipSubRouterMetrics in that the former tracks the messages
+// received by the local node from other nodes over the GossipSub protocol but may not all be accepted by the local node,
+// e.g., due to RPC pruning or throttling; while the latter tracks the local node's view of the GossipSub protocol, i.e., entirely
+// containing the messages that are accepted by the local node (either as whole RPC or only for the control messages).
+// Having this distinction is useful for debugging and troubleshooting the GossipSub protocol, for example, the number of
+// messages received by the local node from other nodes over the GossipSub protocol may be much higher than the number
+// of messages accepted by the local node, which may indicate that the local node is throttling the incoming messages.
+type GossipSubRpcInspectorMetrics interface {
 	// OnIncomingRpcAcceptedFully tracks the number of RPC messages received by the node that are fully accepted.
 	// An RPC may contain any number of control messages, i.e., IHAVE, IWANT, GRAFT, PRUNE, as well as the actual messages.
 	// A fully accepted RPC means that all the control messages are accepted and all the messages are accepted.
@@ -89,7 +100,13 @@ type GossipSubRouterMetrics interface {
 }
 
 // LocalGossipSubRouterMetrics encapsulates the metrics collectors for GossipSub router of the local node.
-// It gives a lens into the local node's view of the GossipSub protocol.
+// It gives a lens into the local GossipSub node's view of the GossipSub protocol.
+// LocalGossipSubRouterMetrics differs from GossipSubRpcInspectorMetrics in that the former tracks the local node's view
+// of the GossipSub protocol, while the latter tracks the messages received by the local node from other nodes over the
+// GossipSub protocol but may not all be accepted by the local node, e.g., due to RPC pruning or throttling.
+// Having this distinction is useful for debugging and troubleshooting the GossipSub protocol, for example, the number of
+// messages received by the local node from other nodes over the GossipSub protocol may be much higher than the number
+// of messages accepted by the local node, which may indicate that the local node is throttling the incoming messages.
 type LocalGossipSubRouterMetrics interface {
 	// OnLocalMeshSizeUpdated tracks the size of the local mesh for a topic.
 	OnLocalMeshSizeUpdated(topic string, size int)
@@ -103,13 +120,9 @@ type LocalGossipSubRouterMetrics interface {
 	OnPeerRemovedFromProtocol()
 
 	// OnLocalPeerJoinedTopic is called when the local node subscribes to a gossipsub topic.
-	// Args:
-	// 	topic: the topic that the local peer subscribed to.
 	OnLocalPeerJoinedTopic()
 
 	// OnLocalPeerLeftTopic is called when the local node unsubscribes from a gossipsub topic.
-	// Args:
-	// 	topic: the topic that the local peer has unsubscribed from.
 	OnLocalPeerLeftTopic()
 
 	// OnPeerGraftTopic is called when the local node receives a GRAFT message from a remote peer on a topic.
@@ -208,7 +221,7 @@ type UnicastManagerMetrics interface {
 
 type GossipSubMetrics interface {
 	GossipSubScoringMetrics
-	GossipSubRouterMetrics
+	GossipSubRpcInspectorMetrics
 	LocalGossipSubRouterMetrics
 	GossipSubRpcValidationInspectorMetrics
 }
