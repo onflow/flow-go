@@ -86,9 +86,9 @@ const (
 	metricsInspectorCacheSize       = "gossipsub-rpc-metrics-inspector-cache-size"
 
 	// gossipsub scoring registry
-	scoringRegistrySlowerDecayThreshold = "gossipsub-scoring-registry-slower-decay-threshold"
-	scoringRegistryDecayRateDecrement   = "gossipsub-scoring-registry-decay-rate-decrement"
-	scoringRegistryDecayAdjustInterval  = "gossipsub-scoring-registry-decay-adjust-interval"
+	scoringRegistrySlowerDecayThreshold = "gossipsub-app-specific-penalty-decay-slowdown-threshold"
+	scoringRegistryDecayRateDecrement   = "gossipsub-app-specific-penalty-decay-rate-reduction-factor"
+	scoringRegistryDecayAdjustInterval  = "gossipsub-app-specific-penalty-decay-evaluation-period"
 	alspDisabled                        = "alsp-disable-penalty"
 	alspSpamRecordCacheSize             = "alsp-spam-record-cache-size"
 	alspSpamRecordQueueSize             = "alsp-spam-report-queue-size"
@@ -282,13 +282,13 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 	flags.Float32(alspSyncEngineSyncRequestProb, config.AlspConfig.SyncEngine.SyncRequestProb, "probability of creating a misbehavior report for a sync request message")
 
 	flags.Float64(scoringRegistrySlowerDecayThreshold,
-		config.GossipSubConfig.GossipSubScoringRegistryConfig.SlowerDecayPenaltyThreshold,
-		"the penalty level which the decay rate is reduced by --gossipsub-scoring-registry-decay-rate-decrement")
+		config.GossipSubConfig.GossipSubScoringRegistryConfig.PenaltyDecaySlowdownThreshold,
+		"the penalty level which the decay rate is reduced by --gossipsub-app-specific-penalty-decay-rate-reduction-factor")
 	flags.Float64(scoringRegistryDecayRateDecrement,
-		config.GossipSubConfig.GossipSubScoringRegistryConfig.DecayRateDecrement,
-		"defines the value by which the decay rate is decreased every time the penalty is below the --gossipsub-scoring-registry-slower-decay-threshold.")
+		config.GossipSubConfig.GossipSubScoringRegistryConfig.DecayRateReductionFactor,
+		"defines the value by which the decay rate is decreased every time the penalty is below the --gossipsub-app-specific-penalty-decay-slowdown-threshold.")
 	flags.Duration(scoringRegistryDecayAdjustInterval,
-		config.GossipSubConfig.GossipSubScoringRegistryConfig.DecayAdjustInterval,
+		config.GossipSubConfig.GossipSubScoringRegistryConfig.PenaltyDecayEvaluationPeriod,
 		"defines the interval at which the decay for a spam record is okay to be adjusted.")
 
 	flags.Int(ihaveMaxSampleSize,

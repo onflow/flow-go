@@ -87,16 +87,16 @@ type SubscriptionProviderParameters struct {
 
 // GossipSubScoringRegistryConfig is the configuration for the GossipSub score registry.
 type GossipSubScoringRegistryConfig struct {
-	// SlowerDecayPenaltyThreshold defines the penalty level which the decay rate is reduced by `DecayRateDecrement` every time the penalty of a node falls below the threshold, thereby slowing down the decay process.
+	// PenaltyDecaySlowdownThreshold defines the penalty level which the decay rate is reduced by `DecayRateReductionFactor` every time the penalty of a node falls below the threshold, thereby slowing down the decay process.
 	// This mechanism ensures that malicious nodes experience longer decay periods, while honest nodes benefit from quicker decay.
-	SlowerDecayPenaltyThreshold float64 `validate:"gt=-100,lt=0" mapstructure:"gossipsub-scoring-registry-slower-decay-threshold"`
-	// DecayRateDecrement defines the value by which the decay rate is decreased every time the penalty is below the SlowerDecayPenaltyThreshold. A reduced decay rate extends the time it takes for penalties to diminish.
-	DecayRateDecrement float64 `validate:"gt=0,lt=1" mapstructure:"gossipsub-scoring-registry-decay-rate-decrement"`
-	// DecayAdjustInterval defines the interval at which the decay for a spam record is okay to be adjusted.
-	DecayAdjustInterval time.Duration `validate:"required,ScoringRegistryDecayAdjustIntervalValidator" mapstructure:"gossipsub-scoring-registry-decay-adjust-interval"`
+	PenaltyDecaySlowdownThreshold float64 `validate:"gt=-100,lt=0" mapstructure:"gossipsub-app-specific-penalty-decay-slowdown-threshold"`
+	// DecayRateReductionFactor defines the value by which the decay rate is decreased every time the penalty is below the PenaltyDecaySlowdownThreshold. A reduced decay rate extends the time it takes for penalties to diminish.
+	DecayRateReductionFactor float64 `validate:"gt=0,lt=1" mapstructure:"gossipsub-app-specific-penalty-decay-rate-reduction-factor"`
+	// PenaltyDecayEvaluationPeriod defines the interval at which the decay for a spam record is okay to be adjusted.
+	PenaltyDecayEvaluationPeriod time.Duration `validate:"required,ScoringRegistryDecayAdjustIntervalValidator" mapstructure:"gossipsub-app-specific-penalty-decay-evaluation-period"`
 }
 
-// ScoringRegistryDecayAdjustIntervalValidator ensures DecayAdjustInterval field is greater than 0.
+// ScoringRegistryDecayAdjustIntervalValidator ensures PenaltyDecayEvaluationPeriod field is greater than 0.
 func ScoringRegistryDecayAdjustIntervalValidator(fl validator.FieldLevel) bool {
 	// Get the duration value from the field
 	duration, ok := fl.Field().Interface().(time.Duration)

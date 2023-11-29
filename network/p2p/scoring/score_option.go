@@ -405,9 +405,9 @@ func NewScoreOption(scoreRegistryConfig p2pconf.GossipSubScoringRegistryConfig, 
 				scoreOptionConfig.logger,
 				scoreOptionConfig.cacheMetrics,
 				DefaultDecayFunction(
-					scoreRegistryConfig.SlowerDecayPenaltyThreshold,
-					scoreRegistryConfig.DecayRateDecrement,
-					scoreRegistryConfig.DecayAdjustInterval,
+					scoreRegistryConfig.PenaltyDecaySlowdownThreshold,
+					scoreRegistryConfig.DecayRateReductionFactor,
+					scoreRegistryConfig.PenaltyDecayEvaluationPeriod,
 				))
 		},
 	})

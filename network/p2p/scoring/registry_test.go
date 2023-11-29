@@ -429,9 +429,9 @@ func TestSpamRecordDecayAdjustment(t *testing.T) {
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
 	scoringRegistryConfig := flowConfig.NetworkConfig.GossipSubConfig.GossipSubScoringRegistryConfig
-	// increase configured DecayRateDecrement so that the decay time is increased faster
-	scoringRegistryConfig.DecayRateDecrement = .1
-	scoringRegistryConfig.DecayAdjustInterval = time.Second
+	// increase configured DecayRateReductionFactor so that the decay time is increased faster
+	scoringRegistryConfig.DecayRateReductionFactor = .1
+	scoringRegistryConfig.PenaltyDecayEvaluationPeriod = time.Second
 
 	peer1 := unittest.PeerIdFixture(t)
 	peer2 := unittest.PeerIdFixture(t)
@@ -542,7 +542,7 @@ func newScoringRegistry(t *testing.T, config p2pconf.GossipSubScoringRegistryCon
 		100,
 		unittest.Logger(),
 		metrics.NewNoopCollector(),
-		scoring.DefaultDecayFunction(config.SlowerDecayPenaltyThreshold, config.DecayRateDecrement, config.DecayAdjustInterval),
+		scoring.DefaultDecayFunction(config.PenaltyDecaySlowdownThreshold, config.DecayRateReductionFactor, config.PenaltyDecayEvaluationPeriod),
 	)
 	cfg := &scoring.GossipSubAppSpecificScoreRegistryConfig{
 		Logger:     unittest.Logger(),

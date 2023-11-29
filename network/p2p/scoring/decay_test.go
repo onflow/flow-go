@@ -282,7 +282,7 @@ func TestDefaultDecayFunction(t *testing.T) {
 	flowConfig, err := config.DefaultConfig()
 	assert.NoError(t, err)
 	scoringRegistryConfig := flowConfig.NetworkConfig.GossipSubConfig.GossipSubScoringRegistryConfig
-	decayFunc := scoring.DefaultDecayFunction(scoringRegistryConfig.SlowerDecayPenaltyThreshold, scoringRegistryConfig.DecayRateDecrement, scoringRegistryConfig.DecayAdjustInterval)
+	decayFunc := scoring.DefaultDecayFunction(scoringRegistryConfig.PenaltyDecaySlowdownThreshold, scoringRegistryConfig.DecayRateReductionFactor, scoringRegistryConfig.PenaltyDecayEvaluationPeriod)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := decayFunc(tt.args.record, tt.args.lastUpdated)
