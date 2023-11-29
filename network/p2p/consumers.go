@@ -25,7 +25,7 @@ type GossipSubInspectorNotifDistributor interface {
 }
 
 // CtrlMsgTopicType represents the type of the topic within a control message.
-type CtrlMsgTopicType int
+type CtrlMsgTopicType uint64
 
 const (
 	// CtrlMsgNonClusterTopicType represents a non-cluster-prefixed topic.
@@ -75,10 +75,10 @@ type InvCtrlMsgNotif struct {
 //   - *InvCtlMsgNotif: invalid control message notification.
 func NewInvalidControlMessageNotification(peerID peer.ID, ctlMsgType p2pmsg.ControlMessageType, err error, count uint64, topicType CtrlMsgTopicType) *InvCtrlMsgNotif {
 	return &InvCtrlMsgNotif{
-		PeerID:            peerID,
-		Error:             err,
-		MsgType:           ctlMsgType,
-		Count:             count,
+		PeerID:    peerID,
+		Error:     err,
+		MsgType:   ctlMsgType,
+		Count:     count,
 		TopicType: topicType,
 	}
 }

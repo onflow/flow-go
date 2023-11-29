@@ -221,27 +221,27 @@ func (c *ControlMsgValidationInspector) processInspectRPCReq(req *InspectRPCRequ
 	for _, ctrlMsgType := range p2pmsg.ControlMessageTypes() {
 		switch ctrlMsgType {
 		case p2pmsg.CtrlMsgGraft:
-			err, isClusterPrefixed := c.inspectGraftMessages(req.Peer, req.rpc.GetControl().GetGraft(), activeClusterIDS)
+			err, topicType := c.inspectGraftMessages(req.Peer, req.rpc.GetControl().GetGraft(), activeClusterIDS)
 			if err != nil {
-				c.logAndDistributeAsyncInspectErrs(req, p2pmsg.CtrlMsgGraft, err, 1, isClusterPrefixed)
+				c.logAndDistributeAsyncInspectErrs(req, p2pmsg.CtrlMsgGraft, err, 1, topicType)
 				return nil
 			}
 		case p2pmsg.CtrlMsgPrune:
-			err, isClusterPrefixed := c.inspectPruneMessages(req.Peer, req.rpc.GetControl().GetPrune(), activeClusterIDS)
+			err, topicType := c.inspectPruneMessages(req.Peer, req.rpc.GetControl().GetPrune(), activeClusterIDS)
 			if err != nil {
-				c.logAndDistributeAsyncInspectErrs(req, p2pmsg.CtrlMsgPrune, err, 1, isClusterPrefixed)
+				c.logAndDistributeAsyncInspectErrs(req, p2pmsg.CtrlMsgPrune, err, 1, topicType)
 				return nil
 			}
 		case p2pmsg.CtrlMsgIWant:
 			err := c.inspectIWantMessages(req.Peer, req.rpc.GetControl().GetIwant())
 			if err != nil {
-				c.logAndDistributeAsyncInspectErrs(req, p2pmsg.CtrlMsgIWant, err, 1, false)
+				c.logAndDistributeAsyncInspectErrs(req, p2pmsg.CtrlMsgIWant, err, 1, p2p.CtrlMsgNonClusterTopicType)
 				return nil
 			}
 		case p2pmsg.CtrlMsgIHave:
-			err, isClusterPrefixed := c.inspectIHaveMessages(req.Peer, req.rpc.GetControl().GetIhave(), activeClusterIDS)
+			err, topicType := c.inspectIHaveMessages(req.Peer, req.rpc.GetControl().GetIhave(), activeClusterIDS)
 			if err != nil {
-				c.logAndDistributeAsyncInspectErrs(req, p2pmsg.CtrlMsgIHave, err, 1, isClusterPrefixed)
+				c.logAndDistributeAsyncInspectErrs(req, p2pmsg.CtrlMsgIHave, err, 1, topicType)
 				return nil
 			}
 		}
@@ -250,7 +250,7 @@ func (c *ControlMsgValidationInspector) processInspectRPCReq(req *InspectRPCRequ
 	// inspect rpc publish messages after all control message validation has passed
 	err, errCount := c.inspectRpcPublishMessages(req.Peer, req.rpc.GetPublish(), activeClusterIDS)
 	if err != nil {
-		c.logAndDistributeAsyncInspectErrs(req, p2pmsg.RpcPublishMessage, err, errCount, false)
+		c.logAndDistributeAsyncInspectErrs(req, p2pmsg.RpcPublishMessage, err, errCount, p2p.CtrlMsgNonClusterTopicType)
 		return nil
 	}
 
@@ -320,7 +320,7 @@ func (c *ControlMsgValidationInspector) inspectPruneMessages(from peer.ID, prune
 	for _, prune := range prunes {
 		topic := channels.Topic(prune.GetTopicID())
 		if tracker.isDuplicate(topic.String()) {
-			return NewDuplicateTopicErr(topic.String(), p2pmsg.CtrlMsgPrune), false
+			return NewDuplicateTopicErr(topic.String(), p2pmsg.CtrlMsgPrune), p2p.CtrlMsgNonClusterTopicType
 		}
 		tracker.set(topic.String())
 		err, ctrlMsgType := c.validateTopic(from, topic, activeClusterIDS)
@@ -699,7 +699,6 @@ func (c *ControlMsgValidationInspector) validateTopic(from peer.ID, topic channe
 	if !ok {
 		return channels.NewInvalidTopicErr(topic, fmt.Errorf("failed to get channel from topic")), p2p.CtrlMsgNonClusterTopicType
 	}
-
 	// handle cluster prefixed topics
 	if channels.IsClusterChannel(channel) {
 		return c.validateClusterPrefixedTopic(from, topic, activeClusterIds), p2p.CtrlMsgTopicTypeClusterPrefixed
@@ -710,7 +709,7 @@ func (c *ControlMsgValidationInspector) validateTopic(from peer.ID, topic channe
 	if err != nil {
 		return err, p2p.CtrlMsgNonClusterTopicType
 	}
-	return nil, p2p.CtrlMsgTopicTypeClusterPrefixed
+	return nil, p2p.CtrlMsgNonClusterTopicType
 }
 
 // validateClusterPrefixedTopic validates cluster prefixed topics.
@@ -728,12 +727,12 @@ func (c *ControlMsgValidationInspector) validateClusterPrefixedTopic(from peer.I
 	lg := c.logger.With().
 		Str("from", p2plogging.PeerId(from)).
 		Logger()
-	// reject messages from unstaked nodes for cluster prefixed topics
+
+	// only staked nodes are expected to participate on cluster prefixed topics
 	nodeID, err := c.getFlowIdentifier(from)
 	if err != nil {
 		return err
 	}
-
 	if len(activeClusterIds) == 0 {
 		// cluster IDs have not been updated yet
 		_, incErr := c.tracker.Inc(nodeID)
@@ -743,7 +742,7 @@ func (c *ControlMsgValidationInspector) validateClusterPrefixedTopic(from peer.I
 		}
 
 		// if the amount of messages received is below our hard threshold log the error and return nil.
-		if c.checkClusterPrefixHardThreshold(nodeID) {
+		if ok := c.checkClusterPrefixHardThreshold(nodeID); ok {
 			lg.Warn().
 				Err(err).
 				Str("topic", topic.String()).
@@ -811,13 +810,13 @@ func (c *ControlMsgValidationInspector) checkClusterPrefixHardThreshold(nodeID f
 //   - err: the error that occurred.
 //   - count: the number of occurrences of the error.
 //   - isClusterPrefixed: indicates if the errors occurred on a cluster prefixed topic.
-func (c *ControlMsgValidationInspector) logAndDistributeAsyncInspectErrs(req *InspectRPCRequest, ctlMsgType p2pmsg.ControlMessageType, err error, count uint64, isClusterPrefixed bool) {
+func (c *ControlMsgValidationInspector) logAndDistributeAsyncInspectErrs(req *InspectRPCRequest, ctlMsgType p2pmsg.ControlMessageType, err error, count uint64, topicType p2p.CtrlMsgTopicType) {
 	lg := c.logger.With().
 		Err(err).
 		Str("control_message_type", ctlMsgType.String()).
 		Bool(logging.KeySuspicious, true).
 		Bool(logging.KeyNetworkingSecurity, true).
-		Bool("is_cluster_prefixed", isClusterPrefixed).
+		Str("topic_type", topicType.String()).
 		Uint64("error_count", count).
 		Str("peer_id", p2plogging.PeerId(req.Peer)).
 		Logger()
@@ -828,7 +827,7 @@ func (c *ControlMsgValidationInspector) logAndDistributeAsyncInspectErrs(req *In
 	case IsErrUnstakedPeer(err):
 		lg.Warn().Msg("control message received from unstaked peer")
 	default:
-		distErr := c.distributor.Distribute(p2p.NewInvalidControlMessageNotification(req.Peer, ctlMsgType, err, count, isClusterPrefixed))
+		distErr := c.distributor.Distribute(p2p.NewInvalidControlMessageNotification(req.Peer, ctlMsgType, err, count, topicType))
 		if distErr != nil {
 			lg.Error().
 				Err(distErr).

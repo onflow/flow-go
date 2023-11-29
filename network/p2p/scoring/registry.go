@@ -284,7 +284,7 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 		}
 
 		// reduce penalty for cluster prefixed topics allowing nodes that are potentially behind to catch up
-		if notification.IsClusterPrefixed {
+		if notification.TopicType == p2p.CtrlMsgTopicTypeClusterPrefixed {
 			penalty *= r.penalty.ClusterPrefixedPenaltyReductionFactor
 		}
 
