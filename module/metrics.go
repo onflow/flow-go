@@ -105,12 +105,12 @@ type LocalGossipSubRouterMetrics interface {
 	// OnLocalPeerJoinedTopic is called when the local node subscribes to a gossipsub topic.
 	// Args:
 	// 	topic: the topic that the local peer subscribed to.
-	OnLocalPeerJoinedTopic(topic string)
+	OnLocalPeerJoinedTopic()
 
 	// OnLocalPeerLeftTopic is called when the local node unsubscribes from a gossipsub topic.
 	// Args:
 	// 	topic: the topic that the local peer has unsubscribed from.
-	OnLocalPeerLeftTopic(topic string)
+	OnLocalPeerLeftTopic()
 
 	// OnPeerGraftTopic is called when the local node receives a GRAFT message from a remote peer on a topic.
 	// Note: the received GRAFT at this point is considered passed the RPC inspection, and is accepted by the local node.
@@ -123,7 +123,7 @@ type LocalGossipSubRouterMetrics interface {
 	// OnMessageEnteredValidation is called when a received pubsub message enters the validation pipeline. It is the
 	// internal validation pipeline of GossipSub protocol. The message may be rejected or accepted by the validation
 	// pipeline.
-	OnMessageEnteredValidation()
+	OnMessageEnteredValidation(size int)
 
 	// OnMessageRejected is called when a received pubsub message is rejected by the validation pipeline.
 	// Args:
@@ -162,22 +162,16 @@ type LocalGossipSubRouterMetrics interface {
 	// 	pruneCount: the number of PRUNE messages included in the RPC.
 	OnRpcSent(msgCount int, iHaveCount int, iWantCount int, graftCount int, pruneCount int)
 
-	// OnRpcDropped is called when an outbound RPC message is dropped by the local node, typically because the local node
+	// OnOutboundRpcDropped is called when an outbound RPC message is dropped by the local node, typically because the local node
 	// outbound message queue is full; or the RPC is big and the local node cannot fragment it.
-	// Args:
-	// 	msgCount: the number of messages included in the RPC.
-	// 	iHaveCount: the number of iHAVE messages included in the RPC.
-	// 	iWantCount: the number of iWANT messages included in the RPC.
-	// 	graftCount: the number of GRAFT messages included in the RPC.
-	// 	pruneCount: the number of PRUNE messages included in the RPC.
-	OnRpcDropped(msgCount int, iHaveCount int, iWantCount int, graftCount int, pruneCount int)
+	OnOutboundRpcDropped()
 
 	// OnUndeliveredMessage is called when a message is not delivered at least one subscriber of the topic, for example when
 	// the subscriber is too slow to process the message.
 	OnUndeliveredMessage()
 
-	// OnMessageDelivered is called when a message is delivered to all subscribers of the topic.
-	OnMessageDelivered()
+	// OnMessageDeliveredToAllSubscribers is called when a message is delivered to all subscribers of the topic.
+	OnMessageDeliveredToAllSubscribers(size int)
 }
 
 // UnicastManagerMetrics unicast manager metrics.
