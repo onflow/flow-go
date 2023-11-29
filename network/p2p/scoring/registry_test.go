@@ -453,6 +453,8 @@ func TestSpamRecordDecayAdjustment(t *testing.T) {
 
 	// simulate sustained malicious activity from peer1, eventually the decay speed
 	// for a spam record should be reduced to the MinimumSpamPenaltyDecayFactor
+	prevDecay := scoring.MaximumSpamPenaltyDecayFactor
+	tolerance := 0.1
 	require.Eventually(t, func() bool {
 		reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 			PeerID:  peer1,
@@ -461,6 +463,8 @@ func TestSpamRecordDecayAdjustment(t *testing.T) {
 		record, err, ok := spamRecords.Get(peer1)
 		require.NoError(t, err)
 		require.True(t, ok)
+		assert.Less(t, math.Abs(prevDecay-record.Decay), tolerance)
+		prevDecay = record.Decay
 		return record.Decay == scoring.MinimumSpamPenaltyDecayFactor
 	}, 5*time.Second, 500*time.Millisecond)
 

@@ -138,6 +138,9 @@ func TestGeometricDecay(t *testing.T) {
 // 4. penalty is negative and below the skipDecayThreshold and lastUpdated is too recent. In this case, the penalty should not be decayed.
 // 5. penalty is negative and below the skipDecayThreshold and lastUpdated is too old. In this case, the penalty should be decayed.
 func TestDefaultDecayFunction(t *testing.T) {
+	flowConfig, err := config.DefaultConfig()
+	assert.NoError(t, err)
+
 	type args struct {
 		record      p2p.GossipSubSpamRecord
 		lastUpdated time.Time
@@ -277,14 +280,14 @@ func TestDefaultDecayFunction(t *testing.T) {
 				},
 			},
 		},
-				{
+		{
 			// 8. penalty is negative and below slowerDecayPenaltyThreshold; and LastDecayAdjustment time passed the decay adjust interval. record decay should be adjusted.
 			name: "penalty is negative and below slowerDecayPenaltyThreshold and LastDecayAdjustment time passed the decay adjust interval. Record decay should be adjusted",
 			args: args{
 				record: p2p.GossipSubSpamRecord{
 					Penalty:             -100,
 					Decay:               0.8,
-					LastDecayAdjustment: time.Now().Add(-flowConfig.NetworkConfig.GossipSubConfig.GossipSubScoringRegistryConfig.DecayAdjustInterval),
+					LastDecayAdjustment: time.Now().Add(-flowConfig.NetworkConfig.GossipSubConfig.GossipSubScoringRegistryConfig.PenaltyDecayEvaluationPeriod),
 				},
 				lastUpdated: time.Now(),
 			},
@@ -296,26 +299,23 @@ func TestDefaultDecayFunction(t *testing.T) {
 			},
 		},
 	}
-
-	flowConfig, err := config.DefaultConfig()
-	assert.NoError(t, err)
 	scoringRegistryConfig := flowConfig.NetworkConfig.GossipSubConfig.GossipSubScoringRegistryConfig
 	decayFunc := scoring.DefaultDecayFunction(scoringRegistryConfig.PenaltyDecaySlowdownThreshold, scoringRegistryConfig.DecayRateReductionFactor, scoringRegistryConfig.PenaltyDecayEvaluationPeriod)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := decayFunc(tt.args.record, tt.args.lastUpdated)
 			assert.NoError(t, err)
-        tolerance := 0.01 // 1% tolerance
-        expectedPenalty := tt.want.record.Penalty
-        
-        // ensure expectedPenalty is not zero to avoid division by zero
-        if expectedPenalty != 0 {
-            normalizedDifference := math.Abs(got.Penalty - expectedPenalty) / math.Abs(expectedPenalty)
-            assert.Less(t, normalizedDifference, tolerance)
-        } else {
-            // handles the case where expectedPenalty is zero
-            assert.Less(t, math.Abs(got.Penalty), tolerance)
-        }
+			tolerance := 0.01 // 1% tolerance
+			expectedPenalty := tt.want.record.Penalty
+
+			// ensure expectedPenalty is not zero to avoid division by zero
+			if expectedPenalty != 0 {
+				normalizedDifference := math.Abs(got.Penalty-expectedPenalty) / math.Abs(expectedPenalty)
+				assert.Less(t, normalizedDifference, tolerance)
+			} else {
+				// handles the case where expectedPenalty is zero
+				assert.Less(t, math.Abs(got.Penalty), tolerance)
+			}
 			assert.Equal(t, tt.want.record.Decay, got.Decay)
 		})
 	}
