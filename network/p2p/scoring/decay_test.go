@@ -305,7 +305,17 @@ func TestDefaultDecayFunction(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := decayFunc(tt.args.record, tt.args.lastUpdated)
 			assert.NoError(t, err)
-			assert.Less(t, math.Abs(got.Penalty-tt.want.record.Penalty), 10e-2)
+        tolerance := 0.01 // 1% tolerance
+        expectedPenalty := tt.want.record.Penalty
+        
+        // ensure expectedPenalty is not zero to avoid division by zero
+        if expectedPenalty != 0 {
+            normalizedDifference := math.Abs(got.Penalty - expectedPenalty) / math.Abs(expectedPenalty)
+            assert.Less(t, normalizedDifference, tolerance)
+        } else {
+            // handles the case where expectedPenalty is zero
+            assert.Less(t, math.Abs(got.Penalty), tolerance)
+        }
 			assert.Equal(t, tt.want.record.Decay, got.Decay)
 		})
 	}
