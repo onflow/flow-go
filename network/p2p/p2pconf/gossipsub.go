@@ -89,7 +89,7 @@ type SubscriptionProviderParameters struct {
 type GossipSubScoringRegistryConfig struct {
 	// PenaltyDecaySlowdownThreshold defines the penalty level which the decay rate is reduced by `DecayRateReductionFactor` every time the penalty of a node falls below the threshold, thereby slowing down the decay process.
 	// This mechanism ensures that malicious nodes experience longer decay periods, while honest nodes benefit from quicker decay.
-	PenaltyDecaySlowdownThreshold float64 `validate:"gt=-100,lt=0" mapstructure:"gossipsub-app-specific-penalty-decay-slowdown-threshold"`
+	PenaltyDecaySlowdownThreshold float64 `validate:"lt=0" mapstructure:"gossipsub-app-specific-penalty-decay-slowdown-threshold"`
 	// DecayRateReductionFactor defines the value by which the decay rate is decreased every time the penalty is below the PenaltyDecaySlowdownThreshold. A reduced decay rate extends the time it takes for penalties to diminish.
 	DecayRateReductionFactor float64 `validate:"gt=0,lt=1" mapstructure:"gossipsub-app-specific-penalty-decay-rate-reduction-factor"`
 	// PenaltyDecayEvaluationPeriod defines the interval at which the decay for a spam record is okay to be adjusted.
