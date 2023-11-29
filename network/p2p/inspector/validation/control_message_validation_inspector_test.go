@@ -11,7 +11,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	
+
 	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
