@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/onflow/flow-go/fvm/evm/stdlib"
+
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
@@ -2909,4 +2911,65 @@ func TestEntropyCallExpectsNoParameters(t *testing.T) {
 			require.ErrorContains(t, output.Err, "too many arguments")
 		},
 		)(t)
+}
+
+func TestEVM(t *testing.T) {
+
+	t.Run("successful transaction", newVMTest().
+		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
+		// we keep this dissabled during bootstrap and later overwrite in the test for test transaction
+		withContextOptions(
+			fvm.WithEVMEnabled(false),
+			fvm.WithCadenceLogging(true),
+		).
+		run(func(
+			t *testing.T,
+			vm fvm.VM,
+			chain flow.Chain,
+			ctx fvm.Context,
+			snapshotTree snapshot.SnapshotTree,
+		) {
+			// generate test address
+			genArr := make([]cadence.Value, 20)
+			for i := range genArr {
+				genArr[i] = cadence.UInt8(i)
+			}
+			addrBytes := cadence.NewArray(genArr).WithType(stdlib.EVMAddressBytesCadenceType)
+			encodedArg, err := jsoncdc.Encode(addrBytes)
+			require.NoError(t, err)
+
+			txBody := flow.NewTransactionBody().
+				SetScript([]byte(fmt.Sprintf(`
+						import EVM from %s
+
+						transaction(bytes: [UInt8; 20]) {
+							execute {
+								let addr = EVM.EVMAddress(bytes: bytes)
+								log(addr)
+							}
+						}
+					`, chain.ServiceAddress().HexWithPrefix()))).
+				SetProposalKey(chain.ServiceAddress(), 0, 0).
+				SetPayer(chain.ServiceAddress()).
+				AddArgument(encodedArg)
+
+			err = testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
+			require.NoError(t, err)
+
+			ctx = fvm.NewContextFromParent(ctx, fvm.WithEVMEnabled(true))
+			_, output, err := vm.Run(
+				ctx,
+				fvm.Transaction(txBody, 0),
+				snapshotTree)
+
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+			require.Len(t, output.Logs, 1)
+			require.Equal(t, output.Logs[0], fmt.Sprintf(
+				"A.%s.EVM.EVMAddress(bytes: %s)",
+				chain.ServiceAddress(),
+				addrBytes.String(),
+			))
+		}),
+	)
 }

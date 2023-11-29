@@ -181,6 +181,21 @@ func (executor *transactionExecutor) preprocess() error {
 // infrequently modified and are expensive to compute.  For now this includes
 // reading meter parameter overrides and parsing programs.
 func (executor *transactionExecutor) preprocessTransactionBody() error {
+	// setup evm
+	if executor.ctx.EVMEnabled {
+		chain := executor.ctx.Chain
+		err := evm.SetupEnvironment(
+			chain.ChainID(),
+			executor.env,
+			executor.cadenceRuntime.TxRuntimeEnv,
+			chain.ServiceAddress(),
+			FlowTokenAddress(chain),
+		)
+		if err != nil {
+			return err
+		}
+	}
+
 	meterParams, err := getBodyMeterParameters(
 		executor.ctx,
 		executor.proc,
@@ -225,21 +240,6 @@ func (executor *transactionExecutor) execute() error {
 }
 
 func (executor *transactionExecutor) ExecuteTransactionBody() error {
-	// setup evm
-	if executor.ctx.EVMEnabled {
-		chain := executor.ctx.Chain
-		err := evm.SetupEnvironment(
-			chain.ChainID(),
-			executor.env,
-			executor.cadenceRuntime.TxRuntimeEnv,
-			chain.ServiceAddress(),
-			FlowTokenAddress(chain),
-		)
-		if err != nil {
-			return err
-		}
-	}
-
 	var invalidator derived.TransactionInvalidator
 	if !executor.errs.CollectedError() {
 
