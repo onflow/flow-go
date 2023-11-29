@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/storage"
 )
 
 var SnapshotHistoryLimitErr = fmt.Errorf("reached the snapshot history limit")
@@ -22,6 +23,7 @@ var SnapshotHistoryLimitErr = fmt.Errorf("reached the snapshot history limit")
 type backendNetwork struct {
 	state                protocol.State
 	chainID              flow.ChainID
+	headers              storage.Headers
 	snapshotHistoryLimit int
 }
 
@@ -32,10 +34,13 @@ The observer and access nodes need to be able to handle GetNetworkParameters
 and GetLatestProtocolStateSnapshot RPCs so this logic was split into
 the backendNetwork so that we can ignore the rest of the backend logic
 */
-func NewNetworkAPI(state protocol.State, chainID flow.ChainID, snapshotHistoryLimit int) *backendNetwork {
+func NewNetworkAPI(state protocol.State, chainID flow.ChainID,
+	headers storage.Headers,
+	snapshotHistoryLimit int) *backendNetwork {
 	return &backendNetwork{
 		state:                state,
 		chainID:              chainID,
+		headers:              headers,
 		snapshotHistoryLimit: snapshotHistoryLimit,
 	}
 }
@@ -103,27 +108,32 @@ func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(_ context.Context, bl
 		return nil, status.Errorf(codes.Internal, "could not get header by blockID: %v", err)
 	}
 
-	snapshotByHeight := b.state.AtHeight(snapshotHeadByBlockId.Height)
-	snapshotHeadByHeight, err := snapshotByHeight.Head()
+	// Because there is no index from block ID to finalized height, we separately look up the finalized
+	// block ID by the height of the queried block, then compare the queried ID to the finalized ID.
+	// If they match, then the queried block must be finalized.
+	blockIDFinalizedAtHeight, err := b.headers.BlockIDByHeight(snapshotHeadByBlockId.Height)
 
-	if err != nil {
-		if errors.Is(err, state.ErrUnknownSnapshotReference) {
-			return nil, status.Errorf(codes.InvalidArgument,
-				"failed to retrieve snapshot for block by height %d: block not finalized", snapshotHeadByBlockId.Height)
-		}
-
-		return nil, status.Errorf(codes.Internal, "failed to find snapshot: %v", err)
+	if errors.Is(err, storage.ErrNotFound) {
+		// The block exists, but no block has been finalized at its height. Therefore, this block
+		// may be finalized in the future, and the client can retry.
+		return nil, status.Errorf(codes.FailedPrecondition,
+			"failed to retrieve snapshot for block by height %d: block not finalized and is above finalized height",
+			snapshotHeadByBlockId.Height)
 	}
 
-	if snapshotHeadByHeight.ID() != blockID {
-		return nil, status.Errorf(codes.InvalidArgument, "failed to retrieve snapshot for block: block not finalized")
+	if blockIDFinalizedAtHeight != blockID {
+		// A different block than what was queried has been finalized at this height.
+		// Therefore, the queried block will never be finalized.
+		return nil, status.Errorf(codes.InvalidArgument,
+			"failed to retrieve snapshot for block: block not finalized and is below finalized height")
 	}
 
-	validSnapshot, err := b.getValidSnapshot(snapshotByHeight, 0, false)
+	validSnapshot, err := b.getValidSnapshot(snapshot, 0, false)
 	if err != nil {
 		if errors.Is(err, ErrSnapshotPhaseMismatch) {
-			return nil, status.Errorf(codes.InvalidArgument, "failed to retrieve snapshot for block, try again with different block: "+
-				"%v", err)
+			return nil, status.Errorf(codes.InvalidArgument,
+				"failed to retrieve snapshot for block, try again with different block: "+
+					"%v", err)
 		}
 		return nil, status.Errorf(codes.Internal, "failed to get a valid snapshot: %v", err)
 	}
@@ -158,8 +168,9 @@ func (b *backendNetwork) GetProtocolStateSnapshotByHeight(_ context.Context, blo
 	validSnapshot, err := b.getValidSnapshot(snapshot, 0, false)
 	if err != nil {
 		if errors.Is(err, ErrSnapshotPhaseMismatch) {
-			return nil, status.Errorf(codes.InvalidArgument, "failed to retrieve snapshot for block, try again with different block: "+
-				"%v", err)
+			return nil, status.Errorf(codes.InvalidArgument,
+				"failed to retrieve snapshot for block, try again with different block: "+
+					"%v", err)
 		}
 		return nil, status.Errorf(codes.Internal, "failed to get a valid snapshot: %v", err)
 	}

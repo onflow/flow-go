@@ -621,6 +621,58 @@ func (_m *API) GetProtocolStateSnapshotByHeight(ctx context.Context, blockHeight
 	return r0, r1
 }
 
+// GetSystemTransaction provides a mock function with given fields: ctx, blockID
+func (_m *API) GetSystemTransaction(ctx context.Context, blockID flow.Identifier) (*flow.TransactionBody, error) {
+	ret := _m.Called(ctx, blockID)
+
+	var r0 *flow.TransactionBody
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) (*flow.TransactionBody, error)); ok {
+		return rf(ctx, blockID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) *flow.TransactionBody); ok {
+		r0 = rf(ctx, blockID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.TransactionBody)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier) error); ok {
+		r1 = rf(ctx, blockID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetSystemTransactionResult provides a mock function with given fields: ctx, blockID, requiredEventEncodingVersion
+func (_m *API) GetSystemTransactionResult(ctx context.Context, blockID flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) (*access.TransactionResult, error) {
+	ret := _m.Called(ctx, blockID, requiredEventEncodingVersion)
+
+	var r0 *access.TransactionResult
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, entities.EventEncodingVersion) (*access.TransactionResult, error)); ok {
+		return rf(ctx, blockID, requiredEventEncodingVersion)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, entities.EventEncodingVersion) *access.TransactionResult); ok {
+		r0 = rf(ctx, blockID, requiredEventEncodingVersion)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*access.TransactionResult)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier, entities.EventEncodingVersion) error); ok {
+		r1 = rf(ctx, blockID, requiredEventEncodingVersion)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetTransaction provides a mock function with given fields: ctx, id
 func (_m *API) GetTransaction(ctx context.Context, id flow.Identifier) (*flow.TransactionBody, error) {
 	ret := _m.Called(ctx, id)
