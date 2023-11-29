@@ -446,7 +446,11 @@ func TestSpamRecordDecayAdjustment(t *testing.T) {
 	// initially, the spamRecords should not have the peer ids.
 	assert.False(t, spamRecords.Has(peer1))
 	assert.False(t, spamRecords.Has(peer2))
-
+	// since the both peers do not have a spam record, their app specific score should be the max app specific reward, which
+	// is the default reward for a staked peer that has valid subscriptions.
+	assert.Equal(t, scoring.MaxAppSpecificReward, reg.AppSpecificScoreFunc()(peer1))
+	assert.Equal(t, scoring.MaxAppSpecificReward, reg.AppSpecificScoreFunc()(peer2))
+	
 	// simulate sustained malicious activity from peer1, eventually the decay speed
 	// for a spam record should be reduced to the MinimumSpamPenaltyDecayFactor
 	require.Eventually(t, func() bool {
