@@ -243,7 +243,7 @@ func TestDefaultDecayFunction(t *testing.T) {
 			},
 		},
 		{
-			// 6. penalty is negative and below slowerDecayPenaltyThreshold record decay should be adjusted.
+			// 6. penalty is negative and below slowerDecayPenaltyThreshold record decay should be adjusted. The `LastDecayAdjustment` has not been updated since initialization.
 			name: "penalty is negative and below slowerDecayPenaltyThreshold record decay should be adjusted",
 			args: args{
 				record: p2p.GossipSubSpamRecord{
@@ -260,7 +260,7 @@ func TestDefaultDecayFunction(t *testing.T) {
 			},
 		},
 		{
-			// 6. penalty is negative and below slowerDecayPenaltyThreshold but record.LastDecayAdjustment is too recent. In this case the decay should not be adjusted.
+			// 7. penalty is negative and below slowerDecayPenaltyThreshold but record.LastDecayAdjustment is too recent. In this case the decay should not be adjusted.
 			name: "penalty is negative and below slowerDecayPenaltyThreshold record decay should not be adjusted",
 			args: args{
 				record: p2p.GossipSubSpamRecord{
@@ -277,6 +277,24 @@ func TestDefaultDecayFunction(t *testing.T) {
 				},
 			},
 		},
+				{
+			// 8. penalty is negative and below slowerDecayPenaltyThreshold; and LastDecayAdjustment time passed the decay adjust interval. record decay should be adjusted.
+			name: "penalty is negative and below slowerDecayPenaltyThreshold and LastDecayAdjustment time passed the decay adjust interval. Record decay should be adjusted",
+			args: args{
+				record: p2p.GossipSubSpamRecord{
+					Penalty:             -100,
+					Decay:               0.8,
+					LastDecayAdjustment: time.Now().Add(-flowConfig.NetworkConfig.GossipSubConfig.GossipSubScoringRegistryConfig.DecayAdjustInterval),
+				},
+				lastUpdated: time.Now(),
+			},
+			want: want{
+				record: p2p.GossipSubSpamRecord{
+					Penalty: -100,
+					Decay:   0.81,
+				},
+			},
+		},
 	}
 
 	flowConfig, err := config.DefaultConfig()
@@ -287,7 +305,17 @@ func TestDefaultDecayFunction(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := decayFunc(tt.args.record, tt.args.lastUpdated)
 			assert.NoError(t, err)
-			assert.Less(t, math.Abs(got.Penalty-tt.want.record.Penalty), 10e-2)
+        tolerance := 0.01 // 1% tolerance
+        expectedPenalty := tt.want.record.Penalty
+        
+        // ensure expectedPenalty is not zero to avoid division by zero
+        if expectedPenalty != 0 {
+            normalizedDifference := math.Abs(got.Penalty - expectedPenalty) / math.Abs(expectedPenalty)
+            assert.Less(t, normalizedDifference, tolerance)
+        } else {
+            // handles the case where expectedPenalty is zero
+            assert.Less(t, math.Abs(got.Penalty), tolerance)
+        }
 			assert.Equal(t, tt.want.record.Decay, got.Decay)
 		})
 	}

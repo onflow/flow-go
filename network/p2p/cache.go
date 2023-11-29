@@ -84,10 +84,9 @@ type GossipSubSpamRecord struct {
 	Decay float64
 	// Penalty is the application specific Penalty of the peer.
 	Penalty float64
-	// LastDecayAdjustment represents the timestamp of the last decay adjustment for the spam record.
-	// The spam record undergoes decay at regular intervals, either increasing or decreasing the decay.
-	// Increasing the decay leads to faster recovery of the peer score, while decreasing it results in slower recovery.
-	// This timestamp ensures that the decay speed of a malicious node is not inadvertently increased
-	// during periods of high message frequency.
+// LastDecayAdjustment records the time of the most recent adjustment in the decay process for a spam record.
+// At each interval, the system evaluates and potentially adjusts the decay rate, which affects how quickly a node's penalty diminishes.
+// The decay process is multiplicative (newPenalty = decayRate * oldPenalty) and operates within a range of 0 to 1. At certain regular intervals, the decay adjustment is evaluated and if the node's penalty falls below the set threshold, the decay rate is modified by the reduction factor, such as 0.01. This modification incrementally increases the decay rate. For example, if the decay rate is `x`, adding the reduction factor results in a decay rate of `x + 0.01`, leading to a slower reduction in penalty. Thus, a higher decay rate actually slows down the recovery process, contrary to accelerating it.
+// The LastDecayAdjustment timestamp is crucial in ensuring balanced and fair penalization, especially important during periods of high message traffic to prevent unintended rapid decay of penalties for malicious nodes.
 	LastDecayAdjustment time.Time
 }
