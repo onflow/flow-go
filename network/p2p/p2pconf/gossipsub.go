@@ -2,8 +2,6 @@ package p2pconf
 
 import (
 	"time"
-
-	"github.com/go-playground/validator/v10"
 )
 
 // ResourceManagerConfig returns the resource manager configuration for the libp2p node.
@@ -93,17 +91,7 @@ type GossipSubScoringRegistryConfig struct {
 	// DecayRateReductionFactor defines the value by which the decay rate is decreased every time the penalty is below the PenaltyDecaySlowdownThreshold. A reduced decay rate extends the time it takes for penalties to diminish.
 	DecayRateReductionFactor float64 `validate:"gt=0,lt=1" mapstructure:"gossipsub-app-specific-penalty-decay-rate-reduction-factor"`
 	// PenaltyDecayEvaluationPeriod defines the interval at which the decay for a spam record is okay to be adjusted.
-	PenaltyDecayEvaluationPeriod time.Duration `validate:"required,ScoringRegistryDecayAdjustIntervalValidator" mapstructure:"gossipsub-app-specific-penalty-decay-evaluation-period"`
-}
-
-// ScoringRegistryDecayAdjustIntervalValidator ensures PenaltyDecayEvaluationPeriod field is greater than 0.
-func ScoringRegistryDecayAdjustIntervalValidator(fl validator.FieldLevel) bool {
-	// Get the duration value from the field
-	duration, ok := fl.Field().Interface().(time.Duration)
-	if !ok {
-		return false
-	}
-	return duration > 0
+	PenaltyDecayEvaluationPeriod time.Duration `validate:"gt=0" mapstructure:"gossipsub-app-specific-penalty-decay-evaluation-period"`
 }
 
 // GossipSubTracerConfig is the config for the gossipsub tracer. GossipSub tracer is used to trace the local mesh events and peer scores.
