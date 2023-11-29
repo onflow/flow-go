@@ -283,13 +283,13 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 
 	flags.Float64(scoringRegistrySlowerDecayThreshold,
 		config.GossipSubConfig.GossipSubScoringRegistryConfig.PenaltyDecaySlowdownThreshold,
-		"the penalty level which the decay rate is reduced by --gossipsub-app-specific-penalty-decay-rate-reduction-factor")
+		"the penalty level at which the decay rate is reduced by --gossipsub-app-specific-penalty-decay-rate-reduction-factor")
 	flags.Float64(scoringRegistryDecayRateDecrement,
 		config.GossipSubConfig.GossipSubScoringRegistryConfig.DecayRateReductionFactor,
 		"defines the value by which the decay rate is decreased every time the penalty is below the --gossipsub-app-specific-penalty-decay-slowdown-threshold.")
 	flags.Duration(scoringRegistryDecayAdjustInterval,
 		config.GossipSubConfig.GossipSubScoringRegistryConfig.PenaltyDecayEvaluationPeriod,
-		"defines the interval at which the decay for a spam record is okay to be adjusted.")
+		"defines the period at which the decay for a spam record is okay to be adjusted.")
 
 	flags.Int(ihaveMaxSampleSize,
 		config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.IHaveRPCInspectionConfig.MaxSampleSize,
