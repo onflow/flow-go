@@ -57,6 +57,9 @@ const (
 	iHaveMisbehaviourPenalty = -10
 	// iWantMisbehaviourPenalty is the penalty applied to the application specific penalty when a peer conducts a iWant misbehaviour.
 	iWantMisbehaviourPenalty = -10
+	// clusterPrefixedPenaltyReductionFactor factor used to reduce the penalty for control message misbehaviours on cluster prefixed topics. This allows a more lenient punishment for nodes
+	// that fall behind and may need to request old data.
+	clusterPrefixedPenaltyReductionFactor = .5
 	// rpcPublishMessageMisbehaviourPenalty is the penalty applied to the application specific penalty when a peer conducts a RpcPublishMessageMisbehaviourPenalty misbehaviour.
 	rpcPublishMessageMisbehaviourPenalty = -10
 )
@@ -65,21 +68,25 @@ type SpamRecordInitFunc func() p2p.GossipSubSpamRecord
 
 // GossipSubCtrlMsgPenaltyValue is the penalty value for each control message type.
 type GossipSubCtrlMsgPenaltyValue struct {
-	Graft             float64 // penalty value for an individual graft message misbehaviour.
-	Prune             float64 // penalty value for an individual prune message misbehaviour.
-	IHave             float64 // penalty value for an individual iHave message misbehaviour.
-	IWant             float64 // penalty value for an individual iWant message misbehaviour.
-	RpcPublishMessage float64 // penalty value for an individual RpcPublishMessage message misbehaviour.
+	Graft float64 // penalty value for an individual graft message misbehaviour.
+	Prune float64 // penalty value for an individual prune message misbehaviour.
+	IHave float64 // penalty value for an individual iHave message misbehaviour.
+	IWant float64 // penalty value for an individual iWant message misbehaviour.
+	// ClusterPrefixedPenaltyReductionFactor factor used to reduce the penalty for control message misbehaviours on cluster prefixed topics. This is allows a more lenient punishment for nodes
+	// that fall behind and may need to request old data.
+	ClusterPrefixedPenaltyReductionFactor float64
+	RpcPublishMessage                     float64 // penalty value for an individual RpcPublishMessage message misbehaviour.
 }
 
 // DefaultGossipSubCtrlMsgPenaltyValue returns the default penalty value for each control message type.
 func DefaultGossipSubCtrlMsgPenaltyValue() GossipSubCtrlMsgPenaltyValue {
 	return GossipSubCtrlMsgPenaltyValue{
-		Graft:             graftMisbehaviourPenalty,
-		Prune:             pruneMisbehaviourPenalty,
-		IHave:             iHaveMisbehaviourPenalty,
-		IWant:             iWantMisbehaviourPenalty,
-		RpcPublishMessage: rpcPublishMessageMisbehaviourPenalty,
+		Graft:                                 graftMisbehaviourPenalty,
+		Prune:                                 pruneMisbehaviourPenalty,
+		IHave:                                 iHaveMisbehaviourPenalty,
+		IWant:                                 iWantMisbehaviourPenalty,
+		ClusterPrefixedPenaltyReductionFactor: clusterPrefixedPenaltyReductionFactor,
+		RpcPublishMessage:                     rpcPublishMessageMisbehaviourPenalty,
 	}
 }
 
@@ -292,21 +299,30 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 	}
 
 	record, err := r.spamScoreCache.Update(notification.PeerID, func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
+		penalty := 0.0
 		switch notification.MsgType {
 		case p2pmsg.CtrlMsgGraft:
-			record.Penalty += r.penalty.Graft
+			penalty += r.penalty.Graft
 		case p2pmsg.CtrlMsgPrune:
-			record.Penalty += r.penalty.Prune
+			penalty += r.penalty.Prune
 		case p2pmsg.CtrlMsgIHave:
-			record.Penalty += r.penalty.IHave
+			penalty += r.penalty.IHave
 		case p2pmsg.CtrlMsgIWant:
-			record.Penalty += r.penalty.IWant
+			penalty += r.penalty.IWant
 		case p2pmsg.RpcPublishMessage:
-			record.Penalty += r.penalty.RpcPublishMessage
+			penalty += r.penalty.RpcPublishMessage
 		default:
 			// the error is considered fatal as it means that we have an unsupported misbehaviour type, we should crash the node to prevent routing attack vulnerability.
 			lg.Fatal().Str("misbehavior_type", notification.MsgType.String()).Msg("unknown misbehaviour type")
 		}
+
+		// reduce penalty for cluster prefixed topics allowing nodes that are potentially behind to catch up
+		if notification.TopicType == p2p.CtrlMsgTopicTypeClusterPrefixed {
+			penalty *= r.penalty.ClusterPrefixedPenaltyReductionFactor
+		}
+
+		record.Penalty += penalty
+
 		return record
 	})
 	if err != nil {

@@ -3,6 +3,7 @@ package scoring_test
 import (
 	"fmt"
 	"math"
+	"sync"
 	"testing"
 	"time"
 
@@ -508,6 +509,74 @@ func TestSpamRecordDecayAdjustment(t *testing.T) {
 	}, 5*time.Second, 500*time.Millisecond)
 }
 
+// TestPeerSpamPenaltyClusterPrefixed evaluates the application-specific penalty calculation for a node when a spam record is present
+// for cluster-prefixed topics. In the case of an invalid control message notification marked as cluster-prefixed,
+// the application-specific penalty should be reduced by the default reduction factor. This test verifies the accurate computation
+// of the application-specific score under these conditions.
+func TestPeerSpamPenaltyClusterPrefixed(t *testing.T) {
+	ctlMsgTypes := p2pmsg.ControlMessageTypes()
+	peerIds := unittest.PeerIdFixtures(t, len(ctlMsgTypes))
+	opts := make([]scoringRegistryParamsOpt, 0)
+	for _, peerID := range peerIds {
+		opts = append(opts, withStakedIdentity(peerID), withValidSubscriptions(peerID))
+	}
+	reg, spamRecords := newGossipSubAppSpecificScoreRegistry(t, opts...)
+
+	for _, peerID := range peerIds {
+		// initially, the spamRecords should not have the peer id.
+		assert.False(t, spamRecords.Has(peerID))
+		// since the peer id does not have a spam record, the app specific score should be the max app specific reward, which
+		// is the default reward for a staked peer that has valid subscriptions.
+		score := reg.AppSpecificScoreFunc()(peerID)
+		assert.Equal(t, scoring.MaxAppSpecificReward, score)
+	}
+
+	// Report consecutive misbehavior's for the specified peer ID. Two misbehavior's are reported concurrently:
+	// 1. With IsClusterPrefixed set to false, ensuring the penalty applied to the application-specific score is not reduced.
+	// 2. With IsClusterPrefixed set to true, reducing the penalty added to the overall app-specific score by the default reduction factor.
+	for i, ctlMsgType := range ctlMsgTypes {
+		peerID := peerIds[i]
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
+				PeerID:    peerID,
+				MsgType:   ctlMsgType,
+				TopicType: p2p.CtrlMsgNonClusterTopicType,
+			})
+		}()
+		go func() {
+			defer wg.Done()
+			reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
+				PeerID:    peerID,
+				MsgType:   ctlMsgType,
+				TopicType: p2p.CtrlMsgTopicTypeClusterPrefixed,
+			})
+		}()
+		unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "timed out waiting for goroutines to finish")
+
+		// expected penalty should be penaltyValueFixtures().Graft * (1  + clusterReductionFactor)
+		expectedPenalty := penaltyValueFixture(ctlMsgType) * (1 + penaltyValueFixtures().ClusterPrefixedPenaltyReductionFactor)
+
+		// the penalty should now be updated in the spamRecords
+		record, err, ok := spamRecords.Get(peerID) // get the record from the spamRecords.
+		assert.True(t, ok)
+		assert.NoError(t, err)
+		assert.Less(t, math.Abs(expectedPenalty-record.Penalty), 10e-3)
+		assert.Equal(t, scoring.InitAppScoreRecordState().Decay, record.Decay)
+		// this peer has a spam record, with no subscription penalty. Hence, the app specific score should only be the spam penalty,
+		// and the peer should be deprived of the default reward for its valid staked role.
+		score := reg.AppSpecificScoreFunc()(peerID)
+		tolerance := 10e-3 // 0.1%
+		if expectedPenalty == 0 {
+			assert.Less(t, math.Abs(expectedPenalty), tolerance)
+		} else {
+			assert.Less(t, math.Abs(expectedPenalty-score)/expectedPenalty, tolerance)
+		}
+	}
+}
+
 // withStakedIdentity returns a function that sets the identity provider to return an staked identity for the given peer id.
 // It is used for testing purposes, and causes the given peer id to benefit from the staked identity reward in GossipSub.
 func withStakedIdentity(peerId peer.ID) func(cfg *scoring.GossipSubAppSpecificScoreRegistryConfig) {
@@ -585,10 +654,30 @@ func newScoringRegistry(t *testing.T, config p2pconf.GossipSubScoringRegistryCon
 // that the tests are not passing because of the default values.
 func penaltyValueFixtures() scoring.GossipSubCtrlMsgPenaltyValue {
 	return scoring.GossipSubCtrlMsgPenaltyValue{
-		Graft:             -100,
-		Prune:             -50,
-		IHave:             -20,
-		IWant:             -10,
-		RpcPublishMessage: -10,
+		Graft:                                 -100,
+		Prune:                                 -50,
+		IHave:                                 -20,
+		IWant:                                 -10,
+		ClusterPrefixedPenaltyReductionFactor: .5,
+		RpcPublishMessage:                     -10,
+	}
+}
+
+// penaltyValueFixture returns the set penalty of the provided control message type returned from the fixture func penaltyValueFixtures.
+func penaltyValueFixture(msgType p2pmsg.ControlMessageType) float64 {
+	penaltyValues := penaltyValueFixtures()
+	switch msgType {
+	case p2pmsg.CtrlMsgGraft:
+		return penaltyValues.Graft
+	case p2pmsg.CtrlMsgPrune:
+		return penaltyValues.Prune
+	case p2pmsg.CtrlMsgIHave:
+		return penaltyValues.IHave
+	case p2pmsg.CtrlMsgIWant:
+		return penaltyValues.IWant
+	case p2pmsg.RpcPublishMessage:
+		return penaltyValues.RpcPublishMessage
+	default:
+		return penaltyValues.ClusterPrefixedPenaltyReductionFactor
 	}
 }
