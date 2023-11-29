@@ -126,7 +126,7 @@ func (t *GossipSubMeshTracer) GetMeshPeers(topic string) []peer.ID {
 	return peers
 }
 
-// Graft is called when a peer is added to a topic mesh. The tracer uses this to track the mesh peers.
+// Graft is called by GossipSub when a peer is added to a topic mesh. The tracer uses this to track the mesh peers.
 func (t *GossipSubMeshTracer) Graft(p peer.ID, topic string) {
 	t.metrics.OnPeerGraftTopic(topic)
 	t.topicMeshMu.Lock()
@@ -154,7 +154,7 @@ func (t *GossipSubMeshTracer) Graft(p peer.ID, topic string) {
 	lg.Debug().Hex("flow_id", logging.ID(id.NodeID)).Str("role", id.Role.String()).Msg("grafted peer")
 }
 
-// Prune is called when a peer is removed from a topic mesh. The tracer uses this to track the mesh peers.
+// Prune is called by GossipSub when a peer is removed from a topic mesh. The tracer uses this to track the mesh peers.
 func (t *GossipSubMeshTracer) Prune(p peer.ID, topic string) {
 	t.metrics.OnPeerPruneTopic(topic)
 	t.topicMeshMu.Lock()
@@ -213,6 +213,8 @@ func (t *GossipSubMeshTracer) SendRPC(rpc *pubsub.RPC, p peer.ID) {
 	t.metrics.OnRpcSent(msgCount, ihaveCount, iwantCount, graftCount, pruneCount)
 }
 
+// AddPeer is called by GossipSub as a callback when a peer is added to the local node on a protocol, i.e., the local node is connected to the peer on a protocol.
+// The peer may or may not be subscribed to any topic.
 func (t *GossipSubMeshTracer) AddPeer(p peer.ID, proto protocol.ID) {
 	t.logger.Trace().
 		Str("local_peer_id", p2plogging.PeerId(p)).
@@ -221,6 +223,8 @@ func (t *GossipSubMeshTracer) AddPeer(p peer.ID, proto protocol.ID) {
 	t.metrics.OnPeerAddedToProtocol(string(proto))
 }
 
+// RemovePeer is called by GossipSub as a callback when a peer is removed from the local node,
+// i.e., the local node is no longer connected to the peer.
 func (t *GossipSubMeshTracer) RemovePeer(p peer.ID) {
 	t.logger.Trace().
 		Str("local_peer_id", p2plogging.PeerId(p)).
@@ -228,20 +232,24 @@ func (t *GossipSubMeshTracer) RemovePeer(p peer.ID) {
 	t.metrics.OnPeerRemovedFromProtocol()
 }
 
+// Join is called by GossipSub as a callback when the local node joins a topic.
 func (t *GossipSubMeshTracer) Join(topic string) {
 	t.logger.Trace().
 		Str("topic", topic).
 		Msg("local peer joined topic")
-	t.metrics.OnLocalPeerJoinedTopic(topic)
+	t.metrics.OnLocalPeerJoinedTopic()
 }
 
+// Leave is called by GossipSub as a callback when the local node leaves a topic.
 func (t *GossipSubMeshTracer) Leave(topic string) {
 	t.logger.Trace().
 		Str("topic", topic).
 		Msg("local peer left topic")
-	t.metrics.OnLocalPeerLeftTopic(topic)
+	t.metrics.OnLocalPeerLeftTopic()
 }
 
+// ValidateMessage is called by GossipSub as a callback when a message is received by the local node and entered the validation phase.
+// As the result of the validation, the message may be rejected or passed to the application (i.e., Flow protocol).
 func (t *GossipSubMeshTracer) ValidateMessage(msg *pubsub.Message) {
 	lg := t.logger.With().Logger()
 
@@ -252,13 +260,15 @@ func (t *GossipSubMeshTracer) ValidateMessage(msg *pubsub.Message) {
 	if err == nil {
 		lg = lg.With().Str("remote_peer_id", p2plogging.PeerId(from)).Logger()
 	}
+	size := len(msg.Data)
 	lg.Trace().
 		Str("received_from", p2plogging.PeerId(msg.ReceivedFrom)).
-		Int("message_size", len(msg.Data)).
-		Msg("received pubsub message")
-	t.metrics.OnMessageEnteredValidation()
+		Int("message_size", size).
+		Msg("received pubsub message entered validation phase")
+	t.metrics.OnMessageEnteredValidation(size)
 }
 
+// DeliverMessage is called by GossipSub as a callback when the local node delivers a message to all subscribers of the topic.
 func (t *GossipSubMeshTracer) DeliverMessage(msg *pubsub.Message) {
 	lg := t.logger.With().Logger()
 
@@ -269,13 +279,19 @@ func (t *GossipSubMeshTracer) DeliverMessage(msg *pubsub.Message) {
 	if err == nil {
 		lg = lg.With().Str("remote_peer_id", p2plogging.PeerId(from)).Logger()
 	}
+	size := len(msg.Data)
 	lg.Trace().
 		Str("received_from", p2plogging.PeerId(msg.ReceivedFrom)).
 		Int("message_size", len(msg.Data)).
-		Msg("delivered pubsub message")
+		Msg("delivered pubsub message to all subscribers")
+	t.metrics.OnMessageDeliveredToAllSubscribers(size)
 }
 
 // RejectMessage is called by GossipSub as a callback when a message is rejected by the local node.
+// The message may be rejected for a variety of reasons, but the most common reason is that the message is invalid with respect to signature.
+// Any message that arrives at the local node should contain the peer id of the source (i.e., the peer that created the message), the
+// networking public key of the source, and the signature of the message. The local node uses this information to verify the message.
+// If any of the information is missing or invalid, the message is rejected.
 func (t *GossipSubMeshTracer) RejectMessage(msg *pubsub.Message, reason string) {
 	lg := t.logger.With().Logger()
 
@@ -320,7 +336,7 @@ func (t *GossipSubMeshTracer) ThrottlePeer(p peer.ID) {
 	t.logger.Warn().
 		Bool(logging.KeyNetworkingSecurity, true).
 		Str("remote_peer_id", p2plogging.PeerId(p)).
-		Msg("throttled peer")
+		Msg("throttled peer; no longer accepting pubsub messages from peer, but may still accept control messages")
 	t.metrics.OnPeerThrottled()
 }
 
@@ -369,9 +385,9 @@ func (t *GossipSubMeshTracer) DropRPC(rpc *pubsub.RPC, p peer.ID) {
 		Int("iwant_size", iwantCount).
 		Int("graft_size", graftCount).
 		Int("prune_size", pruneCount).
-		Msg("received pubsub rpc")
+		Msg("outbound rpc dropped")
 
-	t.metrics.OnRpcDropped(msgCount, ihaveCount, iwantCount, graftCount, pruneCount)
+	t.metrics.OnOutboundRpcDropped()
 }
 
 // UndeliverableMessage is called by GossipSub as a callback when a message is dropped by the local node, typically because the local node
