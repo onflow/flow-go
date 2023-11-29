@@ -243,7 +243,7 @@ func TestDefaultDecayFunction(t *testing.T) {
 			},
 		},
 		{
-			// 6. penalty is negative and below slowerDecayPenaltyThreshold record decay should be adjusted.
+			// 6. penalty is negative and below slowerDecayPenaltyThreshold record decay should be adjusted. The `LastDecayAdjustment` has not been updated since initialization.
 			name: "penalty is negative and below slowerDecayPenaltyThreshold record decay should be adjusted",
 			args: args{
 				record: p2p.GossipSubSpamRecord{
