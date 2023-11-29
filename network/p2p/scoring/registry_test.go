@@ -1,17 +1,22 @@
 package scoring_test
 
 import (
+	"context"
 	"fmt"
 	"math"
+	"os"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/atomic"
 
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/p2p"
@@ -19,6 +24,7 @@ import (
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
 	"github.com/onflow/flow-go/network/p2p/scoring"
+	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -31,6 +37,10 @@ func TestNoPenaltyRecord(t *testing.T) {
 		t,
 		withStakedIdentity(peerID),
 		withValidSubscriptions(peerID))
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+	reg.Start(signalerCtx)
+	defer stopRegistry(t, cancel, reg)
 
 	// initially, the spamRecords should not have the peer id.
 	assert.False(t, spamRecords.Has(peerID))
@@ -72,6 +82,10 @@ func testPeerWithSpamRecord(t *testing.T, messageType p2pmsg.ControlMessageType,
 		t,
 		withStakedIdentity(peerID),
 		withValidSubscriptions(peerID))
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+	reg.Start(signalerCtx)
+	defer stopRegistry(t, cancel, reg)
 
 	// initially, the spamRecords should not have the peer id.
 	assert.False(t, spamRecords.Has(peerID))
@@ -126,6 +140,10 @@ func testSpamRecordWithUnknownIdentity(t *testing.T, messageType p2pmsg.ControlM
 		t,
 		withUnknownIdentity(peerID),
 		withValidSubscriptions(peerID))
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+	reg.Start(signalerCtx)
+	defer stopRegistry(t, cancel, reg)
 
 	// initially, the spamRecords should not have the peer id.
 	assert.False(t, spamRecords.Has(peerID))
@@ -179,6 +197,10 @@ func testSpamRecordWithSubscriptionPenalty(t *testing.T, messageType p2pmsg.Cont
 		t,
 		withStakedIdentity(peerID),
 		withInvalidSubscriptions(peerID))
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+	reg.Start(signalerCtx)
+	defer stopRegistry(t, cancel, reg)
 
 	// initially, the spamRecords should not have the peer id.
 	assert.False(t, spamRecords.Has(peerID))
@@ -212,6 +234,10 @@ func TestSpamPenaltyDecaysInCache(t *testing.T) {
 	reg, _ := newGossipSubAppSpecificScoreRegistry(t,
 		withStakedIdentity(peerID),
 		withValidSubscriptions(peerID))
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+	reg.Start(signalerCtx)
+	defer stopRegistry(t, cancel, reg)
 
 	// report a misbehavior for the peer id.
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
@@ -282,6 +308,10 @@ func TestSpamPenaltyDecayToZero(t *testing.T) {
 				Penalty: 0,
 			}
 		}))
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+	reg.Start(signalerCtx)
+	defer stopRegistry(t, cancel, reg)
 
 	// report a misbehavior for the peer id.
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
@@ -328,6 +358,10 @@ func TestPersistingUnknownIdentityPenalty(t *testing.T) {
 				Penalty: 0,
 			}
 		}))
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+	reg.Start(signalerCtx)
+	defer stopRegistry(t, cancel, reg)
 
 	// initially, the app specific score should be the default unknown identity penalty.
 	require.Equal(t, scoring.DefaultUnknownIdentityPenalty, reg.AppSpecificScoreFunc()(peerID))
@@ -386,8 +420,13 @@ func TestPersistingInvalidSubscriptionPenalty(t *testing.T) {
 			}
 		}))
 
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+	reg.Start(signalerCtx)
+	defer stopRegistry(t, cancel, reg)
+
 	// initially, the app specific score should be the default invalid subscription penalty.
-	require.Equal(t, scoring.DefaultUnknownIdentityPenalty, reg.AppSpecificScoreFunc()(peerID))
+	require.Equal(t, scoring.DefaultInvalidSubscriptionPenalty, reg.AppSpecificScoreFunc()(peerID))
 
 	// report a misbehavior for the peer id.
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
@@ -413,7 +452,7 @@ func TestPersistingInvalidSubscriptionPenalty(t *testing.T) {
 
 	require.Eventually(t, func() bool {
 		// when the spam penalty is decayed to zero, the app specific penalty of the node should only contain the default invalid subscription penalty.
-		return reg.AppSpecificScoreFunc()(peerID) == scoring.DefaultUnknownIdentityPenalty
+		return reg.AppSpecificScoreFunc()(peerID) == scoring.DefaultInvalidSubscriptionPenalty
 	}, 5*time.Second, 100*time.Millisecond)
 
 	// the spam penalty should now be zero in spamRecords.
@@ -435,6 +474,10 @@ func TestPeerSpamPenaltyClusterPrefixed(t *testing.T) {
 		opts = append(opts, withStakedIdentity(peerID), withValidSubscriptions(peerID))
 	}
 	reg, spamRecords := newGossipSubAppSpecificScoreRegistry(t, opts...)
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+	reg.Start(signalerCtx)
+	defer stopRegistry(t, cancel, reg)
 
 	for _, peerID := range peerIds {
 		// initially, the spamRecords should not have the peer id.
@@ -491,6 +534,82 @@ func TestPeerSpamPenaltyClusterPrefixed(t *testing.T) {
 	}
 }
 
+// TestScoringRegistrySilencePeriod ensures that the scoring registry does not penalize nodes during the silence period, and
+// starts to penalize nodes only after the silence period is over.
+func TestScoringRegistrySilencePeriod(t *testing.T) {
+	peerID := unittest.PeerIdFixture(t)
+	silenceDuration := 5 * time.Second
+	silencedNotificationLogs := atomic.NewInt32(0)
+	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
+		if level == zerolog.DebugLevel {
+			if message == "ignoring invalid control message notification for peer during silence period" {
+				silencedNotificationLogs.Inc()
+			}
+		}
+	})
+	logger := zerolog.New(os.Stdout).Level(zerolog.DebugLevel).Hook(hook)
+	reg, spamRecords := newGossipSubAppSpecificScoreRegistry(
+		t,
+		withStakedIdentity(peerID),
+		withInvalidSubscriptions(peerID), // the peer id has an invalid subscription.
+		func(config *scoring.GossipSubAppSpecificScoreRegistryConfig) {
+			// we set the scoring registry silence duration 10 seconds
+			// the peer is not expected to be penalized for the first 5 seconds of the test
+			// after that an invalid control message notification is processed and the peer
+			// should be penalized
+			config.ScoringRegistryStartupSilenceDuration = silenceDuration
+			// hooked logger will capture the number of logs related to ignored notifications
+			config.Logger = logger
+		})
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+	defer stopRegistry(t, cancel, reg)
+	// capture approximate registry start time
+	reg.Start(signalerCtx)
+	registryStartTime := time.Now()
+	expectedNumOfSilencedNotif := 0
+	// while we are in the silence period all notifications should be ignored and the
+	// invalid subscription penalty should not be applied to the app specific score
+	// we ensure we stay within the silence duration by iterating only up until 1 second
+	// before silence period is over
+	for time.Since(registryStartTime) < (silenceDuration - time.Second) {
+		// report a misbehavior for the peer id.
+		reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
+			PeerID:  peerID,
+			MsgType: p2pmsg.CtrlMsgGraft,
+		})
+		expectedNumOfSilencedNotif++
+		// spam records should not be created during the silence period
+		_, err, ok := spamRecords.Get(peerID)
+		assert.False(t, ok)
+		assert.NoError(t, err)
+		// initially, the app specific score should be the default invalid subscription penalty.
+		require.Equal(t, float64(0), reg.AppSpecificScoreFunc()(peerID))
+	}
+	// sleep for one second to ensure silence period is over
+	time.Sleep(time.Second)
+	// we expect to have logged a debug message for all notifications ignored.
+	require.Equal(t, int32(expectedNumOfSilencedNotif), silencedNotificationLogs.Load())
+	// after silence period the invalid subscription penalty should be applied to the app specific score
+	require.Equal(t, scoring.DefaultInvalidSubscriptionPenalty, reg.AppSpecificScoreFunc()(peerID))
+
+	// after silence period the peer has spam record as well as an unknown identity. Hence, the app specific score should be the spam penalty
+	// and the staking penalty.
+	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
+		PeerID:  peerID,
+		MsgType: p2pmsg.CtrlMsgGraft,
+	})
+	// the penalty should now be applied and spam records created.
+	record, err, ok := spamRecords.Get(peerID)
+	assert.True(t, ok)
+	assert.NoError(t, err)
+	expectedPenalty := penaltyValueFixtures().Graft
+	assert.Less(t, math.Abs(expectedPenalty-record.Penalty), 10e-3)
+	assert.Equal(t, scoring.InitAppScoreRecordState().Decay, record.Decay) // decay should be initialized to the initial state.
+	score := reg.AppSpecificScoreFunc()(peerID)
+	assert.Less(t, math.Abs(expectedPenalty+scoring.DefaultInvalidSubscriptionPenalty-score), 10e-3)
+}
+
 // withStakedIdentity returns a function that sets the identity provider to return an staked identity for the given peer id.
 // It is used for testing purposes, and causes the given peer id to benefit from the staked identity reward in GossipSub.
 func withStakedIdentity(peerId peer.ID) func(cfg *scoring.GossipSubAppSpecificScoreRegistryConfig) {
@@ -533,16 +652,19 @@ func withInitFunction(initFunction func() p2p.GossipSubSpamRecord) func(cfg *sco
 // for the testing purposes.
 func newGossipSubAppSpecificScoreRegistry(t *testing.T, opts ...func(*scoring.GossipSubAppSpecificScoreRegistryConfig)) (*scoring.GossipSubAppSpecificScoreRegistry, *netcache.GossipSubSpamRecordCache) {
 	cache := netcache.NewGossipSubSpamRecordCache(100, unittest.Logger(), metrics.NewNoopCollector(), scoring.DefaultDecayFunction())
+	subscriptionValidator := mockp2p.NewSubscriptionValidator(t)
 	cfg := &scoring.GossipSubAppSpecificScoreRegistryConfig{
 		Logger:     unittest.Logger(),
 		Init:       scoring.InitAppScoreRecordState,
 		Penalty:    penaltyValueFixtures(),
 		IdProvider: mock.NewIdentityProvider(t),
-		Validator:  mockp2p.NewSubscriptionValidator(t),
+		Validator:  subscriptionValidator,
 		CacheFactory: func() p2p.GossipSubSpamRecordCache {
 			return cache
 		},
+		ScoringRegistryStartupSilenceDuration: 0, // turn off silence period by default
 	}
+	p2ptest.MockScoringRegistrySubscriptionValidatorReadyDoneAware(subscriptionValidator)
 	for _, opt := range opts {
 		opt(cfg)
 	}
@@ -580,4 +702,9 @@ func penaltyValueFixture(msgType p2pmsg.ControlMessageType) float64 {
 	default:
 		return penaltyValues.ClusterPrefixedPenaltyReductionFactor
 	}
+}
+
+func stopRegistry(t *testing.T, cancel context.CancelFunc, registry *scoring.GossipSubAppSpecificScoreRegistry) {
+	cancel()
+	unittest.RequireCloseBefore(t, registry.Done(), 500*time.Millisecond, "registry did not stop")
 }

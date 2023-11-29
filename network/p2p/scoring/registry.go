@@ -356,8 +356,9 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 		Msg("applied misbehaviour penalty and updated application specific penalty")
 }
 
+// afterSilencePeriod returns true if registry silence period is over, false otherwise.
 func (r *GossipSubAppSpecificScoreRegistry) afterSilencePeriod() bool {
-	return time.Since(r.silencePeriodStartTime) < r.silencePeriodDuration
+	return time.Since(r.silencePeriodStartTime) > r.silencePeriodDuration
 }
 
 // DefaultDecayFunction is the default decay function that is used to decay the application specific penalty of a peer.
