@@ -94,7 +94,7 @@ const (
 	alspSyncEngineRangeRequestBaseProb = "alsp-sync-engine-range-request-base-prob"
 	alspSyncEngineSyncRequestProb      = "alsp-sync-engine-sync-request-prob"
 
-	scoringRegistryStartupSilencePeriod = "gossipsub-scoring-registry-startup-silence-period"
+	scoringRegistryStartupSilenceDuration = "gossipsub-scoring-registry-startup-silence-duration"
 )
 
 func AllFlagNames() []string {
@@ -152,7 +152,7 @@ func AllFlagNames() []string {
 		iwantCacheMissCheckSize,
 		rpcMessageMaxSampleSize,
 		rpcMessageErrorThreshold,
-		scoringRegistryStartupSilencePeriod,
+		scoringRegistryStartupSilenceDuration,
 	}
 
 	for _, scope := range []string{systemScope, transientScope, protocolScope, peerScope, peerProtocolScope} {
@@ -312,8 +312,8 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 		config.GossipSubConfig.SubscriptionProviderConfig.CacheSize,
 		"size of the cache that keeps the list of topics each peer has subscribed to, recommended size is 10x the number of authorized nodes")
 	flags.Duration(
-		scoringRegistryStartupSilencePeriod,
-		config.GossipSubConfig.ScoringRegistryStartupSilencePeriod,
+		scoringRegistryStartupSilenceDuration,
+		config.GossipSubConfig.ScoringRegistryStartupSilenceDuration,
 		"the duration of time, after the node startup, during which the scoring registry remains inactive before penalizing nodes.")
 }
 

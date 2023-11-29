@@ -197,7 +197,7 @@ network-config:
   # returned for all nodes will be 0, and any invalid control message notifications
   # will be ignored. This configuration allows nodes to stabilize and initialize before
   # applying penalties or processing invalid control message notifications.
-  gossipsub-scoring-registry-startup-silence-period: 20m
+  gossipsub-scoring-registry-startup-silence-duration: 20m
   # Application layer spam prevention
   alsp-spam-record-cache-size: 1000
   alsp-spam-report-queue-size: 10_000

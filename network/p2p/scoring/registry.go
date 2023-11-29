@@ -98,6 +98,10 @@ type GossipSubAppSpecificScoreRegistry struct {
 	// initial application specific penalty record, used to initialize the penalty cache entry.
 	init      func() p2p.GossipSubSpamRecord
 	validator p2p.SubscriptionValidator
+	// silencePeriodDuration duration that the startup silence period will last, during which nodes will not be penalized
+	silencePeriodDuration time.Duration
+	// silencePeriodStartTime time that the silence period begins, this is the time that the registry is started by the node.
+	silencePeriodStartTime time.Time
 }
 
 // GossipSubAppSpecificScoreRegistryConfig is the configuration for the GossipSubAppSpecificScoreRegistry.
@@ -123,6 +127,10 @@ type GossipSubAppSpecificScoreRegistryConfig struct {
 	// CacheFactory is a factory function that returns a new GossipSubSpamRecordCache. It is used to initialize the spamScoreCache.
 	// The cache is used to store the application specific penalty of peers.
 	CacheFactory func() p2p.GossipSubSpamRecordCache
+
+	// ScoringRegistryStartupSilenceDuration defines the duration of time, after the node startup,
+	// during which the scoring registry remains inactive before penalizing nodes.
+	ScoringRegistryStartupSilenceDuration time.Duration
 }
 
 // NewGossipSubAppSpecificScoreRegistry returns a new GossipSubAppSpecificScoreRegistry.
@@ -135,12 +143,13 @@ type GossipSubAppSpecificScoreRegistryConfig struct {
 //	a new GossipSubAppSpecificScoreRegistry.
 func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegistryConfig) *GossipSubAppSpecificScoreRegistry {
 	reg := &GossipSubAppSpecificScoreRegistry{
-		logger:         config.Logger.With().Str("module", "app_score_registry").Logger(),
-		spamScoreCache: config.CacheFactory(),
-		penalty:        config.Penalty,
-		init:           config.Init,
-		validator:      config.Validator,
-		idProvider:     config.IdProvider,
+		logger:                config.Logger.With().Str("module", "app_score_registry").Logger(),
+		spamScoreCache:        config.CacheFactory(),
+		penalty:               config.Penalty,
+		init:                  config.Init,
+		validator:             config.Validator,
+		idProvider:            config.IdProvider,
+		silencePeriodDuration: config.ScoringRegistryStartupSilenceDuration,
 	}
 
 	builder := component.NewComponentManagerBuilder()
@@ -168,24 +177,40 @@ func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegis
 
 var _ p2p.GossipSubInvCtrlMsgNotifConsumer = (*GossipSubAppSpecificScoreRegistry)(nil)
 
+// Start sets the silencePeriodStartTime before starting registry components.
+func (r *GossipSubAppSpecificScoreRegistry) Start(parent irrecoverable.SignalerContext) {
+	if !r.silencePeriodStartTime.IsZero() {
+		parent.Throw(fmt.Errorf("gossipsub scoring registry started more than once"))
+	}
+	r.silencePeriodStartTime = time.Now()
+	r.Component.Start(parent)
+}
+
 // AppSpecificScoreFunc returns the application specific penalty function that is called by the GossipSub protocol to determine the application specific penalty of a peer.
 func (r *GossipSubAppSpecificScoreRegistry) AppSpecificScoreFunc() func(peer.ID) float64 {
 	return func(pid peer.ID) float64 {
-		appSpecificScore := float64(0)
+		appSpecificScorePenalty := float64(0)
 
 		lg := r.logger.With().Str("peer_id", p2plogging.PeerId(pid)).Logger()
+
+		// during startup silence period avoid penalizing nodes
+		if !r.afterSilencePeriod() {
+			lg.Debug().Msg("returning 0 app specific score penalty for node during silence period")
+			return appSpecificScorePenalty
+		}
+
 		// (1) spam penalty: the penalty is applied to the application specific penalty when a peer conducts a spamming misbehaviour.
 		spamRecord, err, spamRecordExists := r.spamScoreCache.Get(pid)
 		if err != nil {
 			// the error is considered fatal as it means the cache is not working properly.
 			// we should not continue with the execution as it may lead to routing attack vulnerability.
 			r.logger.Fatal().Str("peer_id", p2plogging.PeerId(pid)).Err(err).Msg("could not get application specific penalty for peer")
-			return appSpecificScore // unreachable, but added to avoid proceeding with the execution if log level is changed.
+			return appSpecificScorePenalty // unreachable, but added to avoid proceeding with the execution if log level is changed.
 		}
 
 		if spamRecordExists {
 			lg = lg.With().Float64("spam_penalty", spamRecord.Penalty).Logger()
-			appSpecificScore += spamRecord.Penalty
+			appSpecificScorePenalty += spamRecord.Penalty
 		}
 
 		// (2) staking score: for staked peers, a default positive reward is applied only if the peer has no penalty on spamming and subscription.
@@ -194,7 +219,7 @@ func (r *GossipSubAppSpecificScoreRegistry) AppSpecificScoreFunc() func(peer.ID)
 		if stakingScore < 0 {
 			lg = lg.With().Float64("staking_penalty", stakingScore).Logger()
 			// staking penalty is applied right away.
-			appSpecificScore += stakingScore
+			appSpecificScorePenalty += stakingScore
 		}
 
 		if stakingScore >= 0 {
@@ -205,21 +230,21 @@ func (r *GossipSubAppSpecificScoreRegistry) AppSpecificScoreFunc() func(peer.ID)
 			subscriptionPenalty := r.subscriptionPenalty(pid, flowId, role)
 			lg = lg.With().Float64("subscription_penalty", subscriptionPenalty).Logger()
 			if subscriptionPenalty < 0 {
-				appSpecificScore += subscriptionPenalty
+				appSpecificScorePenalty += subscriptionPenalty
 			}
 		}
 
 		// (4) staking reward: for staked peers, a default positive reward is applied only if the peer has no penalty on spamming and subscription.
-		if stakingScore > 0 && appSpecificScore == float64(0) {
+		if stakingScore > 0 && appSpecificScorePenalty == float64(0) {
 			lg = lg.With().Float64("staking_reward", stakingScore).Logger()
-			appSpecificScore += stakingScore
+			appSpecificScorePenalty += stakingScore
 		}
 
 		lg.Trace().
-			Float64("total_app_specific_score", appSpecificScore).
+			Float64("total_app_specific_score", appSpecificScorePenalty).
 			Msg("application specific penalty computed")
 
-		return appSpecificScore
+		return appSpecificScorePenalty
 	}
 }
 
@@ -280,6 +305,12 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 		Str("peer_id", p2plogging.PeerId(notification.PeerID)).
 		Str("misbehavior_type", notification.MsgType.String()).Logger()
 
+	// during startup silence period avoid penalizing nodes, ignore all notifications
+	if !r.afterSilencePeriod() {
+		lg.Debug().Msg("ignoring invalid control message notification for peer during silence period")
+		return
+	}
+
 	// try initializing the application specific penalty for the peer if it is not yet initialized.
 	// this is done to avoid the case where the peer is not yet cached and the application specific penalty is not yet initialized.
 	// initialization is successful only if the peer is not yet cached.
@@ -323,6 +354,10 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 	lg.Debug().
 		Float64("app_specific_score", record.Penalty).
 		Msg("applied misbehaviour penalty and updated application specific penalty")
+}
+
+func (r *GossipSubAppSpecificScoreRegistry) afterSilencePeriod() bool {
+	return time.Since(r.silencePeriodStartTime) < r.silencePeriodDuration
 }
 
 // DefaultDecayFunction is the default decay function that is used to decay the application specific penalty of a peer.
