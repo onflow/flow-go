@@ -13,13 +13,13 @@ import (
 // GossipSubControlMessageMetrics is a metrics and observability wrapper component for the incoming RPCs to a
 // GossipSub router. It records metrics on the number of control messages received in each RPC.
 type GossipSubControlMessageMetrics struct {
-	metrics module.GossipSubRouterMetrics
+	metrics module.GossipSubRpcInspectorMetrics
 	logger  zerolog.Logger
 }
 
 var _ p2p.GossipSubControlMetricsObserver = (*GossipSubControlMessageMetrics)(nil)
 
-func NewGossipSubControlMessageMetrics(metrics module.GossipSubRouterMetrics, logger zerolog.Logger) *GossipSubControlMessageMetrics {
+func NewGossipSubControlMessageMetrics(metrics module.GossipSubRpcInspectorMetrics, logger zerolog.Logger) *GossipSubControlMessageMetrics {
 	return &GossipSubControlMessageMetrics{
 		logger:  logger.With().Str("module", "gossipsub-control-message-metrics").Logger(),
 		metrics: metrics,
