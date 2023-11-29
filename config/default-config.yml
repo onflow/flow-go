@@ -195,7 +195,7 @@ network-config:
   #  This mechanism ensures that malicious nodes experience longer decay periods, while honest nodes benefit from quicker decay.
   gossipsub-app-specific-penalty-decay-slowdown-threshold: -99
   #  Defines the value by which the decay rate is decreased every time the penalty is below the gossipsub-scoring-registry-slower-decay-threshold. A reduced decay rate extends the time it takes for penalties to diminish.
-  gossipsub-scoring-registry-decay-rate-decrement: .01
+  gossipsub-app-specific-penalty-decay-rate-reduction-factor: .01
   # Defines the interval at which the decay for a spam record is okay to be adjusted.
   gossipsub-scoring-registry-decay-adjust-interval: 10m
   # Application layer spam prevention
