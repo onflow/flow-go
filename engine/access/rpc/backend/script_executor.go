@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"fmt"
 	"math"
 
 	"go.uber.org/atomic"
@@ -21,31 +22,31 @@ type ScriptExecutor struct {
 	// initialized is used to signal that the index and executor are ready
 	initialized *atomic.Bool
 
-	// minHeight and maxHeight are used to limit the block range that can be queried using local execution
+	// minCompatibleHeight and maxCompatibleHeight are used to limit the block range that can be queried using local execution
 	// to ensure only blocks that are compatible with the node's current software version are allowed.
 	// Note: this is a temporary solution for cadence/fvm upgrades while version beacon support is added
-	minHeight *atomic.Uint64
-	maxHeight *atomic.Uint64
+	minCompatibleHeight *atomic.Uint64
+	maxCompatibleHeight *atomic.Uint64
 }
 
 func NewScriptExecutor() *ScriptExecutor {
 	return &ScriptExecutor{
-		initialized: atomic.NewBool(false),
-		minHeight:   atomic.NewUint64(0),
-		maxHeight:   atomic.NewUint64(math.MaxUint64),
+		initialized:         atomic.NewBool(false),
+		minCompatibleHeight: atomic.NewUint64(0),
+		maxCompatibleHeight: atomic.NewUint64(math.MaxUint64),
 	}
 }
 
-// SetMinExecutableHeight sets the lowest block height (inclusive) that can be queried using local execution
+// SetMinCompatibleHeight sets the lowest block height (inclusive) that can be queried using local execution
 // Use this to limit the executable block range supported by the node's current software version.
-func (s *ScriptExecutor) SetMinExecutableHeight(height uint64) {
-	s.minHeight.Store(height)
+func (s *ScriptExecutor) SetMinCompatibleHeight(height uint64) {
+	s.minCompatibleHeight.Store(height)
 }
 
-// SetMaxExecutableHeight sets the highest block height (inclusive) that can be queried using local execution
+// SetMaxCompatibleHeight sets the highest block height (inclusive) that can be queried using local execution
 // Use this to limit the executable block range supported by the node's current software version.
-func (s *ScriptExecutor) SetMaxExecutableHeight(height uint64) {
-	s.maxHeight.Store(height)
+func (s *ScriptExecutor) SetMaxCompatibleHeight(height uint64) {
+	s.maxCompatibleHeight.Store(height)
 }
 
 // InitReporter initializes the indexReporter and script executor
@@ -65,8 +66,8 @@ func (s *ScriptExecutor) InitReporter(indexReporter state_synchronization.IndexR
 //   - execution.ErrDataNotAvailable if the data for the block height is not available. this could be because
 //     the height is not within the index block range, or the index is not ready.
 func (s *ScriptExecutor) ExecuteAtBlockHeight(ctx context.Context, script []byte, arguments [][]byte, height uint64) ([]byte, error) {
-	if !s.isDataAvailable(height) {
-		return nil, execution.ErrDataNotAvailable
+	if err := s.checkDataAvailable(height); err != nil {
+		return nil, err
 	}
 
 	return s.scriptExecutor.ExecuteAtBlockHeight(ctx, script, arguments, height)
@@ -79,17 +80,29 @@ func (s *ScriptExecutor) ExecuteAtBlockHeight(ctx context.Context, script []byte
 //   - execution.ErrDataNotAvailable if the data for the block height is not available. this could be because
 //     the height is not within the index block range, or the index is not ready.
 func (s *ScriptExecutor) GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error) {
-	if !s.isDataAvailable(height) {
-		return nil, execution.ErrDataNotAvailable
+	if err := s.checkDataAvailable(height); err != nil {
+		return nil, err
 	}
 
 	return s.scriptExecutor.GetAccountAtBlockHeight(ctx, address, height)
 }
 
-func (s *ScriptExecutor) isDataAvailable(height uint64) bool {
-	return s.initialized.Load() &&
-		height <= s.indexReporter.HighestIndexedHeight() &&
-		height >= s.indexReporter.LowestIndexedHeight() &&
-		height <= s.maxHeight.Load() &&
-		height >= s.minHeight.Load()
+func (s *ScriptExecutor) checkDataAvailable(height uint64) error {
+	if !s.initialized.Load() {
+		return fmt.Errorf("%w: script executor not initialized", execution.ErrDataNotAvailable)
+	}
+
+	if height > s.indexReporter.HighestIndexedHeight() {
+		return fmt.Errorf("%w: block not indexed yet", execution.ErrDataNotAvailable)
+	}
+
+	if height < s.indexReporter.LowestIndexedHeight() {
+		return fmt.Errorf("%w: block is before lowest indexed height", execution.ErrDataNotAvailable)
+	}
+
+	if height > s.maxCompatibleHeight.Load() || height < s.minCompatibleHeight.Load() {
+		return fmt.Errorf("%w: node software is not compatible with version required to executed block", execution.ErrDataNotAvailable)
+	}
+
+	return nil
 }
