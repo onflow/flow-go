@@ -137,9 +137,10 @@ func (h *ContractHandler) meterGasUsage(res *types.Result) {
 
 func (h *ContractHandler) emitEvent(event *types.Event) {
 	// TODO add extra metering for rlp encoding
-	encoded, err := event.Payload.Encode()
+	ev, err := event.Payload.CadenceEvent()
 	handleError(err)
-	err = h.backend.EmitRawEvent(event.Etype, encoded)
+
+	err = h.backend.EmitEvent(ev)
 	handleError(err)
 }
 
