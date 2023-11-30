@@ -1052,10 +1052,15 @@ func (b *backendTransactions) lookupTransactionErrorMessage(
 	blockID flow.Identifier,
 	transactionID flow.Identifier,
 ) (string, error) {
-	cacheKey := flow.MakeIDFromFingerPrint(append(blockID[:], transactionID[:]...))
-	value, cached := b.txErrorMessagesCache.Get(cacheKey)
-	if cached {
-		return value, nil
+	var cacheKey flow.Identifier
+	var value string
+
+	if b.txErrorMessagesCache != nil {
+		cacheKey = flow.MakeIDFromFingerPrint(append(blockID[:], transactionID[:]...))
+		value, cached := b.txErrorMessagesCache.Get(cacheKey)
+		if cached {
+			return value, nil
+		}
 	}
 
 	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
@@ -1075,7 +1080,11 @@ func (b *backendTransactions) lookupTransactionErrorMessage(
 		return "", fmt.Errorf("could not fetch error message from ENs: %w", err)
 	}
 	value = resp.ErrorMessage
-	b.txErrorMessagesCache.Add(cacheKey, value)
+
+	if b.txErrorMessagesCache != nil {
+		b.txErrorMessagesCache.Add(cacheKey, value)
+	}
+
 	return value, nil
 }
 
@@ -1096,10 +1105,15 @@ func (b *backendTransactions) lookupTransactionErrorMessageByIndex(
 		return "", rpc.ConvertStorageError(err)
 	}
 
-	cacheKey := flow.MakeIDFromFingerPrint(append(blockID[:], txResult.TransactionID[:]...))
-	value, cached := b.txErrorMessagesCache.Get(cacheKey)
-	if cached {
-		return value, nil
+	var cacheKey flow.Identifier
+	var value string
+
+	if b.txErrorMessagesCache != nil {
+		cacheKey = flow.MakeIDFromFingerPrint(append(blockID[:], txResult.TransactionID[:]...))
+		value, cached := b.txErrorMessagesCache.Get(cacheKey)
+		if cached {
+			return value, nil
+		}
 	}
 
 	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
@@ -1119,7 +1133,11 @@ func (b *backendTransactions) lookupTransactionErrorMessageByIndex(
 		return "", fmt.Errorf("could not fetch error message from ENs: %w", err)
 	}
 	value = resp.ErrorMessage
-	b.txErrorMessagesCache.Add(cacheKey, value)
+
+	if b.txErrorMessagesCache != nil {
+		b.txErrorMessagesCache.Add(cacheKey, value)
+	}
+
 	return value, nil
 }
 
@@ -1139,14 +1157,19 @@ func (b *backendTransactions) lookupTransactionErrorMessagesByBlockID(
 	}
 
 	results := make(map[flow.Identifier]string)
-	needToFetch := false
-	for _, txResult := range txResults {
-		if txResult.Failed {
-			cacheKey := flow.MakeIDFromFingerPrint(append(blockID[:], txResult.TransactionID[:]...))
-			if value, ok := b.txErrorMessagesCache.Get(cacheKey); ok {
-				results[txResult.TransactionID] = value
-			} else {
-				needToFetch = true
+
+	needToFetch := true
+
+	if b.txErrorMessagesCache != nil {
+		needToFetch = false
+		for _, txResult := range txResults {
+			if txResult.Failed {
+				cacheKey := flow.MakeIDFromFingerPrint(append(blockID[:], txResult.TransactionID[:]...))
+				if value, ok := b.txErrorMessagesCache.Get(cacheKey); ok {
+					results[txResult.TransactionID] = value
+				} else {
+					needToFetch = true
+				}
 			}
 		}
 	}
@@ -1173,8 +1196,10 @@ func (b *backendTransactions) lookupTransactionErrorMessagesByBlockID(
 	}
 	result := make(map[flow.Identifier]string, len(resp))
 	for _, value := range resp {
-		cacheKey := flow.MakeIDFromFingerPrint(append(req.BlockId, value.TransactionId...))
-		b.txErrorMessagesCache.Add(cacheKey, value.ErrorMessage)
+		if b.txErrorMessagesCache != nil {
+			cacheKey := flow.MakeIDFromFingerPrint(append(req.BlockId, value.TransactionId...))
+			b.txErrorMessagesCache.Add(cacheKey, value.ErrorMessage)
+		}
 		result[convert.MessageToIdentifier(value.TransactionId)] = value.ErrorMessage
 	}
 	return result, nil

@@ -125,9 +125,16 @@ func New(params Params) (*Backend, error) {
 		}
 	}
 
-	txErrorMessagesCache, err := lru.New[flow.Identifier, string](int(params.TxErrorMessagesCacheSize))
-	if err != nil {
-		return nil, fmt.Errorf("failed to init cache for transaction error messages: %w", err)
+	// NOTE: The transaction error message cache is currently only used by the access node and not by the observer node.
+	//       To avoid introducing unnecessary command line arguments in the observer, one case could be that the error
+	//       message cache is nil for the observer node.
+	var txErrorMessagesCache *lru.Cache[flow.Identifier, string]
+
+	if params.TxErrorMessagesCacheSize > 0 {
+		txErrorMessagesCache, err = lru.New[flow.Identifier, string](int(params.TxErrorMessagesCacheSize))
+		if err != nil {
+			return nil, fmt.Errorf("failed to init cache for transaction error messages: %w", err)
+		}
 	}
 
 	// initialize node version info

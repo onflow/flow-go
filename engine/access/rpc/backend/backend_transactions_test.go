@@ -591,7 +591,6 @@ func (suite *Suite) TestLookupTransactionErrorMessages_HappyPath() {
 	}
 
 	exeEventResp := &execproto.GetTransactionErrorMessagesResponse{}
-	expectedResults := make(map[flow.Identifier]string)
 	for _, result := range resultsByBlockID {
 		r := result
 		if r.Failed {
@@ -600,7 +599,6 @@ func (suite *Suite) TestLookupTransactionErrorMessages_HappyPath() {
 				TransactionId: r.TransactionID[:],
 				ErrorMessage:  errMsg,
 			})
-			expectedResults[r.TransactionID] = errMsg
 		}
 	}
 
