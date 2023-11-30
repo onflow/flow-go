@@ -11,8 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/ledger/common/convert"
-	"github.com/onflow/flow-go/ledger/common/pathfinder"
 
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/state"
@@ -21,6 +19,8 @@ import (
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	led "github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/convert"
+	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	ledger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/model/flow"
@@ -109,6 +109,7 @@ func withRegisterStore(t *testing.T, fn func(
 	endHeight uint64,
 	headers map[uint64]*flow.Header,
 )) {
+	// block 10 is executed block
 	pebble.RunWithRegistersStorageAtInitialHeights(t, 10, 10, func(diskStore *pebble.Registers) {
 		log := unittest.Logger()
 		var wal execution.ExecutedFinalizedWAL
@@ -123,10 +124,10 @@ func TestExecutionStateWithStorehouse(t *testing.T) {
 	t.Run("commit write and read new state", prepareStorehouseTest(func(
 		t *testing.T, es state.ExecutionState, l *ledger.Ledger, headers *storage.Headers, stateCommitments *storage.Commits, finalized *testutil.MockFinalizedReader) {
 
-		// Block 1 height 11, start statecommitment sc1
-		block1 := finalized.BlockAtHeight(11)
-		header1 := block1.Header
-		sc1 := flow.StateCommitment(l.InitialState())
+		// block 11 is the block to be executed
+		block11 := finalized.BlockAtHeight(11)
+		header11 := block11.Header
+		sc10 := flow.StateCommitment(l.InitialState())
 
 		reg1 := unittest.MakeOwnerReg("fruit", "apple")
 		reg2 := unittest.MakeOwnerReg("vegetable", "carrot")
@@ -138,9 +139,9 @@ func TestExecutionStateWithStorehouse(t *testing.T) {
 			Meter: meter.NewMeter(meter.DefaultParameters()),
 		}
 
-		// create Block 1's end statecommitment
+		// create Block 11's end statecommitment
 		sc2, update, sc2Snapshot, err := state.CommitDelta(l, executionSnapshot,
-			storehouse.NewExecutingBlockSnapshot(state.NewLedgerStorageSnapshot(l, sc1), sc1))
+			storehouse.NewExecutingBlockSnapshot(state.NewLedgerStorageSnapshot(l, sc10), sc10))
 		require.NoError(t, err)
 
 		// validate new snapshot
@@ -152,89 +153,22 @@ func TestExecutionStateWithStorehouse(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, reg2.Value, val)
 
-		require.Equal(t, sc1[:], update.RootHash[:])
-		require.Len(t, update.Paths, 2)
-		require.Len(t, update.Payloads, 2)
-
-		// validate sc2
-		require.Equal(t, sc2, sc2Snapshot.Commitment())
-
-		key1 := convert.RegisterIDToLedgerKey(reg1.Key)
-		path1, err := pathfinder.KeyToPath(key1, ledger.DefaultPathFinderVersion)
-		require.NoError(t, err)
-
-		key2 := convert.RegisterIDToLedgerKey(reg2.Key)
-		path2, err := pathfinder.KeyToPath(key2, ledger.DefaultPathFinderVersion)
-		require.NoError(t, err)
-
-		// validate update
-		require.Equal(t, path1, update.Paths[0])
-		require.Equal(t, path2, update.Paths[1])
-
-		k1, err := update.Payloads[0].Key()
-		require.NoError(t, err)
-
-		k2, err := update.Payloads[1].Key()
-		require.NoError(t, err)
-
-		require.Equal(t, key1, k1)
-		require.Equal(t, key2, k2)
-
-		require.Equal(t, []byte("apple"), []byte(update.Payloads[0].Value()))
-		require.Equal(t, []byte("carrot"), []byte(update.Payloads[1].Value()))
+		validateUpdate(t, update, sc10, executionSnapshot)
 
 		// validate storage snapshot
-
 		completeBlock := &entity.ExecutableBlock{
-			Block:               block1,
+			Block:               block11,
 			CompleteCollections: map[flow.Identifier]*entity.CompleteCollection{},
-			StartState:          &sc1,
+			StartState:          &sc10,
 			Executing:           false,
 		}
 
-		computationResult := execution.NewEmptyComputationResult(completeBlock)
-		numberOfChunks := 1
-		ceds := make([]*execution_data.ChunkExecutionData, numberOfChunks)
-		ceds[0] = unittest.ChunkExecutionDataFixture(t, 1024)
-		computationResult.CollectionExecutionResultAt(0).UpdateExecutionSnapshot(executionSnapshot)
-		computationResult.AppendCollectionAttestationResult(
-			*completeBlock.StartState,
-			sc2,
-			nil,
-			unittest.IdentifierFixture(),
-			ceds[0],
-		)
-
-		bed := unittest.BlockExecutionDataFixture(
-			unittest.WithBlockExecutionDataBlockID(completeBlock.Block.ID()),
-			unittest.WithChunkExecutionDatas(ceds...),
-		)
-
-		executionDataID, err := execution_data.CalculateID(context.Background(), bed, execution_data.DefaultSerializer)
-		require.NoError(t, err)
-
-		executionResult := flow.NewExecutionResult(
-			unittest.IdentifierFixture(),
-			completeBlock.ID(),
-			computationResult.AllChunks(),
-			flow.ServiceEventList{},
-			executionDataID)
-
-		computationResult.BlockAttestationResult.BlockExecutionResult.ExecutionDataRoot = &flow.BlockExecutionDataRoot{
-			BlockID:               completeBlock.ID(),
-			ChunkExecutionDataIDs: []cid.Cid{flow.IdToCid(unittest.IdentifierFixture())},
-		}
-
-		computationResult.ExecutionReceipt = &flow.ExecutionReceipt{
-			ExecutionResult:   *executionResult,
-			Spocks:            make([]crypto.Signature, numberOfChunks),
-			ExecutorSignature: crypto.Signature{},
-		}
+		computationResult := makeComputationResult(t, completeBlock, executionSnapshot, sc2)
 
 		// save result and store registers
 		require.NoError(t, es.SaveExecutionResults(context.Background(), computationResult))
 
-		storageSnapshot := es.NewStorageSnapshot(sc2, header1.ID(), header1.Height)
+		storageSnapshot := es.NewStorageSnapshot(sc2, header11.ID(), header11.Height)
 
 		// validate the storage snapshot has the registers
 		b1, err := storageSnapshot.Get(reg1.Key)
@@ -249,5 +183,68 @@ func TestExecutionStateWithStorehouse(t *testing.T) {
 		require.True(t, l.HasState(led.State(sc2)))
 		require.False(t, l.HasState(led.State(unittest.StateCommitmentFixture())))
 	}))
+}
 
+func validateUpdate(t *testing.T, update *led.TrieUpdate, commit flow.StateCommitment, executionSnapshot *snapshot.ExecutionSnapshot) {
+	require.Equal(t, commit[:], update.RootHash[:])
+	require.Len(t, update.Paths, len(executionSnapshot.WriteSet))
+	require.Len(t, update.Payloads, len(executionSnapshot.WriteSet))
+
+	regs := executionSnapshot.UpdatedRegisters()
+	for i, reg := range regs {
+		key := convert.RegisterIDToLedgerKey(reg.Key)
+		path, err := pathfinder.KeyToPath(key, ledger.DefaultPathFinderVersion)
+		require.NoError(t, err)
+
+		require.Equal(t, path, update.Paths[i])
+		require.Equal(t, led.Value(reg.Value), update.Payloads[i].Value())
+	}
+}
+
+func makeComputationResult(
+	t *testing.T,
+	completeBlock *entity.ExecutableBlock,
+	executionSnapshot *snapshot.ExecutionSnapshot,
+	commit flow.StateCommitment,
+) *execution.ComputationResult {
+
+	computationResult := execution.NewEmptyComputationResult(completeBlock)
+	numberOfChunks := 1
+	ceds := make([]*execution_data.ChunkExecutionData, numberOfChunks)
+	ceds[0] = unittest.ChunkExecutionDataFixture(t, 1024)
+	computationResult.CollectionExecutionResultAt(0).UpdateExecutionSnapshot(executionSnapshot)
+	computationResult.AppendCollectionAttestationResult(
+		*completeBlock.StartState,
+		commit,
+		nil,
+		unittest.IdentifierFixture(),
+		ceds[0],
+	)
+
+	bed := unittest.BlockExecutionDataFixture(
+		unittest.WithBlockExecutionDataBlockID(completeBlock.Block.ID()),
+		unittest.WithChunkExecutionDatas(ceds...),
+	)
+
+	executionDataID, err := execution_data.CalculateID(context.Background(), bed, execution_data.DefaultSerializer)
+	require.NoError(t, err)
+
+	executionResult := flow.NewExecutionResult(
+		unittest.IdentifierFixture(),
+		completeBlock.ID(),
+		computationResult.AllChunks(),
+		flow.ServiceEventList{},
+		executionDataID)
+
+	computationResult.BlockAttestationResult.BlockExecutionResult.ExecutionDataRoot = &flow.BlockExecutionDataRoot{
+		BlockID:               completeBlock.ID(),
+		ChunkExecutionDataIDs: []cid.Cid{flow.IdToCid(unittest.IdentifierFixture())},
+	}
+
+	computationResult.ExecutionReceipt = &flow.ExecutionReceipt{
+		ExecutionResult:   *executionResult,
+		Spocks:            make([]crypto.Signature, numberOfChunks),
+		ExecutorSignature: crypto.Signature{},
+	}
+	return computationResult
 }
