@@ -1,4 +1,4 @@
-package storehouse_test
+package testutil
 
 import (
 	"fmt"
@@ -9,61 +9,49 @@ import (
 	"go.uber.org/atomic"
 )
 
-var unknownBlock = unittest.IdentifierFixture()
-var unknownReg = makeReg("unknown", "unknown")
-
-func makeReg(key string, value string) flow.RegisterEntry {
-	return flow.RegisterEntry{
-		Key: flow.RegisterID{
-			Owner: "owner",
-			Key:   key,
-		},
-		Value: []byte(value),
-	}
-}
-
-type mockFinalizedReader struct {
+type MockFinalizedReader struct {
 	headerByHeight  map[uint64]*flow.Header
+	blockByHeight   map[uint64]*flow.Block
 	lowest          uint64
 	highest         uint64
 	finalizedHeight *atomic.Uint64
-	finalizedCalled *atomic.Int64
 }
 
-func newMockFinalizedReader(initHeight uint64, count int) (*mockFinalizedReader, map[uint64]*flow.Header, uint64) {
+func NewMockFinalizedReader(initHeight uint64, count int) (*MockFinalizedReader, map[uint64]*flow.Header, uint64) {
 	root := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(initHeight))
 	blocks := unittest.ChainFixtureFrom(count, root)
 	headerByHeight := make(map[uint64]*flow.Header, len(blocks)+1)
 	headerByHeight[root.Height] = root
 
+	blockByHeight := make(map[uint64]*flow.Block, len(blocks)+1)
 	for _, b := range blocks {
 		headerByHeight[b.Header.Height] = b.Header
+		blockByHeight[b.Header.Height] = b
 	}
 
 	highest := blocks[len(blocks)-1].Header.Height
-	return &mockFinalizedReader{
+	return &MockFinalizedReader{
 		headerByHeight:  headerByHeight,
+		blockByHeight:   blockByHeight,
 		lowest:          initHeight,
 		highest:         highest,
 		finalizedHeight: atomic.NewUint64(initHeight),
-		finalizedCalled: atomic.NewInt64(0),
 	}, headerByHeight, highest
 }
 
-func (r *mockFinalizedReader) FinalizedBlockIDAtHeight(height uint64) (flow.Identifier, error) {
-	r.finalizedCalled.Add(1)
+func (r *MockFinalizedReader) FinalizedBlockIDAtHeight(height uint64) (flow.Identifier, error) {
 	finalized := r.finalizedHeight.Load()
 	if height > finalized {
 		return flow.Identifier{}, storage.ErrNotFound
 	}
 
 	if height < r.lowest {
-		return unknownBlock, nil
+		return flow.ZeroID, fmt.Errorf("height %d is out of range [%d, %d]", height, r.lowest, r.highest)
 	}
 	return r.headerByHeight[height].ID(), nil
 }
 
-func (r *mockFinalizedReader) MockFinal(height uint64) error {
+func (r *MockFinalizedReader) MockFinal(height uint64) error {
 	if height < r.lowest || height > r.highest {
 		return fmt.Errorf("height %d is out of range [%d, %d]", height, r.lowest, r.highest)
 	}
@@ -72,6 +60,6 @@ func (r *mockFinalizedReader) MockFinal(height uint64) error {
 	return nil
 }
 
-func (r *mockFinalizedReader) FinalizedCalled() int {
-	return int(r.finalizedCalled.Load())
+func (r *MockFinalizedReader) BlockAtHeight(height uint64) *flow.Block {
+	return r.blockByHeight[height]
 }

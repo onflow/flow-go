@@ -54,7 +54,6 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState, l *ledger.Ledger,
 
 			es := state.NewExecutionState(
 				ls, stateCommitments, blocks, headers, collections, chunkDataPacks, results, myReceipts, events, serviceEvents, txResults, badgerDB, trace.NewNoopTracer(),
-				// TODO: to test with register store
 				nil,
 				false,
 			)

@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/storehouse"
+	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -18,7 +19,7 @@ func withRegisterStore(t *testing.T, fn func(
 	t *testing.T,
 	rs *storehouse.RegisterStore,
 	diskStore execution.OnDiskRegisterStore,
-	finalized *mockFinalizedReader,
+	finalized *testutil.MockFinalizedReader,
 	rootHeight uint64,
 	endHeight uint64,
 	headers map[uint64]*flow.Header,
@@ -26,7 +27,7 @@ func withRegisterStore(t *testing.T, fn func(
 	pebble.RunWithRegistersStorageAtInitialHeights(t, 10, 10, func(diskStore *pebble.Registers) {
 		log := unittest.Logger()
 		var wal execution.ExecutedFinalizedWAL
-		finalized, headerByHeight, highest := newMockFinalizedReader(10, 100)
+		finalized, headerByHeight, highest := testutil.NewMockFinalizedReader(10, 100)
 		rs, err := storehouse.NewRegisterStore(diskStore, wal, finalized, log)
 		require.NoError(t, err)
 		fn(t, rs, diskStore, finalized, 10, highest, headerByHeight)
@@ -44,7 +45,7 @@ func TestRegisterStoreGetRegisterFail(t *testing.T) {
 		t *testing.T,
 		rs *storehouse.RegisterStore,
 		diskStore execution.OnDiskRegisterStore,
-		finalized *mockFinalizedReader,
+		finalized *testutil.MockFinalizedReader,
 		rootHeight uint64,
 		endHeight uint64,
 		headerByHeight map[uint64]*flow.Header,
@@ -83,7 +84,7 @@ func TestRegisterStoreSaveRegistersShouldFail(t *testing.T) {
 		t *testing.T,
 		rs *storehouse.RegisterStore,
 		diskStore execution.OnDiskRegisterStore,
-		finalized *mockFinalizedReader,
+		finalized *testutil.MockFinalizedReader,
 		rootHeight uint64,
 		endHeight uint64,
 		headerByHeight map[uint64]*flow.Header,
@@ -112,7 +113,7 @@ func TestRegisterStoreSaveRegistersShouldOK(t *testing.T) {
 		t *testing.T,
 		rs *storehouse.RegisterStore,
 		diskStore execution.OnDiskRegisterStore,
-		finalized *mockFinalizedReader,
+		finalized *testutil.MockFinalizedReader,
 		rootHeight uint64,
 		endHeight uint64,
 		headerByHeight map[uint64]*flow.Header,
@@ -164,7 +165,7 @@ func TestRegisterStoreIsBlockExecuted(t *testing.T) {
 		t *testing.T,
 		rs *storehouse.RegisterStore,
 		diskStore execution.OnDiskRegisterStore,
-		finalized *mockFinalizedReader,
+		finalized *testutil.MockFinalizedReader,
 		rootHeight uint64,
 		endHeight uint64,
 		headerByHeight map[uint64]*flow.Header,
@@ -209,7 +210,7 @@ func TestRegisterStoreReadingFromDisk(t *testing.T) {
 		t *testing.T,
 		rs *storehouse.RegisterStore,
 		diskStore execution.OnDiskRegisterStore,
-		finalized *mockFinalizedReader,
+		finalized *testutil.MockFinalizedReader,
 		rootHeight uint64,
 		endHeight uint64,
 		headerByHeight map[uint64]*flow.Header,
@@ -257,7 +258,7 @@ func TestRegisterStoreReadingFromInMemStore(t *testing.T) {
 		t *testing.T,
 		rs *storehouse.RegisterStore,
 		diskStore execution.OnDiskRegisterStore,
-		finalized *mockFinalizedReader,
+		finalized *testutil.MockFinalizedReader,
 		rootHeight uint64,
 		endHeight uint64,
 		headerByHeight map[uint64]*flow.Header,
@@ -423,7 +424,7 @@ func TestRegisterStoreExecuteFirstFinalizeLater(t *testing.T) {
 		t *testing.T,
 		rs *storehouse.RegisterStore,
 		diskStore execution.OnDiskRegisterStore,
-		finalized *mockFinalizedReader,
+		finalized *testutil.MockFinalizedReader,
 		rootHeight uint64,
 		endHeight uint64,
 		headerByHeight map[uint64]*flow.Header,
@@ -469,7 +470,7 @@ func TestRegisterStoreFinalizeFirstExecuteLater(t *testing.T) {
 		t *testing.T,
 		rs *storehouse.RegisterStore,
 		diskStore execution.OnDiskRegisterStore,
-		finalized *mockFinalizedReader,
+		finalized *testutil.MockFinalizedReader,
 		rootHeight uint64,
 		endHeight uint64,
 		headerByHeight map[uint64]*flow.Header,
@@ -512,7 +513,7 @@ func TestRegisterStoreConcurrentFinalizeAndExecute(t *testing.T) {
 		t *testing.T,
 		rs *storehouse.RegisterStore,
 		diskStore execution.OnDiskRegisterStore,
-		finalized *mockFinalizedReader,
+		finalized *testutil.MockFinalizedReader,
 		rootHeight uint64,
 		endHeight uint64,
 		headerByHeight map[uint64]*flow.Header,
