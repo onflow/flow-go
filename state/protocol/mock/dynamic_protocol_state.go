@@ -112,6 +112,20 @@ func (_m *DynamicProtocolState) EpochCommit() *flow.EpochCommit {
 	return r0
 }
 
+// EpochPhase provides a mock function with given fields:
+func (_m *DynamicProtocolState) EpochPhase() flow.EpochPhase {
+	ret := _m.Called()
+
+	var r0 flow.EpochPhase
+	if rf, ok := ret.Get(0).(func() flow.EpochPhase); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(flow.EpochPhase)
+	}
+
+	return r0
+}
+
 // EpochSetup provides a mock function with given fields:
 func (_m *DynamicProtocolState) EpochSetup() *flow.EpochSetup {
 	ret := _m.Called()
@@ -122,22 +136,6 @@ func (_m *DynamicProtocolState) EpochSetup() *flow.EpochSetup {
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*flow.EpochSetup)
-		}
-	}
-
-	return r0
-}
-
-// EpochStatus provides a mock function with given fields:
-func (_m *DynamicProtocolState) EpochStatus() *flow.EpochStatus {
-	ret := _m.Called()
-
-	var r0 *flow.EpochStatus
-	if rf, ok := ret.Get(0).(func() *flow.EpochStatus); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.EpochStatus)
 		}
 	}
 
@@ -171,6 +169,34 @@ func (_m *DynamicProtocolState) Identities() flow.GenericIdentityList[flow.Ident
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(flow.GenericIdentityList[flow.Identity])
 		}
+	}
+
+	return r0
+}
+
+// InvalidEpochTransitionAttempted provides a mock function with given fields:
+func (_m *DynamicProtocolState) InvalidEpochTransitionAttempted() bool {
+	ret := _m.Called()
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func() bool); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
+// PreviousEpochExists provides a mock function with given fields:
+func (_m *DynamicProtocolState) PreviousEpochExists() bool {
+	ret := _m.Called()
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func() bool); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(bool)
 	}
 
 	return r0
