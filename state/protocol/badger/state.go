@@ -437,6 +437,16 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 			return fmt.Errorf("could not index sealed block: %w", err)
 		}
 
+		// insert first-height indices for epochs which have started
+		hasPrevious, err := protocol.PreviousEpochExists(root)
+		if err != nil {
+			return fmt.Errorf("could not check existence of previous epoch: %w", err)
+		}
+		if hasPrevious {
+			indexFirstHeight(root.Epochs().Previous())
+		}
+		indexFirstHeight(root.Epochs().Current())
+
 		return nil
 	}
 }
@@ -567,7 +577,6 @@ func (state *State) bootstrapSporkInfo(root protocol.Snapshot) func(*badger.Txn)
 
 // indexFirstHeight indexes the first height for the epoch, as part of bootstrapping.
 // The input epoch must have been started (the first block of the epoch has been finalized).
-// todo re-work this
 // No errors are expected during normal operation.
 func indexFirstHeight(epoch protocol.Epoch) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
