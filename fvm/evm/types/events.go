@@ -2,6 +2,11 @@ package types
 
 import (
 	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"strings"
+
+	"github.com/onflow/cadence/runtime/common"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -24,6 +29,52 @@ type EventPayload interface {
 type Event struct {
 	Etype   flow.EventType
 	Payload EventPayload
+}
+
+type EVMLocation struct{}
+
+var _ common.Location = EVMLocation{}
+
+const (
+	evmLocationPrefix = "evm"
+	locationDivider   = "."
+)
+
+func (l EVMLocation) TypeID(memoryGauge common.MemoryGauge, qualifiedIdentifier string) common.TypeID {
+	id := fmt.Sprintf("%s.%s", locationDivider, qualifiedIdentifier)
+	common.UseMemory(memoryGauge, common.NewRawStringMemoryUsage(len(id)))
+
+	return common.TypeID(id)
+}
+
+func (l EVMLocation) QualifiedIdentifier(typeID common.TypeID) string {
+	pieces := strings.SplitN(string(typeID), locationDivider, 2)
+
+	if len(pieces) < 2 {
+		return ""
+	}
+
+	return pieces[1]
+}
+
+func (l EVMLocation) String() string {
+	return evmLocationPrefix
+}
+
+func (l EVMLocation) Description() string {
+	return evmLocationPrefix
+}
+
+func (l EVMLocation) ID() string {
+	return evmLocationPrefix
+}
+
+func (l EVMLocation) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&struct {
+		Type string
+	}{
+		Type: "EVMLocation",
+	})
 }
 
 // we might break this event into two (tx included /tx executed) if size becomes an issue
