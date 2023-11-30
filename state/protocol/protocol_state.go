@@ -42,8 +42,6 @@ type DynamicProtocolState interface {
 	// EpochPhase returns the epoch phase for the current epoch.
 	EpochPhase() flow.EpochPhase
 
-	// EpochStatus returns the status of current epoch at given block based on the internal state of protocol.
-	EpochStatus() *flow.EpochStatus
 	// Identities returns identities (in canonical ordering) that can participate in the current or previous
 	// or next epochs. Let P be the set of identities in the previous epoch, C be the set of identities in
 	// the current epoch, and N be the set of identities in the next epoch.
