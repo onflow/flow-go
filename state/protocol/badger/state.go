@@ -481,12 +481,6 @@ func (state *State) bootstrapEpoch(rootProtocolState protocol.DynamicProtocolSta
 				return fmt.Errorf("invalid EpochCommit for previous epoch: %w", err)
 			}
 
-			// TODO do this in a separate step?
-			//err = indexFirstHeight(previous)(tx.DBTxn)
-			//if err != nil {
-			//	return fmt.Errorf("could not index epoch first height: %w", err)
-			//}
-
 			setups = append(setups, setup)
 			commits = append(commits, commit)
 		}
@@ -500,13 +494,7 @@ func (state *State) bootstrapEpoch(rootProtocolState protocol.DynamicProtocolSta
 		if err := protocol.IsValidEpochCommit(commit, setup); err != nil {
 			return fmt.Errorf("invalid EpochCommit for current epoch: %w", err)
 		}
-
-		// todo do in separate step?
-		//err = indexFirstHeight(current)(tx.DBTxn)
-		//if err != nil {
-		//	return fmt.Errorf("could not index epoch first height: %w", err)
-		//}
-
+	
 		setups = append(setups, setup)
 		commits = append(commits, commit)
 
