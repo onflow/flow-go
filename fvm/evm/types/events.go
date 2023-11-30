@@ -11,14 +11,14 @@ import (
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/onflow/cadence"
-	"github.com/onflow/cadence/runtime/stdlib"
-
 	"github.com/onflow/flow-go/model/flow"
 )
 
 const (
 	EventTypeBlockExecuted       flow.EventType = "evm.BlockExecuted"
 	EventTypeTransactionExecuted flow.EventType = "evm.TransactionExecuted"
+	evmLocationPrefix                           = "evm"
+	locationDivider                             = "."
 )
 
 type EventPayload interface {
@@ -31,14 +31,9 @@ type Event struct {
 	Payload EventPayload
 }
 
-type EVMLocation struct{}
-
 var _ common.Location = EVMLocation{}
 
-const (
-	evmLocationPrefix = "evm"
-	locationDivider   = "."
-)
+type EVMLocation struct{}
 
 func (l EVMLocation) TypeID(memoryGauge common.MemoryGauge, qualifiedIdentifier string) common.TypeID {
 	id := fmt.Sprintf("%s.%s", locationDivider, qualifiedIdentifier)
@@ -97,7 +92,7 @@ func (p *TransactionExecutedPayload) CadenceEvent() (cadence.Event, error) {
 
 	return cadence.Event{
 		EventType: cadence.NewEventType(
-			stdlib.FlowLocation{},
+			EVMLocation{},
 			string(EventTypeTransactionExecuted),
 			[]cadence.Field{
 				cadence.NewField("blockHeight", cadence.UInt64Type{}),
@@ -164,7 +159,7 @@ func (p *BlockExecutedEventPayload) CadenceEvent() (cadence.Event, error) {
 		cadence.String(p.Block.StateRoot.String()),
 		cadence.NewArray(hashes).WithType(hashesType),
 	}).WithType(&cadence.EventType{
-		Location:            stdlib.FlowLocation{}, // todo create evm custom location
+		Location:            EVMLocation{},
 		QualifiedIdentifier: string(EventTypeBlockExecuted),
 		Fields: []cadence.Field{
 			cadence.NewField("height", cadence.UInt64Type{}),
