@@ -280,16 +280,6 @@ func (e *RichProtocolStateEntry) Copy() *RichProtocolStateEntry {
 	}
 }
 
-// EpochStatus returns epoch status for the current protocol state.
-func (e *ProtocolStateEntry) EpochStatus() *EpochStatus {
-	return &EpochStatus{
-		PreviousEpoch:                   e.PreviousEpoch.EventIDs(),
-		CurrentEpoch:                    e.CurrentEpoch.EventIDs(),
-		NextEpoch:                       e.NextEpoch.EventIDs(),
-		InvalidEpochTransitionAttempted: e.InvalidEpochTransitionAttempted,
-	}
-}
-
 // EpochPhase returns the current epoch phase.
 func (e *ProtocolStateEntry) EpochPhase() EpochPhase {
 	// first assert that current/previous epoch contains valid values
