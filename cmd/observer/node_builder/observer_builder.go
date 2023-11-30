@@ -710,8 +710,7 @@ func (builder *ObserverServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 	}
 	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
 
-	node, err := p2pbuilder.NewNodeBuilder(
-		builder.Logger,
+	node, err := p2pbuilder.NewNodeBuilder(builder.Logger,
 		&p2pconfig.MetricsConfig{
 			HeroCacheFactory: builder.HeroCacheMetricsFactory(),
 			Metrics:          builder.Metrics.Network,
@@ -721,10 +720,10 @@ func (builder *ObserverServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 		networkKey,
 		builder.SporkID,
 		builder.IdentityProvider,
+		builder.FlowConfig.NetworkConfig.GossipSubConfig.GossipSubScoringRegistryConfig,
 		&builder.FlowConfig.NetworkConfig.ResourceManager,
-		&builder.FlowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig,
+		&builder.FlowConfig.NetworkConfig.GossipSubConfig,
 		p2pconfig.PeerManagerDisableConfig(), // disable peer manager for observer node.
-		&builder.FlowConfig.NetworkConfig.GossipSubConfig.SubscriptionProviderConfig,
 		&p2p.DisallowListCacheConfig{
 			MaxSize: builder.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
 			Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
