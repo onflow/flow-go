@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	EventTypeBlockExecuted       flow.EventType = "evm.BlockExecuted"
-	EventTypeTransactionExecuted flow.EventType = "evm.TransactionExecuted"
+	EventTypeBlockExecuted       flow.EventType = "BlockExecuted"
+	EventTypeTransactionExecuted flow.EventType = "TransactionExecuted"
 	evmLocationPrefix                           = "evm"
 	locationDivider                             = "."
 )
@@ -36,7 +36,7 @@ var _ common.Location = EVMLocation{}
 type EVMLocation struct{}
 
 func (l EVMLocation) TypeID(memoryGauge common.MemoryGauge, qualifiedIdentifier string) common.TypeID {
-	id := fmt.Sprintf("%s.%s", locationDivider, qualifiedIdentifier)
+	id := fmt.Sprintf("%s%s%s", evmLocationPrefix, locationDivider, qualifiedIdentifier)
 	common.UseMemory(memoryGauge, common.NewRawStringMemoryUsage(len(id)))
 
 	return common.TypeID(id)
@@ -70,6 +70,31 @@ func (l EVMLocation) MarshalJSON() ([]byte, error) {
 	}{
 		Type: "EVMLocation",
 	})
+}
+
+func init() {
+	common.RegisterTypeIDDecoder(
+		evmLocationPrefix,
+		func(_ common.MemoryGauge, typeID string) (common.Location, string, error) {
+			if typeID == "" {
+				return nil, "", fmt.Errorf("invalid EVM type location ID: missing type prefix")
+			}
+
+			parts := strings.SplitN(typeID, ".", 2)
+			prefix := parts[0]
+			if prefix != evmLocationPrefix {
+				return EVMLocation{}, "", fmt.Errorf("invalid EVM type location ID: invalid prefix")
+			}
+
+			var qualifiedIdentifier string
+			pieceCount := len(parts)
+			if pieceCount > 1 {
+				qualifiedIdentifier = parts[1]
+			}
+
+			return EVMLocation{}, qualifiedIdentifier, nil
+		},
+	)
 }
 
 // we might break this event into two (tx included /tx executed) if size becomes an issue
