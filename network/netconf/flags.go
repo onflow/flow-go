@@ -160,17 +160,8 @@ func AllFlagNames() []string {
 		BuildFlagName(gossipSub, p2pconf.ScoreParamsKey, p2pconf.AppSpecificScoreRegistryKey, p2pconf.ScoreTTLKey),
 		BuildFlagName(gossipSub, p2pconf.ScoreParamsKey, p2pconf.SpamRecordCacheSizeKey),
 		BuildFlagName(gossipSub, p2pconf.ScoreParamsKey, p2pconf.DecayIntervalKey),
-		iwantMaxSampleSize,
-		iwantMaxMessageIDSampleSize,
-		ihaveMaxMessageIDSampleSize,
-		iwantCacheMissThreshold,
-		controlMessageMaxSampleSize,
-		iwantDuplicateMsgIDThreshold,
-		iwantCacheMissCheckSize,
 		scoringRegistrySlowerDecayThreshold,
 		scoringRegistryDecayRateDecrement,
-		rpcMessageMaxSampleSize,
-		rpcMessageErrorThreshold,
 		scoringRegistryDecayAdjustInterval,
 	}
 
@@ -289,13 +280,13 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 	flags.Float32(alspSyncEngineSyncRequestProb, config.AlspConfig.SyncEngine.SyncRequestProb, "probability of creating a misbehavior report for a sync request message")
 
 	flags.Float64(scoringRegistrySlowerDecayThreshold,
-		config.GossipSubConfig.GossipSubScoringRegistryConfig.PenaltyDecaySlowdownThreshold,
+		config.GossipSub.GossipSubScoringRegistryConfig.PenaltyDecaySlowdownThreshold,
 		"the penalty level at which the decay rate is reduced by --gossipsub-app-specific-penalty-decay-rate-reduction-factor")
 	flags.Float64(scoringRegistryDecayRateDecrement,
-		config.GossipSubConfig.GossipSubScoringRegistryConfig.DecayRateReductionFactor,
+		config.GossipSub.GossipSubScoringRegistryConfig.DecayRateReductionFactor,
 		"defines the value by which the decay rate is decreased every time the penalty is below the --gossipsub-app-specific-penalty-decay-slowdown-threshold.")
 	flags.Duration(scoringRegistryDecayAdjustInterval,
-		config.GossipSubConfig.GossipSubScoringRegistryConfig.PenaltyDecayEvaluationPeriod,
+		config.GossipSub.GossipSubScoringRegistryConfig.PenaltyDecayEvaluationPeriod,
 		"defines the period at which the decay for a spam record is okay to be adjusted.")
 	flags.Int(BuildFlagName(gossipSub, p2pconf.RpcInspectorKey, p2pconf.ValidationConfigKey, p2pconf.IHaveConfigKey, p2pconf.MaxSampleSizeKey),
 		config.GossipSub.RpcInspector.Validation.IHave.MaxSampleSize,
