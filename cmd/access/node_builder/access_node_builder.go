@@ -693,45 +693,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					return nil, fmt.Errorf("could not check if registers db is bootstrapped: %w", err)
 				}
 
-				indexerInitialized := true
-				_, err = indexedBlockHeight.ProcessedIndex()
-				if err != nil {
-					if !errors.Is(err, storage.ErrNotFound) {
-						return nil, fmt.Errorf("could not get indexed block height: %w", err)
-					}
-					indexerInitialized = false
-				}
-
-				var registers *pStorage.Registers
-
-				if bootstrapped {
-					// if the registers db is bootstrapped AND its latest height is not the
-					// root checkpoint height, then there must be indexed data in the protocol db.
-					// otherwise, the db is likely corrupt, or the protocol db was reset but the
-					// execution-state db was kept. neither case is valid
-					registers, err = pStorage.NewRegisters(pdb)
-					if err != nil {
-						return nil, fmt.Errorf("could not create registers storage: %w", err)
-					}
-
-					// the registers db may have been bootstrapped, but the node crashed before
-					// initializing the indexer. In this case, the register db's latest height
-					// will be the root height.
-					if !indexerInitialized && registers.LatestHeight() != builder.SealedRootBlock.Header.Height {
-						return nil, fmt.Errorf(
-							"registers db is bootstrapped but indexed block height is not set. " +
-								"this may indicate that one of the databases are corrupt")
-					}
-				} else {
-					// if the registers db is empty, then the indexer must also be empty.
-					// the only exception is if the registers db was deleted, and the node was
-					// configured to reset the indexer height.
-					if indexerInitialized && !builder.forceResetIndexerHeight {
-						return nil, fmt.Errorf(
-							"registers db is not bootstrapped but indexed block height is set. " +
-								"this may indicate that one of the databases are corrupt")
-					}
-
+				if !bootstrapped {
 					checkpointFile := builder.checkpointFile
 					if checkpointFile == cmd.NotSet {
 						checkpointFile = path.Join(builder.BootstrapDir, bootstrap.PathRootCheckpoint)
@@ -763,22 +725,11 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					if err != nil {
 						return nil, fmt.Errorf("could not load checkpoint file: %w", err)
 					}
+				}
 
-					// this is only supported when bootstrapping a new register db, otherwise the
-					// register db will throw exceptions when indexing an already indexed height.
-					if builder.forceResetIndexerHeight {
-						builder.Logger.Info().Uint64("height", checkpointHeight).Msg("attempting to reset indexer start height")
-						err = indexedBlockHeight.SetProcessedIndex(checkpointHeight)
-						if err != nil && !errors.Is(err, storage.ErrNotFound) {
-							return nil, fmt.Errorf("could not reset indexed block height: %w", err)
-						}
-						builder.Logger.Info().Uint64("height", checkpointHeight).Msg("successfully reset indexer start height")
-					}
-
-					registers, err = pStorage.NewRegisters(pdb)
-					if err != nil {
-						return nil, fmt.Errorf("could not create registers storage: %w", err)
-					}
+				registers, err := pStorage.NewRegisters(pdb)
+				if err != nil {
+					return nil, fmt.Errorf("could not create registers storage: %w", err)
 				}
 
 				builder.Storage.RegisterIndex = registers
@@ -806,6 +757,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					executionDataStoreCache,
 					builder.ExecutionDataRequester.HighestConsecutiveHeight,
 					indexedBlockHeight,
+					builder.forceResetIndexerHeight,
 				)
 				if err != nil {
 					return nil, err

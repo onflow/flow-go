@@ -83,6 +83,7 @@ func newIndexerTest(t *testing.T, availableBlocks int, lastIndexedIndex int) *in
 		exeCache,
 		test.latestHeight,
 		progress,
+		false,
 	)
 	require.NoError(t, err)
 
