@@ -17,6 +17,7 @@ const (
 )
 
 type EventPayload interface {
+	// CadenceEvent creates a Cadence event type
 	CadenceEvent() (cadence.Event, error)
 }
 
