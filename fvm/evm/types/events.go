@@ -17,7 +17,6 @@ const (
 )
 
 type EventPayload interface {
-	Encode() ([]byte, error)
 	CadenceEvent() (cadence.Event, error)
 }
 
@@ -32,10 +31,6 @@ type TransactionExecutedPayload struct {
 	TxEncoded   []byte
 	TxHash      gethCommon.Hash
 	Result      *Result
-}
-
-func (p *TransactionExecutedPayload) Encode() ([]byte, error) {
-	return rlp.EncodeToBytes(p)
 }
 
 func (p *TransactionExecutedPayload) CadenceEvent() (cadence.Event, error) {
@@ -100,10 +95,6 @@ func NewTransactionExecutedEvent(
 
 type BlockExecutedEventPayload struct {
 	Block *Block
-}
-
-func (p *BlockExecutedEventPayload) Encode() ([]byte, error) {
-	return rlp.EncodeToBytes(p)
 }
 
 func (p *BlockExecutedEventPayload) CadenceEvent() (cadence.Event, error) {
