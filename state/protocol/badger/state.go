@@ -494,7 +494,7 @@ func (state *State) bootstrapEpoch(rootProtocolState protocol.DynamicProtocolSta
 		if err := protocol.IsValidEpochCommit(commit, setup); err != nil {
 			return fmt.Errorf("invalid EpochCommit for current epoch: %w", err)
 		}
-	
+
 		setups = append(setups, setup)
 		commits = append(commits, commit)
 
