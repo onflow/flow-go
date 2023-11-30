@@ -53,8 +53,8 @@ require (
 	github.com/onflow/atree v0.6.0
 	github.com/onflow/cadence v0.42.5
 	github.com/onflow/flow v0.3.4
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.14.0
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.14.0
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.1-0.20231130031602-3a326a55abcf
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.15.1-0.20231130031602-3a326a55abcf
 	github.com/onflow/flow-go-sdk v0.41.16
 	github.com/onflow/flow-go/crypto v0.24.9
 	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20231121210617-52ee94b830c2
