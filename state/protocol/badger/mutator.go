@@ -899,7 +899,7 @@ func (m *FollowerState) epochTransitionMetricsAndEventsOnBlockFinalized(block *f
 //
 // This function should only be called when epoch fallback *has not already been triggered*.
 // No errors are expected during normal operation.
-func (m *FollowerState) epochPhaseMetricsAndEventsOnBlockFinalized(block *flow.Block, stateAtBlock protocol.DynamicProtocolState) (
+func (m *FollowerState) epochPhaseMetricsAndEventsOnBlockFinalized(block *flow.Block) (
 	metrics []func(),
 	events []func(),
 	err error,
@@ -932,16 +932,6 @@ func (m *FollowerState) epochPhaseMetricsAndEventsOnBlockFinalized(block *flow.B
 				events = append(events, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseCommitted) })
 				// track epoch phase transition (setup->committed)
 				events = append(events, func() { m.consumer.EpochCommittedPhaseStarted(ev.Counter-1, block.Header) })
-				// track final view of committed epoch
-				nextEpochSetup := stateAtBlock.Entry().NextEpochSetup
-				if nextEpochSetup != nil {
-					return nil, nil, fmt.Errorf("we are in Epoch")
-				}
-				nextEpochSetup, err := m.epoch.setups.ByID(epochStatus.NextEpoch.SetupID)
-				if err != nil {
-					return nil, nil, fmt.Errorf("could not retrieve setup event for next epoch: %w", err)
-				}
-				events = append(events, func() { m.metrics.CommittedEpochFinalView(nextEpochSetup.FinalView) })
 			case *flow.VersionBeacon:
 				// do nothing for now
 			default:
