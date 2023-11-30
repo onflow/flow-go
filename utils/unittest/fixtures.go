@@ -1427,6 +1427,14 @@ func TransactionDSLFixture(chain flow.Chain) dsl.Transaction {
 	}
 }
 
+// RegisterIDFixture returns a RegisterID with a fixed key and owner
+func RegisterIDFixture() flow.RegisterID {
+	return flow.RegisterID{
+		Owner: "owner",
+		Key:   "key",
+	}
+}
+
 // VerifiableChunkDataFixture returns a complete verifiable chunk with an
 // execution receipt referencing the block/collections.
 func VerifiableChunkDataFixture(chunkIndex uint64) *verification.VerifiableChunkData {
@@ -2620,7 +2628,7 @@ func P2PRPCPruneFixture(topic *string) *pubsub_pb.ControlPrune {
 	}
 }
 
-// P2PRPCIHaveFixtures returns n number of control message rpc iHave fixtures with m number of message ids each.
+// P2PRPCIHaveFixtures returns n number of control message where n = len(topics) rpc iHave fixtures with m number of message ids each.
 func P2PRPCIHaveFixtures(m int, topics ...string) []*pubsub_pb.ControlIHave {
 	n := len(topics)
 	ihaves := make([]*pubsub_pb.ControlIHave, n)
