@@ -3,7 +3,6 @@ package inmem
 import (
 	"errors"
 	"fmt"
-
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -67,7 +66,7 @@ func (s Snapshot) Descendants() ([]flow.Identifier, error) {
 }
 
 func (s Snapshot) Phase() (flow.EpochPhase, error) {
-	return s.enc.ProtocolState.EpochStatus().Phase()
+	return s.enc.ProtocolState.EpochPhase(), nil
 }
 
 func (s Snapshot) RandomSource() ([]byte, error) {

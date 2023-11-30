@@ -374,6 +374,7 @@ func (q *EpochQuery) Next() protocol.Epoch {
 		return invalid.NewEpochf("could not get protocol state snapshot at block %x: %w", q.snap.blockID, err)
 	}
 	status := psSnapshot.EpochStatus()
+	// todo: need only phase
 	phase, err := status.Phase()
 	if err != nil {
 		// critical error: malformed EpochStatus in storage
@@ -405,6 +406,7 @@ func (q *EpochQuery) Previous() protocol.Epoch {
 		return invalid.NewEpochf("could not get protocol state snapshot at block %x: %w", q.snap.blockID, err)
 	}
 	status := psSnapshot.EpochStatus()
+	// todo: needs HasPrevious
 	entry := psSnapshot.Entry()
 
 	// CASE 1: there is no previous epoch - this indicates we are in the first

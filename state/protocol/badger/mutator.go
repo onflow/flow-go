@@ -656,6 +656,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		return fmt.Errorf("could not retrieve protocol state snapshot: %w", err)
 	}
 	epochStatus := psSnapshot.EpochStatus()
+	// todo: need InvalidEpochTransitionAttempted and phase
 	currentEpochSetup := psSnapshot.EpochSetup()
 	epochFallbackTriggered, err := m.isEpochEmergencyFallbackTriggered()
 	if err != nil {
