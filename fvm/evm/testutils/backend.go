@@ -288,13 +288,6 @@ func (vs *testEventEmitter) EmitEvent(event cadence.Event) error {
 	return vs.emitEvent(event)
 }
 
-func (vs *testEventEmitter) EmitRawEvent(etype flow.EventType, payload []byte) error {
-	if vs.emitRawEvent == nil {
-		panic("method not set")
-	}
-	return vs.emitRawEvent(etype, payload)
-}
-
 func (vs *testEventEmitter) Events() flow.EventsList {
 	if vs.events == nil {
 		panic("method not set")

@@ -155,22 +155,6 @@ func Test_EmitEvent_Limit(t *testing.T) {
 		err := eventEmitter.EmitEvent(cadenceEvent1)
 		require.Error(t, err)
 	})
-
-	t.Run("emit raw event - exceeding limit", func(t *testing.T) {
-		flowEvent := flow.Event{
-			Type:    "sometype",
-			Payload: []byte{1, 2, 3, 4, 5},
-		}
-
-		eventSize := uint64(len(flowEvent.Payload))
-		eventEmitter := createTestEventEmitterWithLimit(
-			flow.Emulator,
-			flow.Emulator.Chain().NewAddressGenerator().CurrentAddress(),
-			eventSize-1)
-
-		err := eventEmitter.EmitRawEvent(flowEvent.Type, flowEvent.Payload)
-		require.Error(t, err)
-	})
 }
 
 func createTestEventEmitterWithLimit(chain flow.ChainID, address flow.Address, eventEmitLimit uint64) environment.EventEmitter {
