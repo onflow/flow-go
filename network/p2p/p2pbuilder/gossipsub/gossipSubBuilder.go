@@ -40,7 +40,8 @@ type Builder struct {
 	subscriptionFilter           pubsub.SubscriptionFilter
 	gossipSubFactory             p2p.GossipSubFactoryFunc
 	gossipSubConfigFunc          p2p.GossipSubAdapterConfigFunc
-	gossipSubPeerScoring         bool          // whether to enable gossipsub peer scoring
+	gossipSubPeerScoring         bool // whether to enable gossipsub peer scoring
+	scoringRegistryConfig        *p2pconf.GossipSubScoringRegistryConfig
 	gossipSubScoreTracerInterval time.Duration // the interval at which the gossipsub score tracer logs the peer scores.
 	// gossipSubTracer is a callback interface that is called by the gossipsub implementation upon
 	// certain events. Currently, we use it to log and observe the local mesh of the node.
@@ -185,6 +186,7 @@ func NewGossipSubBuilder(
 	networkType network.NetworkingType,
 	sporkId flow.Identifier,
 	idProvider module.IdentityProvider,
+	scoringRegistryConfig *p2pconf.GossipSubScoringRegistryConfig,
 	rpcInspectorConfig *p2pconf.GossipSubRPCInspectorsConfig,
 	subscriptionProviderPrams *p2pconf.SubscriptionProviderParameters,
 	rpcTracker p2p.RpcControlTracking,
@@ -207,6 +209,7 @@ func NewGossipSubBuilder(
 		rpcInspectorSuiteFactory:  defaultInspectorSuite(rpcTracker),
 		subscriptionProviderParam: subscriptionProviderPrams,
 		gossipSubScorePenalties:   gossipSubScorePenalties,
+		scoringRegistryConfig:     scoringRegistryConfig,
 	}
 
 	return b
@@ -350,7 +353,7 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, e
 		}
 
 		g.scoreOptionConfig.SetRegisterNotificationConsumerFunc(inspectorSuite.AddInvalidControlMessageConsumer)
-		scoreOpt = scoring.NewScoreOption(g.scoreOptionConfig, g.gossipSubScorePenalties, subscriptionProvider)
+		scoreOpt = scoring.NewScoreOption(g.scoringRegistryConfig, g.gossipSubScorePenalties, g.scoreOptionConfig, subscriptionProvider)
 		gossipSubConfigs.WithScoreOption(scoreOpt)
 
 		if g.gossipSubScoreTracerInterval > 0 {

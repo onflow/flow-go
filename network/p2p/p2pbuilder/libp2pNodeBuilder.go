@@ -92,6 +92,7 @@ type LibP2PNodeBuilderParams struct {
 	DisallowListCacheCfg      *p2p.DisallowListCacheConfig
 	UnicastConfig             *p2pconfig.UnicastConfig
 	GossipSubScorePenalties   *p2pconf.GossipSubScorePenalties
+	ScoringRegistryConfig     *p2pconf.GossipSubScoringRegistryConfig
 }
 
 func NewNodeBuilder(params *LibP2PNodeBuilderParams, rpcTracking p2p.RpcControlTracking) *LibP2PNodeBuilder {
@@ -110,6 +111,7 @@ func NewNodeBuilder(params *LibP2PNodeBuilderParams, rpcTracking p2p.RpcControlT
 			params.NetworkingType,
 			params.SporkId,
 			params.IdProvider,
+			params.ScoringRegistryConfig,
 			params.RpcInspectorCfg,
 			params.SubscriptionProviderParam,
 			rpcTracking,

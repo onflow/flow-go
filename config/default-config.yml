@@ -198,6 +198,12 @@ network-config:
     iHave: -0.1
     iWant: -0.1
     publish: -0.1
+  # Threshold level for penalty. At each evaluation period, when a node's penalty is below this value, the decay rate slows down, ensuring longer decay periods for malicious nodes and quicker decay for honest ones.
+  gossipsub-app-specific-penalty-decay-slowdown-threshold: -99
+  # This setting adjusts the decay rate when a node's penalty falls below the threshold. The decay rate, ranging between 0 and 1, dictates how quickly penalties decrease: a higher rate results in slower decay. The decay calculation is multiplicative (newPenalty = decayRate * oldPenalty). The reduction factor increases the decay rate, thus decelerating the penalty reduction. For instance, with a 0.01 reduction factor, the decay rate increases by 0.01 at each evaluation interval when the penalty is below the threshold. Consequently, a decay rate of `x` diminishes the penalty to zero more rapidly than a rate of `x+0.01`.
+  gossipsub-app-specific-penalty-decay-rate-reduction-factor: .01
+  # Defines the frequency for evaluating and potentially adjusting the decay process of a spam record. At each interval, the system assesses the current penalty of a node. If this penalty is below the defined threshold, the decay rate is modified according to the reduction factor, slowing down the penalty reduction process. This reassessment at regular intervals ensures that the decay rate is dynamically adjusted to reflect the node's ongoing behavior, maintaining a balance between penalizing malicious activity and allowing recovery for honest nodes.
+  gossipsub-app-specific-penalty-decay-evaluation-period: 10m
   # Application layer spam prevention
   alsp-spam-record-cache-size: 1000
   alsp-spam-report-queue-size: 10_000

@@ -7,7 +7,6 @@ import (
 	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
 
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/utils/unittest"
 )
 
 const (

@@ -94,6 +94,7 @@ func InitCorruptLibp2pNode(
 			DisallowListCacheCfg:      disallowListCacheCfg,
 			UnicastConfig:             uniCfg,
 			GossipSubScorePenalties:   &netConfig.GossipsubScorePenalties,
+			ScoringRegistryConfig:     &netConfig.GossipSubScoringRegistryConfig,
 		},
 		Resolver:            resolver,
 		Role:                role,

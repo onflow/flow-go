@@ -37,24 +37,31 @@ func (i InvCtrlMsgErrs) Len() int {
 
 // InvCtrlMsgErr struct that wraps an error that occurred with during control message inspection and holds some metadata about the err such as the errors InvCtrlMsgErrSeverity.
 type InvCtrlMsgErr struct {
-	Err      error
-	severity InvCtrlMsgErrSeverity
+	Err              error
+	severity         InvCtrlMsgErrSeverity
+	ctrlMsgTopicType CtrlMsgTopicType
 }
 
 func (i InvCtrlMsgErr) Severity() InvCtrlMsgErrSeverity {
 	return i.severity
 }
 
+func (i InvCtrlMsgErr) CtrlMsgTopicType() CtrlMsgTopicType {
+	return i.ctrlMsgTopicType
+}
+
 // NewInvCtrlMsgErr returns a new InvCtrlMsgErr.
 // Args:
 // - err: the error.
 // - severity: the error severity.
+// - ctrlMsgTopicType: the control message topic type.
 // Returns:
 // - *InvCtrlMsgErr: the invalid control message error.
-func NewInvCtrlMsgErr(err error, severity InvCtrlMsgErrSeverity) *InvCtrlMsgErr {
+func NewInvCtrlMsgErr(err error, severity InvCtrlMsgErrSeverity, ctrlMsgTopicType CtrlMsgTopicType) *InvCtrlMsgErr {
 	return &InvCtrlMsgErr{
-		Err:      err,
-		severity: severity,
+		Err:              err,
+		severity:         severity,
+		ctrlMsgTopicType: ctrlMsgTopicType,
 	}
 }
 
@@ -98,6 +105,28 @@ type GossipSubInspectorNotifDistributor interface {
 	// AddConsumer must be concurrency safe. Once a consumer is added, it must be called for all future events.
 	// There is no guarantee that the consumer will be called for events that were already received by the distributor.
 	AddConsumer(GossipSubInvCtrlMsgNotifConsumer)
+}
+
+// CtrlMsgTopicType represents the type of the topic within a control message.
+type CtrlMsgTopicType uint64
+
+const (
+	// CtrlMsgNonClusterTopicType represents a non-cluster-prefixed topic.
+	CtrlMsgNonClusterTopicType CtrlMsgTopicType = iota
+	// CtrlMsgTopicTypeClusterPrefixed represents a cluster-prefixed topic.
+	CtrlMsgTopicTypeClusterPrefixed
+	CtrlMsgTopicTypeUnknown
+)
+
+func (t CtrlMsgTopicType) String() string {
+	switch t {
+	case CtrlMsgNonClusterTopicType:
+		return "non-cluster-prefixed"
+	case CtrlMsgTopicTypeClusterPrefixed:
+		return "cluster-prefixed"
+	default:
+		return "unknown"
+	}
 }
 
 // GossipSubInvCtrlMsgNotifConsumer is the interface for the consumer that consumes gossipsub inspector notifications.

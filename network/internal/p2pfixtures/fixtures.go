@@ -135,6 +135,7 @@ func CreateNode(t *testing.T, networkKey crypto.PrivateKey, sporkID flow.Identif
 			UnicastConfig: defaultFlowConfig.NetworkConfig.UnicastConfig,
 		},
 		GossipSubScorePenalties: &defaultFlowConfig.NetworkConfig.GossipsubScorePenalties,
+		ScoringRegistryConfig:   &defaultFlowConfig.NetworkConfig.GossipSubScoringRegistryConfig,
 	}
 	builder := p2pbuilder.NewNodeBuilder(params, meshTracer).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {

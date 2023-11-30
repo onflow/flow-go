@@ -402,6 +402,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 				},
 				UnicastConfig:           uniCfg,
 				GossipSubScorePenalties: &fnb.FlowConfig.NetworkConfig.GossipsubScorePenalties,
+				ScoringRegistryConfig:   &fnb.FlowConfig.NetworkConfig.GossipSubScoringRegistryConfig,
 			},
 			Resolver:            fnb.Resolver,
 			Role:                fnb.BaseConfig.NodeRole,

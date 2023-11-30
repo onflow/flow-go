@@ -608,6 +608,7 @@ func (builder *FollowerServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 			UnicastConfig: builder.FlowConfig.NetworkConfig.UnicastConfig,
 		},
 		GossipSubScorePenalties: &builder.FlowConfig.NetworkConfig.GossipsubScorePenalties,
+		ScoringRegistryConfig:   &builder.FlowConfig.NetworkConfig.GossipSubScoringRegistryConfig,
 	}
 	node, err := p2pbuilder.NewNodeBuilder(params, meshTracer).
 		SetSubscriptionFilter(
