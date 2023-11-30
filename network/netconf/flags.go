@@ -48,51 +48,15 @@ const (
 	memoryLimitBytes           = "memory-bytes"
 
 	// connection manager
-	highWatermark = "libp2p-high-watermark"
-	lowWatermark  = "libp2p-low-watermark"
-	gracePeriod   = "libp2p-grace-period"
-	silencePeriod = "libp2p-silence-period"
-	// gossipsub
-	gossipSub = "gossipsub"
-	// rpcSentTrackerCacheSize      = "gossipsub-rpc-sent-tracker-cache-size"
-	// rpcSentTrackerQueueCacheSize = "gossipsub-rpc-sent-tracker-queue-cache-size"
-	// rpcSentTrackerNumOfWorkers   = "gossipsub-rpc-sent-tracker-workers"
-	// scoreTracerInterval          = "gossipsub-score-tracer-interval"
-
-	// gossipSubSubscriptionProviderUpdateInterval = "gossipsub-subscription-provider-update-interval"
-	// gossipSubSubscriptionProviderCacheSize      = "gossipsub-subscription-provider-cache-size"
-	//
-	// // gossipsub validation inspector
-	// gossipSubRPCInspectorNotificationCacheSize                 = "gossipsub-rpc-inspector-notification-cache-size"
-	// validationInspectorNumberOfWorkers                         = "gossipsub-rpc-validation-inspector-workers"
-	// validationInspectorInspectMessageQueueCacheSize            = "gossipsub-rpc-validation-inspector-queue-cache-size"
-	// validationInspectorClusterPrefixedTopicsReceivedCacheSize  = "gossipsub-cluster-prefix-tracker-cache-size"
-	// validationInspectorClusterPrefixedTopicsReceivedCacheDecay = "gossipsub-cluster-prefix-tracker-cache-decay"
-	// validationInspectorClusterPrefixHardThreshold              = "gossipsub-rpc-cluster-prefixed-hard-threshold"
-	//
-	// ihaveMaxSampleSize           = "gossipsub-rpc-ihave-max-sample-size"
-	// ihaveMaxMessageIDSampleSize  = "gossipsub-rpc-ihave-max-message-id-sample-size"
-	// controlMessageMaxSampleSize  = "gossipsub-rpc-graft-and-prune-message-max-sample-size"
-	// iwantMaxSampleSize           = "gossipsub-rpc-iwant-max-sample-size"
-	// iwantMaxMessageIDSampleSize  = "gossipsub-rpc-iwant-max-message-id-sample-size"
-	// iwantCacheMissThreshold      = "gossipsub-rpc-iwant-cache-miss-threshold"
-	// iwantCacheMissCheckSize      = "gossipsub-rpc-iwant-cache-miss-check-size"
-	// iwantDuplicateMsgIDThreshold = "gossipsub-rpc-iwant-duplicate-message-id-threshold"
-	// rpcMessageMaxSampleSize      = "gossipsub-rpc-message-max-sample-size"
-	// rpcMessageErrorThreshold     = "gossipsub-rpc-message-error-threshold"
-	// gossipsub metrics inspector
-	// metricsInspectorNumberOfWorkers = "gossipsub-rpc-metrics-inspector-workers"
-	// metricsInspectorCacheSize       = "gossipsub-rpc-metrics-inspector-cache-size"
-
-	// gossipsub scoring registry
-	scoringRegistrySlowerDecayThreshold = "gossipsub-app-specific-penalty-decay-slowdown-threshold"
-	scoringRegistryDecayRateDecrement   = "gossipsub-app-specific-penalty-decay-rate-reduction-factor"
-	scoringRegistryDecayAdjustInterval  = "gossipsub-app-specific-penalty-decay-evaluation-period"
-	alspDisabled                        = "alsp-disable-penalty"
-	alspSpamRecordCacheSize             = "alsp-spam-record-cache-size"
-	alspSpamRecordQueueSize             = "alsp-spam-report-queue-size"
-	alspHearBeatInterval                = "alsp-heart-beat-interval"
-
+	highWatermark                      = "libp2p-high-watermark"
+	lowWatermark                       = "libp2p-low-watermark"
+	gracePeriod                        = "libp2p-grace-period"
+	silencePeriod                      = "libp2p-silence-period"
+	gossipSub                          = "gossipsub"
+	alspDisabled                       = "alsp-disable-penalty"
+	alspSpamRecordCacheSize            = "alsp-spam-record-cache-size"
+	alspSpamRecordQueueSize            = "alsp-spam-report-queue-size"
+	alspHearBeatInterval               = "alsp-heart-beat-interval"
 	alspSyncEngineBatchRequestBaseProb = "alsp-sync-engine-batch-request-base-prob"
 	alspSyncEngineRangeRequestBaseProb = "alsp-sync-engine-range-request-base-prob"
 	alspSyncEngineSyncRequestProb      = "alsp-sync-engine-sync-request-prob"
@@ -158,11 +122,11 @@ func AllFlagNames() []string {
 		BuildFlagName(gossipSub, p2pconf.ScoreParamsKey, p2pconf.AppSpecificScoreRegistryKey, p2pconf.ScoreUpdateWorkerNumKey),
 		BuildFlagName(gossipSub, p2pconf.ScoreParamsKey, p2pconf.AppSpecificScoreRegistryKey, p2pconf.ScoreUpdateRequestQueueSizeKey),
 		BuildFlagName(gossipSub, p2pconf.ScoreParamsKey, p2pconf.AppSpecificScoreRegistryKey, p2pconf.ScoreTTLKey),
-		BuildFlagName(gossipSub, p2pconf.ScoreParamsKey, p2pconf.SpamRecordCacheSizeKey),
+		BuildFlagName(gossipSub, p2pconf.ScoreParamsKey, p2pconf.SpamRecordCacheKey, p2pconf.CacheSizeKey),
+		BuildFlagName(gossipSub, p2pconf.ScoreParamsKey, p2pconf.SpamRecordCacheKey, p2pconf.PenaltyDecaySlowdownThresholdKey),
+		BuildFlagName(gossipSub, p2pconf.ScoreParamsKey, p2pconf.SpamRecordCacheKey, p2pconf.DecayRateReductionFactorKey),
+		BuildFlagName(gossipSub, p2pconf.ScoreParamsKey, p2pconf.SpamRecordCacheKey, p2pconf.PenaltyDecayEvaluationPeriodKey),
 		BuildFlagName(gossipSub, p2pconf.ScoreParamsKey, p2pconf.DecayIntervalKey),
-		scoringRegistrySlowerDecayThreshold,
-		scoringRegistryDecayRateDecrement,
-		scoringRegistryDecayAdjustInterval,
 	}
 
 	for _, scope := range []string{systemScope, transientScope, protocolScope, peerScope, peerProtocolScope} {
@@ -279,14 +243,16 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 		"base probability of creating a misbehavior report for a range request message")
 	flags.Float32(alspSyncEngineSyncRequestProb, config.AlspConfig.SyncEngine.SyncRequestProb, "probability of creating a misbehavior report for a sync request message")
 
-	flags.Float64(scoringRegistrySlowerDecayThreshold,
-		config.GossipSub.GossipSubScoringRegistryConfig.PenaltyDecaySlowdownThreshold,
-		"the penalty level at which the decay rate is reduced by --gossipsub-app-specific-penalty-decay-rate-reduction-factor")
-	flags.Float64(scoringRegistryDecayRateDecrement,
-		config.GossipSub.GossipSubScoringRegistryConfig.DecayRateReductionFactor,
-		"defines the value by which the decay rate is decreased every time the penalty is below the --gossipsub-app-specific-penalty-decay-slowdown-threshold.")
-	flags.Duration(scoringRegistryDecayAdjustInterval,
-		config.GossipSub.GossipSubScoringRegistryConfig.PenaltyDecayEvaluationPeriod,
+	flags.Float64(BuildFlagName(gossipSub, p2pconf.ScoreParamsKey, p2pconf.SpamRecordCacheKey, p2pconf.PenaltyDecaySlowdownThresholdKey),
+		config.GossipSub.ScoringParameters.SpamRecordCache.PenaltyDecaySlowdownThreshold,
+		fmt.Sprintf("the penalty level at which the decay rate is reduced by --%s",
+			BuildFlagName(gossipSub, p2pconf.ScoreParamsKey, p2pconf.SpamRecordCacheKey, p2pconf.DecayRateReductionFactorKey)))
+	flags.Float64(BuildFlagName(gossipSub, p2pconf.ScoreParamsKey, p2pconf.SpamRecordCacheKey, p2pconf.DecayRateReductionFactorKey),
+		config.GossipSub.ScoringParameters.SpamRecordCache.DecayRateReductionFactor,
+		fmt.Sprintf("defines the value by which the decay rate is decreased every time the penalty is below the --%s",
+			BuildFlagName(gossipSub, p2pconf.ScoreParamsKey, p2pconf.SpamRecordCacheKey, p2pconf.PenaltyDecaySlowdownThresholdKey)))
+	flags.Duration(BuildFlagName(gossipSub, p2pconf.ScoreParamsKey, p2pconf.SpamRecordCacheKey, p2pconf.PenaltyDecayEvaluationPeriodKey),
+		config.GossipSub.ScoringParameters.SpamRecordCache.PenaltyDecayEvaluationPeriod,
 		"defines the period at which the decay for a spam record is okay to be adjusted.")
 	flags.Int(BuildFlagName(gossipSub, p2pconf.RpcInspectorKey, p2pconf.ValidationConfigKey, p2pconf.IHaveConfigKey, p2pconf.MaxSampleSizeKey),
 		config.GossipSub.RpcInspector.Validation.IHave.MaxSampleSize,
@@ -333,8 +299,8 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 	flags.Duration(BuildFlagName(gossipSub, p2pconf.ScoreParamsKey, p2pconf.AppSpecificScoreRegistryKey, p2pconf.ScoreTTLKey),
 		config.GossipSub.ScoringParameters.AppSpecificScore.ScoreTTL,
 		"time to live for app specific scores; when expired a new request will be sent to the score update worker pool; till then the expired score will be used")
-	flags.Uint32(BuildFlagName(gossipSub, p2pconf.ScoreParamsKey, p2pconf.SpamRecordCacheSizeKey),
-		config.GossipSub.ScoringParameters.SpamRecordCacheSize,
+	flags.Uint32(BuildFlagName(gossipSub, p2pconf.ScoreParamsKey, p2pconf.SpamRecordCacheKey, p2pconf.CacheSizeKey),
+		config.GossipSub.ScoringParameters.SpamRecordCache.CacheSize,
 		"size of the spam record cache, recommended size is 10x the number of authorized nodes")
 	flags.Duration(BuildFlagName(gossipSub, p2pconf.ScoreParamsKey, p2pconf.DecayIntervalKey),
 		config.GossipSub.ScoringParameters.DecayInterval,

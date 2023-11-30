@@ -362,7 +362,7 @@ func (c *ScoreOptionConfig) SetRegisterNotificationConsumerFunc(f func(p2p.Gossi
 // NewScoreOption creates a new penalty option with the given configuration.
 func NewScoreOption(cfg *ScoreOptionConfig, provider p2p.SubscriptionProvider) (*ScoreOption, error) {
 	throttledSampler := logging.BurstSampler(MaxDebugLogs, time.Second)
-	logger := scoreOptionConfig.logger.With().
+	logger := cfg.logger.With().
 		Str("module", "pubsub_score_option").
 		Logger().
 		Sample(zerolog.LevelSampler{
@@ -378,10 +378,14 @@ func NewScoreOption(cfg *ScoreOptionConfig, provider p2p.SubscriptionProvider) (
 		IdProvider:              cfg.provider,
 		HeroCacheMetricsFactory: cfg.heroCacheMetricsFactory,
 		AppScoreCacheFactory: func() p2p.GossipSubApplicationSpecificScoreCache {
-			return internal.NewAppSpecificScoreCache(cfg.params.SpamRecordCacheSize, cfg.logger, cfg.heroCacheMetricsFactory)
+			return internal.NewAppSpecificScoreCache(cfg.params.SpamRecordCache.CacheSize, cfg.logger, cfg.heroCacheMetricsFactory)
 		},
 		SpamRecordCacheFactory: func() p2p.GossipSubSpamRecordCache {
-			return netcache.NewGossipSubSpamRecordCache(cfg.params.SpamRecordCacheSize, cfg.logger, cfg.heroCacheMetricsFactory, DefaultDecayFunction())
+			return netcache.NewGossipSubSpamRecordCache(cfg.params.SpamRecordCache.CacheSize, cfg.logger, cfg.heroCacheMetricsFactory,
+				DefaultDecayFunction(
+					cfg.params.SpamRecordCache.PenaltyDecaySlowdownThreshold,
+					cfg.params.SpamRecordCache.DecayRateReductionFactor,
+					cfg.params.SpamRecordCache.PenaltyDecayEvaluationPeriod))
 		},
 		Parameters: cfg.params.AppSpecificScore,
 	})
@@ -398,8 +402,8 @@ func NewScoreOption(cfg *ScoreOptionConfig, provider p2p.SubscriptionProvider) (
 
 	// set the app specific penalty function for the penalty option
 	// if the app specific penalty function is not set, use the default one
-	if scoreOptionConfig.appScoreFunc != nil {
-		s.appScoreFunc = scoreOptionConfig.appScoreFunc
+	if cfg.appScoreFunc != nil {
+		s.appScoreFunc = cfg.appScoreFunc
 		s.logger.
 			Warn().
 			Str(logging.KeyNetworkingSecurity, "true").
@@ -417,14 +421,14 @@ func NewScoreOption(cfg *ScoreOptionConfig, provider p2p.SubscriptionProvider) (
 	}
 
 	// registers the score registry as the consumer of the invalid control message notifications
-	if scoreOptionConfig.registerNotificationConsumerFunc != nil {
-		scoreOptionConfig.registerNotificationConsumerFunc(scoreRegistry)
+	if cfg.registerNotificationConsumerFunc != nil {
+		cfg.registerNotificationConsumerFunc(scoreRegistry)
 	}
 
 	s.peerScoreParams.AppSpecificScore = s.appScoreFunc
 
 	// apply the topic penalty parameters if any.
-	for _, topicParams := range scoreOptionConfig.topicParams {
+	for _, topicParams := range cfg.topicParams {
 		topicParams(s.peerScoreParams.Topics)
 	}
 

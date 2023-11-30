@@ -68,22 +68,19 @@ type GossipSubParameters struct {
 	// RpcInspectorParameters configuration for all gossipsub RPC control message inspectors.
 	RpcInspector RpcInspectorParameters `mapstructure:"rpc-inspector"`
 
-	GossipSubScoringRegistryConfig `mapstructure:",squash"`
 	// GossipSubScoringRegistryConfig is the configuration for the GossipSub score registry.
 	// GossipSubTracerParameters is the configuration for the gossipsub tracer. GossipSubParameters tracer is used to trace the local mesh events and peer scores.
 	RpcTracer GossipSubTracerParameters `mapstructure:"rpc-tracer"`
 
 	// ScoringParameters is whether to enable GossipSubParameters peer scoring.
-	PeerScoringEnabled bool `mapstructure:"peer-scoring-enabled"`
-
+	PeerScoringEnabled   bool                           `mapstructure:"peer-scoring-enabled"`
 	SubscriptionProvider SubscriptionProviderParameters `mapstructure:"subscription-provider"`
-
-	ScoringParameters ScoringParameters `mapstructure:"scoring-parameters"`
+	ScoringParameters    ScoringParameters              `mapstructure:"scoring-parameters"`
 }
 
 const (
 	AppSpecificScoreRegistryKey = "app-specific-score"
-	SpamRecordCacheSizeKey      = "spam-record-cache-size"
+	SpamRecordCacheKey          = "spam-record-cache"
 	DecayIntervalKey            = "decay-interval"
 )
 
@@ -91,10 +88,7 @@ const (
 // Parameters are "numerical values" that are used to compute or build components that compute the score of a peer in GossipSub system.
 type ScoringParameters struct {
 	AppSpecificScore AppSpecificScoreParameters `validate:"required" mapstructure:"app-specific-score"`
-	// SpamRecordCacheSize is size of the cache used to store the spam records of peers.
-	// The spam records are used to penalize peers that send invalid messages.
-	SpamRecordCacheSize uint32 `validate:"gt=0" mapstructure:"spam-record-cache-size"`
-
+	SpamRecordCache  SpamRecordCacheParameters  `validate:"required" mapstructure:"spam-record-cache"`
 	// DecayInterval is the interval at which the counters associated with a peer behavior in GossipSub system are decayed.
 	DecayInterval time.Duration `validate:"gt=0s" mapstructure:"decay-interval"`
 }
@@ -121,6 +115,28 @@ type AppSpecificScoreParameters struct {
 	ScoreTTL time.Duration `validate:"required" mapstructure:"score-ttl"`
 }
 
+const (
+	PenaltyDecaySlowdownThresholdKey = "penalty-decay-slowdown-threshold"
+	DecayRateReductionFactorKey      = "decay-rate-reduction-factor"
+	PenaltyDecayEvaluationPeriodKey  = "penalty-decay-evaluation-period"
+)
+
+type SpamRecordCacheParameters struct {
+	// CacheSize is size of the cache used to store the spam records of peers.
+	// The spam records are used to penalize peers that send invalid messages.
+	CacheSize uint32 `validate:"gt=0" mapstructure:"cache-size"`
+
+	// PenaltyDecaySlowdownThreshold defines the penalty level which the decay rate is reduced by `DecayRateReductionFactor` every time the penalty of a node falls below the threshold, thereby slowing down the decay process.
+	// This mechanism ensures that malicious nodes experience longer decay periods, while honest nodes benefit from quicker decay.
+	PenaltyDecaySlowdownThreshold float64 `validate:"lt=0" mapstructure:"penalty-decay-slowdown-threshold"`
+
+	// DecayRateReductionFactor defines the value by which the decay rate is decreased every time the penalty is below the PenaltyDecaySlowdownThreshold. A reduced decay rate extends the time it takes for penalties to diminish.
+	DecayRateReductionFactor float64 `validate:"gt=0,lt=1" mapstructure:"penalty-decay-rate-reduction-factor"`
+
+	// PenaltyDecayEvaluationPeriod defines the interval at which the decay for a spam record is okay to be adjusted.
+	PenaltyDecayEvaluationPeriod time.Duration `validate:"gt=0" mapstructure:"penalty-decay-evaluation-period"`
+}
+
 // SubscriptionProviderParameters keys.
 const (
 	UpdateIntervalKey = "update-interval"
@@ -139,16 +155,6 @@ type SubscriptionProviderParameters struct {
 	CacheSize uint32 `validate:"gt=0" mapstructure:"cache-size"`
 }
 
-// GossipSubScoringRegistryConfig is the configuration for the GossipSub score registry.
-type GossipSubScoringRegistryConfig struct {
-	// PenaltyDecaySlowdownThreshold defines the penalty level which the decay rate is reduced by `DecayRateReductionFactor` every time the penalty of a node falls below the threshold, thereby slowing down the decay process.
-	// This mechanism ensures that malicious nodes experience longer decay periods, while honest nodes benefit from quicker decay.
-	PenaltyDecaySlowdownThreshold float64 `validate:"lt=0" mapstructure:"gossipsub-app-specific-penalty-decay-slowdown-threshold"`
-	// DecayRateReductionFactor defines the value by which the decay rate is decreased every time the penalty is below the PenaltyDecaySlowdownThreshold. A reduced decay rate extends the time it takes for penalties to diminish.
-	DecayRateReductionFactor float64 `validate:"gt=0,lt=1" mapstructure:"gossipsub-app-specific-penalty-decay-rate-reduction-factor"`
-	// PenaltyDecayEvaluationPeriod defines the interval at which the decay for a spam record is okay to be adjusted.
-	PenaltyDecayEvaluationPeriod time.Duration `validate:"gt=0" mapstructure:"gossipsub-app-specific-penalty-decay-evaluation-period"`
-}
 // GossipSubTracerParameters keys.
 const (
 	LocalMeshLogIntervalKey         = "local-mesh-logging-interval"
