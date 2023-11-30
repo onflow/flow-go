@@ -756,8 +756,8 @@ func (exeNode *ExecutionNode) LoadRegisterStore(
 	}
 
 	node.Logger.Info().
-		String("pebble_db_path": exeNode.exeConf.registerDir).
-		Msgf("register store enabled") 
+		Str("pebble_db_path", exeNode.exeConf.registerDir).
+		Msg("register store enabled")
 	pebbledb, err := storagepebble.OpenRegisterPebbleDB(exeNode.exeConf.registerDir)
 
 	if err != nil {
