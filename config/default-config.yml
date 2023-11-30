@@ -197,9 +197,26 @@ network-config:
         # score ttl is the time to live for the app specific score. Once the score is expired; a new request will be sent to the app specific score provider to update the score.
         # until the score is updated, the previous score will be used.
         score-ttl: 1m
-      # size of cache used to track spam records at gossipsub. Each peer id is mapped to a spam record that keeps track of the spam score for that peer.
-      # cache should be big enough to keep track of the entire network's size. Otherwise, the local node's view of the network will be incomplete due to cache eviction.
-      spam-record-cache-size: 10_000
+      spam-record-cache:
+        # size of cache used to track spam records at gossipsub. Each peer id is mapped to a spam record that keeps track of the spam score for that peer.
+        # cache should be big enough to keep track of the entire network's size. Otherwise, the local node's view of the network will be incomplete due to cache eviction.
+        cache-size: 10_000
+        # Threshold level for spam record penalty.
+        # At each evaluation period, when a node's penalty is below this value, the decay rate slows down, ensuring longer decay periods for malicious nodes and quicker decay for honest ones.
+        penalty-decay-slowdown-threshold: -99
+        # This setting adjusts the decay rate when a node's penalty falls below the threshold.
+        # The decay rate, ranging between 0 and 1, dictates how quickly penalties decrease: a higher rate results in slower decay.
+        # The decay calculation is multiplicative (newPenalty = decayRate * oldPenalty).
+        # The reduction factor increases the decay rate, thus decelerating the penalty reduction. For instance, with a 0.01 reduction factor,
+        # the decay rate increases by 0.01 at each evaluation interval when the penalty is below the threshold.
+        # Consequently, a decay rate of `x` diminishes the penalty to zero more rapidly than a rate of `x+0.01`.
+        penalty-decay-rate-reduction-factor: 0.01
+        # Defines the frequency for evaluating and potentially adjusting the decay process of a spam record.
+        # At each interval, the system assesses the current penalty of a node.
+        # If this penalty is below the defined threshold, the decay rate is modified according to the reduction factor, slowing down the penalty reduction process.
+        # This reassessment at regular intervals ensures that the decay rate is dynamically adjusted to reflect the node's ongoing behavior,
+        # maintaining a balance between penalizing malicious activity and allowing recovery for honest nodes.
+        penalty-decay-evaluation-period: 10m
       # the intervals at which counters associated with a peer behavior in gossipsub system are decayed.
       decay-interval: 1m
     subscription-provider:
