@@ -290,18 +290,28 @@ func (e *ProtocolStateEntry) EpochStatus() *EpochStatus {
 	}
 }
 
+// EpochPhase returns the current epoch phase.
 func (e *ProtocolStateEntry) EpochPhase() EpochPhase {
+	// first assert that current/previous epoch contains valid values
+	if e.CurrentEpoch.SetupID == ZeroID || e.CurrentEpoch.CommitID == ZeroID {
+		return EpochPhaseUndefined
+	}
+	if e.PreviousEpoch != nil && e.PreviousEpoch.SetupID == ZeroID || e.PreviousEpoch.CommitID == ZeroID {
+		return EpochPhaseUndefined
+	}
+
+	// the epoch phase is determined by how much information we have about the next epoch
 	if e.NextEpoch == nil {
 		return EpochPhaseStaking
 	}
-	if e.NextEpoch.CommitID == ZeroID {
+	if e.NextEpoch.SetupID != ZeroID && e.NextEpoch.CommitID == ZeroID {
 		return EpochPhaseSetup
 	}
+	if e.NextEpoch.SetupID != ZeroID && e.NextEpoch.CommitID != ZeroID {
+		return EpochPhaseCommitted
 	}
-	if es.NextEpoch.CommitID == ZeroID {
-		return EpochPhaseSetup, nil
-	}
-	return EpochPhaseCommitted, nil
+
+	return EpochPhaseUndefined
 }
 
 func (ll DynamicIdentityEntryList) Lookup() map[Identifier]*DynamicIdentityEntry {

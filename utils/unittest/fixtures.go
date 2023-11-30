@@ -2040,6 +2040,7 @@ func EpochSetupFixture(opts ...func(setup *flow.EpochSetup)) *flow.EpochSetup {
 	return setup
 }
 
+// todo remove
 func EpochStatusFixture() *flow.EpochStatus {
 	return &flow.EpochStatus{
 		PreviousEpoch: flow.EventIDs{

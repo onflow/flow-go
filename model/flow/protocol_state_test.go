@@ -46,6 +46,8 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 			nil,
 		)
 		assert.NoError(t, err)
+		assert.Equal(t, flow.EpochPhaseStaking, entry.EpochPhase())
+
 		expectedIdentities, err := flow.BuildIdentityTable(
 			setup.Participants,
 			identities,
@@ -73,6 +75,8 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 			nil,
 		)
 		assert.NoError(t, err)
+		assert.Equal(t, flow.EpochPhaseStaking, richEntry.EpochPhase())
+
 		expectedIdentities, err := flow.BuildIdentityTable(
 			stateEntry.CurrentEpochSetup.Participants,
 			stateEntry.CurrentEpoch.ActiveIdentities,
@@ -105,6 +109,8 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 			nil,
 		)
 		assert.NoError(t, err)
+		assert.Equal(t, flow.EpochPhaseSetup, richEntry.EpochPhase())
+
 		expectedIdentities, err := flow.BuildIdentityTable(
 			stateEntry.CurrentEpochSetup.Participants,
 			stateEntry.CurrentEpoch.ActiveIdentities,
@@ -127,6 +133,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 	})
 
 	// TODO: include test for epoch setup phase where no prior epoch exist (i.e. first epoch setup phase after spork)
+	// TODO: above is done in https://github.com/onflow/flow-go/pull/5080 - add phase check once merged
 
 	// Common situation during the epoch commit phase for epoch N+1
 	//  * we are currently in Epoch N
@@ -145,6 +152,8 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 			stateEntry.NextEpochCommit,
 		)
 		assert.NoError(t, err)
+		assert.Equal(t, flow.EpochPhaseCommitted, richEntry.EpochPhase())
+
 		expectedIdentities, err := flow.BuildIdentityTable(
 			stateEntry.CurrentEpochSetup.Participants,
 			stateEntry.CurrentEpoch.ActiveIdentities,
@@ -166,6 +175,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 	})
 
 	// TODO: include test for epoch commit phase where no prior epoch exist (i.e. first epoch commit phase after spork)
+	// TODO: above is done in https://github.com/onflow/flow-go/pull/5080 - add phase check once merged
 
 }
 

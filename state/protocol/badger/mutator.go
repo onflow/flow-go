@@ -814,6 +814,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 //
 // No errors are expected during normal operation.
 func (m *FollowerState) epochFallbackTriggeredByFinalizedBlock(block *flow.Header, epochStatus *flow.EpochStatus, currentEpochSetup *flow.EpochSetup) (bool, error) {
+	// todo: replace epochStatus with protocolStateEntry
 	// 1. Epoch fallback is tentatively triggered on this fork
 	if epochStatus.InvalidEpochTransitionAttempted {
 		return true, nil
@@ -907,6 +908,7 @@ func (m *FollowerState) epochPhaseMetricsAndEventsOnBlockFinalized(block *flow.B
 	events []func(),
 	err error,
 ) {
+	// todo: replace epochStatus with protocolStateEntry
 
 	// block payload may not specify seals in order, so order them by block height before processing
 	orderedSeals, err := protocol.OrderedSeals(block.Payload.Seals, m.headers)
