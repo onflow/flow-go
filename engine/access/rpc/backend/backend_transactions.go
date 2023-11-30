@@ -21,6 +21,8 @@ import (
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -140,7 +142,7 @@ func (b *backendTransactions) sendTransactionToCollector(ctx context.Context,
 	tx *flow.TransactionBody,
 	collectionNodeAddr string) error {
 
-	collectionRPC, closer, err := b.connFactory.GetAccessAPIClient(collectionNodeAddr)
+	collectionRPC, closer, err := b.connFactory.GetAccessAPIClient(collectionNodeAddr, nil)
 	if err != nil {
 		return fmt.Errorf("failed to connect to collection node at %s: %w", collectionNodeAddr, err)
 	}
@@ -193,7 +195,7 @@ func (b *backendTransactions) GetTransaction(ctx context.Context, txID flow.Iden
 }
 
 func (b *backendTransactions) GetTransactionsByBlockID(
-	ctx context.Context,
+	_ context.Context,
 	blockID flow.Identifier,
 ) ([]*flow.TransactionBody, error) {
 	var transactions []*flow.TransactionBody
@@ -317,6 +319,9 @@ func (b *backendTransactions) GetTransactionResult(
 	// derive status of the transaction
 	txStatus, err := b.deriveTransactionStatus(tx, transactionWasExecuted, block)
 	if err != nil {
+		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
+			irrecoverable.Throw(ctx, err)
+		}
 		return nil, rpc.ConvertStorageError(err)
 	}
 
@@ -434,6 +439,9 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 			// tx body is irrelevant to status if it's in an executed block
 			txStatus, err := b.deriveTransactionStatus(nil, true, block)
 			if err != nil {
+				if !errors.Is(err, state.ErrUnknownSnapshotReference) {
+					irrecoverable.Throw(ctx, err)
+				}
 				return nil, rpc.ConvertStorageError(err)
 			}
 			events, err := convert.MessagesToEventsWithEncodingConversion(txResult.GetEvents(), resp.GetEventEncodingVersion(), requiredEventEncodingVersion)
@@ -488,6 +496,9 @@ func (b *backendTransactions) GetTransactionResultsByBlockID(
 		systemTxResult := resp.TransactionResults[len(resp.TransactionResults)-1]
 		systemTxStatus, err := b.deriveTransactionStatus(systemTx, true, block)
 		if err != nil {
+			if !errors.Is(err, state.ErrUnknownSnapshotReference) {
+				irrecoverable.Throw(ctx, err)
+			}
 			return nil, rpc.ConvertStorageError(err)
 		}
 
@@ -546,6 +557,9 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 	// tx body is irrelevant to status if it's in an executed block
 	txStatus, err := b.deriveTransactionStatus(nil, true, block)
 	if err != nil {
+		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
+			irrecoverable.Throw(ctx, err)
+		}
 		return nil, rpc.ConvertStorageError(err)
 	}
 
@@ -565,13 +579,75 @@ func (b *backendTransactions) GetTransactionResultByIndex(
 	}, nil
 }
 
+// GetSystemTransaction returns system transaction
+func (b *backendTransactions) GetSystemTransaction(ctx context.Context, _ flow.Identifier) (*flow.TransactionBody, error) {
+	systemTx, err := blueprints.SystemChunkTransaction(b.chainID.Chain())
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "could not get system chunk transaction: %v", err)
+	}
+
+	return systemTx, nil
+}
+
+// GetSystemTransactionResult returns system transaction result
+func (b *backendTransactions) GetSystemTransactionResult(ctx context.Context, blockID flow.Identifier, requiredEventEncodingVersion entities.EventEncodingVersion) (*access.TransactionResult, error) {
+	block, err := b.blocks.ByID(blockID)
+	if err != nil {
+		return nil, rpc.ConvertStorageError(err)
+	}
+
+	req := &execproto.GetTransactionsByBlockIDRequest{
+		BlockId: blockID[:],
+	}
+	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
+	if err != nil {
+		if IsInsufficientExecutionReceipts(err) {
+			return nil, status.Errorf(codes.NotFound, err.Error())
+		}
+		return nil, rpc.ConvertError(err, "failed to retrieve result from any execution node", codes.Internal)
+	}
+
+	resp, err := b.getTransactionResultsByBlockIDFromAnyExeNode(ctx, execNodes, req)
+	if err != nil {
+		return nil, rpc.ConvertError(err, "failed to retrieve result from execution node", codes.Internal)
+	}
+
+	systemTx, err := blueprints.SystemChunkTransaction(b.chainID.Chain())
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "could not get system chunk transaction: %v", err)
+	}
+
+	systemTxResult := resp.TransactionResults[len(resp.TransactionResults)-1]
+	systemTxStatus, err := b.deriveTransactionStatus(systemTx, true, block)
+	if err != nil {
+		return nil, rpc.ConvertStorageError(err)
+	}
+
+	events, err := convert.MessagesToEventsWithEncodingConversion(systemTxResult.GetEvents(), resp.GetEventEncodingVersion(), requiredEventEncodingVersion)
+	if err != nil {
+		return nil, rpc.ConvertError(err, "failed to convert events from system tx result", codes.Internal)
+	}
+
+	return &access.TransactionResult{
+		Status:        systemTxStatus,
+		StatusCode:    uint(systemTxResult.GetStatusCode()),
+		Events:        events,
+		ErrorMessage:  systemTxResult.GetErrorMessage(),
+		BlockID:       blockID,
+		TransactionID: systemTx.ID(),
+		BlockHeight:   block.Header.Height,
+	}, nil
+}
+
 // deriveTransactionStatus derives the transaction status based on current protocol state
+// Error returns:
+//   - state.ErrUnknownSnapshotReference - block referenced by transaction has not been found.
+//   - all other errors are unexpected and potentially symptoms of internal implementation bugs or state corruption (fatal).
 func (b *backendTransactions) deriveTransactionStatus(
 	tx *flow.TransactionBody,
 	executed bool,
 	block *flow.Block,
 ) (flow.TransactionStatus, error) {
-
 	if block == nil {
 		// Not in a block, let's see if it's expired
 		referenceBlock, err := b.state.AtBlockID(tx.ReferenceBlockID).Head()
@@ -582,7 +658,7 @@ func (b *backendTransactions) deriveTransactionStatus(
 		// get the latest finalized block from the state
 		finalized, err := b.state.Final().Head()
 		if err != nil {
-			return flow.TransactionStatusUnknown, err
+			return flow.TransactionStatusUnknown, irrecoverable.NewExceptionf("failed to lookup final header: %w", err)
 		}
 		finalizedHeight := finalized.Height
 
@@ -626,7 +702,7 @@ func (b *backendTransactions) deriveTransactionStatus(
 	// get the latest sealed block from the State
 	sealed, err := b.state.Sealed().Head()
 	if err != nil {
-		return flow.TransactionStatusUnknown, err
+		return flow.TransactionStatusUnknown, irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
 	}
 
 	if block.Header.Height > sealed.Height {
@@ -647,6 +723,9 @@ func (b *backendTransactions) isExpired(refHeight, compareToHeight uint64) bool 
 	return compareToHeight-refHeight > flow.DefaultTransactionExpiry
 }
 
+// Error returns:
+//   - `storage.ErrNotFound` - collection referenced by transaction or block by a collection has not been found.
+//   - all other errors are unexpected and potentially symptoms of internal implementation bugs or state corruption (fatal).
 func (b *backendTransactions) lookupBlock(txID flow.Identifier) (*flow.Block, error) {
 
 	collection, err := b.collections.LightByTransactionID(txID)
@@ -782,8 +861,13 @@ func (b *backendTransactions) getTransactionResultFromExecutionNode(
 	return events, resp.GetStatusCode(), resp.GetErrorMessage(), nil
 }
 
-func (b *backendTransactions) NotifyFinalizedBlockHeight(height uint64) {
-	b.retry.Retry(height)
+// ATTENTION: might be a source of problems in future. We run this code on finalization gorotuine,
+// potentially lagging finalization events if operations take long time.
+// We might need to move this logic on dedicated goroutine and provide a way to skip finalization events if they are delivered
+// too often for this engine. An example of similar approach - https://github.com/onflow/flow-go/blob/10b0fcbf7e2031674c00f3cdd280f27bd1b16c47/engine/common/follower/compliance_engine.go#L201..
+// No errors expected during normal operations.
+func (b *backendTransactions) ProcessFinalizedBlockHeight(height uint64) error {
+	return b.retry.Retry(height)
 }
 
 func (b *backendTransactions) getTransactionResultFromAnyExeNode(

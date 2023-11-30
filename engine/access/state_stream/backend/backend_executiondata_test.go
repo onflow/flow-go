@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
+	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	"github.com/onflow/flow-go/module/mempool/herocache"
@@ -38,12 +39,14 @@ var testEventTypes = []flow.EventType{
 type BackendExecutionDataSuite struct {
 	suite.Suite
 
-	state    *protocolmock.State
-	params   *protocolmock.Params
-	snapshot *protocolmock.Snapshot
-	headers  *storagemock.Headers
-	seals    *storagemock.Seals
-	results  *storagemock.ExecutionResults
+	state          *protocolmock.State
+	params         *protocolmock.Params
+	snapshot       *protocolmock.Snapshot
+	headers        *storagemock.Headers
+	seals          *storagemock.Seals
+	results        *storagemock.ExecutionResults
+	registers      *storagemock.RegisterIndex
+	registersAsync *execution.RegistersAsyncStore
 
 	bs                blobs.Blobstore
 	eds               execution_data.ExecutionDataStore
@@ -83,8 +86,9 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 	s.execDataCache = cache.NewExecutionDataCache(s.eds, s.headers, s.seals, s.results, s.execDataHeroCache)
 
 	conf := Config{
-		ClientSendTimeout:    state_stream.DefaultSendTimeout,
-		ClientSendBufferSize: state_stream.DefaultSendBufferSize,
+		ClientSendTimeout:       state_stream.DefaultSendTimeout,
+		ClientSendBufferSize:    state_stream.DefaultSendBufferSize,
+		RegisterIDsRequestLimit: state_stream.DefaultRegisterIDsRequestLimit,
 	}
 
 	var err error
@@ -144,6 +148,20 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 
 		s.T().Logf("adding exec data for block %d %d %v => %v", i, block.Header.Height, block.ID(), result.ExecutionDataID)
 	}
+
+	s.registersAsync = execution.NewRegistersAsyncStore()
+	s.registers = storagemock.NewRegisterIndex(s.T())
+	err = s.registersAsync.InitDataAvailable(s.registers)
+	require.NoError(s.T(), err)
+	s.registers.On("LatestHeight").Return(rootBlock.Header.Height).Maybe()
+	s.registers.On("FirstHeight").Return(rootBlock.Header.Height).Maybe()
+	s.registers.On("Get", mock.AnythingOfType("RegisterID"), mock.AnythingOfType("uint64")).Return(
+		func(id flow.RegisterID, height uint64) (flow.RegisterValue, error) {
+			if id == unittest.RegisterIDFixture() {
+				return flow.RegisterValue{}, nil
+			}
+			return nil, storage.ErrNotFound
+		}).Maybe()
 
 	s.state.On("Sealed").Return(s.snapshot, nil).Maybe()
 	s.snapshot.On("Head").Return(s.blocks[0].Header, nil).Maybe()
@@ -239,6 +257,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 		s.broadcaster,
 		rootBlock.Header.Height,
 		rootBlock.Header.Height, // initialize with no downloaded data
+		s.registersAsync,
 	)
 	require.NoError(s.T(), err)
 }
@@ -416,5 +435,29 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataHandlesErrors() {
 
 		sub := s.backend.SubscribeExecutionData(subCtx, flow.ZeroID, s.blocks[len(s.blocks)-1].Header.Height+10)
 		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()))
+	})
+}
+
+func (s *BackendExecutionDataSuite) TestGetRegisterValuesErrors() {
+	s.Run("normal case", func() {
+		res, err := s.backend.GetRegisterValues(flow.RegisterIDs{unittest.RegisterIDFixture()}, s.backend.rootBlockHeight)
+		require.NoError(s.T(), err)
+		require.NotEmpty(s.T(), res)
+	})
+
+	s.Run("returns error if block height is out of range", func() {
+		_, err := s.backend.GetRegisterValues(flow.RegisterIDs{unittest.RegisterIDFixture()}, s.backend.rootBlockHeight+1)
+		require.Equal(s.T(), codes.OutOfRange, status.Code(err))
+	})
+
+	s.Run("returns error if register path is not indexed", func() {
+		falseID := flow.RegisterIDs{flow.RegisterID{Owner: "ha", Key: "ha"}}
+		_, err := s.backend.GetRegisterValues(falseID, s.backend.rootBlockHeight)
+		require.Equal(s.T(), codes.NotFound, status.Code(err))
+	})
+
+	s.Run("returns error if too many registers are requested", func() {
+		_, err := s.backend.GetRegisterValues(make(flow.RegisterIDs, s.backend.registerRequestLimit+1), s.backend.rootBlockHeight)
+		require.Equal(s.T(), codes.InvalidArgument, status.Code(err))
 	})
 }

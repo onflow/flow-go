@@ -2,15 +2,18 @@ package fvm_test
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/big"
 	"strings"
 	"testing"
 
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
+	"github.com/onflow/atree"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
@@ -29,9 +32,13 @@ import (
 	bootstrapexec "github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/evm/testutils"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/tracing"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/model/flow"
@@ -146,7 +153,9 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 
 	opts := []fvm.Option{
 		fvm.WithTransactionFeesEnabled(true),
-		fvm.WithAccountStorageLimit(true),
+		// TODO (JanezP): enable storage feee once we figure out how storage limits work
+		// with the EVM account
+		fvm.WithAccountStorageLimit(false),
 		fvm.WithChain(chain),
 		fvm.WithLogger(logger),
 		fvm.WithMaxStateInteractionSize(interactionLimit),
@@ -156,6 +165,7 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 				runtime.Config{},
 			),
 		),
+		fvm.WithEVMEnabled(true),
 	}
 	fvmContext := fvm.NewContext(opts...)
 
@@ -192,6 +202,7 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithTransactionFee(fvm.DefaultTransactionFees),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+		fvm.WithSetupEVMEnabled(true),
 	)
 	require.NoError(tb, err)
 
@@ -276,6 +287,26 @@ func (b *BasicBlockExecutor) ExecuteCollections(tb testing.TB, collections [][]*
 	}
 
 	return computationResult
+}
+
+func (b *BasicBlockExecutor) RunWithLedger(tb testing.TB, f func(ledger atree.Ledger)) {
+	ts := state.NewTransactionState(b.activeSnapshot, state.DefaultParameters())
+
+	accounts := environment.NewAccounts(ts)
+	meter := environment.NewMeter(ts)
+
+	valueStore := environment.NewValueStore(
+		tracing.NewMockTracerSpan(),
+		meter,
+		accounts,
+	)
+
+	f(valueStore)
+
+	newSnapshot, err := ts.FinalizeMainTransaction()
+	require.NoError(tb, err)
+
+	b.activeSnapshot = b.activeSnapshot.Append(newSnapshot)
 }
 
 func (b *BasicBlockExecutor) SetupAccounts(tb testing.TB, privateKeys []flow.AccountPrivateKey) []TestBenchAccount {
@@ -372,6 +403,11 @@ func (l *logExtractor) Write(p []byte) (n int, err error) {
 
 var _ io.Writer = &logExtractor{}
 
+type benchTransactionContext struct {
+	EvmTestContract *testutils.TestContract
+	EvmTestAccount  *testutils.EOATestAccount
+}
+
 // BenchmarkRuntimeEmptyTransaction simulates executing blocks with `transactionsPerBlock`
 // where each transaction is an empty transaction
 func BenchmarkRuntimeTransaction(b *testing.B) {
@@ -387,7 +423,13 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 		InteractionUsed: map[string]uint64{},
 	}
 
-	benchTransaction := func(b *testing.B, tx string) {
+	testContractAddress, err := chain.AddressAtIndex(environment.EVMAccountIndex + 1)
+	require.NoError(b, err)
+
+	benchTransaction := func(
+		b *testing.B,
+		txStringFunc func(b *testing.B, context benchTransactionContext) string,
+	) {
 
 		logger := zerolog.New(logE).Level(zerolog.DebugLevel)
 
@@ -406,8 +448,13 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 		for _, account := range accounts {
 			addrs = append(addrs, account.Address)
 		}
+		// TODO (JanezP): fix when the evm account has a receiver
+		//evmAddress, err := chain.AddressAtIndex(environment.EVMAccountIndex)
+		//require.NoError(b, err)
+		//addrs = append(addrs, evmAddress)
+
 		// fund all accounts so not to run into storage problems
-		fundAccounts(b, blockExecutor, cadence.UFix64(10_000_000_000), addrs...)
+		fundAccounts(b, blockExecutor, cadence.UFix64(1_000_000_000_000), addrs...)
 
 		accounts[0].DeployContract(b, blockExecutor, "TestContract", `
 			access(all) contract TestContract {
@@ -421,17 +468,33 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 				}
 			}
 			`)
+		require.Equal(b, testContractAddress, accounts[0].Address,
+			"test contract should be deployed to first available account index")
 
 		accounts[0].AddArrayToStorage(b, blockExecutor, []string{longString, longString, longString, longString, longString})
 
-		btx := []byte(tx)
+		tc := testutils.GetStorageTestContract(b)
+		var evmTestAccount *testutils.EOATestAccount
+		blockExecutor.RunWithLedger(b, func(ledger atree.Ledger) {
+			testutils.DeployContract(b, tc, ledger, chain.ServiceAddress())
+			evmTestAccount = testutils.FundAndGetEOATestAccount(b, ledger, chain.ServiceAddress())
+		})
+
+		benchTransactionContext := benchTransactionContext{
+			EvmTestContract: tc,
+			EvmTestAccount:  evmTestAccount,
+		}
 
 		benchmarkAccount := &accounts[0]
 
 		b.ResetTimer() // setup done, lets start measuring
+		b.StopTimer()
 		for i := 0; i < b.N; i++ {
 			transactions := make([]*flow.TransactionBody, transactionsPerBlock)
 			for j := 0; j < transactionsPerBlock; j++ {
+				tx := txStringFunc(b, benchTransactionContext)
+
+				btx := []byte(tx)
 				txBody := flow.NewTransactionBody().
 					SetScript(btx).
 					AddAuthorizer(benchmarkAccount.Address).
@@ -443,8 +506,9 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 
 				transactions[j] = txBody
 			}
-
+			b.StartTimer()
 			computationResult := blockExecutor.ExecuteCollections(b, [][]*flow.TransactionBody{transactions})
+			b.StopTimer()
 			totalInteractionUsed := uint64(0)
 			totalComputationUsed := uint64(0)
 			results := computationResult.AllTransactionResults()
@@ -460,130 +524,265 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 	}
 
 	templateTx := func(rep int, prepare string) string {
-		return fmt.Sprintf(`
+		return fmt.Sprintf(
+			`
 			import FungibleToken from 0x%s
 			import FlowToken from 0x%s
 			import TestContract from 0x%s
+			import EVM from 0x%s
 
 			transaction(){
 				prepare(signer: AuthAccount){
 					var i = 0
 					while i < %d {
-						i = i + 1
+						i = i + 	1
 			%s
 					}
 				}
-			}`, fvm.FungibleTokenAddress(chain), fvm.FlowTokenAddress(chain), "754aed9de6197641", rep, prepare)
+			}`,
+			fvm.FungibleTokenAddress(chain),
+			fvm.FlowTokenAddress(chain),
+			testContractAddress,
+			chain.ServiceAddress(),
+			rep,
+			prepare,
+		)
 	}
 
 	b.Run("reference tx", func(b *testing.B) {
-		benchTransaction(b, templateTx(100, ""))
+		benchTransaction(b,
+			func(b *testing.B, context benchTransactionContext) string {
+				return templateTx(100, "")
+			},
+		)
 	})
 	b.Run("convert int to string", func(b *testing.B) {
-		benchTransaction(b, templateTx(100, `i.toString()`))
+		benchTransaction(b,
+			func(b *testing.B, context benchTransactionContext) string {
+				return templateTx(100, `i.toString()`)
+			},
+		)
 	})
 	b.Run("convert int to string and concatenate it", func(b *testing.B) {
-		benchTransaction(b, templateTx(100, `"x".concat(i.toString())`))
+		benchTransaction(b,
+			func(b *testing.B, context benchTransactionContext) string {
+				return templateTx(100, `"x".concat(i.toString())`)
+			},
+		)
 	})
 	b.Run("get signer address", func(b *testing.B) {
-		benchTransaction(b, templateTx(100, `signer.address`))
+		benchTransaction(b,
+			func(b *testing.B, context benchTransactionContext) string {
+				return templateTx(100, `signer.address`)
+			},
+		)
 	})
 	b.Run("get public account", func(b *testing.B) {
-		benchTransaction(b, templateTx(100, `getAccount(signer.address)`))
+		benchTransaction(b,
+			func(b *testing.B, context benchTransactionContext) string {
+				return templateTx(100, `getAccount(signer.address)`)
+			},
+		)
 	})
 	b.Run("get account and get balance", func(b *testing.B) {
-		benchTransaction(b, templateTx(100, `getAccount(signer.address).balance`))
+		benchTransaction(b,
+			func(b *testing.B, context benchTransactionContext) string {
+				return templateTx(100, `getAccount(signer.address).balance`)
+			},
+		)
 	})
 	b.Run("get account and get available balance", func(b *testing.B) {
-		benchTransaction(b, templateTx(100, `getAccount(signer.address).availableBalance`))
+		benchTransaction(b,
+			func(b *testing.B, context benchTransactionContext) string {
+				return templateTx(100, `getAccount(signer.address).availableBalance`)
+			},
+		)
 	})
 	b.Run("get account and get storage used", func(b *testing.B) {
-		benchTransaction(b, templateTx(100, `getAccount(signer.address).storageUsed`))
+		benchTransaction(b,
+			func(b *testing.B, context benchTransactionContext) string {
+				return templateTx(100, `getAccount(signer.address).storageUsed`)
+			},
+		)
 	})
 	b.Run("get account and get storage capacity", func(b *testing.B) {
-		benchTransaction(b, templateTx(100, `getAccount(signer.address).storageCapacity`))
+		benchTransaction(b,
+			func(b *testing.B, context benchTransactionContext) string {
+				return templateTx(100, `getAccount(signer.address).storageCapacity`)
+			},
+		)
 	})
 	b.Run("get signer vault", func(b *testing.B) {
 		benchTransaction(
 			b,
-			templateTx(100, `let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)!`),
+			func(b *testing.B, context benchTransactionContext) string {
+				return templateTx(100, `let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)!`)
+			},
 		)
 	})
 	b.Run("get signer receiver", func(b *testing.B) {
 		benchTransaction(
 			b,
-			templateTx(100, `let receiverRef =  getAccount(signer.address)
-				.getCapability(/public/flowTokenReceiver)
-				.borrow<&{FungibleToken.Receiver}>()!`),
+			func(b *testing.B, context benchTransactionContext) string {
+				return templateTx(100,
+					`let receiverRef =  getAccount(signer.address)
+					.getCapability(/public/flowTokenReceiver)
+					.borrow<&{FungibleToken.Receiver}>()!`)
+			},
 		)
 	})
 	b.Run("transfer tokens", func(b *testing.B) {
 		benchTransaction(
 			b,
-			templateTx(100, `
-				let receiverRef =  getAccount(signer.address)
-					.getCapability(/public/flowTokenReceiver)
-					.borrow<&{FungibleToken.Receiver}>()!
-
-				let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)!
-
-				receiverRef.deposit(from: <-vaultRef.withdraw(amount: 0.00001))
-			`),
+			func(b *testing.B, context benchTransactionContext) string {
+				return templateTx(100, `
+					let receiverRef =  getAccount(signer.address)
+						.getCapability(/public/flowTokenReceiver)
+						.borrow<&{FungibleToken.Receiver}>()!
+	
+					let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)!
+	
+					receiverRef.deposit(from: <-vaultRef.withdraw(amount: 0.00001))
+				`)
+			},
 		)
 	})
 	b.Run("load and save empty string on signers address", func(b *testing.B) {
 		benchTransaction(
 			b,
-			templateTx(100, `
-				signer.load<String>(from: /storage/testpath)
-				signer.save("", to: /storage/testpath)
-			`),
+			func(b *testing.B, context benchTransactionContext) string {
+				return templateTx(100, `
+					signer.load<String>(from: /storage/testpath)
+					signer.save("", to: /storage/testpath)
+				`)
+			},
 		)
 	})
 	b.Run("load and save long string on signers address", func(b *testing.B) {
 		benchTransaction(
 			b,
-			templateTx(100, fmt.Sprintf(`
-				signer.load<String>(from: /storage/testpath)
-				signer.save("%s", to: /storage/testpath)
-			`, longString)),
+			func(b *testing.B, context benchTransactionContext) string {
+				return templateTx(100, fmt.Sprintf(`
+					signer.load<String>(from: /storage/testpath)
+					signer.save("%s", to: /storage/testpath)
+				`, longString))
+			},
 		)
 	})
 	b.Run("create new account", func(b *testing.B) {
-		benchTransaction(b, templateTx(50, `let acct = AuthAccount(payer: signer)`))
+		benchTransaction(b,
+			func(b *testing.B, context benchTransactionContext) string {
+				return templateTx(50, `let acct = AuthAccount(payer: signer)`)
+			},
+		)
 	})
 	b.Run("call empty contract function", func(b *testing.B) {
-		benchTransaction(b, templateTx(100, `TestContract.empty()`))
+		benchTransaction(b,
+			func(b *testing.B, context benchTransactionContext) string {
+				return templateTx(100, `TestContract.empty()`)
+			},
+		)
 	})
 	b.Run("emit event", func(b *testing.B) {
-		benchTransaction(b, templateTx(100, `TestContract.emit()`))
+		benchTransaction(b,
+			func(b *testing.B, context benchTransactionContext) string {
+				return templateTx(100, `TestContract.emit()`)
+			},
+		)
 	})
 	b.Run("borrow array from storage", func(b *testing.B) {
 		benchTransaction(
 			b,
-			templateTx(100, `
-				let strings = signer.borrow<&[String]>(from: /storage/test)!
-				var i = 0
-				while (i < strings.length) {
-				  log(strings[i])
-				  i = i +1
-				}
-			`),
+			func(b *testing.B, context benchTransactionContext) string {
+				return templateTx(100, `
+					let strings = signer.borrow<&[String]>(from: /storage/test)!
+					var i = 0
+					while (i < strings.length) {
+					  log(strings[i])
+					  i = i +1
+					}
+				`)
+			},
 		)
 	})
 	b.Run("copy array from storage", func(b *testing.B) {
 		benchTransaction(
 			b,
-			templateTx(100, `
-				let strings = signer.copy<[String]>(from: /storage/test)!
-				var i = 0
-				while (i < strings.length) {
-				  log(strings[i])
-				  i = i +1
-				}
-			`),
+			func(b *testing.B, context benchTransactionContext) string {
+				return templateTx(100, `
+					let strings = signer.copy<[String]>(from: /storage/test)!
+					var i = 0
+					while (i < strings.length) {
+					  log(strings[i])
+					  i = i +1
+					}
+				`)
+			},
 		)
 	})
+
+	benchEvm := func(b *testing.B, control bool) {
+		// This is the same as the evm benchmark but without the EVM.run call
+		// This way we can observe the cost of just the EVM.run call
+		benchTransaction(
+			b,
+			func(b *testing.B, context benchTransactionContext) string {
+				coinbaseBytes := context.EvmTestAccount.Address().Bytes()
+				transactionBody := fmt.Sprintf(`
+				                    let coinbaseBytesRaw = "%s".decodeHex()
+					let coinbaseBytes: [UInt8; 20] = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+					for j, v in coinbaseBytesRaw {
+						coinbaseBytes[j] = v
+					}
+					let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+				`, hex.EncodeToString(coinbaseBytes))
+
+				num := int64(12)
+				gasLimit := uint64(100_000)
+
+				// add 10 EVM transactions to the Flow transaction body
+				for i := 0; i < 100; i++ {
+					txBytes := context.EvmTestAccount.PrepareSignAndEncodeTx(b,
+						context.EvmTestContract.DeployedAt.ToCommon(),
+						context.EvmTestContract.MakeCallData(b, "store", big.NewInt(num)),
+						big.NewInt(0),
+						gasLimit,
+						big.NewInt(0),
+					)
+					if control {
+						transactionBody += fmt.Sprintf(`
+						let txBytes%[1]d = "%[2]s".decodeHex()
+						EVM.run(tx: txBytes%[1]d, coinbase: coinbase)
+						`,
+							i,
+							hex.EncodeToString(txBytes),
+						)
+					} else {
+						// don't run the EVM transaction but do the hex conversion
+						transactionBody += fmt.Sprintf(`
+						let txBytes%[1]d = "%[2]s".decodeHex()
+						//EVM.run(tx: txBytes%[1]d, coinbase: coinbase)
+						`,
+							i,
+							hex.EncodeToString(txBytes),
+						)
+					}
+
+				}
+
+				return templateTx(1, transactionBody)
+			},
+		)
+	}
+
+	b.Run("evm", func(b *testing.B) {
+		benchEvm(b, false)
+	})
+
+	b.Run("evm control", func(b *testing.B) {
+		benchEvm(b, true)
+	})
+
 }
 
 const TransferTxTemplate = `

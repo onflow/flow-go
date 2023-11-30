@@ -316,6 +316,39 @@ func messageToTrustedTransaction(
 	return *t, nil
 }
 
+func MessageToRegisterID(m *entities.RegisterID) (flow.RegisterID, error) {
+	if m == nil {
+		return flow.RegisterID{}, ErrEmptyMessage
+	}
+	return flow.RegisterID{
+		Owner: m.GetOwner(),
+		Key:   m.GetKey(),
+	}, nil
+}
+
+// MessagesToRegisterIDs converts a protobuf message to RegisterIDs
+func MessagesToRegisterIDs(m []*entities.RegisterID) (flow.RegisterIDs, error) {
+	if m == nil {
+		return nil, ErrEmptyMessage
+	}
+	result := make(flow.RegisterIDs, len(m))
+	for i, entry := range m {
+		regId, err := MessageToRegisterID(entry)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert register id %d: %w", i, err)
+		}
+		result[i] = regId
+	}
+	return result, nil
+}
+
+func RegisterIDToMessage(id flow.RegisterID) *entities.RegisterID {
+	return &entities.RegisterID{
+		Owner: id.Owner,
+		Key:   id.Key,
+	}
+}
+
 // insecureAddress converts a raw address to a flow.Address, skipping validation
 // This is useful when converting transactions from trusted state like BlockExecutionData.
 // This should only be used for trusted inputs

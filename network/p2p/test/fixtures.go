@@ -9,6 +9,7 @@ import (
 	"time"
 
 	dht "github.com/libp2p/go-libp2p-kad-dht"
+	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/connmgr"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
@@ -19,6 +20,7 @@ import (
 	"github.com/rs/zerolog"
 	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/rand"
 
 	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/crypto"
@@ -57,6 +59,11 @@ const (
 	// expected to be necessary. Any failure to start a node within this timeout is likely to be
 	// caused by a bug in the code.
 	libp2pNodeShutdownTimeout = 10 * time.Second
+
+	// topicIDFixtureLen is the length of the topic ID fixture for testing.
+	topicIDFixtureLen = 10
+	// messageIDFixtureLen is the length of the message ID fixture for testing.
+	messageIDFixtureLen = 10
 )
 
 // NetworkingKeyFixtures is a test helper that generates a ECDSA flow key pair.
@@ -132,17 +139,17 @@ func NodeFixture(t *testing.T,
 	connManager, err := connection.NewConnManager(logger, parameters.MetricsCfg.Metrics, &parameters.FlowConfig.NetworkConfig.ConnectionManagerConfig)
 	require.NoError(t, err)
 
-	builder := p2pbuilder.NewNodeBuilder(logger,
-		parameters.MetricsCfg,
+	builder := p2pbuilder.NewNodeBuilder(
+		logger, parameters.MetricsCfg,
 		parameters.NetworkingType,
 		parameters.Address,
 		parameters.Key,
 		sporkID,
 		parameters.IdProvider,
+		defaultFlowConfig.NetworkConfig.GossipSubConfig.GossipSubScoringRegistryConfig,
 		&parameters.FlowConfig.NetworkConfig.ResourceManager,
-		&parameters.FlowConfig.NetworkConfig.GossipSubRPCInspectorsConfig,
+		&parameters.FlowConfig.NetworkConfig.GossipSubConfig,
 		parameters.PeerManagerConfig,
-		&parameters.FlowConfig.NetworkConfig.GossipSubConfig.SubscriptionProviderConfig,
 		&p2p.DisallowListCacheConfig{
 			MaxSize: uint32(1000),
 			Metrics: metrics.NewNoopCollector(),
@@ -839,4 +846,185 @@ func MockInspectorNotificationDistributorReadyDoneAware(d *mockp2p.GossipSubInsp
 		close(ch)
 		return ch
 	}()).Maybe()
+}
+
+// GossipSubRpcFixtures returns a slice of random message IDs for testing.
+// Args:
+// - t: *testing.T instance
+// - count: number of message IDs to generate
+// Returns:
+// - []string: slice of message IDs.
+// Note: evey other parameters that are not explicitly set are set to 10. This function suites applications that need to generate a large number of RPC messages with
+// filled random data. For a better control over the generated data, use GossipSubRpcFixture.
+func GossipSubRpcFixtures(t *testing.T, count int) []*pb.RPC {
+	c := 10
+	rpcs := make([]*pb.RPC, 0)
+	for i := 0; i < count; i++ {
+		rpcs = append(rpcs,
+			GossipSubRpcFixture(t,
+				c,
+				WithPrune(c, GossipSubTopicIdFixture()),
+				WithGraft(c, GossipSubTopicIdFixture()),
+				WithIHave(c, c, GossipSubTopicIdFixture()),
+				WithIWant(c, c)))
+	}
+	return rpcs
+}
+
+// GossipSubRpcFixture returns a random GossipSub RPC message. An RPC message is the GossipSub-level message that is exchanged between nodes.
+// It contains individual messages, subscriptions, and control messages.
+// Args:
+// - t: *testing.T instance
+// - msgCnt: number of messages to generate
+// - opts: options to customize control messages (not having an option means no control message).
+// Returns:
+// - *pb.RPC: a random GossipSub RPC message
+// Note: the message is not signed.
+func GossipSubRpcFixture(t *testing.T, msgCnt int, opts ...GossipSubCtrlOption) *pb.RPC {
+	rand.Seed(uint64(time.Now().UnixNano()))
+
+	// creates a random number of Subscriptions
+	numSubscriptions := 10
+	topicIdSize := 10
+	subscriptions := make([]*pb.RPC_SubOpts, numSubscriptions)
+	for i := 0; i < numSubscriptions; i++ {
+		subscribe := rand.Intn(2) == 1
+		topicID := unittest.RandomStringFixture(t, topicIdSize)
+		subscriptions[i] = &pb.RPC_SubOpts{
+			Subscribe: &subscribe,
+			Topicid:   &topicID,
+		}
+	}
+
+	// generates random messages
+	messages := make([]*pb.Message, msgCnt)
+	for i := 0; i < msgCnt; i++ {
+		messages[i] = GossipSubMessageFixture(t)
+	}
+
+	// Create a Control Message
+	controlMessages := GossipSubCtrlFixture(opts...)
+
+	// Create the RPC
+	rpc := &pb.RPC{
+		Subscriptions: subscriptions,
+		Publish:       messages,
+		Control:       controlMessages,
+	}
+
+	return rpc
+}
+
+type GossipSubCtrlOption func(*pb.ControlMessage)
+
+// GossipSubCtrlFixture returns a ControlMessage with the given options.
+func GossipSubCtrlFixture(opts ...GossipSubCtrlOption) *pb.ControlMessage {
+	msg := &pb.ControlMessage{}
+	for _, opt := range opts {
+		opt(msg)
+	}
+	return msg
+}
+
+// WithIHave adds iHave control messages of the given size and number to the control message.
+func WithIHave(msgCount, msgIDCount int, topicId string) GossipSubCtrlOption {
+	return func(msg *pb.ControlMessage) {
+		iHaves := make([]*pb.ControlIHave, msgCount)
+		for i := 0; i < msgCount; i++ {
+			iHaves[i] = &pb.ControlIHave{
+				TopicID:    &topicId,
+				MessageIDs: GossipSubMessageIdsFixture(msgIDCount),
+			}
+		}
+		msg.Ihave = iHaves
+	}
+}
+
+// WithIWant adds iWant control messages of the given size and number to the control message.
+// The message IDs are generated randomly.
+// Args:
+//
+//	msgCount: number of iWant messages to add.
+//	msgIdsPerIWant: number of message IDs to add to each iWant message.
+//
+// Returns:
+// A GossipSubCtrlOption that adds iWant messages to the control message.
+// Example: WithIWant(2, 3) will add 2 iWant messages, each with 3 message IDs.
+func WithIWant(iWantCount int, msgIdsPerIWant int) GossipSubCtrlOption {
+	return func(msg *pb.ControlMessage) {
+		iWants := make([]*pb.ControlIWant, iWantCount)
+		for i := 0; i < iWantCount; i++ {
+			iWants[i] = &pb.ControlIWant{
+				MessageIDs: GossipSubMessageIdsFixture(msgIdsPerIWant),
+			}
+		}
+		msg.Iwant = iWants
+	}
+}
+
+// WithGraft adds GRAFT control messages with given topicID to the control message.
+func WithGraft(msgCount int, topicId string) GossipSubCtrlOption {
+	return func(msg *pb.ControlMessage) {
+		grafts := make([]*pb.ControlGraft, msgCount)
+		for i := 0; i < msgCount; i++ {
+			grafts[i] = &pb.ControlGraft{
+				TopicID: &topicId,
+			}
+		}
+		msg.Graft = grafts
+	}
+}
+
+// WithPrune adds PRUNE control messages with given topicID to the control message.
+func WithPrune(msgCount int, topicId string) GossipSubCtrlOption {
+	return func(msg *pb.ControlMessage) {
+		prunes := make([]*pb.ControlPrune, msgCount)
+		for i := 0; i < msgCount; i++ {
+			prunes[i] = &pb.ControlPrune{
+				TopicID: &topicId,
+			}
+		}
+		msg.Prune = prunes
+	}
+}
+
+// gossipSubMessageIdFixture returns a random gossipSub message ID.
+func gossipSubMessageIdFixture() string {
+	// TODO: messageID length should be a parameter.
+	return unittest.GenerateRandomStringWithLen(messageIDFixtureLen)
+}
+
+// GossipSubTopicIdFixture returns a random gossipSub topic ID.
+func GossipSubTopicIdFixture() string {
+	// TODO: topicID length should be a parameter.
+	return unittest.GenerateRandomStringWithLen(topicIDFixtureLen)
+}
+
+// GossipSubMessageIdsFixture returns a slice of random gossipSub message IDs of the given size.
+func GossipSubMessageIdsFixture(count int) []string {
+	msgIds := make([]string, count)
+	for i := 0; i < count; i++ {
+		msgIds[i] = gossipSubMessageIdFixture()
+	}
+	return msgIds
+}
+
+// GossipSubMessageFixture returns a random gossipSub message; this contains a single pubsub message that is exchanged between nodes.
+// The message is generated randomly.
+// Args:
+// - t: *testing.T instance
+// Returns:
+// - *pb.Message: a random gossipSub message
+// Note: the message is not signed.
+func GossipSubMessageFixture(t *testing.T) *pb.Message {
+	byteSize := 100
+	topic := unittest.RandomStringFixture(t, byteSize)
+	return &pb.Message{
+		From:      unittest.RandomBytes(byteSize),
+		Data:      unittest.RandomBytes(byteSize),
+		Seqno:     unittest.RandomBytes(byteSize),
+		Topic:     &topic,
+		Signature: unittest.RandomBytes(byteSize),
+		Key:       unittest.RandomBytes(byteSize),
+	}
 }
