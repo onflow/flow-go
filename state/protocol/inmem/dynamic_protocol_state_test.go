@@ -29,57 +29,42 @@ func TestDynamicProtocolStateAdapter(t *testing.T) {
 		actualChainID := adapter.GlobalParams().ChainID()
 		assert.Equal(t, expectedChainID, actualChainID)
 	})
-	t.Run("epoch-status-staking", func(t *testing.T) {
+	t.Run("epoch-phase-staking", func(t *testing.T) {
 		entry := unittest.ProtocolStateFixture()
 		adapter := inmem.NewDynamicProtocolStateAdapter(entry, globalParams)
-		status := adapter.EpochStatus()
-		assert.Equal(t, entry.PreviousEpoch.EventIDs(), status.PreviousEpoch)
-		assert.Equal(t, flow.EventIDs{
-			SetupID:  entry.CurrentEpoch.SetupID,
-			CommitID: entry.CurrentEpoch.CommitID,
-		}, status.CurrentEpoch)
-		assert.Equal(t, flow.EventIDs{}, status.NextEpoch)
-		assert.False(t, status.InvalidEpochTransitionAttempted)
+		assert.Equal(t, flow.EpochPhaseStaking, adapter.EpochPhase())
+		assert.True(t, adapter.PreviousEpochExists())
+		assert.False(t, adapter.InvalidEpochTransitionAttempted())
 	})
-	t.Run("epoch-status-setup", func(t *testing.T) {
+	t.Run("epoch-phase-setup", func(t *testing.T) {
 		entry := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
 		// cleanup the commit event, so we are in setup phase
 		entry.NextEpoch.CommitID = flow.ZeroID
 
 		adapter := inmem.NewDynamicProtocolStateAdapter(entry, globalParams)
-		status := adapter.EpochStatus()
-		assert.Equal(t, entry.PreviousEpoch.EventIDs(), status.PreviousEpoch)
-		assert.Equal(t, flow.EventIDs{
-			SetupID:  entry.CurrentEpoch.SetupID,
-			CommitID: entry.CurrentEpoch.CommitID,
-		}, status.CurrentEpoch)
-		assert.Equal(t, flow.EventIDs{
-			SetupID:  entry.NextEpoch.SetupID,
-			CommitID: flow.ZeroID,
-		}, status.NextEpoch)
-		assert.False(t, status.InvalidEpochTransitionAttempted)
+		assert.Equal(t, flow.EpochPhaseSetup, adapter.EpochPhase())
+		assert.True(t, adapter.PreviousEpochExists())
+		assert.False(t, adapter.InvalidEpochTransitionAttempted())
 	})
-	t.Run("epoch-status-commit", func(t *testing.T) {
+	t.Run("epoch-phase-commit", func(t *testing.T) {
 		entry := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
 		adapter := inmem.NewDynamicProtocolStateAdapter(entry, globalParams)
-		status := adapter.EpochStatus()
-		assert.Equal(t, entry.PreviousEpoch.EventIDs(), status.PreviousEpoch)
-		assert.Equal(t, flow.EventIDs{
-			SetupID:  entry.CurrentEpoch.SetupID,
-			CommitID: entry.CurrentEpoch.CommitID,
-		}, status.CurrentEpoch)
-		assert.Equal(t, flow.EventIDs{
-			SetupID:  entry.NextEpoch.SetupID,
-			CommitID: entry.NextEpoch.CommitID,
-		}, status.NextEpoch)
-		assert.False(t, status.InvalidEpochTransitionAttempted)
+		assert.Equal(t, flow.EpochPhaseCommitted, adapter.EpochPhase())
+		assert.True(t, adapter.PreviousEpochExists())
+		assert.False(t, adapter.InvalidEpochTransitionAttempted())
 	})
 	t.Run("invalid-state-transition-attempted", func(t *testing.T) {
 		entry := unittest.ProtocolStateFixture(func(entry *flow.RichProtocolStateEntry) {
 			entry.InvalidEpochTransitionAttempted = true
 		})
 		adapter := inmem.NewDynamicProtocolStateAdapter(entry, globalParams)
-		status := adapter.EpochStatus()
-		assert.True(t, status.InvalidEpochTransitionAttempted)
+		assert.False(t, adapter.InvalidEpochTransitionAttempted())
+	})
+	t.Run("no-previous-epoch", func(t *testing.T) {
+		entry := unittest.ProtocolStateFixture(func(entry *flow.RichProtocolStateEntry) {
+			entry.PreviousEpoch = nil
+		})
+		adapter := inmem.NewDynamicProtocolStateAdapter(entry, globalParams)
+		assert.False(t, adapter.PreviousEpochExists())
 	})
 }

@@ -567,6 +567,7 @@ func (state *State) bootstrapSporkInfo(root protocol.Snapshot) func(*badger.Txn)
 
 // indexFirstHeight indexes the first height for the epoch, as part of bootstrapping.
 // The input epoch must have been started (the first block of the epoch has been finalized).
+// todo re-work this
 // No errors are expected during normal operation.
 func indexFirstHeight(epoch protocol.Epoch) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
