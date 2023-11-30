@@ -185,7 +185,19 @@ func Bootstrap(
 			return fmt.Errorf("could not bootstrap spork info: %w", err)
 		}
 
-		// 6) set metric values
+		// 6) bootstrap dynamic protocol state
+		err = state.bootstrapProtocolState(segment, root, protocolStateSnapshotsDB)(tx)
+		if err != nil {
+			return fmt.Errorf("could not bootstrap protocol state: %w", err)
+		}
+
+		// 7) initialize version beacon
+		err = transaction.WithTx(state.boostrapVersionBeacon(root))(tx)
+		if err != nil {
+			return fmt.Errorf("could not bootstrap version beacon: %w", err)
+		}
+
+		// 8) set metric values
 		err = state.updateEpochMetrics(root)
 		if err != nil {
 			return fmt.Errorf("could not update epoch metrics: %w", err)
@@ -195,18 +207,6 @@ func Bootstrap(
 		state.metrics.FinalizedHeight(lastFinalized.Header.Height)
 		for _, block := range segment.Blocks {
 			state.metrics.BlockFinalized(block)
-		}
-
-		// 7) bootstrap dynamic protocol state
-		err = state.bootstrapProtocolState(segment, root, protocolStateSnapshotsDB)(tx)
-		if err != nil {
-			return fmt.Errorf("could not bootstrap protocol state: %w", err)
-		}
-
-		// 8) initialize version beacon
-		err = transaction.WithTx(state.boostrapVersionBeacon(root))(tx)
-		if err != nil {
-			return fmt.Errorf("could not bootstrap version beacon: %w", err)
 		}
 
 		return nil
@@ -443,9 +443,15 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 			return fmt.Errorf("could not check existence of previous epoch: %w", err)
 		}
 		if hasPrevious {
-			indexFirstHeight(root.Epochs().Previous())
+			err = indexFirstHeight(root.Epochs().Previous())(tx)
+			if err != nil {
+				return fmt.Errorf("could not index previous epoch first height: %w", err)
+			}
 		}
-		indexFirstHeight(root.Epochs().Current())
+		err = indexFirstHeight(root.Epochs().Current())(tx)
+		if err != nil {
+			return fmt.Errorf("could not index current epoch first height: %w", err)
+		}
 
 		return nil
 	}

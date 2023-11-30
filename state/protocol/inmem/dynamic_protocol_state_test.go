@@ -58,7 +58,7 @@ func TestDynamicProtocolStateAdapter(t *testing.T) {
 			entry.InvalidEpochTransitionAttempted = true
 		})
 		adapter := inmem.NewDynamicProtocolStateAdapter(entry, globalParams)
-		assert.False(t, adapter.InvalidEpochTransitionAttempted())
+		assert.True(t, adapter.InvalidEpochTransitionAttempted())
 	})
 	t.Run("no-previous-epoch", func(t *testing.T) {
 		entry := unittest.ProtocolStateFixture(func(entry *flow.RichProtocolStateEntry) {

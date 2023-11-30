@@ -286,7 +286,7 @@ func (e *ProtocolStateEntry) EpochPhase() EpochPhase {
 	if e.CurrentEpoch.SetupID == ZeroID || e.CurrentEpoch.CommitID == ZeroID {
 		return EpochPhaseUndefined
 	}
-	if e.PreviousEpoch != nil && e.PreviousEpoch.SetupID == ZeroID || e.PreviousEpoch.CommitID == ZeroID {
+	if e.PreviousEpoch != nil && (e.PreviousEpoch.SetupID == ZeroID || e.PreviousEpoch.CommitID == ZeroID) {
 		return EpochPhaseUndefined
 	}
 
