@@ -655,7 +655,6 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	if err != nil {
 		return fmt.Errorf("could not retrieve protocol state snapshot: %w", err)
 	}
-	// todo: need InvalidEpochTransitionAttempted and phase
 	currentEpochSetup := psSnapshot.EpochSetup()
 	epochFallbackTriggered, err := m.isEpochEmergencyFallbackTriggered()
 	if err != nil {
@@ -685,7 +684,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	// If epoch emergency fallback is triggered, the current epoch continues until
 	// the next spork - so skip these updates.
 	if !epochFallbackTriggered {
-		epochPhaseMetrics, epochPhaseEvents, err := m.epochPhaseMetricsAndEventsOnBlockFinalized(block, epochStatus)
+		epochPhaseMetrics, epochPhaseEvents, err := m.epochPhaseMetricsAndEventsOnBlockFinalized(block)
 		if err != nil {
 			return fmt.Errorf("could not determine epoch phase metrics/events for finalized block: %w", err)
 		}
@@ -814,7 +813,6 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 //
 // No errors are expected during normal operation.
 func (m *FollowerState) epochFallbackTriggeredByFinalizedBlock(block *flow.Header, stateAtBlock protocol.DynamicProtocolState) (bool, error) {
-	// todo: replace epochStatus with protocolStateEntry
 	// 1. Epoch fallback is tentatively triggered on this fork
 	if stateAtBlock.InvalidEpochTransitionAttempted() {
 		return true, nil

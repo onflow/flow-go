@@ -3,7 +3,6 @@ package badger
 import (
 	"errors"
 	"fmt"
-
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -372,27 +371,22 @@ func (q *EpochQuery) Next() protocol.Epoch {
 	if err != nil {
 		return invalid.NewEpochf("could not get protocol state snapshot at block %x: %w", q.snap.blockID, err)
 	}
-	status := psSnapshot.EpochStatus()
-	// todo: need only phase
-	phase, err := status.Phase()
-	if err != nil {
-		// critical error: malformed EpochStatus in storage
-		return invalid.NewEpochf("read malformed EpochStatus from storage: %w", err)
-	}
+	phase := psSnapshot.EpochPhase()
 	// if we are in the staking phase, the next epoch is not setup yet
 	if phase == flow.EpochPhaseStaking {
 		return invalid.NewEpoch(protocol.ErrNextEpochNotSetup)
 	}
-
 	// if we are in setup phase, return a SetupEpoch
 	nextSetup := psSnapshot.Entry().NextEpochSetup
 	if phase == flow.EpochPhaseSetup {
 		return inmem.NewSetupEpoch(nextSetup)
 	}
-
 	// if we are in committed phase, return a CommittedEpoch
 	nextCommit := psSnapshot.Entry().NextEpochCommit
-	return inmem.NewCommittedEpoch(nextSetup, nextCommit)
+	if phase == flow.EpochPhaseCommitted {
+		return inmem.NewCommittedEpoch(nextSetup, nextCommit)
+	}
+	return invalid.NewEpochf("data corruption: unknown epoch phase implies malformed protocol state epoch data")
 }
 
 // Previous returns the previous epoch. During the first epoch after the root
