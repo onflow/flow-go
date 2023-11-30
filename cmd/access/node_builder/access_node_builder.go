@@ -1038,13 +1038,34 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		// Execution State Streaming API
 		flags.Uint32Var(&builder.stateStreamConf.ExecutionDataCacheSize, "execution-data-cache-size", defaultConfig.stateStreamConf.ExecutionDataCacheSize, "block execution data cache size")
 		flags.Uint32Var(&builder.stateStreamConf.MaxGlobalStreams, "state-stream-global-max-streams", defaultConfig.stateStreamConf.MaxGlobalStreams, "global maximum number of concurrent streams")
-		flags.UintVar(&builder.stateStreamConf.MaxExecutionDataMsgSize, "state-stream-max-message-size", defaultConfig.stateStreamConf.MaxExecutionDataMsgSize, "maximum size for a gRPC message containing block execution data")
-		flags.StringToIntVar(&builder.stateStreamFilterConf, "state-stream-event-filter-limits", defaultConfig.stateStreamFilterConf, "event filter limits for ExecutionData SubscribeEvents API e.g. EventTypes=100,Addresses=100,Contracts=100 etc.")
-		flags.DurationVar(&builder.stateStreamConf.ClientSendTimeout, "state-stream-send-timeout", defaultConfig.stateStreamConf.ClientSendTimeout, "maximum wait before timing out while sending a response to a streaming client e.g. 30s")
-		flags.UintVar(&builder.stateStreamConf.ClientSendBufferSize, "state-stream-send-buffer-size", defaultConfig.stateStreamConf.ClientSendBufferSize, "maximum number of responses to buffer within a stream")
-		flags.Float64Var(&builder.stateStreamConf.ResponseLimit, "state-stream-response-limit", defaultConfig.stateStreamConf.ResponseLimit, "max number of responses per second to send over streaming endpoints. this helps manage resources consumed by each client querying data not in the cache e.g. 3 or 0.5. 0 means no limit")
-		flags.Uint64Var(&builder.stateStreamConf.HeartbeatInterval, "state-stream-heartbeat-interval", defaultConfig.stateStreamConf.HeartbeatInterval, "default interval in blocks at which heartbeat messages should be sent. applied when client did not specify a value.")
-		flags.Uint32Var(&builder.stateStreamConf.RegisterIDsRequestLimit, "state-stream-max-register-values", defaultConfig.stateStreamConf.RegisterIDsRequestLimit, "maximum number of register ids to include in a single request to the GetRegisters endpoint")
+		flags.UintVar(&builder.stateStreamConf.MaxExecutionDataMsgSize,
+			"state-stream-max-message-size",
+			defaultConfig.stateStreamConf.MaxExecutionDataMsgSize,
+			"maximum size for a gRPC message containing block execution data")
+		flags.StringToIntVar(&builder.stateStreamFilterConf,
+			"state-stream-event-filter-limits",
+			defaultConfig.stateStreamFilterConf,
+			"event filter limits for ExecutionData SubscribeEvents API e.g. EventTypes=100,Addresses=100,Contracts=100 etc.")
+		flags.DurationVar(&builder.stateStreamConf.ClientSendTimeout,
+			"state-stream-send-timeout",
+			defaultConfig.stateStreamConf.ClientSendTimeout,
+			"maximum wait before timing out while sending a response to a streaming client e.g. 30s")
+		flags.UintVar(&builder.stateStreamConf.ClientSendBufferSize,
+			"state-stream-send-buffer-size",
+			defaultConfig.stateStreamConf.ClientSendBufferSize,
+			"maximum number of responses to buffer within a stream")
+		flags.Float64Var(&builder.stateStreamConf.ResponseLimit,
+			"state-stream-response-limit",
+			defaultConfig.stateStreamConf.ResponseLimit,
+			"max number of responses per second to send over streaming endpoints. this helps manage resources consumed by each client querying data not in the cache e.g. 3 or 0.5. 0 means no limit")
+		flags.Uint64Var(&builder.stateStreamConf.HeartbeatInterval,
+			"state-stream-heartbeat-interval",
+			defaultConfig.stateStreamConf.HeartbeatInterval,
+			"default interval in blocks at which heartbeat messages should be sent. applied when client did not specify a value.")
+		flags.Uint32Var(&builder.stateStreamConf.RegisterIDsRequestLimit,
+			"state-stream-max-register-values",
+			defaultConfig.stateStreamConf.RegisterIDsRequestLimit,
+			"maximum number of register ids to include in a single request to the GetRegisters endpoint")
 
 		// Execution Data Indexer
 		flags.BoolVar(&builder.executionDataIndexingEnabled,
@@ -1055,11 +1076,26 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.StringVar(&builder.checkpointFile, "execution-state-checkpoint", defaultConfig.checkpointFile, "execution-state checkpoint file")
 
 		// Script Execution
-		flags.StringVar(&builder.rpcConf.BackendConfig.ScriptExecutionMode, "script-execution-mode", defaultConfig.rpcConf.BackendConfig.ScriptExecutionMode, "mode to use when executing scripts. one of (local-only, execution-nodes-only, failover, compare)")
-		flags.Uint64Var(&builder.scriptExecutorConfig.ComputationLimit, "script-execution-computation-limit", defaultConfig.scriptExecutorConfig.ComputationLimit, "maximum number of computation units a locally executed script can use. default: 100000")
-		flags.IntVar(&builder.scriptExecutorConfig.MaxErrorMessageSize, "script-execution-max-error-length", defaultConfig.scriptExecutorConfig.MaxErrorMessageSize, "maximum number characters to include in error message strings. additional characters are truncated. default: 1000")
-		flags.DurationVar(&builder.scriptExecutorConfig.LogTimeThreshold, "script-execution-log-time-threshold", defaultConfig.scriptExecutorConfig.LogTimeThreshold, "emit a log for any scripts that take over this threshold. default: 1s")
-		flags.DurationVar(&builder.scriptExecutorConfig.ExecutionTimeLimit, "script-execution-timeout", defaultConfig.scriptExecutorConfig.ExecutionTimeLimit, "timeout value for locally executed scripts. default: 10s")
+		flags.StringVar(&builder.rpcConf.BackendConfig.ScriptExecutionMode,
+			"script-execution-mode",
+			defaultConfig.rpcConf.BackendConfig.ScriptExecutionMode,
+			"mode to use when executing scripts. one of (local-only, execution-nodes-only, failover, compare)")
+		flags.Uint64Var(&builder.scriptExecutorConfig.ComputationLimit,
+			"script-execution-computation-limit",
+			defaultConfig.scriptExecutorConfig.ComputationLimit,
+			"maximum number of computation units a locally executed script can use. default: 100000")
+		flags.IntVar(&builder.scriptExecutorConfig.MaxErrorMessageSize,
+			"script-execution-max-error-length",
+			defaultConfig.scriptExecutorConfig.MaxErrorMessageSize,
+			"maximum number characters to include in error message strings. additional characters are truncated. default: 1000")
+		flags.DurationVar(&builder.scriptExecutorConfig.LogTimeThreshold,
+			"script-execution-log-time-threshold",
+			defaultConfig.scriptExecutorConfig.LogTimeThreshold,
+			"emit a log for any scripts that take over this threshold. default: 1s")
+		flags.DurationVar(&builder.scriptExecutorConfig.ExecutionTimeLimit,
+			"script-execution-timeout",
+			defaultConfig.scriptExecutorConfig.ExecutionTimeLimit,
+			"timeout value for locally executed scripts. default: 10s")
 
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
@@ -1681,7 +1717,6 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 		networkKey,
 		builder.SporkID,
 		builder.IdentityProvider,
-		builder.FlowConfig.NetworkConfig.GossipSubConfig.GossipSubScoringRegistryConfig,
 		&builder.FlowConfig.NetworkConfig.ResourceManager,
 		&p2pconfig.PeerManagerConfig{
 			// TODO: eventually, we need pruning enabled even on public network. However, it needs a modified version of
