@@ -81,7 +81,6 @@ func NewNodeBuilder(
 	networkKey fcrypto.PrivateKey,
 	sporkId flow.Identifier,
 	idProvider module.IdentityProvider,
-	scoringRegistryConfig p2pconf.GossipSubScoringRegistryConfig,
 	rCfg *p2pconf.ResourceManagerConfig,
 	peerManagerConfig *p2pconfig.PeerManagerConfig,
 	disallowListCacheCfg *p2p.DisallowListCacheConfig,
