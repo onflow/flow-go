@@ -22,7 +22,7 @@ require (
 	github.com/onflow/cadence v0.42.5
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.4-0.20231016154253-a00dbf7c061f
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.2.4-0.20231016154253-a00dbf7c061f
-	github.com/onflow/flow-emulator v0.57.4-evm-poc.0.20231121132446-e95478589c02
+	github.com/onflow/flow-emulator v0.58.1-0.20231130135659-f5b2faca6c77
 	github.com/onflow/flow-go v0.32.7
 	github.com/onflow/flow-go-sdk v0.41.16
 	github.com/onflow/flow-go/crypto v0.24.10

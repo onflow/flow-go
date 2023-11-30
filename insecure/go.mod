@@ -10,7 +10,7 @@ require (
 	github.com/libp2p/go-libp2p v0.28.1
 	github.com/libp2p/go-libp2p-pubsub v0.9.3
 	github.com/multiformats/go-multiaddr-dns v0.3.1
-	github.com/onflow/flow-go v0.32.4-0.20231120205522-d5395b480516
+	github.com/onflow/flow-go v0.32.4-0.20231130134727-3c01c7f8966c
 	github.com/onflow/flow-go/crypto v0.24.10
 	github.com/rs/zerolog v1.29.0
 	github.com/spf13/pflag v1.0.5
