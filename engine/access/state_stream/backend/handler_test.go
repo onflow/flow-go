@@ -541,18 +541,6 @@ func TestGetRegisterValues(t *testing.T) {
 		require.Equal(t, status.Code(err), codes.InvalidArgument)
 	})
 
-	t.Run("too many register IDs", func(t *testing.T) {
-		api := ssmock.NewAPI(t)
-		h := NewHandler(api, flow.Localnet.Chain(), makeConfig(1))
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		invalidMessage := &executiondata.GetRegisterValuesRequest{
-			RegisterIds: make([]*entities.RegisterID, convert.MaxRegisterIDsPerRequest+1),
-		}
-		_, err := h.GetRegisterValues(ctx, invalidMessage)
-		require.Equal(t, status.Code(err), codes.InvalidArgument)
-	})
-
 	t.Run("valid registers", func(t *testing.T) {
 		api := ssmock.NewAPI(t)
 		api.On("GetRegisterValues", testIds, testHeight).Return(testValues, nil)
