@@ -201,6 +201,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			EventFilterConfig:       state_stream.DefaultEventFilterConfig,
 			ResponseLimit:           state_stream.DefaultResponseLimit,
 			HeartbeatInterval:       state_stream.DefaultHeartbeatInterval,
+			RegisterIDsRequestLimit: state_stream.DefaultRegisterIDsRequestLimit,
 		},
 		stateStreamFilterConf:        nil,
 		ExecutionNodeAddress:         "localhost:9000",
@@ -1035,38 +1036,15 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"maximum delay for exponential backoff when fetching execution data fails e.g. 5m")
 
 		// Execution State Streaming API
-		flags.Uint32Var(&builder.stateStreamConf.ExecutionDataCacheSize,
-			"execution-data-cache-size",
-			defaultConfig.stateStreamConf.ExecutionDataCacheSize,
-			"block execution data cache size")
-		flags.Uint32Var(&builder.stateStreamConf.MaxGlobalStreams,
-			"state-stream-global-max-streams",
-			defaultConfig.stateStreamConf.MaxGlobalStreams,
-			"global maximum number of concurrent streams")
-		flags.UintVar(&builder.stateStreamConf.MaxExecutionDataMsgSize,
-			"state-stream-max-message-size",
-			defaultConfig.stateStreamConf.MaxExecutionDataMsgSize,
-			"maximum size for a gRPC message containing block execution data")
-		flags.StringToIntVar(&builder.stateStreamFilterConf,
-			"state-stream-event-filter-limits",
-			defaultConfig.stateStreamFilterConf,
-			"event filter limits for ExecutionData SubscribeEvents API e.g. EventTypes=100,Addresses=100,Contracts=100 etc.")
-		flags.DurationVar(&builder.stateStreamConf.ClientSendTimeout,
-			"state-stream-send-timeout",
-			defaultConfig.stateStreamConf.ClientSendTimeout,
-			"maximum wait before timing out while sending a response to a streaming client e.g. 30s")
-		flags.UintVar(&builder.stateStreamConf.ClientSendBufferSize,
-			"state-stream-send-buffer-size",
-			defaultConfig.stateStreamConf.ClientSendBufferSize,
-			"maximum number of responses to buffer within a stream")
-		flags.Float64Var(&builder.stateStreamConf.ResponseLimit,
-			"state-stream-response-limit",
-			defaultConfig.stateStreamConf.ResponseLimit,
-			"max number of responses per second to send over streaming endpoints. this helps manage resources consumed by each client querying data not in the cache e.g. 3 or 0.5. 0 means no limit")
-		flags.Uint64Var(&builder.stateStreamConf.HeartbeatInterval,
-			"state-stream-heartbeat-interval",
-			defaultConfig.stateStreamConf.HeartbeatInterval,
-			"default interval in blocks at which heartbeat messages should be sent. applied when client did not specify a value.")
+		flags.Uint32Var(&builder.stateStreamConf.ExecutionDataCacheSize, "execution-data-cache-size", defaultConfig.stateStreamConf.ExecutionDataCacheSize, "block execution data cache size")
+		flags.Uint32Var(&builder.stateStreamConf.MaxGlobalStreams, "state-stream-global-max-streams", defaultConfig.stateStreamConf.MaxGlobalStreams, "global maximum number of concurrent streams")
+		flags.UintVar(&builder.stateStreamConf.MaxExecutionDataMsgSize, "state-stream-max-message-size", defaultConfig.stateStreamConf.MaxExecutionDataMsgSize, "maximum size for a gRPC message containing block execution data")
+		flags.StringToIntVar(&builder.stateStreamFilterConf, "state-stream-event-filter-limits", defaultConfig.stateStreamFilterConf, "event filter limits for ExecutionData SubscribeEvents API e.g. EventTypes=100,Addresses=100,Contracts=100 etc.")
+		flags.DurationVar(&builder.stateStreamConf.ClientSendTimeout, "state-stream-send-timeout", defaultConfig.stateStreamConf.ClientSendTimeout, "maximum wait before timing out while sending a response to a streaming client e.g. 30s")
+		flags.UintVar(&builder.stateStreamConf.ClientSendBufferSize, "state-stream-send-buffer-size", defaultConfig.stateStreamConf.ClientSendBufferSize, "maximum number of responses to buffer within a stream")
+		flags.Float64Var(&builder.stateStreamConf.ResponseLimit, "state-stream-response-limit", defaultConfig.stateStreamConf.ResponseLimit, "max number of responses per second to send over streaming endpoints. this helps manage resources consumed by each client querying data not in the cache e.g. 3 or 0.5. 0 means no limit")
+		flags.Uint64Var(&builder.stateStreamConf.HeartbeatInterval, "state-stream-heartbeat-interval", defaultConfig.stateStreamConf.HeartbeatInterval, "default interval in blocks at which heartbeat messages should be sent. applied when client did not specify a value.")
+		flags.Uint32Var(&builder.stateStreamConf.RegisterIDsRequestLimit, "state-stream-max-register-values", defaultConfig.stateStreamConf.RegisterIDsRequestLimit, "maximum number of register ids to include in a single request to the GetRegisters endpoint")
 
 		// Execution Data Indexer
 		flags.BoolVar(&builder.executionDataIndexingEnabled,
@@ -1126,6 +1104,9 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			}
 			if builder.stateStreamConf.ResponseLimit < 0 {
 				return errors.New("state-stream-response-limit must be greater than or equal to 0")
+			}
+			if builder.stateStreamConf.RegisterIDsRequestLimit <= 0 {
+				return errors.New("state-stream-max-register-values must be greater than 0")
 			}
 		}
 		if builder.rpcConf.BackendConfig.CircuitBreakerConfig.Enabled {
@@ -1700,6 +1681,7 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 		networkKey,
 		builder.SporkID,
 		builder.IdentityProvider,
+		builder.FlowConfig.NetworkConfig.GossipSubConfig.GossipSubScoringRegistryConfig,
 		&builder.FlowConfig.NetworkConfig.ResourceManager,
 		&p2pconfig.PeerManagerConfig{
 			// TODO: eventually, we need pruning enabled even on public network. However, it needs a modified version of

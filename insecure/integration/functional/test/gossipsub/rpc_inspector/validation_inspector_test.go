@@ -62,6 +62,7 @@ func TestValidationInspector_InvalidTopicId_Detection(t *testing.T) {
 			count.Inc()
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
+			require.Equal(t, notification.TopicType, p2p.CtrlMsgNonClusterTopicType, "IsClusterPrefixed is expected to be false, no RPC with cluster prefixed topic sent in this test")
 			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
 			require.True(t, channels.IsInvalidTopicErr(notification.Error))
 			switch notification.MsgType {
@@ -196,6 +197,7 @@ func TestValidationInspector_DuplicateTopicId_Detection(t *testing.T) {
 			count.Inc()
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
+			require.Equal(t, notification.TopicType, p2p.CtrlMsgNonClusterTopicType, "IsClusterPrefixed is expected to be false, no RPC with cluster prefixed topic sent in this test")
 			require.True(t, validation.IsDuplicateTopicErr(notification.Error))
 			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
 			switch notification.MsgType {
@@ -301,6 +303,7 @@ func TestValidationInspector_IHaveDuplicateMessageId_Detection(t *testing.T) {
 			count.Inc()
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
+			require.Equal(t, notification.TopicType, p2p.CtrlMsgNonClusterTopicType, "IsClusterPrefixed is expected to be false, no RPC with cluster prefixed topic sent in this test")
 			require.True(t, validation.IsDuplicateTopicErr(notification.Error))
 			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
 			require.True(t,
@@ -411,6 +414,7 @@ func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
 			count.Inc()
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
+			require.Equal(t, notification.TopicType, p2p.CtrlMsgTopicTypeClusterPrefixed)
 			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
 			require.True(t, channels.IsUnknownClusterIDErr(notification.Error))
 			switch notification.MsgType {
@@ -788,6 +792,7 @@ func TestValidationInspector_InspectIWants_CacheMissThreshold(t *testing.T) {
 		return func(args mockery.Arguments) {
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
+			require.Equal(t, notification.TopicType, p2p.CtrlMsgNonClusterTopicType, "IsClusterPrefixed is expected to be false, no RPC with cluster prefixed topic sent in this test")
 			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
 			require.True(t,
 				notification.MsgType == p2pmsg.CtrlMsgIWant,
@@ -922,6 +927,7 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 		return func(args mockery.Arguments) {
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
+			require.Equal(t, notification.TopicType, p2p.CtrlMsgNonClusterTopicType, "IsClusterPrefixed is expected to be false, no RPC with cluster prefixed topic sent in this test")
 			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
 			require.True(t,
 				notification.MsgType == p2pmsg.RpcPublishMessage,

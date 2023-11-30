@@ -147,8 +147,9 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 		return unittest.ProposalFixture()
 	})
 
-	// now simulates node2 spamming node1 with invalid gossipsub control messages.
-	for i := 0; i < 30; i++ {
+	// simulates node2 spamming node1 with invalid gossipsub control messages until node2 gets dissallow listed.
+	// since the decay will start lower than .99 and will only be incremented by default .01, we need to spam a lot of messages so that the node gets disallow listed
+	for i := 0; i < 750; i++ {
 		inspectorSuite1.consumer.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 			PeerID:  node2.ID(),
 			MsgType: p2pmsg.ControlMessageTypes()[rand.Intn(len(p2pmsg.ControlMessageTypes()))],

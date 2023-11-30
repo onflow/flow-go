@@ -362,7 +362,7 @@ func (c *ScoreOptionConfig) SetRegisterNotificationConsumerFunc(f func(p2p.Gossi
 // NewScoreOption creates a new penalty option with the given configuration.
 func NewScoreOption(cfg *ScoreOptionConfig, provider p2p.SubscriptionProvider) (*ScoreOption, error) {
 	throttledSampler := logging.BurstSampler(MaxDebugLogs, time.Second)
-	logger := cfg.logger.With().
+	logger := scoreOptionConfig.logger.With().
 		Str("module", "pubsub_score_option").
 		Logger().
 		Sample(zerolog.LevelSampler{
@@ -398,8 +398,8 @@ func NewScoreOption(cfg *ScoreOptionConfig, provider p2p.SubscriptionProvider) (
 
 	// set the app specific penalty function for the penalty option
 	// if the app specific penalty function is not set, use the default one
-	if cfg.appScoreFunc != nil {
-		s.appScoreFunc = cfg.appScoreFunc
+	if scoreOptionConfig.appScoreFunc != nil {
+		s.appScoreFunc = scoreOptionConfig.appScoreFunc
 		s.logger.
 			Warn().
 			Str(logging.KeyNetworkingSecurity, "true").
@@ -417,14 +417,14 @@ func NewScoreOption(cfg *ScoreOptionConfig, provider p2p.SubscriptionProvider) (
 	}
 
 	// registers the score registry as the consumer of the invalid control message notifications
-	if cfg.registerNotificationConsumerFunc != nil {
-		cfg.registerNotificationConsumerFunc(scoreRegistry)
+	if scoreOptionConfig.registerNotificationConsumerFunc != nil {
+		scoreOptionConfig.registerNotificationConsumerFunc(scoreRegistry)
 	}
 
 	s.peerScoreParams.AppSpecificScore = s.appScoreFunc
 
 	// apply the topic penalty parameters if any.
-	for _, topicParams := range cfg.topicParams {
+	for _, topicParams := range scoreOptionConfig.topicParams {
 		topicParams(s.peerScoreParams.Topics)
 	}
 

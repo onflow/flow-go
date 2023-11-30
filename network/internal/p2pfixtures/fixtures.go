@@ -111,6 +111,7 @@ func CreateNode(t *testing.T, networkKey crypto.PrivateKey, sporkID flow.Identif
 		networkKey,
 		sporkID,
 		idProvider,
+		defaultFlowConfig.NetworkConfig.GossipSubConfig.GossipSubScoringRegistryConfig,
 		&defaultFlowConfig.NetworkConfig.ResourceManager,
 		p2pconfig.PeerManagerDisableConfig(),
 		&p2p.DisallowListCacheConfig{
