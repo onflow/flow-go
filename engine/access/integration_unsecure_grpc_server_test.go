@@ -179,18 +179,19 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	suite.snapshot.On("Head").Return(block, nil)
 
 	bnd, err := backend.New(backend.Params{
-		State:                suite.state,
-		CollectionRPC:        suite.collClient,
-		Blocks:               suite.blocks,
-		Headers:              suite.headers,
-		Collections:          suite.collections,
-		Transactions:         suite.transactions,
-		ChainID:              suite.chainID,
-		AccessMetrics:        suite.metrics,
-		MaxHeightRange:       0,
-		Log:                  suite.log,
-		SnapshotHistoryLimit: 0,
-		Communicator:         backend.NewNodeCommunicator(false),
+		State:                    suite.state,
+		CollectionRPC:            suite.collClient,
+		Blocks:                   suite.blocks,
+		Headers:                  suite.headers,
+		Collections:              suite.collections,
+		Transactions:             suite.transactions,
+		ChainID:                  suite.chainID,
+		AccessMetrics:            suite.metrics,
+		MaxHeightRange:           0,
+		Log:                      suite.log,
+		SnapshotHistoryLimit:     0,
+		Communicator:             backend.NewNodeCommunicator(false),
+		TxErrorMessagesCacheSize: 1000,
 	})
 	require.NoError(suite.T(), err)
 
