@@ -85,8 +85,7 @@ func (s *Snapshot) Phase() (flow.EpochPhase, error) {
 	if err != nil {
 		return flow.EpochPhaseUndefined, fmt.Errorf("could not retrieve protocol state snapshot: %w", err)
 	}
-	phase, err := psSnapshot.EpochStatus().Phase()
-	return phase, err
+	return psSnapshot.EpochPhase(), nil
 }
 
 func (s *Snapshot) Identities(selector flow.IdentityFilter[flow.Identity]) (flow.IdentityList, error) {
@@ -405,13 +404,11 @@ func (q *EpochQuery) Previous() protocol.Epoch {
 	if err != nil {
 		return invalid.NewEpochf("could not get protocol state snapshot at block %x: %w", q.snap.blockID, err)
 	}
-	status := psSnapshot.EpochStatus()
-	// todo: needs HasPrevious
 	entry := psSnapshot.Entry()
 
 	// CASE 1: there is no previous epoch - this indicates we are in the first
 	// epoch after a spork root or genesis block
-	if !status.HasPrevious() {
+	if !psSnapshot.PreviousEpochExists() {
 		return invalid.NewEpoch(protocol.ErrNoPreviousEpoch)
 	}
 
