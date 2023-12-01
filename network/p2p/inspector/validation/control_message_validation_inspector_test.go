@@ -337,7 +337,7 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Times(3).Run(func(args mock.Arguments) {
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
-			require.Equal(t, notification.TopicType, p2p.CtrlMsgNonClusterTopicType, "expected p2p.CtrlMsgNonClusterTopicType notification type, no RPC with cluster prefixed topic sent in this test")
+			require.Equal(t, notification.Errors[0].CtrlMsgTopicType(), p2p.CtrlMsgNonClusterTopicType, "expected p2p.CtrlMsgNonClusterTopicType notification type, no RPC with cluster prefixed topic sent in this test")
 			require.Equal(t, from, notification.PeerID)
 			require.Contains(t, []p2pmsg.ControlMessageType{p2pmsg.CtrlMsgGraft, p2pmsg.CtrlMsgPrune, p2pmsg.CtrlMsgIHave}, notification.MsgType)
 			require.True(t, validation.IsDuplicateTopicErr(notification.Errors[0].Err))
@@ -885,7 +885,7 @@ func checkNotificationFunc(t *testing.T, expectedPeerID peer.ID, expectedMsgType
 	return func(args mock.Arguments) {
 		notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 		require.True(t, ok)
-		require.Equal(t, topicType, notification.TopicType)
+		require.Equal(t, topicType, notification.Errors[0].CtrlMsgTopicType())
 		require.Equal(t, expectedPeerID, notification.PeerID)
 		require.Equal(t, expectedMsgType, notification.MsgType)
 		require.True(t, isExpectedErr(notification.Errors[0].Err))

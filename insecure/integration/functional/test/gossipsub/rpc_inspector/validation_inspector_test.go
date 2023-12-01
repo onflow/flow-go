@@ -62,7 +62,7 @@ func TestValidationInspector_InvalidTopicId_Detection(t *testing.T) {
 			count.Inc()
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
-			require.Equal(t, notification.TopicType, p2p.CtrlMsgNonClusterTopicType, "IsClusterPrefixed is expected to be false, no RPC with cluster prefixed topic sent in this test")
+			require.Equal(t, notification.Errors[0].CtrlMsgTopicType(), p2p.CtrlMsgNonClusterTopicType, "IsClusterPrefixed is expected to be false, no RPC with cluster prefixed topic sent in this test")
 			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
 			require.True(t, channels.IsInvalidTopicErr(notification.Errors[0].Err))
 			switch notification.MsgType {
@@ -136,6 +136,7 @@ func TestValidationInspector_InvalidTopicId_Detection(t *testing.T) {
 
 	// prepare to spam - generate control messages
 	graftCtlMsgsWithUnknownTopic := spammer.GenerateCtlMessages(int(controlMessageCount), p2ptest.WithGraft(messageCount, unknownTopic.String()))
+
 	graftCtlMsgsWithMalformedTopic := spammer.GenerateCtlMessages(int(controlMessageCount), p2ptest.WithGraft(messageCount, malformedTopic.String()))
 	graftCtlMsgsInvalidSporkIDTopic := spammer.GenerateCtlMessages(int(controlMessageCount), p2ptest.WithGraft(messageCount, invalidSporkIDTopic.String()))
 
@@ -197,7 +198,7 @@ func TestValidationInspector_DuplicateTopicId_Detection(t *testing.T) {
 			count.Inc()
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
-			require.Equal(t, notification.TopicType, p2p.CtrlMsgNonClusterTopicType, "IsClusterPrefixed is expected to be false, no RPC with cluster prefixed topic sent in this test")
+			require.Equal(t, notification.Errors[0].CtrlMsgTopicType(), p2p.CtrlMsgNonClusterTopicType, "IsClusterPrefixed is expected to be false, no RPC with cluster prefixed topic sent in this test")
 			require.True(t, validation.IsDuplicateTopicErr(notification.Errors[0].Err))
 			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
 			switch notification.MsgType {
@@ -304,8 +305,8 @@ func TestValidationInspector_IHaveDuplicateMessageId_Detection(t *testing.T) {
 			count.Inc()
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
-			require.Equal(t, notification.TopicType, p2p.CtrlMsgNonClusterTopicType, "IsClusterPrefixed is expected to be false, no RPC with cluster prefixed topic sent in this test")
-			require.True(t, validation.IsDuplicateTopicErr(notification.Errors[0].Err))
+			require.Equal(t, notification.Errors[0].CtrlMsgTopicType(), p2p.CtrlMsgNonClusterTopicType, "IsClusterPrefixed is expected to be false, no RPC with cluster prefixed topic sent in this test")
+			require.True(t, validation.IsDuplicateMessageIDErr(notification.Errors[0].Err))
 			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
 			require.True(t,
 				notification.MsgType == p2pmsg.CtrlMsgIHave,
@@ -416,7 +417,7 @@ func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
 			count.Inc()
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
-			require.Equal(t, notification.TopicType, p2p.CtrlMsgTopicTypeClusterPrefixed)
+			require.Equal(t, notification.Errors[0].CtrlMsgTopicType(), p2p.CtrlMsgTopicTypeClusterPrefixed)
 			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
 			require.True(t, channels.IsUnknownClusterIDErr(notification.Errors[0].Err))
 			switch notification.MsgType {
@@ -848,7 +849,7 @@ func TestValidationInspector_InspectIWants_CacheMissThreshold(t *testing.T) {
 		return func(args mockery.Arguments) {
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
-			require.Equal(t, notification.TopicType, p2p.CtrlMsgNonClusterTopicType, "IsClusterPrefixed is expected to be false, no RPC with cluster prefixed topic sent in this test")
+			require.Equal(t, notification.Errors[0].CtrlMsgTopicType(), p2p.CtrlMsgNonClusterTopicType, "IsClusterPrefixed is expected to be false, no RPC with cluster prefixed topic sent in this test")
 			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
 			require.True(t, notification.MsgType == p2pmsg.CtrlMsgIWant, fmt.Sprintf("unexpected control message type %s error: %s", notification.MsgType, notification.Errors[0].Err))
 			require.True(t, validation.IsIWantCacheMissThresholdErr(notification.Errors[0].Err))
@@ -981,7 +982,7 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 		return func(args mockery.Arguments) {
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
-			require.Equal(t, notification.TopicType, p2p.CtrlMsgNonClusterTopicType, "IsClusterPrefixed is expected to be false, no RPC with cluster prefixed topic sent in this test")
+			require.Equal(t, notification.Errors[0].CtrlMsgTopicType(), p2p.CtrlMsgNonClusterTopicType, "IsClusterPrefixed is expected to be false, no RPC with cluster prefixed topic sent in this test")
 			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
 			require.True(t, notification.MsgType == p2pmsg.RpcPublishMessage, fmt.Sprintf("unexpected control message type %s error: %s", notification.MsgType, notification.Errors[0].Err))
 			require.True(t, validation.IsInvalidRpcPublishMessagesErr(notification.Errors[0].Err))
@@ -1090,6 +1091,7 @@ func TestValidationInspector_MultiErrorNotification(t *testing.T) {
 
 	requireExpectedNotifErr := func(notification *p2p.InvCtrlMsgNotif) {
 		for _, invErr := range notification.Errors {
+			fmt.Println(invErr.Err)
 			require.True(t, channels.IsInvalidTopicErr(invErr.Err))
 		}
 	}
@@ -1180,7 +1182,7 @@ func TestValidationInspector_MultiErrorNotification(t *testing.T) {
 	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Maybe()
 
 	// create unknown topic
-	unknownTopic := channels.Topic(fmt.Sprintf("%s/%s", corruptlibp2p.GossipSubTopicIdFixture(), sporkID))
+	unknownTopic := channels.Topic(fmt.Sprintf("%s/%s", p2ptest.GossipSubTopicIdFixture(), sporkID))
 	// create malformed topic
 	malformedTopic := channels.Topic(channels.TestNetworkChannel)
 	// a topics spork ID is considered invalid if it does not match the current spork ID
@@ -1195,10 +1197,10 @@ func TestValidationInspector_MultiErrorNotification(t *testing.T) {
 	defer stopComponents(t, cancel, nodes, validationInspector)
 
 	// prepare to spam - generate control messages
-	grafts := spammer.GenerateCtlMessages(int(controlMessageCount), corruptlibp2p.WithGrafts(unknownTopic.String(), malformedTopic.String(), invalidSporkIDTopic.String()))
-	prunes := spammer.GenerateCtlMessages(int(controlMessageCount), corruptlibp2p.WithPrunes(unknownTopic.String(), malformedTopic.String(), invalidSporkIDTopic.String()))
-	ihaves := spammer.GenerateCtlMessages(int(controlMessageCount), corruptlibp2p.WithIHaves(100, unknownTopic.String(), malformedTopic.String(), invalidSporkIDTopic.String()))
-	iwants := spammer.GenerateCtlMessages(int(controlMessageCount), corruptlibp2p.WithIWant("duplicate_message_id", "duplicate_message_id"))
+	grafts := spammer.GenerateCtlMessages(int(controlMessageCount), p2ptest.WithGrafts(unknownTopic.String(), malformedTopic.String(), invalidSporkIDTopic.String()))
+	prunes := spammer.GenerateCtlMessages(int(controlMessageCount), p2ptest.WithPrunes(unknownTopic.String(), malformedTopic.String(), invalidSporkIDTopic.String()))
+	ihaves := spammer.GenerateCtlMessages(int(controlMessageCount), p2ptest.WithIHaves(100, unknownTopic.String(), malformedTopic.String(), invalidSporkIDTopic.String()))
+	iwants := spammer.GenerateCtlMessages(int(controlMessageCount), p2ptest.WithIWantMessageIds("duplicate_message_id", "duplicate_message_id"))
 
 	// spam the victim peer with invalid graft messages
 	spammer.SpamControlMessage(t, victimNode, grafts)

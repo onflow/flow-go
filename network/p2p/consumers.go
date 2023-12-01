@@ -115,7 +115,6 @@ const (
 	CtrlMsgNonClusterTopicType CtrlMsgTopicType = iota
 	// CtrlMsgTopicTypeClusterPrefixed represents a cluster-prefixed topic.
 	CtrlMsgTopicTypeClusterPrefixed
-	CtrlMsgTopicTypeUnknown
 )
 
 func (t CtrlMsgTopicType) String() string {

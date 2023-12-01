@@ -49,19 +49,6 @@ const (
 	// skipDecayThreshold is the threshold for which when the negative penalty is above this value, the decay function will not be called.
 	// instead, the penalty will be set to 0. This is to prevent the penalty from keeping a small negative value for a long time.
 	skipDecayThreshold = -0.1
-	// graftMisbehaviourPenalty is the penalty applied to the application specific penalty when a peer conducts a graft misbehaviour.
-	graftMisbehaviourPenalty = -10
-	// pruneMisbehaviourPenalty is the penalty applied to the application specific penalty when a peer conducts a prune misbehaviour.
-	pruneMisbehaviourPenalty = -10
-	// iHaveMisbehaviourPenalty is the penalty applied to the application specific penalty when a peer conducts a iHave misbehaviour.
-	iHaveMisbehaviourPenalty = -10
-	// iWantMisbehaviourPenalty is the penalty applied to the application specific penalty when a peer conducts a iWant misbehaviour.
-	iWantMisbehaviourPenalty = -10
-	// clusterPrefixedPenaltyReductionFactor factor used to reduce the penalty for control message misbehaviours on cluster prefixed topics. This allows a more lenient punishment for nodes
-	// that fall behind and may need to request old data.
-	clusterPrefixedPenaltyReductionFactor = .5
-	// rpcPublishMessageMisbehaviourPenalty is the penalty applied to the application specific penalty when a peer conducts a RpcPublishMessageMisbehaviourPenalty misbehaviour.
-	rpcPublishMessageMisbehaviourPenalty = -10
 )
 
 type SpamRecordInitFunc func() p2p.GossipSubSpamRecord
@@ -305,12 +292,12 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 	// apply the base penalty to the application specific penalty.
 	appliedPenalty := float64(0)
 	for _, err := range notification.Errors {
-		appliedPenalty += float64(err.Severity()) * basePenalty
-	}
-
-	// reduce penalty for cluster prefixed topics allowing nodes that are potentially behind to catch up
-	if notification.TopicType == p2p.CtrlMsgTopicTypeClusterPrefixed {
-		appliedPenalty *= r.penalty.ClusterPrefixedPenaltyReductionFactor
+		errPenalty := float64(err.Severity()) * basePenalty
+		// reduce penalty for cluster prefixed topics allowing nodes that are potentially behind to catch up
+		if err.CtrlMsgTopicType() == p2p.CtrlMsgTopicTypeClusterPrefixed {
+			errPenalty *= r.penalty.ClusterPrefixedPenaltyReductionFactor
+		}
+		appliedPenalty += errPenalty
 	}
 
 	record, err := r.spamScoreCache.Update(notification.PeerID, func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {

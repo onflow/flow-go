@@ -164,7 +164,7 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 func randomInvCtlMsgErrs(n int) p2p.InvCtrlMsgErrs {
 	errs := make(p2p.InvCtrlMsgErrs, n)
 	for i := 0; i < n; i++ {
-		errs[i] = p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid control message"), randomErrSeverity())
+		errs[i] = p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid control message"), randomErrSeverity(), p2p.CtrlMsgNonClusterTopicType)
 	}
 	return errs
 }
