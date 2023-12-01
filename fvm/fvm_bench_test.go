@@ -448,7 +448,7 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 		for _, account := range accounts {
 			addrs = append(addrs, account.Address)
 		}
-		evmAddress, err := chain.AddressAtIndex(environment.EVMAccountIndex)
+		evmAddress, err := chain.AddressAtIndex(systemcontracts.EVMAccountIndex)
 		require.NoError(b, err)
 		addrs = append(addrs, evmAddress)
 
