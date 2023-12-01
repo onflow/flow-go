@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/onflow/flow-go/fvm/systemcontracts"
+
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog"
@@ -184,12 +186,13 @@ func (executor *transactionExecutor) preprocessTransactionBody() error {
 	// setup evm
 	if executor.ctx.EVMEnabled {
 		chain := executor.ctx.Chain
+		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 		err := evm.SetupEnvironment(
 			chain.ChainID(),
 			executor.env,
 			executor.cadenceRuntime.TxRuntimeEnv,
 			chain.ServiceAddress(),
-			FlowTokenAddress(chain),
+			sc.FlowToken.Address,
 		)
 		if err != nil {
 			return err
