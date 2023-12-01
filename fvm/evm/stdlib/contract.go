@@ -396,12 +396,7 @@ func newInternalEVMTypeBalanceFunction(
 			account := handler.AccountByAddress(address, isAuthorized)
 
 			// todo return the Balance type
-			return interpreter.NewUFix64Value(gauge, func() (balance uint64) {
-				errors.WrapPanic(func() {
-					balance = account.Balance().ToAttoFlow().Uint64()
-				})
-				return
-			})
+			return interpreter.UFix64Value(account.Balance())
 		},
 	)
 }
