@@ -2,8 +2,6 @@ package cmd
 
 import (
 	"context"
-	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
@@ -243,8 +241,7 @@ type StateExcerptAtBoot struct {
 }
 
 func DefaultBaseConfig() *BaseConfig {
-	homedir, _ := os.UserHomeDir()
-	datadir := filepath.Join(homedir, ".flow", "database")
+	datadir := "/data/protocol"
 
 	// NOTE: if the codec used in the network component is ever changed any code relying on
 	// the message format specific to the codec must be updated. i.e: the AuthorizedSenderValidator.

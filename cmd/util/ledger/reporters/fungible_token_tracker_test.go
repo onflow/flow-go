@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -69,6 +70,8 @@ func TestFungibleTokenTracker(t *testing.T) {
 	err = view.Merge(snapshot)
 	require.NoError(t, err)
 
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
 	// deploy wrapper resource
 	testContract := fmt.Sprintf(`
 	import FungibleToken from 0x%s
@@ -87,7 +90,7 @@ func TestFungibleTokenTracker(t *testing.T) {
 		access(all) fun CreateWrappedVault(inp: @{FungibleToken.Vault}): @WrappedToken.WrappedVault {
 			return <-create WrappedVault(v :<- inp)
 		}
-	}`, fvm.FungibleTokenAddress(chain))
+	}`, sc.FungibleToken.Address.Hex())
 
 	deployingTestContractScript := []byte(fmt.Sprintf(`
 	transaction {
@@ -109,7 +112,8 @@ func TestFungibleTokenTracker(t *testing.T) {
 	err = view.Merge(snapshot)
 	require.NoError(t, err)
 
-	wrapTokenScript := []byte(fmt.Sprintf(`
+	wrapTokenScript := []byte(fmt.Sprintf(
+		`
 							import FungibleToken from 0x%s
 							import FlowToken from 0x%s
 							import WrappedToken from 0x%s
@@ -123,7 +127,11 @@ func TestFungibleTokenTracker(t *testing.T) {
 									let wrappedFlow <- WrappedToken.CreateWrappedVault(inp :<- sentVault)
 									signer.storage.save(<-wrappedFlow, to: /storage/wrappedToken)
 								}
-							}`, fvm.FungibleTokenAddress(chain), fvm.FlowTokenAddress(chain), chain.ServiceAddress()))
+							}`,
+		sc.FungibleToken.Address.Hex(),
+		sc.FlowToken.Address.Hex(),
+		sc.FlowServiceAccount.Address.Hex(),
+	))
 
 	txBody = flow.NewTransactionBody().
 		SetScript(wrapTokenScript).

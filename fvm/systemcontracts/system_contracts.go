@@ -16,20 +16,29 @@ package systemcontracts
 import (
 	"fmt"
 
+	"github.com/onflow/flow-core-contracts/lib/go/templates"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
 const (
-
 	// Unqualified names of system smart contracts (not including address prefix)
 
-	ContractNameEpoch             = "FlowEpoch"
-	ContractNameClusterQC         = "FlowClusterQC"
-	ContractNameDKG               = "FlowDKG"
-	ContractNameServiceAccount    = "FlowServiceAccount"
-	ContractNameFlowFees          = "FlowFees"
-	ContractNameStorageFees       = "FlowStorageFees"
-	ContractNameNodeVersionBeacon = "NodeVersionBeacon"
+	ContractNameEpoch               = "FlowEpoch"
+	ContractNameIDTableStaking      = "FlowIDTableStaking"
+	ContractNameClusterQC           = "FlowClusterQC"
+	ContractNameDKG                 = "FlowDKG"
+	ContractNameServiceAccount      = "FlowServiceAccount"
+	ContractNameFlowFees            = "FlowFees"
+	ContractNameStorageFees         = "FlowStorageFees"
+	ContractNameNodeVersionBeacon   = "NodeVersionBeacon"
+	ContractNameRandomBeaconHistory = "RandomBeaconHistory"
+	ContractNameFungibleToken       = "FungibleToken"
+	ContractNameFlowToken           = "FlowToken"
+	ContractNameNonFungibleToken    = "NonFungibleToken"
+	ContractNameMetadataViews       = "MetadataViews"
+	ContractNameViewResolver        = "ViewResolver"
+	ContractNameEVM                 = "EVM"
 
 	// Unqualified names of service events (not including address prefix or contract name)
 
@@ -46,6 +55,30 @@ const (
 	ContractStorageFeesFunction_calculateAccountCapacity                      = "calculateAccountCapacity"
 	ContractStorageFeesFunction_getAccountsCapacityForTransactionStorageCheck = "getAccountsCapacityForTransactionStorageCheck"
 	ContractStorageFeesFunction_defaultTokenAvailableBalance                  = "defaultTokenAvailableBalance"
+
+	// Indexes of the system contracts that are deployed to an address at a specific index
+
+	FungibleTokenAccountIndex = 2
+	FlowTokenAccountIndex     = 3
+	FlowFeesAccountIndex      = 4
+	EVMAccountIndex           = 5
+)
+
+// Well-known addresses for system contracts on long-running networks.
+// For now, all system contracts tracked by this package are deployed to the same
+// address (per chain) as the staking contract.
+//
+// Ref: https://docs.onflow.org/core-contracts/staking-contract-reference/
+var (
+	// stakingContractAddressMainnet is the address of the FlowIDTableStaking contract on Mainnet
+	stakingContractAddressMainnet = flow.HexToAddress("8624b52f9ddcd04a")
+	// stakingContractAddressTestnet is the address of the FlowIDTableStaking contract on Testnet
+	stakingContractAddressTestnet = flow.HexToAddress("9eca2b38b18b5dfe")
+
+	// nftTokenAddressTestnet is the address of the NonFungibleToken contract on Testnet
+	nftTokenAddressMainnet = flow.HexToAddress("1d7e57aa55817448")
+	// nftTokenAddressTestnet is the address of the NonFungibleToken contract on Testnet
+	nftTokenAddressTestnet = flow.HexToAddress("631e88ae7f1d7c20")
 )
 
 // SystemContract represents a system contract on a particular chain.
@@ -75,10 +108,85 @@ func (se ServiceEvent) EventType() flow.EventType {
 
 // SystemContracts is a container for all system contracts on a particular chain.
 type SystemContracts struct {
-	Epoch             SystemContract
-	ClusterQC         SystemContract
-	DKG               SystemContract
-	NodeVersionBeacon SystemContract
+	// epoch related contracts
+	Epoch          SystemContract
+	IDTableStaking SystemContract
+	ClusterQC      SystemContract
+	DKG            SystemContract
+
+	// service account related contracts
+	FlowServiceAccount  SystemContract
+	NodeVersionBeacon   SystemContract
+	RandomBeaconHistory SystemContract
+	FlowStorageFees     SystemContract
+
+	// token related contracts
+	FlowFees      SystemContract
+	FlowToken     SystemContract
+	FungibleToken SystemContract
+
+	// NFT related contracts
+	NonFungibleToken SystemContract
+	MetadataViews    SystemContract
+	ViewResolver     SystemContract
+
+	// EVM related contracts
+	EVM SystemContract
+}
+
+// AsTemplateEnv returns a template environment with all system contracts filled in.
+// This is useful for generating Cadence code from templates.
+func (c SystemContracts) AsTemplateEnv() templates.Environment {
+	return templates.Environment{
+		EpochAddress:             c.Epoch.Address.Hex(),
+		IDTableAddress:           c.IDTableStaking.Address.Hex(),
+		QuorumCertificateAddress: c.ClusterQC.Address.Hex(),
+		DkgAddress:               c.DKG.Address.Hex(),
+
+		ServiceAccountAddress:    c.FlowServiceAccount.Address.Hex(),
+		NodeVersionBeaconAddress: c.NodeVersionBeacon.Address.Hex(),
+		// TODO:
+		// RandomBeaconHistoryAddress: c.RandomBeaconHistory.Address.Hex(),
+		StorageFeesAddress: c.FlowStorageFees.Address.Hex(),
+
+		FlowFeesAddress:      c.FlowFees.Address.Hex(),
+		FlowTokenAddress:     c.FlowToken.Address.Hex(),
+		FungibleTokenAddress: c.FungibleToken.Address.Hex(),
+
+		// The following contracts dont exist on the template env yet
+		// that is not a problem, but they are still listed here for completeness.
+
+		// NonFungibleToken: c.NonFungibleToken.Address.Hex(),
+		// MetadataViews : c.MetadataViews.Address.Hex(),
+		// ViewResolver : c.ViewResolver.Address.Hex(),
+
+		// EVMAddress: c.EVM.Address.Hex(),
+	}
+}
+
+// All returns all system contracts as a slice.
+func (c SystemContracts) All() []SystemContract {
+	return []SystemContract{
+		c.Epoch,
+		c.IDTableStaking,
+		c.ClusterQC,
+		c.DKG,
+
+		c.FlowServiceAccount,
+		c.NodeVersionBeacon,
+		c.RandomBeaconHistory,
+		c.FlowStorageFees,
+
+		c.FlowFees,
+		c.FlowToken,
+		c.FungibleToken,
+
+		c.NonFungibleToken,
+		c.MetadataViews,
+		c.ViewResolver,
+
+		c.EVM,
+	}
 }
 
 // ServiceEvents is a container for all service events on a particular chain.
@@ -98,121 +206,164 @@ func (se ServiceEvents) All() []ServiceEvent {
 }
 
 // SystemContractsForChain returns the system contract configuration for the given chain.
-func SystemContractsForChain(chainID flow.ChainID) (*SystemContracts, error) {
-	addresses, ok := contractAddressesByChainID[chainID]
+// Panics if the chain is unknown.
+func SystemContractsForChain(chainID flow.ChainID) *SystemContracts {
+	contracts, ok := systemContractsForChain[chainID]
 	if !ok {
-		return nil, fmt.Errorf("unknown chain id (%s)", chainID.String())
+		// this is a panic, since it can only happen if the code is wrong
+		panic(fmt.Sprintf("unknown chain: %s", chainID))
 	}
-
-	contracts := &SystemContracts{
-		Epoch: SystemContract{
-			Address: addresses[ContractNameEpoch],
-			Name:    ContractNameEpoch,
-		},
-		ClusterQC: SystemContract{
-			Address: addresses[ContractNameClusterQC],
-			Name:    ContractNameClusterQC,
-		},
-		DKG: SystemContract{
-			Address: addresses[ContractNameDKG],
-			Name:    ContractNameDKG,
-		},
-		NodeVersionBeacon: SystemContract{
-			Address: addresses[ContractNameNodeVersionBeacon],
-			Name:    ContractNameNodeVersionBeacon,
-		},
-	}
-
-	return contracts, nil
+	return contracts
 }
+
+var systemContractsForChain = map[flow.ChainID]*SystemContracts{}
 
 // ServiceEventsForChain returns the service event confirmation for the given chain.
-func ServiceEventsForChain(chainID flow.ChainID) (*ServiceEvents, error) {
-	addresses, ok := contractAddressesByChainID[chainID]
+// Panics if the chain is unknown.
+func ServiceEventsForChain(chainID flow.ChainID) *ServiceEvents {
+	events, ok := serviceEventsForChain[chainID]
 	if !ok {
-		return nil, fmt.Errorf("unknown chain id (%s)", chainID.String())
+		// this is a panic, since it can only happen if the code is wrong
+		panic(fmt.Sprintf("unknown chain: %s", chainID))
 	}
-
-	events := &ServiceEvents{
-		EpochSetup: ServiceEvent{
-			Address:      addresses[ContractNameEpoch],
-			ContractName: ContractNameEpoch,
-			Name:         EventNameEpochSetup,
-		},
-		EpochCommit: ServiceEvent{
-			Address:      addresses[ContractNameEpoch],
-			ContractName: ContractNameEpoch,
-			Name:         EventNameEpochCommit,
-		},
-		VersionBeacon: ServiceEvent{
-			Address:      addresses[ContractNameNodeVersionBeacon],
-			ContractName: ContractNameNodeVersionBeacon,
-			Name:         EventNameVersionBeacon,
-		},
-	}
-
-	return events, nil
+	return events
 }
 
-// contractAddressesByChainID stores the default system smart contract
-// addresses for each chain.
-var contractAddressesByChainID map[flow.ChainID]map[string]flow.Address
+var serviceEventsForChain = map[flow.ChainID]*ServiceEvents{}
 
-// Well-known addresses for system contracts on long-running networks.
-// For now, all system contracts tracked by this package are deployed to the same
-// address (per chain) as the staking contract.
-//
-// Ref: https://docs.onflow.org/core-contracts/staking-contract-reference/
-var (
-	// stakingContractAddressMainnet is the address of the FlowIDTableStaking contract on Mainnet
-	stakingContractAddressMainnet = flow.HexToAddress("8624b52f9ddcd04a")
-	// stakingContractAddressTestnet is the address of the FlowIDTableStaking contract on Testnet
-	stakingContractAddressTestnet = flow.HexToAddress("9eca2b38b18b5dfe")
-)
+var contractAddressFunc = map[string]func(id flow.ChainID) flow.Address{}
 
 func init() {
-	contractAddressesByChainID = make(map[flow.ChainID]map[string]flow.Address)
 
-	// Main Flow network
-	// All system contracts are deployed to the account of the staking contract
-	mainnet := map[string]flow.Address{
-		ContractNameEpoch:             stakingContractAddressMainnet,
-		ContractNameClusterQC:         stakingContractAddressMainnet,
-		ContractNameDKG:               stakingContractAddressMainnet,
-		ContractNameNodeVersionBeacon: flow.Mainnet.Chain().ServiceAddress(),
+	serviceAddressFunc := func(chain flow.ChainID) flow.Address {
+		return chain.Chain().ServiceAddress()
 	}
-	contractAddressesByChainID[flow.Mainnet] = mainnet
 
-	// Long-lived test networks
-	// All system contracts are deployed to the account of the staking contract
-	testnet := map[string]flow.Address{
-		ContractNameEpoch:             stakingContractAddressTestnet,
-		ContractNameClusterQC:         stakingContractAddressTestnet,
-		ContractNameDKG:               stakingContractAddressTestnet,
-		ContractNameNodeVersionBeacon: flow.Testnet.Chain().ServiceAddress(),
+	// epoch contracts are deployed on a separate account on mainnet and testnet
+	epochAddressFunc := func(chain flow.ChainID) flow.Address {
+		switch chain {
+		case flow.Mainnet:
+			return stakingContractAddressMainnet
+		case flow.Testnet:
+			return stakingContractAddressTestnet
+		default:
+			return chain.Chain().ServiceAddress()
+		}
 	}
-	contractAddressesByChainID[flow.Testnet] = testnet
 
-	// Sandboxnet test network
-	// All system contracts are deployed to the service account
-	sandboxnet := map[string]flow.Address{
-		ContractNameEpoch:             flow.Sandboxnet.Chain().ServiceAddress(),
-		ContractNameClusterQC:         flow.Sandboxnet.Chain().ServiceAddress(),
-		ContractNameDKG:               flow.Sandboxnet.Chain().ServiceAddress(),
-		ContractNameNodeVersionBeacon: flow.Sandboxnet.Chain().ServiceAddress(),
+	// some contracts are always at an address with a a predetermined index
+	nthAddressFunc := func(index uint64) func(chain flow.ChainID) flow.Address {
+		return func(chain flow.ChainID) flow.Address {
+			address, err := chain.Chain().AddressAtIndex(index)
+			if err != nil {
+				// this can only happen if the code is wrong
+				panic(fmt.Sprintf("failed to get %d address: %v", FlowFeesAccountIndex, err))
+			}
+			return address
+		}
 	}
-	contractAddressesByChainID[flow.Sandboxnet] = sandboxnet
 
-	// Transient test networks
-	// All system contracts are deployed to the service account
-	transient := map[string]flow.Address{
-		ContractNameEpoch:             flow.Emulator.Chain().ServiceAddress(),
-		ContractNameClusterQC:         flow.Emulator.Chain().ServiceAddress(),
-		ContractNameDKG:               flow.Emulator.Chain().ServiceAddress(),
-		ContractNameNodeVersionBeacon: flow.Emulator.Chain().ServiceAddress(),
+	nftTokenAddressFunc := func(chain flow.ChainID) flow.Address {
+		switch chain {
+		case flow.Mainnet:
+			return nftTokenAddressMainnet
+		case flow.Testnet:
+			return nftTokenAddressTestnet
+		default:
+			return chain.Chain().ServiceAddress()
+		}
 	}
-	contractAddressesByChainID[flow.Emulator] = transient
-	contractAddressesByChainID[flow.Localnet] = transient
-	contractAddressesByChainID[flow.BftTestnet] = transient
-	contractAddressesByChainID[flow.Benchnet] = transient
+
+	contractAddressFunc = map[string]func(id flow.ChainID) flow.Address{
+		ContractNameIDTableStaking: epochAddressFunc,
+		ContractNameEpoch:          epochAddressFunc,
+		ContractNameClusterQC:      epochAddressFunc,
+		ContractNameDKG:            epochAddressFunc,
+
+		ContractNameNodeVersionBeacon:   serviceAddressFunc,
+		ContractNameRandomBeaconHistory: serviceAddressFunc,
+		ContractNameServiceAccount:      serviceAddressFunc,
+		ContractNameStorageFees:         serviceAddressFunc,
+
+		ContractNameFlowFees:      nthAddressFunc(FlowFeesAccountIndex),
+		ContractNameFungibleToken: nthAddressFunc(FungibleTokenAccountIndex),
+		ContractNameFlowToken:     nthAddressFunc(FlowTokenAccountIndex),
+
+		ContractNameNonFungibleToken: nftTokenAddressFunc,
+		ContractNameMetadataViews:    nftTokenAddressFunc,
+		ContractNameViewResolver:     nftTokenAddressFunc,
+
+		ContractNameEVM: nthAddressFunc(EVMAccountIndex),
+	}
+
+	getSystemContractsForChain := func(chainID flow.ChainID) *SystemContracts {
+
+		contract := func(name string) SystemContract {
+			addressFunc, ok := contractAddressFunc[name]
+			if !ok {
+				// this is a panic, since it can only happen if the code is wrong
+				panic(fmt.Sprintf("unknown system contract name: %s", name))
+			}
+
+			return SystemContract{
+				Address: addressFunc(chainID),
+				Name:    name,
+			}
+		}
+
+		contracts := &SystemContracts{
+			Epoch:          contract(ContractNameEpoch),
+			IDTableStaking: contract(ContractNameIDTableStaking),
+			ClusterQC:      contract(ContractNameClusterQC),
+			DKG:            contract(ContractNameDKG),
+
+			FlowServiceAccount:  contract(ContractNameServiceAccount),
+			NodeVersionBeacon:   contract(ContractNameNodeVersionBeacon),
+			RandomBeaconHistory: contract(ContractNameRandomBeaconHistory),
+			FlowStorageFees:     contract(ContractNameStorageFees),
+
+			FlowFees:      contract(ContractNameFlowFees),
+			FlowToken:     contract(ContractNameFlowToken),
+			FungibleToken: contract(ContractNameFungibleToken),
+
+			NonFungibleToken: contract(ContractNameNonFungibleToken),
+			MetadataViews:    contract(ContractNameMetadataViews),
+			ViewResolver:     contract(ContractNameViewResolver),
+
+			EVM: contract(ContractNameEVM),
+		}
+
+		return contracts
+	}
+
+	getServiceEventsForChain := func(chainID flow.ChainID) *ServiceEvents {
+
+		event := func(contractName, eventName string) ServiceEvent {
+			addressFunc, ok := contractAddressFunc[contractName]
+			if !ok {
+				// this is a panic, since it can only happen if the code is wrong
+				panic(fmt.Sprintf("unknown system contract name: %s", contractName))
+			}
+
+			return ServiceEvent{
+				Address:      addressFunc(chainID),
+				ContractName: contractName,
+				Name:         eventName,
+			}
+		}
+
+		events := &ServiceEvents{
+			EpochSetup:    event(ContractNameEpoch, EventNameEpochSetup),
+			EpochCommit:   event(ContractNameEpoch, EventNameEpochCommit),
+			VersionBeacon: event(ContractNameNodeVersionBeacon, EventNameVersionBeacon),
+		}
+
+		return events
+	}
+
+	// pre-populate the system contracts and service events for all chains for fast access
+	for _, chain := range flow.AllChainIDs() {
+		serviceEventsForChain[chain] = getServiceEventsForChain(chain)
+		systemContractsForChain[chain] = getSystemContractsForChain(chain)
+	}
 }

@@ -78,7 +78,9 @@ type Routable interface {
 	RoutingTable() *kbucket.RoutingTable
 	// SetRouting sets the node's routing implementation.
 	// SetRouting may be called at most once.
-	SetRouting(r routing.Routing)
+	// Returns:
+	// - error: An error, if any occurred during the process; any returned error is irrecoverable.
+	SetRouting(r routing.Routing) error
 	// Routing returns node routing object.
 	Routing() routing.Routing
 }

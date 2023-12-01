@@ -29,6 +29,7 @@ const (
 	encPayloadLengthSize = 4
 
 	encodedTrieSize = encNodeIndexSize + encRegCountSize + encRegSizeSize + encHashSize
+	EncodedTrieSize = encodedTrieSize
 )
 
 const payloadEncodingVersion = 1
@@ -268,6 +269,13 @@ func ReadNode(reader io.Reader, scratch []byte, getNode func(nodeIndex uint64) (
 	return n, nil
 }
 
+type EncodedTrie struct {
+	RootIndex uint64
+	RegCount  uint64
+	RegSize   uint64
+	RootHash  hash.Hash
+}
+
 // EncodeTrie encodes trie in the following format:
 // - root node index (8 byte)
 // - allocated reg count (8 byte)
@@ -305,9 +313,7 @@ func EncodeTrie(trie *trie.MTrie, rootIndex uint64, scratch []byte) []byte {
 	return buf[:pos]
 }
 
-// ReadTrie reconstructs a trie from data read from reader.
-func ReadTrie(reader io.Reader, scratch []byte, getNode func(nodeIndex uint64) (*node.Node, error)) (*trie.MTrie, error) {
-
+func ReadEncodedTrie(reader io.Reader, scratch []byte) (EncodedTrie, error) {
 	if len(scratch) < encodedTrieSize {
 		scratch = make([]byte, encodedTrieSize)
 	}
@@ -315,7 +321,7 @@ func ReadTrie(reader io.Reader, scratch []byte, getNode func(nodeIndex uint64) (
 	// Read encoded trie
 	_, err := io.ReadFull(reader, scratch[:encodedTrieSize])
 	if err != nil {
-		return nil, fmt.Errorf("failed to read serialized trie: %w", err)
+		return EncodedTrie{}, fmt.Errorf("failed to read serialized trie: %w", err)
 	}
 
 	pos := 0
@@ -335,21 +341,36 @@ func ReadTrie(reader io.Reader, scratch []byte, getNode func(nodeIndex uint64) (
 	// Decode root node hash
 	readRootHash, err := hash.ToHash(scratch[pos : pos+encHashSize])
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode hash of serialized trie: %w", err)
+		return EncodedTrie{}, fmt.Errorf("failed to decode hash of serialized trie: %w", err)
 	}
 
-	rootNode, err := getNode(rootIndex)
+	return EncodedTrie{
+		RootIndex: rootIndex,
+		RegCount:  regCount,
+		RegSize:   regSize,
+		RootHash:  readRootHash,
+	}, nil
+}
+
+// ReadTrie reconstructs a trie from data read from reader.
+func ReadTrie(reader io.Reader, scratch []byte, getNode func(nodeIndex uint64) (*node.Node, error)) (*trie.MTrie, error) {
+	encodedTrie, err := ReadEncodedTrie(reader, scratch)
+	if err != nil {
+		return nil, err
+	}
+
+	rootNode, err := getNode(encodedTrie.RootIndex)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find root node of serialized trie: %w", err)
 	}
 
-	mtrie, err := trie.NewMTrie(rootNode, regCount, regSize)
+	mtrie, err := trie.NewMTrie(rootNode, encodedTrie.RegCount, encodedTrie.RegSize)
 	if err != nil {
 		return nil, fmt.Errorf("failed to restore serialized trie: %w", err)
 	}
 
 	rootHash := mtrie.RootHash()
-	if !rootHash.Equals(ledger.RootHash(readRootHash)) {
+	if !rootHash.Equals(ledger.RootHash(encodedTrie.RootHash)) {
 		return nil, fmt.Errorf("failed to restore serialized trie: roothash doesn't match")
 	}
 

@@ -2,7 +2,6 @@ package request
 
 import (
 	"fmt"
-	"regexp"
 
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -57,19 +56,15 @@ func (g *GetEvents) Parse(rawType string, rawStart string, rawEnd string, rawBlo
 		return fmt.Errorf("must provide either block IDs or start and end height range")
 	}
 
-	g.Type = rawType
-	if g.Type == "" {
+	if rawType == "" {
 		return fmt.Errorf("event type must be provided")
 	}
-
-	// match basic format A.address.contract.event (ignore err since regex will always compile)
-	basic, _ := regexp.MatchString(`[A-Z]\.[a-f0-9]{16}\.[\w+]*\.[\w+]*`, g.Type)
-	// match core events flow.event
-	core, _ := regexp.MatchString(`flow\.[\w]*`, g.Type)
-
-	if !core && !basic {
-		return fmt.Errorf("invalid event type format")
+	var eventType EventType
+	err = eventType.Parse(rawType)
+	if err != nil {
+		return err
 	}
+	g.Type = eventType.Flow()
 
 	// validate start end height option
 	if g.StartHeight != EmptyHeight && g.EndHeight != EmptyHeight {

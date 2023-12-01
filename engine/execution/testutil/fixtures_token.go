@@ -6,11 +6,12 @@ import (
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 
-	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 func CreateTokenTransferTransaction(chain flow.Chain, amount int, to flow.Address, signer flow.Address) *flow.TransactionBody {
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 	return flow.NewTransactionBody().
 		SetScript([]byte(fmt.Sprintf(`
 		import FungibleToken from 0x%s
@@ -31,7 +32,7 @@ func CreateTokenTransferTransaction(chain flow.Chain, amount int, to flow.Addres
 					?? panic("Could not borrow receiver reference to the recipient's Vault")
 				receiverRef.deposit(from: <-self.sentVault)
 			}
-		}`, fvm.FungibleTokenAddress(chain), fvm.FlowTokenAddress(chain)))).
+		}`, sc.FungibleToken.Address.Hex(), sc.FlowToken.Address.Hex()))).
 		AddArgument(jsoncdc.MustEncode(cadence.UFix64(amount))).
 		AddArgument(jsoncdc.MustEncode(cadence.NewAddress(to))).
 		AddAuthorizer(signer)

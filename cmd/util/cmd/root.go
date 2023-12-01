@@ -25,6 +25,7 @@ import (
 	rollback_executed_height "github.com/onflow/flow-go/cmd/util/cmd/rollback-executed-height/cmd"
 	"github.com/onflow/flow-go/cmd/util/cmd/snapshot"
 	truncate_database "github.com/onflow/flow-go/cmd/util/cmd/truncate-database"
+	"github.com/onflow/flow-go/cmd/util/cmd/version"
 )
 
 var (
@@ -60,6 +61,7 @@ func init() {
 }
 
 func addCommands() {
+	rootCmd.AddCommand(version.Cmd)
 	rootCmd.AddCommand(extract.Cmd)
 	rootCmd.AddCommand(export.Cmd)
 	rootCmd.AddCommand(checkpoint_list_tries.Cmd)

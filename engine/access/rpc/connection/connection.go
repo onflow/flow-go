@@ -6,20 +6,28 @@ import (
 	"net"
 	"time"
 
-	"github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/module"
+
+	"github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/flow/protobuf/go/flow/execution"
 )
 
 // ConnectionFactory is an interface for creating access and execution API clients.
 type ConnectionFactory interface {
-	GetAccessAPIClient(address string) (access.AccessAPIClient, io.Closer, error)
-	GetAccessAPIClientWithPort(address string, port uint) (access.AccessAPIClient, io.Closer, error)
-	InvalidateAccessAPIClient(address string)
+	// GetAccessAPIClient gets an access API client for the specified address using the default CollectionGRPCPort, networkPubKey is optional,
+	// and it is used for secure gRPC connection. Can be nil for an unsecured connection.
+	// The returned io.Closer should close the connection after the call if no error occurred during client creation.
+	GetAccessAPIClient(address string, networkPubKey crypto.PublicKey) (access.AccessAPIClient, io.Closer, error)
+	// GetAccessAPIClientWithPort gets an access API client for the specified address with port, networkPubKey is optional,
+	// and it is used for secure gRPC connection. Can be nil for an unsecured connection.
+	// The returned io.Closer should close the connection after the call if no error occurred during client creation.
+	GetAccessAPIClientWithPort(address string, networkPubKey crypto.PublicKey) (access.AccessAPIClient, io.Closer, error)
+	// GetExecutionAPIClient gets an execution API client for the specified address using the default ExecutionGRPCPort.
+	// The returned io.Closer should close the connection after the call if no error occurred during client creation.
 	GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, io.Closer, error)
-	InvalidateExecutionAPIClient(address string)
 }
 
 // ProxyConnectionFactory wraps an existing ConnectionFactory and allows getting API clients for a target address.
@@ -28,9 +36,15 @@ type ProxyConnectionFactory struct {
 	targetAddress string
 }
 
-func (p *ProxyConnectionFactory) GetAccessAPIClient(address string) (access.AccessAPIClient, io.Closer, error) {
-	return p.ConnectionFactory.GetAccessAPIClient(p.targetAddress)
+// GetAccessAPIClient gets an access API client for a target address using the default CollectionGRPCPort.
+// The networkPubKey is the public key used for a secure gRPC connection. It can be nil for an unsecured connection.
+// The returned io.Closer should close the connection after the call if no error occurred during client creation.
+func (p *ProxyConnectionFactory) GetAccessAPIClient(address string, networkPubKey crypto.PublicKey) (access.AccessAPIClient, io.Closer, error) {
+	return p.ConnectionFactory.GetAccessAPIClient(p.targetAddress, networkPubKey)
 }
+
+// GetExecutionAPIClient gets an execution API client for a target address using the default ExecutionGRPCPort.
+// The returned io.Closer should close the connection after the call if no error occurred during client creation.
 func (p *ProxyConnectionFactory) GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, io.Closer, error) {
 	return p.ConnectionFactory.GetExecutionAPIClient(p.targetAddress)
 }
@@ -48,18 +62,21 @@ type ConnectionFactoryImpl struct {
 }
 
 // GetAccessAPIClient gets an access API client for the specified address using the default CollectionGRPCPort.
-func (cf *ConnectionFactoryImpl) GetAccessAPIClient(address string) (access.AccessAPIClient, io.Closer, error) {
-	return cf.GetAccessAPIClientWithPort(address, cf.CollectionGRPCPort)
-}
-
-// GetAccessAPIClientWithPort gets an access API client for the specified address and port.
-func (cf *ConnectionFactoryImpl) GetAccessAPIClientWithPort(address string, port uint) (access.AccessAPIClient, io.Closer, error) {
-	grpcAddress, err := getGRPCAddress(address, port)
+// The networkPubKey is the public key used for secure gRPC connection. Can be nil for an unsecured connection.
+// The returned io.Closer should close the connection after the call if no error occurred during client creation.
+func (cf *ConnectionFactoryImpl) GetAccessAPIClient(address string, networkPubKey crypto.PublicKey) (access.AccessAPIClient, io.Closer, error) {
+	address, err := getGRPCAddress(address, cf.CollectionGRPCPort)
 	if err != nil {
 		return nil, nil, err
 	}
+	return cf.GetAccessAPIClientWithPort(address, networkPubKey)
+}
 
-	conn, closer, err := cf.Manager.GetConnection(grpcAddress, cf.CollectionNodeGRPCTimeout, AccessClient)
+// GetAccessAPIClientWithPort gets an access API client for the specified address with port.
+// The networkPubKey is the public key used for secure gRPC connection. Can be nil for an unsecured connection.
+// The returned io.Closer should close the connection after the call if no error occurred during client creation.
+func (cf *ConnectionFactoryImpl) GetAccessAPIClientWithPort(address string, networkPubKey crypto.PublicKey) (access.AccessAPIClient, io.Closer, error) {
+	conn, closer, err := cf.Manager.GetConnection(address, cf.CollectionNodeGRPCTimeout, AccessClient, networkPubKey)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -67,58 +84,20 @@ func (cf *ConnectionFactoryImpl) GetAccessAPIClientWithPort(address string, port
 	return access.NewAccessAPIClient(conn), closer, nil
 }
 
-// InvalidateAccessAPIClient invalidates the access API client associated with the given address.
-// It removes the cached client from the cache and closes the connection if a cache is used.
-func (cf *ConnectionFactoryImpl) InvalidateAccessAPIClient(address string) {
-	if !cf.Manager.HasCache() {
-		return
-	}
-
-	cf.Log.Debug().Str("cached_access_client_invalidated", address).Msg("invalidating cached access client")
-	cf.invalidateAPIClient(address, cf.CollectionGRPCPort)
-}
-
 // GetExecutionAPIClient gets an execution API client for the specified address using the default ExecutionGRPCPort.
+// The returned io.Closer should close the connection after the call if no error occurred during client creation.
 func (cf *ConnectionFactoryImpl) GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, io.Closer, error) {
 	grpcAddress, err := getGRPCAddress(address, cf.ExecutionGRPCPort)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	conn, closer, err := cf.Manager.GetConnection(grpcAddress, cf.ExecutionNodeGRPCTimeout, ExecutionClient)
+	conn, closer, err := cf.Manager.GetConnection(grpcAddress, cf.ExecutionNodeGRPCTimeout, ExecutionClient, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	return execution.NewExecutionAPIClient(conn), closer, nil
-}
-
-// InvalidateExecutionAPIClient invalidates the execution API client associated with the given address.
-// It removes the cached client from the cache and closes the connection if a cache is used.
-func (cf *ConnectionFactoryImpl) InvalidateExecutionAPIClient(address string) {
-	if !cf.Manager.HasCache() {
-		return
-	}
-
-	cf.Log.Debug().Str("cached_execution_client_invalidated", address).Msg("invalidating cached execution client")
-	cf.invalidateAPIClient(address, cf.ExecutionGRPCPort)
-}
-
-// invalidateAPIClient invalidates the access or execution API client associated with the given address and port.
-// It removes the cached client from the ConnectionsCache and closes the connection if a cache is used.
-func (cf *ConnectionFactoryImpl) invalidateAPIClient(address string, port uint) {
-	grpcAddress, err := getGRPCAddress(address, port)
-	if err != nil {
-		panic(err) // TODO: return and handle the error
-	}
-
-	if !cf.Manager.Remove(grpcAddress) {
-		return
-	}
-
-	if cf.AccessMetrics != nil {
-		cf.AccessMetrics.ConnectionFromPoolInvalidated()
-	}
 }
 
 // getGRPCAddress translates the flow.Identity address to the GRPC address of the node by switching the port to the

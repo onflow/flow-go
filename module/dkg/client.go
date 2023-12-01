@@ -44,7 +44,7 @@ func NewClient(
 		Str("component", "dkg_contract_client").
 		Str("flow_client_an_id", flowClientANID.String()).
 		Logger()
-	base := epochs.NewBaseClient(log, flowClient, accountAddress, accountKeyIndex, signer, dkgContractAddress)
+	base := epochs.NewBaseClient(log, flowClient, accountAddress, accountKeyIndex, signer)
 
 	env := templates.Environment{DkgAddress: dkgContractAddress}
 

@@ -3,6 +3,7 @@ package migrations
 import (
 	fvm "github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -30,7 +31,7 @@ func StorageFeesMigration(payload []ledger.Payload) ([]ledger.Payload, error) {
 		u = u + uint64(storageUsedByStorageUsed)
 
 		newPayload = append(newPayload, *ledger.NewPayload(
-			registerIDToKey(id),
+			convert.RegisterIDToLedgerKey(id),
 			utils.Uint64ToBinary(u),
 		))
 	}
@@ -42,7 +43,7 @@ func incrementStorageUsed(p ledger.Payload, used map[string]uint64) error {
 	if err != nil {
 		return err
 	}
-	id, err := KeyToRegisterID(k)
+	id, err := convert.LedgerKeyToRegisterID(k)
 	if err != nil {
 		return err
 	}

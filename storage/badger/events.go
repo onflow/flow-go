@@ -68,6 +68,23 @@ func (e *Events) BatchStore(blockID flow.Identifier, blockEvents []flow.EventsLi
 	return nil
 }
 
+// Store will store events for the given block ID
+func (e *Events) Store(blockID flow.Identifier, blockEvents []flow.EventsList) error {
+	batch := NewBatch(e.db)
+
+	err := e.BatchStore(blockID, blockEvents, batch)
+	if err != nil {
+		return err
+	}
+
+	err = batch.Flush()
+	if err != nil {
+		return fmt.Errorf("cannot flush batch: %w", err)
+	}
+
+	return nil
+}
+
 // ByBlockID returns the events for the given block ID
 func (e *Events) ByBlockID(blockID flow.Identifier) ([]flow.Event, error) {
 	tx := e.db.NewTransaction(false)

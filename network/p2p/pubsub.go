@@ -128,6 +128,7 @@ type Topic interface {
 
 // ScoreOptionBuilder abstracts the configuration for the underlying pubsub score implementation.
 type ScoreOptionBuilder interface {
+	component.Component
 	// BuildFlowPubSubScoreOption builds the pubsub score options as pubsub.Option for the Flow network.
 	BuildFlowPubSubScoreOption() (*pubsub.PeerScoreParams, *pubsub.PeerScoreThresholds)
 	// TopicScoreParams returns the topic score params for the given topic.
@@ -224,24 +225,26 @@ func (p PeerScoreSnapshot) IsWarning() bool {
 
 	// Check overall score.
 	switch {
-	case p.Score < 0:
+	case p.Score < -1:
 		// If the overall score is negative, the peer is in warning state, it means that the peer is suspected to be
 		// misbehaving at the GossipSub level.
 		return true
 	// Check app-specific score.
-	case p.AppSpecificScore < 0:
+	case p.AppSpecificScore < -1:
 		// If the app specific score is negative, the peer is in warning state, it means that the peer behaves in a way
 		// that is not allowed by the Flow protocol.
 		return true
 	// Check IP colocation factor.
-	case p.IPColocationFactor > 0:
+	case p.IPColocationFactor > 5:
 		// If the IP colocation factor is positive, the peer is in warning state, it means that the peer is running on the
-		// same IP as another peer and is suspected to be a sybil node.
+		// same IP as another peer and is suspected to be a sybil node. For now, we set it to a high value to make sure
+		// that peers from the same operator are not marked as sybil nodes.
+		// TODO: this should be revisited once the collocation penalty is enabled.
 		return true
 	// Check behaviour penalty.
-	case p.BehaviourPenalty > 0:
+	case p.BehaviourPenalty > 20:
 		// If the behaviour penalty is positive, the peer is in warning state, it means that the peer is suspected to be
-		// misbehaving at the GossipSub level, e.g. sending too many duplicate messages.
+		// misbehaving at the GossipSub level, e.g. sending too many duplicate messages. Setting it to 20 to reduce the noise; 20 is twice the threshold (defaultBehaviourPenaltyThreshold).
 		return true
 	// If none of the conditions are met, return false.
 	default:
