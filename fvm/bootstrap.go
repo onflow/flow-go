@@ -973,16 +973,6 @@ func panicOnMetaInvokeErrf(msg string, txError errors.CodedError, err error) {
 	}
 }
 
-func FungibleTokenAddress(chain flow.Chain) flow.Address {
-	address, _ := chain.AddressAtIndex(environment.FungibleTokenAccountIndex)
-	return address
-}
-
-func FlowTokenAddress(chain flow.Chain) flow.Address {
-	address, _ := chain.AddressAtIndex(environment.FlowTokenAccountIndex)
-	return address
-}
-
 // invokeMetaTransaction invokes a meta transaction inside the context of an
 // outer transaction.
 //
