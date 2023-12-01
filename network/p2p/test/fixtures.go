@@ -158,7 +158,9 @@ func NodeFixture(t *testing.T,
 		GossipSubScorePenalties: &parameters.FlowConfig.NetworkConfig.GossipsubScorePenalties,
 		ScoringRegistryConfig:   &parameters.FlowConfig.NetworkConfig.GossipSubScoringRegistryConfig,
 	}
-	builder := p2pbuilder.NewNodeBuilder(libP2PNodeBuilderParams, parameters.PubSubTracer).
+	builder, err := p2pbuilder.NewNodeBuilder(libP2PNodeBuilderParams, parameters.PubSubTracer)
+	require.NoError(t, err)
+	builder.
 		SetConnectionManager(connManager).
 		SetCreateNode(p2pbuilder.DefaultCreateNodeFunc).
 		SetResourceManager(parameters.ResourceManager)

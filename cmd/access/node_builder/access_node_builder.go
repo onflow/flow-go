@@ -1599,7 +1599,11 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 		GossipSubScorePenalties: &builder.FlowConfig.NetworkConfig.GossipsubScorePenalties,
 		ScoringRegistryConfig:   &builder.FlowConfig.NetworkConfig.GossipSubScoringRegistryConfig,
 	}
-	libp2pNode, err := p2pbuilder.NewNodeBuilder(params, meshTracer).
+	nodeBuilder, err := p2pbuilder.NewNodeBuilder(params, meshTracer)
+	if err != nil {
+		return nil, fmt.Errorf("could not create libp2p node builder: %w", err)
+	}
+	libp2pNode, err := nodeBuilder.
 		SetBasicResolver(builder.Resolver).
 		SetSubscriptionFilter(subscription.NewRoleBasedFilter(flow.RoleAccess, builder.IdentityProvider)).
 		SetConnectionManager(connManager).
@@ -1610,7 +1614,6 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 		SetGossipSubTracer(meshTracer).
 		SetGossipSubScoreTracerInterval(builder.FlowConfig.NetworkConfig.GossipSubConfig.ScoreTracerInterval).
 		Build()
-
 	if err != nil {
 		return nil, fmt.Errorf("could not build libp2p node for staked access node: %w", err)
 	}

@@ -610,7 +610,11 @@ func (builder *FollowerServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 		GossipSubScorePenalties: &builder.FlowConfig.NetworkConfig.GossipsubScorePenalties,
 		ScoringRegistryConfig:   &builder.FlowConfig.NetworkConfig.GossipSubScoringRegistryConfig,
 	}
-	node, err := p2pbuilder.NewNodeBuilder(params, meshTracer).
+	nodeBuilder, err := p2pbuilder.NewNodeBuilder(params, meshTracer)
+	if err != nil {
+		return nil, fmt.Errorf("could not create libp2p node builder: %w", err)
+	}
+	libp2pNode, err := nodeBuilder.
 		SetSubscriptionFilter(
 			subscription.NewRoleBasedFilter(
 				subscription.UnstakedRole, builder.IdentityProvider,
@@ -631,7 +635,7 @@ func (builder *FollowerServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 		return nil, fmt.Errorf("could not build public libp2p node: %w", err)
 	}
 
-	builder.LibP2PNode = node
+	builder.LibP2PNode = libp2pNode
 
 	return builder.LibP2PNode, nil
 }

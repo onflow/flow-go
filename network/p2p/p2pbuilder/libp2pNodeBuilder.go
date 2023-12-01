@@ -7,6 +7,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/libp2p/go-libp2p"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/config"
@@ -78,24 +79,28 @@ type LibP2PNodeBuilder struct {
 
 // LibP2PNodeBuilderParams parameters required to create a new *LibP2PNodeBuilder with NewNodeBuilder.
 type LibP2PNodeBuilderParams struct {
-	Logger                    zerolog.Logger
-	MetricsConfig             *p2pconfig.MetricsConfig
-	NetworkingType            flownet.NetworkingType
-	Address                   string
-	NetworkKey                fcrypto.PrivateKey
-	SporkId                   flow.Identifier
-	IdProvider                module.IdentityProvider
-	RCfg                      *p2pconf.ResourceManagerConfig
-	RpcInspectorCfg           *p2pconf.GossipSubRPCInspectorsConfig
-	PeerManagerConfig         *p2pconfig.PeerManagerConfig
-	SubscriptionProviderParam *p2pconf.SubscriptionProviderParameters
-	DisallowListCacheCfg      *p2p.DisallowListCacheConfig
-	UnicastConfig             *p2pconfig.UnicastConfig
-	GossipSubScorePenalties   *p2pconf.GossipSubScorePenalties
-	ScoringRegistryConfig     *p2pconf.GossipSubScoringRegistryConfig
+	Logger                    zerolog.Logger                          `validate:"required"`
+	MetricsConfig             *p2pconfig.MetricsConfig                `validate:"required"`
+	NetworkingType            flownet.NetworkingType                  `validate:"required"`
+	Address                   string                                  `validate:"required"`
+	NetworkKey                fcrypto.PrivateKey                      `validate:"required"`
+	SporkId                   flow.Identifier                         `validate:"required"`
+	IdProvider                module.IdentityProvider                 `validate:"required"`
+	RCfg                      *p2pconf.ResourceManagerConfig          `validate:"required"`
+	RpcInspectorCfg           *p2pconf.GossipSubRPCInspectorsConfig   `validate:"required"`
+	PeerManagerConfig         *p2pconfig.PeerManagerConfig            `validate:"required"`
+	SubscriptionProviderParam *p2pconf.SubscriptionProviderParameters `validate:"required"`
+	DisallowListCacheCfg      *p2p.DisallowListCacheConfig            `validate:"required"`
+	UnicastConfig             *p2pconfig.UnicastConfig                `validate:"required"`
+	GossipSubScorePenalties   *p2pconf.GossipSubScorePenalties        `validate:"required"`
+	ScoringRegistryConfig     *p2pconf.GossipSubScoringRegistryConfig `validate:"required"`
 }
 
-func NewNodeBuilder(params *LibP2PNodeBuilderParams, rpcTracking p2p.RpcControlTracking) *LibP2PNodeBuilder {
+func NewNodeBuilder(params *LibP2PNodeBuilderParams, rpcTracking p2p.RpcControlTracking) (*LibP2PNodeBuilder, error) {
+	err := validator.New().Struct(params)
+	if err != nil {
+		return nil, fmt.Errorf("libp2p node builder params validation failed: %w", err)
+	}
 	return &LibP2PNodeBuilder{
 		logger:               params.Logger,
 		sporkId:              params.SporkId,
@@ -119,7 +124,7 @@ func NewNodeBuilder(params *LibP2PNodeBuilderParams, rpcTracking p2p.RpcControlT
 		),
 		peerManagerConfig: params.PeerManagerConfig,
 		unicastConfig:     params.UnicastConfig,
-	}
+	}, nil
 }
 
 var _ p2p.NodeBuilder = &LibP2PNodeBuilder{}
@@ -459,7 +464,11 @@ func DefaultNodeBuilder(params *DefaultNodeBuilderParams) (p2p.NodeBuilder, erro
 	}
 	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
 
-	builder := NewNodeBuilder(params.LibP2PNodeBuilderParams, meshTracer).
+	builder, err := NewNodeBuilder(params.LibP2PNodeBuilderParams, meshTracer)
+	if err != nil {
+		return nil, fmt.Errorf("could not create libp2p node builder: %w", err)
+	}
+	builder.
 		SetBasicResolver(params.Resolver).
 		SetConnectionManager(connManager).
 		SetConnectionGater(connGater).

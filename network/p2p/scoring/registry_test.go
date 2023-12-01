@@ -9,18 +9,18 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/mock"
-	netcache "github.com/onflow/flow-go/network/p2p/cache"
-	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
-	"github.com/onflow/flow-go/network/p2p/p2pconf"
 	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/config"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/p2p"
+	netcache "github.com/onflow/flow-go/network/p2p/cache"
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
+	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
+	"github.com/onflow/flow-go/network/p2p/p2pconf"
 	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/utils/unittest"
 )

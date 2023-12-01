@@ -137,7 +137,9 @@ func CreateNode(t *testing.T, networkKey crypto.PrivateKey, sporkID flow.Identif
 		GossipSubScorePenalties: &defaultFlowConfig.NetworkConfig.GossipsubScorePenalties,
 		ScoringRegistryConfig:   &defaultFlowConfig.NetworkConfig.GossipSubScoringRegistryConfig,
 	}
-	builder := p2pbuilder.NewNodeBuilder(params, meshTracer).
+	builder, err := p2pbuilder.NewNodeBuilder(params, meshTracer)
+	require.NoError(t, err)
+	builder.
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
 			return p2pdht.NewDHT(c, h, protocols.FlowDHTProtocolID(sporkID), zerolog.Nop(), metrics.NewNoopCollector())
 		}).
