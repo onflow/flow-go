@@ -143,14 +143,20 @@ func NewControlMsgValidationInspector(params *InspectorParams) (*ControlMsgValid
 
 	builder := component.NewComponentManagerBuilder()
 	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		c.logger.Debug().Msg("starting rpc inspector distributor")
 		c.ctx = ctx
 		c.distributor.Start(ctx)
 		select {
 		case <-ctx.Done():
+			c.logger.Debug().Msg("rpc inspector distributor startup aborted; context cancelled")
 		case <-c.distributor.Ready():
+			c.logger.Debug().Msg("rpc inspector distributor started")
 			ready()
 		}
+		<-ctx.Done()
+		c.logger.Debug().Msg("rpc inspector distributor stopped")
 		<-c.distributor.Done()
+		c.logger.Debug().Msg("rpc inspector distributor shutdown complete")
 	})
 	for i := 0; i < c.config.NumberOfWorkers; i++ {
 		builder.AddWorker(pool.WorkerLogic())

@@ -84,7 +84,7 @@ func NodeFixture(t *testing.T,
 	defaultFlowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
 
-	logger := unittest.Logger().Level(zerolog.WarnLevel)
+	logger := unittest.Logger()
 	require.NotNil(t, idProvider)
 	connectionGater := NewConnectionGater(idProvider, func(p peer.ID) error {
 		return nil
@@ -116,7 +116,7 @@ func NodeFixture(t *testing.T,
 			Metrics:          metrics.NewNoopCollector(),
 		},
 		ResourceManager:                  &network.NullResourceManager{},
-		GossipSubPeerScoreTracerInterval: 0, // disabled by default
+		GossipSubPeerScoreTracerInterval: defaultFlowConfig.NetworkConfig.GossipSubConfig.ScoreTracerInterval,
 		ConnGater:                        connectionGater,
 		PeerManagerConfig:                PeerManagerConfigFixture(), // disabled by default
 		FlowConfig:                       defaultFlowConfig,
