@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/execution"
 	execmock "github.com/onflow/flow-go/module/execution/mock"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
@@ -398,6 +399,31 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_ReturnsENErrors() {
 
 	s.Run("ExecuteScriptAtBlockHeight", func() {
 		s.testExecuteScriptAtBlockHeight(ctx, backend, statusCode)
+	})
+}
+
+// TestExecuteScriptAtLatestBlockFromStorage_InconsistentState tests that signaler context received error when node state is
+// inconsistent
+func (s *BackendScriptsSuite) TestExecuteScriptAtLatestBlockFromStorage_InconsistentState() {
+	scriptExecutor := execmock.NewScriptExecutor(s.T())
+
+	backend := s.defaultBackend()
+	backend.scriptExecMode = ScriptExecutionModeLocalOnly
+	backend.scriptExecutor = scriptExecutor
+
+	s.Run(fmt.Sprintf("ExecuteScriptAtLatestBlock - fails with %v", "inconsistent node's state"), func() {
+		s.state.On("Sealed").Return(s.snapshot, nil)
+
+		err := fmt.Errorf("inconsistent node's state")
+		s.snapshot.On("Head").Return(nil, err)
+
+		signCtxErr := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
+		signalerCtx := irrecoverable.WithSignalerContext(context.Background(),
+			irrecoverable.NewMockSignalerContextExpectError(s.T(), context.Background(), signCtxErr))
+
+		actual, err := backend.ExecuteScriptAtLatestBlock(signalerCtx, s.script, s.arguments)
+		s.Require().Error(err)
+		s.Require().Nil(actual)
 	})
 }
 

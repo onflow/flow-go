@@ -18,6 +18,7 @@ import (
 	fvmerrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/execution"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -43,7 +44,9 @@ func (b *backendAccounts) GetAccount(ctx context.Context, address flow.Address) 
 func (b *backendAccounts) GetAccountAtLatestBlock(ctx context.Context, address flow.Address) (*flow.Account, error) {
 	sealed, err := b.state.Sealed().Head()
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to get latest sealed header: %v", err)
+		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
+		irrecoverable.Throw(ctx, err)
+		return nil, err
 	}
 
 	sealedBlockID := sealed.ID()
