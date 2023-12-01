@@ -3,10 +3,11 @@ package testutil
 import (
 	"fmt"
 
+	"go.uber.org/atomic"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
-	"go.uber.org/atomic"
 )
 
 type MockFinalizedReader struct {
@@ -15,6 +16,7 @@ type MockFinalizedReader struct {
 	lowest          uint64
 	highest         uint64
 	finalizedHeight *atomic.Uint64
+	finalizedCalled *atomic.Int64
 }
 
 func NewMockFinalizedReader(initHeight uint64, count int) (*MockFinalizedReader, map[uint64]*flow.Header, uint64) {
@@ -36,10 +38,12 @@ func NewMockFinalizedReader(initHeight uint64, count int) (*MockFinalizedReader,
 		lowest:          initHeight,
 		highest:         highest,
 		finalizedHeight: atomic.NewUint64(initHeight),
+		finalizedCalled: atomic.NewInt64(0),
 	}, headerByHeight, highest
 }
 
 func (r *MockFinalizedReader) FinalizedBlockIDAtHeight(height uint64) (flow.Identifier, error) {
+	r.finalizedCalled.Add(1)
 	finalized := r.finalizedHeight.Load()
 	if height > finalized {
 		return flow.Identifier{}, storage.ErrNotFound
@@ -62,4 +66,8 @@ func (r *MockFinalizedReader) MockFinal(height uint64) error {
 
 func (r *MockFinalizedReader) BlockAtHeight(height uint64) *flow.Block {
 	return r.blockByHeight[height]
+}
+
+func (r *MockFinalizedReader) FinalizedCalled() int {
+	return int(r.finalizedCalled.Load())
 }
