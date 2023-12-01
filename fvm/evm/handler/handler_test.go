@@ -11,23 +11,24 @@ import (
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	gethParams "github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/onflow/cadence/runtime/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/cadence/runtime/common"
+
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm/emulator"
 	"github.com/onflow/flow-go/fvm/evm/emulator/database"
 	"github.com/onflow/flow-go/fvm/evm/handler"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/types"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 // TODO add test for fatal errors
 
-var flowTokenAddress = common.Address(fvm.FlowTokenAddress(flow.Emulator.Chain()))
+var flowTokenAddress = common.MustBytesToAddress(systemcontracts.SystemContractsForChain(flow.Emulator).FlowToken.Address.Bytes())
 
 func TestHandler_TransactionRun(t *testing.T) {
 	t.Parallel()

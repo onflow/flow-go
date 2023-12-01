@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	led "github.com/onflow/flow-go/ledger"
 	ledger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/model/flow"
@@ -53,6 +54,9 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState, l *ledger.Ledger,
 
 			es := state.NewExecutionState(
 				ls, stateCommitments, blocks, headers, collections, chunkDataPacks, results, myReceipts, events, serviceEvents, txResults, badgerDB, trace.NewNoopTracer(),
+				// TODO: to test with register store
+				nil,
+				false,
 			)
 
 			f(t, es, ls, headers, stateCommitments)
@@ -131,8 +135,8 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		assert.Equal(t, flow.RegisterValue("carrot"), b2)
 
 		// verify has state
-		require.True(t, es.HasState(sc2))
-		require.False(t, es.HasState(unittest.StateCommitmentFixture()))
+		require.True(t, l.HasState(led.State(sc2)))
+		require.False(t, l.HasState(led.State(unittest.StateCommitmentFixture())))
 	}))
 
 	t.Run("commit write and read previous state", prepareTest(func(
