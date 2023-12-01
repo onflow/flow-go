@@ -3,10 +3,11 @@ package storehouse_test
 import (
 	"fmt"
 
+	"go.uber.org/atomic"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
-	"go.uber.org/atomic"
 )
 
 var unknownBlock = unittest.IdentifierFixture()
