@@ -62,6 +62,12 @@ contract EVM {
             return EVMAddress(bytes: self.addressBytes)
         }
 
+        /// Get balance of the bridged account
+        access(all)
+        fun balance(): Balance {
+            return self.address().balance()
+        }
+
         /// Deposits the given vault into the bridged account's balance
         access(all)
         fun deposit(from: @FlowToken.Vault) {
