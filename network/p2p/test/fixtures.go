@@ -84,7 +84,7 @@ func NodeFixture(t *testing.T,
 	defaultFlowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
 
-	logger := unittest.Logger().Level(zerolog.WarnLevel)
+	logger := unittest.Logger()
 	require.NotNil(t, idProvider)
 	connectionGater := NewConnectionGater(idProvider, func(p peer.ID) error {
 		return nil
@@ -116,7 +116,7 @@ func NodeFixture(t *testing.T,
 			Metrics:          metrics.NewNoopCollector(),
 		},
 		ResourceManager:                  &network.NullResourceManager{},
-		GossipSubPeerScoreTracerInterval: 0, // disabled by default
+		GossipSubPeerScoreTracerInterval: defaultFlowConfig.NetworkConfig.GossipSubConfig.ScoreTracerInterval,
 		ConnGater:                        connectionGater,
 		PeerManagerConfig:                PeerManagerConfigFixture(), // disabled by default
 		FlowConfig:                       defaultFlowConfig,
@@ -139,17 +139,18 @@ func NodeFixture(t *testing.T,
 	connManager, err := connection.NewConnManager(logger, parameters.MetricsCfg.Metrics, &parameters.FlowConfig.NetworkConfig.ConnectionManagerConfig)
 	require.NoError(t, err)
 
-	builder := p2pbuilder.NewNodeBuilder(logger,
+	builder := p2pbuilder.NewNodeBuilder(
+		logger,
 		parameters.MetricsCfg,
 		parameters.NetworkingType,
 		parameters.Address,
 		parameters.Key,
 		sporkID,
 		parameters.IdProvider,
+		defaultFlowConfig.NetworkConfig.GossipSubConfig.GossipSubScoringRegistryConfig,
 		&parameters.FlowConfig.NetworkConfig.ResourceManager,
-		&parameters.FlowConfig.NetworkConfig.GossipSubRPCInspectorsConfig,
+		&parameters.FlowConfig.NetworkConfig.GossipSubConfig,
 		parameters.PeerManagerConfig,
-		&parameters.FlowConfig.NetworkConfig.GossipSubConfig.SubscriptionProviderConfig,
 		&p2p.DisallowListCacheConfig{
 			MaxSize: uint32(1000),
 			Metrics: metrics.NewNoopCollector(),

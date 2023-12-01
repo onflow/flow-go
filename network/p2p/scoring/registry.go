@@ -2,6 +2,7 @@ package scoring
 
 import (
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -19,11 +20,10 @@ import (
 )
 
 const (
-	// skipDecayThreshold is the threshold for which when the negative penalty is above this value, the decay function will not be called.
-	// instead, the penalty will be set to 0. This is to prevent the penalty from keeping a small negative value for a long time.
-	skipDecayThreshold = -0.1
-	// defaultDecay is the default decay value for the application specific penalty.
-	// this value is used when no custom decay value is provided, and  decays the penalty by 1% every second.
+	// MinimumSpamPenaltyDecayFactor is minimum speed at which the spam penalty value of a peer is decayed.
+	// Spam record will be initialized with a decay value between .5 , .7 and this value will then be decayed up to .99 on consecutive misbehavior's,
+	// The maximum decay value decays the penalty by 1% every second. The decay is applied geometrically, i.e., `newPenalty = oldPenalty * decay`, hence, the higher decay value
+	// indicates a lower decay speed, i.e., it takes more heartbeat intervals to decay a penalty back to zero when the decay value is high.
 	// assume:
 	//     penalty = -100 (the maximum application specific penalty is -100)
 	//     skipDecayThreshold = -0.1
@@ -41,7 +41,14 @@ const (
 	//     n > log( 0.001 ) / log( 0.99 )
 	//     n > -3 / log( 0.99 )
 	//     n >  458.22
-	defaultDecay = 0.99 // default decay value for the application specific penalty.
+	MinimumSpamPenaltyDecayFactor = 0.99
+	// MaximumSpamPenaltyDecayFactor represents the maximum rate at which the spam penalty value of a peer decays. Decay speeds increase
+	// during sustained malicious activity, leading to a slower recovery of the app-specific score for the penalized node. Conversely,
+	// decay speeds decrease, allowing faster recoveries, when nodes exhibit fleeting misbehavior.
+	MaximumSpamPenaltyDecayFactor = 0.8
+	// skipDecayThreshold is the threshold for which when the negative penalty is above this value, the decay function will not be called.
+	// instead, the penalty will be set to 0. This is to prevent the penalty from keeping a small negative value for a long time.
+	skipDecayThreshold = -0.1
 	// graftMisbehaviourPenalty is the penalty applied to the application specific penalty when a peer conducts a graft misbehaviour.
 	graftMisbehaviourPenalty = -10
 	// pruneMisbehaviourPenalty is the penalty applied to the application specific penalty when a peer conducts a prune misbehaviour.
@@ -56,6 +63,8 @@ const (
 	// rpcPublishMessageMisbehaviourPenalty is the penalty applied to the application specific penalty when a peer conducts a RpcPublishMessageMisbehaviourPenalty misbehaviour.
 	rpcPublishMessageMisbehaviourPenalty = -10
 )
+
+type SpamRecordInitFunc func() p2p.GossipSubSpamRecord
 
 // GossipSubCtrlMsgPenaltyValue is the penalty value for each control message type.
 type GossipSubCtrlMsgPenaltyValue struct {
@@ -96,7 +105,7 @@ type GossipSubAppSpecificScoreRegistry struct {
 	spamScoreCache p2p.GossipSubSpamRecordCache
 	penalty        GossipSubCtrlMsgPenaltyValue
 	// initial application specific penalty record, used to initialize the penalty cache entry.
-	init      func() p2p.GossipSubSpamRecord
+	init      SpamRecordInitFunc
 	validator p2p.SubscriptionValidator
 	// silencePeriodDuration duration that the startup silence period will last, during which nodes will not be penalized
 	silencePeriodDuration time.Duration
@@ -122,7 +131,7 @@ type GossipSubAppSpecificScoreRegistryConfig struct {
 
 	// Init is a factory function that returns a new GossipSubSpamRecord. It is used to initialize the spam record of
 	// a peer when the peer is first observed by the local peer.
-	Init func() p2p.GossipSubSpamRecord
+	Init SpamRecordInitFunc
 
 	// CacheFactory is a factory function that returns a new GossipSubSpamRecordCache. It is used to initialize the spamScoreCache.
 	// The cache is used to store the application specific penalty of peers.
@@ -136,7 +145,7 @@ type GossipSubAppSpecificScoreRegistryConfig struct {
 // NewGossipSubAppSpecificScoreRegistry returns a new GossipSubAppSpecificScoreRegistry.
 // Args:
 //
-//	config: the configuration for the registry.
+//	config: the config for the registry.
 //
 // Returns:
 //
@@ -191,7 +200,7 @@ func (r *GossipSubAppSpecificScoreRegistry) AppSpecificScoreFunc() func(peer.ID)
 	return func(pid peer.ID) float64 {
 		appSpecificScore := float64(0)
 
-		lg := r.logger.With().Str("peer_id", p2plogging.PeerId(pid)).Logger()
+		lg := r.logger.With().Str("remote_peer_id", p2plogging.PeerId(pid)).Logger()
 
 		// during startup silence period avoid penalizing nodes
 		if !r.afterSilencePeriod() {
@@ -240,7 +249,7 @@ func (r *GossipSubAppSpecificScoreRegistry) AppSpecificScoreFunc() func(peer.ID)
 			appSpecificScore += stakingScore
 		}
 
-		lg.Trace().
+		lg.Debug().
 			Float64("total_app_specific_score", appSpecificScore).
 			Msg("application specific penalty computed")
 
@@ -313,8 +322,9 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 
 	// try initializing the application specific penalty for the peer if it is not yet initialized.
 	// this is done to avoid the case where the peer is not yet cached and the application specific penalty is not yet initialized.
-	// initialization is successful only if the peer is not yet cached.
-	initialized := r.spamScoreCache.Add(notification.PeerID, r.init())
+	// initialization is successful only if the peer is not yet cached. If any error is occurred during initialization we log a fatal error
+	initRecord := r.init()
+	initialized := r.spamScoreCache.Add(notification.PeerID, initRecord)
 	if initialized {
 		lg.Trace().Str("peer_id", p2plogging.PeerId(notification.PeerID)).Msg("application specific penalty initialized for peer")
 	}
@@ -364,7 +374,7 @@ func (r *GossipSubAppSpecificScoreRegistry) afterSilencePeriod() bool {
 // DefaultDecayFunction is the default decay function that is used to decay the application specific penalty of a peer.
 // It is used if no decay function is provided in the configuration.
 // It decays the application specific penalty of a peer if it is negative.
-func DefaultDecayFunction() netcache.PreprocessorFunc {
+func DefaultDecayFunction(slowerDecayPenaltyThreshold, decayRateDecrement float64, decayAdjustInterval time.Duration) netcache.PreprocessorFunc {
 	return func(record p2p.GossipSubSpamRecord, lastUpdated time.Time) (p2p.GossipSubSpamRecord, error) {
 		if record.Penalty >= 0 {
 			// no need to decay the penalty if it is positive, the reason is currently the app specific penalty
@@ -376,6 +386,8 @@ func DefaultDecayFunction() netcache.PreprocessorFunc {
 		if record.Penalty > skipDecayThreshold {
 			// penalty is negative but greater than the threshold, we set it to 0.
 			record.Penalty = 0
+			record.Decay = MaximumSpamPenaltyDecayFactor
+			record.LastDecayAdjustment = time.Time{}
 			return record, nil
 		}
 
@@ -385,6 +397,14 @@ func DefaultDecayFunction() netcache.PreprocessorFunc {
 			return record, fmt.Errorf("could not decay application specific penalty: %w", err)
 		}
 		record.Penalty = penalty
+
+		if record.Penalty <= slowerDecayPenaltyThreshold {
+			if time.Since(record.LastDecayAdjustment) > decayAdjustInterval || record.LastDecayAdjustment.IsZero() {
+				// reduces the decay speed flooring at MinimumSpamRecordDecaySpeed
+				record.Decay = math.Min(record.Decay+decayRateDecrement, MinimumSpamPenaltyDecayFactor)
+				record.LastDecayAdjustment = time.Now()
+			}
+		}
 		return record, nil
 	}
 }
@@ -394,7 +414,8 @@ func DefaultDecayFunction() netcache.PreprocessorFunc {
 //   - a gossipsub spam record with the default decay value and 0 penalty.
 func InitAppScoreRecordState() p2p.GossipSubSpamRecord {
 	return p2p.GossipSubSpamRecord{
-		Decay:   defaultDecay,
-		Penalty: 0,
+		Decay:               MaximumSpamPenaltyDecayFactor,
+		Penalty:             0,
+		LastDecayAdjustment: time.Now(),
 	}
 }
