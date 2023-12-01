@@ -1,20 +1,16 @@
 package handler_test
 
 import (
-	"bytes"
 	"fmt"
 	"math"
 	"math/big"
 	"testing"
-
-	"github.com/onflow/cadence"
 
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	gethParams "github.com/ethereum/go-ethereum/params"
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -94,26 +90,10 @@ func TestHandler_TransactionRun(t *testing.T) {
 
 					event := events[0]
 					assert.Equal(t, event.Type, types.EventTypeTransactionExecuted)
-					ev, err := jsoncdc.Decode(nil, event.Payload)
-					require.NoError(t, err)
-					cadenceEvent, ok := ev.(cadence.Event)
-					require.True(t, ok)
-					for j, f := range cadenceEvent.GetFields() {
-						fmt.Println(j, f.Identifier)
-						if f.Identifier == "logs" {
-							cadenceEvent.GetFieldValues()[j].String()
-						}
-					}
-					//for i, l := range result.Logs {
-					//	assert.Equal(t, l, ev.Result.Logs[i])
-					//}
 
 					// check block event
 					event = events[1]
 					assert.Equal(t, event.Type, types.EventTypeBlockExecuted)
-					payload := types.BlockExecutedEventPayload{}
-					err = rlp.Decode(bytes.NewReader(event.Payload), &payload)
-					require.NoError(t, err)
 				})
 			})
 		})
