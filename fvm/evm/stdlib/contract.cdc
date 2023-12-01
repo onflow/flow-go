@@ -25,6 +25,8 @@ contract EVM {
             )
         }
 
+        /// Balance of the address
+        access(all)
         fun balance(): UFix64 {
             return InternalEVM.balance(
                 address: self.bytes
