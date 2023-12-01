@@ -24,7 +24,7 @@ const ServiceAccountPrivateKeySignAlgo = crypto.ECDSAP256
 const ServiceAccountPrivateKeyHashAlgo = hash.SHA2_256
 
 // Pre-calculated state commitment with root account with the above private key
-const GenesisStateCommitmentHex = "8476e9a47da2f993fd0d04efc10238113f217b0c037ccf903613088d51027d6a"
+const GenesisStateCommitmentHex = "436f6ac1de4738ed17405527dee7e639bc89600f329f6453d320311d84750211"
 
 var GenesisStateCommitment flow.StateCommitment
 
