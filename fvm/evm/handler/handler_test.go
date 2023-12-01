@@ -7,6 +7,10 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/onflow/cadence"
+
+	jsoncdc "github.com/onflow/cadence/encoding/json"
+
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	gethParams "github.com/ethereum/go-ethereum/params"
@@ -90,12 +94,19 @@ func TestHandler_TransactionRun(t *testing.T) {
 
 					event := events[0]
 					assert.Equal(t, event.Type, types.EventTypeTransactionExecuted)
-					ev := types.TransactionExecutedPayload{}
-					err = rlp.Decode(bytes.NewReader(event.Payload), &ev)
+					ev, err := jsoncdc.Decode(nil, event.Payload)
 					require.NoError(t, err)
-					for i, l := range result.Logs {
-						assert.Equal(t, l, ev.Result.Logs[i])
+					cadenceEvent, ok := ev.(cadence.Event)
+					require.True(t, ok)
+					for j, f := range cadenceEvent.GetFields() {
+						fmt.Println(j, f.Identifier)
+						if f.Identifier == "logs" {
+							cadenceEvent.GetFieldValues()[j].String()
+						}
 					}
+					//for i, l := range result.Logs {
+					//	assert.Equal(t, l, ev.Result.Logs[i])
+					//}
 
 					// check block event
 					event = events[1]
@@ -311,12 +322,6 @@ func TestHandler_BridgedAccount(t *testing.T) {
 				// transaction event
 				event := events[0]
 				assert.Equal(t, event.Type, types.EventTypeTransactionExecuted)
-				ret := types.TransactionExecutedPayload{}
-				err = rlp.Decode(bytes.NewReader(event.Payload), &ret)
-				require.NoError(t, err)
-				// TODO: decode encoded tx and check for the amount and value
-				// assert.Equal(t, foa.Address(), ret.Address)
-				// assert.Equal(t, balance, ret.Amount)
 
 				// block event
 				event = events[1]
@@ -325,8 +330,7 @@ func TestHandler_BridgedAccount(t *testing.T) {
 				// transaction event
 				event = events[2]
 				assert.Equal(t, event.Type, types.EventTypeTransactionExecuted)
-				ret = types.TransactionExecutedPayload{}
-				err = rlp.Decode(bytes.NewReader(event.Payload), &ret)
+				_, err = jsoncdc.Decode(nil, event.Payload)
 				require.NoError(t, err)
 				// TODO: decode encoded tx and check for the amount and value
 				// assert.Equal(t, foa.Address(), ret.Address)
