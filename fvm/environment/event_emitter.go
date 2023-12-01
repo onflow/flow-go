@@ -39,7 +39,7 @@ func DefaultEventEmitterParams() EventEmitterParams {
 // with the runtime environment interface.
 type EventEmitter interface {
 	// EmitEvent satisfies Cadence's runtime API.
-	// This will encode the cadence event and call emitRawEvent.
+	// This will encode the cadence event
 	//
 	// Note that the script variant will return OperationNotSupportedError.
 	EmitEvent(event cadence.Event) error
