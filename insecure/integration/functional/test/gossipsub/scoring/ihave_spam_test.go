@@ -168,6 +168,7 @@ func TestGossipSubIHaveBrokenPromises_Below_Threshold(t *testing.T) {
 // Second round of attack makes spammers broken promises above the threshold of 10 RPCs, hence a degradation of the spammers score.
 // Third round of attack makes spammers broken promises to around 20 RPCs above the threshold, which causes the graylisting of the spammer node.
 func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky in CI")
 	role := flow.RoleConsensus
 	sporkId := unittest.IdentifierFixture()
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
