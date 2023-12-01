@@ -24,6 +24,12 @@ contract EVM {
                 to: self.bytes
             )
         }
+
+        fun balance(): UFix64 {
+            return InternalEVM.balance(
+                address: self.bytes
+            )
+        }
     }
 
     access(all)
@@ -64,7 +70,7 @@ contract EVM {
 
         /// Get balance of the bridged account
         access(all)
-        fun balance(): Balance {
+        fun balance(): UFix64 {
             return self.address().balance()
         }
 
