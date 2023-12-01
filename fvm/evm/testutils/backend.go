@@ -279,7 +279,6 @@ func (m *testMeter) TotalEmittedEventBytes() uint64 {
 
 type testEventEmitter struct {
 	emitEvent              func(event cadence.Event) error
-	emitRawEvent           func(etype flow.EventType, payload []byte) error
 	events                 func() flow.EventsList
 	serviceEvents          func() flow.EventsList
 	convertedServiceEvents func() flow.ServiceEventList
