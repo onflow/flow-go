@@ -51,6 +51,8 @@ var transactionExecutedEventCadenceType = &cadence.EventType{
 	},
 }
 
+// todo add decoder for events from cadence to evm payload
+
 func (p *TransactionExecutedPayload) CadenceEvent() (cadence.Event, error) {
 	var encodedLogs []byte
 	var err error

@@ -100,6 +100,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 					cadenceEvent, ok := ev.(cadence.Event)
 					require.True(t, ok)
 					for j, f := range cadenceEvent.GetFields() {
+						// todo add an event decoder in types.event
 						if f.Identifier == "logs" {
 							cadenceLogs := cadenceEvent.GetFieldValues()[j]
 							encodedLogs, err := hex.DecodeString(strings.ReplaceAll(cadenceLogs.String(), "\"", ""))
