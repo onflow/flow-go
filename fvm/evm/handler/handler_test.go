@@ -1,10 +1,11 @@
 package handler_test
 
 import (
-	"bytes"
+	"encoding/hex"
 	"fmt"
 	"math"
 	"math/big"
+	"strings"
 	"testing"
 
 	"github.com/onflow/cadence"
@@ -100,9 +101,12 @@ func TestHandler_TransactionRun(t *testing.T) {
 					require.True(t, ok)
 					for j, f := range cadenceEvent.GetFields() {
 						if f.Identifier == "logs" {
-							rawLog := cadenceEvent.GetFieldValues()[j].String()
+							cadenceLogs := cadenceEvent.GetFieldValues()[j]
+							encodedLogs, err := hex.DecodeString(strings.ReplaceAll(cadenceLogs.String(), "\"", ""))
+							require.NoError(t, err)
+
 							var logs []*gethTypes.Log
-							err = rlp.DecodeBytes([]byte(rawLog), logs)
+							err = rlp.DecodeBytes(encodedLogs, &logs)
 							require.NoError(t, err)
 
 							for i, l := range result.Logs {
@@ -114,8 +118,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 					// check block event
 					event = events[1]
 					assert.Equal(t, event.Type, types.EventTypeBlockExecuted)
-					payload := types.BlockExecutedEventPayload{}
-					err = rlp.Decode(bytes.NewReader(event.Payload), &payload)
+					_, err = jsoncdc.Decode(nil, event.Payload)
 					require.NoError(t, err)
 				})
 			})
