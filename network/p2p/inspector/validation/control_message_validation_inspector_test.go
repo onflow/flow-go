@@ -445,7 +445,7 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		duplicateMsgIDIHave := unittest.P2PRPCIHaveFixture(&validTopic, append(msgIds, unittest.IdentifierListFixture(5)...).Strings()...)
 		duplicateMsgIDRpc := unittest.P2PRPCFixture(unittest.WithIHaves(duplicateMsgIDIHave))
 		from := unittest.PeerIdFixture(t)
-		checkNotification := checkNotificationFunc(t, from, p2pmsg.CtrlMsgIHave, validation.IsDuplicateTopicErr, p2p.CtrlMsgNonClusterTopicType)
+		checkNotification := checkNotificationFunc(t, from, p2pmsg.CtrlMsgIHave, validation.IsDuplicateMessageIDErr, p2p.CtrlMsgNonClusterTopicType)
 		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Once().Run(checkNotification)
 		inspector.Start(signalerCtx)
 
@@ -667,7 +667,6 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 			// override the inspector and params, run the inspector in private mode
 			params.NetworkingType = network.PrivateNetwork
 		})
-
 		from := unittest.PeerIdFixture(t)
 		id := unittest.IdentityFixture()
 		id.Ejected = true

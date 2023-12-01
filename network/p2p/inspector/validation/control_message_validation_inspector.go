@@ -502,6 +502,13 @@ func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWant
 							p2p.HighErrSeverity,
 							p2p.CtrlMsgNonClusterTopicType,
 						))
+						lg.Debug().
+							Int("total_message_ids", totalMessageIds).
+							Int("cache_misses", cacheMisses).
+							Int("duplicates", duplicates).
+							Int("error_count", errs.Len()).
+							Msg("iwant control message validation failed cache miss threshold exceeded")
+						return errs
 					}
 				}
 			}
