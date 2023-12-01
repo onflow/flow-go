@@ -359,6 +359,53 @@ func newInternalEVMTypeDepositFunction(
 	)
 }
 
+const internalEVMTypeBalanceFunctionName = "balance"
+
+var internalEVMTypeBalanceFunctionType = &sema.FunctionType{
+	Parameters: []sema.Parameter{
+		{
+			Label:          "address",
+			TypeAnnotation: sema.NewTypeAnnotation(evmAddressBytesType),
+		},
+	},
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.UFix64Type),
+}
+
+func newInternalEVMTypeBalanceFunction(
+	gauge common.MemoryGauge,
+	handler types.ContractHandler,
+) *interpreter.HostFunctionValue {
+	return interpreter.NewHostFunctionValue(
+		gauge,
+		internalEVMTypeCallFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			inter := invocation.Interpreter
+			locationRange := invocation.LocationRange
+
+			addressValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			address, err := AddressBytesArrayValueToEVMAddress(inter, locationRange, addressValue)
+			if err != nil {
+				panic(err)
+			}
+
+			const isAuthorized = false
+			account := handler.AccountByAddress(address, isAuthorized)
+
+			// todo return the Balance type
+			return interpreter.NewUFix64Value(gauge, func() (balance uint64) {
+				errors.WrapPanic(func() {
+					balance = account.Balance().ToAttoFlow().Uint64()
+				})
+				return
+			})
+		},
+	)
+}
+
 const internalEVMTypeWithdrawFunctionName = "withdraw"
 
 var internalEVMTypeWithdrawFunctionType = &sema.FunctionType{
@@ -538,6 +585,7 @@ func NewInternalEVMContractValue(
 			internalEVMTypeDepositFunctionName:              newInternalEVMTypeDepositFunction(gauge, handler),
 			internalEVMTypeWithdrawFunctionName:             newInternalEVMTypeWithdrawFunction(gauge, handler),
 			internalEVMTypeDeployFunctionName:               newInternalEVMTypeDeployFunction(gauge, handler),
+			internalEVMTypeBalanceFunctionName:              newInternalEVMTypeBalanceFunction(gauge, handler),
 		},
 		nil,
 		nil,
@@ -588,6 +636,12 @@ var InternalEVMContractType = func() *sema.CompositeType {
 			ty,
 			internalEVMTypeDeployFunctionName,
 			internalEVMTypeDeployFunctionType,
+			"",
+		),
+		sema.NewUnmeteredPublicFunctionMember(
+			ty,
+			internalEVMTypeBalanceFunctionName,
+			internalEVMTypeBalanceFunctionType,
 			"",
 		),
 	})
