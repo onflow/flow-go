@@ -22,8 +22,7 @@ import (
 func Test_IsServiceEvent(t *testing.T) {
 
 	chain := flow.Emulator
-	events, err := systemcontracts.ServiceEventsForChain(chain)
-	require.NoError(t, err)
+	events := systemcontracts.ServiceEventsForChain(chain)
 
 	t.Run("correct", func(t *testing.T) {
 		for _, event := range events.All() {

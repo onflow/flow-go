@@ -1168,17 +1168,10 @@ func getContractEpochCounter(
 	uint64,
 	error,
 ) {
-	// Get the address of the FlowEpoch smart contract
-	sc, err := systemcontracts.SystemContractsForChain(vmCtx.Chain.ChainID())
-	if err != nil {
-		return 0, fmt.Errorf("could not get system contracts: %w", err)
-	}
-	address := sc.Epoch.Address
+	sc := systemcontracts.SystemContractsForChain(vmCtx.Chain.ChainID())
 
 	// Generate the script to get the epoch counter from the FlowEpoch smart contract
-	scriptCode := templates.GenerateGetCurrentEpochCounterScript(templates.Environment{
-		EpochAddress: address.Hex(),
-	})
+	scriptCode := templates.GenerateGetCurrentEpochCounterScript(sc.AsTemplateEnv())
 	script := fvm.Script(scriptCode)
 
 	// execute the script
