@@ -619,6 +619,9 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	execState := executionState.NewExecutionState(
 		ls, commitsStorage, node.Blocks, node.Headers, collectionsStorage, chunkDataPackStorage, results, myReceipts, eventsStorage, serviceEventsStorage, txResultStorage, node.PublicDB, node.Tracer,
+		// TODO: test with register store
+		nil,
+		false,
 	)
 
 	requestEngine, err := requester.New(
