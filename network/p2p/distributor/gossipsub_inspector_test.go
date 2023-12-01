@@ -98,6 +98,6 @@ func invalidControlMessageNotificationFixture(t *testing.T) *p2p.InvCtrlMsgNotif
 	return &p2p.InvCtrlMsgNotif{
 		PeerID:  unittest.PeerIdFixture(t),
 		MsgType: msgType,
-		Errors:  p2p.InvCtrlMsgErrs{p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid control message"), severity)},
+		Errors:  p2p.InvCtrlMsgErrs{p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid control message"), severity, p2p.CtrlMsgTopicTypeClusterPrefixed)},
 	}
 }
