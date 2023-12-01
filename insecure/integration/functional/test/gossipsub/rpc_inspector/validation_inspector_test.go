@@ -28,6 +28,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
+	"github.com/onflow/flow-go/network/p2p/scoring"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -1041,6 +1042,7 @@ func TestGossipSubSpamMitigationIntegration(t *testing.T) {
 		sporkID,
 		t.Name(),
 		idProvider,
+		p2ptest.WithPeerScoreTracerInterval(100*time.Millisecond),
 		p2ptest.WithRole(flow.RoleConsensus),
 		p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride))
 
@@ -1066,8 +1068,8 @@ func TestGossipSubSpamMitigationIntegration(t *testing.T) {
 		}
 	})
 
-	spamRpcCount := 10            // total number of individual rpc messages to send
-	spamCtrlMsgCount := int64(10) // total number of control messages to send on each RPC
+	spamRpcCount := 100            // total number of individual rpc messages to send
+	spamCtrlMsgCount := int64(100) // total number of control messages to send on each RPC
 
 	// unknownTopic is an unknown topic to the victim node but shaped like a valid topic (i.e., it has the correct prefix and spork ID).
 	unknownTopic := channels.Topic(fmt.Sprintf("%s/%s", p2ptest.GossipSubTopicIdFixture(), sporkID))
@@ -1119,7 +1121,10 @@ func TestGossipSubSpamMitigationIntegration(t *testing.T) {
 	spammer.SpamControlMessage(t, victimNode, pruneCtlMsgsDuplicateTopic)
 
 	// wait for three GossipSub heartbeat intervals to ensure that the victim node has penalized the spammer node.
-	time.Sleep(3 * time.Second)
+	require.Eventually(t, func() bool {
+		score, ok := victimNode.PeerScoreExposer().GetScore(spammer.SpammerNode.ID())
+		return ok && score < 2*scoring.DefaultGraylistThreshold
+	}, 5*time.Second, 100*time.Millisecond, "expected victim node to penalize spammer node")
 
 	// now we expect the detection and mitigation to kick in and the victim node to disconnect from the spammer node.
 	// so the spammer and victim nodes should not be able to exchange messages on the topic.
