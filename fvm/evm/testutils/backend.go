@@ -6,6 +6,8 @@ import (
 	"math"
 	"testing"
 
+	jsoncdc "github.com/onflow/cadence/encoding/json"
+
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime/common"
@@ -86,8 +88,13 @@ func GetSimpleValueStore() *TestValueStore {
 func getSimpleEventEmitter() *testEventEmitter {
 	events := make(flow.EventsList, 0)
 	return &testEventEmitter{
-		emitRawEvent: func(etype flow.EventType, payload []byte) error {
-			events = append(events, flow.Event{Type: etype, Payload: payload})
+		emitEvent: func(event cadence.Event) error {
+			payload, err := jsoncdc.Encode(event)
+			if err != nil {
+				return err
+			}
+
+			events = append(events, flow.Event{Type: flow.EventType(event.EventType.QualifiedIdentifier), Payload: payload})
 			return nil
 		},
 		events: func() flow.EventsList {
