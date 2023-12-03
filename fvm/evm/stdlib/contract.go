@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 
+	gethABI "github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
@@ -37,6 +38,203 @@ var evmTransactionBytesType = sema.NewVariableSizedType(nil, sema.UInt8Type)
 var evmAddressBytesType = sema.NewConstantSizedType(nil, sema.UInt8Type, types.AddressLength)
 var evmAddressBytesStaticType = interpreter.ConvertSemaArrayTypeToStaticArrayType(nil, evmAddressBytesType)
 var EVMAddressBytesCadenceType = cadence.NewConstantSizedArrayType(types.AddressLength, cadence.TheUInt8Type)
+
+// EVM.encodeABI
+
+const internalEVMTypeEncodeABIFunctionName = "encodeABI"
+
+var internalEVMTypeEncodeABIFunctionType = &sema.FunctionType{
+	Parameters: []sema.Parameter{
+		{
+			Label:      sema.ArgumentLabelNotRequired,
+			Identifier: "values",
+			TypeAnnotation: sema.NewTypeAnnotation(
+				sema.NewVariableSizedType(nil, sema.AnyStructType),
+			),
+		},
+	},
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.ByteArrayType),
+}
+
+func newInternalEVMTypeEncodeABIFunction(
+	gauge common.MemoryGauge,
+) *interpreter.HostFunctionValue {
+	return interpreter.NewHostFunctionValue(
+		gauge,
+		internalEVMTypeEncodeABIFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			inter := invocation.Interpreter
+			locationRange := invocation.LocationRange
+
+			// Get `values` argument
+
+			valuesArray, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			values := make([]interface{}, 0)
+			var arguments gethABI.Arguments
+
+			for i := 0; i < valuesArray.Count(); i++ {
+				element := valuesArray.Get(inter, locationRange, i)
+				switch value := element.(type) {
+				case *interpreter.StringValue:
+					values = append(values, value.Str)
+					typ, err := gethABI.NewType("string", "", nil)
+					if err != nil {
+						panic(err)
+					}
+					arguments = append(arguments, gethABI.Argument{Type: typ})
+				case interpreter.UInt64Value:
+					values = append(values, uint64(value))
+					typ, err := gethABI.NewType("uint64", "", nil)
+					if err != nil {
+						panic(err)
+					}
+					arguments = append(arguments, gethABI.Argument{Type: typ})
+				case interpreter.BoolValue:
+					values = append(values, bool(value))
+					typ, err := gethABI.NewType("bool", "", nil)
+					if err != nil {
+						panic(err)
+					}
+					arguments = append(arguments, gethABI.Argument{Type: typ})
+				}
+			}
+
+			encoded, err := arguments.Pack(values...)
+			if err != nil {
+				panic(err)
+			}
+
+			return interpreter.ByteSliceToByteArrayValue(inter, encoded)
+		},
+	)
+}
+
+// EVM.decodeABI
+
+const internalEVMTypeDecodeABIFunctionName = "decodeABI"
+
+var internalEVMTypeDecodeABIFunctionType = &sema.FunctionType{
+	Parameters: []sema.Parameter{
+		{
+			Label:      sema.ArgumentLabelNotRequired,
+			Identifier: "types",
+			TypeAnnotation: sema.NewTypeAnnotation(
+				sema.NewVariableSizedType(nil, sema.AnyType),
+			),
+		},
+		{
+			Label:          "data",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.ByteArrayType),
+		},
+	},
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(
+		sema.NewVariableSizedType(nil, sema.AnyStructType),
+	),
+}
+
+func newInternalEVMTypeDecodeABIFunction(
+	gauge common.MemoryGauge,
+) *interpreter.HostFunctionValue {
+	return interpreter.NewHostFunctionValue(
+		gauge,
+		internalEVMTypeDecodeABIFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			inter := invocation.Interpreter
+			locationRange := invocation.LocationRange
+
+			// Get `types` argument
+
+			types, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			// Get `data` argument
+
+			dataValue, ok := invocation.Arguments[1].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			data, err := interpreter.ByteArrayValueToByteSlice(inter, dataValue, locationRange)
+			if err != nil {
+				panic(err)
+			}
+
+			var arguments gethABI.Arguments
+			for i := 0; i < types.Count(); i++ {
+				arg := types.Get(inter, locationRange, i)
+				switch arg.String() {
+				case "Type<String>()":
+					typ, err := gethABI.NewType("string", "", nil)
+					if err != nil {
+						panic(err)
+					}
+					arguments = append(arguments, gethABI.Argument{Type: typ})
+				case "Type<UInt64>()":
+					typ, err := gethABI.NewType("uint64", "", nil)
+					if err != nil {
+						panic(err)
+					}
+					arguments = append(arguments, gethABI.Argument{Type: typ})
+				case "Type<Bool>()":
+					typ, err := gethABI.NewType("bool", "", nil)
+					if err != nil {
+						panic(err)
+					}
+					arguments = append(arguments, gethABI.Argument{Type: typ})
+				}
+			}
+
+			decoded, err := arguments.Unpack(data)
+			if err != nil {
+				panic(err)
+			}
+
+			values := make([]interpreter.Value, 0)
+			for _, arg := range decoded {
+				switch value := arg.(type) {
+				case string:
+					values = append(values, interpreter.NewStringValue(
+						inter,
+						common.NewStringMemoryUsage(len(value)),
+						func() string {
+							return value
+						},
+					))
+				case uint64:
+					values = append(values, interpreter.NewUInt64Value(
+						inter,
+						func() uint64 {
+							return value
+						},
+					))
+				case bool:
+					values = append(values, interpreter.BoolValue(value))
+				}
+			}
+			arrayType := interpreter.NewVariableSizedStaticType(
+				inter,
+				interpreter.NewPrimitiveStaticType(
+					inter,
+					interpreter.PrimitiveStaticTypeAnyStruct,
+				),
+			)
+
+			return interpreter.NewArrayValue(
+				inter,
+				invocation.LocationRange,
+				arrayType,
+				common.ZeroAddress,
+				values...,
+			)
+		},
+	)
+}
 
 const internalEVMTypeRunFunctionName = "run"
 
@@ -581,6 +779,8 @@ func NewInternalEVMContractValue(
 			internalEVMTypeWithdrawFunctionName:             newInternalEVMTypeWithdrawFunction(gauge, handler),
 			internalEVMTypeDeployFunctionName:               newInternalEVMTypeDeployFunction(gauge, handler),
 			internalEVMTypeBalanceFunctionName:              newInternalEVMTypeBalanceFunction(gauge, handler),
+			internalEVMTypeEncodeABIFunctionName:            newInternalEVMTypeEncodeABIFunction(gauge),
+			internalEVMTypeDecodeABIFunctionName:            newInternalEVMTypeDecodeABIFunction(gauge),
 		},
 		nil,
 		nil,
@@ -623,6 +823,12 @@ var InternalEVMContractType = func() *sema.CompositeType {
 		),
 		sema.NewUnmeteredPublicFunctionMember(
 			ty,
+			internalEVMTypeEncodeABIFunctionName,
+			internalEVMTypeEncodeABIFunctionType,
+			"",
+		),
+		sema.NewUnmeteredPublicFunctionMember(
+			ty,
 			internalEVMTypeWithdrawFunctionName,
 			internalEVMTypeWithdrawFunctionType,
 			"",
@@ -637,6 +843,12 @@ var InternalEVMContractType = func() *sema.CompositeType {
 			ty,
 			internalEVMTypeBalanceFunctionName,
 			internalEVMTypeBalanceFunctionType,
+			"",
+		),
+		sema.NewUnmeteredPublicFunctionMember(
+			ty,
+			internalEVMTypeDecodeABIFunctionName,
+			internalEVMTypeDecodeABIFunctionType,
 			"",
 		),
 	})
