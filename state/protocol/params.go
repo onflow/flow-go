@@ -40,6 +40,9 @@ type InstanceParams interface {
 	// it will remain in effect until the next spork.
 	// No errors are expected during normal operation.
 	EpochFallbackTriggered() (bool, error)
+
+	// SporkRootBlockHeight is the height of the root block in the current spork.
+	SporkRootBlockHeight() uint64
 }
 
 // GlobalParams represents protocol state parameters that do not vary between instances.
