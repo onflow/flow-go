@@ -22,7 +22,7 @@ import (
 type ProtocolState struct {
 	db             *badger.DB
 	cache          *Cache[flow.Identifier, *flow.RichProtocolStateEntry] // protocol_state_id -> protocol state
-	byBlockIdCache *Cache[flow.Identifier, *flow.RichProtocolStateEntry] // block id -> protocol_state_id
+	byBlockIdCache *Cache[flow.Identifier, flow.Identifier]              // block id -> protocol_state_id
 }
 
 var _ storage.ProtocolState = (*ProtocolState)(nil)
@@ -49,30 +49,28 @@ func NewProtocolState(collector module.CacheMetrics,
 			return result, nil
 		}
 	}
-	cache := newCache[flow.Identifier, *flow.RichProtocolStateEntry](collector, metrics.ResourceProtocolState,
-		withLimit[flow.Identifier, *flow.RichProtocolStateEntry](cacheSize),
-		withStore(noopStore[flow.Identifier, *flow.RichProtocolStateEntry]),
-		withRetrieve(retrieve))
 
-	retrieveByBlockID := func(blockID flow.Identifier) func(tx *badger.Txn) (*flow.RichProtocolStateEntry, error) {
-		return func(tx *badger.Txn) (*flow.RichProtocolStateEntry, error) {
+	retrieveByBlockID := func(blockID flow.Identifier) func(tx *badger.Txn) (flow.Identifier, error) {
+		return func(tx *badger.Txn) (flow.Identifier, error) {
 			var protocolStateID flow.Identifier
 			err := operation.LookupProtocolState(blockID, &protocolStateID)(tx)
 			if err != nil {
-				return nil, fmt.Errorf("could not lookup identity table ID for block (%x): %w", blockID[:], err)
+				return flow.ZeroID, fmt.Errorf("could not lookup identity table ID for block (%x): %w", blockID[:], err)
 			}
-			return cache.Get(protocolStateID)(tx)
+			return protocolStateID, nil
 		}
 	}
-	byBlockIdCache := newCache[flow.Identifier, *flow.RichProtocolStateEntry](collector, metrics.ResourceProtocolStateByBlockID,
-		withLimit[flow.Identifier, *flow.RichProtocolStateEntry](cacheSize),
-		withStore(noopStore[flow.Identifier, *flow.RichProtocolStateEntry]),
-		withRetrieve(retrieveByBlockID))
 
 	return &ProtocolState{
-		db:             db,
-		cache:          cache,
-		byBlockIdCache: byBlockIdCache,
+		db: db,
+		cache: newCache[flow.Identifier, *flow.RichProtocolStateEntry](collector, metrics.ResourceProtocolState,
+			withLimit[flow.Identifier, *flow.RichProtocolStateEntry](cacheSize),
+			withStore(noopStore[flow.Identifier, *flow.RichProtocolStateEntry]),
+			withRetrieve(retrieve)),
+		byBlockIdCache: newCache[flow.Identifier, flow.Identifier](collector, metrics.ResourceProtocolStateByBlockID,
+			withLimit[flow.Identifier, flow.Identifier](cacheSize),
+			withStore(noopStore[flow.Identifier, flow.Identifier]),
+			withRetrieve(retrieveByBlockID)),
 	}
 }
 
@@ -112,7 +110,13 @@ func (s *ProtocolState) Index(blockID flow.Identifier, protocolStateID flow.Iden
 func (s *ProtocolState) ByID(id flow.Identifier) (*flow.RichProtocolStateEntry, error) {
 	tx := s.db.NewTransaction(false)
 	defer tx.Discard()
-	return s.cache.Get(id)(tx)
+	return s.byID(id)(tx)
+}
+
+// byID retrieves the identity table by its ID. Error returns:
+//   - storage.ErrNotFound if no identity table with the given ID exists
+func (s *ProtocolState) byID(protocolStateID flow.Identifier) func(*badger.Txn) (*flow.RichProtocolStateEntry, error) {
+	return s.cache.Get(protocolStateID)
 }
 
 // ByBlockID retrieves the identity table by the respective block ID.
@@ -122,7 +126,11 @@ func (s *ProtocolState) ByID(id flow.Identifier) (*flow.RichProtocolStateEntry, 
 func (s *ProtocolState) ByBlockID(blockID flow.Identifier) (*flow.RichProtocolStateEntry, error) {
 	tx := s.db.NewTransaction(false)
 	defer tx.Discard()
-	return s.byBlockIdCache.Get(blockID)(tx)
+	protocolStateID, err := s.byBlockIdCache.Get(blockID)(tx)
+	if err != nil {
+		return nil, fmt.Errorf("could not lookup identity table ID for block (%x): %w", blockID[:], err)
+	}
+	return s.byID(protocolStateID)(tx)
 }
 
 // newRichProtocolStateEntry constructs a rich protocol state entry from a protocol state entry.
