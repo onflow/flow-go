@@ -21,18 +21,18 @@ type InstanceParams interface {
 	// the head of the protocol state snapshot used to bootstrap this state and
 	// may differ from node to node for the same protocol state.
 	// No errors are expected during normal operation.
-	FinalizedRoot() (*flow.Header, error)
+	FinalizedRoot() *flow.Header
 
 	// SealedRoot returns the sealed root block. If it's different from FinalizedRoot() block,
 	// it means the node is bootstrapped from mid-spork.
 	// No errors are expected during normal operation.
-	SealedRoot() (*flow.Header, error)
+	SealedRoot() *flow.Header
 
 	// Seal returns the root block seal of the current protocol state. This will be
 	// the seal for the root block used to bootstrap this state and may differ from
 	// node to node for the same protocol state.
 	// No errors are expected during normal operation.
-	Seal() (*flow.Seal, error)
+	Seal() *flow.Seal
 
 	// EpochFallbackTriggered returns whether epoch fallback mode (EECC) has been triggered.
 	// EECC is a permanent, spork-scoped state which is triggered when the next
@@ -40,9 +40,6 @@ type InstanceParams interface {
 	// it will remain in effect until the next spork.
 	// No errors are expected during normal operation.
 	EpochFallbackTriggered() (bool, error)
-
-	// SporkRootBlockHeight is the height of the root block in the current spork.
-	SporkRootBlockHeight() uint64
 }
 
 // GlobalParams represents protocol state parameters that do not vary between instances.

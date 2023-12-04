@@ -65,7 +65,7 @@ func (_m *Params) EpochFallbackTriggered() (bool, error) {
 }
 
 // FinalizedRoot provides a mock function with given fields:
-func (_m *Params) FinalizedRoot() (*flow.Header, error) {
+func (_m *Params) FinalizedRoot() *flow.Header {
 	ret := _m.Called()
 
 	var r0 *flow.Header
@@ -87,7 +87,7 @@ func (_m *Params) FinalizedRoot() (*flow.Header, error) {
 		r1 = ret.Error(1)
 	}
 
-	return r0, r1
+	return r0
 }
 
 // ProtocolVersion provides a mock function with given fields:
@@ -105,7 +105,7 @@ func (_m *Params) ProtocolVersion() uint {
 }
 
 // Seal provides a mock function with given fields:
-func (_m *Params) Seal() (*flow.Seal, error) {
+func (_m *Params) Seal() *flow.Seal {
 	ret := _m.Called()
 
 	var r0 *flow.Seal
@@ -127,11 +127,11 @@ func (_m *Params) Seal() (*flow.Seal, error) {
 		r1 = ret.Error(1)
 	}
 
-	return r0, r1
+	return r0
 }
 
 // SealedRoot provides a mock function with given fields:
-func (_m *Params) SealedRoot() (*flow.Header, error) {
+func (_m *Params) SealedRoot() *flow.Header {
 	ret := _m.Called()
 
 	var r0 *flow.Header
@@ -153,7 +153,7 @@ func (_m *Params) SealedRoot() (*flow.Header, error) {
 		r1 = ret.Error(1)
 	}
 
-	return r0, r1
+	return r0
 }
 
 // SporkID provides a mock function with given fields:

@@ -104,7 +104,7 @@ func NewEngine(log zerolog.Logger,
 	sealsMempool mempool.IncorporatedResultSeals,
 	requiredApprovalsForSealConstructionGetter module.SealingConfigsGetter,
 ) (*Engine, error) {
-	rootHeader, err := state.Params().FinalizedRoot()
+	rootHeader := state.Params().FinalizedRoot()
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve root block: %w", err)
 	}

@@ -121,7 +121,7 @@ func removeExecutionResultsFromHeight(
 	fromHeight uint64) error {
 	log.Info().Msgf("removing results for blocks from height: %v", fromHeight)
 
-	root, err := protoState.Params().FinalizedRoot()
+	root := protoState.Params().FinalizedRoot()
 	if err != nil {
 		return fmt.Errorf("could not get root: %w", err)
 	}

@@ -294,7 +294,7 @@ func getNodeVersionInfo(stateParams protocol.Params) (*access.NodeVersionInfo, e
 	protocolVersion := stateParams.ProtocolVersion()
 	sporkRootBlockHeight := stateParams.SporkRootBlockHeight()
 
-	nodeRootBlockHeader, err := stateParams.SealedRoot()
+	nodeRootBlockHeader := stateParams.SealedRoot()
 	if err != nil {
 		return nil, fmt.Errorf("failed to read node root block: %w", err)
 	}
@@ -359,7 +359,7 @@ func executionNodesForBlockID(
 
 	// check if the block ID is of the root block. If it is then don't look for execution receipts since they
 	// will not be present for the root block.
-	rootBlock, err := state.Params().FinalizedRoot()
+	rootBlock := state.Params().FinalizedRoot()
 	if err != nil {
 		return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
 	}

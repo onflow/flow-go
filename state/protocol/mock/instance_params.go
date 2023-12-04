@@ -37,7 +37,7 @@ func (_m *InstanceParams) EpochFallbackTriggered() (bool, error) {
 }
 
 // FinalizedRoot provides a mock function with given fields:
-func (_m *InstanceParams) FinalizedRoot() (*flow.Header, error) {
+func (_m *InstanceParams) FinalizedRoot() *flow.Header {
 	ret := _m.Called()
 
 	var r0 *flow.Header
@@ -59,11 +59,11 @@ func (_m *InstanceParams) FinalizedRoot() (*flow.Header, error) {
 		r1 = ret.Error(1)
 	}
 
-	return r0, r1
+	return r0
 }
 
 // Seal provides a mock function with given fields:
-func (_m *InstanceParams) Seal() (*flow.Seal, error) {
+func (_m *InstanceParams) Seal() *flow.Seal {
 	ret := _m.Called()
 
 	var r0 *flow.Seal
@@ -85,11 +85,11 @@ func (_m *InstanceParams) Seal() (*flow.Seal, error) {
 		r1 = ret.Error(1)
 	}
 
-	return r0, r1
+	return r0
 }
 
 // SealedRoot provides a mock function with given fields:
-func (_m *InstanceParams) SealedRoot() (*flow.Header, error) {
+func (_m *InstanceParams) SealedRoot() *flow.Header {
 	ret := _m.Called()
 
 	var r0 *flow.Header
@@ -111,7 +111,7 @@ func (_m *InstanceParams) SealedRoot() (*flow.Header, error) {
 		r1 = ret.Error(1)
 	}
 
-	return r0, r1
+	return r0
 }
 
 type mockConstructorTestingTNewInstanceParams interface {

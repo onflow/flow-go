@@ -27,7 +27,7 @@ func runGetLivenessData(*cobra.Command, []string) {
 		log.Fatal().Err(err).Msg("could not init protocol state")
 	}
 
-	rootBlock, err := state.Params().FinalizedRoot()
+	rootBlock := state.Params().FinalizedRoot()
 	if err != nil {
 		log.Fatal().Err(err).Msgf("could not get root block")
 	}
