@@ -321,10 +321,10 @@ jobs:
 #            make: make -C integration bft-protocol-tests
 #            runner: buildjet-8vcpu-ubuntu-2204
 #            corrupt: true
-#          - name: BFT (Gossipsub) Integration Tests
-#            make: make -C integration bft-gossipsub-tests
-#            runner: buildjet-16vcpu-ubuntu-2204
-#            corrupt: true
+          - name: BFT (Gossipsub) Integration Tests
+            make: make -C integration bft-gossipsub-tests
+            runner: buildjet-16vcpu-ubuntu-2204
+            corrupt: true
           - name: Collection Integration Tests
             make: make -C integration collection-tests
             runner: ubuntu-latest
