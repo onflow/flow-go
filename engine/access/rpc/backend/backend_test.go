@@ -468,7 +468,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_NonFinalizedBlocks() {
 		backend, err := New(params)
 		suite.Require().NoError(err)
 
-		suite.T().Run("block exists, but no block has been finalized at its height.", func(t *testing.T) {
+		suite.T().Run("failed to get a valid snapshot", func(t *testing.T) {
 			// since block was not yet finalized AtHeight must return an invalid snapshot
 			suite.state.On("AtHeight", newBlock.Header.Height).Return(invalid.NewSnapshot(realstate.ErrUnknownSnapshotReference))
 			// since block was added to the block tree it must be queryable by block ID
@@ -482,7 +482,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_NonFinalizedBlocks() {
 			suite.Require().Equal(codes.Internal, status.Code(err))
 		})
 
-		suite.T().Run("failed to get a valid snapshot", func(t *testing.T) {
+		suite.T().Run("no block has been finalized yet at the height we're looking", func(t *testing.T) {
 			// since block was not yet finalized AtHeight must return an invalid snapshot
 			suite.state.On("AtHeight", newBlock.Header.Height).Return(invalid.NewSnapshot(realstate.ErrUnknownSnapshotReference))
 			// since block was added to the block tree it must be queryable by block ID
