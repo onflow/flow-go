@@ -69,22 +69,12 @@ func (_m *Params) FinalizedRoot() *flow.Header {
 	ret := _m.Called()
 
 	var r0 *flow.Header
-	var r1 error
-	if rf, ok := ret.Get(0).(func() (*flow.Header, error)); ok {
-		return rf()
-	}
 	if rf, ok := ret.Get(0).(func() *flow.Header); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*flow.Header)
 		}
-	}
-
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
 	}
 
 	return r0
@@ -109,22 +99,12 @@ func (_m *Params) Seal() *flow.Seal {
 	ret := _m.Called()
 
 	var r0 *flow.Seal
-	var r1 error
-	if rf, ok := ret.Get(0).(func() (*flow.Seal, error)); ok {
-		return rf()
-	}
 	if rf, ok := ret.Get(0).(func() *flow.Seal); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*flow.Seal)
 		}
-	}
-
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
 	}
 
 	return r0
@@ -135,22 +115,12 @@ func (_m *Params) SealedRoot() *flow.Header {
 	ret := _m.Called()
 
 	var r0 *flow.Header
-	var r1 error
-	if rf, ok := ret.Get(0).(func() (*flow.Header, error)); ok {
-		return rf()
-	}
 	if rf, ok := ret.Get(0).(func() *flow.Header); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*flow.Header)
 		}
-	}
-
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
 	}
 
 	return r0

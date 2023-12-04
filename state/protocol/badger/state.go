@@ -37,11 +37,23 @@ type State struct {
 		setups  storage.EpochSetups
 		commits storage.EpochCommits
 	}
-	globalParams             protocol.GlobalParams
+	params                   protocol.Params
 	protocolStateSnapshotsDB storage.ProtocolState
 	protocolState            protocol.MutableProtocolState
 	versionBeacons           storage.VersionBeacons
 
+	// finalizedRootHeight marks the cutoff of the history this node knows about. We cache it in the state
+	// because it cannot change over the lifecycle of a protocol state instance. It is frequently
+	// larger than the height of the root block of the spork, (also cached below as
+	// `sporkRootBlockHeight`), for instance, if the node joined in an epoch after the last spork.
+	finalizedRootHeight uint64
+	// sealedRootHeight returns the root block that is sealed.
+	sealedRootHeight uint64
+	// sporkRootBlockHeight is the height of the root block in the current spork. We cache it in
+	// the state, because it cannot change over the lifecycle of a protocol state instance.
+	// Caution: A node that joined in a later epoch past the spork, the node will likely _not_
+	// know the spork's root block in full (though it will always know the height).
+	sporkRootBlockHeight uint64
 	// cache the latest finalized and sealed block headers as these are common queries.
 	// It can be cached because the protocol state is solely responsible for updating these values.
 	cachedFinal  *atomic.Pointer[cachedHeader]
@@ -97,6 +109,15 @@ func Bootstrap(
 		return nil, fmt.Errorf("expected empty database")
 	}
 
+	instanceParams, err := ReadInstanceParams(db, headers, seals)
+	if err != nil {
+		return nil, fmt.Errorf("could not read instance params: %w", err)
+	}
+
+	params := &Params{
+		GlobalParams:   root.Params(),
+		InstanceParams: instanceParams,
+	}
 	state := newState(
 		metrics,
 		db,
@@ -109,7 +130,7 @@ func Bootstrap(
 		commits,
 		protocolStateSnapshotsDB,
 		versionBeacons,
-		root.Params(),
+		params,
 	)
 
 	if err := IsValidRootSnapshot(root, !config.SkipNetworkAddressValidation); err != nil {
@@ -630,9 +651,17 @@ func OpenState(
 	if !isBootstrapped {
 		return nil, fmt.Errorf("expected database to contain bootstrapped state")
 	}
-	globalParams, err := ReadGlobalParams(db, headers)
+	globalParams, err := ReadGlobalParams(db)
 	if err != nil {
-		return nil, fmt.Errorf("could not read global params")
+		return nil, fmt.Errorf("could not read global params: %w", err)
+	}
+	instanceParams, err := ReadInstanceParams(db, headers, seals)
+	if err != nil {
+		return nil, fmt.Errorf("could not read instance params: %w", err)
+	}
+	params := &Params{
+		GlobalParams:   globalParams,
+		InstanceParams: instanceParams,
 	}
 	state := newState(
 		metrics,
@@ -646,7 +675,7 @@ func OpenState(
 		commits,
 		protocolState,
 		versionBeacons,
-		globalParams,
+		params,
 	) // populate the protocol state cache
 	err = state.populateCache()
 	if err != nil {
@@ -677,10 +706,7 @@ func OpenState(
 }
 
 func (state *State) Params() protocol.Params {
-	return Params{
-		GlobalParams:   state.globalParams,
-		InstanceParams: &InstanceParams{state: state},
-	}
+	return state.params
 }
 
 // Sealed returns a snapshot for the latest sealed block. A latest sealed block
@@ -756,7 +782,7 @@ func newState(
 	commits storage.EpochCommits,
 	protocolStateSnapshots storage.ProtocolState,
 	versionBeacons storage.VersionBeacons,
-	globalParams protocol.GlobalParams,
+	params protocol.Params,
 ) *State {
 	state := &State{
 		metrics: metrics,
@@ -773,11 +799,11 @@ func newState(
 			setups:  setups,
 			commits: commits,
 		},
-		globalParams:             globalParams,
+		params:                   params,
 		protocolStateSnapshotsDB: protocolStateSnapshots,
 		protocolState: protocol_state.NewMutableProtocolState(
 			protocolStateSnapshots,
-			globalParams,
+			params,
 			headers,
 			results,
 			setups,
@@ -919,6 +945,10 @@ func (state *State) populateCache() error {
 	if err != nil {
 		return fmt.Errorf("could not cache finalized header: %w", err)
 	}
+
+	state.finalizedRootHeight = state.Params().FinalizedRoot().Height
+	state.sealedRootHeight = state.Params().SealedRoot().Height
+	state.sporkRootBlockHeight = state.Params().SporkRootBlockHeight()
 
 	return nil
 }

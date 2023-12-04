@@ -42,7 +42,7 @@ type InstanceParams struct {
 
 var _ protocol.InstanceParams = (*InstanceParams)(nil)
 
-func NewInstanceParams(db *badger.DB, headers storage.Headers, seals storage.Seals) (*InstanceParams, error) {
+func ReadInstanceParams(db *badger.DB, headers storage.Headers, seals storage.Seals) (*InstanceParams, error) {
 	params := &InstanceParams{
 		db: db,
 	}
@@ -117,20 +117,20 @@ func (p *InstanceParams) EpochFallbackTriggered() (bool, error) {
 	return triggered, nil
 }
 
-func (p *InstanceParams) FinalizedRoot() (*flow.Header, error) {
-	return p.finalizedRoot, nil
+func (p *InstanceParams) FinalizedRoot() *flow.Header {
+	return p.finalizedRoot
 }
 
-func (p *InstanceParams) SealedRoot() (*flow.Header, error) {
-	return p.sealedRoot, nil
+func (p *InstanceParams) SealedRoot() *flow.Header {
+	return p.sealedRoot
 }
 
 // Seal returns the root block seal of the current protocol state. This will be
 // the seal for the root block used to bootstrap this state and may differ from
 // node to node for the same protocol state.
 // No errors are expected during normal operation.
-func (p *InstanceParams) Seal() (*flow.Seal, error) {
-	return p.rootSeal, nil
+func (p *InstanceParams) Seal() *flow.Seal {
+	return p.rootSeal
 }
 
 // SporkRootBlockHeight is the height of the root block in the current spork.
