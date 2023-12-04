@@ -613,10 +613,7 @@ func createQCContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap.
 
 	var qcContractClient module.QCContractClient
 
-	contracts, err := systemcontracts.SystemContractsForChain(node.RootChainID)
-	if err != nil {
-		return nil, err
-	}
+	contracts := systemcontracts.SystemContractsForChain(node.RootChainID)
 	qcContractAddress := contracts.ClusterQC.Address.Hex()
 
 	// construct signer from private key
@@ -631,7 +628,16 @@ func createQCContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap.
 	}
 
 	// create actual qc contract client, all flags and machine account info file found
-	qcContractClient = epochs.NewQCContractClient(node.Logger, flowClient, anID, node.Me.NodeID(), machineAccountInfo.Address, machineAccountInfo.KeyIndex, qcContractAddress, txSigner)
+	qcContractClient = epochs.NewQCContractClient(
+		node.Logger,
+		flowClient,
+		anID,
+		node.Me.NodeID(),
+		machineAccountInfo.Address,
+		machineAccountInfo.KeyIndex,
+		qcContractAddress,
+		txSigner,
+	)
 
 	return qcContractClient, nil
 }
