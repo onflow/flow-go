@@ -22,14 +22,95 @@ var _ protocol.Params = (*Params)(nil)
 // InstanceParams implements the interface protocol.InstanceParams. All functions
 // are served on demand directly from the database, _without_ any caching.
 type InstanceParams struct {
-	state *State
+	db *badger.DB
+
+	// rootHeight marks the cutoff of the history this node knows about. We cache it in the state
+	// because it cannot change over the lifecycle of a protocol state instance. It is frequently
+	// larger than the height of the root block of the spork, (also cached below as
+	// `sporkRootBlockHeight`), for instance, if the node joined in an epoch after the last spork.
+	finalizedRoot *flow.Header
+	// sealedRootHeight returns the root block that is sealed.
+	sealedRoot *flow.Header
+	// sporkRootBlockHeight is the height of the root block in the current spork. We cache it in
+	// the state, because it cannot change over the lifecycle of a protocol state instance.
+	// Caution: A node that joined in a later epoch past the spork, the node will likely _not_
+	// know the spork's root block in full (though it will always know the height).
+	sporkRootBlockHeight uint64
+	// rootSeal stores the root block seal of the current protocol state.
+	rootSeal *flow.Seal
 }
 
 var _ protocol.InstanceParams = (*InstanceParams)(nil)
 
+func NewInstanceParams(db *badger.DB, headers storage.Headers, seals storage.Seals) (*InstanceParams, error) {
+	params := &InstanceParams{
+		db: db,
+	}
+
+	err := db.View(func(txn *badger.Txn) error {
+		var (
+			finalizedRootHeight uint64
+			sealedRootHeight    uint64
+		)
+
+		// root height
+		err := db.View(operation.RetrieveRootHeight(&finalizedRootHeight))
+		if err != nil {
+			return fmt.Errorf("could not read root block to populate cache: %w", err)
+		}
+		// sealed root height
+		err = db.View(operation.RetrieveSealedRootHeight(&sealedRootHeight))
+		if err != nil {
+			return fmt.Errorf("could not read sealed root block to populate cache: %w", err)
+		}
+		// spork root block height
+		err = db.View(operation.RetrieveSporkRootBlockHeight(&params.sporkRootBlockHeight))
+		if err != nil {
+			return fmt.Errorf("could not get spork root block height: %w", err)
+		}
+
+		// look up root block ID
+		var finalizedRootID flow.Identifier
+		err = db.View(operation.LookupBlockHeight(finalizedRootHeight, &finalizedRootID))
+		if err != nil {
+			return fmt.Errorf("could not look up finalized root height: %w", err)
+		}
+
+		params.finalizedRoot, err = headers.ByBlockID(finalizedRootID)
+		if err != nil {
+			return fmt.Errorf("could not retrieve finalized root header: %w", err)
+		}
+
+		var sealedRootID flow.Identifier
+		err = db.View(operation.LookupBlockHeight(sealedRootHeight, &sealedRootID))
+		if err != nil {
+			return fmt.Errorf("could not look up sealed root height: %w", err)
+		}
+
+		// retrieve root header
+		params.sealedRoot, err = headers.ByBlockID(sealedRootID)
+		if err != nil {
+			return fmt.Errorf("could not retrieve sealed root header: %w", err)
+		}
+
+		// retrieve the root seal
+		params.rootSeal, err = seals.HighestInFork(finalizedRootID)
+		if err != nil {
+			return fmt.Errorf("could not retrieve root seal: %w", err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not read root data to populate cache: %w", err)
+	}
+
+	return params, nil
+}
+
 func (p *InstanceParams) EpochFallbackTriggered() (bool, error) {
 	var triggered bool
-	err := p.state.db.View(operation.CheckEpochEmergencyFallbackTriggered(&triggered))
+	err := p.db.View(operation.CheckEpochEmergencyFallbackTriggered(&triggered))
 	if err != nil {
 		return false, fmt.Errorf("could not check epoch fallback triggered: %w", err)
 	}
@@ -37,62 +118,29 @@ func (p *InstanceParams) EpochFallbackTriggered() (bool, error) {
 }
 
 func (p *InstanceParams) FinalizedRoot() (*flow.Header, error) {
-
-	// look up root block ID
-	var rootID flow.Identifier
-	err := p.state.db.View(operation.LookupBlockHeight(p.state.finalizedRootHeight, &rootID))
-	if err != nil {
-		return nil, fmt.Errorf("could not look up root header: %w", err)
-	}
-
-	// retrieve root header
-	header, err := p.state.headers.ByBlockID(rootID)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve root header: %w", err)
-	}
-
-	return header, nil
+	return p.finalizedRoot, nil
 }
 
 func (p *InstanceParams) SealedRoot() (*flow.Header, error) {
-	// look up root block ID
-	var rootID flow.Identifier
-	err := p.state.db.View(operation.LookupBlockHeight(p.state.sealedRootHeight, &rootID))
-
-	if err != nil {
-		return nil, fmt.Errorf("could not look up root header: %w", err)
-	}
-
-	// retrieve root header
-	header, err := p.state.headers.ByBlockID(rootID)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve root header: %w", err)
-	}
-
-	return header, nil
+	return p.sealedRoot, nil
 }
 
+// Seal returns the root block seal of the current protocol state. This will be
+// the seal for the root block used to bootstrap this state and may differ from
+// node to node for the same protocol state.
+// No errors are expected during normal operation.
 func (p *InstanceParams) Seal() (*flow.Seal, error) {
+	return p.rootSeal, nil
+}
 
-	// look up root header
-	var rootID flow.Identifier
-	err := p.state.db.View(operation.LookupBlockHeight(p.state.finalizedRootHeight, &rootID))
-	if err != nil {
-		return nil, fmt.Errorf("could not look up root header: %w", err)
-	}
-
-	// retrieve the root seal
-	seal, err := p.state.seals.HighestInFork(rootID)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve root seal: %w", err)
-	}
-
-	return seal, nil
+// SporkRootBlockHeight is the height of the root block in the current spork.
+func (p *InstanceParams) SporkRootBlockHeight() uint64 {
+	return p.sporkRootBlockHeight
 }
 
 // ReadGlobalParams reads the global parameters from the database and returns them as in-memory representation.
 // No errors are expected during normal operation.
-func ReadGlobalParams(db *badger.DB, headers storage.Headers) (*inmem.Params, error) {
+func ReadGlobalParams(db *badger.DB) (*inmem.Params, error) {
 	var sporkID flow.Identifier
 	err := db.View(operation.RetrieveSporkID(&sporkID))
 	if err != nil {
