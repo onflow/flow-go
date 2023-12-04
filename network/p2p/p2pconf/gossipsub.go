@@ -84,7 +84,7 @@ const (
 	DecayIntervalKey            = "decay-interval"
 )
 
-// Parameters are the parameters for the score option.
+// ScoringParameters are the parameters for the score option.
 // Parameters are "numerical values" that are used to compute or build components that compute the score of a peer in GossipSub system.
 type ScoringParameters struct {
 	AppSpecificScore AppSpecificScoreParameters `validate:"required" mapstructure:"app-specific-score"`
