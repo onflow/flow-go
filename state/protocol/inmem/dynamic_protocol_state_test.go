@@ -63,6 +63,8 @@ func TestDynamicProtocolStateAdapter(t *testing.T) {
 	t.Run("no-previous-epoch", func(t *testing.T) {
 		entry := unittest.ProtocolStateFixture(func(entry *flow.RichProtocolStateEntry) {
 			entry.PreviousEpoch = nil
+			entry.PreviousEpochSetup = nil
+			entry.PreviousEpochCommit = nil
 		})
 		adapter := inmem.NewDynamicProtocolStateAdapter(entry, globalParams)
 		assert.False(t, adapter.PreviousEpochExists())

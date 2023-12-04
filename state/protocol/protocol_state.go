@@ -34,7 +34,7 @@ type DynamicProtocolState interface {
 	// InvalidEpochTransitionAttempted denotes whether an invalid epoch state transition was attempted
 	// on the fork ending this block. Once the first block where this flag is true is finalized, epoch
 	// fallback mode is triggered.
-	// TODO at the moment, this is a one-way transition and requires a spork to recover - need to revisit for sporkless EFM recovery
+	// TODO for 'leaving Epoch Fallback via special service event': at the moment, this is a one-way transition and requires a spork to recover - need to revisit for sporkless EFM recovery
 	InvalidEpochTransitionAttempted() bool
 	// PreviousEpochExists returns true if a previous epoch exists. This is true for all epoch
 	// except those immediately following a spork.

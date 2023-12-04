@@ -294,11 +294,12 @@ func (e *ProtocolStateEntry) EpochPhase() EpochPhase {
 	if e.NextEpoch == nil {
 		return EpochPhaseStaking
 	}
-	if e.NextEpoch.SetupID != ZeroID && e.NextEpoch.CommitID == ZeroID {
-		return EpochPhaseSetup
-	}
-	if e.NextEpoch.SetupID != ZeroID && e.NextEpoch.CommitID != ZeroID {
-		return EpochPhaseCommitted
+	if e.NextEpoch.SetupID != ZeroID {
+		if e.NextEpoch.CommitID == ZeroID {
+			return EpochPhaseSetup	
+		} else {
+			return EpochPhaseCommitted
+		}
 	}
 
 	return EpochPhaseUndefined
