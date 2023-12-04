@@ -1008,7 +1008,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 				return errors.New("circuit-breaker-restore-timeout must be greater than 0")
 			}
 		}
-		if builder.TxErrorMessagesCacheSize <= 0 {
+		if builder.TxErrorMessagesCacheSize == 0 {
 			return errors.New("transaction-error-messages-cache-size must be greater than 0")
 		}
 

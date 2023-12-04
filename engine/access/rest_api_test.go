@@ -162,20 +162,19 @@ func (suite *RestAPITestSuite) SetupTest() {
 		nil).Build()
 
 	bnd, err := backend.New(backend.Params{
-		State:                    suite.state,
-		CollectionRPC:            suite.collClient,
-		Blocks:                   suite.blocks,
-		Headers:                  suite.headers,
-		Collections:              suite.collections,
-		Transactions:             suite.transactions,
-		ExecutionResults:         suite.executionResults,
-		ChainID:                  suite.chainID,
-		AccessMetrics:            suite.metrics,
-		MaxHeightRange:           0,
-		Log:                      suite.log,
-		SnapshotHistoryLimit:     0,
-		Communicator:             backend.NewNodeCommunicator(false),
-		TxErrorMessagesCacheSize: 1000,
+		State:                suite.state,
+		CollectionRPC:        suite.collClient,
+		Blocks:               suite.blocks,
+		Headers:              suite.headers,
+		Collections:          suite.collections,
+		Transactions:         suite.transactions,
+		ExecutionResults:     suite.executionResults,
+		ChainID:              suite.chainID,
+		AccessMetrics:        suite.metrics,
+		MaxHeightRange:       0,
+		Log:                  suite.log,
+		SnapshotHistoryLimit: 0,
+		Communicator:         backend.NewNodeCommunicator(false),
 	})
 	require.NoError(suite.T(), err)
 

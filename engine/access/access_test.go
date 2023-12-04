@@ -147,21 +147,20 @@ func (suite *Suite) RunTest(
 
 		var err error
 		suite.backend, err = backend.New(backend.Params{
-			State:                    suite.state,
-			CollectionRPC:            suite.collClient,
-			Blocks:                   all.Blocks,
-			Headers:                  all.Headers,
-			Collections:              all.Collections,
-			Transactions:             all.Transactions,
-			ExecutionResults:         all.Results,
-			ExecutionReceipts:        all.Receipts,
-			ChainID:                  suite.chainID,
-			AccessMetrics:            suite.metrics,
-			MaxHeightRange:           backend.DefaultMaxHeightRange,
-			Log:                      suite.log,
-			SnapshotHistoryLimit:     backend.DefaultSnapshotHistoryLimit,
-			Communicator:             backend.NewNodeCommunicator(false),
-			TxErrorMessagesCacheSize: 1000,
+			State:                suite.state,
+			CollectionRPC:        suite.collClient,
+			Blocks:               all.Blocks,
+			Headers:              all.Headers,
+			Collections:          all.Collections,
+			Transactions:         all.Transactions,
+			ExecutionResults:     all.Results,
+			ExecutionReceipts:    all.Receipts,
+			ChainID:              suite.chainID,
+			AccessMetrics:        suite.metrics,
+			MaxHeightRange:       backend.DefaultMaxHeightRange,
+			Log:                  suite.log,
+			SnapshotHistoryLimit: backend.DefaultSnapshotHistoryLimit,
+			Communicator:         backend.NewNodeCommunicator(false),
 		})
 		require.NoError(suite.T(), err)
 

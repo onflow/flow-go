@@ -1158,10 +1158,8 @@ func (b *backendTransactions) lookupTransactionErrorMessagesByBlockID(
 
 	results := make(map[flow.Identifier]string)
 
-	needToFetch := true
-
 	if b.txErrorMessagesCache != nil {
-		needToFetch = false
+		needToFetch := false
 		for _, txResult := range txResults {
 			if txResult.Failed {
 				cacheKey := flow.MakeIDFromFingerPrint(append(blockID[:], txResult.TransactionID[:]...))
@@ -1172,11 +1170,11 @@ func (b *backendTransactions) lookupTransactionErrorMessagesByBlockID(
 				}
 			}
 		}
-	}
 
-	// all transactions were served from cache or there were no failed transactions
-	if !needToFetch {
-		return results, nil
+		// all transactions were served from cache or there were no failed transactions
+		if !needToFetch {
+			return results, nil
+		}
 	}
 
 	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)

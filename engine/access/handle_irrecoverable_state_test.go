@@ -145,19 +145,18 @@ func (suite *IrrecoverableStateTestSuite) SetupTest() {
 	suite.snapshot.On("Head").Return(blockHeader, nil).Once()
 
 	bnd, err := backend.New(backend.Params{
-		State:                    suite.state,
-		CollectionRPC:            suite.collClient,
-		Blocks:                   suite.blocks,
-		Headers:                  suite.headers,
-		Collections:              suite.collections,
-		Transactions:             suite.transactions,
-		ChainID:                  suite.chainID,
-		AccessMetrics:            suite.metrics,
-		MaxHeightRange:           0,
-		Log:                      suite.log,
-		SnapshotHistoryLimit:     0,
-		Communicator:             backend.NewNodeCommunicator(false),
-		TxErrorMessagesCacheSize: 1000,
+		State:                suite.state,
+		CollectionRPC:        suite.collClient,
+		Blocks:               suite.blocks,
+		Headers:              suite.headers,
+		Collections:          suite.collections,
+		Transactions:         suite.transactions,
+		ChainID:              suite.chainID,
+		AccessMetrics:        suite.metrics,
+		MaxHeightRange:       0,
+		Log:                  suite.log,
+		SnapshotHistoryLimit: 0,
+		Communicator:         backend.NewNodeCommunicator(false),
 	})
 	suite.Require().NoError(err)
 
