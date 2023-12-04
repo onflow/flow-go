@@ -941,7 +941,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 
 			snapshotTree = snapshotTree.Append(executionSnapshot)
 
-			require.Len(t, output.Events, 10)
+			require.Len(t, output.Events, 16)
 			unittest.EnsureEventsIndexSeq(t, output.Events, chain.ChainID())
 
 			accountCreatedEvents := filterAccountCreatedEvents(output.Events)
@@ -2122,7 +2122,7 @@ func TestInteractionLimit(t *testing.T) {
 			interactionLimit: math.MaxUint64,
 			require: func(t *testing.T, output fvm.ProcedureOutput) {
 				require.NoError(t, output.Err)
-				require.Len(t, output.Events, 5)
+				require.Len(t, output.Events, 9)
 			},
 		},
 		{
@@ -2130,7 +2130,7 @@ func TestInteractionLimit(t *testing.T) {
 			interactionLimit: fvm.DefaultMaxInteractionSize,
 			require: func(t *testing.T, output fvm.ProcedureOutput) {
 				require.NoError(t, output.Err)
-				require.Len(t, output.Events, 5)
+				require.Len(t, output.Events, 9)
 				unittest.EnsureEventsIndexSeq(t, output.Events, flow.Testnet.Chain().ChainID())
 			},
 		},
@@ -2139,16 +2139,16 @@ func TestInteractionLimit(t *testing.T) {
 			interactionLimit: 170000,
 			require: func(t *testing.T, output fvm.ProcedureOutput) {
 				require.NoError(t, output.Err)
-				require.Len(t, output.Events, 5)
+				require.Len(t, output.Events, 9)
 				unittest.EnsureEventsIndexSeq(t, output.Events, flow.Testnet.Chain().ChainID())
 			},
 		},
 		{
-			name:             "even lower low limit fails, and has only 3 events",
+			name:             "even lower low limit fails, and has only 5 events",
 			interactionLimit: 5000,
 			require: func(t *testing.T, output fvm.ProcedureOutput) {
 				require.Error(t, output.Err)
-				require.Len(t, output.Events, 3)
+				require.Len(t, output.Events, 5)
 				unittest.EnsureEventsIndexSeq(t, output.Events, flow.Testnet.Chain().ChainID())
 			},
 		},
