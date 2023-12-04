@@ -14,9 +14,10 @@ type MessageEntity struct {
 var _ flow.Entity = (*MessageEntity)(nil)
 
 func NewMessageEntity(msg *engine.Message) MessageEntity {
+	id := identifierOfMessage(msg)
 	return MessageEntity{
 		Msg: *msg,
-		id:  identifierOfMessage(msg),
+		id:  id,
 	}
 }
 

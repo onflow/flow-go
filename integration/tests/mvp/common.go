@@ -13,7 +13,7 @@ import (
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go-sdk/templates"
 
-	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
 )
@@ -77,6 +77,8 @@ func RunMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork, acc
 	}
 	require.NotEqual(t, sdk.EmptyAddress, newAccountAddress)
 
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
 	t.Log(">> new account address: ", newAccountAddress)
 
 	// Generate the fund account transaction (so account can be used as a payer)
@@ -100,8 +102,9 @@ func RunMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork, acc
 				receiverRef.deposit(from: <-self.sentVault)
 			  }
 			}`,
-			fvm.FungibleTokenAddress(chain).Hex(),
-			fvm.FlowTokenAddress(chain).Hex()))).
+			sc.FungibleToken.Address.Hex(),
+			sc.FlowToken.Address.Hex(),
+		))).
 		AddAuthorizer(serviceAddress).
 		SetReferenceBlockID(sdk.Identifier(latestBlockID)).
 		SetProposalKey(serviceAddress, 0, serviceAccountClient.GetSeqNumber()).
