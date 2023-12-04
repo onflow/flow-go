@@ -327,11 +327,11 @@ jobs:
             corrupt: true
           - name: BFT (Gossipsub - Signature) Integration Tests
             make: make -C integration bft-gossipsub-signature-tests
-            runner: buildjet-4vcpu-ubuntu-2204
+            runner: buildjet-8vcpu-ubuntu-2204
             corrupt: true
           - name: BFT (Gossipsub - Topic Validator) Integration Tests
             make: make -C integration bft-gossipsub-topic-validator-tests
-            runner: buildjet-4vcpu-ubuntu-2204
+            runner: buildjet-8vcpu-ubuntu-2204
             corrupt: true
           - name: Collection Integration Tests
             make: make -C integration collection-tests
