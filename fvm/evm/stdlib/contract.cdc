@@ -27,10 +27,12 @@ contract EVM {
 
         /// Balance of the address
         access(all)
-        fun balance(): UFix64 {
-            return InternalEVM.balance(
+        fun balance(): Balance {
+            let balance = InternalEVM.balance(
                 address: self.bytes
             )
+
+            return Balance(flow: balance)
         }
     }
 
@@ -72,7 +74,7 @@ contract EVM {
 
         /// Get balance of the bridged account
         access(all)
-        fun balance(): UFix64 {
+        fun balance(): Balance {
             return self.address().balance()
         }
 
