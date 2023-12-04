@@ -1150,7 +1150,11 @@ func TestEVMAccountBalance(t *testing.T) {
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
 
-	expectedBalance, err := cadence.NewUFix64FromParts(1, 1337000)
+	expectedBalanceValue, err := cadence.NewUFix64FromParts(1, 1337000)
+	expectedBalance := cadence.
+		NewStruct([]cadence.Value{expectedBalanceValue}).
+		WithType(stdlib.NewBalanceCadenceType(common.Address(contractsAddress)))
+
 	require.NoError(t, err)
 
 	var handler *testContractHandler
@@ -1163,7 +1167,7 @@ func TestEVMAccountBalance(t *testing.T) {
 			return &testFlowAccount{
 				address: fromAddress,
 				balance: func() types.Balance {
-					return types.Balance(expectedBalance)
+					return types.Balance(expectedBalanceValue)
 				},
 			}
 		},
@@ -1178,7 +1182,7 @@ func TestEVMAccountBalance(t *testing.T) {
       import EVM from 0x1
 
       access(all)
-      fun main(): UFix64 {
+      fun main(): EVM.Balance {
           let bridgedAccount <- EVM.createBridgedAccount()
           let balance = bridgedAccount.balance()
           destroy bridgedAccount
