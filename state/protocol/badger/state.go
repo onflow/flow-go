@@ -42,18 +42,6 @@ type State struct {
 	protocolState            protocol.MutableProtocolState
 	versionBeacons           storage.VersionBeacons
 
-	// rootHeight marks the cutoff of the history this node knows about. We cache it in the state
-	// because it cannot change over the lifecycle of a protocol state instance. It is frequently
-	// larger than the height of the root block of the spork, (also cached below as
-	// `sporkRootBlockHeight`), for instance if the node joined in an epoch after the last spork.
-	finalizedRootHeight uint64
-	// sealedRootHeight returns the root block that is sealed.
-	sealedRootHeight uint64
-	// sporkRootBlockHeight is the height of the root block in the current spork. We cache it in
-	// the state, because it cannot change over the lifecycle of a protocol state instance.
-	// Caution: A node that joined in a later epoch past the spork, the node will likely _not_
-	// know the spork's root block in full (though it will always know the height).
-	sporkRootBlockHeight uint64
 	// cache the latest finalized and sealed block headers as these are common queries.
 	// It can be cached because the protocol state is solely responsible for updating these values.
 	cachedFinal  *atomic.Pointer[cachedHeader]
@@ -894,24 +882,9 @@ func (state *State) populateCache() error {
 
 	// cache the initial value for finalized block
 	err := state.db.View(func(tx *badger.Txn) error {
-		// root height
-		err := state.db.View(operation.RetrieveRootHeight(&state.finalizedRootHeight))
-		if err != nil {
-			return fmt.Errorf("could not read root block to populate cache: %w", err)
-		}
-		// sealed root height
-		err = state.db.View(operation.RetrieveSealedRootHeight(&state.sealedRootHeight))
-		if err != nil {
-			return fmt.Errorf("could not read sealed root block to populate cache: %w", err)
-		}
-		// spork root block height
-		err = state.db.View(operation.RetrieveSporkRootBlockHeight(&state.sporkRootBlockHeight))
-		if err != nil {
-			return fmt.Errorf("could not get spork root block height: %w", err)
-		}
 		// finalized header
 		var finalizedHeight uint64
-		err = operation.RetrieveFinalizedHeight(&finalizedHeight)(tx)
+		err := operation.RetrieveFinalizedHeight(&finalizedHeight)(tx)
 		if err != nil {
 			return fmt.Errorf("could not lookup finalized height: %w", err)
 		}
