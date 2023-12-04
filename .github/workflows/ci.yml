@@ -321,9 +321,17 @@ jobs:
 #            make: make -C integration bft-protocol-tests
 #            runner: buildjet-8vcpu-ubuntu-2204
 #            corrupt: true
-          - name: BFT (Gossipsub) Integration Tests
-            make: make -C integration bft-gossipsub-tests
-            runner: buildjet-16vcpu-ubuntu-2204
+          - name: BFT (Gossipsub - RPC Inspector) Integration Tests
+            make: make -C integration bft-gossipsub-rpc-inspector-tests
+            runner: ubuntu-latest
+            corrupt: true
+          - name: BFT (Gossipsub - Signature) Integration Tests
+            make: make -C integration bft-gossipsub-signature-tests
+            runner: ubuntu-latest
+            corrupt: true
+          - name: BFT (Gossipsub - Topic Validator) Integration Tests
+            make: make -C integration bft-gossipsub-topic-validator-tests
+            runner: ubuntu-latest
             corrupt: true
           - name: Collection Integration Tests
             make: make -C integration collection-tests

@@ -102,10 +102,19 @@ bft-framework-tests:
 .PHONY: bft-protocol-tests
 bft-protocol-tests:
 	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/bft/protocol/... -p 1
-.PHONY: bft-gossipsub-tests
-bft-gossipsub-tests:
-	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/bft/gossipsub/... -p 1
+
+.PHONY: bft-gossipsub-rpc-inspector-tests
+bft-gossipsub-rpc-inspector-tests:
+	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/bft/gossipsub/rpc_inspector/... -p 1
+
+.PHONY: bft-gossipsub-signature-tests
+bft-gossipsub-signature-tests:
+	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/bft/gossipsub/signature/... -p 1
+
+.PHONY: bft-gossipsub-topic-validator-tests
+bft-gossipsub-topic-validator-tests:
+	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/bft/gossipsub/topicvalidator/... -p 1
 
 .PHONY: bft-tests
-bft-tests: bft-framework-tests bft-protocol-tests bft-gossipsub-tests
+bft-tests: bft-framework-tests bft-protocol-tests bft-gossipsub-rpc-inspector-tests bft-gossipsub-signature-tests bft-gossipsub-topic-validator-tests
 ############################################################################################
