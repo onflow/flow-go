@@ -371,6 +371,7 @@ var internalEVMTypeBalanceFunctionType = &sema.FunctionType{
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.UFix64Type),
 }
 
+// newInternalEVMTypeBalanceFunction returns the Flow balance of the account
 func newInternalEVMTypeBalanceFunction(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
@@ -395,7 +396,6 @@ func newInternalEVMTypeBalanceFunction(
 			const isAuthorized = false
 			account := handler.AccountByAddress(address, isAuthorized)
 
-			// todo return the Balance type
 			return interpreter.UFix64Value(account.Balance())
 		},
 	)
