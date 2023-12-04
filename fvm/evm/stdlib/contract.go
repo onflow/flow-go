@@ -118,6 +118,19 @@ func newInternalEVMTypeEncodeABIFunction(
 						}
 						arguments = append(arguments, gethABI.Argument{Type: typ})
 					}
+				case *interpreter.ArrayValue:
+					elements := make([]uint64, 0)
+					for i := 0; i < value.Count(); i++ {
+						element := value.Get(inter, locationRange, i)
+						v := element.(interpreter.UInt64Value)
+						elements = append(elements, uint64(v))
+					}
+					values = append(values, elements)
+					typ, err := gethABI.NewType("uint64[]", "", nil)
+					if err != nil {
+						panic(err)
+					}
+					arguments = append(arguments, gethABI.Argument{Type: typ})
 				}
 			}
 
@@ -211,6 +224,12 @@ func newInternalEVMTypeDecodeABIFunction(
 						panic(err)
 					}
 					arguments = append(arguments, gethABI.Argument{Type: typ})
+				case "Type<[UInt64]>()":
+					typ, err := gethABI.NewType("uint64[]", "", nil)
+					if err != nil {
+						panic(err)
+					}
+					arguments = append(arguments, gethABI.Argument{Type: typ})
 				}
 			}
 
@@ -243,6 +262,29 @@ func newInternalEVMTypeDecodeABIFunction(
 					var address types.Address
 					copy(address[:], value.Bytes())
 					values = append(values, EVMAddressToAddressBytesArrayValue(inter, address))
+				case []uint64:
+					arrayType := interpreter.NewVariableSizedStaticType(
+						inter,
+						interpreter.NewPrimitiveStaticType(
+							inter,
+							interpreter.PrimitiveStaticTypeUInt64,
+						),
+					)
+					arrValues := make([]interpreter.Value, 0)
+					for _, v := range value {
+						arrValues = append(arrValues, interpreter.NewUInt64Value(inter, func() uint64 {
+							return v
+						}))
+					}
+
+					arr := interpreter.NewArrayValue(
+						inter,
+						invocation.LocationRange,
+						arrayType,
+						common.ZeroAddress,
+						arrValues...,
+					)
+					values = append(values, arr)
 				}
 			}
 			arrayType := interpreter.NewVariableSizedStaticType(
