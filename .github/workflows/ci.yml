@@ -461,5 +461,5 @@ jobs:
       uses: nick-fields/retry@v2
       with:
         timeout_minutes: 35
-        max_attempts: 5
+        max_attempts: 3
         command: VERBOSE=1 ${{ matrix.make }}
