@@ -133,7 +133,6 @@ func NodeFixture(t *testing.T,
 		parameters.Key,
 		sporkID,
 		parameters.IdProvider,
-		defaultFlowConfig.NetworkConfig.GossipSubConfig.GossipSubScoringRegistryConfig,
 		&parameters.FlowConfig.NetworkConfig.ResourceManager,
 		parameters.PeerManagerConfig,
 		&p2p.DisallowListCacheConfig{
