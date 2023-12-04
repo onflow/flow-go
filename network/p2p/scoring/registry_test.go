@@ -370,19 +370,14 @@ func testScoreRegistrySpamRecordWithSubscriptionPenalty(t *testing.T, messageTyp
 		// the peer has spam record as well as an unknown identity. Hence, the app specific score should be the spam penalty
 		// and the staking penalty.
 		// As the app specific score in the cache and spam penalty in the spamRecords are updated at different times, we account for 0.1% error.
-		nominator := math.Abs(expectedPenalty + scoring.DefaultInvalidSubscriptionPenalty - score)
-		denominator := math.Max(math.Abs(expectedPenalty+scoring.DefaultInvalidSubscriptionPenalty), math.Abs(score))
-		return math.Abs(nominator/denominator) < 0.01
+		return unittest.AreNumericallyClose(expectedPenalty+scoring.DefaultInvalidSubscriptionPenalty, score, 0.01)
 	}, 5*time.Second, 10*time.Millisecond)
 
 	// the app specific score should now be updated in the cache.
 	score, updated, exists = appScoreCache.Get(peerID) // get the score from the cache.
 	require.True(t, exists)
 	require.True(t, updated.After(queryTime))
-
-	nominator := math.Abs(expectedPenalty + scoring.DefaultInvalidSubscriptionPenalty - score)
-	denominator := math.Max(expectedPenalty+scoring.DefaultInvalidSubscriptionPenalty, score)
-	require.True(t, math.Abs(nominator/denominator) < 0.01)
+	unittest.RequireNumericallyClose(t, expectedPenalty+scoring.DefaultInvalidSubscriptionPenalty, score, 0.01)
 
 	// stop the registry.
 	cancel()

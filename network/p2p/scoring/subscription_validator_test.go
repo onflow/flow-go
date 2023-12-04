@@ -170,7 +170,8 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 	cfg, err := config.DefaultConfig()
 	require.NoError(t, err)
 	// set a low update interval to speed up the test
-	cfg.NetworkConfig.GossipSub.SubscriptionProvider.UpdateInterval = 100 * time.Millisecond
+	cfg.NetworkConfig.GossipSub.SubscriptionProvider.UpdateInterval = 10 * time.Millisecond
+	cfg.NetworkConfig.GossipSub.ScoringParameters.AppSpecificScore.ScoreTTL = 10 * time.Millisecond
 
 	sporkId := unittest.IdentifierFixture()
 
@@ -197,6 +198,14 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 		p2ptest.OverrideFlowConfig(cfg),
 		p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride),
 		p2ptest.WithRole(flow.RoleVerification))
+
+	// suppress peer provider error
+	peerProvider := func() peer.IDSlice {
+		return []peer.ID{conNode.ID(), verNode1.ID(), verNode2.ID()}
+	}
+	verNode1.WithPeersProvider(peerProvider)
+	verNode2.WithPeersProvider(peerProvider)
+	conNode.WithPeersProvider(peerProvider)
 
 	ids := flow.IdentityList{&conId, &verId1, &verId2}
 	nodes := []p2p.LibP2PNode{conNode, verNode1, verNode2}

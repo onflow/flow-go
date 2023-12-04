@@ -386,7 +386,8 @@ func (r *GossipSubAppSpecificScoreRegistry) stakingScore(pid peer.ID) (float64, 
 func (r *GossipSubAppSpecificScoreRegistry) subscriptionPenalty(pid peer.ID, flowId flow.Identifier, role flow.Role) float64 {
 	// checks if peer has any subscription violation.
 	if err := r.validator.CheckSubscribedToAllowedTopics(pid, role); err != nil {
-		r.logger.Err(err).
+		r.logger.Warn().
+			Err(err).
 			Str("peer_id", p2plogging.PeerId(pid)).
 			Hex("flow_id", logging.ID(flowId)).
 			Bool(logging.KeySuspicious, true).
