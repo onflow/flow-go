@@ -1048,6 +1048,53 @@ func EpochSetupFixtureCCF(randomSource []byte) []byte {
 	return b
 }
 
+func EpochSetupCCFWithNonHexRandomSource() []byte {
+	// randomSource of correct length but made of non hex characters
+	randomSource := "ZZ"
+	for len(randomSource) != 2*flow.EpochSetupRandomSourceLength {
+		randomSource = randomSource + "aa"
+	}
+
+	event := cadence.NewEvent([]cadence.Value{
+		// counter
+		cadence.NewUInt64(1),
+
+		// nodeInfo
+		createEpochNodes(),
+
+		// firstView
+		cadence.NewUInt64(100),
+
+		// finalView
+		cadence.NewUInt64(200),
+
+		// collectorClusters
+		createEpochCollectors(),
+
+		// randomSource
+		cadence.String(randomSource),
+
+		// DKGPhase1FinalView
+		cadence.UInt64(150),
+
+		// DKGPhase2FinalView
+		cadence.UInt64(160),
+
+		// DKGPhase3FinalView
+		cadence.UInt64(170),
+	}).WithType(newFlowEpochEpochSetupEventType())
+
+	b, err := ccf.Encode(event)
+	if err != nil {
+		panic(err)
+	}
+	_, err = ccf.Decode(nil, b)
+	if err != nil {
+		panic(err)
+	}
+	return b
+}
+
 var EpochCommitFixtureCCF = func() []byte {
 	b, err := ccf.Encode(createEpochCommittedEvent())
 	if err != nil {
