@@ -254,6 +254,15 @@ func TestEVMEncodeABI(t *testing.T) {
 
       access(all)
       fun main(): [UInt8] {
+        // bytes for address 0x7A58c0Be72BE218B41C608b7Fe7C5bB630736C71
+        let address = EVM.EVMAddress(
+          bytes: [122, 88, 192, 190, 114, 190, 33, 139, 65, 198, 8, 183, 254, 124, 91, 182, 48, 115, 108, 113]
+        )
+        let data = EVM.encodeABI([address])
+        let values = EVM.decodeABI([Type<EVM.EVMAddress>()], data: data)
+        assert(values.length == 1)
+        assert((values[0] as! [UInt8; 20]) == address.bytes)
+
         return EVM.encodeABI(["John Doe", UInt64(33), false])
       }
 	`)

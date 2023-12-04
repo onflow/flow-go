@@ -6,6 +6,7 @@ import (
 	"regexp"
 
 	gethABI "github.com/ethereum/go-ethereum/accounts/abi"
+	gethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
@@ -100,6 +101,23 @@ func newInternalEVMTypeEncodeABIFunction(
 						panic(err)
 					}
 					arguments = append(arguments, gethABI.Argument{Type: typ})
+				case *interpreter.CompositeValue:
+					if value.QualifiedIdentifier == "EVM.EVMAddress" {
+						bytes, err := interpreter.ByteArrayValueToByteSlice(
+							inter,
+							value.GetMember(inter, locationRange, "bytes"),
+							locationRange,
+						)
+						if err != nil {
+							panic(err)
+						}
+						values = append(values, gethCommon.Address(bytes))
+						typ, err := gethABI.NewType("address", "", nil)
+						if err != nil {
+							panic(err)
+						}
+						arguments = append(arguments, gethABI.Argument{Type: typ})
+					}
 				}
 			}
 
@@ -148,7 +166,7 @@ func newInternalEVMTypeDecodeABIFunction(
 
 			// Get `types` argument
 
-			types, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			typesArray, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
@@ -166,8 +184,8 @@ func newInternalEVMTypeDecodeABIFunction(
 			}
 
 			var arguments gethABI.Arguments
-			for i := 0; i < types.Count(); i++ {
-				arg := types.Get(inter, locationRange, i)
+			for i := 0; i < typesArray.Count(); i++ {
+				arg := typesArray.Get(inter, locationRange, i)
 				switch arg.String() {
 				case "Type<String>()":
 					typ, err := gethABI.NewType("string", "", nil)
@@ -183,6 +201,12 @@ func newInternalEVMTypeDecodeABIFunction(
 					arguments = append(arguments, gethABI.Argument{Type: typ})
 				case "Type<Bool>()":
 					typ, err := gethABI.NewType("bool", "", nil)
+					if err != nil {
+						panic(err)
+					}
+					arguments = append(arguments, gethABI.Argument{Type: typ})
+				case "Type<A.0000000000000001.EVM.EVMAddress>()":
+					typ, err := gethABI.NewType("address", "", nil)
 					if err != nil {
 						panic(err)
 					}
@@ -215,6 +239,10 @@ func newInternalEVMTypeDecodeABIFunction(
 					))
 				case bool:
 					values = append(values, interpreter.BoolValue(value))
+				case gethCommon.Address:
+					var address types.Address
+					copy(address[:], value.Bytes())
+					values = append(values, EVMAddressToAddressBytesArrayValue(inter, address))
 				}
 			}
 			arrayType := interpreter.NewVariableSizedStaticType(
