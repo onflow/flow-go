@@ -51,12 +51,13 @@ type Suite struct {
 	snapshot *protocol.Snapshot
 	log      zerolog.Logger
 
-	blocks       *storagemock.Blocks
-	headers      *storagemock.Headers
-	collections  *storagemock.Collections
-	transactions *storagemock.Transactions
-	receipts     *storagemock.ExecutionReceipts
-	results      *storagemock.ExecutionResults
+	blocks             *storagemock.Blocks
+	headers            *storagemock.Headers
+	collections        *storagemock.Collections
+	transactions       *storagemock.Transactions
+	receipts           *storagemock.ExecutionReceipts
+	results            *storagemock.ExecutionResults
+	transactionResults *storagemock.LightTransactionResults
 
 	colClient              *access.AccessAPIClient
 	execClient             *access.ExecutionAPIClient
@@ -95,6 +96,7 @@ func (suite *Suite) SetupTest() {
 	suite.colClient = new(access.AccessAPIClient)
 	suite.archiveClient = new(access.AccessAPIClient)
 	suite.execClient = new(access.ExecutionAPIClient)
+	suite.transactionResults = storagemock.NewLightTransactionResults(suite.T())
 	suite.chainID = flow.Testnet
 	suite.historicalAccessClient = new(access.AccessAPIClient)
 	suite.connectionFactory = connectionmock.NewConnectionFactory(suite.T())
@@ -2176,19 +2178,21 @@ func getEvents(n int) []flow.Event {
 
 func (suite *Suite) defaultBackendParams() Params {
 	return Params{
-		State:                suite.state,
-		Blocks:               suite.blocks,
-		Headers:              suite.headers,
-		Collections:          suite.collections,
-		Transactions:         suite.transactions,
-		ExecutionReceipts:    suite.receipts,
-		ExecutionResults:     suite.results,
-		ChainID:              suite.chainID,
-		CollectionRPC:        suite.colClient,
-		MaxHeightRange:       DefaultMaxHeightRange,
-		SnapshotHistoryLimit: DefaultSnapshotHistoryLimit,
-		Communicator:         NewNodeCommunicator(false),
-		AccessMetrics:        metrics.NewNoopCollector(),
-		Log:                  suite.log,
+		State:                    suite.state,
+		Blocks:                   suite.blocks,
+		Headers:                  suite.headers,
+		Collections:              suite.collections,
+		Transactions:             suite.transactions,
+		ExecutionReceipts:        suite.receipts,
+		ExecutionResults:         suite.results,
+		LightTransactionResults:  suite.transactionResults,
+		ChainID:                  suite.chainID,
+		CollectionRPC:            suite.colClient,
+		MaxHeightRange:           DefaultMaxHeightRange,
+		SnapshotHistoryLimit:     DefaultSnapshotHistoryLimit,
+		Communicator:             NewNodeCommunicator(false),
+		AccessMetrics:            metrics.NewNoopCollector(),
+		Log:                      suite.log,
+		TxErrorMessagesCacheSize: 1000,
 	}
 }
