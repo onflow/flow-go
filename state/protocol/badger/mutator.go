@@ -508,6 +508,9 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, certi
 		return fmt.Errorf("could not retrieve block header for %x: %w", parentID, err)
 	}
 
+	// TODO: Move this outside of insert. Per method documentation:
+	//  > Caller is responsible for ensuring block validity.
+	//  > No errors are expected during normal operation.
 	stateMutator, err := m.protocolState.Mutator(candidate.Header.View, parentID)
 	if err != nil {
 		return fmt.Errorf("could not create protocol state mutator for view %d: %w", candidate.Header.View, err)
@@ -664,7 +667,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 
 	// if epoch fallback was not previously triggered, check whether this block triggers it
 	if !epochFallbackTriggered {
-		epochFallbackTriggered, err = m.epochFallbackTriggeredByFinalizedBlock(header, epochStatus, currentEpochSetup)
+		epochFallbackTriggered, err = m.isEpochFallbackTriggeredByFinalizedBlock(header, epochStatus, currentEpochSetup)
 		if err != nil {
 			return fmt.Errorf("could not check whether finalized block triggers epoch fallback: %w", err)
 		}
@@ -800,7 +803,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	return nil
 }
 
-// epochFallbackTriggeredByFinalizedBlock checks whether finalizing the input block
+// isEpochFallbackTriggeredByFinalizedBlock checks whether finalizing the input block
 // would trigger epoch emergency fallback mode. In particular, we trigger epoch
 // fallback mode while finalizing block B in either of the following cases:
 //  1. B is the head of a fork in which epoch fallback was tentatively triggered,
@@ -813,7 +816,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 // See protocol.Params for more details on the epoch commitment deadline.
 //
 // No errors are expected during normal operation.
-func (m *FollowerState) epochFallbackTriggeredByFinalizedBlock(block *flow.Header, epochStatus *flow.EpochStatus, currentEpochSetup *flow.EpochSetup) (bool, error) {
+func (m *FollowerState) isEpochFallbackTriggeredByFinalizedBlock(block *flow.Header, epochStatus *flow.EpochStatus, currentEpochSetup *flow.EpochSetup) (bool, error) {
 	// 1. Epoch fallback is tentatively triggered on this fork
 	if epochStatus.InvalidEpochTransitionAttempted {
 		return true, nil

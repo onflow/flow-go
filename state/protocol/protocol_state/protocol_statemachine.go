@@ -28,6 +28,8 @@ type protocolStateMachine struct {
 var _ ProtocolStateMachine = (*protocolStateMachine)(nil)
 
 // newStateMachine creates a new protocol state protocolStateMachine.
+// An exception is returned in case the `InvalidEpochTransitionAttempted` flag is set in the `parentState`. This means that
+// the protocol state evolution has reached an undefined state from the perspective of the happy path state machine.
 func newStateMachine(view uint64, parentState *flow.RichProtocolStateEntry) (*protocolStateMachine, error) {
 	if parentState.InvalidEpochTransitionAttempted {
 		return nil, irrecoverable.NewExceptionf("cannot create happy path protocol state machine at view (%d) for a parent state"+
@@ -40,6 +42,15 @@ func newStateMachine(view uint64, parentState *flow.RichProtocolStateEntry) (*pr
 			view:        view,
 		},
 	}, nil
+}
+
+// NewStateMachine instantiates a new `protocolStateMachine` and returns is as an interface type `ProtocolStateMachine`.
+// Thereby, `NewStateMachine` is a specific version of `StateMachineFactoryMethod` for creating a happy-path state machine.
+//
+// An exception is returned in case the `InvalidEpochTransitionAttempted` flag is set in the `parentState`. This means that
+// the protocol state evolution has reached an undefined state from the perspective of the happy path state machine.
+func NewStateMachine(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
+	return newStateMachine(candidateView, parentState)
 }
 
 // ProcessEpochSetup updates the protocol state with data from the epoch setup event.

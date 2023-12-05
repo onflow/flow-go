@@ -75,6 +75,8 @@ func NewMutableProtocolState(
 	}
 }
 
+// TODO rename to Mutator factory
+
 // Mutator instantiates a `protocol.StateMutator` based on the previous protocol state.
 // Has to be called for each block to evolve the protocol state.
 // Expected errors during normal operations:
@@ -91,11 +93,7 @@ func (s *MutableProtocolState) Mutator(candidateView uint64, parentID flow.Ident
 		s.commits,
 		candidateView,
 		parentState,
-		func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
-			return newStateMachine(candidateView, parentState)
-		},
-		func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
-			return newEpochFallbackStateMachine(candidateView, parentState), nil
-		},
+		NewStateMachine,
+		NewEpochFallbackStateMachine,
 	)
 }
