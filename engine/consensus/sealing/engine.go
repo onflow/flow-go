@@ -105,9 +105,6 @@ func NewEngine(log zerolog.Logger,
 	requiredApprovalsForSealConstructionGetter module.SealingConfigsGetter,
 ) (*Engine, error) {
 	rootHeader := state.Params().FinalizedRoot()
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve root block: %w", err)
-	}
 
 	unit := engine.NewUnit()
 	e := &Engine{
@@ -124,7 +121,7 @@ func NewEngine(log zerolog.Logger,
 		rootHeader:    rootHeader,
 	}
 
-	err = e.setupTrustedInboundQueues()
+	err := e.setupTrustedInboundQueues()
 	if err != nil {
 		return nil, fmt.Errorf("initialization of inbound queues for trusted inputs failed: %w", err)
 	}

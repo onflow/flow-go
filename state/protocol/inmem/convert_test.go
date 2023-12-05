@@ -44,7 +44,6 @@ func TestFromSnapshot(t *testing.T) {
 		// test that we are able to retrieve an in-memory version of root snapshot
 		t.Run("root snapshot", func(t *testing.T) {
 			root := state.Params().FinalizedRoot()
-			require.NoError(t, err)
 			expected := state.AtHeight(root.Height)
 			actual, err := inmem.FromSnapshot(expected)
 			require.NoError(t, err)

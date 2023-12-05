@@ -787,7 +787,6 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 
 func getRoot(t *testing.T, node *testmock.GenericNode) (*flow.Header, *flow.QuorumCertificate) {
 	rootHead := node.State.Params().FinalizedRoot()
-	require.NoError(t, err)
 
 	signers, err := node.State.AtHeight(0).Identities(filter.HasRole[flow.Identity](flow.RoleConsensus))
 	require.NoError(t, err)

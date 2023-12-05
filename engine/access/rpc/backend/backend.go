@@ -124,10 +124,7 @@ func New(params Params) (*Backend, error) {
 	}
 
 	// initialize node version info
-	nodeInfo, err := getNodeVersionInfo(params.State.Params())
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize node version info: %w", err)
-	}
+	nodeInfo := getNodeVersionInfo(params.State.Params())
 
 	b := &Backend{
 		state: params.State,
@@ -289,15 +286,12 @@ func (b *Backend) GetNodeVersionInfo(_ context.Context) (*access.NodeVersionInfo
 
 // getNodeVersionInfo returns the NodeVersionInfo for the node.
 // Since these values are static while the node is running, it is safe to cache.
-func getNodeVersionInfo(stateParams protocol.Params) (*access.NodeVersionInfo, error) {
+func getNodeVersionInfo(stateParams protocol.Params) *access.NodeVersionInfo {
 	sporkID := stateParams.SporkID()
 	protocolVersion := stateParams.ProtocolVersion()
 	sporkRootBlockHeight := stateParams.SporkRootBlockHeight()
 
 	nodeRootBlockHeader := stateParams.SealedRoot()
-	if err != nil {
-		return nil, fmt.Errorf("failed to read node root block: %w", err)
-	}
 
 	nodeInfo := &access.NodeVersionInfo{
 		Semver:               build.Version(),
@@ -308,7 +302,7 @@ func getNodeVersionInfo(stateParams protocol.Params) (*access.NodeVersionInfo, e
 		NodeRootBlockHeight:  nodeRootBlockHeader.Height,
 	}
 
-	return nodeInfo, nil
+	return nodeInfo
 }
 
 func (b *Backend) GetCollectionByID(_ context.Context, colID flow.Identifier) (*flow.LightCollection, error) {
@@ -355,14 +349,14 @@ func executionNodesForBlockID(
 	log zerolog.Logger,
 ) (flow.IdentitySkeletonList, error) {
 
-	var executorIDs flow.IdentifierList
+	var (
+		executorIDs flow.IdentifierList
+		err         error
+	)
 
 	// check if the block ID is of the root block. If it is then don't look for execution receipts since they
 	// will not be present for the root block.
 	rootBlock := state.Params().FinalizedRoot()
-	if err != nil {
-		return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
-	}
 
 	if rootBlock.ID() == blockID {
 		executorIdentities, err := state.Final().Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
