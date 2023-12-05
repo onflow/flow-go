@@ -314,6 +314,7 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, e
 			IdProvider:              g.idProvider,
 			Params:                  &g.gossipSubCfg.SubscriptionProvider,
 			HeroCacheMetricsFactory: g.metricsCfg.HeroCacheFactory,
+			NetworkingType:          g.networkType,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("could not create subscription provider: %w", err)

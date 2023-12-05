@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
 	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
 	"github.com/onflow/flow-go/network/p2p/scoring"
@@ -41,6 +42,7 @@ func TestSubscriptionProvider_GetSubscribedTopics(t *testing.T) {
 		Params:                  &cfg.NetworkConfig.GossipSub.SubscriptionProvider,
 		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 		IdProvider:              idProvider,
+		NetworkingType:          network.PrivateNetwork,
 	})
 	require.NoError(t, err)
 
@@ -102,6 +104,7 @@ func TestSubscriptionProvider_GetSubscribedTopics_SkippingUnknownPeers(t *testin
 		Params:                  &cfg.NetworkConfig.GossipSub.SubscriptionProvider,
 		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 		IdProvider:              idProvider,
+		NetworkingType:          network.PrivateNetwork,
 	})
 	require.NoError(t, err)
 
