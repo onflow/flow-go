@@ -259,17 +259,19 @@ func TestEVMEncodeABI(t *testing.T) {
           bytes: [122, 88, 192, 190, 114, 190, 33, 139, 65, 198, 8, 183, 254, 124, 91, 182, 48, 115, 108, 113]
         )
         var data = EVM.encodeABI([address])
-        var values = EVM.decodeABI([Type<EVM.EVMAddress>()], data: data)
+        var values = EVM.decodeABI(types: [Type<EVM.EVMAddress>()], data: data)
         assert(values.length == 1)
         assert((values[0] as! [UInt8; 20]) == address.bytes)
 
         let array: [UInt64] = [5, 6]
         data = EVM.encodeABI([array])
-        values = EVM.decodeABI([Type<[UInt64]>()], data: data)
+        values = EVM.decodeABI(types: [Type<[UInt64]>()], data: data)
         assert(values.length == 1)
         assert((values[0] as! [UInt64]) == [5, 6])
 
-        return EVM.encodeABI(["John Doe", UInt64(33), false])
+        data = EVM.encodeABI(["John Doe", UInt64(33), false])
+        values = EVM.decodeABI(types: [Type<String>(), Type<UInt64>(), Type<Bool>()], data: data)
+        return data
       }
 	`)
 
@@ -375,7 +377,7 @@ func TestEVMDecodeABI(t *testing.T) {
       access(all)
       fun main(data: [UInt8]): Bool {
         let types = [Type<String>(), Type<UInt64>(), Type<Bool>()]
-        let values = EVM.decodeABI(types, data: data)
+        let values = EVM.decodeABI(types: types, data: data)
 
         assert(values.length == 3)
         assert((values[0] as! String) == "John Doe")

@@ -154,7 +154,7 @@ contract EVM {
     }
 
     access(all)
-    fun decodeABI(_ types: [Type], data: [UInt8]): [AnyStruct] {
-        return InternalEVM.decodeABI(types, data: data)
+    fun decodeABI(types: [Type], data: [UInt8]): [AnyStruct] {
+        return InternalEVM.decodeABI(types: types, data: data)
     }
 }

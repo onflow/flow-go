@@ -162,10 +162,9 @@ const internalEVMTypeDecodeABIFunctionName = "decodeABI"
 var internalEVMTypeDecodeABIFunctionType = &sema.FunctionType{
 	Parameters: []sema.Parameter{
 		{
-			Label:      sema.ArgumentLabelNotRequired,
 			Identifier: "types",
 			TypeAnnotation: sema.NewTypeAnnotation(
-				sema.NewVariableSizedType(nil, sema.AnyType),
+				sema.NewVariableSizedType(nil, sema.MetaType),
 			),
 		},
 		{
@@ -209,33 +208,43 @@ func newInternalEVMTypeDecodeABIFunction(
 
 			var arguments gethABI.Arguments
 			typesArray.Iterate(inter, func(element interpreter.Value) (resume bool) {
-				switch element.String() {
-				case "Type<String>()":
+				typeValue, ok := element.(interpreter.TypeValue)
+				if !ok {
+					panic(errors.NewUnreachableError())
+				}
+
+				switch value := typeValue.Type.(type) {
+				case interpreter.ArrayStaticType:
+					typ, err := gethABI.NewType("uint64[]", "", nil)
+					if err != nil {
+						panic(err)
+					}
+					arguments = append(arguments, gethABI.Argument{Type: typ})
+				case interpreter.CompositeStaticType:
+					if value.QualifiedIdentifier == "EVM.EVMAddress" {
+						typ, err := gethABI.NewType("address", "", nil)
+						if err != nil {
+							panic(err)
+						}
+						arguments = append(arguments, gethABI.Argument{Type: typ})
+					}
+				}
+
+				switch typeValue.Type {
+				case interpreter.PrimitiveStaticTypeString:
 					typ, err := gethABI.NewType("string", "", nil)
 					if err != nil {
 						panic(err)
 					}
 					arguments = append(arguments, gethABI.Argument{Type: typ})
-				case "Type<UInt64>()":
-					typ, err := gethABI.NewType("uint64", "", nil)
-					if err != nil {
-						panic(err)
-					}
-					arguments = append(arguments, gethABI.Argument{Type: typ})
-				case "Type<Bool>()":
+				case interpreter.PrimitiveStaticTypeBool:
 					typ, err := gethABI.NewType("bool", "", nil)
 					if err != nil {
 						panic(err)
 					}
 					arguments = append(arguments, gethABI.Argument{Type: typ})
-				case "Type<A.0000000000000001.EVM.EVMAddress>()":
-					typ, err := gethABI.NewType("address", "", nil)
-					if err != nil {
-						panic(err)
-					}
-					arguments = append(arguments, gethABI.Argument{Type: typ})
-				case "Type<[UInt64]>()":
-					typ, err := gethABI.NewType("uint64[]", "", nil)
+				case interpreter.PrimitiveStaticTypeUInt64:
+					typ, err := gethABI.NewType("uint64", "", nil)
 					if err != nil {
 						panic(err)
 					}
