@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 	netcache "github.com/onflow/flow-go/network/p2p/cache"
@@ -312,6 +313,7 @@ type ScoreOptionConfig struct {
 	appScoreFunc                     func(peer.ID) float64
 	topicParams                      []func(map[string]*pubsub.TopicScoreParams)
 	registerNotificationConsumerFunc func(p2p.GossipSubInvCtrlMsgNotifConsumer)
+	networkingType                   network.NetworkingType
 }
 
 // NewScoreOptionConfig creates a new configuration for the GossipSub peer scoring option.
@@ -319,18 +321,21 @@ type ScoreOptionConfig struct {
 // - logger: the logger to use.
 // - hcMetricsFactory: HeroCache metrics factory to create metrics for the scoring-related caches.
 // - idProvider: the identity provider to use.
+// - networkingType: the networking type to use, public or private.
 // Returns:
 // - a new configuration for the GossipSub peer scoring option.
 func NewScoreOptionConfig(logger zerolog.Logger,
 	params p2pconf.ScoringParameters,
 	hcMetricsFactory metrics.HeroCacheMetricsFactory,
-	idProvider module.IdentityProvider) *ScoreOptionConfig {
+	idProvider module.IdentityProvider,
+	networkingType network.NetworkingType) *ScoreOptionConfig {
 	return &ScoreOptionConfig{
 		logger:                  logger.With().Str("module", "pubsub_score_option").Logger(),
 		provider:                idProvider,
 		params:                  params,
 		heroCacheMetricsFactory: hcMetricsFactory,
 		topicParams:             make([]func(map[string]*pubsub.TopicScoreParams), 0),
+		networkingType:          networkingType,
 	}
 }
 
@@ -387,7 +392,8 @@ func NewScoreOption(cfg *ScoreOptionConfig, provider p2p.SubscriptionProvider) (
 					cfg.params.SpamRecordCache.DecayRateReductionFactor,
 					cfg.params.SpamRecordCache.PenaltyDecayEvaluationPeriod))
 		},
-		Parameters: cfg.params.AppSpecificScore,
+		Parameters:     cfg.params.AppSpecificScore,
+		NetworkingType: cfg.networkingType,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create gossipsub app specific score registry: %w", err)

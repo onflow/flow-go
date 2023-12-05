@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
 	netcache "github.com/onflow/flow-go/network/p2p/cache"
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
@@ -161,6 +162,8 @@ type GossipSubAppSpecificScoreRegistryConfig struct {
 	AppScoreCacheFactory func() p2p.GossipSubApplicationSpecificScoreCache `validate:"required"`
 
 	HeroCacheMetricsFactory metrics.HeroCacheMetricsFactory `validate:"required"`
+
+	NetworkingType network.NetworkingType
 }
 
 // NewGossipSubAppSpecificScoreRegistry returns a new GossipSubAppSpecificScoreRegistry.
@@ -181,7 +184,7 @@ func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegis
 	lg := config.Logger.With().Str("module", "app_score_registry").Logger()
 	store := queue.NewHeroStore(config.Parameters.ScoreUpdateRequestQueueSize,
 		lg.With().Str("component", "app_specific_score_update").Logger(),
-		metrics.GossipSubAppSpecificScoreUpdateQueueMetricFactory(config.HeroCacheMetricsFactory))
+		metrics.GossipSubAppSpecificScoreUpdateQueueMetricFactory(config.HeroCacheMetricsFactory, config.NetworkingType))
 
 	reg := &GossipSubAppSpecificScoreRegistry{
 		logger:         config.Logger.With().Str("module", "app_score_registry").Logger(),

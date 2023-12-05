@@ -223,8 +223,12 @@ func GossipSubRPCInspectorClusterPrefixedCacheMetricFactory(f HeroCacheMetricsFa
 // - f: the HeroCacheMetricsFactory to create the collector
 // Returns:
 // - a HeroCacheMetrics for the app-specific score update queue.
-func GossipSubAppSpecificScoreUpdateQueueMetricFactory(f HeroCacheMetricsFactory) module.HeroCacheMetrics {
-	return f(namespaceNetwork, ResourceNetworkingAppSpecificScoreUpdateQueue)
+func GossipSubAppSpecificScoreUpdateQueueMetricFactory(f HeroCacheMetricsFactory, networkingType network.NetworkingType) module.HeroCacheMetrics {
+	r := ResourceNetworkingAppSpecificScoreUpdateQueue
+	if networkingType == network.PublicNetwork {
+		r = PrependPublicPrefix(r)
+	}
+	return f(namespaceNetwork, r)
 }
 
 func CollectionNodeTransactionsCacheMetrics(registrar prometheus.Registerer, epoch uint64) *HeroCacheCollector {

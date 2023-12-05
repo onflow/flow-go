@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
 	netcache "github.com/onflow/flow-go/network/p2p/cache"
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
@@ -963,6 +964,7 @@ func newGossipSubAppSpecificScoreRegistry(t *testing.T, params p2pconf.ScoringPa
 		},
 		Parameters:              params.AppSpecificScore,
 		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
+		NetworkingType:          network.PrivateNetwork,
 	}
 	for _, opt := range opts {
 		opt(cfg)
