@@ -145,13 +145,13 @@ jobs:
       with:
         go-version: ${{ env.GO_VERSION }}
         cache: true
-    - name: Setup tests (${{ matrix.targets.name }})
-      run: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" install-tools
+    - name: Install tools
+      run: make install-tools
     - name: Run tests (${{ matrix.targets.name }})
       uses: nick-fields/retry@v2
       with:
-        timeout_minutes: 35
-        max_attempts: 5
+        timeout_minutes: 10
+        max_attempts: 1
         command: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" test
 
       # TODO(rbtz): re-enable when we fix exisiting races.
@@ -163,6 +163,27 @@ jobs:
         file: ./coverage.txt
         flags: unittests
         name: codecov-umbrella
+
+  unit-test-flaky:
+    name: Unit Tests - Flaky
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: Install tools
+        run: make install-tools
+      - name: Run flaky tests
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 35
+          max_attempts: 5
+          command: VERBOSE=1 go test -v -run 'TestControlMessageValidationInspector_truncateRPC|TestFoo2|TestFoo3' --tags relic ./...
+
 
   unit-test-modules:
     name: Unit Tests (Modules)
