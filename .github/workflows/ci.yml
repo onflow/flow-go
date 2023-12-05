@@ -169,6 +169,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TEST_FLAKY: true
+    defaults:
+      run:
+        working-directory: network/p2p/inspector/validation
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
@@ -186,7 +189,6 @@ jobs:
         uses: nick-fields/retry@v2
 #        run: make test-flaky
         with:
-          working-directory: network/p2p/inspector/validation
           timeout_minutes: 35
           max_attempts: 5
           command: VERBOSE=1 go test -v -run 'TestControlMessageValidationInspector_truncateRPC' --tags relic
