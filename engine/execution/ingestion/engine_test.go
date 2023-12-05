@@ -175,7 +175,10 @@ func TestExecuteOneBlock(t *testing.T) {
 		ctx.mockIsBlockExecuted(store)
 		ctx.mockStateCommitmentByBlockID(store)
 		ctx.mockGetExecutionResultID(store)
-		ctx.executionState.On("NewStorageSnapshot", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		ctx.executionState.On("NewStorageSnapshot",
+			*result.ExecutableBlock.StartState,
+			result.ExecutableBlock.Block.Header.ParentID,
+			result.ExecutableBlock.Block.Header.Height-1).Return(nil)
 
 		// receive block
 		err := ctx.engine.handleBlock(context.Background(), blockA.Block)
