@@ -864,7 +864,3 @@ func stopInspector(t *testing.T, cancel context.CancelFunc, inspector *validatio
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 }
-
-func defaultTopicOracle() []string {
-	return []string{}
-}
