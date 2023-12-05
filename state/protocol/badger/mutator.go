@@ -663,6 +663,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 
 	// if epoch fallback was not previously triggered, check whether this block triggers it
 	if !epochFallbackTriggered && psSnapshot.InvalidEpochTransitionAttempted() {
+		epochFallbackTriggered = true
 		// emit the protocol event only the first time epoch fallback is triggered
 		events = append(events, m.consumer.EpochEmergencyFallbackTriggered)
 		metrics = append(metrics, m.metrics.EpochEmergencyFallbackTriggered)

@@ -1744,20 +1744,21 @@ func TestEmergencyEpochFallback(t *testing.T) {
 	t.Run("passed epoch commitment deadline in EpochStaking phase - should trigger EECC", func(t *testing.T) {
 
 		rootSnapshot := unittest.RootSnapshotFixture(participants)
-		rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
 		metricsMock := mockmodule.NewComplianceMetrics(t)
 		mockMetricsForRootSnapshot(metricsMock, rootSnapshot)
 		protoEventsMock := mockprotocol.NewConsumer(t)
 		protoEventsMock.On("BlockFinalized", mock.Anything)
 		protoEventsMock.On("BlockProcessable", mock.Anything, mock.Anything)
 
-		util.RunWithFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *badger.DB, state *protocol.ParticipantState, _ realprotocol.MutableProtocolState) {
+		util.RunWithFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *badger.DB, state *protocol.ParticipantState, mutableProtocolState realprotocol.MutableProtocolState) {
 			head, err := rootSnapshot.Head()
 			require.NoError(t, err)
 			result, _, err := rootSnapshot.SealedResult()
 			require.NoError(t, err)
 			safetyThreshold := rootSnapshot.Params().EpochCommitSafetyThreshold()
 			require.NoError(t, err)
+
+			calculateExpectedStateId := calculateExpectedStateId(t, mutableProtocolState)
 
 			epoch1Setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 			epoch1FinalView := epoch1Setup.FinalView
@@ -1771,7 +1772,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 			// block 1 will be the first block on or past the epoch commitment deadline
 			block1 := unittest.BlockWithParentFixture(head)
 			block1.Header.View = epoch1CommitmentDeadline + rand.Uint64()%2
-			block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
+			block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(calculateExpectedStateId(block1.Header, nil))))
 			err = state.Extend(context.Background(), block1)
 			require.NoError(t, err)
 			assertEpochEmergencyFallbackTriggered(t, state, false) // not triggered before finalization

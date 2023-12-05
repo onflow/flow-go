@@ -102,6 +102,7 @@ func newStateMutator(
 // updated protocol state entry, state ID and a flag indicating if there were any changes.
 func (m *stateMutator) Build() (hasChanges bool, updatedState *flow.ProtocolStateEntry, stateID flow.Identifier, dbUpdates transaction.DeferredDBUpdate) {
 	updatedState, stateID, hasChanges = m.stateMachine.Build()
+	fmt.Println("building state, got:", m.stateMachine.ParentState().InvalidEpochTransitionAttempted, updatedState.InvalidEpochTransitionAttempted)
 	dbUpdates = m.pendingDbUpdates
 	return
 }
