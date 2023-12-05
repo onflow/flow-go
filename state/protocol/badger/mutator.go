@@ -793,36 +793,6 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	return nil
 }
 
-// epochFallbackTriggeredByFinalizedBlock checks whether finalizing the input block
-// would trigger epoch emergency fallback mode. In particular, we trigger epoch
-// fallback mode while finalizing block B in either of the following cases:
-//  1. B is the head of a fork in which epoch fallback was tentatively triggered,
-//     due to incorporating an invalid service event.
-//  2. (a) B is the first finalized block with view greater than or equal to the epoch
-//     commitment deadline for the current epoch AND
-//     (b) the next epoch has not been committed as of B.
-//
-// This function should only be called when epoch fallback *has not already been triggered*.
-// See protocol.Params for more details on the epoch commitment deadline.
-//
-// No errors are expected during normal operation.
-func (m *FollowerState) epochFallbackTriggeredByFinalizedBlock(block *flow.Header, stateAtBlock protocol.DynamicProtocolState) (bool, error) {
-	// 1. Epoch fallback is tentatively triggered on this fork
-	if stateAtBlock.InvalidEpochTransitionAttempted() {
-		return true, nil
-	}
-
-	// 2.(a) determine whether block B is past the epoch commitment deadline
-	safetyThreshold := m.Params().EpochCommitSafetyThreshold()
-	blockExceedsDeadline := block.View+safetyThreshold >= stateAtBlock.EpochSetup().FinalView
-
-	// 2.(b) determine whether the next epoch is committed w.r.t. block B
-	isNextEpochCommitted := stateAtBlock.EpochPhase() == flow.EpochPhaseCommitted
-
-	blockTriggersEpochFallback := blockExceedsDeadline && !isNextEpochCommitted
-	return blockTriggersEpochFallback, nil
-}
-
 // isFirstBlockOfEpoch returns true if the given block is the first block of a new epoch.
 // We accept the EpochSetup event for the current epoch (w.r.t. input block B) which contains
 // the FirstView for the epoch (denoted W). By construction, B.View >= W.
