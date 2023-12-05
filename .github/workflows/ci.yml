@@ -169,9 +169,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TEST_FLAKY: true
-    defaults:
-      run:
-        working-directory: network/p2p/inspector/validation
+#    defaults:
+#      run:
+#        working-directory: network/p2p/inspector/validation
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
@@ -191,7 +191,7 @@ jobs:
         with:
           timeout_minutes: 35
           max_attempts: 5
-          command: VERBOSE=1 go test -v -run 'TestControlMessageValidationInspector_truncateRPC' --tags relic
+          command: cd network/p2p/inspector/validation && VERBOSE=1 go test -v -run 'TestControlMessageValidationInspector_truncateRPC' --tags relic
 
   unit-test-modules:
     name: Unit Tests (Modules)
