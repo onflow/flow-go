@@ -32,6 +32,7 @@ func ContractCode(flowTokenAddress flow.Address) []byte {
 }
 
 const ContractName = "EVM"
+const evmAddressTypeBytesFieldName = "bytes"
 
 var EVMTransactionBytesCadenceType = cadence.NewVariableSizedArrayType(cadence.TheUInt8Type)
 var evmTransactionBytesType = sema.NewVariableSizedType(nil, sema.UInt8Type)
@@ -104,7 +105,7 @@ func newInternalEVMTypeEncodeABIFunction(
 					if value.QualifiedIdentifier == "EVM.EVMAddress" {
 						bytes, err := interpreter.ByteArrayValueToByteSlice(
 							inter,
-							value.GetMember(inter, locationRange, "bytes"),
+							value.GetMember(inter, locationRange, evmAddressTypeBytesFieldName),
 							locationRange,
 						)
 						if err != nil {
