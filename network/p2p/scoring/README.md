@@ -259,3 +259,35 @@ This option is passed to the GossipSub at the time of initialization.
 flowPubSubOption := scoreOption.BuildFlowPubSubScoreOption()
 gossipSubOption := scoreOption.BuildGossipSubScoreOption()
 ```
+
+# Caching Application Specific Score
+![app-specific-score-cache.png](app-specific-score-cache.png)
+As the figure above illustrates, GossipSub's peer scoring mechanism invokes the application-specific scoring function on a peer id upon receiving a gossip message from that peer.
+This means that the application-specific score of a peer is computed every time a gossip message is received from that peer. 
+This can be computationally expensive, especially when the network is large and the number of gossip messages is high. 
+As shown by the figure above, each time the application-specific score of a peer is computed, the score is computed from scratch by
+computing the spam penalty, staking score and subscription penalty. Each of these computations involves a cache lookup and a computation.
+Hence, a single computation of the application-specific score of a peer involves 3 cache lookups and 3 computations.
+As the application-specific score of a peer is not expected to change frequently, we can cache the score of a peer and reuse it for a certain period of time. 
+This can significantly reduce the computational overhead of the scoring mechanism. 
+By caching the application-specific score of a peer, we can reduce the number of cache lookups and computations from 3 to 1 per computation of the application-specific score of a peer, which
+results in a 66% reduction in the computational overhead of the scoring mechanism.
+The caching mechanism is implemented in the `GossipSubAppSpecificScoreRegistry` struct. Each time the application-specific score of a peer is requested by the GossipSub protocol, the registry
+checks if the score of the peer is cached. If the score is cached, the cached score is returned. Otherwise, a score of zero is returned, and a request for the application-specific score of the peer is 
+queued to the `appScoreUpdateWorkerPool` to be computed asynchronously. Once the score is computed, it is cached and the score is updated in the `appScoreCache`. 
+Each score record in the cache is associated with a TTL (time-to-live) value, which is the duration for which the score is valid. 
+When the retrieved score is expired, the expired score is still returned to the GossipSub protocol, but the score is updated asynchronously in the background by submitting a request to the `appScoreUpdateWorkerPool`.
+The app-specific score configuration values are configurable through the following parameters in the `default-config.yaml` file:
+```yaml
+    scoring-parameters:
+      app-specific-score:
+        # number of workers that asynchronously update the app specific score requests when they are expired.
+        score-update-worker-num: 5
+        # size of the queue used by the worker pool for the app specific score update requests. The queue is used to buffer the app specific score update requests
+        # before they are processed by the worker pool. The queue size must be larger than total number of peers in the network.
+        # The queue is deduplicated based on the peer ids ensuring that there is only one app specific score update request per peer in the queue.
+        score-update-request-queue-size: 10_000
+        # score ttl is the time to live for the app specific score. Once the score is expired; a new request will be sent to the app specific score provider to update the score.
+        # until the score is updated, the previous score will be used.
+        score-ttl: 1m
+```
