@@ -3,6 +3,7 @@ package stdlib
 import (
 	_ "embed"
 	"fmt"
+	"math/big"
 	"regexp"
 
 	gethABI "github.com/ethereum/go-ethereum/accounts/abi"
@@ -87,9 +88,86 @@ func newInternalEVMTypeEncodeABIFunction(
 						panic(err)
 					}
 					arguments = append(arguments, gethABI.Argument{Type: typ})
+				case interpreter.UInt8Value:
+					values = append(values, uint8(value))
+					typ, err := gethABI.NewType("uint8", "", nil)
+					if err != nil {
+						panic(err)
+					}
+					arguments = append(arguments, gethABI.Argument{Type: typ})
+				case interpreter.UInt16Value:
+					values = append(values, uint16(value))
+					typ, err := gethABI.NewType("uint16", "", nil)
+					if err != nil {
+						panic(err)
+					}
+					arguments = append(arguments, gethABI.Argument{Type: typ})
+				case interpreter.UInt32Value:
+					values = append(values, uint32(value))
+					typ, err := gethABI.NewType("uint32", "", nil)
+					if err != nil {
+						panic(err)
+					}
+					arguments = append(arguments, gethABI.Argument{Type: typ})
 				case interpreter.UInt64Value:
 					values = append(values, uint64(value))
 					typ, err := gethABI.NewType("uint64", "", nil)
+					if err != nil {
+						panic(err)
+					}
+					arguments = append(arguments, gethABI.Argument{Type: typ})
+				case interpreter.UInt128Value:
+					values = append(values, value.BigInt)
+					typ, err := gethABI.NewType("uint128", "", nil)
+					if err != nil {
+						panic(err)
+					}
+					arguments = append(arguments, gethABI.Argument{Type: typ})
+				case interpreter.UInt256Value:
+					values = append(values, value.BigInt)
+					typ, err := gethABI.NewType("uint256", "", nil)
+					if err != nil {
+						panic(err)
+					}
+					arguments = append(arguments, gethABI.Argument{Type: typ})
+				case interpreter.Int8Value:
+					values = append(values, int8(value))
+					typ, err := gethABI.NewType("int8", "", nil)
+					if err != nil {
+						panic(err)
+					}
+					arguments = append(arguments, gethABI.Argument{Type: typ})
+				case interpreter.Int16Value:
+					values = append(values, int16(value))
+					typ, err := gethABI.NewType("int16", "", nil)
+					if err != nil {
+						panic(err)
+					}
+					arguments = append(arguments, gethABI.Argument{Type: typ})
+				case interpreter.Int32Value:
+					values = append(values, int32(value))
+					typ, err := gethABI.NewType("int32", "", nil)
+					if err != nil {
+						panic(err)
+					}
+					arguments = append(arguments, gethABI.Argument{Type: typ})
+				case interpreter.Int64Value:
+					values = append(values, int64(value))
+					typ, err := gethABI.NewType("int64", "", nil)
+					if err != nil {
+						panic(err)
+					}
+					arguments = append(arguments, gethABI.Argument{Type: typ})
+				case interpreter.Int128Value:
+					values = append(values, value.BigInt)
+					typ, err := gethABI.NewType("int128", "", nil)
+					if err != nil {
+						panic(err)
+					}
+					arguments = append(arguments, gethABI.Argument{Type: typ})
+				case interpreter.Int256Value:
+					values = append(values, value.BigInt)
+					typ, err := gethABI.NewType("int256", "", nil)
 					if err != nil {
 						panic(err)
 					}
@@ -243,8 +321,74 @@ func newInternalEVMTypeDecodeABIFunction(
 						panic(err)
 					}
 					arguments = append(arguments, gethABI.Argument{Type: typ})
+				case interpreter.PrimitiveStaticTypeUInt8:
+					typ, err := gethABI.NewType("uint8", "", nil)
+					if err != nil {
+						panic(err)
+					}
+					arguments = append(arguments, gethABI.Argument{Type: typ})
+				case interpreter.PrimitiveStaticTypeUInt16:
+					typ, err := gethABI.NewType("uint16", "", nil)
+					if err != nil {
+						panic(err)
+					}
+					arguments = append(arguments, gethABI.Argument{Type: typ})
+				case interpreter.PrimitiveStaticTypeUInt32:
+					typ, err := gethABI.NewType("uint32", "", nil)
+					if err != nil {
+						panic(err)
+					}
+					arguments = append(arguments, gethABI.Argument{Type: typ})
 				case interpreter.PrimitiveStaticTypeUInt64:
 					typ, err := gethABI.NewType("uint64", "", nil)
+					if err != nil {
+						panic(err)
+					}
+					arguments = append(arguments, gethABI.Argument{Type: typ})
+				case interpreter.PrimitiveStaticTypeUInt128:
+					typ, err := gethABI.NewType("uint128", "", nil)
+					if err != nil {
+						panic(err)
+					}
+					arguments = append(arguments, gethABI.Argument{Type: typ})
+				case interpreter.PrimitiveStaticTypeUInt256:
+					typ, err := gethABI.NewType("uint256", "", nil)
+					if err != nil {
+						panic(err)
+					}
+					arguments = append(arguments, gethABI.Argument{Type: typ})
+				case interpreter.PrimitiveStaticTypeInt8:
+					typ, err := gethABI.NewType("int8", "", nil)
+					if err != nil {
+						panic(err)
+					}
+					arguments = append(arguments, gethABI.Argument{Type: typ})
+				case interpreter.PrimitiveStaticTypeInt16:
+					typ, err := gethABI.NewType("int16", "", nil)
+					if err != nil {
+						panic(err)
+					}
+					arguments = append(arguments, gethABI.Argument{Type: typ})
+				case interpreter.PrimitiveStaticTypeInt32:
+					typ, err := gethABI.NewType("int32", "", nil)
+					if err != nil {
+						panic(err)
+					}
+					arguments = append(arguments, gethABI.Argument{Type: typ})
+				case interpreter.PrimitiveStaticTypeInt64:
+					typ, err := gethABI.NewType("int64", "", nil)
+					if err != nil {
+						panic(err)
+					}
+					arguments = append(arguments, gethABI.Argument{Type: typ})
+				case interpreter.PrimitiveStaticTypeInt128:
+					typ, err := gethABI.NewType("int128", "", nil)
+					if err != nil {
+						panic(err)
+					}
+					arguments = append(arguments, gethABI.Argument{Type: typ})
+				case interpreter.PrimitiveStaticTypeInt256:
+					typ, err := gethABI.NewType("int256", "", nil)
 					if err != nil {
 						panic(err)
 					}
@@ -270,10 +414,66 @@ func newInternalEVMTypeDecodeABIFunction(
 							return value
 						},
 					))
+				case uint8:
+					values = append(values, interpreter.NewUInt8Value(
+						inter,
+						func() uint8 {
+							return value
+						},
+					))
+				case uint16:
+					values = append(values, interpreter.NewUInt16Value(
+						inter,
+						func() uint16 {
+							return value
+						},
+					))
+				case uint32:
+					values = append(values, interpreter.NewUInt32Value(
+						inter,
+						func() uint32 {
+							return value
+						},
+					))
 				case uint64:
 					values = append(values, interpreter.NewUInt64Value(
 						inter,
 						func() uint64 {
+							return value
+						},
+					))
+				case *big.Int:
+					values = append(values, interpreter.NewUInt128ValueFromBigInt(
+						inter,
+						func() *big.Int {
+							return value
+						},
+					))
+				case int8:
+					values = append(values, interpreter.NewInt8Value(
+						inter,
+						func() int8 {
+							return value
+						},
+					))
+				case int16:
+					values = append(values, interpreter.NewInt16Value(
+						inter,
+						func() int16 {
+							return value
+						},
+					))
+				case int32:
+					values = append(values, interpreter.NewInt32Value(
+						inter,
+						func() int32 {
+							return value
+						},
+					))
+				case int64:
+					values = append(values, interpreter.NewInt64Value(
+						inter,
+						func() int64 {
 							return value
 						},
 					))
