@@ -1034,12 +1034,12 @@ func TestGossipSubSpamMitigationIntegration(t *testing.T) {
 	cfg, err := config.DefaultConfig()
 	require.NoError(t, err)
 	// set the scoring parameters to be more aggressive to speed up the test
+	cfg.NetworkConfig.GossipSub.RpcTracer.ScoreTracerInterval = 100 * time.Millisecond
 	cfg.NetworkConfig.GossipSub.ScoringParameters.AppSpecificScore.ScoreTTL = 100 * time.Millisecond
 	victimNode, victimId := p2ptest.NodeFixture(t,
 		sporkID,
 		t.Name(),
 		idProvider,
-		p2ptest.WithPeerScoreTracerInterval(100*time.Millisecond),
 		p2ptest.WithRole(flow.RoleConsensus),
 		p2ptest.OverrideFlowConfig(cfg),
 		p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride))
