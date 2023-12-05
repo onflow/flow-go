@@ -33,6 +33,7 @@ import (
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/model/flow"
@@ -240,13 +241,15 @@ func TestExecuteScript(t *testing.T) {
 
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx, fvm.WithExecutionMemoryLimit(math.MaxUint64))
 
+	sc := systemcontracts.SystemContractsForChain(execCtx.Chain.ChainID())
+
 	script := []byte(fmt.Sprintf(
 		`
 			import FungibleToken from %s
 
 			pub fun main() {}
 		`,
-		fvm.FungibleTokenAddress(execCtx.Chain).HexWithPrefix(),
+		sc.FungibleToken.Address.HexWithPrefix(),
 	))
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
@@ -305,13 +308,15 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 			return nil, fmt.Errorf("error getting register")
 		})
 
+	sc := systemcontracts.SystemContractsForChain(execCtx.Chain.ChainID())
+
 	script := []byte(fmt.Sprintf(
 		`
 			pub fun main(): UFix64 {
 				return getAccount(%s).balance
 			}
 		`,
-		fvm.FungibleTokenAddress(execCtx.Chain).HexWithPrefix(),
+		sc.FungibleToken.Address.HexWithPrefix(),
 	))
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
