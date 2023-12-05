@@ -109,30 +109,6 @@ func Bootstrap(
 		return nil, fmt.Errorf("expected empty database")
 	}
 
-	instanceParams, err := ReadInstanceParams(db, headers, seals)
-	if err != nil {
-		return nil, fmt.Errorf("could not read instance params: %w", err)
-	}
-
-	params := &Params{
-		GlobalParams:   root.Params(),
-		InstanceParams: instanceParams,
-	}
-	state := newState(
-		metrics,
-		db,
-		headers,
-		seals,
-		results,
-		blocks,
-		qcs,
-		setups,
-		commits,
-		protocolStateSnapshotsDB,
-		versionBeacons,
-		params,
-	)
-
 	if err := IsValidRootSnapshot(root, !config.SkipNetworkAddressValidation); err != nil {
 		return nil, fmt.Errorf("cannot bootstrap invalid root snapshot: %w", err)
 	}
@@ -157,7 +133,7 @@ func Bootstrap(
 		// 1) bootstrap the sealing segment
 		// creating sealed root block with the rootResult
 		// creating finalized root block with lastFinalized
-		err = state.bootstrapSealingSegment(segment, lastFinalized, rootSeal)(tx)
+		err = bootstrapSealingSegment(blocks, qcs, segment, lastFinalized, rootSeal)(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap sealing chain segment blocks: %w", err)
 		}
@@ -173,43 +149,43 @@ func Bootstrap(
 		}
 
 		// 3) initialize the current protocol state height/view pointers
-		err = transaction.WithTx(state.bootstrapStatePointers(root))(tx)
+		err = transaction.WithTx(bootstrapStatePointers(root))(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap height/view pointers: %w", err)
 		}
 
 		// 4) initialize values related to the epoch logic
-		err = state.bootstrapEpoch(root.Epochs(), !config.SkipNetworkAddressValidation)(tx)
+		err = bootstrapEpoch(setups, commits, root.Epochs(), !config.SkipNetworkAddressValidation)(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap epoch values: %w", err)
 		}
 
 		// 5) initialize spork params
-		err = transaction.WithTx(state.bootstrapSporkInfo(root))(tx)
+		err = transaction.WithTx(bootstrapSporkInfo(root))(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap spork info: %w", err)
 		}
 
 		// 6) set metric values
-		err = state.updateEpochMetrics(root)
+		err = updateEpochMetrics(metrics, root, false)
 		if err != nil {
 			return fmt.Errorf("could not update epoch metrics: %w", err)
 		}
-		state.metrics.BlockSealed(lastSealed)
-		state.metrics.SealedHeight(lastSealed.Header.Height)
-		state.metrics.FinalizedHeight(lastFinalized.Header.Height)
+		metrics.BlockSealed(lastSealed)
+		metrics.SealedHeight(lastSealed.Header.Height)
+		metrics.FinalizedHeight(lastFinalized.Header.Height)
 		for _, block := range segment.Blocks {
-			state.metrics.BlockFinalized(block)
+			metrics.BlockFinalized(block)
 		}
 
 		// 7) bootstrap dynamic protocol state
-		err = state.bootstrapProtocolState(segment, root, protocolStateSnapshotsDB)(tx)
+		err = bootstrapProtocolState(segment, root, protocolStateSnapshotsDB)(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap protocol state: %w", err)
 		}
 
 		// 8) initialize version beacon
-		err = transaction.WithTx(state.boostrapVersionBeacon(root))(tx)
+		err = transaction.WithTx(boostrapVersionBeacon(root))(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap version beacon: %w", err)
 		}
@@ -220,13 +196,30 @@ func Bootstrap(
 		return nil, fmt.Errorf("bootstrapping failed: %w", err)
 	}
 
-	// populate the protocol state cache
-	err = state.populateCache()
+	instanceParams, err := ReadInstanceParams(db, headers, seals)
 	if err != nil {
-		return nil, fmt.Errorf("failed to populate cache: %w", err)
+		return nil, fmt.Errorf("could not read instance params: %w", err)
 	}
 
-	return state, nil
+	params := &Params{
+		GlobalParams:   root.Params(),
+		InstanceParams: instanceParams,
+	}
+
+	return newState(
+		metrics,
+		db,
+		headers,
+		seals,
+		results,
+		blocks,
+		qcs,
+		setups,
+		commits,
+		protocolStateSnapshotsDB,
+		versionBeacons,
+		params,
+	)
 }
 
 // bootstrapProtocolState bootstraps data structures needed for Dynamic Protocol State.
@@ -234,7 +227,7 @@ func Bootstrap(
 // dynamic protocol state didn't change in the sealing segment.
 // The root snapshot's sealing segment must not straddle any epoch transitions
 // or epoch phase transitions.
-func (state *State) bootstrapProtocolState(segment *flow.SealingSegment, root protocol.Snapshot, protocolState storage.ProtocolState) func(tx *transaction.Tx) error {
+func bootstrapProtocolState(segment *flow.SealingSegment, root protocol.Snapshot, protocolState storage.ProtocolState) func(tx *transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
 		rootProtocolState, err := root.ProtocolState()
 		if err != nil {
@@ -262,7 +255,13 @@ func (state *State) bootstrapProtocolState(segment *flow.SealingSegment, root pr
 
 // bootstrapSealingSegment inserts all blocks and associated metadata for the
 // protocol state root snapshot to disk.
-func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *flow.Block, rootSeal *flow.Seal) func(tx *transaction.Tx) error {
+func bootstrapSealingSegment(
+	blocks storage.Blocks,
+	qcs storage.QuorumCertificates,
+	segment *flow.SealingSegment,
+	head *flow.Block,
+	rootSeal *flow.Seal,
+) func(tx *transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
 
 		for _, result := range segment.ExecutionResults {
@@ -296,7 +295,7 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 		for _, block := range segment.ExtraBlocks {
 			blockID := block.ID()
 			height := block.Header.Height
-			err := state.blocks.StoreTx(block)(tx)
+			err := blocks.StoreTx(block)(tx)
 			if err != nil {
 				return fmt.Errorf("could not insert SealingSegment extra block: %w", err)
 			}
@@ -304,7 +303,7 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 			if err != nil {
 				return fmt.Errorf("could not index SealingSegment extra block (id=%x): %w", blockID, err)
 			}
-			err = state.qcs.StoreTx(block.Header.QuorumCertificate())(tx)
+			err = qcs.StoreTx(block.Header.QuorumCertificate())(tx)
 			if err != nil {
 				return fmt.Errorf("could not store qc for SealingSegment extra block (id=%x): %w", blockID, err)
 			}
@@ -314,7 +313,7 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 			blockID := block.ID()
 			height := block.Header.Height
 
-			err := state.blocks.StoreTx(block)(tx)
+			err := blocks.StoreTx(block)(tx)
 			if err != nil {
 				return fmt.Errorf("could not insert SealingSegment block: %w", err)
 			}
@@ -322,7 +321,7 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 			if err != nil {
 				return fmt.Errorf("could not index SealingSegment block (id=%x): %w", blockID, err)
 			}
-			err = state.qcs.StoreTx(block.Header.QuorumCertificate())(tx)
+			err = qcs.StoreTx(block.Header.QuorumCertificate())(tx)
 			if err != nil {
 				return fmt.Errorf("could not store qc for SealingSegment block (id=%x): %w", blockID, err)
 			}
@@ -364,7 +363,7 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 
 // bootstrapStatePointers instantiates special pointers used to by the protocol
 // state to keep track of special block heights and views.
-func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.Txn) error {
+func bootstrapStatePointers(root protocol.Snapshot) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		segment, err := root.SealingSegment()
 		if err != nil {
@@ -450,7 +449,12 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 // the previous, current, and next epochs as of the root snapshot.
 // This has to be bootstrapped before dynamic protocol state.
 // TODO(yuraolex): This information can be bootstrapped from dynamic protocol state.
-func (state *State) bootstrapEpoch(epochs protocol.EpochQuery, verifyNetworkAddress bool) func(*transaction.Tx) error {
+func bootstrapEpoch(
+	epochSetups storage.EpochSetups,
+	epochCommits storage.EpochCommits,
+	epochs protocol.EpochQuery,
+	verifyNetworkAddress bool,
+) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
 		previous := epochs.Previous()
 		current := epochs.Current()
@@ -560,13 +564,13 @@ func (state *State) bootstrapEpoch(epochs protocol.EpochQuery, verifyNetworkAddr
 		// insert all epoch setup/commit service events
 		// dynamic protocol state relies on these events being stored
 		for _, setup := range setups {
-			err = state.epoch.setups.StoreTx(setup)(tx)
+			err = epochSetups.StoreTx(setup)(tx)
 			if err != nil {
 				return fmt.Errorf("could not store epoch setup event: %w", err)
 			}
 		}
 		for _, commit := range commits {
-			err = state.epoch.commits.StoreTx(commit)(tx)
+			err = epochCommits.StoreTx(commit)(tx)
 			if err != nil {
 				return fmt.Errorf("could not store epoch commit event: %w", err)
 			}
@@ -578,7 +582,7 @@ func (state *State) bootstrapEpoch(epochs protocol.EpochQuery, verifyNetworkAddr
 
 // bootstrapSporkInfo bootstraps the protocol state with information about the
 // spork which is used to disambiguate Flow networks.
-func (state *State) bootstrapSporkInfo(root protocol.Snapshot) func(*badger.Txn) error {
+func bootstrapSporkInfo(root protocol.Snapshot) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		params := root.Params()
 
@@ -663,7 +667,7 @@ func OpenState(
 		GlobalParams:   globalParams,
 		InstanceParams: instanceParams,
 	}
-	state := newState(
+	state, err := newState(
 		metrics,
 		db,
 		headers,
@@ -676,10 +680,10 @@ func OpenState(
 		protocolState,
 		versionBeacons,
 		params,
-	) // populate the protocol state cache
-	err = state.populateCache()
+	)
+
 	if err != nil {
-		return nil, fmt.Errorf("failed to populate cache: %w", err)
+		return nil, fmt.Errorf("could not create state: %w", err)
 	}
 
 	// report last finalized and sealed block height
@@ -696,8 +700,13 @@ func OpenState(
 	}
 	metrics.SealedHeight(sealed.Height)
 
+	epochFallbackTriggered, err := state.isEpochEmergencyFallbackTriggered()
+	if err != nil {
+		return nil, fmt.Errorf("could not check epoch emergency fallback flag: %w", err)
+	}
+
 	// update all epoch related metrics
-	err = state.updateEpochMetrics(finalSnapshot)
+	err = updateEpochMetrics(metrics, finalSnapshot, epochFallbackTriggered)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update epoch metrics: %w", err)
 	}
@@ -783,7 +792,7 @@ func newState(
 	protocolStateSnapshots storage.ProtocolState,
 	versionBeacons storage.VersionBeacons,
 	params protocol.Params,
-) *State {
+) (*State, error) {
 	state := &State{
 		metrics: metrics,
 		db:      db,
@@ -814,7 +823,13 @@ func newState(
 		cachedSealed:   new(atomic.Pointer[cachedHeader]),
 	}
 
-	return state
+	// populate the protocol state cache
+	err := state.populateCache()
+	if err != nil {
+		return nil, fmt.Errorf("failed to populate cache: %w", err)
+	}
+
+	return state, nil
 }
 
 // IsBootstrapped returns whether the database contains a bootstrapped state
@@ -832,24 +847,24 @@ func IsBootstrapped(db *badger.DB) (bool, error) {
 
 // updateEpochMetrics update the `consensus_compliance_current_epoch_counter` and the
 // `consensus_compliance_current_epoch_phase` metric
-func (state *State) updateEpochMetrics(snap protocol.Snapshot) error {
+func updateEpochMetrics(metrics module.ComplianceMetrics, snap protocol.Snapshot, epochFallbackTriggered bool) error {
 
 	// update epoch counter
 	counter, err := snap.Epochs().Current().Counter()
 	if err != nil {
 		return fmt.Errorf("could not get current epoch counter: %w", err)
 	}
-	state.metrics.CurrentEpochCounter(counter)
+	metrics.CurrentEpochCounter(counter)
 
 	// update epoch phase
 	phase, err := snap.Phase()
 	if err != nil {
 		return fmt.Errorf("could not get current epoch counter: %w", err)
 	}
-	state.metrics.CurrentEpochPhase(phase)
+	metrics.CurrentEpochPhase(phase)
 
 	// update committed epoch final view
-	err = state.updateCommittedEpochFinalView(snap)
+	err = updateCommittedEpochFinalView(metrics, snap)
 	if err != nil {
 		return fmt.Errorf("could not update committed epoch final view")
 	}
@@ -858,25 +873,21 @@ func (state *State) updateEpochMetrics(snap protocol.Snapshot) error {
 	if err != nil {
 		return fmt.Errorf("could not update current epoch final view: %w", err)
 	}
-	state.metrics.CurrentEpochFinalView(currentEpochFinalView)
+	metrics.CurrentEpochFinalView(currentEpochFinalView)
 
 	dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView, err := protocol.DKGPhaseViews(snap.Epochs().Current())
 	if err != nil {
 		return fmt.Errorf("could not get dkg phase final view: %w", err)
 	}
 
-	state.metrics.CurrentDKGPhase1FinalView(dkgPhase1FinalView)
-	state.metrics.CurrentDKGPhase2FinalView(dkgPhase2FinalView)
-	state.metrics.CurrentDKGPhase3FinalView(dkgPhase3FinalView)
+	metrics.CurrentDKGPhase1FinalView(dkgPhase1FinalView)
+	metrics.CurrentDKGPhase2FinalView(dkgPhase2FinalView)
+	metrics.CurrentDKGPhase3FinalView(dkgPhase3FinalView)
 
 	// EECC - check whether the epoch emergency fallback flag has been set
 	// in the database. If so, skip updating any epoch-related metrics.
-	epochFallbackTriggered, err := state.isEpochEmergencyFallbackTriggered()
-	if err != nil {
-		return fmt.Errorf("could not check epoch emergency fallback flag: %w", err)
-	}
 	if epochFallbackTriggered {
-		state.metrics.EpochEmergencyFallbackTriggered()
+		metrics.EpochEmergencyFallbackTriggered()
 	}
 
 	return nil
@@ -884,7 +895,7 @@ func (state *State) updateEpochMetrics(snap protocol.Snapshot) error {
 
 // boostrapVersionBeacon bootstraps version beacon, by adding the latest beacon
 // to an index, if present.
-func (state *State) boostrapVersionBeacon(
+func boostrapVersionBeacon(
 	snapshot protocol.Snapshot,
 ) func(*badger.Txn) error {
 	return func(txn *badger.Txn) error {
@@ -960,7 +971,7 @@ func (state *State) populateCache() error {
 // For example, suppose we have epochs N and N+1.
 // If we are in epoch N's Staking or Setup Phase, then epoch N's final view should be the value of the metric.
 // If we are in epoch N's Committed Phase, then epoch N+1's final view should be the value of the metric.
-func (state *State) updateCommittedEpochFinalView(snap protocol.Snapshot) error {
+func updateCommittedEpochFinalView(metrics module.ComplianceMetrics, snap protocol.Snapshot) error {
 
 	phase, err := snap.Phase()
 	if err != nil {
@@ -976,7 +987,7 @@ func (state *State) updateCommittedEpochFinalView(snap protocol.Snapshot) error 
 		if err != nil {
 			return fmt.Errorf("could not get current epoch final view from snapshot: %w", err)
 		}
-		state.metrics.CommittedEpochFinalView(finalView)
+		metrics.CommittedEpochFinalView(finalView)
 	case flow.EpochPhaseCommitted:
 
 		// if we are in Committed phase, then set the metric value to the next epoch's final view
@@ -984,7 +995,7 @@ func (state *State) updateCommittedEpochFinalView(snap protocol.Snapshot) error 
 		if err != nil {
 			return fmt.Errorf("could not get next epoch final view from snapshot: %w", err)
 		}
-		state.metrics.CommittedEpochFinalView(finalView)
+		metrics.CommittedEpochFinalView(finalView)
 	default:
 		return fmt.Errorf("invalid phase: %s", phase)
 	}
