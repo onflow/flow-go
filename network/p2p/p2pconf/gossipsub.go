@@ -117,7 +117,7 @@ type AppSpecificScoreParameters struct {
 
 const (
 	PenaltyDecaySlowdownThresholdKey = "penalty-decay-slowdown-threshold"
-	DecayRateReductionFactorKey      = "decay-rate-reduction-factor"
+	DecayRateReductionFactorKey      = "penalty-decay-rate-reduction-factor"
 	PenaltyDecayEvaluationPeriodKey  = "penalty-decay-evaluation-period"
 )
 
