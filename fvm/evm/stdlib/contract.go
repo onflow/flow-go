@@ -120,11 +120,20 @@ func newInternalEVMTypeEncodeABIFunction(
 					}
 				case *interpreter.ArrayValue:
 					elements := make([]uint64, 0)
-					for i := 0; i < value.Count(); i++ {
-						element := value.Get(inter, locationRange, i)
-						v := element.(interpreter.UInt64Value)
+					value.Iterate(inter, func(element interpreter.Value) (resume bool) {
+						v, ok := element.(interpreter.UInt64Value)
+						if !ok {
+							panic(
+								fmt.Errorf(
+									"unsupported array value type: %v",
+									element.StaticType(inter),
+								),
+							)
+						}
 						elements = append(elements, uint64(v))
-					}
+
+						return true
+					})
 					values = append(values, elements)
 					typ, err := gethABI.NewType("uint64[]", "", nil)
 					if err != nil {
