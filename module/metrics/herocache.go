@@ -87,8 +87,12 @@ func NewSubscriptionRecordCacheMetricsFactory(f HeroCacheMetricsFactory, network
 // - f: the HeroCacheMetricsFactory to create the collector
 // Returns:
 // - a HeroCacheMetrics for the application specific score cache
-func NewGossipSubApplicationSpecificScoreCacheMetrics(f HeroCacheMetricsFactory) module.HeroCacheMetrics {
-	return f(namespaceNetwork, ResourceNetworkingGossipSubApplicationSpecificScoreCache)
+func NewGossipSubApplicationSpecificScoreCacheMetrics(f HeroCacheMetricsFactory, networkingType network.NetworkingType) module.HeroCacheMetrics {
+	r := ResourceNetworkingGossipSubApplicationSpecificScoreCache
+	if networkingType == network.PublicNetwork {
+		r = PrependPublicPrefix(r)
+	}
+	return f(namespaceNetwork, r)
 }
 
 // DisallowListCacheMetricsFactory is the factory method for creating a new HeroCacheCollector for the disallow list cache.
@@ -108,9 +112,12 @@ func DisallowListCacheMetricsFactory(f HeroCacheMetricsFactory, networkingType n
 
 // GossipSubSpamRecordCacheMetricsFactory is the factory method for creating a new HeroCacheCollector for the spam record cache.
 // The spam record cache is used to keep track of peers that are spamming the network and the reasons for it.
-// Currently, the spam record cache is only used for the private network.
-func GossipSubSpamRecordCacheMetricsFactory(f HeroCacheMetricsFactory) module.HeroCacheMetrics {
-	return f(namespaceNetwork, ResourceNetworkingGossipSubSpamRecordCache)
+func GossipSubSpamRecordCacheMetricsFactory(f HeroCacheMetricsFactory, networkingType network.NetworkingType) module.HeroCacheMetrics {
+	r := ResourceNetworkingGossipSubSpamRecordCache
+	if networkingType == network.PublicNetwork {
+		r = PrependPublicPrefix(r)
+	}
+	return f(namespaceNetwork, r)
 }
 
 func NetworkDnsTxtCacheMetricsFactory(registrar prometheus.Registerer) *HeroCacheCollector {

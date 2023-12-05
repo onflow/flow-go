@@ -16,7 +16,7 @@ import (
 // specifically, it tests the Add and Get methods.
 // It does not test the eviction policy of the cache.
 func TestAppSpecificScoreCache(t *testing.T) {
-	cache := internal.NewAppSpecificScoreCache(10, unittest.Logger(), metrics.NewNoopHeroCacheMetricsFactory())
+	cache := internal.NewAppSpecificScoreCache(10, unittest.Logger(), metrics.NewNoopCollector())
 	require.NotNil(t, cache, "failed to create AppSpecificScoreCache")
 
 	peerID := unittest.PeerIdFixture(t)
@@ -47,7 +47,7 @@ func TestAppSpecificScoreCache(t *testing.T) {
 // TestAppSpecificScoreCache_Concurrent_Add_Get_Update tests the concurrent functionality of AppSpecificScoreCache;
 // specifically, it tests the Add and Get methods under concurrent access.
 func TestAppSpecificScoreCache_Concurrent_Add_Get_Update(t *testing.T) {
-	cache := internal.NewAppSpecificScoreCache(10, unittest.Logger(), metrics.NewNoopHeroCacheMetricsFactory())
+	cache := internal.NewAppSpecificScoreCache(10, unittest.Logger(), metrics.NewNoopCollector())
 	require.NotNil(t, cache, "failed to create AppSpecificScoreCache")
 
 	peerId1 := unittest.PeerIdFixture(t)
@@ -140,7 +140,7 @@ func TestAppSpecificScoreCache_Concurrent_Add_Get_Update(t *testing.T) {
 // TestAppSpecificScoreCache_Eviction tests the eviction policy of AppSpecificScoreCache;
 // specifically, it tests that the cache evicts the least recently used record when the cache is full.
 func TestAppSpecificScoreCache_Eviction(t *testing.T) {
-	cache := internal.NewAppSpecificScoreCache(10, unittest.Logger(), metrics.NewNoopHeroCacheMetricsFactory())
+	cache := internal.NewAppSpecificScoreCache(10, unittest.Logger(), metrics.NewNoopCollector())
 	require.NotNil(t, cache, "failed to create AppSpecificScoreCache")
 
 	peerIds := unittest.PeerIdFixtures(t, 11)

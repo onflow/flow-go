@@ -383,10 +383,12 @@ func NewScoreOption(cfg *ScoreOptionConfig, provider p2p.SubscriptionProvider) (
 		IdProvider:              cfg.provider,
 		HeroCacheMetricsFactory: cfg.heroCacheMetricsFactory,
 		AppScoreCacheFactory: func() p2p.GossipSubApplicationSpecificScoreCache {
-			return internal.NewAppSpecificScoreCache(cfg.params.SpamRecordCache.CacheSize, cfg.logger, cfg.heroCacheMetricsFactory)
+			collector := metrics.NewGossipSubApplicationSpecificScoreCacheMetrics(cfg.heroCacheMetricsFactory, cfg.networkingType)
+			return internal.NewAppSpecificScoreCache(cfg.params.SpamRecordCache.CacheSize, cfg.logger, collector)
 		},
 		SpamRecordCacheFactory: func() p2p.GossipSubSpamRecordCache {
-			return netcache.NewGossipSubSpamRecordCache(cfg.params.SpamRecordCache.CacheSize, cfg.logger, cfg.heroCacheMetricsFactory,
+			collector := metrics.GossipSubSpamRecordCacheMetricsFactory(cfg.heroCacheMetricsFactory, cfg.networkingType)
+			return netcache.NewGossipSubSpamRecordCache(cfg.params.SpamRecordCache.CacheSize, cfg.logger, collector,
 				DefaultDecayFunction(
 					cfg.params.SpamRecordCache.PenaltyDecaySlowdownThreshold,
 					cfg.params.SpamRecordCache.DecayRateReductionFactor,

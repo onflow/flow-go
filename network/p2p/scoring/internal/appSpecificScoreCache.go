@@ -8,10 +8,10 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
-	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/p2p"
 )
 
@@ -33,12 +33,12 @@ var _ p2p.GossipSubApplicationSpecificScoreCache = (*AppSpecificScoreCache)(nil)
 // - collector: the metrics collector to use for collecting metrics.
 // Returns:
 // - *AppSpecificScoreCache: the created cache.
-func NewAppSpecificScoreCache(sizeLimit uint32, logger zerolog.Logger, hcMetricsFactory metrics.HeroCacheMetricsFactory) *AppSpecificScoreCache {
+func NewAppSpecificScoreCache(sizeLimit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics) *AppSpecificScoreCache {
 	backData := herocache.NewCache(sizeLimit,
 		herocache.DefaultOversizeFactor,
 		heropool.LRUEjection,
 		logger.With().Str("mempool", "gossipsub-app-specific-score-cache").Logger(),
-		metrics.NewGossipSubApplicationSpecificScoreCacheMetrics(hcMetricsFactory))
+		collector)
 
 	return &AppSpecificScoreCache{
 		c: stdmap.NewBackend(stdmap.WithBackData(backData)),

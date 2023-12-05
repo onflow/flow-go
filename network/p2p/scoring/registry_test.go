@@ -937,9 +937,9 @@ func newGossipSubAppSpecificScoreRegistry(t *testing.T, params p2pconf.ScoringPa
 	*internal.AppSpecificScoreCache) {
 	cache := netcache.NewGossipSubSpamRecordCache(100,
 		unittest.Logger(),
-		metrics.NewNoopHeroCacheMetricsFactory(),
+		metrics.NewNoopCollector(),
 		scoring.DefaultDecayFunction(params.SpamRecordCache.PenaltyDecaySlowdownThreshold, params.SpamRecordCache.DecayRateReductionFactor, params.SpamRecordCache.PenaltyDecayEvaluationPeriod))
-	appSpecificScoreCache := internal.NewAppSpecificScoreCache(100, unittest.Logger(), metrics.NewNoopHeroCacheMetricsFactory())
+	appSpecificScoreCache := internal.NewAppSpecificScoreCache(100, unittest.Logger(), metrics.NewNoopCollector())
 
 	validator := mockp2p.NewSubscriptionValidator(t)
 	validator.On("Start", testifymock.Anything).Return().Maybe()

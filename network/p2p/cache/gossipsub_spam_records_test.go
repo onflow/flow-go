@@ -21,7 +21,7 @@ import (
 // adding a new record to the cache.
 func TestGossipSubSpamRecordCache_Add(t *testing.T) {
 	// create a new instance of GossipSubSpamRecordCache.
-	cache := netcache.NewGossipSubSpamRecordCache(100, unittest.Logger(), metrics.NewNoopHeroCacheMetricsFactory())
+	cache := netcache.NewGossipSubSpamRecordCache(100, unittest.Logger(), metrics.NewNoopCollector())
 
 	// tests adding a new record to the cache.
 	require.True(t, cache.Add("peer0", p2p.GossipSubSpamRecord{
@@ -70,7 +70,7 @@ func TestGossipSubSpamRecordCache_Add(t *testing.T) {
 // It updates the cache with a number of records concurrently and then checks if the cache
 // can retrieve all records.
 func TestGossipSubSpamRecordCache_Concurrent_Add(t *testing.T) {
-	cache := netcache.NewGossipSubSpamRecordCache(200, unittest.Logger(), metrics.NewNoopHeroCacheMetricsFactory())
+	cache := netcache.NewGossipSubSpamRecordCache(200, unittest.Logger(), metrics.NewNoopCollector())
 
 	// defines the number of records to update.
 	numRecords := 100
@@ -113,7 +113,7 @@ func TestGossipSubSpamRecordCache_Concurrent_Add(t *testing.T) {
 // TestGossipSubSpamRecordCache_Update tests the Update method of the GossipSubSpamRecordCache. It tests if the cache can update
 // the penalty of an existing record and fail to update the penalty of a non-existing record.
 func TestGossipSubSpamRecordCache_Update(t *testing.T) {
-	cache := netcache.NewGossipSubSpamRecordCache(200, unittest.Logger(), metrics.NewNoopHeroCacheMetricsFactory())
+	cache := netcache.NewGossipSubSpamRecordCache(200, unittest.Logger(), metrics.NewNoopCollector())
 
 	peerID := "peer1"
 
@@ -141,7 +141,7 @@ func TestGossipSubSpamRecordCache_Update(t *testing.T) {
 // TestGossipSubSpamRecordCache_Concurrent_Update tests if the cache can be updated concurrently. It updates the cache
 // with a number of records concurrently and then checks if the cache can retrieve all records.
 func TestGossipSubSpamRecordCache_Concurrent_Update(t *testing.T) {
-	cache := netcache.NewGossipSubSpamRecordCache(200, unittest.Logger(), metrics.NewNoopHeroCacheMetricsFactory())
+	cache := netcache.NewGossipSubSpamRecordCache(200, unittest.Logger(), metrics.NewNoopCollector())
 
 	// defines the number of records to update.
 	numRecords := 100
@@ -199,7 +199,7 @@ func TestGossipSubSpamRecordCache_Concurrent_Update(t *testing.T) {
 func TestGossipSubSpamRecordCache_Update_With_Preprocess(t *testing.T) {
 	cache := netcache.NewGossipSubSpamRecordCache(200,
 		unittest.Logger(),
-		metrics.NewNoopHeroCacheMetricsFactory(),
+		metrics.NewNoopCollector(),
 		func(record p2p.GossipSubSpamRecord, lastUpdated time.Time) (p2p.GossipSubSpamRecord, error) {
 			record.Penalty += 1.5
 			return record, nil
@@ -232,7 +232,7 @@ func TestGossipSubSpamRecordCache_Update_Preprocess_Error(t *testing.T) {
 	secondPreprocessorCalled := false
 	cache := netcache.NewGossipSubSpamRecordCache(200,
 		unittest.Logger(),
-		metrics.NewNoopHeroCacheMetricsFactory(),
+		metrics.NewNoopCollector(),
 		// the first preprocessor function does not return an error.
 		func(record p2p.GossipSubSpamRecord, lastUpdated time.Time) (p2p.GossipSubSpamRecord, error) {
 			return record, nil
@@ -277,7 +277,7 @@ func TestGossipSubSpamRecordCache_Update_Preprocess_Error(t *testing.T) {
 // This is a desired behavior that is guaranteed by the underlying HeroCache library.
 // In other words, we don't desire the records to be externally mutable after they are added to the cache (unless by a subsequent call to Update).
 func TestGossipSubSpamRecordCache_ByValue(t *testing.T) {
-	cache := netcache.NewGossipSubSpamRecordCache(200, unittest.Logger(), metrics.NewNoopHeroCacheMetricsFactory())
+	cache := netcache.NewGossipSubSpamRecordCache(200, unittest.Logger(), metrics.NewNoopCollector())
 
 	peerID := "peer1"
 	added := cache.Add(peer.ID(peerID), p2p.GossipSubSpamRecord{
@@ -308,7 +308,7 @@ func TestGossipSubSpamRecordCache_ByValue(t *testing.T) {
 // TestGossipSubSpamRecordCache_Get_With_Preprocessors tests if the cache applies the preprocessors to the records
 // before returning them.
 func TestGossipSubSpamRecordCache_Get_With_Preprocessors(t *testing.T) {
-	cache := netcache.NewGossipSubSpamRecordCache(10, unittest.Logger(), metrics.NewNoopHeroCacheMetricsFactory(),
+	cache := netcache.NewGossipSubSpamRecordCache(10, unittest.Logger(), metrics.NewNoopCollector(),
 		// first preprocessor: adds 1 to the penalty.
 		func(record p2p.GossipSubSpamRecord, lastUpdated time.Time) (p2p.GossipSubSpamRecord, error) {
 			record.Penalty++
@@ -348,7 +348,7 @@ func TestGossipSubSpamRecordCache_Get_Preprocessor_Error(t *testing.T) {
 	secondPreprocessorCalledCount := 0
 	thirdPreprocessorCalledCount := 0
 
-	cache := netcache.NewGossipSubSpamRecordCache(10, unittest.Logger(), metrics.NewNoopHeroCacheMetricsFactory(),
+	cache := netcache.NewGossipSubSpamRecordCache(10, unittest.Logger(), metrics.NewNoopCollector(),
 		// first preprocessor: adds 1 to the penalty.
 		func(record p2p.GossipSubSpamRecord, lastUpdated time.Time) (p2p.GossipSubSpamRecord, error) {
 			record.Penalty++
@@ -402,7 +402,7 @@ func TestGossipSubSpamRecordCache_Get_Preprocessor_Error(t *testing.T) {
 // TestGossipSubSpamRecordCache_Get_Without_Preprocessors tests when no preprocessors are provided to the cache constructor
 // that the cache returns the original record without any modifications.
 func TestGossipSubSpamRecordCache_Get_Without_Preprocessors(t *testing.T) {
-	cache := netcache.NewGossipSubSpamRecordCache(10, unittest.Logger(), metrics.NewNoopHeroCacheMetricsFactory())
+	cache := netcache.NewGossipSubSpamRecordCache(10, unittest.Logger(), metrics.NewNoopCollector())
 
 	record := p2p.GossipSubSpamRecord{
 		Decay:   0.5,
@@ -423,7 +423,7 @@ func TestGossipSubSpamRecordCache_Get_Without_Preprocessors(t *testing.T) {
 // This test evaluates that the cache de-duplicates the records based on their peer id and not content, and hence
 // each peer id can only be added once to the cache.
 func TestGossipSubSpamRecordCache_Duplicate_Add_Sequential(t *testing.T) {
-	cache := netcache.NewGossipSubSpamRecordCache(10, unittest.Logger(), metrics.NewNoopHeroCacheMetricsFactory())
+	cache := netcache.NewGossipSubSpamRecordCache(10, unittest.Logger(), metrics.NewNoopCollector())
 
 	record := p2p.GossipSubSpamRecord{
 		Decay:   0.5,
@@ -445,7 +445,7 @@ func TestGossipSubSpamRecordCache_Duplicate_Add_Sequential(t *testing.T) {
 // TestGossipSubSpamRecordCache_Duplicate_Add_Concurrent tests if the cache returns false when a duplicate record is added to the cache.
 // Test is the concurrent version of TestAppScoreCache_DuplicateAdd_Sequential.
 func TestGossipSubSpamRecordCache_Duplicate_Add_Concurrent(t *testing.T) {
-	cache := netcache.NewGossipSubSpamRecordCache(10, unittest.Logger(), metrics.NewNoopHeroCacheMetricsFactory())
+	cache := netcache.NewGossipSubSpamRecordCache(10, unittest.Logger(), metrics.NewNoopCollector())
 
 	successAdd := atomic.Int32{}
 	successAdd.Store(0)
