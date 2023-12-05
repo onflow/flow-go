@@ -52,5 +52,8 @@ func TestFinalizedReader(t *testing.T) {
 		finalized, err = reader.FinalizedBlockIDAtHeight(block2.Header.Height)
 		require.NoError(t, err)
 		require.Equal(t, block2.ID(), finalized)
+
+		// should noop and no panic
+		reader.BlockProcessable(block.Header, block2.Header.QuorumCertificate())
 	})
 }
