@@ -262,6 +262,8 @@ gossipSubOption := scoreOption.BuildGossipSubScoreOption()
 
 # Caching Application Specific Score
 ![app-specific-score-cache.png](app-specific-score-cache.png)
+The application-specific score of a peer is part of its overall score in the GossipSub protocol. In contrast to the rest of the GossipSub score of the peer that is computed
+internally by the GossipSub protocol, the application-specific score of a peer is computed externally by the application, i.e., the Flow protocol-level semantics.
 As the figure above illustrates, GossipSub's peer scoring mechanism invokes the application-specific scoring function on a peer id upon receiving a gossip message from that peer.
 This means that the application-specific score of a peer is computed every time a gossip message is received from that peer. 
 This can be computationally expensive, especially when the network is large and the number of gossip messages is high. 
