@@ -24,7 +24,7 @@ func (s *EpochJoinAndLeaveSNSuite) SetupTest() {
 	// TODO: fix the access integration test logic to function without slowing down
 	// the block rate
 	s.ConsensusProposalDuration = time.Millisecond * 250
-	s.Suite.SetupTest()
+	s.DynamicEpochTransitionSuite.SetupTest()
 }
 
 // TestEpochJoinAndLeaveSN should update consensus nodes and assert healthy network conditions
