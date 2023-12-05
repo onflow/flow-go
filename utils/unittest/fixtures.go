@@ -2630,7 +2630,7 @@ func P2PRPCPruneFixture(topic *string) *pubsub_pb.ControlPrune {
 	}
 }
 
-// P2PRPCIHaveFixtures returns n number of control message rpc iHave fixtures with m number of message ids each.
+// P2PRPCIHaveFixtures returns n number of control message where n = len(topics) rpc iHave fixtures with m number of message ids each.
 func P2PRPCIHaveFixtures(m int, topics ...string) []*pubsub_pb.ControlIHave {
 	n := len(topics)
 	ihaves := make([]*pubsub_pb.ControlIHave, n)

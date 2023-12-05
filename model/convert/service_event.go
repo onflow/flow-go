@@ -20,10 +20,7 @@ import (
 // state. This acts as the conversion from the Cadence type to the flow-go type.
 func ServiceEvent(chainID flow.ChainID, event flow.Event) (*flow.ServiceEvent, error) {
 
-	events, err := systemcontracts.ServiceEventsForChain(chainID)
-	if err != nil {
-		return nil, fmt.Errorf("could not get service event info: %w", err)
-	}
+	events := systemcontracts.ServiceEventsForChain(chainID)
 
 	// depending on type of service event construct Go type
 	switch event.Type {

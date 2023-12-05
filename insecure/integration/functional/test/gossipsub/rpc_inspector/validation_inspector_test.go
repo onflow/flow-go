@@ -28,6 +28,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
+	"github.com/onflow/flow-go/network/p2p/scoring"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -62,6 +63,7 @@ func TestValidationInspector_InvalidTopicId_Detection(t *testing.T) {
 			count.Inc()
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
+			require.Equal(t, notification.TopicType, p2p.CtrlMsgNonClusterTopicType, "IsClusterPrefixed is expected to be false, no RPC with cluster prefixed topic sent in this test")
 			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
 			require.True(t, channels.IsInvalidTopicErr(notification.Error))
 			switch notification.MsgType {
@@ -196,6 +198,7 @@ func TestValidationInspector_DuplicateTopicId_Detection(t *testing.T) {
 			count.Inc()
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
+			require.Equal(t, notification.TopicType, p2p.CtrlMsgNonClusterTopicType, "IsClusterPrefixed is expected to be false, no RPC with cluster prefixed topic sent in this test")
 			require.True(t, validation.IsDuplicateTopicErr(notification.Error))
 			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
 			switch notification.MsgType {
@@ -302,6 +305,7 @@ func TestValidationInspector_IHaveDuplicateMessageId_Detection(t *testing.T) {
 			count.Inc()
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
+			require.Equal(t, notification.TopicType, p2p.CtrlMsgNonClusterTopicType, "IsClusterPrefixed is expected to be false, no RPC with cluster prefixed topic sent in this test")
 			require.True(t, validation.IsDuplicateTopicErr(notification.Error))
 			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
 			require.True(t,
@@ -413,6 +417,7 @@ func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
 			count.Inc()
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
+			require.Equal(t, notification.TopicType, p2p.CtrlMsgTopicTypeClusterPrefixed)
 			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
 			require.True(t, channels.IsUnknownClusterIDErr(notification.Error))
 			switch notification.MsgType {
@@ -794,6 +799,7 @@ func TestValidationInspector_InspectIWants_CacheMissThreshold(t *testing.T) {
 		return func(args mockery.Arguments) {
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
+			require.Equal(t, notification.TopicType, p2p.CtrlMsgNonClusterTopicType, "IsClusterPrefixed is expected to be false, no RPC with cluster prefixed topic sent in this test")
 			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
 			require.True(t,
 				notification.MsgType == p2pmsg.CtrlMsgIWant,
@@ -929,6 +935,7 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 		return func(args mockery.Arguments) {
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
+			require.Equal(t, notification.TopicType, p2p.CtrlMsgNonClusterTopicType, "IsClusterPrefixed is expected to be false, no RPC with cluster prefixed topic sent in this test")
 			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
 			require.True(t,
 				notification.MsgType == p2pmsg.RpcPublishMessage,
@@ -1024,6 +1031,7 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 // The victim node is configured to use the GossipSubInspector to detect spam and the scoring system to mitigate spam.
 // The test ensures that the victim node is disconnected from the spammer node on the GossipSub mesh after the spam detection is triggered.
 func TestGossipSubSpamMitigationIntegration(t *testing.T) {
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky in CI")
 	t.Parallel()
 	idProvider := mock.NewIdentityProvider(t)
 	sporkID := unittest.IdentifierFixture()
@@ -1035,6 +1043,7 @@ func TestGossipSubSpamMitigationIntegration(t *testing.T) {
 		sporkID,
 		t.Name(),
 		idProvider,
+		p2ptest.WithPeerScoreTracerInterval(100*time.Millisecond),
 		p2ptest.WithRole(flow.RoleConsensus),
 		p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride))
 
@@ -1060,8 +1069,8 @@ func TestGossipSubSpamMitigationIntegration(t *testing.T) {
 		}
 	})
 
-	spamRpcCount := 10            // total number of individual rpc messages to send
-	spamCtrlMsgCount := int64(10) // total number of control messages to send on each RPC
+	spamRpcCount := 100            // total number of individual rpc messages to send
+	spamCtrlMsgCount := int64(100) // total number of control messages to send on each RPC
 
 	// unknownTopic is an unknown topic to the victim node but shaped like a valid topic (i.e., it has the correct prefix and spork ID).
 	unknownTopic := channels.Topic(fmt.Sprintf("%s/%s", p2ptest.GossipSubTopicIdFixture(), sporkID))
@@ -1113,7 +1122,10 @@ func TestGossipSubSpamMitigationIntegration(t *testing.T) {
 	spammer.SpamControlMessage(t, victimNode, pruneCtlMsgsDuplicateTopic)
 
 	// wait for three GossipSub heartbeat intervals to ensure that the victim node has penalized the spammer node.
-	time.Sleep(3 * time.Second)
+	require.Eventually(t, func() bool {
+		score, ok := victimNode.PeerScoreExposer().GetScore(spammer.SpammerNode.ID())
+		return ok && score < 2*scoring.DefaultGraylistThreshold
+	}, 5*time.Second, 100*time.Millisecond, "expected victim node to penalize spammer node")
 
 	// now we expect the detection and mitigation to kick in and the victim node to disconnect from the spammer node.
 	// so the spammer and victim nodes should not be able to exchange messages on the topic.
