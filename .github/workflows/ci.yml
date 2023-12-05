@@ -154,7 +154,7 @@ jobs:
         max_attempts: 1
         command: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" test
 
-      # TODO(rbtz): re-enable when we fix exisiting races.
+      # TODO(rbtz): re-enable when we fix existing races.
       #env:
       #  RACE_DETECTOR: 1
     - name: Upload coverage report
@@ -167,6 +167,8 @@ jobs:
   unit-test-flaky:
     name: Unit Tests - Flaky
     runs-on: ubuntu-latest
+    env:
+      TEST_FLAKY: true
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
@@ -177,13 +179,14 @@ jobs:
           cache: true
       - name: Install tools
         run: make install-tools
+      - name: Change directory
+        run: cd network/p2p/inspector/validation
       - name: Run flaky tests
         uses: nick-fields/retry@v2
         with:
           timeout_minutes: 35
           max_attempts: 5
           command: VERBOSE=1 go test -v -run 'TestControlMessageValidationInspector_truncateRPC|TestFoo2|TestFoo3' --tags relic ./...
-
 
   unit-test-modules:
     name: Unit Tests (Modules)
