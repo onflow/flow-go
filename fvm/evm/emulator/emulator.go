@@ -5,12 +5,12 @@ import (
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethCore "github.com/ethereum/go-ethereum/core"
-	gethRawDB "github.com/ethereum/go-ethereum/core/rawdb"
 	gethState "github.com/ethereum/go-ethereum/core/state"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	gethVM "github.com/ethereum/go-ethereum/core/vm"
 	gethCrypto "github.com/ethereum/go-ethereum/crypto"
 
+	"github.com/onflow/flow-go/fvm/evm/emulator/database"
 	"github.com/onflow/flow-go/fvm/evm/types"
 )
 
@@ -315,15 +315,17 @@ func (proc *procedure) run(msg *gethCore.Message, txType uint8) (*types.Result, 
 
 // Ramtin: this is the part of the code that we have to update if we hit performance problems
 // the NewDatabase from the RawDB might have to change.
-func newState(database types.Database) (*gethState.StateDB, error) {
-	root, err := database.GetRootHash()
+func newState(db types.Database) (*gethState.StateDB, error) {
+	root, err := db.GetRootHash()
 	if err != nil {
 		return nil, err
 	}
 
 	return gethState.New(root,
-		gethState.NewDatabase(
-			gethRawDB.NewDatabase(database),
-		),
+		database.NewTrieDatabase(db),
 		nil)
+
+	// gethState.NewDatabase(
+	// 	gethRawDB.NewDatabase(db),
+	// ),
 }
