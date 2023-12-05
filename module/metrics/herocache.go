@@ -72,8 +72,12 @@ func NetworkReceiveCacheMetricsFactory(f HeroCacheMetricsFactory, networkType ne
 	return f(namespaceNetwork, r)
 }
 
-func NewSubscriptionRecordCacheMetricsFactory(f HeroCacheMetricsFactory) module.HeroCacheMetrics {
-	return f(namespaceNetwork, ResourceNetworkingSubscriptionRecordsCache)
+func NewSubscriptionRecordCacheMetricsFactory(f HeroCacheMetricsFactory, networkType network.NetworkingType) module.HeroCacheMetrics {
+	r := ResourceNetworkingSubscriptionRecordsCache
+	if networkType == network.PublicNetwork {
+		r = PrependPublicPrefix(r)
+	}
+	return f(namespaceNetwork, r)
 }
 
 // NewGossipSubApplicationSpecificScoreCacheMetrics is the factory method for creating a new HeroCacheCollector for the
