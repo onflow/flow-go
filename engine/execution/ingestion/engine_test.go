@@ -175,10 +175,7 @@ func TestExecuteOneBlock(t *testing.T) {
 		ctx.mockIsBlockExecuted(store)
 		ctx.mockStateCommitmentByBlockID(store)
 		ctx.mockGetExecutionResultID(store)
-		ctx.executionState.On("NewStorageSnapshot",
-			*result.ExecutableBlock.StartState,
-			result.ExecutableBlock.Block.Header.ParentID,
-			result.ExecutableBlock.Block.Header.Height-1).Return(nil)
+		ctx.mockNewStorageSnapshot(result)
 
 		// receive block
 		err := ctx.engine.handleBlock(context.Background(), blockA.Block)
@@ -228,13 +225,14 @@ func TestExecuteBlocks(t *testing.T) {
 		// executable as soon as its parent block A is executed.
 		blockA := makeBlockWithCollection(store.RootBlock, &col1)
 		blockB := makeBlockWithCollection(blockA.Block.Header, &col2)
-		store.CreateBlockAndMockResult(t, blockA)
-		store.CreateBlockAndMockResult(t, blockB)
+		resultA := store.CreateBlockAndMockResult(t, blockA)
+		resultB := store.CreateBlockAndMockResult(t, blockB)
 
 		ctx.mockIsBlockExecuted(store)
 		ctx.mockStateCommitmentByBlockID(store)
 		ctx.mockGetExecutionResultID(store)
-		ctx.executionState.On("NewStorageSnapshot", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		ctx.mockNewStorageSnapshot(resultA)
+		ctx.mockNewStorageSnapshot(resultB)
 		ctx.providerEngine.On("BroadcastExecutionReceipt", mock.Anything, mock.Anything, mock.Anything).Return(false, nil)
 
 		// receive block
@@ -275,8 +273,8 @@ func TestExecuteNextBlockIfCollectionIsReady(t *testing.T) {
 		// Root <- A[C1] <- B[C2]
 		blockA := makeBlockWithCollection(store.RootBlock, &col1)
 		blockB := makeBlockWithCollection(blockA.Block.Header, &col2)
-		store.CreateBlockAndMockResult(t, blockA)
-		store.CreateBlockAndMockResult(t, blockB)
+		resultA := store.CreateBlockAndMockResult(t, blockA)
+		resultB := store.CreateBlockAndMockResult(t, blockB)
 
 		// C2 is available in storage
 		require.NoError(t, ctx.collections.Store(&col2))
@@ -284,7 +282,8 @@ func TestExecuteNextBlockIfCollectionIsReady(t *testing.T) {
 		ctx.mockIsBlockExecuted(store)
 		ctx.mockStateCommitmentByBlockID(store)
 		ctx.mockGetExecutionResultID(store)
-		ctx.executionState.On("NewStorageSnapshot", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		ctx.mockNewStorageSnapshot(resultA)
+		ctx.mockNewStorageSnapshot(resultB)
 
 		// receiving block A and B will not trigger any execution
 		// because A is missing collection C1, B is waiting for A to be executed
@@ -324,12 +323,12 @@ func TestExecuteBlockOnlyOnce(t *testing.T) {
 		col := unittest.CollectionFixture(1)
 		// Root <- A[C]
 		blockA := makeBlockWithCollection(store.RootBlock, &col)
-		store.CreateBlockAndMockResult(t, blockA)
+		resultA := store.CreateBlockAndMockResult(t, blockA)
 
 		ctx.mockIsBlockExecuted(store)
 		ctx.mockStateCommitmentByBlockID(store)
 		ctx.mockGetExecutionResultID(store)
-		ctx.executionState.On("NewStorageSnapshot", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		ctx.mockNewStorageSnapshot(resultA)
 
 		// receive block
 		err := ctx.engine.handleBlock(context.Background(), blockA.Block)
@@ -380,13 +379,14 @@ func TestExecuteForkConcurrently(t *testing.T) {
 
 		blockA := makeBlockWithCollection(store.RootBlock, &col1, &col2)
 		blockB := makeBlockWithCollection(store.RootBlock, &col1, &col2)
-		store.CreateBlockAndMockResult(t, blockA)
-		store.CreateBlockAndMockResult(t, blockB)
+		resultA := store.CreateBlockAndMockResult(t, blockA)
+		resultB := store.CreateBlockAndMockResult(t, blockB)
 
 		ctx.mockIsBlockExecuted(store)
 		ctx.mockStateCommitmentByBlockID(store)
 		ctx.mockGetExecutionResultID(store)
-		ctx.executionState.On("NewStorageSnapshot", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		ctx.mockNewStorageSnapshot(resultA)
+		ctx.mockNewStorageSnapshot(resultB)
 
 		// receive blocks
 		err := ctx.engine.handleBlock(context.Background(), blockA.Block)
@@ -430,14 +430,16 @@ func TestExecuteBlockInOrder(t *testing.T) {
 		blockA := makeBlockWithCollection(store.RootBlock, &col1, &col2)
 		blockB := makeBlockWithCollection(store.RootBlock, &col2)
 		blockC := makeBlockWithCollection(store.RootBlock, &col3)
-		store.CreateBlockAndMockResult(t, blockA)
-		store.CreateBlockAndMockResult(t, blockB)
-		store.CreateBlockAndMockResult(t, blockC)
+		resultA := store.CreateBlockAndMockResult(t, blockA)
+		resultB := store.CreateBlockAndMockResult(t, blockB)
+		resultC := store.CreateBlockAndMockResult(t, blockC)
 
 		ctx.mockIsBlockExecuted(store)
 		ctx.mockStateCommitmentByBlockID(store)
 		ctx.mockGetExecutionResultID(store)
-		ctx.executionState.On("NewStorageSnapshot", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		ctx.mockNewStorageSnapshot(resultA)
+		ctx.mockNewStorageSnapshot(resultB)
+		ctx.mockNewStorageSnapshot(resultC)
 
 		// receive blocks
 		err := ctx.engine.handleBlock(context.Background(), blockA.Block)
@@ -493,8 +495,8 @@ func TestStopAtHeightWhenFinalizedBeforeExecuted(t *testing.T) {
 		blockC := makeBlockWithCollection(blockB.Block.Header)
 		blockD := makeBlockWithCollection(blockC.Block.Header)
 
-		store.CreateBlockAndMockResult(t, blockA)
-		store.CreateBlockAndMockResult(t, blockB)
+		resultA := store.CreateBlockAndMockResult(t, blockA)
+		resultB := store.CreateBlockAndMockResult(t, blockB)
 		store.CreateBlockAndMockResult(t, blockC)
 		store.CreateBlockAndMockResult(t, blockD)
 
@@ -508,7 +510,8 @@ func TestStopAtHeightWhenFinalizedBeforeExecuted(t *testing.T) {
 		ctx.mockIsBlockExecuted(store)
 		ctx.mockStateCommitmentByBlockID(store)
 		ctx.mockGetExecutionResultID(store)
-		ctx.executionState.On("NewStorageSnapshot", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		ctx.mockNewStorageSnapshot(resultA)
+		ctx.mockNewStorageSnapshot(resultB)
 
 		// receive blocks
 		err = ctx.engine.handleBlock(context.Background(), blockA.Block)
@@ -561,8 +564,8 @@ func TestStopAtHeightWhenExecutedBeforeFinalized(t *testing.T) {
 		blockC := makeBlockWithCollection(blockB.Block.Header)
 		blockD := makeBlockWithCollection(blockC.Block.Header)
 
-		store.CreateBlockAndMockResult(t, blockA)
-		store.CreateBlockAndMockResult(t, blockB)
+		resultA := store.CreateBlockAndMockResult(t, blockA)
+		resultB := store.CreateBlockAndMockResult(t, blockB)
 		store.CreateBlockAndMockResult(t, blockC)
 		store.CreateBlockAndMockResult(t, blockD)
 
@@ -576,7 +579,8 @@ func TestStopAtHeightWhenExecutedBeforeFinalized(t *testing.T) {
 		ctx.mockIsBlockExecuted(store)
 		ctx.mockStateCommitmentByBlockID(store)
 		ctx.mockGetExecutionResultID(store)
-		ctx.executionState.On("NewStorageSnapshot", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		ctx.mockNewStorageSnapshot(resultA)
+		ctx.mockNewStorageSnapshot(resultB)
 
 		ctx.providerEngine.On("BroadcastExecutionReceipt", mock.Anything, mock.Anything, mock.Anything).Return(false, nil)
 		ctx.mockComputeBlock(store)
@@ -626,7 +630,7 @@ func TestStopAtHeightWhenExecutionFinalization(t *testing.T) {
 		blockB := makeBlockWithCollection(blockA.Block.Header)
 		blockC := makeBlockWithCollection(blockB.Block.Header)
 
-		store.CreateBlockAndMockResult(t, blockA)
+		resultA := store.CreateBlockAndMockResult(t, blockA)
 		store.CreateBlockAndMockResult(t, blockB)
 		store.CreateBlockAndMockResult(t, blockC)
 
@@ -638,7 +642,7 @@ func TestStopAtHeightWhenExecutionFinalization(t *testing.T) {
 		ctx.mockIsBlockExecuted(store)
 		ctx.mockStateCommitmentByBlockID(store)
 		ctx.mockGetExecutionResultID(store)
-		ctx.executionState.On("NewStorageSnapshot", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		ctx.mockNewStorageSnapshot(resultA)
 
 		ctx.providerEngine.On("BroadcastExecutionReceipt", mock.Anything, mock.Anything, mock.Anything).Return(false, nil)
 		ctx.mockComputeBlock(store)
@@ -694,7 +698,7 @@ func TestExecutedBlockUploadedFailureDoesntBlock(t *testing.T) {
 		ctx.mockIsBlockExecuted(store)
 		ctx.mockStateCommitmentByBlockID(store)
 		ctx.mockGetExecutionResultID(store)
-		ctx.executionState.On("NewStorageSnapshot", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		ctx.mockNewStorageSnapshot(result)
 
 		// receive block
 		err := ctx.engine.handleBlock(context.Background(), blockA.Block)
@@ -787,6 +791,17 @@ func (ctx *testingContext) mockGetExecutionResultID(store *mocks.MockBlockStore)
 
 			return blockResult.Result.ExecutionReceipt.ExecutionResult.ID(), nil
 		})
+}
+
+func (ctx *testingContext) mockNewStorageSnapshot(result *execution.ComputationResult) {
+	// the result is the mocked result for the block, in other words, if the ingestion executes this block,
+	// the mocked computationManager will produce this result.
+	// so when mocking the StorageSnapshot method, it must be called with the StartState, as well as its
+	// parent block, which is used for retrieving the storage state at the end of the parent block.
+	ctx.executionState.On("NewStorageSnapshot",
+		*result.ExecutableBlock.StartState,
+		result.ExecutableBlock.Block.Header.ParentID,
+		result.ExecutableBlock.Block.Header.Height-1).Return(nil)
 }
 
 func (ctx *testingContext) mockComputeBlock(store *mocks.MockBlockStore) {
