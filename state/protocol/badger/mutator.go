@@ -662,16 +662,10 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	}
 
 	// if epoch fallback was not previously triggered, check whether this block triggers it
-	if !epochFallbackTriggered {
-		epochFallbackTriggered, err = m.epochFallbackTriggeredByFinalizedBlock(header, psSnapshot)
-		if err != nil {
-			return fmt.Errorf("could not check whether finalized block triggers epoch fallback: %w", err)
-		}
-		if epochFallbackTriggered {
-			// emit the protocol event only the first time epoch fallback is triggered
-			events = append(events, m.consumer.EpochEmergencyFallbackTriggered)
-			metrics = append(metrics, m.metrics.EpochEmergencyFallbackTriggered)
-		}
+	if !epochFallbackTriggered && psSnapshot.InvalidEpochTransitionAttempted() {
+		// emit the protocol event only the first time epoch fallback is triggered
+		events = append(events, m.consumer.EpochEmergencyFallbackTriggered)
+		metrics = append(metrics, m.metrics.EpochEmergencyFallbackTriggered)
 	}
 
 	isFirstBlockOfEpoch, err := m.isFirstBlockOfEpoch(header, currentEpochSetup)
