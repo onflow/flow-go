@@ -11,6 +11,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
+	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
 	protocolstatemock "github.com/onflow/flow-go/state/protocol/protocol_state/mock"
 	"github.com/onflow/flow-go/storage/badger/transaction"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -29,6 +30,7 @@ type StateMutatorSuite struct {
 	resultsDB       *storagemock.ExecutionResults
 	setupsDB        *storagemock.EpochSetups
 	commitsDB       *storagemock.EpochCommits
+	globalParams    *protocolmock.GlobalParams
 	parentState     *flow.RichProtocolStateEntry
 	stateMachine    *protocolstatemock.ProtocolStateMachine
 	candidateView   uint64
@@ -42,6 +44,8 @@ func (s *StateMutatorSuite) SetupTest() {
 	s.resultsDB = storagemock.NewExecutionResults(s.T())
 	s.setupsDB = storagemock.NewEpochSetups(s.T())
 	s.commitsDB = storagemock.NewEpochCommits(s.T())
+	s.globalParams = protocolmock.NewGlobalParams(s.T())
+	s.globalParams.On("EpochCommitSafetyThreshold").Return(uint64(1000))
 	s.parentState = unittest.ProtocolStateFixture()
 	s.candidateView = s.parentState.CurrentEpochSetup.FirstView + 1
 	s.stateMachine = protocolstatemock.NewProtocolStateMachine(s.T())
@@ -52,6 +56,7 @@ func (s *StateMutatorSuite) SetupTest() {
 		s.resultsDB,
 		s.setupsDB,
 		s.commitsDB,
+		s.globalParams,
 		s.candidateView,
 		s.parentState,
 		func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
@@ -140,6 +145,7 @@ func (s *StateMutatorSuite) TestApplyServiceEvents_InvalidEpochSetup() {
 			s.resultsDB,
 			s.setupsDB,
 			s.commitsDB,
+			s.globalParams,
 			s.candidateView,
 			s.parentState,
 			func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
@@ -202,6 +208,7 @@ func (s *StateMutatorSuite) TestApplyServiceEvents_InvalidEpochCommit() {
 			s.resultsDB,
 			s.setupsDB,
 			s.commitsDB,
+			s.globalParams,
 			s.candidateView,
 			s.parentState,
 			func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
