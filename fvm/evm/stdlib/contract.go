@@ -77,8 +77,7 @@ func newInternalEVMTypeEncodeABIFunction(
 			values := make([]interface{}, 0)
 			var arguments gethABI.Arguments
 
-			for i := 0; i < valuesArray.Count(); i++ {
-				element := valuesArray.Get(inter, locationRange, i)
+			valuesArray.Iterate(inter, func(element interpreter.Value) (resume bool) {
 				switch value := element.(type) {
 				case *interpreter.StringValue:
 					values = append(values, value.Str)
@@ -132,7 +131,9 @@ func newInternalEVMTypeEncodeABIFunction(
 					}
 					arguments = append(arguments, gethABI.Argument{Type: typ})
 				}
-			}
+
+				return true
+			})
 
 			encoded, err := arguments.Pack(values...)
 			if err != nil {
@@ -197,9 +198,8 @@ func newInternalEVMTypeDecodeABIFunction(
 			}
 
 			var arguments gethABI.Arguments
-			for i := 0; i < typesArray.Count(); i++ {
-				arg := typesArray.Get(inter, locationRange, i)
-				switch arg.String() {
+			typesArray.Iterate(inter, func(element interpreter.Value) (resume bool) {
+				switch element.String() {
 				case "Type<String>()":
 					typ, err := gethABI.NewType("string", "", nil)
 					if err != nil {
@@ -231,7 +231,9 @@ func newInternalEVMTypeDecodeABIFunction(
 					}
 					arguments = append(arguments, gethABI.Argument{Type: typ})
 				}
-			}
+
+				return true
+			})
 
 			decoded, err := arguments.Unpack(data)
 			if err != nil {
