@@ -23,30 +23,25 @@ var _ protocol.Params = (*Params)(nil)
 // are served on demand directly from the database, _without_ any caching.
 type InstanceParams struct {
 	db *badger.DB
-
-	// rootHeight marks the cutoff of the history this node knows about. We cache it in the state
-	// because it cannot change over the lifecycle of a protocol state instance. It is frequently
-	// larger than the height of the root block of the spork, (also cached below as
-	// `sporkRootBlockHeight`), for instance, if the node joined in an epoch after the last spork.
+	// finalizedRoot marks the cutoff of the history this node knows about.
 	finalizedRoot *flow.Header
 	// sealedRootHeight returns the root block that is sealed.
 	sealedRoot *flow.Header
-	// sporkRootBlockHeight is the height of the root block in the current spork. We cache it in
-	// the state, because it cannot change over the lifecycle of a protocol state instance.
-	// Caution: A node that joined in a later epoch past the spork, the node will likely _not_
-	// know the spork's root block in full (though it will always know the height).
-	sporkRootBlockHeight uint64
 	// rootSeal stores the root block seal of the current protocol state.
 	rootSeal *flow.Seal
 }
 
 var _ protocol.InstanceParams = (*InstanceParams)(nil)
 
+// ReadInstanceParams reads the instance parameters from the database and returns them as in-memory representation.
+// No errors are expected during normal operation.
 func ReadInstanceParams(db *badger.DB, headers storage.Headers, seals storage.Seals) (*InstanceParams, error) {
 	params := &InstanceParams{
 		db: db,
 	}
 
+	// in next section we will read data from the database and cache them,
+	// as they are immutable for the runtime of the node.
 	err := db.View(func(txn *badger.Txn) error {
 		var (
 			finalizedRootHeight uint64
@@ -62,11 +57,6 @@ func ReadInstanceParams(db *badger.DB, headers storage.Headers, seals storage.Se
 		err = db.View(operation.RetrieveSealedRootHeight(&sealedRootHeight))
 		if err != nil {
 			return fmt.Errorf("could not read sealed root block to populate cache: %w", err)
-		}
-		// spork root block height
-		err = db.View(operation.RetrieveSporkRootBlockHeight(&params.sporkRootBlockHeight))
-		if err != nil {
-			return fmt.Errorf("could not get spork root block height: %w", err)
 		}
 
 		// look up root block ID
@@ -108,6 +98,12 @@ func ReadInstanceParams(db *badger.DB, headers storage.Headers, seals storage.Se
 	return params, nil
 }
 
+// EpochFallbackTriggered returns whether epoch fallback mode (EFM) has been triggered.
+// EFM is a permanent, spork-scoped state which is triggered when the next
+// epoch fails to be committed in the allocated time. Once EFM is triggered,
+// it will remain in effect until the next spork.
+// TODO for 'leaving Epoch Fallback via special service event'
+// No errors are expected during normal operation.
 func (p *InstanceParams) EpochFallbackTriggered() (bool, error) {
 	var triggered bool
 	err := p.db.View(operation.CheckEpochEmergencyFallbackTriggered(&triggered))
@@ -117,10 +113,16 @@ func (p *InstanceParams) EpochFallbackTriggered() (bool, error) {
 	return triggered, nil
 }
 
+// FinalizedRoot returns the finalized root header of the current protocol state. This will be
+// the head of the protocol state snapshot used to bootstrap this state and
+// may differ from node to node for the same protocol state.
+// No errors are expected during normal operation.
 func (p *InstanceParams) FinalizedRoot() *flow.Header {
 	return p.finalizedRoot
 }
 
+// SealedRoot returns the sealed root block. If it's different from FinalizedRoot() block,
+// it means the node is bootstrapped from mid-spork.
 func (p *InstanceParams) SealedRoot() *flow.Header {
 	return p.sealedRoot
 }
@@ -128,14 +130,8 @@ func (p *InstanceParams) SealedRoot() *flow.Header {
 // Seal returns the root block seal of the current protocol state. This will be
 // the seal for the root block used to bootstrap this state and may differ from
 // node to node for the same protocol state.
-// No errors are expected during normal operation.
 func (p *InstanceParams) Seal() *flow.Seal {
 	return p.rootSeal
-}
-
-// SporkRootBlockHeight is the height of the root block in the current spork.
-func (p *InstanceParams) SporkRootBlockHeight() uint64 {
-	return p.sporkRootBlockHeight
 }
 
 // ReadGlobalParams reads the global parameters from the database and returns them as in-memory representation.

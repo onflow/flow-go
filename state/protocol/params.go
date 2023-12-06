@@ -20,24 +20,22 @@ type InstanceParams interface {
 	// FinalizedRoot returns the finalized root header of the current protocol state. This will be
 	// the head of the protocol state snapshot used to bootstrap this state and
 	// may differ from node to node for the same protocol state.
-	// No errors are expected during normal operation.
 	FinalizedRoot() *flow.Header
 
 	// SealedRoot returns the sealed root block. If it's different from FinalizedRoot() block,
 	// it means the node is bootstrapped from mid-spork.
-	// No errors are expected during normal operation.
 	SealedRoot() *flow.Header
 
 	// Seal returns the root block seal of the current protocol state. This will be
 	// the seal for the root block used to bootstrap this state and may differ from
 	// node to node for the same protocol state.
-	// No errors are expected during normal operation.
 	Seal() *flow.Seal
 
-	// EpochFallbackTriggered returns whether epoch fallback mode (EECC) has been triggered.
-	// EECC is a permanent, spork-scoped state which is triggered when the next
-	// epoch fails to be committed in the allocated time. Once EECC is triggered,
+	// EpochFallbackTriggered returns whether epoch fallback mode (EFM) has been triggered.
+	// EFM is a permanent, spork-scoped state which is triggered when the next
+	// epoch fails to be committed in the allocated time. Once EFM is triggered,
 	// it will remain in effect until the next spork.
+	// TODO for 'leaving Epoch Fallback via special service event'
 	// No errors are expected during normal operation.
 	EpochFallbackTriggered() (bool, error)
 }
@@ -93,7 +91,7 @@ type GlobalParams interface {
 	// the epoch actually ends. Although the use of this deadline DOES NOT
 	// guarantee these properties, it is a simpler way to assure them with high
 	// likelihood, given reasonable configuration.
-	// In particular, all nodes will agree about EECC being triggered (or not)
+	// In particular, all nodes will agree about EFM being triggered (or not)
 	// if at least one block with view in [d, f] is finalized - in other words
 	// at least one block is finalized after the epoch commitment deadline, and
 	// before the next epoch begins.
