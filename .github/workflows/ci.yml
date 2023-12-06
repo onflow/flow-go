@@ -74,8 +74,8 @@ jobs:
       - name: code sanity check
         run: make code-sanity-check
 
-  create-dynamic-test-matrix:
-    name: Create Dynamic Test Matrix
+  dynamic-test-matrix:
+    name: Dynamic Test Matrix
     runs-on: ubuntu-latest
     outputs:
       dynamic-matrix: ${{ steps.set-test-matrix.outputs.dynamicMatrix }}
