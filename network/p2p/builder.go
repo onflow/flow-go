@@ -19,10 +19,18 @@ import (
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p/p2pconf"
+	"github.com/onflow/flow-go/network/p2p/p2pnode"
 )
 
 type GossipSubFactoryFunc func(context.Context, zerolog.Logger, host.Host, PubSubAdapterConfig, CollectionClusterChangesConsumer) (PubSubAdapter, error)
-type CreateNodeFunc func(zerolog.Logger, host.Host, ProtocolPeerCache, PeerManager, *DisallowListCacheConfig) LibP2PNode
+
+// NodeConstructor is a function that creates a new libp2p node.
+// Args:
+// - config: configuration for the node
+// Returns:
+// - LibP2PNode: new libp2p node
+// - error: error if any, any returned error is irrecoverable.
+type NodeConstructor func(config *p2pnode.Config) (LibP2PNode, error)
 type GossipSubAdapterConfigFunc func(*BasePubSubAdapterConfig) PubSubAdapterConfig
 
 // GossipSubBuilder provides a builder pattern for creating a GossipSubParameters pubsub system.
@@ -125,7 +133,15 @@ type NodeBuilder interface {
 	// Returns:
 	// none
 	OverrideGossipSubScoringConfig(*PeerScoringConfigOverride) NodeBuilder
-	SetCreateNode(CreateNodeFunc) NodeBuilder
+
+	// OverrideNodeConstructor overrides the default node constructor, i.e., the function that creates a new libp2p node.
+	// The purpose of override is to allow the node to provide a custom node constructor for sake of testing or experimentation.
+	// It is NOT recommended to override the default node constructor in production unless you know what you are doing.
+	// Args:
+	// - NodeConstructor: custom node constructor
+	// Returns:
+	// none
+	OverrideNodeConstructor(NodeConstructor) NodeBuilder
 	SetGossipSubFactory(GossipSubFactoryFunc, GossipSubAdapterConfigFunc) NodeBuilder
 	OverrideDefaultRpcInspectorSuiteFactory(GossipSubRpcInspectorSuiteFactoryFunc) NodeBuilder
 	Build() (LibP2PNode, error)

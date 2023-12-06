@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/hashicorp/go-multierror"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	kbucket "github.com/libp2p/go-libp2p-kbucket"
@@ -64,29 +65,58 @@ type Node struct {
 	// Cache of temporary disallow-listed peers, when a peer is disallow-listed, the connections to that peer
 	// are closed and further connections are not allowed till the peer is removed from the disallow-list.
 	disallowListedCache p2p.DisallowListCache
+	parameters          *Parameters
+}
+
+// Parameters are the numerical values that are used to configure the libp2p node.
+type Parameters struct {
+	EnableProtectedStreams bool `validate:"required"`
+}
+
+// Config is the configuration for the libp2p node, it contains the parameters as well as the essential components for setting up the node.
+// It is used to create a new libp2p node.
+type Config struct {
+	Parameters *Parameters `validate:"required"`
+	// logger used to provide logging
+	Logger zerolog.Logger `validate:"required"`
+	// reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p/core/host)
+	Host                 host.Host                    `validate:"required"`
+	PeerManager          p2p.PeerManager              `validate:"required"`
+	DisallowListCacheCfg *p2p.DisallowListCacheConfig `validate:"required"`
 }
 
 // NewNode creates a new libp2p node and sets its parameters.
-func NewNode(
-	logger zerolog.Logger,
-	host host.Host,
-	pCache p2p.ProtocolPeerCache,
-	peerManager p2p.PeerManager,
-	disallowLstCacheCfg *p2p.DisallowListCacheConfig,
-) *Node {
+// Args:
+//   - cfg: The configuration for the libp2p node.
+//
+// Returns:
+//   - *Node: The created libp2p node.
+//
+// - error: An error, if any occurred during the process. This includes failure in creating the node. The returned error is irrecoverable, and the node cannot be used.
+func NewNode(cfg *Config) (*Node, error) {
+	err := validator.New().Struct(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("invalid config: %w", err)
+	}
+
+	pCache, err := internal.NewProtocolPeerCache(cfg.Logger, cfg.Host)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create protocol peer cache: %w", err)
+	}
+
 	return &Node{
-		host:        host,
-		logger:      logger.With().Str("component", "libp2p-node").Logger(),
+		host:        cfg.Host,
+		logger:      cfg.Logger.With().Str("component", "libp2p-node").Logger(),
 		topics:      make(map[channels.Topic]p2p.Topic),
 		subs:        make(map[channels.Topic]p2p.Subscription),
 		pCache:      pCache,
-		peerManager: peerManager,
+		peerManager: cfg.PeerManager,
 		disallowListedCache: internal.NewDisallowListCache(
-			disallowLstCacheCfg.MaxSize,
-			logger.With().Str("module", "disallow-list-cache").Logger(),
-			disallowLstCacheCfg.Metrics,
+			cfg.DisallowListCacheCfg.MaxSize,
+			cfg.Logger.With().Str("module", "disallow-list-cache").Logger(),
+			cfg.DisallowListCacheCfg.Metrics,
 		),
-	}
+	}, nil
 }
 
 func (n *Node) Start(ctx irrecoverable.SignalerContext) {

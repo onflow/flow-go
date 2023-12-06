@@ -9,7 +9,7 @@ import (
 
 // UnicastConfig configuration parameters for the unicast protocol.
 type UnicastConfig struct {
-	netconf.UnicastConfig
+	netconf.Unicast
 
 	// RateLimiterDistributor distributor that distributes notifications whenever a peer is rate limited to all consumers.
 	RateLimiterDistributor p2p.UnicastRateLimiterDistributor

@@ -128,6 +128,7 @@ func (suite *NetworkTestSuite) SetupTest() {
 	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
 	defaultFlowConfig, err := config.DefaultConfig()
 	require.NoError(suite.T(), err)
+	defaultFlowConfig.NetworkConfig.Unicast.UnicastManager.CreateStreamBackoffDelay = 1 * time.Millisecond
 
 	opts := []p2ptest.NodeFixtureParameterOption{p2ptest.WithUnicastHandlerFunc(nil)}
 
@@ -141,7 +142,7 @@ func (suite *NetworkTestSuite) SetupTest() {
 		opts = append(opts,
 			p2ptest.WithConnectionManager(connManager),
 			p2ptest.WithRole(flow.RoleExecution),
-			p2ptest.WithCreateStreamRetryDelay(1*time.Millisecond)) // to suppress exponential backoff
+			p2ptest.OverrideFlowConfig(defaultFlowConfig)) // to suppress exponential backoff
 		node, nodeId := p2ptest.NodeFixture(suite.T(),
 			suite.sporkId,
 			suite.T().Name(),
@@ -279,12 +280,16 @@ func (suite *NetworkTestSuite) TestUnicastRateLimit_Messages() {
 	opts := []ratelimit.RateLimitersOption{ratelimit.WithMessageRateLimiter(messageRateLimiter), ratelimit.WithNotifier(distributor), ratelimit.WithDisabledRateLimiting(false)}
 	rateLimiters := ratelimit.NewRateLimiters(opts...)
 
+	defaultFlowConfig, err := config.DefaultConfig()
+	require.NoError(suite.T(), err)
+	defaultFlowConfig.NetworkConfig.Unicast.UnicastManager.CreateStreamBackoffDelay = 1 * time.Millisecond
+
 	idProvider := unittest.NewUpdatableIDProvider(suite.ids)
 	ids, libP2PNodes := testutils.LibP2PNodeForNetworkFixture(suite.T(),
 		suite.sporkId,
 		1,
 		p2ptest.WithUnicastRateLimitDistributor(distributor),
-		p2ptest.WithCreateStreamRetryDelay(1*time.Millisecond), // to suppress exponential backoff
+		p2ptest.OverrideFlowConfig(defaultFlowConfig), // to suppress exponential backoff
 		p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(pid peer.ID) error {
 			if messageRateLimiter.IsRateLimited(pid) {
 				return fmt.Errorf("rate-limited peer")
@@ -417,13 +422,17 @@ func (suite *NetworkTestSuite) TestUnicastRateLimit_Bandwidth() {
 	opts := []ratelimit.RateLimitersOption{ratelimit.WithBandwidthRateLimiter(bandwidthRateLimiter), ratelimit.WithNotifier(distributor), ratelimit.WithDisabledRateLimiting(false)}
 	rateLimiters := ratelimit.NewRateLimiters(opts...)
 
+	defaultFlowConfig, err := config.DefaultConfig()
+	require.NoError(suite.T(), err)
+	defaultFlowConfig.NetworkConfig.Unicast.UnicastManager.CreateStreamBackoffDelay = 1 * time.Millisecond
+
 	idProvider := unittest.NewUpdatableIDProvider(suite.ids)
 	// create a new staked identity
 	ids, libP2PNodes := testutils.LibP2PNodeForNetworkFixture(suite.T(),
 		suite.sporkId,
 		1,
 		p2ptest.WithUnicastRateLimitDistributor(distributor),
-		p2ptest.WithCreateStreamRetryDelay(1*time.Millisecond), // to suppress exponential backoff
+		p2ptest.OverrideFlowConfig(defaultFlowConfig), // to suppress exponential backoff
 		p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(pid peer.ID) error {
 			// create connection gater, connection gater will refuse connections from rate limited nodes
 			if bandwidthRateLimiter.IsRateLimited(pid) {

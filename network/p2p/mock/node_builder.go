@@ -134,11 +134,11 @@ func (_m *NodeBuilder) SetConnectionManager(_a0 connmgr.ConnManager) p2p.NodeBui
 }
 
 // SetCreateNode provides a mock function with given fields: _a0
-func (_m *NodeBuilder) SetCreateNode(_a0 p2p.CreateNodeFunc) p2p.NodeBuilder {
+func (_m *NodeBuilder) OverrideNodeConstructor(_a0 p2p.NodeConstructor) p2p.NodeBuilder {
 	ret := _m.Called(_a0)
 
 	var r0 p2p.NodeBuilder
-	if rf, ok := ret.Get(0).(func(p2p.CreateNodeFunc) p2p.NodeBuilder); ok {
+	if rf, ok := ret.Get(0).(func(p2p.NodeConstructor) p2p.NodeBuilder); ok {
 		r0 = rf(_a0)
 	} else {
 		if ret.Get(0) != nil {

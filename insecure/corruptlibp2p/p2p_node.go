@@ -57,6 +57,12 @@ func NewCorruptLibP2PNode(
 	pCache p2p.ProtocolPeerCache,
 	peerManager p2p.PeerManager,
 	disallowListCacheCfg *p2p.DisallowListCacheConfig) p2p.LibP2PNode {
-	node := p2pnode.NewNode(logger, host, pCache, peerManager, disallowListCacheCfg)
+
+	node, err := p2pnode.NewNode(&p2pnode.Config{
+		Logger:               logger,
+		Host:                 host,
+		PeerManager:          peerManager,
+		DisallowListCacheCfg: disallowListCacheCfg,
+	})
 	return &CorruptP2PNode{Node: node, logger: logger, codec: cbor.NewCodec()}
 }

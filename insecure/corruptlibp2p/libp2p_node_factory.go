@@ -101,7 +101,7 @@ func InitCorruptLibp2pNode(
 		return nil, fmt.Errorf("could not create corrupt libp2p node builder: %w", err)
 	}
 	if topicValidatorDisabled {
-		builder.SetCreateNode(NewCorruptLibP2PNode)
+		builder.OverrideNodeConstructor(NewCorruptLibP2PNode)
 	}
 
 	overrideWithCorruptGossipSub(

@@ -591,7 +591,7 @@ func (builder *FollowerServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 			Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
 		},
 		&p2pconfig.UnicastConfig{
-			UnicastConfig: builder.FlowConfig.NetworkConfig.UnicastConfig,
+			Unicast: builder.FlowConfig.NetworkConfig.UnicastConfig,
 		}).
 		SetSubscriptionFilter(
 			subscription.NewRoleBasedFilter(

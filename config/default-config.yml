@@ -14,28 +14,30 @@ network-config:
   dns-cache-ttl: 5m
   # The size of the queue for notifications about new peers in the disallow list.
   disallow-list-notification-cache-size: 100
-  # unicast rate limiters config
-  # Setting this to true will disable connection disconnects and gating when unicast rate limiters are configured
-  unicast-dry-run: true
-  # The number of seconds a peer will be forced to wait before being allowed to successfully reconnect to the node after being rate limited
-  unicast-lockout-duration: 10s
-  # Amount of unicast messages that can be sent by a peer per second
-  unicast-message-rate-limit: 0
-  # Bandwidth size in bytes a peer is allowed to send via unicast streams per second
-  unicast-bandwidth-rate-limit: 0
-  # Bandwidth size in bytes a peer is allowed to send via unicast streams at once
-  unicast-bandwidth-burst-limit: 1e9
-  # The minimum number of consecutive successful streams to reset the unicast stream creation retry budget from zero to the maximum default. If it is set to 100 for example, it
-  # means that if a peer has 100 consecutive successful streams to the remote peer, and the remote peer has a zero stream creation budget,
-  # the unicast stream creation retry budget for that remote peer will be reset to the maximum default.
-  unicast-stream-zero-retry-reset-threshold: 100
-  # The maximum number of retry attempts for creating a unicast stream to a remote peer before giving up. If it is set to 3 for example, it means that if a peer fails to create
-  # retry a unicast stream to a remote peer 3 times, the peer will give up and will not retry creating a unicast stream to that remote peer.
-  # When it is set to zero it means that the peer will not retry creating a unicast stream to a remote peer if it fails.
-  unicast-max-stream-creation-retry-attempt-times: 3
-  # The size of the dial config cache used to keep track of the dial config for each remote peer. The dial config is used to keep track of the dial retry budget for each remote peer.
-  # Recommended to set it to the maximum number of remote peers in the network.
-  unicast-dial-config-cache-size: 10_000
+  unicast:
+    rate-limiter:
+      # Setting this to true will disable connection disconnects and gating when unicast rate limiters are configured
+      dry-run: true
+      # The number of seconds a peer will be forced to wait before being allowed to successfully reconnect to the node after being rate limited
+      lockout-duration: 10s
+      # Amount of unicast messages that can be sent by a peer per second
+      message-rate-limit: 0
+      # Bandwidth size in bytes a peer is allowed to send via unicast streams per second
+      bandwidth-rate-limit: 0
+      # Bandwidth size in bytes a peer is allowed to send via unicast streams at once
+      bandwidth-burst-limit: 1e9
+    manager:
+      # The minimum number of consecutive successful streams to reset the unicast stream creation retry budget from zero to the maximum default. If it is set to 100 for example, it
+      # means that if a peer has 100 consecutive successful streams to the remote peer, and the remote peer has a zero stream creation budget,
+      # the unicast stream creation retry budget for that remote peer will be reset to the maximum default.
+      stream-zero-retry-reset-threshold: 100
+      # The maximum number of retry attempts for creating a unicast stream to a remote peer before giving up. If it is set to 3 for example, it means that if a peer fails to create
+      # retry a unicast stream to a remote peer 3 times, the peer will give up and will not retry creating a unicast stream to that remote peer.
+      # When it is set to zero it means that the peer will not retry creating a unicast stream to a remote peer if it fails.
+      max-stream-creation-retry-attempt-times: 3
+      # The size of the dial config cache used to keep track of the dial config for each remote peer. The dial config is used to keep track of the dial retry budget for each remote peer.
+      # Recommended to set it to the maximum number of remote peers in the network.
+      dial-config-cache-size: 10_000
   # Resource manager config
   libp2p-resource-manager:
     # Maximum allowed fraction of file descriptors to be allocated by the libp2p resources in [0,1]
