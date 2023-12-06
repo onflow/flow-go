@@ -34,6 +34,7 @@ func ContractCode(flowTokenAddress flow.Address) []byte {
 
 const ContractName = "EVM"
 const evmAddressTypeBytesFieldName = "bytes"
+const evmAddressTypeStructName = "EVM.EVMAddress"
 
 var EVMTransactionBytesCadenceType = cadence.NewVariableSizedArrayType(cadence.TheUInt8Type)
 var evmTransactionBytesType = sema.NewVariableSizedType(nil, sema.UInt8Type)
@@ -57,6 +58,14 @@ var internalEVMTypeEncodeABIFunctionType = &sema.FunctionType{
 		},
 	},
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.ByteArrayType),
+}
+
+func newGethArgument(typeName string) gethABI.Argument {
+	typ, err := gethABI.NewType(typeName, "", nil)
+	if err != nil {
+		panic(err)
+	}
+	return gethABI.Argument{Type: typ}
 }
 
 func newInternalEVMTypeEncodeABIFunction(
@@ -83,102 +92,46 @@ func newInternalEVMTypeEncodeABIFunction(
 				switch value := element.(type) {
 				case *interpreter.StringValue:
 					values = append(values, value.Str)
-					typ, err := gethABI.NewType("string", "", nil)
-					if err != nil {
-						panic(err)
-					}
-					arguments = append(arguments, gethABI.Argument{Type: typ})
+					arguments = append(arguments, newGethArgument("string"))
 				case interpreter.UInt8Value:
 					values = append(values, uint8(value))
-					typ, err := gethABI.NewType("uint8", "", nil)
-					if err != nil {
-						panic(err)
-					}
-					arguments = append(arguments, gethABI.Argument{Type: typ})
+					arguments = append(arguments, newGethArgument("uint8"))
 				case interpreter.UInt16Value:
 					values = append(values, uint16(value))
-					typ, err := gethABI.NewType("uint16", "", nil)
-					if err != nil {
-						panic(err)
-					}
-					arguments = append(arguments, gethABI.Argument{Type: typ})
+					arguments = append(arguments, newGethArgument("uint16"))
 				case interpreter.UInt32Value:
 					values = append(values, uint32(value))
-					typ, err := gethABI.NewType("uint32", "", nil)
-					if err != nil {
-						panic(err)
-					}
-					arguments = append(arguments, gethABI.Argument{Type: typ})
+					arguments = append(arguments, newGethArgument("uint32"))
 				case interpreter.UInt64Value:
 					values = append(values, uint64(value))
-					typ, err := gethABI.NewType("uint64", "", nil)
-					if err != nil {
-						panic(err)
-					}
-					arguments = append(arguments, gethABI.Argument{Type: typ})
+					arguments = append(arguments, newGethArgument("uint64"))
 				case interpreter.UInt128Value:
 					values = append(values, value.BigInt)
-					typ, err := gethABI.NewType("uint128", "", nil)
-					if err != nil {
-						panic(err)
-					}
-					arguments = append(arguments, gethABI.Argument{Type: typ})
+					arguments = append(arguments, newGethArgument("uint128"))
 				case interpreter.UInt256Value:
 					values = append(values, value.BigInt)
-					typ, err := gethABI.NewType("uint256", "", nil)
-					if err != nil {
-						panic(err)
-					}
-					arguments = append(arguments, gethABI.Argument{Type: typ})
+					arguments = append(arguments, newGethArgument("uint256"))
 				case interpreter.Int8Value:
 					values = append(values, int8(value))
-					typ, err := gethABI.NewType("int8", "", nil)
-					if err != nil {
-						panic(err)
-					}
-					arguments = append(arguments, gethABI.Argument{Type: typ})
+					arguments = append(arguments, newGethArgument("int8"))
 				case interpreter.Int16Value:
 					values = append(values, int16(value))
-					typ, err := gethABI.NewType("int16", "", nil)
-					if err != nil {
-						panic(err)
-					}
-					arguments = append(arguments, gethABI.Argument{Type: typ})
+					arguments = append(arguments, newGethArgument("int16"))
 				case interpreter.Int32Value:
 					values = append(values, int32(value))
-					typ, err := gethABI.NewType("int32", "", nil)
-					if err != nil {
-						panic(err)
-					}
-					arguments = append(arguments, gethABI.Argument{Type: typ})
+					arguments = append(arguments, newGethArgument("int32"))
 				case interpreter.Int64Value:
 					values = append(values, int64(value))
-					typ, err := gethABI.NewType("int64", "", nil)
-					if err != nil {
-						panic(err)
-					}
-					arguments = append(arguments, gethABI.Argument{Type: typ})
+					arguments = append(arguments, newGethArgument("int64"))
 				case interpreter.Int128Value:
 					values = append(values, value.BigInt)
-					typ, err := gethABI.NewType("int128", "", nil)
-					if err != nil {
-						panic(err)
-					}
-					arguments = append(arguments, gethABI.Argument{Type: typ})
+					arguments = append(arguments, newGethArgument("int128"))
 				case interpreter.Int256Value:
 					values = append(values, value.BigInt)
-					typ, err := gethABI.NewType("int256", "", nil)
-					if err != nil {
-						panic(err)
-					}
-					arguments = append(arguments, gethABI.Argument{Type: typ})
+					arguments = append(arguments, newGethArgument("int256"))
 				case interpreter.BoolValue:
 					values = append(values, bool(value))
-					typ, err := gethABI.NewType("bool", "", nil)
-					if err != nil {
-						panic(err)
-					}
-					arguments = append(arguments, gethABI.Argument{Type: typ})
+					arguments = append(arguments, newGethArgument("bool"))
 				case *interpreter.CompositeValue:
 					if value.TypeID() == "A.0000000000000001.EVM.EVMAddress" {
 						bytes, err := interpreter.ByteArrayValueToByteSlice(
@@ -190,11 +143,7 @@ func newInternalEVMTypeEncodeABIFunction(
 							panic(err)
 						}
 						values = append(values, gethCommon.Address(bytes))
-						typ, err := gethABI.NewType("address", "", nil)
-						if err != nil {
-							panic(err)
-						}
-						arguments = append(arguments, gethABI.Argument{Type: typ})
+						arguments = append(arguments, newGethArgument("address"))
 					}
 				case *interpreter.ArrayValue:
 					elements := make([]uint64, 0)
@@ -214,11 +163,7 @@ func newInternalEVMTypeEncodeABIFunction(
 						return true
 					})
 					values = append(values, elements)
-					typ, err := gethABI.NewType("uint64[]", "", nil)
-					if err != nil {
-						panic(err)
-					}
-					arguments = append(arguments, gethABI.Argument{Type: typ})
+					arguments = append(arguments, newGethArgument("uint64[]"))
 				default:
 					panic(fmt.Errorf("unsupported type: %v", value.StaticType(inter)))
 				}
@@ -297,18 +242,10 @@ func newInternalEVMTypeDecodeABIFunction(
 
 				switch value := typeValue.Type.(type) {
 				case interpreter.ArrayStaticType:
-					typ, err := gethABI.NewType("uint64[]", "", nil)
-					if err != nil {
-						panic(err)
-					}
-					arguments = append(arguments, gethABI.Argument{Type: typ})
+					arguments = append(arguments, newGethArgument("uint64[]"))
 				case interpreter.CompositeStaticType:
 					if value.TypeID == "A.0000000000000001.EVM.EVMAddress" {
-						typ, err := gethABI.NewType("address", "", nil)
-						if err != nil {
-							panic(err)
-						}
-						arguments = append(arguments, gethABI.Argument{Type: typ})
+						arguments = append(arguments, newGethArgument("address"))
 					} else {
 						panic(fmt.Errorf("unsupported composite type: %v", value))
 					}
@@ -316,89 +253,33 @@ func newInternalEVMTypeDecodeABIFunction(
 
 				switch typeValue.Type {
 				case interpreter.PrimitiveStaticTypeString:
-					typ, err := gethABI.NewType("string", "", nil)
-					if err != nil {
-						panic(err)
-					}
-					arguments = append(arguments, gethABI.Argument{Type: typ})
+					arguments = append(arguments, newGethArgument("string"))
 				case interpreter.PrimitiveStaticTypeBool:
-					typ, err := gethABI.NewType("bool", "", nil)
-					if err != nil {
-						panic(err)
-					}
-					arguments = append(arguments, gethABI.Argument{Type: typ})
+					arguments = append(arguments, newGethArgument("bool"))
 				case interpreter.PrimitiveStaticTypeUInt8:
-					typ, err := gethABI.NewType("uint8", "", nil)
-					if err != nil {
-						panic(err)
-					}
-					arguments = append(arguments, gethABI.Argument{Type: typ})
+					arguments = append(arguments, newGethArgument("uint8"))
 				case interpreter.PrimitiveStaticTypeUInt16:
-					typ, err := gethABI.NewType("uint16", "", nil)
-					if err != nil {
-						panic(err)
-					}
-					arguments = append(arguments, gethABI.Argument{Type: typ})
+					arguments = append(arguments, newGethArgument("uint16"))
 				case interpreter.PrimitiveStaticTypeUInt32:
-					typ, err := gethABI.NewType("uint32", "", nil)
-					if err != nil {
-						panic(err)
-					}
-					arguments = append(arguments, gethABI.Argument{Type: typ})
+					arguments = append(arguments, newGethArgument("uint32"))
 				case interpreter.PrimitiveStaticTypeUInt64:
-					typ, err := gethABI.NewType("uint64", "", nil)
-					if err != nil {
-						panic(err)
-					}
-					arguments = append(arguments, gethABI.Argument{Type: typ})
+					arguments = append(arguments, newGethArgument("uint64"))
 				case interpreter.PrimitiveStaticTypeUInt128:
-					typ, err := gethABI.NewType("uint128", "", nil)
-					if err != nil {
-						panic(err)
-					}
-					arguments = append(arguments, gethABI.Argument{Type: typ})
+					arguments = append(arguments, newGethArgument("uint128"))
 				case interpreter.PrimitiveStaticTypeUInt256:
-					typ, err := gethABI.NewType("uint256", "", nil)
-					if err != nil {
-						panic(err)
-					}
-					arguments = append(arguments, gethABI.Argument{Type: typ})
+					arguments = append(arguments, newGethArgument("uint256"))
 				case interpreter.PrimitiveStaticTypeInt8:
-					typ, err := gethABI.NewType("int8", "", nil)
-					if err != nil {
-						panic(err)
-					}
-					arguments = append(arguments, gethABI.Argument{Type: typ})
+					arguments = append(arguments, newGethArgument("int8"))
 				case interpreter.PrimitiveStaticTypeInt16:
-					typ, err := gethABI.NewType("int16", "", nil)
-					if err != nil {
-						panic(err)
-					}
-					arguments = append(arguments, gethABI.Argument{Type: typ})
+					arguments = append(arguments, newGethArgument("int16"))
 				case interpreter.PrimitiveStaticTypeInt32:
-					typ, err := gethABI.NewType("int32", "", nil)
-					if err != nil {
-						panic(err)
-					}
-					arguments = append(arguments, gethABI.Argument{Type: typ})
+					arguments = append(arguments, newGethArgument("int32"))
 				case interpreter.PrimitiveStaticTypeInt64:
-					typ, err := gethABI.NewType("int64", "", nil)
-					if err != nil {
-						panic(err)
-					}
-					arguments = append(arguments, gethABI.Argument{Type: typ})
+					arguments = append(arguments, newGethArgument("int64"))
 				case interpreter.PrimitiveStaticTypeInt128:
-					typ, err := gethABI.NewType("int128", "", nil)
-					if err != nil {
-						panic(err)
-					}
-					arguments = append(arguments, gethABI.Argument{Type: typ})
+					arguments = append(arguments, newGethArgument("int128"))
 				case interpreter.PrimitiveStaticTypeInt256:
-					typ, err := gethABI.NewType("int256", "", nil)
-					if err != nil {
-						panic(err)
-					}
-					arguments = append(arguments, gethABI.Argument{Type: typ})
+					arguments = append(arguments, newGethArgument("int256"))
 				}
 
 				// continue iteration
@@ -493,12 +374,12 @@ func newInternalEVMTypeDecodeABIFunction(
 					compositeValue := interpreter.NewCompositeValue(
 						inter,
 						locationRange,
-						common.NewAddressLocation(gauge, contractsAddress, "EVM"),
-						"EVM.EVMAddress",
+						common.NewAddressLocation(gauge, contractsAddress, ContractName),
+						evmAddressTypeStructName,
 						common.CompositeKindStructure,
 						[]interpreter.CompositeField{
 							{
-								Name:  "bytes",
+								Name:  evmAddressTypeBytesFieldName,
 								Value: EVMAddressToAddressBytesArrayValue(inter, address),
 							},
 						},
