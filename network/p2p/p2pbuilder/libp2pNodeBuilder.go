@@ -74,7 +74,8 @@ type LibP2PNodeBuilder struct {
 }
 
 func NewNodeBuilder(
-	logger zerolog.Logger, gossipSubCfg *p2pconf.GossipSubParameters,
+	logger zerolog.Logger,
+	gossipSubCfg *p2pconf.GossipSubParameters,
 	metricsConfig *p2pconfig.MetricsConfig,
 	networkingType flownet.NetworkingType,
 	address string,
@@ -97,9 +98,11 @@ func NewNodeBuilder(
 		disallowListCacheCfg: disallowListCacheCfg,
 		networkingType:       networkingType,
 		gossipSubBuilder: gossipsubbuilder.NewGossipSubBuilder(logger,
-			metricsConfig, gossipSubCfg,
+			metricsConfig,
+			gossipSubCfg,
 			networkingType,
-			sporkId, idProvider),
+			sporkId,
+			idProvider),
 		peerManagerConfig: peerManagerConfig,
 		unicastConfig:     unicastConfig,
 	}
@@ -277,45 +280,43 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 	node.SetUnicastManager(unicastManager)
 
 	cm := component.NewComponentManagerBuilder().
-		AddWorker(
-			func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-				if builder.routingFactory != nil {
-					routingSystem, err := builder.routingFactory(ctx, h)
-					if err != nil {
-						ctx.Throw(fmt.Errorf("could not create routing system: %w", err))
-					}
-					if err := node.SetRouting(routingSystem); err != nil {
-						ctx.Throw(fmt.Errorf("could not set routing system: %w", err))
-					}
-					builder.gossipSubBuilder.SetRoutingSystem(routingSystem)
-					lg.Debug().Msg("routing system created")
-				}
-				// gossipsub is created here, because it needs to be created during the node startup.
-				gossipSub, err := builder.gossipSubBuilder.Build(ctx)
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			if builder.routingFactory != nil {
+				routingSystem, err := builder.routingFactory(ctx, h)
 				if err != nil {
-					ctx.Throw(fmt.Errorf("could not create gossipsub: %w", err))
+					ctx.Throw(fmt.Errorf("could not create routing system: %w", err))
 				}
-				node.SetPubSub(gossipSub)
-				gossipSub.Start(ctx)
-				ready()
-
-				<-gossipSub.Done()
-			}).
-		AddWorker(
-			func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-				// encapsulates shutdown logic for the libp2p node.
-				ready()
-				<-ctx.Done()
-				// we wait till the context is done, and then we stop the libp2p node.
-
-				err = node.Stop()
-				if err != nil {
-					// ignore context cancellation errors
-					if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
-						ctx.Throw(fmt.Errorf("could not stop libp2p node: %w", err))
-					}
+				if err := node.SetRouting(routingSystem); err != nil {
+					ctx.Throw(fmt.Errorf("could not set routing system: %w", err))
 				}
-			})
+				builder.gossipSubBuilder.SetRoutingSystem(routingSystem)
+				lg.Debug().Msg("routing system created")
+			}
+			// gossipsub is created here, because it needs to be created during the node startup.
+			gossipSub, err := builder.gossipSubBuilder.Build(ctx)
+			if err != nil {
+				ctx.Throw(fmt.Errorf("could not create gossipsub: %w", err))
+			}
+			node.SetPubSub(gossipSub)
+			gossipSub.Start(ctx)
+			ready()
+
+			<-gossipSub.Done()
+		}).
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			// encapsulates shutdown logic for the libp2p node.
+			ready()
+			<-ctx.Done()
+			// we wait till the context is done, and then we stop the libp2p node.
+
+			err = node.Stop()
+			if err != nil {
+				// ignore context cancellation errors
+				if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+					ctx.Throw(fmt.Errorf("could not stop libp2p node: %w", err))
+				}
+			}
+		})
 
 	node.SetComponentManager(cm.Build())
 
@@ -364,10 +365,9 @@ func defaultLibP2POptions(address string, key fcrypto.PrivateKey) ([]config.Opti
 	// While this sounds great, it intermittently causes a 'broken pipe' error
 	// as the 1-k discovery process and the 1-1 messaging both sometimes attempt to open connection to the same target
 	// As of now there is no requirement of client sockets to be a well-known port, so disabling port reuse all together.
-	t := libp2p.Transport(
-		func(u transport.Upgrader) (*tcp.TcpTransport, error) {
-			return tcp.NewTCPTransport(u, nil, tcp.DisableReuseport())
-		})
+	t := libp2p.Transport(func(u transport.Upgrader) (*tcp.TcpTransport, error) {
+		return tcp.NewTCPTransport(u, nil, tcp.DisableReuseport())
+	})
 
 	// gather all the options for the libp2p node
 	options := []config.Option{
