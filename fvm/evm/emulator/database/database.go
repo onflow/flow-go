@@ -116,7 +116,6 @@ func (db *Database) get(key []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	v, err := data.StoredValue(db.atreemap.Storage)
 	if err != nil {
 		return nil, err
@@ -413,6 +412,11 @@ func (b *batch) Replay(w gethDB.KeyValueWriter) error {
 func handleError(err error) error {
 	if err == nil {
 		return nil
+	}
+	// cases like key not found
+	var atreeUserError *atree.UserError
+	if stdErrors.As(err, &atreeUserError) {
+		return types.NewDatabaseError(err)
 	}
 	var atreeFatalError *atree.FatalError
 	// if is a atree fatal error or fvm fatal error (the second one captures external errors)

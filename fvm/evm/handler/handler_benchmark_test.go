@@ -10,7 +10,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func BenchmarkStorage(b *testing.B) { benchmarkStorageGrowth(b, 100, 100) }
+func BenchmarkStorage(b *testing.B) { benchmarkStorageGrowth(b, 100, 1_000_000) }
 
 // benchmark
 func benchmarkStorageGrowth(b *testing.B, accountCount, setupKittyCount int) {
@@ -22,11 +22,10 @@ func benchmarkStorageGrowth(b *testing.B, accountCount, setupKittyCount int) {
 				rootAddr,
 				func(tc *testutils.TestContract) {
 					db, handler := SetupHandler(b, backend, rootAddr)
-					numOfAccounts := 100000
-					accounts := make([]types.Account, numOfAccounts)
+					accounts := make([]types.Account, accountCount)
 					// setup several of accounts
 					// note that trie growth is the function of number of accounts
-					for i := 0; i < numOfAccounts; i++ {
+					for i := 0; i < accountCount; i++ {
 						account := handler.AccountByAddress(handler.AllocateAddress(), true)
 						account.Deposit(types.NewFlowTokenVault(types.Balance(100)))
 						accounts[i] = account

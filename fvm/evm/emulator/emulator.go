@@ -171,21 +171,21 @@ func (proc *procedure) commit() (gethCommon.Hash, error) {
 	// commits the changes from the journal into the in memory trie.
 	// in the future if we want to move this to the block level we could use finalize
 	// to get the root hash
-	newRoot, err := proc.state.Commit(true)
+	newRoot, err := proc.state.Commit(0, true)
 	if err != nil {
 		return gethTypes.EmptyRootHash, handleCommitError(err)
 	}
 
-	// flush the trie to the lower level db
-	// the reason we have to do this, is the original database
-	// is designed to keep changes in memory until the state.Commit
-	// is called then the changes moves into the trie, but the trie
-	// would stay in memory for faster transaction execution. you
-	// have to explicitly ask the trie to commit to the underlying storage
-	err = proc.state.Database().TrieDB().Commit(newRoot, false)
-	if err != nil {
-		return gethTypes.EmptyRootHash, handleCommitError(err)
-	}
+	// // flush the trie to the lower level db
+	// // the reason we have to do this, is the original database
+	// // is designed to keep changes in memory until the state.Commit
+	// // is called then the changes moves into the trie, but the trie
+	// // would stay in memory for faster transaction execution. you
+	// // have to explicitly ask the trie to commit to the underlying storage
+	// err = proc.state.Database().TrieDB().Commit(newRoot, false)
+	// if err != nil {
+	// 	return gethTypes.EmptyRootHash, handleCommitError(err)
+	// }
 
 	// // remove the read registers (no history tracking)
 	// err = proc.database.DeleteAndCleanReadKey()
@@ -324,8 +324,4 @@ func newState(db types.Database) (*gethState.StateDB, error) {
 	return gethState.New(root,
 		database.NewTrieDatabase(db),
 		nil)
-
-	// gethState.NewDatabase(
-	// 	gethRawDB.NewDatabase(db),
-	// ),
 }
