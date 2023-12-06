@@ -163,7 +163,7 @@ type GossipSubAppSpecificScoreRegistryConfig struct {
 
 	HeroCacheMetricsFactory metrics.HeroCacheMetricsFactory `validate:"required"`
 
-	NetworkingType network.NetworkingType
+	NetworkingType network.NetworkingType `validate:"required"`
 }
 
 // NewGossipSubAppSpecificScoreRegistry returns a new GossipSubAppSpecificScoreRegistry.
