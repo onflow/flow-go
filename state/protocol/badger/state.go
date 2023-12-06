@@ -166,7 +166,7 @@ func Bootstrap(
 			return fmt.Errorf("could not bootstrap spork info: %w", err)
 		}
 
-		// 6) set metric values
+		// 6) set metric values, we pass `false` here since this node has empty storage and doesn't know anything about EFM.
 		err = updateEpochMetrics(metrics, root, false)
 		if err != nil {
 			return fmt.Errorf("could not update epoch metrics: %w", err)
