@@ -169,9 +169,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TEST_FLAKY: true
-#    defaults:
-#      run:
-#        working-directory: network/p2p/inspector/validation
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
@@ -182,12 +179,8 @@ jobs:
           cache: true
       - name: Install tools
         run: make install-tools
-#      - name: Change directory
-#        run: cd network/p2p/inspector/validation
       - name: Run flaky tests
-#        working-directory: network/p2p/inspector/validation
         uses: nick-fields/retry@v2
-#        run: make test-flaky
         with:
           timeout_minutes: 35
           max_attempts: 5
