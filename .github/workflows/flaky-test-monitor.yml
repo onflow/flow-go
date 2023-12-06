@@ -8,7 +8,6 @@ on:
   push:
     paths:
       - '.github/workflows/flaky-test-monitor.yml'
-      - '.github/workflows/ci.yml'
 
 env:
   BIGQUERY_DATASET: production_src_flow_test_metrics
@@ -83,7 +82,7 @@ jobs:
       matrix:
         include:
           - name: crypto
-            setup:
+            setup: noop
             race: 1
             test_category: unit-crypto
           - name: insecure

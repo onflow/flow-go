@@ -4,10 +4,11 @@ import (
 	"context"
 	"sync/atomic"
 
-	"github.com/onflow/flow/protobuf/go/flow/execution"
-	"github.com/onflow/flow/protobuf/go/flow/executiondata"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+	"github.com/onflow/flow/protobuf/go/flow/executiondata"
 
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/common/rpc"
@@ -54,9 +55,7 @@ func (h *Handler) GetExecutionDataByBlockID(ctx context.Context, request *execut
 		return nil, status.Errorf(codes.Internal, "could not convert execution data to entity: %v", err)
 	}
 
-	// convert event payloads from CCF to JSON-CDC
-	// This is a temporary solution until the Access API supports specifying the encoding in the request
-	err = convert.BlockExecutionDataEventPayloadsToJson(message)
+	err = convert.BlockExecutionDataEventPayloadsToVersion(message, request.GetEventEncodingVersion())
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "could not convert execution data event payloads to JSON: %v", err)
 	}
@@ -102,9 +101,7 @@ func (h *Handler) SubscribeExecutionData(request *executiondata.SubscribeExecuti
 			return status.Errorf(codes.Internal, "could not convert execution data to entity: %v", err)
 		}
 
-		// convert event payloads from CCF to JSON-CDC
-		// This is a temporary solution until the Access API supports specifying the encoding in the request
-		err = convert.BlockExecutionDataEventPayloadsToJson(execData)
+		err = convert.BlockExecutionDataEventPayloadsToVersion(execData, request.GetEventEncodingVersion())
 		if err != nil {
 			return status.Errorf(codes.Internal, "could not convert execution data event payloads to JSON: %v", err)
 		}
@@ -187,7 +184,7 @@ func (h *Handler) SubscribeEvents(request *executiondata.SubscribeEventsRequest,
 		// BlockExecutionData contains CCF encoded events, and the Access API returns JSON-CDC events.
 		// convert event payload formats.
 		// This is a temporary solution until the Access API supports specifying the encoding in the request
-		events, err := convert.EventsToMessagesFromVersion(resp.Events, execution.EventEncodingVersion_CCF_V0)
+		events, err := convert.EventsToMessagesWithEncodingConversion(resp.Events, entities.EventEncodingVersion_CCF_V0, request.GetEventEncodingVersion())
 		if err != nil {
 			return status.Errorf(codes.Internal, "could not convert events to entity: %v", err)
 		}
@@ -203,6 +200,16 @@ func (h *Handler) SubscribeEvents(request *executiondata.SubscribeEventsRequest,
 	}
 }
 
-func (h *Handler) GetRegisterValues(ctx context.Context, request *executiondata.GetRegisterValuesRequest) (*executiondata.GetRegisterValuesResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "not implemented")
+func (h *Handler) GetRegisterValues(_ context.Context, request *executiondata.GetRegisterValuesRequest) (*executiondata.GetRegisterValuesResponse, error) {
+	// Convert data
+	registerIDs, err := convert.MessagesToRegisterIDs(request.GetRegisterIds())
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "could not convert register IDs: %v", err)
+	}
+	// get payload from store
+	values, err := h.api.GetRegisterValues(registerIDs, request.GetBlockHeight())
+	if err != nil {
+		return nil, rpc.ConvertError(err, "could not get register values", codes.Internal)
+	}
+	return &executiondata.GetRegisterValuesResponse{Values: values}, nil
 }

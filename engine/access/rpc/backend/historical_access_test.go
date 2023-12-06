@@ -48,7 +48,13 @@ func (suite *Suite) TestHistoricalTransactionResult() {
 		Once()
 
 	// Make the call for the transaction result
-	result, err := backend.GetTransactionResult(ctx, txID, flow.ZeroID, flow.ZeroID)
+	result, err := backend.GetTransactionResult(
+		ctx,
+		txID,
+		flow.ZeroID,
+		flow.ZeroID,
+		entities.EventEncodingVersion_JSON_CDC_V0,
+	)
 	suite.checkResponse(result, err)
 
 	// status should be sealed

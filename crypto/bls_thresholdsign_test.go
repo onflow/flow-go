@@ -618,7 +618,6 @@ func BenchmarkSimpleKeyGen(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_, _, _, _ = BLSThresholdKeyGen(n, optimalThreshold(n), seed)
 	}
-	b.StopTimer()
 }
 
 func BenchmarkSignatureReconstruction(b *testing.B) {
@@ -647,5 +646,4 @@ func BenchmarkSignatureReconstruction(b *testing.B) {
 		_, err := BLSReconstructThresholdSignature(n, threshold, signShares, signers)
 		require.NoError(b, err)
 	}
-	b.StopTimer()
 }

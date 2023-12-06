@@ -32,7 +32,6 @@ type Client struct {
 	accountKey     *sdk.AccountKey
 	accountKeyPriv sdkcrypto.PrivateKey
 	signer         sdkcrypto.InMemorySigner
-	seqNo          uint64
 	Chain          flow.Chain
 	account        *sdk.Account
 }
@@ -48,7 +47,7 @@ func NewClientWithKey(accessAddr string, accountAddr sdk.Address, key sdkcrypto.
 
 	acc, err := flowClient.GetAccount(context.Background(), accountAddr)
 	if err != nil {
-		return nil, fmt.Errorf("could not get the account %x: %w", accountAddr, err)
+		return nil, fmt.Errorf("could not get the account %v: %w", accountAddr, err)
 	}
 	accountKey := acc.Keys[0]
 
@@ -63,7 +62,6 @@ func NewClientWithKey(accessAddr string, accountAddr sdk.Address, key sdkcrypto.
 		accountKeyPriv: key,
 		signer:         mySigner,
 		Chain:          chain,
-		seqNo:          accountKey.SequenceNumber,
 		account:        acc,
 	}
 	return tc, nil
@@ -101,8 +99,8 @@ func (c *Client) AccountKeyPriv() sdkcrypto.PrivateKey {
 }
 
 func (c *Client) GetSeqNumber() uint64 {
-	n := c.seqNo
-	c.seqNo++
+	n := c.accountKey.SequenceNumber
+	c.accountKey.SequenceNumber++
 	return n
 }
 
@@ -361,19 +359,16 @@ func (c *Client) GetAccount(accountAddress sdk.Address) (*sdk.Account, error) {
 func (c *Client) CreateAccount(
 	ctx context.Context,
 	accountKey *sdk.AccountKey,
-	payerAccount *sdk.Account,
-	payer sdk.Address,
 	latestBlockID sdk.Identifier,
 ) (sdk.Address, error) {
-
-	payerKey := payerAccount.Keys[0]
+	payer := c.SDKServiceAddress()
 	tx, err := templates.CreateAccount([]*sdk.AccountKey{accountKey}, nil, payer)
 	if err != nil {
 		return sdk.Address{}, fmt.Errorf("failed cusnctruct create account transaction %w", err)
 	}
 	tx.SetGasLimit(1000).
 		SetReferenceBlockID(latestBlockID).
-		SetProposalKey(payer, 0, payerKey.SequenceNumber).
+		SetProposalKey(payer, 0, c.GetSeqNumber()).
 		SetPayer(payer)
 
 	err = c.SignAndSendTransaction(ctx, tx)
@@ -384,6 +379,10 @@ func (c *Client) CreateAccount(
 	result, err := c.WaitForSealed(ctx, tx.ID())
 	if err != nil {
 		return sdk.Address{}, fmt.Errorf("failed to wait for create account transaction to seal %w", err)
+	}
+
+	if result.Error != nil {
+		return sdk.Address{}, fmt.Errorf("failed to create new account %w", result.Error)
 	}
 
 	if address, ok := c.UserAddress(result); ok {

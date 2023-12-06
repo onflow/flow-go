@@ -16,6 +16,8 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
+	"google.golang.org/grpc/credentials"
+
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
@@ -394,6 +396,11 @@ func (builder *ObserverServiceBuilder) buildFollowerEngine() *ObserverServiceBui
 
 func (builder *ObserverServiceBuilder) buildSyncEngine() *ObserverServiceBuilder {
 	builder.Component("sync engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		spamConfig, err := synceng.NewSpamDetectionConfig()
+		if err != nil {
+			return nil, fmt.Errorf("could not initialize spam detection config: %w", err)
+		}
+
 		sync, err := synceng.New(
 			node.Logger,
 			node.Metrics.Engine,
@@ -404,7 +411,7 @@ func (builder *ObserverServiceBuilder) buildSyncEngine() *ObserverServiceBuilder
 			builder.FollowerEng,
 			builder.SyncCore,
 			builder.SyncEngineParticipantsProviderFactory(),
-			synceng.NewSpamDetectionConfig(),
+			spamConfig,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create synchronization engine: %w", err)
@@ -703,8 +710,7 @@ func (builder *ObserverServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 	}
 	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
 
-	node, err := p2pbuilder.NewNodeBuilder(
-		builder.Logger,
+	node, err := p2pbuilder.NewNodeBuilder(builder.Logger,
 		&p2pconfig.MetricsConfig{
 			HeroCacheFactory: builder.HeroCacheMetricsFactory(),
 			Metrics:          builder.Metrics.Network,
@@ -714,8 +720,9 @@ func (builder *ObserverServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 		networkKey,
 		builder.SporkID,
 		builder.IdentityProvider,
-		&builder.FlowConfig.NetworkConfig.ResourceManagerConfig,
-		&builder.FlowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig,
+		builder.FlowConfig.NetworkConfig.GossipSubConfig.GossipSubScoringRegistryConfig,
+		&builder.FlowConfig.NetworkConfig.ResourceManager,
+		&builder.FlowConfig.NetworkConfig.GossipSubConfig,
 		p2pconfig.PeerManagerDisableConfig(), // disable peer manager for observer node.
 		&p2p.DisallowListCacheConfig{
 			MaxSize: builder.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
@@ -893,6 +900,16 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		)
 		return nil
 	})
+	builder.Module("server certificate", func(node *cmd.NodeConfig) error {
+		// generate the server certificate that will be served by the GRPC server
+		x509Certificate, err := grpcutils.X509Certificate(node.NetworkKey)
+		if err != nil {
+			return err
+		}
+		tlsConfig := grpcutils.DefaultServerTLSConfig(x509Certificate)
+		builder.rpcConf.TransportCredentials = credentials.NewTLS(tlsConfig)
+		return nil
+	})
 	builder.Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		accessMetrics := builder.AccessMetrics
 		config := builder.rpcConf
@@ -911,8 +928,8 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		connFactory := &rpcConnection.ConnectionFactoryImpl{
 			CollectionGRPCPort:        0,
 			ExecutionGRPCPort:         0,
-			CollectionNodeGRPCTimeout: backendConfig.CollectionClientTimeout,
-			ExecutionNodeGRPCTimeout:  backendConfig.ExecutionClientTimeout,
+			CollectionNodeGRPCTimeout: builder.apiTimeout,
+			ExecutionNodeGRPCTimeout:  builder.apiTimeout,
 			AccessMetrics:             accessMetrics,
 			Log:                       node.Logger,
 			Manager: rpcConnection.NewManager(
@@ -952,8 +969,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		restHandler, err := restapiproxy.NewRestProxyHandler(
 			accessBackend,
 			builder.upstreamIdentities,
-			builder.apiTimeout,
-			config.MaxMsgSize,
+			connFactory,
 			builder.Logger,
 			observerCollector,
 			node.RootChainID.Chain())
@@ -982,7 +998,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		}
 
 		// upstream access node forwarder
-		forwarder, err := apiproxy.NewFlowAccessAPIForwarder(builder.upstreamIdentities, builder.apiTimeout, config.MaxMsgSize)
+		forwarder, err := apiproxy.NewFlowAccessAPIForwarder(builder.upstreamIdentities, connFactory)
 		if err != nil {
 			return nil, err
 		}

@@ -36,6 +36,7 @@ import (
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
 	gossipsubbuilder "github.com/onflow/flow-go/network/p2p/p2pbuilder/gossipsub"
 	"github.com/onflow/flow-go/network/p2p/p2pconf"
+	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/tracer"
@@ -83,13 +84,13 @@ func NewNodeBuilder(
 	networkKey fcrypto.PrivateKey,
 	sporkId flow.Identifier,
 	idProvider module.IdentityProvider,
+	scoringRegistryConfig p2pconf.GossipSubScoringRegistryConfig,
 	rCfg *p2pconf.ResourceManagerConfig,
-	rpcInspectorCfg *p2pconf.GossipSubRPCInspectorsConfig,
+	gossipCfg *p2pconf.GossipSubConfig,
 	peerManagerConfig *p2pconfig.PeerManagerConfig,
 	disallowListCacheCfg *p2p.DisallowListCacheConfig,
 	rpcTracker p2p.RpcControlTracking,
-	unicastConfig *p2pconfig.UnicastConfig,
-) *LibP2PNodeBuilder {
+	unicastConfig *p2pconfig.UnicastConfig) *LibP2PNodeBuilder {
 	return &LibP2PNodeBuilder{
 		logger:               logger,
 		sporkId:              sporkId,
@@ -105,7 +106,9 @@ func NewNodeBuilder(
 			networkingType,
 			sporkId,
 			idProvider,
-			rpcInspectorCfg,
+			scoringRegistryConfig,
+			&gossipCfg.GossipSubRPCInspectorsConfig,
+			&gossipCfg.SubscriptionProviderConfig,
 			rpcTracker),
 		peerManagerConfig: peerManagerConfig,
 		unicastConfig:     unicastConfig,
@@ -210,33 +213,18 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		builder.logger.Warn().
 			Msg("libp2p resource manager is overridden by the node builder, metrics may not be available")
 	} else {
-		// setting up default resource manager, by hooking in the resource manager metrics reporter.
-		limits := rcmgr.DefaultLimits
-		libp2p.SetDefaultServiceLimits(&limits)
-
-		mem, err := allowedMemory(builder.resourceManagerCfg.MemoryLimitRatio)
+		// scales the default limits by the allowed memory and file descriptors and applies the inbound connection and stream limits.
+		limits, err := BuildLibp2pResourceManagerLimits(builder.logger, builder.resourceManagerCfg)
 		if err != nil {
-			return nil, fmt.Errorf("could not get allowed memory: %w", err)
+			return nil, fmt.Errorf("could not build libp2p resource manager limits: %w", err)
 		}
-		fd, err := allowedFileDescriptors(builder.resourceManagerCfg.FileDescriptorsRatio)
-		if err != nil {
-			return nil, fmt.Errorf("could not get allowed file descriptors: %w", err)
-		}
-		limits.PeerBaseLimit.ConnsInbound = builder.resourceManagerCfg.PeerBaseLimitConnsInbound
-		l := limits.Scale(mem, fd)
-		mgr, err := rcmgr.NewResourceManager(rcmgr.NewFixedLimiter(l), rcmgr.WithMetrics(builder.metricsConfig.Metrics))
+		mgr, err := rcmgr.NewResourceManager(rcmgr.NewFixedLimiter(*limits), rcmgr.WithMetrics(builder.metricsConfig.Metrics))
 		if err != nil {
 			return nil, fmt.Errorf("could not create libp2p resource manager: %w", err)
 		}
-		builder.logger.Info().
-			Str("key", keyResourceManagerLimit).
-			Int64("allowed_memory", mem).
-			Int("allowed_file_descriptors", fd).
-			Msg("allowed memory and file descriptors are fetched from the system")
-		newLimitConfigLogger(builder.logger).logResourceManagerLimits(l)
 
 		opts = append(opts, libp2p.ResourceManager(mgr))
-		builder.logger.Info().Msg("libp2p resource manager is set to default with metrics")
+		builder.logger.Info().Msg("default libp2p resource manager is enabled with metrics")
 	}
 
 	if builder.connManager != nil {
@@ -252,6 +240,7 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		return nil, err
 	}
 	builder.gossipSubBuilder.SetHost(h)
+	lg := builder.logger.With().Str("local_peer_id", p2plogging.PeerId(h.ID())).Logger()
 
 	pCache, err := p2pnode.NewProtocolPeerCache(builder.logger, h)
 	if err != nil {
@@ -267,7 +256,7 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		peerUpdater, err := connection.NewPeerUpdater(
 			&connection.PeerUpdaterConfig{
 				PruneConnections: builder.peerManagerConfig.ConnectionPruning,
-				Logger:           builder.logger,
+				Logger:           lg,
 				Host:             connection.NewConnectorHost(h),
 				Connector:        connector,
 			})
@@ -275,35 +264,30 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 			return nil, fmt.Errorf("failed to create libp2p connector: %w", err)
 		}
 
-		peerManager = connection.NewPeerManager(builder.logger, builder.peerManagerConfig.UpdateInterval, peerUpdater)
+		peerManager = connection.NewPeerManager(lg, builder.peerManagerConfig.UpdateInterval, peerUpdater)
 
 		if builder.unicastConfig.RateLimiterDistributor != nil {
 			builder.unicastConfig.RateLimiterDistributor.AddConsumer(peerManager)
 		}
 	}
 
-	node := builder.createNode(builder.logger, h, pCache, peerManager, builder.disallowListCacheCfg)
+	node := builder.createNode(lg, h, pCache, peerManager, builder.disallowListCacheCfg)
 
 	if builder.connGater != nil {
 		builder.connGater.SetDisallowListOracle(node)
 	}
 
 	unicastManager, err := unicast.NewUnicastManager(&unicast.ManagerConfig{
-		Logger:                             builder.logger,
+		Logger:                             lg,
 		StreamFactory:                      stream.NewLibP2PStreamFactory(h),
 		SporkId:                            builder.sporkId,
-		ConnStatus:                         node,
 		CreateStreamBackoffDelay:           builder.unicastConfig.CreateStreamBackoffDelay,
-		DialBackoffDelay:                   builder.unicastConfig.DialBackoffDelay,
-		DialInProgressBackoffDelay:         builder.unicastConfig.DialInProgressBackoffDelay,
 		Metrics:                            builder.metricsConfig.Metrics,
 		StreamZeroRetryResetThreshold:      builder.unicastConfig.StreamZeroRetryResetThreshold,
-		DialZeroRetryResetThreshold:        builder.unicastConfig.DialZeroRetryResetThreshold,
 		MaxStreamCreationRetryAttemptTimes: builder.unicastConfig.MaxStreamCreationRetryAttemptTimes,
-		MaxDialRetryAttemptTimes:           builder.unicastConfig.MaxDialRetryAttemptTimes,
-		DialConfigCacheFactory: func(configFactory func() unicast.DialConfig) unicast.DialConfigCache {
-			return unicastcache.NewDialConfigCache(builder.unicastConfig.DialConfigCacheSize,
-				builder.logger,
+		UnicastConfigCacheFactory: func(configFactory func() unicast.Config) unicast.ConfigCache {
+			return unicastcache.NewUnicastConfigCache(builder.unicastConfig.ConfigCacheSize,
+				lg,
 				metrics.DialConfigCacheMetricFactory(builder.metricsConfig.HeroCacheFactory, builder.networkingType),
 				configFactory)
 		},
@@ -325,7 +309,7 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 						ctx.Throw(fmt.Errorf("could not set routing system: %w", err))
 					}
 					builder.gossipSubBuilder.SetRoutingSystem(routingSystem)
-					builder.logger.Debug().Msg("routing system created")
+					lg.Debug().Msg("routing system created")
 				}
 				// gossipsub is created here, because it needs to be created during the node startup.
 				gossipSub, err := builder.gossipSubBuilder.Build(ctx)
@@ -441,7 +425,6 @@ func DefaultNodeBuilder(
 	connGaterCfg *p2pconfig.ConnectionGaterConfig,
 	peerManagerCfg *p2pconfig.PeerManagerConfig,
 	gossipCfg *p2pconf.GossipSubConfig,
-	rpcInspectorCfg *p2pconf.GossipSubRPCInspectorsConfig,
 	rCfg *p2pconf.ResourceManagerConfig,
 	uniCfg *p2pconfig.UnicastConfig,
 	connMgrConfig *netconf.ConnectionManagerConfig,
@@ -484,8 +467,9 @@ func DefaultNodeBuilder(
 		flowKey,
 		sporkId,
 		idProvider,
+		gossipCfg.GossipSubScoringRegistryConfig,
 		rCfg,
-		rpcInspectorCfg,
+		gossipCfg,
 		peerManagerCfg,
 		disallowListCacheCfg,
 		meshTracer,

@@ -155,7 +155,7 @@ func WithConsumer(
 		}
 
 		collector := &metrics.NoopCollector{}
-		consumer := chunkconsumer.NewChunkConsumer(
+		consumer, err := chunkconsumer.NewChunkConsumer(
 			unittest.Logger(),
 			collector,
 			processedIndex,
@@ -163,6 +163,7 @@ func WithConsumer(
 			engine,
 			maxProcessing,
 		)
+		require.NoError(t, err)
 
 		withConsumer(consumer, chunksQueue)
 	})

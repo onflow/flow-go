@@ -13,7 +13,6 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
-	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/multiformats/go-multiaddr"
@@ -32,7 +31,6 @@ import (
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
-	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
 	"github.com/onflow/flow-go/network/p2p/tracer"
@@ -125,8 +123,9 @@ func CreateNode(t *testing.T, networkKey crypto.PrivateKey, sporkID flow.Identif
 		networkKey,
 		sporkID,
 		idProvider,
-		&defaultFlowConfig.NetworkConfig.ResourceManagerConfig,
-		&defaultFlowConfig.NetworkConfig.GossipSubRPCInspectorsConfig,
+		defaultFlowConfig.NetworkConfig.GossipSubConfig.GossipSubScoringRegistryConfig,
+		&defaultFlowConfig.NetworkConfig.ResourceManager,
+		&defaultFlowConfig.NetworkConfig.GossipSubConfig,
 		p2pconfig.PeerManagerDisableConfig(),
 		&p2p.DisallowListCacheConfig{
 			MaxSize: uint32(1000),
@@ -151,36 +150,6 @@ func CreateNode(t *testing.T, networkKey crypto.PrivateKey, sporkID flow.Identif
 	require.NoError(t, err)
 
 	return libp2pNode
-}
-
-// PeerIdFixture creates a random and unique peer ID (libp2p node ID).
-func PeerIdFixture(t *testing.T) peer.ID {
-	key, err := generateNetworkingKey(unittest.IdentifierFixture())
-	require.NoError(t, err)
-
-	pubKey, err := keyutils.LibP2PPublicKeyFromFlow(key.PublicKey())
-	require.NoError(t, err)
-
-	peerID, err := peer.IDFromPublicKey(pubKey)
-	require.NoError(t, err)
-
-	return peerID
-}
-
-// generateNetworkingKey generates a Flow ECDSA key using the given seed
-func generateNetworkingKey(s flow.Identifier) (crypto.PrivateKey, error) {
-	seed := make([]byte, crypto.KeyGenSeedMinLen)
-	copy(seed, s[:])
-	return crypto.GeneratePrivateKey(crypto.ECDSASecp256k1, seed)
-}
-
-// PeerIdsFixture creates random and unique peer IDs (libp2p node IDs).
-func PeerIdsFixture(t *testing.T, n int) []peer.ID {
-	peerIDs := make([]peer.ID, n)
-	for i := 0; i < n; i++ {
-		peerIDs[i] = PeerIdFixture(t)
-	}
-	return peerIDs
 }
 
 // SubMustNeverReceiveAnyMessage checks that the subscription never receives any message within the given timeout by the context.

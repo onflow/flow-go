@@ -13,9 +13,15 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 )
 
-// BlockExecutionDataEventPayloadsToJson converts all event payloads from CCF to JSON-CDC in place
-// This is a temporary workaround until a more robust solution is implemented
-func BlockExecutionDataEventPayloadsToJson(m *entities.BlockExecutionData) error {
+// BlockExecutionDataEventPayloadsToVersion converts all event payloads to version
+func BlockExecutionDataEventPayloadsToVersion(
+	m *entities.BlockExecutionData,
+	to entities.EventEncodingVersion,
+) error {
+	if to == entities.EventEncodingVersion_CCF_V0 {
+		return nil
+	}
+
 	for i, chunk := range m.ChunkExecutionData {
 		for j, e := range chunk.Events {
 			converted, err := CcfPayloadToJsonPayload(e.Payload)
@@ -308,6 +314,39 @@ func messageToTrustedTransaction(
 	t.SetGasLimit(m.GetGasLimit())
 
 	return *t, nil
+}
+
+func MessageToRegisterID(m *entities.RegisterID) (flow.RegisterID, error) {
+	if m == nil {
+		return flow.RegisterID{}, ErrEmptyMessage
+	}
+	return flow.RegisterID{
+		Owner: m.GetOwner(),
+		Key:   m.GetKey(),
+	}, nil
+}
+
+// MessagesToRegisterIDs converts a protobuf message to RegisterIDs
+func MessagesToRegisterIDs(m []*entities.RegisterID) (flow.RegisterIDs, error) {
+	if m == nil {
+		return nil, ErrEmptyMessage
+	}
+	result := make(flow.RegisterIDs, len(m))
+	for i, entry := range m {
+		regId, err := MessageToRegisterID(entry)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert register id %d: %w", i, err)
+		}
+		result[i] = regId
+	}
+	return result, nil
+}
+
+func RegisterIDToMessage(id flow.RegisterID) *entities.RegisterID {
+	return &entities.RegisterID{
+		Owner: id.Owner,
+		Key:   id.Key,
+	}
 }
 
 // insecureAddress converts a raw address to a flow.Address, skipping validation

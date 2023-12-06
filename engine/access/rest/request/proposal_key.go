@@ -10,8 +10,8 @@ import (
 
 type ProposalKey flow.ProposalKey
 
-func (p *ProposalKey) Parse(raw models.ProposalKey) error {
-	address, err := ParseAddress(raw.Address)
+func (p *ProposalKey) Parse(raw models.ProposalKey, chain flow.Chain) error {
+	address, err := ParseAddress(raw.Address, chain)
 	if err != nil {
 		return err
 	}
