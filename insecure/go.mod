@@ -11,7 +11,7 @@ require (
 	github.com/libp2p/go-libp2p-pubsub v0.9.3
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/onflow/flow-go v0.32.4-0.20231130134727-3c01c7f8966c
-	github.com/onflow/flow-go/crypto v0.24.9
+	github.com/onflow/flow-go/crypto v0.25.0
 	github.com/rs/zerolog v1.29.0
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.8.4
@@ -297,5 +297,3 @@ require (
 )
 
 replace github.com/onflow/flow-go => ../
-
-replace github.com/onflow/flow-go/crypto => ../crypto
