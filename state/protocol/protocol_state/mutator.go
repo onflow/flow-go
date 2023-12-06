@@ -277,9 +277,9 @@ func (m *stateMutator) transitionToEpochFallbackMode(results []*flow.ExecutionRe
 // epochFallbackTriggeredByIncorporatingCandidate checks whether incorporating the input block
 // would trigger epoch fallback mode (EFM) along the current fork. In particular, we trigger epoch
 // fallback mode when:
-//  1. The next epoch has not been committed as of B (EpochPhase < flow.EpochPhaseCommitted)
+//  1. The next epoch has not been committed as of B (EpochPhase < flow.EpochPhaseCommitted) AND
 //  2. B is the first incorporated block with view greater than or equal to the epoch commitment
-//     deadline for the current epoch AND
+//     deadline for the current epoch
 func epochFallbackTriggeredByIncorporatingCandidate(candidateView, safetyThreshold, finalView uint64, phase flow.EpochPhase) bool {
 	if phase == flow.EpochPhaseCommitted { // Requirement 1
 		return false
