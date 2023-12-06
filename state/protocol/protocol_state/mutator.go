@@ -58,16 +58,15 @@ func newStateMutator(
 		stateMachine ProtocolStateMachine
 		err          error
 	)
-	// CASE 1: EFM was tentatively triggered in a previous block along this fork
-	EFMAlreadyTriggeredOnThisFork := parentState.InvalidEpochTransitionAttempted
-	// CASE 2: EFM is tentatively triggered by incorporating this block
-	EFMTriggeredByCandidate := epochFallbackTriggeredByIncorporatingCandidate(candidateView, params.EpochCommitSafetyThreshold(), parentState.CurrentEpochSetup.FinalView, parentState.EpochPhase())
-	if EFMAlreadyTriggeredOnThisFork || EFMTriggeredByCandidate {
-		// InvalidEpochTransitionAttempted being true indicates that we have encountered an invalid epoch service event
-		// or an invalid state transition. In this case, the stateMutator enters EFM by utilizing a specialized
-		// ProtocolStateMachine for evolving the protocol state during EFM.
+	candidateAttemptsInvalidEpochTransition := epochFallbackTriggeredByIncorporatingCandidate(candidateView, params.EpochCommitSafetyThreshold(), parentState.CurrentEpochSetup.FinalView, parentState.EpochPhase())
+	if parentState.InvalidEpochTransitionAttempted || candidateAttemptsInvalidEpochTransition {
+		// Case 1: InvalidEpochTransitionAttempted is true, indicating that we have encountered an invalid
+		//         epoch service event or an invalid state transition previously in this fork.
+		// Case 2: Incorporating the candidate block is itself an invalid epoch transition.
 		//
-		// Whenever invalid epoch state transition has been observed only epochFallbackStateMachines must be created for subsequent views.
+		// In either case, Epoch Fallback Mode (EFM) has been tentatively triggered on this fork,
+		// and we must use only the `epochFallbackStateMachine` along this fork.
+		//
 		// TODO for 'leaving Epoch Fallback via special service event': this might need to change.
 		stateMachine, err = epochFallbackStateMachineFactory(candidateView, parentState)
 	} else {
@@ -102,7 +101,6 @@ func newStateMutator(
 // updated protocol state entry, state ID and a flag indicating if there were any changes.
 func (m *stateMutator) Build() (hasChanges bool, updatedState *flow.ProtocolStateEntry, stateID flow.Identifier, dbUpdates transaction.DeferredDBUpdate) {
 	updatedState, stateID, hasChanges = m.stateMachine.Build()
-	fmt.Println("building state, got:", m.stateMachine.ParentState().InvalidEpochTransitionAttempted, updatedState.InvalidEpochTransitionAttempted)
 	dbUpdates = m.pendingDbUpdates
 	return
 }
@@ -279,12 +277,12 @@ func (m *stateMutator) transitionToEpochFallbackMode(results []*flow.ExecutionRe
 // epochFallbackTriggeredByIncorporatingCandidate checks whether incorporating the input block
 // would trigger epoch fallback mode (EFM) along the current fork. In particular, we trigger epoch
 // fallback mode when:
-//  1. B is the first incorporated block with view greater than or equal to the epoch commitment
+//  1. The next epoch has not been committed as of B (EpochPhase < flow.EpochPhaseCommitted)
+//  2. B is the first incorporated block with view greater than or equal to the epoch commitment
 //     deadline for the current epoch AND
-//  2. The next epoch has not been committed as of B (EpochPhase < flow.EpochPhaseCommitted)
 func epochFallbackTriggeredByIncorporatingCandidate(candidateView, safetyThreshold, finalView uint64, phase flow.EpochPhase) bool {
-	if phase == flow.EpochPhaseCommitted { // Requirement 2
+	if phase == flow.EpochPhaseCommitted { // Requirement 1
 		return false
 	}
-	return candidateView+safetyThreshold >= finalView // Requirement 1
+	return candidateView+safetyThreshold >= finalView // Requirement 2
 }
