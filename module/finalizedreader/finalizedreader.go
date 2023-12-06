@@ -11,10 +11,11 @@ import (
 )
 
 type FinalizedReader struct {
-	protocol.Consumer
 	lastHeight *atomic.Uint64
 	headers    storage.Headers
 }
+
+var _ protocol.Consumer = (*FinalizedReader)(nil)
 
 func NewFinalizedReader(headers storage.Headers, lastHeight uint64) *FinalizedReader {
 	return &FinalizedReader{
@@ -43,4 +44,24 @@ func (r *FinalizedReader) FinalizedBlockIDAtHeight(height uint64) (flow.Identifi
 // to consume finalized blocks from the protocol
 func (r *FinalizedReader) BlockFinalized(h *flow.Header) {
 	r.lastHeight.Store(h.Height)
+}
+
+func (r *FinalizedReader) BlockProcessable(h *flow.Header, qc *flow.QuorumCertificate) {
+	// noop
+}
+
+func (r *FinalizedReader) EpochTransition(newEpochCounter uint64, first *flow.Header) {
+	// noop
+}
+
+func (r *FinalizedReader) EpochSetupPhaseStarted(currentEpochCounter uint64, first *flow.Header) {
+	// noop
+}
+
+func (r *FinalizedReader) EpochCommittedPhaseStarted(currentEpochCounter uint64, first *flow.Header) {
+	// noop
+}
+
+func (r *FinalizedReader) EpochEmergencyFallbackTriggered() {
+	// noop
 }

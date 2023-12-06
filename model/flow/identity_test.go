@@ -58,7 +58,7 @@ func TestIdentityEncodingJSON(t *testing.T) {
 		var dec flow.Identity
 		err = json.Unmarshal(enc, &dec)
 		require.NoError(t, err)
-		require.Equal(t, identity, &dec)
+		require.True(t, identity.Equals(&dec))
 	})
 
 	t.Run("empty address should be omitted", func(t *testing.T) {
@@ -71,7 +71,7 @@ func TestIdentityEncodingJSON(t *testing.T) {
 		var dec flow.Identity
 		err = json.Unmarshal(enc, &dec)
 		require.NoError(t, err)
-		require.Equal(t, identity, &dec)
+		require.True(t, identity.Equals(&dec))
 	})
 
 	t.Run("compat: should accept old files using Stake field", func(t *testing.T) {
@@ -83,7 +83,7 @@ func TestIdentityEncodingJSON(t *testing.T) {
 		var dec flow.Identity
 		err = json.Unmarshal(enc, &dec)
 		require.NoError(t, err)
-		require.Equal(t, identity, &dec)
+		require.True(t, identity.Equals(&dec))
 	})
 }
 
@@ -94,7 +94,7 @@ func TestIdentityEncodingMsgpack(t *testing.T) {
 	var dec flow.Identity
 	err = msgpack.Unmarshal(enc, &dec)
 	require.NoError(t, err)
-	require.Equal(t, identity, &dec)
+	require.True(t, identity.Equals(&dec))
 }
 
 func TestIdentityList_Exists(t *testing.T) {

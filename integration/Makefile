@@ -8,113 +8,112 @@ else
 	RACE_FLAG :=
 endif
 
+include ../crypto_adx_flag.mk
+
+CGO_FLAG := CGO_CFLAGS=$(CRYPTO_FLAG)
+
 # Run the integration test suite
 .PHONY: integration-test
-integration-test: access-tests ghost-tests mvp-tests execution-tests verification-tests upgrades-tests collection-tests epochs-an-tests epochs-ln-tests epochs-sn-tests epochs-static-tests epochs-vn-tests network-tests consensus-tests
+integration-test: access-cohort1-tests access-cohort2-tests access-cohort3-tests ghost-tests mvp-tests execution-tests verification-tests upgrades-tests collection-tests epochs-an-tests epochs-ln-tests epochs-sn-tests epochs-static-tests epochs-vn-tests network-tests consensus-tests
 
 .PHONY: ci-integration-test
-ci-integration-test: access-tests ghost-tests mvp-tests epochs-an-tests epochs-ln-tests epochs-sn-tests epochs-static-tests epochs-vn-tests consensus-tests execution-tests verification-tests upgrades-tests network-tests collection-tests
-
-############################################################################################
-# CAUTION: DO NOT MODIFY THE TARGETS BELOW! DOING SO WILL BREAK THE FLAKY TEST MONITOR
-# In particular, do not skip tests by commenting them out here.
+ci-integration-test: access-cohort1-tests access-cohort2-tests access-cohort3-tests ghost-tests mvp-tests epochs-an-tests epochs-ln-tests epochs-sn-tests epochs-static-tests epochs-vn-tests consensus-tests execution-tests verification-tests upgrades-tests network-tests collection-tests
 
 # Run unit tests for test utilities in this module
 .PHONY: test
 test:
-	go test $(if $(VERBOSE),-v,) -tags relic -coverprofile=$(COVER_PROFILE) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) `go list ./... | grep -v -e integration/tests`
+	$(CGO_FLAG) go test $(if $(VERBOSE),-v,) -coverprofile=$(COVER_PROFILE) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) `go list ./... | grep -v -e integration/tests`
 
 .PHONY: access-cohort1-tests
 access-cohort1-tests:
-	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/access/cohort1/...
+	$(CGO_FLAG) go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) ./tests/access/cohort1/...
 
 .PHONY: access-cohort2-tests
 access-cohort2-tests:
-	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/access/cohort2/...
+	$(CGO_FLAG) go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) ./tests/access/cohort2/...
 
 .PHONY: access-cohort3-tests
 access-cohort3-tests:
-	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/access/cohort3/...
+	$(CGO_FLAG) go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) ./tests/access/cohort3/...
 
 
 .PHONY: collection-tests
 collection-tests:
-	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/collection/...
+	$(CGO_FLAG) go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) ./tests/collection/...
 
 .PHONY: consensus-tests
 consensus-tests:
-	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/consensus/...
+	$(CGO_FLAG) go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) ./tests/consensus/...
 
 .PHONY: epochs-an-tests
 epochs-an-tests:
 	# Use a higher timeout of 20m for the suite of tests which span full epochs
-	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic -timeout 20m ./tests/epochs/an/...
+	$(CGO_FLAG) go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -timeout 20m ./tests/epochs/an/...
 
 .PHONY: epochs-ln-tests
 epochs-ln-tests:
 	# Use a higher timeout of 20m for the suite of tests which span full epochs
-	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic -timeout 20m ./tests/epochs/ln/...
+	$(CGO_FLAG) go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -timeout 20m ./tests/epochs/ln/...
 
 .PHONY: epochs-sn-tests
 epochs-sn-tests:
 	# Use a higher timeout of 20m for the suite of tests which span full epochs
-	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic -timeout 20m ./tests/epochs/sn/...
+	$(CGO_FLAG) go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -timeout 20m ./tests/epochs/sn/...
 
 .PHONY: epochs-static-tests
 epochs-static-tests:
 	# Use a higher timeout of 20m for the suite of tests which span full epochs
-	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic -timeout 20m ./tests/epochs/static/...
+	$(CGO_FLAG) go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -timeout 20m ./tests/epochs/static/...
 
 .PHONY: epochs-vn-tests
 epochs-vn-tests:
 	# Use a higher timeout of 20m for the suite of tests which span full epochs
-	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic -timeout 20m ./tests/epochs/vn/...
+	$(CGO_FLAG) go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -timeout 20m ./tests/epochs/vn/...
 
 .PHONY: ghost-tests
 ghost-tests:
-	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/ghost/...
+	$(CGO_FLAG) go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) ./tests/ghost/...
 
 .PHONY: mvp-tests
 mvp-tests:
-	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/mvp/...
+	$(CGO_FLAG) go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) ./tests/mvp/...
 
 .PHONY: execution-tests
 execution-tests:
-	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/execution/...
+	$(CGO_FLAG) go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) ./tests/execution/...
 
 .PHONY: verification-tests
 verification-tests:
-	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/verification/...
+	$(CGO_FLAG) go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) ./tests/verification/...
 
 # upgrades-tests tests need to be run sequentially (-p 1) due to interference between different Docker networks when tests are run in parallel
 .PHONY: upgrades-tests
 upgrades-tests:
-	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/upgrades/... -p 1
+	$(CGO_FLAG) go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) ./tests/upgrades/... -p 1
 
 .PHONY: network-tests
 network-tests:
-	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/network/...
+	$(CGO_FLAG) go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) ./tests/network/...
 
 # BFT tests need to be run sequentially (-p 1) due to interference between different Docker networks when tests are run in parallel
 .PHONY: bft-framework-tests
 bft-framework-tests:
-	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/bft/framework/... -p 1
+	$(CGO_FLAG) go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) ./tests/bft/framework/... -p 1
 .PHONY: bft-protocol-tests
 bft-protocol-tests:
-	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/bft/protocol/... -p 1
+	$(CGO_FLAG) go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) ./tests/bft/protocol/... -p 1
 
 .PHONY: bft-gossipsub-rpc-inspector-tests
 bft-gossipsub-rpc-inspector-tests:
-	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/bft/gossipsub/rpc_inspector/... -p 1
+	$(CGO_FLAG) go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) ./tests/bft/gossipsub/rpc_inspector/... -p 1
 
 .PHONY: bft-gossipsub-signature-tests
 bft-gossipsub-signature-tests:
-	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/bft/gossipsub/signature/... -p 1
+	$(CGO_FLAG) go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) ./tests/bft/gossipsub/signature/... -p 1
 
 .PHONY: bft-gossipsub-topic-validator-tests
 bft-gossipsub-topic-validator-tests:
-	go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/bft/gossipsub/topicvalidator/... -p 1
+	$(CGO_FLAG) go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) ./tests/bft/gossipsub/topicvalidator/... -p 1
 
 .PHONY: bft-tests
 bft-tests: bft-framework-tests bft-protocol-tests bft-gossipsub-rpc-inspector-tests bft-gossipsub-signature-tests bft-gossipsub-topic-validator-tests
-############################################################################################
