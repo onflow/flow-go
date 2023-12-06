@@ -181,7 +181,6 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 		idProvider,
 		p2ptest.WithLogger(unittest.Logger()),
 		p2ptest.OverrideFlowConfig(cfg),
-		p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride),
 		p2ptest.WithRole(flow.RoleConsensus))
 
 	// two verification node.
@@ -189,14 +188,12 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 		idProvider,
 		p2ptest.WithLogger(unittest.Logger()),
 		p2ptest.OverrideFlowConfig(cfg),
-		p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride),
 		p2ptest.WithRole(flow.RoleVerification))
 
 	verNode2, verId2 := p2ptest.NodeFixture(t, sporkId, t.Name(),
 		idProvider,
 		p2ptest.WithLogger(unittest.Logger()),
 		p2ptest.OverrideFlowConfig(cfg),
-		p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride),
 		p2ptest.WithRole(flow.RoleVerification))
 
 	// suppress peer provider error

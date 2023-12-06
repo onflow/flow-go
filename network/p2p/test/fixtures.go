@@ -175,7 +175,7 @@ func NodeFixture(t *testing.T,
 	}
 
 	if parameters.PeerScoringEnabled {
-		builder.EnableGossipSubScoringWithOverride(parameters.PeerScoringConfigOverride)
+		builder.OverrideGossipSubScoringConfig(parameters.PeerScoringConfigOverride)
 	}
 
 	if parameters.GossipSubFactory != nil && parameters.GossipSubConfig != nil {

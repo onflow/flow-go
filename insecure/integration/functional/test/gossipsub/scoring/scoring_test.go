@@ -117,9 +117,7 @@ func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory fun
 		t.Name(),
 		idProvider,
 		p2ptest.WithRole(role),
-		p2ptest.OverrideFlowConfig(cfg),
-		p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride),
-	)
+		p2ptest.OverrideFlowConfig(cfg))
 
 	idProvider.On("ByPeerID", victimNode.ID()).Return(&victimIdentity, true).Maybe()
 	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Maybe()

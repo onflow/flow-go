@@ -1041,8 +1041,7 @@ func TestGossipSubSpamMitigationIntegration(t *testing.T) {
 		t.Name(),
 		idProvider,
 		p2ptest.WithRole(flow.RoleConsensus),
-		p2ptest.OverrideFlowConfig(cfg),
-		p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride))
+		p2ptest.OverrideFlowConfig(cfg))
 
 	ids := flow.IdentityList{&victimId, &spammer.SpammerId}
 	idProvider.On("ByPeerID", mockery.Anything).Return(func(peerId peer.ID) *flow.Identity {

@@ -161,7 +161,7 @@ func (builder *LibP2PNodeBuilder) SetGossipSubFactory(gf p2p.GossipSubFactoryFun
 // - PeerScoringConfigOverride: override for the peer scoring config- Recommended to use PeerScoringConfigNoOverride for production.
 // Returns:
 // none
-func (builder *LibP2PNodeBuilder) EnableGossipSubScoringWithOverride(config *p2p.PeerScoringConfigOverride) p2p.NodeBuilder {
+func (builder *LibP2PNodeBuilder) OverrideGossipSubScoringConfig(config *p2p.PeerScoringConfigOverride) p2p.NodeBuilder {
 	builder.gossipSubBuilder.EnableGossipSubScoringWithOverride(config)
 	return builder
 }
@@ -426,7 +426,8 @@ func DefaultNodeBuilder(
 		connection.WithOnInterceptPeerDialFilters(append(peerFilters, connGaterCfg.InterceptPeerDialFilters...)),
 		connection.WithOnInterceptSecuredFilters(append(peerFilters, connGaterCfg.InterceptSecuredFilters...)))
 
-	builder := NewNodeBuilder(logger, gossipCfg,
+	builder := NewNodeBuilder(logger,
+		gossipCfg,
 		metricsCfg,
 		networkingType,
 		address,
@@ -440,11 +441,6 @@ func DefaultNodeBuilder(
 		SetConnectionManager(connManager).
 		SetConnectionGater(connGater).
 		SetCreateNode(DefaultCreateNodeFunc)
-
-	if gossipCfg.PeerScoringEnabled {
-		// In production, we never override the default scoring config.
-		builder.EnableGossipSubScoringWithOverride(p2p.PeerScoringConfigNoOverride)
-	}
 
 	if role != "ghost" {
 		r, err := flow.ParseRole(role)

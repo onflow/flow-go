@@ -36,16 +36,13 @@ func TestFullGossipSubConnectivity(t *testing.T) {
 	// two groups of non-access nodes and one group of access nodes.
 	groupOneNodes, groupOneIds := p2ptest.NodesFixture(t, sporkId, t.Name(), 5,
 		idProvider,
-		p2ptest.WithRole(flow.RoleConsensus),
-		p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride))
+		p2ptest.WithRole(flow.RoleConsensus))
 	groupTwoNodes, groupTwoIds := p2ptest.NodesFixture(t, sporkId, t.Name(), 5,
 		idProvider,
-		p2ptest.WithRole(flow.RoleCollection),
-		p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride))
+		p2ptest.WithRole(flow.RoleCollection))
 	accessNodeGroup, accessNodeIds := p2ptest.NodesFixture(t, sporkId, t.Name(), 5,
 		idProvider,
-		p2ptest.WithRole(flow.RoleAccess),
-		p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride))
+		p2ptest.WithRole(flow.RoleAccess))
 
 	ids := append(append(groupOneIds, groupTwoIds...), accessNodeIds...)
 	nodes := append(append(groupOneNodes, groupTwoNodes...), accessNodeGroup...)
@@ -129,17 +126,13 @@ func TestFullGossipSubConnectivityAmongHonestNodesWithMaliciousMajority(t *testi
 	sporkId := unittest.IdentifierFixture()
 
 	idProvider := mock.NewIdentityProvider(t)
-	// two (honest) consensus nodes
-	opts := []p2ptest.NodeFixtureParameterOption{p2ptest.WithRole(flow.RoleConsensus)}
-	opts = append(opts, p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride))
-
 	defaultConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
 	// override the default config to make the mesh tracer log more frequently
 	defaultConfig.NetworkConfig.GossipSub.RpcTracer.LocalMeshLogInterval = time.Second
 
-	con1Node, con1Id := p2ptest.NodeFixture(t, sporkId, t.Name(), idProvider, append(opts, p2ptest.OverrideFlowConfig(defaultConfig))...)
-	con2Node, con2Id := p2ptest.NodeFixture(t, sporkId, t.Name(), idProvider, append(opts, p2ptest.OverrideFlowConfig(defaultConfig))...)
+	con1Node, con1Id := p2ptest.NodeFixture(t, sporkId, t.Name(), idProvider, p2ptest.WithRole(flow.RoleConsensus), p2ptest.OverrideFlowConfig(defaultConfig))
+	con2Node, con2Id := p2ptest.NodeFixture(t, sporkId, t.Name(), idProvider, p2ptest.WithRole(flow.RoleConsensus), p2ptest.OverrideFlowConfig(defaultConfig))
 
 	// create > 2 * 12 malicious access nodes
 	// 12 is the maximum size of default GossipSub mesh.

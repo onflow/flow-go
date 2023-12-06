@@ -113,16 +113,18 @@ type NodeBuilder interface {
 	SetConnectionGater(ConnectionGater) NodeBuilder
 	SetRoutingSystem(func(context.Context, host.Host) (routing.Routing, error)) NodeBuilder
 
-	// EnableGossipSubScoringWithOverride enables peer scoring for the GossipSubParameters pubsub system with the given override.
+	// OverrideGossipSubScoringConfig overrides the default peer scoring config for the GossipSub protocol.
+	// Note that it does not enable peer scoring. The peer scoring is enabled directly by setting the `peer-scoring-enabled` flag to true in `default-config.yaml`, or
+	// by setting the `gossipsub-peer-scoring-enabled` runtime flag to true. This function only overrides the default peer scoring config which takes effect
+	// only if the peer scoring is enabled (mostly for testing purposes).
 	// Any existing peer scoring config attribute that is set in the override will override the default peer scoring config.
 	// Anything that is left to nil or zero value in the override will be ignored and the default value will be used.
 	// Note: it is not recommended to override the default peer scoring config in production unless you know what you are doing.
-	// Production Tip: use PeerScoringConfigNoOverride as the argument to this function to enable peer scoring without any override.
 	// Args:
 	// - PeerScoringConfigOverride: override for the peer scoring config- Recommended to use PeerScoringConfigNoOverride for production.
 	// Returns:
 	// none
-	EnableGossipSubScoringWithOverride(*PeerScoringConfigOverride) NodeBuilder
+	OverrideGossipSubScoringConfig(*PeerScoringConfigOverride) NodeBuilder
 	SetCreateNode(CreateNodeFunc) NodeBuilder
 	SetGossipSubFactory(GossipSubFactoryFunc, GossipSubAdapterConfigFunc) NodeBuilder
 	OverrideDefaultRpcInspectorSuiteFactory(GossipSubRpcInspectorSuiteFactoryFunc) NodeBuilder
@@ -145,8 +147,3 @@ type PeerScoringConfigOverride struct {
 	// If the function is nil, the default application specific score parameters are used.
 	AppSpecificScoreParams func(peer.ID) float64
 }
-
-// PeerScoringConfigNoOverride is a default peer scoring configuration for a GossipSubParameters pubsub system.
-// It is set to nil, which means that no override is done to the default peer scoring configuration.
-// It is the recommended way to use the default peer scoring configuration.
-var PeerScoringConfigNoOverride = (*PeerScoringConfigOverride)(nil)
