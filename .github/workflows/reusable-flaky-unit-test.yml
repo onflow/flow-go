@@ -23,7 +23,7 @@ on:
 jobs:
   flaky-unit-test:
     name: Flaky Unit Tests
-    runs-on: $${{ inputs.runner }}
+    runs-on: ${{ inputs.runner }}
     env:
       TEST_FLAKY: true
     steps:
