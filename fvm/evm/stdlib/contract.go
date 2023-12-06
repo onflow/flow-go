@@ -180,7 +180,7 @@ func newInternalEVMTypeEncodeABIFunction(
 					}
 					arguments = append(arguments, gethABI.Argument{Type: typ})
 				case *interpreter.CompositeValue:
-					if value.QualifiedIdentifier == "EVM.EVMAddress" {
+					if value.TypeID() == "A.0000000000000001.EVM.EVMAddress" {
 						bytes, err := interpreter.ByteArrayValueToByteSlice(
 							inter,
 							value.GetMember(inter, locationRange, evmAddressTypeBytesFieldName),
@@ -210,6 +210,7 @@ func newInternalEVMTypeEncodeABIFunction(
 						}
 						elements = append(elements, uint64(v))
 
+						// continue iteration
 						return true
 					})
 					values = append(values, elements)
@@ -218,8 +219,11 @@ func newInternalEVMTypeEncodeABIFunction(
 						panic(err)
 					}
 					arguments = append(arguments, gethABI.Argument{Type: typ})
+				default:
+					panic(fmt.Errorf("unsupported type: %v", value.StaticType(inter)))
 				}
 
+				// continue iteration
 				return true
 			})
 
@@ -299,12 +303,14 @@ func newInternalEVMTypeDecodeABIFunction(
 					}
 					arguments = append(arguments, gethABI.Argument{Type: typ})
 				case interpreter.CompositeStaticType:
-					if value.QualifiedIdentifier == "EVM.EVMAddress" {
+					if value.TypeID == "A.0000000000000001.EVM.EVMAddress" {
 						typ, err := gethABI.NewType("address", "", nil)
 						if err != nil {
 							panic(err)
 						}
 						arguments = append(arguments, gethABI.Argument{Type: typ})
+					} else {
+						panic(fmt.Errorf("unsupported composite type: %v", value))
 					}
 				}
 
@@ -395,6 +401,7 @@ func newInternalEVMTypeDecodeABIFunction(
 					arguments = append(arguments, gethABI.Argument{Type: typ})
 				}
 
+				// continue iteration
 				return true
 			})
 
@@ -482,7 +489,22 @@ func newInternalEVMTypeDecodeABIFunction(
 				case gethCommon.Address:
 					var address types.Address
 					copy(address[:], value.Bytes())
-					values = append(values, EVMAddressToAddressBytesArrayValue(inter, address))
+					contractsAddress := common.Address{0, 0, 0, 0, 0, 0, 0, 1}
+					compositeValue := interpreter.NewCompositeValue(
+						inter,
+						locationRange,
+						common.NewAddressLocation(gauge, contractsAddress, "EVM"),
+						"EVM.EVMAddress",
+						common.CompositeKindStructure,
+						[]interpreter.CompositeField{
+							{
+								Name:  "bytes",
+								Value: EVMAddressToAddressBytesArrayValue(inter, address),
+							},
+						},
+						common.ZeroAddress,
+					)
+					values = append(values, compositeValue)
 				case []uint64:
 					arrayType := interpreter.NewVariableSizedStaticType(
 						inter,
@@ -506,6 +528,8 @@ func newInternalEVMTypeDecodeABIFunction(
 						arrValues...,
 					)
 					values = append(values, arr)
+				default:
+					panic(fmt.Errorf("unsupported type: %T", value))
 				}
 			}
 			arrayType := interpreter.NewVariableSizedStaticType(
