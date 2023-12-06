@@ -113,12 +113,15 @@ func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(_ context.Context, bl
 	// If they match, then the queried block must be finalized.
 	blockIDFinalizedAtHeight, err := b.headers.BlockIDByHeight(snapshotHeadByBlockId.Height)
 
-	if errors.Is(err, storage.ErrNotFound) {
-		// The block exists, but no block has been finalized at its height. Therefore, this block
-		// may be finalized in the future, and the client can retry.
-		return nil, status.Errorf(codes.FailedPrecondition,
-			"failed to retrieve snapshot for block by height %d: block not finalized and is above finalized height",
-			snapshotHeadByBlockId.Height)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			// The block exists, but no block has been finalized at its height. Therefore, this block
+			// may be finalized in the future, and the client can retry.
+			return nil, status.Errorf(codes.FailedPrecondition,
+				"failed to retrieve snapshot for block by height %d: block not finalized and is above finalized height",
+				snapshotHeadByBlockId.Height)
+		}
+		return nil, status.Errorf(codes.Internal, "failed to lookup block id by height %d", snapshotHeadByBlockId.Height)
 	}
 
 	if blockIDFinalizedAtHeight != blockID {
