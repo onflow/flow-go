@@ -1,0 +1,44 @@
+# This reusable workflow runs a flaky unit test and retries it up to 5 times.
+
+on:
+  workflow_call:
+    inputs:
+      name:
+        description: 'The name of the flaky unit test'
+        required: true
+        type: string
+      dir:
+        description: 'The directory of the flaky unit test'
+        required: true
+        type: string
+      retries:
+        description: 'The number of times to retry the flaky unit test if it fails'
+        required: true
+        type: string
+      runner:
+        description: 'The name of the runner to use'
+        required: true
+        type: string
+
+jobs:
+  flaky-unit-test:
+    name: Flaky Unit Tests
+    runs-on: $${{ inputs.runner }}
+    env:
+      TEST_FLAKY: true
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: Install tools
+        run: make install-tools
+      - name: Run flaky tests
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 35
+          max_attempts: ${{ inputs.retries }}
+          command: cd ${{ inputs.dir }} && VERBOSE=1 go test -v -run ${{ inputs.name }}

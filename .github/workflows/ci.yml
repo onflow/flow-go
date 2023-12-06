@@ -155,27 +155,14 @@ jobs:
         flags: unittests
         name: codecov-umbrella
 
-  unit-test-flaky:
-    name: Flaky Unit Tests
-    runs-on: ubuntu-latest
-    env:
-      TEST_FLAKY: true
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
-      - name: Setup Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-      - name: Install tools
-        run: make install-tools
-      - name: Run flaky tests
-        uses: nick-fields/retry@v2
-        with:
-          timeout_minutes: 35
-          max_attempts: 5
-          command: cd network/p2p/inspector/validation && VERBOSE=1 go test -v -run 'TestControlMessageValidationInspector_truncateRPC' --tags relic
+  flaky-unit-test-TestControlMessageValidationInspector_truncateRPC:
+    name: Flaky Unit Test (TestControlMessageValidationInspector_truncateRPC)
+    uses: ./.github/workflows/reusable-flaky-unit-test.yml
+    with:
+      name: TestControlMessageValidationInspector_truncateRPC
+      dir: network/p2p/inspector/validation
+      retries: 5
+      runner: ubuntu-latest
 
   unit-test-modules:
     name: Unit Tests (Modules)
@@ -227,70 +214,70 @@ jobs:
 
   docker-build-access:
     name: Docker Build Access
-    uses: ./.github/workflows/docker-build.yml
+    uses: ./.github/workflows/reusable-docker-build.yml
     with:
       name: access
       make: docker-build-access
 
   docker-build-access-corrupt:
     name: Docker Build Corrupt Access
-    uses: ./.github/workflows/docker-build.yml
+    uses: ./.github/workflows/reusable-docker-build.yml
     with:
       name: access-corrupt
       make: docker-build-access-corrupt
 
   docker-build-collection:
     name: Docker Build Collection
-    uses: ./.github/workflows/docker-build.yml
+    uses: ./.github/workflows/reusable-docker-build.yml
     with:
       name: collection
       make: docker-build-collection
 
   docker-build-consensus:
     name: Docker Build Consensus
-    uses: ./.github/workflows/docker-build.yml
+    uses: ./.github/workflows/reusable-docker-build.yml
     with:
       name: consensus
       make: docker-build-consensus
 
   docker-build-execution:
     name: Docker Build Execution
-    uses: ./.github/workflows/docker-build.yml
+    uses: ./.github/workflows/reusable-docker-build.yml
     with:
       name: execution
       make: docker-build-execution
 
   docker-build-execution-corrupt:
     name: Docker Build Corrupt Execution
-    uses: ./.github/workflows/docker-build.yml
+    uses: ./.github/workflows/reusable-docker-build.yml
     with:
       name: execution-corrupt
       make: docker-build-execution-corrupt
 
   docker-build-ghost:
     name: Docker Build Ghost
-    uses: ./.github/workflows/docker-build.yml
+    uses: ./.github/workflows/reusable-docker-build.yml
     with:
       name: ghost
       make: docker-build-ghost
 
   docker-build-observer:
     name: Docker Build Observer
-    uses: ./.github/workflows/docker-build.yml
+    uses: ./.github/workflows/reusable-docker-build.yml
     with:
       name: observer
       make: docker-build-observer
 
   docker-build-verification:
     name: Docker Build Verification
-    uses: ./.github/workflows/docker-build.yml
+    uses: ./.github/workflows/reusable-docker-build.yml
     with:
       name: verification
       make: docker-build-verification
 
   docker-build-verification-corrupt:
     name: Docker Build Corrupt Verification
-    uses: ./.github/workflows/docker-build.yml
+    uses: ./.github/workflows/reusable-docker-build.yml
     with:
       name: verification-corrupt
       make: docker-build-verification-corrupt
