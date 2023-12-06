@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/util"
 	"github.com/stretchr/testify/assert"
 	"testing"
 
@@ -146,11 +145,11 @@ func (s *StateMutatorSuite) TestStateMutator_Constructor() {
 	s.Run("EpochStaking phase", func() {
 		// Since we are before the epoch commitment deadline, we should use the happy-path state machine
 		s.Run("before commitment deadline", func() {
-			expectedConstructorCalled := make(chan struct{})
+			expectedConstructorCalled := false
 			s.candidateView = s.parentState.CurrentEpochSetup.FirstView + 1
 			mutator, err := newStateMutator(s.headersDB, s.resultsDB, s.setupsDB, s.commitsDB, s.globalParams, s.candidateView, s.parentState,
 				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
-					close(expectedConstructorCalled) // expect happy-path constructor
+					expectedConstructorCalled = true // expect happy-path constructor
 					return s.stateMachine, nil
 				},
 				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
@@ -160,12 +159,12 @@ func (s *StateMutatorSuite) TestStateMutator_Constructor() {
 			)
 			require.NoError(s.T(), err)
 			assert.NotNil(s.T(), mutator)
-			assert.True(s.T(), util.CheckClosed(expectedConstructorCalled))
+			assert.True(s.T(), expectedConstructorCalled)
 		})
 		// Since we are past the epoch commitment deadline, and have not entered the EpochCommitted
 		// phase, we should use the epoch fallback state machine.
 		s.Run("past commitment deadline", func() {
-			expectedConstructorCalled := make(chan struct{})
+			expectedConstructorCalled := false
 			s.candidateView = s.parentState.CurrentEpochSetup.FinalView - 1
 			mutator, err := newStateMutator(s.headersDB, s.resultsDB, s.setupsDB, s.commitsDB, s.globalParams, s.candidateView, s.parentState,
 				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
@@ -173,13 +172,13 @@ func (s *StateMutatorSuite) TestStateMutator_Constructor() {
 					return s.stateMachine, nil
 				},
 				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
-					close(expectedConstructorCalled) // expect epoch-fallback state machine
+					expectedConstructorCalled = true // expect epoch-fallback state machine
 					return s.stateMachine, nil
 				},
 			)
 			require.NoError(s.T(), err)
 			assert.NotNil(s.T(), mutator)
-			assert.True(s.T(), util.CheckClosed(expectedConstructorCalled))
+			assert.True(s.T(), expectedConstructorCalled)
 		})
 	})
 
@@ -190,11 +189,11 @@ func (s *StateMutatorSuite) TestStateMutator_Constructor() {
 
 		// Since we are before the epoch commitment deadline, we should use the happy-path state machine
 		s.Run("before commitment deadline", func() {
-			expectedConstructorCalled := make(chan struct{})
+			expectedConstructorCalled := false
 			s.candidateView = s.parentState.CurrentEpochSetup.FirstView + 1
 			mutator, err := newStateMutator(s.headersDB, s.resultsDB, s.setupsDB, s.commitsDB, s.globalParams, s.candidateView, s.parentState,
 				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
-					close(expectedConstructorCalled) // expect happy-path constructor
+					expectedConstructorCalled = true // expect happy-path constructor
 					return s.stateMachine, nil
 				},
 				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
@@ -204,12 +203,12 @@ func (s *StateMutatorSuite) TestStateMutator_Constructor() {
 			)
 			require.NoError(s.T(), err)
 			assert.NotNil(s.T(), mutator)
-			assert.True(s.T(), util.CheckClosed(expectedConstructorCalled))
+			assert.True(s.T(), expectedConstructorCalled)
 		})
 		// Since we are past the epoch commitment deadline, and have not entered the EpochCommitted
 		// phase, we should use the epoch fallback state machine.
 		s.Run("past commitment deadline", func() {
-			expectedConstructorCalled := make(chan struct{})
+			expectedConstructorCalled := false
 			s.candidateView = s.parentState.CurrentEpochSetup.FinalView - 1
 			mutator, err := newStateMutator(s.headersDB, s.resultsDB, s.setupsDB, s.commitsDB, s.globalParams, s.candidateView, s.parentState,
 				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
@@ -217,13 +216,13 @@ func (s *StateMutatorSuite) TestStateMutator_Constructor() {
 					return s.stateMachine, nil
 				},
 				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
-					close(expectedConstructorCalled) // expect epoch-fallback state machine
+					expectedConstructorCalled = true // expect epoch-fallback state machine
 					return s.stateMachine, nil
 				},
 			)
 			require.NoError(s.T(), err)
 			assert.NotNil(s.T(), mutator)
-			assert.True(s.T(), util.CheckClosed(expectedConstructorCalled))
+			assert.True(s.T(), expectedConstructorCalled)
 		})
 	})
 
@@ -231,11 +230,11 @@ func (s *StateMutatorSuite) TestStateMutator_Constructor() {
 		s.parentState = unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
 		// Since we are before the epoch commitment deadline, we should use the happy-path state machine
 		s.Run("before commitment deadline", func() {
-			expectedConstructorCalled := make(chan struct{})
+			expectedConstructorCalled := false
 			s.candidateView = s.parentState.CurrentEpochSetup.FirstView + 1
 			mutator, err := newStateMutator(s.headersDB, s.resultsDB, s.setupsDB, s.commitsDB, s.globalParams, s.candidateView, s.parentState,
 				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
-					close(expectedConstructorCalled) // expect happy-path constructor
+					expectedConstructorCalled = true // expect happy-path constructor
 					return s.stateMachine, nil
 				},
 				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
@@ -245,16 +244,16 @@ func (s *StateMutatorSuite) TestStateMutator_Constructor() {
 			)
 			require.NoError(s.T(), err)
 			assert.NotNil(s.T(), mutator)
-			assert.True(s.T(), util.CheckClosed(expectedConstructorCalled))
+			assert.True(s.T(), expectedConstructorCalled)
 		})
 		// Despite being past the epoch commitment deadline, since we are in the EpochCommitted phase
 		// already, we should proceed with the happy-path state machine
 		s.Run("past commitment deadline", func() {
-			expectedConstructorCalled := make(chan struct{})
+			expectedConstructorCalled := false
 			s.candidateView = s.parentState.CurrentEpochSetup.FinalView - 1
 			mutator, err := newStateMutator(s.headersDB, s.resultsDB, s.setupsDB, s.commitsDB, s.globalParams, s.candidateView, s.parentState,
 				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
-					close(expectedConstructorCalled) // expect happy-path constructor
+					expectedConstructorCalled = true // expect happy-path constructor
 					return s.stateMachine, nil
 				},
 				func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
@@ -264,7 +263,7 @@ func (s *StateMutatorSuite) TestStateMutator_Constructor() {
 			)
 			require.NoError(s.T(), err)
 			assert.NotNil(s.T(), mutator)
-			assert.True(s.T(), util.CheckClosed(expectedConstructorCalled))
+			assert.True(s.T(), expectedConstructorCalled)
 		})
 	})
 
