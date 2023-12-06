@@ -12,8 +12,10 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/common/rpc"
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/counters"
+	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	"github.com/onflow/flow-go/state/protocol"
@@ -35,6 +37,9 @@ type Config struct {
 
 	// MaxGlobalStreams defines the global max number of streams that can be open at the same time.
 	MaxGlobalStreams uint32
+
+	// RegisterIDsRequestLimit defines the max number of register IDs that can be received in a single request.
+	RegisterIDsRequestLimit uint32
 
 	// ExecutionDataCacheSize is the max number of objects for the execution data cache.
 	ExecutionDataCacheSize uint32
@@ -62,16 +67,18 @@ type StateStreamBackend struct {
 	ExecutionDataBackend
 	EventsBackend
 
-	log             zerolog.Logger
-	state           protocol.State
-	headers         storage.Headers
-	seals           storage.Seals
-	results         storage.ExecutionResults
-	execDataStore   execution_data.ExecutionDataStore
-	execDataCache   *cache.ExecutionDataCache
-	broadcaster     *engine.Broadcaster
-	rootBlockHeight uint64
-	rootBlockID     flow.Identifier
+	log                  zerolog.Logger
+	state                protocol.State
+	headers              storage.Headers
+	seals                storage.Seals
+	results              storage.ExecutionResults
+	execDataStore        execution_data.ExecutionDataStore
+	execDataCache        *cache.ExecutionDataCache
+	broadcaster          *engine.Broadcaster
+	rootBlockHeight      uint64
+	rootBlockID          flow.Identifier
+	registers            *execution.RegistersAsyncStore
+	registerRequestLimit int
 
 	// highestHeight contains the highest consecutive block height for which we have received a
 	// new Execution Data notification.
@@ -90,6 +97,7 @@ func New(
 	broadcaster *engine.Broadcaster,
 	rootHeight uint64,
 	highestAvailableHeight uint64,
+	registers *execution.RegistersAsyncStore,
 ) (*StateStreamBackend, error) {
 	logger := log.With().Str("module", "state_stream_api").Logger()
 
@@ -100,17 +108,19 @@ func New(
 	}
 
 	b := &StateStreamBackend{
-		log:             logger,
-		state:           state,
-		headers:         headers,
-		seals:           seals,
-		results:         results,
-		execDataStore:   execDataStore,
-		execDataCache:   execDataCache,
-		broadcaster:     broadcaster,
-		rootBlockHeight: rootHeight,
-		rootBlockID:     rootBlockID,
-		highestHeight:   counters.NewMonotonousCounter(highestAvailableHeight),
+		log:                  logger,
+		state:                state,
+		headers:              headers,
+		seals:                seals,
+		results:              results,
+		execDataStore:        execDataStore,
+		execDataCache:        execDataCache,
+		broadcaster:          broadcaster,
+		rootBlockHeight:      rootHeight,
+		rootBlockID:          rootBlockID,
+		registers:            registers,
+		registerRequestLimit: int(config.RegisterIDsRequestLimit),
+		highestHeight:        counters.NewMonotonousCounter(highestAvailableHeight),
 	}
 
 	b.ExecutionDataBackend = ExecutionDataBackend{
@@ -211,4 +221,19 @@ func (b *StateStreamBackend) getStartHeight(startBlockID flow.Identifier, startH
 // setHighestHeight sets the highest height for which execution data is available.
 func (b *StateStreamBackend) setHighestHeight(height uint64) bool {
 	return b.highestHeight.Set(height)
+}
+
+// GetRegisterValues returns the register values for the given register IDs at the given block height.
+func (b *StateStreamBackend) GetRegisterValues(ids flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
+	if len(ids) > b.registerRequestLimit {
+		return nil, status.Errorf(codes.InvalidArgument, "number of register IDs exceeds limit of %d", b.registerRequestLimit)
+	}
+	values, err := b.registers.RegisterValues(ids, height)
+	if errors.Is(err, storage.ErrHeightNotIndexed) {
+		return nil, status.Errorf(codes.OutOfRange, "register values for block %d is not available", height)
+	}
+	if errors.Is(err, storage.ErrNotFound) {
+		return nil, status.Errorf(codes.NotFound, "register values for block %d is not available", height)
+	}
+	return values, err
 }

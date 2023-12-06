@@ -82,7 +82,7 @@ jobs:
       matrix:
         include:
           - name: crypto
-            setup:
+            setup: noop
             race: 1
             test_category: unit-crypto
           - name: insecure

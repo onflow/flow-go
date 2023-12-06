@@ -22,12 +22,12 @@ else
 	ADX_SUPPORT := 1
 endif
 
-# the crypto package uses BLST source files underneath which may use ADX insructions.
+# the crypto package uses BLST source files underneath which may use ADX instructions.
 ifeq ($(ADX_SUPPORT), 1)
-# if ADX insructions are supported, default is to use a fast ADX BLST implementation 
+# if ADX instructions are supported, default is to use a fast ADX BLST implementation 
 	CRYPTO_FLAG := ""
 else
-# if ADX insructions aren't supported, this CGO flags uses a slower non-ADX BLST implementation 
+# if ADX instructions aren't supported, this CGO flags uses a slower non-ADX BLST implementation 
 	CRYPTO_FLAG := "-O -D__BLST_PORTABLE__"
 endif
 CGO_FLAG := CGO_CFLAGS=$(CRYPTO_FLAG)
@@ -75,8 +75,6 @@ c-sanitize: c-asan
 # - address sanitization and other checks (only on linux)
 # - memory sanitization (target m-san) is disabled because of multiple false positives
 
-
-
 # Go tidy
 .PHONY: go-tidy
 go-tidy:
@@ -90,9 +88,6 @@ lint: go-tidy
 	# revive -config revive.toml
 	golangci-lint run -v ./...
 	
-	
-
-
 # test all packages
 .PHONY: test
 test:

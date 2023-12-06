@@ -401,11 +401,18 @@ void bls_batch_verify(const int sigs_len, byte *results, const E2 *pks_input,
 
   // build the arrays of G1 and G2 elements to verify
   E2 *pks = (E2 *)malloc(sigs_len * sizeof(E2));
-  if (!pks)
+  if (!pks) {
     return;
+  }
   E1 *sigs = (E1 *)malloc(sigs_len * sizeof(E1));
-  if (!sigs)
+  if (!sigs) {
     goto out_sigs;
+  }
+
+  E1 h;
+  if (map_to_G1(&h, data, data_len) != VALID) {
+    goto out;
+  }
 
   for (int i = 0; i < sigs_len; i++) {
     // convert the signature points:
@@ -440,11 +447,7 @@ void bls_batch_verify(const int sigs_len, byte *results, const E2 *pks_input,
   }
   // build a binary tree of aggregations
   node *root = build_tree(sigs_len, &pks[0], &sigs[0]);
-  if (!root)
-    goto out;
-
-  E1 h;
-  if (map_to_G1(&h, data, data_len) != VALID) {
+  if (!root) {
     goto out;
   }
 
