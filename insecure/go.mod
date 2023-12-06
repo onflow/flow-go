@@ -298,3 +298,5 @@ require (
 )
 
 replace github.com/onflow/flow-go => ../
+
+replace github.com/onflow/flow-go/crypto => ../crypto

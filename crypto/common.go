@@ -8,9 +8,6 @@ import (
 
 //revive:disable:var-naming
 
-// the `go generate` command requires bash scripting, `cmake` and `git`.
-//go:generate bash ./build_dependency.sh
-
 const (
 	// Minimum targeted bits of security.
 	// This is used as a reference but it doesn't mean all implemented primitives provide this minimum.
@@ -21,9 +18,6 @@ const (
 	// it is still recommened that seed is generated using a secure RNG.
 	KeyGenSeedMinLen = 2 * (securityBits / 8)
 	KeyGenSeedMaxLen = 256
-
-	// max relic PRG seed length in bytes
-	maxRelicPrgSeed = 1 << 32
 )
 
 // TODO: update this code to make sure

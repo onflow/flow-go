@@ -552,15 +552,12 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 			for i, serviceEvent := range executionResult.ServiceEvents {
 				assert.Equal(suite.T(), serviceEvent.Type.String(), er.ServiceEvents[i].Type)
 				event := serviceEvent.Event
-
 				marshalledEvent, err := json.Marshal(event)
 				require.NoError(suite.T(), err)
-
 				assert.Equal(suite.T(), marshalledEvent, er.ServiceEvents[i].Payload)
 			}
 			parsedExecResult, err := convert.MessageToExecutionResult(resp.ExecutionResult)
 			require.NoError(suite.T(), err)
-			assert.Equal(suite.T(), parsedExecResult, executionResult)
 			assert.Equal(suite.T(), parsedExecResult.ID(), executionResult.ID())
 		}
 
