@@ -34,7 +34,7 @@ func ContractCode(flowTokenAddress flow.Address) []byte {
 
 const ContractName = "EVM"
 const evmAddressTypeBytesFieldName = "bytes"
-const evmAddressTypeStructName = "EVM.EVMAddress"
+const evmAddressTypeStructName = "EVMAddress"
 
 var EVMTransactionBytesCadenceType = cadence.NewVariableSizedArrayType(cadence.TheUInt8Type)
 var evmTransactionBytesType = sema.NewVariableSizedType(nil, sema.UInt8Type)
@@ -42,6 +42,14 @@ var evmTransactionBytesType = sema.NewVariableSizedType(nil, sema.UInt8Type)
 var evmAddressBytesType = sema.NewConstantSizedType(nil, sema.UInt8Type, types.AddressLength)
 var evmAddressBytesStaticType = interpreter.ConvertSemaArrayTypeToStaticArrayType(nil, evmAddressBytesType)
 var EVMAddressBytesCadenceType = cadence.NewConstantSizedArrayType(types.AddressLength, cadence.TheUInt8Type)
+
+func newGethArgument(typeName string) gethABI.Argument {
+	typ, err := gethABI.NewType(typeName, "", nil)
+	if err != nil {
+		panic(err)
+	}
+	return gethABI.Argument{Type: typ}
+}
 
 // EVM.encodeABI
 
@@ -58,14 +66,6 @@ var internalEVMTypeEncodeABIFunctionType = &sema.FunctionType{
 		},
 	},
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.ByteArrayType),
-}
-
-func newGethArgument(typeName string) gethABI.Argument {
-	typ, err := gethABI.NewType(typeName, "", nil)
-	if err != nil {
-		panic(err)
-	}
-	return gethABI.Argument{Type: typ}
 }
 
 func newInternalEVMTypeEncodeABIFunction(
@@ -244,7 +244,10 @@ func newInternalEVMTypeDecodeABIFunction(
 				case interpreter.ArrayStaticType:
 					arguments = append(arguments, newGethArgument("uint64[]"))
 				case interpreter.CompositeStaticType:
-					if value.TypeID == "A.0000000000000001.EVM.EVMAddress" {
+					typeID := common.TypeID(
+						fmt.Sprintf("A.%v.%v", evmContractLocation, evmAddressTypeStructName),
+					)
+					if value.TypeID == typeID {
 						arguments = append(arguments, newGethArgument("address"))
 					} else {
 						panic(fmt.Errorf("unsupported composite type: %v", value))
@@ -291,102 +294,17 @@ func newInternalEVMTypeDecodeABIFunction(
 				panic(err)
 			}
 
+			i := 0
 			values := make([]interpreter.Value, 0)
-			for _, arg := range decoded {
-				switch value := arg.(type) {
-				case string:
-					values = append(values, interpreter.NewStringValue(
-						inter,
-						common.NewStringMemoryUsage(len(value)),
-						func() string {
-							return value
-						},
-					))
-				case uint8:
-					values = append(values, interpreter.NewUInt8Value(
-						inter,
-						func() uint8 {
-							return value
-						},
-					))
-				case uint16:
-					values = append(values, interpreter.NewUInt16Value(
-						inter,
-						func() uint16 {
-							return value
-						},
-					))
-				case uint32:
-					values = append(values, interpreter.NewUInt32Value(
-						inter,
-						func() uint32 {
-							return value
-						},
-					))
-				case uint64:
-					values = append(values, interpreter.NewUInt64Value(
-						inter,
-						func() uint64 {
-							return value
-						},
-					))
-				case *big.Int:
-					values = append(values, interpreter.NewUInt128ValueFromBigInt(
-						inter,
-						func() *big.Int {
-							return value
-						},
-					))
-				case int8:
-					values = append(values, interpreter.NewInt8Value(
-						inter,
-						func() int8 {
-							return value
-						},
-					))
-				case int16:
-					values = append(values, interpreter.NewInt16Value(
-						inter,
-						func() int16 {
-							return value
-						},
-					))
-				case int32:
-					values = append(values, interpreter.NewInt32Value(
-						inter,
-						func() int32 {
-							return value
-						},
-					))
-				case int64:
-					values = append(values, interpreter.NewInt64Value(
-						inter,
-						func() int64 {
-							return value
-						},
-					))
-				case bool:
-					values = append(values, interpreter.BoolValue(value))
-				case gethCommon.Address:
-					var address types.Address
-					copy(address[:], value.Bytes())
-					contractsAddress := common.Address{0, 0, 0, 0, 0, 0, 0, 1}
-					compositeValue := interpreter.NewCompositeValue(
-						inter,
-						locationRange,
-						common.NewAddressLocation(gauge, contractsAddress, ContractName),
-						evmAddressTypeStructName,
-						common.CompositeKindStructure,
-						[]interpreter.CompositeField{
-							{
-								Name:  evmAddressTypeBytesFieldName,
-								Value: EVMAddressToAddressBytesArrayValue(inter, address),
-							},
-						},
-						common.ZeroAddress,
-					)
-					values = append(values, compositeValue)
-				case []uint64:
+			typesArray.Iterate(inter, func(element interpreter.Value) (resume bool) {
+				typeValue, ok := element.(interpreter.TypeValue)
+				if !ok {
+					panic(errors.NewUnreachableError())
+				}
+
+				switch value := typeValue.Type.(type) {
+				case interpreter.ArrayStaticType:
+					elements := decoded[i].([]uint64)
 					arrayType := interpreter.NewVariableSizedStaticType(
 						inter,
 						interpreter.NewPrimitiveStaticType(
@@ -395,7 +313,7 @@ func newInternalEVMTypeDecodeABIFunction(
 						),
 					)
 					arrValues := make([]interpreter.Value, 0)
-					for _, v := range value {
+					for _, v := range elements {
 						arrValues = append(arrValues, interpreter.NewUInt64Value(inter, func() uint64 {
 							return v
 						}))
@@ -409,10 +327,150 @@ func newInternalEVMTypeDecodeABIFunction(
 						arrValues...,
 					)
 					values = append(values, arr)
-				default:
-					panic(fmt.Errorf("unsupported type: %T", value))
+				case interpreter.CompositeStaticType:
+					typeID := common.TypeID(
+						fmt.Sprintf("A.%v.%v", evmContractLocation, evmAddressTypeStructName),
+					)
+					if value.TypeID == typeID {
+						addr := decoded[i].(gethCommon.Address)
+						var address types.Address
+						copy(address[:], addr.Bytes())
+						compositeValue := interpreter.NewCompositeValue(
+							inter,
+							locationRange,
+							evmContractLocation,
+							fmt.Sprintf("%s.%s", ContractName, evmAddressTypeStructName),
+							common.CompositeKindStructure,
+							[]interpreter.CompositeField{
+								{
+									Name:  evmAddressTypeBytesFieldName,
+									Value: EVMAddressToAddressBytesArrayValue(inter, address),
+								},
+							},
+							common.ZeroAddress,
+						)
+						values = append(values, compositeValue)
+					} else {
+						panic(fmt.Errorf("unsupported composite type: %v", value))
+					}
 				}
-			}
+
+				switch typeValue.Type {
+				case interpreter.PrimitiveStaticTypeString:
+					value := decoded[i].(string)
+					values = append(values, interpreter.NewStringValue(
+						inter,
+						common.NewStringMemoryUsage(len(value)),
+						func() string {
+							return value
+						},
+					))
+				case interpreter.PrimitiveStaticTypeBool:
+					value := decoded[i].(bool)
+					values = append(values, interpreter.BoolValue(value))
+				case interpreter.PrimitiveStaticTypeUInt8:
+					value := decoded[i].(uint8)
+					values = append(values, interpreter.NewUInt8Value(
+						inter,
+						func() uint8 {
+							return value
+						},
+					))
+				case interpreter.PrimitiveStaticTypeUInt16:
+					value := decoded[i].(uint16)
+					values = append(values, interpreter.NewUInt16Value(
+						inter,
+						func() uint16 {
+							return value
+						},
+					))
+				case interpreter.PrimitiveStaticTypeUInt32:
+					value := decoded[i].(uint32)
+					values = append(values, interpreter.NewUInt32Value(
+						inter,
+						func() uint32 {
+							return value
+						},
+					))
+				case interpreter.PrimitiveStaticTypeUInt64:
+					value := decoded[i].(uint64)
+					values = append(values, interpreter.NewUInt64Value(
+						inter,
+						func() uint64 {
+							return value
+						},
+					))
+				case interpreter.PrimitiveStaticTypeUInt128:
+					value := decoded[i].(*big.Int)
+					values = append(values, interpreter.NewUInt128ValueFromBigInt(
+						inter,
+						func() *big.Int {
+							return value
+						},
+					))
+				case interpreter.PrimitiveStaticTypeUInt256:
+					value := decoded[i].(*big.Int)
+					values = append(values, interpreter.NewUInt256ValueFromBigInt(
+						inter,
+						func() *big.Int {
+							return value
+						},
+					))
+				case interpreter.PrimitiveStaticTypeInt8:
+					value := decoded[i].(int8)
+					values = append(values, interpreter.NewInt8Value(
+						inter,
+						func() int8 {
+							return value
+						},
+					))
+				case interpreter.PrimitiveStaticTypeInt16:
+					value := decoded[i].(int16)
+					values = append(values, interpreter.NewInt16Value(
+						inter,
+						func() int16 {
+							return value
+						},
+					))
+				case interpreter.PrimitiveStaticTypeInt32:
+					value := decoded[i].(int32)
+					values = append(values, interpreter.NewInt32Value(
+						inter,
+						func() int32 {
+							return value
+						},
+					))
+				case interpreter.PrimitiveStaticTypeInt64:
+					value := decoded[i].(int64)
+					values = append(values, interpreter.NewInt64Value(
+						inter,
+						func() int64 {
+							return value
+						},
+					))
+				case interpreter.PrimitiveStaticTypeInt128:
+					value := decoded[i].(*big.Int)
+					values = append(values, interpreter.NewInt128ValueFromBigInt(
+						inter,
+						func() *big.Int {
+							return value
+						},
+					))
+				case interpreter.PrimitiveStaticTypeInt256:
+					value := decoded[i].(*big.Int)
+					values = append(values, interpreter.NewInt256ValueFromBigInt(
+						inter,
+						func() *big.Int {
+							return value
+						},
+					))
+				}
+
+				i += 1
+				// continue iteration
+				return true
+			})
+
 			arrayType := interpreter.NewVariableSizedStaticType(
 				inter,
 				interpreter.NewPrimitiveStaticType(
@@ -1074,15 +1132,17 @@ var internalEVMStandardLibraryType = stdlib.StandardLibraryType{
 	Kind: common.DeclarationKindContract,
 }
 
+var evmContractLocation common.AddressLocation
+
 func SetupEnvironment(env runtime.Environment, handler types.ContractHandler, service flow.Address) {
-	location := common.NewAddressLocation(nil, common.Address(service), ContractName)
+	evmContractLocation = common.NewAddressLocation(nil, common.Address(service), ContractName)
 	env.DeclareType(
 		internalEVMStandardLibraryType,
-		location,
+		evmContractLocation,
 	)
 	env.DeclareValue(
 		newInternalEVMStandardLibraryValue(nil, handler),
-		location,
+		evmContractLocation,
 	)
 }
 
