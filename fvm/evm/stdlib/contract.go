@@ -133,7 +133,10 @@ func newInternalEVMTypeEncodeABIFunction(
 					values = append(values, bool(value))
 					arguments = append(arguments, newGethArgument("bool"))
 				case *interpreter.CompositeValue:
-					if value.TypeID() == "A.0000000000000001.EVM.EVMAddress" {
+					typeID := common.TypeID(
+						fmt.Sprintf("A.%v.%v", evmContractLocation, evmAddressTypeStructName),
+					)
+					if value.TypeID() == typeID {
 						bytes, err := interpreter.ByteArrayValueToByteSlice(
 							inter,
 							value.GetMember(inter, locationRange, evmAddressTypeBytesFieldName),
