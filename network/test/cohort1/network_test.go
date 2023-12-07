@@ -136,7 +136,7 @@ func (suite *NetworkTestSuite) SetupTest() {
 		connManager, err := testutils.NewTagWatchingConnManager(
 			unittest.Logger(),
 			metrics.NewNoopCollector(),
-			&defaultFlowConfig.NetworkConfig.ConnectionManagerConfig)
+			&defaultFlowConfig.NetworkConfig.ConnectionManager)
 		require.NoError(suite.T(), err)
 
 		opts = append(opts,

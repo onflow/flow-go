@@ -7,15 +7,16 @@ import (
 )
 
 const (
-	gossipsubKey = "gossipsub"
-	unicastKey   = "unicast"
+	gossipsubKey         = "gossipsub"
+	unicastKey           = "unicast"
+	connectionManagerKey = "connection-manager"
 )
 
 // Config encapsulation of configuration structs for all components related to the Flow network.
 type Config struct {
-	Unicast                 Unicast                       `mapstructure:"unicast"`
-	ResourceManager         p2pconf.ResourceManagerConfig `mapstructure:"libp2p-resource-manager"`
-	ConnectionManagerConfig `mapstructure:",squash"`
+	Unicast           Unicast                       `mapstructure:"unicast"`
+	ResourceManager   p2pconf.ResourceManagerConfig `mapstructure:"libp2p-resource-manager"`
+	ConnectionManager ConnectionManager             `mapstructure:"connection-manager"`
 	// GossipSub core gossipsub configuration.
 	GossipSub  p2pconf.GossipSubParameters `mapstructure:"gossipsub"`
 	AlspConfig `mapstructure:",squash"`

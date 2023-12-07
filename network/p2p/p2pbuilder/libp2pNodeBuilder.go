@@ -407,7 +407,7 @@ func DefaultNodeBuilder(
 	gossipCfg *p2pconf.GossipSubParameters,
 	rCfg *p2pconf.ResourceManagerConfig,
 	uniCfg *p2pconfig.UnicastConfig,
-	connMgrConfig *netconf.ConnectionManagerConfig,
+	connMgrConfig *netconf.ConnectionManager,
 	disallowListCacheCfg *p2p.DisallowListCacheConfig,
 	dhtSystemActivation DhtSystemActivation,
 ) (p2p.NodeBuilder, error) {

@@ -175,7 +175,7 @@ type NodeConfig struct {
 	// logger used to provide logging
 	Logger zerolog.Logger `validate:"required"`
 	// reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p/core/host)
-	Host                 host.Host                `validate:"required"`
-	PeerManager          PeerManager              `validate:"required"`
+	Host                 host.Host `validate:"required"`
+	PeerManager          PeerManager
 	DisallowListCacheCfg *DisallowListCacheConfig `validate:"required"`
 }

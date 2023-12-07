@@ -397,7 +397,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			&fnb.FlowConfig.NetworkConfig.GossipSub,
 			&fnb.FlowConfig.NetworkConfig.ResourceManager,
 			uniCfg,
-			&fnb.FlowConfig.NetworkConfig.ConnectionManagerConfig,
+			&fnb.FlowConfig.NetworkConfig.ConnectionManager,
 			&p2p.DisallowListCacheConfig{
 				MaxSize: fnb.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
 				Metrics: metrics.DisallowListCacheMetricsFactory(fnb.HeroCacheMetricsFactory(), network.PrivateNetwork),
