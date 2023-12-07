@@ -1,13 +1,8 @@
-//go:build relic
-// +build relic
-
 package crypto
 
 // SPoCK design based on the BLS signature scheme.
 // BLS is using BLS12-381 curve and the same settings in bls.go.
 
-// #cgo CFLAGS: -g -Wall -std=c99
-// #cgo LDFLAGS: -L${SRCDIR}/relic/build/lib -l relic_s
 // #include "bls_include.h"
 import "C"
 import (
@@ -78,7 +73,7 @@ func SPOCKVerify(pk1 PublicKey, proof1 Signature, pk2 PublicKey, proof2 Signatur
 		return false, notBLSKeyError
 	}
 
-	if len(proof1) != signatureLengthBLSBLS12381 || len(proof2) != signatureLengthBLSBLS12381 {
+	if len(proof1) != g1BytesLen || len(proof2) != g1BytesLen {
 		return false, nil
 	}
 
@@ -90,9 +85,9 @@ func SPOCKVerify(pk1 PublicKey, proof1 Signature, pk2 PublicKey, proof2 Signatur
 	}
 
 	// verify the spock proof using the secret data
-	verif := C.bls_spock_verify((*C.ep2_st)(&blsPk1.point),
+	verif := C.bls_spock_verify((*C.E2)(&blsPk1.point),
 		(*C.uchar)(&proof1[0]),
-		(*C.ep2_st)(&blsPk2.point),
+		(*C.E2)(&blsPk2.point),
 		(*C.uchar)(&proof2[0]))
 
 	switch verif {

@@ -66,7 +66,7 @@ func (e *UnexecutedLoader) LoadUnexecuted(ctx context.Context) ([]flow.Identifie
 	blockIDs := make([]flow.Identifier, 0)
 	isRoot := rootBlock.ID() == last.ID()
 	if !isRoot {
-		executed, err := state.IsBlockExecuted(ctx, e.execState, lastExecutedID)
+		executed, err := e.execState.IsBlockExecuted(lastExecutedHeight, lastExecutedID)
 		if err != nil {
 			return nil, fmt.Errorf("cannot check is last exeucted final block has been executed %v: %w", lastExecutedID, err)
 		}
@@ -162,7 +162,7 @@ func (e *UnexecutedLoader) finalizedUnexecutedBlocks(ctx context.Context, finali
 			return nil, fmt.Errorf("could not get header at height: %v, %w", lastExecuted, err)
 		}
 
-		executed, err := state.IsBlockExecuted(ctx, e.execState, header.ID())
+		executed, err := e.execState.IsBlockExecuted(header.Height, header.ID())
 		if err != nil {
 			return nil, fmt.Errorf("could not check whether block is executed: %w", err)
 		}
@@ -211,7 +211,11 @@ func (e *UnexecutedLoader) pendingUnexecutedBlocks(ctx context.Context, finalize
 	unexecuted := make([]flow.Identifier, 0)
 
 	for _, pending := range pendings {
-		executed, err := state.IsBlockExecuted(ctx, e.execState, pending)
+		p, err := e.headers.ByBlockID(pending)
+		if err != nil {
+			return nil, fmt.Errorf("could not get header by block id: %w", err)
+		}
+		executed, err := e.execState.IsBlockExecuted(p.Height, pending)
 		if err != nil {
 			return nil, fmt.Errorf("could not check block executed or not: %w", err)
 		}
