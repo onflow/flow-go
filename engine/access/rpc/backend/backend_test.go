@@ -361,7 +361,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_EpochTransitionSpan() {
 }
 
 // TestGetLatestProtocolStateSnapshot_EpochTransitionSpan tests our GetLatestProtocolStateSnapshot RPC endpoint
-// where the length of the sealing segment is greater than the configured SnapshotHistoryLimit
+// where the length of the sealing segment is greater than the configured SnapshotHistoryLimit.
 func (suite *Suite) TestGetLatestProtocolStateSnapshot_HistoryLimit() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
@@ -397,7 +397,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_HistoryLimit() {
 	})
 }
 
-// TestGetProtocolStateSnapshotByBlockID tests our GetProtocolStateSnapshotByBlockID RPC endpoint
+// TestGetProtocolStateSnapshotByBlockID tests our GetProtocolStateSnapshotByBlockID RPC endpoint.
 func (suite *Suite) TestGetProtocolStateSnapshotByBlockID() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
@@ -448,18 +448,12 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID() {
 }
 
 // TestGetProtocolStateSnapshotByBlockID_Non_Finalized_Blocks tests our GetProtocolStateSnapshotByBlockID RPC endpoint
-// where non finalized block is added to state
+// where non finalized block is added to state.
 func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_NonFinalizedBlocks() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
 	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 		rootBlock, err := rootSnapshot.Head()
-		suite.Require().NoError(err)
-		// create a new block with root block as parent
-		newBlock := unittest.BlockWithParentFixture(rootBlock)
-		ctx := context.Background()
-		// add new block to the chain state
-		err = state.Extend(ctx, newBlock)
 		suite.Require().NoError(err)
 
 		params := suite.defaultBackendParams()
@@ -468,7 +462,58 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_NonFinalizedBlocks() {
 		backend, err := New(params)
 		suite.Require().NoError(err)
 
-		suite.T().Run("failed to get a valid snapshot", func(t *testing.T) {
+		suite.T().Run("unknown query block", func(t *testing.T) {
+			// create a new block with root block as parent
+			newBlock := unittest.BlockWithParentFixture(rootBlock)
+			ctx := context.Background()
+
+			suite.state.On("AtBlockID", newBlock.ID()).Return(state.AtBlockID(newBlock.ID()))
+			suite.headers.On("BlockIDByHeight", newBlock.Header.Height).Return(newBlock.ID(), nil)
+
+			// query the handler for the snapshot for non existing block
+			snapshotBytes, err := backend.GetProtocolStateSnapshotByBlockID(ctx, newBlock.ID())
+			suite.Require().Nil(snapshotBytes)
+			suite.Require().Error(err)
+			suite.Require().Equal(codes.NotFound, status.Code(err))
+			suite.Require().Equal(status.Errorf(codes.NotFound, "failed to get a valid snapshot: block not found").Error(),
+				err.Error())
+		})
+
+		suite.T().Run("unexpected error from snapshot.AtBlockID", func(t *testing.T) {
+			// create a new block with root block as parent
+			//newBlock := unittest.BlockWithParentFixture(rootBlock)
+			ctx := context.Background()
+			//// add new block to the chain state
+			//err = state.Extend(ctx, newBlock)
+			suite.Require().NoError(err)
+
+			executedBlock := unittest.BlockFixture()
+
+			db.Close()
+
+			// since block was added to the block tree it must be queryable by block ID
+			//suite.state.On("AtBlockID", newBlock.ID()).Return(state.AtBlockID(newBlock.ID()))
+			//suite.headers.On("BlockIDByHeight", newBlock.Header.Height).Return(newBlock.ID(), nil)
+			suite.state.On("AtBlockID", mock.Anything).Unset()
+			suite.state.On("AtBlockID", executedBlock.ID()).Return(state.AtBlockID(executedBlock.ID()))
+
+			// query the handler for the snapshot for non finalized block
+			snapshotBytes, err := backend.GetProtocolStateSnapshotByBlockID(ctx, executedBlock.ID())
+			suite.Require().Nil(snapshotBytes)
+			suite.Require().Error(err)
+			//suite.Require().Equal(codes.Internal, status.Code(err))
+			suite.Require().Equal(status.Errorf(codes.Internal, "failed to get a valid snapshot: block not found").Error(),
+				err.Error())
+		})
+
+		suite.T().Run("unexpected error from BlockIDByHeight", func(t *testing.T) {
+			// create a new block with root block as parent
+			newBlock := unittest.BlockWithParentFixture(rootBlock)
+			ctx := context.Background()
+			// add new block to the chain state
+			err = state.Extend(ctx, newBlock)
+			suite.Require().NoError(err)
+
 			// since block was added to the block tree it must be queryable by block ID
 			suite.state.On("AtBlockID", newBlock.ID()).Return(state.AtBlockID(newBlock.ID()))
 			suite.headers.On("BlockIDByHeight", newBlock.Header.Height).Return(newBlock.ID(), nil)
@@ -477,10 +522,17 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_NonFinalizedBlocks() {
 			snapshotBytes, err := backend.GetProtocolStateSnapshotByBlockID(ctx, newBlock.ID())
 			suite.Require().Nil(snapshotBytes)
 			suite.Require().Error(err)
-			suite.Require().Equal(codes.Internal, status.Code(err))
+			suite.Require().Equal(codes.FailedPrecondition, status.Code(err))
 		})
 
 		suite.T().Run("no block has been finalized yet at the height we're looking", func(t *testing.T) {
+			// create a new block with root block as parent
+			newBlock := unittest.BlockWithParentFixture(rootBlock)
+			ctx := context.Background()
+			// add new block to the chain state
+			err = state.Extend(ctx, newBlock)
+			suite.Require().NoError(err)
+
 			// since block was added to the block tree it must be queryable by block ID
 			suite.state.On("AtBlockID", newBlock.ID()).Return(state.AtBlockID(newBlock.ID()))
 			suite.headers.On("BlockIDByHeight", mock.Anything).Return(flow.ZeroID, storage.ErrNotFound)
@@ -491,6 +543,191 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_NonFinalizedBlocks() {
 			suite.Require().Error(err)
 			suite.Require().Equal(codes.FailedPrecondition, status.Code(err))
 		})
+
+		//
+		//suite.T().Run("failed to get a valid snapshot", func(t *testing.T) {
+		//	// create a new block with root block as parent
+		//	newBlock := unittest.BlockWithParentFixture(rootBlock)
+		//	ctx := context.Background()
+		//	// add new block to the chain state
+		//	err = state.Extend(ctx, newBlock)
+		//	suite.Require().NoError(err)
+		//
+		//	// since block was added to the block tree it must be queryable by block ID
+		//	suite.state.On("AtBlockID", newBlock.ID()).Return(state.AtBlockID(newBlock.ID()))
+		//	suite.headers.On("BlockIDByHeight", newBlock.Header.Height).Return(newBlock.ID(), nil)
+		//
+		//	// query the handler for the snapshot for non finalized block
+		//	snapshotBytes, err := backend.GetProtocolStateSnaSnapshotByBpshotByBlockID(ctx, newBlock.ID())
+		//	suite.Require().Nil(snapshotBytes)
+		//	suite.Require().Error(err)
+		//	suite.Require().Equal(codes.Internal, status.Code(err))
+		//})
+
+	})
+}
+
+// TestGetProtocolStateSnapshotByBlockID_NonQueryBlock tests our GetProtocolStateSnapshotByBlockID RPC endpoint
+// where no block with the given ID was found.
+func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_NonQueryBlock() {
+	identities := unittest.CompleteIdentitySet()
+	rootSnapshot := unittest.RootSnapshotFixture(identities)
+	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
+		rootBlock, err := rootSnapshot.Head()
+		suite.Require().NoError(err)
+
+		params := suite.defaultBackendParams()
+		params.MaxHeightRange = TEST_MAX_HEIGHT
+
+		backend, err := New(params)
+		suite.Require().NoError(err)
+
+		// create a new block with root block as parent
+		newBlock := unittest.BlockWithParentFixture(rootBlock)
+		ctx := context.Background()
+
+		suite.state.On("AtBlockID", newBlock.ID()).Return(state.AtBlockID(newBlock.ID()))
+		suite.headers.On("BlockIDByHeight", newBlock.Header.Height).Return(newBlock.ID(), nil)
+
+		// query the handler for the snapshot for non existing block
+		snapshotBytes, err := backend.GetProtocolStateSnapshotByBlockID(ctx, newBlock.ID())
+		suite.Require().Nil(snapshotBytes)
+		suite.Require().Error(err)
+		suite.Require().Equal(codes.NotFound, status.Code(err))
+		suite.Require().Equal(status.Errorf(codes.NotFound, "failed to get a valid snapshot: block not found").Error(),
+			err.Error())
+	})
+}
+
+// TestGetProtocolStateSnapshotByBlockID_AtBlockIDInternalError tests our GetProtocolStateSnapshotByBlockID RPC endpoint
+// where unexpected error from snapshot.AtBlockID appear because of closed database.
+func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_AtBlockIDInternalError() {
+	identities := unittest.CompleteIdentitySet()
+	rootSnapshot := unittest.RootSnapshotFixture(identities)
+	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
+		params := suite.defaultBackendParams()
+		params.MaxHeightRange = TEST_MAX_HEIGHT
+
+		backend, err := New(params)
+		suite.Require().NoError(err)
+
+		ctx := context.Background()
+
+		newBlock := unittest.BlockFixture()
+
+		suite.state.On("AtBlockID", newBlock.ID()).Return(state.AtBlockID(newBlock.ID()))
+
+		// query the handler for the snapshot
+		snapshotBytes, err := backend.GetProtocolStateSnapshotByBlockID(ctx, newBlock.ID())
+		suite.Require().Nil(snapshotBytes)
+		suite.Require().Error(err)
+		suite.Require().Equal(status.Errorf(codes.Internal, "could not get header by blockID: "+
+			"critical unexpected error querying snapshot: "+
+			"could not check existence of reference block: "+
+			"could not check existence: DB Closed").Error(),
+			err.Error())
+	})
+}
+
+// TestGetProtocolStateSnapshotByBlockID_BlockNotFinalizedAtHeight tests our GetProtocolStateSnapshotByBlockID RPC endpoint
+// where The block exists, but no block has been finalized at its height.
+func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_BlockNotFinalizedAtHeight() {
+	identities := unittest.CompleteIdentitySet()
+	rootSnapshot := unittest.RootSnapshotFixture(identities)
+	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
+		rootBlock, err := rootSnapshot.Head()
+		suite.Require().NoError(err)
+
+		params := suite.defaultBackendParams()
+		params.MaxHeightRange = TEST_MAX_HEIGHT
+
+		backend, err := New(params)
+		suite.Require().NoError(err)
+
+		// create a new block with root block as parent
+		newBlock := unittest.BlockWithParentFixture(rootBlock)
+		ctx := context.Background()
+		// add new block to the chain state
+		err = state.Extend(ctx, newBlock)
+		suite.Require().NoError(err)
+
+		// since block was added to the block tree it must be queryable by block ID
+		suite.state.On("AtBlockID", newBlock.ID()).Return(state.AtBlockID(newBlock.ID()))
+		suite.headers.On("BlockIDByHeight", mock.Anything).Return(flow.ZeroID, storage.ErrNotFound)
+
+		// query the handler for the snapshot for non finalized block
+		snapshotBytes, err := backend.GetProtocolStateSnapshotByBlockID(ctx, newBlock.ID())
+		suite.Require().Nil(snapshotBytes)
+		suite.Require().Error(err)
+		suite.Require().Equal(codes.FailedPrecondition, status.Code(err))
+	})
+}
+
+// TestGetProtocolStateSnapshotByBlockID_DifferentBlockFinalizedAtHeight tests our GetProtocolStateSnapshotByBlockID RPC
+// endpoint where a different block than what was queried has been finalized at this height.
+func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_DifferentBlockFinalizedAtHeight() {
+	identities := unittest.CompleteIdentitySet()
+	rootSnapshot := unittest.RootSnapshotFixture(identities)
+	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
+		rootBlock, err := rootSnapshot.Head()
+		suite.Require().NoError(err)
+
+		params := suite.defaultBackendParams()
+		params.MaxHeightRange = TEST_MAX_HEIGHT
+
+		backend, err := New(params)
+		suite.Require().NoError(err)
+
+		// create a new block with root block as parent
+		newBlock := unittest.BlockWithParentFixture(rootBlock)
+		ctx := context.Background()
+		// add new block to the chain state
+		err = state.Extend(ctx, newBlock)
+		suite.Require().NoError(err)
+
+		// since block was added to the block tree it must be queryable by block ID
+		suite.state.On("AtBlockID", newBlock.ID()).Return(state.AtBlockID(newBlock.ID()))
+		suite.headers.On("BlockIDByHeight", mock.Anything).Return(flow.ZeroID, storage.ErrNotFound)
+
+		// query the handler for the snapshot for non finalized block
+		snapshotBytes, err := backend.GetProtocolStateSnapshotByBlockID(ctx, newBlock.ID())
+		suite.Require().Nil(snapshotBytes)
+		suite.Require().Error(err)
+		suite.Require().Equal(codes.FailedPrecondition, status.Code(err))
+	})
+}
+
+// TestGetProtocolStateSnapshotByBlockID_UnexpectedErrorBlockIDByHeight tests our GetProtocolStateSnapshotByBlockID RPC
+// endpoint where a unexpected error from BlockIDByHeight appear.
+func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_UnexpectedErrorBlockIDByHeight() {
+	identities := unittest.CompleteIdentitySet()
+	rootSnapshot := unittest.RootSnapshotFixture(identities)
+	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
+		rootBlock, err := rootSnapshot.Head()
+		suite.Require().NoError(err)
+
+		params := suite.defaultBackendParams()
+		params.MaxHeightRange = TEST_MAX_HEIGHT
+
+		backend, err := New(params)
+		suite.Require().NoError(err)
+
+		// create a new block with root block as parent
+		newBlock := unittest.BlockWithParentFixture(rootBlock)
+		ctx := context.Background()
+		// add new block to the chain state
+		err = state.Extend(ctx, newBlock)
+		suite.Require().NoError(err)
+
+		// since block was added to the block tree it must be queryable by block ID
+		suite.state.On("AtBlockID", newBlock.ID()).Return(state.AtBlockID(newBlock.ID()))
+		suite.headers.On("BlockIDByHeight", mock.Anything).Return(flow.ZeroID)
+
+		// query the handler for the snapshot
+		snapshotBytes, err := backend.GetProtocolStateSnapshotByBlockID(ctx, newBlock.ID())
+		suite.Require().Nil(snapshotBytes)
+		suite.Require().Error(err)
+		suite.Require().Equal(codes.Internal, status.Code(err))
 	})
 }
 
