@@ -58,7 +58,7 @@ func NewCorruptLibP2PNode(
 	peerManager p2p.PeerManager,
 	disallowListCacheCfg *p2p.DisallowListCacheConfig) p2p.LibP2PNode {
 
-	node, err := p2pnode.NewNode(&p2pnode.Config{
+	node, err := p2pnode.NewNode(&p2p.NodeConfig{
 		Logger:               logger,
 		Host:                 host,
 		PeerManager:          peerManager,

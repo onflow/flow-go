@@ -92,7 +92,7 @@ func NewNodeBuilder(
 		sporkId:              sporkId,
 		address:              address,
 		networkKey:           networkKey,
-		createNode:           func(cfg *p2pnode.Config) (p2p.LibP2PNode, error) { return p2pnode.NewNode(cfg) },
+		createNode:           func(cfg *p2p.NodeConfig) (p2p.LibP2PNode, error) { return p2pnode.NewNode(cfg) },
 		metricsConfig:        metricsConfig,
 		resourceManagerCfg:   rCfg,
 		disallowListCacheCfg: disallowListCacheCfg,
@@ -257,8 +257,8 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		}
 	}
 
-	node, err := builder.createNode(&p2pnode.Config{
-		Parameters: &p2pnode.Parameters{
+	node, err := builder.createNode(&p2p.NodeConfig{
+		Parameters: &p2p.NodeParameters{
 			EnableProtectedStreams: builder.unicastConfig.EnableStreamProtection,
 		},
 		Logger:               builder.logger,

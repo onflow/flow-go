@@ -19,7 +19,6 @@ import (
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p/p2pconf"
-	"github.com/onflow/flow-go/network/p2p/p2pnode"
 )
 
 type GossipSubFactoryFunc func(context.Context, zerolog.Logger, host.Host, PubSubAdapterConfig, CollectionClusterChangesConsumer) (PubSubAdapter, error)
@@ -30,7 +29,7 @@ type GossipSubFactoryFunc func(context.Context, zerolog.Logger, host.Host, PubSu
 // Returns:
 // - LibP2PNode: new libp2p node
 // - error: error if any, any returned error is irrecoverable.
-type NodeConstructor func(config *p2pnode.Config) (LibP2PNode, error)
+type NodeConstructor func(config *NodeConfig) (LibP2PNode, error)
 type GossipSubAdapterConfigFunc func(*BasePubSubAdapterConfig) PubSubAdapterConfig
 
 // GossipSubBuilder provides a builder pattern for creating a GossipSubParameters pubsub system.
@@ -162,4 +161,21 @@ type PeerScoringConfigOverride struct {
 	// Override criteria: if the function is not nil, it will override the default application specific score parameters.
 	// If the function is nil, the default application specific score parameters are used.
 	AppSpecificScoreParams func(peer.ID) float64
+}
+
+// NodeParameters are the numerical values that are used to configure the libp2p node.
+type NodeParameters struct {
+	EnableProtectedStreams bool `validate:"required"`
+}
+
+// NodeConfig is the configuration for the libp2p node, it contains the parameters as well as the essential components for setting up the node.
+// It is used to create a new libp2p node.
+type NodeConfig struct {
+	Parameters *NodeParameters `validate:"required"`
+	// logger used to provide logging
+	Logger zerolog.Logger `validate:"required"`
+	// reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p/core/host)
+	Host                 host.Host                `validate:"required"`
+	PeerManager          PeerManager              `validate:"required"`
+	DisallowListCacheCfg *DisallowListCacheConfig `validate:"required"`
 }

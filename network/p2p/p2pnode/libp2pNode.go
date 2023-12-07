@@ -65,24 +65,7 @@ type Node struct {
 	// Cache of temporary disallow-listed peers, when a peer is disallow-listed, the connections to that peer
 	// are closed and further connections are not allowed till the peer is removed from the disallow-list.
 	disallowListedCache p2p.DisallowListCache
-	parameters          *Parameters
-}
-
-// Parameters are the numerical values that are used to configure the libp2p node.
-type Parameters struct {
-	EnableProtectedStreams bool `validate:"required"`
-}
-
-// Config is the configuration for the libp2p node, it contains the parameters as well as the essential components for setting up the node.
-// It is used to create a new libp2p node.
-type Config struct {
-	Parameters *Parameters `validate:"required"`
-	// logger used to provide logging
-	Logger zerolog.Logger `validate:"required"`
-	// reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p/core/host)
-	Host                 host.Host                    `validate:"required"`
-	PeerManager          p2p.PeerManager              `validate:"required"`
-	DisallowListCacheCfg *p2p.DisallowListCacheConfig `validate:"required"`
+	parameters          *p2p.NodeParameters
 }
 
 // NewNode creates a new libp2p node and sets its parameters.
@@ -93,7 +76,7 @@ type Config struct {
 //   - *Node: The created libp2p node.
 //
 // - error: An error, if any occurred during the process. This includes failure in creating the node. The returned error is irrecoverable, and the node cannot be used.
-func NewNode(cfg *Config) (*Node, error) {
+func NewNode(cfg *p2p.NodeConfig) (*Node, error) {
 	err := validator.New().Struct(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
