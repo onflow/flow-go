@@ -4,19 +4,10 @@
 FROM golang:1.20-buster AS build-setup
 
 RUN apt-get update
-RUN apt-get -y install cmake zip
-
-## (1) Build Relic first to maximize caching
-FROM build-setup AS build-relic
+RUN apt-get -y install zip
 
 RUN mkdir /build
 WORKDIR /build
-
-# Copy over the crypto package
-COPY crypto ./crypto
-
-# Build Relic (this places build artifacts in /build/relic/build)
-RUN cd ./crypto/ && go generate
 
 ## (2) Build the app binary
 FROM build-setup AS build-env
@@ -35,11 +26,11 @@ ARG TARGET
 
 COPY . .
 
-# Copy over Relic build artifacts
-COPY --from=build-relic /build/crypto/relic/build ./crypto/relic/build
-
 FROM build-env as build-production
 WORKDIR /app
+
+# CGO_FLAG can be overwritten
+ARG CGO_FLAG
 
 # Keep Go's build cache between builds.
 # https://github.com/golang/go/issues/27719#issuecomment-514747274
@@ -48,7 +39,7 @@ RUN --mount=type=cache,sharing=locked,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=ssh \
     cd integration && \
-    CGO_ENABLED=1 go build --tags relic -ldflags "-extldflags -static" -o ./app ./${TARGET}
+    CGO_ENABLED=1 CGO_FLAGS="${CGO_FLAG}" go build -ldflags "-extldflags -static" -o ./app ./${TARGET}
 
 RUN mv /app/integration/app /app/app
 

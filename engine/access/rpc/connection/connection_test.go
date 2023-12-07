@@ -59,7 +59,7 @@ func TestProxyAccessAPI(t *testing.T) {
 	}
 
 	// get a collection API client
-	client, conn, err := proxyConnectionFactory.GetAccessAPIClient("foo")
+	client, conn, err := proxyConnectionFactory.GetAccessAPIClient("foo", nil)
 	defer conn.Close()
 	assert.NoError(t, err)
 
@@ -155,7 +155,7 @@ func TestProxyAccessAPIConnectionReuse(t *testing.T) {
 	}
 
 	// get a collection API client
-	_, closer, err := proxyConnectionFactory.GetAccessAPIClient("foo")
+	_, closer, err := proxyConnectionFactory.GetAccessAPIClient("foo", nil)
 	assert.Equal(t, connectionCache.Len(), 1)
 	assert.NoError(t, err)
 	assert.Nil(t, closer.Close())
@@ -308,7 +308,7 @@ func TestCollectionNodeClientTimeout(t *testing.T) {
 	)
 
 	// create the collection API client
-	client, _, err := connectionFactory.GetAccessAPIClient(cn.listener.Addr().String())
+	client, _, err := connectionFactory.GetAccessAPIClient(cn.listener.Addr().String(), nil)
 	assert.NoError(t, err)
 
 	ctx := context.Background()
@@ -361,22 +361,22 @@ func TestConnectionPoolFull(t *testing.T) {
 
 	// get a collection API client
 	// Create and add first client to cache
-	_, _, err := connectionFactory.GetAccessAPIClient(cn1Address)
+	_, _, err := connectionFactory.GetAccessAPIClient(cn1Address, nil)
 	assert.Equal(t, connectionCache.Len(), 1)
 	assert.NoError(t, err)
 
 	// Create and add second client to cache
-	_, _, err = connectionFactory.GetAccessAPIClient(cn2Address)
+	_, _, err = connectionFactory.GetAccessAPIClient(cn2Address, nil)
 	assert.Equal(t, connectionCache.Len(), 2)
 	assert.NoError(t, err)
 
 	// Peek first client from cache. "recently used"-ness will not be updated, so it will be wiped out first.
-	_, _, err = connectionFactory.GetAccessAPIClient(cn1Address)
+	_, _, err = connectionFactory.GetAccessAPIClient(cn1Address, nil)
 	assert.Equal(t, connectionCache.Len(), 2)
 	assert.NoError(t, err)
 
 	// Create and add third client to cache, firs client will be removed from cache
-	_, _, err = connectionFactory.GetAccessAPIClient(cn3Address)
+	_, _, err = connectionFactory.GetAccessAPIClient(cn3Address, nil)
 	assert.Equal(t, connectionCache.Len(), 2)
 	assert.NoError(t, err)
 
@@ -436,7 +436,7 @@ func TestConnectionPoolStale(t *testing.T) {
 	}
 
 	// get a collection API client
-	client, _, err := proxyConnectionFactory.GetAccessAPIClient("foo")
+	client, _, err := proxyConnectionFactory.GetAccessAPIClient("foo", nil)
 	assert.Equal(t, connectionCache.Len(), 1)
 	assert.NoError(t, err)
 	// close connection to simulate something "going wrong" with our stored connection
@@ -451,7 +451,7 @@ func TestConnectionPoolStale(t *testing.T) {
 	assert.Error(t, err)
 
 	// re-access, should replace stale connection in cache with new one
-	_, _, _ = proxyConnectionFactory.GetAccessAPIClient("foo")
+	_, _, _ = proxyConnectionFactory.GetAccessAPIClient("foo", nil)
 	assert.Equal(t, connectionCache.Len(), 1)
 
 	var conn *grpc.ClientConn
@@ -620,7 +620,7 @@ func TestEvictingCacheClients(t *testing.T) {
 
 	clientAddress := cn.listener.Addr().String()
 	// Create the execution API client
-	client, _, err := connectionFactory.GetAccessAPIClient(clientAddress)
+	client, _, err := connectionFactory.GetAccessAPIClient(clientAddress, nil)
 	require.NoError(t, err)
 
 	ctx := context.Background()
@@ -802,7 +802,15 @@ func setupGRPCServer(t *testing.T) *grpc.ClientConn {
 	return conn
 }
 
-// TestCircuitBreakerExecutionNode tests the circuit breaker state changes for execution nodes.
+var successCodes = []codes.Code{
+	codes.Canceled,
+	codes.InvalidArgument,
+	codes.NotFound,
+	codes.Unimplemented,
+	codes.OutOfRange,
+}
+
+// TestCircuitBreakerExecutionNode tests the circuit breaker for execution nodes.
 func TestCircuitBreakerExecutionNode(t *testing.T) {
 	requestTimeout := 500 * time.Millisecond
 	circuitBreakerRestoreTimeout := 1500 * time.Millisecond
@@ -811,11 +819,6 @@ func TestCircuitBreakerExecutionNode(t *testing.T) {
 	en := new(executionNode)
 	en.start(t)
 	defer en.stop(t)
-
-	// Set up the handler mock to not respond within the requestTimeout.
-	req := &execution.PingRequest{}
-	resp := &execution.PingResponse{}
-	en.handler.On("Ping", testifymock.Anything, req).After(2*requestTimeout).Return(resp, nil)
 
 	// Create the connection factory.
 	connectionFactory := new(ConnectionFactoryImpl)
@@ -852,10 +855,11 @@ func TestCircuitBreakerExecutionNode(t *testing.T) {
 	client, _, err := connectionFactory.GetExecutionAPIClient(en.listener.Addr().String())
 	require.NoError(t, err)
 
-	ctx := context.Background()
+	req := &execution.PingRequest{}
+	resp := &execution.PingResponse{}
 
 	// Helper function to make the Ping call to the execution node and measure the duration.
-	callAndMeasurePingDuration := func() (time.Duration, error) {
+	callAndMeasurePingDuration := func(ctx context.Context) (time.Duration, error) {
 		start := time.Now()
 
 		// Make the call to the execution node.
@@ -865,30 +869,51 @@ func TestCircuitBreakerExecutionNode(t *testing.T) {
 		return time.Since(start), err
 	}
 
-	// Call and measure the duration for the first invocation.
-	duration, err := callAndMeasurePingDuration()
-	assert.Equal(t, codes.DeadlineExceeded, status.Code(err))
-	assert.LessOrEqual(t, requestTimeout, duration)
+	t.Run("test different states of the circuit breaker", func(t *testing.T) {
+		ctx := context.Background()
 
-	// Call and measure the duration for the second invocation (circuit breaker state is now "Open").
-	duration, err = callAndMeasurePingDuration()
-	assert.Equal(t, gobreaker.ErrOpenState, err)
-	assert.Greater(t, requestTimeout, duration)
+		// Set up the handler mock to not respond within the requestTimeout.
+		en.handler.On("Ping", testifymock.Anything, req).After(2*requestTimeout).Return(resp, nil)
 
-	// Reset the mock Ping for the next invocation to return response without delay
-	en.handler.On("Ping", testifymock.Anything, req).Unset()
-	en.handler.On("Ping", testifymock.Anything, req).Return(resp, nil)
+		// Call and measure the duration for the first invocation.
+		duration, err := callAndMeasurePingDuration(ctx)
+		assert.Equal(t, codes.DeadlineExceeded, status.Code(err))
+		assert.LessOrEqual(t, requestTimeout, duration)
 
-	// Wait until the circuit breaker transitions to the "HalfOpen" state.
-	time.Sleep(circuitBreakerRestoreTimeout + (500 * time.Millisecond))
+		// Call and measure the duration for the second invocation (circuit breaker state is now "Open").
+		duration, err = callAndMeasurePingDuration(ctx)
+		assert.Equal(t, gobreaker.ErrOpenState, err)
+		assert.Greater(t, requestTimeout, duration)
 
-	// Call and measure the duration for the third invocation (circuit breaker state is now "HalfOpen").
-	duration, err = callAndMeasurePingDuration()
-	assert.Greater(t, requestTimeout, duration)
-	assert.Equal(t, nil, err)
+		// Reset the mock Ping for the next invocation to return response without delay
+		en.handler.On("Ping", testifymock.Anything, req).Unset()
+		en.handler.On("Ping", testifymock.Anything, req).Return(resp, nil)
+
+		// Wait until the circuit breaker transitions to the "HalfOpen" state.
+		time.Sleep(circuitBreakerRestoreTimeout + (500 * time.Millisecond))
+
+		// Call and measure the duration for the third invocation (circuit breaker state is now "HalfOpen").
+		duration, err = callAndMeasurePingDuration(ctx)
+		assert.Greater(t, requestTimeout, duration)
+		assert.Equal(t, nil, err)
+	})
+
+	for _, code := range successCodes {
+		t.Run(fmt.Sprintf("test error %s treated as a success for circuit breaker ", code.String()), func(t *testing.T) {
+			ctx := context.Background()
+
+			en.handler.On("Ping", testifymock.Anything, req).Unset()
+			en.handler.On("Ping", testifymock.Anything, req).Return(nil, status.Error(code, code.String()))
+
+			duration, err := callAndMeasurePingDuration(ctx)
+			require.Error(t, err)
+			require.Equal(t, code, status.Code(err))
+			require.Greater(t, requestTimeout, duration)
+		})
+	}
 }
 
-// TestCircuitBreakerCollectionNode tests the circuit breaker state changes for collection nodes.
+// TestCircuitBreakerCollectionNode tests the circuit breaker for collection nodes.
 func TestCircuitBreakerCollectionNode(t *testing.T) {
 	requestTimeout := 500 * time.Millisecond
 	circuitBreakerRestoreTimeout := 1500 * time.Millisecond
@@ -897,11 +922,6 @@ func TestCircuitBreakerCollectionNode(t *testing.T) {
 	cn := new(collectionNode)
 	cn.start(t)
 	defer cn.stop(t)
-
-	// Set up the handler mock to not respond within the requestTimeout.
-	req := &access.PingRequest{}
-	resp := &access.PingResponse{}
-	cn.handler.On("Ping", testifymock.Anything, req).After(2*requestTimeout).Return(resp, nil)
 
 	// Create the connection factory.
 	connectionFactory := new(ConnectionFactoryImpl)
@@ -935,13 +955,14 @@ func TestCircuitBreakerCollectionNode(t *testing.T) {
 	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
 
 	// Create the collection API client.
-	client, _, err := connectionFactory.GetAccessAPIClient(cn.listener.Addr().String())
+	client, _, err := connectionFactory.GetAccessAPIClient(cn.listener.Addr().String(), nil)
 	assert.NoError(t, err)
 
-	ctx := context.Background()
+	req := &access.PingRequest{}
+	resp := &access.PingResponse{}
 
 	// Helper function to make the Ping call to the collection node and measure the duration.
-	callAndMeasurePingDuration := func() (time.Duration, error) {
+	callAndMeasurePingDuration := func(ctx context.Context) (time.Duration, error) {
 		start := time.Now()
 
 		// Make the call to the collection node.
@@ -951,25 +972,46 @@ func TestCircuitBreakerCollectionNode(t *testing.T) {
 		return time.Since(start), err
 	}
 
-	// Call and measure the duration for the first invocation.
-	duration, err := callAndMeasurePingDuration()
-	assert.Equal(t, codes.DeadlineExceeded, status.Code(err))
-	assert.LessOrEqual(t, requestTimeout, duration)
+	t.Run("test different states of the circuit breaker", func(t *testing.T) {
+		ctx := context.Background()
 
-	// Call and measure the duration for the second invocation (circuit breaker state is now "Open").
-	duration, err = callAndMeasurePingDuration()
-	assert.Equal(t, gobreaker.ErrOpenState, err)
-	assert.Greater(t, requestTimeout, duration)
+		// Set up the handler mock to not respond within the requestTimeout.
+		cn.handler.On("Ping", testifymock.Anything, req).After(2*requestTimeout).Return(resp, nil)
 
-	// Reset the mock Ping for the next invocation to return response without delay
-	cn.handler.On("Ping", testifymock.Anything, req).Unset()
-	cn.handler.On("Ping", testifymock.Anything, req).Return(resp, nil)
+		// Call and measure the duration for the first invocation.
+		duration, err := callAndMeasurePingDuration(ctx)
+		assert.Equal(t, codes.DeadlineExceeded, status.Code(err))
+		assert.LessOrEqual(t, requestTimeout, duration)
 
-	// Wait until the circuit breaker transitions to the "HalfOpen" state.
-	time.Sleep(circuitBreakerRestoreTimeout + (500 * time.Millisecond))
+		// Call and measure the duration for the second invocation (circuit breaker state is now "Open").
+		duration, err = callAndMeasurePingDuration(ctx)
+		assert.Equal(t, gobreaker.ErrOpenState, err)
+		assert.Greater(t, requestTimeout, duration)
 
-	// Call and measure the duration for the third invocation (circuit breaker state is now "HalfOpen").
-	duration, err = callAndMeasurePingDuration()
-	assert.Greater(t, requestTimeout, duration)
-	assert.Equal(t, nil, err)
+		// Reset the mock Ping for the next invocation to return response without delay
+		cn.handler.On("Ping", testifymock.Anything, req).Unset()
+		cn.handler.On("Ping", testifymock.Anything, req).Return(resp, nil)
+
+		// Wait until the circuit breaker transitions to the "HalfOpen" state.
+		time.Sleep(circuitBreakerRestoreTimeout + (500 * time.Millisecond))
+
+		// Call and measure the duration for the third invocation (circuit breaker state is now "HalfOpen").
+		duration, err = callAndMeasurePingDuration(ctx)
+		assert.Greater(t, requestTimeout, duration)
+		assert.Equal(t, nil, err)
+	})
+
+	for _, code := range successCodes {
+		t.Run(fmt.Sprintf("test error %s treated as a success for circuit breaker ", code.String()), func(t *testing.T) {
+			ctx := context.Background()
+
+			cn.handler.On("Ping", testifymock.Anything, req).Unset()
+			cn.handler.On("Ping", testifymock.Anything, req).Return(nil, status.Error(code, code.String()))
+
+			duration, err := callAndMeasurePingDuration(ctx)
+			require.Error(t, err)
+			require.Equal(t, code, status.Code(err))
+			require.Greater(t, requestTimeout, duration)
+		})
+	}
 }

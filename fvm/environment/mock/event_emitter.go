@@ -45,20 +45,6 @@ func (_m *EventEmitter) EmitEvent(event cadence.Event) error {
 	return r0
 }
 
-// EmitFlowEvent provides a mock function with given fields: etype, payload
-func (_m *EventEmitter) EmitFlowEvent(etype flow.EventType, payload []byte) error {
-	ret := _m.Called(etype, payload)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.EventType, []byte) error); ok {
-		r0 = rf(etype, payload)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // Events provides a mock function with given fields:
 func (_m *EventEmitter) Events() flow.EventsList {
 	ret := _m.Called()

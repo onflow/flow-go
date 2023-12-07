@@ -321,7 +321,7 @@ func (a *ecdsaAlgo) decodePublicKeyCompressed(pkBytes []byte) (PublicKey, error)
 	return &pubKeyECDSA{a, goPubKey}, nil
 }
 
-// prKeyECDSA is the private key of ECDSA, it implements the generic PrivateKey
+// prKeyECDSA is the private key of ECDSA, it implements the interface PrivateKey
 type prKeyECDSA struct {
 	// the signature algo
 	alg *ecdsaAlgo
@@ -330,6 +330,8 @@ type prKeyECDSA struct {
 	// public key
 	pubKey *pubKeyECDSA
 }
+
+var _ PrivateKey = (*prKeyECDSA)(nil)
 
 // Algorithm returns the algo related to the private key
 func (sk *prKeyECDSA) Algorithm() SigningAlgorithm {
@@ -398,6 +400,8 @@ type pubKeyECDSA struct {
 	// public key data
 	goPubKey *ecdsa.PublicKey
 }
+
+var _ PublicKey = (*pubKeyECDSA)(nil)
 
 // Algorithm returns the the algo related to the private key
 func (pk *pubKeyECDSA) Algorithm() SigningAlgorithm {

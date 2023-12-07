@@ -1,19 +1,23 @@
 package bootstrap
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
+	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	pStorage "github.com/onflow/flow-go/storage/pebble"
 )
 
 // an increased limit for bootstrapping
@@ -36,9 +40,10 @@ func (b *Bootstrapper) BootstrapLedger(
 	chain flow.Chain,
 	opts ...fvm.BootstrapProcedureOption,
 ) (flow.StateCommitment, error) {
+	startCommit := flow.StateCommitment(ledger.InitialState())
 	storageSnapshot := state.NewLedgerStorageSnapshot(
 		ledger,
-		flow.StateCommitment(ledger.InitialState()))
+		startCommit)
 
 	vm := fvm.NewVirtualMachine()
 
@@ -58,10 +63,11 @@ func (b *Bootstrapper) BootstrapLedger(
 		return flow.DummyStateCommitment, err
 	}
 
-	newStateCommitment, _, err := state.CommitDelta(
+	newStateCommitment, _, _, err := state.CommitDelta(
 		ledger,
 		executionSnapshot,
-		flow.StateCommitment(ledger.InitialState()))
+		storehouse.NewExecutingBlockSnapshot(storageSnapshot, startCommit),
+	)
 	if err != nil {
 		return flow.DummyStateCommitment, err
 	}
@@ -135,5 +141,23 @@ func (b *Bootstrapper) BootstrapExecutionDatabase(
 		return err
 	}
 
+	return nil
+}
+
+func ImportRegistersFromCheckpoint(logger zerolog.Logger, checkpointFile string, checkpointHeight uint64, pdb *pebble.DB, workerCount int) error {
+	logger.Info().Msgf("importing registers from checkpoint file %s at height %d", checkpointFile, checkpointHeight)
+
+	bootstrap, err := pStorage.NewRegisterBootstrap(pdb, checkpointFile, checkpointHeight, logger)
+	if err != nil {
+		return fmt.Errorf("could not create registers bootstrapper: %w", err)
+	}
+
+	// TODO: find a way to hook a context up to this to allow a graceful shutdown
+	err = bootstrap.IndexCheckpointFile(context.Background(), workerCount)
+	if err != nil {
+		return fmt.Errorf("could not load checkpoint file: %w", err)
+	}
+
+	logger.Info().Msgf("finish importing registers from checkpoint file %s at height %d", checkpointFile, checkpointHeight)
 	return nil
 }

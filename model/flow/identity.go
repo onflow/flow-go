@@ -394,6 +394,9 @@ func (iy *Identity) UnmarshalMsgpack(b []byte) error {
 }
 
 func (iy *IdentitySkeleton) EqualTo(other *IdentitySkeleton) bool {
+	if other == nil {
+		return false
+	}
 	if iy.NodeID != other.NodeID {
 		return false
 	}
@@ -426,6 +429,9 @@ func (iy *IdentitySkeleton) EqualTo(other *IdentitySkeleton) bool {
 }
 
 func (iy *DynamicIdentity) EqualTo(other *DynamicIdentity) bool {
+	if other == nil {
+		return false
+	}
 	return iy.EpochParticipationStatus == other.EpochParticipationStatus
 }
 

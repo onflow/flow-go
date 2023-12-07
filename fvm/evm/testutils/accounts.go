@@ -98,6 +98,13 @@ func (a *EOATestAccount) signTx(
 	return tx
 }
 
+func (a *EOATestAccount) SetNonce(nonce uint64) {
+	a.lock.Lock()
+	defer a.lock.Unlock()
+
+	a.nonce = nonce
+}
+
 func GetTestEOAAccount(t testing.TB, keyHex string) *EOATestAccount {
 	key, _ := gethCrypto.HexToECDSA(keyHex)
 	address := gethCrypto.PubkeyToAddress(key.PublicKey)
@@ -110,7 +117,12 @@ func GetTestEOAAccount(t testing.TB, keyHex string) *EOATestAccount {
 	}
 }
 
-func RunWithEOATestAccount(t *testing.T, led atree.Ledger, flowEVMRootAddress flow.Address, f func(*EOATestAccount)) {
+func RunWithEOATestAccount(t testing.TB, led atree.Ledger, flowEVMRootAddress flow.Address, f func(*EOATestAccount)) {
+	account := FundAndGetEOATestAccount(t, led, flowEVMRootAddress)
+	f(account)
+}
+
+func FundAndGetEOATestAccount(t testing.TB, led atree.Ledger, flowEVMRootAddress flow.Address) *EOATestAccount {
 	account := GetTestEOAAccount(t, EOATestAccount1KeyHex)
 
 	// fund account
@@ -131,5 +143,12 @@ func RunWithEOATestAccount(t *testing.T, led atree.Ledger, flowEVMRootAddress fl
 	)
 	require.NoError(t, err)
 
-	f(account)
+	blk2, err := e.NewReadOnlyBlockView(types.NewDefaultBlockContext(2))
+	require.NoError(t, err)
+
+	bal, err := blk2.BalanceOf(account.Address())
+	require.NoError(t, err)
+	require.Greater(t, bal.Uint64(), uint64(0))
+
+	return account
 }
