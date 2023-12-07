@@ -242,7 +242,36 @@ func newInternalEVMTypeDecodeABIFunction(
 
 				switch value := typeValue.Type.(type) {
 				case interpreter.ArrayStaticType:
-					arguments = append(arguments, newGethArgument("uint64[]"))
+					switch value.ElementType() {
+					case interpreter.PrimitiveStaticTypeString:
+						arguments = append(arguments, newGethArgument("string[]"))
+					case interpreter.PrimitiveStaticTypeBool:
+						arguments = append(arguments, newGethArgument("bool[]"))
+					case interpreter.PrimitiveStaticTypeUInt8:
+						arguments = append(arguments, newGethArgument("uint8[]"))
+					case interpreter.PrimitiveStaticTypeUInt16:
+						arguments = append(arguments, newGethArgument("uint16[]"))
+					case interpreter.PrimitiveStaticTypeUInt32:
+						arguments = append(arguments, newGethArgument("uint32[]"))
+					case interpreter.PrimitiveStaticTypeUInt64:
+						arguments = append(arguments, newGethArgument("uint64[]"))
+					case interpreter.PrimitiveStaticTypeUInt128:
+						arguments = append(arguments, newGethArgument("uint128[]"))
+					case interpreter.PrimitiveStaticTypeUInt256:
+						arguments = append(arguments, newGethArgument("uint256[]"))
+					case interpreter.PrimitiveStaticTypeInt8:
+						arguments = append(arguments, newGethArgument("int8[]"))
+					case interpreter.PrimitiveStaticTypeInt16:
+						arguments = append(arguments, newGethArgument("int16[]"))
+					case interpreter.PrimitiveStaticTypeInt32:
+						arguments = append(arguments, newGethArgument("int32[]"))
+					case interpreter.PrimitiveStaticTypeInt64:
+						arguments = append(arguments, newGethArgument("int64[]"))
+					case interpreter.PrimitiveStaticTypeInt128:
+						arguments = append(arguments, newGethArgument("int128[]"))
+					case interpreter.PrimitiveStaticTypeInt256:
+						arguments = append(arguments, newGethArgument("int256[]"))
+					}
 				case interpreter.CompositeStaticType:
 					typeID := common.TypeID(
 						fmt.Sprintf("A.%v.%v", evmContractLocation, evmAddressTypeStructName),
