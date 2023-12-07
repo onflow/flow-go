@@ -94,6 +94,7 @@ func NewNode(cfg *p2p.NodeConfig) (*Node, error) {
 		subs:        make(map[channels.Topic]p2p.Subscription),
 		pCache:      pCache,
 		peerManager: cfg.PeerManager,
+		parameters:  cfg.Parameters,
 		disallowListedCache: internal.NewDisallowListCache(
 			cfg.DisallowListCacheCfg.MaxSize,
 			cfg.Logger.With().Str("module", "disallow-list-cache").Logger(),
