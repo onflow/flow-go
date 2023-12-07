@@ -586,21 +586,129 @@ func newInternalEVMTypeDecodeABIFunction(
 
 				switch value := typeValue.Type.(type) {
 				case interpreter.ArrayStaticType:
-					elements := decoded[i].([]uint64)
+					var arrayElementType interpreter.PrimitiveStaticType
+					arrValues := make([]interpreter.Value, 0)
+
+					switch value.ElementType() {
+					case interpreter.PrimitiveStaticTypeString:
+						arrayElementType = interpreter.PrimitiveStaticTypeString
+						elements := decoded[i].([]string)
+						for _, v := range elements {
+							arrValues = append(arrValues, interpreter.NewStringValue(inter, common.NewStringMemoryUsage(len(v)), func() string {
+								return v
+							}))
+						}
+					case interpreter.PrimitiveStaticTypeBool:
+						arrayElementType = interpreter.PrimitiveStaticTypeBool
+						elements := decoded[i].([]bool)
+						for _, v := range elements {
+							arrValues = append(arrValues, interpreter.BoolValue(v))
+						}
+					case interpreter.PrimitiveStaticTypeUInt8:
+						arrayElementType = interpreter.PrimitiveStaticTypeUInt8
+						elements := decoded[i].([]uint8)
+						for _, v := range elements {
+							arrValues = append(arrValues, interpreter.NewUInt8Value(inter, func() uint8 {
+								return v
+							}))
+						}
+					case interpreter.PrimitiveStaticTypeUInt16:
+						arrayElementType = interpreter.PrimitiveStaticTypeUInt16
+						elements := decoded[i].([]uint16)
+						for _, v := range elements {
+							arrValues = append(arrValues, interpreter.NewUInt16Value(inter, func() uint16 {
+								return v
+							}))
+						}
+					case interpreter.PrimitiveStaticTypeUInt32:
+						arrayElementType = interpreter.PrimitiveStaticTypeUInt32
+						elements := decoded[i].([]uint32)
+						for _, v := range elements {
+							arrValues = append(arrValues, interpreter.NewUInt32Value(inter, func() uint32 {
+								return v
+							}))
+						}
+					case interpreter.PrimitiveStaticTypeUInt64:
+						arrayElementType = interpreter.PrimitiveStaticTypeUInt64
+						elements := decoded[i].([]uint64)
+						for _, v := range elements {
+							arrValues = append(arrValues, interpreter.NewUInt64Value(inter, func() uint64 {
+								return v
+							}))
+						}
+					case interpreter.PrimitiveStaticTypeUInt128:
+						arrayElementType = interpreter.PrimitiveStaticTypeUInt128
+						elements := decoded[i].([]*big.Int)
+						for _, v := range elements {
+							arrValues = append(arrValues, interpreter.NewUInt128ValueFromBigInt(inter, func() *big.Int {
+								return v
+							}))
+						}
+					case interpreter.PrimitiveStaticTypeUInt256:
+						arrayElementType = interpreter.PrimitiveStaticTypeUInt256
+						elements := decoded[i].([]*big.Int)
+						for _, v := range elements {
+							arrValues = append(arrValues, interpreter.NewUInt256ValueFromBigInt(inter, func() *big.Int {
+								return v
+							}))
+						}
+					case interpreter.PrimitiveStaticTypeInt8:
+						arrayElementType = interpreter.PrimitiveStaticTypeInt8
+						elements := decoded[i].([]int8)
+						for _, v := range elements {
+							arrValues = append(arrValues, interpreter.NewInt8Value(inter, func() int8 {
+								return v
+							}))
+						}
+					case interpreter.PrimitiveStaticTypeInt16:
+						arrayElementType = interpreter.PrimitiveStaticTypeInt16
+						elements := decoded[i].([]int16)
+						for _, v := range elements {
+							arrValues = append(arrValues, interpreter.NewInt16Value(inter, func() int16 {
+								return v
+							}))
+						}
+					case interpreter.PrimitiveStaticTypeInt32:
+						arrayElementType = interpreter.PrimitiveStaticTypeInt32
+						elements := decoded[i].([]int32)
+						for _, v := range elements {
+							arrValues = append(arrValues, interpreter.NewInt32Value(inter, func() int32 {
+								return v
+							}))
+						}
+					case interpreter.PrimitiveStaticTypeInt64:
+						arrayElementType = interpreter.PrimitiveStaticTypeInt64
+						elements := decoded[i].([]int64)
+						for _, v := range elements {
+							arrValues = append(arrValues, interpreter.NewInt64Value(inter, func() int64 {
+								return v
+							}))
+						}
+					case interpreter.PrimitiveStaticTypeInt128:
+						arrayElementType = interpreter.PrimitiveStaticTypeInt128
+						elements := decoded[i].([]*big.Int)
+						for _, v := range elements {
+							arrValues = append(arrValues, interpreter.NewInt128ValueFromBigInt(inter, func() *big.Int {
+								return v
+							}))
+						}
+					case interpreter.PrimitiveStaticTypeInt256:
+						arrayElementType = interpreter.PrimitiveStaticTypeInt256
+						elements := decoded[i].([]*big.Int)
+						for _, v := range elements {
+							arrValues = append(arrValues, interpreter.NewInt256ValueFromBigInt(inter, func() *big.Int {
+								return v
+							}))
+						}
+					}
+
 					arrayType := interpreter.NewVariableSizedStaticType(
 						inter,
 						interpreter.NewPrimitiveStaticType(
 							inter,
-							interpreter.PrimitiveStaticTypeUInt64,
+							arrayElementType,
 						),
 					)
-					arrValues := make([]interpreter.Value, 0)
-					for _, v := range elements {
-						arrValues = append(arrValues, interpreter.NewUInt64Value(inter, func() uint64 {
-							return v
-						}))
-					}
-
 					arr := interpreter.NewArrayValue(
 						inter,
 						invocation.LocationRange,
