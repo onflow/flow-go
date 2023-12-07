@@ -95,6 +95,7 @@ execution:
         - --rpc-addr=0.0.0.0:9000
         - --cadence-tracing=false
         - --extensive-tracing=false
+        - --enable-storehouse=true
       env:{{template "env" .}}
       image: {{$val.docker_registry}}/execution:{{$val.docker_tag}}
       nodeId: {{$val.node_id}}
