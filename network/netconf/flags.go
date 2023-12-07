@@ -64,12 +64,12 @@ func AllFlagNames() []string {
 		BuildFlagName(unicastKey, unicastManagerKey, configCacheSizeKey),
 		dnsCacheTTL,
 		disallowListNotificationCacheSize,
-		BuildFlagName(unicastKey, unicastManagerKey, messageRateLimitKey),
-		BuildFlagName(unicastKey, RateLimiterKey, BandwidthRateLimitKey),
-		BuildFlagName(unicastKey, RateLimiterKey, BandwidthBurstLimitKey),
-		BuildFlagName(unicastKey, RateLimiterKey, LockoutDurationKey),
-		BuildFlagName(unicastKey, RateLimiterKey, DryRunKey),
-		BuildFlagName(unicastKey, EnableStreamProtectionKey),
+		BuildFlagName(unicastKey, rateLimiterKey, messageRateLimitKey),
+		BuildFlagName(unicastKey, rateLimiterKey, BandwidthRateLimitKey),
+		BuildFlagName(unicastKey, rateLimiterKey, BandwidthBurstLimitKey),
+		BuildFlagName(unicastKey, rateLimiterKey, LockoutDurationKey),
+		BuildFlagName(unicastKey, rateLimiterKey, DryRunKey),
+		BuildFlagName(unicastKey, enableStreamProtectionKey),
 		rootResourceManagerPrefix + "-" + memoryLimitRatioPrefix,
 		rootResourceManagerPrefix + "-" + fileDescriptorsRatioPrefix,
 		highWatermark,
@@ -162,14 +162,14 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 		"cache size of the dial config cache, recommended to be big enough to accommodate the entire nodes in the network.")
 
 	// unicast stream handler rate limits
-	flags.Int(BuildFlagName(unicastKey, unicastManagerKey, messageRateLimitKey), config.Unicast.RateLimiter.MessageRateLimit, "maximum number of unicast messages that a peer can send per second")
-	flags.Int(BuildFlagName(unicastKey, RateLimiterKey, BandwidthRateLimitKey), config.Unicast.RateLimiter.BandwidthRateLimit,
+	flags.Int(BuildFlagName(unicastKey, rateLimiterKey, messageRateLimitKey), config.Unicast.RateLimiter.MessageRateLimit, "maximum number of unicast messages that a peer can send per second")
+	flags.Int(BuildFlagName(unicastKey, rateLimiterKey, BandwidthRateLimitKey), config.Unicast.RateLimiter.BandwidthRateLimit,
 		"bandwidth size in bytes a peer is allowed to send via unicast streams per second")
-	flags.Int(BuildFlagName(unicastKey, RateLimiterKey, BandwidthBurstLimitKey), config.Unicast.RateLimiter.BandwidthBurstLimit, "bandwidth size in bytes a peer is allowed to send at one time")
-	flags.Duration(BuildFlagName(unicastKey, RateLimiterKey, LockoutDurationKey), config.Unicast.RateLimiter.LockoutDuration,
+	flags.Int(BuildFlagName(unicastKey, rateLimiterKey, BandwidthBurstLimitKey), config.Unicast.RateLimiter.BandwidthBurstLimit, "bandwidth size in bytes a peer is allowed to send at one time")
+	flags.Duration(BuildFlagName(unicastKey, rateLimiterKey, LockoutDurationKey), config.Unicast.RateLimiter.LockoutDuration,
 		"the number of seconds a peer will be forced to wait before being allowed to successful reconnect to the node after being rate limited")
-	flags.Bool(BuildFlagName(unicastKey, RateLimiterKey, DryRunKey), config.Unicast.RateLimiter.DryRun, "disable peer disconnects and connections gating when rate limiting peers")
-	flags.Bool(BuildFlagName(unicastKey, EnableStreamProtectionKey),
+	flags.Bool(BuildFlagName(unicastKey, rateLimiterKey, DryRunKey), config.Unicast.RateLimiter.DryRun, "disable peer disconnects and connections gating when rate limiting peers")
+	flags.Bool(BuildFlagName(unicastKey, enableStreamProtectionKey),
 		config.Unicast.EnableStreamProtection,
 		"enable stream protection for unicast streams, when enabled, all connections that are being established or have been already established for unicast streams are protected")
 

@@ -8,9 +8,7 @@ network-config:
   preferred-unicast-protocols: [ ]
   received-message-cache-size: 10_000
   peerupdate-interval: 10m
-  unicast-message-timeout: 5s
-  # Unicast create stream retry delay is initial delay used in the exponential backoff for create stream retries
-  unicast-create-stream-retry-delay: 1s
+
   dns-cache-ttl: 5m
   # The size of the queue for notifications about new peers in the disallow list.
   disallow-list-notification-cache-size: 100
@@ -38,6 +36,15 @@ network-config:
       # The size of the dial config cache used to keep track of the dial config for each remote peer. The dial config is used to keep track of the dial retry budget for each remote peer.
       # Recommended to set it to the maximum number of remote peers in the network.
       dial-config-cache-size: 10_000
+      # Unicast create stream retry delay is initial delay used in the exponential backoff for create stream retries
+      create-stream-retry-delay: 1s
+    message-timeout: 5s
+    # Enable stream protection for unicast streams; when enabled, all connections that are being established or
+    #	have been already established for unicast streams are protected, meaning that they won't be closed by the connection manager.
+    #	This is useful for preventing the connection manager from closing unicast streams that are being used by the application layer.
+    #	However, it may interfere with the resource manager of libp2p, i.e., the connection manager may not be able to close connections
+    #	that are not being used by the application layer while at the same time the node is running out of resources for new connections.
+    enable-stream-protection: true
   # Resource manager config
   libp2p-resource-manager:
     # Maximum allowed fraction of file descriptors to be allocated by the libp2p resources in [0,1]

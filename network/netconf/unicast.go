@@ -3,9 +3,9 @@ package netconf
 import "time"
 
 const (
-	RateLimiterKey            = "rate-limiter"
+	rateLimiterKey            = "rate-limiter"
 	unicastManagerKey         = "manager"
-	EnableStreamProtectionKey = "enable-stream-protection"
+	enableStreamProtectionKey = "enable-stream-protection"
 	MessageTimeoutKey         = "message-timeout"
 )
 
