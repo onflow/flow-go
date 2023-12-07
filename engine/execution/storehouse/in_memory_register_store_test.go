@@ -612,6 +612,49 @@ func TestInMemoryRegisterStore(t *testing.T) {
 	})
 }
 
+// Benchmark GetRegister that only iterate 1 block / 5 blocks / 25 blocks
+// Benchmark GetRegister for 5 blocks and interupted by Save
+// Benchmark SaveRegister at 20 block per second, and Prune at 20 block per second
+func BenchmarkInMemoryRegisterStoreGetRegister(b *testing.B) {
+	numRegisterUpdatePerBlock := 10
+	numBlock := 25
+	chain, _, _ := unittest.ChainFixture(numBlock + 1)
+	genesis, blocks := chain[0], chain[1:]
+	store := NewInMemoryRegisterStore(genesis.Header.Height, genesis.ID())
+	// Create a register store with registers saved
+	for _, block := range blocks {
+		registers := make(flow.RegisterEntries, 0, numRegisterUpdatePerBlock)
+		for i := 0; i < numRegisterUpdatePerBlock; i++ {
+			registers = append(registers,
+				makeReg(fmt.Sprintf("%v", i), // key
+					fmt.Sprintf("%v", block.Header.Height), // value
+				))
+		}
+		require.NoError(b, store.SaveRegisters(
+			block.Header.Height, block.ID(), block.Header.ParentID, registers))
+	}
+
+	// Benchmark GetRegister
+	b.ResetTimer()
+	numBlockToTraverse := 20
+	for i := 0; i < b.N; i++ {
+		b.StopTimer()
+		index := len(blocks) - numBlockToTraverse
+		block := blocks[index]
+		blockID := block.ID()
+		n := i % numRegisterUpdatePerBlock
+		reg := makeReg(fmt.Sprintf("%v", n), "")
+		b.StartTimer()
+		_, err := store.GetRegister(block.Header.Height, blockID, reg.Key)
+		require.NoError(b, err)
+	}
+
+	b.StopTimer()
+}
+
+func BenchmarkInMemoryRegisterStoreGetRegisterSaveRegister(b *testing.B) {
+}
+
 func randBetween(min, max uint64) uint64 {
 	return uint64(rand.Intn(int(max)-int(min))) + min
 }
