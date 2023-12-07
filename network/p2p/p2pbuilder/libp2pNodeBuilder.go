@@ -275,13 +275,11 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 	}
 
 	unicastManager, err := unicast.NewUnicastManager(&unicast.ManagerConfig{
-		Logger:                             builder.logger,
-		StreamFactory:                      stream.NewLibP2PStreamFactory(h),
-		SporkId:                            builder.sporkId,
-		CreateStreamBackoffDelay:           builder.unicastConfig.UnicastManager.CreateStreamBackoffDelay,
-		Metrics:                            builder.metricsConfig.Metrics,
-		StreamZeroRetryResetThreshold:      builder.unicastConfig.UnicastManager.StreamZeroRetryResetThreshold,
-		MaxStreamCreationRetryAttemptTimes: builder.unicastConfig.UnicastManager.MaxStreamCreationRetryAttemptTimes,
+		Logger:        builder.logger,
+		StreamFactory: stream.NewLibP2PStreamFactory(h),
+		SporkId:       builder.sporkId,
+		Metrics:       builder.metricsConfig.Metrics,
+		Parameters:    &builder.unicastConfig.UnicastManager,
 		UnicastConfigCacheFactory: func(configFactory func() unicast.Config) unicast.ConfigCache {
 			return unicastcache.NewUnicastConfigCache(builder.unicastConfig.UnicastManager.ConfigCacheSize, builder.logger,
 				metrics.DialConfigCacheMetricFactory(builder.metricsConfig.HeroCacheFactory, builder.networkingType),
