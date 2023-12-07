@@ -1722,7 +1722,7 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 			Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
 		},
 		&p2pconfig.UnicastConfig{
-			Unicast: builder.FlowConfig.NetworkConfig.UnicastConfig,
+			Unicast: builder.FlowConfig.NetworkConfig.Unicast,
 		}).
 		SetBasicResolver(builder.Resolver).
 		SetSubscriptionFilter(subscription.NewRoleBasedFilter(flow.RoleAccess, builder.IdentityProvider)).
