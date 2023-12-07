@@ -15,6 +15,15 @@ import (
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
+// DefaultProtocolStateCacheSize is the default size for primary protocol state cache.
+// Minimally, we have 3 entries per epoch (one on epoch Switchover, one on receiving the Epoch Setup and one when seeing the Epoch Commit event).
+// Lets be generous and assume we have 20 different Protocol States per epoch.
+var DefaultProtocolStateCacheSize uint = 20
+
+// DefaultProtocolStateByBlockIDCacheSize is the default value for secondary byBlockIdCache.
+// We want to be able to cover a broad interval of views without cache misses, so we use a bigger value.
+var DefaultProtocolStateByBlockIDCacheSize uint = 1000
+
 // ProtocolState implements persistent storage for storing Protocol States.
 // Protocol state uses an embedded cache without storing capabilities(store happens on first retrieval) to avoid unnecessary
 // operations and to speed up access to frequently used Protocol State.
@@ -59,7 +68,8 @@ func NewProtocolState(collector module.CacheMetrics,
 	epochSetups storage.EpochSetups,
 	epochCommits storage.EpochCommits,
 	db *badger.DB,
-	cacheSize uint,
+	stateCacheSize uint,
+	stateByBlockIDCacheSize uint,
 ) *ProtocolState {
 	retrieveByProtocolStateID := func(protocolStateID flow.Identifier) func(tx *badger.Txn) (*flow.RichProtocolStateEntry, error) {
 		var protocolStateEntry flow.ProtocolStateEntry
@@ -100,11 +110,11 @@ func NewProtocolState(collector module.CacheMetrics,
 	return &ProtocolState{
 		db: db,
 		cache: newCache[flow.Identifier, *flow.RichProtocolStateEntry](collector, metrics.ResourceProtocolState,
-			withLimit[flow.Identifier, *flow.RichProtocolStateEntry](cacheSize),
+			withLimit[flow.Identifier, *flow.RichProtocolStateEntry](stateCacheSize),
 			withStore(noopStore[flow.Identifier, *flow.RichProtocolStateEntry]),
 			withRetrieve(retrieveByProtocolStateID)),
 		byBlockIdCache: newCache[flow.Identifier, flow.Identifier](collector, metrics.ResourceProtocolStateByBlockID,
-			withLimit[flow.Identifier, flow.Identifier](cacheSize),
+			withLimit[flow.Identifier, flow.Identifier](stateByBlockIDCacheSize),
 			withStore(storeByBlockID),
 			withRetrieve(retrieveByBlockID)),
 	}
