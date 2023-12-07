@@ -15,10 +15,9 @@ import (
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
-// ProtocolState implements persistent storage for storing identity table instances.
+// ProtocolState implements persistent storage for storing Protocol States.
 // Protocol state uses an embedded cache without storing capabilities(store happens on first retrieval) to avoid unnecessary
-// operations and to speed up access to frequently used identity tables.
-// TODO: update naming to IdentityTable
+// operations and to speed up access to frequently used Protocol State.
 type ProtocolState struct {
 	db             *badger.DB
 	cache          *Cache[flow.Identifier, *flow.RichProtocolStateEntry] // protocol_state_id -> protocol state
@@ -27,7 +26,7 @@ type ProtocolState struct {
 
 var _ storage.ProtocolState = (*ProtocolState)(nil)
 
-// NewProtocolState creates a ProtocolState instance, which is a database of identity table instances.
+// NewProtocolState creates a ProtocolState instance, which is a database of Protocol State.
 // It supports storing, caching and retrieving by ID or the additionally indexed block ID.
 func NewProtocolState(collector module.CacheMetrics,
 	epochSetups storage.EpochSetups,
@@ -35,7 +34,7 @@ func NewProtocolState(collector module.CacheMetrics,
 	db *badger.DB,
 	cacheSize uint,
 ) *ProtocolState {
-	retrieve := func(protocolStateID flow.Identifier) func(tx *badger.Txn) (*flow.RichProtocolStateEntry, error) {
+	retrieveByProtocolStateID := func(protocolStateID flow.Identifier) func(tx *badger.Txn) (*flow.RichProtocolStateEntry, error) {
 		var protocolStateEntry flow.ProtocolStateEntry
 		return func(tx *badger.Txn) (*flow.RichProtocolStateEntry, error) {
 			err := operation.RetrieveProtocolState(protocolStateID, &protocolStateEntry)(tx)
@@ -44,9 +43,19 @@ func NewProtocolState(collector module.CacheMetrics,
 			}
 			result, err := newRichProtocolStateEntry(&protocolStateEntry, epochSetups, epochCommits)
 			if err != nil {
-				return nil, fmt.Errorf("could not create rich identity table entry: %w", err)
+				return nil, fmt.Errorf("could not create rich protocol state entry: %w", err)
 			}
 			return result, nil
+		}
+	}
+
+	storeByBlockID := func(blockID flow.Identifier, protocolStateID flow.Identifier) func(*transaction.Tx) error {
+		return func(tx *transaction.Tx) error {
+			err := transaction.WithTx(operation.IndexProtocolState(blockID, protocolStateID))(tx)
+			if err != nil {
+				return fmt.Errorf("could not index protocol state for block (%x): %w", blockID[:], err)
+			}
+			return nil
 		}
 	}
 
@@ -55,7 +64,7 @@ func NewProtocolState(collector module.CacheMetrics,
 			var protocolStateID flow.Identifier
 			err := operation.LookupProtocolState(blockID, &protocolStateID)(tx)
 			if err != nil {
-				return flow.ZeroID, fmt.Errorf("could not lookup identity table ID for block (%x): %w", blockID[:], err)
+				return flow.ZeroID, fmt.Errorf("could not lookup protocol state ID for block (%x): %w", blockID[:], err)
 			}
 			return protocolStateID, nil
 		}
@@ -66,19 +75,21 @@ func NewProtocolState(collector module.CacheMetrics,
 		cache: newCache[flow.Identifier, *flow.RichProtocolStateEntry](collector, metrics.ResourceProtocolState,
 			withLimit[flow.Identifier, *flow.RichProtocolStateEntry](cacheSize),
 			withStore(noopStore[flow.Identifier, *flow.RichProtocolStateEntry]),
-			withRetrieve(retrieve)),
+			withRetrieve(retrieveByProtocolStateID)),
 		byBlockIdCache: newCache[flow.Identifier, flow.Identifier](collector, metrics.ResourceProtocolStateByBlockID,
 			withLimit[flow.Identifier, flow.Identifier](cacheSize),
-			withStore(noopStore[flow.Identifier, flow.Identifier]),
+			withStore(storeByBlockID),
 			withRetrieve(retrieveByBlockID)),
 	}
 }
 
-// StoreTx allows us to store an identity table as part of a DB tx, while still going through the caching layer.
-// Per convention, the given Identity Table must be in canonical order, otherwise an exception is returned.
-// Expected error returns during normal operations:
-//   - storage.ErrAlreadyExists if an Identity Table with the given id is already stored
-func (s *ProtocolState) StoreTx(id flow.Identifier, protocolState *flow.ProtocolStateEntry) func(*transaction.Tx) error {
+// StoreTx returns an anonymous function (intended to be executed as part of a badger transaction),
+// which persists the given protocol state as part of a DB tx. Per convention, the identities in
+// the Protocol State must be in canonical order for the current and next epoch (if present),
+// otherwise an exception is returned.
+// Expected errors of the returned anonymous function:
+//   - storage.ErrAlreadyExists if a Protocol State with the given id is already stored
+func (s *ProtocolState) StoreTx(protocolStateID flow.Identifier, protocolState *flow.ProtocolStateEntry) func(*transaction.Tx) error {
 	// front-load sanity checks:
 	if !protocolState.CurrentEpoch.ActiveIdentities.Sorted(order.IdentifierCanonical) {
 		return transaction.Fail(fmt.Errorf("sanity check failed: identities are not sorted"))
@@ -88,49 +99,56 @@ func (s *ProtocolState) StoreTx(id flow.Identifier, protocolState *flow.Protocol
 	}
 
 	// happy path: return anonymous function, whose future execution (as part of a transaction) will store the protocolState
-	return transaction.WithTx(operation.InsertProtocolState(id, protocolState))
+	return transaction.WithTx(operation.InsertProtocolState(protocolStateID, protocolState))
 }
 
-// Index indexes the identity table by block ID.
-// Error returns:
-//   - storage.ErrAlreadyExists if an identity table for the given blockID has already been indexed
+// Index returns an anonymous function that is intended to be executed as part of a database transaction.
+// In a nutshell, we want to maintain a map from `blockID` to `protocolStateID`, where `blockID` references the
+// block that _proposes_ the Protocol State.
+// Upon call, the anonymous function persists the specific map entry in the node's database.
+// Protocol convention:
+//   - Consider block B, whose ingestion might potentially lead to an updated protocol state. For example,
+//     the protocol state changes if we seal some execution results emitting service events.
+//   - For the key `blockID`, we use the identity of block B which _proposes_ this Protocol State. As value,
+//     the hash of the resulting protocol state at the end of processing B is to be used.
+//   - CAUTION: The protocol state requires confirmation by a QC and will only become active at the child block,
+//     _after_ validating the QC.
+//
+// Expected errors during normal operations:
+//   - storage.ErrAlreadyExists if a Protocol State for the given blockID has already been indexed
 func (s *ProtocolState) Index(blockID flow.Identifier, protocolStateID flow.Identifier) func(*transaction.Tx) error {
-	return func(tx *transaction.Tx) error {
-		err := transaction.WithTx(operation.IndexProtocolState(blockID, protocolStateID))(tx)
-		if err != nil {
-			return fmt.Errorf("could not index identity table for block (%x): %w", blockID[:], err)
-		}
-		return nil
-	}
+	return s.byBlockIdCache.PutTx(blockID, protocolStateID)
 }
 
-// ByID retrieves the identity table by its ID.
-// Error returns:
-//   - storage.ErrNotFound if no identity table with the given ID exists
-func (s *ProtocolState) ByID(id flow.Identifier) (*flow.RichProtocolStateEntry, error) {
+// ByID returns the protocol state by its ID.
+// Expected errors during normal operations:
+//   - storage.ErrNotFound if no protocol state with the given Identifier is known.
+func (s *ProtocolState) ByID(protocolStateID flow.Identifier) (*flow.RichProtocolStateEntry, error) {
 	tx := s.db.NewTransaction(false)
 	defer tx.Discard()
-	return s.byID(id)(tx)
+	return s.cache.Get(protocolStateID)(tx)
 }
 
-// byID retrieves the identity table by its ID. Error returns:
-//   - storage.ErrNotFound if no identity table with the given ID exists
-func (s *ProtocolState) byID(protocolStateID flow.Identifier) func(*badger.Txn) (*flow.RichProtocolStateEntry, error) {
-	return s.cache.Get(protocolStateID)
-}
-
-// ByBlockID retrieves the identity table by the respective block ID.
-// TODO: clarify whether the blockID is the block that defines this identity table or the _child_ block where the identity table is applied. CAUTION: surface for bugs!
-// Error returns:
-//   - storage.ErrNotFound if no identity table for the given blockID exists
+// ByBlockID retrieves the Protocol State that the block with the given ID proposes.
+// CAUTION: this protocol state requires confirmation by a QC and will only become active at the child block,
+// _after_ validating the QC. Protocol convention:
+//   - Consider block B, whose ingestion might potentially lead to an updated protocol state. For example,
+//     the protocol state changes if we seal some execution results emitting service events.
+//   - For the key `blockID`, we use the identity of block B which _proposes_ this Protocol State. As value,
+//     the hash of the resulting protocol state at the end of processing B is to be used.
+//   - CAUTION: The protocol state requires confirmation by a QC and will only become active at the child block,
+//     _after_ validating the QC.
+//
+// Expected errors during normal operations:
+//   - storage.ErrNotFound if no protocol state has been indexed for the given block.
 func (s *ProtocolState) ByBlockID(blockID flow.Identifier) (*flow.RichProtocolStateEntry, error) {
 	tx := s.db.NewTransaction(false)
 	defer tx.Discard()
 	protocolStateID, err := s.byBlockIdCache.Get(blockID)(tx)
 	if err != nil {
-		return nil, fmt.Errorf("could not lookup identity table ID for block (%x): %w", blockID[:], err)
+		return nil, fmt.Errorf("could not lookup protocol state ID for block (%x): %w", blockID[:], err)
 	}
-	return s.byID(protocolStateID)(tx)
+	return s.cache.Get(protocolStateID)(tx)
 }
 
 // newRichProtocolStateEntry constructs a rich protocol state entry from a protocol state entry.
