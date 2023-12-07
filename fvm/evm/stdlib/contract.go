@@ -146,24 +146,274 @@ func newInternalEVMTypeEncodeABIFunction(
 						arguments = append(arguments, newGethArgument("address"))
 					}
 				case *interpreter.ArrayValue:
-					elements := make([]uint64, 0)
-					value.Iterate(inter, func(element interpreter.Value) (resume bool) {
-						v, ok := element.(interpreter.UInt64Value)
-						if !ok {
-							panic(
-								fmt.Errorf(
-									"unsupported array value type: %v",
-									element.StaticType(inter),
-								),
-							)
-						}
-						elements = append(elements, uint64(v))
+					switch value.Type.ElementType() {
+					case interpreter.PrimitiveStaticTypeString:
+						elements := make([]string, 0)
+						value.Iterate(inter, func(element interpreter.Value) (resume bool) {
+							v, ok := element.(*interpreter.StringValue)
+							if !ok {
+								panic(
+									fmt.Errorf(
+										"unsupported array value type: %v",
+										element.StaticType(inter),
+									),
+								)
+							}
+							elements = append(elements, v.Str)
 
-						// continue iteration
-						return true
-					})
-					values = append(values, elements)
-					arguments = append(arguments, newGethArgument("uint64[]"))
+							// continue iteration
+							return true
+						})
+						values = append(values, elements)
+						arguments = append(arguments, newGethArgument("string[]"))
+					case interpreter.PrimitiveStaticTypeBool:
+						elements := make([]bool, 0)
+						value.Iterate(inter, func(element interpreter.Value) (resume bool) {
+							v, ok := element.(interpreter.BoolValue)
+							if !ok {
+								panic(
+									fmt.Errorf(
+										"unsupported array value type: %v",
+										element.StaticType(inter),
+									),
+								)
+							}
+							elements = append(elements, bool(v))
+
+							// continue iteration
+							return true
+						})
+						values = append(values, elements)
+						arguments = append(arguments, newGethArgument("bool[]"))
+					case interpreter.PrimitiveStaticTypeUInt8:
+						elements := make([]uint8, 0)
+						value.Iterate(inter, func(element interpreter.Value) (resume bool) {
+							v, ok := element.(interpreter.UInt8Value)
+							if !ok {
+								panic(
+									fmt.Errorf(
+										"unsupported array value type: %v",
+										element.StaticType(inter),
+									),
+								)
+							}
+							elements = append(elements, uint8(v))
+
+							// continue iteration
+							return true
+						})
+						values = append(values, elements)
+						arguments = append(arguments, newGethArgument("uint8[]"))
+					case interpreter.PrimitiveStaticTypeUInt16:
+						elements := make([]uint16, 0)
+						value.Iterate(inter, func(element interpreter.Value) (resume bool) {
+							v, ok := element.(interpreter.UInt16Value)
+							if !ok {
+								panic(
+									fmt.Errorf(
+										"unsupported array value type: %v",
+										element.StaticType(inter),
+									),
+								)
+							}
+							elements = append(elements, uint16(v))
+
+							// continue iteration
+							return true
+						})
+						values = append(values, elements)
+						arguments = append(arguments, newGethArgument("uint16[]"))
+					case interpreter.PrimitiveStaticTypeUInt32:
+						elements := make([]uint32, 0)
+						value.Iterate(inter, func(element interpreter.Value) (resume bool) {
+							v, ok := element.(interpreter.UInt32Value)
+							if !ok {
+								panic(
+									fmt.Errorf(
+										"unsupported array value type: %v",
+										element.StaticType(inter),
+									),
+								)
+							}
+							elements = append(elements, uint32(v))
+
+							// continue iteration
+							return true
+						})
+						values = append(values, elements)
+						arguments = append(arguments, newGethArgument("uint32[]"))
+					case interpreter.PrimitiveStaticTypeUInt64:
+						elements := make([]uint64, 0)
+						value.Iterate(inter, func(element interpreter.Value) (resume bool) {
+							v, ok := element.(interpreter.UInt64Value)
+							if !ok {
+								panic(
+									fmt.Errorf(
+										"unsupported array value type: %v",
+										element.StaticType(inter),
+									),
+								)
+							}
+							elements = append(elements, uint64(v))
+
+							// continue iteration
+							return true
+						})
+						values = append(values, elements)
+						arguments = append(arguments, newGethArgument("uint64[]"))
+					case interpreter.PrimitiveStaticTypeUInt128:
+						elements := make([]*big.Int, 0)
+						value.Iterate(inter, func(element interpreter.Value) (resume bool) {
+							v, ok := element.(interpreter.UInt128Value)
+							if !ok {
+								panic(
+									fmt.Errorf(
+										"unsupported array value type: %v",
+										element.StaticType(inter),
+									),
+								)
+							}
+							elements = append(elements, v.BigInt)
+
+							// continue iteration
+							return true
+						})
+						values = append(values, elements)
+						arguments = append(arguments, newGethArgument("uint128[]"))
+					case interpreter.PrimitiveStaticTypeUInt256:
+						elements := make([]*big.Int, 0)
+						value.Iterate(inter, func(element interpreter.Value) (resume bool) {
+							v, ok := element.(interpreter.UInt256Value)
+							if !ok {
+								panic(
+									fmt.Errorf(
+										"unsupported array value type: %v",
+										element.StaticType(inter),
+									),
+								)
+							}
+							elements = append(elements, v.BigInt)
+
+							// continue iteration
+							return true
+						})
+						values = append(values, elements)
+						arguments = append(arguments, newGethArgument("uint256[]"))
+					case interpreter.PrimitiveStaticTypeInt8:
+						elements := make([]int8, 0)
+						value.Iterate(inter, func(element interpreter.Value) (resume bool) {
+							v, ok := element.(interpreter.Int8Value)
+							if !ok {
+								panic(
+									fmt.Errorf(
+										"unsupported array value type: %v",
+										element.StaticType(inter),
+									),
+								)
+							}
+							elements = append(elements, int8(v))
+
+							// continue iteration
+							return true
+						})
+						values = append(values, elements)
+						arguments = append(arguments, newGethArgument("int8[]"))
+					case interpreter.PrimitiveStaticTypeInt16:
+						elements := make([]int16, 0)
+						value.Iterate(inter, func(element interpreter.Value) (resume bool) {
+							v, ok := element.(interpreter.Int16Value)
+							if !ok {
+								panic(
+									fmt.Errorf(
+										"unsupported array value type: %v",
+										element.StaticType(inter),
+									),
+								)
+							}
+							elements = append(elements, int16(v))
+
+							// continue iteration
+							return true
+						})
+						values = append(values, elements)
+						arguments = append(arguments, newGethArgument("int16[]"))
+					case interpreter.PrimitiveStaticTypeInt32:
+						elements := make([]int32, 0)
+						value.Iterate(inter, func(element interpreter.Value) (resume bool) {
+							v, ok := element.(interpreter.Int32Value)
+							if !ok {
+								panic(
+									fmt.Errorf(
+										"unsupported array value type: %v",
+										element.StaticType(inter),
+									),
+								)
+							}
+							elements = append(elements, int32(v))
+
+							// continue iteration
+							return true
+						})
+						values = append(values, elements)
+						arguments = append(arguments, newGethArgument("int32[]"))
+					case interpreter.PrimitiveStaticTypeInt64:
+						elements := make([]int64, 0)
+						value.Iterate(inter, func(element interpreter.Value) (resume bool) {
+							v, ok := element.(interpreter.Int64Value)
+							if !ok {
+								panic(
+									fmt.Errorf(
+										"unsupported array value type: %v",
+										element.StaticType(inter),
+									),
+								)
+							}
+							elements = append(elements, int64(v))
+
+							// continue iteration
+							return true
+						})
+						values = append(values, elements)
+						arguments = append(arguments, newGethArgument("int64[]"))
+					case interpreter.PrimitiveStaticTypeInt128:
+						elements := make([]*big.Int, 0)
+						value.Iterate(inter, func(element interpreter.Value) (resume bool) {
+							v, ok := element.(interpreter.Int128Value)
+							if !ok {
+								panic(
+									fmt.Errorf(
+										"unsupported array value type: %v",
+										element.StaticType(inter),
+									),
+								)
+							}
+							elements = append(elements, v.BigInt)
+
+							// continue iteration
+							return true
+						})
+						values = append(values, elements)
+						arguments = append(arguments, newGethArgument("int128[]"))
+					case interpreter.PrimitiveStaticTypeInt256:
+						elements := make([]*big.Int, 0)
+						value.Iterate(inter, func(element interpreter.Value) (resume bool) {
+							v, ok := element.(interpreter.Int256Value)
+							if !ok {
+								panic(
+									fmt.Errorf(
+										"unsupported array value type: %v",
+										element.StaticType(inter),
+									),
+								)
+							}
+							elements = append(elements, v.BigInt)
+
+							// continue iteration
+							return true
+						})
+						values = append(values, elements)
+						arguments = append(arguments, newGethArgument("int256[]"))
+					}
 				default:
 					panic(fmt.Errorf("unsupported type: %v", value.StaticType(inter)))
 				}
