@@ -137,7 +137,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 			entry.NextEpochCommit = nil
 			entry.NextEpoch.CommitID = flow.ZeroID
 		})
-
+		// sanity check that previous epoch is not populated in `stateEntry`
 		assert.Nil(t, stateEntry.PreviousEpoch)
 		assert.Nil(t, stateEntry.PreviousEpochSetup)
 		assert.Nil(t, stateEntry.PreviousEpochCommit)
@@ -217,7 +217,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 			entry.PreviousEpochCommit = nil
 			entry.PreviousEpoch = nil
 		})
-
+		// sanity check that previous epoch is not populated in `stateEntry`
 		assert.Nil(t, stateEntry.PreviousEpoch)
 		assert.Nil(t, stateEntry.PreviousEpochSetup)
 		assert.Nil(t, stateEntry.PreviousEpochCommit)
