@@ -25,8 +25,9 @@ type ConnectionManager struct {
 	HighWatermark int `mapstructure:"high-watermark"` // naming from libp2p
 	LowWatermark  int `mapstructure:"low-watermark"`  // naming from libp2p
 
-	// SilencePeriod is the time to wait before start pruning connections since the startup.
+	// SilencePeriod is a regular interval that the connection manager will check for pruning peers if the number of peers exceeds the high-watermark.
+	// It is a regular interval.
 	SilencePeriod time.Duration `mapstructure:"silence-period"` // naming from libp2p
-	// GracePeriod is the time to wait before pruning a new connection.
+	// GracePeriod is the time to wait before a new connection is considered for pruning.
 	GracePeriod time.Duration `mapstructure:"grace-period"` // naming from libp2p
 }

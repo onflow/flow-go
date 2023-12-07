@@ -119,11 +119,16 @@ network-config:
     # will be pruned. If both peers have incoming connections, and there are still ties, one of the peers will be
     # pruned at random.
     # Algorithm implementation is in https://github.com/libp2p/go-libp2p/blob/master/p2p/net/connmgr/connmgr.go#L262-L318
-    high-watermark: 500
-    low-watermark: 450
-    # The time to wait before pruning a new connection
+    # We assume number of nodes around 500, and each node is allowed to make at most 8 connections to each certain remote node,
+    # we hence set the high-watermark to 500 * 8 = 4000, and the low-watermark to 500 * (0.5 * 4) = 1000, this means that when the
+    # number of peers exceeds 4000, the connection manager will prune the peers with the least number of streams until the number of
+    # peers is reduced to 1000 assuming an average of 2 connections per peer.
+    high-watermark: 4000
+    low-watermark: 1000
+    # The silence period is a regular interval that the connection manager will check for pruning peers if the number of peers exceeds the high-watermark.
+    # it is a regular interval and 10s is the default libp2p value.
     silence-period: 10s
-    # The time to wait before start pruning connections
+    # The time to wait before a new connection is considered for pruning.
     grace-period: 1m
   # Gossipsub config
   gossipsub:
