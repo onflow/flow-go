@@ -572,7 +572,7 @@ func EnsureStreamCreationInBothDirections(t *testing.T, ctx context.Context, nod
 				continue
 			}
 			// stream creation should pass without error
-			err := this.OpenProtectedStream(ctx, other.ID(), t.Name(), func(stream network.Stream) error {
+			err := this.OpenAndWriteOnStream(ctx, other.ID(), t.Name(), func(stream network.Stream) error {
 				// do nothing
 				require.NotNil(t, stream)
 				return nil

@@ -118,7 +118,7 @@ func CreateNode(t *testing.T, networkKey crypto.PrivateKey, sporkID flow.Identif
 			Metrics: metrics.NewNoopCollector(),
 		},
 		&p2pconfig.UnicastConfig{
-			Unicast: defaultFlowConfig.NetworkConfig.UnicastConfig,
+			Unicast: defaultFlowConfig.NetworkConfig.Unicast,
 		}).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
 			return p2pdht.NewDHT(c, h, protocols.FlowDHTProtocolID(sporkID), zerolog.Nop(), metrics.NewNoopCollector())
@@ -229,7 +229,7 @@ func EnsureMessageExchangeOverUnicast(t *testing.T, ctx context.Context, nodes [
 			if this == other {
 				continue
 			}
-			err := this.OpenProtectedStream(ctx, other.ID(), t.Name(), func(stream network.Stream) error {
+			err := this.OpenAndWriteOnStream(ctx, other.ID(), t.Name(), func(stream network.Stream) error {
 				rw := bufio.NewReadWriter(bufio.NewReader(stream), bufio.NewWriter(stream))
 				_, err := rw.WriteString(msg)
 				require.NoError(t, err)
@@ -288,7 +288,7 @@ func EnsureNoStreamCreation(t *testing.T, ctx context.Context, from []p2p.LibP2P
 			}
 			require.Empty(t, other.Host().Network().ConnsToPeer(thisId))
 
-			err := this.OpenProtectedStream(ctx, otherId, t.Name(), func(stream network.Stream) error {
+			err := this.OpenAndWriteOnStream(ctx, otherId, t.Name(), func(stream network.Stream) error {
 				// no-op as the stream is never created.
 				return nil
 			})
@@ -313,7 +313,7 @@ func EnsureStreamCreation(t *testing.T, ctx context.Context, from []p2p.LibP2PNo
 				require.Fail(t, "node is in both from and to lists")
 			}
 			// stream creation should pass without error
-			err := this.OpenProtectedStream(ctx, other.ID(), t.Name(), func(stream network.Stream) error {
+			err := this.OpenAndWriteOnStream(ctx, other.ID(), t.Name(), func(stream network.Stream) error {
 				require.NotNil(t, stream)
 				return nil
 			})

@@ -309,21 +309,21 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 
 	// setup default rate limiter options
 	unicastRateLimiterOpts := []ratelimit.RateLimitersOption{
-		ratelimit.WithDisabledRateLimiting(fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastConfig.UnicastRateLimiter.DryRun),
+		ratelimit.WithDisabledRateLimiting(fnb.BaseConfig.FlowConfig.NetworkConfig.Unicast.RateLimiter.DryRun),
 		ratelimit.WithNotifier(fnb.UnicastRateLimiterDistributor),
 	}
 
 	// override noop unicast message rate limiter
-	if fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastConfig.UnicastRateLimiter.MessageRateLimit > 0 {
+	if fnb.BaseConfig.FlowConfig.NetworkConfig.Unicast.RateLimiter.MessageRateLimit > 0 {
 		unicastMessageRateLimiter := ratelimiter.NewRateLimiter(
-			rate.Limit(fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastConfig.UnicastRateLimiter.MessageRateLimit),
-			fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastConfig.UnicastRateLimiter.MessageRateLimit,
-			fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastConfig.UnicastRateLimiter.LockoutDuration,
+			rate.Limit(fnb.BaseConfig.FlowConfig.NetworkConfig.Unicast.RateLimiter.MessageRateLimit),
+			fnb.BaseConfig.FlowConfig.NetworkConfig.Unicast.RateLimiter.MessageRateLimit,
+			fnb.BaseConfig.FlowConfig.NetworkConfig.Unicast.RateLimiter.LockoutDuration,
 		)
 		unicastRateLimiterOpts = append(unicastRateLimiterOpts, ratelimit.WithMessageRateLimiter(unicastMessageRateLimiter))
 
 		// avoid connection gating and pruning during dry run
-		if !fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastConfig.UnicastRateLimiter.DryRun {
+		if !fnb.BaseConfig.FlowConfig.NetworkConfig.Unicast.RateLimiter.DryRun {
 			f := rateLimiterPeerFilter(unicastMessageRateLimiter)
 			// add IsRateLimited peerFilters to conn gater intercept secure peer and peer manager filters list
 			// don't allow rate limited peers to establishing incoming connections
@@ -334,16 +334,16 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	}
 
 	// override noop unicast bandwidth rate limiter
-	if fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastConfig.UnicastRateLimiter.BandwidthRateLimit > 0 && fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastConfig.UnicastRateLimiter.BandwidthBurstLimit > 0 {
+	if fnb.BaseConfig.FlowConfig.NetworkConfig.Unicast.RateLimiter.BandwidthRateLimit > 0 && fnb.BaseConfig.FlowConfig.NetworkConfig.Unicast.RateLimiter.BandwidthBurstLimit > 0 {
 		unicastBandwidthRateLimiter := ratelimit.NewBandWidthRateLimiter(
-			rate.Limit(fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastConfig.UnicastRateLimiter.BandwidthRateLimit),
-			fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastConfig.UnicastRateLimiter.BandwidthBurstLimit,
-			fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastConfig.UnicastRateLimiter.LockoutDuration,
+			rate.Limit(fnb.BaseConfig.FlowConfig.NetworkConfig.Unicast.RateLimiter.BandwidthRateLimit),
+			fnb.BaseConfig.FlowConfig.NetworkConfig.Unicast.RateLimiter.BandwidthBurstLimit,
+			fnb.BaseConfig.FlowConfig.NetworkConfig.Unicast.RateLimiter.LockoutDuration,
 		)
 		unicastRateLimiterOpts = append(unicastRateLimiterOpts, ratelimit.WithBandwidthRateLimiter(unicastBandwidthRateLimiter))
 
 		// avoid connection gating and pruning during dry run
-		if !fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastConfig.UnicastRateLimiter.DryRun {
+		if !fnb.BaseConfig.FlowConfig.NetworkConfig.Unicast.RateLimiter.DryRun {
 			f := rateLimiterPeerFilter(unicastBandwidthRateLimiter)
 			// add IsRateLimited peerFilters to conn gater intercept secure peer and peer manager filters list
 			connGaterInterceptSecureFilters = append(connGaterInterceptSecureFilters, f)
@@ -355,7 +355,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	unicastRateLimiters := ratelimit.NewRateLimiters(unicastRateLimiterOpts...)
 
 	uniCfg := &p2pconfig.UnicastConfig{
-		Unicast:                fnb.BaseConfig.FlowConfig.NetworkConfig.UnicastConfig,
+		Unicast:                fnb.BaseConfig.FlowConfig.NetworkConfig.Unicast,
 		RateLimiterDistributor: fnb.UnicastRateLimiterDistributor,
 	}
 
@@ -492,7 +492,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
 		IdentityProvider:      fnb.IdentityProvider,
 		ReceiveCache:          receiveCache,
 		ConduitFactory:        cf,
-		UnicastMessageTimeout: fnb.FlowConfig.NetworkConfig.UnicastMessageTimeout,
+		UnicastMessageTimeout: fnb.FlowConfig.NetworkConfig.Unicast.MessageTimeout,
 		IdentityTranslator:    fnb.IDTranslator,
 		AlspCfg: &alspmgr.MisbehaviorReportManagerConfig{
 			Logger:                  fnb.Logger,

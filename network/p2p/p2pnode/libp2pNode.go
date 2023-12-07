@@ -189,8 +189,7 @@ func (n *Node) GetPeersForProtocol(pid protocol.ID) peer.IDSlice {
 	return peers
 }
 
-// OpenProtectedStream opens a new stream to a peer with a protection tag. The protection tag can be used to ensure
-// that the connection to the peer is maintained for a particular purpose. The stream is opened to the given peerID
+// OpenAndWriteOnStream opens a new stream to a peer. The stream is opened to the given peerID
 // and writingLogic is executed on the stream. The created stream does not need to be reused and can be inexpensively
 // created for each send. Moreover, the stream creation does not incur a round-trip time as the stream negotiation happens
 // on an existing connection.
@@ -207,9 +206,14 @@ func (n *Node) GetPeersForProtocol(pid protocol.ID) peer.IDSlice {
 // error: An error, if any occurred during the process. This includes failure in creating the stream, setting the write
 // deadline, executing the writing logic, resetting the stream if the writing logic fails, or closing the stream.
 // All returned errors during this process can be considered benign.
-func (n *Node) OpenProtectedStream(ctx context.Context, peerID peer.ID, protectionTag string, writingLogic func(stream libp2pnet.Stream) error) error {
-	n.host.ConnManager().Protect(peerID, protectionTag)
-	defer n.host.ConnManager().Unprotect(peerID, protectionTag)
+func (n *Node) OpenAndWriteOnStream(ctx context.Context, peerID peer.ID, protectionTag string, writingLogic func(stream libp2pnet.Stream) error) error {
+	lg := n.logger.With().Str("remote_peer_id", p2plogging.PeerId(peerID)).Logger()
+	if n.parameters.EnableProtectedStreams {
+		n.host.ConnManager().Protect(peerID, protectionTag)
+		defer n.host.ConnManager().Unprotect(peerID, protectionTag)
+		lg = lg.With().Str("protection_tag", protectionTag).Logger()
+		lg.Trace().Msg("attempting to create protected stream")
+	}
 
 	// streams don't need to be reused and are fairly inexpensive to be created for each send.
 	// A stream creation does NOT incur an RTT as stream negotiation happens on an existing connection.
@@ -217,12 +221,14 @@ func (n *Node) OpenProtectedStream(ctx context.Context, peerID peer.ID, protecti
 	if err != nil {
 		return fmt.Errorf("failed to create stream for %s: %w", peerID, err)
 	}
+	lg.Trace().Msg("successfully created stream")
 
 	deadline, _ := ctx.Deadline()
 	err = s.SetWriteDeadline(deadline)
 	if err != nil {
 		return fmt.Errorf("failed to set write deadline for stream: %w", err)
 	}
+	lg.Trace().Msg("successfully set write deadline on stream")
 
 	err = writingLogic(s)
 	if err != nil {
@@ -237,12 +243,14 @@ func (n *Node) OpenProtectedStream(ctx context.Context, peerID peer.ID, protecti
 
 		return fmt.Errorf("writing logic failed for %s: %w", peerID, err)
 	}
+	lg.Trace().Msg("successfully wrote on stream")
 
 	// close the stream immediately
 	err = s.Close()
 	if err != nil {
 		return fmt.Errorf("failed to close the stream for %s: %w", peerID, err)
 	}
+	lg.Trace().Msg("successfully closed stream")
 
 	return nil
 }
