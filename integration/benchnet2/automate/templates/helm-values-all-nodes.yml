@@ -91,7 +91,6 @@ execution:
     {{$val.name}}:
       args:{{template "args" .}}
         - --loglevel=INFO
-        - --triedir=/trie
         - --rpc-addr=0.0.0.0:9000
         - --cadence-tracing=false
         - --extensive-tracing=false
