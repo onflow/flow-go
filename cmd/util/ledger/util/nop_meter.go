@@ -9,6 +9,10 @@ import (
 
 type NopMeter struct{}
 
+func (n NopMeter) ComputationAvailable(_ common.ComputationKind, _ uint) bool {
+	return false
+}
+
 func (n NopMeter) MeterComputation(_ common.ComputationKind, _ uint) error {
 	return nil
 }

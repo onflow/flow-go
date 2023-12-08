@@ -11,12 +11,12 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
-	"github.com/onflow/flow-go/model/flow"
 	util2 "github.com/onflow/flow-go/module/util"
 )
 
 var cricketMomentsAddress = mustHexToAddress("4eded0de73020ca5")
-var cricketMomentsShardedCollectionType = "A.4eded0de73020ca5.CricketMomentsShardedCollection.ShardedCollection"
+
+//var cricketMomentsShardedCollectionType = "A.4eded0de73020ca5.CricketMomentsShardedCollection.ShardedCollection"
 
 func isCricketMomentsShardedCollection(
 	mr *migratorRuntime,
@@ -135,252 +135,253 @@ func cloneCricketMomentsShardedCollection(
 	key interpreter.StorageMapKey,
 	value interpreter.Value,
 ) (interpreter.Value, error) {
+	return nil, nil
 
-	shardedCollectionMap, err := getShardedCollectionMap(mr, value)
-	if err != nil {
-		return nil, err
-	}
-	count, err := getCricketMomentsShardedCollectionNFTCount(
-		mr,
-		shardedCollectionMap,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	ctx, c := context.WithCancelCause(context.Background())
-	cancel := func(err error) {
-		if err != nil {
-			log.Info().Err(err).Msg("canceling context")
-		}
-		c(err)
-	}
-	defer cancel(nil)
-
-	type valueWithKeys struct {
-		cricketKeyPair
-		value interpreter.Value
-	}
-
-	keyPairChan := make(chan cricketKeyPair, count)
-	clonedValues := make([]valueWithKeys, 0, count)
-
-	interpreters, _, err := mr.ChildInterpreters(log, 1, flow.ConvertAddress(mr.Address))
-	if err != nil {
-		return nil, err
-	}
-	inter := interpreters[0]
-	inter.SharedState.Config.InvalidatedResourceValidationEnabled = false
-
-	// worker for dispatching values to clone
-	go func() {
-		defer close(keyPairChan)
-
-		storageMap := mr.GetReadOnlyStorage().GetStorageMap(mr.Address, domain, false)
-		storageMapValue := storageMap.ReadValue(&util.NopMemoryGauge{}, key)
-		scm, err := getShardedCollectionMap(mr, storageMapValue)
-		if err != nil {
-			cancel(err)
-			return
-		}
-
-		shardedCollectionMapIterator := scm.Iterator()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-			}
-
-			outerKey := shardedCollectionMapIterator.NextKey(nil)
-			if outerKey == nil {
-				break
-			}
-
-			ownedNFTs, err := getNftCollection(inter, outerKey, scm)
-			if err != nil {
-				cancel(err)
-				return
-			}
-
-			ownedNFTsIterator := ownedNFTs.Iterator()
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				default:
-				}
-
-				innerKey := ownedNFTsIterator.NextKey(nil)
-				if innerKey == nil {
-					break
-				}
-
-				keyPairChan <- cricketKeyPair{
-					nftCollectionKey:     innerKey,
-					shardedCollectionKey: outerKey,
-				}
-			}
-		}
-	}()
-
-	interpreters, closeInterpreters, err := mr.ChildInterpreters(log, nWorkers, flow.ConvertAddress(mr.Address))
-	if err != nil {
-		return nil, err
-	}
-
-	// workers for cloning values
-	wg := sync.WaitGroup{}
-	wg.Add(nWorkers)
-	progressLog := util2.LogProgress(log, "cloning cricket moments", count)
-	for i := 0; i < nWorkers; i++ {
-		go func(i int) {
-			defer wg.Done()
-			inter := interpreters[i]
-
-			storageMap := mr.GetReadOnlyStorage().GetStorageMap(mr.Address, domain, false)
-			storageMapValue := storageMap.ReadValue(&util.NopMemoryGauge{}, key)
-			scm, err := getShardedCollectionMap(mr, storageMapValue)
-			if err != nil {
-				cancel(err)
-				return
-			}
-
-			inter.SharedState.Config.InvalidatedResourceValidationEnabled = false
-
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case keyPair, ok := <-keyPairChan:
-					if !ok {
-						return
-					}
-
-					ownedNFTs, err := getNftCollection(
-						inter,
-						keyPair.shardedCollectionKey,
-						scm,
-					)
-					if err != nil {
-						cancel(err)
-						return
-					}
-
-					value, ok := ownedNFTs.Get(
-						inter,
-						interpreter.EmptyLocationRange,
-						keyPair.nftCollectionKey,
-					)
-					if !ok {
-						cancel(fmt.Errorf("expected value for key %s", keyPair.nftCollectionKey))
-						return
-					}
-
-					var newValue interpreter.Value
-					err = capturePanic(func() {
-						newValue = value.Clone(inter)
-					})
-					if err != nil {
-						cancel(err)
-						return
-					}
-					if newValue == nil {
-						cancel(fmt.Errorf("failed to clone value"))
-						return
-					}
-
-					clonedValues = append(clonedValues,
-						valueWithKeys{
-							cricketKeyPair: keyPair,
-							value:          newValue,
-						},
-					)
-
-					// TODO: potentially remove here as well
-
-					progressLog(1)
-				}
-			}
-		}(i)
-	}
-	// only after all values have been cloned, can they be set back
-	wg.Wait()
-
-	if ctx.Err() != nil {
-		return nil, fmt.Errorf("context error when cloning values: %w", ctx.Err())
-	}
-
-	// close all child interpreters
-	err = closeInterpreters()
-	if err != nil {
-		return nil, err
-	}
-
-	progressLog = util2.LogProgress(log, "removing cricket moments", len(clonedValues))
-	for _, clonedValue := range clonedValues {
-		ownedNFTs, err := getNftCollection(
-			mr.Interpreter,
-			clonedValue.shardedCollectionKey,
-			shardedCollectionMap,
-		)
-
-		if err != nil {
-			return nil, fmt.Errorf("failed to get nft collection: %w", err)
-		}
-
-		// TODO: move remove inside the copy loop
-		err = capturePanic(func() {
-			// TODO: remove is fairly slow, consider customizing it, to remove some
-			// unnecessary checks
-			ownedNFTs.Remove(
-				mr.Interpreter,
-				interpreter.EmptyLocationRange,
-				clonedValue.nftCollectionKey,
-			)
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to set key: %w", err)
-		}
-		progressLog(1)
-	}
-
-	log.Info().Msg("cloning empty cricket moments sharded collection")
-	value = value.Clone(mr.Interpreter)
-	log.Info().Msg("cloned empty cricket moments sharded collection")
-	shardedCollectionMap, err = getShardedCollectionMap(mr, value)
-	if err != nil {
-		return nil, err
-	}
-
-	// this is fairly short no need to optimise
-	progressLog = util2.LogProgress(log, "setting cloned cricket moments", len(clonedValues))
-	for _, clonedValue := range clonedValues {
-		ownedNFTs, err := getNftCollection(
-			mr.Interpreter,
-			clonedValue.shardedCollectionKey,
-			shardedCollectionMap,
-		)
-
-		if err != nil {
-			return nil, fmt.Errorf("failed to get nft collection: %w", err)
-		}
-
-		err = capturePanic(func() {
-			ownedNFTs.UnsafeInsert(
-				mr.Interpreter,
-				interpreter.EmptyLocationRange,
-				clonedValue.nftCollectionKey,
-				clonedValue.value,
-			)
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to set key: %w", err)
-		}
-		progressLog(1)
-	}
-
-	return value, nil
+	//shardedCollectionMap, err := getShardedCollectionMap(mr, value)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//count, err := getCricketMomentsShardedCollectionNFTCount(
+	//	mr,
+	//	shardedCollectionMap,
+	//)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//
+	//ctx, c := context.WithCancelCause(context.Background())
+	//cancel := func(err error) {
+	//	if err != nil {
+	//		log.Info().Err(err).Msg("canceling context")
+	//	}
+	//	c(err)
+	//}
+	//defer cancel(nil)
+	//
+	//type valueWithKeys struct {
+	//	cricketKeyPair
+	//	value interpreter.Value
+	//}
+	//
+	//keyPairChan := make(chan cricketKeyPair, count)
+	//clonedValues := make([]valueWithKeys, 0, count)
+	//
+	//interpreters, _, err := mr.ChildInterpreters(log, 1, flow.ConvertAddress(mr.Address))
+	//if err != nil {
+	//	return nil, err
+	//}
+	//inter := interpreters[0]
+	//inter.SharedState.Config.InvalidatedResourceValidationEnabled = false
+	//
+	//// worker for dispatching values to clone
+	//go func() {
+	//	defer close(keyPairChan)
+	//
+	//	storageMap := mr.GetReadOnlyStorage().GetStorageMap(mr.Address, domain, false)
+	//	storageMapValue := storageMap.ReadValue(&util.NopMemoryGauge{}, key)
+	//	scm, err := getShardedCollectionMap(mr, storageMapValue)
+	//	if err != nil {
+	//		cancel(err)
+	//		return
+	//	}
+	//
+	//	shardedCollectionMapIterator := scm.Iterator()
+	//	for {
+	//		select {
+	//		case <-ctx.Done():
+	//			return
+	//		default:
+	//		}
+	//
+	//		outerKey := shardedCollectionMapIterator.NextKey(nil)
+	//		if outerKey == nil {
+	//			break
+	//		}
+	//
+	//		ownedNFTs, err := getNftCollection(inter, outerKey, scm)
+	//		if err != nil {
+	//			cancel(err)
+	//			return
+	//		}
+	//
+	//		ownedNFTsIterator := ownedNFTs.Iterator()
+	//		for {
+	//			select {
+	//			case <-ctx.Done():
+	//				return
+	//			default:
+	//			}
+	//
+	//			innerKey := ownedNFTsIterator.NextKey(nil)
+	//			if innerKey == nil {
+	//				break
+	//			}
+	//
+	//			keyPairChan <- cricketKeyPair{
+	//				nftCollectionKey:     innerKey,
+	//				shardedCollectionKey: outerKey,
+	//			}
+	//		}
+	//	}
+	//}()
+	//
+	//interpreters, closeInterpreters, err := mr.ChildInterpreters(log, nWorkers, flow.ConvertAddress(mr.Address))
+	//if err != nil {
+	//	return nil, err
+	//}
+	//
+	//// workers for cloning values
+	//wg := sync.WaitGroup{}
+	//wg.Add(nWorkers)
+	//progressLog := util2.LogProgress(log, "cloning cricket moments", count)
+	//for i := 0; i < nWorkers; i++ {
+	//	go func(i int) {
+	//		defer wg.Done()
+	//		inter := interpreters[i]
+	//
+	//		storageMap := mr.GetReadOnlyStorage().GetStorageMap(mr.Address, domain, false)
+	//		storageMapValue := storageMap.ReadValue(&util.NopMemoryGauge{}, key)
+	//		scm, err := getShardedCollectionMap(mr, storageMapValue)
+	//		if err != nil {
+	//			cancel(err)
+	//			return
+	//		}
+	//
+	//		inter.SharedState.Config.InvalidatedResourceValidationEnabled = false
+	//
+	//		for {
+	//			select {
+	//			case <-ctx.Done():
+	//				return
+	//			case keyPair, ok := <-keyPairChan:
+	//				if !ok {
+	//					return
+	//				}
+	//
+	//				ownedNFTs, err := getNftCollection(
+	//					inter,
+	//					keyPair.shardedCollectionKey,
+	//					scm,
+	//				)
+	//				if err != nil {
+	//					cancel(err)
+	//					return
+	//				}
+	//
+	//				value, ok := ownedNFTs.Get(
+	//					inter,
+	//					interpreter.EmptyLocationRange,
+	//					keyPair.nftCollectionKey,
+	//				)
+	//				if !ok {
+	//					cancel(fmt.Errorf("expected value for key %s", keyPair.nftCollectionKey))
+	//					return
+	//				}
+	//
+	//				var newValue interpreter.Value
+	//				err = capturePanic(func() {
+	//					newValue = value.Clone(inter)
+	//				})
+	//				if err != nil {
+	//					cancel(err)
+	//					return
+	//				}
+	//				if newValue == nil {
+	//					cancel(fmt.Errorf("failed to clone value"))
+	//					return
+	//				}
+	//
+	//				clonedValues = append(clonedValues,
+	//					valueWithKeys{
+	//						cricketKeyPair: keyPair,
+	//						value:          newValue,
+	//					},
+	//				)
+	//
+	//				// TODO: potentially remove here as well
+	//
+	//				progressLog(1)
+	//			}
+	//		}
+	//	}(i)
+	//}
+	//// only after all values have been cloned, can they be set back
+	//wg.Wait()
+	//
+	//if ctx.Err() != nil {
+	//	return nil, fmt.Errorf("context error when cloning values: %w", ctx.Err())
+	//}
+	//
+	//// close all child interpreters
+	//err = closeInterpreters()
+	//if err != nil {
+	//	return nil, err
+	//}
+	//
+	//progressLog = util2.LogProgress(log, "removing cricket moments", len(clonedValues))
+	//for _, clonedValue := range clonedValues {
+	//	ownedNFTs, err := getNftCollection(
+	//		mr.Interpreter,
+	//		clonedValue.shardedCollectionKey,
+	//		shardedCollectionMap,
+	//	)
+	//
+	//	if err != nil {
+	//		return nil, fmt.Errorf("failed to get nft collection: %w", err)
+	//	}
+	//
+	//	// TODO: move remove inside the copy loop
+	//	err = capturePanic(func() {
+	//		// TODO: remove is fairly slow, consider customizing it, to remove some
+	//		// unnecessary checks
+	//		ownedNFTs.Remove(
+	//			mr.Interpreter,
+	//			interpreter.EmptyLocationRange,
+	//			clonedValue.nftCollectionKey,
+	//		)
+	//	})
+	//	if err != nil {
+	//		return nil, fmt.Errorf("failed to set key: %w", err)
+	//	}
+	//	progressLog(1)
+	//}
+	//
+	//log.Info().Msg("cloning empty cricket moments sharded collection")
+	//value = value.Clone(mr.Interpreter)
+	//log.Info().Msg("cloned empty cricket moments sharded collection")
+	//shardedCollectionMap, err = getShardedCollectionMap(mr, value)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//
+	//// this is fairly short no need to optimise
+	//progressLog = util2.LogProgress(log, "setting cloned cricket moments", len(clonedValues))
+	//for _, clonedValue := range clonedValues {
+	//	ownedNFTs, err := getNftCollection(
+	//		mr.Interpreter,
+	//		clonedValue.shardedCollectionKey,
+	//		shardedCollectionMap,
+	//	)
+	//
+	//	if err != nil {
+	//		return nil, fmt.Errorf("failed to get nft collection: %w", err)
+	//	}
+	//
+	//	err = capturePanic(func() {
+	//		ownedNFTs.UnsafeInsert(
+	//			mr.Interpreter,
+	//			interpreter.EmptyLocationRange,
+	//			clonedValue.nftCollectionKey,
+	//			clonedValue.value,
+	//		)
+	//	})
+	//	if err != nil {
+	//		return nil, fmt.Errorf("failed to set key: %w", err)
+	//	}
+	//	progressLog(1)
+	//}
+	//
+	//return value, nil
 }
 
 type hashWithKeys struct {
