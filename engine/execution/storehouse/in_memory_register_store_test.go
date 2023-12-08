@@ -5,7 +5,9 @@ import (
 	"math/rand"
 	"sync"
 	"testing"
+	"time"
 
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -612,38 +614,46 @@ func TestInMemoryRegisterStore(t *testing.T) {
 	})
 }
 
-// Benchmark GetRegister that only iterate 1 block / 5 blocks / 25 blocks
-// Benchmark GetRegister for 5 blocks and interupted by Save
-// Benchmark SaveRegister at 20 block per second, and Prune at 20 block per second
+// Benchmark GetRegister, and see how long in average it takes to return a register
+// if it has to iterate through N blocks
+// for instance, if N is 10, then given a chain of 10 blocks, if register A is only
+// updated at the block 1, then getting register A at block 10 will have to iterate
+// through block 10, block 9, block 8, ... block 1, and finally return the register,
+// in other words, it will have to iterate through 10 blocks.
+// Given the performance of GetRegister is largely affected by the number of blocks to
+// iterate through, this test is to benchmark and compare the performance with different
+// number of blocks to iterate.
 func BenchmarkInMemoryRegisterStoreGetRegister(b *testing.B) {
-	numRegisterUpdatePerBlock := 10
-	numBlock := 25
-	chain, _, _ := unittest.ChainFixture(numBlock + 1)
-	genesis, blocks := chain[0], chain[1:]
-	store := NewInMemoryRegisterStore(genesis.Header.Height, genesis.ID())
-	// Create a register store with registers saved
-	for _, block := range blocks {
-		registers := make(flow.RegisterEntries, 0, numRegisterUpdatePerBlock)
-		for i := 0; i < numRegisterUpdatePerBlock; i++ {
-			registers = append(registers,
-				makeReg(fmt.Sprintf("%v", i), // key
-					fmt.Sprintf("%v", block.Header.Height), // value
-				))
-		}
-		require.NoError(b, store.SaveRegisters(
-			block.Header.Height, block.ID(), block.Header.ParentID, registers))
-	}
+	b.Run("1 block", func(b *testing.B) {
+		benchmarkGetRegisterWhenIterateNBlocks(b, 1)
+	})
+	b.Run("7 blocks", func(b *testing.B) {
+		// 7 blocks is the number of sealed blocks in average
+		benchmarkGetRegisterWhenIterateNBlocks(b, 7)
+	})
+	b.Run("10 blocks", func(b *testing.B) {
+		// 10 blocks if finalization has some hiccup
+		benchmarkGetRegisterWhenIterateNBlocks(b, 10)
+	})
+}
 
+func benchmarkGetRegisterWhenIterateNBlocks(b *testing.B, numBlock int) {
+	_, blocks, store := createChainAndStore(b, numBlock)
+	benchmarkGetRegister(b, store, blocks)
+}
+
+func benchmarkGetRegister(b *testing.B, store *InMemoryRegisterStore, blocks []*flow.Block) {
 	// Benchmark GetRegister
 	b.ResetTimer()
-	numBlockToTraverse := 20
+	log.Info().Msgf("Benchmark GetRegister with b.N %v", b.N)
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
-		index := len(blocks) - numBlockToTraverse
-		block := blocks[index]
+		// since each register is updated at every height, if we would like to benchmark
+		// getting a register which needs to traverse n blocks, we just need to get the register
+		// at the last-nth block
+		block := blocks[len(blocks)-1]
 		blockID := block.ID()
-		n := i % numRegisterUpdatePerBlock
-		reg := makeReg(fmt.Sprintf("%v", n), "")
+		reg := makeReg(fmt.Sprintf("%v", 0), "")
 		b.StartTimer()
 		_, err := store.GetRegister(block.Header.Height, blockID, reg.Key)
 		require.NoError(b, err)
@@ -653,6 +663,50 @@ func BenchmarkInMemoryRegisterStoreGetRegister(b *testing.B) {
 }
 
 func BenchmarkInMemoryRegisterStoreGetRegisterSaveRegister(b *testing.B) {
+	numBlock := 10
+	root, blocks, store := createChainAndStore(b, numBlock)
+	stop, start := saveRegistersUntilStop(b, root, store)
+	defer start()
+	benchmarkGetRegister(b, store, blocks)
+	close(stop)
+}
+
+func createChainAndStore(b testing.TB, numBlock int) (*flow.Header, []*flow.Block, *InMemoryRegisterStore) {
+	chain, _, _ := unittest.ChainFixture(numBlock + 1)
+	genesis, blocks := chain[0], chain[1:]
+	store := NewInMemoryRegisterStore(genesis.Header.Height, genesis.ID())
+	// Create a register store with 1 register saved at each block
+	for i, block := range blocks {
+		registers := make(flow.RegisterEntries, 0, 1)
+		registers = append(registers,
+			makeReg(fmt.Sprintf("%v", i), // key
+				fmt.Sprintf("%v", block.Header.Height), // value
+			))
+		require.NoError(b, store.SaveRegisters(
+			block.Header.Height, block.ID(), block.Header.ParentID, registers))
+	}
+	return genesis.Header, blocks, store
+}
+
+func saveRegistersUntilStop(t testing.TB, root *flow.Header, store *InMemoryRegisterStore) (chan struct{}, func()) {
+	stop := make(chan struct{})
+	parent := root
+	asyncLoop := func() {
+		for {
+			select {
+			case _ = <-stop:
+				break
+			case <-time.After(time.Second):
+				registers := make(flow.RegisterEntries, 0, 1)
+				registers = append(registers, makeReg("hello", "world"))
+				block := unittest.BlockWithParentFixture(parent)
+				require.NoError(t, store.SaveRegisters(
+					block.Header.Height, block.ID(), block.Header.ParentID, registers))
+				parent = block.Header
+			}
+		}
+	}
+	return stop, asyncLoop
 }
 
 func randBetween(min, max uint64) uint64 {
