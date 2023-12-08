@@ -8,11 +8,14 @@ import (
 	"time"
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	grpcinsecure "google.golang.org/grpc/credentials/insecure"
 
+	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/grpc/forwarder"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/grpcutils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -135,51 +138,60 @@ func TestNewFlowCachedAccessAPIProxy(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Prepare a proxy that fails due to the second connection being idle
-	l := flow.IdentitySkeletonList{
-		{Address: unittest.IPPort("11634")},
-		{Address: unittest.IPPort("11635")},
-	}
-	c := FlowAccessAPIForwarder{}
-	c.Forwarder, err = forwarder.NewForwarder(l, time.Second, grpcutils.DefaultMaxMsgSize)
-
-	if err == nil {
-		t.Fatal(fmt.Errorf("should not start with one connection ready"))
-	}
-
 	// Bring up 2nd upstream server
 	charlie2, _, err := newFlowLite("tcp", unittest.IPPort("11635"), done)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	background := context.Background()
+	metrics := metrics.NewNoopCollector()
 
-	// Prepare a proxy
-	l = flow.IdentitySkeletonList{
-		{Address: unittest.IPPort("11634")},
-		{Address: unittest.IPPort("11635")},
+	// create the factory
+	connectionFactory := &connection.ConnectionFactoryImpl{
+		// set metrics reporting
+		AccessMetrics:             metrics,
+		CollectionNodeGRPCTimeout: time.Second,
+		Manager: connection.NewManager(
+			nil,
+			unittest.Logger(),
+			metrics,
+			grpcutils.DefaultMaxMsgSize,
+			connection.CircuitBreakerConfig{},
+			grpcutils.NoCompressor,
+		),
 	}
-	c = FlowAccessAPIForwarder{}
-	c.Forwarder, err = forwarder.NewForwarder(l, time.Second, grpcutils.DefaultMaxMsgSize)
+
+	// Prepare a proxy that fails due to the second connection being idle
+	l := flow.IdentitySkeletonList{{Address: unittest.IPPort("11634")}, {Address: unittest.IPPort("11635")}}
+	c := FlowAccessAPIForwarder{}
+	c.Forwarder, err = forwarder.NewForwarder(l, connectionFactory)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx := context.Background()
+
+	// Wait until proxy call passes
+	_, err = c.Ping(ctx, &access.PingRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// get and close first connection
+	_, closer, err := c.Forwarder.FaultTolerantClient()
+	assert.NoError(t, err)
+	closer.Close()
+
+	// connection factory created a new gRPC connection which was closed before
+	// if creation fails should use second connection
+	// Wait until proxy call passes
+	_, err = c.Ping(ctx, &access.PingRequest{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Wait until proxy call passes
-	_, err = c.Ping(background, &access.PingRequest{})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Wait until proxy call passes
-	_, err = c.Ping(background, &access.PingRequest{})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Wait until proxy call passes
-	_, err = c.Ping(background, &access.PingRequest{})
+	_, err = c.Ping(ctx, &access.PingRequest{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -188,7 +200,7 @@ func TestNewFlowCachedAccessAPIProxy(t *testing.T) {
 	charlie2.Stop()
 
 	// Wait until proxy call fails
-	_, err = c.Ping(background, &access.PingRequest{})
+	_, err = c.Ping(ctx, &access.PingRequest{})
 	if err == nil {
 		t.Fatal(fmt.Errorf("should fail on no connections"))
 	}

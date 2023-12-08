@@ -25,7 +25,6 @@ import (
 
 // TestMetricsInspector_ObserveRPC ensures that the gossipsub rpc metrics inspector observes metrics for control messages as expected.
 func TestMetricsInspector_ObserveRPC(t *testing.T) {
-	t.Parallel()
 	role := flow.RoleConsensus
 	sporkID := unittest.IdentifierFixture()
 	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
@@ -74,9 +73,9 @@ func TestMetricsInspector_ObserveRPC(t *testing.T) {
 	defer stopComponents(t, cancel, nodes, metricsInspector)
 	// prepare to spam - generate control messages
 	ctlMsgs := spammer.GenerateCtlMessages(controlMessageCount,
-		corruptlibp2p.WithGraft(messageCount, channels.PushBlocks.String()),
-		corruptlibp2p.WithPrune(messageCount, channels.PushBlocks.String()),
-		corruptlibp2p.WithIHave(messageCount, 1000, channels.PushBlocks.String()))
+		p2ptest.WithGraft(messageCount, channels.PushBlocks.String()),
+		p2ptest.WithPrune(messageCount, channels.PushBlocks.String()),
+		p2ptest.WithIHave(messageCount, 1000, channels.PushBlocks.String()))
 
 	// start spamming the victim peer
 	spammer.SpamControlMessage(t, victimNode, ctlMsgs)

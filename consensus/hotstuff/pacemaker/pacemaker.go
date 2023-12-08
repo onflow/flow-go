@@ -31,7 +31,7 @@ type ActivePaceMaker struct {
 
 	ctx            context.Context
 	timeoutControl *timeout.Controller
-	notifier       hotstuff.Consumer
+	notifier       hotstuff.ParticipantConsumer
 	viewTracker    viewTracker
 	started        bool
 }
