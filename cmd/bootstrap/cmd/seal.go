@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"encoding/hex"
+	"time"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/model/dkg"
@@ -93,5 +94,9 @@ func rootEpochTargetEndTime() uint64 {
 	if flagEpochCounter < flagEpochTimingRefCounter {
 		panic("invalid epoch timing config: reference epoch counter must be before root epoch counter")
 	}
-	return flagEpochTimingRefTimestamp + (flagEpochCounter-flagEpochTimingRefCounter)*flagEpochTimingDuration
+	targetEndTime := flagEpochTimingRefTimestamp + (flagEpochCounter-flagEpochTimingRefCounter)*flagEpochTimingDuration
+	if targetEndTime < uint64(time.Now().Unix()) {
+		panic("sanity check failed: root epoch target end time is before current time")
+	}
+	return targetEndTime
 }
