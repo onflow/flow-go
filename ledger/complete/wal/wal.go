@@ -194,7 +194,16 @@ func (w *DiskWAL) replay(
 				continue
 			}
 
-			w.log.Info().Int("checkpoint", latestCheckpoint).Msg("checkpoint loaded")
+			if len(forestSequencing) == 0 {
+				return fmt.Errorf("checkpoint loaded but has no trie")
+			}
+
+			firstTrie := forestSequencing[0].RootHash()
+			lastTrie := forestSequencing[len(forestSequencing)-1].RootHash()
+			w.log.Info().Int("checkpoint", latestCheckpoint).
+				Hex("first_trie", firstTrie[:]).
+				Hex("last_trie", lastTrie[:]).
+				Msg("checkpoint loaded")
 
 			err = checkpointFn(forestSequencing)
 			if err != nil {
@@ -231,7 +240,8 @@ func (w *DiskWAL) replay(
 				return fmt.Errorf("error while handling root checkpoint: %w", err)
 			}
 
-			w.log.Info().Msgf("root checkpoint loaded")
+			w.log.Info().Msgf("root checkpoint loaded, root hash: %v",
+				flattenedForest[len(flattenedForest)-1].RootHash())
 			checkpointLoaded = true
 		}
 	}
