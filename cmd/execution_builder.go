@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	"github.com/onflow/go-bitswap"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/host"
 	"github.com/shirou/gopsutil/v3/mem"
@@ -546,6 +547,7 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 			"cannot get the latest executed block id at height %v: %w",
 			height, err)
 	}
+
 	blockSnapshot, _, err := exeNode.executionState.CreateStorageSnapshot(blockID)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create a storage snapshot at block %v at height %v: %w", blockID,
@@ -700,6 +702,14 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 		exeNode.registerStore,
 		exeNode.exeConf.enableStorehouse,
 	)
+
+	height, _, err := exeNode.executionState.GetHighestExecutedBlockID(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("could not get highest executed block: %w", err)
+	}
+
+	log.Info().Msgf("execution state highest executed block height: %v", height)
+	exeNode.collector.ExecutionLastExecutedBlockHeight(height)
 
 	return &module.NoopReadyDoneAware{}, nil
 }

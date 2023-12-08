@@ -246,10 +246,14 @@ func (s *InMemoryRegisterStore) IsBlockExecuted(height uint64, blockID flow.Iden
 	defer s.RUnlock()
 
 	// finalized and executed blocks are pruned
+	// so if the height is below pruned height, in memory register store is not sure if
+	// it's executed or not
 	if height < s.prunedHeight {
 		return false, fmt.Errorf("below pruned height")
 	}
 
+	// if the height is the pruned height, then it's executed only if the blockID is the prunedID
+	// since the pruned block must be finalized and executed.
 	if height == s.prunedHeight {
 		return blockID == s.prunedID, nil
 	}
