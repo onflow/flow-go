@@ -149,7 +149,7 @@ func (w *DiskWAL) replay(
 	useCheckpoints bool,
 ) error {
 
-	w.log.Info().Msgf("loading checkpoint with WAL from %d to %d", from, to)
+	w.log.Info().Msgf("loading checkpoint with WAL from %d to %d, useCheckpoints %v", from, to, useCheckpoints)
 
 	if to < from {
 		return fmt.Errorf("end of range cannot be smaller than beginning")
@@ -177,6 +177,8 @@ func (w *DiskWAL) replay(
 			// from-1 to account for checkpoints connected to segments, ie. checkpoint 8 if replaying segments 9-12
 			availableCheckpoints = getPossibleCheckpoints(allCheckpoints, from-1, to)
 		}
+
+		w.log.Info().Ints("checkpoints", availableCheckpoints).Msg("available checkpoints")
 
 		for len(availableCheckpoints) > 0 {
 			// as long as there are checkpoints to try, we always try with the last checkpoint file, since
@@ -215,12 +217,15 @@ func (w *DiskWAL) replay(
 		}
 
 		if loadedCheckpoint != -1 && loadedCheckpoint == to {
+			w.log.Info().Msgf("no checkpoint to load")
 			return nil
 		}
 
 		if loadedCheckpoint >= 0 {
 			startSegment = loadedCheckpoint + 1
 		}
+
+		w.log.Info().Msgf("starting replay from checkpoint segment %d", startSegment)
 	}
 
 	if loadedCheckpoint == -1 && startSegment == 0 {
@@ -243,6 +248,8 @@ func (w *DiskWAL) replay(
 			w.log.Info().Msgf("root checkpoint loaded, root hash: %v",
 				flattenedForest[len(flattenedForest)-1].RootHash())
 			checkpointLoaded = true
+		} else {
+			w.log.Info().Msgf("no root checkpoint was found")
 		}
 	}
 
