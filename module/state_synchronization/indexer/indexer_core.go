@@ -1,6 +1,7 @@
 package indexer
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -41,8 +42,16 @@ func New(
 	events storage.Events,
 	results storage.LightTransactionResults,
 ) (*IndexerCore, error) {
+	log = log.With().Str("component", "execution_indexer").Logger()
+	metrics.InitializeLatestHeight(registers.LatestHeight())
+
+	log.Info().
+		Uint64("first_height", registers.FirstHeight()).
+		Uint64("latest_height", registers.LatestHeight()).
+		Msg("indexer initialized")
+
 	return &IndexerCore{
-		log:       log.With().Str("component", "execution_indexer").Logger(),
+		log:       log,
 		metrics:   metrics,
 		batcher:   batcher,
 		registers: registers,
@@ -52,23 +61,24 @@ func New(
 	}, nil
 }
 
-// RegisterValues retrieves register values by the register IDs at the provided block height.
+// RegisterValue retrieves register values by the register IDs at the provided block height.
 // Even if the register wasn't indexed at the provided height, returns the highest height the register was indexed at.
+// If a register is not found it will return a nil value and not an error.
 // Expected errors:
-// - storage.ErrNotFound if the register by the ID was never indexed
-func (c *IndexerCore) RegisterValues(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error) {
-	values := make([]flow.RegisterValue, len(IDs))
-
-	for j, id := range IDs {
-		value, err := c.registers.Get(id, height)
-		if err != nil {
-			return nil, err
-		}
-
-		values[j] = value
+// - storage.ErrHeightNotIndexed if the given height was not indexed yet or lower than the first indexed height.
+func (c *IndexerCore) RegisterValue(ID flow.RegisterID, height uint64) (flow.RegisterValue, error) {
+	value, err := c.registers.Get(ID, height)
+	// only return an error if the error doesn't match the not found error, since we have
+	// to gracefully handle not found values and instead assign nil, that is because the script executor
+	// expects that behaviour
+	if errors.Is(err, storage.ErrNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
 	}
 
-	return values, nil
+	return value, nil
 }
 
 // IndexBlockData indexes all execution block data by height.

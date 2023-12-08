@@ -151,7 +151,7 @@ func New(
 	headers storage.Headers,
 	cfg ExecutionDataConfig,
 	distributor *ExecutionDataDistributor,
-) state_synchronization.ExecutionDataRequester {
+) (state_synchronization.ExecutionDataRequester, error) {
 	e := &executionDataRequester{
 		log:                  log.With().Str("component", "execution_data_requester").Logger(),
 		downloader:           downloader,
@@ -179,7 +179,7 @@ func New(
 	// from `processedHeight + 1`. If the database is empty, rootHeight will be used to init the
 	// last processed height. Once the execution data is fetched and stored, it notifies
 	// `executionDataNotifier`.
-	e.blockConsumer = jobqueue.NewComponentConsumer(
+	blockConsumer, err := jobqueue.NewComponentConsumer(
 		e.log.With().Str("module", "block_consumer").Logger(),
 		e.finalizationNotifier.Channel(), // to listen to finalization events to find newly sealed blocks
 		processedHeight,                  // read and persist the downloaded height
@@ -189,6 +189,10 @@ func New(
 		fetchWorkers,                     // the number of concurrent workers
 		e.config.MaxSearchAhead,          // max number of unsent notifications to allow before pausing new fetches
 	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create block consumer: %w", err)
+	}
+	e.blockConsumer = blockConsumer
 
 	// notifies notificationConsumer when new ExecutionData blobs are available
 	// SetPostNotifier will notify executionDataNotifier AFTER e.blockConsumer.LastProcessedIndex is updated.
@@ -222,7 +226,7 @@ func New(
 	// `e.consumers`.
 	// Note: the `e.consumers` will be guaranteed to receive at least one `OnExecutionDataFetched` event
 	// for each sealed block in consecutive block height order.
-	e.notificationConsumer = jobqueue.NewComponentConsumer(
+	e.notificationConsumer, err = jobqueue.NewComponentConsumer(
 		e.log.With().Str("module", "notification_consumer").Logger(),
 		executionDataNotifier.Channel(), // listen for notifications from the block consumer
 		processedNotifications,          // read and persist the notified height
@@ -232,13 +236,16 @@ func New(
 		1,                               // use a single worker to ensure notification is delivered in consecutive order
 		0,                               // search ahead limit controlled by worker count
 	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create notification consumer: %w", err)
+	}
 
 	e.Component = component.NewComponentManagerBuilder().
 		AddWorker(e.runBlockConsumer).
 		AddWorker(e.runNotificationConsumer).
 		Build()
 
-	return e
+	return e, nil
 }
 
 // OnBlockFinalized accepts block finalization notifications from the FollowerDistributor

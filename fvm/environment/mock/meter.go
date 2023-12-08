@@ -15,6 +15,20 @@ type Meter struct {
 	mock.Mock
 }
 
+// ComputationAvailable provides a mock function with given fields: _a0, _a1
+func (_m *Meter) ComputationAvailable(_a0 common.ComputationKind, _a1 uint) bool {
+	ret := _m.Called(_a0, _a1)
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(common.ComputationKind, uint) bool); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
 // ComputationIntensities provides a mock function with given fields:
 func (_m *Meter) ComputationIntensities() meter.MeteredComputationIntensities {
 	ret := _m.Called()

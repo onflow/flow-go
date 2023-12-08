@@ -22,12 +22,11 @@ import (
 func Test_IsServiceEvent(t *testing.T) {
 
 	chain := flow.Emulator
-	events, err := systemcontracts.ServiceEventsForChain(chain)
-	require.NoError(t, err)
+	events := systemcontracts.ServiceEventsForChain(chain)
 
 	t.Run("correct", func(t *testing.T) {
 		for _, event := range events.All() {
-			isServiceEvent, err := environment.IsServiceEvent(cadence.Event{
+			event := cadence.Event{
 				EventType: &cadence.EventType{
 					Location: common.AddressLocation{
 						Address: common.MustBytesToAddress(
@@ -35,14 +34,16 @@ func Test_IsServiceEvent(t *testing.T) {
 					},
 					QualifiedIdentifier: event.QualifiedIdentifier(),
 				},
-			}, chain)
+			}
+
+			isServiceEvent, err := environment.IsServiceEvent(flow.EventType(event.Type().ID()), chain)
 			require.NoError(t, err)
 			assert.True(t, isServiceEvent)
 		}
 	})
 
 	t.Run("wrong chain", func(t *testing.T) {
-		isServiceEvent, err := environment.IsServiceEvent(cadence.Event{
+		event := cadence.Event{
 			EventType: &cadence.EventType{
 				Location: common.AddressLocation{
 					Address: common.MustBytesToAddress(
@@ -50,13 +51,15 @@ func Test_IsServiceEvent(t *testing.T) {
 				},
 				QualifiedIdentifier: events.EpochCommit.QualifiedIdentifier(),
 			},
-		}, chain)
+		}
+
+		isServiceEvent, err := environment.IsServiceEvent(flow.EventType(event.Type().ID()), chain)
 		require.NoError(t, err)
 		assert.False(t, isServiceEvent)
 	})
 
 	t.Run("wrong type", func(t *testing.T) {
-		isServiceEvent, err := environment.IsServiceEvent(cadence.Event{
+		event := cadence.Event{
 			EventType: &cadence.EventType{
 				Location: common.AddressLocation{
 					Address: common.MustBytesToAddress(
@@ -64,7 +67,9 @@ func Test_IsServiceEvent(t *testing.T) {
 				},
 				QualifiedIdentifier: "SomeContract.SomeEvent",
 			},
-		}, chain)
+		}
+
+		isServiceEvent, err := environment.IsServiceEvent(flow.EventType(event.Type().ID()), chain)
 		require.NoError(t, err)
 		assert.False(t, isServiceEvent)
 	})
@@ -149,7 +154,6 @@ func Test_EmitEvent_Limit(t *testing.T) {
 		err := eventEmitter.EmitEvent(cadenceEvent1)
 		require.Error(t, err)
 	})
-
 }
 
 func createTestEventEmitterWithLimit(chain flow.ChainID, address flow.Address, eventEmitLimit uint64) environment.EventEmitter {

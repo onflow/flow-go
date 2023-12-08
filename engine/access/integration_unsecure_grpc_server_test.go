@@ -23,8 +23,10 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/access/state_stream"
+	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
+	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	"github.com/onflow/flow-go/module/grpcserver"
@@ -56,7 +58,7 @@ type SameGRPCPortTestSuite struct {
 	chainID        flow.ChainID
 	metrics        *metrics.NoopCollector
 	rpcEng         *rpc.Engine
-	stateStreamEng *state_stream.Engine
+	stateStreamEng *statestreambackend.Engine
 
 	// storage
 	blocks       *storagemock.Blocks
@@ -66,6 +68,7 @@ type SameGRPCPortTestSuite struct {
 	receipts     *storagemock.ExecutionReceipts
 	seals        *storagemock.Seals
 	results      *storagemock.ExecutionResults
+	registers    *execution.RegistersAsyncStore
 
 	ctx    irrecoverable.SignalerContext
 	cancel context.CancelFunc
@@ -89,6 +92,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
 	params := new(protocol.Params)
+	suite.registers = execution.NewRegistersAsyncStore()
 
 	suite.epochQuery = new(protocol.EpochQuery)
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
@@ -190,6 +194,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	})
 	require.NoError(suite.T(), err)
 
+	stateStreamConfig := statestreambackend.Config{}
 	// create rpc engine builder
 	rpcEngBuilder, err := rpc.NewBuilder(
 		suite.log,
@@ -204,8 +209,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		suite.secureGrpcServer,
 		suite.unsecureGrpcServer,
 		nil,
-		state_stream.DefaultEventFilterConfig,
-		0,
+		stateStreamConfig,
 	)
 	assert.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
@@ -227,12 +231,12 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		},
 	).Maybe()
 
-	conf := state_stream.Config{
+	conf := statestreambackend.Config{
 		ClientSendTimeout:    state_stream.DefaultSendTimeout,
 		ClientSendBufferSize: state_stream.DefaultSendBufferSize,
 	}
 
-	stateStreamBackend, err := state_stream.New(
+	stateStreamBackend, err := statestreambackend.New(
 		suite.log,
 		conf,
 		suite.state,
@@ -244,11 +248,12 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		nil,
 		rootBlock.Header.Height,
 		rootBlock.Header.Height,
+		suite.registers,
 	)
 	assert.NoError(suite.T(), err)
 
 	// create state stream engine
-	suite.stateStreamEng, err = state_stream.NewEng(
+	suite.stateStreamEng, err = statestreambackend.NewEng(
 		suite.log,
 		conf,
 		suite.execDataCache,

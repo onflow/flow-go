@@ -14,11 +14,10 @@ import (
 	ledger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/ledger/complete/wal"
+	bootstrapFilenames "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 )
-
-const bootstrapCheckpointFile = "bootstrap-checkpoint"
 
 func GenerateExecutionState(
 	dbDir string,
@@ -75,7 +74,7 @@ func GenerateExecutionState(
 		return flow.DummyStateCommitment, fmt.Errorf("bootstraping failed to produce a checkpoint for trie %v", stateCommitment)
 	}
 
-	err = wal.StoreCheckpointV6([]*trie.MTrie{matchTrie}, dbDir, bootstrapCheckpointFile, zerolog.Nop(), 1)
+	err = wal.StoreCheckpointV6([]*trie.MTrie{matchTrie}, dbDir, bootstrapFilenames.FilenameWALRootCheckpoint, zerolog.Nop(), 1)
 	if err != nil {
 		return flow.DummyStateCommitment, fmt.Errorf("failed to store bootstrap checkpoint: %w", err)
 	}

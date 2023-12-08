@@ -2,7 +2,9 @@ package execution
 
 import (
 	"context"
-	"fmt"
+	"errors"
+
+	"github.com/onflow/flow-go/fvm/environment"
 
 	"github.com/rs/zerolog"
 
@@ -12,34 +14,65 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/storage"
 )
 
-// RegistersAtHeight returns register value for provided register ID at the block height.
+// ErrDataNotAvailable indicates that the data for a given block was not available
+//
+// This generally indicates a request was made for execution data at a block height that was not
+// not locally indexed
+var ErrDataNotAvailable = errors.New("data for block is not available")
+
+// RegisterAtHeight returns register value for provided register ID at the block height.
 // Even if the register wasn't indexed at the provided height, returns the highest height the register was indexed at.
+// If the register with the ID was not indexed at all return nil value and no error.
 // Expected errors:
-// - storage.ErrNotFound if the register by the ID was never indexed
-// - ErrIndexBoundary if the height is out of indexed height boundary
-type RegistersAtHeight func(ID flow.RegisterID, height uint64) (flow.RegisterValue, error)
+// - storage.ErrHeightNotIndexed if the given height was not indexed yet or lower than the first indexed height.
+type RegisterAtHeight func(ID flow.RegisterID, height uint64) (flow.RegisterValue, error)
+
+type ScriptExecutor interface {
+	// ExecuteAtBlockHeight executes provided script against the block height.
+	// A result value is returned encoded as byte array. An error will be returned if script
+	// doesn't successfully execute.
+	// Expected errors:
+	// - storage.ErrNotFound if block or register value at height was not found.
+	// - ErrDataNotAvailable if the data for the block height is not available
+	ExecuteAtBlockHeight(
+		ctx context.Context,
+		script []byte,
+		arguments [][]byte,
+		height uint64,
+	) ([]byte, error)
+
+	// GetAccountAtBlockHeight returns a Flow account by the provided address and block height.
+	// Expected errors:
+	// - ErrDataNotAvailable if the data for the block height is not available
+	GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error)
+}
+
+var _ ScriptExecutor = (*Scripts)(nil)
 
 type Scripts struct {
-	executor          *query.QueryExecutor
-	headers           storage.Headers
-	registersAtHeight RegistersAtHeight
+	executor         *query.QueryExecutor
+	headers          storage.Headers
+	registerAtHeight RegisterAtHeight
 }
 
 func NewScripts(
 	log zerolog.Logger,
-	metrics *metrics.ExecutionCollector,
+	metrics module.ExecutionMetrics,
 	chainID flow.ChainID,
 	entropy query.EntropyProviderPerBlock,
 	header storage.Headers,
-	registersAtHeight RegistersAtHeight,
+	registerAtHeight RegisterAtHeight,
+	queryConf query.QueryConfig,
 ) (*Scripts, error) {
 	vm := fvm.NewVirtualMachine()
 
 	options := computation.DefaultFVMOptions(chainID, false, false)
+	blocks := environment.NewBlockFinder(header)
+	options = append(options, fvm.WithBlocks(blocks)) // add blocks for getBlocks calls in scripts
 	vmCtx := fvm.NewContext(options...)
 
 	derivedChainData, err := derived.NewDerivedChainData(derived.DefaultDerivedDataCacheSize)
@@ -48,7 +81,7 @@ func NewScripts(
 	}
 
 	queryExecutor := query.NewQueryExecutor(
-		query.NewDefaultConfig(),
+		queryConf,
 		log,
 		metrics,
 		vm,
@@ -58,9 +91,9 @@ func NewScripts(
 	)
 
 	return &Scripts{
-		executor:          queryExecutor,
-		headers:           header,
-		registersAtHeight: registersAtHeight,
+		executor:         queryExecutor,
+		headers:          header,
+		registerAtHeight: registerAtHeight,
 	}, nil
 }
 
@@ -68,12 +101,14 @@ func NewScripts(
 // A result value is returned encoded as byte array. An error will be returned if script
 // doesn't successfully execute.
 // Expected errors:
-// - Storage.NotFound if block or register value at height was not found.
+// - Script execution related errors
+// - ErrDataNotAvailable if the data for the block height is not available
 func (s *Scripts) ExecuteAtBlockHeight(
 	ctx context.Context,
 	script []byte,
 	arguments [][]byte,
-	height uint64) ([]byte, error) {
+	height uint64,
+) ([]byte, error) {
 
 	snap, header, err := s.snapshotWithBlock(height)
 	if err != nil {
@@ -85,7 +120,8 @@ func (s *Scripts) ExecuteAtBlockHeight(
 
 // GetAccountAtBlockHeight returns a Flow account by the provided address and block height.
 // Expected errors:
-// - Storage.NotFound if block or register value at height was not found.
+// - Script execution related errors
+// - ErrDataNotAvailable if the data for the block height is not available
 func (s *Scripts) GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error) {
 	snap, header, err := s.snapshotWithBlock(height)
 	if err != nil {
@@ -104,26 +140,12 @@ func (s *Scripts) snapshotWithBlock(height uint64) (snapshot.StorageSnapshot, *f
 	}
 
 	storageSnapshot := snapshot.NewReadFuncStorageSnapshot(func(ID flow.RegisterID) (flow.RegisterValue, error) {
-		return s.registersAtHeight(ID, height)
+		register, err := s.registerAtHeight(ID, height)
+		if errors.Is(err, storage.ErrHeightNotIndexed) {
+			return nil, errors.Join(ErrDataNotAvailable, err)
+		}
+		return register, err
 	})
 
 	return storageSnapshot, header, nil
-}
-
-// IndexRegisterAdapter an adapter for using indexer register values function that takes a slice of IDs in the
-// script executor that only uses a single register ID at a time. It also does additional sanity checks if multiple values
-// are returned, which shouldn't occur in normal operation.
-func IndexRegisterAdapter(registerFun func(IDs flow.RegisterIDs, height uint64) ([]flow.RegisterValue, error)) func(flow.RegisterID, uint64) (flow.RegisterValue, error) {
-	return func(ID flow.RegisterID, height uint64) (flow.RegisterValue, error) {
-		values, err := registerFun([]flow.RegisterID{ID}, height)
-		if err != nil {
-			return nil, err
-		}
-
-		// even though this shouldn't occur in correct implementation we check that function returned either a single register or error
-		if len(values) != 1 {
-			return nil, fmt.Errorf("invalid number of returned values for a single register: %d", len(values))
-		}
-		return values[0], nil
-	}
 }

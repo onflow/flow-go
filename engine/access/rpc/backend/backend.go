@@ -4,8 +4,6 @@ import (
 	"context"
 	"crypto/md5" //nolint:gosec
 	"fmt"
-	"net"
-	"strconv"
 	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -20,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -35,7 +34,7 @@ const DefaultMaxHeightRange = 250
 
 // DefaultSnapshotHistoryLimit the amount of blocks to look back in state
 // when recursively searching for a valid snapshot
-const DefaultSnapshotHistoryLimit = 50
+const DefaultSnapshotHistoryLimit = 500
 
 // DefaultLoggedScriptsCacheSize is the default size of the lookup cache used to dedupe logs of scripts sent to ENs
 // limiting cache size to 16MB and does not affect script execution, only for keeping logs tidy
@@ -79,19 +78,6 @@ type Backend struct {
 	nodeInfo *access.NodeVersionInfo
 }
 
-// Config defines the configurable options for creating Backend
-type Config struct {
-	ExecutionClientTimeout    time.Duration // execution API GRPC client timeout
-	CollectionClientTimeout   time.Duration // collection API GRPC client timeout
-	ConnectionPoolSize        uint          // size of the cache for storing collection and execution connections
-	MaxHeightRange            uint          // max size of height range requests
-	PreferredExecutionNodeIDs []string      // preferred list of upstream execution node IDs
-	FixedExecutionNodeIDs     []string      // fixed list of execution node IDs to choose from if no node ID can be chosen from the PreferredExecutionNodeIDs
-	ArchiveAddressList        []string      // the archive node address list to send script executions. when configured, script executions will be all sent to the archive node
-	ScriptExecValidation      bool
-	CircuitBreakerConfig      connection.CircuitBreakerConfig // the configuration for circuit breaker
-}
-
 type Params struct {
 	State                     protocol.State
 	CollectionRPC             accessproto.AccessAPIClient
@@ -102,6 +88,7 @@ type Params struct {
 	Transactions              storage.Transactions
 	ExecutionReceipts         storage.ExecutionReceipts
 	ExecutionResults          storage.ExecutionResults
+	LightTransactionResults   storage.LightTransactionResults
 	ChainID                   flow.ChainID
 	AccessMetrics             module.AccessMetrics
 	ConnFactory               connection.ConnectionFactory
@@ -111,15 +98,16 @@ type Params struct {
 	FixedExecutionNodeIDs     []string
 	Log                       zerolog.Logger
 	SnapshotHistoryLimit      int
-	ArchiveAddressList        []string
 	Communicator              Communicator
-	ScriptExecValidation      bool
 	TxResultCacheSize         uint
+	TxErrorMessagesCacheSize  uint
+	ScriptExecutor            execution.ScriptExecutor
+	ScriptExecutionMode       ScriptExecutionMode
 }
 
 // New creates backend instance
 func New(params Params) (*Backend, error) {
-	retry := newRetry()
+	retry := newRetry(params.Log)
 	if params.RetryEnabled {
 		retry.Activate()
 	}
@@ -129,20 +117,23 @@ func New(params Params) (*Backend, error) {
 		return nil, fmt.Errorf("failed to initialize script logging cache: %w", err)
 	}
 
-	archivePorts := make([]uint, len(params.ArchiveAddressList))
-	for idx, addr := range params.ArchiveAddressList {
-		port, err := findPortFromAddress(addr)
-		if err != nil {
-			return nil, fmt.Errorf("failed to find archive node port: %w", err)
-		}
-		archivePorts[idx] = port
-	}
-
 	var txResCache *lru.Cache[flow.Identifier, *access.TransactionResult]
 	if params.TxResultCacheSize > 0 {
 		txResCache, err = lru.New[flow.Identifier, *access.TransactionResult](int(params.TxResultCacheSize))
 		if err != nil {
 			return nil, fmt.Errorf("failed to init cache for transaction results: %w", err)
+		}
+	}
+
+	// NOTE: The transaction error message cache is currently only used by the access node and not by the observer node.
+	//       To avoid introducing unnecessary command line arguments in the observer, one case could be that the error
+	//       message cache is nil for the observer node.
+	var txErrorMessagesCache *lru.Cache[flow.Identifier, string]
+
+	if params.TxErrorMessagesCacheSize > 0 {
+		txErrorMessagesCache, err = lru.New[flow.Identifier, string](int(params.TxErrorMessagesCacheSize))
+		if err != nil {
+			return nil, fmt.Errorf("failed to init cache for transaction error messages: %w", err)
 		}
 	}
 
@@ -156,17 +147,16 @@ func New(params Params) (*Backend, error) {
 		state: params.State,
 		// create the sub-backends
 		backendScripts: backendScripts{
-			headers:              params.Headers,
-			executionReceipts:    params.ExecutionReceipts,
-			connFactory:          params.ConnFactory,
-			state:                params.State,
-			log:                  params.Log,
-			metrics:              params.AccessMetrics,
-			loggedScripts:        loggedScripts,
-			archiveAddressList:   params.ArchiveAddressList,
-			archivePorts:         archivePorts,
-			nodeCommunicator:     params.Communicator,
-			scriptExecValidation: params.ScriptExecValidation,
+			headers:           params.Headers,
+			executionReceipts: params.ExecutionReceipts,
+			connFactory:       params.ConnFactory,
+			state:             params.State,
+			log:               params.Log,
+			metrics:           params.AccessMetrics,
+			loggedScripts:     loggedScripts,
+			nodeCommunicator:  params.Communicator,
+			scriptExecutor:    params.ScriptExecutor,
+			scriptExecMode:    params.ScriptExecutionMode,
 		},
 		backendTransactions: backendTransactions{
 			staticCollectionRPC:  params.CollectionRPC,
@@ -175,6 +165,7 @@ func New(params Params) (*Backend, error) {
 			collections:          params.Collections,
 			blocks:               params.Blocks,
 			transactions:         params.Transactions,
+			results:              params.LightTransactionResults,
 			executionReceipts:    params.ExecutionReceipts,
 			transactionValidator: configureTransactionValidator(params.State, params.ChainID),
 			transactionMetrics:   params.AccessMetrics,
@@ -184,6 +175,7 @@ func New(params Params) (*Backend, error) {
 			log:                  params.Log,
 			nodeCommunicator:     params.Communicator,
 			txResultCache:        txResCache,
+			txErrorMessagesCache: txErrorMessagesCache,
 		},
 		backendEvents: backendEvents{
 			state:             params.State,
@@ -209,6 +201,8 @@ func New(params Params) (*Backend, error) {
 			connFactory:       params.ConnFactory,
 			log:               params.Log,
 			nodeCommunicator:  params.Communicator,
+			scriptExecutor:    params.ScriptExecutor,
+			scriptExecMode:    params.ScriptExecutionMode,
 		},
 		backendExecutionResults: backendExecutionResults{
 			executionResults: params.ExecutionResults,
@@ -385,7 +379,8 @@ func executionNodesForBlockID(
 	blockID flow.Identifier,
 	executionReceipts storage.ExecutionReceipts,
 	state protocol.State,
-	log zerolog.Logger) (flow.IdentityList, error) {
+	log zerolog.Logger,
+) (flow.IdentityList, error) {
 
 	var executorIDs flow.IdentifierList
 
@@ -460,7 +455,8 @@ func executionNodesForBlockID(
 func findAllExecutionNodes(
 	blockID flow.Identifier,
 	executionReceipts storage.ExecutionReceipts,
-	log zerolog.Logger) (flow.IdentifierList, error) {
+	log zerolog.Logger,
+) (flow.IdentifierList, error) {
 
 	// lookup the receipt's storage with the block ID
 	allReceipts, err := executionReceipts.ByBlockID(blockID)
@@ -549,23 +545,4 @@ func chooseExecutionNodes(state protocol.State, executorIDs flow.IdentifierList)
 
 	// If no preferred or fixed ENs have been specified, then return all executor IDs i.e. no preference at all
 	return allENs.Filter(filter.HasNodeID(executorIDs...)), nil
-}
-
-// Find ports from supplied Address
-func findPortFromAddress(address string) (uint, error) {
-	_, portStr, err := net.SplitHostPort(address)
-	if err != nil {
-		return 0, fmt.Errorf("fail to extract port from address %v: %w", address, err)
-	}
-
-	port, err := strconv.Atoi(portStr)
-	if err != nil {
-		return 0, fmt.Errorf("fail to convert port string %v to port from address %v", portStr, address)
-	}
-
-	if port < 0 {
-		return 0, fmt.Errorf("invalid port: %v in address %v", port, address)
-	}
-
-	return uint(port), nil
 }

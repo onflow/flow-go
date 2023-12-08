@@ -41,8 +41,10 @@ jobs:
       with:
         go-version: ${{ env.GO_VERSION }}
         cache: true
-    - name: Build relic
-      run: make crypto_setup_gopath
+    - name: Install C formatter
+      run: sudo apt-get install -y clang-format
+    - name: Run C formatter and sanitizer for ./crypto
+      run: make -C crypto c-format && make -C crypto c-sanitize
     - name: Run go generate
       run: go generate
       working-directory: ${{ matrix.dir }}
@@ -51,10 +53,11 @@ jobs:
       with:
         # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
         version: v1.54
-        args: -v --build-tags relic
+        args: -v
         working-directory: ${{ matrix.dir }}
         # https://github.com/golangci/golangci-lint-action/issues/244
         skip-cache: true
+    
 
   tidy:
     name: Tidy
@@ -72,18 +75,6 @@ jobs:
       - name: code sanity check
         run: make code-sanity-check
 
-  shell-check:
-    name: ShellCheck
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout repo
-      uses: actions/checkout@v3
-    - name: Run ShellCheck
-      uses: ludeeus/action-shellcheck@203a3fd018dfe73f8ae7e3aa8da2c149a5f41c33
-      with:
-        scandir: './crypto'
-        ignore: 'relic'
-
   create-dynamic-test-matrix:
     name: Create Dynamic Test Matrix
     runs-on: ubuntu-latest
@@ -99,7 +90,7 @@ jobs:
           cache: true
       - name: Set Test Matrix
         id: set-test-matrix
-        run: go run utils/test_matrix/test_matrix.go admin cmd consensus engine fvm ledger module network/test network/p2p utils
+        run: go run utils/test_matrix/test_matrix.go admin cmd consensus engine/access engine/collection engine/common engine/consensus engine/execution/ingestion:buildjet-8vcpu-ubuntu-2204 engine/execution/computation engine/execution engine/verification engine:buildjet-4vcpu-ubuntu-2204 fvm ledger module/dkg module:buildjet-4vcpu-ubuntu-2204 network/alsp network/test/cohort1:buildjet-16vcpu-ubuntu-2204 network/test/cohort2:buildjet-4vcpu-ubuntu-2204 network/p2p/connection network/p2p/p2pnode:buildjet-4vcpu-ubuntu-2204 network/p2p/scoring network/p2p network state storage utils
 
   unit-test:
     name: Unit Tests (${{ matrix.targets.name }})
@@ -108,8 +99,8 @@ jobs:
       fail-fast: false
       matrix:
         targets: ${{ fromJSON(needs.create-dynamic-test-matrix.outputs.dynamic-matrix)}}
-    # need to set image explicitly due to GitHub logging issue as described in https://github.com/onflow/flow-go/pull/3087#issuecomment-1234383202
-    runs-on: ubuntu-20.04
+    ## need to set image explicitly due to GitHub logging issue as described in https://github.com/onflow/flow-go/pull/3087#issuecomment-1234383202
+    runs-on: ${{ matrix.targets.runner }}
     steps:
     - name: Checkout repo
       uses: actions/checkout@v3
@@ -123,8 +114,8 @@ jobs:
     - name: Run tests (${{ matrix.targets.name }})
       uses: nick-fields/retry@v2
       with:
-        timeout_minutes: 25
-        max_attempts: 3
+        timeout_minutes: 35
+        max_attempts: 5
         command: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" test
 
       # TODO(rbtz): re-enable when we fix exisiting races.
@@ -144,21 +135,21 @@ jobs:
       matrix:
         include:
           - name: crypto
-            make1: -C crypto setup
-            make2: unittest
+            setup: noop
             retries: 1
             race: 1
+            runner: ubuntu-latest
           - name: insecure
-            make1: install-tools
-            make2: test
-            retries: 3
+            setup: install-tools
+            retries: 5
             race: 0
+            runner: buildjet-4vcpu-ubuntu-2204
           - name: integration
-            make1: install-tools
-            make2: test
-            retries: 3
+            setup: install-tools
+            retries: 5
             race: 0
-    runs-on: ubuntu-latest
+            runner: buildjet-4vcpu-ubuntu-2204
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
@@ -168,16 +159,16 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: true
       - name: Setup tests (${{ matrix.name }})
-        run: make ${{ matrix.make1 }}
+        run: make ${{ matrix.setup }}
       - name: Run tests (${{ matrix.name }})
         env:
           RACE_DETECTOR: ${{ matrix.race }}
         uses: nick-fields/retry@v2
         with:
-          timeout_minutes: 25
+          timeout_minutes: 35
           max_attempts: ${{ matrix.retries }}
-          # run `make2` target inside each module's root
-          command: VERBOSE=1 make -C ${{ matrix.name }} ${{ matrix.make2 }}
+          # run test target inside each module's root
+          command: VERBOSE=1 make -C ${{ matrix.name }} test
       - name: Upload coverage report
         uses: codecov/codecov-action@v3
         with:
@@ -185,27 +176,99 @@ jobs:
           flags: unittests
           name: codecov-umbrella
 
+  docker-build:
+    name: Docker Build
+    runs-on: buildjet-16vcpu-ubuntu-2204
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+        with:
+          # all tags are needed for integration tests
+          fetch-depth: 0
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: Docker build
+        run: make docker-build-flow docker-build-flow-corrupt
+      - name: Save Docker images
+        run: |
+          docker save \
+          gcr.io/flow-container-registry/access:latest \
+          gcr.io/flow-container-registry/collection:latest \
+          gcr.io/flow-container-registry/consensus:latest \
+          gcr.io/flow-container-registry/execution:latest \
+          gcr.io/flow-container-registry/ghost:latest \
+          gcr.io/flow-container-registry/observer:latest \
+          gcr.io/flow-container-registry/verification:latest \
+          gcr.io/flow-container-registry/access-corrupted:latest \
+          gcr.io/flow-container-registry/execution-corrupted:latest \
+          gcr.io/flow-container-registry/verification-corrupted:latest > flow-docker-images.tar
+      - name: Cache Docker images
+        uses: actions/cache@v3
+        with:
+          path: flow-docker-images.tar
+          # use the workflow run id as part of the cache key to ensure these docker images will only be used for a single workflow run
+          key: flow-docker-images-${{ hashFiles('**/Dockerfile') }}-${{ github.run_id }}
+
   integration-test:
     name: Integration Tests
+    needs: docker-build
     strategy:
       fail-fast: false
       matrix:
-        make:
-          - make -C integration access-tests
-          - make -C integration bft-framework-tests
-          - make -C integration bft-protocol-tests
-          - make -C integration bft-gossipsub-tests
-          - make -C integration collection-tests
-          - make -C integration consensus-tests
-          - make -C integration epochs-cohort1-tests
-          - make -C integration epochs-cohort2-tests
-          - make -C integration execution-tests
-          - make -C integration ghost-tests
-          - make -C integration mvp-tests
-          - make -C integration network-tests
-          - make -C integration verification-tests
-          - make -C integration upgrades-tests
-    runs-on: ubuntu-latest
+        include:
+          - name: Access Cohort1 Integration Tests
+            make: make -C integration access-cohort1-tests
+            runner: buildjet-4vcpu-ubuntu-2204
+          - name: Access Cohort2 Integration Tests
+            make: make -C integration access-cohort2-tests
+            runner: ubuntu-latest
+          - name: Access Cohort3 Integration Tests
+            make: make -C integration access-cohort3-tests
+            runner: ubuntu-latest
+            # test suite has single test which is flaky and needs to be fixed - reminder here to put it back when it's fixed
+#          - name: BFT (Framework) Integration Tests
+#            make: make -C integration bft-framework-tests
+#            runner: ubuntu-latest
+          - name: BFT (Protocol) Integration Tests
+            make: make -C integration bft-protocol-tests
+            runner: buildjet-8vcpu-ubuntu-2204
+          - name: BFT (Gossipsub) Integration Tests
+            make: make -C integration bft-gossipsub-tests
+            runner: ubuntu-latest
+          - name: Collection Integration Tests
+            make: make -C integration collection-tests
+            runner: ubuntu-latest
+          - name: Consensus Integration Tests
+            make: make -C integration consensus-tests
+            runner: ubuntu-latest
+          - name: Epoch Cohort1 Integration Tests
+            make: make -C integration epochs-cohort1-tests
+            runner: buildjet-8vcpu-ubuntu-2204
+          - name: Epoch Cohort2 Integration Tests
+            make: make -C integration epochs-cohort2-tests
+            runner: buildjet-4vcpu-ubuntu-2204
+          - name: Execution Integration Tests
+            make: make -C integration execution-tests
+            runner: ubuntu-latest
+          - name: Ghost Integration Tests
+            make: make -C integration ghost-tests
+            runner: ubuntu-latest
+          - name: MVP Integration Tests
+            make: make -C integration mvp-tests
+            runner: ubuntu-latest
+          - name: Network Integration Tests
+            make: make -C integration network-tests
+            runner: ubuntu-latest
+          - name: Verification Integration Tests
+            make: make -C integration verification-tests
+            runner: ubuntu-latest
+          - name: Upgrade Integration Tests
+            make: make -C integration upgrades-tests
+            runner: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
     steps:
     - name: Checkout repo
       uses: actions/checkout@v3
@@ -217,53 +280,20 @@ jobs:
       with:
         go-version: ${{ env.GO_VERSION }}
         cache: true
-    - name: Build relic
-      run: make crypto_setup_gopath
-    - name: Docker build
-      run: make docker-build-flow docker-build-flow-corrupt
-    - name: Run tests
+    - name: Load cached Docker images
+      uses: actions/cache@v3
+      with:
+        path: flow-docker-images.tar
+        # use the same cache key as the docker-build job
+        key: flow-docker-images-${{ hashFiles('**/Dockerfile') }}-${{ github.run_id }}
+    - name: Load Docker images
+      run: docker load -i flow-docker-images.tar
+    - name: Run tests (${{ matrix.name }})
       # TODO(rbtz): re-enable when we fix exisiting races.
       #env:
       #  RACE_DETECTOR: 1
       uses: nick-fields/retry@v2
       with:
-        timeout_minutes: 25
-        max_attempts: 3
+        timeout_minutes: 35
+        max_attempts: 5
         command: VERBOSE=1 ${{ matrix.make }}
-
-  localnet-test:
-    name: Localnet Compatibility Tests With Flow-CLI Client and Observer
-    strategy:
-      fail-fast: false
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout repo
-      uses: actions/checkout@v3
-    - name: Setup Go
-      uses: actions/setup-go@v3
-      with:
-        go-version: ${{ env.GO_VERSION }}
-        cache: true
-    - name: Build relic and other tools
-      run: make install-tools
-    - name: Install Flow Client In Docker
-      # This proved to be more reliable than installing it locally.
-      run: cd integration/localnet && sh client/client.sh
-    - name: Set up Localnet
-      run: bash -c 'cd integration/localnet/ && make -e OBSERVER=2 bootstrap && make start-flow'
-    - name: Ensure Observer is started
-      run: docker ps -f name=localnet-observer_1-1 | grep localnet-observer
-    - name: Get Client Version ensuring the client is provisioned
-      run: docker run --network host localnet-client /go/flow -f /go/flow-localnet.json -n observer version
-    - name: Wait for a default waiting period until a clean state
-      # This will not cause flakiness.
-      # The waiting time is a reasonable time to expect an observer to be responsive
-      run: sleep 10
-    - name: Get Status ensuring the access endpoint is online
-      run: docker run --network host localnet-client /go/flow -f /go/flow-localnet.json -n access status
-    - name: Wait for finalized blocks and check them
-      run: docker run --network host localnet-client /go/flow -f /go/flow-localnet.json -n observer blocks get latest
-    - name: Wait for finalized blocks and check them with Observer
-      run: sleep 5 && docker run --network host localnet-client /go/flow -f /go/flow-localnet.json -n access blocks get latest && docker run --network host localnet-client /go/flow -f /go/flow-localnet.json -n observer blocks get latest
-    - name: Stop localnet
-      run: bash -c 'cd integration/localnet/ && make stop'

@@ -118,7 +118,7 @@ type blockComputer struct {
 	maxConcurrency        int
 }
 
-func SystemChunkContext(vmCtx fvm.Context, logger zerolog.Logger) fvm.Context {
+func SystemChunkContext(vmCtx fvm.Context) fvm.Context {
 	return fvm.NewContextFromParent(
 		vmCtx,
 		fvm.WithContractDeploymentRestricted(false),
@@ -129,6 +129,8 @@ func SystemChunkContext(vmCtx fvm.Context, logger zerolog.Logger) fvm.Context {
 		fvm.WithServiceEventCollectionEnabled(),
 		fvm.WithEventCollectionSizeLimit(SystemChunkEventCollectionMaxSize),
 		fvm.WithMemoryAndInteractionLimitsDisabled(),
+		// only the system transaction is allowed to call the block entropy provider
+		fvm.WithRandomSourceHistoryCallAllowed(true),
 	)
 }
 
@@ -149,7 +151,7 @@ func NewBlockComputer(
 	if maxConcurrency < 1 {
 		return nil, fmt.Errorf("invalid maxConcurrency: %d", maxConcurrency)
 	}
-	systemChunkCtx := SystemChunkContext(vmCtx, logger)
+	systemChunkCtx := SystemChunkContext(vmCtx)
 	vmCtx = fvm.NewContextFromParent(
 		vmCtx,
 		fvm.WithMetricsReporter(metrics),
@@ -344,7 +346,9 @@ func (e *blockComputer) executeBlock(
 		parentBlockExecutionResultID,
 		block,
 		numTxns,
-		e.colResCons)
+		e.colResCons,
+		baseSnapshot,
+	)
 	defer collector.Stop()
 
 	requestQueue := make(chan TransactionRequest, numTxns)

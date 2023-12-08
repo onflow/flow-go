@@ -23,6 +23,11 @@ func (_m *ExecutionStateIndexerMetrics) BlockReindexed() {
 	_m.Called()
 }
 
+// InitializeLatestHeight provides a mock function with given fields: height
+func (_m *ExecutionStateIndexerMetrics) InitializeLatestHeight(height uint64) {
+	_m.Called(height)
+}
+
 type mockConstructorTestingTNewExecutionStateIndexerMetrics interface {
 	mock.TestingT
 	Cleanup(func())

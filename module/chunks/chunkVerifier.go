@@ -36,7 +36,7 @@ func NewChunkVerifier(vm fvm.VM, vmCtx fvm.Context, logger zerolog.Logger) *Chun
 	return &ChunkVerifier{
 		vm:             vm,
 		vmCtx:          vmCtx,
-		systemChunkCtx: computer.SystemChunkContext(vmCtx, vmCtx.Logger),
+		systemChunkCtx: computer.SystemChunkContext(vmCtx),
 		logger:         logger.With().Str("component", "chunk_verifier").Logger(),
 	}
 }

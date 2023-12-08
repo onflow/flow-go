@@ -30,5 +30,10 @@ func SubscribeEvents(
 		return nil, models.NewBadRequestError(err)
 	}
 
+	// Check if heartbeat interval was passed via request
+	if req.HeartbeatInterval > 0 {
+		wsController.heartbeatInterval = req.HeartbeatInterval
+	}
+
 	return wsController.api.SubscribeEvents(ctx, req.StartBlockID, req.StartHeight, filter), nil
 }

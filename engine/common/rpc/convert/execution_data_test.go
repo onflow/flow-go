@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/ledger/common/testutils"
@@ -19,15 +20,8 @@ import (
 
 func TestConvertBlockExecutionDataEventPayloads(t *testing.T) {
 	// generators will produce identical event payloads (before encoding)
-	ccfEventGenerator := generator.EventGenerator(generator.WithEncoding(generator.EncodingCCF))
-	jsonEventsGenerator := generator.EventGenerator(generator.WithEncoding(generator.EncodingJSON))
-
-	ccfEvents := make([]flow.Event, 0, 3)
-	jsonEvents := make([]flow.Event, 0, 3)
-	for i := 0; i < 3; i++ {
-		ccfEvents = append(ccfEvents, ccfEventGenerator.New())
-		jsonEvents = append(jsonEvents, jsonEventsGenerator.New())
-	}
+	ccfEvents := generator.GetEventsWithEncoding(3, entities.EventEncodingVersion_CCF_V0)
+	jsonEvents := generator.GetEventsWithEncoding(3, entities.EventEncodingVersion_JSON_CDC_V0)
 
 	// generate BlockExecutionData with CCF encoded events
 	executionData := unittest.BlockExecutionDataFixture(
@@ -53,7 +47,7 @@ func TestConvertBlockExecutionDataEventPayloads(t *testing.T) {
 	})
 
 	t.Run("converted event payloads are encoded in jsoncdc", func(t *testing.T) {
-		err = convert.BlockExecutionDataEventPayloadsToJson(execDataMessage)
+		err = convert.BlockExecutionDataEventPayloadsToVersion(execDataMessage, entities.EventEncodingVersion_JSON_CDC_V0)
 		require.NoError(t, err)
 
 		for _, chunk := range execDataMessage.GetChunkExecutionData() {
@@ -176,4 +170,35 @@ func TestConvertChunkExecutionData(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestMessageToRegisterIDs(t *testing.T) {
+	tests := []struct {
+		name  string
+		regID flow.RegisterID
+	}{
+		{
+			name:  "service level register id",
+			regID: flow.UUIDRegisterID(0),
+		},
+		{
+			name:  "account level register id",
+			regID: flow.AccountStatusRegisterID(unittest.AddressFixture()),
+		},
+		{
+			name:  "regular register id",
+			regID: unittest.RegisterIDFixture(),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			registerIDMessage := convert.RegisterIDToMessage(test.regID)
+			reConvertedRegisterID, err := convert.MessageToRegisterID(registerIDMessage)
+			require.NoError(t, err)
+			assert.Equal(t, test.regID, reConvertedRegisterID)
+		})
+	}
+	_, err := convert.MessageToRegisterID(nil)
+	require.ErrorIs(t, err, convert.ErrEmptyMessage)
 }

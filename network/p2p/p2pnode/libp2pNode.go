@@ -38,9 +38,6 @@ const (
 )
 
 const (
-	// MaxConnectAttempt is the maximum number of attempts to be made to connect to a remote node for 1-1 direct communication
-	MaxConnectAttempt = 3
-
 	// DefaultMaxPubSubMsgSize defines the maximum message size in publish and multicast modes
 	DefaultMaxPubSubMsgSize = 5 * mb // 5 mb
 
@@ -87,7 +84,8 @@ func NewNode(
 		disallowListedCache: internal.NewDisallowListCache(
 			disallowLstCacheCfg.MaxSize,
 			logger.With().Str("module", "disallow-list-cache").Logger(),
-			disallowLstCacheCfg.Metrics),
+			disallowLstCacheCfg.Metrics,
+		),
 	}
 }
 
@@ -269,15 +267,13 @@ func (n *Node) createStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stre
 		}
 	}
 
-	stream, dialAddrs, err := n.uniMgr.CreateStream(ctx, peerID, MaxConnectAttempt)
+	stream, err := n.uniMgr.CreateStream(ctx, peerID)
 	if err != nil {
-		return nil, flownet.NewPeerUnreachableError(fmt.Errorf("could not create stream (peer_id: %s, dialing address(s): %v): %w", peerID,
-			dialAddrs, err))
+		return nil, flownet.NewPeerUnreachableError(fmt.Errorf("could not create stream peer_id: %s: %w", peerID, err))
 	}
 
 	lg.Info().
 		Str("networking_protocol_id", string(stream.Protocol())).
-		Str("dial_address", fmt.Sprintf("%v", dialAddrs)).
 		Msg("stream successfully created to remote peer")
 	return stream, nil
 }
@@ -495,7 +491,8 @@ func (n *Node) WithPeersProvider(peersProvider p2p.PeersProvider) {
 				}
 
 				return allowListedPeerIds
-			})
+			},
+		)
 	}
 }
 

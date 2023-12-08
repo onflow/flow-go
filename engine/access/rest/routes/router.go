@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/middleware"
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/state_stream"
+	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )
@@ -62,11 +63,11 @@ func (b *RouterBuilder) AddRestRoutes(backend access.API, chain flow.Chain) *Rou
 func (b *RouterBuilder) AddWsRoutes(
 	stateStreamApi state_stream.API,
 	chain flow.Chain,
-	eventFilterConfig state_stream.EventFilterConfig,
-	maxGlobalStreams uint32) *RouterBuilder {
+	stateStreamConfig backend.Config,
+) *RouterBuilder {
 
 	for _, r := range WSRoutes {
-		h := NewWSHandler(b.logger, stateStreamApi, r.Handler, chain, eventFilterConfig, maxGlobalStreams)
+		h := NewWSHandler(b.logger, stateStreamApi, r.Handler, chain, stateStreamConfig)
 		b.v1SubRouter.
 			Methods(r.Method).
 			Path(r.Pattern).

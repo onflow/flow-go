@@ -2,6 +2,7 @@ package request
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -10,6 +11,7 @@ const startBlockIdQuery = "start_block_id"
 const eventTypesQuery = "event_types"
 const addressesQuery = "addresses"
 const contractsQuery = "contracts"
+const heartbeatIntervalQuery = "heartbeat_interval"
 
 type SubscribeEvents struct {
 	StartBlockID flow.Identifier
@@ -18,6 +20,8 @@ type SubscribeEvents struct {
 	EventTypes []string
 	Addresses  []string
 	Contracts  []string
+
+	HeartbeatInterval uint64
 }
 
 func (g *SubscribeEvents) Build(r *Request) error {
@@ -27,10 +31,18 @@ func (g *SubscribeEvents) Build(r *Request) error {
 		r.GetQueryParams(eventTypesQuery),
 		r.GetQueryParams(addressesQuery),
 		r.GetQueryParams(contractsQuery),
+		r.GetQueryParam(heartbeatIntervalQuery),
 	)
 }
 
-func (g *SubscribeEvents) Parse(rawStartBlockID string, rawStartHeight string, rawTypes []string, rawAddresses []string, rawContracts []string) error {
+func (g *SubscribeEvents) Parse(
+	rawStartBlockID string,
+	rawStartHeight string,
+	rawTypes []string,
+	rawAddresses []string,
+	rawContracts []string,
+	rawHeartbeatInterval string,
+) error {
 	var startBlockID ID
 	err := startBlockID.Parse(rawStartBlockID)
 	if err != nil {
@@ -64,6 +76,18 @@ func (g *SubscribeEvents) Parse(rawStartBlockID string, rawStartHeight string, r
 	g.EventTypes = eventTypes.Flow()
 	g.Addresses = rawAddresses
 	g.Contracts = rawContracts
+
+	// parse heartbeat interval
+	if rawHeartbeatInterval == "" {
+		// set zero if the interval wasn't passed in request, so we can check it later and apply any default value if needed
+		g.HeartbeatInterval = 0
+		return nil
+	}
+
+	g.HeartbeatInterval, err = strconv.ParseUint(rawHeartbeatInterval, 10, 64)
+	if err != nil {
+		return fmt.Errorf("invalid heartbeat interval format")
+	}
 
 	return nil
 }

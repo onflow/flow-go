@@ -52,7 +52,7 @@ func TestRegisterBootstrap_IndexCheckpointFile_Happy(t *testing.T) {
 
 		bootstrap, err := NewRegisterBootstrap(pb, checkpointFile, rootHeight, log)
 		require.NoError(t, err)
-		err = bootstrap.IndexCheckpointFile(context.Background())
+		err = bootstrap.IndexCheckpointFile(context.Background(), workerCount)
 		require.NoError(t, err)
 
 		// create registers instance and check values
@@ -86,7 +86,7 @@ func TestRegisterBootstrap_IndexCheckpointFile_Empty(t *testing.T) {
 
 		bootstrap, err := NewRegisterBootstrap(pb, checkpointFile, rootHeight, log)
 		require.NoError(t, err)
-		err = bootstrap.IndexCheckpointFile(context.Background())
+		err = bootstrap.IndexCheckpointFile(context.Background(), workerCount)
 		require.NoError(t, err)
 
 		// create registers instance and check values
@@ -124,7 +124,7 @@ func TestRegisterBootstrap_IndexCheckpointFile_FormatIssue(t *testing.T) {
 
 		bootstrap, err := NewRegisterBootstrap(pb, checkpointFile, rootHeight, log)
 		require.NoError(t, err)
-		err = bootstrap.IndexCheckpointFile(context.Background())
+		err = bootstrap.IndexCheckpointFile(context.Background(), workerCount)
 		require.ErrorContains(t, err, "unexpected ledger key format")
 		require.NoError(t, pb.Close())
 		require.NoError(t, os.RemoveAll(dbDir))
@@ -147,7 +147,7 @@ func TestRegisterBootstrap_IndexCheckpointFile_CorruptedCheckpointFile(t *testin
 		pb, dbDir := createPebbleForTest(t)
 		bootstrap, err := NewRegisterBootstrap(pb, checkpointFileName, rootHeight, log)
 		require.NoError(t, err)
-		err = bootstrap.IndexCheckpointFile(context.Background())
+		err = bootstrap.IndexCheckpointFile(context.Background(), workerCount)
 		require.ErrorIs(t, err, os.ErrNotExist)
 		require.NoError(t, os.RemoveAll(dbDir))
 	})
@@ -165,7 +165,7 @@ func TestRegisterBootstrap_IndexCheckpointFile_MultipleBatch(t *testing.T) {
 		pb, dbDir := createPebbleForTest(t)
 		bootstrap, err := NewRegisterBootstrap(pb, checkpointFile, rootHeight, log)
 		require.NoError(t, err)
-		err = bootstrap.IndexCheckpointFile(context.Background())
+		err = bootstrap.IndexCheckpointFile(context.Background(), workerCount)
 		require.NoError(t, err)
 
 		// create registers instance and check values
@@ -191,9 +191,11 @@ func simpleTrieWithValidRegisterIDs(t *testing.T) ([]*trie.MTrie, []*flow.Regist
 	return trieWithValidRegisterIDs(t, 2)
 }
 
+const workerCount = 10
+
 func largeTrieWithValidRegisterIDs(t *testing.T) ([]*trie.MTrie, []*flow.RegisterID) {
 	// large enough trie so every worker should have something to index
-	largeTrieSize := 2 * pebbleBootstrapRegisterBatchLen * pebbleBootstrapWorkerCount
+	largeTrieSize := 2 * pebbleBootstrapRegisterBatchLen * workerCount
 	return trieWithValidRegisterIDs(t, uint16(largeTrieSize))
 }
 

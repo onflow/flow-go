@@ -14,6 +14,8 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/request"
 	"github.com/onflow/flow-go/engine/access/state_stream"
+	"github.com/onflow/flow-go/engine/access/state_stream/backend"
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -38,6 +40,7 @@ type WebsocketController struct {
 	maxStreams        int32                          // the maximum number of streams allowed
 	activeStreamCount *atomic.Int32                  // the current number of active streams
 	readChannel       chan error                     // channel which notify closing connection by the client and provide errors to the client
+	heartbeatInterval uint64                         // the interval to deliver heartbeat messages to client[IN BLOCKS]
 }
 
 // SetWebsocketConf used to set read and write deadlines for WebSocket connections and establishes a Pong handler to
@@ -111,6 +114,7 @@ func (wsController *WebsocketController) writeEvents(sub state_stream.Subscripti
 	ticker := time.NewTicker(pingPeriod)
 	defer ticker.Stop()
 
+	blocksSinceLastMessage := uint64(0)
 	for {
 		select {
 		case err := <-wsController.readChannel:
@@ -122,7 +126,6 @@ func (wsController *WebsocketController) writeEvents(sub state_stream.Subscripti
 				wsController.wsErrorHandler(err)
 			}
 			return
-
 		case event, ok := <-sub.Channel():
 			if !ok {
 				if sub.Err() != nil {
@@ -139,6 +142,35 @@ func (wsController *WebsocketController) writeEvents(sub state_stream.Subscripti
 				wsController.wsErrorHandler(models.NewRestError(http.StatusInternalServerError, "failed to set the initial write deadline: ", err))
 				return
 			}
+
+			resp, ok := event.(*backend.EventsResponse)
+			if !ok {
+				err = fmt.Errorf("unexpected response type: %s", event)
+				wsController.wsErrorHandler(err)
+				return
+			}
+			// responses with empty events increase heartbeat interval counter, when threshold is met a heartbeat
+			// message will be emitted.
+			if len(resp.Events) == 0 {
+				blocksSinceLastMessage++
+				if blocksSinceLastMessage < wsController.heartbeatInterval {
+					continue
+				}
+				blocksSinceLastMessage = 0
+			}
+
+			// EventsResponse contains CCF encoded events, and this API returns JSON-CDC events.
+			// convert event payload formats.
+			for i, e := range resp.Events {
+				payload, err := convert.CcfPayloadToJsonPayload(e.Payload)
+				if err != nil {
+					err = fmt.Errorf("could not convert event payload from CCF to Json: %w", err)
+					wsController.wsErrorHandler(err)
+					return
+				}
+				resp.Events[i].Payload = payload
+			}
+
 			// Write the response to the WebSocket connection
 			err = wsController.conn.WriteJSON(event)
 			if err != nil {
@@ -205,10 +237,11 @@ type WSHandler struct {
 	*HttpHandler
 	subscribeFunc SubscribeHandlerFunc
 
-	api               state_stream.API
-	eventFilterConfig state_stream.EventFilterConfig
-	maxStreams        int32
-	activeStreamCount *atomic.Int32
+	api                      state_stream.API
+	eventFilterConfig        state_stream.EventFilterConfig
+	maxStreams               int32
+	defaultHeartbeatInterval uint64
+	activeStreamCount        *atomic.Int32
 }
 
 var _ http.Handler = (*WSHandler)(nil)
@@ -218,16 +251,16 @@ func NewWSHandler(
 	api state_stream.API,
 	subscribeFunc SubscribeHandlerFunc,
 	chain flow.Chain,
-	eventFilterConfig state_stream.EventFilterConfig,
-	maxGlobalStreams uint32,
+	stateStreamConfig backend.Config,
 ) *WSHandler {
 	handler := &WSHandler{
-		subscribeFunc:     subscribeFunc,
-		api:               api,
-		eventFilterConfig: eventFilterConfig,
-		maxStreams:        int32(maxGlobalStreams),
-		activeStreamCount: atomic.NewInt32(0),
-		HttpHandler:       NewHttpHandler(logger, chain),
+		subscribeFunc:            subscribeFunc,
+		api:                      api,
+		eventFilterConfig:        stateStreamConfig.EventFilterConfig,
+		maxStreams:               int32(stateStreamConfig.MaxGlobalStreams),
+		defaultHeartbeatInterval: stateStreamConfig.HeartbeatInterval,
+		activeStreamCount:        atomic.NewInt32(0),
+		HttpHandler:              NewHttpHandler(logger, chain),
 	}
 
 	return handler
@@ -246,7 +279,12 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Upgrade the HTTP connection to a WebSocket connection
-	upgrader := websocket.Upgrader{}
+	upgrader := websocket.Upgrader{
+		// allow all origins by default, operators can override using a proxy
+		CheckOrigin: func(r *http.Request) bool {
+			return true
+		},
+	}
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		h.errorHandler(w, models.NewRestError(http.StatusInternalServerError, "webSocket upgrade error: ", err), logger)
@@ -262,6 +300,7 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		maxStreams:        h.maxStreams,
 		activeStreamCount: h.activeStreamCount,
 		readChannel:       make(chan error),
+		heartbeatInterval: h.defaultHeartbeatInterval, // set default heartbeat interval from state stream config
 	}
 
 	err = wsController.SetWebsocketConf()

@@ -75,6 +75,13 @@ func NewExecutionStateIndexerCollector() module.ExecutionStateIndexerMetrics {
 	}
 }
 
+// InitializeLatestHeight records the latest height that has been indexed.
+// This should only be used during startup. After startup, use BlockIndexed to record newly
+// indexed heights.
+func (c *ExecutionStateIndexerCollector) InitializeLatestHeight(height uint64) {
+	c.highestIndexedHeight.Set(float64(height))
+}
+
 // BlockIndexed records metrics from indexing execution data from a single block.
 func (c *ExecutionStateIndexerCollector) BlockIndexed(height uint64, duration time.Duration, registers, events, transactionResults int) {
 	c.indexDuration.Observe(float64(duration.Milliseconds()))

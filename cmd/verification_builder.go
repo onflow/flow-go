@@ -245,13 +245,17 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				v.verConf.stopAtHeight)
 
 			// requester and fetcher engines are started by chunk consumer
-			chunkConsumer = chunkconsumer.NewChunkConsumer(
+			chunkConsumer, err = chunkconsumer.NewChunkConsumer(
 				node.Logger,
 				collector,
 				processedChunkIndex,
 				chunkQueue,
 				fetcherEngine,
 				v.verConf.chunkWorkers)
+
+			if err != nil {
+				return nil, fmt.Errorf("could not create chunk consumer: %w", err)
+			}
 
 			err = node.Metrics.Mempool.Register(metrics.ResourceChunkConsumer, chunkConsumer.Size)
 			if err != nil {
@@ -395,6 +399,11 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			return followerEng, nil
 		}).
 		Component("sync engine", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+			spamConfig, err := commonsync.NewSpamDetectionConfig()
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize spam detection config: %w", err)
+			}
+
 			sync, err := commonsync.New(
 				node.Logger,
 				node.Metrics.Engine,
@@ -405,7 +414,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				followerEng,
 				syncCore,
 				node.SyncEngineIdentifierProvider,
-				commonsync.NewSpamDetectionConfig(),
+				spamConfig,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
