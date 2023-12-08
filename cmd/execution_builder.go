@@ -1325,6 +1325,10 @@ func copyBootstrapState(dir, trie string) error {
 
 	// copy from the bootstrap folder to the execution state folder
 	from, to := path.Join(dir, bootstrapFilenames.DirnameExecutionState), trie
+
+	log.Info().Str("dir", dir).Str("trie", trie).
+		Msgf("copying checkpoint file %v from directory: %v, to: %v", filename, from, to)
+
 	copiedFiles, err := wal.CopyCheckpointFile(filename, from, to)
 	if err != nil {
 		return fmt.Errorf("can not copy checkpoint file %s, from %s to %s",
