@@ -70,6 +70,7 @@ var internalEVMTypeEncodeABIFunctionType = &sema.FunctionType{
 
 func newInternalEVMTypeEncodeABIFunction(
 	gauge common.MemoryGauge,
+	location common.AddressLocation,
 ) *interpreter.HostFunctionValue {
 	return interpreter.NewHostFunctionValue(
 		gauge,
@@ -93,6 +94,9 @@ func newInternalEVMTypeEncodeABIFunction(
 				case *interpreter.StringValue:
 					values = append(values, value.Str)
 					arguments = append(arguments, newGethArgument("string"))
+				case interpreter.BoolValue:
+					values = append(values, bool(value))
+					arguments = append(arguments, newGethArgument("bool"))
 				case interpreter.UInt8Value:
 					values = append(values, uint8(value))
 					arguments = append(arguments, newGethArgument("uint8"))
@@ -129,12 +133,9 @@ func newInternalEVMTypeEncodeABIFunction(
 				case interpreter.Int256Value:
 					values = append(values, value.BigInt)
 					arguments = append(arguments, newGethArgument("int256"))
-				case interpreter.BoolValue:
-					values = append(values, bool(value))
-					arguments = append(arguments, newGethArgument("bool"))
 				case *interpreter.CompositeValue:
 					typeID := common.TypeID(
-						fmt.Sprintf("A.%v.%v", evmContractLocation, evmAddressTypeStructName),
+						fmt.Sprintf("A.%v.%v", location, evmAddressTypeStructName),
 					)
 					if value.TypeID() == typeID {
 						bytes, err := interpreter.ByteArrayValueToByteSlice(
@@ -459,6 +460,7 @@ var internalEVMTypeDecodeABIFunctionType = &sema.FunctionType{
 
 func newInternalEVMTypeDecodeABIFunction(
 	gauge common.MemoryGauge,
+	location common.AddressLocation,
 ) *interpreter.HostFunctionValue {
 	return interpreter.NewHostFunctionValue(
 		gauge,
@@ -527,7 +529,7 @@ func newInternalEVMTypeDecodeABIFunction(
 					}
 				case interpreter.CompositeStaticType:
 					typeID := common.TypeID(
-						fmt.Sprintf("A.%v.%v", evmContractLocation, evmAddressTypeStructName),
+						fmt.Sprintf("A.%v.%v", location, evmAddressTypeStructName),
 					)
 					if value.TypeID == typeID {
 						arguments = append(arguments, newGethArgument("address"))
@@ -719,7 +721,7 @@ func newInternalEVMTypeDecodeABIFunction(
 					values = append(values, arr)
 				case interpreter.CompositeStaticType:
 					typeID := common.TypeID(
-						fmt.Sprintf("A.%v.%v", evmContractLocation, evmAddressTypeStructName),
+						fmt.Sprintf("A.%v.%v", location, evmAddressTypeStructName),
 					)
 					if value.TypeID == typeID {
 						addr := decoded[i].(gethCommon.Address)
@@ -728,7 +730,7 @@ func newInternalEVMTypeDecodeABIFunction(
 						compositeValue := interpreter.NewCompositeValue(
 							inter,
 							locationRange,
-							evmContractLocation,
+							location,
 							fmt.Sprintf("%s.%s", ContractName, evmAddressTypeStructName),
 							common.CompositeKindStructure,
 							[]interpreter.CompositeField{
@@ -1409,6 +1411,7 @@ func newInternalEVMTypeDeployFunction(
 func NewInternalEVMContractValue(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
+	location common.AddressLocation,
 ) *interpreter.SimpleCompositeValue {
 	return interpreter.NewSimpleCompositeValue(
 		gauge,
@@ -1423,8 +1426,8 @@ func NewInternalEVMContractValue(
 			internalEVMTypeWithdrawFunctionName:             newInternalEVMTypeWithdrawFunction(gauge, handler),
 			internalEVMTypeDeployFunctionName:               newInternalEVMTypeDeployFunction(gauge, handler),
 			internalEVMTypeBalanceFunctionName:              newInternalEVMTypeBalanceFunction(gauge, handler),
-			internalEVMTypeEncodeABIFunctionName:            newInternalEVMTypeEncodeABIFunction(gauge),
-			internalEVMTypeDecodeABIFunctionName:            newInternalEVMTypeDecodeABIFunction(gauge),
+			internalEVMTypeEncodeABIFunctionName:            newInternalEVMTypeEncodeABIFunction(gauge, location),
+			internalEVMTypeDecodeABIFunctionName:            newInternalEVMTypeDecodeABIFunction(gauge, location),
 		},
 		nil,
 		nil,
@@ -1467,12 +1470,6 @@ var InternalEVMContractType = func() *sema.CompositeType {
 		),
 		sema.NewUnmeteredPublicFunctionMember(
 			ty,
-			internalEVMTypeEncodeABIFunctionName,
-			internalEVMTypeEncodeABIFunctionType,
-			"",
-		),
-		sema.NewUnmeteredPublicFunctionMember(
-			ty,
 			internalEVMTypeWithdrawFunctionName,
 			internalEVMTypeWithdrawFunctionType,
 			"",
@@ -1487,6 +1484,12 @@ var InternalEVMContractType = func() *sema.CompositeType {
 			ty,
 			internalEVMTypeBalanceFunctionName,
 			internalEVMTypeBalanceFunctionType,
+			"",
+		),
+		sema.NewUnmeteredPublicFunctionMember(
+			ty,
+			internalEVMTypeEncodeABIFunctionName,
+			internalEVMTypeEncodeABIFunctionType,
 			"",
 		),
 		sema.NewUnmeteredPublicFunctionMember(
@@ -1507,11 +1510,12 @@ var internalEVMContractStaticType = interpreter.ConvertSemaCompositeTypeToStatic
 func newInternalEVMStandardLibraryValue(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
+	location common.AddressLocation,
 ) stdlib.StandardLibraryValue {
 	return stdlib.StandardLibraryValue{
 		Name:  InternalEVMContractName,
 		Type:  InternalEVMContractType,
-		Value: NewInternalEVMContractValue(gauge, handler),
+		Value: NewInternalEVMContractValue(gauge, handler, location),
 		Kind:  common.DeclarationKindContract,
 	}
 }
@@ -1522,17 +1526,15 @@ var internalEVMStandardLibraryType = stdlib.StandardLibraryType{
 	Kind: common.DeclarationKindContract,
 }
 
-var evmContractLocation common.AddressLocation
-
 func SetupEnvironment(env runtime.Environment, handler types.ContractHandler, service flow.Address) {
-	evmContractLocation = common.NewAddressLocation(nil, common.Address(service), ContractName)
+	location := common.NewAddressLocation(nil, common.Address(service), ContractName)
 	env.DeclareType(
 		internalEVMStandardLibraryType,
-		evmContractLocation,
+		location,
 	)
 	env.DeclareValue(
-		newInternalEVMStandardLibraryValue(nil, handler),
-		evmContractLocation,
+		newInternalEVMStandardLibraryValue(nil, handler, location),
+		location,
 	)
 }
 
