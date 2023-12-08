@@ -517,9 +517,9 @@ func StoreCheckpointV5(dir string, fileName string, logger zerolog.Logger, tries
 }
 
 func logProgress(msg string, estimatedSubtrieNodeCount int, logger zerolog.Logger) func(nodeCounter uint64) {
-	lg := util.LogProgress(msg, estimatedSubtrieNodeCount, logger)
+	lg := util.LogProgress(logger, msg, estimatedSubtrieNodeCount)
 	return func(index uint64) {
-		lg(int(index))
+		lg(1)
 	}
 }
 
