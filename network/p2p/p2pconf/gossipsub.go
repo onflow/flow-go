@@ -62,8 +62,36 @@ type GossipSubConfig struct {
 	// GossipSubTracerConfig is the configuration for the gossipsub tracer. GossipSub tracer is used to trace the local mesh events and peer scores.
 	GossipSubTracerConfig `mapstructure:",squash"`
 
+	// GossipSubScoringRegistryConfig is the configuration for the GossipSub score registry.
+	GossipSubScoringRegistryConfig `mapstructure:",squash"`
+
 	// PeerScoring is whether to enable GossipSub peer scoring.
 	PeerScoring bool `mapstructure:"gossipsub-peer-scoring-enabled"`
+
+	SubscriptionProviderConfig SubscriptionProviderParameters `mapstructure:",squash"`
+}
+
+type SubscriptionProviderParameters struct {
+	// SubscriptionUpdateInterval is the interval for updating the list of topics the node have subscribed to; as well as the list of all
+	// peers subscribed to each of those topics. This is used to penalize peers that have an invalid subscription based on their role.
+	SubscriptionUpdateInterval time.Duration `validate:"gt=0s" mapstructure:"gossipsub-subscription-provider-update-interval"`
+
+	// CacheSize is the size of the cache that keeps the list of peers subscribed to each topic as the local node.
+	// This is the local view of the current node towards the subscription status of other nodes in the system.
+	// The cache must be large enough to accommodate the maximum number of nodes in the system, otherwise the view of the local node will be incomplete
+	// due to cache eviction.
+	CacheSize uint32 `validate:"gt=0" mapstructure:"gossipsub-subscription-provider-cache-size"`
+}
+
+// GossipSubScoringRegistryConfig is the configuration for the GossipSub score registry.
+type GossipSubScoringRegistryConfig struct {
+	// PenaltyDecaySlowdownThreshold defines the penalty level which the decay rate is reduced by `DecayRateReductionFactor` every time the penalty of a node falls below the threshold, thereby slowing down the decay process.
+	// This mechanism ensures that malicious nodes experience longer decay periods, while honest nodes benefit from quicker decay.
+	PenaltyDecaySlowdownThreshold float64 `validate:"lt=0" mapstructure:"gossipsub-app-specific-penalty-decay-slowdown-threshold"`
+	// DecayRateReductionFactor defines the value by which the decay rate is decreased every time the penalty is below the PenaltyDecaySlowdownThreshold. A reduced decay rate extends the time it takes for penalties to diminish.
+	DecayRateReductionFactor float64 `validate:"gt=0,lt=1" mapstructure:"gossipsub-app-specific-penalty-decay-rate-reduction-factor"`
+	// PenaltyDecayEvaluationPeriod defines the interval at which the decay for a spam record is okay to be adjusted.
+	PenaltyDecayEvaluationPeriod time.Duration `validate:"gt=0" mapstructure:"gossipsub-app-specific-penalty-decay-evaluation-period"`
 }
 
 // GossipSubTracerConfig is the config for the gossipsub tracer. GossipSub tracer is used to trace the local mesh events and peer scores.

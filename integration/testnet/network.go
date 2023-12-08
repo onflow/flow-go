@@ -74,6 +74,8 @@ const (
 	DefaultFlowSecretsDBDir = "/data/secrets"
 	// DefaultExecutionRootDir is the default directory for the execution node state database.
 	DefaultExecutionRootDir = "/data/exedb"
+	// DefaultRegisterDir is the default directory for the register store database.
+	DefaultRegisterDir = "/data/register"
 	// DefaultExecutionDataServiceDir for the execution data service blobstore.
 	DefaultExecutionDataServiceDir = "/data/execution_data"
 	// DefaultExecutionStateDir for the execution data service blobstore.
@@ -868,6 +870,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			nodeContainer.AddFlag("triedir", DefaultExecutionRootDir)
 			nodeContainer.AddFlag("execution-data-dir", DefaultExecutionDataServiceDir)
 			nodeContainer.AddFlag("chunk-data-pack-dir", DefaultChunkDataPackDir)
+			nodeContainer.AddFlag("register-dir", DefaultRegisterDir)
 
 		case flow.RoleAccess:
 			nodeContainer.exposePort(GRPCPort, testingdock.RandomPort(t))

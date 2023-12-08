@@ -946,7 +946,7 @@ func TestLatestSealedResult(t *testing.T) {
 			expectedResult, expectedSeal, err := rootSnapshot.SealedResult()
 			require.NoError(t, err)
 
-			assert.Equal(t, expectedResult, gotResult)
+			assert.Equal(t, expectedResult.ID(), gotResult.ID())
 			assert.Equal(t, expectedSeal, gotSeal)
 		})
 	})
