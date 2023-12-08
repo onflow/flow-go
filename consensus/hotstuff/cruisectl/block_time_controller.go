@@ -392,7 +392,7 @@ func (ctl *BlockTimeController) measureViewDuration(tb TimedBlock) error {
 	// constructs the child (for first view of new epoch). The last view of the epoch ends, when the child proposal is published.
 	tau := ctl.targetViewTime()                                                    // τ: idealized target view time in units of seconds
 	viewDurationsRemaining := ctl.curEpochFinalView + 1 - view                     // k[v]: views remaining in current epoch
-	durationRemaining := unix2time(ctl.curEpochTargetEndTime).Sub(tb.TimeObserved) // Γ[v] = T[v] - t[v], with t[v] ≡ tb.TimeObserved the time when observing the block that trigged the view change
+	durationRemaining := unix2time(ctl.curEpochTargetEndTime).Sub(tb.TimeObserved) // Γ[v] = T[v] - t[v], with t[v] ≡ tb.TimeObserved the time when observing the block that triggered the view change
 
 	// Compute instantaneous error term: e[v] = k[v]·τ - T[v] i.e. the projected difference from target switchover
 	// and update PID controller's error terms. All UNITS in SECOND.

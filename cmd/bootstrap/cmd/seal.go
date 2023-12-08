@@ -84,7 +84,7 @@ func constructRootResultAndSeal(
 // rootEpochTargetEndTime computes the target end time for the given epoch, using the given config.
 // CAUTION: the variables `flagEpochTimingRefCounter`, `flagEpochTimingDuration`, and
 // `flagEpochTimingRefTimestamp` must contain proper values. You can either specify a value for
-// each config parameter or use the function `validateOrPopulateEpochTimingConfig()` to populate the varaibles
+// each config parameter or use the function `validateOrPopulateEpochTimingConfig()` to populate the variables
 // from defaults.
 func rootEpochTargetEndTime() uint64 {
 	if flagEpochTimingRefTimestamp == 0 || flagEpochTimingDuration == 0 {
