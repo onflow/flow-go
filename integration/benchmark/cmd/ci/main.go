@@ -20,6 +20,7 @@ import (
 
 	"github.com/onflow/flow-go/integration/benchmark"
 	pb "github.com/onflow/flow-go/integration/benchmark/proto"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -159,10 +160,8 @@ func main() {
 		loaderMetrics,
 		[]access.Client{flowClient},
 		benchmark.NetworkParams{
-			ServAccPrivKeyHex:     serviceAccountPrivateKeyHex,
-			ServiceAccountAddress: &serviceAccountAddress,
-			FungibleTokenAddress:  &fungibleTokenAddress,
-			FlowTokenAddress:      &flowTokenAddress,
+			ServAccPrivKeyHex: serviceAccountPrivateKeyHex,
+			ChainID:           flow.Emulator,
 		},
 		benchmark.LoadParams{
 			NumberOfAccounts: maxInflight,
