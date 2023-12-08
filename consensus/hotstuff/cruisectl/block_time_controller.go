@@ -126,7 +126,7 @@ func NewBlockTimeController(log zerolog.Logger, metrics module.CruiseCtlMetrics,
 		Build()
 
 	// initialize state
-	err = ctl.initEpochInfo(curView)
+	err = ctl.initEpochInfo()
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize epoch info: %w", err)
 	}
@@ -144,7 +144,7 @@ func NewBlockTimeController(log zerolog.Logger, metrics module.CruiseCtlMetrics,
 
 // initEpochInfo initializes the epochInfo state upon component startup.
 // No errors are expected during normal operation.
-func (ctl *BlockTimeController) initEpochInfo(curView uint64) error {
+func (ctl *BlockTimeController) initEpochInfo() error {
 	finalSnapshot := ctl.state.Final()
 	curEpoch := finalSnapshot.Epochs().Current()
 
