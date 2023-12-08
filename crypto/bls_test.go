@@ -1,6 +1,3 @@
-//go:build relic
-// +build relic
-
 package crypto
 
 import (
@@ -30,7 +27,11 @@ func TestBLSMainMethods(t *testing.T) {
 	// This test checks that:
 	//  - signature decoding handles input x-coordinates larger than p (doesn't result in an exception)
 	//  - signature decoding only accepts reduced x-coordinates to avoid signature malleability
+
 	t.Run("invalid x coordinate larger than p", func(t *testing.T) {
+		if !isG1Compressed() || !isG2Compressed() {
+			t.Skip()
+		}
 		msg, err := hex.DecodeString("7f26ba692dc2da7ff828ef4675ff1cd6ab855fca0637b6dab295f1df8e51bc8bb1b8f0c6610aabd486cf1f098f2ddbc6691d94e10f928816f890a3d366ce46249836a595c7ea1828af52e899ba2ab627ab667113bb563918c5d5a787c414399487b4e3a7")
 		require.NoError(t, err)
 		validSig, err := hex.DecodeString("80b0cac2a0f4f8881913edf2b29065675dfed6f6f4e17e9b5d860a845d4e7d476b277d06a493b81482e63d8131f9f2fa")
@@ -74,8 +75,7 @@ func TestBLSMainMethods(t *testing.T) {
 			// test a valid signature
 			result, err := pk.Verify(s, input, hasher)
 			assert.NoError(t, err)
-			assert.True(t, result,
-				"Verification should succeed:\n signature:%s\n message:%x\n private key:%s", s, input, sk)
+			assert.True(t, result)
 		}
 	})
 }
@@ -187,26 +187,35 @@ func TestBLSEncodeDecode(t *testing.T) {
 	// specific tests for BLS
 
 	//  zero private key
-	skBytes := make([]byte, PrKeyLenBLSBLS12381)
-	sk, err := DecodePrivateKey(BLSBLS12381, skBytes)
-	require.Error(t, err, "decoding identity private key should fail")
-	assert.True(t, IsInvalidInputsError(err))
-	assert.Nil(t, sk)
+	t.Run("zero private key", func(t *testing.T) {
+		skBytes := make([]byte, PrKeyLenBLSBLS12381)
+		sk, err := DecodePrivateKey(BLSBLS12381, skBytes)
+		require.Error(t, err, "decoding identity private key should fail")
+		assert.True(t, IsInvalidInputsError(err))
+		assert.Nil(t, sk)
+	})
 
 	//  identity public key
-	pkBytes := make([]byte, PubKeyLenBLSBLS12381)
-	pkBytes[0] = infinityPointHeader
-	pk, err := DecodePublicKey(BLSBLS12381, pkBytes)
-	require.NoError(t, err, "decoding identity public key should succeed")
-	assert.True(t, pk.Equals(IdentityBLSPublicKey()))
+	t.Run("infinity public key", func(t *testing.T) {
+		//  decode an identity public key
+		pkBytes := make([]byte, PubKeyLenBLSBLS12381)
+		pkBytes[0] = g2SerHeader
+		pk, err := DecodePublicKey(BLSBLS12381, pkBytes)
+		require.NoError(t, err, "decoding identity public key should succeed")
+		assert.True(t, pk.Equals(IdentityBLSPublicKey()))
+		// encode an identity public key
+		assert.Equal(t, pk.Encode(), pkBytes)
+	})
 
 	// invalid point
-	pkBytes = make([]byte, PubKeyLenBLSBLS12381)
-	pkBytes[0] = invalidBLSSignatureHeader
-	pk, err = DecodePublicKey(BLSBLS12381, pkBytes)
-	require.Error(t, err, "the key decoding should fail - key value is invalid")
-	assert.True(t, IsInvalidInputsError(err))
-	assert.Nil(t, pk)
+	t.Run("invalid public key", func(t *testing.T) {
+		pkBytes := make([]byte, PubKeyLenBLSBLS12381)
+		pkBytes[0] = invalidBLSSignatureHeader
+		pk, err := DecodePublicKey(BLSBLS12381, pkBytes)
+		require.Error(t, err, "the key decoding should fail - key value is invalid")
+		assert.True(t, IsInvalidInputsError(err))
+		assert.Nil(t, pk)
+	})
 
 	// Test a public key serialization with a point encoded with a coordinate x with
 	// x[0] or x[1] not reduced mod p.
@@ -217,21 +226,26 @@ func TestBLSEncodeDecode(t *testing.T) {
 	// Although uniqueness of public key respresentation isn't a security property, some implementations
 	// may implicitely rely on the property.
 
-	// valid pk with x[0] < p and x[1] < p
-	validPk, err := hex.DecodeString("818d72183e3e908af5bd6c2e37494c749b88f0396d3fbc2ba4d9ea28f1c50d1c6a540ec8fe06b6d860f72ec9363db3b8038360809700d36d761cb266af6babe9a069dc7364d3502e84536bd893d5f09ec2dd4f07cae1f8a178ffacc450f9b9a2")
-	require.NoError(t, err)
-	_, err = DecodePublicKey(BLSBLS12381, validPk)
-	assert.NoError(t, err)
-	// invalidpk1 with x[0]+p and same x[1]
-	invalidPk1, err := hex.DecodeString("9B8E840277BE772540D913E47A94F94C00003BBE60C4CEEB0C0ABCC9E876034089000EC7AF5AB6D81AF62EC9363D5E63038360809700d36d761cb266af6babe9a069dc7364d3502e84536bd893d5f09ec2dd4f07cae1f8a178ffacc450f9b9a2")
-	require.NoError(t, err)
-	_, err = DecodePublicKey(BLSBLS12381, invalidPk1)
-	assert.Error(t, err)
-	// invalidpk1 with same x[0] and x[1]+p
-	invalidPk2, err := hex.DecodeString("818d72183e3e908af5bd6c2e37494c749b88f0396d3fbc2ba4d9ea28f1c50d1c6a540ec8fe06b6d860f72ec9363db3b81D84726AD080BA07C1385A1CF2B758C104E127F8585862EDEB843E798A86E6C2E1894F067C35F8A132FEACC450F9644D")
-	require.NoError(t, err)
-	_, err = DecodePublicKey(BLSBLS12381, invalidPk2)
-	assert.Error(t, err)
+	t.Run("public key with non-reduced coordinates", func(t *testing.T) {
+		if !isG2Compressed() {
+			t.Skip()
+		}
+		// valid pk with x[0] < p and x[1] < p
+		validPk, err := hex.DecodeString("818d72183e3e908af5bd6c2e37494c749b88f0396d3fbc2ba4d9ea28f1c50d1c6a540ec8fe06b6d860f72ec9363db3b8038360809700d36d761cb266af6babe9a069dc7364d3502e84536bd893d5f09ec2dd4f07cae1f8a178ffacc450f9b9a2")
+		require.NoError(t, err)
+		_, err = DecodePublicKey(BLSBLS12381, validPk)
+		assert.NoError(t, err)
+		// invalidpk1 with x[0]+p and same x[1]
+		invalidPk1, err := hex.DecodeString("9B8E840277BE772540D913E47A94F94C00003BBE60C4CEEB0C0ABCC9E876034089000EC7AF5AB6D81AF62EC9363D5E63038360809700d36d761cb266af6babe9a069dc7364d3502e84536bd893d5f09ec2dd4f07cae1f8a178ffacc450f9b9a2")
+		require.NoError(t, err)
+		_, err = DecodePublicKey(BLSBLS12381, invalidPk1)
+		assert.Error(t, err)
+		// invalidpk1 with same x[0] and x[1]+p
+		invalidPk2, err := hex.DecodeString("818d72183e3e908af5bd6c2e37494c749b88f0396d3fbc2ba4d9ea28f1c50d1c6a540ec8fe06b6d860f72ec9363db3b81D84726AD080BA07C1385A1CF2B758C104E127F8585862EDEB843E798A86E6C2E1894F067C35F8A132FEACC450F9644D")
+		require.NoError(t, err)
+		_, err = DecodePublicKey(BLSBLS12381, invalidPk2)
+		assert.Error(t, err)
+	})
 }
 
 // TestBLSEquals tests equal for BLS keys
@@ -273,7 +287,7 @@ func TestBLSPOP(t *testing.T) {
 			// test a valid PoP
 			result, err := BLSVerifyPOP(pk, s)
 			require.NoError(t, err)
-			assert.True(t, result, "Verification should succeed:\n signature:%s\n private key:%s", s, sk)
+			assert.True(t, result)
 
 			// test with a valid but different key
 			seed[0] ^= 1
@@ -281,7 +295,7 @@ func TestBLSPOP(t *testing.T) {
 			require.NoError(t, err)
 			result, err = BLSVerifyPOP(wrongSk.PublicKey(), s)
 			require.NoError(t, err)
-			assert.False(t, result, "Verification should fail:\n signature:%s\n private key:%s", s, sk)
+			assert.False(t, result)
 		}
 	})
 
@@ -300,7 +314,7 @@ func TestBLSPOP(t *testing.T) {
 }
 
 // BLS multi-signature
-// signature aggregation sanity check
+// signature aggregation with the same message sanity check
 //
 // Aggregate n signatures of the same message under different keys, and compare
 // it against the signature of the message under an aggregated private key.
@@ -315,7 +329,7 @@ func TestBLSAggregateSignatures(t *testing.T) {
 	// hasher
 	kmac := NewExpandMsgXOFKMAC128("test tag")
 	// number of signatures to aggregate
-	sigsNum := mrand.Intn(100) + 1
+	sigsNum := rand.Intn(100) + 1
 	sigs := make([]Signature, 0, sigsNum)
 	sks := make([]PrivateKey, 0, sigsNum)
 	pks := make([]PublicKey, 0, sigsNum)
@@ -342,40 +356,34 @@ func TestBLSAggregateSignatures(t *testing.T) {
 		aggSig, err := AggregateBLSSignatures(sigs)
 		require.NoError(t, err)
 		// First check: check the signatures are equal
-		assert.Equal(t, aggSig, expectedSig,
-			"incorrect signature %s, should be %s, private keys are %s, input is %x",
-			aggSig, expectedSig, sks, input)
+		assert.Equal(t, aggSig, expectedSig)
 		// Second check: Verify the aggregated signature
 		valid, err := VerifyBLSSignatureOneMessage(pks, aggSig, input, kmac)
 		require.NoError(t, err)
-		assert.True(t, valid,
-			"Verification of %s failed, signature should be %s private keys are %s, input is %x",
-			aggSig, expectedSig, sks, input)
+		assert.True(t, valid)
 	})
 
 	// check if one signature is not correct
 	t.Run("one invalid signature", func(t *testing.T) {
 		input[0] ^= 1
-		randomIndex := mrand.Intn(sigsNum)
-		sigs[randomIndex], err = sks[randomIndex].Sign(input, kmac)
+		randomIndex := rand.Intn(sigsNum)
+		sigs[randomIndex], err = sks[randomIndex].Sign(input, kmac) // sign a different message
 		input[0] ^= 1
 		aggSig, err = AggregateBLSSignatures(sigs)
 		require.NoError(t, err)
-		assert.NotEqual(t, aggSig, expectedSig,
-			"signature %s shouldn't be %s private keys are %s, input is %x",
-			aggSig, expectedSig, sks, input)
+		// First check: check the signatures are not equal
+		assert.NotEqual(t, aggSig, expectedSig)
+		// Second check: multi-verification should fail
 		valid, err := VerifyBLSSignatureOneMessage(pks, aggSig, input, kmac)
 		require.NoError(t, err)
-		assert.False(t, valid,
-			"verification of signature %s should fail, it shouldn't be %s private keys are %s, input is %x",
-			aggSig, expectedSig, sks, input)
-		sigs[randomIndex], err = sks[randomIndex].Sign(input, kmac)
+		assert.False(t, valid)
+		sigs[randomIndex], err = sks[randomIndex].Sign(input, kmac) // rebuild the correct signature
 		require.NoError(t, err)
 	})
 
 	// check if one the public keys is not correct
 	t.Run("one invalid public key", func(t *testing.T) {
-		randomIndex := mrand.Intn(sigsNum)
+		randomIndex := rand.Intn(sigsNum)
 		newSk := randomSK(t, rand)
 		sks[randomIndex] = newSk
 		pks[randomIndex] = newSk.PublicKey()
@@ -383,14 +391,10 @@ func TestBLSAggregateSignatures(t *testing.T) {
 		require.NoError(t, err)
 		expectedSig, err = aggSk.Sign(input, kmac)
 		require.NoError(t, err)
-		assert.NotEqual(t, aggSig, expectedSig,
-			"signature %s shouldn't be %s, private keys are %s, input is %x, wrong key is of index %d",
-			aggSig, expectedSig, sks, input, randomIndex)
+		assert.NotEqual(t, aggSig, expectedSig)
 		valid, err := VerifyBLSSignatureOneMessage(pks, aggSig, input, kmac)
 		require.NoError(t, err)
-		assert.False(t, valid,
-			"signature %s should fail, shouldn't be %s, private keys are %s, input is %x, wrong key is of index %d",
-			aggSig, expectedSig, sks, input, randomIndex)
+		assert.False(t, valid)
 	})
 
 	t.Run("invalid inputs", func(t *testing.T) {
@@ -407,7 +411,7 @@ func TestBLSAggregateSignatures(t *testing.T) {
 		assert.False(t, result)
 
 		// test with a signature of a wrong length
-		shortSig := sigs[0][:signatureLengthBLSBLS12381-1]
+		shortSig := sigs[0][:SignatureLenBLSBLS12381-1]
 		aggSig, err = AggregateBLSSignatures([]Signature{shortSig})
 		assert.Error(t, err)
 		assert.True(t, IsInvalidSignatureError(err))
@@ -441,10 +445,10 @@ func TestBLSAggregateSignatures(t *testing.T) {
 // Aggregate n public keys and their respective private keys and compare
 // the public key of the aggregated private key is equal to the aggregated
 // public key
-func TestBLSAggregatePubKeys(t *testing.T) {
+func TestBLSAggregatePublicKeys(t *testing.T) {
 	rand := getPRG(t)
 	// number of keys to aggregate
-	pkNum := mrand.Intn(100) + 1
+	pkNum := rand.Intn(100) + 1
 	pks := make([]PublicKey, 0, pkNum)
 	sks := make([]PrivateKey, 0, pkNum)
 
@@ -490,9 +494,7 @@ func TestBLSAggregatePubKeys(t *testing.T) {
 		keys := []PublicKey{pks[0], IdentityBLSPublicKey()}
 		aggPkWithIdentity, err := AggregateBLSPublicKeys(keys)
 		assert.NoError(t, err)
-		assert.True(t, aggPkWithIdentity.Equals(pks[0]),
-			"incorrect public key %s, should be %s",
-			aggPkWithIdentity, pks[0])
+		assert.True(t, aggPkWithIdentity.Equals(pks[0]))
 	})
 
 	t.Run("invalid inputs", func(t *testing.T) {
@@ -512,8 +514,8 @@ func TestBLSAggregatePubKeys(t *testing.T) {
 
 	// check that the public key corresponding to the zero private key is indeed identity
 	// The package doesn't allow to generate a zero private key. One way to obtain a zero
-	// private key is via aggrgeting opposite private keys
-	t.Run("public key of zero private key", func(t *testing.T) {
+	// private key is via aggregating opposite private keys
+	t.Run("Identity public key from identity private key", func(t *testing.T) {
 		// sk1 is group order of bls12-381 minus one
 		groupOrderMinus1 := []byte{0x73, 0xED, 0xA7, 0x53, 0x29, 0x9D, 0x7D, 0x48, 0x33, 0x39,
 			0xD8, 0x08, 0x09, 0xA1, 0xD8, 0x05, 0x53, 0xBD, 0xA4, 0x02, 0xFF, 0xFE,
@@ -525,9 +527,42 @@ func TestBLSAggregatePubKeys(t *testing.T) {
 		one[PrKeyLenBLSBLS12381-1] = 1
 		sk2, err := DecodePrivateKey(BLSBLS12381, one)
 		require.NoError(t, err)
+		// public key of aggregated private keys
 		aggSK, err := AggregateBLSPrivateKeys([]PrivateKey{sk1, sk2})
 		require.NoError(t, err)
 		assert.True(t, aggSK.PublicKey().Equals(IdentityBLSPublicKey()))
+		// aggregated public keys
+		aggPK, err := AggregateBLSPublicKeys([]PublicKey{sk1.PublicKey(), sk2.PublicKey()})
+		require.NoError(t, err)
+		assert.True(t, aggPK.Equals(IdentityBLSPublicKey()))
+		// check of internal identity flag
+		blsKey, ok := aggPK.(*pubKeyBLSBLS12381)
+		require.True(t, ok)
+		assert.True(t, blsKey.isIdentity)
+		// check of encoding header
+		pkBytes := aggPK.Encode()
+		assert.Equal(t, g2SerHeader, pkBytes[0])
+	})
+
+	t.Run("Identity public key from opposite points", func(t *testing.T) {
+		if !isG2Compressed() {
+			t.Skip()
+		}
+		pkBytes := pks[0].Encode()
+		negateCompressedPoint(pkBytes)
+		minusPk, err := DecodePublicKey(BLSBLS12381, pkBytes)
+		require.NoError(t, err)
+		// aggregated public keys
+		aggPK, err := AggregateBLSPublicKeys([]PublicKey{pks[0], minusPk})
+		require.NoError(t, err)
+		assert.True(t, aggPK.Equals(IdentityBLSPublicKey()))
+		// check of internal identity flag
+		blsKey, ok := aggPK.(*pubKeyBLSBLS12381)
+		require.True(t, ok)
+		assert.True(t, blsKey.isIdentity)
+		// check of encoding header
+		pkBytes = aggPK.Encode()
+		assert.Equal(t, g2SerHeader, pkBytes[0])
 	})
 }
 
@@ -536,7 +571,7 @@ func TestBLSAggregatePubKeys(t *testing.T) {
 func TestBLSRemovePubKeys(t *testing.T) {
 	rand := getPRG(t)
 	// number of keys to aggregate
-	pkNum := mrand.Intn(100) + 1
+	pkNum := rand.Intn(100) + 1
 	pks := make([]PublicKey, 0, pkNum)
 
 	// generate public keys
@@ -549,7 +584,7 @@ func TestBLSRemovePubKeys(t *testing.T) {
 	require.NoError(t, err)
 
 	// random number of keys to remove (at least one key is left)
-	pkToRemoveNum := mrand.Intn(pkNum)
+	pkToRemoveNum := rand.Intn(pkNum)
 	expectedPatrialPk, err := AggregateBLSPublicKeys(pks[pkToRemoveNum:])
 	require.NoError(t, err)
 
@@ -561,9 +596,7 @@ func TestBLSRemovePubKeys(t *testing.T) {
 		BLSkey, ok := expectedPatrialPk.(*pubKeyBLSBLS12381)
 		require.True(t, ok)
 
-		assert.True(t, BLSkey.Equals(partialPk),
-			"incorrect key %s, should be %s, keys are %s, index is %d",
-			partialPk, BLSkey, pks, pkToRemoveNum)
+		assert.True(t, BLSkey.Equals(partialPk))
 	})
 
 	// remove an extra key and check inequality
@@ -574,9 +607,7 @@ func TestBLSRemovePubKeys(t *testing.T) {
 
 		BLSkey, ok := expectedPatrialPk.(*pubKeyBLSBLS12381)
 		require.True(t, ok)
-		assert.False(t, BLSkey.Equals(partialPk),
-			"incorrect key %s, should not be %s, keys are %s, index is %d, extra key is %s",
-			partialPk, BLSkey, pks, pkToRemoveNum, extraPk)
+		assert.False(t, BLSkey.Equals(partialPk))
 	})
 
 	// specific test to remove all keys
@@ -591,9 +622,7 @@ func TestBLSRemovePubKeys(t *testing.T) {
 		BLSRandomPk, ok := randomPk.(*pubKeyBLSBLS12381)
 		require.True(t, ok)
 
-		assert.True(t, BLSRandomPk.Equals(randomPkPlusIdentityPk),
-			"incorrect key %s, should be infinity point, keys are %s",
-			identityPk, pks)
+		assert.True(t, BLSRandomPk.Equals(randomPkPlusIdentityPk))
 	})
 
 	// specific test with an empty slice of keys to remove
@@ -604,9 +633,7 @@ func TestBLSRemovePubKeys(t *testing.T) {
 		aggBLSkey, ok := aggPk.(*pubKeyBLSBLS12381)
 		require.True(t, ok)
 
-		assert.True(t, aggBLSkey.Equals(partialPk),
-			"incorrect key %s, should be %s",
-			partialPk, aggBLSkey)
+		assert.True(t, aggBLSkey.Equals(partialPk))
 	})
 
 	t.Run("invalid inputs", func(t *testing.T) {
@@ -640,7 +667,6 @@ func TestBLSBatchVerify(t *testing.T) {
 	// number of signatures to aggregate
 	sigsNum := rand.Intn(100) + 2
 	sigs := make([]Signature, 0, sigsNum)
-	sks := make([]PrivateKey, 0, sigsNum)
 	pks := make([]PublicKey, 0, sigsNum)
 	expectedValid := make([]bool, 0, sigsNum)
 
@@ -650,7 +676,6 @@ func TestBLSBatchVerify(t *testing.T) {
 		s, err := sk.Sign(input, kmac)
 		require.NoError(t, err)
 		sigs = append(sigs, s)
-		sks = append(sks, sk)
 		pks = append(pks, sk.PublicKey())
 		expectedValid = append(expectedValid, true)
 	}
@@ -659,9 +684,26 @@ func TestBLSBatchVerify(t *testing.T) {
 	t.Run("all signatures are valid", func(t *testing.T) {
 		valid, err := BatchVerifyBLSSignaturesOneMessage(pks, sigs, input, kmac)
 		require.NoError(t, err)
-		assert.Equal(t, valid, expectedValid,
-			"Verification of %s failed, private keys are %s, input is %x, results is %v",
-			sigs, sks, input, valid)
+		assert.Equal(t, valid, expectedValid)
+	})
+
+	// valid signatures but indices aren't correct: sig[i] is correct under pks[j]
+	// and sig[j] is correct under pks[j].
+	// implementations simply aggregating all signatures and keys would fail this test.
+	t.Run("valid signatures with incorrect indices", func(t *testing.T) {
+		i := rand.Intn(sigsNum-1) + 1
+		j := rand.Intn(i)
+		// swap correct keys
+		pks[i], pks[j] = pks[j], pks[i]
+
+		valid, err := BatchVerifyBLSSignaturesOneMessage(pks, sigs, input, kmac)
+		require.NoError(t, err)
+		expectedValid[i], expectedValid[j] = false, false
+		assert.Equal(t, valid, expectedValid)
+
+		// restore keys
+		pks[i], pks[j] = pks[j], pks[i]
+		expectedValid[i], expectedValid[j] = true, true
 	})
 
 	// valid signatures but indices aren't correct: sig[i] is correct under pks[j]
@@ -676,9 +718,7 @@ func TestBLSBatchVerify(t *testing.T) {
 		valid, err := BatchVerifyBLSSignaturesOneMessage(pks, sigs, input, kmac)
 		require.NoError(t, err)
 		expectedValid[i], expectedValid[j] = false, false
-		assert.Equal(t, valid, expectedValid,
-			"Verification of %s failed, private keys are %s, input is %x, results is %v",
-			sigs, sks, input, valid)
+		assert.Equal(t, valid, expectedValid)
 
 		// restore keys
 		pks[i], pks[j] = pks[j], pks[i]
@@ -689,9 +729,7 @@ func TestBLSBatchVerify(t *testing.T) {
 	t.Run("one valid signature", func(t *testing.T) {
 		valid, err := BatchVerifyBLSSignaturesOneMessage(pks[:1], sigs[:1], input, kmac)
 		require.NoError(t, err)
-		assert.Equal(t, valid, expectedValid[:1],
-			"Verification of %s failed, private keys are %s, input is %x, results is %v",
-			sigs, sks, input, valid)
+		assert.Equal(t, expectedValid[:1], valid)
 	})
 
 	// pick a random number of invalid signatures
@@ -715,9 +753,7 @@ func TestBLSBatchVerify(t *testing.T) {
 
 		valid, err := BatchVerifyBLSSignaturesOneMessage(pks, sigs, input, kmac)
 		require.NoError(t, err)
-		assert.Equal(t, expectedValid, valid,
-			"Verification of %s failed\n private keys are %s\n input is %x\n results is %v",
-			sigs, sks, input, valid)
+		assert.Equal(t, expectedValid, valid)
 	})
 
 	// all signatures are invalid
@@ -732,9 +768,7 @@ func TestBLSBatchVerify(t *testing.T) {
 
 		valid, err := BatchVerifyBLSSignaturesOneMessage(pks, sigs, input, kmac)
 		require.NoError(t, err)
-		assert.Equal(t, valid, expectedValid,
-			"Verification of %s failed, private keys are %s, input is %x, results is %v",
-			sigs, sks, input, valid)
+		assert.Equal(t, valid, expectedValid)
 	})
 
 	// test the empty list case
@@ -742,8 +776,7 @@ func TestBLSBatchVerify(t *testing.T) {
 		valid, err := BatchVerifyBLSSignaturesOneMessage(pks[:0], sigs[:0], input, kmac)
 		require.Error(t, err)
 		assert.True(t, IsBLSAggregateEmptyListError(err))
-		assert.Equal(t, valid, expectedValid[:0],
-			"verification should fail with empty list key, got %v", valid)
+		assert.Equal(t, valid, expectedValid[:0])
 	})
 
 	// test incorrect inputs
@@ -754,8 +787,7 @@ func TestBLSBatchVerify(t *testing.T) {
 		valid, err := BatchVerifyBLSSignaturesOneMessage(pks[:len(pks)-1], sigs, input, kmac)
 		require.Error(t, err)
 		assert.True(t, IsInvalidInputsError(err))
-		assert.Equal(t, valid, expectedValid,
-			"verification should fail with incorrect input lenghts, got %v", valid)
+		assert.Equal(t, valid, expectedValid)
 	})
 
 	// test wrong hasher
@@ -767,8 +799,7 @@ func TestBLSBatchVerify(t *testing.T) {
 		require.Error(t, err)
 		assert.True(t, IsNilHasherError(err))
 
-		assert.Equal(t, valid, expectedValid,
-			"verification should fail with nil hasher, got %v", valid)
+		assert.Equal(t, valid, expectedValid)
 	})
 
 	// test wrong key
@@ -781,9 +812,15 @@ func TestBLSBatchVerify(t *testing.T) {
 		require.Error(t, err)
 		assert.True(t, IsNotBLSKeyError(err))
 
-		assert.Equal(t, valid, expectedValid,
-			"verification should fail with invalid key, got %v", valid)
+		assert.Equal(t, valid, expectedValid)
 	})
+}
+
+// Utility function that flips a point sign bit to negate the point
+// this is shortcut which works only for zcash BLS12-381 compressed serialization.
+// Applicable to both signatures and public keys.
+func negateCompressedPoint(pointbytes []byte) {
+	pointbytes[0] ^= 0x20
 }
 
 // alter or fix a signature
@@ -855,16 +892,15 @@ func BenchmarkBatchVerify(b *testing.B) {
 //
 // Aggregate n signatures of distinct messages under different keys,
 // and verify the aggregated signature using the multi-signature verification with
-// many message.
+// many messages.
 func TestBLSAggregateSignaturesManyMessages(t *testing.T) {
 	rand := getPRG(t)
-
 	// number of signatures to aggregate
-	sigsNum := mrand.Intn(20) + 1
+	sigsNum := rand.Intn(40) + 1
 	sigs := make([]Signature, 0, sigsNum)
 
-	// number of keys
-	keysNum := mrand.Intn(sigsNum) + 1
+	// number of keys (less than the number of signatures)
+	keysNum := rand.Intn(sigsNum) + 1
 	sks := make([]PrivateKey, 0, keysNum)
 	// generate the keys
 	for i := 0; i < keysNum; i++ {
@@ -873,7 +909,7 @@ func TestBLSAggregateSignaturesManyMessages(t *testing.T) {
 	}
 
 	// number of messages (could be larger or smaller than the number of keys)
-	msgsNum := mrand.Intn(sigsNum) + 1
+	msgsNum := rand.Intn(sigsNum) + 1
 	messages := make([][20]byte, msgsNum)
 	for i := 0; i < msgsNum; i++ {
 		_, err := rand.Read(messages[i][:])
@@ -888,10 +924,10 @@ func TestBLSAggregateSignaturesManyMessages(t *testing.T) {
 	for i := 0; i < sigsNum; i++ {
 		kmac := NewExpandMsgXOFKMAC128("test tag")
 		// pick a key randomly from the list
-		skRand := mrand.Intn(keysNum)
+		skRand := rand.Intn(keysNum)
 		sk := sks[skRand]
 		// pick a message randomly from the list
-		msgRand := mrand.Intn(msgsNum)
+		msgRand := rand.Intn(msgsNum)
 		msg := messages[msgRand][:]
 		// generate a signature
 		s, err := sk.Sign(msg, kmac)
@@ -912,15 +948,13 @@ func TestBLSAggregateSignaturesManyMessages(t *testing.T) {
 		// Verify the aggregated signature
 		valid, err := VerifyBLSSignatureManyMessages(inputPks, aggSig, inputMsgs, inputKmacs)
 		require.NoError(t, err)
-		assert.True(t, valid,
-			"Verification of %s failed, should be valid, private keys are %s, inputs are %x, input public keys are %s",
-			aggSig, sks, inputMsgs, inputPks)
+		assert.True(t, valid)
 	})
 
 	// check if one of the signatures is not correct
 	t.Run("one signature is invalid", func(t *testing.T) {
-		randomIndex := mrand.Intn(sigsNum) // pick a random signature
-		messages[0][0] ^= 1                // make sure the signature is different
+		randomIndex := rand.Intn(sigsNum) // pick a random signature
+		messages[0][0] ^= 1               // make sure the signature is different
 		var err error
 		sigs[randomIndex], err = sks[0].Sign(messages[0][:], inputKmacs[0])
 		require.NoError(t, err)
@@ -929,9 +963,7 @@ func TestBLSAggregateSignaturesManyMessages(t *testing.T) {
 		require.NoError(t, err)
 		valid, err := VerifyBLSSignatureManyMessages(inputPks, aggSig, inputMsgs, inputKmacs)
 		require.NoError(t, err)
-		assert.False(t, valid,
-			"Verification of %s should fail, private keys are %s, inputs are %x, input public keys are %s",
-			aggSig, sks, inputMsgs, inputPks)
+		assert.False(t, valid)
 	})
 
 	// test the empty keys case
@@ -939,8 +971,7 @@ func TestBLSAggregateSignaturesManyMessages(t *testing.T) {
 		valid, err := VerifyBLSSignatureManyMessages(inputPks[:0], aggSig, inputMsgs, inputKmacs)
 		assert.Error(t, err)
 		assert.True(t, IsBLSAggregateEmptyListError(err))
-		assert.False(t, valid,
-			"verification should fail with an empty key list")
+		assert.False(t, valid)
 	})
 
 	// test inconsistent input arrays
@@ -949,13 +980,13 @@ func TestBLSAggregateSignaturesManyMessages(t *testing.T) {
 		valid, err := VerifyBLSSignatureManyMessages(inputPks, aggSig, inputMsgs[:sigsNum-1], inputKmacs)
 		assert.Error(t, err)
 		assert.True(t, IsInvalidInputsError(err))
-		assert.False(t, valid, "verification should fail with inconsistent messages and hashers")
+		assert.False(t, valid)
 
 		// empty key list
 		valid, err = VerifyBLSSignatureManyMessages(inputPks[:0], aggSig, inputMsgs, inputKmacs)
 		assert.Error(t, err)
 		assert.True(t, IsBLSAggregateEmptyListError(err))
-		assert.False(t, valid, "verification should fail with empty list key")
+		assert.False(t, valid)
 
 		// nil hasher
 		tmp := inputKmacs[0]
@@ -963,7 +994,7 @@ func TestBLSAggregateSignaturesManyMessages(t *testing.T) {
 		valid, err = VerifyBLSSignatureManyMessages(inputPks, aggSig, inputMsgs, inputKmacs)
 		assert.Error(t, err)
 		assert.True(t, IsNilHasherError(err))
-		assert.False(t, valid, "verification should fail with nil hasher")
+		assert.False(t, valid)
 		inputKmacs[0] = tmp
 
 		// wrong key
@@ -972,8 +1003,47 @@ func TestBLSAggregateSignaturesManyMessages(t *testing.T) {
 		valid, err = VerifyBLSSignatureManyMessages(inputPks, aggSig, inputMsgs, inputKmacs)
 		assert.Error(t, err)
 		assert.True(t, IsNotBLSKeyError(err))
-		assert.False(t, valid, "verification should fail with nil hasher")
+		assert.False(t, valid)
 		inputPks[0] = tmpPK
+	})
+
+	t.Run("variable number of distinct keys and messages", func(t *testing.T) {
+		// use a specific PRG for easier reproduction
+		prg := getPRG(t)
+		// number of signatures to aggregate
+		N := 100
+		sigs := make([]Signature, 0, N)
+		msgs := make([][]byte, 0, N)
+		pks := make([]PublicKey, 0, N)
+		kmacs := make([]hash.Hasher, 0, N)
+		kmac := NewExpandMsgXOFKMAC128("test tag")
+		for i := 0; i < N; i++ {
+			// distinct message
+			msg := make([]byte, 20)
+			msgs = append(msgs, msg)
+			_, err := prg.Read(msg)
+			require.NoError(t, err)
+			// distinct key
+			sk := randomSK(t, prg)
+			pks = append(pks, sk.PublicKey())
+			// generate a signature
+			s, err := sk.Sign(msg, kmac)
+			require.NoError(t, err)
+			sigs = append(sigs, s)
+			kmacs = append(kmacs, kmac)
+		}
+
+		// go through all numbers of couples (msg, key)
+		for i := 1; i < N; i++ {
+			// aggregate signatures
+			var err error
+			aggSig, err = AggregateBLSSignatures(sigs[:i])
+			require.NoError(t, err)
+			// Verify the aggregated signature
+			valid, err := VerifyBLSSignatureManyMessages(pks[:i], aggSig, msgs[:i], kmacs[:i])
+			require.NoError(t, err, "verification errored with %d couples (msg,key)", i)
+			assert.True(t, valid, "verification failed with %d couples (msg,key)", i)
+		}
 	})
 }
 
@@ -1111,17 +1181,22 @@ func TestBLSIdentity(t *testing.T) {
 	hasher := NewExpandMsgXOFKMAC128("")
 
 	t.Run("identity signature comparison", func(t *testing.T) {
+		if !isG1Compressed() {
+			t.Skip()
+		}
 		// verify that constructed identity signatures are recognized as such by IsBLSSignatureIdentity.
 		// construct identity signature by summing (aggregating) a random signature and its inverse.
-		assert.True(t, IsBLSSignatureIdentity(identityBLSSignature))
+
+		// sanity check to start
+		assert.True(t, IsBLSSignatureIdentity(g1Serialization))
 
 		// sum up a random signature and its inverse to get identity
 		sk := randomSK(t, rand)
 		sig, err := sk.Sign(msg, hasher)
 		require.NoError(t, err)
-		oppositeSig := make([]byte, signatureLengthBLSBLS12381)
+		oppositeSig := make([]byte, SignatureLenBLSBLS12381)
 		copy(oppositeSig, sig)
-		negatePoint(oppositeSig)
+		negateCompressedPoint(oppositeSig)
 		aggSig, err := AggregateBLSSignatures([]Signature{sig, oppositeSig})
 		require.NoError(t, err)
 		assert.True(t, IsBLSSignatureIdentity(aggSig))

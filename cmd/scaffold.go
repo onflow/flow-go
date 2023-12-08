@@ -395,7 +395,6 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			connGaterCfg,
 			peerManagerCfg,
 			&fnb.FlowConfig.NetworkConfig.GossipSubConfig,
-			&fnb.FlowConfig.NetworkConfig.GossipSubRPCInspectorsConfig,
 			&fnb.FlowConfig.NetworkConfig.ResourceManager,
 			uniCfg,
 			&fnb.FlowConfig.NetworkConfig.ConnectionManagerConfig,
@@ -1005,7 +1004,8 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 	setups := bstorage.NewEpochSetups(fnb.Metrics.Cache, fnb.DB)
 	epochCommits := bstorage.NewEpochCommits(fnb.Metrics.Cache, fnb.DB)
 	commits := bstorage.NewCommits(fnb.Metrics.Cache, fnb.DB)
-	protocolState := bstorage.NewProtocolState(fnb.Metrics.Cache, setups, epochCommits, fnb.DB, bstorage.DefaultCacheSize)
+	protocolState := bstorage.NewProtocolState(fnb.Metrics.Cache, setups, epochCommits, fnb.DB,
+		bstorage.DefaultProtocolStateCacheSize, bstorage.DefaultProtocolStateByBlockIDCacheSize)
 	versionBeacons := bstorage.NewVersionBeacons(fnb.DB)
 
 	fnb.Storage = Storage{

@@ -10,7 +10,7 @@ import (
 )
 
 func TestBeaconKG(t *testing.T) {
-	seed := unittest.SeedFixture(2 * crypto.SeedMinLenDKG)
+	seed := unittest.SeedFixture(2 * crypto.KeyGenSeedMinLen)
 
 	// n = 0
 	_, err := RandomBeaconKG(0, seed)

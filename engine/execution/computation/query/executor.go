@@ -54,6 +54,7 @@ type Executor interface {
 type QueryConfig struct {
 	LogTimeThreshold    time.Duration
 	ExecutionTimeLimit  time.Duration
+	ComputationLimit    uint64
 	MaxErrorMessageSize int
 }
 
@@ -61,6 +62,7 @@ func NewDefaultConfig() QueryConfig {
 	return QueryConfig{
 		LogTimeThreshold:    DefaultLogTimeThreshold,
 		ExecutionTimeLimit:  DefaultExecutionTimeLimit,
+		ComputationLimit:    fvm.DefaultComputationLimit,
 		MaxErrorMessageSize: DefaultMaxErrorMessageSize,
 	}
 }
@@ -87,6 +89,9 @@ func NewQueryExecutor(
 	derivedChainData *derived.DerivedChainData,
 	entropyPerBlock EntropyProviderPerBlock,
 ) *QueryExecutor {
+	if config.ComputationLimit > 0 {
+		vmCtx = fvm.NewContextFromParent(vmCtx, fvm.WithComputationLimit(config.ComputationLimit))
+	}
 	return &QueryExecutor{
 		config:           config,
 		logger:           logger,

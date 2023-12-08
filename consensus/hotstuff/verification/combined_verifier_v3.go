@@ -1,6 +1,3 @@
-//go:build relic
-// +build relic
-
 package verification
 
 import (

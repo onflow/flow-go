@@ -48,6 +48,9 @@ type SignalerContext interface {
 	sealed()         // private, to constrain builder to using WithSignaler
 }
 
+// SignalerContextKey represents the key type for retrieving a SignalerContext from a value `context.Context`.
+type SignalerContextKey struct{}
+
 // private, to force context derivation / WithSignaler
 type signalerCtx struct {
 	context.Context
@@ -62,6 +65,11 @@ func WithSignaler(parent context.Context) (SignalerContext, <-chan error) {
 	return &signalerCtx{parent, sig}, errChan
 }
 
+// WithSignalerContext wraps `SignalerContext` using `context.WithValue` so it can later be used with `Throw`.
+func WithSignalerContext(parent context.Context, ctx SignalerContext) context.Context {
+	return context.WithValue(parent, SignalerContextKey{}, ctx)
+}
+
 // Throw enables throwing an irrecoverable error using any context.Context.
 //
 // If we have an SignalerContext, we can directly ctx.Throw.
@@ -72,12 +80,13 @@ func WithSignaler(parent context.Context) (SignalerContext, <-chan error) {
 // Throw can be a drop-in replacement anywhere we have a context.Context likely
 // to support Irrecoverables. Note: this is not a method
 func Throw(ctx context.Context, err error) {
-	signalerAbleContext, ok := ctx.(SignalerContext)
+	signalerAbleContext, ok := ctx.Value(SignalerContextKey{}).(SignalerContext)
 	if ok {
 		signalerAbleContext.Throw(err)
+	} else {
+		// Be spectacular on how this does not -but should- handle irrecoverables:
+		log.Fatalf("irrecoverable error signaler not found for context, please implement! Unhandled irrecoverable error: %v", err)
 	}
-	// Be spectacular on how this does not -but should- handle irrecoverables:
-	log.Fatalf("irrecoverable error signaler not found for context, please implement! Unhandled irrecoverable error %v", err)
 }
 
 // WithSignallerAndCancel returns an irrecoverable context, the cancel
