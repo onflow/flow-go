@@ -51,6 +51,12 @@ func newGethArgument(typeName string) gethABI.Argument {
 	return gethABI.Argument{Type: typ}
 }
 
+func evmAddressTypeID(location common.AddressLocation) common.TypeID {
+	return common.TypeID(
+		fmt.Sprintf("A.%v.%v", location, evmAddressTypeStructName),
+	)
+}
+
 // EVM.encodeABI
 
 const internalEVMTypeEncodeABIFunctionName = "encodeABI"
@@ -134,10 +140,7 @@ func newInternalEVMTypeEncodeABIFunction(
 					values = append(values, value.BigInt)
 					arguments = append(arguments, newGethArgument("int256"))
 				case *interpreter.CompositeValue:
-					typeID := common.TypeID(
-						fmt.Sprintf("A.%v.%v", location, evmAddressTypeStructName),
-					)
-					if value.TypeID() == typeID {
+					if value.TypeID() == evmAddressTypeID(location) {
 						bytes, err := interpreter.ByteArrayValueToByteSlice(
 							inter,
 							value.GetMember(inter, locationRange, evmAddressTypeBytesFieldName),
@@ -148,6 +151,13 @@ func newInternalEVMTypeEncodeABIFunction(
 						}
 						values = append(values, gethCommon.Address(bytes))
 						arguments = append(arguments, newGethArgument("address"))
+					} else {
+						panic(
+							fmt.Errorf(
+								"unsupported composite value: %v",
+								element.StaticType(inter),
+							),
+						)
 					}
 				case *interpreter.ArrayValue:
 					switch value.Type.ElementType() {
@@ -528,10 +538,7 @@ func newInternalEVMTypeDecodeABIFunction(
 						arguments = append(arguments, newGethArgument("int256[]"))
 					}
 				case interpreter.CompositeStaticType:
-					typeID := common.TypeID(
-						fmt.Sprintf("A.%v.%v", location, evmAddressTypeStructName),
-					)
-					if value.TypeID == typeID {
+					if value.TypeID == evmAddressTypeID(location) {
 						arguments = append(arguments, newGethArgument("address"))
 					} else {
 						panic(fmt.Errorf("unsupported composite type: %v", value))
@@ -720,10 +727,7 @@ func newInternalEVMTypeDecodeABIFunction(
 					)
 					values = append(values, arr)
 				case interpreter.CompositeStaticType:
-					typeID := common.TypeID(
-						fmt.Sprintf("A.%v.%v", location, evmAddressTypeStructName),
-					)
-					if value.TypeID == typeID {
+					if value.TypeID == evmAddressTypeID(location) {
 						addr := decoded[i].(gethCommon.Address)
 						var address types.Address
 						copy(address[:], addr.Bytes())
