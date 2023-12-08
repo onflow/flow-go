@@ -136,20 +136,6 @@ func (_m *ReadOnlyExecutionState) GetHighestExecutedBlockID(_a0 context.Context)
 	return r0, r1, r2
 }
 
-// HasState provides a mock function with given fields: _a0
-func (_m *ReadOnlyExecutionState) HasState(_a0 flow.StateCommitment) bool {
-	ret := _m.Called(_a0)
-
-	var r0 bool
-	if rf, ok := ret.Get(0).(func(flow.StateCommitment) bool); ok {
-		r0 = rf(_a0)
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-
-	return r0
-}
-
 // IsBlockExecuted provides a mock function with given fields: height, blockID
 func (_m *ReadOnlyExecutionState) IsBlockExecuted(height uint64, blockID flow.Identifier) (bool, error) {
 	ret := _m.Called(height, blockID)
