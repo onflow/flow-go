@@ -281,28 +281,17 @@ func (e *RichProtocolStateEntry) Copy() *RichProtocolStateEntry {
 }
 
 // EpochPhase returns the current epoch phase.
+// The receiver ProtocolStateEntry must be properly constructed.
 func (e *ProtocolStateEntry) EpochPhase() EpochPhase {
-	// first assert that current/previous epoch contains valid values
-	if e.CurrentEpoch.SetupID == ZeroID || e.CurrentEpoch.CommitID == ZeroID {
-		return EpochPhaseUndefined
-	}
-	if e.PreviousEpoch != nil && (e.PreviousEpoch.SetupID == ZeroID || e.PreviousEpoch.CommitID == ZeroID) {
-		return EpochPhaseUndefined
-	}
-
-	// the epoch phase is determined by how much information we have about the next epoch
+	// The epoch phase is determined by how much information we have about the next epoch
 	if e.NextEpoch == nil {
-		return EpochPhaseStaking
+		return EpochPhaseStaking // if no information about the next epoch is known, we are in the Staking Phase
 	}
-	if e.NextEpoch.SetupID != ZeroID {
-		if e.NextEpoch.CommitID == ZeroID {
-			return EpochPhaseSetup
-		} else {
-			return EpochPhaseCommitted
-		}
+	// Per convention, NextEpoch ≠ nil if and only if NextEpoch.SetupID is specified.
+	if e.NextEpoch.CommitID == ZeroID {
+		return EpochPhaseSetup // if only the Setup event is known for the next epoch but not the Commit event, we are in the Setup Phase
 	}
-
-	return EpochPhaseUndefined
+	return EpochPhaseCommitted // if the Setup and Commit events are known for the next epoch, we are in the Committed Phase
 }
 
 func (ll DynamicIdentityEntryList) Lookup() map[Identifier]*DynamicIdentityEntry {
