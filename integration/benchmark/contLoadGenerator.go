@@ -5,20 +5,19 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-
 	"time"
 
 	"github.com/onflow/cadence"
+	flowsdk "github.com/onflow/flow-go-sdk"
+	"github.com/onflow/flow-go-sdk/access"
+	"github.com/onflow/flow-go-sdk/crypto"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/onflow/flow-go/integration/benchmark/account"
-	"github.com/onflow/flow-go/module/metrics"
-
-	flowsdk "github.com/onflow/flow-go-sdk"
-	"github.com/onflow/flow-go-sdk/access"
-	"github.com/onflow/flow-go-sdk/crypto"
-	"github.com/onflow/flow-go/model/flow"
 )
 
 type LoadType string
@@ -31,6 +30,7 @@ const (
 	LedgerHeavyLoadType   LoadType = "ledger-heavy"
 	ConstExecCostLoadType LoadType = "const-exec" // for an empty transactions with various tx arguments
 	ExecDataHeavyLoadType LoadType = "exec-data-heavy"
+	EVMLoadType           LoadType = "evm"
 )
 
 const lostTransactionThreshold = 90 * time.Second
@@ -78,10 +78,8 @@ type ContLoadGenerator struct {
 }
 
 type NetworkParams struct {
-	ServAccPrivKeyHex     string
-	ServiceAccountAddress *flowsdk.Address
-	FungibleTokenAddress  *flowsdk.Address
-	FlowTokenAddress      *flowsdk.Address
+	ServAccPrivKeyHex string
+	ChainID           flow.ChainID
 }
 
 type LoadParams struct {
@@ -109,7 +107,14 @@ func New(
 	// TODO(rbtz): add loadbalancing between multiple clients
 	flowClient := flowClients[0]
 
-	servAcc, err := account.LoadServiceAccount(ctx, flowClient, networkParams.ServiceAccountAddress, networkParams.ServAccPrivKeyHex)
+	sc := systemcontracts.SystemContractsForChain(networkParams.ChainID)
+	serviceAddress := flowsdk.BytesToAddress(sc.FlowServiceAccount.Address.Bytes())
+	servAcc, err := account.LoadServiceAccount(
+		ctx,
+		flowClient,
+		&serviceAddress,
+		networkParams.ServAccPrivKeyHex,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("error loading service account %w", err)
 	}
@@ -127,9 +132,11 @@ func New(
 	// check and cap params for const-exec mode
 	if loadParams.LoadType == ConstExecCostLoadType {
 		if constExecParams.MaxTxSizeInByte > flow.DefaultMaxTransactionByteSize {
-			errMsg := fmt.Sprintf("MaxTxSizeInByte(%d) is larger than DefaultMaxTransactionByteSize(%d).",
+			errMsg := fmt.Sprintf(
+				"MaxTxSizeInByte(%d) is larger than DefaultMaxTransactionByteSize(%d).",
 				constExecParams.MaxTxSizeInByte,
-				flow.DefaultMaxTransactionByteSize)
+				flow.DefaultMaxTransactionByteSize,
+			)
 			log.Error().Msg(errMsg)
 
 			return nil, errors.New(errMsg)
@@ -146,9 +153,11 @@ func New(
 		}
 
 		if constExecParams.ArgSizeInByte > flow.DefaultMaxTransactionByteSize {
-			errMsg := fmt.Sprintf("ArgSizeInByte(%d) is larger than DefaultMaxTransactionByteSize(%d).",
+			errMsg := fmt.Sprintf(
+				"ArgSizeInByte(%d) is larger than DefaultMaxTransactionByteSize(%d).",
 				constExecParams.ArgSizeInByte,
-				flow.DefaultMaxTransactionByteSize)
+				flow.DefaultMaxTransactionByteSize,
+			)
 			log.Error().Msg(errMsg)
 			return nil, errors.New(errMsg)
 		}
@@ -182,6 +191,8 @@ func New(
 		lg.workFunc = lg.sendConstExecCostTx
 	case CompHeavyLoadType, EventHeavyLoadType, LedgerHeavyLoadType, ExecDataHeavyLoadType:
 		lg.workFunc = lg.sendFavContractTx
+	case EVMLoadType:
+		lg.workFunc = lg.sendEVMTx
 	default:
 		return nil, fmt.Errorf("unknown load type: %s", loadParams.LoadType)
 	}
@@ -263,7 +274,12 @@ func (lg *ContLoadGenerator) populateServiceAccountKeys(num int) error {
 		default:
 		}
 
-		lg.serviceAccount, err = account.LoadServiceAccount(lg.ctx, lg.flowClient, lg.serviceAccount.Address, lg.networkParams.ServAccPrivKeyHex)
+		lg.serviceAccount, err = account.LoadServiceAccount(
+			lg.ctx,
+			lg.flowClient,
+			lg.serviceAccount.Address,
+			lg.networkParams.ServAccPrivKeyHex,
+		)
 		if err != nil {
 			return fmt.Errorf("error loading service account %w", err)
 		}
@@ -299,7 +315,11 @@ func (lg *ContLoadGenerator) Init() error {
 				num = accountCreationBatchSize
 			}
 
-			lg.log.Info().Int("cumulative", i).Int("num", num).Int("numberOfAccounts", lg.loadParams.NumberOfAccounts).Msg("creating accounts")
+			lg.log.Info().
+				Int("cumulative", i).
+				Int("num", num).
+				Int("numberOfAccounts", lg.loadParams.NumberOfAccounts).
+				Msg("creating accounts")
 			for {
 				err := lg.createAccounts(num)
 				if errors.Is(err, account.ErrNoKeysAvailable) {
@@ -478,9 +498,12 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 		SetHashAlgo(crypto.SHA3_256).
 		SetWeight(flowsdk.AccountKeyWeightThreshold)
 
+	sc := systemcontracts.SystemContractsForChain(lg.networkParams.ChainID)
+	fungibleTokenAddress := flowsdk.BytesToAddress(sc.FungibleToken.Address.Bytes())
+	flowTokenAddress := flowsdk.BytesToAddress(sc.FlowToken.Address.Bytes())
 	// Generate an account creation script
 	createAccountTx := flowsdk.NewTransaction().
-		SetScript(CreateAccountsScript(*lg.networkParams.FungibleTokenAddress, *lg.networkParams.FlowTokenAddress)).
+		SetScript(CreateAccountsScript(fungibleTokenAddress, flowTokenAddress)).
 		SetReferenceBlockID(lg.follower.BlockID()).
 		SetGasLimit(999999)
 
@@ -547,7 +570,10 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 
 	var accountsCreated int
 	for _, event := range result.Events {
-		log.Trace().Str("event_type", event.Type).Str("event", event.String()).Msg("account creation tx event")
+		log.Trace().
+			Str("event_type", event.Type).
+			Str("event", event.String()).
+			Msg("account creation tx event")
 
 		if event.Type == flowsdk.EventAccountCreated {
 			accountCreatedEvent := flowsdk.AccountCreatedEvent(event)
@@ -555,7 +581,12 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 
 			log.Trace().Hex("address", accountAddress.Bytes()).Msg("new account created")
 
-			newAcc, err := account.New(accountsCreated, &accountAddress, privKey, []*flowsdk.AccountKey{accountKey})
+			newAcc, err := account.New(
+				accountsCreated,
+				&accountAddress,
+				privKey,
+				[]*flowsdk.AccountKey{accountKey},
+			)
 			if err != nil {
 				return fmt.Errorf("failed to create account: %w", err)
 			}
@@ -576,8 +607,10 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 	return nil
 }
 
-func (lg *ContLoadGenerator) createAddKeyTx(accountAddress flowsdk.Address, numberOfKeysToAdd uint) (*flowsdk.Transaction, error) {
-
+func (lg *ContLoadGenerator) createAddKeyTx(
+	accountAddress flowsdk.Address,
+	numberOfKeysToAdd uint,
+) (*flowsdk.Transaction, error) {
 	key, err := lg.serviceAccount.GetKey()
 	if err != nil {
 		return nil, err
@@ -659,12 +692,17 @@ func (lg *ContLoadGenerator) sendAddKeyTx(workerID int) {
 	lg.workerStatsTracker.IncTxExecuted()
 }
 
-func (lg *ContLoadGenerator) addKeysToProposerAccount(proposerPayerAccount *account.FlowAccount) error {
+func (lg *ContLoadGenerator) addKeysToProposerAccount(
+	proposerPayerAccount *account.FlowAccount,
+) error {
 	if proposerPayerAccount == nil {
 		return errors.New("proposerPayerAccount is nil")
 	}
 
-	addKeysToPayerTx, err := lg.createAddKeyTx(*lg.accounts[0].Address, lg.constExecParams.PayerKeyCount)
+	addKeysToPayerTx, err := lg.createAddKeyTx(
+		*lg.accounts[0].Address,
+		lg.constExecParams.PayerKeyCount,
+	)
 	if err != nil {
 		lg.log.Error().Msg("failed to create add-key transaction for const-exec")
 		return err
@@ -780,7 +818,10 @@ func (lg *ContLoadGenerator) sendConstExecCostTx(workerID int) {
 
 	// now adding comment to fulfill the final transaction size
 	commentSizeInByte := lg.constExecParams.MaxTxSizeInByte - txSizeWithoutComment
-	txScriptWithComment := ConstExecCostTransaction(lg.constExecParams.AuthAccountNum, commentSizeInByte)
+	txScriptWithComment := ConstExecCostTransaction(
+		lg.constExecParams.AuthAccountNum,
+		commentSizeInByte,
+	)
 	tx = tx.SetScript(txScriptWithComment)
 
 	txSizeWithComment := uint(len(tx.Encode()))
@@ -832,9 +873,12 @@ func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
 		Int("dstAccount", nextAcc.ID).
 		Msg("creating transfer script")
 
+	sc := systemcontracts.SystemContractsForChain(lg.networkParams.ChainID)
+	fungibleTokenAddress := flowsdk.BytesToAddress(sc.FungibleToken.Address.Bytes())
+	flowTokenAddress := flowsdk.BytesToAddress(sc.FlowToken.Address.Bytes())
 	transferTx, err := TokenTransferTransaction(
-		lg.networkParams.FungibleTokenAddress,
-		lg.networkParams.FlowTokenAddress,
+		&fungibleTokenAddress,
+		&flowTokenAddress,
 		nextAcc.Address,
 		tokensPerTransfer)
 	if err != nil {
@@ -870,6 +914,92 @@ func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
 	defer key.IncrementSequenceNumber()
 
 	log = log.With().Hex("tx_id", transferTx.ID().Bytes()).Logger()
+	log.Trace().Msg("transaction sent")
+
+	t := time.NewTimer(lostTransactionThreshold)
+	defer t.Stop()
+
+	select {
+	case result := <-ch:
+		if result.Error != nil {
+			lg.workerStatsTracker.IncTxFailed()
+		}
+		log.Trace().
+			Dur("duration", time.Since(startTime)).
+			Err(result.Error).
+			Str("status", result.Status.String()).
+			Msg("transaction confirmed")
+	case <-t.C:
+		lg.loaderMetrics.TransactionLost()
+		log.Warn().
+			Dur("duration", time.Since(startTime)).
+			Int("availableAccounts", len(lg.availableAccounts)).
+			Msg("transaction lost")
+		lg.workerStatsTracker.IncTxTimedout()
+	case <-lg.Done():
+		return
+	}
+	lg.workerStatsTracker.IncTxExecuted()
+}
+
+func (lg *ContLoadGenerator) sendEVMTx(workerID int) {
+	log := lg.log.With().Int("workerID", workerID).Logger()
+
+	log.Trace().
+		Int("availableAccounts", len(lg.availableAccounts)).
+		Msg("getting next available account")
+
+	var acc *account.FlowAccount
+
+	select {
+	case acc = <-lg.availableAccounts:
+	default:
+		log.Error().Msg("next available account channel empty; skipping send")
+		return
+	}
+	defer func() { lg.availableAccounts <- acc }()
+	nextAcc := lg.accounts[(acc.ID+1)%len(lg.accounts)]
+
+	sc := systemcontracts.SystemContractsForChain(lg.networkParams.ChainID)
+	fungibleTokenAddress := flowsdk.BytesToAddress(sc.FungibleToken.Address.Bytes())
+	flowTokenAddress := flowsdk.BytesToAddress(sc.FlowToken.Address.Bytes())
+	tx, err := TokenTransferTransaction(
+		&fungibleTokenAddress,
+		&flowTokenAddress,
+		nextAcc.Address,
+		tokensPerTransfer)
+	if err != nil {
+		log.Error().Err(err).Msg("error creating invoke EVM script")
+		return
+	}
+
+	tx = tx.
+		SetReferenceBlockID(lg.follower.BlockID()).
+		SetGasLimit(9999)
+
+	log.Trace().Msg("signing transaction")
+
+	key, err := acc.GetKey()
+	if err != nil {
+		log.Error().Err(err).Msg("error getting key")
+		return
+	}
+	defer key.Done()
+
+	err = key.SignTx(tx)
+	if err != nil {
+		log.Error().Err(err).Msg("error signing transaction")
+		return
+	}
+
+	startTime := time.Now()
+	ch, err := lg.sendTx(workerID, tx)
+	if err != nil {
+		return
+	}
+	defer key.IncrementSequenceNumber()
+
+	log = log.With().Hex("tx_id", tx.ID().Bytes()).Logger()
 	log.Trace().Msg("transaction sent")
 
 	t := time.NewTimer(lostTransactionThreshold)
@@ -952,7 +1082,10 @@ func (lg *ContLoadGenerator) sendFavContractTx(workerID int) {
 	lg.workerStatsTracker.IncTxExecuted()
 }
 
-func (lg *ContLoadGenerator) sendTx(workerID int, tx *flowsdk.Transaction) (<-chan flowsdk.TransactionResult, error) {
+func (lg *ContLoadGenerator) sendTx(
+	workerID int,
+	tx *flowsdk.Transaction,
+) (<-chan flowsdk.TransactionResult, error) {
 	log := lg.log.With().Int("workerID", workerID).Str("tx_id", tx.ID().String()).Logger()
 	log.Trace().Msg("sending transaction")
 
