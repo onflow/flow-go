@@ -40,7 +40,6 @@ import (
 // - malformed topic: topic is malformed in some way
 // - invalid spork ID: spork ID prepended to topic and current spork ID do not match
 func TestValidationInspector_InvalidTopicId_Detection(t *testing.T) {
-	t.Parallel()
 	role := flow.RoleConsensus
 	sporkID := unittest.IdentifierFixture()
 	flowConfig, err := config.DefaultConfig()
@@ -175,7 +174,6 @@ func TestValidationInspector_InvalidTopicId_Detection(t *testing.T) {
 // TestValidationInspector_DuplicateTopicId_Detection ensures that when an RPC control message contains a duplicate topic ID an invalid control message
 // notification is disseminated with the expected error.
 func TestValidationInspector_DuplicateTopicId_Detection(t *testing.T) {
-	t.Parallel()
 	role := flow.RoleConsensus
 	sporkID := unittest.IdentifierFixture()
 	flowConfig, err := config.DefaultConfig()
@@ -287,7 +285,6 @@ func TestValidationInspector_DuplicateTopicId_Detection(t *testing.T) {
 // TestValidationInspector_IHaveDuplicateMessageId_Detection ensures that when an RPC iHave control message contains a duplicate message ID for a single topic
 // notification is disseminated with the expected error.
 func TestValidationInspector_IHaveDuplicateMessageId_Detection(t *testing.T) {
-	t.Parallel()
 	role := flow.RoleConsensus
 	sporkID := unittest.IdentifierFixture()
 	flowConfig, err := config.DefaultConfig()
@@ -391,7 +388,6 @@ func TestValidationInspector_IHaveDuplicateMessageId_Detection(t *testing.T) {
 // TestValidationInspector_UnknownClusterId_Detection ensures that when an RPC control message contains a topic with an unknown cluster ID an invalid control message
 // notification is disseminated with the expected error.
 func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
-	t.Parallel()
 	role := flow.RoleConsensus
 	sporkID := unittest.IdentifierFixture()
 	flowConfig, err := config.DefaultConfig()
@@ -504,7 +500,6 @@ func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
 // cluster prefix hard threshold when the active cluster IDs not set and an invalid control message notification is disseminated with the expected error.
 // This test involves Graft control messages.
 func TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection(t *testing.T) {
-	t.Parallel()
 	role := flow.RoleConsensus
 	sporkID := unittest.IdentifierFixture()
 	flowConfig, err := config.DefaultConfig()
@@ -594,7 +589,6 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection(t *testing.T
 // cluster prefix hard threshold when the active cluster IDs not set and an invalid control message notification is disseminated with the expected error.
 // This test involves Prune control messages.
 func TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection(t *testing.T) {
-	t.Parallel()
 	role := flow.RoleConsensus
 	sporkID := unittest.IdentifierFixture()
 	flowConfig, err := config.DefaultConfig()
@@ -680,7 +674,6 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection(t *testing.T
 // TestValidationInspector_UnstakedNode_Detection ensures that RPC control message inspector disseminates an invalid control message notification when an unstaked peer
 // sends a control message for a cluster prefixed topic.
 func TestValidationInspector_UnstakedNode_Detection(t *testing.T) {
-	t.Parallel()
 	role := flow.RoleConsensus
 	sporkID := unittest.IdentifierFixture()
 	flowConfig, err := config.DefaultConfig()
@@ -779,7 +772,6 @@ func TestValidationInspector_UnstakedNode_Detection(t *testing.T) {
 // TestValidationInspector_InspectIWants_CacheMissThreshold ensures that expected invalid control message notification is disseminated when the number of iWant message Ids
 // without a corresponding iHave message sent with the same message ID exceeds the configured cache miss threshold.
 func TestValidationInspector_InspectIWants_CacheMissThreshold(t *testing.T) {
-	t.Parallel()
 	role := flow.RoleConsensus
 	sporkID := unittest.IdentifierFixture()
 	// create our RPC validation inspector
@@ -885,7 +877,6 @@ func TestValidationInspector_InspectIWants_CacheMissThreshold(t *testing.T) {
 // TestValidationInspector_InspectRpcPublishMessages ensures that expected invalid control message notification is disseminated when the number of errors encountered during
 // RPC publish message validation exceeds the configured error threshold.
 func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
-	t.Parallel()
 	role := flow.RoleConsensus
 	sporkID := unittest.IdentifierFixture()
 	// create our RPC validation inspector
@@ -1031,8 +1022,6 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 // The victim node is configured to use the GossipSubInspector to detect spam and the scoring system to mitigate spam.
 // The test ensures that the victim node is disconnected from the spammer node on the GossipSub mesh after the spam detection is triggered.
 func TestGossipSubSpamMitigationIntegration(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky in CI")
-	t.Parallel()
 	idProvider := mock.NewIdentityProvider(t)
 	sporkID := unittest.IdentifierFixture()
 	spammer := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkID, flow.RoleConsensus, idProvider)

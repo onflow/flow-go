@@ -1,6 +1,3 @@
-//go:build relic
-// +build relic
-
 package crypto
 
 // This file contains tests against the library BLST (https://github.com/supranational/blst).
@@ -21,8 +18,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	blst "github.com/supranational/blst/bindings/go"
 	"pgregory.net/rapid"
+
+	"github.com/onflow/flow-go/crypto/internal/blst"
 )
 
 // validPrivateKeyBytesFlow generates bytes of a valid private key in Flow library
@@ -82,7 +80,7 @@ func validSignatureBytesBLST(t *rapid.T) []byte {
 // testEncodeDecodePrivateKeyCrossBLST tests encoding and decoding of private keys are consistent with BLST.
 // This test assumes private key serialization is identical to the one in BLST.
 func testEncodeDecodePrivateKeyCrossBLST(t *rapid.T) {
-	randomSlice := rapid.SliceOfN(rapid.Byte(), prKeyLengthBLSBLS12381, prKeyLengthBLSBLS12381)
+	randomSlice := rapid.SliceOfN(rapid.Byte(), PrKeyLenBLSBLS12381, PrKeyLenBLSBLS12381)
 	validSliceFlow := rapid.Custom(validPrivateKeyBytesFlow)
 	validSliceBLST := rapid.Custom(validPrivateKeyBytesBLST)
 	// skBytes are bytes of either a valid or a random private key
@@ -129,39 +127,36 @@ func testEncodeDecodePublicKeyCrossBLST(t *rapid.T) {
 	if flowPass && blstPass {
 		pkFlowOutBytes := pkFlow.Encode()
 		pkBLSTOutBytes := pkBLST.Compress()
-
 		assert.Equal(t, pkFlowOutBytes, pkBLSTOutBytes)
 	}
 }
 
-// testEncodeDecodeSignatureCrossBLST tests encoding and decoding of signatures are consistent with BLST.
-// This test assumes signature serialization is identical to the one in BLST.
-func testEncodeDecodeSignatureCrossBLST(t *rapid.T) {
-	randomSlice := rapid.SliceOfN(rapid.Byte(), SignatureLenBLSBLS12381, SignatureLenBLSBLS12381)
+// testEncodeDecodeG1CrossBLST tests encoding and decoding of G1 points are consistent with BLST.
+// This test assumes signature serialization is identical to BLST.
+func testEncodeDecodeG1CrossBLST(t *rapid.T) {
+	randomSlice := rapid.SliceOfN(rapid.Byte(), g1BytesLen, g1BytesLen)
 	validSignatureFlow := rapid.Custom(validSignatureBytesFlow)
 	validSignatureBLST := rapid.Custom(validSignatureBytesBLST)
-	// sigBytes are bytes of either a valid or a random signature
+	// sigBytes are bytes of either a valid serialization of a E1/G1 point, or random bytes
 	sigBytes := rapid.OneOf(randomSlice, validSignatureFlow, validSignatureBLST).Example().([]byte)
 
 	// check decoding results are consistent
-	var pointFlow pointG1
-	// here we test readPointG1 rather than the simple Signature type alias
-	err := readPointG1(&pointFlow, sigBytes)
-	flowPass := (err == nil) && (checkMembershipG1(&pointFlow) == int(valid))
+	var pointFlow pointE1
+	err := readPointE1(&pointFlow, sigBytes)
+	flowPass := (err == nil) && (checkMembershipG1(&pointFlow))
 
 	var pointBLST blst.P1Affine
+	// res is non-nil iff point is in G1
 	res := pointBLST.Uncompress(sigBytes)
-	// flow validation has no infinity rejection for G1
 	blstPass := (res != nil) && pointBLST.SigValidate(false)
 
-	require.Equal(t, flowPass, blstPass, "deserialization of signature %x differs", sigBytes)
+	require.Equal(t, flowPass, blstPass, "deserialization of G1 %x differs", sigBytes)
 
-	// check both signatures (G1 points) are equal
+	// check both serializations of G1 points are equal
 	if flowPass && blstPass {
-		sigFlowOutBytes := make([]byte, signatureLengthBLSBLS12381)
-		writePointG1(sigFlowOutBytes, &pointFlow)
+		sigFlowOutBytes := make([]byte, g1BytesLen)
+		writePointE1(sigFlowOutBytes, &pointFlow)
 		sigBLSTOutBytes := pointBLST.Compress()
-
 		assert.Equal(t, sigFlowOutBytes, sigBLSTOutBytes)
 	}
 }
@@ -177,10 +172,10 @@ func testEncodeDecodeSignatureCrossBLST(t *rapid.T) {
 //
 // The test also assumes Flow signature serialization is identical to the one in BLST.
 func testSignHashCrossBLST(t *rapid.T) {
-	// generate two private keys from the same seed
+	// decode two private keys from the same bytes
 	skBytes := rapid.Custom(validPrivateKeyBytesFlow).Example().([]byte)
-
 	skFlow, err := DecodePrivateKey(BLSBLS12381, skBytes)
+
 	require.NoError(t, err)
 	var skBLST blst.Scalar
 	res := skBLST.Deserialize(skBytes)
@@ -195,7 +190,7 @@ func testSignHashCrossBLST(t *rapid.T) {
 	sigBytesBLST := sigBLST.Compress()
 
 	skFlowBLS, ok := skFlow.(*prKeyBLSBLS12381)
-	require.True(t, ok, "incoherent key type assertion")
+	require.True(t, ok)
 	sigFlow := skFlowBLS.signWithXMDSHA256(message)
 	sigBytesFlow := sigFlow.Bytes()
 
@@ -214,10 +209,10 @@ func testKeyGenCrossBLST(t *rapid.T) {
 	assert.Equal(t, skFlow.Encode(), skBLST.Serialize())
 }
 
-func TestAgainstBLST(t *testing.T) {
+func TestCrossBLST(t *testing.T) {
 	rapid.Check(t, testKeyGenCrossBLST)
 	rapid.Check(t, testEncodeDecodePrivateKeyCrossBLST)
 	rapid.Check(t, testEncodeDecodePublicKeyCrossBLST)
-	rapid.Check(t, testEncodeDecodeSignatureCrossBLST)
+	rapid.Check(t, testEncodeDecodeG1CrossBLST)
 	rapid.Check(t, testSignHashCrossBLST)
 }

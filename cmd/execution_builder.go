@@ -540,15 +540,16 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 
 	// Get latest executed block and a view at that block
 	ctx := context.Background()
-	_, blockID, err := exeNode.executionState.GetHighestExecutedBlockID(ctx)
+	height, blockID, err := exeNode.executionState.GetHighestExecutedBlockID(ctx)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"cannot get the latest executed block id: %w",
-			err)
+			"cannot get the latest executed block id at height %v: %w",
+			height, err)
 	}
 	blockSnapshot, _, err := exeNode.executionState.CreateStorageSnapshot(blockID)
 	if err != nil {
-		return nil, fmt.Errorf("cannot create a storage snapshot at block %v: %w", blockID, err)
+		return nil, fmt.Errorf("cannot create a storage snapshot at block %v at height %v: %w", blockID,
+			height, err)
 	}
 
 	// Get the epoch counter from the smart contract at the last executed block.
@@ -558,7 +559,8 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 		blockSnapshot)
 	// Failing to fetch the epoch counter from the smart contract is a fatal error.
 	if err != nil {
-		return nil, fmt.Errorf("cannot get epoch counter from the smart contract at block %s: %w", blockID.String(), err)
+		return nil, fmt.Errorf("cannot get epoch counter from the smart contract at block %s at height %v: %w",
+			blockID.String(), height, err)
 	}
 
 	// Get the epoch counter form the protocol state, at the same block.
@@ -577,6 +579,7 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 		Uint64("contractEpochCounter", contractEpochCounter).
 		Uint64("protocolStateEpochCounter", protocolStateEpochCounter).
 		Str("blockID", blockID.String()).
+		Uint64("height", height).
 		Logger()
 
 	if contractEpochCounter != protocolStateEpochCounter {

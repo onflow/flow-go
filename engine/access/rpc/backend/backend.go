@@ -87,6 +87,7 @@ type Params struct {
 	Transactions              storage.Transactions
 	ExecutionReceipts         storage.ExecutionReceipts
 	ExecutionResults          storage.ExecutionResults
+	LightTransactionResults   storage.LightTransactionResults
 	ChainID                   flow.ChainID
 	AccessMetrics             module.AccessMetrics
 	ConnFactory               connection.ConnectionFactory
@@ -98,6 +99,7 @@ type Params struct {
 	SnapshotHistoryLimit      int
 	Communicator              Communicator
 	TxResultCacheSize         uint
+	TxErrorMessagesCacheSize  uint
 	ScriptExecutor            execution.ScriptExecutor
 	ScriptExecutionMode       ScriptExecutionMode
 }
@@ -119,6 +121,18 @@ func New(params Params) (*Backend, error) {
 		txResCache, err = lru.New[flow.Identifier, *access.TransactionResult](int(params.TxResultCacheSize))
 		if err != nil {
 			return nil, fmt.Errorf("failed to init cache for transaction results: %w", err)
+		}
+	}
+
+	// NOTE: The transaction error message cache is currently only used by the access node and not by the observer node.
+	//       To avoid introducing unnecessary command line arguments in the observer, one case could be that the error
+	//       message cache is nil for the observer node.
+	var txErrorMessagesCache *lru.Cache[flow.Identifier, string]
+
+	if params.TxErrorMessagesCacheSize > 0 {
+		txErrorMessagesCache, err = lru.New[flow.Identifier, string](int(params.TxErrorMessagesCacheSize))
+		if err != nil {
+			return nil, fmt.Errorf("failed to init cache for transaction error messages: %w", err)
 		}
 	}
 
@@ -150,6 +164,7 @@ func New(params Params) (*Backend, error) {
 			collections:          params.Collections,
 			blocks:               params.Blocks,
 			transactions:         params.Transactions,
+			results:              params.LightTransactionResults,
 			executionReceipts:    params.ExecutionReceipts,
 			transactionValidator: configureTransactionValidator(params.State, params.ChainID),
 			transactionMetrics:   params.AccessMetrics,
@@ -159,6 +174,7 @@ func New(params Params) (*Backend, error) {
 			log:                  params.Log,
 			nodeCommunicator:     params.Communicator,
 			txResultCache:        txResCache,
+			txErrorMessagesCache: txErrorMessagesCache,
 		},
 		backendEvents: backendEvents{
 			state:             params.State,

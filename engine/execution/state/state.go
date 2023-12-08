@@ -482,7 +482,19 @@ func (s *state) UpdateHighestExecutedBlockIfHigher(ctx context.Context, header *
 	return operation.RetryOnConflict(s.db.Update, procedure.UpdateHighestExecutedBlockIfHigher(header))
 }
 
+// deprecated by storehouse's GetHighestFinalizedExecuted
 func (s *state) GetHighestExecutedBlockID(ctx context.Context) (uint64, flow.Identifier, error) {
+	if s.enableRegisterStore {
+		// when storehouse is enabled, the highest executed block is consisted as
+		// the highest finalized and executed block
+		height := s.GetHighestFinalizedExecuted()
+		header, err := s.headers.ByHeight(height)
+		if err != nil {
+			return 0, flow.ZeroID, fmt.Errorf("could not get header by height %v: %w", height, err)
+		}
+		return height, header.ID(), nil
+	}
+
 	var blockID flow.Identifier
 	var height uint64
 	err := s.db.View(procedure.GetHighestExecutedBlock(&height, &blockID))
