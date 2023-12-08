@@ -1,33 +1,39 @@
 package handler_test
 
 import (
-	"bytes"
+	"encoding/hex"
 	"fmt"
 	"math"
 	"math/big"
+	"strings"
 	"testing"
+
+	"github.com/onflow/cadence"
+
+	jsoncdc "github.com/onflow/cadence/encoding/json"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	gethParams "github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/onflow/cadence/runtime/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/cadence/runtime/common"
+
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm/emulator"
 	"github.com/onflow/flow-go/fvm/evm/emulator/database"
 	"github.com/onflow/flow-go/fvm/evm/handler"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/types"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 // TODO add test for fatal errors
 
-var flowTokenAddress = common.Address(fvm.FlowTokenAddress(flow.Emulator.Chain()))
+var flowTokenAddress = common.MustBytesToAddress(systemcontracts.SystemContractsForChain(flow.Emulator).FlowToken.Address.Bytes())
 
 func TestHandler_TransactionRun(t *testing.T) {
 	t.Parallel()
@@ -90,18 +96,31 @@ func TestHandler_TransactionRun(t *testing.T) {
 
 					event := events[0]
 					assert.Equal(t, event.Type, types.EventTypeTransactionExecuted)
-					ev := types.TransactionExecutedPayload{}
-					err = rlp.Decode(bytes.NewReader(event.Payload), &ev)
+					ev, err := jsoncdc.Decode(nil, event.Payload)
 					require.NoError(t, err)
-					for i, l := range result.Logs {
-						assert.Equal(t, l, ev.Result.Logs[i])
+					cadenceEvent, ok := ev.(cadence.Event)
+					require.True(t, ok)
+					for j, f := range cadenceEvent.GetFields() {
+						// todo add an event decoder in types.event
+						if f.Identifier == "logs" {
+							cadenceLogs := cadenceEvent.GetFieldValues()[j]
+							encodedLogs, err := hex.DecodeString(strings.ReplaceAll(cadenceLogs.String(), "\"", ""))
+							require.NoError(t, err)
+
+							var logs []*gethTypes.Log
+							err = rlp.DecodeBytes(encodedLogs, &logs)
+							require.NoError(t, err)
+
+							for i, l := range result.Logs {
+								assert.Equal(t, l, logs[i])
+							}
+						}
 					}
 
 					// check block event
 					event = events[1]
 					assert.Equal(t, event.Type, types.EventTypeBlockExecuted)
-					payload := types.BlockExecutedEventPayload{}
-					err = rlp.Decode(bytes.NewReader(event.Payload), &payload)
+					_, err = jsoncdc.Decode(nil, event.Payload)
 					require.NoError(t, err)
 				})
 			})
@@ -311,12 +330,6 @@ func TestHandler_BridgedAccount(t *testing.T) {
 				// transaction event
 				event := events[0]
 				assert.Equal(t, event.Type, types.EventTypeTransactionExecuted)
-				ret := types.TransactionExecutedPayload{}
-				err = rlp.Decode(bytes.NewReader(event.Payload), &ret)
-				require.NoError(t, err)
-				// TODO: decode encoded tx and check for the amount and value
-				// assert.Equal(t, foa.Address(), ret.Address)
-				// assert.Equal(t, balance, ret.Amount)
 
 				// block event
 				event = events[1]
@@ -325,8 +338,7 @@ func TestHandler_BridgedAccount(t *testing.T) {
 				// transaction event
 				event = events[2]
 				assert.Equal(t, event.Type, types.EventTypeTransactionExecuted)
-				ret = types.TransactionExecutedPayload{}
-				err = rlp.Decode(bytes.NewReader(event.Payload), &ret)
+				_, err = jsoncdc.Decode(nil, event.Payload)
 				require.NoError(t, err)
 				// TODO: decode encoded tx and check for the amount and value
 				// assert.Equal(t, foa.Address(), ret.Address)

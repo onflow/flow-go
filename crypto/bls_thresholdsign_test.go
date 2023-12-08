@@ -1,6 +1,3 @@
-//go:build relic
-// +build relic
-
 package crypto
 
 import (
@@ -30,12 +27,12 @@ var thresholdSignatureMessage = []byte("random message")
 
 // centralized test of the stateful threshold signature using the threshold key generation.
 func testCentralizedStatefulAPI(t *testing.T) {
+	rand := getPRG(t)
+	seed := make([]byte, KeyGenSeedMinLen)
+	_, err := rand.Read(seed)
 	n := 10
 	for threshold := MinimumThreshold; threshold < n; threshold++ {
 		// generate threshold keys
-		rand := getPRG(t)
-		seed := make([]byte, SeedMinLenDKG)
-		_, err := rand.Read(seed)
 		require.NoError(t, err)
 		skShares, pkShares, pkGroup, err := BLSThresholdKeyGen(n, threshold, seed)
 		require.NoError(t, err)
@@ -344,9 +341,9 @@ func testDistributedStatefulAPI_FeldmanVSS(t *testing.T) {
 		chans[i] = make(chan *message, 2*n)
 	}
 	// start DKG in all participants
-	seed := make([]byte, SeedMinLenDKG)
+	seed := make([]byte, KeyGenSeedMinLen)
 	read, err := rand.Read(seed)
-	require.Equal(t, read, SeedMinLenDKG)
+	require.Equal(t, read, KeyGenSeedMinLen)
 	require.NoError(t, err)
 	sync.Add(n)
 	for current := 0; current < n; current++ {
@@ -404,9 +401,9 @@ func testDistributedStatefulAPI_JointFeldman(t *testing.T) {
 			chans[i] = make(chan *message, 2*n)
 		}
 		// start DKG in all participants but the
-		seed := make([]byte, SeedMinLenDKG)
+		seed := make([]byte, KeyGenSeedMinLen)
 		read, err := rand.Read(seed)
-		require.Equal(t, read, SeedMinLenDKG)
+		require.Equal(t, read, KeyGenSeedMinLen)
 		require.NoError(t, err)
 		sync.Add(n)
 		for current := 0; current < n; current++ {
@@ -544,11 +541,12 @@ type statelessKeys struct {
 
 // Centralized test of threshold signature protocol using the threshold key generation.
 func testCentralizedStatelessAPI(t *testing.T) {
-	rand := getPRG(t)
+
+	seed := make([]byte, KeyGenSeedMinLen)
 	n := 10
 	for threshold := MinimumThreshold; threshold < n; threshold++ {
 		// generate threshold keys
-		seed := make([]byte, SeedMinLenDKG)
+		rand := getPRG(t)
 		_, err := rand.Read(seed)
 		require.NoError(t, err)
 		skShares, pkShares, pkGroup, err := BLSThresholdKeyGen(n, threshold, seed)
@@ -596,9 +594,14 @@ func testCentralizedStatelessAPI(t *testing.T) {
 			signers[randomDuplicate] = tmp
 		}
 
+		// check with not enough signatures
+		thresholdSignature, err = BLSReconstructThresholdSignature(n, threshold, signShares[:threshold], signers[:threshold])
+		assert.Error(t, err)
+		assert.True(t, IsNotEnoughSharesError(err))
+		assert.Nil(t, thresholdSignature)
+
 		// check with an invalid signature (invalid serialization)
-		invalidSig := make([]byte, signatureLengthBLSBLS12381)
-		signShares[0] = invalidSig
+		signShares[0] = BLSInvalidSignature()
 		thresholdSignature, err = BLSReconstructThresholdSignature(n, threshold, signShares, signers[:threshold+1])
 		assert.Error(t, err)
 		assert.True(t, IsInvalidSignatureError(err))
@@ -608,12 +611,39 @@ func testCentralizedStatelessAPI(t *testing.T) {
 
 func BenchmarkSimpleKeyGen(b *testing.B) {
 	n := 60
-	seed := make([]byte, SeedMinLenDKG)
+	seed := make([]byte, KeyGenSeedMinLen)
 	_, err := crand.Read(seed)
 	require.NoError(b, err)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, _, _, _ = BLSThresholdKeyGen(n, optimalThreshold(n), seed)
 	}
-	b.StopTimer()
+}
+
+func BenchmarkSignatureReconstruction(b *testing.B) {
+	n := 60
+	seed := make([]byte, KeyGenSeedMinLen)
+	_, _ = crand.Read(seed)
+	threshold := 40
+	// generate threshold keys
+	skShares, _, _, err := BLSThresholdKeyGen(n, threshold, seed)
+	require.NoError(b, err)
+	// signature hasher
+	kmac := NewExpandMsgXOFKMAC128(thresholdSignatureTag)
+	// generate signature shares
+	signShares := make([]Signature, 0, threshold+1)
+	signers := make([]int, 0, threshold+1)
+	// create (t+1) signatures of the first randomly chosen signers
+	for i := 0; i < threshold+1; i++ {
+		signers = append(signers, i)
+		share, err := skShares[i].Sign(thresholdSignatureMessage, kmac)
+		require.NoError(b, err)
+		signShares = append(signShares, share)
+	}
+	// reconstruct
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := BLSReconstructThresholdSignature(n, threshold, signShares, signers)
+		require.NoError(b, err)
+	}
 }

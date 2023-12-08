@@ -1,9 +1,5 @@
-//go:build relic
-// +build relic
-
 package crypto
 
-// #cgo CFLAGS: -g -Wall -std=c99
 // #include "bls_thresholdsign_include.h"
 import "C"
 
@@ -46,6 +42,8 @@ type blsThresholdSignatureParticipant struct {
 	myPrivateKey PrivateKey
 }
 
+var _ ThresholdSignatureParticipant = (*blsThresholdSignatureParticipant)(nil)
+
 // blsThresholdSignatureInspector implements ThresholdSignatureInspector
 // based on the BLS signature scheme
 type blsThresholdSignatureInspector struct {
@@ -72,6 +70,8 @@ type blsThresholdSignatureInspector struct {
 	lock sync.RWMutex
 }
 
+var _ ThresholdSignatureInspector = (*blsThresholdSignatureInspector)(nil)
+
 // NewBLSThresholdSignatureParticipant creates a new instance of Threshold signature Participant using BLS.
 // A participant is able to participate in a threshold signing protocol as well as following the
 // protocol.
@@ -82,8 +82,8 @@ type blsThresholdSignatureInspector struct {
 // participant is indexed by `myIndex` and holds the input private key
 // where n is the length of the public key shares slice.
 //
-// The function returns
-//   - (nil, invalidInputsError) if:
+// The function returns:
+// - (nil, invalidInputsError) if:
 //   - n is not in [`ThresholdSignMinSize`, `ThresholdSignMaxSize`]
 //   - threshold value is not in interval [1, n-1]
 //   - input private key and public key at my index do not match
@@ -138,8 +138,8 @@ func NewBLSThresholdSignatureParticipant(
 // Participants are defined by their public key share, and are indexed from 0 to n-1
 // where n is the length of the public key shares slice.
 //
-// The function returns
-//   - (nil, invalidInputsError) if:
+// The function returns:
+// - (nil, invalidInputsError) if:
 //   - n is not in [`ThresholdSignMinSize`, `ThresholdSignMaxSize`]
 //   - threshold value is not in interval [1, n-1]
 //   - (nil, notBLSKeyError) at least one public key is not of type pubKeyBLSBLS12381
@@ -402,24 +402,21 @@ func (s *blsThresholdSignatureInspector) reconstructThresholdSignature() (Signat
 		return nil, notEnoughSharesErrorf("number of signature shares %d is not enough, %d are required",
 			len(s.shares), s.threshold+1)
 	}
-	thresholdSignature := make([]byte, signatureLengthBLSBLS12381)
+	thresholdSignature := make([]byte, SignatureLenBLSBLS12381)
 
 	// prepare the C layer inputs
-	shares := make([]byte, 0, len(s.shares)*signatureLengthBLSBLS12381)
+	shares := make([]byte, 0, len(s.shares)*SignatureLenBLSBLS12381)
 	signers := make([]index, 0, len(s.shares))
 	for index, share := range s.shares {
 		shares = append(shares, share...)
-		signers = append(signers, index)
+		signers = append(signers, index+1)
 	}
 
-	// set BLS settings
-	blsInstance.reInit()
-
 	// Lagrange Interpolate at point 0
-	result := C.G1_lagrangeInterpolateAtZero(
+	result := C.E1_lagrange_interpolate_at_zero_write(
 		(*C.uchar)(&thresholdSignature[0]),
 		(*C.uchar)(&shares[0]),
-		(*C.uint8_t)(&signers[0]), (C.int)(s.threshold+1))
+		(*C.uint8_t)(&signers[0]), (C.int)(s.threshold))
 
 	if result != valid {
 		return nil, invalidSignatureError
@@ -443,10 +440,14 @@ func (s *blsThresholdSignatureInspector) reconstructThresholdSignature() (Signat
 //
 // size is the number of participants, it must be in the range [ThresholdSignMinSize..ThresholdSignMaxSize].
 // threshold is the threshold value, it must be in the range [MinimumThreshold..size-1].
-// The function does not check the validity of the shares, and does not check
-// the validity of the resulting signature.
+// The function does not accept any input public key. Therefore, it does not check the validity of the
+// shares against individual public keys, and does not check the validity of the resulting signature
+// against the group public key.
 // BLSReconstructThresholdSignature returns:
-//   - (nil, error) if the inputs are not in the correct range, if the threshold is not reached
+//   - (nil, invalidInputsError) if :
+//     -- numbers of shares does not match the number of signers
+//     -- the inputs are not in the correct range.
+//   - (nil, notEnoughSharesError) if the threshold is not reached.
 //   - (nil, duplicatedSignerError) if input signers are not distinct.
 //   - (nil, invalidSignatureError) if at least one of the first (threshold+1) signatures.
 //     does not serialize to a valid E1 point.
@@ -456,8 +457,6 @@ func (s *blsThresholdSignatureInspector) reconstructThresholdSignature() (Signat
 // are considered to reconstruct the signature.
 func BLSReconstructThresholdSignature(size int, threshold int,
 	shares []Signature, signers []int) (Signature, error) {
-	// set BLS settings
-	blsInstance.reInit()
 
 	if size < ThresholdSignMinSize || size > ThresholdSignMaxSize {
 		return nil, invalidInputsErrorf(
@@ -478,15 +477,15 @@ func BLSReconstructThresholdSignature(size int, threshold int,
 	}
 
 	if len(shares) < threshold+1 {
-		return nil, invalidInputsErrorf(
-			"the number of signatures does not reach the threshold")
+		return nil, notEnoughSharesErrorf(
+			"the number of signatures %d is less than the minimum %d", len(shares), threshold+1)
 	}
 
 	// map to check signers are distinct
 	m := make(map[index]bool)
 
 	// flatten the shares (required by the C layer)
-	flatShares := make([]byte, 0, signatureLengthBLSBLS12381*(threshold+1))
+	flatShares := make([]byte, 0, SignatureLenBLSBLS12381*(threshold+1))
 	indexSigners := make([]index, 0, threshold+1)
 	for i, share := range shares {
 		flatShares = append(flatShares, share...)
@@ -501,15 +500,15 @@ func BLSReconstructThresholdSignature(size int, threshold int,
 				"%d is a duplicate signer", index(signers[i]))
 		}
 		m[index(signers[i])] = true
-		indexSigners = append(indexSigners, index(signers[i]))
+		indexSigners = append(indexSigners, index(signers[i])+1)
 	}
 
-	thresholdSignature := make([]byte, signatureLengthBLSBLS12381)
+	thresholdSignature := make([]byte, SignatureLenBLSBLS12381)
 	// Lagrange Interpolate at point 0
-	if C.G1_lagrangeInterpolateAtZero(
+	if C.E1_lagrange_interpolate_at_zero_write(
 		(*C.uchar)(&thresholdSignature[0]),
 		(*C.uchar)(&flatShares[0]),
-		(*C.uint8_t)(&indexSigners[0]), (C.int)(threshold+1),
+		(*C.uint8_t)(&indexSigners[0]), (C.int)(threshold),
 	) != valid {
 		return nil, invalidSignatureError
 	}
@@ -536,13 +535,15 @@ func EnoughShares(threshold int, sharesNumber int) (bool, error) {
 // BLSThresholdKeyGen is a key generation for a BLS-based
 // threshold signature scheme with a trusted dealer.
 //
-// The function returns :
-//   - (nil, nil, nil, invalidInputsErrorf) if:
+// The function returns:
+// - (nil, nil, nil, invalidInputsErrorf) if:
+//   - seed is too short
 //   - n is not in [`ThresholdSignMinSize`, `ThresholdSignMaxSize`]
 //   - threshold value is not in interval [1, n-1]
 //   - (groupPrivKey, []pubKeyShares, groupPubKey, nil) otherwise
 func BLSThresholdKeyGen(size int, threshold int, seed []byte) ([]PrivateKey,
 	[]PublicKey, PublicKey, error) {
+
 	if size < ThresholdSignMinSize || size > ThresholdSignMaxSize {
 		return nil, nil, nil, invalidInputsErrorf(
 			"size should be between %d and %d, got %d",
@@ -558,33 +559,23 @@ func BLSThresholdKeyGen(size int, threshold int, seed []byte) ([]PrivateKey,
 			threshold)
 	}
 
-	// set BLS settings
-	blsInstance.reInit()
-
 	// the scalars x and G2 points y
 	x := make([]scalar, size)
-	y := make([]pointG2, size)
-	var X0 pointG2
+	y := make([]pointE2, size)
+	var X0 pointE2
 
-	// seed relic
-	if err := seedRelic(seed); err != nil {
-		return nil, nil, nil, fmt.Errorf("seeding relic failed: %w", err)
+	// Generate a polynomial P in Fr[X] of degree t
+	a, err := generateFrPolynomial(seed, threshold)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to generate random polynomial: %w", err)
 	}
-	// Generate a polynomial P in Zr[X] of degree t
-	a := make([]scalar, threshold+1)
-	randZrStar(&a[0]) // non-identity key
-	if threshold > 0 {
-		for i := 1; i < threshold; i++ {
-			randZr(&a[i])
-		}
-		randZrStar(&a[threshold]) // enforce the polynomial degree
-	}
+
 	// compute the shares
 	for i := index(1); int(i) <= size; i++ {
-		C.Zr_polynomialImage(
-			(*C.bn_st)(&x[i-1]),
-			(*C.ep2_st)(&y[i-1]),
-			(*C.bn_st)(&a[0]), (C.int)(len(a)),
+		C.Fr_polynomial_image(
+			(*C.Fr)(&x[i-1]),
+			(*C.E2)(&y[i-1]),
+			(*C.Fr)(&a[0]), (C.int)(len(a)-1),
 			(C.uint8_t)(i),
 		)
 	}

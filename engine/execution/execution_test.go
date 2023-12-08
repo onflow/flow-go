@@ -233,7 +233,13 @@ func TestExecutionFlow(t *testing.T) {
 	}, time.Second*10, time.Millisecond*500)
 
 	// check that the block has been executed.
-	exeNode.AssertHighestExecutedBlock(t, block.Header)
+	exeNode.AssertBlockIsExecuted(t, block.Header)
+
+	if exeNode.StorehouseEnabled {
+		exeNode.AssertHighestExecutedBlock(t, genesis)
+	} else {
+		exeNode.AssertHighestExecutedBlock(t, block.Header)
+	}
 
 	myReceipt, err := exeNode.MyExecutionReceipts.MyReceipt(block.ID())
 	require.NoError(t, err)
@@ -435,7 +441,15 @@ func TestFailedTxWillNotChangeStateCommitment(t *testing.T) {
 	hub.DeliverAllEventually(t, func() bool {
 		return receiptsReceived.Load() == 1
 	})
-	exe1Node.AssertHighestExecutedBlock(t, block1.Header)
+
+	if exe1Node.StorehouseEnabled {
+		exe1Node.AssertHighestExecutedBlock(t, genesis)
+	} else {
+		exe1Node.AssertHighestExecutedBlock(t, block1.Header)
+	}
+
+	exe1Node.AssertBlockIsExecuted(t, block1.Header)
+	exe1Node.AssertBlockNotExecuted(t, block2.Header)
 
 	scExe1Genesis, err := exe1Node.ExecutionState.StateCommitmentByBlockID(genesis.ID())
 	assert.NoError(t, err)
@@ -457,8 +471,8 @@ func TestFailedTxWillNotChangeStateCommitment(t *testing.T) {
 	})
 
 	// ensure state has been synced across both nodes
-	exe1Node.AssertHighestExecutedBlock(t, block3.Header)
-	// exe2Node.AssertHighestExecutedBlock(t, block3.Header)
+	exe1Node.AssertBlockIsExecuted(t, block2.Header)
+	exe1Node.AssertBlockIsExecuted(t, block3.Header)
 
 	// verify state commitment of block 2 is the same as block 1, since tx failed on seq number verification
 	scExe1Block2, err := exe1Node.ExecutionState.StateCommitmentByBlockID(block2.ID())
