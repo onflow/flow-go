@@ -112,7 +112,6 @@ func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(_ context.Context, bl
 	// block ID by the height of the queried block, then compare the queried ID to the finalized ID.
 	// If they match, then the queried block must be finalized.
 	blockIDFinalizedAtHeight, err := b.headers.BlockIDByHeight(snapshotHeadByBlockId.Height)
-
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			// The block exists, but no block has been finalized at its height. Therefore, this block
@@ -158,7 +157,6 @@ func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(_ context.Context, bl
 //     yielding an invalid snapshot. Therefore we will never return a snapshot for this block height.
 func (b *backendNetwork) GetProtocolStateSnapshotByHeight(_ context.Context, blockHeight uint64) ([]byte, error) {
 	snapshot := b.state.AtHeight(blockHeight)
-
 	_, err := snapshot.Head()
 	if err != nil {
 		if errors.Is(err, state.ErrUnknownSnapshotReference) {

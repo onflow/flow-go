@@ -2,6 +2,7 @@ package unittest
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/state"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -393,13 +394,13 @@ func (bc *BaseChainSuite) SetupChain() {
 func StateSnapshotForUnknownBlock() *protocol.Snapshot {
 	snapshot := &protocol.Snapshot{}
 	snapshot.On("Identity", mock.Anything).Return(
-		nil, storerr.ErrNotFound,
+		nil, state.ErrUnknownSnapshotReference,
 	)
 	snapshot.On("Identities", mock.Anything).Return(
-		nil, storerr.ErrNotFound,
+		nil, state.ErrUnknownSnapshotReference,
 	)
 	snapshot.On("Head", mock.Anything).Return(
-		nil, storerr.ErrNotFound,
+		nil, state.ErrUnknownSnapshotReference,
 	)
 	return snapshot
 }
