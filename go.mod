@@ -52,11 +52,11 @@ require (
 	github.com/multiformats/go-multihash v0.2.3
 	github.com/onflow/atree v0.6.0
 	github.com/onflow/cadence v0.42.5
+	github.com/onflow/crypto v0.25.0
 	github.com/onflow/flow v0.3.4
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.14.0
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.14.0
 	github.com/onflow/flow-go-sdk v0.41.16
-	github.com/onflow/crypto v0.25.0
 	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20231124194313-106cc495def6
 	github.com/onflow/go-bitswap v0.0.0-20230703214630-6d3db958c73d
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
@@ -249,6 +249,7 @@ require (
 	github.com/multiformats/go-varint v0.0.7 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20230711213910-baad011d2b13 // indirect
+	github.com/onflow/flow-go/crypto v0.24.7 // indirect
 	github.com/onflow/flow-nft/lib/go/contracts v1.1.0 // indirect
 	github.com/onflow/sdks v0.5.0 // indirect
 	github.com/onsi/ginkgo/v2 v2.9.7 // indirect
