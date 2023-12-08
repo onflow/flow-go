@@ -43,10 +43,82 @@ var evmAddressBytesType = sema.NewConstantSizedType(nil, sema.UInt8Type, types.A
 var evmAddressBytesStaticType = interpreter.ConvertSemaArrayTypeToStaticArrayType(nil, evmAddressBytesType)
 var EVMAddressBytesCadenceType = cadence.NewConstantSizedArrayType(types.AddressLength, cadence.TheUInt8Type)
 
+// unknownABITypeError
+
+type unknownABITypeError struct {
+	TypeName string
+}
+
+var _ errors.UserError = unknownABITypeError{}
+
+func (unknownABITypeError) IsUserError() {}
+
+func (e unknownABITypeError) Error() string {
+	return fmt.Sprintf("unknown ABI type: %s", e.TypeName)
+}
+
+// unsupportedValueABIEncodingError
+
+type unsupportedValueABIEncodingError struct {
+	Type    interpreter.StaticType
+	Message string
+}
+
+var _ errors.UserError = unsupportedValueABIEncodingError{}
+
+func (unsupportedValueABIEncodingError) IsUserError() {}
+
+func (e unsupportedValueABIEncodingError) Error() string {
+	return fmt.Sprintf("unsupported ABI encoding for value of type: %v", e.Type)
+}
+
+// unsupportedValueABIDecodingError
+
+type unsupportedValueABIDecodingError struct {
+	Type    interpreter.StaticType
+	Message string
+}
+
+var _ errors.UserError = unsupportedValueABIDecodingError{}
+
+func (unsupportedValueABIDecodingError) IsUserError() {}
+
+func (e unsupportedValueABIDecodingError) Error() string {
+	return fmt.Sprintf("unsupported ABI decoding for value of type: %v", e.Type)
+}
+
+// abiEncodingError
+
+type abiEncodingError struct {
+	Message string
+}
+
+var _ errors.UserError = abiEncodingError{}
+
+func (abiEncodingError) IsUserError() {}
+
+func (e abiEncodingError) Error() string {
+	return fmt.Sprintf("encoding of values to ABI failed with: %v", e.Message)
+}
+
+// abiDecodingError
+
+type abiDecodingError struct {
+	Message string
+}
+
+var _ errors.UserError = abiDecodingError{}
+
+func (abiDecodingError) IsUserError() {}
+
+func (e abiDecodingError) Error() string {
+	return fmt.Sprintf("decoding of ABI to values failed with: %v", e.Message)
+}
+
 func newGethArgument(typeName string) gethABI.Argument {
 	typ, err := gethABI.NewType(typeName, "", nil)
 	if err != nil {
-		panic(err)
+		panic(unknownABITypeError{TypeName: typeName})
 	}
 	return gethABI.Argument{Type: typ}
 }
@@ -153,10 +225,9 @@ func newInternalEVMTypeEncodeABIFunction(
 						arguments = append(arguments, newGethArgument("address"))
 					} else {
 						panic(
-							fmt.Errorf(
-								"unsupported composite value: %v",
-								element.StaticType(inter),
-							),
+							unsupportedValueABIEncodingError{
+								Type: element.StaticType(inter),
+							},
 						)
 					}
 				case *interpreter.ArrayValue:
@@ -167,10 +238,9 @@ func newInternalEVMTypeEncodeABIFunction(
 							v, ok := element.(*interpreter.StringValue)
 							if !ok {
 								panic(
-									fmt.Errorf(
-										"unsupported array value type: %v",
-										element.StaticType(inter),
-									),
+									unsupportedValueABIEncodingError{
+										Type: element.StaticType(inter),
+									},
 								)
 							}
 							elements = append(elements, v.Str)
@@ -186,10 +256,9 @@ func newInternalEVMTypeEncodeABIFunction(
 							v, ok := element.(interpreter.BoolValue)
 							if !ok {
 								panic(
-									fmt.Errorf(
-										"unsupported array value type: %v",
-										element.StaticType(inter),
-									),
+									unsupportedValueABIEncodingError{
+										Type: element.StaticType(inter),
+									},
 								)
 							}
 							elements = append(elements, bool(v))
@@ -205,10 +274,9 @@ func newInternalEVMTypeEncodeABIFunction(
 							v, ok := element.(interpreter.UInt8Value)
 							if !ok {
 								panic(
-									fmt.Errorf(
-										"unsupported array value type: %v",
-										element.StaticType(inter),
-									),
+									unsupportedValueABIEncodingError{
+										Type: element.StaticType(inter),
+									},
 								)
 							}
 							elements = append(elements, uint8(v))
@@ -224,10 +292,9 @@ func newInternalEVMTypeEncodeABIFunction(
 							v, ok := element.(interpreter.UInt16Value)
 							if !ok {
 								panic(
-									fmt.Errorf(
-										"unsupported array value type: %v",
-										element.StaticType(inter),
-									),
+									unsupportedValueABIEncodingError{
+										Type: element.StaticType(inter),
+									},
 								)
 							}
 							elements = append(elements, uint16(v))
@@ -243,10 +310,9 @@ func newInternalEVMTypeEncodeABIFunction(
 							v, ok := element.(interpreter.UInt32Value)
 							if !ok {
 								panic(
-									fmt.Errorf(
-										"unsupported array value type: %v",
-										element.StaticType(inter),
-									),
+									unsupportedValueABIEncodingError{
+										Type: element.StaticType(inter),
+									},
 								)
 							}
 							elements = append(elements, uint32(v))
@@ -262,10 +328,9 @@ func newInternalEVMTypeEncodeABIFunction(
 							v, ok := element.(interpreter.UInt64Value)
 							if !ok {
 								panic(
-									fmt.Errorf(
-										"unsupported array value type: %v",
-										element.StaticType(inter),
-									),
+									unsupportedValueABIEncodingError{
+										Type: element.StaticType(inter),
+									},
 								)
 							}
 							elements = append(elements, uint64(v))
@@ -281,10 +346,9 @@ func newInternalEVMTypeEncodeABIFunction(
 							v, ok := element.(interpreter.UInt128Value)
 							if !ok {
 								panic(
-									fmt.Errorf(
-										"unsupported array value type: %v",
-										element.StaticType(inter),
-									),
+									unsupportedValueABIEncodingError{
+										Type: element.StaticType(inter),
+									},
 								)
 							}
 							elements = append(elements, v.BigInt)
@@ -300,10 +364,9 @@ func newInternalEVMTypeEncodeABIFunction(
 							v, ok := element.(interpreter.UInt256Value)
 							if !ok {
 								panic(
-									fmt.Errorf(
-										"unsupported array value type: %v",
-										element.StaticType(inter),
-									),
+									unsupportedValueABIEncodingError{
+										Type: element.StaticType(inter),
+									},
 								)
 							}
 							elements = append(elements, v.BigInt)
@@ -319,10 +382,9 @@ func newInternalEVMTypeEncodeABIFunction(
 							v, ok := element.(interpreter.Int8Value)
 							if !ok {
 								panic(
-									fmt.Errorf(
-										"unsupported array value type: %v",
-										element.StaticType(inter),
-									),
+									unsupportedValueABIEncodingError{
+										Type: element.StaticType(inter),
+									},
 								)
 							}
 							elements = append(elements, int8(v))
@@ -338,10 +400,9 @@ func newInternalEVMTypeEncodeABIFunction(
 							v, ok := element.(interpreter.Int16Value)
 							if !ok {
 								panic(
-									fmt.Errorf(
-										"unsupported array value type: %v",
-										element.StaticType(inter),
-									),
+									unsupportedValueABIEncodingError{
+										Type: element.StaticType(inter),
+									},
 								)
 							}
 							elements = append(elements, int16(v))
@@ -357,10 +418,9 @@ func newInternalEVMTypeEncodeABIFunction(
 							v, ok := element.(interpreter.Int32Value)
 							if !ok {
 								panic(
-									fmt.Errorf(
-										"unsupported array value type: %v",
-										element.StaticType(inter),
-									),
+									unsupportedValueABIEncodingError{
+										Type: element.StaticType(inter),
+									},
 								)
 							}
 							elements = append(elements, int32(v))
@@ -376,10 +436,9 @@ func newInternalEVMTypeEncodeABIFunction(
 							v, ok := element.(interpreter.Int64Value)
 							if !ok {
 								panic(
-									fmt.Errorf(
-										"unsupported array value type: %v",
-										element.StaticType(inter),
-									),
+									unsupportedValueABIEncodingError{
+										Type: element.StaticType(inter),
+									},
 								)
 							}
 							elements = append(elements, int64(v))
@@ -395,10 +454,9 @@ func newInternalEVMTypeEncodeABIFunction(
 							v, ok := element.(interpreter.Int128Value)
 							if !ok {
 								panic(
-									fmt.Errorf(
-										"unsupported array value type: %v",
-										element.StaticType(inter),
-									),
+									unsupportedValueABIEncodingError{
+										Type: element.StaticType(inter),
+									},
 								)
 							}
 							elements = append(elements, v.BigInt)
@@ -414,10 +472,9 @@ func newInternalEVMTypeEncodeABIFunction(
 							v, ok := element.(interpreter.Int256Value)
 							if !ok {
 								panic(
-									fmt.Errorf(
-										"unsupported array value type: %v",
-										element.StaticType(inter),
-									),
+									unsupportedValueABIEncodingError{
+										Type: element.StaticType(inter),
+									},
 								)
 							}
 							elements = append(elements, v.BigInt)
@@ -427,21 +484,33 @@ func newInternalEVMTypeEncodeABIFunction(
 						})
 						values = append(values, elements)
 						arguments = append(arguments, newGethArgument("int256[]"))
+					default:
+						panic(
+							unsupportedValueABIEncodingError{
+								Type: element.StaticType(inter),
+							},
+						)
 					}
 				default:
-					panic(fmt.Errorf("unsupported type: %v", value.StaticType(inter)))
+					panic(
+						unsupportedValueABIEncodingError{
+							Type: element.StaticType(inter),
+						},
+					)
 				}
 
 				// continue iteration
 				return true
 			})
 
-			encoded, err := arguments.Pack(values...)
+			encodedValues, err := arguments.Pack(values...)
 			if err != nil {
-				panic(err)
+				panic(
+					abiEncodingError{Message: err.Error()},
+				)
 			}
 
-			return interpreter.ByteSliceToByteArrayValue(inter, encoded)
+			return interpreter.ByteSliceToByteArrayValue(inter, encodedValues)
 		},
 	)
 }
@@ -505,6 +574,8 @@ func newInternalEVMTypeDecodeABIFunction(
 					panic(errors.NewUnreachableError())
 				}
 
+				supportedValue := true
+
 				switch value := typeValue.Type.(type) {
 				case interpreter.ArrayStaticType:
 					switch value.ElementType() {
@@ -536,13 +607,30 @@ func newInternalEVMTypeDecodeABIFunction(
 						arguments = append(arguments, newGethArgument("int128[]"))
 					case interpreter.PrimitiveStaticTypeInt256:
 						arguments = append(arguments, newGethArgument("int256[]"))
+					default:
+						panic(
+							unsupportedValueABIDecodingError{
+								Type: value.ElementType(),
+							},
+						)
 					}
 				case interpreter.CompositeStaticType:
 					if value.TypeID == evmAddressTypeID(location) {
 						arguments = append(arguments, newGethArgument("address"))
 					} else {
-						panic(fmt.Errorf("unsupported composite type: %v", value))
+						panic(
+							unsupportedValueABIDecodingError{
+								Type: typeValue.Type,
+							},
+						)
 					}
+				default:
+					supportedValue = false
+				}
+
+				if supportedValue {
+					// continue iteration
+					return true
 				}
 
 				switch typeValue.Type {
@@ -574,15 +662,34 @@ func newInternalEVMTypeDecodeABIFunction(
 					arguments = append(arguments, newGethArgument("int128"))
 				case interpreter.PrimitiveStaticTypeInt256:
 					arguments = append(arguments, newGethArgument("int256"))
+				default:
+					panic(
+						unsupportedValueABIDecodingError{
+							Type: typeValue.Type,
+						},
+					)
 				}
 
 				// continue iteration
 				return true
 			})
 
-			decoded, err := arguments.Unpack(data)
+			decodedValues, err := arguments.Unpack(data)
 			if err != nil {
-				panic(err)
+				panic(
+					abiDecodingError{Message: err.Error()},
+				)
+			}
+
+			if len(decodedValues) != typesArray.Count() {
+				message := fmt.Sprintf(
+					"received %d types for %d values",
+					typesArray.Count(),
+					len(decodedValues),
+				)
+				panic(
+					abiDecodingError{Message: message},
+				)
 			}
 
 			i := 0
@@ -601,7 +708,10 @@ func newInternalEVMTypeDecodeABIFunction(
 					switch value.ElementType() {
 					case interpreter.PrimitiveStaticTypeString:
 						arrayElementType = interpreter.PrimitiveStaticTypeString
-						elements := decoded[i].([]string)
+						elements, ok := decodedValues[i].([]string)
+						if !ok {
+							panic(abiDecodingError{Message: "could not decode ABI value to [String]"})
+						}
 						for _, v := range elements {
 							arrValues = append(arrValues, interpreter.NewStringValue(inter, common.NewStringMemoryUsage(len(v)), func() string {
 								return v
@@ -609,13 +719,19 @@ func newInternalEVMTypeDecodeABIFunction(
 						}
 					case interpreter.PrimitiveStaticTypeBool:
 						arrayElementType = interpreter.PrimitiveStaticTypeBool
-						elements := decoded[i].([]bool)
+						elements, ok := decodedValues[i].([]bool)
+						if !ok {
+							panic(abiDecodingError{Message: "could not decode ABI value to [Bool]"})
+						}
 						for _, v := range elements {
 							arrValues = append(arrValues, interpreter.BoolValue(v))
 						}
 					case interpreter.PrimitiveStaticTypeUInt8:
 						arrayElementType = interpreter.PrimitiveStaticTypeUInt8
-						elements := decoded[i].([]uint8)
+						elements, ok := decodedValues[i].([]uint8)
+						if !ok {
+							panic(abiDecodingError{Message: "could not decode ABI value to [UInt8]"})
+						}
 						for _, v := range elements {
 							arrValues = append(arrValues, interpreter.NewUInt8Value(inter, func() uint8 {
 								return v
@@ -623,7 +739,10 @@ func newInternalEVMTypeDecodeABIFunction(
 						}
 					case interpreter.PrimitiveStaticTypeUInt16:
 						arrayElementType = interpreter.PrimitiveStaticTypeUInt16
-						elements := decoded[i].([]uint16)
+						elements, ok := decodedValues[i].([]uint16)
+						if !ok {
+							panic(abiDecodingError{Message: "could not decode ABI value to [UInt16]"})
+						}
 						for _, v := range elements {
 							arrValues = append(arrValues, interpreter.NewUInt16Value(inter, func() uint16 {
 								return v
@@ -631,7 +750,10 @@ func newInternalEVMTypeDecodeABIFunction(
 						}
 					case interpreter.PrimitiveStaticTypeUInt32:
 						arrayElementType = interpreter.PrimitiveStaticTypeUInt32
-						elements := decoded[i].([]uint32)
+						elements, ok := decodedValues[i].([]uint32)
+						if !ok {
+							panic(abiDecodingError{Message: "could not decode ABI value to [UInt32]"})
+						}
 						for _, v := range elements {
 							arrValues = append(arrValues, interpreter.NewUInt32Value(inter, func() uint32 {
 								return v
@@ -639,7 +761,10 @@ func newInternalEVMTypeDecodeABIFunction(
 						}
 					case interpreter.PrimitiveStaticTypeUInt64:
 						arrayElementType = interpreter.PrimitiveStaticTypeUInt64
-						elements := decoded[i].([]uint64)
+						elements, ok := decodedValues[i].([]uint64)
+						if !ok {
+							panic(abiDecodingError{Message: "could not decode ABI value to [UInt64]"})
+						}
 						for _, v := range elements {
 							arrValues = append(arrValues, interpreter.NewUInt64Value(inter, func() uint64 {
 								return v
@@ -647,7 +772,10 @@ func newInternalEVMTypeDecodeABIFunction(
 						}
 					case interpreter.PrimitiveStaticTypeUInt128:
 						arrayElementType = interpreter.PrimitiveStaticTypeUInt128
-						elements := decoded[i].([]*big.Int)
+						elements, ok := decodedValues[i].([]*big.Int)
+						if !ok {
+							panic(abiDecodingError{Message: "could not decode ABI value to [UInt128]"})
+						}
 						for _, v := range elements {
 							arrValues = append(arrValues, interpreter.NewUInt128ValueFromBigInt(inter, func() *big.Int {
 								return v
@@ -655,7 +783,10 @@ func newInternalEVMTypeDecodeABIFunction(
 						}
 					case interpreter.PrimitiveStaticTypeUInt256:
 						arrayElementType = interpreter.PrimitiveStaticTypeUInt256
-						elements := decoded[i].([]*big.Int)
+						elements, ok := decodedValues[i].([]*big.Int)
+						if !ok {
+							panic(abiDecodingError{Message: "could not decode ABI value to [UInt256]"})
+						}
 						for _, v := range elements {
 							arrValues = append(arrValues, interpreter.NewUInt256ValueFromBigInt(inter, func() *big.Int {
 								return v
@@ -663,7 +794,10 @@ func newInternalEVMTypeDecodeABIFunction(
 						}
 					case interpreter.PrimitiveStaticTypeInt8:
 						arrayElementType = interpreter.PrimitiveStaticTypeInt8
-						elements := decoded[i].([]int8)
+						elements, ok := decodedValues[i].([]int8)
+						if !ok {
+							panic(abiDecodingError{Message: "could not decode ABI value to [Int8]"})
+						}
 						for _, v := range elements {
 							arrValues = append(arrValues, interpreter.NewInt8Value(inter, func() int8 {
 								return v
@@ -671,7 +805,10 @@ func newInternalEVMTypeDecodeABIFunction(
 						}
 					case interpreter.PrimitiveStaticTypeInt16:
 						arrayElementType = interpreter.PrimitiveStaticTypeInt16
-						elements := decoded[i].([]int16)
+						elements, ok := decodedValues[i].([]int16)
+						if !ok {
+							panic(abiDecodingError{Message: "could not decode ABI value to [Int16]"})
+						}
 						for _, v := range elements {
 							arrValues = append(arrValues, interpreter.NewInt16Value(inter, func() int16 {
 								return v
@@ -679,7 +816,10 @@ func newInternalEVMTypeDecodeABIFunction(
 						}
 					case interpreter.PrimitiveStaticTypeInt32:
 						arrayElementType = interpreter.PrimitiveStaticTypeInt32
-						elements := decoded[i].([]int32)
+						elements, ok := decodedValues[i].([]int32)
+						if !ok {
+							panic(abiDecodingError{Message: "could not decode ABI value to [Int32]"})
+						}
 						for _, v := range elements {
 							arrValues = append(arrValues, interpreter.NewInt32Value(inter, func() int32 {
 								return v
@@ -687,7 +827,10 @@ func newInternalEVMTypeDecodeABIFunction(
 						}
 					case interpreter.PrimitiveStaticTypeInt64:
 						arrayElementType = interpreter.PrimitiveStaticTypeInt64
-						elements := decoded[i].([]int64)
+						elements, ok := decodedValues[i].([]int64)
+						if !ok {
+							panic(abiDecodingError{Message: "could not decode ABI value to [Int64]"})
+						}
 						for _, v := range elements {
 							arrValues = append(arrValues, interpreter.NewInt64Value(inter, func() int64 {
 								return v
@@ -695,7 +838,10 @@ func newInternalEVMTypeDecodeABIFunction(
 						}
 					case interpreter.PrimitiveStaticTypeInt128:
 						arrayElementType = interpreter.PrimitiveStaticTypeInt128
-						elements := decoded[i].([]*big.Int)
+						elements, ok := decodedValues[i].([]*big.Int)
+						if !ok {
+							panic(abiDecodingError{Message: "could not decode ABI value to [Int128]"})
+						}
 						for _, v := range elements {
 							arrValues = append(arrValues, interpreter.NewInt128ValueFromBigInt(inter, func() *big.Int {
 								return v
@@ -703,7 +849,10 @@ func newInternalEVMTypeDecodeABIFunction(
 						}
 					case interpreter.PrimitiveStaticTypeInt256:
 						arrayElementType = interpreter.PrimitiveStaticTypeInt256
-						elements := decoded[i].([]*big.Int)
+						elements, ok := decodedValues[i].([]*big.Int)
+						if !ok {
+							panic(abiDecodingError{Message: "could not decode ABI value to [Int256]"})
+						}
 						for _, v := range elements {
 							arrValues = append(arrValues, interpreter.NewInt256ValueFromBigInt(inter, func() *big.Int {
 								return v
@@ -728,7 +877,10 @@ func newInternalEVMTypeDecodeABIFunction(
 					values = append(values, arr)
 				case interpreter.CompositeStaticType:
 					if value.TypeID == evmAddressTypeID(location) {
-						addr := decoded[i].(gethCommon.Address)
+						addr, ok := decodedValues[i].(gethCommon.Address)
+						if !ok {
+							panic(abiDecodingError{Message: "could not decode ABI value to EVM.EVMAddress"})
+						}
 						var address types.Address
 						copy(address[:], addr.Bytes())
 						compositeValue := interpreter.NewCompositeValue(
@@ -747,13 +899,20 @@ func newInternalEVMTypeDecodeABIFunction(
 						)
 						values = append(values, compositeValue)
 					} else {
-						panic(fmt.Errorf("unsupported composite type: %v", value))
+						panic(
+							unsupportedValueABIDecodingError{
+								Type: typeValue.Type,
+							},
+						)
 					}
 				}
 
 				switch typeValue.Type {
 				case interpreter.PrimitiveStaticTypeString:
-					value := decoded[i].(string)
+					value, ok := decodedValues[i].(string)
+					if !ok {
+						panic(abiDecodingError{Message: "could not decode ABI value to String"})
+					}
 					values = append(values, interpreter.NewStringValue(
 						inter,
 						common.NewStringMemoryUsage(len(value)),
@@ -762,10 +921,16 @@ func newInternalEVMTypeDecodeABIFunction(
 						},
 					))
 				case interpreter.PrimitiveStaticTypeBool:
-					value := decoded[i].(bool)
+					value, ok := decodedValues[i].(bool)
+					if !ok {
+						panic(abiDecodingError{Message: "could not decode ABI value to Bool"})
+					}
 					values = append(values, interpreter.BoolValue(value))
 				case interpreter.PrimitiveStaticTypeUInt8:
-					value := decoded[i].(uint8)
+					value, ok := decodedValues[i].(uint8)
+					if !ok {
+						panic(abiDecodingError{Message: "could not decode ABI value to UInt8"})
+					}
 					values = append(values, interpreter.NewUInt8Value(
 						inter,
 						func() uint8 {
@@ -773,7 +938,10 @@ func newInternalEVMTypeDecodeABIFunction(
 						},
 					))
 				case interpreter.PrimitiveStaticTypeUInt16:
-					value := decoded[i].(uint16)
+					value, ok := decodedValues[i].(uint16)
+					if !ok {
+						panic(abiDecodingError{Message: "could not decode ABI value to UInt16"})
+					}
 					values = append(values, interpreter.NewUInt16Value(
 						inter,
 						func() uint16 {
@@ -781,7 +949,10 @@ func newInternalEVMTypeDecodeABIFunction(
 						},
 					))
 				case interpreter.PrimitiveStaticTypeUInt32:
-					value := decoded[i].(uint32)
+					value, ok := decodedValues[i].(uint32)
+					if !ok {
+						panic(abiDecodingError{Message: "could not decode ABI value to UInt32"})
+					}
 					values = append(values, interpreter.NewUInt32Value(
 						inter,
 						func() uint32 {
@@ -789,7 +960,10 @@ func newInternalEVMTypeDecodeABIFunction(
 						},
 					))
 				case interpreter.PrimitiveStaticTypeUInt64:
-					value := decoded[i].(uint64)
+					value, ok := decodedValues[i].(uint64)
+					if !ok {
+						panic(abiDecodingError{Message: "could not decode ABI value to UInt64"})
+					}
 					values = append(values, interpreter.NewUInt64Value(
 						inter,
 						func() uint64 {
@@ -797,7 +971,10 @@ func newInternalEVMTypeDecodeABIFunction(
 						},
 					))
 				case interpreter.PrimitiveStaticTypeUInt128:
-					value := decoded[i].(*big.Int)
+					value, ok := decodedValues[i].(*big.Int)
+					if !ok {
+						panic(abiDecodingError{Message: "could not decode ABI value to UInt128"})
+					}
 					values = append(values, interpreter.NewUInt128ValueFromBigInt(
 						inter,
 						func() *big.Int {
@@ -805,7 +982,10 @@ func newInternalEVMTypeDecodeABIFunction(
 						},
 					))
 				case interpreter.PrimitiveStaticTypeUInt256:
-					value := decoded[i].(*big.Int)
+					value, ok := decodedValues[i].(*big.Int)
+					if !ok {
+						panic(abiDecodingError{Message: "could not decode ABI value to UInt256"})
+					}
 					values = append(values, interpreter.NewUInt256ValueFromBigInt(
 						inter,
 						func() *big.Int {
@@ -813,7 +993,10 @@ func newInternalEVMTypeDecodeABIFunction(
 						},
 					))
 				case interpreter.PrimitiveStaticTypeInt8:
-					value := decoded[i].(int8)
+					value, ok := decodedValues[i].(int8)
+					if !ok {
+						panic(abiDecodingError{Message: "could not decode ABI value to Int8"})
+					}
 					values = append(values, interpreter.NewInt8Value(
 						inter,
 						func() int8 {
@@ -821,7 +1004,10 @@ func newInternalEVMTypeDecodeABIFunction(
 						},
 					))
 				case interpreter.PrimitiveStaticTypeInt16:
-					value := decoded[i].(int16)
+					value, ok := decodedValues[i].(int16)
+					if !ok {
+						panic(abiDecodingError{Message: "could not decode ABI value to Int16"})
+					}
 					values = append(values, interpreter.NewInt16Value(
 						inter,
 						func() int16 {
@@ -829,7 +1015,10 @@ func newInternalEVMTypeDecodeABIFunction(
 						},
 					))
 				case interpreter.PrimitiveStaticTypeInt32:
-					value := decoded[i].(int32)
+					value, ok := decodedValues[i].(int32)
+					if !ok {
+						panic(abiDecodingError{Message: "could not decode ABI value to Int32"})
+					}
 					values = append(values, interpreter.NewInt32Value(
 						inter,
 						func() int32 {
@@ -837,7 +1026,10 @@ func newInternalEVMTypeDecodeABIFunction(
 						},
 					))
 				case interpreter.PrimitiveStaticTypeInt64:
-					value := decoded[i].(int64)
+					value, ok := decodedValues[i].(int64)
+					if !ok {
+						panic(abiDecodingError{Message: "could not decode ABI value to Int64"})
+					}
 					values = append(values, interpreter.NewInt64Value(
 						inter,
 						func() int64 {
@@ -845,7 +1037,10 @@ func newInternalEVMTypeDecodeABIFunction(
 						},
 					))
 				case interpreter.PrimitiveStaticTypeInt128:
-					value := decoded[i].(*big.Int)
+					value, ok := decodedValues[i].(*big.Int)
+					if !ok {
+						panic(abiDecodingError{Message: "could not decode ABI value to Int128"})
+					}
 					values = append(values, interpreter.NewInt128ValueFromBigInt(
 						inter,
 						func() *big.Int {
@@ -853,7 +1048,10 @@ func newInternalEVMTypeDecodeABIFunction(
 						},
 					))
 				case interpreter.PrimitiveStaticTypeInt256:
-					value := decoded[i].(*big.Int)
+					value, ok := decodedValues[i].(*big.Int)
+					if !ok {
+						panic(abiDecodingError{Message: "could not decode ABI value to Int256"})
+					}
 					values = append(values, interpreter.NewInt256ValueFromBigInt(
 						inter,
 						func() *big.Int {

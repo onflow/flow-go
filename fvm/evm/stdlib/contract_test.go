@@ -470,126 +470,126 @@ func TestEVMEncodeDecodeABIRoundtrip(t *testing.T) {
 
       access(all)
       fun main(): Bool {
-		// Check EVM.EVMAddress encode/decode
+        // Check EVM.EVMAddress encode/decode
         // bytes for address 0x7A58c0Be72BE218B41C608b7Fe7C5bB630736C71
         let address = EVM.EVMAddress(
           bytes: [
-			122, 88, 192, 190, 114, 190, 33, 139, 65, 198,
-			8, 183, 254, 124, 91, 182, 48, 115, 108, 113
-		  ]
+            122, 88, 192, 190, 114, 190, 33, 139, 65, 198,
+            8, 183, 254, 124, 91, 182, 48, 115, 108, 113
+          ]
         )
         var data = EVM.encodeABI([address])
         var values = EVM.decodeABI(types: [Type<EVM.EVMAddress>()], data: data)
         assert(values.length == 1)
         assert((values[0] as! EVM.EVMAddress).bytes == address.bytes)
 
-		// Check String encode/decode
-		data = EVM.encodeABI(["John Doe", ""])
-		values = EVM.decodeABI(types: [Type<String>(), Type<String>()], data: data)
-		assert((values[0] as! String) == "John Doe")
-		assert((values[1] as! String) == "")
+        // Check String encode/decode
+        data = EVM.encodeABI(["John Doe", ""])
+        values = EVM.decodeABI(types: [Type<String>(), Type<String>()], data: data)
+        assert((values[0] as! String) == "John Doe")
+        assert((values[1] as! String) == "")
 
-		// Check Bool encode/decode
-		data = EVM.encodeABI([true, false])
-		values = EVM.decodeABI(types: [Type<Bool>(), Type<Bool>()], data: data)
-		assert((values[0] as! Bool) == true)
-		assert((values[1] as! Bool) == false)
+        // Check Bool encode/decode
+        data = EVM.encodeABI([true, false])
+        values = EVM.decodeABI(types: [Type<Bool>(), Type<Bool>()], data: data)
+        assert((values[0] as! Bool) == true)
+        assert((values[1] as! Bool) == false)
 
-		// Check UInt*/Int* encode/decode
+        // Check UInt*/Int* encode/decode
         data = EVM.encodeABI([
-			UInt8(33),
-			UInt16(33),
-			UInt32(33),
-			UInt64(33),
-			UInt128(33),
-			UInt256(33),
-			Int8(-33),
-			Int16(-33),
-			Int32(-33),
-			Int64(-33),
-			Int128(-33),
-			Int256(-33)
-		])
+          UInt8(33),
+          UInt16(33),
+          UInt32(33),
+          UInt64(33),
+          UInt128(33),
+          UInt256(33),
+          Int8(-33),
+          Int16(-33),
+          Int32(-33),
+          Int64(-33),
+          Int128(-33),
+          Int256(-33)
+        ])
         values = EVM.decodeABI(
-			types: [
-				Type<UInt8>(),
-				Type<UInt16>(),
-				Type<UInt32>(),
-				Type<UInt64>(),
-				Type<UInt128>(),
-				Type<UInt256>(),
-				Type<Int8>(),
-				Type<Int16>(),
-				Type<Int32>(),
-				Type<Int64>(),
-				Type<Int128>(),
-				Type<Int256>()
-			],
-			data: data
-		)
-		assert((values[0] as! UInt8) == 33)
-		assert((values[1] as! UInt16) == 33)
-		assert((values[2] as! UInt32) == 33)
-		assert((values[3] as! UInt64) == 33)
-		assert((values[4] as! UInt128) == 33)
-		assert((values[5] as! UInt256) == 33)
-		assert((values[6] as! Int8) == -33)
-		assert((values[7] as! Int16) == -33)
-		assert((values[8] as! Int32) == -33)
-		assert((values[9] as! Int64) == -33)
-		assert((values[10] as! Int128) == -33)
-		assert((values[11] as! Int256) == -33)
+          types: [
+            Type<UInt8>(),
+            Type<UInt16>(),
+            Type<UInt32>(),
+            Type<UInt64>(),
+            Type<UInt128>(),
+            Type<UInt256>(),
+            Type<Int8>(),
+            Type<Int16>(),
+            Type<Int32>(),
+            Type<Int64>(),
+            Type<Int128>(),
+            Type<Int256>()
+          ],
+          data: data
+        )
+        assert((values[0] as! UInt8) == 33)
+        assert((values[1] as! UInt16) == 33)
+        assert((values[2] as! UInt32) == 33)
+        assert((values[3] as! UInt64) == 33)
+        assert((values[4] as! UInt128) == 33)
+        assert((values[5] as! UInt256) == 33)
+        assert((values[6] as! Int8) == -33)
+        assert((values[7] as! Int16) == -33)
+        assert((values[8] as! Int32) == -33)
+        assert((values[9] as! Int64) == -33)
+        assert((values[10] as! Int128) == -33)
+        assert((values[11] as! Int256) == -33)
 
-		// Check array of leaf types encode/decode
+        // Check array of leaf types encode/decode
         data = EVM.encodeABI([
-			["one", "two"],
-			[true, false],
-			[5, 10] as [UInt8],
-			[5, 10] as [UInt16],
-			[5, 10] as [UInt32],
-			[5, 10] as [UInt64],
-			[5, 10] as [UInt128],
-			[5, 10] as [UInt256],
-			[-5, -10] as [Int8],
-			[-5, -10] as [Int16],
-			[-5, -10] as [Int32],
-			[-5, -10] as [Int64],
-			[-5, -10] as [Int128],
-			[-5, -10] as [Int256]
-		])
+          ["one", "two"],
+          [true, false],
+          [5, 10] as [UInt8],
+          [5, 10] as [UInt16],
+          [5, 10] as [UInt32],
+          [5, 10] as [UInt64],
+          [5, 10] as [UInt128],
+          [5, 10] as [UInt256],
+          [-5, -10] as [Int8],
+          [-5, -10] as [Int16],
+          [-5, -10] as [Int32],
+          [-5, -10] as [Int64],
+          [-5, -10] as [Int128],
+          [-5, -10] as [Int256]
+        ])
         values = EVM.decodeABI(
-			types: [
-				Type<[String]>(),
-				Type<[Bool]>(),
-				Type<[UInt8]>(),
-				Type<[UInt16]>(),
-				Type<[UInt32]>(),
-				Type<[UInt64]>(),
-				Type<[UInt128]>(),
-				Type<[UInt256]>(),
-				Type<[Int8]>(),
-				Type<[Int16]>(),
-				Type<[Int32]>(),
-				Type<[Int64]>(),
-				Type<[Int128]>(),
-				Type<[Int256]>()
-			],
-			data: data
-		)
-		assert((values[0] as! [String]) == ["one", "two"])
-		assert((values[1] as! [Bool]) == [true, false])
-		assert((values[2] as! [UInt8]) == [5, 10])
-		assert((values[3] as! [UInt16]) == [5, 10])
-		assert((values[4] as! [UInt32]) == [5, 10])
-		assert((values[5] as! [UInt64]) == [5, 10])
-		assert((values[6] as! [UInt128]) == [5, 10])
-		assert((values[7] as! [UInt256]) == [5, 10])
-		assert((values[8] as! [Int8]) == [-5, -10])
-		assert((values[9] as! [Int16]) == [-5, -10])
-		assert((values[10] as! [Int32]) == [-5, -10])
-		assert((values[11] as! [Int64]) == [-5, -10])
-		assert((values[12] as! [Int128]) == [-5, -10])
-		assert((values[13] as! [Int256]) == [-5, -10])
+          types: [
+            Type<[String]>(),
+            Type<[Bool]>(),
+            Type<[UInt8]>(),
+            Type<[UInt16]>(),
+            Type<[UInt32]>(),
+            Type<[UInt64]>(),
+            Type<[UInt128]>(),
+            Type<[UInt256]>(),
+            Type<[Int8]>(),
+            Type<[Int16]>(),
+            Type<[Int32]>(),
+            Type<[Int64]>(),
+            Type<[Int128]>(),
+            Type<[Int256]>()
+          ],
+          data: data
+        )
+        assert((values[0] as! [String]) == ["one", "two"])
+        assert((values[1] as! [Bool]) == [true, false])
+        assert((values[2] as! [UInt8]) == [5, 10])
+        assert((values[3] as! [UInt16]) == [5, 10])
+        assert((values[4] as! [UInt32]) == [5, 10])
+        assert((values[5] as! [UInt64]) == [5, 10])
+        assert((values[6] as! [UInt128]) == [5, 10])
+        assert((values[7] as! [UInt256]) == [5, 10])
+        assert((values[8] as! [Int8]) == [-5, -10])
+        assert((values[9] as! [Int16]) == [-5, -10])
+        assert((values[10] as! [Int32]) == [-5, -10])
+        assert((values[11] as! [Int64]) == [-5, -10])
+        assert((values[12] as! [Int128]) == [-5, -10])
+        assert((values[13] as! [Int256]) == [-5, -10])
 
         return true
       }
