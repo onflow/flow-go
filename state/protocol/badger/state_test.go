@@ -594,7 +594,6 @@ func assertSealingSegmentBlocksQueryableAfterBootstrap(t *testing.T, snapshot pr
 		require.NoError(t, err)
 
 		rootBlock := state.Params().FinalizedRoot()
-		require.NoError(t, err)
 
 		// root block should be the highest block from the sealing segment
 		assert.Equal(t, segment.Highest().Header, rootBlock)

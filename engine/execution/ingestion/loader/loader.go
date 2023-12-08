@@ -56,9 +56,6 @@ func (e *Loader) LoadUnexecuted(ctx context.Context) ([]flow.Identifier, error) 
 
 	// don't reload root block
 	rootBlock := e.state.Params().SealedRoot()
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve root block: %w", err)
-	}
 
 	blockIDs := make([]flow.Identifier, 0)
 	isRoot := rootBlock.ID() == last.ID()
@@ -149,9 +146,6 @@ func (e *Loader) finalizedUnexecutedBlocks(ctx context.Context, finalized protoc
 	// dynamically bootstrapped execution node will reload blocks from
 	// [sealedRoot.Height + 1, finalizedRoot.Height] and execute them on startup.
 	rootBlock := e.state.Params().SealedRoot()
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve root block: %w", err)
-	}
 
 	for ; lastExecuted > rootBlock.Height; lastExecuted-- {
 		header, err := e.getHeaderByHeight(lastExecuted)

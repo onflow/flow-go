@@ -23,11 +23,12 @@ var _ protocol.Params = (*Params)(nil)
 // are served on demand directly from the database, _without_ any caching.
 type InstanceParams struct {
 	db *badger.DB
-	// finalizedRoot marks the cutoff of the history this node knows about.
+	// finalizedRoot marks the cutoff of the history this node knows about. It is the block at the tip
+	// of the root snapshot used to bootstrap this node - all newer blocks are synced from the network.
 	finalizedRoot *flow.Header
-	// sealedRootHeight returns the root block that is sealed.
+	// sealedRoot is the latest sealed block with respect to `finalizedRoot`.
 	sealedRoot *flow.Header
-	// rootSeal stores the root block seal of the current protocol state.
+	// rootSeal is the seal for block `sealedRoot` - the newest incorporated seal with respect to `finalizedRoot`.
 	rootSeal *flow.Seal
 }
 
@@ -92,7 +93,7 @@ func ReadInstanceParams(db *badger.DB, headers storage.Headers, seals storage.Se
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("could not read root data to populate cache: %w", err)
+		return nil, fmt.Errorf("could not read InstanceParams data to populate cache: %w", err)
 	}
 
 	return params, nil
