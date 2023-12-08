@@ -97,7 +97,7 @@ go-math-rand-check:
 	# `exclude` should only specify non production code (test, bench..).
 	# If this check fails, try updating your code by using:
 	#   - "crypto/rand" or "flow-go/utils/rand" for non-deterministic randomness
-	#   - "flow-go/crypto/random" for deterministic randomness
+	#   - "onflow/crypto/random" for deterministic randomness
 	grep --include=\*.go \
 	--exclude=*test* --exclude=*helper* --exclude=*example* --exclude=*fixture* --exclude=*benchmark* --exclude=*profiler* \
     --exclude-dir=*test* --exclude-dir=*helper* --exclude-dir=*example* --exclude-dir=*fixture* --exclude-dir=*benchmark* --exclude-dir=*profiler* -rnw '"math/rand"'; \

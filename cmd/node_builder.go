@@ -10,9 +10,9 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
+	"github.com/onflow/crypto"
 	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/config"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"

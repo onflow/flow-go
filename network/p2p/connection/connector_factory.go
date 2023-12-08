@@ -8,7 +8,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	discoveryBackoff "github.com/libp2p/go-libp2p/p2p/discovery/backoff"
 
-	"github.com/onflow/flow-go/crypto/random"
+	"github.com/onflow/crypto/random"
 	"github.com/onflow/flow-go/network/p2p"
 )
 

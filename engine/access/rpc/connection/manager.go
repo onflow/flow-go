@@ -17,7 +17,7 @@ import (
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/crypto"
 	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/deflate" //required for gRPC compression
 	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/snappy"  //required for gRPC compression
 	"github.com/onflow/flow-go/module"

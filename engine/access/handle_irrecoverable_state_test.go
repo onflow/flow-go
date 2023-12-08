@@ -19,7 +19,7 @@ import (
 
 	restclient "github.com/onflow/flow/openapi/go-client-generated"
 
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/crypto"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rest/routes"

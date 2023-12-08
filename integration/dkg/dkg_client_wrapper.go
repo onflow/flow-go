@@ -9,7 +9,7 @@ import (
 
 	sdk "github.com/onflow/flow-go-sdk"
 
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	model "github.com/onflow/flow-go/model/messages"

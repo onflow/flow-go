@@ -21,8 +21,8 @@ import (
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkclient "github.com/onflow/flow-go-sdk/access/grpc"
 
+	"github.com/onflow/crypto"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
-	"github.com/onflow/flow-go/crypto"
 	ghostclient "github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/integration/client"
 	"github.com/onflow/flow-go/model/bootstrap"

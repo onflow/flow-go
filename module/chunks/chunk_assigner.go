@@ -3,8 +3,8 @@ package chunks
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/crypto/hash"
-	"github.com/onflow/flow-go/crypto/random"
+	"github.com/onflow/crypto/hash"
+	"github.com/onflow/crypto/random"
 	chunkmodels "github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/encoding/json"
 	"github.com/onflow/flow-go/model/flow"

@@ -9,7 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/network/p2p/translator"
 
-	fcrypto "github.com/onflow/flow-go/crypto"
+	fcrypto "github.com/onflow/crypto"
 
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 )

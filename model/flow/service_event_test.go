@@ -10,7 +10,7 @@ import (
 	"github.com/vmihailenco/msgpack"
 	"gotest.tools/assert"
 
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/crypto"
 	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"

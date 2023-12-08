@@ -56,7 +56,7 @@ require (
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.14.0
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.14.0
 	github.com/onflow/flow-go-sdk v0.41.16
-	github.com/onflow/flow-go/crypto v0.25.0
+	github.com/onflow/crypto v0.25.0
 	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20231124194313-106cc495def6
 	github.com/onflow/go-bitswap v0.0.0-20230703214630-6d3db958c73d
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
