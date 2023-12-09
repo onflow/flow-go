@@ -246,16 +246,8 @@ func (s *InMemoryRegisterStore) IsBlockExecuted(height uint64, blockID flow.Iden
 	defer s.RUnlock()
 
 	// finalized and executed blocks are pruned
-	// so if the height is below pruned height, in memory register store is not sure if
-	// it's executed or not
-	if height < s.prunedHeight {
+	if height <= s.prunedHeight {
 		return false, fmt.Errorf("below pruned height")
-	}
-
-	// if the height is the pruned height, then it's executed only if the blockID is the prunedID
-	// since the pruned block must be finalized and executed.
-	if height == s.prunedHeight {
-		return blockID == s.prunedID, nil
 	}
 
 	_, ok := s.registersByBlockID[blockID]
@@ -268,18 +260,9 @@ func (s *InMemoryRegisterStore) findFinalizedFork(height uint64, blockID flow.Id
 	s.RLock()
 	defer s.RUnlock()
 
-	if height < s.prunedHeight {
+	if height <= s.prunedHeight {
 		return nil, fmt.Errorf("cannot find finalized fork at height %d, it is pruned (prunedHeight: %v)", height, s.prunedHeight)
 	}
-
-	if height == s.prunedHeight {
-		if blockID != s.prunedID {
-			return nil, fmt.Errorf("cannot find finalized fork at height %d, it is pruned (prunedHeight: %v, prunedID: %v)", height, s.prunedHeight, s.prunedID)
-		}
-
-		return nil, nil
-	}
-
 	prunedHeight := height
 	block := blockID
 
