@@ -183,6 +183,68 @@ func TestInMemoryRegisterStore(t *testing.T) {
 		require.Equal(t, regB.Value, valB)
 	})
 
+	t.Run("IsBlockExecuted", func(t *testing.T) {
+		t.Parallel()
+		pruned := uint64(10)
+		lastID := unittest.IdentifierFixture()
+		store := NewInMemoryRegisterStore(pruned, lastID)
+
+		height := pruned + 1 // above the pruned pruned
+		blockID := unittest.IdentifierFixture()
+		reg := unittest.RegisterEntryFixture()
+		err := store.SaveRegisters(
+			height,
+			blockID,
+			lastID,
+			flow.RegisterEntries{reg},
+		)
+		require.NoError(t, err)
+
+		// above the pruned height and is executed
+		executed, err := store.IsBlockExecuted(height, blockID)
+		require.NoError(t, err)
+		require.True(t, executed)
+
+		// above the pruned height, and is not executed
+		executed, err = store.IsBlockExecuted(pruned+1, unittest.IdentifierFixture())
+		require.NoError(t, err)
+		require.False(t, executed)
+
+		executed, err = store.IsBlockExecuted(pruned+2, unittest.IdentifierFixture())
+		require.NoError(t, err)
+		require.False(t, executed)
+
+		// below the pruned height
+		executed, err = store.IsBlockExecuted(pruned-1, unittest.IdentifierFixture())
+		require.Error(t, err)
+
+		// equal to the pruned height and is the pruned block
+		executed, err = store.IsBlockExecuted(pruned, lastID)
+		require.NoError(t, err)
+		require.True(t, executed)
+
+		// equal to the pruned height, but is not the pruned block
+		executed, err = store.IsBlockExecuted(pruned, unittest.IdentifierFixture())
+		require.NoError(t, err)
+		require.False(t, executed)
+
+		// prune a new block
+		require.NoError(t, store.Prune(height, blockID))
+		// equal to the pruned height and is the pruned block
+		executed, err = store.IsBlockExecuted(height, blockID)
+		require.NoError(t, err)
+		require.True(t, executed)
+
+		// equal to the pruned height, but is not the pruned block
+		executed, err = store.IsBlockExecuted(height, unittest.IdentifierFixture())
+		require.NoError(t, err)
+		require.False(t, executed)
+
+		// below the pruned height
+		executed, err = store.IsBlockExecuted(pruned, lastID)
+		require.Error(t, err)
+	})
+
 	// 5. Given A(X: 1, Y: 2), GetRegister(A, X) should return 1, GetRegister(A, X) should return 2
 	t.Run("GetRegistersOK", func(t *testing.T) {
 		t.Parallel()
