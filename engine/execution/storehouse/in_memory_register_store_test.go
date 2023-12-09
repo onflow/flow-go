@@ -215,7 +215,7 @@ func TestInMemoryRegisterStore(t *testing.T) {
 		require.False(t, executed)
 
 		// below the pruned height
-		executed, err = store.IsBlockExecuted(pruned-1, unittest.IdentifierFixture())
+		_, err = store.IsBlockExecuted(pruned-1, unittest.IdentifierFixture())
 		require.Error(t, err)
 
 		// equal to the pruned height and is the pruned block
@@ -241,7 +241,7 @@ func TestInMemoryRegisterStore(t *testing.T) {
 		require.False(t, executed)
 
 		// below the pruned height
-		executed, err = store.IsBlockExecuted(pruned, lastID)
+		_, err = store.IsBlockExecuted(pruned, lastID)
 		require.Error(t, err)
 	})
 
