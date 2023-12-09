@@ -47,7 +47,8 @@ type State struct {
 	// larger than the height of the root block of the spork, (also cached below as
 	// `sporkRootBlockHeight`), for instance, if the node joined in an epoch after the last spork.
 	finalizedRootHeight uint64
-	// sealedRootHeight returns the root block that is sealed.
+	// sealedRootHeight returns the root block that is sealed. We cache it in
+	// the state, because it cannot change over the lifecycle of a protocol state instance.
 	sealedRootHeight uint64
 	// sporkRootBlockHeight is the height of the root block in the current spork. We cache it in
 	// the state, because it cannot change over the lifecycle of a protocol state instance.
@@ -149,7 +150,7 @@ func Bootstrap(
 		}
 
 		// 3) initialize the current protocol state height/view pointers
-		err = transaction.WithTx(bootstrapStatePointers(root))(tx)
+		err = bootstrapStatePointers(root)(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap height/view pointers: %w", err)
 		}
@@ -161,7 +162,7 @@ func Bootstrap(
 		}
 
 		// 5) initialize spork params
-		err = transaction.WithTx(bootstrapSporkInfo(root))(tx)
+		err = bootstrapSporkInfo(root)(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap spork info: %w", err)
 		}
@@ -185,7 +186,7 @@ func Bootstrap(
 		}
 
 		// 8) initialize version beacon
-		err = transaction.WithTx(boostrapVersionBeacon(root))(tx)
+		err = boostrapVersionBeacon(root)(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap version beacon: %w", err)
 		}
@@ -227,7 +228,7 @@ func Bootstrap(
 // dynamic protocol state didn't change in the sealing segment.
 // The root snapshot's sealing segment must not straddle any epoch transitions
 // or epoch phase transitions.
-func bootstrapProtocolState(segment *flow.SealingSegment, root protocol.Snapshot, protocolState storage.ProtocolState) func(tx *transaction.Tx) error {
+func bootstrapProtocolState(segment *flow.SealingSegment, root protocol.Snapshot, protocolState storage.ProtocolState) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
 		rootProtocolState, err := root.ProtocolState()
 		if err != nil {
@@ -261,15 +262,16 @@ func bootstrapSealingSegment(
 	segment *flow.SealingSegment,
 	head *flow.Block,
 	rootSeal *flow.Seal,
-) func(tx *transaction.Tx) error {
-	return func(tx *transaction.Tx) error {
+) func(*transaction.Tx) error {
 
+	return func(tx *transaction.Tx) error {
+		bdtx := tx.DBTxn // tx is just a wrapper around a badger transaction with the additional ability to register callbacks that are executed after the badger transaction completed _successfully_
 		for _, result := range segment.ExecutionResults {
-			err := transaction.WithTx(operation.SkipDuplicates(operation.InsertExecutionResult(result)))(tx)
+			err := operation.SkipDuplicates(operation.InsertExecutionResult(result))(bdtx)
 			if err != nil {
 				return fmt.Errorf("could not insert execution result: %w", err)
 			}
-			err = transaction.WithTx(operation.IndexExecutionResult(result.BlockID, result.ID()))(tx)
+			err = operation.IndexExecutionResult(result.BlockID, result.ID())(bdtx)
 			if err != nil {
 				return fmt.Errorf("could not index execution result: %w", err)
 			}
@@ -277,7 +279,7 @@ func bootstrapSealingSegment(
 
 		// insert the first seal (in case the segment's first block contains no seal)
 		if segment.FirstSeal != nil {
-			err := transaction.WithTx(operation.InsertSeal(segment.FirstSeal.ID(), segment.FirstSeal))(tx)
+			err := operation.InsertSeal(segment.FirstSeal.ID(), segment.FirstSeal)(bdtx)
 			if err != nil {
 				return fmt.Errorf("could not insert first seal: %w", err)
 			}
@@ -287,7 +289,7 @@ func bootstrapSealingSegment(
 		// different from the finalized root block, then it means the node dynamically bootstrapped.
 		// In that case, we should index the result of the sealed root block so that the EN is able
 		// to execute the next block.
-		err := transaction.WithTx(operation.SkipDuplicates(operation.IndexExecutionResult(rootSeal.BlockID, rootSeal.ResultID)))(tx)
+		err := operation.SkipDuplicates(operation.IndexExecutionResult(rootSeal.BlockID, rootSeal.ResultID))(bdtx)
 		if err != nil {
 			return fmt.Errorf("could not index root result: %w", err)
 		}
@@ -299,7 +301,7 @@ func bootstrapSealingSegment(
 			if err != nil {
 				return fmt.Errorf("could not insert SealingSegment extra block: %w", err)
 			}
-			err = transaction.WithTx(operation.IndexBlockHeight(height, blockID))(tx)
+			err = operation.IndexBlockHeight(height, blockID)(bdtx)
 			if err != nil {
 				return fmt.Errorf("could not index SealingSegment extra block (id=%x): %w", blockID, err)
 			}
@@ -317,7 +319,7 @@ func bootstrapSealingSegment(
 			if err != nil {
 				return fmt.Errorf("could not insert SealingSegment block: %w", err)
 			}
-			err = transaction.WithTx(operation.IndexBlockHeight(height, blockID))(tx)
+			err = operation.IndexBlockHeight(height, blockID)(bdtx)
 			if err != nil {
 				return fmt.Errorf("could not index SealingSegment block (id=%x): %w", blockID, err)
 			}
@@ -333,18 +335,18 @@ func bootstrapSealingSegment(
 			}
 			// sanity check: make sure the seal exists
 			var latestSeal flow.Seal
-			err = transaction.WithTx(operation.RetrieveSeal(latestSealID, &latestSeal))(tx)
+			err = operation.RetrieveSeal(latestSealID, &latestSeal)(bdtx)
 			if err != nil {
 				return fmt.Errorf("could not verify latest seal for block (id=%x) exists: %w", blockID, err)
 			}
-			err = transaction.WithTx(operation.IndexLatestSealAtBlock(blockID, latestSealID))(tx)
+			err = operation.IndexLatestSealAtBlock(blockID, latestSealID)(bdtx)
 			if err != nil {
 				return fmt.Errorf("could not index block seal: %w", err)
 			}
 
 			// for all but the first block in the segment, index the parent->child relationship
 			if i > 0 {
-				err = transaction.WithTx(operation.InsertBlockChildren(block.Header.ParentID, []flow.Identifier{blockID}))(tx)
+				err = operation.InsertBlockChildren(block.Header.ParentID, []flow.Identifier{blockID})(bdtx)
 				if err != nil {
 					return fmt.Errorf("could not insert child index for block (id=%x): %w", blockID, err)
 				}
@@ -352,7 +354,7 @@ func bootstrapSealingSegment(
 		}
 
 		// insert an empty child index for the final block in the segment
-		err = transaction.WithTx(operation.InsertBlockChildren(head.ID(), nil))(tx)
+		err = operation.InsertBlockChildren(head.ID(), nil)(bdtx)
 		if err != nil {
 			return fmt.Errorf("could not insert child index for head block (id=%x): %w", head.ID(), err)
 		}
@@ -363,8 +365,8 @@ func bootstrapSealingSegment(
 
 // bootstrapStatePointers instantiates special pointers used to by the protocol
 // state to keep track of special block heights and views.
-func bootstrapStatePointers(root protocol.Snapshot) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
+func bootstrapStatePointers(root protocol.Snapshot) func(*transaction.Tx) error {
+	return func(tx *transaction.Tx) error {
 		segment, err := root.SealingSegment()
 		if err != nil {
 			return fmt.Errorf("could not get sealing segment: %w", err)
@@ -408,35 +410,36 @@ func bootstrapStatePointers(root protocol.Snapshot) func(*badger.Txn) error {
 			NewestQC:    rootQC,
 		}
 
+		bdtx := tx.DBTxn
 		// insert initial views for HotStuff
-		err = operation.InsertSafetyData(highest.Header.ChainID, safetyData)(tx)
+		err = operation.InsertSafetyData(highest.Header.ChainID, safetyData)(bdtx)
 		if err != nil {
 			return fmt.Errorf("could not insert safety data: %w", err)
 		}
-		err = operation.InsertLivenessData(highest.Header.ChainID, livenessData)(tx)
+		err = operation.InsertLivenessData(highest.Header.ChainID, livenessData)(bdtx)
 		if err != nil {
 			return fmt.Errorf("could not insert liveness data: %w", err)
 		}
 
 		// insert height pointers
-		err = operation.InsertRootHeight(highest.Header.Height)(tx)
+		err = operation.InsertRootHeight(highest.Header.Height)(bdtx)
 		if err != nil {
 			return fmt.Errorf("could not insert finalized root height: %w", err)
 		}
 		// the sealed root height is the lowest block in sealing segment
-		err = operation.InsertSealedRootHeight(lowest.Header.Height)(tx)
+		err = operation.InsertSealedRootHeight(lowest.Header.Height)(bdtx)
 		if err != nil {
 			return fmt.Errorf("could not insert sealed root height: %w", err)
 		}
-		err = operation.InsertFinalizedHeight(highest.Header.Height)(tx)
+		err = operation.InsertFinalizedHeight(highest.Header.Height)(bdtx)
 		if err != nil {
 			return fmt.Errorf("could not insert finalized height: %w", err)
 		}
-		err = operation.InsertSealedHeight(lowest.Header.Height)(tx)
+		err = operation.InsertSealedHeight(lowest.Header.Height)(bdtx)
 		if err != nil {
 			return fmt.Errorf("could not insert sealed height: %w", err)
 		}
-		err = operation.IndexFinalizedSealByBlockID(seal.BlockID, seal.ID())(tx)
+		err = operation.IndexFinalizedSealByBlockID(seal.BlockID, seal.ID())(bdtx)
 		if err != nil {
 			return fmt.Errorf("could not index sealed block: %w", err)
 		}
@@ -485,7 +488,7 @@ func bootstrapEpoch(
 				return fmt.Errorf("invalid commit: %w", err)
 			}
 
-			err = indexFirstHeight(previous)(tx.DBTxn)
+			err = indexFirstHeight(previous)(tx)
 			if err != nil {
 				return fmt.Errorf("could not index epoch first height: %w", err)
 			}
@@ -515,7 +518,7 @@ func bootstrapEpoch(
 			return fmt.Errorf("invalid commit: %w", err)
 		}
 
-		err = indexFirstHeight(current)(tx.DBTxn)
+		err = indexFirstHeight(current)(tx)
 		if err != nil {
 			return fmt.Errorf("could not index epoch first height: %w", err)
 		}
@@ -582,30 +585,31 @@ func bootstrapEpoch(
 
 // bootstrapSporkInfo bootstraps the protocol state with information about the
 // spork which is used to disambiguate Flow networks.
-func bootstrapSporkInfo(root protocol.Snapshot) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
+func bootstrapSporkInfo(root protocol.Snapshot) func(*transaction.Tx) error {
+	return func(tx *transaction.Tx) error {
 		params := root.Params()
+		bdtx := tx.DBTxn
 
 		sporkID := params.SporkID()
-		err := operation.InsertSporkID(sporkID)(tx)
+		err := operation.InsertSporkID(sporkID)(bdtx)
 		if err != nil {
 			return fmt.Errorf("could not insert spork ID: %w", err)
 		}
 
 		sporkRootBlockHeight := params.SporkRootBlockHeight()
-		err = operation.InsertSporkRootBlockHeight(sporkRootBlockHeight)(tx)
+		err = operation.InsertSporkRootBlockHeight(sporkRootBlockHeight)(bdtx)
 		if err != nil {
 			return fmt.Errorf("could not insert spork root block height: %w", err)
 		}
 
 		version := params.ProtocolVersion()
-		err = operation.InsertProtocolVersion(version)(tx)
+		err = operation.InsertProtocolVersion(version)(bdtx)
 		if err != nil {
 			return fmt.Errorf("could not insert protocol version: %w", err)
 		}
 
 		threshold := params.EpochCommitSafetyThreshold()
-		err = operation.InsertEpochCommitSafetyThreshold(threshold)(tx)
+		err = operation.InsertEpochCommitSafetyThreshold(threshold)(bdtx)
 		if err != nil {
 			return fmt.Errorf("could not insert epoch commit safety threshold: %w", err)
 		}
@@ -617,8 +621,8 @@ func bootstrapSporkInfo(root protocol.Snapshot) func(*badger.Txn) error {
 // indexFirstHeight indexes the first height for the epoch, as part of bootstrapping.
 // The input epoch must have been started (the first block of the epoch has been finalized).
 // No errors are expected during normal operation.
-func indexFirstHeight(epoch protocol.Epoch) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
+func indexFirstHeight(epoch protocol.Epoch) func(*transaction.Tx) error {
+	return func(tx *transaction.Tx) error {
 		counter, err := epoch.Counter()
 		if err != nil {
 			return fmt.Errorf("could not get epoch counter: %w", err)
@@ -627,7 +631,7 @@ func indexFirstHeight(epoch protocol.Epoch) func(*badger.Txn) error {
 		if err != nil {
 			return fmt.Errorf("could not get epoch first height: %w", err)
 		}
-		err = operation.InsertEpochFirstHeight(counter, firstHeight)(tx)
+		err = operation.InsertEpochFirstHeight(counter, firstHeight)(tx.DBTxn)
 		if err != nil {
 			return fmt.Errorf("could not index first height %d for epoch %d: %w", firstHeight, counter, err)
 		}
@@ -895,20 +899,16 @@ func updateEpochMetrics(metrics module.ComplianceMetrics, snap protocol.Snapshot
 
 // boostrapVersionBeacon bootstraps version beacon, by adding the latest beacon
 // to an index, if present.
-func boostrapVersionBeacon(
-	snapshot protocol.Snapshot,
-) func(*badger.Txn) error {
-	return func(txn *badger.Txn) error {
+func boostrapVersionBeacon(snapshot protocol.Snapshot) func(*transaction.Tx) error {
+	return func(tx *transaction.Tx) error {
 		versionBeacon, err := snapshot.VersionBeacon()
 		if err != nil {
 			return err
 		}
-
 		if versionBeacon == nil {
 			return nil
 		}
-
-		return operation.IndexVersionBeaconByHeight(versionBeacon)(txn)
+		return operation.IndexVersionBeaconByHeight(versionBeacon)(tx.DBTxn)
 	}
 }
 
