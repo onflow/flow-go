@@ -10,7 +10,7 @@ import (
 )
 
 func IsServiceEvent(event flow.Event, chainID flow.ChainID) bool {
-	serviceEvents, _ := systemcontracts.ServiceEventsForChain(chainID)
+	serviceEvents := systemcontracts.ServiceEventsForChain(chainID)
 	for _, serviceEvent := range serviceEvents.All() {
 		if serviceEvent.EventType() == event.Type {
 			return true

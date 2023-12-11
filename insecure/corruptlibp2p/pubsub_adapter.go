@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"github.com/onflow/flow-go/utils/logging"
@@ -108,6 +109,11 @@ func (c *CorruptGossipSubAdapter) ListPeers(topic string) []peer.ID {
 	return c.gossipSub.ListPeers(topic)
 }
 
+func (c *CorruptGossipSubAdapter) GetLocalMeshPeers(topic channels.Topic) []peer.ID {
+	// this method is a no-op in the corrupt gossipsub; as the corrupt gossipsub is solely used for testing, it does not come with a mesh tracer.
+	return []peer.ID{}
+}
+
 func (c *CorruptGossipSubAdapter) ActiveClustersChanged(lst flow.ChainIDList) {
 	c.clusterChangeConsumer.ActiveClustersChanged(lst)
 }
@@ -127,7 +133,11 @@ func (c *CorruptGossipSubAdapter) PeerScoreExposer() p2p.PeerScoreExposer {
 	return c.peerScoreExposer
 }
 
-func NewCorruptGossipSubAdapter(ctx context.Context, logger zerolog.Logger, h host.Host, cfg p2p.PubSubAdapterConfig, clusterChangeConsumer p2p.CollectionClusterChangesConsumer) (p2p.PubSubAdapter, *corrupt.GossipSubRouter, error) {
+func NewCorruptGossipSubAdapter(ctx context.Context,
+	logger zerolog.Logger,
+	h host.Host,
+	cfg p2p.PubSubAdapterConfig,
+	clusterChangeConsumer p2p.CollectionClusterChangesConsumer) (p2p.PubSubAdapter, *corrupt.GossipSubRouter, error) {
 	gossipSubConfig, ok := cfg.(*CorruptPubSubAdapterConfig)
 	if !ok {
 		return nil, nil, fmt.Errorf("invalid gossipsub config type: %T", cfg)

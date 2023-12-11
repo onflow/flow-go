@@ -65,11 +65,11 @@ func meshTracerFixture(flowConfig *config.FlowConfig, idProvider module.Identity
 		IDProvider:                         idProvider,
 		LoggerInterval:                     time.Second,
 		HeroCacheMetricsFactory:            metrics.NewNoopHeroCacheMetricsFactory(),
-		RpcSentTrackerCacheSize:            flowConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerCacheSize,
-		RpcSentTrackerWorkerQueueCacheSize: flowConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerQueueCacheSize,
-		RpcSentTrackerNumOfWorkers:         flowConfig.NetworkConfig.GossipSubConfig.RpcSentTrackerNumOfWorkers,
-		DuplicateMessageTrackerCacheSize:   flowConfig.NetworkConfig.GossipSubConfig.DuplicateMessageTrackerCacheSize,
-		DuplicateMessageTrackerGuageDecay:  flowConfig.NetworkConfig.GossipSubConfig.DuplicateMessageTrackerGuageDecay,
+		RpcSentTrackerCacheSize:            flowConfig.NetworkConfig.GossipSub.RpcTracer.RPCSentTrackerCacheSize,
+		RpcSentTrackerWorkerQueueCacheSize: flowConfig.NetworkConfig.GossipSub.RpcTracer.RPCSentTrackerQueueCacheSize,
+		RpcSentTrackerNumOfWorkers:         flowConfig.NetworkConfig.GossipSub.RpcTracer.RpcSentTrackerNumOfWorkers,
+		DuplicateMessageTrackerCacheSize:   flowConfig.NetworkConfig.GossipSub.DuplicateMessageTrackerCacheSize,
+		DuplicateMessageTrackerGuageDecay:  flowConfig.NetworkConfig.GossipSub.DuplicateMessageTrackerGuageDecay,
 	}
 	return tracer.NewGossipSubMeshTracer(meshTracerCfg)
 }

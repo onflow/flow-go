@@ -104,6 +104,22 @@ func (_m *LibP2PNode) GetIPPort() (string, string, error) {
 	return r0, r1, r2
 }
 
+// GetLocalMeshPeers provides a mock function with given fields: topic
+func (_m *LibP2PNode) GetLocalMeshPeers(topic channels.Topic) []peer.ID {
+	ret := _m.Called(topic)
+
+	var r0 []peer.ID
+	if rf, ok := ret.Get(0).(func(channels.Topic) []peer.ID); ok {
+		r0 = rf(topic)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]peer.ID)
+		}
+	}
+
+	return r0
+}
+
 // GetPeersForProtocol provides a mock function with given fields: pid
 func (_m *LibP2PNode) GetPeersForProtocol(pid protocol.ID) peer.IDSlice {
 	ret := _m.Called(pid)

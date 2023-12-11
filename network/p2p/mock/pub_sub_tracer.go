@@ -4,6 +4,8 @@ package mockp2p
 
 import (
 	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
+	channels "github.com/onflow/flow-go/network/channels"
+
 	mock "github.com/stretchr/testify/mock"
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
@@ -63,6 +65,18 @@ func (_m *PubSubTracer) DuplicateMessageCount(peerID peer.ID) float64 {
 		r0 = rf(peerID)
 	} else {
 		r0 = ret.Get(0).(float64)
+
+		// GetLocalMeshPeers provides a mock function with given fields: topic
+func (_m *PubSubTracer) GetLocalMeshPeers(topic channels.Topic) []peer.ID {
+	ret := _m.Called(topic)
+
+	var r0 []peer.ID
+	if rf, ok := ret.Get(0).(func(channels.Topic) []peer.ID); ok {
+		r0 = rf(topic)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]peer.ID)
+		}
 	}
 
 	return r0

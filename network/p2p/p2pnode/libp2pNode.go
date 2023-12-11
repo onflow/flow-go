@@ -558,6 +558,15 @@ func (n *Node) SetPubSub(ps p2p.PubSubAdapter) {
 	n.pubSub = ps
 }
 
+// GetLocalMeshPeers returns the list of peers in the local mesh for the given topic.
+// Args:
+// - topic: the topic.
+// Returns:
+// - []peer.ID: the list of peers in the local mesh for the given topic.
+func (n *Node) GetLocalMeshPeers(topic channels.Topic) []peer.ID {
+	return n.pubSub.GetLocalMeshPeers(topic)
+}
+
 // SetComponentManager sets the component manager for the node.
 // SetComponentManager may be called at most once.
 func (n *Node) SetComponentManager(cm *component.ComponentManager) {

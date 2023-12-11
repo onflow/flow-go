@@ -254,10 +254,7 @@ func getDeployEpochTransactionText(snapshot *inmem.Snapshot) []byte {
 
 	// root chain id and system contractsRegister
 	chainID := head.ChainID
-	systemContracts, err := systemcontracts.SystemContractsForChain(chainID)
-	if err != nil {
-		log.Fatal().Err(err).Str("chain_id", chainID.String()).Msgf("could not get system contracts for chainID")
-	}
+	systemContracts := systemcontracts.SystemContractsForChain(chainID)
 
 	// epoch contract name and get code for contract
 	epochContractCode := contracts.FlowEpoch(
