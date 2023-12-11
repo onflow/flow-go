@@ -31,12 +31,12 @@ func ContractCode(flowTokenAddress flow.Address) []byte {
 
 const ContractName = "EVM"
 
-var EVMTransactionBytesCadenceType = cadence.NewVariableSizedArrayType(cadence.TheUInt8Type)
+var EVMTransactionBytesCadenceType = cadence.NewVariableSizedArrayType(cadence.UInt8Type)
 var evmTransactionBytesType = sema.NewVariableSizedType(nil, sema.UInt8Type)
 
 var evmAddressBytesType = sema.NewConstantSizedType(nil, sema.UInt8Type, types.AddressLength)
 var evmAddressBytesStaticType = interpreter.ConvertSemaArrayTypeToStaticArrayType(nil, evmAddressBytesType)
-var EVMAddressBytesCadenceType = cadence.NewConstantSizedArrayType(types.AddressLength, cadence.TheUInt8Type)
+var EVMAddressBytesCadenceType = cadence.NewConstantSizedArrayType(types.AddressLength, cadence.UInt8Type)
 
 const internalEVMTypeRunFunctionName = "run"
 
@@ -650,7 +650,7 @@ func NewBalanceCadenceType(address common.Address) *cadence.StructType {
 		[]cadence.Field{
 			{
 				Identifier: "flow",
-				Type:       cadence.UFix64Type{},
+				Type:       cadence.UFix64Type,
 			},
 		},
 		nil,

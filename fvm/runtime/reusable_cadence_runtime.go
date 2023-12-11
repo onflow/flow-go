@@ -80,7 +80,7 @@ func NewReusableCadenceRuntime(rt runtime.Runtime, config runtime.Config) *Reusa
 		),
 	}
 
-	reusable.TxRuntimeEnv.Declare(blockRandomSource)
+	reusable.TxRuntimeEnv.DeclareValue(blockRandomSource, nil)
 
 	return reusable
 }
