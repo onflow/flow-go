@@ -1157,8 +1157,7 @@ func TestEVMAccountBalance(t *testing.T) {
 
 	require.NoError(t, err)
 
-	var handler *testContractHandler
-	handler = &testContractHandler{
+	handler := &testContractHandler{
 		flowTokenAddress: common.Address(contractsAddress),
 		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
 			assert.Equal(t, types.Address{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
