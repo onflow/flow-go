@@ -28,6 +28,7 @@ type mockFinalizedReader struct {
 	lowest          uint64
 	highest         uint64
 	finalizedHeight *atomic.Uint64
+	finalizedCalled *atomic.Int64
 }
 
 func newMockFinalizedReader(initHeight uint64, count int) (*mockFinalizedReader, map[uint64]*flow.Header, uint64) {
@@ -46,10 +47,12 @@ func newMockFinalizedReader(initHeight uint64, count int) (*mockFinalizedReader,
 		lowest:          initHeight,
 		highest:         highest,
 		finalizedHeight: atomic.NewUint64(initHeight),
+		finalizedCalled: atomic.NewInt64(0),
 	}, headerByHeight, highest
 }
 
 func (r *mockFinalizedReader) FinalizedBlockIDAtHeight(height uint64) (flow.Identifier, error) {
+	r.finalizedCalled.Add(1)
 	finalized := r.finalizedHeight.Load()
 	if height > finalized {
 		return flow.Identifier{}, storage.ErrNotFound
@@ -68,4 +71,8 @@ func (r *mockFinalizedReader) MockFinal(height uint64) error {
 
 	r.finalizedHeight.Store(height)
 	return nil
+}
+
+func (r *mockFinalizedReader) FinalizedCalled() int {
+	return int(r.finalizedCalled.Load())
 }

@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/execution"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
@@ -72,7 +73,9 @@ func (b *backendScripts) ExecuteScriptAtLatestBlock(
 	latestHeader, err := b.state.Sealed().Head()
 	if err != nil {
 		// the latest sealed header MUST be available
-		return nil, status.Errorf(codes.Internal, "failed to get latest sealed header: %v", err)
+		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
+		irrecoverable.Throw(ctx, err)
+		return nil, err
 	}
 
 	return b.executeScript(ctx, newScriptExecutionRequest(latestHeader.ID(), latestHeader.Height, script, arguments))
@@ -125,9 +128,11 @@ func (b *backendScripts) executeScript(
 
 	case ScriptExecutionModeFailover:
 		localResult, localDuration, localErr := b.executeScriptLocally(ctx, scriptRequest)
-		if localErr == nil || isInvalidArgumentError(localErr) {
+		if localErr == nil || isInvalidArgumentError(localErr) || status.Code(localErr) == codes.Canceled {
 			return localResult, localErr
 		}
+		// Note: scripts that timeout are retried on the execution nodes since ANs may have performance
+		// issues for some scripts.
 		execResult, execDuration, execErr := b.executeScriptOnAvailableExecutionNodes(ctx, scriptRequest)
 
 		resultComparer := newScriptResultComparison(b.log, b.metrics, scriptRequest)
@@ -185,11 +190,13 @@ func (b *backendScripts) executeScriptLocally(
 	if err != nil {
 		convertedErr := convertScriptExecutionError(err, r.height)
 
-		if status.Code(convertedErr) == codes.InvalidArgument {
+		switch status.Code(convertedErr) {
+		case codes.InvalidArgument, codes.Canceled, codes.DeadlineExceeded:
 			lg.Debug().Err(err).
 				Str("script", string(r.script)).
 				Msg("script failed to execute locally")
-		} else {
+
+		default:
 			lg.Error().Err(err).Msg("script execution failed")
 			b.metrics.ScriptExecutionErrorLocal()
 		}
@@ -332,8 +339,17 @@ func convertScriptExecutionError(err error, height uint64) error {
 			return rpc.ConvertError(err, "failed to execute script", codes.Internal)
 		}
 
-		// runtime errors
-		return status.Errorf(codes.InvalidArgument, "failed to execute script: %v", err)
+		switch coded.Code() {
+		case fvmerrors.ErrCodeScriptExecutionCancelledError:
+			return status.Errorf(codes.Canceled, "script execution canceled: %v", err)
+
+		case fvmerrors.ErrCodeScriptExecutionTimedOutError:
+			return status.Errorf(codes.DeadlineExceeded, "script execution timed out: %v", err)
+
+		default:
+			// runtime errors
+			return status.Errorf(codes.InvalidArgument, "failed to execute script: %v", err)
+		}
 	}
 
 	return convertIndexError(err, height, "failed to execute script")

@@ -143,14 +143,20 @@ func NewControlMsgValidationInspector(params *InspectorParams) (*ControlMsgValid
 
 	builder := component.NewComponentManagerBuilder()
 	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		c.logger.Debug().Msg("starting rpc inspector distributor")
 		c.ctx = ctx
 		c.distributor.Start(ctx)
 		select {
 		case <-ctx.Done():
+			c.logger.Debug().Msg("rpc inspector distributor startup aborted; context cancelled")
 		case <-c.distributor.Ready():
+			c.logger.Debug().Msg("rpc inspector distributor started")
 			ready()
 		}
+		<-ctx.Done()
+		c.logger.Debug().Msg("rpc inspector distributor stopped")
 		<-c.distributor.Done()
+		c.logger.Debug().Msg("rpc inspector distributor shutdown complete")
 	})
 	for i := 0; i < c.config.NumberOfWorkers; i++ {
 		builder.AddWorker(pool.WorkerLogic())
@@ -218,27 +224,27 @@ func (c *ControlMsgValidationInspector) processInspectRPCReq(req *InspectRPCRequ
 	for _, ctrlMsgType := range p2pmsg.ControlMessageTypes() {
 		switch ctrlMsgType {
 		case p2pmsg.CtrlMsgGraft:
-			err := c.inspectGraftMessages(req.Peer, req.rpc.GetControl().GetGraft(), activeClusterIDS)
+			err, topicType := c.inspectGraftMessages(req.Peer, req.rpc.GetControl().GetGraft(), activeClusterIDS)
 			if err != nil {
-				c.logAndDistributeAsyncInspectErrs(req, p2pmsg.CtrlMsgGraft, err, 1)
+				c.logAndDistributeAsyncInspectErrs(req, p2pmsg.CtrlMsgGraft, err, 1, topicType)
 				return nil
 			}
 		case p2pmsg.CtrlMsgPrune:
-			err := c.inspectPruneMessages(req.Peer, req.rpc.GetControl().GetPrune(), activeClusterIDS)
+			err, topicType := c.inspectPruneMessages(req.Peer, req.rpc.GetControl().GetPrune(), activeClusterIDS)
 			if err != nil {
-				c.logAndDistributeAsyncInspectErrs(req, p2pmsg.CtrlMsgPrune, err, 1)
+				c.logAndDistributeAsyncInspectErrs(req, p2pmsg.CtrlMsgPrune, err, 1, topicType)
 				return nil
 			}
 		case p2pmsg.CtrlMsgIWant:
 			err := c.inspectIWantMessages(req.Peer, req.rpc.GetControl().GetIwant())
 			if err != nil {
-				c.logAndDistributeAsyncInspectErrs(req, p2pmsg.CtrlMsgIWant, err, 1)
+				c.logAndDistributeAsyncInspectErrs(req, p2pmsg.CtrlMsgIWant, err, 1, p2p.CtrlMsgNonClusterTopicType)
 				return nil
 			}
 		case p2pmsg.CtrlMsgIHave:
-			err := c.inspectIHaveMessages(req.Peer, req.rpc.GetControl().GetIhave(), activeClusterIDS)
+			err, topicType := c.inspectIHaveMessages(req.Peer, req.rpc.GetControl().GetIhave(), activeClusterIDS)
 			if err != nil {
-				c.logAndDistributeAsyncInspectErrs(req, p2pmsg.CtrlMsgIHave, err, 1)
+				c.logAndDistributeAsyncInspectErrs(req, p2pmsg.CtrlMsgIHave, err, 1, topicType)
 				return nil
 			}
 		}
@@ -247,7 +253,7 @@ func (c *ControlMsgValidationInspector) processInspectRPCReq(req *InspectRPCRequ
 	// inspect rpc publish messages after all control message validation has passed
 	err, errCount := c.inspectRpcPublishMessages(req.Peer, req.rpc.GetPublish(), activeClusterIDS)
 	if err != nil {
-		c.logAndDistributeAsyncInspectErrs(req, p2pmsg.RpcPublishMessage, err, errCount)
+		c.logAndDistributeAsyncInspectErrs(req, p2pmsg.RpcPublishMessage, err, errCount, p2p.CtrlMsgNonClusterTopicType)
 		return nil
 	}
 
@@ -284,20 +290,22 @@ func (c *ControlMsgValidationInspector) checkPubsubMessageSender(message *pubsub
 // - activeClusterIDS: the list of active cluster ids.
 // Returns:
 // - DuplicateTopicErr: if there are any duplicate topics in the list of grafts
-func (c *ControlMsgValidationInspector) inspectGraftMessages(from peer.ID, grafts []*pubsub_pb.ControlGraft, activeClusterIDS flow.ChainIDList) error {
+// - error: if any error occurs while sampling or validating topics, all returned errors are benign and should not cause the node to crash.
+// - bool: true if an error is returned and the topic that failed validation was a cluster prefixed topic, false otherwise.
+func (c *ControlMsgValidationInspector) inspectGraftMessages(from peer.ID, grafts []*pubsub_pb.ControlGraft, activeClusterIDS flow.ChainIDList) (error, p2p.CtrlMsgTopicType) {
 	tracker := make(duplicateStrTracker)
 	for _, graft := range grafts {
 		topic := channels.Topic(graft.GetTopicID())
 		if tracker.isDuplicate(topic.String()) {
-			return NewDuplicateTopicErr(topic.String(), p2pmsg.CtrlMsgGraft)
+			return NewDuplicateTopicErr(topic.String(), p2pmsg.CtrlMsgGraft), p2p.CtrlMsgNonClusterTopicType
 		}
 		tracker.set(topic.String())
-		err := c.validateTopic(from, topic, activeClusterIDS)
+		err, ctrlMsgType := c.validateTopic(from, topic, activeClusterIDS)
 		if err != nil {
-			return err
+			return err, ctrlMsgType
 		}
 	}
-	return nil
+	return nil, p2p.CtrlMsgNonClusterTopicType
 }
 
 // inspectPruneMessages performs topic validation on all prunes in the control message using the provided validateTopic func while tracking duplicates.
@@ -309,20 +317,21 @@ func (c *ControlMsgValidationInspector) inspectGraftMessages(from peer.ID, graft
 //   - DuplicateTopicErr: if there are any duplicate topics found in the list of iHaves
 //     or any duplicate message ids found inside a single iHave.
 //   - error: if any error occurs while sampling or validating topics, all returned errors are benign and should not cause the node to crash.
-func (c *ControlMsgValidationInspector) inspectPruneMessages(from peer.ID, prunes []*pubsub_pb.ControlPrune, activeClusterIDS flow.ChainIDList) error {
+//   - bool: true if an error is returned and the topic that failed validation was a cluster prefixed topic, false otherwise.
+func (c *ControlMsgValidationInspector) inspectPruneMessages(from peer.ID, prunes []*pubsub_pb.ControlPrune, activeClusterIDS flow.ChainIDList) (error, p2p.CtrlMsgTopicType) {
 	tracker := make(duplicateStrTracker)
 	for _, prune := range prunes {
 		topic := channels.Topic(prune.GetTopicID())
 		if tracker.isDuplicate(topic.String()) {
-			return NewDuplicateTopicErr(topic.String(), p2pmsg.CtrlMsgPrune)
+			return NewDuplicateTopicErr(topic.String(), p2pmsg.CtrlMsgPrune), p2p.CtrlMsgNonClusterTopicType
 		}
 		tracker.set(topic.String())
-		err := c.validateTopic(from, topic, activeClusterIDS)
+		err, ctrlMsgType := c.validateTopic(from, topic, activeClusterIDS)
 		if err != nil {
-			return err
+			return err, ctrlMsgType
 		}
 	}
-	return nil
+	return nil, p2p.CtrlMsgNonClusterTopicType
 }
 
 // inspectIHaveMessages performs topic validation on all ihaves in the control message using the provided validateTopic func while tracking duplicates.
@@ -334,9 +343,10 @@ func (c *ControlMsgValidationInspector) inspectPruneMessages(from peer.ID, prune
 //   - DuplicateTopicErr: if there are any duplicate topics found in the list of iHaves
 //     or any duplicate message ids found inside a single iHave.
 //   - error: if any error occurs while sampling or validating topics, all returned errors are benign and should not cause the node to crash.
-func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihaves []*pubsub_pb.ControlIHave, activeClusterIDS flow.ChainIDList) error {
+//   - bool: true if an error is returned and the topic that failed validation was a cluster prefixed topic, false otherwise.
+func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihaves []*pubsub_pb.ControlIHave, activeClusterIDS flow.ChainIDList) (error, p2p.CtrlMsgTopicType) {
 	if len(ihaves) == 0 {
-		return nil
+		return nil, p2p.CtrlMsgNonClusterTopicType
 	}
 	lg := c.logger.With().
 		Str("peer_id", p2plogging.PeerId(from)).
@@ -350,17 +360,17 @@ func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihave
 		messageIds := ihave.GetMessageIDs()
 		topic := ihave.GetTopicID()
 		if duplicateTopicTracker.isDuplicate(topic) {
-			return NewDuplicateTopicErr(topic, p2pmsg.CtrlMsgIHave)
+			return NewDuplicateTopicErr(topic, p2pmsg.CtrlMsgIHave), p2p.CtrlMsgNonClusterTopicType
 		}
 		duplicateTopicTracker.set(topic)
-		err := c.validateTopic(from, channels.Topic(topic), activeClusterIDS)
+		err, ctrlMsgType := c.validateTopic(from, channels.Topic(topic), activeClusterIDS)
 		if err != nil {
-			return err
+			return err, ctrlMsgType
 		}
 
 		for _, messageID := range messageIds {
 			if duplicateMessageIDTracker.isDuplicate(messageID) {
-				return NewDuplicateTopicErr(messageID, p2pmsg.CtrlMsgIHave)
+				return NewDuplicateTopicErr(messageID, p2pmsg.CtrlMsgIHave), p2p.CtrlMsgNonClusterTopicType
 			}
 			duplicateMessageIDTracker.set(messageID)
 		}
@@ -368,7 +378,7 @@ func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihave
 	lg.Debug().
 		Int("total_message_ids", totalMessageIds).
 		Msg("ihave control message validation complete")
-	return nil
+	return nil, p2p.CtrlMsgNonClusterTopicType
 }
 
 // inspectIWantMessages inspects RPC iWant control messages. This func will sample the iWants and perform validation on each iWant in the sample.
@@ -485,7 +495,10 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 			}
 		}
 		topic := channels.Topic(message.GetTopic())
-		err := c.validateTopic(from, topic, activeClusterIDS)
+		// The boolean value returned when validating a topic, indicating whether the topic is cluster-prefixed or not, is intentionally ignored.
+		// This is because we have already set a threshold for errors allowed on publish messages. Reducing the penalty further based on
+		// cluster prefix status is unnecessary when the error threshold is exceeded.
+		err, _ := c.validateTopic(from, topic, activeClusterIDS)
 		if err != nil {
 			// we can skip checking for subscription of topic that failed validation and continue
 			errs = multierror.Append(errs, err)
@@ -684,23 +697,22 @@ func (c *ControlMsgValidationInspector) performSample(ctrlMsg p2pmsg.ControlMess
 //
 // This func returns an exception in case of unexpected bug or state corruption if cluster prefixed topic validation
 // fails due to unexpected error returned when getting the active cluster IDS.
-func (c *ControlMsgValidationInspector) validateTopic(from peer.ID, topic channels.Topic, activeClusterIds flow.ChainIDList) error {
+func (c *ControlMsgValidationInspector) validateTopic(from peer.ID, topic channels.Topic, activeClusterIds flow.ChainIDList) (error, p2p.CtrlMsgTopicType) {
 	channel, ok := channels.ChannelFromTopic(topic)
 	if !ok {
-		return channels.NewInvalidTopicErr(topic, fmt.Errorf("failed to get channel from topic"))
+		return channels.NewInvalidTopicErr(topic, fmt.Errorf("failed to get channel from topic")), p2p.CtrlMsgNonClusterTopicType
 	}
-
 	// handle cluster prefixed topics
 	if channels.IsClusterChannel(channel) {
-		return c.validateClusterPrefixedTopic(from, topic, activeClusterIds)
+		return c.validateClusterPrefixedTopic(from, topic, activeClusterIds), p2p.CtrlMsgTopicTypeClusterPrefixed
 	}
 
 	// non cluster prefixed topic validation
 	err := channels.IsValidNonClusterFlowTopic(topic, c.sporkID)
 	if err != nil {
-		return err
+		return err, p2p.CtrlMsgNonClusterTopicType
 	}
-	return nil
+	return nil, p2p.CtrlMsgNonClusterTopicType
 }
 
 // validateClusterPrefixedTopic validates cluster prefixed topics.
@@ -718,12 +730,12 @@ func (c *ControlMsgValidationInspector) validateClusterPrefixedTopic(from peer.I
 	lg := c.logger.With().
 		Str("from", p2plogging.PeerId(from)).
 		Logger()
-	// reject messages from unstaked nodes for cluster prefixed topics
+
+	// only staked nodes are expected to participate on cluster prefixed topics
 	nodeID, err := c.getFlowIdentifier(from)
 	if err != nil {
 		return err
 	}
-
 	if len(activeClusterIds) == 0 {
 		// cluster IDs have not been updated yet
 		_, incErr := c.tracker.Inc(nodeID)
@@ -733,7 +745,7 @@ func (c *ControlMsgValidationInspector) validateClusterPrefixedTopic(from peer.I
 		}
 
 		// if the amount of messages received is below our hard threshold log the error and return nil.
-		if c.checkClusterPrefixHardThreshold(nodeID) {
+		if ok := c.checkClusterPrefixHardThreshold(nodeID); ok {
 			lg.Warn().
 				Err(err).
 				Str("topic", topic.String()).
@@ -800,12 +812,14 @@ func (c *ControlMsgValidationInspector) checkClusterPrefixHardThreshold(nodeID f
 //   - ctlMsgType: the control message type of the rpc message that caused the error.
 //   - err: the error that occurred.
 //   - count: the number of occurrences of the error.
-func (c *ControlMsgValidationInspector) logAndDistributeAsyncInspectErrs(req *InspectRPCRequest, ctlMsgType p2pmsg.ControlMessageType, err error, count uint64) {
+//   - isClusterPrefixed: indicates if the errors occurred on a cluster prefixed topic.
+func (c *ControlMsgValidationInspector) logAndDistributeAsyncInspectErrs(req *InspectRPCRequest, ctlMsgType p2pmsg.ControlMessageType, err error, count uint64, topicType p2p.CtrlMsgTopicType) {
 	lg := c.logger.With().
 		Err(err).
 		Str("control_message_type", ctlMsgType.String()).
 		Bool(logging.KeySuspicious, true).
 		Bool(logging.KeyNetworkingSecurity, true).
+		Str("topic_type", topicType.String()).
 		Uint64("error_count", count).
 		Str("peer_id", p2plogging.PeerId(req.Peer)).
 		Logger()
@@ -816,7 +830,7 @@ func (c *ControlMsgValidationInspector) logAndDistributeAsyncInspectErrs(req *In
 	case IsErrUnstakedPeer(err):
 		lg.Warn().Msg("control message received from unstaked peer")
 	default:
-		distErr := c.distributor.Distribute(p2p.NewInvalidControlMessageNotification(req.Peer, ctlMsgType, err, count))
+		distErr := c.distributor.Distribute(p2p.NewInvalidControlMessageNotification(req.Peer, ctlMsgType, err, count, topicType))
 		if distErr != nil {
 			lg.Error().
 				Err(distErr).

@@ -4,14 +4,16 @@ import (
 	"context"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
-// MockSignalerContext is a SignalerContext which will immediately fail a test if an error is thrown.
+// MockSignalerContext is a SignalerContext that can be used in tests to assert that an error is thrown.
+// It embeds a mock.Mock, so it can be used it to assert that Throw is called with a specific error.
+// Use NewMockSignalerContextExpectError to create a new MockSignalerContext that expects a specific error, otherwise NewMockSignalerContext.
 type MockSignalerContext struct {
 	context.Context
-	t           *testing.T
-	expectError error
+	*mock.Mock
 }
 
 var _ SignalerContext = &MockSignalerContext{}
@@ -19,29 +21,32 @@ var _ SignalerContext = &MockSignalerContext{}
 func (m MockSignalerContext) sealed() {}
 
 func (m MockSignalerContext) Throw(err error) {
-	if m.expectError != nil {
-		assert.EqualError(m.t, err, m.expectError.Error())
-		return
-	}
-	m.t.Fatalf("mock signaler context received error: %v", err)
+	m.Called(err)
 }
 
 func NewMockSignalerContext(t *testing.T, ctx context.Context) *MockSignalerContext {
-	return &MockSignalerContext{
+	m := &MockSignalerContext{
 		Context: ctx,
-		t:       t,
+		Mock:    &mock.Mock{},
 	}
+	m.Mock.Test(t)
+	t.Cleanup(func() { m.AssertExpectations(t) })
+	return m
 }
 
+// NewMockSignalerContextWithCancel creates a new MockSignalerContext with a cancel function.
 func NewMockSignalerContextWithCancel(t *testing.T, parent context.Context) (*MockSignalerContext, context.CancelFunc) {
 	ctx, cancel := context.WithCancel(parent)
 	return NewMockSignalerContext(t, ctx), cancel
 }
 
+// NewMockSignalerContextExpectError creates a new MockSignalerContext which expects a specific error to be thrown.
 func NewMockSignalerContextExpectError(t *testing.T, ctx context.Context, err error) *MockSignalerContext {
-	return &MockSignalerContext{
-		Context:     ctx,
-		t:           t,
-		expectError: err,
-	}
+	require.NotNil(t, err)
+	m := NewMockSignalerContext(t, ctx)
+
+	// since we expect an error, we should expect a call to Throw
+	m.On("Throw", err).Once().Return()
+
+	return m
 }
