@@ -1136,7 +1136,7 @@ func (exeNode *ExecutionNode) LoadReceiptProviderEngine(
 	receiptRequestQueue := queue.NewHeroStore(exeNode.exeConf.receiptRequestsCacheSize, node.Logger, receiptRequestQueueMetric)
 
 	eng, err := provider.New(
-		node.Logger,
+		node.Logger.With().Str("engine", "receipt_provider").Logger(),
 		node.Metrics.Engine,
 		node.EngineRegistry,
 		node.Me,
