@@ -24,13 +24,16 @@ import (
 	envMock "github.com/onflow/flow-go/fvm/environment/mock"
 	errors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func transferTokensTx(chain flow.Chain) *flow.TransactionBody {
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 	return flow.NewTransactionBody().
-		SetScript([]byte(fmt.Sprintf(`
+		SetScript([]byte(fmt.Sprintf(
+			`
 							// This transaction is a template for a transaction that
 							// could be used by anyone to send tokens to another account
 							// that has been set up to receive tokens.
@@ -69,7 +72,10 @@ func transferTokensTx(chain flow.Chain) *flow.TransactionBody {
 									// Deposit the withdrawn tokens in the recipient's receiver
 									receiverRef.deposit(from: <-self.sentVault)
 								}
-							}`, fvm.FungibleTokenAddress(chain), fvm.FlowTokenAddress(chain))),
+							}`,
+			sc.FungibleToken.Address.Hex(),
+			sc.FlowToken.Address.Hex(),
+		)),
 		)
 }
 
@@ -1009,9 +1015,11 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 					chain)
 				require.NoError(t, err)
 
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 				// deposit more flow to increase capacity
 				txBody := flow.NewTransactionBody().
-					SetScript([]byte(fmt.Sprintf(`
+					SetScript([]byte(fmt.Sprintf(
+						`
 					import FungibleToken from %s
 					import FlowToken from %s
 
@@ -1027,10 +1035,12 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 								?? panic("Could not borrow receiver reference to the recipient's Vault")
 							receiver.deposit(from: <-payment)
 						}
-					}`, fvm.FungibleTokenAddress(chain).HexWithPrefix(),
-						fvm.FlowTokenAddress(chain).HexWithPrefix(),
+					}`,
+						sc.FungibleToken.Address.HexWithPrefix(),
+						sc.FlowToken.Address.HexWithPrefix(),
 						"Container",
-						hex.EncodeToString([]byte(script))))).
+						hex.EncodeToString([]byte(script)),
+					))).
 					AddAuthorizer(accounts[0]).
 					AddAuthorizer(chain.ServiceAddress()).
 					SetProposalKey(chain.ServiceAddress(), 0, 0).
@@ -1816,7 +1826,9 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		address flow.Address,
 	) uint64 {
 
-		code := []byte(fmt.Sprintf(`
+		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+		code := []byte(fmt.Sprintf(
+			`
 					import FungibleToken from 0x%s
 					import FlowToken from 0x%s
 
@@ -1828,7 +1840,10 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 
 						return vaultRef.balance
 					}
-				`, fvm.FungibleTokenAddress(chain), fvm.FlowTokenAddress(chain)))
+				`,
+			sc.FungibleToken.Address.Hex(),
+			sc.FlowToken.Address.Hex(),
+		))
 		script := fvm.Script(code).WithArguments(
 			jsoncdc.MustEncode(cadence.NewAddress(address)),
 		)
