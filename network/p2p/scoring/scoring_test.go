@@ -46,10 +46,6 @@ func (m *mockInspectorSuite) AddInvalidControlMessageConsumer(consumer p2p.Gossi
 func (m *mockInspectorSuite) ActiveClustersChanged(_ flow.ChainIDList) {
 	// no-op
 }
-func (m *mockInspectorSuite) SetTopicOracle(_ func() []string) error {
-	// no-op
-	return nil
-}
 
 // newMockInspectorSuite creates a new mockInspectorSuite.
 // Args:
@@ -97,7 +93,8 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 		module.GossipSubMetrics,
 		metrics.HeroCacheMetricsFactory,
 		flownet.NetworkingType,
-		module.IdentityProvider) (p2p.GossipSubInspectorSuite, error) {
+		module.IdentityProvider,
+		func() p2p.TopicProvider) (p2p.GossipSubInspectorSuite, error) {
 		// override the gossipsub rpc inspector suite factory to return the mock inspector suite
 		return inspectorSuite1, nil
 	}
@@ -140,8 +137,9 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 		return unittest.ProposalFixture()
 	})
 
-	// now simulates node2 spamming node1 with invalid gossipsub control messages.
-	for i := 0; i < 30; i++ {
+	// simulates node2 spamming node1 with invalid gossipsub control messages until node2 gets dissallow listed.
+	// since the decay will start lower than .99 and will only be incremented by default .01, we need to spam a lot of messages so that the node gets disallow listed
+	for i := 0; i < 750; i++ {
 		inspectorSuite1.consumer.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 			PeerID:  node2.ID(),
 			MsgType: p2pmsg.ControlMessageTypes()[rand.Intn(len(p2pmsg.ControlMessageTypes()))],

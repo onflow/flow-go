@@ -13,13 +13,13 @@ type WALReader struct {
 }
 
 // Next provides a mock function with given fields:
-func (_m *WALReader) Next() (uint64, []flow.RegisterEntry, error) {
+func (_m *WALReader) Next() (uint64, flow.RegisterEntries, error) {
 	ret := _m.Called()
 
 	var r0 uint64
-	var r1 []flow.RegisterEntry
+	var r1 flow.RegisterEntries
 	var r2 error
-	if rf, ok := ret.Get(0).(func() (uint64, []flow.RegisterEntry, error)); ok {
+	if rf, ok := ret.Get(0).(func() (uint64, flow.RegisterEntries, error)); ok {
 		return rf()
 	}
 	if rf, ok := ret.Get(0).(func() uint64); ok {
@@ -28,11 +28,11 @@ func (_m *WALReader) Next() (uint64, []flow.RegisterEntry, error) {
 		r0 = ret.Get(0).(uint64)
 	}
 
-	if rf, ok := ret.Get(1).(func() []flow.RegisterEntry); ok {
+	if rf, ok := ret.Get(1).(func() flow.RegisterEntries); ok {
 		r1 = rf()
 	} else {
 		if ret.Get(1) != nil {
-			r1 = ret.Get(1).([]flow.RegisterEntry)
+			r1 = ret.Get(1).(flow.RegisterEntries)
 		}
 	}
 

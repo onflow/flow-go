@@ -12,6 +12,22 @@ type RegisterUpdatesHolder struct {
 	mock.Mock
 }
 
+// UpdatedRegisterSet provides a mock function with given fields:
+func (_m *RegisterUpdatesHolder) UpdatedRegisterSet() map[flow.RegisterID][]byte {
+	ret := _m.Called()
+
+	var r0 map[flow.RegisterID][]byte
+	if rf, ok := ret.Get(0).(func() map[flow.RegisterID][]byte); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[flow.RegisterID][]byte)
+		}
+	}
+
+	return r0
+}
+
 // UpdatedRegisters provides a mock function with given fields:
 func (_m *RegisterUpdatesHolder) UpdatedRegisters() flow.RegisterEntries {
 	ret := _m.Called()

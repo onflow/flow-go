@@ -373,17 +373,19 @@ func (q *EpochQuery) Next() protocol.Epoch {
 		return invalid.NewEpochf("could not get protocol state snapshot at block %x: %w", q.snap.blockID, err)
 	}
 	phase := psSnapshot.EpochPhase()
+	entry := psSnapshot.Entry()
+
 	// if we are in the staking phase, the next epoch is not setup yet
 	if phase == flow.EpochPhaseStaking {
 		return invalid.NewEpoch(protocol.ErrNextEpochNotSetup)
 	}
 	// if we are in setup phase, return a SetupEpoch
-	nextSetup := psSnapshot.Entry().NextEpochSetup
+	nextSetup := entry.NextEpochSetup
 	if phase == flow.EpochPhaseSetup {
 		return inmem.NewSetupEpoch(nextSetup)
 	}
 	// if we are in committed phase, return a CommittedEpoch
-	nextCommit := psSnapshot.Entry().NextEpochCommit
+	nextCommit := entry.NextEpochCommit
 	if phase == flow.EpochPhaseCommitted {
 		return inmem.NewCommittedEpoch(nextSetup, nextCommit)
 	}

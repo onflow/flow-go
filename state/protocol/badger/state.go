@@ -459,7 +459,6 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 
 // bootstrapEpoch bootstraps the protocol state database with information about
 // the previous, current, and next epochs as of the root snapshot.
-// This has to be bootstrapped before dynamic protocol state.
 func (state *State) bootstrapEpoch(rootProtocolState protocol.DynamicProtocolState, verifyNetworkAddress bool) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
 		richEntry := rootProtocolState.Entry()
@@ -468,7 +467,7 @@ func (state *State) bootstrapEpoch(rootProtocolState protocol.DynamicProtocolSta
 		var setups []*flow.EpochSetup
 		var commits []*flow.EpochCommit
 
-		// insert previous epoch if it exists
+		// validate and insert previous epoch if it exists
 		if rootProtocolState.PreviousEpochExists() {
 			// if there is a previous epoch, both setup and commit events must exist
 			setup := richEntry.PreviousEpochSetup
@@ -485,6 +484,7 @@ func (state *State) bootstrapEpoch(rootProtocolState protocol.DynamicProtocolSta
 			commits = append(commits, commit)
 		}
 
+		// validate and insert current epoch
 		setup := richEntry.CurrentEpochSetup
 		commit := richEntry.CurrentEpochCommit
 
@@ -498,7 +498,7 @@ func (state *State) bootstrapEpoch(rootProtocolState protocol.DynamicProtocolSta
 		setups = append(setups, setup)
 		commits = append(commits, commit)
 
-		// insert next epoch, if it exists
+		// validate and insert next epoch, if it exists
 		if richEntry.NextEpoch != nil {
 			setup := richEntry.NextEpochSetup   // must not be nil
 			commit := richEntry.NextEpochCommit // may be nil

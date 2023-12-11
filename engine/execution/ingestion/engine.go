@@ -284,7 +284,7 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 	span, _ := e.tracer.StartBlockSpan(ctx, blockID, trace.EXEHandleBlock)
 	defer span.End()
 
-	executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, blockID)
+	executed, err := e.execState.IsBlockExecuted(block.Header.Height, blockID)
 	if err != nil {
 		return fmt.Errorf("could not check whether block is executed: %w", err)
 	}
@@ -357,7 +357,7 @@ func (e *Engine) enqueueBlockAndCheckExecutable(
 	// check if the block's parent has been executed. (we can't execute the block if the parent has
 	// not been executed yet)
 	// check if there is a statecommitment for the parent block
-	parentCommitment, err := e.execState.StateCommitmentByBlockID(e.unit.Ctx(), block.Header.ParentID)
+	parentCommitment, err := e.execState.StateCommitmentByBlockID(block.Header.ParentID)
 
 	// if we found the statecommitment for the parent block, then add it to the executable block.
 	if err == nil {
@@ -429,7 +429,10 @@ func (e *Engine) executeBlock(
 		return
 	}
 
-	snapshot := e.execState.NewStorageSnapshot(*executableBlock.StartState)
+	snapshot := e.execState.NewStorageSnapshot(*executableBlock.StartState,
+		executableBlock.Block.Header.ParentID,
+		executableBlock.Block.Header.Height-1,
+	)
 
 	computationResult, err := e.computationManager.ComputeBlock(
 		ctx,

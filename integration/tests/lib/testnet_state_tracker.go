@@ -116,7 +116,7 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 					sender)
 
 			default:
-				t.Logf("%v other msg received from %s: %#v\n", time.Now().UTC(), sender, msg)
+				t.Logf("%v other msg received from %s: %T\n", time.Now().UTC(), sender, msg)
 				continue
 			}
 		}

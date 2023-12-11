@@ -6,7 +6,6 @@ require (
 	github.com/btcsuite/btcd/btcec/v2 v2.2.1
 	github.com/sirupsen/logrus v1.4.2
 	github.com/stretchr/testify v1.8.0
-	github.com/supranational/blst v0.3.10
 	golang.org/x/crypto v0.0.0-20220622213112-05595931fe9d
 	gonum.org/v1/gonum v0.6.1
 	pgregory.net/rapid v0.4.7
