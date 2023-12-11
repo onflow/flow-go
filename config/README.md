@@ -15,12 +15,12 @@ defined. A single default value can be overridden by setting the CLI flag for th
 config to false.
 Override entire config file.
 ```shell
-go build -tags relic -o flow-access-node ./cmd/access
+go build -o flow-access-node ./cmd/access
 ./flow-access-node --config-file=config/config.yml
 ```
 Override a single configuration value.
 ```shell
-go build -tags relic -o flow-access-node ./cmd/access
+go build -o flow-access-node ./cmd/access
 ./flow-access-node --networking-connection-pruning=false
 ```
 ### Adding a new config value

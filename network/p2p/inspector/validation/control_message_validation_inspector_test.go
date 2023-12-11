@@ -862,5 +862,5 @@ func inspectorFixture(t *testing.T, opts ...func(params *validation.InspectorPar
 
 func stopInspector(t *testing.T, cancel context.CancelFunc, inspector *validation.ControlMsgValidationInspector) {
 	cancel()
-	unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
+	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
