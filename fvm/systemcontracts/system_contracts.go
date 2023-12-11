@@ -143,11 +143,10 @@ func (c SystemContracts) AsTemplateEnv() templates.Environment {
 		QuorumCertificateAddress: c.ClusterQC.Address.Hex(),
 		DkgAddress:               c.DKG.Address.Hex(),
 
-		ServiceAccountAddress:    c.FlowServiceAccount.Address.Hex(),
-		NodeVersionBeaconAddress: c.NodeVersionBeacon.Address.Hex(),
-		// TODO:
-		// RandomBeaconHistoryAddress: c.RandomBeaconHistory.Address.Hex(),
-		StorageFeesAddress: c.FlowStorageFees.Address.Hex(),
+		ServiceAccountAddress:      c.FlowServiceAccount.Address.Hex(),
+		NodeVersionBeaconAddress:   c.NodeVersionBeacon.Address.Hex(),
+		RandomBeaconHistoryAddress: c.RandomBeaconHistory.Address.Hex(),
+		StorageFeesAddress:         c.FlowStorageFees.Address.Hex(),
 
 		FlowFeesAddress:      c.FlowFees.Address.Hex(),
 		FlowTokenAddress:     c.FlowToken.Address.Hex(),
