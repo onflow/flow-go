@@ -168,6 +168,8 @@ func Bootstrap(
 		}
 
 		// 6) set metric values, we pass `false` here since this node has empty storage and doesn't know anything about EFM.
+		// TODO for 'leaving Epoch Fallback via special service event', this needs to be updated to support bootstrapping
+		// while in EFM, currently initial state doesn't know how to bootstrap node when we have entered EFM.
 		err = updateEpochMetrics(metrics, root, false)
 		if err != nil {
 			return fmt.Errorf("could not update epoch metrics: %w", err)
