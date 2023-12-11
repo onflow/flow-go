@@ -47,7 +47,8 @@ type State struct {
 	// larger than the height of the root block of the spork, (also cached below as
 	// `sporkRootBlockHeight`), for instance, if the node joined in an epoch after the last spork.
 	finalizedRootHeight uint64
-	// sealedRootHeight returns the root block that is sealed.
+	// sealedRootHeight returns the root block that is sealed. We cache it in
+	// the state, because it cannot change over the lifecycle of a protocol state instance.
 	sealedRootHeight uint64
 	// sporkRootBlockHeight is the height of the root block in the current spork. We cache it in
 	// the state, because it cannot change over the lifecycle of a protocol state instance.
