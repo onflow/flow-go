@@ -226,7 +226,7 @@ func (w *DiskWAL) replay(
 		}
 
 		w.log.Info().
-			Uint64("start_segment", startSegment).
+			Int("start_segment", startSegment).
 			Msg("starting replay from checkpoint segment")
 	}
 
@@ -247,8 +247,9 @@ func (w *DiskWAL) replay(
 				return fmt.Errorf("error while handling root checkpoint: %w", err)
 			}
 
+			rootHash := flattenedForest[len(flattenedForest)-1].RootHash()
 			w.log.Info().
-				Hex("root_hash", flattenedForest[len(flattenedForest)-1].RootHash()).
+				Hex("root_hash", rootHash[:]).
 				Msg("root checkpoint loaded")
 			checkpointLoaded = true
 		} else {
