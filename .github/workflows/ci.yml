@@ -37,7 +37,7 @@ jobs:
     - name: Checkout repo
       uses: actions/checkout@v3
     - name: Setup Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v4
       timeout-minutes: 2 # fail fast. sometimes this step takes an extremely long time
       with:
         go-version: ${{ env.GO_VERSION }}
@@ -67,7 +67,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         timeout-minutes: 2 # fail fast. sometimes this step takes an extremely long time
         with:
           go-version: ${{ env.GO_VERSION }}
@@ -86,7 +86,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         timeout-minutes: 2 # fail fast. sometimes this step takes an extremely long time
         with:
           go-version: ${{ env.GO_VERSION }}
@@ -108,7 +108,7 @@ jobs:
     - name: Checkout repo
       uses: actions/checkout@v3
     - name: Setup Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v4
       timeout-minutes: 2 # fail fast. sometimes this step takes an extremely long time
       with:
         go-version: ${{ env.GO_VERSION }}
@@ -121,7 +121,6 @@ jobs:
         timeout_minutes: 35
         max_attempts: 5
         command: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" test
-
       # TODO(rbtz): re-enable when we fix exisiting races.
       #env:
       #  RACE_DETECTOR: 1
@@ -158,7 +157,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         timeout-minutes: 2 # fail fast. sometimes this step takes an extremely long time
         with:
           go-version: ${{ env.GO_VERSION }}
@@ -191,7 +190,7 @@ jobs:
           # all tags are needed for integration tests
           fetch-depth: 0
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         timeout-minutes: 2 # fail fast. sometimes this step takes an extremely long time
         with:
           go-version: ${{ env.GO_VERSION }}
@@ -282,7 +281,7 @@ jobs:
           # all tags are needed for integration tests
           fetch-depth: 0
     - name: Setup Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v4
       timeout-minutes: 2 # fail fast. sometimes this step takes an extremely long time
       with:
         go-version: ${{ env.GO_VERSION }}
