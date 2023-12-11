@@ -17,7 +17,6 @@ on:
   merge_group:
     branches:
       - master
-
 env:
   GO_VERSION: "1.20"
 
@@ -75,8 +74,8 @@ jobs:
       - name: code sanity check
         run: make code-sanity-check
 
-  create-dynamic-test-matrix:
-    name: Create Dynamic Test Matrix
+  dynamic-test-matrix:
+    name: Dynamic Test Matrix
     runs-on: ubuntu-latest
     outputs:
       dynamic-matrix: ${{ steps.set-test-matrix.outputs.dynamicMatrix }}
@@ -90,17 +89,45 @@ jobs:
           cache: true
       - name: Set Test Matrix
         id: set-test-matrix
-        run: go run utils/test_matrix/test_matrix.go admin cmd consensus engine/access engine/collection engine/common engine/consensus engine/execution/ingestion:buildjet-8vcpu-ubuntu-2204 engine/execution/computation engine/execution engine/verification engine:buildjet-4vcpu-ubuntu-2204 fvm ledger module/dkg module:buildjet-4vcpu-ubuntu-2204 network/alsp network/test/cohort1:buildjet-16vcpu-ubuntu-2204 network/test/cohort2:buildjet-4vcpu-ubuntu-2204 network/p2p/connection network/p2p/p2pnode:buildjet-4vcpu-ubuntu-2204 network/p2p/scoring network/p2p network state storage utils
+        run: >
+          go run utils/test_matrix/test_matrix.go 
+          admin
+          cmd
+          consensus
+          engine/access
+          engine/collection
+          engine/common
+          engine/consensus
+          engine/execution/ingestion:buildjet-8vcpu-ubuntu-2204 
+          engine/execution/computation
+          engine/execution
+          engine/verification
+          engine:buildjet-4vcpu-ubuntu-2204
+          fvm
+          ledger
+          module/dkg
+          module:buildjet-4vcpu-ubuntu-2204 
+          network/alsp
+          network/test:buildjet-8vcpu-ubuntu-2204
+          network/p2p/connection
+          network/p2p/p2pnode:buildjet-4vcpu-ubuntu-2204
+          network/p2p/scoring
+          network/p2p:buildjet-4vcpu-ubuntu-2204
+          network
+          state
+          storage
+          utils
 
   unit-test:
     name: Unit Tests (${{ matrix.targets.name }})
-    needs: create-dynamic-test-matrix
+    needs: dynamic-test-matrix
     strategy:
       fail-fast: false
       matrix:
-        targets: ${{ fromJSON(needs.create-dynamic-test-matrix.outputs.dynamic-matrix)}}
+        targets: ${{ fromJSON(needs.dynamic-test-matrix.outputs.dynamic-matrix)}}
     ## need to set image explicitly due to GitHub logging issue as described in https://github.com/onflow/flow-go/pull/3087#issuecomment-1234383202
     runs-on: ${{ matrix.targets.runner }}
+    # only run this job if the modified files include any file in the package directory
     steps:
     - name: Checkout repo
       uses: actions/checkout@v3
@@ -109,16 +136,16 @@ jobs:
       with:
         go-version: ${{ env.GO_VERSION }}
         cache: true
-    - name: Setup tests (${{ matrix.targets.name }})
-      run: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" install-tools
+    - name: Install tools
+      run: make install-tools
     - name: Run tests (${{ matrix.targets.name }})
       uses: nick-fields/retry@v2
       with:
-        timeout_minutes: 35
-        max_attempts: 5
+        timeout_minutes: 10
+        max_attempts: 1
         command: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" test
 
-      # TODO(rbtz): re-enable when we fix exisiting races.
+      # TODO(rbtz): re-enable when we fix existing races.
       #env:
       #  RACE_DETECTOR: 1
     - name: Upload coverage report
@@ -127,6 +154,15 @@ jobs:
         file: ./coverage.txt
         flags: unittests
         name: codecov-umbrella
+
+  flaky-unit-test-TestControlMessageValidationInspector_truncateRPC:
+    name: Flaky Unit Test (TestControlMessageValidationInspector_truncateRPC)
+    uses: ./.github/workflows/reusable-flaky-unit-test.yml
+    with:
+      name: TestControlMessageValidationInspector_truncateRPC
+      dir: network/p2p/inspector/validation
+      retries: 5
+      runner: ubuntu-latest
 
   unit-test-modules:
     name: Unit Tests (Modules)
@@ -176,45 +212,89 @@ jobs:
           flags: unittests
           name: codecov-umbrella
 
-  docker-build:
-    name: Docker Build
-    runs-on: buildjet-16vcpu-ubuntu-2204
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
-        with:
-          # all tags are needed for integration tests
-          fetch-depth: 0
-      - name: Setup Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-      - name: Docker build
-        run: make docker-build-flow docker-build-flow-corrupt
-      - name: Save Docker images
-        run: |
-          docker save \
-          gcr.io/flow-container-registry/access:latest \
-          gcr.io/flow-container-registry/collection:latest \
-          gcr.io/flow-container-registry/consensus:latest \
-          gcr.io/flow-container-registry/execution:latest \
-          gcr.io/flow-container-registry/ghost:latest \
-          gcr.io/flow-container-registry/observer:latest \
-          gcr.io/flow-container-registry/verification:latest \
-          gcr.io/flow-container-registry/access-corrupted:latest \
-          gcr.io/flow-container-registry/execution-corrupted:latest \
-          gcr.io/flow-container-registry/verification-corrupted:latest > flow-docker-images.tar
-      - name: Cache Docker images
-        uses: actions/cache@v3
-        with:
-          path: flow-docker-images.tar
-          # use the workflow run id as part of the cache key to ensure these docker images will only be used for a single workflow run
-          key: flow-docker-images-${{ hashFiles('**/Dockerfile') }}-${{ github.run_id }}
+  docker-build-access:
+    name: Docker Build Access
+    uses: ./.github/workflows/reusable-docker-build.yml
+    with:
+      name: access
+      make: docker-build-access
+
+  docker-build-access-corrupt:
+    name: Docker Build Corrupt Access
+    uses: ./.github/workflows/reusable-docker-build.yml
+    with:
+      name: access-corrupt
+      make: docker-build-access-corrupt
+
+  docker-build-collection:
+    name: Docker Build Collection
+    uses: ./.github/workflows/reusable-docker-build.yml
+    with:
+      name: collection
+      make: docker-build-collection
+
+  docker-build-consensus:
+    name: Docker Build Consensus
+    uses: ./.github/workflows/reusable-docker-build.yml
+    with:
+      name: consensus
+      make: docker-build-consensus
+
+  docker-build-execution:
+    name: Docker Build Execution
+    uses: ./.github/workflows/reusable-docker-build.yml
+    with:
+      name: execution
+      make: docker-build-execution
+
+  docker-build-execution-corrupt:
+    name: Docker Build Corrupt Execution
+    uses: ./.github/workflows/reusable-docker-build.yml
+    with:
+      name: execution-corrupt
+      make: docker-build-execution-corrupt
+
+  docker-build-ghost:
+    name: Docker Build Ghost
+    uses: ./.github/workflows/reusable-docker-build.yml
+    with:
+      name: ghost
+      make: docker-build-ghost
+
+  docker-build-observer:
+    name: Docker Build Observer
+    uses: ./.github/workflows/reusable-docker-build.yml
+    with:
+      name: observer
+      make: docker-build-observer
+
+  docker-build-verification:
+    name: Docker Build Verification
+    uses: ./.github/workflows/reusable-docker-build.yml
+    with:
+      name: verification
+      make: docker-build-verification
+
+  docker-build-verification-corrupt:
+    name: Docker Build Corrupt Verification
+    uses: ./.github/workflows/reusable-docker-build.yml
+    with:
+      name: verification-corrupt
+      make: docker-build-verification-corrupt
 
   integration-test:
     name: Integration Tests
-    needs: docker-build
+    needs: [
+      docker-build-access,
+      docker-build-access-corrupt,
+      docker-build-collection,
+      docker-build-consensus,
+      docker-build-execution,
+      docker-build-execution-corrupt,
+      docker-build-ghost,
+      docker-build-observer,
+      docker-build-verification,
+      docker-build-verification-corrupt]
     strategy:
       fail-fast: false
       matrix:
@@ -222,72 +302,154 @@ jobs:
           - name: Access Cohort1 Integration Tests
             make: make -C integration access-cohort1-tests
             runner: buildjet-4vcpu-ubuntu-2204
+            corrupt: false
           - name: Access Cohort2 Integration Tests
             make: make -C integration access-cohort2-tests
             runner: ubuntu-latest
+            corrupt: false
           - name: Access Cohort3 Integration Tests
             make: make -C integration access-cohort3-tests
             runner: ubuntu-latest
+            corrupt: false
             # test suite has single test which is flaky and needs to be fixed - reminder here to put it back when it's fixed
 #          - name: BFT (Framework) Integration Tests
 #            make: make -C integration bft-framework-tests
 #            runner: ubuntu-latest
-          - name: BFT (Protocol) Integration Tests
-            make: make -C integration bft-protocol-tests
-            runner: buildjet-8vcpu-ubuntu-2204
-          - name: BFT (Gossipsub) Integration Tests
-            make: make -C integration bft-gossipsub-tests
+#          - name: BFT (Protocol) Integration Tests
+#            make: make -C integration bft-protocol-tests
+#            runner: buildjet-8vcpu-ubuntu-2204
+#            corrupt: true
+          - name: BFT (Gossipsub - RPC Inspector) Integration Tests
+            make: make -C integration bft-gossipsub-rpc-inspector-tests
             runner: ubuntu-latest
+            corrupt: true
+          - name: BFT (Gossipsub - Signature) Integration Tests
+            make: make -C integration bft-gossipsub-signature-tests
+            runner: buildjet-16vcpu-ubuntu-2204
+            corrupt: true
+          - name: BFT (Gossipsub - Topic Validator) Integration Tests
+            make: make -C integration bft-gossipsub-topic-validator-tests
+            runner: buildjet-16vcpu-ubuntu-2204
+            corrupt: true
           - name: Collection Integration Tests
             make: make -C integration collection-tests
             runner: ubuntu-latest
+            corrupt: false
           - name: Consensus Integration Tests
             make: make -C integration consensus-tests
             runner: ubuntu-latest
-          - name: Epoch Cohort1 Integration Tests
-            make: make -C integration epochs-cohort1-tests
-            runner: buildjet-8vcpu-ubuntu-2204
-          - name: Epoch Cohort2 Integration Tests
-            make: make -C integration epochs-cohort2-tests
-            runner: buildjet-4vcpu-ubuntu-2204
+            corrupt: false
+          - name: Epoch AN Integration Tests
+            make: make -C integration epochs-an-tests
+            runner: ubuntu-latest
+            corrupt: false
+          - name: Epoch LN Integration Tests
+            make: make -C integration epochs-ln-tests
+            runner: ubuntu-latest
+            corrupt: false
+          - name: Epoch SN Integration Tests
+            make: make -C integration epochs-sn-tests
+            runner: ubuntu-latest
+            corrupt: false
+          - name: Epoch Static Integration Tests
+            make: make -C integration epochs-static-tests
+            runner: ubuntu-latest
+            corrupt: false
+          - name: Epoch VN Integration Tests
+            make: make -C integration epochs-vn-tests
+            runner: ubuntu-latest
+            corrupt: false
           - name: Execution Integration Tests
             make: make -C integration execution-tests
             runner: ubuntu-latest
+            corrupt: false
           - name: Ghost Integration Tests
             make: make -C integration ghost-tests
             runner: ubuntu-latest
+            corrupt: false
           - name: MVP Integration Tests
             make: make -C integration mvp-tests
             runner: ubuntu-latest
+            corrupt: false
           - name: Network Integration Tests
             make: make -C integration network-tests
             runner: ubuntu-latest
+            corrupt: false
           - name: Verification Integration Tests
             make: make -C integration verification-tests
             runner: ubuntu-latest
+            corrupt: false
           - name: Upgrade Integration Tests
             make: make -C integration upgrades-tests
             runner: ubuntu-latest
+            corrupt: false
     runs-on: ${{ matrix.runner }}
     steps:
     - name: Checkout repo
       uses: actions/checkout@v3
-      with:
-          # all tags are needed for integration tests
-          fetch-depth: 0
     - name: Setup Go
       uses: actions/setup-go@v3
       with:
         go-version: ${{ env.GO_VERSION }}
         cache: true
-    - name: Load cached Docker images
+    - name: Load cached Access Docker image
       uses: actions/cache@v3
       with:
-        path: flow-docker-images.tar
-        # use the same cache key as the docker-build job
-        key: flow-docker-images-${{ hashFiles('**/Dockerfile') }}-${{ github.run_id }}
-    - name: Load Docker images
-      run: docker load -i flow-docker-images.tar
+        path: flow-docker-access.tar
+        key: flow-docker-images-access-${{ github.run_id }}
+    - name: Load cached Corrupt Access Docker image
+      if: matrix.corrupt == true
+      uses: actions/cache@v3
+      with:
+        path: flow-docker-access-corrupt.tar
+        key: flow-docker-images-access-corrupt-${{ github.run_id }}
+    - name: Load cached Collection Docker image
+      uses: actions/cache@v3
+      with:
+        path: flow-docker-collection.tar
+        key: flow-docker-images-collection-${{ github.run_id }}
+    - name: Load cached Consensus Docker image
+      uses: actions/cache@v3
+      with:
+        path: flow-docker-consensus.tar
+        key: flow-docker-images-consensus-${{ github.run_id }}
+    - name: Load cached Execution Docker image
+      uses: actions/cache@v3
+      with:
+        path: flow-docker-execution.tar
+        key: flow-docker-images-execution-${{ github.run_id }}
+    - name: Load cached Corrupt Execution Docker image
+      if: matrix.corrupt == true
+      uses: actions/cache@v3
+      with:
+        path: flow-docker-execution-corrupt.tar
+        key: flow-docker-images-execution-corrupt-${{ github.run_id }}
+    - name: Load cached Ghost Docker image
+      uses: actions/cache@v3
+      with:
+        path: flow-docker-ghost.tar
+        key: flow-docker-images-ghost-${{ github.run_id }}
+    - name: Load cached Observer Docker image
+      uses: actions/cache@v3
+      with:
+        path: flow-docker-observer.tar
+        key: flow-docker-images-observer-${{ github.run_id }}
+    - name: Load cached Verification Docker image
+      uses: actions/cache@v3
+      with:
+        path: flow-docker-verification.tar
+        key: flow-docker-images-verification-${{ github.run_id }}
+    - name: Load cached Corrupt Verification Docker image
+      if: matrix.corrupt == true
+      uses: actions/cache@v3
+      with:
+        path: flow-docker-verification-corrupt.tar
+        key: flow-docker-images-verification-corrupt-${{ github.run_id }}
+    - name: Load Docker images from tars
+      run: |
+        for f in *.tar; do
+          docker load -i $f
+        done
     - name: Run tests (${{ matrix.name }})
       # TODO(rbtz): re-enable when we fix exisiting races.
       #env:

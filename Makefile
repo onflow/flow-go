@@ -336,7 +336,7 @@ docker-build-execution-corrupt:
 	./insecure/cmd/mods_override.sh
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./insecure/cmd/execution --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target production \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
-		-t "$(CONTAINER_REGISTRY)/execution-corrupted:latest" -t "$(CONTAINER_REGISTRY)/execution-corrupted:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/execution-corrupted:$(IMAGE_TAG)" .
+		-t "$(CONTAINER_REGISTRY)/execution-corrupt:latest" -t "$(CONTAINER_REGISTRY)/execution-corrupt:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/execution-corrupt:$(IMAGE_TAG)" .
 	./insecure/cmd/mods_restore.sh
 
 .PHONY: docker-build-verification
@@ -365,7 +365,7 @@ docker-build-verification-corrupt:
 	./insecure/cmd/mods_override.sh
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./insecure/cmd/verification --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target production \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
-		-t "$(CONTAINER_REGISTRY)/verification-corrupted:latest" -t "$(CONTAINER_REGISTRY)/verification-corrupted:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/verification-corrupted:$(IMAGE_TAG)" .
+		-t "$(CONTAINER_REGISTRY)/verification-corrupt:latest" -t "$(CONTAINER_REGISTRY)/verification-corrupt:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/verification-corrupt:$(IMAGE_TAG)" .
 	./insecure/cmd/mods_restore.sh
 
 .PHONY: docker-build-access
@@ -394,7 +394,7 @@ docker-build-access-corrupt:
 	./insecure/cmd/mods_override.sh
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./insecure/cmd/access --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target production \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
-		-t "$(CONTAINER_REGISTRY)/access-corrupted:latest" -t "$(CONTAINER_REGISTRY)/access-corrupted:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/access-corrupted:$(IMAGE_TAG)" .
+		-t "$(CONTAINER_REGISTRY)/access-corrupt:latest" -t "$(CONTAINER_REGISTRY)/access-corrupt:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/access-corrupt:$(IMAGE_TAG)" .
 	./insecure/cmd/mods_restore.sh
 
 .PHONY: docker-build-observer
@@ -456,7 +456,7 @@ docker-build-flow: docker-build-collection docker-build-consensus docker-build-e
 docker-build-flow-without-netgo: docker-build-collection-without-netgo docker-build-consensus-without-netgo docker-build-execution-without-netgo docker-build-verification-without-netgo docker-build-access-without-netgo docker-build-observer-without-netgo
 
 .PHONY: docker-build-flow-corrupt
-docker-build-flow-corrupt: docker-build-execution-corrupt docker-build-verification-corrupt docker-build-access-corrupt
+docker-build-flow-corrupt: docker-build-access-corrupt docker-build-execution-corrupt docker-build-verification-corrupt
 
 .PHONY: docker-build-benchnet
 docker-build-benchnet: docker-build-flow docker-build-loader
@@ -494,8 +494,8 @@ docker-push-execution:
 
 .PHONY: docker-push-execution-corrupt
 docker-push-execution-corrupt:
-	docker push "$(CONTAINER_REGISTRY)/execution-corrupted:$(SHORT_COMMIT)"
-	docker push "$(CONTAINER_REGISTRY)/execution-corrupted:$(IMAGE_TAG)"
+	docker push "$(CONTAINER_REGISTRY)/execution-corrupt:$(SHORT_COMMIT)"
+	docker push "$(CONTAINER_REGISTRY)/execution-corrupt:$(IMAGE_TAG)"
 
 
 .PHONY: docker-push-execution-without-netgo
@@ -513,8 +513,8 @@ docker-push-verification:
 
 .PHONY: docker-push-verification-corrupt
 docker-push-verification-corrupt:
-	docker push "$(CONTAINER_REGISTRY)/verification-corrupted:$(SHORT_COMMIT)"
-	docker push "$(CONTAINER_REGISTRY)/verification-corrupted:$(IMAGE_TAG)"
+	docker push "$(CONTAINER_REGISTRY)/verification-corrupt:$(SHORT_COMMIT)"
+	docker push "$(CONTAINER_REGISTRY)/verification-corrupt:$(IMAGE_TAG)"
 
 .PHONY: docker-push-verification-without-netgo
 docker-push-verification-without-netgo:
@@ -531,8 +531,8 @@ docker-push-access:
 
 .PHONY: docker-push-access-corrupt
 docker-push-access-corrupt:
-	docker push "$(CONTAINER_REGISTRY)/access-corrupted:$(SHORT_COMMIT)"
-	docker push "$(CONTAINER_REGISTRY)/access-corrupted:$(IMAGE_TAG)"
+	docker push "$(CONTAINER_REGISTRY)/access-corrupt:$(SHORT_COMMIT)"
+	docker push "$(CONTAINER_REGISTRY)/access-corrupt:$(IMAGE_TAG)"
 
 .PHONY: docker-push-access-without-netgo
 docker-push-access-without-netgo:

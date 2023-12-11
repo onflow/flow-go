@@ -1,0 +1,39 @@
+# this reusable workflow builds docker images and caches them for use in integration tests
+
+on:
+  workflow_call:
+    inputs:
+      name:
+        description: 'The name of the docker image'
+        required: true
+        type: string
+      make:
+        description: 'The make command to build the docker image'
+        required: true
+        type: string
+
+jobs:
+  docker-build:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+        with:
+          # all tags are needed for integration tests
+          fetch-depth: 0
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: Docker build
+        run: make ${{ inputs.make }}
+      - name: Save Docker image
+        run: docker save gcr.io/flow-container-registry/${{ inputs.name }}:latest > flow-docker-${{ inputs.name }}.tar
+      - name: Cache Docker image
+        uses: actions/cache@v3
+        with:
+          path: flow-docker-${{ inputs.name }}.tar
+          # use the workflow run id as part of the cache key to ensure these docker images will only be used for a single workflow run
+          key: flow-docker-images-${{ inputs.name }}-${{ github.run_id }}

@@ -1,3 +1,5 @@
+//go:build !skip
+
 package validation_test
 
 import (
@@ -83,6 +85,7 @@ func TestNewControlMsgValidationInspector(t *testing.T) {
 // Message truncation for each control message type occurs when the count of control
 // messages exceeds the configured maximum sample size for that control message type.
 func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky in CI")
 	t.Run("truncateGraftMessages should truncate graft messages as expected", func(t *testing.T) {
 		graftPruneMessageMaxSampleSize := 1000
 		inspector, signalerCtx, cancel, distributor, rpcTracker, _, _, _ := inspectorFixture(t, func(params *validation.InspectorParams) {

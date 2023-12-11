@@ -1,4 +1,4 @@
-package cohort2
+package sn
 
 import (
 	"testing"

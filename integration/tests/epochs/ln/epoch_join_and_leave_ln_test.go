@@ -1,4 +1,4 @@
-package cohort1
+package ln
 
 import (
 	"testing"
