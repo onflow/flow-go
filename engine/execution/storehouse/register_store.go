@@ -46,6 +46,8 @@ func NewRegisterStore(
 	// init the memStore with the last executed and finalized block ID
 	memStore := NewInMemoryRegisterStore(height, finalizedID)
 
+	log.Info().Msgf("initialized in memory register store at block %v, height %v", finalizedID, height)
+
 	return &RegisterStore{
 		memStore:   memStore,
 		diskStore:  diskStore,
