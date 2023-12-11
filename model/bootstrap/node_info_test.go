@@ -50,7 +50,7 @@ func TestNodeInfoPubEncodingJSON(t *testing.T) {
 		var dec bootstrap.NodeInfoPub
 		err = json.Unmarshal(enc, &dec)
 		require.NoError(t, err)
-		assert.Equal(t, conf, dec)
+		assert.True(t, dec.Equals(&conf))
 	})
 	t.Run("compat: should accept old files using Stake field", func(t *testing.T) {
 		conf := unittest.NodeInfoFixture().Public()
@@ -61,6 +61,6 @@ func TestNodeInfoPubEncodingJSON(t *testing.T) {
 		var dec bootstrap.NodeInfoPub
 		err = json.Unmarshal(enc, &dec)
 		require.NoError(t, err)
-		assert.Equal(t, conf, dec)
+		assert.True(t, dec.Equals(&conf))
 	})
 }

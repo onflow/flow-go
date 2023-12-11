@@ -113,7 +113,7 @@ func NewBuilder(log zerolog.Logger,
 		stateStreamBackend:        stateStreamBackend,
 		stateStreamConfig:         stateStreamConfig,
 	}
-	backendNotifierActor, backendNotifierWorker := events.NewFinalizationActor(eng.notifyBackendOnBlockFinalized)
+	backendNotifierActor, backendNotifierWorker := events.NewFinalizationActor(eng.processOnFinalizedBlock)
 	eng.backendNotifierActor = backendNotifierActor
 
 	eng.Component = component.NewComponentManagerBuilder().
@@ -171,12 +171,13 @@ func (e *Engine) OnFinalizedBlock(block *model.Block) {
 	e.backendNotifierActor.OnFinalizedBlock(block)
 }
 
-// notifyBackendOnBlockFinalized is invoked by the FinalizationActor when a new block is finalized.
-// It notifies the backend of the newly finalized block.
-func (e *Engine) notifyBackendOnBlockFinalized(_ *model.Block) error {
+// processOnFinalizedBlock is invoked by the FinalizationActor when a new block is finalized.
+// It informs the backend of the newly finalized block.
+// The input to this callback is treated as trusted.
+// No errors expected during normal operations.
+func (e *Engine) processOnFinalizedBlock(_ *model.Block) error {
 	finalizedHeader := e.finalizedHeaderCache.Get()
-	e.backend.NotifyFinalizedBlockHeight(finalizedHeader.Height)
-	return nil
+	return e.backend.ProcessFinalizedBlockHeight(finalizedHeader.Height)
 }
 
 // RestApiAddress returns the listen address of the REST API server.
@@ -212,6 +213,7 @@ func (e *Engine) serveGRPCWebProxyWorker(ctx irrecoverable.SignalerContext, read
 
 // serveREST is a worker routine which starts the HTTP REST server.
 // The ready callback is called after the server address is bound and set.
+// Note: The original REST BaseContext is discarded, and the irrecoverable.SignalerContext is used for error handling.
 func (e *Engine) serveREST(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	if e.config.RestConfig.ListenAddress == "" {
 		e.log.Debug().Msg("no REST API address specified - not starting the server")
@@ -229,6 +231,11 @@ func (e *Engine) serveREST(ctx irrecoverable.SignalerContext, ready component.Re
 		return
 	}
 	e.restServer = r
+
+	// Set up the irrecoverable.SignalerContext for error handling in the REST server.
+	e.restServer.BaseContext = func(_ net.Listener) context.Context {
+		return irrecoverable.WithSignalerContext(ctx, ctx)
+	}
 
 	l, err := net.Listen("tcp", e.config.RestConfig.ListenAddress)
 	if err != nil {

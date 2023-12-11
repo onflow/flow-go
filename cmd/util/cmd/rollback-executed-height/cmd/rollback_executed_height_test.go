@@ -61,6 +61,8 @@ func TestReExecuteBlock(t *testing.T) {
 			txResults,
 			db,
 			trace.NewNoopTracer(),
+			nil,
+			false,
 		)
 		require.NotNil(t, es)
 
@@ -183,6 +185,8 @@ func TestReExecuteBlockWithDifferentResult(t *testing.T) {
 			txResults,
 			db,
 			trace.NewNoopTracer(),
+			nil,
+			false,
 		)
 		require.NotNil(t, es)
 

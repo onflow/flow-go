@@ -44,6 +44,7 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
+	"github.com/onflow/flow-go/network/p2p/p2pconf"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/dsl"
@@ -2627,7 +2628,7 @@ func P2PRPCPruneFixture(topic *string) *pubsub_pb.ControlPrune {
 	}
 }
 
-// P2PRPCIHaveFixtures returns n number of control message rpc iHave fixtures with m number of message ids each.
+// P2PRPCIHaveFixtures returns n number of control message where n = len(topics) rpc iHave fixtures with m number of message ids each.
 func P2PRPCIHaveFixtures(m int, topics ...string) []*pubsub_pb.ControlIHave {
 	n := len(topics)
 	ihaves := make([]*pubsub_pb.ControlIHave, n)
@@ -2691,6 +2692,12 @@ func WithIWants(iWants ...*pubsub_pb.ControlIWant) RPCFixtureOpt {
 	}
 }
 
+func WithPubsubMessages(msgs ...*pubsub_pb.Message) RPCFixtureOpt {
+	return func(rpc *pubsub.RPC) {
+		rpc.Publish = msgs
+	}
+}
+
 // P2PRPCFixture returns a pubsub RPC fixture. Currently, this fixture only sets the ControlMessage field.
 func P2PRPCFixture(opts ...RPCFixtureOpt) *pubsub.RPC {
 	rpc := &pubsub.RPC{
@@ -2704,4 +2711,74 @@ func P2PRPCFixture(opts ...RPCFixtureOpt) *pubsub.RPC {
 	}
 
 	return rpc
+}
+
+func WithFrom(pid peer.ID) func(*pubsub_pb.Message) {
+	return func(msg *pubsub_pb.Message) {
+		msg.From = []byte(pid)
+	}
+}
+
+// GossipSubMessageFixture returns a gossip sub message fixture for the specified topic.
+func GossipSubMessageFixture(s string, opts ...func(*pubsub_pb.Message)) *pubsub_pb.Message {
+	pb := &pubsub_pb.Message{
+		From:      RandomBytes(32),
+		Data:      RandomBytes(32),
+		Seqno:     RandomBytes(10),
+		Topic:     &s,
+		Signature: RandomBytes(100),
+		Key:       RandomBytes(32),
+	}
+
+	for _, opt := range opts {
+		opt(pb)
+	}
+
+	return pb
+}
+
+// GossipSubMessageFixtures returns a list of gossipsub message fixtures.
+func GossipSubMessageFixtures(n int, topic string, opts ...func(*pubsub_pb.Message)) []*pubsub_pb.Message {
+	msgs := make([]*pubsub_pb.Message, n)
+	for i := 0; i < n; i++ {
+		msgs[i] = GossipSubMessageFixture(topic, opts...)
+	}
+	return msgs
+}
+
+// LibP2PResourceLimitOverrideFixture returns a random resource limit override for testing.
+// The values are not guaranteed to be valid between 0 and 1000.
+// Returns:
+//   - p2pconf.ResourceManagerOverrideLimit: a random resource limit override.
+func LibP2PResourceLimitOverrideFixture() p2pconf.ResourceManagerOverrideLimit {
+	return p2pconf.ResourceManagerOverrideLimit{
+		StreamsInbound:      rand.Intn(1000),
+		StreamsOutbound:     rand.Intn(1000),
+		ConnectionsInbound:  rand.Intn(1000),
+		ConnectionsOutbound: rand.Intn(1000),
+		FD:                  rand.Intn(1000),
+		Memory:              rand.Intn(1000),
+	}
+}
+
+func RegisterEntryFixture() flow.RegisterEntry {
+	val := make([]byte, 4)
+	_, _ = crand.Read(val)
+	return flow.RegisterEntry{
+		Key: flow.RegisterID{
+			Owner: "owner",
+			Key:   "key1",
+		},
+		Value: val,
+	}
+}
+
+func MakeOwnerReg(key string, value string) flow.RegisterEntry {
+	return flow.RegisterEntry{
+		Key: flow.RegisterID{
+			Owner: "owner",
+			Key:   key,
+		},
+		Value: []byte(value),
+	}
 }

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"testing"
 
-	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
@@ -18,10 +17,13 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/execution"
 	execmock "github.com/onflow/flow-go/module/execution/mock"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
+
+	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 )
 
 type BackendAccountsSuite struct {
@@ -313,6 +315,30 @@ func (s *BackendAccountsSuite) TestGetAccountFromFailover_ReturnsENErrors() {
 
 	s.Run("GetAccountAtBlockHeight - fails with backend err", func() {
 		s.testGetAccountAtBlockHeight(ctx, backend, statusCode)
+	})
+}
+
+// TestGetAccountAtLatestBlock_InconsistentState tests that signaler context received error when node state is
+// inconsistent
+func (s *BackendAccountsSuite) TestGetAccountAtLatestBlockFromStorage_InconsistentState() {
+	scriptExecutor := execmock.NewScriptExecutor(s.T())
+
+	backend := s.defaultBackend()
+	backend.scriptExecMode = ScriptExecutionModeLocalOnly
+	backend.scriptExecutor = scriptExecutor
+
+	s.Run(fmt.Sprintf("GetAccountAtLatestBlock - fails with %v", "inconsistent node's state"), func() {
+		s.state.On("Sealed").Return(s.snapshot, nil)
+
+		err := fmt.Errorf("inconsistent node's state")
+		s.snapshot.On("Head").Return(nil, err)
+
+		signCtxErr := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
+		signalerCtx := irrecoverable.WithSignalerContext(context.Background(), irrecoverable.NewMockSignalerContextExpectError(s.T(), context.Background(), signCtxErr))
+
+		actual, err := backend.GetAccountAtLatestBlock(signalerCtx, s.failingAddress)
+		s.Require().Error(err)
+		s.Require().Nil(actual)
 	})
 }
 

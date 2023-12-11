@@ -144,6 +144,7 @@ type AccessNodeConfig struct {
 	executionDataConfig          edrequester.ExecutionDataConfig
 	PublicNetworkConfig          PublicNetworkConfig
 	TxResultCacheSize            uint
+	TxErrorMessagesCacheSize     uint
 	executionDataIndexingEnabled bool
 	registersDBPath              string
 	checkpointFile               string
@@ -219,6 +220,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		apiRatelimits:                nil,
 		apiBurstlimits:               nil,
 		TxResultCacheSize:            0,
+		TxErrorMessagesCacheSize:     1000,
 		PublicNetworkConfig: PublicNetworkConfig{
 			BindAddress: cmd.NotSet,
 			Metrics:     metrics.NewNoopCollector(),
@@ -726,7 +728,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					}
 
 					// TODO: find a way to hook a context up to this to allow a graceful shutdown
-					err = buutstrap.IndexCheckpointFile(context.Background())
+					workerCount := 10
+					err = buutstrap.IndexCheckpointFile(context.Background(), workerCount)
 					if err != nil {
 						return nil, fmt.Errorf("could not load checkpoint file: %w", err)
 					}
@@ -908,6 +911,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.BoolVar(&builder.retryEnabled, "retry-enabled", defaultConfig.retryEnabled, "whether to enable the retry mechanism at the access node level")
 		flags.BoolVar(&builder.rpcMetricsEnabled, "rpc-metrics-enabled", defaultConfig.rpcMetricsEnabled, "whether to enable the rpc metrics")
 		flags.UintVar(&builder.TxResultCacheSize, "transaction-result-cache-size", defaultConfig.TxResultCacheSize, "transaction result cache size.(Disabled by default i.e 0)")
+		flags.UintVar(&builder.TxErrorMessagesCacheSize, "transaction-error-messages-cache-size", defaultConfig.TxErrorMessagesCacheSize, "transaction error messages cache size.(By default 1000)")
 		flags.StringVarP(&builder.nodeInfoFile, "node-info-file", "", defaultConfig.nodeInfoFile, "full path to a json file which provides more details about nodes when reporting its reachability metrics")
 		flags.StringToIntVar(&builder.apiRatelimits, "api-rate-limits", defaultConfig.apiRatelimits, "per second rate limits for Access API methods e.g. Ping=300,GetTransaction=500 etc.")
 		flags.StringToIntVar(&builder.apiBurstlimits, "api-burst-limits", defaultConfig.apiBurstlimits, "burst limits for Access API methods e.g. Ping=100,GetTransaction=100 etc.")
@@ -1010,6 +1014,9 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			if builder.rpcConf.BackendConfig.CircuitBreakerConfig.RestoreTimeout <= 0 {
 				return errors.New("circuit-breaker-restore-timeout must be greater than 0")
 			}
+		}
+		if builder.TxErrorMessagesCacheSize == 0 {
+			return errors.New("transaction-error-messages-cache-size must be greater than 0")
 		}
 
 		return nil
@@ -1268,6 +1275,10 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.RegistersAsyncStore = execution.NewRegistersAsyncStore()
 			return nil
 		}).
+		Module("async register store", func(node *cmd.NodeConfig) error {
+			builder.RegistersAsyncStore = execution.NewRegistersAsyncStore()
+			return nil
+		}).
 		Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			config := builder.rpcConf
 			backendConfig := config.BackendConfig
@@ -1326,6 +1337,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				SnapshotHistoryLimit:      backend.DefaultSnapshotHistoryLimit,
 				Communicator:              backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
 				TxResultCacheSize:         builder.TxResultCacheSize,
+				TxErrorMessagesCacheSize:  builder.TxErrorMessagesCacheSize,
 				ScriptExecutor:            builder.ScriptExecutor,
 				ScriptExecutionMode:       scriptExecMode,
 			})
@@ -1577,17 +1589,19 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 	}
 	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
 
-	libp2pNode, err := p2pbuilder.NewNodeBuilder(builder.Logger, &p2pconfig.MetricsConfig{
-		HeroCacheFactory: builder.HeroCacheMetricsFactory(),
-		Metrics:          networkMetrics,
-	},
+	libp2pNode, err := p2pbuilder.NewNodeBuilder(builder.Logger,
+		&p2pconfig.MetricsConfig{
+			HeroCacheFactory: builder.HeroCacheMetricsFactory(),
+			Metrics:          networkMetrics,
+		},
 		network.PublicNetwork,
 		bindAddress,
 		networkKey,
 		builder.SporkID,
 		builder.IdentityProvider,
-		&builder.FlowConfig.NetworkConfig.ResourceManagerConfig,
-		&builder.FlowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig,
+		builder.FlowConfig.NetworkConfig.GossipSubConfig.GossipSubScoringRegistryConfig,
+		&builder.FlowConfig.NetworkConfig.ResourceManager,
+		&builder.FlowConfig.NetworkConfig.GossipSubConfig,
 		&p2pconfig.PeerManagerConfig{
 			// TODO: eventually, we need pruning enabled even on public network. However, it needs a modified version of
 			// the peer manager that also operate on the public identities.

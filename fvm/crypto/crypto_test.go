@@ -425,16 +425,13 @@ func TestVerifySignatureFromTransaction(t *testing.T) {
 
 func TestValidatePublicKey(t *testing.T) {
 
-	// make sure the seed length is larger than miniumum seed lengths of all signature schemes
-	seedLength := 64
-
 	validPublicKey := func(t *testing.T, s runtime.SignatureAlgorithm) []byte {
-		seed := make([]byte, seedLength)
+		seed := make([]byte, gocrypto.KeyGenSeedMinLen)
 		_, err := rand.Read(seed)
 		require.NoError(t, err)
-		pk, err := gocrypto.GeneratePrivateKey(crypto.RuntimeToCryptoSigningAlgorithm(s), seed)
+		sk, err := gocrypto.GeneratePrivateKey(crypto.RuntimeToCryptoSigningAlgorithm(s), seed)
 		require.NoError(t, err)
-		return pk.PublicKey().Encode()
+		return sk.PublicKey().Encode()
 	}
 
 	t.Run("Unknown algorithm should return false", func(t *testing.T) {
@@ -463,12 +460,14 @@ func TestValidatePublicKey(t *testing.T) {
 			runtime.SignatureAlgorithmBLS_BLS12_381,
 		}
 		for i, s := range signatureAlgos {
+
 			t.Run(fmt.Sprintf("case %v: %v", i, s), func(t *testing.T) {
 				key := validPublicKey(t, s)
+				// This may cause flakiness depending on the public key
+				// deserialization scheme used!!
 				key[0] ^= 1 // alter one bit of the valid key
-
 				err := crypto.ValidatePublicKey(s, key)
-				require.Error(t, err)
+				require.Errorf(t, err, "key is %#x", key)
 			})
 		}
 	})

@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/execution"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
@@ -72,7 +73,9 @@ func (b *backendScripts) ExecuteScriptAtLatestBlock(
 	latestHeader, err := b.state.Sealed().Head()
 	if err != nil {
 		// the latest sealed header MUST be available
-		return nil, status.Errorf(codes.Internal, "failed to get latest sealed header: %v", err)
+		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
+		irrecoverable.Throw(ctx, err)
+		return nil, err
 	}
 
 	return b.executeScript(ctx, newScriptExecutionRequest(latestHeader.ID(), latestHeader.Height, script, arguments))

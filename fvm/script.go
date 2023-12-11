@@ -10,8 +10,10 @@ import (
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/evm"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/logical"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/hash"
 )
@@ -197,6 +199,21 @@ func (executor *scriptExecutor) execute() error {
 func (executor *scriptExecutor) executeScript() error {
 	rt := executor.env.BorrowCadenceRuntime()
 	defer executor.env.ReturnCadenceRuntime(rt)
+
+	if executor.ctx.EVMEnabled {
+		chain := executor.ctx.Chain
+		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+		err := evm.SetupEnvironment(
+			chain.ChainID(),
+			executor.env,
+			rt.ScriptRuntimeEnv,
+			chain.ServiceAddress(),
+			sc.FlowToken.Address,
+		)
+		if err != nil {
+			return err
+		}
+	}
 
 	value, err := rt.ExecuteScript(
 		runtime.Script{

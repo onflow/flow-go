@@ -103,4 +103,7 @@ const (
 	ErrCodeContractNotFoundError ErrorCode = 1251
 	// Deprecated: No longer used.
 	ErrCodeContractNamesNotFoundError ErrorCode = 1252
+
+	// fvm std lib errors 1300-1400
+	ErrEVMExecutionError ErrorCode = 1300
 )
