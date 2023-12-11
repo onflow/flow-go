@@ -132,8 +132,6 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		assert.Equal(t, expectedIdentities, richEntry.NextEpochIdentityTable, "should be equal to next epoch setup participants + current epoch setup participants")
 	})
 
-	// TODO: include test for epoch setup phase where no prior epoch exist (i.e. first epoch setup phase after spork)
-	// TODO: above is done in https://github.com/onflow/flow-go/pull/5080 - add phase check once merged
 	t.Run("setup-after-spork", func(t *testing.T) {
 		stateEntry := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.RichProtocolStateEntry) {
 			// no previous epoch since we are in the first epoch
@@ -160,6 +158,8 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 			nil,
 		)
 		assert.NoError(t, err)
+		assert.Equal(t, flow.EpochPhaseSetup, richEntry.EpochPhase())
+
 		expectedIdentities, err := flow.BuildIdentityTable(
 			stateEntry.CurrentEpochSetup.Participants,
 			stateEntry.CurrentEpoch.ActiveIdentities,
@@ -220,8 +220,6 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		assert.Equal(t, expectedIdentities, richEntry.NextEpochIdentityTable, "should be equal to next epoch setup participants + current epoch setup participants")
 	})
 
-	// TODO: include test for epoch commit phase where no prior epoch exist (i.e. first epoch commit phase after spork)
-	// TODO: above is done in https://github.com/onflow/flow-go/pull/5080 - add phase check once merged
 	t.Run("commit-after-spork", func(t *testing.T) {
 		stateEntry := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.RichProtocolStateEntry) {
 			// no previous epoch since we are in the first epoch
@@ -244,6 +242,8 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 			stateEntry.NextEpochCommit,
 		)
 		assert.NoError(t, err)
+		assert.Equal(t, flow.EpochPhaseCommitted, richEntry.EpochPhase())
+
 		expectedIdentities, err := flow.BuildIdentityTable(
 			stateEntry.CurrentEpochSetup.Participants,
 			stateEntry.CurrentEpoch.ActiveIdentities,
