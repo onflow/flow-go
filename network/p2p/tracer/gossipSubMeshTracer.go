@@ -200,15 +200,17 @@ func (t *GossipSubMeshTracer) SendRPC(rpc *pubsub.RPC, p peer.ID) {
 	}
 	msgCount = len(rpc.Publish)
 	t.metrics.OnRpcReceived(msgCount, ihaveCount, iwantCount, graftCount, pruneCount)
-	t.logger.Trace().
-		Str("remote_peer_id", p2plogging.PeerId(p)).
-		Int("subscription_option_count", len(rpc.Subscriptions)).
-		Int("publish_message_count", msgCount).
-		Int("ihave_size", ihaveCount).
-		Int("iwant_size", iwantCount).
-		Int("graft_size", graftCount).
-		Int("prune_size", pruneCount).
-		Msg("sent pubsub rpc")
+	if t.logger.GetLevel() == zerolog.TraceLevel {
+		t.logger.Trace().
+			Str("remote_peer_id", p2plogging.PeerId(p)).
+			Int("subscription_option_count", len(rpc.Subscriptions)).
+			Int("publish_message_count", msgCount).
+			Int("ihave_size", ihaveCount).
+			Int("iwant_size", iwantCount).
+			Int("graft_size", graftCount).
+			Int("prune_size", pruneCount).
+			Msg("sent pubsub rpc")
+	}
 
 	t.metrics.OnRpcSent(msgCount, ihaveCount, iwantCount, graftCount, pruneCount)
 }
@@ -354,14 +356,16 @@ func (t *GossipSubMeshTracer) RecvRPC(rpc *pubsub.RPC) {
 	}
 	msgCount = len(rpc.Publish)
 	t.metrics.OnRpcReceived(msgCount, ihaveCount, iwantCount, graftCount, pruneCount)
-	t.logger.Trace().
-		Int("subscription_option_count", len(rpc.Subscriptions)).
-		Int("publish_message_count", msgCount).
-		Int("ihave_size", ihaveCount).
-		Int("iwant_size", iwantCount).
-		Int("graft_size", graftCount).
-		Int("prune_size", pruneCount).
-		Msg("received pubsub rpc")
+	if t.logger.GetLevel() == zerolog.TraceLevel {
+		t.logger.Trace().
+			Int("subscription_option_count", len(rpc.Subscriptions)).
+			Int("publish_message_count", msgCount).
+			Int("ihave_size", ihaveCount).
+			Int("iwant_size", iwantCount).
+			Int("graft_size", graftCount).
+			Int("prune_size", pruneCount).
+			Msg("received pubsub rpc")
+	}
 }
 
 // DropRPC is called by GossipSub as a callback when an outbound RPC message is dropped by the local node, typically because the local node
@@ -376,17 +380,18 @@ func (t *GossipSubMeshTracer) DropRPC(rpc *pubsub.RPC, p peer.ID) {
 	}
 	msgCount = len(rpc.Publish)
 	t.metrics.OnRpcReceived(msgCount, ihaveCount, iwantCount, graftCount, pruneCount)
-	t.logger.Warn().
-		Bool(logging.KeyNetworkingSecurity, true).
-		Str("remote_peer_id", p2plogging.PeerId(p)).
-		Int("subscription_option_count", len(rpc.Subscriptions)).
-		Int("publish_message_count", msgCount).
-		Int("ihave_size", ihaveCount).
-		Int("iwant_size", iwantCount).
-		Int("graft_size", graftCount).
-		Int("prune_size", pruneCount).
-		Msg("outbound rpc dropped")
-
+	if t.logger.GetLevel() == zerolog.TraceLevel {
+		t.logger.Warn().
+			Bool(logging.KeyNetworkingSecurity, true).
+			Str("remote_peer_id", p2plogging.PeerId(p)).
+			Int("subscription_option_count", len(rpc.Subscriptions)).
+			Int("publish_message_count", msgCount).
+			Int("ihave_size", ihaveCount).
+			Int("iwant_size", iwantCount).
+			Int("graft_size", graftCount).
+			Int("prune_size", pruneCount).
+			Msg("outbound rpc dropped")
+	}
 	t.metrics.OnOutboundRpcDropped()
 }
 
