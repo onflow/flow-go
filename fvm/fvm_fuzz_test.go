@@ -105,7 +105,7 @@ var fuzzTransactionTypes = []transactionType{
 		require: func(t *testing.T, tctx transactionTypeContext, results fuzzResults) {
 			// if there is an error, it should be computation exceeded
 			if results.output.Err != nil {
-				require.Len(t, results.output.Events, 3)
+				require.Len(t, results.output.Events, 5)
 				unittest.EnsureEventsIndexSeq(t, results.output.Events, tctx.chain.ChainID())
 				codes := []errors.ErrorCode{
 					errors.ErrCodeComputationLimitExceededError,

@@ -223,7 +223,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 		assert.Len(t, txResults, 1)
 		assert.Equal(t, "", txResults[0].ErrorMessage)
 		// ensure events from the first transaction is emitted
-		require.Len(t, colResult.Events(), 10)
+		require.Len(t, colResult.Events(), 16)
 
 		colResult = cr.CollectionExecutionResultAt(1)
 		txResults = colResult.TransactionResults()
@@ -231,7 +231,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 		// storage limit error
 		assert.Contains(t, txResults[0].ErrorMessage, errors.ErrCodeStorageCapacityExceeded.String())
 		// ensure fee deduction events are emitted even though tx fails
-		require.Len(t, colResult.Events(), 3)
+		require.Len(t, colResult.Events(), 5)
 	})
 
 	t.Run("with failed transaction fee deduction", func(t *testing.T) {
@@ -303,7 +303,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 				transactionEvents += 1
 			}
 		}
-		require.Equal(t, 10, transactionEvents)
+		require.Equal(t, 16, transactionEvents)
 
 		assert.Contains(t, txResults[1].ErrorMessage, errors.ErrCodeStorageCapacityExceeded.String())
 
@@ -314,7 +314,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 				transactionEvents += 1
 			}
 		}
-		require.Equal(t, 3, transactionEvents)
+		require.Equal(t, 5, transactionEvents)
 	})
 
 }
