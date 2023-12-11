@@ -182,7 +182,7 @@ func (r *GossipSubAppSpecificScoreRegistry) AppSpecificScoreFunc() func(peer.ID)
 	return func(pid peer.ID) float64 {
 		appSpecificScore := float64(0)
 
-		lg := r.logger.With().Str("peer_id", p2plogging.PeerId(pid)).Logger()
+		lg := r.logger.With().Str("remote_peer_id", p2plogging.PeerId(pid)).Logger()
 		// (1) spam penalty: the penalty is applied to the application specific penalty when a peer conducts a spamming misbehaviour.
 		spamRecord, err, spamRecordExists := r.spamScoreCache.Get(pid)
 		if err != nil {
@@ -224,7 +224,7 @@ func (r *GossipSubAppSpecificScoreRegistry) AppSpecificScoreFunc() func(peer.ID)
 			appSpecificScore += stakingScore
 		}
 
-		lg.Trace().
+		lg.Debug().
 			Float64("total_app_specific_score", appSpecificScore).
 			Msg("application specific penalty computed")
 

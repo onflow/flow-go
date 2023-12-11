@@ -38,8 +38,6 @@ jobs:
         # to accurately get the version tag
         fetch-depth: 0
         ref: ${{ inputs.tag }}
-    - name: Build relic
-      run: make crypto_setup_gopath
     - name: Build and upload boot-tools
       run: |
         make tool-bootstrap tool-transit

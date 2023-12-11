@@ -39,13 +39,10 @@ func DefaultEventEmitterParams() EventEmitterParams {
 // with the runtime environment interface.
 type EventEmitter interface {
 	// EmitEvent satisfies Cadence's runtime API.
-	// This will encode the cadence event and call EmitRawEvent.
+	// This will encode the cadence event
 	//
 	// Note that the script variant will return OperationNotSupportedError.
 	EmitEvent(event cadence.Event) error
-
-	// EmitRawEvent is used to emit events that are not Cadence events.
-	EmitRawEvent(eventType flow.EventType, payload []byte) error
 
 	Events() flow.EventsList
 	ServiceEvents() flow.EventsList
@@ -77,16 +74,6 @@ func (emitter ParseRestrictedEventEmitter) EmitEvent(event cadence.Event) error 
 		event)
 }
 
-func (emitter ParseRestrictedEventEmitter) EmitRawEvent(eventType flow.EventType, payload []byte) error {
-	return parseRestrict2Arg(
-		emitter.txnState,
-		trace.FVMEnvEmitEvent,
-		emitter.impl.EmitRawEvent,
-		eventType,
-		payload,
-	)
-}
-
 func (emitter ParseRestrictedEventEmitter) Events() flow.EventsList {
 	return emitter.impl.Events()
 }
@@ -110,10 +97,6 @@ var _ EventEmitter = NoEventEmitter{}
 type NoEventEmitter struct{}
 
 func (NoEventEmitter) EmitEvent(cadence.Event) error {
-	return nil
-}
-
-func (NoEventEmitter) EmitRawEvent(flow.EventType, []byte) error {
 	return nil
 }
 
@@ -178,7 +161,6 @@ func (emitter *eventEmitter) EventCollection() *EventCollection {
 }
 
 func (emitter *eventEmitter) EmitEvent(event cadence.Event) error {
-	defer emitter.tracer.StartExtensiveTracingChildSpan(trace.FVMEnvEncodeEvent).End()
 	err := emitter.meter.MeterComputation(ComputationKindEncodeEvent, 1)
 	if err != nil {
 		return fmt.Errorf("emit event, event encoding failed: %w", err)
@@ -188,17 +170,16 @@ func (emitter *eventEmitter) EmitEvent(event cadence.Event) error {
 	if err != nil {
 		return errors.NewEventEncodingError(err)
 	}
-
-	return emitter.EmitRawEvent(flow.EventType(event.EventType.ID()), payload)
-}
-
-func (emitter *eventEmitter) EmitRawEvent(eventType flow.EventType, payload []byte) error {
+	emitter.tracer.StartExtensiveTracingChildSpan(trace.FVMEnvEncodeEvent).End()
 	defer emitter.tracer.StartExtensiveTracingChildSpan(trace.FVMEnvEmitEvent).End()
+
 	payloadSize := len(payload)
-	err := emitter.meter.MeterComputation(ComputationKindEmitEvent, uint(payloadSize))
+	err = emitter.meter.MeterComputation(ComputationKindEmitEvent, uint(payloadSize))
 	if err != nil {
 		return fmt.Errorf("emit event failed: %w", err)
 	}
+
+	eventType := flow.EventType(event.EventType.ID())
 	flowEvent := flow.Event{
 		Type:             eventType,
 		TransactionID:    emitter.txID,
@@ -238,7 +219,6 @@ func (emitter *eventEmitter) EmitRawEvent(eventType flow.EventType, payload []by
 	}
 
 	return nil
-
 }
 
 func (emitter *eventEmitter) Events() flow.EventsList {
@@ -320,13 +300,7 @@ func (collection *EventCollection) TotalEventCounter() uint32 {
 func IsServiceEvent(eventType flow.EventType, chain flow.ChainID) (bool, error) {
 
 	// retrieve the service event information for this chain
-	events, err := systemcontracts.ServiceEventsForChain(chain)
-	if err != nil {
-		return false, fmt.Errorf(
-			"unknown system contracts for chain (%s): %w",
-			chain.String(),
-			err)
-	}
+	events := systemcontracts.ServiceEventsForChain(chain)
 
 	for _, serviceEvent := range events.All() {
 		if serviceEvent.EventType() == eventType {

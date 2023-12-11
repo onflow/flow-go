@@ -38,6 +38,7 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/fvm/tracing"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
@@ -422,8 +423,9 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 		TimeSpent:       map[string]uint64{},
 		InteractionUsed: map[string]uint64{},
 	}
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
-	testContractAddress, err := chain.AddressAtIndex(environment.EVMAccountIndex + 1)
+	testContractAddress, err := chain.AddressAtIndex(systemcontracts.EVMAccountIndex + 1)
 	require.NoError(b, err)
 
 	benchTransaction := func(
@@ -540,10 +542,10 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 					}
 				}
 			}`,
-			fvm.FungibleTokenAddress(chain),
-			fvm.FlowTokenAddress(chain),
+			sc.FungibleToken.Address.Hex(),
+			sc.FlowToken.Address.Hex(),
 			testContractAddress,
-			chain.ServiceAddress(),
+			sc.FlowServiceAccount.Address.Hex(),
 			rep,
 			prepare,
 		)
