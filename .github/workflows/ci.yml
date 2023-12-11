@@ -37,12 +37,14 @@ jobs:
     - name: Checkout repo
       uses: actions/checkout@v3
     - name: Setup Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v4
       with:
         go-version: ${{ env.GO_VERSION }}
         cache: true
-    - name: Build relic
-      run: make crypto_setup_gopath
+    - name: Install C formatter
+      run: sudo apt-get install -y clang-format
+    - name: Run C formatter and sanitizer for ./crypto
+      run: make -C crypto c-format && make -C crypto c-sanitize
     - name: Run go generate
       run: go generate
       working-directory: ${{ matrix.dir }}
@@ -51,10 +53,11 @@ jobs:
       with:
         # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
         version: v1.54
-        args: -v --build-tags relic
+        args: -v
         working-directory: ${{ matrix.dir }}
         # https://github.com/golangci/golangci-lint-action/issues/244
         skip-cache: true
+    
 
   tidy:
     name: Tidy
@@ -63,7 +66,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
@@ -71,18 +74,6 @@ jobs:
         run: make tidy
       - name: code sanity check
         run: make code-sanity-check
-
-  shell-check:
-    name: ShellCheck
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout repo
-      uses: actions/checkout@v3
-    - name: Run ShellCheck
-      uses: ludeeus/action-shellcheck@203a3fd018dfe73f8ae7e3aa8da2c149a5f41c33
-      with:
-        scandir: './crypto'
-        ignore: 'relic'
 
   create-dynamic-test-matrix:
     name: Create Dynamic Test Matrix
@@ -93,7 +84,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
@@ -114,7 +105,7 @@ jobs:
     - name: Checkout repo
       uses: actions/checkout@v3
     - name: Setup Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v4
       with:
         go-version: ${{ env.GO_VERSION }}
         cache: true
@@ -126,7 +117,6 @@ jobs:
         timeout_minutes: 35
         max_attempts: 5
         command: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" test
-
       # TODO(rbtz): re-enable when we fix exisiting races.
       #env:
       #  RACE_DETECTOR: 1
@@ -144,20 +134,17 @@ jobs:
       matrix:
         include:
           - name: crypto
-            make1: -C crypto setup
-            make2: unittest
+            setup: noop
             retries: 1
             race: 1
             runner: ubuntu-latest
           - name: insecure
-            make1: install-tools
-            make2: test
+            setup: install-tools
             retries: 5
             race: 0
             runner: buildjet-4vcpu-ubuntu-2204
           - name: integration
-            make1: install-tools
-            make2: test
+            setup: install-tools
             retries: 5
             race: 0
             runner: buildjet-4vcpu-ubuntu-2204
@@ -166,12 +153,12 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
       - name: Setup tests (${{ matrix.name }})
-        run: make ${{ matrix.make1 }}
+        run: make ${{ matrix.setup }}
       - name: Run tests (${{ matrix.name }})
         env:
           RACE_DETECTOR: ${{ matrix.race }}
@@ -179,8 +166,8 @@ jobs:
         with:
           timeout_minutes: 35
           max_attempts: ${{ matrix.retries }}
-          # run `make2` target inside each module's root
-          command: VERBOSE=1 make -C ${{ matrix.name }} ${{ matrix.make2 }}
+          # run test target inside each module's root
+          command: VERBOSE=1 make -C ${{ matrix.name }} test
       - name: Upload coverage report
         uses: codecov/codecov-action@v3
         with:
@@ -198,12 +185,10 @@ jobs:
           # all tags are needed for integration tests
           fetch-depth: 0
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
-      - name: Build relic
-        run: make crypto_setup_gopath
       - name: Docker build
         run: make docker-build-flow docker-build-flow-corrupt
       - name: Save Docker images
@@ -290,12 +275,10 @@ jobs:
           # all tags are needed for integration tests
           fetch-depth: 0
     - name: Setup Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v4
       with:
         go-version: ${{ env.GO_VERSION }}
         cache: true
-    - name: Build relic
-      run: make crypto_setup_gopath
     - name: Load cached Docker images
       uses: actions/cache@v3
       with:

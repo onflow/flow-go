@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -166,6 +167,7 @@ func newAccountDataProcessor(
 	snapshot snapshot.StorageSnapshot,
 ) *balanceProcessor {
 	bp := NewBalanceReporter(chain, snapshot)
+	sc := systemcontracts.SystemContractsForChain(bp.ctx.Chain.ChainID())
 
 	bp.logger = logger
 	bp.rwa = rwa
@@ -181,7 +183,7 @@ func newAccountDataProcessor(
 						?? panic("Could not borrow Balance reference to the Vault")
 					return vaultRef.balance
 				}
-			`, fvm.FungibleTokenAddress(bp.ctx.Chain), fvm.FlowTokenAddress(bp.ctx.Chain)))
+			`, sc.FungibleToken.Address.Hex(), sc.FlowToken.Address.Hex()))
 
 	bp.fusdScript = []byte(fmt.Sprintf(`
 			import FungibleToken from 0x%s
@@ -193,7 +195,7 @@ func newAccountDataProcessor(
 					?? panic("Could not borrow Balance reference to the Vault")
 				return vaultRef.balance
 			}
-			`, fvm.FungibleTokenAddress(bp.ctx.Chain), "3c5959b568896393"))
+			`, sc.FungibleToken.Address.Hex(), "3c5959b568896393"))
 
 	bp.momentsScript = []byte(`
 			import TopShot from 0x0b2a3299cc857e29

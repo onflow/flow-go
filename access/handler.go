@@ -24,16 +24,6 @@ type Handler struct {
 	me                   module.Local
 }
 
-// TODO: this is implemented in https://github.com/onflow/flow-go/pull/4957, remove when merged
-func (h *Handler) GetProtocolStateSnapshotByBlockID(ctx context.Context, request *access.GetProtocolStateSnapshotByBlockIDRequest) (*access.ProtocolStateSnapshotResponse, error) {
-	panic("implement me")
-}
-
-// TODO: this is implemented in https://github.com/onflow/flow-go/pull/4957, remove when merged
-func (h *Handler) GetProtocolStateSnapshotByHeight(ctx context.Context, request *access.GetProtocolStateSnapshotByHeightRequest) (*access.ProtocolStateSnapshotResponse, error) {
-	panic("implement me")
-}
-
 // HandlerOption is used to hand over optional constructor parameters
 type HandlerOption func(*Handler)
 
@@ -632,6 +622,38 @@ func (h *Handler) GetLatestProtocolStateSnapshot(ctx context.Context, req *acces
 	metadata := h.buildMetadataResponse()
 
 	snapshot, err := h.api.GetLatestProtocolStateSnapshot(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &access.ProtocolStateSnapshotResponse{
+		SerializedSnapshot: snapshot,
+		Metadata:           metadata,
+	}, nil
+}
+
+// GetProtocolStateSnapshotByBlockID returns serializable Snapshot by blockID
+func (h *Handler) GetProtocolStateSnapshotByBlockID(ctx context.Context, req *access.GetProtocolStateSnapshotByBlockIDRequest) (*access.ProtocolStateSnapshotResponse, error) {
+	metadata := h.buildMetadataResponse()
+
+	blockID := convert.MessageToIdentifier(req.GetBlockId())
+
+	snapshot, err := h.api.GetProtocolStateSnapshotByBlockID(ctx, blockID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &access.ProtocolStateSnapshotResponse{
+		SerializedSnapshot: snapshot,
+		Metadata:           metadata,
+	}, nil
+}
+
+// GetProtocolStateSnapshotByHeight returns serializable Snapshot by block height
+func (h *Handler) GetProtocolStateSnapshotByHeight(ctx context.Context, req *access.GetProtocolStateSnapshotByHeightRequest) (*access.ProtocolStateSnapshotResponse, error) {
+	metadata := h.buildMetadataResponse()
+
+	snapshot, err := h.api.GetProtocolStateSnapshotByHeight(ctx, req.GetBlockHeight())
 	if err != nil {
 		return nil, err
 	}

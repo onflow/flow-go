@@ -49,44 +49,36 @@ type signer interface {
 	decodePublicKeyCompressed([]byte) (PublicKey, error)
 }
 
-// newNonRelicSigner returns a signer that does not depend on Relic library.
-func newNonRelicSigner(algo SigningAlgorithm) (signer, error) {
+// newSigner returns a signer instance
+func newSigner(algo SigningAlgorithm) (signer, error) {
 	switch algo {
 	case ECDSAP256:
 		return p256Instance, nil
 	case ECDSASecp256k1:
 		return secp256k1Instance, nil
+	case BLSBLS12381:
+		return blsInstance, nil
 	default:
 		return nil, invalidInputsErrorf("the signature scheme %s is not supported", algo)
 	}
 }
 
-// Initialize the context of all algos not requiring Relic
-func initNonRelic() {
-	// P-256
+// Initialize the context of all algos
+func init() {
+	// ECDSA
 	p256Instance = &(ecdsaAlgo{
 		curve: elliptic.P256(),
 		algo:  ECDSAP256,
 	})
-
-	// secp256k1
 	secp256k1Instance = &(ecdsaAlgo{
 		curve: btcec.S256(),
 		algo:  ECDSASecp256k1,
 	})
-}
 
-// Signature format Check for non-relic algos (ECDSA)
-func signatureFormatCheckNonRelic(algo SigningAlgorithm, s Signature) (bool, error) {
-	switch algo {
-	case ECDSAP256:
-		return p256Instance.signatureFormatCheck(s), nil
-	case ECDSASecp256k1:
-		return secp256k1Instance.signatureFormatCheck(s), nil
-	default:
-		return false, invalidInputsErrorf(
-			"the signature scheme %s is not supported",
-			algo)
+	// BLS
+	initBLS12381()
+	blsInstance = &blsBLS12381Algo{
+		algo: BLSBLS12381,
 	}
 }
 
@@ -98,8 +90,16 @@ func signatureFormatCheckNonRelic(algo SigningAlgorithm, s Signature) (bool, err
 // If SignatureFormatCheck returns false then the input is not a valid
 // signature and will fail a verification against any message and public key.
 func SignatureFormatCheck(algo SigningAlgorithm, s Signature) (bool, error) {
-	// For now, signatureFormatCheckNonRelic is only defined for non-Relic algos.
-	return signatureFormatCheckNonRelic(algo, s)
+	switch algo {
+	case ECDSAP256:
+		return p256Instance.signatureFormatCheck(s), nil
+	case ECDSASecp256k1:
+		return secp256k1Instance.signatureFormatCheck(s), nil
+	default:
+		return false, invalidInputsErrorf(
+			"the signature scheme %s is not supported",
+			algo)
+	}
 }
 
 // GeneratePrivateKey generates a private key of the algorithm using the entropy of the given seed.

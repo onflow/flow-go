@@ -56,7 +56,7 @@ func NewQCContractClient(
 		Str("component", "qc_contract_client").
 		Str("flow_client_an_id", flowClientANID.String()).
 		Logger()
-	base := NewBaseClient(log, flowClient, accountAddress, accountKeyIndex, signer, qcContractAddress)
+	base := NewBaseClient(log, flowClient, accountAddress, accountKeyIndex, signer)
 
 	// set QCContractAddress to the contract address given
 	env := templates.Environment{QuorumCertificateAddress: qcContractAddress}
