@@ -15,6 +15,12 @@ import (
 	"github.com/onflow/flow-go/network/p2p/scoring"
 )
 
+const (
+	// skipDecayThreshold is the threshold for which when the counter is below this value, the decay function will not be called.
+	// instead, the counter will be set to 0. This is to prevent the counter from becoming a large number over time.
+	skipDecayThreshold = 0.1
+)
+
 // GossipSubDuplicateMessageTrackerCache is a cache used to store the current count of duplicate messages detected
 // from a peer. This count is utilized to calculate a penalty for duplicate messages, which is then applied
 // to the peer's application-specific score. The duplicate message tracker decays over time to prevent perpetual
@@ -52,8 +58,41 @@ func NewGossipSubDuplicateMessageTrackerCache(sizeLimit uint32, decay float64, l
 }
 
 func (g *GossipSubDuplicateMessageTrackerCache) init(peerId peer.ID) bool {
-	entityId := flow.HashToID([]byte(peerId)) // HeroCache uses hash of peer.ID as the unique identifier of the record.
+	entityId := flow.MakeID(peerId) // HeroCache uses hash of peer.ID as the unique identifier of the record.
 	return g.c.Add(NewDuplicateMessagesCounter(entityId))
+}
+
+// Get returns the current number of duplicate messages encountered from a peer. The counter is decayed before being
+// returned.
+// Args:
+// - peerID: the peer ID of the peer in the GossipSub protocol.
+//
+// Returns:
+// - float64: updated value for the duplicate message tracker.
+// - bool: true if the counter was initialized, false otherwise.
+// - error: if any error was encountered during record adjustments in cache.
+// No errors are expected during normal operation.
+func (g *GossipSubDuplicateMessageTrackerCache) Get(peerId peer.ID) (float64, error) {
+	if g.init(peerId) {
+		return 0, nil
+	}
+	var err error
+	entityID := flow.MakeID(peerId)
+	adjustedEntity, adjusted := g.c.Adjust(entityID, func(entity flow.Entity) flow.Entity {
+		// perform recordDecay on gauge value
+		record := duplicateMessagesCounter(entity)
+		entity, err = g.decayAdjustment(record)
+		return entity
+	})
+	if err != nil {
+		return 0, fmt.Errorf("unexpected error while applying recordDecay adjustment for peerID %s: %w", peerId, err)
+	}
+	if !adjusted {
+		return 0, fmt.Errorf("unexpected error record not found for  peerID %s, even after an init attempt", peerId)
+	}
+
+	record := duplicateMessagesCounter(adjustedEntity)
+	return record.Gauge, nil
 }
 
 // Inc increments the number of duplicate messages detected for the peer. This func is used in conjunction with the GossipSubMeshTracer and is invoked
@@ -67,7 +106,7 @@ func (g *GossipSubDuplicateMessageTrackerCache) init(peerId peer.ID) bool {
 // No errors are expected during normal operation.
 func (g *GossipSubDuplicateMessageTrackerCache) Inc(peerId peer.ID) (float64, error) {
 	var err error
-	entityID := flow.HashToID([]byte(peerId))
+	entityID := flow.MakeID(peerId)
 	optimisticAdjustFunc := func() (flow.Entity, bool) {
 		return g.c.Adjust(entityID, func(entity flow.Entity) flow.Entity {
 			record := duplicateMessagesCounter(entity)
@@ -94,10 +133,10 @@ func (g *GossipSubDuplicateMessageTrackerCache) Inc(peerId peer.ID) (float64, er
 		}
 	}
 
-	return adjustedEntity.(DuplicateMessagesCounter).Gauge, nil
+	return adjustedEntity.(DuplicateMessagesCounterEntity).Gauge, nil
 }
 
-// incrementAdjustment performs a cache adjustment that increments the guage for the DuplicateMessagesCounter
+// incrementAdjustment performs a cache adjustment that increments the guage for the DuplicateMessagesCounterEntity
 func (g *GossipSubDuplicateMessageTrackerCache) incrementAdjustment(entity flow.Entity) flow.Entity {
 	record := duplicateMessagesCounter(entity)
 	record.Gauge++
@@ -107,9 +146,14 @@ func (g *GossipSubDuplicateMessageTrackerCache) incrementAdjustment(entity flow.
 }
 
 // decayAdjustment performs geometric recordDecay on the duplicate message counter gauge of a peer. This ensures a peer is not penalized forever.
-func (g *GossipSubDuplicateMessageTrackerCache) decayAdjustment(counter DuplicateMessagesCounter) (DuplicateMessagesCounter, error) {
+func (g *GossipSubDuplicateMessageTrackerCache) decayAdjustment(counter DuplicateMessagesCounterEntity) (DuplicateMessagesCounterEntity, error) {
 	received := counter.Gauge
 	if received == 0 {
+		return counter, nil
+	}
+
+	if received < skipDecayThreshold {
+		counter.Gauge = 0
 		return counter, nil
 	}
 
@@ -119,75 +163,4 @@ func (g *GossipSubDuplicateMessageTrackerCache) decayAdjustment(counter Duplicat
 	}
 	counter.Gauge = decayedVal
 	return counter, nil
-}
-
-// Get returns the current number of duplicate messages encountered from a peer. The counter is decayed before being
-// returned.
-// Args:
-// - peerID: the peer ID of the peer in the GossipSub protocol.
-//
-// Returns:
-// - float64: updated value for the duplicate message tracker.
-// - bool: true if the counter was initialized, false otherwise.
-// - error: if any error was encountered during record adjustments in cache.
-// No errors are expected during normal operation.
-func (g *GossipSubDuplicateMessageTrackerCache) Get(peerId peer.ID) (float64, error) {
-	if g.init(peerId) {
-		return 0, nil
-	}
-	var err error
-	entityID := flow.HashToID([]byte(peerId))
-	adjustedEntity, adjusted := g.c.Adjust(entityID, func(entity flow.Entity) flow.Entity {
-		// perform recordDecay on gauge value
-		record := duplicateMessagesCounter(entity)
-		entity, err = g.decayAdjustment(record)
-		return entity
-	})
-	if err != nil {
-		return 0, fmt.Errorf("unexpected error while applying recordDecay adjustment for peerID %s: %w", peerId, err)
-	}
-	if !adjusted {
-		return 0, fmt.Errorf("unexpected error record not found for  peerID %s, even after an init attempt", peerId)
-	}
-
-	record := duplicateMessagesCounter(adjustedEntity)
-	return record.Gauge, nil
-}
-
-// DuplicateMessagesCounter cache record that keeps track of the amount of duplicate messages received from a peer.
-type DuplicateMessagesCounter struct {
-	// ID the entity ID.
-	Id flow.Identifier
-	// Gauge the number of duplicate messages.
-	Gauge       float64
-	lastUpdated time.Time
-}
-
-func NewDuplicateMessagesCounter(id flow.Identifier) DuplicateMessagesCounter {
-	return DuplicateMessagesCounter{
-		Id:          id,
-		Gauge:       0.0,
-		lastUpdated: time.Now(),
-	}
-}
-
-var _ flow.Entity = (*DuplicateMessagesCounter)(nil)
-
-func (d DuplicateMessagesCounter) ID() flow.Identifier {
-	return d.Id
-}
-
-func (d DuplicateMessagesCounter) Checksum() flow.Identifier {
-	return d.Id
-}
-
-// duplicateMessagesCounter infers the DuplicateMessagesCounter type from the flow entity provided, panics if the wrong type is encountered.
-func duplicateMessagesCounter(entity flow.Entity) DuplicateMessagesCounter {
-	record, ok := entity.(DuplicateMessagesCounter)
-	if !ok {
-		// sanity check
-		// This should never happen, because the cache only contains DuplicateMessagesCounter entities.
-		panic(fmt.Sprintf("invalid entity type, expected DuplicateMessagesCounter type, got: %T", entity))
-	}
-	return record
 }

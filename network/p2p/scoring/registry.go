@@ -281,15 +281,14 @@ func (r *GossipSubAppSpecificScoreRegistry) subscriptionPenalty(pid peer.ID, flo
 // duplicateMessagePenalty returns the duplicate message penalty for a peer.
 func (r *GossipSubAppSpecificScoreRegistry) duplicateMessagePenalty(pid peer.ID) float64 {
 	duplicateMessageCount := r.getDuplicateMessageCount(pid)
-	if duplicateMessageCount == 0 {
-		return 0
+	if duplicateMessageCount != 0 {
+		duplicateMessagePenalty := duplicateMessageCount * DefaultDuplicateMessagePenalty
+		if duplicateMessagePenalty > MaxAppSpecificPenalty {
+			return MaxAppSpecificPenalty
+		}
+		return duplicateMessagePenalty
 	}
-
-	duplicateMessagePenalty := duplicateMessageCount * DefaultDuplicateMessagePenalty
-	if duplicateMessagePenalty > MaxAppSpecificPenalty {
-		return MaxAppSpecificPenalty
-	}
-	return duplicateMessagePenalty
+	return 0
 }
 
 // OnInvalidControlMessageNotification is called when a new invalid control message notification is distributed.
