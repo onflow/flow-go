@@ -21,13 +21,13 @@ type ResourceManagerOverrideScope struct {
 	// Transient is the limit for the resource at the transient scope. Transient limits are used for resources that have not fully established and are under negotiation.
 	Transient ResourceManagerOverrideLimit `mapstructure:"transient"`
 
-	// Protocol is the limit for the resource at the protocol scope, e.g., DHT, GossipSubParameters, etc. It dictates the maximum allowed resource across all peers for that protocol.
+	// Protocol is the limit for the resource at the protocol scope, e.g., DHT, GossipSub, etc. It dictates the maximum allowed resource across all peers for that protocol.
 	Protocol ResourceManagerOverrideLimit `mapstructure:"protocol"`
 
 	// Peer is the limit for the resource at the peer scope. It dictates the maximum allowed resource for a specific peer.
 	Peer ResourceManagerOverrideLimit `mapstructure:"peer"`
 
-	// Connection is the limit for the resource for a pair of (peer, protocol), e.g., (peer1, DHT), (peer1, GossipSubParameters), etc. It dictates the maximum allowed resource for a protocol and a peer.
+	// Connection is the limit for the resource for a pair of (peer, protocol), e.g., (peer1, DHT), (peer1, GossipSub), etc. It dictates the maximum allowed resource for a protocol and a peer.
 	PeerProtocol ResourceManagerOverrideLimit `mapstructure:"peer-protocol"`
 }
 
@@ -63,16 +63,16 @@ const (
 	SubscriptionProviderKey = "subscription-provider"
 )
 
-// GossipSubParameters is the configuration for the GossipSubParameters pubsub implementation.
+// GossipSubParameters is the configuration for the GossipSub pubsub implementation.
 type GossipSubParameters struct {
 	// RpcInspectorParameters configuration for all gossipsub RPC control message inspectors.
 	RpcInspector RpcInspectorParameters `mapstructure:"rpc-inspector"`
 
 	// GossipSubScoringRegistryConfig is the configuration for the GossipSub score registry.
-	// GossipSubTracerParameters is the configuration for the gossipsub tracer. GossipSubParameters tracer is used to trace the local mesh events and peer scores.
+	// GossipSubTracerParameters is the configuration for the gossipsub tracer. GossipSub tracer is used to trace the local mesh events and peer scores.
 	RpcTracer GossipSubTracerParameters `mapstructure:"rpc-tracer"`
 
-	// ScoringParameters is whether to enable GossipSubParameters peer scoring.
+	// ScoringParameters is whether to enable GossipSub peer scoring.
 	PeerScoringEnabled   bool                           `mapstructure:"peer-scoring-enabled"`
 	SubscriptionProvider SubscriptionProviderParameters `mapstructure:"subscription-provider"`
 	ScoringParameters    ScoringParameters              `mapstructure:"scoring-parameters"`
@@ -164,7 +164,7 @@ const (
 	RPCSentTrackerNumOfWorkersKey   = "rpc-sent-tracker-workers"
 )
 
-// GossipSubTracerParameters is the config for the gossipsub tracer. GossipSubParameters tracer is used to trace the local mesh events and peer scores.
+// GossipSubTracerParameters is the config for the gossipsub tracer. GossipSub tracer is used to trace the local mesh events and peer scores.
 type GossipSubTracerParameters struct {
 	// LocalMeshLogInterval is the interval at which the local mesh is logged.
 	LocalMeshLogInterval time.Duration `validate:"gt=0s" mapstructure:"local-mesh-logging-interval"`

@@ -25,7 +25,7 @@ type GossipSubFactoryFunc func(context.Context, zerolog.Logger, host.Host, PubSu
 type CreateNodeFunc func(zerolog.Logger, host.Host, ProtocolPeerCache, PeerManager, *DisallowListCacheConfig) LibP2PNode
 type GossipSubAdapterConfigFunc func(*BasePubSubAdapterConfig) PubSubAdapterConfig
 
-// GossipSubBuilder provides a builder pattern for creating a GossipSubParameters pubsub system.
+// GossipSubBuilder provides a builder pattern for creating a GossipSub pubsub system.
 type GossipSubBuilder interface {
 	// SetHost sets the host of the builder.
 	// If the host has already been set, a fatal error is logged.
@@ -43,7 +43,7 @@ type GossipSubBuilder interface {
 	// We expect the node to initialize with a default gossipsub config. Hence, this function overrides the default config.
 	SetGossipSubConfigFunc(GossipSubAdapterConfigFunc)
 
-	// EnableGossipSubScoringWithOverride enables peer scoring for the GossipSubParameters pubsub system with the given override.
+	// EnableGossipSubScoringWithOverride enables peer scoring for the GossipSub pubsub system with the given override.
 	// Any existing peer scoring config attribute that is set in the override will override the default peer scoring config.
 	// Anything that is left to nil or zero value in the override will be ignored and the default value will be used.
 	// Note: it is not recommended to override the default peer scoring config in production unless you know what you are doing.
@@ -65,15 +65,15 @@ type GossipSubBuilder interface {
 	// It is NOT recommended to override the default RPC inspector suite factory in production unless you know what you are doing.
 	OverrideDefaultRpcInspectorSuiteFactory(GossipSubRpcInspectorSuiteFactoryFunc)
 
-	// Build creates a new GossipSubParameters pubsub system.
-	// It returns the newly created GossipSubParameters pubsub system and any errors encountered during its creation.
+	// Build creates a new GossipSub pubsub system.
+	// It returns the newly created GossipSub pubsub system and any errors encountered during its creation.
 	//
 	// Arguments:
 	// - context.Context: the irrecoverable context of the node.
 	//
 	// Returns:
-	// - PubSubAdapter: a GossipSubParameters pubsub system for the libp2p node.
-	// - error: if an error occurs during the creation of the GossipSubParameters pubsub system, it is returned. Otherwise, nil is returned.
+	// - PubSubAdapter: a GossipSub pubsub system for the libp2p node.
+	// - error: if an error occurs during the creation of the GossipSub pubsub system, it is returned. Otherwise, nil is returned.
 	// Note that on happy path, the returned error is nil. Any error returned is unexpected and should be handled as irrecoverable.
 	Build(irrecoverable.SignalerContext) (PubSubAdapter, error)
 }
