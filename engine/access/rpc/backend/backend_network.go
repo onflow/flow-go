@@ -35,7 +35,7 @@ and GetLatestProtocolStateSnapshot RPCs so this logic was split into
 the backendNetwork so that we can ignore the rest of the backend logic
 */
 func NewNetworkAPI(
-	state protocol.State, 
+	state protocol.State,
 	chainID flow.ChainID,
 	headers storage.Headers,
 	snapshotHistoryLimit int,
