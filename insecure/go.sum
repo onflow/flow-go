@@ -960,7 +960,6 @@ github.com/go-stack/stack v1.8.1/go.mod h1:dcoOX6HbPZSZptuspn9bctJ+N/CnF5gGygcUP
 github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 h1:tfuBGBXKqDEevZMzYi5KSi8KkcZtzBcTgAUUtapy0OI=
 github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572/go.mod h1:9Pwr4B2jHnOSGXyyzV8ROjYa2ojvAY6HCGYYfMoC3Ls=
 github.com/go-test/deep v1.0.5/go.mod h1:QV8Hv/iy04NyLBxAdO9njL0iVPN1S4d/A3NVv1V36o8=
-github.com/go-test/deep v1.1.0 h1:WOcxcdHcvdgThNXjw0t76K42FXTU7HpNQWHpA2HHNlg=
 github.com/go-test/deep v1.1.0/go.mod h1:5C2ZWiW0ErCdrYzpqxLbTX7MG14M9iiw8DgHncVwcsE=
 github.com/go-yaml/yaml v2.1.0+incompatible/go.mod h1:w2MrLa16VYP0jy6N7M5kHaCkaLENm+P+Tv+MfurjSw0=
 github.com/gobwas/httphead v0.0.0-20180130184737-2c6c146eadee h1:s+21KNqlpePfkah2I+gwHF8xmJWRjooY+5248k6m4A0=
@@ -1864,8 +1863,8 @@ github.com/onflow/atree v0.6.0/go.mod h1:gBHU0M05qCbv9NN0kijLWMgC47gHVNBIp4KmsVF
 github.com/onflow/atree v0.6.1-0.20230711151834-86040b30171f h1:Z8/PgTqOgOg02MTRpTBYO2k16FE6z4wEOtaC2WBR9Xo=
 github.com/onflow/atree v0.6.1-0.20230711151834-86040b30171f/go.mod h1:xvP61FoOs95K7IYdIYRnNcYQGf4nbF/uuJ0tHf4DRuM=
 github.com/onflow/cadence v0.39.13-stable-cadence/go.mod h1:SxT8/IEkS1drFj2ofUEK9S6KyJ5GQbrm0LX4EFCp/7Q=
-github.com/onflow/cadence v1.0.0-preview.1 h1:Y/q/43aDc93/1Atsxx3+e2V/dZiQuF1TqkXEVboA5pY=
-github.com/onflow/cadence v1.0.0-preview.1/go.mod h1:Q5Up9Kt+J6zuAFmgrsiKz6t//E/hR5/iuVjH62pdztk=
+github.com/onflow/cadence v1.0.0-preview.1.0.20231211164258-0de878b2740c h1:TuOuvYh69RrTKXxT7WuiFeiLOKMPWs/ag2sL/e7146A=
+github.com/onflow/cadence v1.0.0-preview.1.0.20231211164258-0de878b2740c/go.mod h1:60RhxKY5V4DXFQfvXQa48eZZVN19O7Lu9cp53FM54vo=
 github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.4-0.20230921055800-5ed9c184d103 h1:NJPpJ/RCwAQ+Yl6JEtIlD3xxNjwoSPwTRdnRYiRHpL8=
 github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.4-0.20230921055800-5ed9c184d103/go.mod h1:o8lCKHUSHlg8TEgM7Jb2d4lt79rLFbS+FMErdYJRX2o=
 github.com/onflow/flow-core-contracts/lib/go/templates v1.2.4-0.20230918230627-2daea3d4f44b h1:ZVIc7C4ntky57Th2FE2Jo9phuNcAkCJRpjY3hM7jdpk=

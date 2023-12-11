@@ -51,7 +51,7 @@ require (
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/multiformats/go-multihash v0.2.3
 	github.com/onflow/atree v0.6.1-0.20230711151834-86040b30171f
-	github.com/onflow/cadence v1.0.0-preview.1
+	github.com/onflow/cadence v1.0.0-preview.1.0.20231211164258-0de878b2740c
 	github.com/onflow/flow v0.3.4
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.1-0.20231211164659-e45ba2bbff61
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.15.1-0.20231204202154-f8dfacb39d86
@@ -176,7 +176,6 @@ require (
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/go-stack/stack v1.8.1 // indirect
 	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
-	github.com/go-test/deep v1.1.0 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/gofrs/flock v0.8.1 // indirect
 	github.com/golang/glog v1.1.0 // indirect

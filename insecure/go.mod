@@ -96,7 +96,6 @@ require (
 	github.com/go-playground/validator/v10 v10.14.1 // indirect
 	github.com/go-stack/stack v1.8.1 // indirect
 	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
-	github.com/go-test/deep v1.1.0 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/gofrs/flock v0.8.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
@@ -200,7 +199,7 @@ require (
 	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/onflow/atree v0.6.1-0.20230711151834-86040b30171f // indirect
-	github.com/onflow/cadence v1.0.0-preview.1 // indirect
+	github.com/onflow/cadence v1.0.0-preview.1.0.20231211164258-0de878b2740c // indirect
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.4-0.20230921055800-5ed9c184d103 // indirect
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.2.4-0.20230918230627-2daea3d4f44b // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20231201182806-a95f9ec50b08 // indirect
