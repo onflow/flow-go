@@ -912,6 +912,11 @@ func (state *State) populateCache() error {
 			return fmt.Errorf("could not get sealed block (id=%x): %w", cachedSealedHeader.id, err)
 		}
 		state.cachedSealed.Store(&cachedSealedHeader)
+
+		state.finalizedRootHeight = state.Params().FinalizedRoot().Height
+		state.sealedRootHeight = state.Params().SealedRoot().Height
+		state.sporkRootBlockHeight = state.Params().SporkRootBlockHeight()
+
 		return nil
 	})
 	if err != nil {
