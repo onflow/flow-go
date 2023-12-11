@@ -7,6 +7,10 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// ErrSnapshotPhaseMismatch indicates that a valid sealing segment cannot be build for a snapshot because
+// the snapshot requested spans either an epoch transition or phase transition.
+var ErrSnapshotPhaseMismatch = errors.New("snapshot does not contain a valid sealing segment")
+
 // InsufficientExecutionReceipts indicates that no execution receipt were found for a given block ID
 type InsufficientExecutionReceipts struct {
 	blockID      flow.Identifier

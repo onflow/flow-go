@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
-	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -210,6 +209,7 @@ func New(params Params) (*Backend, error) {
 		backendNetwork: backendNetwork{
 			state:                params.State,
 			chainID:              params.ChainID,
+			headers:              params.Headers,
 			snapshotHistoryLimit: params.SnapshotHistoryLimit,
 		},
 		collections:       params.Collections,
@@ -357,18 +357,6 @@ func (b *Backend) GetNetworkParameters(_ context.Context) access.NetworkParamete
 	return access.NetworkParameters{
 		ChainID: b.chainID,
 	}
-}
-
-// GetLatestProtocolStateSnapshot returns the latest finalized snapshot
-func (b *Backend) GetLatestProtocolStateSnapshot(_ context.Context) ([]byte, error) {
-	snapshot := b.state.Final()
-
-	validSnapshot, err := b.getValidSnapshot(snapshot, 0)
-	if err != nil {
-		return nil, err
-	}
-
-	return convert.SnapshotToBytes(validSnapshot)
 }
 
 // executionNodesForBlockID returns upto maxNodesCnt number of randomly chosen execution node identities
