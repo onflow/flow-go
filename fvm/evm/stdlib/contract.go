@@ -610,7 +610,7 @@ func newInternalEVMTypeDecodeABIFunction(
 					default:
 						panic(
 							unsupportedValueABIDecodingError{
-								Type: value.ElementType(),
+								Type: typeValue.Type,
 							},
 						)
 					}
@@ -678,17 +678,6 @@ func newInternalEVMTypeDecodeABIFunction(
 			if err != nil {
 				panic(
 					abiDecodingError{Message: err.Error()},
-				)
-			}
-
-			if len(decodedValues) != typesArray.Count() {
-				message := fmt.Sprintf(
-					"received %d types for %d values",
-					typesArray.Count(),
-					len(decodedValues),
-				)
-				panic(
-					abiDecodingError{Message: message},
 				)
 			}
 

@@ -656,6 +656,1236 @@ func TestEVMEncodeDecodeABIRoundtrip(t *testing.T) {
 	)
 }
 
+func TestEVMEncodeDecodeABIErrors(t *testing.T) {
+
+	t.Parallel()
+
+	t.Run("encodeABI with unsupported Address type", func(t *testing.T) {
+
+		t.Parallel()
+
+		handler := &testContractHandler{}
+
+		contractsAddress := flow.BytesToAddress([]byte{0x1})
+
+		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+
+		rt := runtime.NewInterpreterRuntime(runtime.Config{})
+
+		accountCodes := map[common.Location][]byte{}
+		var events []cadence.Event
+
+		runtimeInterface := &TestRuntimeInterface{
+			Storage: NewTestLedger(nil, nil),
+			OnGetSigningAccounts: func() ([]runtime.Address, error) {
+				return []runtime.Address{runtime.Address(contractsAddress)}, nil
+			},
+			OnResolveLocation: SingleIdentifierLocationResolver(t),
+			OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+				accountCodes[location] = code
+				return nil
+			},
+			OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+				code = accountCodes[location]
+				return code, nil
+			},
+			OnEmitEvent: func(event cadence.Event) error {
+				events = append(events, event)
+				return nil
+			},
+			OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+				return json.Decode(nil, b)
+			},
+		}
+
+		nextTransactionLocation := NewTransactionLocationGenerator()
+		nextScriptLocation := NewScriptLocationGenerator()
+
+		// Deploy contracts
+
+		deployContracts(
+			t,
+			rt,
+			contractsAddress,
+			runtimeInterface,
+			transactionEnvironment,
+			nextTransactionLocation,
+		)
+
+		// Run script
+
+		script := []byte(`
+          import EVM from 0x1
+
+          access(all)
+          fun main(): Bool {
+            let address: Address = 0x045a1763c93006ca
+            let data = EVM.encodeABI([address])
+
+            return true
+          }
+		`)
+
+		_, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.Error(t, err)
+		assert.ErrorContains(
+			t,
+			err,
+			"unsupported ABI encoding for value of type: Address",
+		)
+	})
+
+	t.Run("encodeABI with unsupported fixed-point number type", func(t *testing.T) {
+
+		t.Parallel()
+
+		handler := &testContractHandler{}
+
+		contractsAddress := flow.BytesToAddress([]byte{0x1})
+
+		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+
+		rt := runtime.NewInterpreterRuntime(runtime.Config{})
+
+		accountCodes := map[common.Location][]byte{}
+		var events []cadence.Event
+
+		runtimeInterface := &TestRuntimeInterface{
+			Storage: NewTestLedger(nil, nil),
+			OnGetSigningAccounts: func() ([]runtime.Address, error) {
+				return []runtime.Address{runtime.Address(contractsAddress)}, nil
+			},
+			OnResolveLocation: SingleIdentifierLocationResolver(t),
+			OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+				accountCodes[location] = code
+				return nil
+			},
+			OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+				code = accountCodes[location]
+				return code, nil
+			},
+			OnEmitEvent: func(event cadence.Event) error {
+				events = append(events, event)
+				return nil
+			},
+			OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+				return json.Decode(nil, b)
+			},
+		}
+
+		nextTransactionLocation := NewTransactionLocationGenerator()
+		nextScriptLocation := NewScriptLocationGenerator()
+
+		// Deploy contracts
+
+		deployContracts(
+			t,
+			rt,
+			contractsAddress,
+			runtimeInterface,
+			transactionEnvironment,
+			nextTransactionLocation,
+		)
+
+		// Run script
+
+		script := []byte(`
+          import EVM from 0x1
+
+          access(all)
+          fun main(): Bool {
+            let data = EVM.encodeABI([0.2])
+
+            return true
+          }
+		`)
+
+		_, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.Error(t, err)
+		assert.ErrorContains(
+			t,
+			err,
+			"unsupported ABI encoding for value of type: UFix64",
+		)
+	})
+
+	t.Run("encodeABI with unsupported dictionary type", func(t *testing.T) {
+
+		t.Parallel()
+
+		handler := &testContractHandler{}
+
+		contractsAddress := flow.BytesToAddress([]byte{0x1})
+
+		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+
+		rt := runtime.NewInterpreterRuntime(runtime.Config{})
+
+		accountCodes := map[common.Location][]byte{}
+		var events []cadence.Event
+
+		runtimeInterface := &TestRuntimeInterface{
+			Storage: NewTestLedger(nil, nil),
+			OnGetSigningAccounts: func() ([]runtime.Address, error) {
+				return []runtime.Address{runtime.Address(contractsAddress)}, nil
+			},
+			OnResolveLocation: SingleIdentifierLocationResolver(t),
+			OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+				accountCodes[location] = code
+				return nil
+			},
+			OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+				code = accountCodes[location]
+				return code, nil
+			},
+			OnEmitEvent: func(event cadence.Event) error {
+				events = append(events, event)
+				return nil
+			},
+			OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+				return json.Decode(nil, b)
+			},
+		}
+
+		nextTransactionLocation := NewTransactionLocationGenerator()
+		nextScriptLocation := NewScriptLocationGenerator()
+
+		// Deploy contracts
+
+		deployContracts(
+			t,
+			rt,
+			contractsAddress,
+			runtimeInterface,
+			transactionEnvironment,
+			nextTransactionLocation,
+		)
+
+		// Run script
+
+		script := []byte(`
+          import EVM from 0x1
+
+          access(all)
+          fun main(): Bool {
+            let dict: {Int: Bool} = {0: false, 1: true}
+            let data = EVM.encodeABI([dict])
+
+            return true
+          }
+		`)
+
+		_, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.Error(t, err)
+		assert.ErrorContains(
+			t,
+			err,
+			"unsupported ABI encoding for value of type: {Int: Bool}",
+		)
+	})
+
+	t.Run("encodeABI with unsupported array element type", func(t *testing.T) {
+
+		t.Parallel()
+
+		handler := &testContractHandler{}
+
+		contractsAddress := flow.BytesToAddress([]byte{0x1})
+
+		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+
+		rt := runtime.NewInterpreterRuntime(runtime.Config{})
+
+		accountCodes := map[common.Location][]byte{}
+		var events []cadence.Event
+
+		runtimeInterface := &TestRuntimeInterface{
+			Storage: NewTestLedger(nil, nil),
+			OnGetSigningAccounts: func() ([]runtime.Address, error) {
+				return []runtime.Address{runtime.Address(contractsAddress)}, nil
+			},
+			OnResolveLocation: SingleIdentifierLocationResolver(t),
+			OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+				accountCodes[location] = code
+				return nil
+			},
+			OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+				code = accountCodes[location]
+				return code, nil
+			},
+			OnEmitEvent: func(event cadence.Event) error {
+				events = append(events, event)
+				return nil
+			},
+			OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+				return json.Decode(nil, b)
+			},
+		}
+
+		nextTransactionLocation := NewTransactionLocationGenerator()
+		nextScriptLocation := NewScriptLocationGenerator()
+
+		// Deploy contracts
+
+		deployContracts(
+			t,
+			rt,
+			contractsAddress,
+			runtimeInterface,
+			transactionEnvironment,
+			nextTransactionLocation,
+		)
+
+		// Run script
+
+		script := []byte(`
+          import EVM from 0x1
+
+          access(all)
+          fun main(): Bool {
+            let chars: [Character] = ["a", "b", "c"]
+            let data = EVM.encodeABI([chars])
+
+            return true
+          }
+		`)
+
+		_, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.Error(t, err)
+		assert.ErrorContains(
+			t,
+			err,
+			"unsupported ABI encoding for value of type: [Character]",
+		)
+	})
+
+	t.Run("encodeABI with unsupported custom composite type", func(t *testing.T) {
+
+		t.Parallel()
+
+		handler := &testContractHandler{}
+
+		contractsAddress := flow.BytesToAddress([]byte{0x1})
+
+		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+
+		rt := runtime.NewInterpreterRuntime(runtime.Config{})
+
+		accountCodes := map[common.Location][]byte{}
+		var events []cadence.Event
+
+		runtimeInterface := &TestRuntimeInterface{
+			Storage: NewTestLedger(nil, nil),
+			OnGetSigningAccounts: func() ([]runtime.Address, error) {
+				return []runtime.Address{runtime.Address(contractsAddress)}, nil
+			},
+			OnResolveLocation: SingleIdentifierLocationResolver(t),
+			OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+				accountCodes[location] = code
+				return nil
+			},
+			OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+				code = accountCodes[location]
+				return code, nil
+			},
+			OnEmitEvent: func(event cadence.Event) error {
+				events = append(events, event)
+				return nil
+			},
+			OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+				return json.Decode(nil, b)
+			},
+		}
+
+		nextTransactionLocation := NewTransactionLocationGenerator()
+		nextScriptLocation := NewScriptLocationGenerator()
+
+		// Deploy contracts
+
+		deployContracts(
+			t,
+			rt,
+			contractsAddress,
+			runtimeInterface,
+			transactionEnvironment,
+			nextTransactionLocation,
+		)
+
+		// Run script
+
+		script := []byte(`
+          import EVM from 0x1
+
+          access(all) struct Token {
+            access(all) let id: Int
+            access(all) var balance: Int
+
+            init(id: Int, balance: Int) {
+              self.id = id
+              self.balance = balance
+            }
+          }
+
+          access(all)
+          fun main(): Bool {
+            let token = Token(id: 9, balance: 150)
+            let data = EVM.encodeABI([token])
+
+            return true
+          }
+		`)
+
+		_, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.Error(t, err)
+		assert.ErrorContains(
+			t,
+			err,
+			"unsupported ABI encoding for value of type: s.0100000000000000000000000000000000000000000000000000000000000000.Token",
+		)
+	})
+
+	t.Run("decodeABI with mismatched type", func(t *testing.T) {
+
+		t.Parallel()
+
+		handler := &testContractHandler{}
+
+		contractsAddress := flow.BytesToAddress([]byte{0x1})
+
+		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+
+		rt := runtime.NewInterpreterRuntime(runtime.Config{})
+
+		accountCodes := map[common.Location][]byte{}
+		var events []cadence.Event
+
+		runtimeInterface := &TestRuntimeInterface{
+			Storage: NewTestLedger(nil, nil),
+			OnGetSigningAccounts: func() ([]runtime.Address, error) {
+				return []runtime.Address{runtime.Address(contractsAddress)}, nil
+			},
+			OnResolveLocation: SingleIdentifierLocationResolver(t),
+			OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+				accountCodes[location] = code
+				return nil
+			},
+			OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+				code = accountCodes[location]
+				return code, nil
+			},
+			OnEmitEvent: func(event cadence.Event) error {
+				events = append(events, event)
+				return nil
+			},
+			OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+				return json.Decode(nil, b)
+			},
+		}
+
+		nextTransactionLocation := NewTransactionLocationGenerator()
+		nextScriptLocation := NewScriptLocationGenerator()
+
+		// Deploy contracts
+
+		deployContracts(
+			t,
+			rt,
+			contractsAddress,
+			runtimeInterface,
+			transactionEnvironment,
+			nextTransactionLocation,
+		)
+
+		// Run script
+
+		script := []byte(`
+          import EVM from 0x1
+
+          access(all)
+          fun main(): Bool {
+            let data = EVM.encodeABI(["Peter"])
+            let values = EVM.decodeABI(types: [Type<Bool>()], data: data)
+
+            return true
+          }
+		`)
+
+		_, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.Error(t, err)
+		assert.ErrorContains(
+			t,
+			err,
+			"decoding of ABI to values failed with: abi: improperly encoded boolean value",
+		)
+	})
+
+	t.Run("decodeABI with surplus of types", func(t *testing.T) {
+
+		t.Parallel()
+
+		handler := &testContractHandler{}
+
+		contractsAddress := flow.BytesToAddress([]byte{0x1})
+
+		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+
+		rt := runtime.NewInterpreterRuntime(runtime.Config{})
+
+		accountCodes := map[common.Location][]byte{}
+		var events []cadence.Event
+
+		runtimeInterface := &TestRuntimeInterface{
+			Storage: NewTestLedger(nil, nil),
+			OnGetSigningAccounts: func() ([]runtime.Address, error) {
+				return []runtime.Address{runtime.Address(contractsAddress)}, nil
+			},
+			OnResolveLocation: SingleIdentifierLocationResolver(t),
+			OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+				accountCodes[location] = code
+				return nil
+			},
+			OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+				code = accountCodes[location]
+				return code, nil
+			},
+			OnEmitEvent: func(event cadence.Event) error {
+				events = append(events, event)
+				return nil
+			},
+			OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+				return json.Decode(nil, b)
+			},
+		}
+
+		nextTransactionLocation := NewTransactionLocationGenerator()
+		nextScriptLocation := NewScriptLocationGenerator()
+
+		// Deploy contracts
+
+		deployContracts(
+			t,
+			rt,
+			contractsAddress,
+			runtimeInterface,
+			transactionEnvironment,
+			nextTransactionLocation,
+		)
+
+		// Run script
+
+		script := []byte(`
+          import EVM from 0x1
+
+          access(all)
+          fun main(): Bool {
+            let data = EVM.encodeABI(["Peter"])
+            let values = EVM.decodeABI(types: [Type<String>(), Type<Bool>()], data: data)
+
+            return true
+          }
+		`)
+
+		_, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.Error(t, err)
+		assert.ErrorContains(
+			t,
+			err,
+			"decoding of ABI to values failed with: abi: improperly encoded boolean value",
+		)
+	})
+
+	t.Run("decodeABI with surplus of values", func(t *testing.T) {
+		t.Skip()
+
+		t.Parallel()
+
+		handler := &testContractHandler{}
+
+		contractsAddress := flow.BytesToAddress([]byte{0x1})
+
+		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+
+		rt := runtime.NewInterpreterRuntime(runtime.Config{})
+
+		accountCodes := map[common.Location][]byte{}
+		var events []cadence.Event
+
+		runtimeInterface := &TestRuntimeInterface{
+			Storage: NewTestLedger(nil, nil),
+			OnGetSigningAccounts: func() ([]runtime.Address, error) {
+				return []runtime.Address{runtime.Address(contractsAddress)}, nil
+			},
+			OnResolveLocation: SingleIdentifierLocationResolver(t),
+			OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+				accountCodes[location] = code
+				return nil
+			},
+			OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+				code = accountCodes[location]
+				return code, nil
+			},
+			OnEmitEvent: func(event cadence.Event) error {
+				events = append(events, event)
+				return nil
+			},
+			OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+				return json.Decode(nil, b)
+			},
+		}
+
+		nextTransactionLocation := NewTransactionLocationGenerator()
+		nextScriptLocation := NewScriptLocationGenerator()
+
+		// Deploy contracts
+
+		deployContracts(
+			t,
+			rt,
+			contractsAddress,
+			runtimeInterface,
+			transactionEnvironment,
+			nextTransactionLocation,
+		)
+
+		// Run script
+
+		script := []byte(`
+          import EVM from 0x1
+
+          access(all)
+          fun main(): Bool {
+            let data = EVM.encodeABI(["Peter", UInt64(9999)])
+            let values = EVM.decodeABI(types: [Type<String>()], data: data)
+
+            return true
+          }
+		`)
+
+		_, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.Error(t, err)
+		assert.ErrorContains(
+			t,
+			err,
+			"decoding of ABI to values failed with: received 1 types for 2 values",
+		)
+	})
+
+	t.Run("decodeABI with random data", func(t *testing.T) {
+		t.Skip()
+
+		t.Parallel()
+
+		handler := &testContractHandler{}
+
+		contractsAddress := flow.BytesToAddress([]byte{0x1})
+
+		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+
+		rt := runtime.NewInterpreterRuntime(runtime.Config{})
+
+		accountCodes := map[common.Location][]byte{}
+		var events []cadence.Event
+
+		runtimeInterface := &TestRuntimeInterface{
+			Storage: NewTestLedger(nil, nil),
+			OnGetSigningAccounts: func() ([]runtime.Address, error) {
+				return []runtime.Address{runtime.Address(contractsAddress)}, nil
+			},
+			OnResolveLocation: SingleIdentifierLocationResolver(t),
+			OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+				accountCodes[location] = code
+				return nil
+			},
+			OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+				code = accountCodes[location]
+				return code, nil
+			},
+			OnEmitEvent: func(event cadence.Event) error {
+				events = append(events, event)
+				return nil
+			},
+			OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+				return json.Decode(nil, b)
+			},
+		}
+
+		nextTransactionLocation := NewTransactionLocationGenerator()
+		nextScriptLocation := NewScriptLocationGenerator()
+
+		// Deploy contracts
+
+		deployContracts(
+			t,
+			rt,
+			contractsAddress,
+			runtimeInterface,
+			transactionEnvironment,
+			nextTransactionLocation,
+		)
+
+		// Run script
+
+		script := []byte(`
+          import EVM from 0x1
+
+          access(all)
+          fun main(): Bool {
+            let data: [UInt8] = "436164656e636521".decodeHex()
+            let values = EVM.decodeABI(types: [Type<String>()], data: data)
+
+            return true
+          }
+		`)
+
+		_, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.Error(t, err)
+		assert.ErrorContains(
+			t,
+			err,
+			"decoding of ABI to values failed with: received 1 types for 0 values",
+		)
+	})
+
+	t.Run("decodeABI with unsupported Address type", func(t *testing.T) {
+
+		t.Parallel()
+
+		handler := &testContractHandler{}
+
+		contractsAddress := flow.BytesToAddress([]byte{0x1})
+
+		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+
+		rt := runtime.NewInterpreterRuntime(runtime.Config{})
+
+		accountCodes := map[common.Location][]byte{}
+		var events []cadence.Event
+
+		runtimeInterface := &TestRuntimeInterface{
+			Storage: NewTestLedger(nil, nil),
+			OnGetSigningAccounts: func() ([]runtime.Address, error) {
+				return []runtime.Address{runtime.Address(contractsAddress)}, nil
+			},
+			OnResolveLocation: SingleIdentifierLocationResolver(t),
+			OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+				accountCodes[location] = code
+				return nil
+			},
+			OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+				code = accountCodes[location]
+				return code, nil
+			},
+			OnEmitEvent: func(event cadence.Event) error {
+				events = append(events, event)
+				return nil
+			},
+			OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+				return json.Decode(nil, b)
+			},
+		}
+
+		nextTransactionLocation := NewTransactionLocationGenerator()
+		nextScriptLocation := NewScriptLocationGenerator()
+
+		// Deploy contracts
+
+		deployContracts(
+			t,
+			rt,
+			contractsAddress,
+			runtimeInterface,
+			transactionEnvironment,
+			nextTransactionLocation,
+		)
+
+		// Run script
+
+		script := []byte(`
+          import EVM from 0x1
+
+          access(all)
+          fun main(): Bool {
+            let data = EVM.encodeABI(["Peter"])
+            let values = EVM.decodeABI(types: [Type<Address>()], data: data)
+
+            return true
+          }
+		`)
+
+		_, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.Error(t, err)
+		assert.ErrorContains(
+			t,
+			err,
+			"unsupported ABI decoding for value of type: Address",
+		)
+	})
+
+	t.Run("decodeABI with unsupported fixed-point number type", func(t *testing.T) {
+
+		t.Parallel()
+
+		handler := &testContractHandler{}
+
+		contractsAddress := flow.BytesToAddress([]byte{0x1})
+
+		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+
+		rt := runtime.NewInterpreterRuntime(runtime.Config{})
+
+		accountCodes := map[common.Location][]byte{}
+		var events []cadence.Event
+
+		runtimeInterface := &TestRuntimeInterface{
+			Storage: NewTestLedger(nil, nil),
+			OnGetSigningAccounts: func() ([]runtime.Address, error) {
+				return []runtime.Address{runtime.Address(contractsAddress)}, nil
+			},
+			OnResolveLocation: SingleIdentifierLocationResolver(t),
+			OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+				accountCodes[location] = code
+				return nil
+			},
+			OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+				code = accountCodes[location]
+				return code, nil
+			},
+			OnEmitEvent: func(event cadence.Event) error {
+				events = append(events, event)
+				return nil
+			},
+			OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+				return json.Decode(nil, b)
+			},
+		}
+
+		nextTransactionLocation := NewTransactionLocationGenerator()
+		nextScriptLocation := NewScriptLocationGenerator()
+
+		// Deploy contracts
+
+		deployContracts(
+			t,
+			rt,
+			contractsAddress,
+			runtimeInterface,
+			transactionEnvironment,
+			nextTransactionLocation,
+		)
+
+		// Run script
+
+		script := []byte(`
+          import EVM from 0x1
+
+          access(all)
+          fun main(): Bool {
+            let data = EVM.encodeABI(["Peter"])
+            let values = EVM.decodeABI(types: [Type<UFix64>()], data: data)
+
+            return true
+          }
+		`)
+
+		_, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.Error(t, err)
+		assert.ErrorContains(
+			t,
+			err,
+			"unsupported ABI decoding for value of type: UFix64",
+		)
+	})
+
+	t.Run("encodeABI with unsupported dictionary type", func(t *testing.T) {
+
+		t.Parallel()
+
+		handler := &testContractHandler{}
+
+		contractsAddress := flow.BytesToAddress([]byte{0x1})
+
+		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+
+		rt := runtime.NewInterpreterRuntime(runtime.Config{})
+
+		accountCodes := map[common.Location][]byte{}
+		var events []cadence.Event
+
+		runtimeInterface := &TestRuntimeInterface{
+			Storage: NewTestLedger(nil, nil),
+			OnGetSigningAccounts: func() ([]runtime.Address, error) {
+				return []runtime.Address{runtime.Address(contractsAddress)}, nil
+			},
+			OnResolveLocation: SingleIdentifierLocationResolver(t),
+			OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+				accountCodes[location] = code
+				return nil
+			},
+			OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+				code = accountCodes[location]
+				return code, nil
+			},
+			OnEmitEvent: func(event cadence.Event) error {
+				events = append(events, event)
+				return nil
+			},
+			OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+				return json.Decode(nil, b)
+			},
+		}
+
+		nextTransactionLocation := NewTransactionLocationGenerator()
+		nextScriptLocation := NewScriptLocationGenerator()
+
+		// Deploy contracts
+
+		deployContracts(
+			t,
+			rt,
+			contractsAddress,
+			runtimeInterface,
+			transactionEnvironment,
+			nextTransactionLocation,
+		)
+
+		// Run script
+
+		script := []byte(`
+          import EVM from 0x1
+
+          access(all)
+          fun main(): Bool {
+            let data = EVM.encodeABI(["Peter"])
+            let values = EVM.decodeABI(types: [Type<{Int: Bool}>()], data: data)
+
+            return true
+          }
+		`)
+
+		_, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.Error(t, err)
+		assert.ErrorContains(
+			t,
+			err,
+			"unsupported ABI decoding for value of type: {Int: Bool}",
+		)
+	})
+
+	t.Run("decodeABI with unsupported array element type", func(t *testing.T) {
+
+		t.Parallel()
+
+		handler := &testContractHandler{}
+
+		contractsAddress := flow.BytesToAddress([]byte{0x1})
+
+		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+
+		rt := runtime.NewInterpreterRuntime(runtime.Config{})
+
+		accountCodes := map[common.Location][]byte{}
+		var events []cadence.Event
+
+		runtimeInterface := &TestRuntimeInterface{
+			Storage: NewTestLedger(nil, nil),
+			OnGetSigningAccounts: func() ([]runtime.Address, error) {
+				return []runtime.Address{runtime.Address(contractsAddress)}, nil
+			},
+			OnResolveLocation: SingleIdentifierLocationResolver(t),
+			OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+				accountCodes[location] = code
+				return nil
+			},
+			OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+				code = accountCodes[location]
+				return code, nil
+			},
+			OnEmitEvent: func(event cadence.Event) error {
+				events = append(events, event)
+				return nil
+			},
+			OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+				return json.Decode(nil, b)
+			},
+		}
+
+		nextTransactionLocation := NewTransactionLocationGenerator()
+		nextScriptLocation := NewScriptLocationGenerator()
+
+		// Deploy contracts
+
+		deployContracts(
+			t,
+			rt,
+			contractsAddress,
+			runtimeInterface,
+			transactionEnvironment,
+			nextTransactionLocation,
+		)
+
+		// Run script
+
+		script := []byte(`
+          import EVM from 0x1
+
+          access(all)
+          fun main(): Bool {
+            let data = EVM.encodeABI(["Peter"])
+            let values = EVM.decodeABI(types: [Type<[Character]>()], data: data)
+
+            return true
+          }
+		`)
+
+		_, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.Error(t, err)
+		assert.ErrorContains(
+			t,
+			err,
+			"unsupported ABI decoding for value of type: [Character]",
+		)
+	})
+
+	t.Run("decodeABI with unsupported custom composite type", func(t *testing.T) {
+
+		t.Parallel()
+
+		handler := &testContractHandler{}
+
+		contractsAddress := flow.BytesToAddress([]byte{0x1})
+
+		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+
+		rt := runtime.NewInterpreterRuntime(runtime.Config{})
+
+		accountCodes := map[common.Location][]byte{}
+		var events []cadence.Event
+
+		runtimeInterface := &TestRuntimeInterface{
+			Storage: NewTestLedger(nil, nil),
+			OnGetSigningAccounts: func() ([]runtime.Address, error) {
+				return []runtime.Address{runtime.Address(contractsAddress)}, nil
+			},
+			OnResolveLocation: SingleIdentifierLocationResolver(t),
+			OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+				accountCodes[location] = code
+				return nil
+			},
+			OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+				code = accountCodes[location]
+				return code, nil
+			},
+			OnEmitEvent: func(event cadence.Event) error {
+				events = append(events, event)
+				return nil
+			},
+			OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+				return json.Decode(nil, b)
+			},
+		}
+
+		nextTransactionLocation := NewTransactionLocationGenerator()
+		nextScriptLocation := NewScriptLocationGenerator()
+
+		// Deploy contracts
+
+		deployContracts(
+			t,
+			rt,
+			contractsAddress,
+			runtimeInterface,
+			transactionEnvironment,
+			nextTransactionLocation,
+		)
+
+		// Run script
+
+		script := []byte(`
+          import EVM from 0x1
+
+          access(all) struct Token {
+            access(all) let id: Int
+            access(all) var balance: Int
+
+            init(id: Int, balance: Int) {
+              self.id = id
+              self.balance = balance
+            }
+          }
+
+          access(all)
+          fun main(): Bool {
+            let data = EVM.encodeABI(["Peter"])
+            let values = EVM.decodeABI(types: [Type<Token>()], data: data)
+
+            return true
+          }
+		`)
+
+		_, err := rt.ExecuteScript(
+			runtime.Script{
+				Source:    script,
+				Arguments: [][]byte{},
+			},
+			runtime.Context{
+				Interface:   runtimeInterface,
+				Environment: scriptEnvironment,
+				Location:    nextScriptLocation(),
+			},
+		)
+		require.Error(t, err)
+		assert.ErrorContains(
+			t,
+			err,
+			"unsupported ABI decoding for value of type: s.0100000000000000000000000000000000000000000000000000000000000000.Token",
+		)
+	})
+}
+
 func TestEVMAddressConstructionAndReturn(t *testing.T) {
 
 	t.Parallel()
