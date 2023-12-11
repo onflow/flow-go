@@ -34,9 +34,12 @@ The observer and access nodes need to be able to handle GetNetworkParameters
 and GetLatestProtocolStateSnapshot RPCs so this logic was split into
 the backendNetwork so that we can ignore the rest of the backend logic
 */
-func NewNetworkAPI(state protocol.State, chainID flow.ChainID,
+func NewNetworkAPI(
+	state protocol.State, 
+	chainID flow.ChainID,
 	headers storage.Headers,
-	snapshotHistoryLimit int) *backendNetwork {
+	snapshotHistoryLimit int,
+) *backendNetwork {
 	return &backendNetwork{
 		state:                state,
 		chainID:              chainID,
@@ -92,7 +95,7 @@ func (b *backendNetwork) GetLatestProtocolStateSnapshot(_ context.Context) ([]by
 // The requested block must be finalized, otherwise an error is returned.
 // Expected errors during normal operation:
 //   - status.Error[codes.NotFound] - No block with the given ID was found
-//   - status.Error[codes.InvalidArgument] - We will never return a snapshot for this block ID:
+//   - status.Error[codes.InvalidArgument] - Block ID will never have a valid snapshot:
 //     1. A block was found, but it is not finalized and is below the finalized height, so it will never be finalized.
 //     2. A block was found, however its sealing segment spans an epoch phase transition, yielding an invalid snapshot.
 //   - status.Error[codes.FailedPrecondition] - A block was found, but it is not finalized and is above the finalized height.
@@ -117,7 +120,7 @@ func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(_ context.Context, bl
 			// The block exists, but no block has been finalized at its height. Therefore, this block
 			// may be finalized in the future, and the client can retry.
 			return nil, status.Errorf(codes.FailedPrecondition,
-				"failed to retrieve snapshot for block by height %d: block not finalized and is above finalized height",
+				"failed to retrieve snapshot for block with height %d: block not finalized and is above finalized height",
 				snapshotHeadByBlockId.Height)
 		}
 		return nil, status.Errorf(codes.Internal, "failed to lookup block id by height %d", snapshotHeadByBlockId.Height)
