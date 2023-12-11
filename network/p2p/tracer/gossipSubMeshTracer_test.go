@@ -8,6 +8,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 
@@ -66,7 +67,15 @@ func TestGossipSubMeshTracer(t *testing.T) {
 	// creates one node with a gossipsub mesh meshTracer, and the other nodes without a gossipsub mesh meshTracer.
 	// we only need one node with a meshTracer to test the meshTracer.
 	// meshTracer logs at 1 second intervals for sake of testing.
-	collector := mockmodule.NewGossipSubLocalMeshMetrics(t)
+	collector := mockmodule.NewLocalGossipSubRouterMetrics(t)
+	// we don't care about the other metrics in this test, so we mock them.
+	collector.On("OnPeerAddedToProtocol", mock.Anything).Return().Maybe()
+	collector.On("OnRpcReceived", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
+	collector.On("OnRpcSent", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
+	collector.On("OnLocalPeerJoinedTopic").Return().Maybe()
+	collector.On("OnLocalPeerLeftTopic").Return().Maybe()
+	collector.On("OnPeerGraftTopic", mock.Anything).Return().Maybe()
+	collector.On("OnPeerPruneTopic", mock.Anything).Return().Maybe()
 	meshTracerCfg := &tracer.GossipSubMeshTracerConfig{
 		Logger:                             logger,
 		Metrics:                            collector,
@@ -116,6 +125,7 @@ func TestGossipSubMeshTracer(t *testing.T) {
 	nodes := []p2p.LibP2PNode{tracerNode, otherNode1, otherNode2, unknownNode}
 	ids := flow.IdentityList{&tracerId, &otherId1, &otherId2, &unknownId}
 
+	p2ptest.RegisterPeerProviders(t, nodes)
 	p2ptest.StartNodes(t, signalerCtx, nodes)
 	defer p2ptest.StopNodes(t, nodes, cancel)
 
