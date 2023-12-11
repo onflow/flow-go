@@ -46,6 +46,8 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 			nil,
 		)
 		assert.NoError(t, err)
+		assert.Equal(t, flow.EpochPhaseStaking, entry.EpochPhase())
+
 		expectedIdentities, err := flow.BuildIdentityTable(
 			setup.Participants,
 			identities,
@@ -73,6 +75,8 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 			nil,
 		)
 		assert.NoError(t, err)
+		assert.Equal(t, flow.EpochPhaseStaking, richEntry.EpochPhase())
+
 		expectedIdentities, err := flow.BuildIdentityTable(
 			stateEntry.CurrentEpochSetup.Participants,
 			stateEntry.CurrentEpoch.ActiveIdentities,
@@ -105,6 +109,8 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 			nil,
 		)
 		assert.NoError(t, err)
+		assert.Equal(t, flow.EpochPhaseSetup, richEntry.EpochPhase())
+
 		expectedIdentities, err := flow.BuildIdentityTable(
 			stateEntry.CurrentEpochSetup.Participants,
 			stateEntry.CurrentEpoch.ActiveIdentities,
@@ -152,6 +158,8 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 			nil,
 		)
 		assert.NoError(t, err)
+		assert.Equal(t, flow.EpochPhaseSetup, richEntry.EpochPhase())
+
 		expectedIdentities, err := flow.BuildIdentityTable(
 			stateEntry.CurrentEpochSetup.Participants,
 			stateEntry.CurrentEpoch.ActiveIdentities,
@@ -190,6 +198,8 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 			stateEntry.NextEpochCommit,
 		)
 		assert.NoError(t, err)
+		assert.Equal(t, flow.EpochPhaseCommitted, richEntry.EpochPhase())
+
 		expectedIdentities, err := flow.BuildIdentityTable(
 			stateEntry.CurrentEpochSetup.Participants,
 			stateEntry.CurrentEpoch.ActiveIdentities,
@@ -232,6 +242,8 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 			stateEntry.NextEpochCommit,
 		)
 		assert.NoError(t, err)
+		assert.Equal(t, flow.EpochPhaseCommitted, richEntry.EpochPhase())
+
 		expectedIdentities, err := flow.BuildIdentityTable(
 			stateEntry.CurrentEpochSetup.Participants,
 			stateEntry.CurrentEpoch.ActiveIdentities,
