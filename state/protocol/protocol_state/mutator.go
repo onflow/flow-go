@@ -161,16 +161,13 @@ func (m *stateMutator) ApplyServiceEventsFromValidatedSeals(seals []*flow.Seal) 
 	parentProtocolState := m.stateMachine.ParentState()
 
 	// perform protocol state transition to next epoch if next epoch is committed and we are at first block of epoch
-	phase, err := parentProtocolState.EpochStatus().Phase()
-	if err != nil {
-		return fmt.Errorf("could not determine epoch phase: %w", err)
-	}
+	phase := parentProtocolState.EpochPhase()
 	if phase == flow.EpochPhaseCommitted {
 		activeSetup := parentProtocolState.CurrentEpochSetup
 		if m.stateMachine.View() > activeSetup.FinalView {
 			// TODO: this is a temporary workaround to allow for the epoch transition to be triggered
 			// most likely it will be not needed when we refactor protocol state entries and define strict safety rules.
-			err = m.stateMachine.TransitionToNextEpoch()
+			err := m.stateMachine.TransitionToNextEpoch()
 			if err != nil {
 				return fmt.Errorf("could not transition protocol state to next epoch: %w", err)
 			}

@@ -46,7 +46,6 @@ func TestBootstrapAndOpen(t *testing.T) {
 		require.NoError(t, err)
 
 		complianceMetrics := new(mock.ComplianceMetrics)
-		complianceMetrics.On("CommittedEpochFinalView", finalView).Once()
 		complianceMetrics.On("CurrentEpochCounter", counter).Once()
 		complianceMetrics.On("CurrentEpochPhase", phase).Once()
 		complianceMetrics.On("CurrentEpochFinalView", finalView).Once()
@@ -117,11 +116,6 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 	protoutil.RunWithBootstrapState(t, committedPhaseSnapshot, func(db *badger.DB, _ *bprotocol.State) {
 
 		complianceMetrics := new(mock.ComplianceMetrics)
-
-		// expect the final view metric to be set to next epoch's final view
-		finalView, err := committedPhaseSnapshot.Epochs().Next().FinalView()
-		require.NoError(t, err)
-		complianceMetrics.On("CommittedEpochFinalView", finalView).Once()
 
 		// expect counter to be set to current epochs counter
 		counter, err := committedPhaseSnapshot.Epochs().Current().Counter()
