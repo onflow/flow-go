@@ -58,7 +58,7 @@ func TestIdentityEncodingJSON(t *testing.T) {
 		var dec flow.Identity
 		err = json.Unmarshal(enc, &dec)
 		require.NoError(t, err)
-		require.Equal(t, identity, &dec)
+		require.True(t, identity.EqualTo(&dec))
 	})
 
 	t.Run("empty address should be omitted", func(t *testing.T) {
@@ -71,7 +71,7 @@ func TestIdentityEncodingJSON(t *testing.T) {
 		var dec flow.Identity
 		err = json.Unmarshal(enc, &dec)
 		require.NoError(t, err)
-		require.Equal(t, identity, &dec)
+		require.True(t, identity.EqualTo(&dec))
 	})
 }
 
@@ -82,7 +82,7 @@ func TestIdentityEncodingMsgpack(t *testing.T) {
 	var dec flow.Identity
 	err = msgpack.Unmarshal(enc, &dec)
 	require.NoError(t, err)
-	require.Equal(t, identity, &dec)
+	require.True(t, identity.EqualTo(&dec))
 }
 
 func TestIdentityList_Exists(t *testing.T) {

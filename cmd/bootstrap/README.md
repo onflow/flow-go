@@ -46,7 +46,7 @@ _Each cluster_ of collector nodes needs to have its own root Block and root QC
 
 # Usage
 
-`go run -tags relic ./cmd/bootstrap` prints usage information
+`go run ./cmd/bootstrap` prints usage information
 
 ## Phase 1: Generate networking and staking keys for partner nodes:
 
@@ -65,7 +65,7 @@ If seeds are not provided, the CLI will try to use the system's pseudo-random nu
 
 #### Example
 ```bash
-go run -tags relic ./cmd/bootstrap key --address "example.com:1234" --role "consensus" -o ./bootstrap/partner-node-infos
+go run ./cmd/bootstrap key --address "example.com:1234" --role "consensus" -o ./bootstrap/partner-node-infos
 ```
 
 #### Generated output files
@@ -97,7 +97,7 @@ Each input is a config file specified as a command line parameter:
 
 #### Example
 ```bash
-go run -tags relic ./cmd/bootstrap finalize \
+go run ./cmd/bootstrap finalize \
   --root-chain main \
   --root-height 0 \
   --root-parent 0000000000000000000000000000000000000000000000000000000000000000 \
@@ -152,7 +152,7 @@ go run -tags relic ./cmd/bootstrap finalize \
 This generates the networking key used by observers to connect to the public libp2p network. It is a different key format than staked nodes and should only be used for Observers.
 
 ```bash
-go run -tags relic ./cmd/bootstrap observer-network-key  -f ./path/network-key
+go run ./cmd/bootstrap observer-network-key  -f ./path/network-key
 ```
 
 This key must be kept secret as it's used to encrypt and sign network requests sent by the observers.

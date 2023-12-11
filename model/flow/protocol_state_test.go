@@ -134,6 +134,52 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 
 	// TODO: include test for epoch setup phase where no prior epoch exist (i.e. first epoch setup phase after spork)
 	// TODO: above is done in https://github.com/onflow/flow-go/pull/5080 - add phase check once merged
+	t.Run("setup-after-spork", func(t *testing.T) {
+		stateEntry := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.RichProtocolStateEntry) {
+			// no previous epoch since we are in the first epoch
+			entry.PreviousEpochSetup = nil
+			entry.PreviousEpochCommit = nil
+			entry.PreviousEpoch = nil
+
+			// next epoch is setup but not committed
+			entry.NextEpochCommit = nil
+			entry.NextEpoch.CommitID = flow.ZeroID
+		})
+		// sanity check that previous epoch is not populated in `stateEntry`
+		assert.Nil(t, stateEntry.PreviousEpoch)
+		assert.Nil(t, stateEntry.PreviousEpochSetup)
+		assert.Nil(t, stateEntry.PreviousEpochCommit)
+
+		richEntry, err := flow.NewRichProtocolStateEntry(
+			stateEntry.ProtocolStateEntry,
+			stateEntry.PreviousEpochSetup,
+			stateEntry.PreviousEpochCommit,
+			stateEntry.CurrentEpochSetup,
+			stateEntry.CurrentEpochCommit,
+			stateEntry.NextEpochSetup,
+			nil,
+		)
+		assert.NoError(t, err)
+		expectedIdentities, err := flow.BuildIdentityTable(
+			stateEntry.CurrentEpochSetup.Participants,
+			stateEntry.CurrentEpoch.ActiveIdentities,
+			stateEntry.NextEpochSetup.Participants,
+			stateEntry.NextEpoch.ActiveIdentities,
+			flow.EpochParticipationStatusJoining,
+		)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedIdentities, richEntry.CurrentEpochIdentityTable, "should be equal to current epoch setup participants + next epoch setup participants")
+		assert.Nil(t, richEntry.NextEpochCommit)
+		expectedIdentities, err = flow.BuildIdentityTable(
+			stateEntry.NextEpochSetup.Participants,
+			stateEntry.NextEpoch.ActiveIdentities,
+			stateEntry.CurrentEpochSetup.Participants,
+			stateEntry.CurrentEpoch.ActiveIdentities,
+			flow.EpochParticipationStatusLeaving,
+		)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedIdentities, richEntry.NextEpochIdentityTable, "should be equal to next epoch setup participants + current epoch setup participants")
+	})
 
 	// Common situation during the epoch commit phase for epoch N+1
 	//  * we are currently in Epoch N
@@ -176,7 +222,47 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 
 	// TODO: include test for epoch commit phase where no prior epoch exist (i.e. first epoch commit phase after spork)
 	// TODO: above is done in https://github.com/onflow/flow-go/pull/5080 - add phase check once merged
+	t.Run("commit-after-spork", func(t *testing.T) {
+		stateEntry := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.RichProtocolStateEntry) {
+			// no previous epoch since we are in the first epoch
+			entry.PreviousEpochSetup = nil
+			entry.PreviousEpochCommit = nil
+			entry.PreviousEpoch = nil
+		})
+		// sanity check that previous epoch is not populated in `stateEntry`
+		assert.Nil(t, stateEntry.PreviousEpoch)
+		assert.Nil(t, stateEntry.PreviousEpochSetup)
+		assert.Nil(t, stateEntry.PreviousEpochCommit)
 
+		richEntry, err := flow.NewRichProtocolStateEntry(
+			stateEntry.ProtocolStateEntry,
+			stateEntry.PreviousEpochSetup,
+			stateEntry.PreviousEpochCommit,
+			stateEntry.CurrentEpochSetup,
+			stateEntry.CurrentEpochCommit,
+			stateEntry.NextEpochSetup,
+			stateEntry.NextEpochCommit,
+		)
+		assert.NoError(t, err)
+		expectedIdentities, err := flow.BuildIdentityTable(
+			stateEntry.CurrentEpochSetup.Participants,
+			stateEntry.CurrentEpoch.ActiveIdentities,
+			stateEntry.NextEpochSetup.Participants,
+			stateEntry.NextEpoch.ActiveIdentities,
+			flow.EpochParticipationStatusJoining,
+		)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedIdentities, richEntry.CurrentEpochIdentityTable, "should be equal to current epoch setup participants + next epoch setup participants")
+		expectedIdentities, err = flow.BuildIdentityTable(
+			stateEntry.NextEpochSetup.Participants,
+			stateEntry.NextEpoch.ActiveIdentities,
+			stateEntry.CurrentEpochSetup.Participants,
+			stateEntry.CurrentEpoch.ActiveIdentities,
+			flow.EpochParticipationStatusLeaving,
+		)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedIdentities, richEntry.NextEpochIdentityTable, "should be equal to next epoch setup participants + current epoch setup participants")
+	})
 }
 
 // TestProtocolStateEntry_Copy tests if the copy method returns a deep copy of the entry.

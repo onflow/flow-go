@@ -69,7 +69,7 @@ func toNodeInfos(confs []ContainerConfig) []bootstrap.NodeInfo {
 }
 
 func getSeed() ([]byte, error) {
-	seedLen := int(math.Max(crypto.SeedMinLenDKG, crypto.KeyGenSeedMinLen))
+	seedLen := int(math.Max(crypto.KeyGenSeedMinLen, crypto.KeyGenSeedMinLen))
 	seed := make([]byte, seedLen)
 	n, err := rand.Read(seed)
 	if err != nil || n != seedLen {

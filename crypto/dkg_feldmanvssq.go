@@ -1,9 +1,5 @@
-//go:build relic
-// +build relic
-
 package crypto
 
-// #cgo CFLAGS: -g -Wall -std=c99
 // #include "dkg_include.h"
 import "C"
 
@@ -27,7 +23,7 @@ import (
 // a complaint answer. The protocol ends with all honest participants
 // reaching a consensus about the dealer qualification/disqualification.
 
-// Private keys are scalar in Zr, where r is the group order of G1/G2
+// Private keys are scalar in Fr, where r is the group order of G1/G2
 // Public keys are in G2.
 
 // feldman VSS protocol, with complaint mechanism, implements DKGState
@@ -162,7 +158,7 @@ func (s *feldmanVSSQualState) End() (PrivateKey, PublicKey, []PublicKey, error) 
 			if c.received && !c.answerReceived {
 				s.disqualified = true
 				s.processor.Disqualify(int(s.dealerIndex),
-					fmt.Sprintf("complaint from %d was not answered",
+					fmt.Sprintf("complaint from (%d) was not answered",
 						complainer))
 				break
 			}
@@ -204,9 +200,9 @@ func (s *feldmanVSSQualState) End() (PrivateKey, PublicKey, []PublicKey, error) 
 	return x, Y, y, nil
 }
 
-const (
+var (
 	complaintSize       = 1
-	complaintAnswerSize = 1 + PrKeyLenBLSBLS12381
+	complaintAnswerSize = 1 + frBytesLen
 )
 
 // HandleBroadcastMsg processes a new broadcasted message received by the current participant.
@@ -402,19 +398,17 @@ func (s *feldmanVSSQualState) receiveShare(origin index, data []byte) {
 		return
 	}
 	// read the participant private share
-	if C.bn_read_Zr_bin((*C.bn_st)(&s.x),
-		(*C.uchar)(&data[0]),
-		PrKeyLenBLSBLS12381,
-	) != valid {
+	err := readScalarFrStar(&s.x, data)
+	if err != nil {
 		s.buildAndBroadcastComplaint()
 		s.processor.FlagMisbehavior(int(origin),
-			fmt.Sprintf("invalid share value %x", data))
+			fmt.Sprintf("invalid share value %x: %s", data, err))
 		return
 	}
 
 	if s.vAReceived {
 		if !s.verifyShare() {
-			// otherwise, build a complaint
+			// build a complaint
 			s.buildAndBroadcastComplaint()
 		}
 	}
@@ -448,7 +442,7 @@ func (s *feldmanVSSQualState) receiveVerifVector(origin index, data []byte) {
 		return
 	}
 	// read the verification vector
-	s.vA = make([]pointG2, s.threshold+1)
+	s.vA = make([]pointE2, s.threshold+1)
 	err := readVerifVector(s.vA, data)
 	if err != nil {
 		s.disqualified = true
@@ -457,7 +451,8 @@ func (s *feldmanVSSQualState) receiveVerifVector(origin index, data []byte) {
 		return
 	}
 
-	s.y = make([]pointG2, s.size)
+	s.y = make([]pointE2, s.size)
+	// compute all public keys
 	s.computePublicKeys()
 
 	// check the (already) registered complaints
@@ -466,8 +461,8 @@ func (s *feldmanVSSQualState) receiveVerifVector(origin index, data []byte) {
 			if s.checkComplaint(complainer, c) {
 				s.disqualified = true
 				s.processor.Disqualify(int(s.dealerIndex),
-					fmt.Sprintf("verification vector received: a complaint answer to %d is invalid",
-						complainer))
+					fmt.Sprintf("verification vector received: a complaint answer to (%d) is invalid, answer is %s, computed key is %s",
+						complainer, &c.answer, &s.y[complainer]))
 				return
 			}
 		}
@@ -483,6 +478,14 @@ func (s *feldmanVSSQualState) receiveVerifVector(origin index, data []byte) {
 // build a complaint against the dealer, add it to the local
 // complaint map and broadcast it
 func (s *feldmanVSSQualState) buildAndBroadcastComplaint() {
+	var logMsg string
+	if s.vAReceived && s.xReceived {
+		logMsg = fmt.Sprintf("building a complaint, share is %s, computed public key is %s",
+			&s.x, &s.y[s.myIndex])
+	} else {
+		logMsg = "building a complaint"
+	}
+	s.processor.FlagMisbehavior(int(s.dealerIndex), logMsg)
 	s.complaints[s.myIndex] = &complaint{
 		received:       true,
 		answerReceived: false,
@@ -497,7 +500,7 @@ func (s *feldmanVSSQualState) buildAndBroadcastComplaintAnswer(complainee index)
 	data := make([]byte, complaintAnswerSize+1)
 	data[0] = byte(feldmanVSSComplaintAnswer)
 	data[1] = byte(complainee)
-	zrPolynomialImage(data[2:], s.a, complainee+1, nil)
+	frPolynomialImage(data[2:], s.a, complainee+1, nil)
 	s.complaints[complainee].answerReceived = true
 	s.processor.Broadcast(data)
 }
@@ -507,8 +510,10 @@ func (s *feldmanVSSQualState) buildAndBroadcastComplaintAnswer(complainee index)
 // - true if the complaint answer is not correct
 func (s *feldmanVSSQualState) checkComplaint(complainer index, c *complaint) bool {
 	// check y[complainer] == share.G2
-	return C.verifyshare((*C.bn_st)(&c.answer),
-		(*C.ep2_st)(&s.y[complainer])) == 0
+	isLog := C.G2_check_log(
+		(*C.Fr)(&c.answer),
+		(*C.E2)(&s.y[complainer]))
+	return !bool(isLog)
 }
 
 // data = |complainee|
@@ -582,8 +587,8 @@ func (s *feldmanVSSQualState) receiveComplaint(origin index, data []byte) {
 		s.disqualified = s.checkComplaint(origin, c)
 		if s.disqualified {
 			s.processor.Disqualify(int(s.dealerIndex),
-				fmt.Sprintf("complaint received: complaint answer to %d is invalid",
-					origin))
+				fmt.Sprintf("complaint received: answer to (%d) is invalid, answer is %s, computed public key is %s",
+					origin, &c.answer, &s.y[origin]))
 		}
 		return
 	}
@@ -624,14 +629,11 @@ func (s *feldmanVSSQualState) receiveComplaintAnswer(origin index, data []byte) 
 		}
 
 		// read the complainer private share
-		C.bn_new_wrapper((*C.bn_st)(&s.complaints[complainer].answer))
-		if C.bn_read_Zr_bin((*C.bn_st)(&s.complaints[complainer].answer),
-			(*C.uchar)(&data[1]),
-			PrKeyLenBLSBLS12381,
-		) != valid {
+		err := readScalarFrStar(&s.complaints[complainer].answer, data[1:])
+		if err != nil {
 			s.disqualified = true
 			s.processor.Disqualify(int(s.dealerIndex),
-				fmt.Sprintf("invalid complaint answer value %x", data))
+				fmt.Sprintf("invalid complaint answer value %x: %s", data, err))
 			return
 		}
 		return
@@ -648,22 +650,19 @@ func (s *feldmanVSSQualState) receiveComplaintAnswer(origin index, data []byte) 
 	// flag check is a sanity check
 	if c.received {
 		// read the complainer private share
-		C.bn_new_wrapper((*C.bn_st)(&c.answer))
-		if C.bn_read_Zr_bin((*C.bn_st)(&c.answer),
-			(*C.uchar)(&data[1]),
-			PrKeyLenBLSBLS12381,
-		) != valid {
+		err := readScalarFrStar(&c.answer, data[1:])
+		if err != nil {
 			s.disqualified = true
 			s.processor.Disqualify(int(s.dealerIndex),
-				fmt.Sprintf("invalid complaint answer value %x", data))
+				fmt.Sprintf("invalid complaint answer value %x: %s", data, err))
 			return
 		}
 		if s.vAReceived {
 			s.disqualified = s.checkComplaint(complainer, c)
 			if s.disqualified {
 				s.processor.Disqualify(int(s.dealerIndex),
-					fmt.Sprintf("complaint answer received: complaint answer to %d is invalid",
-						complainer))
+					fmt.Sprintf("complaint answer received: answer to (%d) is invalid, answer is %s, computed key is %s",
+						complainer, &c.answer, &s.y[complainer]))
 			}
 		}
 
