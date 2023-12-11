@@ -141,15 +141,20 @@ func deployContracts(
 	}{
 		{
 			name: "FungibleToken",
-			code: contracts2.FungibleToken(),
+			code: contracts2.FungibleToken(
+				contractsAddressHex,
+			),
 		},
 		{
 			name: "NonFungibleToken",
-			code: contracts2.NonFungibleToken(),
+			code: contracts2.NonFungibleToken(
+				contractsAddressHex,
+			),
 		},
 		{
 			name: "MetadataViews",
 			code: contracts2.MetadataViews(
+				contractsAddressHex,
 				contractsAddressHex,
 				contractsAddressHex,
 			),
@@ -157,6 +162,7 @@ func deployContracts(
 		{
 			name: "FungibleTokenMetadataViews",
 			code: contracts2.FungibleTokenMetadataViews(
+				contractsAddressHex,
 				contractsAddressHex,
 				contractsAddressHex,
 			),
@@ -168,6 +174,7 @@ func deployContracts(
 		{
 			name: "FlowToken",
 			code: contracts2.FlowToken(
+				contractsAddressHex,
 				contractsAddressHex,
 				contractsAddressHex,
 				contractsAddressHex,
@@ -647,7 +654,7 @@ func TestEVMCreateBridgedAccount(t *testing.T) {
 		cadence.UInt8(0), cadence.UInt8(0),
 	}).WithType(cadence.NewConstantSizedArrayType(
 		types.AddressLength,
-		cadence.UInt8Type{},
+		cadence.UInt8Type,
 	))
 
 	require.Equal(t, expected, actual)
@@ -768,7 +775,7 @@ func TestBridgedAccountCall(t *testing.T) {
 		cadence.UInt8(3),
 		cadence.UInt8(1),
 		cadence.UInt8(4),
-	}).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type{}))
+	}).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type))
 
 	require.Equal(t, expected, actual)
 }
@@ -1136,7 +1143,7 @@ func TestBridgedAccountDeploy(t *testing.T) {
 		cadence.UInt8(0), cadence.UInt8(0),
 	}).WithType(cadence.NewConstantSizedArrayType(
 		types.AddressLength,
-		cadence.UInt8Type{},
+		cadence.UInt8Type,
 	))
 
 	require.Equal(t, expected, actual)
