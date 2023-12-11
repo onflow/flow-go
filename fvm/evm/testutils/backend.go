@@ -8,9 +8,9 @@ import (
 
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime/common"
-
-	jsoncdc "github.com/onflow/cadence/encoding/json""github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/maps"
 
 	"github.com/onflow/flow-go/fvm/environment"
