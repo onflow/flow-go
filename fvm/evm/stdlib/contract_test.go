@@ -140,6 +140,10 @@ func deployContracts(
 		deployTx []byte
 	}{
 		{
+			name: "ViewResolver",
+			code: contracts2.ViewResolver(),
+		},
+		{
 			name: "FungibleToken",
 			code: contracts2.FungibleToken(
 				contractsAddressHex,
@@ -168,10 +172,6 @@ func deployContracts(
 			),
 		},
 		{
-			name: "ViewResolver",
-			code: contracts2.ViewResolver(),
-		},
-		{
 			name: "FlowToken",
 			code: contracts2.FlowToken(
 				contractsAddressHex,
@@ -181,7 +181,7 @@ func deployContracts(
 			),
 			deployTx: []byte(`
               transaction(name: String, code: String) {
-                prepare(signer: AuthAccount) {
+                prepare(signer: auth(AddContract, Storage, Capabilities) &Account) {
                   signer.contracts.add(name: name, code: code.utf8, signer)
                 }
               }
@@ -822,8 +822,8 @@ func TestEVMAddressDeposit(t *testing.T) {
 
       access(all)
       fun main() {
-          let admin = getAuthAccount(0x1)
-              .borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+          let admin = getAuthAccount<auth(BorrowValue) &Account>(0x1)
+              .storage.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
           let minter <- admin.createNewMinter(allowedAmount: 1.23)
           let vault <- minter.mintTokens(amount: 1.23)
           destroy minter
@@ -945,8 +945,8 @@ func TestBridgedAccountWithdraw(t *testing.T) {
 
       access(all)
       fun main(): UFix64 {
-          let admin = getAuthAccount(0x1)
-              .borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+          let admin = getAuthAccount<auth(BorrowValue) &Account>(0x1)
+              .storage.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
           let minter <- admin.createNewMinter(allowedAmount: 2.34)
           let vault <- minter.mintTokens(amount: 2.34)
           destroy minter
