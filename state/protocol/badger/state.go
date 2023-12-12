@@ -411,7 +411,7 @@ func bootstrapStatePointers(root protocol.Snapshot) func(*transaction.Tx) error 
 			NewestQC:    rootQC,
 		}
 
-		bdtx := tx.DBTxn
+		bdtx := tx.DBTxn // tx is just a wrapper around a badger transaction with the additional ability to register callbacks that are executed after the badger transaction completed _successfully_
 		// insert initial views for HotStuff
 		err = operation.InsertSafetyData(highest.Header.ChainID, safetyData)(bdtx)
 		if err != nil {
@@ -451,12 +451,12 @@ func bootstrapStatePointers(root protocol.Snapshot) func(*transaction.Tx) error 
 			return fmt.Errorf("could not check existence of previous epoch: %w", err)
 		}
 		if hasPrevious {
-			err = indexFirstHeight(root.Epochs().Previous())(tx)
+			err = indexFirstHeight(root.Epochs().Previous())(bdtx)
 			if err != nil {
 				return fmt.Errorf("could not index previous epoch first height: %w", err)
 			}
 		}
-		err = indexFirstHeight(root.Epochs().Current())(tx)
+		err = indexFirstHeight(root.Epochs().Current())(bdtx)
 		if err != nil {
 			return fmt.Errorf("could not index current epoch first height: %w", err)
 		}
@@ -552,9 +552,9 @@ func bootstrapEpoch(
 // spork which is used to disambiguate Flow networks.
 func bootstrapSporkInfo(root protocol.Snapshot) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
-		params := root.Params()
-		bdtx := tx.DBTxn
+		bdtx := tx.DBTxn // tx is just a wrapper around a badger transaction with the additional ability to register callbacks that are executed after the badger transaction completed _successfully_
 
+		params := root.Params()
 		sporkID := params.SporkID()
 		err := operation.InsertSporkID(sporkID)(bdtx)
 		if err != nil {
@@ -586,8 +586,8 @@ func bootstrapSporkInfo(root protocol.Snapshot) func(*transaction.Tx) error {
 // indexFirstHeight indexes the first height for the epoch, as part of bootstrapping.
 // The input epoch must have been started (the first block of the epoch has been finalized).
 // No errors are expected during normal operation.
-func indexFirstHeight(epoch protocol.Epoch) func(*transaction.Tx) error {
-	return func(tx *transaction.Tx) error {
+func indexFirstHeight(epoch protocol.Epoch) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
 		counter, err := epoch.Counter()
 		if err != nil {
 			return fmt.Errorf("could not get epoch counter: %w", err)
@@ -596,7 +596,7 @@ func indexFirstHeight(epoch protocol.Epoch) func(*transaction.Tx) error {
 		if err != nil {
 			return fmt.Errorf("could not get epoch first height: %w", err)
 		}
-		err = operation.InsertEpochFirstHeight(counter, firstHeight)(tx.DBTxn)
+		err = operation.InsertEpochFirstHeight(counter, firstHeight)(tx)
 		if err != nil {
 			return fmt.Errorf("could not index first height %d for epoch %d: %w", firstHeight, counter, err)
 		}
