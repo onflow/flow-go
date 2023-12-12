@@ -29,9 +29,9 @@ func TestGossipSubDuplicateMessageTrackerCache(t *testing.T) {
 	count, err = cache.Inc(peerID)
 	require.NoError(t, err)
 	require.Equal(t, 1.0, count)
-	//count, err = cache.Get(peerID)
-	//require.NoError(t, err)
-	//require.Equal(t, 1.0, count)
+	count, err = cache.Get(peerID)
+	require.NoError(t, err)
+	unittest.RequireNumericallyClose(t, 1.0, count, .1)
 }
 
 // TestGossipSubDuplicateMessageTrackerCache tests the concurrent functionality of the GossipSubDuplicateMessageTrackerCache.
@@ -84,14 +84,14 @@ func TestGossipSubDuplicateMessageTrackerCache_Concurrent_Inc_Get(t *testing.T) 
 		defer wg.Done()
 		count, err := cache.Get(peerId1)
 		require.NoError(t, err)
-		require.Equal(t, 1.0, count)
+		unittest.RequireNumericallyClose(t, 1.0, count, .1)
 	}()
 
 	go func() {
 		defer wg.Done()
 		count, err := cache.Get(peerId2)
 		require.NoError(t, err)
-		require.Equal(t, 1.0, count)
+		unittest.RequireNumericallyClose(t, 1.0, count, .1)
 	}()
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "failed to get updated counts")

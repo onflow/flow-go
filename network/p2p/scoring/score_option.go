@@ -55,7 +55,7 @@ const (
 
 	// DefaultDuplicateMessagePenalty is the default penalty for duplicate messages detected by the gossipsub tracer for a peer. The default
 	// penalty is multiplied by the current duplicate message count for a peer before it is applied to the application specific score.
-	DefaultDuplicateMessagePenalty = -1
+	DefaultDuplicateMessagePenalty = -0.1
 
 	// DefaultGossipThreshold when a peer's penalty drops below this threshold,
 	// no gossip is emitted towards that peer and gossip from that peer is ignored.
