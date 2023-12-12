@@ -69,7 +69,7 @@ func meshTracerFixture(flowConfig *config.FlowConfig, idProvider module.Identity
 		RpcSentTrackerWorkerQueueCacheSize: flowConfig.NetworkConfig.GossipSub.RpcTracer.RPCSentTrackerQueueCacheSize,
 		RpcSentTrackerNumOfWorkers:         flowConfig.NetworkConfig.GossipSub.RpcTracer.RpcSentTrackerNumOfWorkers,
 		DuplicateMessageTrackerCacheSize:   flowConfig.NetworkConfig.GossipSub.DuplicateMessageTrackerCacheSize,
-		DuplicateMessageTrackerGuageDecay:  flowConfig.NetworkConfig.GossipSub.DuplicateMessageTrackerGuageDecay,
+		DuplicateMessageTrackerGaugeDecay:  flowConfig.NetworkConfig.GossipSub.DuplicateMessageTrackerGuageDecay,
 	}
 	return tracer.NewGossipSubMeshTracer(meshTracerCfg)
 }

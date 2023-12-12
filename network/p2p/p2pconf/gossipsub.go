@@ -157,11 +157,13 @@ type SubscriptionProviderParameters struct {
 
 // GossipSubTracerParameters keys.
 const (
-	LocalMeshLogIntervalKey         = "local-mesh-logging-interval"
-	ScoreTracerIntervalKey          = "score-tracer-interval"
-	RPCSentTrackerCacheSizeKey      = "rpc-sent-tracker-cache-size"
-	RPCSentTrackerQueueCacheSizeKey = "rpc-sent-tracker-queue-cache-size"
-	RPCSentTrackerNumOfWorkersKey   = "rpc-sent-tracker-workers"
+	LocalMeshLogIntervalKey              = "local-mesh-logging-interval"
+	ScoreTracerIntervalKey               = "score-tracer-interval"
+	RPCSentTrackerCacheSizeKey           = "rpc-sent-tracker-cache-size"
+	RPCSentTrackerQueueCacheSizeKey      = "rpc-sent-tracker-queue-cache-size"
+	RPCSentTrackerNumOfWorkersKey        = "rpc-sent-tracker-workers"
+	DuplicateMessageCacheTrackerSizeKey  = "duplicate-message-cache-tracker-size"
+	DuplicateMessageCacheTrackerDecayKey = "duplicate-message-cache-tracker-decay"
 )
 
 // GossipSubTracerParameters is the config for the gossipsub tracer. GossipSubParameters tracer is used to trace the local mesh events and peer scores.
@@ -175,11 +177,11 @@ type GossipSubTracerParameters struct {
 	// RPCSentTrackerQueueCacheSize cache size of the rpc sent tracker queue used for async tracking.
 	RPCSentTrackerQueueCacheSize uint32 `validate:"gt=0" mapstructure:"rpc-sent-tracker-queue-cache-size"`
 	// RpcSentTrackerNumOfWorkers number of workers for rpc sent tracker worker pool.
-	RpcSentTrackerNumOfWorkers int `validate:"gt=0" mapstructure:"gossipsub-rpc-sent-tracker-workers"`
+	RpcSentTrackerNumOfWorkers int `validate:"gt=0" mapstructure:"rpc-sent-tracker-workers"`
 	// DuplicateMessageTrackerCacheSize cache size of the gossipsub duplicate message tracker.
-	DuplicateMessageTrackerCacheSize uint32 `validate:"gt=0" mapstructure:"gossipsub-duplicate-message-cache-tracker-size"`
+	DuplicateMessageTrackerCacheSize uint32 `validate:"gt=0" mapstructure:"duplicate-message-cache-tracker-size"`
 	// DuplicateMessageTrackerGuageDecay decay rate for the peer duplicate message counters.
-	DuplicateMessageTrackerGuageDecay float64 `validate:"gt=0,lt=1" mapstructure:"gossipsub-duplicate-message-cache-tracker-decay"`
+	DuplicateMessageTrackerGuageDecay float64 `validate:"gt=0,lt=1" mapstructure:"duplicate-message-cache-tracker-decay"`
 }
 
 // ResourceScope is the scope of the resource, e.g., system, transient, protocol, peer, peer-protocol.

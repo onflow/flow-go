@@ -71,7 +71,7 @@ type GossipSubMeshTracerConfig struct {
 	RpcSentTrackerWorkerQueueCacheSize uint32
 	RpcSentTrackerNumOfWorkers         int
 	DuplicateMessageTrackerCacheSize   uint32
-	DuplicateMessageTrackerGuageDecay  float64
+	DuplicateMessageTrackerGaugeDecay  float64
 }
 
 // NewGossipSubMeshTracer creates a new *GossipSubMeshTracer.
@@ -100,7 +100,7 @@ func NewGossipSubMeshTracer(config *GossipSubMeshTracerConfig) *GossipSubMeshTra
 		rpcSentTracker: rpcSentTracker,
 		duplicateMessageTrackerCache: internal.NewGossipSubDuplicateMessageTrackerCache(
 			config.DuplicateMessageTrackerCacheSize,
-			config.DuplicateMessageTrackerGuageDecay,
+			config.DuplicateMessageTrackerGaugeDecay,
 			config.Logger,
 			metrics.GossipSubDuplicateMessageTrackerCacheMetricFactory(config.HeroCacheMetricsFactory, config.NetworkingType),
 		),

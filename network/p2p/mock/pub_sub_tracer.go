@@ -56,17 +56,21 @@ func (_m *PubSubTracer) DuplicateMessage(msg *pubsub.Message) {
 	_m.Called(msg)
 }
 
-// DuplicateMessageCount provides a mock function with given fields: peerID
-func (_m *PubSubTracer) DuplicateMessageCount(peerID peer.ID) float64 {
-	ret := _m.Called(peerID)
+// DuplicateMessageCount provides a mock function with given fields: _a0
+func (_m *PubSubTracer) DuplicateMessageCount(_a0 peer.ID) float64 {
+	ret := _m.Called(_a0)
 
 	var r0 float64
 	if rf, ok := ret.Get(0).(func(peer.ID) float64); ok {
-		r0 = rf(peerID)
+		r0 = rf(_a0)
 	} else {
 		r0 = ret.Get(0).(float64)
+	}
 
-		// GetLocalMeshPeers provides a mock function with given fields: topic
+	return r0
+}
+
+// GetLocalMeshPeers provides a mock function with given fields: topic
 func (_m *PubSubTracer) GetLocalMeshPeers(topic channels.Topic) []peer.ID {
 	ret := _m.Called(topic)
 

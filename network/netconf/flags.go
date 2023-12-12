@@ -94,14 +94,14 @@ func AllFlagNames() []string {
 		alspSyncEngineBatchRequestBaseProb,
 		alspSyncEngineRangeRequestBaseProb,
 		alspSyncEngineSyncRequestProb,
-		duplicateMessageTrackerCacheSize,
-		duplicateMessageTrackerDecay,
 		BuildFlagName(gossipSub, p2pconf.PeerScoringEnabledKey),
 		BuildFlagName(gossipSub, p2pconf.RpcTracerKey, p2pconf.LocalMeshLogIntervalKey),
 		BuildFlagName(gossipSub, p2pconf.RpcTracerKey, p2pconf.ScoreTracerIntervalKey),
 		BuildFlagName(gossipSub, p2pconf.RpcTracerKey, p2pconf.RPCSentTrackerCacheSizeKey),
 		BuildFlagName(gossipSub, p2pconf.RpcTracerKey, p2pconf.RPCSentTrackerQueueCacheSizeKey),
 		BuildFlagName(gossipSub, p2pconf.RpcTracerKey, p2pconf.RPCSentTrackerNumOfWorkersKey),
+		BuildFlagName(gossipSub, p2pconf.RpcTracerKey, p2pconf.DuplicateMessageCacheTrackerSizeKey),
+		BuildFlagName(gossipSub, p2pconf.RpcTracerKey, p2pconf.DuplicateMessageCacheTrackerDecayKey),
 		BuildFlagName(gossipSub, p2pconf.RpcInspectorKey, p2pconf.ValidationConfigKey, p2pconf.NumberOfWorkersKey),
 		BuildFlagName(gossipSub, p2pconf.RpcInspectorKey, p2pconf.ValidationConfigKey, p2pconf.QueueSizeKey),
 		BuildFlagName(gossipSub, p2pconf.RpcInspectorKey, p2pconf.ValidationConfigKey, p2pconf.ClusterPrefixedMessageConfigKey, p2pconf.TrackerCacheSizeKey),
@@ -204,14 +204,13 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 		"cache size of the rpc sent tracker used by the gossipsub mesh tracer.")
 	flags.Uint32(BuildFlagName(gossipSub, p2pconf.RpcTracerKey, p2pconf.RPCSentTrackerQueueCacheSizeKey), config.GossipSub.RpcTracer.RPCSentTrackerQueueCacheSize,
 		"cache size of the rpc sent tracker worker queue.")
-	flags.Uint32(
-		duplicateMessageTrackerCacheSize,
-		config.GossipSub.DuplicateMessageTrackerCacheSize,
+	flags.Uint32(BuildFlagName(gossipSub, p2pconf.RpcTracerKey, p2pconf.DuplicateMessageCacheTrackerSizeKey),
+		config.GossipSub.RpcTracer.DuplicateMessageTrackerCacheSize,
 		"cache size of the gossipsub duplicate message tracker.")
-	flags.Float64(
-		duplicateMessageTrackerDecay,
-		config.GossipSub.DuplicateMessageTrackerGuageDecay,
+	flags.Float64(BuildFlagName(gossipSub, p2pconf.RpcTracerKey, p2pconf.DuplicateMessageCacheTrackerDecayKey),
+		config.GossipSub.RpcTracer.DuplicateMessageTrackerGuageDecay,
 		"decay rate for the peer duplicate message counters.")
+
 	flags.Int(BuildFlagName(gossipSub, p2pconf.RpcTracerKey, p2pconf.RPCSentTrackerNumOfWorkersKey), config.GossipSub.RpcTracer.RpcSentTrackerNumOfWorkers,
 		"number of workers for the rpc sent tracker worker pool.")
 	// gossipsub RPC control message validation limits used for validation configuration and rate limiting

@@ -333,17 +333,16 @@ func NewScoreOptionConfig(logger zerolog.Logger,
 	params p2pconf.ScoringParameters,
 	hcMetricsFactory metrics.HeroCacheMetricsFactory,
 	idProvider module.IdentityProvider,
+	getDuplicateMessageCount func(id peer.ID) float64,
 	networkingType network.NetworkingType) *ScoreOptionConfig {
 	return &ScoreOptionConfig{
-		logger:                  logger.With().Str("module", "pubsub_score_option").Logger(),
-		provider:                idProvider,
-		params:                  params,
-		heroCacheMetricsFactory: hcMetricsFactory,
-		topicParams:             make([]func(map[string]*pubsub.TopicScoreParams), 0),
-		networkingType:          networkingType,
-		getDuplicateMessageCount: func(id peer.ID) float64 {
-			return 0
-		},
+		logger:                   logger.With().Str("module", "pubsub_score_option").Logger(),
+		provider:                 idProvider,
+		params:                   params,
+		heroCacheMetricsFactory:  hcMetricsFactory,
+		topicParams:              make([]func(map[string]*pubsub.TopicScoreParams), 0),
+		networkingType:           networkingType,
+		getDuplicateMessageCount: getDuplicateMessageCount,
 	}
 }
 
