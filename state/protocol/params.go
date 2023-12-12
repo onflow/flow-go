@@ -26,9 +26,8 @@ type InstanceParams interface {
 	// it means the node is bootstrapped from mid-spork.
 	SealedRoot() *flow.Header
 
-	// Seal returns the root block seal of the current protocol state. This will be
-	// the seal for the root block used to bootstrap this state and may differ from
-	// node to node for the same protocol state.
+	// Seal returns the root block seal of the current protocol state. This is the seal for the
+	// `SealedRoot` block that was used to bootstrap this state. It may differ from node to node.
 	Seal() *flow.Seal
 
 	// EpochFallbackTriggered returns whether Epoch Fallback Mode [EFM] has been triggered.
