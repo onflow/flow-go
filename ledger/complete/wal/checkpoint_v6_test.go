@@ -343,11 +343,11 @@ func TestWriteAndReadCheckpointV6LeafSimpleTrie(t *testing.T) {
 			err := OpenAndReadLeafNodesFromCheckpointV6(leafNodesCh, dir, fileName, logger)
 			require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
 		}()
-		resultPayloads := make([]ledger.Payload, 0)
+		resultPayloads := make([]*ledger.Payload, 0)
 		for leafNode := range leafNodesCh {
 			// avoid dummy payload from empty trie
 			if leafNode.Payload != nil {
-				resultPayloads = append(resultPayloads, *leafNode.Payload)
+				resultPayloads = append(resultPayloads, leafNode.Payload)
 			}
 		}
 		require.EqualValues(t, tries[1].AllPayloads(), resultPayloads)
