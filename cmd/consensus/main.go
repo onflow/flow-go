@@ -721,7 +721,7 @@ func main() {
 			return ctl, nil
 		}).
 		Component("consensus participant", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			mutableProtocolState := protocol_state.NewMutableProtocolState(
+			mutableProtocolState := protocol_state.NewMutableProtocolStateFactory(
 				node.Storage.ProtocolState,
 				node.State.Params(),
 				node.Storage.Headers,

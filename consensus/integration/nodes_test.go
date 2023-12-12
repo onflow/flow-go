@@ -460,7 +460,7 @@ func createNode(
 
 	seals := stdmap.NewIncorporatedResultSeals(sealLimit)
 
-	mutableProtocolState := protocol_state.NewMutableProtocolState(
+	mutableProtocolState := protocol_state.NewMutableProtocolStateFactory(
 		protocolStateDB,
 		state.Params(),
 		headersDB,

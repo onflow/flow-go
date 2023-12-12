@@ -135,7 +135,7 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 
 	// take first collection node and use its storage as data source for stateMutator
 	refNode := tc.nodes[0]
-	stateMutator := protocol_state.NewMutableProtocolState(
+	stateMutator := protocol_state.NewMutableProtocolStateFactory(
 		refNode.ProtocolStateSnapshots,
 		refNode.State.Params(),
 		refNode.Headers,

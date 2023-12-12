@@ -861,7 +861,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		mutableProtocolState := protocol_state.NewMutableProtocolState(
+		mutableProtocolState := protocol_state.NewMutableProtocolStateFactory(
 			all.ProtocolState,
 			state.Params(),
 			all.Headers,

@@ -68,7 +68,7 @@ func TestMutableProtocolState_Mutator(t *testing.T) {
 	setupsDB := storagemock.NewEpochSetups(t)
 	commitsDB := storagemock.NewEpochCommits(t)
 
-	mutableState := NewMutableProtocolState(
+	mutableState := NewMutableProtocolStateFactory(
 		protocolStateDB,
 		globalParams,
 		headersDB,

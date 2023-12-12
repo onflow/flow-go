@@ -101,7 +101,7 @@ func (suite *MutatorSuite) SetupTest() {
 	suite.protoState, err = pbadger.NewFollowerState(log, tracer, events.NewNoop(), state, all.Index, all.Payloads, protocolutil.MockBlockTimer())
 	require.NoError(suite.T(), err)
 
-	suite.mutableProtocolState = protocol_state.NewMutableProtocolState(
+	suite.mutableProtocolState = protocol_state.NewMutableProtocolStateFactory(
 		all.ProtocolState,
 		state.Params(),
 		all.Headers,

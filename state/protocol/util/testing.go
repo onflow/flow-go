@@ -320,7 +320,7 @@ func RunWithFullProtocolStateAndMetricsAndConsumer(t testing.TB, rootSnapshot pr
 			sealValidator,
 		)
 		require.NoError(t, err)
-		mutableProtocolState := protocol_state.NewMutableProtocolState(
+		mutableProtocolState := protocol_state.NewMutableProtocolStateFactory(
 			all.ProtocolState,
 			state.Params(),
 			all.Headers,
@@ -406,7 +406,7 @@ func RunWithFullProtocolStateAndMutator(t testing.TB, rootSnapshot protocol.Snap
 			sealValidator,
 		)
 		require.NoError(t, err)
-		mutableProtocolState := protocol_state.NewMutableProtocolState(
+		mutableProtocolState := protocol_state.NewMutableProtocolStateFactory(
 			all.ProtocolState,
 			state.Params(),
 			all.Headers,
