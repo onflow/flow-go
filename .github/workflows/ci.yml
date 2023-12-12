@@ -30,21 +30,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        dir: [./, ./integration/, ./crypto/, ./insecure/]
+        dir: [./, ./integration/, ./insecure/]
     name: Lint
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repo
       uses: actions/checkout@v3
     - name: Setup Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v4
       with:
         go-version: ${{ env.GO_VERSION }}
         cache: true
-    - name: Install C formatter
-      run: sudo apt-get install -y clang-format
-    - name: Run C formatter and sanitizer for ./crypto
-      run: make -C crypto c-format && make -C crypto c-sanitize
     - name: Run go generate
       run: go generate
       working-directory: ${{ matrix.dir }}
@@ -66,7 +62,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
@@ -84,7 +80,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
@@ -105,7 +101,7 @@ jobs:
     - name: Checkout repo
       uses: actions/checkout@v3
     - name: Setup Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v4
       with:
         go-version: ${{ env.GO_VERSION }}
         cache: true
@@ -117,7 +113,6 @@ jobs:
         timeout_minutes: 35
         max_attempts: 5
         command: VERBOSE=1 make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" test
-
       # TODO(rbtz): re-enable when we fix exisiting races.
       #env:
       #  RACE_DETECTOR: 1
@@ -134,11 +129,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: crypto
-            setup: noop
-            retries: 1
-            race: 1
-            runner: ubuntu-latest
           - name: insecure
             setup: install-tools
             retries: 5
@@ -154,7 +144,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
@@ -186,7 +176,7 @@ jobs:
           # all tags are needed for integration tests
           fetch-depth: 0
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
@@ -276,7 +266,7 @@ jobs:
           # all tags are needed for integration tests
           fetch-depth: 0
     - name: Setup Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v4
       with:
         go-version: ${{ env.GO_VERSION }}
         cache: true
