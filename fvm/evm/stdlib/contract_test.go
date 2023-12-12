@@ -8,7 +8,8 @@ import (
 	"github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
-	contracts2 "github.com/onflow/flow-core-contracts/lib/go/contracts"
+	"github.com/onflow/cadence/runtime/tests/utils"
+	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -141,33 +142,33 @@ func deployContracts(
 	}{
 		{
 			name: "FungibleToken",
-			code: contracts2.FungibleToken(),
+			code: coreContracts.FungibleToken(),
 		},
 		{
 			name: "NonFungibleToken",
-			code: contracts2.NonFungibleToken(),
+			code: coreContracts.NonFungibleToken(),
 		},
 		{
 			name: "MetadataViews",
-			code: contracts2.MetadataViews(
+			code: coreContracts.MetadataViews(
 				contractsAddressHex,
 				contractsAddressHex,
 			),
 		},
 		{
 			name: "FungibleTokenMetadataViews",
-			code: contracts2.FungibleTokenMetadataViews(
+			code: coreContracts.FungibleTokenMetadataViews(
 				contractsAddressHex,
 				contractsAddressHex,
 			),
 		},
 		{
 			name: "ViewResolver",
-			code: contracts2.ViewResolver(),
+			code: coreContracts.ViewResolver(),
 		},
 		{
 			name: "FlowToken",
-			code: contracts2.FlowToken(
+			code: coreContracts.FlowToken(
 				contractsAddressHex,
 				contractsAddressHex,
 				contractsAddressHex,
@@ -743,11 +744,11 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 				Location:    nextScriptLocation(),
 			},
 		)
-		require.Error(t, err)
+		utils.RequireError(t, err)
 		assert.ErrorContains(
 			t,
 			err,
-			"unsupported ABI encoding for value of type: Address",
+			"failed to ABI encode value of type Address",
 		)
 	})
 
@@ -828,11 +829,11 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 				Location:    nextScriptLocation(),
 			},
 		)
-		require.Error(t, err)
+		utils.RequireError(t, err)
 		assert.ErrorContains(
 			t,
 			err,
-			"unsupported ABI encoding for value of type: UFix64",
+			"failed to ABI encode value of type UFix64",
 		)
 	})
 
@@ -914,11 +915,11 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 				Location:    nextScriptLocation(),
 			},
 		)
-		require.Error(t, err)
+		utils.RequireError(t, err)
 		assert.ErrorContains(
 			t,
 			err,
-			"unsupported ABI encoding for value of type: {Int: Bool}",
+			"failed to ABI encode value of type {Int: Bool}",
 		)
 	})
 
@@ -1000,11 +1001,11 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 				Location:    nextScriptLocation(),
 			},
 		)
-		require.Error(t, err)
+		utils.RequireError(t, err)
 		assert.ErrorContains(
 			t,
 			err,
-			"unsupported ABI encoding for value of type: [Character]",
+			"failed to ABI encode value of type [Character]",
 		)
 	})
 
@@ -1096,11 +1097,11 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 				Location:    nextScriptLocation(),
 			},
 		)
-		require.Error(t, err)
+		utils.RequireError(t, err)
 		assert.ErrorContains(
 			t,
 			err,
-			"unsupported ABI encoding for value of type: s.0100000000000000000000000000000000000000000000000000000000000000.Token",
+			"failed to ABI encode value of type s.0100000000000000000000000000000000000000000000000000000000000000.Token",
 		)
 	})
 
@@ -1182,11 +1183,11 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 				Location:    nextScriptLocation(),
 			},
 		)
-		require.Error(t, err)
+		utils.RequireError(t, err)
 		assert.ErrorContains(
 			t,
 			err,
-			"decoding of ABI to values failed with: abi: improperly encoded boolean value",
+			"failed to ABI decode data",
 		)
 	})
 
@@ -1268,97 +1269,11 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 				Location:    nextScriptLocation(),
 			},
 		)
-		require.Error(t, err)
+		utils.RequireError(t, err)
 		assert.ErrorContains(
 			t,
 			err,
-			"decoding of ABI to values failed with: abi: improperly encoded boolean value",
-		)
-	})
-
-	t.Run("decodeABI with unsupported Address type", func(t *testing.T) {
-
-		t.Parallel()
-
-		handler := &testContractHandler{}
-
-		contractsAddress := flow.BytesToAddress([]byte{0x1})
-
-		transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
-		scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
-
-		rt := runtime.NewInterpreterRuntime(runtime.Config{})
-
-		accountCodes := map[common.Location][]byte{}
-		var events []cadence.Event
-
-		runtimeInterface := &TestRuntimeInterface{
-			Storage: NewTestLedger(nil, nil),
-			OnGetSigningAccounts: func() ([]runtime.Address, error) {
-				return []runtime.Address{runtime.Address(contractsAddress)}, nil
-			},
-			OnResolveLocation: SingleIdentifierLocationResolver(t),
-			OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
-				accountCodes[location] = code
-				return nil
-			},
-			OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
-				code = accountCodes[location]
-				return code, nil
-			},
-			OnEmitEvent: func(event cadence.Event) error {
-				events = append(events, event)
-				return nil
-			},
-			OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
-				return json.Decode(nil, b)
-			},
-		}
-
-		nextTransactionLocation := NewTransactionLocationGenerator()
-		nextScriptLocation := NewScriptLocationGenerator()
-
-		// Deploy contracts
-
-		deployContracts(
-			t,
-			rt,
-			contractsAddress,
-			runtimeInterface,
-			transactionEnvironment,
-			nextTransactionLocation,
-		)
-
-		// Run script
-
-		script := []byte(`
-          import EVM from 0x1
-
-          access(all)
-          fun main(): Bool {
-            let data = EVM.encodeABI(["Peter"])
-            let values = EVM.decodeABI(types: [Type<Address>()], data: data)
-
-            return true
-          }
-		`)
-
-		_, err := rt.ExecuteScript(
-			runtime.Script{
-				Source:    script,
-				Arguments: [][]byte{},
-			},
-			runtime.Context{
-				Interface:   runtimeInterface,
-				Environment: scriptEnvironment,
-				Location:    nextScriptLocation(),
-			},
-		)
-		require.Error(t, err)
-		assert.ErrorContains(
-			t,
-			err,
-			"unsupported ABI decoding for value of type: Address",
+			"failed to ABI decode data",
 		)
 	})
 
@@ -1440,15 +1355,15 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 				Location:    nextScriptLocation(),
 			},
 		)
-		require.Error(t, err)
+		utils.RequireError(t, err)
 		assert.ErrorContains(
 			t,
 			err,
-			"unsupported ABI decoding for value of type: UFix64",
+			"failed to ABI decode data with type UFix64",
 		)
 	})
 
-	t.Run("encodeABI with unsupported dictionary type", func(t *testing.T) {
+	t.Run("decodeABI with unsupported dictionary type", func(t *testing.T) {
 
 		t.Parallel()
 
@@ -1526,11 +1441,11 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 				Location:    nextScriptLocation(),
 			},
 		)
-		require.Error(t, err)
+		utils.RequireError(t, err)
 		assert.ErrorContains(
 			t,
 			err,
-			"unsupported ABI decoding for value of type: {Int: Bool}",
+			"failed to ABI decode data with type {Int: Bool}",
 		)
 	})
 
@@ -1612,11 +1527,11 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 				Location:    nextScriptLocation(),
 			},
 		)
-		require.Error(t, err)
+		utils.RequireError(t, err)
 		assert.ErrorContains(
 			t,
 			err,
-			"unsupported ABI decoding for value of type: [Character]",
+			"failed to ABI decode data with type [Character]",
 		)
 	})
 
@@ -1708,11 +1623,11 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 				Location:    nextScriptLocation(),
 			},
 		)
-		require.Error(t, err)
+		utils.RequireError(t, err)
 		assert.ErrorContains(
 			t,
 			err,
-			"unsupported ABI decoding for value of type: s.0100000000000000000000000000000000000000000000000000000000000000.Token",
+			"failed to ABI decode data with type s.0100000000000000000000000000000000000000000000000000000000000000.Token",
 		)
 	})
 }
