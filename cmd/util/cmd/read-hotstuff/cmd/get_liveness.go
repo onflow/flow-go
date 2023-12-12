@@ -28,8 +28,6 @@ func runGetLivenessData(*cobra.Command, []string) {
 	}
 
 	rootBlock := state.Params().FinalizedRoot()
-	if err != nil {
-		log.Fatal().Err(err).Msgf("could not get root block")
 	}
 
 	reader := NewHotstuffReader(db, rootBlock.ChainID)

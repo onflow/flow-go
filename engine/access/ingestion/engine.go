@@ -688,7 +688,7 @@ func (e *Engine) updateLastFullBlockReceivedIndex() {
 			logError(err)
 			return
 		}
-		lastFullHeight = e.state.Params().FinalizedRoot().Height
+		lastFullHeight = e.state.Params().FinalizedRoot().Height // use the root height as the last full height
 	}
 
 	e.log.Debug().Uint64("last_full_block_height", lastFullHeight).Msg("updating LastFullBlockReceived index...")
