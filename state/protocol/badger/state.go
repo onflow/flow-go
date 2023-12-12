@@ -671,6 +671,7 @@ func OpenState(
 		GlobalParams:   globalParams,
 		InstanceParams: instanceParams,
 	}
+
 	state, err := newState(
 		metrics,
 		db,
@@ -685,7 +686,6 @@ func OpenState(
 		versionBeacons,
 		params,
 	)
-
 	if err != nil {
 		return nil, fmt.Errorf("could not create state: %w", err)
 	}
@@ -916,7 +916,6 @@ func boostrapVersionBeacon(snapshot protocol.Snapshot) func(*transaction.Tx) err
 // The cache must be populated before the State receives any queries.
 // No errors expected during normal operations.
 func (state *State) populateCache() error {
-
 	// cache the initial value for finalized block
 	err := state.db.View(func(tx *badger.Txn) error {
 		// finalized header
@@ -972,7 +971,6 @@ func (state *State) populateCache() error {
 // If we are in epoch N's Staking or Setup Phase, then epoch N's final view should be the value of the metric.
 // If we are in epoch N's Committed Phase, then epoch N+1's final view should be the value of the metric.
 func updateCommittedEpochFinalView(metrics module.ComplianceMetrics, snap protocol.Snapshot) error {
-
 	phase, err := snap.Phase()
 	if err != nil {
 		return fmt.Errorf("could not get epoch phase: %w", err)
