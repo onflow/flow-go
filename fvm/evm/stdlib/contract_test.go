@@ -597,6 +597,11 @@ func TestEVMEncodeDecodeABIRoundtrip(t *testing.T) {
         assert(values.length == 1)
         assert((values[0] as! String) == "Peter")
 
+        data = EVM.encodeABI([[["Foo", "Bar"], ["Baz", "Qux"]]])
+ 	    values = EVM.decodeABI(types: [Type<[[String]]>()], data: data)
+        assert(values.length == 1)
+        assert((values[0] as! [[String]]) == [["Foo", "Bar"], ["Baz", "Qux"]])
+
         return true
       }
 	`)
