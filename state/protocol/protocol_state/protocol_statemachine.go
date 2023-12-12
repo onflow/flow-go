@@ -44,15 +44,6 @@ func newStateMachine(view uint64, parentState *flow.RichProtocolStateEntry) (*pr
 	}, nil
 }
 
-// NewStateMachine instantiates a new `protocolStateMachine` and returns is as an interface type `ProtocolStateMachine`.
-// Thereby, `NewStateMachine` is a specific version of `StateMachineFactoryMethod` for creating a happy-path state machine.
-//
-// An exception is returned in case the `InvalidEpochTransitionAttempted` flag is set in the `parentState`. This means that
-// the protocol state evolution has reached an undefined state from the perspective of the happy path state machine.
-func NewStateMachine(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
-	return newStateMachine(candidateView, parentState)
-}
-
 // ProcessEpochSetup updates the protocol state with data from the epoch setup event.
 // Observing an epoch setup event also affects the identity table for current epoch:
 //   - it transitions the protocol state from Staking to Epoch Setup phase

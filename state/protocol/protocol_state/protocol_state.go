@@ -91,7 +91,11 @@ func (s *MutableProtocolState) Mutator(candidateView uint64, parentID flow.Ident
 		s.commits,
 		candidateView,
 		parentState,
-		NewStateMachine,
-		NewEpochFallbackStateMachine,
+		func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) { // needed for translating from concrete implementation type to interface type
+			return newStateMachine(candidateView, parentState)
+		},
+		func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) { // needed for translating from concrete implementation type to interface type
+			return newEpochFallbackStateMachine(candidateView, parentState), nil
+		},
 	)
 }

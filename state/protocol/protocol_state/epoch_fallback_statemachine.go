@@ -30,13 +30,6 @@ func newEpochFallbackStateMachine(view uint64, parentState *flow.RichProtocolSta
 	}
 }
 
-// NewEpochFallbackStateMachine instantiates a new `protocolStateMachine` and returns is as an interface type `ProtocolStateMachine`.
-// Thereby, `NewStateMachine` is a specific version of `StateMachineFactoryMethod` for creating a happy-path state machine.
-// This function never errors.
-func NewEpochFallbackStateMachine(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {
-	return newEpochFallbackStateMachine(candidateView, parentState), nil
-}
-
 // ProcessEpochSetup processes epoch setup service events, for epoch fallback we are ignoring this event.
 func (m *epochFallbackStateMachine) ProcessEpochSetup(_ *flow.EpochSetup) (bool, error) {
 	// won't process if we are in fallback mode
