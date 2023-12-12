@@ -28,8 +28,6 @@ func runGetLivenessData(*cobra.Command, []string) {
 	}
 
 	rootBlock := state.Params().FinalizedRoot()
-	}
-
 	reader := NewHotstuffReader(db, rootBlock.ChainID)
 
 	log.Info().Msg("getting hotstuff liveness data")
