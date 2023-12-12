@@ -22,7 +22,6 @@ type DynamicIdentityEntryList []*DynamicIdentityEntry
 // Note that the current implementation does not store the identity table directly. Instead, we store
 // the original events that constituted the _initial_ identity table at the beginning of the epoch
 // plus some modifiers. We intend to restructure this code soon.
-// TODO: https://github.com/onflow/flow-go/issues/4649
 type ProtocolStateEntry struct {
 	PreviousEpoch *EpochStateContainer // minimal dynamic properties for previous epoch [optional, nil for first epoch after spork, genesis]
 	CurrentEpoch  EpochStateContainer  // minimal dynamic properties for current epoch
@@ -280,14 +279,18 @@ func (e *RichProtocolStateEntry) Copy() *RichProtocolStateEntry {
 	}
 }
 
-// EpochStatus returns epoch status for the current protocol state.
-func (e *ProtocolStateEntry) EpochStatus() *EpochStatus {
-	return &EpochStatus{
-		PreviousEpoch:                   e.PreviousEpoch.EventIDs(),
-		CurrentEpoch:                    e.CurrentEpoch.EventIDs(),
-		NextEpoch:                       e.NextEpoch.EventIDs(),
-		InvalidEpochTransitionAttempted: e.InvalidEpochTransitionAttempted,
+// EpochPhase returns the current epoch phase.
+// The receiver ProtocolStateEntry must be properly constructed.
+func (e *ProtocolStateEntry) EpochPhase() EpochPhase {
+	// The epoch phase is determined by how much information we have about the next epoch
+	if e.NextEpoch == nil {
+		return EpochPhaseStaking // if no information about the next epoch is known, we are in the Staking Phase
 	}
+	// Per convention, NextEpoch ≠ nil if and only if NextEpoch.SetupID is specified.
+	if e.NextEpoch.CommitID == ZeroID {
+		return EpochPhaseSetup // if only the Setup event is known for the next epoch but not the Commit event, we are in the Setup Phase
+	}
+	return EpochPhaseCommitted // if the Setup and Commit events are known for the next epoch, we are in the Committed Phase
 }
 
 func (ll DynamicIdentityEntryList) Lookup() map[Identifier]*DynamicIdentityEntry {

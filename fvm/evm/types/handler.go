@@ -2,6 +2,7 @@ package types
 
 import (
 	gethCommon "github.com/ethereum/go-ethereum/common"
+	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/environment"
 )
@@ -37,6 +38,8 @@ type ContractHandler interface {
 	// Run runs a transaction in the evm environment,
 	// collects the gas fees, and transfers the gas fees to the given coinbase account.
 	Run(tx []byte, coinbase Address)
+
+	FlowTokenAddress() common.Address
 }
 
 // Backend passes the FVM functionality needed inside the handler
@@ -57,7 +60,7 @@ type BlockStore interface {
 	// LatestBlock returns the latest appended block
 	LatestBlock() (*Block, error)
 
-	// returns the hash of the block at the given height
+	// BlockHash returns the hash of the block at the given height
 	BlockHash(height int) (gethCommon.Hash, error)
 
 	// BlockProposal returns the block proposal
@@ -66,6 +69,6 @@ type BlockStore interface {
 	// CommitBlockProposal commits the block proposal and update the chain of blocks
 	CommitBlockProposal() error
 
-	// Resets the block proposal
+	// ResetBlockProposal resets the block proposal
 	ResetBlockProposal() error
 }

@@ -9,10 +9,13 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 	netcache "github.com/onflow/flow-go/network/p2p/cache"
+	"github.com/onflow/flow-go/network/p2p/p2pconf"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -292,7 +295,9 @@ const (
 )
 
 // ScoreOption is a functional option for configuring the peer scoring system.
+// TODO: rename it to ScoreManager.
 type ScoreOption struct {
+	component.Component
 	logger zerolog.Logger
 
 	peerScoreParams     *pubsub.PeerScoreParams
@@ -378,24 +383,32 @@ func (c *ScoreOptionConfig) OverrideDecayInterval(interval time.Duration) {
 }
 
 // NewScoreOption creates a new penalty option with the given configuration.
-func NewScoreOption(cfg *ScoreOptionConfig) *ScoreOption {
+func NewScoreOption(scoreRegistryConfig p2pconf.GossipSubScoringRegistryConfig, scoreOptionConfig *ScoreOptionConfig, provider p2p.SubscriptionProvider) *ScoreOption {
 	throttledSampler := logging.BurstSampler(MaxDebugLogs, time.Second)
-	logger := cfg.logger.With().
+	logger := scoreOptionConfig.logger.With().
 		Str("module", "pubsub_score_option").
 		Logger().
 		Sample(zerolog.LevelSampler{
 			TraceSampler: throttledSampler,
 			DebugSampler: throttledSampler,
 		})
-	validator := NewSubscriptionValidator()
+	validator := NewSubscriptionValidator(scoreOptionConfig.logger, provider)
 	scoreRegistry := NewGossipSubAppSpecificScoreRegistry(&GossipSubAppSpecificScoreRegistryConfig{
 		Logger:     logger,
 		Penalty:    DefaultGossipSubCtrlMsgPenaltyValue(),
 		Validator:  validator,
 		Init:       InitAppScoreRecordState,
-		IdProvider: cfg.provider,
+		IdProvider: scoreOptionConfig.provider,
 		CacheFactory: func() p2p.GossipSubSpamRecordCache {
-			return netcache.NewGossipSubSpamRecordCache(cfg.cacheSize, cfg.logger, cfg.cacheMetrics, DefaultDecayFunction())
+			return netcache.NewGossipSubSpamRecordCache(
+				scoreOptionConfig.cacheSize,
+				scoreOptionConfig.logger,
+				scoreOptionConfig.cacheMetrics,
+				DefaultDecayFunction(
+					scoreRegistryConfig.PenaltyDecaySlowdownThreshold,
+					scoreRegistryConfig.DecayRateReductionFactor,
+					scoreRegistryConfig.PenaltyDecayEvaluationPeriod,
+				))
 		},
 	})
 	s := &ScoreOption{
@@ -407,40 +420,55 @@ func NewScoreOption(cfg *ScoreOptionConfig) *ScoreOption {
 
 	// set the app specific penalty function for the penalty option
 	// if the app specific penalty function is not set, use the default one
-	if cfg.appScoreFunc != nil {
-		s.appScoreFunc = cfg.appScoreFunc
+	if scoreOptionConfig.appScoreFunc != nil {
+		s.appScoreFunc = scoreOptionConfig.appScoreFunc
 		s.logger.
 			Warn().
 			Str(logging.KeyNetworkingSecurity, "true").
 			Msg("app specific score function is overridden, should never happen in production")
 	}
 
-	if cfg.decayInterval > 0 {
+	if scoreOptionConfig.decayInterval > 0 {
 		// overrides the default decay interval if the decay interval is set.
-		s.peerScoreParams.DecayInterval = cfg.decayInterval
+		s.peerScoreParams.DecayInterval = scoreOptionConfig.decayInterval
 		s.logger.
 			Warn().
 			Str(logging.KeyNetworkingSecurity, "true").
-			Dur("decay_interval_ms", cfg.decayInterval).
+			Dur("decay_interval_ms", scoreOptionConfig.decayInterval).
 			Msg("decay interval is overridden, should never happen in production")
 	}
 
 	// registers the score registry as the consumer of the invalid control message notifications
-	if cfg.registerNotificationConsumerFunc != nil {
-		cfg.registerNotificationConsumerFunc(scoreRegistry)
+	if scoreOptionConfig.registerNotificationConsumerFunc != nil {
+		scoreOptionConfig.registerNotificationConsumerFunc(scoreRegistry)
 	}
 
 	s.peerScoreParams.AppSpecificScore = s.appScoreFunc
 
 	// apply the topic penalty parameters if any.
-	for _, topicParams := range cfg.topicParams {
+	for _, topicParams := range scoreOptionConfig.topicParams {
 		topicParams(s.peerScoreParams.Topics)
 	}
-	return s
-}
 
-func (s *ScoreOption) SetSubscriptionProvider(provider *SubscriptionProvider) error {
-	return s.validator.RegisterSubscriptionProvider(provider)
+	s.Component = component.NewComponentManagerBuilder().AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		s.logger.Info().Msg("starting score registry")
+		scoreRegistry.Start(ctx)
+		select {
+		case <-ctx.Done():
+			s.logger.Warn().Msg("stopping score registry; context done")
+		case <-scoreRegistry.Ready():
+			s.logger.Info().Msg("score registry started")
+			ready()
+			s.logger.Info().Msg("score registry ready")
+		}
+
+		<-ctx.Done()
+		s.logger.Info().Msg("stopping score registry")
+		<-scoreRegistry.Done()
+		s.logger.Info().Msg("score registry stopped")
+	}).Build()
+
+	return s
 }
 
 func (s *ScoreOption) BuildFlowPubSubScoreOption() (*pubsub.PeerScoreParams, *pubsub.PeerScoreThresholds) {

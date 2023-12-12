@@ -128,6 +128,7 @@ type Topic interface {
 
 // ScoreOptionBuilder abstracts the configuration for the underlying pubsub score implementation.
 type ScoreOptionBuilder interface {
+	component.Component
 	// BuildFlowPubSubScoreOption builds the pubsub score options as pubsub.Option for the Flow network.
 	BuildFlowPubSubScoreOption() (*pubsub.PeerScoreParams, *pubsub.PeerScoreThresholds)
 	// TopicScoreParams returns the topic score params for the given topic.

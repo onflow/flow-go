@@ -60,6 +60,7 @@ const (
 	ResourceMyReceipt                                  = "my_receipt"
 	ResourceCollection                                 = "collection"
 	ResourceProtocolState                              = "protocol_state"
+	ResourceProtocolStateByBlockID                     = "protocol_state_by_block_id"
 	ResourceApproval                                   = "approval"
 	ResourceSeal                                       = "seal"
 	ResourcePendingIncorporatedSeal                    = "pending_incorporated_seal"
@@ -86,6 +87,7 @@ const (
 	ResourceEpochCommit                                = "epoch_commit"
 	ResourceEpochStatus                                = "epoch_status"
 	ResourceNetworkingReceiveCache                     = "networking_received_message" // networking layer
+	ResourceNetworkingSubscriptionRecordsCache         = "subscription_records_cache"  // networking layer
 	ResourceNetworkingDnsIpCache                       = "networking_dns_ip_cache"     // networking layer
 	ResourceNetworkingDnsTxtCache                      = "networking_dns_txt_cache"    // networking layer
 	ResourceNetworkingDisallowListNotificationQueue    = "networking_disallow_list_notification_queue"

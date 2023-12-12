@@ -603,6 +603,8 @@ func main() {
 			)
 
 			notifier.AddParticipantConsumer(telemetryConsumer)
+			notifier.AddCommunicatorConsumer(telemetryConsumer)
+			notifier.AddFinalizationConsumer(telemetryConsumer)
 			notifier.AddFollowerConsumer(followerDistributor)
 
 			// initialize the persister
@@ -958,10 +960,7 @@ func loadBeaconPrivateKey(dir string, myID flow.Identifier) (*encodable.RandomBe
 func createDKGContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap.NodeMachineAccountInfo, flowClient *client.Client, anID flow.Identifier) (module.DKGContractClient, error) {
 	var dkgClient module.DKGContractClient
 
-	contracts, err := systemcontracts.SystemContractsForChain(node.RootChainID)
-	if err != nil {
-		return nil, err
-	}
+	contracts := systemcontracts.SystemContractsForChain(node.RootChainID)
 	dkgContractAddress := contracts.DKG.Address.Hex()
 
 	// construct signer from private key

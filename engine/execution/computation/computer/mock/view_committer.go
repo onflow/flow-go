@@ -3,8 +3,10 @@
 package mock
 
 import (
-	ledger "github.com/onflow/flow-go/ledger"
+	execution "github.com/onflow/flow-go/engine/execution"
 	flow "github.com/onflow/flow-go/model/flow"
+
+	ledger "github.com/onflow/flow-go/ledger"
 
 	mock "github.com/stretchr/testify/mock"
 
@@ -17,17 +19,18 @@ type ViewCommitter struct {
 }
 
 // CommitView provides a mock function with given fields: _a0, _a1
-func (_m *ViewCommitter) CommitView(_a0 *snapshot.ExecutionSnapshot, _a1 flow.StateCommitment) (flow.StateCommitment, []byte, *ledger.TrieUpdate, error) {
+func (_m *ViewCommitter) CommitView(_a0 *snapshot.ExecutionSnapshot, _a1 execution.ExtendableStorageSnapshot) (flow.StateCommitment, []byte, *ledger.TrieUpdate, execution.ExtendableStorageSnapshot, error) {
 	ret := _m.Called(_a0, _a1)
 
 	var r0 flow.StateCommitment
 	var r1 []byte
 	var r2 *ledger.TrieUpdate
-	var r3 error
-	if rf, ok := ret.Get(0).(func(*snapshot.ExecutionSnapshot, flow.StateCommitment) (flow.StateCommitment, []byte, *ledger.TrieUpdate, error)); ok {
+	var r3 execution.ExtendableStorageSnapshot
+	var r4 error
+	if rf, ok := ret.Get(0).(func(*snapshot.ExecutionSnapshot, execution.ExtendableStorageSnapshot) (flow.StateCommitment, []byte, *ledger.TrieUpdate, execution.ExtendableStorageSnapshot, error)); ok {
 		return rf(_a0, _a1)
 	}
-	if rf, ok := ret.Get(0).(func(*snapshot.ExecutionSnapshot, flow.StateCommitment) flow.StateCommitment); ok {
+	if rf, ok := ret.Get(0).(func(*snapshot.ExecutionSnapshot, execution.ExtendableStorageSnapshot) flow.StateCommitment); ok {
 		r0 = rf(_a0, _a1)
 	} else {
 		if ret.Get(0) != nil {
@@ -35,7 +38,7 @@ func (_m *ViewCommitter) CommitView(_a0 *snapshot.ExecutionSnapshot, _a1 flow.St
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(*snapshot.ExecutionSnapshot, flow.StateCommitment) []byte); ok {
+	if rf, ok := ret.Get(1).(func(*snapshot.ExecutionSnapshot, execution.ExtendableStorageSnapshot) []byte); ok {
 		r1 = rf(_a0, _a1)
 	} else {
 		if ret.Get(1) != nil {
@@ -43,7 +46,7 @@ func (_m *ViewCommitter) CommitView(_a0 *snapshot.ExecutionSnapshot, _a1 flow.St
 		}
 	}
 
-	if rf, ok := ret.Get(2).(func(*snapshot.ExecutionSnapshot, flow.StateCommitment) *ledger.TrieUpdate); ok {
+	if rf, ok := ret.Get(2).(func(*snapshot.ExecutionSnapshot, execution.ExtendableStorageSnapshot) *ledger.TrieUpdate); ok {
 		r2 = rf(_a0, _a1)
 	} else {
 		if ret.Get(2) != nil {
@@ -51,13 +54,21 @@ func (_m *ViewCommitter) CommitView(_a0 *snapshot.ExecutionSnapshot, _a1 flow.St
 		}
 	}
 
-	if rf, ok := ret.Get(3).(func(*snapshot.ExecutionSnapshot, flow.StateCommitment) error); ok {
+	if rf, ok := ret.Get(3).(func(*snapshot.ExecutionSnapshot, execution.ExtendableStorageSnapshot) execution.ExtendableStorageSnapshot); ok {
 		r3 = rf(_a0, _a1)
 	} else {
-		r3 = ret.Error(3)
+		if ret.Get(3) != nil {
+			r3 = ret.Get(3).(execution.ExtendableStorageSnapshot)
+		}
 	}
 
-	return r0, r1, r2, r3
+	if rf, ok := ret.Get(4).(func(*snapshot.ExecutionSnapshot, execution.ExtendableStorageSnapshot) error); ok {
+		r4 = rf(_a0, _a1)
+	} else {
+		r4 = ret.Error(4)
+	}
+
+	return r0, r1, r2, r3, r4
 }
 
 type mockConstructorTestingTNewViewCommitter interface {

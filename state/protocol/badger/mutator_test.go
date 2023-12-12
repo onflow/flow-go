@@ -818,7 +818,6 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.NoError(t, err)
 		metrics.On("CurrentEpochCounter", counter).Once()
 		metrics.On("CurrentEpochPhase", initialPhase).Once()
-		metrics.On("CommittedEpochFinalView", finalView).Once()
 
 		metrics.On("CurrentEpochFinalView", finalView).Once()
 
@@ -1036,15 +1035,12 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// expect epoch phase transition once we finalize block 6
 		consumer.On("EpochCommittedPhaseStarted", epoch2Setup.Counter-1, block6.Header).Once()
-		// expect committed final view to be updated, since we are committing epoch 2
-		metrics.On("CommittedEpochFinalView", epoch2Setup.FinalView).Once()
 		metrics.On("CurrentEpochPhase", flow.EpochPhaseCommitted).Once()
 
 		err = state.Finalize(context.Background(), block6.ID())
 		require.NoError(t, err)
 
 		consumer.AssertCalled(t, "EpochCommittedPhaseStarted", epoch2Setup.Counter-1, block6.Header)
-		metrics.AssertCalled(t, "CommittedEpochFinalView", epoch2Setup.FinalView)
 		metrics.AssertCalled(t, "CurrentEpochPhase", flow.EpochPhaseCommitted)
 
 		// we should still be in epoch 1
@@ -2661,7 +2657,6 @@ func mockMetricsForRootSnapshot(metricsMock *mockmodule.ComplianceMetrics, rootS
 	phase, _ := rootSnapshot.Phase()
 	metricsMock.On("CurrentEpochPhase", phase)
 	metricsMock.On("CurrentEpochFinalView", rootSnapshot.Encodable().Epochs.Current.FinalView)
-	metricsMock.On("CommittedEpochFinalView", rootSnapshot.Encodable().Epochs.Current.FinalView)
 	metricsMock.On("CurrentDKGPhase1FinalView", rootSnapshot.Encodable().Epochs.Current.DKGPhase1FinalView)
 	metricsMock.On("CurrentDKGPhase2FinalView", rootSnapshot.Encodable().Epochs.Current.DKGPhase2FinalView)
 	metricsMock.On("CurrentDKGPhase3FinalView", rootSnapshot.Encodable().Epochs.Current.DKGPhase3FinalView)

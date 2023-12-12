@@ -24,7 +24,7 @@ func TestDatabase(t *testing.T) {
 	value2 := []byte{9, 10, 11}
 
 	t.Run("test basic database functionality", func(t *testing.T) {
-		testutils.RunWithTestBackend(t, func(backend types.Backend) {
+		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(flowEVMRoot flow.Address) {
 				db, err := database.NewDatabase(backend, flowEVMRoot)
 				require.NoError(t, err)
@@ -70,7 +70,7 @@ func TestDatabase(t *testing.T) {
 	})
 
 	t.Run("test batch functionality", func(t *testing.T) {
-		testutils.RunWithTestBackend(t, func(backend types.Backend) {
+		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(flowEVMRoot flow.Address) {
 				db, err := database.NewDatabase(backend, flowEVMRoot)
 				require.NoError(t, err)
@@ -159,7 +159,7 @@ func TestDatabase(t *testing.T) {
 	})
 
 	t.Run("test fatal error (not implemented methods)", func(t *testing.T) {
-		testutils.RunWithTestBackend(t, func(backend types.Backend) {
+		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(flowEVMRoot flow.Address) {
 				db, err := database.NewDatabase(backend, flowEVMRoot)
 				require.NoError(t, err)

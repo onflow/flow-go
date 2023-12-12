@@ -51,6 +51,7 @@ const (
 	ComputationKindEVMGasUsage                = 2037
 	ComputationKindRLPEncoding                = 2038
 	ComputationKindRLPDecoding                = 2039
+	ComputationKindEncodeEvent                = 2040
 )
 
 type Meter interface {

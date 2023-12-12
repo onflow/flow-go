@@ -170,7 +170,11 @@ func Bootstrap(
 		}
 
 		// 4) initialize values related to the epoch logic
-		err = state.bootstrapEpoch(root.Epochs(), !config.SkipNetworkAddressValidation)(tx)
+		rootProtocolState, err := root.ProtocolState()
+		if err != nil {
+			return fmt.Errorf("could not retrieve protocol state for root snapshot: %w", err)
+		}
+		err = state.bootstrapEpoch(rootProtocolState, !config.SkipNetworkAddressValidation)(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap epoch values: %w", err)
 		}
@@ -181,7 +185,19 @@ func Bootstrap(
 			return fmt.Errorf("could not bootstrap spork info: %w", err)
 		}
 
-		// 6) set metric values
+		// 6) bootstrap dynamic protocol state
+		err = state.bootstrapProtocolState(segment, root, protocolStateSnapshotsDB)(tx)
+		if err != nil {
+			return fmt.Errorf("could not bootstrap protocol state: %w", err)
+		}
+
+		// 7) initialize version beacon
+		err = transaction.WithTx(state.boostrapVersionBeacon(root))(tx)
+		if err != nil {
+			return fmt.Errorf("could not bootstrap version beacon: %w", err)
+		}
+
+		// 8) set metric values
 		err = state.updateEpochMetrics(root)
 		if err != nil {
 			return fmt.Errorf("could not update epoch metrics: %w", err)
@@ -191,18 +207,6 @@ func Bootstrap(
 		state.metrics.FinalizedHeight(lastFinalized.Header.Height)
 		for _, block := range segment.Blocks {
 			state.metrics.BlockFinalized(block)
-		}
-
-		// 7) bootstrap dynamic protocol state
-		err = state.bootstrapProtocolState(segment, root, protocolStateSnapshotsDB)(tx)
-		if err != nil {
-			return fmt.Errorf("could not bootstrap protocol state: %w", err)
-		}
-
-		// 8) initialize version beacon
-		err = transaction.WithTx(state.boostrapVersionBeacon(root))(tx)
-		if err != nil {
-			return fmt.Errorf("could not bootstrap version beacon: %w", err)
 		}
 
 		return nil
@@ -433,131 +437,95 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 			return fmt.Errorf("could not index sealed block: %w", err)
 		}
 
+		// insert first-height indices for epochs which have started
+		hasPrevious, err := protocol.PreviousEpochExists(root)
+		if err != nil {
+			return fmt.Errorf("could not check existence of previous epoch: %w", err)
+		}
+		if hasPrevious {
+			err = indexFirstHeight(root.Epochs().Previous())(tx)
+			if err != nil {
+				return fmt.Errorf("could not index previous epoch first height: %w", err)
+			}
+		}
+		err = indexFirstHeight(root.Epochs().Current())(tx)
+		if err != nil {
+			return fmt.Errorf("could not index current epoch first height: %w", err)
+		}
+
 		return nil
 	}
 }
 
 // bootstrapEpoch bootstraps the protocol state database with information about
 // the previous, current, and next epochs as of the root snapshot.
-// This has to be bootstrapped before dynamic protocol state.
-// TODO(yuraolex): This information can be bootstrapped from dynamic protocol state.
-func (state *State) bootstrapEpoch(epochs protocol.EpochQuery, verifyNetworkAddress bool) func(*transaction.Tx) error {
+func (state *State) bootstrapEpoch(rootProtocolState protocol.DynamicProtocolState, verifyNetworkAddress bool) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
-		previous := epochs.Previous()
-		current := epochs.Current()
-		next := epochs.Next()
+		richEntry := rootProtocolState.Entry()
 
-		// build the status as we go
-		status := new(flow.EpochStatus)
+		// keep track of EpochSetup/EpochCommit service events, then store them after this step is complete
 		var setups []*flow.EpochSetup
 		var commits []*flow.EpochCommit
 
-		// insert previous epoch if it exists
-		_, err := previous.Counter()
-		if err == nil {
+		// validate and insert previous epoch if it exists
+		if rootProtocolState.PreviousEpochExists() {
 			// if there is a previous epoch, both setup and commit events must exist
-			setup, err := protocol.ToEpochSetup(previous)
-			if err != nil {
-				return fmt.Errorf("could not get previous epoch setup event: %w", err)
-			}
-			commit, err := protocol.ToEpochCommit(previous)
-			if err != nil {
-				return fmt.Errorf("could not get previous epoch commit event: %w", err)
-			}
+			setup := richEntry.PreviousEpochSetup
+			commit := richEntry.PreviousEpochCommit
 
 			if err := protocol.IsValidEpochSetup(setup, verifyNetworkAddress); err != nil {
-				return fmt.Errorf("invalid setup: %w", err)
+				return fmt.Errorf("invalid EpochSetup for previous epoch: %w", err)
 			}
 			if err := protocol.IsValidEpochCommit(commit, setup); err != nil {
-				return fmt.Errorf("invalid commit: %w", err)
-			}
-
-			err = indexFirstHeight(previous)(tx.DBTxn)
-			if err != nil {
-				return fmt.Errorf("could not index epoch first height: %w", err)
+				return fmt.Errorf("invalid EpochCommit for previous epoch: %w", err)
 			}
 
 			setups = append(setups, setup)
 			commits = append(commits, commit)
-			status.PreviousEpoch.SetupID = setup.ID()
-			status.PreviousEpoch.CommitID = commit.ID()
-		} else if !errors.Is(err, protocol.ErrNoPreviousEpoch) {
-			return fmt.Errorf("could not retrieve previous epoch: %w", err)
 		}
 
-		// insert current epoch - both setup and commit events must exist
-		setup, err := protocol.ToEpochSetup(current)
-		if err != nil {
-			return fmt.Errorf("could not get current epoch setup event: %w", err)
-		}
-		commit, err := protocol.ToEpochCommit(current)
-		if err != nil {
-			return fmt.Errorf("could not get current epoch commit event: %w", err)
-		}
+		// validate and insert current epoch
+		setup := richEntry.CurrentEpochSetup
+		commit := richEntry.CurrentEpochCommit
 
 		if err := protocol.IsValidEpochSetup(setup, verifyNetworkAddress); err != nil {
-			return fmt.Errorf("invalid setup: %w", err)
+			return fmt.Errorf("invalid EpochSetup for current epoch: %w", err)
 		}
 		if err := protocol.IsValidEpochCommit(commit, setup); err != nil {
-			return fmt.Errorf("invalid commit: %w", err)
-		}
-
-		err = indexFirstHeight(current)(tx.DBTxn)
-		if err != nil {
-			return fmt.Errorf("could not index epoch first height: %w", err)
+			return fmt.Errorf("invalid EpochCommit for current epoch: %w", err)
 		}
 
 		setups = append(setups, setup)
 		commits = append(commits, commit)
-		status.CurrentEpoch.SetupID = setup.ID()
-		status.CurrentEpoch.CommitID = commit.ID()
 
-		// insert next epoch, if it exists
-		_, err = next.Counter()
-		if err == nil {
-			// either only the setup event, or both the setup and commit events must exist
-			setup, err := protocol.ToEpochSetup(next)
-			if err != nil {
-				return fmt.Errorf("could not get next epoch setup event: %w", err)
-			}
+		// validate and insert next epoch, if it exists
+		if richEntry.NextEpoch != nil {
+			setup := richEntry.NextEpochSetup   // must not be nil
+			commit := richEntry.NextEpochCommit // may be nil
 
 			if err := protocol.IsValidEpochSetup(setup, verifyNetworkAddress); err != nil {
-				return fmt.Errorf("invalid setup: %w", err)
+				return fmt.Errorf("invalid EpochSetup for next epoch: %w", err)
 			}
-
 			setups = append(setups, setup)
-			status.NextEpoch.SetupID = setup.ID()
-			commit, err := protocol.ToEpochCommit(next)
-			if err != nil && !errors.Is(err, protocol.ErrNextEpochNotCommitted) {
-				return fmt.Errorf("could not get next epoch commit event: %w", err)
-			}
-			if err == nil {
+
+			if commit != nil {
 				if err := protocol.IsValidEpochCommit(commit, setup); err != nil {
-					return fmt.Errorf("invalid commit")
+					return fmt.Errorf("invalid EpochCommit for next epoch")
 				}
 				commits = append(commits, commit)
-				status.NextEpoch.CommitID = commit.ID()
 			}
-		} else if !errors.Is(err, protocol.ErrNextEpochNotSetup) {
-			return fmt.Errorf("could not get next epoch: %w", err)
-		}
-
-		// sanity check: ensure epoch status is valid
-		err = status.Check()
-		if err != nil {
-			return fmt.Errorf("bootstrapping resulting in invalid epoch status: %w", err)
 		}
 
 		// insert all epoch setup/commit service events
 		// dynamic protocol state relies on these events being stored
 		for _, setup := range setups {
-			err = state.epoch.setups.StoreTx(setup)(tx)
+			err := state.epoch.setups.StoreTx(setup)(tx)
 			if err != nil {
 				return fmt.Errorf("could not store epoch setup event: %w", err)
 			}
 		}
 		for _, commit := range commits {
-			err = state.epoch.commits.StoreTx(commit)(tx)
+			err := state.epoch.commits.StoreTx(commit)(tx)
 			if err != nil {
 				return fmt.Errorf("could not store epoch commit event: %w", err)
 			}
@@ -834,12 +802,6 @@ func (state *State) updateEpochMetrics(snap protocol.Snapshot) error {
 	}
 	state.metrics.CurrentEpochPhase(phase)
 
-	// update committed epoch final view
-	err = state.updateCommittedEpochFinalView(snap)
-	if err != nil {
-		return fmt.Errorf("could not update committed epoch final view")
-	}
-
 	currentEpochFinalView, err := snap.Epochs().Current().FinalView()
 	if err != nil {
 		return fmt.Errorf("could not update current epoch final view: %w", err)
@@ -945,45 +907,6 @@ func (state *State) populateCache() error {
 	})
 	if err != nil {
 		return fmt.Errorf("could not cache finalized header: %w", err)
-	}
-
-	return nil
-}
-
-// updateCommittedEpochFinalView updates the `committed_epoch_final_view` metric
-// based on the current epoch phase of the input snapshot. It should be called
-// at startup and during transitions between EpochSetup and EpochCommitted phases.
-//
-// For example, suppose we have epochs N and N+1.
-// If we are in epoch N's Staking or Setup Phase, then epoch N's final view should be the value of the metric.
-// If we are in epoch N's Committed Phase, then epoch N+1's final view should be the value of the metric.
-func (state *State) updateCommittedEpochFinalView(snap protocol.Snapshot) error {
-
-	phase, err := snap.Phase()
-	if err != nil {
-		return fmt.Errorf("could not get epoch phase: %w", err)
-	}
-
-	// update metric based of epoch phase
-	switch phase {
-	case flow.EpochPhaseStaking, flow.EpochPhaseSetup:
-
-		// if we are in Staking or Setup phase, then set the metric value to the current epoch's final view
-		finalView, err := snap.Epochs().Current().FinalView()
-		if err != nil {
-			return fmt.Errorf("could not get current epoch final view from snapshot: %w", err)
-		}
-		state.metrics.CommittedEpochFinalView(finalView)
-	case flow.EpochPhaseCommitted:
-
-		// if we are in Committed phase, then set the metric value to the next epoch's final view
-		finalView, err := snap.Epochs().Next().FinalView()
-		if err != nil {
-			return fmt.Errorf("could not get next epoch final view from snapshot: %w", err)
-		}
-		state.metrics.CommittedEpochFinalView(finalView)
-	default:
-		return fmt.Errorf("invalid phase: %s", phase)
 	}
 
 	return nil

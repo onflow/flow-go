@@ -12,11 +12,13 @@ import (
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/evm"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/module/trace"
 )
 
@@ -180,6 +182,22 @@ func (executor *transactionExecutor) preprocess() error {
 // infrequently modified and are expensive to compute.  For now this includes
 // reading meter parameter overrides and parsing programs.
 func (executor *transactionExecutor) preprocessTransactionBody() error {
+	// setup evm
+	if executor.ctx.EVMEnabled {
+		chain := executor.ctx.Chain
+		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+		err := evm.SetupEnvironment(
+			chain.ChainID(),
+			executor.env,
+			executor.cadenceRuntime.TxRuntimeEnv,
+			chain.ServiceAddress(),
+			sc.FlowToken.Address,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
 	meterParams, err := getBodyMeterParameters(
 		executor.ctx,
 		executor.proc,
@@ -224,6 +242,22 @@ func (executor *transactionExecutor) execute() error {
 }
 
 func (executor *transactionExecutor) ExecuteTransactionBody() error {
+	// setup evm
+	if executor.ctx.EVMEnabled {
+		chain := executor.ctx.Chain
+		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+		err := evm.SetupEnvironment(
+			chain.ChainID(),
+			executor.env,
+			executor.cadenceRuntime.TxRuntimeEnv,
+			chain.ServiceAddress(),
+			sc.FlowToken.Address,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
 	var invalidator derived.TransactionInvalidator
 	if !executor.errs.CollectedError() {
 
