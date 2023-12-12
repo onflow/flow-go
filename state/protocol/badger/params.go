@@ -60,25 +60,23 @@ func ReadInstanceParams(db *badger.DB, headers storage.Headers, seals storage.Se
 			return fmt.Errorf("could not read sealed root block to populate cache: %w", err)
 		}
 
-		// look up root block ID
+		// look up 'finalized root block'
 		var finalizedRootID flow.Identifier
 		err = db.View(operation.LookupBlockHeight(finalizedRootHeight, &finalizedRootID))
 		if err != nil {
 			return fmt.Errorf("could not look up finalized root height: %w", err)
 		}
-
 		params.finalizedRoot, err = headers.ByBlockID(finalizedRootID)
 		if err != nil {
 			return fmt.Errorf("could not retrieve finalized root header: %w", err)
 		}
 
+		// look up the sealed block as of the 'finalized root block'
 		var sealedRootID flow.Identifier
 		err = db.View(operation.LookupBlockHeight(sealedRootHeight, &sealedRootID))
 		if err != nil {
 			return fmt.Errorf("could not look up sealed root height: %w", err)
 		}
-
-		// retrieve root header
 		params.sealedRoot, err = headers.ByBlockID(sealedRootID)
 		if err != nil {
 			return fmt.Errorf("could not retrieve sealed root header: %w", err)
@@ -99,7 +97,7 @@ func ReadInstanceParams(db *badger.DB, headers storage.Headers, seals storage.Se
 	return params, nil
 }
 
-// EpochFallbackTriggered returns whether epoch fallback mode (EFM) has been triggered.
+// EpochFallbackTriggered returns whether epoch fallback mode [EFM] has been triggered.
 // EFM is a permanent, spork-scoped state which is triggered when the next
 // epoch fails to be committed in the allocated time. Once EFM is triggered,
 // it will remain in effect until the next spork.
@@ -117,7 +115,6 @@ func (p *InstanceParams) EpochFallbackTriggered() (bool, error) {
 // FinalizedRoot returns the finalized root header of the current protocol state. This will be
 // the head of the protocol state snapshot used to bootstrap this state and
 // may differ from node to node for the same protocol state.
-// No errors are expected during normal operation.
 func (p *InstanceParams) FinalizedRoot() *flow.Header {
 	return p.finalizedRoot
 }
@@ -128,9 +125,8 @@ func (p *InstanceParams) SealedRoot() *flow.Header {
 	return p.sealedRoot
 }
 
-// Seal returns the root block seal of the current protocol state. This will be
-// the seal for the root block used to bootstrap this state and may differ from
-// node to node for the same protocol state.
+// Seal returns the root block seal of the current protocol state. This is the seal for the
+// `SealedRoot` block that was used to bootstrap this state. It may differ from node to node.
 func (p *InstanceParams) Seal() *flow.Seal {
 	return p.rootSeal
 }
@@ -162,9 +158,7 @@ func ReadGlobalParams(db *badger.DB) (*inmem.Params, error) {
 		return nil, fmt.Errorf("could not get protocol version: %w", err)
 	}
 
-	// retrieve root header
-
-	root, err := ReadFinalizedRoot(db)
+	root, err := ReadFinalizedRoot(db) // retrieve root header
 	if err != nil {
 		return nil, fmt.Errorf("could not get root: %w", err)
 	}

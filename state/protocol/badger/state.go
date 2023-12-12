@@ -55,10 +55,12 @@ type State struct {
 	// Caution: A node that joined in a later epoch past the spork, the node will likely _not_
 	// know the spork's root block in full (though it will always know the height).
 	sporkRootBlockHeight uint64
-	// cache the latest finalized and sealed block headers as these are common queries.
-	// It can be cached because the protocol state is solely responsible for updating these values.
-	cachedFinal  *atomic.Pointer[cachedHeader]
-	cachedSealed *atomic.Pointer[cachedHeader]
+	// cachedLatestFinal is the *latest* finalized block header, which we can cache here,
+	// because the protocol state is solely responsible for updating it.
+	cachedLatestFinal *atomic.Pointer[cachedHeader]
+	// cachedLatestSealed is the *latest* sealed block headers, which we can cache here,
+	// because the protocol state is solely responsible for updating it.
+	cachedLatestSealed *atomic.Pointer[cachedHeader]
 }
 
 var _ protocol.State = (*State)(nil)
@@ -234,7 +236,7 @@ func Bootstrap(
 // dynamic protocol state didn't change in the sealing segment.
 // The root snapshot's sealing segment must not straddle any epoch transitions
 // or epoch phase transitions.
-func bootstrapProtocolState(segment *flow.SealingSegment, rootProtocolState protocol.DynamicProtocolState, protocolState storage.ProtocolState) func(tx *transaction.Tx) error {
+func bootstrapProtocolState(segment *flow.SealingSegment, rootProtocolState protocol.DynamicProtocolState, protocolState storage.ProtocolState) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
 		rootProtocolStateEntry := rootProtocolState.Entry().ProtocolStateEntry
 		protocolStateID := rootProtocolStateEntry.ID()
@@ -264,10 +266,9 @@ func bootstrapSealingSegment(
 	segment *flow.SealingSegment,
 	head *flow.Block,
 	rootSeal *flow.Seal,
-) func(tx *transaction.Tx) error {
+) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
-		txn := tx.DBTxn
-
+		txn := tx.DBTxn // tx is just a wrapper around a badger transaction with the additional ability to register callbacks that are executed after the badger transaction completed _successfully_
 		for _, result := range segment.ExecutionResults {
 			err := operation.SkipDuplicates(operation.InsertExecutionResult(result))(txn)
 			if err != nil {
@@ -368,7 +369,7 @@ func bootstrapSealingSegment(
 // bootstrapStatePointers instantiates special pointers used to by the protocol
 // state to keep track of special block heights and views.
 func bootstrapStatePointers(root protocol.Snapshot) func(*transaction.Tx) error {
-	return transaction.WithTx(func(txn *badger.Txn) error {
+	return func(tx *transaction.Tx) error {
 		segment, err := root.SealingSegment()
 		if err != nil {
 			return fmt.Errorf("could not get sealing segment: %w", err)
@@ -412,35 +413,36 @@ func bootstrapStatePointers(root protocol.Snapshot) func(*transaction.Tx) error 
 			NewestQC:    rootQC,
 		}
 
+		bdtx := tx.DBTxn // tx is just a wrapper around a badger transaction with the additional ability to register callbacks that are executed after the badger transaction completed _successfully_
 		// insert initial views for HotStuff
-		err = operation.InsertSafetyData(highest.Header.ChainID, safetyData)(txn)
+		err = operation.InsertSafetyData(highest.Header.ChainID, safetyData)(bdtx)
 		if err != nil {
 			return fmt.Errorf("could not insert safety data: %w", err)
 		}
-		err = operation.InsertLivenessData(highest.Header.ChainID, livenessData)(txn)
+		err = operation.InsertLivenessData(highest.Header.ChainID, livenessData)(bdtx)
 		if err != nil {
 			return fmt.Errorf("could not insert liveness data: %w", err)
 		}
 
 		// insert height pointers
-		err = operation.InsertRootHeight(highest.Header.Height)(txn)
+		err = operation.InsertRootHeight(highest.Header.Height)(bdtx)
 		if err != nil {
 			return fmt.Errorf("could not insert finalized root height: %w", err)
 		}
 		// the sealed root height is the lowest block in sealing segment
-		err = operation.InsertSealedRootHeight(lowest.Header.Height)(txn)
+		err = operation.InsertSealedRootHeight(lowest.Header.Height)(bdtx)
 		if err != nil {
 			return fmt.Errorf("could not insert sealed root height: %w", err)
 		}
-		err = operation.InsertFinalizedHeight(highest.Header.Height)(txn)
+		err = operation.InsertFinalizedHeight(highest.Header.Height)(bdtx)
 		if err != nil {
 			return fmt.Errorf("could not insert finalized height: %w", err)
 		}
-		err = operation.InsertSealedHeight(lowest.Header.Height)(txn)
+		err = operation.InsertSealedHeight(lowest.Header.Height)(bdtx)
 		if err != nil {
 			return fmt.Errorf("could not insert sealed height: %w", err)
 		}
-		err = operation.IndexFinalizedSealByBlockID(seal.BlockID, seal.ID())(txn)
+		err = operation.IndexFinalizedSealByBlockID(seal.BlockID, seal.ID())(bdtx)
 		if err != nil {
 			return fmt.Errorf("could not index sealed block: %w", err)
 		}
@@ -451,18 +453,18 @@ func bootstrapStatePointers(root protocol.Snapshot) func(*transaction.Tx) error 
 			return fmt.Errorf("could not check existence of previous epoch: %w", err)
 		}
 		if hasPrevious {
-			err = indexFirstHeight(root.Epochs().Previous())(txn)
+			err = indexFirstHeight(root.Epochs().Previous())(bdtx)
 			if err != nil {
 				return fmt.Errorf("could not index previous epoch first height: %w", err)
 			}
 		}
-		err = indexFirstHeight(root.Epochs().Current())(txn)
+		err = indexFirstHeight(root.Epochs().Current())(bdtx)
 		if err != nil {
 			return fmt.Errorf("could not index current epoch first height: %w", err)
 		}
 
 		return nil
-	})
+	}
 }
 
 // bootstrapEpoch bootstraps the protocol state database with information about
@@ -471,7 +473,8 @@ func bootstrapEpoch(
 	epochSetups storage.EpochSetups,
 	epochCommits storage.EpochCommits,
 	rootProtocolState protocol.DynamicProtocolState,
-	verifyNetworkAddress bool) func(*transaction.Tx) error {
+	verifyNetworkAddress bool,
+) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
 		richEntry := rootProtocolState.Entry()
 
@@ -550,35 +553,36 @@ func bootstrapEpoch(
 // bootstrapSporkInfo bootstraps the protocol state with information about the
 // spork which is used to disambiguate Flow networks.
 func bootstrapSporkInfo(root protocol.Snapshot) func(*transaction.Tx) error {
-	return transaction.WithTx(func(tx *badger.Txn) error {
-		params := root.Params()
+	return func(tx *transaction.Tx) error {
+		bdtx := tx.DBTxn // tx is just a wrapper around a badger transaction with the additional ability to register callbacks that are executed after the badger transaction completed _successfully_
 
+		params := root.Params()
 		sporkID := params.SporkID()
-		err := operation.InsertSporkID(sporkID)(tx)
+		err := operation.InsertSporkID(sporkID)(bdtx)
 		if err != nil {
 			return fmt.Errorf("could not insert spork ID: %w", err)
 		}
 
 		sporkRootBlockHeight := params.SporkRootBlockHeight()
-		err = operation.InsertSporkRootBlockHeight(sporkRootBlockHeight)(tx)
+		err = operation.InsertSporkRootBlockHeight(sporkRootBlockHeight)(bdtx)
 		if err != nil {
 			return fmt.Errorf("could not insert spork root block height: %w", err)
 		}
 
 		version := params.ProtocolVersion()
-		err = operation.InsertProtocolVersion(version)(tx)
+		err = operation.InsertProtocolVersion(version)(bdtx)
 		if err != nil {
 			return fmt.Errorf("could not insert protocol version: %w", err)
 		}
 
 		threshold := params.EpochCommitSafetyThreshold()
-		err = operation.InsertEpochCommitSafetyThreshold(threshold)(tx)
+		err = operation.InsertEpochCommitSafetyThreshold(threshold)(bdtx)
 		if err != nil {
 			return fmt.Errorf("could not insert epoch commit safety threshold: %w", err)
 		}
 
 		return nil
-	})
+	}
 }
 
 // indexFirstHeight indexes the first height for the epoch, as part of bootstrapping.
@@ -634,6 +638,7 @@ func OpenState(
 		GlobalParams:   globalParams,
 		InstanceParams: instanceParams,
 	}
+
 	state, err := newState(
 		metrics,
 		db,
@@ -648,7 +653,6 @@ func OpenState(
 		versionBeacons,
 		params,
 	)
-
 	if err != nil {
 		return nil, fmt.Errorf("could not create state: %w", err)
 	}
@@ -688,7 +692,7 @@ func (state *State) Params() protocol.Params {
 // Sealed returns a snapshot for the latest sealed block. A latest sealed block
 // must always exist, so this function always returns a valid snapshot.
 func (state *State) Sealed() protocol.Snapshot {
-	cached := state.cachedSealed.Load()
+	cached := state.cachedLatestSealed.Load()
 	if cached == nil {
 		return invalid.NewSnapshotf("internal inconsistency: no cached sealed header")
 	}
@@ -698,7 +702,7 @@ func (state *State) Sealed() protocol.Snapshot {
 // Final returns a snapshot for the latest finalized block. A latest finalized
 // block must always exist, so this function always returns a valid snapshot.
 func (state *State) Final() protocol.Snapshot {
-	cached := state.cachedFinal.Load()
+	cached := state.cachedLatestFinal.Load()
 	if cached == nil {
 		return invalid.NewSnapshotf("internal inconsistency: no cached final header")
 	}
@@ -785,9 +789,9 @@ func newState(
 			setups,
 			commits,
 		),
-		versionBeacons: versionBeacons,
-		cachedFinal:    new(atomic.Pointer[cachedHeader]),
-		cachedSealed:   new(atomic.Pointer[cachedHeader]),
+		versionBeacons:     versionBeacons,
+		cachedLatestFinal:  new(atomic.Pointer[cachedHeader]),
+		cachedLatestSealed: new(atomic.Pointer[cachedHeader]),
 	}
 
 	// populate the protocol state cache
@@ -856,19 +860,15 @@ func updateEpochMetrics(metrics module.ComplianceMetrics, snap protocol.Snapshot
 
 // boostrapVersionBeacon bootstraps version beacon, by adding the latest beacon
 // to an index, if present.
-func boostrapVersionBeacon(
-	snapshot protocol.Snapshot,
-) func(*transaction.Tx) error {
+func boostrapVersionBeacon(snapshot protocol.Snapshot) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
 		versionBeacon, err := snapshot.VersionBeacon()
 		if err != nil {
 			return err
 		}
-
 		if versionBeacon == nil {
 			return nil
 		}
-
 		return operation.IndexVersionBeaconByHeight(versionBeacon)(tx.DBTxn)
 	}
 }
@@ -877,7 +877,6 @@ func boostrapVersionBeacon(
 // The cache must be populated before the State receives any queries.
 // No errors expected during normal operations.
 func (state *State) populateCache() error {
-
 	// cache the initial value for finalized block
 	err := state.db.View(func(tx *badger.Txn) error {
 		// finalized header
@@ -895,7 +894,7 @@ func (state *State) populateCache() error {
 		if err != nil {
 			return fmt.Errorf("could not get finalized block (id=%x): %w", cachedFinalHeader.id, err)
 		}
-		state.cachedFinal.Store(&cachedFinalHeader)
+		state.cachedLatestFinal.Store(&cachedFinalHeader)
 		// sealed header
 		var sealedHeight uint64
 		err = operation.RetrieveSealedHeight(&sealedHeight)(tx)
@@ -911,7 +910,7 @@ func (state *State) populateCache() error {
 		if err != nil {
 			return fmt.Errorf("could not get sealed block (id=%x): %w", cachedSealedHeader.id, err)
 		}
-		state.cachedSealed.Store(&cachedSealedHeader)
+		state.cachedLatestSealed.Store(&cachedSealedHeader)
 
 		state.finalizedRootHeight = state.Params().FinalizedRoot().Height
 		state.sealedRootHeight = state.Params().SealedRoot().Height
