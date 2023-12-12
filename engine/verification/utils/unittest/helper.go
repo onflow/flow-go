@@ -653,7 +653,7 @@ func bootstrapSystem(
 		bootstrapNodesInfo = append(bootstrapNodesInfo, verID)
 		identities = append(identities, verID.Identity())
 
-		mutableProtocolState := protocol_state.NewMutableProtocolStateFactory(
+		mutableProtocolState := protocol_state.NewMutableProtocolState(
 			stateFixture.Storage.ProtocolState,
 			stateFixture.State.Params(),
 			stateFixture.Storage.Headers,

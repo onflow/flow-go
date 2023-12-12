@@ -755,7 +755,7 @@ func newState(
 		},
 		globalParams:             globalParams,
 		protocolStateSnapshotsDB: protocolStateSnapshots,
-		protocolState: protocol_state.NewMutableProtocolStateFactory(
+		protocolState: protocol_state.NewMutableProtocolState(
 			protocolStateSnapshots,
 			globalParams,
 			headers,

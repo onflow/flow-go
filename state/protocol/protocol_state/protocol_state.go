@@ -45,9 +45,9 @@ func (s *ProtocolState) GlobalParams() protocol.GlobalParams {
 	return s.globalParams
 }
 
-// MutableProtocolMutatorFactory is an implementation of the mutable interface for protocol state, it allows to evolve the protocol state
+// MutableProtocolState is an implementation of the mutable interface for protocol state, it allows to evolve the protocol state
 // by acting as factory for protocol.StateMutator which can be used to apply state-changing operations.
-type MutableProtocolMutatorFactory struct {
+type MutableProtocolState struct {
 	ProtocolState
 	headers storage.Headers
 	results storage.ExecutionResults
@@ -55,18 +55,18 @@ type MutableProtocolMutatorFactory struct {
 	commits storage.EpochCommits
 }
 
-var _ protocol.MutableProtocolState = (*MutableProtocolMutatorFactory)(nil)
+var _ protocol.MutableProtocolState = (*MutableProtocolState)(nil)
 
-// NewMutableProtocolStateFactory creates a new instance of MutableProtocolMutatorFactory.
-func NewMutableProtocolStateFactory(
+// NewMutableProtocolState creates a new instance of MutableProtocolState.
+func NewMutableProtocolState(
 	protocolStateDB storage.ProtocolState,
 	globalParams protocol.GlobalParams,
 	headers storage.Headers,
 	results storage.ExecutionResults,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
-) *MutableProtocolMutatorFactory {
-	return &MutableProtocolMutatorFactory{
+) *MutableProtocolState {
+	return &MutableProtocolState{
 		ProtocolState: *NewProtocolState(protocolStateDB, globalParams),
 		headers:       headers,
 		results:       results,
@@ -79,7 +79,7 @@ func NewMutableProtocolStateFactory(
 // Has to be called for each block to evolve the protocol state.
 // Expected errors during normal operations:
 //   - `storage.ErrNotFound` if no protocol state for parent block is known.
-func (s *MutableProtocolMutatorFactory) Mutator(candidateView uint64, parentID flow.Identifier) (protocol.StateMutator, error) {
+func (s *MutableProtocolState) Mutator(candidateView uint64, parentID flow.Identifier) (protocol.StateMutator, error) {
 	parentState, err := s.protocolStateDB.ByBlockID(parentID)
 	if err != nil {
 		return nil, fmt.Errorf("could not query parent protocol state at block (%x): %w", parentID, err)
