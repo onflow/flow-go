@@ -2048,23 +2048,6 @@ func EpochSetupFixture(opts ...func(setup *flow.EpochSetup)) *flow.EpochSetup {
 	return setup
 }
 
-func EpochStatusFixture() *flow.EpochStatus {
-	return &flow.EpochStatus{
-		PreviousEpoch: flow.EventIDs{
-			SetupID:  IdentifierFixture(),
-			CommitID: IdentifierFixture(),
-		},
-		CurrentEpoch: flow.EventIDs{
-			SetupID:  IdentifierFixture(),
-			CommitID: IdentifierFixture(),
-		},
-		NextEpoch: flow.EventIDs{
-			SetupID:  IdentifierFixture(),
-			CommitID: IdentifierFixture(),
-		},
-	}
-}
-
 func IndexFixture() *flow.Index {
 	return &flow.Index{
 		CollectionIDs: IdentifierListFixture(5),

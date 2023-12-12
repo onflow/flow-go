@@ -655,7 +655,6 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	if err != nil {
 		return fmt.Errorf("could not retrieve protocol state snapshot: %w", err)
 	}
-	epochStatus := psSnapshot.EpochStatus()
 	currentEpochSetup := psSnapshot.EpochSetup()
 	epochFallbackTriggered, err := m.isEpochEmergencyFallbackTriggered()
 	if err != nil {
@@ -664,7 +663,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 
 	// if epoch fallback was not previously triggered, check whether this block triggers it
 	if !epochFallbackTriggered {
-		epochFallbackTriggered, err = m.epochFallbackTriggeredByFinalizedBlock(header, epochStatus, currentEpochSetup)
+		epochFallbackTriggered, err = m.epochFallbackTriggeredByFinalizedBlock(header, psSnapshot)
 		if err != nil {
 			return fmt.Errorf("could not check whether finalized block triggers epoch fallback: %w", err)
 		}
@@ -685,7 +684,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	// If epoch emergency fallback is triggered, the current epoch continues until
 	// the next spork - so skip these updates.
 	if !epochFallbackTriggered {
-		epochPhaseMetrics, epochPhaseEvents, err := m.epochPhaseMetricsAndEventsOnBlockFinalized(block, epochStatus)
+		epochPhaseMetrics, epochPhaseEvents, err := m.epochPhaseMetricsAndEventsOnBlockFinalized(block)
 		if err != nil {
 			return fmt.Errorf("could not determine epoch phase metrics/events for finalized block: %w", err)
 		}
@@ -693,7 +692,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		events = append(events, epochPhaseEvents...)
 
 		if isFirstBlockOfEpoch {
-			epochTransitionMetrics, epochTransitionEvents := m.epochTransitionMetricsAndEventsOnBlockFinalized(header, currentEpochSetup)
+			epochTransitionMetrics, epochTransitionEvents := m.epochTransitionMetricsAndEventsOnBlockFinalized(header, psSnapshot.EpochSetup())
 			if err != nil {
 				return fmt.Errorf("could not determine epoch transition metrics/events for finalized block: %w", err)
 			}
@@ -813,22 +812,18 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 // See protocol.Params for more details on the epoch commitment deadline.
 //
 // No errors are expected during normal operation.
-func (m *FollowerState) epochFallbackTriggeredByFinalizedBlock(block *flow.Header, epochStatus *flow.EpochStatus, currentEpochSetup *flow.EpochSetup) (bool, error) {
+func (m *FollowerState) epochFallbackTriggeredByFinalizedBlock(block *flow.Header, stateAtBlock protocol.DynamicProtocolState) (bool, error) {
 	// 1. Epoch fallback is tentatively triggered on this fork
-	if epochStatus.InvalidEpochTransitionAttempted {
+	if stateAtBlock.InvalidEpochTransitionAttempted() {
 		return true, nil
 	}
 
 	// 2.(a) determine whether block B is past the epoch commitment deadline
 	safetyThreshold := m.Params().EpochCommitSafetyThreshold()
-	blockExceedsDeadline := block.View+safetyThreshold >= currentEpochSetup.FinalView
+	blockExceedsDeadline := block.View+safetyThreshold >= stateAtBlock.EpochSetup().FinalView
 
 	// 2.(b) determine whether the next epoch is committed w.r.t. block B
-	currentEpochPhase, err := epochStatus.Phase()
-	if err != nil {
-		return false, fmt.Errorf("could not get current epoch phase: %w", err)
-	}
-	isNextEpochCommitted := currentEpochPhase == flow.EpochPhaseCommitted
+	isNextEpochCommitted := stateAtBlock.EpochPhase() == flow.EpochPhaseCommitted
 
 	blockTriggersEpochFallback := blockExceedsDeadline && !isNextEpochCommitted
 	return blockTriggersEpochFallback, nil
@@ -902,7 +897,7 @@ func (m *FollowerState) epochTransitionMetricsAndEventsOnBlockFinalized(block *f
 //
 // This function should only be called when epoch fallback *has not already been triggered*.
 // No errors are expected during normal operation.
-func (m *FollowerState) epochPhaseMetricsAndEventsOnBlockFinalized(block *flow.Block, epochStatus *flow.EpochStatus) (
+func (m *FollowerState) epochPhaseMetricsAndEventsOnBlockFinalized(block *flow.Block) (
 	metrics []func(),
 	events []func(),
 	err error,
@@ -935,12 +930,6 @@ func (m *FollowerState) epochPhaseMetricsAndEventsOnBlockFinalized(block *flow.B
 				events = append(events, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseCommitted) })
 				// track epoch phase transition (setup->committed)
 				events = append(events, func() { m.consumer.EpochCommittedPhaseStarted(ev.Counter-1, block.Header) })
-				// track final view of committed epoch
-				nextEpochSetup, err := m.epoch.setups.ByID(epochStatus.NextEpoch.SetupID)
-				if err != nil {
-					return nil, nil, fmt.Errorf("could not retrieve setup event for next epoch: %w", err)
-				}
-				events = append(events, func() { m.metrics.CommittedEpochFinalView(nextEpochSetup.FinalView) })
 			case *flow.VersionBeacon:
 				// do nothing for now
 			default:

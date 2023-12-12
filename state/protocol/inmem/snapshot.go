@@ -67,7 +67,7 @@ func (s Snapshot) Descendants() ([]flow.Identifier, error) {
 }
 
 func (s Snapshot) Phase() (flow.EpochPhase, error) {
-	return s.enc.ProtocolState.EpochStatus().Phase()
+	return s.enc.ProtocolState.EpochPhase(), nil
 }
 
 func (s Snapshot) RandomSource() ([]byte, error) {
