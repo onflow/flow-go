@@ -268,20 +268,26 @@ func (s *state) CreateStorageSnapshot(
 	if err != nil {
 		// statecommitment not exists means the block hasn't been executed yet
 		if errors.Is(err, storage.ErrNotFound) {
-			return nil, nil, fmt.Errorf("block %v is not executed: %w", blockID, ErrNotExecuted)
+			return nil, nil, fmt.Errorf("block %v is never executed: %w", blockID, ErrNotExecuted)
 		}
 
 		return nil, header, fmt.Errorf("cannot get commit by block ID: %w", err)
 	}
 
 	// make sure we have trie state for this block
-	hasState, err := s.hasState(commit, blockID, header.Height)
-	if err != nil {
-		return nil, header, fmt.Errorf("cannot check state for commit %x (block %v): %w", commit, blockID, err)
+	ledgerHasState := s.ls.HasState(ledger.State(commit))
+	if !ledgerHasState {
+		return nil, header, fmt.Errorf("state not found in ledger for commit %x (block %v): %w", commit, blockID, ErrExecutionStatePruned)
 	}
 
-	if !hasState {
-		return nil, header, fmt.Errorf("state not found for commit %x (block %v): %w", commit, blockID, ErrExecutionStatePruned)
+	if s.enableRegisterStore {
+		isExecuted, err := s.registerStore.IsBlockExecuted(header.Height, blockID)
+		if err != nil {
+			return nil, header, fmt.Errorf("cannot check if block %v is executed: %w", blockID, err)
+		}
+		if !isExecuted {
+			return nil, header, fmt.Errorf("block %v is not executed yet: %w", blockID, ErrNotExecuted)
+		}
 	}
 
 	return s.NewStorageSnapshot(commit, blockID, header.Height), header, nil
@@ -321,17 +327,6 @@ func CommitDelta(
 	newStorageSnapshot := baseStorageSnapshot.Extend(newCommit, ruh.UpdatedRegisterSet())
 
 	return newCommit, trieUpdate, newStorageSnapshot, nil
-}
-
-func (s *state) hasState(commitment flow.StateCommitment, blockID flow.Identifier, height uint64) (bool, error) {
-	ledgerHasState := s.ls.HasState(ledger.State(commitment))
-	if !ledgerHasState {
-		return false, nil
-	}
-	if !s.enableRegisterStore {
-		return true, nil
-	}
-	return s.registerStore.IsBlockExecuted(height, blockID)
 }
 
 func (s *state) StateCommitmentByBlockID(blockID flow.Identifier) (flow.StateCommitment, error) {
