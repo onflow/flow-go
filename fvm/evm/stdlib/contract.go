@@ -440,7 +440,7 @@ func encodeABI(
 		switch arrayStaticType := arrayStaticType.(type) {
 		case interpreter.ConstantSizedStaticType:
 			size := int(arrayStaticType.Size)
-			result = reflect.New(reflect.ArrayOf(size, elementGoType))
+			result = reflect.Indirect(reflect.New(reflect.ArrayOf(size, elementGoType)))
 
 		case interpreter.VariableSizedStaticType:
 			size := value.Count()

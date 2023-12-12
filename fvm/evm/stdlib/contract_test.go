@@ -595,6 +595,60 @@ func TestEVMEncodeDecodeABIRoundtrip(t *testing.T) {
         assert((values[13] as! [Int256]) == [-5, -10])
         assert((values[14] as! [EVM.EVMAddress])[0].bytes == [address][0].bytes)
 
+        // Check constant-size array of leaf types encode/decode
+        data = EVM.encodeABI([
+          ["one", "two"] as [String; 2],
+          [true, false] as [Bool; 2],
+          [5, 10] as [UInt8; 2],
+          [5, 10] as [UInt16; 2],
+          [5, 10] as [UInt32; 2],
+          [5, 10] as [UInt64; 2],
+          [5, 10] as [UInt128; 2],
+          [5, 10] as [UInt256; 2],
+          [-5, -10] as [Int8; 2],
+          [-5, -10] as [Int16; 2],
+          [-5, -10] as [Int32; 2],
+          [-5, -10] as [Int64; 2],
+          [-5, -10] as [Int128; 2],
+          [-5, -10] as [Int256; 2],
+          [address] as [EVM.EVMAddress; 1]
+        ])
+        values = EVM.decodeABI(
+          types: [
+            Type<[String; 2]>(),
+            Type<[Bool; 2]>(),
+            Type<[UInt8; 2]>(),
+            Type<[UInt16; 2]>(),
+            Type<[UInt32; 2]>(),
+            Type<[UInt64; 2]>(),
+            Type<[UInt128; 2]>(),
+            Type<[UInt256; 2]>(),
+            Type<[Int8; 2]>(),
+            Type<[Int16; 2]>(),
+            Type<[Int32; 2]>(),
+            Type<[Int64; 2]>(),
+            Type<[Int128; 2]>(),
+            Type<[Int256; 2]>(),
+            Type<[EVM.EVMAddress; 1]>()
+          ],
+          data: data
+        )
+        assert((values[0] as! [String; 2]) == ["one", "two"])
+        assert((values[1] as! [Bool; 2]) == [true, false])
+        assert((values[2] as! [UInt8; 2]) == [5, 10])
+        assert((values[3] as! [UInt16; 2]) == [5, 10])
+        assert((values[4] as! [UInt32; 2]) == [5, 10])
+        assert((values[5] as! [UInt64; 2]) == [5, 10])
+        assert((values[6] as! [UInt128; 2]) == [5, 10])
+        assert((values[7] as! [UInt256; 2]) == [5, 10])
+        assert((values[8] as! [Int8; 2]) == [-5, -10])
+        assert((values[9] as! [Int16; 2]) == [-5, -10])
+        assert((values[10] as! [Int32; 2]) == [-5, -10])
+        assert((values[11] as! [Int64; 2]) == [-5, -10])
+        assert((values[12] as! [Int128; 2]) == [-5, -10])
+        assert((values[13] as! [Int256; 2]) == [-5, -10])
+        assert((values[14] as! [EVM.EVMAddress; 1])[0].bytes == [address][0].bytes)
+
         // Check partial decoding of encoded data
         data = EVM.encodeABI(["Peter", UInt64(9999)])
         values = EVM.decodeABI(types: [Type<String>()], data: data)
