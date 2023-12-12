@@ -8,14 +8,14 @@ transaction {
             ?? panic("Could not borrow heartbeat from storage path")
         epochHeartbeat.advanceBlock()
 
-        let versionBeaconHeartbeat = serviceAccount.storage.borrow<&NodeVersionBeacon.Heartbeat>(
-            from: NodeVersionBeacon.HeartbeatStoragePath)
-                ?? panic("Couldn't borrow NodeVersionBeacon.Heartbeat Resource")
+        let versionBeaconHeartbeat = serviceAccount.storage
+            .borrow<&NodeVersionBeacon.Heartbeat>(from: NodeVersionBeacon.HeartbeatStoragePath)
+            ?? panic("Couldn't borrow NodeVersionBeacon.Heartbeat Resource")
         versionBeaconHeartbeat.heartbeat()
 
-        let randomBeaconHistoryHeartbeat = serviceAccount.borrow<&RandomBeaconHistory.Heartbeat>(
-            from: RandomBeaconHistory.HeartbeatStoragePath)
-                ?? panic("Couldn't borrow RandomBeaconHistory.Heartbeat Resource")
+        let randomBeaconHistoryHeartbeat = serviceAccount.storage
+            .borrow<&RandomBeaconHistory.Heartbeat>(from: RandomBeaconHistory.HeartbeatStoragePath)
+            ?? panic("Couldn't borrow RandomBeaconHistory.Heartbeat Resource")
         randomBeaconHistoryHeartbeat.heartbeat(randomSourceHistory: randomSourceHistory())
     }
 }
