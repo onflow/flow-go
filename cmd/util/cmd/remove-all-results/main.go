@@ -9,9 +9,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
 var (
@@ -22,8 +20,8 @@ func main() {
 }
 
 var rootCmd = &cobra.Command{
-	Use:   "remove-commit",
-	Short: "remove-commit",
+	Use:   "remove-all-results",
+	Short: "remove-all-results",
 	Run:   run,
 }
 
@@ -55,9 +53,7 @@ func run(*cobra.Command, []string) {
 	db := common.InitStorage(flagDataDir)
 	defer db.Close()
 
-	metrics := &metrics.NoopCollector{}
-	commits := badger.NewCommits(metrics, db)
-	err := commits.RemoveByBlockID(flow.ZeroID)
+	err := operation.RemoveAll(db)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("fail to remove commit")
 	}
