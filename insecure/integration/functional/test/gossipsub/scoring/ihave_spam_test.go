@@ -16,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/insecure/corruptlibp2p"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/scoring"
@@ -34,15 +33,12 @@ import (
 // Also, per hearbeat (i.e., decay interval), the spammer is allowed to send at most 5000 ihave messages (gossip sub parameter) on aggregate, and
 // excess messages are dropped (without being counted as broken promises).
 func TestGossipSubIHaveBrokenPromises_Below_Threshold(t *testing.T) {
-
-	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky test")
-
 	role := flow.RoleConsensus
 	sporkId := unittest.IdentifierFixture()
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 
 	receivedIWants := unittest.NewProtectedMap[string, struct{}]()
-	idProvider := mock.NewIdentityProvider(t)
+	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
 	spammer := corruptlibp2p.NewGossipSubRouterSpammerWithRpcInspector(t, sporkId, role, idProvider, func(id peer.ID, rpc *corrupt.RPC) error {
 		// override rpc inspector of the spammer node to keep track of the iwants it has received.
 		if rpc.RPC.Control == nil || rpc.RPC.Control.Iwant == nil {
@@ -80,9 +76,8 @@ func TestGossipSubIHaveBrokenPromises_Below_Threshold(t *testing.T) {
 		}),
 	)
 
-	idProvider.On("ByPeerID", victimNode.ID()).Return(&victimIdentity, true).Maybe()
-	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Maybe()
 	ids := flow.IdentityList{&spammer.SpammerId, &victimIdentity}
+	idProvider.SetIdentities(ids)
 	nodes := []p2p.LibP2PNode{spammer.SpammerNode, victimNode}
 
 	p2ptest.StartNodes(t, signalerCtx, nodes)
@@ -168,13 +163,12 @@ func TestGossipSubIHaveBrokenPromises_Below_Threshold(t *testing.T) {
 // Second round of attack makes spammers broken promises above the threshold of 10 RPCs, hence a degradation of the spammers score.
 // Third round of attack makes spammers broken promises to around 20 RPCs above the threshold, which causes the graylisting of the spammer node.
 func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky in CI")
 	role := flow.RoleConsensus
 	sporkId := unittest.IdentifierFixture()
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 
 	receivedIWants := unittest.NewProtectedMap[string, struct{}]()
-	idProvider := mock.NewIdentityProvider(t)
+	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
 	spammer := corruptlibp2p.NewGossipSubRouterSpammerWithRpcInspector(t, sporkId, role, idProvider, func(id peer.ID, rpc *corrupt.RPC) error {
 		// override rpc inspector of the spammer node to keep track of the iwants it has received.
 		if rpc.RPC.Control == nil || rpc.RPC.Control.Iwant == nil {
@@ -221,9 +215,8 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 		}),
 	)
 
-	idProvider.On("ByPeerID", victimNode.ID()).Return(&victimIdentity, true).Maybe()
-	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Maybe()
 	ids := flow.IdentityList{&spammer.SpammerId, &victimIdentity}
+	idProvider.SetIdentities(ids)
 	nodes := []p2p.LibP2PNode{spammer.SpammerNode, victimNode}
 
 	p2ptest.StartNodes(t, signalerCtx, nodes)
@@ -253,6 +246,7 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 		// ideally it must be 10 (one per RPC), but we give it a buffer of 1 to account for decays and floating point errors.
 		// note that we intentionally override the decay speed to be 60-times faster in this test.
 		if behavioralPenalty < 7.5 {
+			fmt.Println("behavioral penalty", behavioralPenalty)
 			return false
 		}
 
@@ -280,6 +274,7 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 		// ideally we should have 20 (10 from the first round, 10 from the second round), but we give it a buffer of 2 to account for decays and floating point errors.
 		// note that we intentionally override the decay speed to be 60-times faster in this test.
 		if behavioralPenalty < 18 {
+			fmt.Println("behavioral penalty", behavioralPenalty)
 			return false
 		}
 
