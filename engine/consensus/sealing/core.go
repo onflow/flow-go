@@ -136,9 +136,6 @@ func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) erro
 	// Get the root block of our local state - we allow references to unknown
 	// blocks below the root height
 	rootHeader := c.state.Params().FinalizedRoot()
-	if err != nil {
-		return fmt.Errorf("could not retrieve root header: %w", err)
-	}
 
 	// Determine the list of unknown blocks referenced within the sealing segment
 	// if we are initializing with a latest sealed block below the root height

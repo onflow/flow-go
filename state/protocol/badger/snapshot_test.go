@@ -787,7 +787,6 @@ func TestSealingSegment_FailureCases(t *testing.T) {
 		// segment, such as b2 should be stored in the state.
 		util.RunWithFollowerProtocolState(t, multipleBlockSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
 			localStateRootBlock := state.Params().FinalizedRoot()
-			require.NoError(t, err)
 			assert.Equal(t, b3.ID(), localStateRootBlock.ID())
 
 			// verify that b2 is known to the protocol state, but constructing a sealing segment fails
