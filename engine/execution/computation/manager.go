@@ -234,7 +234,7 @@ func DefaultFVMOptions(chainID flow.ChainID, cadenceTracing bool, extensiveTraci
 			reusableRuntime.NewReusableCadenceRuntimePool(
 				ReusableCadenceRuntimePoolSize,
 				runtime.Config{
-					TracingEnabled:        cadenceTracing,
+					TracingEnabled: cadenceTracing,
 					// Attachments are enabled everywhere except for Mainnet
 					AttachmentsEnabled: chainID != flow.Mainnet,
 				},
