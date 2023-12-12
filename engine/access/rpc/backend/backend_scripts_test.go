@@ -85,9 +85,9 @@ func (s *BackendScriptsSuite) SetupTest() {
 	block := unittest.BlockFixture()
 	s.block = &block
 
-	s.script = []byte("pub fun main() { return 1 }")
+	s.script = []byte("access(all) fun main() { return 1 }")
 	s.arguments = [][]byte{[]byte("arg1"), []byte("arg2")}
-	s.failingScript = []byte("pub fun main() { panic(\"!!\") }")
+	s.failingScript = []byte("access(all) fun main() { panic(\"!!\") }")
 }
 
 func (s *BackendScriptsSuite) defaultBackend() *backendScripts {

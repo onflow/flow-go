@@ -18,6 +18,7 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
+
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/blueprints"
@@ -1735,7 +1736,8 @@ func TestBlockContext_Random(t *testing.T) {
 	})
 
 	script_string := `
-	pub fun main(a: Int8) {
+	access(all)
+	fun main(a: Int8) {
 		let rand = unsafeRandom()
 		log(rand)
 		let rand%d = unsafeRandom()

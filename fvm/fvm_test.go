@@ -179,7 +179,8 @@ func TestHashing(t *testing.T) {
 			`
 				import Crypto
 
-				access(all) fun main(data: [UInt8]): [UInt8] {
+				access(all)
+				fun main(data: [UInt8]): [UInt8] {
 					return Crypto.hash(data, algorithm: HashAlgorithm.%s)
 				}
 			`, hashName))

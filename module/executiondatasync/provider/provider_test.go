@@ -155,7 +155,7 @@ func TestCalculateChunkExecutionDataID(t *testing.T) {
 	ced := execution_data.ChunkExecutionData{
 		Collection: &flow.Collection{
 			Transactions: []*flow.TransactionBody{
-				{Script: []byte("pub fun main() {}")},
+				{Script: []byte("access(all) fun main() {}")},
 			},
 		},
 		Events: []flow.Event{

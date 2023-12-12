@@ -86,7 +86,8 @@ func TestKeyListSignature(t *testing.T) {
 				`
                       import Crypto
 
-                      access(all) fun main(
+                      access(all)
+                      fun main(
                           rawPublicKeys: [[UInt8]],
                           message: [UInt8],
                           signatures: [[UInt8]],
@@ -403,7 +404,8 @@ func TestBLSMultiSignature(t *testing.T) {
 							`
 								import Crypto
 		
-								access(all) fun main(
+								access(all)
+								fun main(
 									publicKey: [UInt8],
 									proof: [UInt8]
 								): Bool {
