@@ -58,7 +58,7 @@ type MutableProtocolMutatorFactory struct {
 var _ protocol.MutableProtocolState = (*MutableProtocolMutatorFactory)(nil)
 
 // NewMutableProtocolState creates a new instance of MutableProtocolMutatorFactory.
-func NewMutableProtocolState(
+func NewMutableProtocolStateFactory(
 	protocolStateDB storage.ProtocolState,
 	globalParams protocol.GlobalParams,
 	headers storage.Headers,
