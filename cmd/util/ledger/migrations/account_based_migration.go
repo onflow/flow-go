@@ -239,16 +239,23 @@ func MigrateGroupConcurrently(
 			case jobs <- job:
 			}
 		}
+		close(jobs)
 	}()
 
 	// read job results
-	logAccount := moduleUtil.LogProgress("processing account group", accountGroups.Len(), log)
+	logAccount := moduleUtil.LogProgress(
+		"processing account group",
+		accountGroups.Len(),
+		log,
+	)
 
-	migrated := make([]*ledger.Payload, 0)
+	migrated := make([]*ledger.Payload, accountGroups.AllPayloadsCount())
 	durations := newMigrationDurations(logTopNDurations)
+	contextDone := false
 	for i := 0; i < accountGroups.Len(); i++ {
 		select {
 		case <-ctx.Done():
+			contextDone = true
 			break
 		case result := <-resultCh:
 			durations.Add(result)
@@ -257,8 +264,10 @@ func MigrateGroupConcurrently(
 			migrated = append(migrated, accountMigrated...)
 			logAccount(1)
 		}
+		if contextDone {
+			break
+		}
 	}
-	close(jobs)
 
 	// make sure to exit all workers before returning from this function
 	// so that the migrator can be closed properly

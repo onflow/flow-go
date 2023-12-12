@@ -19,13 +19,15 @@ import (
 // encodedKeyAddressPrefixLength is the length of the address prefix in the encoded key
 // 2 for uint16 of number of key parts
 // 4 for uint32 of the length of the first key part
-// 2 for uint32 of the key part type
+// 2 for uint16 of the key part type
 // 8 for the address which is the actual length of the first key part
 const encodedKeyAddressPrefixLength = 2 + 4 + 2 + flow.AddressLength
 
 // minSizeForSplitSortingIntoGoroutines below this size, no need to split
 // the sorting into goroutines
 const minSizeForSplitSortingIntoGoroutines = 100_000
+
+const estimatedNumOfAccount = 30_000_000
 
 // PayloadAccountGroup is a grouping of payloads by account
 type PayloadAccountGroup struct {
@@ -37,6 +39,8 @@ type PayloadAccountGroup struct {
 type PayloadAccountGrouping struct {
 	payloads sortablePayloads
 	indexes  []int
+
+	payloadsCount int
 
 	current int
 }
@@ -72,6 +76,11 @@ func (g *PayloadAccountGrouping) Len() int {
 	return len(g.indexes)
 }
 
+// AllPayloadsCount the number of accounts
+func (g *PayloadAccountGrouping) AllPayloadsCount() int {
+	return g.payloadsCount
+}
+
 // GroupPayloadsByAccount takes a list of payloads and groups them by account.
 // it uses nWorkers to sort the payloads by address and find the start and end indexes of
 // each account.
@@ -102,10 +111,10 @@ func GroupPayloadsByAccount(
 
 	start = time.Now()
 	// find the indexes of the payloads that start a new account
-	indexes := make([]int, 0, len(p))
+	indexes := make([]int, 0, estimatedNumOfAccount)
 	for i := 0; i < len(p); {
 		indexes = append(indexes, i)
-		i = p.FindLastOfTheSameKey(i) + 1
+		i = p.FindNextKeyIndex(i)
 	}
 	end = time.Now()
 
@@ -117,13 +126,15 @@ func GroupPayloadsByAccount(
 	return &PayloadAccountGrouping{
 		payloads: p,
 		indexes:  indexes,
+
+		payloadsCount: len(payloads),
 	}
 }
 
 // payloadToAddress takes a payload and return:
-// - (address, true, nil) if the payload is for an account, the account address is returned
-// - ("", false, nil) if the payload is not for an account
-// - ("", false, err) if running into any exception
+// - (address, nil) if the payload is for an account, the account address is returned
+// - (common.ZeroAddress, nil) if the payload is not for an account
+// - (common.ZeroAddress, err) if running into any exception
 // The zero address is used for global Payloads and is not an actual account
 func payloadToAddress(p *ledger.Payload) (common.Address, error) {
 	k, err := p.Key()
@@ -170,7 +181,7 @@ func (s sortablePayloads) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
 
-func (s sortablePayloads) FindLastOfTheSameKey(i int) int {
+func (s sortablePayloads) FindNextKeyIndex(i int) int {
 	low := i
 	step := 1
 	for low+step < len(s) && s.Compare(low+step, i) == 0 {
@@ -192,7 +203,7 @@ func (s sortablePayloads) FindLastOfTheSameKey(i int) int {
 		}
 	}
 
-	return low - 1
+	return low
 }
 
 // sortPayloads sorts the payloads in the range [i, j) using goroutines and merges
@@ -206,7 +217,7 @@ func sortPayloads(i, j int, source, buffer sortablePayloads, goroutineAllowance 
 		return
 	}
 
-	// if we are out of goroutine allowance, sort with built-in sortß
+	// if we are out of goroutine allowance, sort with built-in sort
 	// if the length is less than minSizeForSplit, sort with built-in sort
 	if goroutineAllowance < 2 || j-i < minSizeForSplitSortingIntoGoroutines {
 		sort.Sort(source[i:j])
@@ -236,17 +247,33 @@ func sortPayloads(i, j int, source, buffer sortablePayloads, goroutineAllowance 
 func mergeInto(source, buffer sortablePayloads, i int, mid int, j int) {
 	left := i
 	right := mid
-	for k := i; k < j; k++ {
-		if left < mid && (right >= j || source.Compare(left, right) <= 0) {
-			buffer[k] = source[left]
-			left++
+	k := i
+	for left < mid && right < j {
+		// More elements in the both partitions to process.
+		if source.Compare(left, right) <= 0 {
+			// Move left partition elements with the same address to buffer.
+			nextLeft := source.FindNextKeyIndex(left)
+			n := copy(buffer[k:], source[left:nextLeft])
+			left = nextLeft
+			k += n
 		} else {
-			buffer[k] = source[right]
-			right++
+			// Move right partition elements with the same address to buffer.
+			nextRight := source.FindNextKeyIndex(right)
+			n := copy(buffer[k:], source[right:nextRight])
+			right = nextRight
+			k += n
 		}
 	}
-
-	for k := i; k < j; k++ {
-		source[k] = buffer[k]
+	// At this point:
+	// - one partition is exhausted.
+	// - remaining elements in the other partition (already sorted) can be copied over.
+	if left < mid {
+		// Copy remaining elements in the left partition.
+		copy(buffer[k:], source[left:mid])
+	} else {
+		// Copy remaining elements in the right partition.
+		copy(buffer[k:], source[right:j])
 	}
+	// Copy merged buffer back to source.
+	copy(source[i:j], buffer[i:j])
 }

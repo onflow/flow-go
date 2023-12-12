@@ -59,7 +59,7 @@ func (a *AccountsAtreeLedger) ValueExists(owner, key []byte) (exists bool, err e
 func (a *AccountsAtreeLedger) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
 	v, err := a.Accounts.AllocateStorageIndex(flow.BytesToAddress(owner))
 	if err != nil {
-		return atree.StorageIndex{}, fmt.Errorf("storage address allocation failed: %w", err)
+		return atree.StorageIndex{}, fmt.Errorf("storage index allocation failed: %w", err)
 	}
 	return v, nil
 }
@@ -89,7 +89,10 @@ func NewPayloadSnapshot(payloads []*ledger.Payload) (*PayloadSnapshot, error) {
 }
 
 func (p PayloadSnapshot) Get(id flow.RegisterID) (flow.RegisterValue, error) {
-	value := p.Payloads[id]
+	value, exists := p.Payloads[id]
+	if !exists {
+		return nil, nil
+	}
 	return value.Value(), nil
 }
 
