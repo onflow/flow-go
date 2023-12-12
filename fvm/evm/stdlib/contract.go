@@ -45,20 +45,6 @@ var evmAddressBytesType = sema.NewConstantSizedType(nil, sema.UInt8Type, types.A
 var evmAddressBytesStaticType = interpreter.ConvertSemaArrayTypeToStaticArrayType(nil, evmAddressBytesType)
 var EVMAddressBytesCadenceType = cadence.NewConstantSizedArrayType(types.AddressLength, cadence.TheUInt8Type)
 
-// unknownABITypeError
-
-type unknownABITypeError struct {
-	TypeName string
-}
-
-var _ errors.UserError = unknownABITypeError{}
-
-func (unknownABITypeError) IsUserError() {}
-
-func (e unknownABITypeError) Error() string {
-	return fmt.Sprintf("unknown ABI type: %s", e.TypeName)
-}
-
 // abiEncodingError
 type abiEncodingError struct {
 	Type interpreter.StaticType
