@@ -541,7 +541,7 @@ func TestEVMEncodeDecodeABIRoundtrip(t *testing.T) {
         assert((values[10] as! Int128) == -33)
         assert((values[11] as! Int256) == -33)
 
-        // Check array of leaf types encode/decode
+        // Check variable-size array of leaf types encode/decode
         data = EVM.encodeABI([
           ["one", "two"],
           [true, false],
@@ -556,7 +556,8 @@ func TestEVMEncodeDecodeABIRoundtrip(t *testing.T) {
           [-5, -10] as [Int32],
           [-5, -10] as [Int64],
           [-5, -10] as [Int128],
-          [-5, -10] as [Int256]
+          [-5, -10] as [Int256],
+          [address] as [EVM.EVMAddress]
         ])
         values = EVM.decodeABI(
           types: [
@@ -573,7 +574,8 @@ func TestEVMEncodeDecodeABIRoundtrip(t *testing.T) {
             Type<[Int32]>(),
             Type<[Int64]>(),
             Type<[Int128]>(),
-            Type<[Int256]>()
+            Type<[Int256]>(),
+            Type<[EVM.EVMAddress]>()
           ],
           data: data
         )
@@ -591,14 +593,17 @@ func TestEVMEncodeDecodeABIRoundtrip(t *testing.T) {
         assert((values[11] as! [Int64]) == [-5, -10])
         assert((values[12] as! [Int128]) == [-5, -10])
         assert((values[13] as! [Int256]) == [-5, -10])
+        assert((values[14] as! [EVM.EVMAddress])[0].bytes == [address][0].bytes)
 
+        // Check partial decoding of encoded data
         data = EVM.encodeABI(["Peter", UInt64(9999)])
         values = EVM.decodeABI(types: [Type<String>()], data: data)
         assert(values.length == 1)
         assert((values[0] as! String) == "Peter")
 
+        // Check nested arrays of leaf values
         data = EVM.encodeABI([[["Foo", "Bar"], ["Baz", "Qux"]]])
- 	    values = EVM.decodeABI(types: [Type<[[String]]>()], data: data)
+        values = EVM.decodeABI(types: [Type<[[String]]>()], data: data)
         assert(values.length == 1)
         assert((values[0] as! [[String]]) == [["Foo", "Bar"], ["Baz", "Qux"]])
 

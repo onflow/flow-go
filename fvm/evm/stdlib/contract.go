@@ -260,7 +260,10 @@ func gethABIType(staticType interpreter.StaticType, evmAddressTypeID common.Type
 	return gethABI.Type{}, false
 }
 
-func goType(staticType interpreter.StaticType) (reflect.Type, bool) {
+func goType(
+	staticType interpreter.StaticType,
+	evmAddressTypeID common.TypeID,
+) (reflect.Type, bool) {
 	switch staticType {
 	case interpreter.PrimitiveStaticTypeString:
 		return reflect.TypeOf(""), true
@@ -296,7 +299,7 @@ func goType(staticType interpreter.StaticType) (reflect.Type, bool) {
 
 	switch staticType := staticType.(type) {
 	case interpreter.ConstantSizedStaticType:
-		elementType, ok := goType(staticType.ElementType())
+		elementType, ok := goType(staticType.ElementType(), evmAddressTypeID)
 		if !ok {
 			break
 		}
@@ -304,12 +307,16 @@ func goType(staticType interpreter.StaticType) (reflect.Type, bool) {
 		return reflect.ArrayOf(int(staticType.Size), elementType), true
 
 	case interpreter.VariableSizedStaticType:
-		elementType, ok := goType(staticType.ElementType())
+		elementType, ok := goType(staticType.ElementType(), evmAddressTypeID)
 		if !ok {
 			break
 		}
 
 		return reflect.SliceOf(elementType), true
+	}
+
+	if staticType.ID() == evmAddressTypeID {
+		return reflect.TypeOf(gethCommon.Address{}), true
 	}
 
 	return nil, false
@@ -423,7 +430,7 @@ func encodeABI(
 
 		elementStaticType := arrayStaticType.ElementType()
 
-		elementGoType, ok := goType(elementStaticType)
+		elementGoType, ok := goType(elementStaticType, evmAddressTypeID)
 		if !ok {
 			break
 		}
