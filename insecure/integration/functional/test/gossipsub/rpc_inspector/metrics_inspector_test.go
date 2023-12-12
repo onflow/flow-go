@@ -25,7 +25,6 @@ import (
 
 // TestMetricsInspector_ObserveRPC ensures that the gossipsub rpc metrics inspector observes metrics for control messages as expected.
 func TestMetricsInspector_ObserveRPC(t *testing.T) {
-	t.Parallel()
 	role := flow.RoleConsensus
 	sporkID := unittest.IdentifierFixture()
 	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})

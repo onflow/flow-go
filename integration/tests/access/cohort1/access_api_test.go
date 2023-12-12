@@ -87,7 +87,12 @@ func (s *AccessAPISuite) SetupTest() {
 	)
 
 	consensusConfigs := []func(config *testnet.NodeConfig){
-		testnet.WithAdditionalFlag("--cruise-ctl-fallback-proposal-duration=100ms"),
+		// `cruise-ctl-fallback-proposal-duration` is set to 250ms instead to of 100ms
+		// to purposely slow down the block rate. This is needed since the crypto module
+		// update providing faster BLS operations.
+		// TODO: fix the access integration test logic to function without slowing down
+		// the block rate
+		testnet.WithAdditionalFlag("--cruise-ctl-fallback-proposal-duration=250ms"),
 		testnet.WithAdditionalFlagf("--required-verification-seal-approvals=%d", 1),
 		testnet.WithAdditionalFlagf("--required-construction-seal-approvals=%d", 1),
 		testnet.WithLogLevel(zerolog.FatalLevel),

@@ -1959,8 +1959,8 @@ github.com/onflow/flow-go-sdk v0.41.7-stable-cadence/go.mod h1:ejVN+bqcsTHVvRpDD
 github.com/onflow/flow-go-sdk v0.44.0-stable-cadence.2 h1:vUVO6m85BiT8c50Oc8YGc3CU+sGqiKW9FZbmiRph2dU=
 github.com/onflow/flow-go-sdk v0.44.0-stable-cadence.2/go.mod h1:mbLrR3MkYbi9LH3yasDj1jrR4QTR8vjRLVFCm4jMHn0=
 github.com/onflow/flow-go/crypto v0.24.7/go.mod h1:fqCzkIBBMRRkciVrvW21rECKq1oD7Q6u+bCI78lfNX0=
-github.com/onflow/flow-go/crypto v0.24.9 h1:0EQp+kSZYJepMIiSypfJVe7tzsPcb6UXOdOtsTCDhBs=
-github.com/onflow/flow-go/crypto v0.24.9/go.mod h1:fqCzkIBBMRRkciVrvW21rECKq1oD7Q6u+bCI78lfNX0=
+github.com/onflow/flow-go/crypto v0.25.0 h1:6lmoiAQ3APCF+nV7f4f2AXL3PuDKqQiWqRJXmjrMEq4=
+github.com/onflow/flow-go/crypto v0.25.0/go.mod h1:OOb2vYcS8AOCajBClhHTJ0NKftFl1RQgTQ0+Vh4nbqk=
 github.com/onflow/flow-nft/lib/go/contracts v1.1.1-0.20231212194623-24d595274bdd h1:ExvryNEp/B4bhLBGMVh9FHcviN4YloGncDpeSbDkCwg=
 github.com/onflow/flow-nft/lib/go/contracts v1.1.1-0.20231212194623-24d595274bdd/go.mod h1:OKA2xWNugqqbaFSmxdb1VWixtuqSdz/VK1MlbdcIUxw=
 github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20221202093946-932d1c70e288/go.mod h1:gQxYqCfkI8lpnKsmIjwtN2mV/N2PIwc1I+RUK4HPIc8=
@@ -2265,7 +2265,6 @@ github.com/stretchr/testify v1.8.4/go.mod h1:sz/lmYIOXD/1dqDmKjjqLyZ2RngseejIcXl
 github.com/subosito/gotenv v1.4.2 h1:X1TuBLAMDFbaTAChgCBLu3DU3UPyELpnF2jjJ2cz/S8=
 github.com/subosito/gotenv v1.4.2/go.mod h1:ayKnFf/c6rvx/2iiLrJUk1e6plDbT3edrFNGqEflhK0=
 github.com/supranational/blst v0.3.10/go.mod h1:jZJtfjgudtNl4en1tzwPIV3KjUnQUvG3/j+w+fVonLw=
-github.com/supranational/blst v0.3.11-0.20230406105308-e9dfc5ee724b h1:u49mjRnygnB34h8OKbnNJFVUtWSKIKb1KukdV8bILUM=
 github.com/syndtr/goleveldb v1.0.0/go.mod h1:ZVVdQEZoIme9iO1Ch2Jdy24qqXrMMOU6lpPAyBWyWuQ=
 github.com/syndtr/goleveldb v1.0.1-0.20190923125748-758128399b1d/go.mod h1:9OrXJhf154huy1nPWmuSrkgjPUtUNhA+Zmy+6AESzuA=
 github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7 h1:epCh84lMvA70Z7CTTCmYQn2CKbY8j86K7/FAIr141uY=

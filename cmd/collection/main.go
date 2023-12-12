@@ -418,7 +418,7 @@ func main() {
 			collectionRequestQueue := queue.NewHeroStore(maxCollectionRequestCacheSize, node.Logger, collectionRequestMetrics)
 
 			return provider.New(
-				node.Logger,
+				node.Logger.With().Str("engine", "collection_provider").Logger(),
 				node.Metrics.Engine,
 				node.EngineRegistry,
 				node.Me,

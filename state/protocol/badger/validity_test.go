@@ -51,7 +51,7 @@ func TestEpochSetupValidity(t *testing.T) {
 	t.Run("short seed", func(t *testing.T) {
 		_, result, _ := unittest.BootstrapFixture(participants)
 		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
-		setup.RandomSource = unittest.SeedFixture(crypto.SeedMinLenDKG - 1)
+		setup.RandomSource = unittest.SeedFixture(crypto.KeyGenSeedMinLen - 1)
 
 		err := verifyEpochSetup(setup, true)
 		require.Error(t, err)
