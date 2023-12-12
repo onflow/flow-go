@@ -55,10 +55,12 @@ type State struct {
 	// Caution: A node that joined in a later epoch past the spork, the node will likely _not_
 	// know the spork's root block in full (though it will always know the height).
 	sporkRootBlockHeight uint64
-	// cache the latest finalized and sealed block headers as these are common queries.
-	// It can be cached because the protocol state is solely responsible for updating these values.
-	cachedFinal  *atomic.Pointer[cachedHeader]
-	cachedSealed *atomic.Pointer[cachedHeader]
+	// cachedLatestFinal is the *latest* finalized block header, which we can cache here,
+	// because the protocol state is solely responsible for updating it.
+	cachedLatestFinal *atomic.Pointer[cachedHeader]
+	// cachedLatestSealed is the *latest* sealed block headers, which we can cache here,
+	// because the protocol state is solely responsible for updating it.
+	cachedLatestSealed *atomic.Pointer[cachedHeader]
 }
 
 var _ protocol.State = (*State)(nil)
@@ -690,7 +692,7 @@ func (state *State) Params() protocol.Params {
 // Sealed returns a snapshot for the latest sealed block. A latest sealed block
 // must always exist, so this function always returns a valid snapshot.
 func (state *State) Sealed() protocol.Snapshot {
-	cached := state.cachedSealed.Load()
+	cached := state.cachedLatestSealed.Load()
 	if cached == nil {
 		return invalid.NewSnapshotf("internal inconsistency: no cached sealed header")
 	}
@@ -700,7 +702,7 @@ func (state *State) Sealed() protocol.Snapshot {
 // Final returns a snapshot for the latest finalized block. A latest finalized
 // block must always exist, so this function always returns a valid snapshot.
 func (state *State) Final() protocol.Snapshot {
-	cached := state.cachedFinal.Load()
+	cached := state.cachedLatestFinal.Load()
 	if cached == nil {
 		return invalid.NewSnapshotf("internal inconsistency: no cached final header")
 	}
@@ -787,9 +789,9 @@ func newState(
 			setups,
 			commits,
 		),
-		versionBeacons: versionBeacons,
-		cachedFinal:    new(atomic.Pointer[cachedHeader]),
-		cachedSealed:   new(atomic.Pointer[cachedHeader]),
+		versionBeacons:     versionBeacons,
+		cachedLatestFinal:  new(atomic.Pointer[cachedHeader]),
+		cachedLatestSealed: new(atomic.Pointer[cachedHeader]),
 	}
 
 	// populate the protocol state cache
@@ -892,7 +894,7 @@ func (state *State) populateCache() error {
 		if err != nil {
 			return fmt.Errorf("could not get finalized block (id=%x): %w", cachedFinalHeader.id, err)
 		}
-		state.cachedFinal.Store(&cachedFinalHeader)
+		state.cachedLatestFinal.Store(&cachedFinalHeader)
 		// sealed header
 		var sealedHeight uint64
 		err = operation.RetrieveSealedHeight(&sealedHeight)(tx)
@@ -908,7 +910,7 @@ func (state *State) populateCache() error {
 		if err != nil {
 			return fmt.Errorf("could not get sealed block (id=%x): %w", cachedSealedHeader.id, err)
 		}
-		state.cachedSealed.Store(&cachedSealedHeader)
+		state.cachedLatestSealed.Store(&cachedSealedHeader)
 
 		state.finalizedRootHeight = state.Params().FinalizedRoot().Height
 		state.sealedRootHeight = state.Params().SealedRoot().Height
