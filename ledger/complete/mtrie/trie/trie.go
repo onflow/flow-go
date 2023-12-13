@@ -748,7 +748,7 @@ func EmptyTrieRootHash() ledger.RootHash {
 }
 
 // AllPayloads returns all payloads
-func (mt *MTrie) AllPayloads() []ledger.Payload {
+func (mt *MTrie) AllPayloads() []*ledger.Payload {
 	return mt.root.AllPayloads()
 }
 

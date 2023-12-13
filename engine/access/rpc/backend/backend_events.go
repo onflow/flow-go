@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -57,7 +58,9 @@ func (b *backendEvents) GetEventsForHeightRange(
 	sealed, err := b.state.Sealed().Head()
 	if err != nil {
 		// sealed block must be in the store, so return an Internal code even if we got NotFound
-		return nil, status.Errorf(codes.Internal, "failed to get events: %v", err)
+		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
+		irrecoverable.Throw(ctx, err)
+		return nil, err
 	}
 
 	// start height should not be beyond the last sealed height

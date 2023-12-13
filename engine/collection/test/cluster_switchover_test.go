@@ -212,7 +212,7 @@ func (tc *ClusterSwitchoverTestCase) StartNodes() {
 		nodes = append(nodes, node)
 	}
 
-	unittest.RequireCloseBefore(tc.T(), util.AllReady(nodes...), time.Second, "could not start nodes")
+	unittest.RequireCloseBefore(tc.T(), util.AllReady(nodes...), 3*time.Second, "could not start nodes")
 
 	// start continuous delivery for all nodes
 	for _, node := range tc.nodes {

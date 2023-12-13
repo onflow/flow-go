@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/storehouse"
+	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -18,7 +19,7 @@ func withRegisterStore(t *testing.T, fn func(
 	t *testing.T,
 	rs *storehouse.RegisterStore,
 	diskStore execution.OnDiskRegisterStore,
-	finalized *mockFinalizedReader,
+	finalized *testutil.MockFinalizedReader,
 	rootHeight uint64,
 	endHeight uint64,
 	headers map[uint64]*flow.Header,
@@ -26,7 +27,7 @@ func withRegisterStore(t *testing.T, fn func(
 	pebble.RunWithRegistersStorageAtInitialHeights(t, 10, 10, func(diskStore *pebble.Registers) {
 		log := unittest.Logger()
 		var wal execution.ExecutedFinalizedWAL
-		finalized, headerByHeight, highest := newMockFinalizedReader(10, 100)
+		finalized, headerByHeight, highest := testutil.NewMockFinalizedReader(10, 100)
 		rs, err := storehouse.NewRegisterStore(diskStore, wal, finalized, log)
 		require.NoError(t, err)
 		fn(t, rs, diskStore, finalized, 10, highest, headerByHeight)
@@ -44,7 +45,7 @@ func TestRegisterStoreGetRegisterFail(t *testing.T) {
 		t *testing.T,
 		rs *storehouse.RegisterStore,
 		diskStore execution.OnDiskRegisterStore,
-		finalized *mockFinalizedReader,
+		finalized *testutil.MockFinalizedReader,
 		rootHeight uint64,
 		endHeight uint64,
 		headerByHeight map[uint64]*flow.Header,
@@ -83,7 +84,7 @@ func TestRegisterStoreSaveRegistersShouldFail(t *testing.T) {
 		t *testing.T,
 		rs *storehouse.RegisterStore,
 		diskStore execution.OnDiskRegisterStore,
-		finalized *mockFinalizedReader,
+		finalized *testutil.MockFinalizedReader,
 		rootHeight uint64,
 		endHeight uint64,
 		headerByHeight map[uint64]*flow.Header,
@@ -112,7 +113,7 @@ func TestRegisterStoreSaveRegistersShouldOK(t *testing.T) {
 		t *testing.T,
 		rs *storehouse.RegisterStore,
 		diskStore execution.OnDiskRegisterStore,
-		finalized *mockFinalizedReader,
+		finalized *testutil.MockFinalizedReader,
 		rootHeight uint64,
 		endHeight uint64,
 		headerByHeight map[uint64]*flow.Header,
@@ -164,7 +165,7 @@ func TestRegisterStoreIsBlockExecuted(t *testing.T) {
 		t *testing.T,
 		rs *storehouse.RegisterStore,
 		diskStore execution.OnDiskRegisterStore,
-		finalized *mockFinalizedReader,
+		finalized *testutil.MockFinalizedReader,
 		rootHeight uint64,
 		endHeight uint64,
 		headerByHeight map[uint64]*flow.Header,
@@ -209,7 +210,7 @@ func TestRegisterStoreReadingFromDisk(t *testing.T) {
 		t *testing.T,
 		rs *storehouse.RegisterStore,
 		diskStore execution.OnDiskRegisterStore,
-		finalized *mockFinalizedReader,
+		finalized *testutil.MockFinalizedReader,
 		rootHeight uint64,
 		endHeight uint64,
 		headerByHeight map[uint64]*flow.Header,
@@ -257,7 +258,7 @@ func TestRegisterStoreReadingFromInMemStore(t *testing.T) {
 		t *testing.T,
 		rs *storehouse.RegisterStore,
 		diskStore execution.OnDiskRegisterStore,
-		finalized *mockFinalizedReader,
+		finalized *testutil.MockFinalizedReader,
 		rootHeight uint64,
 		endHeight uint64,
 		headerByHeight map[uint64]*flow.Header,
@@ -310,6 +311,107 @@ func TestRegisterStoreReadingFromInMemStore(t *testing.T) {
 	})
 }
 
+func TestRegisterStoreReadRegisterAtPrunedHeight(t *testing.T) {
+	t.Parallel()
+	withRegisterStore(t, func(
+		t *testing.T,
+		rs *storehouse.RegisterStore,
+		diskStore execution.OnDiskRegisterStore,
+		finalized *testutil.MockFinalizedReader,
+		rootHeight uint64,
+		endHeight uint64,
+		headerByHeight map[uint64]*flow.Header,
+	) {
+
+		// R <- 11 (X: 1)
+
+		// if execute first then finalize later, should be able to read register at pruned height
+		// save block 11
+		err := rs.SaveRegisters(headerByHeight[rootHeight+1], flow.RegisterEntries{makeReg("X", "1")})
+		require.NoError(t, err)
+		require.Equal(t, 2, finalized.FinalizedCalled()) // called by SaveRegisters with height 11
+
+		// finalize block 11
+		require.NoError(t, finalized.MockFinal(rootHeight+1))
+		require.NoError(t, rs.OnBlockFinalized()) // notify 11 is finalized
+
+		val, err := rs.GetRegister(rootHeight+1, headerByHeight[rootHeight+1].ID(), makeReg("X", "").Key)
+		require.NoError(t, err)
+		require.Equal(t, makeReg("X", "1").Value, val)
+
+		// R <- 11 (X: 1) <- 12 (X: 2)
+		// if finalize first then execute later, should not be able to read register at pruned height
+		// finalize block 12
+		require.NoError(t, finalized.MockFinal(rootHeight+2))
+		require.NoError(t, rs.OnBlockFinalized()) // notify 12 is finalized
+
+		// save block 12
+		err = rs.SaveRegisters(headerByHeight[rootHeight+2], flow.RegisterEntries{makeReg("X", "2")})
+		require.NoError(t, err)
+
+		val, err = rs.GetRegister(rootHeight+1, headerByHeight[rootHeight+1].ID(), makeReg("X", "").Key)
+		require.NoError(t, err)
+		require.Equal(t, makeReg("X", "1").Value, val)
+
+		val, err = rs.GetRegister(rootHeight+2, headerByHeight[rootHeight+2].ID(), makeReg("X", "").Key)
+		require.NoError(t, err)
+		require.Equal(t, makeReg("X", "2").Value, val)
+	})
+}
+
+// Test that when getting register during executing a finalized block or finalize an executed block,
+// FinalizedBlockIDAtHeight should not be called
+func TestRegisterStoreExecuteFinalizedBlockOrFinalizeExecutedBlockShouldNotCallFinalizedHeight(t *testing.T) {
+	t.Parallel()
+	withRegisterStore(t, func(
+		t *testing.T,
+		rs *storehouse.RegisterStore,
+		diskStore execution.OnDiskRegisterStore,
+		finalized *testutil.MockFinalizedReader,
+		rootHeight uint64,
+		endHeight uint64,
+		headerByHeight map[uint64]*flow.Header,
+	) {
+
+		require.Equal(t, 1, finalized.FinalizedCalled()) // called by NewRegisterStore
+		// R <- 11 (X: 1)
+
+		val, err := rs.GetRegister(rootHeight, headerByHeight[rootHeight].ID(), makeReg("X", "").Key)
+		require.NoError(t, err)
+		require.Nil(t, val)
+		require.Equal(t, 1, finalized.FinalizedCalled()) // no FinalizedBlockIDAtHeight called
+
+		// if execute first then finalize later, should be able to read register at pruned height
+		// save block 11
+		err = rs.SaveRegisters(headerByHeight[rootHeight+1], flow.RegisterEntries{makeReg("X", "1")})
+		require.NoError(t, err)
+		require.Equal(t, 2, finalized.FinalizedCalled()) // called by SaveRegisters with height 11
+
+		// finalize block 11
+		require.NoError(t, finalized.MockFinal(rootHeight+1))
+		require.NoError(t, rs.OnBlockFinalized())        // notify 11 is finalized
+		require.Equal(t, 4, finalized.FinalizedCalled()) // called by Checking whether height 11 and 12 are finalized
+
+		// R <- 11 (X: 1) <- 12 (X: 2)
+		// if finalize first then execute later, should not be able to read register at pruned height
+		// finalize block 12
+		require.NoError(t, finalized.MockFinal(rootHeight+2))
+		require.NoError(t, rs.OnBlockFinalized())        // notify 12 is finalized
+		require.Equal(t, 5, finalized.FinalizedCalled()) // called by Checking whether height 12 and 13 are finalized
+
+		val, err = rs.GetRegister(rootHeight+1, headerByHeight[rootHeight+1].ID(), makeReg("X", "").Key)
+		require.NoError(t, err)
+		require.Equal(t, makeReg("X", "1").Value, val)
+		require.Equal(t, 5, finalized.FinalizedCalled()) // no FinalizedBlockIDAtHeight call
+
+		// save block 12
+		err = rs.SaveRegisters(headerByHeight[rootHeight+2], flow.RegisterEntries{makeReg("X", "2")})
+		require.NoError(t, err)
+		require.Equal(t, 7, finalized.FinalizedCalled()) // called by SaveRegisters with height 12 and 13
+
+	})
+}
+
 // Execute first then finalize later
 // SaveRegisters(1), SaveRegisters(2), SaveRegisters(3), then
 // OnBlockFinalized(1), OnBlockFinalized(2), OnBlockFinalized(3) should
@@ -322,7 +424,7 @@ func TestRegisterStoreExecuteFirstFinalizeLater(t *testing.T) {
 		t *testing.T,
 		rs *storehouse.RegisterStore,
 		diskStore execution.OnDiskRegisterStore,
-		finalized *mockFinalizedReader,
+		finalized *testutil.MockFinalizedReader,
 		rootHeight uint64,
 		endHeight uint64,
 		headerByHeight map[uint64]*flow.Header,
@@ -368,7 +470,7 @@ func TestRegisterStoreFinalizeFirstExecuteLater(t *testing.T) {
 		t *testing.T,
 		rs *storehouse.RegisterStore,
 		diskStore execution.OnDiskRegisterStore,
-		finalized *mockFinalizedReader,
+		finalized *testutil.MockFinalizedReader,
 		rootHeight uint64,
 		endHeight uint64,
 		headerByHeight map[uint64]*flow.Header,
@@ -411,7 +513,7 @@ func TestRegisterStoreConcurrentFinalizeAndExecute(t *testing.T) {
 		t *testing.T,
 		rs *storehouse.RegisterStore,
 		diskStore execution.OnDiskRegisterStore,
-		finalized *mockFinalizedReader,
+		finalized *testutil.MockFinalizedReader,
 		rootHeight uint64,
 		endHeight uint64,
 		headerByHeight map[uint64]*flow.Header,
