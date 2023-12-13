@@ -74,6 +74,11 @@ type EpochSetup struct {
 	RandomSource       []byte               // source of randomness for epoch-specific setup tasks
 }
 
+// NumViews returns the number of views within the epoch.
+func (setup EpochSetup) NumViews() uint64 {
+	return setup.FinalView - setup.FirstView + 1
+}
+
 func (setup *EpochSetup) ServiceEvent() ServiceEvent {
 	return ServiceEvent{
 		Type:  ServiceEventSetup,

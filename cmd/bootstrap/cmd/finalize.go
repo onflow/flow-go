@@ -1,27 +1,21 @@
 package cmd
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"strings"
 
-	"github.com/onflow/cadence"
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd"
-	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/fvm"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/order"
-	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
@@ -31,20 +25,17 @@ import (
 var (
 	flagConfig                  string
 	flagInternalNodePrivInfoDir string
-	flagCollectionClusters      uint
 	flagPartnerNodeInfoDir      string
 	// Deprecated: use flagPartnerWeights instead
-	deprecatedFlagPartnerStakes     string
-	flagPartnerWeights              string
-	flagDKGDataPath                 string
-	flagRootBlock                   string
-	flagRootEpoch                   string
-	flagRootBlockVotesDir           string
-	flagRootCommit                  string
-	flagProtocolVersion             uint
-	flagServiceAccountPublicKeyJSON string
-	flagGenesisTokenSupply          string
-	flagEpochCommitSafetyThreshold  uint64
+	deprecatedFlagPartnerStakes string
+	flagPartnerWeights          string
+	flagDKGDataPath             string
+	flagRootBlock               string
+	flagRootResult              string
+	flagRootSeal                string
+	flagRootEpoch               string // todo remove
+	flagRootBlockVotesDir       string
+	flagProtocolVersion         uint
 )
 
 // PartnerWeights is the format of the JSON file specifying partner node weights.
@@ -88,29 +79,20 @@ func addFinalizeCmdFlags() {
 	// required parameters for generation of root block, root execution result and root block seal
 	finalizeCmd.Flags().StringVar(&flagRootBlock, "root-block", "",
 		"path to a JSON file containing root block")
+	// TODO remove
 	finalizeCmd.Flags().StringVar(&flagRootEpoch, "root-epoch", "",
 		"path to a JSON file containing root epoch")
+	finalizeCmd.Flags().StringVar(&flagRootResult, "root-result", "",
+		"path to a JSON file containing root epoch")
+	finalizeCmd.Flags().StringVar(&flagRootSeal, "root-seal", "",
+		"path to a JSON file containing root epoch")
 	finalizeCmd.Flags().StringVar(&flagRootBlockVotesDir, "root-block-votes-dir", "", "path to directory with votes for root block")
-	finalizeCmd.Flags().StringVar(&flagRootCommit, "root-commit", "0000000000000000000000000000000000000000000000000000000000000000", "state commitment of root execution state")
-	finalizeCmd.Flags().Uint64Var(&flagEpochCommitSafetyThreshold, "epoch-commit-safety-threshold", 500, "defines epoch commitment deadline")
 	finalizeCmd.Flags().UintVar(&flagProtocolVersion, "protocol-version", flow.DefaultProtocolVersion, "major software version used for the duration of this spork")
 
 	cmd.MarkFlagRequired(finalizeCmd, "root-block")
 	cmd.MarkFlagRequired(finalizeCmd, "root-epoch")
 	cmd.MarkFlagRequired(finalizeCmd, "root-block-votes-dir")
-	cmd.MarkFlagRequired(finalizeCmd, "root-commit")
 	cmd.MarkFlagRequired(finalizeCmd, "protocol-version")
-	cmd.MarkFlagRequired(finalizeCmd, "epoch-commit-safety-threshold")
-
-	// optional parameters to influence various aspects of identity generation
-	finalizeCmd.Flags().UintVar(&flagCollectionClusters, "collection-clusters", 2, "number of collection clusters")
-
-	// these two flags are only used when setup a network from genesis
-	finalizeCmd.Flags().StringVar(&flagServiceAccountPublicKeyJSON, "service-account-public-key-json",
-		"{\"PublicKey\":\"ABCDEFGHIJK\",\"SignAlgo\":2,\"HashAlgo\":1,\"SeqNumber\":0,\"Weight\":1000}",
-		"encoded json of public key for the service account")
-	finalizeCmd.Flags().StringVar(&flagGenesisTokenSupply, "genesis-token-supply", "10000000.00000000",
-		"genesis flow token supply")
 }
 
 func finalize(cmd *cobra.Command, args []string) {
@@ -126,10 +108,10 @@ func finalize(cmd *cobra.Command, args []string) {
 	}
 
 	// validate epoch configs
-	err := validateEpochConfig()
-	if err != nil {
-		log.Fatal().Err(err).Msg("invalid or unsafe epoch commit threshold config")
-	}
+	//err := validateEpochConfig()
+	//if err != nil {
+	//	log.Fatal().Err(err).Msg("invalid or unsafe epoch commit threshold config")
+	//}
 
 	log.Info().Msg("collecting partner network and staking keys")
 	partnerNodes := readPartnerNodeInfos()
@@ -147,9 +129,6 @@ func finalize(cmd *cobra.Command, args []string) {
 	stakingNodes := mergeNodeInfos(internalNodes, partnerNodes)
 	log.Info().Msg("")
 
-	// create flow.IdentityList representation of participant set
-	participants := model.ToIdentityList(stakingNodes).Sort(order.Canonical[flow.Identity])
-
 	log.Info().Msg("reading root block data")
 	block := readRootBlock()
 	log.Info().Msg("")
@@ -164,9 +143,8 @@ func finalize(cmd *cobra.Command, args []string) {
 	dkgData := readDKGData()
 	log.Info().Msg("")
 
-	log.Info().Msg("reading root epoch")
-	epoch, epochSetup, epochCommit := readRootEpoch()
-	clusterQCs := clusterRootQCsFromEpoch(epoch)
+	log.Info().Msg("reading root result/seal")
+	result, seal := readRootResultAndSeal()
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing root QC")
@@ -177,21 +155,6 @@ func finalize(cmd *cobra.Command, args []string) {
 		model.FilterByRole(internalNodes, flow.RoleConsensus),
 		dkgData,
 	)
-	log.Info().Msg("")
-
-	// if no root commit is specified, bootstrap an empty execution state
-	if flagRootCommit == "0000000000000000000000000000000000000000000000000000000000000000" {
-		generateEmptyExecutionState(
-			block.Header.ChainID,
-			epochSetup.Assignments,
-			clusterQCs,
-			dkgData,
-			participants,
-		)
-	}
-
-	log.Info().Msg("constructing root execution result and block seal")
-	result, seal := constructRootResultAndSeal(flagRootCommit, block, epochSetup, epochCommit)
 	log.Info().Msg("")
 
 	// construct serializable root protocol snapshot
@@ -221,7 +184,7 @@ func finalize(cmd *cobra.Command, args []string) {
 	// read snapshot and verify consistency
 	rootSnapshot, err := loadRootProtocolSnapshot(model.PathRootProtocolStateSnapshot)
 	if err != nil {
-		log.Fatal().Err(err).Msg("unable to load seralized root protocol")
+		log.Fatal().Err(err).Msg("unable to load serialized root protocol")
 	}
 
 	savedResult, savedSeal, err := rootSnapshot.SealedResult()
@@ -490,6 +453,7 @@ func readRootBlock() *flow.Block {
 
 // readRootEpoch reads root epoch data from disc, this file needs to be prepared with
 // rootblock command
+// todo remove
 func readRootEpoch() (protocol.Epoch, *flow.EpochSetup, *flow.EpochCommit) {
 	encodableEpoch, err := utils.ReadData[inmem.EncodableEpoch](flagRootEpoch)
 	if err != nil {
@@ -505,6 +469,18 @@ func readRootEpoch() (protocol.Epoch, *flow.EpochSetup, *flow.EpochCommit) {
 		log.Fatal().Err(err).Msg("could not extract commit event")
 	}
 	return epoch, setup, commit
+}
+
+func readRootResultAndSeal() (*flow.ExecutionResult, *flow.Seal) {
+	result, err := utils.ReadData[flow.ExecutionResult](flagRootResult)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to read root result")
+	}
+	seal, err := utils.ReadData[flow.Seal](flagRootSeal)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to read root seal")
+	}
+	return result, seal
 }
 
 // readDKGData reads DKG data from disc, this file needs to be prepared with
@@ -573,96 +549,4 @@ func loadRootProtocolSnapshot(path string) (*inmem.Snapshot, error) {
 	}
 
 	return inmem.SnapshotFromEncodable(snapshot), nil
-}
-
-// generateEmptyExecutionState generates a new empty execution state with the
-// given configuration. Sets the flagRootCommit variable for future reads.
-func generateEmptyExecutionState(
-	chainID flow.ChainID,
-	assignments flow.AssignmentList,
-	clusterQCs []*flow.QuorumCertificate,
-	dkgData dkg.DKGData,
-	identities flow.IdentityList,
-) (commit flow.StateCommitment) {
-
-	log.Info().Msg("generating empty execution state")
-	var serviceAccountPublicKey flow.AccountPublicKey
-	err := serviceAccountPublicKey.UnmarshalJSON([]byte(flagServiceAccountPublicKeyJSON))
-	if err != nil {
-		log.Fatal().Err(err).Msg("unable to parse the service account public key json")
-	}
-
-	cdcInitialTokenSupply, err := cadence.NewUFix64(flagGenesisTokenSupply)
-	if err != nil {
-		log.Fatal().Err(err).Msg("invalid genesis token supply")
-	}
-
-	randomSource := make([]byte, flow.EpochSetupRandomSourceLength)
-	if _, err = rand.Read(randomSource); err != nil {
-		log.Fatal().Err(err).Msg("failed to generate a random source")
-	}
-	cdcRandomSource, err := cadence.NewString(hex.EncodeToString(randomSource))
-	if err != nil {
-		log.Fatal().Err(err).Msg("invalid random source")
-	}
-
-	epochConfig := epochs.EpochConfig{
-		EpochTokenPayout:             cadence.UFix64(0),
-		RewardCut:                    cadence.UFix64(0),
-		CurrentEpochCounter:          cadence.UInt64(flagEpochCounter),
-		NumViewsInEpoch:              cadence.UInt64(flagNumViewsInEpoch),
-		NumViewsInStakingAuction:     cadence.UInt64(flagNumViewsInStakingAuction),
-		NumViewsInDKGPhase:           cadence.UInt64(flagNumViewsInDKGPhase),
-		NumCollectorClusters:         cadence.UInt16(flagCollectionClusters),
-		FLOWsupplyIncreasePercentage: cadence.UFix64(0),
-		RandomSource:                 cdcRandomSource,
-		CollectorClusters:            assignments,
-		ClusterQCs:                   clusterQCs,
-		DKGPubKeys:                   dkgData.PubKeyShares,
-	}
-
-	commit, err = run.GenerateExecutionState(
-		filepath.Join(flagOutdir, model.DirnameExecutionState),
-		serviceAccountPublicKey,
-		chainID.Chain(),
-		fvm.WithInitialTokenSupply(cdcInitialTokenSupply),
-		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
-		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
-		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
-		fvm.WithEpochConfig(epochConfig),
-		fvm.WithIdentities(identities),
-	)
-	if err != nil {
-		log.Fatal().Err(err).Msg("unable to generate execution state")
-	}
-	flagRootCommit = hex.EncodeToString(commit[:])
-	log.Info().Msg("")
-	return
-}
-
-// validateEpochConfig validates configuration of the epoch commitment deadline.
-func validateEpochConfig() error {
-	chainID := parseChainID(flagRootChain)
-	dkgFinalView := flagNumViewsInStakingAuction + flagNumViewsInDKGPhase*3 // 3 DKG phases
-	epochCommitDeadline := flagNumViewsInEpoch - flagEpochCommitSafetyThreshold
-
-	defaultSafetyThreshold, err := protocol.DefaultEpochCommitSafetyThreshold(chainID)
-	if err != nil {
-		return fmt.Errorf("could not get default epoch commit safety threshold: %w", err)
-	}
-
-	// sanity check: the safety threshold is >= the default for the chain
-	if flagEpochCommitSafetyThreshold < defaultSafetyThreshold {
-		return fmt.Errorf("potentially unsafe epoch config: epoch commit safety threshold smaller than expected (%d < %d)", flagEpochCommitSafetyThreshold, defaultSafetyThreshold)
-	}
-	// sanity check: epoch commitment deadline cannot be before the DKG end
-	if epochCommitDeadline <= dkgFinalView {
-		return fmt.Errorf("invalid epoch config: the epoch commitment deadline (%d) is before the DKG final view (%d)", epochCommitDeadline, dkgFinalView)
-	}
-	// sanity check: the difference between DKG end and safety threshold is also >= the default safety threshold
-	if epochCommitDeadline-dkgFinalView < defaultSafetyThreshold {
-		return fmt.Errorf("potentially unsafe epoch config: time between DKG end and epoch commitment deadline is smaller than expected (%d-%d < %d)",
-			epochCommitDeadline, dkgFinalView, defaultSafetyThreshold)
-	}
-	return nil
 }
