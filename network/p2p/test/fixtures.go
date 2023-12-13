@@ -1079,7 +1079,7 @@ func WithGrafts(topicIds ...string) GossipSubCtrlOption {
 //
 // Returns:
 // A GossipSubCtrlOption that adds PRUNE messages to the control message.
-// Example: WithPrunes("topic1", "topic2", "topic3") will add PRUNE messages for each specified topic ID.
+// Example: WithPrunes("topic1", "topic2", "topic3") will add one PRUNE messages for each specified topic ID.
 func WithPrunes(topicIds ...string) GossipSubCtrlOption {
 	return func(msg *pb.ControlMessage) {
 		prunes := make([]*pb.ControlPrune, len(topicIds))
