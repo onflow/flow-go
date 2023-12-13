@@ -53,6 +53,7 @@ func testSpock(
 }
 
 func TestSpockStateGet(t *testing.T) {
+	otherOwner := unittest.RandomAddressFixture()
 	registerId := flow.NewRegisterID(fooOwner, "bar")
 
 	states := testSpock(
@@ -74,7 +75,7 @@ func TestSpockStateGet(t *testing.T) {
 			},
 			// Reading different register ids will result in different spock
 			func(t *testing.T, state *spockState) {
-				_, err := state.Get(flow.NewRegisterID(unittest.RandomAddressFixture(), "bar"))
+				_, err := state.Get(flow.NewRegisterID(otherOwner, "bar"))
 				require.NoError(t, err)
 			},
 			func(t *testing.T, state *spockState) {
@@ -147,6 +148,7 @@ func TestSpockStateGetVsSetNil(t *testing.T) {
 }
 
 func TestSpockStateSet(t *testing.T) {
+	otherOwner := unittest.RandomAddressFixture()
 	registerId := flow.NewRegisterID(fooOwner, "bar")
 	value := flow.RegisterValue([]byte("value"))
 
@@ -173,7 +175,7 @@ func TestSpockStateSet(t *testing.T) {
 				require.NoError(t, err)
 			},
 			func(t *testing.T, state *spockState) {
-				err := state.Set(flow.NewRegisterID(unittest.RandomAddressFixture(), "bar"), value)
+				err := state.Set(flow.NewRegisterID(otherOwner, "bar"), value)
 				require.NoError(t, err)
 			},
 			// Setting different register value will result in different spock

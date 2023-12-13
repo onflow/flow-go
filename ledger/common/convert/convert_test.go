@@ -12,11 +12,13 @@ import (
 )
 
 func TestLedgerKeyToRegisterID(t *testing.T) {
+	expectedRegisterID := unittest.RegisterIDFixture()
+
 	key := ledger.Key{
 		KeyParts: []ledger.KeyPart{
 			{
 				Type:  convert.KeyPartOwner,
-				Value: []byte("owner"),
+				Value: []byte(expectedRegisterID.Owner),
 			},
 			{
 				Type:  convert.KeyPartKey,
@@ -25,7 +27,6 @@ func TestLedgerKeyToRegisterID(t *testing.T) {
 		},
 	}
 
-	expectedRegisterID := unittest.RegisterIDFixture()
 	registerID, err := convert.LedgerKeyToRegisterID(key)
 	require.NoError(t, err)
 	require.Equal(t, expectedRegisterID, registerID)
@@ -78,7 +79,7 @@ func TestRegisterIDToLedgerKey(t *testing.T) {
 				Type: convert.KeyPartOwner,
 				// Note: the owner field is extended to address length during NewRegisterID
 				// so we have to do the same here
-				Value: flow.BytesToAddress([]byte("owner")).Bytes(),
+				Value: []byte(registerID.Owner),
 			},
 			{
 				Type:  convert.KeyPartKey,
