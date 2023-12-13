@@ -423,20 +423,17 @@ func DefaultCreateNodeFunc(
 	return p2pnode.NewNode(logger, host, pCache, peerManager, disallowListCacheCfg)
 }
 
-type DefaultNodeBuilderParams struct {
-	*LibP2PNodeBuilderParams
-	Resolver            madns.BasicResolver
-	Role                string
-	ConnGaterCfg        *p2pconfig.ConnectionGaterConfig
-	GossipCfg           *p2pconf.GossipSubConfig
-	ConnMgrConfig       *netconf.ConnectionManagerConfig
-	DhtSystemActivation DhtSystemActivation
-}
-
 // DefaultNodeBuilder returns a node builder.
-func DefaultNodeBuilder(params *DefaultNodeBuilderParams) (p2p.NodeBuilder, error) {
+func DefaultNodeBuilder(params *LibP2PNodeBuilderParams,
+	resolver madns.BasicResolver,
+	role string,
+	connGaterCfg *p2pconfig.ConnectionGaterConfig,
+	gossipCfg *p2pconf.GossipSubConfig,
+	connMgrConfig *netconf.ConnectionManagerConfig,
+	dhtSystemActivation DhtSystemActivation,
+) (p2p.NodeBuilder, error) {
 
-	connManager, err := connection.NewConnManager(params.Logger, params.MetricsConfig.Metrics, params.ConnMgrConfig)
+	connManager, err := connection.NewConnManager(params.Logger, params.MetricsConfig.Metrics, connMgrConfig)
 	if err != nil {
 		return nil, fmt.Errorf("could not create connection manager: %w", err)
 	}
@@ -448,48 +445,48 @@ func DefaultNodeBuilder(params *DefaultNodeBuilderParams) (p2p.NodeBuilder, erro
 	connGater := connection.NewConnGater(
 		params.Logger,
 		params.IdProvider,
-		connection.WithOnInterceptPeerDialFilters(append(peerFilters, params.ConnGaterCfg.InterceptPeerDialFilters...)),
-		connection.WithOnInterceptSecuredFilters(append(peerFilters, params.ConnGaterCfg.InterceptSecuredFilters...)))
+		connection.WithOnInterceptPeerDialFilters(append(peerFilters, connGaterCfg.InterceptPeerDialFilters...)),
+		connection.WithOnInterceptSecuredFilters(append(peerFilters, connGaterCfg.InterceptSecuredFilters...)))
 
 	meshTracerCfg := &tracer.GossipSubMeshTracerConfig{
 		Logger:                             params.Logger,
 		Metrics:                            params.MetricsConfig.Metrics,
 		IDProvider:                         params.IdProvider,
-		LoggerInterval:                     params.GossipCfg.LocalMeshLogInterval,
-		RpcSentTrackerCacheSize:            params.GossipCfg.RPCSentTrackerCacheSize,
-		RpcSentTrackerWorkerQueueCacheSize: params.GossipCfg.RPCSentTrackerQueueCacheSize,
-		RpcSentTrackerNumOfWorkers:         params.GossipCfg.RpcSentTrackerNumOfWorkers,
+		LoggerInterval:                     gossipCfg.LocalMeshLogInterval,
+		RpcSentTrackerCacheSize:            gossipCfg.RPCSentTrackerCacheSize,
+		RpcSentTrackerWorkerQueueCacheSize: gossipCfg.RPCSentTrackerQueueCacheSize,
+		RpcSentTrackerNumOfWorkers:         gossipCfg.RpcSentTrackerNumOfWorkers,
 		HeroCacheMetricsFactory:            params.MetricsConfig.HeroCacheFactory,
 		NetworkingType:                     flownet.PrivateNetwork,
 	}
 	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
 
-	builder, err := NewNodeBuilder(params.LibP2PNodeBuilderParams, meshTracer)
+	builder, err := NewNodeBuilder(params, meshTracer)
 	if err != nil {
 		return nil, fmt.Errorf("could not create libp2p node builder: %w", err)
 	}
 	builder.
-		SetBasicResolver(params.Resolver).
+		SetBasicResolver(resolver).
 		SetConnectionManager(connManager).
 		SetConnectionGater(connGater).
 		SetCreateNode(DefaultCreateNodeFunc)
 
-	if params.GossipCfg.PeerScoring {
+	if gossipCfg.PeerScoring {
 		// In production, we never override the default scoring config.
 		builder.EnableGossipSubScoringWithOverride(p2p.PeerScoringConfigNoOverride)
 	}
 
 	builder.SetGossipSubTracer(meshTracer)
-	builder.SetGossipSubScoreTracerInterval(params.GossipCfg.ScoreTracerInterval)
+	builder.SetGossipSubScoreTracerInterval(gossipCfg.ScoreTracerInterval)
 
-	if params.Role != "ghost" {
-		r, err := flow.ParseRole(params.Role)
+	if role != "ghost" {
+		r, err := flow.ParseRole(role)
 		if err != nil {
 			return nil, fmt.Errorf("could not parse role: %w", err)
 		}
 		builder.SetSubscriptionFilter(subscription.NewRoleBasedFilter(r, params.IdProvider))
 
-		if params.DhtSystemActivation == DhtSystemEnabled {
+		if dhtSystemActivation == DhtSystemEnabled {
 			builder.SetRoutingSystem(
 				func(ctx context.Context, host host.Host) (routing.Routing, error) {
 					return dht.NewDHT(ctx, host, protocols.FlowDHTProtocolID(params.SporkId), params.Logger, params.MetricsConfig.Metrics, dht.AsServer())

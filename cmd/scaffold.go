@@ -380,38 +380,36 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		if err != nil {
 			return nil, fmt.Errorf("could not determine dht activation status: %w", err)
 		}
-		defaultNodeBuilderParams := &p2pbuilder.DefaultNodeBuilderParams{
-			LibP2PNodeBuilderParams: &p2pbuilder.LibP2PNodeBuilderParams{
-				Logger: fnb.Logger,
-				MetricsConfig: &p2pconfig.MetricsConfig{
-					Metrics:          fnb.Metrics.Network,
-					HeroCacheFactory: fnb.HeroCacheMetricsFactory(),
-				},
-				NetworkingType:            network.PrivateNetwork,
-				Address:                   myAddr,
-				NetworkKey:                fnb.NetworkKey,
-				SporkId:                   fnb.SporkID,
-				IdProvider:                fnb.IdentityProvider,
-				RCfg:                      &fnb.FlowConfig.NetworkConfig.ResourceManager,
-				RpcInspectorCfg:           &fnb.FlowConfig.NetworkConfig.GossipSubRPCInspectorsConfig,
-				PeerManagerConfig:         peerManagerCfg,
-				SubscriptionProviderParam: &fnb.FlowConfig.NetworkConfig.GossipSubConfig.SubscriptionProviderConfig,
-				DisallowListCacheCfg: &p2p.DisallowListCacheConfig{
-					MaxSize: fnb.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
-					Metrics: metrics.DisallowListCacheMetricsFactory(fnb.HeroCacheMetricsFactory(), network.PrivateNetwork),
-				},
-				UnicastConfig:           uniCfg,
-				GossipSubScorePenalties: &fnb.FlowConfig.NetworkConfig.GossipsubScorePenalties,
-				ScoringRegistryConfig:   &fnb.FlowConfig.NetworkConfig.GossipSubScoringRegistryConfig,
+		params := &p2pbuilder.LibP2PNodeBuilderParams{
+			Logger: fnb.Logger,
+			MetricsConfig: &p2pconfig.MetricsConfig{
+				Metrics:          fnb.Metrics.Network,
+				HeroCacheFactory: fnb.HeroCacheMetricsFactory(),
 			},
-			Resolver:            fnb.Resolver,
-			Role:                fnb.BaseConfig.NodeRole,
-			ConnGaterCfg:        connGaterCfg,
-			GossipCfg:           &fnb.FlowConfig.NetworkConfig.GossipSubConfig,
-			ConnMgrConfig:       &fnb.FlowConfig.NetworkConfig.ConnectionManagerConfig,
-			DhtSystemActivation: dhtActivationStatus,
+			NetworkingType:            network.PrivateNetwork,
+			Address:                   myAddr,
+			NetworkKey:                fnb.NetworkKey,
+			SporkId:                   fnb.SporkID,
+			IdProvider:                fnb.IdentityProvider,
+			RCfg:                      &fnb.FlowConfig.NetworkConfig.ResourceManager,
+			RpcInspectorCfg:           &fnb.FlowConfig.NetworkConfig.GossipSubRPCInspectorsConfig,
+			PeerManagerConfig:         peerManagerCfg,
+			SubscriptionProviderParam: &fnb.FlowConfig.NetworkConfig.GossipSubConfig.SubscriptionProviderConfig,
+			DisallowListCacheCfg: &p2p.DisallowListCacheConfig{
+				MaxSize: fnb.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
+				Metrics: metrics.DisallowListCacheMetricsFactory(fnb.HeroCacheMetricsFactory(), network.PrivateNetwork),
+			},
+			UnicastConfig:           uniCfg,
+			GossipSubScorePenalties: &fnb.FlowConfig.NetworkConfig.GossipsubScorePenalties,
+			ScoringRegistryConfig:   &fnb.FlowConfig.NetworkConfig.GossipSubScoringRegistryConfig,
 		}
-		builder, err := p2pbuilder.DefaultNodeBuilder(defaultNodeBuilderParams)
+		builder, err := p2pbuilder.DefaultNodeBuilder(params,
+			fnb.Resolver,
+			fnb.BaseConfig.NodeRole,
+			connGaterCfg,
+			&fnb.FlowConfig.NetworkConfig.GossipSubConfig,
+			&fnb.FlowConfig.NetworkConfig.ConnectionManagerConfig,
+			dhtActivationStatus)
 		if err != nil {
 			return nil, fmt.Errorf("could not create libp2p node builder: %w", err)
 		}

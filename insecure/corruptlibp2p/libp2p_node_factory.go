@@ -78,32 +78,30 @@ func InitCorruptLibp2pNode(
 	if err != nil {
 		return nil, fmt.Errorf("could not get dht system activation status: %w", err)
 	}
-	defaultNodeBuilderParams := &p2pbuilder.DefaultNodeBuilderParams{
-		LibP2PNodeBuilderParams: &p2pbuilder.LibP2PNodeBuilderParams{
-			Logger:                    log,
-			MetricsConfig:             metCfg,
-			NetworkingType:            network.PrivateNetwork,
-			Address:                   address,
-			NetworkKey:                flowKey,
-			SporkId:                   sporkId,
-			IdProvider:                idProvider,
-			RCfg:                      &netConfig.ResourceManager,
-			RpcInspectorCfg:           &netConfig.GossipSubRPCInspectorsConfig,
-			PeerManagerConfig:         peerManagerCfg,
-			SubscriptionProviderParam: &netConfig.GossipSubConfig.SubscriptionProviderConfig,
-			DisallowListCacheCfg:      disallowListCacheCfg,
-			UnicastConfig:             uniCfg,
-			GossipSubScorePenalties:   &netConfig.GossipsubScorePenalties,
-			ScoringRegistryConfig:     &netConfig.GossipSubScoringRegistryConfig,
-		},
-		Resolver:            resolver,
-		Role:                role,
-		ConnGaterCfg:        connGaterCfg,
-		GossipCfg:           &netConfig.GossipSubConfig,
-		ConnMgrConfig:       &netConfig.ConnectionManagerConfig,
-		DhtSystemActivation: dhtActivationStatus,
+	params := &p2pbuilder.LibP2PNodeBuilderParams{
+		Logger:                    log,
+		MetricsConfig:             metCfg,
+		NetworkingType:            network.PrivateNetwork,
+		Address:                   address,
+		NetworkKey:                flowKey,
+		SporkId:                   sporkId,
+		IdProvider:                idProvider,
+		RCfg:                      &netConfig.ResourceManager,
+		RpcInspectorCfg:           &netConfig.GossipSubRPCInspectorsConfig,
+		PeerManagerConfig:         peerManagerCfg,
+		SubscriptionProviderParam: &netConfig.GossipSubConfig.SubscriptionProviderConfig,
+		DisallowListCacheCfg:      disallowListCacheCfg,
+		UnicastConfig:             uniCfg,
+		GossipSubScorePenalties:   &netConfig.GossipsubScorePenalties,
+		ScoringRegistryConfig:     &netConfig.GossipSubScoringRegistryConfig,
 	}
-	builder, err := p2pbuilder.DefaultNodeBuilder(defaultNodeBuilderParams)
+	builder, err := p2pbuilder.DefaultNodeBuilder(params,
+		resolver,
+		role,
+		connGaterCfg,
+		&netConfig.GossipSubConfig,
+		&netConfig.ConnectionManagerConfig,
+		dhtActivationStatus)
 	if err != nil {
 		return nil, fmt.Errorf("could not create corrupt libp2p node builder: %w", err)
 	}
