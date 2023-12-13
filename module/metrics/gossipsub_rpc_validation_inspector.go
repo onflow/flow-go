@@ -46,7 +46,7 @@ func NewGossipSubRPCValidationInspectorMetrics(prefix string) *GossipSubRpcValid
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
 			Name:      gc.prefix + "rpc_invalid_control_message_error_count",
-			Help:      "total number of errors in a single invalid control message notification",
+			Help:      "histogram tracking number of errors in a single invalid control message notification",
 			Buckets:   []float64{25, 50, 100, 1000},
 		},
 	)
