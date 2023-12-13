@@ -201,8 +201,8 @@ func (s *scriptTestSuite) bootstrap() {
 func (s *scriptTestSuite) createAccount() flow.Address {
 	const createAccountTransaction = `
 		transaction {
-		  prepare(signer: AuthAccount) {
-			let account = AuthAccount(payer: signer)
+		  prepare(signer: auth(Storage, Capabilities) &Account) {
+			let account = Account(payer: signer)
 		  }
 		}`
 
