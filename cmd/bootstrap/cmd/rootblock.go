@@ -4,13 +4,15 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"path/filepath"
+	"time"
+
 	"github.com/onflow/cadence"
+
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/state/protocol"
-	"path/filepath"
-	"time"
 
 	"github.com/spf13/cobra"
 
