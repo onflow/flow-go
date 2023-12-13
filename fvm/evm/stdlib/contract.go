@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/cadence/runtime/stdlib"
 
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -158,12 +159,19 @@ func newInternalEVMTypeEncodeABIFunction(
 				return true
 			})
 
-			encodedValues, err := arguments.Pack(values...)
+			hexData, err := arguments.Pack(values...)
 			if err != nil {
 				panic(abiEncodingError{})
 			}
 
-			return interpreter.ByteSliceToByteArrayValue(inter, encodedValues)
+			encodedValues := interpreter.ByteSliceToByteArrayValue(inter, hexData)
+
+			invocation.Interpreter.ReportComputation(
+				environment.ComputationKindEVMEncodeABI,
+				uint(encodedValues.Count()),
+			)
+
+			return encodedValues
 		},
 	)
 }
@@ -525,6 +533,11 @@ func newInternalEVMTypeDecodeABIFunction(
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
+
+			invocation.Interpreter.ReportComputation(
+				environment.ComputationKindEVMDecodeABI,
+				uint(dataValue.Count()),
+			)
 
 			data, err := interpreter.ByteArrayValueToByteSlice(inter, dataValue, locationRange)
 			if err != nil {
