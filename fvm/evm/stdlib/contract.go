@@ -39,6 +39,8 @@ const ContractName = "EVM"
 const evmAddressTypeBytesFieldName = "bytes"
 const evmAddressTypeQualifiedIdentifier = "EVM.EVMAddress"
 
+const abiEncodingByteSize = 32
+
 var EVMTransactionBytesCadenceType = cadence.NewVariableSizedArrayType(cadence.TheUInt8Type)
 var evmTransactionBytesType = sema.NewVariableSizedType(nil, sema.UInt8Type)
 
@@ -97,6 +99,48 @@ func (e abiDecodingError) Error() string {
 	return b.String()
 }
 
+func calculateComputation(
+	inter *interpreter.Interpreter,
+	values *interpreter.ArrayValue,
+	evmAddressTypeID common.TypeID,
+) int {
+	computation := 0
+
+	values.Iterate(inter, func(element interpreter.Value) (resume bool) {
+		switch value := element.(type) {
+		case *interpreter.StringValue:
+			// Dynamic variables, such as strings, are encoded
+			// in 3 chunks of 32 bytes. The first chunk contains
+			// the index where information for the string begin,
+			// the second chunk contains the number of bytes the
+			// string occupies, and the third chunk contains the
+			// value of the string itself.
+			computation += 3 * abiEncodingByteSize
+		case *interpreter.CompositeValue:
+			if value.TypeID() == evmAddressTypeID {
+				// EVM addresses are static variables with a fixed
+				// size of 32 bytes.
+				computation += abiEncodingByteSize
+			}
+		case *interpreter.ArrayValue:
+			// Dynamic variables, such as arrays and slices, encode
+			// an extra chunk of 32 bytes, for each element, except
+			// for the last one.
+			computation += (value.Count()-1)*abiEncodingByteSize +
+				calculateComputation(inter, value, evmAddressTypeID)
+		default:
+			// Numeric and bool variables are also static variables
+			// with a fixed size of 32 bytes.
+			computation += abiEncodingByteSize
+		}
+
+		// continue iteration
+		return true
+	})
+
+	return computation
+}
+
 // EVM.encodeABI
 
 const internalEVMTypeEncodeABIFunctionName = "encodeABI"
@@ -135,6 +179,11 @@ func newInternalEVMTypeEncodeABIFunction(
 				panic(errors.NewUnreachableError())
 			}
 
+			invocation.Interpreter.ReportComputation(
+				environment.ComputationKindEVMEncodeABI,
+				uint(calculateComputation(inter, valuesArray, evmAddressTypeID)),
+			)
+
 			size := valuesArray.Count()
 
 			values := make([]any, 0, size)
@@ -159,19 +208,12 @@ func newInternalEVMTypeEncodeABIFunction(
 				return true
 			})
 
-			hexData, err := arguments.Pack(values...)
+			encodedValues, err := arguments.Pack(values...)
 			if err != nil {
 				panic(abiEncodingError{})
 			}
 
-			encodedValues := interpreter.ByteSliceToByteArrayValue(inter, hexData)
-
-			invocation.Interpreter.ReportComputation(
-				environment.ComputationKindEVMEncodeABI,
-				uint(encodedValues.Count()),
-			)
-
-			return encodedValues
+			return interpreter.ByteSliceToByteArrayValue(inter, encodedValues)
 		},
 	)
 }

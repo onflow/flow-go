@@ -54,7 +54,7 @@ const (
 	ComputationKindEncodeEvent                = 2040
 	_                                         = 2041
 	ComputationKindEVMEncodeABI               = 2042
-	ComputationKindEVMDecodeABI               = 2042
+	ComputationKindEVMDecodeABI               = 2043
 )
 
 type Meter interface {
