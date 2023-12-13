@@ -33,6 +33,7 @@ type AccountBasedMigration interface {
 		address common.Address,
 		payloads []*ledger.Payload,
 	) ([]*ledger.Payload, error)
+	io.Closer
 }
 
 // CreateAccountBasedMigration creates a migration function that migrates the payloads
@@ -91,15 +92,12 @@ func MigrateByAccount(
 
 	defer func() {
 		for i, migrator := range migrations {
-			// close the migrator if it's a Closer
-			if migrator, ok := migrator.(io.Closer); ok {
-				log.Info().
-					Int("migration_index", i).
-					Type("migration", migrator).
-					Msg("closing migration")
-				if err := migrator.Close(); err != nil {
-					log.Error().Err(err).Msg("error closing migration")
-				}
+			log.Info().
+				Int("migration_index", i).
+				Type("migration", migrator).
+				Msg("closing migration")
+			if err := migrator.Close(); err != nil {
+				log.Error().Err(err).Msg("error closing migration")
 			}
 		}
 	}()
@@ -155,12 +153,13 @@ func MigrateGroupConcurrently(
 					}
 					start := time.Now()
 
-					// This is not an account, but common values for all accounts.
-					if job.Address == common.ZeroAddress {
+					// This is not an account, but service level keys.
+					if util.IsServiceLevelAddress(job.Address) {
 						resultCh <- &migrationResult{
 							migrationDuration: migrationDuration{
-								Address:  job.Address,
-								Duration: time.Since(start),
+								Address:      job.Address,
+								Duration:     time.Since(start),
+								PayloadCount: len(job.Payloads),
 							},
 							Migrated: job.Payloads,
 						}
@@ -170,11 +169,13 @@ func MigrateGroupConcurrently(
 					if _, ok := knownProblematicAccounts[job.Address]; ok {
 						log.Info().
 							Hex("address", job.Address[:]).
+							Int("payload_count", len(job.Payloads)).
 							Msg("skipping problematic account")
 						resultCh <- &migrationResult{
 							migrationDuration: migrationDuration{
-								Address:  job.Address,
-								Duration: time.Since(start),
+								Address:      job.Address,
+								Duration:     time.Since(start),
+								PayloadCount: len(job.Payloads),
 							},
 							Migrated: job.Payloads,
 						}
@@ -206,8 +207,9 @@ func MigrateGroupConcurrently(
 
 					resultCh <- &migrationResult{
 						migrationDuration: migrationDuration{
-							Address:  job.Address,
-							Duration: time.Since(start),
+							Address:      job.Address,
+							Duration:     time.Since(start),
+							PayloadCount: len(job.Payloads),
 						},
 						Migrated: accountMigrated,
 					}
@@ -301,6 +303,14 @@ var knownProblematicAccounts = map[common.Address]string{
 	// Mainnet account
 }
 
+func mustHexToAddress(hex string) common.Address {
+	address, err := common.HexToAddress(hex)
+	if err != nil {
+		panic(err)
+	}
+	return address
+}
+
 type jobMigrateAccountGroup struct {
 	Address  common.Address
 	Payloads []*ledger.Payload
@@ -313,8 +323,9 @@ type migrationResult struct {
 }
 
 type migrationDuration struct {
-	Address  common.Address
-	Duration time.Duration
+	Address      common.Address
+	Duration     time.Duration
+	PayloadCount int
 }
 
 // migrationDurations implements heap methods for the timer results
@@ -354,7 +365,11 @@ func (h *migrationDurations) Pop() interface{} {
 func (h *migrationDurations) Array() zerolog.LogArrayMarshaler {
 	array := zerolog.Arr()
 	for _, result := range h.v {
-		array = array.Str(fmt.Sprintf("%s: %s", result.Address.Hex(), result.Duration.String()))
+		array = array.Str(fmt.Sprintf("%s [payloads: %d]: %s",
+			result.Address.Hex(),
+			result.PayloadCount,
+			result.Duration.String(),
+		))
 	}
 	return array
 }
@@ -366,12 +381,4 @@ func (h *migrationDurations) Add(result *migrationResult) {
 		}
 		heap.Push(h, result.migrationDuration)
 	}
-}
-
-func mustHexToAddress(hex string) common.Address {
-	address, err := common.HexToAddress(hex)
-	if err != nil {
-		panic(err)
-	}
-	return address
 }
