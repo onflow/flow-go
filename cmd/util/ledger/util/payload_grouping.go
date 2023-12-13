@@ -40,8 +40,6 @@ type PayloadAccountGrouping struct {
 	payloads sortablePayloads
 	indexes  []int
 
-	payloadsCount int
-
 	current int
 }
 
@@ -78,7 +76,7 @@ func (g *PayloadAccountGrouping) Len() int {
 
 // AllPayloadsCount the number of accounts
 func (g *PayloadAccountGrouping) AllPayloadsCount() int {
-	return g.payloadsCount
+	return len(g.payloads)
 }
 
 // GroupPayloadsByAccount takes a list of payloads and groups them by account.
@@ -126,8 +124,6 @@ func GroupPayloadsByAccount(
 	return &PayloadAccountGrouping{
 		payloads: p,
 		indexes:  indexes,
-
-		payloadsCount: len(payloads),
 	}
 }
 

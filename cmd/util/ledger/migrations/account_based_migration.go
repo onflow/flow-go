@@ -217,6 +217,7 @@ func MigrateGroupConcurrently(
 	}
 
 	go func() {
+		defer close(jobs)
 		for {
 			g, err := accountGroups.Next()
 			if err != nil {
@@ -239,7 +240,6 @@ func MigrateGroupConcurrently(
 			case jobs <- job:
 			}
 		}
-		close(jobs)
 	}()
 
 	// read job results
@@ -251,7 +251,7 @@ func MigrateGroupConcurrently(
 		),
 	)
 
-	migrated := make([]*ledger.Payload, accountGroups.AllPayloadsCount())
+	migrated := make([]*ledger.Payload, 0, accountGroups.AllPayloadsCount())
 	durations := newMigrationDurations(logTopNDurations)
 	contextDone := false
 	for i := 0; i < accountGroups.Len(); i++ {

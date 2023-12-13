@@ -123,7 +123,7 @@ func (m *AccountUsageMigrator) compareUsage(
 func newPayloadWithValue(payload *ledger.Payload, value ledger.Value) (*ledger.Payload, error) {
 	key, err := payload.Key()
 	if err != nil {
-		return &ledger.Payload{}, err
+		return nil, err
 	}
 	newPayload := ledger.NewPayload(key, value)
 	return newPayload, nil
