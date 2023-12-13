@@ -86,14 +86,14 @@ type LibP2PNodeBuilderConfig struct {
 	NetworkKey                fcrypto.PrivateKey                      `validate:"required"`
 	SporkId                   flow.Identifier                         `validate:"required"`
 	IdProvider                module.IdentityProvider                 `validate:"required"`
-	RCfg                      *p2pconf.ResourceManagerConfig          `validate:"required"`
-	RpcInspectorCfg           *p2pconf.GossipSubRPCInspectorsConfig   `validate:"required"`
-	PeerManagerConfig         *p2pconfig.PeerManagerConfig            `validate:"required"`
-	SubscriptionProviderParam *p2pconf.SubscriptionProviderParameters `validate:"required"`
+	ResourceManagerParams                      *p2pconf.ResourceManagerConfig          `validate:"required"`
+	RpcInspectorParams          *p2pconf.GossipSubRPCInspectorsConfig   `validate:"required"`
+	PeerManagerParams         *p2pconfig.PeerManagerConfig            `validate:"required"`
+	SubscriptionProviderParams *p2pconf.SubscriptionProviderParameters `validate:"required"`
 	DisallowListCacheCfg      *p2p.DisallowListCacheConfig            `validate:"required"`
-	UnicastConfig             *p2pconfig.UnicastConfig                `validate:"required"`
-	GossipSubScorePenalties   *p2pconf.GossipSubScorePenalties        `validate:"required"`
-	ScoringRegistryConfig     *p2pconf.GossipSubScoringRegistryConfig `validate:"required"`
+	UnicastParams             *p2pconfig.UnicastConfig                `validate:"required"`
+	GossipSubScorePenaltiesParams   *p2pconf.GossipSubScorePenalties        `validate:"required"`
+	ScoringRegistryParams     *p2pconf.GossipSubScoringRegistryConfig `validate:"required"`
 }
 
 func NewNodeBuilder(params *LibP2PNodeBuilderParams, rpcTracking p2p.RpcControlTracking) (*LibP2PNodeBuilder, error) {
