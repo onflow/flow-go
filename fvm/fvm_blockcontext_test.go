@@ -948,6 +948,9 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+		// The evm account has a storage exception, and if we don't bootstrap with evm,
+		// the first created account will have that address.
+		fvm.WithSetupEVMEnabled(true),
 	}
 
 	t.Run("Storing too much data fails", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
@@ -1859,6 +1862,9 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 		fvm.WithExecutionMemoryLimit(math.MaxUint64),
+		// The evm account has a storage exception, and if we don't bootstrap with evm,
+		// the first created account will have that address.
+		fvm.WithSetupEVMEnabled(true),
 	).run(
 		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 			ctx.LimitAccountStorage = true // this test requires storage limits to be enforced

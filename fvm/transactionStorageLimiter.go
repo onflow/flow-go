@@ -74,13 +74,14 @@ func (limiter TransactionStorageLimiter) getStorageCheckAddresses(
 		addresses = append(addresses, payer)
 	}
 
+	sc := systemcontracts.SystemContractsForChain(ctx.Chain.ChainID())
 	for id := range snapshot.WriteSet {
 		address, ok := addressFromRegisterId(id)
 		if !ok {
 			continue
 		}
 
-		if limiter.shouldSkipSpecialAddress(ctx, address) {
+		if limiter.shouldSkipSpecialAddress(ctx, address, sc) {
 			continue
 		}
 
@@ -170,7 +171,7 @@ func (limiter TransactionStorageLimiter) checkStorageLimits(
 func (limiter TransactionStorageLimiter) shouldSkipSpecialAddress(
 	ctx Context,
 	address flow.Address,
+	sc *systemcontracts.SystemContracts,
 ) bool {
-	sc := systemcontracts.SystemContractsForChain(ctx.Chain.ChainID())
 	return sc.EVM.Address == address
 }
