@@ -23,9 +23,7 @@ var (
 	DirnameRootBlockVotes     = filepath.Join(DirnamePublicBootstrap, "root-block-votes")
 	FileNamePartnerWeights    = "partner-weights.json"
 
-	PathRootBlockData = filepath.Join(DirnamePublicBootstrap, "root-block.json")
-	// TODO remove this
-	PathRootEpoch                 = filepath.Join(DirnamePublicBootstrap, "root-epoch.json")
+	PathRootBlockData             = filepath.Join(DirnamePublicBootstrap, "root-block.json")
 	PathRootParams                = filepath.Join(DirnamePublicBootstrap, "root-params.json")
 	PathRootResult                = filepath.Join(DirnamePublicBootstrap, "root-result.json")
 	PathRootSeal                  = filepath.Join(DirnamePublicBootstrap, "root-seal.json")
