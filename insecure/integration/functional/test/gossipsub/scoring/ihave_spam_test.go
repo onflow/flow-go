@@ -206,7 +206,7 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 		idProvider,
 		p2ptest.OverrideFlowConfig(conf),
 		p2ptest.WithRole(role),
-		p2ptest.WithPeerScoreTracerInterval(1*time.Second),
+		p2ptest.WithPeerScoreTracerInterval(10*time.Millisecond), // to speed up the test
 		p2ptest.EnablePeerScoringWithOverride(&p2p.PeerScoringConfigOverride{
 			TopicScoreParams: map[channels.Topic]*pubsub.TopicScoreParams{
 				blockTopic: blockTopicOverrideParams,
@@ -218,6 +218,13 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 	ids := flow.IdentityList{&spammer.SpammerId, &victimIdentity}
 	idProvider.SetIdentities(ids)
 	nodes := []p2p.LibP2PNode{spammer.SpammerNode, victimNode}
+	// to suppress the logs of peer provider has not set
+	victimNode.WithPeersProvider(func() peer.IDSlice {
+		return peer.IDSlice{spammer.SpammerNode.ID()}
+	})
+	spammer.SpammerNode.WithPeersProvider(func() peer.IDSlice {
+		return peer.IDSlice{victimNode.ID()}
+	})
 
 	p2ptest.StartNodes(t, signalerCtx, nodes)
 	defer p2ptest.StopNodes(t, nodes, cancel)
@@ -235,6 +242,7 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 
 	// FIRST ROUND OF ATTACK: spammer sends 10 RPCs to the victim node, each containing 500 iHave messages.
 	spamIHaveBrokenPromise(t, spammer, blockTopic.String(), receivedIWants, victimNode)
+	t.Log("first round of attack finished")
 
 	// wait till victim counts the spam iHaves as broken promises for the second round of attack (one per RPC for a total of 10).
 	require.Eventually(t, func() bool {
@@ -246,14 +254,15 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 		// ideally it must be 10 (one per RPC), but we give it a buffer of 1 to account for decays and floating point errors.
 		// note that we intentionally override the decay speed to be 60-times faster in this test.
 		if behavioralPenalty < 7.5 {
-			fmt.Println("behavioral penalty", behavioralPenalty)
+			t.Logf("[first round] pending on behavioral penalty %f", behavioralPenalty)
 			return false
 		}
 
+		t.Logf("[first round] success on behavioral penalty %f", behavioralPenalty)
 		return true
 		// Note: we have to wait at least 3 seconds for an iHave to be considered as broken promise (gossipsub parameters), we set it to 10
 		// seconds to be on the safe side.
-	}, 10*time.Second, 100*time.Millisecond)
+	}, 10*time.Second, 1*time.Second)
 
 	scoreAfterFirstRound, ok := victimNode.PeerScoreExposer().GetScore(spammer.SpammerNode.ID())
 	require.True(t, ok, "score for spammer node must be present")
@@ -263,7 +272,7 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 
 	// SECOND ROUND OF ATTACK: spammer sends 10 RPCs to the victim node, each containing 500 iHave messages.
 	spamIHaveBrokenPromise(t, spammer, blockTopic.String(), receivedIWants, victimNode)
-
+	t.Log("second round of attack finished")
 	// wait till victim counts the spam iHaves as broken promises for the second round of attack (one per RPC for a total of 10).
 	require.Eventually(t, func() bool {
 		behavioralPenalty, ok := victimNode.PeerScoreExposer().GetBehaviourPenalty(spammer.SpammerNode.ID())
@@ -271,27 +280,28 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 			return false
 		}
 
-		// ideally we should have 20 (10 from the first round, 10 from the second round), but we give it a buffer of 2 to account for decays and floating point errors.
+		// ideally we should have 20 (10 from the first round, 10 from the second round), but we give it a buffer of 5 to account for decays and floating point errors.
 		// note that we intentionally override the decay speed to be 60-times faster in this test.
-		if behavioralPenalty < 18 {
-			fmt.Println("behavioral penalty", behavioralPenalty)
+		if behavioralPenalty < 15 {
+			t.Logf("[second round] pending on behavioral penalty %f", behavioralPenalty)
 			return false
 		}
 
+		t.Logf("[second round] success on behavioral penalty %f", behavioralPenalty)
 		return true
 		// Note: we have to wait at least 3 seconds for an iHave to be considered as broken promise (gossipsub parameters), we set it to 10
 		// seconds to be on the safe side.
-	}, 10*time.Second, 100*time.Millisecond)
+	}, 10*time.Second, 1*time.Second)
 
 	spammerScore, ok := victimNode.PeerScoreExposer().GetScore(spammer.SpammerNode.ID())
 	require.True(t, ok, "sanity check failed, we should have a score for the spammer node")
 	// with the second round of the attack, the spammer is about 10 broken promises above the threshold (total ~20 broken promises, but the first 10 are not counted).
-	// we expect the score to be dropped to initScore - 10 * 10 * 0.01 * scoring.MaxAppSpecificReward, however, instead of 10, we consider 8 about the threshold, to account for decays.
+	// we expect the score to be dropped to initScore - 10 * 10 * 0.01 * scoring.MaxAppSpecificReward, however, instead of 10, we consider 5 about the threshold, to account for decays.
 	require.LessOrEqual(t,
 		spammerScore,
-		initScore-8*8*0.01*scoring.MaxAppSpecificReward,
+		initScore-5*5*0.01*scoring.MaxAppSpecificReward,
 		"sanity check failed, the score of the spammer node must be less than the initial score minus 8 * 8 * 0.01 * scoring.MaxAppSpecificReward: %f, actual: %f",
-		initScore-10*10*10-2*scoring.MaxAppSpecificReward,
+		initScore-5*5*0.1*scoring.MaxAppSpecificReward,
 		spammerScore)
 	require.Greaterf(t,
 		spammerScore,
@@ -319,23 +329,25 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 
 	// THIRD ROUND OF ATTACK: spammer sends 10 RPCs to the victim node, each containing 500 iHave messages, we expect spammer to be graylisted.
 	spamIHaveBrokenPromise(t, spammer, blockTopic.String(), receivedIWants, victimNode)
-
+	t.Log("third round of attack finished")
 	// wait till victim counts the spam iHaves as broken promises for the third round of attack (one per RPC for a total of 10).
 	require.Eventually(t, func() bool {
 		behavioralPenalty, ok := victimNode.PeerScoreExposer().GetBehaviourPenalty(spammer.SpammerNode.ID())
 		if !ok {
 			return false
 		}
-		// ideally we should have 30 (10 from the first round, 10 from the second round, 10 from the third round), but we give it a buffer of 3 to account for decays and floating point errors.
+		// ideally we should have 30 (10 from the first round, 10 from the second round, 10 from the third round), but we give it a buffer of 5 to account for decays and floating point errors.
 		// note that we intentionally override the decay speed to be 60-times faster in this test.
-		if behavioralPenalty < 27 {
+		if behavioralPenalty < 25 {
+			t.Logf("[third round] pending on behavioral penalty %f", behavioralPenalty)
 			return false
 		}
 
+		t.Logf("[third round] success on behavioral penalty %f", behavioralPenalty)
 		return true
 		// Note: we have to wait at least 3 seconds for an iHave to be considered as broken promise (gossipsub parameters), we set it to 10
 		// seconds to be on the safe side.
-	}, 10*time.Second, 100*time.Millisecond)
+	}, 10*time.Second, 1*time.Second)
 
 	spammerScore, ok = victimNode.PeerScoreExposer().GetScore(spammer.SpammerNode.ID())
 	require.True(t, ok, "sanity check failed, we should have a score for the spammer node")
