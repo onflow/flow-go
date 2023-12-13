@@ -55,6 +55,8 @@ gen-bootstrap: clone-flow
 		--epoch-staking-phase-length 20000 \
 		--epoch-dkg-phase-length 2000 \
 		--collection-clusters 1 \
+		--protocol-version=0 \
+		--epoch-commit-safety-threshold=1000 \
 		--genesis-token-supply="1000000000.0" \
 		--service-account-public-key-json "{\"PublicKey\":\"R7MTEDdLclRLrj2MI1hcp4ucgRTpR15PCHAWLM5nks6Y3H7+PGkfZTP2di2jbITooWO4DD1yqaBSAVK8iQ6i0A==\",\"SignAlgo\":2,\"HashAlgo\":1,\"SeqNumber\":0,\"Weight\":1000}" \
 		--config ../../../bootstrap/conf/node-config.json \
@@ -67,15 +69,13 @@ gen-bootstrap: clone-flow
 		-o ../../../bootstrap/  \
 		--partner-dir ../../../bootstrap/partner-nodes \
 		--partner-weights ../../../bootstrap/conf/partner-stakes.json \
-		--protocol-version=0 \
 		--internal-priv-dir ../../../bootstrap/keys/private-root-information \
 		--dkg-data ../../../bootstrap/private-root-information/root-dkg-data.priv.json \
 		--root-block ../../../bootstrap/public-root-information/root-block.json \
 		--root-result ../../../bootstrap/public-root-information/root-result.json \
 		--root-seal ../../../bootstrap/public-root-information/root-seal.json \
-		--root-block-votes-dir ../../../bootstrap/public-root-information/root-block-votes/ \
-		--root-epoch ../../../bootstrap/public-root-information/root-epoch.json \
-		--epoch-commit-safety-threshold=1000
+		--root-params ../../../bootstrap/public-root-information/root-params.json \
+		--root-block-votes-dir ../../../bootstrap/public-root-information/root-block-votes/
 
 gen-helm-l1:
 	go run automate/cmd/level1/bootstrap.go --data bootstrap/public-root-information/root-protocol-state-snapshot.json --dockerTag $(NETWORK_ID) --dockerRegistry $(DOCKER_REGISTRY)
