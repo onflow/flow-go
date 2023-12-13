@@ -1057,7 +1057,7 @@ func WithGraft(msgCount int, topicId string) GossipSubCtrlOption {
 //
 // Returns:
 // A GossipSubCtrlOption that adds GRAFT messages to the control message.
-// Example: WithGrafts("topic1", "topic2", "topic3") will add GRAFT messages for each specified topic ID.
+// Example: WithGrafts("topic1", "topic2", "topic3") will add one GRAFT messages for each specified topic ID.
 func WithGrafts(topicIds ...string) GossipSubCtrlOption {
 	return func(msg *pb.ControlMessage) {
 		grafts := make([]*pb.ControlGraft, len(topicIds))
