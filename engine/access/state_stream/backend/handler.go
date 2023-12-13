@@ -206,10 +206,12 @@ func (h *Handler) GetRegisterValues(_ context.Context, request *executiondata.Ge
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "could not convert register IDs: %v", err)
 	}
+
 	// get payload from store
 	values, err := h.api.GetRegisterValues(registerIDs, request.GetBlockHeight())
 	if err != nil {
 		return nil, rpc.ConvertError(err, "could not get register values", codes.Internal)
 	}
+
 	return &executiondata.GetRegisterValuesResponse{Values: values}, nil
 }

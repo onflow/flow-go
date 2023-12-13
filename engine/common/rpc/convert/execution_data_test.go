@@ -193,12 +193,26 @@ func TestMessageToRegisterIDs(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			registerIDMessage := convert.RegisterIDToMessage(test.regID)
-			reConvertedRegisterID, err := convert.MessageToRegisterID(registerIDMessage)
+			msg := convert.RegisterIDToMessage(test.regID)
+			converted, err := convert.MessageToRegisterID(msg)
 			require.NoError(t, err)
-			assert.Equal(t, test.regID, reConvertedRegisterID)
+			assert.Equal(t, test.regID, converted)
 		})
 	}
-	_, err := convert.MessageToRegisterID(nil)
-	require.ErrorIs(t, err, convert.ErrEmptyMessage)
+
+	t.Run("nil owner converts to empty string", func(t *testing.T) {
+		msg := &entities.RegisterID{
+			Owner: nil,
+			Key:   []byte("key"),
+		}
+		converted, err := convert.MessageToRegisterID(msg)
+		require.NoError(t, err)
+		assert.Equal(t, "", converted.Owner)
+		assert.Equal(t, "key", converted.Key)
+	})
+
+	t.Run("nil message returns error", func(t *testing.T) {
+		_, err := convert.MessageToRegisterID(nil)
+		require.ErrorIs(t, err, convert.ErrEmptyMessage)
+	})
 }
