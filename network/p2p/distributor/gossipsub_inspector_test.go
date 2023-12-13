@@ -92,6 +92,7 @@ func invalidControlMessageNotificationListFixture(t *testing.T, n int) []*p2p.In
 	return list
 }
 
+// invalidControlMessageNotificationFixture creates an invalid control message notification fixture with a random severity abd random message type.
 func invalidControlMessageNotificationFixture(t *testing.T) *p2p.InvCtrlMsgNotif {
 	severity := []p2p.InvCtrlMsgErrSeverity{p2p.CriticalErrSeverity, p2p.HighErrSeverity, p2p.ModerateErrSeverity, p2p.LowErrSeverity}[rand.Intn(4)]
 	msgType := []p2pmsg.ControlMessageType{p2pmsg.CtrlMsgGraft, p2pmsg.CtrlMsgPrune, p2pmsg.CtrlMsgIHave, p2pmsg.CtrlMsgIWant}[rand.Intn(4)]
