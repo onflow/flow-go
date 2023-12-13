@@ -3,10 +3,12 @@ package cmd
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/module/epochs"
+	"github.com/onflow/flow-go/state/protocol"
 	"path/filepath"
 	"time"
 
@@ -17,7 +19,6 @@ import (
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/order"
-	"github.com/onflow/flow-go/state/protocol/inmem"
 )
 
 var (
@@ -26,6 +27,8 @@ var (
 	flagRootHeight                  uint64
 	flagRootCommit                  string
 	flagRootTimestamp               string
+	flagProtocolVersion             uint
+	flagEpochCommitSafetyThreshold  uint64
 	flagCollectionClusters          uint
 	flagEpochCounter                uint64
 	flagNumViewsInEpoch             uint64
@@ -86,11 +89,15 @@ func addRootBlockCmdFlags() {
 	rootBlockCmd.Flags().Uint64Var(&flagRootHeight, "root-height", 0, "height of the root block")
 	rootBlockCmd.Flags().StringVar(&flagRootTimestamp, "root-timestamp", time.Now().UTC().Format(time.RFC3339), "timestamp of the root block (RFC3339)")
 	rootBlockCmd.Flags().StringVar(&flagRootCommit, "root-commit", "0000000000000000000000000000000000000000000000000000000000000000", "state commitment of root execution state")
+	rootBlockCmd.Flags().UintVar(&flagProtocolVersion, "protocol-version", flow.DefaultProtocolVersion, "major software version used for the duration of this spork")
+	rootBlockCmd.Flags().Uint64Var(&flagEpochCommitSafetyThreshold, "epoch-commit-safety-threshold", 500, "defines epoch commitment deadline")
 
 	cmd.MarkFlagRequired(rootBlockCmd, "root-chain")
 	cmd.MarkFlagRequired(rootBlockCmd, "root-parent")
 	cmd.MarkFlagRequired(rootBlockCmd, "root-height")
 	cmd.MarkFlagRequired(rootBlockCmd, "root-commit")
+	cmd.MarkFlagRequired(rootBlockCmd, "protocol-version")
+	cmd.MarkFlagRequired(rootBlockCmd, "epoch-commit-safety-threshold")
 
 	// these two flags are only used when setup a network from genesis
 	rootBlockCmd.Flags().StringVar(&flagServiceAccountPublicKeyJSON, "service-account-public-key-json",
@@ -111,6 +118,13 @@ func rootBlock(cmd *cobra.Command, args []string) {
 			log.Fatal().Msg("cannot use both --partner-stakes and --partner-weights flags (use only --partner-weights)")
 		}
 	}
+
+	// validate epoch configs
+	err := validateEpochConfig()
+	if err != nil {
+		log.Fatal().Err(err).Msg("invalid or unsafe epoch commit threshold config")
+	}
+
 	log.Info().Msg("collecting partner network and staking keys")
 	partnerNodes := readPartnerNodeInfos()
 	log.Info().Msg("")
@@ -156,17 +170,15 @@ func rootBlock(cmd *cobra.Command, args []string) {
 
 	log.Info().Msg("constructing epoch events")
 	epochSetup, epochCommit := constructRootEpochEvents(header.View, participants, assignments, clusterQCs, dkgData)
-	committedEpoch := inmem.NewCommittedEpoch(epochSetup, epochCommit)
-	encodableEpoch, err := inmem.FromEpoch(committedEpoch)
-	if err != nil {
-		log.Fatal().Msg("could not convert root epoch to encodable")
-	}
-	writeJSON(model.PathRootEpoch, encodableEpoch.Encodable())
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing root block")
 	block := constructRootBlock(header, epochSetup, epochCommit)
 	writeJSON(model.PathRootBlockData, block)
+	writeJSON(model.PathRootParams, model.Params{
+		EpochCommitSafetyThreshold: flagEpochCommitSafetyThreshold,
+		ProtocolVersion:            flagProtocolVersion,
+	})
 	log.Info().Msg("")
 
 	// if no root commit is specified, bootstrap an empty execution state
@@ -197,32 +209,31 @@ func rootBlock(cmd *cobra.Command, args []string) {
 }
 
 // validateEpochConfig validates configuration of the epoch commitment deadline.
-// TODO figure out where this should live
-//func validateEpochConfig() error {
-//	chainID := parseChainID(flagRootChain)
-//	dkgFinalView := flagNumViewsInStakingAuction + flagNumViewsInDKGPhase*3 // 3 DKG phases
-//	epochCommitDeadline := flagNumViewsInEpoch - flagEpochCommitSafetyThreshold
-//
-//	defaultSafetyThreshold, err := protocol.DefaultEpochCommitSafetyThreshold(chainID)
-//	if err != nil {
-//		return fmt.Errorf("could not get default epoch commit safety threshold: %w", err)
-//	}
-//
-//	// sanity check: the safety threshold is >= the default for the chain
-//	if flagEpochCommitSafetyThreshold < defaultSafetyThreshold {
-//		return fmt.Errorf("potentially unsafe epoch config: epoch commit safety threshold smaller than expected (%d < %d)", flagEpochCommitSafetyThreshold, defaultSafetyThreshold)
-//	}
-//	// sanity check: epoch commitment deadline cannot be before the DKG end
-//	if epochCommitDeadline <= dkgFinalView {
-//		return fmt.Errorf("invalid epoch config: the epoch commitment deadline (%d) is before the DKG final view (%d)", epochCommitDeadline, dkgFinalView)
-//	}
-//	// sanity check: the difference between DKG end and safety threshold is also >= the default safety threshold
-//	if epochCommitDeadline-dkgFinalView < defaultSafetyThreshold {
-//		return fmt.Errorf("potentially unsafe epoch config: time between DKG end and epoch commitment deadline is smaller than expected (%d-%d < %d)",
-//			epochCommitDeadline, dkgFinalView, defaultSafetyThreshold)
-//	}
-//	return nil
-//}
+func validateEpochConfig() error {
+	chainID := parseChainID(flagRootChain)
+	dkgFinalView := flagNumViewsInStakingAuction + flagNumViewsInDKGPhase*3 // 3 DKG phases
+	epochCommitDeadline := flagNumViewsInEpoch - flagEpochCommitSafetyThreshold
+
+	defaultSafetyThreshold, err := protocol.DefaultEpochCommitSafetyThreshold(chainID)
+	if err != nil {
+		return fmt.Errorf("could not get default epoch commit safety threshold: %w", err)
+	}
+
+	// sanity check: the safety threshold is >= the default for the chain
+	if flagEpochCommitSafetyThreshold < defaultSafetyThreshold {
+		return fmt.Errorf("potentially unsafe epoch config: epoch commit safety threshold smaller than expected (%d < %d)", flagEpochCommitSafetyThreshold, defaultSafetyThreshold)
+	}
+	// sanity check: epoch commitment deadline cannot be before the DKG end
+	if epochCommitDeadline <= dkgFinalView {
+		return fmt.Errorf("invalid epoch config: the epoch commitment deadline (%d) is before the DKG final view (%d)", epochCommitDeadline, dkgFinalView)
+	}
+	// sanity check: the difference between DKG end and safety threshold is also >= the default safety threshold
+	if epochCommitDeadline-dkgFinalView < defaultSafetyThreshold {
+		return fmt.Errorf("potentially unsafe epoch config: time between DKG end and epoch commitment deadline is smaller than expected (%d-%d < %d)",
+			epochCommitDeadline, dkgFinalView, defaultSafetyThreshold)
+	}
+	return nil
+}
 
 // generateEmptyExecutionState generates a new empty execution state with the
 // given configuration. Sets the flagRootCommit variable for future reads.

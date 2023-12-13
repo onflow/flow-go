@@ -16,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/order"
-	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/io"
@@ -27,16 +26,15 @@ var (
 	flagInternalNodePrivInfoDir string
 	flagPartnerNodeInfoDir      string
 	// Deprecated: use flagPartnerWeights instead
-	deprecatedFlagPartnerStakes    string
-	flagPartnerWeights             string
-	flagDKGDataPath                string
-	flagRootBlock                  string
-	flagRootResult                 string
-	flagRootSeal                   string
-	flagRootEpoch                  string // todo remove
-	flagRootBlockVotesDir          string
-	flagProtocolVersion            uint
-	flagEpochCommitSafetyThreshold uint64
+	deprecatedFlagPartnerStakes string
+	flagPartnerWeights          string
+	flagDKGDataPath             string
+	// todo rename below to ...path?
+	flagRootBlock         string
+	flagRootResult        string
+	flagRootSeal          string
+	flagRootParams        string
+	flagRootBlockVotesDir string
 )
 
 // PartnerWeights is the format of the JSON file specifying partner node weights.
@@ -78,24 +76,17 @@ func addFinalizeCmdFlags() {
 	cmd.MarkFlagRequired(finalizeCmd, "dkg-data")
 
 	// required parameters for generation of root block, root execution result and root block seal
-	finalizeCmd.Flags().StringVar(&flagRootBlock, "root-block", "",
-		"path to a JSON file containing root block")
-	// TODO remove
-	finalizeCmd.Flags().StringVar(&flagRootEpoch, "root-epoch", "",
-		"path to a JSON file containing root epoch")
-	finalizeCmd.Flags().StringVar(&flagRootResult, "root-result", "",
-		"path to a JSON file containing root epoch")
-	finalizeCmd.Flags().StringVar(&flagRootSeal, "root-seal", "",
-		"path to a JSON file containing root epoch")
+	finalizeCmd.Flags().StringVar(&flagRootBlock, "root-block", "", "path to a JSON file containing root block")
+	finalizeCmd.Flags().StringVar(&flagRootResult, "root-result", "", "path to a JSON file containing root epoch")
+	finalizeCmd.Flags().StringVar(&flagRootSeal, "root-seal", "", "path to a JSON file containing root epoch")
+	finalizeCmd.Flags().StringVar(&flagRootParams, "root-params", "", "path to a JSON file containing root params")
 	finalizeCmd.Flags().StringVar(&flagRootBlockVotesDir, "root-block-votes-dir", "", "path to directory with votes for root block")
-	finalizeCmd.Flags().UintVar(&flagProtocolVersion, "protocol-version", flow.DefaultProtocolVersion, "major software version used for the duration of this spork")
-	finalizeCmd.Flags().Uint64Var(&flagEpochCommitSafetyThreshold, "epoch-commit-safety-threshold", 500, "defines epoch commitment deadline")
 
 	cmd.MarkFlagRequired(finalizeCmd, "root-block")
-	cmd.MarkFlagRequired(finalizeCmd, "root-epoch")
+	cmd.MarkFlagRequired(finalizeCmd, "root-result")
+	cmd.MarkFlagRequired(finalizeCmd, "root-seal")
+	cmd.MarkFlagRequired(finalizeCmd, "root-params")
 	cmd.MarkFlagRequired(finalizeCmd, "root-block-votes-dir")
-	cmd.MarkFlagRequired(finalizeCmd, "protocol-version")
-	cmd.MarkFlagRequired(finalizeCmd, "epoch-commit-safety-threshold")
 }
 
 func finalize(cmd *cobra.Command, args []string) {
@@ -109,12 +100,6 @@ func finalize(cmd *cobra.Command, args []string) {
 			log.Fatal().Msg("cannot use both --partner-stakes and --partner-weights flags (use only --partner-weights)")
 		}
 	}
-
-	// validate epoch configs
-	//err := validateEpochConfig()
-	//if err != nil {
-	//	log.Fatal().Err(err).Msg("invalid or unsafe epoch commit threshold config")
-	//}
 
 	log.Info().Msg("collecting partner network and staking keys")
 	partnerNodes := readPartnerNodeInfos()
@@ -150,6 +135,10 @@ func finalize(cmd *cobra.Command, args []string) {
 	result, seal := readRootResultAndSeal()
 	log.Info().Msg("")
 
+	log.Info().Msg("reading root params")
+	params := readRootParams()
+	log.Info().Msg("")
+
 	log.Info().Msg("constructing root QC")
 	rootQC := constructRootQC(
 		block,
@@ -162,7 +151,7 @@ func finalize(cmd *cobra.Command, args []string) {
 
 	// construct serializable root protocol snapshot
 	log.Info().Msg("constructing root protocol snapshot")
-	snapshot, err := inmem.SnapshotFromBootstrapStateWithParams(block, result, seal, rootQC, flagProtocolVersion, flagEpochCommitSafetyThreshold)
+	snapshot, err := inmem.SnapshotFromBootstrapStateWithParams(block, result, seal, rootQC, params.ProtocolVersion, params.EpochCommitSafetyThreshold)
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to generate root protocol snapshot")
 	}
@@ -454,26 +443,6 @@ func readRootBlock() *flow.Block {
 	return rootBlock
 }
 
-// readRootEpoch reads root epoch data from disc, this file needs to be prepared with
-// rootblock command
-// todo remove
-func readRootEpoch() (protocol.Epoch, *flow.EpochSetup, *flow.EpochCommit) {
-	encodableEpoch, err := utils.ReadData[inmem.EncodableEpoch](flagRootEpoch)
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not read root epoch data")
-	}
-	epoch := inmem.NewEpoch(*encodableEpoch)
-	setup, err := protocol.ToEpochSetup(epoch)
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not extract setup event")
-	}
-	commit, err := protocol.ToEpochCommit(epoch)
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not extract commit event")
-	}
-	return epoch, setup, commit
-}
-
 func readRootResultAndSeal() (*flow.ExecutionResult, *flow.Seal) {
 	result, err := utils.ReadData[flow.ExecutionResult](flagRootResult)
 	if err != nil {
@@ -484,6 +453,14 @@ func readRootResultAndSeal() (*flow.ExecutionResult, *flow.Seal) {
 		log.Fatal().Err(err).Msg("failed to read root seal")
 	}
 	return result, seal
+}
+
+func readRootParams() *model.Params {
+	params, err := utils.ReadData[model.Params](flagRootParams)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to read root params")
+	}
+	return params
 }
 
 // readDKGData reads DKG data from disc, this file needs to be prepared with
