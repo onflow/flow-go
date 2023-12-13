@@ -1429,7 +1429,7 @@ func TransactionDSLFixture(chain flow.Chain) dsl.Transaction {
 // RegisterIDFixture returns a RegisterID with a fixed key and owner
 func RegisterIDFixture() flow.RegisterID {
 	return flow.RegisterID{
-		Owner: "owner",
+		Owner: string(RandomAddressFixture().Bytes()),
 		Key:   "key",
 	}
 }

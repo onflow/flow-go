@@ -320,10 +320,11 @@ func MessageToRegisterID(m *entities.RegisterID) (flow.RegisterID, error) {
 	if m == nil {
 		return flow.RegisterID{}, ErrEmptyMessage
 	}
-	return flow.RegisterID{
-		Owner: m.GetOwner(),
-		Key:   m.GetKey(),
-	}, nil
+
+	owner := string(m.GetOwner())
+	key := string(m.GetKey())
+
+	return flow.NewRegisterID(owner, key), nil
 }
 
 // MessagesToRegisterIDs converts a protobuf message to RegisterIDs
@@ -344,8 +345,8 @@ func MessagesToRegisterIDs(m []*entities.RegisterID) (flow.RegisterIDs, error) {
 
 func RegisterIDToMessage(id flow.RegisterID) *entities.RegisterID {
 	return &entities.RegisterID{
-		Owner: id.Owner,
-		Key:   id.Key,
+		Owner: []byte(id.Owner),
+		Key:   []byte(id.Key),
 	}
 }
 
