@@ -24,6 +24,16 @@ contract EVM {
                 to: self.bytes
             )
         }
+
+        /// Balance of the address
+        access(all)
+        fun balance(): Balance {
+            let balance = InternalEVM.balance(
+                address: self.bytes
+            )
+
+            return Balance(flow: balance)
+        }
     }
 
     access(all)
@@ -60,6 +70,12 @@ contract EVM {
         fun address(): EVMAddress {
             // Always create a new EVMAddress instance
             return EVMAddress(bytes: self.addressBytes)
+        }
+
+        /// Get balance of the bridged account
+        access(all)
+        fun balance(): Balance {
+            return self.address().balance()
         }
 
         /// Deposits the given vault into the bridged account's balance
