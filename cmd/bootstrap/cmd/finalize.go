@@ -27,15 +27,16 @@ var (
 	flagInternalNodePrivInfoDir string
 	flagPartnerNodeInfoDir      string
 	// Deprecated: use flagPartnerWeights instead
-	deprecatedFlagPartnerStakes string
-	flagPartnerWeights          string
-	flagDKGDataPath             string
-	flagRootBlock               string
-	flagRootResult              string
-	flagRootSeal                string
-	flagRootEpoch               string // todo remove
-	flagRootBlockVotesDir       string
-	flagProtocolVersion         uint
+	deprecatedFlagPartnerStakes    string
+	flagPartnerWeights             string
+	flagDKGDataPath                string
+	flagRootBlock                  string
+	flagRootResult                 string
+	flagRootSeal                   string
+	flagRootEpoch                  string // todo remove
+	flagRootBlockVotesDir          string
+	flagProtocolVersion            uint
+	flagEpochCommitSafetyThreshold uint64
 )
 
 // PartnerWeights is the format of the JSON file specifying partner node weights.
@@ -88,11 +89,13 @@ func addFinalizeCmdFlags() {
 		"path to a JSON file containing root epoch")
 	finalizeCmd.Flags().StringVar(&flagRootBlockVotesDir, "root-block-votes-dir", "", "path to directory with votes for root block")
 	finalizeCmd.Flags().UintVar(&flagProtocolVersion, "protocol-version", flow.DefaultProtocolVersion, "major software version used for the duration of this spork")
+	finalizeCmd.Flags().Uint64Var(&flagEpochCommitSafetyThreshold, "epoch-commit-safety-threshold", 500, "defines epoch commitment deadline")
 
 	cmd.MarkFlagRequired(finalizeCmd, "root-block")
 	cmd.MarkFlagRequired(finalizeCmd, "root-epoch")
 	cmd.MarkFlagRequired(finalizeCmd, "root-block-votes-dir")
 	cmd.MarkFlagRequired(finalizeCmd, "protocol-version")
+	cmd.MarkFlagRequired(finalizeCmd, "epoch-commit-safety-threshold")
 }
 
 func finalize(cmd *cobra.Command, args []string) {

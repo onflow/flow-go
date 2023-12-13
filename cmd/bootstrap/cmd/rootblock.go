@@ -31,7 +31,6 @@ var (
 	flagNumViewsInEpoch             uint64
 	flagNumViewsInStakingAuction    uint64
 	flagNumViewsInDKGPhase          uint64
-	flagEpochCommitSafetyThreshold  uint64
 	flagServiceAccountPublicKeyJSON string
 	flagGenesisTokenSupply          string
 )
@@ -72,23 +71,21 @@ func addRootBlockCmdFlags() {
 	rootBlockCmd.Flags().Uint64Var(&flagNumViewsInEpoch, "epoch-length", 4000, "length of each epoch measured in views")
 	rootBlockCmd.Flags().Uint64Var(&flagNumViewsInStakingAuction, "epoch-staking-phase-length", 100, "length of the epoch staking phase measured in views")
 	rootBlockCmd.Flags().Uint64Var(&flagNumViewsInDKGPhase, "epoch-dkg-phase-length", 1000, "length of each DKG phase measured in views")
-	rootBlockCmd.Flags().Uint64Var(&flagEpochCommitSafetyThreshold, "epoch-commit-safety-threshold", 500, "defines epoch commitment deadline")
 
 	// optional parameters to influence various aspects of identity generation
-	finalizeCmd.Flags().UintVar(&flagCollectionClusters, "collection-clusters", 2, "number of collection clusters")
+	rootBlockCmd.Flags().UintVar(&flagCollectionClusters, "collection-clusters", 2, "number of collection clusters")
 
 	cmd.MarkFlagRequired(rootBlockCmd, "epoch-counter")
 	cmd.MarkFlagRequired(rootBlockCmd, "epoch-length")
 	cmd.MarkFlagRequired(rootBlockCmd, "epoch-staking-phase-length")
 	cmd.MarkFlagRequired(rootBlockCmd, "epoch-dkg-phase-length")
-	cmd.MarkFlagRequired(finalizeCmd, "epoch-commit-safety-threshold")
 
 	// required parameters for generation of root block, root execution result and root block seal
 	rootBlockCmd.Flags().StringVar(&flagRootChain, "root-chain", "local", "chain ID for the root block (can be 'main', 'test', 'sandbox', 'bench', or 'local'")
 	rootBlockCmd.Flags().StringVar(&flagRootParent, "root-parent", "0000000000000000000000000000000000000000000000000000000000000000", "ID for the parent of the root block")
 	rootBlockCmd.Flags().Uint64Var(&flagRootHeight, "root-height", 0, "height of the root block")
 	rootBlockCmd.Flags().StringVar(&flagRootTimestamp, "root-timestamp", time.Now().UTC().Format(time.RFC3339), "timestamp of the root block (RFC3339)")
-	finalizeCmd.Flags().StringVar(&flagRootCommit, "root-commit", "0000000000000000000000000000000000000000000000000000000000000000", "state commitment of root execution state")
+	rootBlockCmd.Flags().StringVar(&flagRootCommit, "root-commit", "0000000000000000000000000000000000000000000000000000000000000000", "state commitment of root execution state")
 
 	cmd.MarkFlagRequired(rootBlockCmd, "root-chain")
 	cmd.MarkFlagRequired(rootBlockCmd, "root-parent")
@@ -96,10 +93,10 @@ func addRootBlockCmdFlags() {
 	cmd.MarkFlagRequired(rootBlockCmd, "root-commit")
 
 	// these two flags are only used when setup a network from genesis
-	finalizeCmd.Flags().StringVar(&flagServiceAccountPublicKeyJSON, "service-account-public-key-json",
+	rootBlockCmd.Flags().StringVar(&flagServiceAccountPublicKeyJSON, "service-account-public-key-json",
 		"{\"PublicKey\":\"ABCDEFGHIJK\",\"SignAlgo\":2,\"HashAlgo\":1,\"SeqNumber\":0,\"Weight\":1000}",
 		"encoded json of public key for the service account")
-	finalizeCmd.Flags().StringVar(&flagGenesisTokenSupply, "genesis-token-supply", "10000000.00000000",
+	rootBlockCmd.Flags().StringVar(&flagGenesisTokenSupply, "genesis-token-supply", "10000000.00000000",
 		"genesis flow token supply")
 }
 
