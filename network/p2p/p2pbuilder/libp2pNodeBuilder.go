@@ -78,7 +78,7 @@ type LibP2PNodeBuilder struct {
 }
 
 // LibP2PNodeBuilderParams parameters required to create a new *LibP2PNodeBuilder with NewNodeBuilder.
-type LibP2PNodeBuilderParams struct {
+type LibP2PNodeBuilderConfig struct {
 	Logger                    zerolog.Logger                          `validate:"required"`
 	MetricsConfig             *p2pconfig.MetricsConfig                `validate:"required"`
 	NetworkingType            flownet.NetworkingType                  `validate:"required"`
