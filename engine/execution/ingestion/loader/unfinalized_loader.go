@@ -59,6 +59,14 @@ func (e *UnfinalizedLoader) LoadUnexecuted(ctx context.Context) ([]flow.Identifi
 		}
 
 		unexecutedFinalized = append(unexecutedFinalized, header.ID())
+
+		if len(unexecutedFinalized) > 10_000 {
+			e.log.Warn().
+				Uint64("total_unexecuted", final.Height-lastExecuted).
+				Msg("too many unexecuted finalized blocks, loading the first 10_000")
+			break
+		}
+
 	}
 
 	// loaded all pending blocks
