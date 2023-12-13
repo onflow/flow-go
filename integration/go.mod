@@ -19,10 +19,10 @@ require (
 	github.com/ipfs/go-datastore v0.6.0
 	github.com/ipfs/go-ds-badger2 v0.1.3
 	github.com/ipfs/go-ipfs-blockstore v1.3.0
-	github.com/onflow/cadence v1.0.0-preview.1.0.20231211223059-394691058b70
-	github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.4-0.20230921055800-5ed9c184d103
-	github.com/onflow/flow-core-contracts/lib/go/templates v1.2.4-0.20230918230627-2daea3d4f44b
-	github.com/onflow/flow-emulator v0.54.1-0.20230912234944-690e2ed31cb4
+	github.com/onflow/cadence v1.0.0-preview.1.0.20231213191345-0ff20e15e7e1
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.1-0.20231212203043-37cbe453d425
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.15.1-0.20231204202154-f8dfacb39d86
+	github.com/onflow/flow-emulator v0.59.0
 	github.com/onflow/flow-go v0.32.4-0.20231130134727-3c01c7f8966c
 	github.com/onflow/flow-go-sdk v0.44.0-stable-cadence.2
 	github.com/onflow/flow-go/crypto v0.25.0
@@ -247,8 +247,9 @@ require (
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/onflow/atree v0.6.1-0.20230711151834-86040b30171f // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20231212194336-a2802ba36596 // indirect
-	github.com/onflow/flow-nft/lib/go/contracts v1.1.1-0.20231212194623-24d595274bdd // indirect
+	github.com/onflow/flow-nft/lib/go/contracts v1.1.1-0.20231213142242-ecf0b5bb544f // indirect
 	github.com/onflow/go-bitswap v0.0.0-20230703214630-6d3db958c73d // indirect
+	github.com/onflow/nft-storefront/lib/go/contracts v0.0.0-20221222181731-14b90207cead // indirect
 	github.com/onflow/sdks v0.5.1-0.20230912225508-b35402f12bba // indirect
 	github.com/onflow/wal v0.0.0-20230529184820-bc9f8244608d // indirect
 	github.com/onsi/ginkgo/v2 v2.9.7 // indirect
@@ -332,7 +333,7 @@ require (
 	golang.org/x/term v0.11.0 // indirect
 	golang.org/x/text v0.12.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
-	golang.org/x/tools v0.9.1 // indirect
+	golang.org/x/tools v0.10.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
 	gonum.org/v1/gonum v0.13.0 // indirect
 	google.golang.org/api v0.126.0 // indirect

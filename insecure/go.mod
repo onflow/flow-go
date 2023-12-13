@@ -199,12 +199,12 @@ require (
 	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/onflow/atree v0.6.1-0.20230711151834-86040b30171f // indirect
-	github.com/onflow/cadence v1.0.0-preview.1.0.20231211223059-394691058b70 // indirect
+	github.com/onflow/cadence v1.0.0-preview.1.0.20231213191345-0ff20e15e7e1 // indirect
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.1-0.20231212203043-37cbe453d425 // indirect
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.15.1-0.20231204202154-f8dfacb39d86 // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20231212194336-a2802ba36596 // indirect
 	github.com/onflow/flow-go-sdk v0.44.0-stable-cadence.2 // indirect
-	github.com/onflow/flow-nft/lib/go/contracts v1.1.1-0.20231212194623-24d595274bdd // indirect
+	github.com/onflow/flow-nft/lib/go/contracts v1.1.1-0.20231213142242-ecf0b5bb544f // indirect
 	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20231124194313-106cc495def6 // indirect
 	github.com/onflow/go-bitswap v0.0.0-20230703214630-6d3db958c73d // indirect
 	github.com/onflow/sdks v0.5.1-0.20230912225508-b35402f12bba // indirect

@@ -51,7 +51,7 @@ require (
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/multiformats/go-multihash v0.2.3
 	github.com/onflow/atree v0.6.1-0.20230711151834-86040b30171f
-	github.com/onflow/cadence v1.0.0-preview.1.0.20231211223059-394691058b70
+	github.com/onflow/cadence v1.0.0-preview.1.0.20231213191345-0ff20e15e7e1
 	github.com/onflow/flow v0.3.4
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.1-0.20231212203043-37cbe453d425
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.15.1-0.20231204202154-f8dfacb39d86
@@ -105,7 +105,7 @@ require (
 	github.com/gorilla/websocket v1.5.0
 	github.com/hashicorp/golang-lru/v2 v2.0.2
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/onflow/flow-nft/lib/go/contracts v1.1.1-0.20231212194623-24d595274bdd
+	github.com/onflow/flow-nft/lib/go/contracts v1.1.1-0.20231213142242-ecf0b5bb544f
 	github.com/onflow/wal v0.0.0-20230529184820-bc9f8244608d
 	github.com/slok/go-http-metrics v0.10.0
 	github.com/sony/gobreaker v0.5.0
