@@ -1689,19 +1689,19 @@ func TestBlockContext_Random(t *testing.T) {
 		fvm.WithCadenceLogging(true),
 	)
 
-	tx_code := []byte(`
+	txCode := []byte(`
 	transaction {
 		execute {
-			let rand1 = unsafeRandom()
+			let rand1 = revertibleRandom<UInt64>()
 			log(rand1)
-			let rand2 = unsafeRandom()
+			let rand2 = revertibleRandom<UInt128>()
 			log(rand2)
 		}
 	}
 	`)
 
 	getTxRandoms := func(t *testing.T) [2]uint64 {
-		txBody := flow.NewTransactionBody().SetScript(tx_code)
+		txBody := flow.NewTransactionBody().SetScript(txCode)
 		err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 		require.NoError(t, err)
 
@@ -1735,20 +1735,19 @@ func TestBlockContext_Random(t *testing.T) {
 		require.NotEqual(t, randoms1[0], randoms2[0], "extremely unlikely to be equal")
 	})
 
-	script_string := `
+	scriptCode := `
 	access(all)
 	fun main(a: Int8) {
-		let rand = unsafeRandom()
+		let rand = revertibleRandom<UInt64>()
 		log(rand)
-		let rand%d = unsafeRandom()
-		log(rand%d)
+		let rand%[1]d = revertibleRandom<UInt128>()
+		log(rand%[1]d)
 	}
 	`
 
 	getScriptRandoms := func(t *testing.T, codeSalt int, arg int) [2]uint64 {
-		script_code := []byte(fmt.Sprintf(script_string, codeSalt, codeSalt))
-		script := fvm.Script(script_code).WithArguments(
-			jsoncdc.MustEncode(cadence.Int8(arg)))
+		script := fvm.Script([]byte(fmt.Sprintf(scriptCode, codeSalt))).
+			WithArguments(jsoncdc.MustEncode(cadence.Int8(arg)))
 
 		_, output, err := vm.Run(ctx, script, testutil.RootBootstrappedLedger(vm, ctx))
 		require.NoError(t, err)
