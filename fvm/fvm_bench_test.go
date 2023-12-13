@@ -1006,7 +1006,6 @@ func deployBatchNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAcc
 				access(all) event TestTokenMinted(testTokenID: UInt64, playID: UInt32, setID: UInt32, serialNumber: UInt32)
 				access(all) event Withdraw(id: UInt64, from: Address?)
 				access(all) event Deposit(id: UInt64, to: Address?)
-				access(all) event TestTokenDestroyed(id: UInt64)
 				access(all) var currentSeries: UInt32
 				access(self) var playDatas: {UInt32: Play}
 				access(self) var setDatas: {UInt32: SetData}
@@ -1162,10 +1161,6 @@ func deployBatchNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAcc
 
 						emit TestTokenMinted(testTokenID: self.id, playID: playID, setID: self.data.setID, serialNumber: self.data.serialNumber)
 					}
-
-					destroy() {
-						emit TestTokenDestroyed(id: self.id)
-					}
 				}
 
 				access(all) resource Admin {
@@ -1279,9 +1274,6 @@ func deployBatchNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAcc
 						} else {
 							return nil
 						}
-					}
-					destroy() {
-						destroy self.ownedNFTs
 					}
 				}
 

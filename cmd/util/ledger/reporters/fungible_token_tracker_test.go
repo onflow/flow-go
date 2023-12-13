@@ -76,18 +76,22 @@ func TestFungibleTokenTracker(t *testing.T) {
 	testContract := fmt.Sprintf(`
 	import FungibleToken from 0x%s
 
-	access(all) contract WrappedToken {
-		access(all) resource WrappedVault {
-			access(all) var vault: @{FungibleToken.Vault}
+	access(all)
+	contract WrappedToken {
+
+		access(all)
+		resource WrappedVault {
+
+			access(all)
+			var vault: @{FungibleToken.Vault}
 
 			init(v: @{FungibleToken.Vault}) {
 				self.vault <- v
 			}
-			destroy() {
-			  destroy self.vault
-			}
 		}
-		access(all) fun CreateWrappedVault(inp: @{FungibleToken.Vault}): @WrappedToken.WrappedVault {
+
+		access(all)
+		fun CreateWrappedVault(inp: @{FungibleToken.Vault}): @WrappedToken.WrappedVault {
 			return <-create WrappedVault(v :<- inp)
 		}
 	}`, sc.FungibleToken.Address.Hex())
