@@ -66,16 +66,16 @@ func (p *Params) EpochFallbackTriggered() (bool, error) {
 	return false, fmt.Errorf("not implemented")
 }
 
-func (p *Params) FinalizedRoot() (*flow.Header, error) {
-	return p.state.root.Header, nil
+func (p *Params) FinalizedRoot() *flow.Header {
+	return p.state.root.Header
 }
 
-func (p *Params) SealedRoot() (*flow.Header, error) {
+func (p *Params) SealedRoot() *flow.Header {
 	return p.FinalizedRoot()
 }
 
-func (p *Params) Seal() (*flow.Seal, error) {
-	return nil, fmt.Errorf("not implemented")
+func (p *Params) Seal() *flow.Seal {
+	return nil
 }
 
 func (ps *ProtocolState) Params() protocol.Params {
