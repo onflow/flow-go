@@ -217,6 +217,7 @@ func MigrateGroupConcurrently(
 	}
 
 	go func() {
+		defer close(jobs)
 		for {
 			g, err := accountGroups.Next()
 			if err != nil {
@@ -242,13 +243,21 @@ func MigrateGroupConcurrently(
 	}()
 
 	// read job results
-	logAccount := moduleUtil.LogProgress(log, "processing account group", accountGroups.Len())
+	logAccount := moduleUtil.LogProgress(
+		log,
+		moduleUtil.DefaultLogProgressConfig(
+			"processing account group",
+			accountGroups.Len(),
+		),
+	)
 
-	migrated := make([]*ledger.Payload, 0)
+	migrated := make([]*ledger.Payload, 0, accountGroups.AllPayloadsCount())
 	durations := newMigrationDurations(logTopNDurations)
+	contextDone := false
 	for i := 0; i < accountGroups.Len(); i++ {
 		select {
 		case <-ctx.Done():
+			contextDone = true
 			break
 		case result := <-resultCh:
 			durations.Add(result)
@@ -257,8 +266,10 @@ func MigrateGroupConcurrently(
 			migrated = append(migrated, accountMigrated...)
 			logAccount(1)
 		}
+		if contextDone {
+			break
+		}
 	}
-	close(jobs)
 
 	// make sure to exit all workers before returning from this function
 	// so that the migrator can be closed properly
@@ -355,4 +366,12 @@ func (h *migrationDurations) Add(result *migrationResult) {
 		}
 		heap.Push(h, result.migrationDuration)
 	}
+}
+
+func mustHexToAddress(hex string) common.Address {
+	address, err := common.HexToAddress(hex)
+	if err != nil {
+		panic(err)
+	}
+	return address
 }

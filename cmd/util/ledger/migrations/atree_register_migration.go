@@ -263,7 +263,11 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 	progressLog := func(int) {}
 
 	if mr.Address == cricketMomentsAddress {
-		progressLog = util2.LogProgress(m.log, "applying changes", len(changes))
+		progressLog = util2.LogProgress(m.log,
+			util2.DefaultLogProgressConfig(
+				"applying changes",
+				len(changes),
+			))
 	}
 
 	for id, value := range changes {
@@ -307,7 +311,11 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 	// add all values that were not changed
 	if len(originalPayloads) > 0 {
 		if mr.Address == cricketMomentsAddress {
-			progressLog = util2.LogProgress(m.log, "checking unchanged registers", len(originalPayloads))
+			progressLog = util2.LogProgress(m.log,
+				util2.DefaultLogProgressConfig(
+					"checking unchanged registers",
+					len(originalPayloads)),
+			)
 		}
 		for id, value := range originalPayloads {
 			progressLog(1)
@@ -397,7 +405,7 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 			return nil, fmt.Errorf("cannot create new payload with value: %w", err)
 		}
 
-		statePayload = &newPayload
+		statePayload = newPayload
 	}
 
 	newPayloads = append(newPayloads, statePayload)
@@ -482,14 +490,6 @@ type migrationProblem struct {
 	Key  string
 	Kind string
 	Msg  string
-}
-
-func mustHexToAddress(hex string) common.Address {
-	address, err := common.HexToAddress(hex)
-	if err != nil {
-		panic(err)
-	}
-	return address
 }
 
 var skippableAccountError = errors.New("account can be skipped")

@@ -174,7 +174,12 @@ func (mr *migratorRuntime) ChildInterpreters(log zerolog.Logger, n int, address 
 	}
 
 	closeInterpreters := func() error {
-		progressLog := util2.LogProgress(log, "closing child interpreters", len(interpreters))
+		progressLog := util2.LogProgress(
+			log,
+			util2.DefaultLogProgressConfig(
+				"closing child interpreters",
+				len(interpreters),
+			))
 		//index := <-storageIndexChan
 		//close(stopStorageIndexChan)
 		//accountStatus.SetStorageIndex(index)

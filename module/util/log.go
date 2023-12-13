@@ -9,20 +9,55 @@ import (
 )
 
 // LogProgressFunc is a function that can be called to add to the progress
-type LogProgressFunc func(add int)
+type LogProgressFunc func(addProgress int)
+
+type LogProgressConfig struct {
+	Message string
+	Total   int
+	Sampler zerolog.Sampler
+}
+
+func DefaultLogProgressConfig(
+	message string,
+	total int,
+) LogProgressConfig {
+	nth := uint32(total / 10) // sample every 10% by default
+	if nth == 0 {
+		nth = 1
+	}
+
+	sampler := newProgressLogsSampler(nth, 60*time.Second)
+	return NewLogProgressConfig(
+		message,
+		total,
+		sampler,
+	)
+}
+
+func NewLogProgressConfig(
+	message string,
+	total int,
+	sampler zerolog.Sampler) LogProgressConfig {
+	return LogProgressConfig{
+		Message: message,
+		Total:   total,
+		Sampler: sampler,
+	}
+
+}
+
+type LogProgressOption func(config *LogProgressConfig)
 
 // LogProgress takes a total and return function such that when called adds the given
 // number to the progress and logs the progress every 10% or every 60 seconds whichever
 // comes first.
 // The returned function can be called concurrently.
 // An eta is also logged, but it assumes that the progress is linear.
-func LogProgress(log zerolog.Logger, msg string, total int) LogProgressFunc {
-	nth := uint32(total / 10) // sample every 10% by default
-	if nth == 0 {
-		nth = 1
-	}
-
-	sampler := log.Sample(newProgressLogsSampler(nth, 60*time.Second))
+func LogProgress(
+	log zerolog.Logger,
+	config LogProgressConfig,
+) LogProgressFunc {
+	sampler := log.Sample(config.Sampler)
 
 	start := time.Now()
 	currentIndex := uint64(0)
@@ -30,8 +65,8 @@ func LogProgress(log zerolog.Logger, msg string, total int) LogProgressFunc {
 		current := atomic.AddUint64(&currentIndex, uint64(add))
 
 		percentage := float64(100)
-		if total > 0 {
-			percentage = (float64(current) / float64(total)) * 100. // currentIndex+1 assuming zero based indexing
+		if config.Total > 0 {
+			percentage = (float64(current) / float64(config.Total)) * 100.
 		}
 		elapsed := time.Since(start)
 		elapsedString := elapsed.Round(1 * time.Second).String()
@@ -46,10 +81,10 @@ func LogProgress(log zerolog.Logger, msg string, total int) LogProgressFunc {
 
 		}
 
-		if current != uint64(total) {
-			sampler.Info().Msgf("%s progress %d/%d (%.1f%%) elapsed: %s, eta %s", msg, current, total, percentage, elapsedString, etaString)
+		if current != uint64(config.Total) {
+			sampler.Info().Msgf("%s progress %d/%d (%.1f%%) elapsed: %s, eta %s", config.Message, current, config.Total, percentage, elapsedString, etaString)
 		} else {
-			log.Info().Msgf("%s progress %d/%d (%.1f%%) total time %s", msg, current, total, percentage, elapsedString)
+			log.Info().Msgf("%s progress %d/%d (%.1f%%) total time %s", config.Message, current, config.Total, percentage, elapsedString)
 		}
 	}
 }

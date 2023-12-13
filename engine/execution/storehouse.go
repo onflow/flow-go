@@ -84,6 +84,13 @@ type InMemoryRegisterStore interface {
 		registers flow.RegisterEntries,
 	) error
 
+	// IsBlockExecuted returns wheather the given block is executed.
+	// It returns:
+	// - (true, nil) if the block is above the pruned height and is executed
+	// - (true, nil) if the block is the pruned block, since the prunded block are finalized and executed
+	// - (false, nil) if the block is above the pruned height and is not executed
+	// - (false, nil) if the block's height is the pruned height, but is different from the pruned block
+	// - (false, exception) if the block is below the pruned height
 	IsBlockExecuted(height uint64, blockID flow.Identifier) (bool, error)
 }
 

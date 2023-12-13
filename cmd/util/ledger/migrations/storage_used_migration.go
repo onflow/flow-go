@@ -91,7 +91,7 @@ func (m *AccountUsageMigrator) MigrateAccount(
 		return nil, fmt.Errorf("cannot create new payload with value: %w", err)
 	}
 
-	payloads[statusIndex] = &newPayload
+	payloads[statusIndex] = newPayload
 
 	return payloads, nil
 }
@@ -120,13 +120,13 @@ func (m *AccountUsageMigrator) compareUsage(
 
 // newPayloadWithValue returns a new payload with the key from the given payload, and
 // the value from the argument
-func newPayloadWithValue(payload *ledger.Payload, value ledger.Value) (ledger.Payload, error) {
+func newPayloadWithValue(payload *ledger.Payload, value ledger.Value) (*ledger.Payload, error) {
 	key, err := payload.Key()
 	if err != nil {
-		return ledger.Payload{}, err
+		return nil, err
 	}
 	newPayload := ledger.NewPayload(key, value)
-	return *newPayload, nil
+	return newPayload, nil
 }
 
 func registerSize(id flow.RegisterID, p *ledger.Payload) int {

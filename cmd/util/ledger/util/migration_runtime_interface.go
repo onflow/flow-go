@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// MigrationRuntimeInterface is a runtime interface that can be used in migrations.
 type MigrationRuntimeInterface struct {
 	Accounts environment.Accounts
 	Programs *environment.Programs
@@ -202,7 +203,7 @@ func (m MigrationRuntimeInterface) GetBlockAtHeight(_ uint64) (block runtime.Blo
 }
 
 func (m MigrationRuntimeInterface) ReadRandom([]byte) error {
-	panic("unexpected UnsafeRandom call")
+	panic("unexpected ReadRandom call")
 }
 
 func (m MigrationRuntimeInterface) VerifySignature(_ []byte, _ string, _ []byte, _ []byte, _ runtime.SignatureAlgorithm, _ runtime.HashAlgorithm) (bool, error) {

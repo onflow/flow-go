@@ -437,7 +437,11 @@ func hashAllNftsInAllCollections(
 	if err != nil {
 		return nil, err
 	}
-	progressLog := util2.LogProgress(log, "hashing cricket moments", count)
+	progressLog := util2.LogProgress(log,
+		util2.DefaultLogProgressConfig(
+			"hashing cricket moments",
+			count,
+		))
 
 	ctx, c := context.WithCancelCause(context.Background())
 	cancel := func(err error) {
