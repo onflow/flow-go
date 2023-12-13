@@ -543,7 +543,7 @@ func trieRegistersPayloadComparer(t *testing.T, triePayloads []*ledger.Payload, 
 func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 	regOwner := "f8d6e0586b0a20c7"
 	regKey := "code"
-	registerID := flow.NewRegisterID(regOwner, regKey)
+	registerID := flow.NewRegisterID(flow.HexToAddress(regOwner), regKey)
 
 	db, dbDir := unittest.TempBadgerDB(t)
 	t.Cleanup(func() {

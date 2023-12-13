@@ -9,9 +9,12 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/rand"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type spockTestOp func(*testing.T, *spockState)
+
+var fooOwner = unittest.RandomAddressFixture()
 
 func chainSpockTestOps(prevOps spockTestOp, op spockTestOp) spockTestOp {
 	return func(t *testing.T, state *spockState) {
@@ -50,7 +53,7 @@ func testSpock(
 }
 
 func TestSpockStateGet(t *testing.T) {
-	registerId := flow.NewRegisterID("foo", "bar")
+	registerId := flow.NewRegisterID(fooOwner, "bar")
 
 	states := testSpock(
 		t,
@@ -71,11 +74,11 @@ func TestSpockStateGet(t *testing.T) {
 			},
 			// Reading different register ids will result in different spock
 			func(t *testing.T, state *spockState) {
-				_, err := state.Get(flow.NewRegisterID("fo0", "bar"))
+				_, err := state.Get(flow.NewRegisterID(unittest.RandomAddressFixture(), "bar"))
 				require.NoError(t, err)
 			},
 			func(t *testing.T, state *spockState) {
-				_, err := state.Get(flow.NewRegisterID("foo", "baR"))
+				_, err := state.Get(flow.NewRegisterID(fooOwner, "baR"))
 				require.NoError(t, err)
 			},
 		})
@@ -94,7 +97,7 @@ func TestSpockStateGet(t *testing.T) {
 }
 
 func TestSpockStateGetDifferentUnderlyingStorage(t *testing.T) {
-	badRegisterId := flow.NewRegisterID("foo", "bad")
+	badRegisterId := flow.NewRegisterID(fooOwner, "bad")
 
 	value1 := flow.RegisterValue([]byte("abc"))
 	value2 := flow.RegisterValue([]byte("blah"))
@@ -127,7 +130,7 @@ func TestSpockStateGetDifferentUnderlyingStorage(t *testing.T) {
 }
 
 func TestSpockStateGetVsSetNil(t *testing.T) {
-	registerId := flow.NewRegisterID("foo", "bar")
+	registerId := flow.NewRegisterID(fooOwner, "bar")
 
 	_ = testSpock(
 		t,
@@ -144,7 +147,7 @@ func TestSpockStateGetVsSetNil(t *testing.T) {
 }
 
 func TestSpockStateSet(t *testing.T) {
-	registerId := flow.NewRegisterID("foo", "bar")
+	registerId := flow.NewRegisterID(fooOwner, "bar")
 	value := flow.RegisterValue([]byte("value"))
 
 	states := testSpock(
@@ -166,11 +169,11 @@ func TestSpockStateSet(t *testing.T) {
 			},
 			// Setting different register id will result in different spock
 			func(t *testing.T, state *spockState) {
-				err := state.Set(flow.NewRegisterID("foo", "baR"), value)
+				err := state.Set(flow.NewRegisterID(fooOwner, "baR"), value)
 				require.NoError(t, err)
 			},
 			func(t *testing.T, state *spockState) {
-				err := state.Set(flow.NewRegisterID("foO", "bar"), value)
+				err := state.Set(flow.NewRegisterID(unittest.RandomAddressFixture(), "bar"), value)
 				require.NoError(t, err)
 			},
 			// Setting different register value will result in different spock
@@ -194,8 +197,8 @@ func TestSpockStateSet(t *testing.T) {
 }
 
 func TestSpockStateSetValueInjection(t *testing.T) {
-	registerId1 := flow.NewRegisterID("foo", "injection")
-	registerId2 := flow.NewRegisterID("foo", "inject")
+	registerId1 := flow.NewRegisterID(fooOwner, "injection")
+	registerId2 := flow.NewRegisterID(fooOwner, "inject")
 
 	_ = testSpock(
 		t,
@@ -213,7 +216,7 @@ func TestSpockStateSetValueInjection(t *testing.T) {
 
 func TestSpockStateMerge(t *testing.T) {
 	readSet := map[flow.RegisterID]struct{}{
-		flow.NewRegisterID("foo", "bar"): struct{}{},
+		flow.NewRegisterID(fooOwner, "bar"): struct{}{},
 	}
 
 	states := testSpock(
@@ -265,13 +268,13 @@ func TestSpockStateMerge(t *testing.T) {
 	require.ErrorContains(t, err, "cannot Merge on a finalized state")
 }
 func TestSpockStateDropChanges(t *testing.T) {
-	registerId := flow.NewRegisterID("foo", "read")
+	registerId := flow.NewRegisterID(fooOwner, "read")
 
 	setup := func(t *testing.T, state *spockState) {
 		_, err := state.Get(registerId)
 		require.NoError(t, err)
 
-		err = state.Set(flow.NewRegisterID("foo", "write"), []byte("blah"))
+		err = state.Set(flow.NewRegisterID(fooOwner, "write"), []byte("blah"))
 		require.NoError(t, err)
 	}
 
@@ -331,7 +334,7 @@ func TestSpockStateRandomOps(t *testing.T) {
 					chain[len(chain)-1],
 					func(t *testing.T, state *spockState) {
 						_, err := state.Get(
-							flow.NewRegisterID("", fmt.Sprintf("%d", id)))
+							flow.NewRegisterID(flow.EmptyAddress, fmt.Sprintf("%d", id)))
 						require.NoError(t, err)
 					}))
 		case uint(1):
@@ -347,7 +350,7 @@ func TestSpockStateRandomOps(t *testing.T) {
 					chain[len(chain)-1],
 					func(t *testing.T, state *spockState) {
 						err := state.Set(
-							flow.NewRegisterID("", fmt.Sprintf("%d", id)),
+							flow.NewRegisterID(flow.EmptyAddress, fmt.Sprintf("%d", id)),
 							[]byte(fmt.Sprintf("%d", value)))
 						require.NoError(t, err)
 					}))
@@ -383,18 +386,21 @@ func TestSpockStateRandomOps(t *testing.T) {
 	_ = testSpock(t, chain)
 }
 func TestSpockStateNewChild(t *testing.T) {
-	baseRegisterId := flow.NewRegisterID("", "base")
+	baseRegisterId := flow.NewRegisterID(flow.EmptyAddress, "base")
 	baseValue := flow.RegisterValue([]byte("base"))
 
-	parentRegisterId1 := flow.NewRegisterID("parent", "1")
+	parentOwner := unittest.RandomAddressFixture()
+	childOwner := unittest.RandomAddressFixture()
+
+	parentRegisterId1 := flow.NewRegisterID(parentOwner, "1")
 	parentValue := flow.RegisterValue([]byte("parent"))
 
-	parentRegisterId2 := flow.NewRegisterID("parent", "2")
+	parentRegisterId2 := flow.NewRegisterID(parentOwner, "2")
 
-	childRegisterId1 := flow.NewRegisterID("child", "1")
+	childRegisterId1 := flow.NewRegisterID(childOwner, "1")
 	childValue := flow.RegisterValue([]byte("child"))
 
-	childRegisterId2 := flow.NewRegisterID("child", "2")
+	childRegisterId2 := flow.NewRegisterID(childOwner, "2")
 
 	parent := newSpockState(
 		snapshot.MapStorageSnapshot{
