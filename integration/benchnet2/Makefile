@@ -30,7 +30,7 @@ endif
 # for the checked out version will be run in the sub folder but the bootstrap folder will be created here (outside of the checked out flow-go in the sub folder)
 gen-bootstrap: clone-flow
 	cd flow-go/cmd/bootstrap && go run . genconfig \
-		--address-format "%s%d-${NETWORK_ID}.${NAMESPACE}:3569"
+		--address-format "%s%d-${NETWORK_ID}.${NAMESPACE}:3569" \
 		--access $(ACCESS) \
 		--collection $(COLLECTION) \
 		--consensus $(CONSENSUS) \
