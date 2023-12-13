@@ -23,3 +23,7 @@ func RetrieveExecutionStateInteractions(
 	return retrieve(
 		makePrefix(codeExecutionStateInteractions, blockID), executionSnapshots)
 }
+
+func RemoveExecutionStateInteractions(blockID flow.Identifier) func(*badger.Txn) error {
+	return remove(makePrefix(codeExecutionStateInteractions, blockID))
+}

@@ -12,10 +12,12 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
 var (
-	flagDataDir string
+	flagDataDir     string
+	flagRootBlockID string
 )
 
 func main() {
@@ -39,6 +41,8 @@ func Execute() {
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&flagDataDir, "datadir", "d", "/var/flow/data/protocol", "directory to the badger dababase")
 	_ = rootCmd.MarkPersistentFlagRequired("datadir")
+	rootCmd.PersistentFlags().StringVarP(&flagRootBlockID, "root-block-id", "", "", "root block id")
+	_ = rootCmd.MarkPersistentFlagRequired("root-block-id")
 
 	cobra.OnInitialize(initConfig)
 }
@@ -50,16 +54,38 @@ func initConfig() {
 func run(*cobra.Command, []string) {
 	log.Info().
 		Str("datadir", flagDataDir).
+		Str("rootblockid", flagRootBlockID).
 		Msg("flags")
+
+	rootBlockID, err := flow.HexStringToIdentifier(flagRootBlockID)
+	if err != nil {
+		log.Fatal().Err(err).Msgf("fail to parse block id")
+	}
 
 	db := common.InitStorage(flagDataDir)
 	defer db.Close()
 
 	metrics := &metrics.NoopCollector{}
 	commits := badger.NewCommits(metrics, db)
-	err := commits.RemoveByBlockID(flow.ZeroID)
+
+	err = commits.RemoveByBlockID(flow.ZeroID)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("fail to remove commit")
+	}
+
+	err = commits.RemoveByBlockID(rootBlockID)
+	if err != nil {
+		log.Fatal().Err(err).Msgf("fail to remove commit")
+	}
+
+	err = db.Update(operation.SkipNonExist(operation.RemoveExecutionStateInteractions(rootBlockID)))
+	if err != nil {
+		log.Fatal().Err(err).Msgf("fail to remove execution state interactions")
+	}
+
+	err = db.Update(operation.SkipNonExist(operation.RemoveExecutedBlock()))
+	if err != nil {
+		log.Fatal().Err(err).Msgf("fail to remove executed block")
 	}
 
 	log.Info().Msgf("remove commit success")

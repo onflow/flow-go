@@ -45,6 +45,10 @@ func RetrieveExecutedBlock(blockID *flow.Identifier) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeExecutedBlock), blockID)
 }
 
+func RemoveExecutedBlock() func(*badger.Txn) error {
+	return remove(makePrefix(codeExecutedBlock))
+}
+
 // IndexCollectionBlock indexes a block by a collection within that block.
 func IndexCollectionBlock(collID flow.Identifier, blockID flow.Identifier) func(*badger.Txn) error {
 	return insert(makePrefix(codeCollectionBlock, collID), blockID)
