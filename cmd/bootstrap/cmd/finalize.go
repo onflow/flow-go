@@ -29,12 +29,11 @@ var (
 	deprecatedFlagPartnerStakes string
 	flagPartnerWeights          string
 	flagDKGDataPath             string
-	// todo rename below to ...path?
-	flagRootBlock         string
-	flagRootResult        string
-	flagRootSeal          string
-	flagRootParams        string
-	flagRootBlockVotesDir string
+	flagRootBlockPath           string
+	flagRootResultPath          string
+	flagRootSealPath            string
+	flagRootParamsPath          string
+	flagRootBlockVotesDir       string
 )
 
 // PartnerWeights is the format of the JSON file specifying partner node weights.
@@ -76,10 +75,10 @@ func addFinalizeCmdFlags() {
 	cmd.MarkFlagRequired(finalizeCmd, "dkg-data")
 
 	// required parameters for generation of root block, root execution result and root block seal
-	finalizeCmd.Flags().StringVar(&flagRootBlock, "root-block", "", "path to a JSON file containing root block")
-	finalizeCmd.Flags().StringVar(&flagRootResult, "root-result", "", "path to a JSON file containing root epoch")
-	finalizeCmd.Flags().StringVar(&flagRootSeal, "root-seal", "", "path to a JSON file containing root epoch")
-	finalizeCmd.Flags().StringVar(&flagRootParams, "root-params", "", "path to a JSON file containing root params")
+	finalizeCmd.Flags().StringVar(&flagRootBlockPath, "root-block", "", "path to a JSON file containing root block")
+	finalizeCmd.Flags().StringVar(&flagRootResultPath, "root-result", "", "path to a JSON file containing root epoch")
+	finalizeCmd.Flags().StringVar(&flagRootSealPath, "root-seal", "", "path to a JSON file containing root epoch")
+	finalizeCmd.Flags().StringVar(&flagRootParamsPath, "root-params", "", "path to a JSON file containing root params")
 	finalizeCmd.Flags().StringVar(&flagRootBlockVotesDir, "root-block-votes-dir", "", "path to directory with votes for root block")
 
 	cmd.MarkFlagRequired(finalizeCmd, "root-block")
@@ -436,7 +435,7 @@ func mergeNodeInfos(internalNodes, partnerNodes []model.NodeInfo) []model.NodeIn
 // readRootBlock reads root block data from disc, this file needs to be prepared with
 // rootblock command
 func readRootBlock() *flow.Block {
-	rootBlock, err := utils.ReadData[flow.Block](flagRootBlock)
+	rootBlock, err := utils.ReadData[flow.Block](flagRootBlockPath)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not read root block data")
 	}
@@ -444,11 +443,11 @@ func readRootBlock() *flow.Block {
 }
 
 func readRootResultAndSeal() (*flow.ExecutionResult, *flow.Seal) {
-	result, err := utils.ReadData[flow.ExecutionResult](flagRootResult)
+	result, err := utils.ReadData[flow.ExecutionResult](flagRootResultPath)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to read root result")
 	}
-	seal, err := utils.ReadData[flow.Seal](flagRootSeal)
+	seal, err := utils.ReadData[flow.Seal](flagRootSealPath)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to read root seal")
 	}
@@ -456,7 +455,7 @@ func readRootResultAndSeal() (*flow.ExecutionResult, *flow.Seal) {
 }
 
 func readRootParams() *model.Params {
-	params, err := utils.ReadData[model.Params](flagRootParams)
+	params, err := utils.ReadData[model.Params](flagRootParamsPath)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to read root params")
 	}

@@ -76,7 +76,7 @@ func TestFinalize_HappyPath(t *testing.T) {
 		flagNumViewsInStakingAuction = 50_000
 		flagNumViewsInDKGPhase = 2_000
 		flagEpochCommitSafetyThreshold = 1_000
-		flagRootBlock = filepath.Join(bootDir, model.PathRootBlockData)
+		flagRootBlockPath = filepath.Join(bootDir, model.PathRootBlockData)
 		flagRootEpoch = filepath.Join(bootDir, model.PathRootEpoch)
 		flagDKGDataPath = filepath.Join(bootDir, model.PathRootDKGData)
 		flagRootBlockVotesDir = filepath.Join(bootDir, model.DirnameRootBlockVotes)
