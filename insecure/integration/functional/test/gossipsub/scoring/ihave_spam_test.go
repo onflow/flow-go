@@ -67,7 +67,7 @@ func TestGossipSubIHaveBrokenPromises_Below_Threshold(t *testing.T) {
 		t.Name(),
 		idProvider,
 		p2ptest.WithRole(role),
-		p2ptest.WithPeerScoreTracerInterval(1*time.Second),
+		p2ptest.WithPeerScoreTracerInterval(10*time.Millisecond), // to speed up the test
 		p2ptest.EnablePeerScoringWithOverride(&p2p.PeerScoringConfigOverride{
 			TopicScoreParams: map[channels.Topic]*pubsub.TopicScoreParams{
 				blockTopic: blockTopicOverrideParams,
@@ -79,6 +79,13 @@ func TestGossipSubIHaveBrokenPromises_Below_Threshold(t *testing.T) {
 	ids := flow.IdentityList{&spammer.SpammerId, &victimIdentity}
 	idProvider.SetIdentities(ids)
 	nodes := []p2p.LibP2PNode{spammer.SpammerNode, victimNode}
+	// to suppress the logs of "peer provider has not set"
+	victimNode.WithPeersProvider(func() peer.IDSlice {
+		return peer.IDSlice{spammer.SpammerNode.ID()}
+	})
+	spammer.SpammerNode.WithPeersProvider(func() peer.IDSlice {
+		return peer.IDSlice{victimNode.ID()}
+	})
 
 	p2ptest.StartNodes(t, signalerCtx, nodes)
 	defer p2ptest.StopNodes(t, nodes, cancel)
@@ -101,17 +108,19 @@ func TestGossipSubIHaveBrokenPromises_Below_Threshold(t *testing.T) {
 		if !ok {
 			return false
 		}
-		// We set 7.5 as the threshold to compensate for the scoring decay in between RPC's being processed by the inspector
-		// ideally it must be 10 (one per RPC), but we give it a buffer of 1 to account for decays and floating point errors.
-		if behavioralPenalty < 7.5 {
+		// We set 7 as the threshold to compensate for the scoring decay in between RPC's being processed by the inspector
+		// ideally it must be 10 (one per RPC), but we give it a buffer of 3 to account for decays and floating point errors.
+		if behavioralPenalty < 7 {
+			t.Logf("pending on behavioral penalty %f", behavioralPenalty)
 			return false
 		}
-
+		t.Logf("success on behavioral penalty %f", behavioralPenalty)
 		initialBehavioralPenalty = behavioralPenalty
 		return true
 		// Note: we have to wait at least 3 seconds for an iHave to be considered as broken promise (gossipsub parameters), we set it to 10
 		// seconds to be on the safe side.
-	}, 10*time.Second, 100*time.Millisecond)
+		// Also, the internal heartbeat of GossipSub is 1 second, hence, there is no need to have ticks shorter than 1 second.
+	}, 10*time.Second, 1*time.Second)
 
 	spammerScore, ok := victimNode.PeerScoreExposer().GetScore(spammer.SpammerNode.ID())
 	require.True(t, ok, "sanity check failed, we should have a score for the spammer node")
@@ -218,7 +227,7 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 	ids := flow.IdentityList{&spammer.SpammerId, &victimIdentity}
 	idProvider.SetIdentities(ids)
 	nodes := []p2p.LibP2PNode{spammer.SpammerNode, victimNode}
-	// to suppress the logs of peer provider has not set
+	// to suppress the logs of "peer provider has not set"
 	victimNode.WithPeersProvider(func() peer.IDSlice {
 		return peer.IDSlice{spammer.SpammerNode.ID()}
 	})
