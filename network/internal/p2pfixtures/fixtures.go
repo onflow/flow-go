@@ -112,7 +112,7 @@ func CreateNode(t *testing.T, networkKey crypto.PrivateKey, sporkID flow.Identif
 		NetworkingType:                     flownet.PublicNetwork,
 	}
 	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
-	params := &p2pbuilder.LibP2PNodeBuilderParams{
+	params := &p2pbuilder.LibP2PNodeBuilderConfig{
 		Logger: logger,
 		MetricsConfig: &p2pconfig.MetricsConfig{
 			HeroCacheFactory: metrics.NewNoopHeroCacheMetricsFactory(),

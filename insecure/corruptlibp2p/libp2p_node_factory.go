@@ -78,7 +78,7 @@ func InitCorruptLibp2pNode(
 	if err != nil {
 		return nil, fmt.Errorf("could not get dht system activation status: %w", err)
 	}
-	params := &p2pbuilder.LibP2PNodeBuilderParams{
+	params := &p2pbuilder.LibP2PNodeBuilderConfig{
 		Logger:                    log,
 		MetricsConfig:             metCfg,
 		NetworkingType:            network.PrivateNetwork,

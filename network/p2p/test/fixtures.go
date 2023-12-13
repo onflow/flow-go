@@ -138,7 +138,7 @@ func NodeFixture(t *testing.T,
 
 	connManager, err := connection.NewConnManager(logger, parameters.MetricsCfg.Metrics, &parameters.FlowConfig.NetworkConfig.ConnectionManagerConfig)
 	require.NoError(t, err)
-	libP2PNodeBuilderParams := &p2pbuilder.LibP2PNodeBuilderParams{
+	libP2PNodeBuilderParams := &p2pbuilder.LibP2PNodeBuilderConfig{
 		Logger:                    logger,
 		MetricsConfig:             parameters.MetricsCfg,
 		NetworkingType:            parameters.NetworkingType,

@@ -380,7 +380,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		if err != nil {
 			return nil, fmt.Errorf("could not determine dht activation status: %w", err)
 		}
-		params := &p2pbuilder.LibP2PNodeBuilderParams{
+		params := &p2pbuilder.LibP2PNodeBuilderConfig{
 			Logger: fnb.Logger,
 			MetricsConfig: &p2pconfig.MetricsConfig{
 				Metrics:          fnb.Metrics.Network,

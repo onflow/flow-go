@@ -77,8 +77,8 @@ type LibP2PNodeBuilder struct {
 	networkingType       flownet.NetworkingType // whether the node is running in private (staked) or public (unstaked) network
 }
 
-// LibP2PNodeBuilderParams parameters required to create a new *LibP2PNodeBuilder with NewNodeBuilder.
-type LibP2PNodeBuilderParams struct {
+// LibP2PNodeBuilderConfig parameters required to create a new *LibP2PNodeBuilder with NewNodeBuilder.
+type LibP2PNodeBuilderConfig struct {
 	Logger                    zerolog.Logger                          `validate:"required"`
 	MetricsConfig             *p2pconfig.MetricsConfig                `validate:"required"`
 	NetworkingType            flownet.NetworkingType                  `validate:"required"`
@@ -96,7 +96,7 @@ type LibP2PNodeBuilderParams struct {
 	ScoringRegistryConfig     *p2pconf.GossipSubScoringRegistryConfig `validate:"required"`
 }
 
-func NewNodeBuilder(params *LibP2PNodeBuilderParams, rpcTracking p2p.RpcControlTracking) (*LibP2PNodeBuilder, error) {
+func NewNodeBuilder(params *LibP2PNodeBuilderConfig, rpcTracking p2p.RpcControlTracking) (*LibP2PNodeBuilder, error) {
 	err := validator.New().Struct(params)
 	if err != nil {
 		return nil, fmt.Errorf("libp2p node builder params validation failed: %w", err)
@@ -424,7 +424,7 @@ func DefaultCreateNodeFunc(
 }
 
 // DefaultNodeBuilder returns a node builder.
-func DefaultNodeBuilder(params *LibP2PNodeBuilderParams,
+func DefaultNodeBuilder(params *LibP2PNodeBuilderConfig,
 	resolver madns.BasicResolver,
 	role string,
 	connGaterCfg *p2pconfig.ConnectionGaterConfig,

@@ -585,7 +585,7 @@ func (builder *FollowerServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 		NetworkingType:                     network.PublicNetwork,
 	}
 	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
-	params := &p2pbuilder.LibP2PNodeBuilderParams{
+	params := &p2pbuilder.LibP2PNodeBuilderConfig{
 		Logger: builder.Logger,
 		MetricsConfig: &p2pconfig.MetricsConfig{
 			HeroCacheFactory: builder.HeroCacheMetricsFactory(),
