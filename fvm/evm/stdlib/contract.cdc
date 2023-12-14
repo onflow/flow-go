@@ -140,9 +140,6 @@ contract EVM {
 
     /// Runs an a RLP-encoded EVM transaction, deducts the gas fees,
     /// and deposits the gas fees into the provided coinbase address.
-    ///
-    /// Returns true if the transaction was successful,
-    /// and returns false otherwise
     access(all)
     fun run(tx: [UInt8], coinbase: EVMAddress) {
         InternalEVM.run(tx: tx, coinbase: coinbase.bytes)
