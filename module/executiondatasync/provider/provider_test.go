@@ -151,7 +151,8 @@ func TestCalculateChunkExecutionDataID(t *testing.T) {
 	rootHash, err := ledger.ToRootHash([]byte("0123456789acbdef0123456789acbdef"))
 	require.NoError(t, err)
 
-	expected := cid.MustParse("QmdtRuw9jFgkynBWofz4qFQHDqUwLhi2nReF4fUyXvdERC")
+	expected := cid.MustParse("QmWJsC7DTufdGijftpphuxZ6EbNsDar1knP2BnvgBaMf9n")
+
 	ced := execution_data.ChunkExecutionData{
 		Collection: &flow.Collection{
 			Transactions: []*flow.TransactionBody{
@@ -159,7 +160,13 @@ func TestCalculateChunkExecutionDataID(t *testing.T) {
 			},
 		},
 		Events: []flow.Event{
-			unittest.EventFixture(flow.EventType("A.0123456789abcdef.SomeContract.SomeEvent"), 1, 2, flow.MustHexStringToIdentifier("95e0929839063afbe334a3d175bea0775cdf5d93f64299e369d16ce21aa423d3"), 0),
+			unittest.EventFixture(
+				"A.0123456789abcdef.SomeContract.SomeEvent",
+				1,
+				2,
+				flow.MustHexStringToIdentifier("95e0929839063afbe334a3d175bea0775cdf5d93f64299e369d16ce21aa423d3"),
+				0,
+			),
 		},
 		TrieUpdate: &ledger.TrieUpdate{
 			RootHash: rootHash,
@@ -180,5 +187,10 @@ func TestCalculateChunkExecutionDataID(t *testing.T) {
 	// This can be used for updating the expected ID when the format is *intentionally* updated
 	t.Log(actual)
 
-	assert.Equal(t, expected, actual)
+	assert.Equal(t,
+		expected, actual,
+		"expected and actual CID do not match: expected %s, actual %s",
+		expected,
+		actual,
+	)
 }
