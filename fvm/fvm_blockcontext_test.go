@@ -1694,7 +1694,7 @@ func TestBlockContext_Random(t *testing.T) {
 		execute {
 			let rand1 = revertibleRandom<UInt64>()
 			log(rand1)
-			let rand2 = revertibleRandom<UInt32>()
+			let rand2 = revertibleRandom<UInt64>()
 			log(rand2)
 		}
 	}
@@ -1740,7 +1740,7 @@ func TestBlockContext_Random(t *testing.T) {
 	fun main(a: Int8) {
 		let rand = revertibleRandom<UInt64>()
 		log(rand)
-		let rand%[1]d = revertibleRandom<UInt32>()
+		let rand%[1]d = revertibleRandom<UInt64>()
 		log(rand%[1]d)
 	}
 	`
