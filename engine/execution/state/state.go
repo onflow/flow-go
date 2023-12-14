@@ -84,6 +84,9 @@ type ExecutionState interface {
 		ctx context.Context,
 		result *execution.ComputationResult,
 	) error
+
+	// only available with storehouse enabled
+	GetHighestFinalizedExecuted() uint64
 }
 
 type state struct {
