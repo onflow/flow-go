@@ -1101,7 +1101,6 @@ func TestValidationInspector_MultiErrorNotification(t *testing.T) {
 
 	requireExpectedNotifErr := func(notification *p2p.InvCtrlMsgNotif) {
 		for _, invErr := range notification.Errors {
-			fmt.Println(invErr.Err)
 			require.True(t, channels.IsInvalidTopicErr(invErr.Err))
 		}
 	}

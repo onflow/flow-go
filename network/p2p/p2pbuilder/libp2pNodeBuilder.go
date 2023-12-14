@@ -79,21 +79,21 @@ type LibP2PNodeBuilder struct {
 
 // LibP2PNodeBuilderConfig parameters required to create a new *LibP2PNodeBuilder with NewNodeBuilder.
 type LibP2PNodeBuilderConfig struct {
-	Logger                    zerolog.Logger                          `validate:"required"`
-	MetricsConfig             *p2pconfig.MetricsConfig                `validate:"required"`
-	NetworkingType            flownet.NetworkingType                  `validate:"required"`
-	Address                   string                                  `validate:"required"`
-	NetworkKey                fcrypto.PrivateKey                      `validate:"required"`
-	SporkId                   flow.Identifier                         `validate:"required"`
-	IdProvider                module.IdentityProvider                 `validate:"required"`
-	RCfg                      *p2pconf.ResourceManagerConfig          `validate:"required"`
-	RpcInspectorCfg           *p2pconf.GossipSubRPCInspectorsConfig   `validate:"required"`
-	PeerManagerConfig         *p2pconfig.PeerManagerConfig            `validate:"required"`
-	SubscriptionProviderParam *p2pconf.SubscriptionProviderParameters `validate:"required"`
-	DisallowListCacheCfg      *p2p.DisallowListCacheConfig            `validate:"required"`
-	UnicastConfig             *p2pconfig.UnicastConfig                `validate:"required"`
-	GossipSubScorePenalties   *p2pconf.GossipSubScorePenalties        `validate:"required"`
-	ScoringRegistryConfig     *p2pconf.GossipSubScoringRegistryConfig `validate:"required"`
+	Logger                        zerolog.Logger                          `validate:"required"`
+	MetricsConfig                 *p2pconfig.MetricsConfig                `validate:"required"`
+	NetworkingType                flownet.NetworkingType                  `validate:"required"`
+	Address                       string                                  `validate:"required"`
+	NetworkKey                    fcrypto.PrivateKey                      `validate:"required"`
+	SporkId                       flow.Identifier                         `validate:"required"`
+	IdProvider                    module.IdentityProvider                 `validate:"required"`
+	ResourceManagerParams         *p2pconf.ResourceManagerConfig          `validate:"required"`
+	RpcInspectorParams            *p2pconf.GossipSubRPCInspectorsConfig   `validate:"required"`
+	PeerManagerParams             *p2pconfig.PeerManagerConfig            `validate:"required"`
+	SubscriptionProviderParams    *p2pconf.SubscriptionProviderParameters `validate:"required"`
+	DisallowListCacheCfg          *p2p.DisallowListCacheConfig            `validate:"required"`
+	UnicastParams                 *p2pconfig.UnicastConfig                `validate:"required"`
+	GossipSubScorePenaltiesParams *p2pconf.GossipSubScorePenalties        `validate:"required"`
+	ScoringRegistryParams         *p2pconf.GossipSubScoringRegistryConfig `validate:"required"`
 }
 
 func NewNodeBuilder(params *LibP2PNodeBuilderConfig, rpcTracking p2p.RpcControlTracking) (*LibP2PNodeBuilder, error) {

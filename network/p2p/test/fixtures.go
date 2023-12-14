@@ -995,7 +995,7 @@ func WithIHaves(m int, topicIds ...string) GossipSubCtrlOption {
 //
 // Returns:
 // A GossipSubCtrlOption that adds iWant messages to the control message.
-// Example: WithIWantMessageIds("message_id_1", "message_id_2") will add 2 iWant messages, each with 3 message IDs.
+// Example: WithIWantMessageIds("message_id_1", "message_id_2") will add one iWant message with 2 message IDs.
 func WithIWantMessageIds(messageIds ...string) GossipSubCtrlOption {
 	return func(msg *pb.ControlMessage) {
 		msg.Iwant = append(msg.Iwant, &pb.ControlIWant{
@@ -1057,7 +1057,7 @@ func WithGraft(msgCount int, topicId string) GossipSubCtrlOption {
 //
 // Returns:
 // A GossipSubCtrlOption that adds GRAFT messages to the control message.
-// Example: WithGrafts("topic1", "topic2", "topic3") will add GRAFT messages for each specified topic ID.
+// Example: WithGrafts("topic1", "topic2", "topic3") will add one GRAFT messages for each specified topic ID.
 func WithGrafts(topicIds ...string) GossipSubCtrlOption {
 	return func(msg *pb.ControlMessage) {
 		grafts := make([]*pb.ControlGraft, len(topicIds))
@@ -1079,7 +1079,7 @@ func WithGrafts(topicIds ...string) GossipSubCtrlOption {
 //
 // Returns:
 // A GossipSubCtrlOption that adds PRUNE messages to the control message.
-// Example: WithPrunes("topic1", "topic2", "topic3") will add PRUNE messages for each specified topic ID.
+// Example: WithPrunes("topic1", "topic2", "topic3") will add one PRUNE messages for each specified topic ID.
 func WithPrunes(topicIds ...string) GossipSubCtrlOption {
 	return func(msg *pb.ControlMessage) {
 		prunes := make([]*pb.ControlPrune, len(topicIds))
