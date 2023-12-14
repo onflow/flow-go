@@ -441,7 +441,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataHandlesErrors() {
 	})
 }
 
-func (s *BackendExecutionDataSuite) TestGetRegisterValuesErrors() {
+func (s *BackendExecutionDataSuite) TestGetRegisterValues() {
 	s.Run("normal case", func() {
 		res, err := s.backend.GetRegisterValues(flow.RegisterIDs{s.registerID}, s.backend.rootBlockHeight)
 		require.NoError(s.T(), err)
