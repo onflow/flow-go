@@ -8,6 +8,7 @@ import (
 	"time"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
 	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
@@ -397,7 +398,7 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 }
 
 // spamIHaveBrokenPromises is a test utility function that is exclusive for the TestGossipSubIHaveBrokenPromises tests.
-// It creates and sends 10 RPCs each with 10 iHave messages, each iHave message has 50 message ids, hence overall, we have 5000 iHave message ids.
+// It creates and sends 10 RPCs each with 1 iHave message, each iHave message has 500 message ids, hence overall, we have 5000 iHave message ids.
 // It then sends those iHave spams to the victim node and waits till the victim node receives them.
 // Args:
 // - t: the test instance.
@@ -410,10 +411,23 @@ func spamIHaveBrokenPromise(t *testing.T,
 	topic string,
 	receivedIWants *unittest.ProtectedMap[string, struct{}],
 	victimNode p2p.LibP2PNode) {
-	spamMsgs := spammer.GenerateCtlMessages(1, p2ptest.WithIHave(1, 500, topic))
+	rpcCount := 10
+	// we can't send more than one iHave per RPC in this test, as each iHave should have a distinct topic, and we only have one subscribed topic.
+	// when the node does not have a topic subscription, it will discard the iHave message.
+	iHavesPerRPC := 1
+	// there is a cap on the max iHaves a gossipsub node processes per heartbeat (1 sec), we don't want to exceed that (currently 5000 iHave messages per heartbeat).
+	messageIdsPerIHave := 100
+	spamCtrlMsgs := spammer.GenerateCtlMessages(rpcCount, p2ptest.WithIHave(iHavesPerRPC, messageIdsPerIHave, topic))
+	// sanity check
+	require.Len(t, spamCtrlMsgs, rpcCount) // 10 RPCs
 	var sentIHaves []string
-	for _, msg := range spamMsgs {
+	// checks that iHave message ids are not duplicated
+	for _, msg := range spamCtrlMsgs {
+		// sanity check
+		require.Len(t, msg.Ihave, iHavesPerRPC) // 1 iHave message per RPC
 		for _, iHave := range msg.Ihave {
+			// sanity check
+			require.Len(t, iHave.MessageIDs, messageIdsPerIHave) // 50 message ids per iHave message
 			for _, msgId := range iHave.MessageIDs {
 				require.NotContains(t, sentIHaves, msgId)
 				sentIHaves = append(sentIHaves, msgId)
@@ -424,16 +438,20 @@ func spamIHaveBrokenPromise(t *testing.T,
 	// spams the victim node with spam iHave messages, since iHave messages are for junk message ids, there will be no
 	// reply from spammer to victim over the iWants. Hence, the victim must count this towards 10 broken promises eventually.
 	// This sums up to 10 broken promises (1 per RPC).
-	var wg sync.WaitGroup
-	for i := 0; i < 50; i++ {
+	wg := sync.WaitGroup{}
+	for i := 0; i < len(spamCtrlMsgs); i++ {
 		wg.Add(1)
+		i := i // capture the loop variable
 		go func() {
 			defer wg.Done()
-			spammer.SpamControlMessage(t, victimNode, spamMsgs, p2ptest.PubsubMessageFixture(t, p2ptest.WithTopic(topic)))
+			spammer.SpamControlMessage(t, victimNode, []pb.ControlMessage{spamCtrlMsgs[i]})
 		}()
+		// we wait 100 milliseconds between each RPC to avoid overwhelming the victim node (it may throttle the spammer node).
+		time.Sleep(100 * time.Millisecond)
 	}
 
-	unittest.AssertReturnsBefore(t, wg.Wait, 3*time.Second, "could not send RPCs on time")
+	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "sanity check failed, we should have sent all the spam iHaves to the victim node")
+
 	// wait till all the spam iHaves are responded with iWants.
 	require.Eventually(t,
 		func() bool {
@@ -444,8 +462,7 @@ func spamIHaveBrokenPromise(t *testing.T,
 			}
 
 			return true
-		},
-		5*time.Second,
+		}, 10*time.Second,
 		100*time.Millisecond,
 		fmt.Sprintf("sanity check failed, we should have received all the iWants for the spam iHaves, expected: %d, actual: %d", len(sentIHaves), receivedIWants.Size()))
 }
