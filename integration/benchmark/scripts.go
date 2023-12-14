@@ -111,7 +111,7 @@ func generateRandomStringWithLen(commentLen uint) string {
 func generateAuthAccountParamList(authAccountNum uint) string {
 	authAccountList := []string{}
 	for i := uint(0); i < authAccountNum; i++ {
-		authAccountList = append(authAccountList, fmt.Sprintf("acct%d: AuthAccount", i+1))
+		authAccountList = append(authAccountList, fmt.Sprintf("acct%d: &Account", i+1))
 	}
 	return strings.Join(authAccountList, ", ")
 }
