@@ -79,7 +79,7 @@ func (a *AppSpecificScoreCache) Add(peerID peer.ID, score float64, time time.Tim
 		LastUpdated: time,
 	})
 	if !added {
-		updated, ok := a.c.Adjust(entityId, func(entity flow.Entity) flow.Entity {
+		_, ok := a.c.Adjust(entityId, func(entity flow.Entity) flow.Entity {
 			r := entity.(appSpecificScoreRecordEntity)
 			r.Score = score
 			r.LastUpdated = time
@@ -88,14 +88,6 @@ func (a *AppSpecificScoreCache) Add(peerID peer.ID, score float64, time time.Tim
 
 		if !ok {
 			return fmt.Errorf("failed to add app specific score record for peer %s", peerID)
-		}
-
-		u := updated.(appSpecificScoreRecordEntity)
-		if u.Score != score {
-			return fmt.Errorf("incorrect update of app specific score record for peer %s, expected score %f, got score %f", peerID, score, u.Score)
-		}
-		if u.LastUpdated != time {
-			return fmt.Errorf("incorrect update of app specific score record for peer %s, expected last updated %s, got last updated %s", peerID, time, u.LastUpdated)
 		}
 	}
 
