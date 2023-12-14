@@ -172,7 +172,8 @@ func TestConvertChunkExecutionData(t *testing.T) {
 	}
 }
 
-func TestMessageToRegisterIDs(t *testing.T) {
+func TestMessageToRegisterID(t *testing.T) {
+	chain := flow.Testnet.Chain()
 	tests := []struct {
 		name  string
 		regID flow.RegisterID
@@ -194,7 +195,7 @@ func TestMessageToRegisterIDs(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			msg := convert.RegisterIDToMessage(test.regID)
-			converted, err := convert.MessageToRegisterID(msg)
+			converted, err := convert.MessageToRegisterID(msg, chain)
 			require.NoError(t, err)
 			assert.Equal(t, test.regID, converted)
 		})
@@ -205,14 +206,46 @@ func TestMessageToRegisterIDs(t *testing.T) {
 			Owner: nil,
 			Key:   []byte("key"),
 		}
-		converted, err := convert.MessageToRegisterID(msg)
+		converted, err := convert.MessageToRegisterID(msg, chain)
 		require.NoError(t, err)
 		assert.Equal(t, "", converted.Owner)
 		assert.Equal(t, "key", converted.Key)
 	})
 
 	t.Run("nil message returns error", func(t *testing.T) {
-		_, err := convert.MessageToRegisterID(nil)
+		_, err := convert.MessageToRegisterID(nil, chain)
 		require.ErrorIs(t, err, convert.ErrEmptyMessage)
+	})
+
+	t.Run("invalid address returns error", func(t *testing.T) {
+		// addresses for other chains are invalid
+		registerID := flow.NewRegisterID(
+			unittest.RandomAddressFixtureForChain(flow.Mainnet),
+			"key",
+		)
+
+		msg := convert.RegisterIDToMessage(registerID)
+		_, err := convert.MessageToRegisterID(msg, chain)
+		require.Error(t, err)
+	})
+
+	t.Run("multiple registerIDs", func(t *testing.T) {
+		expected := flow.RegisterIDs{
+			flow.UUIDRegisterID(0),
+			flow.AccountStatusRegisterID(unittest.AddressFixture()),
+			unittest.RegisterIDFixture(),
+		}
+
+		messages := make([]*entities.RegisterID, len(expected))
+		for i, regID := range expected {
+			regID := regID
+			messages[i] = convert.RegisterIDToMessage(regID)
+			require.Equal(t, regID.Owner, string(messages[i].Owner))
+			require.Equal(t, regID.Key, string(messages[i].Key))
+		}
+
+		actual, err := convert.MessagesToRegisterIDs(messages, chain)
+		require.NoError(t, err)
+		assert.Equal(t, expected, actual)
 	})
 }

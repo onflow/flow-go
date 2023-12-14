@@ -202,7 +202,7 @@ func (h *Handler) SubscribeEvents(request *executiondata.SubscribeEventsRequest,
 
 func (h *Handler) GetRegisterValues(_ context.Context, request *executiondata.GetRegisterValuesRequest) (*executiondata.GetRegisterValuesResponse, error) {
 	// Convert data
-	registerIDs, err := convert.MessagesToRegisterIDs(request.GetRegisterIds())
+	registerIDs, err := convert.MessagesToRegisterIDs(request.GetRegisterIds(), h.chain)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "could not convert register IDs: %v", err)
 	}
