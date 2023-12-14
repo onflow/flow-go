@@ -103,8 +103,8 @@ func calculateComputation(
 	inter *interpreter.Interpreter,
 	values *interpreter.ArrayValue,
 	evmAddressTypeID common.TypeID,
-) int {
-	computation := 0
+) uint {
+	computation := uint(0)
 
 	values.Iterate(inter, func(element interpreter.Value) (resume bool) {
 		switch value := element.(type) {
@@ -115,7 +115,14 @@ func calculateComputation(
 			// the second chunk contains the number of bytes the
 			// string occupies, and the third chunk contains the
 			// value of the string itself.
-			computation += 3 * abiEncodingByteSize
+			computation += 2 * abiEncodingByteSize
+			stringLength := len(value.Str)
+			chunks := stringLength / abiEncodingByteSize
+			remainder := stringLength % abiEncodingByteSize
+			if remainder > 0 {
+				chunks += 1
+			}
+			computation += uint(chunks * abiEncodingByteSize)
 		case *interpreter.CompositeValue:
 			if value.TypeID() == evmAddressTypeID {
 				// EVM addresses are static variables with a fixed
@@ -126,7 +133,7 @@ func calculateComputation(
 			// Dynamic variables, such as arrays and slices, encode
 			// an extra chunk of 32 bytes, for each element, except
 			// for the last one.
-			computation += (value.Count()-1)*abiEncodingByteSize +
+			computation += uint((value.Count()-1)*abiEncodingByteSize) +
 				calculateComputation(inter, value, evmAddressTypeID)
 		default:
 			// Numeric and bool variables are also static variables
@@ -181,7 +188,7 @@ func newInternalEVMTypeEncodeABIFunction(
 
 			invocation.Interpreter.ReportComputation(
 				environment.ComputationKindEVMEncodeABI,
-				uint(calculateComputation(inter, valuesArray, evmAddressTypeID)),
+				calculateComputation(inter, valuesArray, evmAddressTypeID),
 			)
 
 			size := valuesArray.Count()
