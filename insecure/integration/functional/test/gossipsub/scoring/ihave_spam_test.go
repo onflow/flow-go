@@ -27,11 +27,11 @@ import (
 // TestGossipSubIHaveBrokenPromises_Below_Threshold tests that as long as the spammer stays below the ihave spam thresholds, it is not caught and
 // penalized by the victim node.
 // The thresholds are:
-// Maximum messages that include iHave per heartbeat is: 10 (gossipsub parameter).
+// Maximum messages that include iHave per heartbeat is: 10 (gossipsub parameter; GossipSubMaxIHaveMessages).
 // Threshold for broken promises of iHave per heartbeat is: 10 (Flow-specific) parameter. It means that GossipSub samples one iHave id out of the
-// entire RPC and if that iHave id is not eventually delivered within 3 seconds (gossipsub parameter), then the promise is considered broken. We set
+// entire RPC and if that iHave id is not eventually delivered within 3 seconds (gossipsub parameter, GossipSubIWantFollowupTime), then the promise is considered broken. We set
 // this threshold to 10 meaning that the first 10 broken promises are ignored. This is to allow for some network churn.
-// Also, per hearbeat (i.e., decay interval), the spammer is allowed to send at most 5000 ihave messages (gossip sub parameter) on aggregate, and
+// Also, per hearbeat (GossipSubHeartbeatInterval, 1 second ), the spammer is allowed to send at most 5000 ihave messages (gossip sub parameter; GossipSubMaxIHaveLength) on aggregate, and
 // excess messages are dropped (without being counted as broken promises).
 func TestGossipSubIHaveBrokenPromises_Below_Threshold(t *testing.T) {
 	role := flow.RoleConsensus
@@ -397,9 +397,13 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 		})
 }
 
-// spamIHaveBrokenPromises is a test utility function that is exclusive for the TestGossipSubIHaveBrokenPromises tests.
-// It creates and sends 10 RPCs each with 1 iHave message, each iHave message has 500 message ids, hence overall, we have 5000 iHave message ids.
+// spamIHaveBrokenPromises is a test utility function that is exclusive for the TestGossipSubIHaveBrokenPromises_.* tests.
+// It creates and sends 10 RPCs each with 1 iHave message, each iHave message has 400 message ids, hence overall, we have 4000 iHave message ids.
 // It then sends those iHave spams to the victim node and waits till the victim node receives them.
+// There are some notes to consider:
+// - we can't send more than one iHave per RPC in this test, as each iHave should have a distinct topic, and we only have one subscribed topic in the TestGossipSubIHaveBrokenPromises_.* tests.
+// - we can't send more than 10 RPCs containing iHave messages per heartbeat (1 sec). This is a gossipsub parameter (GossipSubMaxIHaveMessages). Hence, we choose 9 RPCs to always stay below the threshold.
+// - we can't send more than 5000 iHave messages per heartbeat (1 sec). This is a gossipsub parameter (GossipSubMaxIHaveLength). Hence, we choose 400 message ids per iHave message to always stay below the threshold (9 * 400 = 3600).
 // Args:
 // - t: the test instance.
 // - spammer: the spammer node.
