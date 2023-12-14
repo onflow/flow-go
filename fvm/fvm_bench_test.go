@@ -671,7 +671,7 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 	b.Run("create new account", func(b *testing.B) {
 		benchTransaction(b,
 			func(b *testing.B, context benchTransactionContext) string {
-				return templateTx(50, `let acct = AuthAccount(payer: signer)`)
+				return templateTx(50, `let acct = Account(payer: signer)`)
 			},
 		)
 	})

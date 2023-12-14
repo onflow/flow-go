@@ -26,7 +26,7 @@ type Prepare struct {
 }
 
 func (p Prepare) ToCadence() string {
-	return fmt.Sprintf("prepare(signer: auth(Storage, Capabilities) &Account) { %s }", p.Content.ToCadence())
+	return fmt.Sprintf("prepare(signer: auth(Storage, Capabilities, Contracts) &Account) { %s }", p.Content.ToCadence())
 }
 
 type Contract struct {
