@@ -28,7 +28,7 @@ func LedgerKeyToRegisterID(key ledger.Key) (flow.RegisterID, error) {
 	}
 
 	return flow.NewRegisterID(
-		string(key.KeyParts[0].Value),
+		flow.BytesToAddress(key.KeyParts[0].Value),
 		string(key.KeyParts[1].Value),
 	), nil
 }
