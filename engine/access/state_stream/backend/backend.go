@@ -228,12 +228,17 @@ func (b *StateStreamBackend) GetRegisterValues(ids flow.RegisterIDs, height uint
 	if len(ids) > b.registerRequestLimit {
 		return nil, status.Errorf(codes.InvalidArgument, "number of register IDs exceeds limit of %d", b.registerRequestLimit)
 	}
+
 	values, err := b.registers.RegisterValues(ids, height)
-	if errors.Is(err, storage.ErrHeightNotIndexed) {
-		return nil, status.Errorf(codes.OutOfRange, "register values for block %d is not available", height)
+	if err != nil {
+		if errors.Is(err, storage.ErrHeightNotIndexed) {
+			return nil, status.Errorf(codes.OutOfRange, "register values for block %d is not available", height)
+		}
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, status.Errorf(codes.NotFound, "register values for block %d not found", height)
+		}
+		return nil, err
 	}
-	if errors.Is(err, storage.ErrNotFound) {
-		return nil, status.Errorf(codes.NotFound, "register values for block %d is not available", height)
-	}
-	return values, err
+
+	return values, nil
 }
