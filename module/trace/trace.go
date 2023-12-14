@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	lru "github.com/hashicorp/golang-lru"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -41,7 +41,7 @@ type Tracer struct {
 	tracer      trace.Tracer
 	shutdown    func(context.Context) error
 	log         zerolog.Logger
-	spanCache   *lru.Cache
+	spanCache   *lru.Cache[flow.Identifier, trace.Span]
 	chainID     string
 	sensitivity uint
 }
@@ -88,7 +88,7 @@ func NewTracer(
 		log.Debug().Err(err).Msg("tracing error")
 	}))
 
-	spanCache, err := lru.New(int(DefaultEntityCacheSize))
+	spanCache, err := lru.New[flow.Identifier, trace.Span](int(DefaultEntityCacheSize))
 	if err != nil {
 		return nil, err
 	}
@@ -157,8 +157,7 @@ func (t *Tracer) entityRootSpan(
 	trace.Span,
 ) {
 	if c, ok := t.spanCache.Get(entityID); ok {
-		span := c.(trace.Span)
-		return trace.ContextWithSpan(ctx, span), span
+		return trace.ContextWithSpan(ctx, c), c
 	}
 
 	traceID := (*trace.TraceID)(entityID[:16])

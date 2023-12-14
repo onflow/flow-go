@@ -243,10 +243,10 @@ func TestGetNodesByIndex(t *testing.T) {
 		ns[i] = randomNode()
 	}
 	subtrieNodes := [][]*node.Node{
-		[]*node.Node{ns[0], ns[1]},
-		[]*node.Node{ns[2]},
-		[]*node.Node{},
-		[]*node.Node{},
+		{ns[0], ns[1]},
+		{ns[2]},
+		{},
+		{},
 	}
 	topLevelNodes := []*node.Node{nil, ns[3]}
 	totalSubTrieNodeCount := computeTotalSubTrieNodeCount(subtrieNodes)
@@ -343,11 +343,11 @@ func TestWriteAndReadCheckpointV6LeafSimpleTrie(t *testing.T) {
 			err := OpenAndReadLeafNodesFromCheckpointV6(leafNodesCh, dir, fileName, logger)
 			require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
 		}()
-		resultPayloads := make([]ledger.Payload, 0)
+		resultPayloads := make([]*ledger.Payload, 0)
 		for leafNode := range leafNodesCh {
 			// avoid dummy payload from empty trie
 			if leafNode.Payload != nil {
-				resultPayloads = append(resultPayloads, *leafNode.Payload)
+				resultPayloads = append(resultPayloads, leafNode.Payload)
 			}
 		}
 		require.EqualValues(t, tries[1].AllPayloads(), resultPayloads)
@@ -588,5 +588,57 @@ func TestCopyCheckpointFileV6(t *testing.T) {
 		decoded, err := OpenAndReadCheckpointV6(to, fileName, logger)
 		require.NoErrorf(t, err, "fail to read checkpoint %v/%v", dir, fileName)
 		requireTriesEqual(t, tries, decoded)
+	})
+}
+
+func TestReadCheckpointRootHash(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		tries := createSimpleTrie(t)
+		fileName := "checkpoint"
+		logger := unittest.Logger()
+		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
+
+		trieRoots, err := ReadTriesRootHash(logger, dir, fileName)
+		require.NoError(t, err)
+		for i, root := range trieRoots {
+			expectedHash := tries[i].RootHash()
+			require.Equal(t, expectedHash, root)
+		}
+		require.Equal(t, len(tries), len(trieRoots))
+	})
+}
+
+func TestReadCheckpointRootHashMulti(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		tries := createMultipleRandomTries(t)
+		fileName := "checkpoint"
+		logger := unittest.Logger()
+		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
+
+		trieRoots, err := ReadTriesRootHash(logger, dir, fileName)
+		require.NoError(t, err)
+		for i, root := range trieRoots {
+			expectedHash := tries[i].RootHash()
+			require.Equal(t, expectedHash, root)
+		}
+		require.Equal(t, len(tries), len(trieRoots))
+	})
+}
+
+func TestCheckpointHasRootHash(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dir string) {
+		tries := createMultipleRandomTries(t)
+		fileName := "checkpoint"
+		logger := unittest.Logger()
+		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
+
+		trieRoots, err := ReadTriesRootHash(logger, dir, fileName)
+		require.NoError(t, err)
+		for _, root := range trieRoots {
+			require.NoError(t, CheckpointHasRootHash(logger, dir, fileName, root))
+		}
+
+		nonExist := ledger.RootHash(unittest.StateCommitmentFixture())
+		require.Error(t, CheckpointHasRootHash(logger, dir, fileName, nonExist))
 	})
 }

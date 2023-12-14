@@ -2,26 +2,22 @@ package backend
 
 import (
 	"context"
+	"crypto/md5" //nolint:gosec
 	"fmt"
-	"net"
-	"strconv"
 	"time"
 
-	lru "github.com/hashicorp/golang-lru"
-	lru2 "github.com/hashicorp/golang-lru/v2"
+	lru "github.com/hashicorp/golang-lru/v2"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
-	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -37,7 +33,7 @@ const DefaultMaxHeightRange = 250
 
 // DefaultSnapshotHistoryLimit the amount of blocks to look back in state
 // when recursively searching for a valid snapshot
-const DefaultSnapshotHistoryLimit = 50
+const DefaultSnapshotHistoryLimit = 500
 
 // DefaultLoggedScriptsCacheSize is the default size of the lookup cache used to dedupe logs of scripts sent to ENs
 // limiting cache size to 16MB and does not affect script execution, only for keeping logs tidy
@@ -76,19 +72,9 @@ type Backend struct {
 	collections       storage.Collections
 	executionReceipts storage.ExecutionReceipts
 	connFactory       connection.ConnectionFactory
-}
 
-// Config defines the configurable options for creating Backend
-type Config struct {
-	ExecutionClientTimeout    time.Duration // execution API GRPC client timeout
-	CollectionClientTimeout   time.Duration // collection API GRPC client timeout
-	ConnectionPoolSize        uint          // size of the cache for storing collection and execution connections
-	MaxHeightRange            uint          // max size of height range requests
-	PreferredExecutionNodeIDs []string      // preferred list of upstream execution node IDs
-	FixedExecutionNodeIDs     []string      // fixed list of execution node IDs to choose from if no node ID can be chosen from the PreferredExecutionNodeIDs
-	ArchiveAddressList        []string      // the archive node address list to send script executions. when configured, script executions will be all sent to the archive node
-	ScriptExecValidation      bool
-	CircuitBreakerConfig      connection.CircuitBreakerConfig // the configuration for circuit breaker
+	// cache the response to GetNodeVersionInfo since it doesn't change
+	nodeInfo *access.NodeVersionInfo
 }
 
 type Params struct {
@@ -101,6 +87,7 @@ type Params struct {
 	Transactions              storage.Transactions
 	ExecutionReceipts         storage.ExecutionReceipts
 	ExecutionResults          storage.ExecutionResults
+	LightTransactionResults   storage.LightTransactionResults
 	ChainID                   flow.ChainID
 	AccessMetrics             module.AccessMetrics
 	ConnFactory               connection.ConnectionFactory
@@ -110,56 +97,65 @@ type Params struct {
 	FixedExecutionNodeIDs     []string
 	Log                       zerolog.Logger
 	SnapshotHistoryLimit      int
-	ArchiveAddressList        []string
 	Communicator              Communicator
-	ScriptExecValidation      bool
 	TxResultCacheSize         uint
+	TxErrorMessagesCacheSize  uint
+	ScriptExecutor            execution.ScriptExecutor
+	ScriptExecutionMode       ScriptExecutionMode
 }
 
 // New creates backend instance
 func New(params Params) (*Backend, error) {
-	retry := newRetry()
+	retry := newRetry(params.Log)
 	if params.RetryEnabled {
 		retry.Activate()
 	}
 
-	loggedScripts, err := lru.New(DefaultLoggedScriptsCacheSize)
+	loggedScripts, err := lru.New[[md5.Size]byte, time.Time](DefaultLoggedScriptsCacheSize)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize script logging cache: %w", err)
 	}
 
-	archivePorts := make([]uint, len(params.ArchiveAddressList))
-	for idx, addr := range params.ArchiveAddressList {
-		port, err := findPortFromAddress(addr)
-		if err != nil {
-			return nil, fmt.Errorf("failed to find archive node port: %w", err)
-		}
-		archivePorts[idx] = port
-	}
-
-	var txResCache *lru2.Cache[flow.Identifier, *access.TransactionResult]
+	var txResCache *lru.Cache[flow.Identifier, *access.TransactionResult]
 	if params.TxResultCacheSize > 0 {
-		txResCache, err = lru2.New[flow.Identifier, *access.TransactionResult](int(params.TxResultCacheSize))
+		txResCache, err = lru.New[flow.Identifier, *access.TransactionResult](int(params.TxResultCacheSize))
 		if err != nil {
 			return nil, fmt.Errorf("failed to init cache for transaction results: %w", err)
 		}
+	}
+
+	// NOTE: The transaction error message cache is currently only used by the access node and not by the observer node.
+	//       To avoid introducing unnecessary command line arguments in the observer, one case could be that the error
+	//       message cache is nil for the observer node.
+	var txErrorMessagesCache *lru.Cache[flow.Identifier, string]
+
+	if params.TxErrorMessagesCacheSize > 0 {
+		txErrorMessagesCache, err = lru.New[flow.Identifier, string](int(params.TxErrorMessagesCacheSize))
+		if err != nil {
+			return nil, fmt.Errorf("failed to init cache for transaction error messages: %w", err)
+		}
+	}
+
+	// initialize node version info
+	nodeInfo, err := getNodeVersionInfo(params.State.Params())
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize node version info: %w", err)
 	}
 
 	b := &Backend{
 		state: params.State,
 		// create the sub-backends
 		backendScripts: backendScripts{
-			headers:              params.Headers,
-			executionReceipts:    params.ExecutionReceipts,
-			connFactory:          params.ConnFactory,
-			state:                params.State,
-			log:                  params.Log,
-			metrics:              params.AccessMetrics,
-			loggedScripts:        loggedScripts,
-			archiveAddressList:   params.ArchiveAddressList,
-			archivePorts:         archivePorts,
-			nodeCommunicator:     params.Communicator,
-			scriptExecValidation: params.ScriptExecValidation,
+			headers:           params.Headers,
+			executionReceipts: params.ExecutionReceipts,
+			connFactory:       params.ConnFactory,
+			state:             params.State,
+			log:               params.Log,
+			metrics:           params.AccessMetrics,
+			loggedScripts:     loggedScripts,
+			nodeCommunicator:  params.Communicator,
+			scriptExecutor:    params.ScriptExecutor,
+			scriptExecMode:    params.ScriptExecutionMode,
 		},
 		backendTransactions: backendTransactions{
 			staticCollectionRPC:  params.CollectionRPC,
@@ -168,6 +164,7 @@ func New(params Params) (*Backend, error) {
 			collections:          params.Collections,
 			blocks:               params.Blocks,
 			transactions:         params.Transactions,
+			results:              params.LightTransactionResults,
 			executionReceipts:    params.ExecutionReceipts,
 			transactionValidator: configureTransactionValidator(params.State, params.ChainID),
 			transactionMetrics:   params.AccessMetrics,
@@ -177,6 +174,7 @@ func New(params Params) (*Backend, error) {
 			log:                  params.Log,
 			nodeCommunicator:     params.Communicator,
 			txResultCache:        txResCache,
+			txErrorMessagesCache: txErrorMessagesCache,
 		},
 		backendEvents: backendEvents{
 			state:             params.State,
@@ -202,6 +200,8 @@ func New(params Params) (*Backend, error) {
 			connFactory:       params.ConnFactory,
 			log:               params.Log,
 			nodeCommunicator:  params.Communicator,
+			scriptExecutor:    params.ScriptExecutor,
+			scriptExecMode:    params.ScriptExecutionMode,
 		},
 		backendExecutionResults: backendExecutionResults{
 			executionResults: params.ExecutionResults,
@@ -209,12 +209,14 @@ func New(params Params) (*Backend, error) {
 		backendNetwork: backendNetwork{
 			state:                params.State,
 			chainID:              params.ChainID,
+			headers:              params.Headers,
 			snapshotHistoryLimit: params.SnapshotHistoryLimit,
 		},
 		collections:       params.Collections,
 		executionReceipts: params.ExecutionReceipts,
 		connFactory:       params.ConnFactory,
 		chainID:           params.ChainID,
+		nodeInfo:          nodeInfo,
 	}
 
 	retry.SetBackend(b)
@@ -236,27 +238,21 @@ func New(params Params) (*Backend, error) {
 // No errors are expected during normal operations.
 func NewCache(
 	log zerolog.Logger,
-	accessMetrics module.AccessMetrics,
-	connectionPoolSize uint,
-) (*lru.Cache, uint, error) {
+	metrics module.AccessMetrics,
+	connectionPoolSize int,
+) (*lru.Cache[string, *connection.CachedClient], error) {
+	cache, err := lru.NewWithEvict(connectionPoolSize, func(_ string, client *connection.CachedClient) {
+		go client.Close() // close is blocking, so run in a goroutine
 
-	var cache *lru.Cache
-	cacheSize := connectionPoolSize
-	if cacheSize > 0 {
-		var err error
-		cache, err = lru.NewWithEvict(int(cacheSize), func(_, evictedValue interface{}) {
-			store := evictedValue.(*connection.CachedClient)
-			store.Close()
-			log.Debug().Str("grpc_conn_evicted", store.Address).Msg("closing grpc connection evicted from pool")
-			if accessMetrics != nil {
-				accessMetrics.ConnectionFromPoolEvicted()
-			}
-		})
-		if err != nil {
-			return nil, 0, fmt.Errorf("could not initialize connection pool cache: %w", err)
-		}
+		log.Debug().Str("grpc_conn_evicted", client.Address).Msg("closing grpc connection evicted from pool")
+		metrics.ConnectionFromPoolEvicted()
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize connection pool cache: %w", err)
 	}
-	return cache, cacheSize, nil
+
+	return cache, nil
 }
 
 func identifierList(ids []string) (flow.IdentifierList, error) {
@@ -303,24 +299,43 @@ func (b *Backend) Ping(ctx context.Context) error {
 }
 
 // GetNodeVersionInfo returns node version information such as semver, commit, sporkID, protocolVersion, etc
-func (b *Backend) GetNodeVersionInfo(ctx context.Context) (*access.NodeVersionInfo, error) {
-	stateParams := b.state.Params()
-	sporkId, err := stateParams.SporkID()
+func (b *Backend) GetNodeVersionInfo(_ context.Context) (*access.NodeVersionInfo, error) {
+	return b.nodeInfo, nil
+}
+
+// getNodeVersionInfo returns the NodeVersionInfo for the node.
+// Since these values are static while the node is running, it is safe to cache.
+func getNodeVersionInfo(stateParams protocol.Params) (*access.NodeVersionInfo, error) {
+	sporkID, err := stateParams.SporkID()
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to read spork ID: %v", err)
+		return nil, fmt.Errorf("failed to read spork ID: %v", err)
 	}
 
 	protocolVersion, err := stateParams.ProtocolVersion()
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to read protocol version: %v", err)
+		return nil, fmt.Errorf("failed to read protocol version: %v", err)
 	}
 
-	return &access.NodeVersionInfo{
-		Semver:          build.Version(),
-		Commit:          build.Commit(),
-		SporkId:         sporkId,
-		ProtocolVersion: uint64(protocolVersion),
-	}, nil
+	sporkRootBlockHeight, err := stateParams.SporkRootBlockHeight()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read spork root block height: %w", err)
+	}
+
+	nodeRootBlockHeader, err := stateParams.SealedRoot()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read node root block: %w", err)
+	}
+
+	nodeInfo := &access.NodeVersionInfo{
+		Semver:               build.Version(),
+		Commit:               build.Commit(),
+		SporkId:              sporkID,
+		ProtocolVersion:      uint64(protocolVersion),
+		SporkRootBlockHeight: sporkRootBlockHeight,
+		NodeRootBlockHeight:  nodeRootBlockHeader.Height,
+	}
+
+	return nodeInfo, nil
 }
 
 func (b *Backend) GetCollectionByID(_ context.Context, colID flow.Identifier) (*flow.LightCollection, error) {
@@ -344,18 +359,6 @@ func (b *Backend) GetNetworkParameters(_ context.Context) access.NetworkParamete
 	}
 }
 
-// GetLatestProtocolStateSnapshot returns the latest finalized snapshot
-func (b *Backend) GetLatestProtocolStateSnapshot(_ context.Context) ([]byte, error) {
-	snapshot := b.state.Final()
-
-	validSnapshot, err := b.getValidSnapshot(snapshot, 0)
-	if err != nil {
-		return nil, err
-	}
-
-	return convert.SnapshotToBytes(validSnapshot)
-}
-
 // executionNodesForBlockID returns upto maxNodesCnt number of randomly chosen execution node identities
 // which have executed the given block ID.
 // If no such execution node is found, an InsufficientExecutionReceipts error is returned.
@@ -364,7 +367,8 @@ func executionNodesForBlockID(
 	blockID flow.Identifier,
 	executionReceipts storage.ExecutionReceipts,
 	state protocol.State,
-	log zerolog.Logger) (flow.IdentityList, error) {
+	log zerolog.Logger,
+) (flow.IdentityList, error) {
 
 	var executorIDs flow.IdentifierList
 
@@ -439,7 +443,8 @@ func executionNodesForBlockID(
 func findAllExecutionNodes(
 	blockID flow.Identifier,
 	executionReceipts storage.ExecutionReceipts,
-	log zerolog.Logger) (flow.IdentifierList, error) {
+	log zerolog.Logger,
+) (flow.IdentifierList, error) {
 
 	// lookup the receipt's storage with the block ID
 	allReceipts, err := executionReceipts.ByBlockID(blockID)
@@ -528,23 +533,4 @@ func chooseExecutionNodes(state protocol.State, executorIDs flow.IdentifierList)
 
 	// If no preferred or fixed ENs have been specified, then return all executor IDs i.e. no preference at all
 	return allENs.Filter(filter.HasNodeID(executorIDs...)), nil
-}
-
-// Find ports from supplied Address
-func findPortFromAddress(address string) (uint, error) {
-	_, portStr, err := net.SplitHostPort(address)
-	if err != nil {
-		return 0, fmt.Errorf("fail to extract port from address %v: %w", address, err)
-	}
-
-	port, err := strconv.Atoi(portStr)
-	if err != nil {
-		return 0, fmt.Errorf("fail to convert port string %v to port from address %v", portStr, address)
-	}
-
-	if port < 0 {
-		return 0, fmt.Errorf("invalid port: %v in address %v", port, address)
-	}
-
-	return uint(port), nil
 }

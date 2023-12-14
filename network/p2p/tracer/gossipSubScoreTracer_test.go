@@ -55,13 +55,13 @@ func TestGossipSubScoreTracer(t *testing.T) {
 
 	// 1. Creates a logger hook to count the number of times the score logs at the interval specified.
 	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
-		if level == zerolog.InfoLevel {
+		if level == zerolog.DebugLevel {
 			if message == tracer.PeerScoreLogMessage {
 				loggerCycle.Inc()
 			}
 		}
 	})
-	logger := zerolog.New(os.Stdout).Level(zerolog.InfoLevel).Hook(hook)
+	logger := zerolog.New(os.Stdout).Level(zerolog.DebugLevel).Hook(hook)
 
 	// sets some fixed scores for the nodes for sake of testing based on their roles.
 	consensusScore := float64(87)

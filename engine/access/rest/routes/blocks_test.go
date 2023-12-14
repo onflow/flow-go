@@ -8,8 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/onflow/flow-go/engine/access/rest/request"
 	"github.com/onflow/flow-go/engine/access/rest/util"
 
@@ -149,10 +147,9 @@ func TestAccessGetBlocks(t *testing.T) {
 	testVectors := prepareTestVectors(t, blockIDs, heights, blocks, executionResults, blkCnt)
 
 	for _, tv := range testVectors {
-		responseRec, err := executeRequest(tv.request, backend)
-		assert.NoError(t, err)
-		require.Equal(t, tv.expectedStatus, responseRec.Code, "failed test %s: incorrect response code", tv.description)
-		actualResp := responseRec.Body.String()
+		rr := executeRequest(tv.request, backend)
+		require.Equal(t, tv.expectedStatus, rr.Code, "failed test %s: incorrect response code", tv.description)
+		actualResp := rr.Body.String()
 		require.JSONEq(t, tv.expectedResponse, actualResp, "Failed: %s: incorrect response body", tv.description)
 	}
 }

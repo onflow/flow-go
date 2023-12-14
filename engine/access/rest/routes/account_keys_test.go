@@ -261,9 +261,7 @@ func TestGetAccountKeyByIndex(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			req, _ := http.NewRequest("GET", test.url, nil)
-			rr, err := executeRequest(req, backend)
-			assert.NoError(t, err)
-
+			rr := executeRequest(req, backend)
 			assert.Equal(t, http.StatusBadRequest, rr.Code)
 			assert.JSONEq(t, test.out, rr.Body.String())
 		})

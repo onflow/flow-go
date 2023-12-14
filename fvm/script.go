@@ -10,8 +10,10 @@ import (
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/evm"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/logical"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/hash"
 )
@@ -24,7 +26,7 @@ type ScriptProcedure struct {
 }
 
 func Script(code []byte) *ScriptProcedure {
-	scriptHash := hash.DefaultHasher.ComputeHash(code)
+	scriptHash := hash.DefaultComputeHash(code)
 
 	return &ScriptProcedure{
 		Script:         code,
@@ -58,7 +60,7 @@ func NewScriptWithContextAndArgs(
 	reqContext context.Context,
 	args ...[]byte,
 ) *ScriptProcedure {
-	scriptHash := hash.DefaultHasher.ComputeHash(code)
+	scriptHash := hash.DefaultComputeHash(code)
 	return &ScriptProcedure{
 		ID:             flow.HashToID(scriptHash),
 		Script:         code,
@@ -121,6 +123,10 @@ func newScriptExecutor(
 	proc *ScriptProcedure,
 	txnState storage.TransactionPreparer,
 ) *scriptExecutor {
+	// update `ctx.EnvironmentParams` with the script info before
+	// creating the executor
+	scriptInfo := environment.NewScriptInfoParams(proc.Script, proc.Arguments)
+	ctx.EnvironmentParams.SetScriptInfoParams(scriptInfo)
 	return &scriptExecutor{
 		ctx:      ctx,
 		proc:     proc,
@@ -193,6 +199,21 @@ func (executor *scriptExecutor) execute() error {
 func (executor *scriptExecutor) executeScript() error {
 	rt := executor.env.BorrowCadenceRuntime()
 	defer executor.env.ReturnCadenceRuntime(rt)
+
+	if executor.ctx.EVMEnabled {
+		chain := executor.ctx.Chain
+		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+		err := evm.SetupEnvironment(
+			chain.ChainID(),
+			executor.env,
+			rt.ScriptRuntimeEnv,
+			chain.ServiceAddress(),
+			sc.FlowToken.Address,
+		)
+		if err != nil {
+			return err
+		}
+	}
 
 	value, err := rt.ExecuteScript(
 		runtime.Script{

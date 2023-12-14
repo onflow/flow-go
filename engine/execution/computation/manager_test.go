@@ -33,6 +33,7 @@ import (
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/model/flow"
@@ -240,13 +241,15 @@ func TestExecuteScript(t *testing.T) {
 
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx, fvm.WithExecutionMemoryLimit(math.MaxUint64))
 
+	sc := systemcontracts.SystemContractsForChain(execCtx.Chain.ChainID())
+
 	script := []byte(fmt.Sprintf(
 		`
 			import FungibleToken from %s
 
 			access(all) fun main() {}
 		`,
-		fvm.FungibleTokenAddress(execCtx.Chain).HexWithPrefix(),
+		sc.FungibleToken.Address.HexWithPrefix(),
 	))
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
@@ -264,7 +267,7 @@ func TestExecuteScript(t *testing.T) {
 		metrics.NewNoopCollector(),
 		trace.NewNoopTracer(),
 		me,
-		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
 		execCtx,
 		committer.NewNoopViewCommitter(),
 		prov,
@@ -305,13 +308,15 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 			return nil, fmt.Errorf("error getting register")
 		})
 
+	sc := systemcontracts.SystemContractsForChain(execCtx.Chain.ChainID())
+
 	script := []byte(fmt.Sprintf(
 		`
 			access(all) fun main(): UFix64 {
 				return getAccount(%s).balance
 			}
 		`,
-		fvm.FungibleTokenAddress(execCtx.Chain).HexWithPrefix(),
+		sc.FungibleToken.Address.HexWithPrefix(),
 	))
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
@@ -329,7 +334,7 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 		metrics.NewNoopCollector(),
 		trace.NewNoopTracer(),
 		me,
-		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
 		execCtx,
 		committer.NewNoopViewCommitter(),
 		prov,
@@ -375,7 +380,7 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 		metrics.NewNoopCollector(),
 		trace.NewNoopTracer(),
 		nil,
-		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
 		ctx,
 		committer.NewNoopViewCommitter(),
 		prov,
@@ -426,7 +431,7 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 		metrics.NewNoopCollector(),
 		trace.NewNoopTracer(),
 		nil,
-		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
 		ctx,
 		committer.NewNoopViewCommitter(),
 		prov,
@@ -480,7 +485,7 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 		metrics.NewNoopCollector(),
 		trace.NewNoopTracer(),
 		nil,
-		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
 		ctx,
 		committer.NewNoopViewCommitter(),
 		prov,
@@ -648,7 +653,7 @@ func TestExecuteScriptTimeout(t *testing.T) {
 		metrics.NewNoopCollector(),
 		trace.NewNoopTracer(),
 		nil,
-		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
 		fvm.NewContext(),
 		committer.NewNoopViewCommitter(),
 		nil,
@@ -695,7 +700,7 @@ func TestExecuteScriptCancelled(t *testing.T) {
 		metrics.NewNoopCollector(),
 		trace.NewNoopTracer(),
 		nil,
-		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
 		fvm.NewContext(),
 		committer.NewNoopViewCommitter(),
 		nil,
@@ -906,7 +911,7 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 		metrics.NewExecutionCollector(ctx.Tracer),
 		trace.NewNoopTracer(),
 		nil,
-		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
 		ctx,
 		committer.NewNoopViewCommitter(),
 		nil,

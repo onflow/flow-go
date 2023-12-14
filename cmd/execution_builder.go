@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	"github.com/onflow/go-bitswap"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/host"
 	"github.com/shirou/gopsutil/v3/mem"
@@ -48,6 +49,8 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
+	"github.com/onflow/flow-go/engine/execution/ingestion/fetcher"
+	"github.com/onflow/flow-go/engine/execution/ingestion/loader"
 	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
 	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 	exeprovider "github.com/onflow/flow-go/engine/execution/provider"
@@ -55,13 +58,16 @@ import (
 	"github.com/onflow/flow-go/engine/execution/scripts"
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
+	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
+	ledgerpkg "github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	ledger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	bootstrapFilenames "github.com/onflow/flow-go/model/bootstrap"
+	modelbootstrap "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -71,6 +77,7 @@ import (
 	exedataprovider "github.com/onflow/flow-go/module/executiondatasync/provider"
 	"github.com/onflow/flow-go/module/executiondatasync/pruner"
 	"github.com/onflow/flow-go/module/executiondatasync/tracker"
+	"github.com/onflow/flow-go/module/finalizedreader"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
@@ -83,6 +90,7 @@ import (
 	storageerr "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/procedure"
+	storagepebble "github.com/onflow/flow-go/storage/pebble"
 	sutil "github.com/onflow/flow-go/storage/util"
 )
 
@@ -121,6 +129,7 @@ type ExecutionNode struct {
 	followerState          protocol.FollowerState
 	committee              hotstuff.DynamicCommittee
 	ledgerStorage          *ledger.Ledger
+	registerStore          *storehouse.RegisterStore
 	events                 *storage.Events
 	serviceEvents          *storage.ServiceEvents
 	txResults              *storage.TransactionResults
@@ -187,6 +196,7 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Module("execution data getter", exeNode.LoadExecutionDataGetter).
 		Module("blobservice peer manager dependencies", exeNode.LoadBlobservicePeerManagerDependencies).
 		Module("bootstrap", exeNode.LoadBootstrapper).
+		Module("register store", exeNode.LoadRegisterStore).
 		Component("execution state ledger", exeNode.LoadExecutionStateLedger).
 
 		// TODO: Modules should be able to depends on components
@@ -531,22 +541,24 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 
 	// Get latest executed block and a view at that block
 	ctx := context.Background()
-	_, blockID, err := exeNode.executionState.GetHighestExecutedBlockID(ctx)
+	height, blockID, err := exeNode.executionState.GetHighestExecutedBlockID(ctx)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"cannot get the latest executed block id: %w",
-			err)
+			"cannot get the latest executed block id at height %v: %w",
+			height, err)
 	}
-	stateCommit, err := exeNode.executionState.StateCommitmentByBlockID(
-		ctx,
-		blockID)
+
+	blockSnapshot, _, err := exeNode.executionState.CreateStorageSnapshot(blockID)
 	if err != nil {
-		return nil, fmt.Errorf(
-			"cannot get the state commitment at latest executed block id %s: %w",
-			blockID.String(),
-			err)
+		tries, _ := exeNode.ledgerStorage.Tries()
+		trieInfo := "empty"
+		if len(tries) > 0 {
+			trieInfo = fmt.Sprintf("length: %v, 1st: %v, last: %v", len(tries), tries[0].RootHash(), tries[len(tries)-1].RootHash())
+		}
+
+		return nil, fmt.Errorf("cannot create a storage snapshot at block %v at height %v, trie: %s: %w", blockID,
+			height, trieInfo, err)
 	}
-	blockSnapshot := exeNode.executionState.NewStorageSnapshot(stateCommit)
 
 	// Get the epoch counter from the smart contract at the last executed block.
 	contractEpochCounter, err := getContractEpochCounter(
@@ -555,7 +567,8 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 		blockSnapshot)
 	// Failing to fetch the epoch counter from the smart contract is a fatal error.
 	if err != nil {
-		return nil, fmt.Errorf("cannot get epoch counter from the smart contract at block %s: %w", blockID.String(), err)
+		return nil, fmt.Errorf("cannot get epoch counter from the smart contract at block %s at height %v: %w",
+			blockID.String(), height, err)
 	}
 
 	// Get the epoch counter form the protocol state, at the same block.
@@ -574,6 +587,7 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 		Uint64("contractEpochCounter", contractEpochCounter).
 		Uint64("protocolStateEpochCounter", protocolStateEpochCounter).
 		Str("blockID", blockID.String()).
+		Uint64("height", height).
 		Logger()
 
 	if contractEpochCounter != protocolStateEpochCounter {
@@ -691,7 +705,17 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 		exeNode.txResults,
 		node.DB,
 		node.Tracer,
+		exeNode.registerStore,
+		exeNode.exeConf.enableStorehouse,
 	)
+
+	height, _, err := exeNode.executionState.GetHighestExecutedBlockID(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("could not get highest executed block: %w", err)
+	}
+
+	log.Info().Msgf("execution state highest executed block height: %v", height)
+	exeNode.collector.ExecutionLastExecutedBlockHeight(height)
 
 	return &module.NoopReadyDoneAware{}, nil
 }
@@ -740,6 +764,75 @@ func (exeNode *ExecutionNode) LoadStopControl(
 	exeNode.stopControl = stopControl
 
 	return stopControl, nil
+}
+
+func (exeNode *ExecutionNode) LoadRegisterStore(
+	node *NodeConfig,
+) error {
+	if !exeNode.exeConf.enableStorehouse {
+		node.Logger.Info().Msg("register store disabled")
+		return nil
+	}
+
+	node.Logger.Info().
+		Str("pebble_db_path", exeNode.exeConf.registerDir).
+		Msg("register store enabled")
+	pebbledb, err := storagepebble.OpenRegisterPebbleDB(exeNode.exeConf.registerDir)
+
+	if err != nil {
+		return fmt.Errorf("could not create disk register store: %w", err)
+	}
+
+	// close pebble db on shut down
+	exeNode.builder.ShutdownFunc(func() error {
+		err := pebbledb.Close()
+		if err != nil {
+			return fmt.Errorf("could not close register store: %w", err)
+		}
+		return nil
+	})
+
+	bootstrapped, err := storagepebble.IsBootstrapped(pebbledb)
+	if err != nil {
+		return fmt.Errorf("could not check if registers db is bootstrapped: %w", err)
+	}
+
+	node.Logger.Info().Msgf("register store bootstrapped: %v", bootstrapped)
+
+	if !bootstrapped {
+		checkpointFile := path.Join(exeNode.exeConf.triedir, modelbootstrap.FilenameWALRootCheckpoint)
+		root, err := exeNode.builder.RootSnapshot.Head()
+		if err != nil {
+			return fmt.Errorf("could not get root snapshot head: %w", err)
+		}
+
+		checkpointHeight := root.Height
+
+		err = bootstrap.ImportRegistersFromCheckpoint(node.Logger, checkpointFile, checkpointHeight, pebbledb, exeNode.exeConf.importCheckpointWorkerCount)
+		if err != nil {
+			return fmt.Errorf("could not import registers from checkpoint: %w", err)
+		}
+	}
+	diskStore, err := storagepebble.NewRegisters(pebbledb)
+	if err != nil {
+		return fmt.Errorf("could not create registers storage: %w", err)
+	}
+
+	reader := finalizedreader.NewFinalizedReader(node.Storage.Headers, node.LastFinalizedHeader.Height)
+	node.ProtocolEvents.AddConsumer(reader)
+
+	registerStore, err := storehouse.NewRegisterStore(
+		diskStore,
+		nil, // TODO: replace with real WAL
+		reader,
+		node.Logger,
+	)
+	if err != nil {
+		return err
+	}
+
+	exeNode.registerStore = registerStore
+	return nil
 }
 
 func (exeNode *ExecutionNode) LoadExecutionStateLedger(
@@ -864,13 +957,15 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		return nil, fmt.Errorf("could not create requester engine: %w", err)
 	}
 
+	fetcher := fetcher.NewCollectionFetcher(node.Logger, exeNode.collectionRequester, node.State, exeNode.exeConf.onflowOnlyLNs)
+	loader := loader.NewUnexecutedLoader(node.Logger, node.State, node.Storage.Headers, exeNode.executionState)
+
 	exeNode.ingestionEng, err = ingestion.New(
 		exeNode.ingestionUnit,
 		node.Logger,
 		node.EngineRegistry,
 		node.Me,
-		exeNode.collectionRequester,
-		node.State,
+		fetcher,
 		node.Storage.Headers,
 		node.Storage.Blocks,
 		node.Storage.Collections,
@@ -880,11 +975,10 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		exeNode.collector,
 		node.Tracer,
 		exeNode.exeConf.extensiveLog,
-		exeNode.checkAuthorizedAtBlock,
 		exeNode.executionDataPruner,
 		exeNode.blockDataUploader,
 		exeNode.stopControl,
-		exeNode.exeConf.onflowOnlyLNs,
+		loader,
 	)
 
 	// TODO: we should solve these mutual dependencies better
@@ -901,7 +995,6 @@ func (exeNode *ExecutionNode) LoadScriptsEngine(node *NodeConfig) (module.ReadyD
 
 	exeNode.scriptsEng = scripts.New(
 		node.Logger,
-		node.State,
 		exeNode.computationManager.QueryExecutor(),
 		exeNode.executionState,
 	)
@@ -1043,7 +1136,7 @@ func (exeNode *ExecutionNode) LoadReceiptProviderEngine(
 	receiptRequestQueue := queue.NewHeroStore(exeNode.exeConf.receiptRequestsCacheSize, node.Logger, receiptRequestQueueMetric)
 
 	eng, err := provider.New(
-		node.Logger,
+		node.Logger.With().Str("engine", "receipt_provider").Logger(),
 		node.Metrics.Engine,
 		node.EngineRegistry,
 		node.Me,
@@ -1067,7 +1160,11 @@ func (exeNode *ExecutionNode) LoadSynchronizationEngine(
 	error,
 ) {
 	// initialize the synchronization engine
-	var err error
+	//var err error
+	spamConfig, err := synchronization.NewSpamDetectionConfig()
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize spam detection config: %w", err)
+	}
 	exeNode.syncEngine, err = synchronization.New(
 		node.Logger,
 		node.Metrics.Engine,
@@ -1078,7 +1175,7 @@ func (exeNode *ExecutionNode) LoadSynchronizationEngine(
 		exeNode.followerEng,
 		exeNode.syncCore,
 		node.SyncEngineIdentifierProvider,
-		synchronization.NewSpamDetectionConfig(),
+		spamConfig,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
@@ -1123,14 +1220,22 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 
 	// if the execution database does not exist, then we need to bootstrap the execution database.
 	if !bootstrapped {
+		err := wal.CheckpointHasRootHash(
+			node.Logger,
+			path.Join(node.BootstrapDir, bootstrapFilenames.DirnameExecutionState),
+			bootstrapFilenames.FilenameWALRootCheckpoint,
+			ledgerpkg.RootHash(node.RootSeal.FinalState),
+		)
+		if err != nil {
+			return err
+		}
+
 		// when bootstrapping, the bootstrap folder must have a checkpoint file
 		// we need to cover this file to the trie folder to restore the trie to restore the execution state.
 		err = copyBootstrapState(node.BootstrapDir, exeNode.exeConf.triedir)
 		if err != nil {
 			return fmt.Errorf("could not load bootstrap state from checkpoint file: %w", err)
 		}
-
-		// TODO: check that the checkpoint file contains the root block's statecommit hash
 
 		err = bootstrapper.BootstrapExecutionDatabase(node.DB, node.RootSeal)
 		if err != nil {
@@ -1159,17 +1264,10 @@ func getContractEpochCounter(
 	uint64,
 	error,
 ) {
-	// Get the address of the FlowEpoch smart contract
-	sc, err := systemcontracts.SystemContractsForChain(vmCtx.Chain.ChainID())
-	if err != nil {
-		return 0, fmt.Errorf("could not get system contracts: %w", err)
-	}
-	address := sc.Epoch.Address
+	sc := systemcontracts.SystemContractsForChain(vmCtx.Chain.ChainID())
 
 	// Generate the script to get the epoch counter from the FlowEpoch smart contract
-	scriptCode := templates.GenerateGetCurrentEpochCounterScript(templates.Environment{
-		EpochAddress: address.Hex(),
-	})
+	scriptCode := templates.GenerateGetCurrentEpochCounterScript(sc.AsTemplateEnv())
 	script := fvm.Script(scriptCode)
 
 	// execute the script
@@ -1227,6 +1325,10 @@ func copyBootstrapState(dir, trie string) error {
 
 	// copy from the bootstrap folder to the execution state folder
 	from, to := path.Join(dir, bootstrapFilenames.DirnameExecutionState), trie
+
+	log.Info().Str("dir", dir).Str("trie", trie).
+		Msgf("copying checkpoint file %v from directory: %v, to: %v", filename, from, to)
+
 	copiedFiles, err := wal.CopyCheckpointFile(filename, from, to)
 	if err != nil {
 		return fmt.Errorf("can not copy checkpoint file %s, from %s to %s",

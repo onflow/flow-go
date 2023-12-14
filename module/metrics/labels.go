@@ -85,6 +85,7 @@ const (
 	ResourceEpochCommit                                = "epoch_commit"
 	ResourceEpochStatus                                = "epoch_status"
 	ResourceNetworkingReceiveCache                     = "networking_received_message" // networking layer
+	ResourceNetworkingSubscriptionRecordsCache         = "subscription_records_cache"  // networking layer
 	ResourceNetworkingDnsIpCache                       = "networking_dns_ip_cache"     // networking layer
 	ResourceNetworkingDnsTxtCache                      = "networking_dns_txt_cache"    // networking layer
 	ResourceNetworkingDisallowListNotificationQueue    = "networking_disallow_list_notification_queue"
@@ -97,6 +98,7 @@ const (
 	ResourceNetworkingDisallowListCache                = "disallow_list_cache"
 	ResourceNetworkingRPCSentTrackerCache              = "gossipsub_rpc_sent_tracker_cache"
 	ResourceNetworkingRPCSentTrackerQueue              = "gossipsub_rpc_sent_tracker_queue"
+	ResourceNetworkingUnicastDialConfigCache           = "unicast_dial_config_cache"
 
 	ResourceFollowerPendingBlocksCache         = "follower_pending_block_cache"           // follower engine
 	ResourceFollowerLoopCertifiedBlocksChannel = "follower_loop_certified_blocks_channel" // follower loop, certified blocks buffered channel

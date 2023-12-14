@@ -4,9 +4,15 @@ import (
 	"net"
 	"sync"
 
+	"go.uber.org/atomic"
+
 	"github.com/rs/zerolog"
 
 	"google.golang.org/grpc"
+	_ "google.golang.org/grpc/encoding/gzip" //required for gRPC compression
+
+	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/deflate" // required for gRPC compression
+	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/snappy"  // required for gRPC compression
 
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -16,8 +22,9 @@ import (
 // into different engines making it possible to use single grpc server for multiple services which live in different modules.
 type GrpcServer struct {
 	component.Component
-	log    zerolog.Logger
-	Server *grpc.Server
+	log             zerolog.Logger
+	Server          *grpc.Server
+	grpcSignalerCtx *atomic.Pointer[irrecoverable.SignalerContext]
 
 	grpcListenAddr string // the GRPC server address as ip:port
 
@@ -31,11 +38,13 @@ var _ component.Component = (*GrpcServer)(nil)
 func NewGrpcServer(log zerolog.Logger,
 	grpcListenAddr string,
 	grpcServer *grpc.Server,
+	grpcSignalerCtx *atomic.Pointer[irrecoverable.SignalerContext],
 ) *GrpcServer {
 	server := &GrpcServer{
-		log:            log,
-		Server:         grpcServer,
-		grpcListenAddr: grpcListenAddr,
+		log:             log,
+		Server:          grpcServer,
+		grpcListenAddr:  grpcListenAddr,
+		grpcSignalerCtx: grpcSignalerCtx,
 	}
 	server.Component = component.NewComponentManagerBuilder().
 		AddWorker(server.serveGRPCWorker).
@@ -49,6 +58,8 @@ func NewGrpcServer(log zerolog.Logger,
 func (g *GrpcServer) serveGRPCWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	g.log = g.log.With().Str("grpc_address", g.grpcListenAddr).Logger()
 	g.log.Info().Msg("starting grpc server on address")
+
+	g.grpcSignalerCtx.Store(&ctx)
 
 	l, err := net.Listen("tcp", g.grpcListenAddr)
 	if err != nil {

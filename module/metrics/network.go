@@ -87,7 +87,7 @@ func NewNetworkCollector(logger zerolog.Logger, opts ...NetworkCollectorOpt) *Ne
 			Subsystem: subsystemGossip,
 			Name:      nc.prefix + "outbound_message_size_bytes",
 			Help:      "size of the outbound network message",
-			Buckets:   []float64{KiB, 100 * KiB, 500 * KiB, 1 * MiB, 2 * MiB, 4 * MiB},
+			Buckets:   []float64{KiB, 100 * KiB, 1 * MiB},
 		}, []string{LabelChannel, LabelProtocol, LabelMessage},
 	)
 
@@ -97,7 +97,7 @@ func NewNetworkCollector(logger zerolog.Logger, opts ...NetworkCollectorOpt) *Ne
 			Subsystem: subsystemGossip,
 			Name:      nc.prefix + "inbound_message_size_bytes",
 			Help:      "size of the inbound network message",
-			Buckets:   []float64{KiB, 100 * KiB, 500 * KiB, 1 * MiB, 2 * MiB, 4 * MiB},
+			Buckets:   []float64{KiB, 100 * KiB, 1 * MiB},
 		}, []string{LabelChannel, LabelProtocol, LabelMessage},
 	)
 

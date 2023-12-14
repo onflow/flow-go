@@ -35,7 +35,7 @@ func NewGossipSubRPCValidationInspectorMetrics(prefix string) *GossipSubRpcValid
 			Subsystem: subsystemGossip,
 			Name:      gc.prefix + "rpc_control_message_validator_async_processing_time_seconds",
 			Help:      "duration [seconds; measured with float64 precision] of how long it takes rpc control message validator to asynchronously process a rpc message",
-			Buckets:   []float64{.1, .25, .5, 1, 2.5, 5, 7.5, 10, 20},
+			Buckets:   []float64{.1, 1},
 		},
 	)
 

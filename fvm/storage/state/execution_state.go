@@ -208,6 +208,19 @@ func (state *ExecutionState) MeterComputation(kind common.ComputationKind, inten
 	return nil
 }
 
+// ComputationAvailable checks if enough computation capacity is available without metering
+func (state *ExecutionState) ComputationAvailable(kind common.ComputationKind, intensity uint) bool {
+	if state.finalized {
+		// if state is finalized return false
+		return false
+	}
+
+	if state.enforceLimits {
+		return state.meter.ComputationAvailable(kind, intensity)
+	}
+	return true
+}
+
 // TotalComputationUsed returns total computation used
 func (state *ExecutionState) TotalComputationUsed() uint64 {
 	return state.meter.TotalComputationUsed()

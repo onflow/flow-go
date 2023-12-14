@@ -87,15 +87,14 @@ func TestGetCollections(t *testing.T) {
 			Once()
 
 		req := getCollectionReq(col.ID().String(), true)
-		rr, err := executeRequest(req, backend)
-		assert.NoError(t, err)
+		rr := executeRequest(req, backend)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
 		// really hacky but we can't build whole response since it's really complex
 		// so we just make sure the transactions are included and have defined values
 		// anyhow we already test transaction responses in transaction tests
 		var res map[string]interface{}
-		err = json.Unmarshal(rr.Body.Bytes(), &res)
+		err := json.Unmarshal(rr.Body.Bytes(), &res)
 		assert.NoError(t, err)
 		resTx := res["transactions"].([]interface{})
 		for i, r := range resTx {

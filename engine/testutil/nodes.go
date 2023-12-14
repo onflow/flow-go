@@ -45,11 +45,15 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
+	exeFetcher "github.com/onflow/flow-go/engine/execution/ingestion/fetcher"
+	"github.com/onflow/flow-go/engine/execution/ingestion/loader"
 	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
 	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 	executionprovider "github.com/onflow/flow-go/engine/execution/provider"
 	executionState "github.com/onflow/flow-go/engine/execution/state"
 	bootstrapexec "github.com/onflow/flow-go/engine/execution/state/bootstrap"
+	esbootstrap "github.com/onflow/flow-go/engine/execution/state/bootstrap"
+	"github.com/onflow/flow-go/engine/execution/storehouse"
 	testmock "github.com/onflow/flow-go/engine/testutil/mock"
 	verificationassigner "github.com/onflow/flow-go/engine/verification/assigner"
 	"github.com/onflow/flow-go/engine/verification/assigner/blockconsumer"
@@ -62,6 +66,7 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
+	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
@@ -73,6 +78,7 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	exedataprovider "github.com/onflow/flow-go/module/executiondatasync/provider"
 	mocktracker "github.com/onflow/flow-go/module/executiondatasync/tracker/mock"
+	"github.com/onflow/flow-go/module/finalizedreader"
 	confinalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -99,6 +105,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	"github.com/onflow/flow-go/state/protocol/util"
 	storage "github.com/onflow/flow-go/storage/badger"
+	storagepebble "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -556,6 +563,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	receipts := storage.NewExecutionReceipts(node.Metrics, node.PublicDB, results, storage.DefaultCacheSize)
 	myReceipts := storage.NewMyExecutionReceipts(node.Metrics, node.PublicDB, receipts)
 	versionBeacons := storage.NewVersionBeacons(node.PublicDB)
+	headersStorage := storage.NewHeaders(node.Metrics, node.PublicDB)
 
 	checkAuthorizedAtBlock := func(blockID flow.Identifier) (bool, error) {
 		return protocol.IsNodeAuthorizedAt(node.State.AtBlockID(blockID), node.Me.NodeID())
@@ -606,6 +614,15 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply))
 	require.NoError(t, err)
 
+	matchTrie, err := ls.FindTrieByStateCommit(commit)
+	require.NoError(t, err)
+	require.NotNil(t, matchTrie)
+
+	const bootstrapCheckpointFile = "bootstrap-checkpoint"
+	checkpointFile := filepath.Join(dbDir, bootstrapCheckpointFile)
+	err = wal.StoreCheckpointV6([]*trie.MTrie{matchTrie}, dbDir, bootstrapCheckpointFile, zerolog.Nop(), 1)
+	require.NoError(t, err)
+
 	rootResult, rootSeal, err := protoState.Sealed().SealedResult()
 	require.NoError(t, err)
 
@@ -615,8 +632,30 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	err = bootstrapper.BootstrapExecutionDatabase(node.PublicDB, rootSeal)
 	require.NoError(t, err)
 
+	registerDir := unittest.TempPebblePath(t)
+	pebbledb, err := storagepebble.OpenRegisterPebbleDB(registerDir)
+	require.NoError(t, err)
+
+	checkpointHeight := uint64(0)
+	require.NoError(t, esbootstrap.ImportRegistersFromCheckpoint(node.Log, checkpointFile, checkpointHeight, pebbledb, 2))
+
+	diskStore, err := storagepebble.NewRegisters(pebbledb)
+	require.NoError(t, err)
+
+	reader := finalizedreader.NewFinalizedReader(headersStorage, checkpointHeight)
+	registerStore, err := storehouse.NewRegisterStore(
+		diskStore,
+		nil, // TOOD(leo): replace with real WAL
+		reader,
+		node.Log)
+	require.NoError(t, err)
+
+	storehouseEnabled := true
 	execState := executionState.NewExecutionState(
 		ls, commitsStorage, node.Blocks, node.Headers, collectionsStorage, chunkDataPackStorage, results, myReceipts, eventsStorage, serviceEventsStorage, txResultStorage, node.PublicDB, node.Tracer,
+		// TODO: test with register store
+		registerStore,
+		storehouseEnabled,
 	)
 
 	requestEngine, err := requester.New(
@@ -709,14 +748,15 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		true,
 	)
 
+	fetcher := exeFetcher.NewCollectionFetcher(node.Log, requestEngine, node.State, false)
+	loader := loader.NewUnexecutedLoader(node.Log, node.State, node.Headers, execState)
 	rootHead, rootQC := getRoot(t, &node)
 	ingestionEngine, err := ingestion.New(
 		unit,
 		node.Log,
 		node.Net,
 		node.Me,
-		requestEngine,
-		node.State,
+		fetcher,
 		node.Headers,
 		node.Blocks,
 		collectionsStorage,
@@ -726,11 +766,10 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Metrics,
 		node.Tracer,
 		false,
-		checkAuthorizedAtBlock,
 		nil,
 		uploader,
 		stopControl,
-		false,
+		loader,
 	)
 	require.NoError(t, err)
 	requestEngine.WithHandle(ingestionEngine.OnCollection)
@@ -771,6 +810,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	idCache, err := cache.NewProtocolStateIDCache(node.Log, node.State, events.NewDistributor())
 	require.NoError(t, err, "could not create finalized snapshot cache")
+	spamConfig, err := synchronization.NewSpamDetectionConfig()
+	require.NoError(t, err, "could not initialize spam detection config")
 	syncEngine, err := synchronization.New(
 		node.Log,
 		node.Metrics,
@@ -787,7 +828,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 			),
 			idCache,
 		),
-		synchronization.NewSpamDetectionConfig(),
+		spamConfig,
 		synchronization.WithPollInterval(time.Duration(0)),
 	)
 	require.NoError(t, err)
@@ -812,6 +853,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		Finalizer:           finalizer,
 		MyExecutionReceipts: myReceipts,
 		Compactor:           compactor,
+		StorehouseEnabled:   storehouseEnabled,
 	}
 }
 
@@ -1053,12 +1095,13 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.ChunkConsumer == nil {
-		node.ChunkConsumer = chunkconsumer.NewChunkConsumer(node.Log,
+		node.ChunkConsumer, err = chunkconsumer.NewChunkConsumer(node.Log,
 			collector,
 			node.ProcessedChunkIndex,
 			node.ChunksQueue,
 			node.FetcherEngine,
 			chunkconsumer.DefaultChunkWorkers) // defaults number of workers to 3.
+		require.NoError(t, err)
 		err = mempoolCollector.Register(metrics.ResourceChunkConsumer, node.ChunkConsumer.Size)
 		require.NoError(t, err)
 	}

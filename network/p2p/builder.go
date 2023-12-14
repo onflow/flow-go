@@ -109,7 +109,9 @@ type GossipSubRpcInspectorSuiteFactoryFunc func(
 	module.GossipSubMetrics,
 	metrics.HeroCacheMetricsFactory,
 	flownet.NetworkingType,
-	module.IdentityProvider) (GossipSubInspectorSuite, error)
+	module.IdentityProvider,
+	func() TopicProvider,
+) (GossipSubInspectorSuite, error)
 
 // NodeBuilder is a builder pattern for creating a libp2p Node instance.
 type NodeBuilder interface {
@@ -132,8 +134,6 @@ type NodeBuilder interface {
 	EnableGossipSubScoringWithOverride(*PeerScoringConfigOverride) NodeBuilder
 	SetCreateNode(CreateNodeFunc) NodeBuilder
 	SetGossipSubFactory(GossipSubFactoryFunc, GossipSubAdapterConfigFunc) NodeBuilder
-	SetStreamCreationRetryInterval(time.Duration) NodeBuilder
-	SetRateLimiterDistributor(UnicastRateLimiterDistributor) NodeBuilder
 	SetGossipSubTracer(PubSubTracer) NodeBuilder
 	SetGossipSubScoreTracerInterval(time.Duration) NodeBuilder
 	OverrideDefaultRpcInspectorSuiteFactory(GossipSubRpcInspectorSuiteFactoryFunc) NodeBuilder

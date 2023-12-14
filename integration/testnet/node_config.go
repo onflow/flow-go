@@ -1,6 +1,7 @@
 package testnet
 
 import (
+	"fmt"
 	"math/rand"
 	"strconv"
 	"strings"
@@ -142,4 +143,9 @@ func WithAdditionalFlag(flag string) func(config *NodeConfig) {
 	return func(config *NodeConfig) {
 		config.AdditionalFlags = append(config.AdditionalFlags, flag)
 	}
+}
+
+// WithAdditionalFlagf adds additional flags to the command using a formatted string
+func WithAdditionalFlagf(format string, a ...any) func(config *NodeConfig) {
+	return WithAdditionalFlag(fmt.Sprintf(format, a...))
 }

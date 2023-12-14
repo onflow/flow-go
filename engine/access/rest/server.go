@@ -9,6 +9,8 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/routes"
+	"github.com/onflow/flow-go/engine/access/state_stream"
+	"github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )
@@ -32,10 +34,17 @@ type Config struct {
 }
 
 // NewServer returns an HTTP server initialized with the REST API handler
-func NewServer(serverAPI access.API, config Config, logger zerolog.Logger, chain flow.Chain, restCollector module.RestMetrics) (*http.Server, error) {
-	router, err := routes.NewRouter(serverAPI, logger, chain, restCollector)
-	if err != nil {
-		return nil, err
+func NewServer(serverAPI access.API,
+	config Config,
+	logger zerolog.Logger,
+	chain flow.Chain,
+	restCollector module.RestMetrics,
+	stateStreamApi state_stream.API,
+	stateStreamConfig backend.Config,
+) (*http.Server, error) {
+	builder := routes.NewRouterBuilder(logger, restCollector).AddRestRoutes(serverAPI, chain)
+	if stateStreamApi != nil {
+		builder.AddWsRoutes(stateStreamApi, chain, stateStreamConfig)
 	}
 
 	c := cors.New(cors.Options{
@@ -49,7 +58,7 @@ func NewServer(serverAPI access.API, config Config, logger zerolog.Logger, chain
 	})
 
 	return &http.Server{
-		Handler:      c.Handler(router),
+		Handler:      c.Handler(builder.Build()),
 		Addr:         config.ListenAddress,
 		WriteTimeout: config.WriteTimeout,
 		ReadTimeout:  config.ReadTimeout,

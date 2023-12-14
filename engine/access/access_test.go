@@ -26,7 +26,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
-	factorymock "github.com/onflow/flow-go/engine/access/rpc/backend/mock"
+	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
@@ -70,6 +70,8 @@ type Suite struct {
 	metrics              *metrics.NoopCollector
 	finalizedHeaderCache module.FinalizedHeaderCache
 	backend              *backend.Backend
+	sporkID              flow.Identifier
+	protocolVersion      uint
 }
 
 // TestAccess tests scenarios which exercise multiple API calls using both the RPC handler and the ingest engine
@@ -84,6 +86,8 @@ func (suite *Suite) SetupTest() {
 	suite.state = new(protocol.State)
 	suite.finalSnapshot = new(protocol.Snapshot)
 	suite.sealedSnapshot = new(protocol.Snapshot)
+	suite.sporkID = unittest.IdentifierFixture()
+	suite.protocolVersion = uint(unittest.Uint64InRange(10, 30))
 
 	suite.rootBlock = unittest.BlockHeaderFixture(unittest.WithHeaderHeight(0))
 	suite.sealedBlock = suite.rootBlock
@@ -108,7 +112,10 @@ func (suite *Suite) SetupTest() {
 
 	suite.params = new(protocol.Params)
 	suite.params.On("FinalizedRoot").Return(suite.rootBlock, nil)
+	suite.params.On("SporkID").Return(suite.sporkID, nil)
+	suite.params.On("ProtocolVersion").Return(suite.protocolVersion, nil)
 	suite.params.On("SporkRootBlockHeight").Return(suite.rootBlock.Height, nil)
+	suite.params.On("SealedRoot").Return(suite.rootBlock, nil)
 	suite.state.On("Params").Return(suite.params).Maybe()
 	suite.collClient = new(accessmock.AccessAPIClient)
 	suite.execClient = new(accessmock.ExecutionAPIClient)
@@ -157,7 +164,13 @@ func (suite *Suite) RunTest(
 		})
 		require.NoError(suite.T(), err)
 
-		handler := access.NewHandler(suite.backend, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me, access.WithBlockSignerDecoder(suite.signerIndicesDecoder))
+		handler := access.NewHandler(
+			suite.backend,
+			suite.chainID.Chain(),
+			suite.finalizedHeaderCache,
+			suite.me,
+			access.WithBlockSignerDecoder(suite.signerIndicesDecoder),
+		)
 		f(handler, db, all)
 	})
 }
@@ -305,20 +318,21 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 		col2ApiClient.On("SendTransaction", mock.Anything, sendReq2).Return(&sendResp, nil).Once()
 
 		// create a mock connection factory
-		connFactory := new(factorymock.ConnectionFactory)
-		connFactory.On("GetAccessAPIClient", collNode1.Address).Return(col1ApiClient, &mockCloser{}, nil)
-		connFactory.On("GetAccessAPIClient", collNode2.Address).Return(col2ApiClient, &mockCloser{}, nil)
+		connFactory := connectionmock.NewConnectionFactory(suite.T())
+		connFactory.On("GetAccessAPIClient", collNode1.Address, nil).Return(col1ApiClient, &mockCloser{}, nil)
+		connFactory.On("GetAccessAPIClient", collNode2.Address, nil).Return(col2ApiClient, &mockCloser{}, nil)
 
 		bnd, err := backend.New(backend.Params{State: suite.state,
-			Collections:          collections,
-			Transactions:         transactions,
-			ChainID:              suite.chainID,
-			AccessMetrics:        metrics,
-			ConnFactory:          connFactory,
-			MaxHeightRange:       backend.DefaultMaxHeightRange,
-			Log:                  suite.log,
-			SnapshotHistoryLimit: backend.DefaultSnapshotHistoryLimit,
-			Communicator:         backend.NewNodeCommunicator(false),
+			Collections:              collections,
+			Transactions:             transactions,
+			ChainID:                  suite.chainID,
+			AccessMetrics:            metrics,
+			ConnFactory:              connFactory,
+			MaxHeightRange:           backend.DefaultMaxHeightRange,
+			Log:                      suite.log,
+			SnapshotHistoryLimit:     backend.DefaultSnapshotHistoryLimit,
+			Communicator:             backend.NewNodeCommunicator(false),
+			TxErrorMessagesCacheSize: 1000,
 		})
 		require.NoError(suite.T(), err)
 
@@ -538,15 +552,12 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 			for i, serviceEvent := range executionResult.ServiceEvents {
 				assert.Equal(suite.T(), serviceEvent.Type.String(), er.ServiceEvents[i].Type)
 				event := serviceEvent.Event
-
 				marshalledEvent, err := json.Marshal(event)
 				require.NoError(suite.T(), err)
-
 				assert.Equal(suite.T(), marshalledEvent, er.ServiceEvents[i].Payload)
 			}
 			parsedExecResult, err := convert.MessageToExecutionResult(resp.ExecutionResult)
 			require.NoError(suite.T(), err)
-			assert.Equal(suite.T(), parsedExecResult, executionResult)
 			assert.Equal(suite.T(), parsedExecResult.ID(), executionResult.ID())
 		}
 
@@ -613,7 +624,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		suite.execClient.On("GetTransactionResult", mock.Anything, mock.Anything).Return(&exeEventResp, nil)
 
 		// create a mock connection factory
-		connFactory := new(factorymock.ConnectionFactory)
+		connFactory := connectionmock.NewConnectionFactory(suite.T())
 		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
 		// initialize storage
@@ -643,6 +654,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 			Log:                       suite.log,
 			SnapshotHistoryLimit:      backend.DefaultSnapshotHistoryLimit,
 			Communicator:              backend.NewNodeCommunicator(false),
+			TxErrorMessagesCacheSize:  1000,
 		})
 		require.NoError(suite.T(), err)
 
@@ -748,7 +760,7 @@ func (suite *Suite) TestGetTransactionResult() {
 		suite.request.On("Request", mock.Anything, mock.Anything).Return()
 
 		// create a mock connection factory
-		connFactory := new(factorymock.ConnectionFactory)
+		connFactory := connectionmock.NewConnectionFactory(suite.T())
 		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
 		// initialize storage
@@ -780,6 +792,7 @@ func (suite *Suite) TestGetTransactionResult() {
 			Log:                       suite.log,
 			SnapshotHistoryLimit:      backend.DefaultSnapshotHistoryLimit,
 			Communicator:              backend.NewNodeCommunicator(false),
+			TxErrorMessagesCacheSize:  1000,
 		})
 		require.NoError(suite.T(), err)
 
@@ -950,26 +963,29 @@ func (suite *Suite) TestExecuteScript() {
 		suite.finalSnapshot.On("Identities", mock.Anything).Return(identities, nil)
 
 		// create a mock connection factory
-		connFactory := new(factorymock.ConnectionFactory)
+		connFactory := connectionmock.NewConnectionFactory(suite.T())
 		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
 		var err error
-		suite.backend, err = backend.New(backend.Params{State: suite.state,
-			CollectionRPC:         suite.collClient,
-			Blocks:                all.Blocks,
-			Headers:               all.Headers,
-			Collections:           collections,
-			Transactions:          transactions,
-			ExecutionReceipts:     receipts,
-			ExecutionResults:      results,
-			ChainID:               suite.chainID,
-			AccessMetrics:         suite.metrics,
-			ConnFactory:           connFactory,
-			MaxHeightRange:        backend.DefaultMaxHeightRange,
-			FixedExecutionNodeIDs: (identities.NodeIDs()).Strings(),
-			Log:                   suite.log,
-			SnapshotHistoryLimit:  backend.DefaultSnapshotHistoryLimit,
-			Communicator:          backend.NewNodeCommunicator(false),
+		suite.backend, err = backend.New(backend.Params{
+			State:                    suite.state,
+			CollectionRPC:            suite.collClient,
+			Blocks:                   all.Blocks,
+			Headers:                  all.Headers,
+			Collections:              collections,
+			Transactions:             transactions,
+			ExecutionReceipts:        receipts,
+			ExecutionResults:         results,
+			ChainID:                  suite.chainID,
+			AccessMetrics:            suite.metrics,
+			ConnFactory:              connFactory,
+			MaxHeightRange:           backend.DefaultMaxHeightRange,
+			FixedExecutionNodeIDs:    (identities.NodeIDs()).Strings(),
+			Log:                      suite.log,
+			SnapshotHistoryLimit:     backend.DefaultSnapshotHistoryLimit,
+			Communicator:             backend.NewNodeCommunicator(false),
+			ScriptExecutionMode:      backend.ScriptExecutionModeExecutionNodesOnly,
+			TxErrorMessagesCacheSize: 1000,
 		})
 		require.NoError(suite.T(), err)
 
@@ -1110,12 +1126,6 @@ func (suite *Suite) TestExecuteScript() {
 // information
 func (suite *Suite) TestAPICallNodeVersionInfo() {
 	suite.RunTest(func(handler *access.Handler, db *badger.DB, all *storage.All) {
-		sporkId := unittest.IdentifierFixture()
-		protocolVersion := uint(unittest.Uint64InRange(10, 30))
-
-		suite.params.On("SporkID").Return(sporkId, nil)
-		suite.params.On("ProtocolVersion").Return(protocolVersion, nil)
-
 		req := &accessproto.GetNodeVersionInfoRequest{}
 		resp, err := handler.GetNodeVersionInfo(context.Background(), req)
 		require.NoError(suite.T(), err)
@@ -1125,8 +1135,8 @@ func (suite *Suite) TestAPICallNodeVersionInfo() {
 		suite.Require().Equal(respNodeVersionInfo, &entitiesproto.NodeVersionInfo{
 			Semver:          build.Version(),
 			Commit:          build.Commit(),
-			SporkId:         sporkId[:],
-			ProtocolVersion: uint64(protocolVersion),
+			SporkId:         suite.sporkID[:],
+			ProtocolVersion: uint64(suite.protocolVersion),
 		})
 	})
 }

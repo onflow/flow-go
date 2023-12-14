@@ -222,15 +222,16 @@ var (
 		common.MemoryKindElaboration:       501,
 
 		// sema types
-		common.MemoryKindVariableSizedSemaType:  51,
-		common.MemoryKindConstantSizedSemaType:  59,
-		common.MemoryKindDictionarySemaType:     67,
-		common.MemoryKindOptionalSemaType:       17,
-		common.MemoryKindIntersectionSemaType:   75,
-		common.MemoryKindReferenceSemaType:      25,
-		common.MemoryKindCapabilitySemaType:     51,
-		common.MemoryKindEntitlementSemaType:    49,
-		common.MemoryKindEntitlementMapSemaType: 73,
+		common.MemoryKindVariableSizedSemaType:       51,
+		common.MemoryKindConstantSizedSemaType:       59,
+		common.MemoryKindDictionarySemaType:          67,
+		common.MemoryKindOptionalSemaType:            17,
+		common.MemoryKindIntersectionSemaType:        75,
+		common.MemoryKindReferenceSemaType:           25,
+		common.MemoryKindCapabilitySemaType:          51,
+		common.MemoryKindEntitlementSemaType:         49,
+		common.MemoryKindEntitlementMapSemaType:      73,
+		common.MemoryKindEntitlementRelationSemaType: 73,
 
 		// ordered-map
 		common.MemoryKindOrderedMap:          17,
