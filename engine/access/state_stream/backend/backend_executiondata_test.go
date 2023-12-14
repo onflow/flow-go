@@ -61,6 +61,7 @@ type BackendExecutionDataSuite struct {
 	blockMap    map[uint64]*flow.Block
 	sealMap     map[flow.Identifier]*flow.Seal
 	resultMap   map[flow.Identifier]*flow.ExecutionResult
+	registerID  flow.RegisterID
 }
 
 func TestBackendExecutionDataSuite(t *testing.T) {
@@ -149,6 +150,8 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 		s.T().Logf("adding exec data for block %d %d %v => %v", i, block.Header.Height, block.ID(), result.ExecutionDataID)
 	}
 
+	s.registerID = unittest.RegisterIDFixture()
+
 	s.registersAsync = execution.NewRegistersAsyncStore()
 	s.registers = storagemock.NewRegisterIndex(s.T())
 	err = s.registersAsync.InitDataAvailable(s.registers)
@@ -157,7 +160,7 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 	s.registers.On("FirstHeight").Return(rootBlock.Header.Height).Maybe()
 	s.registers.On("Get", mock.AnythingOfType("RegisterID"), mock.AnythingOfType("uint64")).Return(
 		func(id flow.RegisterID, height uint64) (flow.RegisterValue, error) {
-			if id == unittest.RegisterIDFixture() {
+			if id == s.registerID {
 				return flow.RegisterValue{}, nil
 			}
 			return nil, storage.ErrNotFound
@@ -440,13 +443,13 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataHandlesErrors() {
 
 func (s *BackendExecutionDataSuite) TestGetRegisterValuesErrors() {
 	s.Run("normal case", func() {
-		res, err := s.backend.GetRegisterValues(flow.RegisterIDs{unittest.RegisterIDFixture()}, s.backend.rootBlockHeight)
+		res, err := s.backend.GetRegisterValues(flow.RegisterIDs{s.registerID}, s.backend.rootBlockHeight)
 		require.NoError(s.T(), err)
 		require.NotEmpty(s.T(), res)
 	})
 
 	s.Run("returns error if block height is out of range", func() {
-		_, err := s.backend.GetRegisterValues(flow.RegisterIDs{unittest.RegisterIDFixture()}, s.backend.rootBlockHeight+1)
+		_, err := s.backend.GetRegisterValues(flow.RegisterIDs{s.registerID}, s.backend.rootBlockHeight+1)
 		require.Equal(s.T(), codes.OutOfRange, status.Code(err))
 	})
 

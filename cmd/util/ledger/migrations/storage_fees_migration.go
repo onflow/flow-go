@@ -25,7 +25,7 @@ func StorageFeesMigration(payload []ledger.Payload) ([]ledger.Payload, error) {
 	for s, u := range storageUsed {
 		// this is the storage used by the storage_used register we are about to add
 		id := flow.NewRegisterID(
-			string(flow.BytesToAddress([]byte(s)).Bytes()),
+			flow.BytesToAddress([]byte(s)),
 			"storage_used")
 		storageUsedByStorageUsed := fvm.RegisterSize(id, make([]byte, 8))
 		u = u + uint64(storageUsedByStorageUsed)
