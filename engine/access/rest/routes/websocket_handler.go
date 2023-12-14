@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/request"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/engine/access/state_stream/backend"
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -156,6 +157,18 @@ func (wsController *WebsocketController) writeEvents(sub state_stream.Subscripti
 					continue
 				}
 				blocksSinceLastMessage = 0
+			}
+
+			// EventsResponse contains CCF encoded events, and this API returns JSON-CDC events.
+			// convert event payload formats.
+			for i, e := range resp.Events {
+				payload, err := convert.CcfPayloadToJsonPayload(e.Payload)
+				if err != nil {
+					err = fmt.Errorf("could not convert event payload from CCF to Json: %w", err)
+					wsController.wsErrorHandler(err)
+					return
+				}
+				resp.Events[i].Payload = payload
 			}
 
 			// Write the response to the WebSocket connection

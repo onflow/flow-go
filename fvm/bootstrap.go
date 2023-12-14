@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/evm/stdlib"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/logical"
@@ -75,6 +76,7 @@ type BootstrapParams struct {
 	minimumStorageReservation        cadence.UFix64
 	storagePerFlow                   cadence.UFix64
 	restrictedAccountCreationEnabled cadence.Bool
+	setupEVMEnabled                  cadence.Bool
 
 	// versionFreezePeriod is the number of blocks in the future where the version
 	// changes are frozen. The Node version beacon manages the freeze period,
@@ -206,6 +208,13 @@ func WithStorageMBPerFLOW(ratio cadence.UFix64) BootstrapProcedureOption {
 func WithRestrictedAccountCreationEnabled(enabled cadence.Bool) BootstrapProcedureOption {
 	return func(bp *BootstrapProcedure) *BootstrapProcedure {
 		bp.restrictedAccountCreationEnabled = enabled
+		return bp
+	}
+}
+
+func WithSetupEVMEnabled(enabled cadence.Bool) BootstrapProcedureOption {
+	return func(bp *BootstrapProcedure) *BootstrapProcedure {
+		bp.setupEVMEnabled = enabled
 		return bp
 	}
 }
@@ -379,6 +388,9 @@ func (b *bootstrapExecutor) Execute() error {
 
 	// set the list of nodes which are allowed to stake in this network
 	b.setStakingAllowlist(service, b.identities.NodeIDs())
+
+	// sets up the EVM environment
+	b.setupEVM(service, fungibleToken, flowToken)
 
 	return nil
 }
@@ -759,6 +771,22 @@ func (b *bootstrapExecutor) setupStorageForServiceAccounts(
 	panicOnMetaInvokeErrf("failed to setup storage for service accounts: %s", txError, err)
 }
 
+func (b *bootstrapExecutor) setupStorageForAccount(
+	account, service, fungibleToken, flowToken flow.Address,
+) {
+	txError, err := b.invokeMetaTransaction(
+		b.ctx,
+		Transaction(
+			blueprints.SetupStorageForAccountTransaction(
+				account,
+				service,
+				fungibleToken,
+				flowToken),
+			0),
+	)
+	panicOnMetaInvokeErrf("failed to setup storage for service accounts: %s", txError, err)
+}
+
 func (b *bootstrapExecutor) setStakingAllowlist(
 	service flow.Address,
 	allowedIDs []flow.Identifier,
@@ -774,6 +802,25 @@ func (b *bootstrapExecutor) setStakingAllowlist(
 			0),
 	)
 	panicOnMetaInvokeErrf("failed to set staking allow-list: %s", txError, err)
+}
+
+func (b *bootstrapExecutor) setupEVM(serviceAddress, fungibleTokenAddress, flowTokenAddress flow.Address) {
+	if b.setupEVMEnabled {
+		evmAcc := b.createAccount(nil) // account for storage
+		tx := blueprints.DeployContractTransaction(
+			serviceAddress,
+			stdlib.ContractCode(flowTokenAddress),
+			stdlib.ContractName,
+		)
+		// WithEVMEnabled should only be used after we create an account for storage
+		txError, err := b.invokeMetaTransaction(
+			NewContextFromParent(b.ctx, WithEVMEnabled(true)),
+			Transaction(tx, 0),
+		)
+		panicOnMetaInvokeErrf("failed to deploy EVM contract: %s", txError, err)
+
+		b.setupStorageForAccount(evmAcc, serviceAddress, fungibleTokenAddress, flowTokenAddress)
+	}
 }
 
 func (b *bootstrapExecutor) registerNodes(service, fungibleToken, flowToken flow.Address) {
@@ -942,16 +989,6 @@ func panicOnMetaInvokeErrf(msg string, txError errors.CodedError, err error) {
 	if err != nil {
 		panic(fmt.Sprintf(msg, err.Error()))
 	}
-}
-
-func FungibleTokenAddress(chain flow.Chain) flow.Address {
-	address, _ := chain.AddressAtIndex(environment.FungibleTokenAccountIndex)
-	return address
-}
-
-func FlowTokenAddress(chain flow.Chain) flow.Address {
-	address, _ := chain.AddressAtIndex(environment.FlowTokenAccountIndex)
-	return address
 }
 
 // invokeMetaTransaction invokes a meta transaction inside the context of an

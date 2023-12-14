@@ -134,12 +134,12 @@ func (t testPeerLimitConfig) maxLimit() int {
 // baseCreateStreamInboundStreamResourceLimitConfig returns a testPeerLimitConfig with default values.
 func baseCreateStreamInboundStreamResourceLimitConfig() *testPeerLimitConfig {
 	return &testPeerLimitConfig{
-		nodeCount:                    5,
-		maxInboundPeerStream:         10,
-		maxInboundStreamProtocol:     10,
-		maxInboundStreamPeerProtocol: 10,
-		maxInboundStreamTransient:    10,
-		maxInboundStreamSystem:       10,
+		nodeCount:                    10,
+		maxInboundPeerStream:         100,
+		maxInboundStreamProtocol:     100,
+		maxInboundStreamPeerProtocol: 100,
+		maxInboundStreamTransient:    100,
+		maxInboundStreamSystem:       100,
 	}
 }
 

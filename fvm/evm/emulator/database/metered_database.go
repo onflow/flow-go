@@ -27,13 +27,14 @@ func (m *MeteredDatabase) DropCache() {
 	m.storage.DropCache()
 }
 
-func (m *MeteredDatabase) BytesRetrieved() int {
+func (m *MeteredDatabase) BytesRead() int {
 	return m.baseStorage.BytesRetrieved()
 }
 
-func (m *MeteredDatabase) BytesStored() int {
+func (m *MeteredDatabase) BytesWritten() int {
 	return m.baseStorage.BytesStored()
 }
+
 func (m *MeteredDatabase) ResetReporter() {
 	m.baseStorage.ResetReporter()
 	m.baseStorage.Size()

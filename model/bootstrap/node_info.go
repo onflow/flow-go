@@ -175,6 +175,18 @@ type decodableNodeInfoPub struct {
 	Stake uint64
 }
 
+func (info *NodeInfoPub) Equals(other *NodeInfoPub) bool {
+	if other == nil {
+		return false
+	}
+	return info.Address == other.Address &&
+		info.NodeID == other.NodeID &&
+		info.Role == other.Role &&
+		info.Weight == other.Weight &&
+		info.NetworkPubKey.PublicKey.Equals(other.NetworkPubKey.PublicKey) &&
+		info.StakingPubKey.PublicKey.Equals(other.StakingPubKey.PublicKey)
+}
+
 func (info *NodeInfoPub) UnmarshalJSON(b []byte) error {
 	var decodable decodableNodeInfoPub
 	err := json.Unmarshal(b, &decodable)

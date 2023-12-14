@@ -148,7 +148,8 @@ func (bl *BlockView) newProcedure() (*procedure, error) {
 			cfg.ChainConfig,
 			cfg.EVMConfig,
 		),
-		state: execState,
+		state:    execState,
+		database: bl.database,
 	}, nil
 }
 
@@ -159,9 +160,10 @@ func (bl *BlockView) commit(rootHash gethCommon.Hash) error {
 }
 
 type procedure struct {
-	config *Config
-	evm    *gethVM.EVM
-	state  *gethState.StateDB
+	config   *Config
+	evm      *gethVM.EVM
+	state    *gethState.StateDB
+	database types.Database
 }
 
 // commit commits the changes to the state.
@@ -184,6 +186,12 @@ func (proc *procedure) commit() (gethCommon.Hash, error) {
 	if err != nil {
 		return gethTypes.EmptyRootHash, handleCommitError(err)
 	}
+
+	// // remove the read registers (no history tracking)
+	// err = proc.database.DeleteAndCleanReadKey()
+	// if err != nil {
+	// 	return gethTypes.EmptyRootHash, types.NewFatalError(err)
+	// }
 	return newRoot, nil
 }
 
@@ -235,8 +243,11 @@ func (proc *procedure) withdrawFrom(address types.Address, amount *big.Int) (*ty
 	// while this method is only called from bridged accounts
 	// it might be the case that someone creates a bridged account
 	// and never transfer tokens to and call for withdraw
+	// TODO: we might revisit this apporach and
+	// 		return res, types.ErrAccountDoesNotExist
+	// instead
 	if !proc.state.Exist(addr) {
-		return res, types.ErrAccountDoesNotExist
+		proc.state.CreateAccount(addr)
 	}
 
 	// check the source account balance

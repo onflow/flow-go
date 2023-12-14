@@ -3,13 +3,13 @@ package apiproxy
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"google.golang.org/grpc/status"
 
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/grpc/forwarder"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -33,17 +33,15 @@ type RestProxyHandler struct {
 func NewRestProxyHandler(
 	api access.API,
 	identities flow.IdentityList,
-	timeout time.Duration,
-	maxMsgSize uint,
+	connectionFactory connection.ConnectionFactory,
 	log zerolog.Logger,
 	metrics metrics.ObserverMetrics,
 	chain flow.Chain,
 ) (*RestProxyHandler, error) {
-
 	forwarder, err := forwarder.NewForwarder(
 		identities,
-		timeout,
-		maxMsgSize)
+		connectionFactory,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not create REST forwarder: %w", err)
 	}
@@ -80,10 +78,11 @@ func (r *RestProxyHandler) log(handler, rpc string, err error) {
 
 // GetCollectionByID returns a collection by ID.
 func (r *RestProxyHandler) GetCollectionByID(ctx context.Context, id flow.Identifier) (*flow.LightCollection, error) {
-	upstream, err := r.FaultTolerantClient()
+	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
 		return nil, err
 	}
+	defer closer.Close()
 
 	getCollectionByIDRequest := &accessproto.GetCollectionByIDRequest{
 		Id: id[:],
@@ -106,10 +105,11 @@ func (r *RestProxyHandler) GetCollectionByID(ctx context.Context, id flow.Identi
 
 // SendTransaction sends already created transaction.
 func (r *RestProxyHandler) SendTransaction(ctx context.Context, tx *flow.TransactionBody) error {
-	upstream, err := r.FaultTolerantClient()
+	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
 		return err
 	}
+	defer closer.Close()
 
 	transaction := convert.TransactionToMessage(*tx)
 	sendTransactionRequest := &accessproto.SendTransactionRequest{
@@ -124,10 +124,11 @@ func (r *RestProxyHandler) SendTransaction(ctx context.Context, tx *flow.Transac
 
 // GetTransaction returns transaction by ID.
 func (r *RestProxyHandler) GetTransaction(ctx context.Context, id flow.Identifier) (*flow.TransactionBody, error) {
-	upstream, err := r.FaultTolerantClient()
+	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
 		return nil, err
 	}
+	defer closer.Close()
 
 	getTransactionRequest := &accessproto.GetTransactionRequest{
 		Id: id[:],
@@ -155,11 +156,12 @@ func (r *RestProxyHandler) GetTransactionResult(
 	collectionID flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) (*access.TransactionResult, error) {
-	upstream, err := r.FaultTolerantClient()
+	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
 
 		return nil, err
 	}
+	defer closer.Close()
 
 	getTransactionResultRequest := &accessproto.GetTransactionRequest{
 		Id:                   id[:],
@@ -180,10 +182,11 @@ func (r *RestProxyHandler) GetTransactionResult(
 
 // GetAccountAtBlockHeight returns account by account address and block height.
 func (r *RestProxyHandler) GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error) {
-	upstream, err := r.FaultTolerantClient()
+	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
 		return nil, err
 	}
+	defer closer.Close()
 
 	getAccountAtBlockHeightRequest := &accessproto.GetAccountAtBlockHeightRequest{
 		Address:     address.Bytes(),
@@ -202,10 +205,11 @@ func (r *RestProxyHandler) GetAccountAtBlockHeight(ctx context.Context, address 
 
 // ExecuteScriptAtLatestBlock executes script at latest block.
 func (r *RestProxyHandler) ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, arguments [][]byte) ([]byte, error) {
-	upstream, err := r.FaultTolerantClient()
+	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
 		return nil, err
 	}
+	defer closer.Close()
 
 	executeScriptAtLatestBlockRequest := &accessproto.ExecuteScriptAtLatestBlockRequest{
 		Script:    script,
@@ -223,10 +227,11 @@ func (r *RestProxyHandler) ExecuteScriptAtLatestBlock(ctx context.Context, scrip
 
 // ExecuteScriptAtBlockHeight executes script at the given block height .
 func (r *RestProxyHandler) ExecuteScriptAtBlockHeight(ctx context.Context, blockHeight uint64, script []byte, arguments [][]byte) ([]byte, error) {
-	upstream, err := r.FaultTolerantClient()
+	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
 		return nil, err
 	}
+	defer closer.Close()
 
 	executeScriptAtBlockHeightRequest := &accessproto.ExecuteScriptAtBlockHeightRequest{
 		BlockHeight: blockHeight,
@@ -245,10 +250,11 @@ func (r *RestProxyHandler) ExecuteScriptAtBlockHeight(ctx context.Context, block
 
 // ExecuteScriptAtBlockID executes script at the given block id .
 func (r *RestProxyHandler) ExecuteScriptAtBlockID(ctx context.Context, blockID flow.Identifier, script []byte, arguments [][]byte) ([]byte, error) {
-	upstream, err := r.FaultTolerantClient()
+	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
 		return nil, err
 	}
+	defer closer.Close()
 
 	executeScriptAtBlockIDRequest := &accessproto.ExecuteScriptAtBlockIDRequest{
 		BlockId:   blockID[:],
@@ -272,10 +278,11 @@ func (r *RestProxyHandler) GetEventsForHeightRange(
 	startHeight, endHeight uint64,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) ([]flow.BlockEvents, error) {
-	upstream, err := r.FaultTolerantClient()
+	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
 		return nil, err
 	}
+	defer closer.Close()
 
 	getEventsForHeightRangeRequest := &accessproto.GetEventsForHeightRangeRequest{
 		Type:                 eventType,
@@ -300,10 +307,11 @@ func (r *RestProxyHandler) GetEventsForBlockIDs(
 	blockIDs []flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) ([]flow.BlockEvents, error) {
-	upstream, err := r.FaultTolerantClient()
+	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
 		return nil, err
 	}
+	defer closer.Close()
 
 	blockIds := convert.IdentifiersToMessages(blockIDs)
 
@@ -324,10 +332,11 @@ func (r *RestProxyHandler) GetEventsForBlockIDs(
 
 // GetExecutionResultForBlockID gets execution result by provided block ID.
 func (r *RestProxyHandler) GetExecutionResultForBlockID(ctx context.Context, blockID flow.Identifier) (*flow.ExecutionResult, error) {
-	upstream, err := r.FaultTolerantClient()
+	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
 		return nil, err
 	}
+	defer closer.Close()
 
 	getExecutionResultForBlockID := &accessproto.GetExecutionResultForBlockIDRequest{
 		BlockId: blockID[:],
@@ -344,10 +353,11 @@ func (r *RestProxyHandler) GetExecutionResultForBlockID(ctx context.Context, blo
 
 // GetExecutionResultByID gets execution result by its ID.
 func (r *RestProxyHandler) GetExecutionResultByID(ctx context.Context, id flow.Identifier) (*flow.ExecutionResult, error) {
-	upstream, err := r.FaultTolerantClient()
+	upstream, closer, err := r.FaultTolerantClient()
 	if err != nil {
 		return nil, err
 	}
+	defer closer.Close()
 
 	executionResultByIDRequest := &accessproto.GetExecutionResultByIDRequest{
 		Id: id[:],

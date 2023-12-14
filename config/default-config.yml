@@ -33,44 +33,70 @@ network-config:
   # retry a unicast stream to a remote peer 3 times, the peer will give up and will not retry creating a unicast stream to that remote peer.
   # When it is set to zero it means that the peer will not retry creating a unicast stream to a remote peer if it fails.
   unicast-max-stream-creation-retry-attempt-times: 3
-  # The number of seconds that the local peer waits since the last successful dial to a remote peer before resetting the unicast dial retry budget from zero to the maximum default.
-  # If it is set to 3600s (1h) for example, it means that if it has passed at least one hour since the last successful dial, and the remote peer has a zero dial retry budget,
-  # the unicast dial retry budget for that remote peer will be reset to the maximum default.
-  unicast-dial-zero-retry-reset-threshold: 3600s
-  # The maximum number of retry attempts for dialing a remote peer before giving up. If it is set to 3 for example, it means that if a peer fails to dial a remote peer 3 times,
-  # the peer will give up and will not retry dialing that remote peer.
-  unicast-max-dial-retry-attempt-times: 3
-  # The backoff delay used in the exponential backoff for consecutive failed unicast dial attempts to a remote peer.
-  unicast-dial-backoff-delay: 1s
-  # The backoff delay used in the exponential backoff for backing off concurrent create stream attempts to the same remote peer
-  # when there is no available connections to that remote peer and a dial is in progress.
-  unicast-dial-in-progress-backoff-delay: 1s
   # The size of the dial config cache used to keep track of the dial config for each remote peer. The dial config is used to keep track of the dial retry budget for each remote peer.
   # Recommended to set it to the maximum number of remote peers in the network.
   unicast-dial-config-cache-size: 10_000
   # Resource manager config
-  # Maximum allowed fraction of file descriptors to be allocated by the libp2p resources in (0,1]
-  libp2p-memory-limit-ratio: 0.5 # flow default
-  # Maximum allowed fraction of memory to be allocated by the libp2p resources in (0,1]
-  libp2p-file-descriptors-ratio: 0.2 # libp2p default
-  # The default value for libp2p PeerBaseLimitConnsInbound. This limit
-  # restricts the amount of inbound connections from a peer to 1, forcing libp2p to reuse the connection.
-  #	Without this limit peers can end up in a state where there exists n number of connections per peer which
-  #	can lead to resource exhaustion of the libp2p node.
-  libp2p-peer-base-limits-conns-inbound: 1
-  # maximum number of inbound system-wide streams, across all peers and protocols
-  # Note that streams are ephemeral and are created and destroyed intermittently.
-  libp2p-inbound-stream-limit-system: 15_000
-  # maximum number of inbound transient streams, across all streams that are not yet fully opened and associated with a protocol.
-  # Note that streams are ephemeral and are created and destroyed intermittently.
-  libp2p-inbound-stream-limit-transient: 15_000
-  # maximum number of inbound streams for each protocol across all peers; this is a per-protocol limit. We expect at least
-  # three protocols per node; gossipsub, unicast, and dht. Note that streams are ephemeral and are created and destroyed intermittently.
-  libp2p-inbound-stream-limit-protocol: 5000
-  # maximum number of inbound streams from each peer across all protocols.
-  libp2p-inbound-stream-limit-peer: 1000
-  # maximum number of inbound streams from each peer for each protocol.
-  libp2p-inbound-stream-limit-protocol-peer: 500
+  libp2p-resource-manager:
+    # Maximum allowed fraction of file descriptors to be allocated by the libp2p resources in [0,1]
+    # setting to zero means no allocation of memory by libp2p; and libp2p will run with very low limits
+    memory-limit-ratio: 0.5 # flow default
+    # Maximum allowed fraction of memory to be allocated by the libp2p resources in [0,1]
+    # setting to zero means no allocation of memory by libp2p; and libp2p will run with very low limits
+    file-descriptors-ratio: 0.2 # libp2p default
+    # limits override: any non-zero values for libp2p-resource-limit-override will override the default values of the libp2p resource limits.
+    limits-override:
+      system:
+        # maximum number of inbound system-wide streams, across all peers and protocols
+        # Note that streams are ephemeral and are created and destroyed intermittently.
+        streams-inbound: 15_000 # override
+        # maximum number of outbound system-wide streams, across all peers and protocols
+        # Note that streams are ephemeral and are created and destroyed intermittently.
+        streams-outbound: 15_000 # override
+        connections-inbound: 0 # no-override, use default
+        connections-outbound: 0 # no-override, use default
+        fd: 0 # no-override, use default
+        memory-bytes: 0 # no-override, use default
+      transient:
+        # maximum number of inbound transient streams, across all streams that are not yet fully opened and associated with a protocol.
+        # Note that streams are ephemeral and are created and destroyed intermittently.
+        streams-inbound: 15_000 # override
+        # maximum number of outbound transient streams, across all streams that are not yet fully opened and associated with a protocol.
+        # Note that streams are ephemeral and are created and destroyed intermittently.
+        streams-outbound: 15_000 # override
+        connections-inbound: 0 # no-override, use default
+        connections-outbound: 0 # no-override, use default
+        fd: 0 # no-override, use default
+        memory-bytes: 0 # no-override, use default
+      protocol:
+        # maximum number of inbound streams for each protocol across all peers; this is a per-protocol limit. We expect at least
+        # three protocols per node; gossipsub, unicast, and dht. Note that streams are ephemeral and are created and destroyed intermittently.
+        streams-inbound: 5000 # override
+        # maximum number of outbound streams for each protocol across all peers; this is a per-protocol limit. We expect at least
+        # three protocols per node; gossipsub, unicast, and dht. Note that streams are ephemeral and are created and destroyed intermittently.
+        streams-outbound: 5000 # override
+        connections-inbound: 0 # no-override, use default
+        connections-outbound: 0 # no-override, use default
+        fd: 0 # no-override, use default
+        memory-bytes: 0 # no-override, use default
+      peer:
+        # maximum number of inbound streams from each peer across all protocols.
+        streams-inbound: 1000 # override
+        # maximum number of outbound streams from each peer across all protocols.
+        streams-outbound: 1000 # override
+        connections-inbound: 0 # no-override, use default
+        connections-outbound: 0 # no-override, use default
+        fd: 0 # no-override, use default
+        memory-bytes: 0 # no-override, use default
+      peer-protocol:
+        # maximum number of inbound streams from each peer for each protocol.
+        streams-inbound: 500 # override
+        # maximum number of outbound streams from each peer for each protocol.
+        streams-outbound: 500 # override
+        connections-inbound: 0 # no-override, use default
+        connections-outbound: 0 # no-override, use default
+        fd: 0 # no-override, use default
+        memory-bytes: 0 # no-override, use default
   # Connection manager config
   # HighWatermark and LowWatermark govern the number of connections are maintained by the ConnManager.
   # When the peer count exceeds the HighWatermark, as many peers will be pruned (and
@@ -108,6 +134,15 @@ network-config:
   gossipsub-rpc-sent-tracker-workers: 5
   # Peer scoring is the default value for enabling peer scoring
   gossipsub-peer-scoring-enabled: true
+  # The interval for updating the list of subscribed peers to all topics in gossipsub. This is used to keep track of subscriptions
+  # violations and penalize peers accordingly. Recommended value is in the order of a few minutes to avoid contentions; as the operation
+  # reads all topics and all peers subscribed to each topic.
+  gossipsub-subscription-provider-update-interval: 10m
+  # The size of cache for keeping the list of all peers subscribed to each topic (same as the local node). This cache is the local node's
+  # view of the network and is used to detect subscription violations and penalize peers accordingly. Recommended to be big enough to
+  # keep the entire network's size. Otherwise, the local node's view of the network will be incomplete due to cache eviction.
+  # Recommended size is 10x the number of peers in the network.
+  gossipsub-subscription-provider-cache-size: 10000
 
   # Gossipsub rpc inspectors configs
   # The size of the queue for notifications about invalid RPC messages
@@ -156,6 +191,12 @@ network-config:
   gossipsub-rpc-metrics-inspector-workers: 1
   # The size of the queue used by worker pool for the control message metrics inspector
   gossipsub-rpc-metrics-inspector-cache-size: 100
+  # Threshold level for penalty. At each evaluation period, when a node's penalty is below this value, the decay rate slows down, ensuring longer decay periods for malicious nodes and quicker decay for honest ones.
+  gossipsub-app-specific-penalty-decay-slowdown-threshold: -99
+  # This setting adjusts the decay rate when a node's penalty falls below the threshold. The decay rate, ranging between 0 and 1, dictates how quickly penalties decrease: a higher rate results in slower decay. The decay calculation is multiplicative (newPenalty = decayRate * oldPenalty). The reduction factor increases the decay rate, thus decelerating the penalty reduction. For instance, with a 0.01 reduction factor, the decay rate increases by 0.01 at each evaluation interval when the penalty is below the threshold. Consequently, a decay rate of `x` diminishes the penalty to zero more rapidly than a rate of `x+0.01`.
+  gossipsub-app-specific-penalty-decay-rate-reduction-factor: .01
+  # Defines the frequency for evaluating and potentially adjusting the decay process of a spam record. At each interval, the system assesses the current penalty of a node. If this penalty is below the defined threshold, the decay rate is modified according to the reduction factor, slowing down the penalty reduction process. This reassessment at regular intervals ensures that the decay rate is dynamically adjusted to reflect the node's ongoing behavior, maintaining a balance between penalizing malicious activity and allowing recovery for honest nodes.
+  gossipsub-app-specific-penalty-decay-evaluation-period: 10m
   # Application layer spam prevention
   alsp-spam-record-cache-size: 1000
   alsp-spam-report-queue-size: 10_000

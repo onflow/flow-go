@@ -40,6 +40,11 @@ func (snapshot *ExecutionSnapshot) UpdatedRegisters() flow.RegisterEntries {
 	return entries
 }
 
+// UpdatedRegisterSet returns all registers that were updated by this view.
+func (snapshot *ExecutionSnapshot) UpdatedRegisterSet() map[flow.RegisterID]flow.RegisterValue {
+	return snapshot.WriteSet
+}
+
 // UpdatedRegisterIDs returns all register ids that were updated by this
 // view.  The returned ids are unsorted.
 func (snapshot *ExecutionSnapshot) UpdatedRegisterIDs() []flow.RegisterID {
