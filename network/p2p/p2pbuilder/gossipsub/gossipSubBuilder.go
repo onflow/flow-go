@@ -294,7 +294,8 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, e
 
 	var scoreOpt *scoring.ScoreOption
 	var scoreTracer p2p.PeerScoreTracer
-	if g.gossipSubCfg.PeerScoringEnabled {
+	// currently, peer scoring is not supported for public networks.
+	if g.gossipSubCfg.PeerScoringEnabled && g.networkType != network.PublicNetwork {
 		// wires the gossipsub score option to the subscription provider.
 		subscriptionProvider, err := scoring.NewSubscriptionProvider(&scoring.SubscriptionProviderConfig{
 			Logger: g.logger,
