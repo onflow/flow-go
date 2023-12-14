@@ -9,17 +9,6 @@ import (
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 )
 
-// InvCtrlMsgErrSeverity the severity of the invalid control message error. The gossip score penalty for an invalid control message error
-// is amplified by the severity of the error.
-type InvCtrlMsgErrSeverity float64
-
-const (
-	LowErrSeverity      InvCtrlMsgErrSeverity = .10
-	ModerateErrSeverity InvCtrlMsgErrSeverity = .15
-	HighErrSeverity     InvCtrlMsgErrSeverity = .20
-	CriticalErrSeverity InvCtrlMsgErrSeverity = .25
-)
-
 // InvCtrlMsgErrs list of InvCtrlMsgErr's
 type InvCtrlMsgErrs []*InvCtrlMsgErr
 
@@ -35,15 +24,10 @@ func (i InvCtrlMsgErrs) Len() int {
 	return len(i)
 }
 
-// InvCtrlMsgErr struct that wraps an error that occurred with during control message inspection and holds some metadata about the err such as the errors InvCtrlMsgErrSeverity.
+// InvCtrlMsgErr struct that wraps an error that occurred with during control message inspection and holds some metadata about the error such as the CtrlMsgTopicType.
 type InvCtrlMsgErr struct {
 	Err              error
-	severity         InvCtrlMsgErrSeverity
 	ctrlMsgTopicType CtrlMsgTopicType
-}
-
-func (i InvCtrlMsgErr) Severity() InvCtrlMsgErrSeverity {
-	return i.severity
 }
 
 func (i InvCtrlMsgErr) CtrlMsgTopicType() CtrlMsgTopicType {
@@ -53,14 +37,12 @@ func (i InvCtrlMsgErr) CtrlMsgTopicType() CtrlMsgTopicType {
 // NewInvCtrlMsgErr returns a new InvCtrlMsgErr.
 // Args:
 // - err: the error.
-// - severity: the error severity.
 // - ctrlMsgTopicType: the control message topic type.
 // Returns:
 // - *InvCtrlMsgErr: the invalid control message error.
-func NewInvCtrlMsgErr(err error, severity InvCtrlMsgErrSeverity, ctrlMsgTopicType CtrlMsgTopicType) *InvCtrlMsgErr {
+func NewInvCtrlMsgErr(err error, ctrlMsgTopicType CtrlMsgTopicType) *InvCtrlMsgErr {
 	return &InvCtrlMsgErr{
 		Err:              err,
-		severity:         severity,
 		ctrlMsgTopicType: ctrlMsgTopicType,
 	}
 }

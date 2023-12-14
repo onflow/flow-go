@@ -300,7 +300,7 @@ func (c *ControlMsgValidationInspector) inspectGraftMessages(from peer.ID, graft
 	for _, graft := range grafts {
 		topic := channels.Topic(graft.GetTopicID())
 		if tracker.isDuplicate(topic.String()) {
-			errs = append(errs, p2p.NewInvCtrlMsgErr(NewDuplicateTopicErr(topic.String(), p2pmsg.CtrlMsgGraft), p2p.ModerateErrSeverity, p2p.CtrlMsgNonClusterTopicType))
+			errs = append(errs, p2p.NewInvCtrlMsgErr(NewDuplicateTopicErr(topic.String(), p2pmsg.CtrlMsgGraft), p2p.CtrlMsgNonClusterTopicType))
 			continue
 		}
 		tracker.set(topic.String())
@@ -311,7 +311,7 @@ func (c *ControlMsgValidationInspector) inspectGraftMessages(from peer.ID, graft
 				lg.Debug().Msg("received control message from unstaked peer")
 				return nil
 			}
-			errs = append(errs, p2p.NewInvCtrlMsgErr(err, p2p.HighErrSeverity, topicType))
+			errs = append(errs, p2p.NewInvCtrlMsgErr(err, topicType))
 		}
 	}
 
@@ -344,7 +344,7 @@ func (c *ControlMsgValidationInspector) inspectPruneMessages(from peer.ID, prune
 	for _, prune := range prunes {
 		topic := channels.Topic(prune.GetTopicID())
 		if tracker.isDuplicate(topic.String()) {
-			errs = append(errs, p2p.NewInvCtrlMsgErr(NewDuplicateTopicErr(topic.String(), p2pmsg.CtrlMsgGraft), p2p.ModerateErrSeverity, p2p.CtrlMsgNonClusterTopicType))
+			errs = append(errs, p2p.NewInvCtrlMsgErr(NewDuplicateTopicErr(topic.String(), p2pmsg.CtrlMsgGraft), p2p.CtrlMsgNonClusterTopicType))
 			continue
 		}
 		tracker.set(topic.String())
@@ -355,7 +355,7 @@ func (c *ControlMsgValidationInspector) inspectPruneMessages(from peer.ID, prune
 				lg.Debug().Msg("received control message from unstaked peer")
 				return nil
 			}
-			errs = append(errs, p2p.NewInvCtrlMsgErr(err, p2p.HighErrSeverity, topicType))
+			errs = append(errs, p2p.NewInvCtrlMsgErr(err, topicType))
 		}
 	}
 
@@ -395,7 +395,7 @@ func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihave
 		messageIds := ihave.GetMessageIDs()
 		topic := ihave.GetTopicID()
 		if duplicateTopicTracker.isDuplicate(topic) {
-			errs = append(errs, p2p.NewInvCtrlMsgErr(NewDuplicateTopicErr(topic, p2pmsg.CtrlMsgGraft), p2p.ModerateErrSeverity, p2p.CtrlMsgNonClusterTopicType))
+			errs = append(errs, p2p.NewInvCtrlMsgErr(NewDuplicateTopicErr(topic, p2pmsg.CtrlMsgGraft), p2p.CtrlMsgNonClusterTopicType))
 			continue
 		}
 		duplicateTopicTracker.set(topic)
@@ -406,12 +406,12 @@ func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihave
 				lg.Debug().Msg("received control message from unstaked peer")
 				return nil
 			}
-			errs = append(errs, p2p.NewInvCtrlMsgErr(err, p2p.HighErrSeverity, topicType))
+			errs = append(errs, p2p.NewInvCtrlMsgErr(err, topicType))
 
 		}
 		for _, messageID := range messageIds {
 			if duplicateMessageIDTracker.isDuplicate(messageID) {
-				errs = append(errs, p2p.NewInvCtrlMsgErr(NewDuplicateMessageIDErr(messageID, p2pmsg.CtrlMsgIHave), p2p.HighErrSeverity, p2p.CtrlMsgNonClusterTopicType))
+				errs = append(errs, p2p.NewInvCtrlMsgErr(NewDuplicateMessageIDErr(messageID, p2pmsg.CtrlMsgIHave), p2p.CtrlMsgNonClusterTopicType))
 				continue
 			}
 			duplicateMessageIDTracker.set(messageID)
@@ -483,7 +483,6 @@ func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWant
 						NewIWantDuplicateMsgIDThresholdErr(
 							duplicates, messageIDCount,
 							c.config.IWantRPCInspectionConfig.DuplicateMsgIDThreshold),
-						p2p.HighErrSeverity,
 						p2p.CtrlMsgNonClusterTopicType,
 					))
 					continue
@@ -499,7 +498,6 @@ func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWant
 								cacheMisses,
 								messageIDCount,
 								c.config.IWantRPCInspectionConfig.CacheMissThreshold),
-							p2p.HighErrSeverity,
 							p2p.CtrlMsgNonClusterTopicType,
 						))
 						lg.Debug().
@@ -579,7 +577,6 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 				NewInvalidRpcPublishMessagesErr(
 					errs.ErrorOrNil(),
 					errs.Len()),
-				p2p.ModerateErrSeverity,
 				p2p.CtrlMsgNonClusterTopicType,
 			))
 		}

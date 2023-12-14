@@ -292,7 +292,7 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 	// apply the base penalty to the application specific penalty.
 	appliedPenalty := float64(0)
 	for _, err := range notification.Errors {
-		errPenalty := float64(err.Severity()) * basePenalty
+		errPenalty := basePenalty
 		// reduce penalty for cluster prefixed topics allowing nodes that are potentially behind to catch up
 		if err.CtrlMsgTopicType() == p2p.CtrlMsgTopicTypeClusterPrefixed {
 			errPenalty *= r.penalty.ClusterPrefixedPenaltyReductionFactor

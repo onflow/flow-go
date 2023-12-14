@@ -161,7 +161,7 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 		})
 }
 
-// randomInvCtlMsgErrs returns n amount of invalid control message errors with a random err severity. Each error returned is set to p2p.CtrlMsgNonClusterTopicType by default.
+// randomInvCtlMsgErrs returns n amount of invalid control message errors. Each error returned is set to p2p.CtrlMsgNonClusterTopicType by default.
 // Args:
 // - int: the number of errors to create.
 // Returns:
@@ -169,7 +169,7 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 func randomInvCtlMsgErrs(n int) p2p.InvCtrlMsgErrs {
 	errs := make(p2p.InvCtrlMsgErrs, n)
 	for i := 0; i < n; i++ {
-		errs[i] = p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid control message"), randomErrSeverity(), p2p.CtrlMsgNonClusterTopicType)
+		errs[i] = p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid control message"), p2p.CtrlMsgNonClusterTopicType)
 	}
 	return errs
 }
