@@ -61,7 +61,6 @@ func NewDatabase(led atree.Ledger, flowEVMRootAddress flow.Address) (*Database, 
 		baseStorage:        baseStorage,
 		flowEVMRootAddress: flowEVMRootAddress,
 		storage:            storage,
-		baseStorage:        baseStorage,
 	}
 
 	err = db.retrieveOrCreateMapRoot()
@@ -319,6 +318,7 @@ func (db *Database) BytesRetrieved() int {
 func (db *Database) BytesStored() int {
 	return db.baseStorage.BytesStored()
 }
+
 func (db *Database) ResetReporter() {
 	db.baseStorage.ResetReporter()
 }
