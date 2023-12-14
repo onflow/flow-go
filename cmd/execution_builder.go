@@ -958,7 +958,12 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 	}
 
 	fetcher := fetcher.NewCollectionFetcher(node.Logger, exeNode.collectionRequester, node.State, exeNode.exeConf.onflowOnlyLNs)
-	loader := loader.NewUnexecutedLoader(node.Logger, node.State, node.Storage.Headers, exeNode.executionState)
+	var blockLoader ingestion.BlockLoader
+	if exeNode.exeConf.enableStorehouse {
+		blockLoader = loader.NewUnfinalizedLoader(node.Logger, node.State, node.Storage.Headers, exeNode.executionState)
+	} else {
+		blockLoader = loader.NewUnexecutedLoader(node.Logger, node.State, node.Storage.Headers, exeNode.executionState)
+	}
 
 	exeNode.ingestionEng, err = ingestion.New(
 		exeNode.ingestionUnit,
@@ -978,7 +983,7 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		exeNode.executionDataPruner,
 		exeNode.blockDataUploader,
 		exeNode.stopControl,
-		loader,
+		blockLoader,
 	)
 
 	// TODO: we should solve these mutual dependencies better

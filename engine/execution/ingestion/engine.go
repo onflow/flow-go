@@ -202,7 +202,7 @@ func (e *Engine) reloadUnexecutedBlocks() error {
 			e.log.Debug().Hex("block_id", blockID[:]).Msg("reloaded block")
 		}
 
-		log.Info().Msg("all unexecuted have been successfully reloaded")
+		e.log.Info().Int("count", len(unexecuted)).Msg("all unexecuted have been successfully reloaded")
 
 		return nil
 	})
