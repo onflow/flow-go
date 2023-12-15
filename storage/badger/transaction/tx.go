@@ -25,6 +25,7 @@ import (
 //     therefore discards. f3 could then succeed, i.e. return nil.
 //     Consequently, the entire list of callbacks is executed, including f1's callback if it
 //     added one. Callback implementations therefore need to account for this edge case.
+//   - not concurrency safe
 type Tx struct {
 	DBTxn     *dbbadger.Txn
 	callbacks []func()

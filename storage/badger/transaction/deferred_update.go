@@ -27,13 +27,27 @@ type DeferredBadgerUpdate = func(tx *badger.Txn) error
 //     Tx is a storage-layer abstraction, with support for callbacks that are executed
 //     after the underlying database transaction completed _successfully_.
 //
-// Operations and callbacks are executed in the order they are added.
+// ORDER OF EXECUTION
+// We extend the process in which `transaction.Tx` executes database operations, schedules
+// callbacks, and executed the callbacks. Specifically, DeferredDbOps proceeds as follows:
+//
+//  0. Record functors added via `AddBadgerOp`, `AddDbOp`, `OnSucceed` ...
+//     • some functor's may schedule callbacks (depending on their type), which are executed
+//     after the underlying database transaction completed _successfully_.
+//     • `OnSucceed` is treated exactly the same way:
+//     it schedules a callback during its execution, but it has no database actions.
+//  1. Execute the functors in the order they were added
+//  2. During each functor's execution:
+//     • some functor's may schedule callbacks (depending on their type)
+//     • record those callbacks in the order they are scheduled (no execution yet)
+//  3. If and only if the underlying database transaction succeeds, run the callbacks
 //
 // DESIGN PATTERN
 //   - DeferredDbOps is stateful, i.e. it needs to be passed as pointer variable.
 //   - Do not instantiate Tx outside of this package. Instead, use
 //     Update(db, DeferredDbOps.Pending) or View(db, DeferredDbOps.Pending)
-//   - Via methods like `AddDbOp`,
+//
+// NOT CONCURRENCY SAFE
 type DeferredDbOps struct {
 	Pending func(tx *Tx) error
 }
