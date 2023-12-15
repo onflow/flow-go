@@ -35,7 +35,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
-	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	unicastcache "github.com/onflow/flow-go/network/p2p/unicast/cache"
@@ -91,7 +90,7 @@ func NewNodeBuilder(
 		sporkId:              sporkId,
 		address:              address,
 		networkKey:           networkKey,
-		createNode:           func(cfg *p2p.NodeConfig) (p2p.LibP2PNode, error) { return p2pnode.NewNode(cfg) },
+		createNode:           func(cfg *p2p.NodeConfig) (p2p.LibP2PNode, error) { return node.NewNode(cfg) },
 		metricsConfig:        metricsConfig,
 		resourceManagerCfg:   rCfg,
 		disallowListCacheCfg: disallowListCacheCfg,

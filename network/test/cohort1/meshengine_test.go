@@ -30,7 +30,6 @@ import (
 	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/p2pnet"
-	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -181,13 +180,13 @@ func (suite *MeshEngineTestSuite) TestMaxMessageSize_Unicast() {
 // TestMaxMessageSize_Multicast evaluates the messageSizeScenario scenario using
 // the Multicast method of conduits.
 func (suite *MeshEngineTestSuite) TestMaxMessageSize_Multicast() {
-	suite.messageSizeScenario(suite.Multicast, p2pnode.DefaultMaxPubSubMsgSize)
+	suite.messageSizeScenario(suite.Multicast, node.DefaultMaxPubSubMsgSize)
 }
 
 // TestMaxMessageSize_Publish evaluates the messageSizeScenario scenario using the
 // Publish method of conduits.
 func (suite *MeshEngineTestSuite) TestMaxMessageSize_Publish() {
-	suite.messageSizeScenario(suite.Publish, p2pnode.DefaultMaxPubSubMsgSize)
+	suite.messageSizeScenario(suite.Publish, node.DefaultMaxPubSubMsgSize)
 }
 
 // TestUnregister_Publish tests that an engine cannot send any message using Publish

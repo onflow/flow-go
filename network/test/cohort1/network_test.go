@@ -36,7 +36,6 @@ import (
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/p2pnet"
-	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/network/p2p/utils/ratelimiter"
@@ -827,7 +826,7 @@ func (suite *NetworkTestSuite) TestMaxMessageSize_Publish() {
 	// so the generated payload is 1000 bytes below the maximum publish message size.
 	// We hence add up 1000 bytes to the input of network payload fixture to make
 	// sure that payload is beyond the permissible size.
-	payload := testutils.NetworkPayloadFixture(suite.T(), uint(p2pnode.DefaultMaxPubSubMsgSize)+1000)
+	payload := testutils.NetworkPayloadFixture(suite.T(), uint(node.DefaultMaxPubSubMsgSize)+1000)
 	event := &libp2pmessage.TestMessage{
 		Text: string(payload),
 	}
