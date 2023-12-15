@@ -104,7 +104,7 @@ func reportABIEncodingComputation(
 	inter *interpreter.Interpreter,
 	values *interpreter.ArrayValue,
 	evmAddressTypeID common.TypeID,
-	reportComputation func(compKind common.ComputationKind, intensity uint),
+	reportComputation func(intensity uint),
 ) {
 	values.Iterate(inter, func(element interpreter.Value) (resume bool) {
 		switch value := element.(type) {
@@ -119,7 +119,8 @@ func reportABIEncodingComputation(
 			stringLength := len(value.Str)
 			chunks := math.Ceil(float64(stringLength) / float64(abiEncodingByteSize))
 			computation += uint(chunks * abiEncodingByteSize)
-			reportComputation(environment.ComputationKindEVMEncodeABI, computation)
+			reportComputation(computation)
+
 		case interpreter.BoolValue,
 			interpreter.UInt8Value,
 			interpreter.UInt16Value,
@@ -133,14 +134,16 @@ func reportABIEncodingComputation(
 			interpreter.Int64Value,
 			interpreter.Int128Value,
 			interpreter.Int256Value:
+
 			// Numeric and bool variables are also static variables
 			// with a fixed size of 32 bytes.
-			reportComputation(environment.ComputationKindEVMEncodeABI, abiEncodingByteSize)
+			reportComputation(abiEncodingByteSize)
+
 		case *interpreter.CompositeValue:
 			if value.TypeID() == evmAddressTypeID {
 				// EVM addresses are static variables with a fixed
 				// size of 32 bytes.
-				reportComputation(environment.ComputationKindEVMEncodeABI, abiEncodingByteSize)
+				reportComputation(abiEncodingByteSize)
 			} else {
 				panic(abiEncodingError{
 					Type: value.StaticType(inter),
@@ -154,8 +157,9 @@ func reportABIEncodingComputation(
 			// array occupies, and the third chunk contains the
 			// values of the array itself.
 			computation := uint(2 * abiEncodingByteSize)
-			reportComputation(environment.ComputationKindEVMEncodeABI, computation)
+			reportComputation(computation)
 			reportABIEncodingComputation(inter, value, evmAddressTypeID, reportComputation)
+
 		default:
 			panic(abiEncodingError{
 				Type: element.StaticType(inter),
@@ -209,7 +213,9 @@ func newInternalEVMTypeEncodeABIFunction(
 				inter,
 				valuesArray,
 				evmAddressTypeID,
-				invocation.Interpreter.ReportComputation,
+				func(intensity uint) {
+					inter.ReportComputation(environment.ComputationKindEVMEncodeABI, intensity)
+				},
 			)
 
 			size := valuesArray.Count()
