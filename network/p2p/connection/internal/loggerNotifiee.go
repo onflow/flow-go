@@ -46,9 +46,9 @@ func (l *LoggerNotifiee) Disconnected(n network.Network, conn network.Conn) {
 
 func (l *LoggerNotifiee) connectionUpdateLogger(n network.Network, con network.Conn) zerolog.Logger {
 	return l.logger.With().
-		Str("remote_peer", logging.PeerId(con.RemotePeer())).
+		Str("remote_peer", p2plogging.PeerId(con.RemotePeer())).
 		Str("remote_address", con.RemoteMultiaddr().String()).
-		Str("local_peer", logging.PeerId(con.LocalPeer())).
+		Str("local_peer", p2plogging.PeerId(con.LocalPeer())).
 		Str("local_address", con.LocalMultiaddr().String()).
 		Str("direction", con.Stat().Direction.String()).
 		Int("total_connections", len(n.Conns())).Logger()
