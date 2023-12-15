@@ -292,7 +292,7 @@ func (c *ControlMsgValidationInspector) checkPubsubMessageSender(message *pubsub
 // - p2p.InvCtrlMsgErrs: list of errors that occured during inspection
 func (c *ControlMsgValidationInspector) inspectGraftMessages(from peer.ID, grafts []*pubsub_pb.ControlGraft, activeClusterIDS flow.ChainIDList) p2p.InvCtrlMsgErrs {
 	lg := c.logger.With().
-		Str("peer_id", p2plogging.PeerId(from)).
+		Str("remote_peer_id", p2plogging.PeerId(from)).
 		Int("sample_size", len(grafts)).
 		Logger()
 	tracker := make(duplicateStrTracker)
