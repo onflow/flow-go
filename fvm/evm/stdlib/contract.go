@@ -3,6 +3,7 @@ package stdlib
 import (
 	_ "embed"
 	"fmt"
+	"math"
 	"math/big"
 	"reflect"
 	"regexp"
@@ -116,11 +117,7 @@ func reportABIEncodingComputation(
 			// value of the string itself.
 			computation := uint(2 * abiEncodingByteSize)
 			stringLength := len(value.Str)
-			chunks := stringLength / abiEncodingByteSize
-			remainder := stringLength % abiEncodingByteSize
-			if remainder > 0 {
-				chunks += 1
-			}
+			chunks := math.Ceil(float64(stringLength) / float64(abiEncodingByteSize))
 			computation += uint(chunks * abiEncodingByteSize)
 			reportComputation(environment.ComputationKindEVMEncodeABI, computation)
 		case interpreter.BoolValue,
