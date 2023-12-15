@@ -28,7 +28,7 @@ func RetrieveEpochCommit(eventID flow.Identifier, event *flow.EpochCommit) func(
 // SetEpochEmergencyFallbackTriggered sets a flag in the DB indicating that
 // epoch emergency fallback has been triggered, and the block where it was triggered.
 //
-// EECC can be triggered in two ways:
+// EFM can be triggered in two ways:
 //  1. Finalizing the first block past the epoch commitment deadline, when the
 //     next epoch has not yet been committed (see protocol.Params for more detail)
 //  2. Finalizing a fork in which an invalid service event was incorporated.
@@ -52,7 +52,7 @@ func CheckEpochEmergencyFallbackTriggered(triggered *bool) func(*badger.Txn) err
 		var blockID flow.Identifier
 		err := RetrieveEpochEmergencyFallbackTriggeredBlockID(&blockID)(tx)
 		if errors.Is(err, storage.ErrNotFound) {
-			// flag unset, EECC not triggered
+			// flag unset, EFM not triggered
 			*triggered = false
 			return nil
 		} else if err != nil {
@@ -60,7 +60,7 @@ func CheckEpochEmergencyFallbackTriggered(triggered *bool) func(*badger.Txn) err
 			*triggered = false
 			return err
 		}
-		// flag is set, EECC triggered
+		// flag is set, EFM triggered
 		*triggered = true
 		return err
 	}

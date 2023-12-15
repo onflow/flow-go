@@ -849,7 +849,7 @@ func updateEpochMetrics(metrics module.ComplianceMetrics, snap protocol.Snapshot
 	metrics.CurrentDKGPhase2FinalView(dkgPhase2FinalView)
 	metrics.CurrentDKGPhase3FinalView(dkgPhase3FinalView)
 
-	// EECC - check whether the epoch emergency fallback flag has been set
+	// EFM - check whether the epoch emergency fallback flag has been set
 	// in the database. If so, skip updating any epoch-related metrics.
 	if epochFallbackTriggered {
 		metrics.EpochEmergencyFallbackTriggered()

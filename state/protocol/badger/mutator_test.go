@@ -1388,8 +1388,8 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 		return block1, createSetupEvent
 	}
 
-	// expect a setup event with wrong counter to trigger EECC without error
-	t.Run("wrong counter (EECC)", func(t *testing.T) {
+	// expect a setup event with wrong counter to trigger EFM without error
+	t.Run("wrong counter (EFM)", func(t *testing.T) {
 		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
 			block1, createSetup := setupState(t, db, state)
 
@@ -1409,8 +1409,8 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 		})
 	})
 
-	// expect a setup event with wrong final view to trigger EECC without error
-	t.Run("invalid final view (EECC)", func(t *testing.T) {
+	// expect a setup event with wrong final view to trigger EFM without error
+	t.Run("invalid final view (EFM)", func(t *testing.T) {
 		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
 			block1, createSetup := setupState(t, db, state)
 
@@ -1430,8 +1430,8 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 		})
 	})
 
-	// expect a setup event with empty seed to trigger EECC without error
-	t.Run("empty seed (EECC)", func(t *testing.T) {
+	// expect a setup event with empty seed to trigger EFM without error
+	t.Run("empty seed (EFM)", func(t *testing.T) {
 		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
 			block1, createSetup := setupState(t, db, state)
 
@@ -1451,7 +1451,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 		})
 	})
 
-	t.Run("participants not ordered (EECC)", func(t *testing.T) {
+	t.Run("participants not ordered (EFM)", func(t *testing.T) {
 		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
 			block1, createSetup := setupState(t, db, state)
 
@@ -1541,7 +1541,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 		return block1, createSetup, createCommit
 	}
 
-	t.Run("without setup (EECC)", func(t *testing.T) {
+	t.Run("without setup (EFM)", func(t *testing.T) {
 		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
 			block1, _, createCommit := setupState(t, state)
 
@@ -1559,8 +1559,8 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 		})
 	})
 
-	// expect a commit event with wrong counter to trigger EECC without error
-	t.Run("inconsistent counter (EECC)", func(t *testing.T) {
+	// expect a commit event with wrong counter to trigger EFM without error
+	t.Run("inconsistent counter (EFM)", func(t *testing.T) {
 		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
 			block1, createSetup, createCommit := setupState(t, state)
 
@@ -1592,8 +1592,8 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 		})
 	})
 
-	// expect a commit event with wrong cluster QCs to trigger EECC without error
-	t.Run("inconsistent cluster QCs (EECC)", func(t *testing.T) {
+	// expect a commit event with wrong cluster QCs to trigger EFM without error
+	t.Run("inconsistent cluster QCs (EFM)", func(t *testing.T) {
 		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
 			block1, createSetup, createCommit := setupState(t, state)
 
@@ -1625,8 +1625,8 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 		})
 	})
 
-	// expect a commit event with wrong dkg participants to trigger EECC without error
-	t.Run("inconsistent DKG participants (EECC)", func(t *testing.T) {
+	// expect a commit event with wrong dkg participants to trigger EFM without error
+	t.Run("inconsistent DKG participants (EFM)", func(t *testing.T) {
 		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
 			block1, createSetup, createCommit := setupState(t, state)
 
@@ -1667,7 +1667,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 func TestExtendEpochTransitionWithoutCommit(t *testing.T) {
 
 	// skipping because this case will now result in emergency epoch continuation kicking in
-	unittest.SkipUnless(t, unittest.TEST_TODO, "disabled as the current implementation uses a temporary fallback measure in this case (triggers EECC), rather than returning an error")
+	unittest.SkipUnless(t, unittest.TEST_TODO, "disabled as the current implementation uses a temporary fallback measure in this case (triggers EFM), rather than returning an error")
 
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
@@ -1734,14 +1734,14 @@ func TestExtendEpochTransitionWithoutCommit(t *testing.T) {
 func TestEmergencyEpochFallback(t *testing.T) {
 
 	// if we finalize the first block past the epoch commitment deadline while
-	// in the EpochStaking phase, EECC should be triggered
+	// in the EpochStaking phase, EFM should be triggered
 	//
 	//       Epoch Commitment Deadline
 	//       |     Epoch Boundary
 	//       |     |
 	//       v     v
 	// ROOT <- B1 <- B2
-	t.Run("passed epoch commitment deadline in EpochStaking phase - should trigger EECC", func(t *testing.T) {
+	t.Run("passed epoch commitment deadline in EpochStaking phase - should trigger EFM", func(t *testing.T) {
 
 		rootSnapshot := unittest.RootSnapshotFixture(participants)
 		metricsMock := mockmodule.NewComplianceMetrics(t)
@@ -1764,7 +1764,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 			epoch1FinalView := epoch1Setup.FinalView
 			epoch1CommitmentDeadline := epoch1FinalView - safetyThreshold
 
-			// finalizing block 1 should trigger EECC
+			// finalizing block 1 should trigger EFM
 			metricsMock.On("EpochEmergencyFallbackTriggered").Once()
 			protoEventsMock.On("EpochEmergencyFallbackTriggered").Once()
 
@@ -1788,21 +1788,21 @@ func TestEmergencyEpochFallback(t *testing.T) {
 			err = state.Finalize(context.Background(), block2.ID())
 			require.NoError(t, err)
 
-			// since EECC has been triggered, epoch transition metrics should not be updated
+			// since EFM has been triggered, epoch transition metrics should not be updated
 			metricsMock.AssertNotCalled(t, "EpochTransition", mock.Anything, mock.Anything)
 			metricsMock.AssertNotCalled(t, "CurrentEpochCounter", epoch1Setup.Counter+1)
 		})
 	})
 
 	// if we finalize the first block past the epoch commitment deadline while
-	// in the EpochSetup phase, EECC should be triggered
+	// in the EpochSetup phase, EFM should be triggered
 	//
 	//                       Epoch Commitment Deadline
 	//                       |         Epoch Boundary
 	//                       |         |
 	//                       v         v
 	// ROOT <- B1 <- B2(R1) <- B3(S1) <- B4
-	t.Run("passed epoch commitment deadline in EpochSetup phase - should trigger EECC", func(t *testing.T) {
+	t.Run("passed epoch commitment deadline in EpochSetup phase - should trigger EFM", func(t *testing.T) {
 
 		rootSnapshot := unittest.RootSnapshotFixture(participants)
 		rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
@@ -1870,7 +1870,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 			err = state.Extend(context.Background(), block3)
 			require.NoError(t, err)
 
-			// finalizing block 3 should trigger EECC
+			// finalizing block 3 should trigger EFM
 			metricsMock.On("EpochEmergencyFallbackTriggered").Once()
 			protoEventsMock.On("EpochEmergencyFallbackTriggered").Once()
 
@@ -1887,7 +1887,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 			err = state.Finalize(context.Background(), block4.ID())
 			require.NoError(t, err)
 
-			// since EECC has been triggered, epoch transition metrics should not be updated
+			// since EFM has been triggered, epoch transition metrics should not be updated
 			metricsMock.AssertNotCalled(t, "EpochTransition", epoch2Setup.Counter, mock.Anything)
 			metricsMock.AssertNotCalled(t, "CurrentEpochCounter", epoch2Setup.Counter)
 		})
@@ -1895,13 +1895,13 @@ func TestEmergencyEpochFallback(t *testing.T) {
 
 	// if an invalid epoch service event is incorporated, we should:
 	//   - not apply the phase transition corresponding to the invalid service event
-	//   - immediately trigger EECC
+	//   - immediately trigger EFM
 	//
 	//                            Epoch Boundary
 	//                                 |
 	//                                 v
 	// ROOT <- B1 <- B2(R1) <- B3(S1) <- B4
-	t.Run("epoch transition with invalid service event - should trigger EECC", func(t *testing.T) {
+	t.Run("epoch transition with invalid service event - should trigger EFM", func(t *testing.T) {
 
 		rootSnapshot := unittest.RootSnapshotFixture(participants)
 		rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
@@ -1966,7 +1966,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 			err = state.Extend(context.Background(), block3)
 			require.NoError(t, err)
 
-			// incorporating the service event should trigger EECC
+			// incorporating the service event should trigger EFM
 			metricsMock.On("EpochEmergencyFallbackTriggered").Once()
 			protoEventsMock.On("EpochEmergencyFallbackTriggered").Once()
 
@@ -1983,7 +1983,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 			err = state.Finalize(context.Background(), block4.ID())
 			require.NoError(t, err)
 
-			// since EECC has been triggered, epoch transition metrics should not be updated
+			// since EFM has been triggered, epoch transition metrics should not be updated
 			metricsMock.AssertNotCalled(t, "EpochTransition", epoch2Setup.Counter, mock.Anything)
 			metricsMock.AssertNotCalled(t, "CurrentEpochCounter", epoch2Setup.Counter)
 		})
