@@ -108,9 +108,8 @@ func TestGossipSubIHaveBrokenPromises_Below_Threshold(t *testing.T) {
 		if !ok {
 			return false
 		}
-		// We set 7 as the threshold to compensate for the scoring decay in between RPC's being processed by the inspector
-		// ideally it must be 10 (one per RPC), but we give it a buffer of 3 to account for decays and floating point errors.
-		if behavioralPenalty < 7 {
+		// ideally, we should have 10, but we give it a buffer of 2.5 to account for 25% discrepancy due to scoring decays, timer asynchrony, and floating point errors.
+		if behavioralPenalty < 7.5 {
 			t.Logf("pending on behavioral penalty %f", behavioralPenalty)
 			return false
 		}
