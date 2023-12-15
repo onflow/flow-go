@@ -18,15 +18,15 @@ func TestStateInteractionsInsertCheckRetrieve(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
 		id1 := flow.NewRegisterID(
-			string([]byte("\x89krg\u007fBN\x1d\xf5\xfb\xb8r\xbc4\xbd\x98ռ\xf1\xd0twU\xbf\x16N\xb4?,\xa0&;")),
+			flow.BytesToAddress([]byte("\x89krg\u007fBN\x1d\xf5\xfb\xb8r\xbc4\xbd\x98ռ\xf1\xd0twU\xbf\x16N\xb4?,\xa0&;")),
 			"")
-		id2 := flow.NewRegisterID(string([]byte{2}), "")
-		id3 := flow.NewRegisterID(string([]byte{3}), "")
+		id2 := flow.NewRegisterID(flow.BytesToAddress([]byte{2}), "")
+		id3 := flow.NewRegisterID(flow.BytesToAddress([]byte{3}), "")
 
 		executionSnapshot := &snapshot.ExecutionSnapshot{
 			ReadSet: map[flow.RegisterID]struct{}{
-				id2: struct{}{},
-				id3: struct{}{},
+				id2: {},
+				id3: {},
 			},
 			WriteSet: map[flow.RegisterID]flow.RegisterValue{
 				id1: []byte("zażółć gęślą jaźń"),
@@ -36,7 +36,7 @@ func TestStateInteractionsInsertCheckRetrieve(t *testing.T) {
 
 		interactions := []*snapshot.ExecutionSnapshot{
 			executionSnapshot,
-			&snapshot.ExecutionSnapshot{},
+			{},
 		}
 
 		blockID := unittest.IdentifierFixture()

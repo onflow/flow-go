@@ -117,92 +117,123 @@ network-config:
   # The time to wait before start pruning connections
   libp2p-grace-period: 1m
   # Gossipsub config
-  # The default interval at which the mesh tracer logs the mesh topology. This is used for debugging and forensics purposes.
-  #	Note that we purposefully choose this logging interval high enough to avoid spamming the logs. Moreover, the
-  #	mesh updates will be logged individually and separately. The logging interval is only used to log the mesh
-  #	topology as a whole specially when there are no updates to the mesh topology for a long time.
-  gossipsub-local-mesh-logging-interval: 1m
-  # The default interval at which the gossipsub score tracer logs the peer scores. This is used for debugging and forensics purposes.
-  #	Note that we purposefully choose this logging interval high enough to avoid spamming the logs.
-  gossipsub-score-tracer-interval: 1m
-  # The default RPC sent tracker cache size. The RPC sent tracker is used to track RPC control messages sent from the local node.
-  # Note: this cache size must be large enough to keep a history of sent messages in a reasonable time window of past history.
-  gossipsub-rpc-sent-tracker-cache-size: 1_000_000
-  # Cache size of the rpc sent tracker queue used for async tracking.
-  gossipsub-rpc-sent-tracker-queue-cache-size: 100_000
-  # Number of workers for rpc sent tracker worker pool.
-  gossipsub-rpc-sent-tracker-workers: 5
-  # Peer scoring is the default value for enabling peer scoring
-  gossipsub-peer-scoring-enabled: true
-  # The interval for updating the list of subscribed peers to all topics in gossipsub. This is used to keep track of subscriptions
-  # violations and penalize peers accordingly. Recommended value is in the order of a few minutes to avoid contentions; as the operation
-  # reads all topics and all peers subscribed to each topic.
-  gossipsub-subscription-provider-update-interval: 10m
-  # The size of cache for keeping the list of all peers subscribed to each topic (same as the local node). This cache is the local node's
-  # view of the network and is used to detect subscription violations and penalize peers accordingly. Recommended to be big enough to
-  # keep the entire network's size. Otherwise, the local node's view of the network will be incomplete due to cache eviction.
-  # Recommended size is 10x the number of peers in the network.
-  gossipsub-subscription-provider-cache-size: 10000
-
-  # Gossipsub rpc inspectors configs
-  # The size of the queue for notifications about invalid RPC messages
-  gossipsub-rpc-inspector-notification-cache-size: 10_000
-  # RPC control message validation inspector configs
-  # Rpc validation inspector number of pool workers
-  gossipsub-rpc-validation-inspector-workers: 5
-  # Max number of ihave messages in a sample to be inspected. If the number of ihave messages exceeds this configured value
-  # the control message ihaves will be truncated to the max sample size. This sample is randomly selected.
-  gossipsub-rpc-ihave-max-sample-size: 1000
-  # Max number of ihave message ids in a sample to be inspected per ihave. Each ihave message includes a list of message ids
-  # each. If the size of the message ids list for a single ihave message exceeds the configured max message id sample size the list of message ids will be truncated.
-  gossipsub-rpc-ihave-max-message-id-sample-size: 1000
-  # Max number of control messages in a sample to be inspected when inspecting GRAFT and PRUNE message types. If the total number of control messages (GRAFT or PRUNE)
-  # exceeds this max sample size then the respective message will be truncated before being processed.
-  gossipsub-rpc-graft-and-prune-message-max-sample-size: 1000
-  # Max number of iwant messages in a sample to be inspected. If the total number of iWant control messages
-  # exceeds this max sample size then the respective message will be truncated before being processed.
-  gossipsub-rpc-iwant-max-sample-size: 1000
-  # Max number of iwant message ids in a sample to be inspected per iwant. Each iwant message includes a list of message ids
-  # each, if the size of this list exceeds the configured max message id sample size the list of message ids will be truncated.
-  gossipsub-rpc-iwant-max-message-id-sample-size: 1000
-  # The allowed threshold of iWant messages received without a corresponding tracked iHave message that was sent. If the cache miss threshold is exceeded an
-  # invalid control message notification is disseminated and the sender will be penalized.
-  gossipsub-rpc-iwant-cache-miss-threshold: .5
-  # The iWants size at which message id cache misses will be checked.
-  gossipsub-rpc-iwant-cache-miss-check-size: 1000
-  # The max allowed duplicate message IDs in a single iWant control message. If the duplicate message threshold is exceeded an invalid control message
-  # notification is disseminated and the sender will be penalized.
-  gossipsub-rpc-iwant-duplicate-message-id-threshold: .15
-  # The size of the queue used by worker pool for the control message validation inspector
-  gossipsub-rpc-validation-inspector-queue-cache-size: 100
-  # Cluster prefixed control message validation configs
-  # The size of the cache used to track the amount of cluster prefixed topics received by peers
-  gossipsub-cluster-prefix-tracker-cache-size: 100
-  # The decay val used for the geometric decay of cache counters used to keep track of cluster prefixed topics received by peers
-  gossipsub-cluster-prefix-tracker-cache-decay: 0.99
-  # The upper bound on the amount of cluster prefixed control messages that will be processed
-  gossipsub-rpc-cluster-prefixed-hard-threshold: 100
-  # The max sample size used for RPC message validation. If the total number of RPC messages exceeds this value a sample will be taken but messages will not be truncated
-  gossipsub-rpc-message-max-sample-size: 1000
-  # The threshold at which an error will be returned if the number of invalid RPC messages exceeds this value
-  gossipsub-rpc-message-error-threshold: 500
-  # RPC metrics observer inspector configs
-  # The number of metrics inspector pool workers
-  gossipsub-rpc-metrics-inspector-workers: 1
-  # The size of the queue used by worker pool for the control message metrics inspector
-  gossipsub-rpc-metrics-inspector-cache-size: 100
-  # Threshold level for penalty. At each evaluation period, when a node's penalty is below this value, the decay rate slows down, ensuring longer decay periods for malicious nodes and quicker decay for honest ones.
-  gossipsub-app-specific-penalty-decay-slowdown-threshold: -99
-  # This setting adjusts the decay rate when a node's penalty falls below the threshold. The decay rate, ranging between 0 and 1, dictates how quickly penalties decrease: a higher rate results in slower decay. The decay calculation is multiplicative (newPenalty = decayRate * oldPenalty). The reduction factor increases the decay rate, thus decelerating the penalty reduction. For instance, with a 0.01 reduction factor, the decay rate increases by 0.01 at each evaluation interval when the penalty is below the threshold. Consequently, a decay rate of `x` diminishes the penalty to zero more rapidly than a rate of `x+0.01`.
-  gossipsub-app-specific-penalty-decay-rate-reduction-factor: .01
-  # Defines the frequency for evaluating and potentially adjusting the decay process of a spam record. At each interval, the system assesses the current penalty of a node. If this penalty is below the defined threshold, the decay rate is modified according to the reduction factor, slowing down the penalty reduction process. This reassessment at regular intervals ensures that the decay rate is dynamically adjusted to reflect the node's ongoing behavior, maintaining a balance between penalizing malicious activity and allowing recovery for honest nodes.
-  gossipsub-app-specific-penalty-decay-evaluation-period: 10m
+  gossipsub:
+    rpc-inspector:
+      # The size of the queue for notifications about invalid RPC messages
+      notification-cache-size: 10_000
+      validation: # RPC control message validation inspector configs
+        # Rpc validation inspector number of pool workers
+        workers: 5
+        # The size of the queue used by worker pool for the control message validation inspector
+        queue-size: 100
+        # The max sample size used for RPC message validation. If the total number of RPC messages exceeds this value a sample will be taken but messages will not be truncated
+        message-max-sample-size: 1000
+        # Max number of control messages in a sample to be inspected when inspecting GRAFT and PRUNE message types. If the total number of control messages (GRAFT or PRUNE)
+        # exceeds this max sample size then the respective message will be truncated before being processed.
+        graft-and-prune-message-max-sample-size: 1000
+        # The threshold at which an error will be returned if the number of invalid RPC messages exceeds this value
+        error-threshold: 500
+        ihave: # Max number of ihave messages in a sample to be inspected. If the number of ihave messages exceeds this configured value
+          # the control message ihaves will be truncated to the max sample size. This sample is randomly selected.
+          max-sample-size: 1000
+          # Max number of ihave message ids in a sample to be inspected per ihave. Each ihave message includes a list of message ids
+          # each. If the size of the message ids list for a single ihave message exceeds the configured max message id sample size the list of message ids will be truncated.
+          max-message-id-sample-size: 1000
+        iwant:
+          # Max number of iwant messages in a sample to be inspected. If the total number of iWant control messages
+          # exceeds this max sample size then the respective message will be truncated before being processed.
+          max-sample-size: 1000
+          # Max number of iwant message ids in a sample to be inspected per iwant. Each iwant message includes a list of message ids
+          # each, if the size of this list exceeds the configured max message id sample size the list of message ids will be truncated.
+          max-message-id-sample-size: 1000
+          # The allowed threshold of iWant messages received without a corresponding tracked iHave message that was sent. If the cache miss threshold is exceeded an
+          # invalid control message notification is disseminated and the sender will be penalized.
+          cache-miss-threshold: .5
+          # The iWants size at which message id cache misses will be checked.
+          cache-miss-check-size: 1000
+          # The max allowed duplicate message IDs in a single iWant control message. If the duplicate message threshold is exceeded an invalid control message
+          # notification is disseminated and the sender will be penalized.
+          duplicate-message-id-threshold: .15
+        cluster-prefixed-messages:
+          # Cluster prefixed control message validation configs
+          # The size of the cache used to track the amount of cluster prefixed topics received by peers
+          tracker-cache-size: 100
+          # The decay val used for the geometric decay of cache counters used to keep track of cluster prefixed topics received by peers
+          tracker-cache-decay: 0.99
+          # The upper bound on the amount of cluster prefixed control messages that will be processed
+          hard-threshold: 100
+      metrics:
+        # RPC metrics observer inspector configs
+        # The number of metrics inspector pool workers
+        workers: 1
+        # The size of the queue used by worker pool for the control message metrics inspector
+        cache-size: 100
+    rpc-tracer:
+      # The default interval at which the mesh tracer logs the mesh topology. This is used for debugging and forensics purposes.
+      #	Note that we purposefully choose this logging interval high enough to avoid spamming the logs. Moreover, the
+      #	mesh updates will be logged individually and separately. The logging interval is only used to log the mesh
+      #	topology as a whole specially when there are no updates to the mesh topology for a long time.
+      local-mesh-logging-interval: 1m
+      # The default interval at which the gossipsub score tracer logs the peer scores. This is used for debugging and forensics purposes.
+      #	Note that we purposefully choose this logging interval high enough to avoid spamming the logs.
+      score-tracer-interval: 1m
+      # The default RPC sent tracker cache size. The RPC sent tracker is used to track RPC control messages sent from the local node.
+      # Note: this cache size must be large enough to keep a history of sent messages in a reasonable time window of past history.
+      rpc-sent-tracker-cache-size: 1_000_000
+      # Cache size of the rpc sent tracker queue used for async tracking.
+      rpc-sent-tracker-queue-cache-size: 100_000
+      # Number of workers for rpc sent tracker worker pool.
+      rpc-sent-tracker-workers: 5
+      # Peer scoring is the default value for enabling peer scoring
+    peer-scoring-enabled: true
+    scoring-parameters:
+      app-specific-score:
+        # number of workers that asynchronously update the app specific score requests when they are expired.
+        score-update-worker-num: 5
+        # size of the queue used by the worker pool for the app specific score update requests. The queue is used to buffer the app specific score update requests
+        # before they are processed by the worker pool. The queue size must be larger than total number of peers in the network.
+        # The queue is deduplicated based on the peer ids ensuring that there is only one app specific score update request per peer in the queue.
+        score-update-request-queue-size: 10_000
+        # score ttl is the time to live for the app specific score. Once the score is expired; a new request will be sent to the app specific score provider to update the score.
+        # until the score is updated, the previous score will be used.
+        score-ttl: 1m
+      spam-record-cache:
+        # size of cache used to track spam records at gossipsub. Each peer id is mapped to a spam record that keeps track of the spam score for that peer.
+        # cache should be big enough to keep track of the entire network's size. Otherwise, the local node's view of the network will be incomplete due to cache eviction.
+        cache-size: 10_000
+        # Threshold level for spam record penalty.
+        # At each evaluation period, when a node's penalty is below this value, the decay rate slows down, ensuring longer decay periods for malicious nodes and quicker decay for honest ones.
+        penalty-decay-slowdown-threshold: -99
+        # This setting adjusts the decay rate when a node's penalty falls below the threshold.
+        # The decay rate, ranging between 0 and 1, dictates how quickly penalties decrease: a higher rate results in slower decay.
+        # The decay calculation is multiplicative (newPenalty = decayRate * oldPenalty).
+        # The reduction factor increases the decay rate, thus decelerating the penalty reduction. For instance, with a 0.01 reduction factor,
+        # the decay rate increases by 0.01 at each evaluation interval when the penalty is below the threshold.
+        # Consequently, a decay rate of `x` diminishes the penalty to zero more rapidly than a rate of `x+0.01`.
+        penalty-decay-rate-reduction-factor: 0.01
+        # Defines the frequency for evaluating and potentially adjusting the decay process of a spam record.
+        # At each interval, the system assesses the current penalty of a node.
+        # If this penalty is below the defined threshold, the decay rate is modified according to the reduction factor, slowing down the penalty reduction process.
+        # This reassessment at regular intervals ensures that the decay rate is dynamically adjusted to reflect the node's ongoing behavior,
+        # maintaining a balance between penalizing malicious activity and allowing recovery for honest nodes.
+        penalty-decay-evaluation-period: 10m
+      # the intervals at which counters associated with a peer behavior in gossipsub system are decayed.
+      decay-interval: 1m
+    subscription-provider:
+      # The interval for updating the list of subscribed peers to all topics in gossipsub. This is used to keep track of subscriptions
+      # violations and penalize peers accordingly. Recommended value is in the order of a few minutes to avoid contentions; as the operation
+      # reads all topics and all peers subscribed to each topic.
+      update-interval: 10m
+      # The size of cache for keeping the list of all peers subscribed to each topic (same as the local node). This cache is the local node's
+      # view of the network and is used to detect subscription violations and penalize peers accordingly. Recommended to be big enough to
+      # keep the entire network's size. Otherwise, the local node's view of the network will be incomplete due to cache eviction.
+      # Recommended size is 10x the number of peers in the network.
+      cache-size: 10000
   # Application layer spam prevention
   alsp-spam-record-cache-size: 1000
   alsp-spam-report-queue-size: 10_000
   alsp-disable-penalty: false
   alsp-heart-beat-interval: 1s
-
   # Base probability in [0,1] that's used in creating the final probability of creating a
   # misbehavior report for a BatchRequest message. This is why the word "base" is used in the name of this field,
   # since it's not the final probability and there are other factors that determine the final probability.
@@ -219,7 +250,6 @@ network-config:
   # batchRequestBaseProb * (1000+1) / synccore.DefaultConfig().MaxSize
   # = 0.01 * 1001 / 64 = 0.15640625 = 15.640625%
   alsp-sync-engine-batch-request-base-prob: 0.01
-
   # Base probability in [0,1] that's used in creating the final probability of creating a
   # misbehavior report for a RangeRequest message. This is why the word "base" is used in the name of this field,
   # since it's not the final probability and there are other factors that determine the final probability.
@@ -237,7 +267,6 @@ network-config:
   # rangeRequestBaseProb * (1000+1) / synccore.DefaultConfig().MaxSize
   # = 0.01 * 1001 / 64 = 0.15640625 = 15.640625%
   alsp-sync-engine-range-request-base-prob: 0.01
-
   # Probability in [0,1] of creating a misbehavior report for a SyncRequest message.
   # create misbehavior report for 1% of SyncRequest messages
   alsp-sync-engine-sync-request-prob: 0.01

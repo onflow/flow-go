@@ -240,7 +240,7 @@ ci: install-tools test
 # Runs integration tests
 .PHONY: ci-integration
 ci-integration:
-	$(MAKE) -C integration ci-integration-test
+	$(MAKE) -C integration integration-test
 
 # Runs benchmark tests
 # NOTE: we do not need `docker-build-flow` as this is run as a separate step

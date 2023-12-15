@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/p2pconf"
 	"github.com/onflow/flow-go/network/p2p/p2plogging"
@@ -44,6 +45,7 @@ type SubscriptionProviderConfig struct {
 	IdProvider              module.IdentityProvider                 `validate:"required"`
 	HeroCacheMetricsFactory metrics.HeroCacheMetricsFactory         `validate:"required"`
 	Params                  *p2pconf.SubscriptionProviderParameters `validate:"required"`
+	NetworkingType          network.NetworkingType                  `validate:"required"`
 }
 
 var _ p2p.SubscriptionProvider = (*SubscriptionProvider)(nil)
@@ -53,13 +55,13 @@ func NewSubscriptionProvider(cfg *SubscriptionProviderConfig) (*SubscriptionProv
 		return nil, fmt.Errorf("invalid subscription provider config: %w", err)
 	}
 
-	cacheMetrics := metrics.NewSubscriptionRecordCacheMetricsFactory(cfg.HeroCacheMetricsFactory)
+	cacheMetrics := metrics.NewSubscriptionRecordCacheMetricsFactory(cfg.HeroCacheMetricsFactory, cfg.NetworkingType)
 	cache := internal.NewSubscriptionRecordCache(cfg.Params.CacheSize, cfg.Logger, cacheMetrics)
 
 	p := &SubscriptionProvider{
 		logger:                  cfg.Logger.With().Str("module", "subscription_provider").Logger(),
 		topicProviderOracle:     cfg.TopicProviderOracle,
-		allTopicsUpdateInterval: cfg.Params.SubscriptionUpdateInterval,
+		allTopicsUpdateInterval: cfg.Params.UpdateInterval,
 		idProvider:              cfg.IdProvider,
 		cache:                   cache,
 	}
@@ -69,7 +71,7 @@ func NewSubscriptionProvider(cfg *SubscriptionProviderConfig) (*SubscriptionProv
 		func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			ready()
 			p.logger.Debug().
-				Float64("update_interval_seconds", cfg.Params.SubscriptionUpdateInterval.Seconds()).
+				Float64("update_interval_seconds", cfg.Params.UpdateInterval.Seconds()).
 				Msg("subscription provider started; starting update topics loop")
 			p.updateTopicsLoop(ctx)
 

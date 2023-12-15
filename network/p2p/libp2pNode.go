@@ -114,13 +114,20 @@ type UnicastManagement interface {
 type PubSub interface {
 	// Subscribe subscribes the node to the given topic and returns the subscription
 	Subscribe(topic channels.Topic, topicValidator TopicValidatorFunc) (Subscription, error)
-	// UnSubscribe cancels the subscriber and closes the topic.
+	// Unsubscribe cancels the subscriber and closes the topic.
 	Unsubscribe(topic channels.Topic) error
 	// Publish publishes the given payload on the topic.
 	Publish(ctx context.Context, messageScope flownet.OutgoingMessageScope) error
 	// SetPubSub sets the node's pubsub implementation.
 	// SetPubSub may be called at most once.
 	SetPubSub(ps PubSubAdapter)
+
+	// GetLocalMeshPeers returns the list of peers in the local mesh for the given topic.
+	// Args:
+	// - topic: the topic.
+	// Returns:
+	// - []peer.ID: the list of peers in the local mesh for the given topic.
+	GetLocalMeshPeers(topic channels.Topic) []peer.ID
 }
 
 // LibP2PNode represents a Flow libp2p node. It provides the network layer with the necessary interface to
