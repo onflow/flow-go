@@ -99,23 +99,22 @@ func (e abiDecodingError) Error() string {
 	return b.String()
 }
 
-func calculateComputation(
+func reportABIEncodingComputation(
 	inter *interpreter.Interpreter,
 	values *interpreter.ArrayValue,
 	evmAddressTypeID common.TypeID,
-) uint {
-	computation := uint(0)
-
+	reportComputation func(compKind common.ComputationKind, intensity uint),
+) {
 	values.Iterate(inter, func(element interpreter.Value) (resume bool) {
 		switch value := element.(type) {
 		case *interpreter.StringValue:
 			// Dynamic variables, such as strings, are encoded
-			// in 3 chunks of 32 bytes. The first chunk contains
+			// in 2+ chunks of 32 bytes. The first chunk contains
 			// the index where information for the string begin,
 			// the second chunk contains the number of bytes the
 			// string occupies, and the third chunk contains the
 			// value of the string itself.
-			computation += 2 * abiEncodingByteSize
+			computation := uint(2 * abiEncodingByteSize)
 			stringLength := len(value.Str)
 			chunks := stringLength / abiEncodingByteSize
 			remainder := stringLength % abiEncodingByteSize
@@ -123,29 +122,52 @@ func calculateComputation(
 				chunks += 1
 			}
 			computation += uint(chunks * abiEncodingByteSize)
+			reportComputation(environment.ComputationKindEVMEncodeABI, computation)
+		case interpreter.BoolValue,
+			interpreter.UInt8Value,
+			interpreter.UInt16Value,
+			interpreter.UInt32Value,
+			interpreter.UInt64Value,
+			interpreter.UInt128Value,
+			interpreter.UInt256Value,
+			interpreter.Int8Value,
+			interpreter.Int16Value,
+			interpreter.Int32Value,
+			interpreter.Int64Value,
+			interpreter.Int128Value,
+			interpreter.Int256Value:
+			// Numeric and bool variables are also static variables
+			// with a fixed size of 32 bytes.
+			reportComputation(environment.ComputationKindEVMEncodeABI, abiEncodingByteSize)
 		case *interpreter.CompositeValue:
 			if value.TypeID() == evmAddressTypeID {
 				// EVM addresses are static variables with a fixed
 				// size of 32 bytes.
-				computation += abiEncodingByteSize
+				reportComputation(environment.ComputationKindEVMEncodeABI, abiEncodingByteSize)
+			} else {
+				panic(abiEncodingError{
+					Type: value.StaticType(inter),
+				})
 			}
 		case *interpreter.ArrayValue:
-			// Dynamic variables, such as arrays and slices, encode
-			// an extra chunk of 32 bytes, for each element, except
-			// for the last one.
-			computation += uint((value.Count()-1)*abiEncodingByteSize) +
-				calculateComputation(inter, value, evmAddressTypeID)
+			// Dynamic variables, such as arrays & slices, are encoded
+			// in 2+ chunks of 32 bytes. The first chunk contains
+			// the index where information for the array begin,
+			// the second chunk contains the number of bytes the
+			// array occupies, and the third chunk contains the
+			// values of the array itself.
+			computation := uint(2 * abiEncodingByteSize)
+			reportComputation(environment.ComputationKindEVMEncodeABI, computation)
+			reportABIEncodingComputation(inter, value, evmAddressTypeID, reportComputation)
 		default:
-			// Numeric and bool variables are also static variables
-			// with a fixed size of 32 bytes.
-			computation += abiEncodingByteSize
+			panic(abiEncodingError{
+				Type: element.StaticType(inter),
+			})
 		}
 
 		// continue iteration
 		return true
 	})
-
-	return computation
 }
 
 // EVM.encodeABI
@@ -186,9 +208,11 @@ func newInternalEVMTypeEncodeABIFunction(
 				panic(errors.NewUnreachableError())
 			}
 
-			invocation.Interpreter.ReportComputation(
-				environment.ComputationKindEVMEncodeABI,
-				calculateComputation(inter, valuesArray, evmAddressTypeID),
+			reportABIEncodingComputation(
+				inter,
+				valuesArray,
+				evmAddressTypeID,
+				invocation.Interpreter.ReportComputation,
 			)
 
 			size := valuesArray.Count()

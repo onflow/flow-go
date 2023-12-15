@@ -287,7 +287,7 @@ func TestEVMEncodeABI(t *testing.T) {
 		},
 		OnMeterComputation: func(compKind common.ComputationKind, intensity uint) error {
 			if compKind == environment.ComputationKindEVMEncodeABI {
-				computation = intensity
+				computation += intensity
 			}
 			return nil
 		},
@@ -415,7 +415,206 @@ func TestEVMEncodeABIComputation(t *testing.T) {
 		},
 		OnMeterComputation: func(compKind common.ComputationKind, intensity uint) error {
 			if compKind == environment.ComputationKindEVMEncodeABI {
-				computation = intensity
+				computation += intensity
+			}
+			return nil
+		},
+	}
+
+	nextTransactionLocation := NewTransactionLocationGenerator()
+	nextScriptLocation := NewScriptLocationGenerator()
+
+	// Deploy contracts
+
+	deployContracts(
+		t,
+		rt,
+		contractsAddress,
+		runtimeInterface,
+		transactionEnvironment,
+		nextTransactionLocation,
+	)
+
+	// Run script
+
+	result, err := rt.ExecuteScript(
+		runtime.Script{
+			Source:    script,
+			Arguments: [][]byte{},
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: scriptEnvironment,
+			Location:    nextScriptLocation(),
+		},
+	)
+	require.NoError(t, err)
+
+	cdcBytes, ok := result.(cadence.Array)
+	require.True(t, ok)
+	// computation & len(cdcBytes.Values) is equal to 832
+	assert.Equal(t, computation, uint(len(cdcBytes.Values)))
+}
+
+func TestEVMEncodeABIComputationEmptyDynamicVariables(t *testing.T) {
+
+	t.Parallel()
+
+	handler := &testContractHandler{}
+
+	contractsAddress := flow.BytesToAddress([]byte{0x1})
+
+	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+
+	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+
+	script := []byte(`
+      import EVM from 0x1
+
+      access(all)
+      fun main(): [UInt8] {
+        return EVM.encodeABI([
+          "",
+          [[""], [] as [String]],
+          [] as [UInt8],
+          ["", "", ""]
+        ])
+      }
+	`)
+
+	accountCodes := map[common.Location][]byte{}
+	var events []cadence.Event
+
+	computation := uint(0)
+	runtimeInterface := &TestRuntimeInterface{
+		Storage: NewTestLedger(nil, nil),
+		OnGetSigningAccounts: func() ([]runtime.Address, error) {
+			return []runtime.Address{runtime.Address(contractsAddress)}, nil
+		},
+		OnResolveLocation: SingleIdentifierLocationResolver(t),
+		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+			accountCodes[location] = code
+			return nil
+		},
+		OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+			code = accountCodes[location]
+			return code, nil
+		},
+		OnEmitEvent: func(event cadence.Event) error {
+			events = append(events, event)
+			return nil
+		},
+		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+			return json.Decode(nil, b)
+		},
+		OnMeterComputation: func(compKind common.ComputationKind, intensity uint) error {
+			if compKind == environment.ComputationKindEVMEncodeABI {
+				computation += intensity
+			}
+			return nil
+		},
+	}
+
+	nextTransactionLocation := NewTransactionLocationGenerator()
+	nextScriptLocation := NewScriptLocationGenerator()
+
+	// Deploy contracts
+
+	deployContracts(
+		t,
+		rt,
+		contractsAddress,
+		runtimeInterface,
+		transactionEnvironment,
+		nextTransactionLocation,
+	)
+
+	// Run script
+
+	result, err := rt.ExecuteScript(
+		runtime.Script{
+			Source:    script,
+			Arguments: [][]byte{},
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: scriptEnvironment,
+			Location:    nextScriptLocation(),
+		},
+	)
+	require.NoError(t, err)
+
+	cdcBytes, ok := result.(cadence.Array)
+	require.True(t, ok)
+	// computation & len(cdcBytes.Values) is equal to 832
+	assert.Equal(t, computation, uint(len(cdcBytes.Values)))
+}
+
+func TestEVMEncodeABIComputationDynamicVariablesAboveChunkSize(t *testing.T) {
+
+	t.Parallel()
+
+	handler := &testContractHandler{}
+
+	contractsAddress := flow.BytesToAddress([]byte{0x1})
+
+	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+
+	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+
+	script := []byte(`
+      import EVM from 0x1
+
+      access(all)
+      fun main(): [UInt8] {
+        let str = "abcdefghijklmnopqrstuvwxyz"
+        let arr: [UInt64] = [
+          1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+          20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36,
+          37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53
+        ]
+
+        return EVM.encodeABI([
+          str,
+          str.concat(str).concat(str),
+          [[str]],
+          arr,
+          [arr],
+          arr.concat(arr).concat(arr)
+        ])
+      }
+	`)
+
+	accountCodes := map[common.Location][]byte{}
+	var events []cadence.Event
+
+	computation := uint(0)
+	runtimeInterface := &TestRuntimeInterface{
+		Storage: NewTestLedger(nil, nil),
+		OnGetSigningAccounts: func() ([]runtime.Address, error) {
+			return []runtime.Address{runtime.Address(contractsAddress)}, nil
+		},
+		OnResolveLocation: SingleIdentifierLocationResolver(t),
+		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+			accountCodes[location] = code
+			return nil
+		},
+		OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+			code = accountCodes[location]
+			return code, nil
+		},
+		OnEmitEvent: func(event cadence.Event) error {
+			events = append(events, event)
+			return nil
+		},
+		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+			return json.Decode(nil, b)
+		},
+		OnMeterComputation: func(compKind common.ComputationKind, intensity uint) error {
+			if compKind == environment.ComputationKindEVMEncodeABI {
+				computation += intensity
 			}
 			return nil
 		},
@@ -513,7 +712,7 @@ func TestEVMDecodeABI(t *testing.T) {
 		},
 		OnMeterComputation: func(compKind common.ComputationKind, intensity uint) error {
 			if compKind == environment.ComputationKindEVMDecodeABI {
-				computation = intensity
+				computation += intensity
 			}
 			return nil
 		},
@@ -647,7 +846,7 @@ func TestEVMDecodeABIComputation(t *testing.T) {
 		},
 		OnMeterComputation: func(compKind common.ComputationKind, intensity uint) error {
 			if compKind == environment.ComputationKindEVMDecodeABI {
-				computation = intensity
+				computation += intensity
 			}
 			return nil
 		},
@@ -1304,7 +1503,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 		assert.ErrorContains(
 			t,
 			err,
-			"failed to ABI encode value of type [Character]",
+			"failed to ABI encode value of type Character",
 		)
 	})
 
