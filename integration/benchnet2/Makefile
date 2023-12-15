@@ -49,7 +49,6 @@ gen-bootstrap: clone-flow
 		--root-chain bench \
 		--root-height 0 \
 		--root-parent 0000000000000000000000000000000000000000000000000000000000000000 \
-		--root-commit 0000000000000000000000000000000000000000000000000000000000000000 \
 		--epoch-counter 0 \
 		--epoch-length 30000 \
 		--epoch-staking-phase-length 20000 \
@@ -57,8 +56,6 @@ gen-bootstrap: clone-flow
 		--collection-clusters 1 \
 		--protocol-version=0 \
 		--epoch-commit-safety-threshold=1000 \
-		--genesis-token-supply="1000000000.0" \
-		--service-account-public-key-json "{\"PublicKey\":\"R7MTEDdLclRLrj2MI1hcp4ucgRTpR15PCHAWLM5nks6Y3H7+PGkfZTP2di2jbITooWO4DD1yqaBSAVK8iQ6i0A==\",\"SignAlgo\":2,\"HashAlgo\":1,\"SeqNumber\":0,\"Weight\":1000}" \
 		--config ../../../bootstrap/conf/node-config.json \
 		-o ../../../bootstrap/ \
 		--partner-dir ../../../bootstrap/partner-nodes \
@@ -72,9 +69,11 @@ gen-bootstrap: clone-flow
 		--internal-priv-dir ../../../bootstrap/keys/private-root-information \
 		--dkg-data ../../../bootstrap/private-root-information/root-dkg-data.priv.json \
 		--root-block ../../../bootstrap/public-root-information/root-block.json \
-		--root-result ../../../bootstrap/public-root-information/root-result.json \
-		--root-seal ../../../bootstrap/public-root-information/root-seal.json \
+		--root-epoch ../../../bootstrap/public-root-information/root-epoch.json \
 		--root-params ../../../bootstrap/public-root-information/root-params.json \
+		--root-commit 0000000000000000000000000000000000000000000000000000000000000000 \
+		--genesis-token-supply="1000000000.0" \
+		--service-account-public-key-json "{\"PublicKey\":\"R7MTEDdLclRLrj2MI1hcp4ucgRTpR15PCHAWLM5nks6Y3H7+PGkfZTP2di2jbITooWO4DD1yqaBSAVK8iQ6i0A==\",\"SignAlgo\":2,\"HashAlgo\":1,\"SeqNumber\":0,\"Weight\":1000}" \
 		--root-block-votes-dir ../../../bootstrap/public-root-information/root-block-votes/
 
 gen-helm-l1:
