@@ -103,7 +103,7 @@ func (e *Engine) GetRegisterAtBlockID(
 
 	blockSnapshot := e.execState.NewStorageSnapshot(stateCommit)
 
-	id := flow.NewRegisterID(string(owner), string(key))
+	id := flow.NewRegisterID(flow.BytesToAddress(owner), string(key))
 	data, err := blockSnapshot.Get(id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get the register (%s): %w", id, err)

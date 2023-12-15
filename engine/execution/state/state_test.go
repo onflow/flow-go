@@ -68,9 +68,8 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState, l *ledger.Ledger)
 }
 
 func TestExecutionStateWithTrieStorage(t *testing.T) {
-	registerID1 := flow.NewRegisterID("fruit", "")
-
-	registerID2 := flow.NewRegisterID("vegetable", "")
+	registerID1 := flow.NewRegisterID(unittest.RandomAddressFixture(), "")
+	registerID2 := flow.NewRegisterID(unittest.RandomAddressFixture(), "")
 
 	t.Run("commit write and read new state", prepareTest(func(t *testing.T, es state.ExecutionState, l *ledger.Ledger) {
 		// TODO: use real block ID

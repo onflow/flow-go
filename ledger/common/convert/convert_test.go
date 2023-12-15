@@ -8,14 +8,17 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestLedgerKeyToRegisterID(t *testing.T) {
+	expectedRegisterID := unittest.RegisterIDFixture()
+
 	key := ledger.Key{
 		KeyParts: []ledger.KeyPart{
 			{
 				Type:  convert.KeyPartOwner,
-				Value: []byte("owner"),
+				Value: []byte(expectedRegisterID.Owner),
 			},
 			{
 				Type:  convert.KeyPartKey,
@@ -24,7 +27,6 @@ func TestLedgerKeyToRegisterID(t *testing.T) {
 		},
 	}
 
-	expectedRegisterID := flow.NewRegisterID("owner", "key")
 	registerID, err := convert.LedgerKeyToRegisterID(key)
 	require.NoError(t, err)
 	require.Equal(t, expectedRegisterID, registerID)
@@ -70,14 +72,14 @@ func TestLedgerKeyToRegisterID_Error(t *testing.T) {
 }
 
 func TestRegisterIDToLedgerKey(t *testing.T) {
-	registerID := flow.NewRegisterID("owner", "key")
+	registerID := unittest.RegisterIDFixture()
 	expectedKey := ledger.Key{
 		KeyParts: []ledger.KeyPart{
 			{
 				Type: convert.KeyPartOwner,
 				// Note: the owner field is extended to address length during NewRegisterID
 				// so we have to do the same here
-				Value: flow.BytesToAddress([]byte("owner")).Bytes(),
+				Value: []byte(registerID.Owner),
 			},
 			{
 				Type:  convert.KeyPartKey,

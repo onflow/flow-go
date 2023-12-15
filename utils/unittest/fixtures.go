@@ -72,9 +72,13 @@ func AddressFixture() flow.Address {
 }
 
 func RandomAddressFixture() flow.Address {
+	return RandomAddressFixtureForChain(flow.Testnet)
+}
+
+func RandomAddressFixtureForChain(chainID flow.ChainID) flow.Address {
 	// we use a 32-bit index - since the linear address generator uses 45 bits,
 	// this won't error
-	addr, err := flow.Testnet.Chain().AddressAtIndex(uint64(rand.Uint32()))
+	addr, err := chainID.Chain().AddressAtIndex(uint64(rand.Uint32()))
 	if err != nil {
 		panic(err)
 	}
@@ -1428,10 +1432,7 @@ func TransactionDSLFixture(chain flow.Chain) dsl.Transaction {
 
 // RegisterIDFixture returns a RegisterID with a fixed key and owner
 func RegisterIDFixture() flow.RegisterID {
-	return flow.RegisterID{
-		Owner: "owner",
-		Key:   "key",
-	}
+	return flow.NewRegisterID(RandomAddressFixture(), "key")
 }
 
 // VerifiableChunkDataFixture returns a complete verifiable chunk with an

@@ -26,12 +26,22 @@ type Handler struct {
 
 // TODO: this is implemented in https://github.com/onflow/flow-go/pull/4957, remove when merged
 func (h *Handler) GetProtocolStateSnapshotByBlockID(ctx context.Context, request *access.GetProtocolStateSnapshotByBlockIDRequest) (*access.ProtocolStateSnapshotResponse, error) {
-	panic("implement me")
+	return nil, status.Error(codes.Unimplemented, "not implemented")
 }
 
 // TODO: this is implemented in https://github.com/onflow/flow-go/pull/4957, remove when merged
 func (h *Handler) GetProtocolStateSnapshotByHeight(ctx context.Context, request *access.GetProtocolStateSnapshotByHeightRequest) (*access.ProtocolStateSnapshotResponse, error) {
-	panic("implement me")
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+// TODO: this is implemented in https://github.com/onflow/flow-go/pull/5049, remove when merged
+func (h *Handler) GetSystemTransaction(context.Context, *access.GetSystemTransactionRequest) (*access.TransactionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+// TODO: this is implemented in https://github.com/onflow/flow-go/pull/5049, remove when merged
+func (h *Handler) GetSystemTransactionResult(context.Context, *access.GetSystemTransactionResultRequest) (*access.TransactionResultResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
 }
 
 // HandlerOption is used to hand over optional constructor parameters

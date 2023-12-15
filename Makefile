@@ -174,7 +174,8 @@ generate-mocks: install-mock-generators
 	mockery --name 'EpochComponentsFactory' --dir=engine/collection/epochmgr --case=underscore --output="engine/collection/epochmgr/mock" --outpkg="mock"
 	mockery --name 'Backend' --dir=engine/collection/rpc --case=underscore --output="engine/collection/rpc/mock" --outpkg="mock"
 	mockery --name 'ProviderEngine' --dir=engine/execution/provider --case=underscore --output="engine/execution/provider/mock" --outpkg="mock"
-	(cd ./crypto && mockery --name 'PublicKey' --case=underscore --output="../module/mock" --outpkg="mock")
+# this is removed on master, but needs to be commented out for mockgen to work on v0.32
+# (cd ./crypto && mockery --name 'PublicKey' --case=underscore --output="../module/mock" --outpkg="mock")
 	mockery --name '.*' --dir=state/cluster --case=underscore --output="state/cluster/mock" --outpkg="mock"
 	mockery --name '.*' --dir=module --case=underscore --tags="relic" --output="./module/mock" --outpkg="mock"
 	mockery --name '.*' --dir=module/mempool --case=underscore --output="./module/mempool/mock" --outpkg="mempool"
@@ -216,8 +217,10 @@ generate-mocks: install-mock-generators
 
 	#temporarily make insecure/ a non-module to allow mockery to create mocks
 	mv insecure/go.mod insecure/go2.mod
+	if [ -f go.work ]; then mv go.work go2.work; fi
 	mockery --name '.*' --dir=insecure/ --case=underscore --output="./insecure/mock"  --outpkg="mockinsecure"
 	mv insecure/go2.mod insecure/go.mod
+	if [ -f go2.work ]; then mv go2.work go.work; fi
 
 # this ensures there is no unused dependency being added by accident
 .PHONY: tidy
@@ -246,7 +249,7 @@ ci: install-tools test
 # Runs integration tests
 .PHONY: ci-integration
 ci-integration: crypto_setup_gopath
-	$(MAKE) -C integration ci-integration-test
+	$(MAKE) -C integration integration-test
 
 # Runs benchmark tests
 # NOTE: we do not need `docker-build-flow` as this is run as a separate step

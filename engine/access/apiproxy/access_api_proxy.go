@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
@@ -44,12 +45,22 @@ func (h *FlowAccessAPIRouter) log(handler, rpc string, err error) {
 
 // TODO: this is implemented in https://github.com/onflow/flow-go/pull/4957, remove when merged
 func (h *FlowAccessAPIRouter) GetProtocolStateSnapshotByBlockID(ctx context.Context, request *access.GetProtocolStateSnapshotByBlockIDRequest) (*access.ProtocolStateSnapshotResponse, error) {
-	panic("implement me")
+	return nil, status.Error(codes.Unimplemented, "not implemented")
 }
 
 // TODO: this is implemented in https://github.com/onflow/flow-go/pull/4957, remove when merged
 func (h *FlowAccessAPIRouter) GetProtocolStateSnapshotByHeight(ctx context.Context, request *access.GetProtocolStateSnapshotByHeightRequest) (*access.ProtocolStateSnapshotResponse, error) {
-	panic("implement me")
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+// TODO: this is implemented in https://github.com/onflow/flow-go/pull/5049, remove when merged
+func (h *FlowAccessAPIRouter) GetSystemTransaction(context.Context, *access.GetSystemTransactionRequest) (*access.TransactionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
+}
+
+// TODO: this is implemented in https://github.com/onflow/flow-go/pull/5049, remove when merged
+func (h *FlowAccessAPIRouter) GetSystemTransactionResult(context.Context, *access.GetSystemTransactionResultRequest) (*access.TransactionResultResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not implemented")
 }
 
 // Ping pings the service. It is special in the sense that it responds successful,
