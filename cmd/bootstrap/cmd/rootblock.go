@@ -171,15 +171,16 @@ func rootBlock(cmd *cobra.Command, args []string) {
 		ExecutionStateConfig:   epochConfig,
 	}
 	writeJSON(model.PathRootEpoch, intermediaryEpochData)
+	intermediaryParamsData := IntermediaryParamsData{
+		EpochCommitSafetyThreshold: flagEpochCommitSafetyThreshold,
+		ProtocolVersion:            flagProtocolVersion,
+	}
+	writeJSON(model.PathRootParams, intermediaryParamsData)
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing root block")
 	block := constructRootBlock(header, epochSetup, epochCommit)
 	writeJSON(model.PathRootBlockData, block)
-	writeJSON(model.PathRootParams, IntermediaryParamsData{
-		EpochCommitSafetyThreshold: flagEpochCommitSafetyThreshold,
-		ProtocolVersion:            flagProtocolVersion,
-	})
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing and writing votes")
@@ -219,6 +220,9 @@ func validateEpochConfig() error {
 	return nil
 }
 
+// generateExecutionStateEpochConfig generates epoch-related configuration used
+// to generate an empty root execution state. This config is generated in the
+// `rootblock` alongside the root epoch and root protocol state ID for consistency.
 func generateExecutionStateEpochConfig(
 	epochSetup *flow.EpochSetup,
 	clusterQCs []*flow.QuorumCertificate,
@@ -235,20 +239,18 @@ func generateExecutionStateEpochConfig(
 	}
 
 	epochConfig := epochs.EpochConfig{
-		// Staking contract config
 		EpochTokenPayout:             cadence.UFix64(0),
 		RewardCut:                    cadence.UFix64(0),
 		FLOWsupplyIncreasePercentage: cadence.UFix64(0),
-		// IntermediaryEpochData config
-		CurrentEpochCounter:      cadence.UInt64(epochSetup.Counter),
-		NumViewsInEpoch:          cadence.UInt64(flagNumViewsInEpoch),
-		NumViewsInStakingAuction: cadence.UInt64(flagNumViewsInStakingAuction),
-		NumViewsInDKGPhase:       cadence.UInt64(flagNumViewsInDKGPhase),
-		NumCollectorClusters:     cadence.UInt16(flagCollectionClusters),
-		RandomSource:             cdcRandomSource,
-		CollectorClusters:        epochSetup.Assignments,
-		ClusterQCs:               clusterQCs,
-		DKGPubKeys:               encodable.WrapRandomBeaconPubKeys(dkgData.PubKeyShares),
+		CurrentEpochCounter:          cadence.UInt64(epochSetup.Counter),
+		NumViewsInEpoch:              cadence.UInt64(flagNumViewsInEpoch),
+		NumViewsInStakingAuction:     cadence.UInt64(flagNumViewsInStakingAuction),
+		NumViewsInDKGPhase:           cadence.UInt64(flagNumViewsInDKGPhase),
+		NumCollectorClusters:         cadence.UInt16(flagCollectionClusters),
+		RandomSource:                 cdcRandomSource,
+		CollectorClusters:            epochSetup.Assignments,
+		ClusterQCs:                   clusterQCs,
+		DKGPubKeys:                   encodable.WrapRandomBeaconPubKeys(dkgData.PubKeyShares),
 	}
 	return epochConfig
 }

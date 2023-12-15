@@ -35,12 +35,10 @@ const rootBlockHappyPathLogs = "collecting partner network and staking keys" +
 	`constructing root QCs for collection node clusters` +
 	`constructing root header` +
 	`constructing epoch events` +
+	`wrote file \S+/root-epoch.json` +
+	`wrote file \S+/root-params.json` +
 	`constructing root block` +
 	`wrote file \S+/root-block.json` +
-	`wrote file \S+/root-params.json` +
-	`constructing root execution result and block seal` +
-	`wrote file \S+/root-result.json` +
-	`wrote file \S+/root-seal.json` +
 	`constructing and writing votes` +
 	`wrote file \S+/root-block-vote.\S+.json`
 
@@ -63,6 +61,12 @@ func TestRootBlock_HappyPath(t *testing.T) {
 		flagRootParent = hex.EncodeToString(rootParent[:])
 		flagRootChain = chainName
 		flagRootHeight = rootHeight
+		flagEpochCounter = 0
+		flagNumViewsInEpoch = 100_000
+		flagNumViewsInStakingAuction = 50_000
+		flagNumViewsInDKGPhase = 2_000
+		flagEpochCommitSafetyThreshold = 1_000
+		flagProtocolVersion = 42
 
 		hook := zeroLoggerHook{logs: &strings.Builder{}}
 		log = log.Hook(hook)
