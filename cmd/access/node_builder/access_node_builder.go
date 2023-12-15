@@ -827,7 +827,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				builder.executionDataConfig.InitialBlockHeight,
 				highestAvailableHeight,
 				builder.RegistersAsyncStore,
-      )
+			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream backend: %w", err)
 			}

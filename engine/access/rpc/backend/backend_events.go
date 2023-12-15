@@ -57,7 +57,7 @@ func (b *backendEvents) GetEventsForHeightRange(
 	// get the latest sealed block header
 	sealed, err := b.state.Sealed().Head()
 	if err != nil {
-		// sealed block must be in the store, so return an Internal code even if we got NotFound
+		// sealed block must be in the store, so throw an exception for any error
 		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
 		irrecoverable.Throw(ctx, err)
 		return nil, err
@@ -137,12 +137,19 @@ func (b *backendEvents) getBlockEvents(
 		return nil, err
 	}
 
+	if len(missingHeaders) == 0 {
+		return localResponse, nil
+	}
+
 	enResponse, err := b.getBlockEventsFromExecutionNode(ctx, missingHeaders, eventType, requiredEventEncodingVersion)
 	if err != nil {
 		return nil, err
 	}
 
 	// sort ascending by block height
+	// this is needed because some blocks may be retrieved from storage and others from execution nodes.
+	// most likely, the earlier blocks will all be found in local storage, but that's not guaranteed,
+	// especially for nodes started after a spork, or once pruning is enabled.
 	// Note: this may not match the order of the original request for clients using GetEventsForBlockIDs
 	// that provide out of order block IDs
 	response := append(localResponse, enResponse...)
@@ -167,16 +174,17 @@ func (b *backendEvents) getBlockEventsFromStorage(
 	resp := make([]flow.BlockEvents, 0)
 	for _, header := range blockHeaders {
 		if ctx.Err() != nil {
-			return nil, nil, rpc.ConvertError(ctx.Err(), "failed to get events", codes.Canceled)
+			return nil, nil, rpc.ConvertError(ctx.Err(), "failed to get events from storage", codes.Canceled)
 		}
 
 		events, err := b.events.ByBlockID(header.ID())
 		if err != nil {
+			// Note: if there are no events for a block, an empty slice is returned
 			if errors.Is(err, storage.ErrNotFound) {
 				missing = append(missing, header)
 				continue
 			}
-			return nil, nil, rpc.ConvertError(err, "failed to get events", codes.Internal)
+			return nil, nil, rpc.ConvertError(err, "failed to get events from storage", codes.Internal)
 		}
 
 		filteredEvents := make([]flow.Event, 0)
