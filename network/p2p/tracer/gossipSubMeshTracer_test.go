@@ -2,10 +2,12 @@ package tracer_test
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -66,24 +68,20 @@ func TestGossipSubMeshTracer(t *testing.T) {
 	// creates one node with a gossipsub mesh meshTracer, and the other nodes without a gossipsub mesh meshTracer.
 	// we only need one node with a meshTracer to test the meshTracer.
 	// meshTracer logs at 1 second intervals for sake of testing.
-	collector := mockmodule.NewGossipSubLocalMeshMetrics(t)
-	meshTracerCfg := &tracer.GossipSubMeshTracerConfig{
-		Logger:                             logger,
-		Metrics:                            collector,
-		IDProvider:                         idProvider,
-		LoggerInterval:                     time.Second,
-		HeroCacheMetricsFactory:            metrics.NewNoopHeroCacheMetricsFactory(),
-		RpcSentTrackerCacheSize:            defaultConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerCacheSize,
-		RpcSentTrackerWorkerQueueCacheSize: defaultConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerQueueCacheSize,
-		RpcSentTrackerNumOfWorkers:         defaultConfig.NetworkConfig.GossipSubConfig.RpcSentTrackerNumOfWorkers,
-	}
-	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
+	collector := newLocalMeshTracerMetricsCollector(t)
+	// set the meshTracer to log at 1 second intervals for sake of testing.
+	defaultConfig.NetworkConfig.GossipSub.RpcTracer.LocalMeshLogInterval = 1 * time.Second
+	// disables peer scoring for sake of testing; so that unknown peers are not penalized and could be detected by the meshTracer.
+	defaultConfig.NetworkConfig.GossipSub.PeerScoringEnabled = false
+
 	tracerNode, tracerId := p2ptest.NodeFixture(
 		t,
 		sporkId,
 		t.Name(),
 		idProvider,
-		p2ptest.WithGossipSubTracer(meshTracer),
+		p2ptest.WithLogger(logger),
+		p2ptest.OverrideFlowConfig(defaultConfig),
+		p2ptest.WithMetricsCollector(collector),
 		p2ptest.WithRole(flow.RoleConsensus))
 
 	idProvider.On("ByPeerID", tracerNode.ID()).Return(&tracerId, true).Maybe()
@@ -112,6 +110,13 @@ func TestGossipSubMeshTracer(t *testing.T) {
 		idProvider,
 		p2ptest.WithRole(flow.RoleConsensus))
 	idProvider.On("ByPeerID", unknownNode.ID()).Return(nil, false).Maybe()
+
+	peerProvider := func() peer.IDSlice {
+		return peer.IDSlice{tracerNode.ID(), otherNode1.ID(), otherNode2.ID(), unknownNode.ID()}
+	}
+	tracerNode.WithPeersProvider(peerProvider)
+	otherNode1.WithPeersProvider(peerProvider)
+	otherNode2.WithPeersProvider(peerProvider)
 
 	nodes := []p2p.LibP2PNode{tracerNode, otherNode1, otherNode2, unknownNode}
 	ids := flow.IdentityList{&tracerId, &otherId1, &otherId2, &unknownId}
@@ -152,15 +157,15 @@ func TestGossipSubMeshTracer(t *testing.T) {
 	// eventually, the meshTracer should have the other nodes in its mesh.
 	assert.Eventually(t, func() bool {
 		topic1MeshSize := 0
-		for _, peer := range meshTracer.GetMeshPeers(topic1.String()) {
-			if peer == otherNode1.ID() || peer == otherNode2.ID() {
+		for _, peerId := range tracerNode.GetLocalMeshPeers(topic1) {
+			if peerId == otherNode1.ID() || peerId == otherNode2.ID() {
 				topic1MeshSize++
 			}
 		}
 
 		topic2MeshSize := 0
-		for _, peer := range meshTracer.GetMeshPeers(topic2.String()) {
-			if peer == otherNode1.ID() {
+		for _, peerId := range tracerNode.GetLocalMeshPeers(topic2) {
+			if peerId == otherNode1.ID() {
 				topic2MeshSize++
 			}
 		}
@@ -184,18 +189,37 @@ func TestGossipSubMeshTracer(t *testing.T) {
 
 	assert.Eventually(t, func() bool {
 		// eventually, the tracerNode should not have the other node in its mesh for topic1.
-		for _, peer := range meshTracer.GetMeshPeers(topic1.String()) {
-			if peer == otherNode1.ID() || peer == otherNode2.ID() || peer == unknownNode.ID() {
+		for _, peerId := range tracerNode.GetLocalMeshPeers(topic1) {
+			if peerId == otherNode1.ID() || peerId == otherNode2.ID() || peerId == unknownNode.ID() {
 				return false
 			}
 		}
 
 		// but the tracerNode should still have the otherNode1 in its mesh for topic2.
-		for _, peer := range meshTracer.GetMeshPeers(topic2.String()) {
-			if peer != otherNode1.ID() {
+		for _, peerId := range tracerNode.GetLocalMeshPeers(topic2) {
+			if peerId != otherNode1.ID() {
 				return false
 			}
 		}
 		return true
 	}, 2*time.Second, 10*time.Millisecond)
+}
+
+// localMeshTracerMetricsCollector is a mock metrics that can be mocked for GossipSubLocalMeshMetrics while acting as a NoopCollector for other metrics.
+type localMeshTracerMetricsCollector struct {
+	*metrics.NoopCollector
+	*mockmodule.GossipSubLocalMeshMetrics
+}
+
+func newLocalMeshTracerMetricsCollector(t *testing.T) *localMeshTracerMetricsCollector {
+	return &localMeshTracerMetricsCollector{
+		GossipSubLocalMeshMetrics: mockmodule.NewGossipSubLocalMeshMetrics(t),
+		NoopCollector:             metrics.NewNoopCollector(),
+	}
+}
+
+func (c *localMeshTracerMetricsCollector) OnLocalMeshSizeUpdated(topic string, size int) {
+	// calls the mock method to assert the metrics.
+	fmt.Println("OnLocalMeshSizeUpdated", topic, size)
+	c.GossipSubLocalMeshMetrics.OnLocalMeshSizeUpdated(topic, size)
 }

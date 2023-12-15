@@ -90,7 +90,7 @@ func InitCorruptLibp2pNode(
 		role,
 		connGaterCfg,
 		peerManagerCfg,
-		&netConfig.GossipSubConfig,
+		&netConfig.GossipSub,
 		&netConfig.ResourceManager,
 		uniCfg,
 		&netConfig.ConnectionManagerConfig,
