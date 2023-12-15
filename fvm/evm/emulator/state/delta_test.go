@@ -439,9 +439,111 @@ func TestDeltaView(t *testing.T) {
 		require.Equal(t, initRefund+addition-subtract, view.GetRefund())
 	})
 
-	// TODO: test access list
+	t.Run("test access list  functionality", func(t *testing.T) {
+		addr1 := testutils.RandomCommonAddress(t)
+		addr2 := testutils.RandomCommonAddress(t)
+		slot1 := types.SlotAddress{
+			Address: testutils.RandomCommonAddress(t),
+			Key:     gethCommon.BytesToHash([]byte{1, 2}),
+		}
 
-	// TODO: test log
+		slot2 := types.SlotAddress{
+			Address: testutils.RandomCommonAddress(t),
+			Key:     gethCommon.BytesToHash([]byte{3, 4}),
+		}
+
+		view := state.NewDeltaView(
+			&MockedReadOnlyView{
+				GetRefundFunc: emptyRefund,
+				AddressInAccessListFunc: func(addr gethCommon.Address) bool {
+					switch addr {
+					case addr1:
+						return true
+					default:
+						return false
+					}
+				},
+				SlotInAccessListFunc: func(slot types.SlotAddress) (addressOk bool, slotOk bool) {
+					switch slot {
+					case slot1:
+						return false, true
+					default:
+						return false, false
+					}
+				},
+			})
+
+		// check address through parent
+		require.True(t, view.AddressInAccessList(addr1))
+
+		// add addr 2 to the list
+		require.False(t, view.AddressInAccessList(addr2))
+		view.AddAddressToAccessList(addr2)
+		require.True(t, view.AddressInAccessList(addr2))
+
+		// check slot through parent
+		addrFound, slotFound := view.SlotInAccessList(slot1)
+		require.False(t, addrFound)
+		require.True(t, slotFound)
+
+		// add slot 2 to the list
+		addrFound, slotFound = view.SlotInAccessList(slot2)
+		require.False(t, addrFound)
+		require.False(t, slotFound)
+		view.AddSlotToAccessList(slot2)
+
+		addrFound, slotFound = view.SlotInAccessList(slot2)
+		require.False(t, addrFound)
+		require.True(t, slotFound)
+	})
+
+	t.Run("test log functionality", func(t *testing.T) {
+		view := state.NewDeltaView(
+			&MockedReadOnlyView{
+				GetRefundFunc: emptyRefund,
+			})
+
+		logs := view.Logs()
+		require.Empty(t, logs)
+
+		log1 := &gethTypes.Log{
+			Address: testutils.RandomCommonAddress(t),
+		}
+		view.AddLog(log1)
+
+		log2 := &gethTypes.Log{
+			Address: testutils.RandomCommonAddress(t),
+		}
+		view.AddLog(log2)
+
+		logs = view.Logs()
+		require.Equal(t, []*gethTypes.Log{log1, log2}, logs)
+	})
+
+	t.Run("test preimage functionality", func(t *testing.T) {
+		view := state.NewDeltaView(
+			&MockedReadOnlyView{
+				GetRefundFunc: emptyRefund,
+			})
+
+		preimages := view.Preimages()
+		require.Empty(t, preimages)
+
+		preimage1 := []byte{1, 2}
+		hash1 := gethCommon.BytesToHash([]byte{2, 3})
+		view.AddPreimage(hash1, preimage1)
+
+		preimage2 := []byte{4, 5}
+		hash2 := gethCommon.BytesToHash([]byte{6, 7})
+		view.AddPreimage(hash2, preimage2)
+
+		expected := make(map[gethCommon.Hash][]byte)
+		expected[hash1] = preimage1
+		expected[hash2] = preimage2
+
+		preimages = view.Preimages()
+		require.Equal(t, expected, preimages)
+	})
 
 	t.Run("test dirty addresses functionality", func(t *testing.T) {
 		addrCount := 6
