@@ -30,10 +30,6 @@ type Tx struct {
 	callbacks []func()
 }
 
-// DeferredDBUpdate is a shorthand notation for an anonymous function. The function takes
-// a badger transaction as input to runs some database updates as part of that transaction.
-type DeferredDBUpdate = []func(tx *Tx) error
-
 // OnSucceed adds a callback to execute after the batch has been successfully flushed.
 // Useful for implementing the cache where we will only cache after the batch of database
 // operations has been successfully applied.
