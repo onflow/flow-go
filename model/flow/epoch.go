@@ -79,6 +79,16 @@ func (setup EpochSetup) NumViews() uint64 {
 	return setup.FinalView - setup.FirstView + 1
 }
 
+// NumViewsInStakingAuction returns the number of views in the staking auction.
+func (setup EpochSetup) NumViewsInStakingAuction() uint64 {
+	return setup.DKGPhase1FinalView - setup.NumViewsInDKGPhase() - setup.FirstView
+}
+
+// NumViewsInDKGPhase returns the number of views in each DKG phase.
+func (setup EpochSetup) NumViewsInDKGPhase() uint64 {
+	return setup.DKGPhase2FinalView - setup.DKGPhase1FinalView
+}
+
 func (setup *EpochSetup) ServiceEvent() ServiceEvent {
 	return ServiceEvent{
 		Type:  ServiceEventSetup,

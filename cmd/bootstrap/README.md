@@ -123,14 +123,11 @@ go run . rootblock  \
     --root-chain bench \
     --root-height 0 \
     --root-parent 0000000000000000000000000000000000000000000000000000000000000000 \
-    --root-commit 0000000000000000000000000000000000000000000000000000000000000000 \
     --epoch-counter 0 \
     --epoch-length 30000 \
     --epoch-staking-phase-length 20000 \
     --epoch-dkg-phase-length 2000 \
     --collection-clusters 1 \
-    --genesis-token-supply="1000000000.0" \
-    --service-account-public-key-json "{\"PublicKey\":\"R7MTEDdLclRLrj2MI1hcp4ucgRTpR15PCHAWLM5nks6Y3H7+PGkfZTP2di2jbITooWO4DD1yqaBSAVK8iQ6i0A==\",\"SignAlgo\":2,\"HashAlgo\":1,\"SeqNumber\":0,\"Weight\":1000}" \
     --protocol-version=0 \
     --epoch-commit-safety-threshold=1000 \
     --config ./bootstrap-example/node-config.json \
@@ -148,10 +145,12 @@ go run . finalize \
     --internal-priv-dir ./bootstrap-example/keys/private-root-information \
     --dkg-data ./bootstrap-example/private-root-information/root-dkg-data.priv.json \
     --root-block ./bootstrap-example/public-root-information/root-block.json \
-    --root-result ./bootstrap-example/public-root-information/root-result.json \
-    --root-seal ./bootstrap-example/public-root-information/root-seal.json \
+    --root-epoch ./bootstrap-example/public-root-information/root-epoch.json \
     --root-params ./bootstrap-example/public-root-information/root-params.json \
     --root-block-votes-dir ./bootstrap-example/public-root-information/root-block-votes/ \
+    --root-commit 0000000000000000000000000000000000000000000000000000000000000000 \
+    --genesis-token-supply="1000000000.0" \
+    --service-account-public-key-json "{\"PublicKey\":\"R7MTEDdLclRLrj2MI1hcp4ucgRTpR15PCHAWLM5nks6Y3H7+PGkfZTP2di2jbITooWO4DD1yqaBSAVK8iQ6i0A==\",\"SignAlgo\":2,\"HashAlgo\":1,\"SeqNumber\":0,\"Weight\":1000}" \
     -o ./bootstrap-example
 ```
 

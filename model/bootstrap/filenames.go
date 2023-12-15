@@ -25,8 +25,7 @@ var (
 
 	PathRootBlockData             = filepath.Join(DirnamePublicBootstrap, "root-block.json")
 	PathRootParams                = filepath.Join(DirnamePublicBootstrap, "root-params.json")
-	PathRootResult                = filepath.Join(DirnamePublicBootstrap, "root-result.json")
-	PathRootSeal                  = filepath.Join(DirnamePublicBootstrap, "root-seal.json")
+	PathRootEpoch                 = filepath.Join(DirnamePublicBootstrap, "root-epoch.json")
 	PathRootProtocolStateSnapshot = filepath.Join(DirnamePublicBootstrap, "root-protocol-state-snapshot.json")
 
 	FilenameWALRootCheckpoint = "root.checkpoint"

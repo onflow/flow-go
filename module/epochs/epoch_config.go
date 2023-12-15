@@ -3,8 +3,8 @@ package epochs
 import (
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/flow-go/model/encodable"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -22,7 +22,7 @@ type EpochConfig struct {
 	RandomSource                 cadence.String
 	CollectorClusters            flow.AssignmentList
 	ClusterQCs                   []*flow.QuorumCertificate
-	DKGPubKeys                   []crypto.PublicKey
+	DKGPubKeys                   []encodable.RandomBeaconPubKey
 }
 
 // DefaultEpochConfig returns an EpochConfig with default values used for

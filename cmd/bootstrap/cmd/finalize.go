@@ -1,8 +1,14 @@
 package cmd
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/onflow/cadence"
+	"github.com/onflow/flow-go/cmd/bootstrap/run"
+	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/module/epochs"
+	"github.com/onflow/flow-go/state/protocol"
 	"path/filepath"
 	"strings"
 
@@ -30,10 +36,13 @@ var (
 	flagPartnerWeights          string
 	flagDKGDataPath             string
 	flagRootBlockPath           string
-	flagRootResultPath          string
-	flagRootSealPath            string
+	flagRootCommit              string
+	flagRootEpochPath           string
 	flagRootParamsPath          string
 	flagRootBlockVotesDir       string
+	// optional flags for creating
+	flagServiceAccountPublicKeyJSON string
+	flagGenesisTokenSupply          string
 )
 
 // PartnerWeights is the format of the JSON file specifying partner node weights.
@@ -67,25 +76,32 @@ func addFinalizeCmdFlags() {
 	finalizeCmd.Flags().StringVar(&flagPartnerWeights, "partner-weights", "", "path to a JSON file containing "+
 		"a map from partner node's NodeID to their weight")
 	finalizeCmd.Flags().StringVar(&flagDKGDataPath, "dkg-data", "", "path to a JSON file containing data as output from DKG process")
+	finalizeCmd.Flags().StringVar(&flagRootCommit, "root-commit", "0000000000000000000000000000000000000000000000000000000000000000", "state commitment of root execution state")
 
 	cmd.MarkFlagRequired(finalizeCmd, "config")
 	cmd.MarkFlagRequired(finalizeCmd, "internal-priv-dir")
 	cmd.MarkFlagRequired(finalizeCmd, "partner-dir")
 	cmd.MarkFlagRequired(finalizeCmd, "partner-weights")
 	cmd.MarkFlagRequired(finalizeCmd, "dkg-data")
+	cmd.MarkFlagRequired(finalizeCmd, "root-commit")
 
 	// required parameters for generation of root block, root execution result and root block seal
 	finalizeCmd.Flags().StringVar(&flagRootBlockPath, "root-block", "", "path to a JSON file containing root block")
-	finalizeCmd.Flags().StringVar(&flagRootResultPath, "root-result", "", "path to a JSON file containing root epoch")
-	finalizeCmd.Flags().StringVar(&flagRootSealPath, "root-seal", "", "path to a JSON file containing root epoch")
+	finalizeCmd.Flags().StringVar(&flagRootEpochPath, "root-epoch", "", "path to a JSON file containing root epoch")
 	finalizeCmd.Flags().StringVar(&flagRootParamsPath, "root-params", "", "path to a JSON file containing root params")
 	finalizeCmd.Flags().StringVar(&flagRootBlockVotesDir, "root-block-votes-dir", "", "path to directory with votes for root block")
 
 	cmd.MarkFlagRequired(finalizeCmd, "root-block")
-	cmd.MarkFlagRequired(finalizeCmd, "root-result")
-	cmd.MarkFlagRequired(finalizeCmd, "root-seal")
+	cmd.MarkFlagRequired(finalizeCmd, "root-epoch")
 	cmd.MarkFlagRequired(finalizeCmd, "root-params")
 	cmd.MarkFlagRequired(finalizeCmd, "root-block-votes-dir")
+
+	// these two flags are only used when setup a network from genesis
+	finalizeCmd.Flags().StringVar(&flagServiceAccountPublicKeyJSON, "service-account-public-key-json",
+		"{\"PublicKey\":\"ABCDEFGHIJK\",\"SignAlgo\":2,\"HashAlgo\":1,\"SeqNumber\":0,\"Weight\":1000}",
+		"encoded json of public key for the service account")
+	finalizeCmd.Flags().StringVar(&flagGenesisTokenSupply, "genesis-token-supply", "10000000.00000000",
+		"genesis flow token supply")
 }
 
 func finalize(cmd *cobra.Command, args []string) {
@@ -116,6 +132,9 @@ func finalize(cmd *cobra.Command, args []string) {
 	stakingNodes := mergeNodeInfos(internalNodes, partnerNodes)
 	log.Info().Msg("")
 
+	// create flow.IdentityList representation of participant set
+	participants := model.ToIdentityList(stakingNodes).Sort(order.Canonical[flow.Identity])
+
 	log.Info().Msg("reading root block data")
 	block := readRootBlock()
 	log.Info().Msg("")
@@ -130,9 +149,8 @@ func finalize(cmd *cobra.Command, args []string) {
 	dkgData := readDKGData()
 	log.Info().Msg("")
 
-	log.Info().Msg("reading root result/seal")
-	result, seal := readRootResultAndSeal()
-	log.Info().Msg("")
+	log.Info().Msg("reading root epoch")
+	_, epochSetup, epochCommit, epochConfig := readIntermediaryEpochData()
 
 	log.Info().Msg("reading root params")
 	params := readRootParams()
@@ -146,6 +164,19 @@ func finalize(cmd *cobra.Command, args []string) {
 		model.FilterByRole(internalNodes, flow.RoleConsensus),
 		dkgData,
 	)
+	log.Info().Msg("")
+
+	// if no root commit is specified, bootstrap an empty execution state
+	if flagRootCommit == "0000000000000000000000000000000000000000000000000000000000000000" {
+		generateEmptyExecutionState(
+			block.Header.ChainID,
+			epochConfig,
+			participants,
+		)
+	}
+
+	log.Info().Msg("constructing root execution result and block seal")
+	result, seal := constructRootResultAndSeal(flagRootCommit, block, epochSetup, epochCommit)
 	log.Info().Msg("")
 
 	// construct serializable root protocol snapshot
@@ -442,20 +473,8 @@ func readRootBlock() *flow.Block {
 	return rootBlock
 }
 
-func readRootResultAndSeal() (*flow.ExecutionResult, *flow.Seal) {
-	result, err := utils.ReadData[flow.ExecutionResult](flagRootResultPath)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to read root result")
-	}
-	seal, err := utils.ReadData[flow.Seal](flagRootSealPath)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to read root seal")
-	}
-	return result, seal
-}
-
-func readRootParams() *model.Params {
-	params, err := utils.ReadData[model.Params](flagRootParamsPath)
+func readRootParams() *IntermediaryParamsData {
+	params, err := utils.ReadData[IntermediaryParamsData](flagRootParamsPath)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to read root params")
 	}
@@ -528,4 +547,62 @@ func loadRootProtocolSnapshot(path string) (*inmem.Snapshot, error) {
 	}
 
 	return inmem.SnapshotFromEncodable(snapshot), nil
+}
+
+// readIntermediaryEpochData reads root epoch data from disc, this file needs to be prepared with
+// rootblock command
+func readIntermediaryEpochData() (protocol.Epoch, *flow.EpochSetup, *flow.EpochCommit, epochs.EpochConfig) {
+	epochData, err := utils.ReadData[IntermediaryEpochData](flagRootEpochPath)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not read root epoch data")
+	}
+	epoch := inmem.NewEpoch(epochData.ProtocolStateRootEpoch)
+	setup, err := protocol.ToEpochSetup(epoch)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not extract setup event")
+	}
+	commit, err := protocol.ToEpochCommit(epoch)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not extract commit event")
+	}
+	return epoch, setup, commit, epochData.ExecutionStateConfig
+}
+
+// generateEmptyExecutionState generates a new empty execution state with the
+// given configuration. Sets the flagRootCommit variable for future reads.
+func generateEmptyExecutionState(
+	chainID flow.ChainID,
+	epochConfig epochs.EpochConfig,
+	identities flow.IdentityList,
+) (commit flow.StateCommitment) {
+
+	log.Info().Msg("generating empty execution state")
+	var serviceAccountPublicKey flow.AccountPublicKey
+	err := serviceAccountPublicKey.UnmarshalJSON([]byte(flagServiceAccountPublicKeyJSON))
+	if err != nil {
+		log.Fatal().Err(err).Msg("unable to parse the service account public key json")
+	}
+
+	cdcInitialTokenSupply, err := cadence.NewUFix64(flagGenesisTokenSupply)
+	if err != nil {
+		log.Fatal().Err(err).Msg("invalid genesis token supply")
+	}
+
+	commit, err = run.GenerateExecutionState(
+		filepath.Join(flagOutdir, model.DirnameExecutionState),
+		serviceAccountPublicKey,
+		chainID.Chain(),
+		fvm.WithInitialTokenSupply(cdcInitialTokenSupply),
+		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+		fvm.WithEpochConfig(epochConfig),
+		fvm.WithIdentities(identities),
+	)
+	if err != nil {
+		log.Fatal().Err(err).Msg("unable to generate execution state")
+	}
+	flagRootCommit = hex.EncodeToString(commit[:])
+	log.Info().Msg("")
+	return
 }
