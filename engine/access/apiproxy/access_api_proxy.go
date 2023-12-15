@@ -43,16 +43,6 @@ func (h *FlowAccessAPIRouter) log(handler, rpc string, err error) {
 	logger.Info().Msg("request succeeded")
 }
 
-// TODO: this is implemented in https://github.com/onflow/flow-go/pull/4957, remove when merged
-func (h *FlowAccessAPIRouter) GetProtocolStateSnapshotByBlockID(ctx context.Context, request *access.GetProtocolStateSnapshotByBlockIDRequest) (*access.ProtocolStateSnapshotResponse, error) {
-	panic("implement me")
-}
-
-// TODO: this is implemented in https://github.com/onflow/flow-go/pull/4957, remove when merged
-func (h *FlowAccessAPIRouter) GetProtocolStateSnapshotByHeight(ctx context.Context, request *access.GetProtocolStateSnapshotByHeightRequest) (*access.ProtocolStateSnapshotResponse, error) {
-	panic("implement me")
-}
-
 // Ping pings the service. It is special in the sense that it responds successful,
 // only if all underlying services are ready.
 func (h *FlowAccessAPIRouter) Ping(context context.Context, req *access.PingRequest) (*access.PingResponse, error) {
@@ -213,6 +203,18 @@ func (h *FlowAccessAPIRouter) GetNetworkParameters(context context.Context, req 
 func (h *FlowAccessAPIRouter) GetLatestProtocolStateSnapshot(context context.Context, req *access.GetLatestProtocolStateSnapshotRequest) (*access.ProtocolStateSnapshotResponse, error) {
 	res, err := h.Observer.GetLatestProtocolStateSnapshot(context, req)
 	h.log("observer", "GetLatestProtocolStateSnapshot", err)
+	return res, err
+}
+
+func (h *FlowAccessAPIRouter) GetProtocolStateSnapshotByBlockID(context context.Context, req *access.GetProtocolStateSnapshotByBlockIDRequest) (*access.ProtocolStateSnapshotResponse, error) {
+	res, err := h.Observer.GetProtocolStateSnapshotByBlockID(context, req)
+	h.log("observer", "GetProtocolStateSnapshotByBlockID", err)
+	return res, err
+}
+
+func (h *FlowAccessAPIRouter) GetProtocolStateSnapshotByHeight(context context.Context, req *access.GetProtocolStateSnapshotByHeightRequest) (*access.ProtocolStateSnapshotResponse, error) {
+	res, err := h.Observer.GetProtocolStateSnapshotByHeight(context, req)
+	h.log("observer", "GetProtocolStateSnapshotByHeight", err)
 	return res, err
 }
 

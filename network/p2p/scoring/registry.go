@@ -263,7 +263,7 @@ func (r *GossipSubAppSpecificScoreRegistry) AppSpecificScoreFunc() func(peer.ID)
 
 			return appSpecificScore // in the mean time, return the expired score.
 		default:
-			// record found in the cache, check if it is expired.
+			// record found in the cache.
 			r.logger.Trace().
 				Float64("app_specific_score", appSpecificScore).
 				Msg("application specific score found in cache")

@@ -140,7 +140,7 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 
 	p2ptest.LetNodesDiscoverEachOther(t, ctx, nodes, ids)
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
-	// checks end-to-end message delivery works on GossipSubParameters
+	// checks end-to-end message delivery works on GossipSub.
 	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() interface{} {
 		return unittest.ProposalFixture()
 	})
@@ -157,7 +157,7 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 
 	time.Sleep(1 * time.Second) // wait for app-specific score to be updated in the cache (remember that we need at least 100 ms for the score to be updated (ScoreTTL))
 
-	// checks no GossipSubParameters message exchange should no longer happen between node1 and node2.
+	// checks no GossipSub message exchange should no longer happen between node1 and node2.
 	p2ptest.EnsureNoPubsubExchangeBetweenGroups(
 		t,
 		ctx,

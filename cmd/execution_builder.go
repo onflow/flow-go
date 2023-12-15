@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	"github.com/onflow/go-bitswap"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/host"
 	"github.com/shirou/gopsutil/v3/mem"
@@ -540,15 +541,23 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 
 	// Get latest executed block and a view at that block
 	ctx := context.Background()
-	_, blockID, err := exeNode.executionState.GetHighestExecutedBlockID(ctx)
+	height, blockID, err := exeNode.executionState.GetHighestExecutedBlockID(ctx)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"cannot get the latest executed block id: %w",
-			err)
+			"cannot get the latest executed block id at height %v: %w",
+			height, err)
 	}
+
 	blockSnapshot, _, err := exeNode.executionState.CreateStorageSnapshot(blockID)
 	if err != nil {
-		return nil, fmt.Errorf("cannot create a storage snapshot at block %v: %w", blockID, err)
+		tries, _ := exeNode.ledgerStorage.Tries()
+		trieInfo := "empty"
+		if len(tries) > 0 {
+			trieInfo = fmt.Sprintf("length: %v, 1st: %v, last: %v", len(tries), tries[0].RootHash(), tries[len(tries)-1].RootHash())
+		}
+
+		return nil, fmt.Errorf("cannot create a storage snapshot at block %v at height %v, trie: %s: %w", blockID,
+			height, trieInfo, err)
 	}
 
 	// Get the epoch counter from the smart contract at the last executed block.
@@ -558,7 +567,8 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 		blockSnapshot)
 	// Failing to fetch the epoch counter from the smart contract is a fatal error.
 	if err != nil {
-		return nil, fmt.Errorf("cannot get epoch counter from the smart contract at block %s: %w", blockID.String(), err)
+		return nil, fmt.Errorf("cannot get epoch counter from the smart contract at block %s at height %v: %w",
+			blockID.String(), height, err)
 	}
 
 	// Get the epoch counter form the protocol state, at the same block.
@@ -577,6 +587,7 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 		Uint64("contractEpochCounter", contractEpochCounter).
 		Uint64("protocolStateEpochCounter", protocolStateEpochCounter).
 		Str("blockID", blockID.String()).
+		Uint64("height", height).
 		Logger()
 
 	if contractEpochCounter != protocolStateEpochCounter {
@@ -697,6 +708,14 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 		exeNode.registerStore,
 		exeNode.exeConf.enableStorehouse,
 	)
+
+	height, _, err := exeNode.executionState.GetHighestExecutedBlockID(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("could not get highest executed block: %w", err)
+	}
+
+	log.Info().Msgf("execution state highest executed block height: %v", height)
+	exeNode.collector.ExecutionLastExecutedBlockHeight(height)
 
 	return &module.NoopReadyDoneAware{}, nil
 }
@@ -1117,7 +1136,7 @@ func (exeNode *ExecutionNode) LoadReceiptProviderEngine(
 	receiptRequestQueue := queue.NewHeroStore(exeNode.exeConf.receiptRequestsCacheSize, node.Logger, receiptRequestQueueMetric)
 
 	eng, err := provider.New(
-		node.Logger,
+		node.Logger.With().Str("engine", "receipt_provider").Logger(),
 		node.Metrics.Engine,
 		node.EngineRegistry,
 		node.Me,
@@ -1306,6 +1325,10 @@ func copyBootstrapState(dir, trie string) error {
 
 	// copy from the bootstrap folder to the execution state folder
 	from, to := path.Join(dir, bootstrapFilenames.DirnameExecutionState), trie
+
+	log.Info().Str("dir", dir).Str("trie", trie).
+		Msgf("copying checkpoint file %v from directory: %v, to: %v", filename, from, to)
+
 	copiedFiles, err := wal.CopyCheckpointFile(filename, from, to)
 	if err != nil {
 		return fmt.Errorf("can not copy checkpoint file %s, from %s to %s",

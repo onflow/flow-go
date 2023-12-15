@@ -194,7 +194,7 @@ func (collector *resultCollector) commitCollection(
 	spock, err := collector.signer.SignFunc(
 		collectionExecutionSnapshot.SpockSecret,
 		collector.spockHasher,
-		SPOCKProve)
+		crypto.SPOCKProve)
 	if err != nil {
 		return fmt.Errorf("signing spock hash failed: %w", err)
 	}
