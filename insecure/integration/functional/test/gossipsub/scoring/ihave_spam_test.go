@@ -398,12 +398,13 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 }
 
 // spamIHaveBrokenPromises is a test utility function that is exclusive for the TestGossipSubIHaveBrokenPromises_.* tests.
-// It creates and sends 10 RPCs each with 1 iHave message, each iHave message has 400 message ids, hence overall, we have 4000 iHave message ids.
-// It then sends those iHave spams to the victim node and waits till the victim node receives them.
+// It creates and sends 10 RPCs each with 1 iHave message, each iHave message has 500 message ids, hence overall, we have 5000 iHave message ids.
+// It then sends those iHave spams to the victim node and waits till the victim node responds with iWants for all the spam iHaves.
 // There are some notes to consider:
-// - we can't send more than one iHave per RPC in this test, as each iHave should have a distinct topic, and we only have one subscribed topic in the TestGossipSubIHaveBrokenPromises_.* tests.
-// - we can't send more than 10 RPCs containing iHave messages per heartbeat (1 sec). This is a gossipsub parameter (GossipSubMaxIHaveMessages). Hence, we choose 9 RPCs to always stay below the threshold.
-// - we can't send more than 5000 iHave messages per heartbeat (1 sec). This is a gossipsub parameter (GossipSubMaxIHaveLength). Hence, we choose 400 message ids per iHave message to always stay below the threshold (9 * 400 = 3600).
+// - we can't send more than one iHave message per RPC in this test, as each iHave should have a distinct topic, and we only have one subscribed topic in the TestGossipSubIHaveBrokenPromises_.* tests.
+// - we can't send more than 10 RPCs containing iHave messages per heartbeat (1 sec). This is a gossipsub parameter (GossipSubMaxIHaveMessages). Hence, we choose 10 RPCs to always stay at the threshold.
+// - we can't send more than 5000 iHave messages per heartbeat (1 sec). This is a gossipsub parameter (GossipSubMaxIHaveLength). Hence, we choose 500 message ids per iHave message to always stay at the threshold (10 * 500 = 5000).
+// - Note that victim nodes picks one iHave id out of the entire RPC and if that iHave id is not eventually delivered within 3 seconds (gossipsub parameter, GossipSubIWantFollowupTime), then the promise is considered broken. Hence, broken promises are counted per RPC (not per iHave message).
 // Args:
 // - t: the test instance.
 // - spammer: the spammer node.
@@ -420,18 +421,20 @@ func spamIHaveBrokenPromise(t *testing.T,
 	// when the node does not have a topic subscription, it will discard the iHave message.
 	iHavesPerRPC := 1
 	// there is a cap on the max iHaves a gossipsub node processes per heartbeat (1 sec), we don't want to exceed that (currently 5000 iHave messages per heartbeat).
-	messageIdsPerIHave := 100
+	messageIdsPerIHave := 500
 	spamCtrlMsgs := spammer.GenerateCtlMessages(rpcCount, p2ptest.WithIHave(iHavesPerRPC, messageIdsPerIHave, topic))
+
 	// sanity check
-	require.Len(t, spamCtrlMsgs, rpcCount) // 10 RPCs
+	require.Len(t, spamCtrlMsgs, rpcCount)
 	var sentIHaves []string
+
 	// checks that iHave message ids are not duplicated
 	for _, msg := range spamCtrlMsgs {
 		// sanity check
-		require.Len(t, msg.Ihave, iHavesPerRPC) // 1 iHave message per RPC
+		require.Len(t, msg.Ihave, iHavesPerRPC)
 		for _, iHave := range msg.Ihave {
 			// sanity check
-			require.Len(t, iHave.MessageIDs, messageIdsPerIHave) // 50 message ids per iHave message
+			require.Len(t, iHave.MessageIDs, messageIdsPerIHave)
 			for _, msgId := range iHave.MessageIDs {
 				require.NotContains(t, sentIHaves, msgId)
 				sentIHaves = append(sentIHaves, msgId)
@@ -441,6 +444,8 @@ func spamIHaveBrokenPromise(t *testing.T,
 
 	// spams the victim node with spam iHave messages, since iHave messages are for junk message ids, there will be no
 	// reply from spammer to victim over the iWants. Hence, the victim must count this towards 10 broken promises eventually.
+	// Note that victim nodes picks one iHave id out of the entire RPC and if that iHave id is not eventually delivered within 3 seconds (gossipsub parameter, GossipSubIWantFollowupTime),
+	// then the promise is considered broken. Hence, broken promises are counted per RPC (not per iHave message).
 	// This sums up to 10 broken promises (1 per RPC).
 	wg := sync.WaitGroup{}
 	for i := 0; i < len(spamCtrlMsgs); i++ {
@@ -450,7 +455,8 @@ func spamIHaveBrokenPromise(t *testing.T,
 			defer wg.Done()
 			spammer.SpamControlMessage(t, victimNode, []pb.ControlMessage{spamCtrlMsgs[i]})
 		}()
-		// we wait 100 milliseconds between each RPC to avoid overwhelming the victim node (it may throttle the spammer node).
+		// we wait 100 milliseconds between each RPC to add an artificial delay between RPCs; this is to reduce the chance that all RPCs arrive in the same heartbeat, hence
+		// victim node dropping some.
 		time.Sleep(100 * time.Millisecond)
 	}
 
