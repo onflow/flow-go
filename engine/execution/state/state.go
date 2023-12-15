@@ -86,6 +86,7 @@ type ExecutionState interface {
 	) error
 
 	// only available with storehouse enabled
+	// panic when called with storehouse disabled (which should be a bug)
 	GetHighestFinalizedExecuted() uint64
 }
 
