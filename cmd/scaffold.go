@@ -53,13 +53,13 @@ import (
 	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dns"
-	"github.com/onflow/flow-go/network/p2p/p2pnet"
 	"github.com/onflow/flow-go/network/p2p/ping"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/network/p2p/utils/ratelimiter"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/topology"
+	"github.com/onflow/flow-go/network/underlay"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
@@ -452,22 +452,22 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
 	unicastRateLimiters *ratelimit.RateLimiters,
 	peerManagerFilters []p2p.PeerFilter) (network.EngineRegistry, error) {
 
-	var networkOptions []p2pnet.NetworkOption
+	var networkOptions []underlay.NetworkOption
 	if len(fnb.MsgValidators) > 0 {
-		networkOptions = append(networkOptions, p2pnet.WithMessageValidators(fnb.MsgValidators...))
+		networkOptions = append(networkOptions, underlay.WithMessageValidators(fnb.MsgValidators...))
 	}
 
 	// by default if no rate limiter configuration was provided in the CLI args the default
 	// noop rate limiter will be used.
-	networkOptions = append(networkOptions, p2pnet.WithUnicastRateLimiters(unicastRateLimiters))
+	networkOptions = append(networkOptions, underlay.WithUnicastRateLimiters(unicastRateLimiters))
 
 	networkOptions = append(networkOptions,
-		p2pnet.WithPreferredUnicastProtocols(protocols.ToProtocolNames(fnb.FlowConfig.NetworkConfig.PreferredUnicastProtocols)...),
+		underlay.WithPreferredUnicastProtocols(protocols.ToProtocolNames(fnb.FlowConfig.NetworkConfig.PreferredUnicastProtocols)...),
 	)
 
 	// peerManagerFilters are used by the peerManager via the network to filter peers from the topology.
 	if len(peerManagerFilters) > 0 {
-		networkOptions = append(networkOptions, p2pnet.WithPeerManagerFilters(peerManagerFilters...))
+		networkOptions = append(networkOptions, underlay.WithPeerManagerFilters(peerManagerFilters...))
 	}
 
 	receiveCache := netcache.NewHeroReceiveCache(fnb.FlowConfig.NetworkConfig.NetworkReceivedMessageCacheSize,
@@ -480,7 +480,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
 	}
 
 	// creates network instance
-	net, err := p2pnet.NewNetwork(&p2pnet.NetworkConfig{
+	net, err := underlay.NewNetwork(&underlay.NetworkConfig{
 		Logger:                fnb.Logger,
 		Libp2pNode:            fnb.LibP2PNode,
 		Codec:                 fnb.CodecFactory(),
@@ -1061,7 +1061,7 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 			filter.And(
 				filter.HasRole(flow.RoleConsensus),
 				filter.Not(filter.HasNodeID(node.Me.NodeID())),
-				p2pnet.NotEjectedFilter,
+				underlay.NotEjectedFilter,
 			),
 			node.IdentityProvider,
 		)

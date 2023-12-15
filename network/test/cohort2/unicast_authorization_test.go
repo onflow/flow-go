@@ -23,8 +23,7 @@ import (
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/logging"
-	"github.com/onflow/flow-go/network/p2p/p2pnet"
+	"github.com/onflow/flow-go/network/underlay"
 	"github.com/onflow/flow-go/network/validator"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -84,8 +83,8 @@ func (u *UnicastAuthorizationTestSuite) setupNetworks(slashingViolationsConsumer
 		u.sporkId,
 		ids,
 		libP2PNodes,
-		p2pnet.WithCodec(u.codec),
-		p2pnet.WithSlashingViolationConsumerFactory(func(_ network.ConduitAdapter) network.ViolationsConsumer {
+		underlay.WithCodec(u.codec),
+		underlay.WithSlashingViolationConsumerFactory(func(_ network.ConduitAdapter) network.ViolationsConsumer {
 			return slashingViolationsConsumer
 		}))
 	require.Len(u.T(), ids, 2)
@@ -446,7 +445,7 @@ func (u *UnicastAuthorizationTestSuite) TestUnicastAuthorization_ReceiverHasNoSu
 		MsgType:  "*message.TestMessage",
 		Channel:  channels.TestNetworkChannel,
 		Protocol: message.ProtocolTypeUnicast,
-		Err:      p2pnet.ErrUnicastMsgWithoutSub,
+		Err:      underlay.ErrUnicastMsgWithoutSub,
 	}
 
 	slashingViolationsConsumer.On("OnUnauthorizedUnicastOnChannel", expectedViolation).

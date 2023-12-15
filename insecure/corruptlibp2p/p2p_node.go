@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
+	p2pnode "github.com/onflow/flow-go/network/p2p/node"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
 )
 
@@ -35,7 +36,7 @@ func AcceptAllTopicValidator() p2p.TopicValidatorFunc {
 
 // CorruptP2PNode is a wrapper around the original LibP2P node.
 type CorruptP2PNode struct {
-	*node.Node
+	*p2pnode.Node
 	logger zerolog.Logger
 	codec  network.Codec
 }

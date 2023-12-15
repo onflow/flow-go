@@ -17,8 +17,8 @@ import (
 	"github.com/onflow/flow-go/network/p2p/builder/config"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dht"
-	"github.com/onflow/flow-go/network/p2p/p2pnet"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
+	"github.com/onflow/flow-go/network/underlay"
 	"github.com/onflow/flow-go/utils/unittest"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -51,7 +51,7 @@ type BlobServiceTestSuite struct {
 	suite.Suite
 
 	cancel       context.CancelFunc
-	networks     []*p2pnet.Network
+	networks     []*underlay.Network
 	blobServices []network.BlobService
 	datastores   []datastore.Batching
 	blobCids     []cid.Cid

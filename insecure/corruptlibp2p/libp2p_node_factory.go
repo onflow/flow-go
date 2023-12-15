@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	p2pbuilder "github.com/onflow/flow-go/network/p2p/builder"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/builder/config"
+	p2pnode "github.com/onflow/flow-go/network/p2p/node"
 )
 
 // InitCorruptLibp2pNode initializes and returns a corrupt libp2p node that should only be used for BFT testing in
@@ -103,7 +104,7 @@ func InitCorruptLibp2pNode(
 	}
 	if topicValidatorDisabled {
 		builder.OverrideNodeConstructor(func(config *p2p.NodeConfig) (p2p.LibP2PNode, error) {
-			node, err := node.NewNode(&p2p.NodeConfig{
+			node, err := p2pnode.NewNode(&p2p.NodeConfig{
 				Logger:               config.Logger,
 				Host:                 config.Host,
 				PeerManager:          config.PeerManager,

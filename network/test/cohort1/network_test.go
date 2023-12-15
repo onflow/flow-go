@@ -35,10 +35,10 @@ import (
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/p2pnet"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/network/p2p/utils/ratelimiter"
+	"github.com/onflow/flow-go/network/underlay"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -88,7 +88,7 @@ type NetworkTestSuite struct {
 	sync.RWMutex
 	size        int // used to determine number of networks under test
 	libP2PNodes []p2p.LibP2PNode
-	networks    []*p2pnet.Network
+	networks    []*underlay.Network
 	obs         chan string // used to keep track of Protect events tagged by pubsub messages
 	ids         []*flow.Identity
 	metrics     *metrics.NoopCollector // no-op performance monitoring simulation
@@ -204,7 +204,7 @@ func (suite *NetworkTestSuite) TestUpdateNodeAddresses() {
 		idProvider,
 		suite.sporkId,
 		libP2PNodes[0])
-	newNet, err := p2pnet.NewNetwork(networkCfg)
+	newNet, err := underlay.NewNetwork(networkCfg)
 	require.NoError(suite.T(), err)
 	require.Len(suite.T(), ids, 1)
 	newId := ids[0]
@@ -303,10 +303,10 @@ func (suite *NetworkTestSuite) TestUnicastRateLimit_Messages() {
 		idProvider,
 		suite.sporkId,
 		libP2PNodes[0])
-	newNet, err := p2pnet.NewNetwork(
+	newNet, err := underlay.NewNetwork(
 		netCfg,
-		p2pnet.WithUnicastRateLimiters(rateLimiters),
-		p2pnet.WithPeerManagerFilters(testutils.IsRateLimitedPeerFilter(messageRateLimiter)))
+		underlay.WithUnicastRateLimiters(rateLimiters),
+		underlay.WithPeerManagerFilters(testutils.IsRateLimitedPeerFilter(messageRateLimiter)))
 	require.NoError(suite.T(), err)
 
 	require.Len(suite.T(), ids, 1)
@@ -449,10 +449,10 @@ func (suite *NetworkTestSuite) TestUnicastRateLimit_Bandwidth() {
 		idProvider,
 		suite.sporkId,
 		libP2PNodes[0])
-	newNet, err := p2pnet.NewNetwork(
+	newNet, err := underlay.NewNetwork(
 		netCfg,
-		p2pnet.WithUnicastRateLimiters(rateLimiters),
-		p2pnet.WithPeerManagerFilters(testutils.IsRateLimitedPeerFilter(bandwidthRateLimiter)))
+		underlay.WithUnicastRateLimiters(rateLimiters),
+		underlay.WithPeerManagerFilters(testutils.IsRateLimitedPeerFilter(bandwidthRateLimiter)))
 	require.NoError(suite.T(), err)
 	require.Len(suite.T(), ids, 1)
 	newId := ids[0]
@@ -760,7 +760,7 @@ func (suite *NetworkTestSuite) TestMaxMessageSize_Unicast() {
 	// so the generated payload is 1000 bytes below the maximum unicast message size.
 	// We hence add up 1000 bytes to the input of network payload fixture to make
 	// sure that payload is beyond the permissible size.
-	payload := testutils.NetworkPayloadFixture(suite.T(), uint(p2pnet.DefaultMaxUnicastMsgSize)+1000)
+	payload := testutils.NetworkPayloadFixture(suite.T(), uint(underlay.DefaultMaxUnicastMsgSize)+1000)
 	event := &libp2pmessage.TestMessage{
 		Text: string(payload),
 	}
@@ -779,7 +779,7 @@ func (suite *NetworkTestSuite) TestLargeMessageSize_SendDirect() {
 	targetId := suite.ids[targetIndex].NodeID
 
 	// creates a network payload with a size greater than the default max size using a known large message type
-	targetSize := uint64(p2pnet.DefaultMaxUnicastMsgSize) + 1000
+	targetSize := uint64(underlay.DefaultMaxUnicastMsgSize) + 1000
 	event := unittest.ChunkDataResponseMsgFixture(unittest.IdentifierFixture(), unittest.WithApproximateSize(targetSize))
 
 	// expect one message to be received by the target
@@ -917,7 +917,7 @@ func TestChunkDataPackMaxMessageSize(t *testing.T) {
 	require.NoError(t, err)
 
 	// get the max message size for the message
-	size, err := p2pnet.UnicastMaxMsgSizeByCode(msg.Proto().Payload)
+	size, err := underlay.UnicastMaxMsgSizeByCode(msg.Proto().Payload)
 	require.NoError(t, err)
-	require.Equal(t, p2pnet.LargeMsgMaxUnicastMsgSize, size)
+	require.Equal(t, underlay.LargeMsgMaxUnicastMsgSize, size)
 }
