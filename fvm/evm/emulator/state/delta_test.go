@@ -439,7 +439,7 @@ func TestDeltaView(t *testing.T) {
 		require.Equal(t, initRefund+addition-subtract, view.GetRefund())
 	})
 
-	t.Run("test access list  functionality", func(t *testing.T) {
+	t.Run("test access list functionality", func(t *testing.T) {
 		addr1 := testutils.RandomCommonAddress(t)
 		addr2 := testutils.RandomCommonAddress(t)
 		slot1 := types.SlotAddress{
@@ -478,8 +478,13 @@ func TestDeltaView(t *testing.T) {
 
 		// add addr 2 to the list
 		require.False(t, view.AddressInAccessList(addr2))
-		view.AddAddressToAccessList(addr2)
+		added := view.AddAddressToAccessList(addr2)
+		require.True(t, added)
 		require.True(t, view.AddressInAccessList(addr2))
+
+		// adding again
+		added = view.AddAddressToAccessList(addr2)
+		require.False(t, added)
 
 		// check slot through parent
 		addrFound, slotFound := view.SlotInAccessList(slot1)
@@ -490,11 +495,19 @@ func TestDeltaView(t *testing.T) {
 		addrFound, slotFound = view.SlotInAccessList(slot2)
 		require.False(t, addrFound)
 		require.False(t, slotFound)
-		view.AddSlotToAccessList(slot2)
+
+		addressAdded, slotAdded := view.AddSlotToAccessList(slot2)
+		require.True(t, addressAdded)
+		require.True(t, slotAdded)
 
 		addrFound, slotFound = view.SlotInAccessList(slot2)
-		require.False(t, addrFound)
+		require.True(t, addrFound)
 		require.True(t, slotFound)
+
+		// adding again
+		addressAdded, slotAdded = view.AddSlotToAccessList(slot2)
+		require.False(t, addressAdded)
+		require.False(t, slotAdded)
 	})
 
 	t.Run("test log functionality", func(t *testing.T) {

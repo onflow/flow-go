@@ -81,9 +81,9 @@ type HotView interface {
 	SubRefund(uint64)
 
 	// AddAddressToAccessList adds an address to the access list
-	AddAddressToAccessList(addr gethCommon.Address)
+	AddAddressToAccessList(addr gethCommon.Address) (addressAdded bool)
 	// AddSlotToAccessList adds a slot to the access list
-	AddSlotToAccessList(SlotAddress)
+	AddSlotToAccessList(SlotAddress) (addressAdded, slotAdded bool)
 
 	// AddLog append a log to the log collection
 	AddLog(*gethTypes.Log)

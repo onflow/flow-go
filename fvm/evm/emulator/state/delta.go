@@ -326,8 +326,10 @@ func (d *DeltaView) AddressInAccessList(addr gethCommon.Address) bool {
 }
 
 // AddAddressToAccessList adds an address to the access list
-func (d *DeltaView) AddAddressToAccessList(addr gethCommon.Address) {
+func (d *DeltaView) AddAddressToAccessList(addr gethCommon.Address) bool {
+	addrPresent := d.AddressInAccessList(addr)
 	d.accessListAddresses[addr] = struct{}{}
+	return !addrPresent
 }
 
 // SlotInAccessList checks if the slot is in the access list
@@ -341,8 +343,11 @@ func (d *DeltaView) SlotInAccessList(sk types.SlotAddress) (addressOk bool, slot
 }
 
 // AddSlotToAccessList adds a slot to the access list
-func (d *DeltaView) AddSlotToAccessList(sk types.SlotAddress) {
+func (d *DeltaView) AddSlotToAccessList(sk types.SlotAddress) (addrAdded bool, slotAdded bool) {
+	addrPresent, slotPresent := d.SlotInAccessList(sk)
+	d.accessListAddresses[sk.Address] = struct{}{}
 	d.accessListSlots[sk] = struct{}{}
+	return !addrPresent, !slotPresent
 }
 
 // AddLog appends a log to the log collection
