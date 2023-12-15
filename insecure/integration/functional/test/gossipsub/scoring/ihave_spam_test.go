@@ -171,8 +171,8 @@ func TestGossipSubIHaveBrokenPromises_Below_Threshold(t *testing.T) {
 // TestGossipSubIHaveBrokenPromises_Above_Threshold tests that a continuous stream of spam iHave broken promises will
 // eventually cause the spammer node to be graylisted (i.e., no incoming RPCs from the spammer node will be accepted, and
 // no outgoing RPCs to the spammer node will be sent).
-// The test performs 3 rounds of attacks: each round with 10 RPCs, each RPC with 10 iHave messages, each iHave message with 50 message ids, hence overall, we have 5000 iHave message ids.
-// Note that based on GossipSub parameters 5000 iHave is the most one can send within one decay interval.
+// The test performs 3 rounds of attacks: each round with 10 RPCs, each RPC with 1 iHave messages, each iHave message with 500 message ids, hence overall, we have 5000 iHave message ids.
+// Note that based on GossipSub parameters 5000 iHave is the most one can send within one heart beat.
 // First round of attack makes spammers broken promises still below the threshold of 10 RPCs (broken promises are counted per RPC), hence no degradation of the spammers score.
 // Second round of attack makes spammers broken promises above the threshold of 10 RPCs, hence a degradation of the spammers score.
 // Third round of attack makes spammers broken promises to around 20 RPCs above the threshold, which causes the graylisting of the spammer node.
@@ -275,8 +275,8 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 
 		t.Logf("[first round] success on behavioral penalty %f", behavioralPenalty)
 		return true
-		// Note: we have to wait at least 3 seconds for an iHave to be considered as broken promise (gossipsub parameters), we set it to 10
-		// seconds to be on the safe side.
+		// Note: we have to wait at least 3 seconds for an iHave to be considered as broken promise (gossipsub parameters), we set it to 10 seconds to be on the safe side.
+		// Also, the internal heartbeat of GossipSub is 1 second, hence, there is no need to have ticks shorter than 500 milliseconds.
 	}, 10*time.Second, 500*time.Millisecond)
 
 	scoreAfterFirstRound, ok := victimNode.PeerScoreExposer().GetScore(spammer.SpammerNode.ID())
@@ -303,8 +303,8 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 
 		t.Logf("[second round] success on behavioral penalty %f", behavioralPenalty)
 		return true
-		// Note: we have to wait at least 3 seconds for an iHave to be considered as broken promise (gossipsub parameters), we set it to 10
-		// seconds to be on the safe side.
+		// Note: we have to wait at least 3 seconds for an iHave to be considered as broken promise (gossipsub parameters), we set it to 10 seconds to be on the safe side.
+		// Also, the internal heartbeat of GossipSub is 1 second, hence, there is no need to have ticks shorter than 500 milliseconds.
 	}, 10*time.Second, 500*time.Millisecond)
 
 	spammerScore, ok := victimNode.PeerScoreExposer().GetScore(spammer.SpammerNode.ID())
@@ -358,8 +358,8 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 
 		t.Logf("[third round] success on behavioral penalty %f", behavioralPenalty)
 		return true
-		// Note: we have to wait at least 3 seconds for an iHave to be considered as broken promise (gossipsub parameters), we set it to 10
-		// seconds to be on the safe side.
+		// Note: we have to wait at least 3 seconds for an iHave to be considered as broken promise (gossipsub parameters), we set it to 10 seconds to be on the safe side.
+		// Also, the internal heartbeat of GossipSub is 1 second, hence, there is no need to have ticks shorter than 500 milliseconds.
 	}, 10*time.Second, 500*time.Millisecond)
 
 	spammerScore, ok = victimNode.PeerScoreExposer().GetScore(spammer.SpammerNode.ID())
