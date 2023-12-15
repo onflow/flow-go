@@ -48,6 +48,7 @@ func newStateMutator(
 	results storage.ExecutionResults,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
+	params protocol.GlobalParams,
 	candidateView uint64,
 	parentState *flow.RichProtocolStateEntry,
 	happyPathStateMachineFactory StateMachineFactoryMethod,
@@ -57,12 +58,15 @@ func newStateMutator(
 		stateMachine ProtocolStateMachine
 		err          error
 	)
-	if parentState.InvalidEpochTransitionAttempted {
-		// InvalidEpochTransitionAttempted being true indicates that we have encountered an invalid epoch service event
-		// or an invalid state transition. In this case, the stateMutator enters EFM by utilizing a specialized
-		// ProtocolStateMachine for evolving the protocol state during EFM.
+	candidateAttemptsInvalidEpochTransition := epochFallbackTriggeredByIncorporatingCandidate(candidateView, params, parentState)
+	if parentState.InvalidEpochTransitionAttempted || candidateAttemptsInvalidEpochTransition {
+		// Case 1: InvalidEpochTransitionAttempted is true, indicating that we have encountered an invalid
+		//         epoch service event or an invalid state transition previously in this fork.
+		// Case 2: Incorporating the candidate block is itself an invalid epoch transition.
 		//
-		// Whenever invalid epoch state transition has been observed only epochFallbackStateMachines must be created for subsequent views.
+		// In either case, Epoch Fallback Mode [EFM] has been tentatively triggered on this fork,
+		// and we must use only the `epochFallbackStateMachine` along this fork.
+		//
 		// TODO for 'leaving Epoch Fallback via special service event': this might need to change.
 		stateMachine, err = epochFallbackStateMachineFactory(candidateView, parentState)
 	} else {
@@ -254,7 +258,7 @@ func (m *stateMutator) applyServiceEventsFromOrderedResults(results []*flow.Exec
 	return dbUpdates, nil
 }
 
-// transitionToEpochFallbackMode transitions the protocol state to Epoch Fallback Mode (EFM).
+// transitionToEpochFallbackMode transitions the protocol state to Epoch Fallback Mode [EFM].
 // This is implemented by switching to a different state machine implementation, which ignores all service events and epoch transitions.
 // At the moment, this is a one-way transition: once we enter EFM, the only way to return to normal is with a spork.
 func (m *stateMutator) transitionToEpochFallbackMode(results []*flow.ExecutionResult) ([]func(tx *transaction.Tx) error, error) {
@@ -268,4 +272,24 @@ func (m *stateMutator) transitionToEpochFallbackMode(results []*flow.ExecutionRe
 		return nil, irrecoverable.NewExceptionf("could not apply service events after transition to epoch fallback mode: %w", err)
 	}
 	return dbUpdates, nil
+}
+
+// epochFallbackTriggeredByIncorporatingCandidate checks whether incorporating the input block B
+// would trigger epoch fallback mode [EFM] along the current fork. We trigger epoch fallback mode
+// when:
+//  1. The next epoch has not been committed as of B (EpochPhase ≠ flow.EpochPhaseCommitted) AND
+//  2. B is the first incorporated block with view greater than or equal to the epoch commitment
+//     deadline for the current epoch
+//
+// In protocol terms, condition 1 means that an EpochCommit service event for the upcoming epoch has
+// not yet been sealed as of block B. Formally, a service event S is considered sealed as of block B if:
+//   - S was emitted during execution of some block A, s.t. A is an ancestor of B.
+//   - The seal for block A was included in some block C, s.t C is an ancestor of B.
+//
+// For further details see `params.EpochCommitSafetyThreshold()`.
+func epochFallbackTriggeredByIncorporatingCandidate(candidateView uint64, params protocol.GlobalParams, parentState *flow.RichProtocolStateEntry) bool {
+	if parentState.EpochPhase() == flow.EpochPhaseCommitted { // Requirement 1
+		return false
+	}
+	return candidateView+params.EpochCommitSafetyThreshold() >= parentState.CurrentEpochSetup.FinalView // Requirement 2
 }
