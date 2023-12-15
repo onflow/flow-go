@@ -66,7 +66,8 @@ func TestGossipSubIHaveBrokenPromises_Below_Threshold(t *testing.T) {
 	require.NoError(t, err)
 	// we override the decay interval to 1 second so that the score is updated within 1 second intervals.
 	conf.NetworkConfig.GossipSub.ScoringParameters.DecayInterval = 1 * time.Second
-	conf.NetworkConfig.GossipSub.RpcTracer.ScoreTracerInterval = 1 * time.Second
+	// score tracer interval is set to 500 milliseconds to speed up the test, it should be shorter than the heartbeat interval (1 second) of gossipsub to catch the score updates in time.
+	conf.NetworkConfig.GossipSub.RpcTracer.ScoreTracerInterval = 500 * time.Millisecond
 	victimNode, victimIdentity := p2ptest.NodeFixture(
 		t,
 		sporkId,
@@ -123,8 +124,8 @@ func TestGossipSubIHaveBrokenPromises_Below_Threshold(t *testing.T) {
 		return true
 		// Note: we have to wait at least 3 seconds for an iHave to be considered as broken promise (gossipsub parameters), we set it to 10
 		// seconds to be on the safe side.
-		// Also, the internal heartbeat of GossipSub is 1 second, hence, there is no need to have ticks shorter than 1 second.
-	}, 10*time.Second, 1*time.Second)
+		// Also, the internal heartbeat of GossipSub is 1 second, hence, there is no need to have ticks shorter than 500 milliseconds.
+	}, 10*time.Second, 500*time.Millisecond)
 
 	spammerScore, ok := victimNode.PeerScoreExposer().GetScore(spammer.SpammerNode.ID())
 	require.True(t, ok, "sanity check failed, we should have a score for the spammer node")
@@ -159,7 +160,7 @@ func TestGossipSubIHaveBrokenPromises_Below_Threshold(t *testing.T) {
 		}
 
 		return true
-	}, 2*time.Second, 100*time.Millisecond, "sanity check failed, the spammer behavioral counter must be decayed after a heartbeat")
+	}, 2*time.Second, 500*time.Millisecond, "sanity check failed, the spammer behavioral counter must be decayed after a heartbeat")
 
 	// since spammer stays below the threshold, it should be able to exchange messages with the victim node over pubsub.
 	p2ptest.EnsurePubsubMessageExchange(t, ctx, nodes, blockTopic, 1, func() interface{} {
@@ -204,7 +205,8 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 	conf.NetworkConfig.GossipSub.RpcInspector.Validation.IHave.MaxMessageIDSampleSize = 10000
 	// we override the decay interval to 1 second so that the score is updated within 1 second intervals.
 	conf.NetworkConfig.GossipSub.ScoringParameters.DecayInterval = 1 * time.Second
-	conf.NetworkConfig.GossipSub.RpcTracer.ScoreTracerInterval = 1 * time.Second
+	// score tracer interval is set to 500 milliseconds to speed up the test, it should be shorter than the heartbeat interval (1 second) of gossipsub to catch the score updates in time.
+	conf.NetworkConfig.GossipSub.RpcTracer.ScoreTracerInterval = 500 * time.Millisecond
 
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
@@ -275,7 +277,7 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 		return true
 		// Note: we have to wait at least 3 seconds for an iHave to be considered as broken promise (gossipsub parameters), we set it to 10
 		// seconds to be on the safe side.
-	}, 10*time.Second, 1*time.Second)
+	}, 10*time.Second, 500*time.Millisecond)
 
 	scoreAfterFirstRound, ok := victimNode.PeerScoreExposer().GetScore(spammer.SpammerNode.ID())
 	require.True(t, ok, "score for spammer node must be present")
@@ -303,7 +305,7 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 		return true
 		// Note: we have to wait at least 3 seconds for an iHave to be considered as broken promise (gossipsub parameters), we set it to 10
 		// seconds to be on the safe side.
-	}, 10*time.Second, 1*time.Second)
+	}, 10*time.Second, 500*time.Millisecond)
 
 	spammerScore, ok := victimNode.PeerScoreExposer().GetScore(spammer.SpammerNode.ID())
 	require.True(t, ok, "sanity check failed, we should have a score for the spammer node")
@@ -358,7 +360,7 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 		return true
 		// Note: we have to wait at least 3 seconds for an iHave to be considered as broken promise (gossipsub parameters), we set it to 10
 		// seconds to be on the safe side.
-	}, 10*time.Second, 1*time.Second)
+	}, 10*time.Second, 500*time.Millisecond)
 
 	spammerScore, ok = victimNode.PeerScoreExposer().GetScore(spammer.SpammerNode.ID())
 	require.True(t, ok, "sanity check failed, we should have a score for the spammer node")
