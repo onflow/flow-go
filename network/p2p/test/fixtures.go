@@ -106,9 +106,6 @@ func NodeFixture(t *testing.T,
 		ConnGater:         connectionGater,
 		PeerManagerConfig: PeerManagerConfigFixture(), // disabled by default
 		FlowConfig:        defaultFlowConfig,
-		UnicastConfig: &p2pconfig.UnicastConfig{
-			UnicastConfig: defaultFlowConfig.NetworkConfig.UnicastConfig,
-		},
 	}
 
 	for _, opt := range opts {
@@ -121,7 +118,7 @@ func NodeFixture(t *testing.T,
 
 	logger := parameters.Logger.With().Hex("node_id", logging.ID(identity.NodeID)).Logger()
 
-	connManager, err := connection.NewConnManager(logger, parameters.MetricsCfg.Metrics, &parameters.FlowConfig.NetworkConfig.ConnectionManagerConfig)
+	connManager, err := connection.NewConnManager(logger, parameters.MetricsCfg.Metrics, &parameters.FlowConfig.NetworkConfig.ConnectionManager)
 	require.NoError(t, err)
 
 	builder := p2pbuilder.NewNodeBuilder(
@@ -139,9 +136,11 @@ func NodeFixture(t *testing.T,
 			MaxSize: uint32(1000),
 			Metrics: metrics.NewNoopCollector(),
 		},
-		parameters.UnicastConfig).
+		&p2pconfig.UnicastConfig{
+			Unicast:                parameters.FlowConfig.NetworkConfig.Unicast,
+			RateLimiterDistributor: parameters.UnicastRateLimiterDistributor,
+		}).
 		SetConnectionManager(connManager).
-		SetCreateNode(p2pbuilder.DefaultCreateNodeFunc).
 		SetResourceManager(parameters.ResourceManager)
 
 	if parameters.DhtOptions != nil && (parameters.Role != flow.RoleAccess && parameters.Role != flow.RoleExecution) {
@@ -212,7 +211,6 @@ type NodeFixtureParameters struct {
 	HandlerFunc                       network.StreamHandler
 	NetworkingType                    flownet.NetworkingType
 	Unicasts                          []protocols.ProtocolName
-	UnicastConfig                     *p2pconfig.UnicastConfig
 	Key                               crypto.PrivateKey
 	Address                           string
 	DhtOptions                        []dht.Option
@@ -231,11 +229,12 @@ type NodeFixtureParameters struct {
 	ResourceManager                   network.ResourceManager
 	GossipSubRpcInspectorSuiteFactory p2p.GossipSubRpcInspectorSuiteFactoryFunc
 	FlowConfig                        *config.FlowConfig
+	UnicastRateLimiterDistributor     p2p.UnicastRateLimiterDistributor
 }
 
 func WithUnicastRateLimitDistributor(distributor p2p.UnicastRateLimiterDistributor) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
-		p.UnicastConfig.RateLimiterDistributor = distributor
+		p.UnicastRateLimiterDistributor = distributor
 	}
 }
 
@@ -248,12 +247,6 @@ func OverrideGossipSubRpcInspectorSuiteFactory(factory p2p.GossipSubRpcInspector
 func OverrideFlowConfig(cfg *config.FlowConfig) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
 		p.FlowConfig = cfg
-	}
-}
-
-func WithCreateStreamRetryDelay(delay time.Duration) NodeFixtureParameterOption {
-	return func(p *NodeFixtureParameters) {
-		p.UnicastConfig.CreateStreamBackoffDelay = delay
 	}
 }
 
@@ -579,7 +572,7 @@ func EnsureStreamCreationInBothDirections(t *testing.T, ctx context.Context, nod
 				continue
 			}
 			// stream creation should pass without error
-			err := this.OpenProtectedStream(ctx, other.ID(), t.Name(), func(stream network.Stream) error {
+			err := this.OpenAndWriteOnStream(ctx, other.ID(), t.Name(), func(stream network.Stream) error {
 				// do nothing
 				require.NotNil(t, stream)
 				return nil

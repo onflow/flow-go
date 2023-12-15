@@ -1,4 +1,4 @@
-package p2pnode
+package internal
 
 import (
 	"fmt"

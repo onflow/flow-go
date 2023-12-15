@@ -256,8 +256,8 @@ func (_m *LibP2PNode) OnDisallowListNotification(id peer.ID, cause network.Disal
 	_m.Called(id, cause)
 }
 
-// OpenProtectedStream provides a mock function with given fields: ctx, peerID, protectionTag, writingLogic
-func (_m *LibP2PNode) OpenProtectedStream(ctx context.Context, peerID peer.ID, protectionTag string, writingLogic func(corenetwork.Stream) error) error {
+// OpenAndWriteOnStream provides a mock function with given fields: ctx, peerID, protectionTag, writingLogic
+func (_m *LibP2PNode) OpenAndWriteOnStream(ctx context.Context, peerID peer.ID, protectionTag string, writingLogic func(corenetwork.Stream) error) error {
 	ret := _m.Called(ctx, peerID, protectionTag, writingLogic)
 
 	var r0 error
