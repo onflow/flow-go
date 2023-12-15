@@ -58,7 +58,7 @@ func newStateMutator(
 		stateMachine ProtocolStateMachine
 		err          error
 	)
-	candidateAttemptsInvalidEpochTransition := epochFallbackTriggeredByIncorporatingCandidate(candidateView, params.EpochCommitSafetyThreshold(), parentState.CurrentEpochSetup.FinalView, parentState.EpochPhase())
+	candidateAttemptsInvalidEpochTransition := epochFallbackTriggeredByIncorporatingCandidate(candidateView, params, parentState)
 	if parentState.InvalidEpochTransitionAttempted || candidateAttemptsInvalidEpochTransition {
 		// Case 1: InvalidEpochTransitionAttempted is true, indicating that we have encountered an invalid
 		//         epoch service event or an invalid state transition previously in this fork.
@@ -274,15 +274,22 @@ func (m *stateMutator) transitionToEpochFallbackMode(results []*flow.ExecutionRe
 	return dbUpdates, nil
 }
 
-// epochFallbackTriggeredByIncorporatingCandidate checks whether incorporating the input block
-// would trigger epoch fallback mode [EFM] along the current fork. In particular, we trigger epoch
-// fallback mode when:
-//  1. The next epoch has not been committed as of B (EpochPhase < flow.EpochPhaseCommitted) AND
+// epochFallbackTriggeredByIncorporatingCandidate checks whether incorporating the input block B
+// would trigger epoch fallback mode [EFM] along the current fork. We trigger epoch fallback mode
+// when:
+//  1. The next epoch has not been committed as of B (EpochPhase ≠ flow.EpochPhaseCommitted) AND
 //  2. B is the first incorporated block with view greater than or equal to the epoch commitment
 //     deadline for the current epoch
-func epochFallbackTriggeredByIncorporatingCandidate(candidateView, safetyThreshold, finalView uint64, phase flow.EpochPhase) bool {
-	if phase == flow.EpochPhaseCommitted { // Requirement 1
+//
+// In protocol terms, condition 1 means that an EpochCommit service event for the upcoming epoch has
+// not yet been sealed as of block B. Formally, a service event S is considered sealed as of block B if:
+//   - S was emitted during execution of some block A, s.t. A is an ancestor of B.
+//   - The seal for block A was included in some block C, s.t C is an ancestor of B.
+//
+// For further details see `params.EpochCommitSafetyThreshold()`.
+func epochFallbackTriggeredByIncorporatingCandidate(candidateView uint64, params protocol.GlobalParams, parentState *flow.RichProtocolStateEntry) bool {
+	if parentState.EpochPhase() == flow.EpochPhaseCommitted { // Requirement 1
 		return false
 	}
-	return candidateView+safetyThreshold >= finalView // Requirement 2
+	return candidateView+params.EpochCommitSafetyThreshold() >= parentState.CurrentEpochSetup.FinalView // Requirement 2
 }
