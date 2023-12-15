@@ -300,12 +300,13 @@ func Benchmark_PayloadStorage(b *testing.B) {
 	require.NoError(b, err)
 	require.NotNil(b, s)
 
-	batchSizeKey := flow.NewRegisterID("batch", "size")
+	owner := unittest.RandomAddressFixture()
+	batchSizeKey := flow.NewRegisterID(owner, "size")
 	const maxBatchSize = 1024
 	var totalBatchSize int
 
 	keyForBatchSize := func(i int) flow.RegisterID {
-		return flow.NewRegisterID("batch", strconv.Itoa(i))
+		return flow.NewRegisterID(owner, strconv.Itoa(i))
 	}
 	valueForHeightAndKey := func(i, j int) []byte {
 		return []byte(fmt.Sprintf("%d-%d", i, j))

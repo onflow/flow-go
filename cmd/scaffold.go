@@ -394,7 +394,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			fnb.BaseConfig.NodeRole,
 			connGaterCfg,
 			peerManagerCfg,
-			&fnb.FlowConfig.NetworkConfig.GossipSubConfig,
+			&fnb.FlowConfig.NetworkConfig.GossipSub,
 			&fnb.FlowConfig.NetworkConfig.ResourceManager,
 			uniCfg,
 			&fnb.FlowConfig.NetworkConfig.ConnectionManagerConfig,

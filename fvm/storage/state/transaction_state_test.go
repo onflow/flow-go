@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func newTestTransactionState() state.NestedTransactionPreparer {
@@ -50,7 +51,7 @@ func TestUnrestrictedNestedTransactionBasic(t *testing.T) {
 
 	// Ensure the values are written to the correctly nested state
 
-	key := flow.NewRegisterID("address", "key")
+	key := flow.NewRegisterID(unittest.RandomAddressFixture(), "key")
 	val := createByteArray(2)
 
 	err = txn.Set(key, val)
@@ -173,7 +174,7 @@ func TestParseRestrictedNestedTransactionBasic(t *testing.T) {
 
 	// Sanity check
 
-	key := flow.NewRegisterID("address", "key")
+	key := flow.NewRegisterID(unittest.RandomAddressFixture(), "key")
 
 	v, err := restrictedNestedState2.Get(key)
 	require.NoError(t, err)
@@ -280,7 +281,7 @@ func TestRestartNestedTransaction(t *testing.T) {
 	id, err := txn.BeginNestedTransaction()
 	require.NoError(t, err)
 
-	key := flow.NewRegisterID("address", "key")
+	key := flow.NewRegisterID(unittest.RandomAddressFixture(), "key")
 	val := createByteArray(2)
 
 	for i := 0; i < 10; i++ {
@@ -332,7 +333,7 @@ func TestRestartNestedTransactionWithInvalidId(t *testing.T) {
 	id, err := txn.BeginNestedTransaction()
 	require.NoError(t, err)
 
-	key := flow.NewRegisterID("address", "key")
+	key := flow.NewRegisterID(unittest.RandomAddressFixture(), "key")
 	val := createByteArray(2)
 
 	err = txn.Set(key, val)
@@ -498,7 +499,7 @@ func TestFinalizeMainTransaction(t *testing.T) {
 	id1, err := txn.BeginNestedTransaction()
 	require.NoError(t, err)
 
-	registerId := flow.NewRegisterID("foo", "bar")
+	registerId := flow.NewRegisterID(unittest.RandomAddressFixture(), "bar")
 
 	value, err := txn.Get(registerId)
 	require.NoError(t, err)
@@ -531,18 +532,21 @@ func TestInterimReadSet(t *testing.T) {
 
 	// Setup test with a bunch of outstanding nested transaction.
 
-	readRegisterId1 := flow.NewRegisterID("read", "1")
-	readRegisterId2 := flow.NewRegisterID("read", "2")
-	readRegisterId3 := flow.NewRegisterID("read", "3")
-	readRegisterId4 := flow.NewRegisterID("read", "4")
+	readOwner := unittest.RandomAddressFixture()
+	writeOwner := unittest.RandomAddressFixture()
 
-	writeRegisterId1 := flow.NewRegisterID("write", "1")
+	readRegisterId1 := flow.NewRegisterID(readOwner, "1")
+	readRegisterId2 := flow.NewRegisterID(readOwner, "2")
+	readRegisterId3 := flow.NewRegisterID(readOwner, "3")
+	readRegisterId4 := flow.NewRegisterID(readOwner, "4")
+
+	writeRegisterId1 := flow.NewRegisterID(writeOwner, "1")
 	writeValue1 := flow.RegisterValue([]byte("value1"))
 
-	writeRegisterId2 := flow.NewRegisterID("write", "2")
+	writeRegisterId2 := flow.NewRegisterID(writeOwner, "2")
 	writeValue2 := flow.RegisterValue([]byte("value2"))
 
-	writeRegisterId3 := flow.NewRegisterID("write", "3")
+	writeRegisterId3 := flow.NewRegisterID(writeOwner, "3")
 	writeValue3 := flow.RegisterValue([]byte("value3"))
 
 	err := txn.Set(writeRegisterId1, writeValue1)

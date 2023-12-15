@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"github.com/onflow/flow-go/network/p2p/tracer/internal"
@@ -114,13 +115,17 @@ func NewGossipSubMeshTracer(config *GossipSubMeshTracerConfig) *GossipSubMeshTra
 	return g
 }
 
-// GetMeshPeers returns the local mesh peers for the given topic.
-func (t *GossipSubMeshTracer) GetMeshPeers(topic string) []peer.ID {
+// GetLocalMeshPeers returns the local mesh peers for the given topic.
+// Args:
+// - topic: the topic.
+// Returns:
+// - []peer.ID: the local mesh peers for the given topic.
+func (t *GossipSubMeshTracer) GetLocalMeshPeers(topic channels.Topic) []peer.ID {
 	t.topicMeshMu.RLock()
 	defer t.topicMeshMu.RUnlock()
 
-	peers := make([]peer.ID, 0, len(t.topicMeshMap[topic]))
-	for p := range t.topicMeshMap[topic] {
+	peers := make([]peer.ID, 0, len(t.topicMeshMap[topic.String()]))
+	for p := range t.topicMeshMap[topic.String()] {
 		peers = append(peers, p)
 	}
 	return peers

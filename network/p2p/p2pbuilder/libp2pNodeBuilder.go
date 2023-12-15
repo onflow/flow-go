@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"time"
 
 	"github.com/libp2p/go-libp2p"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -39,7 +38,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/subscription"
-	"github.com/onflow/flow-go/network/p2p/tracer"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	unicastcache "github.com/onflow/flow-go/network/p2p/unicast/cache"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
@@ -70,7 +68,6 @@ type LibP2PNodeBuilder struct {
 	routingFactory       func(context.Context, host.Host) (routing.Routing, error)
 	peerManagerConfig    *p2pconfig.PeerManagerConfig
 	createNode           p2p.CreateNodeFunc
-	gossipSubTracer      p2p.PubSubTracer
 	disallowListCacheCfg *p2p.DisallowListCacheConfig
 	unicastConfig        *p2pconfig.UnicastConfig
 	networkingType       flownet.NetworkingType // whether the node is running in private (staked) or public (unstaked) network
@@ -78,19 +75,18 @@ type LibP2PNodeBuilder struct {
 
 func NewNodeBuilder(
 	logger zerolog.Logger,
+	gossipSubCfg *p2pconf.GossipSubParameters,
 	metricsConfig *p2pconfig.MetricsConfig,
 	networkingType flownet.NetworkingType,
 	address string,
 	networkKey fcrypto.PrivateKey,
 	sporkId flow.Identifier,
 	idProvider module.IdentityProvider,
-	scoringRegistryConfig p2pconf.GossipSubScoringRegistryConfig,
 	rCfg *p2pconf.ResourceManagerConfig,
-	gossipCfg *p2pconf.GossipSubConfig,
 	peerManagerConfig *p2pconfig.PeerManagerConfig,
 	disallowListCacheCfg *p2p.DisallowListCacheConfig,
-	rpcTracker p2p.RpcControlTracking,
-	unicastConfig *p2pconfig.UnicastConfig) *LibP2PNodeBuilder {
+	unicastConfig *p2pconfig.UnicastConfig,
+) *LibP2PNodeBuilder {
 	return &LibP2PNodeBuilder{
 		logger:               logger,
 		sporkId:              sporkId,
@@ -103,13 +99,10 @@ func NewNodeBuilder(
 		networkingType:       networkingType,
 		gossipSubBuilder: gossipsubbuilder.NewGossipSubBuilder(logger,
 			metricsConfig,
+			gossipSubCfg,
 			networkingType,
 			sporkId,
-			idProvider,
-			scoringRegistryConfig,
-			&gossipCfg.GossipSubRPCInspectorsConfig,
-			&gossipCfg.SubscriptionProviderConfig,
-			rpcTracker),
+			idProvider),
 		peerManagerConfig: peerManagerConfig,
 		unicastConfig:     unicastConfig,
 	}
@@ -159,7 +152,7 @@ func (builder *LibP2PNodeBuilder) SetGossipSubFactory(gf p2p.GossipSubFactoryFun
 	return builder
 }
 
-// EnableGossipSubScoringWithOverride enables peer scoring for the GossipSub pubsub system with the given override.
+// OverrideGossipSubScoringConfig enables peer scoring for the GossipSub pubsub system with the given override.
 // Any existing peer scoring config attribute that is set in the override will override the default peer scoring config.
 // Anything that is left to nil or zero value in the override will be ignored and the default value will be used.
 // Note: it is not recommended to override the default peer scoring config in production unless you know what you are doing.
@@ -168,24 +161,13 @@ func (builder *LibP2PNodeBuilder) SetGossipSubFactory(gf p2p.GossipSubFactoryFun
 // - PeerScoringConfigOverride: override for the peer scoring config- Recommended to use PeerScoringConfigNoOverride for production.
 // Returns:
 // none
-func (builder *LibP2PNodeBuilder) EnableGossipSubScoringWithOverride(config *p2p.PeerScoringConfigOverride) p2p.NodeBuilder {
+func (builder *LibP2PNodeBuilder) OverrideGossipSubScoringConfig(config *p2p.PeerScoringConfigOverride) p2p.NodeBuilder {
 	builder.gossipSubBuilder.EnableGossipSubScoringWithOverride(config)
-	return builder
-}
-
-func (builder *LibP2PNodeBuilder) SetGossipSubTracer(tracer p2p.PubSubTracer) p2p.NodeBuilder {
-	builder.gossipSubBuilder.SetGossipSubTracer(tracer)
-	builder.gossipSubTracer = tracer
 	return builder
 }
 
 func (builder *LibP2PNodeBuilder) SetCreateNode(f p2p.CreateNodeFunc) p2p.NodeBuilder {
 	builder.createNode = f
-	return builder
-}
-
-func (builder *LibP2PNodeBuilder) SetGossipSubScoreTracerInterval(interval time.Duration) p2p.NodeBuilder {
-	builder.gossipSubBuilder.SetGossipSubScoreTracerInterval(interval)
 	return builder
 }
 
@@ -298,45 +280,43 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 	node.SetUnicastManager(unicastManager)
 
 	cm := component.NewComponentManagerBuilder().
-		AddWorker(
-			func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-				if builder.routingFactory != nil {
-					routingSystem, err := builder.routingFactory(ctx, h)
-					if err != nil {
-						ctx.Throw(fmt.Errorf("could not create routing system: %w", err))
-					}
-					if err := node.SetRouting(routingSystem); err != nil {
-						ctx.Throw(fmt.Errorf("could not set routing system: %w", err))
-					}
-					builder.gossipSubBuilder.SetRoutingSystem(routingSystem)
-					lg.Debug().Msg("routing system created")
-				}
-				// gossipsub is created here, because it needs to be created during the node startup.
-				gossipSub, err := builder.gossipSubBuilder.Build(ctx)
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			if builder.routingFactory != nil {
+				routingSystem, err := builder.routingFactory(ctx, h)
 				if err != nil {
-					ctx.Throw(fmt.Errorf("could not create gossipsub: %w", err))
+					ctx.Throw(fmt.Errorf("could not create routing system: %w", err))
 				}
-				node.SetPubSub(gossipSub)
-				gossipSub.Start(ctx)
-				ready()
-
-				<-gossipSub.Done()
-			}).
-		AddWorker(
-			func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-				// encapsulates shutdown logic for the libp2p node.
-				ready()
-				<-ctx.Done()
-				// we wait till the context is done, and then we stop the libp2p node.
-
-				err = node.Stop()
-				if err != nil {
-					// ignore context cancellation errors
-					if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
-						ctx.Throw(fmt.Errorf("could not stop libp2p node: %w", err))
-					}
+				if err := node.SetRouting(routingSystem); err != nil {
+					ctx.Throw(fmt.Errorf("could not set routing system: %w", err))
 				}
-			})
+				builder.gossipSubBuilder.SetRoutingSystem(routingSystem)
+				lg.Debug().Msg("routing system created")
+			}
+			// gossipsub is created here, because it needs to be created during the node startup.
+			gossipSub, err := builder.gossipSubBuilder.Build(ctx)
+			if err != nil {
+				ctx.Throw(fmt.Errorf("could not create gossipsub: %w", err))
+			}
+			node.SetPubSub(gossipSub)
+			gossipSub.Start(ctx)
+			ready()
+
+			<-gossipSub.Done()
+		}).
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			// encapsulates shutdown logic for the libp2p node.
+			ready()
+			<-ctx.Done()
+			// we wait till the context is done, and then we stop the libp2p node.
+
+			err = node.Stop()
+			if err != nil {
+				// ignore context cancellation errors
+				if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+					ctx.Throw(fmt.Errorf("could not stop libp2p node: %w", err))
+				}
+			}
+		})
 
 	node.SetComponentManager(cm.Build())
 
@@ -385,10 +365,9 @@ func defaultLibP2POptions(address string, key fcrypto.PrivateKey) ([]config.Opti
 	// While this sounds great, it intermittently causes a 'broken pipe' error
 	// as the 1-k discovery process and the 1-1 messaging both sometimes attempt to open connection to the same target
 	// As of now there is no requirement of client sockets to be a well-known port, so disabling port reuse all together.
-	t := libp2p.Transport(
-		func(u transport.Upgrader) (*tcp.TcpTransport, error) {
-			return tcp.NewTCPTransport(u, nil, tcp.DisableReuseport())
-		})
+	t := libp2p.Transport(func(u transport.Upgrader) (*tcp.TcpTransport, error) {
+		return tcp.NewTCPTransport(u, nil, tcp.DisableReuseport())
+	})
 
 	// gather all the options for the libp2p node
 	options := []config.Option{
@@ -424,7 +403,7 @@ func DefaultNodeBuilder(
 	role string,
 	connGaterCfg *p2pconfig.ConnectionGaterConfig,
 	peerManagerCfg *p2pconfig.PeerManagerConfig,
-	gossipCfg *p2pconf.GossipSubConfig,
+	gossipCfg *p2pconf.GossipSubParameters,
 	rCfg *p2pconf.ResourceManagerConfig,
 	uniCfg *p2pconfig.UnicastConfig,
 	connMgrConfig *netconf.ConnectionManagerConfig,
@@ -447,45 +426,21 @@ func DefaultNodeBuilder(
 		connection.WithOnInterceptPeerDialFilters(append(peerFilters, connGaterCfg.InterceptPeerDialFilters...)),
 		connection.WithOnInterceptSecuredFilters(append(peerFilters, connGaterCfg.InterceptSecuredFilters...)))
 
-	meshTracerCfg := &tracer.GossipSubMeshTracerConfig{
-		Logger:                             logger,
-		Metrics:                            metricsCfg.Metrics,
-		IDProvider:                         idProvider,
-		LoggerInterval:                     gossipCfg.LocalMeshLogInterval,
-		RpcSentTrackerCacheSize:            gossipCfg.RPCSentTrackerCacheSize,
-		RpcSentTrackerWorkerQueueCacheSize: gossipCfg.RPCSentTrackerQueueCacheSize,
-		RpcSentTrackerNumOfWorkers:         gossipCfg.RpcSentTrackerNumOfWorkers,
-		HeroCacheMetricsFactory:            metricsCfg.HeroCacheFactory,
-		NetworkingType:                     flownet.PrivateNetwork,
-	}
-	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
-
 	builder := NewNodeBuilder(logger,
+		gossipCfg,
 		metricsCfg,
 		networkingType,
 		address,
 		flowKey,
 		sporkId,
 		idProvider,
-		gossipCfg.GossipSubScoringRegistryConfig,
-		rCfg,
-		gossipCfg,
-		peerManagerCfg,
+		rCfg, peerManagerCfg,
 		disallowListCacheCfg,
-		meshTracer,
 		uniCfg).
 		SetBasicResolver(resolver).
 		SetConnectionManager(connManager).
 		SetConnectionGater(connGater).
 		SetCreateNode(DefaultCreateNodeFunc)
-
-	if gossipCfg.PeerScoring {
-		// In production, we never override the default scoring config.
-		builder.EnableGossipSubScoringWithOverride(p2p.PeerScoringConfigNoOverride)
-	}
-
-	builder.SetGossipSubTracer(meshTracer)
-	builder.SetGossipSubScoreTracerInterval(gossipCfg.ScoreTracerInterval)
 
 	if role != "ghost" {
 		r, err := flow.ParseRole(role)
