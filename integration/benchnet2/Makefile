@@ -69,8 +69,7 @@ gen-bootstrap: clone-flow
 		--internal-priv-dir ../../../bootstrap/keys/private-root-information \
 		--dkg-data ../../../bootstrap/private-root-information/root-dkg-data.priv.json \
 		--root-block ../../../bootstrap/public-root-information/root-block.json \
-		--root-epoch ../../../bootstrap/public-root-information/root-epoch.json \
-		--root-params ../../../bootstrap/public-root-information/root-params.json \
+		--intermediary-bootstrapping-data ../../../bootstrap/public-root-information/intermediary-bootstrapping-data.json \
 		--root-commit 0000000000000000000000000000000000000000000000000000000000000000 \
 		--genesis-token-supply="1000000000.0" \
 		--service-account-public-key-json "{\"PublicKey\":\"R7MTEDdLclRLrj2MI1hcp4ucgRTpR15PCHAWLM5nks6Y3H7+PGkfZTP2di2jbITooWO4DD1yqaBSAVK8iQ6i0A==\",\"SignAlgo\":2,\"HashAlgo\":1,\"SeqNumber\":0,\"Weight\":1000}" \

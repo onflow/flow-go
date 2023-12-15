@@ -145,8 +145,7 @@ go run . finalize \
     --internal-priv-dir ./bootstrap-example/keys/private-root-information \
     --dkg-data ./bootstrap-example/private-root-information/root-dkg-data.priv.json \
     --root-block ./bootstrap-example/public-root-information/root-block.json \
-    --root-epoch ./bootstrap-example/public-root-information/root-epoch.json \
-    --root-params ./bootstrap-example/public-root-information/root-params.json \
+    --intermediary-bootstrapping-data ./bootstrap-example/public-root-information/intermediary-bootstrapping-data.json \
     --root-block-votes-dir ./bootstrap-example/public-root-information/root-block-votes/ \
     --root-commit 0000000000000000000000000000000000000000000000000000000000000000 \
     --genesis-token-supply="1000000000.0" \

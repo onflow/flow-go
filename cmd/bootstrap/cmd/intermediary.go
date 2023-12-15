@@ -8,7 +8,6 @@ import (
 // IntermediaryBootstrappingData stores data which needs to be passed between the
 // 2 steps of the bootstrapping process: `rootblock` and `finalize`.
 // This structure is created in `rootblock`, written to disk, then read in `finalize`.
-// TODO unused
 type IntermediaryBootstrappingData struct {
 	IntermediaryParamsData
 	IntermediaryEpochData

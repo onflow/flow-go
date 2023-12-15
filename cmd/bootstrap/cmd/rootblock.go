@@ -158,7 +158,7 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	header := constructRootHeader(flagRootChain, flagRootParent, flagRootHeight, flagRootTimestamp)
 	log.Info().Msg("")
 
-	log.Info().Msg("constructing epoch events")
+	log.Info().Msg("constructing intermediary bootstrapping data")
 	epochSetup, epochCommit := constructRootEpochEvents(header.View, participants, assignments, clusterQCs, dkgData)
 	committedEpoch := inmem.NewCommittedEpoch(epochSetup, epochCommit)
 	encodableEpoch, err := inmem.FromEpoch(committedEpoch)
@@ -170,12 +170,15 @@ func rootBlock(cmd *cobra.Command, args []string) {
 		ProtocolStateRootEpoch: encodableEpoch.Encodable(),
 		ExecutionStateConfig:   epochConfig,
 	}
-	writeJSON(model.PathRootEpoch, intermediaryEpochData)
 	intermediaryParamsData := IntermediaryParamsData{
 		EpochCommitSafetyThreshold: flagEpochCommitSafetyThreshold,
 		ProtocolVersion:            flagProtocolVersion,
 	}
-	writeJSON(model.PathRootParams, intermediaryParamsData)
+	intermediaryData := IntermediaryBootstrappingData{
+		IntermediaryEpochData:  intermediaryEpochData,
+		IntermediaryParamsData: intermediaryParamsData,
+	}
+	writeJSON(model.PathIntermediaryBootstrappingData, intermediaryData)
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing root block")

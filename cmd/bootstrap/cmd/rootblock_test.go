@@ -34,9 +34,10 @@ const rootBlockHappyPathLogs = "collecting partner network and staking keys" +
 	`constructing root blocks for collection node clusters` +
 	`constructing root QCs for collection node clusters` +
 	`constructing root header` +
-	`constructing epoch events` +
-	`wrote file \S+/root-epoch.json` +
-	`wrote file \S+/root-params.json` +
+	//`constructing epoch events` +
+	//`wrote file \S+/root-epoch.json` +
+	`constructing intermediary bootstrapping data` +
+	`wrote file \S+/intermediary-bootstrapping-data.json` +
 	`constructing root block` +
 	`wrote file \S+/root-block.json` +
 	`constructing and writing votes` +
