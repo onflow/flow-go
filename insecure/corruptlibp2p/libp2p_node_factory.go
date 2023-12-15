@@ -108,6 +108,7 @@ func InitCorruptLibp2pNode(
 				Logger:               config.Logger,
 				Host:                 config.Host,
 				PeerManager:          config.PeerManager,
+				Parameters:           config.Parameters,
 				DisallowListCacheCfg: disallowListCacheCfg,
 			})
 
