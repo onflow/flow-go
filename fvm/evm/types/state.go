@@ -15,8 +15,13 @@ type StateDB interface {
 	// Commit commits the changes
 	Commit() error
 
-	// returns raw logs (txHash and etc has to be injected)
-	Logs() []*gethTypes.Log
+	// Logs collects and prepares logs
+	Logs(
+		blockHash gethCommon.Hash,
+		blockNumber uint64,
+		txHash gethCommon.Hash,
+		txIndex uint,
+	) []*gethTypes.Log
 
 	// returns a map of preimages
 	Preimages() map[gethCommon.Hash][]byte
@@ -76,13 +81,13 @@ type HotView interface {
 	SetTransientState(SlotAddress, gethCommon.Hash)
 
 	// AddRefund adds the amount to the total (gas) refund
-	AddRefund(uint64)
+	AddRefund(uint64) error
 	// SubRefund subtracts the amount from the total (gas) refund
-	SubRefund(uint64)
+	SubRefund(uint64) error
 
-	// AddAddressToAccessList adds an address to the access list
+	// AddAddressToAccessList adds an address to the per-transaction access list
 	AddAddressToAccessList(addr gethCommon.Address) (addressAdded bool)
-	// AddSlotToAccessList adds a slot to the access list
+	// AddSlotToAccessList adds a slot to the per-transaction access list
 	AddSlotToAccessList(SlotAddress) (addressAdded, slotAdded bool)
 
 	// AddLog append a log to the log collection

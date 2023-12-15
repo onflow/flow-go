@@ -317,13 +317,18 @@ func (d *DeltaView) GetRefund() uint64 {
 }
 
 // AddRefund adds the amount to the total (gas) refund
-func (d *DeltaView) AddRefund(amount uint64) {
+func (d *DeltaView) AddRefund(amount uint64) error {
 	d.refund += amount
+	return nil
 }
 
 // SubRefund subtracts the amount from the total (gas) refund
-func (d *DeltaView) SubRefund(amount uint64) {
+func (d *DeltaView) SubRefund(amount uint64) error {
+	if amount > d.refund {
+		return fmt.Errorf("refund counter below zero (gas: %d > refund: %d)", amount, d.refund)
+	}
 	d.refund -= amount
+	return nil
 }
 
 // AddressInAccessList checks if the address is in the access list
@@ -372,8 +377,11 @@ func (d *DeltaView) Logs() []*gethTypes.Log {
 }
 
 // AddPreimage adds a preimage
-func (d *DeltaView) AddPreimage(hash gethCommon.Hash, input []byte) {
-	d.preimages[hash] = input
+func (d *DeltaView) AddPreimage(hash gethCommon.Hash, preimage []byte) {
+	// make a copy (legacy behaviour)
+	pi := make([]byte, len(preimage))
+	copy(pi, preimage)
+	d.preimages[hash] = pi
 }
 
 // Preimages returns a map of preimages

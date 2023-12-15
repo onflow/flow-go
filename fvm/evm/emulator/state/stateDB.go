@@ -204,10 +204,21 @@ func (db *StateDB) lastestView() *DeltaView {
 	return db.views[len(db.views)-1]
 }
 
-func (db *StateDB) Logs() []*gethTypes.Log {
+func (db *StateDB) Logs(
+	blockHash gethCommon.Hash,
+	blockNumber uint64,
+	txHash gethCommon.Hash,
+	txIndex uint,
+) []*gethTypes.Log {
 	allLogs := make([]*gethTypes.Log, 0)
 	for _, view := range db.views {
-		allLogs = append(allLogs, view.Logs()...)
+		for _, log := range view.Logs() {
+			log.BlockNumber = blockNumber
+			log.BlockHash = blockHash
+			log.TxHash = txHash
+			log.TxIndex = txIndex
+			allLogs = append(allLogs, log)
+		}
 	}
 	return allLogs
 }

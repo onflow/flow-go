@@ -430,13 +430,19 @@ func TestDeltaView(t *testing.T) {
 
 		// add refund
 		addition := uint64(7)
-		view.AddRefund(addition)
+		err := view.AddRefund(addition)
+		require.NoError(t, err)
 		require.Equal(t, initRefund+addition, view.GetRefund())
 
 		// sub refund
 		subtract := uint64(2)
-		view.SubRefund(subtract)
+		err = view.SubRefund(subtract)
+		require.NoError(t, err)
 		require.Equal(t, initRefund+addition-subtract, view.GetRefund())
+
+		// refund goes negative
+		err = view.SubRefund(1000)
+		require.Error(t, err)
 	})
 
 	t.Run("test access list functionality", func(t *testing.T) {
