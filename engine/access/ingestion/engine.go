@@ -196,11 +196,8 @@ func (e *Engine) Start(parent irrecoverable.SignalerContext) {
 // If the index has already been initialized, this is a no-op.
 // No errors are expected during normal operation.
 func (e *Engine) initLastFullBlockHeightIndex() error {
-	rootBlock, err := e.state.Params().FinalizedRoot()
-	if err != nil {
-		return fmt.Errorf("failed to get root block: %w", err)
-	}
-	err = e.blocks.InsertLastFullBlockHeightIfNotExists(rootBlock.Height)
+	rootBlock := e.state.Params().FinalizedRoot()
+	err := e.blocks.InsertLastFullBlockHeightIfNotExists(rootBlock.Height)
 	if err != nil {
 		return fmt.Errorf("failed to update last full block height during ingestion engine startup: %w", err)
 	}
@@ -691,13 +688,7 @@ func (e *Engine) updateLastFullBlockReceivedIndex() {
 			logError(err)
 			return
 		}
-		// use the root height as the last full height
-		header, err := e.state.Params().FinalizedRoot()
-		if err != nil {
-			logError(err)
-			return
-		}
-		lastFullHeight = header.Height
+		lastFullHeight = e.state.Params().FinalizedRoot().Height // use the root height as the last full height
 	}
 
 	e.log.Debug().Uint64("last_full_block_height", lastFullHeight).Msg("updating LastFullBlockReceived index...")

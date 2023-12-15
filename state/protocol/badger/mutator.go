@@ -761,9 +761,9 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	}
 
 	// update the cache
-	m.State.cachedFinal.Store(&cachedHeader{blockID, header})
+	m.State.cachedLatestFinal.Store(&cachedHeader{blockID, header})
 	if len(block.Payload.Seals) > 0 {
-		m.State.cachedSealed.Store(&cachedHeader{lastSeal.BlockID, sealed})
+		m.State.cachedLatestSealed.Store(&cachedHeader{lastSeal.BlockID, sealed})
 	}
 
 	// Emit protocol events after database transaction succeeds. Event delivery is guaranteed,
