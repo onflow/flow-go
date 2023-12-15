@@ -12,6 +12,7 @@ import (
 	ledgermock "github.com/onflow/flow-go/ledger/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/utils/unittest"
 	utils "github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -36,7 +37,7 @@ func TestLedgerViewCommitter(t *testing.T) {
 		newState, proof, _, err := com.CommitView(
 			&snapshot.ExecutionSnapshot{
 				WriteSet: map[flow.RegisterID]flow.RegisterValue{
-					flow.NewRegisterID("owner", "key"): []byte{1},
+					unittest.RegisterIDFixture(): []byte{1},
 				},
 			},
 			utils.StateCommitmentFixture())
