@@ -73,9 +73,13 @@ func AddressFixture() flow.Address {
 }
 
 func RandomAddressFixture() flow.Address {
+	return RandomAddressFixtureForChain(flow.Testnet)
+}
+
+func RandomAddressFixtureForChain(chainID flow.ChainID) flow.Address {
 	// we use a 32-bit index - since the linear address generator uses 45 bits,
 	// this won't error
-	addr, err := flow.Testnet.Chain().AddressAtIndex(uint64(rand.Uint32()))
+	addr, err := chainID.Chain().AddressAtIndex(uint64(rand.Uint32()))
 	if err != nil {
 		panic(err)
 	}
@@ -1427,6 +1431,11 @@ func TransactionDSLFixture(chain flow.Chain) dsl.Transaction {
 	}
 }
 
+// RegisterIDFixture returns a RegisterID with a fixed key and owner
+func RegisterIDFixture() flow.RegisterID {
+	return flow.NewRegisterID(RandomAddressFixture(), "key")
+}
+
 // VerifiableChunkDataFixture returns a complete verifiable chunk with an
 // execution receipt referencing the block/collections.
 func VerifiableChunkDataFixture(chunkIndex uint64) *verification.VerifiableChunkData {
@@ -2620,7 +2629,7 @@ func P2PRPCPruneFixture(topic *string) *pubsub_pb.ControlPrune {
 	}
 }
 
-// P2PRPCIHaveFixtures returns n number of control message rpc iHave fixtures with m number of message ids each.
+// P2PRPCIHaveFixtures returns n number of control message where n = len(topics) rpc iHave fixtures with m number of message ids each.
 func P2PRPCIHaveFixtures(m int, topics ...string) []*pubsub_pb.ControlIHave {
 	n := len(topics)
 	ihaves := make([]*pubsub_pb.ControlIHave, n)

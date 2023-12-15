@@ -268,7 +268,7 @@ func messageToTrustedTransaction(
 
 	proposalKey := m.GetProposalKey()
 	if proposalKey != nil {
-		proposalAddress, err := insecureAddress(proposalKey.GetAddress(), chain)
+		proposalAddress, err := insecureAddress(proposalKey.GetAddress())
 		if err != nil {
 			return *t, fmt.Errorf("could not convert proposer address: %w", err)
 		}
@@ -277,7 +277,7 @@ func messageToTrustedTransaction(
 
 	payer := m.GetPayer()
 	if payer != nil {
-		payerAddress, err := insecureAddress(payer, chain)
+		payerAddress, err := insecureAddress(payer)
 		if err != nil {
 			return *t, fmt.Errorf("could not convert payer address: %w", err)
 		}
@@ -316,10 +316,52 @@ func messageToTrustedTransaction(
 	return *t, nil
 }
 
+func MessageToRegisterID(m *entities.RegisterID, chain flow.Chain) (flow.RegisterID, error) {
+	if m == nil {
+		return flow.RegisterID{}, ErrEmptyMessage
+	}
+
+	owner := flow.EmptyAddress
+	if len(m.GetOwner()) > 0 {
+		var err error
+		owner, err = Address(m.GetOwner(), chain)
+		if err != nil {
+			return flow.RegisterID{}, fmt.Errorf("could not convert owner address: %w", err)
+		}
+	}
+
+	key := string(m.GetKey())
+
+	return flow.NewRegisterID(owner, key), nil
+}
+
+// MessagesToRegisterIDs converts a protobuf message to RegisterIDs
+func MessagesToRegisterIDs(m []*entities.RegisterID, chain flow.Chain) (flow.RegisterIDs, error) {
+	if m == nil {
+		return nil, ErrEmptyMessage
+	}
+	result := make(flow.RegisterIDs, len(m))
+	for i, entry := range m {
+		regID, err := MessageToRegisterID(entry, chain)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert register id %d: %w", i, err)
+		}
+		result[i] = regID
+	}
+	return result, nil
+}
+
+func RegisterIDToMessage(id flow.RegisterID) *entities.RegisterID {
+	return &entities.RegisterID{
+		Owner: []byte(id.Owner),
+		Key:   []byte(id.Key),
+	}
+}
+
 // insecureAddress converts a raw address to a flow.Address, skipping validation
 // This is useful when converting transactions from trusted state like BlockExecutionData.
 // This should only be used for trusted inputs
-func insecureAddress(rawAddress []byte, chain flow.Chain) (flow.Address, error) {
+func insecureAddress(rawAddress []byte) (flow.Address, error) {
 	if len(rawAddress) == 0 {
 		return flow.EmptyAddress, status.Error(codes.InvalidArgument, "address cannot be empty")
 	}

@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/utils/logging"
@@ -31,6 +32,7 @@ type GossipSubAdapter struct {
 	topicScoreParamFunc func(topic *pubsub.Topic) *pubsub.TopicScoreParams
 	logger              zerolog.Logger
 	peerScoreExposer    p2p.PeerScoreExposer
+	localMeshTracer     p2p.PubSubTracer
 	// clusterChangeConsumer is a callback that is invoked when the set of active clusters of collection nodes changes.
 	// This callback is implemented by the rpc inspector suite of the GossipSubAdapter, and consumes the cluster changes
 	// to update the rpc inspector state of the recent topics (i.e., channels).
@@ -107,6 +109,7 @@ func NewGossipSubAdapter(ctx context.Context,
 			<-tracer.Done()
 			a.logger.Info().Msg("pubsub tracer stopped")
 		})
+		a.localMeshTracer = tracer
 	}
 
 	if inspectorSuite := gossipSubConfig.InspectorSuiteComponent(); inspectorSuite != nil {
@@ -209,6 +212,15 @@ func (g *GossipSubAdapter) GetTopics() []string {
 
 func (g *GossipSubAdapter) ListPeers(topic string) []peer.ID {
 	return g.gossipSub.ListPeers(topic)
+}
+
+// GetLocalMeshPeers returns the list of peers in the local mesh for the given topic.
+// Args:
+// - topic: the topic.
+// Returns:
+// - []peer.ID: the list of peers in the local mesh for the given topic.
+func (g *GossipSubAdapter) GetLocalMeshPeers(topic channels.Topic) []peer.ID {
+	return g.localMeshTracer.GetLocalMeshPeers(topic)
 }
 
 // PeerScoreExposer returns the peer score exposer for the gossipsub adapter. The exposer is a read-only interface

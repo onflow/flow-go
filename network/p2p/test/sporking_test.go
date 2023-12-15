@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/model/flow"
 	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/network/message"
@@ -204,15 +205,23 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 	previousSporkId := unittest.IdentifierFixture()
 
 	// create and start node 1 on localhost and random port
+	cfg, err := config.DefaultConfig()
+	require.NoError(t, err)
+	// cross-talk prevention is intrinsically tied to how we encode topics, peer scoring adds another layer of protection by preventing unknown identifiers
+	// from joining the mesh. As this test simulates the scenario where a node is moved from the old chain to the new chain, we disable peer scoring
+	// to allow the node to join the mesh on the new chain, otherwise the node will be disconnected from the mesh due to peer scoring penalty for unknown identifiers.
+	cfg.NetworkConfig.GossipSub.PeerScoringEnabled = false
 	node1, id1 := p2ptest.NodeFixture(t,
 		previousSporkId,
 		"test_one_to_k_crosstalk_prevention",
 		idProvider,
+		p2ptest.OverrideFlowConfig(cfg),
 	)
 
 	p2ptest.StartNode(t, signalerCtx1, node1)
 	defer p2ptest.StopNode(t, node1, cancel1)
 	idProvider.SetIdentities(flow.IdentityList{&id1})
+
 	// create and start node 2 on localhost and random port with the same root block ID
 	node2, id2 := p2ptest.NodeFixture(t,
 		previousSporkId,

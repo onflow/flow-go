@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p/scoring/internal"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -19,7 +20,7 @@ func TestNewSubscriptionRecordCache(t *testing.T) {
 	cache := internal.NewSubscriptionRecordCache(
 		sizeLimit,
 		unittest.Logger(),
-		metrics.NewSubscriptionRecordCacheMetricsFactory(metrics.NewNoopHeroCacheMetricsFactory()))
+		metrics.NewSubscriptionRecordCacheMetricsFactory(metrics.NewNoopHeroCacheMetricsFactory(), network.PrivateNetwork))
 
 	require.NotNil(t, cache, "cache should not be nil")
 	require.IsType(t, &internal.SubscriptionRecordCache{}, cache, "cache should be of type *SubscriptionRecordCache")
@@ -31,7 +32,7 @@ func TestSubscriptionCache_GetSubscribedTopics(t *testing.T) {
 	cache := internal.NewSubscriptionRecordCache(
 		sizeLimit,
 		unittest.Logger(),
-		metrics.NewSubscriptionRecordCacheMetricsFactory(metrics.NewNoopHeroCacheMetricsFactory()))
+		metrics.NewSubscriptionRecordCacheMetricsFactory(metrics.NewNoopHeroCacheMetricsFactory(), network.PrivateNetwork))
 
 	// create a dummy peer ID
 	peerID := unittest.PeerIdFixture(t)
@@ -63,7 +64,7 @@ func TestSubscriptionCache_MoveToNextUpdateCycle(t *testing.T) {
 	cache := internal.NewSubscriptionRecordCache(
 		sizeLimit,
 		unittest.Logger(),
-		metrics.NewSubscriptionRecordCacheMetricsFactory(metrics.NewNoopHeroCacheMetricsFactory()))
+		metrics.NewSubscriptionRecordCacheMetricsFactory(metrics.NewNoopHeroCacheMetricsFactory(), network.PrivateNetwork))
 
 	// initial cycle should be 0, so first increment sets it to 1
 	firstCycle := cache.MoveToNextUpdateCycle()
@@ -80,7 +81,7 @@ func TestSubscriptionCache_TestAddTopicForPeer(t *testing.T) {
 	cache := internal.NewSubscriptionRecordCache(
 		sizeLimit,
 		unittest.Logger(),
-		metrics.NewSubscriptionRecordCacheMetricsFactory(metrics.NewNoopHeroCacheMetricsFactory()))
+		metrics.NewSubscriptionRecordCacheMetricsFactory(metrics.NewNoopHeroCacheMetricsFactory(), network.PrivateNetwork))
 
 	// case when adding a topic to an existing peer
 	existingPeerID := unittest.PeerIdFixture(t)
@@ -117,7 +118,7 @@ func TestSubscriptionCache_DuplicateTopics(t *testing.T) {
 	cache := internal.NewSubscriptionRecordCache(
 		sizeLimit,
 		unittest.Logger(),
-		metrics.NewSubscriptionRecordCacheMetricsFactory(metrics.NewNoopHeroCacheMetricsFactory()))
+		metrics.NewSubscriptionRecordCacheMetricsFactory(metrics.NewNoopHeroCacheMetricsFactory(), network.PrivateNetwork))
 
 	peerID := unittest.PeerIdFixture(t)
 	topic := "topic1"
@@ -141,7 +142,7 @@ func TestSubscriptionCache_MoveUpdateCycle(t *testing.T) {
 	cache := internal.NewSubscriptionRecordCache(
 		sizeLimit,
 		unittest.Logger(),
-		metrics.NewSubscriptionRecordCacheMetricsFactory(metrics.NewNoopHeroCacheMetricsFactory()))
+		metrics.NewSubscriptionRecordCacheMetricsFactory(metrics.NewNoopHeroCacheMetricsFactory(), network.PrivateNetwork))
 
 	peerID := unittest.PeerIdFixture(t)
 	topic1 := "topic1"
@@ -188,7 +189,7 @@ func TestSubscriptionCache_MoveUpdateCycleWithDifferentPeers(t *testing.T) {
 	cache := internal.NewSubscriptionRecordCache(
 		sizeLimit,
 		unittest.Logger(),
-		metrics.NewSubscriptionRecordCacheMetricsFactory(metrics.NewNoopHeroCacheMetricsFactory()))
+		metrics.NewSubscriptionRecordCacheMetricsFactory(metrics.NewNoopHeroCacheMetricsFactory(), network.PrivateNetwork))
 
 	peer1 := unittest.PeerIdFixture(t)
 	peer2 := unittest.PeerIdFixture(t)
@@ -234,7 +235,7 @@ func TestSubscriptionCache_ConcurrentUpdate(t *testing.T) {
 	cache := internal.NewSubscriptionRecordCache(
 		sizeLimit,
 		unittest.Logger(),
-		metrics.NewSubscriptionRecordCacheMetricsFactory(metrics.NewNoopHeroCacheMetricsFactory()))
+		metrics.NewSubscriptionRecordCacheMetricsFactory(metrics.NewNoopHeroCacheMetricsFactory(), network.PrivateNetwork))
 
 	peerIds := unittest.PeerIdFixtures(t, 100)
 	topics := []string{"topic1", "topic2", "topic3"}
@@ -277,7 +278,7 @@ func TestSubscriptionCache_TestSizeLimit(t *testing.T) {
 	cache := internal.NewSubscriptionRecordCache(
 		sizeLimit,
 		unittest.Logger(),
-		metrics.NewSubscriptionRecordCacheMetricsFactory(metrics.NewNoopHeroCacheMetricsFactory()))
+		metrics.NewSubscriptionRecordCacheMetricsFactory(metrics.NewNoopHeroCacheMetricsFactory(), network.PrivateNetwork))
 
 	peerIds := unittest.PeerIdFixtures(t, 100)
 	topics := []string{"topic1", "topic2", "topic3"}

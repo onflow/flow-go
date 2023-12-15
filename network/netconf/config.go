@@ -11,9 +11,9 @@ type Config struct {
 	UnicastConfig           `mapstructure:",squash"`
 	ResourceManager         p2pconf.ResourceManagerConfig `mapstructure:"libp2p-resource-manager"`
 	ConnectionManagerConfig `mapstructure:",squash"`
-	// GossipSubConfig core gossipsub configuration.
-	p2pconf.GossipSubConfig `mapstructure:",squash"`
-	AlspConfig              `mapstructure:",squash"`
+	// GossipSub core gossipsub configuration.
+	GossipSub  p2pconf.GossipSubParameters `mapstructure:"gossipsub"`
+	AlspConfig `mapstructure:",squash"`
 
 	// NetworkConnectionPruning determines whether connections to nodes
 	// that are not part of protocol state should be trimmed

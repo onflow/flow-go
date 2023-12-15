@@ -8,15 +8,19 @@ else
 	RACE_FLAG :=
 endif
 
+include ../crypto_adx_flag.mk
+
+CGO_FLAG := CGO_CFLAGS=$(CRYPTO_FLAG)
+
 # runs all unit tests of the insecure module
 .PHONY: test
 test:
-	go test $(if $(VERBOSE),-v,) -coverprofile=$(COVER_PROFILE) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) --tags relic ./...
+	$(CGO_FLAG) go test $(if $(VERBOSE),-v,) -coverprofile=$(COVER_PROFILE) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) ./...
 
 .PHONY: lint
 lint: tidy
 	# revive -config revive.toml -exclude storage/ledger/trie ./...
-	golangci-lint run -v --build-tags relic ./...
+	golangci-lint run -v
 
 # this ensures there is no unused dependency being added by accident
 .PHONY: tidy

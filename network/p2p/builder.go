@@ -2,7 +2,6 @@ package p2p
 
 import (
 	"context"
-	"time"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/connmgr"
@@ -55,14 +54,6 @@ type GossipSubBuilder interface {
 	// none
 	EnableGossipSubScoringWithOverride(*PeerScoringConfigOverride)
 
-	// SetGossipSubScoreTracerInterval sets the gossipsub score tracer interval of the builder.
-	// If the gossipsub score tracer interval has already been set, a fatal error is logged.
-	SetGossipSubScoreTracerInterval(time.Duration)
-
-	// SetGossipSubTracer sets the gossipsub tracer of the builder.
-	// If the gossipsub tracer has already been set, a fatal error is logged.
-	SetGossipSubTracer(PubSubTracer)
-
 	// SetRoutingSystem sets the routing system of the builder.
 	// If the routing system has already been set, a fatal error is logged.
 	SetRoutingSystem(routing.Routing)
@@ -105,7 +96,7 @@ type GossipSubRpcInspectorSuiteFactoryFunc func(
 	irrecoverable.SignalerContext,
 	zerolog.Logger,
 	flow.Identifier,
-	*p2pconf.GossipSubRPCInspectorsConfig,
+	*p2pconf.RpcInspectorParameters,
 	module.GossipSubMetrics,
 	metrics.HeroCacheMetricsFactory,
 	flownet.NetworkingType,
@@ -122,20 +113,20 @@ type NodeBuilder interface {
 	SetConnectionGater(ConnectionGater) NodeBuilder
 	SetRoutingSystem(func(context.Context, host.Host) (routing.Routing, error)) NodeBuilder
 
-	// EnableGossipSubScoringWithOverride enables peer scoring for the GossipSub pubsub system with the given override.
+	// OverrideGossipSubScoringConfig overrides the default peer scoring config for the GossipSub protocol.
+	// Note that it does not enable peer scoring. The peer scoring is enabled directly by setting the `peer-scoring-enabled` flag to true in `default-config.yaml`, or
+	// by setting the `gossipsub-peer-scoring-enabled` runtime flag to true. This function only overrides the default peer scoring config which takes effect
+	// only if the peer scoring is enabled (mostly for testing purposes).
 	// Any existing peer scoring config attribute that is set in the override will override the default peer scoring config.
 	// Anything that is left to nil or zero value in the override will be ignored and the default value will be used.
 	// Note: it is not recommended to override the default peer scoring config in production unless you know what you are doing.
-	// Production Tip: use PeerScoringConfigNoOverride as the argument to this function to enable peer scoring without any override.
 	// Args:
 	// - PeerScoringConfigOverride: override for the peer scoring config- Recommended to use PeerScoringConfigNoOverride for production.
 	// Returns:
 	// none
-	EnableGossipSubScoringWithOverride(*PeerScoringConfigOverride) NodeBuilder
+	OverrideGossipSubScoringConfig(*PeerScoringConfigOverride) NodeBuilder
 	SetCreateNode(CreateNodeFunc) NodeBuilder
 	SetGossipSubFactory(GossipSubFactoryFunc, GossipSubAdapterConfigFunc) NodeBuilder
-	SetGossipSubTracer(PubSubTracer) NodeBuilder
-	SetGossipSubScoreTracerInterval(time.Duration) NodeBuilder
 	OverrideDefaultRpcInspectorSuiteFactory(GossipSubRpcInspectorSuiteFactoryFunc) NodeBuilder
 	Build() (LibP2PNode, error)
 }
@@ -155,16 +146,4 @@ type PeerScoringConfigOverride struct {
 	// Override criteria: if the function is not nil, it will override the default application specific score parameters.
 	// If the function is nil, the default application specific score parameters are used.
 	AppSpecificScoreParams func(peer.ID) float64
-
-	// DecayInterval is the interval over which we decay the effect of past behavior, so that
-	// a good or bad behavior will not have a permanent effect on the penalty. It is also the interval
-	// that GossipSub uses to refresh the scores of all peers.
-	// Override criteria: if the value is not zero, it will override the default decay interval.
-	// If the value is zero, the default decay interval is used.
-	DecayInterval time.Duration
 }
-
-// PeerScoringConfigNoOverride is a default peer scoring configuration for a GossipSub pubsub system.
-// It is set to nil, which means that no override is done to the default peer scoring configuration.
-// It is the recommended way to use the default peer scoring configuration.
-var PeerScoringConfigNoOverride = (*PeerScoringConfigOverride)(nil)

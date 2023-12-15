@@ -136,18 +136,28 @@ func (_m *ReadOnlyExecutionState) GetHighestExecutedBlockID(_a0 context.Context)
 	return r0, r1, r2
 }
 
-// HasState provides a mock function with given fields: _a0
-func (_m *ReadOnlyExecutionState) HasState(_a0 flow.StateCommitment) bool {
-	ret := _m.Called(_a0)
+// IsBlockExecuted provides a mock function with given fields: height, blockID
+func (_m *ReadOnlyExecutionState) IsBlockExecuted(height uint64, blockID flow.Identifier) (bool, error) {
+	ret := _m.Called(height, blockID)
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func(flow.StateCommitment) bool); ok {
-		r0 = rf(_a0)
+	var r1 error
+	if rf, ok := ret.Get(0).(func(uint64, flow.Identifier) (bool, error)); ok {
+		return rf(height, blockID)
+	}
+	if rf, ok := ret.Get(0).(func(uint64, flow.Identifier) bool); ok {
+		r0 = rf(height, blockID)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(uint64, flow.Identifier) error); ok {
+		r1 = rf(height, blockID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // NewStorageSnapshot provides a mock function with given fields: commit, blockID, height
@@ -166,25 +176,25 @@ func (_m *ReadOnlyExecutionState) NewStorageSnapshot(commit flow.StateCommitment
 	return r0
 }
 
-// StateCommitmentByBlockID provides a mock function with given fields: _a0, _a1
-func (_m *ReadOnlyExecutionState) StateCommitmentByBlockID(_a0 context.Context, _a1 flow.Identifier) (flow.StateCommitment, error) {
-	ret := _m.Called(_a0, _a1)
+// StateCommitmentByBlockID provides a mock function with given fields: _a0
+func (_m *ReadOnlyExecutionState) StateCommitmentByBlockID(_a0 flow.Identifier) (flow.StateCommitment, error) {
+	ret := _m.Called(_a0)
 
 	var r0 flow.StateCommitment
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) (flow.StateCommitment, error)); ok {
-		return rf(_a0, _a1)
+	if rf, ok := ret.Get(0).(func(flow.Identifier) (flow.StateCommitment, error)); ok {
+		return rf(_a0)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) flow.StateCommitment); ok {
-		r0 = rf(_a0, _a1)
+	if rf, ok := ret.Get(0).(func(flow.Identifier) flow.StateCommitment); ok {
+		r0 = rf(_a0)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(flow.StateCommitment)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier) error); ok {
-		r1 = rf(_a0, _a1)
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+		r1 = rf(_a0)
 	} else {
 		r1 = ret.Error(1)
 	}
