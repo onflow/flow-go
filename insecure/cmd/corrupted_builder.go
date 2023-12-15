@@ -75,7 +75,7 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 
 		uniCfg := &p2pconfig.UnicastConfig{
 			RateLimiterDistributor: cnb.UnicastRateLimiterDistributor,
-			Unicast:                cnb.FlowConfig.NetworkConfig.UnicastConfig,
+			Unicast:                cnb.FlowConfig.NetworkConfig.Unicast,
 		}
 
 		connGaterCfg := &p2pconfig.ConnectionGaterConfig{
