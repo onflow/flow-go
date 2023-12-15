@@ -20,7 +20,7 @@ type ErrIllegalConnectionState struct {
 }
 
 func (e ErrIllegalConnectionState) Error() string {
-	return fmt.Sprintf("unexpected connection status to peer %s: received NotConnected status while connection list is not empty %d ", logging.PeerId(e.pid), e.numOfConns)
+	return fmt.Sprintf("unexpected connection status to peer %s: received NotConnected status while connection list is not empty %d ", p2plogging.PeerId(e.pid), e.numOfConns)
 }
 
 // NewConnectionStatusErr returns a new ErrIllegalConnectionState.
