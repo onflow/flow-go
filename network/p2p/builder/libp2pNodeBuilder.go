@@ -29,11 +29,11 @@ import (
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/netconf"
 	"github.com/onflow/flow-go/network/p2p"
+	p2pconfig2 "github.com/onflow/flow-go/network/p2p/builder/config"
+	"github.com/onflow/flow-go/network/p2p/builder/gossipsub"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
-	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
-	gossipsubbuilder "github.com/onflow/flow-go/network/p2p/p2pbuilder/gossipsub"
 	"github.com/onflow/flow-go/network/p2p/p2pconf"
 	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
@@ -58,7 +58,7 @@ type LibP2PNodeBuilder struct {
 	address          string
 	networkKey       fcrypto.PrivateKey
 	logger           zerolog.Logger
-	metricsConfig    *p2pconfig.MetricsConfig
+	metricsConfig    *p2pconfig2.MetricsConfig
 	basicResolver    madns.BasicResolver
 
 	resourceManager      network.ResourceManager
@@ -66,26 +66,26 @@ type LibP2PNodeBuilder struct {
 	connManager          connmgr.ConnManager
 	connGater            p2p.ConnectionGater
 	routingFactory       func(context.Context, host.Host) (routing.Routing, error)
-	peerManagerConfig    *p2pconfig.PeerManagerConfig
+	peerManagerConfig    *p2pconfig2.PeerManagerConfig
 	createNode           p2p.NodeConstructor
 	disallowListCacheCfg *p2p.DisallowListCacheConfig
-	unicastConfig        *p2pconfig.UnicastConfig
+	unicastConfig        *p2pconfig2.UnicastConfig
 	networkingType       flownet.NetworkingType // whether the node is running in private (staked) or public (unstaked) network
 }
 
 func NewNodeBuilder(
 	logger zerolog.Logger,
 	gossipSubCfg *p2pconf.GossipSubParameters,
-	metricsConfig *p2pconfig.MetricsConfig,
+	metricsConfig *p2pconfig2.MetricsConfig,
 	networkingType flownet.NetworkingType,
 	address string,
 	networkKey fcrypto.PrivateKey,
 	sporkId flow.Identifier,
 	idProvider module.IdentityProvider,
 	rCfg *p2pconf.ResourceManagerConfig,
-	peerManagerConfig *p2pconfig.PeerManagerConfig,
+	peerManagerConfig *p2pconfig2.PeerManagerConfig,
 	disallowListCacheCfg *p2p.DisallowListCacheConfig,
-	unicastConfig *p2pconfig.UnicastConfig,
+	unicastConfig *p2pconfig2.UnicastConfig,
 ) *LibP2PNodeBuilder {
 	return &LibP2PNodeBuilder{
 		logger:               logger,
@@ -399,14 +399,14 @@ func DefaultNodeBuilder(
 	flowKey fcrypto.PrivateKey,
 	sporkId flow.Identifier,
 	idProvider module.IdentityProvider,
-	metricsCfg *p2pconfig.MetricsConfig,
+	metricsCfg *p2pconfig2.MetricsConfig,
 	resolver madns.BasicResolver,
 	role string,
-	connGaterCfg *p2pconfig.ConnectionGaterConfig,
-	peerManagerCfg *p2pconfig.PeerManagerConfig,
+	connGaterCfg *p2pconfig2.ConnectionGaterConfig,
+	peerManagerCfg *p2pconfig2.PeerManagerConfig,
 	gossipCfg *p2pconf.GossipSubParameters,
 	rCfg *p2pconf.ResourceManagerConfig,
-	uniCfg *p2pconfig.UnicastConfig,
+	uniCfg *p2pconfig2.UnicastConfig,
 	connMgrConfig *netconf.ConnectionManager,
 	disallowListCacheCfg *p2p.DisallowListCacheConfig,
 	dhtSystemActivation DhtSystemActivation,

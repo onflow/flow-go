@@ -47,12 +47,12 @@ import (
 	alspmgr "github.com/onflow/flow-go/network/alsp/manager"
 	netcache "github.com/onflow/flow-go/network/cache"
 	"github.com/onflow/flow-go/network/p2p"
+	p2pbuilder "github.com/onflow/flow-go/network/p2p/builder"
+	p2pconfig2 "github.com/onflow/flow-go/network/p2p/builder/config"
 	"github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dns"
-	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
-	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
 	"github.com/onflow/flow-go/network/p2p/p2pnet"
 	"github.com/onflow/flow-go/network/p2p/ping"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
@@ -354,17 +354,17 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	// setup unicast rate limiters
 	unicastRateLimiters := ratelimit.NewRateLimiters(unicastRateLimiterOpts...)
 
-	uniCfg := &p2pconfig.UnicastConfig{
+	uniCfg := &p2pconfig2.UnicastConfig{
 		Unicast:                fnb.BaseConfig.FlowConfig.NetworkConfig.Unicast,
 		RateLimiterDistributor: fnb.UnicastRateLimiterDistributor,
 	}
 
-	connGaterCfg := &p2pconfig.ConnectionGaterConfig{
+	connGaterCfg := &p2pconfig2.ConnectionGaterConfig{
 		InterceptPeerDialFilters: connGaterPeerDialFilters,
 		InterceptSecuredFilters:  connGaterInterceptSecureFilters,
 	}
 
-	peerManagerCfg := &p2pconfig.PeerManagerConfig{
+	peerManagerCfg := &p2pconfig2.PeerManagerConfig{
 		ConnectionPruning: fnb.FlowConfig.NetworkConfig.NetworkConnectionPruning,
 		UpdateInterval:    fnb.FlowConfig.NetworkConfig.PeerUpdateInterval,
 		ConnectorFactory:  connection.DefaultLibp2pBackoffConnectorFactory(),
@@ -386,7 +386,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			fnb.NetworkKey,
 			fnb.SporkID,
 			fnb.IdentityProvider,
-			&p2pconfig.MetricsConfig{
+			&p2pconfig2.MetricsConfig{
 				Metrics:          fnb.Metrics.Network,
 				HeroCacheFactory: fnb.HeroCacheMetricsFactory(),
 			},

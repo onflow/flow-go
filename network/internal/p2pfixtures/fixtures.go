@@ -30,9 +30,9 @@ import (
 	"github.com/onflow/flow-go/network/internal/p2putils"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
+	p2pbuilder "github.com/onflow/flow-go/network/p2p/builder"
+	p2pconfig2 "github.com/onflow/flow-go/network/p2p/builder/config"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
-	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
-	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -102,7 +102,7 @@ func CreateNode(t *testing.T, networkKey crypto.PrivateKey, sporkID flow.Identif
 	builder := p2pbuilder.NewNodeBuilder(
 		logger,
 		&defaultFlowConfig.NetworkConfig.GossipSub,
-		&p2pconfig.MetricsConfig{
+		&p2pconfig2.MetricsConfig{
 			HeroCacheFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 			Metrics:          metrics.NewNoopCollector(),
 		},
@@ -112,12 +112,12 @@ func CreateNode(t *testing.T, networkKey crypto.PrivateKey, sporkID flow.Identif
 		sporkID,
 		idProvider,
 		&defaultFlowConfig.NetworkConfig.ResourceManager,
-		p2pconfig.PeerManagerDisableConfig(),
+		p2pconfig2.PeerManagerDisableConfig(),
 		&p2p.DisallowListCacheConfig{
 			MaxSize: uint32(1000),
 			Metrics: metrics.NewNoopCollector(),
 		},
-		&p2pconfig.UnicastConfig{
+		&p2pconfig2.UnicastConfig{
 			Unicast: defaultFlowConfig.NetworkConfig.Unicast,
 		}).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
