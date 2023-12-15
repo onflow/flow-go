@@ -89,6 +89,7 @@ func (s *MutableProtocolState) Mutator(candidateView uint64, parentID flow.Ident
 		s.results,
 		s.setups,
 		s.commits,
+		s.globalParams,
 		candidateView,
 		parentState,
 		func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (ProtocolStateMachine, error) {

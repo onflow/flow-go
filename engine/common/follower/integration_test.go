@@ -90,8 +90,8 @@ func TestFollowerHappyPath(t *testing.T) {
 		require.NoError(t, err)
 		rootProtocolStateID := rootProtocolState.Entry().ID()
 
-		// Hack EECC.
-		// Since root snapshot is created with 1000 views for first epoch, we will forcefully enter EECC to avoid errors
+		// Hack EFM.
+		// Since root snapshot is created with 1000 views for first epoch, we will forcefully enter EFM to avoid errors
 		// related to epoch transitions.
 		db.NewTransaction(true)
 		err = db.Update(func(txn *badger.Txn) error {

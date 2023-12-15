@@ -63,6 +63,7 @@ func TestProtocolState_AtBlockID(t *testing.T) {
 func TestMutableProtocolState_Mutator(t *testing.T) {
 	protocolStateDB := storagemock.NewProtocolState(t)
 	globalParams := mock.NewGlobalParams(t)
+	globalParams.On("EpochCommitSafetyThreshold").Return(uint64(1000))
 	headersDB := storagemock.NewHeaders(t)
 	resultsDB := storagemock.NewExecutionResults(t)
 	setupsDB := storagemock.NewEpochSetups(t)

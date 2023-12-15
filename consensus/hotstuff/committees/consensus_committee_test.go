@@ -181,7 +181,7 @@ func (suite *ConsensusSuite) TestConstruction_CommittedNextEpoch() {
 	suite.AssertStoredEpochCounterRange(suite.currentEpochCounter, suite.currentEpochCounter+1)
 }
 
-// TestConstruction_EpochFallbackTriggered tests construction when EECC has been triggered.
+// TestConstruction_EpochFallbackTriggered tests construction when EFM has been triggered.
 // Both current and the injected fallback epoch should be cached after construction.
 func (suite *ConsensusSuite) TestConstruction_EpochFallbackTriggered() {
 	curEpoch := newMockEpoch(suite.currentEpochCounter, unittest.IdentityListFixture(10), 101, 200, unittest.SeedFixture(32), true)
