@@ -63,7 +63,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/conduit"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
-	"github.com/onflow/flow-go/network/p2p/p2plogging"
+	"github.com/onflow/flow-go/network/p2p/logging"
 	"github.com/onflow/flow-go/network/p2p/p2pnet"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/translator"
@@ -642,7 +642,7 @@ func (builder *ObserverServiceBuilder) InitIDProviders() {
 
 					if flowID, err := builder.IDTranslator.GetFlowID(pid); err != nil {
 						// TODO: this is an instance of "log error and continue with best effort" anti-pattern
-						builder.Logger.Err(err).Str("peer", p2plogging.PeerId(pid)).Msg("failed to translate to Flow ID")
+						builder.Logger.Err(err).Str("peer", logging.PeerId(pid)).Msg("failed to translate to Flow ID")
 					} else {
 						result = append(result, flowID)
 					}

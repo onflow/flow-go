@@ -10,7 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/p2plogging"
+	"github.com/onflow/flow-go/network/p2p/logging"
 )
 
 const keyResourceManagerLimit = "libp2p_resource_manager_limit"
@@ -19,9 +19,9 @@ const keyResourceManagerLimit = "libp2p_resource_manager_limit"
 func notEjectedPeerFilter(idProvider module.IdentityProvider) p2p.PeerFilter {
 	return func(p peer.ID) error {
 		if id, found := idProvider.ByPeerID(p); !found {
-			return fmt.Errorf("failed to get identity of unknown peer with peer id %s", p2plogging.PeerId(p))
+			return fmt.Errorf("failed to get identity of unknown peer with peer id %s", logging.PeerId(p))
 		} else if id.Ejected {
-			return fmt.Errorf("peer %s with node id %s is ejected", p2plogging.PeerId(p), id.NodeID.String())
+			return fmt.Errorf("peer %s with node id %s is ejected", logging.PeerId(p), id.NodeID.String())
 		}
 
 		return nil
@@ -112,7 +112,7 @@ func (l *limitConfigLogger) logProtocolLimits(p map[protocol.ID]rcmgr.ResourceLi
 
 func (l *limitConfigLogger) logPeerLimits(p map[peer.ID]rcmgr.ResourceLimits) {
 	for pId, pLimits := range p {
-		lg := l.withBaseLimit(fmt.Sprintf("peer_%s", p2plogging.PeerId(pId)), pLimits)
+		lg := l.withBaseLimit(fmt.Sprintf("peer_%s", logging.PeerId(pId)), pLimits)
 		lg.Info().Msg("peer limits set")
 	}
 }

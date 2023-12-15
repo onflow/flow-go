@@ -19,9 +19,9 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
 	netcache "github.com/onflow/flow-go/network/p2p/cache"
+	logging2 "github.com/onflow/flow-go/network/p2p/logging"
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 	"github.com/onflow/flow-go/network/p2p/p2pconf"
-	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -241,7 +241,7 @@ var _ p2p.GossipSubInvCtrlMsgNotifConsumer = (*GossipSubAppSpecificScoreRegistry
 // Implementation must be thread-safe.
 func (r *GossipSubAppSpecificScoreRegistry) AppSpecificScoreFunc() func(peer.ID) float64 {
 	return func(pid peer.ID) float64 {
-		lg := r.logger.With().Str("remote_peer_id", p2plogging.PeerId(pid)).Logger()
+		lg := r.logger.With().Str("remote_peer_id", logging2.PeerId(pid)).Logger()
 		appSpecificScore, lastUpdated, ok := r.appScoreCache.Get(pid)
 		switch {
 		case !ok:
@@ -285,13 +285,13 @@ func (r *GossipSubAppSpecificScoreRegistry) AppSpecificScoreFunc() func(peer.ID)
 func (r *GossipSubAppSpecificScoreRegistry) computeAppSpecificScore(pid peer.ID) float64 {
 	appSpecificScore := float64(0)
 
-	lg := r.logger.With().Str("peer_id", p2plogging.PeerId(pid)).Logger()
+	lg := r.logger.With().Str("peer_id", logging2.PeerId(pid)).Logger()
 	// (1) spam penalty: the penalty is applied to the application specific penalty when a peer conducts a spamming misbehaviour.
 	spamRecord, err, spamRecordExists := r.spamScoreCache.Get(pid)
 	if err != nil {
 		// the error is considered fatal as it means the cache is not working properly.
 		// we should not continue with the execution as it may lead to routing attack vulnerability.
-		r.logger.Fatal().Str("peer_id", p2plogging.PeerId(pid)).Err(err).Msg("could not get application specific penalty for peer")
+		r.logger.Fatal().Str("peer_id", logging2.PeerId(pid)).Err(err).Msg("could not get application specific penalty for peer")
 		return appSpecificScore // unreachable, but added to avoid proceeding with the execution if log level is changed.
 	}
 
@@ -348,14 +348,14 @@ func (r *GossipSubAppSpecificScoreRegistry) processAppSpecificScoreUpdateWork(p 
 		return fmt.Errorf("could not add application specific score %f for peer to cache: %w", appSpecificScore, err)
 	}
 	r.logger.Trace().
-		Str("remote_peer_id", p2plogging.PeerId(p)).
+		Str("remote_peer_id", logging2.PeerId(p)).
 		Float64("app_specific_score", appSpecificScore).
 		Msg("application specific score computed and cache updated")
 	return nil
 }
 
 func (r *GossipSubAppSpecificScoreRegistry) stakingScore(pid peer.ID) (float64, flow.Identifier, flow.Role) {
-	lg := r.logger.With().Str("peer_id", p2plogging.PeerId(pid)).Logger()
+	lg := r.logger.With().Str("peer_id", logging2.PeerId(pid)).Logger()
 
 	// checks if peer has a valid Flow protocol identity.
 	flowId, err := HasValidFlowIdentity(r.idProvider, pid)
@@ -391,7 +391,7 @@ func (r *GossipSubAppSpecificScoreRegistry) subscriptionPenalty(pid peer.ID, flo
 	if err := r.validator.CheckSubscribedToAllowedTopics(pid, role); err != nil {
 		r.logger.Warn().
 			Err(err).
-			Str("peer_id", p2plogging.PeerId(pid)).
+			Str("peer_id", logging2.PeerId(pid)).
 			Hex("flow_id", logging.ID(flowId)).
 			Bool(logging.KeySuspicious, true).
 			Msg("invalid subscription detected, penalizing peer")
@@ -409,7 +409,7 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 
 	lg := r.logger.With().
 		Err(notification.Error).
-		Str("peer_id", p2plogging.PeerId(notification.PeerID)).
+		Str("peer_id", logging2.PeerId(notification.PeerID)).
 		Str("misbehavior_type", notification.MsgType.String()).Logger()
 
 	// try initializing the application specific penalty for the peer if it is not yet initialized.
@@ -418,7 +418,7 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 	initRecord := r.init()
 	initialized := r.spamScoreCache.Add(notification.PeerID, initRecord)
 	if initialized {
-		lg.Trace().Str("peer_id", p2plogging.PeerId(notification.PeerID)).Msg("application specific penalty initialized for peer")
+		lg.Trace().Str("peer_id", logging2.PeerId(notification.PeerID)).Msg("application specific penalty initialized for peer")
 	}
 
 	record, err := r.spamScoreCache.Update(notification.PeerID, func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {

@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/onflow/flow-go/network/p2p/p2plogging/internal"
+	"github.com/onflow/flow-go/network/p2p/logging/internal"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 

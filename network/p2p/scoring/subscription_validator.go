@@ -8,7 +8,7 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/p2plogging"
+	"github.com/onflow/flow-go/network/p2p/logging"
 	p2putils "github.com/onflow/flow-go/network/p2p/utils"
 )
 
@@ -61,7 +61,7 @@ var _ p2p.SubscriptionValidator = (*SubscriptionValidator)(nil)
 // The error is benign, i.e., it does not indicate an illegal state in the execution of the code. We expect this error
 // when there are malicious peers in the network. But such errors should not lead to a crash of the node.
 func (v *SubscriptionValidator) CheckSubscribedToAllowedTopics(pid peer.ID, role flow.Role) error {
-	lg := v.logger.With().Str("remote_peer_id", p2plogging.PeerId(pid)).Logger()
+	lg := v.logger.With().Str("remote_peer_id", logging.PeerId(pid)).Logger()
 
 	topics := v.subscriptionProvider.GetSubscribedTopics(pid)
 	lg.Trace().Strs("topics", topics).Msg("checking subscription for remote peer id")

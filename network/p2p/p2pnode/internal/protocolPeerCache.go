@@ -11,7 +11,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/network/p2p/p2plogging"
+	"github.com/onflow/flow-go/network/p2p/logging"
 )
 
 // ProtocolPeerCache store a mapping from protocol ID to peers who support that protocol
@@ -97,7 +97,7 @@ func (p *ProtocolPeerCache) consumeSubscription(logger zerolog.Logger, h host.Ho
 		case event.EvtPeerIdentificationCompleted:
 			protocols, err := h.Peerstore().GetProtocols(evt.Peer)
 			if err != nil {
-				logger.Err(err).Str("peer_id", p2plogging.PeerId(evt.Peer)).Msg("failed to get protocols for peer")
+				logger.Err(err).Str("peer_id", logging.PeerId(evt.Peer)).Msg("failed to get protocols for peer")
 				continue
 			}
 			p.AddProtocols(evt.Peer, protocols)

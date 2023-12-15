@@ -10,7 +10,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/network/p2p/p2plogging"
+	logging2 "github.com/onflow/flow-go/network/p2p/logging"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -360,7 +360,7 @@ func (nc *NetworkCollector) OnUnauthorizedMessage(role, msgType, topic, offense 
 // OnRateLimitedPeer tracks the number of rate limited messages seen on the network.
 func (nc *NetworkCollector) OnRateLimitedPeer(peerID peer.ID, role, msgType, topic, reason string) {
 	nc.logger.Warn().
-		Str("peer_id", p2plogging.PeerId(peerID)).
+		Str("peer_id", logging2.PeerId(peerID)).
 		Str("role", role).
 		Str("message_type", msgType).
 		Str("topic", topic).

@@ -7,7 +7,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 
-	"github.com/onflow/flow-go/network/p2p/p2plogging"
+	"github.com/onflow/flow-go/network/p2p/logging"
 )
 
 // ErrSecurityProtocolNegotiationFailed indicates security protocol negotiation failed during the stream factory connect attempt.
@@ -17,7 +17,7 @@ type ErrSecurityProtocolNegotiationFailed struct {
 }
 
 func (e ErrSecurityProtocolNegotiationFailed) Error() string {
-	return fmt.Errorf("failed to dial remote peer %s in stream factory invalid node ID: %w", p2plogging.PeerId(e.pid), e.err).Error()
+	return fmt.Errorf("failed to dial remote peer %s in stream factory invalid node ID: %w", logging.PeerId(e.pid), e.err).Error()
 }
 
 // IsErrSecurityProtocolNegotiationFailed returns whether an error is ErrSecurityProtocolNegotiationFailed.
@@ -40,7 +40,7 @@ type ErrProtocolNotSupported struct {
 
 func (e ErrProtocolNotSupported) Error() string {
 	return fmt.Errorf("failed to dial remote peer %s remote node is running on a different spork: %w, protocol attempted: %s",
-		p2plogging.PeerId(e.peerID),
+		logging.PeerId(e.peerID),
 		e.err,
 		e.protocolID).Error()
 }

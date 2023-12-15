@@ -22,9 +22,9 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/inspector/internal/cache"
+	logging2 "github.com/onflow/flow-go/network/p2p/logging"
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 	"github.com/onflow/flow-go/network/p2p/p2pconf"
-	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/utils/logging"
@@ -198,7 +198,7 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 		c.logger.Error().
 			Err(err).
 			Bool(logging.KeyNetworkingSecurity, true).
-			Str("peer_id", p2plogging.PeerId(from)).
+			Str("peer_id", logging2.PeerId(from)).
 			Msg("failed to get inspect RPC request")
 		return fmt.Errorf("failed to get inspect RPC request: %w", err)
 	}
@@ -349,7 +349,7 @@ func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihave
 		return nil, p2p.CtrlMsgNonClusterTopicType
 	}
 	lg := c.logger.With().
-		Str("peer_id", p2plogging.PeerId(from)).
+		Str("peer_id", logging2.PeerId(from)).
 		Int("sample_size", len(ihaves)).
 		Int("max_sample_size", c.config.IHave.MaxSampleSize).
 		Logger()
@@ -398,7 +398,7 @@ func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWant
 	}
 	lastHighest := c.rpcTracker.LastHighestIHaveRPCSize()
 	lg := c.logger.With().
-		Str("peer_id", p2plogging.PeerId(from)).
+		Str("peer_id", logging2.PeerId(from)).
 		Uint("max_sample_size", c.config.IWant.MaxSampleSize).
 		Int64("last_highest_ihave_rpc_size", lastHighest).
 		Logger()
@@ -652,7 +652,7 @@ func (c *ControlMsgValidationInspector) truncateIWantMessages(from peer.ID, rpc 
 func (c *ControlMsgValidationInspector) truncateIWantMessageIds(from peer.ID, rpc *pubsub.RPC) {
 	lastHighest := c.rpcTracker.LastHighestIHaveRPCSize()
 	lg := c.logger.With().
-		Str("peer_id", p2plogging.PeerId(from)).
+		Str("peer_id", logging2.PeerId(from)).
 		Uint("max_sample_size", c.config.IWant.MaxSampleSize).
 		Int64("last_highest_ihave_rpc_size", lastHighest).
 		Logger()
@@ -728,7 +728,7 @@ func (c *ControlMsgValidationInspector) validateTopic(from peer.ID, topic channe
 // errors are unexpected and irrecoverable indicating a bug.
 func (c *ControlMsgValidationInspector) validateClusterPrefixedTopic(from peer.ID, topic channels.Topic, activeClusterIds flow.ChainIDList) error {
 	lg := c.logger.With().
-		Str("from", p2plogging.PeerId(from)).
+		Str("from", logging2.PeerId(from)).
 		Logger()
 
 	// only staked nodes are expected to participate on cluster prefixed topics
@@ -821,7 +821,7 @@ func (c *ControlMsgValidationInspector) logAndDistributeAsyncInspectErrs(req *In
 		Bool(logging.KeyNetworkingSecurity, true).
 		Str("topic_type", topicType.String()).
 		Uint64("error_count", count).
-		Str("peer_id", p2plogging.PeerId(req.Peer)).
+		Str("peer_id", logging2.PeerId(req.Peer)).
 		Logger()
 
 	switch {

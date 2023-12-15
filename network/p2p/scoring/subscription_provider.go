@@ -15,8 +15,8 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
+	logging2 "github.com/onflow/flow-go/network/p2p/logging"
 	"github.com/onflow/flow-go/network/p2p/p2pconf"
-	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"github.com/onflow/flow-go/network/p2p/scoring/internal"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -128,7 +128,7 @@ func (s *SubscriptionProvider) updateTopics() error {
 				// peer is not authorized (staked); hence it does not have a valid role in the network; and
 				// we skip the topic update for this peer (also avoiding sybil attacks on the cache).
 				s.logger.Debug().
-					Str("remote_peer_id", p2plogging.PeerId(p)).
+					Str("remote_peer_id", logging2.PeerId(p)).
 					Bool(logging.KeyNetworkingSecurity, true).
 					Msg("skipping topic update for unauthorized peer")
 				continue
@@ -140,7 +140,7 @@ func (s *SubscriptionProvider) updateTopics() error {
 				return fmt.Errorf("failed to update topics for peer %s: %w", p, err)
 			}
 			s.logger.Debug().
-				Str("remote_peer_id", p2plogging.PeerId(p)).
+				Str("remote_peer_id", logging2.PeerId(p)).
 				Strs("updated_topics", updatedTopics).
 				Msg("updated topics for peer")
 		}
@@ -155,7 +155,7 @@ func (s *SubscriptionProvider) updateTopics() error {
 func (s *SubscriptionProvider) GetSubscribedTopics(pid peer.ID) []string {
 	topics, ok := s.cache.GetSubscribedTopics(pid)
 	if !ok {
-		s.logger.Trace().Str("peer_id", p2plogging.PeerId(pid)).Msg("no topics found for peer")
+		s.logger.Trace().Str("peer_id", logging2.PeerId(pid)).Msg("no topics found for peer")
 		return nil
 	}
 	return topics

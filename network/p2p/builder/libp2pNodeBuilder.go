@@ -34,8 +34,8 @@ import (
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
+	"github.com/onflow/flow-go/network/p2p/logging"
 	"github.com/onflow/flow-go/network/p2p/p2pconf"
-	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/unicast"
@@ -231,7 +231,7 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		return nil, err
 	}
 	builder.gossipSubBuilder.SetHost(h)
-	builder.logger = builder.logger.With().Str("local_peer_id", p2plogging.PeerId(h.ID())).Logger()
+	builder.logger = builder.logger.With().Str("local_peer_id", logging.PeerId(h.ID())).Logger()
 
 	var peerManager p2p.PeerManager
 	if builder.peerManagerConfig.UpdateInterval > 0 {

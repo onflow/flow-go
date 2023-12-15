@@ -24,7 +24,7 @@ import (
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/p2plogging"
+	"github.com/onflow/flow-go/network/p2p/logging"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/onflow/flow-go/network/p2p/utils"
@@ -55,7 +55,7 @@ func TestTopicValidator_Unstaked(t *testing.T) {
 	channel := channels.ConsensusCommittee
 	topic := channels.TopicFromChannel(channel, sporkId)
 
-	//NOTE: identity2 is not in the ids list simulating an un-staked node
+	// NOTE: identity2 is not in the ids list simulating an un-staked node
 	ids := flow.IdentityList{&identity1}
 	translatorFixture, err := translator.NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
@@ -64,7 +64,7 @@ func TestTopicValidator_Unstaked(t *testing.T) {
 	isStaked := func(pid peer.ID) error {
 		fid, err := translatorFixture.GetFlowID(pid)
 		if err != nil {
-			return fmt.Errorf("could not translate the peer_id %s to a Flow identifier: %w", p2plogging.PeerId(pid), err)
+			return fmt.Errorf("could not translate the peer_id %s to a Flow identifier: %w", logging.PeerId(pid), err)
 		}
 
 		if _, ok := ids.ByNodeID(fid); !ok {
@@ -342,7 +342,7 @@ func TestAuthorizedSenderValidator_Unauthorized(t *testing.T) {
 
 	violation := &network.Violation{
 		Identity: &identity3,
-		PeerID:   p2plogging.PeerId(an1.ID()),
+		PeerID:   logging.PeerId(an1.ID()),
 		OriginID: identity3.NodeID,
 		MsgType:  "*messages.BlockProposal",
 		Channel:  channel,
