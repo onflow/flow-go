@@ -75,6 +75,11 @@ func NewDeltaView(parent types.ReadOnlyView) *DeltaView {
 	}
 }
 
+// NewChildView constructs a new delta view having the current view as parent
+func (d *DeltaView) NewChildView() *DeltaView {
+	return NewDeltaView(d)
+}
+
 // Exist returns true if address exists
 //
 // it also returns true for both newly created accounts or accounts that has been flagged for deletion
@@ -363,11 +368,6 @@ func (d *DeltaView) Preimages() map[gethCommon.Hash][]byte {
 // Commit for deltaview is a no-op
 func (d *DeltaView) Commit() error {
 	return nil
-}
-
-// NewChildView constructs a new delta view having the current view as parent
-func (d *DeltaView) NewChildView() *DeltaView {
-	return NewDeltaView(d)
 }
 
 // DirtyAddresses returns a set of addresses that has been updated in this view
