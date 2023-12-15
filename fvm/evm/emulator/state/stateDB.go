@@ -212,6 +212,16 @@ func (db *StateDB) Logs() []*gethTypes.Log {
 	return allLogs
 }
 
+func (db *StateDB) Preimages() map[gethCommon.Hash][]byte {
+	preImages := make(map[gethCommon.Hash][]byte, 0)
+	for _, view := range db.views {
+		for k, v := range view.Preimages() {
+			preImages[k] = v
+		}
+	}
+	return preImages
+}
+
 func (db *StateDB) Commit() error {
 	// return error if any has been acumulated
 	if db.dbErr != nil {
@@ -242,6 +252,11 @@ func (db *StateDB) Commit() error {
 
 	// update accounts
 	for _, addr := range sortedAddresses {
+		// TODO check if address is
+		if db.HasSuicided(addr) {
+			db.baseView.DeleteAccount(addr)
+			continue
+		}
 		db.baseView.UpdateAccount(
 			addr,
 			db.GetBalance(addr),

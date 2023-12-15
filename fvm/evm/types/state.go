@@ -18,6 +18,9 @@ type StateDB interface {
 	// returns raw logs (txHash and etc has to be injected)
 	Logs() []*gethTypes.Log
 
+	// returns a map of preimages
+	Preimages() map[gethCommon.Hash][]byte
+
 	// Reset prepares the storage for the next flow transaction execution
 	Reset() error
 }
@@ -104,6 +107,9 @@ type BaseView interface {
 		code []byte,
 		codeHash gethCommon.Hash,
 	) error
+
+	// DeleteAccount deletes an account
+	DeleteAccount(addr gethCommon.Address) error
 
 	// UpdateSlot updates the value for the given slot in the main storage
 	UpdateSlot(

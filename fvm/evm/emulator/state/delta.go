@@ -355,6 +355,11 @@ func (d *DeltaView) AddPreimage(hash gethCommon.Hash, input []byte) {
 	d.preimages[hash] = input
 }
 
+// Preimages returns a map of preimages
+func (d *DeltaView) Preimages() map[gethCommon.Hash][]byte {
+	return d.preimages
+}
+
 // Commit for deltaview is a no-op
 func (d *DeltaView) Commit() error {
 	return nil
