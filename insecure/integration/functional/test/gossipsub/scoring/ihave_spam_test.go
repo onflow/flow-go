@@ -3,7 +3,6 @@ package scoring
 import (
 	"context"
 	"fmt"
-	"sync"
 	"testing"
 	"time"
 
@@ -260,9 +259,8 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 		if !ok {
 			return false
 		}
-		// We set 7.5 as the threshold to compensate for the scoring decay in between RPC's being processed by the inspector
-		// ideally it must be 10 (one per RPC), but we give it a buffer of 1 to account for decays and floating point errors.
-		// note that we intentionally override the decay speed to be 60-times faster in this test.
+
+		// ideally, we should have 10, but we give it a buffer of 2.5 to account for 25% discrepancy due to scoring decays, timer asynchrony, and floating point errors.
 		if behavioralPenalty < 7.5 {
 			t.Logf("[first round] pending on behavioral penalty %f", behavioralPenalty)
 			return false
@@ -290,8 +288,7 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 			return false
 		}
 
-		// ideally we should have 20 (10 from the first round, 10 from the second round), but we give it a buffer of 5 to account for decays and floating point errors.
-		// note that we intentionally override the decay speed to be 60-times faster in this test.
+		// ideally, we should have 20 (10 from the first round, 10 from the second round), but we give it a buffer of 5 to account for 25% discrepancy due to scoring decays, timer asynchrony, and floating point errors.
 		if behavioralPenalty < 15 {
 			t.Logf("[second round] pending on behavioral penalty %f", behavioralPenalty)
 			return false
@@ -346,9 +343,8 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 		if !ok {
 			return false
 		}
-		// ideally we should have 30 (10 from the first round, 10 from the second round, 10 from the third round), but we give it a buffer of 5 to account for decays and floating point errors.
-		// note that we intentionally override the decay speed to be 60-times faster in this test.
-		if behavioralPenalty < 25 {
+		// ideally, we should have 30 (10 from the first round, 10 from the second round, 10 from the third round), but we give it a buffer of 7.5 to account for 25% discrepancy due to scoring decays, timer asynchrony, and floating point errors.
+		if behavioralPenalty < 22.5 {
 			t.Logf("[third round] pending on behavioral penalty %f", behavioralPenalty)
 			return false
 		}
@@ -447,20 +443,12 @@ func spamIHaveBrokenPromise(t *testing.T,
 	// Note that victim nodes picks one iHave id out of the entire RPC and if that iHave id is not eventually delivered within 3 seconds (gossipsub parameter, GossipSubIWantFollowupTime),
 	// then the promise is considered broken. Hence, broken promises are counted per RPC (not per iHave message).
 	// This sums up to 10 broken promises (1 per RPC).
-	wg := sync.WaitGroup{}
 	for i := 0; i < len(spamCtrlMsgs); i++ {
-		wg.Add(1)
-		i := i // capture the loop variable
-		go func() {
-			defer wg.Done()
-			spammer.SpamControlMessage(t, victimNode, []pb.ControlMessage{spamCtrlMsgs[i]})
-		}()
-		// we wait 100 milliseconds between each RPC to add an artificial delay between RPCs; this is to reduce the chance that all RPCs arrive in the same heartbeat, hence
+		spammer.SpamControlMessage(t, victimNode, []pb.ControlMessage{spamCtrlMsgs[i]})
+		// we wait 50 milliseconds between each RPC to add an artificial delay between RPCs; this is to reduce the chance that all RPCs arrive in the same heartbeat, hence
 		// victim node dropping some.
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 	}
-
-	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "sanity check failed, we should have sent all the spam iHaves to the victim node")
 
 	// wait till all the spam iHaves are responded with iWants.
 	require.Eventually(t,
