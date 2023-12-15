@@ -18,10 +18,10 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/builder/config"
 	inspectorbuilder "github.com/onflow/flow-go/network/p2p/builder/inspector"
+	"github.com/onflow/flow-go/network/p2p/config"
 	"github.com/onflow/flow-go/network/p2p/distributor"
 	"github.com/onflow/flow-go/network/p2p/inspector"
 	"github.com/onflow/flow-go/network/p2p/inspector/validation"
-	"github.com/onflow/flow-go/network/p2p/p2pconf"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/network/p2p/tracer"
@@ -46,7 +46,7 @@ type Builder struct {
 	idProvider               module.IdentityProvider
 	routingSystem            routing.Routing
 	rpcInspectorSuiteFactory p2p.GossipSubRpcInspectorSuiteFactoryFunc
-	gossipSubCfg             *p2pconf.GossipSubParameters
+	gossipSubCfg             *config.GossipSubParameters
 }
 
 var _ p2p.GossipSubBuilder = (*Builder)(nil)
@@ -149,7 +149,7 @@ func (g *Builder) OverrideDefaultRpcInspectorSuiteFactory(factory p2p.GossipSubR
 // Note: the builder is not thread-safe. It should only be used in the main thread.
 func NewGossipSubBuilder(logger zerolog.Logger,
 	metricsCfg *p2pconfig.MetricsConfig,
-	gossipSubCfg *p2pconf.GossipSubParameters,
+	gossipSubCfg *config.GossipSubParameters,
 	networkType network.NetworkingType,
 	sporkId flow.Identifier,
 	idProvider module.IdentityProvider) *Builder {
@@ -211,7 +211,7 @@ func defaultInspectorSuite(rpcTracker p2p.RpcControlTracking) p2p.GossipSubRpcIn
 	return func(ctx irrecoverable.SignalerContext,
 		logger zerolog.Logger,
 		sporkId flow.Identifier,
-		inspectorCfg *p2pconf.RpcInspectorParameters,
+		inspectorCfg *config.RpcInspectorParameters,
 		gossipSubMetrics module.GossipSubMetrics,
 		heroCacheMetricsFactory metrics.HeroCacheMetricsFactory,
 		networkType network.NetworkingType,

@@ -24,7 +24,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/inspector/internal/cache"
 	logging2 "github.com/onflow/flow-go/network/p2p/logging"
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
-	"github.com/onflow/flow-go/network/p2p/p2pconf"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/utils/logging"
@@ -41,7 +40,7 @@ type ControlMsgValidationInspector struct {
 	sporkID flow.Identifier
 	metrics module.GossipSubRpcValidationInspectorMetrics
 	// config control message validation configurations.
-	config *p2pconf.RpcValidationInspector
+	config *config.RpcValidationInspector
 	// distributor used to disseminate invalid RPC message notifications.
 	distributor p2p.GossipSubInspectorNotifDistributor
 	// workerPool queue that stores *InspectRPCRequest that will be processed by component workers.
@@ -69,7 +68,7 @@ type InspectorParams struct {
 	// SporkID the current spork ID.
 	SporkID flow.Identifier `validate:"required"`
 	// Config inspector configuration.
-	Config *p2pconf.RpcValidationInspector `validate:"required"`
+	Config *config.RpcValidationInspector `validate:"required"`
 	// Distributor gossipsub inspector notification distributor.
 	Distributor p2p.GossipSubInspectorNotifDistributor `validate:"required"`
 	// HeroCacheMetricsFactory the metrics factory.

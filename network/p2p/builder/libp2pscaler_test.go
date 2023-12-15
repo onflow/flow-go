@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/config"
-	"github.com/onflow/flow-go/network/p2p/p2pconf"
+	config2 "github.com/onflow/flow-go/network/p2p/config"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -125,7 +125,7 @@ func TestApplyResourceLimitOverride(t *testing.T) {
 	libp2p.SetDefaultServiceLimits(&limits)
 	scaled := limits.Scale(mem, fd)
 
-	systemOverride := p2pconf.ResourceManagerOverrideLimit{
+	systemOverride := config2.ResourceManagerOverrideLimit{
 		StreamsInbound:      0, // should not be overridden.
 		StreamsOutbound:     456,
 		ConnectionsInbound:  789,
@@ -134,7 +134,7 @@ func TestApplyResourceLimitOverride(t *testing.T) {
 		Memory:              7890,
 	}
 
-	peerOverride := p2pconf.ResourceManagerOverrideLimit{
+	peerOverride := config2.ResourceManagerOverrideLimit{
 		StreamsInbound:      321,
 		StreamsOutbound:     0, // should not be overridden.
 		ConnectionsInbound:  987,
@@ -144,8 +144,8 @@ func TestApplyResourceLimitOverride(t *testing.T) {
 	}
 
 	partial := rcmgr.PartialLimitConfig{}
-	partial.System = ApplyResourceLimitOverride(unittest.Logger(), p2pconf.ResourceScopeSystem, scaled.ToPartialLimitConfig().System, systemOverride)
-	partial.PeerDefault = ApplyResourceLimitOverride(unittest.Logger(), p2pconf.ResourceScopePeer, scaled.ToPartialLimitConfig().PeerDefault, peerOverride)
+	partial.System = ApplyResourceLimitOverride(unittest.Logger(), config2.ResourceScopeSystem, scaled.ToPartialLimitConfig().System, systemOverride)
+	partial.PeerDefault = ApplyResourceLimitOverride(unittest.Logger(), config2.ResourceScopePeer, scaled.ToPartialLimitConfig().PeerDefault, peerOverride)
 
 	final := partial.Build(scaled).ToPartialLimitConfig()
 	require.Equal(t, 456, int(final.System.StreamsOutbound))                                           // should be overridden.
@@ -176,7 +176,7 @@ func TestBuildLibp2pResourceManagerLimits(t *testing.T) {
 	require.NoError(t, err)
 
 	// this function will evaluate that the limits are override correctly on each scope using the override config.
-	requireEqual := func(t *testing.T, override p2pconf.ResourceManagerOverrideLimit, actual rcmgr.ResourceLimits) {
+	requireEqual := func(t *testing.T, override config2.ResourceManagerOverrideLimit, actual rcmgr.ResourceLimits) {
 		require.Equal(t, override.StreamsInbound, int(actual.StreamsInbound))
 		require.Equal(t, override.StreamsOutbound, int(actual.StreamsOutbound))
 		require.Equal(t, override.ConnectionsInbound, int(actual.ConnsInbound))

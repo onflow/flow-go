@@ -31,11 +31,10 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	p2pconfig2 "github.com/onflow/flow-go/network/p2p/builder/config"
 	"github.com/onflow/flow-go/network/p2p/builder/gossipsub"
+	config2 "github.com/onflow/flow-go/network/p2p/config"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
-	"github.com/onflow/flow-go/network/p2p/logging"
-	"github.com/onflow/flow-go/network/p2p/p2pconf"
 	"github.com/onflow/flow-go/network/p2p/p2pnode"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/unicast"
@@ -62,7 +61,7 @@ type LibP2PNodeBuilder struct {
 	basicResolver    madns.BasicResolver
 
 	resourceManager      network.ResourceManager
-	resourceManagerCfg   *p2pconf.ResourceManagerConfig
+	resourceManagerCfg   *config2.ResourceManagerConfig
 	connManager          connmgr.ConnManager
 	connGater            p2p.ConnectionGater
 	routingFactory       func(context.Context, host.Host) (routing.Routing, error)
@@ -75,14 +74,14 @@ type LibP2PNodeBuilder struct {
 
 func NewNodeBuilder(
 	logger zerolog.Logger,
-	gossipSubCfg *p2pconf.GossipSubParameters,
+	gossipSubCfg *config2.GossipSubParameters,
 	metricsConfig *p2pconfig2.MetricsConfig,
 	networkingType flownet.NetworkingType,
 	address string,
 	networkKey fcrypto.PrivateKey,
 	sporkId flow.Identifier,
 	idProvider module.IdentityProvider,
-	rCfg *p2pconf.ResourceManagerConfig,
+	rCfg *config2.ResourceManagerConfig,
 	peerManagerConfig *p2pconfig2.PeerManagerConfig,
 	disallowListCacheCfg *p2p.DisallowListCacheConfig,
 	unicastConfig *p2pconfig2.UnicastConfig,
@@ -404,8 +403,8 @@ func DefaultNodeBuilder(
 	role string,
 	connGaterCfg *p2pconfig2.ConnectionGaterConfig,
 	peerManagerCfg *p2pconfig2.PeerManagerConfig,
-	gossipCfg *p2pconf.GossipSubParameters,
-	rCfg *p2pconf.ResourceManagerConfig,
+	gossipCfg *config2.GossipSubParameters,
+	rCfg *config2.ResourceManagerConfig,
 	uniCfg *p2pconfig2.UnicastConfig,
 	connMgrConfig *netconf.ConnectionManager,
 	disallowListCacheCfg *p2p.DisallowListCacheConfig,

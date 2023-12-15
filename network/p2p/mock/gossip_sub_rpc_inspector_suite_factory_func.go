@@ -5,6 +5,7 @@ package mockp2p
 import (
 	flow "github.com/onflow/flow-go/model/flow"
 	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
+	p2pconf "github.com/onflow/flow-go/network/p2p/config"
 
 	metrics "github.com/onflow/flow-go/module/metrics"
 
@@ -15,8 +16,6 @@ import (
 	network "github.com/onflow/flow-go/network"
 
 	p2p "github.com/onflow/flow-go/network/p2p"
-
-	p2pconf "github.com/onflow/flow-go/network/p2p/p2pconf"
 
 	zerolog "github.com/rs/zerolog"
 )

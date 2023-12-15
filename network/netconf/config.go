@@ -2,8 +2,6 @@ package netconf
 
 import (
 	"time"
-
-	"github.com/onflow/flow-go/network/p2p/p2pconf"
 )
 
 const (
@@ -14,11 +12,11 @@ const (
 
 // Config encapsulation of configuration structs for all components related to the Flow network.
 type Config struct {
-	Unicast           Unicast                       `mapstructure:"unicast"`
-	ResourceManager   p2pconf.ResourceManagerConfig `mapstructure:"libp2p-resource-manager"`
-	ConnectionManager ConnectionManager             `mapstructure:"connection-manager"`
+	Unicast           Unicast                      `mapstructure:"unicast"`
+	ResourceManager   config.ResourceManagerConfig `mapstructure:"libp2p-resource-manager"`
+	ConnectionManager ConnectionManager            `mapstructure:"connection-manager"`
 	// GossipSub core gossipsub configuration.
-	GossipSub  p2pconf.GossipSubParameters `mapstructure:"gossipsub"`
+	GossipSub  config.GossipSubParameters `mapstructure:"gossipsub"`
 	AlspConfig `mapstructure:",squash"`
 
 	// NetworkConnectionPruning determines whether connections to nodes

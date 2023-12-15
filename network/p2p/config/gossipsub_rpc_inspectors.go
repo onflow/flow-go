@@ -1,4 +1,4 @@
-package p2pconf
+package p2pconfig
 
 // RpcInspectorParameters keys.
 const (
