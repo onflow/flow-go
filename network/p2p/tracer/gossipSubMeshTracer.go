@@ -266,8 +266,14 @@ func (t *GossipSubMeshTracer) Leave(topic string) {
 // ValidateMessage is called by GossipSub as a callback when a message is received by the local node and entered the validation phase.
 // As the result of the validation, the message may be rejected or passed to the application (i.e., Flow protocol).
 func (t *GossipSubMeshTracer) ValidateMessage(msg *pubsub.Message) {
-	lg := t.logger.With().Logger()
+	size := len(msg.Data)
+	t.metrics.OnMessageEnteredValidation(size)
 
+	if t.logger.GetLevel() > zerolog.TraceLevel {
+		return // return fast if we are not logging at trace level
+	}
+
+	lg := t.logger.With().Logger()
 	if msg.Topic != nil {
 		lg = lg.With().Str("topic", *msg.Topic).Logger()
 	}
@@ -275,22 +281,23 @@ func (t *GossipSubMeshTracer) ValidateMessage(msg *pubsub.Message) {
 	if err == nil {
 		lg = lg.With().Str("remote_peer_id", p2plogging.PeerId(from)).Logger()
 	}
-	size := len(msg.Data)
 
-	t.metrics.OnMessageEnteredValidation(size)
-	if t.logger.GetLevel() == zerolog.TraceLevel {
-		lg.Trace().
-			Str("received_from", p2plogging.PeerId(msg.ReceivedFrom)).
-			Int("message_size", size).
-			Msg("received pubsub message entered validation phase")
-	}
-
+	lg.Trace().
+		Str("received_from", p2plogging.PeerId(msg.ReceivedFrom)).
+		Int("message_size", size).
+		Msg("received pubsub message entered validation phase")
 }
 
 // DeliverMessage is called by GossipSub as a callback when the local node delivers a message to all subscribers of the topic.
 func (t *GossipSubMeshTracer) DeliverMessage(msg *pubsub.Message) {
-	lg := t.logger.With().Logger()
+	size := len(msg.Data)
+	t.metrics.OnMessageDeliveredToAllSubscribers(size)
 
+	if t.logger.GetLevel() > zerolog.TraceLevel {
+		return // return fast if we are not logging at trace level
+	}
+
+	lg := t.logger.With().Logger()
 	if msg.Topic != nil {
 		lg = lg.With().Str("topic", *msg.Topic).Logger()
 	}
@@ -298,14 +305,11 @@ func (t *GossipSubMeshTracer) DeliverMessage(msg *pubsub.Message) {
 	if err == nil {
 		lg = lg.With().Str("remote_peer_id", p2plogging.PeerId(from)).Logger()
 	}
-	size := len(msg.Data)
-	t.metrics.OnMessageDeliveredToAllSubscribers(size)
-	if t.logger.GetLevel() == zerolog.TraceLevel {
-		lg.Trace().
-			Str("received_from", p2plogging.PeerId(msg.ReceivedFrom)).
-			Int("message_size", len(msg.Data)).
-			Msg("delivered pubsub message to all subscribers")
-	}
+
+	lg.Trace().
+		Str("received_from", p2plogging.PeerId(msg.ReceivedFrom)).
+		Int("message_size", len(msg.Data)).
+		Msg("delivered pubsub message to all subscribers")
 }
 
 // RejectMessage is called by GossipSub as a callback when a message is rejected by the local node.
@@ -314,8 +318,14 @@ func (t *GossipSubMeshTracer) DeliverMessage(msg *pubsub.Message) {
 // networking public key of the source, and the signature of the message. The local node uses this information to verify the message.
 // If any of the information is missing or invalid, the message is rejected.
 func (t *GossipSubMeshTracer) RejectMessage(msg *pubsub.Message, reason string) {
-	lg := t.logger.With().Logger()
+	size := len(msg.Data)
+	t.metrics.OnMessageRejected(size, reason)
 
+	if t.logger.GetLevel() > zerolog.TraceLevel {
+		return // return fast if we are not logging at trace level
+	}
+
+	lg := t.logger.With().Logger()
 	if msg.Topic != nil {
 		lg = lg.With().Str("topic", *msg.Topic).Logger()
 	}
@@ -323,21 +333,24 @@ func (t *GossipSubMeshTracer) RejectMessage(msg *pubsub.Message, reason string) 
 	if err == nil {
 		lg = lg.With().Str("remote_peer_id", p2plogging.PeerId(from)).Logger()
 	}
-	size := len(msg.Data)
-	t.metrics.OnMessageRejected(size, reason)
-	if t.logger.GetLevel() == zerolog.TraceLevel {
-		lg.Trace().
-			Str("received_from", p2plogging.PeerId(msg.ReceivedFrom)).
-			Int("message_size", size).
-			Msg("rejected pubsub message")
-	}
+
+	lg.Trace().
+		Str("received_from", p2plogging.PeerId(msg.ReceivedFrom)).
+		Int("message_size", size).
+		Msg("rejected pubsub message")
 
 }
 
 // DuplicateMessage is called by GossipSub as a callback when a duplicate message is received by the local node.
 func (t *GossipSubMeshTracer) DuplicateMessage(msg *pubsub.Message) {
-	lg := t.logger.With().Logger()
+	size := len(msg.Data)
+	t.metrics.OnMessageDuplicate(size)
 
+	if t.logger.GetLevel() > zerolog.TraceLevel {
+		return // return fast if we are not logging at trace level
+	}
+
+	lg := t.logger.With().Logger()
 	if msg.Topic != nil {
 		lg = lg.With().Str("topic", *msg.Topic).Logger()
 	}
@@ -346,14 +359,10 @@ func (t *GossipSubMeshTracer) DuplicateMessage(msg *pubsub.Message) {
 		lg = lg.With().Str("remote_peer_id", p2plogging.PeerId(from)).Logger()
 	}
 
-	size := len(msg.Data)
-	t.metrics.OnMessageDuplicate(size)
-	if t.logger.GetLevel() == zerolog.TraceLevel {
-		lg.Trace().
-			Str("received_from", p2plogging.PeerId(msg.ReceivedFrom)).
-			Int("message_size", size).
-			Msg("received duplicate pubsub message")
-	}
+	lg.Trace().
+		Str("received_from", p2plogging.PeerId(msg.ReceivedFrom)).
+		Int("message_size", size).
+		Msg("received duplicate pubsub message")
 }
 
 // ThrottlePeer is called by GossipSub when a peer is throttled by the local node, i.e., the local node is not accepting any
