@@ -26,11 +26,11 @@ import (
 // TestGossipSubIHaveBrokenPromises_Below_Threshold tests that as long as the spammer stays below the ihave spam thresholds, it is not caught and
 // penalized by the victim node.
 // The thresholds are:
-// Maximum messages that include iHave per heartbeat is: 10 (gossipsub parameter; GossipSubMaxIHaveMessages).
-// Threshold for broken promises of iHave per heartbeat is: 10 (Flow-specific) parameter. It means that GossipSub samples one iHave id out of the
+// - Maximum messages that include iHave per heartbeat is: 10 (gossipsub parameter; GossipSubMaxIHaveMessages), after which iHave messages are dropped.
+// - Threshold for broken promises of iHave per heartbeat is: 10 (Flow parameter; defaultBehaviourPenaltyThreshold). It means that GossipSub samples one iHave id out of the
 // entire RPC and if that iHave id is not eventually delivered within 3 seconds (gossipsub parameter, GossipSubIWantFollowupTime), then the promise is considered broken. We set
 // this threshold to 10 meaning that the first 10 broken promises are ignored. This is to allow for some network churn.
-// Also, per hearbeat (GossipSubHeartbeatInterval, 1 second ), the spammer is allowed to send at most 5000 ihave messages (gossip sub parameter; GossipSubMaxIHaveLength) on aggregate, and
+// - Per hearbeat (gossipsub parameter GossipSubHeartbeatInterval, 1 second ), the spammer is allowed to send at most 5000 ihave messages (gossip sub parameter; GossipSubMaxIHaveLength) on aggregate, and
 // excess messages are dropped (without being counted as broken promises).
 func TestGossipSubIHaveBrokenPromises_Below_Threshold(t *testing.T) {
 	role := flow.RoleConsensus
