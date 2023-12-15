@@ -264,7 +264,7 @@ func (t *GossipSubMeshTracer) ValidateMessage(msg *pubsub.Message) {
 	size := len(msg.Data)
 	t.metrics.OnMessageEnteredValidation(size)
 
-	if t.logger.GetLevel() != zerolog.TraceLevel {
+	if t.logger.GetLevel() > zerolog.TraceLevel {
 		return // return fast if we are not logging at trace level.
 	}
 
@@ -289,7 +289,7 @@ func (t *GossipSubMeshTracer) DeliverMessage(msg *pubsub.Message) {
 	size := len(msg.Data)
 	t.metrics.OnMessageDeliveredToAllSubscribers(size)
 
-	if t.logger.GetLevel() != zerolog.TraceLevel {
+	if t.logger.GetLevel() > zerolog.TraceLevel {
 		return // return fast if we are not logging at trace level.
 	}
 
@@ -317,7 +317,7 @@ func (t *GossipSubMeshTracer) RejectMessage(msg *pubsub.Message, reason string) 
 	size := len(msg.Data)
 	t.metrics.OnMessageRejected(size, reason)
 
-	if t.logger.GetLevel() != zerolog.TraceLevel {
+	if t.logger.GetLevel() > zerolog.TraceLevel {
 		return // fail fast if we are not logging at trace level.
 	}
 
@@ -341,7 +341,7 @@ func (t *GossipSubMeshTracer) DuplicateMessage(msg *pubsub.Message) {
 	size := len(msg.Data)
 	t.metrics.OnMessageDuplicate(size)
 
-	if t.logger.GetLevel() != zerolog.TraceLevel {
+	if t.logger.GetLevel() > zerolog.TraceLevel {
 		return // return fast if we are not logging at trace level.
 	}
 
