@@ -105,7 +105,7 @@ type UnicastManagement interface {
 	// error: An error, if any occurred during the process. This includes failure in creating the stream, setting the write
 	// deadline, executing the writing logic, resetting the stream if the writing logic fails, or closing the stream.
 	// All returned errors during this process can be considered benign.
-	OpenProtectedStream(ctx context.Context, peerID peer.ID, protectionTag string, writingLogic func(stream libp2pnet.Stream) error) error
+	OpenAndWriteOnStream(ctx context.Context, peerID peer.ID, protectionTag string, writingLogic func(stream libp2pnet.Stream) error) error
 	// WithDefaultUnicastProtocol overrides the default handler of the unicast manager and registers all preferred protocols.
 	WithDefaultUnicastProtocol(defaultHandler libp2pnet.StreamHandler, preferred []protocols.ProtocolName) error
 }

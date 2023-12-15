@@ -96,7 +96,7 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 		connManager, err := testutils.NewTagWatchingConnManager(
 			unittest.Logger(),
 			metrics.NewNoopCollector(),
-			&defaultFlowConfig.NetworkConfig.ConnectionManagerConfig)
+			&defaultFlowConfig.NetworkConfig.ConnectionManager)
 		require.NoError(suite.T(), err)
 
 		opts = append(opts, p2ptest.WithConnectionManager(connManager))
