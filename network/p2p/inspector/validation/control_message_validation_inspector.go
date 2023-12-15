@@ -602,7 +602,7 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 		if err != nil {
 			// short circuit validation when unstaked peer detected
 			if IsErrUnstakedPeer(err) {
-				lg.Debug().Msg("received control message from unstaked peer")
+				lg.Debug().Msg("received publish message from unstaked peer")
 				continue
 			}
 			errs = multierror.Append(errs, err)
