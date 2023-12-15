@@ -1389,7 +1389,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 	}
 
 	// expect a setup event with wrong counter to trigger EFM without error
-	t.Run("wrong counter (EFM)", func(t *testing.T) {
+	t.Run("wrong counter [EFM]", func(t *testing.T) {
 		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
 			block1, createSetup := setupState(t, db, state)
 
@@ -1410,7 +1410,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 	})
 
 	// expect a setup event with wrong final view to trigger EFM without error
-	t.Run("invalid final view (EFM)", func(t *testing.T) {
+	t.Run("invalid final view [EFM]", func(t *testing.T) {
 		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
 			block1, createSetup := setupState(t, db, state)
 
@@ -1431,7 +1431,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 	})
 
 	// expect a setup event with empty seed to trigger EFM without error
-	t.Run("empty seed (EFM)", func(t *testing.T) {
+	t.Run("empty seed [EFM]", func(t *testing.T) {
 		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
 			block1, createSetup := setupState(t, db, state)
 
@@ -1451,7 +1451,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 		})
 	})
 
-	t.Run("participants not ordered (EFM)", func(t *testing.T) {
+	t.Run("participants not ordered [EFM]", func(t *testing.T) {
 		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
 			block1, createSetup := setupState(t, db, state)
 
@@ -1541,7 +1541,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 		return block1, createSetup, createCommit
 	}
 
-	t.Run("without setup (EFM)", func(t *testing.T) {
+	t.Run("without setup [EFM]", func(t *testing.T) {
 		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
 			block1, _, createCommit := setupState(t, state)
 
@@ -1560,7 +1560,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 	})
 
 	// expect a commit event with wrong counter to trigger EFM without error
-	t.Run("inconsistent counter (EFM)", func(t *testing.T) {
+	t.Run("inconsistent counter [EFM]", func(t *testing.T) {
 		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
 			block1, createSetup, createCommit := setupState(t, state)
 
@@ -1593,7 +1593,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 	})
 
 	// expect a commit event with wrong cluster QCs to trigger EFM without error
-	t.Run("inconsistent cluster QCs (EFM)", func(t *testing.T) {
+	t.Run("inconsistent cluster QCs [EFM]", func(t *testing.T) {
 		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
 			block1, createSetup, createCommit := setupState(t, state)
 
@@ -1626,7 +1626,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 	})
 
 	// expect a commit event with wrong dkg participants to trigger EFM without error
-	t.Run("inconsistent DKG participants (EFM)", func(t *testing.T) {
+	t.Run("inconsistent DKG participants [EFM]", func(t *testing.T) {
 		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
 			block1, createSetup, createCommit := setupState(t, state)
 

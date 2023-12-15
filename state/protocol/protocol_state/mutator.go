@@ -64,7 +64,7 @@ func newStateMutator(
 		//         epoch service event or an invalid state transition previously in this fork.
 		// Case 2: Incorporating the candidate block is itself an invalid epoch transition.
 		//
-		// In either case, Epoch Fallback Mode (EFM) has been tentatively triggered on this fork,
+		// In either case, Epoch Fallback Mode [EFM] has been tentatively triggered on this fork,
 		// and we must use only the `epochFallbackStateMachine` along this fork.
 		//
 		// TODO for 'leaving Epoch Fallback via special service event': this might need to change.
@@ -258,7 +258,7 @@ func (m *stateMutator) applyServiceEventsFromOrderedResults(results []*flow.Exec
 	return dbUpdates, nil
 }
 
-// transitionToEpochFallbackMode transitions the protocol state to Epoch Fallback Mode (EFM).
+// transitionToEpochFallbackMode transitions the protocol state to Epoch Fallback Mode [EFM].
 // This is implemented by switching to a different state machine implementation, which ignores all service events and epoch transitions.
 // At the moment, this is a one-way transition: once we enter EFM, the only way to return to normal is with a spork.
 func (m *stateMutator) transitionToEpochFallbackMode(results []*flow.ExecutionResult) ([]func(tx *transaction.Tx) error, error) {
@@ -275,7 +275,7 @@ func (m *stateMutator) transitionToEpochFallbackMode(results []*flow.ExecutionRe
 }
 
 // epochFallbackTriggeredByIncorporatingCandidate checks whether incorporating the input block
-// would trigger epoch fallback mode (EFM) along the current fork. In particular, we trigger epoch
+// would trigger epoch fallback mode [EFM] along the current fork. In particular, we trigger epoch
 // fallback mode when:
 //  1. The next epoch has not been committed as of B (EpochPhase < flow.EpochPhaseCommitted) AND
 //  2. B is the first incorporated block with view greater than or equal to the epoch commitment

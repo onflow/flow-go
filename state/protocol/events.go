@@ -84,7 +84,7 @@ type Consumer interface {
 	// NOTE: Only called once the phase transition has been finalized.
 	EpochCommittedPhaseStarted(currentEpochCounter uint64, first *flow.Header)
 
-	// EpochEmergencyFallbackTriggered is called when epoch fallback mode (EFM) is triggered.
+	// EpochEmergencyFallbackTriggered is called when epoch fallback mode [EFM] is triggered.
 	// Since EFM is a permanent, spork-scoped state, this event is triggered only once.
 	// After this event is triggered, no further epoch transitions will occur,
 	// no further epoch phase transitions will occur, and no further epoch-related

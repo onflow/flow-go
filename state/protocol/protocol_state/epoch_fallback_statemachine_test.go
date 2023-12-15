@@ -62,7 +62,7 @@ func (s *EpochFallbackStateMachineSuite) TestTransitionToNextEpoch() {
 }
 
 // TestNewEpochFallbackStateMachine tests that creating epoch fallback state machine sets
-// `InvalidEpochTransitionAttempted` to true to record that we have entered epoch fallback mode(EFM).
+// `InvalidEpochTransitionAttempted` to true to record that we have entered epoch fallback mode[EFM].
 func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 	s.parentProtocolState.InvalidEpochTransitionAttempted = false
 	s.stateMachine = newEpochFallbackStateMachine(s.candidate.View, s.parentProtocolState.Copy())
