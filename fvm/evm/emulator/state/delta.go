@@ -282,6 +282,16 @@ func (d *DeltaView) GetState(sk types.SlotAddress) (gethCommon.Hash, error) {
 
 // SetState adds sets a value for the given slot of the main storage
 func (d *DeltaView) SetState(sk types.SlotAddress, value gethCommon.Hash) error {
+	lastValue, err := d.GetState(sk)
+	if err != nil {
+		return err
+	}
+	// we skip the value is the same
+	// this step might look not helping with performance but we kept it to
+	// act similar to the Geth StateDB behaviour
+	if value == lastValue {
+		return nil
+	}
 	d.states[sk] = value
 	d.dirtySlots[sk] = struct{}{}
 	return nil
@@ -343,6 +353,7 @@ func (d *DeltaView) SlotInAccessList(sk types.SlotAddress) (addressOk bool, slot
 }
 
 // AddSlotToAccessList adds a slot to the access list
+// it also adds the address to the address list
 func (d *DeltaView) AddSlotToAccessList(sk types.SlotAddress) (addrAdded bool, slotAdded bool) {
 	addrPresent, slotPresent := d.SlotInAccessList(sk)
 	d.accessListAddresses[sk.Address] = struct{}{}
