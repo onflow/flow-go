@@ -28,23 +28,21 @@ func unicastManagerFixture(t *testing.T) (*unicast.Manager, *mockp2p.StreamFacto
 	cfg, err := config.DefaultConfig()
 	require.NoError(t, err)
 
-	unicastConfigCache := unicastcache.NewUnicastConfigCache(cfg.NetworkConfig.UnicastConfig.ConfigCacheSize,
+	unicastConfigCache := unicastcache.NewUnicastConfigCache(cfg.NetworkConfig.Unicast.UnicastManager.ConfigCacheSize,
 		unittest.Logger(),
 		metrics.NewNoopCollector(),
 		func() unicast.Config {
 			return unicast.Config{
-				StreamCreationRetryAttemptBudget: cfg.NetworkConfig.UnicastConfig.MaxStreamCreationRetryAttemptTimes,
+				StreamCreationRetryAttemptBudget: cfg.NetworkConfig.Unicast.UnicastManager.MaxStreamCreationRetryAttemptTimes,
 			}
 		})
 
 	mgr, err := unicast.NewUnicastManager(&unicast.ManagerConfig{
-		Logger:                             unittest.Logger(),
-		StreamFactory:                      streamFactory,
-		SporkId:                            unittest.IdentifierFixture(),
-		CreateStreamBackoffDelay:           cfg.NetworkConfig.UnicastConfig.CreateStreamBackoffDelay,
-		Metrics:                            metrics.NewNoopCollector(),
-		StreamZeroRetryResetThreshold:      cfg.NetworkConfig.UnicastConfig.StreamZeroRetryResetThreshold,
-		MaxStreamCreationRetryAttemptTimes: cfg.NetworkConfig.UnicastConfig.MaxStreamCreationRetryAttemptTimes,
+		Logger:        unittest.Logger(),
+		StreamFactory: streamFactory,
+		SporkId:       unittest.IdentifierFixture(),
+		Metrics:       metrics.NewNoopCollector(),
+		Parameters:    &cfg.NetworkConfig.Unicast.UnicastManager,
 		UnicastConfigCacheFactory: func(func() unicast.Config) unicast.ConfigCache {
 			return unicastConfigCache
 		},
@@ -62,20 +60,18 @@ func TestManagerConfigValidation(t *testing.T) {
 	require.NoError(t, err)
 
 	validConfig := unicast.ManagerConfig{
-		Logger:                             unittest.Logger(),
-		StreamFactory:                      mockp2p.NewStreamFactory(t),
-		SporkId:                            unittest.IdentifierFixture(),
-		CreateStreamBackoffDelay:           cfg.NetworkConfig.UnicastConfig.CreateStreamBackoffDelay,
-		Metrics:                            metrics.NewNoopCollector(),
-		StreamZeroRetryResetThreshold:      cfg.NetworkConfig.UnicastConfig.StreamZeroRetryResetThreshold,
-		MaxStreamCreationRetryAttemptTimes: cfg.NetworkConfig.UnicastConfig.MaxStreamCreationRetryAttemptTimes,
+		Logger:        unittest.Logger(),
+		StreamFactory: mockp2p.NewStreamFactory(t),
+		SporkId:       unittest.IdentifierFixture(),
+		Parameters:    &cfg.NetworkConfig.Unicast.UnicastManager,
+		Metrics:       metrics.NewNoopCollector(),
 		UnicastConfigCacheFactory: func(func() unicast.Config) unicast.ConfigCache {
-			return unicastcache.NewUnicastConfigCache(cfg.NetworkConfig.UnicastConfig.ConfigCacheSize,
+			return unicastcache.NewUnicastConfigCache(cfg.NetworkConfig.Unicast.UnicastManager.ConfigCacheSize,
 				unittest.Logger(),
 				metrics.NewNoopCollector(),
 				func() unicast.Config {
 					return unicast.Config{
-						StreamCreationRetryAttemptBudget: cfg.NetworkConfig.UnicastConfig.MaxStreamCreationRetryAttemptTimes,
+						StreamCreationRetryAttemptBudget: cfg.NetworkConfig.Unicast.UnicastManager.MaxStreamCreationRetryAttemptTimes,
 					}
 				})
 		},
@@ -94,25 +90,9 @@ func TestManagerConfigValidation(t *testing.T) {
 		require.Nil(t, mgr)
 	})
 
-	t.Run("Invalid CreateStreamBackoffDelay", func(t *testing.T) {
+	t.Run("Nil Parameters", func(t *testing.T) {
 		cfg := validConfig
-		cfg.CreateStreamBackoffDelay = 0
-		mgr, err := unicast.NewUnicastManager(&cfg)
-		require.Error(t, err)
-		require.Nil(t, mgr)
-	})
-
-	t.Run("Invalid StreamZeroRetryResetThreshold", func(t *testing.T) {
-		cfg := validConfig
-		cfg.StreamZeroRetryResetThreshold = 0
-		mgr, err := unicast.NewUnicastManager(&cfg)
-		require.Error(t, err)
-		require.Nil(t, mgr)
-	})
-
-	t.Run("Invalid MaxStreamCreationRetryAttemptTimes", func(t *testing.T) {
-		cfg := validConfig
-		cfg.MaxStreamCreationRetryAttemptTimes = 0
+		cfg.Parameters = nil
 		mgr, err := unicast.NewUnicastManager(&cfg)
 		require.Error(t, err)
 		require.Nil(t, mgr)
@@ -164,10 +144,8 @@ func TestUnicastManager_SuccessfulStream(t *testing.T) {
 	// The unicast config must be updated with the backoff budget decremented.
 	unicastCfg, err := configCache.GetOrInit(peerID)
 	require.NoError(t, err)
-	require.Equal(t,
-		cfg.NetworkConfig.UnicastConfig.MaxStreamCreationRetryAttemptTimes,
-		unicastCfg.StreamCreationRetryAttemptBudget) // stream backoff budget must remain intact.
-	require.Equal(t, uint64(1), unicastCfg.ConsecutiveSuccessfulStream) // consecutive successful stream must incremented.
+	require.Equal(t, cfg.NetworkConfig.Unicast.UnicastManager.MaxStreamCreationRetryAttemptTimes, unicastCfg.StreamCreationRetryAttemptBudget) // stream backoff budget must remain intact.
+	require.Equal(t, uint64(1), unicastCfg.ConsecutiveSuccessfulStream)                                                                        // consecutive successful stream must incremented.
 }
 
 // TestUnicastManager_StreamBackoff tests the backoff mechanism of the unicast manager for stream creation.
@@ -184,7 +162,7 @@ func TestUnicastManager_StreamBackoff(t *testing.T) {
 	// mocks that it attempts to create a stream some number of times, before giving up.
 	streamFactory.On("NewStream", mock.Anything, peerID, mock.Anything).
 		Return(nil, fmt.Errorf("some error")).
-		Times(int(cfg.NetworkConfig.UnicastConfig.MaxStreamCreationRetryAttemptTimes + 1))
+		Times(int(cfg.NetworkConfig.Unicast.UnicastManager.MaxStreamCreationRetryAttemptTimes + 1))
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -197,7 +175,7 @@ func TestUnicastManager_StreamBackoff(t *testing.T) {
 	unicastCfg, err := configCache.GetOrInit(peerID)
 	require.NoError(t, err)
 	// stream backoff budget must be decremented by 1 since all budget is used up.
-	require.Equal(t, cfg.NetworkConfig.UnicastConfig.MaxStreamCreationRetryAttemptTimes-1, unicastCfg.StreamCreationRetryAttemptBudget)
+	require.Equal(t, cfg.NetworkConfig.Unicast.UnicastManager.MaxStreamCreationRetryAttemptTimes-1, unicastCfg.StreamCreationRetryAttemptBudget)
 	// consecutive successful stream must be reset to zero, since the stream creation failed.
 	require.Equal(t, uint64(0), unicastCfg.ConsecutiveSuccessfulStream)
 }
@@ -215,7 +193,7 @@ func TestUnicastManager_StreamFactory_StreamBackoff(t *testing.T) {
 	// mocks that it attempts to create a stream some number of times, before giving up.
 	streamFactory.On("NewStream", mock.Anything, peerID, mock.Anything).
 		Return(nil, fmt.Errorf("some error")).
-		Times(int(cfg.NetworkConfig.UnicastConfig.MaxStreamCreationRetryAttemptTimes + 1))
+		Times(int(cfg.NetworkConfig.Unicast.UnicastManager.MaxStreamCreationRetryAttemptTimes + 1))
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -227,7 +205,7 @@ func TestUnicastManager_StreamFactory_StreamBackoff(t *testing.T) {
 	unicastCfg, err := unicastConfigCache.GetOrInit(peerID)
 	require.NoError(t, err)
 	// stream backoff budget must be decremented by 1.
-	require.Equal(t, cfg.NetworkConfig.UnicastConfig.MaxStreamCreationRetryAttemptTimes-1, unicastCfg.StreamCreationRetryAttemptBudget)
+	require.Equal(t, cfg.NetworkConfig.Unicast.UnicastManager.MaxStreamCreationRetryAttemptTimes-1, unicastCfg.StreamCreationRetryAttemptBudget)
 	// consecutive successful stream must be zero as we have not created a successful stream yet.
 	require.Equal(t, uint64(0), unicastCfg.ConsecutiveSuccessfulStream)
 }
@@ -259,7 +237,7 @@ func TestUnicastManager_Stream_ConsecutiveStreamCreation_Increment(t *testing.T)
 		unicastCfg, err := unicastConfigCache.GetOrInit(peerID)
 		require.NoError(t, err)
 		// stream backoff budget must be intact (all stream creation attempts are successful).
-		require.Equal(t, cfg.NetworkConfig.UnicastConfig.MaxStreamCreationRetryAttemptTimes, unicastCfg.StreamCreationRetryAttemptBudget)
+		require.Equal(t, cfg.NetworkConfig.Unicast.UnicastManager.MaxStreamCreationRetryAttemptTimes, unicastCfg.StreamCreationRetryAttemptBudget)
 		// consecutive successful stream must be incremented.
 		require.Equal(t, uint64(i+1), unicastCfg.ConsecutiveSuccessfulStream)
 	}
@@ -346,7 +324,7 @@ func TestUnicastManager_StreamFactory_ErrNoAddresses(t *testing.T) {
 	require.NoError(t, err)
 
 	// stream backoff budget must be reduced by 1 due to failed stream creation.
-	require.Equal(t, cfg.NetworkConfig.UnicastConfig.MaxStreamCreationRetryAttemptTimes-1, unicastCfg.StreamCreationRetryAttemptBudget)
+	require.Equal(t, cfg.NetworkConfig.Unicast.UnicastManager.MaxStreamCreationRetryAttemptTimes-1, unicastCfg.StreamCreationRetryAttemptBudget)
 	// consecutive successful stream must be set to zero.
 	require.Equal(t, uint64(0), unicastCfg.ConsecutiveSuccessfulStream)
 }
@@ -374,7 +352,7 @@ func TestUnicastManager_Stream_ErrSecurityProtocolNegotiationFailed(t *testing.T
 	unicastCfg, err := unicastConfigCache.GetOrInit(peerID)
 	require.NoError(t, err)
 	// stream retry budget must be decremented by 1 (since we didn't have a successful stream creation, the budget is decremented).
-	require.Equal(t, cfg.NetworkConfig.UnicastConfig.MaxStreamCreationRetryAttemptTimes-1, unicastCfg.StreamCreationRetryAttemptBudget)
+	require.Equal(t, cfg.NetworkConfig.Unicast.UnicastManager.MaxStreamCreationRetryAttemptTimes-1, unicastCfg.StreamCreationRetryAttemptBudget)
 	// consecutive successful stream must be set to zero.
 	require.Equal(t, uint64(0), unicastCfg.ConsecutiveSuccessfulStream)
 }
@@ -401,7 +379,7 @@ func TestUnicastManager_StreamFactory_ErrGaterDisallowedConnection(t *testing.T)
 	unicastCfg, err := unicastConfigCache.GetOrInit(peerID)
 	require.NoError(t, err)
 	// stream backoff budget must be reduced by 1 due to failed stream creation.
-	require.Equal(t, cfg.NetworkConfig.UnicastConfig.MaxStreamCreationRetryAttemptTimes-1, unicastCfg.StreamCreationRetryAttemptBudget)
+	require.Equal(t, cfg.NetworkConfig.Unicast.UnicastManager.MaxStreamCreationRetryAttemptTimes-1, unicastCfg.StreamCreationRetryAttemptBudget)
 	// consecutive successful stream must be set to zero.
 	require.Equal(t, uint64(0), unicastCfg.ConsecutiveSuccessfulStream)
 }
@@ -420,7 +398,7 @@ func TestUnicastManager_Stream_BackoffBudgetDecremented(t *testing.T) {
 	// Let's consider x = unicastmodel.MaxStreamCreationRetryAttemptTimes + 1. Then the test tries x times CreateStream. With dynamic backoffs,
 	// the first CreateStream call will try to NewStream x times, the second CreateStream call will try to NewStream x-1 times,
 	// and so on. So the total number of Connect calls is x + (x-1) + (x-2) + ... + 1 = x(x+1)/2.
-	maxStreamRetryBudget := cfg.NetworkConfig.UnicastConfig.MaxStreamCreationRetryAttemptTimes
+	maxStreamRetryBudget := cfg.NetworkConfig.Unicast.UnicastManager.MaxStreamCreationRetryAttemptTimes
 	maxStreamAttempt := maxStreamRetryBudget + 1 // 1 attempt + retry times
 	totalAttempts := maxStreamAttempt * (maxStreamAttempt + 1) / 2
 
@@ -474,12 +452,12 @@ func TestUnicastManager_Stream_BackoffBudgetResetToDefault(t *testing.T) {
 	// update the unicast config of the peer to have a zero stream backoff budget but a consecutive successful stream counter above the reset threshold.
 	adjustedCfg, err := unicastConfigCache.Adjust(peerID, func(unicastConfig unicast.Config) (unicast.Config, error) {
 		unicastConfig.StreamCreationRetryAttemptBudget = 0
-		unicastConfig.ConsecutiveSuccessfulStream = cfg.NetworkConfig.UnicastConfig.StreamZeroRetryResetThreshold + 1
+		unicastConfig.ConsecutiveSuccessfulStream = cfg.NetworkConfig.Unicast.UnicastManager.StreamZeroRetryResetThreshold + 1
 		return unicastConfig, nil
 	})
 	require.NoError(t, err)
 	require.Equal(t, uint64(0), adjustedCfg.StreamCreationRetryAttemptBudget)
-	require.Equal(t, cfg.NetworkConfig.UnicastConfig.StreamZeroRetryResetThreshold+1, adjustedCfg.ConsecutiveSuccessfulStream)
+	require.Equal(t, cfg.NetworkConfig.Unicast.UnicastManager.StreamZeroRetryResetThreshold+1, adjustedCfg.ConsecutiveSuccessfulStream)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -491,9 +469,9 @@ func TestUnicastManager_Stream_BackoffBudgetResetToDefault(t *testing.T) {
 	unicastCfg, err := unicastConfigCache.GetOrInit(peerID)
 	require.NoError(t, err)
 	// stream backoff budget must reset to default.
-	require.Equal(t, cfg.NetworkConfig.UnicastConfig.MaxStreamCreationRetryAttemptTimes, unicastCfg.StreamCreationRetryAttemptBudget)
+	require.Equal(t, cfg.NetworkConfig.Unicast.UnicastManager.MaxStreamCreationRetryAttemptTimes, unicastCfg.StreamCreationRetryAttemptBudget)
 	// consecutive successful stream must increment by 1 (it was threshold + 1 before).
-	require.Equal(t, cfg.NetworkConfig.UnicastConfig.StreamZeroRetryResetThreshold+1+1, unicastCfg.ConsecutiveSuccessfulStream)
+	require.Equal(t, cfg.NetworkConfig.Unicast.UnicastManager.StreamZeroRetryResetThreshold+1+1, unicastCfg.ConsecutiveSuccessfulStream)
 }
 
 // TestUnicastManager_Stream_NoBackoff_When_Budget_Is_Zero tests that when the stream backoff budget is zero and the consecutive successful stream counter is not above the

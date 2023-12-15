@@ -104,7 +104,7 @@ func TestFindPeerWithDHT(t *testing.T) {
 			// lookup since client i does not know client j's address.
 			unittest.RequireReturnsBefore(
 				t, func() {
-					err = dhtClientNodes[i].OpenProtectedStream(
+					err = dhtClientNodes[i].OpenAndWriteOnStream(
 						ctx, dhtClientNodes[j].ID(), t.Name(), func(stream network.Stream) error {
 							// do nothing
 							require.NotNil(t, stream)
