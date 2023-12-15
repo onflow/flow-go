@@ -30,8 +30,6 @@ const finalizeHappyPathLogs = "collecting partner network and staking keys" +
 	`read vote .*` +
 	`reading dkg data` +
 	`reading intermediary bootstrapping data` +
-	//`reading root epoch` +
-	//`reading root params` +
 	`constructing root QC` +
 	`constructing root execution result and block seal` +
 	`constructing root protocol snapshot` +
