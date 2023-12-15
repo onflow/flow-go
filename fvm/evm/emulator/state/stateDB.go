@@ -49,14 +49,18 @@ func (db *StateDB) Exist(addr gethCommon.Address) bool {
 //
 // Empty is defined according to EIP161 (balance = nonce = code = 0).
 func (db *StateDB) Empty(addr gethCommon.Address) bool {
-	return db.GetNonce(addr) == 0 &&
-		db.GetBalance(addr).Sign() == 0 &&
-		bytes.Equal(db.GetCodeHash(addr).Bytes(), gethTypes.EmptyCodeHash.Bytes())
+	return !db.Exist(addr) || (
+		db.GetNonce(addr) == 0 &&
+			db.GetBalance(addr).Sign() == 0 &&
+			bytes.Equal(db.GetCodeHash(addr).Bytes(), gethTypes.EmptyCodeHash.Bytes())
+	)
 }
 
 // CreateAccount creates a new account for the given address
 // it sets the nonce to zero
 func (db *StateDB) CreateAccount(addr gethCommon.Address) {
+	// TODO: If a state object with the address already exists the balance is carried over to the new account.
+	// Carrying over the balance ensures that Ether doesn't disappear.
 	db.lastestView().CreateAccount(addr)
 }
 
