@@ -16,12 +16,13 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/builder/config"
+	p2pbuilderconfig "github.com/onflow/flow-go/network/p2p/builder/config"
 	inspectorbuilder "github.com/onflow/flow-go/network/p2p/builder/inspector"
 	"github.com/onflow/flow-go/network/p2p/config"
 	"github.com/onflow/flow-go/network/p2p/distributor"
 	"github.com/onflow/flow-go/network/p2p/inspector"
 	"github.com/onflow/flow-go/network/p2p/inspector/validation"
+	p2pnode "github.com/onflow/flow-go/network/p2p/node"
 	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/network/p2p/tracer"
 	"github.com/onflow/flow-go/network/p2p/utils"
@@ -33,7 +34,7 @@ type Builder struct {
 	networkType         network.NetworkingType
 	sporkId             flow.Identifier
 	logger              zerolog.Logger
-	metricsCfg          *p2pconfig.MetricsConfig
+	metricsCfg          *p2pbuilderconfig.MetricsConfig
 	h                   host.Host
 	subscriptionFilter  pubsub.SubscriptionFilter
 	gossipSubFactory    p2p.GossipSubFactoryFunc
@@ -45,7 +46,7 @@ type Builder struct {
 	idProvider               module.IdentityProvider
 	routingSystem            routing.Routing
 	rpcInspectorSuiteFactory p2p.GossipSubRpcInspectorSuiteFactoryFunc
-	gossipSubCfg             *config.GossipSubParameters
+	gossipSubCfg             *p2pconfig.GossipSubParameters
 }
 
 var _ p2p.GossipSubBuilder = (*Builder)(nil)
@@ -147,8 +148,8 @@ func (g *Builder) OverrideDefaultRpcInspectorSuiteFactory(factory p2p.GossipSubR
 // - a new gossipsub builder.
 // Note: the builder is not thread-safe. It should only be used in the main thread.
 func NewGossipSubBuilder(logger zerolog.Logger,
-	metricsCfg *p2pconfig.MetricsConfig,
-	gossipSubCfg *config.GossipSubParameters,
+	metricsCfg *p2pbuilderconfig.MetricsConfig,
+	gossipSubCfg *p2pconfig.GossipSubParameters,
 	networkType network.NetworkingType,
 	sporkId flow.Identifier,
 	idProvider module.IdentityProvider) *Builder {
@@ -191,7 +192,7 @@ func NewGossipSubBuilder(logger zerolog.Logger,
 // Note: always use the default gossipsub factory function to create the gossipsub factory (unless you know what you are doing).
 func defaultGossipSubFactory() p2p.GossipSubFactoryFunc {
 	return func(ctx context.Context, logger zerolog.Logger, h host.Host, cfg p2p.PubSubAdapterConfig, clusterChangeConsumer p2p.CollectionClusterChangesConsumer) (p2p.PubSubAdapter, error) {
-		return node.NewGossipSubAdapter(ctx, logger, h, cfg, clusterChangeConsumer)
+		return p2pnode.NewGossipSubAdapter(ctx, logger, h, cfg, clusterChangeConsumer)
 	}
 }
 
@@ -199,7 +200,7 @@ func defaultGossipSubFactory() p2p.GossipSubFactoryFunc {
 // Note: always use the default gossipsub config function to create the gossipsub config (unless you know what you are doing).
 func defaultGossipSubAdapterConfig() p2p.GossipSubAdapterConfigFunc {
 	return func(cfg *p2p.BasePubSubAdapterConfig) p2p.PubSubAdapterConfig {
-		return node.NewGossipSubAdapterConfig(cfg)
+		return p2pnode.NewGossipSubAdapterConfig(cfg)
 	}
 }
 
@@ -210,14 +211,14 @@ func defaultInspectorSuite(rpcTracker p2p.RpcControlTracking) p2p.GossipSubRpcIn
 	return func(ctx irrecoverable.SignalerContext,
 		logger zerolog.Logger,
 		sporkId flow.Identifier,
-		inspectorCfg *config.RpcInspectorParameters,
+		inspectorCfg *p2pconfig.RpcInspectorParameters,
 		gossipSubMetrics module.GossipSubMetrics,
 		heroCacheMetricsFactory metrics.HeroCacheMetricsFactory,
 		networkType network.NetworkingType,
 		idProvider module.IdentityProvider,
 		topicProvider func() p2p.TopicProvider) (p2p.GossipSubInspectorSuite, error) {
 		metricsInspector := inspector.NewControlMsgMetricsInspector(logger,
-			node.NewGossipSubControlMessageMetrics(gossipSubMetrics, logger),
+			p2pnode.NewGossipSubControlMessageMetrics(gossipSubMetrics, logger),
 			inspectorCfg.Metrics.NumberOfWorkers,
 			[]queue.HeroStoreConfigOption{
 				queue.WithHeroStoreSizeLimit(inspectorCfg.Metrics.CacheSize),
@@ -263,7 +264,7 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, e
 	var gossipSub p2p.PubSubAdapter
 
 	gossipSubConfigs := g.gossipSubConfigFunc(&p2p.BasePubSubAdapterConfig{
-		MaxMessageSize: node.DefaultMaxPubSubMsgSize,
+		MaxMessageSize: p2pnode.DefaultMaxPubSubMsgSize,
 	})
 	gossipSubConfigs.WithMessageIdFunction(utils.MessageID)
 
