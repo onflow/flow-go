@@ -10,7 +10,7 @@ type DeferredDBUpdates = []DeferredDBUpdate
 
 // DeferredDBUpdate is a shorthand notation for an anonymous function that takes
 // a `transaction.Tx` as input and runs some database operations as part of that transaction.
-type DeferredDBUpdate = func(tx *Tx) error
+type DeferredDBUpdate = func(*Tx) error
 
 // DeferredBadgerUpdates is a shorthand notation for a list of anonymous functions that all
 // take a badger transaction as input and run some database operations as part of that transaction.
@@ -18,7 +18,7 @@ type DeferredBadgerUpdates = []DeferredBadgerUpdate
 
 // DeferredBadgerUpdate is a shorthand notation for an anonymous function that takes
 // a badger transaction as input and runs some database operations as part of that transaction.
-type DeferredBadgerUpdate = func(tx *badger.Txn) error
+type DeferredBadgerUpdate = func(*badger.Txn) error
 
 // DeferredDbOps is a utility for accumulating deferred database interactions that
 // are supposed to be executed in one atomic transaction. It supports:
@@ -49,9 +49,20 @@ type DeferredBadgerUpdate = func(tx *badger.Txn) error
 //
 // NOT CONCURRENCY SAFE
 type DeferredDbOps struct {
-	Pending func(tx *Tx) error
+	Pending DeferredDBUpdate
 }
 
+// NewDeferredDbOps instantiates a DeferredDbOps. Initially, it behaves like a no-op until functors are added.
+func NewDeferredDbOps() *DeferredDbOps {
+	return &DeferredDbOps{
+		Pending: func(tx *Tx) error { return nil }, // initially nothing is pending, i.e. no-op
+	}
+}
+
+// AddBadgerOp schedules the given DeferredBadgerUpdate to be executed as part of the future transaction.
+// For adding multiple DeferredBadgerUpdates, use `AddBadgerOps(ops ...DeferredBadgerUpdate)` if easily possible, as
+// it reduces the call stack compared to adding the functors individually via `AddBadgerOp(op DeferredBadgerUpdate)`.
+// This method returns a self-reference for chaining.
 func (d *DeferredDbOps) AddBadgerOp(op DeferredBadgerUpdate) *DeferredDbOps {
 	prior := d.Pending
 	d.Pending = func(tx *Tx) error {
@@ -68,6 +79,8 @@ func (d *DeferredDbOps) AddBadgerOp(op DeferredBadgerUpdate) *DeferredDbOps {
 	return d
 }
 
+// AddBadgerOps schedules the given DeferredBadgerUpdates to be executed as part of the future transaction.
+// This method returns a self-reference for chaining.
 func (d *DeferredDbOps) AddBadgerOps(ops ...DeferredBadgerUpdate) *DeferredDbOps {
 	prior := d.Pending
 	d.Pending = func(tx *Tx) error {
@@ -86,6 +99,10 @@ func (d *DeferredDbOps) AddBadgerOps(ops ...DeferredBadgerUpdate) *DeferredDbOps
 	return d
 }
 
+// AddDbOp schedules the given DeferredDBUpdate to be executed as part of the future transaction.
+// For adding multiple DeferredBadgerUpdates, use `AddDbOps(ops ...DeferredDBUpdate)` if easily possible, as
+// it reduces the call stack compared to adding the functors individually via `AddDbOp(op DeferredDBUpdate)`.
+// This method returns a self-reference for chaining.
 func (d *DeferredDbOps) AddDbOp(op DeferredDBUpdate) *DeferredDbOps {
 	prior := d.Pending
 	d.Pending = func(tx *Tx) error {
@@ -102,6 +119,8 @@ func (d *DeferredDbOps) AddDbOp(op DeferredDBUpdate) *DeferredDbOps {
 	return d
 }
 
+// AddDbOps schedules the given DeferredDBUpdates to be executed as part of the future transaction.
+// This method returns a self-reference for chaining.
 func (d *DeferredDbOps) AddDbOps(ops ...DeferredDBUpdate) *DeferredDbOps {
 	prior := d.Pending
 	d.Pending = func(tx *Tx) error {
@@ -120,9 +139,10 @@ func (d *DeferredDbOps) AddDbOps(ops ...DeferredDBUpdate) *DeferredDbOps {
 	return d
 }
 
-// OnSucceed adds a callback to execute after the DeferredDbOps have been successfully
-// executed. Useful for pre-emptively adding some element to a cache after the database
-// operations has been successfully applied.
+// OnSucceed adds a callback to be executed after the deferred database operations have succeeded. For
+// adding multiple callbacks, use `OnSucceeds(callbacks ...func())` if easily possible, as it reduces
+// the call stack compared to adding the functors individually via `OnSucceed(callback func())`.
+// This method returns a self-reference for chaining.
 func (d *DeferredDbOps) OnSucceed(callback func()) *DeferredDbOps {
 	prior := d.Pending
 	d.Pending = func(tx *Tx) error {
@@ -131,6 +151,23 @@ func (d *DeferredDbOps) OnSucceed(callback func()) *DeferredDbOps {
 			return err
 		}
 		tx.OnSucceed(callback)
+		return nil
+	}
+	return d
+}
+
+// OnSucceeds adds callbacks to be executed after the deferred database operations have succeeded.
+// This method returns a self-reference for chaining.
+func (d *DeferredDbOps) OnSucceeds(callbacks ...func()) *DeferredDbOps {
+	prior := d.Pending
+	d.Pending = func(tx *Tx) error {
+		err := prior(tx)
+		if err != nil {
+			return err
+		}
+		for _, c := range callbacks {
+			tx.OnSucceed(c)
+		}
 		return nil
 	}
 	return d
