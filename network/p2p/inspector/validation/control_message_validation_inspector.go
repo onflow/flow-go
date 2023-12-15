@@ -501,6 +501,7 @@ func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWant
 							p2p.CtrlMsgNonClusterTopicType,
 						))
 						lg.Debug().
+						Bool(logging.KeySuspicious, true).
 							Int("total_message_ids", totalMessageIds).
 							Int("cache_misses", cacheMisses).
 							Int("duplicates", duplicates).
