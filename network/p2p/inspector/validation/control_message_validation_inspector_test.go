@@ -750,6 +750,7 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 				require.Contains(t, duplicateMessageID, id)
 			})
 			inspector.Start(signalerCtx)
+			unittest.RequireCloseBefore(t, inspector.Ready(), 1 * time.Second, "inspector did not start in time")
 
 			require.NoError(t, inspector.Inspect(from, graftsReq))
 			require.NoError(t, inspector.Inspect(from, prunesReq))
