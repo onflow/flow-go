@@ -25,15 +25,18 @@ type StateDB struct {
 
 var _ types.StateDB = &StateDB{}
 
-func NewStateDB(ledger atree.Ledger, root flow.Address) *StateDB {
-	bv := NewBaseView(ledger, root)
+func NewStateDB(ledger atree.Ledger, root flow.Address) (*StateDB, error) {
+	bv, err := NewBaseView(ledger, root)
+	if err != nil {
+		return nil, err
+	}
 	return &StateDB{
 		ledger:   ledger,
 		root:     root,
 		baseView: bv,
 		views:    []*DeltaView{NewDeltaView(bv)},
 		dbErr:    nil,
-	}
+	}, nil
 }
 
 // Exist returns true if the given address exists in state.
@@ -49,11 +52,12 @@ func (db *StateDB) Exist(addr gethCommon.Address) bool {
 //
 // Empty is defined according to EIP161 (balance = nonce = code = 0).
 func (db *StateDB) Empty(addr gethCommon.Address) bool {
-	return !db.Exist(addr) || (
-		db.GetNonce(addr) == 0 &&
-			db.GetBalance(addr).Sign() == 0 &&
-			bytes.Equal(db.GetCodeHash(addr).Bytes(), gethTypes.EmptyCodeHash.Bytes())
-	)
+	if !db.Exist(addr) {
+		return true
+	}
+	return db.GetNonce(addr) == 0 &&
+		db.GetBalance(addr).Sign() == 0 &&
+		bytes.Equal(db.GetCodeHash(addr).Bytes(), gethTypes.EmptyCodeHash.Bytes())
 }
 
 // CreateAccount creates a new account for the given address
@@ -349,10 +353,11 @@ func (db *StateDB) Prepare(rules gethParams.Rules, sender, coinbase gethCommon.A
 }
 
 func (db *StateDB) Reset() error {
+	// TODO: implement me
 	// TODO we might not need to recreate the base view and reuse it
-	bv := NewBaseView(db.ledger, db.root)
-	db.baseView = bv
-	db.views = []*DeltaView{NewDeltaView(bv)}
-	db.dbErr = nil
+	// bv := NewBaseView(db.ledger, db.root)
+	// db.baseView = bv
+	// db.views = []*DeltaView{NewDeltaView(bv)}
+	// db.dbErr = nil
 	return nil
 }

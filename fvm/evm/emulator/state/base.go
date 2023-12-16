@@ -26,16 +26,16 @@ const (
 	StorageIDSize        = 16
 )
 
-// TODO rename to BaseView
 type BaseView struct {
 	rootAddress flow.Address
 	ledger      atree.Ledger
-	baseStorage *atree.LedgerBaseStorage
 	storage     *atree.PersistentSlabStorage
 
-	// singular maps
-	accounts *atree.OrderedMap
-	codes    *atree.OrderedMap
+	// collections
+	collectionProvider *CollectionProvider
+	accounts           *Collection
+	codes              *Collection
+	slots              map[gethCommon.Address]*Collection
 
 	// caches
 	cachedAccounts map[gethCommon.Address]*account
@@ -49,28 +49,32 @@ type BaseView struct {
 
 // NewBaseView constructs a new base view
 func NewBaseView(ledger atree.Ledger, rootAddress flow.Address) (*BaseView, error) {
+
+	baseStorage := atree.NewLedgerBaseStorage(ledger)
+	storage, err := NewPersistentSlabStorage(baseStorage)
+	if err != nil {
+		return nil, handleError(err)
+	}
+
 	view := &BaseView{
-		ledger:      ledger,
-		rootAddress: rootAddress,
-		baseStorage: atree.NewLedgerBaseStorage(ledger),
+		ledger:             ledger,
+		rootAddress:        rootAddress,
+		storage:            storage,
+		collectionProvider: NewCollectionProvider(atree.Address(rootAddress), storage),
+
+		slots: make(map[gethCommon.Address]*Collection),
 
 		cachedAccounts: make(map[gethCommon.Address]*account),
 		cachedCodes:    make(map[gethCommon.Address][]byte),
 		cachedSlots:    make(map[types.SlotAddress]gethCommon.Hash),
 	}
 
-	var err error
-	view.storage, err = NewPersistentSlabStorage(view.baseStorage)
+	view.accounts, view.accountSetupOnCommit, err = view.fetchOrCreateCollection(AccountsStorageIDKey)
 	if err != nil {
 		return nil, handleError(err)
 	}
 
-	view.accounts, view.accountSetupOnCommit, err = view.retrieveOrCreateMap(AccountsStorageIDKey)
-	if err != nil {
-		return nil, handleError(err)
-	}
-
-	view.codes, view.codeSetupOnCommit, err = view.retrieveOrCreateMap(CodesStorageIDKey)
+	view.codes, view.codeSetupOnCommit, err = view.fetchOrCreateCollection(CodesStorageIDKey)
 	if err != nil {
 		return nil, handleError(err)
 	}
@@ -168,11 +172,74 @@ func (v *BaseView) SlotInAccessList(types.SlotAddress) (addressOk bool, slotOk b
 	return false, false
 }
 
-func (v *BaseView) updateAccount(acc *account) error {
-	return v.storeAccount(acc)
+func (v *BaseView) CreateAccount(
+	addr gethCommon.Address,
+	balance *big.Int,
+	nonce uint64,
+	code []byte,
+	codeHash gethCommon.Hash,
+) error {
+	err := v.createAccount(addr, balance, nonce, code, codeHash)
+	return handleError(err)
 }
 
-func (v *BaseView) CreateAccount(
+func (v *BaseView) UpdateAccount(
+	addr gethCommon.Address,
+	balance *big.Int,
+	nonce uint64,
+	code []byte,
+	codeHash gethCommon.Hash,
+) error {
+	err := v.updateAccount(addr, balance, nonce, code, codeHash)
+	return handleError(err)
+}
+
+func (v *BaseView) DeleteAccount(addr gethCommon.Address) error {
+	err := v.deleteAccount(addr)
+	return handleError(err)
+}
+
+func (v *BaseView) UpdateSlot(sk types.SlotAddress, value gethCommon.Hash) error {
+	return v.storeSlot(sk, value)
+}
+
+func (v *BaseView) Commit() error {
+	// commit atree changes
+	err := v.storage.FastCommit(runtime.NumCPU())
+	if err != nil {
+		return err
+	}
+
+	if v.accountSetupOnCommit {
+		err = v.ledger.SetValue(v.rootAddress[:], []byte(AccountsStorageIDKey), v.accounts.StorageIDBytes())
+		if err != nil {
+			return handleError(err)
+		}
+	}
+
+	if v.codeSetupOnCommit {
+		err = v.ledger.SetValue(v.rootAddress[:], []byte(CodesStorageIDKey), v.accounts.StorageIDBytes())
+		if err != nil {
+			return handleError(err)
+		}
+	}
+	return nil
+}
+
+func (v *BaseView) fetchOrCreateCollection(path string) (collection *Collection, created bool, error error) {
+	storageIDBytes, err := v.ledger.GetValue(v.rootAddress.Bytes(), []byte(AccountsStorageIDKey))
+	if err != nil {
+		return nil, false, err
+	}
+	if len(storageIDBytes) == 0 {
+		collection, err = v.collectionProvider.NewCollection()
+		return collection, true, err
+	}
+	collection, err = v.collectionProvider.GetCollection(storageIDBytes)
+	return collection, false, err
+}
+
+func (v *BaseView) createAccount(
 	addr gethCommon.Address,
 	balance *big.Int,
 	nonce uint64,
@@ -186,27 +253,18 @@ func (v *BaseView) CreateAccount(
 			return err
 		}
 
-		// create storage map
-		accountStateMap, err := atree.NewMap(
-			v.storage,
-			atree.Address(v.rootAddress),
-			atree.NewDefaultDigesterBuilder(),
-			emptyTypeInfo{},
-		)
+		col, err := v.collectionProvider.NewCollection()
 		if err != nil {
 			return err
 		}
-		sID, err = storageIDToBytes(accountStateMap.StorageID())
-		if err != nil {
-			return err
-		}
+		sID = col.storageIDBytes
 	}
 
 	acc := newAccount(addr, balance, nonce, codeHash, sID)
 	return v.storeAccount(acc)
 }
 
-func (v *BaseView) UpdateAccount(
+func (v *BaseView) updateAccount(
 	addr gethCommon.Address,
 	balance *big.Int,
 	nonce uint64,
@@ -229,123 +287,30 @@ func (v *BaseView) UpdateAccount(
 	return v.storeAccount(newAcc)
 }
 
-func (v *BaseView) DeleteAccount(addr gethCommon.Address) error {
-	// TODO implement me
-
-	// We need a way to also delete all slots related to this account (eip-6780)
-	return nil
-}
-
-func (v *BaseView) UpdateSlot(sk types.SlotAddress, value gethCommon.Hash) error {
-	return v.storeSlot(sk, value)
-}
-
-func (v *BaseView) Commit() error {
-	// commit atree changes
-	err := v.storage.FastCommit(runtime.NumCPU())
+func (v *BaseView) deleteAccount(addr gethCommon.Address) error {
+	acc, err := v.getAccount(addr)
 	if err != nil {
 		return err
-	}
-
-	if v.accountSetupOnCommit {
-		data, err := storageIDToBytes(v.accounts.StorageID())
-		if err != nil {
-			return handleError(err)
-		}
-		err = v.ledger.SetValue(v.rootAddress[:], []byte(AccountsStorageIDKey), data)
-		if err != nil {
-			return handleError(err)
-		}
-	}
-
-	if v.codeSetupOnCommit {
-		data, err := storageIDToBytes(v.codes.StorageID())
-		if err != nil {
-			return handleError(err)
-		}
-		err = v.ledger.SetValue(v.rootAddress[:], []byte(CodesStorageIDKey), data)
-		if err != nil {
-			return handleError(err)
-		}
-	}
-	return nil
-}
-
-func (v *BaseView) retrieveOrCreateMap(path string) (omap *atree.OrderedMap, requireSetup bool, err error) {
-	storageIDBytes, err := v.ledger.GetValue(v.rootAddress.Bytes(), []byte(path))
-	if err != nil {
-		return nil, false, err
-	}
-
-	// if map doesn't exist
-	if len(storageIDBytes) == 0 {
-		m, err := atree.NewMap(v.storage, atree.Address(v.rootAddress), atree.NewDefaultDigesterBuilder(), emptyTypeInfo{})
-		return m, true, err
-	}
-
-	storageID, err := atree.NewStorageIDFromRawBytes(storageIDBytes)
-	if err != nil {
-		return nil, false, err
-	}
-	m, err := atree.NewMapWithRootID(v.storage, storageID, atree.NewDefaultDigesterBuilder())
-	return m, false, err
-}
-
-func (v *BaseView) getAccount(addr gethCommon.Address) (*account, error) {
-	acc, found := v.cachedAccounts[addr]
-	if found {
-		return acc, nil
-	}
-	acc, err := v.fetchAccount(addr)
-	if err != nil {
-		return nil, err
 	}
 	if acc != nil {
-		v.cachedAccounts[addr] = acc
-	}
-	return acc, nil
-}
-
-func (v *BaseView) fetchAccount(addr gethCommon.Address) (*account, error) {
-	// first check if we have the address in the accounts
-	// this escapes hitting NotFound errors
-	found, err := v.accounts.Has(compare, hashInputProvider, NewByteStringValue(addr.Bytes()))
-	if err != nil {
-		return nil, err
-	}
-	if !found {
-		return nil, nil
+		return fmt.Errorf("account doesn't exist")
 	}
 
-	// then get account
-	data, err := v.accounts.Get(compare, hashInputProvider, NewByteStringValue(addr.Bytes()))
-	if err != nil {
-		return nil, err
-	}
-
-	value, err := data.StoredValue(v.accounts.Storage)
-	if err != nil {
-		return nil, err
-	}
-
-	bytes := value.(ByteStringValue).Bytes()
-	return decodeAccount(bytes)
-}
-
-func (v *BaseView) storeAccount(acc *account) error {
-	data, err := acc.encode()
+	err = v.accounts.Remove(addr.Bytes())
 	if err != nil {
 		return err
 	}
 
-	existingValueStorable, err := v.accounts.Set(compare, hashInputProvider, NewByteStringValue(acc.address.Bytes()), NewByteStringValue(data))
-	if err != nil {
-		return err
-	}
-
-	if id, ok := existingValueStorable.(atree.StorageIDStorable); ok {
-		// NOTE: deep remove isn't necessary because value is ByteStringValue (not container)
-		err := v.storage.Remove(atree.StorageID(id))
+	if len(acc.storageIDBytes) > 0 {
+		col, found := v.slots[addr]
+		if !found {
+			col, err = v.collectionProvider.GetCollection(acc.storageIDBytes)
+			if err != nil {
+				return err
+			}
+		}
+		// Delete all slots related to this account (eip-6780)
+		err = col.Destroy()
 		if err != nil {
 			return err
 		}
@@ -353,12 +318,42 @@ func (v *BaseView) storeAccount(acc *account) error {
 	return nil
 }
 
+func (v *BaseView) getAccount(addr gethCommon.Address) (*account, error) {
+	acc, found := v.cachedAccounts[addr]
+	if found {
+		return acc, nil
+	}
+
+	data, err := v.accounts.Get(addr.Bytes())
+	if err != nil {
+		return nil, err
+	}
+
+	acc, err = decodeAccount(data)
+	if err != nil {
+		return nil, err
+	}
+
+	if acc != nil {
+		v.cachedAccounts[addr] = acc
+	}
+	return acc, nil
+}
+
+func (v *BaseView) storeAccount(acc *account) error {
+	data, err := acc.encode()
+	if err != nil {
+		return err
+	}
+	return v.accounts.Set(acc.address.Bytes(), data)
+}
+
 func (v *BaseView) getCode(addr gethCommon.Address) ([]byte, error) {
 	code, found := v.cachedCodes[addr]
 	if found {
 		return code, nil
 	}
-	code, err := v.fetchCode(addr)
+	code, err := v.codes.Get(addr.Bytes())
 	if err != nil {
 		return nil, err
 	}
@@ -368,41 +363,8 @@ func (v *BaseView) getCode(addr gethCommon.Address) ([]byte, error) {
 	return code, nil
 }
 
-func (v *BaseView) fetchCode(addr gethCommon.Address) ([]byte, error) {
-	// first check if we have the address in the codes
-	// this escapes hitting NotFound errors
-	found, err := v.codes.Has(compare, hashInputProvider, NewByteStringValue(addr.Bytes()))
-	if err != nil {
-		return nil, err
-	}
-	if !found {
-		return nil, nil
-	}
-
-	// then get the code
-	data, err := v.codes.Get(compare, hashInputProvider, NewByteStringValue(addr.Bytes()))
-	if err != nil {
-		return nil, err
-	}
-
-	value, err := data.StoredValue(v.accounts.Storage)
-	return value.(ByteStringValue).Bytes(), err
-}
-
 func (v *BaseView) storeCode(addr gethCommon.Address, code []byte) error {
-	existingValueStorable, err := v.accounts.Set(compare, hashInputProvider, NewByteStringValue(addr.Bytes()), NewByteStringValue(code))
-	if err != nil {
-		return err
-	}
-
-	if id, ok := existingValueStorable.(atree.StorageIDStorable); ok {
-		// NOTE: deep remove isn't necessary because value is ByteStringValue (not container)
-		err := v.storage.Remove(atree.StorageID(id))
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+	return v.codes.Set(addr.Bytes(), code)
 }
 
 func (v *BaseView) getSlot(sk types.SlotAddress) (gethCommon.Hash, error) {
@@ -411,42 +373,31 @@ func (v *BaseView) getSlot(sk types.SlotAddress) (gethCommon.Hash, error) {
 	if found {
 		return value, nil
 	}
-	value, err := v.fetchSlot(sk)
-	if err != nil {
-		return defValue, err
-	}
 
-	if value != defValue {
-		v.cachedSlots[sk] = value
-	}
-	return value, nil
-}
-
-func (v *BaseView) fetchSlot(sk types.SlotAddress) (gethCommon.Hash, error) {
-	// get account first
+	// check account
 	acc, err := v.getAccount(sk.Address)
 	if err != nil || acc == nil || len(acc.storageIDBytes) == 0 {
 		return gethCommon.Hash{}, err
 	}
 
-	storageID, err := atree.NewStorageIDFromRawBytes(acc.storageIDBytes)
+	col, found := v.slots[sk.Address]
+	if !found {
+		col, err = v.collectionProvider.GetCollection(acc.storageIDBytes)
+		if err != nil {
+			return gethCommon.Hash{}, err
+		}
+		v.slots[sk.Address] = col
+	}
+
+	val, err := col.Get(sk.Key.Bytes())
 	if err != nil {
 		return gethCommon.Hash{}, err
 	}
-	accountStateMap, err := atree.NewMapWithRootID(v.storage, storageID, atree.NewDefaultDigesterBuilder())
-
-	found, err := accountStateMap.Has(compare, hashInputProvider, NewByteStringValue(sk.Key.Bytes()))
-	if err != nil || !found {
-		return gethCommon.Hash{}, err
+	value = gethCommon.BytesToHash(val)
+	if value != defValue {
+		v.cachedSlots[sk] = value
 	}
-
-	data, err := accountStateMap.Get(compare, hashInputProvider, NewByteStringValue(sk.Key.Bytes()))
-	if err != nil {
-		return gethCommon.Hash{}, nil
-	}
-
-	value, err := data.StoredValue(accountStateMap.Storage)
-	return gethCommon.BytesToHash(value.(ByteStringValue).Bytes()), err
+	return value, nil
 }
 
 func (v *BaseView) storeSlot(sk types.SlotAddress, data gethCommon.Hash) error {
@@ -455,50 +406,32 @@ func (v *BaseView) storeSlot(sk types.SlotAddress, data gethCommon.Hash) error {
 		return err
 	}
 	if acc == nil {
-		return fmt.Errorf("account doesn't exist")
+		return fmt.Errorf("slot belongs to a non existing account")
 	}
-
-	var accountStateMap *atree.OrderedMap
 	if len(acc.storageIDBytes) == 0 {
-		return fmt.Errorf("storageIDBytes is empty but it shouldn't be")
+		return fmt.Errorf("slot belongs to a non-smart contract account")
+	}
 
-	} else {
-		storageID, err := atree.NewStorageIDFromRawBytes(acc.storageIDBytes)
+	col, found := v.slots[sk.Address]
+	if !found {
+		col, err = v.collectionProvider.GetCollection(acc.storageIDBytes)
 		if err != nil {
 			return err
 		}
-		accountStateMap, err = atree.NewMapWithRootID(v.storage, storageID, atree.NewDefaultDigesterBuilder())
-		if err != nil {
-			return err
-		}
+		v.slots[sk.Address] = col
 	}
 
-	// TODO: if value is common.Hash remove the item from the list
-	existingValueStorable, err := accountStateMap.Set(
-		compare,
-		hashInputProvider,
-		NewByteStringValue(acc.address.Bytes()),
-		NewByteStringValue(data.Bytes()),
-	)
-	if err != nil {
-		return err
-	}
-
-	if id, ok := existingValueStorable.(atree.StorageIDStorable); ok {
-		// NOTE: deep remove isn't necessary because value is ByteStringValue (not container)
-		err := v.storage.Remove(atree.StorageID(id))
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+	return col.Set(sk.Key.Bytes(), data.Bytes())
 }
 
 func handleError(err error) error {
 	if err == nil {
 		return nil
 	}
-
+	var atreeUserError *atree.UserError
+	if stdErrors.As(err, &atreeUserError) {
+		return types.NewDatabaseError(err)
+	}
 	var atreeFatalError *atree.FatalError
 	// if is a atree fatal error or fvm fatal error (the second one captures external errors)
 	if stdErrors.As(err, &atreeFatalError) || errors.IsFailure(err) {
@@ -506,10 +439,4 @@ func handleError(err error) error {
 	}
 	// wrap the non-fatal error with DB error
 	return types.NewDatabaseError(err)
-}
-
-func storageIDToBytes(sID atree.StorageID) ([]byte, error) {
-	data := make([]byte, StorageIDSize)
-	_, err := sID.ToRawBytes(data)
-	return data, err
 }
