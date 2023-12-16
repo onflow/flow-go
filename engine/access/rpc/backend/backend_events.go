@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
@@ -29,6 +30,7 @@ type backendEvents struct {
 	events            storage.Events
 	executionReceipts storage.ExecutionReceipts
 	state             protocol.State
+	chain             flow.Chain
 	connFactory       connection.ConnectionFactory
 	log               zerolog.Logger
 	maxHeightRange    uint
@@ -132,7 +134,13 @@ func (b *backendEvents) getBlockEvents(
 	eventType string,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) ([]flow.BlockEvents, error) {
-	localResponse, missingHeaders, err := b.getBlockEventsFromStorage(ctx, blockHeaders, eventType, requiredEventEncodingVersion)
+	target := flow.EventType(eventType)
+
+	if _, err := events.ValidateEvent(target, b.chain); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid event type: %v", err)
+	}
+
+	localResponse, missingHeaders, err := b.getBlockEventsFromStorage(ctx, blockHeaders, target, requiredEventEncodingVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -165,11 +173,9 @@ func (b *backendEvents) getBlockEvents(
 func (b *backendEvents) getBlockEventsFromStorage(
 	ctx context.Context,
 	blockHeaders []*flow.Header,
-	eventType string,
+	eventType flow.EventType,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) ([]flow.BlockEvents, []*flow.Header, error) {
-	target := flow.EventType(eventType)
-
 	missing := make([]*flow.Header, 0)
 	resp := make([]flow.BlockEvents, 0)
 	for _, header := range blockHeaders {
@@ -189,7 +195,7 @@ func (b *backendEvents) getBlockEventsFromStorage(
 
 		filteredEvents := make([]flow.Event, 0)
 		for _, e := range events {
-			if e.Type != target {
+			if e.Type != eventType {
 				continue
 			}
 

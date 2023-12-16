@@ -179,6 +179,7 @@ func New(params Params) (*Backend, error) {
 		},
 		backendEvents: backendEvents{
 			log:               params.Log,
+			chain:             params.ChainID.Chain(),
 			state:             params.State,
 			headers:           params.Headers,
 			events:            params.Events,
