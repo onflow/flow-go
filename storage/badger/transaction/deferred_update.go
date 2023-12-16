@@ -44,8 +44,10 @@ type DeferredBadgerUpdate = func(*badger.Txn) error
 //
 // DESIGN PATTERN
 //   - DeferredDbOps is stateful, i.e. it needs to be passed as pointer variable.
-//   - Do not instantiate Tx outside of this package. Instead, use
-//     Update(db, DeferredDbOps.Pending) or View(db, DeferredDbOps.Pending)
+//   - Do not instantiate Tx directly. Instead, use one of the following
+//     transaction.Update(db, DeferredDbOps.Pending)
+//     transaction.View(db, DeferredDbOps.Pending)
+//     operation.RetryOnConflictTx(db, transaction.Update, DeferredDbOps.Pending)
 //
 // NOT CONCURRENCY SAFE
 type DeferredDbOps struct {
@@ -82,6 +84,10 @@ func (d *DeferredDbOps) AddBadgerOp(op DeferredBadgerUpdate) *DeferredDbOps {
 // AddBadgerOps schedules the given DeferredBadgerUpdates to be executed as part of the future transaction.
 // This method returns a self-reference for chaining.
 func (d *DeferredDbOps) AddBadgerOps(ops ...DeferredBadgerUpdate) *DeferredDbOps {
+	if len(ops) < 1 {
+		return d
+	}
+
 	prior := d.Pending
 	d.Pending = func(tx *Tx) error {
 		err := prior(tx)
@@ -122,6 +128,10 @@ func (d *DeferredDbOps) AddDbOp(op DeferredDBUpdate) *DeferredDbOps {
 // AddDbOps schedules the given DeferredDBUpdates to be executed as part of the future transaction.
 // This method returns a self-reference for chaining.
 func (d *DeferredDbOps) AddDbOps(ops ...DeferredDBUpdate) *DeferredDbOps {
+	if len(ops) < 1 {
+		return d
+	}
+
 	prior := d.Pending
 	d.Pending = func(tx *Tx) error {
 		err := prior(tx)
@@ -159,6 +169,10 @@ func (d *DeferredDbOps) OnSucceed(callback func()) *DeferredDbOps {
 // OnSucceeds adds callbacks to be executed after the deferred database operations have succeeded.
 // This method returns a self-reference for chaining.
 func (d *DeferredDbOps) OnSucceeds(callbacks ...func()) *DeferredDbOps {
+	if len(callbacks) < 1 {
+		return d
+	}
+
 	prior := d.Pending
 	d.Pending = func(tx *Tx) error {
 		err := prior(tx)
