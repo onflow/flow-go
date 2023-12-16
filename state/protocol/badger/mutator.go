@@ -684,16 +684,11 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	}
 
 	// if epoch fallback was not previously triggered, check whether this block triggers it
-	if !epochFallbackTriggered {
-		epochFallbackTriggered, err = m.isEpochFallbackTriggeredByFinalizedBlock(header, psSnapshot)
-		if err != nil {
-			return fmt.Errorf("could not check whether finalized block triggers epoch fallback: %w", err)
-		}
-		if epochFallbackTriggered {
-			// emit the protocol event only the first time epoch fallback is triggered
-			events = append(events, m.consumer.EpochEmergencyFallbackTriggered)
-			metrics = append(metrics, m.metrics.EpochEmergencyFallbackTriggered)
-		}
+	if !epochFallbackTriggered && psSnapshot.InvalidEpochTransitionAttempted() {
+		epochFallbackTriggered = true
+		// emit the protocol event only the first time epoch fallback is triggered
+		events = append(events, m.consumer.EpochEmergencyFallbackTriggered)
+		metrics = append(metrics, m.metrics.EpochEmergencyFallbackTriggered)
 	}
 
 	isFirstBlockOfEpoch, err := m.isFirstBlockOfEpoch(header, currentEpochSetup)
@@ -788,9 +783,9 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	}
 
 	// update the cache
-	m.State.cachedFinal.Store(&cachedHeader{blockID, header})
+	m.State.cachedLatestFinal.Store(&cachedHeader{blockID, header})
 	if len(block.Payload.Seals) > 0 {
-		m.State.cachedSealed.Store(&cachedHeader{lastSeal.BlockID, sealed})
+		m.State.cachedLatestSealed.Store(&cachedHeader{lastSeal.BlockID, sealed})
 	}
 
 	// Emit protocol events after database transaction succeeds. Event delivery is guaranteed,
@@ -819,36 +814,6 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	}
 
 	return nil
-}
-
-// isEpochFallbackTriggeredByFinalizedBlock checks whether finalizing the input block
-// would trigger epoch emergency fallback mode. In particular, we trigger epoch
-// fallback mode while finalizing block B in either of the following cases:
-//  1. B is the head of a fork in which epoch fallback was tentatively triggered,
-//     due to incorporating an invalid service event.
-//  2. (a) B is the first finalized block with view greater than or equal to the epoch
-//     commitment deadline for the current epoch AND
-//     (b) the next epoch has not been committed as of B.
-//
-// This function should only be called when epoch fallback *has not already been triggered*.
-// See protocol.Params for more details on the epoch commitment deadline.
-//
-// No errors are expected during normal operation.
-func (m *FollowerState) isEpochFallbackTriggeredByFinalizedBlock(block *flow.Header, stateAtBlock protocol.DynamicProtocolState) (bool, error) {
-	// 1. Epoch fallback is tentatively triggered on this fork
-	if stateAtBlock.InvalidEpochTransitionAttempted() {
-		return true, nil
-	}
-
-	// 2.(a) determine whether block B is past the epoch commitment deadline
-	safetyThreshold := m.Params().EpochCommitSafetyThreshold()
-	blockExceedsDeadline := block.View+safetyThreshold >= stateAtBlock.EpochSetup().FinalView
-
-	// 2.(b) determine whether the next epoch is committed w.r.t. block B
-	isNextEpochCommitted := stateAtBlock.EpochPhase() == flow.EpochPhaseCommitted
-
-	blockTriggersEpochFallback := blockExceedsDeadline && !isNextEpochCommitted
-	return blockTriggersEpochFallback, nil
 }
 
 // isFirstBlockOfEpoch returns true if the given block is the first block of a new epoch.

@@ -77,7 +77,7 @@ func (n *node) setEpochs(t *testing.T, currentSetup flow.EpochSetup, nextSetup f
 	nextEpoch.On("Counter").Return(nextSetup.Counter, nil)
 	nextEpoch.On("InitialIdentities").Return(nextSetup.Participants, nil)
 	nextEpoch.On("RandomSource").Return(nextSetup.RandomSource, nil)
-	nextEpoch.On("DKG").Return(nil, nil) // no error means didn't run into EECC
+	nextEpoch.On("DKG").Return(nil, nil) // no error means didn't run into EFM
 	nextEpoch.On("FirstView").Return(nextSetup.FirstView, nil)
 	nextEpoch.On("FinalView").Return(nextSetup.FinalView, nil)
 

@@ -1096,11 +1096,7 @@ func (fnb *FlowNodeBuilder) initState() error {
 		fnb.State = state
 
 		// set root snapshot field
-		rootBlock, err := state.Params().FinalizedRoot()
-		if err != nil {
-			return fmt.Errorf("could not get root block from protocol state: %w", err)
-		}
-
+		rootBlock := state.Params().FinalizedRoot()
 		rootSnapshot := state.AtBlockID(rootBlock.ID())
 		if err := fnb.setRootSnapshot(rootSnapshot); err != nil {
 			return err
@@ -1252,11 +1248,7 @@ func (fnb *FlowNodeBuilder) initLocal() error {
 	// We enforce this strictly for MainNet. For other networks (e.g. TestNet or BenchNet), we
 	// are lenient, to allow ghost node to run as any role.
 	if self.Role.String() != fnb.BaseConfig.NodeRole {
-		rootBlockHeader, err := fnb.State.Params().FinalizedRoot()
-		if err != nil {
-			return fmt.Errorf("could not get root block from protocol state: %w", err)
-		}
-
+		rootBlockHeader := fnb.State.Params().FinalizedRoot()
 		if rootBlockHeader.ChainID == flow.Mainnet {
 			return fmt.Errorf("running as incorrect role, expected: %v, actual: %v, exiting",
 				self.Role.String(),
