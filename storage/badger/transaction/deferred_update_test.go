@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/storage/badger/transaction"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -14,7 +15,8 @@ import (
 func TestEmpty(t *testing.T) {
 	deferredDbOps := transaction.NewDeferredDbOps()
 	// deferredDbOps.Pending should be a no-op and therefore not care that transaction.Tx is nil
-	deferredDbOps.Pending(nil)
+	err := deferredDbOps.Pending(nil)
+	require.NoError(t, err)
 }
 
 // TestAddBaderOp adds 1 or 2 DeferredBadgerUpdate(s) and verifies that they are executed in the expected order
@@ -24,7 +26,8 @@ func Test_AddBaderOp(t *testing.T) {
 			m := NewCallMonitor(t)
 			deferredDbOps := transaction.NewDeferredDbOps().
 				AddBadgerOp(m.MakeBadgerUpdate())
-			transaction.Update(db, deferredDbOps.Pending)
+			err := transaction.Update(db, deferredDbOps.Pending)
+			require.NoError(t, err)
 		})
 
 		t.Run("two DeferredBadgerUpdates added individually", func(t *testing.T) {
@@ -32,7 +35,8 @@ func Test_AddBaderOp(t *testing.T) {
 			deferredDbOps := transaction.NewDeferredDbOps().
 				AddBadgerOp(m.MakeBadgerUpdate()).
 				AddBadgerOp(m.MakeBadgerUpdate())
-			transaction.Update(db, deferredDbOps.Pending)
+			err := transaction.Update(db, deferredDbOps.Pending)
+			require.NoError(t, err)
 		})
 
 		t.Run("two DeferredBadgerUpdates added as a sequence", func(t *testing.T) {
@@ -41,7 +45,8 @@ func Test_AddBaderOp(t *testing.T) {
 			deferredDbOps.AddBadgerOps(
 				m.MakeBadgerUpdate(),
 				m.MakeBadgerUpdate())
-			transaction.Update(db, deferredDbOps.Pending)
+			err := transaction.Update(db, deferredDbOps.Pending)
+			require.NoError(t, err)
 		})
 	})
 }
@@ -53,21 +58,24 @@ func Test_AddDbOp(t *testing.T) {
 			m := NewCallMonitor(t)
 			deferredDbOps := transaction.NewDeferredDbOps().
 				AddDbOp(m.MakeDBUpdate(0))
-			transaction.Update(db, deferredDbOps.Pending)
+			err := transaction.Update(db, deferredDbOps.Pending)
+			require.NoError(t, err)
 		})
 
 		t.Run("single DeferredDBUpdate with one callback", func(t *testing.T) {
 			m := NewCallMonitor(t)
 			deferredDbOps := transaction.NewDeferredDbOps().
 				AddDbOp(m.MakeDBUpdate(1))
-			transaction.Update(db, deferredDbOps.Pending)
+			err := transaction.Update(db, deferredDbOps.Pending)
+			require.NoError(t, err)
 		})
 
 		t.Run("single DeferredDBUpdate with multiple callbacks", func(t *testing.T) {
 			m := NewCallMonitor(t)
 			deferredDbOps := transaction.NewDeferredDbOps().
 				AddDbOp(m.MakeDBUpdate(21))
-			transaction.Update(db, deferredDbOps.Pending)
+			err := transaction.Update(db, deferredDbOps.Pending)
+			require.NoError(t, err)
 		})
 
 		t.Run("two DeferredDBUpdates added individually", func(t *testing.T) {
@@ -75,7 +83,8 @@ func Test_AddDbOp(t *testing.T) {
 			deferredDbOps := transaction.NewDeferredDbOps().
 				AddDbOp(m.MakeDBUpdate(17)).
 				AddDbOp(m.MakeDBUpdate(0))
-			transaction.Update(db, deferredDbOps.Pending)
+			err := transaction.Update(db, deferredDbOps.Pending)
+			require.NoError(t, err)
 		})
 
 		t.Run("two DeferredDBUpdates added as a sequence", func(t *testing.T) {
@@ -84,7 +93,8 @@ func Test_AddDbOp(t *testing.T) {
 			deferredDbOps.AddDbOps(
 				m.MakeDBUpdate(0),
 				m.MakeDBUpdate(17))
-			transaction.Update(db, deferredDbOps.Pending)
+			err := transaction.Update(db, deferredDbOps.Pending)
+			require.NoError(t, err)
 		})
 	})
 }
@@ -96,7 +106,8 @@ func Test_AddOnSucceedCallback(t *testing.T) {
 			m := NewCallMonitor(t)
 			deferredDbOps := transaction.NewDeferredDbOps().
 				OnSucceed(m.MakeCallback())
-			transaction.Update(db, deferredDbOps.Pending)
+			err := transaction.Update(db, deferredDbOps.Pending)
+			require.NoError(t, err)
 		})
 
 		t.Run("two callbacks added individually", func(t *testing.T) {
@@ -104,14 +115,16 @@ func Test_AddOnSucceedCallback(t *testing.T) {
 			deferredDbOps := transaction.NewDeferredDbOps().
 				OnSucceed(m.MakeCallback()).
 				OnSucceed(m.MakeCallback())
-			transaction.Update(db, deferredDbOps.Pending)
+			err := transaction.Update(db, deferredDbOps.Pending)
+			require.NoError(t, err)
 		})
 
 		t.Run("many callbacks added as a sequence", func(t *testing.T) {
 			m := NewCallMonitor(t)
 			deferredDbOps := transaction.NewDeferredDbOps().
 				OnSucceeds(m.MakeCallbacks(11)...)
-			transaction.Update(db, deferredDbOps.Pending)
+			err := transaction.Update(db, deferredDbOps.Pending)
+			require.NoError(t, err)
 		})
 	})
 }
@@ -138,7 +151,8 @@ func Test_EverythingMixed(t *testing.T) {
 				m.MakeDBUpdate(0),
 				m.MakeDBUpdate(1)).
 			OnSucceed(m.MakeCallback())
-		transaction.Update(db, deferredDbOps.Pending)
+		err := transaction.Update(db, deferredDbOps.Pending)
+		require.NoError(t, err)
 	})
 }
 
