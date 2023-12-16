@@ -2,11 +2,11 @@ package flow
 
 import (
 	"fmt"
-	"sort"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/fingerprint"
+	"golang.org/x/exp/slices"
 )
 
 // TransactionBody includes the main contents of a transaction
@@ -306,7 +306,7 @@ func (tb *TransactionBody) AddPayloadSignature(address Address, keyID uint64, si
 	s := tb.createSignature(address, keyID, sig)
 
 	tb.PayloadSignatures = append(tb.PayloadSignatures, s)
-	sort.Slice(tb.PayloadSignatures, compareSignatures(tb.PayloadSignatures))
+	slices.SortFunc(tb.PayloadSignatures, compareSignatures)
 
 	return tb
 }
@@ -316,7 +316,7 @@ func (tb *TransactionBody) AddEnvelopeSignature(address Address, keyID uint64, s
 	s := tb.createSignature(address, keyID, sig)
 
 	tb.EnvelopeSignatures = append(tb.EnvelopeSignatures, s)
-	sort.Slice(tb.EnvelopeSignatures, compareSignatures(tb.EnvelopeSignatures))
+	slices.SortFunc(tb.EnvelopeSignatures, compareSignatures)
 
 	return tb
 }
@@ -488,17 +488,12 @@ func (s TransactionSignature) canonicalForm() interface{} {
 	}
 }
 
-func compareSignatures(signatures []TransactionSignature) func(i, j int) bool {
-	return func(i, j int) bool {
-		sigA := signatures[i]
-		sigB := signatures[j]
-
-		if sigA.SignerIndex == sigB.SignerIndex {
-			return sigA.KeyIndex < sigB.KeyIndex
-		}
-
-		return sigA.SignerIndex < sigB.SignerIndex
+func compareSignatures(sigA, sigB TransactionSignature) int {
+	if sigA.SignerIndex == sigB.SignerIndex {
+		return int(sigA.KeyIndex) - int(sigB.KeyIndex)
 	}
+
+	return sigA.SignerIndex - sigB.SignerIndex
 }
 
 type signaturesList []TransactionSignature

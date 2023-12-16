@@ -7,41 +7,30 @@ import (
 )
 
 // Canonical represents the canonical ordering for identity lists.
-func Canonical(identity1 *flow.Identity, identity2 *flow.Identity) bool {
+func Canonical(identity1 *flow.Identity, identity2 *flow.Identity) int {
 	return IdentifierCanonical(identity1.NodeID, identity2.NodeID)
 }
 
 // ByReferenceOrder return a function for sorting identities based on the order
 // of the given nodeIDs
-func ByReferenceOrder(nodeIDs []flow.Identifier) func(*flow.Identity, *flow.Identity) bool {
-	indices := make(map[flow.Identifier]uint)
+func ByReferenceOrder(nodeIDs []flow.Identifier) func(*flow.Identity, *flow.Identity) int {
+	indices := make(map[flow.Identifier]int)
 	for index, nodeID := range nodeIDs {
 		_, ok := indices[nodeID]
 		if ok {
 			panic("should never order by reference order with duplicate node IDs")
 		}
-		indices[nodeID] = uint(index)
+		indices[nodeID] = index
 	}
-	return func(identity1 *flow.Identity, identity2 *flow.Identity) bool {
-		return indices[identity1.NodeID] < indices[identity2.NodeID]
+	return func(identity1 *flow.Identity, identity2 *flow.Identity) int {
+		return indices[identity1.NodeID] - indices[identity2.NodeID]
 	}
 }
 
 // IdentityListCanonical takes a list of identities and
 // check if it's ordered in canonical order.
+// (since the canonical order is a strict order, the check
+// also includes checking that all identities are distinct)
 func IdentityListCanonical(identities flow.IdentityList) bool {
-	if len(identities) == 0 {
-		return true
-	}
-
-	prev := identities[0].ID()
-	for i := 1; i < len(identities); i++ {
-		id := identities[i].ID()
-		if !IdentifierCanonical(prev, id) {
-			return false
-		}
-		prev = id
-	}
-
-	return true
+	return identities.Sorted(Canonical)
 }
