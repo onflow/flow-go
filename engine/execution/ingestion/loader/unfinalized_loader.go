@@ -67,7 +67,7 @@ func (e *UnfinalizedLoader) LoadUnexecuted(ctx context.Context) ([]flow.Identifi
 
 		unexecutedFinalized = append(unexecutedFinalized, header.ID())
 
-		if len(unexecutedFinalized) > 100_000 {
+		if len(unexecutedFinalized) > 500_000 {
 			lg.Warn().
 				Uint64("total_unexecuted", final.Height-lastExecuted).
 				Msgf("too many unexecuted finalized blocks, loading the first %v", len(unexecutedFinalized))

@@ -185,6 +185,13 @@ func (e *UnexecutedLoader) finalizedUnexecutedBlocks(ctx context.Context, finali
 		}
 
 		unexecuted = append(unexecuted, header.ID())
+
+		if len(unexecuted) > 500_000 {
+			e.log.Warn().
+				Uint64("total_unexecuted", final.Height-firstUnexecuted).
+				Msgf("too many unexecuted blocks, loading the first %v", len(unexecuted))
+			break
+		}
 	}
 
 	e.log.Info().
