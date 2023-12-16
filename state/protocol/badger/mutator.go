@@ -309,10 +309,6 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block,
 		if certifyingQC.BlockID != blockID {
 			return fmt.Errorf("qc doesn't certify candidate block, expect %x blockID, got %x", blockID, certifyingQC.BlockID)
 		}
-		deferredDbOps.AddDbOp(m.qcs.StoreTx(certifyingQC))
-		deferredDbOps.OnSucceed(func() {
-			m.consumer.BlockProcessable(candidate.Header, certifyingQC)
-		})
 	}
 
 	// STEP 5:
@@ -558,37 +554,34 @@ func (m *ParticipantState) receiptExtend(ctx context.Context, candidate *flow.Bl
 // Now, if block 101 is extending block 100, and its payload has a seal for 96, then it will
 // be the last sealed for block 101.
 // No errors are expected during normal operation.
-func (m *FollowerState) lastSealed(candidate *flow.Block, deferredDbOps *transaction.DeferredDbOps) (*flow.Seal, error) {
-	header := candidate.Header
+func (m *FollowerState) lastSealed(candidate *flow.Block, deferredDbOps *transaction.DeferredDbOps) (latestSeal *flow.Seal, err error) {
 	payload := candidate.Payload
 	blockID := candidate.ID()
 
-	// getting the last sealed block
-	last, err := m.seals.HighestInFork(header.ParentID)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve parent seal (%x): %w", header.ParentID, err)
-	}
-
-	// if the payload of the block has no seals, then the last seal is the seal for the highest block
+	// If the candidate blocks' payload has no seals, the latest seal in this fork remains unchanged, i.e. latest seal as of the
+	// parent is also the latest seal as of the candidate block. Otherwise, we take the latest seal included in the candidate block.
+	// Note that seals might not be ordered in the block.
 	if len(payload.Seals) == 0 {
-		return last, nil
+		latestSeal, err = m.seals.HighestInFork(candidate.Header.ParentID)
+		if err != nil {
+			return nil, fmt.Errorf("could not retrieve parent seal (%x): %w", candidate.Header.ParentID, err)
+		}
+	} else {
+		ordered, err := protocol.OrderedSeals(payload.Seals, m.headers)
+		if err != nil {
+			// all errors are unexpected - differentiation is for clearer error messages
+			if errors.Is(err, storage.ErrNotFound) {
+				return nil, fmt.Errorf("ordering seals: candidate payload contains seals for unknown block: %s", err.Error())
+			}
+			if errors.Is(err, protocol.ErrDiscontinuousSeals) || errors.Is(err, protocol.ErrMultipleSealsForSameHeight) {
+				return nil, fmt.Errorf("ordering seals: candidate payload contains invalid seal set: %s", err.Error())
+			}
+			return nil, fmt.Errorf("unexpected error ordering seals: %w", err)
+		}
+		latestSeal = ordered[len(ordered)-1]
 	}
 
-	ordered, err := protocol.OrderedSeals(payload.Seals, m.headers)
-	if err != nil {
-		// all errors are unexpected - differentiation is for clearer error messages
-		if errors.Is(err, storage.ErrNotFound) {
-			return nil, fmt.Errorf("ordering seals: candidate payload contains seals for unknown block: %s", err.Error())
-		}
-		if errors.Is(err, protocol.ErrDiscontinuousSeals) || errors.Is(err, protocol.ErrMultipleSealsForSameHeight) {
-			return nil, fmt.Errorf("ordering seals: candidate payload contains invalid seal set: %s", err.Error())
-		}
-		return nil, fmt.Errorf("unexpected error ordering seals: %w", err)
-	}
-	latestSeal := ordered[len(ordered)-1]
-	latestSealID := last.ID()
-
-	deferredDbOps.AddBadgerOp(operation.IndexLatestSealAtBlock(blockID, latestSealID))
+	deferredDbOps.AddBadgerOp(operation.IndexLatestSealAtBlock(blockID, latestSeal.ID()))
 	return latestSeal, nil
 }
 
