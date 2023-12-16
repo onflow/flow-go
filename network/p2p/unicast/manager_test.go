@@ -14,7 +14,7 @@ import (
 	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/module/metrics"
 	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
-	p2ptest "github.com/onflow/flow-go/network/p2p/test"
+	"github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	unicastcache "github.com/onflow/flow-go/network/p2p/unicast/cache"
 	"github.com/onflow/flow-go/network/p2p/unicast/stream"

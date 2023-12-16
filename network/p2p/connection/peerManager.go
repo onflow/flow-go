@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/p2p"
-	logging2 "github.com/onflow/flow-go/network/p2p/logging"
+	"github.com/onflow/flow-go/network/p2p/logging"
 	"github.com/onflow/flow-go/utils/logging"
 	"github.com/onflow/flow-go/utils/rand"
 )
@@ -166,7 +166,7 @@ func (pm *PeerManager) SetPeersProvider(peersProvider p2p.PeersProvider) {
 // is disconnected immediately after being rate limited.
 func (pm *PeerManager) OnRateLimitedPeer(pid peer.ID, role, msgType, topic, reason string) {
 	pm.logger.Warn().
-		Str("peer_id", logging2.PeerId(pid)).
+		Str("peer_id", p2plogging.PeerId(pid)).
 		Str("role", role).
 		Str("message_type", msgType).
 		Str("topic", topic).

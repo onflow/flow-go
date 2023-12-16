@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/network/compressor"
-	p2ptest "github.com/onflow/flow-go/network/p2p/test"
+	"github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols/internal"
 	"github.com/onflow/flow-go/utils/unittest"
 )

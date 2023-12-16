@@ -14,7 +14,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
-	p2pconfig "github.com/onflow/flow-go/network/p2p/builder/config"
+	"github.com/onflow/flow-go/network/p2p/builder/config"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
 	"github.com/onflow/flow-go/utils/logging"
@@ -73,17 +73,17 @@ func (cnb *CorruptedNodeBuilder) enqueueNetworkingLayer() {
 			myAddr = cnb.FlowNodeBuilder.BaseConfig.BindAddr
 		}
 
-		uniCfg := &p2pconfig.UnicastConfig{
+		uniCfg := &p2pbuilderconfig.UnicastConfig{
 			RateLimiterDistributor: cnb.UnicastRateLimiterDistributor,
 			Unicast:                cnb.FlowConfig.NetworkConfig.Unicast,
 		}
 
-		connGaterCfg := &p2pconfig.ConnectionGaterConfig{
+		connGaterCfg := &p2pbuilderconfig.ConnectionGaterConfig{
 			InterceptPeerDialFilters: []p2p.PeerFilter{}, // disable connection gater onInterceptPeerDialFilters
 			InterceptSecuredFilters:  []p2p.PeerFilter{}, // disable connection gater onInterceptSecuredFilters
 		}
 
-		peerManagerCfg := &p2pconfig.PeerManagerConfig{
+		peerManagerCfg := &p2pbuilderconfig.PeerManagerConfig{
 			ConnectionPruning: cnb.FlowConfig.NetworkConfig.NetworkConnectionPruning,
 			UpdateInterval:    cnb.FlowConfig.NetworkConfig.PeerUpdateInterval,
 			ConnectorFactory:  connection.DefaultLibp2pBackoffConnectorFactory(),

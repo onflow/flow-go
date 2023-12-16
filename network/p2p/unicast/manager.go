@@ -18,7 +18,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/p2p"
-	logging2 "github.com/onflow/flow-go/network/p2p/logging"
+	"github.com/onflow/flow-go/network/p2p/logging"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/unicast/stream"
 	"github.com/onflow/flow-go/utils/logging"
@@ -159,12 +159,12 @@ func (m *Manager) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.S
 		m.logger.Fatal().
 			Err(err).
 			Bool(logging.KeyNetworkingSecurity, true).
-			Str("peer_id", logging2.PeerId(peerID)).
+			Str("peer_id", p2plogging.PeerId(peerID)).
 			Msg("failed to retrieve dial config for peer id")
 	}
 
 	m.logger.Debug().
-		Str("peer_id", logging2.PeerId(peerID)).
+		Str("peer_id", p2plogging.PeerId(peerID)).
 		Str("dial_config", fmt.Sprintf("%+v", dialCfg)).
 		Msg("dial config for the peer retrieved")
 
@@ -187,14 +187,14 @@ func (m *Manager) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.S
 		m.logger.Fatal().
 			Err(err).
 			Bool(logging.KeyNetworkingSecurity, true).
-			Str("peer_id", logging2.PeerId(peerID)).
+			Str("peer_id", p2plogging.PeerId(peerID)).
 			Msg("failed to adjust dial config for peer id")
 	}
 
 	m.logger.Warn().
 		Err(errs).
 		Bool(logging.KeySuspicious, true).
-		Str("peer_id", logging2.PeerId(peerID)).
+		Str("peer_id", p2plogging.PeerId(peerID)).
 		Str("dial_config", fmt.Sprintf("%+v", updatedCfg)).
 		Msg("failed to create stream to peer id, dial config adjusted")
 
@@ -246,11 +246,11 @@ func (m *Manager) createStream(ctx context.Context, peerID peer.ID, protocol pro
 		m.logger.Fatal().
 			Err(err).
 			Bool(logging.KeyNetworkingSecurity, true).
-			Str("peer_id", logging2.PeerId(peerID)).
+			Str("peer_id", p2plogging.PeerId(peerID)).
 			Msg("failed to adjust dial config for peer id")
 	}
 	m.logger.Debug().
-		Str("peer_id", logging2.PeerId(peerID)).
+		Str("peer_id", p2plogging.PeerId(peerID)).
 		Str("updated_dial_config", fmt.Sprintf("%+v", updatedConfig)).
 		Msg("stream created successfully")
 	return s, nil

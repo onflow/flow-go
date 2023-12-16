@@ -24,9 +24,9 @@ import (
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
-	config2 "github.com/onflow/flow-go/network/p2p/config"
+	"github.com/onflow/flow-go/network/p2p/config"
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
-	p2ptest "github.com/onflow/flow-go/network/p2p/test"
+	"github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -91,7 +91,7 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 		irrecoverable.SignalerContext,
 		zerolog.Logger,
 		flow.Identifier,
-		*config2.RpcInspectorParameters,
+		*p2pconfig.RpcInspectorParameters,
 		module.GossipSubMetrics,
 		metrics.HeroCacheMetricsFactory,
 		flownet.NetworkingType,

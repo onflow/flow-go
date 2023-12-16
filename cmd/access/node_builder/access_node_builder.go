@@ -77,8 +77,8 @@ import (
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/blob"
-	p2pbuilder "github.com/onflow/flow-go/network/p2p/builder"
-	p2pconfig2 "github.com/onflow/flow-go/network/p2p/builder/config"
+	"github.com/onflow/flow-go/network/p2p/builder"
+	"github.com/onflow/flow-go/network/p2p/builder/config"
 	"github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/p2p/connection"
@@ -1700,7 +1700,7 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 		return nil, fmt.Errorf("could not create connection manager: %w", err)
 	}
 
-	libp2pNode, err := p2pbuilder.NewNodeBuilder(builder.Logger, &builder.FlowConfig.NetworkConfig.GossipSub, &p2pconfig2.MetricsConfig{
+	libp2pNode, err := p2pbuilder.NewNodeBuilder(builder.Logger, &builder.FlowConfig.NetworkConfig.GossipSub, &p2pbuilderconfig.MetricsConfig{
 		HeroCacheFactory: builder.HeroCacheMetricsFactory(),
 		Metrics:          networkMetrics,
 	},
@@ -1710,7 +1710,7 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 		builder.SporkID,
 		builder.IdentityProvider,
 		&builder.FlowConfig.NetworkConfig.ResourceManager,
-		&p2pconfig2.PeerManagerConfig{
+		&p2pbuilderconfig.PeerManagerConfig{
 			// TODO: eventually, we need pruning enabled even on public network. However, it needs a modified version of
 			// the peer manager that also operate on the public identities.
 			ConnectionPruning: connection.PruningDisabled,
@@ -1721,7 +1721,7 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 			MaxSize: builder.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
 			Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
 		},
-		&p2pconfig2.UnicastConfig{
+		&p2pbuilderconfig.UnicastConfig{
 			Unicast: builder.FlowConfig.NetworkConfig.Unicast,
 		}).
 		SetBasicResolver(builder.Resolver).

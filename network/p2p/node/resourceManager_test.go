@@ -19,7 +19,7 @@ import (
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/internal/p2putils"
 	"github.com/onflow/flow-go/network/p2p"
-	p2ptest "github.com/onflow/flow-go/network/p2p/test"
+	"github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/utils/unittest"
 )

@@ -3,7 +3,7 @@ package netconf
 import (
 	"time"
 
-	p2pconfig "github.com/onflow/flow-go/network/p2p/config"
+	"github.com/onflow/flow-go/network/p2p/config"
 )
 
 const (

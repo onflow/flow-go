@@ -33,8 +33,8 @@ import (
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
-	p2pbuilder "github.com/onflow/flow-go/network/p2p/builder"
-	p2pconfig2 "github.com/onflow/flow-go/network/p2p/builder/config"
+	"github.com/onflow/flow-go/network/p2p/builder"
+	"github.com/onflow/flow-go/network/p2p/builder/config"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
@@ -98,7 +98,7 @@ func NodeFixture(t *testing.T,
 		Logger:         unittest.Logger().Level(zerolog.WarnLevel),
 		Role:           flow.RoleCollection,
 		IdProvider:     idProvider,
-		MetricsCfg: &p2pconfig2.MetricsConfig{
+		MetricsCfg: &p2pbuilderconfig.MetricsConfig{
 			HeroCacheFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 			Metrics:          metrics.NewNoopCollector(),
 		},
@@ -136,7 +136,7 @@ func NodeFixture(t *testing.T,
 			MaxSize: uint32(1000),
 			Metrics: metrics.NewNoopCollector(),
 		},
-		&p2pconfig2.UnicastConfig{
+		&p2pbuilderconfig.UnicastConfig{
 			Unicast:                parameters.FlowConfig.NetworkConfig.Unicast,
 			RateLimiterDistributor: parameters.UnicastRateLimiterDistributor,
 		}).
@@ -239,13 +239,13 @@ type NodeFixtureParameters struct {
 	PeerScoringEnabled                bool
 	IdProvider                        module.IdentityProvider
 	PeerScoringConfigOverride         *p2p.PeerScoringConfigOverride
-	PeerManagerConfig                 *p2pconfig2.PeerManagerConfig
+	PeerManagerConfig                 *p2pbuilderconfig.PeerManagerConfig
 	PeerProvider                      p2p.PeersProvider // peer manager parameter
 	ConnGater                         p2p.ConnectionGater
 	ConnManager                       connmgr.ConnManager
 	GossipSubFactory                  p2p.GossipSubFactoryFunc
 	GossipSubConfig                   p2p.GossipSubAdapterConfigFunc
-	MetricsCfg                        *p2pconfig2.MetricsConfig
+	MetricsCfg                        *p2pbuilderconfig.MetricsConfig
 	ResourceManager                   network.ResourceManager
 	GossipSubRpcInspectorSuiteFactory p2p.GossipSubRpcInspectorSuiteFactoryFunc
 	FlowConfig                        *config.FlowConfig
@@ -294,7 +294,7 @@ func WithDefaultStreamHandler(handler network.StreamHandler) NodeFixtureParamete
 	}
 }
 
-func WithPeerManagerEnabled(cfg *p2pconfig2.PeerManagerConfig, peerProvider p2p.PeersProvider) NodeFixtureParameterOption {
+func WithPeerManagerEnabled(cfg *p2pbuilderconfig.PeerManagerConfig, peerProvider p2p.PeersProvider) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
 		p.PeerManagerConfig = cfg
 		p.PeerProvider = peerProvider
@@ -384,8 +384,8 @@ func WithUnicastHandlerFunc(handler network.StreamHandler) NodeFixtureParameterO
 }
 
 // PeerManagerConfigFixture is a test fixture that sets the default config for the peer manager.
-func PeerManagerConfigFixture(opts ...func(*p2pconfig2.PeerManagerConfig)) *p2pconfig2.PeerManagerConfig {
-	cfg := &p2pconfig2.PeerManagerConfig{
+func PeerManagerConfigFixture(opts ...func(*p2pbuilderconfig.PeerManagerConfig)) *p2pbuilderconfig.PeerManagerConfig {
+	cfg := &p2pbuilderconfig.PeerManagerConfig{
 		ConnectionPruning: true,
 		UpdateInterval:    1 * time.Second,
 		ConnectorFactory:  connection.DefaultLibp2pBackoffConnectorFactory(),
@@ -398,8 +398,8 @@ func PeerManagerConfigFixture(opts ...func(*p2pconfig2.PeerManagerConfig)) *p2pc
 
 // WithZeroJitterAndZeroBackoff is a test fixture that sets the default config for the peer manager.
 // It uses a backoff connector with zero jitter and zero backoff.
-func WithZeroJitterAndZeroBackoff(t *testing.T) func(*p2pconfig2.PeerManagerConfig) {
-	return func(cfg *p2pconfig2.PeerManagerConfig) {
+func WithZeroJitterAndZeroBackoff(t *testing.T) func(*p2pbuilderconfig.PeerManagerConfig) {
+	return func(cfg *p2pbuilderconfig.PeerManagerConfig) {
 		cfg.ConnectorFactory = func(host host.Host) (p2p.Connector, error) {
 			cacheSize := 100
 			dialTimeout := time.Minute * 2

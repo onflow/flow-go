@@ -14,7 +14,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
-	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
+	"github.com/onflow/flow-go/network/p2p/logging"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 )
 

@@ -57,13 +57,13 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/converter"
 	"github.com/onflow/flow-go/network/p2p"
-	p2pbuilder "github.com/onflow/flow-go/network/p2p/builder"
-	p2pconfig2 "github.com/onflow/flow-go/network/p2p/builder/config"
+	"github.com/onflow/flow-go/network/p2p/builder"
+	"github.com/onflow/flow-go/network/p2p/builder/config"
 	"github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/network/p2p/conduit"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
-	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
+	"github.com/onflow/flow-go/network/p2p/logging"
 	"github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
@@ -745,7 +745,7 @@ func (builder *ObserverServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 	node, err := p2pbuilder.NewNodeBuilder(
 		builder.Logger,
 		&builder.FlowConfig.NetworkConfig.GossipSub,
-		&p2pconfig2.MetricsConfig{
+		&p2pbuilderconfig.MetricsConfig{
 			HeroCacheFactory: builder.HeroCacheMetricsFactory(),
 			Metrics:          builder.Metrics.Network,
 		},
@@ -755,12 +755,12 @@ func (builder *ObserverServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 		builder.SporkID,
 		builder.IdentityProvider,
 		&builder.FlowConfig.NetworkConfig.ResourceManager,
-		p2pconfig2.PeerManagerDisableConfig(), // disable peer manager for observer node.
+		p2pbuilderconfig.PeerManagerDisableConfig(), // disable peer manager for observer node.
 		&p2p.DisallowListCacheConfig{
 			MaxSize: builder.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
 			Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
 		},
-		&p2pconfig2.UnicastConfig{
+		&p2pbuilderconfig.UnicastConfig{
 			Unicast: builder.FlowConfig.NetworkConfig.Unicast,
 		}).
 		SetSubscriptionFilter(

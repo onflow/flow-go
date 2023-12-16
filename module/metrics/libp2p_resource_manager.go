@@ -11,7 +11,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/rs/zerolog"
 
-	logging2 "github.com/onflow/flow-go/network/p2p/logging"
+	"github.com/onflow/flow-go/network/p2p/logging"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -172,22 +172,22 @@ func (l *LibP2PResourceManagerMetrics) BlockConn(dir network.Direction, usefd bo
 
 func (l *LibP2PResourceManagerMetrics) AllowStream(p peer.ID, dir network.Direction) {
 	l.allowStreamCount.WithLabelValues(dir.String()).Inc()
-	l.logger.Trace().Str("peer", logging2.PeerId(p)).Str("direction", dir.String()).Msg("allowing stream")
+	l.logger.Trace().Str("peer", p2plogging.PeerId(p)).Str("direction", dir.String()).Msg("allowing stream")
 }
 
 func (l *LibP2PResourceManagerMetrics) BlockStream(p peer.ID, dir network.Direction) {
 	l.blockStreamCount.WithLabelValues(dir.String()).Inc()
-	l.logger.Debug().Bool(logging.KeySuspicious, true).Str("peer", logging2.PeerId(p)).Str("direction", dir.String()).Msg("blocking stream")
+	l.logger.Debug().Bool(logging.KeySuspicious, true).Str("peer", p2plogging.PeerId(p)).Str("direction", dir.String()).Msg("blocking stream")
 }
 
 func (l *LibP2PResourceManagerMetrics) AllowPeer(p peer.ID) {
 	l.allowPeerCount.Inc()
-	l.logger.Trace().Str("peer", logging2.PeerId(p)).Msg("allowing peer")
+	l.logger.Trace().Str("peer", p2plogging.PeerId(p)).Msg("allowing peer")
 }
 
 func (l *LibP2PResourceManagerMetrics) BlockPeer(p peer.ID) {
 	l.blockPeerCount.Inc()
-	l.logger.Debug().Bool(logging.KeySuspicious, true).Str("peer", logging2.PeerId(p)).Msg("blocking peer")
+	l.logger.Debug().Bool(logging.KeySuspicious, true).Str("peer", p2plogging.PeerId(p)).Msg("blocking peer")
 }
 
 func (l *LibP2PResourceManagerMetrics) AllowProtocol(proto protocol.ID) {
@@ -202,7 +202,7 @@ func (l *LibP2PResourceManagerMetrics) BlockProtocol(proto protocol.ID) {
 
 func (l *LibP2PResourceManagerMetrics) BlockProtocolPeer(proto protocol.ID, p peer.ID) {
 	l.blockProtocolPeerCount.Inc()
-	l.logger.Debug().Bool(logging.KeySuspicious, true).Str("protocol", string(proto)).Str("peer", logging2.PeerId(p)).Msg("blocking protocol for peer")
+	l.logger.Debug().Bool(logging.KeySuspicious, true).Str("protocol", string(proto)).Str("peer", p2plogging.PeerId(p)).Msg("blocking protocol for peer")
 }
 
 func (l *LibP2PResourceManagerMetrics) AllowService(svc string) {
@@ -217,7 +217,7 @@ func (l *LibP2PResourceManagerMetrics) BlockService(svc string) {
 
 func (l *LibP2PResourceManagerMetrics) BlockServicePeer(svc string, p peer.ID) {
 	l.blockServicePeerCount.Inc()
-	l.logger.Debug().Bool(logging.KeySuspicious, true).Str("service", svc).Str("peer", logging2.PeerId(p)).Msg("blocking service for peer")
+	l.logger.Debug().Bool(logging.KeySuspicious, true).Str("service", svc).Str("peer", p2plogging.PeerId(p)).Msg("blocking service for peer")
 }
 
 func (l *LibP2PResourceManagerMetrics) AllowMemory(size int) {

@@ -18,7 +18,7 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
-	logging2 "github.com/onflow/flow-go/network/p2p/logging"
+	"github.com/onflow/flow-go/network/p2p/logging"
 	"github.com/onflow/flow-go/network/p2p/tracer/internal"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -137,7 +137,7 @@ func (t *GossipSubMeshTracer) Graft(p peer.ID, topic string) {
 	t.topicMeshMu.Lock()
 	defer t.topicMeshMu.Unlock()
 
-	lg := t.logger.With().Str("topic", topic).Str("peer_id", logging2.PeerId(p)).Logger()
+	lg := t.logger.With().Str("topic", topic).Str("peer_id", p2plogging.PeerId(p)).Logger()
 
 	if _, ok := t.topicMeshMap[topic]; !ok {
 		t.topicMeshMap[topic] = make(map[peer.ID]struct{})
@@ -165,7 +165,7 @@ func (t *GossipSubMeshTracer) Prune(p peer.ID, topic string) {
 	t.topicMeshMu.Lock()
 	defer t.topicMeshMu.Unlock()
 
-	lg := t.logger.With().Str("topic", topic).Str("peer_id", logging2.PeerId(p)).Logger()
+	lg := t.logger.With().Str("topic", topic).Str("peer_id", p2plogging.PeerId(p)).Logger()
 
 	if _, ok := t.topicMeshMap[topic]; !ok {
 		return
@@ -490,11 +490,11 @@ func (t *GossipSubMeshTracer) logPeers() {
 
 			if !exists {
 				shouldWarn = true
-				topicPeers = topicPeers.Str(strconv.Itoa(peerIndex), fmt.Sprintf("pid=%s, flow_id=unknown, role=unknown", logging2.PeerId(p)))
+				topicPeers = topicPeers.Str(strconv.Itoa(peerIndex), fmt.Sprintf("pid=%s, flow_id=unknown, role=unknown", p2plogging.PeerId(p)))
 				continue
 			}
 
-			topicPeers = topicPeers.Str(strconv.Itoa(peerIndex), fmt.Sprintf("pid=%s, flow_id=%x, role=%s", logging2.PeerId(p), id.NodeID, id.Role.String()))
+			topicPeers = topicPeers.Str(strconv.Itoa(peerIndex), fmt.Sprintf("pid=%s, flow_id=%x, role=%s", p2plogging.PeerId(p), id.NodeID, id.Role.String()))
 		}
 
 		lg := t.logger.With().

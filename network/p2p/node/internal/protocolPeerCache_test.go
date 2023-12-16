@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	fcrypto "github.com/onflow/flow-go/crypto"
-	p2pbuilder "github.com/onflow/flow-go/network/p2p/builder"
+	"github.com/onflow/flow-go/network/p2p/builder"
 	"github.com/onflow/flow-go/network/p2p/node/internal"
 	"github.com/onflow/flow-go/utils/unittest"
 )

@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
-	p2pnode "github.com/onflow/flow-go/network/p2p/node"
+	"github.com/onflow/flow-go/network/p2p/node"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
 )
 

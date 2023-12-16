@@ -8,7 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/network/internal/p2putils"
 	"github.com/onflow/flow-go/network/p2p"
-	logging2 "github.com/onflow/flow-go/network/p2p/logging"
+	"github.com/onflow/flow-go/network/p2p/logging"
 	"github.com/onflow/flow-go/utils/logging"
 	"github.com/onflow/flow-go/utils/rand"
 )
@@ -100,7 +100,7 @@ func (l *PeerUpdater) connectToPeers(ctx context.Context, peerIDs peer.IDSlice) 
 
 	for _, peerID := range peerIDs {
 		if l.host.IsConnectedTo(peerID) {
-			l.log.Trace().Str("peer_id", logging2.PeerId(peerID)).Msg("already connected to peer, skipping connection")
+			l.log.Trace().Str("peer_id", p2plogging.PeerId(peerID)).Msg("already connected to peer, skipping connection")
 			continue
 		}
 		peerCh <- peer.AddrInfo{ID: peerID}

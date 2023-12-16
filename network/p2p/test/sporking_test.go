@@ -17,7 +17,7 @@ import (
 	"github.com/onflow/flow-go/network/message"
 
 	"github.com/onflow/flow-go/network/p2p"
-	p2ptest "github.com/onflow/flow-go/network/p2p/test"
+	"github.com/onflow/flow-go/network/p2p/test"
 
 	"github.com/onflow/flow-go/network/p2p/utils"
 
