@@ -4,8 +4,9 @@ package bootstrap
 import (
 	"encoding/json"
 	"fmt"
-	"sort"
 	"strings"
+
+	"golang.org/x/exp/slices"
 
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
@@ -406,8 +407,8 @@ func FilterByRole(nodes []NodeInfo, role flow.Role) []NodeInfo {
 func Sort(nodes []NodeInfo, order flow.IdentityOrder) []NodeInfo {
 	dup := make([]NodeInfo, len(nodes))
 	copy(dup, nodes)
-	sort.Slice(dup, func(i, j int) bool {
-		return order(dup[i].Identity(), dup[j].Identity())
+	slices.SortFunc(dup, func(i, j NodeInfo) int {
+		return order(i.Identity(), j.Identity())
 	})
 	return dup
 }

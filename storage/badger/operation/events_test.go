@@ -2,8 +2,9 @@ package operation
 
 import (
 	"bytes"
-	"sort"
 	"testing"
+
+	"golang.org/x/exp/slices"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/require"
@@ -114,24 +115,14 @@ func TestRetrieveEventByBlockIDTxID(t *testing.T) {
 	})
 }
 
-// Event retrieval does not guarantee any order, hence a sort function to help compare expected and actual events
+// Event retrieval does not guarantee any order,
+// hence a sort function with a an event oredr to help compare expected and actual events
 func sortEvent(events []flow.Event) {
-	sort.Slice(events, func(i, j int) bool {
-
-		tComp := bytes.Compare(events[i].TransactionID[:], events[j].TransactionID[:])
-		if tComp < 0 {
-			return true
+	slices.SortFunc(events, func(i, j flow.Event) int {
+		tComp := bytes.Compare(i.TransactionID[:], j.TransactionID[:])
+		if tComp != 0 {
+			return tComp
 		}
-		if tComp > 0 {
-			return false
-		}
-
-		txIndex := events[i].TransactionIndex == events[j].TransactionIndex
-		if !txIndex {
-			return events[i].TransactionIndex < events[j].TransactionIndex
-		}
-
-		return events[i].EventIndex < events[j].EventIndex
-
+		return int(i.EventIndex) - int(j.EventIndex)
 	})
 }

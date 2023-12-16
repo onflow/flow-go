@@ -7,13 +7,16 @@ import (
 
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestStorageStateSet(t *testing.T) {
-	registerId1 := flow.NewRegisterID("foo", "1")
+	fooOwner := unittest.RandomAddressFixture()
+
+	registerId1 := flow.NewRegisterID(fooOwner, "1")
 	value1 := flow.RegisterValue([]byte("value1"))
 
-	registerId2 := flow.NewRegisterID("foo", "2")
+	registerId2 := flow.NewRegisterID(fooOwner, "2")
 	value2 := flow.RegisterValue([]byte("value2"))
 
 	state := newStorageState(nil)
@@ -40,13 +43,13 @@ func TestStorageStateSet(t *testing.T) {
 
 func TestStorageStateGetFromNilBase(t *testing.T) {
 	state := newStorageState(nil)
-	value, err := state.Get(flow.NewRegisterID("foo", "bar"))
+	value, err := state.Get(flow.NewRegisterID(unittest.RandomAddressFixture(), "bar"))
 	require.NoError(t, err)
 	require.Nil(t, value)
 }
 
 func TestStorageStateGetFromBase(t *testing.T) {
-	registerId := flow.NewRegisterID("", "base")
+	registerId := flow.NewRegisterID(flow.EmptyAddress, "base")
 	baseValue := flow.RegisterValue([]byte("base"))
 
 	state := newStorageState(
@@ -89,7 +92,7 @@ func TestStorageStateGetFromBase(t *testing.T) {
 }
 
 func TestStorageStateGetFromWriteSet(t *testing.T) {
-	registerId := flow.NewRegisterID("", "base")
+	registerId := flow.NewRegisterID(flow.EmptyAddress, "base")
 	expectedValue := flow.RegisterValue([]byte("base"))
 
 	state := newStorageState(nil)
@@ -112,22 +115,25 @@ func TestStorageStateGetFromWriteSet(t *testing.T) {
 }
 
 func TestStorageStateMerge(t *testing.T) {
-	baseRegisterId := flow.NewRegisterID("", "base")
+	parentOwner := unittest.RandomAddressFixture()
+	childOwner := unittest.RandomAddressFixture()
+
+	baseRegisterId := flow.NewRegisterID(flow.EmptyAddress, "base")
 	baseValue := flow.RegisterValue([]byte("base"))
 
-	parentRegisterId1 := flow.NewRegisterID("parent", "1")
+	parentRegisterId1 := flow.NewRegisterID(parentOwner, "1")
 	parentValue := flow.RegisterValue([]byte("parent"))
 
-	parentRegisterId2 := flow.NewRegisterID("parent", "2")
+	parentRegisterId2 := flow.NewRegisterID(parentOwner, "2")
 
-	parentRegisterId3 := flow.NewRegisterID("parent", "3")
+	parentRegisterId3 := flow.NewRegisterID(parentOwner, "3")
 	originalParentValue3 := flow.RegisterValue([]byte("parent value"))
 	updatedParentValue3 := flow.RegisterValue([]byte("child value"))
 
-	childRegisterId1 := flow.NewRegisterID("child", "1")
+	childRegisterId1 := flow.NewRegisterID(childOwner, "1")
 	childValue1 := flow.RegisterValue([]byte("child"))
 
-	childRegisterId2 := flow.NewRegisterID("child", "2")
+	childRegisterId2 := flow.NewRegisterID(childOwner, "2")
 
 	parent := newStorageState(
 		snapshot.MapStorageSnapshot{

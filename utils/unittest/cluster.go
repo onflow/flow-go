@@ -2,7 +2,8 @@ package unittest
 
 import (
 	"fmt"
-	"sort"
+
+	"golang.org/x/exp/slices"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
@@ -51,9 +52,7 @@ func ClusterAssignment(n uint, nodes flow.IdentityList) flow.AssignmentList {
 	collectors := nodes.Filter(filter.HasRole(flow.RoleCollection))
 
 	// order, so the same list results in the same
-	sort.Slice(collectors, func(i, j int) bool {
-		return order.Canonical(collectors[i], collectors[j])
-	})
+	slices.SortFunc(collectors, order.Canonical)
 
 	assignments := make(flow.AssignmentList, n)
 	for i, collector := range collectors {

@@ -266,7 +266,7 @@ func (p *TimeoutProcessor) buildTC() (*flow.TimeoutCertificate, error) {
 	// we need to canonically order the respective `newestQCView`, so we can properly map signer to `newestQCView` after decoding.
 
 	// sort data in canonical order
-	slices.SortFunc(signersData, func(lhs, rhs hotstuff.TimeoutSignerInfo) bool {
+	slices.SortFunc(signersData, func(lhs, rhs hotstuff.TimeoutSignerInfo) int {
 		return order.IdentifierCanonical(lhs.Signer, rhs.Signer)
 	})
 

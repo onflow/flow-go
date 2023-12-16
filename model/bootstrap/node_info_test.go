@@ -16,7 +16,7 @@ import (
 func TestSort(t *testing.T) {
 	nodes := unittest.NodeInfosFixture(20)
 	nodes = bootstrap.Sort(nodes, order.Canonical)
-	require.True(t, bootstrap.ToIdentityList(nodes).Sorted(order.Canonical))
+	require.True(t, order.IdentityListCanonical(bootstrap.ToIdentityList(nodes)))
 }
 
 func TestNodeConfigEncodingJSON(t *testing.T) {

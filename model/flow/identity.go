@@ -301,8 +301,16 @@ func (iy *Identity) EqualTo(other *Identity) bool {
 // IdentityFilter is a filter on identities.
 type IdentityFilter func(*Identity) bool
 
-// IdentityOrder is a sort for identities.
-type IdentityOrder func(*Identity, *Identity) bool
+// IdentityOrder is an order function for identities.
+//
+// It defines a strict weak ordering between identities.
+// It returns a negative number if the first identity is "strictly less" than the second,
+// a positive number if the second identity is "strictly less" than the second,
+// and zero if the two identities are equal.
+//
+// `IdentityOrder` can be used to sort identities as required
+// in https://pkg.go.dev/golang.org/x/exp/slices#SortFunc.
+type IdentityOrder func(*Identity, *Identity) int
 
 // IdentityMapFunc is a modifier function for map operations for identities.
 // Identities are COPIED from the source slice.
@@ -537,8 +545,8 @@ func (il IdentityList) Union(other IdentityList) IdentityList {
 		}
 	}
 
-	slices.SortFunc(union, func(a, b *Identity) bool {
-		return bytes.Compare(a.NodeID[:], b.NodeID[:]) < 0
+	slices.SortFunc(union, func(a, b *Identity) int {
+		return bytes.Compare(a.NodeID[:], b.NodeID[:])
 	})
 
 	return union
