@@ -2,8 +2,9 @@ package operation
 
 import (
 	"bytes"
-	"slices"
 	"testing"
+
+	"golang.org/x/exp/slices"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/require"
