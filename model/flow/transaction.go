@@ -3,10 +3,11 @@ package flow
 import (
 	"fmt"
 
+	"golang.org/x/exp/slices"
+
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/fingerprint"
-	"golang.org/x/exp/slices"
 )
 
 // TransactionBody includes the main contents of a transaction
