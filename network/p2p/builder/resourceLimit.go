@@ -7,7 +7,7 @@ import (
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/network/p2p/config"
+	p2pconfig "github.com/onflow/flow-go/network/p2p/config"
 )
 
 // BuildLibp2pResourceManagerLimits builds the resource manager limits for the libp2p node.
