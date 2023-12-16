@@ -6,7 +6,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/network/p2p/logging"
+	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -14,7 +14,7 @@ import (
 // It ensures that the PeerId logger helper returns the same string as the peer.ID.String() method.
 func TestPeerIdLogging(t *testing.T) {
 	pid := unittest.PeerIdFixture(t)
-	pidStr := logging.PeerId(pid)
+	pidStr := p2plogging.PeerId(pid)
 	require.Equal(t, pid.String(), pidStr)
 }
 
@@ -47,6 +47,6 @@ func BenchmarkPeerIdLogging(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = logging.PeerId(pids[i%count])
+		_ = p2plogging.PeerId(pids[i%count])
 	}
 }

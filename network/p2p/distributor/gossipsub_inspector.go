@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/logging"
+	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
 )
 
 const (
@@ -81,7 +81,7 @@ func NewGossipSubInspectorNotificationDistributor(log zerolog.Logger, store engi
 // The distribution is done asynchronously and non-blocking. The notification is added to a queue and processed by a worker pool.
 // DistributeEvent in this implementation does not return an error, but it logs a warning if the queue is full.
 func (g *GossipSubInspectorNotifDistributor) Distribute(notification *p2p.InvCtrlMsgNotif) error {
-	lg := g.logger.With().Str("peer_id", logging.PeerId(notification.PeerID)).Logger()
+	lg := g.logger.With().Str("peer_id", p2plogging.PeerId(notification.PeerID)).Logger()
 	if ok := g.workerPool.Submit(notification); !ok {
 		// we use a queue with a fixed size, so this can happen when queue is full or when the notification is duplicate.
 		lg.Warn().Msg("gossipsub rpc inspector notification queue is full or notification is duplicate, discarding notification")

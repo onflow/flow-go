@@ -6,6 +6,8 @@ import (
 	"github.com/libp2p/go-libp2p"
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 	"github.com/rs/zerolog"
+
+	p2pconfig "github.com/onflow/flow-go/network/p2p/config"
 )
 
 // BuildLibp2pResourceManagerLimits builds the resource manager limits for the libp2p node.
@@ -18,7 +20,7 @@ import (
 //
 //   - the resource manager limits.
 //   - any error encountered, all returned errors are irrecoverable (we cannot continue without the resource manager limits).
-func BuildLibp2pResourceManagerLimits(logger zerolog.Logger, config *config.ResourceManagerConfig) (*rcmgr.ConcreteLimitConfig, error) {
+func BuildLibp2pResourceManagerLimits(logger zerolog.Logger, config *p2pconfig.ResourceManagerConfig) (*rcmgr.ConcreteLimitConfig, error) {
 	defaultLimits := rcmgr.DefaultLimits
 	libp2p.SetDefaultServiceLimits(&defaultLimits)
 
@@ -34,11 +36,11 @@ func BuildLibp2pResourceManagerLimits(logger zerolog.Logger, config *config.Reso
 	scaled := defaultLimits.Scale(mem, fd)
 	scaledP := scaled.ToPartialLimitConfig()
 	override := rcmgr.PartialLimitConfig{}
-	override.System = ApplyResourceLimitOverride(logger, config.ResourceScopeSystem, scaledP.System, config.Override.System)
-	override.Transient = ApplyResourceLimitOverride(logger, config.ResourceScopeTransient, scaledP.Transient, config.Override.Transient)
-	override.ProtocolDefault = ApplyResourceLimitOverride(logger, config.ResourceScopeProtocol, scaledP.ProtocolDefault, config.Override.Protocol)
-	override.PeerDefault = ApplyResourceLimitOverride(logger, config.ResourceScopePeer, scaledP.PeerDefault, config.Override.Peer)
-	override.ProtocolPeerDefault = ApplyResourceLimitOverride(logger, config.ResourceScopePeerProtocol, scaledP.ProtocolPeerDefault, config.Override.PeerProtocol)
+	override.System = ApplyResourceLimitOverride(logger, p2pconfig.ResourceScopeSystem, scaledP.System, config.Override.System)
+	override.Transient = ApplyResourceLimitOverride(logger, p2pconfig.ResourceScopeTransient, scaledP.Transient, config.Override.Transient)
+	override.ProtocolDefault = ApplyResourceLimitOverride(logger, p2pconfig.ResourceScopeProtocol, scaledP.ProtocolDefault, config.Override.Protocol)
+	override.PeerDefault = ApplyResourceLimitOverride(logger, p2pconfig.ResourceScopePeer, scaledP.PeerDefault, config.Override.Peer)
+	override.ProtocolPeerDefault = ApplyResourceLimitOverride(logger, p2pconfig.ResourceScopePeerProtocol, scaledP.ProtocolPeerDefault, config.Override.PeerProtocol)
 
 	limits := override.Build(scaled)
 	logger.Info().
@@ -64,9 +66,9 @@ func BuildLibp2pResourceManagerLimits(logger zerolog.Logger, config *config.Reso
 //
 //	the overridden limit.
 func ApplyResourceLimitOverride(logger zerolog.Logger,
-	resourceScope config.ResourceScope,
+	resourceScope p2pconfig.ResourceScope,
 	original rcmgr.ResourceLimits,
-	override config.ResourceManagerOverrideLimit) rcmgr.ResourceLimits {
+	override p2pconfig.ResourceManagerOverrideLimit) rcmgr.ResourceLimits {
 	lg := logger.With().Logger()
 
 	if override.StreamsInbound > 0 {

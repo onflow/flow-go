@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/atomic"
 
-	"github.com/onflow/flow-go/network/p2p/builder/config"
+	p2pbuilderconfig "github.com/onflow/flow-go/network/p2p/builder/config"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	"github.com/onflow/flow-go/network/p2p/dht"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
@@ -90,7 +90,7 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 		p2ptest.WithRole(flow.RoleExecution),
 		p2ptest.WithDHTOptions(dht.AsServer()),
 		p2ptest.WithPeerManagerEnabled(
-			&p2pconfig.PeerManagerConfig{
+			&p2pbuilderconfig.PeerManagerConfig{
 				UpdateInterval:    1 * time.Second,
 				ConnectionPruning: true,
 				ConnectorFactory:  connection.DefaultLibp2pBackoffConnectorFactory(),

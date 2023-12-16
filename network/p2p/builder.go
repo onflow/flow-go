@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
+	p2pconfig "github.com/onflow/flow-go/network/p2p/config"
 )
 
 type GossipSubFactoryFunc func(context.Context, zerolog.Logger, host.Host, PubSubAdapterConfig, CollectionClusterChangesConsumer) (PubSubAdapter, error)
@@ -102,7 +103,7 @@ type GossipSubRpcInspectorSuiteFactoryFunc func(
 	irrecoverable.SignalerContext,
 	zerolog.Logger,
 	flow.Identifier,
-	*config.RpcInspectorParameters,
+	*p2pconfig.RpcInspectorParameters,
 	module.GossipSubMetrics,
 	metrics.HeroCacheMetricsFactory,
 	flownet.NetworkingType,

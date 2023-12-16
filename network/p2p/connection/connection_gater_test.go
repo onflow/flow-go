@@ -18,9 +18,9 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/builder/config"
+	p2pbuilderconfig "github.com/onflow/flow-go/network/p2p/builder/config"
 	"github.com/onflow/flow-go/network/p2p/connection"
-	"github.com/onflow/flow-go/network/p2p/logging"
+	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
 	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/unicast/stream"
@@ -43,7 +43,7 @@ func TestConnectionGating(t *testing.T) {
 		idProvider,
 		p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(p peer.ID) error {
 			if !node1Peers.Has(p) {
-				return fmt.Errorf("id not found: %s", logging.PeerId(p))
+				return fmt.Errorf("id not found: %s", p2plogging.PeerId(p))
 			}
 			return nil
 		})))
@@ -57,7 +57,7 @@ func TestConnectionGating(t *testing.T) {
 		idProvider,
 		p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(p peer.ID) error {
 			if !node2Peers.Has(p) {
-				return fmt.Errorf("id not found: %s", logging.PeerId(p))
+				return fmt.Errorf("id not found: %s", p2plogging.PeerId(p))
 			}
 			return nil
 		})))
@@ -259,7 +259,7 @@ func TestConnectionGater_InterceptUpgrade(t *testing.T) {
 			p2ptest.WithRole(flow.RoleConsensus),
 			p2ptest.WithDefaultStreamHandler(handler),
 			// enable peer manager, with a 1-second refresh rate, and connection pruning enabled.
-			p2ptest.WithPeerManagerEnabled(&p2pconfig.PeerManagerConfig{
+			p2ptest.WithPeerManagerEnabled(&p2pbuilderconfig.PeerManagerConfig{
 				ConnectionPruning: true,
 				UpdateInterval:    1 * time.Second,
 				ConnectorFactory:  connection.DefaultLibp2pBackoffConnectorFactory(),
@@ -342,7 +342,7 @@ func TestConnectionGater_Disallow_Integration(t *testing.T) {
 			p2ptest.WithRole(flow.RoleConsensus),
 			p2ptest.WithDefaultStreamHandler(handler),
 			// enable peer manager, with a 1-second refresh rate, and connection pruning enabled.
-			p2ptest.WithPeerManagerEnabled(&p2pconfig.PeerManagerConfig{
+			p2ptest.WithPeerManagerEnabled(&p2pbuilderconfig.PeerManagerConfig{
 				ConnectionPruning: true,
 				UpdateInterval:    1 * time.Second,
 				ConnectorFactory:  connection.DefaultLibp2pBackoffConnectorFactory(),

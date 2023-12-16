@@ -14,7 +14,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
-	"github.com/onflow/flow-go/network/p2p/logging"
+	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 )
 
@@ -32,9 +32,9 @@ func FlowStream(conn network.Conn) network.Stream {
 func StreamLogger(log zerolog.Logger, stream network.Stream) zerolog.Logger {
 	logger := log.With().
 		Str("protocol", string(stream.Protocol())).
-		Str("remote_peer", logging.PeerId(stream.Conn().RemotePeer())).
+		Str("remote_peer", p2plogging.PeerId(stream.Conn().RemotePeer())).
 		Str("remote_address", stream.Conn().RemoteMultiaddr().String()).
-		Str("local_peer", logging.PeerId(stream.Conn().LocalPeer())).
+		Str("local_peer", p2plogging.PeerId(stream.Conn().LocalPeer())).
 		Str("local_address", stream.Conn().LocalMultiaddr().String()).Logger()
 	return logger
 }

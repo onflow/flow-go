@@ -18,7 +18,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	p2pbuilderconfig "github.com/onflow/flow-go/network/p2p/builder/config"
 	inspectorbuilder "github.com/onflow/flow-go/network/p2p/builder/inspector"
-	"github.com/onflow/flow-go/network/p2p/config"
+	p2pconfig "github.com/onflow/flow-go/network/p2p/config"
 	"github.com/onflow/flow-go/network/p2p/distributor"
 	"github.com/onflow/flow-go/network/p2p/inspector"
 	"github.com/onflow/flow-go/network/p2p/inspector/validation"

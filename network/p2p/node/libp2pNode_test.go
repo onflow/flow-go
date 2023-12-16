@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/internal/p2putils"
 	"github.com/onflow/flow-go/network/p2p"
+	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
@@ -160,7 +161,7 @@ func TestConnGater(t *testing.T) {
 	node1Peers := unittest.NewProtectedMap[peer.ID, struct{}]()
 	node1, identity1 := p2ptest.NodeFixture(t, sporkID, t.Name(), idProvider, p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(pid peer.ID) error {
 		if !node1Peers.Has(pid) {
-			return fmt.Errorf("peer id not found: %s", logging.PeerId(pid))
+			return fmt.Errorf("peer id not found: %s", p2plogging.PeerId(pid))
 		}
 		return nil
 	})))
@@ -175,7 +176,7 @@ func TestConnGater(t *testing.T) {
 	node2Peers := unittest.NewProtectedMap[peer.ID, struct{}]()
 	node2, identity2 := p2ptest.NodeFixture(t, sporkID, t.Name(), idProvider, p2ptest.WithConnectionGater(p2ptest.NewConnectionGater(idProvider, func(pid peer.ID) error {
 		if !node2Peers.Has(pid) {
-			return fmt.Errorf("id not found: %s", logging.PeerId(pid))
+			return fmt.Errorf("id not found: %s", p2plogging.PeerId(pid))
 		}
 		return nil
 	})))

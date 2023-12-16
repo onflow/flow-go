@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 	netcache "github.com/onflow/flow-go/network/p2p/cache"
+	p2pconfig "github.com/onflow/flow-go/network/p2p/config"
 	"github.com/onflow/flow-go/network/p2p/scoring/internal"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/utils/logging"
@@ -306,7 +307,7 @@ type ScoreOption struct {
 
 type ScoreOptionConfig struct {
 	logger                           zerolog.Logger
-	params                           config.ScoringParameters
+	params                           p2pconfig.ScoringParameters
 	provider                         module.IdentityProvider
 	heroCacheMetricsFactory          metrics.HeroCacheMetricsFactory
 	appScoreFunc                     func(peer.ID) float64
@@ -324,7 +325,7 @@ type ScoreOptionConfig struct {
 // Returns:
 // - a new configuration for the GossipSub peer scoring option.
 func NewScoreOptionConfig(logger zerolog.Logger,
-	params config.ScoringParameters,
+	params p2pconfig.ScoringParameters,
 	hcMetricsFactory metrics.HeroCacheMetricsFactory,
 	idProvider module.IdentityProvider,
 	networkingType network.NetworkingType) *ScoreOptionConfig {

@@ -43,6 +43,7 @@ import (
 	"github.com/onflow/flow-go/module/updatable_configs"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
+	p2pconfig "github.com/onflow/flow-go/network/p2p/config"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
@@ -2751,8 +2752,8 @@ func GossipSubMessageFixtures(n int, topic string, opts ...func(*pubsub_pb.Messa
 // The values are not guaranteed to be valid between 0 and 1000.
 // Returns:
 //   - p2pconf.ResourceManagerOverrideLimit: a random resource limit override.
-func LibP2PResourceLimitOverrideFixture() config.ResourceManagerOverrideLimit {
-	return config.ResourceManagerOverrideLimit{
+func LibP2PResourceLimitOverrideFixture() p2pconfig.ResourceManagerOverrideLimit {
+	return p2pconfig.ResourceManagerOverrideLimit{
 		StreamsInbound:      rand.Intn(1000),
 		StreamsOutbound:     rand.Intn(1000),
 		ConnectionsInbound:  rand.Intn(1000),
