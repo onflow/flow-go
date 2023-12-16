@@ -119,6 +119,8 @@ func (il IdentifierList) Sort(less IdentifierOrder) IdentifierList {
 }
 
 // Sorted returns whether the list is sorted by the input ordering.
+//
+// If the list is well sorted and has duplicates, the function returns `true`.
 func (il IdentifierList) Sorted(less IdentifierOrder) bool {
 	return slices.IsSortedFunc(il, less)
 }

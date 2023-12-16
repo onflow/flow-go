@@ -12,6 +12,8 @@ import (
 // The caller must ensure each assignment contains identities ordered in canonical order, so that
 // each cluster in the returned cluster list is ordered in canonical order as well. If not,
 // an error will be returned.
+//
+// This function assumes that there are no duplicate collectors.
 func NewClusterList(assignments flow.AssignmentList, collectors flow.IdentityList) (flow.ClusterList, error) {
 
 	// build a lookup for all the identities by node identifier
