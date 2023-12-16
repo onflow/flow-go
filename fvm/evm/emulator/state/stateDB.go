@@ -2,6 +2,7 @@ package state
 
 import (
 	"bytes"
+	stdErrors "errors"
 	"math/big"
 	"sort"
 
@@ -9,6 +10,7 @@ import (
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	gethParams "github.com/ethereum/go-ethereum/params"
 	"github.com/onflow/atree"
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -317,8 +319,19 @@ func (s *StateDB) Error() error {
 
 // handleError capture the first non-nil error it is called with.
 func (s *StateDB) handleError(err error) {
+	if err == nil {
+		return
+	}
+
+	var atreeFatalError *atree.FatalError
+	// if is a atree fatal error or fvm fatal error (the second one captures external errors)
+	if stdErrors.As(err, &atreeFatalError) || errors.IsFailure(err) {
+		panic(types.NewFatalError(err))
+	}
+
+	// already no error is captured
 	if s.dbErr == nil {
-		s.dbErr = err
+		s.dbErr = types.NewDatabaseError(err)
 	}
 }
 

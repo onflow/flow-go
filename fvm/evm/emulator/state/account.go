@@ -7,40 +7,40 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
-type account struct {
+type Account struct {
 	// address
-	address gethCommon.Address
+	Address gethCommon.Address
 	// balance of the account
-	balance *big.Int
+	Balance *big.Int
 	// nonce
-	nonce uint64
+	Nonce uint64
 	// hash of the code
-	codeHash gethCommon.Hash
+	CodeHash gethCommon.Hash
 	// storageID of the map that holds account slots
-	storageIDBytes []byte
+	StorageIDBytes []byte
 }
 
-func newAccount(
+func NewAccount(
 	address gethCommon.Address,
 	balance *big.Int,
 	nonce uint64,
 	codeHash gethCommon.Hash,
 	storageIDBytes []byte,
-) *account {
-	return &account{
-		address:        address,
-		balance:        balance,
-		nonce:          nonce,
-		codeHash:       codeHash,
-		storageIDBytes: storageIDBytes,
+) *Account {
+	return &Account{
+		Address:        address,
+		Balance:        balance,
+		Nonce:          nonce,
+		CodeHash:       codeHash,
+		StorageIDBytes: storageIDBytes,
 	}
 }
 
-func (a *account) encode() ([]byte, error) {
+func (a *Account) Encode() ([]byte, error) {
 	return rlp.EncodeToBytes(a)
 }
 
-func decodeAccount(inp []byte) (*account, error) {
-	a := &account{}
+func DecodeAccount(inp []byte) (*Account, error) {
+	a := &Account{}
 	return a, rlp.DecodeBytes(inp, a)
 }
