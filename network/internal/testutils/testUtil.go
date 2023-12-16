@@ -96,7 +96,7 @@ func (tw *TagWatchingConnManager) Unprotect(id peer.ID, tag string) bool {
 }
 
 // NewTagWatchingConnManager creates a new TagWatchingConnManager with the given config. It returns an error if the config is invalid.
-func NewTagWatchingConnManager(log zerolog.Logger, metrics module.LibP2PConnectionMetrics, config *netconf.ConnectionManagerConfig) (*TagWatchingConnManager, error) {
+func NewTagWatchingConnManager(log zerolog.Logger, metrics module.LibP2PConnectionMetrics, config *netconf.ConnectionManager) (*TagWatchingConnManager, error) {
 	cm, err := connection.NewConnManager(log, metrics, config)
 	if err != nil {
 		return nil, fmt.Errorf("could not create connection manager: %w", err)

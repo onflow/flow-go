@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/hashicorp/go-multierror"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	kbucket "github.com/libp2p/go-libp2p-kbucket"
@@ -64,29 +65,42 @@ type Node struct {
 	// Cache of temporary disallow-listed peers, when a peer is disallow-listed, the connections to that peer
 	// are closed and further connections are not allowed till the peer is removed from the disallow-list.
 	disallowListedCache p2p.DisallowListCache
+	parameters          *p2p.NodeParameters
 }
 
 // NewNode creates a new libp2p node and sets its parameters.
-func NewNode(
-	logger zerolog.Logger,
-	host host.Host,
-	pCache p2p.ProtocolPeerCache,
-	peerManager p2p.PeerManager,
-	disallowLstCacheCfg *p2p.DisallowListCacheConfig,
-) *Node {
+// Args:
+//   - cfg: The configuration for the libp2p node.
+//
+// Returns:
+//   - *Node: The created libp2p node.
+//
+// - error: An error, if any occurred during the process. This includes failure in creating the node. The returned error is irrecoverable, and the node cannot be used.
+func NewNode(cfg *p2p.NodeConfig) (*Node, error) {
+	err := validator.New().Struct(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("invalid config: %w", err)
+	}
+
+	pCache, err := internal.NewProtocolPeerCache(cfg.Logger, cfg.Host)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create protocol peer cache: %w", err)
+	}
+
 	return &Node{
-		host:        host,
-		logger:      logger.With().Str("component", "libp2p-node").Logger(),
+		host:        cfg.Host,
+		logger:      cfg.Logger.With().Str("component", "libp2p-node").Logger(),
 		topics:      make(map[channels.Topic]p2p.Topic),
 		subs:        make(map[channels.Topic]p2p.Subscription),
 		pCache:      pCache,
-		peerManager: peerManager,
+		peerManager: cfg.PeerManager,
+		parameters:  cfg.Parameters,
 		disallowListedCache: internal.NewDisallowListCache(
-			disallowLstCacheCfg.MaxSize,
-			logger.With().Str("module", "disallow-list-cache").Logger(),
-			disallowLstCacheCfg.Metrics,
+			cfg.DisallowListCacheCfg.MaxSize,
+			cfg.Logger.With().Str("module", "disallow-list-cache").Logger(),
+			cfg.DisallowListCacheCfg.Metrics,
 		),
-	}
+	}, nil
 }
 
 func (n *Node) Start(ctx irrecoverable.SignalerContext) {
@@ -176,8 +190,7 @@ func (n *Node) GetPeersForProtocol(pid protocol.ID) peer.IDSlice {
 	return peers
 }
 
-// OpenProtectedStream opens a new stream to a peer with a protection tag. The protection tag can be used to ensure
-// that the connection to the peer is maintained for a particular purpose. The stream is opened to the given peerID
+// OpenAndWriteOnStream opens a new stream to a peer. The stream is opened to the given peerID
 // and writingLogic is executed on the stream. The created stream does not need to be reused and can be inexpensively
 // created for each send. Moreover, the stream creation does not incur a round-trip time as the stream negotiation happens
 // on an existing connection.
@@ -194,9 +207,14 @@ func (n *Node) GetPeersForProtocol(pid protocol.ID) peer.IDSlice {
 // error: An error, if any occurred during the process. This includes failure in creating the stream, setting the write
 // deadline, executing the writing logic, resetting the stream if the writing logic fails, or closing the stream.
 // All returned errors during this process can be considered benign.
-func (n *Node) OpenProtectedStream(ctx context.Context, peerID peer.ID, protectionTag string, writingLogic func(stream libp2pnet.Stream) error) error {
-	n.host.ConnManager().Protect(peerID, protectionTag)
-	defer n.host.ConnManager().Unprotect(peerID, protectionTag)
+func (n *Node) OpenAndWriteOnStream(ctx context.Context, peerID peer.ID, protectionTag string, writingLogic func(stream libp2pnet.Stream) error) error {
+	lg := n.logger.With().Str("remote_peer_id", p2plogging.PeerId(peerID)).Logger()
+	if n.parameters.EnableProtectedStreams {
+		n.host.ConnManager().Protect(peerID, protectionTag)
+		defer n.host.ConnManager().Unprotect(peerID, protectionTag)
+		lg = lg.With().Str("protection_tag", protectionTag).Logger()
+		lg.Trace().Msg("attempting to create protected stream")
+	}
 
 	// streams don't need to be reused and are fairly inexpensive to be created for each send.
 	// A stream creation does NOT incur an RTT as stream negotiation happens on an existing connection.
@@ -204,12 +222,14 @@ func (n *Node) OpenProtectedStream(ctx context.Context, peerID peer.ID, protecti
 	if err != nil {
 		return fmt.Errorf("failed to create stream for %s: %w", peerID, err)
 	}
+	lg.Trace().Msg("successfully created stream")
 
 	deadline, _ := ctx.Deadline()
 	err = s.SetWriteDeadline(deadline)
 	if err != nil {
 		return fmt.Errorf("failed to set write deadline for stream: %w", err)
 	}
+	lg.Trace().Msg("successfully set write deadline on stream")
 
 	err = writingLogic(s)
 	if err != nil {
@@ -224,12 +244,14 @@ func (n *Node) OpenProtectedStream(ctx context.Context, peerID peer.ID, protecti
 
 		return fmt.Errorf("writing logic failed for %s: %w", peerID, err)
 	}
+	lg.Trace().Msg("successfully wrote on stream")
 
 	// close the stream immediately
 	err = s.Close()
 	if err != nil {
 		return fmt.Errorf("failed to close the stream for %s: %w", peerID, err)
 	}
+	lg.Trace().Msg("successfully closed stream")
 
 	return nil
 }
@@ -556,6 +578,15 @@ func (n *Node) SetPubSub(ps p2p.PubSubAdapter) {
 	}
 
 	n.pubSub = ps
+}
+
+// GetLocalMeshPeers returns the list of peers in the local mesh for the given topic.
+// Args:
+// - topic: the topic.
+// Returns:
+// - []peer.ID: the list of peers in the local mesh for the given topic.
+func (n *Node) GetLocalMeshPeers(topic channels.Topic) []peer.ID {
+	return n.pubSub.GetLocalMeshPeers(topic)
 }
 
 // SetComponentManager sets the component manager for the node.

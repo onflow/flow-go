@@ -541,9 +541,10 @@ func trieRegistersPayloadComparer(t *testing.T, triePayloads []*ledger.Payload, 
 }
 
 func TestIndexerIntegration_StoreAndGet(t *testing.T) {
-	regOwner := "f8d6e0586b0a20c7"
+	regOwnerAddress := unittest.RandomAddressFixture()
+	regOwner := string(regOwnerAddress.Bytes())
 	regKey := "code"
-	registerID := flow.NewRegisterID(regOwner, regKey)
+	registerID := flow.NewRegisterID(regOwnerAddress, regKey)
 
 	db, dbDir := unittest.TempBadgerDB(t)
 	t.Cleanup(func() {
@@ -561,13 +562,13 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 
 			values := [][]byte{[]byte("1"), []byte("1"), []byte("2"), []byte("3"), []byte("4")}
 			for i, val := range values {
-				testDesc := fmt.Sprintf("test itteration number %d failed with test value %s", i, val)
+				testDesc := fmt.Sprintf("test iteration number %d failed with test value %s", i, val)
 				height := uint64(i + 1)
 				err := storeRegisterWithValue(index, height, regOwner, regKey, val)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				results, err := index.RegisterValue(registerID, height)
-				require.Nil(t, err, testDesc)
+				require.NoError(t, err, testDesc)
 				assert.Equal(t, val, results)
 			}
 		})

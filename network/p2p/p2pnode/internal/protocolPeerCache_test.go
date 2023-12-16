@@ -1,4 +1,4 @@
-package p2pnode_test
+package internal_test
 
 import (
 	"context"
@@ -14,7 +14,7 @@ import (
 
 	fcrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
-	"github.com/onflow/flow-go/network/p2p/p2pnode"
+	"github.com/onflow/flow-go/network/p2p/p2pnode/internal"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -25,7 +25,7 @@ func TestProtocolPeerCache(t *testing.T) {
 	// create three hosts, and a pcache for the first
 	h1, err := p2pbuilder.DefaultLibP2PHost(unittest.DefaultAddress, unittest.KeyFixture(fcrypto.ECDSASecp256k1))
 	require.NoError(t, err)
-	pcache, err := p2pnode.NewProtocolPeerCache(zerolog.Nop(), h1)
+	pcache, err := internal.NewProtocolPeerCache(zerolog.Nop(), h1)
 	require.NoError(t, err)
 	h2, err := p2pbuilder.DefaultLibP2PHost(unittest.DefaultAddress, unittest.KeyFixture(fcrypto.ECDSASecp256k1))
 	require.NoError(t, err)
