@@ -118,11 +118,11 @@ func TestRetrieveEventByBlockIDTxID(t *testing.T) {
 // Event retrieval does not guarantee any order,
 // hence a sort function with a an event oredr to help compare expected and actual events
 func sortEvent(events []flow.Event) {
-	slices.SortFunc(events, func(i, j int) int {
-		tComp := bytes.Compare(events[i].TransactionID[:], events[j].TransactionID[:])
+	slices.SortFunc(events, func(i, j flow.Event) int {
+		tComp := bytes.Compare(i.TransactionID[:], j.TransactionID[:])
 		if tComp != 0 {
 			return tComp
 		}
-		return int(events[i].EventIndex) - int(events[j].EventIndex)
+		return int(i.EventIndex) - int(j.EventIndex)
 	})
 }
