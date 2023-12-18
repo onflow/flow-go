@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func createByteArray(size int) []byte {
@@ -23,12 +24,12 @@ func TestExecutionState_Finalize(t *testing.T) {
 
 	child := parent.NewChild()
 
-	readId := flow.NewRegisterID("0", "x")
+	readId := flow.NewRegisterID(unittest.RandomAddressFixture(), "x")
 
 	_, err := child.Get(readId)
 	require.NoError(t, err)
 
-	writeId := flow.NewRegisterID("1", "y")
+	writeId := flow.NewRegisterID(unittest.RandomAddressFixture(), "y")
 	writeValue := flow.RegisterValue("a")
 
 	err = child.Set(writeId, writeValue)
@@ -65,8 +66,10 @@ func TestExecutionState_Finalize(t *testing.T) {
 func TestExecutionState_ChildMergeFunctionality(t *testing.T) {
 	st := state.NewExecutionState(nil, state.DefaultParameters())
 
+	owner := unittest.RandomAddressFixture()
+
 	t.Run("test read from parent state (backoff)", func(t *testing.T) {
-		key := flow.NewRegisterID("address", "key1")
+		key := flow.NewRegisterID(owner, "key1")
 		value := createByteArray(1)
 		// set key1 on parent
 		err := st.Set(key, value)
@@ -80,7 +83,7 @@ func TestExecutionState_ChildMergeFunctionality(t *testing.T) {
 	})
 
 	t.Run("test write to child (no merge)", func(t *testing.T) {
-		key := flow.NewRegisterID("address", "key2")
+		key := flow.NewRegisterID(owner, "key2")
 		value := createByteArray(2)
 		stChild := st.NewChild()
 
@@ -95,7 +98,7 @@ func TestExecutionState_ChildMergeFunctionality(t *testing.T) {
 	})
 
 	t.Run("test write to child and merge", func(t *testing.T) {
-		key := flow.NewRegisterID("address", "key3")
+		key := flow.NewRegisterID(owner, "key3")
 		value := createByteArray(3)
 		stChild := st.NewChild()
 
@@ -119,7 +122,7 @@ func TestExecutionState_ChildMergeFunctionality(t *testing.T) {
 	})
 
 	t.Run("test write to ledger", func(t *testing.T) {
-		key := flow.NewRegisterID("address", "key4")
+		key := flow.NewRegisterID(owner, "key4")
 		value := createByteArray(4)
 		// set key4 on parent
 		err := st.Set(key, value)
@@ -138,7 +141,7 @@ func TestExecutionState_MaxValueSize(t *testing.T) {
 		nil,
 		state.DefaultParameters().WithMaxValueSizeAllowed(6))
 
-	key := flow.NewRegisterID("address", "key")
+	key := flow.NewRegisterID(unittest.RandomAddressFixture(), "key")
 
 	// update should pass
 	value := createByteArray(5)
@@ -157,8 +160,8 @@ func TestExecutionState_MaxKeySize(t *testing.T) {
 		// Note: owners are always 8 bytes
 		state.DefaultParameters().WithMaxKeySizeAllowed(8+2))
 
-	key1 := flow.NewRegisterID("1", "23")
-	key2 := flow.NewRegisterID("123", "234")
+	key1 := flow.NewRegisterID(unittest.RandomAddressFixture(), "23")
+	key2 := flow.NewRegisterID(unittest.RandomAddressFixture(), "234")
 
 	// read
 	_, err := st.Get(key1)
@@ -179,19 +182,19 @@ func TestExecutionState_MaxKeySize(t *testing.T) {
 }
 
 func TestExecutionState_MaxInteraction(t *testing.T) {
-	key1 := flow.NewRegisterID("1", "2")
+	key1 := flow.NewRegisterID(unittest.RandomAddressFixture(), "2")
 	key1Size := uint64(8 + 1)
 
 	value1 := []byte("A")
 	value1Size := uint64(1)
 
-	key2 := flow.NewRegisterID("123", "23")
+	key2 := flow.NewRegisterID(unittest.RandomAddressFixture(), "23")
 	key2Size := uint64(8 + 2)
 
-	key3 := flow.NewRegisterID("234", "345")
+	key3 := flow.NewRegisterID(unittest.RandomAddressFixture(), "345")
 	key3Size := uint64(8 + 3)
 
-	key4 := flow.NewRegisterID("3", "4567")
+	key4 := flow.NewRegisterID(unittest.RandomAddressFixture(), "4567")
 	key4Size := uint64(8 + 4)
 
 	st := state.NewExecutionState(

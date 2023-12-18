@@ -8,34 +8,43 @@ network-config:
   preferred-unicast-protocols: [ ]
   received-message-cache-size: 10_000
   peerupdate-interval: 10m
-  unicast-message-timeout: 5s
-  # Unicast create stream retry delay is initial delay used in the exponential backoff for create stream retries
-  unicast-create-stream-retry-delay: 1s
+
   dns-cache-ttl: 5m
   # The size of the queue for notifications about new peers in the disallow list.
   disallow-list-notification-cache-size: 100
-  # unicast rate limiters config
-  # Setting this to true will disable connection disconnects and gating when unicast rate limiters are configured
-  unicast-dry-run: true
-  # The number of seconds a peer will be forced to wait before being allowed to successfully reconnect to the node after being rate limited
-  unicast-lockout-duration: 10s
-  # Amount of unicast messages that can be sent by a peer per second
-  unicast-message-rate-limit: 0
-  # Bandwidth size in bytes a peer is allowed to send via unicast streams per second
-  unicast-bandwidth-rate-limit: 0
-  # Bandwidth size in bytes a peer is allowed to send via unicast streams at once
-  unicast-bandwidth-burst-limit: 1e9
-  # The minimum number of consecutive successful streams to reset the unicast stream creation retry budget from zero to the maximum default. If it is set to 100 for example, it
-  # means that if a peer has 100 consecutive successful streams to the remote peer, and the remote peer has a zero stream creation budget,
-  # the unicast stream creation retry budget for that remote peer will be reset to the maximum default.
-  unicast-stream-zero-retry-reset-threshold: 100
-  # The maximum number of retry attempts for creating a unicast stream to a remote peer before giving up. If it is set to 3 for example, it means that if a peer fails to create
-  # retry a unicast stream to a remote peer 3 times, the peer will give up and will not retry creating a unicast stream to that remote peer.
-  # When it is set to zero it means that the peer will not retry creating a unicast stream to a remote peer if it fails.
-  unicast-max-stream-creation-retry-attempt-times: 3
-  # The size of the dial config cache used to keep track of the dial config for each remote peer. The dial config is used to keep track of the dial retry budget for each remote peer.
-  # Recommended to set it to the maximum number of remote peers in the network.
-  unicast-dial-config-cache-size: 10_000
+  unicast:
+    rate-limiter:
+      # Setting this to true will disable connection disconnects and gating when unicast rate limiters are configured
+      dry-run: true
+      # The number of seconds a peer will be forced to wait before being allowed to successfully reconnect to the node after being rate limited
+      lockout-duration: 10s
+      # Amount of unicast messages that can be sent by a peer per second
+      message-rate-limit: 0
+      # Bandwidth size in bytes a peer is allowed to send via unicast streams per second
+      bandwidth-rate-limit: 0
+      # Bandwidth size in bytes a peer is allowed to send via unicast streams at once
+      bandwidth-burst-limit: 1e9
+    manager:
+      # The minimum number of consecutive successful streams to reset the unicast stream creation retry budget from zero to the maximum default. If it is set to 100 for example, it
+      # means that if a peer has 100 consecutive successful streams to the remote peer, and the remote peer has a zero stream creation budget,
+      # the unicast stream creation retry budget for that remote peer will be reset to the maximum default.
+      stream-zero-retry-reset-threshold: 100
+      # The maximum number of retry attempts for creating a unicast stream to a remote peer before giving up. If it is set to 3 for example, it means that if a peer fails to create
+      # retry a unicast stream to a remote peer 3 times, the peer will give up and will not retry creating a unicast stream to that remote peer.
+      # When it is set to zero it means that the peer will not retry creating a unicast stream to a remote peer if it fails.
+      max-stream-creation-retry-attempt-times: 3
+      # The size of the dial config cache used to keep track of the dial config for each remote peer. The dial config is used to keep track of the dial retry budget for each remote peer.
+      # Recommended to set it to the maximum number of remote peers in the network.
+      dial-config-cache-size: 10_000
+      # Unicast create stream retry delay is initial delay used in the exponential backoff for create stream retries
+      create-stream-retry-delay: 1s
+    message-timeout: 5s
+    # Enable stream protection for unicast streams; when enabled, all connections that are being established or
+    #	have been already established for unicast streams are protected, meaning that they won't be closed by the connection manager.
+    #	This is useful for preventing the connection manager from closing unicast streams that are being used by the application layer.
+    #	However, it may interfere with the resource manager of libp2p, i.e., the connection manager may not be able to close connections
+    #	that are not being used by the application layer while at the same time the node is running out of resources for new connections.
+    enable-stream-protection: true
   # Resource manager config
   libp2p-resource-manager:
     # Maximum allowed fraction of file descriptors to be allocated by the libp2p resources in [0,1]
@@ -97,112 +106,148 @@ network-config:
         connections-outbound: 0 # no-override, use default
         fd: 0 # no-override, use default
         memory-bytes: 0 # no-override, use default
-  # Connection manager config
-  # HighWatermark and LowWatermark govern the number of connections are maintained by the ConnManager.
-  # When the peer count exceeds the HighWatermark, as many peers will be pruned (and
-  # their connections terminated) until LowWatermark peers remain. In other words, whenever the
-  # peer count is x > HighWatermark, the ConnManager will prune x - LowWatermark peers.
-  # The pruning algorithm is as follows:
-  # 1. The ConnManager will not prune any peers that have been connected for less than GracePeriod.
-  # 2. The ConnManager will not prune any peers that are protected.
-  # 3. The ConnManager will sort the peers based on their number of streams and direction of connections, and
-  # prunes the peers with the least number of streams. If there are ties, the peer with the incoming connection
-  # will be pruned. If both peers have incoming connections, and there are still ties, one of the peers will be
-  # pruned at random.
-  # Algorithm implementation is in https://github.com/libp2p/go-libp2p/blob/master/p2p/net/connmgr/connmgr.go#L262-L318
-  libp2p-high-watermark: 500
-  libp2p-low-watermark: 450
-  # The time to wait before pruning a new connection
-  libp2p-silence-period: 10s
-  # The time to wait before start pruning connections
-  libp2p-grace-period: 1m
+  connection-manager:
+    # HighWatermark and LowWatermark govern the number of connections are maintained by the ConnManager.
+    # When the peer count exceeds the HighWatermark, as many peers will be pruned (and
+    # their connections terminated) until LowWatermark peers remain. In other words, whenever the
+    # peer count is x > HighWatermark, the ConnManager will prune x - LowWatermark peers.
+    # The pruning algorithm is as follows:
+    # 1. The ConnManager will not prune any peers that have been connected for less than GracePeriod.
+    # 2. The ConnManager will not prune any peers that are protected.
+    # 3. The ConnManager will sort the peers based on their number of streams and direction of connections, and
+    # prunes the peers with the least number of streams. If there are ties, the peer with the incoming connection
+    # will be pruned. If both peers have incoming connections, and there are still ties, one of the peers will be
+    # pruned at random.
+    # Algorithm implementation is in https://github.com/libp2p/go-libp2p/blob/master/p2p/net/connmgr/connmgr.go#L262-L318
+    # We assume number of nodes around 500, and each node is allowed to make at most 8 connections to each certain remote node,
+    # we hence set the high-watermark to 500 * 8 = 4000, and the low-watermark to 500 * (0.5 * 4) = 1000, this means that when the
+    # number of peers exceeds 4000, the connection manager will prune the peers with the least number of streams until the number of
+    # peers is reduced to 1000 assuming an average of 2 connections per peer.
+    high-watermark: 4000
+    low-watermark: 1000
+    # The silence period is a regular interval that the connection manager will check for pruning peers if the number of peers exceeds the high-watermark.
+    # it is a regular interval and 10s is the default libp2p value.
+    silence-period: 10s
+    # The time to wait before a new connection is considered for pruning.
+    grace-period: 1m
   # Gossipsub config
-  # The default interval at which the mesh tracer logs the mesh topology. This is used for debugging and forensics purposes.
-  #	Note that we purposefully choose this logging interval high enough to avoid spamming the logs. Moreover, the
-  #	mesh updates will be logged individually and separately. The logging interval is only used to log the mesh
-  #	topology as a whole specially when there are no updates to the mesh topology for a long time.
-  gossipsub-local-mesh-logging-interval: 1m
-  # The default interval at which the gossipsub score tracer logs the peer scores. This is used for debugging and forensics purposes.
-  #	Note that we purposefully choose this logging interval high enough to avoid spamming the logs.
-  gossipsub-score-tracer-interval: 1m
-  # The default RPC sent tracker cache size. The RPC sent tracker is used to track RPC control messages sent from the local node.
-  # Note: this cache size must be large enough to keep a history of sent messages in a reasonable time window of past history.
-  gossipsub-rpc-sent-tracker-cache-size: 1_000_000
-  # Cache size of the rpc sent tracker queue used for async tracking.
-  gossipsub-rpc-sent-tracker-queue-cache-size: 100_000
-  # Number of workers for rpc sent tracker worker pool.
-  gossipsub-rpc-sent-tracker-workers: 5
-  # Peer scoring is the default value for enabling peer scoring
-  gossipsub-peer-scoring-enabled: true
-  # The interval for updating the list of subscribed peers to all topics in gossipsub. This is used to keep track of subscriptions
-  # violations and penalize peers accordingly. Recommended value is in the order of a few minutes to avoid contentions; as the operation
-  # reads all topics and all peers subscribed to each topic.
-  gossipsub-subscription-provider-update-interval: 10m
-  # The size of cache for keeping the list of all peers subscribed to each topic (same as the local node). This cache is the local node's
-  # view of the network and is used to detect subscription violations and penalize peers accordingly. Recommended to be big enough to
-  # keep the entire network's size. Otherwise, the local node's view of the network will be incomplete due to cache eviction.
-  # Recommended size is 10x the number of peers in the network.
-  gossipsub-subscription-provider-cache-size: 10000
-
-  # Gossipsub rpc inspectors configs
-  # The size of the queue for notifications about invalid RPC messages
-  gossipsub-rpc-inspector-notification-cache-size: 10_000
-  # RPC control message validation inspector configs
-  # Rpc validation inspector number of pool workers
-  gossipsub-rpc-validation-inspector-workers: 5
-  # Max number of ihave messages in a sample to be inspected. If the number of ihave messages exceeds this configured value
-  # the control message ihaves will be truncated to the max sample size. This sample is randomly selected.
-  gossipsub-rpc-ihave-max-sample-size: 1000
-  # Max number of ihave message ids in a sample to be inspected per ihave. Each ihave message includes a list of message ids
-  # each. If the size of the message ids list for a single ihave message exceeds the configured max message id sample size the list of message ids will be truncated.
-  gossipsub-rpc-ihave-max-message-id-sample-size: 1000
-  # Max number of control messages in a sample to be inspected when inspecting GRAFT and PRUNE message types. If the total number of control messages (GRAFT or PRUNE)
-  # exceeds this max sample size then the respective message will be truncated before being processed.
-  gossipsub-rpc-graft-and-prune-message-max-sample-size: 1000
-  # Max number of iwant messages in a sample to be inspected. If the total number of iWant control messages
-  # exceeds this max sample size then the respective message will be truncated before being processed.
-  gossipsub-rpc-iwant-max-sample-size: 1000
-  # Max number of iwant message ids in a sample to be inspected per iwant. Each iwant message includes a list of message ids
-  # each, if the size of this list exceeds the configured max message id sample size the list of message ids will be truncated.
-  gossipsub-rpc-iwant-max-message-id-sample-size: 1000
-  # The allowed threshold of iWant messages received without a corresponding tracked iHave message that was sent. If the cache miss threshold is exceeded an
-  # invalid control message notification is disseminated and the sender will be penalized.
-  gossipsub-rpc-iwant-cache-miss-threshold: .5
-  # The iWants size at which message id cache misses will be checked.
-  gossipsub-rpc-iwant-cache-miss-check-size: 1000
-  # The max allowed duplicate message IDs in a single iWant control message. If the duplicate message threshold is exceeded an invalid control message
-  # notification is disseminated and the sender will be penalized.
-  gossipsub-rpc-iwant-duplicate-message-id-threshold: .15
-  # The size of the queue used by worker pool for the control message validation inspector
-  gossipsub-rpc-validation-inspector-queue-cache-size: 100
-  # Cluster prefixed control message validation configs
-  # The size of the cache used to track the amount of cluster prefixed topics received by peers
-  gossipsub-cluster-prefix-tracker-cache-size: 100
-  # The decay val used for the geometric decay of cache counters used to keep track of cluster prefixed topics received by peers
-  gossipsub-cluster-prefix-tracker-cache-decay: 0.99
-  # The upper bound on the amount of cluster prefixed control messages that will be processed
-  gossipsub-rpc-cluster-prefixed-hard-threshold: 100
-  # The max sample size used for RPC message validation. If the total number of RPC messages exceeds this value a sample will be taken but messages will not be truncated
-  gossipsub-rpc-message-max-sample-size: 1000
-  # The threshold at which an error will be returned if the number of invalid RPC messages exceeds this value
-  gossipsub-rpc-message-error-threshold: 500
-  # RPC metrics observer inspector configs
-  # The number of metrics inspector pool workers
-  gossipsub-rpc-metrics-inspector-workers: 1
-  # The size of the queue used by worker pool for the control message metrics inspector
-  gossipsub-rpc-metrics-inspector-cache-size: 100
-  # Threshold level for penalty. At each evaluation period, when a node's penalty is below this value, the decay rate slows down, ensuring longer decay periods for malicious nodes and quicker decay for honest ones.
-  gossipsub-app-specific-penalty-decay-slowdown-threshold: -99
-  # This setting adjusts the decay rate when a node's penalty falls below the threshold. The decay rate, ranging between 0 and 1, dictates how quickly penalties decrease: a higher rate results in slower decay. The decay calculation is multiplicative (newPenalty = decayRate * oldPenalty). The reduction factor increases the decay rate, thus decelerating the penalty reduction. For instance, with a 0.01 reduction factor, the decay rate increases by 0.01 at each evaluation interval when the penalty is below the threshold. Consequently, a decay rate of `x` diminishes the penalty to zero more rapidly than a rate of `x+0.01`.
-  gossipsub-app-specific-penalty-decay-rate-reduction-factor: .01
-  # Defines the frequency for evaluating and potentially adjusting the decay process of a spam record. At each interval, the system assesses the current penalty of a node. If this penalty is below the defined threshold, the decay rate is modified according to the reduction factor, slowing down the penalty reduction process. This reassessment at regular intervals ensures that the decay rate is dynamically adjusted to reflect the node's ongoing behavior, maintaining a balance between penalizing malicious activity and allowing recovery for honest nodes.
-  gossipsub-app-specific-penalty-decay-evaluation-period: 10m
+  gossipsub:
+    rpc-inspector:
+      # The size of the queue for notifications about invalid RPC messages
+      notification-cache-size: 10_000
+      validation: # RPC control message validation inspector configs
+        # Rpc validation inspector number of pool workers
+        workers: 5
+        # The size of the queue used by worker pool for the control message validation inspector
+        queue-size: 100
+        # The max sample size used for RPC message validation. If the total number of RPC messages exceeds this value a sample will be taken but messages will not be truncated
+        message-max-sample-size: 1000
+        # Max number of control messages in a sample to be inspected when inspecting GRAFT and PRUNE message types. If the total number of control messages (GRAFT or PRUNE)
+        # exceeds this max sample size then the respective message will be truncated before being processed.
+        graft-and-prune-message-max-sample-size: 1000
+        # The threshold at which an error will be returned if the number of invalid RPC messages exceeds this value
+        error-threshold: 500
+        ihave: # Max number of ihave messages in a sample to be inspected. If the number of ihave messages exceeds this configured value
+          # the control message ihaves will be truncated to the max sample size. This sample is randomly selected.
+          max-sample-size: 1000
+          # Max number of ihave message ids in a sample to be inspected per ihave. Each ihave message includes a list of message ids
+          # each. If the size of the message ids list for a single ihave message exceeds the configured max message id sample size the list of message ids will be truncated.
+          max-message-id-sample-size: 1000
+        iwant:
+          # Max number of iwant messages in a sample to be inspected. If the total number of iWant control messages
+          # exceeds this max sample size then the respective message will be truncated before being processed.
+          max-sample-size: 1000
+          # Max number of iwant message ids in a sample to be inspected per iwant. Each iwant message includes a list of message ids
+          # each, if the size of this list exceeds the configured max message id sample size the list of message ids will be truncated.
+          max-message-id-sample-size: 1000
+          # The allowed threshold of iWant messages received without a corresponding tracked iHave message that was sent. If the cache miss threshold is exceeded an
+          # invalid control message notification is disseminated and the sender will be penalized.
+          cache-miss-threshold: .5
+          # The iWants size at which message id cache misses will be checked.
+          cache-miss-check-size: 1000
+          # The max allowed duplicate message IDs in a single iWant control message. If the duplicate message threshold is exceeded an invalid control message
+          # notification is disseminated and the sender will be penalized.
+          duplicate-message-id-threshold: .15
+        cluster-prefixed-messages:
+          # Cluster prefixed control message validation configs
+          # The size of the cache used to track the amount of cluster prefixed topics received by peers
+          tracker-cache-size: 100
+          # The decay val used for the geometric decay of cache counters used to keep track of cluster prefixed topics received by peers
+          tracker-cache-decay: 0.99
+          # The upper bound on the amount of cluster prefixed control messages that will be processed
+          hard-threshold: 100
+      metrics:
+        # RPC metrics observer inspector configs
+        # The number of metrics inspector pool workers
+        workers: 1
+        # The size of the queue used by worker pool for the control message metrics inspector
+        cache-size: 100
+    rpc-tracer:
+      # The default interval at which the mesh tracer logs the mesh topology. This is used for debugging and forensics purposes.
+      #	Note that we purposefully choose this logging interval high enough to avoid spamming the logs. Moreover, the
+      #	mesh updates will be logged individually and separately. The logging interval is only used to log the mesh
+      #	topology as a whole specially when there are no updates to the mesh topology for a long time.
+      local-mesh-logging-interval: 1m
+      # The default interval at which the gossipsub score tracer logs the peer scores. This is used for debugging and forensics purposes.
+      #	Note that we purposefully choose this logging interval high enough to avoid spamming the logs.
+      score-tracer-interval: 1m
+      # The default RPC sent tracker cache size. The RPC sent tracker is used to track RPC control messages sent from the local node.
+      # Note: this cache size must be large enough to keep a history of sent messages in a reasonable time window of past history.
+      rpc-sent-tracker-cache-size: 1_000_000
+      # Cache size of the rpc sent tracker queue used for async tracking.
+      rpc-sent-tracker-queue-cache-size: 100_000
+      # Number of workers for rpc sent tracker worker pool.
+      rpc-sent-tracker-workers: 5
+      # Peer scoring is the default value for enabling peer scoring
+    peer-scoring-enabled: true
+    scoring-parameters:
+      app-specific-score:
+        # number of workers that asynchronously update the app specific score requests when they are expired.
+        score-update-worker-num: 5
+        # size of the queue used by the worker pool for the app specific score update requests. The queue is used to buffer the app specific score update requests
+        # before they are processed by the worker pool. The queue size must be larger than total number of peers in the network.
+        # The queue is deduplicated based on the peer ids ensuring that there is only one app specific score update request per peer in the queue.
+        score-update-request-queue-size: 10_000
+        # score ttl is the time to live for the app specific score. Once the score is expired; a new request will be sent to the app specific score provider to update the score.
+        # until the score is updated, the previous score will be used.
+        score-ttl: 1m
+      spam-record-cache:
+        # size of cache used to track spam records at gossipsub. Each peer id is mapped to a spam record that keeps track of the spam score for that peer.
+        # cache should be big enough to keep track of the entire network's size. Otherwise, the local node's view of the network will be incomplete due to cache eviction.
+        cache-size: 10_000
+        # Threshold level for spam record penalty.
+        # At each evaluation period, when a node's penalty is below this value, the decay rate slows down, ensuring longer decay periods for malicious nodes and quicker decay for honest ones.
+        penalty-decay-slowdown-threshold: -99
+        # This setting adjusts the decay rate when a node's penalty falls below the threshold.
+        # The decay rate, ranging between 0 and 1, dictates how quickly penalties decrease: a higher rate results in slower decay.
+        # The decay calculation is multiplicative (newPenalty = decayRate * oldPenalty).
+        # The reduction factor increases the decay rate, thus decelerating the penalty reduction. For instance, with a 0.01 reduction factor,
+        # the decay rate increases by 0.01 at each evaluation interval when the penalty is below the threshold.
+        # Consequently, a decay rate of `x` diminishes the penalty to zero more rapidly than a rate of `x+0.01`.
+        penalty-decay-rate-reduction-factor: 0.01
+        # Defines the frequency for evaluating and potentially adjusting the decay process of a spam record.
+        # At each interval, the system assesses the current penalty of a node.
+        # If this penalty is below the defined threshold, the decay rate is modified according to the reduction factor, slowing down the penalty reduction process.
+        # This reassessment at regular intervals ensures that the decay rate is dynamically adjusted to reflect the node's ongoing behavior,
+        # maintaining a balance between penalizing malicious activity and allowing recovery for honest nodes.
+        penalty-decay-evaluation-period: 10m
+      # the intervals at which counters associated with a peer behavior in gossipsub system are decayed.
+      decay-interval: 1m
+    subscription-provider:
+      # The interval for updating the list of subscribed peers to all topics in gossipsub. This is used to keep track of subscriptions
+      # violations and penalize peers accordingly. Recommended value is in the order of a few minutes to avoid contentions; as the operation
+      # reads all topics and all peers subscribed to each topic.
+      update-interval: 10m
+      # The size of cache for keeping the list of all peers subscribed to each topic (same as the local node). This cache is the local node's
+      # view of the network and is used to detect subscription violations and penalize peers accordingly. Recommended to be big enough to
+      # keep the entire network's size. Otherwise, the local node's view of the network will be incomplete due to cache eviction.
+      # Recommended size is 10x the number of peers in the network.
+      cache-size: 10000
   # Application layer spam prevention
   alsp-spam-record-cache-size: 1000
   alsp-spam-report-queue-size: 10_000
   alsp-disable-penalty: false
   alsp-heart-beat-interval: 1s
-
   # Base probability in [0,1] that's used in creating the final probability of creating a
   # misbehavior report for a BatchRequest message. This is why the word "base" is used in the name of this field,
   # since it's not the final probability and there are other factors that determine the final probability.
@@ -219,7 +264,6 @@ network-config:
   # batchRequestBaseProb * (1000+1) / synccore.DefaultConfig().MaxSize
   # = 0.01 * 1001 / 64 = 0.15640625 = 15.640625%
   alsp-sync-engine-batch-request-base-prob: 0.01
-
   # Base probability in [0,1] that's used in creating the final probability of creating a
   # misbehavior report for a RangeRequest message. This is why the word "base" is used in the name of this field,
   # since it's not the final probability and there are other factors that determine the final probability.
@@ -237,7 +281,6 @@ network-config:
   # rangeRequestBaseProb * (1000+1) / synccore.DefaultConfig().MaxSize
   # = 0.01 * 1001 / 64 = 0.15640625 = 15.640625%
   alsp-sync-engine-range-request-base-prob: 0.01
-
   # Probability in [0,1] of creating a misbehavior report for a SyncRequest message.
   # create misbehavior report for 1% of SyncRequest messages
   alsp-sync-engine-sync-request-prob: 0.01

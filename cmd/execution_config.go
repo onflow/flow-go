@@ -73,7 +73,7 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	flags.StringVarP(&exeConf.rpcConf.ListenAddr, "rpc-addr", "i", "localhost:9000", "the address the gRPC server listens on")
 	flags.UintVar(&exeConf.rpcConf.MaxMsgSize, "rpc-max-message-size", grpcutils.DefaultMaxMsgSize, "the maximum message size in bytes for messages sent or received over grpc")
 	flags.BoolVar(&exeConf.rpcConf.RpcMetricsEnabled, "rpc-metrics-enabled", false, "whether to enable the rpc metrics")
-	flags.StringVar(&exeConf.triedir, "triedir", datadir, "directory to store the execution State")
+	flags.StringVar(&exeConf.triedir, "triedir", filepath.Join(datadir, "trie"), "directory to store the execution State")
 	flags.StringVar(&exeConf.executionDataDir, "execution-data-dir", filepath.Join(datadir, "execution_data"), "directory to use for storing Execution Data")
 	flags.StringVar(&exeConf.registerDir, "register-dir", filepath.Join(datadir, "register"), "directory to use for storing registers Data")
 	flags.Uint32Var(&exeConf.mTrieCacheSize, "mtrie-cache-size", 500, "cache size for MTrie")

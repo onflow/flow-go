@@ -41,7 +41,7 @@ type ControlMsgValidationInspector struct {
 	sporkID flow.Identifier
 	metrics module.GossipSubRpcValidationInspectorMetrics
 	// config control message validation configurations.
-	config *p2pconf.GossipSubRPCValidationInspectorConfigs
+	config *p2pconf.RpcValidationInspector
 	// distributor used to disseminate invalid RPC message notifications.
 	distributor p2p.GossipSubInspectorNotifDistributor
 	// workerPool queue that stores *InspectRPCRequest that will be processed by component workers.
@@ -69,7 +69,7 @@ type InspectorParams struct {
 	// SporkID the current spork ID.
 	SporkID flow.Identifier `validate:"required"`
 	// Config inspector configuration.
-	Config *p2pconf.GossipSubRPCValidationInspectorConfigs `validate:"required"`
+	Config *p2pconf.RpcValidationInspector `validate:"required"`
 	// Distributor gossipsub inspector notification distributor.
 	Distributor p2p.GossipSubInspectorNotifDistributor `validate:"required"`
 	// HeroCacheMetricsFactory the metrics factory.
@@ -109,17 +109,17 @@ func NewControlMsgValidationInspector(params *InspectorParams) (*ControlMsgValid
 	clusterPrefixedCacheCollector := metrics.GossipSubRPCInspectorClusterPrefixedCacheMetricFactory(params.HeroCacheMetricsFactory, params.NetworkingType)
 
 	clusterPrefixedTracker, err := cache.NewClusterPrefixedMessagesReceivedTracker(params.Logger,
-		params.Config.ClusterPrefixedControlMsgsReceivedCacheSize,
+		params.Config.ClusterPrefixedMessage.ControlMsgsReceivedCacheSize,
 		clusterPrefixedCacheCollector,
-		params.Config.ClusterPrefixedControlMsgsReceivedCacheDecay)
+		params.Config.ClusterPrefixedMessage.ControlMsgsReceivedCacheDecay)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cluster prefix topics received tracker")
 	}
 
-	if params.Config.RpcMessageMaxSampleSize < params.Config.RpcMessageErrorThreshold {
+	if params.Config.MessageMaxSampleSize < params.Config.MessageErrorThreshold {
 		return nil, fmt.Errorf("rpc message max sample size must be greater than or equal to rpc message error threshold, got %d and %d respectively",
-			params.Config.RpcMessageMaxSampleSize,
-			params.Config.RpcMessageErrorThreshold)
+			params.Config.MessageMaxSampleSize,
+			params.Config.MessageErrorThreshold)
 	}
 
 	c := &ControlMsgValidationInspector{
@@ -135,7 +135,7 @@ func NewControlMsgValidationInspector(params *InspectorParams) (*ControlMsgValid
 		topicOracle:    params.TopicOracle,
 	}
 
-	store := queue.NewHeroStore(params.Config.CacheSize, params.Logger, inspectMsgQueueCacheCollector)
+	store := queue.NewHeroStore(params.Config.QueueSize, params.Logger, inspectMsgQueueCacheCollector)
 
 	pool := worker.NewWorkerPoolBuilder[*InspectRPCRequest](lg, store, c.processInspectRPCReq).Build()
 
@@ -351,7 +351,7 @@ func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihave
 	lg := c.logger.With().
 		Str("peer_id", p2plogging.PeerId(from)).
 		Int("sample_size", len(ihaves)).
-		Int("max_sample_size", c.config.IHaveRPCInspectionConfig.MaxSampleSize).
+		Int("max_sample_size", c.config.IHave.MaxSampleSize).
 		Logger()
 	duplicateTopicTracker := make(duplicateStrTracker)
 	duplicateMessageIDTracker := make(duplicateStrTracker)
@@ -399,16 +399,16 @@ func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWant
 	lastHighest := c.rpcTracker.LastHighestIHaveRPCSize()
 	lg := c.logger.With().
 		Str("peer_id", p2plogging.PeerId(from)).
-		Uint("max_sample_size", c.config.IWantRPCInspectionConfig.MaxSampleSize).
+		Uint("max_sample_size", c.config.IWant.MaxSampleSize).
 		Int64("last_highest_ihave_rpc_size", lastHighest).
 		Logger()
 	sampleSize := uint(len(iWants))
 	tracker := make(duplicateStrTracker)
 	cacheMisses := 0
-	allowedCacheMissesThreshold := float64(sampleSize) * c.config.IWantRPCInspectionConfig.CacheMissThreshold
+	allowedCacheMissesThreshold := float64(sampleSize) * c.config.IWant.CacheMissThreshold
 	duplicates := 0
-	allowedDuplicatesThreshold := float64(sampleSize) * c.config.IWantRPCInspectionConfig.DuplicateMsgIDThreshold
-	checkCacheMisses := len(iWants) >= c.config.IWantRPCInspectionConfig.CacheMissCheckSize
+	allowedDuplicatesThreshold := float64(sampleSize) * c.config.IWant.DuplicateMsgIDThreshold
+	checkCacheMisses := len(iWants) >= c.config.IWant.CacheMissCheckSize
 	lg = lg.With().
 		Uint("iwant_sample_size", sampleSize).
 		Float64("allowed_cache_misses_threshold", allowedCacheMissesThreshold).
@@ -425,7 +425,7 @@ func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWant
 			if tracker.isDuplicate(messageID) {
 				duplicates++
 				if float64(duplicates) > allowedDuplicatesThreshold {
-					return NewIWantDuplicateMsgIDThresholdErr(duplicates, messageIDCount, c.config.IWantRPCInspectionConfig.DuplicateMsgIDThreshold)
+					return NewIWantDuplicateMsgIDThresholdErr(duplicates, messageIDCount, c.config.IWant.DuplicateMsgIDThreshold)
 				}
 			}
 			// check cache miss threshold
@@ -433,7 +433,7 @@ func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWant
 				cacheMisses++
 				if checkCacheMisses {
 					if float64(cacheMisses) > allowedCacheMissesThreshold {
-						return NewIWantCacheMissThresholdErr(cacheMisses, messageIDCount, c.config.IWantRPCInspectionConfig.CacheMissThreshold)
+						return NewIWantCacheMissThresholdErr(cacheMisses, messageIDCount, c.config.IWant.CacheMissThreshold)
 					}
 				}
 			}
@@ -468,7 +468,7 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 	if totalMessages == 0 {
 		return nil, 0
 	}
-	sampleSize := c.config.RpcMessageMaxSampleSize
+	sampleSize := c.config.MessageMaxSampleSize
 	if sampleSize > totalMessages {
 		sampleSize = totalMessages
 	}
@@ -511,7 +511,7 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 	}
 
 	// return an error when we exceed the error threshold
-	if errs != nil && errs.Len() > c.config.RpcMessageErrorThreshold {
+	if errs != nil && errs.Len() > c.config.MessageErrorThreshold {
 		return NewInvalidRpcPublishMessagesErr(errs.ErrorOrNil(), errs.Len()), uint64(errs.Len())
 	}
 
@@ -590,7 +590,7 @@ func (c *ControlMsgValidationInspector) truncateIHaveMessages(rpc *pubsub.RPC) {
 	if totalIHaves == 0 {
 		return
 	}
-	sampleSize := c.config.IHaveRPCInspectionConfig.MaxSampleSize
+	sampleSize := c.config.IHave.MaxSampleSize
 	if sampleSize > totalIHaves {
 		sampleSize = totalIHaves
 	}
@@ -613,7 +613,7 @@ func (c *ControlMsgValidationInspector) truncateIHaveMessageIds(rpc *pubsub.RPC)
 		if totalMessageIDs == 0 {
 			return
 		}
-		sampleSize := c.config.IHaveRPCInspectionConfig.MaxMessageIDSampleSize
+		sampleSize := c.config.IHave.MaxMessageIDSampleSize
 		if sampleSize > totalMessageIDs {
 			sampleSize = totalMessageIDs
 		}
@@ -634,7 +634,7 @@ func (c *ControlMsgValidationInspector) truncateIWantMessages(from peer.ID, rpc 
 	if totalIWants == 0 {
 		return
 	}
-	sampleSize := c.config.IWantRPCInspectionConfig.MaxSampleSize
+	sampleSize := c.config.IWant.MaxSampleSize
 	if sampleSize > totalIWants {
 		sampleSize = totalIWants
 	}
@@ -653,15 +653,15 @@ func (c *ControlMsgValidationInspector) truncateIWantMessageIds(from peer.ID, rp
 	lastHighest := c.rpcTracker.LastHighestIHaveRPCSize()
 	lg := c.logger.With().
 		Str("peer_id", p2plogging.PeerId(from)).
-		Uint("max_sample_size", c.config.IWantRPCInspectionConfig.MaxSampleSize).
+		Uint("max_sample_size", c.config.IWant.MaxSampleSize).
 		Int64("last_highest_ihave_rpc_size", lastHighest).
 		Logger()
 
 	sampleSize := int(10 * lastHighest)
-	if sampleSize == 0 || sampleSize > c.config.IWantRPCInspectionConfig.MaxMessageIDSampleSize {
+	if sampleSize == 0 || sampleSize > c.config.IWant.MaxMessageIDSampleSize {
 		// invalid or 0 sample size is suspicious
 		lg.Warn().Str(logging.KeySuspicious, "true").Msg("zero or invalid sample size, using default max sample size")
-		sampleSize = c.config.IWantRPCInspectionConfig.MaxMessageIDSampleSize
+		sampleSize = c.config.IWant.MaxMessageIDSampleSize
 	}
 	for _, iWant := range rpc.GetControl().GetIwant() {
 		messageIDs := iWant.GetMessageIDs()
@@ -722,7 +722,7 @@ func (c *ControlMsgValidationInspector) validateTopic(from peer.ID, topic channe
 //   - channels.UnknownClusterIDErr: if the topic contains a cluster ID prefix that is not in the active cluster IDs list.
 //
 // In the case where an ErrActiveClusterIdsNotSet or UnknownClusterIDErr is encountered and the cluster prefixed topic received
-// tracker for the peer is less than or equal to the configured ClusterPrefixHardThreshold an error will only be logged and not returned.
+// tracker for the peer is less than or equal to the configured HardThreshold an error will only be logged and not returned.
 // At the point where the hard threshold is crossed the error will be returned and the sender will start to be penalized.
 // Any errors encountered while incrementing or loading the cluster prefixed control message gauge for a peer will result in an irrecoverable error being thrown, these
 // errors are unexpected and irrecoverable indicating a bug.
@@ -794,7 +794,7 @@ func (c *ControlMsgValidationInspector) getFlowIdentifier(peerID peer.ID) (flow.
 }
 
 // checkClusterPrefixHardThreshold returns true if the cluster prefix received tracker count is less than
-// the configured ClusterPrefixHardThreshold, false otherwise.
+// the configured HardThreshold, false otherwise.
 // If any error is encountered while loading from the tracker this func will throw an error on the signaler context, these errors
 // are unexpected and irrecoverable indicating a bug.
 func (c *ControlMsgValidationInspector) checkClusterPrefixHardThreshold(nodeID flow.Identifier) bool {
@@ -803,7 +803,7 @@ func (c *ControlMsgValidationInspector) checkClusterPrefixHardThreshold(nodeID f
 		// irrecoverable error encountered
 		c.logAndThrowError(fmt.Errorf("cluster prefixed control message gauge during hard threshold check failed for node %s: %w", nodeID, err))
 	}
-	return gauge <= c.config.ClusterPrefixHardThreshold
+	return gauge <= c.config.ClusterPrefixedMessage.HardThreshold
 }
 
 // logAndDistributeErr logs the provided error and attempts to disseminate an invalid control message validation notification for the error.

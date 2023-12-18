@@ -19,7 +19,7 @@ func runBeaconKG(nodes []model.NodeInfo) dkg.DKGData {
 	log.Debug().Msgf("will run DKG")
 	var dkgData dkg.DKGData
 	var err error
-	dkgData, err = bootstrapDKG.RandomBeaconKG(n, GenerateRandomSeed(crypto.SeedMinLenDKG))
+	dkgData, err = bootstrapDKG.RandomBeaconKG(n, GenerateRandomSeed(crypto.KeyGenSeedMinLen))
 	if err != nil {
 		log.Fatal().Err(err).Msg("error running DKG")
 	}
