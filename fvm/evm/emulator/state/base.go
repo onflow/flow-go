@@ -151,6 +151,10 @@ func (v *BaseView) GetState(sk types.SlotAddress) (gethCommon.Hash, error) {
 	return v.getSlot(sk)
 }
 
+func (v *BaseView) UpdateSlot(sk types.SlotAddress, value gethCommon.Hash) error {
+	return v.storeSlot(sk, value)
+}
+
 func (v *BaseView) HasSuicided(gethCommon.Address) bool {
 	return false
 }
@@ -169,10 +173,6 @@ func (v *BaseView) AddressInAccessList(gethCommon.Address) bool {
 
 func (v *BaseView) SlotInAccessList(types.SlotAddress) (addressOk bool, slotOk bool) {
 	return false, false
-}
-
-func (v *BaseView) UpdateSlot(sk types.SlotAddress, value gethCommon.Hash) error {
-	return v.storeSlot(sk, value)
 }
 
 func (v *BaseView) Commit() error {
