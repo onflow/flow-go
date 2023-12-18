@@ -200,12 +200,6 @@ func (v *BaseView) Commit() error {
 	return nil
 }
 
-func (v *BaseView) PurgeCaches() {
-	v.cachedAccounts = make(map[gethCommon.Address]*Account)
-	v.cachedCodes = make(map[gethCommon.Address][]byte)
-	v.cachedSlots = make(map[types.SlotAddress]gethCommon.Hash)
-}
-
 func (v *BaseView) fetchOrCreateCollection(path string) (collection *Collection, created bool, error error) {
 	collectionID, err := v.ledger.GetValue(v.rootAddress[:], []byte(path))
 	if err != nil {

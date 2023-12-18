@@ -137,11 +137,22 @@ func (c *Collection) Remove(key []byte) error {
 }
 
 func (c *Collection) Destroy() error {
-	// TODO: implement deep remove
-	// err := c.omap.PopIterate(func(_ Storable, _ Storable){
-	// 	//
-	// })
-	return nil
+	var cachedErr error
+	err := c.omap.PopIterate(func(_ atree.Storable, valueStorable atree.Storable) {
+		if id, ok := valueStorable.(atree.StorageIDStorable); ok {
+			err := c.storage.Remove(atree.StorageID(id))
+			if err != nil && cachedErr == nil {
+				cachedErr = err
+			}
+		}
+	})
+	if cachedErr != nil {
+		return cachedErr
+	}
+	if err != nil {
+		return err
+	}
+	return c.storage.Remove(c.omap.StorageID())
 }
 
 type ByteStringValue struct {

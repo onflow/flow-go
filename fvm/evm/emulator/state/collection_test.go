@@ -50,7 +50,12 @@ func TestCollection(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, value2, ret)
 
-	// TODO add test for Destroy
+	// destroy
+	err = c1.Destroy()
+	require.NoError(t, err)
+
+	_, err = cp.CollectionByID(c1.CollectionID())
+	require.Error(t, err)
 }
 
 func setupTestCollection(t *testing.T) *state.CollectionProvider {
