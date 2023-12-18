@@ -7,6 +7,9 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
+// Account holds the metadata of an address and provides (de)serialization
+//
+// note that code and slots of an address is not part of this data structure
 type Account struct {
 	// address
 	Address gethCommon.Address
@@ -16,23 +19,24 @@ type Account struct {
 	Nonce uint64
 	// hash of the code
 	CodeHash gethCommon.Hash
-	// storageID of the map that holds account slots
-	StorageIDBytes []byte
+	// CollectionID of the id of the collection holds slots of this account
+	CollectionID []byte
 }
 
+// NewAccount constructs a new account
 func NewAccount(
 	address gethCommon.Address,
 	balance *big.Int,
 	nonce uint64,
 	codeHash gethCommon.Hash,
-	storageIDBytes []byte,
+	collectionID []byte,
 ) *Account {
 	return &Account{
-		Address:        address,
-		Balance:        balance,
-		Nonce:          nonce,
-		CodeHash:       codeHash,
-		StorageIDBytes: storageIDBytes,
+		Address:      address,
+		Balance:      balance,
+		Nonce:        nonce,
+		CodeHash:     codeHash,
+		CollectionID: collectionID,
 	}
 }
 
@@ -41,6 +45,9 @@ func (a *Account) Encode() ([]byte, error) {
 }
 
 func DecodeAccount(inp []byte) (*Account, error) {
+	if len(inp) == 0 {
+		return nil, nil
+	}
 	a := &Account{}
 	return a, rlp.DecodeBytes(inp, a)
 }

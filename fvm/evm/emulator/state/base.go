@@ -3,7 +3,6 @@ package state
 import (
 	"fmt"
 	"math/big"
-	"runtime"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
@@ -25,15 +24,14 @@ const (
 )
 
 type BaseView struct {
-	rootAddress flow.Address
-	ledger      atree.Ledger
-	storage     *atree.PersistentSlabStorage
+	rootAddress        flow.Address
+	ledger             atree.Ledger
+	collectionProvider *CollectionProvider
 
 	// collections
-	collectionProvider *CollectionProvider
-	accounts           *Collection
-	codes              *Collection
-	slots              map[gethCommon.Address]*Collection
+	accounts *Collection
+	codes    *Collection
+	slots    map[gethCommon.Address]*Collection
 
 	// caches
 	cachedAccounts map[gethCommon.Address]*Account
@@ -49,9 +47,7 @@ var _ types.BaseView = &BaseView{}
 
 // NewBaseView constructs a new base view
 func NewBaseView(ledger atree.Ledger, rootAddress flow.Address) (*BaseView, error) {
-
-	baseStorage := atree.NewLedgerBaseStorage(ledger)
-	storage, err := NewPersistentSlabStorage(baseStorage)
+	cp, err := NewCollectionProvider(atree.Address(rootAddress), ledger)
 	if err != nil {
 		return nil, err
 	}
@@ -59,8 +55,7 @@ func NewBaseView(ledger atree.Ledger, rootAddress flow.Address) (*BaseView, erro
 	view := &BaseView{
 		ledger:             ledger,
 		rootAddress:        rootAddress,
-		storage:            storage,
-		collectionProvider: NewCollectionProvider(atree.Address(rootAddress), storage),
+		collectionProvider: cp,
 
 		slots: make(map[gethCommon.Address]*Collection),
 
@@ -121,7 +116,7 @@ func (v *BaseView) GetCode(addr gethCommon.Address) ([]byte, error) {
 		return nil, err
 	}
 	// if no account found return
-	if acc != nil {
+	if acc == nil {
 		return nil, nil
 	}
 	// if no code on this account
@@ -140,7 +135,7 @@ func (v *BaseView) GetCodeSize(addr gethCommon.Address) (int, error) {
 		return 0, err
 	}
 	// if no account found return
-	if acc != nil {
+	if acc == nil {
 		return 0, nil
 	}
 	// no code on this account
@@ -181,57 +176,67 @@ func (v *BaseView) UpdateSlot(sk types.SlotAddress, value gethCommon.Hash) error
 }
 
 func (v *BaseView) Commit() error {
-	// commit atree changes
-	err := v.storage.FastCommit(runtime.NumCPU())
+	// commit collections
+	err := v.collectionProvider.Commit()
 	if err != nil {
 		return err
 	}
-
 	if v.accountSetupOnCommit {
-		err = v.ledger.SetValue(v.rootAddress[:], []byte(AccountsStorageIDKey), v.accounts.StorageIDBytes())
+		err = v.ledger.SetValue(v.rootAddress[:], []byte(AccountsStorageIDKey), v.accounts.CollectionID())
 		if err != nil {
 			return err
 		}
+		v.accountSetupOnCommit = false
+
 	}
 
 	if v.codeSetupOnCommit {
-		err = v.ledger.SetValue(v.rootAddress[:], []byte(CodesStorageIDKey), v.accounts.StorageIDBytes())
+		err = v.ledger.SetValue(v.rootAddress[:], []byte(CodesStorageIDKey), v.codes.CollectionID())
 		if err != nil {
 			return err
 		}
+		v.codeSetupOnCommit = false
 	}
 	return nil
 }
 
+func (v *BaseView) PurgeCaches() {
+	v.cachedAccounts = make(map[gethCommon.Address]*Account)
+	v.cachedCodes = make(map[gethCommon.Address][]byte)
+	v.cachedSlots = make(map[types.SlotAddress]gethCommon.Hash)
+}
+
 func (v *BaseView) fetchOrCreateCollection(path string) (collection *Collection, created bool, error error) {
-	storageIDBytes, err := v.ledger.GetValue(v.rootAddress.Bytes(), []byte(AccountsStorageIDKey))
+	collectionID, err := v.ledger.GetValue(v.rootAddress[:], []byte(path))
 	if err != nil {
 		return nil, false, err
 	}
-	if len(storageIDBytes) == 0 {
+	if len(collectionID) == 0 {
 		collection, err = v.collectionProvider.NewCollection()
 		return collection, true, err
 	}
-	collection, err = v.collectionProvider.GetCollection(storageIDBytes)
+	collection, err = v.collectionProvider.CollectionByID(collectionID)
 	return collection, false, err
 }
 
 func (v *BaseView) getAccount(addr gethCommon.Address) (*Account, error) {
+	// check cached accounts first
 	acc, found := v.cachedAccounts[addr]
 	if found {
 		return acc, nil
 	}
 
+	// then collect it from the account collection
 	data, err := v.accounts.Get(addr.Bytes())
 	if err != nil {
 		return nil, err
 	}
-
+	// decode it
 	acc, err = DecodeAccount(data)
 	if err != nil {
 		return nil, err
 	}
-
+	// cache it
 	if acc != nil {
 		v.cachedAccounts[addr] = acc
 	}
@@ -256,7 +261,7 @@ func (v *BaseView) CreateAccount(
 		if err != nil {
 			return err
 		}
-		sID = col.storageIDBytes
+		sID = col.CollectionID()
 	}
 
 	acc := NewAccount(addr, balance, nonce, codeHash, sID)
@@ -282,7 +287,7 @@ func (v *BaseView) UpdateAccount(
 		}
 		// TODO: maybe purge the state as well
 	}
-	newAcc := NewAccount(addr, balance, nonce, codeHash, acc.StorageIDBytes)
+	newAcc := NewAccount(addr, balance, nonce, codeHash, acc.CollectionID)
 	return v.storeAccount(newAcc)
 }
 
@@ -300,10 +305,12 @@ func (v *BaseView) DeleteAccount(addr gethCommon.Address) error {
 		return err
 	}
 
-	if len(acc.StorageIDBytes) > 0 {
+	delete(v.cachedAccounts, addr)
+
+	if len(acc.CollectionID) > 0 {
 		col, found := v.slots[addr]
 		if !found {
-			col, err = v.collectionProvider.GetCollection(acc.StorageIDBytes)
+			col, err = v.collectionProvider.CollectionByID(acc.CollectionID)
 			if err != nil {
 				return err
 			}
@@ -322,6 +329,7 @@ func (v *BaseView) storeAccount(acc *Account) error {
 	if err != nil {
 		return err
 	}
+	v.cachedAccounts[acc.Address] = acc
 	return v.accounts.Set(acc.Address.Bytes(), data)
 }
 
@@ -341,11 +349,11 @@ func (v *BaseView) getCode(addr gethCommon.Address) ([]byte, error) {
 }
 
 func (v *BaseView) storeCode(addr gethCommon.Address, code []byte) error {
+	v.cachedCodes[addr] = code
 	return v.codes.Set(addr.Bytes(), code)
 }
 
 func (v *BaseView) getSlot(sk types.SlotAddress) (gethCommon.Hash, error) {
-	defValue := gethCommon.Hash{}
 	value, found := v.cachedSlots[sk]
 	if found {
 		return value, nil
@@ -353,13 +361,13 @@ func (v *BaseView) getSlot(sk types.SlotAddress) (gethCommon.Hash, error) {
 
 	// check account
 	acc, err := v.getAccount(sk.Address)
-	if err != nil || acc == nil || len(acc.StorageIDBytes) == 0 {
+	if err != nil || acc == nil || len(acc.CollectionID) == 0 {
 		return gethCommon.Hash{}, err
 	}
 
 	col, found := v.slots[sk.Address]
 	if !found {
-		col, err = v.collectionProvider.GetCollection(acc.StorageIDBytes)
+		col, err = v.collectionProvider.CollectionByID(acc.CollectionID)
 		if err != nil {
 			return gethCommon.Hash{}, err
 		}
@@ -371,9 +379,7 @@ func (v *BaseView) getSlot(sk types.SlotAddress) (gethCommon.Hash, error) {
 		return gethCommon.Hash{}, err
 	}
 	value = gethCommon.BytesToHash(val)
-	if value != defValue {
-		v.cachedSlots[sk] = value
-	}
+	v.cachedSlots[sk] = value
 	return value, nil
 }
 
@@ -385,18 +391,19 @@ func (v *BaseView) storeSlot(sk types.SlotAddress, data gethCommon.Hash) error {
 	if acc == nil {
 		return fmt.Errorf("slot belongs to a non existing account")
 	}
-	if len(acc.StorageIDBytes) == 0 {
+	if len(acc.CollectionID) == 0 {
 		return fmt.Errorf("slot belongs to a non-smart contract account")
 	}
 
 	col, found := v.slots[sk.Address]
 	if !found {
-		col, err = v.collectionProvider.GetCollection(acc.StorageIDBytes)
+		col, err = v.collectionProvider.CollectionByID(acc.CollectionID)
 		if err != nil {
 			return err
 		}
 		v.slots[sk.Address] = col
 	}
 
+	v.cachedSlots[sk] = data
 	return col.Set(sk.Key.Bytes(), data.Bytes())
 }
