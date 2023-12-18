@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
-	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
+	"github.com/onflow/flow-go/network/p2p/logging"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -38,7 +38,11 @@ type GossipSubScoreTracer struct {
 
 var _ p2p.PeerScoreTracer = (*GossipSubScoreTracer)(nil)
 
-func NewGossipSubScoreTracer(logger zerolog.Logger, provider module.IdentityProvider, collector module.GossipSubScoringMetrics, updateInterval time.Duration) *GossipSubScoreTracer {
+func NewGossipSubScoreTracer(
+	logger zerolog.Logger,
+	provider module.IdentityProvider,
+	collector module.GossipSubScoringMetrics,
+	updateInterval time.Duration) *GossipSubScoreTracer {
 	g := &GossipSubScoreTracer{
 		logger:            logger.With().Str("component", "gossipsub_score_tracer").Logger(),
 		updateInterval:    updateInterval,
