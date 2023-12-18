@@ -55,7 +55,7 @@ func TestCollection(t *testing.T) {
 
 func setupTestCollection(t *testing.T) *state.CollectionProvider {
 	ledger := testutils.GetSimpleValueStore()
-	cp, err := state.NewCollectionProvider(atree.Address{}, ledger)
+	cp, err := state.NewCollectionProvider(atree.Address{1, 2, 3, 4, 5, 6, 7, 8}, ledger)
 	require.NoError(t, err)
 	return cp
 }

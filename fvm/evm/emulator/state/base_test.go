@@ -143,8 +143,6 @@ func TestBaseView(t *testing.T) {
 		)
 	})
 
-	// add test update and delete account (etc)
-
 	t.Run("test slot storage", func(t *testing.T) {
 		ledger := testutils.GetSimpleValueStore()
 		rootAddr := flow.Address{1, 2, 3, 4, 5, 6, 7, 8}
@@ -197,7 +195,7 @@ func TestBaseView(t *testing.T) {
 
 	t.Run("default values method calls", func(t *testing.T) {
 		// calls to these method that has always same value
-		view, err := state.NewBaseView(testutils.GetSimpleValueStore(), flow.Address{})
+		view, err := state.NewBaseView(testutils.GetSimpleValueStore(), flow.Address{1, 2, 3, 4})
 		require.NoError(t, err)
 
 		require.Equal(t, false, view.HasSuicided(gethCommon.Address{}))

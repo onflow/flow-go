@@ -13,10 +13,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// TODO we need to handle the
-// issue with caching for spocks (this view has to be constructed for each transaction)
-// the internal db can be a reused.
-
 const (
 	AccountsStorageIDKey = "AccountsStorageIDKey"
 	CodesStorageIDKey    = "CodesStorageIDKey"
@@ -306,7 +302,7 @@ func (v *BaseView) DeleteAccount(addr gethCommon.Address) error {
 	if err != nil {
 		return err
 	}
-	if acc != nil {
+	if acc == nil {
 		return fmt.Errorf("account doesn't exist")
 	}
 

@@ -10,7 +10,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func BenchmarkStorage(b *testing.B) { benchmarkStorageGrowth(b, 100_000, 1_000_000) }
+func BenchmarkStorage(b *testing.B) { benchmarkStorageGrowth(b, 100, 1_000_000) }
 
 // benchmark
 func benchmarkStorageGrowth(b *testing.B, accountCount, setupKittyCount int) {

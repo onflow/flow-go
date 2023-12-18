@@ -18,6 +18,8 @@ import (
 
 // TODO: question, does stateDB has to be thread safe ?
 // error handling
+//
+// StateDB should not be used for running multiple transactions
 type StateDB struct {
 	ledger   atree.Ledger
 	root     flow.Address
@@ -371,9 +373,6 @@ func (s *StateDB) handleError(err error) {
 
 func (db *StateDB) Prepare(rules gethParams.Rules, sender, coinbase gethCommon.Address, dest *gethCommon.Address, precompiles []gethCommon.Address, txAccesses gethTypes.AccessList) {
 	if rules.IsBerlin {
-		// TODO: figure out this Clear out any leftover from previous executions
-		// db.interim.ResetAccessList()
-
 		// no need for mutation
 		db.AddAddressToAccessList(sender)
 
@@ -394,17 +393,4 @@ func (db *StateDB) Prepare(rules gethParams.Rules, sender, coinbase gethCommon.A
 			db.AddAddressToAccessList(coinbase)
 		}
 	}
-	// TODO figure out these
-	// Reset transient storage at the beginning of transaction execution
-	// db.ResetTransientStorage()
-}
-
-func (db *StateDB) Reset() error {
-	// TODO: implement me
-	// TODO we might not need to recreate the base view and reuse it
-	// bv := NewBaseView(db.ledger, db.root)
-	// db.baseView = bv
-	// db.views = []*DeltaView{NewDeltaView(bv)}
-	// db.dbErr = nil
-	return nil
 }

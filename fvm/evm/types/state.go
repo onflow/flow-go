@@ -25,9 +25,6 @@ type StateDB interface {
 
 	// returns a map of preimages
 	Preimages() map[gethCommon.Hash][]byte
-
-	// Reset prepares the storage for the next flow transaction execution
-	Reset() error
 }
 
 // ReadOnlyView provides a readonly view of the state
