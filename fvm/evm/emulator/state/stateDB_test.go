@@ -25,12 +25,20 @@ func TestStateDB(t *testing.T) {
 		require.NoError(t, err)
 
 		addr1 := testutils.RandomCommonAddress(t)
+		key1 := testutils.RandomCommonHash(t)
+		value1 := testutils.RandomCommonHash(t)
 
 		db.CreateAccount(addr1)
 		require.NoError(t, db.Error())
 
 		db.AddBalance(addr1, big.NewInt(5))
 		require.NoError(t, db.Error())
+
+		// should have code to be able to set state
+		db.SetCode(addr1, []byte{1, 2, 3})
+		require.NoError(t, db.Error())
+
+		db.SetState(addr1, key1, value1)
 
 		err = db.Commit()
 		require.NoError(t, err)
@@ -42,6 +50,10 @@ func TestStateDB(t *testing.T) {
 		bal := db.GetBalance(addr1)
 		require.NoError(t, db.Error())
 		require.Equal(t, big.NewInt(5), bal)
+
+		val := db.GetState(addr1, key1)
+		require.NoError(t, db.Error())
+		require.Equal(t, value1, val)
 	})
 
 	t.Run("test snapshot and revert functionality", func(t *testing.T) {

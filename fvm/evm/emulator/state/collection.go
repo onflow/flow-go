@@ -21,6 +21,10 @@ func NewCollectionProvider(
 	rootAddr atree.Address,
 	ledger atree.Ledger,
 ) (*CollectionProvider, error) {
+	// empty address is not allowed (causes issues with atree)
+	if rootAddr == atree.AddressUndefined {
+		return nil, fmt.Errorf("empty address as root is not allowed")
+	}
 	baseStorage := atree.NewLedgerBaseStorage(ledger)
 	storage, err := NewPersistentSlabStorage(baseStorage)
 	return &CollectionProvider{

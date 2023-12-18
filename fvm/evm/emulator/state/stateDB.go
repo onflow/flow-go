@@ -259,6 +259,8 @@ func (db *StateDB) Commit() error {
 		return db.dbErr
 	}
 
+	var err error
+
 	// iterate views and collect dirty addresses and slots
 	addresses := make(map[gethCommon.Address]interface{})
 	slots := make(map[types.SlotAddress]interface{})
@@ -285,26 +287,35 @@ func (db *StateDB) Commit() error {
 	for _, addr := range sortedAddresses {
 		// TODO check if address is
 		if db.HasSuicided(addr) {
-			db.baseView.DeleteAccount(addr)
+			err = db.baseView.DeleteAccount(addr)
+			if err != nil {
+				return err
+			}
 			continue
 		}
 		if db.IsCreated(addr) {
-			db.baseView.CreateAccount(
+			err = db.baseView.CreateAccount(
 				addr,
 				db.GetBalance(addr),
 				db.GetNonce(addr),
 				db.GetCode(addr),
 				db.GetCodeHash(addr),
 			)
+			if err != nil {
+				return err
+			}
 			continue
 		}
-		db.baseView.UpdateAccount(
+		err = db.baseView.UpdateAccount(
 			addr,
 			db.GetBalance(addr),
 			db.GetNonce(addr),
 			db.GetCode(addr),
 			db.GetCodeHash(addr),
 		)
+		if err != nil {
+			return err
+		}
 	}
 
 	// sort slots
@@ -322,10 +333,13 @@ func (db *StateDB) Commit() error {
 
 	// update slots
 	for _, sk := range sortedSlots {
-		db.baseView.UpdateSlot(
+		err = db.baseView.UpdateSlot(
 			sk,
 			db.GetState(sk.Address, sk.Key),
 		)
+		if err != nil {
+			return err
+		}
 	}
 
 	// don't purge views yet, people might call the logs etc
