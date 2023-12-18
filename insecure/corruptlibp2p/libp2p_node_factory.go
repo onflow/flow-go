@@ -19,9 +19,9 @@ import (
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/netconf"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/builder"
+	p2pbuilder "github.com/onflow/flow-go/network/p2p/builder"
 	p2pbuilderconfig "github.com/onflow/flow-go/network/p2p/builder/config"
-	"github.com/onflow/flow-go/network/p2p/node"
+	p2pnode "github.com/onflow/flow-go/network/p2p/node"
 )
 
 // InitCorruptLibp2pNode initializes and returns a corrupt libp2p node that should only be used for BFT testing in

@@ -10,7 +10,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
-	"github.com/onflow/flow-go/network/p2p/logging"
+	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
 )
 
 // IdentityProviderIDTranslator implements an `p2p.IDTranslator` which provides ID
