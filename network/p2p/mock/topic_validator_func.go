@@ -5,9 +5,8 @@ package mockp2p
 import (
 	context "context"
 
-	mock "github.com/stretchr/testify/mock"
-
 	p2p "github.com/onflow/flow-go/network/p2p"
+	mock "github.com/stretchr/testify/mock"
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
 

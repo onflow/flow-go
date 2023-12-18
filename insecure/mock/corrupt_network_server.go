@@ -3,9 +3,8 @@
 package mockinsecure
 
 import (
-	emptypb "google.golang.org/protobuf/types/known/emptypb"
-
 	insecure "github.com/onflow/flow-go/insecure"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 
 	mock "github.com/stretchr/testify/mock"
 )

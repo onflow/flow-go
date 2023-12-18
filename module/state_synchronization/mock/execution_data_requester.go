@@ -3,9 +3,8 @@
 package state_synchronization
 
 import (
-	mock "github.com/stretchr/testify/mock"
-
 	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
+	mock "github.com/stretchr/testify/mock"
 
 	model "github.com/onflow/flow-go/consensus/hotstuff/model"
 )

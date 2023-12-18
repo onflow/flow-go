@@ -4,7 +4,6 @@ package mockp2p
 
 import (
 	host "github.com/libp2p/go-libp2p/core/host"
-
 	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
 
 	mock "github.com/stretchr/testify/mock"

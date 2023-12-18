@@ -5,9 +5,8 @@ package mock
 import (
 	context "context"
 
-	metrics "github.com/slok/go-http-metrics/metrics"
-
 	flow "github.com/onflow/flow-go/model/flow"
+	metrics "github.com/slok/go-http-metrics/metrics"
 
 	mock "github.com/stretchr/testify/mock"
 

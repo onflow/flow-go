@@ -3,9 +3,8 @@
 package mockfetcher
 
 import (
-	mock "github.com/stretchr/testify/mock"
-
 	fetcher "github.com/onflow/flow-go/engine/verification/fetcher"
+	mock "github.com/stretchr/testify/mock"
 
 	verification "github.com/onflow/flow-go/model/verification"
 )

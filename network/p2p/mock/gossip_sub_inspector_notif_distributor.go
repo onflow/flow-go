@@ -3,9 +3,8 @@
 package mockp2p
 
 import (
-	mock "github.com/stretchr/testify/mock"
-
 	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
+	mock "github.com/stretchr/testify/mock"
 
 	p2p "github.com/onflow/flow-go/network/p2p"
 )

@@ -3,9 +3,8 @@
 package mock
 
 import (
-	mock "github.com/stretchr/testify/mock"
-
 	channels "github.com/onflow/flow-go/network/channels"
+	mock "github.com/stretchr/testify/mock"
 
 	time "time"
 )

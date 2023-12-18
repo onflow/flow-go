@@ -4,7 +4,6 @@ package mock
 
 import (
 	common "github.com/onflow/cadence/runtime/common"
-
 	environment "github.com/onflow/flow-go/fvm/environment"
 
 	mock "github.com/stretchr/testify/mock"
