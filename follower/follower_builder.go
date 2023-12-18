@@ -591,24 +591,24 @@ func (builder *FollowerServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 			HeroCacheFactory: builder.HeroCacheMetricsFactory(),
 			Metrics:          builder.Metrics.Network,
 		},
-		NetworkingType:            network.PublicNetwork,
-		Address:                   builder.BaseConfig.BindAddr,
-		NetworkKey:                networkKey,
-		SporkId:                   builder.SporkID,
-		IdProvider:                builder.IdentityProvider,
-		RCfg:                      &builder.FlowConfig.NetworkConfig.ResourceManager,
-		RpcInspectorCfg:           &builder.FlowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig,
-		PeerManagerConfig:         p2pconfig.PeerManagerDisableConfig(),
-		SubscriptionProviderParam: &builder.FlowConfig.NetworkConfig.GossipSubConfig.SubscriptionProviderConfig,
+		NetworkingType:             network.PublicNetwork,
+		Address:                    builder.BaseConfig.BindAddr,
+		NetworkKey:                 networkKey,
+		SporkId:                    builder.SporkID,
+		IdProvider:                 builder.IdentityProvider,
+		ResourceManagerParams:      &builder.FlowConfig.NetworkConfig.ResourceManager,
+		RpcInspectorParams:         &builder.FlowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig,
+		PeerManagerParams:          p2pconfig.PeerManagerDisableConfig(),
+		SubscriptionProviderParams: &builder.FlowConfig.NetworkConfig.GossipSubConfig.SubscriptionProviderConfig,
 		DisallowListCacheCfg: &p2p.DisallowListCacheConfig{
 			MaxSize: builder.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
 			Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
 		},
-		UnicastConfig: &p2pconfig.UnicastConfig{
+		UnicastParams: &p2pconfig.UnicastConfig{
 			UnicastConfig: builder.FlowConfig.NetworkConfig.UnicastConfig,
 		},
-		GossipSubScorePenalties: &builder.FlowConfig.NetworkConfig.GossipsubScorePenalties,
-		ScoringRegistryConfig:   &builder.FlowConfig.NetworkConfig.GossipSubScoringRegistryConfig,
+		GossipSubScorePenaltiesParams: &builder.FlowConfig.NetworkConfig.GossipsubScorePenalties,
+		ScoringRegistryParams:         &builder.FlowConfig.NetworkConfig.GossipSubScoringRegistryConfig,
 	}
 	nodeBuilder, err := p2pbuilder.NewNodeBuilder(params, meshTracer)
 	if err != nil {

@@ -30,6 +30,7 @@ type InvCtrlMsgErr struct {
 	ctrlMsgTopicType CtrlMsgTopicType
 }
 
+// CtrlMsgTopicType returns the CtrlMsgTopicType of the error.
 func (i InvCtrlMsgErr) CtrlMsgTopicType() CtrlMsgTopicType {
 	return i.ctrlMsgTopicType
 }

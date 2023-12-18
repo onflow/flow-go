@@ -118,24 +118,24 @@ func CreateNode(t *testing.T, networkKey crypto.PrivateKey, sporkID flow.Identif
 			HeroCacheFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 			Metrics:          metrics.NewNoopCollector(),
 		},
-		NetworkingType:            flownet.PrivateNetwork,
-		Address:                   unittest.DefaultAddress,
-		NetworkKey:                networkKey,
-		SporkId:                   sporkID,
-		IdProvider:                idProvider,
-		RCfg:                      &defaultFlowConfig.NetworkConfig.ResourceManager,
-		RpcInspectorCfg:           &defaultFlowConfig.NetworkConfig.GossipSubRPCInspectorsConfig,
-		PeerManagerConfig:         p2pconfig.PeerManagerDisableConfig(),
-		SubscriptionProviderParam: &defaultFlowConfig.NetworkConfig.GossipSubConfig.SubscriptionProviderConfig,
+		NetworkingType:             flownet.PrivateNetwork,
+		Address:                    unittest.DefaultAddress,
+		NetworkKey:                 networkKey,
+		SporkId:                    sporkID,
+		IdProvider:                 idProvider,
+		ResourceManagerParams:      &defaultFlowConfig.NetworkConfig.ResourceManager,
+		RpcInspectorParams:         &defaultFlowConfig.NetworkConfig.GossipSubRPCInspectorsConfig,
+		PeerManagerParams:          p2pconfig.PeerManagerDisableConfig(),
+		SubscriptionProviderParams: &defaultFlowConfig.NetworkConfig.GossipSubConfig.SubscriptionProviderConfig,
 		DisallowListCacheCfg: &p2p.DisallowListCacheConfig{
 			MaxSize: uint32(1000),
 			Metrics: metrics.NewNoopCollector(),
 		},
-		UnicastConfig: &p2pconfig.UnicastConfig{
+		UnicastParams: &p2pconfig.UnicastConfig{
 			UnicastConfig: defaultFlowConfig.NetworkConfig.UnicastConfig,
 		},
-		GossipSubScorePenalties: &defaultFlowConfig.NetworkConfig.GossipsubScorePenalties,
-		ScoringRegistryConfig:   &defaultFlowConfig.NetworkConfig.GossipSubScoringRegistryConfig,
+		GossipSubScorePenaltiesParams: &defaultFlowConfig.NetworkConfig.GossipsubScorePenalties,
+		ScoringRegistryParams:         &defaultFlowConfig.NetworkConfig.GossipSubScoringRegistryConfig,
 	}
 	builder, err := p2pbuilder.NewNodeBuilder(params, meshTracer)
 	require.NoError(t, err)

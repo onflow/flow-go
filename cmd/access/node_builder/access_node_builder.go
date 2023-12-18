@@ -1574,30 +1574,30 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 			HeroCacheFactory: builder.HeroCacheMetricsFactory(),
 			Metrics:          networkMetrics,
 		},
-		NetworkingType:  network.PublicNetwork,
-		Address:         bindAddress,
-		NetworkKey:      networkKey,
-		SporkId:         builder.SporkID,
-		IdProvider:      builder.IdentityProvider,
-		RCfg:            &builder.FlowConfig.NetworkConfig.ResourceManager,
-		RpcInspectorCfg: &builder.FlowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig,
-		PeerManagerConfig: &p2pconfig.PeerManagerConfig{
+		NetworkingType:        network.PublicNetwork,
+		Address:               bindAddress,
+		NetworkKey:            networkKey,
+		SporkId:               builder.SporkID,
+		IdProvider:            builder.IdentityProvider,
+		ResourceManagerParams: &builder.FlowConfig.NetworkConfig.ResourceManager,
+		RpcInspectorParams:    &builder.FlowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig,
+		PeerManagerParams: &p2pconfig.PeerManagerConfig{
 			// TODO: eventually, we need pruning enabled even on public network. However, it needs a modified version of
 			// the peer manager that also operate on the public identities.
 			ConnectionPruning: connection.PruningDisabled,
 			UpdateInterval:    builder.FlowConfig.NetworkConfig.PeerUpdateInterval,
 			ConnectorFactory:  connection.DefaultLibp2pBackoffConnectorFactory(),
 		},
-		SubscriptionProviderParam: &builder.FlowConfig.NetworkConfig.GossipSubConfig.SubscriptionProviderConfig,
+		SubscriptionProviderParams: &builder.FlowConfig.NetworkConfig.GossipSubConfig.SubscriptionProviderConfig,
 		DisallowListCacheCfg: &p2p.DisallowListCacheConfig{
 			MaxSize: builder.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
 			Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
 		},
-		UnicastConfig: &p2pconfig.UnicastConfig{
+		UnicastParams: &p2pconfig.UnicastConfig{
 			UnicastConfig: builder.FlowConfig.NetworkConfig.UnicastConfig,
 		},
-		GossipSubScorePenalties: &builder.FlowConfig.NetworkConfig.GossipsubScorePenalties,
-		ScoringRegistryConfig:   &builder.FlowConfig.NetworkConfig.GossipSubScoringRegistryConfig,
+		GossipSubScorePenaltiesParams: &builder.FlowConfig.NetworkConfig.GossipsubScorePenalties,
+		ScoringRegistryParams:         &builder.FlowConfig.NetworkConfig.GossipSubScoringRegistryConfig,
 	}
 	nodeBuilder, err := p2pbuilder.NewNodeBuilder(params, meshTracer)
 	if err != nil {

@@ -139,24 +139,24 @@ func NodeFixture(t *testing.T,
 	connManager, err := connection.NewConnManager(logger, parameters.MetricsCfg.Metrics, &parameters.FlowConfig.NetworkConfig.ConnectionManagerConfig)
 	require.NoError(t, err)
 	libP2PNodeBuilderParams := &p2pbuilder.LibP2PNodeBuilderConfig{
-		Logger:                    logger,
-		MetricsConfig:             parameters.MetricsCfg,
-		NetworkingType:            parameters.NetworkingType,
-		Address:                   parameters.Address,
-		NetworkKey:                parameters.Key,
-		SporkId:                   sporkID,
-		IdProvider:                parameters.IdProvider,
-		RCfg:                      &parameters.FlowConfig.NetworkConfig.ResourceManager,
-		RpcInspectorCfg:           &parameters.FlowConfig.NetworkConfig.GossipSubRPCInspectorsConfig,
-		PeerManagerConfig:         parameters.PeerManagerConfig,
-		SubscriptionProviderParam: &parameters.FlowConfig.NetworkConfig.GossipSubConfig.SubscriptionProviderConfig,
+		Logger:                     logger,
+		MetricsConfig:              parameters.MetricsCfg,
+		NetworkingType:             parameters.NetworkingType,
+		Address:                    parameters.Address,
+		NetworkKey:                 parameters.Key,
+		SporkId:                    sporkID,
+		IdProvider:                 parameters.IdProvider,
+		ResourceManagerParams:      &parameters.FlowConfig.NetworkConfig.ResourceManager,
+		RpcInspectorParams:         &parameters.FlowConfig.NetworkConfig.GossipSubRPCInspectorsConfig,
+		PeerManagerParams:          parameters.PeerManagerConfig,
+		SubscriptionProviderParams: &parameters.FlowConfig.NetworkConfig.GossipSubConfig.SubscriptionProviderConfig,
 		DisallowListCacheCfg: &p2p.DisallowListCacheConfig{
 			MaxSize: uint32(1000),
 			Metrics: metrics.NewNoopCollector(),
 		},
-		UnicastConfig:           parameters.UnicastConfig,
-		GossipSubScorePenalties: &parameters.FlowConfig.NetworkConfig.GossipsubScorePenalties,
-		ScoringRegistryConfig:   &parameters.FlowConfig.NetworkConfig.GossipSubScoringRegistryConfig,
+		UnicastParams:                 parameters.UnicastConfig,
+		GossipSubScorePenaltiesParams: &parameters.FlowConfig.NetworkConfig.GossipsubScorePenalties,
+		ScoringRegistryParams:         &parameters.FlowConfig.NetworkConfig.GossipSubScoringRegistryConfig,
 	}
 	builder, err := p2pbuilder.NewNodeBuilder(libP2PNodeBuilderParams, parameters.PubSubTracer)
 	require.NoError(t, err)
