@@ -5,8 +5,9 @@ package mockinsecure
 import (
 	context "context"
 
-	insecure "github.com/onflow/flow-go/insecure"
 	metadata "google.golang.org/grpc/metadata"
+
+	insecure "github.com/onflow/flow-go/insecure"
 
 	mock "github.com/stretchr/testify/mock"
 )

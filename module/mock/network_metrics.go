@@ -3,8 +3,9 @@
 package mock
 
 import (
-	channels "github.com/onflow/flow-go/network/channels"
 	mock "github.com/stretchr/testify/mock"
+
+	channels "github.com/onflow/flow-go/network/channels"
 
 	network "github.com/libp2p/go-libp2p/core/network"
 

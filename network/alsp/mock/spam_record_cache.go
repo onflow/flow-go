@@ -3,8 +3,9 @@
 package mockalsp
 
 import (
-	flow "github.com/onflow/flow-go/model/flow"
 	mock "github.com/stretchr/testify/mock"
+
+	flow "github.com/onflow/flow-go/model/flow"
 
 	model "github.com/onflow/flow-go/network/alsp/model"
 )

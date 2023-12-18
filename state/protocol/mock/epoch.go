@@ -3,8 +3,9 @@
 package mock
 
 import (
-	flow "github.com/onflow/flow-go/model/flow"
 	mock "github.com/stretchr/testify/mock"
+
+	flow "github.com/onflow/flow-go/model/flow"
 
 	protocol "github.com/onflow/flow-go/state/protocol"
 )

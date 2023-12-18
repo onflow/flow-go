@@ -3,8 +3,9 @@
 package mockp2p
 
 import (
-	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
 	mock "github.com/stretchr/testify/mock"
+
+	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
 

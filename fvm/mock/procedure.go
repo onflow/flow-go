@@ -3,9 +3,10 @@
 package mock
 
 import (
+	mock "github.com/stretchr/testify/mock"
+
 	fvm "github.com/onflow/flow-go/fvm"
 	logical "github.com/onflow/flow-go/fvm/storage/logical"
-	mock "github.com/stretchr/testify/mock"
 
 	storage "github.com/onflow/flow-go/fvm/storage"
 )

@@ -2,7 +2,7 @@ package internal
 
 import (
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/test"
+	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 )
 
 func WithCorruptGossipSub(factory p2p.GossipSubFactoryFunc, config p2p.GossipSubAdapterConfigFunc) p2ptest.NodeFixtureParameterOption {

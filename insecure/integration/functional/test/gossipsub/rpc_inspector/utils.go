@@ -18,7 +18,7 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
-	"github.com/onflow/flow-go/network/p2p/test"
+	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/tracer"
 	"github.com/onflow/flow-go/utils/unittest"
 )

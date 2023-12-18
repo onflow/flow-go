@@ -10,6 +10,7 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	datastore "github.com/ipfs/go-datastore"
 	protocol "github.com/libp2p/go-libp2p/core/protocol"
+
 	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
 	network "github.com/onflow/flow-go/network"
 	channels "github.com/onflow/flow-go/network/channels"
