@@ -19,8 +19,8 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
 	netcache "github.com/onflow/flow-go/network/p2p/cache"
-	p2pconfig "github.com/onflow/flow-go/network/p2p/config"
-	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
+	"github.com/onflow/flow-go/network/p2p/config"
+	"github.com/onflow/flow-go/network/p2p/logging"
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 	"github.com/onflow/flow-go/utils/logging"
 )

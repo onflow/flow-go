@@ -7,7 +7,7 @@ import (
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/p2p"
-	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
+	"github.com/onflow/flow-go/network/p2p/logging"
 )
 
 // GossipSubControlMessageMetrics is a metrics and observability wrapper component for the incoming RPCs to a
