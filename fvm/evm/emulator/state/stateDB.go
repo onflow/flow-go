@@ -3,6 +3,7 @@ package state
 import (
 	"bytes"
 	stdErrors "errors"
+	"fmt"
 	"math/big"
 	"sort"
 
@@ -68,6 +69,11 @@ func (db *StateDB) CreateAccount(addr gethCommon.Address) {
 	// TODO: If a state object with the address already exists the balance is carried over to the new account.
 	// Carrying over the balance ensures that Ether doesn't disappear.
 	db.lastestView().CreateAccount(addr)
+}
+
+// IsCreated returns true if address is recently created (context of a transaction)
+func (db *StateDB) IsCreated(addr gethCommon.Address) bool {
+	return db.lastestView().IsCreated(addr)
 }
 
 // Suicide flags the address for deletion.
@@ -201,6 +207,10 @@ func (db *StateDB) AddPreimage(hash gethCommon.Hash, data []byte) {
 }
 
 func (db *StateDB) RevertToSnapshot(index int) {
+	if index > len(db.views) {
+		db.dbErr = fmt.Errorf("invalid revert")
+		return
+	}
 	db.views = db.views[:index]
 }
 
@@ -276,6 +286,16 @@ func (db *StateDB) Commit() error {
 		// TODO check if address is
 		if db.HasSuicided(addr) {
 			db.baseView.DeleteAccount(addr)
+			continue
+		}
+		if db.IsCreated(addr) {
+			db.baseView.CreateAccount(
+				addr,
+				db.GetBalance(addr),
+				db.GetNonce(addr),
+				db.GetCode(addr),
+				db.GetCodeHash(addr),
+			)
 			continue
 		}
 		db.baseView.UpdateAccount(

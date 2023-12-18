@@ -64,6 +64,7 @@ func TestDeltaView(t *testing.T) {
 		// create a account at address 2
 		err = view.CreateAccount(addr2)
 		require.NoError(t, err)
+		require.True(t, view.IsCreated(addr2))
 
 		// now it should be found
 		found, err = view.Exist(addr2)
@@ -631,6 +632,7 @@ func TestDeltaView(t *testing.T) {
 type MockedReadOnlyView struct {
 	ExistFunc               func(gethCommon.Address) (bool, error)
 	HasSuicidedFunc         func(gethCommon.Address) bool
+	IsCreatedFunc           func(gethCommon.Address) bool
 	GetBalanceFunc          func(gethCommon.Address) (*big.Int, error)
 	GetNonceFunc            func(gethCommon.Address) (uint64, error)
 	GetCodeFunc             func(gethCommon.Address) ([]byte, error)
@@ -650,6 +652,13 @@ func (v *MockedReadOnlyView) Exist(addr gethCommon.Address) (bool, error) {
 		panic("Exist is not set in this mocked view")
 	}
 	return v.ExistFunc(addr)
+}
+
+func (v *MockedReadOnlyView) IsCreated(addr gethCommon.Address) bool {
+	if v.IsCreatedFunc == nil {
+		panic("IsCreated is not set in this mocked view")
+	}
+	return v.IsCreatedFunc(addr)
 }
 
 func (v *MockedReadOnlyView) HasSuicided(addr gethCommon.Address) bool {

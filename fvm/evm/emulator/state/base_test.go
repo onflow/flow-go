@@ -201,6 +201,7 @@ func TestBaseView(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, false, view.HasSuicided(gethCommon.Address{}))
+		require.Equal(t, false, view.IsCreated(gethCommon.Address{}))
 		require.Equal(t, uint64(0), view.GetRefund())
 		require.Equal(t, gethCommon.Hash{}, view.GetTransientState(types.SlotAddress{}))
 		require.Equal(t, false, view.AddressInAccessList(gethCommon.Address{}))

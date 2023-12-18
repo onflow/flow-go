@@ -18,6 +18,32 @@ import (
 func TestStateDB(t *testing.T) {
 	t.Parallel()
 
+	t.Run("test commit functionality", func(t *testing.T) {
+		ledger := testutils.GetSimpleValueStore()
+		rootAddr := flow.Address{1, 2, 3, 4, 5, 6, 7, 8}
+		db, err := state.NewStateDB(ledger, rootAddr)
+		require.NoError(t, err)
+
+		addr1 := testutils.RandomCommonAddress(t)
+
+		db.CreateAccount(addr1)
+		require.NoError(t, db.Error())
+
+		db.AddBalance(addr1, big.NewInt(5))
+		require.NoError(t, db.Error())
+
+		err = db.Commit()
+		require.NoError(t, err)
+
+		// create a new db
+		db, err = state.NewStateDB(ledger, rootAddr)
+		require.NoError(t, err)
+
+		bal := db.GetBalance(addr1)
+		require.NoError(t, db.Error())
+		require.Equal(t, big.NewInt(5), bal)
+	})
+
 	t.Run("test snapshot and revert functionality", func(t *testing.T) {
 		ledger := testutils.GetSimpleValueStore()
 		rootAddr := flow.Address{1, 2, 3, 4, 5, 6, 7, 8}
@@ -69,5 +95,9 @@ func TestStateDB(t *testing.T) {
 		bal = db.GetBalance(addr1)
 		require.NoError(t, db.Error())
 		require.Equal(t, big.NewInt(0), bal)
+
+		// revert to an invalid snapshot
+		db.RevertToSnapshot(10)
+		require.Error(t, db.Error())
 	})
 }

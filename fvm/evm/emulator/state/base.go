@@ -155,6 +155,10 @@ func (v *BaseView) UpdateSlot(sk types.SlotAddress, value gethCommon.Hash) error
 	return v.storeSlot(sk, value)
 }
 
+func (v *BaseView) IsCreated(gethCommon.Address) bool {
+	return false
+}
+
 func (v *BaseView) HasSuicided(gethCommon.Address) bool {
 	return false
 }

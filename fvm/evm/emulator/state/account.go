@@ -40,10 +40,12 @@ func NewAccount(
 	}
 }
 
+// Encode encodes the account
 func (a *Account) Encode() ([]byte, error) {
 	return rlp.EncodeToBytes(a)
 }
 
+// DecodeAccount constructs a new account from encoded data
 func DecodeAccount(inp []byte) (*Account, error) {
 	if len(inp) == 0 {
 		return nil, nil

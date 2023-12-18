@@ -103,6 +103,15 @@ func (d *DeltaView) CreateAccount(addr gethCommon.Address) error {
 	return nil
 }
 
+// IsCreated returns true if address has been created in this tx
+func (d *DeltaView) IsCreated(addr gethCommon.Address) bool {
+	_, found := d.created[addr]
+	if found {
+		return true
+	}
+	return d.parent.IsCreated(addr)
+}
+
 // HasSuicided returns true if address has been flagged for deletion
 func (d *DeltaView) HasSuicided(addr gethCommon.Address) bool {
 	_, found := d.suicided[addr]

@@ -34,6 +34,8 @@ type StateDB interface {
 type ReadOnlyView interface {
 	// Exist returns true if an address exist in the state
 	Exist(gethCommon.Address) (bool, error)
+	// IsCreated returns true if address has been created in this tx
+	IsCreated(gethCommon.Address) bool
 	// HasSuicided returns true if an address has suicided
 	HasSuicided(gethCommon.Address) bool
 	// GetBalance returns the balance of an address
@@ -103,6 +105,15 @@ type HotView interface {
 // baseview is usually updated at the commit calls to the higher level view
 type BaseView interface {
 	ReadOnlyView
+
+	// Creates a new account
+	CreateAccount(
+		addr gethCommon.Address,
+		balance *big.Int,
+		nonce uint64,
+		code []byte,
+		codeHash gethCommon.Hash,
+	) error
 
 	// UpdateAccount updates a account
 	UpdateAccount(
