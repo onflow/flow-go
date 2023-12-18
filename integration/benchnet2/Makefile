@@ -50,12 +50,12 @@ gen-bootstrap: clone-flow
 		--root-height 0 \
 		--root-parent 0000000000000000000000000000000000000000000000000000000000000000 \
 		--epoch-counter 0 \
-		--epoch-length 30000 \
-		--epoch-staking-phase-length 20000 \
-		--epoch-dkg-phase-length 2000 \
+		--epoch-length 5000 \
+		--epoch-staking-phase-length 500 \
+		--epoch-dkg-phase-length 1000 \
 		--collection-clusters 1 \
 		--protocol-version=0 \
-		--epoch-commit-safety-threshold=1000 \
+		--epoch-commit-safety-threshold=500 \
 		--config ../../../bootstrap/conf/node-config.json \
 		-o ../../../bootstrap/ \
 		--partner-dir ../../../bootstrap/partner-nodes \
