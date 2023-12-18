@@ -207,7 +207,7 @@ func (db *StateDB) RevertToSnapshot(index int) {
 func (db *StateDB) Snapshot() int {
 	newView := db.lastestView().NewChildView()
 	db.views = append(db.views, newView)
-	return len(db.views)
+	return len(db.views) - 1
 }
 
 func (db *StateDB) lastestView() *DeltaView {

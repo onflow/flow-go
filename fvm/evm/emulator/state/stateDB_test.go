@@ -1,0 +1,73 @@
+package state_test
+
+import (
+	"math/big"
+	"testing"
+
+	"github.com/onflow/flow-go/fvm/evm/emulator/state"
+	"github.com/onflow/flow-go/fvm/evm/testutils"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/stretchr/testify/require"
+)
+
+// Test revert
+// Test error handling
+// Test commit
+// Test logs
+
+func TestStateDB(t *testing.T) {
+	t.Parallel()
+
+	t.Run("test snapshot and revert functionality", func(t *testing.T) {
+		ledger := testutils.GetSimpleValueStore()
+		rootAddr := flow.Address{1, 2, 3, 4, 5, 6, 7, 8}
+		db, err := state.NewStateDB(ledger, rootAddr)
+		require.NoError(t, err)
+
+		addr1 := testutils.RandomCommonAddress(t)
+		require.False(t, db.Exist(addr1))
+		require.NoError(t, db.Error())
+
+		snapshot1 := db.Snapshot()
+		require.Equal(t, 1, snapshot1)
+
+		db.CreateAccount(addr1)
+		require.NoError(t, db.Error())
+
+		require.True(t, db.Exist(addr1))
+		require.NoError(t, db.Error())
+
+		db.AddBalance(addr1, big.NewInt(5))
+		require.NoError(t, db.Error())
+
+		bal := db.GetBalance(addr1)
+		require.NoError(t, db.Error())
+		require.Equal(t, big.NewInt(5), bal)
+
+		snapshot2 := db.Snapshot()
+		require.Equal(t, 2, snapshot2)
+
+		db.AddBalance(addr1, big.NewInt(5))
+		require.NoError(t, db.Error())
+
+		bal = db.GetBalance(addr1)
+		require.NoError(t, db.Error())
+		require.Equal(t, big.NewInt(10), bal)
+
+		// revert to snapshot 2
+		db.RevertToSnapshot(snapshot2)
+		require.NoError(t, db.Error())
+
+		bal = db.GetBalance(addr1)
+		require.NoError(t, db.Error())
+		require.Equal(t, big.NewInt(5), bal)
+
+		// revert to snapshot 1
+		db.RevertToSnapshot(snapshot1)
+		require.NoError(t, db.Error())
+
+		bal = db.GetBalance(addr1)
+		require.NoError(t, db.Error())
+		require.Equal(t, big.NewInt(0), bal)
+	})
+}

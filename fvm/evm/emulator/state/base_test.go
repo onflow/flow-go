@@ -13,13 +13,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// get account test
-// Update tests
-
 func TestBaseView(t *testing.T) {
 	t.Parallel()
 
-	t.Run("test account creation functionality", func(t *testing.T) {
+	t.Run("test account functionalities", func(t *testing.T) {
 		ledger := testutils.GetSimpleValueStore()
 		rootAddr := flow.Address{1, 2, 3, 4, 5, 6, 7, 8}
 		view, err := state.NewBaseView(ledger, rootAddr)
@@ -62,11 +59,11 @@ func TestBaseView(t *testing.T) {
 		err = view.Commit()
 		require.NoError(t, err)
 
-		view2, err := state.NewBaseView(ledger, rootAddr)
+		view, err = state.NewBaseView(ledger, rootAddr)
 		require.NoError(t, err)
 
 		checkAccount(t,
-			view2,
+			view,
 			addr1,
 			true,
 			newBal,
@@ -75,9 +72,78 @@ func TestBaseView(t *testing.T) {
 			newCodeHash,
 		)
 
+		// test update account
+
+		newBal = big.NewInt(12)
+		newNonce = uint64(6)
+		newCode = []byte("some new code")
+		newCodeHash = gethCommon.Hash{2, 3}
+		err = view.UpdateAccount(addr1, newBal, newNonce, newCode, newCodeHash)
+		require.NoError(t, err)
+
+		// check data from cache
+		checkAccount(t,
+			view,
+			addr1,
+			true,
+			newBal,
+			newNonce,
+			newCode,
+			newCodeHash,
+		)
+
+		// commit the changes and create a new baseview
+		err = view.Commit()
+		require.NoError(t, err)
+
+		view, err = state.NewBaseView(ledger, rootAddr)
+		require.NoError(t, err)
+
+		checkAccount(t,
+			view,
+			addr1,
+			true,
+			newBal,
+			newNonce,
+			newCode,
+			newCodeHash,
+		)
+
+		// test delete account
+
+		err = view.DeleteAccount(addr1)
+		require.NoError(t, err)
+
+		// check from cache
+		checkAccount(t,
+			view,
+			addr1,
+			false,
+			big.NewInt(0),
+			uint64(0),
+			nil,
+			gethTypes.EmptyCodeHash,
+		)
+
+		// commit the changes and create a new baseview
+		err = view.Commit()
+		require.NoError(t, err)
+
+		view, err = state.NewBaseView(ledger, rootAddr)
+		require.NoError(t, err)
+
+		checkAccount(t,
+			view,
+			addr1,
+			false,
+			big.NewInt(0),
+			uint64(0),
+			nil,
+			gethTypes.EmptyCodeHash,
+		)
 	})
 
-	// delete account (etc)
+	// add test update and delete account (etc)
 
 	t.Run("test slot storage", func(t *testing.T) {
 		ledger := testutils.GetSimpleValueStore()
