@@ -283,8 +283,9 @@ func (v *BaseView) UpdateAccount(
 	if err != nil {
 		return err
 	}
-	// create account first
-	// TODO: we might need to revisit this
+	// if update is called on a non existing account
+	// we gracefully call the create account
+	// TODO: but we might need to revisit this action
 	if acc == nil {
 		return v.CreateAccount(addr, balance, nonce, code, codeHash)
 	}

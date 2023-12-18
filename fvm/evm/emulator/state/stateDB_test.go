@@ -11,8 +11,7 @@ import (
 )
 
 // Test revert
-// Test error handling
-// Test commit
+// TODO: add test for error handling
 // Test logs
 
 func TestStateDB(t *testing.T) {
