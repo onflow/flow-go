@@ -95,7 +95,7 @@ func rootEpochTargetEndTime() uint64 {
 		panic("invalid epoch timing config: reference epoch counter must be before root epoch counter")
 	}
 	targetEndTime := flagEpochTimingRefTimestamp + (flagEpochCounter-flagEpochTimingRefCounter)*flagEpochTimingDuration
-	if targetEndTime < uint64(time.Now().Unix()) {
+	if targetEndTime <= uint64(time.Now().Unix()) {
 		panic("sanity check failed: root epoch target end time is before current time")
 	}
 	return targetEndTime
