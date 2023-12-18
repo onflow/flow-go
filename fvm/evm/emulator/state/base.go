@@ -283,6 +283,11 @@ func (v *BaseView) UpdateAccount(
 	if err != nil {
 		return err
 	}
+	// create account first
+	// TODO: we might need to revisit this
+	if acc == nil {
+		return v.CreateAccount(addr, balance, nonce, code, codeHash)
+	}
 	// if it has a code change
 	if codeHash != acc.CodeHash {
 		err := v.storeCode(addr, code)

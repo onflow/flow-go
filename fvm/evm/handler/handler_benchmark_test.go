@@ -12,6 +12,7 @@ import (
 
 func BenchmarkStorage(b *testing.B) { benchmarkStorageGrowth(b, 100, 100) }
 
+// TODO: fix me
 // benchmark
 func benchmarkStorageGrowth(b *testing.B, accountCount, setupKittyCount int) {
 	testutils.RunWithTestBackend(b, func(backend *testutils.TestBackend) {
@@ -21,7 +22,7 @@ func benchmarkStorageGrowth(b *testing.B, accountCount, setupKittyCount int) {
 				backend,
 				rootAddr,
 				func(tc *testutils.TestContract) {
-					db, handler := SetupHandler(b, backend, rootAddr)
+					handler := SetupHandler(b, backend, rootAddr)
 					numOfAccounts := 100000
 					accounts := make([]types.Account, numOfAccounts)
 					// setup several of accounts
@@ -57,8 +58,8 @@ func benchmarkStorageGrowth(b *testing.B, accountCount, setupKittyCount int) {
 					}
 
 					// measure the impact of mint after the setup phase
-					db.ResetReporter()
-					db.DropCache()
+					// db.ResetReporter()
+					// db.DropCache()
 
 					accounts[0].Call(
 						tc.DeployedAt,
@@ -73,8 +74,8 @@ func benchmarkStorageGrowth(b *testing.B, accountCount, setupKittyCount int) {
 						types.Balance(0),
 					)
 
-					b.ReportMetric(float64(db.BytesRetrieved()), "bytes_read")
-					b.ReportMetric(float64(db.BytesStored()), "bytes_written")
+					// b.ReportMetric(float64(db.BytesRetrieved()), "bytes_read")
+					// b.ReportMetric(float64(db.BytesStored()), "bytes_written")
 					b.ReportMetric(float64(backend.TotalStorageSize()), "total_storage_size")
 				})
 		})
