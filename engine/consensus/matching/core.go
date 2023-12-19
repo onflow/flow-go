@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
@@ -180,12 +181,14 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 		Hex("initial_state", initialState[:]).
 		Hex("final_state", finalState[:]).Logger()
 
-	// if the receipt is for an unknown block, skip it. It will be re-requested
-	// later by `requestPending` function.
+	// if the receipt is for an unknown block, skip it. It will be re-requested later by `requestPending` function.
 	executedBlock, err := c.headersDB.ByBlockID(receipt.ExecutionResult.BlockID)
 	if err != nil {
-		log.Debug().Msg("discarding receipt for unknown block")
-		return false, nil
+		if errors.Is(err, storage.ErrNotFound) {
+			log.Debug().Msg("dropping execution receipt for unknown block")
+			return false, nil
+		}
+		return false, irrecoverable.NewExceptionf("encountered unexpected storage error attempting to retrieve block %v: %w", receipt.ExecutionResult.BlockID, err)
 	}
 
 	log = log.With().

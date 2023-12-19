@@ -1,5 +1,3 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package protocol
 
 import (
@@ -33,7 +31,10 @@ type Snapshot interface {
 	// history. It can represent either a finalized or ambiguous block,
 	// depending on our selection criteria. Either way, it's the block on which
 	// we should build the next block in the context of the selected state.
-	// TODO document error returns
+	// Expected error returns:
+	//   - state.ErrUnknownSnapshotReference if the reference point for the snapshot
+	//     (height or block ID) does not resolve to a queriable block in the state.
+	// All other errors should be treated as exceptions.
 	Head() (*flow.Header, error)
 
 	// QuorumCertificate returns a valid quorum certificate for the header at
@@ -54,12 +55,19 @@ type Snapshot interface {
 	//
 	// It allows us to provide optional upfront filters which can be used by the
 	// implementation to speed up database lookups.
-	// TODO document error returns
+	// Expected error returns:
+	//   - state.ErrUnknownSnapshotReference if the reference point for the snapshot
+	//     (height or block ID) does not resolve to a queriable block in the state.
+	// All other errors should be treated as exceptions.
 	Identities(selector flow.IdentityFilter) (flow.IdentityList, error)
 
 	// Identity attempts to retrieve the node with the given identifier at the
 	// selected point of the protocol state history. It will error if it doesn't exist.
-	// TODO document error returns
+	// Expected error returns:
+	//   - state.ErrUnknownSnapshotReference if the reference point for the snapshot
+	//     (height or block ID) does not resolve to a queriable block in the state.
+	//   - protocol.IdentityNotFoundError if nodeID does not correspond to a valid node.
+	// All other errors should be treated as exceptions.
 	Identity(nodeID flow.Identifier) (*flow.Identity, error)
 
 	// SealedResult returns the most recent included seal as of this block and
