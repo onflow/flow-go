@@ -273,6 +273,7 @@ type FlowAccessNodeBuilder struct {
 	ExecutionIndexerCore       *indexer.IndexerCore
 	ScriptExecutor             *backend.ScriptExecutor
 	RegistersAsyncStore        *execution.RegistersAsyncStore
+	IndexerDependencies        *cmd.DependencyList
 
 	// The sync engine participants provider is the libp2p peer store for the access node
 	// which is not available until after the network has started.
@@ -488,8 +489,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 
 	// setup dependency chain to ensure indexer starts after the requester
 	requesterDependable := module.NewProxiedReadyDoneAware()
-	indexerDependencies := cmd.NewDependencyList()
-	indexerDependencies.Add(requesterDependable)
+	builder.IndexerDependencies.Add(requesterDependable)
 
 	builder.
 		AdminCommand("read-execution-data", func(config *cmd.NodeConfig) commands.AdminCommand {
@@ -716,14 +716,14 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 
 					checkpointHeight := builder.SealedRootBlock.Header.Height
 
-					buutstrap, err := pStorage.NewRegisterBootstrap(pdb, checkpointFile, checkpointHeight, builder.Logger)
+					bootstrap, err := pStorage.NewRegisterBootstrap(pdb, checkpointFile, checkpointHeight, builder.Logger)
 					if err != nil {
-						return nil, fmt.Errorf("could not create registers bootstrapper: %w", err)
+						return nil, fmt.Errorf("could not create registers bootstrap: %w", err)
 					}
 
 					// TODO: find a way to hook a context up to this to allow a graceful shutdown
 					workerCount := 10
-					err = buutstrap.IndexCheckpointFile(context.Background(), workerCount)
+					err = bootstrap.IndexCheckpointFile(context.Background(), workerCount)
 					if err != nil {
 						return nil, fmt.Errorf("could not load checkpoint file: %w", err)
 					}
@@ -744,6 +744,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					builder.Storage.Headers,
 					builder.Storage.Events,
 					builder.Storage.LightTransactionResults,
+					builder.IngestEng.OnCollection,
 				)
 				if err != nil {
 					return nil, err
@@ -790,7 +791,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				builder.ScriptExecutor.InitReporter(builder.ExecutionIndexer, scripts)
 
 				return builder.ExecutionIndexer, nil
-			}, indexerDependencies)
+			}, builder.IndexerDependencies)
 	}
 
 	if builder.stateStreamConf.ListenAddr != "" {
@@ -861,6 +862,7 @@ func FlowAccessNode(nodeBuilder *cmd.FlowNodeBuilder) *FlowAccessNodeBuilder {
 		AccessNodeConfig:    DefaultAccessNodeConfig(),
 		FlowNodeBuilder:     nodeBuilder,
 		FollowerDistributor: dist,
+		IndexerDependencies: cmd.NewDependencyList(),
 	}
 }
 
@@ -1259,6 +1261,9 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 		builder.BuildExecutionSyncComponents()
 	}
 
+	ingestionDependable := module.NewProxiedReadyDoneAware()
+	builder.IndexerDependencies.Add(ingestionDependable)
+
 	builder.
 		BuildConsensusFollower().
 		Module("collection node client", func(node *cmd.NodeConfig) error {
@@ -1535,6 +1540,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			if err != nil {
 				return nil, err
 			}
+			ingestionDependable.Init(builder.IngestEng)
 			builder.RequestEng.WithHandle(builder.IngestEng.OnCollection)
 			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.IngestEng.OnFinalizedBlock)
 

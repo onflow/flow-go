@@ -32,9 +32,10 @@ const collectionCatchupTimeout = 30 * time.Second
 // time to poll the storage to check if missing collections have been received
 const collectionCatchupDBPollInterval = 10 * time.Millisecond
 
+// time to update the FullBlockHeight index
 const fullBlockRefreshInterval = 10 * time.Second
 
-// time to update the FullBlockHeight index
+// time to request missing collections from the network
 const missingCollsRequestInterval = 1 * time.Minute
 
 // a threshold of number of blocks with missing collections beyond which collections should be re-requested
@@ -203,6 +204,8 @@ func (e *Engine) initLastFullBlockHeightIndex() error {
 	if err != nil {
 		return fmt.Errorf("failed to get root block: %w", err)
 	}
+
+	// insert is a noop if the index has already been initialized and no error is returned
 	err = e.blocks.InsertLastFullBlockHeightIfNotExists(rootBlock.Height)
 	if err != nil {
 		return fmt.Errorf("failed to update last full block height during ingestion engine startup: %w", err)
@@ -753,7 +756,7 @@ func (e *Engine) lowestHeightWithMissingCollection(lastFullHeight, finalizedHeig
 	return newLastFullHeight, nil
 }
 
-// checkMissingCollections requests missing collections if the number of blocks missing collection
+// checkMissingCollections requests missing collections if the number of blocks missing collections
 // have reached the defaultMissingCollsForBlkThreshold value.
 func (e *Engine) checkMissingCollections() error {
 	lastFullHeight, err := e.blocks.GetLastFullBlockHeight()
