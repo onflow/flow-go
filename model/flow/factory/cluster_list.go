@@ -30,7 +30,7 @@ func NewClusterList(assignments flow.AssignmentList, collectors flow.IdentityLis
 	for i, participants := range assignments {
 		cluster := make(flow.IdentityList, 0, len(participants))
 		if len(participants) == 0 {
-			return nil, fmt.Errorf("particpants in assignment list is empty, cluster index %v", i)
+			return nil, fmt.Errorf("participants in assignment list is empty, cluster index %v", i)
 		}
 
 		// Check assignments is sorted in canonical order
@@ -45,8 +45,8 @@ func NewClusterList(assignments flow.AssignmentList, collectors flow.IdentityLis
 			delete(lookup, participantID)
 
 			if i > 0 {
-				if order.IdentifierCanonical(prev, participantID) > 0 {
-					return nil, fmt.Errorf("the assignments is not sorted in canonical order in cluster index %v, prev %v, next %v",
+				if order.IdentifierCanonical(prev, participantID) >= 0 {
+					return nil, fmt.Errorf("the assignments is not sorted in canonical order or there are duplicates in cluster index %v, prev %v, next %v",
 						i, prev, participantID)
 				}
 			}

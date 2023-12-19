@@ -118,9 +118,13 @@ func (il IdentifierList) Sort(less IdentifierOrder) IdentifierList {
 	return dup
 }
 
-// Sorted returns whether the list is sorted by the input ordering.
-//
-// If the list is well sorted and has duplicates, the function returns `true`.
-func (il IdentifierList) Sorted(less IdentifierOrder) bool {
-	return slices.IsSortedFunc(il, less)
+// StrictlySorted returns whether the list is strictly sorted by the input ordering.
+// Strictly means that the function checks there is not order equality among the elements.
+func (il IdentifierList) StrictlySorted(less IdentifierOrder) bool {
+	for i := 0; i < len(il)-1; i++ {
+		if less(il[i], il[i+1]) >= 0 {
+			return false
+		}
+	}
+	return true
 }

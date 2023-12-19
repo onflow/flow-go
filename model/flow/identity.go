@@ -396,9 +396,15 @@ func (il IdentityList) Sort(less IdentityOrder) IdentityList {
 	return dup
 }
 
-// Sorted returns whether the list is sorted by the input ordering.
-func (il IdentityList) Sorted(less IdentityOrder) bool {
-	return slices.IsSortedFunc(il, less)
+// StrictlySorted returns whether the list is strictly sorted by the input ordering.
+// Strictly means that the function checks there is not order equality among the elements.
+func (il IdentityList) StrictlySorted(less IdentityOrder) bool {
+	for i := 0; i < len(il)-1; i++ {
+		if less(il[i], il[i+1]) >= 0 {
+			return false
+		}
+	}
+	return true
 }
 
 // NodeIDs returns the NodeIDs of the nodes in the list.
