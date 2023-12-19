@@ -7,6 +7,11 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"github.com/onflow/flow-go/module"
+	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
+)
+
+const (
+	labelIHaveMessage = "ihave_actual_message"
 )
 
 // GossipSubRpcValidationInspectorMetrics metrics collector for the gossipsub RPC validation inspector.
@@ -14,6 +19,7 @@ type GossipSubRpcValidationInspectorMetrics struct {
 	prefix                                 string
 	rpcCtrlMsgInAsyncPreProcessingGauge    prometheus.Gauge
 	rpcCtrlMsgAsyncProcessingTimeHistogram prometheus.Histogram
+	rpcCtrlMsgTruncation                   prometheus.HistogramVec
 }
 
 var _ module.GossipSubRpcValidationInspectorMetrics = (*GossipSubRpcValidationInspectorMetrics)(nil)
@@ -52,4 +58,23 @@ func (c *GossipSubRpcValidationInspectorMetrics) AsyncProcessingStarted() {
 func (c *GossipSubRpcValidationInspectorMetrics) AsyncProcessingFinished(duration time.Duration) {
 	c.rpcCtrlMsgInAsyncPreProcessingGauge.Dec()
 	c.rpcCtrlMsgAsyncProcessingTimeHistogram.Observe(duration.Seconds())
+}
+
+// OnControlMessageIDsTruncated tracks the number of times a control message was truncated.
+// Args:
+//
+//	messageType: the type of the control message that was truncated
+//	diff: the number of message ids truncated.
+func (c *GossipSubRpcValidationInspectorMetrics) OnControlMessageIDsTruncated(messageType p2pmsg.ControlMessageType, diff int) {
+	c.rpcCtrlMsgTruncation.WithLabelValues(messageType.String()).Observe(float64(diff))
+}
+
+// OnIHaveMessageTruncated tracks the number of times an IHave message was truncated.
+// Note that this function is called whenever an actual iHave message is truncated with all the message ids that it contains.
+// This is different from the OnControlMessageIDsTruncated function which is called whenever some message ids are truncated from a control message.
+// Args:
+//
+//	diff: the number of actual messages truncated.
+func (c *GossipSubRpcValidationInspectorMetrics) OnIHaveMessageTruncated(diff int) {
+	c.OnControlMessageIDsTruncated(labelIHaveMessage, diff)
 }
