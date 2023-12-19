@@ -4,22 +4,25 @@ import (
 	"math/big"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
+	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
-// Account holds the metadata of an address and provides (de)serialization
+// Account holds the metadata of an address and provides (de)serialization functionality
 //
-// note that code and slots of an address is not part of this data structure
+// Note that code and storage slots of an address is not part of this data structure
 type Account struct {
 	// address
 	Address gethCommon.Address
-	// balance of the account
+	// balance of the address
 	Balance *big.Int
-	// nonce
+	// nonce of the address
 	Nonce uint64
 	// hash of the code
+	// if no code the gethTypes.EmptyCodeHash is stored
 	CodeHash gethCommon.Hash
-	// CollectionID of the id of the collection holds slots of this account
+	// the id of the collection holds storage slots for this account
+	// this value is nil for EOA accounts
 	CollectionID []byte
 }
 
@@ -40,12 +43,16 @@ func NewAccount(
 	}
 }
 
+func (a *Account) HasCode() bool {
+	return a.CodeHash != gethTypes.EmptyCodeHash
+}
+
 // Encode encodes the account
 func (a *Account) Encode() ([]byte, error) {
 	return rlp.EncodeToBytes(a)
 }
 
-// DecodeAccount constructs a new account from encoded data
+// DecodeAccount constructs a new account from the encoded data
 func DecodeAccount(inp []byte) (*Account, error) {
 	if len(inp) == 0 {
 		return nil, nil

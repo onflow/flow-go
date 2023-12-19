@@ -29,7 +29,7 @@ type StateDB interface {
 
 // ReadOnlyView provides a readonly view of the state
 type ReadOnlyView interface {
-	// Exist returns true if an address exist in the state
+	// Exist returns true if the address exist in the state
 	Exist(gethCommon.Address) (bool, error)
 	// IsCreated returns true if address has been created in this tx
 	IsCreated(gethCommon.Address) bool

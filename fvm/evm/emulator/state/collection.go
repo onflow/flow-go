@@ -12,11 +12,17 @@ import (
 	"github.com/onflow/atree"
 )
 
+const (
+	storageIDSize = 16
+)
+
+// CollectionProvider provides access to collections
 type CollectionProvider struct {
 	rootAddr atree.Address
 	storage  *atree.PersistentSlabStorage
 }
 
+// NewCollectionProvider constructs a new CollectionProvider
 func NewCollectionProvider(
 	rootAddr atree.Address,
 	ledger atree.Ledger,
@@ -33,6 +39,13 @@ func NewCollectionProvider(
 	}, err
 }
 
+// CollectionByID returns the collection by collection ID
+//
+// if no collection is found with that collection id, it return error
+// Warning: this method should only used only once for each collection and
+// the returned pointer should be kept for the future.
+// calling twice for the same collection might result in odd-behaviours
+// currently collection provider doesn't do any internal caching to protect aginast these cases
 func (cp *CollectionProvider) CollectionByID(collectionID []byte) (*Collection, error) {
 	storageID, err := atree.NewStorageIDFromRawBytes(collectionID)
 	if err != nil {
@@ -49,12 +62,13 @@ func (cp *CollectionProvider) CollectionByID(collectionID []byte) (*Collection, 
 	}, nil
 }
 
+// NewCollection constructs a new collection
 func (cp *CollectionProvider) NewCollection() (*Collection, error) {
 	omap, err := atree.NewMap(cp.storage, cp.rootAddr, atree.NewDefaultDigesterBuilder(), emptyTypeInfo{})
 	if err != nil {
 		return nil, err
 	}
-	storageIDBytes := make([]byte, StorageIDSize)
+	storageIDBytes := make([]byte, storageIDSize)
 	_, err = omap.StorageID().ToRawBytes(storageIDBytes)
 	if err != nil {
 		return nil, err
@@ -66,20 +80,30 @@ func (cp *CollectionProvider) NewCollection() (*Collection, error) {
 	}, nil
 }
 
+// Commit commits all changes to the collections with changes
 func (cp *CollectionProvider) Commit() error {
 	return cp.storage.FastCommit(runtime.NumCPU())
 }
 
+// Collection provides a persistent and compact way of storing key/value pairs
+// each collection has a unique collectionID that can be used to fetch the collection
+//
+// TODO(ramtin): we might not need any extra hashing on the atree side
+// and optimize this to just use the key given the keys are hashed ?
 type Collection struct {
 	omap         *atree.OrderedMap
 	storage      *atree.PersistentSlabStorage
 	collectionID []byte
 }
 
+// CollectionID returns the unique id for the collection
 func (c *Collection) CollectionID() []byte {
 	return c.collectionID
 }
 
+// Get gets the value for the given key
+//
+// if key doesn't exist it returns nil (no error)
 func (c *Collection) Get(key []byte) ([]byte, error) {
 	// first check if we have the key
 	// this avoids getting a NotFound error
@@ -104,6 +128,9 @@ func (c *Collection) Get(key []byte) ([]byte, error) {
 	return value.(ByteStringValue).Bytes(), nil
 }
 
+// Set sets the value for the given key
+//
+// if a value already stored at the given key it replaces the value
 func (c *Collection) Set(key, value []byte) error {
 	existingValueStorable, err := c.omap.Set(compare, hashInputProvider, NewByteStringValue(key), NewByteStringValue(value))
 	if err != nil {
@@ -120,7 +147,18 @@ func (c *Collection) Set(key, value []byte) error {
 	return nil
 }
 
+// Remove removes a key from the collection
+//
+// if the key doesn't exist it return no error
 func (c *Collection) Remove(key []byte) error {
+	found, err := c.omap.Has(compare, hashInputProvider, NewByteStringValue(key))
+	if err != nil {
+		return err
+	}
+	if !found {
+		return nil
+	}
+
 	_, existingValueStorable, err := c.omap.Remove(compare, hashInputProvider, NewByteStringValue(key))
 	if err != nil {
 		return err
@@ -136,6 +174,7 @@ func (c *Collection) Remove(key []byte) error {
 	return nil
 }
 
+// Destroy destroys the whole collection
 func (c *Collection) Destroy() error {
 	var cachedErr error
 	err := c.omap.PopIterate(func(_ atree.Storable, valueStorable atree.Storable) {
@@ -351,7 +390,6 @@ func NewPersistentSlabStorage(baseStorage atree.BaseStorage) (*atree.PersistentS
 		decodeStorable,
 		decodeTypeInfo,
 	), nil
-
 }
 
 type emptyTypeInfo struct{}
