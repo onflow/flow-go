@@ -13,10 +13,22 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestSort(t *testing.T) {
+func TestIdentityListCanonical(t *testing.T) {
 	nodes := unittest.NodeInfosFixture(20)
+	ids := bootstrap.ToIdentityList(nodes)
+
+	require.False(t,
+		order.IdentityListCanonical(ids),
+		"unlikely to fail but not impossible")
 	nodes = bootstrap.Sort(nodes, order.Canonical)
-	require.True(t, order.IdentityListCanonical(bootstrap.ToIdentityList(nodes)))
+	ids = bootstrap.ToIdentityList(nodes)
+	require.True(t, order.IdentityListCanonical(ids))
+
+	// check `StrictlySorted` detects order equality in a sorted list
+	nodes[1] = nodes[10] // add a duplication
+	nodes = bootstrap.Sort(nodes, order.Canonical)
+	ids = bootstrap.ToIdentityList(nodes)
+	assert.False(t, order.IdentityListCanonical(ids))
 }
 
 func TestNodeConfigEncodingJSON(t *testing.T) {
