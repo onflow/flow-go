@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/atree"
 
 	"github.com/onflow/flow-go/fvm/evm/emulator"
-	"github.com/onflow/flow-go/fvm/evm/emulator/database"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -387,10 +386,7 @@ func RunWithDeployedContract(t testing.TB, tc *TestContract, led atree.Ledger, f
 
 func DeployContract(t testing.TB, tc *TestContract, led atree.Ledger, flowEVMRootAddress flow.Address) {
 	// deploy contract
-	db, err := database.NewDatabase(led, flowEVMRootAddress)
-	require.NoError(t, err)
-
-	e := emulator.NewEmulator(db)
+	e := emulator.NewEmulator(led, flowEVMRootAddress)
 
 	blk, err := e.NewBlockView(types.NewDefaultBlockContext(2))
 	require.NoError(t, err)

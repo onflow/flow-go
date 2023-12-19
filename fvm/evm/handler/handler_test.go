@@ -23,7 +23,6 @@ import (
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm/emulator"
-	"github.com/onflow/flow-go/fvm/evm/emulator/database"
 	"github.com/onflow/flow-go/fvm/evm/handler"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/types"
@@ -194,7 +193,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 
 		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
-				_, handler := SetupHandler(t, backend, rootAddr)
+				handler := SetupHandler(t, backend, rootAddr)
 
 				eoa := testutils.GetTestEOAAccount(t, testutils.EOATestAccount1KeyHex)
 
@@ -250,7 +249,7 @@ func TestHandler_OpsWithoutEmulator(t *testing.T) {
 
 		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
-				_, handler := SetupHandler(t, backend, rootAddr)
+				handler := SetupHandler(t, backend, rootAddr)
 
 				// test call last executed block without initialization
 				b := handler.LastExecutedBlock()
@@ -300,7 +299,7 @@ func TestHandler_BridgedAccount(t *testing.T) {
 
 		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
-				_, handler := SetupHandler(t, backend, rootAddr)
+				handler := SetupHandler(t, backend, rootAddr)
 
 				foa := handler.AccountByAddress(handler.AllocateAddress(), true)
 				require.NotNil(t, foa)
@@ -474,7 +473,7 @@ func TestHandler_BridgedAccount(t *testing.T) {
 		// TODO update this test with events, gas metering, etc
 		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
-				_, handler := SetupHandler(t, backend, rootAddr)
+				handler := SetupHandler(t, backend, rootAddr)
 
 				foa := handler.AccountByAddress(handler.AllocateAddress(), true)
 				require.NotNil(t, foa)
@@ -533,18 +532,15 @@ func assertPanic(t *testing.T, check checkError, f func()) {
 	f()
 }
 
-func SetupHandler(t testing.TB, backend types.Backend, rootAddr flow.Address) (*database.Database, *handler.ContractHandler) {
+func SetupHandler(t testing.TB, backend types.Backend, rootAddr flow.Address) *handler.ContractHandler {
 	bs, err := handler.NewBlockStore(backend, rootAddr)
 	require.NoError(t, err)
 
 	aa, err := handler.NewAddressAllocator(backend, rootAddr)
 	require.NoError(t, err)
 
-	db, err := database.NewDatabase(backend, rootAddr)
-	require.NoError(t, err)
-
-	emulator := emulator.NewEmulator(db)
+	emulator := emulator.NewEmulator(backend, rootAddr)
 
 	handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, emulator)
-	return db, handler
+	return handler
 }

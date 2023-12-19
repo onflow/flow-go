@@ -10,7 +10,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func BenchmarkStorage(b *testing.B) { benchmarkStorageGrowth(b, 100, 100) }
+func BenchmarkStorage(b *testing.B) { benchmarkStorageGrowth(b, 100, 1_000_000) }
 
 // benchmark
 func benchmarkStorageGrowth(b *testing.B, accountCount, setupKittyCount int) {
@@ -21,12 +21,11 @@ func benchmarkStorageGrowth(b *testing.B, accountCount, setupKittyCount int) {
 				backend,
 				rootAddr,
 				func(tc *testutils.TestContract) {
-					db, handler := SetupHandler(b, backend, rootAddr)
-					numOfAccounts := 100000
-					accounts := make([]types.Account, numOfAccounts)
+					handler := SetupHandler(b, backend, rootAddr)
+					accounts := make([]types.Account, accountCount)
 					// setup several of accounts
 					// note that trie growth is the function of number of accounts
-					for i := 0; i < numOfAccounts; i++ {
+					for i := 0; i < accountCount; i++ {
 						account := handler.AccountByAddress(handler.AllocateAddress(), true)
 						account.Deposit(types.NewFlowTokenVault(types.Balance(100)))
 						accounts[i] = account
@@ -54,11 +53,8 @@ func benchmarkStorageGrowth(b *testing.B, accountCount, setupKittyCount int) {
 						)
 						require.Equal(b, 2, len(backend.Events()))
 						backend.DropEvents() // this would make things lighter
+						backend.ResetStats() // reset stats
 					}
-
-					// measure the impact of mint after the setup phase
-					db.ResetReporter()
-					db.DropCache()
 
 					accounts[0].Call(
 						tc.DeployedAt,
@@ -73,8 +69,8 @@ func benchmarkStorageGrowth(b *testing.B, accountCount, setupKittyCount int) {
 						types.Balance(0),
 					)
 
-					b.ReportMetric(float64(db.BytesRetrieved()), "bytes_read")
-					b.ReportMetric(float64(db.BytesStored()), "bytes_written")
+					b.ReportMetric(float64(backend.TotalBytesRead()), "bytes_read")
+					b.ReportMetric(float64(backend.TotalBytesWritten()), "bytes_written")
 					b.ReportMetric(float64(backend.TotalStorageSize()), "total_storage_size")
 				})
 		})
