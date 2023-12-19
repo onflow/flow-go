@@ -85,21 +85,21 @@ func NewUnicastManager(cfg *ManagerConfig) (*Manager, error) {
 		logger: cfg.Logger.With().Str("module", "unicast-manager").Logger(),
 		dialConfigCache: cfg.UnicastConfigCacheFactory(func() Config {
 			return Config{
-				StreamCreationRetryAttemptBudget: cfg.MaxStreamCreationRetryAttemptTimes,
+				StreamCreationRetryAttemptBudget: cfg.Parameters.MaxStreamCreationRetryAttemptTimes,
 			}
 		}),
 		streamFactory:                   cfg.StreamFactory,
 		sporkId:                         cfg.SporkId,
 		metrics:                         cfg.Metrics,
-		createStreamBackoffDelay:        cfg.CreateStreamBackoffDelay,
-		streamZeroBackoffResetThreshold: cfg.StreamZeroRetryResetThreshold,
-		maxStreamCreationAttemptTimes:   cfg.MaxStreamCreationRetryAttemptTimes,
+		createStreamBackoffDelay:        cfg.Parameters.CreateStreamBackoffDelay,
+		streamZeroBackoffResetThreshold: cfg.Parameters.StreamZeroRetryResetThreshold,
+		maxStreamCreationAttemptTimes:   cfg.Parameters.MaxStreamCreationRetryAttemptTimes,
 	}
 
 	m.logger.Info().
 		Hex("spork_id", logging.ID(cfg.SporkId)).
-		Dur("create_stream_backoff_delay", cfg.CreateStreamBackoffDelay).
-		Uint64("stream_zero_backoff_reset_threshold", cfg.StreamZeroRetryResetThreshold).
+		Dur("create_stream_backoff_delay", cfg.Parameters.CreateStreamBackoffDelay).
+		Uint64("stream_zero_backoff_reset_threshold", cfg.Parameters.StreamZeroRetryResetThreshold).
 		Msg("unicast manager created")
 
 	return m, nil

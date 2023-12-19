@@ -193,27 +193,27 @@ func TestConnGater(t *testing.T) {
 	node1.Host().Peerstore().AddAddrs(node2Info.ID, node2Info.Addrs, peerstore.PermanentAddrTTL)
 	node2.Host().Peerstore().AddAddrs(node1Info.ID, node1Info.Addrs, peerstore.PermanentAddrTTL)
 
-	err = node1.OpenProtectedStream(ctx, node2Info.ID, t.Name(), func(stream network.Stream) error {
+	err = node1.OpenAndWriteOnStream(ctx, node2Info.ID, t.Name(), func(stream network.Stream) error {
 		// no-op, as the connection should not be possible
 		return nil
 	})
 	require.ErrorContains(t, err, "target node is not on the approved list of nodes")
 
-	err = node2.OpenProtectedStream(ctx, node1Info.ID, t.Name(), func(stream network.Stream) error {
+	err = node2.OpenAndWriteOnStream(ctx, node1Info.ID, t.Name(), func(stream network.Stream) error {
 		// no-op, as the connection should not be possible
 		return nil
 	})
 	require.ErrorContains(t, err, "target node is not on the approved list of nodes")
 
 	node1Peers.Add(node2Info.ID, struct{}{})
-	err = node1.OpenProtectedStream(ctx, node2Info.ID, t.Name(), func(stream network.Stream) error {
+	err = node1.OpenAndWriteOnStream(ctx, node2Info.ID, t.Name(), func(stream network.Stream) error {
 		// no-op, as the connection should not be possible
 		return nil
 	})
 	require.Error(t, err)
 
 	node2Peers.Add(node1Info.ID, struct{}{})
-	err = node1.OpenProtectedStream(ctx, node2Info.ID, t.Name(), func(stream network.Stream) error {
+	err = node1.OpenAndWriteOnStream(ctx, node2Info.ID, t.Name(), func(stream network.Stream) error {
 		// no-op, as the connection should not be possible
 		return nil
 	})
@@ -303,7 +303,7 @@ func createConcurrentStreams(t *testing.T, ctx context.Context, nodes []p2p.LibP
 				wg.Add(1)
 				go func(sender p2p.LibP2PNode) {
 					defer wg.Done()
-					err := sender.OpenProtectedStream(ctx, pInfo.ID, t.Name(), func(stream network.Stream) error {
+					err := sender.OpenAndWriteOnStream(ctx, pInfo.ID, t.Name(), func(stream network.Stream) error {
 						streams <- stream
 
 						// wait for the done signal to close the stream
