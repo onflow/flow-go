@@ -149,17 +149,17 @@ network-config:
         error-threshold: 500
         ihave: # Max number of ihave messages in a sample to be inspected. If the number of ihave messages exceeds this configured value
           # the control message ihaves will be truncated to the max sample size. This sample is randomly selected.
-          max-sample-size: 1000
+          max-sample-size: 20
           # Max number of ihave message ids in a sample to be inspected per ihave. Each ihave message includes a list of message ids
           # each. If the size of the message ids list for a single ihave message exceeds the configured max message id sample size the list of message ids will be truncated.
-          max-message-id-sample-size: 1000
+          max-message-id-sample-size: 20
         iwant:
           # Max number of iwant messages in a sample to be inspected. If the total number of iWant control messages
           # exceeds this max sample size then the respective message will be truncated before being processed.
-          max-sample-size: 1000
+          max-sample-size: 20
           # Max number of iwant message ids in a sample to be inspected per iwant. Each iwant message includes a list of message ids
           # each, if the size of this list exceeds the configured max message id sample size the list of message ids will be truncated.
-          max-message-id-sample-size: 1000
+          max-message-id-sample-size: 20
           # The allowed threshold of iWant messages received without a corresponding tracked iHave message that was sent. If the cache miss threshold is exceeded an
           # invalid control message notification is disseminated and the sender will be penalized.
           cache-miss-threshold: .5
