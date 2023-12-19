@@ -62,7 +62,7 @@ func (s *RestStateStreamSuite) SetupTest() {
 		testnet.WithAdditionalFlag("--execution-data-sync-enabled=true"),
 		testnet.WithAdditionalFlagf("--execution-data-dir=%s", testnet.DefaultExecutionDataServiceDir),
 		testnet.WithAdditionalFlag("--execution-data-retry-delay=1s"),
-		testnet.WithAdditionalFlag("--execution-data-indexer-enabled=true"),
+		testnet.WithAdditionalFlag("--execution-data-indexing-enabled=true"),
 		testnet.WithAdditionalFlagf("--execution-state-dir=%s", testnet.DefaultExecutionStateDir),
 	)
 

@@ -402,7 +402,7 @@ func (s *ObserverSuite) getRestEndpoints() []RestEndpointTest {
 	block := unittest.BlockFixture()
 	executionResult := unittest.ExecutionResultFixture()
 	collection := unittest.CollectionFixture(2)
-	eventType := unittest.EventTypeFixture(flow.Testnet)
+	eventType := unittest.EventTypeFixture(flow.Localnet)
 
 	return []RestEndpointTest{
 		{
