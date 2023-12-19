@@ -77,10 +77,11 @@ func (s *BackendEventsSuite) SetupTest() {
 	s.execClient = access.NewExecutionAPIClient(s.T())
 	s.executionNodes = unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
 
-	s.blocks = make([]*flow.Block, 5)
-	s.blockIDs = make([]flow.Identifier, 5)
+	blockCount := 5
+	s.blocks = make([]*flow.Block, blockCount)
+	s.blockIDs = make([]flow.Identifier, blockCount)
 
-	for i := 0; i < 5; i++ {
+	for i := 0; i < blockCount; i++ {
 		var header *flow.Header
 		if i == 0 {
 			header = unittest.BlockHeaderFixture()
@@ -95,7 +96,7 @@ func (s *BackendEventsSuite) SetupTest() {
 			Payload: &payload,
 		}
 		// the last block is sealed
-		if i == 4 {
+		if i == blockCount-1 {
 			s.block = block
 			s.sealedHead = header
 		}
@@ -112,7 +113,7 @@ func (s *BackendEventsSuite) SetupTest() {
 
 	s.failingAddress = unittest.AddressFixture()
 
-	s.blockEvents = generator.GetEventsWithEncoding(2, entities.EventEncodingVersion_CCF_V0)
+	s.blockEvents = generator.GetEventsWithEncoding(10, entities.EventEncodingVersion_CCF_V0)
 	targetEvent = string(s.blockEvents[0].Type)
 
 	s.events.On("ByBlockID", mock.Anything).Return(func(blockID flow.Identifier) ([]flow.Event, error) {

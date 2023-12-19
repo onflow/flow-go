@@ -127,7 +127,7 @@ func (b *backendEvents) GetEventsForBlockIDs(
 }
 
 // getBlockEvents retrieves events for all the specified blocks that have the given type
-// It gets all events available on storage, and requests the rest to an execution node.
+// It gets all events available in storage, and requests the rest from an execution node.
 func (b *backendEvents) getBlockEvents(
 	ctx context.Context,
 	blockHeaders []*flow.Header,
