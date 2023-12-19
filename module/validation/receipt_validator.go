@@ -279,9 +279,7 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 	// all needed checks after we have validated all results.
 	receiptsByResult := payload.Receipts.GroupByResultID()
 
-	// first validate all results that were included into payload
-	// if one of results is invalid we fail the whole check because it could be violating parent-children relationship
-	// each execution
+	// validate all results that are incorporated into the payload. If one is malformed, the entire block is invalid.
 	for i, result := range payload.Results {
 		resultID := result.ID()
 

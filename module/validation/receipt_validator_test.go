@@ -793,8 +793,13 @@ func (s *ReceiptValidationSuite) TestValidateReceiptResultWithoutReceipt() {
 	s.Require().True(engine.IsInvalidInputError(err))
 }
 
-// TestValidateReceiptResultHasEnoughReceipts tests a case where a leader incorporates an execution result
-// into their proposal, which has multiple receipts and ReceiptValidator accepts it as valid payload.
+// TestValidateReceiptResultHasEnoughReceipts tests the happy path of a block proposal, where a leader
+// includes multiple Execution Receipts that commit to the same result. In this case, the Flow protocol
+// prescribes that
+//   - the Execution Result is only incorporated once
+//   - from each Receipt the `ExecutionReceiptMeta` is to be included.
+//
+// The validator is expected to accept such payload as valid.
 func (s *ReceiptValidationSuite) TestValidateReceiptResultHasEnoughReceipts() {
 	k := uint(5)
 	// assuming signatures are all good
