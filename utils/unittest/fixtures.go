@@ -1715,7 +1715,7 @@ func EventsFixture(
 }
 
 func EventTypeFixture(chainID flow.ChainID) flow.EventType {
-	eventType := fmt.Sprintf("A.%s.FlowToken.TokensDeposited", RandomAddressFixtureForChain(chainID))
+	eventType := fmt.Sprintf("A.%s.TestContract.TestEvent1", RandomAddressFixtureForChain(chainID))
 	return flow.EventType(eventType)
 }
 
