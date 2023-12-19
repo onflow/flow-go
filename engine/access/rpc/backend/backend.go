@@ -12,7 +12,9 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/cmd/build"
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
+	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -45,6 +47,9 @@ const DefaultConnectionPoolSize = 250
 var preferredENIdentifiers flow.IdentifierList
 var fixedENIdentifiers flow.IdentifierList
 
+type GetStartHeightFunc func(flow.Identifier, uint64) (uint64, error)
+type GetHighestHeight func() uint64
+
 // Backend implements the Access API.
 //
 // It is composed of several sub-backends that implement part of the Access API.
@@ -66,6 +71,9 @@ type Backend struct {
 	backendAccounts
 	backendExecutionResults
 	backendNetwork
+
+	*subscription.SubscriptionBackendHandler
+	backendSubscribeBlocks
 
 	state             protocol.State
 	chainID           flow.ChainID
@@ -102,6 +110,14 @@ type Params struct {
 	TxErrorMessagesCacheSize  uint
 	ScriptExecutor            execution.ScriptExecutor
 	ScriptExecutionMode       ScriptExecutionMode
+
+	Broadcaster    *engine.Broadcaster
+	SendTimeout    time.Duration
+	ResponseLimit  float64
+	SendBufferSize int
+
+	RootHeight             uint64
+	HighestAvailableHeight uint64
 }
 
 // New creates backend instance
@@ -143,7 +159,9 @@ func New(params Params) (*Backend, error) {
 	}
 
 	b := &Backend{
-		state: params.State,
+		state:                      params.State,
+		SubscriptionBackendHandler: subscription.NewSubscriptionBackendHandler(params.State, params.RootHeight, params.Headers, params.HighestAvailableHeight),
+
 		// create the sub-backends
 		backendScripts: backendScripts{
 			headers:           params.Headers,
@@ -212,12 +230,23 @@ func New(params Params) (*Backend, error) {
 			headers:              params.Headers,
 			snapshotHistoryLimit: params.SnapshotHistoryLimit,
 		},
+		backendSubscribeBlocks: backendSubscribeBlocks{
+			log:            params.Log,
+			state:          params.State,
+			blocks:         params.Blocks,
+			broadcaster:    params.Broadcaster,
+			sendTimeout:    params.SendTimeout,
+			responseLimit:  params.ResponseLimit,
+			sendBufferSize: params.SendBufferSize,
+		},
 		collections:       params.Collections,
 		executionReceipts: params.ExecutionReceipts,
 		connFactory:       params.ConnFactory,
 		chainID:           params.ChainID,
 		nodeInfo:          nodeInfo,
 	}
+	b.backendSubscribeBlocks.getStartHeight = b.GetStartHeight
+	b.backendSubscribeBlocks.getHighestHeight = b.GetHighestHeight
 
 	retry.SetBackend(b)
 

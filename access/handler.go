@@ -2,12 +2,15 @@ package access
 
 import (
 	"context"
+	"sync/atomic"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
+	"github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -17,6 +20,7 @@ import (
 )
 
 type Handler struct {
+	subscription.StateStreamHandler
 	api                  API
 	chain                flow.Chain
 	signerIndicesDecoder hotstuff.BlockSignerDecoder
@@ -29,8 +33,17 @@ type HandlerOption func(*Handler)
 
 var _ access.AccessAPIServer = (*Handler)(nil)
 
-func NewHandler(api API, chain flow.Chain, finalizedHeader module.FinalizedHeaderCache, me module.Local, options ...HandlerOption) *Handler {
+func NewHandler(api API,
+	chain flow.Chain,
+	finalizedHeader module.FinalizedHeaderCache,
+	me module.Local,
+	maxStreams uint32,
+	options ...HandlerOption) *Handler {
 	h := &Handler{
+		StateStreamHandler: subscription.StateStreamHandler{
+			MaxStreams:  int32(maxStreams),
+			StreamCount: atomic.Int32{},
+		},
 		api:                  api,
 		chain:                chain,
 		finalizedHeaderCache: finalizedHeader,
@@ -699,6 +712,61 @@ func (h *Handler) GetExecutionResultByID(ctx context.Context, req *access.GetExe
 		ExecutionResult: execResult,
 		Metadata:        metadata,
 	}, nil
+}
+func (h *Handler) SubscribeBlocks(request *access.SubscribeBlocksRequest, stream access.AccessAPI_SubscribeBlocksServer) error {
+	// check if the maximum number of streams is reached
+	if h.StreamCount.Load() >= h.MaxStreams {
+		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
+	}
+	h.StreamCount.Add(1)
+	defer h.StreamCount.Add(-1)
+
+	startBlockID := flow.ZeroID
+	if request.GetStartBlockId() != nil {
+		blockID, err := convert.BlockID(request.GetStartBlockId())
+		if err != nil {
+			return status.Errorf(codes.InvalidArgument, "could not convert start block ID: %v", err)
+		}
+		startBlockID = blockID
+	}
+
+	sub := h.api.SubscribeBlocks(stream.Context(), startBlockID, request.GetStartBlockHeight(), convert.MessageToBlockStatus(request.BlockStatus))
+
+	for {
+		v, ok := <-sub.Channel()
+		if !ok {
+			if sub.Err() != nil {
+				return rpc.ConvertError(sub.Err(), "stream encountered an error", codes.Internal)
+			}
+			return nil
+		}
+
+		blockResp, ok := v.(*flow.Block)
+		if !ok {
+			return status.Errorf(codes.Internal, "unexpected response type: %T", v)
+		}
+		emptyBlock := &flow.Block{}
+		if blockResp == emptyBlock {
+			continue
+		}
+
+		signerIDs, err := h.signerIndicesDecoder.DecodeSignerIDs(blockResp.Header)
+		if err != nil {
+			return status.Errorf(codes.Internal, "could not decode signer ids: %v", err)
+		}
+
+		blockMessage, err := convert.BlockToMessage(blockResp, signerIDs)
+		if err != nil {
+			return status.Errorf(codes.Internal, "could not convert block to entity: %v", err)
+		}
+
+		err = stream.Send(&access.SubscribeBlocksResponse{
+			Block: blockMessage,
+		})
+		if err != nil {
+			return rpc.ConvertError(err, "could not send response", codes.Internal)
+		}
+	}
 }
 
 func (h *Handler) blockResponse(block *flow.Block, fullResponse bool, status flow.BlockStatus) (*access.BlockResponse, error) {

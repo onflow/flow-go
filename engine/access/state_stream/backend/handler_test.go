@@ -24,6 +24,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	ssmock "github.com/onflow/flow-go/engine/access/state_stream/mock"
+	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
@@ -278,7 +279,7 @@ func TestExecutionDataStream(t *testing.T) {
 		request *executiondata.SubscribeExecutionDataRequest,
 		response *ExecutionDataResponse,
 	) {
-		sub := NewSubscription(1)
+		sub := subscription.NewSubscription(1)
 
 		api.On("SubscribeExecutionData", mock.Anything, flow.ZeroID, uint64(0), mock.Anything).Return(sub)
 
@@ -405,7 +406,7 @@ func TestEventStream(t *testing.T) {
 		request *executiondata.SubscribeEventsRequest,
 		response *EventsResponse,
 	) {
-		sub := NewSubscription(1)
+		sub := subscription.NewSubscription(1)
 
 		api.On("SubscribeEvents", mock.Anything, flow.ZeroID, uint64(0), mock.Anything).Return(sub)
 
@@ -608,10 +609,10 @@ func TestGetRegisterValues(t *testing.T) {
 func makeConfig(maxGlobalStreams uint32) Config {
 	return Config{
 		EventFilterConfig:    state_stream.DefaultEventFilterConfig,
-		ClientSendTimeout:    state_stream.DefaultSendTimeout,
-		ClientSendBufferSize: state_stream.DefaultSendBufferSize,
+		ClientSendTimeout:    subscription.DefaultSendTimeout,
+		ClientSendBufferSize: subscription.DefaultSendBufferSize,
 		MaxGlobalStreams:     maxGlobalStreams,
-		HeartbeatInterval:    state_stream.DefaultHeartbeatInterval,
+		HeartbeatInterval:    subscription.DefaultHeartbeatInterval,
 	}
 }
 

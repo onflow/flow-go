@@ -230,6 +230,10 @@ func (h *FlowAccessAPIRouter) GetExecutionResultByID(context context.Context, re
 	return res, err
 }
 
+func (h *FlowAccessAPIRouter) SubscribeBlocks(req *access.SubscribeBlocksRequest, server access.AccessAPI_SubscribeBlocksServer) error {
+	panic("implement me")
+}
+
 // FlowAccessAPIForwarder forwards all requests to a set of upstream access nodes or observers
 type FlowAccessAPIForwarder struct {
 	*forwarder.Forwarder

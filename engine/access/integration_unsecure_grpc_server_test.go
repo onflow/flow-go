@@ -22,8 +22,8 @@ import (
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
-	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
+	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/execution"
@@ -118,7 +118,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 
 	suite.broadcaster = engine.NewBroadcaster()
 
-	suite.execDataHeroCache = herocache.NewBlockExecutionData(state_stream.DefaultCacheSize, suite.log, metrics.NewNoopCollector())
+	suite.execDataHeroCache = herocache.NewBlockExecutionData(subscription.DefaultCacheSize, suite.log, metrics.NewNoopCollector())
 	suite.execDataCache = cache.NewExecutionDataCache(suite.eds, suite.headers, suite.seals, suite.results, suite.execDataHeroCache)
 
 	accessIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
@@ -232,8 +232,8 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	).Maybe()
 
 	conf := statestreambackend.Config{
-		ClientSendTimeout:    state_stream.DefaultSendTimeout,
-		ClientSendBufferSize: state_stream.DefaultSendBufferSize,
+		ClientSendTimeout:    subscription.DefaultSendTimeout,
+		ClientSendBufferSize: subscription.DefaultSendBufferSize,
 	}
 
 	stateStreamBackend, err := statestreambackend.New(

@@ -45,6 +45,7 @@ import (
 	rpcConnection "github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
+	stream_subscription "github.com/onflow/flow-go/engine/access/subscription"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
@@ -147,6 +148,7 @@ type AccessNodeConfig struct {
 	registersDBPath              string
 	checkpointFile               string
 	scriptExecutorConfig         query.QueryConfig
+	broadcaster                  *engine.Broadcaster
 }
 
 type PublicNetworkConfig struct {
@@ -195,14 +197,14 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		},
 		stateStreamConf: statestreambackend.Config{
 			MaxExecutionDataMsgSize: grpcutils.DefaultMaxMsgSize,
-			ExecutionDataCacheSize:  state_stream.DefaultCacheSize,
-			ClientSendTimeout:       state_stream.DefaultSendTimeout,
-			ClientSendBufferSize:    state_stream.DefaultSendBufferSize,
-			MaxGlobalStreams:        state_stream.DefaultMaxGlobalStreams,
+			ExecutionDataCacheSize:  stream_subscription.DefaultCacheSize,
+			ClientSendTimeout:       stream_subscription.DefaultSendTimeout,
+			ClientSendBufferSize:    stream_subscription.DefaultSendBufferSize,
+			MaxGlobalStreams:        stream_subscription.DefaultMaxGlobalStreams,
 			EventFilterConfig:       state_stream.DefaultEventFilterConfig,
-			ResponseLimit:           state_stream.DefaultResponseLimit,
-			HeartbeatInterval:       state_stream.DefaultHeartbeatInterval,
 			RegisterIDsRequestLimit: state_stream.DefaultRegisterIDsRequestLimit,
+			ResponseLimit:           stream_subscription.DefaultResponseLimit,
+			HeartbeatInterval:       stream_subscription.DefaultHeartbeatInterval,
 		},
 		stateStreamFilterConf:        nil,
 		ExecutionNodeAddress:         "localhost:9000",
@@ -236,6 +238,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		registersDBPath:              filepath.Join(homedir, ".flow", "execution_state"),
 		checkpointFile:               cmd.NotSet,
 		scriptExecutorConfig:         query.NewDefaultConfig(),
+		broadcaster:                  nil,
 	}
 }
 
@@ -811,7 +814,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			if err != nil {
 				return nil, fmt.Errorf("could not get highest consecutive height: %w", err)
 			}
-			broadcaster := engine.NewBroadcaster()
+			builder.broadcaster = engine.NewBroadcaster()
 
 			builder.stateStreamBackend, err = statestreambackend.New(
 				node.Logger,
@@ -822,7 +825,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				node.Storage.Results,
 				builder.ExecutionDataStore,
 				executionDataStoreCache,
-				broadcaster,
+				builder.broadcaster,
 				builder.executionDataConfig.InitialBlockHeight,
 				highestAvailableHeight,
 				builder.RegistersAsyncStore)
@@ -838,7 +841,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				node.RootChainID,
 				builder.stateStreamGrpcServer,
 				builder.stateStreamBackend,
-				broadcaster,
+				builder.broadcaster,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream engine: %w", err)
@@ -1439,6 +1442,11 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				return nil, fmt.Errorf("could not parse script execution mode: %w", err)
 			}
 
+			highestAvailableHeight, err := builder.ExecutionDataRequester.HighestConsecutiveHeight()
+			if err != nil {
+				return nil, fmt.Errorf("could not get highest consecutive height: %w", err)
+			}
+
 			nodeBackend, err := backend.New(backend.Params{
 				State:                     node.State,
 				CollectionRPC:             builder.CollectionRPC,
@@ -1463,6 +1471,12 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				TxErrorMessagesCacheSize:  builder.TxErrorMessagesCacheSize,
 				ScriptExecutor:            builder.ScriptExecutor,
 				ScriptExecutionMode:       scriptExecMode,
+				Broadcaster:               builder.broadcaster,
+				SendTimeout:               builder.stateStreamConf.ClientSendTimeout,
+				ResponseLimit:             builder.stateStreamConf.ResponseLimit,
+				SendBufferSize:            int(builder.stateStreamConf.ClientSendBufferSize),
+				RootHeight:                builder.executionDataConfig.InitialBlockHeight,
+				HighestAvailableHeight:    highestAvailableHeight,
 			})
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize backend: %w", err)

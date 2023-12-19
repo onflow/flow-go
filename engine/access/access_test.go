@@ -27,6 +27,7 @@ import (
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
+	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
@@ -169,6 +170,7 @@ func (suite *Suite) RunTest(
 			suite.chainID.Chain(),
 			suite.finalizedHeaderCache,
 			suite.me,
+			subscription.DefaultMaxGlobalStreams,
 			access.WithBlockSignerDecoder(suite.signerIndicesDecoder),
 		)
 		f(handler, db, all)
@@ -336,7 +338,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 		})
 		require.NoError(suite.T(), err)
 
-		handler := access.NewHandler(bnd, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me)
+		handler := access.NewHandler(bnd, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me, subscription.DefaultMaxGlobalStreams)
 
 		// Send transaction 1
 		resp, err := handler.SendTransaction(context.Background(), sendReq1)
@@ -658,7 +660,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		})
 		require.NoError(suite.T(), err)
 
-		handler := access.NewHandler(bnd, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me)
+		handler := access.NewHandler(bnd, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me, subscription.DefaultMaxGlobalStreams)
 
 		// create the ingest engine
 		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, all.Blocks, all.Headers, collections,
@@ -796,7 +798,7 @@ func (suite *Suite) TestGetTransactionResult() {
 		})
 		require.NoError(suite.T(), err)
 
-		handler := access.NewHandler(bnd, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me)
+		handler := access.NewHandler(bnd, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me, subscription.DefaultMaxGlobalStreams)
 
 		// create the ingest engine
 		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, all.Blocks, all.Headers, collections,
@@ -989,7 +991,7 @@ func (suite *Suite) TestExecuteScript() {
 		})
 		require.NoError(suite.T(), err)
 
-		handler := access.NewHandler(suite.backend, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me)
+		handler := access.NewHandler(suite.backend, suite.chainID.Chain(), suite.finalizedHeaderCache, suite.me, subscription.DefaultMaxGlobalStreams)
 
 		// initialize metrics related storage
 		metrics := metrics.NewNoopCollector()

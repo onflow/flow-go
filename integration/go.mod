@@ -355,3 +355,8 @@ require (
 replace github.com/onflow/flow-go => ../
 
 replace github.com/onflow/flow-go/insecure => ../insecure
+
+replace github.com/onflow/flow-emulator v0.54.1-0.20231110220143-28061d9b37e7 => github.com/AndriiDiachuk/flow-emulator v0.0.0-20231128135645-f5cda716a283
+
+//TODO: Remove when onflow/flow branch will be merged
+replace github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20231213135419-ae911cc351a2 => github.com/UlyanaAndrukhiv/flow/protobuf/go/flow v0.0.0-20231219141407-557af8046100

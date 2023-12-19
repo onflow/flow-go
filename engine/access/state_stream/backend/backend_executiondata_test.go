@@ -17,6 +17,7 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/state_stream"
+	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/execution"
@@ -83,12 +84,12 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 
 	s.broadcaster = engine.NewBroadcaster()
 
-	s.execDataHeroCache = herocache.NewBlockExecutionData(state_stream.DefaultCacheSize, logger, metrics.NewNoopCollector())
+	s.execDataHeroCache = herocache.NewBlockExecutionData(subscription.DefaultCacheSize, logger, metrics.NewNoopCollector())
 	s.execDataCache = cache.NewExecutionDataCache(s.eds, s.headers, s.seals, s.results, s.execDataHeroCache)
 
 	conf := Config{
-		ClientSendTimeout:       state_stream.DefaultSendTimeout,
-		ClientSendBufferSize:    state_stream.DefaultSendBufferSize,
+		ClientSendTimeout:       subscription.DefaultSendTimeout,
+		ClientSendBufferSize:    subscription.DefaultSendBufferSize,
 		RegisterIDsRequestLimit: state_stream.DefaultRegisterIDsRequestLimit,
 	}
 
@@ -330,12 +331,12 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionData() {
 			name:            "happy path - start from root block by height",
 			highestBackfill: len(s.blocks) - 1, // backfill all blocks
 			startBlockID:    flow.ZeroID,
-			startHeight:     s.backend.rootBlockHeight, // start from root block
+			startHeight:     s.backend.SubscriptionBackendHandler.RootHeight, // start from root block
 		},
 		{
 			name:            "happy path - start from root block by id",
-			highestBackfill: len(s.blocks) - 1,     // backfill all blocks
-			startBlockID:    s.backend.rootBlockID, // start from root block
+			highestBackfill: len(s.blocks) - 1,                                // backfill all blocks
+			startBlockID:    s.backend.SubscriptionBackendHandler.RootBlockID, // start from root block
 			startHeight:     0,
 		},
 	}
@@ -417,7 +418,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataHandlesErrors() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.backend.SubscribeExecutionData(subCtx, flow.ZeroID, s.backend.rootBlockHeight-1)
+		sub := s.backend.SubscribeExecutionData(subCtx, flow.ZeroID, s.backend.SubscriptionBackendHandler.RootHeight-1)
 		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()))
 	})
 
@@ -443,24 +444,24 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataHandlesErrors() {
 
 func (s *BackendExecutionDataSuite) TestGetRegisterValues() {
 	s.Run("normal case", func() {
-		res, err := s.backend.GetRegisterValues(flow.RegisterIDs{s.registerID}, s.backend.rootBlockHeight)
+		res, err := s.backend.GetRegisterValues(flow.RegisterIDs{s.registerID}, s.backend.SubscriptionBackendHandler.RootHeight)
 		require.NoError(s.T(), err)
 		require.NotEmpty(s.T(), res)
 	})
 
 	s.Run("returns error if block height is out of range", func() {
-		_, err := s.backend.GetRegisterValues(flow.RegisterIDs{s.registerID}, s.backend.rootBlockHeight+1)
+		_, err := s.backend.GetRegisterValues(flow.RegisterIDs{s.registerID}, s.backend.SubscriptionBackendHandler.RootHeight+1)
 		require.Equal(s.T(), codes.OutOfRange, status.Code(err))
 	})
 
 	s.Run("returns error if register path is not indexed", func() {
 		falseID := flow.RegisterIDs{flow.RegisterID{Owner: "ha", Key: "ha"}}
-		_, err := s.backend.GetRegisterValues(falseID, s.backend.rootBlockHeight)
+		_, err := s.backend.GetRegisterValues(falseID, s.backend.SubscriptionBackendHandler.RootHeight)
 		require.Equal(s.T(), codes.NotFound, status.Code(err))
 	})
 
 	s.Run("returns error if too many registers are requested", func() {
-		_, err := s.backend.GetRegisterValues(make(flow.RegisterIDs, s.backend.registerRequestLimit+1), s.backend.rootBlockHeight)
+		_, err := s.backend.GetRegisterValues(make(flow.RegisterIDs, s.backend.registerRequestLimit+1), s.backend.SubscriptionBackendHandler.RootHeight)
 		require.Equal(s.T(), codes.InvalidArgument, status.Code(err))
 	})
 }

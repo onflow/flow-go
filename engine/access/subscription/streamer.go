@@ -1,4 +1,4 @@
-package backend
+package subscription
 
 import (
 	"context"
@@ -10,7 +10,6 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/access/state_stream"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/storage"
 )
@@ -18,7 +17,7 @@ import (
 // Streamer
 type Streamer struct {
 	log         zerolog.Logger
-	sub         state_stream.Streamable
+	sub         Streamable
 	broadcaster *engine.Broadcaster
 	sendTimeout time.Duration
 	limiter     *rate.Limiter
@@ -29,7 +28,7 @@ func NewStreamer(
 	broadcaster *engine.Broadcaster,
 	sendTimeout time.Duration,
 	limit float64,
-	sub state_stream.Streamable,
+	sub Streamable,
 ) *Streamer {
 	var limiter *rate.Limiter
 	if limit > 0 {

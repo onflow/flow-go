@@ -11,29 +11,31 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/executiondata"
 
 	"github.com/onflow/flow-go/engine/access/state_stream"
+	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 type Handler struct {
+	subscription.StateStreamHandler
+
 	api   state_stream.API
 	chain flow.Chain
 
-	eventFilterConfig state_stream.EventFilterConfig
-
-	maxStreams               int32
-	streamCount              atomic.Int32
+	eventFilterConfig        state_stream.EventFilterConfig
 	defaultHeartbeatInterval uint64
 }
 
 func NewHandler(api state_stream.API, chain flow.Chain, config Config) *Handler {
 	h := &Handler{
+		StateStreamHandler: subscription.StateStreamHandler{
+			MaxStreams:  int32(config.MaxGlobalStreams),
+			StreamCount: atomic.Int32{},
+		},
 		api:                      api,
 		chain:                    chain,
 		eventFilterConfig:        config.EventFilterConfig,
-		maxStreams:               int32(config.MaxGlobalStreams),
-		streamCount:              atomic.Int32{},
 		defaultHeartbeatInterval: config.HeartbeatInterval,
 	}
 	return h
@@ -65,11 +67,11 @@ func (h *Handler) GetExecutionDataByBlockID(ctx context.Context, request *execut
 
 func (h *Handler) SubscribeExecutionData(request *executiondata.SubscribeExecutionDataRequest, stream executiondata.ExecutionDataAPI_SubscribeExecutionDataServer) error {
 	// check if the maximum number of streams is reached
-	if h.streamCount.Load() >= h.maxStreams {
+	if h.StreamCount.Load() >= h.MaxStreams {
 		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
 	}
-	h.streamCount.Add(1)
-	defer h.streamCount.Add(-1)
+	h.StreamCount.Add(1)
+	defer h.StreamCount.Add(-1)
 
 	startBlockID := flow.ZeroID
 	if request.GetStartBlockId() != nil {
@@ -118,11 +120,11 @@ func (h *Handler) SubscribeExecutionData(request *executiondata.SubscribeExecuti
 
 func (h *Handler) SubscribeEvents(request *executiondata.SubscribeEventsRequest, stream executiondata.ExecutionDataAPI_SubscribeEventsServer) error {
 	// check if the maximum number of streams is reached
-	if h.streamCount.Load() >= h.maxStreams {
+	if h.StreamCount.Load() >= h.MaxStreams {
 		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
 	}
-	h.streamCount.Add(1)
-	defer h.streamCount.Add(-1)
+	h.StreamCount.Add(1)
+	defer h.StreamCount.Add(-1)
 
 	startBlockID := flow.ZeroID
 	if request.GetStartBlockId() != nil {
