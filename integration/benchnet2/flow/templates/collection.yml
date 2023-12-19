@@ -7,8 +7,8 @@ metadata:
   name: {{ $k }}
   labels:
     app: {{ $k }}
-    network: {{ $.Values.networkId }}
-    role: collection 
+    networkId: {{ $.Values.networkId }}
+    nodeType: collection
     owner: {{ $.Values.owner }}
     service: flow
 
@@ -29,10 +29,9 @@ spec:
         prometheus.io/port: "8080"
       labels:
         app: {{ $k }}
-        network: {{ $.Values.networkId }}
-        role: access
-        owner: {{ $.Values.owner }}
+        nodeType: collection
         service: flow
+        networkId: {{ $.Values.networkId }}
     spec:  
       nodeSelector:
         iam.gke.io/gke-metadata-server-enabled: "true"
