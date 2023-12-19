@@ -3,7 +3,9 @@ package backend
 import (
 	"context"
 	"crypto/md5" //nolint:gosec
+	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -473,4 +475,38 @@ func (s *BackendScriptsSuite) testExecuteScriptAtBlockHeight(ctx context.Context
 		s.Require().Equal(statusCode, status.Code(err))
 		s.Require().Nil(actual)
 	}
+}
+
+func TestTheThing(t *testing.T) {
+
+	testcases := []struct {
+		err1 error
+		err2 error
+	}{
+		{
+			err1: errors.New("rpc error: code = InvalidArgument desc = failed to execute the script on the execution node execution-003.devnet48.nodes.onflow.org:3569: rpc error: code = InvalidArgument desc = failed to execute script: failed to execute script at block (c709b8be217895260db3292bf8837bacd731eecd9f98cbccc8b1a9cf6e763461): [Error Code: 1101] error caused by: 1 error occurred:\n\t* [Error Code: 1101] cadence runtime error: Execution failed:\nerror: missing digits\n --> 2ced8f6630ba56a630876ed8b036d730331a9d18a8539b2429f89f0ca99cefb7:1:28\n  |\n1 | import NFTSalesCapped from 0xNFTSalesCapped\n  |                             ^\n\nerror: unexpected token: identifier\n --> 2ced8f6630ba56a630876ed8b036d730331a9d18a8539b2429f89f0ca99cefb7:1:29\n  |\n1 | import NFTSalesCapped from 0xNFTSalesCapped\n  |                              ^\n\n\n"),
+			err2: errors.New("rpc error: code = InvalidArgument desc = failed to execute script: [Error Code: 1101] failed to execute script at block (c709b8be217895260db3292bf8837bacd731eecd9f98cbccc8b1a9cf6e763461): [Error Code: 1101] error caused by: 1 error occurred:\n\t* [Error Code: 1101] cadence runtime error: Execution failed:\nerror: missing digits\n --> 2ced8f6630ba56a630876ed8b036d730331a9d18a8539b2429f89f0ca99cefb7:1:28\n  |\n1 | import NFTSalesCapped from 0xNFTSalesCapped\n  |                             ^\n\nerror: unexpected token: identifier\n --> 2ced8f6630ba56a630876ed8b036d730331a9d18a8539b2429f89f0ca99cefb7:1:29\n  |\n1 | import NFTSalesCapped from 0xNFTSalesCapped\n  |                              ^\n\n\n"),
+		},
+	}
+
+	for _, tc := range testcases {
+		if !compareIt(tc.err1, tc.err2) {
+			t.Errorf("not equal")
+		}
+	}
+}
+
+func compareIt(execErr, localErr error) bool {
+	if status.Code(execErr) == status.Code(localErr) {
+		// both script execution implementations use the same engine, which adds
+		// "failed to execute script at block" to the message before returning. Any characters
+		// before this can be ignored. The string that comes after is the original error and
+		// should match.
+		execParts := strings.Split(execErr.Error(), "failed to execute script at block")
+		localParts := strings.Split(localErr.Error(), "failed to execute script at block")
+		if len(execParts) == 2 && len(localParts) == 2 && execParts[1] == localParts[1] {
+			return true
+		}
+	}
+	return false
 }
