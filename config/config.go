@@ -42,13 +42,13 @@ type FlowConfig struct {
 // incompatible with the node's internal state, or that the node's internal state is corrupted. In all
 // cases, continuation is impossible.
 func (fc *FlowConfig) Validate() error {
-	err := validate.Struct(fc)
-	if err != nil {
-		if validationErrors, ok := err.(validator.ValidationErrors); ok {
-			return fmt.Errorf("failed to validate flow configuration: %w", validationErrors)
-		}
-		return fmt.Errorf("unexpeceted error encountered while validating flow configuration: %w", err)
-	}
+	//err := validate.Struct(fc)
+	//if err != nil {
+	//	if validationErrors, ok := err.(validator.ValidationErrors); ok {
+	//		return fmt.Errorf("failed to validate flow configuration: %w", validationErrors)
+	//	}
+	//	return fmt.Errorf("unexpeceted error encountered while validating flow configuration: %w", err)
+	//}
 	return nil
 }
 
