@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/channels"
+	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 )
 
 type NoopCollector struct{}
@@ -323,6 +324,9 @@ func (nc *NoopCollector) OnBehaviourPenaltyUpdated(f float64)                   
 func (nc *NoopCollector) OnIPColocationFactorUpdated(f float64)                            {}
 func (nc *NoopCollector) OnAppSpecificScoreUpdated(f float64)                              {}
 func (nc *NoopCollector) OnOverallPeerScoreUpdated(f float64)                              {}
+func (nc *NoopCollector) OnIHaveMessageTruncated(diff int)                                 {}
+func (nc *NoopCollector) OnControlMessageIDsTruncated(messageType p2pmsg.ControlMessageType, diff int) {
+}
 
 func (nc *NoopCollector) AsyncProcessingStarted()               {}
 func (nc *NoopCollector) AsyncProcessingFinished(time.Duration) {}

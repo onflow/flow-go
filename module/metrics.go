@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/channels"
+	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 )
 
 type EntriesFunc func() uint
@@ -267,6 +268,21 @@ type GossipSubRpcValidationInspectorMetrics interface {
 	// AsyncProcessingFinished tracks the time spent by a rpc validation inspector worker to process an inspect message request asynchronously and decrements the metric tracking
 	// the number of inspect message requests  being processed asynchronously by the rpc validation inspector workers.
 	AsyncProcessingFinished(duration time.Duration)
+
+	// OnIHaveMessageTruncated tracks the number of times an IHave message was truncated.
+	// Note that this function is called whenever an actual iHave message is truncated with all the message ids that it contains.
+	// This is different from the OnControlMessageIDsTruncated function which is called whenever some message ids are truncated from a control message.
+	// Args:
+	//
+	//	diff: the number of actual messages truncated.
+	OnIHaveMessageTruncated(diff int)
+
+	// OnControlMessageIDsTruncated tracks the number of times a control message was truncated.
+	// Args:
+	//
+	//	messageType: the type of the control message that was truncated
+	//	diff: the number of message ids truncated.
+	OnControlMessageIDsTruncated(messageType p2pmsg.ControlMessageType, diff int)
 }
 
 // NetworkInboundQueueMetrics encapsulates the metrics collectors for the inbound queue of the networking layer.
