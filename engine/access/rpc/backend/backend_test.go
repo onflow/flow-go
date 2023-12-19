@@ -8,6 +8,7 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 	entitiesproto "github.com/onflow/flow/protobuf/go/flow/entities"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
@@ -65,7 +66,6 @@ type Suite struct {
 	colClient              *access.AccessAPIClient
 	execClient             *access.ExecutionAPIClient
 	historicalAccessClient *access.AccessAPIClient
-	archiveClient          *access.AccessAPIClient
 
 	connectionFactory *connectionmock.ConnectionFactory
 	communicator      *backendmock.Communicator
@@ -97,7 +97,6 @@ func (suite *Suite) SetupTest() {
 	suite.receipts = new(storagemock.ExecutionReceipts)
 	suite.results = new(storagemock.ExecutionResults)
 	suite.colClient = new(access.AccessAPIClient)
-	suite.archiveClient = new(access.AccessAPIClient)
 	suite.execClient = new(access.ExecutionAPIClient)
 	suite.transactionResults = storagemock.NewLightTransactionResults(suite.T())
 	suite.chainID = flow.Testnet
@@ -1935,15 +1934,14 @@ func (suite *Suite) TestGetTransactionResultEventEncodingVersion() {
 	backend, err := New(params)
 	suite.Require().NoError(err)
 
-	exeNodeEventEncodingVersion := entitiesproto.EventEncodingVersion_CCF_V0
-	events := generator.GetEventsWithEncoding(1, exeNodeEventEncodingVersion)
-	eventMessages := convert.EventsToMessages(events)
+	ccfEvents, jsoncdcEvents := generateEncodedEvents(suite.T(), 1)
+	eventMessages := convert.EventsToMessages(ccfEvents)
 
 	for _, version := range eventEncodingVersions {
 		suite.Run(fmt.Sprintf("test %s event encoding version for GetTransactionResult", version.String()), func() {
 			exeEventResp := &execproto.GetTransactionResultResponse{
 				Events:               eventMessages,
-				EventEncodingVersion: exeNodeEventEncodingVersion,
+				EventEncodingVersion: entitiesproto.EventEncodingVersion_CCF_V0,
 			}
 
 			suite.execClient.
@@ -1955,8 +1953,15 @@ func (suite *Suite) TestGetTransactionResultEventEncodingVersion() {
 				Once()
 
 			result, err := backend.GetTransactionResult(ctx, txId, blockId, flow.ZeroID, version)
-			expectedResult := generator.GetEventsWithEncoding(1, version)
 			suite.checkResponse(result, err)
+
+			var expectedResult []flow.Event
+			switch version {
+			case entitiesproto.EventEncodingVersion_CCF_V0:
+				expectedResult = append(expectedResult, ccfEvents...)
+			case entitiesproto.EventEncodingVersion_JSON_CDC_V0:
+				expectedResult = append(expectedResult, jsoncdcEvents...)
+			}
 
 			suite.Assert().Equal(result.Events, expectedResult)
 		})
@@ -1996,8 +2001,8 @@ func (suite *Suite) TestGetTransactionResultByIndexAndBlockIdEventEncodingVersio
 	suite.Require().NoError(err)
 
 	exeNodeEventEncodingVersion := entitiesproto.EventEncodingVersion_CCF_V0
-	events := generator.GetEventsWithEncoding(1, exeNodeEventEncodingVersion)
-	eventMessages := convert.EventsToMessages(events)
+	ccfEvents, jsoncdcEvents := generateEncodedEvents(suite.T(), 1)
+	eventMessages := convert.EventsToMessages(ccfEvents)
 
 	for _, version := range eventEncodingVersions {
 		suite.Run(fmt.Sprintf("test %s event encoding version for GetTransactionResultByIndex", version.String()), func() {
@@ -2017,8 +2022,15 @@ func (suite *Suite) TestGetTransactionResultByIndexAndBlockIdEventEncodingVersio
 			result, err := backend.GetTransactionResultByIndex(ctx, blockId, index, version)
 			suite.checkResponse(result, err)
 
-			expectedResult := generator.GetEventsWithEncoding(1, version)
-			suite.Assert().Equal(result.Events, expectedResult)
+			var expectedResult []flow.Event
+			switch version {
+			case entitiesproto.EventEncodingVersion_CCF_V0:
+				expectedResult = append(expectedResult, ccfEvents...)
+			case entitiesproto.EventEncodingVersion_JSON_CDC_V0:
+				expectedResult = append(expectedResult, jsoncdcEvents...)
+			}
+
+			suite.Assert().Equal(expectedResult, result.Events)
 		})
 
 		suite.Run(fmt.Sprintf("test %s event encoding version for GetTransactionResultsByBlockID", version.String()), func() {
@@ -2041,7 +2053,14 @@ func (suite *Suite) TestGetTransactionResultByIndexAndBlockIdEventEncodingVersio
 			results, err := backend.GetTransactionResultsByBlockID(ctx, blockId, version)
 			suite.checkResponse(results, err)
 
-			expectedResult := generator.GetEventsWithEncoding(1, version)
+			var expectedResult []flow.Event
+			switch version {
+			case entitiesproto.EventEncodingVersion_CCF_V0:
+				expectedResult = append(expectedResult, ccfEvents...)
+			case entitiesproto.EventEncodingVersion_JSON_CDC_V0:
+				expectedResult = append(expectedResult, jsoncdcEvents...)
+			}
+
 			for _, result := range results {
 				suite.Assert().Equal(result.Events, expectedResult)
 			}
@@ -2143,6 +2162,17 @@ func getEvents(n int) []flow.Event {
 		events[i] = flow.Event{Type: flow.EventAccountCreated}
 	}
 	return events
+}
+
+func generateEncodedEvents(t *testing.T, n int) ([]flow.Event, []flow.Event) {
+	ccfEvents := generator.GetEventsWithEncoding(n, entities.EventEncodingVersion_CCF_V0)
+	jsonEvents := make([]flow.Event, n)
+	for i, e := range ccfEvents {
+		jsonEvent, err := convert.CcfEventToJsonEvent(e)
+		require.NoError(t, err)
+		jsonEvents[i] = *jsonEvent
+	}
+	return ccfEvents, jsonEvents
 }
 
 func (suite *Suite) defaultBackendParams() Params {
