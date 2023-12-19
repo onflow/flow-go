@@ -199,13 +199,14 @@ func finalize(cmd *cobra.Command, args []string) {
 
 	// if no root commit is specified, bootstrap an empty execution state
 	if flagRootCommit == "0000000000000000000000000000000000000000000000000000000000000000" {
-		generateEmptyExecutionState(
+		commit := generateEmptyExecutionState(
 			block.Header.ChainID,
 			assignments,
 			clusterQCs,
 			dkgData,
 			participants,
 		)
+		flagRootCommit = hex.EncodeToString(commit[:])
 	}
 
 	log.Info().Msg("constructing root execution result and block seal")
@@ -632,9 +633,8 @@ func generateEmptyExecutionState(
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to generate execution state")
 	}
-	flagRootCommit = hex.EncodeToString(commit[:])
 	log.Info().Msg("")
-	return
+	return commit
 }
 
 // validateEpochConfig validates configuration of the epoch commitment deadline.

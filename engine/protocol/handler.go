@@ -79,6 +79,31 @@ func (h *Handler) GetLatestProtocolStateSnapshot(ctx context.Context, req *acces
 	}, nil
 }
 
+// GetProtocolStateSnapshotByBlockID returns serializable Snapshot by blockID
+func (h *Handler) GetProtocolStateSnapshotByBlockID(ctx context.Context, req *access.GetProtocolStateSnapshotByBlockIDRequest) (*access.ProtocolStateSnapshotResponse, error) {
+	blockID := convert.MessageToIdentifier(req.GetBlockId())
+	snapshot, err := h.api.GetProtocolStateSnapshotByBlockID(ctx, blockID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &access.ProtocolStateSnapshotResponse{
+		SerializedSnapshot: snapshot,
+	}, nil
+}
+
+// GetProtocolStateSnapshotByHeight returns serializable Snapshot by block height
+func (h *Handler) GetProtocolStateSnapshotByHeight(ctx context.Context, req *access.GetProtocolStateSnapshotByHeightRequest) (*access.ProtocolStateSnapshotResponse, error) {
+	snapshot, err := h.api.GetProtocolStateSnapshotByHeight(ctx, req.GetBlockHeight())
+	if err != nil {
+		return nil, err
+	}
+
+	return &access.ProtocolStateSnapshotResponse{
+		SerializedSnapshot: snapshot,
+	}, nil
+}
+
 // GetLatestBlockHeader gets the latest sealed block header.
 func (h *Handler) GetLatestBlockHeader(
 	ctx context.Context,

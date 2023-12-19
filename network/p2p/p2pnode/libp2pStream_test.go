@@ -58,7 +58,7 @@ func TestStreamClosing(t *testing.T) {
 		go func(i int) {
 			// Create stream from node 1 to node 2 (reuse if one already exists)
 			nodes[0].Host().Peerstore().AddAddrs(nodeInfo1.ID, nodeInfo1.Addrs, peerstore.AddressTTL)
-			err := nodes[0].OpenProtectedStream(ctx, nodeInfo1.ID, t.Name(), func(s network.Stream) error {
+			err := nodes[0].OpenAndWriteOnStream(ctx, nodeInfo1.ID, t.Name(), func(s network.Stream) error {
 				w := bufio.NewWriter(s)
 
 				// Send message from node 1 to 2
@@ -165,7 +165,7 @@ func testCreateStream(t *testing.T, sporkId flow.Identifier, unicasts []protocol
 		require.NoError(t, err)
 		nodes[0].Host().Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.AddressTTL)
 		go func() {
-			err := nodes[0].OpenProtectedStream(ctx, pInfo.ID, t.Name(), func(stream network.Stream) error {
+			err := nodes[0].OpenAndWriteOnStream(ctx, pInfo.ID, t.Name(), func(stream network.Stream) error {
 				require.NotNil(t, stream)
 				streams = append(streams, stream)
 				// if we return this function, the stream will be closed, but we need to keep it open for the test
@@ -242,7 +242,7 @@ func TestCreateStream_FallBack(t *testing.T) {
 
 		// a new stream must be created
 		go func() {
-			err = thisNode.OpenProtectedStream(ctx, pInfo.ID, t.Name(), func(stream network.Stream) error {
+			err = thisNode.OpenAndWriteOnStream(ctx, pInfo.ID, t.Name(), func(stream network.Stream) error {
 				require.NotNil(t, stream)
 				streams = append(streams, stream)
 
@@ -300,7 +300,7 @@ func TestCreateStreamIsConcurrencySafe(t *testing.T) {
 	createStream := func() {
 		<-gate
 		nodes[0].Host().Peerstore().AddAddrs(nodeInfo1.ID, nodeInfo1.Addrs, peerstore.AddressTTL)
-		err := nodes[0].OpenProtectedStream(ctx, nodeInfo1.ID, t.Name(), func(stream network.Stream) error {
+		err := nodes[0].OpenAndWriteOnStream(ctx, nodeInfo1.ID, t.Name(), func(stream network.Stream) error {
 			// no-op stream writer, we just check that the stream was created
 			return nil
 		})
@@ -358,7 +358,7 @@ func TestNoBackoffWhenCreatingStream(t *testing.T) {
 	cfg, err := config.DefaultConfig()
 	require.NoError(t, err)
 
-	maxTimeToWait := time.Duration(cfg.NetworkConfig.UnicastConfig.MaxStreamCreationRetryAttemptTimes) * unicast.MaxRetryJitter * time.Millisecond
+	maxTimeToWait := time.Duration(cfg.NetworkConfig.Unicast.UnicastManager.MaxStreamCreationRetryAttemptTimes) * unicast.MaxRetryJitter * time.Millisecond
 
 	// need to add some buffer time so that RequireReturnsBefore waits slightly longer than maxTimeToWait to avoid
 	// a race condition
@@ -384,7 +384,7 @@ func TestNoBackoffWhenCreatingStream(t *testing.T) {
 		ctx, cancel := context.WithTimeout(ctx, maxTimeToWait)
 
 		unittest.RequireReturnsBefore(t, func() {
-			err = node1.OpenProtectedStream(ctx, pInfo.ID, t.Name(), func(stream network.Stream) error {
+			err = node1.OpenAndWriteOnStream(ctx, pInfo.ID, t.Name(), func(stream network.Stream) error {
 				// do nothing, this is a no-op stream writer, we just check that the stream was created
 				return nil
 			})
@@ -523,7 +523,7 @@ func TestCreateStreamTimeoutWithUnresponsiveNode(t *testing.T) {
 	unittest.AssertReturnsBefore(t,
 		func() {
 			nodes[0].Host().Peerstore().AddAddrs(silentNodeInfo.ID, silentNodeInfo.Addrs, peerstore.AddressTTL)
-			err = nodes[0].OpenProtectedStream(tctx, silentNodeInfo.ID, t.Name(), func(stream network.Stream) error {
+			err = nodes[0].OpenAndWriteOnStream(tctx, silentNodeInfo.ID, t.Name(), func(stream network.Stream) error {
 				// do nothing, this is a no-op stream writer, we just check that the stream was created
 				return nil
 			})
@@ -564,7 +564,7 @@ func TestCreateStreamIsConcurrent(t *testing.T) {
 		func() {
 			goodNodes[0].Host().Peerstore().AddAddrs(silentNodeInfo.ID, silentNodeInfo.Addrs, peerstore.AddressTTL)
 			// the subsequent call will be blocked
-			_ = goodNodes[0].OpenProtectedStream(ctx, silentNodeInfo.ID, t.Name(), func(stream network.Stream) error {
+			_ = goodNodes[0].OpenAndWriteOnStream(ctx, silentNodeInfo.ID, t.Name(), func(stream network.Stream) error {
 				// do nothing, the stream creation will be blocked so this should never be called
 				require.Fail(t, "this should never be called")
 				return nil
@@ -575,7 +575,7 @@ func TestCreateStreamIsConcurrent(t *testing.T) {
 	unittest.RequireReturnsBefore(t,
 		func() {
 			goodNodes[0].Host().Peerstore().AddAddrs(goodNodeInfo1.ID, goodNodeInfo1.Addrs, peerstore.AddressTTL)
-			err := goodNodes[0].OpenProtectedStream(ctx, goodNodeInfo1.ID, t.Name(), func(stream network.Stream) error {
+			err := goodNodes[0].OpenAndWriteOnStream(ctx, goodNodeInfo1.ID, t.Name(), func(stream network.Stream) error {
 				// do nothing, this is a no-op stream writer, we just check that the stream was created
 				return nil
 			})

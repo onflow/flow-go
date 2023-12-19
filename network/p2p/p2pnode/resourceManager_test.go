@@ -13,6 +13,7 @@ import (
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	mockmodule "github.com/onflow/flow-go/module/mock"
@@ -33,6 +34,10 @@ func TestCreateStream_InboundConnResourceLimit(t *testing.T) {
 	defer cancel()
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
+	cfg, err := config.DefaultConfig()
+	require.NoError(t, err)
+	cfg.NetworkConfig.Unicast.UnicastManager.CreateStreamBackoffDelay = 10 * time.Millisecond
+
 	sporkID := unittest.IdentifierFixture()
 
 	sender, id1 := p2ptest.NodeFixture(
@@ -41,7 +46,7 @@ func TestCreateStream_InboundConnResourceLimit(t *testing.T) {
 		t.Name(),
 		idProvider,
 		p2ptest.WithDefaultResourceManager(),
-		p2ptest.WithCreateStreamRetryDelay(10*time.Millisecond))
+		p2ptest.OverrideFlowConfig(cfg))
 
 	receiver, id2 := p2ptest.NodeFixture(
 		t,
@@ -49,7 +54,7 @@ func TestCreateStream_InboundConnResourceLimit(t *testing.T) {
 		t.Name(),
 		idProvider,
 		p2ptest.WithDefaultResourceManager(),
-		p2ptest.WithCreateStreamRetryDelay(10*time.Millisecond))
+		p2ptest.OverrideFlowConfig(cfg))
 
 	idProvider.On("ByPeerID", sender.ID()).Return(&id1, true).Maybe()
 	idProvider.On("ByPeerID", receiver.ID()).Return(&id2, true).Maybe()
@@ -284,8 +289,11 @@ func testCreateStreamInboundStreamResourceLimits(t *testing.T, cfg *testPeerLimi
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-
 	sporkID := unittest.IdentifierFixture()
+
+	flowCfg, err := config.DefaultConfig()
+	require.NoError(t, err)
+	flowCfg.NetworkConfig.Unicast.UnicastManager.CreateStreamBackoffDelay = 10 * time.Millisecond
 
 	// sender nodes will have infinite stream limit to ensure that they can create as many streams as they want.
 	resourceManagerSnd, err := rcmgr.NewResourceManager(rcmgr.NewFixedLimiter(rcmgr.InfiniteLimits))
@@ -295,7 +303,7 @@ func testCreateStreamInboundStreamResourceLimits(t *testing.T, cfg *testPeerLimi
 		t.Name(), cfg.nodeCount,
 		idProvider,
 		p2ptest.WithResourceManager(resourceManagerSnd),
-		p2ptest.WithCreateStreamRetryDelay(10*time.Millisecond))
+		p2ptest.OverrideFlowConfig(flowCfg))
 
 	// receiver node will run with default limits and no scaling.
 	limits := rcmgr.DefaultLimits
@@ -334,7 +342,7 @@ func testCreateStreamInboundStreamResourceLimits(t *testing.T, cfg *testPeerLimi
 		t.Name(),
 		idProvider,
 		p2ptest.WithResourceManager(resourceManagerRcv),
-		p2ptest.WithCreateStreamRetryDelay(10*time.Millisecond))
+		p2ptest.OverrideFlowConfig(flowCfg))
 
 	for i, sender := range senders {
 		idProvider.On("ByPeerID", sender.ID()).Return(senderIds[i], true).Maybe()

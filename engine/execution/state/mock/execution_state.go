@@ -138,15 +138,15 @@ func (_m *ExecutionState) GetHighestExecutedBlockID(_a0 context.Context) (uint64
 	return r0, r1, r2
 }
 
-// HasState provides a mock function with given fields: _a0
-func (_m *ExecutionState) HasState(_a0 flow.StateCommitment) bool {
-	ret := _m.Called(_a0)
+// GetHighestFinalizedExecuted provides a mock function with given fields:
+func (_m *ExecutionState) GetHighestFinalizedExecuted() uint64 {
+	ret := _m.Called()
 
-	var r0 bool
-	if rf, ok := ret.Get(0).(func(flow.StateCommitment) bool); ok {
-		r0 = rf(_a0)
+	var r0 uint64
+	if rf, ok := ret.Get(0).(func() uint64); ok {
+		r0 = rf()
 	} else {
-		r0 = ret.Get(0).(bool)
+		r0 = ret.Get(0).(uint64)
 	}
 
 	return r0
