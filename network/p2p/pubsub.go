@@ -12,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/collection"
 	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/network/channels"
 )
 
 type ValidationResult int
@@ -53,6 +54,13 @@ type PubSubAdapter interface {
 	// For example, if current peer has subscribed to topics A and B, then ListPeers only return
 	// subscribed peers for topics A and B, and querying for topic C will return an empty list.
 	ListPeers(topic string) []peer.ID
+
+	// GetLocalMeshPeers returns the list of peers in the local mesh for the given topic.
+	// Args:
+	// - topic: the topic.
+	// Returns:
+	// - []peer.ID: the list of peers in the local mesh for the given topic.
+	GetLocalMeshPeers(topic channels.Topic) []peer.ID
 
 	// PeerScoreExposer returns the peer score exposer for the gossipsub adapter. The exposer is a read-only interface
 	// for querying peer scores and returns the local scoring table of the underlying gossipsub node.
@@ -172,6 +180,12 @@ type PubSubTracer interface {
 	component.Component
 	pubsub.RawTracer
 	RpcControlTracking
+	// GetLocalMeshPeers returns the list of peers in the mesh for the given topic.
+	// Args:
+	// - topic: the topic.
+	// Returns:
+	// - []peer.ID: the list of peers in the mesh for the given topic.
+	GetLocalMeshPeers(topic channels.Topic) []peer.ID
 }
 
 // RpcControlTracking is the abstraction of the underlying libp2p control message tracker used to track message ids advertised by the iHave control messages.

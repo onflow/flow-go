@@ -469,7 +469,8 @@ func (n *Network) handleRegisterEngineRequest(parent irrecoverable.SignalerConte
 	return newConduit, nil
 }
 
-func (n *Network) handleRegisterBlobServiceRequest(parent irrecoverable.SignalerContext, channel channels.Channel, ds datastore.Batching, opts []network.BlobServiceOption) (network.BlobService, error) {
+func (n *Network) handleRegisterBlobServiceRequest(parent irrecoverable.SignalerContext, channel channels.Channel, ds datastore.Batching, opts []network.BlobServiceOption) (network.BlobService,
+	error) {
 	bs := blob.NewBlobService(n.libP2PNode.Host(), n.libP2PNode.Routing(), channel.String(), ds, n.bitswapMetrics, n.logger, opts...)
 
 	// start the blob service using the network's context
@@ -643,7 +644,7 @@ func (n *Network) UnicastOnChannel(channel channels.Channel, payload interface{}
 	}
 	streamProtectionTag := fmt.Sprintf("%v:%v", channel, msg.PayloadType())
 
-	err = n.libP2PNode.OpenProtectedStream(ctx, peerID, streamProtectionTag, func(stream libp2pnet.Stream) error {
+	err = n.libP2PNode.OpenAndWriteOnStream(ctx, peerID, streamProtectionTag, func(stream libp2pnet.Stream) error {
 		bufw := bufio.NewWriter(stream)
 		writer := ggio.NewDelimitedWriter(bufw)
 

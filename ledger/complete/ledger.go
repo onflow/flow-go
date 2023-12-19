@@ -362,7 +362,7 @@ func (l *Ledger) MigrateAt(
 			fmt.Errorf("failed to clean up tries to reduce memory usage: %w", err)
 	}
 
-	var payloads []ledger.Payload
+	var payloads []*ledger.Payload
 	var newTrie *trie.MTrie
 
 	noMigration := len(migrations) == 0
@@ -413,9 +413,14 @@ func (l *Ledger) MigrateAt(
 
 		emptyTrie := trie.NewEmptyMTrie()
 
+		derefPayloads := make([]ledger.Payload, len(payloads))
+		for i, p := range payloads {
+			derefPayloads[i] = *p
+		}
+
 		// no need to prune the data since it has already been prunned through migrations
 		applyPruning := false
-		newTrie, _, err = trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, applyPruning)
+		newTrie, _, err = trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, derefPayloads, applyPruning)
 		if err != nil {
 			return nil, fmt.Errorf("constructing updated trie failed: %w", err)
 		}
