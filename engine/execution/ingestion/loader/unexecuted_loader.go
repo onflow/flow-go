@@ -156,6 +156,8 @@ func (e *UnexecutedLoader) finalizedUnexecutedBlocks(ctx context.Context, finali
 		return nil, fmt.Errorf("failed to retrieve root block: %w", err)
 	}
 
+	e.log.Info().Msgf("finding first unexecuted block... (scanning range: %v - %v)", lastExecuted, rootBlock.Height)
+
 	for ; lastExecuted > rootBlock.Height; lastExecuted-- {
 		header, err := e.getHeaderByHeight(lastExecuted)
 		if err != nil {
@@ -173,6 +175,9 @@ func (e *UnexecutedLoader) finalizedUnexecutedBlocks(ctx context.Context, finali
 	}
 
 	firstUnexecuted := lastExecuted + 1
+
+	e.log.Info().Msgf("first unexecuted block found, loading all finalized and unexecuted (%v - %v)",
+		firstUnexecuted, final.Height)
 
 	unexecuted := make([]flow.Identifier, 0)
 
