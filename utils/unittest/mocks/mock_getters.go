@@ -2,7 +2,7 @@ package mocks
 
 import "github.com/onflow/flow-go/storage"
 
-// MockGetter implements a simple generic getter function for mock storage methods.
+// StorageMapGetter implements a simple generic getter function for mock storage methods.
 //
 // Example:
 // Instead of the following code:
