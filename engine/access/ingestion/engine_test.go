@@ -557,7 +557,8 @@ func (s *Suite) TestProcessBackgroundCalls() {
 			return block.Header.Height, nil
 		}).Once()
 
-		s.eng.updateLastFullBlockReceivedIndex()
+		err := s.eng.updateLastFullBlockReceivedIndex()
+		s.Require().NoError(err)
 
 		s.blocks.AssertExpectations(s.T())
 	})
@@ -567,7 +568,9 @@ func (s *Suite) TestProcessBackgroundCalls() {
 			return finalizedHeight, nil
 		}).Once()
 
-		s.eng.updateLastFullBlockReceivedIndex()
+		err := s.eng.updateLastFullBlockReceivedIndex()
+		s.Require().NoError(err)
+
 		s.blocks.AssertExpectations(s.T()) // not new call to UpdateLastFullBlockHeight should be made
 	})
 
@@ -589,7 +592,8 @@ func (s *Suite) TestProcessBackgroundCalls() {
 			}
 		}
 
-		s.eng.checkMissingCollections()
+		err := s.eng.checkMissingCollections()
+		s.Require().NoError(err)
 
 		// assert that missing collections are requested
 		s.request.AssertExpectations(s.T())
@@ -619,7 +623,8 @@ func (s *Suite) TestProcessBackgroundCalls() {
 			}
 		}
 
-		s.eng.checkMissingCollections()
+		err := s.eng.checkMissingCollections()
+		s.Require().NoError(err)
 
 		// assert that missing collections are requested
 		s.request.AssertExpectations(s.T())
@@ -643,7 +648,8 @@ func (s *Suite) TestProcessBackgroundCalls() {
 			blkMissingColl[i] = true
 		}
 
-		s.eng.checkMissingCollections()
+		err := s.eng.checkMissingCollections()
+		s.Require().NoError(err)
 
 		// assert that missing collections are not requested even though there are collections missing
 		s.request.AssertExpectations(s.T())
