@@ -10,7 +10,7 @@ access:
       limits:
         cpu: "800m"
         memory: "10Gi"
-    storage: 1G
+    storage: 10G
   nodes:
 {{- range $val := .}}{{if eq ($val.role) ("access")}}
     {{$val.name}}:
@@ -38,7 +38,7 @@ collection:
       limits:
         cpu: "800m"
         memory: "10Gi"
-    storage: 1G
+    storage: 10G
   nodes:
 {{- range $val := .}}{{if eq ($val.role) ("collection")}}
     {{$val.name}}:
@@ -85,7 +85,7 @@ execution:
       limits:
         cpu: "800m"
         memory: "10Gi"
-    storage: 10G
+    storage: 50G
   nodes:
 {{- range $val := .}}{{if eq ($val.role) ("execution")}}
     {{$val.name}}:
