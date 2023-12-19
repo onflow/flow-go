@@ -83,7 +83,11 @@ spec:
     - metadata:
         name: data
         labels:
+          app: {{ $k }}
           networkId: {{ $.Values.networkId }}
+          nodeType: access
+          owner: {{ $.Values.owner }}
+          service: flow
       spec:
         accessModes: ["ReadWriteOnce"]
         resources:
