@@ -1,4 +1,4 @@
-package p2pconfig
+package p2pbuilderconfig
 
 import (
 	"time"
