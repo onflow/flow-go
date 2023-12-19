@@ -17,31 +17,38 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// TODO: question, does stateDB has to be thread safe ?
-// error handling
+// StateDB implements a types.StateDB interface
 //
-// StateDB should not be used for running multiple transactions
+// stateDB interface defined by the Geth doesn't support returning errors
+// when state calls are happening, and requires stateDB to cache the error
+// and return it at a later time (when commit is called). Only the first error
+// is expected to be returned.
+// Warning: current implementation of the StateDB is considered
+// to be used for a single EVM transaction execution and is not
+// thread safe.yet the current design supports addition of these properties
+// future if needed
 type StateDB struct {
-	ledger   atree.Ledger
-	root     flow.Address
-	baseView types.BaseView
-	views    []*DeltaView
-	dbErr    error
+	ledger      atree.Ledger
+	root        flow.Address
+	baseView    types.BaseView
+	views       []*DeltaView
+	cachedError error
 }
 
 var _ types.StateDB = &StateDB{}
 
+// NewStateDB constructs a new StateDB
 func NewStateDB(ledger atree.Ledger, root flow.Address) (*StateDB, error) {
 	bv, err := NewBaseView(ledger, root)
 	if err != nil {
 		return nil, err
 	}
 	return &StateDB{
-		ledger:   ledger,
-		root:     root,
-		baseView: bv,
-		views:    []*DeltaView{NewDeltaView(bv)},
-		dbErr:    nil,
+		ledger:      ledger,
+		root:        root,
+		baseView:    bv,
+		views:       []*DeltaView{NewDeltaView(bv)},
+		cachedError: nil,
 	}, nil
 }
 
@@ -125,68 +132,83 @@ func (db *StateDB) SetNonce(addr gethCommon.Address, nonce uint64) {
 	db.lastestView().SetNonce(addr, nonce)
 }
 
+// GetCodeHash returns the code hash of the given address
 func (db *StateDB) GetCodeHash(addr gethCommon.Address) gethCommon.Hash {
 	hash, err := db.lastestView().GetCodeHash(addr)
 	db.handleError(err)
 	return hash
 }
 
+// GetCode returns the code for the given address
 func (db *StateDB) GetCode(addr gethCommon.Address) []byte {
 	code, err := db.lastestView().GetCode(addr)
 	db.handleError(err)
 	return code
 }
 
-func (db *StateDB) SetCode(addr gethCommon.Address, code []byte) {
-	db.lastestView().SetCode(addr, code)
-}
-
+// GetCodeSize returns the size of the code for the given address
 func (db *StateDB) GetCodeSize(addr gethCommon.Address) int {
 	codeSize, err := db.lastestView().GetCodeSize(addr)
 	db.handleError(err)
 	return codeSize
 }
 
+// SetCode sets the code for the given address
+func (db *StateDB) SetCode(addr gethCommon.Address, code []byte) {
+	db.lastestView().SetCode(addr, code)
+}
+
+// AddRefund adds an amount to the total (gas) refund
 func (db *StateDB) AddRefund(amount uint64) {
 	db.lastestView().AddRefund(amount)
 }
 
+// AddRefund subtracts an amount from the total (gas) refund
 func (db *StateDB) SubRefund(amount uint64) {
 	db.lastestView().SubRefund(amount)
 }
 
+// GetRefund returns the total (gas) refund
 func (db *StateDB) GetRefund() uint64 {
 	return db.lastestView().GetRefund()
 }
 
+// GetCommittedState returns the value for the given storage slot considering only the commited state and not
+// changes in the scope of current transaction.
 func (db *StateDB) GetCommittedState(addr gethCommon.Address, key gethCommon.Hash) gethCommon.Hash {
 	value, err := db.baseView.GetState(types.SlotAddress{Address: addr, Key: key})
 	db.handleError(err)
 	return value
 }
 
+// GetState returns the value for the given storage slot
 func (db *StateDB) GetState(addr gethCommon.Address, key gethCommon.Hash) gethCommon.Hash {
 	state, err := db.lastestView().GetState(types.SlotAddress{Address: addr, Key: key})
 	db.handleError(err)
 	return state
 }
 
+// SetState sets a value for the given storage slot
 func (db *StateDB) SetState(addr gethCommon.Address, key gethCommon.Hash, value gethCommon.Hash) {
 	db.lastestView().SetState(types.SlotAddress{Address: addr, Key: key}, value)
 }
 
+// GetState returns the value for the given key of the transient storage
 func (db *StateDB) GetTransientState(addr gethCommon.Address, key gethCommon.Hash) gethCommon.Hash {
 	return db.lastestView().GetTransientState(types.SlotAddress{Address: addr, Key: key})
 }
 
+// SetTransientState sets a value for the given key of the transient storage
 func (db *StateDB) SetTransientState(addr gethCommon.Address, key, value gethCommon.Hash) {
 	db.lastestView().SetTransientState(types.SlotAddress{Address: addr, Key: key}, value)
 }
 
+// AddressInAccessList checks if an address is in the access list
 func (db *StateDB) AddressInAccessList(addr gethCommon.Address) bool {
 	return db.lastestView().AddressInAccessList(addr)
 }
 
+// AddressInAccessList checks if the given (address,slot) is in the access list
 func (db *StateDB) SlotInAccessList(addr gethCommon.Address, key gethCommon.Hash) (addressOk bool, slotOk bool) {
 	return db.lastestView().SlotInAccessList(types.SlotAddress{Address: addr, Key: key})
 }
@@ -201,32 +223,35 @@ func (db *StateDB) AddSlotToAccessList(addr gethCommon.Address, key gethCommon.H
 	db.lastestView().AddSlotToAccessList(types.SlotAddress{Address: addr, Key: key})
 }
 
+// AddLog appends a lot to the collection of logs
 func (db *StateDB) AddLog(log *gethTypes.Log) {
 	db.lastestView().AddLog(log)
 }
 
+// AddPreimage adds a preimage to the collection of preimages
 func (db *StateDB) AddPreimage(hash gethCommon.Hash, data []byte) {
 	db.lastestView().AddPreimage(hash, data)
 }
 
+// RevertToSnapshot reverts the changes until we reach the given snaptshot
 func (db *StateDB) RevertToSnapshot(index int) {
 	if index > len(db.views) {
-		db.dbErr = fmt.Errorf("invalid revert")
+		db.cachedError = fmt.Errorf("invalid revert")
 		return
 	}
 	db.views = db.views[:index]
 }
 
+// Snapshot takes an snapshot of the state and returns an int
+// that can be used later for revert calls.
 func (db *StateDB) Snapshot() int {
 	newView := db.lastestView().NewChildView()
 	db.views = append(db.views, newView)
 	return len(db.views) - 1
 }
 
-func (db *StateDB) lastestView() *DeltaView {
-	return db.views[len(db.views)-1]
-}
-
+// Logs returns the list of logs
+// it also update each log with the block and tx info
 func (db *StateDB) Logs(
 	blockHash gethCommon.Hash,
 	blockNumber uint64,
@@ -246,6 +271,7 @@ func (db *StateDB) Logs(
 	return allLogs
 }
 
+// Preimages returns a set of preimages
 func (db *StateDB) Preimages() map[gethCommon.Hash][]byte {
 	preImages := make(map[gethCommon.Hash][]byte, 0)
 	for _, view := range db.views {
@@ -256,10 +282,11 @@ func (db *StateDB) Preimages() map[gethCommon.Hash][]byte {
 	return preImages
 }
 
+// Commit commits state changes back to the underlying
 func (db *StateDB) Commit() error {
 	// return error if any has been acumulated
-	if db.dbErr != nil {
-		return db.dbErr
+	if db.cachedError != nil {
+		return db.cachedError
 	}
 
 	var err error
@@ -349,29 +376,9 @@ func (db *StateDB) Commit() error {
 	return db.baseView.Commit()
 }
 
-// Error returns the memorized database failure occurred earlier.
-func (s *StateDB) Error() error {
-	return s.dbErr
-}
-
-// handleError capture the first non-nil error it is called with.
-func (s *StateDB) handleError(err error) {
-	if err == nil {
-		return
-	}
-
-	var atreeFatalError *atree.FatalError
-	// if is a atree fatal error or fvm fatal error (the second one captures external errors)
-	if stdErrors.As(err, &atreeFatalError) || errors.IsFailure(err) {
-		panic(types.NewFatalError(err))
-	}
-
-	// already no error is captured
-	if s.dbErr == nil {
-		s.dbErr = types.NewDatabaseError(err)
-	}
-}
-
+// Prepare is a highlevel logic that sadly is considered to be part of the
+// stateDB interface and not on the layers above.
+// based on parameters that are passed it updates accesslists
 func (db *StateDB) Prepare(rules gethParams.Rules, sender, coinbase gethCommon.Address, dest *gethCommon.Address, precompiles []gethCommon.Address, txAccesses gethTypes.AccessList) {
 	if rules.IsBerlin {
 		// no need for mutation
@@ -393,5 +400,32 @@ func (db *StateDB) Prepare(rules gethParams.Rules, sender, coinbase gethCommon.A
 		if rules.IsShanghai { // EIP-3651: warm coinbase
 			db.AddAddressToAccessList(coinbase)
 		}
+	}
+}
+
+// Error returns the memorized database failure occurred earlier.
+func (s *StateDB) Error() error {
+	return s.cachedError
+}
+
+func (db *StateDB) lastestView() *DeltaView {
+	return db.views[len(db.views)-1]
+}
+
+// handleError capture the first non-nil error it is called with.
+func (s *StateDB) handleError(err error) {
+	if err == nil {
+		return
+	}
+
+	var atreeFatalError *atree.FatalError
+	// if is a atree fatal error or fvm fatal error (the second one captures external errors)
+	if stdErrors.As(err, &atreeFatalError) || errors.IsFailure(err) {
+		panic(types.NewFatalError(err))
+	}
+
+	// already no error is captured
+	if s.cachedError == nil {
+		s.cachedError = types.NewStateError(err)
 	}
 }

@@ -4,6 +4,8 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
+	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/onflow/flow-go/fvm/evm/emulator/state"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/model/flow"
@@ -110,5 +112,34 @@ func TestStateDB(t *testing.T) {
 		// revert to an invalid snapshot
 		db.RevertToSnapshot(10)
 		require.Error(t, db.Error())
+	})
+
+	t.Run("test log functionality", func(t *testing.T) {
+		ledger := testutils.GetSimpleValueStore()
+		rootAddr := flow.Address{1, 2, 3, 4, 5, 6, 7, 8}
+		db, err := state.NewStateDB(ledger, rootAddr)
+		require.NoError(t, err)
+
+		logs := []*gethTypes.Log{
+			testutils.GetRandomLogFixture(t),
+			testutils.GetRandomLogFixture(t),
+			testutils.GetRandomLogFixture(t),
+			testutils.GetRandomLogFixture(t),
+		}
+
+		db.AddLog(logs[0])
+		db.AddLog(logs[1])
+
+		_ = db.Snapshot()
+
+		db.AddLog(logs[2])
+		db.AddLog(logs[3])
+
+		snapshot := db.Snapshot()
+		db.AddLog(testutils.GetRandomLogFixture(t))
+		db.RevertToSnapshot(snapshot)
+
+		ret := db.Logs(common.Hash{}, 1, common.Hash{}, 1)
+		require.Equal(t, ret, logs)
 	})
 }
