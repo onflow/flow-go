@@ -63,41 +63,52 @@ type NetworkSecurityMetrics interface {
 // messages received by the local node from other nodes over the GossipSub protocol may be much higher than the number
 // of messages accepted by the local node, which may indicate that the local node is throttling the incoming messages.
 type GossipSubRpcInspectorMetrics interface {
-	// OnIncomingRpcAcceptedFully tracks the number of RPC messages received by the node that are fully accepted.
-	// An RPC may contain any number of control messages, i.e., IHAVE, IWANT, GRAFT, PRUNE, as well as the actual messages.
-	// A fully accepted RPC means that all the control messages are accepted and all the messages are accepted.
-	OnIncomingRpcAcceptedFully()
-
-	// OnIncomingRpcAcceptedOnlyForControlMessages tracks the number of RPC messages received by the node that are accepted
-	// only for the control messages, i.e., only for the included IHAVE, IWANT, GRAFT, PRUNE. However, the actual messages
-	// included in the RPC are not accepted.
-	// This happens mostly when the validation pipeline of GossipSub is throttled, and cannot accept more actual messages for
-	// validation.
-	OnIncomingRpcAcceptedOnlyForControlMessages()
-
-	// OnIncomingRpcRejected tracks the number of RPC messages received by the node that are rejected.
-	// This happens mostly when the RPC is coming from a low-scored peer based on the peer scoring module of GossipSub.
-	OnIncomingRpcRejected()
-
-	// OnIWantReceived tracks the number of IWANT messages received by the node from other nodes over an RPC message.
+	// OnIWantMessagesReceived tracks the number of IWANT messages received by the node from other nodes on an RPC.
 	// iWant is a control message that is sent by a node to request a message that it has seen advertised in an iHAVE message.
-	OnIWantReceived(count int)
+	// Note that each IWANT message can contain multiple message ids, but this function only tracks the number of IWANT messages received, not the number of message ids on each IWANT message.
+	// This function is called once per RPC, and counts the number of iWant messages received on that RPC, not per iWant message.
+	// Args:
+	//
+	//	msgCount: the number of IWANT messages received on an RPC.
+	OnIWantMessagesReceived(msgCount int)
 
-	// OnIHaveReceived tracks the number of IHAVE messages received by the node from other nodes over an RPC message.
-	// iHave is a control message that is sent by a node to another node to indicate that it has a new gossiped message.
-	OnIHaveReceived(count int)
+	// OnIWantMessageIDsReceived tracks the number of message ids received by the node from other nodes on an RPC.
+	// Note: this function is called on each IWANT message received by the node, not on each message id received.
+	OnIWantMessageIDsReceived(msgIdCount int)
 
-	// OnGraftReceived tracks the number of GRAFT messages received by the node from other nodes over an RPC message.
+	// OnIHaveMessagesReceived tracks the number of IHAVE messages received by the node from another node on an RPC.
+	// This function is called once per RPC, and counts the number of iHave messages received on that RPC, not per iHave message.
+	// An IHAVE message can contain multiple message ids, but this function only tracks the number of IHAVE messages received, not the number of message ids on each IHAVE message.
+	// iHave is a control message that is sent by a node to another node to indicate that it has a new gossiped messages (the message ids).
+	// Args:
+	// - msgCount: the number of IHAVE messages received on an RPC.
+	OnIHaveMessagesReceived(count int)
+
+	// OnIHaveMessageIDsReceived tracks the number of message ids received by the node from other nodes on an iHave message.
+	// This function is called on each iHave message received by the node.
+	// Args:
+	// - channel: the channel on which the iHave message was received.
+	// - msgIdCount: the number of message ids received on the iHave message.
+	OnIHaveMessageIDsReceived(channel string, msgIdCount int)
+
+	// OnGraftReceived tracks the number of GRAFT messages received by the node from another node on an RPC.
 	// GRAFT is a control message of GossipSub protocol that connects two nodes over a topic directly as gossip partners.
+	// Note: this function is called once per RPC, and counts the number of graft messages received on that RPC, not per graft message.
 	OnGraftReceived(count int)
 
-	// OnPruneReceived tracks the number of PRUNE messages received by the node from other nodes over an RPC message.
+	// OnPruneReceived tracks the number of PRUNE messages received by the node from another node on an RPC.
 	// PRUNE is a control message of GossipSub protocol that disconnects two nodes over a topic.
+	// Note: this function is called once per RPC, and counts the number of prune messages received on that RPC, not per prune message.
 	OnPruneReceived(count int)
 
-	// OnPublishedGossipMessagesReceived tracks the number of gossip messages received by the node from other nodes over an
-	// RPC message.
+	// OnPublishedGossipMessagesReceived tracks the number of publish messages received by the node from another node on an RPC.
+	// Args:
+	// - msgCount: the number of publish messages received on an RPC.
+	// Note: this function is called once per RPC, and counts the number of publish messages received on that RPC, not per publish message.
 	OnPublishedGossipMessagesReceived(count int)
+
+	// OnIncomingRpcReceived tracks the number of RPC messages received by the node.
+	OnIncomingRpcReceived()
 }
 
 // LocalGossipSubRouterMetrics encapsulates the metrics collectors for GossipSub router of the local node.
@@ -263,6 +274,8 @@ type GossipSubScoringMetrics interface {
 
 // GossipSubRpcValidationInspectorMetrics encapsulates the metrics collectors for the gossipsub rpc validation control message inspectors.
 type GossipSubRpcValidationInspectorMetrics interface {
+	GossipSubRpcInspectorMetrics
+
 	// AsyncProcessingStarted increments the metric tracking the number of inspect message request being processed by workers in the rpc validator worker pool.
 	AsyncProcessingStarted()
 	// AsyncProcessingFinished tracks the time spent by a rpc validation inspector worker to process an inspect message request asynchronously and decrements the metric tracking
