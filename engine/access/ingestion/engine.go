@@ -33,7 +33,7 @@ const collectionCatchupTimeout = 30 * time.Second
 const collectionCatchupDBPollInterval = 10 * time.Millisecond
 
 // time to update the FullBlockHeight index
-const fullBlockRefreshInterval = 10 * time.Second
+const fullBlockRefreshInterval = 1 * time.Second
 
 // time to request missing collections from the network
 const missingCollsRequestInterval = 1 * time.Minute

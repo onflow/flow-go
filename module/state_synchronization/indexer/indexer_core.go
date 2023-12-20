@@ -162,10 +162,23 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 	})
 
 	g.Go(func() error {
+		start := time.Now()
+
 		// index all collections except the system chunk
+		// Note: the access ingestion engine also indexes collections, starting when the block is
+		// finalized. This process can fall behind due to the node being offline, resource issues
+		// or network congestion. This indexer ensures that collections are never farther behind
+		// than the latest indexed block. Calling the collection handler with a collection that
+		// has already been indexed is a noop.
 		for _, chunk := range data.ChunkExecutionDatas[0 : len(data.ChunkExecutionDatas)-1] {
 			c.collectionHandler(flow.ZeroID, chunk.Collection)
 		}
+
+		lg.Debug().
+			Int("collection_count", len(data.ChunkExecutionDatas)-1).
+			Dur("duration_ms", time.Since(start)).
+			Msg("indexed collections")
+
 		return nil
 	})
 
@@ -215,7 +228,6 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 
 	c.metrics.BlockIndexed(block.Height, time.Since(start), eventCount, registerCount, resultCount)
 	lg.Debug().
-		Int("collection_count", len(data.ChunkExecutionDatas)).
 		Dur("duration_ms", time.Since(start)).
 		Msg("indexed block data")
 
