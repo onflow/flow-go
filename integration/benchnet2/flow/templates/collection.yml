@@ -85,7 +85,7 @@ spec:
         labels:
           app: {{ $k }}
           networkId: {{ $.Values.networkId }}
-          nodeType: access
+          nodeType: collection 
           owner: {{ $.Values.owner }}
           service: flow
       spec:
