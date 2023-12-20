@@ -416,11 +416,6 @@ func (d *DeltaView) Preimages() map[gethCommon.Hash][]byte {
 	return d.preimages
 }
 
-// Commit for deltaview is a no-op
-func (d *DeltaView) Commit() error {
-	return nil
-}
-
 // DirtyAddresses returns a set of addresses that has been updated in this view
 func (d *DeltaView) DirtyAddresses() map[gethCommon.Address]interface{} {
 	return d.dirtyAddresses
