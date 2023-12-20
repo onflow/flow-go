@@ -169,7 +169,7 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Blo
 	// The `candidate` block _must be valid_ (otherwise, the state will be corrupted)!
 	err = operation.RetryOnConflictTx(m.db, transaction.Update, deferredDbOps.Pending) // No errors are expected during normal operations
 	if err != nil {
-		return fmt.Errorf("failed to persist candiate block %v and its dependencies: %w", blockID, err)
+		return fmt.Errorf("failed to persist candidate block %v and its dependencies: %w", blockID, err)
 	}
 
 	return nil
@@ -224,7 +224,7 @@ func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) er
 		return fmt.Errorf("payload seal(s) not compliant with chain state: %w", err)
 	}
 
-	// evolve protocol state and verify consistency with commitment included in
+	// evolve protocol state and verify consistency with commitment included in payload
 	err = m.evolveProtocolState(ctx, candidate, deferredDbOps)
 	if err != nil {
 		return fmt.Errorf("evolving protocol state failed: %w", err)
@@ -571,10 +571,10 @@ func (m *FollowerState) lastSealed(candidate *flow.Block, deferredDbOps *transac
 		if err != nil {
 			// all errors are unexpected - differentiation is for clearer error messages
 			if errors.Is(err, storage.ErrNotFound) {
-				return nil, fmt.Errorf("ordering seals: candidate payload contains seals for unknown block: %s", err.Error())
+				return nil, irrecoverable.NewExceptionf("ordering seals: candidate payload contains seals for unknown block: %w", err)
 			}
 			if errors.Is(err, protocol.ErrDiscontinuousSeals) || errors.Is(err, protocol.ErrMultipleSealsForSameHeight) {
-				return nil, fmt.Errorf("ordering seals: candidate payload contains invalid seal set: %s", err.Error())
+				return nil, irrecoverable.NewExceptionf("ordering seals: candidate payload contains invalid seal set: %w", err)
 			}
 			return nil, fmt.Errorf("unexpected error ordering seals: %w", err)
 		}

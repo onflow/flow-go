@@ -94,8 +94,8 @@ func (d *DeferredDbOps) AddBadgerOps(ops ...DeferredBadgerUpdate) *DeferredDbOps
 		if err != nil {
 			return err
 		}
-		for _, o := range ops {
-			err = o(tx.DBTxn)
+		for _, op := range ops {
+			err = op(tx.DBTxn)
 			if err != nil {
 				return err
 			}
