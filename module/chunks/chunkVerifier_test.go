@@ -50,8 +50,8 @@ var eventsList = flow.EventsList{
 
 const computationUsed = uint64(100)
 
-var id0 = flow.NewRegisterID("00", "")
-var id5 = flow.NewRegisterID("05", "")
+var id0 = flow.NewRegisterID(unittest.RandomAddressFixture(), "")
+var id5 = flow.NewRegisterID(unittest.RandomAddressFixture(), "")
 
 // the chain we use for this test suite
 var testChain = flow.Emulator
@@ -403,16 +403,13 @@ func blockFixture(collection *flow.Collection) *flow.Block {
 }
 
 func generateStateUpdates(t *testing.T, f *completeLedger.Ledger) (ledger.State, ledger.Proof, *ledger.Update) {
-	id1 := flow.NewRegisterID("00", "")
-	id2 := flow.NewRegisterID("05", "")
-
 	entries := flow.RegisterEntries{
 		{
-			Key:   id1,
+			Key:   id0,
 			Value: []byte{'a'},
 		},
 		{
-			Key:   id2,
+			Key:   id5,
 			Value: []byte{'b'},
 		},
 	}
@@ -432,7 +429,7 @@ func generateStateUpdates(t *testing.T, f *completeLedger.Ledger) (ledger.State,
 
 	entries = flow.RegisterEntries{
 		{
-			Key:   id2,
+			Key:   id5,
 			Value: []byte{'B'},
 		},
 	}
