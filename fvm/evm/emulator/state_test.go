@@ -69,9 +69,8 @@ func (s *storageTest) run(runner func(state types.StateDB)) error {
 		return err
 	}
 
-	// TODO: figure out us
-	// s.metrics.add(bytesWrittenMetric, s.db.BytesStored())
-	// s.metrics.add(bytesReadMetric, s.db.BytesRetrieved())
+	s.metrics.add(bytesWrittenMetric, s.store.TotalBytesWritten())
+	s.metrics.add(bytesReadMetric, s.store.TotalBytesRead())
 	s.metrics.add(storageItemsMetric, s.store.TotalStorageItems())
 	s.metrics.add(storageBytesMetric, s.store.TotalStorageSize())
 
