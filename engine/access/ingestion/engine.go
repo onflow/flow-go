@@ -704,10 +704,6 @@ func (e *Engine) updateLastFullBlockReceivedIndex() error {
 		return fmt.Errorf("failed to get last full block height: %w", err)
 	}
 
-	e.log.Debug().
-		Uint64("last_full_block_height", lastFullHeight).
-		Msg("updating LastFullBlockReceived index...")
-
 	finalBlk, err := e.state.Final().Head()
 	if err != nil {
 		return fmt.Errorf("failed to get finalized block: %w", err)
@@ -715,21 +711,23 @@ func (e *Engine) updateLastFullBlockReceivedIndex() error {
 	finalizedHeight := finalBlk.Height
 
 	// track the latest contiguous full height
-	latestFullHeight, err := e.lowestHeightWithMissingCollection(lastFullHeight, finalizedHeight)
+	newLastFullHeight, err := e.lowestHeightWithMissingCollection(lastFullHeight, finalizedHeight)
 	if err != nil {
 		return fmt.Errorf("failed to find last full block received height: %w", err)
 	}
 
 	// if more contiguous blocks are now complete, update db
-	if latestFullHeight > lastFullHeight {
-		err = e.blocks.UpdateLastFullBlockHeight(latestFullHeight)
+	if newLastFullHeight > lastFullHeight {
+		err = e.blocks.UpdateLastFullBlockHeight(newLastFullHeight)
 		if err != nil {
-			// TODO: should this return an error?
-			e.log.Error().Err(err).Msg("failed to update last full block height")
-			return nil
+			return fmt.Errorf("failed to update last full block height")
 		}
 
-		e.metrics.UpdateLastFullBlockHeight(lastFullHeight)
+		e.metrics.UpdateLastFullBlockHeight(newLastFullHeight)
+
+		e.log.Debug().
+			Uint64("last_full_block_height", newLastFullHeight).
+			Msg("updated LastFullBlockReceived index")
 	}
 
 	return nil
@@ -764,10 +762,6 @@ func (e *Engine) checkMissingCollections() error {
 		return err
 	}
 
-	lg := e.log.With().
-		Uint64("last_full_blk_height", lastFullHeight).
-		Logger()
-
 	finalBlk, err := e.state.Final().Head()
 	if err != nil {
 		return fmt.Errorf("failed to get finalized block: %w", err)
@@ -801,26 +795,26 @@ func (e *Engine) checkMissingCollections() error {
 	if incompleteBlksCnt >= defaultMissingCollsForBlkThreshold ||
 		(finalizedHeight-lastFullHeight) > defaultMissingCollsForAgeThreshold {
 		// warn log since this should generally not happen
-		lg.Warn().
+		e.log.Warn().
+			Uint64("last_full_blk_height", lastFullHeight).
 			Int("missing_collection_blk_count", incompleteBlksCnt).
 			Int("missing_collection_count", len(allMissingColls)).
 			Msg("re-requesting missing collections")
 		e.requestCollectionsInFinalizedBlock(allMissingColls)
 	}
 
-	lg.Debug().Msg("updated LastFullBlockReceived index")
 	return nil
 }
 
 // missingCollectionsAtHeight returns all missing collection guarantees at a given height
 func (e *Engine) missingCollectionsAtHeight(h uint64) ([]*flow.CollectionGuarantee, error) {
-	blk, err := e.blocks.ByHeight(h)
+	block, err := e.blocks.ByHeight(h)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve block by height %d: %w", h, err)
 	}
 
 	var missingColls []*flow.CollectionGuarantee
-	for _, guarantee := range blk.Payload.Guarantees {
+	for _, guarantee := range block.Payload.Guarantees {
 		collID := guarantee.CollectionID
 		found, err := e.haveCollection(collID)
 		if err != nil {
