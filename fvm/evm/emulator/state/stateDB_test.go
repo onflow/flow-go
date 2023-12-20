@@ -65,8 +65,17 @@ func TestStateDB(t *testing.T) {
 
 		db.SetState(addr1, key1, value1)
 
+		ret := db.GetState(addr1, key1)
+		require.Equal(t, value1, ret)
+
+		ret = db.GetCommittedState(addr1, key1)
+		require.Equal(t, gethCommon.Hash{}, ret)
+
 		err = db.Commit()
 		require.NoError(t, err)
+
+		ret = db.GetCommittedState(addr1, key1)
+		require.Equal(t, value1, ret)
 
 		// create a new db
 		db, err = state.NewStateDB(ledger, rootAddr)
