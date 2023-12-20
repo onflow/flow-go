@@ -97,9 +97,27 @@ func (d *DeltaView) Exist(addr gethCommon.Address) (bool, error) {
 
 // CreateAccount creates a new account for the given address
 func (d *DeltaView) CreateAccount(addr gethCommon.Address) error {
+	// If a address already exists the balance is carried over to the new account.
+	// Carrying over the balance ensures that Ether doesn't disappear. (legacy behaviour of the Geth stateDB)
+	exist, err := d.Exist(addr)
+	if err != nil {
+		return err
+	}
+	var bal *big.Int
+	if exist {
+		bal, err = d.GetBalance(addr)
+		if err != nil {
+			return err
+		}
+	}
+
 	d.created[addr] = struct{}{}
 	// flag the address as dirty
 	d.dirtyAddresses[addr] = struct{}{}
+	if exist {
+		d.AddBalance(addr, bal)
+	}
+
 	return nil
 }
 
@@ -396,11 +414,6 @@ func (d *DeltaView) AddPreimage(hash gethCommon.Hash, preimage []byte) {
 // Preimages returns a map of preimages
 func (d *DeltaView) Preimages() map[gethCommon.Hash][]byte {
 	return d.preimages
-}
-
-// Commit for deltaview is a no-op
-func (d *DeltaView) Commit() error {
-	return nil
 }
 
 // DirtyAddresses returns a set of addresses that has been updated in this view
