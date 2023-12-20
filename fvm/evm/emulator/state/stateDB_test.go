@@ -6,7 +6,9 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
+	gethParams "github.com/ethereum/go-ethereum/params"
 	"github.com/onflow/atree"
 	"github.com/onflow/flow-go/fvm/evm/emulator/state"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
@@ -19,6 +21,28 @@ var rootAddr = flow.Address{1, 2, 3, 4, 5, 6, 7, 8}
 
 func TestStateDB(t *testing.T) {
 	t.Parallel()
+
+	t.Run("test Empty method", func(t *testing.T) {
+		ledger := testutils.GetSimpleValueStore()
+		db, err := state.NewStateDB(ledger, rootAddr)
+		require.NoError(t, err)
+
+		addr1 := testutils.RandomCommonAddress(t)
+		// non-existent account
+		require.True(t, db.Empty(addr1))
+		require.NoError(t, db.Error())
+
+		db.CreateAccount(addr1)
+		require.NoError(t, db.Error())
+
+		require.True(t, db.Empty(addr1))
+		require.NoError(t, db.Error())
+
+		db.AddBalance(addr1, big.NewInt(10))
+		require.NoError(t, db.Error())
+
+		require.False(t, db.Empty(addr1))
+	})
 
 	t.Run("test commit functionality", func(t *testing.T) {
 		ledger := testutils.GetSimpleValueStore()
@@ -158,6 +182,52 @@ func TestStateDB(t *testing.T) {
 
 		db.RevertToSnapshot(snap1)
 		require.Equal(t, uint64(7), db.GetRefund())
+	})
+
+	t.Run("test Prepare functionality", func(t *testing.T) {
+		ledger := testutils.GetSimpleValueStore()
+		db, err := state.NewStateDB(ledger, rootAddr)
+
+		sender := testutils.RandomCommonAddress(t)
+		coinbase := testutils.RandomCommonAddress(t)
+		dest := testutils.RandomCommonAddress(t)
+		precompiles := []gethCommon.Address{
+			testutils.RandomCommonAddress(t),
+			testutils.RandomCommonAddress(t),
+		}
+
+		txAccesses := gethTypes.AccessList([]gethTypes.AccessTuple{
+			{Address: testutils.RandomCommonAddress(t),
+				StorageKeys: []gethCommon.Hash{
+					testutils.RandomCommonHash(t),
+					testutils.RandomCommonHash(t),
+				},
+			},
+		})
+
+		rules := gethParams.Rules{
+			IsBerlin:   true,
+			IsShanghai: true,
+		}
+
+		require.NoError(t, err)
+		db.Prepare(rules, sender, coinbase, &dest, precompiles, txAccesses)
+
+		require.True(t, db.AddressInAccessList(sender))
+		require.True(t, db.AddressInAccessList(coinbase))
+		require.True(t, db.AddressInAccessList(dest))
+
+		for _, add := range precompiles {
+			require.True(t, db.AddressInAccessList(add))
+		}
+
+		for _, el := range txAccesses {
+			for _, key := range el.StorageKeys {
+				addrFound, slotFound := db.SlotInAccessList(el.Address, key)
+				require.True(t, addrFound)
+				require.True(t, slotFound)
+			}
+		}
 	})
 
 	t.Run("test non-fatal error handling", func(t *testing.T) {
