@@ -6,10 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/integration/testnet"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/onflow/flow-go/integration/testnet"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // This suite tests collection syncing using the ingestion engine and the indexer.
