@@ -35,8 +35,8 @@ const (
 	ComputationKindRemoveAccountContractCode
 	ComputationKindResolveLocation
 	ComputationKindRevokeAccountKey
-	ComputationKindRevokeEncodedAccountKey
-	_
+	_ // removed, DO NOT REUSE
+	_ // removed, DO NOT REUSE
 	ComputationKindSetValue
 	ComputationKindUpdateAccountContractCode
 	ComputationKindValidatePublicKey
