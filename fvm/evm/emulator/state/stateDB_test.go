@@ -12,10 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Test revert
-// TODO: add test for error handling
-// Test logs
-
 func TestStateDB(t *testing.T) {
 	t.Parallel()
 
@@ -142,4 +138,6 @@ func TestStateDB(t *testing.T) {
 		ret := db.Logs(common.Hash{}, 1, common.Hash{}, 1)
 		require.Equal(t, ret, logs)
 	})
+
+	// TODO: add test for error handling
 }

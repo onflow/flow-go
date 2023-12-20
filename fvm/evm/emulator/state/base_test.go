@@ -158,8 +158,9 @@ func TestBaseView(t *testing.T) {
 		}
 
 		// non-existent account
-		_, err = view.GetState(slot1)
-		require.Error(t, err)
+		value, err := view.GetState(slot1)
+		require.NoError(t, err)
+		require.Equal(t, value, gethCommon.Hash{})
 
 		// store a new value
 		newValue := testutils.RandomCommonHash(t)
@@ -176,7 +177,7 @@ func TestBaseView(t *testing.T) {
 		require.NoError(t, err)
 
 		// return result from the cache
-		value, err := view.GetState(slot1)
+		value, err = view.GetState(slot1)
 		require.NoError(t, err)
 		require.Equal(t, newValue, value)
 
