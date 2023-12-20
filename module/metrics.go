@@ -809,6 +809,9 @@ type ExecutionMetrics interface {
 	// ExecutionLastExecutedBlockHeight reports last executed block height
 	ExecutionLastExecutedBlockHeight(height uint64)
 
+	// ExecutionLastFinalizedExecutedBlockHeight reports last finalized and executed block height
+	ExecutionLastFinalizedExecutedBlockHeight(height uint64)
+
 	// ExecutionBlockExecuted reports the total time and computation spent on executing a block
 	ExecutionBlockExecuted(dur time.Duration, stats ExecutionResultStats)
 
