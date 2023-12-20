@@ -15,12 +15,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var rootAddr = flow.Address{1, 2, 3, 4, 5, 6, 7, 8}
+
 func TestStateDB(t *testing.T) {
 	t.Parallel()
 
 	t.Run("test commit functionality", func(t *testing.T) {
 		ledger := testutils.GetSimpleValueStore()
-		rootAddr := flow.Address{1, 2, 3, 4, 5, 6, 7, 8}
 		db, err := state.NewStateDB(ledger, rootAddr)
 		require.NoError(t, err)
 
@@ -58,7 +59,6 @@ func TestStateDB(t *testing.T) {
 
 	t.Run("test snapshot and revert functionality", func(t *testing.T) {
 		ledger := testutils.GetSimpleValueStore()
-		rootAddr := flow.Address{1, 2, 3, 4, 5, 6, 7, 8}
 		db, err := state.NewStateDB(ledger, rootAddr)
 		require.NoError(t, err)
 
@@ -115,7 +115,6 @@ func TestStateDB(t *testing.T) {
 
 	t.Run("test log functionality", func(t *testing.T) {
 		ledger := testutils.GetSimpleValueStore()
-		rootAddr := flow.Address{1, 2, 3, 4, 5, 6, 7, 8}
 		db, err := state.NewStateDB(ledger, rootAddr)
 		require.NoError(t, err)
 
@@ -142,6 +141,25 @@ func TestStateDB(t *testing.T) {
 		require.Equal(t, ret, logs)
 	})
 
+	t.Run("test refund functionality", func(t *testing.T) {
+		ledger := testutils.GetSimpleValueStore()
+		db, err := state.NewStateDB(ledger, rootAddr)
+		require.NoError(t, err)
+
+		require.Equal(t, uint64(0), db.GetRefund())
+		db.AddRefund(10)
+		require.Equal(t, uint64(10), db.GetRefund())
+		db.SubRefund(3)
+		require.Equal(t, uint64(7), db.GetRefund())
+
+		snap1 := db.Snapshot()
+		db.AddRefund(10)
+		require.Equal(t, uint64(17), db.GetRefund())
+
+		db.RevertToSnapshot(snap1)
+		require.Equal(t, uint64(7), db.GetRefund())
+	})
+
 	t.Run("test non-fatal error handling", func(t *testing.T) {
 		ledger := &testutils.TestValueStore{
 			GetValueFunc: func(owner, key []byte) ([]byte, error) {
@@ -154,7 +172,6 @@ func TestStateDB(t *testing.T) {
 				return atree.StorageIndex{}, nil
 			},
 		}
-		rootAddr := flow.Address{1, 2, 3, 4, 5, 6, 7, 8}
 		db, err := state.NewStateDB(ledger, rootAddr)
 		require.NoError(t, err)
 
@@ -179,7 +196,6 @@ func TestStateDB(t *testing.T) {
 				return atree.StorageIndex{}, nil
 			},
 		}
-		rootAddr := flow.Address{1, 2, 3, 4, 5, 6, 7, 8}
 		db, err := state.NewStateDB(ledger, rootAddr)
 		require.NoError(t, err)
 
@@ -191,4 +207,5 @@ func TestStateDB(t *testing.T) {
 		// check wrapping
 		require.True(t, types.IsAFatalError(err))
 	})
+
 }
