@@ -97,9 +97,17 @@ func (d *DeltaView) Exist(addr gethCommon.Address) (bool, error) {
 
 // CreateAccount creates a new account for the given address
 func (d *DeltaView) CreateAccount(addr gethCommon.Address) error {
+	// If a address already exists the balance is carried over to the new account.
+	// Carrying over the balance ensures that Ether doesn't disappear. (legacy behaviour of the Geth stateDB)
+	bal, err := d.GetBalance(addr)
+	if err != nil {
+		return err
+	}
+
 	d.created[addr] = struct{}{}
 	// flag the address as dirty
 	d.dirtyAddresses[addr] = struct{}{}
+	d.AddBalance(addr, bal)
 	return nil
 }
 

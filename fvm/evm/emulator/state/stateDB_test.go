@@ -1,13 +1,16 @@
 package state_test
 
 import (
+	"fmt"
 	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/onflow/atree"
 	"github.com/onflow/flow-go/fvm/evm/emulator/state"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
+	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/stretchr/testify/require"
 )
@@ -139,5 +142,53 @@ func TestStateDB(t *testing.T) {
 		require.Equal(t, ret, logs)
 	})
 
-	// TODO: add test for error handling
+	t.Run("test non-fatal error handling", func(t *testing.T) {
+		ledger := &testutils.TestValueStore{
+			GetValueFunc: func(owner, key []byte) ([]byte, error) {
+				return nil, nil
+			},
+			SetValueFunc: func(owner, key, value []byte) error {
+				return atree.NewUserError(fmt.Errorf("key not found"))
+			},
+			AllocateStorageIndexFunc: func(owner []byte) (atree.StorageIndex, error) {
+				return atree.StorageIndex{}, nil
+			},
+		}
+		rootAddr := flow.Address{1, 2, 3, 4, 5, 6, 7, 8}
+		db, err := state.NewStateDB(ledger, rootAddr)
+		require.NoError(t, err)
+
+		db.CreateAccount(testutils.RandomCommonAddress(t))
+
+		err = db.Commit()
+		// ret := db.Error()
+		require.Error(t, err)
+		// check wrapping
+		require.True(t, types.IsAStateError(err))
+	})
+
+	t.Run("test fatal error handling", func(t *testing.T) {
+		ledger := &testutils.TestValueStore{
+			GetValueFunc: func(owner, key []byte) ([]byte, error) {
+				return nil, nil
+			},
+			SetValueFunc: func(owner, key, value []byte) error {
+				return atree.NewFatalError(fmt.Errorf("key not found"))
+			},
+			AllocateStorageIndexFunc: func(owner []byte) (atree.StorageIndex, error) {
+				return atree.StorageIndex{}, nil
+			},
+		}
+		rootAddr := flow.Address{1, 2, 3, 4, 5, 6, 7, 8}
+		db, err := state.NewStateDB(ledger, rootAddr)
+		require.NoError(t, err)
+
+		db.CreateAccount(testutils.RandomCommonAddress(t))
+
+		err = db.Commit()
+		// ret := db.Error()
+		require.Error(t, err)
+		// check wrapping
+		require.True(t, types.IsAFatalError(err))
+	})
 }

@@ -76,8 +76,6 @@ func (db *StateDB) Empty(addr gethCommon.Address) bool {
 // CreateAccount creates a new account for the given address
 // it sets the nonce to zero
 func (db *StateDB) CreateAccount(addr gethCommon.Address) {
-	// TODO: If a state object with the address already exists the balance is carried over to the new account.
-	// Carrying over the balance ensures that Ether doesn't disappear.
 	db.lastestView().CreateAccount(addr)
 }
 
@@ -286,7 +284,7 @@ func (db *StateDB) Preimages() map[gethCommon.Hash][]byte {
 func (db *StateDB) Commit() error {
 	// return error if any has been acumulated
 	if db.cachedError != nil {
-		return db.cachedError
+		return wrapError(db.cachedError)
 	}
 
 	var err error
@@ -319,7 +317,7 @@ func (db *StateDB) Commit() error {
 		if db.HasSuicided(addr) {
 			err = db.baseView.DeleteAccount(addr)
 			if err != nil {
-				return err
+				return wrapError(err)
 			}
 			continue
 		}
@@ -332,7 +330,7 @@ func (db *StateDB) Commit() error {
 				db.GetCodeHash(addr),
 			)
 			if err != nil {
-				return err
+				return wrapError(err)
 			}
 			continue
 		}
@@ -344,7 +342,7 @@ func (db *StateDB) Commit() error {
 			db.GetCodeHash(addr),
 		)
 		if err != nil {
-			return err
+			return wrapError(err)
 		}
 	}
 
@@ -368,12 +366,16 @@ func (db *StateDB) Commit() error {
 			db.GetState(sk.Address, sk.Key),
 		)
 		if err != nil {
-			return err
+			return wrapError(err)
 		}
 	}
 
 	// don't purge views yet, people might call the logs etc
-	return db.baseView.Commit()
+	err = db.baseView.Commit()
+	if err != nil {
+		return wrapError(err)
+	}
+	return nil
 }
 
 // Prepare is a highlevel logic that sadly is considered to be part of the
@@ -405,27 +407,44 @@ func (db *StateDB) Prepare(rules gethParams.Rules, sender, coinbase gethCommon.A
 
 // Error returns the memorized database failure occurred earlier.
 func (s *StateDB) Error() error {
-	return s.cachedError
+	return wrapError(s.cachedError)
 }
 
 func (db *StateDB) lastestView() *DeltaView {
 	return db.views[len(db.views)-1]
 }
 
-// handleError capture the first non-nil error it is called with.
+// set error captures the first non-nil error it is called with.
 func (s *StateDB) handleError(err error) {
 	if err == nil {
 		return
 	}
+	if s.cachedError == nil {
+		s.cachedError = err
+	}
+}
+
+func wrapError(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	var atreeUserError *atree.UserError
+	// if is an atree user error
+	if stdErrors.As(err, &atreeUserError) {
+		return types.NewStateError(err)
+	}
 
 	var atreeFatalError *atree.FatalError
-	// if is a atree fatal error or fvm fatal error (the second one captures external errors)
-	if stdErrors.As(err, &atreeFatalError) || errors.IsFailure(err) {
-		panic(types.NewFatalError(err))
+	// if is a atree fatal error or
+	if stdErrors.As(err, &atreeFatalError) {
+		return types.NewFatalError(err)
 	}
 
-	// already no error is captured
-	if s.cachedError == nil {
-		s.cachedError = types.NewStateError(err)
+	// if is fvm fatal error
+	if errors.IsFailure(err) {
+		return types.NewFatalError(err)
 	}
+
+	return types.NewStateError(err)
 }
