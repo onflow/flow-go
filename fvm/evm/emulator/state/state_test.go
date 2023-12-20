@@ -1,4 +1,4 @@
-package emulator_test
+package state_test
 
 import (
 	"encoding/binary"
