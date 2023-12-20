@@ -51,7 +51,6 @@ func TestHandler_TransactionRun(t *testing.T) {
 					require.NoError(t, err)
 
 					result := &types.Result{
-						StateRootHash:           testutils.RandomCommonHash(t),
 						DeployedContractAddress: types.Address(testutils.RandomAddress(t)),
 						ReturnedValue:           testutils.RandomData(t),
 						GasConsumed:             testutils.RandomGas(1000),
