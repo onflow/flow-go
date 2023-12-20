@@ -10,15 +10,12 @@ import (
 
 	"github.com/onflow/flow-go/utils/io"
 
-	"github.com/ethereum/go-ethereum/ethdb"
-
 	"github.com/ethereum/go-ethereum/common"
-	gethRawDB "github.com/ethereum/go-ethereum/core/rawdb"
-	gethState "github.com/ethereum/go-ethereum/core/state"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/fvm/evm/emulator/database"
+	"github.com/onflow/flow-go/fvm/evm/emulator/state"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
+	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -36,37 +33,16 @@ const (
 
 type storageTest struct {
 	store        *testutils.TestValueStore
-	db           *database.MeteredDatabase
-	ethDB        ethdb.Database
-	stateDB      gethState.Database
 	addressIndex uint64
-	hash         common.Hash
 	metrics      *metrics
 }
 
 func newStorageTest() (*storageTest, error) {
 	simpleStore := testutils.GetSimpleValueStore()
 
-	db, err := database.NewMeteredDatabase(simpleStore, flow.Address{0x01})
-	if err != nil {
-		return nil, err
-	}
-
-	hash, err := db.GetRootHash()
-	if err != nil {
-		return nil, err
-	}
-
-	rawDB := gethRawDB.NewDatabase(db)
-	stateDB := gethState.NewDatabase(rawDB)
-
 	return &storageTest{
 		store:        simpleStore,
-		db:           db,
-		ethDB:        rawDB,
-		stateDB:      stateDB,
 		addressIndex: 100,
-		hash:         hash,
 		metrics:      newMetrics(),
 	}, nil
 }
@@ -80,33 +56,22 @@ func (s *storageTest) newAddress() common.Address {
 
 // run the provided runner with a newly created state which gets comitted after the runner
 // is finished. Storage metrics are being recorded with each run.
-func (s *storageTest) run(runner func(state *gethState.StateDB)) error {
-	state, err := gethState.New(s.hash, s.stateDB, nil)
+func (s *storageTest) run(runner func(state types.StateDB)) error {
+	state, err := state.NewStateDB(s.store, flow.Address{0x01})
 	if err != nil {
 		return err
 	}
 
 	runner(state)
 
-	s.hash, err = state.Commit(true)
+	err = state.Commit()
 	if err != nil {
 		return err
 	}
 
-	err = state.Database().TrieDB().Commit(s.hash, true)
-	if err != nil {
-		return err
-	}
-
-	err = s.db.Commit(s.hash)
-	if err != nil {
-		return err
-	}
-
-	s.db.DropCache()
-
-	s.metrics.add(bytesWrittenMetric, s.db.BytesStored())
-	s.metrics.add(bytesReadMetric, s.db.BytesRetrieved())
+	// TODO: figure out us
+	// s.metrics.add(bytesWrittenMetric, s.db.BytesStored())
+	// s.metrics.add(bytesReadMetric, s.db.BytesRetrieved())
 	s.metrics.add(storageItemsMetric, s.store.TotalStorageItems())
 	s.metrics.add(storageBytesMetric, s.store.TotalStorageSize())
 
@@ -168,7 +133,7 @@ func Test_AccountCreations(t *testing.T) {
 	accountChart := "accounts,storage_size"
 	maxAccounts := 50_000
 	for i := 0; i < maxAccounts; i++ {
-		err = tester.run(func(state *gethState.StateDB) {
+		err = tester.run(func(state types.StateDB) {
 			state.AddBalance(tester.newAddress(), big.NewInt(100))
 		})
 		require.NoError(t, err)
@@ -205,16 +170,19 @@ func Test_AccountContractInteraction(t *testing.T) {
 
 	interactions := 50000
 	for i := 0; i < interactions; i++ {
-		err = tester.run(func(state *gethState.StateDB) {
+		err = tester.run(func(state types.StateDB) {
 			// create a new account
 			accAddr := tester.newAddress()
 			state.AddBalance(accAddr, big.NewInt(100))
 
 			// create a contract
 			contractAddr := tester.newAddress()
-			state.SetBalance(contractAddr, big.NewInt(int64(i)))
+			state.AddBalance(contractAddr, big.NewInt(int64(i)))
 			state.SetCode(contractAddr, code)
-			state.SetStorage(contractAddr, contractState)
+
+			for k, v := range contractState {
+				state.SetState(contractAddr, k, v)
+			}
 
 			// simulate interaction with contract state and account balance for fees
 			state.SetState(contractAddr, common.HexToHash("0x03"), common.HexToHash("0x40"))

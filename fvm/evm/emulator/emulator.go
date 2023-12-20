@@ -159,15 +159,15 @@ type procedure struct {
 
 // commit commits the changes to the state.
 func (proc *procedure) commit() error {
-	return proc.state.Commit()
+	return handleCommitError(proc.state.Commit())
 }
 
 func handleCommitError(err error) error {
 	if err == nil {
 		return nil
 	}
-	// if known types (database errors) don't do anything and return
-	if types.IsAFatalError(err) || types.IsADatabaseError(err) {
+	// if known types (state errors) don't do anything and return
+	if types.IsAFatalError(err) || types.IsAStateError(err) {
 		return err
 	}
 
@@ -243,8 +243,8 @@ func (proc *procedure) run(msg *gethCore.Message, txType uint8) (*types.Result, 
 	).TransitionDb()
 	if err != nil {
 		res.Failed = true
-		// if the error is a fatal error or a non-fatal database error return it
-		if types.IsAFatalError(err) || types.IsADatabaseError(err) {
+		// if the error is a fatal error or a non-fatal state error return it
+		if types.IsAFatalError(err) || types.IsAStateError(err) {
 			return &res, err
 		}
 		// otherwise is a validation error (pre-check failure)
