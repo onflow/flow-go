@@ -19,7 +19,7 @@ func NewStorageSnapshotFromPayload(
 		}
 
 		id := flow.NewRegisterID(
-			string(key.KeyParts[0].Value),
+			flow.BytesToAddress(key.KeyParts[0].Value),
 			string(key.KeyParts[1].Value))
 
 		snapshot[id] = entry.Value()

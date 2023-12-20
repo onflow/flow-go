@@ -8,14 +8,17 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestLedgerKeyToRegisterID(t *testing.T) {
+	expectedRegisterID := unittest.RegisterIDFixture()
+
 	key := ledger.Key{
 		KeyParts: []ledger.KeyPart{
 			{
 				Type:  convert.KeyPartOwner,
-				Value: []byte("owner"),
+				Value: []byte(expectedRegisterID.Owner),
 			},
 			{
 				Type:  convert.KeyPartKey,
@@ -24,7 +27,6 @@ func TestLedgerKeyToRegisterID(t *testing.T) {
 		},
 	}
 
-	expectedRegisterID := flow.NewRegisterID("owner", "key")
 	registerID, err := convert.LedgerKeyToRegisterID(key)
 	require.NoError(t, err)
 	require.Equal(t, expectedRegisterID, registerID)
@@ -70,14 +72,14 @@ func TestLedgerKeyToRegisterID_Error(t *testing.T) {
 }
 
 func TestRegisterIDToLedgerKey(t *testing.T) {
-	registerID := flow.NewRegisterID("owner", "key")
+	registerID := unittest.RegisterIDFixture()
 	expectedKey := ledger.Key{
 		KeyParts: []ledger.KeyPart{
 			{
 				Type: convert.KeyPartOwner,
 				// Note: the owner field is extended to address length during NewRegisterID
 				// so we have to do the same here
-				Value: flow.BytesToAddress([]byte("owner")).Bytes(),
+				Value: []byte(registerID.Owner),
 			},
 			{
 				Type:  convert.KeyPartKey,
@@ -110,20 +112,21 @@ func TestRegisterIDToLedgerKey_Global(t *testing.T) {
 }
 
 func TestPayloadToRegister(t *testing.T) {
+	expected := unittest.RegisterIDFixture()
 	t.Run("can convert", func(t *testing.T) {
 		value := []byte("value")
 		p := ledger.NewPayload(
 			ledger.NewKey(
 				[]ledger.KeyPart{
-					ledger.NewKeyPart(convert.KeyPartOwner, []byte("owner")),
-					ledger.NewKeyPart(convert.KeyPartKey, []byte("key")),
+					ledger.NewKeyPart(convert.KeyPartOwner, []byte(expected.Owner)),
+					ledger.NewKeyPart(convert.KeyPartKey, []byte(expected.Key)),
 				},
 			),
 			value,
 		)
 		regID, regValue, err := convert.PayloadToRegister(p)
 		require.NoError(t, err)
-		require.Equal(t, flow.NewRegisterID("owner", "key"), regID)
+		require.Equal(t, expected, regID)
 		require.Equal(t, value, regValue)
 	})
 
@@ -140,7 +143,7 @@ func TestPayloadToRegister(t *testing.T) {
 		)
 		regID, regValue, err := convert.PayloadToRegister(p)
 		require.NoError(t, err)
-		require.Equal(t, flow.NewRegisterID("", "uuid"), regID)
+		require.Equal(t, flow.NewRegisterID(flow.EmptyAddress, "uuid"), regID)
 		require.Equal(t, "", regID.Owner)
 		require.Equal(t, "uuid", regID.Key)
 		require.True(t, regID.IsInternalState())

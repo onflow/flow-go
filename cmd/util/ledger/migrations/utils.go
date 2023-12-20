@@ -22,7 +22,7 @@ var _ atree.Ledger = &AccountsAtreeLedger{}
 func (a *AccountsAtreeLedger) GetValue(owner, key []byte) ([]byte, error) {
 	v, err := a.Accounts.GetValue(
 		flow.NewRegisterID(
-			string(flow.BytesToAddress(owner).Bytes()),
+			flow.BytesToAddress(owner),
 			string(key)))
 	if err != nil {
 		return nil, fmt.Errorf("getting value failed: %w", err)
@@ -33,7 +33,7 @@ func (a *AccountsAtreeLedger) GetValue(owner, key []byte) ([]byte, error) {
 func (a *AccountsAtreeLedger) SetValue(owner, key, value []byte) error {
 	err := a.Accounts.SetValue(
 		flow.NewRegisterID(
-			string(flow.BytesToAddress(owner).Bytes()),
+			flow.BytesToAddress(owner),
 			string(key)),
 		value)
 	if err != nil {
