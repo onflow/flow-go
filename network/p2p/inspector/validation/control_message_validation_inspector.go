@@ -581,11 +581,7 @@ func (c *ControlMsgValidationInspector) truncateRPC(from peer.ID, rpc *pubsub.RP
 func (c *ControlMsgValidationInspector) truncateGraftMessages(rpc *pubsub.RPC) {
 	grafts := rpc.GetControl().GetGraft()
 	originalGraftSize := len(grafts)
-	if originalGraftSize == 0 {
-		return
-	}
-
-	if originalGraftSize < c.config.GraftPruneMessageMaxSampleSize {
+	if originalGraftSize <= c.config.GraftPruneMessageMaxSampleSize {
 		return // nothing to truncate
 	}
 
@@ -605,11 +601,7 @@ func (c *ControlMsgValidationInspector) truncateGraftMessages(rpc *pubsub.RPC) {
 func (c *ControlMsgValidationInspector) truncatePruneMessages(rpc *pubsub.RPC) {
 	prunes := rpc.GetControl().GetPrune()
 	originalPruneSize := len(prunes)
-	if originalPruneSize == 0 {
-		return
-	}
-
-	if originalPruneSize < c.config.GraftPruneMessageMaxSampleSize {
+	if originalPruneSize <= c.config.GraftPruneMessageMaxSampleSize {
 		return // nothing to truncate
 	}
 
