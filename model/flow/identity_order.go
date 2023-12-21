@@ -1,10 +1,6 @@
 // (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
 
-package order
-
-import (
-	"github.com/onflow/flow-go/model/flow"
-)
+package flow
 
 // Canonical is a function that defines a weak strict ordering "<" for identities.
 // It returns:
@@ -19,7 +15,7 @@ import (
 // Use `IsCanonical` for canonical order checks.
 //
 // The current function is based on the identifiers bytes lexicographic comparison.
-func Canonical(identity1 *flow.Identity, identity2 *flow.Identity) int {
+func Canonical(identity1 *Identity, identity2 *Identity) int {
 	return IdentifierCanonical(identity1.NodeID, identity2.NodeID)
 }
 
@@ -31,14 +27,14 @@ func Canonical(identity1 *flow.Identity, identity2 *flow.Identity) int {
 // The strictness is important, meaning that two identities with the same
 // NodeID do not satisfy the canonical order.
 // This also implies that the canonical order is irreflexive ((i,i) isn't in canonical order).
-func IsCanonical(i1, i2 *flow.Identity) bool {
+func IsCanonical(i1, i2 *Identity) bool {
 	return Canonical(i1, i2) < 0
 }
 
 // ByReferenceOrder return a function for sorting identities based on the order
 // of the given nodeIDs
-func ByReferenceOrder(nodeIDs []flow.Identifier) func(*flow.Identity, *flow.Identity) int {
-	indices := make(map[flow.Identifier]int)
+func ByReferenceOrder(nodeIDs []Identifier) func(*Identity, *Identity) int {
+	indices := make(map[Identifier]int)
 	for index, nodeID := range nodeIDs {
 		_, ok := indices[nodeID]
 		if ok {
@@ -46,7 +42,7 @@ func ByReferenceOrder(nodeIDs []flow.Identifier) func(*flow.Identity, *flow.Iden
 		}
 		indices[nodeID] = index
 	}
-	return func(identity1 *flow.Identity, identity2 *flow.Identity) int {
+	return func(identity1 *Identity, identity2 *Identity) int {
 		return indices[identity1.NodeID] - indices[identity2.NodeID]
 	}
 }
@@ -56,7 +52,7 @@ func ByReferenceOrder(nodeIDs []flow.Identifier) func(*flow.Identity, *flow.Iden
 //
 // The strictness is important here, meaning that a list with 2 successive entities
 // with equal NodeID isn't considered well sorted.
-func IdentityListCanonical(il flow.IdentityList) bool {
+func IdentityListCanonical(il IdentityList) bool {
 	for i := 0; i < len(il)-1; i++ {
 		if !IsCanonical(il[i], il[i+1]) {
 			return false

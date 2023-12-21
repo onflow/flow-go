@@ -1,9 +1,7 @@
-package order
+package flow
 
 import (
 	"bytes"
-
-	"github.com/onflow/flow-go/model/flow"
 )
 
 // IdentifierCanonical is a function that defines a weak strict ordering "<" for identifiers.
@@ -21,11 +19,11 @@ import (
 // The current function is based on the identifiers bytes lexicographic comparison.
 // Example:
 //
-//	IdentifierCanonical(flow.Identifier{1}, flow.Identifier{2}) // -1
-//	IdentifierCanonical(flow.Identifier{2}, flow.Identifier{1}) // 1
-//	IdentifierCanonical(flow.Identifier{1}, flow.Identifier{1}) // 0
-//	IdentifierCanonical(flow.Identifier{0, 1}, flow.Identifier{0, 2}) // -1
-func IdentifierCanonical(id1 flow.Identifier, id2 flow.Identifier) int {
+//	IdentifierCanonical(Identifier{1}, Identifier{2}) // -1
+//	IdentifierCanonical(Identifier{2}, Identifier{1}) // 1
+//	IdentifierCanonical(Identifier{1}, Identifier{1}) // 0
+//	IdentifierCanonical(Identifier{0, 1}, Identifier{0, 2}) // -1
+func IdentifierCanonical(id1 Identifier, id2 Identifier) int {
 	return bytes.Compare(id1[:], id2[:])
 }
 
@@ -36,7 +34,7 @@ func IdentifierCanonical(id1 flow.Identifier, id2 flow.Identifier) int {
 //
 // The strictness is important, meaning that the canonical order
 // is irreflexive ((i,i) isn't in canonical order).
-func IsIdentifierCanonical(i1, i2 flow.Identifier) bool {
+func IsIdentifierCanonical(i1, i2 Identifier) bool {
 	return IdentifierCanonical(i1, i2) < 0
 }
 
@@ -45,7 +43,7 @@ func IsIdentifierCanonical(i1, i2 flow.Identifier) bool {
 //
 // The strictness is important here, meaning that a list with 2 equal identifiers
 // isn't considered well sorted.
-func IdentifierListCanonical(il flow.IdentifierList) bool {
+func IdentifierListCanonical(il IdentifierList) bool {
 	for i := 0; i < len(il)-1; i++ {
 		if !IsIdentifierCanonical(il[i], il[i+1]) {
 			return false

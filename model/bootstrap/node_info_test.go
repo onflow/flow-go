@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/bootstrap"
-	"github.com/onflow/flow-go/model/flow/order"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -18,19 +18,19 @@ func TestIdentityListCanonical(t *testing.T) {
 	ids := bootstrap.ToIdentityList(nodes)
 	// make sure the list is not sorted
 	nodes[0].NodeID[0], nodes[1].NodeID[0] = 2, 1
-	require.False(t, order.IsIdentifierCanonical(nodes[0].NodeID, nodes[1].NodeID))
+	require.False(t, flow.IsIdentifierCanonical(nodes[0].NodeID, nodes[1].NodeID))
 	ids = bootstrap.ToIdentityList(nodes)
-	assert.False(t, order.IdentityListCanonical(ids))
+	assert.False(t, flow.IdentityListCanonical(ids))
 
-	nodes = bootstrap.Sort(nodes, order.Canonical)
+	nodes = bootstrap.Sort(nodes, flow.Canonical)
 	ids = bootstrap.ToIdentityList(nodes)
-	require.True(t, order.IdentityListCanonical(ids))
+	require.True(t, flow.IdentityListCanonical(ids))
 
 	// check `IdentityListCanonical` detects order equality in a sorted list
 	nodes[1] = nodes[10] // add a duplication
-	nodes = bootstrap.Sort(nodes, order.Canonical)
+	nodes = bootstrap.Sort(nodes, flow.Canonical)
 	ids = bootstrap.ToIdentityList(nodes)
-	assert.False(t, order.IdentityListCanonical(ids))
+	assert.False(t, flow.IdentityListCanonical(ids))
 }
 
 func TestNodeConfigEncodingJSON(t *testing.T) {

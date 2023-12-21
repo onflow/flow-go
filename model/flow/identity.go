@@ -1,7 +1,6 @@
 package flow
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -17,7 +16,6 @@ import (
 	"github.com/vmihailenco/msgpack"
 
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/utils/rand"
 )
 
@@ -541,13 +539,7 @@ func (il IdentityList) Union(other IdentityList) IdentityList {
 		}
 	}
 
-	slices.SortFunc(union, func(a, b *Identity) int {
-		// CAUTION: we want to return the union in canonical order, which must be consistent with
-		// the implementations in the `model/flow/order` package. However, using the `order` package
-		// directly here causes a circular dependency
-		return bytes.Compare(a.NodeID[:], b.NodeID[:])
-	})
-
+	slices.SortFunc(union, Canonical)
 	return union
 }
 
@@ -571,7 +563,7 @@ func (il IdentityList) Exists(target *Identity) bool {
 // target:  value to search for
 // CAUTION:  The identity list MUST be sorted prior to calling this method
 func (il IdentityList) IdentifierExists(target Identifier) bool {
-	_, ok := slices.BinarySearchFunc(il, &Identity{NodeID: target}, order.IdentifierCanonical)
+	_, ok := slices.BinarySearchFunc(il, &Identity{NodeID: target}, Canonical)
 	return ok
 }
 

@@ -1,7 +1,6 @@
 package flow
 
 import (
-	"github.com/onflow/flow-go/model/flow/order"
 	"golang.org/x/exp/slices"
 )
 
@@ -27,7 +26,7 @@ func (il IdentifierList) Lookup() map[Identifier]struct{} {
 // Otherwise it returns true.
 // It satisfies the sort.Interface making the IdentifierList sortable.
 func (il IdentifierList) Less(i, j int) bool {
-	return order.IdentifierCanonical(il[i], il[j])
+	return IsIdentifierCanonical(il[i], il[j])
 }
 
 // Swap swaps the element i and j in the IdentifierList.

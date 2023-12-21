@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/order"
 )
 
 // NewClusterList creates a new cluster list based on the given cluster assignment
@@ -47,7 +46,7 @@ func NewClusterList(assignments flow.AssignmentList, collectors flow.IdentityLis
 			delete(lookup, participantID)
 
 			if i > 0 {
-				if !order.IsIdentifierCanonical(prev, participantID) {
+				if !flow.IsIdentifierCanonical(prev, participantID) {
 					return nil, fmt.Errorf("the assignments is not sorted in canonical order or there are duplicates in cluster index %v, prev %v, next %v",
 						i, prev, participantID)
 				}
