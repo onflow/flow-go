@@ -37,20 +37,28 @@ type DeferredBadgerUpdate = func(*badger.Txn) error
 // DESIGN PATTERN
 //   - DeferredDbOps is stateful, i.e. it needs to be passed as pointer variable.
 //   - Do not instantiate Tx directly. Instead, use one of the following
-//     transaction.Update(db, DeferredDbOps.Pending)
-//     transaction.View(db, DeferredDbOps.Pending)
-//     operation.RetryOnConflictTx(db, transaction.Update, DeferredDbOps.Pending)
+//     transaction.Update(db, DeferredDbOps.Pending())
+//     transaction.View(db, DeferredDbOps.Pending())
+//     operation.RetryOnConflictTx(db, transaction.Update, DeferredDbOps.Pending())
 //
 // NOT CONCURRENCY SAFE
 type DeferredDbOps struct {
-	Pending DeferredDBUpdate
+	pending DeferredDBUpdate
 }
 
 // NewDeferredDbOps instantiates a DeferredDbOps. Initially, it behaves like a no-op until functors are added.
 func NewDeferredDbOps() *DeferredDbOps {
 	return &DeferredDbOps{
-		Pending: func(tx *Tx) error { return nil }, // initially nothing is pending, i.e. no-op
+		pending: func(tx *Tx) error { return nil }, // initially nothing is pending, i.e. no-op
 	}
+}
+
+// Pending returns a DeferredDBUpdate that includes all database operations and callbacks
+// that were added so far. Caution, DeferredDbOps keeps its internal state of deferred operations.
+// Pending() can be called multiple times, but should only be executed in a database transaction
+// once to avoid conflicts.
+func (d *DeferredDbOps) Pending() DeferredDBUpdate {
+	return d.pending
 }
 
 // AddBadgerOp schedules the given DeferredBadgerUpdate to be executed as part of the future transaction.
@@ -58,8 +66,8 @@ func NewDeferredDbOps() *DeferredDbOps {
 // it reduces the call stack compared to adding the functors individually via `AddBadgerOp(op DeferredBadgerUpdate)`.
 // This method returns a self-reference for chaining.
 func (d *DeferredDbOps) AddBadgerOp(op DeferredBadgerUpdate) *DeferredDbOps {
-	prior := d.Pending
-	d.Pending = func(tx *Tx) error {
+	prior := d.pending
+	d.pending = func(tx *Tx) error {
 		err := prior(tx)
 		if err != nil {
 			return err
@@ -80,8 +88,8 @@ func (d *DeferredDbOps) AddBadgerOps(ops ...DeferredBadgerUpdate) *DeferredDbOps
 		return d
 	}
 
-	prior := d.Pending
-	d.Pending = func(tx *Tx) error {
+	prior := d.pending
+	d.pending = func(tx *Tx) error {
 		err := prior(tx)
 		if err != nil {
 			return err
@@ -102,8 +110,8 @@ func (d *DeferredDbOps) AddBadgerOps(ops ...DeferredBadgerUpdate) *DeferredDbOps
 // it reduces the call stack compared to adding the functors individually via `AddDbOp(op DeferredDBUpdate)`.
 // This method returns a self-reference for chaining.
 func (d *DeferredDbOps) AddDbOp(op DeferredDBUpdate) *DeferredDbOps {
-	prior := d.Pending
-	d.Pending = func(tx *Tx) error {
+	prior := d.pending
+	d.pending = func(tx *Tx) error {
 		err := prior(tx)
 		if err != nil {
 			return err
@@ -124,8 +132,8 @@ func (d *DeferredDbOps) AddDbOps(ops ...DeferredDBUpdate) *DeferredDbOps {
 		return d
 	}
 
-	prior := d.Pending
-	d.Pending = func(tx *Tx) error {
+	prior := d.pending
+	d.pending = func(tx *Tx) error {
 		err := prior(tx)
 		if err != nil {
 			return err
@@ -146,8 +154,8 @@ func (d *DeferredDbOps) AddDbOps(ops ...DeferredDBUpdate) *DeferredDbOps {
 // the call stack compared to adding the functors individually via `OnSucceed(callback func())`.
 // This method returns a self-reference for chaining.
 func (d *DeferredDbOps) OnSucceed(callback func()) *DeferredDbOps {
-	prior := d.Pending
-	d.Pending = func(tx *Tx) error {
+	prior := d.pending
+	d.pending = func(tx *Tx) error {
 		err := prior(tx)
 		if err != nil {
 			return err
@@ -165,8 +173,8 @@ func (d *DeferredDbOps) OnSucceeds(callbacks ...func()) *DeferredDbOps {
 		return d
 	}
 
-	prior := d.Pending
-	d.Pending = func(tx *Tx) error {
+	prior := d.pending
+	d.pending = func(tx *Tx) error {
 		err := prior(tx)
 		if err != nil {
 			return err

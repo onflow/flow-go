@@ -167,7 +167,7 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Blo
 
 	// Execute the deferred database operations as one atomic transaction and emit scheduled notifications on success.
 	// The `candidate` block _must be valid_ (otherwise, the state will be corrupted)!
-	err = operation.RetryOnConflictTx(m.db, transaction.Update, deferredDbOps.Pending) // No errors are expected during normal operations
+	err = operation.RetryOnConflictTx(m.db, transaction.Update, deferredDbOps.Pending()) // No errors are expected during normal operations
 	if err != nil {
 		return fmt.Errorf("failed to persist candidate block %v and its dependencies: %w", blockID, err)
 	}
@@ -232,7 +232,7 @@ func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) er
 
 	// Execute the deferred database operations and emit scheduled notifications on success.
 	// The `candidate` block _must be valid_ (otherwise, the state will be corrupted)!
-	err = operation.RetryOnConflictTx(m.db, transaction.Update, deferredDbOps.Pending) // No errors are expected during normal operations
+	err = operation.RetryOnConflictTx(m.db, transaction.Update, deferredDbOps.Pending()) // No errors are expected during normal operations
 	if err != nil {
 		return fmt.Errorf("failed to persist candiate block %v and its dependencies: %w", candidate.ID(), err)
 	}
