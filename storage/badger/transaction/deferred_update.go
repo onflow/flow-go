@@ -4,17 +4,9 @@ import (
 	"github.com/dgraph-io/badger/v2"
 )
 
-// DeferredDBUpdates is a shorthand notation for a list of anonymous functions that all
-// take a `transaction.Tx` as input and run some database operations as part of that transaction.
-type DeferredDBUpdates = []DeferredDBUpdate
-
 // DeferredDBUpdate is a shorthand notation for an anonymous function that takes
 // a `transaction.Tx` as input and runs some database operations as part of that transaction.
 type DeferredDBUpdate = func(*Tx) error
-
-// DeferredBadgerUpdates is a shorthand notation for a list of anonymous functions that all
-// take a badger transaction as input and run some database operations as part of that transaction.
-type DeferredBadgerUpdates = []DeferredBadgerUpdate
 
 // DeferredBadgerUpdate is a shorthand notation for an anonymous function that takes
 // a badger transaction as input and runs some database operations as part of that transaction.
@@ -138,8 +130,8 @@ func (d *DeferredDbOps) AddDbOps(ops ...DeferredDBUpdate) *DeferredDbOps {
 		if err != nil {
 			return err
 		}
-		for _, o := range ops {
-			err = o(tx)
+		for _, op := range ops {
+			err = op(tx)
 			if err != nil {
 				return err
 			}

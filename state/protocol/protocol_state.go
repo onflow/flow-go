@@ -117,7 +117,7 @@ type StateMutator interface {
 	//     of the calling code (specifically `FollowerState`).
 	//
 	// updated protocol state entry, state ID and a flag indicating if there were any changes.
-	Build() (hasChanges bool, updatedState *flow.ProtocolStateEntry, stateID flow.Identifier, dbUpdates transaction.DeferredDBUpdates)
+	Build() (hasChanges bool, updatedState *flow.ProtocolStateEntry, stateID flow.Identifier, dbUpdates []transaction.DeferredDBUpdate)
 
 	// ApplyServiceEventsFromValidatedSeals applies the state changes that are delivered via
 	// sealed service events:
