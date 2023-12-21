@@ -169,7 +169,6 @@ generate-mocks: install-mock-generators
 	mockery --name '.*' --dir=engine/execution/ --case=underscore --output="engine/execution/mock" --outpkg="mock"
 	mockery --name 'Backend' --dir=engine/collection/rpc --case=underscore --output="engine/collection/rpc/mock" --outpkg="mock"
 	mockery --name 'ProviderEngine' --dir=engine/execution/provider --case=underscore --output="engine/execution/provider/mock" --outpkg="mock"
-	(cd ./crypto && mockery --name 'PublicKey' --case=underscore --output="../module/mock" --outpkg="mock")
 	mockery --name '.*' --dir=state/cluster --case=underscore --output="state/cluster/mock" --outpkg="mock"
 	mockery --name '.*' --dir=module --case=underscore --output="./module/mock" --outpkg="mock"
 	mockery --name '.*' --dir=module/mempool --case=underscore --output="./module/mempool/mock" --outpkg="mempool"
@@ -241,7 +240,7 @@ ci: install-tools test
 # Runs integration tests
 .PHONY: ci-integration
 ci-integration:
-	$(MAKE) -C integration ci-integration-test
+	$(MAKE) -C integration integration-test
 
 # Runs benchmark tests
 # NOTE: we do not need `docker-build-flow` as this is run as a separate step

@@ -40,12 +40,11 @@ import (
 // - malformed topic: topic is malformed in some way
 // - invalid spork ID: spork ID prepended to topic and current spork ID do not match
 func TestValidationInspector_InvalidTopicId_Detection(t *testing.T) {
-	t.Parallel()
 	role := flow.RoleConsensus
 	sporkID := unittest.IdentifierFixture()
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
-	inspectorConfig := flowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs
+	inspectorConfig := flowConfig.NetworkConfig.GossipSub.RpcInspector.Validation
 
 	messageCount := 100
 	inspectorConfig.NumberOfWorkers = 1
@@ -91,6 +90,7 @@ func TestValidationInspector_InvalidTopicId_Detection(t *testing.T) {
 	distributor := mockp2p.NewGossipSubInspectorNotificationDistributor(t)
 	p2ptest.MockInspectorNotificationDistributorReadyDoneAware(distributor)
 	withExpectedNotificationDissemination(expectedNumOfTotalNotif, inspectDisseminatedNotifyFunc)(distributor, spammer)
+
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
 	topicProvider := newMockUpdatableTopicProvider()
 	validationInspector, err := validation.NewControlMsgValidationInspector(&validation.InspectorParams{
@@ -114,7 +114,6 @@ func TestValidationInspector_InvalidTopicId_Detection(t *testing.T) {
 		t.Name(),
 		idProvider,
 		p2ptest.WithRole(role),
-		p2ptest.WithGossipSubTracer(meshTracer),
 		internal.WithCorruptGossipSub(corruptlibp2p.CorruptGossipSubFactory(), corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(corruptInspectorFunc)))
 	idProvider.On("ByPeerID", victimNode.ID()).Return(&victimIdentity, true).Maybe()
 	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Maybe()
@@ -175,12 +174,11 @@ func TestValidationInspector_InvalidTopicId_Detection(t *testing.T) {
 // TestValidationInspector_DuplicateTopicId_Detection ensures that when an RPC control message contains a duplicate topic ID an invalid control message
 // notification is disseminated with the expected error.
 func TestValidationInspector_DuplicateTopicId_Detection(t *testing.T) {
-	t.Parallel()
 	role := flow.RoleConsensus
 	sporkID := unittest.IdentifierFixture()
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
-	inspectorConfig := flowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs
+	inspectorConfig := flowConfig.NetworkConfig.GossipSub.RpcInspector.Validation
 
 	inspectorConfig.NumberOfWorkers = 1
 
@@ -251,7 +249,6 @@ func TestValidationInspector_DuplicateTopicId_Detection(t *testing.T) {
 		t.Name(),
 		idProvider,
 		p2ptest.WithRole(role),
-		p2ptest.WithGossipSubTracer(meshTracer),
 		internal.WithCorruptGossipSub(corruptlibp2p.CorruptGossipSubFactory(), corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(corruptInspectorFunc)))
 	idProvider.On("ByPeerID", victimNode.ID()).Return(&victimIdentity, true).Maybe()
 	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Maybe()
@@ -287,12 +284,11 @@ func TestValidationInspector_DuplicateTopicId_Detection(t *testing.T) {
 // TestValidationInspector_IHaveDuplicateMessageId_Detection ensures that when an RPC iHave control message contains a duplicate message ID for a single topic
 // notification is disseminated with the expected error.
 func TestValidationInspector_IHaveDuplicateMessageId_Detection(t *testing.T) {
-	t.Parallel()
 	role := flow.RoleConsensus
 	sporkID := unittest.IdentifierFixture()
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
-	inspectorConfig := flowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs
+	inspectorConfig := flowConfig.NetworkConfig.GossipSub.RpcInspector.Validation
 
 	inspectorConfig.NumberOfWorkers = 1
 
@@ -353,7 +349,6 @@ func TestValidationInspector_IHaveDuplicateMessageId_Detection(t *testing.T) {
 		t.Name(),
 		idProvider,
 		p2ptest.WithRole(role),
-		p2ptest.WithGossipSubTracer(meshTracer),
 		internal.WithCorruptGossipSub(corruptlibp2p.CorruptGossipSubFactory(), corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(corruptInspectorFunc)))
 	idProvider.On("ByPeerID", victimNode.ID()).Return(&victimIdentity, true).Maybe()
 	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Maybe()
@@ -391,15 +386,14 @@ func TestValidationInspector_IHaveDuplicateMessageId_Detection(t *testing.T) {
 // TestValidationInspector_UnknownClusterId_Detection ensures that when an RPC control message contains a topic with an unknown cluster ID an invalid control message
 // notification is disseminated with the expected error.
 func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
-	t.Parallel()
 	role := flow.RoleConsensus
 	sporkID := unittest.IdentifierFixture()
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
-	inspectorConfig := flowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs
+	inspectorConfig := flowConfig.NetworkConfig.GossipSub.RpcInspector.Validation
 	// set hard threshold to 0 so that in the case of invalid cluster ID
 	// we force the inspector to return an error
-	inspectorConfig.ClusterPrefixHardThreshold = 0
+	inspectorConfig.ClusterPrefixedMessage.HardThreshold = 0
 	inspectorConfig.NumberOfWorkers = 1
 
 	// SafetyThreshold < messageCount < HardThreshold ensures that the RPC message will be further inspected and topic IDs will be checked
@@ -467,7 +461,6 @@ func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
 		t.Name(),
 		idProvider,
 		p2ptest.WithRole(role),
-		p2ptest.WithGossipSubTracer(meshTracer),
 		internal.WithCorruptGossipSub(corruptlibp2p.CorruptGossipSubFactory(), corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(corruptInspectorFunc)))
 	idProvider.On("ByPeerID", victimNode.ID()).Return(&victimIdentity, true).Maybe()
 	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Times(4)
@@ -504,13 +497,12 @@ func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
 // cluster prefix hard threshold when the active cluster IDs not set and an invalid control message notification is disseminated with the expected error.
 // This test involves Graft control messages.
 func TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection(t *testing.T) {
-	t.Parallel()
 	role := flow.RoleConsensus
 	sporkID := unittest.IdentifierFixture()
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
-	inspectorConfig := flowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs
-	inspectorConfig.ClusterPrefixHardThreshold = 5
+	inspectorConfig := flowConfig.NetworkConfig.GossipSub.RpcInspector.Validation
+	inspectorConfig.ClusterPrefixedMessage.HardThreshold = 5
 	inspectorConfig.NumberOfWorkers = 1
 	controlMessageCount := int64(10)
 
@@ -563,7 +555,6 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection(t *testing.T
 		t.Name(),
 		idProvider,
 		p2ptest.WithRole(role),
-		p2ptest.WithGossipSubTracer(meshTracer),
 		internal.WithCorruptGossipSub(corruptlibp2p.CorruptGossipSubFactory(), corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(corruptInspectorFunc)))
 	idProvider.On("ByPeerID", victimNode.ID()).Return(&victimIdentity, true).Maybe()
 	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Maybe()
@@ -594,13 +585,12 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection(t *testing.T
 // cluster prefix hard threshold when the active cluster IDs not set and an invalid control message notification is disseminated with the expected error.
 // This test involves Prune control messages.
 func TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection(t *testing.T) {
-	t.Parallel()
 	role := flow.RoleConsensus
 	sporkID := unittest.IdentifierFixture()
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
-	inspectorConfig := flowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs
-	inspectorConfig.ClusterPrefixHardThreshold = 5
+	inspectorConfig := flowConfig.NetworkConfig.GossipSub.RpcInspector.Validation
+	inspectorConfig.ClusterPrefixedMessage.HardThreshold = 5
 	inspectorConfig.NumberOfWorkers = 1
 	controlMessageCount := int64(10)
 
@@ -650,7 +640,6 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection(t *testing.T
 		t.Name(),
 		idProvider,
 		p2ptest.WithRole(role),
-		p2ptest.WithGossipSubTracer(meshTracer),
 		internal.WithCorruptGossipSub(corruptlibp2p.CorruptGossipSubFactory(), corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(corruptInspectorFunc)))
 	idProvider.On("ByPeerID", victimNode.ID()).Return(&victimIdentity, true).Maybe()
 	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Maybe()
@@ -677,18 +666,17 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection(t *testing.T
 	unittest.RequireCloseBefore(t, done, 5*time.Second, "failed to inspect RPC messages on time")
 }
 
-// TestValidationInspector_UnstakedNode_Detection ensures that RPC control message inspector disseminates an invalid control message notification when an unstaked peer
+// TestValidationInspector_Unstaked_Node_Detection ensures that RPC control message inspector disseminates an invalid control message notification when an unstaked peer
 // sends a control message for a cluster prefixed topic.
 func TestValidationInspector_UnstakedNode_Detection(t *testing.T) {
-	t.Parallel()
 	role := flow.RoleConsensus
 	sporkID := unittest.IdentifierFixture()
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
-	inspectorConfig := flowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs
+	inspectorConfig := flowConfig.NetworkConfig.GossipSub.RpcInspector.Validation
 	// set hard threshold to 0 so that in the case of invalid cluster ID
 	// we force the inspector to return an error
-	inspectorConfig.ClusterPrefixHardThreshold = 0
+	inspectorConfig.ClusterPrefixedMessage.HardThreshold = 0
 	inspectorConfig.NumberOfWorkers = 1
 
 	// SafetyThreshold < messageCount < HardThreshold ensures that the RPC message will be further inspected and topic IDs will be checked
@@ -743,7 +731,6 @@ func TestValidationInspector_UnstakedNode_Detection(t *testing.T) {
 		t.Name(),
 		idProvider,
 		p2ptest.WithRole(role),
-		p2ptest.WithGossipSubTracer(meshTracer),
 		internal.WithCorruptGossipSub(corruptlibp2p.CorruptGossipSubFactory(), corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(corruptInspectorFunc)))
 	idProvider.On("ByPeerID", victimNode.ID()).Return(&victimIdentity, true).Maybe()
 	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Maybe()
@@ -779,17 +766,16 @@ func TestValidationInspector_UnstakedNode_Detection(t *testing.T) {
 // TestValidationInspector_InspectIWants_CacheMissThreshold ensures that expected invalid control message notification is disseminated when the number of iWant message Ids
 // without a corresponding iHave message sent with the same message ID exceeds the configured cache miss threshold.
 func TestValidationInspector_InspectIWants_CacheMissThreshold(t *testing.T) {
-	t.Parallel()
 	role := flow.RoleConsensus
 	sporkID := unittest.IdentifierFixture()
 	// create our RPC validation inspector
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
-	inspectorConfig := flowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs
+	inspectorConfig := flowConfig.NetworkConfig.GossipSub.RpcInspector.Validation
 	// force all cache miss checks
-	inspectorConfig.IWantRPCInspectionConfig.CacheMissCheckSize = 1
+	inspectorConfig.IWant.CacheMissCheckSize = 1
 	inspectorConfig.NumberOfWorkers = 1
-	inspectorConfig.IWantRPCInspectionConfig.CacheMissThreshold = .5 // set cache miss threshold to 50%
+	inspectorConfig.IWant.CacheMissThreshold = .5 // set cache miss threshold to 50%
 	messageCount := 1
 	controlMessageCount := int64(1)
 	cacheMissThresholdNotifCount := atomic.NewUint64(0)
@@ -846,7 +832,6 @@ func TestValidationInspector_InspectIWants_CacheMissThreshold(t *testing.T) {
 		t.Name(),
 		idProvider,
 		p2ptest.WithRole(role),
-		p2ptest.WithGossipSubTracer(meshTracer),
 		internal.WithCorruptGossipSub(corruptlibp2p.CorruptGossipSubFactory(), corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(corruptInspectorFunc)))
 	idProvider.On("ByPeerID", victimNode.ID()).Return(&victimIdentity, true).Maybe()
 	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Maybe()
@@ -885,13 +870,12 @@ func TestValidationInspector_InspectIWants_CacheMissThreshold(t *testing.T) {
 // TestValidationInspector_InspectRpcPublishMessages ensures that expected invalid control message notification is disseminated when the number of errors encountered during
 // RPC publish message validation exceeds the configured error threshold.
 func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
-	t.Parallel()
 	role := flow.RoleConsensus
 	sporkID := unittest.IdentifierFixture()
 	// create our RPC validation inspector
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
-	inspectorConfig := flowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs
+	inspectorConfig := flowConfig.NetworkConfig.GossipSub.RpcInspector.Validation
 	inspectorConfig.NumberOfWorkers = 1
 
 	idProvider := mock.NewIdentityProvider(t)
@@ -985,7 +969,7 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 	topicProvider.UpdateTopics(topics)
 
 	// after 7 errors encountered disseminate a notification
-	inspectorConfig.RpcMessageErrorThreshold = 6
+	inspectorConfig.MessageErrorThreshold = 6
 
 	require.NoError(t, err)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
@@ -994,7 +978,6 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 		t.Name(),
 		idProvider,
 		p2ptest.WithRole(role),
-		p2ptest.WithGossipSubTracer(meshTracer),
 		internal.WithCorruptGossipSub(corruptlibp2p.CorruptGossipSubFactory(), corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(corruptInspectorFunc)))
 	idProvider.On("ByPeerID", victimNode.ID()).Return(&victimIdentity, true).Maybe()
 	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Maybe()
@@ -1031,21 +1014,23 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 // The victim node is configured to use the GossipSubInspector to detect spam and the scoring system to mitigate spam.
 // The test ensures that the victim node is disconnected from the spammer node on the GossipSub mesh after the spam detection is triggered.
 func TestGossipSubSpamMitigationIntegration(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky in CI")
-	t.Parallel()
 	idProvider := mock.NewIdentityProvider(t)
 	sporkID := unittest.IdentifierFixture()
 	spammer := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkID, flow.RoleConsensus, idProvider)
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
+	cfg, err := config.DefaultConfig()
+	require.NoError(t, err)
+	// set the scoring parameters to be more aggressive to speed up the test
+	cfg.NetworkConfig.GossipSub.RpcTracer.ScoreTracerInterval = 100 * time.Millisecond
+	cfg.NetworkConfig.GossipSub.ScoringParameters.AppSpecificScore.ScoreTTL = 100 * time.Millisecond
 	victimNode, victimId := p2ptest.NodeFixture(t,
 		sporkID,
 		t.Name(),
 		idProvider,
-		p2ptest.WithPeerScoreTracerInterval(100*time.Millisecond),
 		p2ptest.WithRole(flow.RoleConsensus),
-		p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride))
+		p2ptest.OverrideFlowConfig(cfg))
 
 	ids := flow.IdentityList{&victimId, &spammer.SpammerId}
 	idProvider.On("ByPeerID", mockery.Anything).Return(func(peerId peer.ID) *flow.Identity {

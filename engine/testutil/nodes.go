@@ -462,7 +462,13 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	assigner, err := chunks.NewChunkAssigner(flow.DefaultChunkAssignmentAlpha, node.State)
 	require.Nil(t, err)
 
-	receiptValidator := validation.NewReceiptValidator(node.State, node.Headers, node.Index, resultsDB, node.Seals)
+	receiptValidator := validation.NewReceiptValidator(
+		node.State,
+		node.Headers,
+		node.Index,
+		resultsDB,
+		node.Seals,
+	)
 
 	sealingEngine, err := sealing.NewEngine(
 		node.Log,
@@ -650,11 +656,12 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Log)
 	require.NoError(t, err)
 
+	storehouseEnabled := true
 	execState := executionState.NewExecutionState(
 		ls, commitsStorage, node.Blocks, node.Headers, collectionsStorage, chunkDataPackStorage, results, myReceipts, eventsStorage, serviceEventsStorage, txResultStorage, node.PublicDB, node.Tracer,
 		// TODO: test with register store
 		registerStore,
-		false,
+		storehouseEnabled,
 	)
 
 	requestEngine, err := requester.New(
@@ -852,6 +859,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		Finalizer:           finalizer,
 		MyExecutionReceipts: myReceipts,
 		Compactor:           compactor,
+		StorehouseEnabled:   storehouseEnabled,
 	}
 }
 
