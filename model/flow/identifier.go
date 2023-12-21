@@ -30,7 +30,7 @@ type IdentifierFilter func(Identifier) bool
 //
 // It defines a strict weak ordering between identifiers.
 // It returns a negative number if the first identifier is "strictly less" than the second,
-// a positive number if the second identifier is "strictly less" than the second,
+// a positive number if the second identifier is "strictly less" than the first,
 // and zero if the two identifiers are equal.
 //
 // `IdentifierOrder` can be used to sort identifiers with

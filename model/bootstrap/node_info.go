@@ -403,7 +403,9 @@ func FilterByRole(nodes []NodeInfo, role flow.Role) []NodeInfo {
 	return filtered
 }
 
-// Sort sorts the NodeInfo list using the given ordering.
+// Sort sorts the NodeInfo list using the given order.
+//
+// The sorted list is returned and the original list is untouched.
 func Sort(nodes []NodeInfo, order flow.IdentityOrder) []NodeInfo {
 	dup := make([]NodeInfo, len(nodes))
 	copy(dup, nodes)

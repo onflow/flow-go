@@ -18,19 +18,27 @@ func TestIdentityListCanonical(t *testing.T) {
 	// make sure the list is not sorted
 	nodes[0].NodeID[0], nodes[1].NodeID[0] = 2, 1
 	require.False(t, flow.IsIdentifierCanonical(nodes[0].NodeID, nodes[1].NodeID))
-
 	ids := bootstrap.ToIdentityList(nodes)
 	assert.False(t, flow.IsIdentityListCanonical(ids))
 
-	nodes = bootstrap.Sort(nodes, flow.Canonical)
-	ids = bootstrap.ToIdentityList(nodes)
-	require.True(t, flow.IsIdentityListCanonical(ids))
+	// make a copy of the original list of nodes
+	nodesCopy := make([]bootstrap.NodeInfo, len(nodes))
+	copy(nodesCopy, nodes)
+
+	sortedNodes := bootstrap.Sort(nodes, flow.Canonical)
+	sortedIds := bootstrap.ToIdentityList(sortedNodes)
+	require.True(t, flow.IsIdentityListCanonical(sortedIds))
+	// make sure original list didn't change
+	assert.Equal(t, nodesCopy, nodes)
 
 	// check `IsIdentityListCanonical` detects order equality in a sorted list
 	nodes[1] = nodes[10] // add a duplication
-	nodes = bootstrap.Sort(nodes, flow.Canonical)
-	ids = bootstrap.ToIdentityList(nodes)
-	assert.False(t, flow.IsIdentityListCanonical(ids))
+	copy(nodesCopy, nodes)
+	sortedNodes = bootstrap.Sort(nodes, flow.Canonical)
+	sortedIds = bootstrap.ToIdentityList(sortedNodes)
+	assert.False(t, flow.IsIdentityListCanonical(sortedIds))
+	// make sure original list didn't change
+	assert.Equal(t, nodesCopy, nodes)
 }
 
 func TestNodeConfigEncodingJSON(t *testing.T) {

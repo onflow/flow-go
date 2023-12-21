@@ -304,7 +304,7 @@ type IdentityFilter func(*Identity) bool
 //
 // It defines a strict weak ordering between identities.
 // It returns a negative number if the first identity is "strictly less" than the second,
-// a positive number if the second identity is "strictly less" than the second,
+// a positive number if the second identity is "strictly less" than the first,
 // and zero if the two identities are equal.
 //
 // `IdentityOrder` can be used to sort identities with
