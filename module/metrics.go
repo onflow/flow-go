@@ -63,26 +63,9 @@ type NetworkSecurityMetrics interface {
 // messages received by the local node from other nodes over the GossipSub protocol may be much higher than the number
 // of messages accepted by the local node, which may indicate that the local node is throttling the incoming messages.
 type GossipSubRpcInspectorMetrics interface {
-	// OnIWantMessagesReceived tracks the number of IWANT messages received by the node from other nodes on an RPC.
-	// iWant is a control message that is sent by a node to request a message that it has seen advertised in an iHAVE message.
-	// Note that each IWANT message can contain multiple message ids, but this function only tracks the number of IWANT messages received, not the number of message ids on each IWANT message.
-	// This function is called once per RPC, and counts the number of iWant messages received on that RPC, not per iWant message.
-	// Args:
-	//
-	//	msgCount: the number of IWANT messages received on an RPC.
-	OnIWantMessagesReceived(msgCount int)
-
 	// OnIWantMessageIDsReceived tracks the number of message ids received by the node from other nodes on an RPC.
 	// Note: this function is called on each IWANT message received by the node, not on each message id received.
 	OnIWantMessageIDsReceived(msgIdCount int)
-
-	// OnIHaveMessagesReceived tracks the number of IHAVE messages received by the node from another node on an RPC.
-	// This function is called once per RPC, and counts the number of iHave messages received on that RPC, not per iHave message.
-	// An IHAVE message can contain multiple message ids, but this function only tracks the number of IHAVE messages received, not the number of message ids on each IHAVE message.
-	// iHave is a control message that is sent by a node to another node to indicate that it has a new gossiped messages (the message ids).
-	// Args:
-	// - msgCount: the number of IHAVE messages received on an RPC.
-	OnIHaveMessagesReceived(count int)
 
 	// OnIHaveMessageIDsReceived tracks the number of message ids received by the node from other nodes on an iHave message.
 	// This function is called on each iHave message received by the node.
@@ -91,24 +74,14 @@ type GossipSubRpcInspectorMetrics interface {
 	// - msgIdCount: the number of message ids received on the iHave message.
 	OnIHaveMessageIDsReceived(channel string, msgIdCount int)
 
-	// OnGraftReceived tracks the number of GRAFT messages received by the node from another node on an RPC.
-	// GRAFT is a control message of GossipSub protocol that connects two nodes over a topic directly as gossip partners.
-	// Note: this function is called once per RPC, and counts the number of graft messages received on that RPC, not per graft message.
-	OnGraftReceived(count int)
-
-	// OnPruneReceived tracks the number of PRUNE messages received by the node from another node on an RPC.
-	// PRUNE is a control message of GossipSub protocol that disconnects two nodes over a topic.
-	// Note: this function is called once per RPC, and counts the number of prune messages received on that RPC, not per prune message.
-	OnPruneReceived(count int)
-
-	// OnPublishedGossipMessagesReceived tracks the number of publish messages received by the node from another node on an RPC.
-	// Args:
-	// - msgCount: the number of publish messages received on an RPC.
-	// Note: this function is called once per RPC, and counts the number of publish messages received on that RPC, not per publish message.
-	OnPublishedGossipMessagesReceived(count int)
-
 	// OnIncomingRpcReceived tracks the number of RPC messages received by the node.
-	OnIncomingRpcReceived()
+	// Args:
+	// 	iHaveCount: the number of iHAVE messages included in the RPC.
+	// 	iWantCount: the number of iWANT messages included in the RPC.
+	// 	graftCount: the number of GRAFT messages included in the RPC.
+	// 	pruneCount: the number of PRUNE messages included in the RPC.
+	// 	msgCount: the number of publish messages included in the RPC.
+	OnIncomingRpcReceived(iHaveCount, iWantCount, graftCount, pruneCount, msgCount int)
 }
 
 // LocalGossipSubRouterMetrics encapsulates the metrics collectors for GossipSub router of the local node.
@@ -282,20 +255,27 @@ type GossipSubRpcValidationInspectorMetrics interface {
 	// the number of inspect message requests  being processed asynchronously by the rpc validation inspector workers.
 	AsyncProcessingFinished(duration time.Duration)
 
-	// OnIHaveMessageTruncated tracks the number of times an IHave message was truncated.
-	// Note that this function is called whenever an actual iHave message is truncated with all the message ids that it contains.
-	// This is different from the OnControlMessageIDsTruncated function which is called whenever some message ids are truncated from a control message.
+	// OnIHaveControlMessageIdsTruncated tracks the number of times message ids on an iHave message were truncated.
+	// Note that this function is called only when the message ids are truncated from an iHave message, not when the iHave message itself is truncated.
+	// This is different from the OnControlMessagesTruncated function which is called when a slice of control messages truncated from an RPC with all their message ids.
 	// Args:
 	//
 	//	diff: the number of actual messages truncated.
-	OnIHaveMessageTruncated(diff int)
+	OnIHaveControlMessageIdsTruncated(diff int)
 
-	// OnControlMessageIDsTruncated tracks the number of times a control message was truncated.
+	// OnIWantControlMessageIdsTruncated tracks the number of times message ids on an iWant message were truncated.
+	// Note that this function is called only when the message ids are truncated from an iWant message, not when the iWant message itself is truncated.
+	// This is different from the OnControlMessagesTruncated function which is called when a slice of control messages truncated from an RPC with all their message ids.
+	// Args:
+	// 	diff: the number of actual messages truncated.
+	OnIWantControlMessageIdsTruncated(diff int)
+
+	// OnControlMessagesTruncated tracks the number of times a slice of control messages is truncated from an RPC with all their included message ids.
 	// Args:
 	//
 	//	messageType: the type of the control message that was truncated
-	//	diff: the number of message ids truncated.
-	OnControlMessageIDsTruncated(messageType p2pmsg.ControlMessageType, diff int)
+	//	diff: the number of control messages truncated.
+	OnControlMessagesTruncated(messageType p2pmsg.ControlMessageType, diff int)
 }
 
 // NetworkInboundQueueMetrics encapsulates the metrics collectors for the inbound queue of the networking layer.
