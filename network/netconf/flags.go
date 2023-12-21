@@ -239,13 +239,6 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 	flags.Float64(validationInspectorClusterPrefixHardThreshold,
 		config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.ClusterPrefixHardThreshold,
 		"the maximum number of cluster-prefixed control messages allowed to be processed when the active cluster id is unset or a mismatch is detected, exceeding this threshold will result in node penalization by gossipsub.")
-	// gossipsub RPC control message metrics observer inspector configuration
-	flags.Int(metricsInspectorNumberOfWorkers,
-		config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCMetricsInspectorConfigs.NumberOfWorkers,
-		"cache size for gossipsub RPC metrics inspector events worker pool queue.")
-	flags.Uint32(metricsInspectorCacheSize,
-		config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCMetricsInspectorConfigs.CacheSize,
-		"cache size for gossipsub RPC metrics inspector events worker pool.")
 	// networking event notifications
 	flags.Uint32(gossipSubRPCInspectorNotificationCacheSize,
 		config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCInspectorNotificationCacheSize,
