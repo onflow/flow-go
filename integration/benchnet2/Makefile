@@ -81,7 +81,7 @@ k8s-delete:
 
 delete-configuration:
 	gsutil rm gs://${CONFIGURATION_BUCKET}/${NETWORK_ID}.tar
-	gsutil rm gs://${CONFIGURATION_BUCKET}/values.yml
+	gsutil rm gs://${CONFIGURATION_BUCKET}/${NETWORK_ID}/values.yml 
 
 k8s-pod-health: validate
 	kubectl get pods --namespace ${NAMESPACE}
