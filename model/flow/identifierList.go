@@ -1,8 +1,7 @@
 package flow
 
 import (
-	"bytes"
-
+	"github.com/onflow/flow-go/model/flow/order"
 	"golang.org/x/exp/slices"
 )
 
@@ -28,9 +27,7 @@ func (il IdentifierList) Lookup() map[Identifier]struct{} {
 // Otherwise it returns true.
 // It satisfies the sort.Interface making the IdentifierList sortable.
 func (il IdentifierList) Less(i, j int) bool {
-	// use the same canonical ordering: order.Canonical(il[i], il[j]) < 0
-	// using the order package causes a circular dependency
-	return bytes.Compare(il[i][:], il[j][:]) < 0
+	return order.IdentifierCanonical(il[i], il[j])
 }
 
 // Swap swaps the element i and j in the IdentifierList.

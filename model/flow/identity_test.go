@@ -243,9 +243,10 @@ func TestIdentity_ID(t *testing.T) {
 
 func TestIdentity_Sort(t *testing.T) {
 	il := unittest.IdentityListFixture(20)
-	random, err := il.Shuffle()
-	require.NoError(t, err)
-	assert.False(t, order.IdentityListCanonical(random), "very unlikely to fail but not impossible")
+	// make sure the list is not sorted
+	il[0].NodeID[0], il[1].NodeID[0] = 2, 1
+	require.False(t, order.Canonical(il[0], il[1]))
+	assert.False(t, order.IdentityListCanonical(random))
 
 	canonical := il.Sort(order.Canonical)
 	assert.True(t, order.IdentityListCanonical(canonical))

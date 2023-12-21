@@ -51,15 +51,11 @@ func ByReferenceOrder(nodeIDs []flow.Identifier) func(*flow.Identity, *flow.Iden
 	}
 }
 
-// IdentityListCanonical takes a list of identities and
-// checks if it's strictly sorted in canonical order.
-// Strict sorting means that equality is not allowed.
-
 // IdentityListCanonical returns true if and only if the given IdentityList is
-// strictly sorted in the canonical order.
+// _strictly_ sorted with regards to the canonical order.
 //
 // The strictness is important here, meaning that a list with 2 successive entities
-// with the same NodeID isn't considered to be sorted.
+// with equal NodeID isn't considered well sorted.
 func IdentityListCanonical(il flow.IdentityList) bool {
 	for i := 0; i < len(il)-1; i++ {
 		if !IsCanonical(il[i], il[i+1]) {

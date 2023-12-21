@@ -16,10 +16,12 @@ import (
 func TestIdentityListCanonical(t *testing.T) {
 	nodes := unittest.NodeInfosFixture(20)
 	ids := bootstrap.ToIdentityList(nodes)
+	// make sure the list is not sorted
+	nodes[0].NodeID[0], nodes[1].NodeID[0] = 2, 1
+	require.False(t, order.IsIdentifierCanonical(nodes[0].NodeID, nodes[1].NodeID))
+	ids = bootstrap.ToIdentityList(nodes)
+	assert.False(t, order.IdentityListCanonical(ids))
 
-	require.False(t,
-		order.IdentityListCanonical(ids),
-		"unlikely to fail but not impossible")
 	nodes = bootstrap.Sort(nodes, order.Canonical)
 	ids = bootstrap.ToIdentityList(nodes)
 	require.True(t, order.IdentityListCanonical(ids))
