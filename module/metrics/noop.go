@@ -21,8 +21,6 @@ import (
 
 type NoopCollector struct{}
 
-
-
 func NewNoopCollector() *NoopCollector {
 	nc := &NoopCollector{}
 	return nc
@@ -275,8 +273,8 @@ func (nc *NoopCollector) OnStreamCreationRetryBudgetResetToDefault()            
 
 var _ module.HeroCacheMetrics = (*NoopCollector)(nil)
 
-func (nc *NoopCollector) OnIWantControlMessageIdsTruncated(diff int)               {} {}
-func (nc *NoopCollector) OnIWantMessageIDsReceived(msgIdCount int)                 {} {}
+func (nc *NoopCollector) OnIWantControlMessageIdsTruncated(diff int)               {}
+func (nc *NoopCollector) OnIWantMessageIDsReceived(msgIdCount int)                 {}
 func (nc *NoopCollector) OnIHaveMessageIDsReceived(channel string, msgIdCount int) {}
 func (nc *NoopCollector) OnLocalMeshSizeUpdated(string, int)                       {}
 func (nc *NoopCollector) OnPeerAddedToProtocol(protocol string)                    {}
@@ -322,7 +320,8 @@ func (nc *NoopCollector) OnOverallPeerScoreUpdated(f float64)                   
 func (nc *NoopCollector) OnIHaveControlMessageIdsTruncated(diff int)                       {}
 func (nc *NoopCollector) OnControlMessagesTruncated(messageType p2pmsg.ControlMessageType, diff int) {
 }
-func (nc *NoopCollector) OnIncomingRpcReceived(iHaveCount, iWantCount, graftCount, pruneCount, msgCount int) {}
+func (nc *NoopCollector) OnIncomingRpcReceived(iHaveCount, iWantCount, graftCount, pruneCount, msgCount int) {
+}
 func (nc *NoopCollector) AsyncProcessingStarted()               {}
 func (nc *NoopCollector) AsyncProcessingFinished(time.Duration) {}
 
