@@ -10,7 +10,7 @@ access:
       limits:
         cpu: "800m"
         memory: "10Gi"
-    storage: 10G
+    storage: 2G
   nodes:
 {{- range $val := .}}{{if eq ($val.role) ("access")}}
     {{$val.name}}:
