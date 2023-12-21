@@ -206,8 +206,6 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 	}
 	c.workerPool.Submit(req)
 
-	// third, collect metrics
-	c.updateMetrics(from, rpc)
 	return nil
 }
 
@@ -248,6 +246,7 @@ func (c *ControlMsgValidationInspector) updateMetrics(from peer.ID, rpc *pubsub.
 // Returns:
 //   - error: no error is expected to be returned from this func as they are logged and distributed in invalid control message notifications.
 func (c *ControlMsgValidationInspector) processInspectRPCReq(req *InspectRPCRequest) error {
+	c.updateMetrics(req.Peer, req.rpc)
 	c.metrics.AsyncProcessingStarted()
 	start := time.Now()
 	defer func() {
