@@ -88,8 +88,6 @@ func AllFlagNames() []string {
 		BuildFlagName(gossipsubKey, p2pconf.RpcInspectorKey, p2pconf.ValidationConfigKey, p2pconf.ClusterPrefixedMessageConfigKey, p2pconf.TrackerCacheSizeKey),
 		BuildFlagName(gossipsubKey, p2pconf.RpcInspectorKey, p2pconf.ValidationConfigKey, p2pconf.ClusterPrefixedMessageConfigKey, p2pconf.TrackerCacheDecayKey),
 		BuildFlagName(gossipsubKey, p2pconf.RpcInspectorKey, p2pconf.ValidationConfigKey, p2pconf.ClusterPrefixedMessageConfigKey, p2pconf.HardThresholdKey),
-		BuildFlagName(gossipsubKey, p2pconf.RpcInspectorKey, p2pconf.MetricsConfigKey, p2pconf.NumberOfWorkersKey),
-		BuildFlagName(gossipsubKey, p2pconf.RpcInspectorKey, p2pconf.MetricsConfigKey, p2pconf.CacheSizeKey),
 		BuildFlagName(gossipsubKey, p2pconf.RpcInspectorKey, p2pconf.NotificationCacheSizeKey),
 		BuildFlagName(gossipsubKey, p2pconf.RpcInspectorKey, p2pconf.ValidationConfigKey, p2pconf.IHaveConfigKey, p2pconf.MaxSampleSizeKey),
 		BuildFlagName(gossipsubKey, p2pconf.RpcInspectorKey, p2pconf.ValidationConfigKey, p2pconf.IHaveConfigKey, p2pconf.MaxMessageIDSampleSizeKey),
@@ -201,12 +199,6 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 	flags.Float64(BuildFlagName(gossipsubKey, p2pconf.RpcInspectorKey, p2pconf.ValidationConfigKey, p2pconf.ClusterPrefixedMessageConfigKey, p2pconf.HardThresholdKey),
 		config.GossipSub.RpcInspector.Validation.ClusterPrefixedMessage.HardThreshold,
 		"the maximum number of cluster-prefixed control messages allowed to be processed when the active cluster id is unset or a mismatch is detected, exceeding this threshold will result in node penalization by gossipsub.")
-	// gossipsub RPC control message metrics observer inspector configuration
-	flags.Int(BuildFlagName(gossipsubKey, p2pconf.RpcInspectorKey, p2pconf.MetricsConfigKey, p2pconf.NumberOfWorkersKey),
-		config.GossipSub.RpcInspector.Metrics.NumberOfWorkers,
-		"number of workers for gossipsub RPC metrics inspector queue.")
-	flags.Uint32(BuildFlagName(gossipsubKey, p2pconf.RpcInspectorKey, p2pconf.MetricsConfigKey, p2pconf.CacheSizeKey), config.GossipSub.RpcInspector.Metrics.CacheSize,
-		"cache size for gossipsub RPC metrics inspector events worker pool.")
 	// networking event notifications
 	flags.Uint32(BuildFlagName(gossipsubKey, p2pconf.RpcInspectorKey, p2pconf.NotificationCacheSizeKey), config.GossipSub.RpcInspector.NotificationCacheSize,
 		"cache size for notification events from gossipsub rpc inspector")
