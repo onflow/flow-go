@@ -1007,6 +1007,39 @@ func (_m *AccessAPIClient) Ping(ctx context.Context, in *access.PingRequest, opt
 	return r0, r1
 }
 
+// SendAndSubscribeTransactionStatuses provides a mock function with given fields: ctx, in, opts
+func (_m *AccessAPIClient) SendAndSubscribeTransactionStatuses(ctx context.Context, in *access.SendAndSubscribeTransactionStatusesRequest, opts ...grpc.CallOption) (access.AccessAPI_SendAndSubscribeTransactionStatusesClient, error) {
+	_va := make([]interface{}, len(opts))
+	for _i := range opts {
+		_va[_i] = opts[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, in)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 access.AccessAPI_SendAndSubscribeTransactionStatusesClient
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *access.SendAndSubscribeTransactionStatusesRequest, ...grpc.CallOption) (access.AccessAPI_SendAndSubscribeTransactionStatusesClient, error)); ok {
+		return rf(ctx, in, opts...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *access.SendAndSubscribeTransactionStatusesRequest, ...grpc.CallOption) access.AccessAPI_SendAndSubscribeTransactionStatusesClient); ok {
+		r0 = rf(ctx, in, opts...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(access.AccessAPI_SendAndSubscribeTransactionStatusesClient)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *access.SendAndSubscribeTransactionStatusesRequest, ...grpc.CallOption) error); ok {
+		r1 = rf(ctx, in, opts...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // SendTransaction provides a mock function with given fields: ctx, in, opts
 func (_m *AccessAPIClient) SendTransaction(ctx context.Context, in *access.SendTransactionRequest, opts ...grpc.CallOption) (*access.SendTransactionResponse, error) {
 	_va := make([]interface{}, len(opts))

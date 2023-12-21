@@ -231,7 +231,11 @@ func (h *FlowAccessAPIRouter) GetExecutionResultByID(context context.Context, re
 }
 
 func (h *FlowAccessAPIRouter) SubscribeBlocks(req *access.SubscribeBlocksRequest, server access.AccessAPI_SubscribeBlocksServer) error {
-	panic("implement me")
+	panic("not implemented")
+}
+
+func (h *FlowAccessAPIRouter) SendAndSubscribeTransactionStatuses(req *access.SendAndSubscribeTransactionStatusesRequest, server access.AccessAPI_SendAndSubscribeTransactionStatusesServer) error {
+	panic("not implemented")
 }
 
 // FlowAccessAPIForwarder forwards all requests to a set of upstream access nodes or observers

@@ -20,7 +20,7 @@ import (
 )
 
 type Handler struct {
-	subscription.StateStreamHandler
+	subscription.StreamingData
 	api                  API
 	chain                flow.Chain
 	signerIndicesDecoder hotstuff.BlockSignerDecoder
@@ -40,7 +40,7 @@ func NewHandler(api API,
 	maxStreams uint32,
 	options ...HandlerOption) *Handler {
 	h := &Handler{
-		StateStreamHandler: subscription.StateStreamHandler{
+		StreamingData: subscription.StreamingData{
 			MaxStreams:  int32(maxStreams),
 			StreamCount: atomic.Int32{},
 		},
@@ -767,6 +767,10 @@ func (h *Handler) SubscribeBlocks(request *access.SubscribeBlocksRequest, stream
 			return rpc.ConvertError(err, "could not send response", codes.Internal)
 		}
 	}
+}
+
+func (h *Handler) SendAndSubscribeTransactionStatuses(request *access.SendAndSubscribeTransactionStatusesRequest, stream access.AccessAPI_SendAndSubscribeTransactionStatusesServer) error {
+	panic("not implemented!")
 }
 
 func (h *Handler) blockResponse(block *flow.Block, fullResponse bool, status flow.BlockStatus) (*access.BlockResponse, error) {

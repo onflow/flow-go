@@ -72,7 +72,7 @@ type Backend struct {
 	backendExecutionResults
 	backendNetwork
 
-	*subscription.SubscriptionBackendHandler
+	*subscription.SubscriptionHandler
 	backendSubscribeBlocks
 
 	state             protocol.State
@@ -159,8 +159,8 @@ func New(params Params) (*Backend, error) {
 	}
 
 	b := &Backend{
-		state:                      params.State,
-		SubscriptionBackendHandler: subscription.NewSubscriptionBackendHandler(params.State, params.RootHeight, params.Headers, params.HighestAvailableHeight),
+		state:               params.State,
+		SubscriptionHandler: subscription.NewSubscriptionBackendHandler(params.State, params.RootHeight, params.Headers, params.HighestAvailableHeight),
 
 		// create the sub-backends
 		backendScripts: backendScripts{

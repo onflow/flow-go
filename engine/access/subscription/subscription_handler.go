@@ -14,12 +14,12 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-type StateStreamHandler struct {
+type StreamingData struct {
 	MaxStreams  int32
 	StreamCount atomic.Int32
 }
 
-type SubscriptionBackendHandler struct {
+type SubscriptionHandler struct {
 	state       protocol.State
 	headers     storage.Headers
 	RootHeight  uint64
@@ -30,8 +30,8 @@ type SubscriptionBackendHandler struct {
 	highestHeight counters.StrictMonotonousCounter
 }
 
-func NewSubscriptionBackendHandler(state protocol.State, rootHeight uint64, headers storage.Headers, highestAvailableHeight uint64) *SubscriptionBackendHandler {
-	return &SubscriptionBackendHandler{
+func NewSubscriptionBackendHandler(state protocol.State, rootHeight uint64, headers storage.Headers, highestAvailableHeight uint64) *SubscriptionHandler {
+	return &SubscriptionHandler{
 		state:         state,
 		RootHeight:    rootHeight,
 		RootBlockID:   flow.ZeroID,
@@ -44,7 +44,7 @@ func NewSubscriptionBackendHandler(state protocol.State, rootHeight uint64, head
 // Only one of startBlockID and startHeight may be set. Otherwise, an InvalidArgument error is returned.
 // If a block is provided and does not exist, a NotFound error is returned.
 // If neither startBlockID nor startHeight is provided, the latest sealed block is used.
-func (h *SubscriptionBackendHandler) GetStartHeight(startBlockID flow.Identifier, startHeight uint64) (uint64, error) {
+func (h *SubscriptionHandler) GetStartHeight(startBlockID flow.Identifier, startHeight uint64) (uint64, error) {
 	// make sure only one of start block ID and start height is provided
 	if startBlockID != flow.ZeroID && startHeight > 0 {
 		return 0, status.Errorf(codes.InvalidArgument, "only one of start block ID and start height may be provided")
@@ -102,10 +102,10 @@ func (h *SubscriptionBackendHandler) GetStartHeight(startBlockID flow.Identifier
 }
 
 // SetHighestHeight sets the highest height for which execution data is available.
-func (h *SubscriptionBackendHandler) SetHighestHeight(height uint64) bool {
+func (h *SubscriptionHandler) SetHighestHeight(height uint64) bool {
 	return h.highestHeight.Set(height)
 }
 
-func (h *SubscriptionBackendHandler) GetHighestHeight() uint64 {
+func (h *SubscriptionHandler) GetHighestHeight() uint64 {
 	return h.highestHeight.Value()
 }

@@ -795,6 +795,20 @@ func (_m *AccessAPIServer) Ping(_a0 context.Context, _a1 *access.PingRequest) (*
 	return r0, r1
 }
 
+// SendAndSubscribeTransactionStatuses provides a mock function with given fields: _a0, _a1
+func (_m *AccessAPIServer) SendAndSubscribeTransactionStatuses(_a0 *access.SendAndSubscribeTransactionStatusesRequest, _a1 access.AccessAPI_SendAndSubscribeTransactionStatusesServer) error {
+	ret := _m.Called(_a0, _a1)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*access.SendAndSubscribeTransactionStatusesRequest, access.AccessAPI_SendAndSubscribeTransactionStatusesServer) error); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // SendTransaction provides a mock function with given fields: _a0, _a1
 func (_m *AccessAPIServer) SendTransaction(_a0 context.Context, _a1 *access.SendTransactionRequest) (*access.SendTransactionResponse, error) {
 	ret := _m.Called(_a0, _a1)

@@ -45,7 +45,7 @@ import (
 	rpcConnection "github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
-	stream_subscription "github.com/onflow/flow-go/engine/access/subscription"
+	"github.com/onflow/flow-go/engine/access/subscription"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
@@ -85,7 +85,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
 	"github.com/onflow/flow-go/network/p2p/p2pnet"
-	"github.com/onflow/flow-go/network/p2p/subscription"
+	networkingsubscription "github.com/onflow/flow-go/network/p2p/subscription"
 	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	relaynet "github.com/onflow/flow-go/network/relay"
@@ -197,14 +197,14 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		},
 		stateStreamConf: statestreambackend.Config{
 			MaxExecutionDataMsgSize: grpcutils.DefaultMaxMsgSize,
-			ExecutionDataCacheSize:  stream_subscription.DefaultCacheSize,
-			ClientSendTimeout:       stream_subscription.DefaultSendTimeout,
-			ClientSendBufferSize:    stream_subscription.DefaultSendBufferSize,
-			MaxGlobalStreams:        stream_subscription.DefaultMaxGlobalStreams,
+			ExecutionDataCacheSize:  subscription.DefaultCacheSize,
+			ClientSendTimeout:       subscription.DefaultSendTimeout,
+			ClientSendBufferSize:    subscription.DefaultSendBufferSize,
+			MaxGlobalStreams:        subscription.DefaultMaxGlobalStreams,
 			EventFilterConfig:       state_stream.DefaultEventFilterConfig,
 			RegisterIDsRequestLimit: state_stream.DefaultRegisterIDsRequestLimit,
-			ResponseLimit:           stream_subscription.DefaultResponseLimit,
-			HeartbeatInterval:       stream_subscription.DefaultHeartbeatInterval,
+			ResponseLimit:           subscription.DefaultResponseLimit,
+			HeartbeatInterval:       subscription.DefaultHeartbeatInterval,
 		},
 		stateStreamFilterConf:        nil,
 		ExecutionNodeAddress:         "localhost:9000",
@@ -1739,7 +1739,7 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 			Unicast: builder.FlowConfig.NetworkConfig.Unicast,
 		}).
 		SetBasicResolver(builder.Resolver).
-		SetSubscriptionFilter(subscription.NewRoleBasedFilter(flow.RoleAccess, builder.IdentityProvider)).
+		SetSubscriptionFilter(networkingsubscription.NewRoleBasedFilter(flow.RoleAccess, builder.IdentityProvider)).
 		SetConnectionManager(connManager).
 		SetRoutingSystem(func(ctx context.Context, h host.Host) (routing.Routing, error) {
 			return dht.NewDHT(ctx, h, protocols.FlowPublicDHTProtocolID(builder.SporkID), builder.Logger, networkMetrics, dht.AsServer())

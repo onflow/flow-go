@@ -18,7 +18,7 @@ import (
 )
 
 type Handler struct {
-	subscription.StateStreamHandler
+	subscription.StreamingData
 
 	api   state_stream.API
 	chain flow.Chain
@@ -29,7 +29,7 @@ type Handler struct {
 
 func NewHandler(api state_stream.API, chain flow.Chain, config Config) *Handler {
 	h := &Handler{
-		StateStreamHandler: subscription.StateStreamHandler{
+		StreamingData: subscription.StreamingData{
 			MaxStreams:  int32(config.MaxGlobalStreams),
 			StreamCount: atomic.Int32{},
 		},
