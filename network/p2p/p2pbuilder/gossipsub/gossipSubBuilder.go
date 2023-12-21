@@ -241,17 +241,7 @@ func defaultInspectorSuite(rpcTracker p2p.RpcControlTracking) p2p.GossipSubRpcIn
 		heroCacheMetricsFactory metrics.HeroCacheMetricsFactory,
 		networkType network.NetworkingType,
 		idProvider module.IdentityProvider) (p2p.GossipSubInspectorSuite, error) {
-		metricsInspector := inspector.NewControlMsgMetricsInspector(
-			logger,
-			p2pnode.NewGossipSubControlMessageMetrics(gossipSubMetrics, logger),
-			inspectorCfg.GossipSubRPCMetricsInspectorConfigs.NumberOfWorkers,
-			[]queue.HeroStoreConfigOption{
-				queue.WithHeroStoreSizeLimit(inspectorCfg.GossipSubRPCMetricsInspectorConfigs.CacheSize),
-				queue.WithHeroStoreCollector(
-					metrics.GossipSubRPCMetricsObserverInspectorQueueMetricFactory(
-						heroCacheMetricsFactory,
-						networkType)),
-			}...)
+
 		notificationDistributor := distributor.DefaultGossipSubInspectorNotificationDistributor(
 			logger,
 			[]queue.HeroStoreConfigOption{
@@ -279,7 +269,7 @@ func defaultInspectorSuite(rpcTracker p2p.RpcControlTracking) p2p.GossipSubRpcIn
 		}
 
 		return inspectorbuilder.NewGossipSubInspectorSuite(
-			[]p2p.GossipSubRPCInspector{metricsInspector, rpcValidationInspector},
+			[]p2p.GossipSubRPCInspector{rpcValidationInspector},
 			notificationDistributor), nil
 	}
 }

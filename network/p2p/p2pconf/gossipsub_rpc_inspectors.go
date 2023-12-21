@@ -4,8 +4,6 @@ package p2pconf
 type GossipSubRPCInspectorsConfig struct {
 	// GossipSubRPCValidationInspectorConfigs control message validation inspector validation configuration and limits.
 	GossipSubRPCValidationInspectorConfigs `mapstructure:",squash"`
-	// GossipSubRPCMetricsInspectorConfigs control message metrics inspector configuration.
-	GossipSubRPCMetricsInspectorConfigs `mapstructure:",squash"`
 	// GossipSubRPCInspectorNotificationCacheSize size of the queue for notifications about invalid RPC messages.
 	GossipSubRPCInspectorNotificationCacheSize uint32 `mapstructure:"gossipsub-rpc-inspector-notification-cache-size"`
 }
@@ -64,12 +62,4 @@ type ClusterPrefixedMessageConfig struct {
 	ClusterPrefixedControlMsgsReceivedCacheSize uint32 `validate:"gt=0" mapstructure:"gossipsub-cluster-prefix-tracker-cache-size"`
 	// ClusterPrefixedControlMsgsReceivedCacheDecay decay val used for the geometric decay of cache counters used to keep track of cluster prefixed topics received by peers.
 	ClusterPrefixedControlMsgsReceivedCacheDecay float64 `validate:"gt=0" mapstructure:"gossipsub-cluster-prefix-tracker-cache-decay"`
-}
-
-// GossipSubRPCMetricsInspectorConfigs rpc metrics observer inspector configuration.
-type GossipSubRPCMetricsInspectorConfigs struct {
-	// NumberOfWorkers number of worker pool workers.
-	NumberOfWorkers int `validate:"gte=1" mapstructure:"gossipsub-rpc-metrics-inspector-workers"`
-	// CacheSize size of the queue used by worker pool for the control message metrics inspector.
-	CacheSize uint32 `validate:"gt=0" mapstructure:"gossipsub-rpc-metrics-inspector-cache-size"`
 }

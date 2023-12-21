@@ -72,10 +72,22 @@ var _ protocol.Consumer = (*ControlMsgValidationInspector)(nil)
 // Returns:
 //   - *ControlMsgValidationInspector: a new control message validation inspector.
 //   - error: an error if there is any error while creating the inspector. All errors are irrecoverable and unexpected.
-func NewControlMsgValidationInspector(ctx irrecoverable.SignalerContext, logger zerolog.Logger, sporkID flow.Identifier, config *p2pconf.GossipSubRPCValidationInspectorConfigs, distributor p2p.GossipSubInspectorNotifDistributor, inspectMsgQueueCacheCollector module.HeroCacheMetrics, clusterPrefixedCacheCollector module.HeroCacheMetrics, idProvider module.IdentityProvider, inspectorMetrics module.GossipSubRpcValidationInspectorMetrics, rpcTracker p2p.RpcControlTracking) (*ControlMsgValidationInspector, error) {
+func NewControlMsgValidationInspector(ctx irrecoverable.SignalerContext,
+	logger zerolog.Logger,
+	sporkID flow.Identifier,
+	config *p2pconf.GossipSubRPCValidationInspectorConfigs,
+	distributor p2p.GossipSubInspectorNotifDistributor,
+	inspectMsgQueueCacheCollector module.HeroCacheMetrics,
+	clusterPrefixedCacheCollector module.HeroCacheMetrics,
+	idProvider module.IdentityProvider,
+	inspectorMetrics module.GossipSubRpcValidationInspectorMetrics,
+	rpcTracker p2p.RpcControlTracking) (*ControlMsgValidationInspector, error) {
 	lg := logger.With().Str("component", "gossip_sub_rpc_validation_inspector").Logger()
 
-	clusterPrefixedTracker, err := cache.NewClusterPrefixedMessagesReceivedTracker(logger, config.ClusterPrefixedControlMsgsReceivedCacheSize, clusterPrefixedCacheCollector, config.ClusterPrefixedControlMsgsReceivedCacheDecay)
+	clusterPrefixedTracker, err := cache.NewClusterPrefixedMessagesReceivedTracker(logger,
+		config.ClusterPrefixedControlMsgsReceivedCacheSize,
+		clusterPrefixedCacheCollector,
+		config.ClusterPrefixedControlMsgsReceivedCacheDecay)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cluster prefix topics received tracker")
 	}
@@ -457,9 +469,9 @@ func (c *ControlMsgValidationInspector) truncateIHaveMessages(rpc *pubsub.RPC) {
 		return
 	}
 
-	if originalIHaveCount > c.config.IHave.MaxSampleSize {
+	if originalIHaveCount > c.config.IHaveRPCInspectionConfig.MaxSampleSize {
 		// truncate ihaves and update metrics
-		sampleSize := c.config.IHave.MaxSampleSize
+		sampleSize := c.config.IHaveRPCInspectionConfig.MaxSampleSize
 		if sampleSize > originalIHaveCount {
 			sampleSize = originalIHaveCount
 		}
@@ -484,8 +496,8 @@ func (c *ControlMsgValidationInspector) truncateIHaveMessageIds(rpc *pubsub.RPC)
 			continue // nothing to truncate; skip
 		}
 
-		if originalMessageIdCount > c.config.IHave.MaxMessageIDSampleSize {
-			sampleSize := c.config.IHave.MaxMessageIDSampleSize
+		if originalMessageIdCount > c.config.IHaveRPCInspectionConfig.MaxMessageIDSampleSize {
+			sampleSize := c.config.IHaveRPCInspectionConfig.MaxMessageIDSampleSize
 			if sampleSize > originalMessageIdCount {
 				sampleSize = originalMessageIdCount
 			}
@@ -513,9 +525,9 @@ func (c *ControlMsgValidationInspector) truncateIWantMessages(from peer.ID, rpc 
 		return
 	}
 
-	if originalIWantCount > c.config.IWant.MaxSampleSize {
+	if originalIWantCount > c.config.IWantRPCInspectionConfig.MaxSampleSize {
 		// truncate iWants and update metrics
-		sampleSize := c.config.IWant.MaxSampleSize
+		sampleSize := c.config.IWantRPCInspectionConfig.MaxSampleSize
 		if sampleSize > originalIWantCount {
 			sampleSize = originalIWantCount
 		}
