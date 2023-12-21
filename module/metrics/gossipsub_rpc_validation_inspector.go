@@ -11,7 +11,8 @@ import (
 )
 
 const (
-	labelIHaveMessage = "ihave_actual_message"
+	labelIHaveMessageIds = "ihave_message_ids"
+	labelIWantMessageIds = "iwant_message_ids"
 )
 
 // GossipSubRpcValidationInspectorMetrics metrics collector for the gossipsub RPC validation inspector.
@@ -58,7 +59,7 @@ func NewGossipSubRPCValidationInspectorMetrics(prefix string) *GossipSubRpcValid
 		Subsystem: subsystemGossip,
 		Name:      gc.prefix + "rpc_control_message_truncation",
 		Help:      "the number of times a control message was truncated",
-		Buckets:   []float64{1, 2, 3, 4, 5, 6, 7, 8},
+		Buckets:   []float64{10, 100, 1000},
 	}, []string{LabelMessage})
 
 	gc.receivedIHaveMsgCount = promauto.NewCounter(prometheus.CounterOpts{
@@ -137,28 +138,28 @@ func (c *GossipSubRpcValidationInspectorMetrics) AsyncProcessingFinished(duratio
 //
 //	messageType: the type of the control message that was truncated
 //	diff: the number of message ids truncated.
-func (c *GossipSubRpcValidationInspectorMetrics) OnControlMessageIDsTruncated(messageType p2pmsg.ControlMessageType, diff int) {
+func (c *GossipSubRpcValidationInspectorMetrics) OnControlMessagesTruncated(messageType p2pmsg.ControlMessageType, diff int) {
 	c.rpcCtrlMsgTruncation.WithLabelValues(messageType.String()).Observe(float64(diff))
 }
 
-// OnIHaveMessageTruncated tracks the number of times an IHave message was truncated.
-// Note that this function is called whenever an actual iHave message is truncated with all the message ids that it contains.
-// This is different from the OnControlMessageIDsTruncated function which is called whenever some message ids are truncated from a control message.
+// OnIHaveControlMessageIdsTruncated tracks the number of times message ids on an iHave message were truncated.
+// Note that this function is called only when the message ids are truncated from an iHave message, not when the iHave message itself is truncated.
+// This is different from the OnControlMessagesTruncated function which is called when a slice of control messages truncated from an RPC with all their message ids.
 // Args:
 //
 //	diff: the number of actual messages truncated.
-func (c *GossipSubRpcValidationInspectorMetrics) OnIHaveMessageTruncated(diff int) {
-	c.OnControlMessageIDsTruncated(labelIHaveMessage, diff)
+func (c *GossipSubRpcValidationInspectorMetrics) OnIHaveControlMessageIdsTruncated(diff int) {
+	c.OnControlMessagesTruncated(labelIHaveMessageIds, diff)
 }
 
-// OnIWantMessagesReceived tracks the number of IWANT messages received by the node from other nodes on an RPC.
-// iWant is a control message that is sent by a node to request a message that it has seen advertised in an iHAVE message.
-// Note that each IWANT message can contain multiple message ids, but this function only tracks the number of IWANT messages received, not the number of message ids on each IWANT message.
+// OnIWantControlMessageIdsTruncated tracks the number of times message ids on an iWant message were truncated.
+// Note that this function is called only when the message ids are truncated from an iWant message, not when the iWant message itself is truncated.
+// This is different from the OnControlMessagesTruncated function which is called when a slice of control messages truncated from an RPC with all their message ids.
 // Args:
 //
-//	msgCount: the number of IWANT messages received on an RPC.
-func (c *GossipSubRpcValidationInspectorMetrics) OnIWantMessagesReceived(msgCount int) {
-	c.receivedIWantMsgCount.Add(float64(msgCount))
+//	diff: the number of actual messages truncated.
+func (c *GossipSubRpcValidationInspectorMetrics) OnIWantControlMessageIdsTruncated(diff int) {
+	c.OnControlMessagesTruncated(labelIWantMessageIds, diff)
 }
 
 // OnIWantMessageIDsReceived tracks the number of message ids received by the node from other nodes on an RPC.
@@ -167,16 +168,6 @@ func (c *GossipSubRpcValidationInspectorMetrics) OnIWantMessagesReceived(msgCoun
 // - msgIdCount: the number of message ids received on the IWANT message.
 func (c *GossipSubRpcValidationInspectorMetrics) OnIWantMessageIDsReceived(msgIdCount int) {
 	c.receivedIWantMsgIDsHistogram.Observe(float64(msgIdCount))
-}
-
-// OnIHaveMessagesReceived tracks the number of IHAVE messages received by the node from another node on an RPC.
-// This function is called once per RPC, and counts the number of iHave messages received on that RPC, not per iHave message.
-// An IHAVE message can contain multiple message ids, but this function only tracks the number of IHAVE messages received, not the number of message ids on each IHAVE message.
-// iHave is a control message that is sent by a node to another node to indicate that it has a new gossiped messages (the message ids).
-// Args:
-// - msgCount: the number of IHAVE messages received on an RPC.
-func (c *GossipSubRpcValidationInspectorMetrics) OnIHaveMessagesReceived(msgCount int) {
-	c.receivedIHaveMsgCount.Add(float64(msgCount))
 }
 
 // OnIHaveMessageIDsReceived tracks the number of message ids received by the node from other nodes on an iHave message.
@@ -188,29 +179,12 @@ func (c *GossipSubRpcValidationInspectorMetrics) OnIHaveMessageIDsReceived(chann
 	c.receivedIHaveMsgIDsHistogram.WithLabelValues(channel).Observe(float64(msgIdCount))
 }
 
-// OnGraftReceived tracks the number of GRAFT messages received by the node from another node on an RPC.
-// GRAFT is a control message of GossipSub protocol that connects two nodes over a topic directly as gossip partners.
-// Note: this function is called once per RPC, and counts the number of graft messages received on that RPC, not per graft message.
-func (c *GossipSubRpcValidationInspectorMetrics) OnGraftReceived(count int) {
-	c.receivedGraftCount.Add(float64(count))
-}
-
-// OnPruneReceived tracks the number of PRUNE messages received by the node from another node on an RPC.
-// PRUNE is a control message of GossipSub protocol that disconnects two nodes over a topic.
-// Note: this function is called once per RPC, and counts the number of prune messages received on that RPC, not per prune message.
-func (c *GossipSubRpcValidationInspectorMetrics) OnPruneReceived(count int) {
-	c.receivedPruneCount.Add(float64(count))
-}
-
-// OnPublishedGossipMessagesReceived tracks the number of publish messages received by the node from another node on an RPC.
-// Args:
-// - msgCount: the number of publish messages received on an RPC.
-// Note: this function is called once per RPC, and counts the number of publish messages received on that RPC, not per publish message.
-func (c *GossipSubRpcValidationInspectorMetrics) OnPublishedGossipMessagesReceived(msgCount int) {
-	c.receivedPublishMessageCount.Add(float64(msgCount))
-}
-
 // OnIncomingRpcReceived tracks the number of incoming RPC messages received by the node.
-func (c *GossipSubRpcValidationInspectorMetrics) OnIncomingRpcReceived() {
+func (c *GossipSubRpcValidationInspectorMetrics) OnIncomingRpcReceived(iHaveCount, iWantCount, graftCount, pruneCount, msgCount int) {
 	c.incomingRpcCount.Inc()
+	c.receivedPublishMessageCount.Add(float64(msgCount))
+	c.receivedPruneCount.Add(float64(pruneCount))
+	c.receivedGraftCount.Add(float64(graftCount))
+	c.receivedIWantMsgCount.Add(float64(iWantCount))
+	c.receivedIHaveMsgCount.Add(float64(iHaveCount))
 }

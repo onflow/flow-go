@@ -272,8 +272,8 @@ func (nc *NoopCollector) OnDialRetryBudgetResetToDefault()                      
 func (nc *NoopCollector) OnStreamCreationRetryBudgetResetToDefault()                    {}
 
 var _ module.HeroCacheMetrics = (*NoopCollector)(nil)
-var _ module.NetworkMetrics = (*NoopCollector)(nil)
 
+func (nc *NoopCollector) OnIWantControlMessageIdsTruncated(diff int)               {}
 func (nc *NoopCollector) OnIWantMessagesReceived(msgCount int)                     {}
 func (nc *NoopCollector) OnIWantMessageIDsReceived(msgIdCount int)                 {}
 func (nc *NoopCollector) OnIHaveMessagesReceived(count int)                        {}
@@ -323,8 +323,8 @@ func (nc *NoopCollector) OnBehaviourPenaltyUpdated(f float64)                   
 func (nc *NoopCollector) OnIPColocationFactorUpdated(f float64)                            {}
 func (nc *NoopCollector) OnAppSpecificScoreUpdated(f float64)                              {}
 func (nc *NoopCollector) OnOverallPeerScoreUpdated(f float64)                              {}
-func (nc *NoopCollector) OnIHaveMessageTruncated(diff int)                                 {}
-func (nc *NoopCollector) OnControlMessageIDsTruncated(messageType p2pmsg.ControlMessageType, diff int) {
+func (nc *NoopCollector) OnIHaveControlMessageIdsTruncated(diff int)                       {}
+func (nc *NoopCollector) OnControlMessagesTruncated(messageType p2pmsg.ControlMessageType, diff int) {
 }
 
 func (nc *NoopCollector) AsyncProcessingStarted()               {}
