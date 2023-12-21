@@ -522,8 +522,8 @@ func DefaultTopicScoreParams() *pubsub.TopicScoreParams {
 	p := &pubsub.TopicScoreParams{
 		TopicWeight:                     defaultTopicWeight,
 		SkipAtomicValidation:            defaultTopicSkipAtomicValidation,
-		InvalidMessageDeliveriesWeight:  defaultTopicInvalidMessageDeliveriesWeight,
-		InvalidMessageDeliveriesDecay:   defaultTopicInvalidMessageDeliveriesDecay,
+		InvalidMessageDeliveriesWeight:  0, // TODO: we should enable it when we can set it externally.
+		InvalidMessageDeliveriesDecay:   0, // TODO: we should enable it when we can set it externally.
 		TimeInMeshQuantum:               defaultTopicTimeInMesh,
 		MeshMessageDeliveriesWeight:     defaultTopicMeshMessageDeliveriesWeight,
 		MeshMessageDeliveriesDecay:      defaultTopicMeshMessageDeliveriesDecay,
