@@ -15,8 +15,8 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/p2pconf"
-	"github.com/onflow/flow-go/network/p2p/p2plogging"
+	p2pconfig "github.com/onflow/flow-go/network/p2p/config"
+	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
 	"github.com/onflow/flow-go/network/p2p/scoring/internal"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -40,12 +40,12 @@ type SubscriptionProvider struct {
 }
 
 type SubscriptionProviderConfig struct {
-	Logger                  zerolog.Logger                          `validate:"required"`
-	TopicProviderOracle     func() p2p.TopicProvider                `validate:"required"`
-	IdProvider              module.IdentityProvider                 `validate:"required"`
-	HeroCacheMetricsFactory metrics.HeroCacheMetricsFactory         `validate:"required"`
-	Params                  *p2pconf.SubscriptionProviderParameters `validate:"required"`
-	NetworkingType          network.NetworkingType                  `validate:"required"`
+	Logger                  zerolog.Logger                            `validate:"required"`
+	TopicProviderOracle     func() p2p.TopicProvider                  `validate:"required"`
+	IdProvider              module.IdentityProvider                   `validate:"required"`
+	HeroCacheMetricsFactory metrics.HeroCacheMetricsFactory           `validate:"required"`
+	Params                  *p2pconfig.SubscriptionProviderParameters `validate:"required"`
+	NetworkingType          network.NetworkingType                    `validate:"required"`
 }
 
 var _ p2p.SubscriptionProvider = (*SubscriptionProvider)(nil)

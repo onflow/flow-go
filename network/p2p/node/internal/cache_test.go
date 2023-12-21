@@ -12,7 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/p2p/p2pnode/internal"
+	"github.com/onflow/flow-go/network/p2p/node/internal"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 

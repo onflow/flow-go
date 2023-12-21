@@ -26,8 +26,8 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2putils"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/p2plogging"
-	"github.com/onflow/flow-go/network/p2p/p2pnode/internal"
+	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
+	nodeinternal "github.com/onflow/flow-go/network/p2p/node/internal"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -82,7 +82,7 @@ func NewNode(cfg *p2p.NodeConfig) (*Node, error) {
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
 
-	pCache, err := internal.NewProtocolPeerCache(cfg.Logger, cfg.Host)
+	pCache, err := nodeinternal.NewProtocolPeerCache(cfg.Logger, cfg.Host)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create protocol peer cache: %w", err)
 	}
@@ -95,7 +95,7 @@ func NewNode(cfg *p2p.NodeConfig) (*Node, error) {
 		pCache:      pCache,
 		peerManager: cfg.PeerManager,
 		parameters:  cfg.Parameters,
-		disallowListedCache: internal.NewDisallowListCache(
+		disallowListedCache: nodeinternal.NewDisallowListCache(
 			cfg.DisallowListCacheCfg.MaxSize,
 			cfg.Logger.With().Str("module", "disallow-list-cache").Logger(),
 			cfg.DisallowListCacheCfg.Metrics,

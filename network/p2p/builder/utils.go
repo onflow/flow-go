@@ -10,7 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/p2plogging"
+	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
 )
 
 const keyResourceManagerLimit = "libp2p_resource_manager_limit"

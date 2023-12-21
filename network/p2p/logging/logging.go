@@ -3,7 +3,7 @@ package p2plogging
 import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
-	"github.com/onflow/flow-go/network/p2p/p2plogging/internal"
+	"github.com/onflow/flow-go/network/p2p/logging/internal"
 )
 
 // peerIdCache is a global cache of peer ids, it is used to avoid expensive base58 encoding of peer ids.
