@@ -20,17 +20,17 @@ func TestIdentityListCanonical(t *testing.T) {
 	nodes[0].NodeID[0], nodes[1].NodeID[0] = 2, 1
 	require.False(t, flow.IsIdentifierCanonical(nodes[0].NodeID, nodes[1].NodeID))
 	ids = bootstrap.ToIdentityList(nodes)
-	assert.False(t, flow.IdentityListCanonical(ids))
+	assert.False(t, flow.IsIdentityListCanonical(ids))
 
 	nodes = bootstrap.Sort(nodes, flow.Canonical)
 	ids = bootstrap.ToIdentityList(nodes)
-	require.True(t, flow.IdentityListCanonical(ids))
+	require.True(t, flow.IsIdentityListCanonical(ids))
 
-	// check `IdentityListCanonical` detects order equality in a sorted list
+	// check `IsIdentityListCanonical` detects order equality in a sorted list
 	nodes[1] = nodes[10] // add a duplication
 	nodes = bootstrap.Sort(nodes, flow.Canonical)
 	ids = bootstrap.ToIdentityList(nodes)
-	assert.False(t, flow.IdentityListCanonical(ids))
+	assert.False(t, flow.IsIdentityListCanonical(ids))
 }
 
 func TestNodeConfigEncodingJSON(t *testing.T) {

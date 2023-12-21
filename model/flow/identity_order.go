@@ -47,12 +47,12 @@ func ByReferenceOrder(nodeIDs []Identifier) func(*Identity, *Identity) int {
 	}
 }
 
-// IdentityListCanonical returns true if and only if the given IdentityList is
+// IsIdentityListCanonical returns true if and only if the given IdentityList is
 // _strictly_ sorted with regards to the canonical order.
 //
 // The strictness is important here, meaning that a list with 2 successive entities
 // with equal NodeID isn't considered well sorted.
-func IdentityListCanonical(il IdentityList) bool {
+func IsIdentityListCanonical(il IdentityList) bool {
 	for i := 0; i < len(il)-1; i++ {
 		if !IsCanonical(il[i], il[i+1]) {
 			return false

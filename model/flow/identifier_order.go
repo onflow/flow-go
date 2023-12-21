@@ -38,12 +38,12 @@ func IsIdentifierCanonical(i1, i2 Identifier) bool {
 	return IdentifierCanonical(i1, i2) < 0
 }
 
-// IdentityListCanonical returns true if and only if the given list is
+// IsIdentityListCanonical returns true if and only if the given list is
 // _strictly_ sorted with regards to the canonical order.
 //
 // The strictness is important here, meaning that a list with 2 equal identifiers
 // isn't considered well sorted.
-func IdentifierListCanonical(il IdentifierList) bool {
+func IsIdentifierListCanonical(il IdentifierList) bool {
 	for i := 0; i < len(il)-1; i++ {
 		if !IsIdentifierCanonical(il[i], il[i+1]) {
 			return false

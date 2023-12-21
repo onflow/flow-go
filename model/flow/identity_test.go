@@ -245,15 +245,15 @@ func TestIdentity_Sort(t *testing.T) {
 	// make sure the list is not sorted
 	il[0].NodeID[0], il[1].NodeID[0] = 2, 1
 	require.False(t, flow.IsCanonical(il[0], il[1]))
-	assert.False(t, flow.IdentityListCanonical(il))
+	assert.False(t, flow.IsIdentityListCanonical(il))
 
 	canonical := il.Sort(flow.Canonical)
-	assert.True(t, flow.IdentityListCanonical(canonical))
+	assert.True(t, flow.IsIdentityListCanonical(canonical))
 
-	// check `IdentityListCanonical` detects order equality in a sorted list
+	// check `IsIdentityListCanonical` detects order equality in a sorted list
 	il[1] = il[10] // add a duplication
 	canonical = il.Sort(flow.Canonical)
-	assert.False(t, flow.IdentityListCanonical(canonical))
+	assert.False(t, flow.IsIdentityListCanonical(canonical))
 }
 
 func TestIdentity_EqualTo(t *testing.T) {

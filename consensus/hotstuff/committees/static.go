@@ -21,7 +21,7 @@ func NewStaticCommittee(participants flow.IdentityList, myID flow.Identifier, dk
 
 // NewStaticCommitteeWithDKG returns a new committee with a static participant set.
 func NewStaticCommitteeWithDKG(participants flow.IdentityList, myID flow.Identifier, dkg protocol.DKG) (*Static, error) {
-	valid := flow.IdentityListCanonical(participants)
+	valid := flow.IsIdentityListCanonical(participants)
 	if !valid {
 		return nil, fmt.Errorf("participants %v is not in Canonical order", participants)
 	}
