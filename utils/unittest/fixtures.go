@@ -2147,7 +2147,7 @@ func BootstrapFixtureWithChainID(
 		WithParticipants(participants),
 		SetupWithCounter(counter),
 		WithFirstView(root.Header.View),
-		WithFinalView(root.Header.View+1000),
+		WithFinalView(root.Header.View+10_000),
 	)
 	commit := EpochCommitFixture(
 		CommitWithCounter(counter),

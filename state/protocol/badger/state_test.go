@@ -301,6 +301,97 @@ func TestBootstrapNonRoot(t *testing.T) {
 		})
 	})
 
+	// should be able to bootstrap from snapshot when the sealing segment contains
+	// a block which references a result included outside the sealing segment.
+	// In this case, B2 contains the result for B1, but is omitted from the segment.
+	// B3 contains only the receipt for B1 and is included in the segment.
+	//
+	//                                      Extra Blocks             Sealing Segment
+	//                                     [-----------------------][--------------------------------------]
+	// ROOT <- B1 <- B2(Receipt1a,Result1) <- B3(Receipt1b) <- ... <- G1 <- G2(R[G1]) <- G3(Seal[G1])
+	t.Run("with detached execution result reference in sealing segment", func(t *testing.T) {
+		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState) protocol.Snapshot {
+			block1 := unittest.BlockWithParentFixture(rootBlock)
+			buildFinalizedBlock(t, state, block1)
+
+			receipt1a, seal1 := unittest.ReceiptAndSealForBlock(block1)
+			receipt1b := unittest.ExecutionReceiptFixture(unittest.WithResult(&receipt1a.ExecutionResult))
+
+			block2 := unittest.BlockWithParentFixture(block1.Header)
+			block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1a)))
+			buildFinalizedBlock(t, state, block2)
+
+			block3 := unittest.BlockWithParentFixture(block2.Header)
+			block3.SetPayload(unittest.PayloadFixture(unittest.WithReceiptsAndNoResults(receipt1b)))
+			buildFinalizedBlock(t, state, block3)
+
+			receipt2, seal2 := unittest.ReceiptAndSealForBlock(block2)
+			receipt3, seal3 := unittest.ReceiptAndSealForBlock(block3)
+
+			receipts := []*flow.ExecutionReceipt{receipt2, receipt3}
+			seals := []*flow.Seal{seal1, seal2, seal3}
+
+			parent := block3
+			for i := 0; i < flow.DefaultTransactionExpiry-int(block3.Header.Height); i++ {
+				next := unittest.BlockWithParentFixture(parent.Header)
+				next.SetPayload(unittest.PayloadFixture(
+					unittest.WithReceipts(receipts[0]),
+					unittest.WithSeals(seals[0])))
+				seals, receipts = seals[1:], receipts[1:]
+
+				nextReceipt, nextSeal := unittest.ReceiptAndSealForBlock(next)
+				receipts = append(receipts, nextReceipt)
+				seals = append(seals, nextSeal)
+				buildFinalizedBlock(t, state, next)
+				parent = next
+			}
+
+			// G1 adds all receipts from all blocks before G1
+			blockG1 := unittest.BlockWithParentFixture(parent.Header)
+			blockG1.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipts...)))
+			buildFinalizedBlock(t, state, blockG1)
+
+			receiptS1, sealS1 := unittest.ReceiptAndSealForBlock(blockG1)
+
+			// G2 adds all seals from all blocks before G1
+			blockG2 := unittest.BlockWithParentFixture(blockG1.Header)
+			blockG2.SetPayload(unittest.PayloadFixture(
+				unittest.WithSeals(seals...),
+				unittest.WithReceipts(receiptS1)))
+			buildFinalizedBlock(t, state, blockG2)
+
+			// G3 seals G1, creating a sealing segment
+			blockG3 := unittest.BlockWithParentFixture(blockG2.Header)
+			blockG3.SetPayload(unittest.PayloadFixture(unittest.WithSeals(sealS1)))
+			buildFinalizedBlock(t, state, blockG3)
+
+			child := unittest.BlockWithParentFixture(blockG3.Header)
+			buildFinalizedBlock(t, state, child)
+
+			return state.AtBlockID(blockG3.ID())
+		})
+
+		segment, err := after.SealingSegment()
+		require.NoError(t, err)
+		// To accurately test the desired edge case we require that the lowest block in ExtraBlocks is B3
+		assert.Equal(t, segment.ExtraBlocks[0].Header.Height, uint64(3))
+
+		bootstrap(t, after, func(state *bprotocol.State, err error) {
+			require.NoError(t, err)
+			unittest.AssertSnapshotsEqual(t, after, state.Final())
+			// should be able to read all QCs
+			segment, err := state.Final().SealingSegment()
+			require.NoError(t, err)
+			for _, block := range segment.Blocks {
+				snapshot := state.AtBlockID(block.ID())
+				_, err := snapshot.QuorumCertificate()
+				require.NoError(t, err)
+				_, err = snapshot.RandomSource()
+				require.NoError(t, err)
+			}
+		})
+	})
+
 	t.Run("with setup next epoch", func(t *testing.T) {
 		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState) protocol.Snapshot {
 			unittest.NewEpochBuilder(t, state).BuildEpoch()
