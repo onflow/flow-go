@@ -35,7 +35,7 @@ type stateMutator struct {
 	commits                          storage.EpochCommits
 	stateMachine                     ProtocolStateMachine
 	epochFallbackStateMachineFactory func() (ProtocolStateMachine, error)
-	pendingDbUpdates                 transaction.DeferredDBUpdate
+	pendingDbUpdates                 []transaction.DeferredDBUpdate
 }
 
 var _ protocol.StateMutator = (*stateMutator)(nil)
@@ -99,7 +99,7 @@ func newStateMutator(
 //     of the calling code (specifically `FollowerState`).
 //
 // updated protocol state entry, state ID and a flag indicating if there were any changes.
-func (m *stateMutator) Build() (hasChanges bool, updatedState *flow.ProtocolStateEntry, stateID flow.Identifier, dbUpdates transaction.DeferredDBUpdate) {
+func (m *stateMutator) Build() (hasChanges bool, updatedState *flow.ProtocolStateEntry, stateID flow.Identifier, dbUpdates []transaction.DeferredDBUpdate) {
 	updatedState, stateID, hasChanges = m.stateMachine.Build()
 	dbUpdates = m.pendingDbUpdates
 	return
@@ -223,7 +223,7 @@ func (m *stateMutator) ApplyServiceEventsFromValidatedSeals(seals []*flow.Seal) 
 // Expected errors during normal operations:
 // - `protocol.InvalidServiceEventError` if any service event is invalid or is not a valid state transition for the current protocol state
 func (m *stateMutator) applyServiceEventsFromOrderedResults(results []*flow.ExecutionResult) ([]func(tx *transaction.Tx) error, error) {
-	var dbUpdates transaction.DeferredDBUpdate
+	var dbUpdates []transaction.DeferredDBUpdate
 	for _, result := range results {
 		for _, event := range result.ServiceEvents {
 			switch ev := event.Event.(type) {

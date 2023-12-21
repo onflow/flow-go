@@ -2470,7 +2470,6 @@ func TestSealed(t *testing.T) {
 		// block 1 will be sealed
 		block1 := unittest.BlockWithParentFixture(head)
 		block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
-
 		receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
 
 		// block 2 contains receipt for block 1

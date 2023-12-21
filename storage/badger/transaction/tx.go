@@ -25,14 +25,11 @@ import (
 //     therefore discards. f3 could then succeed, i.e. return nil.
 //     Consequently, the entire list of callbacks is executed, including f1's callback if it
 //     added one. Callback implementations therefore need to account for this edge case.
+//   - not concurrency safe
 type Tx struct {
 	DBTxn     *dbbadger.Txn
 	callbacks []func()
 }
-
-// DeferredDBUpdate is a shorthand notation for an anonymous function. The function takes
-// a badger transaction as input to runs some database updates as part of that transaction.
-type DeferredDBUpdate = []func(tx *Tx) error
 
 // OnSucceed adds a callback to execute after the batch has been successfully flushed.
 // Useful for implementing the cache where we will only cache after the batch of database
