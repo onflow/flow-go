@@ -157,12 +157,12 @@ func (e *UnexecutedLoader) finalizedUnexecutedBlocks(ctx context.Context, finali
 	}
 
 	for ; lastExecuted > rootBlock.Height; lastExecuted-- {
-		header, err := e.getHeaderByHeight(lastExecuted)
+		finalizedID, err := e.getHeaderByHeight(lastExecuted)
 		if err != nil {
 			return nil, fmt.Errorf("could not get header at height: %v, %w", lastExecuted, err)
 		}
 
-		executed, err := e.execState.IsBlockExecuted(header.Height, header.ID())
+		executed, err := e.execState.IsBlockExecuted(lastExecuted, finalizedID)
 		if err != nil {
 			return nil, fmt.Errorf("could not check whether block is executed: %w", err)
 		}
@@ -179,12 +179,12 @@ func (e *UnexecutedLoader) finalizedUnexecutedBlocks(ctx context.Context, finali
 	// starting from the first unexecuted block, go through each unexecuted and finalized block
 	// reload its block to execution queues
 	for height := firstUnexecuted; height <= final.Height; height++ {
-		header, err := e.getHeaderByHeight(height)
+		finalizedID, err := e.getHeaderByHeight(height)
 		if err != nil {
 			return nil, fmt.Errorf("could not get header at height: %v, %w", height, err)
 		}
 
-		unexecuted = append(unexecuted, header.ID())
+		unexecuted = append(unexecuted, finalizedID)
 	}
 
 	e.log.Info().
@@ -231,8 +231,8 @@ func (e *UnexecutedLoader) pendingUnexecutedBlocks(ctx context.Context, finalize
 // if the EN is dynamically bootstrapped, the finalized blocks at height range:
 // [ sealedRoot.Height, finalizedRoot.Height - 1] can not be retrieved from
 // protocol state, but only from headers
-func (e *UnexecutedLoader) getHeaderByHeight(height uint64) (*flow.Header, error) {
+func (e *UnexecutedLoader) getHeaderByHeight(height uint64) (flow.Identifier, error) {
 	// we don't use protocol state because for dynamic boostrapped execution node
 	// the last executed and sealed block is below the finalized root block
-	return e.headers.ByHeight(height)
+	return e.headers.BlockIDByHeight(height)
 }
