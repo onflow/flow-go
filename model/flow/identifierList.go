@@ -9,7 +9,7 @@ import (
 // IdentifierList defines a sortable list of identifiers
 type IdentifierList []Identifier
 
-// Len returns length of the IdentiferList in the number of stored identifiers.
+// Len returns length of the IdentifierList in the number of stored identifiers.
 // It satisfies the sort.Interface making the IdentifierList sortable.
 func (il IdentifierList) Len() int {
 	return len(il)
@@ -112,19 +112,9 @@ IDLoop:
 	return dup
 }
 
+// Sort returns a sorted _copy_ of the IdentifierList, leaving the original invariant.
 func (il IdentifierList) Sort(less IdentifierOrder) IdentifierList {
 	dup := il.Copy()
 	slices.SortFunc(dup, less)
 	return dup
-}
-
-// StrictlySorted returns whether the list is strictly sorted by the input ordering.
-// Strictly means that the function checks there is not order equality among the elements.
-func (il IdentifierList) StrictlySorted(less IdentifierOrder) bool {
-	for i := 0; i < len(il)-1; i++ {
-		if less(il[i], il[i+1]) >= 0 {
-			return false
-		}
-	}
-	return true
 }

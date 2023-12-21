@@ -9,11 +9,13 @@ import (
 
 // NewClusterList creates a new cluster list based on the given cluster assignment
 // and the provided list of identities.
-// The caller must ensure each assignment contains identities ordered in canonical order, so that
-// each cluster in the returned cluster list is ordered in canonical order as well. If not,
-// an error will be returned.
 //
-// This function assumes that there are no duplicate collectors.
+// The caller must ensure the following prerequisites:
+//   - each assignment contains identities ordered in canonical order
+//   - every collector has a unique NodeID, i.e. there are no two elements in `collectors` with the same NodeID
+//
+// These prerequisites ensures that each cluster in the returned cluster list is ordered in canonical order as well.
+// This function checks that the prerequisites are satisfied and errors otherwise.
 func NewClusterList(assignments flow.AssignmentList, collectors flow.IdentityList) (flow.ClusterList, error) {
 
 	// build a lookup for all the identities by node identifier
@@ -45,7 +47,7 @@ func NewClusterList(assignments flow.AssignmentList, collectors flow.IdentityLis
 			delete(lookup, participantID)
 
 			if i > 0 {
-				if order.IdentifierCanonical(prev, participantID) >= 0 {
+				if !order.IsIdentifierCanonical(prev, participantID) {
 					return nil, fmt.Errorf("the assignments is not sorted in canonical order or there are duplicates in cluster index %v, prev %v, next %v",
 						i, prev, participantID)
 				}

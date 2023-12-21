@@ -17,6 +17,7 @@ import (
 	"github.com/vmihailenco/msgpack"
 
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/utils/rand"
 )
 
@@ -308,8 +309,8 @@ type IdentityFilter func(*Identity) bool
 // a positive number if the second identity is "strictly less" than the second,
 // and zero if the two identities are equal.
 //
-// `IdentityOrder` can be used to sort identities as required
-// in https://pkg.go.dev/golang.org/x/exp/slices#SortFunc.
+// `IdentityOrder` can be used to sort identities with
+// https://pkg.go.dev/golang.org/x/exp/slices#SortFunc.
 type IdentityOrder func(*Identity, *Identity) int
 
 // IdentityMapFunc is a modifier function for map operations for identities.
@@ -394,17 +395,6 @@ func (il IdentityList) Sort(less IdentityOrder) IdentityList {
 	dup := il.Copy()
 	slices.SortFunc(dup, less)
 	return dup
-}
-
-// StrictlySorted returns whether the list is strictly sorted by the input ordering.
-// Strictly means that the function checks there is not order equality among the elements.
-func (il IdentityList) StrictlySorted(less IdentityOrder) bool {
-	for i := 0; i < len(il)-1; i++ {
-		if less(il[i], il[i+1]) >= 0 {
-			return false
-		}
-	}
-	return true
 }
 
 // NodeIDs returns the NodeIDs of the nodes in the list.
@@ -535,7 +525,7 @@ func (il IdentityList) SamplePct(pct float64) (IdentityList, error) {
 // Union returns a new identity list containing every identity that occurs in
 // either `il`, or `other`, or both. There are no duplicates in the output,
 // where duplicates are identities with the same node ID.
-// The returned IdentityList is sorted
+// The returned IdentityList is sorted canonically.
 func (il IdentityList) Union(other IdentityList) IdentityList {
 	maxLen := len(il) + len(other)
 
@@ -552,6 +542,9 @@ func (il IdentityList) Union(other IdentityList) IdentityList {
 	}
 
 	slices.SortFunc(union, func(a, b *Identity) int {
+		// CAUTION: we want to return the union in canonical order, which must be consistent with
+		// the implementations in the `model/flow/order` package. However, using the `order` package
+		// directly here causes a circular dependency
 		return bytes.Compare(a.NodeID[:], b.NodeID[:])
 	})
 
@@ -578,9 +571,7 @@ func (il IdentityList) Exists(target *Identity) bool {
 // target:  value to search for
 // CAUTION:  The identity list MUST be sorted prior to calling this method
 func (il IdentityList) IdentifierExists(target Identifier) bool {
-	_, ok := slices.BinarySearchFunc(il, &Identity{NodeID: target}, func(a, b *Identity) int {
-		return bytes.Compare(a.NodeID[:], b.NodeID[:])
-	})
+	_, ok := slices.BinarySearchFunc(il, &Identity{NodeID: target}, order.IdentifierCanonical)
 	return ok
 }
 

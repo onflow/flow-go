@@ -24,7 +24,7 @@ func TestIdentityListCanonical(t *testing.T) {
 	ids = bootstrap.ToIdentityList(nodes)
 	require.True(t, order.IdentityListCanonical(ids))
 
-	// check `StrictlySorted` detects order equality in a sorted list
+	// check `IdentityListCanonical` detects order equality in a sorted list
 	nodes[1] = nodes[10] // add a duplication
 	nodes = bootstrap.Sort(nodes, order.Canonical)
 	ids = bootstrap.ToIdentityList(nodes)

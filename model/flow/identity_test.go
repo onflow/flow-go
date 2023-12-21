@@ -245,15 +245,15 @@ func TestIdentity_Sort(t *testing.T) {
 	il := unittest.IdentityListFixture(20)
 	random, err := il.Shuffle()
 	require.NoError(t, err)
-	assert.False(t, random.StrictlySorted(order.Canonical), "very unlikely to fail but not impossible")
+	assert.False(t, order.IdentityListCanonical(random), "very unlikely to fail but not impossible")
 
 	canonical := il.Sort(order.Canonical)
-	assert.True(t, canonical.StrictlySorted(order.Canonical))
+	assert.True(t, order.IdentityListCanonical(canonical))
 
-	// check `StrictlySorted` detects order equality in a sorted list
+	// check `IdentityListCanonical` detects order equality in a sorted list
 	il[1] = il[10] // add a duplication
 	canonical = il.Sort(order.Canonical)
-	assert.False(t, canonical.StrictlySorted(order.Canonical))
+	assert.False(t, order.IdentityListCanonical(canonical))
 }
 
 func TestIdentity_EqualTo(t *testing.T) {

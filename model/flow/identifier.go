@@ -26,15 +26,15 @@ type Identifier [IdentifierLen]byte
 // IdentifierFilter is a filter on identifiers.
 type IdentifierFilter func(Identifier) bool
 
-// IdentityOrder is an order function for identifiers.
+// IdentifierOrder is an order function for identifiers.
 //
 // It defines a strict weak ordering between identifiers.
 // It returns a negative number if the first identifier is "strictly less" than the second,
 // a positive number if the second identifier is "strictly less" than the second,
 // and zero if the two identifiers are equal.
 //
-// `IdentifierOrder` can be used to sort identifiers as required
-// in https://pkg.go.dev/golang.org/x/exp/slices#SortFunc.
+// `IdentifierOrder` can be used to sort identifiers with
+// https://pkg.go.dev/golang.org/x/exp/slices#SortFunc.
 type IdentifierOrder func(Identifier, Identifier) int
 
 var (
