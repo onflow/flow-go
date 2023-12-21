@@ -136,8 +136,6 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 	}
 	c.workerPool.Submit(req)
 
-	// third, collect metrics
-	c.updateMetrics(from, rpc)
 	return nil
 }
 
@@ -173,6 +171,7 @@ func (c *ControlMsgValidationInspector) updateMetrics(from peer.ID, rpc *pubsub.
 // processInspectRPCReq func used by component workers to perform further inspection of RPC control messages that will validate ensure all control message
 // types are valid in the RPC.
 func (c *ControlMsgValidationInspector) processInspectRPCReq(req *InspectRPCRequest) error {
+	c.updateMetrics(req.Peer, req.rpc)
 	c.metrics.AsyncProcessingStarted()
 	start := time.Now()
 	defer func() {
