@@ -1165,7 +1165,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		RandomSource:                 cdcRandomSource,
 		CollectorClusters:            clusterAssignments,
 		ClusterQCs:                   clusterQCs,
-		DKGPubKeys:                   dkg.PubKeyShares,
+		DKGPubKeys:                   encodable.WrapRandomBeaconPubKeys(dkg.PubKeyShares),
 	}
 
 	// generate the initial execution state

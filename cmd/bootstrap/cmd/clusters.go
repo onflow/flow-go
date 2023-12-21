@@ -10,7 +10,6 @@ import (
 	"github.com/onflow/flow-go/model/flow/assignment"
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/state/protocol"
 )
 
 // Construct random cluster assignment with internal and partner nodes.
@@ -123,21 +122,4 @@ func filterClusterSigners(cluster flow.IdentitySkeletonList, nodeInfos []model.N
 	}
 
 	return filtered
-}
-
-// clusterRootQCsFromEpoch returns a list of cluster root QCs from the given epoch.
-func clusterRootQCsFromEpoch(epoch protocol.Epoch) []*flow.QuorumCertificate {
-	clustering, err := epoch.Clustering()
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not get epoch clustering")
-	}
-	qcs := make([]*flow.QuorumCertificate, 0, len(clustering))
-	for i := range clustering {
-		cluster, err := epoch.Cluster(uint(i))
-		if err != nil {
-			log.Fatal().Err(err).Msgf("could not get epoch cluster (index=%d)", i)
-		}
-		qcs = append(qcs, cluster.RootQC())
-	}
-	return qcs
 }

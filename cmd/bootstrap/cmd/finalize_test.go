@@ -29,7 +29,7 @@ const finalizeHappyPathLogs = "collecting partner network and staking keys" +
 	`reading root block votes` +
 	`read vote .*` +
 	`reading dkg data` +
-	`reading root epoch` +
+	`reading intermediary bootstrapping data` +
 	`constructing root QC` +
 	`constructing root execution result and block seal` +
 	`constructing root protocol snapshot` +
@@ -66,18 +66,18 @@ func TestFinalize_HappyPath(t *testing.T) {
 		flagRootChain = chainName
 		flagRootParent = hex.EncodeToString(rootParent[:])
 		flagRootHeight = rootHeight
-
-		// rootBlock will generate DKG and place it into bootDir/public-root-information
-		rootBlock(nil, nil)
-
 		flagRootCommit = hex.EncodeToString(rootCommit[:])
 		flagEpochCounter = epochCounter
 		flagNumViewsInEpoch = 100_000
 		flagNumViewsInStakingAuction = 50_000
 		flagNumViewsInDKGPhase = 2_000
 		flagEpochCommitSafetyThreshold = 1_000
-		flagRootBlock = filepath.Join(bootDir, model.PathRootBlockData)
-		flagRootEpoch = filepath.Join(bootDir, model.PathRootEpoch)
+
+		// rootBlock will generate DKG and place it into bootDir/public-root-information
+		rootBlock(nil, nil)
+
+		flagRootBlockPath = filepath.Join(bootDir, model.PathRootBlockData)
+		flagIntermediaryBootstrappingDataPath = filepath.Join(bootDir, model.PathIntermediaryBootstrappingData)
 		flagDKGDataPath = filepath.Join(bootDir, model.PathRootDKGData)
 		flagRootBlockVotesDir = filepath.Join(bootDir, model.DirnameRootBlockVotes)
 
