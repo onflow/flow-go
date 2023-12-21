@@ -15,11 +15,11 @@ import (
 
 func TestIdentityListCanonical(t *testing.T) {
 	nodes := unittest.NodeInfosFixture(20)
-	ids := bootstrap.ToIdentityList(nodes)
 	// make sure the list is not sorted
 	nodes[0].NodeID[0], nodes[1].NodeID[0] = 2, 1
 	require.False(t, flow.IsIdentifierCanonical(nodes[0].NodeID, nodes[1].NodeID))
-	ids = bootstrap.ToIdentityList(nodes)
+
+	ids := bootstrap.ToIdentityList(nodes)
 	assert.False(t, flow.IsIdentityListCanonical(ids))
 
 	nodes = bootstrap.Sort(nodes, flow.Canonical)
