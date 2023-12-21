@@ -19,9 +19,9 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
 	netcache "github.com/onflow/flow-go/network/p2p/cache"
+	p2pconfig "github.com/onflow/flow-go/network/p2p/config"
+	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
-	"github.com/onflow/flow-go/network/p2p/p2pconf"
-	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -134,7 +134,7 @@ type GossipSubAppSpecificScoreRegistry struct {
 // GossipSubAppSpecificScoreRegistryConfig is the configuration for the GossipSubAppSpecificScoreRegistry.
 // Configurations are the "union of parameters and other components" that are used to compute or build components that compute or maintain the application specific score of peers.
 type GossipSubAppSpecificScoreRegistryConfig struct {
-	Parameters p2pconf.AppSpecificScoreParameters `validate:"required"`
+	Parameters p2pconfig.AppSpecificScoreParameters `validate:"required"`
 
 	Logger zerolog.Logger `validate:"required"`
 
