@@ -299,6 +299,13 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 		}
 		appliedPenalty += errPenalty
 	}
+	lg.Debug().
+		Err(notification.Errors.Error()).
+		Str("control_message_type", notification.MsgType.String()).
+		Bool(logging.KeySuspicious, true).
+		Bool(logging.KeyNetworkingSecurity, true).
+		Int("error_count", notification.Errors.Len()).
+		Msg("invalid control message notification processed")
 
 	record, err := r.spamScoreCache.Update(notification.PeerID, func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
 		record.Penalty += appliedPenalty

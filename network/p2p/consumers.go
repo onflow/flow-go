@@ -1,6 +1,7 @@
 package p2p
 
 import (
+	"fmt"
 	"github.com/hashicorp/go-multierror"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -15,7 +16,14 @@ type InvCtrlMsgErrs []*InvCtrlMsgErr
 func (i InvCtrlMsgErrs) Error() error {
 	var errs *multierror.Error
 	for _, err := range i {
-		errs = multierror.Append(errs, err.Err)
+		switch {
+		case err.Topic() != "":
+			errs = multierror.Append(errs, fmt.Errorf("%w (topic: %s)", err.Err, err.Topic()))
+		case err.MessageID() != "":
+			errs = multierror.Append(errs, fmt.Errorf("%w (messageID: %s)", err.Err, err.MessageID()))
+		default:
+			errs = multierror.Append(errs, err.Err)
+		}
 	}
 	return errs.ErrorOrNil()
 }
@@ -24,15 +32,46 @@ func (i InvCtrlMsgErrs) Len() int {
 	return len(i)
 }
 
-// InvCtrlMsgErr struct that wraps an error that occurred with during control message inspection and holds some metadata about the error such as the CtrlMsgTopicType.
+// InvCtrlMsgErr represents an error that occurred during control message inspection.
+// It encapsulates the error itself along with additional metadata, including the control message type,
+// the associated topic or message ID.
 type InvCtrlMsgErr struct {
-	Err              error
+	// Err holds the underlying error.
+	Err error
+
+	// ctrlMsgTopicType specifies the type of control message.
 	ctrlMsgTopicType CtrlMsgTopicType
+
+	// topic is the topic associated with the error.
+	topic string
+
+	// messageID is the message ID associated with an error during iWant validation.
+	messageID string
+}
+
+// SetTopic sets the topic of the error.
+func (e *InvCtrlMsgErr) SetTopic(topic string) {
+	e.topic = topic
+}
+
+// SetMessageID sets the provided messageID.
+func (e *InvCtrlMsgErr) SetMessageID(messageID string) {
+	e.messageID = messageID
+}
+
+// MessageID returns the messageID of the error.
+func (e *InvCtrlMsgErr) MessageID() string {
+	return e.messageID
+}
+
+// Topic returns the topi of the error.
+func (e *InvCtrlMsgErr) Topic() string {
+	return e.topic
 }
 
 // CtrlMsgTopicType returns the CtrlMsgTopicType of the error.
-func (i InvCtrlMsgErr) CtrlMsgTopicType() CtrlMsgTopicType {
-	return i.ctrlMsgTopicType
+func (e *InvCtrlMsgErr) CtrlMsgTopicType() CtrlMsgTopicType {
+	return e.ctrlMsgTopicType
 }
 
 // NewInvCtrlMsgErr returns a new InvCtrlMsgErr.

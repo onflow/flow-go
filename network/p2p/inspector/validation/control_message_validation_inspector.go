@@ -300,7 +300,9 @@ func (c *ControlMsgValidationInspector) inspectGraftMessages(from peer.ID, graft
 	for _, graft := range grafts {
 		topic := channels.Topic(graft.GetTopicID())
 		if tracker.isDuplicate(topic.String()) {
-			errs = append(errs, p2p.NewInvCtrlMsgErr(NewDuplicateTopicErr(topic.String(), p2pmsg.CtrlMsgGraft), p2p.CtrlMsgNonClusterTopicType))
+			invErr := p2p.NewInvCtrlMsgErr(NewDuplicateTopicErr(topic.String(), p2pmsg.CtrlMsgGraft), p2p.CtrlMsgNonClusterTopicType)
+			invErr.SetTopic(topic.String())
+			errs = append(errs, invErr)
 			continue
 		}
 		tracker.set(topic.String())
@@ -311,7 +313,9 @@ func (c *ControlMsgValidationInspector) inspectGraftMessages(from peer.ID, graft
 				lg.Debug().Msg("received control message from unstaked peer")
 				return nil
 			}
-			errs = append(errs, p2p.NewInvCtrlMsgErr(err, topicType))
+			invErr := p2p.NewInvCtrlMsgErr(err, topicType)
+			invErr.SetTopic(topic.String())
+			errs = append(errs, invErr)
 		}
 	}
 
@@ -344,7 +348,9 @@ func (c *ControlMsgValidationInspector) inspectPruneMessages(from peer.ID, prune
 	for _, prune := range prunes {
 		topic := channels.Topic(prune.GetTopicID())
 		if tracker.isDuplicate(topic.String()) {
-			errs = append(errs, p2p.NewInvCtrlMsgErr(NewDuplicateTopicErr(topic.String(), p2pmsg.CtrlMsgGraft), p2p.CtrlMsgNonClusterTopicType))
+			invErr := p2p.NewInvCtrlMsgErr(NewDuplicateTopicErr(topic.String(), p2pmsg.CtrlMsgGraft), p2p.CtrlMsgNonClusterTopicType)
+			invErr.SetTopic(topic.String())
+			errs = append(errs, invErr)
 			continue
 		}
 		tracker.set(topic.String())
@@ -355,7 +361,9 @@ func (c *ControlMsgValidationInspector) inspectPruneMessages(from peer.ID, prune
 				lg.Debug().Msg("received control message from unstaked peer")
 				return nil
 			}
-			errs = append(errs, p2p.NewInvCtrlMsgErr(err, topicType))
+			invErr := p2p.NewInvCtrlMsgErr(err, topicType)
+			invErr.SetTopic(topic.String())
+			errs = append(errs, invErr)
 		}
 	}
 
@@ -395,7 +403,9 @@ func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihave
 		messageIds := ihave.GetMessageIDs()
 		topic := ihave.GetTopicID()
 		if duplicateTopicTracker.isDuplicate(topic) {
-			errs = append(errs, p2p.NewInvCtrlMsgErr(NewDuplicateTopicErr(topic, p2pmsg.CtrlMsgGraft), p2p.CtrlMsgNonClusterTopicType))
+			invErr := p2p.NewInvCtrlMsgErr(NewDuplicateTopicErr(topic, p2pmsg.CtrlMsgGraft), p2p.CtrlMsgNonClusterTopicType)
+			invErr.SetTopic(topic)
+			errs = append(errs, invErr)
 			continue
 		}
 		duplicateTopicTracker.set(topic)
@@ -406,12 +416,16 @@ func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihave
 				lg.Debug().Msg("received control message from unstaked peer")
 				return nil
 			}
-			errs = append(errs, p2p.NewInvCtrlMsgErr(err, topicType))
+			invErr := p2p.NewInvCtrlMsgErr(err, topicType)
+			invErr.SetTopic(topic)
+			errs = append(errs, invErr)
 
 		}
 		for _, messageID := range messageIds {
 			if duplicateMessageIDTracker.isDuplicate(messageID) {
-				errs = append(errs, p2p.NewInvCtrlMsgErr(NewDuplicateMessageIDErr(messageID, p2pmsg.CtrlMsgIHave), p2p.CtrlMsgNonClusterTopicType))
+				invErr := p2p.NewInvCtrlMsgErr(NewDuplicateMessageIDErr(messageID, p2pmsg.CtrlMsgIHave), p2p.CtrlMsgNonClusterTopicType)
+				invErr.SetMessageID(messageID)
+				errs = append(errs, invErr)
 				continue
 			}
 			duplicateMessageIDTracker.set(messageID)
@@ -479,12 +493,14 @@ func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWant
 			if tracker.isDuplicate(messageID) {
 				duplicates++
 				if float64(duplicates) > allowedDuplicatesThreshold {
-					errs = append(errs, p2p.NewInvCtrlMsgErr(
+					invErr := p2p.NewInvCtrlMsgErr(
 						NewIWantDuplicateMsgIDThresholdErr(
 							duplicates, messageIDCount,
 							c.config.IWantRPCInspectionConfig.DuplicateMsgIDThreshold),
 						p2p.CtrlMsgNonClusterTopicType,
-					))
+					)
+					invErr.SetMessageID(messageID)
+					errs = append(errs, invErr)
 					continue
 				}
 			}
@@ -493,15 +509,17 @@ func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWant
 				cacheMisses++
 				if checkCacheMisses {
 					if float64(cacheMisses) > allowedCacheMissesThreshold {
-						errs = append(errs, p2p.NewInvCtrlMsgErr(
+						invErr := p2p.NewInvCtrlMsgErr(
 							NewIWantCacheMissThresholdErr(
 								cacheMisses,
 								messageIDCount,
 								c.config.IWantRPCInspectionConfig.CacheMissThreshold),
 							p2p.CtrlMsgNonClusterTopicType,
-						))
+						)
+						invErr.SetMessageID(messageID)
+						errs = append(errs, invErr)
 						lg.Debug().
-						Bool(logging.KeySuspicious, true).
+							Bool(logging.KeySuspicious, true).
 							Int("total_message_ids", totalMessageIds).
 							Int("cache_misses", cacheMisses).
 							Int("duplicates", duplicates).
@@ -574,12 +592,13 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 	checkErrThreshold := func(errs *multierror.Error, invCtrlMsgErrs p2p.InvCtrlMsgErrs) p2p.InvCtrlMsgErrs {
 		// capture error when we exceed the error threshold
 		if errs != nil && errs.Len() > c.config.RpcMessageErrorThreshold {
-			invCtrlMsgErrs = append(invCtrlMsgErrs, p2p.NewInvCtrlMsgErr(
+			invErr := p2p.NewInvCtrlMsgErr(
 				NewInvalidRpcPublishMessagesErr(
 					errs.ErrorOrNil(),
 					errs.Len()),
 				p2p.CtrlMsgNonClusterTopicType,
-			))
+			)
+			invCtrlMsgErrs = append(invCtrlMsgErrs, invErr)
 		}
 		return invCtrlMsgErrs
 	}
@@ -939,7 +958,7 @@ func (c *ControlMsgValidationInspector) logAndDistributeAsyncInspectErrs(req *In
 		c.logAndThrowError(fmt.Errorf("failed to distribute invalid control message notification: %w", err))
 	}
 	c.metrics.InvalidControlMessageNotificationErrors(errs.Len())
-	lg.Error().Err(errs.Error()).Msg("rpc control message async inspection failed")
+	lg.Error().Err(errs.Error()).Msg("rpc control message async inspection failed invalid control message notification disseminated")
 }
 
 // logAndThrowError logs and throws irrecoverable errors on the context.
