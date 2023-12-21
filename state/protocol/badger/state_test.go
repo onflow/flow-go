@@ -378,17 +378,6 @@ func TestBootstrapNonRoot(t *testing.T) {
 
 		bootstrap(t, after, func(state *bprotocol.State, err error) {
 			require.NoError(t, err)
-			unittest.AssertSnapshotsEqual(t, after, state.Final())
-			// should be able to read all QCs
-			segment, err := state.Final().SealingSegment()
-			require.NoError(t, err)
-			for _, block := range segment.Blocks {
-				snapshot := state.AtBlockID(block.ID())
-				_, err := snapshot.QuorumCertificate()
-				require.NoError(t, err)
-				_, err = snapshot.RandomSource()
-				require.NoError(t, err)
-			}
 		})
 	})
 

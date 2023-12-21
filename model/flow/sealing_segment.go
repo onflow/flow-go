@@ -2,7 +2,6 @@ package flow
 
 import (
 	"fmt"
-
 	"golang.org/x/exp/slices"
 )
 
@@ -217,12 +216,6 @@ func (builder *SealingSegmentBuilder) AddBlock(block *Block) error {
 	}
 	blockID := block.ID()
 
-	// a block might contain receipts or seals that refer to results that are included in blocks
-	// whose height is below the first block of the segment.
-	// In order to include those missing results into the segment, we construct a list of those
-	// missing result IDs referenced by this block
-	missingResultIDs := make(map[Identifier]struct{})
-
 	// for the first (lowest) block, if it contains no seal, store the latest
 	// seal incorporated prior to the first block
 	if len(builder.blocks) == 0 {
@@ -232,8 +225,6 @@ func (builder *SealingSegmentBuilder) AddBlock(block *Block) error {
 				return fmt.Errorf("%w: %v", ErrSegmentSealLookup, err)
 			}
 			builder.firstSeal = seal
-			// add first seal result ID here, since it isn't in payload
-			missingResultIDs[seal.ResultID] = struct{}{}
 		}
 	}
 
@@ -248,28 +239,6 @@ func (builder *SealingSegmentBuilder) AddBlock(block *Block) error {
 	// they could be referenced in a future block in the segment
 	for _, result := range block.Payload.Results {
 		builder.includedResults[result.ID()] = struct{}{}
-	}
-
-	for _, receipt := range block.Payload.Receipts {
-		if _, ok := builder.includedResults[receipt.ResultID]; !ok {
-			missingResultIDs[receipt.ResultID] = struct{}{}
-		}
-	}
-	for _, seal := range block.Payload.Seals {
-		if _, ok := builder.includedResults[seal.ResultID]; !ok {
-			missingResultIDs[seal.ResultID] = struct{}{}
-		}
-	}
-
-	// add the missing results
-	for resultID := range missingResultIDs {
-		result, err := builder.resultLookup(resultID)
-
-		if err != nil {
-			return fmt.Errorf("%w: (%x) %v", ErrSegmentResultLookup, resultID, err)
-		}
-		builder.addExecutionResult(result)
-		builder.includedResults[resultID] = struct{}{}
 	}
 
 	builder.blocks = append(builder.blocks, block)
@@ -300,6 +269,7 @@ func (builder *SealingSegmentBuilder) AddExtraBlock(block *Block) error {
 // AddExecutionResult adds result to executionResults
 func (builder *SealingSegmentBuilder) addExecutionResult(result *ExecutionResult) {
 	builder.results = append(builder.results, result)
+	builder.includedResults[result.ID()] = struct{}{}
 }
 
 // SealingSegment completes building the sealing segment, validating the segment
@@ -309,6 +279,44 @@ func (builder *SealingSegmentBuilder) addExecutionResult(result *ExecutionResult
 // a valid sealing segment.
 // No errors are expected during normal operation.
 func (builder *SealingSegmentBuilder) SealingSegment() (*SealingSegment, error) {
+
+	// at this point, go through all blocks and store any results which are referenced
+	// by blocks in the segment, but not contained within any blocks in the segment
+	missingExecutionResults := make(map[Identifier]struct{})
+
+	if builder.firstSeal != nil {
+		_, ok := builder.includedResults[builder.firstSeal.ResultID]
+		if !ok {
+			missingExecutionResults[builder.firstSeal.ResultID] = struct{}{}
+		}
+	}
+
+	for _, block := range append(builder.blocks, builder.extraBlocks...) {
+		for _, receipt := range block.Payload.Receipts {
+			_, included := builder.includedResults[receipt.ResultID]
+			if included {
+				continue
+			}
+			missingExecutionResults[receipt.ResultID] = struct{}{}
+		}
+		for _, seal := range block.Payload.Seals {
+			_, included := builder.includedResults[seal.ResultID]
+			if included {
+				continue
+			}
+			missingExecutionResults[seal.ResultID] = struct{}{}
+		}
+	}
+
+	// retrieve and store all missing execution results
+	for resultID := range missingExecutionResults {
+		result, err := builder.resultLookup(resultID)
+		if err != nil {
+			return nil, fmt.Errorf("could not retrieve missing result (id=%x): %v (%w)", resultID, err, ErrSegmentResultLookup)
+		}
+		builder.addExecutionResult(result)
+	}
+
 	if err := builder.validateSegment(); err != nil {
 		return nil, fmt.Errorf("failed to validate sealing segment: %w", err)
 	}
