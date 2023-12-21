@@ -15,7 +15,7 @@ import (
 type UnfinalizedLoader struct {
 	log       zerolog.Logger
 	state     protocol.State
-	headers   storage.Headers // see comments on getHeaderByHeight for why we need it
+	headers   storage.Headers
 	execState state.FinalizedExecutionState
 }
 
@@ -60,7 +60,7 @@ func (e *UnfinalizedLoader) LoadUnexecuted(ctx context.Context) ([]flow.Identifi
 	// reload its block to execution queues
 	// loading finalized blocks
 	for height := lastExecuted + 1; height <= final.Height; height++ {
-		finalizedID, err := e.getHeaderByHeight(height)
+		finalizedID, err := e.headers.BlockIDByHeight(height)
 		if err != nil {
 			return nil, fmt.Errorf("could not get header at height: %v, %w", height, err)
 		}
@@ -84,13 +84,4 @@ func (e *UnfinalizedLoader) LoadUnexecuted(ctx context.Context) ([]flow.Identifi
 		Msgf("finalized unexecuted blocks")
 
 	return unexecuted, nil
-}
-
-// if the EN is dynamically bootstrapped, the finalized blocks at height range:
-// [ sealedRoot.Height, finalizedRoot.Height - 1] can not be retrieved from
-// protocol state, but only from headers
-func (e *UnfinalizedLoader) getHeaderByHeight(height uint64) (flow.Identifier, error) {
-	// we don't use protocol state because for dynamic boostrapped execution node
-	// the last executed and sealed block is below the finalized root block
-	return e.headers.BlockIDByHeight(height)
 }
