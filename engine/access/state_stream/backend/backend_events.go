@@ -90,11 +90,10 @@ func (b EventsBackend) getEventsFromExecutionData(ctx context.Context, height ui
 
 // getEventsFromStorage returns the events for a given height from the index storage.
 func (b EventsBackend) getEventsFromStorage(height uint64, filter state_stream.EventFilter) (*EventsResponse, error) {
-	header, err := b.headers.ByHeight(height)
+	blockID, err := b.headers.BlockIDByHeight(height)
 	if err != nil {
 		return nil, fmt.Errorf("could not get header for height %d: %w", height, err)
 	}
-	blockID := header.ID()
 
 	events, err := b.events.ByBlockID(blockID)
 	if err != nil {
