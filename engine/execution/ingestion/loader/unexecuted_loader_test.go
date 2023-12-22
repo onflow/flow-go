@@ -200,7 +200,7 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		loader := loader.NewUnexecutedLoader(log, ps, headers, es)
 
 		// block C is the only finalized block, index its header by its height
-		headers.EXPECT().ByHeight(blockC.Header.Height).Return(blockC.Header, nil)
+		headers.EXPECT().BlockIDByHeight(blockC.Header.Height).Return(blockC.Header.ID(), nil)
 
 		es.ExecuteBlock(t, blockA)
 		es.ExecuteBlock(t, blockB)
@@ -238,7 +238,7 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		loader := loader.NewUnexecutedLoader(log, ps, headers, es)
 
 		// block C is finalized, index its header by its height
-		headers.EXPECT().ByHeight(blockC.Header.Height).Return(blockC.Header, nil)
+		headers.EXPECT().BlockIDByHeight(blockC.Header.Height).Return(blockC.Header.ID(), nil)
 
 		es.ExecuteBlock(t, blockA)
 		es.ExecuteBlock(t, blockB)
@@ -278,7 +278,7 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		loader := loader.NewUnexecutedLoader(log, ps, headers, es)
 
 		// block A is finalized, index its header by its height
-		headers.EXPECT().ByHeight(blockA.Header.Height).Return(blockA.Header, nil)
+		headers.EXPECT().BlockIDByHeight(blockA.Header.Height).Return(blockA.Header.ID(), nil)
 
 		es.ExecuteBlock(t, blockA)
 		es.ExecuteBlock(t, blockB)
@@ -346,7 +346,7 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		loader := loader.NewUnexecutedLoader(log, ps, headers, es)
 
 		// block C is finalized, index its header by its height
-		headers.EXPECT().ByHeight(blockC.Header.Height).Return(blockC.Header, nil)
+		headers.EXPECT().BlockIDByHeight(blockC.Header.Height).Return(blockC.Header.ID(), nil)
 
 		es.ExecuteBlock(t, blockA)
 		es.ExecuteBlock(t, blockB)

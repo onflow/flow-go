@@ -376,7 +376,7 @@ func (s *BackendAccountsSuite) testGetAccountAtLatestBlock(ctx context.Context, 
 
 func (s *BackendAccountsSuite) testGetAccountAtBlockHeight(ctx context.Context, backend *backendAccounts, statusCode codes.Code) {
 	height := s.block.Header.Height
-	s.headers.On("ByHeight", height).Return(s.block.Header, nil).Once()
+	s.headers.On("BlockIDByHeight", height).Return(s.block.Header.ID(), nil).Once()
 
 	if statusCode == codes.OK {
 		actual, err := backend.GetAccountAtBlockHeight(ctx, s.account.Address, height)
