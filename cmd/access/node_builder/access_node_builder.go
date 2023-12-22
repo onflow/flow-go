@@ -815,11 +815,22 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			}
 			broadcaster := engine.NewBroadcaster()
 
+			eventQueryMode, err := backend.ParseIndexQueryMode(builder.rpcConf.BackendConfig.EventQueryMode)
+			if err != nil {
+				return nil, fmt.Errorf("could not parse event query mode: %w", err)
+			}
+
+			// use the events index for events if enabled and the node is configured to use it for
+			// regular event queries
+			useIndex := builder.executionDataIndexingEnabled &&
+				eventQueryMode != backend.IndexQueryModeExecutionNodesOnly
+
 			builder.stateStreamBackend, err = statestreambackend.New(
 				node.Logger,
 				builder.stateStreamConf,
 				node.State,
 				node.Storage.Headers,
+				node.Storage.Events,
 				node.Storage.Seals,
 				node.Storage.Results,
 				builder.ExecutionDataStore,
@@ -828,6 +839,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				builder.executionDataConfig.InitialBlockHeight,
 				highestAvailableHeight,
 				builder.RegistersAsyncStore,
+				useIndex,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create state stream backend: %w", err)
