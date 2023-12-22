@@ -72,12 +72,13 @@ const (
 	validationInspectorClusterPrefixHardThreshold              = "gossipsub-rpc-cluster-prefixed-hard-threshold"
 
 	// gossipsub score penalties
-	rootScorePenaltiesPrefix = "gossipsub-score-penalty"
-	graftPenalty             = "graft"
-	prunePenalty             = "prune"
-	iHavePenalty             = "ihave"
-	iWantPenalty             = "iwant"
-	publishPenalty           = "publish"
+	rootScorePenaltiesPrefix       = "gossipsub-score-penalty"
+	graftPenalty                   = "graft"
+	prunePenalty                   = "prune"
+	iHavePenalty                   = "ihave"
+	iWantPenalty                   = "iwant"
+	publishPenalty                 = "publish"
+	clusterPrefixedReductionFactor = "cluster-prefixed-reduction-factor"
 
 	ihaveMaxSampleSize           = "gossipsub-rpc-ihave-max-sample-size"
 	ihaveMaxMessageIDSampleSize  = "gossipsub-rpc-ihave-max-message-id-sample-size"
@@ -170,6 +171,7 @@ func AllFlagNames() []string {
 		rootScorePenaltiesPrefix + "-" + iHavePenalty,
 		rootScorePenaltiesPrefix + "-" + iWantPenalty,
 		rootScorePenaltiesPrefix + "-" + publishPenalty,
+		rootScorePenaltiesPrefix + "-" + clusterPrefixedReductionFactor,
 
 		scoringRegistryDecayAdjustInterval,
 	}
@@ -356,6 +358,9 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 	flags.Float64(fmt.Sprintf("%s-%s", rootScorePenaltiesPrefix, publishPenalty),
 		config.GossipsubScorePenalties.Publish,
 		"the penalty value for messages published with a control message")
+	flags.Float64(fmt.Sprintf("%s-%s", rootScorePenaltiesPrefix, clusterPrefixedReductionFactor),
+		config.GossipsubScorePenalties.ClusterPrefixedReductionFactor,
+		"factor used to reduce the penalty for control message misbehaviours on cluster prefixed topics")
 }
 
 // LoadLibP2PResourceManagerFlags loads all CLI flags for the libp2p resource manager configuration on the provided pflag set.

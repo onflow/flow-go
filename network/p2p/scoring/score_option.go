@@ -393,11 +393,12 @@ func NewScoreOption(scoreRegistryConfig *p2pconf.GossipSubScoringRegistryConfig,
 			DebugSampler: throttledSampler,
 		})
 	penaltyValues := GossipSubCtrlMsgPenaltyValue{
-		Graft:             scorePenalties.Graft,
-		Prune:             scorePenalties.Prune,
-		IHave:             scorePenalties.IHave,
-		IWant:             scorePenalties.IWant,
-		RpcPublishMessage: scorePenalties.Publish,
+		Graft:                                 scorePenalties.Graft,
+		Prune:                                 scorePenalties.Prune,
+		IHave:                                 scorePenalties.IHave,
+		IWant:                                 scorePenalties.IWant,
+		RpcPublishMessage:                     scorePenalties.Publish,
+		ClusterPrefixedPenaltyReductionFactor: scorePenalties.ClusterPrefixedReductionFactor,
 	}
 	validator := NewSubscriptionValidator(scoreOptionConfig.logger, provider)
 	scoreRegistry := NewGossipSubAppSpecificScoreRegistry(&GossipSubAppSpecificScoreRegistryConfig{

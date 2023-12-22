@@ -110,11 +110,12 @@ type GossipSubTracerConfig struct {
 
 // GossipSubScorePenalties penalty values for each RPC control message type.
 type GossipSubScorePenalties struct {
-	Graft   float64 `validate:"lt=0" mapstructure:"graft"`
-	Prune   float64 `validate:"lt=0" mapstructure:"prune"`
-	IHave   float64 `validate:"lt=0" mapstructure:"iHave"`
-	IWant   float64 `validate:"lt=0" mapstructure:"iWant"`
-	Publish float64 `validate:"lt=0" mapstructure:"publish"`
+	Graft                          float64 `validate:"lt=0" mapstructure:"graft"`
+	Prune                          float64 `validate:"lt=0" mapstructure:"prune"`
+	IHave                          float64 `validate:"lt=0" mapstructure:"iHave"`
+	IWant                          float64 `validate:"lt=0" mapstructure:"iWant"`
+	Publish                        float64 `validate:"lt=0" mapstructure:"publish"`
+	ClusterPrefixedReductionFactor float64 `validate:"gt=0,lt=1" mapstructure:"cluster-prefixed-reduction-factor"`
 }
 
 // ResourceScope is the scope of the resource, e.g., system, transient, protocol, peer, peer-protocol.

@@ -590,11 +590,12 @@ func TestPeerSpamPenaltyClusterPrefixed(t *testing.T) {
 // TestInvalidControlMessageMultiErrorScoreCalculation tests that invalid control message penalties are calculated as expected when notifications
 // contain multiple errors with multiple different severity levels.
 func TestInvalidControlMessageMultiErrorScoreCalculation(t *testing.T) {
-	peerIds := unittest.PeerIdFixtures(t, 4)
+	peerIds := unittest.PeerIdFixtures(t, 5)
 	opts := make([]scoringRegistryParamsOpt, 0)
 	for _, peerID := range peerIds {
 		opts = append(opts, withStakedIdentity(peerID), withValidSubscriptions(peerID))
 	}
+
 	reg, spamRecords := newGossipSubAppSpecificScoreRegistry(t, opts...)
 	for _, peerID := range peerIds {
 		// initially, the spamRecords should not have the peer id.
@@ -668,6 +669,23 @@ func TestInvalidControlMessageMultiErrorScoreCalculation(t *testing.T) {
 				penaltyValues.IWant +
 				penaltyValues.IWant +
 				penaltyValues.IWant,
+		},
+		// multiple errors with mixed cluster prefixed and non cluster prefixed, with random severity's iwant
+		{
+			notification: &p2p.InvCtrlMsgNotif{
+				PeerID:  peerIds[4],
+				MsgType: p2pmsg.CtrlMsgIWant,
+				Errors: p2p.InvCtrlMsgErrs{
+					p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid iwant"), p2p.CtrlMsgNonClusterTopicType),
+					p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid iwant"), p2p.CtrlMsgNonClusterTopicType),
+					p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid iwant"), p2p.CtrlMsgTopicTypeClusterPrefixed),
+					p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid iwant"), p2p.CtrlMsgTopicTypeClusterPrefixed),
+				},
+			},
+			expectedPenalty: penaltyValues.IWant +
+				penaltyValues.IWant +
+				(penaltyValues.IWant * penaltyValues.ClusterPrefixedPenaltyReductionFactor) +
+				(penaltyValues.IWant * penaltyValues.ClusterPrefixedPenaltyReductionFactor),
 		},
 	}
 
