@@ -146,12 +146,6 @@ network-config:
   gossipsub-cluster-prefix-tracker-cache-decay: 0.99
   # The upper bound on the amount of cluster prefixed control messages that will be processed
   gossipsub-rpc-cluster-prefixed-hard-threshold: 100
-
-  # RPC metrics observer inspector configs
-  # The number of metrics inspector pool workers
-  gossipsub-rpc-metrics-inspector-workers: 1
-  # The size of the queue used by worker pool for the control message metrics inspector
-  gossipsub-rpc-metrics-inspector-cache-size: 100
   # Application layer spam prevention
   alsp-spam-record-cache-size: 1000
   alsp-spam-report-queue-size: 10_000

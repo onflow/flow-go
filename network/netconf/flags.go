@@ -72,10 +72,6 @@ const (
 	iwantCacheMissCheckSize      = "gossipsub-rpc-iwant-cache-miss-check-size"
 	iwantDuplicateMsgIDThreshold = "gossipsub-rpc-iwant-duplicate-message-id-threshold"
 
-	// gossipsub metrics inspector
-	metricsInspectorNumberOfWorkers = "gossipsub-rpc-metrics-inspector-workers"
-	metricsInspectorCacheSize       = "gossipsub-rpc-metrics-inspector-cache-size"
-
 	alspDisabled            = "alsp-disable-penalty"
 	alspSpamRecordCacheSize = "alsp-spam-record-cache-size"
 	alspSpamRecordQueueSize = "alsp-spam-report-queue-size"
@@ -133,8 +129,6 @@ func AllFlagNames() []string {
 		validationInspectorClusterPrefixedTopicsReceivedCacheDecay,
 		validationInspectorClusterPrefixHardThreshold,
 		ihaveMaxSampleSize,
-		metricsInspectorNumberOfWorkers,
-		metricsInspectorCacheSize,
 		alspDisabled,
 		alspSpamRecordCacheSize,
 		alspSpamRecordQueueSize,
@@ -239,13 +233,6 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 	flags.Float64(validationInspectorClusterPrefixHardThreshold,
 		config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCValidationInspectorConfigs.ClusterPrefixHardThreshold,
 		"the maximum number of cluster-prefixed control messages allowed to be processed when the active cluster id is unset or a mismatch is detected, exceeding this threshold will result in node penalization by gossipsub.")
-	// gossipsub RPC control message metrics observer inspector configuration
-	flags.Int(metricsInspectorNumberOfWorkers,
-		config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCMetricsInspectorConfigs.NumberOfWorkers,
-		"cache size for gossipsub RPC metrics inspector events worker pool queue.")
-	flags.Uint32(metricsInspectorCacheSize,
-		config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCMetricsInspectorConfigs.CacheSize,
-		"cache size for gossipsub RPC metrics inspector events worker pool.")
 	// networking event notifications
 	flags.Uint32(gossipSubRPCInspectorNotificationCacheSize,
 		config.GossipSubConfig.GossipSubRPCInspectorsConfig.GossipSubRPCInspectorNotificationCacheSize,
@@ -254,7 +241,9 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 	flags.Bool(alspDisabled, config.AlspConfig.DisablePenalty, "disable the penalty mechanism of the alsp protocol. default value (recommended) is false")
 	flags.Uint32(alspSpamRecordCacheSize, config.AlspConfig.SpamRecordCacheSize, "size of spam record cache, recommended to be 10x the number of authorized nodes")
 	flags.Uint32(alspSpamRecordQueueSize, config.AlspConfig.SpamReportQueueSize, "size of spam report queue, recommended to be 100x the number of authorized nodes")
-	flags.Duration(alspHearBeatInterval, config.AlspConfig.HearBeatInterval, "interval between two consecutive heartbeat events at alsp, recommended to leave it as default unless you know what you are doing.")
+	flags.Duration(alspHearBeatInterval,
+		config.AlspConfig.HearBeatInterval,
+		"interval between two consecutive heartbeat events at alsp, recommended to leave it as default unless you know what you are doing.")
 	flags.Float32(alspSyncEngineBatchRequestBaseProb, config.AlspConfig.SyncEngine.BatchRequestBaseProb, "base probability of creating a misbehavior report for a batch request message")
 	flags.Float32(alspSyncEngineRangeRequestBaseProb, config.AlspConfig.SyncEngine.RangeRequestBaseProb, "base probability of creating a misbehavior report for a range request message")
 	flags.Float32(alspSyncEngineSyncRequestProb, config.AlspConfig.SyncEngine.SyncRequestProb, "probability of creating a misbehavior report for a sync request message")

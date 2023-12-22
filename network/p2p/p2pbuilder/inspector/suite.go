@@ -18,6 +18,7 @@ type GossipSubInspectorSuite struct {
 	ctrlMsgInspectDistributor p2p.GossipSubInspectorNotifDistributor
 }
 
+// TODO: this can be simplified as there is no more need for the aggregated inspector.
 var _ p2p.GossipSubInspectorSuite = (*GossipSubInspectorSuite)(nil)
 
 // NewGossipSubInspectorSuite creates a new GossipSubInspectorSuite.
