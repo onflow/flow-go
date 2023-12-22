@@ -125,25 +125,6 @@ const (
 	// topic parameters at the current implementation.
 	defaultTopicSkipAtomicValidation = true
 
-	// defaultTopicInvalidMessageDeliveriesWeight this value is applied to the square of the number of invalid message deliveries on a topic.
-	// It is used to penalize peers that send invalid messages. By an invalid message, we mean a message that is not signed by the
-	// publisher, or a message that is not signed by the peer that sent it. We set it to -1.0, which means that with around 14 invalid
-	// message deliveries within a gossipsub heartbeat interval, the peer will be disconnected.
-	// The supporting math is as follows:
-	// - each staked (i.e., authorized) peer is rewarded by the fixed reward of 100 (i.e., DefaultStakedIdentityReward).
-	// - x invalid message deliveries will result in a penalty of x^2 * DefaultTopicInvalidMessageDeliveriesWeight, i.e., -x^2.
-	// - the peer will be disconnected when its penalty reaches -100 (i.e., MaxAppSpecificPenalty).
-	// - so, the maximum number of invalid message deliveries that a peer can have before being disconnected is sqrt(200/DefaultTopicInvalidMessageDeliveriesWeight) ~ 14.
-	defaultTopicInvalidMessageDeliveriesWeight = -1.0
-
-	// defaultTopicInvalidMessageDeliveriesDecay decay factor used to decay the number of invalid message deliveries.
-	// The total number of invalid message deliveries is multiplied by this factor at each heartbeat interval to
-	// decay the number of invalid message deliveries, and prevent the peer from being disconnected if it stops
-	// sending invalid messages. We set it to 0.99, which means that the number of invalid message deliveries will
-	// decay by 1% at each heartbeat interval.
-	// The decay heartbeats are defined by the heartbeat interval of the gossipsub scoring system, which is 1 Minute (defaultDecayInterval).
-	defaultTopicInvalidMessageDeliveriesDecay = .99
-
 	// defaultTopicTimeInMeshQuantum is the default time in mesh quantum for the GossipSub scoring system. It is used to gauge
 	// a discrete time interval for the time in mesh counter. We set it to 1 hour, which means that every one complete hour a peer is
 	// in a topic mesh, the time in mesh counter will be incremented by 1 and is counted towards the availability score of the peer in that topic mesh.
@@ -522,8 +503,8 @@ func DefaultTopicScoreParams() *pubsub.TopicScoreParams {
 	p := &pubsub.TopicScoreParams{
 		TopicWeight:                     defaultTopicWeight,
 		SkipAtomicValidation:            defaultTopicSkipAtomicValidation,
-		InvalidMessageDeliveriesWeight:  defaultTopicInvalidMessageDeliveriesWeight,
-		InvalidMessageDeliveriesDecay:   defaultTopicInvalidMessageDeliveriesDecay,
+		InvalidMessageDeliveriesWeight:  0, // TODO: we should enable it when we can set it externally.
+		InvalidMessageDeliveriesDecay:   0, // TODO: we should enable it when we can set it externally.
 		TimeInMeshQuantum:               defaultTopicTimeInMesh,
 		MeshMessageDeliveriesWeight:     defaultTopicMeshMessageDeliveriesWeight,
 		MeshMessageDeliveriesDecay:      defaultTopicMeshMessageDeliveriesDecay,

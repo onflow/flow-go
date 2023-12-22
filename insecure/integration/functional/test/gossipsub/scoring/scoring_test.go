@@ -27,7 +27,7 @@ import (
 // a spammer peer, the victim will eventually penalize the spammer and stop receiving messages from them.
 // Note: the term integration is used here because it requires integrating all components of the libp2p stack.
 func TestGossipSubInvalidMessageDelivery_Integration(t *testing.T) {
-	t.Parallel()
+	unittest.SkipUnless(t, unittest.TEST_TODO, "test is broken as we disabled the invalid message delivery penalty")
 
 	tt := []struct {
 		name           string
