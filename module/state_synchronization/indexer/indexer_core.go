@@ -170,12 +170,16 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 		// or network congestion. This indexer ensures that collections are never farther behind
 		// than the latest indexed block. Calling the collection handler with a collection that
 		// has already been indexed is a noop.
-		for _, chunk := range data.ChunkExecutionDatas[0 : len(data.ChunkExecutionDatas)-1] {
-			c.collectionHandler(flow.ZeroID, chunk.Collection)
+		indexedCount := 0
+		if len(data.ChunkExecutionDatas) > 0 {
+			for _, chunk := range data.ChunkExecutionDatas[0 : len(data.ChunkExecutionDatas)-1] {
+				c.collectionHandler(flow.ZeroID, chunk.Collection)
+				indexedCount++
+			}
 		}
 
 		lg.Debug().
-			Int("collection_count", len(data.ChunkExecutionDatas)-1).
+			Int("collection_count", indexedCount).
 			Dur("duration_ms", time.Since(start)).
 			Msg("indexed collections")
 

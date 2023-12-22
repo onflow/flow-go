@@ -796,6 +796,7 @@ func (e *Engine) checkMissingCollections() error {
 		(finalizedHeight-lastFullHeight) > defaultMissingCollsForAgeThreshold {
 		// warn log since this should generally not happen
 		e.log.Warn().
+			Uint64("finalized_height", finalizedHeight).
 			Uint64("last_full_blk_height", lastFullHeight).
 			Int("missing_collection_blk_count", incompleteBlksCnt).
 			Int("missing_collection_count", len(allMissingColls)).
