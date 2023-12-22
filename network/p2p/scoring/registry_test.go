@@ -694,15 +694,15 @@ func TestInvalidControlMessageMultiErrorScoreCalculation(t *testing.T) {
 		reg.OnInvalidControlMessageNotification(tCase.notification)
 		// the penalty should now be updated in the spamRecords
 		record, err, ok := spamRecords.Get(tCase.notification.PeerID) // get the record from the spamRecords.
-		assert.True(t, ok)
-		assert.NoError(t, err)
-		assert.Less(t, math.Abs(tCase.expectedPenalty-record.Penalty), 10e-3)  // penalty should be updated to -10.
-		assert.Equal(t, scoring.InitAppScoreRecordState().Decay, record.Decay) // decay should be initialized to the initial state.
+		require.True(t, ok)
+		require.NoError(t, err)
+		require.Less(t, math.Abs(tCase.expectedPenalty-record.Penalty), 10e-3)  // penalty should be updated to -10.
+		require.Equal(t, scoring.InitAppScoreRecordState().Decay, record.Decay) // decay should be initialized to the initial state.
 
 		// this peer has a spam record, with no subscription penalty. Hence, the app specific score should only be the spam penalty,
 		// and the peer should be deprived of the default reward for its valid staked role.
 		score := reg.AppSpecificScoreFunc()(tCase.notification.PeerID)
-		assert.Less(t, math.Abs(tCase.expectedPenalty-score), 10e-3)
+		require.Less(t, math.Abs(tCase.expectedPenalty-score), 10e-3)
 	}
 }
 
