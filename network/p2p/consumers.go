@@ -2,6 +2,7 @@ package p2p
 
 import (
 	"fmt"
+
 	"github.com/hashicorp/go-multierror"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
