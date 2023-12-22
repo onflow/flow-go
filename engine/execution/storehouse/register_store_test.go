@@ -151,8 +151,6 @@ func TestRegisterStoreSaveRegistersShouldOK(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, executed)
 
-		require.Equal(t, rootHeight+1, n.height)
-
 		// block 12 is empty
 		err = rs.SaveRegisters(headerByHeight[rootHeight+2], flow.RegisterEntries{})
 		require.NoError(t, err)
@@ -166,8 +164,6 @@ func TestRegisterStoreSaveRegistersShouldOK(t *testing.T) {
 		executed, err = rs.IsBlockExecuted(rootHeight+1, headerByHeight[rootHeight+2].ID())
 		require.NoError(t, err)
 		require.True(t, executed)
-
-		require.Equal(t, rootHeight+2, n.height)
 	})
 }
 
@@ -471,17 +467,22 @@ func TestRegisterStoreExecuteFirstFinalizeLater(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, rootHeight, rs.LastFinalizedAndExecutedHeight())
 
+		require.Equal(t, rootHeight, n.height)
+
 		require.NoError(t, finalized.MockFinal(rootHeight+1))
 		require.NoError(t, rs.OnBlockFinalized()) // notify 11 is finalized
 		require.Equal(t, rootHeight+1, rs.LastFinalizedAndExecutedHeight())
+		require.Equal(t, rootHeight+1, n.height)
 
 		require.NoError(t, finalized.MockFinal(rootHeight+2))
 		require.NoError(t, rs.OnBlockFinalized()) // notify 12 is finalized
 		require.Equal(t, rootHeight+2, rs.LastFinalizedAndExecutedHeight())
+		require.Equal(t, rootHeight+2, n.height)
 
 		require.NoError(t, finalized.MockFinal(rootHeight+3))
 		require.NoError(t, rs.OnBlockFinalized()) // notify 13 is finalized
 		require.Equal(t, rootHeight+3, rs.LastFinalizedAndExecutedHeight())
+		require.Equal(t, rootHeight+3, n.height)
 	})
 }
 
@@ -515,20 +516,25 @@ func TestRegisterStoreFinalizeFirstExecuteLater(t *testing.T) {
 		require.NoError(t, rs.OnBlockFinalized()) // notify 13 is finalized
 		require.Equal(t, rootHeight, rs.LastFinalizedAndExecutedHeight())
 
+		require.Equal(t, rootHeight, n.height)
+
 		// save block 11
 		err := rs.SaveRegisters(headerByHeight[rootHeight+1], flow.RegisterEntries{makeReg("X", "1")})
 		require.NoError(t, err)
 		require.Equal(t, rootHeight+1, rs.LastFinalizedAndExecutedHeight())
+		require.Equal(t, rootHeight+1, n.height)
 
 		// save block 12
 		err = rs.SaveRegisters(headerByHeight[rootHeight+2], flow.RegisterEntries{makeReg("X", "2")})
 		require.NoError(t, err)
 		require.Equal(t, rootHeight+2, rs.LastFinalizedAndExecutedHeight())
+		require.Equal(t, rootHeight+2, n.height)
 
 		// save block 13
 		err = rs.SaveRegisters(headerByHeight[rootHeight+3], flow.RegisterEntries{makeReg("X", "3")})
 		require.NoError(t, err)
 		require.Equal(t, rootHeight+3, rs.LastFinalizedAndExecutedHeight())
+		require.Equal(t, rootHeight+3, n.height)
 	})
 }
 
