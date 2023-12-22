@@ -66,6 +66,7 @@ func checkMyCommitWithSealedCommit(
 // A timer could reduce the number of checks, as it only checks once every minute.
 func (c *Core) runLoop(ctx context.Context, tickInterval time.Duration) error {
 	ticker := time.NewTicker(tickInterval)
+	defer ticker.Stop() // critical for ticker to be garbage collected
 	for {
 		select {
 		case <-ticker.C:
@@ -74,7 +75,6 @@ func (c *Core) runLoop(ctx context.Context, tickInterval time.Duration) error {
 				return err
 			}
 		case <-ctx.Done():
-			ticker.Stop() // critical for ticker to be garbage collected
 			return nil
 		}
 	}
