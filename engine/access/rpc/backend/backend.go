@@ -102,7 +102,8 @@ type Params struct {
 	TxResultCacheSize         uint
 	TxErrorMessagesCacheSize  uint
 	ScriptExecutor            execution.ScriptExecutor
-	ScriptExecutionMode       ScriptExecutionMode
+	ScriptExecutionMode       IndexQueryMode
+	EventQueryMode            IndexQueryMode
 }
 
 // New creates backend instance
@@ -187,6 +188,7 @@ func New(params Params) (*Backend, error) {
 			connFactory:       params.ConnFactory,
 			maxHeightRange:    params.MaxHeightRange,
 			nodeCommunicator:  params.Communicator,
+			queryMode:         params.EventQueryMode,
 		},
 		backendBlockHeaders: backendBlockHeaders{
 			headers: params.Headers,

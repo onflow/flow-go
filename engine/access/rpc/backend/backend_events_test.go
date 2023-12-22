@@ -30,6 +30,11 @@ import (
 
 var targetEvent string
 
+type testCase struct {
+	encoding  entities.EventEncodingVersion
+	queryMode IndexQueryMode
+}
+
 type BackendEventsSuite struct {
 	suite.Suite
 
@@ -48,14 +53,12 @@ type BackendEventsSuite struct {
 	executionNodes flow.IdentityList
 	execClient     *access.ExecutionAPIClient
 
-	block          *flow.Block
-	sealedHead     *flow.Header
-	account        *flow.Account
-	failingAddress flow.Address
-
+	sealedHead  *flow.Header
 	blocks      []*flow.Block
 	blockIDs    []flow.Identifier
 	blockEvents []flow.Event
+
+	testCases []testCase
 }
 
 func TestBackendEventsSuite(t *testing.T) {
@@ -97,7 +100,6 @@ func (s *BackendEventsSuite) SetupTest() {
 		}
 		// the last block is sealed
 		if i == blockCount-1 {
-			s.block = block
 			s.sealedHead = header
 		}
 
@@ -106,12 +108,6 @@ func (s *BackendEventsSuite) SetupTest() {
 
 		s.T().Logf("block %d: %s", header.Height, block.ID())
 	}
-
-	var err error
-	s.account, err = unittest.AccountFixture()
-	s.Require().NoError(err)
-
-	s.failingAddress = unittest.AddressFixture()
 
 	s.blockEvents = generator.GetEventsWithEncoding(10, entities.EventEncodingVersion_CCF_V0)
 	targetEvent = string(s.blockEvents[0].Type)
@@ -123,7 +119,43 @@ func (s *BackendEventsSuite) SetupTest() {
 			}
 		}
 		return nil, storage.ErrNotFound
-	})
+	}).Maybe()
+
+	s.headers.On("ByHeight", mock.Anything).Return(func(height uint64) (*flow.Header, error) {
+		for _, block := range s.blocks {
+			if height == block.Header.Height {
+				return block.Header, nil
+			}
+		}
+		return nil, storage.ErrNotFound
+	}).Maybe()
+
+	s.headers.On("ByBlockID", mock.Anything).Return(func(blockID flow.Identifier) (*flow.Header, error) {
+		for _, block := range s.blocks {
+			if blockID == block.ID() {
+				return block.Header, nil
+			}
+		}
+		return nil, storage.ErrNotFound
+	}).Maybe()
+
+	s.testCases = make([]testCase, 0)
+
+	for _, encoding := range []entities.EventEncodingVersion{
+		entities.EventEncodingVersion_CCF_V0,
+		entities.EventEncodingVersion_JSON_CDC_V0,
+	} {
+		for _, queryMode := range []IndexQueryMode{
+			IndexQueryModeExecutionNodesOnly,
+			IndexQueryModeLocalOnly,
+			IndexQueryModeFailover,
+		} {
+			s.testCases = append(s.testCases, testCase{
+				encoding:  encoding,
+				queryMode: queryMode,
+			})
+		}
+	}
 }
 
 func (s *BackendEventsSuite) defaultBackend() *backendEvents {
@@ -137,6 +169,7 @@ func (s *BackendEventsSuite) defaultBackend() *backendEvents {
 		connFactory:       s.connectionFactory,
 		nodeCommunicator:  NewNodeCommunicator(false),
 		maxHeightRange:    DefaultMaxHeightRange,
+		queryMode:         IndexQueryModeExecutionNodesOnly,
 	}
 }
 
@@ -209,26 +242,126 @@ func (s *BackendEventsSuite) setupENFailingResponse(eventType string, headers []
 		Return(nil, err)
 }
 
-func (s *BackendEventsSuite) TestGetEventsForHeightRange() {
+// TestGetEvents_HappyPaths tests the happy paths for GetEventsForBlockIDs and GetEventsForHeightRange
+// across all queryModes and encodings
+func (s *BackendEventsSuite) TestGetEvents_HappyPaths() {
 	ctx := context.Background()
-
-	s.headers.On("ByHeight", mock.Anything).Return(func(height uint64) (*flow.Header, error) {
-		for _, block := range s.blocks {
-			if height == block.Header.Height {
-				return block.Header, nil
-			}
-		}
-		return nil, storage.ErrNotFound
-	})
 
 	startHeight := s.blocks[0].Header.Height
 	endHeight := s.sealedHead.Height
+
+	s.state.On("Sealed").Return(s.snapshot)
+	s.snapshot.On("Head").Return(s.sealedHead, nil)
+
+	s.Run("GetEventsForHeightRange - end height updated", func() {
+		backend := s.defaultBackend()
+		backend.queryMode = IndexQueryModeFailover
+		endHeight := startHeight + 20 // should still return 5 responses
+		encoding := entities.EventEncodingVersion_CCF_V0
+
+		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding)
+		s.Require().NoError(err)
+
+		s.assertResponse(response, encoding)
+	})
+
+	for _, tt := range s.testCases {
+		s.Run(fmt.Sprintf("all from storage - %s - %s", tt.encoding.String(), tt.queryMode), func() {
+			switch tt.queryMode {
+			case IndexQueryModeExecutionNodesOnly:
+				// not applicable
+				return
+			case IndexQueryModeLocalOnly, IndexQueryModeFailover:
+				// only calls to local storage
+			}
+
+			backend := s.defaultBackend()
+			backend.queryMode = tt.queryMode
+
+			response, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, tt.encoding)
+			s.Require().NoError(err)
+			s.assertResponse(response, tt.encoding)
+
+			response, err = backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, tt.encoding)
+			s.Require().NoError(err)
+			s.assertResponse(response, tt.encoding)
+		})
+
+		s.Run(fmt.Sprintf("all from en - %s - %s", tt.encoding.String(), tt.queryMode), func() {
+			events := storagemock.NewEvents(s.T())
+
+			switch tt.queryMode {
+			case IndexQueryModeLocalOnly:
+				// not applicable
+				return
+			case IndexQueryModeExecutionNodesOnly:
+				// only calls to EN, no calls to storage
+			case IndexQueryModeFailover:
+				// all calls to storage fail
+				events.On("ByBlockID", mock.Anything).Return(nil, storage.ErrNotFound)
+			}
+
+			backend := s.defaultBackend()
+			backend.queryMode = tt.queryMode
+			backend.events = events
+
+			s.setupENSuccessResponse(targetEvent, s.blocks)
+
+			response, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, tt.encoding)
+			s.Require().NoError(err)
+			s.assertResponse(response, tt.encoding)
+
+			response, err = backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, tt.encoding)
+			s.Require().NoError(err)
+			s.assertResponse(response, tt.encoding)
+		})
+
+		s.Run(fmt.Sprintf("mixed storage & en - %s - %s", tt.encoding.String(), tt.queryMode), func() {
+			events := storagemock.NewEvents(s.T())
+
+			switch tt.queryMode {
+			case IndexQueryModeLocalOnly, IndexQueryModeExecutionNodesOnly:
+				// not applicable
+				return
+			case IndexQueryModeFailover:
+				// only failing blocks queried from EN
+				s.setupENSuccessResponse(targetEvent, s.blocks[0:2])
+			}
+
+			// the first 2 blocks are not available from storage, and should be fetched from the EN
+			events.On("ByBlockID", s.blockIDs[0]).Return(nil, storage.ErrNotFound)
+			events.On("ByBlockID", s.blockIDs[1]).Return(nil, storage.ErrNotFound)
+			events.On("ByBlockID", s.blockIDs[2]).Return(s.blockEvents, nil)
+			events.On("ByBlockID", s.blockIDs[3]).Return(s.blockEvents, nil)
+			events.On("ByBlockID", s.blockIDs[4]).Return(s.blockEvents, nil)
+
+			backend := s.defaultBackend()
+			backend.queryMode = tt.queryMode
+			backend.events = events
+
+			response, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, tt.encoding)
+			s.Require().NoError(err)
+			s.assertResponse(response, tt.encoding)
+
+			response, err = backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, tt.encoding)
+			s.Require().NoError(err)
+			s.assertResponse(response, tt.encoding)
+		})
+	}
+}
+
+func (s *BackendEventsSuite) TestGetEventsForHeightRange_HandlesErrors() {
+	ctx := context.Background()
+
+	startHeight := s.blocks[0].Header.Height
+	endHeight := s.sealedHead.Height
+	encoding := entities.EventEncodingVersion_CCF_V0
 
 	s.Run("returns error for endHeight < startHeight", func() {
 		backend := s.defaultBackend()
 		endHeight := startHeight - 1
 
-		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, entities.EventEncodingVersion_CCF_V0)
+		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding)
 		s.Assert().Equal(codes.InvalidArgument, status.Code(err))
 		s.Assert().Nil(response)
 	})
@@ -237,7 +370,7 @@ func (s *BackendEventsSuite) TestGetEventsForHeightRange() {
 		backend := s.defaultBackend()
 		endHeight := startHeight + DefaultMaxHeightRange
 
-		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, entities.EventEncodingVersion_CCF_V0)
+		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding)
 		s.Assert().Equal(codes.InvalidArgument, status.Code(err))
 		s.Assert().Nil(response)
 	})
@@ -252,7 +385,7 @@ func (s *BackendEventsSuite) TestGetEventsForHeightRange() {
 
 		backend := s.defaultBackend()
 
-		response, err := backend.GetEventsForHeightRange(signalerCtx, targetEvent, startHeight, endHeight, entities.EventEncodingVersion_CCF_V0)
+		response, err := backend.GetEventsForHeightRange(signalerCtx, targetEvent, startHeight, endHeight, encoding)
 		// these will never be returned in production
 		s.Assert().Equal(codes.Unknown, status.Code(err))
 		s.Assert().Nil(response)
@@ -266,89 +399,22 @@ func (s *BackendEventsSuite) TestGetEventsForHeightRange() {
 		startHeight := s.sealedHead.Height + 1
 		endHeight := startHeight + 1
 
-		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, entities.EventEncodingVersion_CCF_V0)
+		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding)
 		s.Assert().Equal(codes.OutOfRange, status.Code(err))
 		s.Assert().Nil(response)
 	})
-
-	s.Run("happy path - end height updated", func() {
-		backend := s.defaultBackend()
-		endHeight := startHeight + 20 // should still return 5 responses
-		encoding := entities.EventEncodingVersion_CCF_V0
-
-		response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding)
-		s.Require().NoError(err)
-
-		s.assertResponse(response, encoding)
-	})
-
-	for _, encoding := range []entities.EventEncodingVersion{
-		entities.EventEncodingVersion_CCF_V0,
-		entities.EventEncodingVersion_JSON_CDC_V0,
-	} {
-		s.Run(fmt.Sprintf("happy path - all from storage - %s", encoding.String()), func() {
-			backend := s.defaultBackend()
-
-			response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding)
-			s.Require().NoError(err)
-
-			s.assertResponse(response, encoding)
-		})
-
-		s.Run(fmt.Sprintf("happy path - all from en - %s", encoding.String()), func() {
-			events := storagemock.NewEvents(s.T())
-			events.On("ByBlockID", mock.Anything).Return(nil, storage.ErrNotFound)
-
-			backend := s.defaultBackend()
-			backend.events = events
-
-			s.setupENSuccessResponse(targetEvent, s.blocks)
-
-			response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding)
-			s.Require().NoError(err)
-
-			s.assertResponse(response, encoding)
-		})
-
-		s.Run(fmt.Sprintf("happy path - mixed storage & en - %s", encoding.String()), func() {
-			// the first 2 blocks are not available from storage, and should be fetched from the EN
-			events := storagemock.NewEvents(s.T())
-			events.On("ByBlockID", s.blockIDs[0]).Return(nil, storage.ErrNotFound)
-			events.On("ByBlockID", s.blockIDs[1]).Return(nil, storage.ErrNotFound)
-			events.On("ByBlockID", s.blockIDs[2]).Return(s.blockEvents, nil)
-			events.On("ByBlockID", s.blockIDs[3]).Return(s.blockEvents, nil)
-			events.On("ByBlockID", s.blockIDs[4]).Return(s.blockEvents, nil)
-
-			backend := s.defaultBackend()
-			backend.events = events
-
-			s.setupENSuccessResponse(targetEvent, s.blocks[0:2])
-
-			response, err := backend.GetEventsForHeightRange(ctx, targetEvent, startHeight, endHeight, encoding)
-			s.Require().NoError(err)
-
-			s.assertResponse(response, encoding)
-		})
-	}
 }
 
-func (s *BackendEventsSuite) TestGetEventsForBlockIDs() {
+func (s *BackendEventsSuite) TestGetEventsForBlockIDs_HandlesErrors() {
 	ctx := context.Background()
 
-	s.headers.On("ByBlockID", mock.Anything).Return(func(blockID flow.Identifier) (*flow.Header, error) {
-		for _, block := range s.blocks {
-			if blockID == block.ID() {
-				return block.Header, nil
-			}
-		}
-		return nil, storage.ErrNotFound
-	})
+	encoding := entities.EventEncodingVersion_CCF_V0
 
 	s.Run("returns error when too many blockIDs requested", func() {
 		backend := s.defaultBackend()
 		backend.maxHeightRange = 3
 
-		response, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, entities.EventEncodingVersion_CCF_V0)
+		response, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, encoding)
 		s.Assert().Equal(codes.InvalidArgument, status.Code(err))
 		s.Assert().Nil(response)
 	})
@@ -368,59 +434,10 @@ func (s *BackendEventsSuite) TestGetEventsForBlockIDs() {
 			headers.On("ByBlockID", blockID).Return(s.blocks[i].Header, nil)
 		}
 
-		response, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, entities.EventEncodingVersion_CCF_V0)
+		response, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, encoding)
 		s.Assert().Equal(codes.NotFound, status.Code(err))
 		s.Assert().Nil(response)
 	})
-
-	for _, encoding := range []entities.EventEncodingVersion{
-		entities.EventEncodingVersion_CCF_V0,
-		entities.EventEncodingVersion_JSON_CDC_V0,
-	} {
-		s.Run(fmt.Sprintf("happy path - all from storage - %s", encoding.String()), func() {
-			backend := s.defaultBackend()
-
-			response, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, encoding)
-			s.Require().NoError(err)
-
-			s.assertResponse(response, encoding)
-		})
-
-		s.Run(fmt.Sprintf("happy path - all from en - %s", encoding.String()), func() {
-			events := storagemock.NewEvents(s.T())
-			events.On("ByBlockID", mock.Anything).Return(nil, storage.ErrNotFound)
-
-			backend := s.defaultBackend()
-			backend.events = events
-
-			s.setupENSuccessResponse(targetEvent, s.blocks)
-
-			response, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, encoding)
-			s.Require().NoError(err)
-
-			s.assertResponse(response, encoding)
-		})
-
-		s.Run(fmt.Sprintf("happy path - mixed storage & en - %s", encoding.String()), func() {
-			// the first 2 blocks are not available from storage, and should be fetched from the EN
-			events := storagemock.NewEvents(s.T())
-			events.On("ByBlockID", s.blockIDs[0]).Return(nil, storage.ErrNotFound)
-			events.On("ByBlockID", s.blockIDs[1]).Return(nil, storage.ErrNotFound)
-			events.On("ByBlockID", s.blockIDs[2]).Return(s.blockEvents, nil)
-			events.On("ByBlockID", s.blockIDs[3]).Return(s.blockEvents, nil)
-			events.On("ByBlockID", s.blockIDs[4]).Return(s.blockEvents, nil)
-
-			backend := s.defaultBackend()
-			backend.events = events
-
-			s.setupENSuccessResponse(targetEvent, s.blocks[0:2])
-
-			response, err := backend.GetEventsForBlockIDs(ctx, targetEvent, s.blockIDs, encoding)
-			s.Require().NoError(err)
-
-			s.assertResponse(response, encoding)
-		})
-	}
 }
 
 func (s *BackendEventsSuite) assertResponse(response []flow.BlockEvents, encoding entities.EventEncodingVersion) {

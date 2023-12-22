@@ -35,6 +35,7 @@ type backendEvents struct {
 	log               zerolog.Logger
 	maxHeightRange    uint
 	nodeCommunicator  Communicator
+	queryMode         IndexQueryMode
 }
 
 // GetEventsForHeightRange retrieves events for all sealed blocks between the start block height and
@@ -140,32 +141,57 @@ func (b *backendEvents) getBlockEvents(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid event type: %v", err)
 	}
 
-	localResponse, missingHeaders, err := b.getBlockEventsFromStorage(ctx, blockHeaders, target, requiredEventEncodingVersion)
-	if err != nil {
-		return nil, err
-	}
+	switch b.queryMode {
+	case IndexQueryModeExecutionNodesOnly:
+		return b.getBlockEventsFromExecutionNode(ctx, blockHeaders, eventType, requiredEventEncodingVersion)
 
-	if len(missingHeaders) == 0 {
+	case IndexQueryModeLocalOnly:
+		localResponse, missingHeaders, err := b.getBlockEventsFromStorage(ctx, blockHeaders, target, requiredEventEncodingVersion)
+		if err != nil {
+			return nil, err
+		}
+		// all blocks should be available.
+		if len(missingHeaders) > 0 {
+			return nil, status.Errorf(codes.NotFound, "events not found in local storage for %d blocks", len(missingHeaders))
+		}
 		return localResponse, nil
+
+	case IndexQueryModeFailover:
+		localResponse, missingHeaders, err := b.getBlockEventsFromStorage(ctx, blockHeaders, target, requiredEventEncodingVersion)
+		if err != nil {
+			// if there was an error, request all blocks from execution nodes
+			missingHeaders = blockHeaders
+			b.log.Debug().Err(err).Msg("failed to get events from local storage")
+		}
+
+		if len(missingHeaders) == 0 {
+			return localResponse, nil
+		}
+
+		b.log.Debug().
+			Int("missing_blocks", len(missingHeaders)).
+			Msg("querying execution nodes for events from missing blocks")
+
+		enResponse, err := b.getBlockEventsFromExecutionNode(ctx, missingHeaders, eventType, requiredEventEncodingVersion)
+		if err != nil {
+			return nil, err
+		}
+
+		// sort ascending by block height
+		// this is needed because some blocks may be retrieved from storage and others from execution nodes.
+		// most likely, the earlier blocks will all be found in local storage, but that's not guaranteed,
+		// especially for nodes started after a spork, or once pruning is enabled.
+		// Note: this may not match the order of the original request for clients using GetEventsForBlockIDs
+		// that provide out of order block IDs
+		response := append(localResponse, enResponse...)
+		sort.Slice(response, func(i, j int) bool {
+			return response[i].BlockHeight < response[j].BlockHeight
+		})
+		return response, nil
+
+	default:
+		return nil, status.Errorf(codes.Internal, "unknown event query mode: %v", b.queryMode)
 	}
-
-	enResponse, err := b.getBlockEventsFromExecutionNode(ctx, missingHeaders, eventType, requiredEventEncodingVersion)
-	if err != nil {
-		return nil, err
-	}
-
-	// sort ascending by block height
-	// this is needed because some blocks may be retrieved from storage and others from execution nodes.
-	// most likely, the earlier blocks will all be found in local storage, but that's not guaranteed,
-	// especially for nodes started after a spork, or once pruning is enabled.
-	// Note: this may not match the order of the original request for clients using GetEventsForBlockIDs
-	// that provide out of order block IDs
-	response := append(localResponse, enResponse...)
-	sort.Slice(response, func(i, j int) bool {
-		return response[i].BlockHeight < response[j].BlockHeight
-	})
-
-	return response, nil
 }
 
 // getBlockEventsFromStorage retrieves events for all the specified blocks that have the given type
@@ -190,6 +216,7 @@ func (b *backendEvents) getBlockEventsFromStorage(
 				missing = append(missing, header)
 				continue
 			}
+			err = fmt.Errorf("failed to get events for block %s: %w", header.ID(), err)
 			return nil, nil, rpc.ConvertError(err, "failed to get events from storage", codes.Internal)
 		}
 
@@ -203,6 +230,7 @@ func (b *backendEvents) getBlockEventsFromStorage(
 			if requiredEventEncodingVersion == entities.EventEncodingVersion_JSON_CDC_V0 {
 				payload, err := convert.CcfPayloadToJsonPayload(e.Payload)
 				if err != nil {
+					err = fmt.Errorf("failed to convert event payload for block %s: %w", header.ID(), err)
 					return nil, nil, rpc.ConvertError(err, "failed to convert event payload", codes.Internal)
 				}
 				e.Payload = payload
@@ -251,7 +279,6 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 
 	execNodes, err := executionNodesForBlockID(ctx, lastBlockID, b.executionReceipts, b.state, b.log)
 	if err != nil {
-		b.log.Error().Err(err).Msg("failed to retrieve events from execution node")
 		return nil, rpc.ConvertError(err, "failed to retrieve events from execution node", codes.Internal)
 	}
 
@@ -259,7 +286,6 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 	var successfulNode *flow.Identity
 	resp, successfulNode, err = b.getEventsFromAnyExeNode(ctx, execNodes, req)
 	if err != nil {
-		b.log.Error().Err(err).Msg("failed to retrieve events from execution nodes")
 		return nil, rpc.ConvertError(err, "failed to retrieve events from execution nodes", codes.Internal)
 	}
 	b.log.Trace().
