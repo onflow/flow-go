@@ -219,7 +219,6 @@ func (c *ControlMsgValidationInspector) processInspectRPCReq(req *InspectRPCRequ
 	defer func() {
 		c.metrics.AsyncProcessingFinished(time.Since(start))
 	}()
-
 	activeClusterIDS := c.tracker.GetActiveClusterIds()
 	for _, ctrlMsgType := range p2pmsg.ControlMessageTypes() {
 		switch ctrlMsgType {
@@ -310,11 +309,6 @@ func (c *ControlMsgValidationInspector) inspectGraftMessages(from peer.ID, graft
 		tracker.set(topic.String())
 		err, topicType := c.validateTopic(from, topic, activeClusterIDS)
 		if err != nil {
-			// short circuit validation when unstaked peer detected
-			if IsErrUnstakedPeer(err) {
-				lg.Debug().Msg("received control message from unstaked peer")
-				return nil
-			}
 			invErr := p2p.NewInvCtrlMsgErr(err, topicType)
 			invErr.SetTopic(topic.String())
 			errs = append(errs, invErr)
@@ -360,11 +354,6 @@ func (c *ControlMsgValidationInspector) inspectPruneMessages(from peer.ID, prune
 		tracker.set(topic.String())
 		err, topicType := c.validateTopic(from, topic, activeClusterIDS)
 		if err != nil {
-			// short circuit validation when unstaked peer detected
-			if IsErrUnstakedPeer(err) {
-				lg.Debug().Msg("received control message from unstaked peer")
-				return nil
-			}
 			invErr := p2p.NewInvCtrlMsgErr(err, topicType)
 			invErr.SetTopic(topic.String())
 			errs = append(errs, invErr)
@@ -417,15 +406,9 @@ func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihave
 		duplicateTopicTracker.set(topic)
 		err, topicType := c.validateTopic(from, channels.Topic(topic), activeClusterIDS)
 		if err != nil {
-			// short circuit validation when unstaked peer detected
-			if IsErrUnstakedPeer(err) {
-				lg.Debug().Msg("received control message from unstaked peer")
-				return nil
-			}
 			invErr := p2p.NewInvCtrlMsgErr(err, topicType)
 			invErr.SetTopic(topic)
 			errs = append(errs, invErr)
-
 		}
 		for _, messageID := range messageIds {
 			if duplicateMessageIDTracker.isDuplicate(messageID) {
@@ -625,11 +608,6 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 		// cluster prefix status is unnecessary when the error threshold is exceeded.
 		err, _ := c.validateTopic(from, topic, activeClusterIDS)
 		if err != nil {
-			// short circuit validation when unstaked peer detected
-			if IsErrUnstakedPeer(err) {
-				lg.Debug().Msg("received publish message from unstaked peer")
-				continue
-			}
 			errs = multierror.Append(errs, err)
 		} else if !hasSubscription(topic.String()) {
 			errs = multierror.Append(errs, fmt.Errorf("subscription for topic %s not found", topic))
@@ -872,7 +850,7 @@ func (c *ControlMsgValidationInspector) validateClusterPrefixedTopic(from peer.I
 			Bool(logging.KeySuspicious, true).
 			Bool(logging.KeyNetworkingSecurity, true).
 			Err(err).
-			Msg("control message received from unstaked peer")
+			Msg("cluster prefixed control message received from unstaked peer")
 		return err
 	}
 	if len(activeClusterIds) == 0 {
