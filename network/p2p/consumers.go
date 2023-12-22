@@ -11,7 +11,7 @@ import (
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 )
 
-// InvCtrlMsgErrs list of InvCtrlMsgErr's
+// InvCtrlMsgErrs list of InvCtrlMsgErr
 type InvCtrlMsgErrs []*InvCtrlMsgErr
 
 func (i InvCtrlMsgErrs) Error() error {
