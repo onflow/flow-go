@@ -475,7 +475,7 @@ type subgraphFixture struct {
 	Approvals          map[uint64]map[flow.Identifier]*flow.ResultApproval // chunkIndex -> Verifier Node ID -> Approval
 }
 
-// Generates a valid subgraph:
+// ValidSubgraphFixture generates a valid subgraph:
 // let
 //   - R1 be a result which pertains to blockA
 //   - R2 be R1's previous result,
@@ -566,7 +566,7 @@ func (bc *BaseChainSuite) Extend(block *flow.Block) {
 	}
 }
 
-// addSubgraphFixtureToMempools adds add entities in subgraph to mempools and persistent storage mocks
+// AddSubgraphFixtureToMempools adds entities in subgraph to mempools and persistent storage mocks
 func (bc *BaseChainSuite) AddSubgraphFixtureToMempools(subgraph subgraphFixture) {
 	bc.Blocks[subgraph.ParentBlock.ID()] = subgraph.ParentBlock
 	bc.Blocks[subgraph.Block.ID()] = subgraph.Block

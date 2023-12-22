@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/state/protocol"
@@ -44,16 +45,15 @@ func NewReceiptValidator(state protocol.State,
 	return rv
 }
 
-// verifySignature ensures that the receipt has a valid signature from nodeIdentity.
+// verifySignature ensures that the given receipt has a valid signature from nodeIdentity.
 // Expected errors during normal operations:
 //   - engine.InvalidInputError if the signature is invalid
 func (v *receiptValidator) verifySignature(receipt *flow.ExecutionReceiptMeta, nodeIdentity *flow.Identity) error {
 	id := receipt.ID()
 	valid, err := nodeIdentity.StakingPubKey.Verify(receipt.ExecutorSignature, id[:], v.signatureHasher)
-	if err != nil {
-		return fmt.Errorf("failed to verify signature: %w", err)
+	if err != nil { // Verify(..) returns (false,nil) for invalid signature. Any error indicates unexpected internal failure.
+		return irrecoverable.NewExceptionf("failed to verify signature: %w", err)
 	}
-
 	if !valid {
 		return engine.NewInvalidInputErrorf("invalid signature for (%x)", nodeIdentity.NodeID)
 	}
@@ -67,7 +67,7 @@ func (v *receiptValidator) verifySignature(receipt *flow.ExecutionReceiptMeta, n
 //
 // Expected errors during normal operations:
 //   - engine.InvalidInputError if the result has malformed chunks
-//   - storage.ErrNotFound if result is for an unknown block
+//   - module.UnknownBlockError when the executed block is unknown
 func (v *receiptValidator) verifyChunksFormat(result *flow.ExecutionResult) error {
 	for index, chunk := range result.Chunks.Items() {
 		if uint(index) != chunk.CollectionIndex {
@@ -81,45 +81,21 @@ func (v *receiptValidator) verifyChunksFormat(result *flow.ExecutionResult) erro
 		}
 	}
 
-	// we create one chunk per collection, plus the
-	// system chunk. so we can check if the chunk number matches with the
-	// number of guarantees plus one; this will ensure the execution receipt
-	// cannot lie about having less chunks and having the remaining ones
-	// approved
-	requiredChunks := 1 // system chunk: must exist for block's ExecutionResult, even if block payload itself is empty
-
+	// For a block containing k collections, the Flow protocol prescribes that a valid execution result
+	// must contain k+1 chunks. Specifically, we have one chunk per collection plus the system chunk.
+	// The system chunk must exist, even if block payload itself is empty.
 	index, err := v.index.ByBlockID(result.BlockID) // returns `storage.ErrNotFound` for unknown block
 	if err != nil {
-		return fmt.Errorf("could not find payload index for executed block %v: %w", result.BlockID, err)
-		// TODO (?) update error to following?
-		//if errors.Is(err, storage.ErrNotFound) {
-		//	return engine.NewUnverifiableInputError("could not find payload index of executed block %v: %w", result.BlockID, err)
-		//}
-		//return fmt.Errorf("unexpected error retrieving payload index of executed block %v: %w", result.BlockID, err)
+		if errors.Is(err, storage.ErrNotFound) {
+			return module.NewUnknownBlockError("could not find payload index for executed block %v: %w", result.BlockID, err)
+		}
+		return irrecoverable.NewExceptionf("unexpected failure retrieving index for executed block %v: %w", result.BlockID, err)
 	}
-
-	requiredChunks += len(index.CollectionIDs)
-
+	requiredChunks := 1 + len(index.CollectionIDs) // one chunk per collection + 1 system chunk
 	if result.Chunks.Len() != requiredChunks {
 		return engine.NewInvalidInputErrorf("invalid number of chunks, expected %d got %d", requiredChunks, result.Chunks.Len())
 	}
 	return nil
-}
-
-// fetchResult retrieves the ExecutionResult with the given resultID
-// or returns
-//
-// Expected errors during normal operations:
-//   - engine.UnverifiableInputError if result is for an unknown block
-func (v *receiptValidator) fetchResult(resultID flow.Identifier) (*flow.ExecutionResult, error) {
-	result, err := v.results.ByID(resultID)
-	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			return nil, engine.NewUnverifiableInputError("cannot retrieve result: %v", resultID)
-		}
-		return nil, err
-	}
-	return result, nil
 }
 
 // subgraphCheck enforces that result forms a valid sub-graph:
@@ -128,11 +104,14 @@ func (v *receiptValidator) fetchResult(resultID flow.Identifier) (*flow.Executio
 //
 // Expected errors during normal operations:
 //   - sentinel engine.InvalidInputError if result does not form a valid sub-graph
-//   - state.ErrUnknownSnapshotReference if result is for an unknown block
+//   - module.UnknownBlockError when the executed block is unknown
 func (v *receiptValidator) subgraphCheck(result *flow.ExecutionResult, prevResult *flow.ExecutionResult) error {
 	block, err := v.state.AtBlockID(result.BlockID).Head() // returns
 	if err != nil {
-		return fmt.Errorf("cannot retrieve executed block %v: %w", result.BlockID, err)
+		if errors.Is(err, storage.ErrNotFound) {
+			return module.NewUnknownBlockError("executed block %v unknown: %w", result.BlockID, err)
+		}
+		return irrecoverable.NewExceptionf("unexpected failure retrieving executed block %v: %w", result.BlockID, err)
 	}
 
 	// validating the PreviousResultID field
@@ -149,7 +128,7 @@ func (v *receiptValidator) subgraphCheck(result *flow.ExecutionResult, prevResul
 
 // resultChainCheck enforces that the end state of the parent result
 // matches the current result's start state.
-// This function is side-effect free. The only possible error it returns is of type
+// This function is side effect free. The only possible error it returns is of type
 //   - engine.InvalidInputError if starting state of result is inconsistent with previous result's end state
 func (v *receiptValidator) resultChainCheck(result *flow.ExecutionResult, prevResult *flow.ExecutionResult) error {
 	finalState, err := prevResult.FinalStateCommitment()
@@ -173,24 +152,27 @@ func (v *receiptValidator) resultChainCheck(result *flow.ExecutionResult, prevRe
 //   - chunks are in correct format
 //   - execution result has a valid parent and satisfies the subgraph check
 //
-// Returns nil if all checks passed successfully.
-//
-// CAUTION:
-//   - Executed block must be known to protocol state. Otherwise, an exception is returned.
+// In order to validate a receipt, both the executed block and the parent result
+// referenced in `receipt.ExecutionResult` must be known. We return nil if all checks
+// pass successfully.
 //
 // Expected errors during normal operations:
 //   - engine.InvalidInputError if receipt violates protocol condition
-//   - engine.UnverifiableInputError if receipt's parent result is unknown
+//   - module.UnknownBlockError if the executed block is unknown
+//   - module.UnknownResultError if the receipt's parent result is unknown
 //
 // All other error are potential symptoms critical internal failures, such as bugs or state corruption.
 func (v *receiptValidator) Validate(receipt *flow.ExecutionReceipt) error {
-	prevResult, err := v.fetchResult(receipt.ExecutionResult.PreviousResultID)
-	if err != nil {
-		return fmt.Errorf("fetching parent result of receipt %v failed: %w", receipt.ID(), err)
+	parentResult, err := v.results.ByID(receipt.ExecutionResult.PreviousResultID)
+	if err != nil { // we expect `storage.ErrNotFound` in case parent result is unknown; any other error is unexpected, critical failure
+		if errors.Is(err, storage.ErrNotFound) {
+			return module.NewUnknownResultError("parent result %v unknown: %w", receipt.ExecutionResult.PreviousResultID, err)
+		}
+		return irrecoverable.NewExceptionf("unexpected exception fetching parent result: %v", receipt.ExecutionResult.PreviousResultID)
 	}
 
-	// first validate result to avoid signature check in `validateReceipt` in case result is invalid.
-	err = v.validateResult(&receipt.ExecutionResult, prevResult)
+	// first validate result to avoid expensive signature check in `validateReceipt` in case result is invalid.
+	err = v.validateResult(&receipt.ExecutionResult, parentResult)
 	if err != nil {
 		return fmt.Errorf("could not validate single result %v at index: %w", receipt.ExecutionResult.ID(), err)
 	}
@@ -199,7 +181,7 @@ func (v *receiptValidator) Validate(receipt *flow.ExecutionReceipt) error {
 	if err != nil {
 		// It's very important that we fail the whole validation if one of the receipts is invalid.
 		// It allows us to make assumptions as stated in previous comment.
-		return fmt.Errorf("could not validate single receipt %v: %w", receipt.ID(), err)
+		return fmt.Errorf("could not validate receipt %v: %w", receipt.ID(), err)
 	}
 
 	return nil
@@ -219,15 +201,26 @@ func (v *receiptValidator) Validate(receipt *flow.ExecutionReceipt) error {
 //     finalized block and only results from this fork are included
 //   - no duplicates in fork
 //
-// CAUTION:
-//   - Executed block must be known to protocol state. Otherwise, an exception is returned.
-//
 // Expected errors during normal operations:
 //   - engine.InvalidInputError if some receipts in the candidate block violate protocol condition
-//   - engine.UnverifiableInputError if for some of the receipts, their respective parent result is unknown
+//   - module.UnknownBlockError if the candidate block's _parent_ is unknown
+//
+// All other error are potential symptoms critical internal failures, such as bugs or state corruption.
 func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 	header := candidate.Header
 	payload := candidate.Payload
+
+	// As a prerequisite, we check that candidate's parent block is known. Otherwise, we cannot validate it.
+	// This check is important to distinguish expected error cases from unexpected exceptions. By confirming
+	// that the protocol state knows the parent block, we guarantee that we can successfully traverse the
+	// candidate's ancestry below.
+	_, err := v.headers.ByBlockID(header.ParentID)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return module.NewUnknownBlockError("cannot validate receipts in block, as its parent block is unknown %v: %w", header.ParentID, err)
+		}
+		return irrecoverable.NewExceptionf("unexpected exception retrieving the candidate block's parent %v: %w", header.ParentID, err)
+	}
 
 	// return if nothing to validate
 	if len(payload.Receipts) == 0 && len(payload.Results) == 0 {
@@ -292,7 +285,9 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 	}
 	err = fork.TraverseForward(v.headers, header.ParentID, bookKeeper, fork.ExcludingBlock(lastSeal.BlockID))
 	if err != nil {
-		return fmt.Errorf("internal error while traversing the ancestor fork of unsealed blocks: %w", err)
+		// At the beginning, we checked that candidate's parent exists in the protocol state, i.e. its
+		// ancestry is known and valid. Hence, any error here is a symptom of internal state corruption.
+		return irrecoverable.NewExceptionf("internal error while traversing the ancestor fork of unsealed blocks: %w", err)
 	}
 
 	// tracks the number of receipts committing to each result.
@@ -306,7 +301,7 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 
 		// Every included result must be accompanied by a receipt with a corresponding `ResultID`, in the same block.
 		// If a result is included without a corresponding receipt, it cannot be attributed to any executor.
-		receiptsForResult := uint(len(receiptsByResult.GetGroup(resultID)))
+		receiptsForResult := len(receiptsByResult.GetGroup(resultID))
 		if receiptsForResult == 0 {
 			return engine.NewInvalidInputErrorf("no receipts for result %v at index %d", resultID, i)
 		}
@@ -322,15 +317,23 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 			return engine.NewInvalidInputErrorf("results %v at index %d does not extend execution tree", resultID, i)
 		}
 
-		// result must be for block on fork
+		// Result must be for block on fork.
 		if _, forBlockOnFork := forkBlocks[result.BlockID]; !forBlockOnFork {
 			return engine.NewInvalidInputErrorf("results %v at index %d is for block not on fork (%x)", resultID, i, result.BlockID)
 		}
+		// Reaching the following code implies that the executed block with ID `result.BlockID` is known to the protocol state, i.e. well formed.
 
 		// validate result
 		err = v.validateResult(result, prevResult)
 		if err != nil {
-			return fmt.Errorf("could not validate result %v at index %d: %w", resultID, i, err)
+			if engine.IsInvalidInputError(err) {
+				return fmt.Errorf("result %v at index %d is invalid: %w", resultID, i, err)
+			}
+			if module.IsUnknownBlockError(err) {
+				// Above, we checked that the result is for an ancestor of the candidate block. If this block or parts of it are not found, our state is corrupted
+				return irrecoverable.NewExceptionf("the executed block or some of its parts were not found despite the block being already incorporated: %w", err)
+			}
+			return fmt.Errorf("unexpected exception while validating result %v at index %d: %w", resultID, i, err)
 		}
 		executionTree[resultID] = result
 	}
@@ -358,6 +361,13 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 
 		err = v.validateReceipt(receipt, result.BlockID)
 		if err != nil {
+			if engine.IsInvalidInputError(err) {
+				return fmt.Errorf("receipt %v at index %d failed validation: %w", receiptID, i, err)
+			}
+			if module.IsUnknownBlockError(err) {
+				// Above, we checked that the result is for an ancestor of the candidate block. If this block or parts of it are not found, our state is corrupted
+				return irrecoverable.NewExceptionf("the executed block or some of its parts were not found despite the block being already incorporated: %w", err)
+			}
 			return fmt.Errorf("receipt %v at index %d failed validation: %w", receiptID, i, err)
 		}
 	}
@@ -365,11 +375,12 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 	return nil
 }
 
+// validateResult validates that the given result is well-formed.
+// While we do not check the validity of the resulting
+// state commitment,
 // Expected errors during normal operations:
 //   - engine.InvalidInputError if the result has malformed chunks
-//   - storage.ErrNotFound or
-//     state.ErrUnknownSnapshotReference
-//     if result is for an unknown block
+//   - module.UnknownBlockError if blockID does not correspond to a block known by the protocol state
 func (v *receiptValidator) validateResult(result *flow.ExecutionResult, prevResult *flow.ExecutionResult) error {
 	err := v.verifyChunksFormat(result)
 	if err != nil {
@@ -393,14 +404,11 @@ func (v *receiptValidator) validateResult(result *flow.ExecutionResult, prevResu
 // to some result. Specifically it enforces:
 // Error returns:
 //   - sentinel engine.InvalidInputError if `receipt` is invalid
-//   - state.ErrUnknownSnapshotReference if blockID does not correspond to a block known by the protocol state
-func (v *receiptValidator) validateReceipt(receipt *flow.ExecutionReceiptMeta, blockID flow.Identifier) error {
-	identity, err := identityForNode(v.state, blockID, receipt.ExecutorID)
+//   - module.UnknownBlockError if executedBlockID is unknown
+func (v *receiptValidator) validateReceipt(receipt *flow.ExecutionReceiptMeta, executedBlockID flow.Identifier) error {
+	identity, err := identityForNode(v.state, executedBlockID, receipt.ExecutorID)
 	if err != nil {
-		return fmt.Errorf("failed to get executor identity %v at block %v: %w",
-			receipt.ExecutorID,
-			blockID,
-			err)
+		return fmt.Errorf("retrieving idenity of node %v at block %v failed: %w", receipt.ExecutorID, executedBlockID, err)
 	}
 
 	err = ensureNodeHasWeightAndRole(identity, flow.RoleExecution)

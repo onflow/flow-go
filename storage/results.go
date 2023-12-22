@@ -16,6 +16,8 @@ type ExecutionResults interface {
 	BatchStore(result *flow.ExecutionResult, batch BatchStorage) error
 
 	// ByID retrieves an execution result by its ID.
+	// Error returns:
+	//  - ErrNotFound if no result with the given ID exists
 	ByID(resultID flow.Identifier) (*flow.ExecutionResult, error)
 
 	// ByIDTx retrieves an execution result by its ID in the context of the given transaction

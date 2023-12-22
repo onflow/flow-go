@@ -233,15 +233,56 @@ func (s *ReceiptValidationSuite) TestReceiptNoPreviousResult() {
 	s.Assert().True(engine.IsUnverifiableInputError(err), err)
 }
 
-// TestReceiptInvalidPreviousResult tests that we reject receipt with invalid previous result
-func (s *ReceiptValidationSuite) TestReceiptInvalidPreviousResult() {
+// TestReceiptNoBlock checks the behaviour if the executed block, referenced by the receipt, is unknown.
+// This case should be treated as an exception and _not_ yield an `UnverifiableInputError` or
+// `InvalidInputError`
+func (s *ReceiptValidationSuite) TestReceiptNoBlock() {
+	valSubgrph := s.ValidSubgraphFixture()
+	valSubgrph.PreviousResult = unittest.ExecutionResultFixture()
+	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID),
+		unittest.WithResult(valSubgrph.Result))
+	s.AddSubgraphFixtureToMempools(valSubgrph)
+
+	// We change the ParentResult's BlockID. Thereby it looks like the receipt is
+	// referencing a ParentResult that exists but is not for the parent block.
+	valSubgrph.Result.BlockID = unittest.IdentifierFixture()
+
+	s.publicKey.On("Verify",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything).Return(true, nil).Maybe()
+
+	err := s.receiptValidator.Validate(receipt)
+	s.Require().Error(err, "should reject invalid receipt")
+	s.Assert().False(engine.IsUnverifiableInputError(err), err)
+	s.Assert().False(engine.IsInvalidInputError(err), err)
+}
+
+// TestInvalidSubgraph is part of verifying that we reject a receipt, whose result
+// does not form a valid 'subgraph'. Formally, a subgraph is defined as
+//
+//	Result   -----------------------------------> Block
+//	  |                                             |
+//	  |                                             v
+//	  |                                           ParentBlock
+//	  v
+//	ParentResult  ---> ParentResult.BlockID
+//
+// with the validity requirement that ParentResult.BlockID == ParentBlock.ID().
+//
+// In our test case, we assume that `ParentResult` and `Block` are known, but
+// ParentResult.BlockID ≠ ParentBlock.ID(). The compliance layer guarantees that new elements are added
+// to the blockchain graph if and only if they are protocol compliant. In other words, we are testing
+// a byzantine receipt that references known and valid entities, but they do not form a valid subgraph.
+// For example, it could be a result for a block in a different fork or an ancestor further in the past.
+func (s *ReceiptValidationSuite) TestInvalidSubgraph() {
 	valSubgrph := s.ValidSubgraphFixture()
 	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID),
 		unittest.WithResult(valSubgrph.Result))
 	s.AddSubgraphFixtureToMempools(valSubgrph)
 
-	// invalidate prev execution result blockID, this should fail because
-	// prev result points to wrong block
+	// We change the ParentResult's BlockID. Thereby it looks like the receipt is
+	// referencing a ParentResult that exists but is not for the parent block.
 	valSubgrph.PreviousResult.BlockID = unittest.IdentifierFixture()
 
 	s.publicKey.On("Verify",
@@ -278,11 +319,12 @@ func (s *ReceiptValidationSuite) TestReceiptInvalidResultChain() {
 
 // TestMultiReceiptValidResultChain tests that multiple receipts and results
 // within one block payload are accepted, where the receipts are building on
-// top of each other (i.e. their results form a chain).
-// Say B(A) means block B has receipt for A:
-//   - we have such chain in storage: G <- A <- B(A) <- C
+// top of each other (i.e. their results form a chain). Test case:
+//   - we have the chain in storage: G <- A <- B(A) <- C
 //   - if a child block of C payload contains receipts and results for (B,C)
 //     it should be accepted as valid
+//
+// Notation: B(A) means block B has receipt for A.
 func (s *ReceiptValidationSuite) TestMultiReceiptValidResultChain() {
 	// assuming signatures are all good
 	s.publicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
@@ -321,8 +363,12 @@ func (s *ReceiptValidationSuite) TestMultiReceiptValidResultChain() {
 	s.Require().NoError(err)
 }
 
-// we have such chain in storage: G <- A <- B(A) <- C
-// if a block payload contains (C,B_bad), they should be invalid
+// TestMultiReceiptInvalidParent performs the following test:
+//   - we have the chain in storage: G <- A <- B(A) <- C
+//   - Let X be block, whose validity we are checking. X should be invalid,
+//     if its payload contains (C,B_bad).
+//
+// Notation: B(A) means block B has receipt for A.
 func (s *ReceiptValidationSuite) TestMultiReceiptInvalidParent() {
 	// assuming signatures are all good
 	s.publicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)

@@ -12,7 +12,7 @@ import (
 //   - the `head` of the fork that should be traversed
 //   - the `lowestBlock` in that fork, which should be included in the traversal
 //
-// The traversal the walks `head <--> lowestBlock` (in either direction).
+// The traversal walks `head <--> lowestBlock` (in either direction).
 //
 // There are a variety of ways to precisely specify `head` and `lowestBlock`:
 //   - At least one block, `head` or `lowestBlock`, must be specified by its ID

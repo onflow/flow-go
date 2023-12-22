@@ -1,10 +1,13 @@
 package validation
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	protocolstate "github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
@@ -12,7 +15,7 @@ import (
 // at the given block and returns the corresponding node's full identity.
 // Error returns:
 //   - engine.InvalidInputError if nodeID is NOT an authorized member of the network at the given block
-//   - state.ErrUnknownSnapshotReference if blockID does not correspond to a block known by the protocol state
+//   - module.UnknownBlockError if blockID is not known to the protocol state
 //
 // All other error are potential symptoms critical internal failures, such as bugs or state corruption.
 func identityForNode(state protocol.State, blockID flow.Identifier, nodeID flow.Identifier) (*flow.Identity, error) {
@@ -22,8 +25,10 @@ func identityForNode(state protocol.State, blockID flow.Identifier, nodeID flow.
 		if protocol.IsIdentityNotFound(err) {
 			return nil, engine.NewInvalidInputErrorf("unknown node identity: %w", err)
 		}
-		// unexpected exception
-		return nil, fmt.Errorf("failed to retrieve node identity: %w", err)
+		if errors.Is(err, protocolstate.ErrUnknownSnapshotReference) {
+			return nil, module.NewUnknownBlockError("block %v is unknown: %w", blockID, err)
+		}
+		return nil, fmt.Errorf("unexpected exception retrieving node identity: %w", err)
 	}
 
 	return identity, nil
