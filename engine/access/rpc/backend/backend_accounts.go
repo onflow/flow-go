@@ -31,7 +31,7 @@ type backendAccounts struct {
 	connFactory       connection.ConnectionFactory
 	nodeCommunicator  Communicator
 	scriptExecutor    execution.ScriptExecutor
-	scriptExecMode    ScriptExecutionMode
+	scriptExecMode    IndexQueryMode
 }
 
 // GetAccount returns the account details at the latest sealed block.
@@ -93,13 +93,13 @@ func (b *backendAccounts) getAccountAtBlock(
 	height uint64,
 ) (*flow.Account, error) {
 	switch b.scriptExecMode {
-	case ScriptExecutionModeExecutionNodesOnly:
+	case IndexQueryModeExecutionNodesOnly:
 		return b.getAccountFromAnyExeNode(ctx, address, blockID)
 
-	case ScriptExecutionModeLocalOnly:
+	case IndexQueryModeLocalOnly:
 		return b.getAccountFromLocalStorage(ctx, address, height)
 
-	case ScriptExecutionModeFailover:
+	case IndexQueryModeFailover:
 		localResult, localErr := b.getAccountFromLocalStorage(ctx, address, height)
 		if localErr == nil {
 			return localResult, nil
@@ -110,7 +110,7 @@ func (b *backendAccounts) getAccountAtBlock(
 
 		return execResult, execErr
 
-	case ScriptExecutionModeCompare:
+	case IndexQueryModeCompare:
 		execResult, execErr := b.getAccountFromAnyExeNode(ctx, address, blockID)
 		// Only compare actual get account errors from the EN, not system errors
 		if execErr != nil && !isInvalidArgumentError(execErr) {

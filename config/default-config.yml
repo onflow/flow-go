@@ -176,12 +176,6 @@ network-config:
           tracker-cache-decay: 0.99
           # The upper bound on the amount of cluster prefixed control messages that will be processed
           hard-threshold: 100
-      metrics:
-        # RPC metrics observer inspector configs
-        # The number of metrics inspector pool workers
-        workers: 1
-        # The size of the queue used by worker pool for the control message metrics inspector
-        cache-size: 100
     rpc-tracer:
       # The default interval at which the mesh tracer logs the mesh topology. This is used for debugging and forensics purposes.
       #	Note that we purposefully choose this logging interval high enough to avoid spamming the logs. Moreover, the
