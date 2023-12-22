@@ -4,8 +4,8 @@ CONFIGURATION_BUCKET := flow-benchnet-automation
 
 # default values that callers can override when calling target
 ACCESS = 1
-COLLECTION = 6
-VALID_COLLECTION := $(shell test $(COLLECTION) -ge 6; echo $$?)
+COLLECTION = 2
+VALID_COLLECTION := $(shell test $(COLLECTION) -ge 2; echo $$?)
 CONSENSUS = 2
 VALID_CONSENSUS := $(shell test $(CONSENSUS) -ge 2; echo $$?)
 EXECUTION = 2
@@ -19,7 +19,7 @@ ifeq ($(strip $(VALID_EXECUTION)), 1)
 else ifeq ($(strip $(VALID_CONSENSUS)), 1)
 	$(error Number of Consensus nodes should be no less than 2)
 else ifeq ($(strip $(VALID_COLLECTION)), 1)
-	$(error Number of Collection nodes should be no less than 6)
+	$(error Number of Collection nodes should be no less than 2)
 else ifeq ($(strip $(NETWORK_ID)),)
 	$(error NETWORK_ID cannot be empty)
 else ifeq ($(strip $(NAMESPACE)),)
@@ -29,13 +29,12 @@ endif
 # assumes there is a checked out version of flow-go in a "flow-go" sub-folder at this level so that the bootstrap executable
 # for the checked out version will be run in the sub folder but the bootstrap folder will be created here (outside of the checked out flow-go in the sub folder)
 gen-bootstrap: clone-flow
-	cd flow-go && make crypto_setup_gopath
-	cd flow-go/cmd/bootstrap && go run -tags relic . genconfig --address-format "%s%d-${NETWORK_ID}.${NAMESPACE}:3569" --access $(ACCESS) --collection $(COLLECTION) --consensus $(CONSENSUS) --execution $(EXECUTION) --verification $(VERIFICATION) --weight 100 -o ./ --config ../../../bootstrap/conf/node-config.json
-	cd flow-go/cmd/bootstrap && go run -tags relic . keygen --machine-account --config ../../../bootstrap/conf/node-config.json -o ../../../bootstrap/keys
+	cd flow-go/cmd/bootstrap && go run . genconfig --address-format "%s%d-${NETWORK_ID}.${NAMESPACE}:3569" --access $(ACCESS) --collection $(COLLECTION) --consensus $(CONSENSUS) --execution $(EXECUTION) --verification $(VERIFICATION) --weight 100 -o ./ --config ../../../bootstrap/conf/node-config.json
+	cd flow-go/cmd/bootstrap && go run . keygen --machine-account --config ../../../bootstrap/conf/node-config.json -o ../../../bootstrap/keys
 	echo {} > ./bootstrap/conf/partner-stakes.json
 	mkdir ./bootstrap/partner-nodes
-	cd flow-go/cmd/bootstrap && go run -tags relic . rootblock  --root-chain bench --root-height 0 --root-parent 0000000000000000000000000000000000000000000000000000000000000000 --config ../../../bootstrap/conf/node-config.json -o ../../../bootstrap/ --partner-dir ../../../bootstrap/partner-nodes --partner-weights ../../../bootstrap/conf/partner-stakes.json --internal-priv-dir ../../../bootstrap/keys/private-root-information
-	cd flow-go/cmd/bootstrap && go run -tags relic . finalize --root-commit 0000000000000000000000000000000000000000000000000000000000000000 --service-account-public-key-json "{\"PublicKey\":\"R7MTEDdLclRLrj2MI1hcp4ucgRTpR15PCHAWLM5nks6Y3H7+PGkfZTP2di2jbITooWO4DD1yqaBSAVK8iQ6i0A==\",\"SignAlgo\":2,\"HashAlgo\":1,\"SeqNumber\":0,\"Weight\":1000}" --config ../../../bootstrap/conf/node-config.json -o ../../../bootstrap/ --partner-dir ../../../bootstrap/partner-nodes --partner-weights ../../../bootstrap/conf/partner-stakes.json --collection-clusters 1 --epoch-counter 0 --epoch-length 30000 --epoch-staking-phase-length 20000 --epoch-dkg-phase-length 2000 --genesis-token-supply="1000000000.0" --protocol-version=0 --internal-priv-dir ../../../bootstrap/keys/private-root-information --dkg-data ../../../bootstrap/private-root-information/root-dkg-data.priv.json --root-block ../../../bootstrap/public-root-information/root-block.json --root-block-votes-dir ../../../bootstrap/public-root-information/root-block-votes/ --epoch-commit-safety-threshold=1000
+	cd flow-go/cmd/bootstrap && go run . rootblock  --root-chain bench --root-height 0 --root-parent 0000000000000000000000000000000000000000000000000000000000000000 --config ../../../bootstrap/conf/node-config.json -o ../../../bootstrap/ --partner-dir ../../../bootstrap/partner-nodes --partner-weights ../../../bootstrap/conf/partner-stakes.json --internal-priv-dir ../../../bootstrap/keys/private-root-information
+	cd flow-go/cmd/bootstrap && go run . finalize --root-commit 0000000000000000000000000000000000000000000000000000000000000000 --service-account-public-key-json "{\"PublicKey\":\"R7MTEDdLclRLrj2MI1hcp4ucgRTpR15PCHAWLM5nks6Y3H7+PGkfZTP2di2jbITooWO4DD1yqaBSAVK8iQ6i0A==\",\"SignAlgo\":2,\"HashAlgo\":1,\"SeqNumber\":0,\"Weight\":1000}" --config ../../../bootstrap/conf/node-config.json -o ../../../bootstrap/ --partner-dir ../../../bootstrap/partner-nodes --partner-weights ../../../bootstrap/conf/partner-stakes.json --collection-clusters 1 --epoch-counter 0 --epoch-length 30000 --epoch-staking-phase-length 20000 --epoch-dkg-phase-length 2000 --genesis-token-supply="1000000000.0" --protocol-version=0 --internal-priv-dir ../../../bootstrap/keys/private-root-information --dkg-data ../../../bootstrap/private-root-information/root-dkg-data.priv.json --root-block ../../../bootstrap/public-root-information/root-block.json --root-block-votes-dir ../../../bootstrap/public-root-information/root-block-votes/ --epoch-commit-safety-threshold=1000
 
 gen-helm-l1:
 	go run automate/cmd/level1/bootstrap.go --data bootstrap/public-root-information/root-protocol-state-snapshot.json --dockerTag $(NETWORK_ID) --dockerRegistry $(DOCKER_REGISTRY)

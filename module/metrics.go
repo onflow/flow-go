@@ -49,9 +49,20 @@ type NetworkSecurityMetrics interface {
 	OnViolationReportSkipped()
 }
 
-// GossipSubRouterMetrics encapsulates the metrics collectors for GossipSubRouter module of the networking layer.
-// It mostly collects the metrics related to the control message exchange between nodes over the GossipSub protocol.
-type GossipSubRouterMetrics interface {
+// GossipSubRpcInspectorMetrics encapsulates the metrics collectors for GossipSub RPC Inspector module of the networking layer.
+// The RPC inspector is the entry point of the GossipSub protocol. It inspects the incoming RPC messages and decides
+// whether to accept, prune, or reject the RPC message.
+// The GossipSubRpcInspectorMetrics tracks the number of RPC messages received by the local node from other nodes over
+// the GossipSub protocol. It also tracks the number of control messages included in the RPC messages, i.e., IHAVE, IWANT,
+// GRAFT, PRUNE. It also tracks the number of actual messages included in the RPC messages.
+// The GossipSubRpcInspectorMetrics differs from LocalGossipSubRouterMetrics in that the former tracks the messages
+// received by the local node from other nodes over the GossipSub protocol but may not all be accepted by the local node,
+// e.g., due to RPC pruning or throttling; while the latter tracks the local node's view of the GossipSub protocol, i.e., entirely
+// containing the messages that are accepted by the local node (either as whole RPC or only for the control messages).
+// Having this distinction is useful for debugging and troubleshooting the GossipSub protocol, for example, the number of
+// messages received by the local node from other nodes over the GossipSub protocol may be much higher than the number
+// of messages accepted by the local node, which may indicate that the local node is throttling the incoming messages.
+type GossipSubRpcInspectorMetrics interface {
 	// OnIncomingRpcAcceptedFully tracks the number of RPC messages received by the node that are fully accepted.
 	// An RPC may contain any number of control messages, i.e., IHAVE, IWANT, GRAFT, PRUNE, as well as the actual messages.
 	// A fully accepted RPC means that all the control messages are accepted and all the messages are accepted.
@@ -89,10 +100,92 @@ type GossipSubRouterMetrics interface {
 	OnPublishedGossipMessagesReceived(count int)
 }
 
-// GossipSubLocalMeshMetrics encapsulates the metrics collectors for GossipSub mesh of the networking layer.
-type GossipSubLocalMeshMetrics interface {
+// LocalGossipSubRouterMetrics encapsulates the metrics collectors for GossipSub router of the local node.
+// It gives a lens into the local GossipSub node's view of the GossipSub protocol.
+// LocalGossipSubRouterMetrics differs from GossipSubRpcInspectorMetrics in that the former tracks the local node's view
+// of the GossipSub protocol, while the latter tracks the messages received by the local node from other nodes over the
+// GossipSub protocol but may not all be accepted by the local node, e.g., due to RPC pruning or throttling.
+// Having this distinction is useful for debugging and troubleshooting the GossipSub protocol, for example, the number of
+// messages received by the local node from other nodes over the GossipSub protocol may be much higher than the number
+// of messages accepted by the local node, which may indicate that the local node is throttling the incoming messages.
+type LocalGossipSubRouterMetrics interface {
 	// OnLocalMeshSizeUpdated tracks the size of the local mesh for a topic.
 	OnLocalMeshSizeUpdated(topic string, size int)
+
+	// OnPeerAddedToProtocol is called when the local node receives a stream from a peer on a gossipsub-related protocol.
+	// Args:
+	// 	protocol: the protocol name that the peer is connected to.
+	OnPeerAddedToProtocol(protocol string)
+
+	// OnPeerRemovedFromProtocol is called when the local considers a remote peer blacklisted or unavailable.
+	OnPeerRemovedFromProtocol()
+
+	// OnLocalPeerJoinedTopic is called when the local node subscribes to a gossipsub topic.
+	OnLocalPeerJoinedTopic()
+
+	// OnLocalPeerLeftTopic is called when the local node unsubscribes from a gossipsub topic.
+	OnLocalPeerLeftTopic()
+
+	// OnPeerGraftTopic is called when the local node receives a GRAFT message from a remote peer on a topic.
+	// Note: the received GRAFT at this point is considered passed the RPC inspection, and is accepted by the local node.
+	OnPeerGraftTopic(topic string)
+
+	// OnPeerPruneTopic is called when the local node receives a PRUNE message from a remote peer on a topic.
+	// Note: the received PRUNE at this point is considered passed the RPC inspection, and is accepted by the local node.
+	OnPeerPruneTopic(topic string)
+
+	// OnMessageEnteredValidation is called when a received pubsub message enters the validation pipeline. It is the
+	// internal validation pipeline of GossipSub protocol. The message may be rejected or accepted by the validation
+	// pipeline.
+	OnMessageEnteredValidation(size int)
+
+	// OnMessageRejected is called when a received pubsub message is rejected by the validation pipeline.
+	// Args:
+	//
+	//	reason: the reason for rejection.
+	// 	size: the size of the message in bytes.
+	OnMessageRejected(size int, reason string)
+
+	// OnMessageDuplicate is called when a received pubsub message is a duplicate of a previously received message, and
+	// is dropped.
+	// Args:
+	// 	size: the size of the message in bytes.
+	OnMessageDuplicate(size int)
+
+	// OnPeerThrottled is called when a peer is throttled by the local node, i.e., the local node is not accepting any
+	// pubsub message from the peer but may still accept control messages.
+	OnPeerThrottled()
+
+	// OnRpcReceived is called when an RPC message is received by the local node. The received RPC is considered
+	// passed the RPC inspection, and is accepted by the local node.
+	// Args:
+	// 	msgCount: the number of messages included in the RPC.
+	// 	iHaveCount: the number of iHAVE messages included in the RPC.
+	// 	iWantCount: the number of iWANT messages included in the RPC.
+	// 	graftCount: the number of GRAFT messages included in the RPC.
+	// 	pruneCount: the number of PRUNE messages included in the RPC.
+	OnRpcReceived(msgCount int, iHaveCount int, iWantCount int, graftCount int, pruneCount int)
+
+	// OnRpcSent is called when an RPC message is sent by the local node.
+	// Note: the sent RPC is considered passed the RPC inspection, and is accepted by the local node.
+	// Args:
+	// 	msgCount: the number of messages included in the RPC.
+	// 	iHaveCount: the number of iHAVE messages included in the RPC.
+	// 	iWantCount: the number of iWANT messages included in the RPC.
+	// 	graftCount: the number of GRAFT messages included in the RPC.
+	// 	pruneCount: the number of PRUNE messages included in the RPC.
+	OnRpcSent(msgCount int, iHaveCount int, iWantCount int, graftCount int, pruneCount int)
+
+	// OnOutboundRpcDropped is called when an outbound RPC message is dropped by the local node, typically because the local node
+	// outbound message queue is full; or the RPC is big and the local node cannot fragment it.
+	OnOutboundRpcDropped()
+
+	// OnUndeliveredMessage is called when a message is not delivered at least one subscriber of the topic, for example when
+	// the subscriber is too slow to process the message.
+	OnUndeliveredMessage()
+
+	// OnMessageDeliveredToAllSubscribers is called when a message is delivered to all subscribers of the topic.
+	OnMessageDeliveredToAllSubscribers(size int)
 }
 
 // UnicastManagerMetrics unicast manager metrics.
@@ -129,8 +222,8 @@ type UnicastManagerMetrics interface {
 
 type GossipSubMetrics interface {
 	GossipSubScoringMetrics
-	GossipSubRouterMetrics
-	GossipSubLocalMeshMetrics
+	GossipSubRpcInspectorMetrics
+	LocalGossipSubRouterMetrics
 	GossipSubRpcValidationInspectorMetrics
 }
 

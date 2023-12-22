@@ -12,10 +12,12 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
 	netcache "github.com/onflow/flow-go/network/p2p/cache"
-	"github.com/onflow/flow-go/network/p2p/p2pconf"
+	p2pconfig "github.com/onflow/flow-go/network/p2p/config"
+	"github.com/onflow/flow-go/network/p2p/scoring/internal"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -105,9 +107,6 @@ const (
 	// MaxDebugLogs sets the max number of debug/trace log events per second. Logs emitted above
 	// this threshold are dropped.
 	MaxDebugLogs = 50
-
-	// defaultScoreCacheSize is the default size of the cache used to store the app specific penalty of peers.
-	defaultScoreCacheSize = 1000
 
 	// defaultDecayInterval is the default decay interval for the overall score of a peer at the GossipSub scoring
 	// system. We set it to 1 minute so that it is not too short so that a malicious node can recover from a penalty
@@ -308,38 +307,36 @@ type ScoreOption struct {
 
 type ScoreOptionConfig struct {
 	logger                           zerolog.Logger
+	params                           p2pconfig.ScoringParameters
 	provider                         module.IdentityProvider
-	cacheSize                        uint32
-	cacheMetrics                     module.HeroCacheMetrics
+	heroCacheMetricsFactory          metrics.HeroCacheMetricsFactory
 	appScoreFunc                     func(peer.ID) float64
-	decayInterval                    time.Duration // the decay interval, when is set to 0, the default value will be used.
 	topicParams                      []func(map[string]*pubsub.TopicScoreParams)
 	registerNotificationConsumerFunc func(p2p.GossipSubInvCtrlMsgNotifConsumer)
+	networkingType                   network.NetworkingType
 }
 
-func NewScoreOptionConfig(logger zerolog.Logger, idProvider module.IdentityProvider) *ScoreOptionConfig {
+// NewScoreOptionConfig creates a new configuration for the GossipSub peer scoring option.
+// Args:
+// - logger: the logger to use.
+// - hcMetricsFactory: HeroCache metrics factory to create metrics for the scoring-related caches.
+// - idProvider: the identity provider to use.
+// - networkingType: the networking type to use, public or private.
+// Returns:
+// - a new configuration for the GossipSub peer scoring option.
+func NewScoreOptionConfig(logger zerolog.Logger,
+	params p2pconfig.ScoringParameters,
+	hcMetricsFactory metrics.HeroCacheMetricsFactory,
+	idProvider module.IdentityProvider,
+	networkingType network.NetworkingType) *ScoreOptionConfig {
 	return &ScoreOptionConfig{
-		logger:       logger,
-		provider:     idProvider,
-		cacheSize:    defaultScoreCacheSize,
-		cacheMetrics: metrics.NewNoopCollector(), // no metrics by default
-		topicParams:  make([]func(map[string]*pubsub.TopicScoreParams), 0),
+		logger:                  logger.With().Str("module", "pubsub_score_option").Logger(),
+		provider:                idProvider,
+		params:                  params,
+		heroCacheMetricsFactory: hcMetricsFactory,
+		topicParams:             make([]func(map[string]*pubsub.TopicScoreParams), 0),
+		networkingType:          networkingType,
 	}
-}
-
-// SetCacheSize sets the size of the cache used to store the app specific penalty of peers.
-// If the cache size is not set, the default value will be used.
-// It is safe to call this method multiple times, the last call will be used.
-func (c *ScoreOptionConfig) SetCacheSize(size uint32) {
-	c.cacheSize = size
-}
-
-// SetCacheMetrics sets the cache metrics collector for the penalty option.
-// It is used to collect metrics for the app specific penalty cache. If the cache metrics collector is not set,
-// a no-op collector will be used.
-// It is safe to call this method multiple times, the last call will be used.
-func (c *ScoreOptionConfig) SetCacheMetrics(metrics module.HeroCacheMetrics) {
-	c.cacheMetrics = metrics
 }
 
 // OverrideAppSpecificScoreFunction sets the app specific penalty function for the penalty option.
@@ -367,58 +364,51 @@ func (c *ScoreOptionConfig) SetRegisterNotificationConsumerFunc(f func(p2p.Gossi
 	c.registerNotificationConsumerFunc = f
 }
 
-// OverrideDecayInterval overrides the decay interval for the penalty option. It is used to override the default
-// decay interval for the penalty option. The decay interval is the time interval that the decay values are applied and
-// peer scores are updated.
-// Note: It is always recommended to use the default value unless you know what you are doing. Hence, calling this method
-// is not recommended in production.
-// Args:
-//
-//	interval: the decay interval.
-//
-// Returns:
-// none
-func (c *ScoreOptionConfig) OverrideDecayInterval(interval time.Duration) {
-	c.decayInterval = interval
-}
-
 // NewScoreOption creates a new penalty option with the given configuration.
-func NewScoreOption(scoreRegistryConfig *p2pconf.GossipSubScoringRegistryConfig, scorePenalties *p2pconf.GossipSubScorePenalties, scoreOptionConfig *ScoreOptionConfig, provider p2p.SubscriptionProvider) *ScoreOption {
+func NewScoreOption(cfg *ScoreOptionConfig, provider p2p.SubscriptionProvider) (*ScoreOption, error) {
 	throttledSampler := logging.BurstSampler(MaxDebugLogs, time.Second)
-	logger := scoreOptionConfig.logger.With().
+	logger := cfg.logger.With().
 		Str("module", "pubsub_score_option").
 		Logger().
 		Sample(zerolog.LevelSampler{
 			TraceSampler: throttledSampler,
 			DebugSampler: throttledSampler,
 		})
+
 	penaltyValues := GossipSubCtrlMsgPenaltyValue{
-		Graft:                                 scorePenalties.Graft,
-		Prune:                                 scorePenalties.Prune,
-		IHave:                                 scorePenalties.IHave,
-		IWant:                                 scorePenalties.IWant,
-		RpcPublishMessage:                     scorePenalties.Publish,
-		ClusterPrefixedPenaltyReductionFactor: scorePenalties.ClusterPrefixedReductionFactor,
+		Graft:                                 cfg.params.GossipsubScorePenalties.Graft,
+		Prune:                                 cfg.params.GossipsubScorePenalties.Prune,
+		IHave:                                 cfg.params.GossipsubScorePenalties.IHave,
+		IWant:                                 cfg.params.GossipsubScorePenalties.IWant,
+		RpcPublishMessage:                     cfg.params.GossipsubScorePenalties.Publish,
+		ClusterPrefixedPenaltyReductionFactor: cfg.params.GossipsubScorePenalties.ClusterPrefixedReductionFactor,
 	}
-	validator := NewSubscriptionValidator(scoreOptionConfig.logger, provider)
-	scoreRegistry := NewGossipSubAppSpecificScoreRegistry(&GossipSubAppSpecificScoreRegistryConfig{
+	validator := NewSubscriptionValidator(cfg.logger, provider)
+	scoreRegistry, err := NewGossipSubAppSpecificScoreRegistry(&GossipSubAppSpecificScoreRegistryConfig{
 		Logger:     logger,
 		Penalty:    penaltyValues,
 		Validator:  validator,
 		Init:       InitAppScoreRecordState,
-		IdProvider: scoreOptionConfig.provider,
-		CacheFactory: func() p2p.GossipSubSpamRecordCache {
-			return netcache.NewGossipSubSpamRecordCache(
-				scoreOptionConfig.cacheSize,
-				scoreOptionConfig.logger,
-				scoreOptionConfig.cacheMetrics,
-				DefaultDecayFunction(
-					scoreRegistryConfig.PenaltyDecaySlowdownThreshold,
-					scoreRegistryConfig.DecayRateReductionFactor,
-					scoreRegistryConfig.PenaltyDecayEvaluationPeriod,
-				))
+		IdProvider: cfg.provider,
+		AppScoreCacheFactory: func() p2p.GossipSubApplicationSpecificScoreCache {
+			collector := metrics.NewGossipSubApplicationSpecificScoreCacheMetrics(cfg.heroCacheMetricsFactory, cfg.networkingType)
+			return internal.NewAppSpecificScoreCache(cfg.params.SpamRecordCache.CacheSize, cfg.logger, collector)
 		},
+		SpamRecordCacheFactory: func() p2p.GossipSubSpamRecordCache {
+			collector := metrics.GossipSubSpamRecordCacheMetricsFactory(cfg.heroCacheMetricsFactory, cfg.networkingType)
+			return netcache.NewGossipSubSpamRecordCache(cfg.params.SpamRecordCache.CacheSize, cfg.logger, collector,
+				DefaultDecayFunction(
+					cfg.params.SpamRecordCache.PenaltyDecaySlowdownThreshold,
+					cfg.params.SpamRecordCache.DecayRateReductionFactor,
+					cfg.params.SpamRecordCache.PenaltyDecayEvaluationPeriod))
+		},
+		Parameters:     cfg.params.AppSpecificScore,
+		NetworkingType: cfg.networkingType,
 	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create gossipsub app specific score registry: %w", err)
+	}
+
 	s := &ScoreOption{
 		logger:          logger,
 		validator:       validator,
@@ -428,33 +418,33 @@ func NewScoreOption(scoreRegistryConfig *p2pconf.GossipSubScoringRegistryConfig,
 
 	// set the app specific penalty function for the penalty option
 	// if the app specific penalty function is not set, use the default one
-	if scoreOptionConfig.appScoreFunc != nil {
-		s.appScoreFunc = scoreOptionConfig.appScoreFunc
+	if cfg.appScoreFunc != nil {
+		s.appScoreFunc = cfg.appScoreFunc
 		s.logger.
 			Warn().
 			Str(logging.KeyNetworkingSecurity, "true").
 			Msg("app specific score function is overridden, should never happen in production")
 	}
 
-	if scoreOptionConfig.decayInterval > 0 {
+	if cfg.params.DecayInterval > 0 && cfg.params.DecayInterval != s.peerScoreParams.DecayInterval {
 		// overrides the default decay interval if the decay interval is set.
-		s.peerScoreParams.DecayInterval = scoreOptionConfig.decayInterval
+		s.peerScoreParams.DecayInterval = cfg.params.DecayInterval
 		s.logger.
 			Warn().
 			Str(logging.KeyNetworkingSecurity, "true").
-			Dur("decay_interval_ms", scoreOptionConfig.decayInterval).
+			Dur("decay_interval_ms", cfg.params.DecayInterval).
 			Msg("decay interval is overridden, should never happen in production")
 	}
 
 	// registers the score registry as the consumer of the invalid control message notifications
-	if scoreOptionConfig.registerNotificationConsumerFunc != nil {
-		scoreOptionConfig.registerNotificationConsumerFunc(scoreRegistry)
+	if cfg.registerNotificationConsumerFunc != nil {
+		cfg.registerNotificationConsumerFunc(scoreRegistry)
 	}
 
 	s.peerScoreParams.AppSpecificScore = s.appScoreFunc
 
 	// apply the topic penalty parameters if any.
-	for _, topicParams := range scoreOptionConfig.topicParams {
+	for _, topicParams := range cfg.topicParams {
 		topicParams(s.peerScoreParams.Topics)
 	}
 
@@ -476,7 +466,7 @@ func NewScoreOption(scoreRegistryConfig *p2pconf.GossipSubScoringRegistryConfig,
 		s.logger.Info().Msg("score registry stopped")
 	}).Build()
 
-	return s
+	return s, nil
 }
 
 func (s *ScoreOption) BuildFlowPubSubScoreOption() (*pubsub.PeerScoreParams, *pubsub.PeerScoreThresholds) {

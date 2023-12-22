@@ -274,16 +274,33 @@ func (nc *NoopCollector) OnStreamCreationRetryBudgetResetToDefault()            
 var _ module.HeroCacheMetrics = (*NoopCollector)(nil)
 var _ module.NetworkMetrics = (*NoopCollector)(nil)
 
-func (nc *NoopCollector) OnRateLimitedUnicastMessage(role, msgType, topic, reason string)  {}
-func (nc *NoopCollector) OnIWantReceived(int)                                              {}
-func (nc *NoopCollector) OnIHaveReceived(int)                                              {}
-func (nc *NoopCollector) OnGraftReceived(int)                                              {}
-func (nc *NoopCollector) OnPruneReceived(int)                                              {}
-func (nc *NoopCollector) OnIncomingRpcAcceptedFully()                                      {}
-func (nc *NoopCollector) OnIncomingRpcAcceptedOnlyForControlMessages()                     {}
-func (nc *NoopCollector) OnIncomingRpcRejected()                                           {}
-func (nc *NoopCollector) OnPublishedGossipMessagesReceived(int)                            {}
-func (nc *NoopCollector) OnLocalMeshSizeUpdated(string, int)                               {}
+func (nc *NoopCollector) OnRateLimitedUnicastMessage(role, msgType, topic, reason string) {}
+func (nc *NoopCollector) OnIWantReceived(int)                                             {}
+func (nc *NoopCollector) OnIHaveReceived(int)                                             {}
+func (nc *NoopCollector) OnGraftReceived(int)                                             {}
+func (nc *NoopCollector) OnPruneReceived(int)                                             {}
+func (nc *NoopCollector) OnIncomingRpcAcceptedFully()                                     {}
+func (nc *NoopCollector) OnIncomingRpcAcceptedOnlyForControlMessages()                    {}
+func (nc *NoopCollector) OnIncomingRpcRejected()                                          {}
+func (nc *NoopCollector) OnPublishedGossipMessagesReceived(int)                           {}
+func (nc *NoopCollector) OnLocalMeshSizeUpdated(string, int)                              {}
+func (nc *NoopCollector) OnPeerAddedToProtocol(protocol string)                           {}
+func (nc *NoopCollector) OnPeerRemovedFromProtocol()                                      {}
+func (nc *NoopCollector) OnLocalPeerJoinedTopic()                                         {}
+func (nc *NoopCollector) OnLocalPeerLeftTopic()                                           {}
+func (nc *NoopCollector) OnPeerGraftTopic(topic string)                                   {}
+func (nc *NoopCollector) OnPeerPruneTopic(topic string)                                   {}
+func (nc *NoopCollector) OnMessageEnteredValidation(size int)                             {}
+func (nc *NoopCollector) OnMessageRejected(size int, reason string)                       {}
+func (nc *NoopCollector) OnMessageDuplicate(size int)                                     {}
+func (nc *NoopCollector) OnPeerThrottled()                                                {}
+func (nc *NoopCollector) OnRpcReceived(msgCount int, iHaveCount int, iWantCount int, graftCount int, pruneCount int) {
+}
+func (nc *NoopCollector) OnRpcSent(msgCount int, iHaveCount int, iWantCount int, graftCount int, pruneCount int) {
+}
+func (nc *NoopCollector) OnOutboundRpcDropped()                                            {}
+func (nc *NoopCollector) OnUndeliveredMessage()                                            {}
+func (nc *NoopCollector) OnMessageDeliveredToAllSubscribers(size int)                      {}
 func (nc *NoopCollector) AllowConn(network.Direction, bool)                                {}
 func (nc *NoopCollector) BlockConn(network.Direction, bool)                                {}
 func (nc *NoopCollector) AllowStream(peer.ID, network.Direction)                           {}

@@ -242,9 +242,39 @@ func (_m *NetworkMetrics) OnLocalMeshSizeUpdated(topic string, size int) {
 	_m.Called(topic, size)
 }
 
+// OnLocalPeerJoinedTopic provides a mock function with given fields:
+func (_m *NetworkMetrics) OnLocalPeerJoinedTopic() {
+	_m.Called()
+}
+
+// OnLocalPeerLeftTopic provides a mock function with given fields:
+func (_m *NetworkMetrics) OnLocalPeerLeftTopic() {
+	_m.Called()
+}
+
 // OnMeshMessageDeliveredUpdated provides a mock function with given fields: _a0, _a1
 func (_m *NetworkMetrics) OnMeshMessageDeliveredUpdated(_a0 channels.Topic, _a1 float64) {
 	_m.Called(_a0, _a1)
+}
+
+// OnMessageDeliveredToAllSubscribers provides a mock function with given fields: size
+func (_m *NetworkMetrics) OnMessageDeliveredToAllSubscribers(size int) {
+	_m.Called(size)
+}
+
+// OnMessageDuplicate provides a mock function with given fields: size
+func (_m *NetworkMetrics) OnMessageDuplicate(size int) {
+	_m.Called(size)
+}
+
+// OnMessageEnteredValidation provides a mock function with given fields: size
+func (_m *NetworkMetrics) OnMessageEnteredValidation(size int) {
+	_m.Called(size)
+}
+
+// OnMessageRejected provides a mock function with given fields: size, reason
+func (_m *NetworkMetrics) OnMessageRejected(size int, reason string) {
+	_m.Called(size, reason)
 }
 
 // OnMisbehaviorReported provides a mock function with given fields: channel, misbehaviorType
@@ -252,8 +282,18 @@ func (_m *NetworkMetrics) OnMisbehaviorReported(channel string, misbehaviorType 
 	_m.Called(channel, misbehaviorType)
 }
 
+// OnOutboundRpcDropped provides a mock function with given fields:
+func (_m *NetworkMetrics) OnOutboundRpcDropped() {
+	_m.Called()
+}
+
 // OnOverallPeerScoreUpdated provides a mock function with given fields: _a0
 func (_m *NetworkMetrics) OnOverallPeerScoreUpdated(_a0 float64) {
+	_m.Called(_a0)
+}
+
+// OnPeerAddedToProtocol provides a mock function with given fields: _a0
+func (_m *NetworkMetrics) OnPeerAddedToProtocol(_a0 string) {
 	_m.Called(_a0)
 }
 
@@ -265,6 +305,26 @@ func (_m *NetworkMetrics) OnPeerDialFailure(duration time.Duration, attempts int
 // OnPeerDialed provides a mock function with given fields: duration, attempts
 func (_m *NetworkMetrics) OnPeerDialed(duration time.Duration, attempts int) {
 	_m.Called(duration, attempts)
+}
+
+// OnPeerGraftTopic provides a mock function with given fields: topic
+func (_m *NetworkMetrics) OnPeerGraftTopic(topic string) {
+	_m.Called(topic)
+}
+
+// OnPeerPruneTopic provides a mock function with given fields: topic
+func (_m *NetworkMetrics) OnPeerPruneTopic(topic string) {
+	_m.Called(topic)
+}
+
+// OnPeerRemovedFromProtocol provides a mock function with given fields:
+func (_m *NetworkMetrics) OnPeerRemovedFromProtocol() {
+	_m.Called()
+}
+
+// OnPeerThrottled provides a mock function with given fields:
+func (_m *NetworkMetrics) OnPeerThrottled() {
+	_m.Called()
 }
 
 // OnPruneReceived provides a mock function with given fields: count
@@ -280,6 +340,16 @@ func (_m *NetworkMetrics) OnPublishedGossipMessagesReceived(count int) {
 // OnRateLimitedPeer provides a mock function with given fields: pid, role, msgType, topic, reason
 func (_m *NetworkMetrics) OnRateLimitedPeer(pid peer.ID, role string, msgType string, topic string, reason string) {
 	_m.Called(pid, role, msgType, topic, reason)
+}
+
+// OnRpcReceived provides a mock function with given fields: msgCount, iHaveCount, iWantCount, graftCount, pruneCount
+func (_m *NetworkMetrics) OnRpcReceived(msgCount int, iHaveCount int, iWantCount int, graftCount int, pruneCount int) {
+	_m.Called(msgCount, iHaveCount, iWantCount, graftCount, pruneCount)
+}
+
+// OnRpcSent provides a mock function with given fields: msgCount, iHaveCount, iWantCount, graftCount, pruneCount
+func (_m *NetworkMetrics) OnRpcSent(msgCount int, iHaveCount int, iWantCount int, graftCount int, pruneCount int) {
+	_m.Called(msgCount, iHaveCount, iWantCount, graftCount, pruneCount)
 }
 
 // OnStreamCreated provides a mock function with given fields: duration, attempts
@@ -315,6 +385,11 @@ func (_m *NetworkMetrics) OnTimeInMeshUpdated(_a0 channels.Topic, _a1 time.Durat
 // OnUnauthorizedMessage provides a mock function with given fields: role, msgType, topic, offense
 func (_m *NetworkMetrics) OnUnauthorizedMessage(role string, msgType string, topic string, offense string) {
 	_m.Called(role, msgType, topic, offense)
+}
+
+// OnUndeliveredMessage provides a mock function with given fields:
+func (_m *NetworkMetrics) OnUndeliveredMessage() {
+	_m.Called()
 }
 
 // OnViolationReportSkipped provides a mock function with given fields:
