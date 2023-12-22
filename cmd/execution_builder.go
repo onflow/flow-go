@@ -801,14 +801,24 @@ func (exeNode *ExecutionNode) LoadRegisterStore(
 
 	if !bootstrapped {
 		checkpointFile := path.Join(exeNode.exeConf.triedir, modelbootstrap.FilenameWALRootCheckpoint)
-		root, err := exeNode.builder.RootSnapshot.Head()
+		sealedRoot, err := node.State.Params().SealedRoot()
 		if err != nil {
-			return fmt.Errorf("could not get root snapshot head: %w", err)
+			return fmt.Errorf("could not get sealed root: %w", err)
 		}
 
-		checkpointHeight := root.Height
+		rootSeal, err := node.State.Params().Seal()
+		if err != nil {
+			return fmt.Errorf("could not get root seal: %w", err)
+		}
 
-		err = bootstrap.ImportRegistersFromCheckpoint(node.Logger, checkpointFile, checkpointHeight, pebbledb, exeNode.exeConf.importCheckpointWorkerCount)
+		if sealedRoot.ID() != rootSeal.BlockID {
+			return fmt.Errorf("mismatching root seal and sealed root: %v != %v", sealedRoot.ID(), rootSeal.BlockID)
+		}
+
+		checkpointHeight := sealedRoot.Height
+		rootHash := ledgerpkg.RootHash(rootSeal.FinalState)
+
+		err = bootstrap.ImportRegistersFromCheckpoint(node.Logger, checkpointFile, checkpointHeight, rootHash, pebbledb, exeNode.exeConf.importCheckpointWorkerCount)
 		if err != nil {
 			return fmt.Errorf("could not import registers from checkpoint: %w", err)
 		}
