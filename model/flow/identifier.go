@@ -26,8 +26,16 @@ type Identifier [IdentifierLen]byte
 // IdentifierFilter is a filter on identifiers.
 type IdentifierFilter func(Identifier) bool
 
-// IdentifierOrder is a sort for identifier
-type IdentifierOrder func(Identifier, Identifier) bool
+// IdentifierOrder is an order function for identifiers.
+//
+// It defines a strict weak ordering between identifiers.
+// It returns a negative number if the first identifier is "strictly less" than the second,
+// a positive number if the second identifier is "strictly less" than the first,
+// and zero if the two identifiers are equal.
+//
+// `IdentifierOrder` can be used to sort identifiers with
+// https://pkg.go.dev/golang.org/x/exp/slices#SortFunc.
+type IdentifierOrder func(Identifier, Identifier) int
 
 var (
 	// ZeroID is the lowest value in the 32-byte ID space.
