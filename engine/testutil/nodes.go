@@ -653,7 +653,9 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		diskStore,
 		nil, // TOOD(leo): replace with real WAL
 		reader,
-		node.Log)
+		node.Log,
+		storehouse.NewNoopNotifier(),
+	)
 	require.NoError(t, err)
 
 	storehouseEnabled := true
