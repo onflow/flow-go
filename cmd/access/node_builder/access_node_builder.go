@@ -1064,7 +1064,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.StringVar(&builder.rpcConf.BackendConfig.EventQueryMode,
 			"event-query-mode",
 			defaultConfig.rpcConf.BackendConfig.EventQueryMode,
-			"mode to use when querying events. one of (local-only, execution-nodes-only, failover)")
+			"mode to use when querying events. one of [local-only, execution-nodes-only(default), failover]")
 
 		// Script Execution
 		flags.StringVar(&builder.rpcConf.BackendConfig.ScriptExecutionMode,
