@@ -53,7 +53,9 @@ func (e *UnfinalizedLoader) LoadUnexecuted(ctx context.Context) ([]flow.Identifi
 
 	lg.Info().Msgf("start loading unfinalized blocks")
 
-	// TODO: dynamically bootstrapped execution node will reload blocks from
+	// dynamically bootstrapped execution node will have highest finalized executed as sealed root,
+	// which is lower than finalized root. so we will reload blocks from
+	// [sealedRoot.Height + 1, finalizedRoot.Height] and execute them on startup.
 	unexecutedFinalized := make([]flow.Identifier, 0)
 
 	// starting from the first unexecuted block, go through each unexecuted and finalized block
