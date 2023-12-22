@@ -300,6 +300,8 @@ func (c *ControlMsgValidationInspector) inspectGraftMessages(from peer.ID, graft
 	for _, graft := range grafts {
 		topic := channels.Topic(graft.GetTopicID())
 		if tracker.isDuplicate(topic.String()) {
+			// Duplicate topic errors are marked with p2p.CtrlMsgNonClusterTopicType since the topic type is unknown until validation completes.
+			// This approach ensures that penalties for duplicate topic errors are not reduced.
 			invErr := p2p.NewInvCtrlMsgErr(NewDuplicateTopicErr(topic.String(), p2pmsg.CtrlMsgGraft), p2p.CtrlMsgNonClusterTopicType)
 			invErr.SetTopic(topic.String())
 			errs = append(errs, invErr)
@@ -348,6 +350,8 @@ func (c *ControlMsgValidationInspector) inspectPruneMessages(from peer.ID, prune
 	for _, prune := range prunes {
 		topic := channels.Topic(prune.GetTopicID())
 		if tracker.isDuplicate(topic.String()) {
+			// Duplicate topic errors are marked with p2p.CtrlMsgNonClusterTopicType since the topic type is unknown until validation completes.
+			// This approach ensures that penalties for duplicate topic errors are not reduced.
 			invErr := p2p.NewInvCtrlMsgErr(NewDuplicateTopicErr(topic.String(), p2pmsg.CtrlMsgGraft), p2p.CtrlMsgNonClusterTopicType)
 			invErr.SetTopic(topic.String())
 			errs = append(errs, invErr)
@@ -403,6 +407,8 @@ func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihave
 		messageIds := ihave.GetMessageIDs()
 		topic := ihave.GetTopicID()
 		if duplicateTopicTracker.isDuplicate(topic) {
+			// Duplicate topic errors are marked with p2p.CtrlMsgNonClusterTopicType since the topic type is unknown until validation completes.
+			// This approach ensures that penalties for duplicate topic errors are not reduced.
 			invErr := p2p.NewInvCtrlMsgErr(NewDuplicateTopicErr(topic, p2pmsg.CtrlMsgGraft), p2p.CtrlMsgNonClusterTopicType)
 			invErr.SetTopic(topic)
 			errs = append(errs, invErr)
