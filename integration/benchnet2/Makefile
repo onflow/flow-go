@@ -52,7 +52,7 @@ gen-bootstrap: clone-flow
 		--dkg-data ../../../bootstrap/private-root-information/root-dkg-data.priv.json \
 		--root-block ../../../bootstrap/public-root-information/root-block.json \
 		--root-block-votes-dir ../../../bootstrap/public-root-information/root-block-votes/ \
-		--epoch-commit-safety-threshold=50
+		--epoch-commit-safety-threshold=100
 
 gen-helm-l1:
 	go run automate/cmd/level1/bootstrap.go --data bootstrap/public-root-information/root-protocol-state-snapshot.json --dockerTag $(NETWORK_ID) --dockerRegistry $(DOCKER_REGISTRY)
