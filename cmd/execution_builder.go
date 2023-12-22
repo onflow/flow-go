@@ -820,12 +820,17 @@ func (exeNode *ExecutionNode) LoadRegisterStore(
 
 	reader := finalizedreader.NewFinalizedReader(node.Storage.Headers, node.LastFinalizedHeader.Height)
 	node.ProtocolEvents.AddConsumer(reader)
+	notifier := storehouse.NewRegisterStoreMetrics(exeNode.collector)
+
+	// report latest finalized and executed height as metrics
+	notifier.OnFinalizedAndExecutedHeightUpdated(diskStore.LatestHeight())
 
 	registerStore, err := storehouse.NewRegisterStore(
 		diskStore,
 		nil, // TODO: replace with real WAL
 		reader,
 		node.Logger,
+		notifier,
 	)
 	if err != nil {
 		return err
