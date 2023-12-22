@@ -1,15 +1,13 @@
 package flow
 
 import (
-	"bytes"
-
 	"golang.org/x/exp/slices"
 )
 
 // IdentifierList defines a sortable list of identifiers
 type IdentifierList []Identifier
 
-// Len returns length of the IdentiferList in the number of stored identifiers.
+// Len returns length of the IdentifierList in the number of stored identifiers.
 // It satisfies the sort.Interface making the IdentifierList sortable.
 func (il IdentifierList) Len() int {
 	return len(il)
@@ -28,9 +26,7 @@ func (il IdentifierList) Lookup() map[Identifier]struct{} {
 // Otherwise it returns true.
 // It satisfies the sort.Interface making the IdentifierList sortable.
 func (il IdentifierList) Less(i, j int) bool {
-	// use the same canonical ordering: order.Canonical(il[i], il[j]) < 0
-	// using the order package causes a circular dependency
-	return bytes.Compare(il[i][:], il[j][:]) < 0
+	return IsIdentifierCanonical(il[i], il[j])
 }
 
 // Swap swaps the element i and j in the IdentifierList.
@@ -112,15 +108,9 @@ IDLoop:
 	return dup
 }
 
+// Sort returns a sorted _copy_ of the IdentifierList, leaving the original invariant.
 func (il IdentifierList) Sort(less IdentifierOrder) IdentifierList {
 	dup := il.Copy()
 	slices.SortFunc(dup, less)
 	return dup
-}
-
-// Sorted returns whether the list is sorted by the input ordering.
-//
-// If the list is well sorted and has duplicates, the function returns `true`.
-func (il IdentifierList) Sorted(less IdentifierOrder) bool {
-	return slices.IsSortedFunc(il, less)
 }

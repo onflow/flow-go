@@ -2,67 +2,14 @@ package dkg
 
 import (
 	"fmt"
-	"math"
 	"sync"
-	"time"
 
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/utils/rand"
 )
-
-const (
-
-	// DefaultBaseStartDelay is the default base delay to use when introducing
-	// random delay to the DKG start process. See preStartDelay for details.
-	DefaultBaseStartDelay = 500 * time.Microsecond
-
-	// DefaultBaseHandleFirstBroadcastDelay is the default base to use when
-	// introducing random delay to processing the first DKG broadcast message.
-	// See preHandleFirstBroadcastDelay for details.
-	//
-	// For a 150-node DKG, we observe a cost of ~2.5s per message to process
-	// broadcast messages during phase 1, for a total of ~6m of total CPU time.
-	// We would like to target spreading this cost over a 30 minute period.
-	// With the default value for DefaultHandleSubsequentBroadcastDelay, this
-	// results in processing all phase 1 messages in 6m+6m=12m, so for a maximum
-	// total processing time of 30m, we sample the initial delay from [0,18m].
-	// We use 50ms as the default because 50ms*150^2 = 18.75m
-	//
-	DefaultBaseHandleFirstBroadcastDelay = 50 * time.Millisecond
-
-	// DefaultHandleSubsequentBroadcastDelay is the default delay to use before
-	// processing all DKG broadcasts after the first.
-	DefaultHandleSubsequentBroadcastDelay = 2500 * time.Millisecond
-)
-
-// ControllerConfig defines configuration for the DKG Controller. These define
-// how the DKG controller introduces delays to expensive DKG computations.
-//
-// We introduce delays for two reasons:
-// 1. Avoid running long-running expensive DKG computations consecutively.
-// 2. Avoid synchronizing expensive DKG computations across the DKG committee.
-//
-// Delays introduced prior to DKG start and prior to processing the FIRST broadcast
-// message are sampled uniformly from [0,m), where m=b*n^2
-//
-//	b = base delay (from config)
-//	n = size of DKG committee
-//
-// Delays introduced prior to processing subsequent broadcast messages are constant.
-type ControllerConfig struct {
-	// BaseStartDelay determines the maximum delay before starting the DKG.
-	BaseStartDelay time.Duration
-	// BaseHandleFirstBroadcastDelay determines the maximum delay before handling
-	// the first broadcast message.
-	BaseHandleFirstBroadcastDelay time.Duration
-	// HandleSubsequentBroadcastDelay determines the constant delay before handling
-	// all broadcast messages following the first.
-	HandleSubsequentBroadcastDelay time.Duration
-}
 
 // Controller implements the DKGController interface. It controls the execution
 // of a Joint Feldman DKG instance. A new Controller must be instantiated for
@@ -101,8 +48,7 @@ type Controller struct {
 	// artifactsLock protects access to artifacts
 	artifactsLock sync.Mutex
 
-	config ControllerConfig
-	once   *sync.Once
+	once *sync.Once
 }
 
 // NewController instantiates a new Joint Feldman DKG controller.
@@ -112,7 +58,6 @@ func NewController(
 	dkg crypto.DKGState,
 	seed []byte,
 	broker module.DKGBroker,
-	config ControllerConfig,
 ) *Controller {
 
 	logger := log.With().
@@ -130,7 +75,6 @@ func NewController(
 		endCh:      make(chan struct{}),
 		shutdownCh: make(chan struct{}),
 		once:       new(sync.Once),
-		config:     config,
 	}
 }
 
@@ -293,32 +237,6 @@ func (c *Controller) doBackgroundWork() {
 
 		case msg := <-broadcastMsgCh:
 
-			// before processing a broadcast message during phase 1, sleep for a
-			// random delay to avoid synchronizing this expensive operation across
-			// all consensus nodes
-			state := c.GetState()
-			if state == Phase1 {
-
-				// introduce a large, uniformly sampled delay prior to processing
-				// the first message
-				isFirstMessage := false
-				c.once.Do(func() {
-					isFirstMessage = true
-					delay, err := c.preHandleFirstBroadcastDelay()
-					if err != nil {
-						c.log.Err(err).Msg("pre handle first broadcast delay failed")
-					}
-					c.log.Info().Msgf("sleeping for %s before processing first phase 1 broadcast message", delay)
-					time.Sleep(delay)
-				})
-
-				if !isFirstMessage {
-					// introduce a constant delay for all subsequent messages
-					c.log.Debug().Msgf("sleeping for %s before processing subsequent phase 1 broadcast message", c.config.HandleSubsequentBroadcastDelay)
-					time.Sleep(c.config.HandleSubsequentBroadcastDelay)
-				}
-			}
-
 			c.dkgLock.Lock()
 			err := c.dkg.HandleBroadcastMsg(int(msg.CommitteeMemberIndex), msg.Data)
 			c.dkgLock.Unlock()
@@ -338,17 +256,8 @@ func (c *Controller) start() error {
 		return fmt.Errorf("cannot execute start routine in state %s", state)
 	}
 
-	// before starting the DKG, sleep for a random delay to avoid synchronizing
-	// this expensive operation across all consensus nodes
-	delay, err := c.preStartDelay()
-	if err != nil {
-		return fmt.Errorf("pre start delay failed: %w", err)
-	}
-	c.log.Debug().Msgf("sleeping for %s before starting DKG", delay)
-	time.Sleep(delay)
-
 	c.dkgLock.Lock()
-	err = c.dkg.Start(c.seed)
+	err := c.dkg.Start(c.seed)
 	c.dkgLock.Unlock()
 	if err != nil {
 		return fmt.Errorf("Error starting DKG: %w", err)
@@ -422,57 +331,4 @@ func (c *Controller) phase3() error {
 			return nil
 		}
 	}
-}
-
-// preStartDelay returns a duration to delay prior to starting the DKG process.
-// This prevents synchronization of the DKG starting (an expensive operation)
-// across the network, which can impact finalization.
-func (c *Controller) preStartDelay() (time.Duration, error) {
-	return computePreprocessingDelay(c.config.BaseStartDelay, c.dkg.Size())
-}
-
-// preHandleFirstBroadcastDelay returns a duration to delay prior to handling
-// the first broadcast message. This delay is used only during phase 1 of the DKG.
-// This prevents synchronization of processing verification vectors (an
-// expensive operation) across the network, which can impact finalization.
-func (c *Controller) preHandleFirstBroadcastDelay() (time.Duration, error) {
-	return computePreprocessingDelay(c.config.BaseHandleFirstBroadcastDelay, c.dkg.Size())
-}
-
-// computePreprocessingDelay computes a random delay to introduce before an
-// expensive operation.
-//
-// The maximum delay is m=b*n^2 where:
-// * b is a configurable base delay
-// * n is the size of the DKG committee
-func computePreprocessingDelay(baseDelay time.Duration, dkgSize int) (time.Duration, error) {
-
-	maxDelay := computePreprocessingDelayMax(baseDelay, dkgSize)
-	if maxDelay <= 0 {
-		return 0, nil
-	}
-	// select delay from [0,m)
-	r, err := rand.Uint64n(uint64(maxDelay.Nanoseconds()))
-	if err != nil {
-		return time.Duration(0), fmt.Errorf("delay generation failed %w", err)
-	}
-	return time.Duration(r), nil
-}
-
-// computePreprocessingDelayMax computes the maximum dely for computePreprocessingDelay.
-func computePreprocessingDelayMax(baseDelay time.Duration, dkgSize int) time.Duration {
-	// sanity checks
-	if baseDelay < 0 {
-		baseDelay = 0
-	}
-	if dkgSize < 0 {
-		dkgSize = 0
-	}
-
-	// m=b*n^2
-	maxDelay := time.Duration(math.Pow(float64(dkgSize), 2)) * baseDelay
-	if maxDelay <= 0 {
-		return 0
-	}
-	return maxDelay
 }

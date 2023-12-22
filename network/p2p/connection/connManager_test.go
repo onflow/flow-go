@@ -59,7 +59,7 @@ func TestConnectionManagerProtection(t *testing.T) {
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
 	noopMetrics := metrics.NewNoopCollector()
-	connManager, err := connection.NewConnManager(log, noopMetrics, &flowConfig.NetworkConfig.ConnectionManagerConfig)
+	connManager, err := connection.NewConnManager(log, noopMetrics, &flowConfig.NetworkConfig.ConnectionManager)
 	require.NoError(t, err)
 
 	testCases := [][]fun{
@@ -106,7 +106,7 @@ func TestConnectionManager_Watermarking(t *testing.T) {
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	defer cancel()
 
-	cfg := &netconf.ConnectionManagerConfig{
+	cfg := &netconf.ConnectionManager{
 		HighWatermark: 4,                      // whenever the number of connections exceeds 4, connection manager prune connections.
 		LowWatermark:  2,                      // connection manager prune connections until the number of connections is 2.
 		GracePeriod:   500 * time.Millisecond, // extra connections will be pruned if they are older than a second (just for testing).

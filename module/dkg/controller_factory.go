@@ -21,7 +21,6 @@ type ControllerFactory struct {
 	me                 module.Local
 	dkgContractClients []module.DKGContractClient
 	tunnel             *BrokerTunnel
-	config             ControllerConfig
 }
 
 // NewControllerFactory creates a new factory that generates Controllers with
@@ -31,14 +30,13 @@ func NewControllerFactory(
 	me module.Local,
 	dkgContractClients []module.DKGContractClient,
 	tunnel *BrokerTunnel,
-	config ControllerConfig) *ControllerFactory {
+) *ControllerFactory {
 
 	return &ControllerFactory{
 		log:                log,
 		me:                 me,
 		dkgContractClients: dkgContractClients,
 		tunnel:             tunnel,
-		config:             config,
 	}
 }
 
@@ -77,7 +75,6 @@ func (f *ControllerFactory) Create(
 		dkg,
 		seed,
 		broker,
-		f.config,
 	)
 
 	return controller, nil

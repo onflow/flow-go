@@ -1,7 +1,6 @@
 package flow
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -305,11 +304,11 @@ type IdentityFilter func(*Identity) bool
 //
 // It defines a strict weak ordering between identities.
 // It returns a negative number if the first identity is "strictly less" than the second,
-// a positive number if the second identity is "strictly less" than the second,
+// a positive number if the second identity is "strictly less" than the first,
 // and zero if the two identities are equal.
 //
-// `IdentityOrder` can be used to sort identities as required
-// in https://pkg.go.dev/golang.org/x/exp/slices#SortFunc.
+// `IdentityOrder` can be used to sort identities with
+// https://pkg.go.dev/golang.org/x/exp/slices#SortFunc.
 type IdentityOrder func(*Identity, *Identity) int
 
 // IdentityMapFunc is a modifier function for map operations for identities.
@@ -394,11 +393,6 @@ func (il IdentityList) Sort(less IdentityOrder) IdentityList {
 	dup := il.Copy()
 	slices.SortFunc(dup, less)
 	return dup
-}
-
-// Sorted returns whether the list is sorted by the input ordering.
-func (il IdentityList) Sorted(less IdentityOrder) bool {
-	return slices.IsSortedFunc(il, less)
 }
 
 // NodeIDs returns the NodeIDs of the nodes in the list.
@@ -529,7 +523,7 @@ func (il IdentityList) SamplePct(pct float64) (IdentityList, error) {
 // Union returns a new identity list containing every identity that occurs in
 // either `il`, or `other`, or both. There are no duplicates in the output,
 // where duplicates are identities with the same node ID.
-// The returned IdentityList is sorted
+// The returned IdentityList is sorted canonically.
 func (il IdentityList) Union(other IdentityList) IdentityList {
 	maxLen := len(il) + len(other)
 
@@ -545,10 +539,7 @@ func (il IdentityList) Union(other IdentityList) IdentityList {
 		}
 	}
 
-	slices.SortFunc(union, func(a, b *Identity) int {
-		return bytes.Compare(a.NodeID[:], b.NodeID[:])
-	})
-
+	slices.SortFunc(union, Canonical)
 	return union
 }
 
@@ -572,9 +563,7 @@ func (il IdentityList) Exists(target *Identity) bool {
 // target:  value to search for
 // CAUTION:  The identity list MUST be sorted prior to calling this method
 func (il IdentityList) IdentifierExists(target Identifier) bool {
-	_, ok := slices.BinarySearchFunc(il, &Identity{NodeID: target}, func(a, b *Identity) int {
-		return bytes.Compare(a.NodeID[:], b.NodeID[:])
-	})
+	_, ok := slices.BinarySearchFunc(il, &Identity{NodeID: target}, Canonical)
 	return ok
 }
 

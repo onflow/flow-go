@@ -462,7 +462,13 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	assigner, err := chunks.NewChunkAssigner(flow.DefaultChunkAssignmentAlpha, node.State)
 	require.Nil(t, err)
 
-	receiptValidator := validation.NewReceiptValidator(node.State, node.Headers, node.Index, resultsDB, node.Seals)
+	receiptValidator := validation.NewReceiptValidator(
+		node.State,
+		node.Headers,
+		node.Index,
+		resultsDB,
+		node.Seals,
+	)
 
 	sealingEngine, err := sealing.NewEngine(
 		node.Log,

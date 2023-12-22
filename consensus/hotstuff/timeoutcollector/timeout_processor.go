@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/tracker"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/signature"
 )
 
@@ -267,7 +266,7 @@ func (p *TimeoutProcessor) buildTC() (*flow.TimeoutCertificate, error) {
 
 	// sort data in canonical order
 	slices.SortFunc(signersData, func(lhs, rhs hotstuff.TimeoutSignerInfo) int {
-		return order.IdentifierCanonical(lhs.Signer, rhs.Signer)
+		return flow.IdentifierCanonical(lhs.Signer, rhs.Signer)
 	})
 
 	// extract signers and data separately
