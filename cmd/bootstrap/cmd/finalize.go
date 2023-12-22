@@ -104,6 +104,7 @@ func addFinalizeCmdFlags() {
 	finalizeCmd.Flags().Uint64Var(&flagNumViewsInStakingAuction, "epoch-staking-phase-length", 100, "length of the epoch staking phase measured in views")
 	finalizeCmd.Flags().Uint64Var(&flagNumViewsInDKGPhase, "epoch-dkg-phase-length", 1000, "length of each DKG phase measured in views")
 	finalizeCmd.Flags().Uint64Var(&flagEpochCommitSafetyThreshold, "epoch-commit-safety-threshold", 500, "defines epoch commitment deadline")
+	finalizeCmd.Flags().UintVar(&flagProtocolVersion, "protocol-version", flow.DefaultProtocolVersion, "major software version used for the duration of this spork")
 	// Epoch timing config - these values must be set identically to `EpochTimingConfig` in the FlowEpoch smart contract.
 	// See https://github.com/onflow/flow-core-contracts/blob/240579784e9bb8d97d91d0e3213614e25562c078/contracts/epochs/FlowEpoch.cdc#L259-L266
 	// Must specify either:
@@ -116,7 +117,12 @@ func addFinalizeCmdFlags() {
 	finalizeCmd.Flags().Uint64Var(&flagEpochTimingRefCounter, "epoch-timing-ref-counter", 0, "the reference epoch for computing the root epoch's target end time")
 	finalizeCmd.Flags().Uint64Var(&flagEpochTimingRefTimestamp, "epoch-timing-ref-timestamp", 0, "the end time of the reference epoch, specified in second-precision Unix time, to use to compute the root epoch's target end time")
 	finalizeCmd.Flags().Uint64Var(&flagEpochTimingDuration, "epoch-timing-duration", 0, "the duration of each epoch in seconds, used to compute the root epoch's target end time")
-	finalizeCmd.Flags().UintVar(&flagProtocolVersion, "protocol-version", flow.DefaultProtocolVersion, "major software version used for the duration of this spork")
+
+	finalizeCmd.MarkFlagsOneRequired("use-default-epoch-timing", "epoch-timing-ref-counter", "epoch-timing-ref-timestamp", "epoch-timing-duration")
+	finalizeCmd.MarkFlagsRequiredTogether("epoch-timing-ref-counter", "epoch-timing-ref-timestamp", "epoch-timing-duration")
+	for _, flag := range []string{"epoch-timing-ref-counter", "epoch-timing-ref-timestamp", "epoch-timing-duration"} {
+		finalizeCmd.MarkFlagsMutuallyExclusive("use-default-epoch-timing", flag)
+	}
 
 	cmd.MarkFlagRequired(finalizeCmd, "root-block")
 	cmd.MarkFlagRequired(finalizeCmd, "root-block-votes-dir")
@@ -126,9 +132,6 @@ func addFinalizeCmdFlags() {
 	cmd.MarkFlagRequired(finalizeCmd, "epoch-staking-phase-length")
 	cmd.MarkFlagRequired(finalizeCmd, "epoch-dkg-phase-length")
 	cmd.MarkFlagRequired(finalizeCmd, "epoch-commit-safety-threshold")
-	cmd.MarkFlagRequired(finalizeCmd, "epoch-timing-ref-counter")
-	cmd.MarkFlagRequired(finalizeCmd, "epoch-timing-ref-timestamp")
-	cmd.MarkFlagRequired(finalizeCmd, "epoch-timing-duration")
 	cmd.MarkFlagRequired(finalizeCmd, "protocol-version")
 
 	// optional parameters to influence various aspects of identity generation
