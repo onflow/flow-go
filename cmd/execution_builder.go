@@ -941,12 +941,12 @@ func (exeNode *ExecutionNode) LoadCheckerEngine(
 	module.ReadyDoneAware,
 	error,
 ) {
-	exeNode.checkerEng = checker.New(
+	core := checker.NewCore(
 		node.Logger,
 		node.State,
 		exeNode.executionState,
-		node.Storage.Seals,
 	)
+	exeNode.checkerEng = checker.NewEngine(core)
 	return exeNode.checkerEng, nil
 }
 
@@ -1055,8 +1055,6 @@ func (exeNode *ExecutionNode) LoadFollowerCore(
 	if err != nil {
 		return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
 	}
-
-	exeNode.followerDistributor.AddFinalizationConsumer(exeNode.checkerEng)
 
 	// creates a consensus follower with ingestEngine as the notifier
 	// so that it gets notified upon each new finalized block
