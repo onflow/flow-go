@@ -79,7 +79,7 @@ func (s *CollectionIndexingSuite) TearDownTest() {
 }
 
 func (s *CollectionIndexingSuite) Test() {
-	// start the network with access_2 paused.
+	// start the network with access_2 disconnected.
 	// this simulates it falling behind on syncing collections
 	access2 := s.net.ContainerByName("access_2")
 	s.Require().NoError(access2.Disconnect())
@@ -94,8 +94,8 @@ func (s *CollectionIndexingSuite) Test() {
 
 	// stop the collection nodes
 	// this will prevent access_2 from syncing collections from the network
-	s.Require().NoError(s.net.ContainerByName("collection_1").Disconnect())
-	s.Require().NoError(s.net.ContainerByName("collection_2").Disconnect())
+	s.Require().NoError(s.net.ContainerByName("collection_1").Pause())
+	s.Require().NoError(s.net.ContainerByName("collection_2").Pause())
 
 	// now start access_2, and wait for it to catch up with collections
 	s.Require().NoError(access2.Connect())
