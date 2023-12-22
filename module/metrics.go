@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/channels"
+	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 )
 
 type EntriesFunc func() uint
@@ -174,8 +175,8 @@ type GossipSubRpcValidationInspectorMetrics interface {
 	// AsyncProcessingFinished tracks the time spent by a rpc validation inspector worker to process an inspect message request asynchronously and decrements the metric tracking
 	// the number of inspect message requests  being processed asynchronously by the rpc validation inspector workers.
 	AsyncProcessingFinished(duration time.Duration)
-	// InvalidControlMessageNotificationErrors tracks the number of errors in each invalid control message notification over time.
-	InvalidControlMessageNotificationErrors(count int)
+	// InvalidControlMessageNotificationError tracks the number of errors in each invalid control message notification per msg type.
+	InvalidControlMessageNotificationError(msgType p2pmsg.ControlMessageType, count float64)
 }
 
 // NetworkInboundQueueMetrics encapsulates the metrics collectors for the inbound queue of the networking layer.

@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/channels"
+	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 )
 
 type NoopCollector struct{}
@@ -307,9 +308,9 @@ func (nc *NoopCollector) OnIPColocationFactorUpdated(f float64)                 
 func (nc *NoopCollector) OnAppSpecificScoreUpdated(f float64)                              {}
 func (nc *NoopCollector) OnOverallPeerScoreUpdated(f float64)                              {}
 
-func (nc *NoopCollector) AsyncProcessingStarted()                     {}
-func (nc *NoopCollector) AsyncProcessingFinished(time.Duration)       {}
-func (nc *NoopCollector) InvalidControlMessageNotificationErrors(int) {}
+func (nc *NoopCollector) AsyncProcessingStarted()                                                   {}
+func (nc *NoopCollector) AsyncProcessingFinished(time.Duration)                                     {}
+func (nc *NoopCollector) InvalidControlMessageNotificationError(p2pmsg.ControlMessageType, float64) {}
 
 func (nc *NoopCollector) OnMisbehaviorReported(string, string) {}
 func (nc *NoopCollector) OnViolationReportSkipped()            {}

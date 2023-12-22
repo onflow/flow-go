@@ -7,6 +7,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"github.com/onflow/flow-go/module"
+	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 )
 
 // GossipSubRpcValidationInspectorMetrics metrics collector for the gossipsub RPC validation inspector.
@@ -14,7 +15,7 @@ type GossipSubRpcValidationInspectorMetrics struct {
 	prefix                                 string
 	rpcCtrlMsgInAsyncPreProcessingGauge    prometheus.Gauge
 	rpcCtrlMsgAsyncProcessingTimeHistogram prometheus.Histogram
-	invalidCtrlMessageErrorCountHistogram  prometheus.Histogram
+	invalidCtrlMessageErrorCount           *prometheus.CounterVec
 }
 
 var _ module.GossipSubRpcValidationInspectorMetrics = (*GossipSubRpcValidationInspectorMetrics)(nil)
@@ -41,15 +42,16 @@ func NewGossipSubRPCValidationInspectorMetrics(prefix string) *GossipSubRpcValid
 			Buckets:   []float64{.1, 1},
 		},
 	)
-	gc.invalidCtrlMessageErrorCountHistogram = promauto.NewHistogram(
-		prometheus.HistogramOpts{
+
+	gc.invalidCtrlMessageErrorCount = promauto.NewCounterVec(
+		prometheus.CounterOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
-			Name:      gc.prefix + "rpc_invalid_control_message_error_count",
-			Help:      "histogram tracking number of errors in a single invalid control message notification",
-			Buckets:   []float64{25, 50, 100, 1000},
-		},
+			Name:      gc.prefix + "rpc_invalid_control_message_error_total",
+			Help:      "the number of invalid control message errors for a specific msg type",
+		}, []string{LabelCtrlMsgType},
 	)
+
 	return gc
 }
 
@@ -65,7 +67,7 @@ func (c *GossipSubRpcValidationInspectorMetrics) AsyncProcessingFinished(duratio
 	c.rpcCtrlMsgAsyncProcessingTimeHistogram.Observe(duration.Seconds())
 }
 
-// InvalidControlMessageNotificationErrors tracks the number of errors in each invalid control message notification over time.
-func (c *GossipSubRpcValidationInspectorMetrics) InvalidControlMessageNotificationErrors(count int) {
-	c.rpcCtrlMsgAsyncProcessingTimeHistogram.Observe(float64(count))
+// InvalidControlMessageNotificationError tracks the number of errors in each invalid control message notification over time per msg type.
+func (c *GossipSubRpcValidationInspectorMetrics) InvalidControlMessageNotificationError(msgType p2pmsg.ControlMessageType, count float64) {
+	c.invalidCtrlMessageErrorCount.WithLabelValues(msgType.String()).Add(count)
 }
