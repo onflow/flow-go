@@ -6,6 +6,8 @@ import (
 	channels "github.com/onflow/flow-go/network/channels"
 	mock "github.com/stretchr/testify/mock"
 
+	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
+
 	time "time"
 )
 
@@ -24,9 +26,9 @@ func (_m *GossipSubMetrics) AsyncProcessingStarted() {
 	_m.Called()
 }
 
-// InvalidControlMessageNotificationErrors provides a mock function with given fields: count
-func (_m *GossipSubMetrics) InvalidControlMessageNotificationErrors(count int) {
-	_m.Called(count)
+// InvalidControlMessageNotificationError provides a mock function with given fields: msgType, count
+func (_m *GossipSubMetrics) InvalidControlMessageNotificationError(msgType p2pmsg.ControlMessageType, count float64) {
+	_m.Called(msgType, count)
 }
 
 // OnAppSpecificScoreUpdated provides a mock function with given fields: _a0

@@ -8,6 +8,8 @@ import (
 
 	network "github.com/libp2p/go-libp2p/core/network"
 
+	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
+
 	peer "github.com/libp2p/go-libp2p/core/peer"
 
 	protocol "github.com/libp2p/go-libp2p/core/protocol"
@@ -120,9 +122,9 @@ func (_m *NetworkMetrics) InboundMessageReceived(sizeBytes int, topic string, _a
 	_m.Called(sizeBytes, topic, _a2, messageType)
 }
 
-// InvalidControlMessageNotificationErrors provides a mock function with given fields: count
-func (_m *NetworkMetrics) InvalidControlMessageNotificationErrors(count int) {
-	_m.Called(count)
+// InvalidControlMessageNotificationError provides a mock function with given fields: msgType, count
+func (_m *NetworkMetrics) InvalidControlMessageNotificationError(msgType p2pmsg.ControlMessageType, count float64) {
+	_m.Called(msgType, count)
 }
 
 // MessageAdded provides a mock function with given fields: priority
