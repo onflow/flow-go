@@ -321,8 +321,14 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 
 		from := unittest.PeerIdFixture(t)
 		require.NoError(t, inspector.Inspect(from, rpc))
-		// sleep for 1 second to ensure rpc is processed
-		time.Sleep(time.Second)
+		require.Never(t, func() bool {
+			for _, call := range distributor.Calls {
+				if call.Method == "Distribute" {
+					return true
+				}
+			}
+			return false
+		}, time.Second, 100*time.Millisecond)
 		cancel()
 		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 	})
@@ -341,7 +347,8 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		duplicateTopicGraftsRpc := unittest.P2PRPCFixture(unittest.WithGrafts(grafts...))
 		duplicateTopicPrunesRpc := unittest.P2PRPCFixture(unittest.WithPrunes(prunes...))
 		duplicateTopicIHavesRpc := unittest.P2PRPCFixture(unittest.WithIHaves(ihaves...))
-		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Times(3).Run(func(args mock.Arguments) {
+		expectedNotifications := 3
+		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Times(expectedNotifications).Run(func(args mock.Arguments) {
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
 			require.Equal(t, duplicateTopic, notification.Errors[0].Topic())
@@ -356,8 +363,15 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		require.NoError(t, inspector.Inspect(from, duplicateTopicGraftsRpc))
 		require.NoError(t, inspector.Inspect(from, duplicateTopicPrunesRpc))
 		require.NoError(t, inspector.Inspect(from, duplicateTopicIHavesRpc))
-		// sleep for 1 second to ensure rpc's is processed
-		time.Sleep(time.Second)
+		require.Never(t, func() bool {
+			calls := 0
+			for _, call := range distributor.Calls {
+				if call.Method == "Distribute" {
+					calls++
+				}
+			}
+			return calls > expectedNotifications
+		}, time.Second, 100*time.Millisecond)
 		cancel()
 		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 	})
@@ -379,15 +393,23 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 
 		from := unittest.PeerIdFixture(t)
 		checkNotification := checkNotificationFunc(t, from, []p2pmsg.ControlMessageType{p2pmsg.CtrlMsgGraft}, channels.IsInvalidTopicErr, p2p.CtrlMsgNonClusterTopicType, allTopics, nil)
-		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Times(3).Run(checkNotification)
+		expectedNotifications := 3
+		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Times(expectedNotifications).Run(checkNotification)
 
 		inspector.Start(signalerCtx)
 
 		require.NoError(t, inspector.Inspect(from, unknownTopicReq))
 		require.NoError(t, inspector.Inspect(from, malformedTopicReq))
 		require.NoError(t, inspector.Inspect(from, invalidSporkIDTopicReq))
-		// sleep for 1 second to ensure rpc's is processed
-		time.Sleep(time.Second)
+		require.Never(t, func() bool {
+			calls := 0
+			for _, call := range distributor.Calls {
+				if call.Method == "Distribute" {
+					calls++
+				}
+			}
+			return calls > expectedNotifications
+		}, time.Second, 100*time.Millisecond)
 		cancel()
 		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 	})
@@ -408,15 +430,24 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 
 		from := unittest.PeerIdFixture(t)
 		checkNotification := checkNotificationFunc(t, from, []p2pmsg.ControlMessageType{p2pmsg.CtrlMsgPrune}, channels.IsInvalidTopicErr, p2p.CtrlMsgNonClusterTopicType, allTopics, nil)
-		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Times(3).Run(checkNotification)
+		expectedNotifications := 3
+		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Times(expectedNotifications).Run(checkNotification)
 
 		inspector.Start(signalerCtx)
 
 		require.NoError(t, inspector.Inspect(from, unknownTopicRpc))
 		require.NoError(t, inspector.Inspect(from, malformedTopicRpc))
 		require.NoError(t, inspector.Inspect(from, invalidSporkIDTopicRpc))
-		// sleep for 1 second to ensure rpc's is processed
-		time.Sleep(time.Second)
+		require.Never(t, func() bool {
+			calls := 0
+			for _, call := range distributor.Calls {
+				if call.Method == "Distribute" {
+					calls++
+				}
+			}
+			return calls > expectedNotifications
+		}, time.Second, 100*time.Millisecond)
+
 		cancel()
 		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 	})
@@ -438,14 +469,23 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 
 		from := unittest.PeerIdFixture(t)
 		checkNotification := checkNotificationFunc(t, from, []p2pmsg.ControlMessageType{p2pmsg.CtrlMsgIHave}, channels.IsInvalidTopicErr, p2p.CtrlMsgNonClusterTopicType, allTopics, nil)
-		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Times(3).Run(checkNotification)
+		expectedNotifications := 3
+		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Times(expectedNotifications).Run(checkNotification)
 		inspector.Start(signalerCtx)
 
 		require.NoError(t, inspector.Inspect(from, unknownTopicRpc))
 		require.NoError(t, inspector.Inspect(from, malformedTopicRpc))
 		require.NoError(t, inspector.Inspect(from, invalidSporkIDTopicRpc))
-		// sleep for 1 second to ensure rpc's is processed
-		time.Sleep(time.Second)
+		require.Never(t, func() bool {
+			calls := 0
+			for _, call := range distributor.Calls {
+				if call.Method == "Distribute" {
+					calls++
+				}
+			}
+			return calls > expectedNotifications
+		}, time.Second, 100*time.Millisecond)
+
 		cancel()
 		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 	})
@@ -466,8 +506,16 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		inspector.Start(signalerCtx)
 
 		require.NoError(t, inspector.Inspect(from, duplicateMsgIDRpc))
-		// sleep for 1 second to ensure rpc's is processed
-		time.Sleep(time.Second)
+		require.Never(t, func() bool {
+			calls := 0
+			for _, call := range distributor.Calls {
+				if call.Method == "Distribute" {
+					calls++
+				}
+			}
+			return calls > 1
+		}, time.Second, 100*time.Millisecond)
+
 		cancel()
 		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 	})
@@ -495,8 +543,15 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		inspector.Start(signalerCtx)
 
 		require.NoError(t, inspector.Inspect(from, duplicateMsgIDRpc))
-		// sleep for 1 second to ensure rpc's is processed
-		time.Sleep(time.Second)
+		require.Never(t, func() bool {
+			calls := 0
+			for _, call := range distributor.Calls {
+				if call.Method == "Distribute" {
+					calls++
+				}
+			}
+			return calls > 1
+		}, time.Second, 100*time.Millisecond)
 		cancel()
 		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 	})
@@ -533,8 +588,15 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		inspector.Start(signalerCtx)
 
 		require.NoError(t, inspector.Inspect(from, inspectMsgRpc))
-		// sleep for 1 second to ensure rpc's is processed
-		time.Sleep(time.Second)
+		require.Never(t, func() bool {
+			calls := 0
+			for _, call := range distributor.Calls {
+				if call.Method == "Distribute" {
+					calls++
+				}
+			}
+			return calls > 1
+		}, time.Second, 100*time.Millisecond)
 		cancel()
 		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 	})
@@ -563,8 +625,14 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		inspector.Start(signalerCtx)
 
 		require.NoError(t, inspector.Inspect(from, inspectMsgRpc))
-		// sleep for 1 second to ensure rpc's is processed
-		time.Sleep(time.Second)
+		require.Never(t, func() bool {
+			for _, call := range distributor.Calls {
+				if call.Method == "Distribute" {
+					return true
+				}
+			}
+			return false
+		}, time.Second, 100*time.Millisecond)
 		cancel()
 		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 	})
@@ -605,8 +673,15 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		inspector.Start(signalerCtx)
 
 		require.NoError(t, inspector.Inspect(from, rpc))
-		// sleep for 1 second to ensure rpc's is processed
-		time.Sleep(time.Second)
+		require.Never(t, func() bool {
+			calls := 0
+			for _, call := range distributor.Calls {
+				if call.Method == "Distribute" {
+					calls++
+				}
+			}
+			return calls > 1
+		}, time.Second, 100*time.Millisecond)
 		cancel()
 		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 	})
@@ -623,8 +698,15 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Once().Run(checkNotification)
 		inspector.Start(signalerCtx)
 		require.NoError(t, inspector.Inspect(from, rpc))
-		// sleep for 1 second to ensure rpc's is processed
-		time.Sleep(time.Second)
+		require.Never(t, func() bool {
+			calls := 0
+			for _, call := range distributor.Calls {
+				if call.Method == "Distribute" {
+					calls++
+				}
+			}
+			return calls > 1
+		}, time.Second, 100*time.Millisecond)
 		cancel()
 		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 	})
@@ -647,13 +729,20 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Once().Run(checkNotification)
 		inspector.Start(signalerCtx)
 		require.NoError(t, inspector.Inspect(from, rpc))
-		// sleep for 1 second to ensure rpc's is processed
-		time.Sleep(time.Second)
+		require.Never(t, func() bool {
+			calls := 0
+			for _, call := range distributor.Calls {
+				if call.Method == "Distribute" {
+					calls++
+				}
+			}
+			return calls > 1
+		}, time.Second, 100*time.Millisecond)
 		cancel()
 		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 	})
 	t.Run("inspectRpcPublishMessages should not inspect pubsub message sender on public networks", func(t *testing.T) {
-		inspector, signalerCtx, cancel, _, _, sporkID, idProvider, topicProviderOracle := inspectorFixture(t)
+		inspector, signalerCtx, cancel, distributor, _, sporkID, idProvider, topicProviderOracle := inspectorFixture(t)
 		from := unittest.PeerIdFixture(t)
 		defer idProvider.AssertNotCalled(t, "ByPeerID", from)
 		topic := fmt.Sprintf("%s/%s", channels.TestNetworkChannel, sporkID)
@@ -662,8 +751,14 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		rpc := unittest.P2PRPCFixture(unittest.WithPubsubMessages(pubsubMsgs...))
 		inspector.Start(signalerCtx)
 		require.NoError(t, inspector.Inspect(from, rpc))
-		// sleep for 1 second to ensure rpc's is processed
-		time.Sleep(time.Second)
+		require.Never(t, func() bool {
+			for _, call := range distributor.Calls {
+				if call.Method == "Distribute" {
+					return true
+				}
+			}
+			return false
+		}, time.Second, 100*time.Millisecond)
 		cancel()
 		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 	})
@@ -683,8 +778,15 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Once().Run(checkNotification)
 		inspector.Start(signalerCtx)
 		require.NoError(t, inspector.Inspect(from, rpc))
-		// sleep for 1 second to ensure rpc's is processed
-		time.Sleep(time.Second)
+		require.Never(t, func() bool {
+			calls := 0
+			for _, call := range distributor.Calls {
+				if call.Method == "Distribute" {
+					calls++
+				}
+			}
+			return calls > 1
+		}, time.Second, 100*time.Millisecond)
 		cancel()
 		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 	})
@@ -705,8 +807,15 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Once().Run(checkNotification)
 		inspector.Start(signalerCtx)
 		require.NoError(t, inspector.Inspect(from, rpc))
-		// sleep for 1 second to ensure rpc's is processed
-		time.Sleep(time.Second)
+		require.Never(t, func() bool {
+			calls := 0
+			for _, call := range distributor.Calls {
+				if call.Method == "Distribute" {
+					calls++
+				}
+			}
+			return calls > 1
+		}, time.Second, 100*time.Millisecond)
 		cancel()
 		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 	})
@@ -740,7 +849,8 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 					require.True(t, channels.IsInvalidTopicErr(err.Err))
 				}
 			}
-			distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Times(4).Run(func(args mock.Arguments) {
+			expectedNotifications := 4
+			distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Times(expectedNotifications).Run(func(args mock.Arguments) {
 				notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 				require.True(t, ok)
 				require.Equal(t, from, notification.PeerID)
@@ -783,8 +893,15 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 			require.NoError(t, inspector.Inspect(from, prunesReq))
 			require.NoError(t, inspector.Inspect(from, ihavesReq))
 			require.NoError(t, inspector.Inspect(from, iwantsReq))
-			// sleep for 1 second to ensure rpc's is processed
-			time.Sleep(time.Second)
+			require.Never(t, func() bool {
+				calls := 0
+				for _, call := range distributor.Calls {
+					if call.Method == "Distribute" {
+						calls++
+					}
+				}
+				return calls > expectedNotifications
+			}, time.Second, 100*time.Millisecond)
 			cancel()
 			unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 		})
@@ -804,8 +921,14 @@ func TestNewControlMsgValidationInspector_validateClusterPrefixedTopic(t *testin
 		inspector.ActiveClustersChanged(flow.ChainIDList{clusterID, flow.ChainID(unittest.IdentifierFixture().String()), flow.ChainID(unittest.IdentifierFixture().String())})
 		inspector.Start(signalerCtx)
 		require.NoError(t, inspector.Inspect(from, inspectMsgRpc))
-		// sleep for 1 second to ensure rpc's is processed
-		time.Sleep(time.Second)
+		require.Never(t, func() bool {
+			for _, call := range distributor.Calls {
+				if call.Method == "Distribute" {
+					return true
+				}
+			}
+			return false
+		}, time.Second, 100*time.Millisecond)
 		cancel()
 		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 	})
@@ -824,8 +947,14 @@ func TestNewControlMsgValidationInspector_validateClusterPrefixedTopic(t *testin
 		idProvider.On("ByPeerID", from).Return(id, true).Once()
 		inspector.Start(signalerCtx)
 		require.NoError(t, inspector.Inspect(from, inspectMsgRpc))
-		// sleep for 1 second to ensure rpc's is processed
-		time.Sleep(time.Second)
+		require.Never(t, func() bool {
+			for _, call := range distributor.Calls {
+				if call.Method == "Distribute" {
+					return true
+				}
+			}
+			return false
+		}, time.Second, 100*time.Millisecond)
 		cancel()
 		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 	})
@@ -837,7 +966,8 @@ func TestNewControlMsgValidationInspector_validateClusterPrefixedTopic(t *testin
 		topicProviderOracle.UpdateTopics([]string{clusterPrefixedTopic})
 		from := unittest.PeerIdFixture(t)
 		checkNotification := checkNotificationFunc(t, from, []p2pmsg.ControlMessageType{p2pmsg.CtrlMsgGraft, p2pmsg.CtrlMsgPrune, p2pmsg.CtrlMsgIHave}, validation.IsErrUnstakedPeer, p2p.CtrlMsgTopicTypeClusterPrefixed, []string{clusterPrefixedTopic}, nil)
-		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Times(3).Run(checkNotification)
+		expectedNotifications := 3
+		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Times(expectedNotifications).Run(checkNotification)
 		idProvider.On("ByPeerID", from).Return(nil, false).Times(3)
 		grafts := unittest.P2PRPCGraftFixtures(clusterPrefixedTopic)
 		prunes := unittest.P2PRPCPruneFixtures(clusterPrefixedTopic)
@@ -851,8 +981,15 @@ func TestNewControlMsgValidationInspector_validateClusterPrefixedTopic(t *testin
 		require.NoError(t, inspector.Inspect(from, graftRpc))
 		require.NoError(t, inspector.Inspect(from, pruneRpc))
 		require.NoError(t, inspector.Inspect(from, ihaveRpc))
-		// sleep for 1 second to ensure rpc's is processed
-		time.Sleep(time.Second)
+		require.Never(t, func() bool {
+			calls := 0
+			for _, call := range distributor.Calls {
+				if call.Method == "Distribute" {
+					calls++
+				}
+			}
+			return calls > expectedNotifications
+		}, time.Second, 100*time.Millisecond)
 		cancel()
 		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 	})
@@ -876,8 +1013,15 @@ func TestNewControlMsgValidationInspector_validateClusterPrefixedTopic(t *testin
 		for i := 0; i < 11; i++ {
 			require.NoError(t, inspector.Inspect(from, inspectMsgRpc))
 		}
-		// sleep for 1 second to ensure rpc's is processed
-		time.Sleep(time.Second)
+		require.Never(t, func() bool {
+			calls := 0
+			for _, call := range distributor.Calls {
+				if call.Method == "Distribute" {
+					calls++
+				}
+			}
+			return calls > 1
+		}, time.Second, 100*time.Millisecond)
 		cancel()
 		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 	})
@@ -901,8 +1045,14 @@ func TestControlMessageValidationInspector_ActiveClustersChanged(t *testing.T) {
 		rpc := unittest.P2PRPCFixture(unittest.WithGrafts(unittest.P2PRPCGraftFixture(&topic)))
 		require.NoError(t, inspector.Inspect(from, rpc))
 	}
-	// sleep for 1 second to ensure rpc's is processed
-	time.Sleep(time.Second)
+	require.Never(t, func() bool {
+		for _, call := range distributor.Calls {
+			if call.Method == "Distribute" {
+				return true
+			}
+		}
+		return false
+	}, time.Second, 100*time.Millisecond)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 }
