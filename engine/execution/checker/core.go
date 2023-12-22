@@ -110,6 +110,9 @@ func (c *Core) runCheck() error {
 	// TODO: better to query seals from protocol state,
 	// switch to state.Final().LastSealed() when available
 	sealedExecuted, seal, err := c.findLatestSealedAtHeight(lastExecutedHeight)
+	if err != nil {
+		return fmt.Errorf("could not get the last sealed block at height: %v, err: %w", lastExecutedHeight, err)
+	}
 
 	sealedCommit := seal.FinalState
 
@@ -146,7 +149,7 @@ func (c *Core) findLastSealedBlock() (*flow.Header, *flow.Header, *flow.Seal, er
 		return nil, nil, nil, fmt.Errorf("could not get the last sealed block: %w", err)
 	}
 
-	return lastSealed, lastFinal, lastSeal, err
+	return lastSealed, lastFinal, lastSeal, nil
 }
 
 // findLastExecutedBlockHeight finds the last executed block height
@@ -161,6 +164,9 @@ func (c *Core) findLastExecutedBlockHeight() (uint64, error) {
 // findLatestSealedAtHeight finds the latest sealed block at the given height
 func (c *Core) findLatestSealedAtHeight(finalizedHeight uint64) (*flow.Header, *flow.Seal, error) {
 	_, seal, err := c.state.AtHeight(finalizedHeight).SealedResult()
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not get the last sealed for the finalized block: %w", err)
+	}
 
 	sealed, err := c.state.AtBlockID(seal.BlockID).Head()
 	if err != nil {
