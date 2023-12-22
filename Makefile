@@ -210,8 +210,10 @@ generate-mocks: install-mock-generators
 
 	#temporarily make insecure/ a non-module to allow mockery to create mocks
 	mv insecure/go.mod insecure/go2.mod
+	[ -f go.work ] && mv go.work go2.work
 	mockery --name '.*' --dir=insecure/ --case=underscore --output="./insecure/mock"  --outpkg="mockinsecure"
 	mv insecure/go2.mod insecure/go.mod
+	[ -f go2.work ] && mv go2.work go.work
 
 # this ensures there is no unused dependency being added by accident
 .PHONY: tidy

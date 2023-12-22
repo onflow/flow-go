@@ -193,11 +193,17 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 	).Maybe()
 
 	s.headers.On("ByHeight", mock.AnythingOfType("uint64")).Return(
-		mocks.StorageMapGetter(s.blockMap),
+		mocks.ConvertStorageOutput(
+			mocks.StorageMapGetter(s.blockMap),
+			func(block *flow.Block) *flow.Header { return block.Header },
+		),
 	).Maybe()
 
 	s.headers.On("BlockIDByHeight", mock.AnythingOfType("uint64")).Return(
-		mocks.StorageMapGetter(s.blockMap),
+		mocks.ConvertStorageOutput(
+			mocks.StorageMapGetter(s.blockMap),
+			func(block *flow.Block) flow.Identifier { return block.ID() },
+		),
 	).Maybe()
 
 	s.backend, err = New(
