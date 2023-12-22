@@ -109,7 +109,8 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 			shouldNotBeTruncated := len(graftsLessThanMaxSampleSize.GetControl().GetGraft()) == 50
 			return shouldBeTruncated && shouldNotBeTruncated
 		}, time.Second, 500*time.Millisecond)
-		stopInspector(t, cancel, inspector)
+		cancel()
+		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 	})
 
 	t.Run("truncatePruneMessages should truncate prune messages as expected", func(t *testing.T) {
@@ -139,7 +140,8 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 			shouldNotBeTruncated := len(prunesLessThanMaxSampleSize.GetControl().GetPrune()) == 50
 			return shouldBeTruncated && shouldNotBeTruncated
 		}, time.Second, 500*time.Millisecond)
-		stopInspector(t, cancel, inspector)
+		cancel()
+		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 	})
 
 	t.Run("truncateIHaveMessages should truncate iHave messages as expected", func(t *testing.T) {
@@ -169,7 +171,8 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 			shouldNotBeTruncated := len(iHavesLessThanMaxSampleSize.GetControl().GetIhave()) == 50
 			return shouldBeTruncated && shouldNotBeTruncated
 		}, time.Second, 500*time.Millisecond)
-		stopInspector(t, cancel, inspector)
+		cancel()
+		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 	})
 
 	t.Run("truncateIHaveMessageIds should truncate iHave message ids as expected", func(t *testing.T) {
@@ -205,7 +208,8 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 			}
 			return true
 		}, time.Second, 500*time.Millisecond)
-		stopInspector(t, cancel, inspector)
+		cancel()
+		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 	})
 
 	t.Run("truncateIWantMessages should truncate iWant messages as expected", func(t *testing.T) {
@@ -233,7 +237,8 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 			shouldNotBeTruncated := len(iWantsLessThanMaxSampleSize.GetControl().GetIwant()) == 50
 			return shouldBeTruncated && shouldNotBeTruncated
 		}, time.Second, 500*time.Millisecond)
-		stopInspector(t, cancel, inspector)
+		cancel()
+		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 	})
 
 	t.Run("truncateIWantMessageIds should truncate iWant message ids as expected", func(t *testing.T) {
@@ -267,7 +272,8 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 			}
 			return true
 		}, time.Second, 500*time.Millisecond)
-		stopInspector(t, cancel, inspector)
+		cancel()
+		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 	})
 }
 
@@ -317,7 +323,8 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		require.NoError(t, inspector.Inspect(from, rpc))
 		// sleep for 1 second to ensure rpc is processed
 		time.Sleep(time.Second)
-		stopInspector(t, cancel, inspector)
+		cancel()
+		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 	})
 
 	t.Run("processInspectRPCReq should disseminate invalid control message notification for control messages with duplicate topics", func(t *testing.T) {
@@ -351,7 +358,8 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		require.NoError(t, inspector.Inspect(from, duplicateTopicIHavesRpc))
 		// sleep for 1 second to ensure rpc's is processed
 		time.Sleep(time.Second)
-		stopInspector(t, cancel, inspector)
+		cancel()
+		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 	})
 
 	t.Run("inspectGraftMessages should disseminate invalid control message notification for invalid graft messages as expected", func(t *testing.T) {
@@ -380,7 +388,8 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		require.NoError(t, inspector.Inspect(from, invalidSporkIDTopicReq))
 		// sleep for 1 second to ensure rpc's is processed
 		time.Sleep(time.Second)
-		stopInspector(t, cancel, inspector)
+		cancel()
+		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 	})
 
 	t.Run("inspectPruneMessages should disseminate invalid control message notification for invalid prune messages as expected", func(t *testing.T) {
@@ -408,7 +417,8 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		require.NoError(t, inspector.Inspect(from, invalidSporkIDTopicRpc))
 		// sleep for 1 second to ensure rpc's is processed
 		time.Sleep(time.Second)
-		stopInspector(t, cancel, inspector)
+		cancel()
+		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 	})
 
 	t.Run("inspectIHaveMessages should disseminate invalid control message notification for iHave messages with invalid topics as expected", func(t *testing.T) {
@@ -436,7 +446,8 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		require.NoError(t, inspector.Inspect(from, invalidSporkIDTopicRpc))
 		// sleep for 1 second to ensure rpc's is processed
 		time.Sleep(time.Second)
-		stopInspector(t, cancel, inspector)
+		cancel()
+		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 	})
 
 	t.Run("inspectIHaveMessages should disseminate invalid control message notification for iHave messages with duplicate message ids as expected", func(t *testing.T) {
@@ -457,7 +468,8 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		require.NoError(t, inspector.Inspect(from, duplicateMsgIDRpc))
 		// sleep for 1 second to ensure rpc's is processed
 		time.Sleep(time.Second)
-		stopInspector(t, cancel, inspector)
+		cancel()
+		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 	})
 
 	t.Run("inspectIWantMessages should disseminate invalid control message notification for iWant messages when duplicate message ids exceeds the allowed threshold", func(t *testing.T) {
@@ -485,7 +497,8 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		require.NoError(t, inspector.Inspect(from, duplicateMsgIDRpc))
 		// sleep for 1 second to ensure rpc's is processed
 		time.Sleep(time.Second)
-		stopInspector(t, cancel, inspector)
+		cancel()
+		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 	})
 
 	t.Run("inspectIWantMessages should disseminate invalid control message notification for iWant messages when cache misses exceeds allowed threshold", func(t *testing.T) {
@@ -522,7 +535,8 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		require.NoError(t, inspector.Inspect(from, inspectMsgRpc))
 		// sleep for 1 second to ensure rpc's is processed
 		time.Sleep(time.Second)
-		stopInspector(t, cancel, inspector)
+		cancel()
+		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 	})
 
 	t.Run("inspectIWantMessages should not disseminate invalid control message notification for iWant messages when cache misses exceeds allowed threshold if cache miss check size not exceeded", func(t *testing.T) {
@@ -551,7 +565,8 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		require.NoError(t, inspector.Inspect(from, inspectMsgRpc))
 		// sleep for 1 second to ensure rpc's is processed
 		time.Sleep(time.Second)
-		stopInspector(t, cancel, inspector)
+		cancel()
+		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 	})
 
 	t.Run("inspectRpcPublishMessages should disseminate invalid control message notification when invalid pubsub messages count greater than configured RpcMessageErrorThreshold", func(t *testing.T) {
@@ -592,7 +607,8 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		require.NoError(t, inspector.Inspect(from, rpc))
 		// sleep for 1 second to ensure rpc's is processed
 		time.Sleep(time.Second)
-		stopInspector(t, cancel, inspector)
+		cancel()
+		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 	})
 	t.Run("inspectRpcPublishMessages should disseminate invalid control message notification when subscription missing for topic", func(t *testing.T) {
 		errThreshold := 500
@@ -609,7 +625,8 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		require.NoError(t, inspector.Inspect(from, rpc))
 		// sleep for 1 second to ensure rpc's is processed
 		time.Sleep(time.Second)
-		stopInspector(t, cancel, inspector)
+		cancel()
+		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 	})
 
 	t.Run("inspectRpcPublishMessages should disseminate invalid control message notification when publish messages contain no topic", func(t *testing.T) {
@@ -632,7 +649,8 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		require.NoError(t, inspector.Inspect(from, rpc))
 		// sleep for 1 second to ensure rpc's is processed
 		time.Sleep(time.Second)
-		stopInspector(t, cancel, inspector)
+		cancel()
+		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 	})
 	t.Run("inspectRpcPublishMessages should not inspect pubsub message sender on public networks", func(t *testing.T) {
 		inspector, signalerCtx, cancel, _, _, sporkID, idProvider, topicProviderOracle := inspectorFixture(t)
@@ -646,7 +664,8 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		require.NoError(t, inspector.Inspect(from, rpc))
 		// sleep for 1 second to ensure rpc's is processed
 		time.Sleep(time.Second)
-		stopInspector(t, cancel, inspector)
+		cancel()
+		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 	})
 	t.Run("inspectRpcPublishMessages should disseminate invalid control message notification when message is from unstaked peer", func(t *testing.T) {
 		inspector, signalerCtx, cancel, distributor, _, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
@@ -666,7 +685,8 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		require.NoError(t, inspector.Inspect(from, rpc))
 		// sleep for 1 second to ensure rpc's is processed
 		time.Sleep(time.Second)
-		stopInspector(t, cancel, inspector)
+		cancel()
+		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 	})
 	t.Run("inspectRpcPublishMessages should disseminate invalid control message notification when message is from ejected peer", func(t *testing.T) {
 		inspector, signalerCtx, cancel, distributor, _, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
@@ -687,7 +707,8 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		require.NoError(t, inspector.Inspect(from, rpc))
 		// sleep for 1 second to ensure rpc's is processed
 		time.Sleep(time.Second)
-		stopInspector(t, cancel, inspector)
+		cancel()
+		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 	})
 	t.Run("rpc inspection should disseminate invalid control message notification with multiple errors when a control message contains multiple errors",
 		func(t *testing.T) {
@@ -764,7 +785,8 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 			require.NoError(t, inspector.Inspect(from, iwantsReq))
 			// sleep for 1 second to ensure rpc's is processed
 			time.Sleep(time.Second)
-			stopInspector(t, cancel, inspector)
+			cancel()
+			unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 		})
 }
 
@@ -784,7 +806,8 @@ func TestNewControlMsgValidationInspector_validateClusterPrefixedTopic(t *testin
 		require.NoError(t, inspector.Inspect(from, inspectMsgRpc))
 		// sleep for 1 second to ensure rpc's is processed
 		time.Sleep(time.Second)
-		stopInspector(t, cancel, inspector)
+		cancel()
+		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 	})
 
 	t.Run("validateClusterPrefixedTopic should not return error if cluster prefixed hard threshold not exceeded for unknown cluster ids", func(t *testing.T) {
@@ -803,8 +826,8 @@ func TestNewControlMsgValidationInspector_validateClusterPrefixedTopic(t *testin
 		require.NoError(t, inspector.Inspect(from, inspectMsgRpc))
 		// sleep for 1 second to ensure rpc's is processed
 		time.Sleep(time.Second)
-		stopInspector(t, cancel, inspector)
-		stopInspector(t, cancel, inspector)
+		cancel()
+		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 	})
 
 	t.Run("validateClusterPrefixedTopic should return an error when sender is unstaked", func(t *testing.T) {
@@ -830,7 +853,8 @@ func TestNewControlMsgValidationInspector_validateClusterPrefixedTopic(t *testin
 		require.NoError(t, inspector.Inspect(from, ihaveRpc))
 		// sleep for 1 second to ensure rpc's is processed
 		time.Sleep(time.Second)
-		stopInspector(t, cancel, inspector)
+		cancel()
+		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 	})
 
 	t.Run("validateClusterPrefixedTopic should return error if cluster prefixed hard threshold exceeded for unknown cluster ids", func(t *testing.T) {
@@ -854,7 +878,8 @@ func TestNewControlMsgValidationInspector_validateClusterPrefixedTopic(t *testin
 		}
 		// sleep for 1 second to ensure rpc's is processed
 		time.Sleep(time.Second)
-		stopInspector(t, cancel, inspector)
+		cancel()
+		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 	})
 }
 
@@ -878,7 +903,8 @@ func TestControlMessageValidationInspector_ActiveClustersChanged(t *testing.T) {
 	}
 	// sleep for 1 second to ensure rpc's is processed
 	time.Sleep(time.Second)
-	stopInspector(t, cancel, inspector)
+	cancel()
+	unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 }
 
 // invalidTopics returns 3 invalid topics.
@@ -947,11 +973,6 @@ func inspectorFixture(t *testing.T, opts ...func(params *validation.InspectorPar
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	return validationInspector, signalerCtx, cancel, distributor, rpcTracker, sporkID, idProvider, topicProviderOracle
-}
-
-func stopInspector(t *testing.T, cancel context.CancelFunc, inspector *validation.ControlMsgValidationInspector) {
-	cancel()
-	unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
 }
 
 func defaultTopicOracle() []string {
