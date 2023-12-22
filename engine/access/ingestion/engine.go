@@ -26,35 +26,39 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// time to wait for the all the missing collections to be received at node startup
-const collectionCatchupTimeout = 30 * time.Second
+const (
+	// time to wait for the all the missing collections to be received at node startup
+	collectionCatchupTimeout = 30 * time.Second
 
-// time to poll the storage to check if missing collections have been received
-const collectionCatchupDBPollInterval = 10 * time.Millisecond
+	// time to poll the storage to check if missing collections have been received
+	collectionCatchupDBPollInterval = 10 * time.Millisecond
 
-// time to update the FullBlockHeight index
-const fullBlockRefreshInterval = 1 * time.Second
+	// time to update the FullBlockHeight index
+	fullBlockRefreshInterval = 1 * time.Second
 
-// time to request missing collections from the network
-const missingCollsRequestInterval = 1 * time.Minute
+	// time to request missing collections from the network
+	missingCollsRequestInterval = 1 * time.Minute
 
-// a threshold of number of blocks with missing collections beyond which collections should be re-requested
-// this is to prevent spamming the collection nodes with request
-const missingCollsForBlkThreshold = 100
+	// a threshold of number of blocks with missing collections beyond which collections should be re-requested
+	// this is to prevent spamming the collection nodes with request
+	missingCollsForBlkThreshold = 100
 
-// a threshold of block height beyond which collections should be re-requested (regardless of the number of blocks for which collection are missing)
-// this is to ensure that if a collection is missing for a long time (in terms of block height) it is eventually re-requested
-const missingCollsForAgeThreshold = 100
+	// a threshold of block height beyond which collections should be re-requested (regardless of the number of blocks for which collection are missing)
+	// this is to ensure that if a collection is missing for a long time (in terms of block height) it is eventually re-requested
+	missingCollsForAgeThreshold = 100
 
-// default queue capacity
-const defaultQueueCapacity = 10_000
+	// default queue capacity
+	defaultQueueCapacity = 10_000
+)
 
-var defaultCollectionCatchupTimeout = collectionCatchupTimeout
-var defaultCollectionCatchupDBPollInterval = collectionCatchupDBPollInterval
-var defaultFullBlockRefreshInterval = fullBlockRefreshInterval
-var defaultMissingCollsRequestInterval = missingCollsRequestInterval
-var defaultMissingCollsForBlkThreshold = missingCollsForBlkThreshold
-var defaultMissingCollsForAgeThreshold uint64 = missingCollsForAgeThreshold
+var (
+	defaultCollectionCatchupTimeout               = collectionCatchupTimeout
+	defaultCollectionCatchupDBPollInterval        = collectionCatchupDBPollInterval
+	defaultFullBlockRefreshInterval               = fullBlockRefreshInterval
+	defaultMissingCollsRequestInterval            = missingCollsRequestInterval
+	defaultMissingCollsForBlkThreshold            = missingCollsForBlkThreshold
+	defaultMissingCollsForAgeThreshold     uint64 = missingCollsForAgeThreshold
+)
 
 // Engine represents the ingestion engine, used to funnel data from other nodes
 // to a centralized location that can be queried by a user
