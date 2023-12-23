@@ -88,7 +88,7 @@ func (s *storageTest) run(runner func(state *gethState.StateDB)) error {
 
 	runner(state)
 
-	s.hash, err = state.Commit(true)
+	s.hash, err = state.Commit(0, true)
 	if err != nil {
 		return err
 	}

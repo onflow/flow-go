@@ -171,7 +171,7 @@ func (proc *procedure) commit() (gethCommon.Hash, error) {
 	// commits the changes from the journal into the in memory trie.
 	// in the future if we want to move this to the block level we could use finalize
 	// to get the root hash
-	newRoot, err := proc.state.Commit(true)
+	newRoot, err := proc.state.Commit(0, true)
 	if err != nil {
 		return gethTypes.EmptyRootHash, handleCommitError(err)
 	}
