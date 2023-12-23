@@ -20,8 +20,8 @@ type ReceiptValidator interface {
 	//
 	// Expected errors during normal operations:
 	//   - engine.InvalidInputError if receipt violates protocol condition
-	//   - module.UnknownBlockError if the executed block is unknown
 	//   - module.UnknownResultError if the receipt's parent result is unknown
+	//   - module.UnknownBlockError if the executed block is unknown
 	//
 	// All other error are potential symptoms critical internal failures, such as bugs or state corruption.
 	Validate(receipt *flow.ExecutionReceipt) error
@@ -45,5 +45,7 @@ type ReceiptValidator interface {
 	//   - module.UnknownBlockError if the candidate block's _parent_ is unknown
 	//
 	// All other error are potential symptoms critical internal failures, such as bugs or state corruption.
+	// Note that module.UnknownResultError is not possible; we have either an invalid candidate block
+	// (yields engine.InvalidInputError) or a missing parent block (yields module.UnknownBlockError).
 	ValidatePayload(candidate *flow.Block) error
 }

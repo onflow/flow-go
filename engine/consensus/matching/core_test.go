@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
@@ -166,13 +167,15 @@ func (ms *MatchingSuite) TestOnReceiptInvalid() {
 
 	// check that _expected_ failure case of invalid receipt is handled without error
 	ms.receiptValidator.On("Validate", receipt).Return(engine.NewInvalidInputError("")).Once()
-	_, err := ms.core.processReceipt(receipt)
+	wasAdded, err := ms.core.processReceipt(receipt)
 	ms.Require().NoError(err, "invalid receipt should be dropped but not error")
+	ms.Require().False(wasAdded, "invalid receipt should not be added")
 
 	// check that _unexpected_ failure case causes the error to be escalated
 	ms.receiptValidator.On("Validate", receipt).Return(fmt.Errorf("")).Once()
 	_, err = ms.core.processReceipt(receipt)
 	ms.Require().Error(err, "unexpected errors should be escalated")
+	ms.Require().False(engine.IsInvalidInputError(err), "exceptions should not be misinterpreted as an invalid receipt")
 
 	ms.receiptValidator.AssertExpectations(ms.T())
 	ms.ReceiptsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
@@ -192,7 +195,7 @@ func (ms *MatchingSuite) TestOnUnverifiableReceipt() {
 	ms.PendingReceipts.On("Add", receipt).Return(false).Once()
 
 	// check that _expected_ failure case of invalid receipt is handled without error
-	ms.receiptValidator.On("Validate", receipt).Return(engine.NewUnverifiableInputError("missing parent result")).Once()
+	ms.receiptValidator.On("Validate", receipt).Return(module.NewUnknownResultError("missing parent result")).Once()
 	wasAdded, err := ms.core.processReceipt(receipt)
 	ms.Require().NoError(err, "unverifiable receipt should be cached but not error")
 	ms.Require().False(wasAdded, "unverifiable receipt should be cached but not added to the node's validated information")

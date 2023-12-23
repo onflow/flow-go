@@ -122,9 +122,11 @@ func NewFullConsensusState(
 //
 //	candidate.View == certifyingQC.View && candidate.ID() == certifyingQC.BlockID
 //
-// Caution:
-//   - This function expects that `certifyingQC` has been validated.
+// CAUTION:
+//   - This function expects that `qc` has been validated. (otherwise, the state will be corrupted)
 //   - The parent block must already be stored.
+//
+// Orphaned blocks are excepted.
 //
 // No errors are expected during normal operations.
 func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Block, certifyingQC *flow.QuorumCertificate) error {
@@ -171,6 +173,10 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Blo
 
 // Extend extends the protocol state of a CONSENSUS PARTICIPANT. It checks
 // the validity of the _entire block_ (header and full payload).
+//
+// CAUTION: per convention, the protocol state requires that the candidate's
+// parent has already been ingested. Otherwise, an exception is returned.
+//
 // Expected errors during normal operations:
 //   - state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
 //   - state.InvalidExtensionError if the candidate block is invalid
@@ -227,25 +233,25 @@ func (m *ParticipantState) Extend(ctx context.Context, candidate *flow.Block) er
 }
 
 // headerExtend verifies the validity of the block header (excluding verification of the
-// consensus rules). Specifically, we check that the block connects to the last finalized block.
+// consensus rules). Specifically, we check that the block connects to the known block tree.
 // Expected errors during normal operations:
 //   - state.InvalidExtensionError if the candidate block is invalid
 func (m *FollowerState) headerExtend(candidate *flow.Block) error {
-	// FIRST: We do some initial cheap sanity checks, like checking the payload
-	// hash is consistent
-
+	// STEP 1: some initial cheap sanity checks, like checking the payload hash is consistent
 	header := candidate.Header
 	payload := candidate.Payload
 	if payload.Hash() != header.PayloadHash {
 		return state.NewInvalidExtensionError("payload integrity check failed")
 	}
 
-	// SECOND: Next, we can check whether the block is a valid descendant of the
-	// parent. It should have the same chain ID and a height that is one bigger.
-
-	parent, err := m.headers.ByBlockID(header.ParentID)
+	// STEP 2: check whether the candidate (i) connects to the known block tree and
+	// (ii) has the same chain ID as its parent and a height incremented by 1.
+	parent, err := m.headers.ByBlockID(header.ParentID) // (i) connects to the known block tree
 	if err != nil {
-		return state.NewInvalidExtensionErrorf("could not retrieve parent: %s", err)
+		// The only sentinel error that can happen here is `storage.ErrNotFound`. However, by convention the
+		// protocol state must be extended in a parent-first order. This block's parent being unknown breaks
+		// with this API contract and results in an exception.
+		return irrecoverable.NewExceptionf("could not retrieve the candidate's parent block %v: %w", header.ParentID, err)
 	}
 	if header.ChainID != parent.ChainID {
 		return state.NewInvalidExtensionErrorf("candidate built for invalid chain (candidate: %s, parent: %s)",
@@ -260,7 +266,7 @@ func (m *FollowerState) headerExtend(candidate *flow.Block) error {
 			header.Height, parent.Height)
 	}
 
-	// check validity of block timestamp using parent's timestamp
+	// STEP 3: check validity of block timestamp using parent's timestamp
 	err = m.blockTimer.Validate(parent.Timestamp, candidate.Header.Timestamp)
 	if err != nil {
 		if protocol.IsInvalidBlockTimestampError(err) {
@@ -434,23 +440,21 @@ func (m *ParticipantState) sealExtend(ctx context.Context, candidate *flow.Block
 //
 // We require the receipts to be sorted by block height (within a payload).
 func (m *ParticipantState) receiptExtend(ctx context.Context, candidate *flow.Block) error {
-
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckReceipts)
 	defer span.End()
 
 	err := m.receiptValidator.ValidatePayload(candidate)
 	if err != nil {
-		// TODO: This reasoning is probably outdated!!!
-		//  "this might be not an error, potentially it can be solved by requesting more data and processing this receipt again"
-		if errors.Is(err, storage.ErrNotFound) {
-			return state.NewInvalidExtensionErrorf("some entities referenced by receipts are missing: %w", err)
-		}
 		if engine.IsInvalidInputError(err) {
 			return state.NewInvalidExtensionErrorf("payload includes invalid receipts: %w", err)
 		}
+		if module.IsUnknownBlockError(err) {
+			// By convention, the protocol state must be extended in a parent-first order. This block's parent
+			// being unknown breaks with this API contract and results in an exception.
+			return irrecoverable.NewExceptionf("internal state corruption detected when validating receipts in candidate block %v: %w", candidate.ID(), err)
+		}
 		return fmt.Errorf("unexpected payload validation error %w", err)
 	}
-
 	return nil
 }
 

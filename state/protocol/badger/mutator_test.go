@@ -500,6 +500,9 @@ func TestExtendSealedBoundary(t *testing.T) {
 	})
 }
 
+// TestExtendMissingParent tests the behaviour when attempting to extend the protocol state by a block
+// whose parent is unknown. Per convention, the protocol state requires that the candidate's
+// parent has already been ingested. Otherwise, an exception is returned.
 func TestExtendMissingParent(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
@@ -513,9 +516,10 @@ func TestExtendMissingParent(t *testing.T) {
 
 		err := state.Extend(context.Background(), &extend)
 		require.Error(t, err)
-		require.True(t, st.IsInvalidExtensionError(err), err)
+		require.False(t, st.IsInvalidExtensionError(err), err)
+		require.False(t, st.IsOutdatedExtensionError(err), err)
 
-		// verify seal not indexed
+		// verify seal that was contained in candidate block is not indexed
 		var sealID flow.Identifier
 		err = db.View(operation.LookupLatestSealAtBlock(extend.ID(), &sealID))
 		require.Error(t, err)

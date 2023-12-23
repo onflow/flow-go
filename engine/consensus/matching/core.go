@@ -181,7 +181,11 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 		Hex("initial_state", initialState[:]).
 		Hex("final_state", finalState[:]).Logger()
 
-	// if the receipt is for an unknown block, skip it. It will be re-requested later by `requestPending` function.
+	// If the receipt is for an unknown block, skip it. It will be re-requested later by `requestPending` function.
+	// Reasoning: If this is an honest receipt, this replica is behind. Chances are high that other leaders will
+	// already have included the receipt by the time this replica has caught up. If we still need the receipt by
+	// the time this replica has caught up, it will be re-requested later by `requestPending` function. If it is
+	// a malicious receipt, discarding it is advantageous for mitigating spamming and resource exhaustion attacks.
 	executedBlock, err := c.headersDB.ByBlockID(receipt.ExecutionResult.BlockID)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
@@ -211,30 +215,27 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 	childSpan := c.tracer.StartSpanFromParent(receiptSpan, trace.CONMatchProcessReceiptVal)
 	err = c.receiptValidator.Validate(receipt)
 	childSpan.End()
-
-	if engine.IsUnverifiableInputError(err) {
-		// If previous result is missing, we can't validate this receipt.
-		// Although we will request its previous receipt(s),
-		// we don't want to drop it now, because when the missing previous arrive
-		// in a wrong order, they will still be dropped, and causing the catch up
-		// to be inefficient.
-		// Instead, we cache the receipt in case it arrives earlier than its
-		// previous receipt.
-		// For instance, given blocks A <- B <- C <- D <- E, if we receive their receipts
-		// in the order of [E,C,D,B,A], then:
-		// if we drop the missing previous receipts, then only A will be processed;
-		// if we cache the missing previous receipts, then all of them will be processed, because
-		// once A is processed, we will check if there is a child receipt pending,
-		// if yes, then process it.
-		c.pendingReceipts.Add(receipt)
-		log.Info().Msg("receipt is cached because its previous result is missing")
-		return false, nil
-	}
-
 	if err != nil {
-		if engine.IsInvalidInputError(err) {
-			log.Err(err).Msg("invalid execution receipt")
+		if module.IsUnknownResultError(err) {
+			// Previous result is missing. Hence, we can't validate this receipt.
+			// We want to efficiently handle receipts arriving out of order. Therefore, we cache the
+			// receipt in `c.pendingReceipts`. On finalization of new blocks, we request receipts
+			// for all unsealed but finalized blocks. For instance, given blocks
+			// A <- B <- C <- D <- E, if we receive their receipts in the order of [E,C,D,B,A], then:
+			//  - If we drop the missing previous receipts, then only A will be processed.
+			//  - If we cache the missing previous receipts, then all of them will be processed, because once
+			//    A is processed, we will check if there is a child receipt pending, if yes, then process it.
+			c.pendingReceipts.Add(receipt)
+			log.Info().Msg("receipt is cached because its previous result is missing")
 			return false, nil
+		}
+		if engine.IsInvalidInputError(err) {
+			log.Err(err).Msg("PROTOCOL VIOLATION detected: invalid execution receipt")
+			return false, nil
+		}
+		if module.IsUnknownBlockError(err) { // This should never happen
+			// Above, we successfully retrieved the `executedBlock`. Hence, `UnknownBlockError` here means our state is corrupted!
+			return false, irrecoverable.NewExceptionf("internal state corruption detected when validating receipt %v for block %v: %w", receipt.ID(), receipt.BlockID, err)
 		}
 		return false, fmt.Errorf("failed to validate execution receipt: %w", err)
 	}
