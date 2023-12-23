@@ -25,7 +25,7 @@ require (
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.2.4-0.20231016154253-a00dbf7c061f
 	github.com/onflow/flow-emulator v0.58.1-0.20231130142844-f22e54339f85
 	github.com/onflow/flow-go v0.32.7
-	github.com/onflow/flow-go-sdk v0.44.1-0.20231212173805-f5e813c0bc50
+	github.com/onflow/flow-go-sdk v0.44.1-0.20231208221202-3cc1a8c296eb
 	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
 	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20231213135419-ae911cc351a2
 	github.com/plus3it/gorecurcopy v0.0.1
