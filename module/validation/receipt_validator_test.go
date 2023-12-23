@@ -1,6 +1,7 @@
 package validation
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -10,7 +11,9 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	fmock "github.com/onflow/flow-go/module/mock"
+	mock_module "github.com/onflow/flow-go/module/mock"
+	mock_protocol "github.com/onflow/flow-go/state/protocol/mock"
+	mock_storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -22,12 +25,12 @@ type ReceiptValidationSuite struct {
 	unittest.BaseChainSuite
 
 	receiptValidator module.ReceiptValidator
-	publicKey        *fmock.PublicKey
+	publicKey        *mock_module.PublicKey
 }
 
 func (s *ReceiptValidationSuite) SetupTest() {
 	s.SetupChain()
-	s.publicKey = &fmock.PublicKey{}
+	s.publicKey = &mock_module.PublicKey{}
 	s.Identities[s.ExeID].StakingPubKey = s.publicKey
 	s.receiptValidator = NewReceiptValidator(
 		s.State,
@@ -61,7 +64,7 @@ func (s *ReceiptValidationSuite) TestReceiptValid() {
 func (s *ReceiptValidationSuite) TestReceiptNoIdentity() {
 	valSubgrph := s.ValidSubgraphFixture()
 	node := unittest.IdentityFixture()
-	mockPk := &fmock.PublicKey{}
+	mockPk := &mock_module.PublicKey{}
 	node.StakingPubKey = mockPk
 
 	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(node.NodeID),
@@ -158,6 +161,52 @@ func (s *ReceiptValidationSuite) TestReceiptTooFewChunks() {
 	s.Assert().True(engine.IsInvalidInputError(err))
 }
 
+// TestReceiptForBlockWith0Collections tests handling of the edge case of a block that contains no
+// collection guarantees:
+//   - A receipt must contain one chunk (system chunk)
+//   - receipts with zero or 2 chunks are rejected
+func (s *ReceiptValidationSuite) TestReceiptForBlockWith0Collections() {
+	s.publicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Maybe()
+
+	valSubgrph := s.ValidSubgraphFixture()
+	valSubgrph.Block.SetPayload(unittest.PayloadFixture())
+	s.Assert().Equal(0, len(valSubgrph.Block.Payload.Guarantees)) // sanity check that no collections in block
+	s.AddSubgraphFixtureToMempools(valSubgrph)
+
+	// happy path receipt
+	receipt := unittest.ExecutionReceiptFixture(
+		unittest.WithExecutorID(s.ExeID),
+		unittest.WithResult(unittest.ExecutionResultFixture(
+			unittest.WithBlock(valSubgrph.Block),
+			unittest.WithPreviousResult(*valSubgrph.PreviousResult),
+		)))
+	s.Assert().Equal(1, len(receipt.Chunks)) // sanity check that one chunk in result
+
+	s.T().Run("valid case: 1 chunk", func(t *testing.T) { // confirm happy path receipt valid
+		err := s.receiptValidator.Validate(receipt)
+		s.Require().NoError(err)
+	})
+
+	s.T().Run("invalid: zero chunks", func(t *testing.T) { // missing system chunk
+		var r flow.ExecutionReceipt = *receipt // copy
+		r.Chunks = r.Chunks[0:0]
+		err := s.receiptValidator.Validate(&r)
+		s.Require().Error(err, "should reject with invalid chunks")
+		s.Assert().True(engine.IsInvalidInputError(err))
+	})
+
+	s.T().Run("invalid: 2 chunks", func(t *testing.T) { // one too many chunks
+		var r flow.ExecutionReceipt = *receipt // copy
+		var extraChunk flow.Chunk = *r.Chunks[0]
+		extraChunk.Index = 1
+		extraChunk.CollectionIndex = 1
+		r.Chunks = append(r.Chunks, &extraChunk)
+		err := s.receiptValidator.Validate(&r)
+		s.Require().Error(err, "should reject with invalid chunks")
+		s.Assert().True(engine.IsInvalidInputError(err))
+	})
+}
+
 // TestReceiptTooManyChunks tests that we reject receipt with more chunks than expected
 func (s *ReceiptValidationSuite) TestReceiptTooManyChunks() {
 	valSubgrph := s.ValidSubgraphFixture()
@@ -213,7 +262,9 @@ func (s *ReceiptValidationSuite) TestReceiptInvalidCollectionIndex() {
 	s.Assert().True(engine.IsInvalidInputError(err))
 }
 
-// TestReceiptNoPreviousResult tests that we reject receipt with missing previous result
+// TestReceiptNoPreviousResult tests that `Validate` rejects a receipt, whose parent result is unknown:
+// - per API contract it should return a `module.IsUnknownResultError`
+// - should _not_ be misinterpreted as an invalid receipt, i.e. should not receive an `engine.InvalidInputError`
 func (s *ReceiptValidationSuite) TestReceiptNoPreviousResult() {
 	valSubgrph := s.ValidSubgraphFixture()
 	// invalidate prev execution result, it will result in failing to lookup
@@ -230,31 +281,7 @@ func (s *ReceiptValidationSuite) TestReceiptNoPreviousResult() {
 
 	err := s.receiptValidator.Validate(receipt)
 	s.Require().Error(err, "should reject invalid receipt")
-	s.Assert().True(engine.IsUnverifiableInputError(err), err)
-}
-
-// TestReceiptNoBlock checks the behaviour if the executed block, referenced by the receipt, is unknown.
-// This case should be treated as an exception and _not_ yield an `UnverifiableInputError` or
-// `InvalidInputError`
-func (s *ReceiptValidationSuite) TestReceiptNoBlock() {
-	valSubgrph := s.ValidSubgraphFixture()
-	valSubgrph.PreviousResult = unittest.ExecutionResultFixture()
-	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID),
-		unittest.WithResult(valSubgrph.Result))
-	s.AddSubgraphFixtureToMempools(valSubgrph)
-
-	// We change the ParentResult's BlockID. Thereby it looks like the receipt is
-	// referencing a ParentResult that exists but is not for the parent block.
-	valSubgrph.Result.BlockID = unittest.IdentifierFixture()
-
-	s.publicKey.On("Verify",
-		mock.Anything,
-		mock.Anything,
-		mock.Anything).Return(true, nil).Maybe()
-
-	err := s.receiptValidator.Validate(receipt)
-	s.Require().Error(err, "should reject invalid receipt")
-	s.Assert().False(engine.IsUnverifiableInputError(err), err)
+	s.Assert().True(module.IsUnknownResultError(err), err)
 	s.Assert().False(engine.IsInvalidInputError(err), err)
 }
 
@@ -266,9 +293,9 @@ func (s *ReceiptValidationSuite) TestReceiptNoBlock() {
 //	  |                                             v
 //	  |                                           ParentBlock
 //	  v
-//	ParentResult  ---> ParentResult.BlockID
+//	PreviousResult  ---> PreviousResult.BlockID
 //
-// with the validity requirement that ParentResult.BlockID == ParentBlock.ID().
+// with the validity requirement that PreviousResult.BlockID == ParentBlock.ID().
 //
 // In our test case, we assume that `ParentResult` and `Block` are known, but
 // ParentResult.BlockID ≠ ParentBlock.ID(). The compliance layer guarantees that new elements are added
@@ -276,19 +303,21 @@ func (s *ReceiptValidationSuite) TestReceiptNoBlock() {
 // a byzantine receipt that references known and valid entities, but they do not form a valid subgraph.
 // For example, it could be a result for a block in a different fork or an ancestor further in the past.
 func (s *ReceiptValidationSuite) TestInvalidSubgraph() {
-	valSubgrph := s.ValidSubgraphFixture()
-	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID),
-		unittest.WithResult(valSubgrph.Result))
-	s.AddSubgraphFixtureToMempools(valSubgrph)
+	s.publicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Maybe()
 
-	// We change the ParentResult's BlockID. Thereby it looks like the receipt is
-	// referencing a ParentResult that exists but is not for the parent block.
-	valSubgrph.PreviousResult.BlockID = unittest.IdentifierFixture()
+	// add two independent sub-graphs, which is essentially two different forks
+	fork1 := s.ValidSubgraphFixture()
+	s.AddSubgraphFixtureToMempools(fork1)
+	fork2 := s.ValidSubgraphFixture()
+	s.AddSubgraphFixtureToMempools(fork2)
 
-	s.publicKey.On("Verify",
-		mock.Anything,
-		mock.Anything,
-		mock.Anything).Return(true, nil).Maybe()
+	// Receipt is for block in fork1 but references a result in fork2 as parent
+	receipt := unittest.ExecutionReceiptFixture(
+		unittest.WithExecutorID(s.ExeID), // valid executor
+		unittest.WithResult(unittest.ExecutionResultFixture(
+			unittest.WithBlock(fork1.Block),             // known executed block on fork 1
+			unittest.WithPreviousResult(*fork2.Result)), // known parent result
+		))
 
 	err := s.receiptValidator.Validate(receipt)
 	s.Require().Error(err, "should reject invalid previous result")
@@ -365,8 +394,8 @@ func (s *ReceiptValidationSuite) TestMultiReceiptValidResultChain() {
 
 // TestMultiReceiptInvalidParent performs the following test:
 //   - we have the chain in storage: G <- A <- B(A) <- C
-//   - Let X be block, whose validity we are checking. X should be invalid,
-//     if its payload contains (C,B_bad).
+//     and are receiving `candidate`, which is a child block of C
+//   - candidate should be invalid, if its payload contains (C,B_bad).
 //
 // Notation: B(A) means block B has receipt for A.
 func (s *ReceiptValidationSuite) TestMultiReceiptInvalidParent() {
@@ -890,4 +919,223 @@ func (s *ReceiptValidationSuite) TestValidateReceiptResultHasEnoughReceipts() {
 
 	err := s.receiptValidator.ValidatePayload(candidate)
 	s.Require().NoError(err)
+}
+
+// TestReceiptNoBlock tests that the validator rejects a receipt, whose executed block is unknown:
+//   - per API contract it should return a `module.UnknownBlockError`
+//   - should _not_ be misinterpreted as an invalid receipt, i.e. should not receive an `engine.InvalidInputError`
+func (s *ReceiptValidationSuite) TestReceiptNoBlock() {
+	s.publicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Maybe()
+
+	// Initially, s.LatestExecutionResult points to the result for s.LatestSealedBlock. We construct the chain:
+	//   LatestSealedBlock <-- unknownExecutedBlock  <-- candidate(r)
+	// where `r` denotes an execution receipt for block `unknownExecutedBlock`
+	unknownExecutedBlock := unittest.BlockWithParentFixture(s.LatestSealedBlock.Header)
+	r := unittest.ExecutionReceiptFixture(
+		unittest.WithExecutorID(s.ExeID), // valid executor
+		unittest.WithResult(unittest.ExecutionResultFixture(
+			unittest.WithBlock(unknownExecutedBlock),
+			unittest.WithPreviousResult(*s.LatestExecutionResult)), // known parent result
+		)) // but the ID of the executed block is randomly chosen, i.e. unknown
+
+	// attempting to validate receipt `r` should fail with an `module.UnknownBlockError`
+	err := s.receiptValidator.Validate(r)
+	s.Require().Error(err, "should reject invalid receipt")
+	s.Assert().True(module.IsUnknownBlockError(err), err)
+	s.Assert().False(engine.IsInvalidInputError(err), err)
+
+	// attempting to validate a block, whose payload contains receipt `r` should fail with an `module.UnknownBlockError`
+	candidate := unittest.BlockWithParentFixture(unknownExecutedBlock.Header)
+	candidate.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(r)))
+	err = s.receiptValidator.ValidatePayload(candidate)
+	s.Require().Error(err, "should reject invalid receipt")
+	s.Assert().True(module.IsUnknownBlockError(err), err)
+	s.Assert().False(engine.IsInvalidInputError(err), err)
+}
+
+// TestException_SealsHighestInFork tests that unexpected exceptions raised by the dependency
+// `receiptValidator.headers.ByBlockID(..)` are escalated and not misinterpreted as
+// `InvalidInputError` or `UnknownBlockError` or `UnknownResultError`
+func (s *ReceiptValidationSuite) TestException_HeadersByBlockID() {
+	s.publicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Maybe()
+
+	//s.T().Run("seals yields exception on Identity retrieval", func(t *testing.T) {
+	valSubgrph := s.ValidSubgraphFixture()
+	s.AddSubgraphFixtureToMempools(valSubgrph)
+
+	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID), unittest.WithResult(valSubgrph.Result))
+	candidate := unittest.BlockWithParentFixture(valSubgrph.Block.Header)
+	candidate.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt)))
+
+	// receiptValidator.headers yields exception on retrieving any block header
+	*s.HeadersDB = mock_storage.Headers{} // receiptValidator has pointer to this field, which we override with a new state mock
+	exception := errors.New("headers.ByBlockID() exception")
+	s.HeadersDB.On("ByBlockID", mock.Anything).Return(nil, exception)
+
+	err := s.receiptValidator.ValidatePayload(candidate)
+	s.Require().Error(err, "ValidatePayload should escalate exception")
+	s.Assert().False(engine.IsInvalidInputError(err), err)
+	s.Assert().False(module.IsUnknownBlockError(err), err)
+	s.Assert().False(module.IsUnknownResultError(err), err)
+}
+
+// TestException_SealsHighestInFork tests that unexpected exceptions raised by the dependency
+// `receiptValidator.seals.HighestInFork(..)` are escalated and not misinterpreted as
+// `InvalidInputError` or `UnknownBlockError` or `UnknownResultError`
+func (s *ReceiptValidationSuite) TestException_SealsHighestInFork() {
+	s.publicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Maybe()
+	valSubgrph := s.ValidSubgraphFixture()
+	s.AddSubgraphFixtureToMempools(valSubgrph)
+
+	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID), unittest.WithResult(valSubgrph.Result))
+	candidate := unittest.BlockWithParentFixture(valSubgrph.Block.Header)
+	candidate.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt)))
+
+	// receiptValidator.seals yields exception on retrieving highest sealed block in fork up to candidate's parent
+	*s.SealsDB = mock_storage.Seals{} // receiptValidator has pointer to this field, which we override with a new state mock
+	exception := errors.New("seals.HighestInFork(..) exception")
+	s.SealsDB.On("HighestInFork", candidate.Header.ParentID).Return(nil, exception)
+
+	err := s.receiptValidator.ValidatePayload(candidate)
+	s.Require().Error(err, "ValidatePayload should escalate exception")
+	s.Assert().False(engine.IsInvalidInputError(err), err)
+	s.Assert().False(module.IsUnknownBlockError(err), err)
+	s.Assert().False(module.IsUnknownResultError(err), err)
+}
+
+// TestException_ProtocolStateHead tests that unexpected exceptions raised by the dependency
+// `receiptValidator.state.AtBlockID() -> Snapshot.Head(..)` are escalated and not misinterpreted as
+// `InvalidInputError` or `UnknownBlockError` or `UnknownResultError`
+func (s *ReceiptValidationSuite) TestException_ProtocolStateHead() {
+	s.publicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Maybe()
+	valSubgrph := s.ValidSubgraphFixture()
+	s.AddSubgraphFixtureToMempools(valSubgrph)
+	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID), unittest.WithResult(valSubgrph.Result))
+
+	// receiptValidator.state yields exception on Block Header retrieval
+	*s.State = mock_protocol.State{} // receiptValidator has pointer to this field, which we override with a new state mock
+	snapshot := &mock_protocol.Snapshot{}
+	exception := errors.New("state.Head() exception")
+	snapshot.On("Head").Return(nil, exception)
+	s.State.On("AtBlockID", valSubgrph.Block.ID()).Return(snapshot)
+
+	s.T().Run("Method Validate", func(t *testing.T) {
+		err := s.receiptValidator.Validate(receipt)
+		s.Require().Error(err, "Validate should escalate exception")
+		s.Assert().False(engine.IsInvalidInputError(err), err)
+		s.Assert().False(module.IsUnknownBlockError(err), err)
+		s.Assert().False(module.IsUnknownResultError(err), err)
+	})
+
+	s.T().Run("Method ValidatePayload", func(t *testing.T) {
+		candidate := unittest.BlockWithParentFixture(valSubgrph.Block.Header)
+		candidate.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt)))
+		err := s.receiptValidator.ValidatePayload(candidate)
+		s.Require().Error(err, "ValidatePayload should escalate exception")
+		s.Assert().False(engine.IsInvalidInputError(err), err)
+		s.Assert().False(module.IsUnknownBlockError(err), err)
+		s.Assert().False(module.IsUnknownResultError(err), err)
+	})
+}
+
+// TestException_ProtocolStateIdentity tests that unexpected exceptions raised by the dependency
+// `receiptValidator.state.AtBlockID() -> Snapshot.Identity(..)` are escalated and not misinterpreted as
+// `InvalidInputError` or `UnknownBlockError` or `UnknownResultError`
+func (s *ReceiptValidationSuite) TestException_ProtocolStateIdentity() {
+	s.publicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Maybe()
+	valSubgrph := s.ValidSubgraphFixture()
+	s.AddSubgraphFixtureToMempools(valSubgrph)
+	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID), unittest.WithResult(valSubgrph.Result))
+
+	// receiptValidator.state yields exception on Identity retrieval
+	*s.State = mock_protocol.State{} // receiptValidator has pointer to this field, which we override with a new state mock
+	snapshot := &mock_protocol.Snapshot{}
+	exception := errors.New("state.Identity() exception")
+	snapshot.On("Head").Return(valSubgrph.Block.Header, nil)
+	snapshot.On("Identity", mock.Anything).Return(nil, exception)
+	s.State.On("AtBlockID", valSubgrph.Block.ID()).Return(snapshot)
+
+	s.T().Run("Method Validate", func(t *testing.T) {
+		err := s.receiptValidator.Validate(receipt)
+		s.Require().Error(err, "Validate should escalate exception")
+		s.Assert().False(engine.IsInvalidInputError(err), err)
+		s.Assert().False(module.IsUnknownBlockError(err), err)
+		s.Assert().False(module.IsUnknownResultError(err), err)
+	})
+
+	s.T().Run("Method ValidatePayload", func(t *testing.T) {
+		candidate := unittest.BlockWithParentFixture(valSubgrph.Block.Header)
+		candidate.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt)))
+		err := s.receiptValidator.ValidatePayload(candidate)
+		s.Require().Error(err, "ValidatePayload should escalate exception")
+		s.Assert().False(engine.IsInvalidInputError(err), err)
+		s.Assert().False(module.IsUnknownBlockError(err), err)
+		s.Assert().False(module.IsUnknownResultError(err), err)
+	})
+}
+
+// TestException_IndexByBlockID tests that unexpected exceptions raised by the dependency
+// `receiptValidator.index.ByBlockID(..)` are escalated and not misinterpreted as
+// `InvalidInputError` or `UnknownBlockError` or `UnknownResultError`
+func (s *ReceiptValidationSuite) TestException_IndexByBlockID() {
+	s.publicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Maybe()
+	valSubgrph := s.ValidSubgraphFixture()
+	s.AddSubgraphFixtureToMempools(valSubgrph)
+	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID), unittest.WithResult(valSubgrph.Result))
+
+	// receiptValidator.index yields exception on Identity retrieval
+	*s.IndexDB = mock_storage.Index{} // receiptValidator has pointer to this field, which we override with a new state mock
+	exception := errors.New("index.ByBlockID(..) exception")
+	s.IndexDB.On("ByBlockID", valSubgrph.Block.ID()).Return(nil, exception)
+
+	s.T().Run("Method Validate", func(t *testing.T) {
+		err := s.receiptValidator.Validate(receipt)
+		s.Require().Error(err, "Validate should escalate exception")
+		s.Assert().False(engine.IsInvalidInputError(err), err)
+		s.Assert().False(module.IsUnknownBlockError(err), err)
+		s.Assert().False(module.IsUnknownResultError(err), err)
+	})
+
+	s.T().Run("Method ValidatePayload", func(t *testing.T) {
+		candidate := unittest.BlockWithParentFixture(valSubgrph.Block.Header)
+		candidate.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt)))
+		err := s.receiptValidator.ValidatePayload(candidate)
+		s.Require().Error(err, "ValidatePayload should escalate exception")
+		s.Assert().False(engine.IsInvalidInputError(err), err)
+		s.Assert().False(module.IsUnknownBlockError(err), err)
+		s.Assert().False(module.IsUnknownResultError(err), err)
+	})
+}
+
+// TestException_ResultsByID tests that unexpected exceptions raised by the dependency
+// `receiptValidator.results.ByID(..)` are escalated and not misinterpreted as
+// `InvalidInputError` or `UnknownBlockError` or `UnknownResultError`
+func (s *ReceiptValidationSuite) TestException_ResultsByID() {
+	s.publicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Maybe()
+	valSubgrph := s.ValidSubgraphFixture()
+	s.AddSubgraphFixtureToMempools(valSubgrph)
+	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID), unittest.WithResult(valSubgrph.Result))
+
+	// receiptValidator.results yields exception on ExecutionResult retrieval
+	*s.ResultsDB = mock_storage.ExecutionResults{} // receiptValidator has pointer to this field, which we override with a new state mock
+	exception := errors.New("results.ByID(..) exception")
+	s.ResultsDB.On("ByID", valSubgrph.Result.PreviousResultID).Return(nil, exception)
+
+	s.T().Run("Method Validate", func(t *testing.T) {
+		err := s.receiptValidator.Validate(receipt)
+		s.Require().Error(err, "Validate should escalate exception")
+		s.Assert().False(engine.IsInvalidInputError(err), err)
+		s.Assert().False(module.IsUnknownBlockError(err), err)
+		s.Assert().False(module.IsUnknownResultError(err), err)
+	})
+
+	s.T().Run("Method ValidatePayload", func(t *testing.T) {
+		candidate := unittest.BlockWithParentFixture(valSubgrph.Block.Header)
+		candidate.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt)))
+		err := s.receiptValidator.ValidatePayload(candidate)
+		s.Require().Error(err, "ValidatePayload should escalate exception")
+		s.Assert().False(engine.IsInvalidInputError(err), err)
+		s.Assert().False(module.IsUnknownBlockError(err), err)
+		s.Assert().False(module.IsUnknownResultError(err), err)
+	})
 }
