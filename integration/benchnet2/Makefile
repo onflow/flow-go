@@ -64,11 +64,15 @@ clean-gen-helm:
 	rm -f values.yml
 	rm -f template-data.json
 
+download-values-file:
+	gsutil cp gs://${CONFIGURATION_BUCKET}/${NETWORK_ID}/values.yml .
+
 upload-bootstrap:
 	tar -cvf ${NETWORK_ID}.tar -C ./bootstrap .
 	gsutil cp ${NETWORK_ID}.tar gs://${CONFIGURATION_BUCKET}/${NETWORK_ID}.tar
+	gsutil cp values.yml gs://${CONFIGURATION_BUCKET}/${NETWORK_ID}/values.yml
 
-helm-deploy:
+helm-deploy: download-values-file
 	helm upgrade --install -f ./values.yml ${NETWORK_ID} ./flow --set ingress.enabled=true --set networkId="${NETWORK_ID}" --set owner="${OWNER}" --set configurationBucket="${CONFIGURATION_BUCKET}" --debug --namespace ${NAMESPACE} --wait
 
 k8s-delete:
@@ -77,6 +81,7 @@ k8s-delete:
 
 delete-configuration:
 	gsutil rm gs://${CONFIGURATION_BUCKET}/${NETWORK_ID}.tar
+	gsutil rm gs://${CONFIGURATION_BUCKET}/${NETWORK_ID}/values.yml 
 
 k8s-pod-health: validate
 	kubectl get pods --namespace ${NAMESPACE}

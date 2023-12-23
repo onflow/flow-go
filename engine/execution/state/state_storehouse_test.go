@@ -114,7 +114,7 @@ func withRegisterStore(t *testing.T, fn func(
 		log := unittest.Logger()
 		var wal execution.ExecutedFinalizedWAL
 		finalized, headerByHeight, highest := testutil.NewMockFinalizedReader(10, 100)
-		rs, err := storehouse.NewRegisterStore(diskStore, wal, finalized, log)
+		rs, err := storehouse.NewRegisterStore(diskStore, wal, finalized, log, storehouse.NewNoopNotifier())
 		require.NoError(t, err)
 		fn(t, rs, diskStore, finalized, 10, highest, headerByHeight)
 	})
