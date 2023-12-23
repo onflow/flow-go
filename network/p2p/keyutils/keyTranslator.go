@@ -12,7 +12,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/onflow/crypto"
-	fcrypto "github.com/onflow/crypto"
 )
 
 // This module is meant to help libp2p <-> flow public key conversions
@@ -46,7 +45,7 @@ func setPubKey(c elliptic.Curve, x *big.Int, y *big.Int) *goecdsa.PublicKey {
 // These utility functions convert a Flow crypto key to a LibP2P key (Flow --> LibP2P)
 
 // PeerIDFromFlowPublicKey converts a Flow public key to a LibP2P peer ID.
-func PeerIDFromFlowPublicKey(networkPubKey fcrypto.PublicKey) (pid peer.ID, err error) {
+func PeerIDFromFlowPublicKey(networkPubKey crypto.PublicKey) (pid peer.ID, err error) {
 	pk, err := LibP2PPublicKeyFromFlow(networkPubKey)
 	if err != nil {
 		err = fmt.Errorf("failed to convert Flow key to LibP2P key: %w", err)
@@ -63,7 +62,7 @@ func PeerIDFromFlowPublicKey(networkPubKey fcrypto.PublicKey) (pid peer.ID, err 
 }
 
 // LibP2PPrivKeyFromFlow converts a Flow private key to a LibP2P Private key
-func LibP2PPrivKeyFromFlow(fpk fcrypto.PrivateKey) (lcrypto.PrivKey, error) {
+func LibP2PPrivKeyFromFlow(fpk crypto.PrivateKey) (lcrypto.PrivKey, error) {
 	// get the signature algorithm
 	keyType, err := keyType(fpk.Algorithm())
 	if err != nil {
@@ -94,7 +93,7 @@ func LibP2PPrivKeyFromFlow(fpk fcrypto.PrivateKey) (lcrypto.PrivKey, error) {
 }
 
 // LibP2PPublicKeyFromFlow converts a Flow public key to a LibP2P public key
-func LibP2PPublicKeyFromFlow(fpk fcrypto.PublicKey) (lcrypto.PubKey, error) {
+func LibP2PPublicKeyFromFlow(fpk crypto.PublicKey) (lcrypto.PubKey, error) {
 	keyType, err := keyType(fpk.Algorithm())
 	if err != nil {
 		return nil, err
@@ -130,7 +129,7 @@ func LibP2PPublicKeyFromFlow(fpk fcrypto.PublicKey) (lcrypto.PubKey, error) {
 // This converts some libp2p PubKeys to a flow PublicKey
 // - the supported key types are ECDSA P-256 and ECDSA Secp256k1 public keys,
 // - libp2p also supports RSA and Ed25519 keys, which Flow doesn't, their conversion will return an error.
-func FlowPublicKeyFromLibP2P(lpk lcrypto.PubKey) (fcrypto.PublicKey, error) {
+func FlowPublicKeyFromLibP2P(lpk lcrypto.PubKey) (crypto.PublicKey, error) {
 
 	switch ktype := lpk.Type(); ktype {
 	case lcrypto_pb.KeyType_ECDSA:
@@ -178,11 +177,11 @@ func FlowPublicKeyFromLibP2P(lpk lcrypto.PubKey) (fcrypto.PublicKey, error) {
 }
 
 // keyType translates Flow signing algorithm constants to the corresponding LibP2P constants
-func keyType(sa fcrypto.SigningAlgorithm) (lcrypto_pb.KeyType, error) {
+func keyType(sa crypto.SigningAlgorithm) (lcrypto_pb.KeyType, error) {
 	switch sa {
-	case fcrypto.ECDSAP256:
+	case crypto.ECDSAP256:
 		return lcrypto_pb.KeyType_ECDSA, nil
-	case fcrypto.ECDSASecp256k1:
+	case crypto.ECDSASecp256k1:
 		return lcrypto_pb.KeyType_Secp256k1, nil
 	default:
 		return -1, lcrypto.ErrBadKeyType
