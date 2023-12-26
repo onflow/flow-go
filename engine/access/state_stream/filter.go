@@ -40,6 +40,11 @@ type EventFilter struct {
 	Contracts  map[string]struct{}
 }
 
+// StatusFilter represents a filter
+type StatusFilter struct {
+	Statuses map[string]struct{}
+}
+
 func NewEventFilter(
 	config EventFilterConfig,
 	chain flow.Chain,
