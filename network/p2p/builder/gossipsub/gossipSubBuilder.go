@@ -179,8 +179,9 @@ func NewGossipSubBuilder(logger zerolog.Logger,
 		idProvider:               idProvider,
 		gossipSubFactory:         defaultGossipSubFactory(),
 		gossipSubConfigFunc:      defaultGossipSubAdapterConfig(),
-		scoreOptionConfig:        scoring.NewScoreOptionConfig(lg, idProvider),
+		scoreOptionConfig:        scoring.NewScoreOptionConfig(lg, gossipSubCfg.ScoringParameters, metricsCfg.HeroCacheFactory, idProvider, networkType),
 		rpcInspectorSuiteFactory: defaultInspectorSuite(meshTracer),
+		gossipSubCfg:             gossipSubCfg,
 	}
 
 	return b

@@ -383,7 +383,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 
 		params := &p2pbuilder.LibP2PNodeBuilderConfig{
 			Logger: fnb.Logger,
-			MetricsConfig: &p2pconfig.MetricsConfig{
+			MetricsConfig: &p2pbuilderconfig.MetricsConfig{
 				Metrics:          fnb.Metrics.Network,
 				HeroCacheFactory: fnb.HeroCacheMetricsFactory(),
 			},
@@ -393,23 +393,21 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			SporkId:                    fnb.SporkID,
 			IdProvider:                 fnb.IdentityProvider,
 			ResourceManagerParams:      &fnb.FlowConfig.NetworkConfig.ResourceManager,
-			RpcInspectorParams:         &fnb.FlowConfig.NetworkConfig.GossipSubRPCInspectorsConfig,
+			RpcInspectorParams:         &fnb.FlowConfig.NetworkConfig.GossipSub.RpcInspector,
 			PeerManagerParams:          peerManagerCfg,
-			SubscriptionProviderParams: &fnb.FlowConfig.NetworkConfig.GossipSubConfig.SubscriptionProviderConfig,
+			SubscriptionProviderParams: &fnb.FlowConfig.NetworkConfig.GossipSub.SubscriptionProvider,
 			DisallowListCacheCfg: &p2p.DisallowListCacheConfig{
 				MaxSize: fnb.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
 				Metrics: metrics.DisallowListCacheMetricsFactory(fnb.HeroCacheMetricsFactory(), network.PrivateNetwork),
 			},
-			UnicastParams:                 uniCfg,
-			GossipSubScorePenaltiesParams: &fnb.FlowConfig.NetworkConfig.GossipsubScorePenalties,
-			ScoringRegistryParams:         &fnb.FlowConfig.NetworkConfig.GossipSubScoringRegistryConfig,
+			UnicastConfig: uniCfg,
 		}
 		builder, err := p2pbuilder.DefaultNodeBuilder(params,
 			fnb.Resolver,
 			fnb.BaseConfig.NodeRole,
 			connGaterCfg,
-			&fnb.FlowConfig.NetworkConfig.GossipSubConfig,
-			&fnb.FlowConfig.NetworkConfig.ConnectionManagerConfig,
+			&fnb.FlowConfig.NetworkConfig.GossipSub,
+			&fnb.FlowConfig.NetworkConfig.ConnectionManager,
 			dhtActivationStatus)
 		if err != nil {
 			return nil, fmt.Errorf("could not create libp2p node builder: %w", err)

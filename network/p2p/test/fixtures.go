@@ -136,11 +136,13 @@ func NodeFixture(t *testing.T,
 			MaxSize: uint32(1000),
 			Metrics: metrics.NewNoopCollector(),
 		},
-		UnicastParams:                 parameters.FlowConfig.NetworkConfig.Unicast,
-		GossipSubScorePenaltiesParams: &parameters.FlowConfig.NetworkConfig.GossipsubScorePenalties,
-		ScoringRegistryParams:         &parameters.FlowConfig.NetworkConfig.GossipSubScoringRegistryConfig,
+		UnicastConfig: &p2pbuilderconfig.UnicastConfig{
+			Unicast:                parameters.FlowConfig.NetworkConfig.Unicast,
+			RateLimiterDistributor: parameters.UnicastRateLimiterDistributor,
+		},
+		GossipSubCfg: &parameters.FlowConfig.NetworkConfig.GossipSub,
 	}
-	builder, err := p2pbuilder.NewNodeBuilder(libP2PNodeBuilderParams, parameters.PubSubTracer)
+	builder, err := p2pbuilder.NewNodeBuilder(libP2PNodeBuilderParams)
 	require.NoError(t, err)
 	builder.
 		SetConnectionManager(connManager).

@@ -385,11 +385,12 @@ func NewScoreOption(cfg *ScoreOptionConfig, provider p2p.SubscriptionProvider) (
 	}
 	validator := NewSubscriptionValidator(cfg.logger, provider)
 	scoreRegistry, err := NewGossipSubAppSpecificScoreRegistry(&GossipSubAppSpecificScoreRegistryConfig{
-		Logger:     logger,
-		Penalty:    penaltyValues,
-		Validator:  validator,
-		Init:       InitAppScoreRecordState,
-		IdProvider: cfg.provider,
+		Logger:                  logger,
+		Penalty:                 penaltyValues,
+		Validator:               validator,
+		Init:                    InitAppScoreRecordState,
+		IdProvider:              cfg.provider,
+		HeroCacheMetricsFactory: cfg.heroCacheMetricsFactory,
 		AppScoreCacheFactory: func() p2p.GossipSubApplicationSpecificScoreCache {
 			collector := metrics.NewGossipSubApplicationSpecificScoreCacheMetrics(cfg.heroCacheMetricsFactory, cfg.networkingType)
 			return internal.NewAppSpecificScoreCache(cfg.params.SpamRecordCache.CacheSize, cfg.logger, collector)

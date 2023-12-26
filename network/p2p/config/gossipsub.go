@@ -82,6 +82,7 @@ const (
 	AppSpecificScoreRegistryKey = "app-specific-score"
 	SpamRecordCacheKey          = "spam-record-cache"
 	DecayIntervalKey            = "decay-interval"
+	Penalties                   = "penalties"
 )
 
 // ScoringParameters are the parameters for the score option.
@@ -90,7 +91,27 @@ type ScoringParameters struct {
 	AppSpecificScore AppSpecificScoreParameters `validate:"required" mapstructure:"app-specific-score"`
 	SpamRecordCache  SpamRecordCacheParameters  `validate:"required" mapstructure:"spam-record-cache"`
 	// DecayInterval is the interval at which the counters associated with a peer behavior in GossipSub system are decayed.
-	DecayInterval time.Duration `validate:"gt=0s" mapstructure:"decay-interval"`
+	DecayInterval           time.Duration           `validate:"gt=0s" mapstructure:"decay-interval"`
+	GossipsubScorePenalties GossipSubScorePenalties `mapstructure:"penalties"`
+}
+
+const (
+	GraftPenaltyKey                   = "graft"
+	PrunePenaltyKey                   = "prune"
+	IhavePenaltyKey                   = "ihave"
+	IWantPenaltyKey                   = "iwant"
+	PublishPenaltyKey                 = "publish"
+	ClusterPrefixedReductionFactorKey = "cluster-prefixed-reduction-factor"
+)
+
+// GossipSubScorePenalties penalty values for each RPC control message type.
+type GossipSubScorePenalties struct {
+	Graft                          float64 `validate:"lt=0" mapstructure:"graft"`
+	Prune                          float64 `validate:"lt=0" mapstructure:"prune"`
+	IHave                          float64 `validate:"lt=0" mapstructure:"ihave"`
+	IWant                          float64 `validate:"lt=0" mapstructure:"iwant"`
+	Publish                        float64 `validate:"lt=0" mapstructure:"publish"`
+	ClusterPrefixedReductionFactor float64 `validate:"gt=0,lt=1" mapstructure:"cluster-prefixed-reduction-factor"`
 }
 
 const (
@@ -176,16 +197,6 @@ type GossipSubTracerParameters struct {
 	RPCSentTrackerQueueCacheSize uint32 `validate:"gt=0" mapstructure:"rpc-sent-tracker-queue-cache-size"`
 	// RpcSentTrackerNumOfWorkers number of workers for rpc sent tracker worker pool.
 	RpcSentTrackerNumOfWorkers int `validate:"gt=0" mapstructure:"rpc-sent-tracker-workers"`
-}
-
-// GossipSubScorePenalties penalty values for each RPC control message type.
-type GossipSubScorePenalties struct {
-	Graft                          float64 `validate:"lt=0" mapstructure:"graft"`
-	Prune                          float64 `validate:"lt=0" mapstructure:"prune"`
-	IHave                          float64 `validate:"lt=0" mapstructure:"iHave"`
-	IWant                          float64 `validate:"lt=0" mapstructure:"iWant"`
-	Publish                        float64 `validate:"lt=0" mapstructure:"publish"`
-	ClusterPrefixedReductionFactor float64 `validate:"gt=0,lt=1" mapstructure:"cluster-prefixed-reduction-factor"`
 }
 
 // ResourceScope is the scope of the resource, e.g., system, transient, protocol, peer, peer-protocol.

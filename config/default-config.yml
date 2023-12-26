@@ -207,6 +207,7 @@ network-config:
         iHave: -0.01
         iWant: -0.01
         publish: -0.01
+        cluster-prefixed-reduction-factor: 0.2
       app-specific-score:
         # number of workers that asynchronously update the app specific score requests when they are expired.
         score-update-worker-num: 5

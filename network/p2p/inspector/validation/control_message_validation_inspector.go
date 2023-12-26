@@ -485,7 +485,7 @@ func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWant
 					invErr := p2p.NewInvCtrlMsgErr(
 						NewIWantDuplicateMsgIDThresholdErr(
 							duplicates, messageIDCount,
-							c.config.IWantRPCInspectionConfig.DuplicateMsgIDThreshold),
+							c.config.IWant.DuplicateMsgIDThreshold),
 						p2p.CtrlMsgNonClusterTopicType,
 					)
 					invErr.SetMessageID(messageID)
@@ -502,7 +502,7 @@ func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWant
 							NewIWantCacheMissThresholdErr(
 								cacheMisses,
 								messageIDCount,
-								c.config.IWantRPCInspectionConfig.CacheMissThreshold),
+								c.config.IWant.CacheMissThreshold),
 							p2p.CtrlMsgNonClusterTopicType,
 						)
 						invErr.SetMessageID(messageID)
@@ -563,7 +563,7 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 	lg := c.logger.With().
 		Str("peer_id", p2plogging.PeerId(from)).
 		Int("sample_size", sampleSize).
-		Int("max_sample_size", c.config.IHaveRPCInspectionConfig.MaxSampleSize).
+		Int("max_sample_size", c.config.IHave.MaxSampleSize).
 		Logger()
 	c.performSample(p2pmsg.RpcPublishMessage, uint(totalMessages), uint(sampleSize), func(i, j uint) {
 		messages[i], messages[j] = messages[j], messages[i]
@@ -580,7 +580,7 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 	}
 	checkErrThreshold := func(errs *multierror.Error, invCtrlMsgErrs p2p.InvCtrlMsgErrs) p2p.InvCtrlMsgErrs {
 		// capture error when we exceed the error threshold
-		if errs != nil && errs.Len() > c.config.RpcMessageErrorThreshold {
+		if errs != nil && errs.Len() > c.config.MessageErrorThreshold {
 			invErr := p2p.NewInvCtrlMsgErr(
 				NewInvalidRpcPublishMessagesErr(
 					errs.ErrorOrNil(),

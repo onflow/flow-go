@@ -78,6 +78,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/blob"
 	p2pbuilder "github.com/onflow/flow-go/network/p2p/builder"
+	p2pbuilderconfig "github.com/onflow/flow-go/network/p2p/builder/config"
 	"github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/p2p/connection"
@@ -1699,21 +1700,9 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 		return nil, fmt.Errorf("could not create connection manager: %w", err)
 	}
 
-	meshTracerCfg := &tracer.GossipSubMeshTracerConfig{
-		Logger:                             builder.Logger,
-		Metrics:                            networkMetrics,
-		IDProvider:                         builder.IdentityProvider,
-		LoggerInterval:                     builder.FlowConfig.NetworkConfig.GossipSubConfig.LocalMeshLogInterval,
-		RpcSentTrackerCacheSize:            builder.FlowConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerCacheSize,
-		RpcSentTrackerWorkerQueueCacheSize: builder.FlowConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerQueueCacheSize,
-		RpcSentTrackerNumOfWorkers:         builder.FlowConfig.NetworkConfig.GossipSubConfig.RpcSentTrackerNumOfWorkers,
-		HeroCacheMetricsFactory:            builder.HeroCacheMetricsFactory(),
-		NetworkingType:                     network.PublicNetwork,
-	}
-	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
 	params := &p2pbuilder.LibP2PNodeBuilderConfig{
 		Logger: builder.Logger,
-		MetricsConfig: &p2pconfig.MetricsConfig{
+		MetricsConfig: &p2pbuilderconfig.MetricsConfig{
 			HeroCacheFactory: builder.HeroCacheMetricsFactory(),
 			Metrics:          networkMetrics,
 		},
@@ -1723,26 +1712,25 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 		SporkId:               builder.SporkID,
 		IdProvider:            builder.IdentityProvider,
 		ResourceManagerParams: &builder.FlowConfig.NetworkConfig.ResourceManager,
-		RpcInspectorParams:    &builder.FlowConfig.NetworkConfig.GossipSubConfig.GossipSubRPCInspectorsConfig,
-		PeerManagerParams: &p2pconfig.PeerManagerConfig{
+		RpcInspectorParams:    &builder.FlowConfig.NetworkConfig.GossipSub.RpcInspector,
+		PeerManagerParams: &p2pbuilderconfig.PeerManagerConfig{
 			// TODO: eventually, we need pruning enabled even on public network. However, it needs a modified version of
 			// the peer manager that also operate on the public identities.
 			ConnectionPruning: connection.PruningDisabled,
 			UpdateInterval:    builder.FlowConfig.NetworkConfig.PeerUpdateInterval,
 			ConnectorFactory:  connection.DefaultLibp2pBackoffConnectorFactory(),
 		},
-		SubscriptionProviderParams: &builder.FlowConfig.NetworkConfig.GossipSubConfig.SubscriptionProviderConfig,
+		SubscriptionProviderParams: &builder.FlowConfig.NetworkConfig.GossipSub.SubscriptionProvider,
 		DisallowListCacheCfg: &p2p.DisallowListCacheConfig{
 			MaxSize: builder.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
 			Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
 		},
-		UnicastParams: &p2pconfig.UnicastConfig{
-			UnicastConfig: builder.FlowConfig.NetworkConfig.UnicastConfig,
+		UnicastConfig: &p2pbuilderconfig.UnicastConfig{
+			Unicast:                builder.FlowConfig.NetworkConfig.Unicast,
+			RateLimiterDistributor: builder.UnicastRateLimiterDistributor,
 		},
-		GossipSubScorePenaltiesParams: &builder.FlowConfig.NetworkConfig.GossipsubScorePenalties,
-		ScoringRegistryParams:         &builder.FlowConfig.NetworkConfig.GossipSubScoringRegistryConfig,
 	}
-	nodeBuilder, err := p2pbuilder.NewNodeBuilder(params, meshTracer)
+	nodeBuilder, err := p2pbuilder.NewNodeBuilder(params)
 	if err != nil {
 		return nil, fmt.Errorf("could not create libp2p node builder: %w", err)
 	}
