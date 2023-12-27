@@ -1471,8 +1471,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				TxErrorMessagesCacheSize:  builder.TxErrorMessagesCacheSize,
 				ScriptExecutor:            builder.ScriptExecutor,
 				ScriptExecutionMode:       scriptExecMode,
-
-				SubscriptionConfig: subscription.Config{
+				SubscriptionParams: backend.SubscriptionParams{
 					Broadcaster:            builder.broadcaster,
 					SendTimeout:            builder.stateStreamConf.ClientSendTimeout,
 					ResponseLimit:          builder.stateStreamConf.ResponseLimit,

@@ -227,7 +227,7 @@ func (s *BackendBlocksSuite) backendParams() Params {
 		AccessMetrics:            metrics.NewNoopCollector(),
 		Log:                      s.log,
 		TxErrorMessagesCacheSize: 1000,
-		SubscriptionConfig: subscription.Config{
+		SubscriptionParams: SubscriptionParams{
 			SendTimeout:            subscription.DefaultSendTimeout,
 			SendBufferSize:         subscription.DefaultSendBufferSize,
 			ResponseLimit:          subscription.DefaultResponseLimit,

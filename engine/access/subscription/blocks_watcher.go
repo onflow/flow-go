@@ -3,7 +3,6 @@ package subscription
 import (
 	"fmt"
 	"sync/atomic"
-	"time"
 
 	"github.com/rs/zerolog"
 
@@ -23,17 +22,7 @@ type StreamingData struct {
 	StreamCount atomic.Int32
 }
 
-type Config struct {
-	Broadcaster            *engine.Broadcaster
-	SendTimeout            time.Duration
-	ResponseLimit          float64
-	SendBufferSize         int
-	RootHeight             uint64
-	HighestAvailableHeight uint64
-	Seals                  storage.Seals
-}
-
-type SubscriptionHandler struct {
+type BlocksWatcher struct {
 	log         zerolog.Logger
 	state       protocol.State
 	headers     storage.Headers
@@ -49,7 +38,7 @@ type SubscriptionHandler struct {
 	sealedHighestHeight counters.StrictMonotonousCounter // monotonous counter for last sealed block height
 }
 
-func NewSubscriptionBackendHandler(
+func NewBlocksWatcher(
 	log zerolog.Logger,
 	state protocol.State,
 	rootHeight uint64,
@@ -57,13 +46,13 @@ func NewSubscriptionBackendHandler(
 	highestAvailableFinalizedHeight uint64,
 	seals storage.Seals,
 	broadcaster *engine.Broadcaster,
-) (*SubscriptionHandler, error) {
+) (*BlocksWatcher, error) {
 	lastSealed, err := state.Sealed().Head()
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve last sealed block: %w", err)
 	}
 
-	return &SubscriptionHandler{
+	return &BlocksWatcher{
 		log:                    log,
 		state:                  state,
 		RootHeight:             rootHeight,
@@ -80,7 +69,7 @@ func NewSubscriptionBackendHandler(
 // Only one of startBlockID and startHeight may be set. Otherwise, an InvalidArgument error is returned.
 // If a block is provided and does not exist, a NotFound error is returned.
 // If neither startBlockID nor startHeight is provided, the latest sealed block is used.
-func (h *SubscriptionHandler) GetStartHeight(startBlockID flow.Identifier, startHeight uint64) (uint64, error) {
+func (h *BlocksWatcher) GetStartHeight(startBlockID flow.Identifier, startHeight uint64) (uint64, error) {
 	// make sure only one of start block ID and start height is provided
 	if startBlockID != flow.ZeroID && startHeight > 0 {
 		return 0, status.Errorf(codes.InvalidArgument, "only one of start block ID and start height may be provided")
@@ -141,7 +130,7 @@ func (h *SubscriptionHandler) GetStartHeight(startBlockID flow.Identifier, start
 // Only one of startBlockID and startHeight may be set. Otherwise, an InvalidArgument error is returned.
 // If a block is provided and does not exist, a NotFound error is returned.
 // If neither startBlockID nor startHeight is provided, the latest sealed block is used.
-func (h *SubscriptionHandler) GetStartHeightSealed(startBlockID flow.Identifier, startHeight uint64) (uint64, error) {
+func (h *BlocksWatcher) GetStartHeightSealed(startBlockID flow.Identifier, startHeight uint64) (uint64, error) {
 	// make sure only one of start block ID and start height is provided
 	if startBlockID != flow.ZeroID && startHeight > 0 {
 		return 0, status.Errorf(codes.InvalidArgument, "only one of start block ID and start height may be provided")
@@ -208,24 +197,24 @@ func (h *SubscriptionHandler) GetStartHeightSealed(startBlockID flow.Identifier,
 }
 
 // SetFinalizedHighestHeight sets the highest finalized block height.
-func (h *SubscriptionHandler) SetFinalizedHighestHeight(height uint64) bool {
+func (h *BlocksWatcher) SetFinalizedHighestHeight(height uint64) bool {
 	return h.finalizedHighestHeight.Set(height)
 }
 
-func (h *SubscriptionHandler) GetFinalizedHighestHeight() uint64 {
+func (h *BlocksWatcher) GetFinalizedHighestHeight() uint64 {
 	return h.finalizedHighestHeight.Value()
 }
 
 // SetSealedHighestHeight sets the highest sealed block height.
-func (h *SubscriptionHandler) SetSealedHighestHeight(height uint64) bool {
+func (h *BlocksWatcher) SetSealedHighestHeight(height uint64) bool {
 	return h.sealedHighestHeight.Set(height)
 }
 
-func (h *SubscriptionHandler) GetSealedHighestHeight() uint64 {
+func (h *BlocksWatcher) GetSealedHighestHeight() uint64 {
 	return h.sealedHighestHeight.Value()
 }
 
-func (h *SubscriptionHandler) ProcessSubscriptionOnFinalizedBlock(finalizedHeader *flow.Header) error {
+func (h *BlocksWatcher) ProcessSubscriptionOnFinalizedBlock(finalizedHeader *flow.Header) error {
 	if ok := h.SetFinalizedHighestHeight(finalizedHeader.Height); !ok {
 		h.log.Debug().Msg("finalized block already received")
 		return nil

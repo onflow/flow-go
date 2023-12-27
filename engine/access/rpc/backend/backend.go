@@ -12,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/cmd/build"
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/common/rpc"
@@ -71,7 +72,7 @@ type Backend struct {
 	backendExecutionResults
 	backendNetwork
 
-	*subscription.SubscriptionHandler
+	*subscription.BlocksWatcher
 	backendSubscribeBlocks
 
 	state             protocol.State
@@ -109,7 +110,18 @@ type Params struct {
 	TxErrorMessagesCacheSize  uint
 	ScriptExecutor            execution.ScriptExecutor
 	ScriptExecutionMode       ScriptExecutionMode
-	SubscriptionConfig        subscription.Config
+	SubscriptionParams        SubscriptionParams
+}
+
+type SubscriptionParams struct {
+	Broadcaster    *engine.Broadcaster
+	SendTimeout    time.Duration
+	ResponseLimit  float64
+	SendBufferSize int
+
+	RootHeight             uint64
+	HighestAvailableHeight uint64
+	Seals                  storage.Seals
 }
 
 // New creates backend instance
@@ -150,22 +162,22 @@ func New(params Params) (*Backend, error) {
 		return nil, fmt.Errorf("failed to initialize node version info: %w", err)
 	}
 
-	subscriptionHandler, err := subscription.NewSubscriptionBackendHandler(
+	subscriptionHandler, err := subscription.NewBlocksWatcher(
 		params.Log,
 		params.State,
-		params.SubscriptionConfig.RootHeight,
+		params.SubscriptionParams.RootHeight,
 		params.Headers,
-		params.SubscriptionConfig.HighestAvailableHeight,
-		params.SubscriptionConfig.Seals,
-		params.SubscriptionConfig.Broadcaster,
+		params.SubscriptionParams.HighestAvailableHeight,
+		params.SubscriptionParams.Seals,
+		params.SubscriptionParams.Broadcaster,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize subscribtion handlear: %w", err)
 	}
 
 	b := &Backend{
-		state:               params.State,
-		SubscriptionHandler: subscriptionHandler,
+		state:         params.State,
+		BlocksWatcher: subscriptionHandler,
 		// create the sub-backends
 		backendScripts: backendScripts{
 			headers:           params.Headers,
@@ -238,10 +250,10 @@ func New(params Params) (*Backend, error) {
 			log:            params.Log,
 			state:          params.State,
 			blocks:         params.Blocks,
-			Broadcaster:    params.SubscriptionConfig.Broadcaster,
-			sendTimeout:    params.SubscriptionConfig.SendTimeout,
-			responseLimit:  params.SubscriptionConfig.ResponseLimit,
-			sendBufferSize: params.SubscriptionConfig.SendBufferSize,
+			Broadcaster:    params.SubscriptionParams.Broadcaster,
+			sendTimeout:    params.SubscriptionParams.SendTimeout,
+			responseLimit:  params.SubscriptionParams.ResponseLimit,
+			sendBufferSize: params.SubscriptionParams.SendBufferSize,
 		},
 		collections:       params.Collections,
 		executionReceipts: params.ExecutionReceipts,

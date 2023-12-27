@@ -22,7 +22,7 @@ type backendSubscribeBlocks struct {
 	log            zerolog.Logger
 	state          protocol.State
 	blocks         storage.Blocks
-	Broadcaster    *engine.Broadcaster //TODO: Should be moved instead of public. Maybe to SubscriptionHandler
+	Broadcaster    *engine.Broadcaster
 	sendTimeout    time.Duration
 	responseLimit  float64
 	sendBufferSize int

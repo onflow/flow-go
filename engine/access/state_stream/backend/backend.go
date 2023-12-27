@@ -63,7 +63,7 @@ type GetExecutionDataFunc func(context.Context, uint64) (*execution_data.BlockEx
 type GetStartHeightFunc func(flow.Identifier, uint64) (uint64, error)
 
 type StateStreamBackend struct {
-	SubscriptionBackendHandler *subscription.SubscriptionHandler
+	SubscriptionBackendHandler *subscription.BlocksWatcher
 
 	ExecutionDataBackend
 	EventsBackend
@@ -96,7 +96,7 @@ func New(
 ) (*StateStreamBackend, error) {
 	logger := log.With().Str("module", "state_stream_api").Logger()
 
-	subscriptionHandler, err := subscription.NewSubscriptionBackendHandler(
+	subscriptionHandler, err := subscription.NewBlocksWatcher(
 		logger,
 		state,
 		rootHeight,
