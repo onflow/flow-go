@@ -2,6 +2,7 @@ package access
 
 import (
 	"context"
+	"fmt"
 	"sync/atomic"
 
 	"google.golang.org/grpc/codes"
@@ -730,8 +731,13 @@ func (h *Handler) SubscribeBlocks(request *access.SubscribeBlocksRequest, stream
 		startBlockID = blockID
 	}
 
-	sub := h.api.SubscribeBlocks(stream.Context(), startBlockID, request.GetStartBlockHeight(), convert.MessageToBlockStatus(request.BlockStatus))
+	blockStatus := convert.MessageToBlockStatus(request.BlockStatus)
+	err := checkBlockStatus(blockStatus)
+	if err != nil {
+		return status.Errorf(codes.InvalidArgument, "invalid block status argument: %v", err)
+	}
 
+	sub := h.api.SubscribeBlocks(stream.Context(), startBlockID, request.GetStartBlockHeight(), blockStatus)
 	for {
 		v, ok := <-sub.Channel()
 		if !ok {
@@ -745,23 +751,14 @@ func (h *Handler) SubscribeBlocks(request *access.SubscribeBlocksRequest, stream
 		if !ok {
 			return status.Errorf(codes.Internal, "unexpected response type: %T", v)
 		}
-		emptyBlock := &flow.Block{}
-		if blockResp == emptyBlock {
-			continue
-		}
 
-		signerIDs, err := h.signerIndicesDecoder.DecodeSignerIDs(blockResp.Header)
+		resp, err := h.blockResponse(blockResp, request.GetFullBlockResponse(), blockStatus)
 		if err != nil {
-			return status.Errorf(codes.Internal, "could not decode signer ids: %v", err)
-		}
-
-		blockMessage, err := convert.BlockToMessage(blockResp, signerIDs)
-		if err != nil {
-			return status.Errorf(codes.Internal, "could not convert block to entity: %v", err)
+			return rpc.ConvertError(err, "could not convert block to message", codes.Internal)
 		}
 
 		err = stream.Send(&access.SubscribeBlocksResponse{
-			Block: blockMessage,
+			Block: resp.Block,
 		})
 		if err != nil {
 			return rpc.ConvertError(err, "could not send response", codes.Internal)
@@ -848,4 +845,11 @@ func WithBlockSignerDecoder(signerIndicesDecoder hotstuff.BlockSignerDecoder) fu
 	return func(handler *Handler) {
 		handler.signerIndicesDecoder = signerIndicesDecoder
 	}
+}
+
+func checkBlockStatus(blockStatus flow.BlockStatus) error {
+	if blockStatus == flow.BlockStatusUnknown {
+		return fmt.Errorf("block status is unlnown. Possible variants: BLOCK_FINALIZED, BLOCK_SEALED")
+	}
+	return nil
 }
