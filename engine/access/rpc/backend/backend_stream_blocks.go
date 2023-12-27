@@ -26,12 +26,12 @@ type backendSubscribeBlocks struct {
 	responseLimit  float64
 	sendBufferSize int
 
-	getStartHeight   GetStartHeightFunc
-	getHighestHeight GetHighestHeight
+	getStartHeight   subscription.GetStartHeightFunc
+	getHighestHeight subscription.GetHighestHeight
 }
 
-func (b backendSubscribeBlocks) SubscribeBlocks(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription {
-	nextHeight, err := b.getStartHeight(startBlockID, startHeight)
+func (b *backendSubscribeBlocks) SubscribeBlocks(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription {
+	nextHeight, err := b.getStartHeight(startBlockID, startHeight, blockStatus)
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start height")
 	}
@@ -42,7 +42,7 @@ func (b backendSubscribeBlocks) SubscribeBlocks(ctx context.Context, startBlockI
 	return sub
 }
 
-func (b backendSubscribeBlocks) getResponse(blockStatus flow.BlockStatus) subscription.GetDataByHeightFunc {
+func (b *backendSubscribeBlocks) getResponse(blockStatus flow.BlockStatus) subscription.GetDataByHeightFunc {
 	return func(ctx context.Context, height uint64) (interface{}, error) {
 		block, err := b.getBlock(ctx, height, blockStatus)
 		if err != nil {
@@ -62,10 +62,15 @@ func (b backendSubscribeBlocks) getResponse(blockStatus flow.BlockStatus) subscr
 // Expected errors during normal operation:
 // - storage.ErrNotFound or execution_data.BlobNotFoundError: block for the given block height is not available.
 func (b *backendSubscribeBlocks) getBlock(ctx context.Context, height uint64, expectedBlockStatus flow.BlockStatus) (*flow.Block, error) {
+	highestHeight, err := b.getHighestHeight(expectedBlockStatus)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "could not get block by height: %v", err)
+	}
+
 	// fail early if no notification has been received for the given block height.
 	// note: it's possible for the data to exist in the data store before the notification is
 	// received. this ensures a consistent view is available to all streams.
-	if height > b.getHighestHeight() {
+	if height > highestHeight {
 		return nil, fmt.Errorf("block %d is not available yet: %w", height, storage.ErrNotFound)
 	}
 

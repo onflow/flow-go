@@ -17,6 +17,9 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+type GetStartHeightFunc func(flow.Identifier, uint64, flow.BlockStatus) (uint64, error)
+type GetHighestHeight func(flow.BlockStatus) (uint64, error)
+
 type StreamingData struct {
 	MaxStreams  int32
 	StreamCount atomic.Int32
@@ -31,11 +34,10 @@ type BlocksWatcher struct {
 	RootHeight  uint64
 	RootBlockID flow.Identifier
 
-	// finalizedHighestHeight contains the highest consecutive block height for which we have received a
-	// new Execution Data notification.
+	// finalizedHighestHeight contains the highest consecutive block height for which we have received a new notification.
 	finalizedHighestHeight counters.StrictMonotonousCounter
-
-	sealedHighestHeight counters.StrictMonotonousCounter // monotonous counter for last sealed block height
+	// sealedHighestHeight contains the highest consecutive block height for which we have received a new notification.
+	sealedHighestHeight counters.StrictMonotonousCounter
 }
 
 func NewBlocksWatcher(
@@ -69,68 +71,12 @@ func NewBlocksWatcher(
 // Only one of startBlockID and startHeight may be set. Otherwise, an InvalidArgument error is returned.
 // If a block is provided and does not exist, a NotFound error is returned.
 // If neither startBlockID nor startHeight is provided, the latest sealed block is used.
-func (h *BlocksWatcher) GetStartHeight(startBlockID flow.Identifier, startHeight uint64) (uint64, error) {
-	// make sure only one of start block ID and start height is provided
-	if startBlockID != flow.ZeroID && startHeight > 0 {
-		return 0, status.Errorf(codes.InvalidArgument, "only one of start block ID and start height may be provided")
+func (h *BlocksWatcher) GetStartHeight(startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) (uint64, error) {
+	// block status could be only sealed and finalized
+	if blockStatus == flow.BlockStatusUnknown {
+		return 0, status.Errorf(codes.InvalidArgument, "block status could not be unknown")
 	}
 
-	if h.RootBlockID == flow.ZeroID {
-		// cache the root block height and ID for runtime lookups.
-		rootBlockID, err := h.headers.BlockIDByHeight(h.RootHeight)
-		if err != nil {
-			return 0, fmt.Errorf("could not get root block ID: %w", err)
-		}
-		h.RootBlockID = rootBlockID
-	}
-
-	// if the start block is the root block, there will not be an execution data. skip it and
-	// begin from the next block.
-	// Note: we can skip the block lookup since it was already done in the constructor
-	if startBlockID == h.RootBlockID ||
-		// Note: there is a corner case when rootBlockHeight == 0:
-		// since the default value of an uint64 is 0, when checking if startHeight matches the root block
-		// we also need to check that startBlockID is unset, otherwise we may incorrectly set the start height
-		// for non-matching startBlockIDs.
-		(startHeight == h.RootHeight && startBlockID == flow.ZeroID) {
-		return h.RootHeight + 1, nil
-	}
-
-	// invalid or missing block IDs will result in an error
-	if startBlockID != flow.ZeroID {
-		header, err := h.headers.ByBlockID(startBlockID)
-		if err != nil {
-			return 0, rpc.ConvertStorageError(fmt.Errorf("could not get header for block %v: %w", startBlockID, err))
-		}
-		return header.Height, nil
-	}
-
-	// heights that have not been indexed yet will result in an error
-	if startHeight > 0 {
-		if startHeight < h.RootHeight {
-			return 0, status.Errorf(codes.InvalidArgument, "start height must be greater than or equal to the root height %d", h.RootHeight)
-		}
-
-		header, err := h.headers.ByHeight(startHeight)
-		if err != nil {
-			return 0, rpc.ConvertStorageError(fmt.Errorf("could not get header for height %d: %w", startHeight, err))
-		}
-		return header.Height, nil
-	}
-
-	// if no start block was provided, use the latest sealed block
-	header, err := h.state.Sealed().Head()
-	if err != nil {
-		return 0, status.Errorf(codes.Internal, "could not get latest sealed block: %v", err)
-	}
-	return header.Height, nil
-}
-
-// GetStartHeightSealed returns the start height to use when searching.
-// Only one of startBlockID and startHeight may be set. Otherwise, an InvalidArgument error is returned.
-// If a block is provided and does not exist, a NotFound error is returned.
-// If neither startBlockID nor startHeight is provided, the latest sealed block is used.
-func (h *BlocksWatcher) GetStartHeightSealed(startBlockID flow.Identifier, startHeight uint64) (uint64, error) {
 	// make sure only one of start block ID and start height is provided
 	if startBlockID != flow.ZeroID && startHeight > 0 {
 		return 0, status.Errorf(codes.InvalidArgument, "only one of start block ID and start height may be provided")
@@ -165,6 +111,10 @@ func (h *BlocksWatcher) GetStartHeightSealed(startBlockID flow.Identifier, start
 		if err != nil {
 			return 0, rpc.ConvertStorageError(fmt.Errorf("could not get header for block %v: %w", startBlockID, err))
 		}
+
+		if blockStatus == flow.BlockStatusFinalized {
+			return header.Height, nil
+		}
 	}
 
 	// heights that have not been indexed yet will result in an error
@@ -177,6 +127,10 @@ func (h *BlocksWatcher) GetStartHeightSealed(startBlockID flow.Identifier, start
 		if err != nil {
 			return 0, rpc.ConvertStorageError(fmt.Errorf("could not get header for height %d: %w", startHeight, err))
 		}
+
+		if blockStatus == flow.BlockStatusFinalized {
+			return header.Height, nil
+		}
 	}
 
 	lastSealed, err := h.state.Sealed().Head()
@@ -184,9 +138,10 @@ func (h *BlocksWatcher) GetStartHeightSealed(startBlockID flow.Identifier, start
 		return 0, status.Errorf(codes.Internal, "could not get latest sealed block: %v", err)
 	}
 
+	// this checking if start block is sealed
 	if header != nil {
 		if header.Height > lastSealed.Height {
-			return 0, status.Errorf(codes.InvalidArgument, "provided start block must be sealed. Latest sealed block %V with the height %d", lastSealed.ID(), lastSealed.Height)
+			return 0, status.Errorf(codes.InvalidArgument, "provided start block must be sealed. Latest sealed block %v with the height %d", lastSealed.ID(), lastSealed.Height)
 		}
 
 		return header.Height, nil
@@ -196,22 +151,27 @@ func (h *BlocksWatcher) GetStartHeightSealed(startBlockID flow.Identifier, start
 	return lastSealed.Height, nil
 }
 
+func (h *BlocksWatcher) GetHighestHeight(blockStatus flow.BlockStatus) (uint64, error) {
+	switch blockStatus {
+	case flow.BlockStatusFinalized:
+		return h.finalizedHighestHeight.Value(), nil
+	case flow.BlockStatusSealed:
+		return h.sealedHighestHeight.Value(), nil
+	case flow.BlockStatusUnknown:
+		return 0, status.Errorf(codes.InvalidArgument, "could not get highest height for block with unknown status")
+	}
+
+	return 0, status.Errorf(codes.InvalidArgument, "could not get highest height for invalid status")
+}
+
 // SetFinalizedHighestHeight sets the highest finalized block height.
 func (h *BlocksWatcher) SetFinalizedHighestHeight(height uint64) bool {
 	return h.finalizedHighestHeight.Set(height)
 }
 
-func (h *BlocksWatcher) GetFinalizedHighestHeight() uint64 {
-	return h.finalizedHighestHeight.Value()
-}
-
 // SetSealedHighestHeight sets the highest sealed block height.
 func (h *BlocksWatcher) SetSealedHighestHeight(height uint64) bool {
 	return h.sealedHighestHeight.Set(height)
-}
-
-func (h *BlocksWatcher) GetSealedHighestHeight() uint64 {
-	return h.sealedHighestHeight.Value()
 }
 
 func (h *BlocksWatcher) ProcessSubscriptionOnFinalizedBlock(finalizedHeader *flow.Header) error {
