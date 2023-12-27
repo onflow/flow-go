@@ -67,12 +67,12 @@ func (s *BackendEventsSuite) TestSubscribeEvents() {
 			name:            "happy path - start from root block by height",
 			highestBackfill: len(s.blocks) - 1, // backfill all blocks
 			startBlockID:    flow.ZeroID,
-			startHeight:     s.backend.SubscriptionBackendHandler.RootHeight, // start from root block
+			startHeight:     s.backend.BlocksWatcher.RootHeight, // start from root block
 		},
 		{
 			name:            "happy path - start from root block by id",
-			highestBackfill: len(s.blocks) - 1,                                // backfill all blocks
-			startBlockID:    s.backend.SubscriptionBackendHandler.RootBlockID, // start from root block
+			highestBackfill: len(s.blocks) - 1,                   // backfill all blocks
+			startBlockID:    s.backend.BlocksWatcher.RootBlockID, // start from root block
 			startHeight:     0,
 		},
 	}
@@ -182,7 +182,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeEventsHandlesErrors() {
 		subCtx, subCancel := context.WithCancel(ctx)
 		defer subCancel()
 
-		sub := s.backend.SubscribeEvents(subCtx, flow.ZeroID, s.backend.SubscriptionBackendHandler.RootHeight-1, state_stream.EventFilter{})
+		sub := s.backend.SubscribeEvents(subCtx, flow.ZeroID, s.backend.BlocksWatcher.RootHeight-1, state_stream.EventFilter{})
 		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected InvalidArgument, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
 	})
 

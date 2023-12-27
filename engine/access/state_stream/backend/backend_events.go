@@ -28,11 +28,11 @@ type EventsBackend struct {
 	sendBufferSize int
 
 	getExecutionData GetExecutionDataFunc
-	getStartHeight   GetStartHeightFunc
+	getStartHeight   subscription.GetStartHeightFunc
 }
 
 func (b EventsBackend) SubscribeEvents(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, filter state_stream.EventFilter) subscription.Subscription {
-	nextHeight, err := b.getStartHeight(startBlockID, startHeight)
+	nextHeight, err := b.getStartHeight(startBlockID, startHeight, flow.BlockStatusFinalized)
 	if err != nil {
 		return subscription.NewFailedSubscription(err, "could not get start height")
 	}

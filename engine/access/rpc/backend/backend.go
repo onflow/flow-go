@@ -47,9 +47,6 @@ const DefaultConnectionPoolSize = 250
 var preferredENIdentifiers flow.IdentifierList
 var fixedENIdentifiers flow.IdentifierList
 
-type GetStartHeightFunc func(flow.Identifier, uint64) (uint64, error)
-type GetHighestHeight func() uint64
-
 // Backend implements the Access API.
 //
 // It is composed of several sub-backends that implement part of the Access API.
@@ -262,7 +259,7 @@ func New(params Params) (*Backend, error) {
 		nodeInfo:          nodeInfo,
 	}
 	b.backendSubscribeBlocks.getStartHeight = b.GetStartHeight
-	b.backendSubscribeBlocks.getHighestHeight = b.GetFinalizedHighestHeight
+	b.backendSubscribeBlocks.getHighestHeight = b.GetHighestHeight
 
 	retry.SetBackend(b)
 

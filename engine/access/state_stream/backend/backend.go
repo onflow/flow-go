@@ -60,10 +60,9 @@ type Config struct {
 }
 
 type GetExecutionDataFunc func(context.Context, uint64) (*execution_data.BlockExecutionDataEntity, error)
-type GetStartHeightFunc func(flow.Identifier, uint64) (uint64, error)
 
 type StateStreamBackend struct {
-	SubscriptionBackendHandler *subscription.BlocksWatcher
+	BlocksWatcher *subscription.BlocksWatcher
 
 	ExecutionDataBackend
 	EventsBackend
@@ -110,17 +109,17 @@ func New(
 	}
 
 	b := &StateStreamBackend{
-		SubscriptionBackendHandler: subscriptionHandler,
-		log:                        logger,
-		state:                      state,
-		headers:                    headers,
-		seals:                      seals,
-		results:                    results,
-		execDataStore:              execDataStore,
-		execDataCache:              execDataCache,
-		broadcaster:                broadcaster,
-		registers:                  registers,
-		registerRequestLimit:       int(config.RegisterIDsRequestLimit),
+		BlocksWatcher:        subscriptionHandler,
+		log:                  logger,
+		state:                state,
+		headers:              headers,
+		seals:                seals,
+		results:              results,
+		execDataStore:        execDataStore,
+		execDataCache:        execDataCache,
+		broadcaster:          broadcaster,
+		registers:            registers,
+		registerRequestLimit: int(config.RegisterIDsRequestLimit),
 	}
 
 	b.ExecutionDataBackend = ExecutionDataBackend{
@@ -131,7 +130,7 @@ func New(
 		responseLimit:    config.ResponseLimit,
 		sendBufferSize:   int(config.ClientSendBufferSize),
 		getExecutionData: b.getExecutionData,
-		getStartHeight:   b.SubscriptionBackendHandler.GetStartHeight,
+		getStartHeight:   b.BlocksWatcher.GetStartHeight,
 	}
 
 	b.EventsBackend = EventsBackend{
@@ -141,7 +140,7 @@ func New(
 		responseLimit:    config.ResponseLimit,
 		sendBufferSize:   int(config.ClientSendBufferSize),
 		getExecutionData: b.getExecutionData,
-		getStartHeight:   b.SubscriptionBackendHandler.GetStartHeight,
+		getStartHeight:   b.BlocksWatcher.GetStartHeight,
 	}
 
 	return b, nil
@@ -151,10 +150,15 @@ func New(
 // Expected errors during normal operation:
 // - storage.ErrNotFound or execution_data.BlobNotFoundError: execution data for the given block height is not available.
 func (b *StateStreamBackend) getExecutionData(ctx context.Context, height uint64) (*execution_data.BlockExecutionDataEntity, error) {
+	highestHeight, err := b.BlocksWatcher.GetHighestHeight(flow.BlockStatusFinalized)
+	if err != nil {
+		return nil, fmt.Errorf("could not get execution data for block %d: %w", height, err)
+	}
+
 	// fail early if no notification has been received for the given block height.
 	// note: it's possible for the data to exist in the data store before the notification is
 	// received. this ensures a consistent view is available to all streams.
-	if height > b.SubscriptionBackendHandler.GetFinalizedHighestHeight() {
+	if height > highestHeight {
 		return nil, fmt.Errorf("execution data for block %d is not available yet: %w", height, storage.ErrNotFound)
 	}
 
@@ -168,7 +172,7 @@ func (b *StateStreamBackend) getExecutionData(ctx context.Context, height uint64
 
 // setHighestHeight sets the highest height for which execution data is available.
 func (b *StateStreamBackend) setHighestHeight(height uint64) bool {
-	return b.SubscriptionBackendHandler.SetFinalizedHighestHeight(height)
+	return b.BlocksWatcher.SetFinalizedHighestHeight(height)
 }
 
 // GetRegisterValues returns the register values for the given register IDs at the given block height.
