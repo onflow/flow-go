@@ -1004,7 +1004,7 @@ func (m *FollowerState) epochStatus(block *flow.Header, epochFallbackTriggered b
 
 // versionBeaconOnBlockFinalized extracts and returns the VersionBeacons from the
 // finalized block's seals.
-// This could return multiple VersionBeacons if the parent block contains multiple Seals.
+// This could return multiple VersionBeacons if the parent block contains multiple seals.
 // The version beacons will be returned in the ascending height order of the seals.
 // Technically only the last VersionBeacon is relevant.
 func (m *FollowerState) versionBeaconOnBlockFinalized(

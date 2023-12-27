@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/hashicorp/go-multierror"
+
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/credentials"
 
@@ -178,7 +180,19 @@ func (e *Engine) OnFinalizedBlock(block *model.Block) {
 // No errors expected during normal operations.
 func (e *Engine) processOnFinalizedBlock(_ *model.Block) error {
 	finalizedHeader := e.finalizedHeaderCache.Get()
-	return e.backend.ProcessFinalizedBlockHeight(finalizedHeader.Height)
+
+	var errs *multierror.Error
+	err := e.backend.ProcessSubscriptionOnFinalizedBlock(finalizedHeader)
+	if err != nil {
+		errs = multierror.Append(errs, err)
+	}
+
+	err = e.backend.ProcessFinalizedBlockHeight(finalizedHeader.Height)
+	if err != nil {
+		errs = multierror.Append(errs, err)
+	}
+
+	return errs.ErrorOrNil()
 }
 
 // RestApiAddress returns the listen address of the REST API server.

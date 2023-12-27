@@ -215,7 +215,7 @@ func (s *BackendBlocksSuite) SetupTest() {
 	//	s.results,
 	//	s.eds,
 	//	s.execDataCache,
-	//	s.broadcaster,
+	//	s.Broadcaster,
 	//	rootBlock.Header.Height,
 	//	rootBlock.Header.Height, // initialize with no downloaded data
 	//	s.registersAsync,

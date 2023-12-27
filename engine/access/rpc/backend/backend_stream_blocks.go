@@ -22,7 +22,7 @@ type backendSubscribeBlocks struct {
 	log            zerolog.Logger
 	state          protocol.State
 	blocks         storage.Blocks
-	broadcaster    *engine.Broadcaster
+	Broadcaster    *engine.Broadcaster //TODO: Should be moved instead of public. Maybe to SubscriptionHandler
 	sendTimeout    time.Duration
 	responseLimit  float64
 	sendBufferSize int
@@ -38,7 +38,7 @@ func (b backendSubscribeBlocks) SubscribeBlocks(ctx context.Context, startBlockI
 	}
 
 	sub := subscription.NewHeightBasedSubscription(b.sendBufferSize, nextHeight, b.getResponse(blockStatus))
-	go subscription.NewStreamer(b.log, b.broadcaster, b.sendTimeout, b.responseLimit, sub).Stream(ctx)
+	go subscription.NewStreamer(b.log, b.Broadcaster, b.sendTimeout, b.responseLimit, sub).Stream(ctx)
 
 	return sub
 }

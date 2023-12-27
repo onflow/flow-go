@@ -96,8 +96,21 @@ func New(
 ) (*StateStreamBackend, error) {
 	logger := log.With().Str("module", "state_stream_api").Logger()
 
+	subscriptionHandler, err := subscription.NewSubscriptionBackendHandler(
+		logger,
+		state,
+		rootHeight,
+		headers,
+		highestAvailableHeight,
+		seals,
+		broadcaster,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize subscribtion handlear: %w", err)
+	}
+
 	b := &StateStreamBackend{
-		SubscriptionBackendHandler: subscription.NewSubscriptionBackendHandler(state, rootHeight, headers, highestAvailableHeight),
+		SubscriptionBackendHandler: subscriptionHandler,
 		log:                        logger,
 		state:                      state,
 		headers:                    headers,
@@ -141,7 +154,7 @@ func (b *StateStreamBackend) getExecutionData(ctx context.Context, height uint64
 	// fail early if no notification has been received for the given block height.
 	// note: it's possible for the data to exist in the data store before the notification is
 	// received. this ensures a consistent view is available to all streams.
-	if height > b.SubscriptionBackendHandler.GetHighestHeight() {
+	if height > b.SubscriptionBackendHandler.GetFinalizedHighestHeight() {
 		return nil, fmt.Errorf("execution data for block %d is not available yet: %w", height, storage.ErrNotFound)
 	}
 
@@ -155,7 +168,7 @@ func (b *StateStreamBackend) getExecutionData(ctx context.Context, height uint64
 
 // setHighestHeight sets the highest height for which execution data is available.
 func (b *StateStreamBackend) setHighestHeight(height uint64) bool {
-	return b.SubscriptionBackendHandler.SetHighestHeight(height)
+	return b.SubscriptionBackendHandler.SetFinalizedHighestHeight(height)
 }
 
 // GetRegisterValues returns the register values for the given register IDs at the given block height.

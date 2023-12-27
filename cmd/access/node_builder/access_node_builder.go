@@ -1471,12 +1471,15 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				TxErrorMessagesCacheSize:  builder.TxErrorMessagesCacheSize,
 				ScriptExecutor:            builder.ScriptExecutor,
 				ScriptExecutionMode:       scriptExecMode,
-				Broadcaster:               builder.broadcaster,
-				SendTimeout:               builder.stateStreamConf.ClientSendTimeout,
-				ResponseLimit:             builder.stateStreamConf.ResponseLimit,
-				SendBufferSize:            int(builder.stateStreamConf.ClientSendBufferSize),
-				RootHeight:                builder.executionDataConfig.InitialBlockHeight,
-				HighestAvailableHeight:    highestAvailableHeight,
+				SubscriptionConfig: subscription.Config{
+					Broadcaster:            builder.broadcaster,
+					SendTimeout:            builder.stateStreamConf.ClientSendTimeout,
+					ResponseLimit:          builder.stateStreamConf.ResponseLimit,
+					SendBufferSize:         int(builder.stateStreamConf.ClientSendBufferSize),
+					RootHeight:             builder.executionDataConfig.InitialBlockHeight,
+					HighestAvailableHeight: highestAvailableHeight,
+					Seals:                  node.Storage.Seals,
+				},
 			})
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize backend: %w", err)
