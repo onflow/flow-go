@@ -40,6 +40,7 @@ type BackendBlocksSuite struct {
 	receipts           *storagemock.ExecutionReceipts
 	results            *storagemock.ExecutionResults
 	transactionResults *storagemock.LightTransactionResults
+	seals              *storagemock.Seals
 
 	colClient              *access.AccessAPIClient
 	execClient             *access.ExecutionAPIClient
@@ -55,8 +56,7 @@ type BackendBlocksSuite struct {
 	blocksArray []*flow.Block
 	blockMap    map[uint64]*flow.Block
 	rootBlock   flow.Block
-
-	sealMap map[flow.Identifier]*flow.Seal
+	sealMap     map[flow.Identifier]*flow.Seal
 
 	backend *Backend
 }
@@ -85,6 +85,7 @@ func (s *BackendBlocksSuite) SetupTest() {
 	s.collections = new(storagemock.Collections)
 	s.receipts = new(storagemock.ExecutionReceipts)
 	s.results = new(storagemock.ExecutionResults)
+	s.seals = new(storagemock.Seals)
 	s.colClient = new(access.AccessAPIClient)
 	s.archiveClient = new(access.AccessAPIClient)
 	s.execClient = new(access.ExecutionAPIClient)
@@ -100,7 +101,7 @@ func (s *BackendBlocksSuite) SetupTest() {
 	blockCount := 5
 	s.blockMap = make(map[uint64]*flow.Block, blockCount)
 	s.blocksArray = make([]*flow.Block, 0, blockCount)
-	//s.sealMap = make(map[flow.Identifier]*flow.Seal, blockCount)
+	s.sealMap = make(map[flow.Identifier]*flow.Seal, blockCount)
 
 	// generate blockCount consecutive blocks with associated seal, result and execution data
 	s.rootBlock = unittest.BlockFixture()
@@ -116,24 +117,24 @@ func (s *BackendBlocksSuite) SetupTest() {
 
 		s.blocksArray = append(s.blocksArray, block)
 		s.blockMap[block.Header.Height] = block
-		//seal := unittest.BlockSealsFixture(1)[0]
-		//s.sealMap[block.ID()] = seal
+		seal := unittest.BlockSealsFixture(1)[0]
+		s.sealMap[block.ID()] = seal
 	}
 
-	//s.seals.On("FinalizedSealForBlock", mock.AnythingOfType("flow.Identifier")).Return(
-	//	func(blockID flow.Identifier) *flow.Seal {
-	//		if seal, ok := s.sealMap[blockID]; ok {
-	//			return seal
-	//		}
-	//		return nil
-	//	},
-	//	func(blockID flow.Identifier) error {
-	//		if _, ok := s.sealMap[blockID]; ok {
-	//			return nil
-	//		}
-	//		return storage.ErrNotFound
-	//	},
-	//).Maybe()
+	s.seals.On("FinalizedSealForBlock", mock.AnythingOfType("flow.Identifier")).Return(
+		func(blockID flow.Identifier) *flow.Seal {
+			if seal, ok := s.sealMap[blockID]; ok {
+				return seal
+			}
+			return nil
+		},
+		func(blockID flow.Identifier) error {
+			if _, ok := s.sealMap[blockID]; ok {
+				return nil
+			}
+			return storage.ErrNotFound
+		},
+	).Maybe()
 
 	s.headers.On("ByBlockID", mock.AnythingOfType("flow.Identifier")).Return(
 		func(blockID flow.Identifier) *flow.Header {
@@ -226,12 +227,15 @@ func (s *BackendBlocksSuite) backendParams() Params {
 		AccessMetrics:            metrics.NewNoopCollector(),
 		Log:                      s.log,
 		TxErrorMessagesCacheSize: 1000,
-		SendTimeout:              subscription.DefaultSendTimeout,
-		SendBufferSize:           subscription.DefaultSendBufferSize,
-		ResponseLimit:            subscription.DefaultResponseLimit,
-		Broadcaster:              s.broadcaster,
-		RootHeight:               s.rootBlock.Header.Height,
-		HighestAvailableHeight:   s.rootBlock.Header.Height,
+		SubscriptionConfig: subscription.Config{
+			SendTimeout:            subscription.DefaultSendTimeout,
+			SendBufferSize:         subscription.DefaultSendBufferSize,
+			ResponseLimit:          subscription.DefaultResponseLimit,
+			Broadcaster:            s.broadcaster,
+			RootHeight:             s.rootBlock.Header.Height,
+			HighestAvailableHeight: s.rootBlock.Header.Height,
+			Seals:                  s.seals,
+		},
 	}
 }
 
@@ -304,7 +308,7 @@ func (s *BackendBlocksSuite) TestSubscribeBlocks() {
 			// add "backfill" block - blocks that are already in the database before the test starts
 			// this simulates a subscription on a past block
 			if test.highestBackfill > 0 {
-				s.backend.SetHighestHeight(s.blocksArray[test.highestBackfill].Header.Height)
+				s.backend.SetFinalizedHighestHeight(s.blocksArray[test.highestBackfill].Header.Height)
 				// simulates last sealed block
 				if test.blockStatus == flow.BlockStatusSealed {
 					s.snapshot.On("Head").Return(s.blocksArray[test.highestBackfill].Header, nil)
@@ -321,7 +325,7 @@ func (s *BackendBlocksSuite) TestSubscribeBlocks() {
 				// simulate new block received.
 				// all blocks with index <= highestBackfill were already received
 				if int(i) > test.highestBackfill {
-					s.backend.SetHighestHeight(b.Header.Height)
+					s.backend.SetFinalizedHighestHeight(b.Header.Height)
 					if test.blockStatus == flow.BlockStatusSealed {
 						s.snapshot.On("Head").Return(b.Header, nil)
 					}

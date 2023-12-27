@@ -121,7 +121,7 @@ func FindGuarantors(state State, guarantee *flow.CollectionGuarantee) ([]flow.Id
 // payload validity in this function, the implementation is optimized for valid payloads,
 // where the heights of the sealed blocks form a continuous integer sequence (no gaps).
 // Per convention ['Vacuous Truth'], an empty set of seals is considered to be
-// ordered. Hence, if `payload.Seals` is empty, we return (nil, nil).
+// ordered. Hence, if `payload.seals` is empty, we return (nil, nil).
 // Expected Error returns during normal operations:
 //   - ErrMultipleSealsForSameHeight in case there are seals repeatedly sealing block at the same height
 //   - ErrDiscontinuousSeals in case there are height-gaps in the sealed blocks
