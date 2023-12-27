@@ -2,25 +2,25 @@ package backend
 
 import (
 	"context"
+	"fmt"
 	"testing"
+	"time"
 
-	"github.com/ipfs/go-datastore"
-	dssync "github.com/ipfs/go-datastore/sync"
-	"github.com/stretchr/testify/assert"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
+
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine"
+	access "github.com/onflow/flow-go/engine/access/mock"
+	backendmock "github.com/onflow/flow-go/engine/access/rpc/backend/mock"
+	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/blobs"
-	"github.com/onflow/flow-go/module/execution"
-	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
-	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
-	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
-	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
+	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -29,27 +29,36 @@ import (
 type BackendBlocksSuite struct {
 	suite.Suite
 
-	state          *protocolmock.State
-	params         *protocolmock.Params
-	snapshot       *protocolmock.Snapshot
-	storageBlocks  *storagemock.Blocks
-	headers        *storagemock.Headers
-	seals          *storagemock.Seals
-	results        *storagemock.ExecutionResults
-	registersAsync *execution.RegistersAsyncStore
+	state    *protocol.State
+	snapshot *protocol.Snapshot
+	log      zerolog.Logger
 
-	bs                blobs.Blobstore
-	eds               execution_data.ExecutionDataStore
-	broadcaster       *engine.Broadcaster
-	execDataCache     *cache.ExecutionDataCache
-	execDataHeroCache *herocache.BlockExecutionData
-	backend           *Backend
+	blocks             *storagemock.Blocks
+	headers            *storagemock.Headers
+	collections        *storagemock.Collections
+	transactions       *storagemock.Transactions
+	receipts           *storagemock.ExecutionReceipts
+	results            *storagemock.ExecutionResults
+	transactionResults *storagemock.LightTransactionResults
 
-	blocks      []*flow.Block
-	execDataMap map[flow.Identifier]*execution_data.BlockExecutionDataEntity
+	colClient              *access.AccessAPIClient
+	execClient             *access.ExecutionAPIClient
+	historicalAccessClient *access.AccessAPIClient
+	archiveClient          *access.AccessAPIClient
+
+	connectionFactory *connectionmock.ConnectionFactory
+	communicator      *backendmock.Communicator
+
+	chainID flow.ChainID
+
+	broadcaster *engine.Broadcaster
+	blocksArray []*flow.Block
 	blockMap    map[uint64]*flow.Block
-	sealMap     map[flow.Identifier]*flow.Seal
-	resultMap   map[flow.Identifier]*flow.ExecutionResult
+	rootBlock   flow.Block
+
+	sealMap map[flow.Identifier]*flow.Seal
+
+	backend *Backend
 }
 
 func TestBackendBlocksSuite(t *testing.T) {
@@ -57,104 +66,74 @@ func TestBackendBlocksSuite(t *testing.T) {
 }
 
 func (s *BackendBlocksSuite) SetupTest() {
-	logger := unittest.Logger()
+	s.log = zerolog.New(zerolog.NewConsoleWriter())
+	s.state = new(protocol.State)
+	s.snapshot = new(protocol.Snapshot)
+	header := unittest.BlockHeaderFixture()
 
-	s.state = protocolmock.NewState(s.T())
-	s.snapshot = protocolmock.NewSnapshot(s.T())
-	s.params = protocolmock.NewParams(s.T())
-	s.storageBlocks = storagemock.NewBlocks(s.T())
-	s.headers = storagemock.NewHeaders(s.T())
-	s.seals = storagemock.NewSeals(s.T())
-	s.results = storagemock.NewExecutionResults(s.T())
+	params := new(protocol.Params)
+	params.On("FinalizedRoot").Return(header, nil)
+	params.On("SporkID").Return(unittest.IdentifierFixture(), nil)
+	params.On("ProtocolVersion").Return(uint(unittest.Uint64InRange(10, 30)), nil)
+	params.On("SporkRootBlockHeight").Return(header.Height, nil)
+	params.On("SealedRoot").Return(header, nil)
+	s.state.On("Params").Return(params)
 
-	s.bs = blobs.NewBlobstore(dssync.MutexWrap(datastore.NewMapDatastore()))
-	s.eds = execution_data.NewExecutionDataStore(s.bs, execution_data.DefaultSerializer)
+	s.blocks = new(storagemock.Blocks)
+	s.headers = new(storagemock.Headers)
+	s.transactions = new(storagemock.Transactions)
+	s.collections = new(storagemock.Collections)
+	s.receipts = new(storagemock.ExecutionReceipts)
+	s.results = new(storagemock.ExecutionResults)
+	s.colClient = new(access.AccessAPIClient)
+	s.archiveClient = new(access.AccessAPIClient)
+	s.execClient = new(access.ExecutionAPIClient)
+	s.transactionResults = storagemock.NewLightTransactionResults(s.T())
+	s.chainID = flow.Testnet
+	s.historicalAccessClient = new(access.AccessAPIClient)
+	s.connectionFactory = connectionmock.NewConnectionFactory(s.T())
+
+	s.communicator = new(backendmock.Communicator)
 
 	s.broadcaster = engine.NewBroadcaster()
 
-	s.execDataHeroCache = herocache.NewBlockExecutionData(subscription.DefaultCacheSize, logger, metrics.NewNoopCollector())
-	s.execDataCache = cache.NewExecutionDataCache(s.eds, s.headers, s.seals, s.results, s.execDataHeroCache)
-
-	var err error
-
 	blockCount := 5
-	s.execDataMap = make(map[flow.Identifier]*execution_data.BlockExecutionDataEntity, blockCount)
 	s.blockMap = make(map[uint64]*flow.Block, blockCount)
-	s.sealMap = make(map[flow.Identifier]*flow.Seal, blockCount)
-	s.resultMap = make(map[flow.Identifier]*flow.ExecutionResult, blockCount)
-	s.blocks = make([]*flow.Block, 0, blockCount)
+	s.blocksArray = make([]*flow.Block, 0, blockCount)
+	//s.sealMap = make(map[flow.Identifier]*flow.Seal, blockCount)
 
 	// generate blockCount consecutive blocks with associated seal, result and execution data
-	rootBlock := unittest.BlockFixture()
-	parent := rootBlock.Header
-	s.blockMap[rootBlock.Header.Height] = &rootBlock
+	s.rootBlock = unittest.BlockFixture()
+	parent := s.rootBlock.Header
+	s.blockMap[s.rootBlock.Header.Height] = &s.rootBlock
 
-	s.T().Logf("Generating %d blocks, root block: %d %s", blockCount, rootBlock.Header.Height, rootBlock.ID())
+	s.T().Logf("Generating %d blocks, root block: %d %s", blockCount, s.rootBlock.Header.Height, s.rootBlock.ID())
 
 	for i := 0; i < blockCount; i++ {
 		block := unittest.BlockWithParentFixture(parent)
 		// update for next iteration
 		parent = block.Header
 
-		seal := unittest.BlockSealsFixture(1)[0]
-		result := unittest.ExecutionResultFixture()
-
-		numChunks := 5
-		chunkDatas := make([]*execution_data.ChunkExecutionData, 0, numChunks)
-		for i := 0; i < numChunks; i++ {
-			chunkDatas = append(chunkDatas, unittest.ChunkExecutionDataFixture(s.T(), execution_data.DefaultMaxBlobSize/5))
-		}
-		execData := unittest.BlockExecutionDataFixture(
-			unittest.WithBlockExecutionDataBlockID(block.ID()),
-			unittest.WithChunkExecutionDatas(chunkDatas...),
-		)
-
-		result.ExecutionDataID, err = s.eds.Add(context.TODO(), execData)
-		assert.NoError(s.T(), err)
-
-		s.blocks = append(s.blocks, block)
-		s.execDataMap[block.ID()] = execution_data.NewBlockExecutionDataEntity(result.ExecutionDataID, execData)
+		s.blocksArray = append(s.blocksArray, block)
 		s.blockMap[block.Header.Height] = block
-		s.sealMap[block.ID()] = seal
-		s.resultMap[seal.ResultID] = result
-
-		s.T().Logf("adding exec data for block %d %d %v => %v", i, block.Header.Height, block.ID(), result.ExecutionDataID)
+		//seal := unittest.BlockSealsFixture(1)[0]
+		//s.sealMap[block.ID()] = seal
 	}
 
-	s.registersAsync = execution.NewRegistersAsyncStore()
-
-	s.state.On("Sealed").Return(s.snapshot, nil).Maybe()
-	s.snapshot.On("Head").Return(s.blocks[0].Header, nil).Maybe()
-
-	s.seals.On("FinalizedSealForBlock", mock.AnythingOfType("flow.Identifier")).Return(
-		func(blockID flow.Identifier) *flow.Seal {
-			if seal, ok := s.sealMap[blockID]; ok {
-				return seal
-			}
-			return nil
-		},
-		func(blockID flow.Identifier) error {
-			if _, ok := s.sealMap[blockID]; ok {
-				return nil
-			}
-			return storage.ErrNotFound
-		},
-	).Maybe()
-
-	s.results.On("ByID", mock.AnythingOfType("flow.Identifier")).Return(
-		func(resultID flow.Identifier) *flow.ExecutionResult {
-			if result, ok := s.resultMap[resultID]; ok {
-				return result
-			}
-			return nil
-		},
-		func(resultID flow.Identifier) error {
-			if _, ok := s.resultMap[resultID]; ok {
-				return nil
-			}
-			return storage.ErrNotFound
-		},
-	).Maybe()
+	//s.seals.On("FinalizedSealForBlock", mock.AnythingOfType("flow.Identifier")).Return(
+	//	func(blockID flow.Identifier) *flow.Seal {
+	//		if seal, ok := s.sealMap[blockID]; ok {
+	//			return seal
+	//		}
+	//		return nil
+	//	},
+	//	func(blockID flow.Identifier) error {
+	//		if _, ok := s.sealMap[blockID]; ok {
+	//			return nil
+	//		}
+	//		return storage.ErrNotFound
+	//	},
+	//).Maybe()
 
 	s.headers.On("ByBlockID", mock.AnythingOfType("flow.Identifier")).Return(
 		func(blockID flow.Identifier) *flow.Header {
@@ -205,24 +184,7 @@ func (s *BackendBlocksSuite) SetupTest() {
 		},
 	).Maybe()
 
-	//s.backend, err = New(
-	//	logger,
-	//	conf,
-	//	s.state,
-	//	s.storageBlocks,
-	//	s.headers,
-	//	s.seals,
-	//	s.results,
-	//	s.eds,
-	//	s.execDataCache,
-	//	s.broadcaster,
-	//	rootBlock.Header.Height,
-	//	rootBlock.Header.Height, // initialize with no downloaded data
-	//	s.registersAsync,
-	//)
-	require.NoError(s.T(), err)
-
-	s.storageBlocks.On("ByHeight", mock.AnythingOfType("uint64")).Return(
+	s.blocks.On("ByHeight", mock.AnythingOfType("uint64")).Return(
 		func(height uint64) *flow.Block {
 			if block, ok := s.blockMap[height]; ok {
 				return block
@@ -236,4 +198,166 @@ func (s *BackendBlocksSuite) SetupTest() {
 			return storage.ErrNotFound
 		},
 	).Maybe()
+
+	s.snapshot.On("Head").Return(s.rootBlock.Header, nil).Maybe()
+	s.state.On("Final").Return(s.snapshot, nil).Maybe()
+	s.state.On("Sealed").Return(s.snapshot, nil).Maybe()
+
+	var err error
+	s.backend, err = New(s.backendParams())
+	require.NoError(s.T(), err)
+}
+
+func (s *BackendBlocksSuite) backendParams() Params {
+	return Params{
+		State:                    s.state,
+		Blocks:                   s.blocks,
+		Headers:                  s.headers,
+		Collections:              s.collections,
+		Transactions:             s.transactions,
+		ExecutionReceipts:        s.receipts,
+		ExecutionResults:         s.results,
+		LightTransactionResults:  s.transactionResults,
+		ChainID:                  s.chainID,
+		CollectionRPC:            s.colClient,
+		MaxHeightRange:           DefaultMaxHeightRange,
+		SnapshotHistoryLimit:     DefaultSnapshotHistoryLimit,
+		Communicator:             NewNodeCommunicator(false),
+		AccessMetrics:            metrics.NewNoopCollector(),
+		Log:                      s.log,
+		TxErrorMessagesCacheSize: 1000,
+		SendTimeout:              subscription.DefaultSendTimeout,
+		SendBufferSize:           subscription.DefaultSendBufferSize,
+		ResponseLimit:            subscription.DefaultResponseLimit,
+		Broadcaster:              s.broadcaster,
+		RootHeight:               s.rootBlock.Header.Height,
+		HighestAvailableHeight:   s.rootBlock.Header.Height,
+	}
+}
+
+func (s *BackendBlocksSuite) TestSubscribeBlocks() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	type testType struct {
+		name            string
+		highestBackfill int
+		startBlockID    flow.Identifier
+		startHeight     uint64
+		blockStatus     flow.BlockStatus
+	}
+
+	baseTests := []testType{
+		{
+			name:            "happy path - all new blocks",
+			highestBackfill: -1, // no backfill
+			startBlockID:    flow.ZeroID,
+			startHeight:     s.rootBlock.Header.Height,
+		},
+		{
+			name:            "happy path - partial backfill",
+			highestBackfill: 2, // backfill the first 3 blocks
+			startBlockID:    flow.ZeroID,
+			startHeight:     s.rootBlock.Header.Height,
+		},
+		{
+			name:            "happy path - complete backfill",
+			highestBackfill: len(s.blocksArray) - 1, // backfill all blocks
+			startBlockID:    s.blocksArray[0].ID(),
+			startHeight:     0,
+		},
+		{
+			name:            "happy path - start from root block by height",
+			highestBackfill: len(s.blocksArray) - 1, // backfill all blocks
+			startBlockID:    flow.ZeroID,
+			startHeight:     s.rootBlock.Header.Height, // start from root block
+		},
+		{
+			name:            "happy path - start from root block by id",
+			highestBackfill: len(s.blocksArray) - 1, // backfill all blocks
+			startBlockID:    s.rootBlock.ID(),       // start from root block
+			startHeight:     0,
+		},
+	}
+
+	// create variations for each of the base test
+	tests := make([]testType, 0, len(baseTests)*2)
+	for _, test := range baseTests {
+		t1 := test
+		t1.name = fmt.Sprintf("%s - finalized blocks", test.name)
+		t1.blockStatus = flow.BlockStatusFinalized
+		tests = append(tests, t1)
+
+		//t2 := test
+		//t2.name = fmt.Sprintf("%s - sealed blocks", test.name)
+		//t2.blockStatus = flow.BlockStatusSealed
+		//tests = append(tests, t2)
+
+		//t3 := test
+		//t3.name = fmt.Sprintf("%s - all types", test.name)
+		//t2.blockStatus = flow.BlockStatusUnknown
+		//tests = append(tests, t3)
+	}
+
+	for _, test := range tests {
+		s.Run(test.name, func() {
+			// add "backfill" block - blocks that are already in the database before the test starts
+			// this simulates a subscription on a past block
+			if test.highestBackfill > 0 {
+				s.backend.SetHighestHeight(s.blocksArray[test.highestBackfill].Header.Height)
+				// simulates last sealed block
+				if test.blockStatus == flow.BlockStatusSealed {
+					s.snapshot.On("Head").Return(s.blocksArray[test.highestBackfill].Header, nil)
+				}
+			}
+
+			subCtx, subCancel := context.WithCancel(ctx)
+			sub := s.backend.SubscribeBlocks(subCtx, test.startBlockID, test.startHeight, test.blockStatus)
+
+			//loop over all blocks
+			for i, b := range s.blocksArray {
+				s.T().Logf("checking block %d %v %d", i, b.ID(), b.Header.Height)
+
+				// simulate new block received.
+				// all blocks with index <= highestBackfill were already received
+				if int(i) > test.highestBackfill {
+					s.backend.SetHighestHeight(b.Header.Height)
+					if test.blockStatus == flow.BlockStatusSealed {
+						s.snapshot.On("Head").Return(b.Header, nil)
+					}
+					s.broadcaster.Publish()
+				}
+
+				// consume block from subscription
+				unittest.RequireReturnsBefore(s.T(), func() {
+					v, ok := <-sub.Channel()
+					require.True(s.T(), ok, "channel closed while waiting for exec data for block %d %v: err: %v", b.Header.Height, b.ID(), sub.Err())
+
+					actualBlock, ok := v.(*flow.Block)
+					require.True(s.T(), ok, "unexpected response type: %T", v)
+
+					s.Require().Equal(b.Header.Height, actualBlock.Header.Height)
+					s.Require().Equal(b.Header.ID(), actualBlock.Header.ID())
+					s.Require().Equal(*b, *actualBlock)
+
+				}, time.Second, fmt.Sprintf("timed out waiting for block %d %v", b.Header.Height, b.ID()))
+			}
+
+			// make sure there are no new messages waiting. the channel should be opened with nothing waiting
+			unittest.RequireNeverReturnBefore(s.T(), func() {
+				<-sub.Channel()
+			}, 100*time.Millisecond, "timed out waiting for subscription to shutdown")
+
+			// stop the subscription
+			subCancel()
+
+			// ensure subscription shuts down gracefully
+			unittest.RequireReturnsBefore(s.T(), func() {
+				v, ok := <-sub.Channel()
+				assert.Nil(s.T(), v)
+				assert.False(s.T(), ok)
+				assert.ErrorIs(s.T(), sub.Err(), context.Canceled)
+			}, 100*time.Millisecond, "timed out waiting for subscription to shutdown")
+		})
+	}
 }
