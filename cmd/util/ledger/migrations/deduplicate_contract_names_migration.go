@@ -16,6 +16,8 @@ import (
 
 // DeduplicateContractNamesMigration checks if the contract names have been duplicated and
 // removes the duplicate ones.
+//
+// This migration de-syncs storage used, so it should be run before the StorageUsedMigration.
 type DeduplicateContractNamesMigration struct {
 	log zerolog.Logger
 }
@@ -68,8 +70,13 @@ func (d *DeduplicateContractNamesMigration) MigrateAccount(
 
 	value := contractNamesPayload.Value()
 	if len(value) == 0 {
+		// Remove the empty payload
+		copy(payloads[contractNamesPayloadIndex:], payloads[contractNamesPayloadIndex+1:])
+		payloads = payloads[:len(payloads)-1]
+
 		return payloads, nil
 	}
+
 	var contractNames []string
 	err := cbor.Unmarshal(value, &contractNames)
 	if err != nil {
