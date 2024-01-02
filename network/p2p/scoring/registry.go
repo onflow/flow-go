@@ -178,6 +178,11 @@ func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegis
 		reg.logger.Info().Msg("stopping subscription validator")
 		<-reg.validator.Done()
 		reg.logger.Info().Msg("subscription validator stopped")
+	}).AddWorker(func(parent irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		if !reg.silencePeriodStartTime.IsZero() {
+			parent.Throw(fmt.Errorf("gossipsub scoring registry started more than once"))
+		}
+		reg.silencePeriodStartTime = time.Now()
 	})
 	reg.Component = builder.Build()
 
@@ -185,15 +190,6 @@ func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegis
 }
 
 var _ p2p.GossipSubInvCtrlMsgNotifConsumer = (*GossipSubAppSpecificScoreRegistry)(nil)
-
-// Start sets the silencePeriodStartTime before starting registry components.
-func (r *GossipSubAppSpecificScoreRegistry) Start(parent irrecoverable.SignalerContext) {
-	if !r.silencePeriodStartTime.IsZero() {
-		parent.Throw(fmt.Errorf("gossipsub scoring registry started more than once"))
-	}
-	r.silencePeriodStartTime = time.Now()
-	r.Component.Start(parent)
-}
 
 // AppSpecificScoreFunc returns the application specific penalty function that is called by the GossipSub protocol to determine the application specific penalty of a peer.
 func (r *GossipSubAppSpecificScoreRegistry) AppSpecificScoreFunc() func(peer.ID) float64 {
