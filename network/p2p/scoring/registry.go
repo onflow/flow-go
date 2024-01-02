@@ -19,9 +19,9 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
 	netcache "github.com/onflow/flow-go/network/p2p/cache"
+	p2pconfig "github.com/onflow/flow-go/network/p2p/config"
+	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
-	"github.com/onflow/flow-go/network/p2p/p2pconf"
-	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -137,7 +137,7 @@ type GossipSubAppSpecificScoreRegistry struct {
 // GossipSubAppSpecificScoreRegistryConfig is the configuration for the GossipSubAppSpecificScoreRegistry.
 // Configurations are the "union of parameters and other components" that are used to compute or build components that compute or maintain the application specific score of peers.
 type GossipSubAppSpecificScoreRegistryConfig struct {
-	Parameters p2pconf.AppSpecificScoreParameters `validate:"required"`
+	Parameters p2pconfig.AppSpecificScoreParameters `validate:"required"`
 
 	Logger zerolog.Logger `validate:"required"`
 
@@ -270,7 +270,7 @@ func (r *GossipSubAppSpecificScoreRegistry) AppSpecificScoreFunc() func(peer.ID)
 
 			return appSpecificScore // in the mean time, return the expired score.
 		default:
-			// record found in the cache, check if it is expired.
+			// record found in the cache.
 			r.logger.Trace().
 				Float64("app_specific_score", appSpecificScore).
 				Msg("application specific score found in cache")

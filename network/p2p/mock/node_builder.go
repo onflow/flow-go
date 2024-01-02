@@ -85,6 +85,22 @@ func (_m *NodeBuilder) OverrideGossipSubScoringConfig(_a0 *p2p.PeerScoringConfig
 	return r0
 }
 
+// OverrideNodeConstructor provides a mock function with given fields: _a0
+func (_m *NodeBuilder) OverrideNodeConstructor(_a0 p2p.NodeConstructor) p2p.NodeBuilder {
+	ret := _m.Called(_a0)
+
+	var r0 p2p.NodeBuilder
+	if rf, ok := ret.Get(0).(func(p2p.NodeConstructor) p2p.NodeBuilder); ok {
+		r0 = rf(_a0)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(p2p.NodeBuilder)
+		}
+	}
+
+	return r0
+}
+
 // SetBasicResolver provides a mock function with given fields: _a0
 func (_m *NodeBuilder) SetBasicResolver(_a0 madns.BasicResolver) p2p.NodeBuilder {
 	ret := _m.Called(_a0)
@@ -123,22 +139,6 @@ func (_m *NodeBuilder) SetConnectionManager(_a0 connmgr.ConnManager) p2p.NodeBui
 
 	var r0 p2p.NodeBuilder
 	if rf, ok := ret.Get(0).(func(connmgr.ConnManager) p2p.NodeBuilder); ok {
-		r0 = rf(_a0)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(p2p.NodeBuilder)
-		}
-	}
-
-	return r0
-}
-
-// SetCreateNode provides a mock function with given fields: _a0
-func (_m *NodeBuilder) SetCreateNode(_a0 p2p.CreateNodeFunc) p2p.NodeBuilder {
-	ret := _m.Called(_a0)
-
-	var r0 p2p.NodeBuilder
-	if rf, ok := ret.Get(0).(func(p2p.CreateNodeFunc) p2p.NodeBuilder); ok {
 		r0 = rf(_a0)
 	} else {
 		if ret.Get(0) != nil {

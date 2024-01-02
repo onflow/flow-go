@@ -86,11 +86,6 @@ type PubSubAdapterConfig interface {
 	WithInspectorSuite(GossipSubInspectorSuite)
 }
 
-// GossipSubControlMetricsObserver funcs used to observe gossipsub related metrics.
-type GossipSubControlMetricsObserver interface {
-	ObserveRPC(peer.ID, *pubsub.RPC)
-}
-
 // GossipSubRPCInspector app specific RPC inspector used to inspect and validate incoming RPC messages before they are processed by libp2p.
 // Implementations must:
 //   - be concurrency safe

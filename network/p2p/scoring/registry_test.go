@@ -21,9 +21,9 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
 	netcache "github.com/onflow/flow-go/network/p2p/cache"
+	p2pconfig "github.com/onflow/flow-go/network/p2p/config"
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
-	"github.com/onflow/flow-go/network/p2p/p2pconf"
 	"github.com/onflow/flow-go/network/p2p/scoring"
 	"github.com/onflow/flow-go/network/p2p/scoring/internal"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -1038,7 +1038,7 @@ func withInitFunction(initFunction scoring.SpamRecordInitFunc) func(cfg *scoring
 // and an application-specific score cache with predefined sizes and functionalities. The function also configures the scoring parameters
 // with test-specific values, particularly modifying the ScoreTTL value for the purpose of the tests. The creation and configuration of
 // the GossipSubAppSpecificScoreRegistry are validated to ensure no errors occur during the process.
-func newGossipSubAppSpecificScoreRegistry(t *testing.T, params p2pconf.ScoringParameters, opts ...func(*scoring.GossipSubAppSpecificScoreRegistryConfig)) (*scoring.GossipSubAppSpecificScoreRegistry,
+func newGossipSubAppSpecificScoreRegistry(t *testing.T, params p2pconfig.ScoringParameters, opts ...func(*scoring.GossipSubAppSpecificScoreRegistryConfig)) (*scoring.GossipSubAppSpecificScoreRegistry,
 	*netcache.GossipSubSpamRecordCache,
 	*internal.AppSpecificScoreCache) {
 	cache := netcache.NewGossipSubSpamRecordCache(100,

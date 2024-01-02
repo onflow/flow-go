@@ -33,11 +33,11 @@ import (
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
+	p2pbuilder "github.com/onflow/flow-go/network/p2p/builder"
+	p2pbuilderconfig "github.com/onflow/flow-go/network/p2p/builder/config"
 	"github.com/onflow/flow-go/network/p2p/connection"
 	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
-	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
-	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/utils"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
@@ -98,7 +98,7 @@ func NodeFixture(t *testing.T,
 		Logger:         unittest.Logger().Level(zerolog.WarnLevel),
 		Role:           flow.RoleCollection,
 		IdProvider:     idProvider,
-		MetricsCfg: &p2pconfig.MetricsConfig{
+		MetricsCfg: &p2pbuilderconfig.MetricsConfig{
 			HeroCacheFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 			Metrics:          metrics.NewNoopCollector(),
 		},
@@ -106,9 +106,6 @@ func NodeFixture(t *testing.T,
 		ConnGater:         connectionGater,
 		PeerManagerConfig: PeerManagerConfigFixture(), // disabled by default
 		FlowConfig:        defaultFlowConfig,
-		UnicastConfig: &p2pconfig.UnicastConfig{
-			UnicastConfig: defaultFlowConfig.NetworkConfig.UnicastConfig,
-		},
 	}
 
 	for _, opt := range opts {
@@ -121,7 +118,7 @@ func NodeFixture(t *testing.T,
 
 	logger := parameters.Logger.With().Hex("node_id", logging.ID(identity.NodeID)).Logger()
 
-	connManager, err := connection.NewConnManager(logger, parameters.MetricsCfg.Metrics, &parameters.FlowConfig.NetworkConfig.ConnectionManagerConfig)
+	connManager, err := connection.NewConnManager(logger, parameters.MetricsCfg.Metrics, &parameters.FlowConfig.NetworkConfig.ConnectionManager)
 	require.NoError(t, err)
 
 	builder := p2pbuilder.NewNodeBuilder(
@@ -139,9 +136,11 @@ func NodeFixture(t *testing.T,
 			MaxSize: uint32(1000),
 			Metrics: metrics.NewNoopCollector(),
 		},
-		parameters.UnicastConfig).
+		&p2pbuilderconfig.UnicastConfig{
+			Unicast:                parameters.FlowConfig.NetworkConfig.Unicast,
+			RateLimiterDistributor: parameters.UnicastRateLimiterDistributor,
+		}).
 		SetConnectionManager(connManager).
-		SetCreateNode(p2pbuilder.DefaultCreateNodeFunc).
 		SetResourceManager(parameters.ResourceManager)
 
 	if parameters.DhtOptions != nil && (parameters.Role != flow.RoleAccess && parameters.Role != flow.RoleExecution) {
@@ -206,13 +205,32 @@ func NodeFixture(t *testing.T,
 	return n, *identity
 }
 
+// RegisterPeerProviders registers the peer provider for all the nodes in the input slice.
+// All node ids are registered as the peers provider for all the nodes.
+// This means that every node will be connected to every other node by the peer manager.
+// This is useful for suppressing the "peer provider not set" verbose warning logs in tests scenarios where
+// it is desirable to have all nodes connected to each other.
+// Args:
+// - t: testing.T- the test object; not used, but included in the signature to defensively prevent misuse of the test utility in production.
+// - nodes: nodes to register the peer provider for, each node will be connected to all other nodes.
+func RegisterPeerProviders(_ *testing.T, nodes []p2p.LibP2PNode) {
+	ids := peer.IDSlice{}
+	for _, node := range nodes {
+		ids = append(ids, node.ID())
+	}
+	for _, node := range nodes {
+		node.WithPeersProvider(func() peer.IDSlice {
+			return ids
+		})
+	}
+}
+
 type NodeFixtureParameterOption func(*NodeFixtureParameters)
 
 type NodeFixtureParameters struct {
 	HandlerFunc                       network.StreamHandler
 	NetworkingType                    flownet.NetworkingType
 	Unicasts                          []protocols.ProtocolName
-	UnicastConfig                     *p2pconfig.UnicastConfig
 	Key                               crypto.PrivateKey
 	Address                           string
 	DhtOptions                        []dht.Option
@@ -221,21 +239,22 @@ type NodeFixtureParameters struct {
 	PeerScoringEnabled                bool
 	IdProvider                        module.IdentityProvider
 	PeerScoringConfigOverride         *p2p.PeerScoringConfigOverride
-	PeerManagerConfig                 *p2pconfig.PeerManagerConfig
+	PeerManagerConfig                 *p2pbuilderconfig.PeerManagerConfig
 	PeerProvider                      p2p.PeersProvider // peer manager parameter
 	ConnGater                         p2p.ConnectionGater
 	ConnManager                       connmgr.ConnManager
 	GossipSubFactory                  p2p.GossipSubFactoryFunc
 	GossipSubConfig                   p2p.GossipSubAdapterConfigFunc
-	MetricsCfg                        *p2pconfig.MetricsConfig
+	MetricsCfg                        *p2pbuilderconfig.MetricsConfig
 	ResourceManager                   network.ResourceManager
 	GossipSubRpcInspectorSuiteFactory p2p.GossipSubRpcInspectorSuiteFactoryFunc
 	FlowConfig                        *config.FlowConfig
+	UnicastRateLimiterDistributor     p2p.UnicastRateLimiterDistributor
 }
 
 func WithUnicastRateLimitDistributor(distributor p2p.UnicastRateLimiterDistributor) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
-		p.UnicastConfig.RateLimiterDistributor = distributor
+		p.UnicastRateLimiterDistributor = distributor
 	}
 }
 
@@ -248,12 +267,6 @@ func OverrideGossipSubRpcInspectorSuiteFactory(factory p2p.GossipSubRpcInspector
 func OverrideFlowConfig(cfg *config.FlowConfig) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
 		p.FlowConfig = cfg
-	}
-}
-
-func WithCreateStreamRetryDelay(delay time.Duration) NodeFixtureParameterOption {
-	return func(p *NodeFixtureParameters) {
-		p.UnicastConfig.CreateStreamBackoffDelay = delay
 	}
 }
 
@@ -281,7 +294,7 @@ func WithDefaultStreamHandler(handler network.StreamHandler) NodeFixtureParamete
 	}
 }
 
-func WithPeerManagerEnabled(cfg *p2pconfig.PeerManagerConfig, peerProvider p2p.PeersProvider) NodeFixtureParameterOption {
+func WithPeerManagerEnabled(cfg *p2pbuilderconfig.PeerManagerConfig, peerProvider p2p.PeersProvider) NodeFixtureParameterOption {
 	return func(p *NodeFixtureParameters) {
 		p.PeerManagerConfig = cfg
 		p.PeerProvider = peerProvider
@@ -371,8 +384,8 @@ func WithUnicastHandlerFunc(handler network.StreamHandler) NodeFixtureParameterO
 }
 
 // PeerManagerConfigFixture is a test fixture that sets the default config for the peer manager.
-func PeerManagerConfigFixture(opts ...func(*p2pconfig.PeerManagerConfig)) *p2pconfig.PeerManagerConfig {
-	cfg := &p2pconfig.PeerManagerConfig{
+func PeerManagerConfigFixture(opts ...func(*p2pbuilderconfig.PeerManagerConfig)) *p2pbuilderconfig.PeerManagerConfig {
+	cfg := &p2pbuilderconfig.PeerManagerConfig{
 		ConnectionPruning: true,
 		UpdateInterval:    1 * time.Second,
 		ConnectorFactory:  connection.DefaultLibp2pBackoffConnectorFactory(),
@@ -385,8 +398,8 @@ func PeerManagerConfigFixture(opts ...func(*p2pconfig.PeerManagerConfig)) *p2pco
 
 // WithZeroJitterAndZeroBackoff is a test fixture that sets the default config for the peer manager.
 // It uses a backoff connector with zero jitter and zero backoff.
-func WithZeroJitterAndZeroBackoff(t *testing.T) func(*p2pconfig.PeerManagerConfig) {
-	return func(cfg *p2pconfig.PeerManagerConfig) {
+func WithZeroJitterAndZeroBackoff(t *testing.T) func(*p2pbuilderconfig.PeerManagerConfig) {
+	return func(cfg *p2pbuilderconfig.PeerManagerConfig) {
 		cfg.ConnectorFactory = func(host host.Host) (p2p.Connector, error) {
 			cacheSize := 100
 			dialTimeout := time.Minute * 2
@@ -579,7 +592,7 @@ func EnsureStreamCreationInBothDirections(t *testing.T, ctx context.Context, nod
 				continue
 			}
 			// stream creation should pass without error
-			err := this.OpenProtectedStream(ctx, other.ID(), t.Name(), func(stream network.Stream) error {
+			err := this.OpenAndWriteOnStream(ctx, other.ID(), t.Name(), func(stream network.Stream) error {
 				// do nothing
 				require.NotNil(t, stream)
 				return nil

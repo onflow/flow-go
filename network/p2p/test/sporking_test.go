@@ -89,7 +89,7 @@ func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {
 
 	// create stream from node 1 to node 2
 	node1.Host().Peerstore().AddAddrs(peerInfo2.ID, peerInfo2.Addrs, peerstore.AddressTTL)
-	err = node1.OpenProtectedStream(context.Background(), peerInfo2.ID, t.Name(), func(stream network.Stream) error {
+	err = node1.OpenAndWriteOnStream(context.Background(), peerInfo2.ID, t.Name(), func(stream network.Stream) error {
 		require.NotNil(t, stream)
 		return nil
 	})
@@ -158,7 +158,7 @@ func TestOneToOneCrosstalkPrevention(t *testing.T) {
 
 	// create stream from node 1 to node 2
 	node2.Host().Peerstore().AddAddrs(peerInfo1.ID, peerInfo1.Addrs, peerstore.AddressTTL)
-	err = node2.OpenProtectedStream(context.Background(), peerInfo1.ID, t.Name(), func(stream network.Stream) error {
+	err = node2.OpenAndWriteOnStream(context.Background(), peerInfo1.ID, t.Name(), func(stream network.Stream) error {
 		assert.NotNil(t, stream)
 		return nil
 	})
@@ -324,7 +324,7 @@ func testOneToOneMessagingFails(t *testing.T, sourceNode p2p.LibP2PNode, peerInf
 	sourceNode.Host().Peerstore().AddAddrs(peerInfo.ID, peerInfo.Addrs, peerstore.AddressTTL)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	err := sourceNode.OpenProtectedStream(ctx, peerInfo.ID, t.Name(), func(stream network.Stream) error {
+	err := sourceNode.OpenAndWriteOnStream(ctx, peerInfo.ID, t.Name(), func(stream network.Stream) error {
 		// this callback should never be called
 		assert.Fail(t, "stream creation should have failed")
 		return nil

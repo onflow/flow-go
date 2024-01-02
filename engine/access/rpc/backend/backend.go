@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
-	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -84,6 +83,7 @@ type Params struct {
 	HistoricalAccessNodes     []accessproto.AccessAPIClient
 	Blocks                    storage.Blocks
 	Headers                   storage.Headers
+	Events                    storage.Events
 	Collections               storage.Collections
 	Transactions              storage.Transactions
 	ExecutionReceipts         storage.ExecutionReceipts
@@ -102,7 +102,8 @@ type Params struct {
 	TxResultCacheSize         uint
 	TxErrorMessagesCacheSize  uint
 	ScriptExecutor            execution.ScriptExecutor
-	ScriptExecutionMode       ScriptExecutionMode
+	ScriptExecutionMode       IndexQueryMode
+	EventQueryMode            IndexQueryMode
 }
 
 // New creates backend instance
@@ -147,11 +148,11 @@ func New(params Params) (*Backend, error) {
 		state: params.State,
 		// create the sub-backends
 		backendScripts: backendScripts{
+			log:               params.Log,
 			headers:           params.Headers,
 			executionReceipts: params.ExecutionReceipts,
 			connFactory:       params.ConnFactory,
 			state:             params.State,
-			log:               params.Log,
 			metrics:           params.AccessMetrics,
 			loggedScripts:     loggedScripts,
 			nodeCommunicator:  params.Communicator,
@@ -159,6 +160,7 @@ func New(params Params) (*Backend, error) {
 			scriptExecMode:    params.ScriptExecutionMode,
 		},
 		backendTransactions: backendTransactions{
+			log:                  params.Log,
 			staticCollectionRPC:  params.CollectionRPC,
 			state:                params.State,
 			chainID:              params.ChainID,
@@ -172,19 +174,21 @@ func New(params Params) (*Backend, error) {
 			retry:                retry,
 			connFactory:          params.ConnFactory,
 			previousAccessNodes:  params.HistoricalAccessNodes,
-			log:                  params.Log,
 			nodeCommunicator:     params.Communicator,
 			txResultCache:        txResCache,
 			txErrorMessagesCache: txErrorMessagesCache,
 		},
 		backendEvents: backendEvents{
+			log:               params.Log,
+			chain:             params.ChainID.Chain(),
 			state:             params.State,
 			headers:           params.Headers,
+			events:            params.Events,
 			executionReceipts: params.ExecutionReceipts,
 			connFactory:       params.ConnFactory,
-			log:               params.Log,
 			maxHeightRange:    params.MaxHeightRange,
 			nodeCommunicator:  params.Communicator,
+			queryMode:         params.EventQueryMode,
 		},
 		backendBlockHeaders: backendBlockHeaders{
 			headers: params.Headers,
@@ -195,11 +199,11 @@ func New(params Params) (*Backend, error) {
 			state:  params.State,
 		},
 		backendAccounts: backendAccounts{
+			log:               params.Log,
 			state:             params.State,
 			headers:           params.Headers,
 			executionReceipts: params.ExecutionReceipts,
 			connFactory:       params.ConnFactory,
-			log:               params.Log,
 			nodeCommunicator:  params.Communicator,
 			scriptExecutor:    params.ScriptExecutor,
 			scriptExecMode:    params.ScriptExecutionMode,
@@ -210,6 +214,7 @@ func New(params Params) (*Backend, error) {
 		backendNetwork: backendNetwork{
 			state:                params.State,
 			chainID:              params.ChainID,
+			headers:              params.Headers,
 			snapshotHistoryLimit: params.SnapshotHistoryLimit,
 		},
 		collections:       params.Collections,
@@ -357,18 +362,6 @@ func (b *Backend) GetNetworkParameters(_ context.Context) access.NetworkParamete
 	return access.NetworkParameters{
 		ChainID: b.chainID,
 	}
-}
-
-// GetLatestProtocolStateSnapshot returns the latest finalized snapshot
-func (b *Backend) GetLatestProtocolStateSnapshot(_ context.Context) ([]byte, error) {
-	snapshot := b.state.Final()
-
-	validSnapshot, err := b.getValidSnapshot(snapshot, 0)
-	if err != nil {
-		return nil, err
-	}
-
-	return convert.SnapshotToBytes(validSnapshot)
 }
 
 // executionNodesForBlockID returns upto maxNodesCnt number of randomly chosen execution node identities

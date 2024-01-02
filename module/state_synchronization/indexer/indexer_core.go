@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/onflow/flow-go/engine/common/requester"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -28,6 +29,8 @@ type IndexerCore struct {
 	events    storage.Events
 	results   storage.LightTransactionResults
 	batcher   bstorage.BatchBuilder
+
+	collectionHandler requester.HandleFunc
 }
 
 // New execution state indexer used to ingest block execution data and index it by height.
@@ -41,6 +44,7 @@ func New(
 	headers storage.Headers,
 	events storage.Events,
 	results storage.LightTransactionResults,
+	collectionHandler requester.HandleFunc,
 ) (*IndexerCore, error) {
 	log = log.With().Str("component", "execution_indexer").Logger()
 	metrics.InitializeLatestHeight(registers.LatestHeight())
@@ -58,6 +62,8 @@ func New(
 		headers:   headers,
 		events:    events,
 		results:   results,
+
+		collectionHandler: collectionHandler,
 	}, nil
 }
 
@@ -68,13 +74,14 @@ func New(
 // - storage.ErrHeightNotIndexed if the given height was not indexed yet or lower than the first indexed height.
 func (c *IndexerCore) RegisterValue(ID flow.RegisterID, height uint64) (flow.RegisterValue, error) {
 	value, err := c.registers.Get(ID, height)
-	// only return an error if the error doesn't match the not found error, since we have
-	// to gracefully handle not found values and instead assign nil, that is because the script executor
-	// expects that behaviour
-	if errors.Is(err, storage.ErrNotFound) {
-		return nil, nil
-	}
 	if err != nil {
+		// only return an error if the error doesn't match the not found error, since we have
+		// to gracefully handle not found values and instead assign nil, that is because the script executor
+		// expects that behaviour
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, nil
+		}
+
 		return nil, err
 	}
 
@@ -103,6 +110,7 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 	if block.Height != latest+1 && block.Height != latest {
 		return fmt.Errorf("must index block data with the next height %d, but got %d", latest+1, block.Height)
 	}
+
 	// allow rerunning the indexer for same height since we are fetching height from register storage, but there are other storages
 	// for indexing resources which might fail to update the values, so this enables rerunning and reindexing those resources
 	if block.Height == latest {
@@ -111,13 +119,7 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 	}
 
 	start := time.Now()
-
-	// concurrently process indexing of block data
 	g := errgroup.Group{}
-
-	// TODO: collections are currently indexed using the ingestion engine. In many cases, they are
-	// downloaded and indexed before the block is sealed. However, when a node is catching up, it
-	// may download the execution data first. In that case, we should index the collections here.
 
 	var eventCount, resultCount, registerCount int
 	g.Go(func() error {
@@ -155,6 +157,31 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 			Int("result_count", resultCount).
 			Dur("duration_ms", time.Since(start)).
 			Msg("indexed badger data")
+
+		return nil
+	})
+
+	g.Go(func() error {
+		start := time.Now()
+
+		// index all collections except the system chunk
+		// Note: the access ingestion engine also indexes collections, starting when the block is
+		// finalized. This process can fall behind due to the node being offline, resource issues
+		// or network congestion. This indexer ensures that collections are never farther behind
+		// than the latest indexed block. Calling the collection handler with a collection that
+		// has already been indexed is a noop.
+		indexedCount := 0
+		if len(data.ChunkExecutionDatas) > 0 {
+			for _, chunk := range data.ChunkExecutionDatas[0 : len(data.ChunkExecutionDatas)-1] {
+				c.collectionHandler(flow.ZeroID, chunk.Collection)
+				indexedCount++
+			}
+		}
+
+		lg.Debug().
+			Int("collection_count", indexedCount).
+			Dur("duration_ms", time.Since(start)).
+			Msg("indexed collections")
 
 		return nil
 	})
@@ -203,7 +230,7 @@ func (c *IndexerCore) IndexBlockData(data *execution_data.BlockExecutionDataEnti
 		return fmt.Errorf("failed to index block data at height %d: %w", block.Height, err)
 	}
 
-	c.metrics.BlockIndexed(block.Height, time.Since(start), registerCount, eventCount, resultCount)
+	c.metrics.BlockIndexed(block.Height, time.Since(start), eventCount, registerCount, resultCount)
 	lg.Debug().
 		Dur("duration_ms", time.Since(start)).
 		Msg("indexed block data")
