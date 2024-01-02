@@ -328,19 +328,19 @@ func (r *GossipSubAppSpecificScoreRegistry) computeAppSpecificScore(pid peer.ID)
 		}
 	}
 
-	// (4) staking reward: for staked peers, a default positive reward is applied only if the peer has no penalty on spamming and subscription.
-	if stakingScore > 0 && appSpecificScore == float64(0) {
-		lg = lg.With().Float64("staking_reward", stakingScore).Logger()
-		appSpecificScore += stakingScore
-	}
-
-	// (5) duplicate messages penalty: the duplicate messages penalty is applied to the application specific penalty as long
+	// (4) duplicate messages penalty: the duplicate messages penalty is applied to the application specific penalty as long
 	// as the number of duplicate messages detected for a peer is greater than 0. This counter is decayed overtime, thus sustained
 	// good behavior should eventually lead to the duplicate messages penalty applied being 0.
 	duplicateMessagesPenalty := r.duplicateMessagesPenalty(pid)
 	if duplicateMessagesPenalty < 0 {
 		lg = lg.With().Float64("duplicate_messages_penalty", duplicateMessagesPenalty).Logger()
 		appSpecificScore += duplicateMessagesPenalty
+	}
+	
+	// (5) staking reward: for staked peers, a default positive reward is applied only if the peer has no penalty on spamming and subscription.
+	if stakingScore > 0 && appSpecificScore == float64(0) {
+		lg = lg.With().Float64("staking_reward", stakingScore).Logger()
+		appSpecificScore += stakingScore
 	}
 
 	lg.Trace().
