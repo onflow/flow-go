@@ -177,7 +177,6 @@ func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegis
 			ready()
 			reg.logger.Info().Msg("subscription validator is ready")
 		}
-
 		<-ctx.Done()
 		reg.logger.Info().Msg("stopping subscription validator")
 		<-reg.validator.Done()
@@ -187,6 +186,7 @@ func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegis
 			parent.Throw(fmt.Errorf("gossipsub scoring registry started more than once"))
 		}
 		reg.silencePeriodStartTime = time.Now()
+		ready()
 	})
 	reg.Component = builder.Build()
 

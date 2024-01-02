@@ -42,6 +42,8 @@ func TestNoPenaltyRecord(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	reg.Start(signalerCtx)
+	unittest.RequireCloseBefore(t, reg.Ready(), 1*time.Second, "registry did not start in time")
+
 	defer stopRegistry(t, cancel, reg)
 
 	// initially, the spamRecords should not have the peer id.
@@ -87,6 +89,8 @@ func testPeerWithSpamRecord(t *testing.T, messageType p2pmsg.ControlMessageType,
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	reg.Start(signalerCtx)
+	unittest.RequireCloseBefore(t, reg.Ready(), 1*time.Second, "registry did not start in time")
+
 	defer stopRegistry(t, cancel, reg)
 
 	// initially, the spamRecords should not have the peer id.
@@ -145,6 +149,8 @@ func testSpamRecordWithUnknownIdentity(t *testing.T, messageType p2pmsg.ControlM
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	reg.Start(signalerCtx)
+	unittest.RequireCloseBefore(t, reg.Ready(), 1*time.Second, "registry did not start in time")
+
 	defer stopRegistry(t, cancel, reg)
 
 	// initially, the spamRecords should not have the peer id.
@@ -201,6 +207,8 @@ func testSpamRecordWithSubscriptionPenalty(t *testing.T, messageType p2pmsg.Cont
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	reg.Start(signalerCtx)
+	unittest.RequireCloseBefore(t, reg.Ready(), 1*time.Second, "registry did not start in time")
+
 	defer stopRegistry(t, cancel, reg)
 
 	// initially, the spamRecords should not have the peer id.
@@ -237,6 +245,8 @@ func TestSpamPenaltyDecaysInCache(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	reg.Start(signalerCtx)
+	unittest.RequireCloseBefore(t, reg.Ready(), 1*time.Second, "registry did not start in time")
+
 	defer stopRegistry(t, cancel, reg)
 
 	// report a misbehavior for the peer id.
@@ -312,6 +322,8 @@ func TestSpamPenaltyDecayToZero(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	reg.Start(signalerCtx)
+	unittest.RequireCloseBefore(t, reg.Ready(), 1*time.Second, "registry did not start in time")
+
 	defer stopRegistry(t, cancel, reg)
 
 	// report a misbehavior for the peer id.
@@ -362,6 +374,8 @@ func TestPersistingUnknownIdentityPenalty(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	reg.Start(signalerCtx)
+	unittest.RequireCloseBefore(t, reg.Ready(), 1*time.Second, "registry did not start in time")
+
 	defer stopRegistry(t, cancel, reg)
 
 	// initially, the app specific score should be the default unknown identity penalty.
@@ -424,6 +438,8 @@ func TestPersistingInvalidSubscriptionPenalty(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	reg.Start(signalerCtx)
+	unittest.RequireCloseBefore(t, reg.Ready(), 1*time.Second, "registry did not start in time")
+
 	defer stopRegistry(t, cancel, reg)
 
 	// initially, the app specific score should be the default invalid subscription penalty.
@@ -563,6 +579,8 @@ func TestPeerSpamPenaltyClusterPrefixed(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	reg.Start(signalerCtx)
+	unittest.RequireCloseBefore(t, reg.Ready(), 1*time.Second, "registry did not start in time")
+
 	defer stopRegistry(t, cancel, reg)
 
 	for _, peerID := range peerIds {
@@ -627,13 +645,13 @@ func TestScoringRegistrySilencePeriod(t *testing.T) {
 	silenceDuration := 5 * time.Second
 	silencedNotificationLogs := atomic.NewInt32(0)
 	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
-		if level == zerolog.DebugLevel {
+		if level == zerolog.TraceLevel {
 			if message == "ignoring invalid control message notification for peer during silence period" {
 				silencedNotificationLogs.Inc()
 			}
 		}
 	})
-	logger := zerolog.New(os.Stdout).Level(zerolog.DebugLevel).Hook(hook)
+	logger := zerolog.New(os.Stdout).Level(zerolog.TraceLevel).Hook(hook)
 	reg, spamRecords := newGossipSubAppSpecificScoreRegistry(
 		t,
 		withStakedIdentity(peerID),
@@ -652,6 +670,8 @@ func TestScoringRegistrySilencePeriod(t *testing.T) {
 	defer stopRegistry(t, cancel, reg)
 	// capture approximate registry start time
 	reg.Start(signalerCtx)
+	unittest.RequireCloseBefore(t, reg.Ready(), 1*time.Second, "registry did not start in time")
+
 	registryStartTime := time.Now()
 	expectedNumOfSilencedNotif := 0
 	// while we are in the silence period all notifications should be ignored and the
