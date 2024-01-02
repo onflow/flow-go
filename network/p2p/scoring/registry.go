@@ -200,7 +200,7 @@ func (r *GossipSubAppSpecificScoreRegistry) AppSpecificScoreFunc() func(peer.ID)
 
 		// during startup silence period avoid penalizing nodes
 		if !r.afterSilencePeriod() {
-			lg.Debug().Msg("returning 0 app specific score penalty for node during silence period")
+			lg.Trace().Msg("returning 0 app specific score penalty for node during silence period")
 			return appSpecificScore
 		}
 
@@ -312,7 +312,7 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 
 	// during startup silence period avoid penalizing nodes, ignore all notifications
 	if !r.afterSilencePeriod() {
-		lg.Debug().Msg("ignoring invalid control message notification for peer during silence period")
+		lg.Trace().Msg("ignoring invalid control message notification for peer during silence period")
 		return
 	}
 

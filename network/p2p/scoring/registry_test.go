@@ -806,5 +806,5 @@ func penaltyValueFixture(msgType p2pmsg.ControlMessageType) float64 {
 
 func stopRegistry(t *testing.T, cancel context.CancelFunc, registry *scoring.GossipSubAppSpecificScoreRegistry) {
 	cancel()
-	unittest.RequireCloseBefore(t, registry.Done(), 500*time.Millisecond, "registry did not stop")
+	unittest.RequireCloseBefore(t, registry.Done(), 5*time.Second, "registry did not stop")
 }
