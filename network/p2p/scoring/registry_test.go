@@ -646,7 +646,7 @@ func TestScoringRegistrySilencePeriod(t *testing.T) {
 	silencedNotificationLogs := atomic.NewInt32(0)
 	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
 		if level == zerolog.TraceLevel {
-			if message == "ignoring invalid control message notification for peer during silence period" {
+			if message == scoring.NotificationSilencedMsg {
 				silencedNotificationLogs.Inc()
 			}
 		}

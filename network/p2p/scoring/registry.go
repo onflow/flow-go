@@ -63,6 +63,8 @@ const (
 	clusterPrefixedPenaltyReductionFactor = .5
 	// rpcPublishMessageMisbehaviourPenalty is the penalty applied to the application specific penalty when a peer conducts a RpcPublishMessageMisbehaviourPenalty misbehaviour.
 	rpcPublishMessageMisbehaviourPenalty = -10
+	// NotificationSilencedMsg log messages for silenced notifications
+	NotificationSilencedMsg = "ignoring invalid control message notification for peer during silence period"
 )
 
 type SpamRecordInitFunc func() p2p.GossipSubSpamRecord
