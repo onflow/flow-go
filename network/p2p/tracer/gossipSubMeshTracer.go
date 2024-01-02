@@ -59,18 +59,26 @@ type GossipSubMeshTracer struct {
 
 var _ p2p.PubSubTracer = (*GossipSubMeshTracer)(nil)
 
+type RpcSentTrackerConfig struct {
+	CacheSize            uint32 `validate:"required"`
+	WorkerQueueCacheSize uint32 `validate:"required"`
+	WorkerQueueNumber    int    `validate:"required"`
+}
+
+type DuplicateMessageTrackerCacheConfig struct {
+	CacheSize uint32  `validate:"required"`
+	Decay     float64 `validate:"required"`
+}
+
 type GossipSubMeshTracerConfig struct {
-	network.NetworkingType
-	metrics.HeroCacheMetricsFactory
-	Logger                             zerolog.Logger
-	Metrics                            module.LocalGossipSubRouterMetrics
-	IDProvider                         module.IdentityProvider
-	LoggerInterval                     time.Duration
-	RpcSentTrackerCacheSize            uint32
-	RpcSentTrackerWorkerQueueCacheSize uint32
-	RpcSentTrackerNumOfWorkers         int
-	DuplicateMessageTrackerCacheSize   uint32
-	DuplicateMessageTrackerGaugeDecay  float64
+	network.NetworkingType          `validate:"required"`
+	metrics.HeroCacheMetricsFactory `validate:"required"`
+	Logger                          zerolog.Logger                     `validate:"required"`
+	Metrics                         module.LocalGossipSubRouterMetrics `validate:"required"`
+	IDProvider                      module.IdentityProvider            `validate:"required"`
+	LoggerInterval                  time.Duration                      `validate:"required"`
+	DuplicateMessageTracker         DuplicateMessageTrackerCacheConfig `validate:"required"`
+	RpcSentTracker                  RpcSentTrackerConfig               `validate:"required"`
 }
 
 // NewGossipSubMeshTracer creates a new *GossipSubMeshTracer.
@@ -82,11 +90,11 @@ func NewGossipSubMeshTracer(config *GossipSubMeshTracerConfig) *GossipSubMeshTra
 	lg := config.Logger.With().Str("component", "gossipsub_topology_tracer").Logger()
 	rpcSentTracker := internal.NewRPCSentTracker(&internal.RPCSentTrackerConfig{
 		Logger:                             lg,
-		RPCSentCacheSize:                   config.RpcSentTrackerCacheSize,
+		RPCSentCacheSize:                   config.RpcSentTracker.CacheSize,
 		RPCSentCacheCollector:              metrics.GossipSubRPCSentTrackerMetricFactory(config.HeroCacheMetricsFactory, config.NetworkingType),
 		WorkerQueueCacheCollector:          metrics.GossipSubRPCSentTrackerQueueMetricFactory(config.HeroCacheMetricsFactory, config.NetworkingType),
-		WorkerQueueCacheSize:               config.RpcSentTrackerWorkerQueueCacheSize,
-		NumOfWorkers:                       config.RpcSentTrackerNumOfWorkers,
+		WorkerQueueCacheSize:               config.RpcSentTracker.WorkerQueueCacheSize,
+		NumOfWorkers:                       config.RpcSentTracker.WorkerQueueNumber,
 		LastHighestIhavesSentResetInterval: defaultLastHighestIHaveRPCSizeResetInterval,
 	})
 	g := &GossipSubMeshTracer{
@@ -97,8 +105,8 @@ func NewGossipSubMeshTracer(config *GossipSubMeshTracerConfig) *GossipSubMeshTra
 		loggerInterval: config.LoggerInterval,
 		rpcSentTracker: rpcSentTracker,
 		duplicateMessageTrackerCache: internal.NewGossipSubDuplicateMessageTrackerCache(
-			config.DuplicateMessageTrackerCacheSize,
-			config.DuplicateMessageTrackerGaugeDecay,
+			config.DuplicateMessageTracker.CacheSize,
+			config.DuplicateMessageTracker.Decay,
 			config.Logger,
 			metrics.GossipSubDuplicateMessageTrackerCacheMetricFactory(config.HeroCacheMetricsFactory, config.NetworkingType),
 		),
@@ -374,7 +382,7 @@ func (t *GossipSubMeshTracer) DuplicateMessage(msg *pubsub.Message) {
 			Msg("failed to increment gossipsub duplicate message tracker count for peer")
 		return
 	}
-	
+
 	lg.Trace().
 		Str("received_from", p2plogging.PeerId(msg.ReceivedFrom)).
 		Int("message_size", size).
