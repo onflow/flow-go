@@ -185,9 +185,9 @@ network-config:
       # Number of workers for rpc sent tracker worker pool.
       rpc-sent-tracker-workers: 5
       # Cache size of the gossipsub duplicate message tracker.
-      duplicate-message-cache-tracker-size: 1000
-      # Decay rate for the peer duplicate message counters.
-      duplicate-message-cache-tracker-decay: .99
+      duplicate-message-tracer:
+         cache-size: 10_000
+         decay: .5
     # Peer scoring is the default value for enabling peer scoring
     peer-scoring-enabled: true
     scoring-parameters:
