@@ -9,9 +9,6 @@ import (
 
 	"github.com/onflow/cadence/runtime/common"
 
-	"github.com/onflow/flow-go/cmd/util/ledger/util"
-	"github.com/onflow/flow-go/fvm/environment"
-	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -45,20 +42,34 @@ func (d *DeduplicateContractNamesMigration) MigrateAccount(
 	address common.Address,
 	payloads []*ledger.Payload,
 ) ([]*ledger.Payload, error) {
-	snapshot, err := util.NewPayloadSnapshot(payloads)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create payload snapshot: %w", err)
-	}
-	transactionState := state.NewTransactionState(snapshot, state.DefaultParameters())
-	accounts := environment.NewAccounts(transactionState)
 	flowAddress := flow.ConvertAddress(address)
+	contractNamesID := flow.ContractNamesRegisterID(flowAddress)
 
-	contractNames, err := accounts.GetContractNames(flowAddress)
+	var contractNamesPayload *ledger.Payload
+	contractNamesPayloadIndex := 0
+	for i, payload := range payloads {
+		key, err := payload.Key()
+		if err != nil {
+			return nil, err
+		}
+		id, err := convert.LedgerKeyToRegisterID(key)
+		if err != nil {
+			return nil, err
+		}
+		if id == contractNamesID {
+			contractNamesPayload = payload
+			contractNamesPayloadIndex = i
+			break
+		}
+	}
+	if contractNamesPayload == nil {
+		return payloads, nil
+	}
+
+	var contractNames []string
+	err := cbor.Unmarshal(contractNamesPayload.Value(), &contractNames)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get contract names: %w", err)
-	}
-	if len(contractNames) == 1 {
-		return payloads, nil
 	}
 
 	var foundDuplicate bool
@@ -92,37 +103,8 @@ func (d *DeduplicateContractNamesMigration) MigrateAccount(
 		)
 	}
 
-	id := flow.ContractNamesRegisterID(flowAddress)
-	err = accounts.SetValue(id, newContractNames)
-
-	if err != nil {
-		return nil, fmt.Errorf("setting value failed: %w", err)
-	}
-
-	// finalize the transaction
-	result, err := transactionState.FinalizeMainTransaction()
-	if err != nil {
-		return nil, fmt.Errorf("failed to finalize main transaction: %w", err)
-	}
-
-	for id, value := range result.WriteSet {
-		if value == nil {
-			delete(snapshot.Payloads, id)
-			continue
-		}
-
-		snapshot.Payloads[id] = ledger.NewPayload(
-			convert.RegisterIDToLedgerKey(id),
-			value,
-		)
-	}
-
-	newPayloads := make([]*ledger.Payload, 0, len(snapshot.Payloads))
-	for _, payload := range snapshot.Payloads {
-		newPayloads = append(newPayloads, payload)
-	}
-
-	return newPayloads, nil
+	payloads[contractNamesPayloadIndex] = ledger.NewPayload(convert.RegisterIDToLedgerKey(contractNamesID), newContractNames)
+	return payloads, nil
 
 }
 
