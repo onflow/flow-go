@@ -7,6 +7,7 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -111,6 +112,8 @@ type GossipSubAppSpecificScoreRegistry struct {
 	silencePeriodDuration time.Duration
 	// silencePeriodStartTime time that the silence period begins, this is the time that the registry is started by the node.
 	silencePeriodStartTime time.Time
+	// silencePeriodElapsed atomic bool that stores a bool flag which indicates if the silence period is over or not.
+	silencePeriodElapsed *atomic.Bool
 }
 
 // GossipSubAppSpecificScoreRegistryConfig is the configuration for the GossipSubAppSpecificScoreRegistry.
@@ -159,6 +162,7 @@ func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegis
 		validator:             config.Validator,
 		idProvider:            config.IdProvider,
 		silencePeriodDuration: config.ScoringRegistryStartupSilenceDuration,
+		silencePeriodElapsed:  atomic.NewBool(false),
 	}
 
 	builder := component.NewComponentManagerBuilder()
@@ -364,7 +368,14 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 
 // afterSilencePeriod returns true if registry silence period is over, false otherwise.
 func (r *GossipSubAppSpecificScoreRegistry) afterSilencePeriod() bool {
-	return time.Since(r.silencePeriodStartTime) > r.silencePeriodDuration
+	if !r.silencePeriodElapsed.Load() {
+		if time.Since(r.silencePeriodStartTime) > r.silencePeriodDuration {
+			r.silencePeriodElapsed.Store(true)
+			return true
+		}
+		return false
+	}
+	return true
 }
 
 // DefaultDecayFunction is the default decay function that is used to decay the application specific penalty of a peer.
