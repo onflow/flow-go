@@ -36,15 +36,6 @@ type UpdateFunction func(record GossipSubSpamRecord) GossipSubSpamRecord
 //
 // Implementation must be thread-safe.
 type GossipSubSpamRecordCache interface {
-	// Add adds the GossipSubSpamRecord of a peer to the cache.
-	// Args:
-	// - peerID: the peer ID of the peer in the GossipSub protocol.
-	// - record: the GossipSubSpamRecord of the peer.
-	//
-	// Returns:
-	// - bool: true if the record was added successfully, false otherwise.
-	Add(peerId peer.ID, record GossipSubSpamRecord) bool
-
 	// Get returns the GossipSubSpamRecord of a peer from the cache.
 	// Args:
 	// - peerID: the peer ID of the peer in the GossipSub protocol.
@@ -54,14 +45,16 @@ type GossipSubSpamRecordCache interface {
 	// - bool: true if the record was retrieved successfully, false otherwise.
 	Get(peerID peer.ID) (*GossipSubSpamRecord, error, bool)
 
-	// Update updates the GossipSub spam penalty of a peer in the cache using the given adjust function.
+	// Adjust updates the GossipSub spam penalty of a peer in the cache. If the peer does not have a record in the cache, a new record is created.
+	// The order of the pre-processing functions is the same as the order in which they were added to the cache.
 	// Args:
 	// - peerID: the peer ID of the peer in the GossipSub protocol.
-	// - adjustFn: the adjust function to be applied to the record.
+	// - updateFn: the update function to be applied to the record.
 	// Returns:
 	// - *GossipSubSpamRecord: the updated record.
 	// - error on failure to update the record. The returned error is irrecoverable and indicates an exception.
-	Update(peerID peer.ID, updateFunc UpdateFunction) (*GossipSubSpamRecord, error)
+	// Note that if any of the pre-processing functions returns an error, the record is reverted to its original state (prior to applying the update function).
+	Adjust(peerID peer.ID, updateFunc UpdateFunction) (*GossipSubSpamRecord, error)
 
 	// Has returns true if the cache contains the GossipSubSpamRecord of the given peer.
 	// Args:

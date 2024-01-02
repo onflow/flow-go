@@ -412,16 +412,7 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 		Str("peer_id", p2plogging.PeerId(notification.PeerID)).
 		Str("misbehavior_type", notification.MsgType.String()).Logger()
 
-	// try initializing the application specific penalty for the peer if it is not yet initialized.
-	// this is done to avoid the case where the peer is not yet cached and the application specific penalty is not yet initialized.
-	// initialization is successful only if the peer is not yet cached. If any error is occurred during initialization we log a fatal error
-	initRecord := r.init()
-	initialized := r.spamScoreCache.Add(notification.PeerID, initRecord)
-	if initialized {
-		lg.Trace().Str("peer_id", p2plogging.PeerId(notification.PeerID)).Msg("application specific penalty initialized for peer")
-	}
-
-	record, err := r.spamScoreCache.Update(notification.PeerID, func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
+	record, err := r.spamScoreCache.Adjust(notification.PeerID, func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
 		penalty := 0.0
 		switch notification.MsgType {
 		case p2pmsg.CtrlMsgGraft:

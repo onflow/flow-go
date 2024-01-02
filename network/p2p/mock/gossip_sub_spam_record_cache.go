@@ -76,7 +76,7 @@ func (_m *GossipSubSpamRecordCache) Has(peerID peer.ID) bool {
 }
 
 // Update provides a mock function with given fields: peerID, updateFunc
-func (_m *GossipSubSpamRecordCache) Update(peerID peer.ID, updateFunc p2p.UpdateFunction) (*p2p.GossipSubSpamRecord, error) {
+func (_m *GossipSubSpamRecordCache) Adjust(peerID peer.ID, updateFunc p2p.UpdateFunction) (*p2p.GossipSubSpamRecord, error) {
 	ret := _m.Called(peerID, updateFunc)
 
 	var r0 *p2p.GossipSubSpamRecord

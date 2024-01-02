@@ -720,7 +720,7 @@ func TestScoreRegistry_TestSpamRecordDecayAdjustment(t *testing.T) {
 		MsgType: p2pmsg.CtrlMsgPrune,
 	})
 	// reduce penalty and increase Decay to scoring.MinimumSpamPenaltyDecayFactor
-	record, err := spamRecords.Update(peer2, func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
+	record, err := spamRecords.Adjust(peer2, func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
 		record.Penalty = -.1
 		record.Decay = scoring.MinimumSpamPenaltyDecayFactor
 		return record

@@ -2,6 +2,7 @@ package cache
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -30,6 +31,18 @@ type GossipSubSpamRecordCache struct {
 	// Primary use case is to perform decay operations on the record before reading or updating it. In this way, a
 	// record is only decayed when it is read or updated without the need to explicitly iterating over the cache.
 	preprocessFns []PreprocessorFunc
+
+	// initFn is a function that is called to initialize a new record in the cache.
+	initFn func() p2p.GossipSubSpamRecord
+
+	// atomicAdjustMutex is a mutex used to ensure that the init-and-adjust operation is atomic.
+	// The init-and-adjust operation is used to initialize a record in the cache and then update it.
+	// The init-and-adjust operation is used when the record does not exist in the cache and needs to be initialized.
+	// The current implementation is not thread-safe, and the mutex is used to ensure that the init-and-adjust operation is atomic, otherwise
+	// more than one thread may try to initialize records at the same time and cause an LRU eviction, hence trying an adjust on a record that does not exist,
+	// which will result in an error.
+	// TODO: implement a thread-safe atomic adjust operation and remove the mutex.
+	atomicAdjustMutex sync.Mutex
 }
 
 var _ p2p.GossipSubSpamRecordCache = (*GossipSubSpamRecordCache)(nil)
@@ -63,41 +76,39 @@ type PreprocessorFunc func(record p2p.GossipSubSpamRecord, lastUpdated time.Time
 func NewGossipSubSpamRecordCache(sizeLimit uint32,
 	logger zerolog.Logger,
 	collector module.HeroCacheMetrics,
+	initFn func() p2p.GossipSubSpamRecord,
 	prFns ...PreprocessorFunc) *GossipSubSpamRecordCache {
 	backData := herocache.NewCache(sizeLimit,
 		herocache.DefaultOversizeFactor,
-		// we should not evict any record from the cache,
-		// eviction will open the node to spam attacks by malicious peers to erase their application specific penalty.
-		heropool.NoEjection,
+		heropool.LRUEjection,
 		logger.With().Str("mempool", "gossipsub-app-Penalty-cache").Logger(),
 		collector)
 	return &GossipSubSpamRecordCache{
-		c:             stdmap.NewBackend(stdmap.WithBackData(backData)),
-		preprocessFns: prFns,
+		c:                 stdmap.NewBackend(stdmap.WithBackData(backData)),
+		preprocessFns:     prFns,
+		initFn:            initFn,
+		atomicAdjustMutex: sync.Mutex{},
 	}
 }
 
-// Add adds the GossipSubSpamRecord of a peer to the cache.
+// init initializes
 // Args:
 // - peerID: the peer ID of the peer in the GossipSub protocol.
-// - record: the GossipSubSpamRecord of the peer.
-//
 // Returns:
 // - bool: true if the record was added successfully, false otherwise.
 // Note that a record is added successfully if the cache has enough space to store the record and no record exists for the peer in the cache.
 // In other words, the entries are deduplicated by the peer ID.
-func (a *GossipSubSpamRecordCache) Add(peerId peer.ID, record p2p.GossipSubSpamRecord) bool {
-	entityId := flow.HashToID([]byte(peerId)) // HeroCache uses hash of peer.ID as the unique identifier of the record.
+func (a *GossipSubSpamRecordCache) init(peerId peer.ID) bool {
+	entityId := flow.MakeID(peerId) // HeroCache uses hash of peer.ID as the unique identifier of the record.
 	return a.c.Add(gossipsubSpamRecordEntity{
 		entityId:            entityId,
 		peerID:              peerId,
 		lastUpdated:         time.Now(),
-		GossipSubSpamRecord: record,
+		GossipSubSpamRecord: a.initFn(),
 	})
 }
 
-// Update updates the GossipSub spam penalty of a peer in the cache. It assumes that a record already exists for the peer in the cache.
-// It first reads the record from the cache, applies the pre-processing functions to the record, and then applies the update function to the record.
+// Adjust updates the GossipSub spam penalty of a peer in the cache. If the peer does not have a record in the cache, a new record is created.
 // The order of the pre-processing functions is the same as the order in which they were added to the cache.
 // Args:
 // - peerID: the peer ID of the peer in the GossipSub protocol.
@@ -106,44 +117,56 @@ func (a *GossipSubSpamRecordCache) Add(peerId peer.ID, record p2p.GossipSubSpamR
 // - *GossipSubSpamRecord: the updated record.
 // - error on failure to update the record. The returned error is irrecoverable and indicates an exception.
 // Note that if any of the pre-processing functions returns an error, the record is reverted to its original state (prior to applying the update function).
-func (a *GossipSubSpamRecordCache) Update(peerID peer.ID, updateFn p2p.UpdateFunction) (*p2p.GossipSubSpamRecord, error) {
+func (a *GossipSubSpamRecordCache) Adjust(peerID peer.ID, updateFn p2p.UpdateFunction) (*p2p.GossipSubSpamRecord, error) {
 	// HeroCache uses flow.Identifier for keys, so reformat of the peer.ID
-	entityId := flow.HashToID([]byte(peerID))
-	if !a.c.Has(entityId) {
-		return nil, fmt.Errorf("could not update spam records for peer %s, record not found", peerID.String())
-	}
+	entityId := flow.MakeID(peerID)
 
 	var err error
-	record, updated := a.c.Adjust(entityId, func(entry flow.Entity) flow.Entity {
-		e := entry.(gossipsubSpamRecordEntity)
+	optimisticAdjustFunc := func() (flow.Entity, bool) {
+		return a.c.Adjust(entityId, func(entry flow.Entity) flow.Entity {
+			e := entry.(gossipsubSpamRecordEntity)
 
-		currentRecord := e.GossipSubSpamRecord
-		// apply the pre-processing functions to the record.
-		for _, apply := range a.preprocessFns {
-			e.GossipSubSpamRecord, err = apply(e.GossipSubSpamRecord, e.lastUpdated)
-			if err != nil {
-				e.GossipSubSpamRecord = currentRecord
-				return e // return the original record if the pre-processing fails (atomic abort).
+			currentRecord := e.GossipSubSpamRecord
+			// apply the pre-processing functions to the record.
+			for _, apply := range a.preprocessFns {
+				e.GossipSubSpamRecord, err = apply(e.GossipSubSpamRecord, e.lastUpdated)
+				if err != nil {
+					e.GossipSubSpamRecord = currentRecord
+					return e // return the original record if the pre-processing fails (atomic abort).
+				}
 			}
-		}
 
-		// apply the update function to the record.
-		e.GossipSubSpamRecord = updateFn(e.GossipSubSpamRecord)
+			// apply the update function to the record.
+			e.GossipSubSpamRecord = updateFn(e.GossipSubSpamRecord)
 
-		if e.GossipSubSpamRecord != currentRecord {
-			e.lastUpdated = time.Now()
-		}
-		return e
-	})
+			if e.GossipSubSpamRecord != currentRecord {
+				e.lastUpdated = time.Now()
+			}
+			return e
+		})
+	}
+
+	// first, we try to optimistically adjust the record assuming that the record already exists.
+	adjustedEntity, adjusted := optimisticAdjustFunc()
 	if err != nil {
 		return nil, fmt.Errorf("could not update spam records for peer %s, error: %w", peerID.String(), err)
 	}
-	if !updated {
-		// this happens when the underlying HeroCache fails to update the record.
-		return nil, fmt.Errorf("internal cache error for updating %s", peerID.String())
+	// if the record does not exist, we initialize the record and try to adjust it again.
+	if !adjusted {
+		// ensuring that the init-and-adjust operation is atomic.
+		a.atomicAdjustMutex.Lock()
+		defer a.atomicAdjustMutex.Unlock()
+
+		a.init(peerID)
+		// as the record is initialized, the adjust attempt should not return an error, and any returned error
+		// is an irrecoverable error and indicates a bug.
+		adjustedEntity, adjusted = optimisticAdjustFunc()
+		if !adjusted {
+			return nil, fmt.Errorf("could not update spam records for peer %s; pre-processing errors (if-any) %w", peerID.String(), err)
+		}
 	}
 
-	r := record.(gossipsubSpamRecordEntity).GossipSubSpamRecord
+	r := adjustedEntity.(gossipsubSpamRecordEntity).GossipSubSpamRecord
 	return &r, nil
 }
 
@@ -168,10 +191,13 @@ func (a *GossipSubSpamRecordCache) Has(peerID peer.ID) bool {
 //     the caller is advised to crash the node.
 //   - true if the record is found in the cache, false otherwise.
 func (a *GossipSubSpamRecordCache) Get(peerID peer.ID) (*p2p.GossipSubSpamRecord, error, bool) {
-	entityId := flow.HashToID([]byte(peerID)) // HeroCache uses hash of peer.ID as the unique identifier of the record.
+	entityId := flow.MakeID(peerID) // HeroCache uses hash of peer.ID as the unique identifier of the record.
 	if !a.c.Has(entityId) {
 		return nil, nil, false
 	}
+
+	a.atomicAdjustMutex.Lock()
+	defer a.atomicAdjustMutex.Unlock()
 
 	var err error
 	record, updated := a.c.Adjust(entityId, func(entry flow.Entity) flow.Entity {
