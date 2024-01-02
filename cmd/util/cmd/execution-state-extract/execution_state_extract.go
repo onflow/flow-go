@@ -85,8 +85,6 @@ func extractExecutionState(
 
 	rwf := reporters.NewReportFileWriterFactory(dir, log)
 
-	cadenceDataValidation := migrators.NewCadenceDataValidationMigrations(rwf, nWorker)
-
 	var migrations = []ledger.Migration{
 		migrators.CreateAccountBasedMigration(
 			log,
@@ -94,12 +92,7 @@ func extractExecutionState(
 			[]migrators.AccountBasedMigration{
 				// do account usage migration before and after as a sanity check.
 				&migrators.AccountUsageMigrator{},
-				cadenceDataValidation.PreMigration(),
-				migrators.NewAtreeRegisterMigrator(
-					rwf,
-				),
-				&migrators.DeduplicateContractNamesMigration{},
-				cadenceDataValidation.PostMigration(),
+				migrators.NewCadenceValueMigrator(rwf),
 				&migrators.AccountUsageMigrator{},
 			}),
 	}

@@ -42,11 +42,8 @@ func newMigratorRuntime(
 	}
 
 	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{
-		AccountLinkingEnabled: true,
 		// Attachments are enabled everywhere except for Mainnet
 		AttachmentsEnabled: true,
-		// Capability Controllers are enabled everywhere except for Mainnet
-		CapabilityControllersEnabled: true,
 	})
 
 	env.Configure(
@@ -147,11 +144,8 @@ func (mr *migratorRuntime) ChildInterpreters(log zerolog.Logger, n int, address 
 		ri := &util.MigrationRuntimeInterface{}
 
 		env := runtime.NewBaseInterpreterEnvironment(runtime.Config{
-			AccountLinkingEnabled: true,
 			// Attachments are enabled everywhere except for Mainnet
 			AttachmentsEnabled: true,
-			// Capability Controllers are enabled everywhere except for Mainnet
-			CapabilityControllersEnabled: true,
 		})
 
 		env.Configure(
