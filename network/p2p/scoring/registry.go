@@ -204,7 +204,7 @@ func (r *GossipSubAppSpecificScoreRegistry) AppSpecificScoreFunc() func(peer.ID)
 
 		// during startup silence period avoid penalizing nodes
 		if !r.afterSilencePeriod() {
-			lg.Debug().Msg("returning 0 app specific score penalty for node during silence period")
+			lg.Trace().Msg("returning 0 app specific score penalty for node during silence period")
 			return appSpecificScore
 		}
 
