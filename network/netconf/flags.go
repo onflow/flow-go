@@ -46,8 +46,6 @@ const (
 	outboundConnectionLimit          = "connections-outbound"
 	fileDescriptorsLimit             = "fd"
 	memoryLimitBytes                 = "memory-bytes"
-	duplicateMessageTrackerCacheSize = "gossipsub-duplicate-message-cache-tracker-size"
-	duplicateMessageTrackerDecay     = "gossipsub-duplicate-message-cache-tracker-decay"
 	// connection manager
 	highWatermark                      = "libp2p-high-watermark"
 	lowWatermark                       = "libp2p-low-watermark"
