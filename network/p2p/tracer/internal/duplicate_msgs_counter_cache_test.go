@@ -21,16 +21,18 @@ func TestGossipSubDuplicateMessageTrackerCache(t *testing.T) {
 	cache := duplicateMessageTrackerCacheFixture(t, 100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
 	peerID := unittest.PeerIdFixture(t)
 	// expect count to initially be 0
-	count, err := cache.Get(peerID)
+	count, err, found := cache.Get(peerID)
 	require.NoError(t, err)
+	require.False(t, found)
 	require.Equal(t, 0.0, count)
 
 	// increment the counter for a peer
 	count, err = cache.Inc(peerID)
 	require.NoError(t, err)
 	require.Equal(t, 1.0, count)
-	count, err = cache.Get(peerID)
+	count, err, found = cache.Get(peerID)
 	require.NoError(t, err)
+	require.True(t, found)
 	unittest.RequireNumericallyClose(t, 1.0, count, .1)
 }
 
@@ -46,15 +48,17 @@ func TestGossipSubDuplicateMessageTrackerCache_Concurrent_Inc_Get(t *testing.T) 
 	// get initial counts concurrently
 	go func() {
 		defer wg.Done()
-		count, err := cache.Get(peerId1)
+		count, err, found := cache.Get(peerId1)
 		require.NoError(t, err)
+		require.False(t, found)
 		require.Equal(t, 0.0, count)
 	}()
 
 	go func() {
 		defer wg.Done()
-		count, err := cache.Get(peerId2)
+		count, err, found := cache.Get(peerId2)
 		require.NoError(t, err)
+		require.False(t, found)
 		require.Equal(t, 0.0, count)
 	}()
 
@@ -82,15 +86,17 @@ func TestGossipSubDuplicateMessageTrackerCache_Concurrent_Inc_Get(t *testing.T) 
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		count, err := cache.Get(peerId1)
+		count, err, found := cache.Get(peerId1)
 		require.NoError(t, err)
+		require.True(t, found)
 		unittest.RequireNumericallyClose(t, 1.0, count, .1)
 	}()
 
 	go func() {
 		defer wg.Done()
-		count, err := cache.Get(peerId2)
+		count, err, found := cache.Get(peerId2)
 		require.NoError(t, err)
+		require.True(t, found)
 		unittest.RequireNumericallyClose(t, 1.0, count, .1)
 	}()
 
@@ -106,8 +112,9 @@ func TestGossipSubDuplicateMessageTrackerCache_DecayAdjustment(t *testing.T) {
 	cache := duplicateMessageTrackerCacheFixture(t, 100, decay, zerolog.Nop(), metrics.NewNoopCollector())
 	peerID := unittest.PeerIdFixture(t)
 	// expect count to initially be 0
-	count, err := cache.Get(peerID)
+	count, err, found := cache.Get(peerID)
 	require.NoError(t, err)
+	require.False(t, found)
 	require.Equal(t, 0.0, count)
 
 	// increment the counter for a peer
@@ -116,8 +123,9 @@ func TestGossipSubDuplicateMessageTrackerCache_DecayAdjustment(t *testing.T) {
 	require.Equal(t, 1.0, count)
 
 	require.Eventually(t, func() bool {
-		count, err = cache.Get(peerID)
+		count, err, found = cache.Get(peerID)
 		require.NoError(t, err)
+		require.True(t, found)
 		return count == 0.0
 	}, 10*time.Second, 100*time.Millisecond)
 }

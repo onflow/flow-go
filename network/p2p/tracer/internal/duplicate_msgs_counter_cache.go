@@ -12,6 +12,7 @@ import (
 	herocache "github.com/onflow/flow-go/module/mempool/herocache/backdata"
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
+	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
 	"github.com/onflow/flow-go/network/p2p/scoring"
 )
 
@@ -57,9 +58,9 @@ func NewGossipSubDuplicateMessageTrackerCache(sizeLimit uint32, decay float64, l
 	}
 }
 
-func (g *GossipSubDuplicateMessageTrackerCache) init(peerId peer.ID) bool {
-	entityId := flow.MakeID(peerId) // HeroCache uses hash of peer.ID as the unique identifier of the record.
-	return g.c.Add(NewDuplicateMessagesCounter(entityId))
+func (g *GossipSubDuplicateMessageTrackerCache) init(peerID peer.ID) bool {
+	entityID := flow.HashToID([]byte(peerID)) // HeroCache uses hash of peer.ID as the unique identifier of the record.
+	return g.c.Add(NewDuplicateMessagesCounter(entityID))
 }
 
 // Get returns the current number of duplicate messages encountered from a peer. The counter is decayed before being
@@ -69,30 +70,31 @@ func (g *GossipSubDuplicateMessageTrackerCache) init(peerId peer.ID) bool {
 //
 // Returns:
 // - float64: updated value for the duplicate message tracker.
-// - bool: true if the counter was initialized, false otherwise.
 // - error: if any error was encountered during record adjustments in cache.
+//   - true if the record is found in the cache, false otherwise.
+//
 // No errors are expected during normal operation.
-func (g *GossipSubDuplicateMessageTrackerCache) Get(peerId peer.ID) (float64, error) {
-	if g.init(peerId) {
-		return 0, nil
+func (g *GossipSubDuplicateMessageTrackerCache) Get(peerID peer.ID) (float64, error, bool) {
+	entityID := flow.HashToID([]byte(peerID)) // HeroCache uses hash of peer.ID as the unique identifier of the record.
+	if !g.c.Has(entityID) {
+		return 0, nil, false
 	}
+
 	var err error
-	entityID := flow.MakeID(peerId)
-	adjustedEntity, adjusted := g.c.Adjust(entityID, func(entity flow.Entity) flow.Entity {
+	adjustedEntity, updated := g.c.Adjust(entityID, func(entity flow.Entity) flow.Entity {
 		// perform recordDecay on gauge value
 		record := duplicateMessagesCounter(entity)
 		entity, err = g.decayAdjustment(record)
 		return entity
 	})
 	if err != nil {
-		return 0, fmt.Errorf("unexpected error while applying recordDecay adjustment for peerID %s: %w", peerId, err)
+		return 0, fmt.Errorf("error while applying pre-processing functions to cache record for peer %s: %w", p2plogging.PeerId(peerID), err), false
 	}
-	if !adjusted {
-		return 0, fmt.Errorf("unexpected error record not found for  peerID %s, even after an init attempt", peerId)
+	if !updated {
+		return 0, fmt.Errorf("could not decay cache record for peer %s", p2plogging.PeerId(peerID)), false
 	}
-
 	record := duplicateMessagesCounter(adjustedEntity)
-	return record.Gauge, nil
+	return record.Gauge, nil, true
 }
 
 // Inc increments the number of duplicate messages detected for the peer. This func is used in conjunction with the GossipSubMeshTracer and is invoked
@@ -104,9 +106,9 @@ func (g *GossipSubDuplicateMessageTrackerCache) Get(peerId peer.ID) (float64, er
 // - float64: updated value for the duplicate message tracker.
 // - error: if any error was encountered during record adjustments in cache.
 // No errors are expected during normal operation.
-func (g *GossipSubDuplicateMessageTrackerCache) Inc(peerId peer.ID) (float64, error) {
+func (g *GossipSubDuplicateMessageTrackerCache) Inc(peerID peer.ID) (float64, error) {
 	var err error
-	entityID := flow.MakeID(peerId)
+	entityID := flow.HashToID([]byte(peerID))
 	optimisticAdjustFunc := func() (flow.Entity, bool) {
 		return g.c.Adjust(entityID, func(entity flow.Entity) flow.Entity {
 			record := duplicateMessagesCounter(entity)
@@ -123,13 +125,13 @@ func (g *GossipSubDuplicateMessageTrackerCache) Inc(peerId peer.ID) (float64, er
 	// If the record was initialized, optimisticAdjustFunc will be called only once.
 	adjustedEntity, adjusted := optimisticAdjustFunc()
 	if err != nil {
-		return 0, fmt.Errorf("unexpected error while applying recordDecay adjustment for peerID %s: %w", peerId, err)
+		return 0, fmt.Errorf("unexpected error while applying recordDecay adjustment for peerID %s: %w", peerID, err)
 	}
 	if !adjusted {
-		g.init(peerId)
+		g.init(peerID)
 		adjustedEntity, adjusted = optimisticAdjustFunc()
 		if !adjusted {
-			return 0, fmt.Errorf("unexpected record not found for peerID %s, even after an init attempt", peerId)
+			return 0, fmt.Errorf("unexpected record not found for peerID %s, even after an init attempt", peerID)
 		}
 	}
 

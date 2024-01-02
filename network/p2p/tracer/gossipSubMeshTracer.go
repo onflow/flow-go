@@ -478,12 +478,15 @@ func (t *GossipSubMeshTracer) LastHighestIHaveRPCSize() int64 {
 
 // DuplicateMessageCount returns the current duplicate message count for the peer.
 func (t *GossipSubMeshTracer) DuplicateMessageCount(peerID peer.ID) float64 {
-	count, err := t.duplicateMessageTrackerCache.Get(peerID)
+	count, err, found := t.duplicateMessageTrackerCache.Get(peerID)
 	if err != nil {
 		t.logger.Err(err).
 			Bool(logging.KeyNetworkingSecurity, true).
 			Str("peer_id", peerID.String()).
 			Msg("failed to get duplicate message count for peer")
+		return 0
+	}
+	if !found {
 		return 0
 	}
 	return count
