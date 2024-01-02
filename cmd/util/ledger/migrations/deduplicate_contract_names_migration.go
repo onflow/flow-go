@@ -66,8 +66,12 @@ func (d *DeduplicateContractNamesMigration) MigrateAccount(
 		return payloads, nil
 	}
 
+	value := contractNamesPayload.Value()
+	if len(value) == 0 {
+		return payloads, nil
+	}
 	var contractNames []string
-	err := cbor.Unmarshal(contractNamesPayload.Value(), &contractNames)
+	err := cbor.Unmarshal(value, &contractNames)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get contract names: %w", err)
 	}
@@ -76,6 +80,17 @@ func (d *DeduplicateContractNamesMigration) MigrateAccount(
 	i := 1
 	for i < len(contractNames) {
 		if contractNames[i-1] != contractNames[i] {
+
+			if contractNames[i-1] > contractNames[i] {
+				// this is not a valid state and we should fail.
+				// Contract names must be sorted by definition.
+				return nil, fmt.Errorf(
+					"contract names for account %s are not sorted: %s",
+					address.Hex(),
+					contractNames,
+				)
+			}
+
 			i++
 			continue
 		}
