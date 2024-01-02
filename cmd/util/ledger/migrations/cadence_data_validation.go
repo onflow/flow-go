@@ -84,6 +84,10 @@ type preMigration struct {
 	v *CadenceDataValidationMigrations
 }
 
+func (m *preMigration) Close() error {
+	return nil
+}
+
 var _ AccountBasedMigration = (*preMigration)(nil)
 
 func (m *preMigration) InitMigration(
