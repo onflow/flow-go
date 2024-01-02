@@ -63,7 +63,7 @@ func TestAccounts_GetPublicKey(t *testing.T) {
 
 		address := flow.HexToAddress("01")
 		registerId := flow.NewRegisterID(
-			string(address.Bytes()),
+			address,
 			"public_key_0")
 
 		for _, value := range [][]byte{{}, nil} {
@@ -88,7 +88,7 @@ func TestAccounts_GetPublicKeyCount(t *testing.T) {
 
 		address := flow.HexToAddress("01")
 		registerId := flow.NewRegisterID(
-			string(address.Bytes()),
+			address,
 			"public_key_count")
 
 		for _, value := range [][]byte{{}, nil} {
@@ -114,7 +114,7 @@ func TestAccounts_GetPublicKeys(t *testing.T) {
 
 		address := flow.HexToAddress("01")
 		registerId := flow.NewRegisterID(
-			string(address.Bytes()),
+			address,
 			"public_key_count")
 
 		for _, value := range [][]byte{{}, nil} {
@@ -243,7 +243,7 @@ func TestAccount_StorageUsed(t *testing.T) {
 		txnState := testutils.NewSimpleTransaction(nil)
 		accounts := environment.NewAccounts(txnState)
 		address := flow.HexToAddress("01")
-		key := flow.NewRegisterID(string(address.Bytes()), "some_key")
+		key := flow.NewRegisterID(address, "some_key")
 
 		err := accounts.Create(nil, address)
 		require.NoError(t, err)
@@ -260,7 +260,7 @@ func TestAccount_StorageUsed(t *testing.T) {
 		txnState := testutils.NewSimpleTransaction(nil)
 		accounts := environment.NewAccounts(txnState)
 		address := flow.HexToAddress("01")
-		key := flow.NewRegisterID(string(address.Bytes()), "some_key")
+		key := flow.NewRegisterID(address, "some_key")
 
 		err := accounts.Create(nil, address)
 		require.NoError(t, err)
@@ -279,7 +279,7 @@ func TestAccount_StorageUsed(t *testing.T) {
 		txnState := testutils.NewSimpleTransaction(nil)
 		accounts := environment.NewAccounts(txnState)
 		address := flow.HexToAddress("01")
-		key := flow.NewRegisterID(string(address.Bytes()), "some_key")
+		key := flow.NewRegisterID(address, "some_key")
 
 		err := accounts.Create(nil, address)
 		require.NoError(t, err)
@@ -298,7 +298,7 @@ func TestAccount_StorageUsed(t *testing.T) {
 		txnState := testutils.NewSimpleTransaction(nil)
 		accounts := environment.NewAccounts(txnState)
 		address := flow.HexToAddress("01")
-		key := flow.NewRegisterID(string(address.Bytes()), "some_key")
+		key := flow.NewRegisterID(address, "some_key")
 
 		err := accounts.Create(nil, address)
 		require.NoError(t, err)
@@ -317,7 +317,7 @@ func TestAccount_StorageUsed(t *testing.T) {
 		txnState := testutils.NewSimpleTransaction(nil)
 		accounts := environment.NewAccounts(txnState)
 		address := flow.HexToAddress("01")
-		key := flow.NewRegisterID(string(address.Bytes()), "some_key")
+		key := flow.NewRegisterID(address, "some_key")
 
 		err := accounts.Create(nil, address)
 		require.NoError(t, err)
@@ -340,19 +340,19 @@ func TestAccount_StorageUsed(t *testing.T) {
 		err := accounts.Create(nil, address)
 		require.NoError(t, err)
 
-		key1 := flow.NewRegisterID(string(address.Bytes()), "some_key")
+		key1 := flow.NewRegisterID(address, "some_key")
 		err = accounts.SetValue(key1, createByteArray(12))
 		require.NoError(t, err)
 		err = accounts.SetValue(key1, createByteArray(11))
 		require.NoError(t, err)
 
-		key2 := flow.NewRegisterID(string(address.Bytes()), "some_key2")
+		key2 := flow.NewRegisterID(address, "some_key2")
 		err = accounts.SetValue(key2, createByteArray(22))
 		require.NoError(t, err)
 		err = accounts.SetValue(key2, createByteArray(23))
 		require.NoError(t, err)
 
-		key3 := flow.NewRegisterID(string(address.Bytes()), "some_key3")
+		key3 := flow.NewRegisterID(address, "some_key3")
 		err = accounts.SetValue(key3, createByteArray(22))
 		require.NoError(t, err)
 		err = accounts.SetValue(key3, createByteArray(0))

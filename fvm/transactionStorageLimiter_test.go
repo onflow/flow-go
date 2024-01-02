@@ -21,8 +21,8 @@ func TestTransactionStorageLimiter(t *testing.T) {
 	owner := flow.HexToAddress("1")
 	executionSnapshot := &snapshot.ExecutionSnapshot{
 		WriteSet: map[flow.RegisterID]flow.RegisterValue{
-			flow.NewRegisterID(string(owner[:]), "a"): flow.RegisterValue("foo"),
-			flow.NewRegisterID(string(owner[:]), "b"): flow.RegisterValue("bar"),
+			flow.NewRegisterID(owner, "a"): flow.RegisterValue("foo"),
+			flow.NewRegisterID(owner, "b"): flow.RegisterValue("bar"),
 		},
 	}
 

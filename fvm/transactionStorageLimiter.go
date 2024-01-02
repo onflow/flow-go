@@ -96,10 +96,10 @@ func (limiter TransactionStorageLimiter) getStorageCheckAddresses(
 
 	slices.SortFunc(
 		addresses,
-		func(a flow.Address, b flow.Address) bool {
+		func(a flow.Address, b flow.Address) int {
 			// reverse order to maintain compatibility with previous
 			// implementation.
-			return bytes.Compare(a[:], b[:]) >= 0
+			return bytes.Compare(b[:], a[:])
 		})
 	return addresses
 }
