@@ -9,7 +9,6 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/mapfunc"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage/badger/transaction"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -219,7 +218,7 @@ func assertRichProtocolStateValidity(t *testing.T, state *flow.RichProtocolState
 		// By construction, `participantsFromCurrentEpochSetup` lists the full Identities in the same ordering as `Participants` and
 		// `ActiveIdentities`. By confirming that `participantsFromCurrentEpochSetup` follows canonical ordering, we can conclude that
 		// also `Participants` and `ActiveIdentities` are canonically ordered.
-		require.True(t, previousEpochParticipants.Sorted(order.Canonical[flow.Identity]), "participants in previous epoch's setup event are not in canonical order")
+		require.True(t, previousEpochParticipants.Sorted(flow.Canonical[flow.Identity]), "participants in previous epoch's setup event are not in canonical order")
 	}
 
 	// invariant: ComposeFullIdentities ensures that we can build full identities of current epoch's *active* participants. This step also confirms that the
@@ -230,7 +229,7 @@ func assertRichProtocolStateValidity(t *testing.T, state *flow.RichProtocolState
 		flow.EpochParticipationStatusActive,
 	)
 	assert.NoError(t, err, "should be able to reconstruct current epoch active participants")
-	require.True(t, participantsFromCurrentEpochSetup.Sorted(order.Canonical[flow.Identity]), "participants in current epoch's setup event are not in canonical order")
+	require.True(t, participantsFromCurrentEpochSetup.Sorted(flow.Canonical[flow.Identity]), "participants in current epoch's setup event are not in canonical order")
 
 	// invariants for `CurrentEpochIdentityTable`:
 	//  - full identity table containing *active* nodes for the current epoch + weight-zero identities of adjacent epoch
@@ -252,7 +251,7 @@ func assertRichProtocolStateValidity(t *testing.T, state *flow.RichProtocolState
 		allIdentities = participantsFromCurrentEpochSetup.Union(previousEpochParticipants.Copy().Map(mapfunc.WithEpochParticipationStatus(flow.EpochParticipationStatusLeaving)))
 	}
 	assert.Equal(t, allIdentities, state.CurrentEpochIdentityTable, "identities should be a full identity table for the current epoch, without duplicates")
-	require.True(t, allIdentities.Sorted(order.Canonical[flow.Identity]), "current epoch's identity table is not in canonical order")
+	require.True(t, allIdentities.Sorted(flow.Canonical[flow.Identity]), "current epoch's identity table is not in canonical order")
 
 	// check next epoch; only applicable during setup/commit phase
 	if state.NextEpoch == nil { // during staking phase, next epoch is not yet specified; hence there is nothing else to check

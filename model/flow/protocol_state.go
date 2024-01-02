@@ -2,7 +2,8 @@ package flow
 
 import (
 	"fmt"
-	"sort"
+
+	"golang.org/x/exp/slices"
 )
 
 // DynamicIdentityEntry encapsulates nodeID and dynamic portion of identity.
@@ -303,14 +304,9 @@ func (ll DynamicIdentityEntryList) Lookup() map[Identifier]*DynamicIdentityEntry
 
 // Sorted returns whether the list is sorted by the input ordering.
 func (ll DynamicIdentityEntryList) Sorted(less IdentifierOrder) bool {
-	for i := 0; i+1 < len(ll); i++ {
-		a := ll[i]
-		b := ll[i+1]
-		if !less(a.NodeID, b.NodeID) {
-			return false
-		}
-	}
-	return true
+	return slices.IsSortedFunc(ll, func(lhs, rhs *DynamicIdentityEntry) int {
+		return less(lhs.NodeID, rhs.NodeID)
+	})
 }
 
 // ByNodeID gets a node from the list by node ID.
@@ -350,8 +346,8 @@ func (ll DynamicIdentityEntryList) Copy() DynamicIdentityEntryList {
 // All Identity fields are deep-copied, _except_ for their keys, which are copied by reference.
 func (ll DynamicIdentityEntryList) Sort(less IdentifierOrder) DynamicIdentityEntryList {
 	dup := ll.Copy()
-	sort.Slice(dup, func(i int, j int) bool {
-		return less(dup[i].NodeID, dup[j].NodeID)
+	slices.SortFunc(dup, func(lhs, rhs *DynamicIdentityEntry) int {
+		return less(lhs.NodeID, rhs.NodeID)
 	})
 	return dup
 }

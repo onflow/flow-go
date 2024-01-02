@@ -9,7 +9,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
@@ -55,7 +54,7 @@ func IsValidRootSnapshot(snap protocol.Snapshot, verifyResultID bool) error {
 	if err != nil {
 		return fmt.Errorf("could not get identities for root snapshot: %w", err)
 	}
-	if !identities.Sorted(order.Canonical[flow.Identity]) {
+	if !identities.Sorted(flow.Canonical[flow.Identity]) {
 		return fmt.Errorf("identities are not canonically ordered")
 	}
 

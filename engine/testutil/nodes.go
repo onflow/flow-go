@@ -447,7 +447,13 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	assigner, err := chunks.NewChunkAssigner(flow.DefaultChunkAssignmentAlpha, node.State)
 	require.Nil(t, err)
 
-	receiptValidator := validation.NewReceiptValidator(node.State, node.Headers, node.Index, resultsDB, node.Seals)
+	receiptValidator := validation.NewReceiptValidator(
+		node.State,
+		node.Headers,
+		node.Index,
+		resultsDB,
+		node.Seals,
+	)
 
 	sealingEngine, err := sealing.NewEngine(
 		node.Log,
@@ -603,7 +609,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	require.NoError(t, err)
 
 	checkpointHeight := uint64(0)
-	require.NoError(t, esbootstrap.ImportRegistersFromCheckpoint(node.Log, checkpointFile, checkpointHeight, pebbledb, 2))
+	require.NoError(t, esbootstrap.ImportRegistersFromCheckpoint(node.Log, checkpointFile, checkpointHeight, matchTrie.RootHash(), pebbledb, 2))
 
 	diskStore, err := storagepebble.NewRegisters(pebbledb)
 	require.NoError(t, err)
@@ -613,7 +619,9 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 		diskStore,
 		nil, // TOOD(leo): replace with real WAL
 		reader,
-		node.Log)
+		node.Log,
+		storehouse.NewNoopNotifier(),
+	)
 	require.NoError(t, err)
 
 	storehouseEnabled := true

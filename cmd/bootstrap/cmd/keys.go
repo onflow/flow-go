@@ -6,7 +6,6 @@ import (
 	"github.com/onflow/flow-go/crypto/hash"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
-	"github.com/onflow/flow-go/model/flow/order"
 
 	"github.com/onflow/flow-go/crypto"
 
@@ -49,7 +48,7 @@ func genNetworkAndStakingKeys() []model.NodeInfo {
 		internalNodes = append(internalNodes, nodeInfo)
 	}
 
-	return model.Sort(internalNodes, order.Canonical[flow.Identity])
+	return model.Sort(internalNodes, flow.Canonical[flow.Identity])
 }
 
 func assembleNodeInfo(nodeConfig model.NodeConfig, networkKey, stakingKey crypto.PrivateKey) model.NodeInfo {

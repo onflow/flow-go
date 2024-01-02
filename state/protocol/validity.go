@@ -6,7 +6,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/model/flow/order"
 )
 
 // IsValidExtendingEpochSetup checks whether an EpochSetup service event being added to the state is valid.
@@ -81,7 +80,7 @@ func IsValidEpochSetup(setup *flow.EpochSetup, verifyNetworkAddress bool) error 
 		}
 	}
 
-	if !setup.Participants.Sorted(order.Canonical[flow.IdentitySkeleton]) { // (c) enforce canonical ordering
+	if !setup.Participants.Sorted(flow.Canonical[flow.IdentitySkeleton]) { // (c) enforce canonical ordering
 		return fmt.Errorf("participants are not canonically ordered")
 	}
 

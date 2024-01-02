@@ -31,9 +31,9 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/p2p/connection"
-	"github.com/onflow/flow-go/network/p2p/p2pnet"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/translator"
+	"github.com/onflow/flow-go/network/underlay"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -96,7 +96,7 @@ func (tw *TagWatchingConnManager) Unprotect(id peer.ID, tag string) bool {
 }
 
 // NewTagWatchingConnManager creates a new TagWatchingConnManager with the given config. It returns an error if the config is invalid.
-func NewTagWatchingConnManager(log zerolog.Logger, metrics module.LibP2PConnectionMetrics, config *netconf.ConnectionManagerConfig) (*TagWatchingConnManager, error) {
+func NewTagWatchingConnManager(log zerolog.Logger, metrics module.LibP2PConnectionMetrics, config *netconf.ConnectionManager) (*TagWatchingConnManager, error) {
 	cm, err := connection.NewConnManager(log, metrics, config)
 	if err != nil {
 		return nil, fmt.Errorf("could not create connection manager: %w", err)
@@ -149,10 +149,10 @@ func NetworksFixture(t *testing.T,
 	sporkId flow.Identifier,
 	ids flow.IdentityList,
 	libp2pNodes []p2p.LibP2PNode,
-	configOpts ...func(*p2pnet.NetworkConfig)) ([]*p2pnet.Network, []*unittest.UpdatableIDProvider) {
+	configOpts ...func(*underlay.NetworkConfig)) ([]*underlay.Network, []*unittest.UpdatableIDProvider) {
 
 	count := len(ids)
-	nets := make([]*p2pnet.Network, 0)
+	nets := make([]*underlay.Network, 0)
 	idProviders := make([]*unittest.UpdatableIDProvider, 0)
 
 	for i := 0; i < count; i++ {
@@ -163,7 +163,7 @@ func NetworksFixture(t *testing.T,
 			opt(params)
 		}
 
-		net, err := p2pnet.NewNetwork(params)
+		net, err := underlay.NewNetwork(params)
 		require.NoError(t, err)
 
 		nets = append(nets, net)
@@ -179,7 +179,7 @@ func NetworkConfigFixture(
 	idProvider module.IdentityProvider,
 	sporkId flow.Identifier,
 	libp2pNode p2p.LibP2PNode,
-	opts ...p2pnet.NetworkConfigOption) *p2pnet.NetworkConfig {
+	opts ...underlay.NetworkConfigOption) *underlay.NetworkConfig {
 
 	me := mock.NewLocal(t)
 	me.On("NodeID").Return(myId.NodeID).Maybe()
@@ -193,7 +193,7 @@ func NetworkConfigFixture(
 		defaultFlowConfig.NetworkConfig.NetworkReceivedMessageCacheSize,
 		unittest.Logger(),
 		metrics.NewNoopCollector())
-	params := &p2pnet.NetworkConfig{
+	params := &underlay.NetworkConfig{
 		Logger:                unittest.Logger(),
 		Codec:                 unittest.NetworkCodec(),
 		Libp2pNode:            libp2pNode,
@@ -205,7 +205,7 @@ func NetworkConfigFixture(
 		ReceiveCache:          receiveCache,
 		ConduitFactory:        conduit.NewDefaultConduitFactory(),
 		SporkId:               sporkId,
-		UnicastMessageTimeout: p2pnet.DefaultUnicastTimeout,
+		UnicastMessageTimeout: underlay.DefaultUnicastTimeout,
 		IdentityTranslator:    translator.NewIdentityProviderIDTranslator(idProvider),
 		AlspCfg: &alspmgr.MisbehaviorReportManagerConfig{
 			Logger:                  unittest.Logger(),

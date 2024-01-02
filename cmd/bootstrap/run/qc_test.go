@@ -9,7 +9,6 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -45,7 +44,7 @@ func TestGenerateRootQCWithSomeInvalidVotes(t *testing.T) {
 }
 
 func createSignerData(t *testing.T, n int) *ParticipantData {
-	identities := unittest.IdentityListFixture(n).Sort(order.Canonical[flow.Identity])
+	identities := unittest.IdentityListFixture(n).Sort(flow.Canonical[flow.Identity])
 
 	networkingKeys := unittest.NetworkingKeys(n)
 	stakingKeys := unittest.StakingKeys(n)

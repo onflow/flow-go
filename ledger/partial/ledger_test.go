@@ -127,7 +127,7 @@ func TestProofsForEmptyRegisters(t *testing.T) {
 	require.NoError(t, err)
 
 	// Read one register during execution.
-	registerID := flow.NewRegisterID("b", "nk")
+	registerID := flow.NewRegisterID(unittest.RandomAddressFixture(), "nk")
 	allKeys := []ledger.Key{
 		convert.RegisterIDToLedgerKey(registerID),
 	}

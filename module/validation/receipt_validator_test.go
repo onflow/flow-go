@@ -29,7 +29,13 @@ func (s *ReceiptValidationSuite) SetupTest() {
 	s.SetupChain()
 	s.publicKey = &fmock.PublicKey{}
 	s.Identities[s.ExeID].StakingPubKey = s.publicKey
-	s.receiptValidator = NewReceiptValidator(s.State, s.HeadersDB, s.IndexDB, s.ResultsDB, s.SealsDB)
+	s.receiptValidator = NewReceiptValidator(
+		s.State,
+		s.HeadersDB,
+		s.IndexDB,
+		s.ResultsDB,
+		s.SealsDB,
+	)
 }
 
 // TestReceiptValid try submitting valid receipt
@@ -764,6 +770,105 @@ func (s *ReceiptValidationSuite) TestValidateReceiptAfterBootstrap() {
 	s.PersistedResults[result0.ID()] = result0
 
 	candidate := unittest.BlockWithParentFixture(blocks[0].Header)
+	err := s.receiptValidator.ValidatePayload(candidate)
+	s.Require().NoError(err)
+}
+
+// TestValidateReceiptResultWithoutReceipt tests a case when a malicious leader incorporates a made-up execution result
+// into their proposal. ReceiptValidator must ensure that for each result included in the block, there must be
+// at least one receipt included in that block as well.
+func (s *ReceiptValidationSuite) TestValidateReceiptResultWithoutReceipt() {
+	// assuming signatures are all good
+	s.publicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+
+	// G <- A <- B
+	blocks, result0, seal := unittest.ChainFixture(2)
+	s.SealsIndex[blocks[0].ID()] = seal
+
+	receipts := unittest.ReceiptChainFor(blocks, result0)
+	blockA, blockB := blocks[1], blocks[2]
+	receiptA, receiptB := receipts[1], receipts[2]
+
+	blockA.Payload.Receipts = []*flow.ExecutionReceiptMeta{}
+	blockB.Payload.Receipts = []*flow.ExecutionReceiptMeta{receiptA.Meta()}
+	blockB.Payload.Results = []*flow.ExecutionResult{&receiptA.ExecutionResult}
+	// update block header so that blocks are chained together
+	unittest.ReconnectBlocksAndReceipts(blocks, receipts)
+	// assuming all receipts are executed by the correct executor
+	for _, r := range receipts {
+		r.ExecutorID = s.ExeID
+	}
+
+	for _, b := range blocks {
+		s.Extend(b)
+	}
+	s.PersistedResults[result0.ID()] = result0
+
+	candidate := unittest.BlockWithParentFixture(blockB.Header)
+	candidate.Payload = &flow.Payload{
+		Receipts: []*flow.ExecutionReceiptMeta{},
+		Results:  []*flow.ExecutionResult{&receiptB.ExecutionResult},
+	}
+
+	err := s.receiptValidator.ValidatePayload(candidate)
+	s.Require().Error(err)
+	s.Require().True(engine.IsInvalidInputError(err))
+}
+
+// TestValidateReceiptResultHasEnoughReceipts tests the happy path of a block proposal, where a leader
+// includes multiple Execution Receipts that commit to the same result. In this case, the Flow protocol
+// prescribes that
+//   - the Execution Result is only incorporated once
+//   - from each Receipt the `ExecutionReceiptMeta` is to be included.
+//
+// The validator is expected to accept such payload as valid.
+func (s *ReceiptValidationSuite) TestValidateReceiptResultHasEnoughReceipts() {
+	k := uint(5)
+	// assuming signatures are all good
+	s.publicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+
+	// G <- A <- B
+	blocks, result0, seal := unittest.ChainFixture(2)
+	s.SealsIndex[blocks[0].ID()] = seal
+
+	receipts := unittest.ReceiptChainFor(blocks, result0)
+	blockA, blockB := blocks[1], blocks[2]
+	receiptA, receiptB := receipts[1], receipts[2]
+
+	blockA.Payload.Receipts = []*flow.ExecutionReceiptMeta{}
+	blockB.Payload.Receipts = []*flow.ExecutionReceiptMeta{receiptA.Meta()}
+	blockB.Payload.Results = []*flow.ExecutionResult{&receiptA.ExecutionResult}
+	// update block header so that blocks are chained together
+	unittest.ReconnectBlocksAndReceipts(blocks, receipts)
+	// assuming all receipts are executed by the correct executor
+	for _, r := range receipts {
+		r.ExecutorID = s.ExeID
+	}
+
+	for _, b := range blocks {
+		s.Extend(b)
+	}
+	s.PersistedResults[result0.ID()] = result0
+
+	candidateReceipts := []*flow.ExecutionReceiptMeta{receiptB.Meta()}
+	// add k-1 more receipts for the same execution result
+	for i := uint(1); i < k; i++ {
+		// use base receipt and change the executor ID, we don't care about signatures since we are not validating them
+		receipt := *receiptB.Meta()
+		// create a mock executor which submitted the receipt
+		executor := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution), unittest.WithStakingPubKey(s.publicKey))
+		receipt.ExecutorID = executor.NodeID
+		// update local identity table so the receipt is considered valid
+		s.Identities[executor.NodeID] = executor
+		candidateReceipts = append(candidateReceipts, &receipt)
+	}
+
+	candidate := unittest.BlockWithParentFixture(blockB.Header)
+	candidate.Payload = &flow.Payload{
+		Receipts: candidateReceipts,
+		Results:  []*flow.ExecutionResult{&receiptB.ExecutionResult},
+	}
+
 	err := s.receiptValidator.ValidatePayload(candidate)
 	s.Require().NoError(err)
 }

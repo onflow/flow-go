@@ -4,8 +4,8 @@ CONFIGURATION_BUCKET := flow-benchnet-automation
 
 # default values that callers can override when calling target
 ACCESS = 1
-COLLECTION = 6
-VALID_COLLECTION := $(shell test $(COLLECTION) -ge 6; echo $$?)
+COLLECTION = 2
+VALID_COLLECTION := $(shell test $(COLLECTION) -ge 2; echo $$?)
 CONSENSUS = 2
 VALID_CONSENSUS := $(shell test $(CONSENSUS) -ge 2; echo $$?)
 EXECUTION = 2
@@ -19,7 +19,7 @@ ifeq ($(strip $(VALID_EXECUTION)), 1)
 else ifeq ($(strip $(VALID_CONSENSUS)), 1)
 	$(error Number of Consensus nodes should be no less than 2)
 else ifeq ($(strip $(VALID_COLLECTION)), 1)
-	$(error Number of Collection nodes should be no less than 6)
+	$(error Number of Collection nodes should be no less than 2)
 else ifeq ($(strip $(NETWORK_ID)),)
 	$(error NETWORK_ID cannot be empty)
 else ifeq ($(strip $(NAMESPACE)),)
@@ -103,11 +103,15 @@ clean-gen-helm:
 	rm -f values.yml
 	rm -f template-data.json
 
+download-values-file:
+	gsutil cp gs://${CONFIGURATION_BUCKET}/${NETWORK_ID}/values.yml .
+
 upload-bootstrap:
 	tar -cvf ${NETWORK_ID}.tar -C ./bootstrap .
 	gsutil cp ${NETWORK_ID}.tar gs://${CONFIGURATION_BUCKET}/${NETWORK_ID}.tar
+	gsutil cp values.yml gs://${CONFIGURATION_BUCKET}/${NETWORK_ID}/values.yml
 
-helm-deploy:
+helm-deploy: download-values-file
 	helm upgrade --install -f ./values.yml ${NETWORK_ID} ./flow --set ingress.enabled=true --set networkId="${NETWORK_ID}" --set owner="${OWNER}" --set configurationBucket="${CONFIGURATION_BUCKET}" --debug --namespace ${NAMESPACE} --wait
 
 k8s-delete:
@@ -116,6 +120,7 @@ k8s-delete:
 
 delete-configuration:
 	gsutil rm gs://${CONFIGURATION_BUCKET}/${NETWORK_ID}.tar
+	gsutil rm gs://${CONFIGURATION_BUCKET}/${NETWORK_ID}/values.yml 
 
 k8s-pod-health: validate
 	kubectl get pods --namespace ${NAMESPACE}

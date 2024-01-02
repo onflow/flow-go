@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network/channels"
@@ -75,7 +74,7 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 				signers = append(signers, identity)
 			}
 		}
-		signerIdentities := model.ToIdentityList(signers).Sort(order.Canonical[flow.Identity]).ToSkeleton()
+		signerIdentities := model.ToIdentityList(signers).Sort(flow.Canonical[flow.Identity]).ToSkeleton()
 		qc, err := run.GenerateClusterRootQC(signers, signerIdentities, rootClusterBlocks[i])
 		require.NoError(t, err)
 		rootClusterQCs[i] = flow.ClusterQCVoteDataFromQC(&flow.QuorumCertificateWithSignerIDs{

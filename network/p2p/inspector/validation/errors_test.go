@@ -29,7 +29,7 @@ func TestErrActiveClusterIDsNotSetRoundTrip(t *testing.T) {
 
 // TestErrDuplicateTopicRoundTrip ensures correct error formatting for DuplicateTopicErr.
 func TestDuplicateTopicErrRoundTrip(t *testing.T) {
-	expectedErrorMsg := fmt.Sprintf("duplicate topic foud in %s control message type: %s", p2pmsg.CtrlMsgGraft, channels.TestNetworkChannel)
+	expectedErrorMsg := fmt.Sprintf("duplicate topic found in %s control message type: %s", p2pmsg.CtrlMsgGraft, channels.TestNetworkChannel)
 	err := NewDuplicateTopicErr(channels.TestNetworkChannel.String(), p2pmsg.CtrlMsgGraft)
 	assert.Equal(t, expectedErrorMsg, err.Error(), "the error message should be correctly formatted")
 	// tests the IsDuplicateTopicErr function.

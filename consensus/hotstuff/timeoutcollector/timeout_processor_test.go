@@ -22,7 +22,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/local"
 	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -55,7 +54,7 @@ func (s *TimeoutProcessorTestSuite) SetupTest() {
 	s.validator = mocks.NewValidator(s.T())
 	s.sigAggregator = mocks.NewTimeoutSignatureAggregator(s.T())
 	s.notifier = mocks.NewTimeoutCollectorConsumer(s.T())
-	s.participants = unittest.IdentityListFixture(11, unittest.WithInitialWeight(s.sigWeight)).Sort(order.Canonical[flow.Identity]).ToSkeleton()
+	s.participants = unittest.IdentityListFixture(11, unittest.WithInitialWeight(s.sigWeight)).Sort(flow.Canonical[flow.Identity]).ToSkeleton()
 	s.signer = s.participants[0]
 	s.view = (uint64)(rand.Uint32() + 100)
 	s.totalWeight = *atomic.NewUint64(0)
@@ -471,7 +470,7 @@ func TestTimeoutProcessor_BuildVerifyTC(t *testing.T) {
 		require.NoError(t, err)
 
 		signers[identity.NodeID] = verification.NewStakingSigner(me)
-	}).Sort(order.Canonical[flow.Identity])
+	}).Sort(flow.Canonical[flow.Identity])
 
 	// utility function which generates a valid timeout for every signer
 	createTimeouts := func(participants flow.IdentitySkeletonList, view uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) []*model.TimeoutObject {

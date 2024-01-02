@@ -55,6 +55,7 @@ func (c fakeNetConn) Close() error {
 	}
 	return nil
 }
+
 func (c fakeNetConn) LocalAddr() net.Addr                { return localAddr }
 func (c fakeNetConn) RemoteAddr() net.Addr               { return remoteAddr }
 func (c fakeNetConn) SetDeadline(t time.Time) error      { return nil }
@@ -101,6 +102,15 @@ func (w *testHijackResponseRecorder) Hijack() (net.Conn, *bufio.ReadWriter, erro
 	return fakeNetConn{w.responseBuff, w.closed}, bufio.NewReadWriter(br, bw), nil
 }
 
+func (w *testHijackResponseRecorder) Close() error {
+	select {
+	case <-w.closed:
+	default:
+		close(w.closed)
+	}
+	return nil
+}
+
 // newTestHijackResponseRecorder creates a new instance of testHijackResponseRecorder.
 func newTestHijackResponseRecorder() *testHijackResponseRecorder {
 	return &testHijackResponseRecorder{
@@ -122,7 +132,7 @@ func executeRequest(req *http.Request, backend access.API) *httptest.ResponseRec
 	return rr
 }
 
-func executeWsRequest(req *http.Request, stateStreamApi state_stream.API, responseRecorder *testHijackResponseRecorder) {
+func executeWsRequest(req *http.Request, stateStreamApi state_stream.API, responseRecorder *testHijackResponseRecorder, chain flow.Chain) {
 	restCollector := metrics.NewNoopCollector()
 
 	config := backend.Config{
@@ -133,7 +143,7 @@ func executeWsRequest(req *http.Request, stateStreamApi state_stream.API, respon
 
 	router := NewRouterBuilder(unittest.Logger(), restCollector).AddWsRoutes(
 		stateStreamApi,
-		flow.Testnet.Chain(), config).Build()
+		chain, config).Build()
 	router.ServeHTTP(responseRecorder, req)
 }
 

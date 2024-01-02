@@ -6,7 +6,6 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
@@ -128,10 +127,10 @@ func NewProtocolState(collector module.CacheMetrics,
 //   - storage.ErrAlreadyExists if a Protocol State with the given id is already stored
 func (s *ProtocolState) StoreTx(protocolStateID flow.Identifier, protocolState *flow.ProtocolStateEntry) func(*transaction.Tx) error {
 	// front-load sanity checks:
-	if !protocolState.CurrentEpoch.ActiveIdentities.Sorted(order.IdentifierCanonical) {
+	if !protocolState.CurrentEpoch.ActiveIdentities.Sorted(flow.IdentifierCanonical) {
 		return transaction.Fail(fmt.Errorf("sanity check failed: identities are not sorted"))
 	}
-	if protocolState.NextEpoch != nil && !protocolState.NextEpoch.ActiveIdentities.Sorted(order.IdentifierCanonical) {
+	if protocolState.NextEpoch != nil && !protocolState.NextEpoch.ActiveIdentities.Sorted(flow.IdentifierCanonical) {
 		return transaction.Fail(fmt.Errorf("sanity check failed: next epoch identities are not sorted"))
 	}
 

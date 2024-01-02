@@ -48,7 +48,7 @@ type Snapshot interface {
 	// epoch. At the end of an epoch, this includes identities scheduled to join
 	// in the next epoch but are not active yet.
 	//
-	// Identities are guaranteed to be returned in canonical order (order.Canonical[flow.Identity]).
+	// Identities are guaranteed to be returned in canonical order (flow.Canonical[flow.Identity]).
 	//
 	// It allows us to provide optional upfront filters which can be used by the
 	// implementation to speed up database lookups.

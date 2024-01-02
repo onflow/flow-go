@@ -9,21 +9,19 @@ import (
 
 	"github.com/onflow/cadence"
 
-	"github.com/onflow/flow-go/cmd/bootstrap/run"
-	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/module/epochs"
-	"github.com/onflow/flow-go/state/protocol"
-
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd"
+	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/fvm"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/order"
+	"github.com/onflow/flow-go/module/epochs"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/io"
@@ -132,7 +130,7 @@ func finalize(cmd *cobra.Command, args []string) {
 	log.Info().Msg("")
 
 	// create flow.IdentityList representation of participant set
-	participants := model.ToIdentityList(stakingNodes).Sort(order.Canonical[flow.Identity])
+	participants := model.ToIdentityList(stakingNodes).Sort(flow.Canonical[flow.Identity])
 
 	log.Info().Msg("reading root block data")
 	block := readRootBlock()
@@ -163,11 +161,12 @@ func finalize(cmd *cobra.Command, args []string) {
 
 	// if no root commit is specified, bootstrap an empty execution state
 	if flagRootCommit == "0000000000000000000000000000000000000000000000000000000000000000" {
-		generateEmptyExecutionState(
+		commit := generateEmptyExecutionState(
 			block.Header.ChainID,
 			intermediaryData.ExecutionStateConfig,
 			participants,
 		)
+		flagRootCommit = hex.EncodeToString(commit[:])
 	}
 
 	log.Info().Msg("constructing root execution result and block seal")
@@ -453,7 +452,7 @@ func mergeNodeInfos(internalNodes, partnerNodes []model.NodeInfo) []model.NodeIn
 	}
 
 	// sort nodes using the canonical ordering
-	nodes = model.Sort(nodes, order.Canonical[flow.Identity])
+	nodes = model.Sort(nodes, flow.Canonical[flow.Identity])
 
 	return nodes
 }
@@ -589,7 +588,6 @@ func generateEmptyExecutionState(
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to generate execution state")
 	}
-	flagRootCommit = hex.EncodeToString(commit[:])
 	log.Info().Msg("")
-	return
+	return commit
 }

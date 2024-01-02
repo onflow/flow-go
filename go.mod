@@ -51,13 +51,13 @@ require (
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/multiformats/go-multihash v0.2.3
 	github.com/onflow/atree v0.6.0
-	github.com/onflow/cadence v0.42.5
+	github.com/onflow/cadence v0.42.6
 	github.com/onflow/flow v0.3.4
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.14.0
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.14.0
-	github.com/onflow/flow-go-sdk v0.41.16
+	github.com/onflow/flow-go-sdk v0.41.17
 	github.com/onflow/flow-go/crypto v0.25.0
-	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20231207123230-136eab6aadf9
+	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20240102134051-f19327b9943c
 	github.com/onflow/go-bitswap v0.0.0-20230703214630-6d3db958c73d
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/pierrec/lz4 v2.6.1+incompatible
@@ -81,13 +81,13 @@ require (
 	go.opentelemetry.io/otel/trace v1.16.0
 	go.uber.org/atomic v1.11.0
 	go.uber.org/multierr v1.11.0
-	golang.org/x/crypto v0.12.0
-	golang.org/x/exp v0.0.0-20230321023759-10a507213a29
-	golang.org/x/sync v0.3.0
-	golang.org/x/sys v0.11.0
-	golang.org/x/text v0.12.0
+	golang.org/x/crypto v0.16.0
+	golang.org/x/exp v0.0.0-20231214170342-aacd6d4b4611
+	golang.org/x/sync v0.5.0
+	golang.org/x/sys v0.15.0
+	golang.org/x/text v0.14.0
 	golang.org/x/time v0.1.0
-	golang.org/x/tools v0.9.1
+	golang.org/x/tools v0.16.0
 	google.golang.org/api v0.126.0
 	google.golang.org/genproto v0.0.0-20230711160842-782d3b101e98
 	google.golang.org/grpc v1.58.3
@@ -295,10 +295,10 @@ require (
 	go.uber.org/dig v1.17.0 // indirect
 	go.uber.org/fx v1.19.2 // indirect
 	go.uber.org/zap v1.24.0 // indirect
-	golang.org/x/mod v0.10.0 // indirect
-	golang.org/x/net v0.12.0 // indirect
+	golang.org/x/mod v0.14.0 // indirect
+	golang.org/x/net v0.19.0 // indirect
 	golang.org/x/oauth2 v0.10.0 // indirect
-	golang.org/x/term v0.11.0 // indirect
+	golang.org/x/term v0.15.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
 	gonum.org/v1/gonum v0.13.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect

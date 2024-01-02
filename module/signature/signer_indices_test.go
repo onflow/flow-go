@@ -6,14 +6,12 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"golang.org/x/exp/slices"
 	"pgregory.net/rapid"
 
 	"github.com/onflow/flow-go/ledger/common/bitutils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/filter/id"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -23,7 +21,7 @@ import (
 //  2. for the decoding step, we offer an optimized convenience function to directly
 //     decode to full identities: Indices --decode--> Identities
 func TestEncodeDecodeIdentities(t *testing.T) {
-	canonicalIdentities := unittest.IdentityListFixture(20).Sort(order.Canonical[flow.Identity]).ToSkeleton()
+	canonicalIdentities := unittest.IdentityListFixture(20).Sort(flow.Canonical[flow.Identity]).ToSkeleton()
 	canonicalIdentifiers := canonicalIdentities.NodeIDs()
 	for s := 0; s < 20; s++ {
 		for e := s; e < 20; e++ {
@@ -111,7 +109,7 @@ func Test_EncodeSignerToIndicesAndSigType(t *testing.T) {
 		numRandomBeaconSigners := rapid.IntRange(0, committeeSize-numStakingSigners).Draw(t, "numRandomBeaconSigners").(int)
 
 		// create committee
-		committeeIdentities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).Sort(order.Canonical[flow.Identity])
+		committeeIdentities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).Sort(flow.Canonical[flow.Identity])
 		committee := committeeIdentities.NodeIDs()
 		stakingSigners, beaconSigners := sampleSigners(t, committee, numStakingSigners, numRandomBeaconSigners)
 
@@ -150,7 +148,7 @@ func Test_DecodeSigTypeToStakingAndBeaconSigners(t *testing.T) {
 
 		// create committee
 		committeeIdentities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).
-			Sort(order.Canonical[flow.Identity])
+			Sort(flow.Canonical[flow.Identity])
 		committee := committeeIdentities.NodeIDs()
 		stakingSigners, beaconSigners := sampleSigners(t, committee, numStakingSigners, numRandomBeaconSigners)
 
@@ -276,7 +274,7 @@ func Test_EncodeSignersToIndices(t *testing.T) {
 		numSigners := rapid.IntRange(0, committeeSize).Draw(t, "numSigners").(int)
 
 		// create committee
-		identities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).Sort(order.Canonical[flow.Identity])
+		identities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).Sort(flow.Canonical[flow.Identity])
 		committee := identities.NodeIDs()
 		signers, err := committee.Sample(uint(numSigners))
 		require.NoError(t, err)
@@ -306,7 +304,7 @@ func Test_DecodeSignerIndicesToIdentifiers(t *testing.T) {
 		numSigners := rapid.IntRange(0, committeeSize).Draw(t, "numSigners").(int)
 
 		// create committee
-		identities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).Sort(order.Canonical[flow.Identity])
+		identities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).Sort(flow.Canonical[flow.Identity])
 		committee := identities.NodeIDs()
 		signers, err := committee.Sample(uint(numSigners))
 		require.NoError(t, err)
@@ -342,7 +340,7 @@ func Test_DecodeSignerIndicesToIdentities(t *testing.T) {
 		numSigners := rapid.IntRange(0, committeeSize).Draw(t, "numSigners").(int)
 
 		// create committee
-		identities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).Sort(order.Canonical[flow.Identity])
+		identities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).Sort(flow.Canonical[flow.Identity])
 		fullSigners, err := identities.Sample(uint(numSigners))
 		require.NoError(t, err)
 		signers := fullSigners.ToSkeleton()
@@ -355,15 +353,7 @@ func Test_DecodeSignerIndicesToIdentities(t *testing.T) {
 		decodedSigners, err := signature.DecodeSignerIndicesToIdentities(identities.ToSkeleton(), signerIndices)
 		require.NoError(t, err)
 
-		// Note that sampling from `identities` generates an _unordered_ list `signers`.
-		// This is fine, as `EncodeSignersToIndices` has no ordering requirement on its input `signers`.
-		// Nevertheless, note that the output of `DecodeSignerIndicesToIdentities` is _always_ canonically
-		// ordered. Therefore, we need to order the input `signers` (so far unordered) before comparing it
-		// to the decoded output (canonically ordered).
-		slices.SortFunc(signers, func(lhs, rhs *flow.IdentitySkeleton) bool {
-			return order.IdentifierCanonical(lhs.NodeID, rhs.NodeID)
-		})
-		require.Equal(t, signers, decodedSigners)
+		require.Equal(t, signers.Sort(flow.Canonical[flow.IdentitySkeleton]), decodedSigners.Sort(flow.Canonical[flow.IdentitySkeleton]))
 	})
 }
 

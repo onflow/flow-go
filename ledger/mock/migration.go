@@ -13,23 +13,23 @@ type Migration struct {
 }
 
 // Execute provides a mock function with given fields: payloads
-func (_m *Migration) Execute(payloads []ledger.Payload) ([]ledger.Payload, error) {
+func (_m *Migration) Execute(payloads []*ledger.Payload) ([]*ledger.Payload, error) {
 	ret := _m.Called(payloads)
 
-	var r0 []ledger.Payload
+	var r0 []*ledger.Payload
 	var r1 error
-	if rf, ok := ret.Get(0).(func([]ledger.Payload) ([]ledger.Payload, error)); ok {
+	if rf, ok := ret.Get(0).(func([]*ledger.Payload) ([]*ledger.Payload, error)); ok {
 		return rf(payloads)
 	}
-	if rf, ok := ret.Get(0).(func([]ledger.Payload) []ledger.Payload); ok {
+	if rf, ok := ret.Get(0).(func([]*ledger.Payload) []*ledger.Payload); ok {
 		r0 = rf(payloads)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]ledger.Payload)
+			r0 = ret.Get(0).([]*ledger.Payload)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func([]ledger.Payload) error); ok {
+	if rf, ok := ret.Get(1).(func([]*ledger.Payload) error); ok {
 		r1 = rf(payloads)
 	} else {
 		r1 = ret.Error(1)

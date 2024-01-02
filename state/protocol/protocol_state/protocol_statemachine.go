@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 )
@@ -98,7 +97,7 @@ func (u *protocolStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (b
 	prevNodeID := epochSetup.Participants[0].NodeID
 	for idx, nextEpochIdentitySkeleton := range epochSetup.Participants {
 		// sanity checking invariant (I):
-		if idx > 0 && !order.IdentifierCanonical(prevNodeID, nextEpochIdentitySkeleton.NodeID) {
+		if idx > 0 && !flow.IsIdentifierCanonical(prevNodeID, nextEpochIdentitySkeleton.NodeID) {
 			return false, protocol.NewInvalidServiceEventErrorf("epoch setup event lists active participants not in canonical ordering")
 		}
 		prevNodeID = nextEpochIdentitySkeleton.NodeID
