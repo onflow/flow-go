@@ -20,7 +20,6 @@ import (
 	inspectorbuilder "github.com/onflow/flow-go/network/p2p/builder/inspector"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/config"
 	"github.com/onflow/flow-go/network/p2p/distributor"
-	"github.com/onflow/flow-go/network/p2p/inspector"
 	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	p2pnode "github.com/onflow/flow-go/network/p2p/node"
 	"github.com/onflow/flow-go/network/p2p/scoring"
@@ -206,6 +205,7 @@ func defaultGossipSubAdapterConfig() p2p.GossipSubAdapterConfigFunc {
 // defaultInspectorSuite returns the default inspector suite factory function. It is used to create the default inspector suite.
 // Inspector suite is utilized to inspect the incoming gossipsub rpc messages from different perspectives.
 // Note: always use the default inspector suite factory function to create the inspector suite (unless you know what you are doing).
+// todo: this function can be simplified.
 func defaultInspectorSuite(rpcTracker p2p.RpcControlTracking) p2p.GossipSubRpcInspectorSuiteFactoryFunc {
 	return func(ctx irrecoverable.SignalerContext,
 		logger zerolog.Logger,
@@ -216,13 +216,7 @@ func defaultInspectorSuite(rpcTracker p2p.RpcControlTracking) p2p.GossipSubRpcIn
 		networkType network.NetworkingType,
 		idProvider module.IdentityProvider,
 		topicProvider func() p2p.TopicProvider) (p2p.GossipSubInspectorSuite, error) {
-		metricsInspector := inspector.NewControlMsgMetricsInspector(logger,
-			p2pnode.NewGossipSubControlMessageMetrics(gossipSubMetrics, logger),
-			inspectorCfg.Metrics.NumberOfWorkers,
-			[]queue.HeroStoreConfigOption{
-				queue.WithHeroStoreSizeLimit(inspectorCfg.Metrics.CacheSize),
-				queue.WithHeroStoreCollector(metrics.GossipSubRPCMetricsObserverInspectorQueueMetricFactory(heroCacheMetricsFactory, networkType)),
-			}...)
+
 		notificationDistributor := distributor.DefaultGossipSubInspectorNotificationDistributor(logger, []queue.HeroStoreConfigOption{
 			queue.WithHeroStoreSizeLimit(inspectorCfg.NotificationCacheSize),
 			queue.WithHeroStoreCollector(metrics.RpcInspectorNotificationQueueMetricFactory(heroCacheMetricsFactory, networkType))}...)
@@ -243,7 +237,7 @@ func defaultInspectorSuite(rpcTracker p2p.RpcControlTracking) p2p.GossipSubRpcIn
 		if err != nil {
 			return nil, fmt.Errorf("failed to create new control message valiadation inspector: %w", err)
 		}
-		return inspectorbuilder.NewGossipSubInspectorSuite(metricsInspector, rpcValidationInspector, notificationDistributor), nil
+		return inspectorbuilder.NewGossipSubInspectorSuite(rpcValidationInspector, notificationDistributor), nil
 	}
 }
 

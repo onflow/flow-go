@@ -1,4 +1,4 @@
-package state_stream
+package events
 
 import (
 	"fmt"
@@ -56,4 +56,25 @@ func ParseEvent(eventType flow.EventType) (*ParsedEvent, error) {
 	}
 
 	return nil, fmt.Errorf("invalid event type: %s", eventType)
+}
+
+// ValidateEvent validates an event type is properly formed and for the correct network, and returns
+// a parsed event. If the event type is invalid, an error is returned.
+func ValidateEvent(eventType flow.EventType, chain flow.Chain) (*ParsedEvent, error) {
+	parsed, err := ParseEvent(eventType)
+	if err != nil {
+		return nil, err
+	}
+
+	// only account type events have an address field
+	if parsed.Type != AccountEventType {
+		return parsed, nil
+	}
+
+	contractAddress := flow.HexToAddress(parsed.Address)
+	if !chain.IsValid(contractAddress) {
+		return nil, fmt.Errorf("invalid event contract address")
+	}
+
+	return parsed, nil
 }
