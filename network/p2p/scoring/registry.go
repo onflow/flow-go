@@ -316,7 +316,7 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 
 	// during startup silence period avoid penalizing nodes, ignore all notifications
 	if !r.afterSilencePeriod() {
-		lg.Debug().Msg("ignoring invalid control message notification for peer during silence period")
+		lg.Trace().Msg("ignoring invalid control message notification for peer during silence period")
 		return
 	}
 
