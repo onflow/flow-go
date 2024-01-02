@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/mapfunc"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
@@ -111,7 +110,7 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 	}
 
 	// sort the identities so the 'IsCached' binary search works
-	identities := setup.Participants.Sort(order.Canonical)
+	identities := setup.Participants.Sort(flow.Canonical)
 
 	// get identities that are in either last/next epoch but NOT in the current epoch
 	var otherEpochIdentities flow.IdentityList
@@ -173,7 +172,7 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 	identities = identities.Filter(selector)
 
 	// apply a deterministic sort to the participants
-	identities = identities.Sort(order.Canonical)
+	identities = identities.Sort(flow.Canonical)
 
 	return identities, nil
 }

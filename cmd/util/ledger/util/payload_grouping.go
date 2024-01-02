@@ -74,7 +74,7 @@ func (g *PayloadAccountGrouping) Len() int {
 	return len(g.indexes)
 }
 
-// AllPayloadsCount the number of accounts
+// AllPayloadsCount the number of payloads
 func (g *PayloadAccountGrouping) AllPayloadsCount() int {
 	return len(g.payloads)
 }

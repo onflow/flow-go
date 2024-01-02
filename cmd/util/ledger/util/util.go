@@ -26,7 +26,7 @@ var _ atree.Ledger = &AccountsAtreeLedger{}
 func (a *AccountsAtreeLedger) GetValue(owner, key []byte) ([]byte, error) {
 	v, err := a.Accounts.GetValue(
 		flow.NewRegisterID(
-			string(flow.BytesToAddress(owner).Bytes()),
+			flow.BytesToAddress(owner),
 			string(key)))
 	if err != nil {
 		return nil, fmt.Errorf("getting value failed: %w", err)
@@ -37,7 +37,7 @@ func (a *AccountsAtreeLedger) GetValue(owner, key []byte) ([]byte, error) {
 func (a *AccountsAtreeLedger) SetValue(owner, key, value []byte) error {
 	err := a.Accounts.SetValue(
 		flow.NewRegisterID(
-			string(flow.BytesToAddress(owner).Bytes()),
+			flow.BytesToAddress(owner),
 			string(key)),
 		value)
 	if err != nil {
@@ -113,7 +113,7 @@ type PayloadsReadonlyLedger struct {
 }
 
 func (p *PayloadsReadonlyLedger) GetValue(owner, key []byte) (value []byte, err error) {
-	v, err := p.Snapshot.Get(flow.NewRegisterID(string(owner), string(key)))
+	v, err := p.Snapshot.Get(flow.NewRegisterID(flow.BytesToAddress(owner), string(key)))
 	if err != nil {
 		return nil, fmt.Errorf("getting value failed: %w", err)
 	}
@@ -129,7 +129,7 @@ func (p *PayloadsReadonlyLedger) SetValue(owner, key, value []byte) (err error) 
 }
 
 func (p *PayloadsReadonlyLedger) ValueExists(owner, key []byte) (exists bool, err error) {
-	_, ok := p.Snapshot.Payloads[flow.NewRegisterID(string(owner), string(key))]
+	_, ok := p.Snapshot.Payloads[flow.NewRegisterID(flow.BytesToAddress(owner), string(key))]
 	return ok, nil
 }
 
@@ -143,6 +143,12 @@ func (p *PayloadsReadonlyLedger) AllocateStorageIndex(owner []byte) (atree.Stora
 
 func NewPayloadsReadonlyLedger(snapshot *PayloadSnapshot) *PayloadsReadonlyLedger {
 	return &PayloadsReadonlyLedger{Snapshot: snapshot}
+}
+
+// IsServiceLevelAddress returns true if the given address is the service level address.
+// Which means it's not an actual account but instead holds service lever registers.
+func IsServiceLevelAddress(address common.Address) bool {
+	return address == common.ZeroAddress
 }
 
 var _ atree.Ledger = &PayloadsReadonlyLedger{}

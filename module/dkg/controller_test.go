@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
@@ -253,20 +252,12 @@ func initNodes(t *testing.T, n int, phase1Duration, phase2Duration, phase3Durati
 		dkg, err := crypto.NewJointFeldman(n, signature.RandomBeaconThreshold(n), i, broker)
 		require.NoError(t, err)
 
-		// create a config with no delays for tests
-		config := ControllerConfig{
-			BaseStartDelay:                 0,
-			BaseHandleFirstBroadcastDelay:  0,
-			HandleSubsequentBroadcastDelay: 0,
-		}
-
 		controller := NewController(
 			logger,
 			"dkg_test",
 			dkg,
 			seed,
 			broker,
-			config,
 		)
 		require.NoError(t, err)
 
@@ -328,63 +319,4 @@ func checkArtifacts(t *testing.T, nodes []*node, totalNodes int) {
 			}
 		}
 	}
-}
-
-func TestDelay(t *testing.T) {
-
-	t.Run("should return 0 delay for <=0 inputs", func(t *testing.T) {
-		delay, err := computePreprocessingDelay(0, 100)
-		require.NoError(t, err)
-		assert.Equal(t, delay, time.Duration(0))
-		delay, err = computePreprocessingDelay(time.Hour, 0)
-		require.NoError(t, err)
-		assert.Equal(t, delay, time.Duration(0))
-		delay, err = computePreprocessingDelay(time.Millisecond, -1)
-		require.NoError(t, err)
-		assert.Equal(t, delay, time.Duration(0))
-		delay, err = computePreprocessingDelay(-time.Millisecond, 100)
-		require.NoError(t, err)
-		assert.Equal(t, delay, time.Duration(0))
-	})
-
-	// NOTE: this is a probabilistic test. It will (extremely infrequently) fail.
-	t.Run("should return different values for same inputs", func(t *testing.T) {
-		d1, err := computePreprocessingDelay(time.Hour, 100)
-		require.NoError(t, err)
-		d2, err := computePreprocessingDelay(time.Hour, 100)
-		require.NoError(t, err)
-		assert.NotEqual(t, d1, d2)
-	})
-
-	t.Run("should return values in expected range", func(t *testing.T) {
-		baseDelay := time.Second
-		dkgSize := 100
-		minDelay := time.Duration(0)
-		// m=b*n^2
-		expectedMaxDelay := time.Duration(int64(baseDelay) * int64(dkgSize) * int64(dkgSize))
-
-		maxDelay := computePreprocessingDelayMax(baseDelay, dkgSize)
-		assert.Equal(t, expectedMaxDelay, maxDelay)
-
-		delay, err := computePreprocessingDelay(baseDelay, dkgSize)
-		require.NoError(t, err)
-		assert.LessOrEqual(t, minDelay, delay)
-		assert.GreaterOrEqual(t, expectedMaxDelay, delay)
-	})
-
-	t.Run("should return values in expected range for defaults", func(t *testing.T) {
-		baseDelay := DefaultBaseHandleFirstBroadcastDelay
-		dkgSize := 150
-		minDelay := time.Duration(0)
-		// m=b*n^2
-		expectedMaxDelay := time.Duration(int64(baseDelay) * int64(dkgSize) * int64(dkgSize))
-
-		maxDelay := computePreprocessingDelayMax(baseDelay, dkgSize)
-		assert.Equal(t, expectedMaxDelay, maxDelay)
-
-		delay, err := computePreprocessingDelay(baseDelay, dkgSize)
-		require.NoError(t, err)
-		assert.LessOrEqual(t, minDelay, delay)
-		assert.GreaterOrEqual(t, expectedMaxDelay, delay)
-	})
 }

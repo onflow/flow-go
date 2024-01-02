@@ -801,14 +801,24 @@ func (exeNode *ExecutionNode) LoadRegisterStore(
 
 	if !bootstrapped {
 		checkpointFile := path.Join(exeNode.exeConf.triedir, modelbootstrap.FilenameWALRootCheckpoint)
-		root, err := exeNode.builder.RootSnapshot.Head()
+		sealedRoot, err := node.State.Params().SealedRoot()
 		if err != nil {
-			return fmt.Errorf("could not get root snapshot head: %w", err)
+			return fmt.Errorf("could not get sealed root: %w", err)
 		}
 
-		checkpointHeight := root.Height
+		rootSeal, err := node.State.Params().Seal()
+		if err != nil {
+			return fmt.Errorf("could not get root seal: %w", err)
+		}
 
-		err = bootstrap.ImportRegistersFromCheckpoint(node.Logger, checkpointFile, checkpointHeight, pebbledb, exeNode.exeConf.importCheckpointWorkerCount)
+		if sealedRoot.ID() != rootSeal.BlockID {
+			return fmt.Errorf("mismatching root seal and sealed root: %v != %v", sealedRoot.ID(), rootSeal.BlockID)
+		}
+
+		checkpointHeight := sealedRoot.Height
+		rootHash := ledgerpkg.RootHash(rootSeal.FinalState)
+
+		err = bootstrap.ImportRegistersFromCheckpoint(node.Logger, checkpointFile, checkpointHeight, rootHash, pebbledb, exeNode.exeConf.importCheckpointWorkerCount)
 		if err != nil {
 			return fmt.Errorf("could not import registers from checkpoint: %w", err)
 		}
@@ -820,12 +830,17 @@ func (exeNode *ExecutionNode) LoadRegisterStore(
 
 	reader := finalizedreader.NewFinalizedReader(node.Storage.Headers, node.LastFinalizedHeader.Height)
 	node.ProtocolEvents.AddConsumer(reader)
+	notifier := storehouse.NewRegisterStoreMetrics(exeNode.collector)
+
+	// report latest finalized and executed height as metrics
+	notifier.OnFinalizedAndExecutedHeightUpdated(diskStore.LatestHeight())
 
 	registerStore, err := storehouse.NewRegisterStore(
 		diskStore,
 		nil, // TODO: replace with real WAL
 		reader,
 		node.Logger,
+		notifier,
 	)
 	if err != nil {
 		return err
@@ -958,7 +973,12 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 	}
 
 	fetcher := fetcher.NewCollectionFetcher(node.Logger, exeNode.collectionRequester, node.State, exeNode.exeConf.onflowOnlyLNs)
-	loader := loader.NewUnexecutedLoader(node.Logger, node.State, node.Storage.Headers, exeNode.executionState)
+	var blockLoader ingestion.BlockLoader
+	if exeNode.exeConf.enableStorehouse {
+		blockLoader = loader.NewUnfinalizedLoader(node.Logger, node.State, node.Storage.Headers, exeNode.executionState)
+	} else {
+		blockLoader = loader.NewUnexecutedLoader(node.Logger, node.State, node.Storage.Headers, exeNode.executionState)
+	}
 
 	exeNode.ingestionEng, err = ingestion.New(
 		exeNode.ingestionUnit,
@@ -978,7 +998,7 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		exeNode.executionDataPruner,
 		exeNode.blockDataUploader,
 		exeNode.stopControl,
-		loader,
+		blockLoader,
 	)
 
 	// TODO: we should solve these mutual dependencies better

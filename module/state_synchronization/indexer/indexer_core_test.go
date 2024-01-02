@@ -14,6 +14,7 @@ import (
 	mocks "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine/common/requester"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
@@ -28,21 +29,24 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+var noopHandlerFunc requester.HandleFunc = func(originID flow.Identifier, entity flow.Entity) {}
+
 type indexCoreTest struct {
-	t                *testing.T
-	indexer          *IndexerCore
-	registers        *storagemock.RegisterIndex
-	events           *storagemock.Events
-	results          *storagemock.LightTransactionResults
-	headers          *storagemock.Headers
-	ctx              context.Context
-	blocks           []*flow.Block
-	data             *execution_data.BlockExecutionDataEntity
-	lastHeightStore  func(t *testing.T) uint64
-	firstHeightStore func(t *testing.T) uint64
-	registersStore   func(t *testing.T, entries flow.RegisterEntries, height uint64) error
-	eventsStore      func(t *testing.T, ID flow.Identifier, events []flow.EventsList) error
-	registersGet     func(t *testing.T, IDs flow.RegisterID, height uint64) (flow.RegisterValue, error)
+	t                 *testing.T
+	indexer           *IndexerCore
+	registers         *storagemock.RegisterIndex
+	events            *storagemock.Events
+	results           *storagemock.LightTransactionResults
+	headers           *storagemock.Headers
+	ctx               context.Context
+	blocks            []*flow.Block
+	collectionHandler requester.HandleFunc
+	data              *execution_data.BlockExecutionDataEntity
+	lastHeightStore   func(t *testing.T) uint64
+	firstHeightStore  func(t *testing.T) uint64
+	registersStore    func(t *testing.T, entries flow.RegisterEntries, height uint64) error
+	eventsStore       func(t *testing.T, ID flow.Identifier, events []flow.EventsList) error
+	registersGet      func(t *testing.T, IDs flow.RegisterID, height uint64) (flow.RegisterValue, error)
 }
 
 func newIndexCoreTest(
@@ -59,6 +63,13 @@ func newIndexCoreTest(
 		ctx:       context.Background(),
 		data:      exeData,
 		headers:   newBlockHeadersStorage(blocks).(*storagemock.Headers), // convert it back to mock type for tests
+		collectionHandler: func(originID flow.Identifier, entity flow.Entity) {
+			// collectionHandler is always called. by default, assert the value passed was empty
+			// to enforce the test writer handles the collection when it's tested.
+			// this will never happen in production.
+			assert.Equal(t, flow.ZeroID, originID)
+			assert.Nil(t, entity)
+		},
 	}
 }
 
@@ -85,6 +96,7 @@ func (i *indexCoreTest) setLastHeight(f func(t *testing.T) uint64) *indexCoreTes
 		})
 	return i
 }
+
 func (i *indexCoreTest) useDefaultHeights() *indexCoreTest {
 	i.registers.
 		On("FirstHeight").
@@ -137,6 +149,11 @@ func (i *indexCoreTest) setGetRegisters(f func(t *testing.T, ID flow.RegisterID,
 	return i
 }
 
+func (i *indexCoreTest) setOnCollection(fn requester.HandleFunc) *indexCoreTest {
+	i.collectionHandler = fn
+	return i
+}
+
 func (i *indexCoreTest) useDefaultEvents() *indexCoreTest {
 	i.events.
 		On("BatchStore", mock.AnythingOfType("flow.Identifier"), mock.AnythingOfType("[]flow.EventsList"), mock.Anything).
@@ -160,7 +177,11 @@ func (i *indexCoreTest) initIndexer() *indexCoreTest {
 
 	i.useDefaultHeights()
 
-	indexer, err := New(zerolog.New(os.Stdout), metrics.NewNoopCollector(), db, i.registers, i.headers, i.events, i.results)
+	onCollection := func(originID flow.Identifier, entity flow.Entity) {
+		i.collectionHandler(originID, entity)
+	}
+
+	indexer, err := New(zerolog.New(os.Stdout), metrics.NewNoopCollector(), db, i.registers, i.headers, i.events, i.results, onCollection)
 	require.NoError(i.t, err)
 	i.indexer = indexer
 	return i
@@ -340,9 +361,55 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("Index Collections", func(t *testing.T) {
+		expectedCollections := unittest.CollectionListFixture(2)
+		ed := &execution_data.BlockExecutionData{
+			BlockID: block.ID(),
+			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
+				{Collection: expectedCollections[0]},
+				{Collection: expectedCollections[1]},
+			},
+		}
+		execData := execution_data.NewBlockExecutionDataEntity(block.ID(), ed)
+		collectionsHandled := 0
+		err := newIndexCoreTest(t, blocks, execData).
+			initIndexer().
+			// make sure an empty set of events were stored
+			setStoreEvents(func(t *testing.T, actualBlockID flow.Identifier, actualEvents []flow.EventsList) error {
+				assert.Equal(t, block.ID(), actualBlockID)
+				require.Len(t, actualEvents, 1)
+				require.Len(t, actualEvents[0], 0)
+				return nil
+			}).
+			// make sure an empty set of transaction results were stored
+			setStoreTransactionResults(func(t *testing.T, actualBlockID flow.Identifier, actualResults []flow.LightTransactionResult) error {
+				assert.Equal(t, block.ID(), actualBlockID)
+				require.Len(t, actualResults, 0)
+				return nil
+			}).
+			setOnCollection(func(_ flow.Identifier, entity flow.Entity) {
+				require.Less(t, collectionsHandled, len(expectedCollections), "more collections handled than expected")
+
+				actual, ok := entity.(*flow.Collection)
+				require.True(t, ok)
+				assert.Equal(t, expectedCollections[collectionsHandled], actual)
+				collectionsHandled++
+			}).
+			// make sure an empty set of register entries was stored
+			setStoreRegisters(func(t *testing.T, entries flow.RegisterEntries, height uint64) error {
+				assert.Equal(t, height, block.Header.Height)
+				assert.Equal(t, 0, entries.Len())
+				return nil
+			}).
+			runIndexBlockData()
+
+		assert.NoError(t, err)
+	})
+
 	t.Run("Index AllTheThings", func(t *testing.T) {
 		expectedEvents := unittest.EventsFixture(20)
 		expectedResults := unittest.LightTransactionResultsFixture(20)
+		expectedCollections := unittest.CollectionListFixture(2)
 		expectedTries := []*ledger.TrieUpdate{trieUpdateFixture(t), trieUpdateFixture(t)}
 		expectedPayloads := make([]*ledger.Payload, 0)
 		for _, trie := range expectedTries {
@@ -353,11 +420,13 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 			BlockID: block.ID(),
 			ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
 				{
+					Collection:         expectedCollections[0],
 					Events:             expectedEvents[:10],
 					TransactionResults: expectedResults[:10],
 					TrieUpdate:         expectedTries[0],
 				},
 				{
+					Collection:         expectedCollections[1],
 					TransactionResults: expectedResults[10:],
 					Events:             expectedEvents[10:],
 					TrieUpdate:         expectedTries[1],
@@ -365,7 +434,7 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 			},
 		}
 		execData := execution_data.NewBlockExecutionDataEntity(block.ID(), ed)
-
+		collectionsHandled := 0
 		err := newIndexCoreTest(t, blocks, execData).
 			initIndexer().
 			// make sure all events are stored at once in order
@@ -386,6 +455,14 @@ func TestExecutionState_IndexBlockData(t *testing.T) {
 					assert.Equal(t, expected, actualResults[i])
 				}
 				return nil
+			}).
+			setOnCollection(func(_ flow.Identifier, entity flow.Entity) {
+				require.Less(t, collectionsHandled, len(expectedCollections), "more collections handled than expected")
+
+				actual, ok := entity.(*flow.Collection)
+				require.True(t, ok)
+				assert.Equal(t, expectedCollections[collectionsHandled], actual)
+				collectionsHandled++
 			}).
 			// make sure update registers match in length and are same as block data ledger payloads
 			setStoreRegisters(func(t *testing.T, entries flow.RegisterEntries, actualHeight uint64) error {
@@ -541,9 +618,10 @@ func trieRegistersPayloadComparer(t *testing.T, triePayloads []*ledger.Payload, 
 }
 
 func TestIndexerIntegration_StoreAndGet(t *testing.T) {
-	regOwner := "f8d6e0586b0a20c7"
+	regOwnerAddress := unittest.RandomAddressFixture()
+	regOwner := string(regOwnerAddress.Bytes())
 	regKey := "code"
-	registerID := flow.NewRegisterID(regOwner, regKey)
+	registerID := flow.NewRegisterID(regOwnerAddress, regKey)
 
 	db, dbDir := unittest.TempBadgerDB(t)
 	t.Cleanup(func() {
@@ -556,18 +634,18 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 	// this test makes sure index values for a single register are correctly updated and always last value is returned
 	t.Run("Single Index Value Changes", func(t *testing.T) {
 		pebbleStorage.RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
-			index, err := New(logger, metrics, db, registers, nil, nil, nil)
+			index, err := New(logger, metrics, db, registers, nil, nil, nil, noopHandlerFunc)
 			require.NoError(t, err)
 
 			values := [][]byte{[]byte("1"), []byte("1"), []byte("2"), []byte("3"), []byte("4")}
 			for i, val := range values {
-				testDesc := fmt.Sprintf("test itteration number %d failed with test value %s", i, val)
+				testDesc := fmt.Sprintf("test iteration number %d failed with test value %s", i, val)
 				height := uint64(i + 1)
 				err := storeRegisterWithValue(index, height, regOwner, regKey, val)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 
 				results, err := index.RegisterValue(registerID, height)
-				require.Nil(t, err, testDesc)
+				require.NoError(t, err, testDesc)
 				assert.Equal(t, val, results)
 			}
 		})
@@ -577,7 +655,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 	// up to the specification script executor requires
 	t.Run("Missing Register", func(t *testing.T) {
 		pebbleStorage.RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
-			index, err := New(logger, metrics, db, registers, nil, nil, nil)
+			index, err := New(logger, metrics, db, registers, nil, nil, nil, noopHandlerFunc)
 			require.NoError(t, err)
 
 			value, err := index.RegisterValue(registerID, 0)
@@ -591,7 +669,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 	// e.g. we index A{h(1) -> X}, A{h(2) -> Y}, when we request h(4) we get value Y
 	t.Run("Single Index Value At Later Heights", func(t *testing.T) {
 		pebbleStorage.RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
-			index, err := New(logger, metrics, db, registers, nil, nil, nil)
+			index, err := New(logger, metrics, db, registers, nil, nil, nil, noopHandlerFunc)
 			require.NoError(t, err)
 
 			storeValues := [][]byte{[]byte("1"), []byte("2")}
@@ -622,7 +700,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 	// this test makes sure we correctly handle weird payloads
 	t.Run("Empty and Nil Payloads", func(t *testing.T) {
 		pebbleStorage.RunWithRegistersStorageAtInitialHeights(t, 0, 0, func(registers *pebbleStorage.Registers) {
-			index, err := New(logger, metrics, db, registers, nil, nil, nil)
+			index, err := New(logger, metrics, db, registers, nil, nil, nil, noopHandlerFunc)
 			require.NoError(t, err)
 
 			require.NoError(t, index.indexRegisters(map[ledger.Path]*ledger.Payload{}, 1))
