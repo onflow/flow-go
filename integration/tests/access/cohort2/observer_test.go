@@ -503,7 +503,7 @@ func createTx(net *testnet.FlowNetwork) interface{} {
 }
 
 func createScript() interface{} {
-	validCode := []byte(`pub fun main(foo: String): String { return foo }`)
+	validCode := []byte(`access(all) fun main(foo: String): String { return foo }`)
 	validArgs := []byte(`{ "type": "String", "value": "hello world" }`)
 	body := map[string]interface{}{
 		"script":    util.ToBase64(validCode),

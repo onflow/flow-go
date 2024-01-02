@@ -131,8 +131,8 @@ func TestEVMAddressDeposit(t *testing.T) {
 
                                access(all)
                                fun main() {
-                                   let admin = getAuthAccount(%[1]s)
-                                       .borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+                                   let admin = getAuthAccount<auth(BorrowValue) &Account>(%[1]s)
+                                       .storage.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
                                    let minter <- admin.createNewMinter(allowedAmount: 1.23)
                                    let vault <- minter.mintTokens(amount: 1.23)
                                    destroy minter
@@ -186,8 +186,8 @@ func TestBridgedAccountWithdraw(t *testing.T) {
 
                                access(all)
                                fun main(): UFix64 {
-                                   let admin = getAuthAccount(%[1]s)
-                                       .borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+                                   let admin = getAuthAccount<auth(BorrowValue) &Account>(%[1]s)
+                                       .storage.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
                                    let minter <- admin.createNewMinter(allowedAmount: 2.34)
                                    let vault <- minter.mintTokens(amount: 2.34)
                                    destroy minter
@@ -245,10 +245,10 @@ func TestBridgedAccountDeploy(t *testing.T) {
                                import EVM from %[1]s
                                import FlowToken from %[2]s
 
-                                access(all)
-                                fun main(): [UInt8; 20] {
-                                   let admin = getAuthAccount(%[1]s)
-                                       .borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+                               access(all)
+                               fun main(): [UInt8; 20] {
+                                   let admin = getAuthAccount<auth(BorrowValue) &Account>(%[1]s)
+                                       .storage.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
                                    let minter <- admin.createNewMinter(allowedAmount: 2.34)
                                    let vault <- minter.mintTokens(amount: 2.34)
                                    destroy minter

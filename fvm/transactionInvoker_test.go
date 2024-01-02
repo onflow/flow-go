@@ -134,10 +134,6 @@ func (e *ErrorReturningRuntime) ReadStored(_ common.Address, _ cadence.Path, _ r
 	return nil, nil
 }
 
-func (e *ErrorReturningRuntime) ReadLinked(_ common.Address, _ cadence.Path, _ runtime.Context) (cadence.Value, error) {
-	panic("ReadLinked not expected")
-}
-
 func (e *ErrorReturningRuntime) InvokeContractFunction(_ common.AddressLocation, _ string, _ []cadence.Value, _ []sema.Type, _ runtime.Context) (cadence.Value, error) {
 	panic("InvokeContractFunction not expected")
 }

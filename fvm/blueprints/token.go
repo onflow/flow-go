@@ -7,37 +7,45 @@ import (
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
+
+	sdk "github.com/onflow/flow-go-sdk"
+
+	nftContracts "github.com/onflow/flow-nft/lib/go/contracts"
 
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func DeployFungibleTokenContractTransaction(fungibleToken flow.Address) *flow.TransactionBody {
-	contract := contracts.FungibleToken()
+func DeployFungibleTokenContractTransaction(fungibleToken, viewResolver flow.Address) *flow.TransactionBody {
+	contract := contracts.FungibleToken(viewResolver.Hex())
 	contractName := "FungibleToken"
 	return DeployContractTransaction(
 		fungibleToken,
 		contract,
-		contractName)
+		contractName,
+	)
 }
 
-func DeployNonFungibleTokenContractTransaction(nonFungibleToken flow.Address) *flow.TransactionBody {
-	contract := contracts.NonFungibleToken()
+func DeployNonFungibleTokenContractTransaction(nonFungibleToken, viewResolver flow.Address) *flow.TransactionBody {
+	contract := contracts.NonFungibleToken(viewResolver.HexWithPrefix())
 	contractName := "NonFungibleToken"
 	return DeployContractTransaction(
 		nonFungibleToken,
 		contract,
-		contractName)
+		contractName,
+	)
 }
 
-func DeployMetadataViewsContractTransaction(fungibleToken, nonFungibleToken flow.Address) *flow.TransactionBody {
-	contract := contracts.MetadataViews(fungibleToken.HexWithPrefix(), nonFungibleToken.HexWithPrefix())
+func DeployMetadataViewsContractTransaction(fungibleToken, nonFungibleToken, viewResolver flow.Address) *flow.TransactionBody {
+	contract := contracts.MetadataViews(fungibleToken.HexWithPrefix(), nonFungibleToken.HexWithPrefix(), viewResolver.HexWithPrefix())
 	contractName := "MetadataViews"
 	return DeployContractTransaction(
 		nonFungibleToken,
 		contract,
-		contractName)
+		contractName,
+	)
 }
 
 func DeployViewResolverContractTransaction(nonFungibleToken flow.Address) *flow.TransactionBody {
@@ -46,16 +54,28 @@ func DeployViewResolverContractTransaction(nonFungibleToken flow.Address) *flow.
 	return DeployContractTransaction(
 		nonFungibleToken,
 		contract,
-		contractName)
+		contractName,
+	)
 }
 
-func DeployFungibleTokenMetadataViewsContractTransaction(fungibleToken, nonFungibleToken flow.Address) *flow.TransactionBody {
-	contract := contracts.FungibleTokenMetadataViews(fungibleToken.Hex(), nonFungibleToken.Hex())
+func DeployMultipleNFTContractTransaction(deployTo, nonFungibleToken flow.Address) *flow.TransactionBody {
+	contract := nftContracts.MultipleNFT(sdk.Address(nonFungibleToken))
+	contractName := "MultipleNFT"
+	return DeployContractTransaction(
+		deployTo,
+		contract,
+		contractName,
+	)
+}
+
+func DeployFungibleTokenMetadataViewsContractTransaction(fungibleToken, nonFungibleToken, viewResolver flow.Address) *flow.TransactionBody {
+	contract := contracts.FungibleTokenMetadataViews(fungibleToken.Hex(), nonFungibleToken.Hex(), viewResolver.Hex())
 	contractName := "FungibleTokenMetadataViews"
 	return DeployContractTransaction(
 		fungibleToken,
 		contract,
-		contractName)
+		contractName,
+	)
 }
 
 //go:embed scripts/deployFlowTokenTransactionTemplate.cdc
@@ -68,7 +88,7 @@ var createFlowTokenMinterTransactionTemplate string
 var mintFlowTokenTransactionTemplate string
 
 func DeployFlowTokenContractTransaction(service, fungibleToken, metadataViews, flowToken flow.Address) *flow.TransactionBody {
-	contract := contracts.FlowToken(fungibleToken.HexWithPrefix(), metadataViews.HexWithPrefix(), metadataViews.HexWithPrefix())
+	contract := contracts.FlowToken(fungibleToken.HexWithPrefix(), fungibleToken.HexWithPrefix(), metadataViews.HexWithPrefix(), metadataViews.HexWithPrefix())
 
 	return flow.NewTransactionBody().
 		SetScript([]byte(deployFlowTokenTransactionTemplate)).

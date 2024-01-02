@@ -77,7 +77,7 @@ func main() {
 			tx := sdk.NewTransaction().
 				SetScript([]byte(`
             		transaction { 
-            		    prepare(signer: AuthAccount) { log(signer.address) }
+            		    prepare(signer: &Account) { log(signer.address) }
             		}
         		`)).
 				SetGasLimit(100).

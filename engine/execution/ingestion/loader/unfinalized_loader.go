@@ -46,6 +46,13 @@ func (e *UnfinalizedLoader) LoadUnexecuted(ctx context.Context) ([]flow.Identifi
 		return nil, fmt.Errorf("could not get finalized block: %w", err)
 	}
 
+	lg := e.log.With().
+		Uint64("last_finalized", final.Height).
+		Uint64("last_finalized_executed", lastExecuted).
+		Logger()
+
+	lg.Info().Msgf("start loading unfinalized blocks")
+
 	// TODO: dynamically bootstrapped execution node will reload blocks from
 	unexecutedFinalized := make([]flow.Identifier, 0)
 
@@ -69,9 +76,7 @@ func (e *UnfinalizedLoader) LoadUnexecuted(ctx context.Context) ([]flow.Identifi
 
 	unexecuted := append(unexecutedFinalized, pendings...)
 
-	e.log.Info().
-		Uint64("last_finalized", final.Height).
-		Uint64("last_finalized_executed", lastExecuted).
+	lg.Info().
 		// Uint64("sealed_root_height", rootBlock.Height).
 		// Hex("sealed_root_id", logging.Entity(rootBlock)).
 		Int("total_finalized_unexecuted", len(unexecutedFinalized)).

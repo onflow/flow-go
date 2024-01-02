@@ -28,6 +28,7 @@ require (
 	cloud.google.com/go/iam v1.1.1 // indirect
 	cloud.google.com/go/storage v1.30.1 // indirect
 	github.com/DataDog/zstd v1.5.2 // indirect
+	github.com/SaveTheRbtz/mph v0.1.2 // indirect
 	github.com/StackExchange/wmi v0.0.0-20180116203802-5d049714c4a6 // indirect
 	github.com/VictoriaMetrics/fastcache v1.6.0 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.17.7 // indirect
@@ -149,8 +150,8 @@ require (
 	github.com/jbenet/go-temp-err-catcher v0.1.0 // indirect
 	github.com/jbenet/goprocess v0.1.4 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
-	github.com/k0kubun/pp/v3 v3.2.0 // indirect
-	github.com/kevinburke/go-bindata v3.23.0+incompatible // indirect
+	github.com/k0kubun/pp v3.0.1+incompatible // indirect
+	github.com/kevinburke/go-bindata v3.24.0+incompatible // indirect
 	github.com/klauspost/compress v1.16.5 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.5 // indirect
 	github.com/koron/go-ssdp v0.0.4 // indirect
@@ -197,16 +198,16 @@ require (
 	github.com/multiformats/go-varint v0.0.7 // indirect
 	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
-	github.com/onflow/atree v0.6.0 // indirect
-	github.com/onflow/cadence v0.42.6 // indirect
-	github.com/onflow/flow-core-contracts/lib/go/contracts v1.2.4-0.20231016154253-a00dbf7c061f // indirect
-	github.com/onflow/flow-core-contracts/lib/go/templates v1.2.4-0.20231016154253-a00dbf7c061f // indirect
-	github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20230711213910-baad011d2b13 // indirect
-	github.com/onflow/flow-go-sdk v0.41.17 // indirect
-	github.com/onflow/flow-nft/lib/go/contracts v1.1.0 // indirect
-	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20231124194313-106cc495def6 // indirect
+	github.com/onflow/atree v0.6.1-0.20230711151834-86040b30171f // indirect
+	github.com/onflow/cadence v1.0.0-preview.1.0.20231213191345-0ff20e15e7e1 // indirect
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.1-0.20231212203043-37cbe453d425 // indirect
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.15.1-0.20231204202154-f8dfacb39d86 // indirect
+	github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20231212194336-a2802ba36596 // indirect
+	github.com/onflow/flow-go-sdk v0.44.0-stable-cadence.2 // indirect
+	github.com/onflow/flow-nft/lib/go/contracts v1.1.1-0.20231213195450-0b951b342b14 // indirect
+	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20231213135419-ae911cc351a2 // indirect
 	github.com/onflow/go-bitswap v0.0.0-20230703214630-6d3db958c73d // indirect
-	github.com/onflow/sdks v0.5.0 // indirect
+	github.com/onflow/sdks v0.5.1-0.20230912225508-b35402f12bba // indirect
 	github.com/onflow/wal v0.0.0-20230529184820-bc9f8244608d // indirect
 	github.com/onsi/ginkgo/v2 v2.9.7 // indirect
 	github.com/opencontainers/runtime-spec v1.0.2 // indirect
@@ -258,6 +259,7 @@ require (
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	github.com/zeebo/blake3 v0.2.3 // indirect
+	github.com/zeebo/xxh3 v1.0.2 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/otel v1.16.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/internal/retry v1.16.0 // indirect

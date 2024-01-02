@@ -128,12 +128,14 @@ func DeployLockedTokensTransaction(service flow.Address, contract []byte, public
 func RegisterNodeTransaction(
 	service flow.Address,
 	flowTokenAddress flow.Address,
+	fungibleTokenAddress flow.Address,
 	nodeAddress flow.Address,
 	id *flow.Identity,
 ) *flow.TransactionBody {
 
 	env := templates.Environment{
 		FlowTokenAddress:         flowTokenAddress.HexWithPrefix(),
+		FungibleTokenAddress:     fungibleTokenAddress.HexWithPrefix(),
 		IDTableAddress:           service.HexWithPrefix(),
 		QuorumCertificateAddress: service.HexWithPrefix(),
 		DkgAddress:               service.HexWithPrefix(),

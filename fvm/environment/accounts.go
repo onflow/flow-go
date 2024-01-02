@@ -75,7 +75,7 @@ func (a *StatefulAccounts) AllocateStorageIndex(
 	key := atree.SlabIndexToLedgerKey(index)
 	a.txnState.RunWithAllLimitsDisabled(func() {
 		err = a.txnState.Set(
-			flow.NewRegisterID(string(address.Bytes()), string(key)),
+			flow.NewRegisterID(address, string(key)),
 			[]byte{})
 	})
 	if err != nil {

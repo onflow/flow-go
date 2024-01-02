@@ -24,6 +24,7 @@ import (
 
 	flow2 "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/templates"
+
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
@@ -103,9 +104,9 @@ func (account *TestBenchAccount) AddArrayToStorage(b *testing.B, blockExec TestB
 	txBody := flow.NewTransactionBody().
 		SetScript([]byte(`
 		transaction(list: [String]) {
-		  prepare(acct: AuthAccount) {
-			acct.load<[String]>(from: /storage/test)
-			acct.save(list, to: /storage/test)
+		  prepare(acct: auth(Storage) &Account) {
+			acct.storage.load<[String]>(from: /storage/test)
+			acct.storage.save(list, to: /storage/test)
 		  }
 		  execute {}
 		}
@@ -154,9 +155,7 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 
 	opts := []fvm.Option{
 		fvm.WithTransactionFeesEnabled(true),
-		// TODO (JanezP): enable storage feee once we figure out how storage limits work
-		// with the EVM account
-		fvm.WithAccountStorageLimit(false),
+		fvm.WithAccountStorageLimit(true),
 		fvm.WithChain(chain),
 		fvm.WithLogger(logger),
 		fvm.WithMaxStateInteractionSize(interactionLimit),
@@ -450,10 +449,9 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 		for _, account := range accounts {
 			addrs = append(addrs, account.Address)
 		}
-		// TODO (JanezP): fix when the evm account has a receiver
-		//evmAddress, err := chain.AddressAtIndex(environment.EVMAccountIndex)
-		//require.NoError(b, err)
-		//addrs = append(addrs, evmAddress)
+		evmAddress, err := chain.AddressAtIndex(systemcontracts.EVMAccountIndex)
+		require.NoError(b, err)
+		addrs = append(addrs, evmAddress)
 
 		// fund all accounts so not to run into storage problems
 		fundAccounts(b, blockExecutor, cadence.UFix64(1_000_000_000_000), addrs...)
@@ -534,7 +532,7 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 			import EVM from 0x%s
 
 			transaction(){
-				prepare(signer: AuthAccount){
+				prepare(signer: auth(Storage, Capabilities) &Account){
 					var i = 0
 					while i < %d {
 						i = i + 	1
@@ -610,7 +608,7 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 	b.Run("get account and get storage capacity", func(b *testing.B) {
 		benchTransaction(b,
 			func(b *testing.B, context benchTransactionContext) string {
-				return templateTx(100, `getAccount(signer.address).storageCapacity`)
+				return templateTx(100, `getAccount(signer.address).storage.capacity`)
 			},
 		)
 	})
@@ -618,7 +616,8 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 		benchTransaction(
 			b,
 			func(b *testing.B, context benchTransactionContext) string {
-				return templateTx(100, `let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)!`)
+				return templateTx(100,
+					`let vaultRef = signer.storage.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)!`)
 			},
 		)
 	})
@@ -628,8 +627,7 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 			func(b *testing.B, context benchTransactionContext) string {
 				return templateTx(100,
 					`let receiverRef =  getAccount(signer.address)
-					.getCapability(/public/flowTokenReceiver)
-					.borrow<&{FungibleToken.Receiver}>()!`)
+						.capabilities.borrow<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)!`)
 			},
 		)
 	})
@@ -639,11 +637,10 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 			func(b *testing.B, context benchTransactionContext) string {
 				return templateTx(100, `
 					let receiverRef =  getAccount(signer.address)
-						.getCapability(/public/flowTokenReceiver)
-						.borrow<&{FungibleToken.Receiver}>()!
-	
-					let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)!
-	
+						.capabilities.borrow<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)!
+
+					let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(from: /storage/flowTokenVault)!
+
 					receiverRef.deposit(from: <-vaultRef.withdraw(amount: 0.00001))
 				`)
 			},
@@ -654,8 +651,8 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 			b,
 			func(b *testing.B, context benchTransactionContext) string {
 				return templateTx(100, `
-					signer.load<String>(from: /storage/testpath)
-					signer.save("", to: /storage/testpath)
+					signer.storage.load<String>(from: /storage/testpath)
+					signer.storage.save("", to: /storage/testpath)
 				`)
 			},
 		)
@@ -665,8 +662,8 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 			b,
 			func(b *testing.B, context benchTransactionContext) string {
 				return templateTx(100, fmt.Sprintf(`
-					signer.load<String>(from: /storage/testpath)
-					signer.save("%s", to: /storage/testpath)
+					signer.storage.load<String>(from: /storage/testpath)
+					signer.storage.save("%s", to: /storage/testpath)
 				`, longString))
 			},
 		)
@@ -674,7 +671,7 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 	b.Run("create new account", func(b *testing.B) {
 		benchTransaction(b,
 			func(b *testing.B, context benchTransactionContext) string {
-				return templateTx(50, `let acct = AuthAccount(payer: signer)`)
+				return templateTx(50, `let acct = Account(payer: signer)`)
 			},
 		)
 	})
@@ -697,7 +694,7 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 			b,
 			func(b *testing.B, context benchTransactionContext) string {
 				return templateTx(100, `
-					let strings = signer.borrow<&[String]>(from: /storage/test)!
+					let strings = signer.storage.borrow<&[String]>(from: /storage/test)!
 					var i = 0
 					while (i < strings.length) {
 					  log(strings[i])
@@ -712,7 +709,7 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 			b,
 			func(b *testing.B, context benchTransactionContext) string {
 				return templateTx(100, `
-					let strings = signer.copy<[String]>(from: /storage/test)!
+					let strings = signer.storage.copy<[String]>(from: /storage/test)!
 					var i = 0
 					while (i < strings.length) {
 					  log(strings[i])
@@ -794,8 +791,8 @@ const TransferTxTemplate = `
 		transaction(testTokenIDs: [UInt64], recipientAddress: Address) {
 			let transferTokens: @NonFungibleToken.Collection
 
-			prepare(acct: AuthAccount) {
-				let ref = acct.borrow<&BatchNFT.Collection>(from: /storage/TestTokenCollection)!
+			prepare(acct: auth(BorrowValue) &Account) {
+				let ref = acct.storage.borrow<&BatchNFT.Collection>(from: /storage/TestTokenCollection)!
 				self.transferTokens <- ref.batchWithdraw(ids: testTokenIDs)
 			}
 
@@ -803,8 +800,7 @@ const TransferTxTemplate = `
 				// get the recipient's public account object
 				let recipient = getAccount(recipientAddress)
 				// get the Collection reference for the receiver
-				let receiverRef = recipient.getCapability(/public/TestTokenCollection)
-					.borrow<&{BatchNFT.TestTokenCollectionPublic}>()!
+				let receiverRef = recipient.capabilities.borrow<&{BatchNFT.TestTokenCollectionPublic}>(/public/TestTokenCollection)!
 				// deposit the NFT in the receivers collection
 				receiverRef.batchDeposit(tokens: <-self.transferTokens)
 			}
@@ -911,14 +907,10 @@ func setupReceiver(b *testing.B, be TestBenchBlockExecutor, nftAccount, batchNFT
 	import BatchNFT from 0x%s
 	
 	transaction {
-		prepare(signer: AuthAccount) {
+		prepare(signer: auth(SaveValue) &Account) {
 			signer.save(
 				<-BatchNFT.createEmptyCollection(),
 				to: /storage/TestTokenCollection
-			)
-			signer.link<&BatchNFT.Collection>(
-				/public/TestTokenCollection,
-				target: /storage/TestTokenCollection
 			)
 		}
 	}`
@@ -946,15 +938,15 @@ func mintNFTs(b *testing.B, be TestBenchBlockExecutor, batchNFTAccount *TestBenc
 	mintScriptTemplate := `
 	import BatchNFT from 0x%s
 	transaction {
-		prepare(signer: AuthAccount) {
-			let adminRef = signer.borrow<&BatchNFT.Admin>(from: /storage/BatchNFTAdmin)!
+		prepare(signer: auth(BorrowValue) &Account) {
+			let adminRef = signer.storage.borrow<&BatchNFT.Admin>(from: /storage/BatchNFTAdmin)!
 			let playID = adminRef.createPlay(metadata: {"name": "Test"})
 			let setID = BatchNFT.nextSetID
 			adminRef.createSet(name: "Test")
 			let setRef = adminRef.borrowSet(setID: setID)
 			setRef.addPlay(playID: playID)
 			let testTokens <- setRef.batchMintTestToken(playID: playID, quantity: %d)
-			signer.borrow<&BatchNFT.Collection>(from: /storage/TestTokenCollection)!
+			signer.storage.borrow<&BatchNFT.Collection>(from: /storage/TestTokenCollection)!
 				.batchDeposit(tokens: <-testTokens)
 		}
 	}`
@@ -1000,29 +992,28 @@ func deployBatchNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAcc
 		return fmt.Sprintf(`
 			import NonFungibleToken from 0x%s
 
-			pub contract BatchNFT: NonFungibleToken {
-				pub event ContractInitialized()
-				pub event PlayCreated(id: UInt32, metadata: {String:String})
-				pub event NewSeriesStarted(newCurrentSeries: UInt32)
-				pub event SetCreated(setID: UInt32, series: UInt32)
-				pub event PlayAddedToSet(setID: UInt32, playID: UInt32)
-				pub event PlayRetiredFromSet(setID: UInt32, playID: UInt32, numTestTokens: UInt32)
-				pub event SetLocked(setID: UInt32)
-				pub event TestTokenMinted(testTokenID: UInt64, playID: UInt32, setID: UInt32, serialNumber: UInt32)
-				pub event Withdraw(id: UInt64, from: Address?)
-				pub event Deposit(id: UInt64, to: Address?)
-				pub event TestTokenDestroyed(id: UInt64)
-				pub var currentSeries: UInt32
+			access(all) contract BatchNFT: NonFungibleToken {
+				access(all) event ContractInitialized()
+				access(all) event PlayCreated(id: UInt32, metadata: {String:String})
+				access(all) event NewSeriesStarted(newCurrentSeries: UInt32)
+				access(all) event SetCreated(setID: UInt32, series: UInt32)
+				access(all) event PlayAddedToSet(setID: UInt32, playID: UInt32)
+				access(all) event PlayRetiredFromSet(setID: UInt32, playID: UInt32, numTestTokens: UInt32)
+				access(all) event SetLocked(setID: UInt32)
+				access(all) event TestTokenMinted(testTokenID: UInt64, playID: UInt32, setID: UInt32, serialNumber: UInt32)
+				access(all) event Withdraw(id: UInt64, from: Address?)
+				access(all) event Deposit(id: UInt64, to: Address?)
+				access(all) var currentSeries: UInt32
 				access(self) var playDatas: {UInt32: Play}
 				access(self) var setDatas: {UInt32: SetData}
 				access(self) var sets: @{UInt32: Set}
-				pub var nextPlayID: UInt32
-				pub var nextSetID: UInt32
-				pub var totalSupply: UInt64
+				access(all) var nextPlayID: UInt32
+				access(all) var nextSetID: UInt32
+				access(all) var totalSupply: UInt64
 
-				pub struct Play {
-					pub let playID: UInt32
-					pub let metadata: {String: String}
+				access(all) struct Play {
+					access(all) let playID: UInt32
+					access(all) let metadata: {String: String}
 
 					init(metadata: {String: String}) {
 						pre {
@@ -1036,10 +1027,10 @@ func deployBatchNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAcc
 					}
 				}
 
-				pub struct SetData {
-					pub let setID: UInt32
-					pub let name: String
-					pub let series: UInt32
+				access(all) struct SetData {
+					access(all) let setID: UInt32
+					access(all) let name: String
+					access(all) let series: UInt32
 					init(name: String) {
 						pre {
 							name.length > 0: "New Set name cannot be empty"
@@ -1052,12 +1043,12 @@ func deployBatchNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAcc
 					}
 				}
 
-				pub resource Set {
-					pub let setID: UInt32
-					pub var plays: [UInt32]
-					pub var retired: {UInt32: Bool}
-					pub var locked: Bool
-					pub var numberMintedPerPlay: {UInt32: UInt32}
+				access(all) resource Set {
+					access(all) let setID: UInt32
+					access(all) var plays: [UInt32]
+					access(all) var retired: {UInt32: Bool}
+					access(all) var locked: Bool
+					access(all) var numberMintedPerPlay: {UInt32: UInt32}
 
 					init(name: String) {
 						self.setID = BatchNFT.nextSetID
@@ -1069,7 +1060,7 @@ func deployBatchNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAcc
 						BatchNFT.setDatas[self.setID] = SetData(name: name)
 					}
 
-					pub fun addPlay(playID: UInt32) {
+					access(all) fun addPlay(playID: UInt32) {
 						pre {
 							BatchNFT.playDatas[playID] != nil: "Cannot add the Play to Set: Play doesn't exist"
 							!self.locked: "Cannot add the play to the Set after the set has been locked"
@@ -1082,13 +1073,13 @@ func deployBatchNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAcc
 						emit PlayAddedToSet(setID: self.setID, playID: playID)
 					}
 
-					pub fun addPlays(playIDs: [UInt32]) {
+					access(all) fun addPlays(playIDs: [UInt32]) {
 						for play in playIDs {
 							self.addPlay(playID: play)
 						}
 					}
 
-					pub fun retirePlay(playID: UInt32) {
+					access(all) fun retirePlay(playID: UInt32) {
 						pre {
 							self.retired[playID] != nil: "Cannot retire the Play: Play doesn't exist in this set!"
 						}
@@ -1100,20 +1091,20 @@ func deployBatchNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAcc
 						}
 					}
 
-					pub fun retireAll() {
+					access(all) fun retireAll() {
 						for play in self.plays {
 							self.retirePlay(playID: play)
 						}
 					}
 
-					pub fun lock() {
+					access(all) fun lock() {
 						if !self.locked {
 							self.locked = true
 							emit SetLocked(setID: self.setID)
 						}
 					}
 
-					pub fun mintTestToken(playID: UInt32): @NFT {
+					access(all) fun mintTestToken(playID: UInt32): @NFT {
 						pre {
 							self.retired[playID] != nil: "Cannot mint the testToken: This play doesn't exist"
 							!self.retired[playID]!: "Cannot mint the testToken from this play: This play has been retired"
@@ -1128,7 +1119,7 @@ func deployBatchNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAcc
 						return <-newTestToken
 					}
 
-					pub fun batchMintTestToken(playID: UInt32, quantity: UInt64): @Collection {
+					access(all) fun batchMintTestToken(playID: UInt32, quantity: UInt64): @Collection {
 						let newCollection <- create Collection()
 
 						var i: UInt64 = 0
@@ -1141,10 +1132,10 @@ func deployBatchNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAcc
 					}
 				}
 
-				pub struct TestTokenData {
-					pub let setID: UInt32
-					pub let playID: UInt32
-					pub let serialNumber: UInt32
+				access(all) struct TestTokenData {
+					access(all) let setID: UInt32
+					access(all) let playID: UInt32
+					access(all) let serialNumber: UInt32
 
 					init(setID: UInt32, playID: UInt32, serialNumber: UInt32) {
 						self.setID = setID
@@ -1154,9 +1145,9 @@ func deployBatchNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAcc
 
 				}
 
-				pub resource NFT: NonFungibleToken.INFT {
-					pub let id: UInt64
-					pub let data: TestTokenData
+				access(all) resource NFT: NonFungibleToken.INFT {
+					access(all) let id: UInt64
+					access(all) let data: TestTokenData
 
 					init(serialNumber: UInt32, playID: UInt32, setID: UInt32) {
 						BatchNFT.totalSupply = BatchNFT.totalSupply + UInt64(1)
@@ -1167,14 +1158,10 @@ func deployBatchNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAcc
 
 						emit TestTokenMinted(testTokenID: self.id, playID: playID, setID: self.data.setID, serialNumber: self.data.serialNumber)
 					}
-
-					destroy() {
-						emit TestTokenDestroyed(id: self.id)
-					}
 				}
 
-				pub resource Admin {
-					pub fun createPlay(metadata: {String: String}): UInt32 {
+				access(all) resource Admin {
+					access(all) fun createPlay(metadata: {String: String}): UInt32 {
 						var newPlay = Play(metadata: metadata)
 						let newID = newPlay.playID
 
@@ -1183,20 +1170,20 @@ func deployBatchNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAcc
 						return newID
 					}
 
-					pub fun createSet(name: String) {
+					access(all) fun createSet(name: String) {
 						var newSet <- create Set(name: name)
 
 						BatchNFT.sets[newSet.setID] <-! newSet
 					}
 
-					pub fun borrowSet(setID: UInt32): &Set {
+					access(all) fun borrowSet(setID: UInt32): &Set {
 						pre {
 							BatchNFT.sets[setID] != nil: "Cannot borrow Set: The Set doesn't exist"
 						}
 						return (&BatchNFT.sets[setID] as &Set?)!
 					}
 
-					pub fun startNewSeries(): UInt32 {
+					access(all) fun startNewSeries(): UInt32 {
 						BatchNFT.currentSeries = BatchNFT.currentSeries + UInt32(1)
 
 						emit NewSeriesStarted(newCurrentSeries: BatchNFT.currentSeries)
@@ -1204,17 +1191,17 @@ func deployBatchNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAcc
 						return BatchNFT.currentSeries
 					}
 
-					pub fun createNewAdmin(): @Admin {
+					access(all) fun createNewAdmin(): @Admin {
 						return <-create Admin()
 					}
 				}
 
-				pub resource interface TestTokenCollectionPublic {
-					pub fun deposit(token: @NonFungibleToken.NFT)
-					pub fun batchDeposit(tokens: @NonFungibleToken.Collection)
-					pub fun getIDs(): [UInt64]
-					pub fun borrowNFT(id: UInt64): &NonFungibleToken.NFT
-					pub fun borrowTestToken(id: UInt64): &BatchNFT.NFT? {
+				access(all) resource interface TestTokenCollectionPublic {
+					access(all) fun deposit(token: @NonFungibleToken.NFT)
+					access(all) fun batchDeposit(tokens: @NonFungibleToken.Collection)
+					access(all) fun getIDs(): [UInt64]
+					access(all) fun borrowNFT(id: UInt64): &NonFungibleToken.NFT
+					access(all) fun borrowTestToken(id: UInt64): &BatchNFT.NFT? {
 						post {
 							(result == nil) || (result?.id == id):
 								"Cannot borrow TestToken reference: The ID of the returned reference is incorrect"
@@ -1222,14 +1209,14 @@ func deployBatchNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAcc
 					}
 				}
 
-				pub resource Collection: TestTokenCollectionPublic, NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic {
-					pub var ownedNFTs: @{UInt64: NonFungibleToken.NFT}
+				access(all) resource Collection: TestTokenCollectionPublic, NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic {
+					access(all) var ownedNFTs: @{UInt64: NonFungibleToken.NFT}
 
 					init() {
 						self.ownedNFTs <- {}
 					}
 
-					pub fun withdraw(withdrawID: UInt64): @NonFungibleToken.NFT {
+					access(all) fun withdraw(withdrawID: UInt64): @NonFungibleToken.NFT {
 						let token <- self.ownedNFTs.remove(key: withdrawID)
 							?? panic("Cannot withdraw: TestToken does not exist in the collection")
 
@@ -1238,7 +1225,7 @@ func deployBatchNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAcc
 						return <-token
 					}
 
-					pub fun batchWithdraw(ids: [UInt64]): @NonFungibleToken.Collection {
+					access(all) fun batchWithdraw(ids: [UInt64]): @NonFungibleToken.Collection {
 						var batchCollection <- create Collection()
 
 						for id in ids {
@@ -1247,7 +1234,7 @@ func deployBatchNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAcc
 						return <-batchCollection
 					}
 
-					pub fun deposit(token: @NonFungibleToken.NFT) {
+					access(all) fun deposit(token: @NonFungibleToken.NFT) {
 						let token <- token as! @BatchNFT.NFT
 
 						let id = token.id
@@ -1260,7 +1247,7 @@ func deployBatchNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAcc
 						destroy oldToken
 					}
 
-					pub fun batchDeposit(tokens: @NonFungibleToken.Collection) {
+					access(all) fun batchDeposit(tokens: @NonFungibleToken.Collection) {
 						let keys = tokens.getIDs()
 
 						for key in keys {
@@ -1269,15 +1256,15 @@ func deployBatchNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAcc
 						destroy tokens
 					}
 
-					pub fun getIDs(): [UInt64] {
+					access(all) fun getIDs(): [UInt64] {
 						return self.ownedNFTs.keys
 					}
 
-					pub fun borrowNFT(id: UInt64): &NonFungibleToken.NFT {
+					access(all) fun borrowNFT(id: UInt64): &NonFungibleToken.NFT {
 						return (&self.ownedNFTs[id] as &NonFungibleToken.NFT?)!
 					}
 
-					pub fun borrowTestToken(id: UInt64): &BatchNFT.NFT? {
+					access(all) fun borrowTestToken(id: UInt64): &BatchNFT.NFT? {
 						if self.ownedNFTs[id] != nil {
 							let ref = (&self.ownedNFTs[id] as auth &NonFungibleToken.NFT?)!
 							return ref as! &BatchNFT.NFT
@@ -1285,24 +1272,21 @@ func deployBatchNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAcc
 							return nil
 						}
 					}
-					destroy() {
-						destroy self.ownedNFTs
-					}
 				}
 
-				pub fun createEmptyCollection(): @NonFungibleToken.Collection {
+				access(all) fun createEmptyCollection(): @NonFungibleToken.Collection {
 					return <-create BatchNFT.Collection()
 				}
 
-				pub fun getAllPlays(): [BatchNFT.Play] {
+				access(all) fun getAllPlays(): [BatchNFT.Play] {
 					return BatchNFT.playDatas.values
 				}
 
-				pub fun getPlayMetaData(playID: UInt32): {String: String}? {
+				access(all) fun getPlayMetaData(playID: UInt32): {String: String}? {
 					return self.playDatas[playID]?.metadata
 				}
 
-				pub fun getPlayMetaDataByField(playID: UInt32, field: String): String? {
+				access(all) fun getPlayMetaDataByField(playID: UInt32, field: String): String? {
 					if let play = BatchNFT.playDatas[playID] {
 						return play.metadata[field]
 					} else {
@@ -1310,15 +1294,15 @@ func deployBatchNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAcc
 					}
 				}
 
-				pub fun getSetName(setID: UInt32): String? {
+				access(all) fun getSetName(setID: UInt32): String? {
 					return BatchNFT.setDatas[setID]?.name
 				}
 
-				pub fun getSetSeries(setID: UInt32): UInt32? {
+				access(all) fun getSetSeries(setID: UInt32): UInt32? {
 					return BatchNFT.setDatas[setID]?.series
 				}
 
-				pub fun getSetIDsByName(setName: String): [UInt32]? {
+				access(all) fun getSetIDsByName(setName: String): [UInt32]? {
 					var setIDs: [UInt32] = []
 
 					for setData in BatchNFT.setDatas.values {
@@ -1334,11 +1318,11 @@ func deployBatchNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAcc
 					}
 				}
 
-				pub fun getPlaysInSet(setID: UInt32): [UInt32]? {
+				access(all) fun getPlaysInSet(setID: UInt32): [UInt32]? {
 					return BatchNFT.sets[setID]?.plays
 				}
 
-				pub fun isEditionRetired(setID: UInt32, playID: UInt32): Bool? {
+				access(all) fun isEditionRetired(setID: UInt32, playID: UInt32): Bool? {
 					if let setToRead <- BatchNFT.sets.remove(key: setID) {
 						let retired = setToRead.retired[playID]
 						BatchNFT.sets[setID] <-! setToRead
@@ -1348,11 +1332,11 @@ func deployBatchNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAcc
 					}
 				}
 
-				pub fun isSetLocked(setID: UInt32): Bool? {
+				access(all) fun isSetLocked(setID: UInt32): Bool? {
 					return BatchNFT.sets[setID]?.locked
 				}
 
-				pub fun getNumTestTokensInEdition(setID: UInt32, playID: UInt32): UInt32? {
+				access(all) fun getNumTestTokensInEdition(setID: UInt32, playID: UInt32): UInt32? {
 					if let setToRead <- BatchNFT.sets.remove(key: setID) {
 						let amount = setToRead.numberMintedPerPlay[playID]
 						BatchNFT.sets[setID] <-! setToRead
@@ -1371,9 +1355,12 @@ func deployBatchNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAcc
 					self.nextSetID = 1
 					self.totalSupply = 0
 
-					self.account.save<@Collection>(<- create Collection(), to: /storage/TestTokenCollection)
-					self.account.link<&{TestTokenCollectionPublic}>(/public/TestTokenCollection, target: /storage/TestTokenCollection)
-					self.account.save<@Admin>(<- create Admin(), to: /storage/BatchNFTAdmin)
+					self.account.storage.save<@Collection>(<- create Collection(), to: /storage/TestTokenCollection)
+
+					let collectionCap = self.account.capabilities.storage.issue<&{TestTokenCollectionPublic}>(/storage/TestTokenCollection)
+					self.account.capabilities.publish(collectionCap, at: /public/TestTokenCollection)
+
+					self.account.storage.save<@Admin>(<- create Admin(), to: /storage/BatchNFTAdmin)
 					emit ContractInitialized()
 				}
 			}
@@ -1384,44 +1371,44 @@ func deployBatchNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAcc
 
 func deployNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAccount) {
 	const nftContract = `
-		pub contract interface NonFungibleToken {
-			pub var totalSupply: UInt64
-			pub event ContractInitialized()
-			pub event Withdraw(id: UInt64, from: Address?)
-			pub event Deposit(id: UInt64, to: Address?)
-			pub resource interface INFT {
-				pub let id: UInt64
+		access(all) contract interface NonFungibleToken {
+			access(all) var totalSupply: UInt64
+			access(all) event ContractInitialized()
+			access(all) event Withdraw(id: UInt64, from: Address?)
+			access(all) event Deposit(id: UInt64, to: Address?)
+			access(all) resource interface INFT {
+				access(all) let id: UInt64
 			}
-			pub resource NFT: INFT {
-				pub let id: UInt64
+			access(all) resource NFT: INFT {
+				access(all) let id: UInt64
 			}
-			pub resource interface Provider {
-				pub fun withdraw(withdrawID: UInt64): @NFT {
+			access(all) resource interface Provider {
+				access(all) fun withdraw(withdrawID: UInt64): @NFT {
 					post {
 						result.id == withdrawID: "The ID of the withdrawn token must be the same as the requested ID"
 					}
 				}
 			}
-			pub resource interface Receiver {
-				pub fun deposit(token: @NFT)
+			access(all) resource interface Receiver {
+				access(all) fun deposit(token: @NFT)
 			}
-			pub resource interface CollectionPublic {
-				pub fun deposit(token: @NFT)
-				pub fun getIDs(): [UInt64]
-				pub fun borrowNFT(id: UInt64): &NFT
+			access(all) resource interface CollectionPublic {
+				access(all) fun deposit(token: @NFT)
+				access(all) fun getIDs(): [UInt64]
+				access(all) fun borrowNFT(id: UInt64): &NFT
 			}
-			pub resource Collection: Provider, Receiver, CollectionPublic {
-				pub var ownedNFTs: @{UInt64: NFT}
-				pub fun withdraw(withdrawID: UInt64): @NFT
-				pub fun deposit(token: @NFT)
-				pub fun getIDs(): [UInt64]
-				pub fun borrowNFT(id: UInt64): &NFT {
+			access(all) resource Collection: Provider, Receiver, CollectionPublic {
+				access(all) var ownedNFTs: @{UInt64: NFT}
+				access(all) fun withdraw(withdrawID: UInt64): @NFT
+				access(all) fun deposit(token: @NFT)
+				access(all) fun getIDs(): [UInt64]
+				access(all) fun borrowNFT(id: UInt64): &NFT {
 					pre {
 						self.ownedNFTs[id] != nil: "NFT does not exist in the collection!"
 					}
 				}
 			}
-			pub fun createEmptyCollection(): @Collection {
+			access(all) fun createEmptyCollection(): @Collection {
 				post {
 					result.getIDs().length == 0: "The created collection must be empty!"
 				}

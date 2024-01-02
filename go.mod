@@ -27,7 +27,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/zerolog/v2 v2.0.0-rc.2
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.0.0-20200501113911-9a95f0fdbfea
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
-	github.com/grpc-ecosystem/grpc-gateway/v2 v2.7.0
+	github.com/grpc-ecosystem/grpc-gateway/v2 v2.11.3
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/improbable-eng/grpc-web v0.15.0
@@ -50,14 +50,14 @@ require (
 	github.com/multiformats/go-multiaddr v0.9.0
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/multiformats/go-multihash v0.2.3
-	github.com/onflow/atree v0.6.0
-	github.com/onflow/cadence v0.42.6
+	github.com/onflow/atree v0.6.1-0.20230711151834-86040b30171f
+	github.com/onflow/cadence v1.0.0-preview.1.0.20231213191345-0ff20e15e7e1
 	github.com/onflow/flow v0.3.4
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.14.0
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.14.0
-	github.com/onflow/flow-go-sdk v0.41.17
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.1-0.20231212203043-37cbe453d425
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.15.1-0.20231204202154-f8dfacb39d86
+	github.com/onflow/flow-go-sdk v0.44.0-stable-cadence.2
 	github.com/onflow/flow-go/crypto v0.25.0
-	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20231124194313-106cc495def6
+	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20231213135419-ae911cc351a2
 	github.com/onflow/go-bitswap v0.0.0-20230703214630-6d3db958c73d
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/pierrec/lz4 v2.6.1+incompatible
@@ -105,6 +105,7 @@ require (
 	github.com/gorilla/websocket v1.5.0
 	github.com/hashicorp/golang-lru/v2 v2.0.2
 	github.com/mitchellh/mapstructure v1.5.0
+	github.com/onflow/flow-nft/lib/go/contracts v1.1.1-0.20231213195450-0b951b342b14
 	github.com/onflow/wal v0.0.0-20230529184820-bc9f8244608d
 	github.com/slok/go-http-metrics v0.10.0
 	github.com/sony/gobreaker v0.5.0
@@ -118,6 +119,7 @@ require (
 	cloud.google.com/go/compute v1.21.0 // indirect
 	cloud.google.com/go/iam v1.1.1 // indirect
 	github.com/DataDog/zstd v1.5.2 // indirect
+	github.com/SaveTheRbtz/mph v0.1.2 // indirect
 	github.com/StackExchange/wmi v0.0.0-20180116203802-5d049714c4a6 // indirect
 	github.com/VictoriaMetrics/fastcache v1.6.0 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.17.7 // indirect
@@ -164,7 +166,6 @@ require (
 	github.com/gabriel-vasile/mimetype v1.4.2 // indirect
 	github.com/gammazero/deque v0.1.0 // indirect
 	github.com/getsentry/sentry-go v0.18.0 // indirect
-	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/go-kit/kit v0.12.0 // indirect
 	github.com/go-kit/log v0.2.1 // indirect
 	github.com/go-logfmt/logfmt v0.5.1 // indirect
@@ -207,8 +208,8 @@ require (
 	github.com/jbenet/go-temp-err-catcher v0.1.0 // indirect
 	github.com/jbenet/goprocess v0.1.4 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
-	github.com/k0kubun/pp/v3 v3.2.0 // indirect
-	github.com/kevinburke/go-bindata v3.23.0+incompatible // indirect
+	github.com/k0kubun/pp v3.0.1+incompatible // indirect
+	github.com/kevinburke/go-bindata v3.24.0+incompatible // indirect
 	github.com/klauspost/compress v1.16.5 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.5 // indirect
 	github.com/koron/go-ssdp v0.0.4 // indirect
@@ -248,9 +249,8 @@ require (
 	github.com/multiformats/go-multistream v0.4.1 // indirect
 	github.com/multiformats/go-varint v0.0.7 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
-	github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20230711213910-baad011d2b13 // indirect
-	github.com/onflow/flow-nft/lib/go/contracts v1.1.0 // indirect
-	github.com/onflow/sdks v0.5.0 // indirect
+	github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20231212194336-a2802ba36596 // indirect
+	github.com/onflow/sdks v0.5.1-0.20230912225508-b35402f12bba // indirect
 	github.com/onsi/ginkgo/v2 v2.9.7 // indirect
 	github.com/opencontainers/runtime-spec v1.0.2 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
@@ -287,6 +287,7 @@ require (
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	github.com/zeebo/blake3 v0.2.3 // indirect
+	github.com/zeebo/xxh3 v1.0.2 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/internal/retry v1.16.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.16.0 // indirect

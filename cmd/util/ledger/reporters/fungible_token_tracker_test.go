@@ -76,25 +76,29 @@ func TestFungibleTokenTracker(t *testing.T) {
 	testContract := fmt.Sprintf(`
 	import FungibleToken from 0x%s
 
-	pub contract WrappedToken {
-		pub resource WrappedVault {
-			pub var vault: @FungibleToken.Vault
+	access(all)
+	contract WrappedToken {
 
-			init(v: @FungibleToken.Vault) {
+		access(all)
+		resource WrappedVault {
+
+			access(all)
+			var vault: @{FungibleToken.Vault}
+
+			init(v: @{FungibleToken.Vault}) {
 				self.vault <- v
 			}
-			destroy() {
-			  destroy self.vault
-			}
 		}
-		pub fun CreateWrappedVault(inp: @FungibleToken.Vault): @WrappedToken.WrappedVault {
+
+		access(all)
+		fun CreateWrappedVault(inp: @{FungibleToken.Vault}): @WrappedToken.WrappedVault {
 			return <-create WrappedVault(v :<- inp)
 		}
 	}`, sc.FungibleToken.Address.Hex())
 
 	deployingTestContractScript := []byte(fmt.Sprintf(`
 	transaction {
-		prepare(signer: AuthAccount) {
+		prepare(signer: auth(AddContract) &Account) {
 				signer.contracts.add(name: "%s", code: "%s".decodeHex())
 		}
 	}
@@ -119,13 +123,13 @@ func TestFungibleTokenTracker(t *testing.T) {
 							import WrappedToken from 0x%s
 
 							transaction(amount: UFix64) {
-								prepare(signer: AuthAccount) {
-									let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+								prepare(signer: auth(Storage) &Account) {
+									let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdrawable) &FlowToken.Vault>(from: /storage/flowTokenVault)
 										?? panic("Could not borrow reference to the owner's Vault!")
 
 									let sentVault <- vaultRef.withdraw(amount: amount)
 									let wrappedFlow <- WrappedToken.CreateWrappedVault(inp :<- sentVault)
-									signer.save(<-wrappedFlow, to: /storage/wrappedToken)
+									signer.storage.save(<-wrappedFlow, to: /storage/wrappedToken)
 								}
 							}`,
 		sc.FungibleToken.Address.Hex(),

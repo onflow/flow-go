@@ -28,7 +28,7 @@ import (
 // This is a collection of tests that validate various Access API endpoints work as expected.
 
 var (
-	simpleScript       = `pub fun main(): Int { return 42; }`
+	simpleScript       = `access(all) fun main(): Int { return 42; }`
 	simpleScriptResult = cadence.NewInt(42)
 )
 

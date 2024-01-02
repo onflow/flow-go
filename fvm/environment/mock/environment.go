@@ -120,20 +120,6 @@ func (_m *Environment) AddAccountKey(address common.Address, publicKey *stdlib.P
 	return r0, r1
 }
 
-// AddEncodedAccountKey provides a mock function with given fields: address, publicKey
-func (_m *Environment) AddEncodedAccountKey(address common.Address, publicKey []byte) error {
-	ret := _m.Called(address, publicKey)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(common.Address, []byte) error); ok {
-		r0 = rf(address, publicKey)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // AllocateStorageIndex provides a mock function with given fields: owner
 func (_m *Environment) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
 	ret := _m.Called(owner)
@@ -1219,32 +1205,6 @@ func (_m *Environment) RevokeAccountKey(address common.Address, index int) (*std
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*stdlib.AccountKey)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(common.Address, int) error); ok {
-		r1 = rf(address, index)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// RevokeEncodedAccountKey provides a mock function with given fields: address, index
-func (_m *Environment) RevokeEncodedAccountKey(address common.Address, index int) ([]byte, error) {
-	ret := _m.Called(address, index)
-
-	var r0 []byte
-	var r1 error
-	if rf, ok := ret.Get(0).(func(common.Address, int) ([]byte, error)); ok {
-		return rf(address, index)
-	}
-	if rf, ok := ret.Get(0).(func(common.Address, int) []byte); ok {
-		r0 = rf(address, index)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]byte)
 		}
 	}
 

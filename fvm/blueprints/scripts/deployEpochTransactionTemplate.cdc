@@ -10,7 +10,7 @@ transaction(
     FLOWsupplyIncreasePercentage: UFix64,
     randomSource: String,
     clusterWeights: [{String: UInt64}]) {
-  prepare(serviceAccount: AuthAccount)	{
+  prepare(serviceAccount: auth(AddContract) &Account)	{
 
     // first, construct Cluster objects from cluster weights
     let clusters: [FlowClusterQC.Cluster] = []

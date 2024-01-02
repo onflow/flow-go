@@ -3,19 +3,19 @@ import NodeVersionBeacon from 0xNODEVERSIONBEACONADDRESS
 import RandomBeaconHistory from 0xRANDOMBEACONHISTORYADDRESS
 
 transaction {
-    prepare(serviceAccount: AuthAccount) {
-        let epochHeartbeat = serviceAccount.borrow<&FlowEpoch.Heartbeat>(from: FlowEpoch.heartbeatStoragePath)
+    prepare(serviceAccount: auth(BorrowValue) &Account) {
+        let epochHeartbeat = serviceAccount.storage.borrow<&FlowEpoch.Heartbeat>(from: FlowEpoch.heartbeatStoragePath)
             ?? panic("Could not borrow heartbeat from storage path")
         epochHeartbeat.advanceBlock()
 
-        let versionBeaconHeartbeat = serviceAccount.borrow<&NodeVersionBeacon.Heartbeat>(
-            from: NodeVersionBeacon.HeartbeatStoragePath)
-                ?? panic("Couldn't borrow NodeVersionBeacon.Heartbeat Resource")
+        let versionBeaconHeartbeat = serviceAccount.storage
+            .borrow<&NodeVersionBeacon.Heartbeat>(from: NodeVersionBeacon.HeartbeatStoragePath)
+            ?? panic("Couldn't borrow NodeVersionBeacon.Heartbeat Resource")
         versionBeaconHeartbeat.heartbeat()
 
-        let randomBeaconHistoryHeartbeat = serviceAccount.borrow<&RandomBeaconHistory.Heartbeat>(
-            from: RandomBeaconHistory.HeartbeatStoragePath)
-                ?? panic("Couldn't borrow RandomBeaconHistory.Heartbeat Resource")
+        let randomBeaconHistoryHeartbeat = serviceAccount.storage
+            .borrow<&RandomBeaconHistory.Heartbeat>(from: RandomBeaconHistory.HeartbeatStoragePath)
+            ?? panic("Couldn't borrow RandomBeaconHistory.Heartbeat Resource")
         randomBeaconHistoryHeartbeat.heartbeat(randomSourceHistory: randomSourceHistory())
     }
 }

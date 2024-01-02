@@ -147,4 +147,14 @@ contract EVM {
     fun run(tx: [UInt8], coinbase: EVMAddress) {
         InternalEVM.run(tx: tx, coinbase: coinbase.bytes)
     }
+
+    access(all)
+    fun encodeABI(_ values: [AnyStruct]): [UInt8] {
+        return InternalEVM.encodeABI(values)
+    }
+
+    access(all)
+    fun decodeABI(types: [Type], data: [UInt8]): [AnyStruct] {
+        return InternalEVM.decodeABI(types: types, data: data)
+    }
 }
