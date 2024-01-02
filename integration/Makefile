@@ -14,15 +14,15 @@ CGO_FLAG := CGO_CFLAGS=$(CRYPTO_FLAG)
 
 # Run the integration test suite
 .PHONY: integration-test
-integration-test: access-tests ghost-tests mvp-tests execution-tests verification-tests upgrades-tests collection-tests epochs-cohort1-tests epochs-cohort2-tests network-tests consensus-tests
-
-.PHONY: ci-integration-test
-ci-integration-test: access-tests ghost-tests mvp-tests epochs-cohort1-tests epochs-cohort2-tests consensus-tests execution-tests verification-tests upgrades-tests network-tests collection-tests
+integration-test: access-tests ghost-tests mvp-tests execution-tests verification-tests upgrades-tests collection-tests epochs-tests network-tests consensus-tests
 
 # Run unit tests for test utilities in this module
 .PHONY: test
 test:
 	$(CGO_FLAG) go test $(if $(VERBOSE),-v,) -coverprofile=$(COVER_PROFILE) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) `go list ./... | grep -v -e integration/tests`
+
+.PHONY: access-tests
+access-tests: access-cohort1-tests access-cohort2-tests access-cohort3-tests
 
 .PHONY: access-cohort1-tests
 access-cohort1-tests:
@@ -36,7 +36,6 @@ access-cohort2-tests:
 access-cohort3-tests:
 	$(CGO_FLAG) go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) ./tests/access/cohort3/...
 
-
 .PHONY: collection-tests
 collection-tests:
 	$(CGO_FLAG) go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) ./tests/collection/...
@@ -44,6 +43,9 @@ collection-tests:
 .PHONY: consensus-tests
 consensus-tests:
 	$(CGO_FLAG) go test $(if $(VERBOSE),-v,) $(RACE_FLAG) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) ./tests/consensus/...
+
+.PHONY: epochs-tests
+epochs-tests: epochs-cohort1-tests epochs-cohort2-tests
 
 .PHONY: epochs-cohort1-tests
 epochs-cohort1-tests:
