@@ -100,7 +100,28 @@ func TestGossipSubDuplicateMessageTrackerCache_Concurrent_Inc_Get(t *testing.T) 
 		unittest.RequireNumericallyClose(t, 1.0, count, .1)
 	}()
 
+	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "failed to get increment counts")
+
+	// concurrently increment the same peerID
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		_, err := cache.Inc(peerId1)
+		require.NoError(t, err)
+	}()
+
+	go func() {
+		defer wg.Done()
+		_, err := cache.Inc(peerId1)
+		require.NoError(t, err)
+	}()
+
 	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "failed to get updated counts")
+
+	count, err, found := cache.Get(peerId1)
+	require.True(t, found)
+	require.NoError(t, err)
+	unittest.RequireNumericallyClose(t, count, 3.0, 0.1)
 }
 
 // TestGossipSubDuplicateMessageTrackerCache tests the decay functionality of the GossipSubDuplicateMessageTrackerCache.
