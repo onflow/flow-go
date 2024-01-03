@@ -72,10 +72,6 @@ func NewUnicastConfigCache(
 // Returns:
 //   - error any returned error should be considered as an irrecoverable error and indicates a bug.
 func (d *UnicastConfigCache) Adjust(peerID peer.ID, adjustFunc unicast.UnicastConfigAdjustFunc) (*unicast.Config, error) {
-	// ensuring that the init-and-adjust operation is atomic.
-	d.atomicAdjustMutex.Lock()
-	defer d.atomicAdjustMutex.Unlock()
-
 	entityId := entityIdOf(peerID)
 	adjustedUnicastCfg, err := d.adjust(entityId, adjustFunc)
 	if err != nil {
@@ -92,10 +88,15 @@ func (d *UnicastConfigCache) Adjust(peerID peer.ID, adjustFunc unicast.UnicastCo
 				EntityId: entityId,
 			}
 
-			added := d.peerCache.Add(e)
-			if !added {
-				return nil, fmt.Errorf("failed to initialize unicast config for peer %s", peerID)
-			}
+			// ensuring that the init-and-adjust operation is atomic.
+			d.atomicAdjustMutex.Lock()
+			defer d.atomicAdjustMutex.Unlock()
+
+			add := d.peerCache.Add(e)
+			fmt.Println("add: ", add, "peerId: ", peerID.String(), "entityId: ", entityId.String(), "size: ", d.peerCache.Size())
+			// if !added {
+			// 	return nil, fmt.Errorf("failed to initialize unicast config for peer %s", peerID)
+			// }
 
 			// as the config is initialized, the adjust function should not return an error, and any returned error
 			// is an irrecoverable error and indicates a bug.

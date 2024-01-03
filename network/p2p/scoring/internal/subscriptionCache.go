@@ -3,6 +3,7 @@ package internal
 import (
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
@@ -34,6 +35,15 @@ type SubscriptionRecordCache struct {
 	// made to the cache so far can be considered out-of-date, and the new updates to the cache records should
 	// overwrite the old ones.
 	currentCycle atomic.Uint64
+
+	// atomicAdjustMutex is a mutex used to ensure that the init-and-adjust operation is atomic.
+	// The init-and-adjust operation is used to initialize a record in the cache and then update it.
+	// The init-and-adjust operation is used when the record does not exist in the cache and needs to be initialized.
+	// The current implementation is not thread-safe, and the mutex is used to ensure that the init-and-adjust operation is atomic, otherwise
+	// more than one thread may try to initialize records at the same time and cause an LRU eviction, hence trying an adjust on a record that does not exist,
+	// which will result in an error.
+	// TODO: implement a thread-safe atomic adjust operation and remove the mutex.
+	atomicAdjustMutex sync.Mutex
 }
 
 // NewSubscriptionRecordCache creates a new subscription cache with the given size limit.
@@ -99,6 +109,10 @@ func (s *SubscriptionRecordCache) MoveToNextUpdateCycle() uint64 {
 // - error: an error if the update failed; any returned error is an irrecoverable error and indicates a bug or misconfiguration.
 // Implementation must be thread-safe.
 func (s *SubscriptionRecordCache) AddTopicForPeer(pid peer.ID, topic string) ([]string, error) {
+	// ensuring atomic init-and-adjust operation.
+	s.atomicAdjustMutex.Lock()
+	defer s.atomicAdjustMutex.Unlock()
+
 	// first, we try to optimistically adjust the record assuming that the record already exists.
 	entityId := flow.MakeID(pid)
 	topics, err := s.addTopicForPeer(entityId, topic)
