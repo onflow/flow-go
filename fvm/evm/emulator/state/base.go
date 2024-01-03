@@ -465,8 +465,8 @@ func (v *BaseView) getSlotCollection(addr gethCommon.Address) (*Collection, erro
 		v.slots[addr] = col
 		// update account's collection ID
 		acc.CollectionID = col.CollectionID()
-		v.storeAccount(acc)
-		return col, nil
+		err = v.storeAccount(acc)
+		return col, err
 	}
 	col, found := v.slots[acc.Address]
 	if !found {
