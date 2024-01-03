@@ -387,21 +387,13 @@ func (v *BaseView) getCode(addr gethCommon.Address) ([]byte, error) {
 	if found {
 		return code, nil
 	}
-	// check if account exist and has codeHash
-	acc, err := v.getAccount(addr)
-	if err != nil {
-		return nil, err
-	}
-	// if no account found return
-	if acc == nil {
-		return nil, nil
-	}
-	// check account has code
-	if !acc.HasCode() {
+	// check if account exist in cache and has codeHash
+	acc, found := v.cachedAccounts[addr]
+	if found && !acc.HasCode() {
 		return nil, nil
 	}
 	// then collect it from the code collection
-	code, err = v.codes.Get(addr.Bytes())
+	code, err := v.codes.Get(addr.Bytes())
 	if err != nil {
 		return nil, err
 	}
