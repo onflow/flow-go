@@ -163,6 +163,11 @@ func (g *GossipSubDuplicateMessageTrackerCache) decayAdjustment(counter Duplicat
 	if err != nil {
 		return counter, fmt.Errorf("could not recordDecay duplicate message counter gauge: %w", err)
 	}
+
+	if decayedVal > received {
+		return counter, fmt.Errorf("unexpected recordDecay value %f for duplicate message counter gauge %f", decayedVal, received)
+	}
+
 	counter.Value = decayedVal
 	return counter, nil
 }
