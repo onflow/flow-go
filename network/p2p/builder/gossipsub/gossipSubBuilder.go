@@ -160,17 +160,21 @@ func NewGossipSubBuilder(logger zerolog.Logger,
 		Logger()
 
 	meshTracerCfg := &tracer.GossipSubMeshTracerConfig{
-		Logger:                             lg,
-		Metrics:                            metricsCfg.Metrics,
-		IDProvider:                         idProvider,
-		LoggerInterval:                     gossipSubCfg.RpcTracer.LocalMeshLogInterval,
-		RpcSentTrackerCacheSize:            gossipSubCfg.RpcTracer.RPCSentTrackerCacheSize,
-		RpcSentTrackerWorkerQueueCacheSize: gossipSubCfg.RpcTracer.RPCSentTrackerQueueCacheSize,
-		RpcSentTrackerNumOfWorkers:         gossipSubCfg.RpcTracer.RpcSentTrackerNumOfWorkers,
-		DuplicateMessageTrackerCacheSize:   gossipSubCfg.RpcTracer.DuplicateMessageTrackerConfig.CacheSize,
-		DuplicateMessageTrackerGaugeDecay:  gossipSubCfg.RpcTracer.DuplicateMessageTrackerConfig.Decay,
-		HeroCacheMetricsFactory:            metricsCfg.HeroCacheFactory,
-		NetworkingType:                     networkType,
+		Logger:         lg,
+		Metrics:        metricsCfg.Metrics,
+		IDProvider:     idProvider,
+		LoggerInterval: gossipSubCfg.RpcTracer.LocalMeshLogInterval,
+		RpcSentTracker: tracer.RpcSentTrackerConfig{
+			CacheSize:            gossipSubCfg.RpcTracer.RPCSentTrackerCacheSize,
+			WorkerQueueCacheSize: gossipSubCfg.RpcTracer.RPCSentTrackerQueueCacheSize,
+			WorkerQueueNumber:    gossipSubCfg.RpcTracer.RpcSentTrackerNumOfWorkers,
+		},
+		DuplicateMessageTracker: tracer.DuplicateMessageTrackerCacheConfig{
+			CacheSize: gossipSubCfg.RpcTracer.DuplicateMessageTrackerConfig.CacheSize,
+			Decay:     gossipSubCfg.RpcTracer.DuplicateMessageTrackerConfig.Decay,
+		},
+		HeroCacheMetricsFactory: metricsCfg.HeroCacheFactory,
+		NetworkingType:          networkType,
 	}
 	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
 

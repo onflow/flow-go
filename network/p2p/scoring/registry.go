@@ -336,7 +336,7 @@ func (r *GossipSubAppSpecificScoreRegistry) computeAppSpecificScore(pid peer.ID)
 		lg = lg.With().Float64("duplicate_messages_penalty", duplicateMessagesPenalty).Logger()
 		appSpecificScore += duplicateMessagesPenalty
 	}
-	
+
 	// (5) staking reward: for staked peers, a default positive reward is applied only if the peer has no penalty on spamming and subscription.
 	if stakingScore > 0 && appSpecificScore == float64(0) {
 		lg = lg.With().Float64("staking_reward", stakingScore).Logger()
@@ -346,7 +346,6 @@ func (r *GossipSubAppSpecificScoreRegistry) computeAppSpecificScore(pid peer.ID)
 	lg.Trace().
 		Float64("total_app_specific_score", appSpecificScore).
 		Msg("application specific score computed")
-
 	return appSpecificScore
 }
 
@@ -417,11 +416,13 @@ func (r *GossipSubAppSpecificScoreRegistry) subscriptionPenalty(pid peer.ID, flo
 	return 0
 }
 
-// duplicateMessagesPenalty returns the duplicate message penalty for a peer.
+// duplicateMessagesPenalty returns the duplicate message penalty for a peer. A penalty is only returned if the duplicate
+// message count for a peer exceeds the DefaultDuplicateMessageThreshold. A penalty is applied for the amount of duplicate
+// messages above the DefaultDuplicateMessageThreshold.
 func (r *GossipSubAppSpecificScoreRegistry) duplicateMessagesPenalty(pid peer.ID) float64 {
 	duplicateMessageCount := r.getDuplicateMessageCount(pid)
-	if duplicateMessageCount != 0 {
-		duplicateMessagePenalty := duplicateMessageCount * DefaultDuplicateMessagePenalty
+	if duplicateMessageCount > DefaultDuplicateMessageThreshold {
+		duplicateMessagePenalty := (duplicateMessageCount - DefaultDuplicateMessageThreshold) * DefaultDuplicateMessagePenalty
 		if duplicateMessagePenalty < MaxAppSpecificPenalty {
 			return MaxAppSpecificPenalty
 		}

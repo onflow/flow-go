@@ -57,6 +57,9 @@ const (
 	// penalty is multiplied by the current duplicate message count for a peer before it is applied to the application specific score.
 	DefaultDuplicateMessagePenalty = -10e-4
 
+	// DefaultDuplicateMessageThreshold the threshold at which the duplicate message count for a peer will result in the peer being penalized.
+	DefaultDuplicateMessageThreshold = 10e+4
+
 	// DefaultGossipThreshold when a peer's penalty drops below this threshold,
 	// no gossip is emitted towards that peer and gossip from that peer is ignored.
 	//
