@@ -197,7 +197,7 @@ network-config:
   # returned for all nodes will be 0, and any invalid control message notifications
   # will be ignored. This configuration allows nodes to stabilize and initialize before
   # applying penalties or processing invalid control message notifications.
-  gossipsub-scoring-registry-startup-silence-duration: 20m
+  gossipsub-scoring-registry-startup-silence-duration: 1h
   # Threshold level for penalty. At each evaluation period, when a node's penalty is below this value, the decay rate slows down, ensuring longer decay periods for malicious nodes and quicker decay for honest ones.
   gossipsub-app-specific-penalty-decay-slowdown-threshold: -99
   # This setting adjusts the decay rate when a node's penalty falls below the threshold. The decay rate, ranging between 0 and 1, dictates how quickly penalties decrease: a higher rate results in slower decay. The decay calculation is multiplicative (newPenalty = decayRate * oldPenalty). The reduction factor increases the decay rate, thus decelerating the penalty reduction. For instance, with a 0.01 reduction factor, the decay rate increases by 0.01 at each evaluation interval when the penalty is below the threshold. Consequently, a decay rate of `x` diminishes the penalty to zero more rapidly than a rate of `x+0.01`.
