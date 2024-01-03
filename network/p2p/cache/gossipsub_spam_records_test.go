@@ -444,28 +444,48 @@ func TestGossipSubSpamRecordCache_Get_Without_Preprocessors(t *testing.T) {
 	require.Equal(t, 0.5, cachedRecord.Decay)
 }
 
-// // TestGossipSubSpamRecordCache_Duplicate_Add_Sequential tests if the cache returns false when a duplicate record is added to the cache.
-// // This test evaluates that the cache de-duplicates the records based on their peer id and not content, and hence
-// // each peer id can only be added once to the cache.
-// func TestGossipSubSpamRecordCache_Duplicate_Add_Sequential(t *testing.T) {
-// 	cache := netcache.NewGossipSubSpamRecordCache(10, unittest.Logger(), metrics.NewNoopCollector())
-//
-// 	record := p2p.GossipSubSpamRecord{
-// 		Decay:   0.5,
-// 		Penalty: 1,
-// 	}
-// 	added := cache.Add("peerA", record)
-// 	assert.True(t, added)
-//
-// 	// verifies that the cache returns false when a duplicate record is added.
-// 	added = cache.Add("peerA", record)
-// 	assert.False(t, added)
-//
-// 	// verifies that the cache deduplicates the records based on their peer id and not content.
-// 	record.Penalty = 2
-// 	added = cache.Add("peerA", record)
-// 	assert.False(t, added)
-// }
+// TestGossipSubSpamRecordCache_Duplicate_Add_Sequential tests if the cache returns false when a duplicate record is added to the cache.
+// This test evaluates that the cache de-duplicates the records based on their peer id and not content, and hence
+// each peer id can only be added once to the cache.
+func TestGossipSubSpamRecordCache_Duplicate_Adjust_Sequential(t *testing.T) {
+	cache := netcache.NewGossipSubSpamRecordCache(10, unittest.Logger(), metrics.NewNoopCollector(), func() p2p.GossipSubSpamRecord {
+		return p2p.GossipSubSpamRecord{
+			Decay:               0,
+			Penalty:             0,
+			LastDecayAdjustment: time.Now(),
+		}
+	})
+
+	peerId := unittest.PeerIdFixture(t)
+	adjustedRecord, err := cache.Adjust(peerId, func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
+		record.Penalty = 1
+		record.Decay = 0.5
+		return record
+	})
+	require.NoError(t, err)
+	require.Equal(t, 1.0, adjustedRecord.Penalty)
+	require.Equal(t, 0.5, adjustedRecord.Decay)
+
+	// duplicate adjust should return the same record.
+	adjustedRecord, err = cache.Adjust(peerId, func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
+		record.Penalty = 1
+		record.Decay = 0.5
+		return record
+	})
+	require.NoError(t, err)
+	require.Equal(t, 1.0, adjustedRecord.Penalty)
+	require.Equal(t, 0.5, adjustedRecord.Decay)
+
+	// verifies that the cache deduplicates the records based on their peer id and not content.
+	adjustedRecord, err = cache.Adjust(peerId, func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
+		record.Penalty = 3
+		record.Decay = 2
+		return record
+	})
+	require.NoError(t, err)
+	require.Equal(t, 3.0, adjustedRecord.Penalty)
+	require.Equal(t, 2.0, adjustedRecord.Decay)
+}
 
 // // TestGossipSubSpamRecordCache_Duplicate_Add_Concurrent tests if the cache returns false when a duplicate record is added to the cache.
 // // Test is the concurrent version of TestAppScoreCache_DuplicateAdd_Sequential.
