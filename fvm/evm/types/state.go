@@ -8,7 +8,7 @@ import (
 	gethVM "github.com/ethereum/go-ethereum/core/vm"
 )
 
-// StateDB is acts as the main interface to the EVM runtime
+// StateDB acts as the main interface to the EVM runtime
 type StateDB interface {
 	gethVM.StateDB
 
@@ -71,7 +71,7 @@ type HotView interface {
 	AddBalance(gethCommon.Address, *big.Int) error
 	// SetNonce sets the nonce for the given address
 	SetNonce(gethCommon.Address, uint64) error
-	// SetNonce sets the code for the given address
+	// SetCode sets the code for the given address
 	SetCode(gethCommon.Address, []byte) error
 
 	// SetState sets a value for the given slot in the main storage

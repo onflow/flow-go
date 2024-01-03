@@ -3,6 +3,7 @@ package state
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"math"
 	"runtime"
@@ -104,18 +105,12 @@ func (c *Collection) CollectionID() []byte {
 //
 // if key doesn't exist it returns nil (no error)
 func (c *Collection) Get(key []byte) ([]byte, error) {
-	// first check if we have the key
-	// this avoids getting a NotFound error
-	found, err := c.omap.Has(compare, hashInputProvider, NewByteStringValue(key))
-	if err != nil {
-		return nil, err
-	}
-	if !found {
-		return nil, nil
-	}
-
 	data, err := c.omap.Get(compare, hashInputProvider, NewByteStringValue(key))
 	if err != nil {
+		var keyNotFoundError *atree.KeyNotFoundError
+		if errors.As(err, &keyNotFoundError) {
+			return nil, nil
+		}
 		return nil, err
 	}
 
@@ -150,16 +145,12 @@ func (c *Collection) Set(key, value []byte) error {
 //
 // if the key doesn't exist it return no error
 func (c *Collection) Remove(key []byte) error {
-	found, err := c.omap.Has(compare, hashInputProvider, NewByteStringValue(key))
-	if err != nil {
-		return err
-	}
-	if !found {
-		return nil
-	}
-
 	_, existingValueStorable, err := c.omap.Remove(compare, hashInputProvider, NewByteStringValue(key))
 	if err != nil {
+		var keyNotFoundError *atree.KeyNotFoundError
+		if errors.As(err, &keyNotFoundError) {
+			return nil
+		}
 		return err
 	}
 
@@ -215,30 +206,29 @@ func (v ByteStringValue) StoredValue(_ atree.SlabStorage) (atree.Value, error) {
 }
 
 func (v ByteStringValue) Storable(storage atree.SlabStorage, address atree.Address, maxInlineSize uint64) (atree.Storable, error) {
-	if uint64(v.ByteSize()) > maxInlineSize {
-
-		// Create StorableSlab
-		id, err := storage.GenerateStorageID(address)
-		if err != nil {
-			return nil, err
-		}
-
-		slab := &atree.StorableSlab{
-			StorageID: id,
-			Storable:  v,
-		}
-
-		// Store StorableSlab in storage
-		err = storage.Store(id, slab)
-		if err != nil {
-			return nil, err
-		}
-
-		// Return storage id as storable
-		return atree.StorageIDStorable(id), nil
+	if uint64(v.ByteSize()) <= maxInlineSize {
+		return v, nil
 	}
 
-	return v, nil
+	// Create StorableSlab
+	id, err := storage.GenerateStorageID(address)
+	if err != nil {
+		return nil, err
+	}
+
+	slab := &atree.StorableSlab{
+		StorageID: id,
+		Storable:  v,
+	}
+
+	// Store StorableSlab in storage
+	err = storage.Store(id, slab)
+	if err != nil {
+		return nil, err
+	}
+
+	// Return storage id as storable
+	return atree.StorageIDStorable(id), nil
 }
 
 func (v ByteStringValue) Encode(enc *atree.Encoder) error {
@@ -416,6 +406,7 @@ func decodeTypeInfo(dec *cbor.StreamDecoder) (atree.TypeInfo, error) {
 			return nil, err
 		}
 		return emptyTypeInfo{}, nil
+	default:
 	}
 
 	return nil, fmt.Errorf("not supported type info")

@@ -13,9 +13,9 @@ import (
 )
 
 const (
-	// the path where we store the collection ID for accounts
+	// AccountsStorageIDKey is the path where we store the collection ID for accounts
 	AccountsStorageIDKey = "AccountsStorageIDKey"
-	// the path where we store the collection ID for codes
+	// CodesStorageIDKey is the path where we store the collection ID for codes
 	CodesStorageIDKey = "CodesStorageIDKey"
 )
 
@@ -150,7 +150,7 @@ func (v *BaseView) GetCodeSize(addr gethCommon.Address) (int, error) {
 	return len(code), err
 }
 
-// GetState returns values for an slot in the main storage
+// GetState returns values for a slot in the main storage
 //
 // for non-existent slots it returns the default empty hash value (gethTypes.EmptyCodeHash)
 func (v *BaseView) GetState(sk types.SlotAddress) (gethCommon.Hash, error) {
