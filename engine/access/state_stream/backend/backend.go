@@ -66,6 +66,7 @@ type GetStartHeightFunc func(flow.Identifier, uint64) (uint64, error)
 type StateStreamBackend struct {
 	ExecutionDataBackend
 	EventsBackend
+	AccountStatusesBackend
 
 	log                  zerolog.Logger
 	state                protocol.State
@@ -135,6 +136,16 @@ func New(
 	}
 
 	b.EventsBackend = EventsBackend{
+		log:              logger,
+		broadcaster:      broadcaster,
+		sendTimeout:      config.ClientSendTimeout,
+		responseLimit:    config.ResponseLimit,
+		sendBufferSize:   int(config.ClientSendBufferSize),
+		getExecutionData: b.getExecutionData,
+		getStartHeight:   b.getStartHeight,
+	}
+
+	b.AccountStatusesBackend = AccountStatusesBackend{
 		log:              logger,
 		broadcaster:      broadcaster,
 		sendTimeout:      config.ClientSendTimeout,

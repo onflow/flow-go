@@ -216,7 +216,7 @@ func (h *Handler) GetRegisterValues(_ context.Context, request *executiondata.Ge
 	return &executiondata.GetRegisterValuesResponse{Values: values}, nil
 }
 
-func (h *Handler) SubscribeAccountStatuses(request *executiondata.SubscribeAccountStatusesRequest, stream executiondata.ExecutionDataAPI_SubscribeEventsServer) error {
+func (h *Handler) SubscribeAccountStatuses(request *executiondata.SubscribeAccountStatusesRequest, stream executiondata.ExecutionDataAPI_SubscribeAccountStatusesServer) error {
 	// check if the maximum number of streams is reached
 	if h.streamCount.Load() >= h.maxStreams {
 		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
@@ -234,16 +234,12 @@ func (h *Handler) SubscribeAccountStatuses(request *executiondata.SubscribeAccou
 	}
 
 	filter := state_stream.StatusFilter{}
-	filter := state_stream.EventFilter{}+
 	if request.GetFilter() != nil {
 		var err error
 		reqFilter := request.GetFilter()
-		filter, err = state_stream.NewEventFilter(
-			h.eventFilterConfig,
-			h.chain,
+
+		filter, err = state_stream.NewStatusFilter(
 			reqFilter.GetEventType(),
-			reqFilter.GetAddress(),
-			reqFilter.GetContract(),
 		)
 		if err != nil {
 			return status.Errorf(codes.InvalidArgument, "invalid event filter: %v", err)
@@ -290,10 +286,15 @@ func (h *Handler) SubscribeAccountStatuses(request *executiondata.SubscribeAccou
 			return status.Errorf(codes.Internal, "could not convert events to entity: %v", err)
 		}
 
-		err = stream.Send(&executiondata.SubscribeEventsResponse{
-			BlockHeight: resp.Height,
-			BlockId:     convert.IdentifierToMessage(resp.BlockID),
-			Events:      events,
+		// REMOVE
+		if len(events) != 0 {
+			blocksSinceLastMessage = 0
+		}
+
+		err = stream.Send(&executiondata.SubscribeAccountStatusesResponse{
+			BlockId: convert.IdentifierToMessage(resp.BlockID),
+			Address: convert.IdentifierToMessage(resp.BlockID),
+			Status:  string("dsf"),
 		})
 		if err != nil {
 			return rpc.ConvertError(err, "could not send response", codes.Internal)

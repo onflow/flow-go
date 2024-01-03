@@ -356,4 +356,4 @@ replace github.com/onflow/flow-go => ../
 
 replace github.com/onflow/flow-go/insecure => ../insecure
 
-replace github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20231213135419-ae911cc351a2 => github.com/AndriiDiachuk/flow/protobuf/go/flow v0.0.0-20231221144755-1a86ee3c7953
+replace github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20231213135419-ae911cc351a2 => github.com/AndriiDiachuk/flow/protobuf/go/flow v0.0.0-20231228142107-7dec94d88278
