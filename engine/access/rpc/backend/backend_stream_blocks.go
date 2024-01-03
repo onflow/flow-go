@@ -43,8 +43,8 @@ func (b *backendSubscribeBlocks) SubscribeBlocks(ctx context.Context, startBlock
 }
 
 func (b *backendSubscribeBlocks) getResponse(blockStatus flow.BlockStatus) subscription.GetDataByHeightFunc {
-	return func(ctx context.Context, height uint64) (interface{}, error) {
-		block, err := b.getBlock(ctx, height, blockStatus)
+	return func(_ context.Context, height uint64) (interface{}, error) {
+		block, err := b.getBlock(height, blockStatus)
 		if err != nil {
 			return nil, fmt.Errorf("could not get block by height %d: %w", height, err)
 		}
@@ -61,7 +61,7 @@ func (b *backendSubscribeBlocks) getResponse(blockStatus flow.BlockStatus) subsc
 // getBlock returns the block for the given block height.
 // Expected errors during normal operation:
 // - storage.ErrNotFound or execution_data.BlobNotFoundError: block for the given block height is not available.
-func (b *backendSubscribeBlocks) getBlock(ctx context.Context, height uint64, expectedBlockStatus flow.BlockStatus) (*flow.Block, error) {
+func (b *backendSubscribeBlocks) getBlock(height uint64, expectedBlockStatus flow.BlockStatus) (*flow.Block, error) {
 	highestHeight, err := b.getHighestHeight(expectedBlockStatus)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "could not get block by height: %v", err)

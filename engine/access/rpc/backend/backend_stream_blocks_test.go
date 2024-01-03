@@ -7,11 +7,12 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/mock"
-
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine"
 	access "github.com/onflow/flow-go/engine/access/mock"
@@ -108,8 +109,6 @@ func (s *BackendBlocksSuite) SetupTest() {
 	parent := s.rootBlock.Header
 	s.blockMap[s.rootBlock.Header.Height] = &s.rootBlock
 
-	s.T().Logf("Generating %d blocks, root block: %d %s", blockCount, s.rootBlock.Header.Height, s.rootBlock.ID())
-
 	for i := 0; i < blockCount; i++ {
 		block := unittest.BlockWithParentFixture(parent)
 		// update for next iteration
@@ -200,7 +199,7 @@ func (s *BackendBlocksSuite) SetupTest() {
 		},
 	).Maybe()
 
-	s.snapshot.On("Head").Return(s.rootBlock.Header, nil).Maybe()
+	s.snapshot.On("Head").Return(s.rootBlock.Header, nil).Once()
 	s.state.On("Final").Return(s.snapshot, nil).Maybe()
 	s.state.On("Sealed").Return(s.snapshot, nil).Maybe()
 
@@ -244,11 +243,12 @@ func (s *BackendBlocksSuite) TestSubscribeBlocks() {
 	defer cancel()
 
 	type testType struct {
-		name            string
-		highestBackfill int
-		startBlockID    flow.Identifier
-		startHeight     uint64
-		blockStatus     flow.BlockStatus
+		name              string
+		highestBackfill   int
+		startBlockID      flow.Identifier
+		startHeight       uint64
+		blockStatus       flow.BlockStatus
+		fullBlockResponse bool
 	}
 
 	baseTests := []testType{
@@ -292,15 +292,10 @@ func (s *BackendBlocksSuite) TestSubscribeBlocks() {
 		t1.blockStatus = flow.BlockStatusFinalized
 		tests = append(tests, t1)
 
-		//t2 := test
-		//t2.name = fmt.Sprintf("%s - sealed blocks", test.name)
-		//t2.blockStatus = flow.BlockStatusSealed
-		//tests = append(tests, t2)
-
-		//t3 := test
-		//t3.name = fmt.Sprintf("%s - all types", test.name)
-		//t2.blockStatus = flow.BlockStatusUnknown
-		//tests = append(tests, t3)
+		t2 := test
+		t2.name = fmt.Sprintf("%s - sealed blocks", test.name)
+		t2.blockStatus = flow.BlockStatusSealed
+		tests = append(tests, t2)
 	}
 
 	for _, test := range tests {
@@ -308,10 +303,11 @@ func (s *BackendBlocksSuite) TestSubscribeBlocks() {
 			// add "backfill" block - blocks that are already in the database before the test starts
 			// this simulates a subscription on a past block
 			if test.highestBackfill > 0 {
-				s.backend.SetFinalizedHighestHeight(s.blocksArray[test.highestBackfill].Header.Height)
-				// simulates last sealed block
-				if test.blockStatus == flow.BlockStatusSealed {
+				if test.blockStatus == flow.BlockStatusFinalized {
+					s.backend.SetFinalizedHighestHeight(s.blocksArray[test.highestBackfill].Header.Height)
+				} else {
 					s.snapshot.On("Head").Return(s.blocksArray[test.highestBackfill].Header, nil)
+					s.backend.SetSealedHighestHeight(s.blocksArray[test.highestBackfill].Header.Height)
 				}
 			}
 
@@ -325,8 +321,10 @@ func (s *BackendBlocksSuite) TestSubscribeBlocks() {
 				// simulate new block received.
 				// all blocks with index <= highestBackfill were already received
 				if int(i) > test.highestBackfill {
-					s.backend.SetFinalizedHighestHeight(b.Header.Height)
-					if test.blockStatus == flow.BlockStatusSealed {
+					if test.blockStatus == flow.BlockStatusFinalized {
+						s.backend.SetFinalizedHighestHeight(b.Header.Height)
+					} else {
+						s.backend.SetSealedHighestHeight(b.Header.Height)
 						s.snapshot.On("Head").Return(b.Header, nil)
 					}
 					s.broadcaster.Publish()
@@ -364,4 +362,49 @@ func (s *BackendBlocksSuite) TestSubscribeBlocks() {
 			}, 100*time.Millisecond, "timed out waiting for subscription to shutdown")
 		})
 	}
+}
+
+func (s *BackendBlocksSuite) TestSubscribeBlocksHandlesErrors() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	s.Run("returns error for unknown block status", func() {
+		subCtx, subCancel := context.WithCancel(ctx)
+		defer subCancel()
+
+		sub := s.backend.SubscribeBlocks(subCtx, s.backend.BlocksWatcher.RootBlockID, 0, flow.BlockStatusUnknown)
+		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected InvalidArgument, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
+	})
+
+	s.Run("returns error if both start blockID and start height are provided", func() {
+		subCtx, subCancel := context.WithCancel(ctx)
+		defer subCancel()
+
+		sub := s.backend.SubscribeBlocks(subCtx, unittest.IdentifierFixture(), 1, flow.BlockStatusFinalized)
+		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()))
+	})
+
+	s.Run("returns error for start height before root height", func() {
+		subCtx, subCancel := context.WithCancel(ctx)
+		defer subCancel()
+
+		sub := s.backend.SubscribeBlocks(subCtx, flow.ZeroID, s.backend.BlocksWatcher.RootHeight-1, flow.BlockStatusFinalized)
+		assert.Equal(s.T(), codes.InvalidArgument, status.Code(sub.Err()), "expected InvalidArgument, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
+	})
+
+	s.Run("returns error for unindexed start blockID", func() {
+		subCtx, subCancel := context.WithCancel(ctx)
+		defer subCancel()
+
+		sub := s.backend.SubscribeBlocks(subCtx, unittest.IdentifierFixture(), 0, flow.BlockStatusFinalized)
+		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()), "expected NotFound, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
+	})
+
+	s.Run("returns error for unindexed start height", func() {
+		subCtx, subCancel := context.WithCancel(ctx)
+		defer subCancel()
+
+		sub := s.backend.SubscribeBlocks(subCtx, flow.ZeroID, s.blocksArray[len(s.blocksArray)-1].Header.Height+10, flow.BlockStatusFinalized)
+		assert.Equal(s.T(), codes.NotFound, status.Code(sub.Err()), "expected NotFound, got %v: %v", status.Code(sub.Err()).String(), sub.Err())
+	})
 }
