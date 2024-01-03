@@ -114,7 +114,11 @@ func TestGossipSubDuplicateMessageTrackerCache_DecayAdjustment(t *testing.T) {
 	count, err = cache.Inc(peerID)
 	require.NoError(t, err)
 	require.Equal(t, 1.0, count)
-
+	require.Eventually(t, func() bool {
+		count, err = cache.Get(peerID)
+		require.NoError(t, err)
+		return count > 0 && count < 0.6
+	}, 10*time.Second, 100*time.Millisecond)
 	require.Eventually(t, func() bool {
 		count, err = cache.Get(peerID)
 		require.NoError(t, err)
