@@ -441,6 +441,10 @@ func (v *BaseView) storeSlot(sk types.SlotAddress, data gethCommon.Hash) error {
 		return err
 	}
 	v.cachedSlots[sk] = data
+	emptyValue := gethCommon.Hash{}
+	if data == emptyValue {
+		return col.Remove(sk.Key.Bytes())
+	}
 	return col.Set(sk.Key.Bytes(), data.Bytes())
 }
 
