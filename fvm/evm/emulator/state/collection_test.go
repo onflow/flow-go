@@ -52,8 +52,10 @@ func TestCollection(t *testing.T) {
 	require.Equal(t, value2, ret)
 
 	// destroy
-	err = c1.Destroy()
+	keys, err := c1.Destroy()
 	require.NoError(t, err)
+	require.Len(t, keys, 1)
+	require.Equal(t, key2, keys[0])
 
 	_, err = cp.CollectionByID(c1.CollectionID())
 	require.Error(t, err)

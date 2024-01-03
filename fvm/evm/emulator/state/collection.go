@@ -51,6 +51,11 @@ func (cp *CollectionProvider) CollectionByID(collectionID []byte) (*Collection, 
 	if err != nil {
 		return nil, err
 	}
+	// sanity check the storage ID address
+	if storageID.Address != cp.rootAddr {
+		return nil, fmt.Errorf("root address mismatch %x != %x", storageID.Address, cp.rootAddr)
+	}
+
 	omap, err := atree.NewMapWithRootID(cp.storage, storageID, atree.NewDefaultDigesterBuilder())
 	if err != nil {
 		return nil, err
@@ -165,23 +170,31 @@ func (c *Collection) Remove(key []byte) error {
 }
 
 // Destroy destroys the whole collection
-func (c *Collection) Destroy() error {
+func (c *Collection) Destroy() ([][]byte, error) {
 	var cachedErr error
-	err := c.omap.PopIterate(func(_ atree.Storable, valueStorable atree.Storable) {
+	keys := make([][]byte, c.omap.Count())
+	i := 0
+	err := c.omap.PopIterate(func(keyStorable atree.Storable, valueStorable atree.Storable) {
 		if id, ok := valueStorable.(atree.StorageIDStorable); ok {
 			err := c.storage.Remove(atree.StorageID(id))
 			if err != nil && cachedErr == nil {
 				cachedErr = err
 			}
 		}
+		key, err := keyStorable.StoredValue(c.omap.Storage)
+		if err != nil && cachedErr == nil {
+			cachedErr = err
+		}
+		keys[i] = key.(ByteStringValue).Bytes()
+		i++
 	})
 	if cachedErr != nil {
-		return cachedErr
+		return keys, cachedErr
 	}
 	if err != nil {
-		return err
+		return keys, err
 	}
-	return c.storage.Remove(c.omap.StorageID())
+	return keys, c.storage.Remove(c.omap.StorageID())
 }
 
 type ByteStringValue struct {

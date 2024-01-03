@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/common"
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/onflow/atree"
@@ -295,9 +296,18 @@ func (v *BaseView) DeleteAccount(addr gethCommon.Address) error {
 			}
 		}
 		// delete all slots related to this account (eip-6780)
-		err = col.Destroy()
+		keys, err := col.Destroy()
 		if err != nil {
 			return err
+		}
+
+		delete(v.slots, addr)
+
+		for _, key := range keys {
+			delete(v.cachedSlots, types.SlotAddress{
+				Address: addr,
+				Key:     common.BytesToHash(key),
+			})
 		}
 	}
 	return nil
