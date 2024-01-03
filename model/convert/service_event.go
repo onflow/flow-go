@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/assignment"
-	"github.com/onflow/flow-go/model/flow/order"
 )
 
 // ServiceEvent converts a service event encoded as the generic flow.Event
@@ -631,7 +630,7 @@ func convertParticipants(cdcParticipants []cadence.Value) (flow.IdentityList, er
 		participants = append(participants, identity)
 	}
 
-	participants = participants.Sort(order.Canonical)
+	participants = participants.Sort(flow.Canonical)
 	return participants, nil
 }
 

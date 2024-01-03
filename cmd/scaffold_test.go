@@ -28,7 +28,7 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/profiler"
-	"github.com/onflow/flow-go/network/p2p/p2pbuilder"
+	p2pbuilder "github.com/onflow/flow-go/network/p2p/builder"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
