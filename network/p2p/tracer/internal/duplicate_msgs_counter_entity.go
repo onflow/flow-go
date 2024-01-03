@@ -11,15 +11,15 @@ import (
 type DuplicateMessagesCounterEntity struct {
 	// ID the entity ID.
 	Id flow.Identifier
-	// Gauge the number of duplicate messages.
-	Gauge       float64
+	// Value the number of duplicate messages.
+	Value       float64
 	lastUpdated time.Time
 }
 
 func NewDuplicateMessagesCounter(id flow.Identifier) DuplicateMessagesCounterEntity {
 	return DuplicateMessagesCounterEntity{
 		Id:          id,
-		Gauge:       0.0,
+		Value:       0.0,
 		lastUpdated: time.Now(),
 	}
 }

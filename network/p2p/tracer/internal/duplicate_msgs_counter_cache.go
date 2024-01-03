@@ -94,7 +94,7 @@ func (g *GossipSubDuplicateMessageTrackerCache) Get(peerID peer.ID) (float64, er
 		return 0, fmt.Errorf("could not decay cache record for peer %s", p2plogging.PeerId(peerID)), false
 	}
 	record := duplicateMessagesCounter(adjustedEntity)
-	return record.Gauge, nil, true
+	return record.Value, nil, true
 }
 
 // Inc increments the number of duplicate messages detected for the peer. This func is used in conjunction with the GossipSubMeshTracer and is invoked
@@ -135,13 +135,13 @@ func (g *GossipSubDuplicateMessageTrackerCache) Inc(peerID peer.ID) (float64, er
 		}
 	}
 
-	return adjustedEntity.(DuplicateMessagesCounterEntity).Gauge, nil
+	return adjustedEntity.(DuplicateMessagesCounterEntity).Value, nil
 }
 
 // incrementAdjustment performs a cache adjustment that increments the guage for the DuplicateMessagesCounterEntity
 func (g *GossipSubDuplicateMessageTrackerCache) incrementAdjustment(entity flow.Entity) flow.Entity {
 	record := duplicateMessagesCounter(entity)
-	record.Gauge++
+	record.Value++
 	record.lastUpdated = time.Now()
 	// Return the adjusted record.
 	return record
@@ -149,13 +149,13 @@ func (g *GossipSubDuplicateMessageTrackerCache) incrementAdjustment(entity flow.
 
 // decayAdjustment performs geometric recordDecay on the duplicate message counter gauge of a peer. This ensures a peer is not penalized forever.
 func (g *GossipSubDuplicateMessageTrackerCache) decayAdjustment(counter DuplicateMessagesCounterEntity) (DuplicateMessagesCounterEntity, error) {
-	received := counter.Gauge
+	received := counter.Value
 	if received == 0 {
 		return counter, nil
 	}
 
 	if received < skipDecayThreshold {
-		counter.Gauge = 0
+		counter.Value = 0
 		return counter, nil
 	}
 
@@ -163,6 +163,6 @@ func (g *GossipSubDuplicateMessageTrackerCache) decayAdjustment(counter Duplicat
 	if err != nil {
 		return counter, fmt.Errorf("could not recordDecay duplicate message counter gauge: %w", err)
 	}
-	counter.Gauge = decayedVal
+	counter.Value = decayedVal
 	return counter, nil
 }
