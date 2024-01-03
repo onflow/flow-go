@@ -92,14 +92,15 @@ func extractExecutionState(
 			log,
 			nWorker,
 			[]migrators.AccountBasedMigration{
-				// do account usage migration before and after as a sanity check.
-				&migrators.AccountUsageMigrator{},
 				cadenceDataValidation.PreMigration(),
 				migrators.NewAtreeRegisterMigrator(
 					rwf,
 				),
 				&migrators.DeduplicateContractNamesMigration{},
 				cadenceDataValidation.PostMigration(),
+
+				// This will fix storage used discrepancies caused by the
+				// DeduplicateContractNamesMigration.
 				&migrators.AccountUsageMigrator{},
 			}),
 	}
