@@ -329,44 +329,8 @@ func TestTransfers(t *testing.T) {
 	})
 }
 
-// TODO: fix me
-// func TestDatabaseErrorHandling(t *testing.T) {
-
-// 	t.Run("test non-fatal db error handling", func(t *testing.T) {
-// 		db := &testutils.TestDatabase{
-// 			GetRootHashFunc: func() (gethCommon.Hash, error) {
-// 				return gethTypes.EmptyRootHash, types.NewDatabaseError(fmt.Errorf("some non-fatal error"))
-// 			},
-// 		}
-
-// 		RunWithNewEmulator(t, backend, rootAddr, func(em *emulator.Emulator) {
-// 			RunWithNewBlockView(t, em, func(blk types.BlockView) {
-// 				_, err := blk.DirectCall(types.NewDepositCall(types.EmptyAddress, big.NewInt(1)))
-// 				require.Error(t, err)
-// 				require.True(t, types.IsADatabaseError(err))
-// 			})
-// 		})
-// 	})
-
-// 	t.Run("test fatal db error handling", func(t *testing.T) {
-// 		db := &testutils.TestDatabase{
-// 			GetRootHashFunc: func() (gethCommon.Hash, error) {
-// 				return gethTypes.EmptyRootHash, types.NewFatalError(fmt.Errorf("some non-fatal error"))
-// 			},
-// 		}
-
-// 		RunWithNewEmulator(t, db, func(em *emulator.Emulator) {
-// 			RunWithNewBlockView(t, em, func(blk types.BlockView) {
-// 				_, err := blk.DirectCall(types.NewDepositCall(types.EmptyAddress, big.NewInt(1)))
-// 				require.Error(t, err)
-// 				require.True(t, types.IsAFatalError(err))
-// 			})
-// 		})
-// 	})
-// }
-
 func TestStorageNoSideEffect(t *testing.T) {
-	t.Skip("we need to fix this issue  ")
+	// TODO fix me
 
 	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(flowEVMRoot flow.Address) {
