@@ -53,6 +53,13 @@ func newMigratorRuntime(
 		runtime.NewCoverageReport(),
 	)
 
+	ri.GetOrLoadProgramFunc = func(
+		location runtime.Location,
+		load func() (*interpreter.Program, error),
+	) (*interpreter.Program, error) {
+		return load()
+	}
+
 	inter, err := interpreter.NewInterpreter(
 		nil,
 		nil,
