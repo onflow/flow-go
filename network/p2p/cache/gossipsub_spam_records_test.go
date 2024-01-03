@@ -345,65 +345,76 @@ func TestGossipSubSpamRecordCache_Get_With_Preprocessors(t *testing.T) {
 	require.Equal(t, 0.5, cachedRecord.Decay)   // decay should not be modified
 }
 
-// // TestGossipSubSpamRecordCache_Get_Preprocessor_Error tests if the cache returns an error if one of the preprocessors returns an error upon a Get.
-// // It adds a record to the cache and then checks if the cache returns an error upon a Get if one of the preprocessors returns an error.
-// // It also checks if a preprocessor is failed, the subsequent preprocessors are not called, and the original record is returned.
-// // In other words, the Get method acts atomically on the record for applying the preprocessors. If one of the preprocessors
-// // fails, the record is returned without applying the subsequent preprocessors.
-// func TestGossipSubSpamRecordCache_Get_Preprocessor_Error(t *testing.T) {
-// 	secondPreprocessorCalledCount := 0
-// 	thirdPreprocessorCalledCount := 0
-//
-// 	cache := netcache.NewGossipSubSpamRecordCache(10, unittest.Logger(), metrics.NewNoopCollector(),
-// 		// first preprocessor: adds 1 to the penalty.
-// 		func(record p2p.GossipSubSpamRecord, lastUpdated time.Time) (p2p.GossipSubSpamRecord, error) {
-// 			record.Penalty++
-// 			return record, nil
-// 		},
-// 		// second preprocessor: multiplies the penalty by 2 (this preprocessor returns an error on the second call)
-// 		func(record p2p.GossipSubSpamRecord, lastUpdated time.Time) (p2p.GossipSubSpamRecord, error) {
-// 			secondPreprocessorCalledCount++
-// 			if secondPreprocessorCalledCount < 2 {
-// 				// on the first call, the preprocessor is successful
-// 				return record, nil
-// 			} else {
-// 				// on the second call, the preprocessor returns an error
-// 				return p2p.GossipSubSpamRecord{}, fmt.Errorf("error in preprocessor")
-// 			}
-// 		},
-// 		// since second preprocessor returns an error on the second call, the third preprocessor should not be called more than once..
-// 		func(record p2p.GossipSubSpamRecord, lastUpdated time.Time) (p2p.GossipSubSpamRecord, error) {
-// 			thirdPreprocessorCalledCount++
-// 			require.Less(t, secondPreprocessorCalledCount, 2)
-// 			return record, nil
-// 		},
-// 	)
-//
-// 	record := p2p.GossipSubSpamRecord{
-// 		Decay:   0.5,
-// 		Penalty: 1,
-// 	}
-// 	added := cache.Add("peerA", record)
-// 	assert.True(t, added)
-//
-// 	// verifies that the preprocessors were called and the penalty was updated accordingly.
-// 	cachedRecord, err, ok := cache.Get("peerA")
-// 	require.NoError(t, err)
-// 	assert.True(t, ok)
-// 	assert.Equal(t, 2.0, cachedRecord.Penalty) // penalty should be updated by the first preprocessor (1 + 1 = 2)
-// 	assert.Equal(t, 0.5, cachedRecord.Decay)
-//
-// 	// query the cache again that should trigger the second preprocessor to return an error.
-// 	cachedRecord, err, ok = cache.Get("peerA")
-// 	require.Error(t, err)
-// 	assert.False(t, ok)
-// 	assert.Nil(t, cachedRecord)
-//
-// 	// verifies that the third preprocessor was not called.
-// 	assert.Equal(t, 1, thirdPreprocessorCalledCount)
-// 	// verifies that the second preprocessor was called only twice (one success, and one failure).
-// 	assert.Equal(t, 2, secondPreprocessorCalledCount)
-// }
+// TestGossipSubSpamRecordCache_Get_Preprocessor_Error tests if the cache returns an error if one of the preprocessors returns an error upon a Get.
+// It adds a record to the cache and then checks if the cache returns an error upon a Get if one of the preprocessors returns an error.
+// It also checks if a preprocessor is failed, the subsequent preprocessors are not called, and the original record is returned.
+// In other words, the Get method acts atomically on the record for applying the preprocessors. If one of the preprocessors
+// fails, the record is returned without applying the subsequent preprocessors.
+func TestGossipSubSpamRecordCache_Get_Preprocessor_Error(t *testing.T) {
+	secondPreprocessorCalledCount := 0
+	thirdPreprocessorCalledCount := 0
+
+	cache := netcache.NewGossipSubSpamRecordCache(10, unittest.Logger(), metrics.NewNoopCollector(),
+		func() p2p.GossipSubSpamRecord {
+			return p2p.GossipSubSpamRecord{
+				Decay:               0,
+				Penalty:             0,
+				LastDecayAdjustment: time.Now(),
+			}
+		},
+		// first preprocessor: adds 1 to the penalty.
+		func(record p2p.GossipSubSpamRecord, lastUpdated time.Time) (p2p.GossipSubSpamRecord, error) {
+			record.Penalty++
+			return record, nil
+		},
+		// second preprocessor: multiplies the penalty by 2 (this preprocessor returns an error on the third call and forward)
+		func(record p2p.GossipSubSpamRecord, lastUpdated time.Time) (p2p.GossipSubSpamRecord, error) {
+			secondPreprocessorCalledCount++
+			if secondPreprocessorCalledCount < 3 {
+				// on the first call, the preprocessor is successful
+				return record, nil
+			} else {
+				// on the second call, the preprocessor returns an error
+				return p2p.GossipSubSpamRecord{}, fmt.Errorf("error in preprocessor")
+			}
+		},
+		// since second preprocessor returns an error on the second call, the third preprocessor should not be called more than once.
+		func(record p2p.GossipSubSpamRecord, lastUpdated time.Time) (p2p.GossipSubSpamRecord, error) {
+			thirdPreprocessorCalledCount++
+			require.Less(t, secondPreprocessorCalledCount, 3)
+			return record, nil
+		},
+	)
+
+	peerId := unittest.PeerIdFixture(t)
+	adjustedRecord, err := cache.Adjust(peerId, func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
+		record.Penalty = 1
+		record.Decay = 0.5
+		return record
+	})
+	require.NoError(t, err)
+	require.Equal(t, 1.0, adjustedRecord.Penalty)
+	require.Equal(t, 0.5, adjustedRecord.Decay)
+
+	// verifies that the preprocessors were called and the penalty was updated accordingly.
+	cachedRecord, err, ok := cache.Get(peerId)
+	require.NoError(t, err)
+	require.True(t, ok)
+	require.Equal(t, 2.0, cachedRecord.Penalty) // penalty should be updated by the first preprocessor (1 + 1 = 2)
+	require.Equal(t, 0.5, cachedRecord.Decay)
+
+	// query the cache again that should trigger the second preprocessor to return an error.
+	cachedRecord, err, ok = cache.Get(peerId)
+	require.Error(t, err)
+	require.False(t, ok)
+	require.Nil(t, cachedRecord)
+
+	// verifies that the third preprocessor was called only twice (two success calls).
+	require.Equal(t, 2, thirdPreprocessorCalledCount)
+	// verifies that the second preprocessor was called three times (two success calls and one failure call).
+	require.Equal(t, 3, secondPreprocessorCalledCount)
+}
+
 //
 // // TestGossipSubSpamRecordCache_Get_Without_Preprocessors tests when no preprocessors are provided to the cache constructor
 // // that the cache returns the original record without any modifications.
