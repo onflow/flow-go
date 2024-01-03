@@ -117,7 +117,6 @@ func (s *ConsensusFollowerSuite) TestReceiveBlocks() {
 func (s *ConsensusFollowerSuite) buildNetworkConfig() {
 
 	// staked access node
-	unittest.IdentityFixture()
 	s.stakedID = unittest.IdentifierFixture()
 	stakedConfig := testnet.NewNodeConfig(
 		flow.RoleAccess,
