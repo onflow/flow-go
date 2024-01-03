@@ -278,7 +278,6 @@ func (r *GossipSubAppSpecificScoreRegistry) AppSpecificScoreFunc() func(peer.ID)
 			lg.Trace().
 				Bool("worker_submitted", submitted).
 				Msg("application specific score not found in cache, submitting worker to update it")
-
 			return 0 // in the mean time, return 0, which is a neutral score.
 		case time.Since(lastUpdated) > r.scoreTTL:
 			// record found in the cache, but expired; submit a worker to update it.
@@ -288,14 +287,12 @@ func (r *GossipSubAppSpecificScoreRegistry) AppSpecificScoreFunc() func(peer.ID)
 				Float64("app_specific_score", appSpecificScore).
 				Dur("score_ttl", r.scoreTTL).
 				Msg("application specific score expired, submitting worker to update it")
-
 			return appSpecificScore // in the mean time, return the expired score.
 		default:
 			// record found in the cache.
 			r.logger.Trace().
 				Float64("app_specific_score", appSpecificScore).
 				Msg("application specific score found in cache")
-
 			return appSpecificScore
 		}
 	}

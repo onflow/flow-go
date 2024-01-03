@@ -868,18 +868,20 @@ func TestScoringRegistrySilencePeriod(t *testing.T) {
 
 	cfg, err := config.DefaultConfig()
 	require.NoError(t, err)
-	// we set the scoring registry silence duration 10 seconds
-	// the peer is not expected to be penalized for the first 5 seconds of the test
-	// after that an invalid control message notification is processed and the peer
-	// should be penalized
-	cfg.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryStartupSilenceDuration = silenceDuration
-	
+	// refresh cached app-specific score every 100 milliseconds to speed up the test.
+	cfg.NetworkConfig.GossipSub.ScoringParameters.AppSpecificScore.ScoreTTL = 100 * time.Millisecond
 	reg, spamRecords, _ := newGossipSubAppSpecificScoreRegistry(t,
 		cfg.NetworkConfig.GossipSub.ScoringParameters,
-		withStakedIdentities(peerID),
-		withValidSubscriptions(peerID), func(config *scoring.GossipSubAppSpecificScoreRegistryConfig) {
+		withUnknownIdentity(peerID),
+		withInvalidSubscriptions(peerID),
+		func(cfg *scoring.GossipSubAppSpecificScoreRegistryConfig) {
+			// we set the scoring registry silence duration 10 seconds
+			// the peer is not expected to be penalized for the first 5 seconds of the test
+			// after that an invalid control message notification is processed and the peer
+			// should be penalized
+			cfg.ScoringRegistryStartupSilenceDuration = silenceDuration
 			// hooked logger will capture the number of logs related to ignored notifications
-			config.Logger = logger
+			cfg.Logger = logger
 		})
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -909,12 +911,13 @@ func TestScoringRegistrySilencePeriod(t *testing.T) {
 		// initially, the app specific score should be the default invalid subscription penalty.
 		require.Equal(t, float64(0), reg.AppSpecificScoreFunc()(peerID))
 	}
-	// sleep for one second to ensure silence period is over
-	time.Sleep(time.Second)
-	// we expect to have logged a debug message for all notifications ignored.
-	require.Equal(t, int32(expectedNumOfSilencedNotif), silencedNotificationLogs.Load())
-	// after silence period the invalid subscription penalty should be applied to the app specific score
-	require.Equal(t, scoring.DefaultInvalidSubscriptionPenalty, reg.AppSpecificScoreFunc()(peerID))
+
+	require.Eventually(t, func() bool {
+		// we expect to have logged a debug message for all notifications ignored.
+		require.Equal(t, int32(expectedNumOfSilencedNotif), silencedNotificationLogs.Load())
+		// after silence period the invalid subscription penalty should be applied to the app specific score
+		return scoring.DefaultInvalidSubscriptionPenalty == reg.AppSpecificScoreFunc()(peerID)
+	}, 2*time.Second, 200*time.Millisecond)
 
 	// after silence period the peer has spam record as well as an unknown identity. Hence, the app specific score should be the spam penalty
 	// and the staking penalty.
@@ -929,8 +932,13 @@ func TestScoringRegistrySilencePeriod(t *testing.T) {
 	expectedPenalty := penaltyValueFixtures().Graft
 	assert.Less(t, math.Abs(expectedPenalty-record.Penalty), 10e-3)
 	assert.Equal(t, scoring.InitAppScoreRecordState().Decay, record.Decay) // decay should be initialized to the initial state.
-	score := reg.AppSpecificScoreFunc()(peerID)
-	assert.Less(t, math.Abs(expectedPenalty+scoring.DefaultInvalidSubscriptionPenalty-score), 10e-3)
+
+	require.Eventually(t, func() bool {
+		// we expect to have logged a debug message for all notifications ignored.
+		require.Equal(t, int32(expectedNumOfSilencedNotif), silencedNotificationLogs.Load())
+		// after silence period the invalid subscription penalty should be applied to the app specific score
+		return scoring.DefaultInvalidSubscriptionPenalty+expectedPenalty-reg.AppSpecificScoreFunc()(peerID) < 0.1
+	}, 2*time.Second, 200*time.Millisecond)
 }
 
 // withStakedIdentities returns a function that sets the identity provider to return staked identities for the given peer ids.
