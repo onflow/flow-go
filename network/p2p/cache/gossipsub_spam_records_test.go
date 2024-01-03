@@ -196,52 +196,67 @@ func TestGossipSubSpamRecordCache_Adjust_With_Preprocess(t *testing.T) {
 	require.Equal(t, 0.1, record.Decay)   // checks if the decay is not changed.
 }
 
-// // TestGossipSubSpamRecordCache_Update_Preprocess_Error tests the Update method of the GossipSubSpamRecordCache.
-// // It tests if any of the preprocessor functions returns an error, the update function effect
-// // is reverted, and the error is returned.
-// func TestGossipSubSpamRecordCache_Update_Preprocess_Error(t *testing.T) {
-// 	secondPreprocessorCalled := false
-// 	cache := netcache.NewGossipSubSpamRecordCache(200,
-// 		unittest.Logger(),
-// 		metrics.NewNoopCollector(),
-// 		// the first preprocessor function does not return an error.
-// 		func(record p2p.GossipSubSpamRecord, lastUpdated time.Time) (p2p.GossipSubSpamRecord, error) {
-// 			return record, nil
-// 		},
-// 		// the second preprocessor function returns an error on the first call and nil on the second call onwards.
-// 		func(record p2p.GossipSubSpamRecord, lastUpdated time.Time) (p2p.GossipSubSpamRecord, error) {
-// 			if !secondPreprocessorCalled {
-// 				secondPreprocessorCalled = true
-// 				return record, fmt.Errorf("error")
-// 			}
-// 			return record, nil
-// 		})
-//
-// 	peerID := "peer1"
-// 	// adds a record to the cache.
-// 	require.True(t, cache.Add(peer.ID(peerID), p2p.GossipSubSpamRecord{
-// 		Decay:   0.1,
-// 		Penalty: 0.5,
-// 	}))
-//
-// 	// tests updating the penalty of an existing record.
-// 	record, err := cache.Adjust(peer.ID(peerID), func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
-// 		record.Penalty = 0.7
-// 		return record
-// 	})
-// 	// since the second preprocessor function returns an error, the update function effect should be reverted.
-// 	// the error should be returned.
-// 	require.Error(t, err)
-// 	require.Nil(t, record)
-//
-// 	// checks if the record is not changed.
-// 	record, err, found := cache.Get(peer.ID(peerID))
-// 	require.True(t, found)
-// 	require.NoError(t, err)
-// 	require.Equal(t, 0.5, record.Penalty) // checks if the penalty is not changed.
-// 	require.Equal(t, 0.1, record.Decay)   // checks if the decay is not changed.
-// }
-//
+// TestGossipSubSpamRecordCache_Adjust_Preprocess_Error tests the Adjust method of the GossipSubSpamRecordCache.
+// It tests if any of the preprocessor functions returns an error, the Adjust function effect
+// is reverted, and the error is returned.
+func TestGossipSubSpamRecordCache_Adjust_Preprocess_Error(t *testing.T) {
+	secondPreprocessorCalled := 0
+	cache := netcache.NewGossipSubSpamRecordCache(200,
+		unittest.Logger(),
+		metrics.NewNoopCollector(),
+		func() p2p.GossipSubSpamRecord {
+			return p2p.GossipSubSpamRecord{
+				Decay:               0,
+				Penalty:             0,
+				LastDecayAdjustment: time.Now(),
+			}
+		},
+		// the first preprocessor function does not return an error.
+		func(record p2p.GossipSubSpamRecord, lastUpdated time.Time) (p2p.GossipSubSpamRecord, error) {
+			return record, nil
+		},
+		// the second preprocessor function returns an error on the second call, and does not return an error on any other call.
+		// this means that adjustment should be successful on the first call, and should fail on the second call.
+		func(record p2p.GossipSubSpamRecord, lastUpdated time.Time) (p2p.GossipSubSpamRecord, error) {
+			secondPreprocessorCalled++
+			if secondPreprocessorCalled == 2 {
+				return record, fmt.Errorf("some error")
+			}
+			return record, nil
+
+		})
+
+	peerID := unittest.PeerIdFixture(t)
+
+	// tests adjusting the penalty of a non-existing record; the record should be initiated and the penalty should be updated.
+	record, err := cache.Adjust(peerID, func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
+		record.Penalty = 0.5
+		record.Decay = 0.1
+		return record
+	})
+	require.NoError(t, err)
+	require.NotNil(t, record)
+	require.Equal(t, 0.5, record.Penalty) // checks if the penalty is not changed.
+	require.Equal(t, 0.1, record.Decay)   // checks if the decay is not changed.
+
+	// tests adjusting the penalty of an existing record.
+	record, err = cache.Adjust(peerID, func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
+		record.Penalty = 0.7
+		return record
+	})
+	// since the second preprocessor function returns an error, the update function effect should be reverted.
+	// the error should be returned.
+	require.Error(t, err)
+	require.Nil(t, record)
+
+	// checks if the record is not changed.
+	record, err, found := cache.Get(peerID)
+	require.True(t, found)
+	require.NoError(t, err)
+	require.Equal(t, 0.5, record.Penalty) // checks if the penalty is not changed.
+	require.Equal(t, 0.1, record.Decay)   // checks if the decay is not changed.
+}
+
 // // TestGossipSubSpamRecordCache_ByValue tests if the cache stores the GossipSubSpamRecord by value.
 // // It updates the cache with a record and then modifies the record externally.
 // // It then checks if the record in the cache is still the original record.

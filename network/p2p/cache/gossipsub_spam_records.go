@@ -99,7 +99,7 @@ func NewGossipSubSpamRecordCache(sizeLimit uint32,
 // Note that a record is added successfully if the cache has enough space to store the record and no record exists for the peer in the cache.
 // In other words, the entries are deduplicated by the peer ID.
 func (a *GossipSubSpamRecordCache) init(peerId peer.ID) bool {
-	entityId := flow.MakeID(peerId) // HeroCache uses hash of peer.ID as the unique identifier of the record.
+	entityId := entityIdOf(peerId)
 	return a.c.Add(gossipsubSpamRecordEntity{
 		entityId:            entityId,
 		peerID:              peerId,
@@ -118,8 +118,7 @@ func (a *GossipSubSpamRecordCache) init(peerId peer.ID) bool {
 // - error on failure to update the record. The returned error is irrecoverable and indicates an exception.
 // Note that if any of the pre-processing functions returns an error, the record is reverted to its original state (prior to applying the update function).
 func (a *GossipSubSpamRecordCache) Adjust(peerID peer.ID, updateFn p2p.UpdateFunction) (*p2p.GossipSubSpamRecord, error) {
-	// HeroCache uses flow.Identifier for keys, so reformat of the peer.ID
-	entityId := flow.MakeID(peerID)
+	entityId := entityIdOf(peerID)
 
 	var err error
 	optimisticAdjustFunc := func() (flow.Entity, bool) {
@@ -161,6 +160,9 @@ func (a *GossipSubSpamRecordCache) Adjust(peerID peer.ID, updateFn p2p.UpdateFun
 		// as the record is initialized, the adjust attempt should not return an error, and any returned error
 		// is an irrecoverable error and indicates a bug.
 		adjustedEntity, adjusted = optimisticAdjustFunc()
+		if err != nil {
+			return nil, fmt.Errorf("could not update spam records for peer %s, error: %w", peerID.String(), err)
+		}
 		if !adjusted {
 			return nil, fmt.Errorf("could not update spam records for peer %s; pre-processing errors (if-any) %w", peerID.String(), err)
 		}
@@ -176,7 +178,7 @@ func (a *GossipSubSpamRecordCache) Adjust(peerID peer.ID, updateFn p2p.UpdateFun
 // Returns:
 // - true if the gossipsub spam record of the peer is found in the cache, false otherwise.
 func (a *GossipSubSpamRecordCache) Has(peerID peer.ID) bool {
-	entityId := flow.HashToID([]byte(peerID)) // HeroCache uses hash of peer.ID as the unique identifier of the record.
+	entityId := entityIdOf(peerID)
 	return a.c.Has(entityId)
 }
 
@@ -191,7 +193,7 @@ func (a *GossipSubSpamRecordCache) Has(peerID peer.ID) bool {
 //     the caller is advised to crash the node.
 //   - true if the record is found in the cache, false otherwise.
 func (a *GossipSubSpamRecordCache) Get(peerID peer.ID) (*p2p.GossipSubSpamRecord, error, bool) {
-	entityId := flow.MakeID(peerID) // HeroCache uses hash of peer.ID as the unique identifier of the record.
+	entityId := entityIdOf(peerID)
 	if !a.c.Has(entityId) {
 		return nil, nil, false
 	}
@@ -252,4 +254,15 @@ func (a gossipsubSpamRecordEntity) ID() flow.Identifier {
 // HeroCache does not use the checksum of the gossipsubSpamRecordEntity.
 func (a gossipsubSpamRecordEntity) Checksum() flow.Identifier {
 	return a.entityId
+}
+
+// entityIdOf converts a peer ID to a flow ID by taking the hash of the peer ID.
+// This is used to convert the peer ID in a notion that is compatible with HeroCache.
+// This is not a protocol-level conversion, and is only used internally by the cache, MUST NOT be exposed outside the cache.
+// Args:
+// - peerId: the peer ID of the peer in the GossipSub protocol.
+// Returns:
+// - flow.Identifier: the flow ID of the peer.
+func entityIdOf(peerId peer.ID) flow.Identifier {
+	return flow.MakeID(peerId)
 }
