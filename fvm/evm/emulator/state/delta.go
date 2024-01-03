@@ -55,20 +55,20 @@ func NewDeltaView(parent types.ReadOnlyView) *DeltaView {
 	return &DeltaView{
 		parent: parent,
 
-		dirtyAddresses:      make(map[gethCommon.Address]interface{}, 0),
-		created:             make(map[gethCommon.Address]interface{}, 0),
-		suicided:            make(map[gethCommon.Address]interface{}, 0),
-		balances:            make(map[gethCommon.Address]*big.Int, 0),
-		nonces:              make(map[gethCommon.Address]uint64, 0),
-		codes:               make(map[gethCommon.Address][]byte, 0),
-		codeHashes:          make(map[gethCommon.Address]gethCommon.Hash, 0),
-		dirtySlots:          make(map[types.SlotAddress]interface{}, 0),
-		states:              make(map[types.SlotAddress]gethCommon.Hash, 0),
-		transient:           make(map[types.SlotAddress]gethCommon.Hash, 0),
-		accessListAddresses: make(map[gethCommon.Address]interface{}, 0),
-		accessListSlots:     make(map[types.SlotAddress]interface{}, 0),
+		dirtyAddresses:      make(map[gethCommon.Address]interface{}),
+		created:             make(map[gethCommon.Address]interface{}),
+		suicided:            make(map[gethCommon.Address]interface{}),
+		balances:            make(map[gethCommon.Address]*big.Int),
+		nonces:              make(map[gethCommon.Address]uint64),
+		codes:               make(map[gethCommon.Address][]byte),
+		codeHashes:          make(map[gethCommon.Address]gethCommon.Hash),
+		dirtySlots:          make(map[types.SlotAddress]interface{}),
+		states:              make(map[types.SlotAddress]gethCommon.Hash),
+		transient:           make(map[types.SlotAddress]gethCommon.Hash),
+		accessListAddresses: make(map[gethCommon.Address]interface{}),
+		accessListSlots:     make(map[types.SlotAddress]interface{}),
 		logs:                make([]*gethTypes.Log, 0),
-		preimages:           make(map[gethCommon.Hash][]byte, 0),
+		preimages:           make(map[gethCommon.Hash][]byte),
 
 		// for refund we just copy the data
 		refund: parent.GetRefund(),
@@ -280,7 +280,7 @@ func (d *DeltaView) SetCode(addr gethCommon.Address, code []byte) error {
 	return nil
 }
 
-// GetTransientState returns the value of the slot of the main state
+// GetState returns the value of the slot of the main state
 func (d *DeltaView) GetState(sk types.SlotAddress) (gethCommon.Hash, error) {
 	val, found := d.states[sk]
 	if found {
@@ -315,7 +315,7 @@ func (d *DeltaView) GetTransientState(sk types.SlotAddress) gethCommon.Hash {
 	return d.parent.GetTransientState(sk)
 }
 
-// SetState adds sets a value for the given slot of the transient storage
+// SetTransientState adds sets a value for the given slot of the transient storage
 func (d *DeltaView) SetTransientState(sk types.SlotAddress, value gethCommon.Hash) {
 	d.transient[sk] = value
 }
