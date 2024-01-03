@@ -111,15 +111,12 @@ func (d *DeltaView) CreateAccount(addr gethCommon.Address) error {
 		if err != nil {
 			return err
 		}
+		d.AddBalance(addr, bal)
 	}
 
 	d.created[addr] = struct{}{}
 	// flag the address as dirty
 	d.dirtyAddresses[addr] = struct{}{}
-
-	if exist {
-		d.AddBalance(addr, bal)
-	}
 
 	// if has already suicided
 	if d.HasSuicided(addr) {
