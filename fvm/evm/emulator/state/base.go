@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/common"
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/onflow/atree"
@@ -13,9 +14,9 @@ import (
 )
 
 const (
-	// the path where we store the collection ID for accounts
+	// AccountsStorageIDKey is the path where we store the collection ID for accounts
 	AccountsStorageIDKey = "AccountsStorageIDKey"
-	// the path where we store the collection ID for codes
+	// CodesStorageIDKey is the path where we store the collection ID for codes
 	CodesStorageIDKey = "CodesStorageIDKey"
 )
 
@@ -150,7 +151,7 @@ func (v *BaseView) GetCodeSize(addr gethCommon.Address) (int, error) {
 	return len(code), err
 }
 
-// GetState returns values for an slot in the main storage
+// GetState returns values for a slot in the main storage
 //
 // for non-existent slots it returns the default empty hash value (gethTypes.EmptyCodeHash)
 func (v *BaseView) GetState(sk types.SlotAddress) (gethCommon.Hash, error) {
@@ -208,13 +209,6 @@ func (v *BaseView) CreateAccount(
 		if err != nil {
 			return err
 		}
-
-		// create a new collection for slots
-		col, err := v.collectionProvider.NewCollection()
-		if err != nil {
-			return err
-		}
-		colID = col.CollectionID()
 	}
 
 	// create a new account and store it
@@ -295,9 +289,18 @@ func (v *BaseView) DeleteAccount(addr gethCommon.Address) error {
 			}
 		}
 		// delete all slots related to this account (eip-6780)
-		err = col.Destroy()
+		keys, err := col.Destroy()
 		if err != nil {
 			return err
+		}
+
+		delete(v.slots, addr)
+
+		for _, key := range keys {
+			delete(v.cachedSlots, types.SlotAddress{
+				Address: addr,
+				Key:     common.BytesToHash(key),
+			})
 		}
 	}
 	return nil
@@ -387,21 +390,13 @@ func (v *BaseView) getCode(addr gethCommon.Address) ([]byte, error) {
 	if found {
 		return code, nil
 	}
-	// check if account exist and has codeHash
-	acc, err := v.getAccount(addr)
-	if err != nil {
-		return nil, err
-	}
-	// if no account found return
-	if acc == nil {
-		return nil, nil
-	}
-	// check account has code
-	if !acc.HasCode() {
+	// check if account exist in cache and has codeHash
+	acc, found := v.cachedAccounts[addr]
+	if found && !acc.HasCode() {
 		return nil, nil
 	}
 	// then collect it from the code collection
-	code, err = v.codes.Get(addr.Bytes())
+	code, err := v.codes.Get(addr.Bytes())
 	if err != nil {
 		return nil, err
 	}
@@ -457,8 +452,21 @@ func (v *BaseView) getSlotCollection(addr gethCommon.Address) (*Collection, erro
 	if acc == nil {
 		return nil, fmt.Errorf("slot belongs to a non-existing account")
 	}
-	if len(acc.CollectionID) == 0 {
+	if !acc.HasCode() {
 		return nil, fmt.Errorf("slot belongs to a non-smart contract account")
+	}
+	if len(acc.CollectionID) == 0 {
+		// create a new collection for slots
+		col, err := v.collectionProvider.NewCollection()
+		if err != nil {
+			return nil, err
+		}
+		// cache collection
+		v.slots[addr] = col
+		// update account's collection ID
+		acc.CollectionID = col.CollectionID()
+		err = v.storeAccount(acc)
+		return col, err
 	}
 	col, found := v.slots[acc.Address]
 	if !found {
@@ -468,5 +476,5 @@ func (v *BaseView) getSlotCollection(addr gethCommon.Address) (*Collection, erro
 		}
 		v.slots[acc.Address] = col
 	}
-	return col, err
+	return col, nil
 }
