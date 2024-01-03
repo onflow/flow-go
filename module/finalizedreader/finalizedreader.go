@@ -32,12 +32,12 @@ func (r *FinalizedReader) FinalizedBlockIDAtHeight(height uint64) (flow.Identifi
 		return flow.ZeroID, fmt.Errorf("height not finalized (%v): %w", height, storage.ErrNotFound)
 	}
 
-	header, err := r.headers.ByHeight(height)
+	finalizedID, err := r.headers.BlockIDByHeight(height)
 	if err != nil {
 		return flow.ZeroID, err
 	}
 
-	return header.ID(), nil
+	return finalizedID, nil
 }
 
 // BlockFinalized implements the protocol.Consumer interface, which allows FinalizedReader

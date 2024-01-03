@@ -66,14 +66,12 @@ func (b *backendAccounts) GetAccountAtBlockHeight(
 	address flow.Address,
 	height uint64,
 ) (*flow.Account, error) {
-	header, err := b.headers.ByHeight(height)
+	blockID, err := b.headers.BlockIDByHeight(height)
 	if err != nil {
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	blockID := header.ID()
-
-	account, err := b.getAccountAtBlock(ctx, address, blockID, header.Height)
+	account, err := b.getAccountAtBlock(ctx, address, blockID, height)
 	if err != nil {
 		b.log.Debug().Err(err).Msgf("failed to get account at height: %d", height)
 		return nil, err
