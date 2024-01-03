@@ -415,27 +415,35 @@ func TestGossipSubSpamRecordCache_Get_Preprocessor_Error(t *testing.T) {
 	require.Equal(t, 3, secondPreprocessorCalledCount)
 }
 
-//
-// // TestGossipSubSpamRecordCache_Get_Without_Preprocessors tests when no preprocessors are provided to the cache constructor
-// // that the cache returns the original record without any modifications.
-// func TestGossipSubSpamRecordCache_Get_Without_Preprocessors(t *testing.T) {
-// 	cache := netcache.NewGossipSubSpamRecordCache(10, unittest.Logger(), metrics.NewNoopCollector())
-//
-// 	record := p2p.GossipSubSpamRecord{
-// 		Decay:   0.5,
-// 		Penalty: 1,
-// 	}
-// 	added := cache.Add("peerA", record)
-// 	assert.True(t, added)
-//
-// 	// verifies that no preprocessors were called and the record was not updated.
-// 	cachedRecord, err, ok := cache.Get("peerA")
-// 	assert.NoError(t, err)
-// 	assert.True(t, ok)
-// 	assert.Equal(t, 1.0, cachedRecord.Penalty)
-// 	assert.Equal(t, 0.5, cachedRecord.Decay)
-// }
-//
+// TestGossipSubSpamRecordCache_Get_Without_Preprocessors tests when no preprocessors are provided to the cache constructor
+// that the cache returns the original record without any modifications.
+func TestGossipSubSpamRecordCache_Get_Without_Preprocessors(t *testing.T) {
+	cache := netcache.NewGossipSubSpamRecordCache(10, unittest.Logger(), metrics.NewNoopCollector(), func() p2p.GossipSubSpamRecord {
+		return p2p.GossipSubSpamRecord{
+			Decay:               0,
+			Penalty:             0,
+			LastDecayAdjustment: time.Now(),
+		}
+	})
+
+	peerId := unittest.PeerIdFixture(t)
+	adjustedRecord, err := cache.Adjust(peerId, func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
+		record.Penalty = 1
+		record.Decay = 0.5
+		return record
+	})
+	require.NoError(t, err)
+	require.Equal(t, 1.0, adjustedRecord.Penalty)
+	require.Equal(t, 0.5, adjustedRecord.Decay)
+
+	// verifies that no preprocessors were called and the record was not updated.
+	cachedRecord, err, ok := cache.Get(peerId)
+	require.NoError(t, err)
+	require.True(t, ok)
+	require.Equal(t, 1.0, cachedRecord.Penalty)
+	require.Equal(t, 0.5, cachedRecord.Decay)
+}
+
 // // TestGossipSubSpamRecordCache_Duplicate_Add_Sequential tests if the cache returns false when a duplicate record is added to the cache.
 // // This test evaluates that the cache de-duplicates the records based on their peer id and not content, and hence
 // // each peer id can only be added once to the cache.
@@ -458,7 +466,7 @@ func TestGossipSubSpamRecordCache_Get_Preprocessor_Error(t *testing.T) {
 // 	added = cache.Add("peerA", record)
 // 	assert.False(t, added)
 // }
-//
+
 // // TestGossipSubSpamRecordCache_Duplicate_Add_Concurrent tests if the cache returns false when a duplicate record is added to the cache.
 // // Test is the concurrent version of TestAppScoreCache_DuplicateAdd_Sequential.
 // func TestGossipSubSpamRecordCache_Duplicate_Add_Concurrent(t *testing.T) {
