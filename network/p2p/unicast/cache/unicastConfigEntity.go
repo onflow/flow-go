@@ -11,18 +11,15 @@ import (
 // It implements the flow.Entity interface.
 type UnicastConfigEntity struct {
 	unicast.Config
-	PeerId peer.ID         // remote peer id; used as the "key" in the unicast config cache.
-	id     flow.Identifier // cache the id for fast lookup (HeroCache).
+	PeerId   peer.ID         // remote peer id; used as the "key" in the unicast config cache.
+	EntityId flow.Identifier // cache the id for fast lookup (HeroCache).
 }
 
 var _ flow.Entity = (*UnicastConfigEntity)(nil)
 
 // ID returns the ID of the unicast config entity; it is hash value of the peer id.
 func (d UnicastConfigEntity) ID() flow.Identifier {
-	if d.id == flow.ZeroID {
-		d.id = entityIdOf(d.PeerId)
-	}
-	return d.id
+	return d.EntityId
 }
 
 // Checksum acts the same as ID.

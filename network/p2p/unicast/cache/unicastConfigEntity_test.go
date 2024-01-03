@@ -21,6 +21,7 @@ func TestUnicastConfigEntity(t *testing.T) {
 			StreamCreationRetryAttemptBudget: 20,
 			ConsecutiveSuccessfulStream:      30,
 		},
+		EntityId: flow.MakeID(peerID),
 	}
 
 	t.Run(
@@ -37,9 +38,11 @@ func TestUnicastConfigEntity(t *testing.T) {
 	)
 
 	t.Run("ID is only calculated from peer.ID", func(t *testing.T) {
+		peerId := unittest.PeerIdFixture(t)
 		d2 := &unicastcache.UnicastConfigEntity{
-			PeerId: unittest.PeerIdFixture(t),
-			Config: d.Config,
+			PeerId:   peerId,
+			Config:   d.Config,
+			EntityId: flow.MakeID(peerId),
 		}
 		require.NotEqual(t, d.ID(), d2.ID()) // different peer id, different id.
 
@@ -48,6 +51,7 @@ func TestUnicastConfigEntity(t *testing.T) {
 			Config: unicast.Config{
 				StreamCreationRetryAttemptBudget: 200,
 			},
+			EntityId: d.EntityId,
 		}
 		require.Equal(t, d.ID(), d3.ID()) // same peer id, same id, even though the unicast config is different.
 	})

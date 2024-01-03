@@ -144,6 +144,10 @@ func (a *GossipSubSpamRecordCache) Adjust(peerID peer.ID, updateFn p2p.UpdateFun
 		})
 	}
 
+	// ensuring that the init-and-adjust operation is atomic.
+	a.atomicAdjustMutex.Lock()
+	defer a.atomicAdjustMutex.Unlock()
+
 	// first, we try to optimistically adjust the record assuming that the record already exists.
 	adjustedEntity, adjusted := optimisticAdjustFunc()
 	if err != nil {
@@ -151,10 +155,6 @@ func (a *GossipSubSpamRecordCache) Adjust(peerID peer.ID, updateFn p2p.UpdateFun
 	}
 	// if the record does not exist, we initialize the record and try to adjust it again.
 	if !adjusted {
-		// ensuring that the init-and-adjust operation is atomic.
-		a.atomicAdjustMutex.Lock()
-		defer a.atomicAdjustMutex.Unlock()
-
 		a.init(peerID)
 		// as the record is initialized, the adjust attempt should not return an error, and any returned error
 		// is an irrecoverable error and indicates a bug.
@@ -192,13 +192,13 @@ func (a *GossipSubSpamRecordCache) Has(peerID peer.ID) bool {
 //     the caller is advised to crash the node.
 //   - true if the record is found in the cache, false otherwise.
 func (a *GossipSubSpamRecordCache) Get(peerID peer.ID) (*p2p.GossipSubSpamRecord, error, bool) {
+	a.atomicAdjustMutex.Lock()
+	defer a.atomicAdjustMutex.Unlock()
+
 	entityId := entityIdOf(peerID)
 	if !a.c.Has(entityId) {
 		return nil, nil, false
 	}
-
-	a.atomicAdjustMutex.Lock()
-	defer a.atomicAdjustMutex.Unlock()
 
 	var err error
 	record, updated := a.c.Adjust(entityId, func(entry flow.Entity) flow.Entity {
