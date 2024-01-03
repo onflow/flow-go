@@ -76,7 +76,8 @@ func (db *StateDB) Empty(addr gethCommon.Address) bool {
 // CreateAccount creates a new account for the given address
 // it sets the nonce to zero
 func (db *StateDB) CreateAccount(addr gethCommon.Address) {
-	db.lastestView().CreateAccount(addr)
+	err := db.lastestView().CreateAccount(addr)
+	db.handleError(err)
 }
 
 // IsCreated returns true if address is recently created (context of a transaction)
@@ -105,7 +106,7 @@ func (db *StateDB) SubBalance(addr gethCommon.Address, amount *big.Int) {
 	db.handleError(err)
 }
 
-// SubBalance adds the amount from the balance of the given address
+// AddBalance adds the amount from the balance of the given address
 func (db *StateDB) AddBalance(addr gethCommon.Address, amount *big.Int) {
 	err := db.lastestView().AddBalance(addr, amount)
 	db.handleError(err)
@@ -127,7 +128,8 @@ func (db *StateDB) GetNonce(addr gethCommon.Address) uint64 {
 
 // SetNonce sets the nonce value for the given address
 func (db *StateDB) SetNonce(addr gethCommon.Address, nonce uint64) {
-	db.lastestView().SetNonce(addr, nonce)
+	err := db.lastestView().SetNonce(addr, nonce)
+	db.handleError(err)
 }
 
 // GetCodeHash returns the code hash of the given address
@@ -153,17 +155,20 @@ func (db *StateDB) GetCodeSize(addr gethCommon.Address) int {
 
 // SetCode sets the code for the given address
 func (db *StateDB) SetCode(addr gethCommon.Address, code []byte) {
-	db.lastestView().SetCode(addr, code)
+	err := db.lastestView().SetCode(addr, code)
+	db.handleError(err)
 }
 
-// AddRefund adds an amount to the total (gas) refund
+// AddRefund adds the amount to the total (gas) refund
 func (db *StateDB) AddRefund(amount uint64) {
-	db.lastestView().AddRefund(amount)
+	err := db.lastestView().AddRefund(amount)
+	db.handleError(err)
 }
 
-// AddRefund subtracts an amount from the total (gas) refund
+// SubRefund subtracts the amount from the total (gas) refund
 func (db *StateDB) SubRefund(amount uint64) {
-	db.lastestView().SubRefund(amount)
+	err := db.lastestView().SubRefund(amount)
+	db.handleError(err)
 }
 
 // GetRefund returns the total (gas) refund
@@ -188,10 +193,11 @@ func (db *StateDB) GetState(addr gethCommon.Address, key gethCommon.Hash) gethCo
 
 // SetState sets a value for the given storage slot
 func (db *StateDB) SetState(addr gethCommon.Address, key gethCommon.Hash, value gethCommon.Hash) {
-	db.lastestView().SetState(types.SlotAddress{Address: addr, Key: key}, value)
+	err := db.lastestView().SetState(types.SlotAddress{Address: addr, Key: key}, value)
+	db.handleError(err)
 }
 
-// GetState returns the value for the given key of the transient storage
+// GetTransientState returns the value for the given key of the transient storage
 func (db *StateDB) GetTransientState(addr gethCommon.Address, key gethCommon.Hash) gethCommon.Hash {
 	return db.lastestView().GetTransientState(types.SlotAddress{Address: addr, Key: key})
 }
@@ -206,7 +212,7 @@ func (db *StateDB) AddressInAccessList(addr gethCommon.Address) bool {
 	return db.lastestView().AddressInAccessList(addr)
 }
 
-// AddressInAccessList checks if the given (address,slot) is in the access list
+// SlotInAccessList checks if the given (address,slot) is in the access list
 func (db *StateDB) SlotInAccessList(addr gethCommon.Address, key gethCommon.Hash) (addressOk bool, slotOk bool) {
 	return db.lastestView().SlotInAccessList(types.SlotAddress{Address: addr, Key: key})
 }
@@ -421,12 +427,12 @@ func (db *StateDB) lastestView() *DeltaView {
 }
 
 // set error captures the first non-nil error it is called with.
-func (s *StateDB) handleError(err error) {
+func (db *StateDB) handleError(err error) {
 	if err == nil {
 		return
 	}
-	if s.cachedError == nil {
-		s.cachedError = err
+	if db.cachedError == nil {
+		db.cachedError = err
 	}
 }
 
