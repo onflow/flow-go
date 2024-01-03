@@ -5,16 +5,16 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	gethParams "github.com/ethereum/go-ethereum/params"
 	"github.com/onflow/atree"
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/fvm/evm/emulator/state"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/stretchr/testify/require"
 )
 
 var rootAddr = flow.Address{1, 2, 3, 4, 5, 6, 7, 8}
@@ -170,7 +170,7 @@ func TestStateDB(t *testing.T) {
 		db.AddLog(testutils.GetRandomLogFixture(t))
 		db.RevertToSnapshot(snapshot)
 
-		ret := db.Logs(common.Hash{}, 1, common.Hash{}, 1)
+		ret := db.Logs(gethCommon.Hash{}, 1, gethCommon.Hash{}, 1)
 		require.Equal(t, ret, logs)
 	})
 
