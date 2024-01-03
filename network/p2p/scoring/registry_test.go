@@ -468,7 +468,7 @@ func testScoreRegistrySpamRecordWithDuplicateMessagesPenalty(t *testing.T, messa
 	record, err, ok := spamRecords.Get(peerID) // get the record from the spamRecords.
 	assert.True(t, ok)
 	assert.NoError(t, err)
-	assert.Less(t, math.Abs(expectedPenalty-record.Penalty), 10e-3)        // penalty should be updated to -10.
+	unittest.RequireNumericallyClose(t, expectedPenalty, record.Penalty, 0.01)
 	assert.Equal(t, scoring.InitAppScoreRecordState().Decay, record.Decay) // decay should be initialized to the initial state.
 
 	queryTime := time.Now()
@@ -575,7 +575,7 @@ func testScoreRegistrySpamRecordWithoutDuplicateMessagesPenalty(t *testing.T, me
 	record, err, ok := spamRecords.Get(peerID) // get the record from the spamRecords.
 	assert.True(t, ok)
 	assert.NoError(t, err)
-	assert.Less(t, math.Abs(expectedPenalty-record.Penalty), 10e-3)        // penalty should be updated to -10.
+	unittest.RequireNumericallyClose(t, expectedPenalty, record.Penalty, 0.01)
 	assert.Equal(t, scoring.InitAppScoreRecordState().Decay, record.Decay) // decay should be initialized to the initial state.
 
 	queryTime := time.Now()
