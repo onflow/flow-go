@@ -315,8 +315,8 @@ func (builder *SealingSegmentBuilder) SealingSegment() (*SealingSegment, error) 
 
 	// SealingSegment must store extra blocks in ascending order, builder stores them in descending.
 	// Apply a sort to reverse the slice and use correct ordering.
-	slices.SortFunc(builder.extraBlocks, func(lhs, rhs *Block) bool {
-		return lhs.Header.Height < rhs.Header.Height
+	slices.SortFunc(builder.extraBlocks, func(lhs, rhs *Block) int {
+		return int(lhs.Header.Height) - int(rhs.Header.Height)
 	})
 
 	return &SealingSegment{

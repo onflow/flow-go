@@ -3,6 +3,7 @@ package state
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"math"
 	"runtime"
@@ -50,6 +51,11 @@ func (cp *CollectionProvider) CollectionByID(collectionID []byte) (*Collection, 
 	if err != nil {
 		return nil, err
 	}
+	// sanity check the storage ID address
+	if storageID.Address != cp.rootAddr {
+		return nil, fmt.Errorf("root address mismatch %x != %x", storageID.Address, cp.rootAddr)
+	}
+
 	omap, err := atree.NewMapWithRootID(cp.storage, storageID, atree.NewDefaultDigesterBuilder())
 	if err != nil {
 		return nil, err
@@ -104,18 +110,12 @@ func (c *Collection) CollectionID() []byte {
 //
 // if key doesn't exist it returns nil (no error)
 func (c *Collection) Get(key []byte) ([]byte, error) {
-	// first check if we have the key
-	// this avoids getting a NotFound error
-	found, err := c.omap.Has(compare, hashInputProvider, NewByteStringValue(key))
-	if err != nil {
-		return nil, err
-	}
-	if !found {
-		return nil, nil
-	}
-
 	data, err := c.omap.Get(compare, hashInputProvider, NewByteStringValue(key))
 	if err != nil {
+		var keyNotFoundError *atree.KeyNotFoundError
+		if errors.As(err, &keyNotFoundError) {
+			return nil, nil
+		}
 		return nil, err
 	}
 
@@ -150,16 +150,12 @@ func (c *Collection) Set(key, value []byte) error {
 //
 // if the key doesn't exist it return no error
 func (c *Collection) Remove(key []byte) error {
-	found, err := c.omap.Has(compare, hashInputProvider, NewByteStringValue(key))
-	if err != nil {
-		return err
-	}
-	if !found {
-		return nil
-	}
-
 	_, existingValueStorable, err := c.omap.Remove(compare, hashInputProvider, NewByteStringValue(key))
 	if err != nil {
+		var keyNotFoundError *atree.KeyNotFoundError
+		if errors.As(err, &keyNotFoundError) {
+			return nil
+		}
 		return err
 	}
 
@@ -174,23 +170,31 @@ func (c *Collection) Remove(key []byte) error {
 }
 
 // Destroy destroys the whole collection
-func (c *Collection) Destroy() error {
+func (c *Collection) Destroy() ([][]byte, error) {
 	var cachedErr error
-	err := c.omap.PopIterate(func(_ atree.Storable, valueStorable atree.Storable) {
+	keys := make([][]byte, c.omap.Count())
+	i := 0
+	err := c.omap.PopIterate(func(keyStorable atree.Storable, valueStorable atree.Storable) {
 		if id, ok := valueStorable.(atree.StorageIDStorable); ok {
 			err := c.storage.Remove(atree.StorageID(id))
 			if err != nil && cachedErr == nil {
 				cachedErr = err
 			}
 		}
+		key, err := keyStorable.StoredValue(c.omap.Storage)
+		if err != nil && cachedErr == nil {
+			cachedErr = err
+		}
+		keys[i] = key.(ByteStringValue).Bytes()
+		i++
 	})
 	if cachedErr != nil {
-		return cachedErr
+		return keys, cachedErr
 	}
 	if err != nil {
-		return err
+		return keys, err
 	}
-	return c.storage.Remove(c.omap.StorageID())
+	return keys, c.storage.Remove(c.omap.StorageID())
 }
 
 type ByteStringValue struct {
@@ -215,30 +219,29 @@ func (v ByteStringValue) StoredValue(_ atree.SlabStorage) (atree.Value, error) {
 }
 
 func (v ByteStringValue) Storable(storage atree.SlabStorage, address atree.Address, maxInlineSize uint64) (atree.Storable, error) {
-	if uint64(v.ByteSize()) > maxInlineSize {
-
-		// Create StorableSlab
-		id, err := storage.GenerateStorageID(address)
-		if err != nil {
-			return nil, err
-		}
-
-		slab := &atree.StorableSlab{
-			StorageID: id,
-			Storable:  v,
-		}
-
-		// Store StorableSlab in storage
-		err = storage.Store(id, slab)
-		if err != nil {
-			return nil, err
-		}
-
-		// Return storage id as storable
-		return atree.StorageIDStorable(id), nil
+	if uint64(v.ByteSize()) <= maxInlineSize {
+		return v, nil
 	}
 
-	return v, nil
+	// Create StorableSlab
+	id, err := storage.GenerateStorageID(address)
+	if err != nil {
+		return nil, err
+	}
+
+	slab := &atree.StorableSlab{
+		StorageID: id,
+		Storable:  v,
+	}
+
+	// Store StorableSlab in storage
+	err = storage.Store(id, slab)
+	if err != nil {
+		return nil, err
+	}
+
+	// Return storage id as storable
+	return atree.StorageIDStorable(id), nil
 }
 
 func (v ByteStringValue) Encode(enc *atree.Encoder) error {
@@ -416,6 +419,7 @@ func decodeTypeInfo(dec *cbor.StreamDecoder) (atree.TypeInfo, error) {
 			return nil, err
 		}
 		return emptyTypeInfo{}, nil
+	default:
 	}
 
 	return nil, fmt.Errorf("not supported type info")
