@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	unicastcache "github.com/onflow/flow-go/network/p2p/unicast/cache"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -25,7 +26,7 @@ func TestUnicastConfigEntity(t *testing.T) {
 	t.Run(
 		"Test ID and Checksum", func(t *testing.T) {
 			// id and checksum methods must return the same value as expected.
-			expectedID := unicastcache.PeerIdToFlowId(peerID)
+			expectedID := flow.MakeID(peerID)
 			require.Equal(t, expectedID, d.ID())
 			require.Equal(t, expectedID, d.Checksum())
 

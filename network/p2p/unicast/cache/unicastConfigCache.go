@@ -1,6 +1,7 @@
 package unicastcache
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 
@@ -19,11 +20,17 @@ import (
 var ErrUnicastConfigNotFound = fmt.Errorf("unicast config not found")
 
 type UnicastConfigCache struct {
-	// mutex is temporarily protect the edge case in HeroCache that optimistic adjustment causes the cache to be full.
-	// TODO: remove this mutex after the HeroCache is fixed.
-	mutex      sync.RWMutex
 	peerCache  *stdmap.Backend
 	cfgFactory func() unicast.Config // factory function that creates a new unicast config.
+
+	// atomicAdjustMutex is a atomicAdjustMutex used to ensure that the init-and-adjust operation is atomic.
+	// The init-and-adjust operation is used to initialize a record in the cache and then update it.
+	// The init-and-adjust operation is used when the record does not exist in the cache and needs to be initialized.
+	// The current implementation is not thread-safe, and the atomicAdjustMutex is used to ensure that the init-and-adjust operation is atomic, otherwise
+	// more than one thread may try to initialize records at the same time and cause an LRU eviction, hence trying an adjust on a record that does not exist,
+	// which will result in an error.
+	// TODO: implement a thread-safe atomic adjust operation and remove the mutex.
+	atomicAdjustMutex sync.Mutex
 }
 
 var _ unicast.ConfigCache = (*UnicastConfigCache)(nil)
@@ -66,14 +73,11 @@ func NewUnicastConfigCache(
 // Returns:
 //   - error any returned error should be considered as an irrecoverable error and indicates a bug.
 func (d *UnicastConfigCache) Adjust(peerID peer.ID, adjustFunc unicast.UnicastConfigAdjustFunc) (*unicast.Config, error) {
-	d.mutex.Lock() // making optimistic adjustment atomic.
-	defer d.mutex.Unlock()
-
 	// first we translate the peer id to a flow id (taking
-	peerIdHash := PeerIdToFlowId(peerID)
+	peerIdHash := entityIdOf(peerID)
 	adjustedUnicastCfg, err := d.adjust(peerIdHash, adjustFunc)
 	if err != nil {
-		if err == ErrUnicastConfigNotFound {
+		if errors.Is(err, ErrUnicastConfigNotFound) {
 			// if the config does not exist, we initialize the config and try to adjust it again.
 			// Note: there is an edge case where the config is initialized by another goroutine between the two calls.
 			// In this case, the init function is invoked twice, but it is not a problem because the underlying
@@ -84,6 +88,10 @@ func (d *UnicastConfigCache) Adjust(peerID peer.ID, adjustFunc unicast.UnicastCo
 				PeerId: peerID,
 				Config: d.cfgFactory(),
 			}
+
+			// ensuring that the init-and-adjust operation is atomic.
+			d.atomicAdjustMutex.Lock()
+			defer d.atomicAdjustMutex.Unlock()
 
 			_ = d.peerCache.Add(e)
 
@@ -152,9 +160,12 @@ func (d *UnicastConfigCache) adjust(peerIdHash flow.Identifier, adjustFunc unica
 //   - error if the factory function returns an error. Any error should be treated as an irrecoverable error and indicates a bug.
 func (d *UnicastConfigCache) GetOrInit(peerID peer.ID) (*unicast.Config, error) {
 	// first we translate the peer id to a flow id (taking
-	flowPeerId := PeerIdToFlowId(peerID)
+	flowPeerId := entityIdOf(peerID)
 	cfg, ok := d.get(flowPeerId)
 	if !ok {
+		// ensuring that the init-and-get operation is atomic.
+		d.atomicAdjustMutex.Lock()
+		defer d.atomicAdjustMutex.Unlock()
 		_ = d.peerCache.Add(UnicastConfigEntity{
 			PeerId: peerID,
 			Config: d.cfgFactory(),
