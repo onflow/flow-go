@@ -257,40 +257,51 @@ func TestGossipSubSpamRecordCache_Adjust_Preprocess_Error(t *testing.T) {
 	require.Equal(t, 0.1, record.Decay)   // checks if the decay is not changed.
 }
 
-// // TestGossipSubSpamRecordCache_ByValue tests if the cache stores the GossipSubSpamRecord by value.
-// // It updates the cache with a record and then modifies the record externally.
-// // It then checks if the record in the cache is still the original record.
-// // This is a desired behavior that is guaranteed by the underlying HeroCache library.
-// // In other words, we don't desire the records to be externally mutable after they are added to the cache (unless by a subsequent call to Update).
-// func TestGossipSubSpamRecordCache_ByValue(t *testing.T) {
-// 	cache := netcache.NewGossipSubSpamRecordCache(200, unittest.Logger(), metrics.NewNoopCollector())
-//
-// 	peerID := "peer1"
-// 	added := cache.Add(peer.ID(peerID), p2p.GossipSubSpamRecord{
-// 		Decay:   0.1,
-// 		Penalty: 0.5,
-// 	})
-// 	require.True(t, added)
-//
-// 	// get the record from the cache
-// 	record, err, found := cache.Get(peer.ID(peerID))
-// 	require.True(t, found)
-// 	require.NoError(t, err)
-//
-// 	// modify the record
-// 	record.Decay = 0.2
-// 	record.Penalty = 0.8
-//
-// 	// get the record from the cache again
-// 	record, err, found = cache.Get(peer.ID(peerID))
-// 	require.True(t, found)
-// 	require.NoError(t, err)
-//
-// 	// check if the record is still the same
-// 	require.Equal(t, 0.1, record.Decay)
-// 	require.Equal(t, 0.5, record.Penalty)
-// }
-//
+// TestGossipSubSpamRecordCache_ByValue tests if the cache stores the GossipSubSpamRecord by value.
+// It updates the cache with a record and then modifies the record externally.
+// It then checks if the record in the cache is still the original record.
+// This is a desired behavior that is guaranteed by the underlying HeroCache library.
+// In other words, we don't desire the records to be externally mutable after they are added to the cache (unless by a subsequent call to Update).
+func TestGossipSubSpamRecordCache_ByValue(t *testing.T) {
+	cache := netcache.NewGossipSubSpamRecordCache(200, unittest.Logger(), metrics.NewNoopCollector(), func() p2p.GossipSubSpamRecord {
+		return p2p.GossipSubSpamRecord{
+			Decay:               0,
+			Penalty:             0,
+			LastDecayAdjustment: time.Now(),
+		}
+	})
+
+	peerID := unittest.PeerIdFixture(t)
+	// adjusts a non-existing record, which should initiate the record.
+	record, err := cache.Adjust(peerID, func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
+		record.Penalty = 0.5
+		record.Decay = 0.1
+		return record
+	})
+	require.NoError(t, err)
+	require.NotNil(t, record)
+	require.Equal(t, 0.5, record.Penalty) // checks if the penalty is not changed.
+	require.Equal(t, 0.1, record.Decay)   // checks if the decay is not changed.
+
+	// get the record from the cache
+	record, err, found := cache.Get(peerID)
+	require.True(t, found)
+	require.NoError(t, err)
+
+	// modify the record
+	record.Decay = 0.2
+	record.Penalty = 0.8
+
+	// get the record from the cache again
+	record, err, found = cache.Get(peerID)
+	require.True(t, found)
+	require.NoError(t, err)
+
+	// check if the record is still the same
+	require.Equal(t, 0.1, record.Decay)
+	require.Equal(t, 0.5, record.Penalty)
+}
+
 // // TestGossipSubSpamRecordCache_Get_With_Preprocessors tests if the cache applies the preprocessors to the records
 // // before returning them.
 // func TestGossipSubSpamRecordCache_Get_With_Preprocessors(t *testing.T) {
