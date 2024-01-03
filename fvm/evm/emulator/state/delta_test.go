@@ -192,7 +192,9 @@ func TestDeltaView(t *testing.T) {
 						return false, nil
 					}
 				},
-
+				HasSuicidedFunc: func(a gethCommon.Address) bool {
+					return false
+				},
 				GetNonceFunc: func(addr gethCommon.Address) (uint64, error) {
 					switch addr {
 					case addr1:
@@ -247,6 +249,9 @@ func TestDeltaView(t *testing.T) {
 					default:
 						return false, nil
 					}
+				},
+				HasSuicidedFunc: func(a gethCommon.Address) bool {
+					return false
 				},
 				GetCodeFunc: func(addr gethCommon.Address) ([]byte, error) {
 					switch addr {
@@ -627,6 +632,96 @@ func TestDeltaView(t *testing.T) {
 		}
 	})
 
+	t.Run("test account creation after suicide call", func(t *testing.T) {
+		addr1 := testutils.RandomCommonAddress(t)
+
+		view := state.NewDeltaView(
+			&MockedReadOnlyView{
+				// we need get refund for parent
+				GetRefundFunc: emptyRefund,
+				ExistFunc: func(addr gethCommon.Address) (bool, error) {
+					return true, nil
+				},
+				HasSuicidedFunc: func(gethCommon.Address) bool {
+					return true
+				},
+				GetBalanceFunc: func(addr gethCommon.Address) (*big.Int, error) {
+					return new(big.Int), nil
+				},
+				GetStateFunc: func(sa types.SlotAddress) (gethCommon.Hash, error) {
+					return gethCommon.Hash{}, nil
+				},
+			})
+
+		found, err := view.Exist(addr1)
+		require.NoError(t, err)
+		require.True(t, found)
+
+		// set balance
+		initBalance := big.NewInt(10)
+		err = view.AddBalance(addr1, initBalance)
+		require.NoError(t, err)
+
+		bal, err := view.GetBalance(addr1)
+		require.NoError(t, err)
+		require.Equal(t, initBalance, bal)
+
+		// set code
+		code := []byte{1, 2, 3}
+		err = view.SetCode(addr1, code)
+		require.NoError(t, err)
+
+		ret, err := view.GetCode(addr1)
+		require.NoError(t, err)
+		require.Equal(t, code, ret)
+
+		// set key values
+		key := testutils.RandomCommonHash(t)
+		value := testutils.RandomCommonHash(t)
+		sk := types.SlotAddress{Address: addr1, Key: key}
+		err = view.SetState(sk, value)
+		require.NoError(t, err)
+
+		vret, err := view.GetState(sk)
+		require.NoError(t, err)
+		require.Equal(t, value, vret)
+
+		success, err := view.Suicide(addr1)
+		require.NoError(t, err)
+		require.True(t, success)
+
+		// balance should be returned zero
+		bal, err = view.GetBalance(addr1)
+		require.NoError(t, err)
+		require.Equal(t, new(big.Int), bal)
+
+		// get code should still work
+		ret, err = view.GetCode(addr1)
+		require.NoError(t, err)
+		require.Equal(t, code, ret)
+
+		// get state should also still work
+		vret, err = view.GetState(sk)
+		require.NoError(t, err)
+		require.Equal(t, value, vret)
+
+		// now re-create account
+
+		err = view.CreateAccount(addr1)
+		require.NoError(t, err)
+
+		bal, err = view.GetBalance(addr1)
+		require.NoError(t, err)
+		require.Equal(t, new(big.Int), bal)
+
+		ret, err = view.GetCode(addr1)
+		require.NoError(t, err)
+		require.Equal(t, nil, ret)
+
+		vret, err = view.GetState(sk)
+		require.NoError(t, err)
+		require.Len(t, vret, 0)
+	})
 }
 
 type MockedReadOnlyView struct {

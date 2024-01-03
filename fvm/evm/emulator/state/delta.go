@@ -22,6 +22,7 @@ type DeltaView struct {
 	dirtyAddresses map[gethCommon.Address]interface{}
 	created        map[gethCommon.Address]interface{}
 	suicided       map[gethCommon.Address]interface{}
+	deleted        map[gethCommon.Address]interface{}
 	balances       map[gethCommon.Address]*big.Int
 	nonces         map[gethCommon.Address]uint64
 	codes          map[gethCommon.Address][]byte
@@ -58,6 +59,7 @@ func NewDeltaView(parent types.ReadOnlyView) *DeltaView {
 		dirtyAddresses:      make(map[gethCommon.Address]interface{}),
 		created:             make(map[gethCommon.Address]interface{}),
 		suicided:            make(map[gethCommon.Address]interface{}),
+		deleted:             make(map[gethCommon.Address]interface{}),
 		balances:            make(map[gethCommon.Address]*big.Int),
 		nonces:              make(map[gethCommon.Address]uint64),
 		codes:               make(map[gethCommon.Address][]byte),
@@ -100,6 +102,25 @@ func (d *DeltaView) CreateAccount(addr gethCommon.Address) error {
 	d.created[addr] = struct{}{}
 	// flag the address as dirty
 	d.dirtyAddresses[addr] = struct{}{}
+
+	// if has already suicided
+	if d.HasSuicided(addr) {
+		// balance has already been set to zero
+		d.nonces[addr] = 0
+		d.codes[addr] = nil
+		d.codeHashes[addr] = gethTypes.EmptyCodeHash
+
+		// flag addr as deleted, this flag helps with postponing deletion of slabs
+		// otherwise we have to iterate over all slabs of this account and set the to nil
+		d.deleted[addr] = struct{}{}
+
+		// remove slabs from cache related to this account
+		for k := range d.states {
+			if k.Address == addr {
+				delete(d.states, k)
+			}
+		}
+	}
 	return nil
 }
 
@@ -134,6 +155,9 @@ func (d *DeltaView) Suicide(addr gethCommon.Address) (bool, error) {
 	// flag the account for deletion
 	d.suicided[addr] = struct{}{}
 
+	// set balance to zero
+	d.balances[addr] = new(big.Int)
+
 	// flag the address as dirty
 	d.dirtyAddresses[addr] = struct{}{}
 	return true, nil
@@ -141,9 +165,6 @@ func (d *DeltaView) Suicide(addr gethCommon.Address) (bool, error) {
 
 // GetBalance returns the balance of the given address
 func (d *DeltaView) GetBalance(addr gethCommon.Address) (*big.Int, error) {
-	if d.HasSuicided(addr) {
-		return big.NewInt(0), nil
-	}
 	val, found := d.balances[addr]
 	if found {
 		return val, nil
@@ -285,6 +306,13 @@ func (d *DeltaView) GetState(sk types.SlotAddress) (gethCommon.Hash, error) {
 	val, found := d.states[sk]
 	if found {
 		return val, nil
+	}
+	// if address is deleted in the scope of this delta view,
+	// don't go backward. this has been done to skip the step to iterate
+	// over all the state slabs and delete them.
+	_, deleted := d.deleted[sk.Address]
+	if deleted {
+		return gethCommon.Hash{}, nil
 	}
 	return d.parent.GetState(sk)
 }
