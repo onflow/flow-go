@@ -313,14 +313,17 @@ func (db *StateDB) Commit() error {
 
 	// update accounts
 	for _, addr := range sortedAddresses {
-		// TODO check if address is
+		deleted := false
+		// First we need to delete accounts
 		if db.HasSuicided(addr) {
 			err = db.baseView.DeleteAccount(addr)
 			if err != nil {
 				return wrapError(err)
 			}
-			continue
+			deleted = true
 		}
+		// then create new ones
+		// an account might be in a single transaction be deleted and recreated
 		if db.IsCreated(addr) {
 			err = db.baseView.CreateAccount(
 				addr,
@@ -332,6 +335,9 @@ func (db *StateDB) Commit() error {
 			if err != nil {
 				return wrapError(err)
 			}
+			continue
+		}
+		if deleted {
 			continue
 		}
 		err = db.baseView.UpdateAccount(
