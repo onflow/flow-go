@@ -209,13 +209,6 @@ func (v *BaseView) CreateAccount(
 		if err != nil {
 			return err
 		}
-
-		// create a new collection for slots
-		col, err := v.collectionProvider.NewCollection()
-		if err != nil {
-			return err
-		}
-		colID = col.CollectionID()
 	}
 
 	// create a new account and store it
@@ -459,8 +452,21 @@ func (v *BaseView) getSlotCollection(addr gethCommon.Address) (*Collection, erro
 	if acc == nil {
 		return nil, fmt.Errorf("slot belongs to a non-existing account")
 	}
-	if len(acc.CollectionID) == 0 {
+	if !acc.HasCode() {
 		return nil, fmt.Errorf("slot belongs to a non-smart contract account")
+	}
+	if len(acc.CollectionID) == 0 {
+		// create a new collection for slots
+		col, err := v.collectionProvider.NewCollection()
+		if err != nil {
+			return nil, err
+		}
+		// cache collection
+		v.slots[addr] = col
+		// update account's collection ID
+		acc.CollectionID = col.CollectionID()
+		v.storeAccount(acc)
+		return col, nil
 	}
 	col, found := v.slots[acc.Address]
 	if !found {
@@ -470,5 +476,5 @@ func (v *BaseView) getSlotCollection(addr gethCommon.Address) (*Collection, erro
 		}
 		v.slots[acc.Address] = col
 	}
-	return col, err
+	return col, nil
 }
