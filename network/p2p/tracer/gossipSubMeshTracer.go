@@ -377,7 +377,8 @@ func (t *GossipSubMeshTracer) DuplicateMessage(msg *pubsub.Message) {
 
 	count, err := t.duplicateMessageTrackerCache.Inc(msg.ReceivedFrom)
 	if err != nil {
-		t.logger.Err(err).
+		t.logger.Fatal().
+			Err(err).
 			Bool(logging.KeyNetworkingSecurity, true).
 			Msg("failed to increment gossipsub duplicate message tracker count for peer")
 		return
