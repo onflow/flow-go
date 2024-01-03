@@ -25,7 +25,7 @@ import (
 // is expected to be returned.
 // Warning: current implementation of the StateDB is considered
 // to be used for a single EVM transaction execution and is not
-// thread safe.yet the current design supports addition of these properties
+// thread safe. yet the current design supports addition of concurrency in the
 // future if needed
 type StateDB struct {
 	ledger      atree.Ledger
