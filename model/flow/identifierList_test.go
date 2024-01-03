@@ -12,6 +12,14 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// Test the canonical ordering of identity and identifier match
+func TestCanonicalOrderingMatch(t *testing.T) {
+	identities := unittest.IdentityListFixture(100)
+	require.Equal(t,
+		identities.Sort(flow.Canonical).NodeIDs(),
+		identities.NodeIDs().Sort(flow.IdentifierCanonical))
+}
+
 // TestIdentifierListSort tests the IdentityList against its implemented sort interface
 // it generates and sorts a list of ids, and then evaluates sorting in ascending order
 func TestIdentifierListSort(t *testing.T) {

@@ -148,7 +148,7 @@ func (s stopBoundary) String() string {
 // StopControlHeaders is an interface for fetching headers
 // Its jut a small subset of storage.Headers for comments see storage.Headers
 type StopControlHeaders interface {
-	ByHeight(height uint64) (*flow.Header, error)
+	BlockIDByHeight(height uint64) (flow.Identifier, error)
 }
 
 // NewStopControl creates new StopControl.
@@ -476,12 +476,12 @@ func (s *StopControl) blockFinalized(
 
 		// Let's find the ID of the block that should be executed last
 		// which is the parent of the block at the stopHeight
-		header, err := s.headers.ByHeight(s.stopBoundary.StopBeforeHeight - 1)
+		finalizedID, err := s.headers.BlockIDByHeight(s.stopBoundary.StopBeforeHeight - 1)
 		if err != nil {
 			handleErr(fmt.Errorf("failed to get header by height: %w", err))
 			return
 		}
-		parentID = header.ID()
+		parentID = finalizedID
 	}
 
 	s.stopBoundary.stopAfterExecuting = parentID

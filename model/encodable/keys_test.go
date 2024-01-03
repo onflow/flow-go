@@ -247,7 +247,7 @@ func TestEncodableRandomBeaconPrivKeyMsgPack(t *testing.T) {
 	err = key.UnmarshalMsgpack(b)
 	require.NoError(t, err)
 
-	require.Equal(t, oldPubKey, key.PublicKey)
+	require.True(t, oldPubKey.Equals(key.PublicKey))
 }
 
 func generateRandomSeed(t *testing.T) []byte {

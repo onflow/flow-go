@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func newEmptyTestBlock() *DerivedDataTable[string, *string] {
@@ -962,7 +963,7 @@ func (computer *testValueComputer) Compute(
 func TestDerivedDataTableGetOrCompute(t *testing.T) {
 	blockDerivedData := NewEmptyTable[flow.RegisterID, int](0)
 
-	key := flow.NewRegisterID("addr", "key")
+	key := flow.NewRegisterID(unittest.RandomAddressFixture(), "key")
 	value := 12345
 
 	t.Run("compute value", func(t *testing.T) {

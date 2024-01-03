@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -56,7 +55,7 @@ func TestChunkDataPackRequestList_UniqueRequestInfo(t *testing.T) {
 		return bytes.Compare(thisChunkIDReqInfo.Disagrees[p][:], thisChunkIDReqInfo.Disagrees[q][:]) < 0
 	})
 
-	thisChunkIDReqInfo.Targets = thisChunkIDReqInfo.Targets.Sort(order.Canonical)
+	thisChunkIDReqInfo.Targets = thisChunkIDReqInfo.Targets.Sort(flow.Canonical)
 
 	require.Equal(t, thisChunkIDReqInfo.Agrees, thisReq1.Agrees.Union(thisReq2.Agrees))
 	require.Equal(t, thisChunkIDReqInfo.Disagrees, thisReq1.Disagrees.Union(thisReq2.Disagrees))

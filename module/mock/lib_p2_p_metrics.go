@@ -8,6 +8,8 @@ import (
 
 	network "github.com/libp2p/go-libp2p/core/network"
 
+	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
+
 	peer "github.com/libp2p/go-libp2p/core/peer"
 
 	protocol "github.com/libp2p/go-libp2p/core/protocol"
@@ -120,6 +122,11 @@ func (_m *LibP2PMetrics) OnBehaviourPenaltyUpdated(_a0 float64) {
 	_m.Called(_a0)
 }
 
+// OnControlMessagesTruncated provides a mock function with given fields: messageType, diff
+func (_m *LibP2PMetrics) OnControlMessagesTruncated(messageType p2pmsg.ControlMessageType, diff int) {
+	_m.Called(messageType, diff)
+}
+
 // OnDNSCacheHit provides a mock function with given fields:
 func (_m *LibP2PMetrics) OnDNSCacheHit() {
 	_m.Called()
@@ -160,14 +167,14 @@ func (_m *LibP2PMetrics) OnFirstMessageDeliveredUpdated(_a0 channels.Topic, _a1 
 	_m.Called(_a0, _a1)
 }
 
-// OnGraftReceived provides a mock function with given fields: count
-func (_m *LibP2PMetrics) OnGraftReceived(count int) {
-	_m.Called(count)
+// OnIHaveControlMessageIdsTruncated provides a mock function with given fields: diff
+func (_m *LibP2PMetrics) OnIHaveControlMessageIdsTruncated(diff int) {
+	_m.Called(diff)
 }
 
-// OnIHaveReceived provides a mock function with given fields: count
-func (_m *LibP2PMetrics) OnIHaveReceived(count int) {
-	_m.Called(count)
+// OnIHaveMessageIDsReceived provides a mock function with given fields: channel, msgIdCount
+func (_m *LibP2PMetrics) OnIHaveMessageIDsReceived(channel string, msgIdCount int) {
+	_m.Called(channel, msgIdCount)
 }
 
 // OnIPColocationFactorUpdated provides a mock function with given fields: _a0
@@ -175,24 +182,19 @@ func (_m *LibP2PMetrics) OnIPColocationFactorUpdated(_a0 float64) {
 	_m.Called(_a0)
 }
 
-// OnIWantReceived provides a mock function with given fields: count
-func (_m *LibP2PMetrics) OnIWantReceived(count int) {
-	_m.Called(count)
+// OnIWantControlMessageIdsTruncated provides a mock function with given fields: diff
+func (_m *LibP2PMetrics) OnIWantControlMessageIdsTruncated(diff int) {
+	_m.Called(diff)
 }
 
-// OnIncomingRpcAcceptedFully provides a mock function with given fields:
-func (_m *LibP2PMetrics) OnIncomingRpcAcceptedFully() {
-	_m.Called()
+// OnIWantMessageIDsReceived provides a mock function with given fields: msgIdCount
+func (_m *LibP2PMetrics) OnIWantMessageIDsReceived(msgIdCount int) {
+	_m.Called(msgIdCount)
 }
 
-// OnIncomingRpcAcceptedOnlyForControlMessages provides a mock function with given fields:
-func (_m *LibP2PMetrics) OnIncomingRpcAcceptedOnlyForControlMessages() {
-	_m.Called()
-}
-
-// OnIncomingRpcRejected provides a mock function with given fields:
-func (_m *LibP2PMetrics) OnIncomingRpcRejected() {
-	_m.Called()
+// OnIncomingRpcReceived provides a mock function with given fields: iHaveCount, iWantCount, graftCount, pruneCount, msgCount
+func (_m *LibP2PMetrics) OnIncomingRpcReceived(iHaveCount int, iWantCount int, graftCount int, pruneCount int, msgCount int) {
+	_m.Called(iHaveCount, iWantCount, graftCount, pruneCount, msgCount)
 }
 
 // OnInvalidMessageDeliveredUpdated provides a mock function with given fields: _a0, _a1
@@ -205,13 +207,53 @@ func (_m *LibP2PMetrics) OnLocalMeshSizeUpdated(topic string, size int) {
 	_m.Called(topic, size)
 }
 
+// OnLocalPeerJoinedTopic provides a mock function with given fields:
+func (_m *LibP2PMetrics) OnLocalPeerJoinedTopic() {
+	_m.Called()
+}
+
+// OnLocalPeerLeftTopic provides a mock function with given fields:
+func (_m *LibP2PMetrics) OnLocalPeerLeftTopic() {
+	_m.Called()
+}
+
 // OnMeshMessageDeliveredUpdated provides a mock function with given fields: _a0, _a1
 func (_m *LibP2PMetrics) OnMeshMessageDeliveredUpdated(_a0 channels.Topic, _a1 float64) {
 	_m.Called(_a0, _a1)
 }
 
+// OnMessageDeliveredToAllSubscribers provides a mock function with given fields: size
+func (_m *LibP2PMetrics) OnMessageDeliveredToAllSubscribers(size int) {
+	_m.Called(size)
+}
+
+// OnMessageDuplicate provides a mock function with given fields: size
+func (_m *LibP2PMetrics) OnMessageDuplicate(size int) {
+	_m.Called(size)
+}
+
+// OnMessageEnteredValidation provides a mock function with given fields: size
+func (_m *LibP2PMetrics) OnMessageEnteredValidation(size int) {
+	_m.Called(size)
+}
+
+// OnMessageRejected provides a mock function with given fields: size, reason
+func (_m *LibP2PMetrics) OnMessageRejected(size int, reason string) {
+	_m.Called(size, reason)
+}
+
+// OnOutboundRpcDropped provides a mock function with given fields:
+func (_m *LibP2PMetrics) OnOutboundRpcDropped() {
+	_m.Called()
+}
+
 // OnOverallPeerScoreUpdated provides a mock function with given fields: _a0
 func (_m *LibP2PMetrics) OnOverallPeerScoreUpdated(_a0 float64) {
+	_m.Called(_a0)
+}
+
+// OnPeerAddedToProtocol provides a mock function with given fields: _a0
+func (_m *LibP2PMetrics) OnPeerAddedToProtocol(_a0 string) {
 	_m.Called(_a0)
 }
 
@@ -225,14 +267,34 @@ func (_m *LibP2PMetrics) OnPeerDialed(duration time.Duration, attempts int) {
 	_m.Called(duration, attempts)
 }
 
-// OnPruneReceived provides a mock function with given fields: count
-func (_m *LibP2PMetrics) OnPruneReceived(count int) {
-	_m.Called(count)
+// OnPeerGraftTopic provides a mock function with given fields: topic
+func (_m *LibP2PMetrics) OnPeerGraftTopic(topic string) {
+	_m.Called(topic)
 }
 
-// OnPublishedGossipMessagesReceived provides a mock function with given fields: count
-func (_m *LibP2PMetrics) OnPublishedGossipMessagesReceived(count int) {
-	_m.Called(count)
+// OnPeerPruneTopic provides a mock function with given fields: topic
+func (_m *LibP2PMetrics) OnPeerPruneTopic(topic string) {
+	_m.Called(topic)
+}
+
+// OnPeerRemovedFromProtocol provides a mock function with given fields:
+func (_m *LibP2PMetrics) OnPeerRemovedFromProtocol() {
+	_m.Called()
+}
+
+// OnPeerThrottled provides a mock function with given fields:
+func (_m *LibP2PMetrics) OnPeerThrottled() {
+	_m.Called()
+}
+
+// OnRpcReceived provides a mock function with given fields: msgCount, iHaveCount, iWantCount, graftCount, pruneCount
+func (_m *LibP2PMetrics) OnRpcReceived(msgCount int, iHaveCount int, iWantCount int, graftCount int, pruneCount int) {
+	_m.Called(msgCount, iHaveCount, iWantCount, graftCount, pruneCount)
+}
+
+// OnRpcSent provides a mock function with given fields: msgCount, iHaveCount, iWantCount, graftCount, pruneCount
+func (_m *LibP2PMetrics) OnRpcSent(msgCount int, iHaveCount int, iWantCount int, graftCount int, pruneCount int) {
+	_m.Called(msgCount, iHaveCount, iWantCount, graftCount, pruneCount)
 }
 
 // OnStreamCreated provides a mock function with given fields: duration, attempts
@@ -263,6 +325,11 @@ func (_m *LibP2PMetrics) OnStreamEstablished(duration time.Duration, attempts in
 // OnTimeInMeshUpdated provides a mock function with given fields: _a0, _a1
 func (_m *LibP2PMetrics) OnTimeInMeshUpdated(_a0 channels.Topic, _a1 time.Duration) {
 	_m.Called(_a0, _a1)
+}
+
+// OnUndeliveredMessage provides a mock function with given fields:
+func (_m *LibP2PMetrics) OnUndeliveredMessage() {
+	_m.Called()
 }
 
 // OutboundConnections provides a mock function with given fields: connectionCount

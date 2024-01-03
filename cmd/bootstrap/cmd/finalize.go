@@ -20,7 +20,6 @@ import (
 	"github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/badger"
@@ -156,7 +155,7 @@ func finalize(cmd *cobra.Command, args []string) {
 	log.Info().Msg("")
 
 	// create flow.IdentityList representation of participant set
-	participants := model.ToIdentityList(stakingNodes).Sort(order.Canonical)
+	participants := model.ToIdentityList(stakingNodes).Sort(flow.Canonical)
 
 	log.Info().Msg("reading root block data")
 	block := readRootBlock()
@@ -199,13 +198,14 @@ func finalize(cmd *cobra.Command, args []string) {
 
 	// if no root commit is specified, bootstrap an empty execution state
 	if flagRootCommit == "0000000000000000000000000000000000000000000000000000000000000000" {
-		generateEmptyExecutionState(
+		commit := generateEmptyExecutionState(
 			block.Header.ChainID,
 			assignments,
 			clusterQCs,
 			dkgData,
 			participants,
 		)
+		flagRootCommit = hex.EncodeToString(commit[:])
 	}
 
 	log.Info().Msg("constructing root execution result and block seal")
@@ -491,7 +491,7 @@ func mergeNodeInfos(internalNodes, partnerNodes []model.NodeInfo) []model.NodeIn
 	}
 
 	// sort nodes using the canonical ordering
-	nodes = model.Sort(nodes, order.Canonical)
+	nodes = model.Sort(nodes, flow.Canonical)
 
 	return nodes
 }
@@ -632,9 +632,8 @@ func generateEmptyExecutionState(
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to generate execution state")
 	}
-	flagRootCommit = hex.EncodeToString(commit[:])
 	log.Info().Msg("")
-	return
+	return commit
 }
 
 // validateEpochConfig validates configuration of the epoch commitment deadline.

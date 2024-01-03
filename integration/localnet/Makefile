@@ -47,7 +47,7 @@ ifeq ($(strip $(VALID_EXECUTION)), 1)
 else ifeq ($(strip $(VALID_CONSENSUS)), 1)
 	$(error Number of Consensus nodes should be no less than 2)
 else
-	go run -tags relic \
+	go run \
 		-ldflags="-X 'github.com/onflow/flow-go/cmd/build.commit=${COMMIT}' \
 		-X  'github.com/onflow/flow-go/cmd/build.semver=${VERSION}'" \
 		builder/*.go \
@@ -123,15 +123,15 @@ stop:
 
 .PHONY: load
 load:
-	go run --tags relic ../benchmark/cmd/manual -log-level info -tps 1,10,100 -tps-durations 30s,30s
+	go run ../benchmark/cmd/manual -log-level info -tps 1,10,100 -tps-durations 30s,30s
 
 .PHONY: tps-ci-smoke
 tps-ci-smoke:
-	go run --tags relic ../benchmark/cmd/ci -log-level info -tps-initial 1 -tps-min 1 -tps-max 10 -duration 20s -tps-adjust-interval 1s -stat-interval 1s -bigquery-upload=false
+	go run ../benchmark/cmd/ci -log-level info -tps-initial 1 -tps-min 1 -tps-max 10 -duration 20s -tps-adjust-interval 1s -stat-interval 1s -bigquery-upload=false
 
 .PHONY: tps-ci
 tps-ci: bootstrap-ci build-flow start-flow
-	go run --tags relic ../benchmark/cmd/ci -log-level info -tps-initial $(TPS_INIT) -tps-min $(TPS_MIN) -tps-max $(TPS_MAX) -duration $(DURATION)
+	go run ../benchmark/cmd/ci -log-level info -tps-initial $(TPS_INIT) -tps-min $(TPS_MIN) -tps-max $(TPS_MAX) -duration $(DURATION)
 
 .PHONY: clean-data
 clean-data:
