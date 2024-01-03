@@ -302,40 +302,49 @@ func TestGossipSubSpamRecordCache_ByValue(t *testing.T) {
 	require.Equal(t, 0.5, record.Penalty)
 }
 
-// // TestGossipSubSpamRecordCache_Get_With_Preprocessors tests if the cache applies the preprocessors to the records
-// // before returning them.
-// func TestGossipSubSpamRecordCache_Get_With_Preprocessors(t *testing.T) {
-// 	cache := netcache.NewGossipSubSpamRecordCache(10, unittest.Logger(), metrics.NewNoopCollector(),
-// 		// first preprocessor: adds 1 to the penalty.
-// 		func(record p2p.GossipSubSpamRecord, lastUpdated time.Time) (p2p.GossipSubSpamRecord, error) {
-// 			record.Penalty++
-// 			return record, nil
-// 		},
-// 		// second preprocessor: multiplies the penalty by 2
-// 		func(record p2p.GossipSubSpamRecord, lastUpdated time.Time) (p2p.GossipSubSpamRecord, error) {
-// 			record.Penalty *= 2
-// 			return record, nil
-// 		},
-// 	)
-//
-// 	record := p2p.GossipSubSpamRecord{
-// 		Decay:   0.5,
-// 		Penalty: 1,
-// 	}
-// 	added := cache.Add("peerA", record)
-// 	assert.True(t, added)
-//
-// 	// verifies that the preprocessors were called and the record was updated accordingly.
-// 	cachedRecord, err, ok := cache.Get("peerA")
-// 	assert.NoError(t, err)
-// 	assert.True(t, ok)
-//
-// 	// expected penalty is 4: the first preprocessor adds 1 to the penalty and the second preprocessor multiplies the penalty by 2.
-// 	// (1 + 1) * 2 = 4
-// 	assert.Equal(t, 4.0, cachedRecord.Penalty) // penalty should be updated
-// 	assert.Equal(t, 0.5, cachedRecord.Decay)   // decay should not be modified
-// }
-//
+// TestGossipSubSpamRecordCache_Get_With_Preprocessors tests if the cache applies the preprocessors to the records
+// before returning them.
+func TestGossipSubSpamRecordCache_Get_With_Preprocessors(t *testing.T) {
+	cache := netcache.NewGossipSubSpamRecordCache(10, unittest.Logger(), metrics.NewNoopCollector(),
+		func() p2p.GossipSubSpamRecord {
+			return p2p.GossipSubSpamRecord{
+				Decay:               0,
+				Penalty:             0,
+				LastDecayAdjustment: time.Now(),
+			}
+		},
+		// first preprocessor: adds 1 to the penalty.
+		func(record p2p.GossipSubSpamRecord, lastUpdated time.Time) (p2p.GossipSubSpamRecord, error) {
+			record.Penalty++
+			return record, nil
+		},
+		// second preprocessor: multiplies the penalty by 2
+		func(record p2p.GossipSubSpamRecord, lastUpdated time.Time) (p2p.GossipSubSpamRecord, error) {
+			record.Penalty *= 2
+			return record, nil
+		},
+	)
+
+	peerId := unittest.PeerIdFixture(t)
+	adjustedRecord, err := cache.Adjust(peerId, func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
+		record.Penalty = 1
+		record.Decay = 0.5
+		return record
+	})
+	require.NoError(t, err)
+	require.Equal(t, 1.0, adjustedRecord.Penalty)
+
+	// verifies that the preprocessors were called and the record was updated accordingly.
+	cachedRecord, err, ok := cache.Get(peerId)
+	require.NoError(t, err)
+	require.True(t, ok)
+
+	// expected penalty is 4: the first preprocessor adds 1 to the penalty and the second preprocessor multiplies the penalty by 2.
+	// (1 + 1) * 2 = 4
+	require.Equal(t, 4.0, cachedRecord.Penalty) // penalty should be updated
+	require.Equal(t, 0.5, cachedRecord.Decay)   // decay should not be modified
+}
+
 // // TestGossipSubSpamRecordCache_Get_Preprocessor_Error tests if the cache returns an error if one of the preprocessors returns an error upon a Get.
 // // It adds a record to the cache and then checks if the cache returns an error upon a Get if one of the preprocessors returns an error.
 // // It also checks if a preprocessor is failed, the subsequent preprocessors are not called, and the original record is returned.
