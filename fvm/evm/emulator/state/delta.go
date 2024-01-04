@@ -28,9 +28,9 @@ type DeltaView struct {
 	codes          map[gethCommon.Address][]byte
 	codeHashes     map[gethCommon.Address]gethCommon.Hash
 
-	// states changes
+	// slot changes
 	dirtySlots map[types.SlotAddress]interface{}
-	states     map[types.SlotAddress]gethCommon.Hash
+	slots      map[types.SlotAddress]gethCommon.Hash
 
 	// transient storage
 	transient map[types.SlotAddress]gethCommon.Hash
@@ -65,7 +65,7 @@ func NewDeltaView(parent types.ReadOnlyView) *DeltaView {
 		codes:               make(map[gethCommon.Address][]byte),
 		codeHashes:          make(map[gethCommon.Address]gethCommon.Hash),
 		dirtySlots:          make(map[types.SlotAddress]interface{}),
-		states:              make(map[types.SlotAddress]gethCommon.Hash),
+		slots:               make(map[types.SlotAddress]gethCommon.Hash),
 		transient:           make(map[types.SlotAddress]gethCommon.Hash),
 		accessListAddresses: make(map[gethCommon.Address]interface{}),
 		accessListSlots:     make(map[types.SlotAddress]interface{}),
@@ -115,9 +115,9 @@ func (d *DeltaView) CreateAccount(addr gethCommon.Address) error {
 		d.deleted[addr] = struct{}{}
 
 		// remove slabs from cache related to this account
-		for k := range d.states {
+		for k := range d.slots {
 			if k.Address == addr {
-				delete(d.states, k)
+				delete(d.slots, k)
 			}
 		}
 	}
@@ -303,7 +303,7 @@ func (d *DeltaView) SetCode(addr gethCommon.Address, code []byte) error {
 
 // GetState returns the value of the slot of the main state
 func (d *DeltaView) GetState(sk types.SlotAddress) (gethCommon.Hash, error) {
-	val, found := d.states[sk]
+	val, found := d.slots[sk]
 	if found {
 		return val, nil
 	}
@@ -323,13 +323,11 @@ func (d *DeltaView) SetState(sk types.SlotAddress, value gethCommon.Hash) error 
 	if err != nil {
 		return err
 	}
-	// we skip the value is the same
-	// this step might look not helping with performance but we kept it to
-	// act similar to the Geth StateDB behaviour
+	// if the value hasn't changed, skip
 	if value == lastValue {
 		return nil
 	}
-	d.states[sk] = value
+	d.slots[sk] = value
 	d.dirtySlots[sk] = struct{}{}
 	return nil
 }
@@ -424,11 +422,6 @@ func (d *DeltaView) AddPreimage(hash gethCommon.Hash, preimage []byte) {
 // Preimages returns a map of preimages
 func (d *DeltaView) Preimages() map[gethCommon.Hash][]byte {
 	return d.preimages
-}
-
-// Commit for deltaview is a no-op
-func (d *DeltaView) Commit() error {
-	return nil
 }
 
 // DirtyAddresses returns a set of addresses that has been updated in this view

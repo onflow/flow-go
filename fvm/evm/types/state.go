@@ -93,9 +93,6 @@ type HotView interface {
 	AddLog(*gethTypes.Log)
 	// AddPreimage adds a preimage to the list of preimages (input -> hash mapping)
 	AddPreimage(gethCommon.Hash, []byte)
-
-	// Commit finalizes and commits the changes
-	Commit() error
 }
 
 // BaseView is a low-level mutable view of the state
