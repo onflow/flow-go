@@ -111,7 +111,10 @@ func (d *DeltaView) CreateAccount(addr gethCommon.Address) error {
 		if err != nil {
 			return err
 		}
-		d.AddBalance(addr, bal)
+		err = d.AddBalance(addr, bal)
+		if err != nil {
+			return err
+		}
 	}
 
 	d.created[addr] = struct{}{}
