@@ -17,14 +17,19 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// GetStartHeightFunc is a function type for getting the start height.
 type GetStartHeightFunc func(flow.Identifier, uint64, flow.BlockStatus) (uint64, error)
+
+// GetHighestHeight is a function type for getting the highest height.
 type GetHighestHeight func(flow.BlockStatus) (uint64, error)
 
+// StreamingData represents common streaming data configuration for access and state_stream handlers.
 type StreamingData struct {
 	MaxStreams  int32
 	StreamCount atomic.Int32
 }
 
+// BlocksWatcher watches for new blocks and handles block-related operations.
 type BlocksWatcher struct {
 	log         zerolog.Logger
 	state       protocol.State
@@ -40,6 +45,7 @@ type BlocksWatcher struct {
 	sealedHighestHeight counters.StrictMonotonousCounter
 }
 
+// NewBlocksWatcher creates a new BlocksWatcher instance.
 func NewBlocksWatcher(
 	log zerolog.Logger,
 	state protocol.State,
@@ -151,6 +157,7 @@ func (h *BlocksWatcher) GetStartHeight(startBlockID flow.Identifier, startHeight
 	return lastSealed.Height, nil
 }
 
+// GetHighestHeight returns the highest height based on the specified block status. Only flow.BlockStatusFinalized and flow.BlockStatusSealed allowed.
 func (h *BlocksWatcher) GetHighestHeight(blockStatus flow.BlockStatus) (uint64, error) {
 	switch blockStatus {
 	case flow.BlockStatusFinalized:
@@ -174,6 +181,7 @@ func (h *BlocksWatcher) SetSealedHighestHeight(height uint64) bool {
 	return h.sealedHighestHeight.Set(height)
 }
 
+// ProcessSubscriptionOnFinalizedBlock processes the subscription logic when a block is finalized.
 func (h *BlocksWatcher) ProcessSubscriptionOnFinalizedBlock(finalizedHeader *flow.Header) error {
 	if ok := h.SetFinalizedHighestHeight(finalizedHeader.Height); !ok {
 		h.log.Debug().Msg("finalized block already received")

@@ -714,6 +714,11 @@ func (h *Handler) GetExecutionResultByID(ctx context.Context, req *access.GetExe
 		Metadata:        metadata,
 	}, nil
 }
+
+// SubscribeBlocks handles subscription requests for blocks.
+// It takes a SubscribeBlocksRequest and an AccessAPI_SubscribeBlocksServer stream as input.
+// The handler manages the subscription to block updates and sends the subscribed block information
+// to the client via the provided stream.
 func (h *Handler) SubscribeBlocks(request *access.SubscribeBlocksRequest, stream access.AccessAPI_SubscribeBlocksServer) error {
 	// check if the maximum number of streams is reached
 	if h.StreamCount.Load() >= h.MaxStreams {

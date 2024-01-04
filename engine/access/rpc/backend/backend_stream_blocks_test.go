@@ -27,6 +27,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// BackendBlocksSuite is a test suite for the backendBlocks functionality related to blocks subscription.
+// It utilizes the suite to organize and structure test code.
 type BackendBlocksSuite struct {
 	suite.Suite
 
@@ -66,6 +68,7 @@ func TestBackendBlocksSuite(t *testing.T) {
 	suite.Run(t, new(BackendBlocksSuite))
 }
 
+// SetupTest initializes the test suite with required dependencies.
 func (s *BackendBlocksSuite) SetupTest() {
 	s.log = zerolog.New(zerolog.NewConsoleWriter())
 	s.state = new(protocol.State)
@@ -208,6 +211,7 @@ func (s *BackendBlocksSuite) SetupTest() {
 	require.NoError(s.T(), err)
 }
 
+// backendParams returns the Params configuration for the backend.
 func (s *BackendBlocksSuite) backendParams() Params {
 	return Params{
 		State:                    s.state,
@@ -238,6 +242,37 @@ func (s *BackendBlocksSuite) backendParams() Params {
 	}
 }
 
+// TestSubscribeBlocks tests the functionality of the SubscribeBlocks method in the Backend.
+// It covers various scenarios for subscribing to blocks, handling backfill, and receiving block updates.
+// The test cases include scenarios for both finalized and sealed blocks.
+//
+// Test Cases:
+//
+// 1. Happy path - all new blocks:
+//   - No backfill is performed, and the subscription starts from the current root block.
+//
+// 2. Happy path - partial backfill:
+//   - A partial backfill is performed, simulating an ongoing subscription to the blockchain.
+//
+// 3. Happy path - complete backfill:
+//   - A complete backfill is performed, simulating the subscription starting from a specific block.
+//
+// 4. Happy path - start from root block by height:
+//   - The subscription starts from the root block, specified by height.
+//
+// 5. Happy path - start from root block by ID:
+//   - The subscription starts from the root block, specified by block ID.
+//
+// Each test case simulates the reception of new blocks during the subscription, ensuring that the SubscribeBlocks
+// method correctly handles updates and delivers the expected block information to the subscriber.
+//
+// Test Steps:
+// - Initialize the test environment, including the Backend instance, mock components, and test data.
+// - For each test case, set up the backfill, if applicable.
+// - Subscribe to blocks using the SubscribeBlocks method.
+// - Simulate the reception of new blocks during the subscription.
+// - Validate that the received block information matches the expected data.
+// - Ensure the subscription shuts down gracefully when canceled.
 func (s *BackendBlocksSuite) TestSubscribeBlocks() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -364,6 +399,27 @@ func (s *BackendBlocksSuite) TestSubscribeBlocks() {
 	}
 }
 
+// TestSubscribeBlocksHandlesErrors tests error handling scenarios for the SubscribeBlocks method in the Backend.
+// It ensures that the method correctly returns errors for various invalid input cases.
+//
+// Test Cases:
+//
+// 1. Returns error for unknown block status:
+//   - Verifies that attempting to subscribe to blocks with an unknown block status results in an InvalidArgument error.
+//
+// 2. Returns error if both start blockID and start height are provided:
+//   - Ensures that providing both start block ID and start height results in an InvalidArgument error.
+//
+// 3. Returns error for start height before root height:
+//   - Validates that attempting to subscribe to blocks with a start height before the root height results in an InvalidArgument error.
+//
+// 4. Returns error for unindexed start blockID:
+//   - Tests that subscribing to blocks with an unindexed start block ID results in a NotFound error.
+//
+// 5. Returns error for unindexed start height:
+//   - Tests that subscribing to blocks with an unindexed start height results in a NotFound error.
+//
+// Each test case checks for specific error conditions and ensures that the SubscribeBlocks method responds appropriately.
 func (s *BackendBlocksSuite) TestSubscribeBlocksHandlesErrors() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

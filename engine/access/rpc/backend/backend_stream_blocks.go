@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
+// backendSubscribeBlocks is a struct representing a backend implementation for subscribing to blocks.
 type backendSubscribeBlocks struct {
 	log            zerolog.Logger
 	state          protocol.State
@@ -30,6 +31,7 @@ type backendSubscribeBlocks struct {
 	getHighestHeight subscription.GetHighestHeight
 }
 
+// SubscribeBlocks subscribes to blocks starting from a specified block ID or height and with a given block status.
 func (b *backendSubscribeBlocks) SubscribeBlocks(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription {
 	nextHeight, err := b.getStartHeight(startBlockID, startHeight, blockStatus)
 	if err != nil {
@@ -42,6 +44,7 @@ func (b *backendSubscribeBlocks) SubscribeBlocks(ctx context.Context, startBlock
 	return sub
 }
 
+// getResponse returns a GetDataByHeightFunc that retrieves block information for the specified height.
 func (b *backendSubscribeBlocks) getResponse(blockStatus flow.BlockStatus) subscription.GetDataByHeightFunc {
 	return func(_ context.Context, height uint64) (interface{}, error) {
 		block, err := b.getBlock(height, blockStatus)
