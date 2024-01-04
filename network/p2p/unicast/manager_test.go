@@ -254,7 +254,7 @@ func TestUnicastManager_Stream_ConsecutiveStreamCreation_Reset(t *testing.T) {
 		Return(nil, fmt.Errorf("some error")).
 		Once()
 
-	adjustedUnicastConfig, err := unicastConfigCache.Adjust(peerID, func(unicastConfig unicast.Config) (unicast.Config, error) {
+	adjustedUnicastConfig, err := unicastConfigCache.AdjustWithInit(peerID, func(unicastConfig unicast.Config) (unicast.Config, error) {
 		// sets the consecutive successful stream to 5 meaning that the last 5 stream creation attempts were successful.
 		unicastConfig.ConsecutiveSuccessfulStream = 5
 		// sets the stream back budget to 0 meaning that the stream backoff budget is exhausted.
@@ -450,7 +450,7 @@ func TestUnicastManager_Stream_BackoffBudgetResetToDefault(t *testing.T) {
 	streamFactory.On("NewStream", mock.Anything, peerID, mock.Anything).Return(&p2ptest.MockStream{}, nil).Once()
 
 	// update the unicast config of the peer to have a zero stream backoff budget but a consecutive successful stream counter above the reset threshold.
-	adjustedCfg, err := unicastConfigCache.Adjust(peerID, func(unicastConfig unicast.Config) (unicast.Config, error) {
+	adjustedCfg, err := unicastConfigCache.AdjustWithInit(peerID, func(unicastConfig unicast.Config) (unicast.Config, error) {
 		unicastConfig.StreamCreationRetryAttemptBudget = 0
 		unicastConfig.ConsecutiveSuccessfulStream = cfg.NetworkConfig.Unicast.UnicastManager.StreamZeroRetryResetThreshold + 1
 		return unicastConfig, nil
@@ -483,7 +483,7 @@ func TestUnicastManager_Stream_NoBackoff_When_Budget_Is_Zero(t *testing.T) {
 	// mocks that it attempts to create a stream once and fails, and does not retry.
 	streamFactory.On("NewStream", mock.Anything, peerID, mock.Anything).Return(nil, fmt.Errorf("some error")).Once()
 
-	adjustedCfg, err := unicastConfigCache.Adjust(peerID, func(unicastConfig unicast.Config) (unicast.Config, error) {
+	adjustedCfg, err := unicastConfigCache.AdjustWithInit(peerID, func(unicastConfig unicast.Config) (unicast.Config, error) {
 		unicastConfig.ConsecutiveSuccessfulStream = 2      // set the consecutive successful stream to 2, which is below the reset threshold.
 		unicastConfig.StreamCreationRetryAttemptBudget = 0 // set the stream backoff budget to 0, meaning that the stream backoff budget is exhausted.
 		return unicastConfig, nil

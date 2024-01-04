@@ -23,7 +23,7 @@ type ConfigCache interface {
 	// - adjustFunc: the function that adjusts the dial config.
 	// Returns:
 	//   - error if the adjustFunc returns an error. Any error should be treated as an irrecoverable error and indicates a bug.
-	Adjust(peerID peer.ID, adjustFunc UnicastConfigAdjustFunc) (*Config, error)
+	AdjustWithInit(peerID peer.ID, adjustFunc UnicastConfigAdjustFunc) (*Config, error)
 
 	// Size returns the number of dial configs in the cache.
 	Size() uint

@@ -234,7 +234,7 @@ func (m *Manager) createStream(ctx context.Context, peerID peer.ID, protocol pro
 		return nil, fmt.Errorf("failed to upgrade raw stream: %w", err)
 	}
 
-	updatedConfig, err := m.dialConfigCache.Adjust(peerID, func(config Config) (Config, error) {
+	updatedConfig, err := m.dialConfigCache.AdjustWithInit(peerID, func(config Config) (Config, error) {
 		config.ConsecutiveSuccessfulStream++ // increase consecutive successful stream count.
 		return config, nil
 	})
@@ -361,7 +361,7 @@ func (m *Manager) getDialConfig(peerID peer.ID) (*Config, error) {
 	if dialCfg.StreamCreationRetryAttemptBudget == uint64(0) && dialCfg.ConsecutiveSuccessfulStream >= m.streamZeroBackoffResetThreshold {
 		// reset the stream creation backoff budget to the default value if the number of consecutive successful streams reaches the threshold,
 		// as the stream creation is reliable enough to be trusted again.
-		dialCfg, err = m.dialConfigCache.Adjust(peerID, func(config Config) (Config, error) {
+		dialCfg, err = m.dialConfigCache.AdjustWithInit(peerID, func(config Config) (Config, error) {
 			config.StreamCreationRetryAttemptBudget = m.maxStreamCreationAttemptTimes
 			m.metrics.OnStreamCreationRetryBudgetUpdated(config.StreamCreationRetryAttemptBudget)
 			m.metrics.OnStreamCreationRetryBudgetResetToDefault()
@@ -385,7 +385,7 @@ func (m *Manager) getDialConfig(peerID peer.ID) (*Config, error) {
 // - connected indicates whether there is a connection to the peer.
 // - error if the dial config cannot be adjusted; any error is irrecoverable and indicates a fatal error.
 func (m *Manager) adjustUnsuccessfulStreamAttempt(peerID peer.ID) (*Config, error) {
-	updatedCfg, err := m.dialConfigCache.Adjust(peerID, func(config Config) (Config, error) {
+	updatedCfg, err := m.dialConfigCache.AdjustWithInit(peerID, func(config Config) (Config, error) {
 		// consecutive successful stream count is reset to 0 if we fail to create a stream or connection to the peer.
 		config.ConsecutiveSuccessfulStream = 0
 

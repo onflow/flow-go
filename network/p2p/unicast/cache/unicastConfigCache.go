@@ -71,43 +71,8 @@ func NewUnicastConfigCache(
 // - adjustFunc: the function that adjusts the unicast config.
 // Returns:
 //   - error any returned error should be considered as an irrecoverable error and indicates a bug.
-func (d *UnicastConfigCache) Adjust(peerID peer.ID, adjustFunc unicast.UnicastConfigAdjustFunc) (*unicast.Config, error) {
+func (d *UnicastConfigCache) AdjustWithInit(peerID peer.ID, adjustFunc unicast.UnicastConfigAdjustFunc) (*unicast.Config, error) {
 	entityId := entityIdOf(peerID)
-	// adjustedUnicastCfg, err := d.adjust(entityId, adjustFunc)
-	// if err != nil {
-	// 	if err == ErrUnicastConfigNotFound {
-	// 		// if the config does not exist, we initialize the config and try to adjust it again.
-	// 		// Note: there is an edge case where the config is initialized by another goroutine between the two calls.
-	// 		// In this case, the init function is invoked twice, but it is not a problem because the underlying
-	// 		// cache is thread-safe. Hence, we do not need to synchronize the two calls. In such cases, one of the
-	// 		// two calls returns false, and the other call returns true. We do not care which call returns false, hence,
-	// 		// we ignore the return value of the init function.
-	// 		e := UnicastConfigEntity{
-	// 			PeerId:   peerID,
-	// 			Config:   d.cfgFactory(),
-	// 			EntityId: entityId,
-	// 		}
-	//
-	// 		// ensuring that the init-and-adjust operation is atomic.
-	// 		d.atomicAdjustMutex.Lock()
-	// 		defer d.atomicAdjustMutex.Unlock()
-	//
-	// 		add := d.peerCache.Add(e)
-	// 		fmt.Println("add: ", add, "peerId: ", peerID.String(), "entityId: ", entityId.String(), "size: ", d.peerCache.Size())
-	// 		// if !added {
-	// 		// 	return nil, fmt.Errorf("failed to initialize unicast config for peer %s", peerID)
-	// 		// }
-	//
-	// 		// as the config is initialized, the adjust function should not return an error, and any returned error
-	// 		// is an irrecoverable error and indicates a bug.
-	// 		return d.adjust(entityId, adjustFunc)
-	// 	}
-	// 	// if the adjust function returns an unexpected error on the first attempt, we return the error directly.
-	// 	// any returned error should be considered as an irrecoverable error and indicates a bug.
-	// 	return nil, fmt.Errorf("failed to adjust unicast config: %w", err)
-	// }
-	// // if the adjust function returns no error on the first attempt, we return the adjusted config.
-	// return adjustedUnicastCfg, nil
 	var rErr error
 	// wraps external adjust function to adjust the unicast config.
 	wrapAdjustFunc := func(entity flow.Entity) flow.Entity {
