@@ -62,7 +62,7 @@ func TestUnicastConfigCache_Adjust_Init(t *testing.T) {
 
 	// Initializing the unicast config for peerID1 through GetWithInit.
 	// unicast config for peerID1 does not exist in the cache, so it must be initialized when using GetWithInit.
-	cfg, err := cache.GetOrInit(peerID1)
+	cfg, err := cache.GetWithInit(peerID1)
 	require.NoError(t, err)
 	require.NotNil(t, cfg, "unicast config must not be nil")
 	require.Equal(t, unicastConfigFixture(), *cfg, "unicast config must be initialized with the default values")
@@ -78,7 +78,7 @@ func TestUnicastConfigCache_Adjust_Init(t *testing.T) {
 
 	// Retrieving the unicast config of peerID2 through GetWithInit.
 	// retrieve the unicast config for peerID2 and assert than it is initialized with the default values; and the adjust function is applied.
-	cfg, err = cache.GetOrInit(peerID2)
+	cfg, err = cache.GetWithInit(peerID2)
 	require.NoError(t, err, "unicast config must exist in the cache")
 	require.NotNil(t, cfg, "unicast config must not be nil")
 	// retrieving an existing unicast config must not change the cache size.
@@ -151,7 +151,7 @@ func TestUnicastConfigCache_Concurrent_Adjust(t *testing.T) {
 			wg.Done()
 
 			peerID := peerIds[j]
-			cfg, err := cache.GetOrInit(peerID)
+			cfg, err := cache.GetWithInit(peerID)
 			require.NoError(t, err)
 			require.Equal(t,
 				uint64(j+1),
@@ -199,7 +199,7 @@ func TestConcurrent_Adjust_And_Get_Is_Safe(t *testing.T) {
 		go func() {
 			wg.Done()
 			peerId := unittest.PeerIdFixture(t)
-			cfg, err := cache.GetOrInit(peerId)
+			cfg, err := cache.GetWithInit(peerId)
 			require.NoError(t, err) // concurrent retrieval must not fail.
 			require.Equal(t, unicastConfigFixture().StreamCreationRetryAttemptBudget, cfg.StreamCreationRetryAttemptBudget)
 			require.Equal(t, uint64(0), cfg.ConsecutiveSuccessfulStream)
@@ -241,7 +241,7 @@ func TestUnicastConfigCache_LRU_Eviction(t *testing.T) {
 
 	// except the first peer id, all other peer ids should stay intact in the cache.
 	for i := 1; i < int(sizeLimit+1); i++ {
-		cfg, err := cache.GetOrInit(peerIds[i])
+		cfg, err := cache.GetWithInit(peerIds[i])
 		require.NoError(t, err)
 		require.Equal(t, uint64(2), cfg.StreamCreationRetryAttemptBudget)
 		require.Equal(t, uint64(3), cfg.ConsecutiveSuccessfulStream)
@@ -251,7 +251,7 @@ func TestUnicastConfigCache_LRU_Eviction(t *testing.T) {
 
 	// querying the first peer id should return a fresh unicast config,
 	// since it should be evicted due to LRU eviction, and the initiated with the default values.
-	cfg, err := cache.GetOrInit(peerIds[0])
+	cfg, err := cache.GetWithInit(peerIds[0])
 	require.NoError(t, err)
 	require.Equal(t, unicastConfigFixture().StreamCreationRetryAttemptBudget, cfg.StreamCreationRetryAttemptBudget)
 	require.Equal(t, uint64(0), cfg.ConsecutiveSuccessfulStream)

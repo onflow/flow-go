@@ -353,7 +353,7 @@ func retryFailedError(dialAttempts, maxAttempts uint64, err error) error {
 //   - dial config for the given peer id.
 //   - error if the dial config cannot be retrieved or adjusted; any error is irrecoverable and indicates a fatal error.
 func (m *Manager) getDialConfig(peerID peer.ID) (*Config, error) {
-	dialCfg, err := m.dialConfigCache.GetOrInit(peerID)
+	dialCfg, err := m.dialConfigCache.GetWithInit(peerID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get or init dial config for peer id: %w", err)
 	}

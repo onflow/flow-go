@@ -14,7 +14,7 @@ type ConfigCache interface {
 	// Returns:
 	//   - *Config, the dial config for the given peer id.
 	//   - error if the factory function returns an error. Any error should be treated as an irrecoverable error and indicates a bug.
-	GetOrInit(peerID peer.ID) (*Config, error)
+	GetWithInit(peerID peer.ID) (*Config, error)
 
 	// Adjust adjusts the dial config for the given peer id using the given adjustFunc.
 	// It returns an error if the adjustFunc returns an error.

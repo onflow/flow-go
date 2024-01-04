@@ -15,9 +15,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/unicast"
 )
 
-// ErrUnicastConfigNotFound is a benign error that indicates that the unicast config does not exist in the cache. It is not a fatal error.
-var ErrUnicastConfigNotFound = fmt.Errorf("unicast config not found")
-
 type UnicastConfigCache struct {
 	peerCache  *stdmap.Backend
 	cfgFactory func() unicast.Config // factory function that creates a new unicast config.
@@ -62,7 +59,7 @@ func NewUnicastConfigCache(
 	}
 }
 
-// Adjust applies the given adjust function to the unicast config of the given peer ID, and stores the adjusted config in the cache.
+// AdjustWithInit applies the given adjust function to the unicast config of the given peer ID, and stores the adjusted config in the cache.
 // It returns an error if the adjustFunc returns an error.
 // Note that if the Adjust is called when the config does not exist, the config is initialized and the
 // adjust function is applied to the initialized config again. In this case, the adjust function should not return an error.
@@ -105,11 +102,11 @@ func (d *UnicastConfigCache) AdjustWithInit(peerID peer.ID, adjustFunc unicast.U
 
 	adjustedEntity, adjusted := d.peerCache.AdjustWithInit(entityId, wrapAdjustFunc, initFunc)
 	if rErr != nil {
-		return nil, fmt.Errorf("adjsut operation aborted: %w", rErr)
+		return nil, fmt.Errorf("adjust operation aborted with an error: %w", rErr)
 	}
 
 	if !adjusted {
-		return nil, fmt.Errorf("failed to adjust config: %w", ErrUnicastConfigNotFound)
+		return nil, fmt.Errorf("adjust operation aborted, entity not found")
 	}
 
 	return &unicast.Config{
@@ -118,14 +115,14 @@ func (d *UnicastConfigCache) AdjustWithInit(peerID peer.ID, adjustFunc unicast.U
 	}, nil
 }
 
-// GetOrInit returns the unicast config for the given peer id. If the config does not exist, it creates a new config
+// GetWithInit returns the unicast config for the given peer id. If the config does not exist, it creates a new config
 // using the factory function and stores it in the cache.
 // Args:
 // - peerID: the peer id of the unicast config.
 // Returns:
 //   - *Config, the unicast config for the given peer id.
 //   - error if the factory function returns an error. Any error should be treated as an irrecoverable error and indicates a bug.
-func (d *UnicastConfigCache) GetOrInit(peerID peer.ID) (*unicast.Config, error) {
+func (d *UnicastConfigCache) GetWithInit(peerID peer.ID) (*unicast.Config, error) {
 	// ensuring that the init-and-get operation is atomic.
 	entityId := entityIdOf(peerID)
 	initFunc := func() flow.Entity {
