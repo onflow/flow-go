@@ -2,7 +2,6 @@ package cache
 
 import (
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -34,15 +33,6 @@ type GossipSubSpamRecordCache struct {
 
 	// initFn is a function that is called to initialize a new record in the cache.
 	initFn func() p2p.GossipSubSpamRecord
-
-	// atomicAdjustMutex is a mutex used to ensure that the init-and-adjust operation is atomic.
-	// The init-and-adjust operation is used to initialize a record in the cache and then update it.
-	// The init-and-adjust operation is used when the record does not exist in the cache and needs to be initialized.
-	// The current implementation is not thread-safe, and the mutex is used to ensure that the init-and-adjust operation is atomic, otherwise
-	// more than one thread may try to initialize records at the same time and cause an LRU eviction, hence trying an adjust on a record that does not exist,
-	// which will result in an error.
-	// TODO: implement a thread-safe atomic adjust operation and remove the mutex.
-	atomicAdjustMutex sync.Mutex
 }
 
 var _ p2p.GossipSubSpamRecordCache = (*GossipSubSpamRecordCache)(nil)
@@ -90,23 +80,6 @@ func NewGossipSubSpamRecordCache(sizeLimit uint32,
 	}
 }
 
-// init initializes
-// Args:
-// - peerID: the peer ID of the peer in the GossipSub protocol.
-// Returns:
-// - bool: true if the record was added successfully, false otherwise.
-// Note that a record is added successfully if the cache has enough space to store the record and no record exists for the peer in the cache.
-// In other words, the entries are deduplicated by the peer ID.
-func (a *GossipSubSpamRecordCache) init(peerId peer.ID) bool {
-	entityId := entityIdOf(peerId)
-	return a.c.Add(gossipsubSpamRecordEntity{
-		entityId:            entityId,
-		peerID:              peerId,
-		lastUpdated:         time.Now(),
-		GossipSubSpamRecord: a.initFn(),
-	})
-}
-
 // Adjust updates the GossipSub spam penalty of a peer in the cache. If the peer does not have a record in the cache, a new record is created.
 // The order of the pre-processing functions is the same as the order in which they were added to the cache.
 // Args:
@@ -120,51 +93,42 @@ func (a *GossipSubSpamRecordCache) Adjust(peerID peer.ID, updateFn p2p.UpdateFun
 	entityId := entityIdOf(peerID)
 
 	var err error
-	optimisticAdjustFunc := func() (flow.Entity, bool) {
-		return a.c.Adjust(entityId, func(entry flow.Entity) flow.Entity {
-			e := entry.(gossipsubSpamRecordEntity)
+	adjustFunc := func(entity flow.Entity) flow.Entity {
+		e := entity.(gossipsubSpamRecordEntity)
 
-			currentRecord := e.GossipSubSpamRecord
-			// apply the pre-processing functions to the record.
-			for _, apply := range a.preprocessFns {
-				e.GossipSubSpamRecord, err = apply(e.GossipSubSpamRecord, e.lastUpdated)
-				if err != nil {
-					e.GossipSubSpamRecord = currentRecord
-					return e // return the original record if the pre-processing fails (atomic abort).
-				}
+		currentRecord := e.GossipSubSpamRecord
+		// apply the pre-processing functions to the record.
+		for _, apply := range a.preprocessFns {
+			e.GossipSubSpamRecord, err = apply(e.GossipSubSpamRecord, e.lastUpdated)
+			if err != nil {
+				e.GossipSubSpamRecord = currentRecord
+				return e // return the original record if the pre-processing fails (atomic abort).
 			}
+		}
 
-			// apply the update function to the record.
-			e.GossipSubSpamRecord = updateFn(e.GossipSubSpamRecord)
+		// apply the update function to the record.
+		e.GossipSubSpamRecord = updateFn(e.GossipSubSpamRecord)
 
-			if e.GossipSubSpamRecord != currentRecord {
-				e.lastUpdated = time.Now()
-			}
-			return e
-		})
+		if e.GossipSubSpamRecord != currentRecord {
+			e.lastUpdated = time.Now()
+		}
+		return e
 	}
 
-	// ensuring that the init-and-adjust operation is atomic.
-	a.atomicAdjustMutex.Lock()
-	defer a.atomicAdjustMutex.Unlock()
+	initFunc := func() flow.Entity {
+		return gossipsubSpamRecordEntity{
+			entityId:            entityId,
+			peerID:              peerID,
+			GossipSubSpamRecord: a.initFn(),
+		}
+	}
 
-	// first, we try to optimistically adjust the record assuming that the record already exists.
-	adjustedEntity, adjusted := optimisticAdjustFunc()
+	adjustedEntity, adjusted := a.c.AdjustWithInit(entityId, adjustFunc, initFunc)
 	if err != nil {
-		return nil, fmt.Errorf("could not update spam records for peer %s, error: %w", peerID.String(), err)
+		return nil, fmt.Errorf("error while applying pre-processing functions to cache record for peer %s: %w", p2plogging.PeerId(peerID), err)
 	}
-	// if the record does not exist, we initialize the record and try to adjust it again.
 	if !adjusted {
-		a.init(peerID)
-		// as the record is initialized, the adjust attempt should not return an error, and any returned error
-		// is an irrecoverable error and indicates a bug.
-		adjustedEntity, adjusted = optimisticAdjustFunc()
-		if err != nil {
-			return nil, fmt.Errorf("could not update spam records for peer %s, error: %w", peerID.String(), err)
-		}
-		if !adjusted {
-			return nil, fmt.Errorf("could not update spam records for peer %s; pre-processing errors (if-any) %w", peerID.String(), err)
-		}
+		return nil, fmt.Errorf("could not adjust cache record for peer %s", p2plogging.PeerId(peerID))
 	}
 
 	r := adjustedEntity.(gossipsubSpamRecordEntity).GossipSubSpamRecord
@@ -192,17 +156,14 @@ func (a *GossipSubSpamRecordCache) Has(peerID peer.ID) bool {
 //     the caller is advised to crash the node.
 //   - true if the record is found in the cache, false otherwise.
 func (a *GossipSubSpamRecordCache) Get(peerID peer.ID) (*p2p.GossipSubSpamRecord, error, bool) {
-	a.atomicAdjustMutex.Lock()
-	defer a.atomicAdjustMutex.Unlock()
-
 	entityId := entityIdOf(peerID)
 	if !a.c.Has(entityId) {
 		return nil, nil, false
 	}
 
 	var err error
-	record, updated := a.c.Adjust(entityId, func(entry flow.Entity) flow.Entity {
-		e := entry.(gossipsubSpamRecordEntity)
+	record, updated := a.c.Adjust(entityId, func(entity flow.Entity) flow.Entity {
+		e := mustBeGossipSubSpamRecordEntity(entity)
 
 		currentRecord := e.GossipSubSpamRecord
 		for _, apply := range a.preprocessFns {
@@ -224,7 +185,7 @@ func (a *GossipSubSpamRecordCache) Get(peerID peer.ID) (*p2p.GossipSubSpamRecord
 		return nil, fmt.Errorf("could not decay cache record for peer %s", p2plogging.PeerId(peerID)), false
 	}
 
-	r := record.(gossipsubSpamRecordEntity).GossipSubSpamRecord
+	r := mustBeGossipSubSpamRecordEntity(record).GossipSubSpamRecord
 	return &r, nil, true
 }
 
@@ -264,4 +225,21 @@ func (a gossipsubSpamRecordEntity) Checksum() flow.Identifier {
 // - flow.Identifier: the flow ID of the peer.
 func entityIdOf(peerId peer.ID) flow.Identifier {
 	return flow.MakeID(peerId)
+}
+
+// mustBeGossipSubSpamRecordEntity converts a flow.Entity to a gossipsubSpamRecordEntity.
+// This is used to convert the flow.Entity returned by HeroCache to a gossipsubSpamRecordEntity.
+// If the conversion fails, it panics.
+// Args:
+// - entity: the flow.Entity to be converted.
+// Returns:
+// - gossipsubSpamRecordEntity: the converted gossipsubSpamRecordEntity.
+func mustBeGossipSubSpamRecordEntity(entity flow.Entity) gossipsubSpamRecordEntity {
+	record, ok := entity.(gossipsubSpamRecordEntity)
+	if !ok {
+		// sanity check
+		// This should never happen, because the cache only contains gossipsubSpamRecordEntity entities.
+		panic(fmt.Sprintf("invalid entity type, expected gossipsubSpamRecordEntity type, got: %T", entity))
+	}
+	return record
 }
