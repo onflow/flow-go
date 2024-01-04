@@ -19,25 +19,25 @@ type DeltaView struct {
 	parent types.ReadOnlyView
 
 	// account changes
-	dirtyAddresses map[gethCommon.Address]interface{}
-	created        map[gethCommon.Address]interface{}
-	suicided       map[gethCommon.Address]interface{}
-	deleted        map[gethCommon.Address]interface{}
+	dirtyAddresses map[gethCommon.Address]struct{}
+	created        map[gethCommon.Address]struct{}
+	suicided       map[gethCommon.Address]struct{}
+	deleted        map[gethCommon.Address]struct{}
 	balances       map[gethCommon.Address]*big.Int
 	nonces         map[gethCommon.Address]uint64
 	codes          map[gethCommon.Address][]byte
 	codeHashes     map[gethCommon.Address]gethCommon.Hash
 
 	// slot changes
-	dirtySlots map[types.SlotAddress]interface{}
+	dirtySlots map[types.SlotAddress]struct{}
 	slots      map[types.SlotAddress]gethCommon.Hash
 
 	// transient storage
 	transient map[types.SlotAddress]gethCommon.Hash
 
 	// access lists
-	accessListAddresses map[gethCommon.Address]interface{}
-	accessListSlots     map[types.SlotAddress]interface{}
+	accessListAddresses map[gethCommon.Address]struct{}
+	accessListSlots     map[types.SlotAddress]struct{}
 
 	// logs
 	logs []*gethTypes.Log
@@ -56,21 +56,16 @@ func NewDeltaView(parent types.ReadOnlyView) *DeltaView {
 	return &DeltaView{
 		parent: parent,
 
-		dirtyAddresses:      make(map[gethCommon.Address]interface{}),
-		created:             make(map[gethCommon.Address]interface{}),
-		suicided:            make(map[gethCommon.Address]interface{}),
-		deleted:             make(map[gethCommon.Address]interface{}),
-		balances:            make(map[gethCommon.Address]*big.Int),
-		nonces:              make(map[gethCommon.Address]uint64),
-		codes:               make(map[gethCommon.Address][]byte),
-		codeHashes:          make(map[gethCommon.Address]gethCommon.Hash),
-		dirtySlots:          make(map[types.SlotAddress]interface{}),
-		slots:               make(map[types.SlotAddress]gethCommon.Hash),
-		transient:           make(map[types.SlotAddress]gethCommon.Hash),
-		accessListAddresses: make(map[gethCommon.Address]interface{}),
-		accessListSlots:     make(map[types.SlotAddress]interface{}),
-		logs:                make([]*gethTypes.Log, 0),
-		preimages:           make(map[gethCommon.Hash][]byte),
+		dirtyAddresses: make(map[gethCommon.Address]struct{}),
+		created:        make(map[gethCommon.Address]struct{}),
+		suicided:       make(map[gethCommon.Address]struct{}),
+		deleted:        make(map[gethCommon.Address]struct{}),
+		balances:       make(map[gethCommon.Address]*big.Int),
+		nonces:         make(map[gethCommon.Address]uint64),
+		codes:          make(map[gethCommon.Address][]byte),
+		codeHashes:     make(map[gethCommon.Address]gethCommon.Hash),
+		dirtySlots:     make(map[types.SlotAddress]struct{}),
+		slots:          make(map[types.SlotAddress]gethCommon.Hash),
 
 		// for refund we just copy the data
 		refund: parent.GetRefund(),
@@ -334,15 +329,20 @@ func (d *DeltaView) SetState(sk types.SlotAddress, value gethCommon.Hash) error 
 
 // GetTransientState returns the value of the slot of the transient state
 func (d *DeltaView) GetTransientState(sk types.SlotAddress) gethCommon.Hash {
-	val, found := d.transient[sk]
-	if found {
-		return val
+	if d.transient != nil {
+		val, found := d.transient[sk]
+		if found {
+			return val
+		}
 	}
 	return d.parent.GetTransientState(sk)
 }
 
 // SetTransientState adds sets a value for the given slot of the transient storage
 func (d *DeltaView) SetTransientState(sk types.SlotAddress, value gethCommon.Hash) {
+	if d.transient == nil {
+		d.transient = make(map[types.SlotAddress]gethCommon.Hash)
+	}
 	d.transient[sk] = value
 }
 
@@ -368,15 +368,21 @@ func (d *DeltaView) SubRefund(amount uint64) error {
 
 // AddressInAccessList checks if the address is in the access list
 func (d *DeltaView) AddressInAccessList(addr gethCommon.Address) bool {
-	_, addressFound := d.accessListAddresses[addr]
-	if !addressFound {
-		addressFound = d.parent.AddressInAccessList(addr)
+	if d.accessListAddresses != nil {
+		_, addressFound := d.accessListAddresses[addr]
+		if addressFound {
+			return true
+		}
 	}
-	return addressFound
+	return d.parent.AddressInAccessList(addr)
 }
 
 // AddAddressToAccessList adds an address to the access list
 func (d *DeltaView) AddAddressToAccessList(addr gethCommon.Address) bool {
+	if d.accessListAddresses == nil {
+		d.accessListAddresses = make(map[gethCommon.Address]struct{})
+	}
+
 	addrPresent := d.AddressInAccessList(addr)
 	d.accessListAddresses[addr] = struct{}{}
 	return !addrPresent
@@ -385,16 +391,22 @@ func (d *DeltaView) AddAddressToAccessList(addr gethCommon.Address) bool {
 // SlotInAccessList checks if the slot is in the access list
 func (d *DeltaView) SlotInAccessList(sk types.SlotAddress) (addressOk bool, slotOk bool) {
 	addressFound := d.AddressInAccessList(sk.Address)
-	_, slotFound := d.accessListSlots[sk]
-	if !slotFound {
-		_, slotFound = d.parent.SlotInAccessList(sk)
+	if d.accessListSlots != nil {
+		_, slotFound := d.accessListSlots[sk]
+		if slotFound {
+			return addressFound, true
+		}
 	}
+	_, slotFound := d.parent.SlotInAccessList(sk)
 	return addressFound, slotFound
 }
 
 // AddSlotToAccessList adds a slot to the access list
 // it also adds the address to the address list
 func (d *DeltaView) AddSlotToAccessList(sk types.SlotAddress) (addrAdded bool, slotAdded bool) {
+	if d.accessListSlots == nil {
+		d.accessListSlots = make(map[types.SlotAddress]struct{})
+	}
 	addrPresent, slotPresent := d.SlotInAccessList(sk)
 	d.accessListAddresses[sk.Address] = struct{}{}
 	d.accessListSlots[sk] = struct{}{}
@@ -403,6 +415,9 @@ func (d *DeltaView) AddSlotToAccessList(sk types.SlotAddress) (addrAdded bool, s
 
 // AddLog appends a log to the log collection
 func (d *DeltaView) AddLog(log *gethTypes.Log) {
+	if d.logs == nil {
+		d.logs = make([]*gethTypes.Log, 0)
+	}
 	d.logs = append(d.logs, log)
 }
 
@@ -413,6 +428,10 @@ func (d *DeltaView) Logs() []*gethTypes.Log {
 
 // AddPreimage adds a preimage
 func (d *DeltaView) AddPreimage(hash gethCommon.Hash, preimage []byte) {
+	if d.preimages == nil {
+		d.preimages = make(map[gethCommon.Hash][]byte)
+	}
+
 	// make a copy (legacy behaviour)
 	pi := make([]byte, len(preimage))
 	copy(pi, preimage)
@@ -425,11 +444,11 @@ func (d *DeltaView) Preimages() map[gethCommon.Hash][]byte {
 }
 
 // DirtyAddresses returns a set of addresses that has been updated in this view
-func (d *DeltaView) DirtyAddresses() map[gethCommon.Address]interface{} {
+func (d *DeltaView) DirtyAddresses() map[gethCommon.Address]struct{} {
 	return d.dirtyAddresses
 }
 
 // DirtySlots returns a set of slots that has been updated in this view
-func (d *DeltaView) DirtySlots() map[types.SlotAddress]interface{} {
+func (d *DeltaView) DirtySlots() map[types.SlotAddress]struct{} {
 	return d.dirtySlots
 }
