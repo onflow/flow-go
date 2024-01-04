@@ -21,7 +21,7 @@ type DeltaView struct {
 	// account changes
 	dirtyAddresses map[gethCommon.Address]interface{}
 	created        map[gethCommon.Address]interface{}
-	suicided       map[gethCommon.Address]interface{}
+	selfDestructed map[gethCommon.Address]interface{}
 	deleted        map[gethCommon.Address]interface{}
 	balances       map[gethCommon.Address]*big.Int
 	nonces         map[gethCommon.Address]uint64
@@ -58,7 +58,7 @@ func NewDeltaView(parent types.ReadOnlyView) *DeltaView {
 
 		dirtyAddresses:      make(map[gethCommon.Address]interface{}),
 		created:             make(map[gethCommon.Address]interface{}),
-		suicided:            make(map[gethCommon.Address]interface{}),
+		selfDestructed:      make(map[gethCommon.Address]interface{}),
 		deleted:             make(map[gethCommon.Address]interface{}),
 		balances:            make(map[gethCommon.Address]*big.Int),
 		nonces:              make(map[gethCommon.Address]uint64),
@@ -90,7 +90,7 @@ func (d *DeltaView) Exist(addr gethCommon.Address) (bool, error) {
 	if found {
 		return true, nil
 	}
-	_, found = d.suicided[addr]
+	_, found = d.selfDestructed[addr]
 	if found {
 		return true, nil
 	}
@@ -118,8 +118,8 @@ func (d *DeltaView) CreateAccount(addr gethCommon.Address) error {
 	// flag the address as dirty
 	d.dirtyAddresses[addr] = struct{}{}
 
-	// if has already suicided
-	if d.HasSuicided(addr) {
+	// if has already self destructed
+	if d.HasSelfDestructed(addr) {
 		// balance has already been set to zero
 		d.nonces[addr] = 0
 		d.codes[addr] = nil
@@ -148,34 +148,26 @@ func (d *DeltaView) IsCreated(addr gethCommon.Address) bool {
 	return d.parent.IsCreated(addr)
 }
 
-// HasSuicided returns true if address has been flagged for deletion
-func (d *DeltaView) HasSuicided(addr gethCommon.Address) bool {
-	_, found := d.suicided[addr]
+// HasSelfDestructed returns true if address has been flagged for deletion
+func (d *DeltaView) HasSelfDestructed(addr gethCommon.Address) bool {
+	_, found := d.selfDestructed[addr]
 	if found {
 		return true
 	}
-	return d.parent.HasSuicided(addr)
+	return d.parent.HasSelfDestructed(addr)
 }
 
-// Suicide sets a flag to delete the account at the end of transaction
-func (d *DeltaView) Suicide(addr gethCommon.Address) (bool, error) {
-	// if it doesn't exist, return false
-	exists, err := d.Exist(addr)
-	if err != nil {
-		return false, err
-	}
-	if !exists {
-		return false, nil
-	}
+// SelfDestruct sets a flag to delete the account at the end of transaction
+func (d *DeltaView) SelfDestruct(addr gethCommon.Address) error {
 	// flag the account for deletion
-	d.suicided[addr] = struct{}{}
+	d.selfDestructed[addr] = struct{}{}
 
 	// set balance to zero
 	d.balances[addr] = new(big.Int)
 
 	// flag the address as dirty
 	d.dirtyAddresses[addr] = struct{}{}
-	return true, nil
+	return nil
 }
 
 // GetBalance returns the balance of the given address

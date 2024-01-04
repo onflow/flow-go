@@ -199,7 +199,7 @@ func TestBaseView(t *testing.T) {
 		view, err := state.NewBaseView(testutils.GetSimpleValueStore(), flow.Address{1, 2, 3, 4})
 		require.NoError(t, err)
 
-		require.Equal(t, false, view.HasSuicided(gethCommon.Address{}))
+		require.Equal(t, false, view.HasSelfDestructed(gethCommon.Address{}))
 		require.Equal(t, false, view.IsCreated(gethCommon.Address{}))
 		require.Equal(t, uint64(0), view.GetRefund())
 		require.Equal(t, gethCommon.Hash{}, view.GetTransientState(types.SlotAddress{}))

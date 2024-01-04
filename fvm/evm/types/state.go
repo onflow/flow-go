@@ -33,8 +33,9 @@ type ReadOnlyView interface {
 	Exist(gethCommon.Address) (bool, error)
 	// IsCreated returns true if address has been created in this tx
 	IsCreated(gethCommon.Address) bool
-	// HasSuicided returns true if an address has suicided
-	HasSuicided(gethCommon.Address) bool
+	// HasSelfDestructed returns true if an address has self destructed
+	HasSelfDestructed(gethCommon.Address) bool
+
 	// GetBalance returns the balance of an address
 	GetBalance(gethCommon.Address) (*big.Int, error)
 	// GetNonce returns the nonce of an address
@@ -63,8 +64,9 @@ type HotView interface {
 
 	// CreateAccount creates a new account
 	CreateAccount(gethCommon.Address) error
-	// Suicide set the flag for deletion of the account after execution
-	Suicide(gethCommon.Address) (success bool, err error)
+	// SelfDestruct set the flag for destruction of the account after execution
+	SelfDestruct(gethCommon.Address) error
+
 	// SubBalance subtracts the amount from the balance the given address
 	SubBalance(gethCommon.Address, *big.Int) error
 	// AddBalance adds the amount to the balance of the given address

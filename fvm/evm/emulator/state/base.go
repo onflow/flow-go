@@ -94,8 +94,8 @@ func (v *BaseView) IsCreated(gethCommon.Address) bool {
 	return false
 }
 
-// HasSuicided returns true if an address has suicided in the context of this transaction
-func (v *BaseView) HasSuicided(gethCommon.Address) bool {
+// HasSelfDestructed returns true if an address has self destructed in the context of this transaction
+func (v *BaseView) HasSelfDestructed(gethCommon.Address) bool {
 	return false
 }
 
