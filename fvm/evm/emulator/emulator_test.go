@@ -335,7 +335,6 @@ func TestStorageNoSideEffect(t *testing.T) {
 			var err error
 			em := emulator.NewEmulator(backend, flowEVMRoot)
 			testAccount := types.NewAddressFromString("test")
-
 			amount := big.NewInt(10)
 			RunWithNewBlockView(t, em, func(blk types.BlockView) {
 				_, err = blk.DirectCall(types.NewDepositCall(testAccount, amount))
@@ -350,4 +349,69 @@ func TestStorageNoSideEffect(t *testing.T) {
 			require.Equal(t, orgSize, backend.TotalStorageSize())
 		})
 	})
+}
+
+func TestCallingExtraPrecompiles(t *testing.T) {
+	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(flowEVMRoot flow.Address) {
+			RunWithNewEmulator(t, backend, flowEVMRoot, func(em *emulator.Emulator) {
+
+				testAccount := types.NewAddressFromString("test")
+				amount := big.NewInt(10_000_000)
+				RunWithNewBlockView(t, em, func(blk types.BlockView) {
+					_, err := blk.DirectCall(types.NewDepositCall(testAccount, amount))
+					require.NoError(t, err)
+				})
+
+				input := []byte{1, 2}
+				output := []byte{3, 4}
+				pc := &MockedPrecompile{
+					RequiredGasFunc: func(input []byte) uint64 {
+						return uint64(10)
+					},
+					RunFunc: func(inp []byte) ([]byte, error) {
+						require.Equal(t, input, inp)
+						return output, nil
+					},
+				}
+				addr := gethCommon.BytesToAddress([]byte{128, 128})
+				ctx := types.NewDefaultBlockContext(blockNumber.Uint64())
+				ctx.ExtraPrecompiles[addr] = pc
+
+				blk, err := em.NewBlockView(ctx)
+				require.NoError(t, err)
+
+				res, err := blk.DirectCall(
+					types.NewContractCall(
+						testAccount,
+						types.NewAddress(addr),
+						input,
+						1_000_000,
+						big.NewInt(0), // this should be zero because the contract doesn't have receiver
+					),
+				)
+				require.NoError(t, err)
+				require.Equal(t, output, res.ReturnedValue)
+			})
+		})
+	})
+}
+
+type MockedPrecompile struct {
+	RequiredGasFunc func(input []byte) uint64
+	RunFunc         func(input []byte) ([]byte, error)
+}
+
+func (mp *MockedPrecompile) RequiredGas(input []byte) uint64 {
+	if mp.RequiredGasFunc == nil {
+		panic("RequiredGas not set for the mocked precompile")
+	}
+	return mp.RequiredGasFunc(input)
+}
+
+func (mp *MockedPrecompile) Run(input []byte) ([]byte, error) {
+	if mp.RunFunc == nil {
+		panic("Run not set for the mocked precompile")
+	}
+	return mp.RunFunc(input)
 }

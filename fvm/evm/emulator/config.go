@@ -5,8 +5,10 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	gethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/vm"
+	gethVM "github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 )
@@ -30,6 +32,15 @@ type Config struct {
 	TxContext *vm.TxContext
 	// base unit of gas for direct calls
 	DirectCallBaseGasUsage uint64
+	// a set of extra precompiles to be injected
+	ExtraPrecompiles map[gethCommon.Address]gethVM.PrecompiledContract
+}
+
+func (c *Config) ChainRules() params.Rules {
+	return c.ChainConfig.Rules(
+		c.BlockContext.BlockNumber,
+		c.BlockContext.Random != nil,
+		c.BlockContext.Time)
 }
 
 // DefaultChainConfig is the default chain config which
@@ -173,6 +184,13 @@ func WithGetBlockHashFunction(getHash vm.GetHashFunc) Option {
 func WithDirectCallBaseGasUsage(gas uint64) Option {
 	return func(c *Config) *Config {
 		c.DirectCallBaseGasUsage = gas
+		return c
+	}
+}
+
+func WithExtraPrecompiles(pc map[common.Address]vm.PrecompiledContract) Option {
+	return func(c *Config) *Config {
+		c.ExtraPrecompiles = pc
 		return c
 	}
 }

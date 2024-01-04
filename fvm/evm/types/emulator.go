@@ -3,7 +3,9 @@ package types
 import (
 	"math/big"
 
+	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
+	gethVM "github.com/ethereum/go-ethereum/core/vm"
 )
 
 var (
@@ -20,6 +22,9 @@ type BlockContext struct {
 	DirectCallBaseGasUsage uint64
 	DirectCallGasPrice     uint64
 	GasFeeCollector        Address
+
+	// a set of extra precompiles to be injected
+	ExtraPrecompiles map[gethCommon.Address]gethVM.PrecompiledContract
 }
 
 // NewDefaultBlockContext returns a new default block context
@@ -28,6 +33,7 @@ func NewDefaultBlockContext(BlockNumber uint64) BlockContext {
 		BlockNumber:            BlockNumber,
 		DirectCallBaseGasUsage: DefaultDirectCallBaseGasUsage,
 		DirectCallGasPrice:     DefaultDirectCallGasPrice,
+		ExtraPrecompiles:       make(map[gethCommon.Address]gethVM.PrecompiledContract),
 	}
 }
 
