@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/onflow/atree"
@@ -244,6 +243,8 @@ func (v *BaseView) UpdateAccount(
 		}
 		// TODO: maybe purge the state in the future as well
 		// currently the behaviour of stateDB doesn't purge the data
+		// We don't need to check if the code is empty and we purge the state
+		// this is not possible right now.
 	}
 	newAcc := NewAccount(addr, balance, nonce, codeHash, acc.CollectionID)
 	// no need to update the cache , storeAccount would update the cache
@@ -299,7 +300,7 @@ func (v *BaseView) DeleteAccount(addr gethCommon.Address) error {
 		for _, key := range keys {
 			delete(v.cachedSlots, types.SlotAddress{
 				Address: addr,
-				Key:     common.BytesToHash(key),
+				Key:     gethCommon.BytesToHash(key),
 			})
 		}
 	}
@@ -440,11 +441,13 @@ func (v *BaseView) storeSlot(sk types.SlotAddress, data gethCommon.Hash) error {
 	if err != nil {
 		return err
 	}
-	v.cachedSlots[sk] = data
+
 	emptyValue := gethCommon.Hash{}
 	if data == emptyValue {
+		delete(v.cachedSlots, sk)
 		return col.Remove(sk.Key.Bytes())
 	}
+	v.cachedSlots[sk] = data
 	return col.Set(sk.Key.Bytes(), data.Bytes())
 }
 
