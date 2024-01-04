@@ -15,7 +15,7 @@ type SpamRecordCache struct {
 }
 
 // Adjust provides a mock function with given fields: originId, adjustFunc
-func (_m *SpamRecordCache) Adjust(originId flow.Identifier, adjustFunc model.RecordAdjustFunc) (float64, error) {
+func (_m *SpamRecordCache) AdjustWithInit(originId flow.Identifier, adjustFunc model.RecordAdjustFunc) (float64, error) {
 	ret := _m.Called(originId, adjustFunc)
 
 	var r0 float64
