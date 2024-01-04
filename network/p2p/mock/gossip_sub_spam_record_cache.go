@@ -14,18 +14,30 @@ type GossipSubSpamRecordCache struct {
 	mock.Mock
 }
 
-// Add provides a mock function with given fields: peerId, record
-func (_m *GossipSubSpamRecordCache) Add(peerId peer.ID, record p2p.GossipSubSpamRecord) bool {
-	ret := _m.Called(peerId, record)
+// Adjust provides a mock function with given fields: peerID, updateFunc
+func (_m *GossipSubSpamRecordCache) Adjust(peerID peer.ID, updateFunc p2p.UpdateFunction) (*p2p.GossipSubSpamRecord, error) {
+	ret := _m.Called(peerID, updateFunc)
 
-	var r0 bool
-	if rf, ok := ret.Get(0).(func(peer.ID, p2p.GossipSubSpamRecord) bool); ok {
-		r0 = rf(peerId, record)
+	var r0 *p2p.GossipSubSpamRecord
+	var r1 error
+	if rf, ok := ret.Get(0).(func(peer.ID, p2p.UpdateFunction) (*p2p.GossipSubSpamRecord, error)); ok {
+		return rf(peerID, updateFunc)
+	}
+	if rf, ok := ret.Get(0).(func(peer.ID, p2p.UpdateFunction) *p2p.GossipSubSpamRecord); ok {
+		r0 = rf(peerID, updateFunc)
 	} else {
-		r0 = ret.Get(0).(bool)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*p2p.GossipSubSpamRecord)
+		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(peer.ID, p2p.UpdateFunction) error); ok {
+		r1 = rf(peerID, updateFunc)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // Get provides a mock function with given fields: peerID
@@ -73,32 +85,6 @@ func (_m *GossipSubSpamRecordCache) Has(peerID peer.ID) bool {
 	}
 
 	return r0
-}
-
-// Update provides a mock function with given fields: peerID, updateFunc
-func (_m *GossipSubSpamRecordCache) Adjust(peerID peer.ID, updateFunc p2p.UpdateFunction) (*p2p.GossipSubSpamRecord, error) {
-	ret := _m.Called(peerID, updateFunc)
-
-	var r0 *p2p.GossipSubSpamRecord
-	var r1 error
-	if rf, ok := ret.Get(0).(func(peer.ID, p2p.UpdateFunction) (*p2p.GossipSubSpamRecord, error)); ok {
-		return rf(peerID, updateFunc)
-	}
-	if rf, ok := ret.Get(0).(func(peer.ID, p2p.UpdateFunction) *p2p.GossipSubSpamRecord); ok {
-		r0 = rf(peerID, updateFunc)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*p2p.GossipSubSpamRecord)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(peer.ID, p2p.UpdateFunction) error); ok {
-		r1 = rf(peerID, updateFunc)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
 }
 
 type mockConstructorTestingTNewGossipSubSpamRecordCache interface {
