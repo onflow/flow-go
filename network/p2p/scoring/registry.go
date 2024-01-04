@@ -342,7 +342,7 @@ func (r *GossipSubAppSpecificScoreRegistry) computeAppSpecificScore(pid peer.ID)
 // - error: an error if the update failed; any returned error is an irrecoverable error and indicates a bug or misconfiguration.
 func (r *GossipSubAppSpecificScoreRegistry) processAppSpecificScoreUpdateWork(p peer.ID) error {
 	appSpecificScore := r.computeAppSpecificScore(p)
-	err := r.appScoreCache.Add(p, appSpecificScore, time.Now())
+	err := r.appScoreCache.AdjustWithInit(p, appSpecificScore, time.Now())
 	if err != nil {
 		// the error is considered fatal as it means the cache is not working properly.
 		return fmt.Errorf("could not add application specific score %f for peer to cache: %w", appSpecificScore, err)
