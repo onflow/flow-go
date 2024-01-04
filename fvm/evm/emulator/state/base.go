@@ -422,7 +422,10 @@ func (v *BaseView) getSlot(sk types.SlotAddress) (gethCommon.Hash, error) {
 	}
 
 	acc, err := v.getAccount(sk.Address)
-	if err != nil || acc == nil || len(acc.CollectionID) == 0 {
+	if err != nil {
+		return gethCommon.Hash{}, err
+	}
+	if acc == nil || len(acc.CollectionID) == 0 {
 		return gethCommon.Hash{}, nil
 	}
 
@@ -477,7 +480,10 @@ func (v *BaseView) getSlotCollection(acc *Account) (*Collection, error) {
 		// update account's collection ID
 		acc.CollectionID = col.CollectionID()
 		err = v.storeAccount(acc)
-		return col, err
+		if err != nil {
+			return nil, err
+		}
+		return col, nil
 	}
 
 	col, found := v.slots[acc.Address]

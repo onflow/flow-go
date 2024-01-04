@@ -4,6 +4,7 @@ import (
 	"bytes"
 	stdErrors "errors"
 	"fmt"
+	"maps"
 	"math/big"
 	"sort"
 
@@ -299,12 +300,8 @@ func (db *StateDB) Commit() error {
 	addresses := make(map[gethCommon.Address]interface{})
 	slots := make(map[types.SlotAddress]interface{})
 	for _, view := range db.views {
-		for key := range view.DirtyAddresses() {
-			addresses[key] = struct{}{}
-		}
-		for key := range view.DirtySlots() {
-			slots[key] = struct{}{}
-		}
+		maps.Copy(addresses, view.DirtyAddresses())
+		maps.Copy(slots, view.DirtySlots())
 	}
 
 	// sort addresses
@@ -312,6 +309,7 @@ func (db *StateDB) Commit() error {
 	for addr := range addresses {
 		sortedAddresses = append(sortedAddresses, addr)
 	}
+
 	sort.Slice(sortedAddresses,
 		func(i, j int) bool {
 			return bytes.Compare(sortedAddresses[i][:], sortedAddresses[j][:]) < 0
@@ -395,7 +393,6 @@ func (db *StateDB) Commit() error {
 // based on parameters that are passed it updates accesslists
 func (db *StateDB) Prepare(rules gethParams.Rules, sender, coinbase gethCommon.Address, dest *gethCommon.Address, precompiles []gethCommon.Address, txAccesses gethTypes.AccessList) {
 	if rules.IsBerlin {
-		// no need for mutation
 		db.AddAddressToAccessList(sender)
 
 		if dest != nil {
