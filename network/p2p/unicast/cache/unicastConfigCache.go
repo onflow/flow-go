@@ -73,54 +73,44 @@ func NewUnicastConfigCache(
 //   - error any returned error should be considered as an irrecoverable error and indicates a bug.
 func (d *UnicastConfigCache) Adjust(peerID peer.ID, adjustFunc unicast.UnicastConfigAdjustFunc) (*unicast.Config, error) {
 	entityId := entityIdOf(peerID)
-	adjustedUnicastCfg, err := d.adjust(entityId, adjustFunc)
-	if err != nil {
-		if err == ErrUnicastConfigNotFound {
-			// if the config does not exist, we initialize the config and try to adjust it again.
-			// Note: there is an edge case where the config is initialized by another goroutine between the two calls.
-			// In this case, the init function is invoked twice, but it is not a problem because the underlying
-			// cache is thread-safe. Hence, we do not need to synchronize the two calls. In such cases, one of the
-			// two calls returns false, and the other call returns true. We do not care which call returns false, hence,
-			// we ignore the return value of the init function.
-			e := UnicastConfigEntity{
-				PeerId:   peerID,
-				Config:   d.cfgFactory(),
-				EntityId: entityId,
-			}
-
-			// ensuring that the init-and-adjust operation is atomic.
-			d.atomicAdjustMutex.Lock()
-			defer d.atomicAdjustMutex.Unlock()
-
-			add := d.peerCache.Add(e)
-			fmt.Println("add: ", add, "peerId: ", peerID.String(), "entityId: ", entityId.String(), "size: ", d.peerCache.Size())
-			// if !added {
-			// 	return nil, fmt.Errorf("failed to initialize unicast config for peer %s", peerID)
-			// }
-
-			// as the config is initialized, the adjust function should not return an error, and any returned error
-			// is an irrecoverable error and indicates a bug.
-			return d.adjust(entityId, adjustFunc)
-		}
-		// if the adjust function returns an unexpected error on the first attempt, we return the error directly.
-		// any returned error should be considered as an irrecoverable error and indicates a bug.
-		return nil, fmt.Errorf("failed to adjust unicast config: %w", err)
-	}
-	// if the adjust function returns no error on the first attempt, we return the adjusted config.
-	return adjustedUnicastCfg, nil
-}
-
-// adjust applies the given adjust function to the unicast config of the given origin id.
-// It returns an error if the adjustFunc returns an error or if the config does not exist.
-// Args:
-// - peerIDHash: the hash value of the peer id of the unicast config (i.e., the ID of the unicast config entity).
-// - adjustFunc: the function that adjusts the unicast config.
-// Returns:
-//   - error if the adjustFunc returns an error or if the config does not exist (ErrUnicastConfigNotFound). Except the ErrUnicastConfigNotFound,
-//     any other error should be treated as an irrecoverable error and indicates a bug.
-func (d *UnicastConfigCache) adjust(entityId flow.Identifier, adjustFunc unicast.UnicastConfigAdjustFunc) (*unicast.Config, error) {
+	// adjustedUnicastCfg, err := d.adjust(entityId, adjustFunc)
+	// if err != nil {
+	// 	if err == ErrUnicastConfigNotFound {
+	// 		// if the config does not exist, we initialize the config and try to adjust it again.
+	// 		// Note: there is an edge case where the config is initialized by another goroutine between the two calls.
+	// 		// In this case, the init function is invoked twice, but it is not a problem because the underlying
+	// 		// cache is thread-safe. Hence, we do not need to synchronize the two calls. In such cases, one of the
+	// 		// two calls returns false, and the other call returns true. We do not care which call returns false, hence,
+	// 		// we ignore the return value of the init function.
+	// 		e := UnicastConfigEntity{
+	// 			PeerId:   peerID,
+	// 			Config:   d.cfgFactory(),
+	// 			EntityId: entityId,
+	// 		}
+	//
+	// 		// ensuring that the init-and-adjust operation is atomic.
+	// 		d.atomicAdjustMutex.Lock()
+	// 		defer d.atomicAdjustMutex.Unlock()
+	//
+	// 		add := d.peerCache.Add(e)
+	// 		fmt.Println("add: ", add, "peerId: ", peerID.String(), "entityId: ", entityId.String(), "size: ", d.peerCache.Size())
+	// 		// if !added {
+	// 		// 	return nil, fmt.Errorf("failed to initialize unicast config for peer %s", peerID)
+	// 		// }
+	//
+	// 		// as the config is initialized, the adjust function should not return an error, and any returned error
+	// 		// is an irrecoverable error and indicates a bug.
+	// 		return d.adjust(entityId, adjustFunc)
+	// 	}
+	// 	// if the adjust function returns an unexpected error on the first attempt, we return the error directly.
+	// 	// any returned error should be considered as an irrecoverable error and indicates a bug.
+	// 	return nil, fmt.Errorf("failed to adjust unicast config: %w", err)
+	// }
+	// // if the adjust function returns no error on the first attempt, we return the adjusted config.
+	// return adjustedUnicastCfg, nil
 	var rErr error
-	adjustedEntity, adjusted := d.peerCache.Adjust(entityId, func(entity flow.Entity) flow.Entity {
+	// wraps external adjust function to adjust the unicast config.
+	wrapAdjustFunc := func(entity flow.Entity) flow.Entity {
 		cfgEntity, ok := entity.(UnicastConfigEntity)
 		if !ok {
 			// sanity check
@@ -138,14 +128,23 @@ func (d *UnicastConfigCache) adjust(entityId flow.Identifier, adjustFunc unicast
 		// Return the adjusted config.
 		cfgEntity.Config = adjustedCfg
 		return cfgEntity
-	})
+	}
 
+	initFunc := func() flow.Entity {
+		return UnicastConfigEntity{
+			PeerId:   peerID,
+			Config:   d.cfgFactory(),
+			EntityId: entityId,
+		}
+	}
+
+	adjustedEntity, adjusted := d.peerCache.AdjustWithInit(entityId, wrapAdjustFunc, initFunc)
 	if rErr != nil {
-		return nil, fmt.Errorf("failed to adjust config: %w", rErr)
+		return nil, fmt.Errorf("adjsut operation aborted: %w", rErr)
 	}
 
 	if !adjusted {
-		return nil, ErrUnicastConfigNotFound
+		return nil, fmt.Errorf("failed to adjust config: %w", ErrUnicastConfigNotFound)
 	}
 
 	return &unicast.Config{
@@ -163,32 +162,18 @@ func (d *UnicastConfigCache) adjust(entityId flow.Identifier, adjustFunc unicast
 //   - error if the factory function returns an error. Any error should be treated as an irrecoverable error and indicates a bug.
 func (d *UnicastConfigCache) GetOrInit(peerID peer.ID) (*unicast.Config, error) {
 	// ensuring that the init-and-get operation is atomic.
-	d.atomicAdjustMutex.Lock()
-	defer d.atomicAdjustMutex.Unlock()
-
 	entityId := entityIdOf(peerID)
-	cfg, ok := d.get(entityId)
-	if !ok {
-		_ = d.peerCache.Add(UnicastConfigEntity{
+	initFunc := func() flow.Entity {
+		return UnicastConfigEntity{
 			PeerId:   peerID,
 			Config:   d.cfgFactory(),
 			EntityId: entityId,
-		})
-		cfg, ok = d.get(entityId)
-		if !ok {
-			return nil, fmt.Errorf("failed to initialize unicast config for peer %s", peerID)
 		}
 	}
-	return cfg, nil
-}
-
-// Get returns the unicast config of the given peer ID.
-func (d *UnicastConfigCache) get(entityId flow.Identifier) (*unicast.Config, bool) {
-	entity, ok := d.peerCache.ByID(entityId)
+	entity, ok := d.peerCache.GetOrInit(entityId, initFunc)
 	if !ok {
-		return nil, false
+		return nil, fmt.Errorf("get or init for unicast config for peer %s failed", peerID)
 	}
-
 	cfg, ok := entity.(UnicastConfigEntity)
 	if !ok {
 		// sanity check
@@ -200,7 +185,7 @@ func (d *UnicastConfigCache) get(entityId flow.Identifier) (*unicast.Config, boo
 	return &unicast.Config{
 		StreamCreationRetryAttemptBudget: cfg.StreamCreationRetryAttemptBudget,
 		ConsecutiveSuccessfulStream:      cfg.ConsecutiveSuccessfulStream,
-	}, true
+	}, nil
 }
 
 // Size returns the number of unicast configs in the cache.
