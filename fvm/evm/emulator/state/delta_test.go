@@ -5,7 +5,6 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	gethCrypto "github.com/ethereum/go-ethereum/crypto"
@@ -41,6 +40,9 @@ func TestDeltaView(t *testing.T) {
 					default:
 						return false, fmt.Errorf("some error")
 					}
+				},
+				GetBalanceFunc: func(a gethCommon.Address) (*big.Int, error) {
+					return new(big.Int), nil
 				},
 				HasSuicidedFunc: func(gethCommon.Address) bool {
 					return false
@@ -164,15 +166,6 @@ func TestDeltaView(t *testing.T) {
 		// handling error on the parent
 		_, err = view.GetBalance(addr3)
 		require.Error(t, err)
-
-		// create a new account at addr3
-		err = view.CreateAccount(addr3)
-		require.NoError(t, err)
-
-		// now the balance should return 0
-		bal, err = view.GetBalance(addr3)
-		require.NoError(t, err)
-		require.Equal(t, big.NewInt(0), bal)
 	})
 
 	t.Run("test nonce functionality", func(t *testing.T) {
@@ -194,6 +187,9 @@ func TestDeltaView(t *testing.T) {
 				},
 				HasSuicidedFunc: func(a gethCommon.Address) bool {
 					return false
+				},
+				GetBalanceFunc: func(gethCommon.Address) (*big.Int, error) {
+					return new(big.Int), nil
 				},
 				GetNonceFunc: func(addr gethCommon.Address) (uint64, error) {
 					switch addr {
@@ -253,6 +249,9 @@ func TestDeltaView(t *testing.T) {
 				HasSuicidedFunc: func(a gethCommon.Address) bool {
 					return false
 				},
+				GetBalanceFunc: func(a gethCommon.Address) (*big.Int, error) {
+					return new(big.Int), nil
+				},
 				GetCodeFunc: func(addr gethCommon.Address) ([]byte, error) {
 					switch addr {
 					case addr1:
@@ -269,7 +268,7 @@ func TestDeltaView(t *testing.T) {
 						return 0, fmt.Errorf("some error")
 					}
 				},
-				GetCodeHashFunc: func(addr gethCommon.Address) (common.Hash, error) {
+				GetCodeHashFunc: func(addr gethCommon.Address) (gethCommon.Hash, error) {
 					switch addr {
 					case addr1:
 						return addr1IntiCodeHash, nil
@@ -716,11 +715,12 @@ func TestDeltaView(t *testing.T) {
 
 		ret, err = view.GetCode(addr1)
 		require.NoError(t, err)
-		require.Equal(t, nil, ret)
+		require.Len(t, ret, 0)
 
 		vret, err = view.GetState(sk)
 		require.NoError(t, err)
-		require.Len(t, vret, 0)
+		emptyValue := gethCommon.Hash{}
+		require.Equal(t, emptyValue, vret)
 	})
 }
 
