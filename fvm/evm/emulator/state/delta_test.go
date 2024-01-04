@@ -5,7 +5,6 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	gethCrypto "github.com/ethereum/go-ethereum/crypto"
@@ -269,7 +268,7 @@ func TestDeltaView(t *testing.T) {
 						return 0, fmt.Errorf("some error")
 					}
 				},
-				GetCodeHashFunc: func(addr gethCommon.Address) (common.Hash, error) {
+				GetCodeHashFunc: func(addr gethCommon.Address) (gethCommon.Hash, error) {
 					switch addr {
 					case addr1:
 						return addr1IntiCodeHash, nil
@@ -706,7 +705,6 @@ func TestDeltaView(t *testing.T) {
 		require.Equal(t, value, vret)
 
 		// now re-create account
-
 		err = view.CreateAccount(addr1)
 		require.NoError(t, err)
 
@@ -716,11 +714,12 @@ func TestDeltaView(t *testing.T) {
 
 		ret, err = view.GetCode(addr1)
 		require.NoError(t, err)
-		require.Equal(t, nil, ret)
+		require.Len(t, ret, 0)
 
 		vret, err = view.GetState(sk)
 		require.NoError(t, err)
-		require.Len(t, vret, 0)
+		emptyValue := gethCommon.Hash{}
+		require.Equal(t, emptyValue, vret)
 	})
 }
 
