@@ -9,6 +9,8 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/convert"
+	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/onflow/cadence/migrations"
 	"github.com/onflow/cadence/migrations/account_type"
@@ -106,8 +108,40 @@ func (m *CadenceValueMigrator) MigrateAccount(
 	m.log.Info().Msg("Committing changes")
 	migration.Commit()
 
-	// TODO: return the updated payloads
-	return migrationRuntime.Payloads, nil
+	// finalize the transaction
+	result, err := migrationRuntime.TransactionState.FinalizeMainTransaction()
+	if err != nil {
+		return nil, fmt.Errorf("failed to finalize main transaction: %w", err)
+	}
+
+	// Merge the changes to the original payloads.
+	return m.mergeRegisterChanges(migrationRuntime, result.WriteSet)
+}
+
+func (m *CadenceValueMigrator) mergeRegisterChanges(
+	mr *migratorRuntime,
+	changes map[flow.RegisterID]flow.RegisterValue,
+) ([]*ledger.Payload, error) {
+
+	originalPayloads := mr.Snapshot.Payloads
+	newPayloads := make([]*ledger.Payload, 0, len(originalPayloads))
+
+	for id, value := range originalPayloads {
+		if len(value.Value()) == 0 {
+			// This is strange, but we don't want to add empty values. Log it.
+			m.log.Warn().Msgf("empty value for key %s", id)
+			continue
+		}
+
+		if updatedPayload, contains := changes[id]; contains {
+			key := convert.RegisterIDToLedgerKey(id)
+			newPayloads = append(newPayloads, ledger.NewPayload(key, updatedPayload))
+		} else {
+			newPayloads = append(newPayloads, value)
+		}
+	}
+
+	return newPayloads, nil
 }
 
 // AccountIDGenerator for the link-value migration

@@ -25,7 +25,7 @@ import (
 	_ "github.com/glebarez/go-sqlite"
 )
 
-const file string = "/Users/supunsetunga/work/flow-go/cmd/util/ledger/migrations/test-data/cadence_values/snapshot4"
+const snapshotPath string = "test-data/cadence_values_migration/snapshot"
 
 func TestCadenceValuesMigration(t *testing.T) {
 
@@ -34,7 +34,7 @@ func TestCadenceValuesMigration(t *testing.T) {
 
 	// Get the old payloads
 
-	payloads := payloadsFromEmulatorSnapshot(t, file)
+	payloads := payloadsFromEmulatorSnapshot(t, snapshotPath)
 
 	// Migrate
 
@@ -47,7 +47,7 @@ func TestCadenceValuesMigration(t *testing.T) {
 	newPayloads, err := valueMigration.MigrateAccount(nil, address, payloads)
 	require.NoError(t, err)
 
-	// Check the migrated payloads
+	// Assert the migrated payloads
 
 	mr, err := newMigratorRuntime(address, newPayloads)
 	require.NoError(t, err)
@@ -62,7 +62,7 @@ func TestCadenceValuesMigration(t *testing.T) {
 
 	var values []interpreter.Value
 	for key, value := iterator.Next(); key != nil; key, value = iterator.Next() {
-		// skip composite values. e.g: FLowToken etc.
+		// skip composite values. e.g: FlowToken etc.
 		if _, isComposite := value.(*interpreter.CompositeValue); isComposite {
 			continue
 		}
