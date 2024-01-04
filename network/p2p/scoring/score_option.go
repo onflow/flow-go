@@ -389,6 +389,13 @@ func NewScoreOption(cfg *ScoreOptionConfig, provider p2p.SubscriptionProvider) (
 		SpamRecordCacheFactory: func() p2p.GossipSubSpamRecordCache {
 			collector := metrics.GossipSubSpamRecordCacheMetricsFactory(cfg.heroCacheMetricsFactory, cfg.networkingType)
 			return netcache.NewGossipSubSpamRecordCache(cfg.params.SpamRecordCache.CacheSize, cfg.logger, collector,
+				func() p2p.GossipSubSpamRecord {
+					return p2p.GossipSubSpamRecord{
+						Decay:               0,
+						Penalty:             0,
+						LastDecayAdjustment: time.Now(),
+					}
+				},
 				DefaultDecayFunction(
 					cfg.params.SpamRecordCache.PenaltyDecaySlowdownThreshold,
 					cfg.params.SpamRecordCache.DecayRateReductionFactor,
