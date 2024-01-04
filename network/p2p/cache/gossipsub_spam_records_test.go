@@ -516,7 +516,9 @@ func TestGossipSubSpamRecordCache_Duplicate_Adjust_Concurrent(t *testing.T) {
 	// adds a record to the cache concurrently.
 	add := func(newRecord p2p.GossipSubSpamRecord) {
 		_, err := cache.Adjust(peerId, func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
-			record = newRecord
+			record.Penalty = newRecord.Penalty
+			record.Decay = newRecord.Decay
+			record.LastDecayAdjustment = newRecord.LastDecayAdjustment
 			return record
 		})
 		require.NoError(t, err)
