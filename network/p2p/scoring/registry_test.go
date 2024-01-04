@@ -565,6 +565,7 @@ func TestScoreRegistry_PersistingUnknownIdentityPenalty(t *testing.T) {
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: p2pmsg.CtrlMsgGraft,
+		Errors:  p2p.InvCtrlMsgErrs{p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid graft"), p2p.CtrlMsgNonClusterTopicType)},
 	})
 
 	// decays happen every second, so we wait for 1 second to make sure the penalty is updated.
@@ -874,13 +875,21 @@ func TestInvalidControlMessageMultiErrorScoreCalculation(t *testing.T) {
 		withStakedIdentities(peerIds...),
 		withValidSubscriptions(peerIds...))
 
+	// starts the registry.
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+	reg.Start(signalerCtx)
+	unittest.RequireCloseBefore(t, reg.Ready(), 1*time.Second, "failed to start GossipSubAppSpecificScoreRegistry")
+
 	for _, peerID := range peerIds {
-		// initially, the spamRecords should not have the peer id.
-		assert.False(t, spamRecords.Has(peerID))
-		// since the peer id does not have a spam record, the app specific score should be the max app specific reward, which
-		// is the default reward for a staked peer that has valid subscriptions.
-		score := reg.AppSpecificScoreFunc()(peerID)
-		assert.Equal(t, scoring.MaxAppSpecificReward, score)
+		require.Eventually(t, func() bool {
+			// initially, the spamRecords should not have the peer id.
+			assert.False(t, spamRecords.Has(peerID))
+			// since the peer id does not have a spam record, the app specific score should be the max app specific reward, which
+			// is the default reward for a staked peer that has valid subscriptions.
+			score := reg.AppSpecificScoreFunc()(peerID)
+			return score == scoring.MaxAppSpecificReward
+		}, 5*time.Second, 500*time.Millisecond)
 	}
 
 	type testCase struct {
@@ -976,11 +985,18 @@ func TestInvalidControlMessageMultiErrorScoreCalculation(t *testing.T) {
 		require.Less(t, math.Abs(tCase.expectedPenalty-record.Penalty), 10e-3)  // penalty should be updated to -10.
 		require.Equal(t, scoring.InitAppScoreRecordState().Decay, record.Decay) // decay should be initialized to the initial state.
 
-		// this peer has a spam record, with no subscription penalty. Hence, the app specific score should only be the spam penalty,
-		// and the peer should be deprived of the default reward for its valid staked role.
-		score := reg.AppSpecificScoreFunc()(tCase.notification.PeerID)
-		require.Less(t, math.Abs(tCase.expectedPenalty-score), 10e-3)
+		require.Eventually(t, func() bool {
+			// this peer has a spam record, with no subscription penalty. Hence, the app specific score should only be the spam penalty,
+			// and the peer should be deprived of the default reward for its valid staked role.
+			score := reg.AppSpecificScoreFunc()(tCase.notification.PeerID)
+			tolerance := 10e-2
+			return math.Abs(tCase.expectedPenalty-score)/tCase.expectedPenalty < tolerance
+		}, 5*time.Second, 500*time.Millisecond)
 	}
+
+	// stop the registry.
+	cancel()
+	unittest.RequireCloseBefore(t, reg.Done(), 1*time.Second, "failed to stop GossipSubAppSpecificScoreRegistry")
 }
 
 // withStakedIdentities returns a function that sets the identity provider to return staked identities for the given peer ids.

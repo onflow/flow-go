@@ -225,7 +225,6 @@ func (r *GossipSubAppSpecificScoreRegistry) AppSpecificScoreFunc() func(peer.ID)
 			lg.Trace().
 				Bool("worker_submitted", submitted).
 				Msg("application specific score not found in cache, submitting worker to update it")
-
 			return 0 // in the mean time, return 0, which is a neutral score.
 		case time.Since(lastUpdated) > r.scoreTTL:
 			// record found in the cache, but expired; submit a worker to update it.
@@ -242,7 +241,6 @@ func (r *GossipSubAppSpecificScoreRegistry) AppSpecificScoreFunc() func(peer.ID)
 			r.logger.Trace().
 				Float64("app_specific_score", appSpecificScore).
 				Msg("application specific score found in cache")
-
 			return appSpecificScore
 		}
 	}
@@ -259,7 +257,6 @@ func (r *GossipSubAppSpecificScoreRegistry) AppSpecificScoreFunc() func(peer.ID)
 // - float64: the application specific score of the peer.
 func (r *GossipSubAppSpecificScoreRegistry) computeAppSpecificScore(pid peer.ID) float64 {
 	appSpecificScore := float64(0)
-
 	lg := r.logger.With().Str("peer_id", p2plogging.PeerId(pid)).Logger()
 	// (1) spam penalty: the penalty is applied to the application specific penalty when a peer conducts a spamming misbehaviour.
 	spamRecord, err, spamRecordExists := r.spamScoreCache.Get(pid)
@@ -305,7 +302,6 @@ func (r *GossipSubAppSpecificScoreRegistry) computeAppSpecificScore(pid peer.ID)
 	lg.Trace().
 		Float64("total_app_specific_score", appSpecificScore).
 		Msg("application specific score computed")
-
 	return appSpecificScore
 }
 

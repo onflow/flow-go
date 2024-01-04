@@ -82,7 +82,7 @@ const (
 	AppSpecificScoreRegistryKey = "app-specific-score"
 	SpamRecordCacheKey          = "spam-record-cache"
 	DecayIntervalKey            = "decay-interval"
-	Penalties                   = "penalties"
+	PenaltiesKey                = "penalties"
 )
 
 // ScoringParameters are the parameters for the score option.

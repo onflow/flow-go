@@ -110,6 +110,13 @@ func AllFlagNames() []string {
 		BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.SpamRecordCacheKey, p2pconfig.DecayRateReductionFactorKey),
 		BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.SpamRecordCacheKey, p2pconfig.PenaltyDecayEvaluationPeriodKey),
 		BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.DecayIntervalKey),
+
+		BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.PenaltiesKey, p2pconfig.GraftPenaltyKey),
+		BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.PenaltiesKey, p2pconfig.PrunePenaltyKey),
+		BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.PenaltiesKey, p2pconfig.IhavePenaltyKey),
+		BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.PenaltiesKey, p2pconfig.IWantPenaltyKey),
+		BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.PenaltiesKey, p2pconfig.PublishPenaltyKey),
+		BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.PenaltiesKey, p2pconfig.ClusterPrefixedReductionFactorKey),
 	}
 
 	for _, scope := range []string{systemScope, transientScope, protocolScope, peerScope, peerProtocolScope} {
@@ -266,22 +273,22 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 		config.GossipSub.SubscriptionProvider.CacheSize,
 		"size of the cache that keeps the list of topics each peer has subscribed to, recommended size is 10x the number of authorized nodes")
 
-	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.Penalties, p2pconfig.GraftPenaltyKey),
+	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.PenaltiesKey, p2pconfig.GraftPenaltyKey),
 		config.GossipSub.ScoringParameters.GossipsubScorePenalties.Graft,
 		"the penalty value for GRAFT control messages")
-	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.Penalties, p2pconfig.PrunePenaltyKey),
+	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.PenaltiesKey, p2pconfig.PrunePenaltyKey),
 		config.GossipSub.ScoringParameters.GossipsubScorePenalties.Prune,
 		"the penalty value for PRUNE control messages")
-	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.Penalties, p2pconfig.IhavePenaltyKey),
+	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.PenaltiesKey, p2pconfig.IhavePenaltyKey),
 		config.GossipSub.ScoringParameters.GossipsubScorePenalties.IHave,
 		"the penalty value for IHAVE control messages")
-	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.Penalties, p2pconfig.IWantPenaltyKey),
+	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.PenaltiesKey, p2pconfig.IWantPenaltyKey),
 		config.GossipSub.ScoringParameters.GossipsubScorePenalties.IWant,
 		"the penalty value for IWANT control messages")
-	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.Penalties, p2pconfig.PublishPenaltyKey),
+	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.PenaltiesKey, p2pconfig.PublishPenaltyKey),
 		config.GossipSub.ScoringParameters.GossipsubScorePenalties.Publish,
 		"the penalty value for messages published with a control message")
-	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.Penalties, p2pconfig.ClusterPrefixedReductionFactorKey),
+	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.PenaltiesKey, p2pconfig.ClusterPrefixedReductionFactorKey),
 		config.GossipSub.ScoringParameters.GossipsubScorePenalties.ClusterPrefixedReductionFactor,
 		"factor used to reduce the penalty for control message misbehaviours on cluster prefixed topics")
 

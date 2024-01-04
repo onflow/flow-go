@@ -180,6 +180,7 @@ func NewGossipSubBuilder(logger zerolog.Logger,
 		gossipSubConfigFunc:      defaultGossipSubAdapterConfig(),
 		scoreOptionConfig:        scoring.NewScoreOptionConfig(lg, gossipSubCfg.ScoringParameters, metricsCfg.HeroCacheFactory, idProvider, networkType),
 		rpcInspectorSuiteFactory: defaultInspectorSuite(meshTracer),
+		gossipSubTracer:          meshTracer,
 		gossipSubCfg:             gossipSubCfg,
 	}
 
