@@ -32,12 +32,9 @@ var _ io.Closer = (*CadenceValueMigrator)(nil)
 func NewCadenceValueMigrator(
 	rwf reporters.ReportWriterFactory,
 ) *CadenceValueMigrator {
-
-	migrator := &CadenceValueMigrator{
+	return &CadenceValueMigrator{
 		reporter: rwf.ReportWriter("cadence-value-migrator"),
 	}
-
-	return migrator
 }
 
 func (m *CadenceValueMigrator) Close() error {
@@ -84,21 +81,17 @@ func (m *CadenceValueMigrator) MigrateAccount(
 				address,
 			},
 		},
-
 		migration.NewValueMigrationsPathMigrator(
 			reporter,
-
 			&capcons.CapabilityValueMigration{
 				CapabilityIDs: capabilityIDs,
 				Reporter:      reporter,
 			},
-
 			&capcons.LinkValueMigration{
 				CapabilityIDs:      capabilityIDs,
 				AccountIDGenerator: &AccountIDGenerator{},
 				Reporter:           reporter,
 			},
-
 			string_normalization.NewStringNormalizingMigration(),
 			account_type.NewAccountTypeMigration(),
 			type_value.NewTypeValueMigration(),
@@ -133,6 +126,7 @@ func (m *CadenceValueMigrator) mergeRegisterChanges(
 			continue
 		}
 
+		// If the payload had changed, then use the updated payload.
 		if updatedPayload, contains := changes[id]; contains {
 			key := convert.RegisterIDToLedgerKey(id)
 			newPayloads = append(newPayloads, ledger.NewPayload(key, updatedPayload))
