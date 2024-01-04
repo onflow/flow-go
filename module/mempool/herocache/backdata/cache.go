@@ -233,7 +233,7 @@ func (c *Cache) AdjustWithInit(entityID flow.Identifier, adjust func(flow.Entity
 //   - the entity.
 //
 // - a bool which indicates whether the entity was found (or created).
-func (c *Cache) GetOrInit(entityID flow.Identifier, init func() flow.Entity) (flow.Entity, bool) {
+func (c *Cache) GetWithInit(entityID flow.Identifier, init func() flow.Entity) (flow.Entity, bool) {
 	defer c.logTelemetry()
 
 	if c.Has(entityID) {

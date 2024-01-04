@@ -170,7 +170,7 @@ func (d *UnicastConfigCache) GetOrInit(peerID peer.ID) (*unicast.Config, error) 
 			EntityId: entityId,
 		}
 	}
-	entity, ok := d.peerCache.GetOrInit(entityId, initFunc)
+	entity, ok := d.peerCache.GetWithInit(entityId, initFunc)
 	if !ok {
 		return nil, fmt.Errorf("get or init for unicast config for peer %s failed", peerID)
 	}

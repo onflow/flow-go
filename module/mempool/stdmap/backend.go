@@ -96,7 +96,7 @@ func (b *Backend) Adjust(entityID flow.Identifier, f func(flow.Entity) flow.Enti
 	return entity, wasUpdated
 }
 
-// GetOrInit returns the given entity from the backdata. If the entity does not exist, it creates a new entity
+// GetWithInit returns the given entity from the backdata. If the entity does not exist, it creates a new entity
 // using the factory function and stores it in the backdata.
 // Args:
 // - entityID: the identifier of the entity to get.
@@ -105,11 +105,11 @@ func (b *Backend) Adjust(entityID flow.Identifier, f func(flow.Entity) flow.Enti
 //   - the entity.
 //
 // - a bool which indicates whether the entity was found (or created).
-func (b *Backend) GetOrInit(entityID flow.Identifier, init func() flow.Entity) (flow.Entity, bool) {
+func (b *Backend) GetWithInit(entityID flow.Identifier, init func() flow.Entity) (flow.Entity, bool) {
 	b.Lock()
 	defer b.Unlock()
 
-	return b.backData.GetOrInit(entityID, init)
+	return b.backData.GetWithInit(entityID, init)
 }
 
 // AdjustWithInit adjusts the entity using the given function if the given identifier can be found. When the

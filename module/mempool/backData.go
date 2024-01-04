@@ -43,7 +43,7 @@ type BackData interface {
 	// Returns:
 	//  - the entity.
 	// - a bool which indicates whether the entity was found (or created).
-	GetOrInit(entityID flow.Identifier, init func() flow.Entity) (flow.Entity, bool)
+	GetWithInit(entityID flow.Identifier, init func() flow.Entity) (flow.Entity, bool)
 
 	// ByID returns the given entity from the backdata.
 	ByID(entityID flow.Identifier) (flow.Entity, bool)

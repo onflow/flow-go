@@ -60,8 +60,8 @@ func TestUnicastConfigCache_Adjust_Init(t *testing.T) {
 	peerID1 := unittest.PeerIdFixture(t)
 	peerID2 := unittest.PeerIdFixture(t)
 
-	// Initializing the unicast config for peerID1 through GetOrInit.
-	// unicast config for peerID1 does not exist in the cache, so it must be initialized when using GetOrInit.
+	// Initializing the unicast config for peerID1 through GetWithInit.
+	// unicast config for peerID1 does not exist in the cache, so it must be initialized when using GetWithInit.
 	cfg, err := cache.GetOrInit(peerID1)
 	require.NoError(t, err)
 	require.NotNil(t, cfg, "unicast config must not be nil")
@@ -76,7 +76,7 @@ func TestUnicastConfigCache_Adjust_Init(t *testing.T) {
 	require.Equal(t, uint(2), cache.Size(), "cache size must be 2")
 	require.Equal(t, cfg.StreamCreationRetryAttemptBudget, unicastConfigFixture().StreamCreationRetryAttemptBudget+1, "stream backoff must be 2")
 
-	// Retrieving the unicast config of peerID2 through GetOrInit.
+	// Retrieving the unicast config of peerID2 through GetWithInit.
 	// retrieve the unicast config for peerID2 and assert than it is initialized with the default values; and the adjust function is applied.
 	cfg, err = cache.GetOrInit(peerID2)
 	require.NoError(t, err, "unicast config must exist in the cache")

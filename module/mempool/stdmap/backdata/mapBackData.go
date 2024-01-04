@@ -86,7 +86,7 @@ func (b *MapBackData) AdjustWithInit(entityID flow.Identifier, adjust func(flow.
 // Returns:
 //   - the entity.
 //   - a bool which indicates whether the entity was found (or created).
-func (b *MapBackData) GetOrInit(entityID flow.Identifier, init func() flow.Entity) (flow.Entity, bool) {
+func (b *MapBackData) GetWithInit(entityID flow.Identifier, init func() flow.Entity) (flow.Entity, bool) {
 	if b.Has(entityID) {
 		return b.ByID(entityID)
 	}
