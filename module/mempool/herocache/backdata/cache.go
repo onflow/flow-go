@@ -224,7 +224,7 @@ func (c *Cache) AdjustWithInit(entityID flow.Identifier, adjust func(flow.Entity
 	return c.Adjust(entityID, adjust)
 }
 
-// GetOrInit returns the given entity from the backdata. If the entity does not exist, it creates a new entity
+// GetWithInit returns the given entity from the backdata. If the entity does not exist, it creates a new entity
 // using the factory function and stores it in the backdata.
 // Args:
 // - entityID: the identifier of the entity to get.

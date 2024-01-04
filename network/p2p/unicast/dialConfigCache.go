@@ -7,7 +7,7 @@ import (
 // ConfigCache is a thread-safe cache for dial configs. It is used by the unicast service to store
 // the dial configs for peers.
 type ConfigCache interface {
-	// GetOrInit returns the dial config for the given peer id. If the config does not exist, it creates a new config
+	// GetWithInit returns the dial config for the given peer id. If the config does not exist, it creates a new config
 	// using the factory function and stores it in the cache.
 	// Args:
 	// - peerID: the peer id of the dial config.
