@@ -51,11 +51,7 @@ type RecordCache struct {
 func NewRecordCache(config *RecordCacheConfig, recordEntityFactory recordEntityFactory) (*RecordCache, error) {
 	backData := herocache.NewCache(config.sizeLimit,
 		herocache.DefaultOversizeFactor,
-		// this cache is supposed to keep the cluster prefix control messages received record for the authorized (staked) nodes. Since the number of such nodes is
-		// expected to be small, we do not eject any records from the cache. The cache size must be large enough to hold all
-		// the records of the authorized nodes. Also, this cache is keeping at most one record per peer id, so the
-		// size of the cache must be at least the number of authorized nodes.
-		heropool.NoEjection,
+		heropool.LRUEjection,
 		config.logger.With().Str("mempool", "gossipsub=cluster-prefix-control-messages-received-records").Logger(),
 		config.collector)
 	return &RecordCache{
@@ -88,32 +84,29 @@ func (r *RecordCache) Init(nodeID flow.Identifier) bool {
 //   - exception only in cases of internal data inconsistency or bugs. No errors are expected.
 func (r *RecordCache) ReceivedClusterPrefixedMessage(nodeID flow.Identifier) (float64, error) {
 	var err error
-	optimisticAdjustFunc := func() (flow.Entity, bool) {
-		return r.c.Adjust(nodeID, func(entity flow.Entity) flow.Entity {
-			entity, err = r.decayAdjustment(entity) // first decay the record
-			if err != nil {
-				return entity
-			}
-			return r.incrementAdjustment(entity) // then increment the record
-		})
-	}
-
-	// optimisticAdjustFunc is called assuming the record exists; if the record does not exist,
-	// it means the record was not initialized. In this case, initialize the record and call optimisticAdjustFunc again.
-	// If the record was initialized, optimisticAdjustFunc will be called only once.
-	adjustedEntity, adjusted := optimisticAdjustFunc()
-	if err != nil {
-		return 0, fmt.Errorf("unexpected error while applying decay adjustment for node %s: %w", nodeID, err)
-	}
-	if !adjusted {
-		r.Init(nodeID)
-		adjustedEntity, adjusted = optimisticAdjustFunc()
-		if !adjusted {
-			return 0, fmt.Errorf("unexpected record not found for node ID %s, even after an init attempt", nodeID)
+	adjustFunc := func(entity flow.Entity) flow.Entity {
+		entity, err = r.decayAdjustment(entity) // first decay the record
+		if err != nil {
+			return entity
 		}
+		return r.incrementAdjustment(entity) // then increment the record
 	}
 
-	return adjustedEntity.(ClusterPrefixedMessagesReceivedRecord).Gauge, nil
+	adjustedEntity, adjusted := r.c.AdjustWithInit(nodeID, adjustFunc, func() flow.Entity {
+		return r.recordEntityFactory(nodeID)
+	})
+
+	if err != nil {
+		return 0, fmt.Errorf("unexpected error while applying decay and increment adjustments for node %s: %w", nodeID, err)
+	}
+
+	if !adjusted {
+		return 0, fmt.Errorf("adjustment failed for node %s", nodeID)
+	}
+
+	record := mustBeClusterPrefixedMessageReceivedRecordEntity(adjustedEntity)
+	
+	return record.Gauge, nil
 }
 
 // Get returns the current number of cluster prefixed control messages received from a peer.
@@ -143,12 +136,7 @@ func (r *RecordCache) Get(nodeID flow.Identifier) (float64, bool, error) {
 		return 0, false, fmt.Errorf("unexpected error record not found for node ID %s, even after an init attempt", nodeID)
 	}
 
-	record, ok := adjustedEntity.(ClusterPrefixedMessagesReceivedRecord)
-	if !ok {
-		// sanity check
-		// This should never happen, because the cache only contains ClusterPrefixedMessagesReceivedRecord entities.
-		panic(fmt.Sprintf("invalid entity type, expected ClusterPrefixedMessagesReceivedRecord type, got: %T", adjustedEntity))
-	}
+	record := mustBeClusterPrefixedMessageReceivedRecordEntity(adjustedEntity)
 
 	return record.Gauge, true, nil
 }
@@ -224,4 +212,20 @@ func defaultDecayFunction(decay float64) decayFunc {
 		recordEntity.Gauge = decayedVal
 		return recordEntity, nil
 	}
+}
+
+// mustBeClusterPrefixedMessageReceivedRecordEntity is a helper function for type assertion of the flow.Entity to ClusterPrefixedMessagesReceivedRecord.
+// It panics if the type assertion fails.
+// Args:
+// - entity: the flow.Entity to be type asserted.
+// Returns:
+// - the ClusterPrefixedMessagesReceivedRecord entity.
+func mustBeClusterPrefixedMessageReceivedRecordEntity(entity flow.Entity) ClusterPrefixedMessagesReceivedRecord {
+	c, ok := entity.(ClusterPrefixedMessagesReceivedRecord)
+	if !ok {
+		// sanity check
+		// This should never happen, because the cache only contains ClusterPrefixedMessagesReceivedRecord entities.
+		panic(fmt.Sprintf("invalid entity type, expected ClusterPrefixedMessagesReceivedRecord type, got: %T", entity))
+	}
+	return c
 }
