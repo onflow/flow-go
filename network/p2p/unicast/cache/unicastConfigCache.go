@@ -2,7 +2,6 @@ package unicastcache
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
@@ -18,15 +17,6 @@ import (
 type UnicastConfigCache struct {
 	peerCache  *stdmap.Backend
 	cfgFactory func() unicast.Config // factory function that creates a new unicast config.
-
-	// atomicAdjustMutex is a atomicAdjustMutex used to ensure that the init-and-adjust operation is atomic.
-	// The init-and-adjust operation is used to initialize a record in the cache and then update it.
-	// The init-and-adjust operation is used when the record does not exist in the cache and needs to be initialized.
-	// The current implementation is not thread-safe, and the atomicAdjustMutex is used to ensure that the init-and-adjust operation is atomic, otherwise
-	// more than one thread may try to initialize records at the same time and cause an LRU eviction, hence trying an adjust on a record that does not exist,
-	// which will result in an error.
-	// TODO: implement a thread-safe atomic adjust operation and remove the mutex.
-	atomicAdjustMutex sync.Mutex
 }
 
 var _ unicast.ConfigCache = (*UnicastConfigCache)(nil)
