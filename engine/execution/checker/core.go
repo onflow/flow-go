@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/rs/zerolog"
 
@@ -13,9 +12,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
-
-// DefaultTimeInterval triggers the check once every minute,
-const DefaultTimeInterval = time.Minute * 1
 
 // Core is the core logic of the checker engine that checks if the execution result matches the sealed result.
 type Core struct {
@@ -58,30 +54,8 @@ func checkMyCommitWithSealedCommit(
 	return nil
 }
 
-// runLoop runs the check every minute.
-// Why using a timer instead of listening to finalized and executed events?
-// because it's simpler as it doesn't need to subscribe to those events.
-// It also runs less checks, note: the checker doesn't need to find the
-// first mismatched block, as long as it can find a mismatch, it's good enough.
-// A timer could reduce the number of checks, as it only checks once every minute.
-func (c *Core) runLoop(ctx context.Context, tickInterval time.Duration) error {
-	ticker := time.NewTicker(tickInterval)
-	defer ticker.Stop() // critical for ticker to be garbage collected
-	for {
-		select {
-		case <-ticker.C:
-			err := c.runCheck()
-			if err != nil {
-				return err
-			}
-		case <-ctx.Done():
-			return nil
-		}
-	}
-}
-
-// it skips when the last sealed has not been executed, and last executed has not been finalized.
-func (c *Core) runCheck() error {
+// RunCheck skips when the last sealed has not been executed, and last executed has not been finalized.
+func (c *Core) RunCheck() error {
 	// find last sealed block
 	lastSealedBlock, lastFinal, seal, err := c.findLastSealedBlock()
 	if err != nil {
