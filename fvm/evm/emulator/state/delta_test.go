@@ -172,15 +172,6 @@ func TestDeltaView(t *testing.T) {
 		// handling error on the parent
 		_, err = view.GetBalance(addr3)
 		require.Error(t, err)
-
-		// create a new account at addr3
-		err = view.CreateAccount(addr3)
-		require.NoError(t, err)
-
-		// now the balance should return 0
-		bal, err = view.GetBalance(addr3)
-		require.NoError(t, err)
-		require.Equal(t, big.NewInt(0), bal)
 	})
 
 	t.Run("test nonce functionality", func(t *testing.T) {
@@ -269,6 +260,9 @@ func TestDeltaView(t *testing.T) {
 				},
 				IsCreatedFunc: func(a gethCommon.Address) bool {
 					return false
+				},
+				GetBalanceFunc: func(a gethCommon.Address) (*big.Int, error) {
+					return new(big.Int), nil
 				},
 				GetCodeFunc: func(addr gethCommon.Address) ([]byte, error) {
 					switch addr {

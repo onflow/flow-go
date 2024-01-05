@@ -117,6 +117,34 @@ func IsADatabaseError(err error) bool {
 	return errors.As(err, &DatabaseError{})
 }
 
+// StateError is a non-fatal error, returned when a state operation
+// has failed (e.g. reaching storage interaction limit)
+type StateError struct {
+	err error
+}
+
+// NewStateError returns a new StateError
+func NewStateError(rootCause error) StateError {
+	return StateError{
+		err: rootCause,
+	}
+}
+
+// Unwrap unwraps the underlying evm error
+func (err StateError) Unwrap() error {
+	return err.err
+}
+
+func (err StateError) Error() string {
+	return fmt.Sprintf("state error: %v", err.err)
+}
+
+// IsAStateError returns true if the error or any underlying errors
+// is of the type EVM validation error
+func IsAStateError(err error) bool {
+	return errors.As(err, &StateError{})
+}
+
 // FatalError is user for any error that is not user related and something
 // unusual has happend. Usually we stop the node when this happens
 // given it might have a non-deterministic root.
