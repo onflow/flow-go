@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"maps"
 	"math/big"
+	"slices"
 	"sort"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
@@ -98,7 +99,8 @@ func (db *StateDB) Suicide(addr gethCommon.Address) bool {
 
 // HasSuicided returns true if address is flaged with suicide.
 func (db *StateDB) HasSuicided(addr gethCommon.Address) bool {
-	return db.lastestView().HasSuicided(addr)
+	suicided, _ := db.lastestView().HasSuicided(addr)
+	return suicided
 }
 
 // SubBalance substitutes the amount from the balance of the given address
@@ -297,8 +299,8 @@ func (db *StateDB) Commit() error {
 	var err error
 
 	// iterate views and collect dirty addresses and slots
-	addresses := make(map[gethCommon.Address]interface{})
-	slots := make(map[types.SlotAddress]interface{})
+	addresses := make(map[gethCommon.Address]struct{})
+	slots := make(map[types.SlotAddress]struct{})
 	for _, view := range db.views {
 		maps.Copy(addresses, view.DirtyAddresses())
 		maps.Copy(slots, view.DirtySlots())
@@ -310,10 +312,9 @@ func (db *StateDB) Commit() error {
 		sortedAddresses = append(sortedAddresses, addr)
 	}
 
-	sort.Slice(sortedAddresses,
-		func(i, j int) bool {
-			return bytes.Compare(sortedAddresses[i][:], sortedAddresses[j][:]) < 0
-		})
+	slices.SortFunc(sortedAddresses, func(a, b gethCommon.Address) int {
+		return bytes.Compare(a[:], b[:])
+	})
 
 	// update accounts
 	for _, addr := range sortedAddresses {

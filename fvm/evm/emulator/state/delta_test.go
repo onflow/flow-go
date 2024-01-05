@@ -5,7 +5,6 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	gethCrypto "github.com/ethereum/go-ethereum/crypto"
@@ -42,8 +41,14 @@ func TestDeltaView(t *testing.T) {
 						return false, fmt.Errorf("some error")
 					}
 				},
-				HasSuicidedFunc: func(gethCommon.Address) bool {
+				IsCreatedFunc: func(a gethCommon.Address) bool {
 					return false
+				},
+				GetBalanceFunc: func(gethCommon.Address) (*big.Int, error) {
+					return new(big.Int), nil
+				},
+				HasSuicidedFunc: func(gethCommon.Address) (bool, *big.Int) {
+					return false, new(big.Int)
 				},
 			})
 
@@ -72,7 +77,7 @@ func TestDeltaView(t *testing.T) {
 		require.True(t, found)
 
 		// test HasSuicided first
-		success := view.HasSuicided(addr1)
+		success, _ := view.HasSuicided(addr1)
 		require.False(t, success)
 
 		// set addr1 for deletion
@@ -81,7 +86,7 @@ func TestDeltaView(t *testing.T) {
 		require.True(t, success)
 
 		// check HasSuicided now
-		success = view.HasSuicided(addr1)
+		success, _ = view.HasSuicided(addr1)
 		require.True(t, success)
 
 		// addr1 should still exist after suicide call
@@ -109,7 +114,10 @@ func TestDeltaView(t *testing.T) {
 						return false, nil
 					}
 				},
-				HasSuicidedFunc: func(gethCommon.Address) bool {
+				HasSuicidedFunc: func(a gethCommon.Address) (bool, *big.Int) {
+					return false, new(big.Int)
+				},
+				IsCreatedFunc: func(a gethCommon.Address) bool {
 					return false
 				},
 				GetBalanceFunc: func(addr gethCommon.Address) (*big.Int, error) {
@@ -164,15 +172,6 @@ func TestDeltaView(t *testing.T) {
 		// handling error on the parent
 		_, err = view.GetBalance(addr3)
 		require.Error(t, err)
-
-		// create a new account at addr3
-		err = view.CreateAccount(addr3)
-		require.NoError(t, err)
-
-		// now the balance should return 0
-		bal, err = view.GetBalance(addr3)
-		require.NoError(t, err)
-		require.Equal(t, big.NewInt(0), bal)
 	})
 
 	t.Run("test nonce functionality", func(t *testing.T) {
@@ -192,8 +191,14 @@ func TestDeltaView(t *testing.T) {
 						return false, nil
 					}
 				},
-				HasSuicidedFunc: func(a gethCommon.Address) bool {
+				HasSuicidedFunc: func(a gethCommon.Address) (bool, *big.Int) {
+					return false, new(big.Int)
+				},
+				IsCreatedFunc: func(a gethCommon.Address) bool {
 					return false
+				},
+				GetBalanceFunc: func(a gethCommon.Address) (*big.Int, error) {
+					return new(big.Int), nil
 				},
 				GetNonceFunc: func(addr gethCommon.Address) (uint64, error) {
 					switch addr {
@@ -250,8 +255,14 @@ func TestDeltaView(t *testing.T) {
 						return false, nil
 					}
 				},
-				HasSuicidedFunc: func(a gethCommon.Address) bool {
+				HasSuicidedFunc: func(a gethCommon.Address) (bool, *big.Int) {
+					return false, new(big.Int)
+				},
+				IsCreatedFunc: func(a gethCommon.Address) bool {
 					return false
+				},
+				GetBalanceFunc: func(a gethCommon.Address) (*big.Int, error) {
+					return new(big.Int), nil
 				},
 				GetCodeFunc: func(addr gethCommon.Address) ([]byte, error) {
 					switch addr {
@@ -269,7 +280,7 @@ func TestDeltaView(t *testing.T) {
 						return 0, fmt.Errorf("some error")
 					}
 				},
-				GetCodeHashFunc: func(addr gethCommon.Address) (common.Hash, error) {
+				GetCodeHashFunc: func(addr gethCommon.Address) (gethCommon.Hash, error) {
 					switch addr {
 					case addr1:
 						return addr1IntiCodeHash, nil
@@ -590,8 +601,11 @@ func TestDeltaView(t *testing.T) {
 				GetNonceFunc: func(addr gethCommon.Address) (uint64, error) {
 					return 0, nil
 				},
-				HasSuicidedFunc: func(gethCommon.Address) bool {
+				IsCreatedFunc: func(a gethCommon.Address) bool {
 					return false
+				},
+				HasSuicidedFunc: func(gethCommon.Address) (bool, *big.Int) {
+					return false, new(big.Int)
 				},
 			})
 
@@ -642,8 +656,11 @@ func TestDeltaView(t *testing.T) {
 				ExistFunc: func(addr gethCommon.Address) (bool, error) {
 					return true, nil
 				},
-				HasSuicidedFunc: func(gethCommon.Address) bool {
-					return true
+				HasSuicidedFunc: func(gethCommon.Address) (bool, *big.Int) {
+					return true, big.NewInt(2)
+				},
+				IsCreatedFunc: func(a gethCommon.Address) bool {
+					return false
 				},
 				GetBalanceFunc: func(addr gethCommon.Address) (*big.Int, error) {
 					return new(big.Int), nil
@@ -706,27 +723,28 @@ func TestDeltaView(t *testing.T) {
 		require.Equal(t, value, vret)
 
 		// now re-create account
-
 		err = view.CreateAccount(addr1)
 		require.NoError(t, err)
 
+		// it should carry over the balance
 		bal, err = view.GetBalance(addr1)
 		require.NoError(t, err)
-		require.Equal(t, new(big.Int), bal)
+		require.Equal(t, initBalance, bal)
 
 		ret, err = view.GetCode(addr1)
 		require.NoError(t, err)
-		require.Equal(t, nil, ret)
+		require.Len(t, ret, 0)
 
 		vret, err = view.GetState(sk)
 		require.NoError(t, err)
-		require.Len(t, vret, 0)
+		emptyValue := gethCommon.Hash{}
+		require.Equal(t, emptyValue, vret)
 	})
 }
 
 type MockedReadOnlyView struct {
 	ExistFunc               func(gethCommon.Address) (bool, error)
-	HasSuicidedFunc         func(gethCommon.Address) bool
+	HasSuicidedFunc         func(gethCommon.Address) (bool, *big.Int)
 	IsCreatedFunc           func(gethCommon.Address) bool
 	GetBalanceFunc          func(gethCommon.Address) (*big.Int, error)
 	GetNonceFunc            func(gethCommon.Address) (uint64, error)
@@ -756,7 +774,7 @@ func (v *MockedReadOnlyView) IsCreated(addr gethCommon.Address) bool {
 	return v.IsCreatedFunc(addr)
 }
 
-func (v *MockedReadOnlyView) HasSuicided(addr gethCommon.Address) bool {
+func (v *MockedReadOnlyView) HasSuicided(addr gethCommon.Address) (bool, *big.Int) {
 	if v.HasSuicidedFunc == nil {
 		panic("HasSuicided is not set in this mocked view")
 	}

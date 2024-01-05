@@ -18,26 +18,34 @@ import (
 type DeltaView struct {
 	parent types.ReadOnlyView
 
-	// account changes
-	dirtyAddresses map[gethCommon.Address]interface{}
-	created        map[gethCommon.Address]interface{}
-	suicided       map[gethCommon.Address]interface{}
-	deleted        map[gethCommon.Address]interface{}
-	balances       map[gethCommon.Address]*big.Int
-	nonces         map[gethCommon.Address]uint64
-	codes          map[gethCommon.Address][]byte
-	codeHashes     map[gethCommon.Address]gethCommon.Hash
+	// dirtyAddresses keeps a set of addresses with changes
+	dirtyAddresses map[gethCommon.Address]struct{}
+	// created keeps a set of recently created addresses
+	created map[gethCommon.Address]struct{}
+	// suicided keeps a set of addresses flagged to be destructed at the
+	// end of transaction, it also keeps the balance of the addresses before destruction
+	toBeDestructed map[gethCommon.Address]*big.Int
+	// is a flag used to track accounts that has been flagged for
+	// destruction but recreated later
+	recreated map[gethCommon.Address]struct{}
+	// balances keeps the changes to the account balances
+	balances map[gethCommon.Address]*big.Int
+	// nonces keeps the changes to the account nonces
+	nonces map[gethCommon.Address]uint64
+	// codes keeps the changes to the account codes
+	codes map[gethCommon.Address][]byte
+	// codeHashes keeps the changes to account code hashes
+	codeHashes map[gethCommon.Address]gethCommon.Hash
 
-	// states changes
-	dirtySlots map[types.SlotAddress]interface{}
-	states     map[types.SlotAddress]gethCommon.Hash
+	// slots keeps a set of slots that has been changed in this view
+	slots map[types.SlotAddress]gethCommon.Hash
 
 	// transient storage
 	transient map[types.SlotAddress]gethCommon.Hash
 
 	// access lists
-	accessListAddresses map[gethCommon.Address]interface{}
-	accessListSlots     map[types.SlotAddress]interface{}
+	accessListAddresses map[gethCommon.Address]struct{}
+	accessListSlots     map[types.SlotAddress]struct{}
 
 	// logs
 	logs []*gethTypes.Log
@@ -56,21 +64,16 @@ func NewDeltaView(parent types.ReadOnlyView) *DeltaView {
 	return &DeltaView{
 		parent: parent,
 
-		dirtyAddresses:      make(map[gethCommon.Address]interface{}),
-		created:             make(map[gethCommon.Address]interface{}),
-		suicided:            make(map[gethCommon.Address]interface{}),
-		deleted:             make(map[gethCommon.Address]interface{}),
-		balances:            make(map[gethCommon.Address]*big.Int),
-		nonces:              make(map[gethCommon.Address]uint64),
-		codes:               make(map[gethCommon.Address][]byte),
-		codeHashes:          make(map[gethCommon.Address]gethCommon.Hash),
-		dirtySlots:          make(map[types.SlotAddress]interface{}),
-		states:              make(map[types.SlotAddress]gethCommon.Hash),
-		transient:           make(map[types.SlotAddress]gethCommon.Hash),
-		accessListAddresses: make(map[gethCommon.Address]interface{}),
-		accessListSlots:     make(map[types.SlotAddress]interface{}),
-		logs:                make([]*gethTypes.Log, 0),
-		preimages:           make(map[gethCommon.Hash][]byte),
+		dirtyAddresses: make(map[gethCommon.Address]struct{}),
+		created:        make(map[gethCommon.Address]struct{}),
+		toBeDestructed: make(map[gethCommon.Address]*big.Int),
+		recreated:      make(map[gethCommon.Address]struct{}),
+		balances:       make(map[gethCommon.Address]*big.Int),
+		nonces:         make(map[gethCommon.Address]uint64),
+		codes:          make(map[gethCommon.Address][]byte),
+		codeHashes:     make(map[gethCommon.Address]gethCommon.Hash),
+
+		slots: make(map[types.SlotAddress]gethCommon.Hash),
 
 		// for refund we just copy the data
 		refund: parent.GetRefund(),
@@ -90,7 +93,7 @@ func (d *DeltaView) Exist(addr gethCommon.Address) (bool, error) {
 	if found {
 		return true, nil
 	}
-	_, found = d.suicided[addr]
+	_, found = d.toBeDestructed[addr]
 	if found {
 		return true, nil
 	}
@@ -98,44 +101,46 @@ func (d *DeltaView) Exist(addr gethCommon.Address) (bool, error) {
 }
 
 // CreateAccount creates a new account for the given address
+//
+// if address has been flaged earlier for destruction, carry over the balance
+// and reset the data from the orginal account.
 func (d *DeltaView) CreateAccount(addr gethCommon.Address) error {
-	// If a address already exists the balance is carried over to the new account.
-	// Carrying over the balance ensures that Ether doesn't disappear. (legacy behaviour of the Geth stateDB)
-	exist, err := d.Exist(addr)
-	if err != nil {
-		return err
-	}
-	var bal *big.Int
-	if exist {
-		bal, err = d.GetBalance(addr)
-		if err != nil {
-			return err
-		}
-		d.AddBalance(addr, bal)
+	// if is already created return
+	if d.IsCreated(addr) {
+		return nil
 	}
 
-	d.created[addr] = struct{}{}
-	// flag the address as dirty
 	d.dirtyAddresses[addr] = struct{}{}
 
-	// if has already suicided
-	if d.HasSuicided(addr) {
-		// balance has already been set to zero
+	// if it has flagged for destruction in this transction,
+	// reset everything and carry over the balance
+	destructed, balance := d.HasSuicided(addr)
+	if destructed {
 		d.nonces[addr] = 0
 		d.codes[addr] = nil
 		d.codeHashes[addr] = gethTypes.EmptyCodeHash
+		d.balances[addr] = balance
 
-		// flag addr as deleted, this flag helps with postponing deletion of slabs
+		// flag addr as recreated, this flag helps with postponing deletion of slabs
 		// otherwise we have to iterate over all slabs of this account and set the to nil
-		d.deleted[addr] = struct{}{}
+		d.recreated[addr] = struct{}{}
 
 		// remove slabs from cache related to this account
-		for k := range d.states {
+		for k := range d.slots {
 			if k.Address == addr {
-				delete(d.states, k)
+				delete(d.slots, k)
 			}
 		}
+		return nil
 	}
+
+	d.created[addr] = struct{}{}
+	// Carrying over the balance ensures that Ether doesn't disappear. (legacy behaviour of the Geth stateDB)
+	bal, err := d.GetBalance(addr)
+	if err != nil {
+		return err
+	}
+	d.balances[addr] = bal
 	return nil
 }
 
@@ -148,17 +153,26 @@ func (d *DeltaView) IsCreated(addr gethCommon.Address) bool {
 	return d.parent.IsCreated(addr)
 }
 
-// HasSuicided returns true if address has been flagged for deletion
-func (d *DeltaView) HasSuicided(addr gethCommon.Address) bool {
-	_, found := d.suicided[addr]
+// HasSuicided returns true if address has been flagged for destruction
+// it also returns the balance of the address before destruction
+func (d *DeltaView) HasSuicided(addr gethCommon.Address) (bool, *big.Int) {
+	bal, found := d.toBeDestructed[addr]
 	if found {
-		return true
+		return true, bal
 	}
 	return d.parent.HasSuicided(addr)
 }
 
 // Suicide sets a flag to delete the account at the end of transaction
+//
+// if an account has been created in this transaction, it would return an error
 func (d *DeltaView) Suicide(addr gethCommon.Address) (bool, error) {
+	// if it has been recently created, calling suicide is not
+	// a valid operation
+	if d.IsCreated(addr) {
+		return false, fmt.Errorf("invalid operation, can't suicide an account that is just created")
+	}
+
 	// if it doesn't exist, return false
 	exists, err := d.Exist(addr)
 	if err != nil {
@@ -167,14 +181,18 @@ func (d *DeltaView) Suicide(addr gethCommon.Address) (bool, error) {
 	if !exists {
 		return false, nil
 	}
-	// flag the account for deletion
-	d.suicided[addr] = struct{}{}
+
+	// flag the account for destruction and capture the balance
+	// before destruction
+	d.toBeDestructed[addr], err = d.GetBalance(addr)
+	if err != nil {
+		return false, err
+	}
+	// flag the address as dirty
+	d.dirtyAddresses[addr] = struct{}{}
 
 	// set balance to zero
 	d.balances[addr] = new(big.Int)
-
-	// flag the address as dirty
-	d.dirtyAddresses[addr] = struct{}{}
 	return true, nil
 }
 
@@ -318,15 +336,15 @@ func (d *DeltaView) SetCode(addr gethCommon.Address, code []byte) error {
 
 // GetState returns the value of the slot of the main state
 func (d *DeltaView) GetState(sk types.SlotAddress) (gethCommon.Hash, error) {
-	val, found := d.states[sk]
+	val, found := d.slots[sk]
 	if found {
 		return val, nil
 	}
 	// if address is deleted in the scope of this delta view,
 	// don't go backward. this has been done to skip the step to iterate
 	// over all the state slabs and delete them.
-	_, deleted := d.deleted[sk.Address]
-	if deleted {
+	_, recreated := d.recreated[sk.Address]
+	if recreated {
 		return gethCommon.Hash{}, nil
 	}
 	return d.parent.GetState(sk)
@@ -338,28 +356,30 @@ func (d *DeltaView) SetState(sk types.SlotAddress, value gethCommon.Hash) error 
 	if err != nil {
 		return err
 	}
-	// we skip the value is the same
-	// this step might look not helping with performance but we kept it to
-	// act similar to the Geth StateDB behaviour
+	// if the value hasn't changed, skip
 	if value == lastValue {
 		return nil
 	}
-	d.states[sk] = value
-	d.dirtySlots[sk] = struct{}{}
+	d.slots[sk] = value
 	return nil
 }
 
 // GetTransientState returns the value of the slot of the transient state
 func (d *DeltaView) GetTransientState(sk types.SlotAddress) gethCommon.Hash {
-	val, found := d.transient[sk]
-	if found {
-		return val
+	if d.transient != nil {
+		val, found := d.transient[sk]
+		if found {
+			return val
+		}
 	}
 	return d.parent.GetTransientState(sk)
 }
 
 // SetTransientState adds sets a value for the given slot of the transient storage
 func (d *DeltaView) SetTransientState(sk types.SlotAddress, value gethCommon.Hash) {
+	if d.transient == nil {
+		d.transient = make(map[types.SlotAddress]gethCommon.Hash)
+	}
 	d.transient[sk] = value
 }
 
@@ -385,15 +405,21 @@ func (d *DeltaView) SubRefund(amount uint64) error {
 
 // AddressInAccessList checks if the address is in the access list
 func (d *DeltaView) AddressInAccessList(addr gethCommon.Address) bool {
-	_, addressFound := d.accessListAddresses[addr]
-	if !addressFound {
-		addressFound = d.parent.AddressInAccessList(addr)
+	if d.accessListAddresses != nil {
+		_, addressFound := d.accessListAddresses[addr]
+		if addressFound {
+			return true
+		}
 	}
-	return addressFound
+	return d.parent.AddressInAccessList(addr)
 }
 
 // AddAddressToAccessList adds an address to the access list
 func (d *DeltaView) AddAddressToAccessList(addr gethCommon.Address) bool {
+	if d.accessListAddresses == nil {
+		d.accessListAddresses = make(map[gethCommon.Address]struct{})
+	}
+
 	addrPresent := d.AddressInAccessList(addr)
 	d.accessListAddresses[addr] = struct{}{}
 	return !addrPresent
@@ -402,16 +428,22 @@ func (d *DeltaView) AddAddressToAccessList(addr gethCommon.Address) bool {
 // SlotInAccessList checks if the slot is in the access list
 func (d *DeltaView) SlotInAccessList(sk types.SlotAddress) (addressOk bool, slotOk bool) {
 	addressFound := d.AddressInAccessList(sk.Address)
-	_, slotFound := d.accessListSlots[sk]
-	if !slotFound {
-		_, slotFound = d.parent.SlotInAccessList(sk)
+	if d.accessListSlots != nil {
+		_, slotFound := d.accessListSlots[sk]
+		if slotFound {
+			return addressFound, true
+		}
 	}
+	_, slotFound := d.parent.SlotInAccessList(sk)
 	return addressFound, slotFound
 }
 
 // AddSlotToAccessList adds a slot to the access list
 // it also adds the address to the address list
 func (d *DeltaView) AddSlotToAccessList(sk types.SlotAddress) (addrAdded bool, slotAdded bool) {
+	if d.accessListSlots == nil {
+		d.accessListSlots = make(map[types.SlotAddress]struct{})
+	}
 	addrPresent, slotPresent := d.SlotInAccessList(sk)
 	d.accessListAddresses[sk.Address] = struct{}{}
 	d.accessListSlots[sk] = struct{}{}
@@ -420,6 +452,9 @@ func (d *DeltaView) AddSlotToAccessList(sk types.SlotAddress) (addrAdded bool, s
 
 // AddLog appends a log to the log collection
 func (d *DeltaView) AddLog(log *gethTypes.Log) {
+	if d.logs == nil {
+		d.logs = make([]*gethTypes.Log, 0)
+	}
 	d.logs = append(d.logs, log)
 }
 
@@ -430,6 +465,10 @@ func (d *DeltaView) Logs() []*gethTypes.Log {
 
 // AddPreimage adds a preimage
 func (d *DeltaView) AddPreimage(hash gethCommon.Hash, preimage []byte) {
+	if d.preimages == nil {
+		d.preimages = make(map[gethCommon.Hash][]byte)
+	}
+
 	// make a copy (legacy behaviour)
 	pi := make([]byte, len(preimage))
 	copy(pi, preimage)
@@ -442,11 +481,15 @@ func (d *DeltaView) Preimages() map[gethCommon.Hash][]byte {
 }
 
 // DirtyAddresses returns a set of addresses that has been updated in this view
-func (d *DeltaView) DirtyAddresses() map[gethCommon.Address]interface{} {
+func (d *DeltaView) DirtyAddresses() map[gethCommon.Address]struct{} {
 	return d.dirtyAddresses
 }
 
 // DirtySlots returns a set of slots that has been updated in this view
-func (d *DeltaView) DirtySlots() map[types.SlotAddress]interface{} {
-	return d.dirtySlots
+func (d *DeltaView) DirtySlots() map[types.SlotAddress]struct{} {
+	dirtySlots := make(map[types.SlotAddress]struct{})
+	for sk := range d.slots {
+		dirtySlots[sk] = struct{}{}
+	}
+	return dirtySlots
 }
