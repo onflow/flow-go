@@ -4,7 +4,6 @@ import (
 	"bytes"
 	stdErrors "errors"
 	"fmt"
-	"maps"
 	"math/big"
 	"slices"
 	"sort"
@@ -302,8 +301,12 @@ func (db *StateDB) Commit() error {
 	addresses := make(map[gethCommon.Address]struct{})
 	slots := make(map[types.SlotAddress]struct{})
 	for _, view := range db.views {
-		maps.Copy(addresses, view.DirtyAddresses())
-		maps.Copy(slots, view.DirtySlots())
+		for key := range view.DirtyAddresses() {
+			addresses[key] = struct{}{}
+		}
+		for key := range view.DirtySlots() {
+			slots[key] = struct{}{}
+		}
 	}
 
 	// sort addresses
