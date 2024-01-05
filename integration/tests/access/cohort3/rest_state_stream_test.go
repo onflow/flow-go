@@ -60,8 +60,10 @@ func (s *RestStateStreamSuite) SetupTest() {
 		flow.RoleAccess,
 		testnet.WithLogLevel(zerolog.InfoLevel),
 		testnet.WithAdditionalFlag("--execution-data-sync-enabled=true"),
-		testnet.WithAdditionalFlag(fmt.Sprintf("--execution-data-dir=%s", testnet.DefaultExecutionDataServiceDir)),
+		testnet.WithAdditionalFlagf("--execution-data-dir=%s", testnet.DefaultExecutionDataServiceDir),
 		testnet.WithAdditionalFlag("--execution-data-retry-delay=1s"),
+		testnet.WithAdditionalFlag("--execution-data-indexing-enabled=true"),
+		testnet.WithAdditionalFlagf("--execution-state-dir=%s", testnet.DefaultExecutionStateDir),
 	)
 
 	// add the ghost (access) node config
@@ -176,15 +178,20 @@ func (s *RestStateStreamSuite) requireEvents(receivedEventsResponse []*backend.E
 
 		for eventType, receivedEventList := range receivedEventMap {
 			// get events by block id and event type
-			response, err := MakeApiRequest(grpcClient.GetEventsForBlockIDs, grpcCtx,
-				&accessproto.GetEventsForBlockIDsRequest{BlockIds: [][]byte{convert.IdentifierToMessage(receivedEventResponse.BlockID)},
-					Type: string(eventType)})
+			response, err := MakeApiRequest(
+				grpcClient.GetEventsForBlockIDs,
+				grpcCtx,
+				&accessproto.GetEventsForBlockIDsRequest{
+					BlockIds: [][]byte{convert.IdentifierToMessage(receivedEventResponse.BlockID)},
+					Type:     string(eventType),
+				},
+			)
 			require.NoError(s.T(), err)
 			require.Equal(s.T(), 1, len(response.Results), "expect to get 1 result")
 
 			expectedEventsResult := response.Results[0]
 			require.Equal(s.T(), expectedEventsResult.BlockHeight, receivedEventResponse.Height, "expect the same block height")
-			require.Equal(s.T(), len(expectedEventsResult.Events), len(receivedEventList), "expect the same count of events")
+			require.Equal(s.T(), len(expectedEventsResult.Events), len(receivedEventList), "expect the same count of events: want: %+v, got: %+v", expectedEventsResult.Events, receivedEventList)
 
 			for i, event := range receivedEventList {
 				require.Equal(s.T(), expectedEventsResult.Events[i].EventIndex, event.EventIndex, "expect the same event index")

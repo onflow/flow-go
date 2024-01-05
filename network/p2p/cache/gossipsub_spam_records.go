@@ -13,7 +13,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/p2plogging"
+	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
 )
 
 // GossipSubSpamRecordCache is a cache for storing the gossipsub spam records of peers. It is thread-safe.
@@ -60,7 +60,10 @@ type PreprocessorFunc func(record p2p.GossipSubSpamRecord, lastUpdated time.Time
 // Returns:
 //
 //	*GossipSubSpamRecordCache: the newly created cache with a HeroCache-based backend.
-func NewGossipSubSpamRecordCache(sizeLimit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics, prFns ...PreprocessorFunc) *GossipSubSpamRecordCache {
+func NewGossipSubSpamRecordCache(sizeLimit uint32,
+	logger zerolog.Logger,
+	collector module.HeroCacheMetrics,
+	prFns ...PreprocessorFunc) *GossipSubSpamRecordCache {
 	backData := herocache.NewCache(sizeLimit,
 		herocache.DefaultOversizeFactor,
 		// we should not evict any record from the cache,

@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -84,7 +85,7 @@ func (v *receiptValidator) verifyChunksFormat(result *flow.ExecutionResult) erro
 	// For a block containing k collections, the Flow protocol prescribes that a valid execution result
 	// must contain k+1 chunks. Specifically, we have one chunk per collection plus the system chunk.
 	// The system chunk must exist, even if block payload itself is empty.
-	index, err := v.index.ByBlockID(result.BlockID) // returns `storage.ErrNotFound` for unknown block
+	index, err := v.index.ByBlockID(result.BlockID) // returns `storage.ErrNotFound` for unknown BlockID
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			return module.NewUnknownBlockError("could not find payload index for executed block %v: %w", result.BlockID, err)
@@ -106,7 +107,7 @@ func (v *receiptValidator) verifyChunksFormat(result *flow.ExecutionResult) erro
 //   - sentinel engine.InvalidInputError if result does not form a valid sub-graph
 //   - module.UnknownBlockError when the executed block is unknown
 func (v *receiptValidator) subgraphCheck(result *flow.ExecutionResult, prevResult *flow.ExecutionResult) error {
-	block, err := v.state.AtBlockID(result.BlockID).Head() // returns
+	block, err := v.state.AtBlockID(result.BlockID).Head() // returns `storage.ErrNotFound` for unknown BlockID
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			return module.NewUnknownBlockError("executed block %v unknown: %w", result.BlockID, err)
@@ -157,7 +158,7 @@ func (v *receiptValidator) resultChainCheck(result *flow.ExecutionResult, prevRe
 // pass successfully.
 //
 // Expected errors during normal operations:
-//   - engine.InvalidInputError if receipt violates protocol condition
+//   - engine.InvalidInputError if receipt violates protocol rules
 //   - module.UnknownBlockError if the executed block is unknown
 //   - module.UnknownResultError if the receipt's parent result is unknown
 //
@@ -319,7 +320,7 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 			return engine.NewInvalidInputErrorf("results %v at index %d does not extend execution tree", resultID, i)
 		}
 
-		// Result must be for block on fork.
+		// result must be for block on fork
 		if _, forBlockOnFork := forkBlocks[result.BlockID]; !forBlockOnFork {
 			return engine.NewInvalidInputErrorf("results %v at index %d is for block not on fork (%x)", resultID, i, result.BlockID)
 		}
@@ -370,7 +371,7 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 				// Above, we checked that the result is for an ancestor of the candidate block. If this block or parts of it are not found, our state is corrupted
 				return irrecoverable.NewExceptionf("the executed block or some of its parts were not found despite the block being already incorporated: %w", err)
 			}
-			return fmt.Errorf("receipt %v at index %d failed validation: %w", receiptID, i, err)
+			return fmt.Errorf("unexpected exception validating receipt %v at index %d: %w", receiptID, i, err)
 		}
 	}
 

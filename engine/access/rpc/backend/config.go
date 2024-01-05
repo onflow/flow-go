@@ -17,52 +17,53 @@ type Config struct {
 	FixedExecutionNodeIDs     []string                        // fixed list of execution node IDs to choose from if no node ID can be chosen from the PreferredExecutionNodeIDs
 	CircuitBreakerConfig      connection.CircuitBreakerConfig // the configuration for circuit breaker
 	ScriptExecutionMode       string                          // the mode in which scripts are executed
+	EventQueryMode            string                          // the mode in which events are queried
 }
 
-type ScriptExecutionMode int
+type IndexQueryMode int
 
 const (
-	// ScriptExecutionModeLocalOnly executes scripts and gets accounts using only local storage
-	ScriptExecutionModeLocalOnly ScriptExecutionMode = iota + 1
+	// IndexQueryModeLocalOnly executes scripts and gets accounts using only local storage
+	IndexQueryModeLocalOnly IndexQueryMode = iota + 1
 
-	// ScriptExecutionModeExecutionNodesOnly executes scripts and gets accounts using only
+	// IndexQueryModeExecutionNodesOnly executes scripts and gets accounts using only
 	// execution nodes
-	ScriptExecutionModeExecutionNodesOnly
+	IndexQueryModeExecutionNodesOnly
 
-	// ScriptExecutionModeFailover executes scripts and gets accounts using local storage first,
+	// IndexQueryModeFailover executes scripts and gets accounts using local storage first,
 	// then falls back to execution nodes if data is not available for the height or if request
 	// failed due to a non-user error.
-	ScriptExecutionModeFailover
+	IndexQueryModeFailover
 
-	// ScriptExecutionModeCompare executes scripts and gets accounts using both local storage and
+	// IndexQueryModeCompare executes scripts and gets accounts using both local storage and
 	// execution nodes and compares the results. The execution node result is always returned.
-	ScriptExecutionModeCompare
+	IndexQueryModeCompare
 )
 
-func ParseScriptExecutionMode(s string) (ScriptExecutionMode, error) {
+func ParseIndexQueryMode(s string) (IndexQueryMode, error) {
 	switch s {
-	case ScriptExecutionModeLocalOnly.String():
-		return ScriptExecutionModeLocalOnly, nil
-	case ScriptExecutionModeExecutionNodesOnly.String():
-		return ScriptExecutionModeExecutionNodesOnly, nil
-	case ScriptExecutionModeFailover.String():
-		return ScriptExecutionModeFailover, nil
-	case ScriptExecutionModeCompare.String():
-		return ScriptExecutionModeCompare, nil
+	case IndexQueryModeLocalOnly.String():
+		return IndexQueryModeLocalOnly, nil
+	case IndexQueryModeExecutionNodesOnly.String():
+		return IndexQueryModeExecutionNodesOnly, nil
+	case IndexQueryModeFailover.String():
+		return IndexQueryModeFailover, nil
+	case IndexQueryModeCompare.String():
+		return IndexQueryModeCompare, nil
 	default:
 		return 0, errors.New("invalid script execution mode")
 	}
 }
 
-func (m ScriptExecutionMode) String() string {
+func (m IndexQueryMode) String() string {
 	switch m {
-	case ScriptExecutionModeLocalOnly:
+	case IndexQueryModeLocalOnly:
 		return "local-only"
-	case ScriptExecutionModeExecutionNodesOnly:
+	case IndexQueryModeExecutionNodesOnly:
 		return "execution-nodes-only"
-	case ScriptExecutionModeFailover:
+	case IndexQueryModeFailover:
 		return "failover"
-	case ScriptExecutionModeCompare:
+	case IndexQueryModeCompare:
 		return "compare"
 	default:
 		return ""
