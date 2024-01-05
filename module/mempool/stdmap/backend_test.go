@@ -259,6 +259,38 @@ func TestBackend_AdjustWithInit_Concurrent_HeroCache(t *testing.T) {
 	}
 }
 
+// TestBackend_GetWithInit_Concurrent tests the GetWithInit method of the Backend with HeroCache as the backdata.
+// It concurrently attempts on adjusting non-existent entities, and verifies that the entities are initialized and retrieved correctly.
+func TestBackend_GetWithInit_Concurrent_HeroCache(t *testing.T) {
+	sizeLimit := uint32(100)
+	backData := herocache.NewCache(sizeLimit, herocache.DefaultOversizeFactor, heropool.LRUEjection, unittest.Logger(), metrics.NewNoopCollector())
+
+	backend := stdmap.NewBackend(stdmap.WithBackData(backData))
+	entities := unittest.EntityListFixture(100)
+	adjustDone := sync.WaitGroup{}
+	for _, e := range entities {
+		adjustDone.Add(1)
+		e := e // capture range variable
+		go func() {
+			adjustDone.Done()
+
+			entity, ok := backend.GetWithInit(e.ID(), func() flow.Entity {
+				return e
+			})
+			require.True(t, ok)
+			require.Equal(t, e.ID(), entity.ID())
+		}()
+	}
+
+	unittest.RequireReturnsBefore(t, adjustDone.Wait, 1*time.Second, "failed to get-with-init elements in time")
+
+	for _, e := range entities {
+		actual, ok := backend.ByID(e.ID())
+		require.True(t, ok)
+		require.Equal(t, e.ID(), actual.ID())
+	}
+}
+
 // TestBackend_AdjustWithInit_Concurrent_MapBased tests the AdjustWithInit method of the Backend with golang map as the backdata.
 // It concurrently attempts on adjusting non-existent entities, and verifies that the entities are initialized and adjusted correctly.
 func TestBackend_AdjustWithInit_Concurrent_MapBased(t *testing.T) {
