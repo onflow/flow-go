@@ -14,10 +14,10 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// trigger the check once every minute,
+// DefaultTimeInterval triggers the check once every minute,
 const DefaultTimeInterval = time.Minute * 1
 
-// The checker engine checks if the execution result matches the sealed result.
+// Core is the core logic of the checker engine that checks if the execution result matches the sealed result.
 type Core struct {
 	log       zerolog.Logger
 	state     protocol.State
@@ -38,7 +38,7 @@ func NewCore(
 	return e
 }
 
-// The point of checker engine is to perform this following check
+// checkMyCommitWithSealedCommit is the main check of the checker engine
 func checkMyCommitWithSealedCommit(
 	executedBlock *flow.Header,
 	myCommit flow.StateCommitment,
