@@ -139,6 +139,9 @@ func (d *DeltaView) HasSuicided(addr gethCommon.Address) bool {
 
 // Suicide sets a flag to delete the account at the end of transaction
 func (d *DeltaView) Suicide(addr gethCommon.Address) (bool, error) {
+	if d.IsCreated(addr) {
+		return false, fmt.Errorf("invalid operation, can't suicide an account that is just created")
+	}
 	// if it doesn't exist, return false
 	exists, err := d.Exist(addr)
 	if err != nil {
