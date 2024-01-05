@@ -149,10 +149,6 @@ type GossipSubAppSpecificScoreRegistryConfig struct {
 	// an authorized peer is found).
 	IdProvider module.IdentityProvider `validate:"required"`
 
-	// Init is a factory function that returns a new GossipSubSpamRecord. It is used to initialize the spam record of
-	// a peer when the peer is first observed by the local peer.
-	Init func() p2p.GossipSubSpamRecord `validate:"required"`
-
 	// SpamRecordCacheFactory is a factory function that returns a new GossipSubSpamRecordCache. It is used to initialize the spamScoreCache.
 	// The cache is used to store the application specific penalty of peers.
 	SpamRecordCacheFactory func() p2p.GossipSubSpamRecordCache `validate:"required"`
@@ -191,7 +187,6 @@ func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegis
 		spamScoreCache: config.SpamRecordCacheFactory(),
 		appScoreCache:  config.AppScoreCacheFactory(),
 		penalty:        config.Penalty,
-		init:           config.Init,
 		validator:      config.Validator,
 		idProvider:     config.IdProvider,
 		scoreTTL:       config.Parameters.ScoreTTL,
