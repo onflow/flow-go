@@ -259,6 +259,39 @@ func TestBackend_AdjustWithInit_Concurrent_HeroCache(t *testing.T) {
 	}
 }
 
+// TestBackend_AdjustWithInit_Concurrent_MapBased tests the AdjustWithInit method of the Backend with golang map as the backdata.
+// It concurrently attempts on adjusting non-existent entities, and verifies that the entities are initialized and adjusted correctly.
+func TestBackend_AdjustWithInit_Concurrent_MapBased(t *testing.T) {
+	sizeLimit := uint(100)
+	backend := stdmap.NewBackend(stdmap.WithLimit(sizeLimit))
+	entities := unittest.EntityListFixture(sizeLimit)
+	adjustDone := sync.WaitGroup{}
+	for _, e := range entities {
+		adjustDone.Add(1)
+		e := e // capture range variable
+		go func() {
+			adjustDone.Done()
+
+			backend.AdjustWithInit(e.ID(), func(entity flow.Entity) flow.Entity {
+				// increment nonce of the entity
+				entity.(*unittest.MockEntity).Nonce++
+				return entity
+			}, func() flow.Entity {
+				return e
+			})
+		}()
+	}
+
+	unittest.RequireReturnsBefore(t, adjustDone.Wait, 1*time.Second, "failed to adjust elements in time")
+
+	for _, e := range entities {
+		actual, ok := backend.ByID(e.ID())
+		require.True(t, ok)
+		require.Equal(t, e.ID(), actual.ID())
+		require.Equal(t, uint64(1), actual.(*unittest.MockEntity).Nonce)
+	}
+}
+
 func addRandomEntities(t *testing.T, backend *stdmap.Backend, num int) {
 	// add swarm-number of items to backend
 	wg := sync.WaitGroup{}
