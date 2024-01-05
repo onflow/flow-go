@@ -43,7 +43,7 @@ require (
 	github.com/ipfs/go-log/v2 v2.5.1
 	github.com/libp2p/go-addr-util v0.1.0
 	github.com/libp2p/go-libp2p v0.32.0
-	github.com/libp2p/go-libp2p-kad-dht v0.24.2
+	github.com/libp2p/go-libp2p-kad-dht v0.25.2
 	github.com/libp2p/go-libp2p-kbucket v0.6.3
 	github.com/libp2p/go-libp2p-pubsub v0.9.3
 	github.com/montanaflynn/stats v0.6.6
@@ -220,6 +220,7 @@ require (
 	github.com/libp2p/go-libp2p-asn-util v0.3.0 // indirect
 	github.com/libp2p/go-libp2p-core v0.20.1 // indirect
 	github.com/libp2p/go-libp2p-record v0.2.0 // indirect
+	github.com/libp2p/go-libp2p-routing-helpers v0.7.2 // indirect
 	github.com/libp2p/go-msgio v0.3.0 // indirect
 	github.com/libp2p/go-nat v0.2.0 // indirect
 	github.com/libp2p/go-netroute v0.2.1 // indirect
