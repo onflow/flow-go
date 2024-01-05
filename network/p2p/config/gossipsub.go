@@ -76,6 +76,7 @@ type GossipSubParameters struct {
 	PeerScoringEnabled   bool                           `mapstructure:"peer-scoring-enabled"`
 	SubscriptionProvider SubscriptionProviderParameters `mapstructure:"subscription-provider"`
 	ScoringParameters    ScoringParameters              `mapstructure:"scoring-parameters"`
+	ScoreOption          ScoreOption                    `mapstructure:"score-option"`
 }
 
 const (
