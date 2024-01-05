@@ -53,7 +53,7 @@ func NewAppSpecificScoreCache(sizeLimit uint32, logger zerolog.Logger, collector
 // - time.Time: the time at which the score was last updated.
 // - bool: true if the score was retrieved successfully, false otherwise.
 func (a *AppSpecificScoreCache) Get(peerID peer.ID) (float64, time.Time, bool) {
-	e, ok := a.c.ByID(flow.MakeID(peerID))
+	e, ok := a.c.ByID(entityIdOf(peerID))
 	if !ok {
 		return 0, time.Time{}, false
 	}
@@ -69,7 +69,7 @@ func (a *AppSpecificScoreCache) Get(peerID peer.ID) (float64, time.Time, bool) {
 // Returns:
 // - error on failure to add the score. The returned error is irrecoverable and indicates an exception.
 func (a *AppSpecificScoreCache) AdjustWithInit(peerID peer.ID, score float64, time time.Time) error {
-	entityId := flow.MakeID(peerID)
+	entityId := entityIdOf(peerID)
 
 	initLogic := func() flow.Entity {
 		return appSpecificScoreRecordEntity{

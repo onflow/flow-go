@@ -58,7 +58,7 @@ func NewSubscriptionRecordCache(sizeLimit uint32,
 // - []string: the list of topics the peer is subscribed to.
 // - bool: true if there is a record for the peer, false otherwise.
 func (s *SubscriptionRecordCache) GetSubscribedTopics(pid peer.ID) ([]string, bool) {
-	e, ok := s.c.ByID(flow.MakeID(pid))
+	e, ok := s.c.ByID(entityIdOf(pid))
 	if !ok {
 		return nil, false
 	}
@@ -96,10 +96,7 @@ func (s *SubscriptionRecordCache) MoveToNextUpdateCycle() uint64 {
 // - error: an error if the update failed; any returned error is an irrecoverable error and indicates a bug or misconfiguration.
 // Implementation must be thread-safe.
 func (s *SubscriptionRecordCache) AddWithInitTopicForPeer(pid peer.ID, topic string) ([]string, error) {
-	// ensuring atomic init-and-adjust operation.
-
-	// first, we try to optimistically adjust the record assuming that the record already exists.
-	entityId := flow.MakeID(pid)
+	entityId := entityIdOf(pid)
 	initLogic := func() flow.Entity {
 		return SubscriptionRecordEntity{
 			entityId:         entityId,
@@ -150,4 +147,15 @@ func (s *SubscriptionRecordCache) AddWithInitTopicForPeer(pid peer.ID, topic str
 	}
 
 	return adjustedEntity.(SubscriptionRecordEntity).Topics, nil
+}
+
+// entityIdOf converts a peer ID to a flow ID by taking the hash of the peer ID.
+// This is used to convert the peer ID in a notion that is compatible with HeroCache.
+// This is not a protocol-level conversion, and is only used internally by the cache, MUST NOT be exposed outside the cache.
+// Args:
+// - peerId: the peer ID of the peer in the GossipSub protocol.
+// Returns:
+// - flow.Identifier: the flow ID of the peer.
+func entityIdOf(pid peer.ID) flow.Identifier {
+	return flow.MakeID(pid)
 }

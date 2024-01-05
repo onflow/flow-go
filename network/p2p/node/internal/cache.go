@@ -76,11 +76,12 @@ func (d *DisallowListCache) IsDisallowListed(peerID peer.ID) ([]network.Disallow
 // - []network.DisallowListedCause: the list of causes for which the peer is disallow-listed.
 // - error: if the operation fails, error is irrecoverable.
 func (d *DisallowListCache) DisallowFor(peerID peer.ID, cause network.DisallowListedCause) ([]network.DisallowListedCause, error) {
+	entityId := makeId(peerID)
 	initLogic := func() flow.Entity {
 		return &disallowListCacheEntity{
-			peerID: peerID,
-			causes: make(map[network.DisallowListedCause]struct{}),
-			id:     makeId(peerID),
+			peerID:   peerID,
+			causes:   make(map[network.DisallowListedCause]struct{}),
+			entityId: entityId,
 		}
 	}
 	adjustLogic := func(entity flow.Entity) flow.Entity {
@@ -88,7 +89,7 @@ func (d *DisallowListCache) DisallowFor(peerID peer.ID, cause network.DisallowLi
 		dEntity.causes[cause] = struct{}{}
 		return dEntity
 	}
-	adjustedEntity, adjusted := d.c.AdjustWithInit(makeId(peerID), adjustLogic, initLogic)
+	adjustedEntity, adjusted := d.c.AdjustWithInit(entityId, adjustLogic, initLogic)
 	if !adjusted {
 		return nil, fmt.Errorf("failed to disallow list peer %s for cause %s", peerID, cause)
 	}
