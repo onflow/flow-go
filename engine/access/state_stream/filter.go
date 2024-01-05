@@ -193,10 +193,15 @@ func (f *StatusFilter) Match(event flow.Event) bool {
 		return true
 	}
 
-	//if parsed.Type == AccountEventType {
-	//	_, ok := f.Addresses[parsed.Address]
-	//	return ok
-	//}
+	parsed, err := ParseEvent(event.Type)
+	if err != nil {
+		// TODO: log this error
+		return false
+	}
+
+	if parsed.Type == ProtocolEventType {
+		return true
+	}
 
 	return false
 }
