@@ -4,10 +4,16 @@ import (
 	"context"
 	"fmt"
 
+	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
+	ftContracts "github.com/onflow/flow-ft/lib/go/contracts"
+	sdk "github.com/onflow/flow-go-sdk"
+	nftContracts "github.com/onflow/flow-nft/lib/go/contracts"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/cadence/runtime/common"
 
+	evm "github.com/onflow/flow-go/fvm/evm/stdlib"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -108,4 +114,130 @@ func (d *ChangeContractCodeMigration) ChangeContract(
 	d.contracts[address][registerID] = newContractCode
 
 	return d
+}
+
+type SystemContractChange struct {
+	Address         common.Address
+	ContractName    string
+	NewContractCode string
+}
+
+func NewSystemContractChange(
+	systemContract systemcontracts.SystemContract,
+	newContractCode []byte,
+) SystemContractChange {
+	return SystemContractChange{
+		Address:         common.Address(systemContract.Address),
+		ContractName:    systemContract.Name,
+		NewContractCode: string(newContractCode),
+	}
+}
+
+func SystemContractChanges(chainID flow.ChainID) []SystemContractChange {
+	systemContracts := systemcontracts.SystemContractsForChain(chainID)
+
+	return []SystemContractChange{
+		// epoch related contracts
+		NewSystemContractChange(
+			systemContracts.Epoch,
+			coreContracts.FlowEpoch(
+				systemContracts.FungibleToken.Address.HexWithPrefix(),
+				systemContracts.FlowToken.Address.HexWithPrefix(),
+				systemContracts.IDTableStaking.Address.HexWithPrefix(),
+				systemContracts.ClusterQC.Address.HexWithPrefix(),
+				systemContracts.DKG.Address.HexWithPrefix(),
+				systemContracts.FlowFees.Address.HexWithPrefix(),
+			),
+		),
+		NewSystemContractChange(
+			systemContracts.IDTableStaking,
+			coreContracts.FlowIDTableStaking(
+				systemContracts.FungibleToken.Address.HexWithPrefix(),
+				systemContracts.FlowToken.Address.HexWithPrefix(),
+				systemContracts.FlowFees.Address.HexWithPrefix(),
+				true,
+			),
+		),
+		NewSystemContractChange(
+			systemContracts.ClusterQC,
+			coreContracts.FlowQC(),
+		),
+		NewSystemContractChange(
+			systemContracts.DKG,
+			coreContracts.FlowDKG(),
+		),
+
+		// service account related contracts
+		NewSystemContractChange(
+			systemContracts.FlowServiceAccount,
+			coreContracts.FlowServiceAccount(
+				systemContracts.FungibleToken.Address.HexWithPrefix(),
+				systemContracts.FlowToken.Address.HexWithPrefix(),
+				systemContracts.FlowFees.Address.HexWithPrefix(),
+				systemContracts.FlowStorageFees.Address.HexWithPrefix(),
+			),
+		),
+		NewSystemContractChange(
+			systemContracts.NodeVersionBeacon,
+			coreContracts.NodeVersionBeacon(),
+		),
+		NewSystemContractChange(
+			systemContracts.RandomBeaconHistory,
+			coreContracts.RandomBeaconHistory(),
+		),
+		NewSystemContractChange(
+			systemContracts.FlowStorageFees,
+			coreContracts.FlowStorageFees(
+				systemContracts.FungibleToken.Address.HexWithPrefix(),
+				systemContracts.FlowToken.Address.HexWithPrefix(),
+			),
+		),
+
+		// token related contracts
+		NewSystemContractChange(
+			systemContracts.FlowFees,
+			coreContracts.FlowFees(
+				systemContracts.FungibleToken.Address.HexWithPrefix(),
+				systemContracts.FlowToken.Address.HexWithPrefix(),
+				systemContracts.FlowStorageFees.Address.HexWithPrefix(),
+			),
+		),
+		NewSystemContractChange(
+			systemContracts.FlowToken,
+			coreContracts.FlowToken(
+				systemContracts.FungibleToken.Address.HexWithPrefix(),
+				systemContracts.MetadataViews.Address.HexWithPrefix(),
+				systemContracts.ViewResolver.Address.HexWithPrefix(),
+			),
+		),
+		NewSystemContractChange(
+			systemContracts.FungibleToken,
+			ftContracts.FungibleToken(),
+		),
+
+		// NFT related contracts
+		NewSystemContractChange(
+			systemContracts.NonFungibleToken,
+			nftContracts.NonFungibleToken(),
+		),
+		NewSystemContractChange(
+			systemContracts.MetadataViews,
+			nftContracts.MetadataViews(
+				sdk.Address(systemContracts.FungibleToken.Address),
+				sdk.Address(systemContracts.NonFungibleToken.Address),
+			),
+		),
+		NewSystemContractChange(
+			systemContracts.ViewResolver,
+			nftContracts.Resolver(),
+		),
+
+		// EVM related contracts
+		NewSystemContractChange(
+			systemContracts.EVM,
+			evm.ContractCode(
+				systemContracts.FlowToken.Address,
+			),
+		),
+	}
 }
