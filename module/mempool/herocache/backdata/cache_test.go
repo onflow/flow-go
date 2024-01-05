@@ -207,6 +207,79 @@ func TestArrayBackData_AdjustWitInit(t *testing.T) {
 	require.False(t, ok)
 }
 
+// TestArrayBackData_GetWithInit evaluates that GetWithInit method. It should initialize and then retrieve the value of
+// non-existing entity while preserving the integrity of BackData on just retrieving the value of existing entity.
+func TestArrayBackData_GetWithInit(t *testing.T) {
+	limit := 1000
+
+	bd := NewCache(uint32(limit), 8, heropool.LRUEjection, unittest.Logger(), metrics.NewNoopCollector())
+
+	entities := unittest.EntityListFixture(uint(limit))
+
+	// GetWithInit
+	for _, e := range entities {
+		// all entities must be initialized retrieved successfully
+		actual, ok := bd.GetWithInit(e.ID(), func() flow.Entity {
+			return e // initialize with the entity
+		})
+		require.True(t, ok)
+		require.Equal(t, e, actual)
+	}
+
+	// All
+	all := bd.All()
+	require.Equal(t, len(entities), len(all))
+	for _, expected := range entities {
+		actual, ok := bd.ByID(expected.ID())
+		require.True(t, ok)
+		require.Equal(t, expected, actual)
+	}
+
+	// Identifiers
+	ids := bd.Identifiers()
+	require.Equal(t, len(entities), len(ids))
+	for _, id := range ids {
+		require.True(t, bd.Has(id))
+	}
+
+	// Entities
+	actualEntities := bd.Entities()
+	require.Equal(t, len(entities), len(actualEntities))
+	require.ElementsMatch(t, entities, actualEntities)
+
+	// Adjust
+	for _, e := range entities {
+		// all entities must be adjusted successfully
+		actual, ok := bd.Adjust(e.ID(), func(entity flow.Entity) flow.Entity {
+			// increment nonce of the entity
+			entity.(*unittest.MockEntity).Nonce++
+			return entity
+		})
+		require.True(t, ok)
+		require.Equal(t, e, actual)
+	}
+
+	// ByID; should return the latest version of the entity
+	for _, e := range entities {
+		// all entities must be retrieved successfully
+		actual, ok := bd.ByID(e.ID())
+		require.True(t, ok)
+		require.Equal(t, e.ID(), actual.ID())
+		require.Equal(t, uint64(1), actual.(*unittest.MockEntity).Nonce)
+	}
+
+	// GetWithInit; should return the latest version of the entity, than increment the nonce
+	for _, e := range entities {
+		// all entities must be retrieved successfully
+		actual, ok := bd.GetWithInit(e.ID(), func() flow.Entity {
+			require.Fail(t, "should not be called") // entity has already been initialized
+			return e
+		})
+		require.True(t, ok)
+		require.Equal(t, e.ID(), actual.ID())
+	}
+}
+
 // TestArrayBackData_WriteHeavy evaluates correctness of Cache under the writing and retrieving
 // a heavy load of entities up to its limit. All data must be written successfully and then retrievable.
 func TestArrayBackData_WriteHeavy(t *testing.T) {
