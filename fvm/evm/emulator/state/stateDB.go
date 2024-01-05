@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"maps"
 	"math/big"
+	"slices"
 	"sort"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
@@ -311,10 +312,9 @@ func (db *StateDB) Commit() error {
 		sortedAddresses = append(sortedAddresses, addr)
 	}
 
-	sort.Slice(sortedAddresses,
-		func(i, j int) bool {
-			return bytes.Compare(sortedAddresses[i][:], sortedAddresses[j][:]) < 0
-		})
+	slices.SortFunc(sortedAddresses, func(a, b gethCommon.Address) int {
+		return bytes.Compare(a[:], b[:])
+	})
 
 	// update accounts
 	for _, addr := range sortedAddresses {
