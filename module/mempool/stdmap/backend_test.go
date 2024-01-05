@@ -324,6 +324,36 @@ func TestBackend_AdjustWithInit_Concurrent_MapBased(t *testing.T) {
 	}
 }
 
+// TestBackend_GetWithInit_Concurrentt_MapBased tests the GetWithInit method of the Backend with golang map as the backdata.
+// It concurrently attempts on adjusting non-existent entities, and verifies that the entities are initialized and retrieved correctly.
+func TestBackend_GetWithInit_Concurrent_MapBased(t *testing.T) {
+	sizeLimit := uint(100)
+	backend := stdmap.NewBackend(stdmap.WithLimit(sizeLimit))
+	entities := unittest.EntityListFixture(100)
+	adjustDone := sync.WaitGroup{}
+	for _, e := range entities {
+		adjustDone.Add(1)
+		e := e // capture range variable
+		go func() {
+			adjustDone.Done()
+
+			entity, ok := backend.GetWithInit(e.ID(), func() flow.Entity {
+				return e
+			})
+			require.True(t, ok)
+			require.Equal(t, e.ID(), entity.ID())
+		}()
+	}
+
+	unittest.RequireReturnsBefore(t, adjustDone.Wait, 1*time.Second, "failed to get-with-init elements in time")
+
+	for _, e := range entities {
+		actual, ok := backend.ByID(e.ID())
+		require.True(t, ok)
+		require.Equal(t, e.ID(), actual.ID())
+	}
+}
+
 func addRandomEntities(t *testing.T, backend *stdmap.Backend, num int) {
 	// add swarm-number of items to backend
 	wg := sync.WaitGroup{}
