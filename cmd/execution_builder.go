@@ -941,6 +941,13 @@ func (exeNode *ExecutionNode) LoadCheckerEngine(
 	module.ReadyDoneAware,
 	error,
 ) {
+	if !exeNode.exeConf.enableChecker {
+		node.Logger.Warn().Msgf("checker engine is disabled")
+		return &module.NoopReadyDoneAware{}, nil
+	}
+
+	node.Logger.Info().Msgf("checker engine is enabled")
+
 	core := checker.NewCore(
 		node.Logger,
 		node.State,
