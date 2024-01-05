@@ -113,9 +113,6 @@ type GossipSubAppSpecificScoreRegistry struct {
 
 	penalty GossipSubCtrlMsgPenaltyValue
 
-	// initial application specific penalty record, used to initialize the penalty cache entry.
-	init func() p2p.GossipSubSpamRecord
-
 	validator p2p.SubscriptionValidator
 
 	// scoreTTL is the time to live of the application specific score of a peer; the registry keeps a cached copy of the
