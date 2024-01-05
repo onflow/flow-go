@@ -98,7 +98,8 @@ func (db *StateDB) Suicide(addr gethCommon.Address) bool {
 
 // HasSuicided returns true if address is flaged with suicide.
 func (db *StateDB) HasSuicided(addr gethCommon.Address) bool {
-	return db.lastestView().HasSuicided(addr)
+	suicided, _ := db.lastestView().HasSuicided(addr)
+	return suicided
 }
 
 // SubBalance substitutes the amount from the balance of the given address
@@ -297,8 +298,8 @@ func (db *StateDB) Commit() error {
 	var err error
 
 	// iterate views and collect dirty addresses and slots
-	addresses := make(map[gethCommon.Address]interface{})
-	slots := make(map[types.SlotAddress]interface{})
+	addresses := make(map[gethCommon.Address]struct{})
+	slots := make(map[types.SlotAddress]struct{})
 	for _, view := range db.views {
 		maps.Copy(addresses, view.DirtyAddresses())
 		maps.Copy(slots, view.DirtySlots())

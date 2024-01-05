@@ -34,7 +34,7 @@ type ReadOnlyView interface {
 	// IsCreated returns true if address has been created in this tx
 	IsCreated(gethCommon.Address) bool
 	// HasSuicided returns true if an address has suicided
-	HasSuicided(gethCommon.Address) bool
+	HasSuicided(gethCommon.Address) (bool, *big.Int)
 	// GetBalance returns the balance of an address
 	GetBalance(gethCommon.Address) (*big.Int, error)
 	// GetNonce returns the nonce of an address
