@@ -18,19 +18,27 @@ import (
 type DeltaView struct {
 	parent types.ReadOnlyView
 
-	// account changes
+	// dirtyAddresses keeps a set of addresses with changes
 	dirtyAddresses map[gethCommon.Address]struct{}
-	created        map[gethCommon.Address]struct{}
-	suicided       map[gethCommon.Address]struct{}
-	deleted        map[gethCommon.Address]struct{}
-	balances       map[gethCommon.Address]*big.Int
-	nonces         map[gethCommon.Address]uint64
-	codes          map[gethCommon.Address][]byte
-	codeHashes     map[gethCommon.Address]gethCommon.Hash
+	// created keeps a set of recently created addresses
+	created map[gethCommon.Address]struct{}
+	// suicided keeps a set of addresses flagged to be destructed at the
+	// end of transaction, it also keeps the balance of the addresses before destruction
+	toBeDestructed map[gethCommon.Address]*big.Int
+	// is a flag used to track accounts that has been flagged for
+	// destruction but recreated later
+	recreated map[gethCommon.Address]struct{}
+	// balances keeps the changes to the account balances
+	balances map[gethCommon.Address]*big.Int
+	// nonces keeps the changes to the account nonces
+	nonces map[gethCommon.Address]uint64
+	// codes keeps the changes to the account codes
+	codes map[gethCommon.Address][]byte
+	// codeHashes keeps the changes to account code hashes
+	codeHashes map[gethCommon.Address]gethCommon.Hash
 
-	// slot changes
-	dirtySlots map[types.SlotAddress]struct{}
-	slots      map[types.SlotAddress]gethCommon.Hash
+	// slots keeps a set of slots that has been changed in this view
+	slots map[types.SlotAddress]gethCommon.Hash
 
 	// transient storage
 	transient map[types.SlotAddress]gethCommon.Hash
@@ -58,14 +66,14 @@ func NewDeltaView(parent types.ReadOnlyView) *DeltaView {
 
 		dirtyAddresses: make(map[gethCommon.Address]struct{}),
 		created:        make(map[gethCommon.Address]struct{}),
-		suicided:       make(map[gethCommon.Address]struct{}),
-		deleted:        make(map[gethCommon.Address]struct{}),
+		toBeDestructed: make(map[gethCommon.Address]*big.Int),
+		recreated:      make(map[gethCommon.Address]struct{}),
 		balances:       make(map[gethCommon.Address]*big.Int),
 		nonces:         make(map[gethCommon.Address]uint64),
 		codes:          make(map[gethCommon.Address][]byte),
 		codeHashes:     make(map[gethCommon.Address]gethCommon.Hash),
-		dirtySlots:     make(map[types.SlotAddress]struct{}),
-		slots:          make(map[types.SlotAddress]gethCommon.Hash),
+
+		slots: make(map[types.SlotAddress]gethCommon.Hash),
 
 		// for refund we just copy the data
 		refund: parent.GetRefund(),
@@ -85,7 +93,7 @@ func (d *DeltaView) Exist(addr gethCommon.Address) (bool, error) {
 	if found {
 		return true, nil
 	}
-	_, found = d.suicided[addr]
+	_, found = d.toBeDestructed[addr]
 	if found {
 		return true, nil
 	}
@@ -93,21 +101,29 @@ func (d *DeltaView) Exist(addr gethCommon.Address) (bool, error) {
 }
 
 // CreateAccount creates a new account for the given address
+//
+// if address has been flaged earlier for destruction, carry over the balance
+// and reset the data from the orginal account.
 func (d *DeltaView) CreateAccount(addr gethCommon.Address) error {
-	d.created[addr] = struct{}{}
-	// flag the address as dirty
+	// if is already created return
+	if d.IsCreated(addr) {
+		return nil
+	}
+
 	d.dirtyAddresses[addr] = struct{}{}
 
-	// if has already suicided
-	if d.HasSuicided(addr) {
-		// balance has already been set to zero
+	// if it has flagged for destruction in this transction,
+	// reset everything and carry over the balance
+	destructed, balance := d.HasSuicided(addr)
+	if destructed {
 		d.nonces[addr] = 0
 		d.codes[addr] = nil
 		d.codeHashes[addr] = gethTypes.EmptyCodeHash
+		d.balances[addr] = balance
 
-		// flag addr as deleted, this flag helps with postponing deletion of slabs
+		// flag addr as recreated, this flag helps with postponing deletion of slabs
 		// otherwise we have to iterate over all slabs of this account and set the to nil
-		d.deleted[addr] = struct{}{}
+		d.recreated[addr] = struct{}{}
 
 		// remove slabs from cache related to this account
 		for k := range d.slots {
@@ -115,7 +131,16 @@ func (d *DeltaView) CreateAccount(addr gethCommon.Address) error {
 				delete(d.slots, k)
 			}
 		}
+		return nil
 	}
+
+	d.created[addr] = struct{}{}
+	// carry over balance
+	bal, err := d.GetBalance(addr)
+	if err != nil {
+		return err
+	}
+	d.balances[addr] = bal
 	return nil
 }
 
@@ -128,20 +153,26 @@ func (d *DeltaView) IsCreated(addr gethCommon.Address) bool {
 	return d.parent.IsCreated(addr)
 }
 
-// HasSuicided returns true if address has been flagged for deletion
-func (d *DeltaView) HasSuicided(addr gethCommon.Address) bool {
-	_, found := d.suicided[addr]
+// HasSuicided returns true if address has been flagged for destruction
+// it also returns the balance of the address before destruction
+func (d *DeltaView) HasSuicided(addr gethCommon.Address) (bool, *big.Int) {
+	bal, found := d.toBeDestructed[addr]
 	if found {
-		return true
+		return true, bal
 	}
 	return d.parent.HasSuicided(addr)
 }
 
 // Suicide sets a flag to delete the account at the end of transaction
+//
+// if an account has been created in this transaction, it would return an error
 func (d *DeltaView) Suicide(addr gethCommon.Address) (bool, error) {
+	// if it has been recently created, calling suicide is not
+	// a valid operation
 	if d.IsCreated(addr) {
 		return false, fmt.Errorf("invalid operation, can't suicide an account that is just created")
 	}
+
 	// if it doesn't exist, return false
 	exists, err := d.Exist(addr)
 	if err != nil {
@@ -150,14 +181,18 @@ func (d *DeltaView) Suicide(addr gethCommon.Address) (bool, error) {
 	if !exists {
 		return false, nil
 	}
-	// flag the account for deletion
-	d.suicided[addr] = struct{}{}
+
+	// flag the account for destruction and capture the balance
+	// before destruction
+	d.toBeDestructed[addr], err = d.GetBalance(addr)
+	if err != nil {
+		return false, err
+	}
+	// flag the address as dirty
+	d.dirtyAddresses[addr] = struct{}{}
 
 	// set balance to zero
 	d.balances[addr] = new(big.Int)
-
-	// flag the address as dirty
-	d.dirtyAddresses[addr] = struct{}{}
 	return true, nil
 }
 
@@ -308,8 +343,8 @@ func (d *DeltaView) GetState(sk types.SlotAddress) (gethCommon.Hash, error) {
 	// if address is deleted in the scope of this delta view,
 	// don't go backward. this has been done to skip the step to iterate
 	// over all the state slabs and delete them.
-	_, deleted := d.deleted[sk.Address]
-	if deleted {
+	_, recreated := d.recreated[sk.Address]
+	if recreated {
 		return gethCommon.Hash{}, nil
 	}
 	return d.parent.GetState(sk)
@@ -326,7 +361,6 @@ func (d *DeltaView) SetState(sk types.SlotAddress, value gethCommon.Hash) error 
 		return nil
 	}
 	d.slots[sk] = value
-	d.dirtySlots[sk] = struct{}{}
 	return nil
 }
 
@@ -453,5 +487,9 @@ func (d *DeltaView) DirtyAddresses() map[gethCommon.Address]struct{} {
 
 // DirtySlots returns a set of slots that has been updated in this view
 func (d *DeltaView) DirtySlots() map[types.SlotAddress]struct{} {
-	return d.dirtySlots
+	dirtySlots := make(map[types.SlotAddress]struct{})
+	for sk := range d.slots {
+		dirtySlots[sk] = struct{}{}
+	}
+	return dirtySlots
 }
