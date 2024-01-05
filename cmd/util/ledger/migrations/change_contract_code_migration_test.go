@@ -16,6 +16,8 @@ func TestChangeContractCodeMigration(t *testing.T) {
 	t.Parallel()
 
 	address1, err := common.HexToAddress("0x1")
+	require.NoError(t, err)
+
 	address2, err := common.HexToAddress("0x2")
 	require.NoError(t, err)
 
