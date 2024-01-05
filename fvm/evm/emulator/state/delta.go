@@ -135,7 +135,7 @@ func (d *DeltaView) CreateAccount(addr gethCommon.Address) error {
 	}
 
 	d.created[addr] = struct{}{}
-	// carry over balance
+	// Carrying over the balance ensures that Ether doesn't disappear. (legacy behaviour of the Geth stateDB)
 	bal, err := d.GetBalance(addr)
 	if err != nil {
 		return err
