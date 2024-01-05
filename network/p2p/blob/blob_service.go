@@ -17,9 +17,9 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
-	"github.com/onflow/go-bitswap"
-	bsmsg "github.com/onflow/go-bitswap/message"
-	bsnet "github.com/onflow/go-bitswap/network"
+	"github.com/peterargue/boxo/bitswap"
+	bsmsg "github.com/peterargue/boxo/bitswap/message"
+	bsnet "github.com/peterargue/boxo/bitswap/network"
 	"github.com/rs/zerolog"
 	"golang.org/x/time/rate"
 

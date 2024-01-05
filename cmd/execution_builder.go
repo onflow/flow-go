@@ -17,7 +17,7 @@ import (
 	"github.com/ipfs/go-cid"
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
-	"github.com/onflow/go-bitswap"
+	"github.com/peterargue/boxo/bitswap"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/shirou/gopsutil/v3/cpu"
