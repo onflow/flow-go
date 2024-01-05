@@ -41,6 +41,9 @@ func TestDeltaView(t *testing.T) {
 						return false, fmt.Errorf("some error")
 					}
 				},
+				IsCreatedFunc: func(a gethCommon.Address) bool {
+					return false
+				},
 				HasSuicidedFunc: func(gethCommon.Address) bool {
 					return false
 				},
@@ -109,6 +112,9 @@ func TestDeltaView(t *testing.T) {
 					}
 				},
 				HasSuicidedFunc: func(gethCommon.Address) bool {
+					return false
+				},
+				IsCreatedFunc: func(a gethCommon.Address) bool {
 					return false
 				},
 				GetBalanceFunc: func(addr gethCommon.Address) (*big.Int, error) {
@@ -589,6 +595,9 @@ func TestDeltaView(t *testing.T) {
 				GetNonceFunc: func(addr gethCommon.Address) (uint64, error) {
 					return 0, nil
 				},
+				IsCreatedFunc: func(a gethCommon.Address) bool {
+					return false
+				},
 				HasSuicidedFunc: func(gethCommon.Address) bool {
 					return false
 				},
@@ -643,6 +652,9 @@ func TestDeltaView(t *testing.T) {
 				},
 				HasSuicidedFunc: func(gethCommon.Address) bool {
 					return true
+				},
+				IsCreatedFunc: func(a gethCommon.Address) bool {
+					return false
 				},
 				GetBalanceFunc: func(addr gethCommon.Address) (*big.Int, error) {
 					return new(big.Int), nil
