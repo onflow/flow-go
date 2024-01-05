@@ -85,19 +85,17 @@ func extractExecutionState(
 
 	rwf := reporters.NewReportFileWriterFactory(dir, log)
 
-	cadenceDataValidation := migrators.NewCadenceDataValidationMigrations(rwf, nWorker)
-
 	var migrations = []ledger.Migration{
 		migrators.CreateAccountBasedMigration(
 			log,
 			nWorker,
 			[]migrators.AccountBasedMigration{
-				cadenceDataValidation.PreMigration(),
 				migrators.NewAtreeRegisterMigrator(
 					rwf,
+					flagValidateMigration,
 				),
+
 				&migrators.DeduplicateContractNamesMigration{},
-				cadenceDataValidation.PostMigration(),
 
 				// This will fix storage used discrepancies caused by the
 				// DeduplicateContractNamesMigration.

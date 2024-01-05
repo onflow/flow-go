@@ -21,9 +21,10 @@ var (
 	flagStateCommitment   string
 	flagDatadir           string
 	flagChain             string
+	flagNWorker           int
 	flagNoMigration       bool
 	flagNoReport          bool
-	flagNWorker           int
+	flagValidateMigration bool
 )
 
 var Cmd = &cobra.Command{
@@ -59,6 +60,10 @@ func init() {
 		"don't report the state")
 
 	Cmd.Flags().IntVar(&flagNWorker, "n-migrate-worker", 10, "number of workers to migrate payload concurrently")
+
+	Cmd.Flags().BoolVar(&flagValidateMigration, "validate", false,
+		"validate migrated Cadence values")
+
 }
 
 func run(*cobra.Command, []string) {
@@ -133,6 +138,10 @@ func run(*cobra.Command, []string) {
 
 	if flagNoMigration {
 		log.Warn().Msgf("--no-migration flag is deprecated")
+	}
+
+	if flagValidateMigration {
+		log.Warn().Msgf("validation flag is enabled and will increase duration of migration")
 	}
 
 	err := extractExecutionState(
