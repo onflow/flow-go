@@ -1,10 +1,9 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package badger_test
 
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/rand"
 	"sync"
 	"testing"
@@ -20,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/signature"
@@ -692,29 +692,54 @@ func TestExtendReceiptsInvalid(t *testing.T) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 
-		validator.On("ValidatePayload", mock.Anything).Return(nil).Once()
-
 		// create block2 and block3
 		block2 := unittest.BlockWithParentFixture(head)
 		block2.SetPayload(flow.EmptyPayload())
-		err = state.Extend(context.Background(), block2)
-		require.NoError(t, err)
-
-		// Add a receipt for block 2
-		receipt := unittest.ExecutionReceiptFixture()
-
+		receipt := unittest.ReceiptForBlockFixture(block2) // receipt for block 2
 		block3 := unittest.BlockWithParentFixture(block2.Header)
 		block3.SetPayload(flow.Payload{
 			Receipts: []*flow.ExecutionReceiptMeta{receipt.Meta()},
 			Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
 		})
 
-		// force the receipt validator to refuse this payload
-		validator.On("ValidatePayload", block3).Return(engine.NewInvalidInputError("")).Once()
+		// validator accepts block 2
+		validator.On("ValidatePayload", block2).Return(nil).Once()
+		err = state.Extend(context.Background(), block2)
+		require.NoError(t, err)
 
+		// but receipt for block 2 is invalid, which the ParticipantState should reject with an InvalidExtensionError
+		validator.On("ValidatePayload", block3).Return(engine.NewInvalidInputError("")).Once()
 		err = state.Extend(context.Background(), block3)
 		require.Error(t, err)
 		require.True(t, st.IsInvalidExtensionError(err), err)
+	})
+}
+
+// TestOnReceiptValidatorExceptions tests that ParticipantState escalates unexpected errors and exceptions
+// returned by the ReceiptValidator. We expect that such errors are *not* interpreted as the block being invalid.
+func TestOnReceiptValidatorExceptions(t *testing.T) {
+	validator := mockmodule.NewReceiptValidator(t)
+
+	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	util.RunWithFullProtocolStateAndValidator(t, rootSnapshot, validator, func(db *badger.DB, state *protocol.ParticipantState) {
+		head, err := rootSnapshot.Head()
+		require.NoError(t, err)
+		block := unittest.BlockWithParentFixture(head)
+
+		// Check that _unexpected_ failure causes the error to be escalated and is *not* interpreted as an invalid block.
+		validator.On("ValidatePayload", block).Return(fmt.Errorf("")).Once()
+		err = state.Extend(context.Background(), block)
+		require.Error(t, err)
+		require.False(t, st.IsInvalidExtensionError(err), err)
+
+		// Check that an `UnknownBlockError` causes the error to be escalated and is *not* interpreted as an invalid receipt.
+		// Reasoning: per convention, the ParticipantState requires that the candidate's parent has already been ingested.
+		// Otherwise, an exception is returned. The `ReceiptValidator.ValidatePayload(..)` returning an `UnknownBlockError`
+		// indicates exactly this situation, where the parent block is unknown.
+		validator.On("ValidatePayload", block).Return(module.NewUnknownBlockError("")).Once()
+		err = state.Extend(context.Background(), block)
+		require.Error(t, err)
+		require.False(t, st.IsInvalidExtensionError(err), err)
 	})
 }
 

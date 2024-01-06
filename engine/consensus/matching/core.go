@@ -181,7 +181,7 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 		Hex("initial_state", initialState[:]).
 		Hex("final_state", finalState[:]).Logger()
 
-	// If the receipt is for an unknown block, skip it. It will be re-requested later by `requestPending` function.
+	// If the receipt is for an unknown block, skip it.
 	// Reasoning: If this is an honest receipt, this replica is behind. Chances are high that other leaders will
 	// already have included the receipt by the time this replica has caught up. If we still need the receipt by
 	// the time this replica has caught up, it will be re-requested later by `requestPending` function. If it is
