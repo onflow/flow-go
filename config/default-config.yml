@@ -332,7 +332,7 @@ network-config:
           # The counter is also decayed by (0.99) every decay interval (defaultDecayInterval) i.e., every minute.
           # Note that misbehaviors are counted by GossipSub across all topics (and is different from the Application Layer Misbehaviors that we count through
           # the ALSP system).
-          penalty-threshold: 10
+          penalty-threshold: 1000
           # The weight for applying penalty when a peer misbehavior goes beyond the threshold.
           # Misbehavior of a peer at gossipsub layer is defined as advertising an iHave without responding to the iWants (broken promises), as well as attempting
           # on GRAFT when the peer is considered for a PRUNE backoff, i.e., the local peer does not allow the peer to join the local topic mesh
@@ -361,7 +361,7 @@ network-config:
           # to (0.99)^x * (sqrt(2) * 10)^2 > 1 --> (0.99)^x * 200 > 1 --> (0.99)^x > 1/200 --> x > log(1/200) / log(0.99) --> x > 527.17 decay intervals, i.e., 527 minutes.
           # Note that misbehaviors are counted by GossipSub across all topics (and is different from the Application Layer Misbehaviors that we count through
           # the ALSP system that are reported by the engines).
-          penalty-weight: -1
+          penalty-weight: -0.01
           # The decay interval for the misbehavior counter of a peer. The misbehavior counter is
           # incremented by GossipSub for iHave broken promises or the GRAFT flooding attacks (i.e., each GRAFT received from a remote peer while that peer is on a PRUNE backoff).
           #
@@ -379,7 +379,7 @@ network-config:
           #
           # Note that misbehaviors are counted by GossipSub across all topics (and is different from the Application Layer Misbehaviors that we count through
           # the ALSP system that is based on the engines report).
-          penalty-decay: 0.99
+          penalty-decay: 0.5
         topic:
           # This is the default value for the skip atomic validation flag for topics.
           # We set it to true, which means gossipsub parameter validation will not fail if we leave some of the
