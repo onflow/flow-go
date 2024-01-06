@@ -1,5 +1,5 @@
 config-file: "./default-config.yml"
-# WARNING: Only modify the gossipsub configurations below if you fully understand their implications.
+# WARNING: Only modify the network configurations below if you fully understand their implications.
 # Incorrect settings may lead to system instability, security vulnerabilities, or degraded performance.
 # Make changes with caution and refer to the documentation for guidance.
 # Network configuration.
