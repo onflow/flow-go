@@ -4,9 +4,7 @@ import (
 	"bytes"
 	stdErrors "errors"
 	"fmt"
-	"maps"
 	"math/big"
-	"slices"
 	"sort"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
@@ -302,8 +300,12 @@ func (db *StateDB) Commit() error {
 	addresses := make(map[gethCommon.Address]struct{})
 	slots := make(map[types.SlotAddress]struct{})
 	for _, view := range db.views {
-		maps.Copy(addresses, view.DirtyAddresses())
-		maps.Copy(slots, view.DirtySlots())
+		for key := range view.DirtyAddresses() {
+			addresses[key] = struct{}{}
+		}
+		for key := range view.DirtySlots() {
+			slots[key] = struct{}{}
+		}
 	}
 
 	// sort addresses
@@ -312,9 +314,10 @@ func (db *StateDB) Commit() error {
 		sortedAddresses = append(sortedAddresses, addr)
 	}
 
-	slices.SortFunc(sortedAddresses, func(a, b gethCommon.Address) int {
-		return bytes.Compare(a[:], b[:])
-	})
+	sort.Slice(sortedAddresses,
+		func(i, j int) bool {
+			return bytes.Compare(sortedAddresses[i][:], sortedAddresses[j][:]) < 0
+		})
 
 	// update accounts
 	for _, addr := range sortedAddresses {
