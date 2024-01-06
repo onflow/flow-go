@@ -23,7 +23,7 @@ type ScoreOption struct {
 	AppSpecificScoreWeight float64 `validate:"gt=0,lte=1" mapstructure:"app-specific-score-weight"`
 	// MaxDebugLogs sets the max number of debug/trace log events per second. Logs emitted above
 	// this threshold are dropped.
-	MaxDebugLogs int `validate:"lte=50" mapstructure:"max-debug-logs"`
+	MaxDebugLogs uint32 `validate:"lte=50" mapstructure:"max-debug-logs"`
 	// DecayInterval is the  decay interval for the overall score of a peer at the GossipSub scoring
 	// system. We set it to 1 minute so that it is not too short so that a malicious node can recover from a penalty
 	// and is not too long so that a well-behaved node can't recover from a penalty.
@@ -39,7 +39,7 @@ type ScoreOption struct {
 	Rewards         ScoreOptionRewards         `validate:"required" mapstructure:"rewards"`
 	Thresholds      ScoreOptionThresholds      `validate:"required" mapstructure:"thresholds"`
 	Behaviour       ScoreOptionBehaviour       `validate:"required" mapstructure:"behaviour"`
-	TopicValidation ScoreOptionTopicValidation `validate:"required" mapstructure:"topic-validation"`
+	TopicValidation ScoreOptionTopicValidation `validate:"required" mapstructure:"topic"`
 }
 
 const (
@@ -58,7 +58,7 @@ type ScoreOptionPenalties struct {
 	// will be graylisted (i.e., all incoming and outgoing RPCs are rejected) and will not be able to publish or gossip any messages.
 	MaxAppSpecificPenalty float64 `validate:"lt=0" mapstructure:"max-app-specific-penalty"`
 	// MinAppSpecificPenalty the minimum penalty for sever offenses that we apply to a remote node score.
-	MinAppSpecificPenalty int `validate:"lt=0" mapstructure:"min-app-specific-penalty"`
+	MinAppSpecificPenalty float64 `validate:"lt=0" mapstructure:"min-app-specific-penalty"`
 	// UnknownIdentityPenalty is the  penalty for unknown identity. It is applied to the peer's score when
 	// the peer is not in the identity list.
 	UnknownIdentityPenalty float64 `validate:"lt=0" mapstructure:"unknown-identity-penalty"`
@@ -84,30 +84,30 @@ type ScoreOptionRewards struct {
 }
 
 const (
-	GossipThresholdKey             = "gossip-threshold"
-	PublishThresholdKey            = "publish-threshold"
-	GraylistThresholdKey           = "graylist-threshold"
-	AcceptPXThresholdKey           = "accept-px-threshold"
-	OpportunisticGraftThresholdKey = "opportunistic-graft-threshold"
+	GossipThresholdKey             = "gossip"
+	PublishThresholdKey            = "publish"
+	GraylistThresholdKey           = "graylist"
+	AcceptPXThresholdKey           = "accept-px"
+	OpportunisticGraftThresholdKey = "opportunistic-graft"
 )
 
 // ScoreOptionThresholds score option threshold configuration parameters.
 type ScoreOptionThresholds struct {
-	// GossipThreshold when a peer's penalty drops below this threshold,
+	// Gossip when a peer's penalty drops below this threshold,
 	// no gossip is emitted towards that peer and gossip from that peer is ignored.
-	GossipThreshold float64 `validate:"lt=0" mapstructure:"gossip-threshold"`
-	// PublishThreshold when a peer's penalty drops below this threshold,
+	Gossip float64 `validate:"lt=0" mapstructure:"gossip"`
+	// Publish when a peer's penalty drops below this threshold,
 	// self-published messages are not propagated towards this peer.
-	PublishThreshold float64 `validate:"lt=0" mapstructure:"publish-threshold"`
-	// GraylistThreshold when a peer's penalty drops below this threshold, the peer is graylisted, i.e.,
+	Publish float64 `validate:"lt=0" mapstructure:"publish"`
+	// Graylist when a peer's penalty drops below this threshold, the peer is graylisted, i.e.,
 	// incoming RPCs from the peer are ignored.
-	GraylistThreshold float64 `validate:"lt=0" mapstructure:"graylist-threshold"`
-	// AcceptPXThreshold when a peer sends us PX information with a prune, we only accept it and connect to the supplied
+	Graylist float64 `validate:"lt=0" mapstructure:"graylist"`
+	// AcceptPX when a peer sends us PX information with a prune, we only accept it and connect to the supplied
 	// peers if the originating peer's penalty exceeds this threshold.
-	AcceptPXThreshold float64 `validate:"gt=0" mapstructure:"accept-px-threshold"`
-	// OpportunisticGraftThreshold when the median peer penalty in the mesh drops below this value,
+	AcceptPX float64 `validate:"gt=0" mapstructure:"accept-px"`
+	// OpportunisticGraft when the median peer penalty in the mesh drops below this value,
 	// the peer may select more peers with penalty above the median to opportunistically graft on the mesh.
-	OpportunisticGraftThreshold float64 `validate:"gt=0" mapstructure:"opportunistic-graft-threshold"`
+	OpportunisticGraft float64 `validate:"gt=0" mapstructure:"opportunistic-graft"`
 }
 
 const (
@@ -118,7 +118,7 @@ const (
 
 // ScoreOptionBehaviour score option behaviour configuration parameters.
 type ScoreOptionBehaviour struct {
-	// BehaviourPenaltyThreshold is the threshold when the behavior of a peer is considered as bad by GossipSub.
+	// PenaltyThreshold is the threshold when the behavior of a peer is considered as bad by GossipSub.
 	// Currently, the misbehavior is defined as advertising an iHave without responding to the iWants (iHave broken promises), as well as attempting
 	// on GRAFT when the peer is considered for a PRUNE backoff, i.e., the local peer does not allow the peer to join the local topic mesh
 	// for a while, and the remote peer keep attempting on GRAFT (aka GRAFT flood).
@@ -134,8 +134,8 @@ type ScoreOptionBehaviour struct {
 	// The counter is also decayed by (0.99) every decay interval (DecayInterval) i.e., every minute.
 	// Note that misbehaviors are counted by GossipSub across all topics (and is different from the Application Layer Misbehaviors that we count through
 	// the ALSP system).
-	BehaviourPenaltyThreshold int `validate:"gt=0" mapstructure:"penalty-threshold"`
-	// BehaviourPenaltyWeight is the weight for applying penalty when a peer misbehavior goes beyond the threshold.
+	PenaltyThreshold float64 `validate:"gt=0" mapstructure:"penalty-threshold"`
+	// PenaltyWeight is the weight for applying penalty when a peer misbehavior goes beyond the threshold.
 	// Misbehavior of a peer at gossipsub layer is defined as advertising an iHave without responding to the iWants (broken promises), as well as attempting
 	// on GRAFT when the peer is considered for a PRUNE backoff, i.e., the local peer does not allow the peer to join the local topic mesh
 	// This is detected by the GossipSub scoring system, and the peer is penalized by BehaviorPenaltyWeight.
@@ -149,22 +149,22 @@ type ScoreOptionBehaviour struct {
 	// We set it to 0.01 * MaxAppSpecificPenalty, which means that misbehaving 10 times more than the threshold (i.e., 10 + 10) will cause the peer to lose
 	// its entire AppSpecificReward that is awarded by our app-specific scoring function to all staked (i.e., authorized) nodes by .
 	// Moreover, as the MaxAppSpecificPenalty is -MaxAppSpecificReward, misbehaving sqrt(2) * 10 times more than the threshold will cause the peer score
-	// to be dropped below the MaxAppSpecificPenalty, which is also below the GraylistThreshold, and the peer will be graylisted (i.e., disconnected).
+	// to be dropped below the MaxAppSpecificPenalty, which is also below the Graylist, and the peer will be graylisted (i.e., disconnected).
 	//
 	// The math is as follows: -|w| * (misbehavior - threshold)^2 = 0.01 * MaxAppSpecificPenalty * (misbehavior - threshold)^2 < 2 * MaxAppSpecificPenalty
 	// if misbehavior > threshold + sqrt(2) * 10.
 	// As shown above, with this choice of BehaviorPenaltyWeight, misbehaving sqrt(2) * 10 times more than the threshold will cause the peer score
-	// to be dropped below the MaxAppSpecificPenalty, which is also below the GraylistThreshold, and the peer will be graylisted (i.e., disconnected). This weight
+	// to be dropped below the MaxAppSpecificPenalty, which is also below the Graylist, and the peer will be graylisted (i.e., disconnected). This weight
 	// is chosen in a way that with almost a few misbehaviors more than the threshold, the peer will be graylisted. The rationale relies on the fact that
 	// the misbehavior counter is incremented by 1 for each RPC containing one or more broken promises. Hence, it is per RPC, and not per broken promise.
 	// Having sqrt(2) * 10 broken promises RPC is a blatant misbehavior, and the peer should be graylisted. With decay interval of 1 minute, and decay value of
-	// 0.99 we expect a graylisted node due to borken promises to get back in about 527 minutes, i.e., (0.99)^x * (sqrt(2) * 10)^2 * MaxAppSpecificPenalty > GraylistThreshold
+	// 0.99 we expect a graylisted node due to borken promises to get back in about 527 minutes, i.e., (0.99)^x * (sqrt(2) * 10)^2 * MaxAppSpecificPenalty > Graylist
 	// where x is the number of decay intervals that the peer is graylisted. As MaxAppSpecificPenalty and GraylistThresholds are close, we can simplify the inequality
 	// to (0.99)^x * (sqrt(2) * 10)^2 > 1 --> (0.99)^x * 200 > 1 --> (0.99)^x > 1/200 --> x > log(1/200) / log(0.99) --> x > 527.17 decay intervals, i.e., 527 minutes.
 	// Note that misbehaviors are counted by GossipSub across all topics (and is different from the Application Layer Misbehaviors that we count through
 	// the ALSP system that are reported by the engines).
-	BehaviourPenaltyWeight float64 `validate:"lt=0" mapstructure:"penalty-weight"`
-	// BehaviourPenaltyDecay is the decay interval for the misbehavior counter of a peer. The misbehavior counter is
+	PenaltyWeight float64 `validate:"lt=0" mapstructure:"penalty-weight"`
+	// PenaltyDecay is the decay interval for the misbehavior counter of a peer. The misbehavior counter is
 	// incremented by GossipSub for iHave broken promises or the GRAFT flooding attacks (i.e., each GRAFT received from a remote peer while that peer is on a PRUNE backoff).
 	//
 	// An iHave broken promise means that a peer advertises an iHave for a message, but does not respond to the iWant requests for that message.
@@ -176,12 +176,12 @@ type ScoreOptionBehaviour struct {
 	//
 	// The misbehavior counter is decayed per decay interval (i.e., DecayInterval = 1 minute) by GossipSub.
 	// We set it to 0.99, which means that the misbehavior counter is decayed by 1% per decay interval.
-	// With the generous threshold that we set (i.e., BehaviourPenaltyThreshold = 10), we take the peers going beyond the threshold as persistent misbehaviors,
+	// With the generous threshold that we set (i.e., PenaltyThreshold = 10), we take the peers going beyond the threshold as persistent misbehaviors,
 	// We expect honest peers never to go beyond the threshold, and if they do, we expect them to go back below the threshold quickly.
 	//
 	// Note that misbehaviors are counted by GossipSub across all topics (and is different from the Application Layer Misbehaviors that we count through
 	// the ALSP system that is based on the engines report).
-	BehaviourPenaltyDecay float64 `validate:"gt=0,lt=1" mapstructure:"penalty-decay"`
+	PenaltyDecay float64 `validate:"gt=0,lt=1" mapstructure:"penalty-decay"`
 }
 
 const (
@@ -249,7 +249,7 @@ type ScoreOptionTopicValidation struct {
 	// mesh will not be affected by the actual message deliveries in that topic mesh.
 	// Moreover, this does not allow the peer to accumulate a large number of actual message deliveries in a topic mesh
 	// and then start under-performing in that topic mesh without being penalized.
-	MeshMessageDeliveriesCap int `validate:"gt=0" mapstructure:"mesh-message-deliveries-cap"`
+	MeshMessageDeliveriesCap float64 `validate:"gt=0" mapstructure:"mesh-message-deliveries-cap"`
 	// MeshMessageDeliveryThreshold is the threshold for the number of actual message deliveries in a
 	// topic mesh that is used to calculate the score of a peer in that topic mesh.
 	// If the number of actual message deliveries in a topic mesh is less than this value,

@@ -76,7 +76,6 @@ type GossipSubParameters struct {
 	PeerScoringEnabled   bool                           `mapstructure:"peer-scoring-enabled"`
 	SubscriptionProvider SubscriptionProviderParameters `mapstructure:"subscription-provider"`
 	ScoringParameters    ScoringParameters              `mapstructure:"scoring-parameters"`
-	ScoreOption          ScoreOption                    `mapstructure:"score-option"`
 }
 
 const (
@@ -91,7 +90,9 @@ type ScoringParameters struct {
 	AppSpecificScore AppSpecificScoreParameters `validate:"required" mapstructure:"app-specific-score"`
 	SpamRecordCache  SpamRecordCacheParameters  `validate:"required" mapstructure:"spam-record-cache"`
 	// DecayInterval is the interval at which the counters associated with a peer behavior in GossipSub system are decayed.
-	DecayInterval time.Duration `validate:"gt=0s" mapstructure:"decay-interval"`
+	DecayInterval             time.Duration             `validate:"gt=0s" mapstructure:"decay-interval"`
+	ScoreOption               ScoreOption               `mapstructure:"score-option"`
+	ScoringRegistryParameters ScoringRegistryParameters `mapstructure:"scoring-registry"`
 }
 
 const (
