@@ -121,7 +121,10 @@ func (d *DeltaView) CreateAccount(addr gethCommon.Address) error {
 			if err != nil {
 				return err
 			}
-			d.SelfDestruct(addr)
+			err = d.SelfDestruct(addr)
+			if err != nil {
+				return err
+			}
 		}
 
 		d.nonces[addr] = 0
