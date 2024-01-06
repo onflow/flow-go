@@ -34,8 +34,8 @@ type ReadOnlyView interface {
 	// IsCreated returns true if address has been created in this tx
 	IsCreated(gethCommon.Address) bool
 	// HasSelfDestructed returns true if an address has self destructed
-	HasSelfDestructed(gethCommon.Address) bool
-
+	// it also returns the balance of address before selfdestruction call
+	HasSelfDestructed(gethCommon.Address) (bool, *big.Int)
 	// GetBalance returns the balance of an address
 	GetBalance(gethCommon.Address) (*big.Int, error)
 	// GetNonce returns the nonce of an address

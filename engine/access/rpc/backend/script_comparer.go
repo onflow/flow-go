@@ -53,7 +53,7 @@ func (c *scriptResultComparison) compare(execResult, localResult *scriptResult) 
 	if isOutOfRangeError(localResult.err) {
 		c.metrics.ScriptExecutionNotIndexed()
 		c.logComparison(execResult, localResult,
-			"script execution results do not match EN because data is not indexed yet")
+			"script execution results do not match EN because data is not indexed yet", false)
 		return false
 	}
 
@@ -66,7 +66,7 @@ func (c *scriptResultComparison) compare(execResult, localResult *scriptResult) 
 
 		c.metrics.ScriptExecutionErrorMismatch()
 		c.logComparison(execResult, localResult,
-			"cadence errors from local execution do not match and EN")
+			"cadence errors from local execution do not match EN", true)
 		return false
 	}
 
@@ -77,12 +77,12 @@ func (c *scriptResultComparison) compare(execResult, localResult *scriptResult) 
 
 	c.metrics.ScriptExecutionResultMismatch()
 	c.logComparison(execResult, localResult,
-		"script execution results from local execution do not match EN")
+		"script execution results from local execution do not match EN", true)
 	return false
 }
 
 // logScriptExecutionComparison logs the script execution comparison between local execution and execution node
-func (c *scriptResultComparison) logComparison(execResult, localResult *scriptResult, msg string) {
+func (c *scriptResultComparison) logComparison(execResult, localResult *scriptResult, msg string, useError bool) {
 	args := make([]string, len(c.request.arguments))
 	for i, arg := range c.request.arguments {
 		args[i] = string(arg)
@@ -109,7 +109,11 @@ func (c *scriptResultComparison) logComparison(execResult, localResult *scriptRe
 	lgCtx = lgCtx.Dur("local_duration_ms", localResult.duration)
 
 	lg := lgCtx.Logger()
-	lg.Debug().Msg(msg)
+	if useError {
+		lg.Error().Msg(msg)
+	} else {
+		lg.Debug().Msg(msg)
+	}
 }
 
 func isOutOfRangeError(err error) bool {
