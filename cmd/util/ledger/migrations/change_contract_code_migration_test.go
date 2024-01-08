@@ -82,7 +82,7 @@ func TestChangeContractCodeMigration(t *testing.T) {
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
 
-		migration.ChangeContract(address1, "A", "B")
+		migration.RegisterContractChange(address1, "A", "B")
 
 		payloads, err := migration.MigrateAccount(ctx, address1,
 			[]*ledger.Payload{
@@ -106,7 +106,7 @@ func TestChangeContractCodeMigration(t *testing.T) {
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
 
-		migration.ChangeContract(address1, "A", "B")
+		migration.RegisterContractChange(address1, "A", "B")
 
 		payloads, err := migration.MigrateAccount(ctx, address1,
 			[]*ledger.Payload{
@@ -132,8 +132,8 @@ func TestChangeContractCodeMigration(t *testing.T) {
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
 
-		migration.ChangeContract(address1, "A", "B")
-		migration.ChangeContract(address1, "B", "B")
+		migration.RegisterContractChange(address1, "A", "B")
+		migration.RegisterContractChange(address1, "B", "B")
 
 		payloads, err := migration.MigrateAccount(ctx, address1,
 			[]*ledger.Payload{
@@ -159,7 +159,7 @@ func TestChangeContractCodeMigration(t *testing.T) {
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
 
-		migration.ChangeContract(address1, "A", "B")
+		migration.RegisterContractChange(address1, "A", "B")
 
 		payloads, err := migration.MigrateAccount(ctx, address1,
 			[]*ledger.Payload{
@@ -185,8 +185,8 @@ func TestChangeContractCodeMigration(t *testing.T) {
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
 
-		migration.ChangeContract(address1, "A", "B")
-		migration.ChangeContract(address1, "B", "B")
+		migration.RegisterContractChange(address1, "A", "B")
+		migration.RegisterContractChange(address1, "B", "B")
 
 		_, err = migration.MigrateAccount(ctx, address1,
 			[]*ledger.Payload{
@@ -205,7 +205,7 @@ func TestChangeContractCodeMigration(t *testing.T) {
 		err := migration.InitMigration(log, nil, 0)
 		require.NoError(t, err)
 
-		migration.ChangeContract(address2, "A", "B")
+		migration.RegisterContractChange(address2, "A", "B")
 
 		_, err = migration.MigrateAccount(ctx, address1,
 			[]*ledger.Payload{

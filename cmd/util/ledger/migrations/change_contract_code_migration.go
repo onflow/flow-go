@@ -107,7 +107,7 @@ func (d *ChangeContractCodeMigration) MigrateAccount(
 	return payloads, nil
 }
 
-func (d *ChangeContractCodeMigration) ChangeContract(
+func (d *ChangeContractCodeMigration) RegisterContractChange(
 	address common.Address,
 	contractName string,
 	newContractCode string,
