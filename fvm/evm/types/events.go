@@ -44,7 +44,6 @@ var transactionExecutedEventCadenceType = &cadence.EventType{
 		cadence.NewField("failed", cadence.BoolType{}),
 		cadence.NewField("transactionType", cadence.UInt8Type{}),
 		cadence.NewField("gasConsumed", cadence.UInt64Type{}),
-		cadence.NewField("stateRootHash", cadence.StringType{}),
 		cadence.NewField("deployedContractAddress", cadence.StringType{}),
 		cadence.NewField("returnedValue", cadence.StringType{}),
 		cadence.NewField("logs", cadence.StringType{}),
@@ -70,7 +69,6 @@ func (p *TransactionExecutedPayload) CadenceEvent() (cadence.Event, error) {
 		cadence.NewBool(p.Result.Failed),
 		cadence.NewUInt8(p.Result.TxType),
 		cadence.NewUInt64(p.Result.GasConsumed),
-		cadence.String(p.Result.StateRootHash.String()),
 		cadence.String(hex.EncodeToString(p.Result.DeployedContractAddress.Bytes())),
 		cadence.String(hex.EncodeToString(p.Result.ReturnedValue)),
 		cadence.String(hex.EncodeToString(encodedLogs)),
@@ -105,7 +103,6 @@ var blockExecutedEventCadenceType = &cadence.EventType{
 		cadence.NewField("height", cadence.UInt64Type{}),
 		cadence.NewField("totalSupply", cadence.UInt64Type{}),
 		cadence.NewField("parentHash", cadence.StringType{}),
-		cadence.NewField("stateRoot", cadence.StringType{}),
 		cadence.NewField("receiptRoot", cadence.StringType{}),
 		cadence.NewField(
 			"transactionHashes",
@@ -129,7 +126,6 @@ func (p *BlockExecutedEventPayload) CadenceEvent() (cadence.Event, error) {
 		cadence.NewUInt64(p.Block.TotalSupply),
 		cadence.String(p.Block.ReceiptRoot.String()),
 		cadence.String(p.Block.ParentBlockHash.String()),
-		cadence.String(p.Block.StateRoot.String()),
 		cadence.NewArray(hashes).WithType(cadence.NewVariableSizedArrayType(cadence.StringType{})),
 	}
 

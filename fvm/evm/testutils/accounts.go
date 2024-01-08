@@ -16,7 +16,6 @@ import (
 	"github.com/onflow/atree"
 
 	"github.com/onflow/flow-go/fvm/evm/emulator"
-	"github.com/onflow/flow-go/fvm/evm/emulator/database"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -126,11 +125,7 @@ func FundAndGetEOATestAccount(t testing.TB, led atree.Ledger, flowEVMRootAddress
 	account := GetTestEOAAccount(t, EOATestAccount1KeyHex)
 
 	// fund account
-	db, err := database.NewDatabase(led, flowEVMRootAddress)
-	require.NoError(t, err)
-
-	e := emulator.NewEmulator(db)
-	require.NoError(t, err)
+	e := emulator.NewEmulator(led, flowEVMRootAddress)
 
 	blk, err := e.NewBlockView(types.NewDefaultBlockContext(2))
 	require.NoError(t, err)

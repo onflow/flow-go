@@ -25,38 +25,6 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-const (
-	// MinimumSpamPenaltyDecayFactor is minimum speed at which the spam penalty value of a peer is decayed.
-	// Spam record will be initialized with a decay value between .5 , .7 and this value will then be decayed up to .99 on consecutive misbehavior's,
-	// The maximum decay value decays the penalty by 1% every second. The decay is applied geometrically, i.e., `newPenalty = oldPenalty * decay`, hence, the higher decay value
-	// indicates a lower decay speed, i.e., it takes more heartbeat intervals to decay a penalty back to zero when the decay value is high.
-	// assume:
-	//     penalty = -100 (the maximum application specific penalty is -100)
-	//     skipDecayThreshold = -0.1
-	// it takes around 459 seconds for the penalty to decay to reach greater than -0.1 and turn into 0.
-	//     x * 0.99 ^ n > -0.1 (assuming negative x).
-	//     0.99 ^ n > -0.1 / x
-	// Now we can take the logarithm of both sides (with any base, but let's use base 10 for simplicity).
-	//     log( 0.99 ^ n ) < log( 0.1 / x )
-	// Using the properties of logarithms, we can bring down the exponent:
-	//     n * log( 0.99 ) < log( -0.1 / x )
-	// And finally, we can solve for n:
-	//     n > log( -0.1 / x ) / log( 0.99 )
-	// We can plug in x = -100:
-	//     n > log( -0.1 / -100 ) / log( 0.99 )
-	//     n > log( 0.001 ) / log( 0.99 )
-	//     n > -3 / log( 0.99 )
-	//     n >  458.22
-	MinimumSpamPenaltyDecayFactor = 0.99
-	// MaximumSpamPenaltyDecayFactor represents the maximum rate at which the spam penalty value of a peer decays. Decay speeds increase
-	// during sustained malicious activity, leading to a slower recovery of the app-specific score for the penalized node. Conversely,
-	// decay speeds decrease, allowing faster recoveries, when nodes exhibit fleeting misbehavior.
-	MaximumSpamPenaltyDecayFactor = 0.8
-	// skipDecayThreshold is the threshold for which when the negative penalty is above this value, the decay function will not be called.
-	// instead, the penalty will be set to 0. This is to prevent the penalty from keeping a small negative value for a long time.
-	skipDecayThreshold = -0.1
-)
-
 type SpamRecordInitFunc func() p2p.GossipSubSpamRecord
 
 // GossipSubCtrlMsgPenaltyValue is the penalty value for each control message type.
@@ -69,6 +37,18 @@ type GossipSubCtrlMsgPenaltyValue struct {
 	// that fall behind and may need to request old data.
 	ClusterPrefixedPenaltyReductionFactor float64
 	RpcPublishMessage                     float64 // penalty value for an individual RpcPublishMessage message misbehaviour.
+}
+
+// GossipSubCtrlMsgPenaltyValues returns the default penalty value for each control message type.
+func GossipSubCtrlMsgPenaltyValues(penalties p2pconfig.MisbehaviourPenalties) GossipSubCtrlMsgPenaltyValue {
+	return GossipSubCtrlMsgPenaltyValue{
+		Graft:                                 penalties.GraftMisbehaviour,
+		Prune:                                 penalties.PruneMisbehaviour,
+		IHave:                                 penalties.IHaveMisbehaviour,
+		IWant:                                 penalties.IWantMisbehaviour,
+		ClusterPrefixedPenaltyReductionFactor: penalties.ClusterPrefixedReductionFactor,
+		RpcPublishMessage:                     penalties.PublishMisbehaviour,
+	}
 }
 
 // GossipSubAppSpecificScoreRegistry is the registry for the application specific score of peers in the GossipSub protocol.
@@ -104,6 +84,11 @@ type GossipSubAppSpecificScoreRegistry struct {
 
 	// appScoreUpdateWorkerPool is the worker pool for handling the application specific score update of peers in a non-blocking way.
 	appScoreUpdateWorkerPool *worker.Pool[peer.ID]
+
+	unknownIdentityPenalty     float64
+	minAppSpecificPenalty      float64
+	stakedIdentityReward       float64
+	invalidSubscriptionPenalty float64
 }
 
 // GossipSubAppSpecificScoreRegistryConfig is the configuration for the GossipSubAppSpecificScoreRegistry.
@@ -139,6 +124,15 @@ type GossipSubAppSpecificScoreRegistryConfig struct {
 	HeroCacheMetricsFactory metrics.HeroCacheMetricsFactory `validate:"required"`
 
 	NetworkingType network.NetworkingType `validate:"required"`
+
+	// UnknownIdentityPenalty This is the penalty for unknown identity.
+	UnknownIdentityPenalty float64 `validate:"required"`
+	// MinAppSpecificPenalty This is the minimum penalty for severe offenses that we apply to a remote node score
+	MinAppSpecificPenalty float64 `validate:"required"`
+	// StakedIdentityReward This is the reward for staking peers.
+	StakedIdentityReward float64 `validate:"required"`
+	// InvalidSubscriptionPenalty This is the penalty for invalid subscription.
+	InvalidSubscriptionPenalty float64 `validate:"required"`
 }
 
 // NewGossipSubAppSpecificScoreRegistry returns a new GossipSubAppSpecificScoreRegistry.
@@ -162,14 +156,18 @@ func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegis
 		metrics.GossipSubAppSpecificScoreUpdateQueueMetricFactory(config.HeroCacheMetricsFactory, config.NetworkingType))
 
 	reg := &GossipSubAppSpecificScoreRegistry{
-		logger:         config.Logger.With().Str("module", "app_score_registry").Logger(),
-		spamScoreCache: config.SpamRecordCacheFactory(),
-		appScoreCache:  config.AppScoreCacheFactory(),
-		penalty:        config.Penalty,
-		init:           config.Init,
-		validator:      config.Validator,
-		idProvider:     config.IdProvider,
-		scoreTTL:       config.Parameters.ScoreTTL,
+		logger:                     config.Logger.With().Str("module", "app_score_registry").Logger(),
+		spamScoreCache:             config.SpamRecordCacheFactory(),
+		appScoreCache:              config.AppScoreCacheFactory(),
+		penalty:                    config.Penalty,
+		init:                       config.Init,
+		validator:                  config.Validator,
+		idProvider:                 config.IdProvider,
+		scoreTTL:                   config.Parameters.ScoreTTL,
+		unknownIdentityPenalty:     config.UnknownIdentityPenalty,
+		minAppSpecificPenalty:      config.MinAppSpecificPenalty,
+		stakedIdentityReward:       config.StakedIdentityReward,
+		invalidSubscriptionPenalty: config.InvalidSubscriptionPenalty,
 	}
 
 	reg.appScoreUpdateWorkerPool = worker.NewWorkerPoolBuilder[peer.ID](lg.With().Str("component", "app_specific_score_update_worker_pool").Logger(),
@@ -335,7 +333,7 @@ func (r *GossipSubAppSpecificScoreRegistry) stakingScore(pid peer.ID) (float64, 
 			Err(err).
 			Bool(logging.KeySuspicious, true).
 			Msg("invalid peer identity, penalizing peer")
-		return DefaultUnknownIdentityPenalty, flow.Identifier{}, 0
+		return r.unknownIdentityPenalty, flow.Identifier{}, 0
 	}
 
 	lg = lg.With().
@@ -348,13 +346,13 @@ func (r *GossipSubAppSpecificScoreRegistry) stakingScore(pid peer.ID) (float64, 
 	if flowId.Role == flow.RoleAccess {
 		lg.Trace().
 			Msg("pushing access node to edge by penalizing with minimum penalty value")
-		return MinAppSpecificPenalty, flowId.NodeID, flowId.Role
+		return r.minAppSpecificPenalty, flowId.NodeID, flowId.Role
 	}
 
 	lg.Trace().
 		Msg("rewarding well-behaved non-access node peer with maximum reward value")
 
-	return DefaultStakedIdentityReward, flowId.NodeID, flowId.Role
+	return r.stakedIdentityReward, flowId.NodeID, flowId.Role
 }
 
 func (r *GossipSubAppSpecificScoreRegistry) subscriptionPenalty(pid peer.ID, flowId flow.Identifier, role flow.Role) float64 {
@@ -366,7 +364,7 @@ func (r *GossipSubAppSpecificScoreRegistry) subscriptionPenalty(pid peer.ID, flo
 			Hex("flow_id", logging.ID(flowId)).
 			Bool(logging.KeySuspicious, true).
 			Msg("invalid subscription detected, penalizing peer")
-		return DefaultInvalidSubscriptionPenalty
+		return r.invalidSubscriptionPenalty
 	}
 
 	return 0
@@ -441,10 +439,19 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 		Msg("applied misbehaviour penalty and updated application specific penalty")
 }
 
+type DecayFunctionConfig struct {
+	SlowerDecayPenaltyThreshold   float64
+	DecayRateReductionFactor      float64
+	DecayAdjustInterval           time.Duration
+	MaximumSpamPenaltyDecayFactor float64
+	MinimumSpamPenaltyDecayFactor float64
+	SkipDecayThreshold            float64
+}
+
 // DefaultDecayFunction is the default decay function that is used to decay the application specific penalty of a peer.
 // It is used if no decay function is provided in the configuration.
 // It decays the application specific penalty of a peer if it is negative.
-func DefaultDecayFunction(slowerDecayPenaltyThreshold, decayRateDecrement float64, decayAdjustInterval time.Duration) netcache.PreprocessorFunc {
+func DefaultDecayFunction(cfg *DecayFunctionConfig) netcache.PreprocessorFunc {
 	return func(record p2p.GossipSubSpamRecord, lastUpdated time.Time) (p2p.GossipSubSpamRecord, error) {
 		if record.Penalty >= 0 {
 			// no need to decay the penalty if it is positive, the reason is currently the app specific penalty
@@ -453,10 +460,10 @@ func DefaultDecayFunction(slowerDecayPenaltyThreshold, decayRateDecrement float6
 			return record, nil
 		}
 
-		if record.Penalty > skipDecayThreshold {
+		if record.Penalty > cfg.SkipDecayThreshold {
 			// penalty is negative but greater than the threshold, we set it to 0.
 			record.Penalty = 0
-			record.Decay = MaximumSpamPenaltyDecayFactor
+			record.Decay = cfg.MaximumSpamPenaltyDecayFactor
 			record.LastDecayAdjustment = time.Time{}
 			return record, nil
 		}
@@ -468,10 +475,10 @@ func DefaultDecayFunction(slowerDecayPenaltyThreshold, decayRateDecrement float6
 		}
 		record.Penalty = penalty
 
-		if record.Penalty <= slowerDecayPenaltyThreshold {
-			if time.Since(record.LastDecayAdjustment) > decayAdjustInterval || record.LastDecayAdjustment.IsZero() {
+		if record.Penalty <= cfg.SlowerDecayPenaltyThreshold {
+			if time.Since(record.LastDecayAdjustment) > cfg.DecayAdjustInterval || record.LastDecayAdjustment.IsZero() {
 				// reduces the decay speed flooring at MinimumSpamRecordDecaySpeed
-				record.Decay = math.Min(record.Decay+decayRateDecrement, MinimumSpamPenaltyDecayFactor)
+				record.Decay = math.Min(record.Decay+cfg.DecayRateReductionFactor, cfg.MinimumSpamPenaltyDecayFactor)
 				record.LastDecayAdjustment = time.Now()
 			}
 		}
@@ -479,13 +486,15 @@ func DefaultDecayFunction(slowerDecayPenaltyThreshold, decayRateDecrement float6
 	}
 }
 
-// InitAppScoreRecordState initializes the gossipsub spam record state for a peer.
+// InitAppScoreRecordStateFunc returns a callback that initializes the gossipsub spam record state for a peer.
 // Returns:
-//   - a gossipsub spam record with the default decay value and 0 penalty.
-func InitAppScoreRecordState() p2p.GossipSubSpamRecord {
-	return p2p.GossipSubSpamRecord{
-		Decay:               MaximumSpamPenaltyDecayFactor,
-		Penalty:             0,
-		LastDecayAdjustment: time.Now(),
+//   - a func that returns a gossipsub spam record with the default decay value and 0 penalty.
+func InitAppScoreRecordStateFunc(maximumSpamPenaltyDecayFactor float64) func() p2p.GossipSubSpamRecord {
+	return func() p2p.GossipSubSpamRecord {
+		return p2p.GossipSubSpamRecord{
+			Decay:               maximumSpamPenaltyDecayFactor,
+			Penalty:             0,
+			LastDecayAdjustment: time.Now(),
+		}
 	}
 }
