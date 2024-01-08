@@ -1,7 +1,12 @@
 package util
 
 import (
+	"database/sql"
+	"encoding/binary"
+	"encoding/hex"
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence/runtime/common"
@@ -146,3 +151,101 @@ func NewPayloadsReadonlyLedger(snapshot *PayloadSnapshot) *PayloadsReadonlyLedge
 }
 
 var _ atree.Ledger = &PayloadsReadonlyLedger{}
+
+func PayloadsFromEmulatorSnapshot(snapshotPath string) ([]*ledger.Payload, error) {
+	db, err := sql.Open("sqlite", snapshotPath)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := db.Query("SELECT key, value FROM ledger")
+	if err != nil {
+		return nil, err
+	}
+
+	var payloads []*ledger.Payload
+
+	for rows.Next() {
+		var hexKey, hexValue string
+
+		err := rows.Scan(&hexKey, &hexValue)
+		if err != nil {
+			return nil, err
+		}
+
+		key, err := hex.DecodeString(hexKey)
+		if err != nil {
+			return nil, err
+		}
+
+		value, err := hex.DecodeString(hexValue)
+		if err != nil {
+			return nil, err
+		}
+
+		registerId := registerIDKeyFromString(string(key))
+
+		// Type loading currently fails, because the core-contracts
+		// in the emulator snapshot are not migrated yet.
+		// So skip the values that get stored by default, and
+		// keep only the explicitly stored values in 'storage' domain.
+		if registerId.Key == "public" || registerId.Key == "private" {
+			continue
+		}
+
+		ledgerKey := convert.RegisterIDToLedgerKey(registerId)
+
+		payloads = append(
+			payloads,
+			ledger.NewPayload(
+				ledgerKey,
+				value,
+			),
+		)
+	}
+
+	return payloads, nil
+}
+
+// registerIDKeyFromString is the inverse of `flow.RegisterID.String()` method.
+func registerIDKeyFromString(s string) flow.RegisterID {
+	parts := strings.SplitN(s, "/", 2)
+
+	owner := parts[0]
+	key := parts[1]
+
+	address, err := common.HexToAddress(owner)
+	if err != nil {
+		panic(err)
+	}
+
+	var decodedKey string
+
+	switch key[0] {
+	case '$':
+		b := make([]byte, 9)
+		b[0] = '$'
+
+		int64Value, err := strconv.ParseInt(key[1:], 10, 64)
+		if err != nil {
+			panic(err)
+		}
+
+		binary.BigEndian.PutUint64(b[1:], uint64(int64Value))
+
+		decodedKey = string(b)
+	case '#':
+		decoded, err := hex.DecodeString(key[1:])
+		if err != nil {
+			panic(err)
+		}
+		decodedKey = string(decoded)
+	default:
+		panic("Invalid register key")
+	}
+
+	return flow.RegisterID{
+		Owner: string(address.Bytes()),
+		Key:   decodedKey,
+	}
+}
