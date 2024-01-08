@@ -5,7 +5,6 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 
 	evm "github.com/onflow/flow-go/fvm/evm/emulator"
-	"github.com/onflow/flow-go/fvm/evm/emulator/database"
 	"github.com/onflow/flow-go/fvm/evm/handler"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
 	"github.com/onflow/flow-go/fvm/evm/types"
@@ -31,12 +30,7 @@ func SetupEnvironment(
 		return err
 	}
 
-	db, err := database.NewDatabase(backend, evmRootAddress)
-	if err != nil {
-		return err
-	}
-
-	em := evm.NewEmulator(db)
+	em := evm.NewEmulator(backend, evmRootAddress)
 
 	bs, err := handler.NewBlockStore(backend, evmRootAddress)
 	if err != nil {

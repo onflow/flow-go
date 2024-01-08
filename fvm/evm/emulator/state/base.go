@@ -422,7 +422,15 @@ func (v *BaseView) getSlot(sk types.SlotAddress) (gethCommon.Hash, error) {
 		return value, nil
 	}
 
-	col, err := v.getSlotCollection(sk.Address)
+	acc, err := v.getAccount(sk.Address)
+	if err != nil {
+		return gethCommon.Hash{}, err
+	}
+	if acc == nil || len(acc.CollectionID) == 0 {
+		return gethCommon.Hash{}, nil
+	}
+
+	col, err := v.getSlotCollection(acc)
 	if err != nil {
 		return gethCommon.Hash{}, err
 	}
@@ -437,7 +445,17 @@ func (v *BaseView) getSlot(sk types.SlotAddress) (gethCommon.Hash, error) {
 }
 
 func (v *BaseView) storeSlot(sk types.SlotAddress, data gethCommon.Hash) error {
-	col, err := v.getSlotCollection(sk.Address)
+	acc, err := v.getAccount(sk.Address)
+	if err != nil {
+		return err
+	}
+	if acc == nil {
+		return fmt.Errorf("slot belongs to a non-existing account")
+	}
+	if !acc.HasCode() {
+		return fmt.Errorf("slot belongs to a non-smart contract account")
+	}
+	col, err := v.getSlotCollection(acc)
 	if err != nil {
 		return err
 	}
@@ -451,17 +469,9 @@ func (v *BaseView) storeSlot(sk types.SlotAddress, data gethCommon.Hash) error {
 	return col.Set(sk.Key.Bytes(), data.Bytes())
 }
 
-func (v *BaseView) getSlotCollection(addr gethCommon.Address) (*Collection, error) {
-	acc, err := v.getAccount(addr)
-	if err != nil {
-		return nil, err
-	}
-	if acc == nil {
-		return nil, fmt.Errorf("slot belongs to a non-existing account")
-	}
-	if !acc.HasCode() {
-		return nil, fmt.Errorf("slot belongs to a non-smart contract account")
-	}
+func (v *BaseView) getSlotCollection(acc *Account) (*Collection, error) {
+	var err error
+
 	if len(acc.CollectionID) == 0 {
 		// create a new collection for slots
 		col, err := v.collectionProvider.NewCollection()
@@ -469,12 +479,16 @@ func (v *BaseView) getSlotCollection(addr gethCommon.Address) (*Collection, erro
 			return nil, err
 		}
 		// cache collection
-		v.slots[addr] = col
+		v.slots[acc.Address] = col
 		// update account's collection ID
 		acc.CollectionID = col.CollectionID()
 		err = v.storeAccount(acc)
-		return col, err
+		if err != nil {
+			return nil, err
+		}
+		return col, nil
 	}
+
 	col, found := v.slots[acc.Address]
 	if !found {
 		col, err = v.collectionProvider.CollectionByID(acc.CollectionID)

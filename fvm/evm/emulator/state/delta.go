@@ -135,7 +135,7 @@ func (d *DeltaView) CreateAccount(addr gethCommon.Address) error {
 	}
 
 	d.created[addr] = struct{}{}
-	// carry over balance
+	// Carrying over the balance ensures that Ether doesn't disappear. (legacy behaviour of the Geth stateDB)
 	bal, err := d.GetBalance(addr)
 	if err != nil {
 		return err
@@ -441,11 +441,14 @@ func (d *DeltaView) SlotInAccessList(sk types.SlotAddress) (addressOk bool, slot
 // AddSlotToAccessList adds a slot to the access list
 // it also adds the address to the address list
 func (d *DeltaView) AddSlotToAccessList(sk types.SlotAddress) (addrAdded bool, slotAdded bool) {
+	addrPresent, slotPresent := d.SlotInAccessList(sk)
+	if d.accessListAddresses == nil {
+		d.accessListAddresses = make(map[gethCommon.Address]struct{})
+	}
+	d.accessListAddresses[sk.Address] = struct{}{}
 	if d.accessListSlots == nil {
 		d.accessListSlots = make(map[types.SlotAddress]struct{})
 	}
-	addrPresent, slotPresent := d.SlotInAccessList(sk)
-	d.accessListAddresses[sk.Address] = struct{}{}
 	d.accessListSlots[sk] = struct{}{}
 	return !addrPresent, !slotPresent
 }
