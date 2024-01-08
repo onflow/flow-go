@@ -24,11 +24,11 @@ const (
 )
 
 type MisbehaviourPenalties struct {
-	SkipDecayThreshold             float64 `validate:"gt=0,lte=1" mapstructure:"skip-decay-threshold"`
-	GraftMisbehaviour              float64 `validate:"gt=0" mapstructure:"graft"`
-	PruneMisbehaviour              float64 `validate:"gt=0" mapstructure:"prune"`
-	IHaveMisbehaviour              float64 `validate:"gt=0" mapstructure:"ihave"`
-	IWantMisbehaviour              float64 `validate:"gt=0" mapstructure:"iwant"`
-	PublishMisbehaviour            float64 `validate:"gt=0" mapstructure:"publish"`
+	SkipDecayThreshold             float64 `validate:"gt=-1,lt=0" mapstructure:"skip-decay-threshold"`
+	GraftMisbehaviour              float64 `validate:"lt=0" mapstructure:"graft"`
+	PruneMisbehaviour              float64 `validate:"lt=0" mapstructure:"prune"`
+	IHaveMisbehaviour              float64 `validate:"lt=0" mapstructure:"ihave"`
+	IWantMisbehaviour              float64 `validate:"lt=0" mapstructure:"iwant"`
+	PublishMisbehaviour            float64 `validate:"lt=0" mapstructure:"publish"`
 	ClusterPrefixedReductionFactor float64 `validate:"gt=0,lte=1" mapstructure:"cluster-prefixed-reduction-factor"`
 }
