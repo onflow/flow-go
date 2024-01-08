@@ -25,11 +25,12 @@ func newMigratorRuntime(
 	payloads []*ledger.Payload,
 ) (
 	*migratorRuntime,
+	environment.Accounts,
 	error,
 ) {
 	snapshot, err := util.NewPayloadSnapshot(payloads)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create payload snapshot: %w", err)
+		return nil, nil, fmt.Errorf("failed to create payload snapshot: %w", err)
 	}
 	transactionState := state.NewTransactionState(snapshot, state.DefaultParameters())
 	accounts := environment.NewAccounts(transactionState)
@@ -65,7 +66,7 @@ func newMigratorRuntime(
 		nil,
 		env.InterpreterConfig)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	return &migratorRuntime{
@@ -76,7 +77,7 @@ func newMigratorRuntime(
 		Interpreter:      inter,
 		Storage:          storage,
 		Accounts:         accountsAtreeLedger,
-	}, nil
+	}, accounts, nil
 }
 
 type migratorRuntime struct {

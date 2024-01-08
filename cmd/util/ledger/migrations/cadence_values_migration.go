@@ -8,6 +8,9 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
+	"github.com/onflow/flow-go/cmd/util/ledger/util"
+	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -59,7 +62,7 @@ func (m *CadenceValueMigrator) MigrateAccount(
 ) ([]*ledger.Payload, error) {
 
 	// Create all the runtime components we need for the migration
-	migrationRuntime, err := newMigratorRuntime(address, oldPayloads)
+	migrationRuntime, accounts, err := newMigratorRuntime(address, oldPayloads)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create migrator runtime: %w", err)
 	}
@@ -75,6 +78,12 @@ func (m *CadenceValueMigrator) MigrateAccount(
 
 	m.log.Info().Msg("Migrating cadence values")
 
+	idGenerator := environment.NewAccountLocalIDGenerator(
+		tracing.NewMockTracerSpan(),
+		util.NopMeter{},
+		accounts,
+	)
+
 	migration.Migrate(
 		&migrations.AddressSliceIterator{
 			Addresses: []common.Address{
@@ -89,7 +98,7 @@ func (m *CadenceValueMigrator) MigrateAccount(
 			},
 			&capcons.LinkValueMigration{
 				CapabilityIDs:      capabilityIDs,
-				AccountIDGenerator: &AccountIDGenerator{},
+				AccountIDGenerator: idGenerator,
 				Reporter:           reporter,
 			},
 			string_normalization.NewStringNormalizingMigration(),
@@ -143,19 +152,6 @@ func (m *CadenceValueMigrator) mergeRegisterChanges(
 	}
 
 	return newPayloads, nil
-}
-
-// AccountIDGenerator for the link-value migration
-type AccountIDGenerator struct {
-	ids map[common.Address]uint64
-}
-
-func (g *AccountIDGenerator) GenerateAccountID(address common.Address) (uint64, error) {
-	if g.ids == nil {
-		g.ids = make(map[common.Address]uint64)
-	}
-	g.ids[address]++
-	return g.ids[address], nil
 }
 
 // cadenceValueMigrationReporter is the reporter for cadence value migrations

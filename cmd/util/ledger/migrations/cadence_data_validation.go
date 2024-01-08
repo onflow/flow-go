@@ -213,7 +213,7 @@ func (m *CadenceDataValidationMigrations) hashAccountCadenceValues(
 	payloads []*ledger.Payload,
 ) ([]byte, error) {
 	hasher := newHasher()
-	mr, err := newMigratorRuntime(address, payloads)
+	mr, _, err := newMigratorRuntime(address, payloads)
 	if err != nil {
 		return nil, err
 	}

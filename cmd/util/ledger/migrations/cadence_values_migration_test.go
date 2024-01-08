@@ -22,6 +22,8 @@ const snapshotPath string = "test-data/cadence_values_migration/snapshot"
 
 func TestCadenceValuesMigration(t *testing.T) {
 
+	t.Parallel()
+
 	address, err := common.HexToAddress("01cf0e2f2f715450")
 	require.NoError(t, err)
 
@@ -46,7 +48,7 @@ func TestCadenceValuesMigration(t *testing.T) {
 
 	// Assert the migrated payloads
 
-	mr, err := newMigratorRuntime(address, newPayloads)
+	mr, _, err := newMigratorRuntime(address, newPayloads)
 	require.NoError(t, err)
 
 	storageMap := mr.Storage.GetStorageMap(address, common.PathDomainStorage.Identifier(), false)
