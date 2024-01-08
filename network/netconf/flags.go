@@ -306,25 +306,6 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 		config.GossipSub.SubscriptionProvider.CacheSize,
 		"size of the cache that keeps the list of topics each peer has subscribed to, recommended size is 10x the number of authorized nodes")
 
-	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.PenaltiesKey, p2pconfig.GraftPenaltyKey),
-		config.GossipSub.ScoringParameters.GossipsubScorePenalties.Graft,
-		"the penalty value for GRAFT control messages")
-	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.PenaltiesKey, p2pconfig.PrunePenaltyKey),
-		config.GossipSub.ScoringParameters.GossipsubScorePenalties.Prune,
-		"the penalty value for PRUNE control messages")
-	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.PenaltiesKey, p2pconfig.IhavePenaltyKey),
-		config.GossipSub.ScoringParameters.GossipsubScorePenalties.IHave,
-		"the penalty value for IHAVE control messages")
-	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.PenaltiesKey, p2pconfig.IWantPenaltyKey),
-		config.GossipSub.ScoringParameters.GossipsubScorePenalties.IWant,
-		"the penalty value for IWANT control messages")
-	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.PenaltiesKey, p2pconfig.PublishPenaltyKey),
-		config.GossipSub.ScoringParameters.GossipsubScorePenalties.Publish,
-		"the penalty value for messages published with a control message")
-	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.PenaltiesKey, p2pconfig.ClusterPrefixedReductionFactorKey),
-		config.GossipSub.ScoringParameters.GossipsubScorePenalties.ClusterPrefixedReductionFactor,
-		"factor used to reduce the penalty for control message misbehaviours on cluster prefixed topics")
-
 	flags.Int(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.AppSpecificScoreRegistryKey, p2pconfig.ScoreUpdateWorkerNumKey),
 		config.GossipSub.ScoringParameters.AppSpecificScore.ScoreUpdateWorkerNum,
 		"number of workers for the app specific score update worker pool")

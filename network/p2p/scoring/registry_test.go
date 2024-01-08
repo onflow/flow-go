@@ -907,7 +907,7 @@ func TestInvalidControlMessageMultiErrorScoreCalculation(t *testing.T) {
 			// since the peer id does not have a spam record, the app specific score should be the max app specific reward, which
 			// is the default reward for a staked peer that has valid subscriptions.
 			score := reg.AppSpecificScoreFunc()(peerID)
-			return score == scoring.MaxAppSpecificReward
+			return score == cfg.NetworkConfig.GossipSub.ScoringParameters.ScoreOption.Rewards.MaxAppSpecificReward
 		}, 5*time.Second, 500*time.Millisecond)
 	}
 
@@ -1001,8 +1001,8 @@ func TestInvalidControlMessageMultiErrorScoreCalculation(t *testing.T) {
 		record, err, ok := spamRecords.Get(tCase.notification.PeerID) // get the record from the spamRecords.
 		require.True(t, ok)
 		require.NoError(t, err)
-		require.Less(t, math.Abs(tCase.expectedPenalty-record.Penalty), 10e-3)  // penalty should be updated to -10.
-		require.Equal(t, scoring.InitAppScoreRecordState().Decay, record.Decay) // decay should be initialized to the initial state.
+		require.Less(t, math.Abs(tCase.expectedPenalty-record.Penalty), 10e-3)                                                                                                             // penalty should be updated to -10.
+		require.Equal(t, scoring.InitAppScoreRecordStateFunc(cfg.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.MaximumSpamPenaltyDecayFactor)().Decay, record.Decay) // decay should be initialized to the initial state.
 
 		require.Eventually(t, func() bool {
 			// this peer has a spam record, with no subscription penalty. Hence, the app specific score should only be the spam penalty,

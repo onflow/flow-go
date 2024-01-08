@@ -121,6 +121,7 @@ func CreateNode(t *testing.T, networkKey crypto.PrivateKey, sporkID flow.Identif
 		UnicastConfig: &p2pbuilderconfig.UnicastConfig{
 			Unicast: defaultFlowConfig.NetworkConfig.Unicast,
 		},
+		GossipSubCfg: &defaultFlowConfig.NetworkConfig.GossipSub,
 	}
 	builder, err := p2pbuilder.NewNodeBuilder(params)
 	require.NoError(t, err)

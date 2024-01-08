@@ -199,13 +199,6 @@ network-config:
       # Peer scoring is the default value for enabling peer scoring
     peer-scoring-enabled: true
     scoring-parameters:
-      penalties:
-        graft: -0.01
-        prune: -0.01
-        iHave: -0.01
-        iWant: -0.01
-        publish: -0.01
-        cluster-prefixed-reduction-factor: 0.2
       app-specific-score:
         # number of workers that asynchronously update the app specific score requests when they are expired.
         score-update-worker-num: 5
@@ -512,15 +505,15 @@ network-config:
           # instead, the penalty will be set to 0. This is to prevent the penalty from keeping a small negative value for a long time.
           skip-decay-threshold: -0.1
           # The penalty applied to the application specific penalty when a peer conducts a graft misbehaviour.
-          graft: -10
+          graft: -0.01
           # The penalty applied to the application specific penalty when a peer conducts a prune misbehaviour.
-          prune: -10
+          prune: -0.01
           # The penalty applied to the application specific penalty when a peer conducts a iHave misbehaviour.
-          ihave: -10
+          ihave: -0.01
           # The penalty applied to the application specific penalty when a peer conducts a iWant misbehaviour.
-          iwant: -10
+          iwant: -0.01
           # The penalty applied to the application specific penalty when a peer conducts a rpc publish message misbehaviour.
-          publish: -10
+          publish: -0.01
           # The factor used to reduce the penalty for control message misbehaviours on cluster prefixed topics. This allows a more lenient punishment for nodes
           # that fall behind and may need to request old data.
           cluster-prefixed-reduction-factor: 0.2
