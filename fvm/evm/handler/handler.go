@@ -103,7 +103,6 @@ func (h *ContractHandler) Run(rlpEncodedTx []byte, coinbase types.Address) {
 	bp, err := h.blockstore.BlockProposal()
 	handleError(err)
 
-	bp.StateRoot = res.StateRootHash
 	txHash := tx.Hash()
 	bp.AppendTxHash(txHash)
 
@@ -301,7 +300,6 @@ func (a *Account) executeAndHandleCall(
 	bp, err := a.fch.blockstore.BlockProposal()
 	handleError(err)
 	bp.AppendTxHash(callHash)
-	bp.StateRoot = res.StateRootHash
 	if deductSupplyDiff {
 		bp.TotalSupply -= totalSupplyDiff
 	} else {
