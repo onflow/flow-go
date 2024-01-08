@@ -158,8 +158,9 @@ func TestBaseView(t *testing.T) {
 		}
 
 		// non-existent account
-		_, err = view.GetState(slot1)
-		require.Error(t, err)
+		value, err := view.GetState(slot1)
+		require.NoError(t, err)
+		require.Equal(t, value, gethCommon.Hash{})
 
 		// store a new value
 		newValue := testutils.RandomCommonHash(t)
@@ -176,7 +177,7 @@ func TestBaseView(t *testing.T) {
 		require.NoError(t, err)
 
 		// return result from the cache
-		value, err := view.GetState(slot1)
+		value, err = view.GetState(slot1)
 		require.NoError(t, err)
 		require.Equal(t, newValue, value)
 
@@ -198,7 +199,9 @@ func TestBaseView(t *testing.T) {
 		view, err := state.NewBaseView(testutils.GetSimpleValueStore(), flow.Address{1, 2, 3, 4})
 		require.NoError(t, err)
 
-		require.Equal(t, false, view.HasSuicided(gethCommon.Address{}))
+		suicided, bal := view.HasSuicided(gethCommon.Address{})
+		require.Equal(t, false, suicided)
+		require.Equal(t, new(big.Int), bal)
 		require.Equal(t, false, view.IsCreated(gethCommon.Address{}))
 		require.Equal(t, uint64(0), view.GetRefund())
 		require.Equal(t, gethCommon.Hash{}, view.GetTransientState(types.SlotAddress{}))
