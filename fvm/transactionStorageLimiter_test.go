@@ -187,7 +187,7 @@ func TestTransactionStorageLimiter(t *testing.T) {
 
 		executionSnapshot := &snapshot.ExecutionSnapshot{
 			WriteSet: map[flow.RegisterID]flow.RegisterValue{
-				flow.NewRegisterID(string(evm.Bytes()), "a"): flow.RegisterValue("foo"),
+				flow.NewRegisterID(evm, "a"): flow.RegisterValue("foo"),
 			},
 		}
 
