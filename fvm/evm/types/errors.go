@@ -89,32 +89,32 @@ func IsEVMValidationError(err error) bool {
 	return errors.As(err, &EVMValidationError{})
 }
 
-// DatabaseError is a non-fatal error, returned when a database operation
+// StateError is a non-fatal error, returned when a state operation
 // has failed (e.g. reaching storage interaction limit)
-type DatabaseError struct {
+type StateError struct {
 	err error
 }
 
-// NewDatabaseError returns a new DatabaseError
-func NewDatabaseError(rootCause error) DatabaseError {
-	return DatabaseError{
+// NewStateError returns a new StateError
+func NewStateError(rootCause error) StateError {
+	return StateError{
 		err: rootCause,
 	}
 }
 
 // Unwrap unwraps the underlying evm error
-func (err DatabaseError) Unwrap() error {
+func (err StateError) Unwrap() error {
 	return err.err
 }
 
-func (err DatabaseError) Error() string {
-	return fmt.Sprintf("database error: %v", err.err)
+func (err StateError) Error() string {
+	return fmt.Sprintf("state error: %v", err.err)
 }
 
-// IsADatabaseError returns true if the error or any underlying errors
+// IsAStateError returns true if the error or any underlying errors
 // is of the type EVM validation error
-func IsADatabaseError(err error) bool {
-	return errors.As(err, &DatabaseError{})
+func IsAStateError(err error) bool {
+	return errors.As(err, &StateError{})
 }
 
 // FatalError is user for any error that is not user related and something

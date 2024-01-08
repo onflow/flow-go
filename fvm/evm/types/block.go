@@ -18,9 +18,6 @@ type Block struct {
 	// holds the total amount of the native token deposited in the evm side.
 	TotalSupply uint64
 
-	// StateRoot returns the EVM root hash of the state after executing this block
-	StateRoot gethCommon.Hash
-
 	// ReceiptRoot returns the root hash of the receipts emitted in this block
 	ReceiptRoot gethCommon.Hash
 
@@ -52,7 +49,6 @@ func NewBlock(height, uuidIndex, totalSupply uint64,
 	return &Block{
 		Height:            height,
 		TotalSupply:       totalSupply,
-		StateRoot:         stateRoot,
 		ReceiptRoot:       receiptRoot,
 		TransactionHashes: txHashes,
 	}
@@ -69,6 +65,5 @@ func NewBlockFromBytes(encoded []byte) (*Block, error) {
 var GenesisBlock = &Block{
 	ParentBlockHash: gethCommon.Hash{},
 	Height:          uint64(0),
-	StateRoot:       gethTypes.EmptyRootHash,
 	ReceiptRoot:     gethTypes.EmptyRootHash,
 }
