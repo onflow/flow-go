@@ -33,6 +33,8 @@ func TestChangeContractCodeMigration(t *testing.T) {
 	}
 
 	t.Run("no contracts", func(t *testing.T) {
+		t.Parallel()
+
 		migration := migrations.ChangeContractCodeMigration{}
 		log := zerolog.New(zerolog.NewTestWriter(t))
 		err := migration.InitMigration(log, nil, 0)
@@ -49,6 +51,8 @@ func TestChangeContractCodeMigration(t *testing.T) {
 	})
 
 	t.Run("1 contract - dont migrate", func(t *testing.T) {
+		t.Parallel()
+
 		migration := migrations.ChangeContractCodeMigration{}
 		log := zerolog.New(zerolog.NewTestWriter(t))
 		err := migration.InitMigration(log, nil, 0)
@@ -69,6 +73,8 @@ func TestChangeContractCodeMigration(t *testing.T) {
 	})
 
 	t.Run("1 contract - migrate", func(t *testing.T) {
+		t.Parallel()
+
 		migration := migrations.ChangeContractCodeMigration{}
 		log := zerolog.New(zerolog.NewTestWriter(t))
 		err := migration.InitMigration(log, nil, 0)
@@ -91,6 +97,8 @@ func TestChangeContractCodeMigration(t *testing.T) {
 	})
 
 	t.Run("2 contracts - migrate 1", func(t *testing.T) {
+		t.Parallel()
+
 		migration := migrations.ChangeContractCodeMigration{}
 		log := zerolog.New(zerolog.NewTestWriter(t))
 		err := migration.InitMigration(log, nil, 0)
@@ -115,6 +123,8 @@ func TestChangeContractCodeMigration(t *testing.T) {
 	})
 
 	t.Run("2 contracts - migrate 2", func(t *testing.T) {
+		t.Parallel()
+
 		migration := migrations.ChangeContractCodeMigration{}
 		log := zerolog.New(zerolog.NewTestWriter(t))
 		err := migration.InitMigration(log, nil, 0)
@@ -140,6 +150,8 @@ func TestChangeContractCodeMigration(t *testing.T) {
 	})
 
 	t.Run("2 contracts on different accounts - migrate 1", func(t *testing.T) {
+		t.Parallel()
+
 		migration := migrations.ChangeContractCodeMigration{}
 		log := zerolog.New(zerolog.NewTestWriter(t))
 		err := migration.InitMigration(log, nil, 0)
@@ -164,6 +176,8 @@ func TestChangeContractCodeMigration(t *testing.T) {
 	})
 
 	t.Run("not all contracts on one account migrated", func(t *testing.T) {
+		t.Parallel()
+
 		migration := migrations.ChangeContractCodeMigration{}
 		log := zerolog.New(zerolog.NewTestWriter(t))
 		err := migration.InitMigration(log, nil, 0)
@@ -182,6 +196,8 @@ func TestChangeContractCodeMigration(t *testing.T) {
 	})
 
 	t.Run("not all accounts migrated", func(t *testing.T) {
+		t.Parallel()
+
 		migration := migrations.ChangeContractCodeMigration{}
 		log := zerolog.New(zerolog.NewTestWriter(t))
 		err := migration.InitMigration(log, nil, 0)
