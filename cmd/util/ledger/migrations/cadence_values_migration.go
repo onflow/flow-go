@@ -119,6 +119,13 @@ func (m *CadenceValueMigrator) mergeRegisterChanges(
 	originalPayloads := mr.Snapshot.Payloads
 	newPayloads := make([]*ledger.Payload, 0, len(originalPayloads))
 
+	// Add all new payloads.
+	for id, value := range changes {
+		key := convert.RegisterIDToLedgerKey(id)
+		newPayloads = append(newPayloads, ledger.NewPayload(key, value))
+	}
+
+	// Add any old payload that wasn't updated.
 	for id, value := range originalPayloads {
 		if len(value.Value()) == 0 {
 			// This is strange, but we don't want to add empty values. Log it.
@@ -126,13 +133,13 @@ func (m *CadenceValueMigrator) mergeRegisterChanges(
 			continue
 		}
 
-		// If the payload had changed, then use the updated payload.
-		if updatedPayload, contains := changes[id]; contains {
-			key := convert.RegisterIDToLedgerKey(id)
-			newPayloads = append(newPayloads, ledger.NewPayload(key, updatedPayload))
-		} else {
-			newPayloads = append(newPayloads, value)
+		// If the payload had changed, then it has been added earlier.
+		// So skip old payload.
+		if _, contains := changes[id]; contains {
+			continue
 		}
+
+		newPayloads = append(newPayloads, value)
 	}
 
 	return newPayloads, nil

@@ -215,7 +215,7 @@ func registerIDKeyFromString(s string) flow.RegisterID {
 
 type testReportWriterFactory struct{}
 
-func (_m *testReportWriterFactory) ReportWriter(dataNamespace string) reporters.ReportWriter {
+func (_m *testReportWriterFactory) ReportWriter(_ string) reporters.ReportWriter {
 	return &testReportWriter{}
 }
 
