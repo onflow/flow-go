@@ -199,8 +199,8 @@ func TestBaseView(t *testing.T) {
 		view, err := state.NewBaseView(testutils.GetSimpleValueStore(), flow.Address{1, 2, 3, 4})
 		require.NoError(t, err)
 
-		suicided, bal := view.HasSuicided(gethCommon.Address{})
-		require.Equal(t, false, suicided)
+		dest, bal := view.HasSelfDestructed(gethCommon.Address{})
+		require.Equal(t, false, dest)
 		require.Equal(t, new(big.Int), bal)
 		require.Equal(t, false, view.IsCreated(gethCommon.Address{}))
 		require.Equal(t, uint64(0), view.GetRefund())

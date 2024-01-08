@@ -22,7 +22,7 @@ var emptyRefund = func() uint64 {
 func TestDeltaView(t *testing.T) {
 	t.Parallel()
 
-	t.Run("test account exist/creation/suicide functionality", func(t *testing.T) {
+	t.Run("test account exist/creation/self-destruct functionality", func(t *testing.T) {
 		addr1 := testutils.RandomCommonAddress(t)
 		addr2 := testutils.RandomCommonAddress(t)
 		addr3 := testutils.RandomCommonAddress(t)
@@ -47,7 +47,7 @@ func TestDeltaView(t *testing.T) {
 				GetBalanceFunc: func(gethCommon.Address) (*big.Int, error) {
 					return new(big.Int), nil
 				},
-				HasSuicidedFunc: func(gethCommon.Address) (bool, *big.Int) {
+				HasSelfDestructedFunc: func(gethCommon.Address) (bool, *big.Int) {
 					return false, new(big.Int)
 				},
 			})
@@ -76,20 +76,19 @@ func TestDeltaView(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, found)
 
-		// test HasSuicided first
-		success, _ := view.HasSuicided(addr1)
+		// test HasSelfDestructed first
+		success, _ := view.HasSelfDestructed(addr1)
 		require.False(t, success)
 
 		// set addr1 for deletion
-		success, err = view.Suicide(addr1)
+		err = view.SelfDestruct(addr1)
 		require.NoError(t, err)
+
+		// check HasSelfDestructed now
+		success, _ = view.HasSelfDestructed(addr1)
 		require.True(t, success)
 
-		// check HasSuicided now
-		success, _ = view.HasSuicided(addr1)
-		require.True(t, success)
-
-		// addr1 should still exist after suicide call
+		// addr1 should still exist after self destruct call
 		found, err = view.Exist(addr1)
 		require.NoError(t, err)
 		require.True(t, found)
@@ -114,7 +113,7 @@ func TestDeltaView(t *testing.T) {
 						return false, nil
 					}
 				},
-				HasSuicidedFunc: func(a gethCommon.Address) (bool, *big.Int) {
+				HasSelfDestructedFunc: func(a gethCommon.Address) (bool, *big.Int) {
 					return false, new(big.Int)
 				},
 				IsCreatedFunc: func(a gethCommon.Address) bool {
@@ -137,10 +136,9 @@ func TestDeltaView(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, addr1InitBal, bal)
 
-		// call suicide on addr
-		success, err := view.Suicide(addr1)
+		// call self destruct on addr
+		err = view.SelfDestruct(addr1)
 		require.NoError(t, err)
-		require.True(t, success)
 
 		// now it should return balance of zero
 		bal, err = view.GetBalance(addr1)
@@ -191,7 +189,7 @@ func TestDeltaView(t *testing.T) {
 						return false, nil
 					}
 				},
-				HasSuicidedFunc: func(a gethCommon.Address) (bool, *big.Int) {
+				HasSelfDestructedFunc: func(a gethCommon.Address) (bool, *big.Int) {
 					return false, new(big.Int)
 				},
 				IsCreatedFunc: func(a gethCommon.Address) bool {
@@ -255,7 +253,7 @@ func TestDeltaView(t *testing.T) {
 						return false, nil
 					}
 				},
-				HasSuicidedFunc: func(a gethCommon.Address) (bool, *big.Int) {
+				HasSelfDestructedFunc: func(a gethCommon.Address) (bool, *big.Int) {
 					return false, new(big.Int)
 				},
 				IsCreatedFunc: func(a gethCommon.Address) bool {
@@ -604,7 +602,7 @@ func TestDeltaView(t *testing.T) {
 				IsCreatedFunc: func(a gethCommon.Address) bool {
 					return false
 				},
-				HasSuicidedFunc: func(gethCommon.Address) (bool, *big.Int) {
+				HasSelfDestructedFunc: func(gethCommon.Address) (bool, *big.Int) {
 					return false, new(big.Int)
 				},
 			})
@@ -617,8 +615,8 @@ func TestDeltaView(t *testing.T) {
 		err := view.CreateAccount(addresses[0])
 		require.NoError(t, err)
 
-		// Suicide address 2
-		_, err = view.Suicide(addresses[1])
+		// self destruct address 2
+		err = view.SelfDestruct(addresses[1])
 		require.NoError(t, err)
 
 		// add balance for address 3
@@ -646,7 +644,7 @@ func TestDeltaView(t *testing.T) {
 		}
 	})
 
-	t.Run("test account creation after suicide call", func(t *testing.T) {
+	t.Run("test account creation after selfdestruct call", func(t *testing.T) {
 		addr1 := testutils.RandomCommonAddress(t)
 
 		view := state.NewDeltaView(
@@ -656,7 +654,7 @@ func TestDeltaView(t *testing.T) {
 				ExistFunc: func(addr gethCommon.Address) (bool, error) {
 					return true, nil
 				},
-				HasSuicidedFunc: func(gethCommon.Address) (bool, *big.Int) {
+				HasSelfDestructedFunc: func(gethCommon.Address) (bool, *big.Int) {
 					return true, big.NewInt(2)
 				},
 				IsCreatedFunc: func(a gethCommon.Address) bool {
@@ -703,9 +701,8 @@ func TestDeltaView(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, value, vret)
 
-		success, err := view.Suicide(addr1)
+		err = view.SelfDestruct(addr1)
 		require.NoError(t, err)
-		require.True(t, success)
 
 		// balance should be returned zero
 		bal, err = view.GetBalance(addr1)
@@ -744,7 +741,7 @@ func TestDeltaView(t *testing.T) {
 
 type MockedReadOnlyView struct {
 	ExistFunc               func(gethCommon.Address) (bool, error)
-	HasSuicidedFunc         func(gethCommon.Address) (bool, *big.Int)
+	HasSelfDestructedFunc   func(gethCommon.Address) (bool, *big.Int)
 	IsCreatedFunc           func(gethCommon.Address) bool
 	GetBalanceFunc          func(gethCommon.Address) (*big.Int, error)
 	GetNonceFunc            func(gethCommon.Address) (uint64, error)
@@ -774,11 +771,11 @@ func (v *MockedReadOnlyView) IsCreated(addr gethCommon.Address) bool {
 	return v.IsCreatedFunc(addr)
 }
 
-func (v *MockedReadOnlyView) HasSuicided(addr gethCommon.Address) (bool, *big.Int) {
-	if v.HasSuicidedFunc == nil {
-		panic("HasSuicided is not set in this mocked view")
+func (v *MockedReadOnlyView) HasSelfDestructed(addr gethCommon.Address) (bool, *big.Int) {
+	if v.HasSelfDestructedFunc == nil {
+		panic("HasSelfDestructed is not set in this mocked view")
 	}
-	return v.HasSuicidedFunc(addr)
+	return v.HasSelfDestructedFunc(addr)
 }
 
 func (v *MockedReadOnlyView) GetBalance(addr gethCommon.Address) (*big.Int, error) {
