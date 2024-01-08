@@ -14,6 +14,15 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+func newContractPayload(address common.Address, contractName string, contract []byte) *ledger.Payload {
+	return ledger.NewPayload(
+		convert.RegisterIDToLedgerKey(
+			flow.ContractRegisterID(flow.ConvertAddress(address), contractName),
+		),
+		contract,
+	)
+}
+
 func TestChangeContractCodeMigration(t *testing.T) {
 	t.Parallel()
 
@@ -24,15 +33,6 @@ func TestChangeContractCodeMigration(t *testing.T) {
 	require.NoError(t, err)
 
 	ctx := context.Background()
-
-	contractPayload := func(address common.Address, contractName string, contract []byte) *ledger.Payload {
-		return ledger.NewPayload(
-			convert.RegisterIDToLedgerKey(
-				flow.ContractRegisterID(flow.ConvertAddress(address), contractName),
-			),
-			contract,
-		)
-	}
 
 	t.Run("no contracts", func(t *testing.T) {
 		t.Parallel()
@@ -62,7 +62,7 @@ func TestChangeContractCodeMigration(t *testing.T) {
 
 		payloads, err := migration.MigrateAccount(ctx, address1,
 			[]*ledger.Payload{
-				contractPayload(address1, "A", []byte("A")),
+				newContractPayload(address1, "A", []byte("A")),
 			},
 		)
 
@@ -86,7 +86,7 @@ func TestChangeContractCodeMigration(t *testing.T) {
 
 		payloads, err := migration.MigrateAccount(ctx, address1,
 			[]*ledger.Payload{
-				contractPayload(address1, "A", []byte("A")),
+				newContractPayload(address1, "A", []byte("A")),
 			},
 		)
 
@@ -110,8 +110,8 @@ func TestChangeContractCodeMigration(t *testing.T) {
 
 		payloads, err := migration.MigrateAccount(ctx, address1,
 			[]*ledger.Payload{
-				contractPayload(address1, "A", []byte("A")),
-				contractPayload(address1, "B", []byte("A")),
+				newContractPayload(address1, "A", []byte("A")),
+				newContractPayload(address1, "B", []byte("A")),
 			},
 		)
 
@@ -137,8 +137,8 @@ func TestChangeContractCodeMigration(t *testing.T) {
 
 		payloads, err := migration.MigrateAccount(ctx, address1,
 			[]*ledger.Payload{
-				contractPayload(address1, "A", []byte("A")),
-				contractPayload(address1, "B", []byte("A")),
+				newContractPayload(address1, "A", []byte("A")),
+				newContractPayload(address1, "B", []byte("A")),
 			},
 		)
 
@@ -163,8 +163,8 @@ func TestChangeContractCodeMigration(t *testing.T) {
 
 		payloads, err := migration.MigrateAccount(ctx, address1,
 			[]*ledger.Payload{
-				contractPayload(address1, "A", []byte("A")),
-				contractPayload(address2, "A", []byte("A")),
+				newContractPayload(address1, "A", []byte("A")),
+				newContractPayload(address2, "A", []byte("A")),
 			},
 		)
 
@@ -190,7 +190,7 @@ func TestChangeContractCodeMigration(t *testing.T) {
 
 		_, err = migration.MigrateAccount(ctx, address1,
 			[]*ledger.Payload{
-				contractPayload(address1, "A", []byte("A")),
+				newContractPayload(address1, "A", []byte("A")),
 			},
 		)
 
@@ -209,7 +209,7 @@ func TestChangeContractCodeMigration(t *testing.T) {
 
 		_, err = migration.MigrateAccount(ctx, address1,
 			[]*ledger.Payload{
-				contractPayload(address1, "A", []byte("A")),
+				newContractPayload(address1, "A", []byte("A")),
 			},
 		)
 
