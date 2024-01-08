@@ -2,14 +2,16 @@ package migrations_test
 
 import (
 	"context"
+	"testing"
+
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestChangeContractCodeMigration(t *testing.T) {

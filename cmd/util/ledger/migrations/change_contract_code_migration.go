@@ -49,7 +49,7 @@ func (d *ChangeContractCodeMigration) InitMigration(
 }
 
 func (d *ChangeContractCodeMigration) MigrateAccount(
-	ctx context.Context,
+	_ context.Context,
 	address common.Address,
 	payloads []*ledger.Payload,
 ) ([]*ledger.Payload, error) {
