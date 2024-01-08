@@ -76,11 +76,12 @@ func (d *ChangeContractCodeMigration) MigrateAccount(
 		return payloads, nil
 	}
 
-	for i, payload := range payloads {
+	for payloadIndex, payload := range payloads {
 		key, err := payload.Key()
 		if err != nil {
 			return nil, err
 		}
+
 		registerID, err := convert.LedgerKeyToRegisterID(key)
 		newContract, ok := contracts[registerID]
 		if !ok {
@@ -90,10 +91,12 @@ func (d *ChangeContractCodeMigration) MigrateAccount(
 		}
 
 		// change contract code
-		payloads[i] = ledger.NewPayload(
+		payloads[payloadIndex] = ledger.NewPayload(
 			key,
 			[]byte(newContract),
 		)
+
+		// TODO: maybe log diff between old and new
 
 		// remove contract from list of contracts to change
 		// to keep track of which contracts are left to change
@@ -154,6 +157,25 @@ func NewSystemContractChange(
 func SystemContractChanges(chainID flow.ChainID) []SystemContractChange {
 	systemContracts := systemcontracts.SystemContractsForChain(chainID)
 
+	var stakingCollectionAddress, stakingProxyAddress common.Address
+
+	switch chainID {
+	case flow.Mainnet:
+		stakingCollectionAddress = mustHexAddress("0x8d0e87b65159ae63")
+		stakingProxyAddress = mustHexAddress("0x62430cf28c26d095")
+
+	case flow.Testnet:
+		stakingCollectionAddress = mustHexAddress("0x95e019a17d0e23d7")
+		stakingProxyAddress = mustHexAddress("0x7aad92e5a0715d21")
+
+	default:
+		panic(fmt.Errorf("unsupported chain ID: %s", chainID))
+	}
+
+	lockedTokensAddress := stakingCollectionAddress
+	fungibleTokenMetadataViewsAddress := common.Address(systemContracts.FungibleToken.Address)
+	fungibleTokenSwitchboardAddress := common.Address(systemContracts.FungibleToken.Address)
+
 	return []SystemContractChange{
 		// epoch related contracts
 		NewSystemContractChange(
@@ -210,6 +232,37 @@ func SystemContractChanges(chainID flow.ChainID) []SystemContractChange {
 				systemContracts.FlowToken.Address.HexWithPrefix(),
 			),
 		),
+		{
+			Address:      stakingCollectionAddress,
+			ContractName: "FlowStakingCollection",
+			NewContractCode: string(coreContracts.FlowStakingCollection(
+				systemContracts.FungibleToken.Address.HexWithPrefix(),
+				systemContracts.FlowToken.Address.HexWithPrefix(),
+				systemContracts.IDTableStaking.Address.HexWithPrefix(),
+				stakingProxyAddress.HexWithPrefix(),
+				lockedTokensAddress.HexWithPrefix(),
+				systemContracts.FlowStorageFees.Address.HexWithPrefix(),
+				systemContracts.ClusterQC.Address.HexWithPrefix(),
+				systemContracts.DKG.Address.HexWithPrefix(),
+				systemContracts.Epoch.Address.HexWithPrefix(),
+			)),
+		},
+		{
+			Address:         stakingProxyAddress,
+			ContractName:    "StakingProxy",
+			NewContractCode: string(coreContracts.FlowStakingProxy()),
+		},
+		{
+			Address:      lockedTokensAddress,
+			ContractName: "LockedTokens",
+			NewContractCode: string(coreContracts.FlowLockedTokens(
+				systemContracts.FungibleToken.Address.HexWithPrefix(),
+				systemContracts.FlowToken.Address.HexWithPrefix(),
+				systemContracts.IDTableStaking.Address.HexWithPrefix(),
+				stakingProxyAddress.HexWithPrefix(),
+				systemContracts.FlowStorageFees.Address.HexWithPrefix(),
+			)),
+		},
 
 		// token related contracts
 		NewSystemContractChange(
@@ -232,6 +285,21 @@ func SystemContractChanges(chainID flow.ChainID) []SystemContractChange {
 			systemContracts.FungibleToken,
 			ftContracts.FungibleToken(),
 		),
+		{
+			Address:      fungibleTokenMetadataViewsAddress,
+			ContractName: "FungibleTokenMetadataViews",
+			NewContractCode: string(ftContracts.FungibleTokenMetadataViews(
+				systemContracts.FungibleToken.Address.HexWithPrefix(),
+				systemContracts.MetadataViews.Address.HexWithPrefix(),
+			)),
+		},
+		{
+			Address:      fungibleTokenSwitchboardAddress,
+			ContractName: "FungibleTokenSwitchboard",
+			NewContractCode: string(ftContracts.FungibleTokenSwitchboard(
+				systemContracts.FungibleToken.Address.HexWithPrefix(),
+			)),
+		},
 
 		// NFT related contracts
 		NewSystemContractChange(
@@ -258,4 +326,12 @@ func SystemContractChanges(chainID flow.ChainID) []SystemContractChange {
 			),
 		),
 	}
+}
+
+func mustHexAddress(hexAddress string) common.Address {
+	address, err := common.HexToAddress(hexAddress)
+	if err != nil {
+		panic(err)
+	}
+	return address
 }
