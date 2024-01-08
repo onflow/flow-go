@@ -176,22 +176,37 @@ func handleCommitError(err error) error {
 }
 
 func (proc *procedure) mintTo(address types.Address, amount *big.Int) (*types.Result, error) {
+	// TODO we need to change this
+	// for regular smart contracts they expect to receive a call
+	// so they can decide to accept eth transfer and do some actions
+	// so we need to transfer to address zero and then make a call
 	addr := address.ToCommon()
-	res := &types.Result{
-		GasConsumed: proc.config.DirectCallBaseGasUsage,
-		TxType:      types.DirectCallTxType,
-	}
 
 	// create account if not exist
 	if !proc.state.Exist(addr) {
 		proc.state.CreateAccount(addr)
 	}
 
-	// add balance
-	proc.state.AddBalance(addr, amount)
+	// if target is an EOA account
+	if len(proc.state.GetCode(addr)) == 0 {
+		// add balance
+		proc.state.AddBalance(addr, amount)
 
-	// we don't need to increment any nonce, given the origin doesn't exist
-	return res, proc.commit()
+		res := &types.Result{
+			GasConsumed: proc.config.DirectCallBaseGasUsage,
+			TxType:      types.DirectCallTxType,
+		}
+		// we don't need to increment any nonce, given the origin doesn't exist
+		return res, proc.commit()
+	}
+
+	// mint to empty address and then make a transfer call
+	proc.state.AddBalance(types.EmptyAddress.ToCommon(), amount)
+
+	return proc.run(
+		types.NewTransferCall(types.EmptyAddress, address, amount).Message(),
+		types.DirectCallTxType,
+	)
 }
 
 func (proc *procedure) withdrawFrom(address types.Address, amount *big.Int) (*types.Result, error) {
