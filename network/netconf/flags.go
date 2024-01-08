@@ -320,55 +320,6 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 		config.GossipSub.ScoringParameters.DecayInterval,
 		"interval at which the counters associated with a peer behavior in GossipSub system are decayed, recommended value is one minute")
 
-	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreOptionKey, p2pconfig.AppScoreWeightKey),
-		config.GossipSub.ScoringParameters.ScoreOption.AppSpecificScoreWeight,
-		"the  weight for app-specific scores")
-	flags.Uint32(BuildFlagName(gossipsubKey, p2pconfig.ScoreOptionKey, p2pconfig.MaxDebugLogsKey),
-		config.GossipSub.ScoringParameters.ScoreOption.MaxDebugLogs,
-		"the max number of debug/trace log events per second. Logs emitted above this threshold are dropped")
-	flags.Duration(BuildFlagName(gossipsubKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionDecayIntervalKey),
-		config.GossipSub.ScoringParameters.ScoreOption.DecayInterval,
-		"the  decay interval for the overall score of a peer at the GossipSub scoring system")
-	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionDecayToZeroKey),
-		config.GossipSub.ScoringParameters.ScoreOption.DecayToZero,
-		"the  decay to zero for the overall score of a peer at the GossipSub scoring system")
-
-	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionPenaltiesKey, p2pconfig.MaxAppSpecificPenaltyKey),
-		config.GossipSub.ScoringParameters.ScoreOption.Penalties.MaxAppSpecificPenalty,
-		"the maximum penalty for sever offenses that we apply to a remote node score")
-	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionPenaltiesKey, p2pconfig.MinAppSpecificPenaltyKey),
-		config.GossipSub.ScoringParameters.ScoreOption.Penalties.MinAppSpecificPenalty,
-		"the minimum penalty for sever offenses that we apply to a remote node score")
-	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionPenaltiesKey, p2pconfig.UnknownIdentityPenaltyKey),
-		config.GossipSub.ScoringParameters.ScoreOption.Penalties.UnknownIdentityPenalty,
-		"the  penalty for unknown identity. It is applied to the peer's score when the peer is not in the identity list")
-	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionPenaltiesKey, p2pconfig.InvalidSubscriptionPenaltyKey),
-		config.GossipSub.ScoringParameters.ScoreOption.Penalties.InvalidSubscriptionPenalty,
-		"the  penalty for invalid subscription. It is applied to the peer's score when the peer subscribes to a topic that it is not authorized to subscribe to")
-
-	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionRewardsKey, p2pconfig.MaxAppSpecificRewardKey),
-		config.GossipSub.ScoringParameters.ScoreOption.Rewards.MaxAppSpecificReward,
-		"the reward for well-behaving staked peers")
-	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionRewardsKey, p2pconfig.StakedIdentityRewardKey),
-		config.GossipSub.ScoringParameters.ScoreOption.Rewards.StakedIdentityReward,
-		"the reward for staking peers")
-
-	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionThresholdsKey, p2pconfig.GossipThresholdKey),
-		config.GossipSub.ScoringParameters.ScoreOption.Thresholds.Gossip,
-		"the threshold when a peer's penalty drops below this threshold, no gossip is emitted towards that peer and gossip from that peer is ignored")
-	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionThresholdsKey, p2pconfig.PublishThresholdKey),
-		config.GossipSub.ScoringParameters.ScoreOption.Thresholds.Publish,
-		"the threshold when a peer's penalty drops below this threshold, self-published messages are not propagated towards this peer")
-	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionThresholdsKey, p2pconfig.GraylistThresholdKey),
-		config.GossipSub.ScoringParameters.ScoreOption.Thresholds.Graylist,
-		"the threshold when a peer's penalty drops below this threshold, the peer is graylisted, i.e., incoming RPCs from the peer are ignored")
-	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionThresholdsKey, p2pconfig.AcceptPXThresholdKey),
-		config.GossipSub.ScoringParameters.ScoreOption.Thresholds.AcceptPX,
-		"the threshold when a peer sends us PX information with a prune, we only accept it and connect to the supplied peers if the originating peer's penalty exceeds this threshold")
-	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionThresholdsKey, p2pconfig.OpportunisticGraftThresholdKey),
-		config.GossipSub.ScoringParameters.ScoreOption.Thresholds.OpportunisticGraft,
-		"the threshold when the median peer penalty in the mesh drops below this value, the peer may select more peers with penalty above the median to opportunistically graft on the mesh")
-
 	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoringRegistryKey, p2pconfig.MinimumSpamPenaltyDecayFactorKey),
 		config.GossipSub.ScoringParameters.ScoringRegistryParameters.MinimumSpamPenaltyDecayFactor,
 		"the minimum speed at which the spam penalty value of a peer is decayed")
@@ -397,47 +348,96 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 		config.GossipSub.ScoringParameters.ScoringRegistryParameters.MisbehaviourPenalties.ClusterPrefixedReductionFactor,
 		"the factor used to reduce the penalty for control message misbehaviours on cluster prefixed topics")
 
-	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionBehaviourKey, p2pconfig.BehaviourPenaltyThresholdKey),
+	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoreOptionKey, p2pconfig.AppScoreWeightKey),
+		config.GossipSub.ScoringParameters.ScoreOption.AppSpecificScoreWeight,
+		"the  weight for app-specific scores")
+	flags.Uint32(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoreOptionKey, p2pconfig.MaxDebugLogsKey),
+		config.GossipSub.ScoringParameters.ScoreOption.MaxDebugLogs,
+		"the max number of debug/trace log events per second. Logs emitted above this threshold are dropped")
+	flags.Duration(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionDecayIntervalKey),
+		config.GossipSub.ScoringParameters.ScoreOption.DecayInterval,
+		"the  decay interval for the overall score of a peer at the GossipSub scoring system")
+	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionDecayToZeroKey),
+		config.GossipSub.ScoringParameters.ScoreOption.DecayToZero,
+		"the  decay to zero for the overall score of a peer at the GossipSub scoring system")
+
+	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionPenaltiesKey, p2pconfig.MaxAppSpecificPenaltyKey),
+		config.GossipSub.ScoringParameters.ScoreOption.Penalties.MaxAppSpecificPenalty,
+		"the maximum penalty for sever offenses that we apply to a remote node score")
+	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionPenaltiesKey, p2pconfig.MinAppSpecificPenaltyKey),
+		config.GossipSub.ScoringParameters.ScoreOption.Penalties.MinAppSpecificPenalty,
+		"the minimum penalty for sever offenses that we apply to a remote node score")
+	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionPenaltiesKey, p2pconfig.UnknownIdentityPenaltyKey),
+		config.GossipSub.ScoringParameters.ScoreOption.Penalties.UnknownIdentityPenalty,
+		"the  penalty for unknown identity. It is applied to the peer's score when the peer is not in the identity list")
+	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionPenaltiesKey, p2pconfig.InvalidSubscriptionPenaltyKey),
+		config.GossipSub.ScoringParameters.ScoreOption.Penalties.InvalidSubscriptionPenalty,
+		"the  penalty for invalid subscription. It is applied to the peer's score when the peer subscribes to a topic that it is not authorized to subscribe to")
+
+	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionRewardsKey, p2pconfig.MaxAppSpecificRewardKey),
+		config.GossipSub.ScoringParameters.ScoreOption.Rewards.MaxAppSpecificReward,
+		"the reward for well-behaving staked peers")
+	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionRewardsKey, p2pconfig.StakedIdentityRewardKey),
+		config.GossipSub.ScoringParameters.ScoreOption.Rewards.StakedIdentityReward,
+		"the reward for staking peers")
+
+	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionThresholdsKey, p2pconfig.GossipThresholdKey),
+		config.GossipSub.ScoringParameters.ScoreOption.Thresholds.Gossip,
+		"the threshold when a peer's penalty drops below this threshold, no gossip is emitted towards that peer and gossip from that peer is ignored")
+	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionThresholdsKey, p2pconfig.PublishThresholdKey),
+		config.GossipSub.ScoringParameters.ScoreOption.Thresholds.Publish,
+		"the threshold when a peer's penalty drops below this threshold, self-published messages are not propagated towards this peer")
+	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionThresholdsKey, p2pconfig.GraylistThresholdKey),
+		config.GossipSub.ScoringParameters.ScoreOption.Thresholds.Graylist,
+		"the threshold when a peer's penalty drops below this threshold, the peer is graylisted, i.e., incoming RPCs from the peer are ignored")
+	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionThresholdsKey, p2pconfig.AcceptPXThresholdKey),
+		config.GossipSub.ScoringParameters.ScoreOption.Thresholds.AcceptPX,
+		"the threshold when a peer sends us PX information with a prune, we only accept it and connect to the supplied peers if the originating peer's penalty exceeds this threshold")
+	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionThresholdsKey, p2pconfig.OpportunisticGraftThresholdKey),
+		config.GossipSub.ScoringParameters.ScoreOption.Thresholds.OpportunisticGraft,
+		"the threshold when the median peer penalty in the mesh drops below this value, the peer may select more peers with penalty above the median to opportunistically graft on the mesh")
+
+	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionBehaviourKey, p2pconfig.BehaviourPenaltyThresholdKey),
 		config.GossipSub.ScoringParameters.ScoreOption.Behaviour.PenaltyThreshold,
 		"the threshold when the behavior of a peer is considered as bad by GossipSub")
-	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionBehaviourKey, p2pconfig.BehaviourPenaltyWeightKey),
+	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionBehaviourKey, p2pconfig.BehaviourPenaltyWeightKey),
 		config.GossipSub.ScoringParameters.ScoreOption.Behaviour.PenaltyWeight,
 		"the weight for applying penalty when a peer misbehavior goes beyond the threshold")
-	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionBehaviourKey, p2pconfig.BehaviourPenaltyDecayKey),
+	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionBehaviourKey, p2pconfig.BehaviourPenaltyDecayKey),
 		config.GossipSub.ScoringParameters.ScoreOption.Behaviour.PenaltyDecay,
 		"the decay interval for the misbehavior counter of a peer. The misbehavior counter is incremented by GossipSub for iHave broken promises or the GRAFT flooding attacks (i.e., each GRAFT received from a remote peer while that peer is on a PRUNE backoff)")
 
-	flags.Bool(BuildFlagName(gossipsubKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionTopicKey, p2pconfig.SkipAtomicValidationKey),
+	flags.Bool(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionTopicKey, p2pconfig.SkipAtomicValidationKey),
 		config.GossipSub.ScoringParameters.ScoreOption.TopicValidation.SkipAtomicValidation,
 		"the default value for the skip atomic validation flag for topics")
-	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionTopicKey, p2pconfig.InvalidMessageDeliveriesWeightKey),
+	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionTopicKey, p2pconfig.InvalidMessageDeliveriesWeightKey),
 		config.GossipSub.ScoringParameters.ScoreOption.TopicValidation.InvalidMessageDeliveriesWeight,
 		"this value is applied to the square of the number of invalid message deliveries on a topic")
-	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionTopicKey, p2pconfig.InvalidMessageDeliveriesDecayKey),
+	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionTopicKey, p2pconfig.InvalidMessageDeliveriesDecayKey),
 		config.GossipSub.ScoringParameters.ScoreOption.TopicValidation.InvalidMessageDeliveriesDecay,
 		"the decay factor used to decay the number of invalid message deliveries")
-	flags.Duration(BuildFlagName(gossipsubKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionTopicKey, p2pconfig.TimeInMeshQuantumKey),
+	flags.Duration(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionTopicKey, p2pconfig.TimeInMeshQuantumKey),
 		config.GossipSub.ScoringParameters.ScoreOption.TopicValidation.TimeInMeshQuantum,
 		"the time in mesh quantum for the GossipSub scoring system")
-	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionTopicKey, p2pconfig.TopicWeightKey),
+	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionTopicKey, p2pconfig.TopicWeightKey),
 		config.GossipSub.ScoringParameters.ScoreOption.TopicValidation.TopicWeight,
 		"the weight of a topic in the GossipSub scoring system")
-	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionTopicKey, p2pconfig.MeshMessageDeliveriesDecayKey),
+	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionTopicKey, p2pconfig.MeshMessageDeliveriesDecayKey),
 		config.GossipSub.ScoringParameters.ScoreOption.TopicValidation.MeshMessageDeliveriesDecay,
 		"this is applied to the number of actual message deliveries in a topic mesh at each decay interval (i.e., DecayInterval)")
-	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionTopicKey, p2pconfig.MeshMessageDeliveriesCapKey),
+	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionTopicKey, p2pconfig.MeshMessageDeliveriesCapKey),
 		config.GossipSub.ScoringParameters.ScoreOption.TopicValidation.MeshMessageDeliveriesCap,
 		"The maximum number of actual message deliveries in a topic mesh that is used to calculate the score of a peer in that topic mesh")
-	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionTopicKey, p2pconfig.MeshMessageDeliveryThresholdKey),
+	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionTopicKey, p2pconfig.MeshMessageDeliveryThresholdKey),
 		config.GossipSub.ScoringParameters.ScoreOption.TopicValidation.MeshMessageDeliveryThreshold,
 		"The threshold for the number of actual message deliveries in a topic mesh that is used to calculate the score of a peer in that topic mesh")
-	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionTopicKey, p2pconfig.MeshDeliveriesWeightKey),
+	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionTopicKey, p2pconfig.MeshDeliveriesWeightKey),
 		config.GossipSub.ScoringParameters.ScoreOption.TopicValidation.MeshDeliveriesWeight,
 		"the weight for applying penalty when a peer is under-performing in a topic mesh")
-	flags.Duration(BuildFlagName(gossipsubKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionTopicKey, p2pconfig.MeshMessageDeliveriesWindowKey),
+	flags.Duration(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionTopicKey, p2pconfig.MeshMessageDeliveriesWindowKey),
 		config.GossipSub.ScoringParameters.ScoreOption.TopicValidation.MeshMessageDeliveriesWindow,
 		"the window size is time interval that we count a delivery of an already seen message towards the score of a peer in a topic mesh. The delivery is counted by GossipSub only if the previous sender of the message is different from the current sender")
-	flags.Duration(BuildFlagName(gossipsubKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionTopicKey, p2pconfig.MeshMessageDeliveryActivationKey),
+	flags.Duration(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoreOptionKey, p2pconfig.ScoreOptionTopicKey, p2pconfig.MeshMessageDeliveryActivationKey),
 		config.GossipSub.ScoringParameters.ScoreOption.TopicValidation.MeshMessageDeliveryActivation,
 		"the time interval that we wait for a new peer that joins a topic mesh till start counting the number of actual message deliveries of that peer in that topic mesh")
 }
@@ -515,6 +515,7 @@ func SetAliases(conf *viper.Viper) error {
 		if !ok {
 			return fmt.Errorf("invalid network configuration missing configuration key flag name %s check config file and cli flags", flagName)
 		}
+
 		conf.RegisterAlias(fullKey, flagName)
 	}
 	return nil
