@@ -41,6 +41,9 @@ func TestCadenceValuesMigration(t *testing.T) {
 	newPayloads, err := valueMigration.MigrateAccount(nil, address, payloads)
 	require.NoError(t, err)
 
+	err = valueMigration.Close()
+	require.NoError(t, err)
+
 	// Assert the migrated payloads
 
 	mr, err := newMigratorRuntime(address, newPayloads)
