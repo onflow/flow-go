@@ -3,6 +3,7 @@ package migrations
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
 	ftContracts "github.com/onflow/flow-ft/lib/go/contracts"
@@ -20,14 +21,17 @@ import (
 )
 
 type ChangeContractCodeMigration struct {
-	log zerolog.Logger
-
+	log       zerolog.Logger
+	mutex     sync.RWMutex
 	contracts map[common.Address]map[flow.RegisterID]string
 }
 
 var _ AccountBasedMigration = (*ChangeContractCodeMigration)(nil)
 
 func (d *ChangeContractCodeMigration) Close() error {
+	d.mutex.RLock()
+	defer d.mutex.RUnlock()
+
 	if len(d.contracts) > 0 {
 		return fmt.Errorf("failed to find all contract registers that need to be changed")
 	}
@@ -54,7 +58,18 @@ func (d *ChangeContractCodeMigration) MigrateAccount(
 	payloads []*ledger.Payload,
 ) ([]*ledger.Payload, error) {
 
-	contracts, ok := d.contracts[address]
+	contracts, ok := (func() (map[flow.RegisterID]string, bool) {
+		d.mutex.Lock()
+		defer d.mutex.Unlock()
+
+		contracts, ok := d.contracts[address]
+
+		// remove address from set of addresses
+		// to keep track of which addresses are left to change
+		delete(d.contracts, address)
+
+		return contracts, ok
+	})()
 
 	if !ok {
 		// no contracts to change on this address
@@ -89,10 +104,6 @@ func (d *ChangeContractCodeMigration) MigrateAccount(
 		return nil, fmt.Errorf("failed to find all contract registers that need to be changed")
 	}
 
-	// remove address from list of addresses to change
-	// to keep track of which addresses are left to change
-	delete(d.contracts, address)
-
 	return payloads, nil
 }
 
@@ -100,7 +111,12 @@ func (d *ChangeContractCodeMigration) ChangeContract(
 	address common.Address,
 	contractName string,
 	newContractCode string,
-) *ChangeContractCodeMigration {
+) (
+	previousNewContractCode string,
+) {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+
 	if d.contracts == nil {
 		d.contracts = map[common.Address]map[flow.RegisterID]string{}
 	}
@@ -111,9 +127,11 @@ func (d *ChangeContractCodeMigration) ChangeContract(
 
 	registerID := flow.ContractRegisterID(flow.ConvertAddress(address), contractName)
 
+	previousNewContractCode = d.contracts[address][registerID]
+
 	d.contracts[address][registerID] = newContractCode
 
-	return d
+	return
 }
 
 type SystemContractChange struct {
