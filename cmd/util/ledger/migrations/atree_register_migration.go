@@ -35,6 +35,9 @@ type AtreeRegisterMigrator struct {
 	rwf     reporters.ReportWriterFactory
 
 	nWorkers int
+
+	validateMigratedValues    bool
+	logVerboseValidationError bool
 }
 
 var _ AccountBasedMigration = (*AtreeRegisterMigrator)(nil)
@@ -42,15 +45,18 @@ var _ io.Closer = (*AtreeRegisterMigrator)(nil)
 
 func NewAtreeRegisterMigrator(
 	rwf reporters.ReportWriterFactory,
+	validateMigratedValues bool,
+	logVerboseValidationError bool,
 ) *AtreeRegisterMigrator {
 
 	sampler := util2.NewTimedSampler(30 * time.Second)
 
 	migrator := &AtreeRegisterMigrator{
-		sampler: sampler,
-
-		rwf: rwf,
-		rw:  rwf.ReportWriter("atree-register-migrator"),
+		sampler:                   sampler,
+		rwf:                       rwf,
+		rw:                        rwf.ReportWriter("atree-register-migrator"),
+		validateMigratedValues:    validateMigratedValues,
+		logVerboseValidationError: logVerboseValidationError,
 	}
 
 	return migrator
@@ -106,6 +112,13 @@ func (m *AtreeRegisterMigrator) MigrateAccount(
 			return oldPayloads, nil
 		}
 		return nil, err
+	}
+
+	if m.validateMigratedValues {
+		err = validateCadenceValues(address, oldPayloads, newPayloads, m.log, m.logVerboseValidationError)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	newLen := len(newPayloads)
