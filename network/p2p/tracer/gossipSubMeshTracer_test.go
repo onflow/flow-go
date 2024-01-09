@@ -66,24 +66,22 @@ func TestGossipSubMeshTracer(t *testing.T) {
 	// creates one node with a gossipsub mesh meshTracer, and the other nodes without a gossipsub mesh meshTracer.
 	// we only need one node with a meshTracer to test the meshTracer.
 	// meshTracer logs at 1 second intervals for sake of testing.
-	collector := mockmodule.NewGossipSubLocalMeshMetrics(t)
-	meshTracerCfg := &tracer.GossipSubMeshTracerConfig{
-		Logger:                             logger,
-		Metrics:                            collector,
-		IDProvider:                         idProvider,
-		LoggerInterval:                     time.Second,
-		HeroCacheMetricsFactory:            metrics.NewNoopHeroCacheMetricsFactory(),
-		RpcSentTrackerCacheSize:            defaultConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerCacheSize,
-		RpcSentTrackerWorkerQueueCacheSize: defaultConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerQueueCacheSize,
-		RpcSentTrackerNumOfWorkers:         defaultConfig.NetworkConfig.GossipSubConfig.RpcSentTrackerNumOfWorkers,
-	}
-	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
+	// creates one node with a gossipsub mesh meshTracer, and the other nodes without a gossipsub mesh meshTracer.
+	// we only need one node with a meshTracer to test the meshTracer.
+	// meshTracer logs at 1 second intervals for sake of testing.
+	collector := newLocalMeshTracerMetricsCollector(t)
+	// set the meshTracer to log at 1 second intervals for sake of testing.
+	defaultConfig.NetworkConfig.GossipSub.RpcTracer.LocalMeshLogInterval = 1 * time.Second
+	// disables peer scoring for sake of testing; so that unknown peers are not penalized and could be detected by the meshTracer.
+	defaultConfig.NetworkConfig.GossipSub.PeerScoringEnabled = false
 	tracerNode, tracerId := p2ptest.NodeFixture(
 		t,
 		sporkId,
 		t.Name(),
 		idProvider,
-		p2ptest.WithGossipSubTracer(meshTracer),
+		p2ptest.WithLogger(logger),
+		p2ptest.OverrideFlowConfig(defaultConfig),
+		p2ptest.WithMetricsCollector(collector),
 		p2ptest.WithRole(flow.RoleConsensus))
 
 	idProvider.On("ByPeerID", tracerNode.ID()).Return(&tracerId, true).Maybe()
@@ -116,6 +114,7 @@ func TestGossipSubMeshTracer(t *testing.T) {
 	nodes := []p2p.LibP2PNode{tracerNode, otherNode1, otherNode2, unknownNode}
 	ids := flow.IdentityList{&tracerId, &otherId1, &otherId2, &unknownId}
 
+	p2ptest.RegisterPeerProviders(t, nodes)
 	p2ptest.StartNodes(t, signalerCtx, nodes)
 	defer p2ptest.StopNodes(t, nodes, cancel)
 
@@ -123,9 +122,9 @@ func TestGossipSubMeshTracer(t *testing.T) {
 
 	// all nodes subscribe to topic1
 	// for topic 1 expect the meshTracer to be notified of the local mesh size being 1, 2, and 3 (when unknownNode, otherNode1, and otherNode2 join the mesh).
-	collector.On("OnLocalMeshSizeUpdated", topic1.String(), 1).Twice() // 1 for the first subscription, 1 for the first leave
-	collector.On("OnLocalMeshSizeUpdated", topic1.String(), 2).Twice() // 1 for the second subscription, 1 for the second leave
-	collector.On("OnLocalMeshSizeUpdated", topic1.String(), 3).Once()  // 3 for the third subscription.
+	collector.l.On("OnLocalMeshSizeUpdated", topic1.String(), 1).Twice() // 1 for the first subscription, 1 for the first leave
+	collector.l.On("OnLocalMeshSizeUpdated", topic1.String(), 2).Twice() // 1 for the second subscription, 1 for the second leave
+	collector.l.On("OnLocalMeshSizeUpdated", topic1.String(), 3).Once()  // 3 for the third subscription.
 
 	for _, node := range nodes {
 		_, err := node.Subscribe(
@@ -138,7 +137,7 @@ func TestGossipSubMeshTracer(t *testing.T) {
 
 	// the tracerNode and otherNode1 subscribe to topic2
 	// for topic 2 expect the meshTracer to be notified of the local mesh size being 1 (when otherNode1 join the mesh).
-	collector.On("OnLocalMeshSizeUpdated", topic2.String(), 1).Once()
+	collector.l.On("OnLocalMeshSizeUpdated", topic2.String(), 1).Once()
 
 	for _, node := range []p2p.LibP2PNode{tracerNode, otherNode1} {
 		_, err := node.Subscribe(
@@ -152,15 +151,15 @@ func TestGossipSubMeshTracer(t *testing.T) {
 	// eventually, the meshTracer should have the other nodes in its mesh.
 	assert.Eventually(t, func() bool {
 		topic1MeshSize := 0
-		for _, peer := range meshTracer.GetMeshPeers(topic1.String()) {
-			if peer == otherNode1.ID() || peer == otherNode2.ID() {
+		for _, peerId := range tracerNode.GetLocalMeshPeers(topic1) {
+			if peerId == otherNode1.ID() || peerId == otherNode2.ID() {
 				topic1MeshSize++
 			}
 		}
 
 		topic2MeshSize := 0
-		for _, peer := range meshTracer.GetMeshPeers(topic2.String()) {
-			if peer == otherNode1.ID() {
+		for _, peerId := range tracerNode.GetLocalMeshPeers(topic2) {
+			if peerId == otherNode1.ID() {
 				topic2MeshSize++
 			}
 		}
@@ -174,7 +173,7 @@ func TestGossipSubMeshTracer(t *testing.T) {
 	}, 2*time.Second, 10*time.Millisecond)
 
 	// expect the meshTracer to be notified of the local mesh size being (when all nodes leave the mesh).
-	collector.On("OnLocalMeshSizeUpdated", topic1.String(), 0).Once()
+	collector.l.On("OnLocalMeshSizeUpdated", topic1.String(), 0).Once()
 
 	// all nodes except the tracerNode unsubscribe from the topic1, which triggers sending a PRUNE to the tracerNode for each unsubscription.
 	// We expect the tracerNode to remove the otherNode1, otherNode2, and unknownNode from its mesh.
@@ -184,18 +183,36 @@ func TestGossipSubMeshTracer(t *testing.T) {
 
 	assert.Eventually(t, func() bool {
 		// eventually, the tracerNode should not have the other node in its mesh for topic1.
-		for _, peer := range meshTracer.GetMeshPeers(topic1.String()) {
-			if peer == otherNode1.ID() || peer == otherNode2.ID() || peer == unknownNode.ID() {
+		for _, peerId := range tracerNode.GetLocalMeshPeers(topic1) {
+			if peerId == otherNode1.ID() || peerId == otherNode2.ID() || peerId == unknownNode.ID() {
 				return false
 			}
 		}
 
 		// but the tracerNode should still have the otherNode1 in its mesh for topic2.
-		for _, peer := range meshTracer.GetMeshPeers(topic2.String()) {
-			if peer != otherNode1.ID() {
+		for _, peerId := range tracerNode.GetLocalMeshPeers(topic2) {
+			if peerId != otherNode1.ID() {
 				return false
 			}
 		}
 		return true
 	}, 2*time.Second, 10*time.Millisecond)
+}
+
+// localMeshTracerMetricsCollector is a mock metrics that can be mocked for GossipSubLocalMeshMetrics while acting as a NoopCollector for other metrics.
+type localMeshTracerMetricsCollector struct {
+	*metrics.NoopCollector
+	l *mockmodule.LocalGossipSubRouterMetrics
+}
+
+func newLocalMeshTracerMetricsCollector(t *testing.T) *localMeshTracerMetricsCollector {
+	return &localMeshTracerMetricsCollector{
+		l:             mockmodule.NewLocalGossipSubRouterMetrics(t),
+		NoopCollector: metrics.NewNoopCollector(),
+	}
+}
+
+func (c *localMeshTracerMetricsCollector) OnLocalMeshSizeUpdated(topic string, size int) {
+	// calls the mock method to assert the metrics.
+	c.l.OnLocalMeshSizeUpdated(topic, size)
 }

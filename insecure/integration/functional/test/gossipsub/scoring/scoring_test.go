@@ -10,6 +10,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/insecure/corruptlibp2p"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
@@ -106,15 +107,17 @@ func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory fun
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
+	cfg, err := config.DefaultConfig()
+	require.NoError(t, err)
+	// we override the decay interval to 1 second so that the score is updated within 1 second intervals.
+	cfg.NetworkConfig.GossipSub.RpcTracer.ScoreTracerInterval = 1 * time.Second
 	victimNode, victimIdentity := p2ptest.NodeFixture(
 		t,
 		sporkId,
 		t.Name(),
 		idProvider,
 		p2ptest.WithRole(role),
-		p2ptest.WithPeerScoreTracerInterval(1*time.Second),
-		p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride),
-	)
+		p2ptest.OverrideFlowConfig(cfg))
 
 	idProvider.On("ByPeerID", victimNode.ID()).Return(&victimIdentity, true).Maybe()
 	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Maybe()
@@ -170,8 +173,13 @@ func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory fun
 	blkTopicSnapshot, ok := topicsSnapshot[blockTopic.String()]
 	require.True(t, ok)
 
-	// ensure that the topic snapshot of the spammer contains a record of at least (60%) of the spam messages sent. The 60% is to account for the messages that were delivered before the score was updated, after the spammer is PRUNED, as well as to account for decay.
-	require.True(t, blkTopicSnapshot.InvalidMessageDeliveries > 0.6*float64(totalSpamMessages), "invalid message deliveries must be greater than %f. invalid message deliveries: %f", 0.9*float64(totalSpamMessages), blkTopicSnapshot.InvalidMessageDeliveries)
+	// ensure that the topic snapshot of the spammer contains a record of at least (60%) of the spam messages sent. The 60% is to account for the messages that were
+	// delivered before the score was updated, after the spammer is PRUNED, as well as to account for decay.
+	require.True(t,
+		blkTopicSnapshot.InvalidMessageDeliveries > 0.6*float64(totalSpamMessages),
+		"invalid message deliveries must be greater than %f. invalid message deliveries: %f",
+		0.9*float64(totalSpamMessages),
+		blkTopicSnapshot.InvalidMessageDeliveries)
 
 	p2ptest.EnsureNoPubsubExchangeBetweenGroups(
 		t,
@@ -203,19 +211,24 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_SingleTopic(t *testing.T) {
 	// we override some of the default scoring parameters in order to speed up the test in a time-efficient manner.
 	blockTopicOverrideParams := scoring.DefaultTopicScoreParams()
 	blockTopicOverrideParams.MeshMessageDeliveriesActivation = 1 * time.Second // we start observing the mesh message deliveries after 1 second of the node startup.
-	thisNode, thisId := p2ptest.NodeFixture(                                   // this node is the one that will be penalizing the under-performer node.
+
+	conf, err := config.DefaultConfig()
+	require.NoError(t, err)
+	// we override the decay interval to 1 second so that the score is updated within 1 second intervals.
+	conf.NetworkConfig.GossipSub.ScoringParameters.DecayInterval = 1 * time.Second
+	conf.NetworkConfig.GossipSub.RpcTracer.ScoreTracerInterval = 1 * time.Second
+	thisNode, thisId := p2ptest.NodeFixture( // this node is the one that will be penalizing the under-performer node.
 		t,
 		sporkId,
 		t.Name(),
 		idProvider,
 		p2ptest.WithRole(role),
-		p2ptest.WithPeerScoreTracerInterval(1*time.Second),
+		p2ptest.OverrideFlowConfig(conf),
 		p2ptest.EnablePeerScoringWithOverride(
 			&p2p.PeerScoringConfigOverride{
 				TopicScoreParams: map[channels.Topic]*pubsub.TopicScoreParams{
 					blockTopic: blockTopicOverrideParams,
 				},
-				DecayInterval: 1 * time.Second, // we override the decay interval to 1 second so that the score is updated within 1 second intervals.
 			}),
 	)
 
@@ -308,20 +321,25 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_TwoTopics(t *testing.T) {
 	blockTopicOverrideParams.MeshMessageDeliveriesActivation = 1 * time.Second // we start observing the mesh message deliveries after 1 second of the node startup.
 	dkgTopicOverrideParams := scoring.DefaultTopicScoreParams()
 	dkgTopicOverrideParams.MeshMessageDeliveriesActivation = 1 * time.Second // we start observing the mesh message deliveries after 1 second of the node startup.
-	thisNode, thisId := p2ptest.NodeFixture(                                 // this node is the one that will be penalizing the under-performer node.
+
+	conf, err := config.DefaultConfig()
+	require.NoError(t, err)
+	// we override the decay interval to 1 second so that the score is updated within 1 second intervals.
+	conf.NetworkConfig.GossipSub.ScoringParameters.DecayInterval = 1 * time.Second
+	conf.NetworkConfig.GossipSub.RpcTracer.ScoreTracerInterval = 1 * time.Second
+	thisNode, thisId := p2ptest.NodeFixture( // this node is the one that will be penalizing the under-performer node.
 		t,
 		sporkId,
 		t.Name(),
 		idProvider,
 		p2ptest.WithRole(role),
-		p2ptest.WithPeerScoreTracerInterval(1*time.Second),
+		p2ptest.OverrideFlowConfig(conf),
 		p2ptest.EnablePeerScoringWithOverride(
 			&p2p.PeerScoringConfigOverride{
 				TopicScoreParams: map[channels.Topic]*pubsub.TopicScoreParams{
 					blockTopic: blockTopicOverrideParams,
 					dkgTopic:   dkgTopicOverrideParams,
 				},
-				DecayInterval: 1 * time.Second, // we override the decay interval to 1 second so that the score is updated within 1 second intervals.
 			}),
 	)
 
@@ -416,6 +434,11 @@ func TestGossipSubMeshDeliveryScoring_Replay_Will_Not_Counted(t *testing.T) {
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 
 	// we override some of the default scoring parameters in order to speed up the test in a time-efficient manner.
+	conf, err := config.DefaultConfig()
+	require.NoError(t, err)
+	// we override the decay interval to 1 second so that the score is updated within 1 second intervals.
+	conf.NetworkConfig.GossipSub.ScoringParameters.DecayInterval = 1 * time.Second
+	conf.NetworkConfig.GossipSub.RpcTracer.ScoreTracerInterval = 1 * time.Second
 	blockTopicOverrideParams := scoring.DefaultTopicScoreParams()
 	blockTopicOverrideParams.MeshMessageDeliveriesActivation = 1 * time.Second // we start observing the mesh message deliveries after 1 second of the node startup.
 	thisNode, thisId := p2ptest.NodeFixture(                                   // this node is the one that will be penalizing the under-performer node.
@@ -424,13 +447,12 @@ func TestGossipSubMeshDeliveryScoring_Replay_Will_Not_Counted(t *testing.T) {
 		t.Name(),
 		idProvider,
 		p2ptest.WithRole(role),
-		p2ptest.WithPeerScoreTracerInterval(1*time.Second),
+		p2ptest.OverrideFlowConfig(conf),
 		p2ptest.EnablePeerScoringWithOverride(
 			&p2p.PeerScoringConfigOverride{
 				TopicScoreParams: map[channels.Topic]*pubsub.TopicScoreParams{
 					blockTopic: blockTopicOverrideParams,
 				},
-				DecayInterval: 1 * time.Second, // we override the decay interval to 1 second so that the score is updated within 1 second intervals.
 			}),
 	)
 

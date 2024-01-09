@@ -198,8 +198,7 @@ func TestGetExecutionDataByBlockID(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ccfEvents := generator.GetEventsWithEncoding(3, entities.EventEncodingVersion_CCF_V0)
-	jsonEvents := generator.GetEventsWithEncoding(3, entities.EventEncodingVersion_JSON_CDC_V0)
+	ccfEvents, jsonEvents := generateEvents(t, 3)
 
 	tests := []struct {
 		eventVersion entities.EventEncodingVersion
@@ -345,8 +344,7 @@ func TestExecutionDataStream(t *testing.T) {
 		}
 	}
 
-	ccfEvents := generator.GetEventsWithEncoding(3, entities.EventEncodingVersion_CCF_V0)
-	jsonEvents := generator.GetEventsWithEncoding(3, entities.EventEncodingVersion_JSON_CDC_V0)
+	ccfEvents, jsonEvents := generateEvents(t, 3)
 
 	tests := []struct {
 		eventVersion entities.EventEncodingVersion
@@ -472,9 +470,7 @@ func TestEventStream(t *testing.T) {
 	}
 
 	// generate events with a payload to include
-	// generators will produce identical event payloads (before encoding)
-	ccfEvents := generator.GetEventsWithEncoding(3, entities.EventEncodingVersion_CCF_V0)
-	jsonEvents := generator.GetEventsWithEncoding(3, entities.EventEncodingVersion_JSON_CDC_V0)
+	ccfEvents, jsonEvents := generateEvents(t, 3)
 
 	tests := []struct {
 		eventVersion entities.EventEncodingVersion
@@ -514,6 +510,10 @@ func TestEventStream(t *testing.T) {
 // TestGetRegisterValues tests the register values.
 func TestGetRegisterValues(t *testing.T) {
 	t.Parallel()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	testHeight := uint64(1)
 
 	// test register IDs + values
@@ -531,74 +531,85 @@ func TestGetRegisterValues(t *testing.T) {
 
 	t.Run("invalid message", func(t *testing.T) {
 		api := ssmock.NewAPI(t)
-		h := NewHandler(api, flow.Localnet.Chain(), makeConfig(1))
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		h := NewHandler(api, flow.Testnet.Chain(), makeConfig(1))
+
 		invalidMessage := &executiondata.GetRegisterValuesRequest{
 			RegisterIds: nil,
 		}
 		_, err := h.GetRegisterValues(ctx, invalidMessage)
-		require.Equal(t, status.Code(err), codes.InvalidArgument)
+		require.Equal(t, codes.InvalidArgument, status.Code(err))
 	})
 
 	t.Run("valid registers", func(t *testing.T) {
 		api := ssmock.NewAPI(t)
 		api.On("GetRegisterValues", testIds, testHeight).Return(testValues, nil)
-		h := NewHandler(api, flow.Localnet.Chain(), makeConfig(1))
+		h := NewHandler(api, flow.Testnet.Chain(), makeConfig(1))
+
 		validRegisters := make([]*entities.RegisterID, len(testIds))
 		for i, id := range testIds {
 			validRegisters[i] = convert.RegisterIDToMessage(id)
 		}
+
 		req := &executiondata.GetRegisterValuesRequest{
 			RegisterIds: validRegisters,
 			BlockHeight: testHeight,
 		}
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+
 		resp, err := h.GetRegisterValues(ctx, req)
 		require.NoError(t, err)
-		require.Equal(t, resp.GetValues(), testValues)
-
+		require.Equal(t, testValues, resp.GetValues())
 	})
 
 	t.Run("unavailable registers", func(t *testing.T) {
 		api := ssmock.NewAPI(t)
 		expectedErr := status.Errorf(codes.NotFound, "could not get register values: %v", storage.ErrNotFound)
 		api.On("GetRegisterValues", invalidIDs, testHeight).Return(nil, expectedErr)
-		h := NewHandler(api, flow.Localnet.Chain(), makeConfig(1))
+		h := NewHandler(api, flow.Testnet.Chain(), makeConfig(1))
+
 		unavailableRegisters := make([]*entities.RegisterID, len(invalidIDs))
 		for i, id := range invalidIDs {
 			unavailableRegisters[i] = convert.RegisterIDToMessage(id)
 		}
+
 		req := &executiondata.GetRegisterValuesRequest{
 			RegisterIds: unavailableRegisters,
 			BlockHeight: testHeight,
 		}
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		_, err := h.GetRegisterValues(ctx, req)
-		require.Equal(t, status.Code(err), codes.NotFound)
 
+		_, err := h.GetRegisterValues(ctx, req)
+		require.Equal(t, codes.NotFound, status.Code(err))
 	})
 
 	t.Run("wrong height", func(t *testing.T) {
 		api := ssmock.NewAPI(t)
 		expectedErr := status.Errorf(codes.OutOfRange, "could not get register values: %v", storage.ErrHeightNotIndexed)
 		api.On("GetRegisterValues", testIds, testHeight+1).Return(nil, expectedErr)
-		h := NewHandler(api, flow.Localnet.Chain(), makeConfig(1))
+		h := NewHandler(api, flow.Testnet.Chain(), makeConfig(1))
+
 		validRegisters := make([]*entities.RegisterID, len(testIds))
 		for i, id := range testIds {
 			validRegisters[i] = convert.RegisterIDToMessage(id)
 		}
+
 		req := &executiondata.GetRegisterValuesRequest{
 			RegisterIds: validRegisters,
 			BlockHeight: testHeight + 1,
 		}
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+
 		_, err := h.GetRegisterValues(ctx, req)
-		require.Equal(t, status.Code(err), codes.OutOfRange)
+		require.Equal(t, codes.OutOfRange, status.Code(err))
 	})
+}
+
+func generateEvents(t *testing.T, n int) ([]flow.Event, []flow.Event) {
+	ccfEvents := generator.GetEventsWithEncoding(n, entities.EventEncodingVersion_CCF_V0)
+	jsonEvents := make([]flow.Event, len(ccfEvents))
+	for i, e := range ccfEvents {
+		jsonEvent, err := convert.CcfEventToJsonEvent(e)
+		require.NoError(t, err)
+		jsonEvents[i] = *jsonEvent
+	}
+	return ccfEvents, jsonEvents
 }
 
 func makeConfig(maxGlobalStreams uint32) Config {

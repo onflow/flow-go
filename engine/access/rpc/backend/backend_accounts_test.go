@@ -139,7 +139,7 @@ func (s *BackendAccountsSuite) TestGetAccountFromExecutionNode_HappyPath() {
 	s.setupENSuccessResponse(s.block.ID())
 
 	backend := s.defaultBackend()
-	backend.scriptExecMode = ScriptExecutionModeExecutionNodesOnly
+	backend.scriptExecMode = IndexQueryModeExecutionNodesOnly
 
 	s.Run("GetAccount - happy path", func() {
 		s.testGetAccount(ctx, backend, codes.OK)
@@ -166,7 +166,7 @@ func (s *BackendAccountsSuite) TestGetAccountFromExecutionNode_Fails() {
 	s.setupENFailingResponse(s.block.ID(), errToReturn)
 
 	backend := s.defaultBackend()
-	backend.scriptExecMode = ScriptExecutionModeExecutionNodesOnly
+	backend.scriptExecMode = IndexQueryModeExecutionNodesOnly
 
 	s.Run("GetAccount - fails with backend err", func() {
 		s.testGetAccount(ctx, backend, statusCode)
@@ -190,7 +190,7 @@ func (s *BackendAccountsSuite) TestGetAccountFromStorage_HappyPath() {
 		Return(s.account, nil)
 
 	backend := s.defaultBackend()
-	backend.scriptExecMode = ScriptExecutionModeLocalOnly
+	backend.scriptExecMode = IndexQueryModeLocalOnly
 	backend.scriptExecutor = scriptExecutor
 
 	s.Run("GetAccount - happy path", func() {
@@ -214,7 +214,7 @@ func (s *BackendAccountsSuite) TestGetAccountFromStorage_Fails() {
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
 
 	backend := s.defaultBackend()
-	backend.scriptExecMode = ScriptExecutionModeLocalOnly
+	backend.scriptExecMode = IndexQueryModeLocalOnly
 	backend.scriptExecutor = scriptExecutor
 
 	testCases := []struct {
@@ -264,7 +264,7 @@ func (s *BackendAccountsSuite) TestGetAccountFromFailover_HappyPath() {
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
 
 	backend := s.defaultBackend()
-	backend.scriptExecMode = ScriptExecutionModeFailover
+	backend.scriptExecMode = IndexQueryModeFailover
 	backend.scriptExecutor = scriptExecutor
 
 	for _, errToReturn := range []error{execution.ErrDataNotAvailable, storage.ErrNotFound} {
@@ -302,7 +302,7 @@ func (s *BackendAccountsSuite) TestGetAccountFromFailover_ReturnsENErrors() {
 		Return(nil, execution.ErrDataNotAvailable)
 
 	backend := s.defaultBackend()
-	backend.scriptExecMode = ScriptExecutionModeFailover
+	backend.scriptExecMode = IndexQueryModeFailover
 	backend.scriptExecutor = scriptExecutor
 
 	s.Run("GetAccount - fails with backend err", func() {
@@ -324,7 +324,7 @@ func (s *BackendAccountsSuite) TestGetAccountAtLatestBlockFromStorage_Inconsiste
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
 
 	backend := s.defaultBackend()
-	backend.scriptExecMode = ScriptExecutionModeLocalOnly
+	backend.scriptExecMode = IndexQueryModeLocalOnly
 	backend.scriptExecutor = scriptExecutor
 
 	s.Run(fmt.Sprintf("GetAccountAtLatestBlock - fails with %v", "inconsistent node's state"), func() {
@@ -376,7 +376,7 @@ func (s *BackendAccountsSuite) testGetAccountAtLatestBlock(ctx context.Context, 
 
 func (s *BackendAccountsSuite) testGetAccountAtBlockHeight(ctx context.Context, backend *backendAccounts, statusCode codes.Code) {
 	height := s.block.Header.Height
-	s.headers.On("ByHeight", height).Return(s.block.Header, nil).Once()
+	s.headers.On("BlockIDByHeight", height).Return(s.block.Header.ID(), nil).Once()
 
 	if statusCode == codes.OK {
 		actual, err := backend.GetAccountAtBlockHeight(ctx, s.account.Address, height)

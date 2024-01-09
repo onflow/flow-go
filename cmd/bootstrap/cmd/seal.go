@@ -6,7 +6,6 @@ import (
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/signature"
 )
 
@@ -39,7 +38,7 @@ func constructRootResultAndSeal(
 		DKGPhase1FinalView: firstView + flagNumViewsInStakingAuction + flagNumViewsInDKGPhase - 1,
 		DKGPhase2FinalView: firstView + flagNumViewsInStakingAuction + flagNumViewsInDKGPhase*2 - 1,
 		DKGPhase3FinalView: firstView + flagNumViewsInStakingAuction + flagNumViewsInDKGPhase*3 - 1,
-		Participants:       participants.Sort(order.Canonical),
+		Participants:       participants.Sort(flow.Canonical),
 		Assignments:        assignments,
 		RandomSource:       GenerateRandomSeed(flow.EpochSetupRandomSourceLength),
 	}

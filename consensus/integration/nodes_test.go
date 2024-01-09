@@ -35,7 +35,6 @@ import (
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
 	builder "github.com/onflow/flow-go/module/builder/consensus"
@@ -257,7 +256,7 @@ func createRootBlockData(participantData *run.ParticipantData) (*flow.Block, *fl
 
 	// add other roles to create a complete identity list
 	participants := unittest.CompleteIdentitySet(consensusParticipants...)
-	participants.Sort(order.Canonical)
+	participants.Sort(flow.Canonical)
 
 	dkgParticipantsKeys := make([]crypto.PublicKey, 0, len(consensusParticipants))
 	for _, participant := range participants.Filter(filter.HasRole(flow.RoleConsensus)) {
@@ -289,7 +288,7 @@ func createRootBlockData(participantData *run.ParticipantData) (*flow.Block, *fl
 }
 
 func createPrivateNodeIdentities(n int) []bootstrap.NodeInfo {
-	consensus := unittest.IdentityListFixture(n, unittest.WithRole(flow.RoleConsensus)).Sort(order.Canonical)
+	consensus := unittest.IdentityListFixture(n, unittest.WithRole(flow.RoleConsensus)).Sort(flow.Canonical)
 	infos := make([]bootstrap.NodeInfo, 0, n)
 	for _, node := range consensus {
 		networkPrivKey := unittest.NetworkingPrivKeyFixture()

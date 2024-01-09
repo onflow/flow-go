@@ -18,8 +18,8 @@ type UnicastManagement struct {
 	mock.Mock
 }
 
-// OpenProtectedStream provides a mock function with given fields: ctx, peerID, protectionTag, writingLogic
-func (_m *UnicastManagement) OpenProtectedStream(ctx context.Context, peerID peer.ID, protectionTag string, writingLogic func(network.Stream) error) error {
+// OpenAndWriteOnStream provides a mock function with given fields: ctx, peerID, protectionTag, writingLogic
+func (_m *UnicastManagement) OpenAndWriteOnStream(ctx context.Context, peerID peer.ID, protectionTag string, writingLogic func(network.Stream) error) error {
 	ret := _m.Called(ctx, peerID, protectionTag, writingLogic)
 
 	var r0 error

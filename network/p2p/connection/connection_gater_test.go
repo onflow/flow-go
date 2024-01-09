@@ -18,10 +18,10 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/p2p"
+	p2pbuilderconfig "github.com/onflow/flow-go/network/p2p/builder/config"
 	"github.com/onflow/flow-go/network/p2p/connection"
+	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
 	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
-	p2pconfig "github.com/onflow/flow-go/network/p2p/p2pbuilder/config"
-	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/p2p/unicast/stream"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -259,7 +259,7 @@ func TestConnectionGater_InterceptUpgrade(t *testing.T) {
 			p2ptest.WithRole(flow.RoleConsensus),
 			p2ptest.WithDefaultStreamHandler(handler),
 			// enable peer manager, with a 1-second refresh rate, and connection pruning enabled.
-			p2ptest.WithPeerManagerEnabled(&p2pconfig.PeerManagerConfig{
+			p2ptest.WithPeerManagerEnabled(&p2pbuilderconfig.PeerManagerConfig{
 				ConnectionPruning: true,
 				UpdateInterval:    1 * time.Second,
 				ConnectorFactory:  connection.DefaultLibp2pBackoffConnectorFactory(),
@@ -342,7 +342,7 @@ func TestConnectionGater_Disallow_Integration(t *testing.T) {
 			p2ptest.WithRole(flow.RoleConsensus),
 			p2ptest.WithDefaultStreamHandler(handler),
 			// enable peer manager, with a 1-second refresh rate, and connection pruning enabled.
-			p2ptest.WithPeerManagerEnabled(&p2pconfig.PeerManagerConfig{
+			p2ptest.WithPeerManagerEnabled(&p2pbuilderconfig.PeerManagerConfig{
 				ConnectionPruning: true,
 				UpdateInterval:    1 * time.Second,
 				ConnectorFactory:  connection.DefaultLibp2pBackoffConnectorFactory(),

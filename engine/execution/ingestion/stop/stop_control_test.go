@@ -162,12 +162,12 @@ type stopControlMockHeaders struct {
 	headers map[uint64]*flow.Header
 }
 
-func (m *stopControlMockHeaders) ByHeight(height uint64) (*flow.Header, error) {
+func (m *stopControlMockHeaders) BlockIDByHeight(height uint64) (flow.Identifier, error) {
 	h, ok := m.headers[height]
 	if !ok {
-		return nil, fmt.Errorf("header not found")
+		return flow.ZeroID, fmt.Errorf("header not found")
 	}
-	return h, nil
+	return h.ID(), nil
 }
 
 func TestAddStopForPastBlocks(t *testing.T) {
