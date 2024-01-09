@@ -197,7 +197,13 @@ func (b *baselineLRU) AdjustWithInit(entityID flow.Identifier, adjust func(flow.
 // If the key is not found, the init function will be called to create a new value.
 // Returns a bool which indicates whether the entity was found (or created).
 func (b *baselineLRU) GetWithInit(entityID flow.Identifier, init func() flow.Entity) (flow.Entity, bool) {
-	e, _, _ := b.c.PeekOrAdd(entityID, init())
+	newE := init()
+	e, ok, _ := b.c.PeekOrAdd(entityID, newE)
+	if !ok {
+		// if the entity was not found, it means that the new entity was added to the cache.
+		return newE, true
+	}
+	// if the entity was found, it means that the new entity was not added to the cache.
 	return e.(flow.Entity), true
 }
 
