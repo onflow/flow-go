@@ -21,6 +21,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
+
+	"github.com/onflow/cadence/runtime/interpreter"
 )
 
 func getStateCommitment(commits storage.Commits, blockHash flow.Identifier) (flow.StateCommitment, error) {
@@ -85,6 +87,8 @@ func extractExecutionState(
 
 	rwf := reporters.NewReportFileWriterFactory(dir, log)
 
+	capabilityIDs := map[interpreter.AddressPath]interpreter.UInt64Value{}
+
 	var migrations = []ledger.Migration{
 		migrators.CreateAccountBasedMigration(
 			log,
@@ -92,7 +96,8 @@ func extractExecutionState(
 			[]migrators.AccountBasedMigration{
 				// do account usage migration before and after as a sanity check.
 				&migrators.AccountUsageMigrator{},
-				migrators.NewCadenceValueMigrator(rwf),
+				migrators.NewCadenceLinkValueMigrator(rwf, capabilityIDs),
+				migrators.NewCadenceValueMigrator(rwf, capabilityIDs),
 				&migrators.AccountUsageMigrator{},
 			}),
 	}

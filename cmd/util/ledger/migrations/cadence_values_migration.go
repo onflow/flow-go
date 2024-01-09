@@ -24,29 +24,25 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 )
 
-type CadenceValueMigrator struct {
-	log      zerolog.Logger
-	reporter reporters.ReportWriter
+type CadenceBaseMigrator struct {
+	log             zerolog.Logger
+	reporter        reporters.ReportWriter
+	valueMigrations func(
+		_ environment.Accounts,
+		reporter *cadenceValueMigrationReporter,
+	) []migrations.ValueMigration
 }
 
-var _ AccountBasedMigration = (*CadenceValueMigrator)(nil)
-var _ io.Closer = (*CadenceValueMigrator)(nil)
+var _ AccountBasedMigration = (*CadenceBaseMigrator)(nil)
+var _ io.Closer = (*CadenceBaseMigrator)(nil)
 
-func NewCadenceValueMigrator(
-	rwf reporters.ReportWriterFactory,
-) *CadenceValueMigrator {
-	return &CadenceValueMigrator{
-		reporter: rwf.ReportWriter("cadence-value-migrator"),
-	}
-}
-
-func (m *CadenceValueMigrator) Close() error {
+func (m *CadenceBaseMigrator) Close() error {
 	// Close the report writer so it flushes to file.
 	m.reporter.Close()
 	return nil
 }
 
-func (m *CadenceValueMigrator) InitMigration(
+func (m *CadenceBaseMigrator) InitMigration(
 	log zerolog.Logger,
 	_ []*ledger.Payload,
 	_ int,
@@ -55,7 +51,7 @@ func (m *CadenceValueMigrator) InitMigration(
 	return nil
 }
 
-func (m *CadenceValueMigrator) MigrateAccount(
+func (m *CadenceBaseMigrator) MigrateAccount(
 	_ context.Context,
 	address common.Address,
 	oldPayloads []*ledger.Payload,
@@ -72,17 +68,9 @@ func (m *CadenceValueMigrator) MigrateAccount(
 		migrationRuntime.Storage,
 	)
 
-	capabilityIDs := map[interpreter.AddressPath]interpreter.UInt64Value{}
-
 	reporter := newValueMigrationReporter(m.reporter, m.log)
 
 	m.log.Info().Msg("Migrating cadence values")
-
-	idGenerator := environment.NewAccountLocalIDGenerator(
-		tracing.NewMockTracerSpan(),
-		util.NopMeter{},
-		accounts,
-	)
 
 	migration.Migrate(
 		&migrations.AddressSliceIterator{
@@ -92,18 +80,7 @@ func (m *CadenceValueMigrator) MigrateAccount(
 		},
 		migration.NewValueMigrationsPathMigrator(
 			reporter,
-			&capcons.CapabilityValueMigration{
-				CapabilityIDs: capabilityIDs,
-				Reporter:      reporter,
-			},
-			&capcons.LinkValueMigration{
-				CapabilityIDs:      capabilityIDs,
-				AccountIDGenerator: idGenerator,
-				Reporter:           reporter,
-			},
-			string_normalization.NewStringNormalizingMigration(),
-			account_type.NewAccountTypeMigration(),
-			type_value.NewTypeValueMigration(),
+			m.valueMigrations(accounts, reporter)...,
 		),
 	)
 
@@ -123,7 +100,7 @@ func (m *CadenceValueMigrator) MigrateAccount(
 	return m.mergeRegisterChanges(migrationRuntime, result.WriteSet)
 }
 
-func (m *CadenceValueMigrator) mergeRegisterChanges(
+func (m *CadenceBaseMigrator) mergeRegisterChanges(
 	mr *migratorRuntime,
 	changes map[flow.RegisterID]flow.RegisterValue,
 ) ([]*ledger.Payload, error) {
@@ -155,6 +132,56 @@ func (m *CadenceValueMigrator) mergeRegisterChanges(
 	}
 
 	return newPayloads, nil
+}
+
+func NewCadenceValueMigrator(
+	rwf reporters.ReportWriterFactory,
+	capabilityIDs map[interpreter.AddressPath]interpreter.UInt64Value,
+) *CadenceBaseMigrator {
+	return &CadenceBaseMigrator{
+		reporter: rwf.ReportWriter("cadence-value-migrator"),
+		valueMigrations: func(
+			accounts environment.Accounts,
+			reporter *cadenceValueMigrationReporter,
+		) []migrations.ValueMigration {
+			// All cadence migrations except the `capcons.LinkValueMigration`.
+			return []migrations.ValueMigration{
+				&capcons.CapabilityValueMigration{
+					CapabilityIDs: capabilityIDs,
+					Reporter:      reporter,
+				},
+				string_normalization.NewStringNormalizingMigration(),
+				account_type.NewAccountTypeMigration(),
+				type_value.NewTypeValueMigration(),
+			}
+		},
+	}
+}
+
+func NewCadenceLinkValueMigrator(
+	rwf reporters.ReportWriterFactory,
+	capabilityIDs map[interpreter.AddressPath]interpreter.UInt64Value,
+) *CadenceBaseMigrator {
+	return &CadenceBaseMigrator{
+		reporter: rwf.ReportWriter("cadence-link-value-migrator"),
+		valueMigrations: func(
+			accounts environment.Accounts,
+			reporter *cadenceValueMigrationReporter,
+		) []migrations.ValueMigration {
+			idGenerator := environment.NewAccountLocalIDGenerator(
+				tracing.NewMockTracerSpan(),
+				util.NopMeter{},
+				accounts,
+			)
+			return []migrations.ValueMigration{
+				&capcons.LinkValueMigration{
+					CapabilityIDs:      capabilityIDs,
+					AccountIDGenerator: idGenerator,
+					Reporter:           reporter,
+				},
+			}
+		},
+	}
 }
 
 // cadenceValueMigrationReporter is the reporter for cadence value migrations

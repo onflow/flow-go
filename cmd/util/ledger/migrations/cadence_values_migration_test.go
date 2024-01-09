@@ -38,7 +38,8 @@ func TestCadenceValuesMigration(t *testing.T) {
 	// Migrate
 
 	rwf := &testReportWriterFactory{}
-	valueMigration := NewCadenceValueMigrator(rwf)
+	capabilityIDs := map[interpreter.AddressPath]interpreter.UInt64Value{}
+	valueMigration := NewCadenceValueMigrator(rwf, capabilityIDs)
 
 	buf := bytes.Buffer{}
 	logger := zerolog.New(&buf).Level(zerolog.ErrorLevel)
@@ -129,10 +130,47 @@ func TestCadenceValuesMigration(t *testing.T) {
 		},
 	)
 
-	// Check error logs
+	// Check error logs - should be empty.
+	assert.Equal(t, 0, buf.Len())
+}
 
-	lines := readLines(&buf)
+func TestLinkValueMigrationTypeErrors(t *testing.T) {
+
+	t.Parallel()
+
+	address, err := common.HexToAddress("01cf0e2f2f715450")
+	require.NoError(t, err)
+
+	// Get the old payloads
+
+	payloads, err := util.PayloadsFromEmulatorSnapshot(snapshotPath)
+	require.NoError(t, err)
+
+	// Migrate
+
+	rwf := &testReportWriterFactory{}
+	capabilityIDs := map[interpreter.AddressPath]interpreter.UInt64Value{}
+	valueMigration := NewCadenceLinkValueMigrator(rwf, capabilityIDs)
+
+	buf := bytes.Buffer{}
+	logger := zerolog.New(&buf).Level(zerolog.ErrorLevel)
+
+	err = valueMigration.InitMigration(logger, nil, 0)
+	require.NoError(t, err)
+
+	_, err = valueMigration.MigrateAccount(nil, address, payloads)
+	require.NoError(t, err)
+
+	err = valueMigration.Close()
+	require.NoError(t, err)
+
+	// Check reporters. No values should have been migrated.
+	reportWriter := valueMigration.reporter.(*testReportWriter)
+	assert.Empty(t, reportWriter.entries)
+
+	// Check error logs.
 	// Should have two type loading errors for link value migration.
+	lines := readLines(&buf)
 	require.Len(t, lines, 2)
 	assert.Contains(t, lines[0], "failed to run LinkValueMigration for path {01cf0e2f2f715450 /public/flowTokenReceiver}")
 	assert.Contains(t, lines[1], "failed to run LinkValueMigration for path {01cf0e2f2f715450 /public/flowTokenBalance}")
