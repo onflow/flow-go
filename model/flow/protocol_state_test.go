@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -293,8 +292,8 @@ func TestProtocolStateEntry_Copy(t *testing.T) {
 // overlap. It also tests if the function returns an error when the arguments are not ordered in the same order.
 func TestBuildIdentityTable(t *testing.T) {
 	t.Run("invalid-adjacent-identity-status", func(t *testing.T) {
-		targetEpochIdentities := unittest.IdentityListFixture(10).Sort(order.Canonical[flow.Identity])
-		adjacentEpochIdentities := unittest.IdentityListFixture(10).Sort(order.Canonical[flow.Identity])
+		targetEpochIdentities := unittest.IdentityListFixture(10).Sort(flow.Canonical[flow.Identity])
+		adjacentEpochIdentities := unittest.IdentityListFixture(10).Sort(flow.Canonical[flow.Identity])
 
 		// Per convention, BuildIdentityTable only accepts EpochParticipationStatusLeaving or EpochParticipationStatusJoining
 		// for the *adjacent* epoch, because these are the only sensible values.
@@ -311,8 +310,8 @@ func TestBuildIdentityTable(t *testing.T) {
 		}
 	})
 	t.Run("happy-path-no-identities-overlap", func(t *testing.T) {
-		targetEpochIdentities := unittest.IdentityListFixture(10).Sort(order.Canonical[flow.Identity])
-		adjacentEpochIdentities := unittest.IdentityListFixture(10).Sort(order.Canonical[flow.Identity])
+		targetEpochIdentities := unittest.IdentityListFixture(10).Sort(flow.Canonical[flow.Identity])
+		adjacentEpochIdentities := unittest.IdentityListFixture(10).Sort(flow.Canonical[flow.Identity])
 
 		identityList, err := flow.BuildIdentityTable(
 			targetEpochIdentities.ToSkeleton(),
@@ -330,7 +329,7 @@ func TestBuildIdentityTable(t *testing.T) {
 		assert.Equal(t, expectedIdentities, identityList)
 	})
 	t.Run("happy-path-identities-overlap", func(t *testing.T) {
-		targetEpochIdentities := unittest.IdentityListFixture(10).Sort(order.Canonical[flow.Identity])
+		targetEpochIdentities := unittest.IdentityListFixture(10).Sort(flow.Canonical[flow.Identity])
 		adjacentEpochIdentities := unittest.IdentityListFixture(10)
 		sampledIdentities, err := targetEpochIdentities.Sample(2)
 		// change address so we can assert that we take identities from target epoch and not adjacent epoch
@@ -339,7 +338,7 @@ func TestBuildIdentityTable(t *testing.T) {
 			adjacentEpochIdentities = append(adjacentEpochIdentities, identity)
 		}
 		assert.NoError(t, err)
-		adjacentEpochIdentities = adjacentEpochIdentities.Sort(order.Canonical[flow.Identity])
+		adjacentEpochIdentities = adjacentEpochIdentities.Sort(flow.Canonical[flow.Identity])
 
 		identityList, err := flow.BuildIdentityTable(
 			targetEpochIdentities.ToSkeleton(),
@@ -357,12 +356,12 @@ func TestBuildIdentityTable(t *testing.T) {
 		assert.Equal(t, expectedIdentities, identityList)
 	})
 	t.Run("target-epoch-identities-not-ordered", func(t *testing.T) {
-		targetEpochIdentities := unittest.IdentityListFixture(10).Sort(order.Canonical[flow.Identity])
+		targetEpochIdentities := unittest.IdentityListFixture(10).Sort(flow.Canonical[flow.Identity])
 		targetEpochIdentitySkeletons, err := targetEpochIdentities.ToSkeleton().Shuffle()
 		assert.NoError(t, err)
 		targetEpochDynamicIdentities := flow.DynamicIdentityEntryListFromIdentities(targetEpochIdentities)
 
-		adjacentEpochIdentities := unittest.IdentityListFixture(10).Sort(order.Canonical[flow.Identity])
+		adjacentEpochIdentities := unittest.IdentityListFixture(10).Sort(flow.Canonical[flow.Identity])
 		identityList, err := flow.BuildIdentityTable(
 			targetEpochIdentitySkeletons,
 			targetEpochDynamicIdentities,
@@ -374,12 +373,12 @@ func TestBuildIdentityTable(t *testing.T) {
 		assert.Empty(t, identityList)
 	})
 	t.Run("adjacent-epoch-identities-not-ordered", func(t *testing.T) {
-		adjacentEpochIdentities := unittest.IdentityListFixture(10).Sort(order.Canonical[flow.Identity])
+		adjacentEpochIdentities := unittest.IdentityListFixture(10).Sort(flow.Canonical[flow.Identity])
 		adjacentEpochIdentitySkeletons, err := adjacentEpochIdentities.ToSkeleton().Shuffle()
 		assert.NoError(t, err)
 		adjacentEpochDynamicIdentities := flow.DynamicIdentityEntryListFromIdentities(adjacentEpochIdentities)
 
-		targetEpochIdentities := unittest.IdentityListFixture(10).Sort(order.Canonical[flow.Identity])
+		targetEpochIdentities := unittest.IdentityListFixture(10).Sort(flow.Canonical[flow.Identity])
 		identityList, err := flow.BuildIdentityTable(
 			targetEpochIdentities.ToSkeleton(),
 			flow.DynamicIdentityEntryListFromIdentities(targetEpochIdentities),

@@ -14,13 +14,12 @@ import (
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/local"
 )
 
 // GenerateClusterRootQC creates votes and generates a QC based on participant data
 func GenerateClusterRootQC(signers []bootstrap.NodeInfo, allCommitteeMembers flow.IdentitySkeletonList, clusterBlock *cluster.Block) (*flow.QuorumCertificate, error) {
-	if !allCommitteeMembers.Sorted(order.Canonical[flow.IdentitySkeleton]) {
+	if !allCommitteeMembers.Sorted(flow.Canonical[flow.IdentitySkeleton]) {
 		return nil, fmt.Errorf("can't create root cluster QC: committee members are not sorted in canonical order")
 	}
 	clusterRootBlock := model.GenesisBlockFromFlow(clusterBlock.Header)

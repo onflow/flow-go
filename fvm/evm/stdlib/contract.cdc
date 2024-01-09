@@ -24,6 +24,16 @@ contract EVM {
                 to: self.bytes
             )
         }
+
+        /// Balance of the address
+        access(all)
+        fun balance(): Balance {
+            let balance = InternalEVM.balance(
+                address: self.bytes
+            )
+
+            return Balance(flow: balance)
+        }
     }
 
     access(all)
@@ -60,6 +70,12 @@ contract EVM {
         fun address(): EVMAddress {
             // Always create a new EVMAddress instance
             return EVMAddress(bytes: self.addressBytes)
+        }
+
+        /// Get balance of the bridged account
+        access(all)
+        fun balance(): Balance {
+            return self.address().balance()
         }
 
         /// Deposits the given vault into the bridged account's balance
@@ -130,5 +146,15 @@ contract EVM {
     access(all)
     fun run(tx: [UInt8], coinbase: EVMAddress) {
         InternalEVM.run(tx: tx, coinbase: coinbase.bytes)
+    }
+
+    access(all)
+    fun encodeABI(_ values: [AnyStruct]): [UInt8] {
+        return InternalEVM.encodeABI(values)
+    }
+
+    access(all)
+    fun decodeABI(types: [Type], data: [UInt8]): [AnyStruct] {
+        return InternalEVM.decodeABI(types: types, data: data)
     }
 }

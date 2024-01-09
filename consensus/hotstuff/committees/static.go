@@ -7,7 +7,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
@@ -19,7 +18,7 @@ func NewStaticReplicas(participants flow.IdentitySkeletonList, myID flow.Identif
 }
 
 func NewStaticReplicasWithDKG(participants flow.IdentitySkeletonList, myID flow.Identifier, dkg protocol.DKG) (*StaticReplicas, error) {
-	valid := order.IdentityListCanonical(participants)
+	valid := flow.IsIdentityListCanonical(participants)
 	if !valid {
 		return nil, fmt.Errorf("participants %v is not in Canonical order", participants)
 	}

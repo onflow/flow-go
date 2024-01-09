@@ -19,7 +19,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/signature"
@@ -265,7 +264,7 @@ func TestStakingVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 		require.NoError(t, err)
 
 		signers[identity.NodeID] = verification.NewStakingSigner(me)
-	}).Sort(order.Canonical[flow.Identity])
+	}).Sort(flow.Canonical[flow.Identity])
 
 	leader := stakingSigners[0]
 	block := helper.MakeBlock(helper.WithBlockView(view), helper.WithBlockProposer(leader.NodeID))

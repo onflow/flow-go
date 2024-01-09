@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -219,7 +218,7 @@ func withNextEpoch(
 	encodableSnapshot := snapshot.Encodable()
 
 	currEpoch := &encodableSnapshot.Epochs.Current // take pointer so assignments apply
-	nextEpochIdentities = nextEpochIdentities.Sort(order.Canonical[flow.Identity])
+	nextEpochIdentities = nextEpochIdentities.Sort(flow.Canonical[flow.Identity])
 
 	currEpoch.FinalView = currEpoch.FirstView + curEpochViews - 1 // first epoch lasts curEpochViews
 	encodableSnapshot.Epochs.Next = &inmem.EncodableEpoch{

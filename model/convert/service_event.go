@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/order"
 )
 
 // ServiceEvent converts a service event encoded as the generic flow.Event
@@ -451,7 +450,7 @@ func convertClusterAssignments(cdcClusters []cadence.Value) (flow.AssignmentList
 		}
 
 		// IMPORTANT: for each cluster, node IDs must be in *canonical order*
-		clusterAssignments[clusterIndex] = clusterMembers.Sort(order.IdentifierCanonical)
+		clusterAssignments[clusterIndex] = clusterMembers.Sort(flow.IdentifierCanonical)
 	}
 
 	return clusterAssignments, nil
@@ -628,7 +627,7 @@ func convertParticipants(cdcParticipants []cadence.Value) (flow.IdentitySkeleton
 	}
 
 	// IMPORTANT: returned identities must be in *canonical order*
-	participants = participants.Sort(order.Canonical[flow.IdentitySkeleton])
+	participants = participants.Sort(flow.Canonical[flow.IdentitySkeleton])
 	return participants, nil
 }
 

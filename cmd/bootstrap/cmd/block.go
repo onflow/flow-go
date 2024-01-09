@@ -7,7 +7,6 @@ import (
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 )
@@ -52,7 +51,7 @@ func constructRootEpochEvents(
 		DKGPhase1FinalView: firstView + flagNumViewsInStakingAuction + flagNumViewsInDKGPhase - 1,
 		DKGPhase2FinalView: firstView + flagNumViewsInStakingAuction + flagNumViewsInDKGPhase*2 - 1,
 		DKGPhase3FinalView: firstView + flagNumViewsInStakingAuction + flagNumViewsInDKGPhase*3 - 1,
-		Participants:       participants.Sort(order.Canonical[flow.Identity]).ToSkeleton(),
+		Participants:       participants.Sort(flow.Canonical[flow.Identity]).ToSkeleton(),
 		Assignments:        assignments,
 		RandomSource:       GenerateRandomSeed(flow.EpochSetupRandomSourceLength),
 	}

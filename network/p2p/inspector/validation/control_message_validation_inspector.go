@@ -21,10 +21,10 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
+	p2pconfig "github.com/onflow/flow-go/network/p2p/config"
 	"github.com/onflow/flow-go/network/p2p/inspector/internal/cache"
+	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
-	"github.com/onflow/flow-go/network/p2p/p2pconf"
-	"github.com/onflow/flow-go/network/p2p/p2plogging"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/utils/logging"
@@ -41,7 +41,7 @@ type ControlMsgValidationInspector struct {
 	sporkID flow.Identifier
 	metrics module.GossipSubRpcValidationInspectorMetrics
 	// config control message validation configurations.
-	config *p2pconf.GossipSubRPCValidationInspectorConfigs
+	config *p2pconfig.RpcValidationInspector
 	// distributor used to disseminate invalid RPC message notifications.
 	distributor p2p.GossipSubInspectorNotifDistributor
 	// workerPool queue that stores *InspectRPCRequest that will be processed by component workers.
@@ -69,7 +69,7 @@ type InspectorParams struct {
 	// SporkID the current spork ID.
 	SporkID flow.Identifier `validate:"required"`
 	// Config inspector configuration.
-	Config *p2pconf.GossipSubRPCValidationInspectorConfigs `validate:"required"`
+	Config *p2pconfig.RpcValidationInspector `validate:"required"`
 	// Distributor gossipsub inspector notification distributor.
 	Distributor p2p.GossipSubInspectorNotifDistributor `validate:"required"`
 	// HeroCacheMetricsFactory the metrics factory.
@@ -109,17 +109,17 @@ func NewControlMsgValidationInspector(params *InspectorParams) (*ControlMsgValid
 	clusterPrefixedCacheCollector := metrics.GossipSubRPCInspectorClusterPrefixedCacheMetricFactory(params.HeroCacheMetricsFactory, params.NetworkingType)
 
 	clusterPrefixedTracker, err := cache.NewClusterPrefixedMessagesReceivedTracker(params.Logger,
-		params.Config.ClusterPrefixedControlMsgsReceivedCacheSize,
+		params.Config.ClusterPrefixedMessage.ControlMsgsReceivedCacheSize,
 		clusterPrefixedCacheCollector,
-		params.Config.ClusterPrefixedControlMsgsReceivedCacheDecay)
+		params.Config.ClusterPrefixedMessage.ControlMsgsReceivedCacheDecay)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cluster prefix topics received tracker")
 	}
 
-	if params.Config.RpcMessageMaxSampleSize < params.Config.RpcMessageErrorThreshold {
+	if params.Config.MessageMaxSampleSize < params.Config.MessageErrorThreshold {
 		return nil, fmt.Errorf("rpc message max sample size must be greater than or equal to rpc message error threshold, got %d and %d respectively",
-			params.Config.RpcMessageMaxSampleSize,
-			params.Config.RpcMessageErrorThreshold)
+			params.Config.MessageMaxSampleSize,
+			params.Config.MessageErrorThreshold)
 	}
 
 	c := &ControlMsgValidationInspector{
@@ -135,7 +135,7 @@ func NewControlMsgValidationInspector(params *InspectorParams) (*ControlMsgValid
 		topicOracle:    params.TopicOracle,
 	}
 
-	store := queue.NewHeroStore(params.Config.CacheSize, params.Logger, inspectMsgQueueCacheCollector)
+	store := queue.NewHeroStore(params.Config.QueueSize, params.Logger, inspectMsgQueueCacheCollector)
 
 	pool := worker.NewWorkerPoolBuilder[*InspectRPCRequest](lg, store, c.processInspectRPCReq).Build()
 
@@ -191,8 +191,10 @@ func (c *ControlMsgValidationInspector) ActiveClustersChanged(clusterIDList flow
 // Returns:
 //   - error: if a new inspect rpc request cannot be created, all errors returned are considered irrecoverable.
 func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) error {
+	// first truncate the rpc to the configured max sample size; if needed
 	c.truncateRPC(from, rpc)
-	// queue further async inspection
+
+	// second, queue further async inspection
 	req, err := NewInspectRPCRequest(from, rpc)
 	if err != nil {
 		c.logger.Error().
@@ -203,7 +205,37 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 		return fmt.Errorf("failed to get inspect RPC request: %w", err)
 	}
 	c.workerPool.Submit(req)
+
 	return nil
+}
+
+// updateMetrics updates the metrics for the received RPC.
+// Args:
+//   - from: the sender.
+//
+// - rpc: the control message RPC.
+func (c *ControlMsgValidationInspector) updateMetrics(from peer.ID, rpc *pubsub.RPC) {
+	includedMessages := len(rpc.GetPublish())
+	iHaveCount, iWantCount, graftCount, pruneCount := 0, 0, 0, 0
+	ctl := rpc.GetControl()
+	if ctl != nil {
+		iHaveCount = len(ctl.GetIhave())
+		iWantCount = len(ctl.GetIwant())
+		graftCount = len(ctl.GetGraft())
+		pruneCount = len(ctl.GetPrune())
+	}
+	c.metrics.OnIncomingRpcReceived(iHaveCount, iWantCount, graftCount, pruneCount, includedMessages)
+	if c.logger.GetLevel() > zerolog.TraceLevel {
+		return // skip logging if trace level is not enabled
+	}
+	c.logger.Trace().
+		Str("peer_id", p2plogging.PeerId(from)).
+		Int("iHaveCount", iHaveCount).
+		Int("iWantCount", iWantCount).
+		Int("graftCount", graftCount).
+		Int("pruneCount", pruneCount).
+		Int("included_message_count", includedMessages).
+		Msg("received rpc with control messages")
 }
 
 // processInspectRPCReq func used by component workers to perform further inspection of RPC control messages that will validate ensure all control message
@@ -214,6 +246,7 @@ func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) e
 // Returns:
 //   - error: no error is expected to be returned from this func as they are logged and distributed in invalid control message notifications.
 func (c *ControlMsgValidationInspector) processInspectRPCReq(req *InspectRPCRequest) error {
+	c.updateMetrics(req.Peer, req.rpc)
 	c.metrics.AsyncProcessingStarted()
 	start := time.Now()
 	defer func() {
@@ -351,7 +384,7 @@ func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihave
 	lg := c.logger.With().
 		Str("peer_id", p2plogging.PeerId(from)).
 		Int("sample_size", len(ihaves)).
-		Int("max_sample_size", c.config.IHaveRPCInspectionConfig.MaxSampleSize).
+		Int("max_sample_size", c.config.IHave.MaxSampleSize).
 		Logger()
 	duplicateTopicTracker := make(duplicateStrTracker)
 	duplicateMessageIDTracker := make(duplicateStrTracker)
@@ -399,16 +432,16 @@ func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWant
 	lastHighest := c.rpcTracker.LastHighestIHaveRPCSize()
 	lg := c.logger.With().
 		Str("peer_id", p2plogging.PeerId(from)).
-		Uint("max_sample_size", c.config.IWantRPCInspectionConfig.MaxSampleSize).
+		Uint("max_sample_size", c.config.IWant.MaxSampleSize).
 		Int64("last_highest_ihave_rpc_size", lastHighest).
 		Logger()
 	sampleSize := uint(len(iWants))
 	tracker := make(duplicateStrTracker)
 	cacheMisses := 0
-	allowedCacheMissesThreshold := float64(sampleSize) * c.config.IWantRPCInspectionConfig.CacheMissThreshold
+	allowedCacheMissesThreshold := float64(sampleSize) * c.config.IWant.CacheMissThreshold
 	duplicates := 0
-	allowedDuplicatesThreshold := float64(sampleSize) * c.config.IWantRPCInspectionConfig.DuplicateMsgIDThreshold
-	checkCacheMisses := len(iWants) >= c.config.IWantRPCInspectionConfig.CacheMissCheckSize
+	allowedDuplicatesThreshold := float64(sampleSize) * c.config.IWant.DuplicateMsgIDThreshold
+	checkCacheMisses := len(iWants) >= c.config.IWant.CacheMissCheckSize
 	lg = lg.With().
 		Uint("iwant_sample_size", sampleSize).
 		Float64("allowed_cache_misses_threshold", allowedCacheMissesThreshold).
@@ -425,7 +458,7 @@ func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWant
 			if tracker.isDuplicate(messageID) {
 				duplicates++
 				if float64(duplicates) > allowedDuplicatesThreshold {
-					return NewIWantDuplicateMsgIDThresholdErr(duplicates, messageIDCount, c.config.IWantRPCInspectionConfig.DuplicateMsgIDThreshold)
+					return NewIWantDuplicateMsgIDThresholdErr(duplicates, messageIDCount, c.config.IWant.DuplicateMsgIDThreshold)
 				}
 			}
 			// check cache miss threshold
@@ -433,7 +466,7 @@ func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWant
 				cacheMisses++
 				if checkCacheMisses {
 					if float64(cacheMisses) > allowedCacheMissesThreshold {
-						return NewIWantCacheMissThresholdErr(cacheMisses, messageIDCount, c.config.IWantRPCInspectionConfig.CacheMissThreshold)
+						return NewIWantCacheMissThresholdErr(cacheMisses, messageIDCount, c.config.IWant.CacheMissThreshold)
 					}
 				}
 			}
@@ -468,7 +501,7 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 	if totalMessages == 0 {
 		return nil, 0
 	}
-	sampleSize := c.config.RpcMessageMaxSampleSize
+	sampleSize := c.config.MessageMaxSampleSize
 	if sampleSize > totalMessages {
 		sampleSize = totalMessages
 	}
@@ -511,7 +544,7 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 	}
 
 	// return an error when we exceed the error threshold
-	if errs != nil && errs.Len() > c.config.RpcMessageErrorThreshold {
+	if errs != nil && errs.Len() > c.config.MessageErrorThreshold {
 		return NewInvalidRpcPublishMessagesErr(errs.ErrorOrNil(), errs.Len()), uint64(errs.Len())
 	}
 
@@ -546,18 +579,18 @@ func (c *ControlMsgValidationInspector) truncateRPC(from peer.ID, rpc *pubsub.RP
 //   - rpc: the rpc message to truncate.
 func (c *ControlMsgValidationInspector) truncateGraftMessages(rpc *pubsub.RPC) {
 	grafts := rpc.GetControl().GetGraft()
-	totalGrafts := len(grafts)
-	if totalGrafts == 0 {
-		return
+	originalGraftSize := len(grafts)
+	if originalGraftSize <= c.config.GraftPruneMessageMaxSampleSize {
+		return // nothing to truncate
 	}
+
+	// truncate grafts and update metrics
 	sampleSize := c.config.GraftPruneMessageMaxSampleSize
-	if sampleSize > totalGrafts {
-		sampleSize = totalGrafts
-	}
-	c.performSample(p2pmsg.CtrlMsgGraft, uint(totalGrafts), uint(sampleSize), func(i, j uint) {
+	c.performSample(p2pmsg.CtrlMsgGraft, uint(originalGraftSize), uint(sampleSize), func(i, j uint) {
 		grafts[i], grafts[j] = grafts[j], grafts[i]
 	})
 	rpc.Control.Graft = grafts[:sampleSize]
+	c.metrics.OnControlMessagesTruncated(p2pmsg.CtrlMsgGraft, originalGraftSize-len(rpc.Control.Graft))
 }
 
 // truncatePruneMessages truncates the Prune control messages in the RPC. If the total number of Prunes in the RPC exceeds the configured
@@ -566,18 +599,17 @@ func (c *ControlMsgValidationInspector) truncateGraftMessages(rpc *pubsub.RPC) {
 //   - rpc: the rpc message to truncate.
 func (c *ControlMsgValidationInspector) truncatePruneMessages(rpc *pubsub.RPC) {
 	prunes := rpc.GetControl().GetPrune()
-	totalPrunes := len(prunes)
-	if totalPrunes == 0 {
-		return
+	originalPruneSize := len(prunes)
+	if originalPruneSize <= c.config.GraftPruneMessageMaxSampleSize {
+		return // nothing to truncate
 	}
+
 	sampleSize := c.config.GraftPruneMessageMaxSampleSize
-	if sampleSize > totalPrunes {
-		sampleSize = totalPrunes
-	}
-	c.performSample(p2pmsg.CtrlMsgPrune, uint(totalPrunes), uint(sampleSize), func(i, j uint) {
+	c.performSample(p2pmsg.CtrlMsgPrune, uint(originalPruneSize), uint(sampleSize), func(i, j uint) {
 		prunes[i], prunes[j] = prunes[j], prunes[i]
 	})
 	rpc.Control.Prune = prunes[:sampleSize]
+	c.metrics.OnControlMessagesTruncated(p2pmsg.CtrlMsgPrune, originalPruneSize-len(rpc.Control.Prune))
 }
 
 // truncateIHaveMessages truncates the iHaves control messages in the RPC. If the total number of iHaves in the RPC exceeds the configured
@@ -586,19 +618,23 @@ func (c *ControlMsgValidationInspector) truncatePruneMessages(rpc *pubsub.RPC) {
 //   - rpc: the rpc message to truncate.
 func (c *ControlMsgValidationInspector) truncateIHaveMessages(rpc *pubsub.RPC) {
 	ihaves := rpc.GetControl().GetIhave()
-	totalIHaves := len(ihaves)
-	if totalIHaves == 0 {
+	originalIHaveCount := len(ihaves)
+	if originalIHaveCount == 0 {
 		return
 	}
-	sampleSize := c.config.IHaveRPCInspectionConfig.MaxSampleSize
-	if sampleSize > totalIHaves {
-		sampleSize = totalIHaves
-	}
 
-	c.performSample(p2pmsg.CtrlMsgIHave, uint(totalIHaves), uint(sampleSize), func(i, j uint) {
-		ihaves[i], ihaves[j] = ihaves[j], ihaves[i]
-	})
-	rpc.Control.Ihave = ihaves[:sampleSize]
+	if originalIHaveCount > c.config.IHave.MaxSampleSize {
+		// truncate ihaves and update metrics
+		sampleSize := c.config.IHave.MaxSampleSize
+		if sampleSize > originalIHaveCount {
+			sampleSize = originalIHaveCount
+		}
+		c.performSample(p2pmsg.CtrlMsgIHave, uint(originalIHaveCount), uint(sampleSize), func(i, j uint) {
+			ihaves[i], ihaves[j] = ihaves[j], ihaves[i]
+		})
+		rpc.Control.Ihave = ihaves[:sampleSize]
+		c.metrics.OnControlMessagesTruncated(p2pmsg.CtrlMsgIHave, originalIHaveCount-len(rpc.Control.Ihave))
+	}
 	c.truncateIHaveMessageIds(rpc)
 }
 
@@ -609,18 +645,23 @@ func (c *ControlMsgValidationInspector) truncateIHaveMessages(rpc *pubsub.RPC) {
 func (c *ControlMsgValidationInspector) truncateIHaveMessageIds(rpc *pubsub.RPC) {
 	for _, ihave := range rpc.GetControl().GetIhave() {
 		messageIDs := ihave.GetMessageIDs()
-		totalMessageIDs := len(messageIDs)
-		if totalMessageIDs == 0 {
-			return
+		originalMessageIdCount := len(messageIDs)
+		if originalMessageIdCount == 0 {
+			continue // nothing to truncate; skip
 		}
-		sampleSize := c.config.IHaveRPCInspectionConfig.MaxMessageIDSampleSize
-		if sampleSize > totalMessageIDs {
-			sampleSize = totalMessageIDs
+
+		if originalMessageIdCount > c.config.IHave.MaxMessageIDSampleSize {
+			sampleSize := c.config.IHave.MaxMessageIDSampleSize
+			if sampleSize > originalMessageIdCount {
+				sampleSize = originalMessageIdCount
+			}
+			c.performSample(p2pmsg.CtrlMsgIHave, uint(originalMessageIdCount), uint(sampleSize), func(i, j uint) {
+				messageIDs[i], messageIDs[j] = messageIDs[j], messageIDs[i]
+			})
+			ihave.MessageIDs = messageIDs[:sampleSize]
+			c.metrics.OnIHaveControlMessageIdsTruncated(originalMessageIdCount - len(ihave.MessageIDs))
 		}
-		c.performSample(p2pmsg.CtrlMsgIHave, uint(totalMessageIDs), uint(sampleSize), func(i, j uint) {
-			messageIDs[i], messageIDs[j] = messageIDs[j], messageIDs[i]
-		})
-		ihave.MessageIDs = messageIDs[:sampleSize]
+		c.metrics.OnIHaveMessageIDsReceived(ihave.GetTopicID(), len(ihave.MessageIDs))
 	}
 }
 
@@ -630,18 +671,23 @@ func (c *ControlMsgValidationInspector) truncateIHaveMessageIds(rpc *pubsub.RPC)
 //   - rpc: the rpc message to truncate.
 func (c *ControlMsgValidationInspector) truncateIWantMessages(from peer.ID, rpc *pubsub.RPC) {
 	iWants := rpc.GetControl().GetIwant()
-	totalIWants := uint(len(iWants))
-	if totalIWants == 0 {
+	originalIWantCount := uint(len(iWants))
+	if originalIWantCount == 0 {
 		return
 	}
-	sampleSize := c.config.IWantRPCInspectionConfig.MaxSampleSize
-	if sampleSize > totalIWants {
-		sampleSize = totalIWants
+
+	if originalIWantCount > c.config.IWant.MaxSampleSize {
+		// truncate iWants and update metrics
+		sampleSize := c.config.IWant.MaxSampleSize
+		if sampleSize > originalIWantCount {
+			sampleSize = originalIWantCount
+		}
+		c.performSample(p2pmsg.CtrlMsgIWant, originalIWantCount, sampleSize, func(i, j uint) {
+			iWants[i], iWants[j] = iWants[j], iWants[i]
+		})
+		rpc.Control.Iwant = iWants[:sampleSize]
+		c.metrics.OnControlMessagesTruncated(p2pmsg.CtrlMsgIWant, int(originalIWantCount)-len(rpc.Control.Iwant))
 	}
-	c.performSample(p2pmsg.CtrlMsgIWant, totalIWants, sampleSize, func(i, j uint) {
-		iWants[i], iWants[j] = iWants[j], iWants[i]
-	})
-	rpc.Control.Iwant = iWants[:sampleSize]
 	c.truncateIWantMessageIds(from, rpc)
 }
 
@@ -653,29 +699,31 @@ func (c *ControlMsgValidationInspector) truncateIWantMessageIds(from peer.ID, rp
 	lastHighest := c.rpcTracker.LastHighestIHaveRPCSize()
 	lg := c.logger.With().
 		Str("peer_id", p2plogging.PeerId(from)).
-		Uint("max_sample_size", c.config.IWantRPCInspectionConfig.MaxSampleSize).
+		Uint("max_sample_size", c.config.IWant.MaxSampleSize).
 		Int64("last_highest_ihave_rpc_size", lastHighest).
 		Logger()
 
 	sampleSize := int(10 * lastHighest)
-	if sampleSize == 0 || sampleSize > c.config.IWantRPCInspectionConfig.MaxMessageIDSampleSize {
+	if sampleSize == 0 || sampleSize > c.config.IWant.MaxMessageIDSampleSize {
 		// invalid or 0 sample size is suspicious
 		lg.Warn().Str(logging.KeySuspicious, "true").Msg("zero or invalid sample size, using default max sample size")
-		sampleSize = c.config.IWantRPCInspectionConfig.MaxMessageIDSampleSize
+		sampleSize = c.config.IWant.MaxMessageIDSampleSize
 	}
 	for _, iWant := range rpc.GetControl().GetIwant() {
 		messageIDs := iWant.GetMessageIDs()
-		totalMessageIDs := len(messageIDs)
-		if totalMessageIDs == 0 {
-			return
+		totalMessageIdCount := len(messageIDs)
+		if totalMessageIdCount == 0 {
+			continue // nothing to truncate; skip
 		}
-		if sampleSize > totalMessageIDs {
-			sampleSize = totalMessageIDs
+
+		if totalMessageIdCount > sampleSize {
+			c.performSample(p2pmsg.CtrlMsgIWant, uint(totalMessageIdCount), uint(sampleSize), func(i, j uint) {
+				messageIDs[i], messageIDs[j] = messageIDs[j], messageIDs[i]
+			})
+			iWant.MessageIDs = messageIDs[:sampleSize]
+			c.metrics.OnIWantControlMessageIdsTruncated(totalMessageIdCount - len(iWant.MessageIDs))
 		}
-		c.performSample(p2pmsg.CtrlMsgIWant, uint(totalMessageIDs), uint(sampleSize), func(i, j uint) {
-			messageIDs[i], messageIDs[j] = messageIDs[j], messageIDs[i]
-		})
-		iWant.MessageIDs = messageIDs[:sampleSize]
+		c.metrics.OnIWantMessageIDsReceived(len(iWant.MessageIDs))
 	}
 }
 
@@ -722,7 +770,7 @@ func (c *ControlMsgValidationInspector) validateTopic(from peer.ID, topic channe
 //   - channels.UnknownClusterIDErr: if the topic contains a cluster ID prefix that is not in the active cluster IDs list.
 //
 // In the case where an ErrActiveClusterIdsNotSet or UnknownClusterIDErr is encountered and the cluster prefixed topic received
-// tracker for the peer is less than or equal to the configured ClusterPrefixHardThreshold an error will only be logged and not returned.
+// tracker for the peer is less than or equal to the configured HardThreshold an error will only be logged and not returned.
 // At the point where the hard threshold is crossed the error will be returned and the sender will start to be penalized.
 // Any errors encountered while incrementing or loading the cluster prefixed control message gauge for a peer will result in an irrecoverable error being thrown, these
 // errors are unexpected and irrecoverable indicating a bug.
@@ -794,7 +842,7 @@ func (c *ControlMsgValidationInspector) getFlowIdentifier(peerID peer.ID) (flow.
 }
 
 // checkClusterPrefixHardThreshold returns true if the cluster prefix received tracker count is less than
-// the configured ClusterPrefixHardThreshold, false otherwise.
+// the configured HardThreshold, false otherwise.
 // If any error is encountered while loading from the tracker this func will throw an error on the signaler context, these errors
 // are unexpected and irrecoverable indicating a bug.
 func (c *ControlMsgValidationInspector) checkClusterPrefixHardThreshold(nodeID flow.Identifier) bool {
@@ -803,7 +851,7 @@ func (c *ControlMsgValidationInspector) checkClusterPrefixHardThreshold(nodeID f
 		// irrecoverable error encountered
 		c.logAndThrowError(fmt.Errorf("cluster prefixed control message gauge during hard threshold check failed for node %s: %w", nodeID, err))
 	}
-	return gauge <= c.config.ClusterPrefixHardThreshold
+	return gauge <= c.config.ClusterPrefixedMessage.HardThreshold
 }
 
 // logAndDistributeErr logs the provided error and attempts to disseminate an invalid control message validation notification for the error.

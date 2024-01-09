@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -55,7 +54,7 @@ func makeBlockSigData(committee flow.IdentitySkeletonList) *hotstuff.BlockSignat
 // aggregated random beacon sigs are from [D,F]
 func TestPackUnpack(t *testing.T) {
 	// prepare data for testing
-	committee := unittest.IdentityListFixture(6, unittest.WithRole(flow.RoleConsensus)).Sort(order.Canonical[flow.Identity]).ToSkeleton()
+	committee := unittest.IdentityListFixture(6, unittest.WithRole(flow.RoleConsensus)).Sort(flow.Canonical[flow.Identity]).ToSkeleton()
 	view := rand.Uint64()
 	blockSigData := makeBlockSigData(committee)
 

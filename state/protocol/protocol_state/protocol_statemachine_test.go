@@ -8,7 +8,6 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -372,7 +371,7 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochSetupInvariants() {
 // event should leave `PreviousEpoch` and `CurrentEpoch`'s EpochStateContainer unchanged.
 // The next epoch's EpochStateContainer should reference the EpochSetup event and hold the respective ActiveIdentities.
 func (s *ProtocolStateMachineSuite) TestProcessEpochSetupHappyPath() {
-	setupParticipants := unittest.IdentityListFixture(5, unittest.WithAllRoles()).Sort(order.Canonical[flow.Identity])
+	setupParticipants := unittest.IdentityListFixture(5, unittest.WithAllRoles()).Sort(flow.Canonical[flow.Identity])
 	setupParticipants[0].InitialWeight = 13
 	setup := unittest.EpochSetupFixture(
 		unittest.SetupWithCounter(s.parentProtocolState.CurrentEpochSetup.Counter+1),
@@ -415,12 +414,12 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochSetupWithSameParticipants() 
 	// By construction, `participantsFromCurrentEpochSetup` lists the full Identities in the same ordering as `Participants` and
 	// `ActiveIdentities`. By confirming that `participantsFromCurrentEpochSetup` follows canonical ordering, we can conclude that
 	// also `Participants` and `ActiveIdentities` are canonically ordered.
-	require.True(s.T(), participantsFromCurrentEpochSetup.Sorted(order.Canonical[flow.Identity]), "participants in current epoch's setup event are not in canonical order")
+	require.True(s.T(), participantsFromCurrentEpochSetup.Sorted(flow.Canonical[flow.Identity]), "participants in current epoch's setup event are not in canonical order")
 
 	overlappingNodes, err := participantsFromCurrentEpochSetup.Sample(2)
 	require.NoError(s.T(), err)
 	setupParticipants := append(unittest.IdentityListFixture(len(s.parentProtocolState.CurrentEpochIdentityTable), unittest.WithAllRoles()),
-		overlappingNodes...).Sort(order.Canonical[flow.Identity])
+		overlappingNodes...).Sort(flow.Canonical[flow.Identity])
 	setup := unittest.EpochSetupFixture(
 		unittest.SetupWithCounter(s.parentProtocolState.CurrentEpochSetup.Counter+1),
 		unittest.WithFirstView(s.parentProtocolState.CurrentEpochSetup.FinalView+1),
@@ -446,7 +445,7 @@ func (s *ProtocolStateMachineSuite) TestEpochSetupAfterIdentityChange() {
 	participantsFromCurrentEpochSetup := s.parentProtocolState.CurrentEpochIdentityTable.Filter(func(i *flow.Identity) bool {
 		_, exists := s.parentProtocolState.CurrentEpochSetup.Participants.ByNodeID(i.NodeID)
 		return exists
-	}).Sort(order.Canonical[flow.Identity])
+	}).Sort(flow.Canonical[flow.Identity])
 	ejectedChanges, err := participantsFromCurrentEpochSetup.Sample(2)
 	require.NoError(s.T(), err)
 	for _, update := range ejectedChanges {
@@ -489,7 +488,7 @@ func (s *ProtocolStateMachineSuite) TestEpochSetupAfterIdentityChange() {
 			// and service events are delivered (asynchronously) in an *order-preserving* manner meaning if ejection has happened before
 			// epoch setup then there is no possible way that it will include ejected node unless there is a severe bug in the service contract.
 			setup.Participants = setup.Participants.Filter(
-				filter.Not(filter.In(ejectedChanges.ToSkeleton()))).Sort(order.Canonical[flow.IdentitySkeleton])
+				filter.Not(filter.In(ejectedChanges.ToSkeleton()))).Sort(flow.Canonical[flow.IdentitySkeleton])
 		},
 	)
 

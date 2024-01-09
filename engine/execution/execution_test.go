@@ -17,7 +17,6 @@ import (
 	"github.com/onflow/flow-go/engine/testutil"
 	testmock "github.com/onflow/flow-go/engine/testutil/mock"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/network/channels"
@@ -61,7 +60,7 @@ func TestExecutionFlow(t *testing.T) {
 	)
 
 	identities := unittest.CompleteIdentitySet(colID.Identity(), conID.Identity(), exeID.Identity(), verID.Identity()).
-		Sort(order.Canonical[flow.Identity])
+		Sort(flow.Canonical[flow.Identity])
 
 	// create execution node
 	exeNode := testutil.ExecutionNode(t, hub, exeID, identities, 21, chainID)

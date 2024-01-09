@@ -154,9 +154,7 @@ func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logge
 
 	opts := []fvm.Option{
 		fvm.WithTransactionFeesEnabled(true),
-		// TODO (JanezP): enable storage feee once we figure out how storage limits work
-		// with the EVM account
-		fvm.WithAccountStorageLimit(false),
+		fvm.WithAccountStorageLimit(true),
 		fvm.WithChain(chain),
 		fvm.WithLogger(logger),
 		fvm.WithMaxStateInteractionSize(interactionLimit),
@@ -450,10 +448,9 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 		for _, account := range accounts {
 			addrs = append(addrs, account.Address)
 		}
-		// TODO (JanezP): fix when the evm account has a receiver
-		//evmAddress, err := chain.AddressAtIndex(environment.EVMAccountIndex)
-		//require.NoError(b, err)
-		//addrs = append(addrs, evmAddress)
+		evmAddress, err := chain.AddressAtIndex(systemcontracts.EVMAccountIndex)
+		require.NoError(b, err)
+		addrs = append(addrs, evmAddress)
 
 		// fund all accounts so not to run into storage problems
 		fundAccounts(b, blockExecutor, cadence.UFix64(1_000_000_000_000), addrs...)

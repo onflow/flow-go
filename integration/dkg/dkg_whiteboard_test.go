@@ -144,12 +144,6 @@ func createNode(
 	})
 	controllerFactoryLogger := zerolog.New(os.Stdout).Hook(hook)
 
-	// create a config with no delays for tests
-	config := dkg.ControllerConfig{
-		BaseStartDelay:                0,
-		BaseHandleFirstBroadcastDelay: 0,
-	}
-
 	// the reactor engine reacts to new views being finalized and drives the
 	// DKG protocol
 	reactorEngine := dkgeng.NewReactorEngine(
@@ -162,7 +156,6 @@ func createNode(
 			core.Me,
 			[]module.DKGContractClient{NewWhiteboardClient(id.NodeID, whiteboard)},
 			brokerTunnel,
-			config,
 		),
 		viewsObserver,
 	)

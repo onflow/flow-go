@@ -26,7 +26,7 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/p2pnet"
+	"github.com/onflow/flow-go/network/underlay"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -52,7 +52,7 @@ type MutableIdentityTableSuite struct {
 type testNode struct {
 	id         *flow.Identity
 	libp2pNode p2p.LibP2PNode
-	network    *p2pnet.Network
+	network    *underlay.Network
 	engine     *testutils.MeshEngine
 }
 

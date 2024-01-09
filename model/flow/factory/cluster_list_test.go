@@ -7,7 +7,6 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -68,8 +67,8 @@ func TestNewClusterList(t *testing.T) {
 	t.Run("(f) cluster assignment lists the nodes in canonical ordering", func(t *testing.T) {
 		assignments := unittest.ClusterAssignment(10, identities.ToSkeleton())
 		// sort in non-canonical order
-		assignments[0] = assignments[0].Sort(func(lhs flow.Identifier, rhs flow.Identifier) bool {
-			return !order.IdentifierCanonical(lhs, rhs)
+		assignments[0] = assignments[0].Sort(func(lhs flow.Identifier, rhs flow.Identifier) int {
+			return -flow.IdentifierCanonical(lhs, rhs)
 		})
 		_, err := factory.NewClusterList(assignments, identities.ToSkeleton())
 		require.Error(t, err)

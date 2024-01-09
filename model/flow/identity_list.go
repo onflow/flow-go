@@ -43,8 +43,16 @@ type GenericIdentity interface {
 // and identity i should be dropped, i.e. i ∉ 𝐼.
 type IdentityFilter[T GenericIdentity] func(*T) bool
 
-// IdentityOrder is a sort for identities.
-type IdentityOrder[T GenericIdentity] func(*T, *T) bool
+// IdentityOrder is an order function for identities.
+//
+// It defines a strict weak ordering between identities.
+// It returns a negative number if the first identity is "strictly less" than the second,
+// a positive number if the second identity is "strictly less" than the first,
+// and zero if the two identities are equal.
+//
+// `IdentityOrder` can be used to sort identities with
+// https://pkg.go.dev/golang.org/x/exp/slices#SortFunc.
+type IdentityOrder[T GenericIdentity] func(*T, *T) int
 
 // IdentityMapFunc is a modifier function for map operations for identities.
 // Identities are COPIED from the source slice.
@@ -291,10 +299,7 @@ func (il GenericIdentityList[T]) Union(other GenericIdentityList[T]) GenericIden
 		}
 	}
 
-	slices.SortFunc(union, func(a, b *T) bool {
-		lhs, rhs := (*a).GetNodeID(), (*b).GetNodeID()
-		return bytes.Compare(lhs[:], rhs[:]) < 0
-	})
+	slices.SortFunc(union, Canonical[T])
 	return union
 }
 

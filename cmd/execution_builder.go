@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	"github.com/onflow/go-bitswap"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/host"
 	"github.com/shirou/gopsutil/v3/mem"
@@ -549,10 +550,17 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 			"cannot get the latest executed block id at height %v: %w",
 			height, err)
 	}
+
 	blockSnapshot, _, err := exeNode.executionState.CreateStorageSnapshot(blockID)
 	if err != nil {
-		return nil, fmt.Errorf("cannot create a storage snapshot at block %v at height %v: %w", blockID,
-			height, err)
+		tries, _ := exeNode.ledgerStorage.Tries()
+		trieInfo := "empty"
+		if len(tries) > 0 {
+			trieInfo = fmt.Sprintf("length: %v, 1st: %v, last: %v", len(tries), tries[0].RootHash(), tries[len(tries)-1].RootHash())
+		}
+
+		return nil, fmt.Errorf("cannot create a storage snapshot at block %v at height %v, trie: %s: %w", blockID,
+			height, trieInfo, err)
 	}
 
 	// Get the epoch counter from the smart contract at the last executed block.
@@ -704,6 +712,14 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 		exeNode.exeConf.enableStorehouse,
 	)
 
+	height, _, err := exeNode.executionState.GetHighestExecutedBlockID(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("could not get highest executed block: %w", err)
+	}
+
+	log.Info().Msgf("execution state highest executed block height: %v", height)
+	exeNode.collector.ExecutionLastExecutedBlockHeight(height)
+
 	return &module.NoopReadyDoneAware{}, nil
 }
 
@@ -788,14 +804,18 @@ func (exeNode *ExecutionNode) LoadRegisterStore(
 
 	if !bootstrapped {
 		checkpointFile := path.Join(exeNode.exeConf.triedir, modelbootstrap.FilenameWALRootCheckpoint)
-		root, err := exeNode.builder.RootSnapshot.Head()
-		if err != nil {
-			return fmt.Errorf("could not get root snapshot head: %w", err)
+		sealedRoot := node.State.Params().SealedRoot()
+
+		rootSeal := node.State.Params().Seal()
+
+		if sealedRoot.ID() != rootSeal.BlockID {
+			return fmt.Errorf("mismatching root seal and sealed root: %v != %v", sealedRoot.ID(), rootSeal.BlockID)
 		}
 
-		checkpointHeight := root.Height
+		checkpointHeight := sealedRoot.Height
+		rootHash := ledgerpkg.RootHash(rootSeal.FinalState)
 
-		err = bootstrap.ImportRegistersFromCheckpoint(node.Logger, checkpointFile, checkpointHeight, pebbledb, exeNode.exeConf.importCheckpointWorkerCount)
+		err = bootstrap.ImportRegistersFromCheckpoint(node.Logger, checkpointFile, checkpointHeight, rootHash, pebbledb, exeNode.exeConf.importCheckpointWorkerCount)
 		if err != nil {
 			return fmt.Errorf("could not import registers from checkpoint: %w", err)
 		}
@@ -807,12 +827,17 @@ func (exeNode *ExecutionNode) LoadRegisterStore(
 
 	reader := finalizedreader.NewFinalizedReader(node.Storage.Headers, node.LastFinalizedHeader.Height)
 	node.ProtocolEvents.AddConsumer(reader)
+	notifier := storehouse.NewRegisterStoreMetrics(exeNode.collector)
+
+	// report latest finalized and executed height as metrics
+	notifier.OnFinalizedAndExecutedHeightUpdated(diskStore.LatestHeight())
 
 	registerStore, err := storehouse.NewRegisterStore(
 		diskStore,
 		nil, // TODO: replace with real WAL
 		reader,
 		node.Logger,
+		notifier,
 	)
 	if err != nil {
 		return err
@@ -945,7 +970,12 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 	}
 
 	fetcher := fetcher.NewCollectionFetcher(node.Logger, exeNode.collectionRequester, node.State, exeNode.exeConf.onflowOnlyLNs)
-	loader := loader.NewUnexecutedLoader(node.Logger, node.State, node.Storage.Headers, exeNode.executionState)
+	var blockLoader ingestion.BlockLoader
+	if exeNode.exeConf.enableStorehouse {
+		blockLoader = loader.NewUnfinalizedLoader(node.Logger, node.State, node.Storage.Headers, exeNode.executionState)
+	} else {
+		blockLoader = loader.NewUnexecutedLoader(node.Logger, node.State, node.Storage.Headers, exeNode.executionState)
+	}
 
 	exeNode.ingestionEng, err = ingestion.New(
 		exeNode.ingestionUnit,
@@ -965,7 +995,7 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		exeNode.executionDataPruner,
 		exeNode.blockDataUploader,
 		exeNode.stopControl,
-		loader,
+		blockLoader,
 	)
 
 	// TODO: we should solve these mutual dependencies better
@@ -1123,7 +1153,7 @@ func (exeNode *ExecutionNode) LoadReceiptProviderEngine(
 	receiptRequestQueue := queue.NewHeroStore(exeNode.exeConf.receiptRequestsCacheSize, node.Logger, receiptRequestQueueMetric)
 
 	eng, err := provider.New(
-		node.Logger,
+		node.Logger.With().Str("engine", "receipt_provider").Logger(),
 		node.Metrics.Engine,
 		node.EngineRegistry,
 		node.Me,
@@ -1312,6 +1342,10 @@ func copyBootstrapState(dir, trie string) error {
 
 	// copy from the bootstrap folder to the execution state folder
 	from, to := path.Join(dir, bootstrapFilenames.DirnameExecutionState), trie
+
+	log.Info().Str("dir", dir).Str("trie", trie).
+		Msgf("copying checkpoint file %v from directory: %v, to: %v", filename, from, to)
+
 	copiedFiles, err := wal.CopyCheckpointFile(filename, from, to)
 	if err != nil {
 		return fmt.Errorf("can not copy checkpoint file %s, from %s to %s",

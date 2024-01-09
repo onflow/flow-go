@@ -20,7 +20,6 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/signature"
@@ -893,7 +892,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// add a participant for the next epoch
 		epoch2NewParticipant := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-		epoch2Participants := append(participants, epoch2NewParticipant).Sort(order.Canonical[flow.Identity]).ToSkeleton()
+		epoch2Participants := append(participants, epoch2NewParticipant).Sort(flow.Canonical[flow.Identity]).ToSkeleton()
 
 		// create the epoch setup event for the second epoch
 		epoch2Setup := unittest.EpochSetupFixture(
@@ -1365,7 +1364,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 
 		// add a participant for the next epoch
 		epoch2NewParticipant := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-		epoch2Participants := append(participants, epoch2NewParticipant).Sort(order.Canonical[flow.Identity]).ToSkeleton()
+		epoch2Participants := append(participants, epoch2NewParticipant).Sort(flow.Canonical[flow.Identity]).ToSkeleton()
 
 		// this function will return a VALID setup event and seal, we will modify
 		// in different ways in each test case
@@ -1506,7 +1505,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 		epoch2Participants := append(
 			participants.Filter(filter.Not[flow.Identity](filter.HasRole[flow.Identity](flow.RoleConsensus))),
 			epoch2NewParticipant,
-		).Sort(order.Canonical[flow.Identity]).ToSkeleton()
+		).Sort(flow.Canonical[flow.Identity]).ToSkeleton()
 
 		// factory method to create a valid EpochSetup method w.r.t. the generated state
 		createSetup := func(block *flow.Block) (*flow.EpochSetup, *flow.ExecutionReceipt, *flow.Seal) {
@@ -1689,7 +1688,7 @@ func TestExtendEpochTransitionWithoutCommit(t *testing.T) {
 
 		// add a participant for the next epoch
 		epoch2NewParticipant := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-		epoch2Participants := append(participants, epoch2NewParticipant).Sort(order.Canonical[flow.Identity]).ToSkeleton()
+		epoch2Participants := append(participants, epoch2NewParticipant).Sort(flow.Canonical[flow.Identity]).ToSkeleton()
 
 		// create the epoch setup event for the second epoch
 		epoch2Setup := unittest.EpochSetupFixture(
@@ -1834,7 +1833,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 
 			// add a participant for the next epoch
 			epoch2NewParticipant := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-			epoch2Participants := append(participants, epoch2NewParticipant).Sort(order.Canonical[flow.Identity]).ToSkeleton()
+			epoch2Participants := append(participants, epoch2NewParticipant).Sort(flow.Canonical[flow.Identity]).ToSkeleton()
 
 			// create the epoch setup event for the second epoch
 			epoch2Setup := unittest.EpochSetupFixture(
@@ -1930,7 +1929,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 
 			// add a participant for the next epoch
 			epoch2NewParticipant := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-			epoch2Participants := append(participants, epoch2NewParticipant).Sort(order.Canonical[flow.Identity]).ToSkeleton()
+			epoch2Participants := append(participants, epoch2NewParticipant).Sort(flow.Canonical[flow.Identity]).ToSkeleton()
 
 			// create the epoch setup event for the second epoch
 			// this event is invalid because it used a non-contiguous first view

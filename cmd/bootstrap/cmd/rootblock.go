@@ -21,7 +21,6 @@ import (
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/order"
 )
 
 var (
@@ -138,7 +137,7 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	log.Info().Msg("")
 
 	// create flow.IdentityList representation of the participant set
-	participants := model.ToIdentityList(stakingNodes).Sort(order.Canonical[flow.Identity])
+	participants := model.ToIdentityList(stakingNodes).Sort(flow.Canonical[flow.Identity])
 
 	log.Info().Msg("computing collection node clusters")
 	assignments, clusters, err := constructClusterAssignment(partnerNodes, internalNodes)
