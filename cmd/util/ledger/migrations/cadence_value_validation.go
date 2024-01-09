@@ -2,6 +2,7 @@ package migrations
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/onflow/atree"
@@ -9,6 +10,7 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
@@ -22,6 +24,8 @@ func validateCadenceValues(
 	address common.Address,
 	oldPayloads []*ledger.Payload,
 	newPayloads []*ledger.Payload,
+	log zerolog.Logger,
+	verboseLogging bool,
 ) error {
 	// Create all the runtime components we need for comparing Cadence values.
 	oldRuntime, err := newReadonlyStorageRuntime(oldPayloads)
@@ -36,7 +40,7 @@ func validateCadenceValues(
 
 	// Iterate through all domains and compare cadence values.
 	for _, domain := range domains {
-		err := validateStorageDomain(address, oldRuntime, newRuntime, domain)
+		err := validateStorageDomain(address, oldRuntime, newRuntime, domain, log, verboseLogging)
 		if err != nil {
 			return err
 		}
@@ -50,6 +54,8 @@ func validateStorageDomain(
 	oldRuntime *readonlyStorageRuntime,
 	newRuntime *readonlyStorageRuntime,
 	domain string,
+	log zerolog.Logger,
+	verboseLogging bool,
 ) error {
 
 	oldStorageMap := oldRuntime.Storage.GetStorageMap(address, domain, false)
@@ -87,12 +93,55 @@ func validateStorageDomain(
 
 		newValue := newStorageMap.ReadValue(nopMemoryGauge, interpreter.StringStorageMapKey(stringKey))
 
-		if !cadenceValueEqual(oldRuntime.Interpreter, oldValue, newRuntime.Interpreter, newValue) {
-			return fmt.Errorf("failed to validate domain %s, key %s: old value %v (%T), new value %v (%T)", domain, key, oldValue, oldValue, newValue, newValue)
+		err := cadenceValueEqual(oldRuntime.Interpreter, oldValue, newRuntime.Interpreter, newValue)
+		if err != nil {
+			if verboseLogging {
+				log.Info().
+					Str("address", address.Hex()).
+					Str("domain", domain).
+					Str("key", string(stringKey)).
+					Str("trace", err.Error()).
+					Str("old value", oldValue.String()).
+					Str("new value", newValue.String()).
+					Msgf("failed to validate value")
+			}
+
+			return fmt.Errorf("failed to validate value for address %s, domain %s, key %s: %s", address.Hex(), domain, key, err.Error())
 		}
 	}
 
 	return nil
+}
+
+type validationError struct {
+	trace         []string
+	errorMsg      string
+	traceReversed bool
+}
+
+func newValidationErrorf(format string, a ...any) *validationError {
+	return &validationError{
+		errorMsg: fmt.Sprintf(format, a...),
+	}
+}
+
+func (e *validationError) addTrace(trace string) {
+	e.trace = append(e.trace, trace)
+}
+
+func (e *validationError) Error() string {
+	if len(e.trace) == 0 {
+		return fmt.Sprintf("failed to validate: %s", e.errorMsg)
+	}
+	// Reverse trace
+	if !e.traceReversed {
+		for i, j := 0, len(e.trace)-1; i < j; i, j = i+1, j-1 {
+			e.trace[i], e.trace[j] = e.trace[j], e.trace[i]
+		}
+		e.traceReversed = true
+	}
+	trace := strings.Join(e.trace, ".")
+	return fmt.Sprintf("failed to validate %s: %s", trace, e.errorMsg)
 }
 
 func cadenceValueEqual(
@@ -100,7 +149,7 @@ func cadenceValueEqual(
 	v interpreter.Value,
 	otherInterpreter *interpreter.Interpreter,
 	other interpreter.Value,
-) bool {
+) *validationError {
 	switch v := v.(type) {
 	case *interpreter.ArrayValue:
 		return cadenceArrayValueEqual(vInterpreter, v, otherInterpreter, other)
@@ -117,10 +166,23 @@ func cadenceValueEqual(
 	default:
 		oldValue, ok := v.(interpreter.EquatableValue)
 		if !ok {
-			return false
+			return newValidationErrorf(
+				"value doesn't implement interpreter.EquatableValue: %T",
+				oldValue,
+			)
 		}
-		return oldValue.Equal(nil, interpreter.EmptyLocationRange, other)
+		if !oldValue.Equal(nil, interpreter.EmptyLocationRange, other) {
+			return newValidationErrorf(
+				"values differ: %v (%T) != %v (%T)",
+				oldValue,
+				oldValue,
+				other,
+				other,
+			)
+		}
 	}
+
+	return nil
 }
 
 func cadenceSomeValueEqual(
@@ -128,10 +190,10 @@ func cadenceSomeValueEqual(
 	v *interpreter.SomeValue,
 	otherInterpreter *interpreter.Interpreter,
 	other interpreter.Value,
-) bool {
+) *validationError {
 	otherSome, ok := other.(*interpreter.SomeValue)
 	if !ok {
-		return false
+		return newValidationErrorf("types differ: %T != %T", v, other)
 	}
 
 	innerValue := v.InnerValue(vInterpreter, interpreter.EmptyLocationRange)
@@ -146,36 +208,41 @@ func cadenceArrayValueEqual(
 	v *interpreter.ArrayValue,
 	otherInterpreter *interpreter.Interpreter,
 	other interpreter.Value,
-) bool {
+) *validationError {
 	otherArray, ok := other.(*interpreter.ArrayValue)
 	if !ok {
-		return false
+		return newValidationErrorf("types differ: %T != %T", v, other)
 	}
 
 	count := v.Count()
 	if count != otherArray.Count() {
-		return false
+		return newValidationErrorf("array counts differ: %d != %d", count, otherArray.Count())
 	}
 
 	if v.Type == nil {
 		if otherArray.Type != nil {
-			return false
+			return newValidationErrorf("array types differ: nil != %s", otherArray.Type)
 		}
-	} else if otherArray.Type == nil ||
-		!v.Type.Equal(otherArray.Type) {
-		return false
+	} else { // v.Type != nil
+		if otherArray.Type == nil {
+			return newValidationErrorf("array types differ: %s != nil", v.Type)
+		} else if !v.Type.Equal(otherArray.Type) {
+			return newValidationErrorf("array types differ: %s != %s", v.Type, otherArray.Type)
+		}
 	}
 
 	for i := 0; i < count; i++ {
 		element := v.Get(vInterpreter, interpreter.EmptyLocationRange, i)
 		otherElement := otherArray.Get(otherInterpreter, interpreter.EmptyLocationRange, i)
 
-		if !cadenceValueEqual(vInterpreter, element, otherInterpreter, otherElement) {
-			return false
+		err := cadenceValueEqual(vInterpreter, element, otherInterpreter, otherElement)
+		if err != nil {
+			err.addTrace(fmt.Sprintf("(%s[%d])", v.Type, i))
+			return err
 		}
 	}
 
-	return true
+	return nil
 }
 
 func cadenceCompositeValueEqual(
@@ -183,30 +250,42 @@ func cadenceCompositeValueEqual(
 	v *interpreter.CompositeValue,
 	otherInterpreter *interpreter.Interpreter,
 	other interpreter.Value,
-) bool {
+) *validationError {
 	otherComposite, ok := other.(*interpreter.CompositeValue)
 	if !ok {
-		return false
+		return newValidationErrorf("types differ: %T != %T", v, other)
 	}
 
-	if !v.StaticType(vInterpreter).Equal(otherComposite.StaticType(otherInterpreter)) ||
-		v.Kind != otherComposite.Kind {
-		return false
+	if !v.StaticType(vInterpreter).Equal(otherComposite.StaticType(otherInterpreter)) {
+		return newValidationErrorf(
+			"composite types differ: %s != %s",
+			v.StaticType(vInterpreter),
+			otherComposite.StaticType(otherInterpreter),
+		)
 	}
 
-	var foundMismatch bool
+	if v.Kind != otherComposite.Kind {
+		return newValidationErrorf(
+			"composite kinds differ: %d != %d",
+			v.Kind,
+			otherComposite.Kind,
+		)
+	}
+
+	var err *validationError
 	v.ForEachField(nopMemoryGauge, func(fieldName string, fieldValue interpreter.Value) bool {
 		otherFieldValue := otherComposite.GetField(otherInterpreter, interpreter.EmptyLocationRange, fieldName)
 
-		if !cadenceValueEqual(vInterpreter, fieldValue, otherInterpreter, otherFieldValue) {
-			foundMismatch = true
+		err = cadenceValueEqual(vInterpreter, fieldValue, otherInterpreter, otherFieldValue)
+		if err != nil {
+			err.addTrace(fmt.Sprintf("(%s.%s)", v.TypeID(), fieldName))
 			return false
 		}
 
 		return true
 	})
 
-	return !foundMismatch
+	return err
 }
 
 func cadenceDictionaryValueEqual(
@@ -214,19 +293,18 @@ func cadenceDictionaryValueEqual(
 	v *interpreter.DictionaryValue,
 	otherInterpreter *interpreter.Interpreter,
 	other interpreter.Value,
-) bool {
-
+) *validationError {
 	otherDictionary, ok := other.(*interpreter.DictionaryValue)
 	if !ok {
-		return false
+		return newValidationErrorf("types differ: %T != %T", v, other)
 	}
 
 	if v.Count() != otherDictionary.Count() {
-		return false
+		return newValidationErrorf("dict counts differ: %d != %d", v.Count(), otherDictionary.Count())
 	}
 
 	if !v.Type.Equal(otherDictionary.Type) {
-		return false
+		return newValidationErrorf("dict types differ: %s != %s", v.Type, otherDictionary.Type)
 	}
 
 	oldIterator := v.Iterator()
@@ -235,20 +313,27 @@ func cadenceDictionaryValueEqual(
 		if key == nil {
 			break
 		}
+
 		oldValue, oldValueExist := v.Get(vInterpreter, interpreter.EmptyLocationRange, key)
 		if !oldValueExist {
-			return false
+			err := newValidationErrorf("old value doesn't exist with key %v (%T)", key, key)
+			err.addTrace(fmt.Sprintf("(%s[%s])", v.Type, key))
+			return err
 		}
 		newValue, newValueExist := otherDictionary.Get(otherInterpreter, interpreter.EmptyLocationRange, key)
 		if !newValueExist {
-			return false
+			err := newValidationErrorf("new value doesn't exist with key %v (%T)", key, key)
+			err.addTrace(fmt.Sprintf("(%s[%s])", otherDictionary.Type, key))
+			return err
 		}
-		if !cadenceValueEqual(vInterpreter, oldValue, otherInterpreter, newValue) {
-			return false
+		err := cadenceValueEqual(vInterpreter, oldValue, otherInterpreter, newValue)
+		if err != nil {
+			err.addTrace(fmt.Sprintf("(%s[%s])", otherDictionary.Type, key))
+			return err
 		}
 	}
 
-	return true
+	return nil
 }
 
 type readonlyStorageRuntime struct {

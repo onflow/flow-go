@@ -93,6 +93,7 @@ func extractExecutionState(
 				migrators.NewAtreeRegisterMigrator(
 					rwf,
 					flagValidateMigration,
+					flagLogVerboseValidationError,
 				),
 
 				&migrators.DeduplicateContractNamesMigration{},

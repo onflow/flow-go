@@ -36,7 +36,7 @@ func TestAtreeRegisterMigration(t *testing.T) {
 			migrations.CreateAccountBasedMigration(log, 2,
 				[]migrations.AccountBasedMigration{
 					validation.PreMigration(),
-					migrations.NewAtreeRegisterMigrator(reporters.NewReportFileWriterFactory(dir, log), true),
+					migrations.NewAtreeRegisterMigrator(reporters.NewReportFileWriterFactory(dir, log), true, false),
 					validation.PostMigration(),
 				},
 			),
