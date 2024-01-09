@@ -1,14 +1,19 @@
 package fvm_test
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
 	"math"
+	"math/big"
 	"strings"
 	"testing"
 
-	"github.com/onflow/flow-go/fvm/evm/stdlib"
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	gethcrypto "github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/params"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
@@ -19,13 +24,15 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
-
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	exeUtils "github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
 	fvmCrypto "github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/environment"
-	errors "github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/evm/emulator"
+	"github.com/onflow/flow-go/fvm/evm/stdlib"
+	evmTypes "github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/meter"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -3011,6 +3018,167 @@ func TestEVM(t *testing.T) {
 				chain.ServiceAddress(),
 				addrBytes.String(),
 			))
+		}),
+	)
+	t.Run("transfer between FVM accounts", newVMTest().
+		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
+		withContextOptions(
+			fvm.WithEVMEnabled(true),
+			fvm.WithCadenceLogging(true),
+		).
+		run(func(
+			t *testing.T,
+			vm fvm.VM,
+			chain flow.Chain,
+			ctx fvm.Context,
+			snapshotTree snapshot.SnapshotTree,
+		) {
+			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
+			// generate test address
+			addressBytes, err := hex.DecodeString("3da9cb19b06A645BA6F12F79D8d7fcdd8A00cfD4")
+			require.NoError(t, err)
+			privateKey, err := gethcrypto.HexToECDSA("e43eb57b2f3be8009ea545059e171dc4fdf543ae97220a76c0684706357f7f39")
+			require.NoError(t, err)
+			addressCadenceBytes := make([]cadence.Value, 20)
+			for i := range addressCadenceBytes {
+				addressCadenceBytes[i] = cadence.UInt8(addressBytes[i])
+			}
+			addressArg, err := jsoncdc.Encode(cadence.NewArray(addressCadenceBytes).WithType(stdlib.EVMAddressBytesCadenceType))
+			require.NoError(t, err)
+
+			// Fund with 2.5 FLOW
+			amount, err := cadence.NewUFix64("2.5")
+			require.NoError(t, err)
+			amountArg, err := jsoncdc.Encode(amount)
+			require.NoError(t, err)
+
+			// Fund evm address
+			txBody := flow.NewTransactionBody().
+				SetScript([]byte(fmt.Sprintf(
+					`
+						import EVM from %s
+						import FungibleToken from %s
+						import FlowToken from %s
+
+						transaction(address: [UInt8; 20], amount: UFix64) {
+							let fundVault: @FlowToken.Vault
+
+							prepare(signer: AuthAccount) {
+								let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+									?? panic("Could not borrow reference to the owner's Vault!")
+						
+								self.fundVault <- vaultRef.withdraw(amount: amount) as! @FlowToken.Vault
+							}
+
+							execute {
+								let fundAddress = EVM.EVMAddress(bytes: address)
+								fundAddress.deposit(from: <-self.fundVault)
+							}
+						}
+					`,
+					sc.FlowServiceAccount.Address.HexWithPrefix(),
+					sc.FungibleToken.Address.HexWithPrefix(),
+					sc.FlowToken.Address.HexWithPrefix(),
+				))).
+				SetProposalKey(chain.ServiceAddress(), 0, 0).
+				SetPayer(chain.ServiceAddress()).
+				AddAuthorizer(chain.ServiceAddress()).
+				AddArgument(addressArg).
+				AddArgument(amountArg)
+
+			err = testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
+			require.NoError(t, err)
+			executionSnapshot, output, err :=
+				vm.Run(
+					ctx,
+					fvm.Transaction(txBody, 0),
+					snapshotTree,
+				)
+
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+			snapshotTree = snapshotTree.Append(executionSnapshot)
+
+			// One evm transfer is 1.0 Flow
+			evmTransfer := func(i uint64) (
+				*snapshot.ExecutionSnapshot,
+				fvm.ProcedureOutput,
+				error,
+			) {
+				nonce := i
+				to := gethcommon.HexToAddress("")
+				gasPrice := big.NewInt(0)
+				evmTx := types.NewTx(&types.LegacyTx{Nonce: nonce, To: &to, Value: evmTypes.OneFlowInAttoFlow, Gas: params.TxGas, GasPrice: gasPrice, Data: nil})
+
+				signed, err := types.SignTx(evmTx, emulator.GetDefaultSigner(), privateKey)
+				require.NoError(t, err)
+
+				var encoded bytes.Buffer
+				err = signed.EncodeRLP(&encoded)
+				require.NoError(t, err)
+
+				encodedCadence := make([]cadence.Value, 0)
+				for _, b := range encoded.Bytes() {
+					encodedCadence = append(encodedCadence, cadence.UInt8(b))
+				}
+				transactionBytes := cadence.NewArray(encodedCadence).WithType(stdlib.EVMTransactionBytesCadenceType)
+				transactionArg, err := jsoncdc.Encode(transactionBytes)
+				require.NoError(t, err)
+
+				txBody = flow.NewTransactionBody().
+					SetScript([]byte(fmt.Sprintf(
+						`
+						import EVM from %s
+						import FungibleToken from %s
+						import FlowToken from %s
+						
+						transaction(encodedTx: [UInt8]) {
+							//let bridgeVault: @FlowToken.Vault
+						
+							prepare(signer: AuthAccount){}
+						
+							execute {
+								let feeAcc <- EVM.createBridgedAccount()
+								EVM.run(tx: encodedTx, coinbase: feeAcc.address())
+								destroy feeAcc
+							}
+						}
+					`,
+						sc.FlowServiceAccount.Address.HexWithPrefix(),
+						sc.FungibleToken.Address.HexWithPrefix(),
+						sc.FlowToken.Address.HexWithPrefix(),
+					))).
+					SetProposalKey(chain.ServiceAddress(), 0, i+1).
+					SetPayer(chain.ServiceAddress()).
+					AddAuthorizer(chain.ServiceAddress()).
+					AddArgument(transactionArg)
+
+				err = testutil.SignTransactionAsServiceAccount(txBody, i+1, chain)
+				require.NoError(t, err)
+
+				return vm.Run(
+					ctx,
+					fvm.Transaction(txBody, 0),
+					snapshotTree)
+			}
+
+			// 2.5 - 1.0 -> OK
+			executionSnapshot, output, err = evmTransfer(0)
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+			snapshotTree = snapshotTree.Append(executionSnapshot)
+
+			// 1.5 - 1.0 -> OK
+			executionSnapshot, output, err = evmTransfer(1)
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+			snapshotTree = snapshotTree.Append(executionSnapshot)
+
+			// 0.5 - 1.0 -> ERROR
+			_, output, err = evmTransfer(2)
+			require.NoError(t, err)
+			require.Error(t, output.Err)
 		}),
 	)
 }
