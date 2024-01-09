@@ -671,7 +671,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 						blob.AuthorizedRequester(nil, builder.IdentityProvider, builder.Logger),
 					),
 					bitswap.WithTracer(
-						blob.NewTracer(node.Logger.With().Str("blob_service", channels.ExecutionDataService.String()).Logger()),
+						blob.NewTracer(node.Logger.With().Str("blob_service", channels.PublicExecutionDataService.String()).Logger()),
 					),
 				),
 			}
