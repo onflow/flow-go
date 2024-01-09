@@ -185,14 +185,6 @@ func PayloadsFromEmulatorSnapshot(snapshotPath string) ([]*ledger.Payload, error
 
 		registerId := registerIDKeyFromString(string(key))
 
-		// Type loading currently fails, because the core-contracts
-		// in the emulator snapshot are not migrated yet.
-		// So skip the values that get stored by default, and
-		// keep only the explicitly stored values in 'storage' domain.
-		if registerId.Key == "public" || registerId.Key == "private" {
-			continue
-		}
-
 		ledgerKey := convert.RegisterIDToLedgerKey(registerId)
 
 		payloads = append(

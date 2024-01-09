@@ -74,7 +74,7 @@ func (m *CadenceValueMigrator) MigrateAccount(
 
 	capabilityIDs := map[interpreter.AddressPath]interpreter.UInt64Value{}
 
-	reporter := newValueMigrationReporter(m.reporter)
+	reporter := newValueMigrationReporter(m.reporter, m.log)
 
 	m.log.Info().Msg("Migrating cadence values")
 
@@ -159,19 +159,21 @@ func (m *CadenceValueMigrator) mergeRegisterChanges(
 
 // cadenceValueMigrationReporter is the reporter for cadence value migrations
 type cadenceValueMigrationReporter struct {
-	rw reporters.ReportWriter
+	rw  reporters.ReportWriter
+	log zerolog.Logger
 }
 
 var _ capcons.LinkMigrationReporter = &cadenceValueMigrationReporter{}
 var _ capcons.CapabilityMigrationReporter = &cadenceValueMigrationReporter{}
 
-func newValueMigrationReporter(rw reporters.ReportWriter) *cadenceValueMigrationReporter {
+func newValueMigrationReporter(rw reporters.ReportWriter, log zerolog.Logger) *cadenceValueMigrationReporter {
 	return &cadenceValueMigrationReporter{
-		rw: rw,
+		rw:  rw,
+		log: log,
 	}
 }
 
-func (t *cadenceValueMigrationReporter) Report(
+func (t *cadenceValueMigrationReporter) Migrated(
 	addressPath interpreter.AddressPath,
 	migration string,
 ) {
@@ -179,6 +181,19 @@ func (t *cadenceValueMigrationReporter) Report(
 		Address:   addressPath,
 		Migration: migration,
 	})
+}
+
+func (t *cadenceValueMigrationReporter) Error(
+	addressPath interpreter.AddressPath,
+	migration string,
+	err error,
+) {
+	t.log.Error().Msgf(
+		"failed to run %s for path %s: %s",
+		migration,
+		addressPath,
+		err,
+	)
 }
 
 func (t *cadenceValueMigrationReporter) MigratedPathCapability(

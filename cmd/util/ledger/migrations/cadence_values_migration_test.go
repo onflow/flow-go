@@ -1,6 +1,9 @@
 package migrations
 
 import (
+	"bufio"
+	"bytes"
+	"io"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -37,7 +40,10 @@ func TestCadenceValuesMigration(t *testing.T) {
 	rwf := &testReportWriterFactory{}
 	valueMigration := NewCadenceValueMigrator(rwf)
 
-	err = valueMigration.InitMigration(zerolog.Nop(), nil, 0)
+	buf := bytes.Buffer{}
+	logger := zerolog.New(&buf).Level(zerolog.ErrorLevel)
+
+	err = valueMigration.InitMigration(logger, nil, 0)
 	require.NoError(t, err)
 
 	newPayloads, err := valueMigration.MigrateAccount(nil, address, payloads)
@@ -122,6 +128,30 @@ func TestCadenceValuesMigration(t *testing.T) {
 			},
 		},
 	)
+
+	// Check error logs
+
+	lines := readLines(&buf)
+	// Should have two type loading errors for link value migration.
+	require.Len(t, lines, 2)
+	assert.Contains(t, lines[0], "failed to run LinkValueMigration for path {01cf0e2f2f715450 /public/flowTokenReceiver}")
+	assert.Contains(t, lines[1], "failed to run LinkValueMigration for path {01cf0e2f2f715450 /public/flowTokenBalance}")
+}
+
+func readLines(reader io.Reader) []string {
+	lines := make([]string, 0)
+	var line []byte
+	var err error
+
+	r := bufio.NewReader(reader)
+	for {
+		line, _, err = r.ReadLine()
+		if err != nil {
+			break
+		}
+		lines = append(lines, string(line))
+	}
+	return lines
 }
 
 type testReportWriterFactory struct{}
