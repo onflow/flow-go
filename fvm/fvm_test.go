@@ -13,6 +13,7 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
+	cadenceErrors "github.com/onflow/cadence/runtime/errors"
 	"github.com/onflow/cadence/runtime/tests/utils"
 	"github.com/stretchr/testify/require"
 
@@ -3040,8 +3041,11 @@ func TestEVM(t *testing.T) {
 		_, output, err := vm.Run(ctx, script, snapshotTree)
 
 		require.NoError(t, err)
+		require.Error(t, output.Err)
 		require.True(t, errors.IsEVMError(output.Err))
-		require.NoError(t, output.Err)
 
+		// make sure error is not treated as internal error by Cadence
+		var internal cadenceErrors.InternalError
+		require.False(t, errors.As(output.Err, &internal))
 	}))
 }
