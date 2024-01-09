@@ -117,7 +117,7 @@ func IsAStateError(err error) bool {
 	return errors.As(err, &StateError{})
 }
 
-// FatalError is user for any error that is not user related and something
+// FatalError is used for any error that is not user related and something
 // unusual has happend. Usually we stop the node when this happens
 // given it might have a non-deterministic root.
 type FatalError struct {
