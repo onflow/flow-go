@@ -865,4 +865,8 @@ func Test_StopControlWorkers(t *testing.T) {
 func TestPatchedVersion(t *testing.T) {
 	require.True(t, semver.New("0.31.20").LessThan(*semver.New("0.31.21")))
 	require.True(t, semver.New("0.31.20-patch.1").LessThan(*semver.New("0.31.20"))) // be careful with this one
+
+	// a special build created with "+" would not change the version priority.
+	require.True(t, semver.New("0.32.11+without-netgo").Equal(*semver.New("0.32.11")))
+	require.True(t, semver.New("0.32.11-without-netgo").LessThan(*semver.New("0.32.11")))
 }
