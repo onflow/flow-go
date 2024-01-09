@@ -273,6 +273,7 @@ func cadenceCompositeValueEqual(
 	}
 
 	var err *validationError
+	vFieldNames := make([]string, 0, 10) // v's field names
 	v.ForEachField(nopMemoryGauge, func(fieldName string, fieldValue interpreter.Value) bool {
 		otherFieldValue := otherComposite.GetField(otherInterpreter, interpreter.EmptyLocationRange, fieldName)
 
@@ -282,8 +283,25 @@ func cadenceCompositeValueEqual(
 			return false
 		}
 
+		vFieldNames = append(vFieldNames, fieldName)
 		return true
 	})
+
+	// TODO: Use CompositeValue.FieldCount() from Cadence after it is merged and available.
+	otherFieldNames := make([]string, 0, len(vFieldNames)) // otherComposite's field names
+	otherComposite.ForEachField(nopMemoryGauge, func(fieldName string, _ interpreter.Value) bool {
+		otherFieldNames = append(otherFieldNames, fieldName)
+		return true
+	})
+
+	if len(vFieldNames) != len(otherFieldNames) {
+		return newValidationErrorf(
+			"composite %s fields differ: %v != %v",
+			v.TypeID(),
+			vFieldNames,
+			otherFieldNames,
+		)
+	}
 
 	return err
 }
