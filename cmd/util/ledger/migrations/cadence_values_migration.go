@@ -108,7 +108,10 @@ func (m *CadenceValueMigrator) MigrateAccount(
 	)
 
 	m.log.Info().Msg("Committing changes")
-	migration.Commit()
+	err = migration.Commit()
+	if err != nil {
+		return nil, fmt.Errorf("failed to commit changes: %w", err)
+	}
 
 	// finalize the transaction
 	result, err := migrationRuntime.TransactionState.FinalizeMainTransaction()
