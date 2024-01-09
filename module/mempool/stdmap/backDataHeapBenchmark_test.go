@@ -195,25 +195,10 @@ func (b *baselineLRU) AdjustWithInit(entityID flow.Identifier, adjust func(flow.
 
 // GetWithInit will retrieve the value item if the given key can be found.
 // If the key is not found, the init function will be called to create a new value.
-// Returns a bool which indicates whether the value was updated as well as the updated value and
-// a bool indicating whether the value was initialized.
-// Note: this is a benchmark helper, hence, the adjust-with-init provides serializability w.r.t other concurrent adjust-with-init or get-with-init operations,
-// and does not provide serializability w.r.t concurrent add, adjust or get operations.
+// Returns a bool which indicates whether the entity was found (or created).
 func (b *baselineLRU) GetWithInit(entityID flow.Identifier, init func() flow.Entity) (flow.Entity, bool) {
-	b.atomicAdjustMutex.Lock()
-	defer b.atomicAdjustMutex.Unlock()
-
-	e, ok := b.ByID(entityID)
-	if ok {
-		return e, true
-	}
-
-	e = init()
-	added := b.Add(entityID, e)
-	if !added {
-		return nil, false
-	}
-	return e, true
+	e, _, _ := b.c.PeekOrAdd(entityID, init())
+	return e.(flow.Entity), true
 }
 
 // ByID returns the given item from the pool.
