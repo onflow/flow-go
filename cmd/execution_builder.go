@@ -801,14 +801,24 @@ func (exeNode *ExecutionNode) LoadRegisterStore(
 
 	if !bootstrapped {
 		checkpointFile := path.Join(exeNode.exeConf.triedir, modelbootstrap.FilenameWALRootCheckpoint)
-		root, err := exeNode.builder.RootSnapshot.Head()
+		sealedRoot, err := node.State.Params().SealedRoot()
 		if err != nil {
-			return fmt.Errorf("could not get root snapshot head: %w", err)
+			return fmt.Errorf("could not get sealed root: %w", err)
 		}
 
-		checkpointHeight := root.Height
+		rootSeal, err := node.State.Params().Seal()
+		if err != nil {
+			return fmt.Errorf("could not get root seal: %w", err)
+		}
 
-		err = bootstrap.ImportRegistersFromCheckpoint(node.Logger, checkpointFile, checkpointHeight, pebbledb, exeNode.exeConf.importCheckpointWorkerCount)
+		if sealedRoot.ID() != rootSeal.BlockID {
+			return fmt.Errorf("mismatching root seal and sealed root: %v != %v", sealedRoot.ID(), rootSeal.BlockID)
+		}
+
+		checkpointHeight := sealedRoot.Height
+		rootHash := ledgerpkg.RootHash(rootSeal.FinalState)
+
+		err = bootstrap.ImportRegistersFromCheckpoint(node.Logger, checkpointFile, checkpointHeight, rootHash, pebbledb, exeNode.exeConf.importCheckpointWorkerCount)
 		if err != nil {
 			return fmt.Errorf("could not import registers from checkpoint: %w", err)
 		}
@@ -820,12 +830,17 @@ func (exeNode *ExecutionNode) LoadRegisterStore(
 
 	reader := finalizedreader.NewFinalizedReader(node.Storage.Headers, node.LastFinalizedHeader.Height)
 	node.ProtocolEvents.AddConsumer(reader)
+	notifier := storehouse.NewRegisterStoreMetrics(exeNode.collector)
+
+	// report latest finalized and executed height as metrics
+	notifier.OnFinalizedAndExecutedHeightUpdated(diskStore.LatestHeight())
 
 	registerStore, err := storehouse.NewRegisterStore(
 		diskStore,
 		nil, // TODO: replace with real WAL
 		reader,
 		node.Logger,
+		notifier,
 	)
 	if err != nil {
 		return err
@@ -926,12 +941,19 @@ func (exeNode *ExecutionNode) LoadCheckerEngine(
 	module.ReadyDoneAware,
 	error,
 ) {
-	exeNode.checkerEng = checker.New(
+	if !exeNode.exeConf.enableChecker {
+		node.Logger.Warn().Msgf("checker engine is disabled")
+		return &module.NoopReadyDoneAware{}, nil
+	}
+
+	node.Logger.Info().Msgf("checker engine is enabled")
+
+	core := checker.NewCore(
 		node.Logger,
 		node.State,
 		exeNode.executionState,
-		node.Storage.Seals,
 	)
+	exeNode.checkerEng = checker.NewEngine(core)
 	return exeNode.checkerEng, nil
 }
 
@@ -1040,8 +1062,6 @@ func (exeNode *ExecutionNode) LoadFollowerCore(
 	if err != nil {
 		return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
 	}
-
-	exeNode.followerDistributor.AddFinalizationConsumer(exeNode.checkerEng)
 
 	// creates a consensus follower with ingestEngine as the notifier
 	// so that it gets notified upon each new finalized block

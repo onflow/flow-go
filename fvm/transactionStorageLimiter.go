@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
@@ -33,6 +34,7 @@ type TransactionStorageLimiter struct{}
 // The payers balance is considered to be maxTxFees lower that its actual balance, due to the fact that
 // the fee deduction step happens after the storage limit check.
 func (limiter TransactionStorageLimiter) CheckStorageLimits(
+	ctx Context,
 	env environment.Environment,
 	snapshot *snapshot.ExecutionSnapshot,
 	payer flow.Address,
@@ -44,7 +46,7 @@ func (limiter TransactionStorageLimiter) CheckStorageLimits(
 
 	defer env.StartChildSpan(trace.FVMTransactionStorageUsedCheck).End()
 
-	err := limiter.checkStorageLimits(env, snapshot, payer, maxTxFees)
+	err := limiter.checkStorageLimits(ctx, env, snapshot, payer, maxTxFees)
 	if err != nil {
 		return fmt.Errorf("storage limit check failed: %w", err)
 	}
@@ -55,6 +57,7 @@ func (limiter TransactionStorageLimiter) CheckStorageLimits(
 // storage limit is exceeded.  The returned list include addresses of updated
 // registers (and the payer's address).
 func (limiter TransactionStorageLimiter) getStorageCheckAddresses(
+	ctx Context,
 	snapshot *snapshot.ExecutionSnapshot,
 	payer flow.Address,
 	maxTxFees uint64,
@@ -71,9 +74,14 @@ func (limiter TransactionStorageLimiter) getStorageCheckAddresses(
 		addresses = append(addresses, payer)
 	}
 
+	sc := systemcontracts.SystemContractsForChain(ctx.Chain.ChainID())
 	for id := range snapshot.WriteSet {
 		address, ok := addressFromRegisterId(id)
 		if !ok {
+			continue
+		}
+
+		if limiter.shouldSkipSpecialAddress(ctx, address, sc) {
 			continue
 		}
 
@@ -88,10 +96,10 @@ func (limiter TransactionStorageLimiter) getStorageCheckAddresses(
 
 	slices.SortFunc(
 		addresses,
-		func(a flow.Address, b flow.Address) bool {
+		func(a flow.Address, b flow.Address) int {
 			// reverse order to maintain compatibility with previous
 			// implementation.
-			return bytes.Compare(a[:], b[:]) >= 0
+			return bytes.Compare(b[:], a[:])
 		})
 	return addresses
 }
@@ -99,12 +107,13 @@ func (limiter TransactionStorageLimiter) getStorageCheckAddresses(
 // checkStorageLimits checks if the transaction changed the storage of any
 // address and exceeded the storage limit.
 func (limiter TransactionStorageLimiter) checkStorageLimits(
+	ctx Context,
 	env environment.Environment,
 	snapshot *snapshot.ExecutionSnapshot,
 	payer flow.Address,
 	maxTxFees uint64,
 ) error {
-	addresses := limiter.getStorageCheckAddresses(snapshot, payer, maxTxFees)
+	addresses := limiter.getStorageCheckAddresses(ctx, snapshot, payer, maxTxFees)
 
 	usages := make([]uint64, len(addresses))
 
@@ -154,4 +163,15 @@ func (limiter TransactionStorageLimiter) checkStorageLimits(
 	}
 
 	return nil
+}
+
+// shouldSkipSpecialAddress returns true if the address is a special address where storage
+// limits are not enforced.
+// This is currently only the EVM storage address. This is a temporary solution.
+func (limiter TransactionStorageLimiter) shouldSkipSpecialAddress(
+	ctx Context,
+	address flow.Address,
+	sc *systemcontracts.SystemContracts,
+) bool {
+	return sc.EVM.Address == address
 }
