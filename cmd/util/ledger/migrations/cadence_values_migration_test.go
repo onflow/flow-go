@@ -3,6 +3,7 @@ package migrations
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"io"
 	"testing"
 
@@ -21,13 +22,15 @@ import (
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 )
 
-const snapshotPath string = "test-data/cadence_values_migration/snapshot"
+const snapshotPath = "test-data/cadence_values_migration/snapshot"
+
+const testAccountAddress = "01cf0e2f2f715450"
 
 func TestCadenceValuesMigration(t *testing.T) {
 
 	t.Parallel()
 
-	address, err := common.HexToAddress("01cf0e2f2f715450")
+	address, err := common.HexToAddress(testAccountAddress)
 	require.NoError(t, err)
 
 	// Get the old payloads
@@ -138,7 +141,7 @@ func TestLinkValueMigrationTypeErrors(t *testing.T) {
 
 	t.Parallel()
 
-	address, err := common.HexToAddress("01cf0e2f2f715450")
+	address, err := common.HexToAddress(testAccountAddress)
 	require.NoError(t, err)
 
 	// Get the old payloads
@@ -172,8 +175,24 @@ func TestLinkValueMigrationTypeErrors(t *testing.T) {
 	// Should have two type loading errors for link value migration.
 	lines := readLines(&buf)
 	require.Len(t, lines, 2)
-	assert.Contains(t, lines[0], "failed to run LinkValueMigration for path {01cf0e2f2f715450 /public/flowTokenReceiver}")
-	assert.Contains(t, lines[1], "failed to run LinkValueMigration for path {01cf0e2f2f715450 /public/flowTokenBalance}")
+
+	assert.Contains(
+		t,
+		lines[0],
+		fmt.Sprintf(
+			"failed to run LinkValueMigration for path {%s /public/flowTokenReceiver}",
+			testAccountAddress,
+		),
+	)
+
+	assert.Contains(
+		t,
+		lines[1],
+		fmt.Sprintf(
+			"failed to run LinkValueMigration for path {%s /public/flowTokenBalance}",
+			testAccountAddress,
+		),
+	)
 }
 
 func readLines(reader io.Reader) []string {
