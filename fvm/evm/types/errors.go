@@ -16,8 +16,9 @@ var (
 	// left in the context of flow transaction to execute the evm operation.
 	ErrInsufficientComputation = errors.New("insufficient computation")
 
-	// unauthorized method call, usually emited when calls are called on EOA accounts
+	// ErrUnAuthroizedMethodCall method call, usually emited when calls are called on EOA accounts
 	ErrUnAuthroizedMethodCall = errors.New("unauthroized method call")
+
 	// ErrInsufficientTotalSupply is returned when flow token
 	// is withdraw request is there but not enough balance is on EVM vault
 	// this should never happen but its a saftey measure to protect Flow against EVM issues.
