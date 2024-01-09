@@ -3015,17 +3015,15 @@ func TestEVM(t *testing.T) {
 
 	t.Run("execution reverted", newVMTest().
 		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
-		withContextOptions(
-			fvm.WithEVMEnabled(false),
-			fvm.WithCadenceLogging(true),
-		).run(func(
-		t *testing.T,
-		vm fvm.VM,
-		chain flow.Chain,
-		ctx fvm.Context,
-		snapshotTree snapshot.SnapshotTree,
-	) {
-		script := fvm.Script([]byte(fmt.Sprintf(`
+		withContextOptions(fvm.WithEVMEnabled(true)).
+		run(func(
+			t *testing.T,
+			vm fvm.VM,
+			chain flow.Chain,
+			ctx fvm.Context,
+			snapshotTree snapshot.SnapshotTree,
+		) {
+			script := fvm.Script([]byte(fmt.Sprintf(`
 			import EVM from %s
 			
 			pub fun main() {
@@ -3037,14 +3035,14 @@ func TestEVM(t *testing.T) {
 			}
 		`, chain.ServiceAddress().HexWithPrefix())))
 
-		_, output, err := vm.Run(ctx, script, snapshotTree)
+			_, output, err := vm.Run(ctx, script, snapshotTree)
 
-		require.NoError(t, err)
-		require.Error(t, output.Err)
-		require.True(t, errors.IsEVMError(output.Err))
+			require.NoError(t, err)
+			require.Error(t, output.Err)
+			require.True(t, errors.IsEVMError(output.Err))
 
-		// make sure error is not treated as internal error by Cadence
-		var internal cadenceErrors.InternalError
-		require.False(t, errors.As(output.Err, &internal))
-	}))
+			// make sure error is not treated as internal error by Cadence
+			var internal cadenceErrors.InternalError
+			require.False(t, errors.As(output.Err, &internal))
+		}))
 }
