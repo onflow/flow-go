@@ -8,8 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/onflow/flow-go/fvm/evm/stdlib"
-
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
@@ -19,13 +17,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
-
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	exeUtils "github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
 	fvmCrypto "github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/environment"
 	errors "github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/evm/stdlib"
 	"github.com/onflow/flow-go/fvm/meter"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -3013,4 +3011,37 @@ func TestEVM(t *testing.T) {
 			))
 		}),
 	)
+
+	t.Run("execution reverted", newVMTest().
+		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
+		withContextOptions(
+			fvm.WithEVMEnabled(false),
+			fvm.WithCadenceLogging(true),
+		).run(func(
+		t *testing.T,
+		vm fvm.VM,
+		chain flow.Chain,
+		ctx fvm.Context,
+		snapshotTree snapshot.SnapshotTree,
+	) {
+		script := fvm.Script([]byte(fmt.Sprintf(`
+			import EVM from %s
+			
+			pub fun main() {
+				let bal = EVM.Balance(flow: 1.0);
+				let acc <- EVM.createBridgedAccount();
+				// withdraw insufficient balance
+				destroy acc.withdraw(balance: bal);
+				destroy acc;
+			}
+		`, chain.ServiceAddress().HexWithPrefix())))
+
+		ctx = fvm.NewContextFromParent(ctx, fvm.WithEVMEnabled(true))
+		_, output, err := vm.Run(ctx, script, snapshotTree)
+
+		require.NoError(t, err)
+		require.True(t, errors.IsEVMError(output.Err))
+		require.NoError(t, output.Err)
+
+	}))
 }
