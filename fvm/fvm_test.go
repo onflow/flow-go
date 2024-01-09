@@ -3037,7 +3037,6 @@ func TestEVM(t *testing.T) {
 			}
 		`, chain.ServiceAddress().HexWithPrefix())))
 
-		ctx = fvm.NewContextFromParent(ctx, fvm.WithEVMEnabled(true))
 		_, output, err := vm.Run(ctx, script, snapshotTree)
 
 		require.NoError(t, err)
