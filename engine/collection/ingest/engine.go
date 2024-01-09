@@ -70,6 +70,7 @@ func New(
 			MaxTransactionByteSize: config.MaxTransactionByteSize,
 			MaxCollectionByteSize:  config.MaxCollectionByteSize,
 		},
+		access.NewNoopLimit(),
 	)
 
 	// FIFO queue for transactions

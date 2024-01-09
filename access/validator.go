@@ -42,6 +42,20 @@ func (b *ProtocolStateBlocks) FinalizedHeader() (*flow.Header, error) {
 	return b.state.Final().Head()
 }
 
+type RateLimiter interface {
+	IsRateLimited(address flow.Address) bool
+}
+
+type NoopLimiter struct{}
+
+func NewNoopLimit() *NoopLimiter {
+	return &NoopLimiter{}
+}
+
+func (l *NoopLimiter) IsRateLimited(address flow.Address) bool {
+	return false
+}
+
 type TransactionValidationOptions struct {
 	Expiry                       uint
 	ExpiryBuffer                 uint
@@ -58,22 +72,30 @@ type TransactionValidator struct {
 	chain                 flow.Chain // for checking validity of addresses
 	options               TransactionValidationOptions
 	serviceAccountAddress flow.Address
+	limiter               RateLimiter
 }
 
 func NewTransactionValidator(
 	blocks Blocks,
 	chain flow.Chain,
 	options TransactionValidationOptions,
+	rateLimiter RateLimiter,
 ) *TransactionValidator {
 	return &TransactionValidator{
 		blocks:                blocks,
 		chain:                 chain,
 		options:               options,
 		serviceAccountAddress: chain.ServiceAddress(),
+		limiter:               rateLimiter,
 	}
 }
 
 func (v *TransactionValidator) Validate(tx *flow.TransactionBody) (err error) {
+	err = v.checkRateLimitPayer(tx)
+	if err != nil {
+		return err
+	}
+
 	err = v.checkTxSizeLimit(tx)
 	if err != nil {
 		return err
@@ -116,6 +138,15 @@ func (v *TransactionValidator) Validate(tx *flow.TransactionBody) (err error) {
 
 	// TODO replace checkSignatureFormat by verifying the account/payer signatures
 
+	return nil
+}
+
+func (v *TransactionValidator) checkRateLimitPayer(tx *flow.TransactionBody) error {
+	if v.limiter.IsRateLimited(tx.Payer) {
+		return InvalidTxRateLimittedError{
+			Payer: tx.Payer,
+		}
+	}
 	return nil
 }
 
