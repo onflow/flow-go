@@ -3,7 +3,7 @@ package precompiles
 import (
 	"fmt"
 
-	gethVM "github.com/ethereum/go-ethereum/core/vm"
+	"github.com/onflow/flow-go/fvm/evm/types"
 )
 
 // This is derived as the first 4 bytes of the Keccak hash of the ASCII form of the signature of the method
@@ -17,12 +17,23 @@ type Callable interface {
 	Run(input []byte) ([]byte, error)
 }
 
-func GetPrecompileContract(callables map[MethodID]Callable) gethVM.PrecompiledContract {
-	return &Precompile{callables: callables}
+func multiMethodPrecompileContract(
+	address types.Address,
+	callables map[MethodID]Callable,
+) types.Precompile {
+	return &Precompile{
+		callables: callables,
+		address:   address,
+	}
 }
 
 type Precompile struct {
 	callables map[MethodID]Callable
+	address   types.Address
+}
+
+func (p *Precompile) Address() types.Address {
+	return p.address
 }
 
 // RequiredPrice calculates the contract gas use

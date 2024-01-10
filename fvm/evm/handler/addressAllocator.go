@@ -11,6 +11,12 @@ import (
 
 const ledgerAddressAllocatorKey = "AddressAllocator"
 
+var (
+	FlowEVMAddressSpacePrefix      = []byte{0, 0, 0, 0, 0, 0, 0, 1}
+	FlowEVMPrecompileAddressPrefix = []byte{0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1}
+	FlowEVMCOAAddressPrefix        = []byte{0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 2}
+)
+
 type AddressAllocator struct {
 	led         atree.Ledger
 	flexAddress flow.Address
@@ -26,8 +32,8 @@ func NewAddressAllocator(led atree.Ledger, flexAddress flow.Address) (*AddressAl
 	}, nil
 }
 
-// AllocateAddress allocates an address
-func (aa *AddressAllocator) AllocateAddress() (types.Address, error) {
+// AllocateCOAAddress allocates an address for COA
+func (aa *AddressAllocator) AllocateCOAAddress() (types.Address, error) {
 	data, err := aa.led.GetValue(aa.flexAddress[:], []byte(ledgerAddressAllocatorKey))
 	if err != nil {
 		return types.Address{}, err
@@ -38,10 +44,7 @@ func (aa *AddressAllocator) AllocateAddress() (types.Address, error) {
 		uuid = binary.BigEndian.Uint64(data)
 	}
 
-	target := types.Address{}
-	// first 12 bytes would be zero
-	// the next 8 bytes would be an increment of the UUID index
-	binary.BigEndian.PutUint64(target[12:], uuid)
+	target := makeCOAAddress(uuid)
 
 	// store new uuid
 	newData := make([]byte, 8)
@@ -52,4 +55,23 @@ func (aa *AddressAllocator) AllocateAddress() (types.Address, error) {
 	}
 
 	return target, nil
+}
+
+func makeCOAAddress(index uint64) types.Address {
+	var addr types.Address
+	copy(addr[:types.AddressLength], FlowEVMCOAAddressPrefix)
+	binary.BigEndian.PutUint64(addr[types.AddressLength-8:], index)
+	return addr
+}
+
+func (aa *AddressAllocator) AllocatePrecompileAddress(index uint64) types.Address {
+	target := makePrecompileAddress(index)
+	return target
+}
+
+func makePrecompileAddress(index uint64) types.Address {
+	var addr types.Address
+	copy(addr[:types.AddressLength], FlowEVMPrecompileAddressPrefix)
+	binary.BigEndian.PutUint64(addr[types.AddressLength-8:], index)
+	return addr
 }

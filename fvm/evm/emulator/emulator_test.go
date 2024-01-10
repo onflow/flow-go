@@ -365,7 +365,11 @@ func TestCallingExtraPrecompiles(t *testing.T) {
 
 				input := []byte{1, 2}
 				output := []byte{3, 4}
+				addr := testutils.RandomAddress(t)
 				pc := &MockedPrecompile{
+					AddressFunc: func() types.Address {
+						return addr
+					},
 					RequiredGasFunc: func(input []byte) uint64 {
 						return uint64(10)
 					},
@@ -374,9 +378,9 @@ func TestCallingExtraPrecompiles(t *testing.T) {
 						return output, nil
 					},
 				}
-				addr := gethCommon.BytesToAddress([]byte{128, 128})
+
 				ctx := types.NewDefaultBlockContext(blockNumber.Uint64())
-				ctx.ExtraPrecompiles[addr] = pc
+				ctx.ExtraPrecompiles = []types.Precompile{pc}
 
 				blk, err := em.NewBlockView(ctx)
 				require.NoError(t, err)
@@ -384,7 +388,7 @@ func TestCallingExtraPrecompiles(t *testing.T) {
 				res, err := blk.DirectCall(
 					types.NewContractCall(
 						testAccount,
-						types.NewAddress(addr),
+						types.NewAddress(addr.ToCommon()),
 						input,
 						1_000_000,
 						big.NewInt(0), // this should be zero because the contract doesn't have receiver
@@ -398,8 +402,16 @@ func TestCallingExtraPrecompiles(t *testing.T) {
 }
 
 type MockedPrecompile struct {
+	AddressFunc     func() types.Address
 	RequiredGasFunc func(input []byte) uint64
 	RunFunc         func(input []byte) ([]byte, error)
+}
+
+func (mp *MockedPrecompile) Address() types.Address {
+	if mp.AddressFunc == nil {
+		panic("Address not set for the mocked precompile")
+	}
+	return mp.AddressFunc()
 }
 
 func (mp *MockedPrecompile) RequiredGas(input []byte) uint64 {

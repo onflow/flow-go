@@ -4,7 +4,8 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	gethVM "github.com/ethereum/go-ethereum/core/vm"
+	gethCommon "github.com/ethereum/go-ethereum/common"
+	"github.com/onflow/flow-go/fvm/evm/types"
 )
 
 var (
@@ -19,7 +20,7 @@ var (
 )
 
 type flowBlockHeightCallable struct {
-	flowBlockHeight uint64
+	flowBlockHeightLookUp func() (uint64, error)
 }
 
 func (c *flowBlockHeightCallable) MethodID() MethodID {
@@ -34,10 +35,13 @@ func (c *flowBlockHeightCallable) Run(input []byte) ([]byte, error) {
 	if len(input) > 0 {
 		return nil, fmt.Errorf("unexpected input is provided")
 	}
-	// TODO maybe replace this with what abi encode does
+	bh, err := c.flowBlockHeightLookUp()
+	if err != nil {
+		return nil, err
+	}
 	encoded := make([]byte, 8)
-	binary.BigEndian.PutUint64(encoded, c.flowBlockHeight)
-	return encoded, nil
+	binary.BigEndian.PutUint64(encoded, bh)
+	return gethCommon.LeftPadBytes(encoded, 32), nil
 }
 
 type verifyProofCallable struct {
@@ -63,10 +67,15 @@ func (c *verifyProofCallable) Run(input []byte) ([]byte, error) {
 	return false32Byte, err
 }
 
-func GetArchContract(flowBlockHeight uint64, verifyProof func([]byte) (bool, error)) gethVM.PrecompiledContract {
-	fbh := &flowBlockHeightCallable{flowBlockHeight}
+func ArchContract(
+	address types.Address,
+	heightProvider func() (uint64, error),
+	verifyProof func([]byte) (bool, error),
+) types.Precompile {
+	fbh := &flowBlockHeightCallable{heightProvider}
 	vc := &verifyProofCallable{verifyProof}
-	return GetPrecompileContract(
+	return multiMethodPrecompileContract(
+		address,
 		map[MethodID]Callable{
 			fbh.MethodID(): fbh,
 			vc.MethodID():  vc,

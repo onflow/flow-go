@@ -65,7 +65,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 							return result, nil
 						},
 					}
-					handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em)
+					handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em, nil)
 
 					coinbase := types.NewAddress(gethCommon.Address{})
 
@@ -143,7 +143,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 							return &types.Result{}, types.NewEVMExecutionError(fmt.Errorf("some sort of error"))
 						},
 					}
-					handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em)
+					handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em, nil)
 
 					coinbase := types.NewAddress(gethCommon.Address{})
 
@@ -279,7 +279,7 @@ func TestHandler_OpsWithoutEmulator(t *testing.T) {
 				aa, err := handler.NewAddressAllocator(backend, rootAddr)
 				require.NoError(t, err)
 
-				handler := handler.NewContractHandler(flowTokenAddress, blockchain, aa, backend, nil)
+				handler := handler.NewContractHandler(flowTokenAddress, blockchain, aa, backend, nil, nil)
 
 				foa := handler.AllocateAddress()
 				require.NotNil(t, foa)
@@ -370,7 +370,7 @@ func TestHandler_BridgedAccount(t *testing.T) {
 					assertPanic(t, types.IsAUnAuthroizedMethodCallError, func() {
 						em := &testutils.TestEmulator{}
 
-						handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em)
+						handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em, nil)
 
 						account := handler.AccountByAddress(testutils.RandomAddress(t), false)
 						account.Withdraw(types.Balance(1))
@@ -384,7 +384,7 @@ func TestHandler_BridgedAccount(t *testing.T) {
 							},
 						}
 
-						handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em)
+						handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em, nil)
 						account := handler.AccountByAddress(testutils.RandomAddress(t), true)
 
 						account.Withdraw(types.Balance(1))
@@ -398,7 +398,7 @@ func TestHandler_BridgedAccount(t *testing.T) {
 							},
 						}
 
-						handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em)
+						handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em, nil)
 						account := handler.AccountByAddress(testutils.RandomAddress(t), true)
 
 						account.Withdraw(types.Balance(0))
@@ -412,7 +412,7 @@ func TestHandler_BridgedAccount(t *testing.T) {
 							},
 						}
 
-						handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em)
+						handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em, nil)
 						account := handler.AccountByAddress(testutils.RandomAddress(t), true)
 
 						account.Withdraw(types.Balance(0))
@@ -442,7 +442,7 @@ func TestHandler_BridgedAccount(t *testing.T) {
 							},
 						}
 
-						handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em)
+						handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em, nil)
 						account := handler.AccountByAddress(testutils.RandomAddress(t), true)
 
 						account.Deposit(types.NewFlowTokenVault(1))
@@ -456,7 +456,7 @@ func TestHandler_BridgedAccount(t *testing.T) {
 							},
 						}
 
-						handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em)
+						handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, em, nil)
 						account := handler.AccountByAddress(testutils.RandomAddress(t), true)
 
 						account.Deposit(types.NewFlowTokenVault(1))
@@ -540,6 +540,6 @@ func SetupHandler(t testing.TB, backend types.Backend, rootAddr flow.Address) *h
 
 	emulator := emulator.NewEmulator(backend, rootAddr)
 
-	handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, emulator)
+	handler := handler.NewContractHandler(flowTokenAddress, bs, aa, backend, emulator, nil)
 	return handler
 }

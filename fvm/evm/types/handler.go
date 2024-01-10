@@ -51,8 +51,11 @@ type Backend interface {
 
 // AddressAllocator allocates addresses, used by the handler
 type AddressAllocator interface {
-	// AllocateAddress allocates an address to be used by a bridged account resource
-	AllocateAddress() (Address, error)
+	// AllocateAddress allocates an address to be used by a COA resource
+	AllocateCOAAddress() (Address, error)
+
+	// AllocateAddress allocates an address by index to be used by a precompile contract
+	AllocatePrecompileAddress(index uint64) Address
 }
 
 // BlockStore stores the chain of blocks
@@ -71,4 +74,11 @@ type BlockStore interface {
 
 	// ResetBlockProposal resets the block proposal
 	ResetBlockProposal() error
+}
+
+// CadenceArchProvider provides some of the functionalities needed to the candence arch
+type CadenceArchProvider interface {
+	FlowBlockHeight() (uint64, error)
+
+	VerifyAccountProof([]byte) (bool, error)
 }

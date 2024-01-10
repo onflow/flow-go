@@ -11,6 +11,7 @@ import (
 	gethVM "github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/onflow/flow-go/fvm/evm/types"
 )
 
 var (
@@ -93,6 +94,7 @@ func defaultConfig() *Config {
 				return common.BytesToHash(crypto.Keccak256([]byte(new(big.Int).SetUint64(n).String())))
 			},
 		},
+		ExtraPrecompiles: make(map[gethCommon.Address]gethVM.PrecompiledContract),
 	}
 }
 
@@ -188,9 +190,11 @@ func WithDirectCallBaseGasUsage(gas uint64) Option {
 	}
 }
 
-func WithExtraPrecompiles(pc map[common.Address]vm.PrecompiledContract) Option {
+func WithExtraPrecompiles(precompiles []types.Precompile) Option {
 	return func(c *Config) *Config {
-		c.ExtraPrecompiles = pc
+		for _, pc := range precompiles {
+			c.ExtraPrecompiles[pc.Address().ToCommon()] = pc
+		}
 		return c
 	}
 }

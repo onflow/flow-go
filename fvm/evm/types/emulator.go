@@ -3,7 +3,6 @@ package types
 import (
 	"math/big"
 
-	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	gethVM "github.com/ethereum/go-ethereum/core/vm"
 )
@@ -16,6 +15,11 @@ var (
 	BlockNumberForEVMRules = big.NewInt(1)
 )
 
+type Precompile interface {
+	gethVM.PrecompiledContract
+	Address() Address
+}
+
 // BlockContext holds the context needed for the emulator operations
 type BlockContext struct {
 	BlockNumber            uint64
@@ -24,7 +28,7 @@ type BlockContext struct {
 	GasFeeCollector        Address
 
 	// a set of extra precompiles to be injected
-	ExtraPrecompiles map[gethCommon.Address]gethVM.PrecompiledContract
+	ExtraPrecompiles []Precompile
 }
 
 // NewDefaultBlockContext returns a new default block context
@@ -33,7 +37,7 @@ func NewDefaultBlockContext(BlockNumber uint64) BlockContext {
 		BlockNumber:            BlockNumber,
 		DirectCallBaseGasUsage: DefaultDirectCallBaseGasUsage,
 		DirectCallGasPrice:     DefaultDirectCallGasPrice,
-		ExtraPrecompiles:       make(map[gethCommon.Address]gethVM.PrecompiledContract),
+		ExtraPrecompiles:       make([]Precompile, 0),
 	}
 }
 
