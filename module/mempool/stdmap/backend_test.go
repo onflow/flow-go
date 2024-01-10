@@ -241,7 +241,9 @@ func TestBackend_AdjustWithInit_Concurrent_HeroCache(t *testing.T) {
 
 			backend.AdjustWithInit(e.ID(), func(entity flow.Entity) flow.Entity {
 				// increment nonce of the entity
-				entity.(*unittest.MockEntity).Nonce++
+				mockEntity, ok := entity.(*unittest.MockEntity)
+				require.True(t, ok)
+				mockEntity.Nonce++
 				return entity
 			}, func() flow.Entity {
 				return e
@@ -306,7 +308,9 @@ func TestBackend_AdjustWithInit_Concurrent_MapBased(t *testing.T) {
 
 			backend.AdjustWithInit(e.ID(), func(entity flow.Entity) flow.Entity {
 				// increment nonce of the entity
-				entity.(*unittest.MockEntity).Nonce++
+				mockEntity, ok := entity.(*unittest.MockEntity)
+				require.True(t, ok)
+				mockEntity.Nonce++
 				return entity
 			}, func() flow.Entity {
 				return e
