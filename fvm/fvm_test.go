@@ -3073,12 +3073,12 @@ func TestEVM(t *testing.T) {
 
 			for _, e := range errWrappers {
 				script := fvm.Script([]byte(fmt.Sprintf(`
-				import EVM from %s
-				
-				pub fun main() {
-					destroy <- EVM.createBridgedAccount();
-				}
-			`, chain.ServiceAddress().HexWithPrefix())))
+					import EVM from %s
+					
+					pub fun main() {
+						destroy <- EVM.createBridgedAccount();
+					}
+				`, chain.ServiceAddress().HexWithPrefix())))
 
 				_, output, err := vm.Run(ctx, script, e)
 
