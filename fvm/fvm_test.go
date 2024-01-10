@@ -23,8 +23,9 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	fvmCrypto "github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/environment"
-	errors "github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
+	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/meter"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -3013,6 +3014,7 @@ func TestEVM(t *testing.T) {
 		}),
 	)
 
+	// this test makes sure the execution error is correctly handled and returned as a correct type
 	t.Run("execution reverted", newVMTest().
 		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
 		withContextOptions(fvm.WithEVMEnabled(true)).
@@ -3024,16 +3026,16 @@ func TestEVM(t *testing.T) {
 			snapshotTree snapshot.SnapshotTree,
 		) {
 			script := fvm.Script([]byte(fmt.Sprintf(`
-			import EVM from %s
-			
-			pub fun main() {
-				let bal = EVM.Balance(flow: 1.0);
-				let acc <- EVM.createBridgedAccount();
-				// withdraw insufficient balance
-				destroy acc.withdraw(balance: bal);
-				destroy acc;
-			}
-		`, chain.ServiceAddress().HexWithPrefix())))
+				import EVM from %s
+				
+				pub fun main() {
+					let bal = EVM.Balance(flow: 1.0);
+					let acc <- EVM.createBridgedAccount();
+					// withdraw insufficient balance
+					destroy acc.withdraw(balance: bal);
+					destroy acc;
+				}
+			`, chain.ServiceAddress().HexWithPrefix())))
 
 			_, output, err := vm.Run(ctx, script, snapshotTree)
 
@@ -3044,5 +3046,69 @@ func TestEVM(t *testing.T) {
 			// make sure error is not treated as internal error by Cadence
 			var internal cadenceErrors.InternalError
 			require.False(t, errors.As(output.Err, &internal))
-		}))
+		}),
+	)
+
+	// this test makes sure the EVM error is correctly returned as an error and has a correct type
+	// we have implemented a snapshot wrapper to return an error from the EVM
+	t.Run("internal evm error handling", newVMTest().
+		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
+		withContextOptions(fvm.WithEVMEnabled(true)).
+		run(func(
+			t *testing.T,
+			vm fvm.VM,
+			chain flow.Chain,
+			ctx fvm.Context,
+			snapshotTree snapshot.SnapshotTree,
+		) {
+			errWrappers := []evmErrorSnapshot{{
+				snapshotTree: snapshotTree,
+				err:          types.ErrNotImplemented,
+				errChecker:   types.IsAFatalError,
+			}, {
+				snapshotTree: snapshotTree,
+				err:          types.NewStateError(fmt.Errorf("test state error")),
+				errChecker:   types.IsAStateError,
+			}}
+
+			for _, e := range errWrappers {
+				script := fvm.Script([]byte(fmt.Sprintf(`
+				import EVM from %s
+				
+				pub fun main() {
+					destroy <- EVM.createBridgedAccount();
+				}
+			`, chain.ServiceAddress().HexWithPrefix())))
+
+				_, output, err := vm.Run(ctx, script, e)
+
+				require.NoError(t, output.Err)
+				require.Error(t, err)
+				// make sure error it's the right type of error
+				require.True(t, e.errChecker(err))
+			}
+		}),
+	)
+}
+
+// evmErrorSnapshot will return an error once it gets to reading the EVM
+// registers for address allocator, that way we can at that point return a provided
+// error, that error type is then checked against the provider checker.
+type evmErrorSnapshot struct {
+	snapshotTree snapshot.SnapshotTree
+	err          error
+	errChecker   func(error) bool
+}
+
+func (s evmErrorSnapshot) Get(
+	id flow.RegisterID,
+) (
+	flow.RegisterValue,
+	error,
+) {
+	if id.Key == "AddressAllocator" {
+		return nil, s.err
+	}
+
+	return s.snapshotTree.Get(id)
 }
