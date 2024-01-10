@@ -12,9 +12,9 @@ import (
 const ledgerAddressAllocatorKey = "AddressAllocator"
 
 var (
-	FlowEVMAddressSpacePrefix      = []byte{0, 0, 0, 0, 0, 0, 0, 1}
-	FlowEVMPrecompileAddressPrefix = []byte{0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1}
-	FlowEVMCOAAddressPrefix        = []byte{0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 2}
+	// leading zeros helps with storage
+	FlowEVMPrecompileAddressPrefix = []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}
+	FlowEVMCOAAddressPrefix        = []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2}
 )
 
 type AddressAllocator struct {
@@ -59,7 +59,7 @@ func (aa *AddressAllocator) AllocateCOAAddress() (types.Address, error) {
 
 func makeCOAAddress(index uint64) types.Address {
 	var addr types.Address
-	copy(addr[:types.AddressLength], FlowEVMCOAAddressPrefix)
+	copy(addr[:types.AddressLength-8], FlowEVMCOAAddressPrefix)
 	binary.BigEndian.PutUint64(addr[types.AddressLength-8:], index)
 	return addr
 }
@@ -71,7 +71,7 @@ func (aa *AddressAllocator) AllocatePrecompileAddress(index uint64) types.Addres
 
 func makePrecompileAddress(index uint64) types.Address {
 	var addr types.Address
-	copy(addr[:types.AddressLength], FlowEVMPrecompileAddressPrefix)
+	copy(addr[:types.AddressLength-8], FlowEVMPrecompileAddressPrefix)
 	binary.BigEndian.PutUint64(addr[types.AddressLength-8:], index)
 	return addr
 }
