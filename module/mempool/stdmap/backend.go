@@ -12,7 +12,7 @@ import (
 	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
-// Backend provides synchronized access to a backdata
+// Backend is a wrapper around the backdata that provides concurrency-safe operations.
 type Backend struct {
 	sync.RWMutex
 	backData           mempool.BackData

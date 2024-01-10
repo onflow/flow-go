@@ -5,7 +5,7 @@ import (
 )
 
 // MapBackData implements a map-based generic memory BackData backed by a Go map.
-// Note that this implementation is not thread-safe, and the higher-level Backend is responsible for concurrency management.
+// Note that this implementation is NOT thread-safe, and the higher-level Backend is responsible for concurrency management.
 type MapBackData struct {
 	// NOTE: as a BackData implementation, MapBackData must be non-blocking.
 	// Concurrency management is done by overlay Backend.

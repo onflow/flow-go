@@ -59,7 +59,7 @@ type slotBucket struct {
 }
 
 // Cache implements an array-based generic memory pool backed by a fixed total array.
-// Note that this implementation is not thread-safe, and the higher-level Backend is responsible for concurrency management.
+// Note that this implementation is NOT thread-safe, and the higher-level Backend is responsible for concurrency management.
 type Cache struct {
 	logger    zerolog.Logger
 	collector module.HeroCacheMetrics
