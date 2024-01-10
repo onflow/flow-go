@@ -1,4 +1,4 @@
-# Mempool module
+# The `mempool` module
 
 The `mempool` module provides mempool implementations for the Flow blockchain, which
 are in-memory data structures that are tasked with storing the `flow.Entity` objects.
