@@ -48,7 +48,7 @@ type RateLimiter interface {
 
 type NoopLimiter struct{}
 
-func NewNoopLimit() *NoopLimiter {
+func NewNoopLimiter() *NoopLimiter {
 	return &NoopLimiter{}
 }
 

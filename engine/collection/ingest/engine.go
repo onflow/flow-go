@@ -55,6 +55,7 @@ func New(
 	chain flow.Chain,
 	pools *epochs.TransactionPools,
 	config Config,
+	limiter *AddressRateLimiter,
 ) (*Engine, error) {
 
 	logger := log.With().Str("engine", "ingest").Logger()
@@ -70,7 +71,7 @@ func New(
 			MaxTransactionByteSize: config.MaxTransactionByteSize,
 			MaxCollectionByteSize:  config.MaxCollectionByteSize,
 		},
-		access.NewNoopLimit(),
+		limiter,
 	)
 
 	// FIFO queue for transactions
