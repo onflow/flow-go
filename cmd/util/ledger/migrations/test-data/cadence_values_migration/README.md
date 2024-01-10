@@ -17,12 +17,33 @@ To create a new snapshot for tests, follow the below steps.
 - Update the `testAccountAddress` constant in the [cadence_values_migration_test.go](../../cadence_values_migration_test.go)
   with the address of the account just created.
 
-- Run the transaction [store_transaction.cdc](store_transaction.cdc), using the newly created `test` account as the signer.
+- Deploy the `Test` contract. For that, first add the below entries to the `flow.json`
+  ```json
+   {
+    "contracts": {
+      "Test": "./test_contract.cdc"
+    },
+    "deployments": {
+      "emulator": {
+        "test": [
+          "Test"
+        ]
+      }
+    }
+  }
+  ```
+  Then run:
+  ```shell
+  flow deploy
+  ```
+
+- To store the values, run the transaction [store_transaction.cdc](store_transaction.cdc),
+  using the newly created `test` account as the signer.
   ```shell
   flow transactions send store_transaction.cdc --signer test
   ```
 
-- Create a snapshot os the emulator state using the REST API:
+- Create a snapshot of the emulator state using the REST API:
   ```shell
   curl -H "Content-type: application/x-www-form-urlencoded" -X POST http://localhost:8080/emulator/snapshots -d "name=test_snapshot"
   ```

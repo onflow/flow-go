@@ -17,7 +17,6 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/sema"
-
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 )
@@ -63,7 +62,7 @@ func TestCadenceValuesMigration(t *testing.T) {
 
 	storageMap := mr.Storage.GetStorageMap(address, common.PathDomainStorage.Identifier(), false)
 	require.NotNil(t, storageMap)
-	require.Equal(t, 4, int(storageMap.Count()))
+	require.Equal(t, 6, int(storageMap.Count()))
 
 	iterator := storageMap.Iterator(mr.Interpreter)
 
@@ -78,18 +77,105 @@ func TestCadenceValuesMigration(t *testing.T) {
 		values = append(values, value)
 	}
 
-	// Order is non-deterministic, so use 'ElementsMatch'.
-	assert.ElementsMatch(
-		t,
-		values,
-		[]interpreter.Value{
-			// Both string values should be in the normalized form.
-			interpreter.NewUnmeteredStringValue("Caf\u00E9"),
-			interpreter.NewUnmeteredStringValue("Caf\u00E9"),
-
-			interpreter.NewUnmeteredTypeValue(fullyEntitledAccountReferenceType),
-		},
+	testContractLocation := common.NewAddressLocation(
+		nil,
+		address,
+		"Test",
 	)
+
+	fooInterfaceType := interpreter.NewInterfaceStaticTypeComputeTypeID(
+		nil,
+		testContractLocation,
+		"Test.Foo",
+	)
+
+	barInterfaceType := interpreter.NewInterfaceStaticTypeComputeTypeID(
+		nil,
+		testContractLocation,
+		"Test.Bar",
+	)
+
+	bazInterfaceType := interpreter.NewInterfaceStaticTypeComputeTypeID(
+		nil,
+		testContractLocation,
+		"Test.Baz",
+	)
+
+	expectedValues := []interpreter.Value{
+		// Both string values should be in the normalized form.
+		interpreter.NewUnmeteredStringValue("Caf\u00E9"),
+		interpreter.NewUnmeteredStringValue("Caf\u00E9"),
+
+		interpreter.NewUnmeteredTypeValue(fullyEntitledAccountReferenceType),
+
+		interpreter.NewDictionaryValue(
+			mr.Interpreter,
+			interpreter.EmptyLocationRange,
+			interpreter.NewDictionaryStaticType(
+				nil,
+				interpreter.PrimitiveStaticTypeString,
+				interpreter.PrimitiveStaticTypeInt,
+			),
+			interpreter.NewUnmeteredStringValue("Caf\u00E9"),
+			interpreter.NewUnmeteredIntValueFromInt64(1),
+			interpreter.NewUnmeteredStringValue("He\u00E9llo"),
+			interpreter.NewUnmeteredIntValueFromInt64(2),
+		),
+
+		interpreter.NewDictionaryValue(
+			mr.Interpreter,
+			interpreter.EmptyLocationRange,
+			interpreter.NewDictionaryStaticType(
+				nil,
+				interpreter.PrimitiveStaticTypeMetaType,
+				interpreter.PrimitiveStaticTypeInt,
+			),
+			interpreter.NewUnmeteredTypeValue(
+				&interpreter.IntersectionStaticType{
+					Types: []*interpreter.InterfaceStaticType{
+						fooInterfaceType,
+						barInterfaceType,
+					},
+					LegacyType: interpreter.PrimitiveStaticTypeAnyStruct,
+				},
+			),
+			interpreter.NewUnmeteredIntValueFromInt64(1),
+			interpreter.NewUnmeteredTypeValue(
+				&interpreter.IntersectionStaticType{
+					Types: []*interpreter.InterfaceStaticType{
+						fooInterfaceType,
+						barInterfaceType,
+						bazInterfaceType,
+					},
+					LegacyType: interpreter.PrimitiveStaticTypeAnyStruct,
+				},
+			),
+			interpreter.NewUnmeteredIntValueFromInt64(2),
+		),
+	}
+
+	require.Equal(t, len(expectedValues), len(values))
+
+	// Order is non-deterministic, so do a greedy compare.
+	for _, value := range values {
+		found := false
+		actualValue := value.(interpreter.EquatableValue)
+		for i, expectedValue := range expectedValues {
+			if actualValue.Equal(mr.Interpreter, interpreter.EmptyLocationRange, expectedValue) {
+				expectedValues = append(expectedValues[:i], expectedValues[i+1:]...)
+				found = true
+				break
+			}
+
+		}
+		if !found {
+			assert.Fail(t, fmt.Sprintf("extra item in actual values: %s", actualValue))
+		}
+	}
+
+	if len(expectedValues) != 0 {
+		assert.Fail(t, fmt.Sprintf("%d extra item(s) in expected values", len(expectedValues)))
+	}
 
 	// Check reporters
 
@@ -124,11 +210,51 @@ func TestCadenceValuesMigration(t *testing.T) {
 				Address: interpreter.AddressPath{
 					Address: address,
 					Path: interpreter.PathValue{
-						Identifier: "type_value_1",
+						Identifier: "type_value",
 						Domain:     common.PathDomainStorage,
 					},
 				},
 				Migration: "AccountTypeMigration",
+			},
+			cadenceValueMigrationReportEntry{
+				Address: interpreter.AddressPath{
+					Address: address,
+					Path: interpreter.PathValue{
+						Identifier: "dictionary_with_string_keys",
+						Domain:     common.PathDomainStorage,
+					},
+				},
+				Migration: "StringNormalizingMigration",
+			},
+			cadenceValueMigrationReportEntry{
+				Address: interpreter.AddressPath{
+					Address: address,
+					Path: interpreter.PathValue{
+						Identifier: "dictionary_with_string_keys",
+						Domain:     common.PathDomainStorage,
+					},
+				},
+				Migration: "StringNormalizingMigration",
+			},
+			cadenceValueMigrationReportEntry{
+				Address: interpreter.AddressPath{
+					Address: address,
+					Path: interpreter.PathValue{
+						Identifier: "dictionary_with_restricted_typed_keys",
+						Domain:     common.PathDomainStorage,
+					},
+				},
+				Migration: "TypeValueMigration",
+			},
+			cadenceValueMigrationReportEntry{
+				Address: interpreter.AddressPath{
+					Address: address,
+					Path: interpreter.PathValue{
+						Identifier: "dictionary_with_restricted_typed_keys",
+						Domain:     common.PathDomainStorage,
+					},
+				},
+				Migration: "TypeValueMigration",
 			},
 		},
 	)
