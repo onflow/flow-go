@@ -148,6 +148,7 @@ func (h *ContractHandler) getBlockContext() types.BlockContext {
 	return types.BlockContext{
 		BlockNumber:            bp.Height,
 		DirectCallBaseGasUsage: types.DefaultDirectCallBaseGasUsage,
+		// ExtraPrecompiles:       precompiles.GetArchContract(),
 	}
 }
 
