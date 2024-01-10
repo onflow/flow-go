@@ -24,7 +24,7 @@ import (
 
 	dkgeng "github.com/onflow/flow-go/engine/consensus/dkg"
 	"github.com/onflow/flow-go/engine/testutil"
-	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/bootstrap"
@@ -186,6 +186,8 @@ func (s *EmulatorSuite) createAndFundAccount(netID *flow.Identity) *nodeAccount 
 	accountSigner, err := sdkcrypto.NewInMemorySigner(accountPrivateKey, accountKey.HashAlgo)
 	require.NoError(s.T(), err)
 
+	sc := systemcontracts.SystemContractsForChain(s.chainID)
+
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	create Flow account
 	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -222,8 +224,8 @@ func (s *EmulatorSuite) createAndFundAccount(netID *flow.Identity) *nodeAccount 
 					receiverRef.deposit(from: <-self.sentVault)
 				  }
 				}`,
-					fvm.FungibleTokenAddress(s.chainID.Chain()).Hex(),
-					fvm.FlowTokenAddress(s.chainID.Chain()).Hex(),
+					sc.FungibleToken.Address.Hex(),
+					sc.FlowToken.Address.Hex(),
 				))).
 		AddAuthorizer(s.blockchain.ServiceKey().Address).
 		SetProposalKey(
@@ -459,12 +461,6 @@ func (s *EmulatorSuite) initEngines(node *node, ids flow.IdentityList) {
 		controllerFactoryLogger = zerolog.New(os.Stdout).Hook(hook)
 	}
 
-	// create a config with no delays for tests
-	config := dkg.ControllerConfig{
-		BaseStartDelay:                0,
-		BaseHandleFirstBroadcastDelay: 0,
-	}
-
 	// the reactor engine reacts to new views being finalized and drives the
 	// DKG protocol
 	reactorEngine := dkgeng.NewReactorEngine(
@@ -477,7 +473,6 @@ func (s *EmulatorSuite) initEngines(node *node, ids flow.IdentityList) {
 			core.Me,
 			[]module.DKGContractClient{node.dkgContractClient},
 			brokerTunnel,
-			config,
 		),
 		viewsObserver,
 	)

@@ -75,12 +75,12 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 	}
 
 	if pending.Height <= finalized {
-		dup, err := f.headers.ByHeight(pending.Height)
+		dupID, err := f.headers.BlockIDByHeight(pending.Height)
 		if err != nil {
 			return fmt.Errorf("could not retrieve finalized equivalent: %w", err)
 		}
-		if dup.ID() != blockID {
-			return fmt.Errorf("cannot finalize pending block conflicting with finalized state (height: %d, pending: %x, finalized: %x)", pending.Height, blockID, dup.ID())
+		if dupID != blockID {
+			return fmt.Errorf("cannot finalize pending block conflicting with finalized state (height: %d, pending: %x, finalized: %x)", pending.Height, blockID, dupID)
 		}
 		return nil
 	}

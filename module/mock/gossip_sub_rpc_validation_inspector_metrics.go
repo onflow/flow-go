@@ -5,6 +5,8 @@ package mock
 import (
 	mock "github.com/stretchr/testify/mock"
 
+	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
+
 	time "time"
 )
 
@@ -21,6 +23,36 @@ func (_m *GossipSubRpcValidationInspectorMetrics) AsyncProcessingFinished(durati
 // AsyncProcessingStarted provides a mock function with given fields:
 func (_m *GossipSubRpcValidationInspectorMetrics) AsyncProcessingStarted() {
 	_m.Called()
+}
+
+// OnControlMessagesTruncated provides a mock function with given fields: messageType, diff
+func (_m *GossipSubRpcValidationInspectorMetrics) OnControlMessagesTruncated(messageType p2pmsg.ControlMessageType, diff int) {
+	_m.Called(messageType, diff)
+}
+
+// OnIHaveControlMessageIdsTruncated provides a mock function with given fields: diff
+func (_m *GossipSubRpcValidationInspectorMetrics) OnIHaveControlMessageIdsTruncated(diff int) {
+	_m.Called(diff)
+}
+
+// OnIHaveMessageIDsReceived provides a mock function with given fields: channel, msgIdCount
+func (_m *GossipSubRpcValidationInspectorMetrics) OnIHaveMessageIDsReceived(channel string, msgIdCount int) {
+	_m.Called(channel, msgIdCount)
+}
+
+// OnIWantControlMessageIdsTruncated provides a mock function with given fields: diff
+func (_m *GossipSubRpcValidationInspectorMetrics) OnIWantControlMessageIdsTruncated(diff int) {
+	_m.Called(diff)
+}
+
+// OnIWantMessageIDsReceived provides a mock function with given fields: msgIdCount
+func (_m *GossipSubRpcValidationInspectorMetrics) OnIWantMessageIDsReceived(msgIdCount int) {
+	_m.Called(msgIdCount)
+}
+
+// OnIncomingRpcReceived provides a mock function with given fields: iHaveCount, iWantCount, graftCount, pruneCount, msgCount
+func (_m *GossipSubRpcValidationInspectorMetrics) OnIncomingRpcReceived(iHaveCount int, iWantCount int, graftCount int, pruneCount int, msgCount int) {
+	_m.Called(iHaveCount, iWantCount, graftCount, pruneCount, msgCount)
 }
 
 type mockConstructorTestingTNewGossipSubRpcValidationInspectorMetrics interface {

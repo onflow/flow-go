@@ -20,16 +20,30 @@ type RegisterStore struct {
 	finalized  execution.FinalizedReader
 	log        zerolog.Logger
 	finalizing *atomic.Bool // making sure only one goroutine is finalizing at a time
+	notifier   execution.RegisterStoreNotifier
 }
 
 var _ execution.RegisterStore = (*RegisterStore)(nil)
+
+type NoopNotifier struct{}
+
+func NewNoopNotifier() *NoopNotifier { return &NoopNotifier{} }
+
+func (n *NoopNotifier) OnFinalizedAndExecutedHeightUpdated(height uint64) {}
+
+var _ execution.RegisterStoreNotifier = (*NoopNotifier)(nil)
 
 func NewRegisterStore(
 	diskStore execution.OnDiskRegisterStore,
 	wal execution.ExecutedFinalizedWAL,
 	finalized execution.FinalizedReader,
 	log zerolog.Logger,
+	notifier execution.RegisterStoreNotifier,
 ) (*RegisterStore, error) {
+	if notifier == nil {
+		return nil, fmt.Errorf("notifier is empty, use NoopNotifier if you don't need it")
+	}
+
 	// replay the executed and finalized blocks from the write ahead logs
 	// to the OnDiskRegisterStore
 	height, err := syncDiskStore(wal, diskStore, log)
@@ -46,6 +60,8 @@ func NewRegisterStore(
 	// init the memStore with the last executed and finalized block ID
 	memStore := NewInMemoryRegisterStore(height, finalizedID)
 
+	log.Info().Msgf("initialized in memory register store at block %v, height %v", finalizedID, height)
+
 	return &RegisterStore{
 		memStore:   memStore,
 		diskStore:  diskStore,
@@ -53,6 +69,7 @@ func NewRegisterStore(
 		finalized:  finalized,
 		finalizing: atomic.NewBool(false),
 		log:        log.With().Str("module", "register-store").Logger(),
+		notifier:   notifier,
 	}, nil
 }
 
@@ -92,12 +109,21 @@ func (r *RegisterStore) GetRegister(height uint64, blockID flow.Identifier, regi
 		return r.getAndConvertNotFoundErr(register, prunedError.PrunedHeight)
 	}
 
-	// if the block is below the pruned height, then there are two cases:
+	// if the block is below or equal to the pruned height, then there are two cases:
 	// the block is a finalized block, or a conflicting block.
 	// In order to distinguish, we need to query the finalized block ID at that height
-	finalizedID, err := r.finalized.FinalizedBlockIDAtHeight(height)
-	if err != nil {
-		return nil, fmt.Errorf("cannot get finalized block ID at height %d: %w", height, err)
+
+	var finalizedID flow.Identifier
+	if height == prunedError.PrunedHeight {
+		// if the block is at the pruned height, then the finalized ID is the pruned ID from in memory store,
+		// this saves a DB query
+		finalizedID = prunedError.PrunedID
+	} else {
+		// if the block is below the pruned height, we query the finalized ID from the finalized reader
+		finalizedID, err = r.finalized.FinalizedBlockIDAtHeight(height)
+		if err != nil {
+			return nil, fmt.Errorf("cannot get finalized block ID at height %d: %w", height, err)
+		}
 	}
 
 	isConflictingBlock := blockID != finalizedID
@@ -183,6 +209,8 @@ func (r *RegisterStore) onBlockFinalized() error {
 	if err != nil {
 		return fmt.Errorf("cannot save %v registers to disk store for height %v: %w", len(regs), next, err)
 	}
+
+	r.notifier.OnFinalizedAndExecutedHeightUpdated(next)
 
 	err = r.memStore.Prune(next, blockID)
 	if err != nil {

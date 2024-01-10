@@ -11,7 +11,6 @@ import (
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -32,7 +31,7 @@ type blockSignerDecoderSuite struct {
 
 func (s *blockSignerDecoderSuite) SetupTest() {
 	// the default header fixture creates signerIDs for a committee of 10 nodes, so we prepare a committee same as that
-	s.allConsensus = unittest.IdentityListFixture(40, unittest.WithRole(flow.RoleConsensus)).Sort(order.Canonical)
+	s.allConsensus = unittest.IdentityListFixture(40, unittest.WithRole(flow.RoleConsensus)).Sort(flow.Canonical)
 
 	// mock consensus committee
 	s.committee = hotstuff.NewDynamicCommittee(s.T())

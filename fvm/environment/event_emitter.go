@@ -39,7 +39,7 @@ func DefaultEventEmitterParams() EventEmitterParams {
 // with the runtime environment interface.
 type EventEmitter interface {
 	// EmitEvent satisfies Cadence's runtime API.
-	// This will encode the cadence event and call emitRawEvent.
+	// This will encode the cadence event
 	//
 	// Note that the script variant will return OperationNotSupportedError.
 	EmitEvent(event cadence.Event) error
@@ -300,13 +300,7 @@ func (collection *EventCollection) TotalEventCounter() uint32 {
 func IsServiceEvent(eventType flow.EventType, chain flow.ChainID) (bool, error) {
 
 	// retrieve the service event information for this chain
-	events, err := systemcontracts.ServiceEventsForChain(chain)
-	if err != nil {
-		return false, fmt.Errorf(
-			"unknown system contracts for chain (%s): %w",
-			chain.String(),
-			err)
-	}
+	events := systemcontracts.ServiceEventsForChain(chain)
 
 	for _, serviceEvent := range events.All() {
 		if serviceEvent.EventType() == eventType {

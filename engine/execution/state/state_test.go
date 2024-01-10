@@ -7,15 +7,12 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/onflow/flow-go/ledger/common/convert"
-	"github.com/onflow/flow-go/ledger/common/pathfinder"
 
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	led "github.com/onflow/flow-go/ledger"
 	ledger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/model/flow"
@@ -53,6 +50,8 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState, l *ledger.Ledger,
 
 			es := state.NewExecutionState(
 				ls, stateCommitments, blocks, headers, collections, chunkDataPacks, results, myReceipts, events, serviceEvents, txResults, badgerDB, trace.NewNoopTracer(),
+				nil,
+				false,
 			)
 
 			f(t, es, ls, headers, stateCommitments)
@@ -77,7 +76,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 
 		sc2, update, sc2Snapshot, err := state.CommitDelta(l, executionSnapshot,
 			storehouse.NewExecutingBlockSnapshot(state.NewLedgerStorageSnapshot(l, sc1), sc1))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// validate new snapshot
 		val, err := sc2Snapshot.Get(reg1.Key)
@@ -88,51 +87,28 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, reg2.Value, val)
 
-		assert.Equal(t, sc1[:], update.RootHash[:])
-		assert.Len(t, update.Paths, 2)
-		assert.Len(t, update.Payloads, 2)
+		require.Equal(t, sc1[:], update.RootHash[:])
+		require.Len(t, update.Paths, 2)
+		require.Len(t, update.Payloads, 2)
 
 		// validate sc2
 		require.Equal(t, sc2, sc2Snapshot.Commitment())
-
-		key1 := convert.RegisterIDToLedgerKey(reg1.Key)
-		path1, err := pathfinder.KeyToPath(key1, ledger.DefaultPathFinderVersion)
-		assert.NoError(t, err)
-
-		key2 := convert.RegisterIDToLedgerKey(reg2.Key)
-		path2, err := pathfinder.KeyToPath(key2, ledger.DefaultPathFinderVersion)
-		assert.NoError(t, err)
-
-		// validate update
-		assert.Equal(t, path1, update.Paths[0])
-		assert.Equal(t, path2, update.Paths[1])
-
-		k1, err := update.Payloads[0].Key()
-		require.NoError(t, err)
-
-		k2, err := update.Payloads[1].Key()
-		require.NoError(t, err)
-
-		assert.Equal(t, key1, k1)
-		assert.Equal(t, key2, k2)
-
-		assert.Equal(t, []byte("apple"), []byte(update.Payloads[0].Value()))
-		assert.Equal(t, []byte("carrot"), []byte(update.Payloads[1].Value()))
+		validateUpdate(t, update, sc1, executionSnapshot)
 
 		header2 := unittest.BlockHeaderWithParentFixture(header1)
 		storageSnapshot := es.NewStorageSnapshot(sc2, header2.ID(), header2.Height)
 
 		b1, err := storageSnapshot.Get(reg1.Key)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		b2, err := storageSnapshot.Get(reg2.Key)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
-		assert.Equal(t, flow.RegisterValue("apple"), b1)
-		assert.Equal(t, flow.RegisterValue("carrot"), b2)
+		require.Equal(t, flow.RegisterValue("apple"), b1)
+		require.Equal(t, flow.RegisterValue("carrot"), b2)
 
 		// verify has state
-		require.True(t, es.HasState(sc2))
-		require.False(t, es.HasState(unittest.StateCommitmentFixture()))
+		require.True(t, l.HasState(led.State(sc2)))
+		require.False(t, l.HasState(led.State(unittest.StateCommitmentFixture())))
 	}))
 
 	t.Run("commit write and read previous state", prepareTest(func(
@@ -150,7 +126,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		sc2, _, sc2Snapshot, err := state.CommitDelta(l, executionSnapshot1,
 			storehouse.NewExecutingBlockSnapshot(state.NewLedgerStorageSnapshot(l, sc1), sc1),
 		)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// update value and get resulting state commitment
 		executionSnapshot2 := &snapshot.ExecutionSnapshot{
@@ -160,7 +136,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		}
 
 		sc3, _, _, err := state.CommitDelta(l, executionSnapshot2, sc2Snapshot)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		header2 := unittest.BlockHeaderWithParentFixture(header1)
 		// create a view for previous state version
@@ -171,17 +147,17 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		storageSnapshot4 := es.NewStorageSnapshot(sc3, header3.ID(), header3.Height)
 
 		// header2 and header3 are different blocks
-		assert.True(t, header2.ID() != (header3.ID()))
+		require.True(t, header2.ID() != (header3.ID()))
 
 		// fetch the value at both versions
 		b1, err := storageSnapshot3.Get(reg1.Key)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		b2, err := storageSnapshot4.Get(reg1.Key)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
-		assert.Equal(t, flow.RegisterValue("apple"), b1)
-		assert.Equal(t, flow.RegisterValue("orange"), b2)
+		require.Equal(t, flow.RegisterValue("apple"), b1)
+		require.Equal(t, flow.RegisterValue("orange"), b2)
 	}))
 
 	t.Run("commit delta and read new state", prepareTest(func(
@@ -202,7 +178,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		sc2, _, sc2Snapshot, err := state.CommitDelta(l, executionSnapshot1,
 			storehouse.NewExecutingBlockSnapshot(state.NewLedgerStorageSnapshot(l, sc1), sc1),
 		)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// update value and get resulting state commitment
 		executionSnapshot2 := &snapshot.ExecutionSnapshot{
@@ -212,7 +188,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		}
 
 		sc3, _, _, err := state.CommitDelta(l, executionSnapshot2, sc2Snapshot)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		header2 := unittest.BlockHeaderWithParentFixture(header1)
 		// create a view for previous state version
@@ -224,13 +200,13 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 
 		// fetch the value at both versions
 		b1, err := storageSnapshot3.Get(reg1.Key)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		b2, err := storageSnapshot4.Get(reg1.Key)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
-		assert.Equal(t, flow.RegisterValue("apple"), b1)
-		assert.Empty(t, b2)
+		require.Equal(t, flow.RegisterValue("apple"), b1)
+		require.Empty(t, b2)
 	}))
 
 	t.Run("commit delta and persist state commit for the second time should be OK", prepareTest(func(
@@ -250,13 +226,13 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		sc2, _, _, err := state.CommitDelta(l, executionSnapshot1,
 			storehouse.NewExecutingBlockSnapshot(state.NewLedgerStorageSnapshot(l, sc1), sc1),
 		)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// committing for the second time should be OK
 		sc2Same, _, _, err := state.CommitDelta(l, executionSnapshot1,
 			storehouse.NewExecutingBlockSnapshot(state.NewLedgerStorageSnapshot(l, sc1), sc1),
 		)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		require.Equal(t, sc2, sc2Same)
 	}))
@@ -278,7 +254,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 
 		sc2, _, _, err := state.CommitDelta(l, executionSnapshot,
 			storehouse.NewExecutingBlockSnapshot(state.NewLedgerStorageSnapshot(l, sc1), sc1))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// test CreateStorageSnapshot for known and executed block
 		headers.On("ByBlockID", header2.ID()).Return(header2, nil)

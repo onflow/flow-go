@@ -1,6 +1,8 @@
 package p2p
 
 import (
+	"time"
+
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 )
@@ -69,6 +71,33 @@ type GossipSubSpamRecordCache interface {
 	Has(peerID peer.ID) bool
 }
 
+// GossipSubApplicationSpecificScoreCache is a cache for storing the application specific score of peers.
+// The application specific score of a peer is used to calculate the GossipSub score of the peer; it contains the spam penalty of the peer, staking score, and subscription penalty.
+// Note that none of the application specific scores, spam penalties, staking scores, and subscription penalties are shared publicly with other peers.
+// Rather they are solely used by the current peer to select the peers to which it will connect on a topic mesh.
+// The cache is expected to have an eject policy to remove the least recently used record when the cache is full.
+// Implementation must be thread-safe, but can be blocking.
+type GossipSubApplicationSpecificScoreCache interface {
+	// Get returns the application specific score of a peer from the cache.
+	// Args:
+	// - peerID: the peer ID of the peer in the GossipSub protocol.
+	// Returns:
+	// - float64: the application specific score of the peer.
+	// - time.Time: the time at which the score was last updated.
+	// - bool: true if the score was retrieved successfully, false otherwise.
+	Get(peerID peer.ID) (float64, time.Time, bool)
+
+	// Add adds the application specific score of a peer to the cache.
+	// If the peer already has a score in the cache, the score is updated.
+	// Args:
+	// - peerID: the peer ID of the peer in the GossipSub protocol.
+	// - score: the application specific score of the peer.
+	// - time: the time at which the score was last updated.
+	// Returns:
+	// - error on failure to add the score. The returned error is irrecoverable and indicates an exception.
+	Add(peerID peer.ID, score float64, time time.Time) error
+}
+
 // GossipSubSpamRecord represents spam record of a peer in the GossipSub protocol.
 // It acts as a penalty card for a peer in the GossipSub protocol that keeps the
 // spam penalty of the peer as well as its decay factor.
@@ -82,4 +111,9 @@ type GossipSubSpamRecord struct {
 	Decay float64
 	// Penalty is the application specific Penalty of the peer.
 	Penalty float64
+	// LastDecayAdjustment records the time of the most recent adjustment in the decay process for a spam record.
+	// At each interval, the system evaluates and potentially adjusts the decay rate, which affects how quickly a node's penalty diminishes.
+	// The decay process is multiplicative (newPenalty = decayRate * oldPenalty) and operates within a range of 0 to 1. At certain regular intervals, the decay adjustment is evaluated and if the node's penalty falls below the set threshold, the decay rate is modified by the reduction factor, such as 0.01. This modification incrementally increases the decay rate. For example, if the decay rate is `x`, adding the reduction factor results in a decay rate of `x + 0.01`, leading to a slower reduction in penalty. Thus, a higher decay rate actually slows down the recovery process, contrary to accelerating it.
+	// The LastDecayAdjustment timestamp is crucial in ensuring balanced and fair penalization, especially important during periods of high message traffic to prevent unintended rapid decay of penalties for malicious nodes.
+	LastDecayAdjustment time.Time
 }

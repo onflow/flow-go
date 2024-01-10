@@ -59,7 +59,7 @@ type DuplicateTopicErr struct {
 }
 
 func (e DuplicateTopicErr) Error() string {
-	return fmt.Sprintf("duplicate topic foud in %s control message type: %s", e.msgType, e.topic)
+	return fmt.Sprintf("duplicate topic found in %s control message type: %s", e.msgType, e.topic)
 }
 
 // NewDuplicateTopicErr returns a new DuplicateTopicErr.

@@ -117,7 +117,7 @@ func (p *TransactionExecutedPayload) CadenceEvent() (cadence.Event, error) {
 
 	return cadence.Event{
 		EventType: cadence.NewEventType(
-			EVMLocation{},
+			stdlib.FlowLocation{},
 			string(EventTypeTransactionExecuted),
 			[]cadence.Field{
 				cadence.NewField("blockHeight", cadence.UInt64Type{}),
@@ -165,39 +165,42 @@ func NewTransactionExecutedEvent(
 	}
 }
 
+var blockExecutedEventCadenceType = &cadence.EventType{
+	Location:            stdlib.FlowLocation{}, // todo create evm custom location
+	QualifiedIdentifier: string(EventTypeBlockExecuted),
+	Fields: []cadence.Field{
+		cadence.NewField("height", cadence.UInt64Type{}),
+		cadence.NewField("totalSupply", cadence.UInt64Type{}),
+		cadence.NewField("parentHash", cadence.StringType{}),
+		cadence.NewField("receiptRoot", cadence.StringType{}),
+		cadence.NewField(
+			"transactionHashes",
+			cadence.NewVariableSizedArrayType(cadence.StringType{}),
+		),
+	},
+}
+
 type BlockExecutedEventPayload struct {
 	Block *Block
 }
 
 func (p *BlockExecutedEventPayload) CadenceEvent() (cadence.Event, error) {
-	hashesType := cadence.NewConstantSizedArrayType(uint(len(p.Block.TransactionHashes)), cadence.StringType{})
 	hashes := make([]cadence.Value, len(p.Block.TransactionHashes))
 	for i, hash := range p.Block.TransactionHashes {
 		hashes[i] = cadence.String(hash.String())
 	}
 
-	return cadence.NewEvent([]cadence.Value{
+	fields := []cadence.Value{
 		cadence.NewUInt64(p.Block.Height),
 		cadence.NewUInt64(p.Block.TotalSupply),
 		cadence.String(p.Block.ReceiptRoot.String()),
 		cadence.String(p.Block.ParentBlockHash.String()),
-		cadence.String(p.Block.StateRoot.String()),
-		cadence.NewArray(hashes).WithType(hashesType),
-	}).WithType(&cadence.EventType{
-		Location:            EVMLocation{},
-		QualifiedIdentifier: string(EventTypeBlockExecuted),
-		Fields: []cadence.Field{
-			cadence.NewField("height", cadence.UInt64Type{}),
-			cadence.NewField("totalSupply", cadence.UInt64Type{}),
-			cadence.NewField("parentHash", cadence.StringType{}),
-			cadence.NewField("stateRoot", cadence.StringType{}),
-			cadence.NewField("receiptRoot", cadence.StringType{}),
-			cadence.NewField(
-				"transactionHashes",
-				hashesType,
-			),
-		},
-	}), nil
+		cadence.NewArray(hashes).WithType(cadence.NewVariableSizedArrayType(cadence.StringType{})),
+	}
+
+	return cadence.
+		NewEvent(fields).
+		WithType(blockExecutedEventCadenceType), nil
 }
 
 func NewBlockExecutedEvent(block *Block) *Event {

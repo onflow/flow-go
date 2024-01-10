@@ -4,17 +4,17 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 
-	"github.com/onflow/flow-go/fvm/environment"
 	evm "github.com/onflow/flow-go/fvm/evm/emulator"
-	"github.com/onflow/flow-go/fvm/evm/emulator/database"
 	"github.com/onflow/flow-go/fvm/evm/handler"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
 	"github.com/onflow/flow-go/fvm/evm/types"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 func RootAccountAddress(chainID flow.ChainID) (flow.Address, error) {
-	return chainID.Chain().AddressAtIndex(environment.EVMAccountIndex)
+	sc := systemcontracts.SystemContractsForChain(chainID)
+	return sc.EVM.Address, nil
 }
 
 func SetupEnvironment(
@@ -30,12 +30,7 @@ func SetupEnvironment(
 		return err
 	}
 
-	db, err := database.NewDatabase(backend, evmRootAddress)
-	if err != nil {
-		return err
-	}
-
-	em := evm.NewEmulator(db)
+	em := evm.NewEmulator(backend, evmRootAddress)
 
 	bs, err := handler.NewBlockStore(backend, evmRootAddress)
 	if err != nil {

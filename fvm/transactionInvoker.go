@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/module/trace"
 )
 
@@ -184,12 +185,13 @@ func (executor *transactionExecutor) preprocessTransactionBody() error {
 	// setup evm
 	if executor.ctx.EVMEnabled {
 		chain := executor.ctx.Chain
+		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 		err := evm.SetupEnvironment(
 			chain.ChainID(),
 			executor.env,
 			executor.cadenceRuntime.TxRuntimeEnv,
 			chain.ServiceAddress(),
-			FlowTokenAddress(chain),
+			sc.FlowToken.Address,
 		)
 		if err != nil {
 			return err
@@ -240,6 +242,22 @@ func (executor *transactionExecutor) execute() error {
 }
 
 func (executor *transactionExecutor) ExecuteTransactionBody() error {
+	// setup evm
+	if executor.ctx.EVMEnabled {
+		chain := executor.ctx.Chain
+		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+		err := evm.SetupEnvironment(
+			chain.ChainID(),
+			executor.env,
+			executor.cadenceRuntime.TxRuntimeEnv,
+			chain.ServiceAddress(),
+			sc.FlowToken.Address,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
 	var invalidator derived.TransactionInvalidator
 	if !executor.errs.CollectedError() {
 
@@ -388,6 +406,7 @@ func (executor *transactionExecutor) normalExecution() (
 	// actual balance, for the purpose of calculating storage capacity, because the payer will have to pay for this tx.
 	executor.txnState.RunWithAllLimitsDisabled(func() {
 		err = executor.CheckStorageLimits(
+			executor.ctx,
 			executor.env,
 			bodySnapshot,
 			executor.proc.Transaction.Payer,

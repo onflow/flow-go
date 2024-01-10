@@ -16,7 +16,6 @@ import (
 	"github.com/onflow/atree"
 
 	"github.com/onflow/flow-go/fvm/evm/emulator"
-	"github.com/onflow/flow-go/fvm/evm/emulator/database"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -98,6 +97,13 @@ func (a *EOATestAccount) signTx(
 	return tx
 }
 
+func (a *EOATestAccount) SetNonce(nonce uint64) {
+	a.lock.Lock()
+	defer a.lock.Unlock()
+
+	a.nonce = nonce
+}
+
 func GetTestEOAAccount(t testing.TB, keyHex string) *EOATestAccount {
 	key, _ := gethCrypto.HexToECDSA(keyHex)
 	address := gethCrypto.PubkeyToAddress(key.PublicKey)
@@ -111,14 +117,15 @@ func GetTestEOAAccount(t testing.TB, keyHex string) *EOATestAccount {
 }
 
 func RunWithEOATestAccount(t testing.TB, led atree.Ledger, flowEVMRootAddress flow.Address, f func(*EOATestAccount)) {
+	account := FundAndGetEOATestAccount(t, led, flowEVMRootAddress)
+	f(account)
+}
+
+func FundAndGetEOATestAccount(t testing.TB, led atree.Ledger, flowEVMRootAddress flow.Address) *EOATestAccount {
 	account := GetTestEOAAccount(t, EOATestAccount1KeyHex)
 
 	// fund account
-	db, err := database.NewDatabase(led, flowEVMRootAddress)
-	require.NoError(t, err)
-
-	e := emulator.NewEmulator(db)
-	require.NoError(t, err)
+	e := emulator.NewEmulator(led, flowEVMRootAddress)
 
 	blk, err := e.NewBlockView(types.NewDefaultBlockContext(2))
 	require.NoError(t, err)
@@ -138,5 +145,5 @@ func RunWithEOATestAccount(t testing.TB, led atree.Ledger, flowEVMRootAddress fl
 	require.NoError(t, err)
 	require.Greater(t, bal.Uint64(), uint64(0))
 
-	f(account)
+	return account
 }

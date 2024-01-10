@@ -72,7 +72,7 @@ func (s *AccessAPISuite) SetupTest() {
 		flow.RoleAccess,
 		testnet.WithLogLevel(zerolog.FatalLevel),
 		// make sure test continues to test as expected if the default config changes
-		testnet.WithAdditionalFlagf("--script-execution-mode=%s", backend.ScriptExecutionModeExecutionNodesOnly),
+		testnet.WithAdditionalFlagf("--script-execution-mode=%s", backend.IndexQueryModeExecutionNodesOnly),
 	)
 
 	indexingAccessConfig := testnet.NewNodeConfig(
@@ -83,11 +83,16 @@ func (s *AccessAPISuite) SetupTest() {
 		testnet.WithAdditionalFlag("--execution-data-retry-delay=1s"),
 		testnet.WithAdditionalFlag("--execution-data-indexing-enabled=true"),
 		testnet.WithAdditionalFlagf("--execution-state-dir=%s", testnet.DefaultExecutionStateDir),
-		testnet.WithAdditionalFlagf("--script-execution-mode=%s", backend.ScriptExecutionModeLocalOnly),
+		testnet.WithAdditionalFlagf("--script-execution-mode=%s", backend.IndexQueryModeLocalOnly),
 	)
 
 	consensusConfigs := []func(config *testnet.NodeConfig){
-		testnet.WithAdditionalFlag("--cruise-ctl-fallback-proposal-duration=100ms"),
+		// `cruise-ctl-fallback-proposal-duration` is set to 250ms instead to of 100ms
+		// to purposely slow down the block rate. This is needed since the crypto module
+		// update providing faster BLS operations.
+		// TODO: fix the access integration test logic to function without slowing down
+		// the block rate
+		testnet.WithAdditionalFlag("--cruise-ctl-fallback-proposal-duration=250ms"),
 		testnet.WithAdditionalFlagf("--required-verification-seal-approvals=%d", 1),
 		testnet.WithAdditionalFlagf("--required-construction-seal-approvals=%d", 1),
 		testnet.WithLogLevel(zerolog.FatalLevel),

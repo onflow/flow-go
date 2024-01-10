@@ -40,6 +40,20 @@ const (
 	MonotonicEmulator ChainID = "flow-emulator-monotonic"
 )
 
+// AllChainIDs returns a list of all supported chain IDs.
+func AllChainIDs() ChainIDList {
+	return ChainIDList{
+		Mainnet,
+		Testnet,
+		Sandboxnet,
+		Benchnet,
+		Localnet,
+		Emulator,
+		BftTestnet,
+		MonotonicEmulator,
+	}
+}
+
 // Transient returns whether the chain ID is for a transient network.
 func (c ChainID) Transient() bool {
 	return c == Emulator || c == Localnet || c == Benchnet || c == BftTestnet
