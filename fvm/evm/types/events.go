@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/onflow/cadence/runtime/common"
-
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/runtime/common"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -117,7 +117,7 @@ func (p *TransactionExecutedPayload) CadenceEvent() (cadence.Event, error) {
 
 	return cadence.Event{
 		EventType: cadence.NewEventType(
-			stdlib.FlowLocation{},
+			EVMLocation{},
 			string(EventTypeTransactionExecuted),
 			[]cadence.Field{
 				cadence.NewField("blockHeight", cadence.UInt64Type{}),
@@ -126,7 +126,6 @@ func (p *TransactionExecutedPayload) CadenceEvent() (cadence.Event, error) {
 				cadence.NewField("failed", cadence.BoolType{}),
 				cadence.NewField("transactionType", cadence.UInt8Type{}),
 				cadence.NewField("gasConsumed", cadence.UInt64Type{}),
-				cadence.NewField("stateRootHash", cadence.StringType{}),
 				cadence.NewField("deployedContractAddress", cadence.StringType{}),
 				cadence.NewField("returnedValue", cadence.StringType{}),
 				cadence.NewField("logs", cadence.StringType{}),
@@ -140,7 +139,6 @@ func (p *TransactionExecutedPayload) CadenceEvent() (cadence.Event, error) {
 			cadence.NewBool(p.Result.Failed),
 			cadence.NewUInt8(p.Result.TxType),
 			cadence.NewUInt64(p.Result.GasConsumed),
-			cadence.String(p.Result.StateRootHash.String()),
 			cadence.String(hex.EncodeToString(p.Result.DeployedContractAddress.Bytes())),
 			cadence.String(hex.EncodeToString(p.Result.ReturnedValue)),
 			cadence.String(hex.EncodeToString(encodedLogs)),
@@ -166,7 +164,7 @@ func NewTransactionExecutedEvent(
 }
 
 var blockExecutedEventCadenceType = &cadence.EventType{
-	Location:            stdlib.FlowLocation{}, // todo create evm custom location
+	Location:            EVMLocation{},
 	QualifiedIdentifier: string(EventTypeBlockExecuted),
 	Fields: []cadence.Field{
 		cadence.NewField("height", cadence.UInt64Type{}),
@@ -193,8 +191,8 @@ func (p *BlockExecutedEventPayload) CadenceEvent() (cadence.Event, error) {
 	fields := []cadence.Value{
 		cadence.NewUInt64(p.Block.Height),
 		cadence.NewUInt64(p.Block.TotalSupply),
-		cadence.String(p.Block.ReceiptRoot.String()),
 		cadence.String(p.Block.ParentBlockHash.String()),
+		cadence.String(p.Block.ReceiptRoot.String()),
 		cadence.NewArray(hashes).WithType(cadence.NewVariableSizedArrayType(cadence.StringType{})),
 	}
 
