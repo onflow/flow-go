@@ -6,11 +6,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestDuplicateStrTracker ensures duplicateStrTracker performs simple set and returns expected result for duplicate str.
-func TestDuplicateStrTracker(t *testing.T) {
+// TestDuplicateStringTracker tests the duplicateStrTracker.track function.
+func TestDuplicateStringTracker(t *testing.T) {
 	tracker := make(duplicateStrTracker)
-	s := "hello world"
-	require.False(t, tracker.isDuplicate(s))
-	tracker.set(s)
-	require.True(t, tracker.isDuplicate(s))
+	require.Equal(t, uint(1), tracker.track("test1"))
+	require.Equal(t, uint(2), tracker.track("test1"))
+
+	// tracking a new string, 3 times
+	require.Equal(t, uint(1), tracker.track("test2"))
+	require.Equal(t, uint(2), tracker.track("test2"))
+	require.Equal(t, uint(3), tracker.track("test2"))
+
+	// tracking an empty string
+	require.Equal(t, uint(1), tracker.track(""))
 }
