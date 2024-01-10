@@ -17,31 +17,59 @@ type RpcInspectorParameters struct {
 
 // RpcValidationInspectorParameters keys.
 const (
-	ClusterPrefixedMessageConfigKey   = "cluster-prefixed-messages"
-	IWantConfigKey                    = "iwant"
-	IHaveConfigKey                    = "ihave"
-	QueueSizeKey                      = "queue-size"
-	GraftPruneMessageMaxSampleSizeKey = "graft-and-prune-message-max-sample-size"
-	MessageMaxSampleSizeKey           = "message-max-sample-size"
-	MessageErrorThresholdKey          = "error-threshold"
+	ClusterPrefixedMessageConfigKey = "cluster-prefixed-messages"
+	IWantConfigKey                  = "iwant"
+	IHaveConfigKey                  = "ihave"
+	GraftPruneKey                   = "graft-and-prune"
+	PublishMessagesConfigKey        = "publish-messages"
+	InspectionQueueConfigKey        = "inspection-queue"
 )
 
 // RpcValidationInspector validation limits used for gossipsub RPC control message inspection.
 type RpcValidationInspector struct {
 	ClusterPrefixedMessage ClusterPrefixedMessageInspectionParameters `mapstructure:"cluster-prefixed-messages"`
-	IWant                  IWantRPCInspectionParameters               `mapstructure:"iwant"`
+	IWant                  IWantRpcInspectionParameters               `mapstructure:"iwant"`
 	IHave                  IHaveRpcInspectionParameters               `mapstructure:"ihave"`
+	GraftPrune             GraftPruneRpcInspectionParameters          `mapstructure:"graft-and-prune"`
+	PublishMessages        PublishMessageInspectionParameters         `mapstructure:"publish-messages"`
+	InspectionQueue        InspectionQueueParameters                  `mapstructure:"inspection-queue"`
+}
+
+const (
+	QueueSizeKey = "queue-size"
+)
+
+type InspectionQueueParameters struct {
 	// NumberOfWorkers number of worker pool workers.
 	NumberOfWorkers int `validate:"gte=1" mapstructure:"workers"`
-	// QueueSize size of the queue used by worker pool for the control message validation inspector.
-	QueueSize uint32 `validate:"gte=100" mapstructure:"queue-size"`
-	// GraftPruneMessageMaxSampleSize the max sample size used for control message validation of GRAFT and PRUNE. If the total number of control messages (GRAFT or PRUNE)
+	// Size size of the queue used by worker pool for the control message validation inspector.
+	Size uint32 `validate:"gte=100" mapstructure:"queue-size"`
+}
+
+const (
+	MessageErrorThresholdKey = "error-threshold"
+)
+
+type PublishMessageInspectionParameters struct {
+	// MaxSampleSize the max sample size used for RPC message validation. If the total number of RPC messages exceeds this value a sample will be taken but messages will not be truncated.
+	MaxSampleSize int `validate:"gte=1000" mapstructure:"max-sample-size"`
+	// ErrorThreshold the threshold at which an error will be returned if the number of invalid RPC messages exceeds this value.
+	ErrorThreshold int `validate:"gte=500" mapstructure:"error-threshold"`
+}
+
+const (
+	MaxTotalDuplicateTopicIdThreshold = "max-total-duplicate-topic-id-threshold"
+)
+
+type GraftPruneRpcInspectionParameters struct {
+	// MaxSampleSize the max sample size used for control message validation of GRAFT and PRUNE. If the total number of control messages (GRAFT or PRUNE)
 	// exceeds this max sample size then the respective message will be truncated to this value before being processed.
-	GraftPruneMessageMaxSampleSize int `validate:"gte=1000" mapstructure:"graft-and-prune-message-max-sample-size"`
-	// RPCMessageMaxSampleSize the max sample size used for RPC message validation. If the total number of RPC messages exceeds this value a sample will be taken but messages will not be truncated.
-	MessageMaxSampleSize int `validate:"gte=1000" mapstructure:"message-max-sample-size"`
-	// RPCMessageErrorThreshold the threshold at which an error will be returned if the number of invalid RPC messages exceeds this value.
-	MessageErrorThreshold int `validate:"gte=500" mapstructure:"error-threshold"`
+	MaxSampleSize int `validate:"gte=1000" mapstructure:"max-sample-size"`
+
+	// MaxTotalDuplicateTopicIdThreshold is the tolerance threshold for having duplicate topics in a single GRAFT or PRUNE message under inspection.
+	// Ideally, a GRAFT or PRUNE message should not have any duplicate topics, hence a topic ID is counted as a duplicate only if it is repeated more than once.
+	// When the total number of duplicate topic ids in a single GRAFT or PRUNE message exceeds this threshold, the inspection of message will fail.
+	MaxTotalDuplicateTopicIdThreshold uint `validate:"gte=0" mapstructure:"max-total-duplicate-topic-id-threshold"`
 }
 
 const (
@@ -52,8 +80,8 @@ const (
 	DuplicateMsgIDThresholdKey = "duplicate-message-id-threshold"
 )
 
-// IWantRPCInspectionParameters contains the "numerical values" for the iwant rpc control message inspection.
-type IWantRPCInspectionParameters struct {
+// IWantRpcInspectionParameters contains the "numerical values" for the iwant rpc control message inspection.
+type IWantRpcInspectionParameters struct {
 	// MaxSampleSize max inspection sample size to use. If the total number of iWant control messages
 	// exceeds this max sample size then the respective message will be truncated before being processed.
 	MaxSampleSize uint `validate:"gt=0" mapstructure:"max-sample-size"`
@@ -70,6 +98,12 @@ type IWantRPCInspectionParameters struct {
 	DuplicateMsgIDThreshold float64 `validate:"gt=0" mapstructure:"duplicate-message-id-threshold"`
 }
 
+const (
+	DuplicateTopicIdThresholdKey           = "duplicate-topic-id-threshold"
+	MaxTotalDuplicateTopicIdThresholdKey   = "max-total-duplicate-topic-id-threshold"
+	MaxTotalDuplicateMessageIdThresholdKey = "max-total-duplicate-message-id-threshold"
+)
+
 // IHaveRpcInspectionParameters contains the "numerical values" for ihave rpc control inspection.
 type IHaveRpcInspectionParameters struct {
 	// MaxSampleSize max inspection sample size to use. If the number of ihave messages exceeds this configured value
@@ -78,6 +112,22 @@ type IHaveRpcInspectionParameters struct {
 	// MaxMessageIDSampleSize max inspection sample size to use for iHave message ids. Each ihave message includes a list of message ids
 	// each, if the size of this list exceeds the configured max message id sample size the list of message ids will be truncated.
 	MaxMessageIDSampleSize int `validate:"gte=1000" mapstructure:"max-message-id-sample-size"`
+
+	// DuplicateTopicIdThreshold is the threshold for considering the repeated topic IDs in a single iHave message as a duplicate.
+	// For example, if the threshold is 2, a maximum of two duplicate topic ids will be allowed in a single iHave message.
+	// This is to allow GossipSub protocol send iHave messages in batches without consolidating the topic IDs.
+	DuplicateTopicIdThreshold uint `validate:"gte=0" mapstructure:"duplicate-topic-id-threshold"`
+
+	// MaxTotalDuplicateTopicIdThreshold is the tolerance threshold for having duplicate topics in an iHave message under inspection.
+	// When the total number of duplicate topic ids in a single iHave message exceeds this threshold, the inspection of message will fail.
+	// Note that a topic ID is counted as a duplicate only if it is repeated more than DuplicateTopicIdThreshold times.
+	MaxTotalDuplicateTopicIdThreshold uint `validate:"gte=0" mapstructure:"max-total-duplicate-topic-id-threshold"`
+
+	// MaxTotalDuplicateMessageIdThreshold is the threshold of tolerance for having duplicate message IDs in a single iHave message under inspection.
+	// When the total number of duplicate message ids in a single iHave message exceeds this threshold, the inspection of message will fail.
+	// Ideally, an iHave message should not have any duplicate message IDs, hence a message id is considered duplicate when it is repeated more than once
+	// within the same iHave message. When the total number of duplicate message ids in a single iHave message exceeds this threshold, the inspection of message will fail.
+	MaxTotalDuplicateMessageIdThreshold uint `validate:"gte=0" mapstructure:"max-total-duplicate-message-id-threshold"`
 }
 
 const (
