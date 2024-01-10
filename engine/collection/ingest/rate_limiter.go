@@ -2,7 +2,6 @@ package ingest
 
 import (
 	"sync"
-	"time"
 
 	"golang.org/x/time/rate"
 
@@ -12,15 +11,20 @@ import (
 type AddressRateLimiter struct {
 	mu       sync.RWMutex
 	limiters map[flow.Address]*rate.Limiter
+	limit    rate.Limit
+}
 
-	ttl             time.Duration
-	cleanupInterval time.Duration
-	limit           rate.Limit
+func NewAddressRateLimiter(limit rate.Limit) *AddressRateLimiter {
+	return &AddressRateLimiter{
+		limiters: make(map[flow.Address]*rate.Limiter),
+		limit:    limit,
+	}
 }
 
 func (r *AddressRateLimiter) IsRateLimited(address flow.Address) bool {
 	limiter := r.getLimiter(address)
-	return limiter.Allow()
+	rateLimited := !limiter.Allow()
+	return rateLimited
 }
 
 func (r *AddressRateLimiter) getLimiter(address flow.Address) *rate.Limiter {
@@ -41,4 +45,15 @@ func (r *AddressRateLimiter) getLimiter(address flow.Address) *rate.Limiter {
 	return limiter
 }
 
-// func (r *AddressRateLimiter) cleanup(
+func (r *AddressRateLimiter) Cleanup() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for address, limiter := range r.limiters {
+		// if there is 1 token, the limiter can be removed, because it's
+		// equvilent to creating a new one
+		token := limiter.Tokens()
+		if token == 1 {
+			delete(r.limiters, address)
+		}
+	}
+}
