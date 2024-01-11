@@ -83,7 +83,7 @@ func TestNewControlMsgValidationInspector(t *testing.T) {
 // Message truncation for each control message type occurs when the count of control
 // messages exceeds the configured maximum sample size for that control message type.
 func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
-	t.Run("truncateGraftMessages should truncate graft messages as expected", func(t *testing.T) {
+	t.Run("graft truncation", func(t *testing.T) {
 		graftPruneMessageMaxSampleSize := 1000
 		inspector, signalerCtx, cancel, distributor, rpcTracker, _, _, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
 			params.Config.GraftPrune.MaxSampleSize = graftPruneMessageMaxSampleSize
@@ -112,7 +112,7 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 		stopInspector(t, cancel, inspector)
 	})
 
-	t.Run("truncatePruneMessages should truncate prune messages as expected", func(t *testing.T) {
+	t.Run("prune truncation", func(t *testing.T) {
 		graftPruneMessageMaxSampleSize := 1000
 		inspector, signalerCtx, cancel, distributor, rpcTracker, _, _, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
 			params.Config.GraftPrune.MaxSampleSize = graftPruneMessageMaxSampleSize
@@ -142,7 +142,7 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 		stopInspector(t, cancel, inspector)
 	})
 
-	t.Run("truncateIHaveMessages should truncate iHave messages as expected", func(t *testing.T) {
+	t.Run("ihave message id truncation", func(t *testing.T) {
 		maxSampleSize := 1000
 		inspector, signalerCtx, cancel, distributor, rpcTracker, _, _, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
 			params.Config.IHave.MaxSampleSize = maxSampleSize
@@ -172,7 +172,7 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 		stopInspector(t, cancel, inspector)
 	})
 
-	t.Run("truncateIHaveMessageIds should truncate iHave message ids as expected", func(t *testing.T) {
+	t.Run("ihave message ids truncation", func(t *testing.T) {
 		maxMessageIDSampleSize := 1000
 		inspector, signalerCtx, cancel, distributor, rpcTracker, _, _, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
 			params.Config.IHave.MaxMessageIDSampleSize = maxMessageIDSampleSize
@@ -208,7 +208,7 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 		stopInspector(t, cancel, inspector)
 	})
 
-	t.Run("truncateIWantMessages should truncate iWant messages as expected", func(t *testing.T) {
+	t.Run("iwant message truncation", func(t *testing.T) {
 		maxSampleSize := uint(100)
 		inspector, signalerCtx, cancel, distributor, rpcTracker, _, _, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
 			params.Config.IWant.MaxSampleSize = maxSampleSize
@@ -236,7 +236,7 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 		stopInspector(t, cancel, inspector)
 	})
 
-	t.Run("truncateIWantMessageIds should truncate iWant message ids as expected", func(t *testing.T) {
+	t.Run("iwant message id truncation", func(t *testing.T) {
 		maxMessageIDSampleSize := 1000
 		inspector, signalerCtx, cancel, distributor, rpcTracker, _, _, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
 			params.Config.IWant.MaxMessageIDSampleSize = maxMessageIDSampleSize
