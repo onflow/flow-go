@@ -31,5 +31,5 @@ type SubscriptionCache interface {
 	// - []string: the list of topics the peer is subscribed to after the update.
 	// - error: an error if the update failed; any returned error is an irrecoverable error and indicates a bug or misconfiguration.
 	// Implementation must be thread-safe.
-	AddTopicForPeer(pid peer.ID, topic string) ([]string, error)
+	AddWithInitTopicForPeer(pid peer.ID, topic string) ([]string, error)
 }
