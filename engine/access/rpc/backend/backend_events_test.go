@@ -121,13 +121,13 @@ func (s *BackendEventsSuite) SetupTest() {
 		return nil, storage.ErrNotFound
 	}).Maybe()
 
-	s.headers.On("ByHeight", mock.Anything).Return(func(height uint64) (*flow.Header, error) {
+	s.headers.On("BlockIDByHeight", mock.Anything).Return(func(height uint64) (flow.Identifier, error) {
 		for _, block := range s.blocks {
 			if height == block.Header.Height {
-				return block.Header, nil
+				return block.ID(), nil
 			}
 		}
-		return nil, storage.ErrNotFound
+		return flow.ZeroID, storage.ErrNotFound
 	}).Maybe()
 
 	s.headers.On("ByBlockID", mock.Anything).Return(func(blockID flow.Identifier) (*flow.Header, error) {

@@ -70,7 +70,9 @@ func TestGroupPayloadsByAccountCompareResults(t *testing.T) {
 
 		require.Equal(t, group1.Address, group2.Address)
 		require.Equal(t, len(group1.Payloads), len(group2.Payloads))
+		require.ElementsMatch(t, group1.Payloads, group2.Payloads)
 		require.Equal(t, len(group1.Payloads), len(groups3[group1.Address]))
+		require.ElementsMatch(t, group1.Payloads, groups3[group1.Address])
 	}
 }
 
