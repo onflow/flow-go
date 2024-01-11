@@ -3,36 +3,51 @@ package main
 import (
 	"context"
 	"encoding/csv"
-	"encoding/json"
+	"encoding/hex"
 	"flag"
 	"fmt"
-	"io"
+	gethCommon "github.com/ethereum/go-ethereum/common"
+	gethcrypto "github.com/ethereum/go-ethereum/crypto"
+	"github.com/onflow/cadence/encoding/ccf"
+	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/flow-go/engine/execution/computation"
+	"github.com/onflow/flow-go/fvm/evm/stdlib"
+	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"math"
 	"math/rand"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
-	"time"
+
+	"github.com/ipfs/go-datastore"
+	dssync "github.com/ipfs/go-datastore/sync"
+	blockstore "github.com/ipfs/go-ipfs-blockstore"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/mock"
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	exeState "github.com/onflow/flow-go/engine/execution/state"
 	bootstrapexec "github.com/onflow/flow-go/engine/execution/state/bootstrap"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/programs"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/module/executiondatasync/provider"
+	mocktracker "github.com/onflow/flow-go/module/executiondatasync/tracker/mock"
 	"github.com/onflow/flow-go/module/metrics"
+	moduleMock "github.com/onflow/flow-go/module/mock"
+	requesterunit "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -72,10 +87,8 @@ func main() {
 			run++
 			fmt.Println("progress: ", run, "/", runsPerWorker*numWorkers)
 			if run%numWorkers == 0 {
-				for _, tt := range Pool.Pool {
-					if stt, ok := tt.(*SimpleTxType); ok {
-						fmt.Println(stt.name, stt.slope)
-					}
+				for n, c := range Generator.controllers {
+					fmt.Println(n, c.slope)
 				}
 			}
 		}
@@ -116,21 +129,29 @@ func outputDataToFile(filename string, columns map[string]struct{}, estimated ma
 	// output collected data to file
 	var data [][]string
 	allColumns := []string{"tx"}
+	allColumnsConverted := []string{"tx"}
 	for s := range columns {
 		allColumns = append(allColumns, s)
+		// TODO: fix for memory
+		allColumnsConverted = append(allColumnsConverted, computationIntensityName(s))
 	}
 	allColumns = append(allColumns, "estimated", "actual")
+	allColumnsConverted = append(allColumnsConverted, "estimated", "ms")
 
-	data = append(data, allColumns)
+	data = append(data, allColumnsConverted)
 
 	for s, u := range actual {
 		cdata := make([]string, len(allColumns))
-		cdata[0] = transactionNames[s]
+		name, ok := transactionNames[s]
+		if !ok {
+			continue
+		}
+		cdata[0] = name
 		for i := 1; i < len(allColumns)-2; i++ {
 			cdata[i] = strconv.FormatUint(intensities[s][allColumns[i]], 10)
 		}
 		cdata[len(allColumns)-2] = strconv.FormatUint(uint64(estimated[s]), 10)
-		cdata[len(allColumns)-1] = strconv.FormatUint(uint64(u), 10)
+		cdata[len(allColumns)-1] = strconv.FormatUint(u, 10)
 		data = append(data, cdata)
 	}
 
@@ -150,10 +171,11 @@ func outputDataToFile(filename string, columns map[string]struct{}, estimated ma
 }
 
 func runTransactionsAndGetData(blocks int) *transactionDataCollector {
-	rand.Seed(time.Now().UnixNano())
 
 	longString := strings.Repeat("0", 100)
 	chain := flow.Testnet.Chain()
+
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
 	dc := newTransactionDataCollector()
 
@@ -234,23 +256,44 @@ func runTransactionsAndGetData(blocks int) *transactionDataCollector {
 	if err != nil {
 		panic(err)
 	}
-	ttctx := TransactionTypeContext{
+
+	addressBytes, err := hex.DecodeString("3da9cb19b06A645BA6F12F79D8d7fcdd8A00cfD4")
+	if err != nil {
+		panic(err)
+	}
+	evmAddress := gethCommon.BytesToAddress(addressBytes)
+	evmAddressPrivateKey, err := gethcrypto.HexToECDSA("e43eb57b2f3be8009ea545059e171dc4fdf543ae97220a76c0684706357f7f39")
+	if err != nil {
+		panic(err)
+	}
+
+	err = serviceAccount.FundEVMAccount(blockExecutor, evmAddress)
+	if err != nil {
+		panic(err)
+	}
+
+	testContractAddress, err := chain.AddressAtIndex(systemcontracts.EVMAccountIndex + 1)
+
+	ttctx := &TransactionGenerationContext{
 		AddressReplacements: map[string]string{
-			"FUNGIBLETOKEN": fvm.FungibleTokenAddress(chain).Hex(),
-			"FLOWTOKEN":     fvm.FlowTokenAddress(chain).Hex(),
-			"TESTCONTRACT":  "754aed9de6197641",
+			"0xFUNGIBLETOKEN": sc.FungibleToken.Address.HexWithPrefix(),
+			"0xFLOWTOKEN":     sc.FlowToken.Address.HexWithPrefix(),
+			"0xTESTCONTRACT":  testContractAddress.HexWithPrefix(),
+			"0xEVM":           sc.FlowServiceAccount.Address.HexWithPrefix(),
 		},
+		ETHAddressNonce:      0,
+		EthAddressPrivateKey: evmAddressPrivateKey,
 	}
 
 	// random transactions per block
 	transactionsPerBlock := rand.Intn(50) + 1
 
 	for i := 0; i < blocks; i++ {
+
 		transactions := make([]*flow.TransactionBody, transactionsPerBlock)
 		generatedTransactions := make([]GeneratedTransaction, transactionsPerBlock)
 		for j := 0; j < transactionsPerBlock; j++ {
-			txType := Pool.GetRandomTransactionType()
-			gtx, err := txType.GenerateTransaction(ttctx)
+			gtx, err := Generator.Generate(ttctx)
 			if err != nil {
 				panic(err)
 			}
@@ -259,7 +302,7 @@ func runTransactionsAndGetData(blocks int) *transactionDataCollector {
 				AddAuthorizer(serviceAccount.Address).
 				SetProposalKey(serviceAccount.Address, 0, serviceAccount.RetAndIncSeqNumber()).
 				SetPayer(accounts[1].Address).
-				SetGasLimit(100000000)
+				SetGasLimit(1000000000)
 
 			err = testutil.SignPayload(txBody, serviceAccount.Address, serviceAccount.PrivateKey)
 			if err != nil {
@@ -272,7 +315,7 @@ func runTransactionsAndGetData(blocks int) *transactionDataCollector {
 			}
 
 			transactions[j] = txBody
-			dc.TransactionNames[txBody.ID().String()] = txType.Name()
+			dc.TransactionNames[txBody.ID().String()] = string(gtx.Name)
 		}
 
 		computationResult, err := blockExecutor.ExecuteCollections([][]*flow.TransactionBody{transactions})
@@ -281,11 +324,11 @@ func runTransactionsAndGetData(blocks int) *transactionDataCollector {
 		}
 
 		for j := 0; j < transactionsPerBlock; j++ {
-			if len(computationResult.TransactionResults[j].ErrorMessage) > 0 {
-				fmt.Println(generatedTransactions[j].Type.Name())
-				panic(computationResult.TransactionResults[j].ErrorMessage)
+			if len(computationResult.AllTransactionResults()[j].ErrorMessage) > 0 {
+				fmt.Println(generatedTransactions[j].Name)
+				panic(computationResult.AllTransactionResults()[j].ErrorMessage)
 			}
-			generatedTransactions[j].AdjustParameterRange(dc.TimeSpent[computationResult.TransactionResults[j].ID().String()])
+			generatedTransactions[j].AdjustParametersCallback(dc.TimeSpent[computationResult.AllTransactionResults()[j].ID().String()])
 		}
 	}
 
@@ -296,7 +339,6 @@ type TestBenchBlockExecutor interface {
 	ExecuteCollections(collections [][]*flow.TransactionBody) (*execution.ComputationResult, error)
 	Chain() flow.Chain
 	ServiceAccount() *TestBenchAccount
-	ResetProgramCache()
 }
 
 type TestBenchAccount struct {
@@ -336,13 +378,14 @@ func (account *TestBenchAccount) DeployContract(blockExec TestBenchBlockExecutor
 		return err
 	}
 
-	if len(computationResult.TransactionResults[0].ErrorMessage) > 0 {
-		return fmt.Errorf(computationResult.TransactionResults[0].ErrorMessage)
+	if len(computationResult.AllTransactionResults()[0].ErrorMessage) > 0 {
+		return fmt.Errorf(computationResult.AllTransactionResults()[0].ErrorMessage)
 	}
 	return nil
 }
 
 func (account *TestBenchAccount) MintTokens(blockExec TestBenchBlockExecutor, tokens uint64) (err error) {
+	sc := systemcontracts.SystemContractsForChain(blockExec.Chain().ChainID())
 	serviceAccount := blockExec.ServiceAccount()
 	txBody := flow.NewTransactionBody().
 		SetScript([]byte(fmt.Sprintf(`
@@ -373,7 +416,7 @@ func (account *TestBenchAccount) MintTokens(blockExec TestBenchBlockExecutor, to
 					destroy minter
 				}
 			}
-		`, fvm.FungibleTokenAddress(blockExec.Chain()), fvm.FlowTokenAddress(blockExec.Chain())))).
+		`, sc.FungibleToken.Address, sc.FlowToken.Address))).
 		AddAuthorizer(blockExec.ServiceAccount().Address)
 
 	txBody.AddArgument(jsoncdc.MustEncode(cadence.BytesToAddress(account.Address.Bytes())))
@@ -398,8 +441,86 @@ func (account *TestBenchAccount) MintTokens(blockExec TestBenchBlockExecutor, to
 	if err != nil {
 		return err
 	}
-	if len(computationResult.TransactionResults[0].ErrorMessage) > 0 {
-		return fmt.Errorf(computationResult.TransactionResults[0].ErrorMessage)
+	if len(computationResult.AllTransactionResults()[0].ErrorMessage) > 0 {
+		return fmt.Errorf(computationResult.AllTransactionResults()[0].ErrorMessage)
+	}
+	return nil
+}
+
+func (account *TestBenchAccount) FundEVMAccount(blockExec TestBenchBlockExecutor, evmAddress gethCommon.Address) error {
+	chain := blockExec.Chain()
+	serviceAccount := blockExec.ServiceAccount()
+
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
+	addressCadenceBytes := make([]cadence.Value, 20)
+	for i := range addressCadenceBytes {
+		addressCadenceBytes[i] = cadence.UInt8(evmAddress[i])
+	}
+	addressArg, err := jsoncdc.Encode(cadence.NewArray(addressCadenceBytes).WithType(stdlib.EVMAddressBytesCadenceType))
+	if err != nil {
+		return err
+	}
+
+	// a million FLOW
+	amount, err := cadence.NewUFix64("1000000.0")
+	if err != nil {
+		return err
+	}
+	amountArg, err := jsoncdc.Encode(amount)
+	if err != nil {
+		return err
+	}
+
+	// Fund evm address
+	txBody := flow.NewTransactionBody().
+		SetScript([]byte(fmt.Sprintf(
+			`
+						import EVM from %s
+						import FungibleToken from %s
+						import FlowToken from %s
+
+						transaction(address: [UInt8; 20], amount: UFix64) {
+							let tokenAdmin: &FlowToken.Administrator
+
+							prepare(signer: AuthAccount) {
+								self.tokenAdmin = signer
+									.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)
+									?? panic("Signer is not the token admin")
+							}
+
+							execute {
+								let minter <- self.tokenAdmin.createNewMinter(allowedAmount: amount)
+								let mintedVault <- minter.mintTokens(amount: amount)
+
+								let fundAddress = EVM.EVMAddress(bytes: address)
+								fundAddress.deposit(from: <-mintedVault)
+
+								destroy minter
+							}
+						}
+					`,
+			sc.FlowServiceAccount.Address.HexWithPrefix(),
+			sc.FungibleToken.Address.HexWithPrefix(),
+			sc.FlowToken.Address.HexWithPrefix(),
+		))).
+		SetProposalKey(serviceAccount.Address, 0, serviceAccount.RetAndIncSeqNumber()).
+		SetPayer(serviceAccount.Address).
+		AddAuthorizer(serviceAccount.Address).
+		AddArgument(addressArg).
+		AddArgument(amountArg)
+
+	err = testutil.SignEnvelope(txBody, serviceAccount.Address, serviceAccount.PrivateKey)
+	if err != nil {
+		return err
+	}
+
+	computationResult, err := blockExec.ExecuteCollections([][]*flow.TransactionBody{{txBody}})
+	if err != nil {
+		return err
+	}
+	if len(computationResult.AllTransactionResults()[0].ErrorMessage) > 0 {
+		return fmt.Errorf(computationResult.AllTransactionResults()[0].ErrorMessage)
 	}
 	return nil
 }
@@ -447,8 +568,8 @@ func (account *TestBenchAccount) AddArrayToStorage(blockExec TestBenchBlockExecu
 	if err != nil {
 		return err
 	}
-	if len(computationResult.TransactionResults[0].ErrorMessage) > 0 {
-		return fmt.Errorf(computationResult.TransactionResults[0].ErrorMessage)
+	if len(computationResult.AllTransactionResults()[0].ErrorMessage) > 0 {
+		return fmt.Errorf(computationResult.AllTransactionResults()[0].ErrorMessage)
 	}
 	return nil
 }
@@ -456,16 +577,15 @@ func (account *TestBenchAccount) AddArrayToStorage(blockExec TestBenchBlockExecu
 // BasicBlockExecutor executes blocks in sequence and applies all changes (not fork aware)
 type BasicBlockExecutor struct {
 	blockComputer         computer.BlockComputer
-	programCache          *programs.Programs
-	activeView            state.View
+	derivedChainData      *derived.DerivedChainData
+	activeSnapshot        snapshot.SnapshotTree
 	activeStateCommitment flow.StateCommitment
 	chain                 flow.Chain
 	serviceAccount        *TestBenchAccount
 }
 
 func NewBasicBlockExecutor(chain flow.Chain, logger zerolog.Logger) (*BasicBlockExecutor, error) {
-	rt := fvm.NewInterpreterRuntime()
-	vm := fvm.NewVirtualMachine(rt)
+	vm := fvm.NewVirtualMachine()
 
 	opts := []fvm.Option{
 		fvm.WithTransactionFeesEnabled(true),
@@ -474,8 +594,16 @@ func NewBasicBlockExecutor(chain flow.Chain, logger zerolog.Logger) (*BasicBlock
 		fvm.WithEventCollectionSizeLimit(math.MaxUint64),
 		fvm.WithGasLimit(20_000_000),
 		fvm.WithChain(chain),
+		fvm.WithLogger(logger),
+		fvm.WithReusableCadenceRuntimePool(
+			reusableRuntime.NewReusableCadenceRuntimePool(
+				computation.ReusableCadenceRuntimePoolSize,
+				runtime.Config{},
+			),
+		),
+		fvm.WithEVMEnabled(true),
 	}
-	fvmContext := fvm.NewContext(logger, opts...)
+	fvmContext := fvm.NewContext(opts...)
 
 	collector := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
@@ -486,6 +614,9 @@ func NewBasicBlockExecutor(chain flow.Chain, logger zerolog.Logger) (*BasicBlock
 	if err != nil {
 		return nil, err
 	}
+
+	compactor := fixtures.NewNoopCompactor(ledger)
+	<-compactor.Ready()
 
 	bootstrapper := bootstrapexec.NewBootstrapper(logger)
 
@@ -504,24 +635,61 @@ func NewBasicBlockExecutor(chain flow.Chain, logger zerolog.Logger) (*BasicBlock
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithTransactionFee(fvm.DefaultTransactionFees),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+		fvm.WithSetupEVMEnabled(true),
 	)
 	if err != nil {
 		return nil, err
 	}
 
+	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
+	trackerStorage := mocktracker.NewMockStorage()
+
+	prov := provider.NewProvider(
+		zerolog.Nop(),
+		metrics.NewNoopCollector(),
+		execution_data.DefaultSerializer,
+		bservice,
+		trackerStorage,
+	)
+
+	me := new(moduleMock.Local)
+	me.On("NodeID").Return(unittest.IdentifierFixture())
+	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
+	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil, nil)
+
 	ledgerCommitter := committer.NewLedgerViewCommitter(ledger, tracer)
-	blockComputer, err := computer.NewBlockComputer(vm, fvmContext, collector, tracer, logger, ledgerCommitter)
+	blockComputer, err := computer.NewBlockComputer(
+		vm,
+		fvmContext,
+		collector,
+		tracer,
+		logger,
+		ledgerCommitter,
+		me,
+		prov,
+		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
+		1,
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	view := delta.NewView(exeState.LedgerGetRegister(ledger, initialCommit))
+	activeSnapshot := snapshot.NewSnapshotTree(
+		exeState.NewLedgerStorageSnapshot(ledger, initialCommit))
+
+	derivedChainData, err := derived.NewDerivedChainData(
+		derived.DefaultDerivedDataCacheSize)
+	if err != nil {
+		return nil, err
+	}
 
 	return &BasicBlockExecutor{
 		blockComputer:         blockComputer,
-		programCache:          programs.NewEmptyPrograms(),
+		derivedChainData:      derivedChainData,
 		activeStateCommitment: initialCommit,
-		activeView:            view,
+		activeSnapshot:        activeSnapshot,
 		chain:                 chain,
 		serviceAccount:        serviceAccount,
 	}, nil
@@ -529,10 +697,6 @@ func NewBasicBlockExecutor(chain flow.Chain, logger zerolog.Logger) (*BasicBlock
 
 func (b *BasicBlockExecutor) Chain() flow.Chain {
 	return b.chain
-}
-
-func (b *BasicBlockExecutor) ResetProgramCache() {
-	b.programCache = programs.NewEmptyPrograms()
 }
 
 func (b *BasicBlockExecutor) ServiceAccount() *TestBenchAccount {
@@ -543,16 +707,25 @@ func (b *BasicBlockExecutor) ExecuteCollections(collections [][]*flow.Transactio
 	executableBlock := unittest.ExecutableBlockFromTransactions(b.chain.ChainID(), collections)
 	executableBlock.StartState = &b.activeStateCommitment
 
-	computationResult, err := b.blockComputer.ExecuteBlock(context.Background(), executableBlock, b.activeView, b.programCache)
+	derivedBlockData := b.derivedChainData.GetOrCreateDerivedBlockData(
+		executableBlock.ID(),
+		executableBlock.ParentID())
+
+	computationResult, err := b.blockComputer.ExecuteBlock(
+		context.Background(),
+		unittest.IdentifierFixture(),
+		executableBlock,
+		b.activeSnapshot,
+		derivedBlockData)
 	if err != nil {
 		return nil, err
 	}
 
-	endState, _, _, err := execution.GenerateExecutionResultAndChunkDataPacks(unittest.IdentifierFixture(), b.activeStateCommitment, computationResult)
-	if err != nil {
-		return nil, err
+	b.activeStateCommitment = computationResult.CurrentEndState()
+
+	for _, snapshot := range computationResult.AllExecutionSnapshots() {
+		b.activeSnapshot = b.activeSnapshot.Append(snapshot)
 	}
-	b.activeStateCommitment = endState
 
 	return computationResult, nil
 }
@@ -592,23 +765,22 @@ func (b *BasicBlockExecutor) SetupAccounts(privateKeys []flow.AccountPrivateKey)
 		if err != nil {
 			return nil, err
 		}
-		if len(computationResult.TransactionResults[0].ErrorMessage) > 0 {
-			return nil, fmt.Errorf(computationResult.TransactionResults[0].ErrorMessage)
+		if len(computationResult.AllTransactionResults()[0].ErrorMessage) > 0 {
+			return nil, fmt.Errorf(computationResult.AllTransactionResults()[0].ErrorMessage)
 		}
 
 		var addr flow.Address
 
-		for _, eventList := range computationResult.Events {
-			for _, event := range eventList {
-				if event.Type == flow.EventAccountCreated {
-					data, err := jsoncdc.Decode(nil, event.Payload)
-					if err != nil {
-						panic("setup account failed, error decoding events")
-					}
-					addr = flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
-					break
+		for _, event := range computationResult.AllEvents() {
+			if event.Type == flow.EventAccountCreated {
+				data, err := ccf.Decode(nil, event.Payload)
+				if err != nil {
+					panic("setup account failed, error decoding events")
 				}
+				addr = flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
+				break
 			}
+
 		}
 		if addr == flow.EmptyAddress {
 			panic("setup account failed, no account creation event emitted")
@@ -618,117 +790,3 @@ func (b *BasicBlockExecutor) SetupAccounts(privateKeys []flow.AccountPrivateKey)
 
 	return accounts, nil
 }
-
-// transactionDataCollector collects data from a transaction execution logs.
-type transactionDataCollector struct {
-	TimeSpent              map[string]uint64
-	MemAlloc               map[string]uint64
-	ComputationIntensities map[string]map[string]uint64
-	MemoryIntensities      map[string]map[string]uint64
-	ComputationColumns     map[string]struct{}
-	MemoryColumns          map[string]struct{}
-	ComputationUsed        map[string]uint
-	MemoryUsed             map[string]uint
-	TransactionNames       map[string]string
-}
-
-type txWeights struct {
-	TXHash                 string            `json:"txHash"`
-	LedgerInteractionUsed  uint64            `json:"ledgerInteractionUsed"`
-	ComputationUsed        uint              `json:"computationUsed"`
-	MemoryUsed             uint              `json:"memoryUsed"`
-	ComputationIntensities map[string]uint64 `json:"computationIntensities"`
-	MemoryIntensities      map[string]uint64 `json:"memoryIntensities"`
-}
-
-type txDoneLog struct {
-	TXHash        string `json:"tx_id"`
-	TimeSpentInMS uint64 `json:"timeSpentInMS"`
-	MemAlloc      uint64 `json:"memAlloc"`
-}
-
-func newTransactionDataCollector() *transactionDataCollector {
-	return &transactionDataCollector{
-		TimeSpent:              map[string]uint64{},
-		MemAlloc:               map[string]uint64{},
-		ComputationIntensities: map[string]map[string]uint64{},
-		MemoryIntensities:      map[string]map[string]uint64{},
-		ComputationColumns:     map[string]struct{}{},
-		MemoryColumns:          map[string]struct{}{},
-		ComputationUsed:        map[string]uint{},
-		MemoryUsed:             map[string]uint{},
-		TransactionNames:       map[string]string{},
-	}
-}
-
-func (l *transactionDataCollector) Write(p []byte) (n int, err error) {
-	if strings.Contains(string(p), "transaction execution data") {
-		w := txWeights{}
-		err := json.Unmarshal(p, &w)
-
-		if err != nil {
-			fmt.Println(err)
-			return len(p), nil
-		}
-
-		l.ComputationIntensities[w.TXHash] = w.ComputationIntensities
-		l.MemoryIntensities[w.TXHash] = w.MemoryIntensities
-		l.ComputationUsed[w.TXHash] = w.ComputationUsed
-		l.MemoryUsed[w.TXHash] = w.MemoryUsed
-
-		for s := range w.MemoryIntensities {
-			l.MemoryColumns[s] = struct{}{}
-		}
-		for s := range w.ComputationIntensities {
-			l.ComputationColumns[s] = struct{}{}
-		}
-
-	}
-	if strings.Contains(string(p), "transaction executed successfully") || strings.Contains(string(p), "transaction executed failed") {
-		w := txDoneLog{}
-		err := json.Unmarshal(p, &w)
-
-		if err != nil {
-			fmt.Println(err)
-			return len(p), nil
-		}
-
-		l.MemAlloc[w.TXHash] = w.MemAlloc
-		l.TimeSpent[w.TXHash] = w.TimeSpentInMS
-	}
-	return len(p), nil
-
-}
-
-// Merge merges the data from the other collector into this one.
-func (l *transactionDataCollector) Merge(l2 *transactionDataCollector) {
-	for k, v := range l2.TimeSpent {
-		l.TimeSpent[k] = v
-	}
-	for k, v := range l2.MemAlloc {
-		l.MemAlloc[k] = v
-	}
-	for k, v := range l2.ComputationIntensities {
-		l.ComputationIntensities[k] = v
-	}
-	for k, v := range l2.MemoryIntensities {
-		l.MemoryIntensities[k] = v
-	}
-	for k, v := range l2.ComputationColumns {
-		l.ComputationColumns[k] = v
-	}
-	for k, v := range l2.MemoryColumns {
-		l.MemoryColumns[k] = v
-	}
-	for k, v := range l2.ComputationUsed {
-		l.ComputationUsed[k] = v
-	}
-	for k, v := range l2.MemoryUsed {
-		l.MemoryUsed[k] = v
-	}
-	for k, v := range l2.TransactionNames {
-		l.TransactionNames[k] = v
-	}
-}
-
-var _ io.Writer = &transactionDataCollector{}
