@@ -3039,7 +3039,7 @@ func TestEVM(t *testing.T) {
 					transaction() {
 						prepare(acc: AuthAccount) {
 							let vaultRef = acc.borrow<&{FungibleToken.Provider}>(from: /storage/flowTokenVault)
-							?? panic("Could not borrow reference to the owner''s Vault!")
+							?? panic("Could not borrow reference to the owner's Vault!")
 
 							let acc <- EVM.createBridgedAccount()
 							let amount <- vaultRef.withdraw(amount: 0.0000001) as! @FlowToken.Vault
