@@ -13,16 +13,14 @@ var (
 	FlowBlockHeightFixedGas = uint64(0) // TODO update me with a proper value
 )
 
+// ArchContract return a procompile for the Cadence Arch contract
 func ArchContract(
 	address types.Address,
 	heightProvider func() (uint64, error),
 ) types.Precompile {
-	fbh := &flowBlockHeightFunction{heightProvider}
-	return multiMethodPrecompileContract(
+	return MultiFunctionPrecompileContract(
 		address,
-		map[FunctionSignature]Function{
-			fbh.FunctionSignature(): fbh,
-		},
+		[]Function{&flowBlockHeightFunction{heightProvider}},
 	)
 }
 

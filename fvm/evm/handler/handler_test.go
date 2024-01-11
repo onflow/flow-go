@@ -505,7 +505,7 @@ func TestHandler_BridgedAccount(t *testing.T) {
 		})
 	})
 
-	t.Run("test precompiled", func(t *testing.T) {
+	t.Run("test call to cadence arch", func(t *testing.T) {
 		t.Parallel()
 
 		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
@@ -519,7 +519,6 @@ func TestHandler_BridgedAccount(t *testing.T) {
 				foa := h.AccountByAddress(h.AllocateAddress(), true)
 				require.NotNil(t, foa)
 
-				// deposit 10000 flow
 				orgBalance, err := types.NewBalanceFromAttoFlow(new(big.Int).Mul(big.NewInt(1e18), big.NewInt(10000)))
 				require.NoError(t, err)
 				vault := types.NewFlowTokenVault(orgBalance)
