@@ -148,7 +148,7 @@ network-config:
           error-threshold: 500
         graft-and-prune: # Max number of control messages in a sample to be inspected when inspecting GRAFT and PRUNE message types. If the total number of control messages (GRAFT or PRUNE)
           # exceeds this max sample size then the respective message will be truncated before being processed.
-          message-max-sample-size: 1000
+          max-sample-size: 1000
           # Maximum number of total duplicate topic ids in a single GRAFT or PRUNE message, ideally this should be 0 but we allow for some tolerance
           # to avoid penalizing peers that are not malicious but are misbehaving due to bugs or other issues.
           # A topic id is considered duplicate if it appears more than once in a single GRAFT or PRUNE message.
