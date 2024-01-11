@@ -15,11 +15,10 @@ type duplicateStrTracker map[string]uint
 // Returns:
 // The number of times this string has been tracked, e.g., 1 if it is the first time, 2 if it is the second time, etc.
 func (d duplicateStrTracker) track(s string) uint {
-	if _, ok := d[s]; ok {
-		d[s]++
-	} else {
-		d[s] = 1
+	if _, ok := d[s]; !ok {
+		d[s] = 0
 	}
+	d[s]++
 
 	return d[s]
 }
