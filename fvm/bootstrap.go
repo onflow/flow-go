@@ -77,6 +77,7 @@ type BootstrapParams struct {
 	storagePerFlow                   cadence.UFix64
 	restrictedAccountCreationEnabled cadence.Bool
 	setupEVMEnabled                  cadence.Bool
+	evmAbiOnly                       cadence.Bool
 
 	// versionFreezePeriod is the number of blocks in the future where the version
 	// changes are frozen. The Node version beacon manages the freeze period,
@@ -215,6 +216,13 @@ func WithRestrictedAccountCreationEnabled(enabled cadence.Bool) BootstrapProcedu
 func WithSetupEVMEnabled(enabled cadence.Bool) BootstrapProcedureOption {
 	return func(bp *BootstrapProcedure) *BootstrapProcedure {
 		bp.setupEVMEnabled = enabled
+		return bp
+	}
+}
+
+func WithEVMABIOnly(evmAbiOnly cadence.Bool) BootstrapProcedureOption {
+	return func(bp *BootstrapProcedure) *BootstrapProcedure {
+		bp.evmAbiOnly = evmAbiOnly
 		return bp
 	}
 }
@@ -809,7 +817,7 @@ func (b *bootstrapExecutor) setupEVM(serviceAddress, fungibleTokenAddress, flowT
 		evmAcc := b.createAccount(nil) // account for storage
 		tx := blueprints.DeployContractTransaction(
 			serviceAddress,
-			stdlib.ContractCode(flowTokenAddress),
+			stdlib.ContractCode(flowTokenAddress, bool(b.evmAbiOnly)),
 			stdlib.ContractName,
 		)
 		// WithEVMEnabled should only be used after we create an account for storage
