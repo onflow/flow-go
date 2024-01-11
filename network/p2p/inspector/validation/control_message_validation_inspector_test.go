@@ -320,34 +320,65 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		stopInspector(t, cancel, inspector)
 	})
 
-	t.Run("processInspectRPCReq should disseminate invalid control message notification for control messages with duplicate topics", func(t *testing.T) {
+	// duplicate graft topic ids beyond threshold should trigger invalid control message notification
+	t.Run("duplicate graft topic ids beyond threshold", func(t *testing.T) {
 		inspector, signalerCtx, cancel, distributor, _, sporkID, _, topicProviderOracle := inspectorFixture(t)
 		duplicateTopic := fmt.Sprintf("%s/%s", channels.TestNetworkChannel, sporkID)
 		// avoid unknown topics errors
 		topicProviderOracle.UpdateTopics([]string{duplicateTopic})
-		// create control messages with duplicate topic
-		grafts := []*pubsub_pb.ControlGraft{unittest.P2PRPCGraftFixture(&duplicateTopic), unittest.P2PRPCGraftFixture(&duplicateTopic)}
-		prunes := []*pubsub_pb.ControlPrune{unittest.P2PRPCPruneFixture(&duplicateTopic), unittest.P2PRPCPruneFixture(&duplicateTopic)}
-		ihaves := []*pubsub_pb.ControlIHave{unittest.P2PRPCIHaveFixture(&duplicateTopic, unittest.IdentifierListFixture(20).Strings()...),
-			unittest.P2PRPCIHaveFixture(&duplicateTopic, unittest.IdentifierListFixture(20).Strings()...)}
+		var grafts []*pubsub_pb.ControlGraft
+		cfg, err := config.DefaultConfig()
+		require.NoError(t, err)
+		for i := 0; i < cfg.NetworkConfig.GossipSub.RpcInspector.Validation.GraftPrune.MaxTotalDuplicateTopicIdThreshold+2; i++ {
+			grafts = append(grafts, unittest.P2PRPCGraftFixture(&duplicateTopic))
+		}
 		from := unittest.PeerIdFixture(t)
-		duplicateTopicGraftsRpc := unittest.P2PRPCFixture(unittest.WithGrafts(grafts...))
-		duplicateTopicPrunesRpc := unittest.P2PRPCFixture(unittest.WithPrunes(prunes...))
-		duplicateTopicIHavesRpc := unittest.P2PRPCFixture(unittest.WithIHaves(ihaves...))
-		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Times(3).Run(func(args mock.Arguments) {
+		rpc := unittest.P2PRPCFixture(unittest.WithGrafts(grafts...))
+		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Once().Run(func(args mock.Arguments) {
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
 			require.Equal(t, notification.TopicType, p2p.CtrlMsgNonClusterTopicType, "expected p2p.CtrlMsgNonClusterTopicType notification type, no RPC with cluster prefixed topic sent in this test")
 			require.Equal(t, from, notification.PeerID)
-			require.Contains(t, []p2pmsg.ControlMessageType{p2pmsg.CtrlMsgGraft, p2pmsg.CtrlMsgPrune, p2pmsg.CtrlMsgIHave}, notification.MsgType)
+			require.Equal(t, p2pmsg.CtrlMsgGraft, notification.MsgType)
 			require.True(t, validation.IsDuplicateTopicErr(notification.Error))
 		})
 
 		inspector.Start(signalerCtx)
+		unittest.RequireComponentsReadyBefore(t, 100*time.Millisecond, inspector)
 
-		require.NoError(t, inspector.Inspect(from, duplicateTopicGraftsRpc))
-		require.NoError(t, inspector.Inspect(from, duplicateTopicPrunesRpc))
-		require.NoError(t, inspector.Inspect(from, duplicateTopicIHavesRpc))
+		require.NoError(t, inspector.Inspect(from, rpc))
+		// sleep for 1 second to ensure rpc's is processed
+		time.Sleep(time.Second)
+		stopInspector(t, cancel, inspector)
+	})
+
+	// duplicate prune topic ids beyond threshold should trigger invalid control message notification
+	t.Run("duplicate prune topic ids beyond threshold", func(t *testing.T) {
+		inspector, signalerCtx, cancel, distributor, _, sporkID, _, topicProviderOracle := inspectorFixture(t)
+		duplicateTopic := fmt.Sprintf("%s/%s", channels.TestNetworkChannel, sporkID)
+		// avoid unknown topics errors
+		topicProviderOracle.UpdateTopics([]string{duplicateTopic})
+		var prunes []*pubsub_pb.ControlPrune
+		cfg, err := config.DefaultConfig()
+		require.NoError(t, err)
+		for i := 0; i < cfg.NetworkConfig.GossipSub.RpcInspector.Validation.GraftPrune.MaxTotalDuplicateTopicIdThreshold+2; i++ {
+			prunes = append(prunes, unittest.P2PRPCPruneFixture(&duplicateTopic))
+		}
+		from := unittest.PeerIdFixture(t)
+		rpc := unittest.P2PRPCFixture(unittest.WithPrunes(prunes...))
+		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Once().Run(func(args mock.Arguments) {
+			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
+			require.True(t, ok)
+			require.Equal(t, notification.TopicType, p2p.CtrlMsgNonClusterTopicType, "expected p2p.CtrlMsgNonClusterTopicType notification type, no RPC with cluster prefixed topic sent in this test")
+			require.Equal(t, from, notification.PeerID)
+			require.Equal(t, p2pmsg.CtrlMsgPrune, notification.MsgType)
+			require.True(t, validation.IsDuplicateTopicErr(notification.Error))
+		})
+
+		inspector.Start(signalerCtx)
+		unittest.RequireComponentsReadyBefore(t, 100*time.Millisecond, inspector)
+
+		require.NoError(t, inspector.Inspect(from, rpc))
 		// sleep for 1 second to ensure rpc's is processed
 		time.Sleep(time.Second)
 		stopInspector(t, cancel, inspector)
