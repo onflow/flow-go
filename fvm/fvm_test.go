@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"github.com/onflow/flow-go/fvm/storage/snapshot/mock"
 	"math"
 	"strings"
 	"testing"
@@ -15,6 +16,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	cadenceErrors "github.com/onflow/cadence/runtime/errors"
 	"github.com/onflow/cadence/runtime/tests/utils"
+	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
@@ -3061,17 +3063,31 @@ func TestEVM(t *testing.T) {
 			ctx fvm.Context,
 			snapshotTree snapshot.SnapshotTree,
 		) {
-			errWrappers := []evmErrorSnapshot{{
-				snapshotTree: snapshotTree,
-				err:          types.ErrNotImplemented,
-				errChecker:   types.IsAFatalError,
+
+			tests := []struct {
+				err        error
+				errChecker func(error) bool
+			}{{
+				types.ErrNotImplemented,
+				types.IsAFatalError,
 			}, {
-				snapshotTree: snapshotTree,
-				err:          types.NewStateError(fmt.Errorf("test state error")),
-				errChecker:   types.IsAStateError,
+				types.NewStateError(fmt.Errorf("test state error")),
+				types.IsAStateError,
 			}}
 
-			for _, e := range errWrappers {
+			for _, e := range tests {
+				// this mock will return an error we provide with the test once it starts to access address allocator registers
+				// that is done to make sure the error is coming out of EVM execution
+				errStorage := &mock.StorageSnapshot{}
+				errStorage.
+					On("Get", mockery.AnythingOfType("flow.RegisterID")).
+					Return(func(id flow.RegisterID) (flow.RegisterValue, error) {
+						if id.Key == "AddressAllocator" {
+							return nil, e.err
+						}
+						return snapshotTree.Get(id)
+					})
+
 				script := fvm.Script([]byte(fmt.Sprintf(`
 					import EVM from %s
 					
@@ -3080,35 +3096,13 @@ func TestEVM(t *testing.T) {
 					}
 				`, chain.ServiceAddress().HexWithPrefix())))
 
-				_, output, err := vm.Run(ctx, script, e)
+				_, output, err := vm.Run(ctx, script, errStorage)
 
 				require.NoError(t, output.Err)
 				require.Error(t, err)
 				// make sure error it's the right type of error
-				require.True(t, e.errChecker(err))
+				require.True(t, e.errChecker(err), "error is not of the right type")
 			}
 		}),
 	)
-}
-
-// evmErrorSnapshot will return an error once it gets to reading the EVM
-// registers for address allocator, that way we can at that point return a provided
-// error, that error type is then checked against the provider checker.
-type evmErrorSnapshot struct {
-	snapshotTree snapshot.SnapshotTree
-	err          error
-	errChecker   func(error) bool
-}
-
-func (s evmErrorSnapshot) Get(
-	id flow.RegisterID,
-) (
-	flow.RegisterValue,
-	error,
-) {
-	if id.Key == "AddressAllocator" {
-		return nil, s.err
-	}
-
-	return s.snapshotTree.Get(id)
 }
