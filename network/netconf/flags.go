@@ -262,16 +262,16 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 	flags.Int(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.PublishMessagesConfigKey, p2pconfig.MessageErrorThresholdKey),
 		config.GossipSub.RpcInspector.Validation.PublishMessages.ErrorThreshold,
 		"the threshold at which an error will be returned if the number of invalid RPC messages exceeds this value")
-	flags.Uint(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.IHaveConfigKey, p2pconfig.MaxTotalDuplicateTopicIdThresholdKey),
+	flags.Int(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.IHaveConfigKey, p2pconfig.MaxTotalDuplicateTopicIdThresholdKey),
 		config.GossipSub.RpcInspector.Validation.IHave.MaxTotalDuplicateTopicIdThreshold,
 		"the max allowed duplicate topic IDs across all iHave control messages in a single RPC message")
-	flags.Uint(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.IHaveConfigKey, p2pconfig.MaxTotalDuplicateMessageIdThresholdKey),
+	flags.Int(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.IHaveConfigKey, p2pconfig.MaxTotalDuplicateMessageIdThresholdKey),
 		config.GossipSub.RpcInspector.Validation.IHave.MaxTotalDuplicateMessageIdThreshold,
 		"the max allowed duplicate message ids in a single iHave control message")
-	flags.Uint(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.IHaveConfigKey, p2pconfig.DuplicateTopicIdThresholdKey),
+	flags.Int(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.IHaveConfigKey, p2pconfig.DuplicateTopicIdThresholdKey),
 		config.GossipSub.RpcInspector.Validation.IHave.DuplicateTopicIdThreshold,
 		"the number of times a topic ID can be repeated in iHave control messages across the same RPC message before it is considered a duplicate")
-	flags.Uint(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.GraftPruneKey, p2pconfig.MaxTotalDuplicateTopicIdThresholdKey),
+	flags.Int(BuildFlagName(gossipsubKey, p2pconfig.RpcInspectorKey, p2pconfig.ValidationConfigKey, p2pconfig.GraftPruneKey, p2pconfig.MaxTotalDuplicateTopicIdThresholdKey),
 		config.GossipSub.RpcInspector.Validation.GraftPrune.MaxTotalDuplicateTopicIdThreshold,
 		"the max allowed duplicate topic IDs across all graft/prune control messages in a single RPC message")
 	flags.Duration(BuildFlagName(gossipsubKey, p2pconfig.SubscriptionProviderKey, p2pconfig.UpdateIntervalKey),

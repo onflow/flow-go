@@ -327,7 +327,7 @@ func (c *ControlMsgValidationInspector) checkPubsubMessageSender(message *pubsub
 // - bool: true if an error is returned and the topic that failed validation was a cluster prefixed topic, false otherwise.
 func (c *ControlMsgValidationInspector) inspectGraftMessages(from peer.ID, grafts []*pubsub_pb.ControlGraft, activeClusterIDS flow.ChainIDList) (error, p2p.CtrlMsgTopicType) {
 	duplicateTopicTracker := make(duplicateStrTracker)
-	totalDuplicateTopicIds := uint(0)
+	totalDuplicateTopicIds := 0
 	for _, graft := range grafts {
 		topic := channels.Topic(graft.GetTopicID())
 		if duplicateTopicTracker.track(topic.String()) > 1 {
@@ -358,7 +358,7 @@ func (c *ControlMsgValidationInspector) inspectGraftMessages(from peer.ID, graft
 //   - bool: true if an error is returned and the topic that failed validation was a cluster prefixed topic, false otherwise.
 func (c *ControlMsgValidationInspector) inspectPruneMessages(from peer.ID, prunes []*pubsub_pb.ControlPrune, activeClusterIDS flow.ChainIDList) (error, p2p.CtrlMsgTopicType) {
 	tracker := make(duplicateStrTracker)
-	totalDuplicateTopicIds := uint(0)
+	totalDuplicateTopicIds := 0
 	for _, prune := range prunes {
 		topic := channels.Topic(prune.GetTopicID())
 		if tracker.track(topic.String()) > 1 {
@@ -398,9 +398,9 @@ func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihave
 		Logger()
 	duplicateTopicTracker := make(duplicateStrTracker)
 	duplicateMessageIDTracker := make(duplicateStrTracker)
-	totalDuplicateTopicIds := uint(0)
-	totalDuplicateMessageIds := uint(0)
 	totalMessageIds := 0
+	totalDuplicateTopicIds := 0
+	totalDuplicateMessageIds := 0
 	for _, ihave := range ihaves {
 		messageIds := ihave.GetMessageIDs()
 		topic := ihave.GetTopicID()
@@ -421,7 +421,7 @@ func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihave
 		}
 
 		for _, messageID := range messageIds {
-			if dupCnt := duplicateMessageIDTracker.track(messageID); dupCnt > 1 {
+			if duplicateMessageIDTracker.track(messageID) > 1 {
 				totalDuplicateMessageIds++
 				// the message is duplicated, check if the total number of duplicates exceeds the configured threshold
 				if totalDuplicateMessageIds > c.config.IHave.MaxTotalDuplicateMessageIdThreshold {
@@ -432,8 +432,8 @@ func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihave
 	}
 	lg.Debug().
 		Int("total_message_ids", totalMessageIds).
-		Uint("total_duplicate_topic_ids", totalDuplicateTopicIds).
-		Uint("total_duplicate_message_ids", totalDuplicateMessageIds).
+		Int("total_duplicate_topic_ids", totalDuplicateTopicIds).
+		Int("total_duplicate_message_ids", totalDuplicateMessageIds).
 		Msg("ihave control message validation complete")
 	return nil, p2p.CtrlMsgNonClusterTopicType
 }

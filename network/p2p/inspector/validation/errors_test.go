@@ -30,7 +30,7 @@ func TestErrActiveClusterIDsNotSetRoundTrip(t *testing.T) {
 // TestErrDuplicateTopicRoundTrip ensures correct error formatting for DuplicateTopicErr.
 func TestDuplicateTopicErrRoundTrip(t *testing.T) {
 	expectedErrorMsg := fmt.Sprintf("duplicate topic found in %s control message type: %s", p2pmsg.CtrlMsgGraft, channels.TestNetworkChannel)
-	err := NewDuplicateTopicErr(channels.TestNetworkChannel.String(), uint(8), p2pmsg.CtrlMsgGraft)
+	err := NewDuplicateTopicErr(channels.TestNetworkChannel.String(), 1, p2pmsg.CtrlMsgGraft)
 	assert.Equal(t, expectedErrorMsg, err.Error(), "the error message should be correctly formatted")
 	// tests the IsDuplicateTopicErr function.
 	assert.True(t, IsDuplicateTopicErr(err), "IsDuplicateTopicErr should return true for DuplicateTopicErr error")
@@ -44,11 +44,11 @@ func TestDuplicateMessageIDErrRoundTrip(t *testing.T) {
 	msgID := "flow-1804flkjnafo"
 	expectedErrMsg1 := fmt.Sprintf("duplicate message ID foud in %s control message type: %s", p2pmsg.CtrlMsgIHave, msgID)
 	expectedErrMsg2 := fmt.Sprintf("duplicate message ID foud in %s control message type: %s", p2pmsg.CtrlMsgIWant, msgID)
-	err := NewDuplicateMessageIDErr(msgID, uint(8), p2pmsg.CtrlMsgIHave)
+	err := NewDuplicateMessageIDErr(msgID, 1, p2pmsg.CtrlMsgIHave)
 	assert.Equal(t, expectedErrMsg1, err.Error(), "the error message should be correctly formatted")
 	// tests the IsDuplicateTopicErr function.
 	assert.True(t, IsDuplicateMessageIDErr(err), "IsDuplicateMessageIDErr should return true for DuplicateMessageIDErr error")
-	err = NewDuplicateMessageIDErr(msgID, uint(8), p2pmsg.CtrlMsgIWant)
+	err = NewDuplicateMessageIDErr(msgID, 1, p2pmsg.CtrlMsgIWant)
 	assert.Equal(t, expectedErrMsg2, err.Error(), "the error message should be correctly formatted")
 	// tests the IsDuplicateTopicErr function.
 	assert.True(t, IsDuplicateMessageIDErr(err), "IsDuplicateMessageIDErr should return true for DuplicateMessageIDErr error")

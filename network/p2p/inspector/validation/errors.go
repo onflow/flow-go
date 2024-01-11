@@ -55,7 +55,7 @@ func IsIWantCacheMissThresholdErr(err error) bool {
 // DuplicateTopicErr error that indicates a duplicate has been detected. This can be duplicate topic or message ID tracking.
 type DuplicateTopicErr struct {
 	topic   string                    // the topic that is duplicated
-	count   uint                      // the number of times the topic has been duplicated
+	count   int                       // the number of times the topic has been duplicated
 	msgType p2pmsg.ControlMessageType // the control message type that the topic was found in
 }
 
@@ -73,7 +73,7 @@ func (e DuplicateTopicErr) Error() string {
 // Returns:
 //
 //	A new DuplicateTopicErr.
-func NewDuplicateTopicErr(topic string, count uint, msgType p2pmsg.ControlMessageType) DuplicateTopicErr {
+func NewDuplicateTopicErr(topic string, count int, msgType p2pmsg.ControlMessageType) DuplicateTopicErr {
 
 	return DuplicateTopicErr{topic, count, msgType}
 }
@@ -87,7 +87,7 @@ func IsDuplicateTopicErr(err error) bool {
 // DuplicateMessageIDErr error that indicates a duplicate message ID has been detected in a IHAVE or IWANT control message.
 type DuplicateMessageIDErr struct {
 	id      string                    // id of the message that is duplicated
-	count   uint                      // the number of times the message ID has been duplicated
+	count   int                       // the number of times the message ID has been duplicated
 	msgType p2pmsg.ControlMessageType // the control message type that the message ID was found in
 }
 
@@ -101,7 +101,7 @@ func (e DuplicateMessageIDErr) Error() string {
 //	id: id of the message that is duplicated
 //	count: the number of times the message ID has been duplicated
 //	msgType: the control message type that the message ID was found in.
-func NewDuplicateMessageIDErr(id string, count uint, msgType p2pmsg.ControlMessageType) DuplicateMessageIDErr {
+func NewDuplicateMessageIDErr(id string, count int, msgType p2pmsg.ControlMessageType) DuplicateMessageIDErr {
 	return DuplicateMessageIDErr{id, count, msgType}
 }
 
