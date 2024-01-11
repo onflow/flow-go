@@ -9,8 +9,9 @@ import (
 )
 
 var (
-	FlowBlockHeightFuncSig  = ComputeFunctionSignature("flowBlockHeight", nil)
-	FlowBlockHeightFixedGas = uint64(0) // TODO update me with a proper value
+	FlowBlockHeightFuncSig = ComputeFunctionSignature("flowBlockHeight", nil)
+	// TODO update me with a higher value if needed
+	FlowBlockHeightFixedGas = uint64(1)
 )
 
 // ArchContract return a procompile for the Cadence Arch contract
