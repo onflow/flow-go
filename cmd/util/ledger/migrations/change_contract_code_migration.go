@@ -7,9 +7,10 @@ import (
 
 	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
 	ftContracts "github.com/onflow/flow-ft/lib/go/contracts"
-	sdk "github.com/onflow/flow-go-sdk"
 	nftContracts "github.com/onflow/flow-nft/lib/go/contracts"
 	"github.com/rs/zerolog"
+
+	sdk "github.com/onflow/flow-go-sdk"
 
 	"github.com/onflow/cadence/runtime/common"
 
