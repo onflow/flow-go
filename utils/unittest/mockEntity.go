@@ -7,6 +7,7 @@ import (
 // MockEntity implements a bare minimum entity for sake of test.
 type MockEntity struct {
 	Identifier flow.Identifier
+	Nonce      uint64
 }
 
 func (m MockEntity) ID() flow.Identifier {

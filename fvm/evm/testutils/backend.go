@@ -52,24 +52,34 @@ func fullKey(owner, key []byte) string {
 func GetSimpleValueStore() *TestValueStore {
 	data := make(map[string][]byte)
 	allocator := make(map[string]uint64)
-
+	bytesRead := 0
+	bytesWritten := 0
 	return &TestValueStore{
 		GetValueFunc: func(owner, key []byte) ([]byte, error) {
-			return data[fullKey(owner, key)], nil
+			fk := fullKey(owner, key)
+			value := data[fk]
+			bytesRead += len(fk) + len(value)
+			return value, nil
 		},
 		SetValueFunc: func(owner, key, value []byte) error {
-			data[fullKey(owner, key)] = value
+			fk := fullKey(owner, key)
+			data[fk] = value
+			bytesWritten += len(fk) + len(value)
 			return nil
 		},
 		ValueExistsFunc: func(owner, key []byte) (bool, error) {
-			return len(data[fullKey(owner, key)]) > 0, nil
-
+			fk := fullKey(owner, key)
+			value := data[fk]
+			bytesRead += len(fk) + len(value)
+			return len(value) > 0, nil
 		},
 		AllocateStorageIndexFunc: func(owner []byte) (atree.StorageIndex, error) {
 			index := allocator[string(owner)]
 			var data [8]byte
 			allocator[string(owner)] = index + 1
 			binary.BigEndian.PutUint64(data[:], index)
+			bytesRead += len(owner) + 8
+			bytesWritten += len(owner) + 8
 			return atree.StorageIndex(data), nil
 		},
 		TotalStorageSizeFunc: func() int {
@@ -82,8 +92,18 @@ func GetSimpleValueStore() *TestValueStore {
 			}
 			return size
 		},
+		TotalBytesReadFunc: func() int {
+			return bytesRead
+		},
+		TotalBytesWrittenFunc: func() int {
+			return bytesWritten
+		},
 		TotalStorageItemsFunc: func() int {
 			return len(maps.Keys(data)) + len(maps.Keys(allocator))
+		},
+		ResetStatsFunc: func() {
+			bytesRead = 0
+			bytesWritten = 0
 		},
 	}
 }
@@ -155,7 +175,10 @@ type TestValueStore struct {
 	ValueExistsFunc          func(owner, key []byte) (bool, error)
 	AllocateStorageIndexFunc func(owner []byte) (atree.StorageIndex, error)
 	TotalStorageSizeFunc     func() int
+	TotalBytesReadFunc       func() int
+	TotalBytesWrittenFunc    func() int
 	TotalStorageItemsFunc    func() int
+	ResetStatsFunc           func()
 }
 
 var _ environment.ValueStore = &TestValueStore{}
@@ -188,6 +211,20 @@ func (vs *TestValueStore) AllocateStorageIndex(owner []byte) (atree.StorageIndex
 	return vs.AllocateStorageIndexFunc(owner)
 }
 
+func (vs *TestValueStore) TotalBytesRead() int {
+	if vs.TotalBytesReadFunc == nil {
+		panic("method not set")
+	}
+	return vs.TotalBytesReadFunc()
+}
+
+func (vs *TestValueStore) TotalBytesWritten() int {
+	if vs.TotalBytesWrittenFunc == nil {
+		panic("method not set")
+	}
+	return vs.TotalBytesWrittenFunc()
+}
+
 func (vs *TestValueStore) TotalStorageSize() int {
 	if vs.TotalStorageSizeFunc == nil {
 		panic("method not set")
@@ -200,6 +237,13 @@ func (vs *TestValueStore) TotalStorageItems() int {
 		panic("method not set")
 	}
 	return vs.TotalStorageItemsFunc()
+}
+
+func (vs *TestValueStore) ResetStats() {
+	if vs.ResetStatsFunc == nil {
+		panic("method not set")
+	}
+	vs.ResetStatsFunc()
 }
 
 type testMeter struct {
