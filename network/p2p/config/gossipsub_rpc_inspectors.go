@@ -57,10 +57,6 @@ type PublishMessageInspectionParameters struct {
 	ErrorThreshold int `validate:"gte=500" mapstructure:"error-threshold"`
 }
 
-const (
-	MaxTotalDuplicateTopicIdThreshold = "max-total-duplicate-topic-id-threshold"
-)
-
 type GraftPruneRpcInspectionParameters struct {
 	// MaxSampleSize the max sample size used for control message validation of GRAFT and PRUNE. If the total number of control messages (GRAFT or PRUNE)
 	// exceeds this max sample size then the respective message will be truncated to this value before being processed.
