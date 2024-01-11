@@ -1,7 +1,6 @@
 package emulator
 
 import (
-	"fmt"
 	"math/big"
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
@@ -303,10 +302,6 @@ func SetupPrecompile(cfg *Config) error {
 	}
 
 	for k, v := range cfg.ExtraPrecompiles {
-		_, alreadyExist := precompiles[k]
-		if alreadyExist {
-			return fmt.Errorf("can not add a precompile, address already in use")
-		}
 		precompiles[k] = v
 	}
 	return nil

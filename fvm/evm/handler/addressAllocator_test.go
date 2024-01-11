@@ -20,7 +20,6 @@ func TestAddressAllocator(t *testing.T) {
 			require.NoError(t, err)
 
 			adr := aa.AllocatePrecompileAddress(3)
-			require.NoError(t, err)
 			expectedAddress := types.NewAddress(gethCommon.HexToAddress("0x0000000000000000000000010000000000000003"))
 			require.Equal(t, expectedAddress, adr)
 

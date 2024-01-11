@@ -44,7 +44,6 @@ func NewContractHandler(
 	addressAllocator types.AddressAllocator,
 	backend types.Backend,
 	emulator types.Emulator,
-	archProvider types.CadenceArchProvider,
 ) *ContractHandler {
 	return &ContractHandler{
 		flowTokenAddress: flowTokenAddress,
@@ -52,22 +51,18 @@ func NewContractHandler(
 		addressAllocator: addressAllocator,
 		backend:          backend,
 		emulator:         emulator,
-		precompiles:      getPrecompiles(addressAllocator, archProvider),
+		precompiles:      getPrecompiles(addressAllocator, backend),
 	}
 }
 
 func getPrecompiles(
 	addressAllocator types.AddressAllocator,
-	archProvider types.CadenceArchProvider,
+	backend types.Backend,
 ) []types.Precompile {
-	if archProvider == nil || addressAllocator == nil {
-		return nil
-	}
 	archAddress := addressAllocator.AllocatePrecompileAddress(1)
 	archContract := precompiles.ArchContract(
 		archAddress,
-		archProvider.FlowBlockHeight,
-		archProvider.VerifyAccountProof,
+		backend.GetCurrentBlockHeight,
 	)
 	return []types.Precompile{archContract}
 }

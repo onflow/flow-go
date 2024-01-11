@@ -47,6 +47,7 @@ type Backend interface {
 	environment.ValueStore
 	environment.Meter
 	environment.EventEmitter
+	environment.BlockInfo
 }
 
 // AddressAllocator allocates addresses, used by the handler
@@ -74,11 +75,4 @@ type BlockStore interface {
 
 	// ResetBlockProposal resets the block proposal
 	ResetBlockProposal() error
-}
-
-// CadenceArchProvider provides some of the functionalities needed to the candence arch
-type CadenceArchProvider interface {
-	FlowBlockHeight() (uint64, error)
-
-	VerifyAccountProof([]byte) (bool, error)
 }

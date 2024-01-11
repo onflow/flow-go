@@ -225,11 +225,8 @@ func TestBridgedAccountWithdraw(t *testing.T) {
 	})
 }
 
-// TODO: provide proper contract code
 func TestBridgedAccountDeploy(t *testing.T) {
-
 	t.Parallel()
-
 	RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 		RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 			tc := GetStorageTestContract(t)
