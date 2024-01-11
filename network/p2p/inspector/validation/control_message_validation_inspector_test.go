@@ -86,7 +86,7 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 	t.Run("truncateGraftMessages should truncate graft messages as expected", func(t *testing.T) {
 		graftPruneMessageMaxSampleSize := 1000
 		inspector, signalerCtx, cancel, distributor, rpcTracker, _, _, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
-			params.Config.GraftPruneMessageMaxSampleSize = graftPruneMessageMaxSampleSize
+			params.Config.GraftPrune.MaxSampleSize = graftPruneMessageMaxSampleSize
 		})
 		// topic validation is ignored set any topic oracle
 		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Maybe()
@@ -115,7 +115,7 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 	t.Run("truncatePruneMessages should truncate prune messages as expected", func(t *testing.T) {
 		graftPruneMessageMaxSampleSize := 1000
 		inspector, signalerCtx, cancel, distributor, rpcTracker, _, _, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
-			params.Config.GraftPruneMessageMaxSampleSize = graftPruneMessageMaxSampleSize
+			params.Config.GraftPrune.MaxSampleSize = graftPruneMessageMaxSampleSize
 		})
 		// topic validation is ignored set any topic oracle
 		rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
@@ -553,7 +553,7 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 	t.Run("inspectRpcPublishMessages should disseminate invalid control message notification when invalid pubsub messages count greater than configured RpcMessageErrorThreshold", func(t *testing.T) {
 		errThreshold := 500
 		inspector, signalerCtx, cancel, distributor, _, sporkID, _, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
-			params.Config.MessageErrorThreshold = errThreshold
+			params.Config.PublishMessages.ErrorThreshold = errThreshold
 		})
 		// create unknown topic
 		unknownTopic := channels.Topic(fmt.Sprintf("%s/%s", unittest.IdentifierFixture(), sporkID)).String()
@@ -593,7 +593,7 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 	t.Run("inspectRpcPublishMessages should disseminate invalid control message notification when subscription missing for topic", func(t *testing.T) {
 		errThreshold := 500
 		inspector, signalerCtx, cancel, distributor, _, sporkID, _, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
-			params.Config.MessageErrorThreshold = errThreshold
+			params.Config.PublishMessages.ErrorThreshold = errThreshold
 		})
 		pubsubMsgs := unittest.GossipSubMessageFixtures(errThreshold+1, fmt.Sprintf("%s/%s", channels.TestNetworkChannel, sporkID))
 		from := unittest.PeerIdFixture(t)
@@ -611,7 +611,7 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		errThreshold := 500
 		inspector, signalerCtx, cancel, distributor, _, _, _, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
 			// 5 invalid pubsub messages will force notification dissemination
-			params.Config.MessageErrorThreshold = errThreshold
+			params.Config.PublishMessages.ErrorThreshold = errThreshold
 		})
 		pubsubMsgs := unittest.GossipSubMessageFixtures(errThreshold+1, "")
 		rpc := unittest.P2PRPCFixture(unittest.WithPubsubMessages(pubsubMsgs...))
