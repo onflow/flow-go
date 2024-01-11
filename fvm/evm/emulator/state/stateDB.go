@@ -103,7 +103,8 @@ func (db *StateDB) Selfdestruct6780(addr gethCommon.Address) {
 
 // HasSelfDestructed returns true if address is flaged with self destruct.
 func (db *StateDB) HasSelfDestructed(addr gethCommon.Address) bool {
-	return db.lastestView().HasSelfDestructed(addr)
+	destructed, _ := db.lastestView().HasSelfDestructed(addr)
+	return destructed
 }
 
 // SubBalance substitutes the amount from the balance of the given address
@@ -302,8 +303,8 @@ func (db *StateDB) Commit() error {
 	var err error
 
 	// iterate views and collect dirty addresses and slots
-	addresses := make(map[gethCommon.Address]interface{})
-	slots := make(map[types.SlotAddress]interface{})
+	addresses := make(map[gethCommon.Address]struct{})
+	slots := make(map[types.SlotAddress]struct{})
 	for _, view := range db.views {
 		for key := range view.DirtyAddresses() {
 			addresses[key] = struct{}{}
@@ -318,6 +319,7 @@ func (db *StateDB) Commit() error {
 	for addr := range addresses {
 		sortedAddresses = append(sortedAddresses, addr)
 	}
+
 	sort.Slice(sortedAddresses,
 		func(i, j int) bool {
 			return bytes.Compare(sortedAddresses[i][:], sortedAddresses[j][:]) < 0
@@ -401,7 +403,6 @@ func (db *StateDB) Commit() error {
 // based on parameters that are passed it updates accesslists
 func (db *StateDB) Prepare(rules gethParams.Rules, sender, coinbase gethCommon.Address, dest *gethCommon.Address, precompiles []gethCommon.Address, txAccesses gethTypes.AccessList) {
 	if rules.IsBerlin {
-		// no need for mutation
 		db.AddAddressToAccessList(sender)
 
 		if dest != nil {
