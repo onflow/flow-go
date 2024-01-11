@@ -4,13 +4,12 @@ import (
 	"math"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
 	gethCommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/vm"
+	gethCore "github.com/ethereum/go-ethereum/core"
 	gethVM "github.com/ethereum/go-ethereum/core/vm"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/params"
+	gethCrypto "github.com/ethereum/go-ethereum/crypto"
+	gethParams "github.com/ethereum/go-ethereum/params"
+
 	"github.com/onflow/flow-go/fvm/evm/types"
 )
 
@@ -24,20 +23,20 @@ var (
 // Config sets the required parameters
 type Config struct {
 	// Chain Config
-	ChainConfig *params.ChainConfig
+	ChainConfig *gethParams.ChainConfig
 	// EVM config
-	EVMConfig vm.Config
+	EVMConfig gethVM.Config
 	// block context
-	BlockContext *vm.BlockContext
+	BlockContext *gethVM.BlockContext
 	// transaction context
-	TxContext *vm.TxContext
+	TxContext *gethVM.TxContext
 	// base unit of gas for direct calls
 	DirectCallBaseGasUsage uint64
 	// a set of extra precompiles to be injected
 	ExtraPrecompiles map[gethCommon.Address]gethVM.PrecompiledContract
 }
 
-func (c *Config) ChainRules() params.Rules {
+func (c *Config) ChainRules() gethParams.Rules {
 	return c.ChainConfig.Rules(
 		c.BlockContext.BlockNumber,
 		c.BlockContext.Random != nil,
@@ -51,7 +50,7 @@ func (c *Config) ChainRules() params.Rules {
 // For the future changes of EVM, we need to update the EVM go mod version
 // and set a proper height for the specific release based on the Flow EVM heights
 // so it could gets activated at a desired time.
-var DefaultChainConfig = &params.ChainConfig{
+var DefaultChainConfig = &gethParams.ChainConfig{
 	ChainID: FlowEVMTestnetChainID, // default is testnet
 
 	// Fork scheduling based on block heights
@@ -78,20 +77,20 @@ var DefaultChainConfig = &params.ChainConfig{
 func defaultConfig() *Config {
 	return &Config{
 		ChainConfig: DefaultChainConfig,
-		EVMConfig: vm.Config{
+		EVMConfig: gethVM.Config{
 			NoBaseFee: true,
 		},
-		TxContext: &vm.TxContext{
+		TxContext: &gethVM.TxContext{
 			GasPrice:   new(big.Int),
 			BlobFeeCap: new(big.Int),
 		},
-		BlockContext: &vm.BlockContext{
-			CanTransfer: core.CanTransfer,
-			Transfer:    core.Transfer,
+		BlockContext: &gethVM.BlockContext{
+			CanTransfer: gethCore.CanTransfer,
+			Transfer:    gethCore.Transfer,
 			GasLimit:    BlockLevelGasLimit, // block gas limit
 			BaseFee:     big.NewInt(0),
-			GetHash: func(n uint64) common.Hash { // default returns some random hash values
-				return common.BytesToHash(crypto.Keccak256([]byte(new(big.Int).SetUint64(n).String())))
+			GetHash: func(n uint64) gethCommon.Hash { // default returns some random hash values
+				return gethCommon.BytesToHash(gethCrypto.Keccak256([]byte(new(big.Int).SetUint64(n).String())))
 			},
 		},
 		ExtraPrecompiles: make(map[gethCommon.Address]gethVM.PrecompiledContract),
@@ -127,7 +126,7 @@ func WithMainnetChainID() Option {
 }
 
 // WithOrigin sets the origin of the transaction (signer)
-func WithOrigin(origin common.Address) Option {
+func WithOrigin(origin gethCommon.Address) Option {
 	return func(c *Config) *Config {
 		c.TxContext.Origin = origin
 		return c
@@ -151,7 +150,7 @@ func WithGasLimit(gasLimit uint64) Option {
 }
 
 // WithCoinbase sets the coinbase of the block where the fees are collected in
-func WithCoinbase(coinbase common.Address) Option {
+func WithCoinbase(coinbase gethCommon.Address) Option {
 	return func(c *Config) *Config {
 		c.BlockContext.Coinbase = coinbase
 		return c
@@ -175,7 +174,7 @@ func WithBlockTime(time uint64) Option {
 }
 
 // WithGetBlockHashFunction sets the functionality to look up block hash by height
-func WithGetBlockHashFunction(getHash vm.GetHashFunc) Option {
+func WithGetBlockHashFunction(getHash gethVM.GetHashFunc) Option {
 	return func(c *Config) *Config {
 		c.BlockContext.GetHash = getHash
 		return c
@@ -190,6 +189,7 @@ func WithDirectCallBaseGasUsage(gas uint64) Option {
 	}
 }
 
+// WithExtraPrecompiles appends precompile list with extra precompiles
 func WithExtraPrecompiles(precompiles []types.Precompile) Option {
 	return func(c *Config) *Config {
 		for _, pc := range precompiles {

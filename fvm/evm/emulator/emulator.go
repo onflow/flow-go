@@ -287,6 +287,7 @@ func (proc *procedure) run(msg *gethCore.Message, txType uint8) (*types.Result, 
 
 func SetupPrecompile(cfg *Config) error {
 	rules := cfg.ChainRules()
+	// captures the pointer to the map that has to be augmented
 	var precompiles map[gethCommon.Address]gethVM.PrecompiledContract
 	switch {
 	case rules.IsCancun:
@@ -300,7 +301,6 @@ func SetupPrecompile(cfg *Config) error {
 	default:
 		precompiles = gethVM.PrecompiledContractsHomestead
 	}
-
 	for k, v := range cfg.ExtraPrecompiles {
 		precompiles[k] = v
 	}

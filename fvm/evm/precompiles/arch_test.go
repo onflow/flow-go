@@ -3,9 +3,10 @@ package precompiles_test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/fvm/evm/precompiles"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
-	"github.com/stretchr/testify/require"
 )
 
 func TestArchContract(t *testing.T) {
