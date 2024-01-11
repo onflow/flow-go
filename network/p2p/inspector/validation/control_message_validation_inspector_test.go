@@ -435,22 +435,61 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		stopInspector(t, cancel, inspector)
 	})
 
-	t.Run("inspectIHaveMessages should disseminate invalid control message notification for iHave messages with duplicate message ids as expected", func(t *testing.T) {
+	t.Run("inspectIHaveMessages should NOT disseminate invalid control message notification for iHave messages when duplicate message ids are below the threshold", func(t *testing.T) {
 		inspector, signalerCtx, cancel, distributor, _, sporkID, _, topicProviderOracle := inspectorFixture(t)
 		validTopic := fmt.Sprintf("%s/%s", channels.PushBlocks.String(), sporkID)
 		// avoid unknown topics errors
 		topicProviderOracle.UpdateTopics([]string{validTopic})
 		duplicateMsgID := unittest.IdentifierFixture()
-		msgIds := flow.IdentifierList{duplicateMsgID, duplicateMsgID, duplicateMsgID}
+
+		cfg, err := config.DefaultConfig()
+		require.NoError(t, err)
+		msgIds := flow.IdentifierList{}
+		// includes as many duplicates as allowed by the threshold
+		for i := 0; i < cfg.NetworkConfig.GossipSub.RpcInspector.Validation.IHave.MaxTotalDuplicateMessageIdThreshold; i++ {
+			msgIds = append(msgIds, duplicateMsgID)
+		}
 		duplicateMsgIDIHave := unittest.P2PRPCIHaveFixture(&validTopic, append(msgIds, unittest.IdentifierListFixture(5)...).Strings()...)
 		duplicateMsgIDRpc := unittest.P2PRPCFixture(unittest.WithIHaves(duplicateMsgIDIHave))
 		from := unittest.PeerIdFixture(t)
-		checkNotification := checkNotificationFunc(t, from, p2pmsg.CtrlMsgIHave, validation.IsDuplicateTopicErr, p2p.CtrlMsgNonClusterTopicType)
-		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Once().Run(checkNotification)
+
+		// no notification should be disseminated for valid messages as long as the number of duplicates is below the threshold
+		distributor.AssertNotCalled(t, "Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif"))
 		inspector.Start(signalerCtx)
+		unittest.RequireComponentsReadyBefore(t, 1*time.Second, inspector)
 
 		require.NoError(t, inspector.Inspect(from, duplicateMsgIDRpc))
-		// sleep for 1 second to ensure rpc's is processed
+		// TODO: this sleeps should be replaced with a queue size checker.
+		time.Sleep(time.Second)
+		stopInspector(t, cancel, inspector)
+	})
+
+	t.Run("inspectIHaveMessages should disseminate invalid control message notification for iHave messages when duplicate message ids are above the threshold", func(t *testing.T) {
+		inspector, signalerCtx, cancel, distributor, _, sporkID, _, topicProviderOracle := inspectorFixture(t)
+		validTopic := fmt.Sprintf("%s/%s", channels.PushBlocks.String(), sporkID)
+		// avoid unknown topics errors
+		topicProviderOracle.UpdateTopics([]string{validTopic})
+		duplicateMsgID := unittest.IdentifierFixture()
+
+		cfg, err := config.DefaultConfig()
+		require.NoError(t, err)
+		msgIds := flow.IdentifierList{}
+		// includes as many duplicates as beyond the threshold
+		for i := 0; i < cfg.NetworkConfig.GossipSub.RpcInspector.Validation.IHave.MaxTotalDuplicateMessageIdThreshold+2; i++ {
+			msgIds = append(msgIds, duplicateMsgID)
+		}
+		duplicateMsgIDIHave := unittest.P2PRPCIHaveFixture(&validTopic, append(msgIds, unittest.IdentifierListFixture(5)...).Strings()...)
+		duplicateMsgIDRpc := unittest.P2PRPCFixture(unittest.WithIHaves(duplicateMsgIDIHave))
+		from := unittest.PeerIdFixture(t)
+
+		// one notification should be disseminated for invalid messages when the number of duplicates exceeds the threshold
+		checkNotification := checkNotificationFunc(t, from, p2pmsg.CtrlMsgIHave, validation.IsDuplicateMessageIDErr, p2p.CtrlMsgNonClusterTopicType)
+		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Once().Run(checkNotification)
+		inspector.Start(signalerCtx)
+		unittest.RequireComponentsReadyBefore(t, 1*time.Second, inspector)
+
+		require.NoError(t, inspector.Inspect(from, duplicateMsgIDRpc))
+		// TODO: this sleeps should be replaced with a queue size checker.
 		time.Sleep(time.Second)
 		stopInspector(t, cancel, inspector)
 	})
