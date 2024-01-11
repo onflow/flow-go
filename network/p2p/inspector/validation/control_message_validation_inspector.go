@@ -334,7 +334,7 @@ func (c *ControlMsgValidationInspector) inspectGraftMessages(from peer.ID, graft
 			// ideally, a GRAFT message should not have any duplicate topics, hence a topic ID is counted as a duplicate only if it is repeated more than once.
 			totalDuplicateTopicIds++
 			// check if the total number of duplicates exceeds the configured threshold.
-			if totalDuplicateTopicIds > c.config.GraftPrune.MaxTotalDuplicateTopicIdThreshold {
+			if totalDuplicateTopicIds > c.config.GraftPrune.DuplicateTopicIdThreshold {
 				return NewDuplicateTopicErr(topic.String(), totalDuplicateTopicIds, p2pmsg.CtrlMsgGraft), p2p.CtrlMsgNonClusterTopicType
 			}
 		}
@@ -365,7 +365,7 @@ func (c *ControlMsgValidationInspector) inspectPruneMessages(from peer.ID, prune
 			// ideally, a PRUNE message should not have any duplicate topics, hence a topic ID is counted as a duplicate only if it is repeated more than once.
 			totalDuplicateTopicIds++
 			// check if the total number of duplicates exceeds the configured threshold.
-			if totalDuplicateTopicIds > c.config.GraftPrune.MaxTotalDuplicateTopicIdThreshold {
+			if totalDuplicateTopicIds > c.config.GraftPrune.DuplicateTopicIdThreshold {
 				return NewDuplicateTopicErr(topic.String(), totalDuplicateTopicIds, p2pmsg.CtrlMsgPrune), p2p.CtrlMsgNonClusterTopicType
 			}
 		}
@@ -412,11 +412,11 @@ func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihave
 		}
 
 		// then track the topic ensuring it is not beyond a duplicate threshold.
-		if dupCnt := duplicateTopicTracker.track(topic); dupCnt > c.config.IHave.DuplicateTopicIdThreshold {
+		if duplicateTopicTracker.track(topic) > 1 {
 			totalDuplicateTopicIds++
 			// the topic is duplicated, check if the total number of duplicates exceeds the configured threshold
-			if totalDuplicateTopicIds > c.config.IHave.MaxTotalDuplicateTopicIdThreshold {
-				return NewDuplicateTopicErr(topic, dupCnt, p2pmsg.CtrlMsgIHave), p2p.CtrlMsgNonClusterTopicType
+			if totalDuplicateTopicIds > c.config.IHave.DuplicateTopicIdThreshold {
+				return NewDuplicateTopicErr(topic, totalDuplicateTopicIds, p2pmsg.CtrlMsgIHave), p2p.CtrlMsgNonClusterTopicType
 			}
 		}
 
@@ -424,7 +424,7 @@ func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihave
 			if duplicateMessageIDTracker.track(messageID) > 1 {
 				totalDuplicateMessageIds++
 				// the message is duplicated, check if the total number of duplicates exceeds the configured threshold
-				if totalDuplicateMessageIds > c.config.IHave.MaxTotalDuplicateMessageIdThreshold {
+				if totalDuplicateMessageIds > c.config.IHave.DuplicateMessageIdThreshold {
 					return NewDuplicateMessageIDErr(messageID, totalDuplicateMessageIds, p2pmsg.CtrlMsgIHave), p2p.CtrlMsgNonClusterTopicType
 				}
 			}

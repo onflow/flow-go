@@ -152,29 +152,23 @@ network-config:
           # Maximum number of total duplicate topic ids in a single GRAFT or PRUNE message, ideally this should be 0 but we allow for some tolerance
           # to avoid penalizing peers that are not malicious but are misbehaving due to bugs or other issues.
           # A topic id is considered duplicate if it appears more than once in a single GRAFT or PRUNE message.
-          max-total-duplicate-topic-id-threshold: 10
-        ihave: # Max number of ihave messages in a sample to be inspected. If the number of ihave messages exceeds this configured value
+          duplicate-topic-id-threshold: 10
+        ihave:
+          # Max number of ihave messages in a sample to be inspected. If the number of ihave messages exceeds this configured value
           # the control message ihaves will be truncated to the max sample size. This sample is randomly selected.
           max-sample-size: 1000
           # Max number of ihave message ids in a sample to be inspected per ihave. Each ihave message includes a list of message ids
           # each. If the size of the message ids list for a single ihave message exceeds the configured max message id sample size the list of message ids will be truncated.
           max-message-id-sample-size: 1000
-          # the threshold for considering the repeated topic IDs in a single iHave message as a duplicate.
-          # For example, if the threshold is 2, a maximum of two duplicate topic ids will be allowed in a single iHave message.
-          #	This is to allow GossipSub protocol send iHave messages in batches without consolidating the topic IDs.
-          # Recommended value is to be somewhere between 10 (moderate) to 100 (aggressive) depending on the message traffic.
-          duplicate-topic-id-threshold: 10
           # The tolerance threshold for having duplicate topics in an iHave message under inspection.
           #	When the total number of duplicate topic ids in a single iHave message exceeds this threshold, the inspection of message will fail.
-          #	Note that a topic ID is counted as a duplicate only if it is repeated more than (duplicate-topic-id-threshold) times.
-          # We currently have `duplicate-topic-id-threshold = 10` meaning that a topic id is considered duplicate if it is repeated more than 10 times in a single iHave message.
-          # Setting `max-total-duplicate-topic-id-threshold = 10` means that if we have an overall 100 (10 * 10) repeated topic ids in a single iHave message, the message will fail inspection.
-          max-total-duplicate-topic-id-threshold: 10
+          #	Note that a topic ID is counted as a duplicate only if it is repeated more than once.
+          duplicate-topic-id-threshold: 10
           # Threshold of tolerance for having duplicate message IDs in a single iHave message under inspection.
           # When the total number of duplicate message ids in a single iHave message exceeds this threshold, the inspection of message will fail.
           # Ideally, an iHave message should not have any duplicate message IDs, hence a message id is considered duplicate when it is repeated more than once
           # within the same iHave message. When the total number of duplicate message ids in a single iHave message exceeds this threshold, the inspection of message will fail.
-          max-total-duplicate-message-id-threshold: 10
+          duplicate-message-id-threshold: 10
         iwant:
           # Max number of iwant messages in a sample to be inspected. If the total number of iWant control messages
           # exceeds this max sample size then the respective message will be truncated before being processed.

@@ -62,10 +62,10 @@ type GraftPruneRpcInspectionParameters struct {
 	// exceeds this max sample size then the respective message will be truncated to this value before being processed.
 	MaxSampleSize int `validate:"gte=1000" mapstructure:"max-sample-size"`
 
-	// MaxTotalDuplicateTopicIdThreshold is the tolerance threshold for having duplicate topics in a single GRAFT or PRUNE message under inspection.
+	// DuplicateTopicIdThreshold is the tolerance threshold for having duplicate topics in a single GRAFT or PRUNE message under inspection.
 	// Ideally, a GRAFT or PRUNE message should not have any duplicate topics, hence a topic ID is counted as a duplicate only if it is repeated more than once.
 	// When the total number of duplicate topic ids in a single GRAFT or PRUNE message exceeds this threshold, the inspection of message will fail.
-	MaxTotalDuplicateTopicIdThreshold int `validate:"gte=0" mapstructure:"max-total-duplicate-topic-id-threshold"`
+	DuplicateTopicIdThreshold int `validate:"gte=0" mapstructure:"duplicate-topic-id-threshold"`
 }
 
 const (
@@ -95,9 +95,8 @@ type IWantRpcInspectionParameters struct {
 }
 
 const (
-	DuplicateTopicIdThresholdKey           = "duplicate-topic-id-threshold"
-	MaxTotalDuplicateTopicIdThresholdKey   = "max-total-duplicate-topic-id-threshold"
-	MaxTotalDuplicateMessageIdThresholdKey = "max-total-duplicate-message-id-threshold"
+	DuplicateTopicIdThresholdKey   = "duplicate-topic-id-threshold"
+	DuplicateMessageIdThresholdKey = "duplicate-message-id-threshold"
 )
 
 // IHaveRpcInspectionParameters contains the "numerical values" for ihave rpc control inspection.
@@ -109,21 +108,16 @@ type IHaveRpcInspectionParameters struct {
 	// each, if the size of this list exceeds the configured max message id sample size the list of message ids will be truncated.
 	MaxMessageIDSampleSize int `validate:"gte=1000" mapstructure:"max-message-id-sample-size"`
 
-	// DuplicateTopicIdThreshold is the threshold for considering the repeated topic IDs in a single iHave message as a duplicate.
-	// For example, if the threshold is 2, a maximum of two duplicate topic ids will be allowed in a single iHave message.
-	// This is to allow GossipSub protocol send iHave messages in batches without consolidating the topic IDs.
-	DuplicateTopicIdThreshold int `validate:"gte=0" mapstructure:"duplicate-topic-id-threshold"`
-
-	// MaxTotalDuplicateTopicIdThreshold is the tolerance threshold for having duplicate topics in an iHave message under inspection.
+	// DuplicateTopicIdThreshold is the tolerance threshold for having duplicate topics in an iHave message under inspection.
 	// When the total number of duplicate topic ids in a single iHave message exceeds this threshold, the inspection of message will fail.
 	// Note that a topic ID is counted as a duplicate only if it is repeated more than DuplicateTopicIdThreshold times.
-	MaxTotalDuplicateTopicIdThreshold int `validate:"gte=0" mapstructure:"max-total-duplicate-topic-id-threshold"`
+	DuplicateTopicIdThreshold int `validate:"gte=0" mapstructure:"duplicate-topic-id-threshold"`
 
-	// MaxTotalDuplicateMessageIdThreshold is the threshold of tolerance for having duplicate message IDs in a single iHave message under inspection.
+	// DuplicateMessageIdThreshold is the threshold of tolerance for having duplicate message IDs in a single iHave message under inspection.
 	// When the total number of duplicate message ids in a single iHave message exceeds this threshold, the inspection of message will fail.
 	// Ideally, an iHave message should not have any duplicate message IDs, hence a message id is considered duplicate when it is repeated more than once
 	// within the same iHave message. When the total number of duplicate message ids in a single iHave message exceeds this threshold, the inspection of message will fail.
-	MaxTotalDuplicateMessageIdThreshold int `validate:"gte=0" mapstructure:"max-total-duplicate-message-id-threshold"`
+	DuplicateMessageIdThreshold int `validate:"gte=0" mapstructure:"duplicate-message-id-threshold"`
 }
 
 const (

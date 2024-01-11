@@ -329,7 +329,7 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		var grafts []*pubsub_pb.ControlGraft
 		cfg, err := config.DefaultConfig()
 		require.NoError(t, err)
-		for i := 0; i < cfg.NetworkConfig.GossipSub.RpcInspector.Validation.GraftPrune.MaxTotalDuplicateTopicIdThreshold+2; i++ {
+		for i := 0; i < cfg.NetworkConfig.GossipSub.RpcInspector.Validation.GraftPrune.DuplicateTopicIdThreshold+2; i++ {
 			grafts = append(grafts, unittest.P2PRPCGraftFixture(&duplicateTopic))
 		}
 		from := unittest.PeerIdFixture(t)
@@ -361,7 +361,7 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		var grafts []*pubsub_pb.ControlGraft
 		cfg, err := config.DefaultConfig()
 		require.NoError(t, err)
-		for i := 0; i < cfg.NetworkConfig.GossipSub.RpcInspector.Validation.GraftPrune.MaxTotalDuplicateTopicIdThreshold; i++ {
+		for i := 0; i < cfg.NetworkConfig.GossipSub.RpcInspector.Validation.GraftPrune.DuplicateTopicIdThreshold; i++ {
 			grafts = append(grafts, unittest.P2PRPCGraftFixture(&duplicateTopic))
 		}
 		from := unittest.PeerIdFixture(t)
@@ -388,7 +388,7 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		cfg, err := config.DefaultConfig()
 		require.NoError(t, err)
 		// we need threshold + 1 to trigger the invalid control message notification; as the first duplicate topic id is not counted
-		for i := 0; i < cfg.NetworkConfig.GossipSub.RpcInspector.Validation.GraftPrune.MaxTotalDuplicateTopicIdThreshold+2; i++ {
+		for i := 0; i < cfg.NetworkConfig.GossipSub.RpcInspector.Validation.GraftPrune.DuplicateTopicIdThreshold+2; i++ {
 			prunes = append(prunes, unittest.P2PRPCPruneFixture(&duplicateTopic))
 		}
 		from := unittest.PeerIdFixture(t)
@@ -420,7 +420,7 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		var prunes []*pubsub_pb.ControlPrune
 		cfg, err := config.DefaultConfig()
 		require.NoError(t, err)
-		for i := 0; i < cfg.NetworkConfig.GossipSub.RpcInspector.Validation.GraftPrune.MaxTotalDuplicateTopicIdThreshold; i++ {
+		for i := 0; i < cfg.NetworkConfig.GossipSub.RpcInspector.Validation.GraftPrune.DuplicateTopicIdThreshold; i++ {
 			prunes = append(prunes, unittest.P2PRPCPruneFixture(&duplicateTopic))
 		}
 		from := unittest.PeerIdFixture(t)
@@ -530,7 +530,7 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		require.NoError(t, err)
 		msgIds := flow.IdentifierList{}
 		// includes as many duplicates as allowed by the threshold
-		for i := 0; i < cfg.NetworkConfig.GossipSub.RpcInspector.Validation.IHave.MaxTotalDuplicateMessageIdThreshold; i++ {
+		for i := 0; i < cfg.NetworkConfig.GossipSub.RpcInspector.Validation.IHave.DuplicateMessageIdThreshold; i++ {
 			msgIds = append(msgIds, duplicateMsgID)
 		}
 		duplicateMsgIDIHave := unittest.P2PRPCIHaveFixture(&validTopic, append(msgIds, unittest.IdentifierListFixture(5)...).Strings()...)
@@ -559,7 +559,7 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		require.NoError(t, err)
 		msgIds := flow.IdentifierList{}
 		// includes as many duplicates as beyond the threshold
-		for i := 0; i < cfg.NetworkConfig.GossipSub.RpcInspector.Validation.IHave.MaxTotalDuplicateMessageIdThreshold+2; i++ {
+		for i := 0; i < cfg.NetworkConfig.GossipSub.RpcInspector.Validation.IHave.DuplicateMessageIdThreshold+2; i++ {
 			msgIds = append(msgIds, duplicateMsgID)
 		}
 		duplicateMsgIDIHave := unittest.P2PRPCIHaveFixture(&validTopic, append(msgIds, unittest.IdentifierListFixture(5)...).Strings()...)
