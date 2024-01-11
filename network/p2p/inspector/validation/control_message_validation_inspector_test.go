@@ -361,6 +361,7 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		var prunes []*pubsub_pb.ControlPrune
 		cfg, err := config.DefaultConfig()
 		require.NoError(t, err)
+		// we need threshold + 1 to trigger the invalid control message notification; as the first duplicate topic id is not counted
 		for i := 0; i < cfg.NetworkConfig.GossipSub.RpcInspector.Validation.GraftPrune.MaxTotalDuplicateTopicIdThreshold+2; i++ {
 			prunes = append(prunes, unittest.P2PRPCPruneFixture(&duplicateTopic))
 		}
@@ -374,6 +375,32 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 			require.Equal(t, p2pmsg.CtrlMsgPrune, notification.MsgType)
 			require.True(t, validation.IsDuplicateTopicErr(notification.Error))
 		})
+
+		inspector.Start(signalerCtx)
+		unittest.RequireComponentsReadyBefore(t, 100*time.Millisecond, inspector)
+
+		require.NoError(t, inspector.Inspect(from, rpc))
+		// sleep for 1 second to ensure rpc's is processed
+		time.Sleep(time.Second)
+		stopInspector(t, cancel, inspector)
+	})
+
+	// duplicate prune topic ids below threshold should NOT trigger invalid control message notification
+	t.Run("duplicate prune topic ids below threshold", func(t *testing.T) {
+		inspector, signalerCtx, cancel, distributor, _, sporkID, _, topicProviderOracle := inspectorFixture(t)
+		duplicateTopic := fmt.Sprintf("%s/%s", channels.TestNetworkChannel, sporkID)
+		// avoid unknown topics errors
+		topicProviderOracle.UpdateTopics([]string{duplicateTopic})
+		var prunes []*pubsub_pb.ControlPrune
+		cfg, err := config.DefaultConfig()
+		require.NoError(t, err)
+		for i := 0; i < cfg.NetworkConfig.GossipSub.RpcInspector.Validation.GraftPrune.MaxTotalDuplicateTopicIdThreshold; i++ {
+			prunes = append(prunes, unittest.P2PRPCPruneFixture(&duplicateTopic))
+		}
+		from := unittest.PeerIdFixture(t)
+		rpc := unittest.P2PRPCFixture(unittest.WithPrunes(prunes...))
+		// no notification should be disseminated for valid messages as long as the number of duplicates is below the threshold
+		distributor.AssertNotCalled(t, "Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif"))
 
 		inspector.Start(signalerCtx)
 		unittest.RequireComponentsReadyBefore(t, 100*time.Millisecond, inspector)
