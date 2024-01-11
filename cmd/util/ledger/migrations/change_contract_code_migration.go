@@ -84,6 +84,10 @@ func (d *ChangeContractCodeMigration) MigrateAccount(
 		}
 
 		registerID, err := convert.LedgerKeyToRegisterID(key)
+		if err != nil {
+			return nil, err
+		}
+
 		newContract, ok := contracts[registerID]
 		if !ok {
 			// not a contract register, or
