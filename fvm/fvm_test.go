@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/tests/utils"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
@@ -24,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	errors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
+	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/meter"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -3026,11 +3028,12 @@ func TestEVM(t *testing.T) {
 			ctx fvm.Context,
 			snapshotTree snapshot.SnapshotTree,
 		) {
+			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(fmt.Sprintf(`
-					import FungibleToken from 0x%s
-					import FlowToken from 0x%s						
+					import FungibleToken from %s
+					import FlowToken from %s						
 					import EVM from %s
 
 					transaction() {
@@ -3039,11 +3042,15 @@ func TestEVM(t *testing.T) {
 							?? panic("Could not borrow reference to the owner''s Vault!")
 
 							let acc <- EVM.createBridgedAccount()
-							acc.deposit(from: <- vaultRef.withdraw(amount: 0.0000001))
+							let amount <- vaultRef.withdraw(amount: 0.0000001) as! @FlowToken.Vault
+							acc.deposit(from: <- amount)
 							destroy acc
 						}
-					}
-				`, chain.ServiceAddress().HexWithPrefix()))).
+					}`,
+					sc.FungibleToken.Address.HexWithPrefix(),
+					sc.FlowToken.Address.HexWithPrefix(),
+					sc.FlowServiceAccount.Address.HexWithPrefix(), // TODO this should be sc.EVM.Address not found there???
+				))).
 				SetProposalKey(chain.ServiceAddress(), 0, 0).
 				AddAuthorizer(chain.ServiceAddress()).
 				SetPayer(chain.ServiceAddress())
@@ -3059,7 +3066,11 @@ func TestEVM(t *testing.T) {
 
 			require.NoError(t, err)
 			require.NoError(t, output.Err)
-			require.Len(t, output.Logs, 1)
+			require.Len(t, output.Events, 3)
+
+			txExe, blockExe := output.Events[1], output.Events[2]
+			assert.Equal(t, types.EVMLocation{}.TypeID(nil, string(types.EventTypeTransactionExecuted)), common.TypeID(txExe.Type))
+			assert.Equal(t, types.EVMLocation{}.TypeID(nil, string(types.EventTypeBlockExecuted)), common.TypeID(blockExe.Type))
 		}),
 	)
 }
