@@ -8,8 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/onflow/flow-go/fvm/evm/stdlib"
-
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
@@ -19,13 +17,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
-
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	exeUtils "github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
 	fvmCrypto "github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/environment"
 	errors "github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/evm/stdlib"
 	"github.com/onflow/flow-go/fvm/meter"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -3011,6 +3009,57 @@ func TestEVM(t *testing.T) {
 				chain.ServiceAddress(),
 				addrBytes.String(),
 			))
+		}),
+	)
+
+	t.Run("deploy contract code", newVMTest().
+		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
+		// we keep this dissabled during bootstrap and later overwrite in the test for test transaction
+		withContextOptions(
+			fvm.WithEVMEnabled(false),
+			fvm.WithCadenceLogging(true),
+		).
+		run(func(
+			t *testing.T,
+			vm fvm.VM,
+			chain flow.Chain,
+			ctx fvm.Context,
+			snapshotTree snapshot.SnapshotTree,
+		) {
+
+			txBody := flow.NewTransactionBody().
+				SetScript([]byte(fmt.Sprintf(`
+					import FungibleToken from 0x%s
+					import FlowToken from 0x%s						
+					import EVM from %s
+
+					transaction() {
+						prepare(acc: AuthAccount) {
+							let vaultRef = acc.borrow<&{FungibleToken.Provider}>(from: /storage/flowTokenVault)
+							?? panic("Could not borrow reference to the owner''s Vault!")
+
+							let acc <- EVM.createBridgedAccount()
+							acc.deposit(from: <- vaultRef.withdraw(amount: 0.0000001))
+							destroy acc
+						}
+					}
+				`, chain.ServiceAddress().HexWithPrefix()))).
+				SetProposalKey(chain.ServiceAddress(), 0, 0).
+				AddAuthorizer(chain.ServiceAddress()).
+				SetPayer(chain.ServiceAddress())
+
+			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
+			require.NoError(t, err)
+
+			ctx = fvm.NewContextFromParent(ctx, fvm.WithEVMEnabled(true))
+			_, output, err := vm.Run(
+				ctx,
+				fvm.Transaction(txBody, 0),
+				snapshotTree)
+
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+			require.Len(t, output.Logs, 1)
 		}),
 	)
 }
