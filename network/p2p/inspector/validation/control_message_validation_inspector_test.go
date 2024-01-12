@@ -86,7 +86,7 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 	t.Run("graft truncation", func(t *testing.T) {
 		graftPruneMessageMaxSampleSize := 1000
 		inspector, signalerCtx, cancel, distributor, rpcTracker, _, _, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
-			params.Config.GraftPrune.MaxSampleSize = graftPruneMessageMaxSampleSize
+			params.Config.GraftPrune.MessageCountThreshold = graftPruneMessageMaxSampleSize
 		})
 		// topic validation is ignored set any topic oracle
 		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Maybe()
@@ -115,7 +115,7 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 	t.Run("prune truncation", func(t *testing.T) {
 		graftPruneMessageMaxSampleSize := 1000
 		inspector, signalerCtx, cancel, distributor, rpcTracker, _, _, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
-			params.Config.GraftPrune.MaxSampleSize = graftPruneMessageMaxSampleSize
+			params.Config.GraftPrune.MessageCountThreshold = graftPruneMessageMaxSampleSize
 		})
 		// topic validation is ignored set any topic oracle
 		rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
@@ -145,7 +145,7 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 	t.Run("ihave message id truncation", func(t *testing.T) {
 		maxSampleSize := 1000
 		inspector, signalerCtx, cancel, distributor, rpcTracker, _, _, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
-			params.Config.IHave.MaxSampleSize = maxSampleSize
+			params.Config.IHave.MessageCountThreshold = maxSampleSize
 		})
 		// topic validation is ignored set any topic oracle
 		rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
@@ -163,9 +163,9 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 		require.NoError(t, inspector.Inspect(from, iHavesGreaterThanMaxSampleSize))
 		require.NoError(t, inspector.Inspect(from, iHavesLessThanMaxSampleSize))
 		require.Eventually(t, func() bool {
-			// rpc with iHaves greater than configured max sample size should be truncated to MaxSampleSize
+			// rpc with iHaves greater than configured max sample size should be truncated to MessageCountThreshold
 			shouldBeTruncated := len(iHavesGreaterThanMaxSampleSize.GetControl().GetIhave()) == maxSampleSize
-			// rpc with iHaves less than MaxSampleSize should not be truncated
+			// rpc with iHaves less than MessageCountThreshold should not be truncated
 			shouldNotBeTruncated := len(iHavesLessThanMaxSampleSize.GetControl().GetIhave()) == 50
 			return shouldBeTruncated && shouldNotBeTruncated
 		}, time.Second, 500*time.Millisecond)
@@ -175,7 +175,7 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 	t.Run("ihave message ids truncation", func(t *testing.T) {
 		maxMessageIDSampleSize := 1000
 		inspector, signalerCtx, cancel, distributor, rpcTracker, _, _, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
-			params.Config.IHave.MaxMessageIDSampleSize = maxMessageIDSampleSize
+			params.Config.IHave.MessageIdCountThreshold = maxMessageIDSampleSize
 		})
 		// topic validation is ignored set any topic oracle
 		rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
@@ -192,13 +192,13 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 		require.NoError(t, inspector.Inspect(from, iHavesLessThanMaxSampleSize))
 		require.Eventually(t, func() bool {
 			for _, iHave := range iHavesGreaterThanMaxSampleSize.GetControl().GetIhave() {
-				// rpc with iHaves message ids greater than configured max sample size should be truncated to MaxSampleSize
+				// rpc with iHaves message ids greater than configured max sample size should be truncated to MessageCountThreshold
 				if len(iHave.GetMessageIDs()) != maxMessageIDSampleSize {
 					return false
 				}
 			}
 			for _, iHave := range iHavesLessThanMaxSampleSize.GetControl().GetIhave() {
-				// rpc with iHaves message ids less than MaxSampleSize should not be truncated
+				// rpc with iHaves message ids less than MessageCountThreshold should not be truncated
 				if len(iHave.GetMessageIDs()) != 50 {
 					return false
 				}
@@ -211,7 +211,7 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 	t.Run("iwant message truncation", func(t *testing.T) {
 		maxSampleSize := uint(100)
 		inspector, signalerCtx, cancel, distributor, rpcTracker, _, _, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
-			params.Config.IWant.MaxSampleSize = maxSampleSize
+			params.Config.IWant.MessageCountThreshold = maxSampleSize
 		})
 		// topic validation is ignored set any topic oracle
 		rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
@@ -227,9 +227,9 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 		require.NoError(t, inspector.Inspect(from, iWantsGreaterThanMaxSampleSize))
 		require.NoError(t, inspector.Inspect(from, iWantsLessThanMaxSampleSize))
 		require.Eventually(t, func() bool {
-			// rpc with iWants greater than configured max sample size should be truncated to MaxSampleSize
+			// rpc with iWants greater than configured max sample size should be truncated to MessageCountThreshold
 			shouldBeTruncated := len(iWantsGreaterThanMaxSampleSize.GetControl().GetIwant()) == int(maxSampleSize)
-			// rpc with iWants less than MaxSampleSize should not be truncated
+			// rpc with iWants less than MessageCountThreshold should not be truncated
 			shouldNotBeTruncated := len(iWantsLessThanMaxSampleSize.GetControl().GetIwant()) == 50
 			return shouldBeTruncated && shouldNotBeTruncated
 		}, time.Second, 500*time.Millisecond)
@@ -239,7 +239,7 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 	t.Run("iwant message id truncation", func(t *testing.T) {
 		maxMessageIDSampleSize := 1000
 		inspector, signalerCtx, cancel, distributor, rpcTracker, _, _, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
-			params.Config.IWant.MaxMessageIDSampleSize = maxMessageIDSampleSize
+			params.Config.IWant.MessageIdCountThreshold = maxMessageIDSampleSize
 		})
 		// topic validation is ignored set any topic oracle
 		rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
@@ -254,13 +254,13 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 		require.NoError(t, inspector.Inspect(from, iWantsLessThanMaxSampleSize))
 		require.Eventually(t, func() bool {
 			for _, iWant := range iWantsGreaterThanMaxSampleSize.GetControl().GetIwant() {
-				// rpc with iWants message ids greater than configured max sample size should be truncated to MaxSampleSize
+				// rpc with iWants message ids greater than configured max sample size should be truncated to MessageCountThreshold
 				if len(iWant.GetMessageIDs()) != maxMessageIDSampleSize {
 					return false
 				}
 			}
 			for _, iWant := range iWantsLessThanMaxSampleSize.GetControl().GetIwant() {
-				// rpc with iWants less than MaxSampleSize should not be truncated
+				// rpc with iWants less than MessageCountThreshold should not be truncated
 				if len(iWant.GetMessageIDs()) != 50 {
 					return false
 				}
@@ -275,7 +275,8 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 // It ensures that valid RPC control messages do not trigger erroneous invalid control message notifications,
 // while all types of invalid control messages trigger expected notifications.
 func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
-	t.Run("processInspectRPCReq should not disseminate any invalid notification errors for valid RPC's", func(t *testing.T) {
+	// valid rpc should not trigger invalid control message notification
+	t.Run("valid rpc", func(t *testing.T) {
 		inspector, signalerCtx, cancel, distributor, rpcTracker, sporkID, _, topicProviderOracle := inspectorFixture(t)
 		defer distributor.AssertNotCalled(t, "Distribute")
 
@@ -437,7 +438,8 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		stopInspector(t, cancel, inspector)
 	})
 
-	t.Run("inspectGraftMessages should disseminate invalid control message notification for invalid graft messages as expected", func(t *testing.T) {
+	// invalid graft topic ids should trigger invalid control message notification
+	t.Run("invalid graft topic", func(t *testing.T) {
 		inspector, signalerCtx, cancel, distributor, _, sporkID, _, topicProviderOracle := inspectorFixture(t)
 		// create unknown topic
 		unknownTopic, malformedTopic, invalidSporkIDTopic := invalidTopics(t, sporkID)
@@ -465,7 +467,8 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		stopInspector(t, cancel, inspector)
 	})
 
-	t.Run("inspectPruneMessages should disseminate invalid control message notification for invalid prune messages as expected", func(t *testing.T) {
+	// invalid prune topic ids should trigger invalid control message notification
+	t.Run("invalid prune topic", func(t *testing.T) {
 		inspector, signalerCtx, cancel, distributor, _, sporkID, _, topicProviderOracle := inspectorFixture(t)
 		// create unknown topic
 		unknownTopic, malformedTopic, invalidSporkIDTopic := invalidTopics(t, sporkID)
@@ -492,7 +495,8 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		stopInspector(t, cancel, inspector)
 	})
 
-	t.Run("inspectIHaveMessages should disseminate invalid control message notification for iHave messages with invalid topics as expected", func(t *testing.T) {
+	// invalid ihave topic ids should trigger invalid control message notification
+	t.Run("invalid ihave topic", func(t *testing.T) {
 		inspector, signalerCtx, cancel, distributor, _, sporkID, _, topicProviderOracle := inspectorFixture(t)
 		// create unknown topic
 		unknownTopic, malformedTopic, invalidSporkIDTopic := invalidTopics(t, sporkID)
@@ -519,7 +523,8 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		stopInspector(t, cancel, inspector)
 	})
 
-	t.Run("inspectIHaveMessages should NOT disseminate invalid control message notification for iHave messages when duplicate message ids are below the threshold", func(t *testing.T) {
+	// ihave duplicate topic ids below threshold should NOT trigger invalid control message notification.
+	t.Run("ihave duplicate topic ids below threshold", func(t *testing.T) {
 		inspector, signalerCtx, cancel, distributor, _, sporkID, _, topicProviderOracle := inspectorFixture(t)
 		validTopic := fmt.Sprintf("%s/%s", channels.PushBlocks.String(), sporkID)
 		// avoid unknown topics errors
@@ -548,7 +553,8 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		stopInspector(t, cancel, inspector)
 	})
 
-	t.Run("inspectIHaveMessages should disseminate invalid control message notification for iHave messages when duplicate message ids are above the threshold", func(t *testing.T) {
+	// ihave duplicate topic ids beyond threshold should trigger invalid control message notification.
+	t.Run("ihave duplicate message ids beyond threshold", func(t *testing.T) {
 		inspector, signalerCtx, cancel, distributor, _, sporkID, _, topicProviderOracle := inspectorFixture(t)
 		validTopic := fmt.Sprintf("%s/%s", channels.PushBlocks.String(), sporkID)
 		// avoid unknown topics errors
@@ -578,7 +584,8 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		stopInspector(t, cancel, inspector)
 	})
 
-	t.Run("inspectIWantMessages should disseminate invalid control message notification for iWant messages when duplicate message ids exceeds the allowed threshold", func(t *testing.T) {
+	// ihave duplicate message ids beyond threshold should trigger invalid control message notification.
+	t.Run("iwant duplicate message ids above threshold", func(t *testing.T) {
 		inspector, signalerCtx, cancel, distributor, rpcTracker, _, _, _ := inspectorFixture(t)
 		// oracle must be set even though iWant messages do not have topic IDs
 		duplicateMsgID := unittest.IdentifierFixture()

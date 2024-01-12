@@ -394,7 +394,7 @@ func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihave
 	lg := c.logger.With().
 		Str("peer_id", p2plogging.PeerId(from)).
 		Int("sample_size", len(ihaves)).
-		Int("max_sample_size", c.config.IHave.MaxSampleSize).
+		Int("max_sample_size", c.config.IHave.MessageCountThreshold).
 		Logger()
 	duplicateTopicTracker := make(duplicateStrTracker)
 	duplicateMessageIDTracker := make(duplicateStrTracker)
@@ -456,7 +456,7 @@ func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWant
 	lastHighest := c.rpcTracker.LastHighestIHaveRPCSize()
 	lg := c.logger.With().
 		Str("peer_id", p2plogging.PeerId(from)).
-		Uint("max_sample_size", c.config.IWant.MaxSampleSize).
+		Uint("max_sample_size", c.config.IWant.MessageCountThreshold).
 		Int64("last_highest_ihave_rpc_size", lastHighest).
 		Logger()
 	sampleSize := uint(len(iWants))
@@ -607,12 +607,12 @@ func (c *ControlMsgValidationInspector) truncateRPC(from peer.ID, rpc *pubsub.RP
 func (c *ControlMsgValidationInspector) truncateGraftMessages(rpc *pubsub.RPC) {
 	grafts := rpc.GetControl().GetGraft()
 	originalGraftSize := len(grafts)
-	if originalGraftSize <= c.config.GraftPrune.MaxSampleSize {
+	if originalGraftSize <= c.config.GraftPrune.MessageCountThreshold {
 		return // nothing to truncate
 	}
 
 	// truncate grafts and update metrics
-	sampleSize := c.config.GraftPrune.MaxSampleSize
+	sampleSize := c.config.GraftPrune.MessageCountThreshold
 	c.performSample(p2pmsg.CtrlMsgGraft, uint(originalGraftSize), uint(sampleSize), func(i, j uint) {
 		grafts[i], grafts[j] = grafts[j], grafts[i]
 	})
@@ -627,11 +627,11 @@ func (c *ControlMsgValidationInspector) truncateGraftMessages(rpc *pubsub.RPC) {
 func (c *ControlMsgValidationInspector) truncatePruneMessages(rpc *pubsub.RPC) {
 	prunes := rpc.GetControl().GetPrune()
 	originalPruneSize := len(prunes)
-	if originalPruneSize <= c.config.GraftPrune.MaxSampleSize {
+	if originalPruneSize <= c.config.GraftPrune.MessageCountThreshold {
 		return // nothing to truncate
 	}
 
-	sampleSize := c.config.GraftPrune.MaxSampleSize
+	sampleSize := c.config.GraftPrune.MessageCountThreshold
 	c.performSample(p2pmsg.CtrlMsgPrune, uint(originalPruneSize), uint(sampleSize), func(i, j uint) {
 		prunes[i], prunes[j] = prunes[j], prunes[i]
 	})
@@ -640,7 +640,7 @@ func (c *ControlMsgValidationInspector) truncatePruneMessages(rpc *pubsub.RPC) {
 }
 
 // truncateIHaveMessages truncates the iHaves control messages in the RPC. If the total number of iHaves in the RPC exceeds the configured
-// MaxSampleSize the list of iHaves will be truncated.
+// MessageCountThreshold the list of iHaves will be truncated.
 // Args:
 //   - rpc: the rpc message to truncate.
 func (c *ControlMsgValidationInspector) truncateIHaveMessages(rpc *pubsub.RPC) {
@@ -650,9 +650,9 @@ func (c *ControlMsgValidationInspector) truncateIHaveMessages(rpc *pubsub.RPC) {
 		return
 	}
 
-	if originalIHaveCount > c.config.IHave.MaxSampleSize {
+	if originalIHaveCount > c.config.IHave.MessageCountThreshold {
 		// truncate ihaves and update metrics
-		sampleSize := c.config.IHave.MaxSampleSize
+		sampleSize := c.config.IHave.MessageCountThreshold
 		if sampleSize > originalIHaveCount {
 			sampleSize = originalIHaveCount
 		}
@@ -666,7 +666,7 @@ func (c *ControlMsgValidationInspector) truncateIHaveMessages(rpc *pubsub.RPC) {
 }
 
 // truncateIHaveMessageIds truncates the message ids for each iHave control message in the RPC. If the total number of message ids in a single iHave exceeds the configured
-// MaxMessageIDSampleSize the list of message ids will be truncated. Before message ids are truncated the iHave control messages should have been truncated themselves.
+// MessageIdCountThreshold the list of message ids will be truncated. Before message ids are truncated the iHave control messages should have been truncated themselves.
 // Args:
 //   - rpc: the rpc message to truncate.
 func (c *ControlMsgValidationInspector) truncateIHaveMessageIds(rpc *pubsub.RPC) {
@@ -677,8 +677,8 @@ func (c *ControlMsgValidationInspector) truncateIHaveMessageIds(rpc *pubsub.RPC)
 			continue // nothing to truncate; skip
 		}
 
-		if originalMessageIdCount > c.config.IHave.MaxMessageIDSampleSize {
-			sampleSize := c.config.IHave.MaxMessageIDSampleSize
+		if originalMessageIdCount > c.config.IHave.MessageIdCountThreshold {
+			sampleSize := c.config.IHave.MessageIdCountThreshold
 			if sampleSize > originalMessageIdCount {
 				sampleSize = originalMessageIdCount
 			}
@@ -693,7 +693,7 @@ func (c *ControlMsgValidationInspector) truncateIHaveMessageIds(rpc *pubsub.RPC)
 }
 
 // truncateIWantMessages truncates the iWant control messages in the RPC. If the total number of iWants in the RPC exceeds the configured
-// MaxSampleSize the list of iWants will be truncated.
+// MessageCountThreshold the list of iWants will be truncated.
 // Args:
 //   - rpc: the rpc message to truncate.
 func (c *ControlMsgValidationInspector) truncateIWantMessages(from peer.ID, rpc *pubsub.RPC) {
@@ -703,9 +703,9 @@ func (c *ControlMsgValidationInspector) truncateIWantMessages(from peer.ID, rpc 
 		return
 	}
 
-	if originalIWantCount > c.config.IWant.MaxSampleSize {
+	if originalIWantCount > c.config.IWant.MessageCountThreshold {
 		// truncate iWants and update metrics
-		sampleSize := c.config.IWant.MaxSampleSize
+		sampleSize := c.config.IWant.MessageCountThreshold
 		if sampleSize > originalIWantCount {
 			sampleSize = originalIWantCount
 		}
@@ -719,22 +719,22 @@ func (c *ControlMsgValidationInspector) truncateIWantMessages(from peer.ID, rpc 
 }
 
 // truncateIWantMessageIds truncates the message ids for each iWant control message in the RPC. If the total number of message ids in a single iWant exceeds the configured
-// MaxMessageIDSampleSize the list of message ids will be truncated. Before message ids are truncated the iWant control messages should have been truncated themselves.
+// MessageIdCountThreshold the list of message ids will be truncated. Before message ids are truncated the iWant control messages should have been truncated themselves.
 // Args:
 //   - rpc: the rpc message to truncate.
 func (c *ControlMsgValidationInspector) truncateIWantMessageIds(from peer.ID, rpc *pubsub.RPC) {
 	lastHighest := c.rpcTracker.LastHighestIHaveRPCSize()
 	lg := c.logger.With().
 		Str("peer_id", p2plogging.PeerId(from)).
-		Uint("max_sample_size", c.config.IWant.MaxSampleSize).
+		Uint("max_sample_size", c.config.IWant.MessageCountThreshold).
 		Int64("last_highest_ihave_rpc_size", lastHighest).
 		Logger()
 
 	sampleSize := int(10 * lastHighest)
-	if sampleSize == 0 || sampleSize > c.config.IWant.MaxMessageIDSampleSize {
+	if sampleSize == 0 || sampleSize > c.config.IWant.MessageIdCountThreshold {
 		// invalid or 0 sample size is suspicious
 		lg.Warn().Str(logging.KeySuspicious, "true").Msg("zero or invalid sample size, using default max sample size")
-		sampleSize = c.config.IWant.MaxMessageIDSampleSize
+		sampleSize = c.config.IWant.MessageIdCountThreshold
 	}
 	for _, iWant := range rpc.GetControl().GetIwant() {
 		messageIDs := iWant.GetMessageIDs()
