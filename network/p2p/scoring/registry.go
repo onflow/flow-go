@@ -27,30 +27,6 @@ import (
 
 type SpamRecordInitFunc func() p2p.GossipSubSpamRecord
 
-// GossipSubCtrlMsgPenaltyValue is the penalty value for each control message type.
-type GossipSubCtrlMsgPenaltyValue struct {
-	Graft float64 // penalty value for an individual graft message misbehaviour.
-	Prune float64 // penalty value for an individual prune message misbehaviour.
-	IHave float64 // penalty value for an individual iHave message misbehaviour.
-	IWant float64 // penalty value for an individual iWant message misbehaviour.
-	// ClusterPrefixedPenaltyReductionFactor factor used to reduce the penalty for control message misbehaviours on cluster prefixed topics. This is allows a more lenient punishment for nodes
-	// that fall behind and may need to request old data.
-	ClusterPrefixedPenaltyReductionFactor float64
-	RpcPublishMessage                     float64 // penalty value for an individual RpcPublishMessage message misbehaviour.
-}
-
-// GossipSubCtrlMsgPenaltyValues returns the default penalty value for each control message type.
-func GossipSubCtrlMsgPenaltyValues(penalties p2pconfig.MisbehaviourPenalties) GossipSubCtrlMsgPenaltyValue {
-	return GossipSubCtrlMsgPenaltyValue{
-		Graft:                                 penalties.GraftMisbehaviour,
-		Prune:                                 penalties.PruneMisbehaviour,
-		IHave:                                 penalties.IHaveMisbehaviour,
-		IWant:                                 penalties.IWantMisbehaviour,
-		ClusterPrefixedPenaltyReductionFactor: penalties.ClusterPrefixedReductionFactor,
-		RpcPublishMessage:                     penalties.PublishMisbehaviour,
-	}
-}
-
 // GossipSubAppSpecificScoreRegistry is the registry for the application specific score of peers in the GossipSub protocol.
 // The application specific score is part of the overall score of a peer, and is used to determine the peer's score based
 // on its behavior related to the application (Flow protocol).
@@ -66,7 +42,7 @@ type GossipSubAppSpecificScoreRegistry struct {
 	// spamScoreCache currently only holds the control message misbehaviour penalty (spam related penalty).
 	spamScoreCache p2p.GossipSubSpamRecordCache
 
-	penalty GossipSubCtrlMsgPenaltyValue
+	penalty p2pconfig.MisbehaviourPenalties
 
 	// initial application specific penalty record, used to initialize the penalty cache entry.
 	init func() p2p.GossipSubSpamRecord
@@ -103,7 +79,7 @@ type GossipSubAppSpecificScoreRegistryConfig struct {
 	Validator p2p.SubscriptionValidator `validate:"required"`
 
 	// Penalty encapsulates the penalty unit for each control message type misbehaviour.
-	Penalty GossipSubCtrlMsgPenaltyValue `validate:"required"`
+	Penalty p2pconfig.MisbehaviourPenalties `validate:"required"`
 
 	// IdProvider is the identity provider used to translate peer ids at the networking layer to Flow identifiers (if
 	// an authorized peer is found).
@@ -398,15 +374,15 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 		penalty := 0.0
 		switch notification.MsgType {
 		case p2pmsg.CtrlMsgGraft:
-			penalty += r.penalty.Graft
+			penalty += r.penalty.GraftMisbehaviour
 		case p2pmsg.CtrlMsgPrune:
-			penalty += r.penalty.Prune
+			penalty += r.penalty.PruneMisbehaviour
 		case p2pmsg.CtrlMsgIHave:
-			penalty += r.penalty.IHave
+			penalty += r.penalty.IHaveMisbehaviour
 		case p2pmsg.CtrlMsgIWant:
-			penalty += r.penalty.IWant
+			penalty += r.penalty.IWantMisbehaviour
 		case p2pmsg.RpcPublishMessage:
-			penalty += r.penalty.RpcPublishMessage
+			penalty += r.penalty.PublishMisbehaviour
 		default:
 			// the error is considered fatal as it means that we have an unsupported misbehaviour type, we should crash the node to prevent routing attack vulnerability.
 			lg.Fatal().Str("misbehavior_type", notification.MsgType.String()).Msg("unknown misbehaviour type")
@@ -414,7 +390,7 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 
 		// reduce penalty for cluster prefixed topics allowing nodes that are potentially behind to catch up
 		if notification.TopicType == p2p.CtrlMsgTopicTypeClusterPrefixed {
-			penalty *= r.penalty.ClusterPrefixedPenaltyReductionFactor
+			penalty *= r.penalty.ClusterPrefixedReductionFactor
 		}
 
 		record.Penalty += penalty

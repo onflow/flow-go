@@ -104,10 +104,11 @@ func NewScoreOption(cfg *ScoreOptionConfig, provider p2p.SubscriptionProvider) (
 			TraceSampler: throttledSampler,
 			DebugSampler: throttledSampler,
 		})
+
 	validator := NewSubscriptionValidator(cfg.logger, provider)
 	scoreRegistry, err := NewGossipSubAppSpecificScoreRegistry(&GossipSubAppSpecificScoreRegistryConfig{
 		Logger:                  logger,
-		Penalty:                 GossipSubCtrlMsgPenaltyValues(cfg.params.ScoringRegistryParameters.MisbehaviourPenalties),
+		Penalty:                 cfg.params.ScoringRegistryParameters.MisbehaviourPenalties,
 		Validator:               validator,
 		Init:                    InitAppScoreRecordStateFunc(cfg.params.ScoringRegistryParameters.MaximumSpamPenaltyDecayFactor),
 		IdProvider:              cfg.provider,

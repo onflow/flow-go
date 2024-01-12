@@ -90,19 +90,19 @@ func TestScoreRegistry_FreshStart(t *testing.T) {
 // asynchronous nature of app-specific score updates in GossipSub's cache.
 func TestScoreRegistry_PeerWithSpamRecord(t *testing.T) {
 	t.Run("graft", func(t *testing.T) {
-		testScoreRegistryPeerWithSpamRecord(t, p2pmsg.CtrlMsgGraft, penaltyValueFixtures().Graft)
+		testScoreRegistryPeerWithSpamRecord(t, p2pmsg.CtrlMsgGraft, penaltyValueFixtures().GraftMisbehaviour)
 	})
 	t.Run("prune", func(t *testing.T) {
-		testScoreRegistryPeerWithSpamRecord(t, p2pmsg.CtrlMsgPrune, penaltyValueFixtures().Prune)
+		testScoreRegistryPeerWithSpamRecord(t, p2pmsg.CtrlMsgPrune, penaltyValueFixtures().PruneMisbehaviour)
 	})
 	t.Run("ihave", func(t *testing.T) {
-		testScoreRegistryPeerWithSpamRecord(t, p2pmsg.CtrlMsgIHave, penaltyValueFixtures().IHave)
+		testScoreRegistryPeerWithSpamRecord(t, p2pmsg.CtrlMsgIHave, penaltyValueFixtures().IHaveMisbehaviour)
 	})
 	t.Run("iwant", func(t *testing.T) {
-		testScoreRegistryPeerWithSpamRecord(t, p2pmsg.CtrlMsgIWant, penaltyValueFixtures().IWant)
+		testScoreRegistryPeerWithSpamRecord(t, p2pmsg.CtrlMsgIWant, penaltyValueFixtures().IWantMisbehaviour)
 	})
 	t.Run("RpcPublishMessage", func(t *testing.T) {
-		testScoreRegistryPeerWithSpamRecord(t, p2pmsg.RpcPublishMessage, penaltyValueFixtures().RpcPublishMessage)
+		testScoreRegistryPeerWithSpamRecord(t, p2pmsg.RpcPublishMessage, penaltyValueFixtures().PublishMisbehaviour)
 	})
 }
 
@@ -193,19 +193,19 @@ func testScoreRegistryPeerWithSpamRecord(t *testing.T, messageType p2pmsg.Contro
 // penalty computation and updates to the score registry when a peer with an unknown identity sends these control messages.
 func TestScoreRegistry_SpamRecordWithUnknownIdentity(t *testing.T) {
 	t.Run("graft", func(t *testing.T) {
-		testScoreRegistrySpamRecordWithUnknownIdentity(t, p2pmsg.CtrlMsgGraft, penaltyValueFixtures().Graft)
+		testScoreRegistrySpamRecordWithUnknownIdentity(t, p2pmsg.CtrlMsgGraft, penaltyValueFixtures().GraftMisbehaviour)
 	})
 	t.Run("prune", func(t *testing.T) {
-		testScoreRegistrySpamRecordWithUnknownIdentity(t, p2pmsg.CtrlMsgPrune, penaltyValueFixtures().Prune)
+		testScoreRegistrySpamRecordWithUnknownIdentity(t, p2pmsg.CtrlMsgPrune, penaltyValueFixtures().PruneMisbehaviour)
 	})
 	t.Run("ihave", func(t *testing.T) {
-		testScoreRegistrySpamRecordWithUnknownIdentity(t, p2pmsg.CtrlMsgIHave, penaltyValueFixtures().IHave)
+		testScoreRegistrySpamRecordWithUnknownIdentity(t, p2pmsg.CtrlMsgIHave, penaltyValueFixtures().IHaveMisbehaviour)
 	})
 	t.Run("iwant", func(t *testing.T) {
-		testScoreRegistrySpamRecordWithUnknownIdentity(t, p2pmsg.CtrlMsgIWant, penaltyValueFixtures().IWant)
+		testScoreRegistrySpamRecordWithUnknownIdentity(t, p2pmsg.CtrlMsgIWant, penaltyValueFixtures().IWantMisbehaviour)
 	})
 	t.Run("RpcPublishMessage", func(t *testing.T) {
-		testScoreRegistrySpamRecordWithUnknownIdentity(t, p2pmsg.RpcPublishMessage, penaltyValueFixtures().RpcPublishMessage)
+		testScoreRegistrySpamRecordWithUnknownIdentity(t, p2pmsg.RpcPublishMessage, penaltyValueFixtures().PublishMisbehaviour)
 	})
 }
 
@@ -298,19 +298,19 @@ func testScoreRegistrySpamRecordWithUnknownIdentity(t *testing.T, messageType p2
 // in spam activities, as indicated by these control messages.
 func TestScoreRegistry_SpamRecordWithSubscriptionPenalty(t *testing.T) {
 	t.Run("graft", func(t *testing.T) {
-		testScoreRegistrySpamRecordWithSubscriptionPenalty(t, p2pmsg.CtrlMsgGraft, penaltyValueFixtures().Graft)
+		testScoreRegistrySpamRecordWithSubscriptionPenalty(t, p2pmsg.CtrlMsgGraft, penaltyValueFixtures().GraftMisbehaviour)
 	})
 	t.Run("prune", func(t *testing.T) {
-		testScoreRegistrySpamRecordWithSubscriptionPenalty(t, p2pmsg.CtrlMsgPrune, penaltyValueFixtures().Prune)
+		testScoreRegistrySpamRecordWithSubscriptionPenalty(t, p2pmsg.CtrlMsgPrune, penaltyValueFixtures().PruneMisbehaviour)
 	})
 	t.Run("ihave", func(t *testing.T) {
-		testScoreRegistrySpamRecordWithSubscriptionPenalty(t, p2pmsg.CtrlMsgIHave, penaltyValueFixtures().IHave)
+		testScoreRegistrySpamRecordWithSubscriptionPenalty(t, p2pmsg.CtrlMsgIHave, penaltyValueFixtures().IHaveMisbehaviour)
 	})
 	t.Run("iwant", func(t *testing.T) {
-		testScoreRegistrySpamRecordWithSubscriptionPenalty(t, p2pmsg.CtrlMsgIWant, penaltyValueFixtures().IWant)
+		testScoreRegistrySpamRecordWithSubscriptionPenalty(t, p2pmsg.CtrlMsgIWant, penaltyValueFixtures().IWantMisbehaviour)
 	})
 	t.Run("RpcPublishMessage", func(t *testing.T) {
-		testScoreRegistrySpamRecordWithSubscriptionPenalty(t, p2pmsg.RpcPublishMessage, penaltyValueFixtures().RpcPublishMessage)
+		testScoreRegistrySpamRecordWithSubscriptionPenalty(t, p2pmsg.RpcPublishMessage, penaltyValueFixtures().PublishMisbehaviour)
 	})
 }
 
@@ -447,11 +447,11 @@ func TestScoreRegistry_SpamPenaltyDecaysInCache(t *testing.T) {
 	time.Sleep(1 * time.Second) // wait for the penalty to decay.
 
 	// the upper bound is the sum of the penalties without decay.
-	scoreUpperBound := penaltyValueFixtures().Prune +
-		penaltyValueFixtures().Graft +
-		penaltyValueFixtures().IHave +
-		penaltyValueFixtures().IWant +
-		penaltyValueFixtures().RpcPublishMessage
+	scoreUpperBound := penaltyValueFixtures().PruneMisbehaviour +
+		penaltyValueFixtures().GraftMisbehaviour +
+		penaltyValueFixtures().IHaveMisbehaviour +
+		penaltyValueFixtures().IWantMisbehaviour +
+		penaltyValueFixtures().PublishMisbehaviour
 	// the lower bound is the sum of the penalties with decay assuming the decay is applied 4 times to the sum of the penalties.
 	// in reality, the decay is applied 4 times to the first penalty, then 3 times to the second penalty, and so on.
 	r := scoring.InitAppScoreRecordStateFunc(cfg.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.MaximumSpamPenaltyDecayFactor)()
@@ -510,7 +510,7 @@ func TestScoreRegistry_SpamPenaltyDecayToZero(t *testing.T) {
 	require.Eventually(t, func() bool {
 		score := reg.AppSpecificScoreFunc()(peerID)
 		// the penalty should be less than zero and greater than the penalty value (due to decay).
-		return score < 0 && score > penaltyValueFixtures().Graft
+		return score < 0 && score > penaltyValueFixtures().GraftMisbehaviour
 	}, 5*time.Second, 100*time.Millisecond)
 
 	require.Eventually(t, func() bool {
@@ -582,8 +582,8 @@ func TestScoreRegistry_PersistingUnknownIdentityPenalty(t *testing.T) {
 		score := reg.AppSpecificScoreFunc()(peerID)
 		// Ideally, the score should be the sum of the default invalid subscription penalty and the graft penalty, however,
 		// due to exponential decay of the spam penalty and asynchronous update the app specific score; score should be in the range of [scoring.
-		// (scoring.DefaultUnknownIdentityPenalty+penaltyValueFixtures().Graft, scoring.DefaultUnknownIdentityPenalty).
-		return score < scoreOptParameters.Penalties.UnknownIdentityPenalty && score > scoreOptParameters.Penalties.UnknownIdentityPenalty+penaltyValueFixtures().Graft
+		// (scoring.DefaultUnknownIdentityPenalty+penaltyValueFixtures().GraftMisbehaviour, scoring.DefaultUnknownIdentityPenalty).
+		return score < scoreOptParameters.Penalties.UnknownIdentityPenalty && score > scoreOptParameters.Penalties.UnknownIdentityPenalty+penaltyValueFixtures().GraftMisbehaviour
 	}, 5*time.Second, 100*time.Millisecond)
 
 	require.Eventually(t, func() bool {
@@ -652,8 +652,8 @@ func TestScoreRegistry_PersistingInvalidSubscriptionPenalty(t *testing.T) {
 		score := reg.AppSpecificScoreFunc()(peerID)
 		// Ideally, the score should be the sum of the default invalid subscription penalty and the graft penalty, however,
 		// due to exponential decay of the spam penalty and asynchronous update the app specific score; score should be in the range of [scoring.
-		// (DefaultInvalidSubscriptionPenalty+penaltyValueFixtures().Graft, scoring.DefaultInvalidSubscriptionPenalty).
-		return score < scoreOptParameters.Penalties.InvalidSubscriptionPenalty && score > scoreOptParameters.Penalties.InvalidSubscriptionPenalty+penaltyValueFixtures().Graft
+		// (DefaultInvalidSubscriptionPenalty+penaltyValueFixtures().GraftMisbehaviour, scoring.DefaultInvalidSubscriptionPenalty).
+		return score < scoreOptParameters.Penalties.InvalidSubscriptionPenalty && score > scoreOptParameters.Penalties.InvalidSubscriptionPenalty+penaltyValueFixtures().GraftMisbehaviour
 	}, 5*time.Second, 100*time.Millisecond)
 
 	require.Eventually(t, func() bool {
@@ -841,8 +841,8 @@ func TestPeerSpamPenaltyClusterPrefixed(t *testing.T) {
 		}()
 		unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "timed out waiting for goroutines to finish")
 
-		// expected penalty should be penaltyValueFixtures().Graft * (1  + clusterReductionFactor)
-		expectedPenalty := penaltyValueFixture(ctlMsgType) * (1 + penaltyValueFixtures().ClusterPrefixedPenaltyReductionFactor)
+		// expected penalty should be penaltyValueFixtures().GraftMisbehaviour * (1  + clusterReductionFactor)
+		expectedPenalty := penaltyValueFixture(ctlMsgType) * (1 + penaltyValueFixtures().ClusterPrefixedReductionFactor)
 
 		// the penalty should now be updated in the spamRecords
 		record, err, ok := spamRecords.Get(peerID) // get the record from the spamRecords.
@@ -1009,14 +1009,15 @@ func newGossipSubAppSpecificScoreRegistry(t *testing.T, params p2pconfig.Scoring
 // penaltyValueFixtures returns a set of penalty values for testing purposes.
 // The values are not realistic. The important thing is that they are different from each other. This is to make sure
 // that the tests are not passing because of the default values.
-func penaltyValueFixtures() scoring.GossipSubCtrlMsgPenaltyValue {
-	return scoring.GossipSubCtrlMsgPenaltyValue{
-		Graft:                                 -100,
-		Prune:                                 -50,
-		IHave:                                 -20,
-		IWant:                                 -10,
-		ClusterPrefixedPenaltyReductionFactor: .5,
-		RpcPublishMessage:                     -10,
+func penaltyValueFixtures() p2pconfig.MisbehaviourPenalties {
+	return p2pconfig.MisbehaviourPenalties{
+		GraftMisbehaviour:              -100,
+		PruneMisbehaviour:              -50,
+		IHaveMisbehaviour:              -20,
+		IWantMisbehaviour:              -10,
+		ClusterPrefixedReductionFactor: .5,
+		PublishMisbehaviour:            -10,
+		SkipDecayThreshold:             -0.1,
 	}
 }
 
@@ -1025,16 +1026,16 @@ func penaltyValueFixture(msgType p2pmsg.ControlMessageType) float64 {
 	penaltyValues := penaltyValueFixtures()
 	switch msgType {
 	case p2pmsg.CtrlMsgGraft:
-		return penaltyValues.Graft
+		return penaltyValues.GraftMisbehaviour
 	case p2pmsg.CtrlMsgPrune:
-		return penaltyValues.Prune
+		return penaltyValues.PruneMisbehaviour
 	case p2pmsg.CtrlMsgIHave:
-		return penaltyValues.IHave
+		return penaltyValues.IHaveMisbehaviour
 	case p2pmsg.CtrlMsgIWant:
-		return penaltyValues.IWant
+		return penaltyValues.IWantMisbehaviour
 	case p2pmsg.RpcPublishMessage:
-		return penaltyValues.RpcPublishMessage
+		return penaltyValues.PublishMisbehaviour
 	default:
-		return penaltyValues.ClusterPrefixedPenaltyReductionFactor
+		return penaltyValues.ClusterPrefixedReductionFactor
 	}
 }
