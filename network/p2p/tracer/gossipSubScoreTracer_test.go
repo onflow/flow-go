@@ -80,7 +80,7 @@ func TestGossipSubScoreTracer(t *testing.T) {
 	cfg.NetworkConfig.GossipSub.RpcTracer.ScoreTracerInterval = 1 * time.Second
 	// the libp2p node updates the subscription list as well as the app-specific score every 10 milliseconds (for testing purposes)
 	cfg.NetworkConfig.GossipSub.SubscriptionProvider.UpdateInterval = 10 * time.Millisecond
-	cfg.NetworkConfig.GossipSub.ScoringParameters.AppSpecificScore.ScoreTTL = 10 * time.Millisecond
+	cfg.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.AppSpecificScore.ScoreTTL = 10 * time.Millisecond
 	tracerNode, tracerId := p2ptest.NodeFixture(
 		t,
 		sporkId,
