@@ -978,7 +978,7 @@ func newGossipSubAppSpecificScoreRegistry(t *testing.T,
 	cache := netcache.NewGossipSubSpamRecordCache(100,
 		unittest.Logger(),
 		metrics.NewNoopCollector(),
-		scoring.InitAppScoreRecordStateFunc(params.ScoringRegistryParameters.SpamRecordCache.Decay.MaximumSpamPenaltyDecayFactor),
+		initFunction,
 		scoring.DefaultDecayFunction(params.ScoringRegistryParameters.SpamRecordCache.Decay))
 	appSpecificScoreCache := internal.NewAppSpecificScoreCache(100, unittest.Logger(), metrics.NewNoopCollector())
 

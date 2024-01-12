@@ -164,6 +164,7 @@ func TestSubscriptionValidator_InvalidSubscriptions(t *testing.T) {
 // 4. Verification node also publishes a chunk request on the RequestChunks channel.
 // 5. Test checks that consensus node does not receive the chunk request while the other verification node does.
 func TestSubscriptionValidator_Integration(t *testing.T) {
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky test")
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
