@@ -101,14 +101,7 @@ type GossipSubAppSpecificScoreRegistryConfig struct {
 
 	NetworkingType network.NetworkingType `validate:"required"`
 
-	// UnknownIdentityPenalty This is the penalty for unknown identity.
-	UnknownIdentityPenalty float64 `validate:"required"`
-	// MinAppSpecificPenalty This is the minimum penalty for severe offenses that we apply to a remote node score
-	MinAppSpecificPenalty float64 `validate:"required"`
-	// StakedIdentityReward This is the reward for staking peers.
-	StakedIdentityReward float64 `validate:"required"`
-	// InvalidSubscriptionPenalty This is the penalty for invalid subscription.
-	InvalidSubscriptionPenalty float64 `validate:"required"`
+	AppSpecificScoreParams p2pconfig.ApplicationSpecificScoreParameters `validate:"required"`
 }
 
 // NewGossipSubAppSpecificScoreRegistry returns a new GossipSubAppSpecificScoreRegistry.
@@ -140,10 +133,10 @@ func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegis
 		validator:                  config.Validator,
 		idProvider:                 config.IdProvider,
 		scoreTTL:                   config.Parameters.ScoreTTL,
-		unknownIdentityPenalty:     config.UnknownIdentityPenalty,
-		minAppSpecificPenalty:      config.MinAppSpecificPenalty,
-		stakedIdentityReward:       config.StakedIdentityReward,
-		invalidSubscriptionPenalty: config.InvalidSubscriptionPenalty,
+		unknownIdentityPenalty:     config.AppSpecificScoreParams.UnknownIdentityPenalty,
+		minAppSpecificPenalty:      config.AppSpecificScoreParams.MinAppSpecificPenalty,
+		stakedIdentityReward:       config.AppSpecificScoreParams.StakedIdentityReward,
+		invalidSubscriptionPenalty: config.AppSpecificScoreParams.InvalidSubscriptionPenalty,
 	}
 
 	reg.appScoreUpdateWorkerPool = worker.NewWorkerPoolBuilder[peer.ID](lg.With().Str("component", "app_specific_score_update_worker_pool").Logger(),

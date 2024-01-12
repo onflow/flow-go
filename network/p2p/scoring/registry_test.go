@@ -981,13 +981,10 @@ func newGossipSubAppSpecificScoreRegistry(t *testing.T, params p2pconfig.Scoring
 		SpamRecordCacheFactory: func() p2p.GossipSubSpamRecordCache {
 			return cache
 		},
-		Parameters:                 params.ScoringRegistryParameters.AppSpecificScore,
-		HeroCacheMetricsFactory:    metrics.NewNoopHeroCacheMetricsFactory(),
-		NetworkingType:             network.PrivateNetwork,
-		UnknownIdentityPenalty:     params.PeerScoring.Protocol.AppSpecificScore.UnknownIdentityPenalty,
-		MinAppSpecificPenalty:      params.PeerScoring.Protocol.AppSpecificScore.MinAppSpecificPenalty,
-		StakedIdentityReward:       params.PeerScoring.Protocol.AppSpecificScore.StakedIdentityReward,
-		InvalidSubscriptionPenalty: params.PeerScoring.Protocol.AppSpecificScore.InvalidSubscriptionPenalty,
+		Parameters:              params.ScoringRegistryParameters.AppSpecificScore,
+		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
+		NetworkingType:          network.PrivateNetwork,
+		AppSpecificScoreParams:  params.PeerScoring.Protocol.AppSpecificScore,
 	}
 	for _, opt := range opts {
 		opt(cfg)

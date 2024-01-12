@@ -122,12 +122,9 @@ func NewScoreOption(cfg *ScoreOptionConfig, provider p2p.SubscriptionProvider) (
 			return netcache.NewGossipSubSpamRecordCache(cfg.params.ScoringRegistryParameters.SpamRecordCache.CacheSize, cfg.logger, collector,
 				DefaultDecayFunction(cfg.params.ScoringRegistryParameters.SpamRecordCache.Decay))
 		},
-		Parameters:                 cfg.params.ScoringRegistryParameters.AppSpecificScore,
-		NetworkingType:             cfg.networkingType,
-		UnknownIdentityPenalty:     cfg.params.PeerScoring.Protocol.AppSpecificScore.UnknownIdentityPenalty,
-		MinAppSpecificPenalty:      cfg.params.PeerScoring.Protocol.AppSpecificScore.MinAppSpecificPenalty,
-		StakedIdentityReward:       cfg.params.PeerScoring.Protocol.AppSpecificScore.StakedIdentityReward,
-		InvalidSubscriptionPenalty: cfg.params.PeerScoring.Protocol.AppSpecificScore.InvalidSubscriptionPenalty,
+		Parameters:             cfg.params.ScoringRegistryParameters.AppSpecificScore,
+		NetworkingType:         cfg.networkingType,
+		AppSpecificScoreParams: cfg.params.PeerScoring.Protocol.AppSpecificScore,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create gossipsub app specific score registry: %w", err)
