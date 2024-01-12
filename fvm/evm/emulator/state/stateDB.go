@@ -54,7 +54,7 @@ func NewStateDB(ledger atree.Ledger, root flow.Address) (*StateDB, error) {
 
 // Exist returns true if the given address exists in state.
 //
-// this should also return true for suicided accounts during the transaction execution.
+// this should also return true for self destructed accounts during the transaction execution.
 func (db *StateDB) Exist(addr gethCommon.Address) bool {
 	exist, err := db.lastestView().Exist(addr)
 	db.handleError(err)
@@ -85,20 +85,26 @@ func (db *StateDB) IsCreated(addr gethCommon.Address) bool {
 	return db.lastestView().IsCreated(addr)
 }
 
-// Suicide flags the address for deletion.
+// SelfDestruct flags the address for deletion.
 //
 // while this address exists for the rest of transaction,
-// the balance of this account is return zero after the Suicide call.
-func (db *StateDB) Suicide(addr gethCommon.Address) bool {
-	success, err := db.lastestView().Suicide(addr)
+// the balance of this account is return zero after the SelfDestruct call.
+func (db *StateDB) SelfDestruct(addr gethCommon.Address) {
+	err := db.lastestView().SelfDestruct(addr)
 	db.handleError(err)
-	return success
 }
 
-// HasSuicided returns true if address is flaged with suicide.
-func (db *StateDB) HasSuicided(addr gethCommon.Address) bool {
-	suicided, _ := db.lastestView().HasSuicided(addr)
-	return suicided
+// Selfdestruct6780 would only follow the self destruct steps if account is created
+func (db *StateDB) Selfdestruct6780(addr gethCommon.Address) {
+	if db.IsCreated(addr) {
+		db.SelfDestruct(addr)
+	}
+}
+
+// HasSelfDestructed returns true if address is flaged with self destruct.
+func (db *StateDB) HasSelfDestructed(addr gethCommon.Address) bool {
+	destructed, _ := db.lastestView().HasSelfDestructed(addr)
+	return destructed
 }
 
 // SubBalance substitutes the amount from the balance of the given address
@@ -322,8 +328,8 @@ func (db *StateDB) Commit() error {
 	// update accounts
 	for _, addr := range sortedAddresses {
 		deleted := false
-		// First we need to delete accounts
-		if db.HasSuicided(addr) {
+		// first we need to delete accounts
+		if db.HasSelfDestructed(addr) {
 			err = db.baseView.DeleteAccount(addr)
 			if err != nil {
 				return wrapError(err)

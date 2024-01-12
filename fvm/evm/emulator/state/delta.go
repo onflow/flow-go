@@ -22,7 +22,7 @@ type DeltaView struct {
 	dirtyAddresses map[gethCommon.Address]struct{}
 	// created keeps a set of recently created addresses
 	created map[gethCommon.Address]struct{}
-	// suicided keeps a set of addresses flagged to be destructed at the
+	// toBeDestructed keeps a set of addresses flagged to be destructed at the
 	// end of transaction, it also keeps the balance of the addresses before destruction
 	toBeDestructed map[gethCommon.Address]*big.Int
 	// is a flag used to track accounts that has been flagged for
@@ -102,23 +102,35 @@ func (d *DeltaView) Exist(addr gethCommon.Address) (bool, error) {
 
 // CreateAccount creates a new account for the given address
 //
-// if address has been flaged earlier for destruction, carry over the balance
+// if address already extists (even if destructed), carry over the balance
 // and reset the data from the orginal account.
 func (d *DeltaView) CreateAccount(addr gethCommon.Address) error {
 	// if is already created return
 	if d.IsCreated(addr) {
 		return nil
 	}
+	exist, err := d.Exist(addr)
+	if err != nil {
+		return err
+	}
+	if exist {
+		// check if already destructed
+		destructed, balance := d.HasSelfDestructed(addr)
+		if !destructed {
+			balance, err = d.GetBalance(addr)
+			if err != nil {
+				return err
+			}
+			err = d.SelfDestruct(addr)
+			if err != nil {
+				return err
+			}
+		}
 
-	d.dirtyAddresses[addr] = struct{}{}
-
-	// if it has flagged for destruction in this transction,
-	// reset everything and carry over the balance
-	destructed, balance := d.HasSuicided(addr)
-	if destructed {
 		d.nonces[addr] = 0
 		d.codes[addr] = nil
 		d.codeHashes[addr] = gethTypes.EmptyCodeHash
+		// carrying over the balance. (legacy behaviour of the Geth stateDB)
 		d.balances[addr] = balance
 
 		// flag addr as recreated, this flag helps with postponing deletion of slabs
@@ -131,16 +143,9 @@ func (d *DeltaView) CreateAccount(addr gethCommon.Address) error {
 				delete(d.slots, k)
 			}
 		}
-		return nil
 	}
-
+	d.dirtyAddresses[addr] = struct{}{}
 	d.created[addr] = struct{}{}
-	// Carrying over the balance ensures that Ether doesn't disappear. (legacy behaviour of the Geth stateDB)
-	bal, err := d.GetBalance(addr)
-	if err != nil {
-		return err
-	}
-	d.balances[addr] = bal
 	return nil
 }
 
@@ -153,47 +158,46 @@ func (d *DeltaView) IsCreated(addr gethCommon.Address) bool {
 	return d.parent.IsCreated(addr)
 }
 
-// HasSuicided returns true if address has been flagged for destruction
-// it also returns the balance of the address before destruction
-func (d *DeltaView) HasSuicided(addr gethCommon.Address) (bool, *big.Int) {
+// HasSelfDestructed returns true if address has been flagged for destruction
+// it also returns the balance of the address before the destruction call
+func (d *DeltaView) HasSelfDestructed(addr gethCommon.Address) (bool, *big.Int) {
 	bal, found := d.toBeDestructed[addr]
 	if found {
 		return true, bal
 	}
-	return d.parent.HasSuicided(addr)
+	return d.parent.HasSelfDestructed(addr)
 }
 
-// Suicide sets a flag to delete the account at the end of transaction
+// SelfDestruct sets a flag to destruct the account at the end of transaction
 //
 // if an account has been created in this transaction, it would return an error
-func (d *DeltaView) Suicide(addr gethCommon.Address) (bool, error) {
-	// if it has been recently created, calling suicide is not
-	// a valid operation
+func (d *DeltaView) SelfDestruct(addr gethCommon.Address) error {
+	// if it has been recently created, calling self destruct is not a valid operation
 	if d.IsCreated(addr) {
-		return false, fmt.Errorf("invalid operation, can't suicide an account that is just created")
+		return fmt.Errorf("invalid operation, can't selfdestruct an account that is just created")
 	}
 
 	// if it doesn't exist, return false
 	exists, err := d.Exist(addr)
 	if err != nil {
-		return false, err
+		return err
 	}
 	if !exists {
-		return false, nil
+		return nil
 	}
 
 	// flag the account for destruction and capture the balance
 	// before destruction
 	d.toBeDestructed[addr], err = d.GetBalance(addr)
 	if err != nil {
-		return false, err
+		return err
 	}
 	// flag the address as dirty
 	d.dirtyAddresses[addr] = struct{}{}
 
 	// set balance to zero
 	d.balances[addr] = new(big.Int)
-	return true, nil
+	return nil
 }
 
 // GetBalance returns the balance of the given address

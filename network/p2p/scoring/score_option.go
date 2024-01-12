@@ -110,7 +110,6 @@ func NewScoreOption(cfg *ScoreOptionConfig, provider p2p.SubscriptionProvider) (
 		Logger:                  logger,
 		Penalty:                 cfg.params.ScoringRegistryParameters.MisbehaviourPenalties,
 		Validator:               validator,
-		Init:                    InitAppScoreRecordStateFunc(cfg.params.ScoringRegistryParameters.SpamRecordCache.Decay.MaximumSpamPenaltyDecayFactor),
 		IdProvider:              cfg.provider,
 		HeroCacheMetricsFactory: cfg.heroCacheMetricsFactory,
 		AppScoreCacheFactory: func() p2p.GossipSubApplicationSpecificScoreCache {
@@ -120,6 +119,7 @@ func NewScoreOption(cfg *ScoreOptionConfig, provider p2p.SubscriptionProvider) (
 		SpamRecordCacheFactory: func() p2p.GossipSubSpamRecordCache {
 			collector := metrics.GossipSubSpamRecordCacheMetricsFactory(cfg.heroCacheMetricsFactory, cfg.networkingType)
 			return netcache.NewGossipSubSpamRecordCache(cfg.params.ScoringRegistryParameters.SpamRecordCache.CacheSize, cfg.logger, collector,
+				InitAppScoreRecordStateFunc(cfg.params.ScoringRegistryParameters.SpamRecordCache.Decay.MaximumSpamPenaltyDecayFactor),
 				DefaultDecayFunction(cfg.params.ScoringRegistryParameters.SpamRecordCache.Decay))
 		},
 		Parameters:             cfg.params.ScoringRegistryParameters.AppSpecificScore,
