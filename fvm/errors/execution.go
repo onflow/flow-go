@@ -289,17 +289,3 @@ func NewInvalidInternalStateAccessError(
 		opType,
 		id)
 }
-
-// NewEVMError constructs a new CodedError which captures a
-// collection of errors provided by (non-fatal) evm runtime.
-func NewEVMError(err error) CodedError {
-	return WrapCodedError(
-		ErrEVMExecutionError,
-		err,
-		"evm runtime error")
-}
-
-// IsEVMError returns true if error is an EVM error
-func IsEVMError(err error) bool {
-	return HasErrorCode(err, ErrEVMExecutionError)
-}
