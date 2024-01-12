@@ -28,8 +28,6 @@ import (
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
 	"github.com/onflow/flow-go/fvm/evm/types"
-	"github.com/onflow/flow-go/fvm/evm/stdlib"
-	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/meter"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -2963,11 +2961,7 @@ func TestEVM(t *testing.T) {
 
 	t.Run("successful transaction", newVMTest().
 		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
-		// we keep this dissabled during bootstrap and later overwrite in the test for test transaction
-		withContextOptions(
-			fvm.WithEVMEnabled(false),
-			fvm.WithCadenceLogging(true),
-		).
+		withContextOptions(fvm.WithCadenceLogging(true)).
 		run(func(
 			t *testing.T,
 			vm fvm.VM,
@@ -3022,7 +3016,6 @@ func TestEVM(t *testing.T) {
 	// this test makes sure the execution error is correctly handled and returned as a correct type
 	t.Run("execution reverted", newVMTest().
 		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
-		withContextOptions(fvm.WithEVMEnabled(true)).
 		run(func(
 			t *testing.T,
 			vm fvm.VM,
@@ -3058,7 +3051,6 @@ func TestEVM(t *testing.T) {
 	// we have implemented a snapshot wrapper to return an error from the EVM
 	t.Run("internal evm error handling", newVMTest().
 		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
-		withContextOptions(fvm.WithEVMEnabled(true)).
 		run(func(
 			t *testing.T,
 			vm fvm.VM,
