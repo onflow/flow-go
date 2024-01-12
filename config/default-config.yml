@@ -260,25 +260,25 @@ network-config:
           # i.e., -100 + 1. This ensures that a node with a score of
           # -100 will be graylisted (i.e., all incoming and outgoing RPCs
           # are rejected) and will not be able to publish or gossip any messages.
-          max-app-specific-penalty: -100
-          min-app-specific-penalty: -1
+          max-app-specific: -100
+          min-app-specific: -1
           # This is the penalty for unknown identity. It is
           # applied to the peer's score when the peer is not in the identity list.
-          unknown-identity-penalty: -100
+          unknown-identity: -100
           # This is the penalty for invalid subscription.
           # It is applied to the peer's score when the peer subscribes to a topic that it is
           # not authorized to subscribe to.
-          invalid-subscription-penalty: -100
+          invalid-subscription: -100
         rewards:
           # This is the reward for well-behaving staked peers.
           # If a peer does not have any misbehavior record, e.g., invalid subscription,
           # invalid message, etc., it will be rewarded with this score.
-          max-app-specific-reward: 100
+          max-app-specific: 100
           # This is the reward for staking peers. It is applied
           # to the peer's score when the peer does not have any misbehavior record, e.g.,
           # invalid subscription, invalid message, etc. The purpose is to reward the staking
           # peers for their contribution to the network and prioritize them in neighbor selection.
-          staked-identity-reward: 100
+          staked-identity: 100
         thresholds:
           # This is the threshold when a peer's penalty drops below this threshold, no gossip
           # is emitted towards that peer and gossip from that peer is ignored.

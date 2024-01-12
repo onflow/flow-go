@@ -32,16 +32,16 @@ type InternalPeerScoring struct {
 	DecayToZero     float64                    `validate:"required" mapstructure:"decay-to-zero"`
 	Penalties       ScoreOptionPenalties       `validate:"required" mapstructure:"penalties"`
 	Rewards         ScoreOptionRewards         `validate:"required" mapstructure:"rewards"`
-	Thresholds      ScoreOptionThresholds      `validate:"required" mapstructure:"thresholds"`
-	Behaviour       ScoreOptionBehaviour       `validate:"required" mapstructure:"behaviour"`
+	Thresholds      InternalScoringThresholds  `validate:"required" mapstructure:"thresholds"`
+	Behaviour       InternalScoringBehavioural `validate:"required" mapstructure:"behaviour"`
 	TopicValidation ScoreOptionTopicValidation `validate:"required" mapstructure:"topic"`
 }
 
 const (
-	MaxAppSpecificPenaltyKey      = "max-app-specific-penalty"
-	MinAppSpecificPenaltyKey      = "min-app-specific-penalty"
-	UnknownIdentityPenaltyKey     = "unknown-identity-penalty"
-	InvalidSubscriptionPenaltyKey = "invalid-subscription-penalty"
+	MaxAppSpecificPenaltyKey      = "max-app-specific"
+	MinAppSpecificPenaltyKey      = "min-app-specific"
+	UnknownIdentityPenaltyKey     = "unknown-identity"
+	InvalidSubscriptionPenaltyKey = "invalid-subscription"
 )
 
 // ScoreOptionPenalties score option penalty configuration parameters.
@@ -49,31 +49,31 @@ type ScoreOptionPenalties struct {
 	// MaxAppSpecificPenalty the maximum penalty for sever offenses that we apply to a remote node score. The score
 	// mechanism of GossipSub in Flow is designed in a way that all other infractions are penalized with a fraction of
 	// this value.
-	MaxAppSpecificPenalty float64 `validate:"lt=0" mapstructure:"max-app-specific-penalty"`
+	MaxAppSpecificPenalty float64 `validate:"lt=0" mapstructure:"max-app-specific"`
 	// MinAppSpecificPenalty the minimum penalty for sever offenses that we apply to a remote node score.
-	MinAppSpecificPenalty float64 `validate:"lt=0" mapstructure:"min-app-specific-penalty"`
+	MinAppSpecificPenalty float64 `validate:"lt=0" mapstructure:"min-app-specific"`
 	// UnknownIdentityPenalty is the  penalty for unknown identity. It is applied to the peer's score when
 	// the peer is not in the identity list.
-	UnknownIdentityPenalty float64 `validate:"lt=0" mapstructure:"unknown-identity-penalty"`
+	UnknownIdentityPenalty float64 `validate:"lt=0" mapstructure:"unknown-identity"`
 	// InvalidSubscriptionPenalty is the  penalty for invalid subscription. It is applied to the peer's score when
 	// the peer subscribes to a topic that it is not authorized to subscribe to.
-	InvalidSubscriptionPenalty float64 `validate:"lt=0" mapstructure:"invalid-subscription-penalty"`
+	InvalidSubscriptionPenalty float64 `validate:"lt=0" mapstructure:"invalid-subscription"`
 }
 
 const (
-	MaxAppSpecificRewardKey = "max-app-specific-reward"
-	StakedIdentityRewardKey = "staked-identity-reward"
+	MaxAppSpecificRewardKey = "max-app-specific"
+	StakedIdentityRewardKey = "staked-identity"
 )
 
 // ScoreOptionRewards score option rewards configuration parameters.
 type ScoreOptionRewards struct {
 	// MaxAppSpecificReward is the  reward for well-behaving staked peers. If a peer does not have
 	// any misbehavior record, e.g., invalid subscription, invalid message, etc., it will be rewarded with this score.
-	MaxAppSpecificReward float64 `validate:"gt=0" mapstructure:"max-app-specific-reward"`
+	MaxAppSpecificReward float64 `validate:"gt=0" mapstructure:"max-app-specific"`
 	// StakedIdentityReward is the  reward for staking peers. It is applied to the peer's score when
 	// the peer does not have any misbehavior record, e.g., invalid subscription, invalid message, etc.
 	// The purpose is to reward the staking peers for their contribution to the network and prioritize them in neighbor selection.
-	StakedIdentityReward float64 `validate:"gt=0" mapstructure:"staked-identity-reward"`
+	StakedIdentityReward float64 `validate:"gt=0" mapstructure:"staked-identity"`
 }
 
 const (
@@ -84,8 +84,8 @@ const (
 	OpportunisticGraftThresholdKey = "opportunistic-graft"
 )
 
-// ScoreOptionThresholds score option threshold configuration parameters.
-type ScoreOptionThresholds struct {
+// InternalScoringThresholds score option threshold configuration parameters.
+type InternalScoringThresholds struct {
 	// Gossip when a peer's penalty drops below this threshold,
 	// no gossip is emitted towards that peer and gossip from that peer is ignored.
 	Gossip float64 `validate:"lt=0" mapstructure:"gossip"`
@@ -109,8 +109,8 @@ const (
 	BehaviourPenaltyDecayKey     = "penalty-decay"
 )
 
-// ScoreOptionBehaviour score option behaviour configuration parameters.
-type ScoreOptionBehaviour struct {
+// InternalScoringBehavioural score option behaviour configuration parameters.
+type InternalScoringBehavioural struct {
 	// PenaltyThreshold is the threshold when the behavior of a peer is considered as bad by GossipSub.
 	// Currently, the misbehavior is defined as advertising an iHave without responding to the iWants (iHave broken promises), as well as attempting
 	// on GRAFT when the peer is considered for a PRUNE backoff, i.e., the local peer does not allow the peer to join the local topic mesh
