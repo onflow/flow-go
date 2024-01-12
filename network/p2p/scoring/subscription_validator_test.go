@@ -171,7 +171,7 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 	require.NoError(t, err)
 	// set a low update interval to speed up the test
 	cfg.NetworkConfig.GossipSub.SubscriptionProvider.UpdateInterval = 10 * time.Millisecond
-	cfg.NetworkConfig.GossipSub.ScoringParameters.AppSpecificScore.ScoreTTL = 10 * time.Millisecond
+	cfg.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.AppSpecificScore.ScoreTTL = 10 * time.Millisecond
 
 	sporkId := unittest.IdentifierFixture()
 

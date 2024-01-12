@@ -3,77 +3,92 @@ package p2pconfig
 import "time"
 
 const (
-	ScoreOptionKey              = "internal-peer-scoring"
-	AppScoreWeightKey           = "app-specific-score-weight"
-	MaxDebugLogsKey             = "max-debug-logs"
-	ScoreOptionDecayIntervalKey = "decay-interval"
-	ScoreOptionDecayToZeroKey   = "decay-to-zero"
-	ScoreOptionPenaltiesKey     = "penalties"
-	ScoreOptionRewardsKey       = "rewards"
-	ScoreOptionThresholdsKey    = "thresholds"
-	ScoreOptionBehaviourKey     = "behaviour"
-	ScoreOptionTopicKey         = "topic"
+	PeerScoringKey = "peer-scoring"
+	InternalKey    = "internal"
+	ProtocolKey    = "protocol"
 )
 
-// InternalPeerScoring gossipsub scoring option configuration parameters.
-type InternalPeerScoring struct {
+// PeerScoringParameters encapsulates the parameters of the GossipSub scoring system.
+type PeerScoringParameters struct {
+	// Internal is the internal parameters of the GossipSub scoring system that are hosted by
+	// the GossipSub system, and are not exposed to the Flow protocol.
+	// The internal parameters are hosted by the GossipSub system.
+	Internal InternalGossipSubScoreParams `validate:"required" mapstructure:"internal"`
+	// Protocol is the protocol parameters of the peer scoring system that is hosted by the Flow protocol.
+	Protocol ProtocolLevelGossipSubScoreParams `validate:"required" mapstructure:"protocol"`
+}
+
+const (
+	AppSpecificScoreWeightKey = "app-specific-score-weight"
+	DecayToZeroKey            = "decay-to-zero"
+	ThresholdsKey             = "thresholds"
+	BehaviourKey              = "behaviour"
+	TopicKey                  = "topic"
+)
+
+type InternalGossipSubScoreParams struct {
 	// AppSpecificScoreWeight is the  weight for app-specific scores. It is used to scale the app-specific
-	// scores to the same range as the other scores.
+	// scores to the same range as the other scores. At the current version, we don't distinguish between the app-specific
+	// scores and the other scores, so we set it to 1.
 	AppSpecificScoreWeight float64 `validate:"gt=0,lte=1" mapstructure:"app-specific-score-weight"`
-	// MaxDebugLogs sets the max number of debug/trace log events per second. Logs emitted above
-	// this threshold are dropped.
-	MaxDebugLogs uint32 `validate:"lte=50" mapstructure:"max-debug-logs"`
 	// DecayInterval is the  decay interval for the overall score of a peer at the GossipSub scoring
-	// system.
+	// system. We set it to 1 minute so that it is not too short so that a malicious node can recover from a penalty
+	// and is not too long so that a well-behaved node can't recover from a penalty.
 	DecayInterval time.Duration `validate:"gte=1m" mapstructure:"decay-interval"`
 	// DecayToZero is the  decay to zero for the overall score of a peer at the GossipSub scoring system.
 	// It defines the maximum value below which a peer scoring counter is reset to zero.
 	// This is to prevent the counter from decaying to a very small value.
+	// The  value is 0.01, which means that a counter will be reset to zero if it decays to 0.01.
+	// When a counter hits the DecayToZero threshold, it means that the peer did not exhibit the behavior
+	// for a long time, and we can reset the counter.
 	DecayToZero     float64                    `validate:"required" mapstructure:"decay-to-zero"`
-	Penalties       ScoreOptionPenalties       `validate:"required" mapstructure:"penalties"`
-	Rewards         ScoreOptionRewards         `validate:"required" mapstructure:"rewards"`
+	TopicParameters TopicScoringParameters     `validate:"required" mapstructure:"topic"`
 	Thresholds      InternalScoringThresholds  `validate:"required" mapstructure:"thresholds"`
 	Behaviour       InternalScoringBehavioural `validate:"required" mapstructure:"behaviour"`
-	TopicValidation ScoreOptionTopicValidation `validate:"required" mapstructure:"topic"`
 }
 
 const (
-	MaxAppSpecificPenaltyKey      = "max-app-specific"
-	MinAppSpecificPenaltyKey      = "min-app-specific"
-	UnknownIdentityPenaltyKey     = "unknown-identity"
-	InvalidSubscriptionPenaltyKey = "invalid-subscription"
+	MaxDebugLogsKey = "max-debug-logs"
+	AppSpecificKey  = "application-specific"
 )
 
-// ScoreOptionPenalties score option penalty configuration parameters.
-type ScoreOptionPenalties struct {
+type ProtocolLevelGossipSubScoreParams struct {
+	MaxDebugLogs     uint32                             `validate:"lte=50" mapstructure:"max-debug-logs"`
+	AppSpecificScore ApplicationSpecificScoreParameters `validate:"required" mapstructure:"application-specific"`
+}
+
+const (
+	MaxAppSpecificKey      = "max-app-specific"
+	MinAppSpecificKey      = "min-app-specific"
+	UnknownIdentityKey     = "unknown-identity"
+	InvalidSubscriptionKey = "invalid-subscription"
+	StakedIdentityKey      = "staked-identity"
+	RewardKey              = "reward"
+	PenaltyKey             = "penalty"
+)
+
+type ApplicationSpecificScoreParameters struct {
 	// MaxAppSpecificPenalty the maximum penalty for sever offenses that we apply to a remote node score. The score
 	// mechanism of GossipSub in Flow is designed in a way that all other infractions are penalized with a fraction of
-	// this value.
-	MaxAppSpecificPenalty float64 `validate:"lt=0" mapstructure:"max-app-specific"`
+	// this value. We have also set the other parameters such as DefaultGraylistThreshold, DefaultGossipThreshold and DefaultPublishThreshold to
+	// be a bit higher than this, i.e., MaxAppSpecificPenalty + 1. This ensures that a node with a score of MaxAppSpecificPenalty
+	// will be graylisted (i.e., all incoming and outgoing RPCs are rejected) and will not be able to publish or gossip any messages.
+	MaxAppSpecificPenalty float64 `validate:"lt=0" mapstructure:"max-app-specific-penalty"`
 	// MinAppSpecificPenalty the minimum penalty for sever offenses that we apply to a remote node score.
-	MinAppSpecificPenalty float64 `validate:"lt=0" mapstructure:"min-app-specific"`
+	MinAppSpecificPenalty float64 `validate:"lt=0" mapstructure:"min-app-specific-penalty"`
 	// UnknownIdentityPenalty is the  penalty for unknown identity. It is applied to the peer's score when
 	// the peer is not in the identity list.
-	UnknownIdentityPenalty float64 `validate:"lt=0" mapstructure:"unknown-identity"`
+	UnknownIdentityPenalty float64 `validate:"lt=0" mapstructure:"unknown-identity-penalty"`
 	// InvalidSubscriptionPenalty is the  penalty for invalid subscription. It is applied to the peer's score when
 	// the peer subscribes to a topic that it is not authorized to subscribe to.
-	InvalidSubscriptionPenalty float64 `validate:"lt=0" mapstructure:"invalid-subscription"`
-}
-
-const (
-	MaxAppSpecificRewardKey = "max-app-specific"
-	StakedIdentityRewardKey = "staked-identity"
-)
-
-// ScoreOptionRewards score option rewards configuration parameters.
-type ScoreOptionRewards struct {
+	InvalidSubscriptionPenalty float64 `validate:"lt=0" mapstructure:"invalid-subscription-penalty"`
 	// MaxAppSpecificReward is the  reward for well-behaving staked peers. If a peer does not have
 	// any misbehavior record, e.g., invalid subscription, invalid message, etc., it will be rewarded with this score.
-	MaxAppSpecificReward float64 `validate:"gt=0" mapstructure:"max-app-specific"`
+	MaxAppSpecificReward float64 `validate:"gt=0" mapstructure:"max-app-specific-reward"`
 	// StakedIdentityReward is the  reward for staking peers. It is applied to the peer's score when
 	// the peer does not have any misbehavior record, e.g., invalid subscription, invalid message, etc.
 	// The purpose is to reward the staking peers for their contribution to the network and prioritize them in neighbor selection.
-	StakedIdentityReward float64 `validate:"gt=0" mapstructure:"staked-identity"`
+	StakedIdentityReward float64 `validate:"gt=0" mapstructure:"staked-identity-reward"`
 }
 
 const (
@@ -166,8 +181,8 @@ const (
 	MeshMessageDeliveryActivationKey  = "mesh-message-delivery-activation"
 )
 
-// ScoreOptionTopicValidation score option topic validation configuration parameters.
-type ScoreOptionTopicValidation struct {
+// TopicScoringParameters score option topic validation configuration parameters.
+type TopicScoringParameters struct {
 	// SkipAtomicValidation is the  value for the skip atomic validation flag for topics.
 	// If set it to true, the gossipsub parameter validation will not fail if we leave some of the
 	// topic parameters at their  values, i.e., zero.

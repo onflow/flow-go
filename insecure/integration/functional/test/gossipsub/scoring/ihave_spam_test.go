@@ -64,7 +64,7 @@ func TestGossipSubIHaveBrokenPromises_Below_Threshold(t *testing.T) {
 	conf, err := config.DefaultConfig()
 	require.NoError(t, err)
 	// we override the decay interval to 1 second so that the score is updated within 1 second intervals.
-	conf.NetworkConfig.GossipSub.ScoringParameters.DecayInterval = 1 * time.Second
+	conf.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Internal.DecayInterval = 1 * time.Second
 	// score tracer interval is set to 500 milliseconds to speed up the test, it should be shorter than the heartbeat interval (1 second) of gossipsub to catch the score updates in time.
 	conf.NetworkConfig.GossipSub.RpcTracer.ScoreTracerInterval = 500 * time.Millisecond
 	victimNode, victimIdentity := p2ptest.NodeFixture(
@@ -133,21 +133,21 @@ func TestGossipSubIHaveBrokenPromises_Below_Threshold(t *testing.T) {
 	// since spammer is not yet considered to be penalized, its score must be greater than the gossipsub health thresholds.
 	require.Greaterf(t,
 		spammerScore,
-		scoreParams.InternalPeerScoring.Thresholds.Gossip,
+		scoreParams.PeerScoring.Internal.Thresholds.Gossip,
 		"sanity check failed, the score of the spammer node must be greater than gossip threshold: %f, actual: %f",
-		scoreParams.InternalPeerScoring.Thresholds.Gossip,
+		scoreParams.PeerScoring.Internal.Thresholds.Gossip,
 		spammerScore)
 	require.Greaterf(t,
 		spammerScore,
-		scoreParams.InternalPeerScoring.Thresholds.Publish,
+		scoreParams.PeerScoring.Internal.Thresholds.Publish,
 		"sanity check failed, the score of the spammer node must be greater than publish threshold: %f, actual: %f",
-		scoreParams.InternalPeerScoring.Thresholds.Publish,
+		scoreParams.PeerScoring.Internal.Thresholds.Publish,
 		spammerScore)
 	require.Greaterf(t,
 		spammerScore,
-		scoreParams.InternalPeerScoring.Thresholds.Graylist,
+		scoreParams.PeerScoring.Internal.Thresholds.Graylist,
 		"sanity check failed, the score of the spammer node must be greater than graylist threshold: %f, actual: %f",
-		scoreParams.InternalPeerScoring.Thresholds.Graylist,
+		scoreParams.PeerScoring.Internal.Thresholds.Graylist,
 		spammerScore)
 
 	// eventually, after a heartbeat the spammer behavioral counter must be decayed
@@ -316,27 +316,27 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 	// we expect the score to be dropped to initScore - 10 * 10 * 0.01 * scoring.MaxAppSpecificReward, however, instead of 10, we consider 5 about the threshold, to account for decays.
 	require.LessOrEqual(t,
 		spammerScore,
-		initScore-5*5*0.01*scoreParams.InternalPeerScoring.Rewards.MaxAppSpecificReward,
+		initScore-5*5*0.01*scoreParams.PeerScoring.Protocol.AppSpecificScore.MaxAppSpecificReward,
 		"sanity check failed, the score of the spammer node must be less than the initial score minus 8 * 8 * 0.01 * scoring.MaxAppSpecificReward: %f, actual: %f",
-		initScore-5*5*0.1*scoreParams.InternalPeerScoring.Rewards.MaxAppSpecificReward,
+		initScore-5*5*0.1*scoreParams.PeerScoring.Protocol.AppSpecificScore.MaxAppSpecificReward,
 		spammerScore)
 	require.Greaterf(t,
 		spammerScore,
-		scoreParams.InternalPeerScoring.Thresholds.Gossip,
+		scoreParams.PeerScoring.Internal.Thresholds.Gossip,
 		"sanity check failed, the score of the spammer node must be greater than gossip threshold: %f, actual: %f",
-		scoreParams.InternalPeerScoring.Thresholds.Gossip,
+		scoreParams.PeerScoring.Internal.Thresholds.Gossip,
 		spammerScore)
 	require.Greaterf(t,
 		spammerScore,
-		scoreParams.InternalPeerScoring.Thresholds.Publish,
+		scoreParams.PeerScoring.Internal.Thresholds.Publish,
 		"sanity check failed, the score of the spammer node must be greater than publish threshold: %f, actual: %f",
-		scoreParams.InternalPeerScoring.Thresholds.Publish,
+		scoreParams.PeerScoring.Internal.Thresholds.Publish,
 		spammerScore)
 	require.Greaterf(t,
 		spammerScore,
-		scoreParams.InternalPeerScoring.Thresholds.Graylist,
+		scoreParams.PeerScoring.Internal.Thresholds.Graylist,
 		"sanity check failed, the score of the spammer node must be greater than graylist threshold: %f, actual: %f",
-		scoreParams.InternalPeerScoring.Thresholds.Graylist,
+		scoreParams.PeerScoring.Internal.Thresholds.Graylist,
 		spammerScore)
 
 	// since the spammer score is above the gossip, graylist and publish thresholds, it should be still able to exchange messages with victim.
@@ -371,21 +371,21 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 	// victim will not exchange messages with it anymore, and also that it will be graylisted meaning all incoming and outgoing RPCs to and from the spammer will be dropped by the victim.
 	require.Lessf(t,
 		spammerScore,
-		scoreParams.InternalPeerScoring.Thresholds.Gossip,
+		scoreParams.PeerScoring.Internal.Thresholds.Gossip,
 		"sanity check failed, the score of the spammer node must be less than gossip threshold: %f, actual: %f",
-		scoreParams.InternalPeerScoring.Thresholds.Gossip,
+		scoreParams.PeerScoring.Internal.Thresholds.Gossip,
 		spammerScore)
 	require.Lessf(t,
 		spammerScore,
-		scoreParams.InternalPeerScoring.Thresholds.Publish,
+		scoreParams.PeerScoring.Internal.Thresholds.Publish,
 		"sanity check failed, the score of the spammer node must be less than publish threshold: %f, actual: %f",
-		scoreParams.InternalPeerScoring.Thresholds.Publish,
+		scoreParams.PeerScoring.Internal.Thresholds.Publish,
 		spammerScore)
 	require.Lessf(t,
 		spammerScore,
-		scoreParams.InternalPeerScoring.Thresholds.Graylist,
+		scoreParams.PeerScoring.Internal.Thresholds.Graylist,
 		"sanity check failed, the score of the spammer node must be less than graylist threshold: %f, actual: %f",
-		scoreParams.InternalPeerScoring.Thresholds.Graylist,
+		scoreParams.PeerScoring.Internal.Thresholds.Graylist,
 		spammerScore)
 
 	// since the spammer score is below the gossip, graylist and publish thresholds, it should not be able to exchange messages with victim anymore.
