@@ -25,12 +25,11 @@ func newMigratorRuntime(
 	payloads []*ledger.Payload,
 ) (
 	*migratorRuntime,
-	environment.Accounts,
 	error,
 ) {
 	snapshot, err := util.NewPayloadSnapshot(payloads)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create payload snapshot: %w", err)
+		return nil, fmt.Errorf("failed to create payload snapshot: %w", err)
 	}
 	transactionState := state.NewTransactionState(snapshot, state.DefaultParameters())
 	accounts := environment.NewAccounts(transactionState)
@@ -66,7 +65,7 @@ func newMigratorRuntime(
 		nil,
 		env.InterpreterConfig)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	return &migratorRuntime{
@@ -76,8 +75,9 @@ func newMigratorRuntime(
 		TransactionState: transactionState,
 		Interpreter:      inter,
 		Storage:          storage,
-		Accounts:         accountsAtreeLedger,
-	}, accounts, nil
+		AccountsLedger:   accountsAtreeLedger,
+		Accounts:         accounts,
+	}, nil
 }
 
 type migratorRuntime struct {
@@ -87,7 +87,8 @@ type migratorRuntime struct {
 	Storage          *runtime.Storage
 	Payloads         []*ledger.Payload
 	Address          common.Address
-	Accounts         *util.AccountsAtreeLedger
+	AccountsLedger   *util.AccountsAtreeLedger
+	Accounts         environment.Accounts
 }
 
 func (mr *migratorRuntime) GetReadOnlyStorage() *runtime.Storage {
@@ -140,11 +141,11 @@ func (mr *migratorRuntime) ChildInterpreters(log zerolog.Logger, n int, address 
 			mu.Lock()
 			defer mu.Unlock()
 
-			return mr.Accounts.AllocateStorageIndex(owner)
+			return mr.AccountsLedger.AllocateStorageIndex(owner)
 
 		}
 		ledger.SetValueFunc = func(owner, key, value []byte) (err error) {
-			return mr.Accounts.SetValue(owner, key, value)
+			return mr.AccountsLedger.SetValue(owner, key, value)
 		}
 
 		storage := runtime.NewStorage(ledger, util.NopMemoryGauge{})

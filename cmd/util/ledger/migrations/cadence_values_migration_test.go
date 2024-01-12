@@ -63,7 +63,7 @@ func TestCadenceValuesMigration(t *testing.T) {
 
 	// Assert the migrated payloads
 
-	mr, _, err := newMigratorRuntime(address, newPayloads)
+	mr, err := newMigratorRuntime(address, newPayloads)
 	require.NoError(t, err)
 
 	storageMap := mr.Storage.GetStorageMap(address, common.PathDomainStorage.Identifier(), false)

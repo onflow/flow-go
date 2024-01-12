@@ -58,7 +58,7 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 ) ([]*ledger.Payload, error) {
 
 	// Create all the runtime components we need for the migration
-	migrationRuntime, accounts, err := newMigratorRuntime(address, oldPayloads)
+	migrationRuntime, err := newMigratorRuntime(address, oldPayloads)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create migrator runtime: %w", err)
 	}
@@ -80,7 +80,7 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 		},
 		migration.NewValueMigrationsPathMigrator(
 			reporter,
-			m.valueMigrations(accounts, reporter)...,
+			m.valueMigrations(migrationRuntime.Accounts, reporter)...,
 		),
 	)
 
