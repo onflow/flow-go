@@ -76,8 +76,13 @@ type BootstrapParams struct {
 	minimumStorageReservation        cadence.UFix64
 	storagePerFlow                   cadence.UFix64
 	restrictedAccountCreationEnabled cadence.Bool
-	setupEVMEnabled                  cadence.Bool
-	evmAbiOnly                       cadence.Bool
+
+	// `setupEVMEnabled` == true && `evmAbiOnly` == true will enable the ABI-only EVM
+	// `setupEVMEnabled` == true && `evmAbiOnly` == false will enable the full EVM functionality
+	// `setupEVMEnabled` == false will disable EVM
+	// This will allow to quickly disable the ABI-only EVM, in case there's a bug or something.
+	setupEVMEnabled cadence.Bool
+	evmAbiOnly      cadence.Bool
 
 	// versionFreezePeriod is the number of blocks in the future where the version
 	// changes are frozen. The Node version beacon manages the freeze period,
