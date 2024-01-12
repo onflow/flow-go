@@ -338,6 +338,16 @@ func (v *BaseView) Commit() error {
 	return nil
 }
 
+// NumberOfContracts returns the number of unique contracts
+func (v *BaseView) NumberOfContracts() uint64 {
+	return v.codes.Size()
+}
+
+// NumberOfContracts returns the number of accounts
+func (v *BaseView) NumberOfAccounts() uint64 {
+	return v.accounts.Size()
+}
+
 func (v *BaseView) fetchOrCreateCollection(path string) (collection *Collection, created bool, error error) {
 	collectionID, err := v.ledger.GetValue(v.rootAddress[:], []byte(path))
 	if err != nil {
