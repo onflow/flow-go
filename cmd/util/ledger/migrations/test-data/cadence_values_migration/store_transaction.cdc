@@ -30,6 +30,23 @@ transaction {
     var cap = acct.link<&Test.R>(/public/linkR, target: /storage/r)
     acct.save(cap, to: /storage/capability)
 
+    // account-typed keys in dictionary
+    acct.save(
+      {
+        Type<AuthAccount>(): 1,
+        Type<AuthAccount.Capabilities>(): 2,
+        Type<AuthAccount.AccountCapabilities>(): 3,
+        Type<AuthAccount.StorageCapabilities>(): 4,
+        Type<AuthAccount.Contracts>(): 5,
+        Type<AuthAccount.Keys>(): 6,
+        Type<AuthAccount.Inbox>(): 7,
+
+        Type<PublicAccount>(): 8,
+
+        Type<AccountKey>(): 9
+      },
+      to: /storage/dictionary_with_account_type_keys,
+    )
   }
 
   execute {

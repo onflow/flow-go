@@ -68,11 +68,12 @@ func TestCadenceValuesMigration(t *testing.T) {
 
 	storageMap := mr.Storage.GetStorageMap(address, common.PathDomainStorage.Identifier(), false)
 	require.NotNil(t, storageMap)
-	require.Equal(t, 8, int(storageMap.Count()))
+	require.Equal(t, 9, int(storageMap.Count()))
 
 	iterator := storageMap.Iterator(mr.Interpreter)
 
 	fullyEntitledAccountReferenceType := interpreter.ConvertSemaToStaticType(nil, sema.FullyEntitledAccountReferenceType)
+	accountReferenceType := interpreter.ConvertSemaToStaticType(nil, sema.AccountReferenceType)
 
 	var values []interpreter.Value
 	for key, value := iterator.Next(); key != nil; key, value = iterator.Next() {
@@ -173,7 +174,7 @@ func TestCadenceValuesMigration(t *testing.T) {
 			common.CompositeKindResource,
 			[]interpreter.CompositeField{
 				{
-					Value: interpreter.NewUnmeteredUInt64Value(4179340454199820288),
+					Value: interpreter.NewUnmeteredUInt64Value(360287970189639680),
 					Name:  "uuid",
 				},
 			},
@@ -186,6 +187,34 @@ func TestCadenceValuesMigration(t *testing.T) {
 				interpreter.NewAddressValue(nil, address),
 				interpreter.NewReferenceStaticType(nil, interpreter.UnauthorizedAccess, rResourceType),
 			),
+		),
+
+		interpreter.NewDictionaryValue(
+			mr.Interpreter,
+			interpreter.EmptyLocationRange,
+			interpreter.NewDictionaryStaticType(
+				nil,
+				interpreter.PrimitiveStaticTypeMetaType,
+				interpreter.PrimitiveStaticTypeInt,
+			),
+			interpreter.NewUnmeteredTypeValue(fullyEntitledAccountReferenceType),
+			interpreter.NewUnmeteredIntValueFromInt64(1),
+			interpreter.NewUnmeteredTypeValue(interpreter.PrimitiveStaticTypeAccount_Capabilities),
+			interpreter.NewUnmeteredIntValueFromInt64(2),
+			interpreter.NewUnmeteredTypeValue(interpreter.PrimitiveStaticTypeAccount_AccountCapabilities),
+			interpreter.NewUnmeteredIntValueFromInt64(3),
+			interpreter.NewUnmeteredTypeValue(interpreter.PrimitiveStaticTypeAccount_StorageCapabilities),
+			interpreter.NewUnmeteredIntValueFromInt64(4),
+			interpreter.NewUnmeteredTypeValue(interpreter.PrimitiveStaticTypeAccount_Contracts),
+			interpreter.NewUnmeteredIntValueFromInt64(5),
+			interpreter.NewUnmeteredTypeValue(interpreter.PrimitiveStaticTypeAccount_Keys),
+			interpreter.NewUnmeteredIntValueFromInt64(6),
+			interpreter.NewUnmeteredTypeValue(interpreter.PrimitiveStaticTypeAccount_Inbox),
+			interpreter.NewUnmeteredIntValueFromInt64(7),
+			interpreter.NewUnmeteredTypeValue(accountReferenceType),
+			interpreter.NewUnmeteredIntValueFromInt64(8),
+			interpreter.NewUnmeteredTypeValue(interpreter.AccountKeyStaticType),
+			interpreter.NewUnmeteredIntValueFromInt64(9),
 		),
 	}
 
@@ -215,6 +244,17 @@ func TestCadenceValuesMigration(t *testing.T) {
 	// Check reporters
 
 	reportWriter := valueMigration.reporter.(*testReportWriter)
+
+	acctTypedDictKeyMigrationReportEntry := cadenceValueMigrationReportEntry{
+		Address: interpreter.AddressPath{
+			Address: address,
+			Path: interpreter.PathValue{
+				Identifier: "dictionary_with_account_type_keys",
+				Domain:     common.PathDomainStorage,
+			},
+		},
+		Migration: "AccountTypeMigration",
+	}
 
 	// Order is non-deterministic, so use 'ElementsMatch'.
 	assert.ElementsMatch(
@@ -309,6 +349,15 @@ func TestCadenceValuesMigration(t *testing.T) {
 				},
 				BorrowType: interpreter.NewReferenceStaticType(nil, interpreter.UnauthorizedAccess, rResourceType),
 			},
+			acctTypedDictKeyMigrationReportEntry,
+			acctTypedDictKeyMigrationReportEntry,
+			acctTypedDictKeyMigrationReportEntry,
+			acctTypedDictKeyMigrationReportEntry,
+			acctTypedDictKeyMigrationReportEntry,
+			acctTypedDictKeyMigrationReportEntry,
+			acctTypedDictKeyMigrationReportEntry,
+			acctTypedDictKeyMigrationReportEntry,
+			acctTypedDictKeyMigrationReportEntry,
 		},
 	)
 
