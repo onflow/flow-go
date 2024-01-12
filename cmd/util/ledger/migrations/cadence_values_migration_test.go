@@ -17,11 +17,13 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/sema"
+
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
+	"github.com/onflow/flow-go/ledger"
 )
 
-const snapshotPath = "test-data/cadence_values_migration/snapshot"
+const snapshotPath = "test-data/cadence_values_migration/snapshot_cadence_v0.42.6"
 
 const testAccountAddress = "01cf0e2f2f715450"
 
@@ -41,11 +43,15 @@ func TestCadenceValuesMigration(t *testing.T) {
 
 	rwf := &testReportWriterFactory{}
 	capabilityIDs := map[interpreter.AddressPath]interpreter.UInt64Value{}
+
+	// Run link values migration
+	payloads = runLinkMigration(t, address, payloads, capabilityIDs, rwf)
+
+	// Run remaining migrations
 	valueMigration := NewCadenceValueMigrator(rwf, capabilityIDs)
 
 	buf := bytes.Buffer{}
 	logger := zerolog.New(&buf).Level(zerolog.ErrorLevel)
-
 	err = valueMigration.InitMigration(logger, nil, 0)
 	require.NoError(t, err)
 
@@ -62,7 +68,7 @@ func TestCadenceValuesMigration(t *testing.T) {
 
 	storageMap := mr.Storage.GetStorageMap(address, common.PathDomainStorage.Identifier(), false)
 	require.NotNil(t, storageMap)
-	require.Equal(t, 6, int(storageMap.Count()))
+	require.Equal(t, 8, int(storageMap.Count()))
 
 	iterator := storageMap.Iterator(mr.Interpreter)
 
@@ -70,8 +76,8 @@ func TestCadenceValuesMigration(t *testing.T) {
 
 	var values []interpreter.Value
 	for key, value := iterator.Next(); key != nil; key, value = iterator.Next() {
-		// skip composite values. e.g: FlowToken etc.
-		if _, isComposite := value.(*interpreter.CompositeValue); isComposite {
+		identifier := string(key.(interpreter.StringAtreeValue))
+		if identifier == "flowTokenVault" || identifier == "flowTokenReceiver" {
 			continue
 		}
 		values = append(values, value)
@@ -101,6 +107,12 @@ func TestCadenceValuesMigration(t *testing.T) {
 		"Test.Baz",
 	)
 
+	rResourceType := interpreter.NewCompositeStaticTypeComputeTypeID(
+		nil,
+		testContractLocation,
+		"Test.R",
+	)
+
 	expectedValues := []interpreter.Value{
 		// Both string values should be in the normalized form.
 		interpreter.NewUnmeteredStringValue("Caf\u00E9"),
@@ -118,7 +130,7 @@ func TestCadenceValuesMigration(t *testing.T) {
 			),
 			interpreter.NewUnmeteredStringValue("Caf\u00E9"),
 			interpreter.NewUnmeteredIntValueFromInt64(1),
-			interpreter.NewUnmeteredStringValue("He\u00E9llo"),
+			interpreter.NewUnmeteredStringValue("H\u00E9llo"),
 			interpreter.NewUnmeteredIntValueFromInt64(2),
 		),
 
@@ -151,6 +163,29 @@ func TestCadenceValuesMigration(t *testing.T) {
 				},
 			),
 			interpreter.NewUnmeteredIntValueFromInt64(2),
+		),
+
+		interpreter.NewCompositeValue(
+			mr.Interpreter,
+			interpreter.EmptyLocationRange,
+			testContractLocation,
+			"Test.R",
+			common.CompositeKindResource,
+			[]interpreter.CompositeField{
+				{
+					Value: interpreter.NewUnmeteredUInt64Value(4179340454199820288),
+					Name:  "uuid",
+				},
+			},
+			address,
+		),
+
+		interpreter.NewUnmeteredSomeValueNonCopying(
+			interpreter.NewUnmeteredCapabilityValue(
+				interpreter.NewUnmeteredUInt64Value(1),
+				interpreter.NewAddressValue(nil, address),
+				interpreter.NewReferenceStaticType(nil, interpreter.UnauthorizedAccess, rResourceType),
+			),
 		),
 	}
 
@@ -256,6 +291,24 @@ func TestCadenceValuesMigration(t *testing.T) {
 				},
 				Migration: "TypeValueMigration",
 			},
+			cadenceValueMigrationReportEntry{
+				Address: interpreter.AddressPath{
+					Address: address,
+					Path: interpreter.PathValue{
+						Identifier: "capability",
+						Domain:     common.PathDomainStorage,
+					},
+				},
+				Migration: "CapabilityValueMigration",
+			},
+			capConsPathCapabilityMigration{
+				AccountAddress: address,
+				AddressPath: interpreter.AddressPath{
+					Address: address,
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainPublic, "linkR"),
+				},
+				BorrowType: interpreter.NewReferenceStaticType(nil, interpreter.UnauthorizedAccess, rResourceType),
+			},
 		},
 	)
 
@@ -263,43 +316,56 @@ func TestCadenceValuesMigration(t *testing.T) {
 	assert.Equal(t, 0, buf.Len())
 }
 
-func TestLinkValueMigrationTypeErrors(t *testing.T) {
+func runLinkMigration(
+	t *testing.T,
+	address common.Address,
+	payloads []*ledger.Payload,
+	capabilityIDs map[interpreter.AddressPath]interpreter.UInt64Value,
+	rwf *testReportWriterFactory,
+) []*ledger.Payload {
+	linkValueMigration := NewCadenceLinkValueMigrator(rwf, capabilityIDs)
 
-	t.Parallel()
+	linkMigrationBuf := bytes.Buffer{}
+	linkMigrationLogger := zerolog.New(&linkMigrationBuf).Level(zerolog.ErrorLevel)
 
-	address, err := common.HexToAddress(testAccountAddress)
+	err := linkValueMigration.InitMigration(linkMigrationLogger, nil, 0)
 	require.NoError(t, err)
 
-	// Get the old payloads
-
-	payloads, err := util.PayloadsFromEmulatorSnapshot(snapshotPath)
+	payloads, err = linkValueMigration.MigrateAccount(nil, address, payloads)
 	require.NoError(t, err)
 
-	// Migrate
+	linkMigrationReportWriter := linkValueMigration.reporter.(*testReportWriter)
 
-	rwf := &testReportWriterFactory{}
-	capabilityIDs := map[interpreter.AddressPath]interpreter.UInt64Value{}
-	valueMigration := NewCadenceLinkValueMigrator(rwf, capabilityIDs)
-
-	buf := bytes.Buffer{}
-	logger := zerolog.New(&buf).Level(zerolog.ErrorLevel)
-
-	err = valueMigration.InitMigration(logger, nil, 0)
-	require.NoError(t, err)
-
-	_, err = valueMigration.MigrateAccount(nil, address, payloads)
-	require.NoError(t, err)
-
-	err = valueMigration.Close()
-	require.NoError(t, err)
-
-	// Check reporters. No values should have been migrated.
-	reportWriter := valueMigration.reporter.(*testReportWriter)
-	assert.Empty(t, reportWriter.entries)
+	// Order is non-deterministic, so use 'ElementsMatch'.
+	assert.ElementsMatch(
+		t,
+		linkMigrationReportWriter.entries,
+		[]any{
+			capConsLinkMigration{
+				AccountAddressPath: interpreter.AddressPath{
+					Address: address,
+					Path: interpreter.PathValue{
+						Identifier: "linkR",
+						Domain:     common.PathDomainPublic,
+					},
+				},
+				CapabilityID: 1,
+			},
+			cadenceValueMigrationReportEntry{
+				Address: interpreter.AddressPath{
+					Address: address,
+					Path: interpreter.PathValue{
+						Identifier: "linkR",
+						Domain:     common.PathDomainPublic,
+					},
+				},
+				Migration: "LinkValueMigration",
+			},
+		},
+	)
 
 	// Check error logs.
-	// Should have two type loading errors for link value migration.
-	lines := readLines(&buf)
+	lines := readLines(&linkMigrationBuf)
 	require.Len(t, lines, 2)
 
 	assert.Contains(
@@ -319,6 +385,7 @@ func TestLinkValueMigrationTypeErrors(t *testing.T) {
 			testAccountAddress,
 		),
 	)
+	return payloads
 }
 
 func readLines(reader io.Reader) []string {

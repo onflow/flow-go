@@ -1,6 +1,3 @@
-// This transaction is used to store values to the emulator state
-// for testing the cadence value migrations.
-
 import Test from 0x01cf0e2f2f715450
 
 transaction {
@@ -10,6 +7,7 @@ transaction {
     acct.save("Caf\u{00E9}", to: /storage/string_value_2)
     acct.save(Type<AuthAccount>(), to: /storage/type_value)
 
+    // String keys in dictionary
     acct.save(
       {
         "Cafe\u{0301}": 1,
@@ -18,6 +16,7 @@ transaction {
       to: /storage/dictionary_with_string_keys,
     )
 
+    // Restricted typed keys in dictionary
     acct.save(
       {
         Type<AnyStruct{Test.Bar, Test.Foo}>(): 1,
@@ -25,6 +24,12 @@ transaction {
       },
       to: /storage/dictionary_with_restricted_typed_keys,
     )
+
+    // Capabilities and links
+    acct.save(<- Test.createR(), to: /storage/r)
+    var cap = acct.link<&Test.R>(/public/linkR, target: /storage/r)
+    acct.save(cap, to: /storage/capability)
+
   }
 
   execute {

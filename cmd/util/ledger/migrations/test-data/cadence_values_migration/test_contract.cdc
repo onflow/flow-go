@@ -5,4 +5,10 @@ access(all) contract Test {
 	access(all) struct interface Bar {}
 
 	access(all) struct interface Baz {}
+
+	access(all) resource R {}
+
+	access(all) fun createR(): @R {
+		return <- create R()
+	}
 }
