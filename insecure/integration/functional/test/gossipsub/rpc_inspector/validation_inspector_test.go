@@ -47,7 +47,7 @@ func TestValidationInspector_InvalidTopicId_Detection(t *testing.T) {
 	inspectorConfig := flowConfig.NetworkConfig.GossipSub.RpcInspector.Validation
 
 	messageCount := 100
-	inspectorConfig.NumberOfWorkers = 1
+	inspectorConfig.InspectionQueue.NumberOfWorkers = 1
 	controlMessageCount := int64(1)
 
 	count := atomic.NewUint64(0)
@@ -180,7 +180,7 @@ func TestValidationInspector_DuplicateTopicId_Detection(t *testing.T) {
 	require.NoError(t, err)
 	inspectorConfig := flowConfig.NetworkConfig.GossipSub.RpcInspector.Validation
 
-	inspectorConfig.NumberOfWorkers = 1
+	inspectorConfig.InspectionQueue.NumberOfWorkers = 1
 
 	messageCount := 10
 	controlMessageCount := int64(1)
@@ -290,7 +290,7 @@ func TestValidationInspector_IHaveDuplicateMessageId_Detection(t *testing.T) {
 	require.NoError(t, err)
 	inspectorConfig := flowConfig.NetworkConfig.GossipSub.RpcInspector.Validation
 
-	inspectorConfig.NumberOfWorkers = 1
+	inspectorConfig.InspectionQueue.NumberOfWorkers = 1
 
 	count := atomic.NewInt64(0)
 	done := make(chan struct{})
@@ -394,7 +394,7 @@ func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
 	// set hard threshold to 0 so that in the case of invalid cluster ID
 	// we force the inspector to return an error
 	inspectorConfig.ClusterPrefixedMessage.HardThreshold = 0
-	inspectorConfig.NumberOfWorkers = 1
+	inspectorConfig.InspectionQueue.NumberOfWorkers = 1
 
 	// SafetyThreshold < messageCount < HardThreshold ensures that the RPC message will be further inspected and topic IDs will be checked
 	// restricting the message count to 1 allows us to only aggregate a single error when the error is logged in the inspector.
@@ -503,7 +503,7 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection(t *testing.T
 	require.NoError(t, err)
 	inspectorConfig := flowConfig.NetworkConfig.GossipSub.RpcInspector.Validation
 	inspectorConfig.ClusterPrefixedMessage.HardThreshold = 5
-	inspectorConfig.NumberOfWorkers = 1
+	inspectorConfig.InspectionQueue.NumberOfWorkers = 1
 	controlMessageCount := int64(10)
 
 	count := atomic.NewInt64(0)
@@ -591,7 +591,7 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection(t *testing.T
 	require.NoError(t, err)
 	inspectorConfig := flowConfig.NetworkConfig.GossipSub.RpcInspector.Validation
 	inspectorConfig.ClusterPrefixedMessage.HardThreshold = 5
-	inspectorConfig.NumberOfWorkers = 1
+	inspectorConfig.InspectionQueue.NumberOfWorkers = 1
 	controlMessageCount := int64(10)
 
 	count := atomic.NewInt64(0)
@@ -677,7 +677,7 @@ func TestValidationInspector_UnstakedNode_Detection(t *testing.T) {
 	// set hard threshold to 0 so that in the case of invalid cluster ID
 	// we force the inspector to return an error
 	inspectorConfig.ClusterPrefixedMessage.HardThreshold = 0
-	inspectorConfig.NumberOfWorkers = 1
+	inspectorConfig.InspectionQueue.NumberOfWorkers = 1
 
 	// SafetyThreshold < messageCount < HardThreshold ensures that the RPC message will be further inspected and topic IDs will be checked
 	// restricting the message count to 1 allows us to only aggregate a single error when the error is logged in the inspector.
@@ -774,7 +774,7 @@ func TestValidationInspector_InspectIWants_CacheMissThreshold(t *testing.T) {
 	inspectorConfig := flowConfig.NetworkConfig.GossipSub.RpcInspector.Validation
 	// force all cache miss checks
 	inspectorConfig.IWant.CacheMissCheckSize = 1
-	inspectorConfig.NumberOfWorkers = 1
+	inspectorConfig.InspectionQueue.NumberOfWorkers = 1
 	inspectorConfig.IWant.CacheMissThreshold = .5 // set cache miss threshold to 50%
 	messageCount := 1
 	controlMessageCount := int64(1)
@@ -876,7 +876,7 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
 	inspectorConfig := flowConfig.NetworkConfig.GossipSub.RpcInspector.Validation
-	inspectorConfig.NumberOfWorkers = 1
+	inspectorConfig.InspectionQueue.NumberOfWorkers = 1
 
 	idProvider := mock.NewIdentityProvider(t)
 	spammer := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkID, role, idProvider)
@@ -969,7 +969,7 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 	topicProvider.UpdateTopics(topics)
 
 	// after 7 errors encountered disseminate a notification
-	inspectorConfig.MessageErrorThreshold = 6
+	inspectorConfig.PublishMessages.ErrorThreshold = 6
 
 	require.NoError(t, err)
 	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
