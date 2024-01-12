@@ -199,8 +199,6 @@ network-config:
       # Peer scoring is the default value for enabling peer scoring
     peer-scoring-enabled: true
     scoring-parameters:
-      # the intervals at which counters associated with a peer behavior in gossipsub system are decayed.
-      decay-interval: 1m
       peer-scoring:
         internal:
           # The weight for app-specific scores.

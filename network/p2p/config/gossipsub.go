@@ -85,8 +85,6 @@ const (
 // ScoringParameters are the parameters for the score option.
 // Parameters are "numerical values" that are used to compute or build components that compute the score of a peer in GossipSub system.
 type ScoringParameters struct {
-	// DecayInterval is the interval at which the counters associated with a peer behavior in GossipSub system are decayed.
-	DecayInterval             time.Duration             `validate:"gt=0s" mapstructure:"decay-interval"`
 	PeerScoring               PeerScoringParameters     `validate:"required" mapstructure:"peer-scoring"`
 	ScoringRegistryParameters ScoringRegistryParameters `validate:"required" mapstructure:"scoring-registry"`
 }

@@ -102,8 +102,6 @@ func AllFlagNames() []string {
 		BuildFlagName(gossipsubKey, p2pconfig.SubscriptionProviderKey, p2pconfig.UpdateIntervalKey),
 		BuildFlagName(gossipsubKey, p2pconfig.SubscriptionProviderKey, p2pconfig.CacheSizeKey),
 
-		BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.DecayIntervalKey),
-
 		BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.PeerScoringKey, p2pconfig.InternalKey, p2pconfig.AppSpecificScoreWeightKey),
 		BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.PeerScoringKey, p2pconfig.InternalKey, p2pconfig.DecayIntervalKey),
 		BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.PeerScoringKey, p2pconfig.InternalKey, p2pconfig.DecayToZeroKey),
@@ -301,9 +299,6 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 		config.GossipSub.SubscriptionProvider.CacheSize,
 		"size of the cache that keeps the list of topics each peer has subscribed to, recommended size is 10x the number of authorized nodes")
 
-	flags.Duration(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.DecayIntervalKey),
-		config.GossipSub.ScoringParameters.DecayInterval,
-		"interval at which the counters associated with a peer behavior in GossipSub system are decayed, recommended value is one minute")
 	flags.Duration(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.PeerScoringKey, p2pconfig.InternalKey, p2pconfig.DecayIntervalKey),
 		config.GossipSub.ScoringParameters.PeerScoring.Internal.DecayInterval,
 		"interval at which the counters associated with a peer behavior in GossipSub system are decayed, recommended value is one minute")

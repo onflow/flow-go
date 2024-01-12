@@ -216,7 +216,7 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_SingleTopic(t *testing.T) {
 	conf, err := config.DefaultConfig()
 	require.NoError(t, err)
 	// we override the decay interval to 1 second so that the score is updated within 1 second intervals.
-	conf.NetworkConfig.GossipSub.ScoringParameters.DecayInterval = 1 * time.Second
+	conf.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Internal.DecayInterval = 1 * time.Second
 	conf.NetworkConfig.GossipSub.RpcTracer.ScoreTracerInterval = 1 * time.Second
 	thisNode, thisId := p2ptest.NodeFixture( // this node is the one that will be penalizing the under-performer node.
 		t,
@@ -328,7 +328,7 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_TwoTopics(t *testing.T) {
 	conf, err := config.DefaultConfig()
 	require.NoError(t, err)
 	// we override the decay interval to 1 second so that the score is updated within 1 second intervals.
-	conf.NetworkConfig.GossipSub.ScoringParameters.DecayInterval = 1 * time.Second
+	conf.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Internal.DecayInterval = 1 * time.Second
 	conf.NetworkConfig.GossipSub.RpcTracer.ScoreTracerInterval = 1 * time.Second
 	thisNode, thisId := p2ptest.NodeFixture( // this node is the one that will be penalizing the under-performer node.
 		t,
@@ -442,7 +442,7 @@ func TestGossipSubMeshDeliveryScoring_Replay_Will_Not_Counted(t *testing.T) {
 	conf, err := config.DefaultConfig()
 	require.NoError(t, err)
 	// we override the decay interval to 1 second so that the score is updated within 1 second intervals.
-	conf.NetworkConfig.GossipSub.ScoringParameters.DecayInterval = 1 * time.Second
+	conf.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Internal.DecayInterval = 1 * time.Second
 	conf.NetworkConfig.GossipSub.RpcTracer.ScoreTracerInterval = 1 * time.Second
 	blockTopicOverrideParams := defaultTopicScoreParams(t)
 	blockTopicOverrideParams.MeshMessageDeliveriesActivation = 1 * time.Second // we start observing the mesh message deliveries after 1 second of the node startup.

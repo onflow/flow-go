@@ -141,7 +141,7 @@ func NewScoreOption(cfg *ScoreOptionConfig, provider p2p.SubscriptionProvider) (
 			// DecayInterval is the interval over which we decay the effect of past behavior, so that
 			// a good or bad behavior will not have a permanent effect on the penalty. It is also the interval
 			// that GossipSub uses to refresh the scores of all peers.
-			DecayInterval: cfg.params.DecayInterval,
+			DecayInterval: cfg.params.PeerScoring.Internal.DecayInterval,
 			// DecayToZero defines the maximum value below which a peer scoring counter is reset to zero.
 			// This is to prevent the counter from decaying to a very small value.
 			// When a counter hits the DecayToZero threshold, it means that the peer did not exhibit the behavior
@@ -189,13 +189,13 @@ func NewScoreOption(cfg *ScoreOptionConfig, provider p2p.SubscriptionProvider) (
 			Msg("app specific score function is overridden, should never happen in production")
 	}
 
-	if cfg.params.DecayInterval > 0 && cfg.params.DecayInterval != s.peerScoreParams.DecayInterval {
+	if cfg.params.PeerScoring.Internal.DecayInterval > 0 && cfg.params.PeerScoring.Internal.DecayInterval != s.peerScoreParams.DecayInterval {
 		// overrides the default decay interval if the decay interval is set.
-		s.peerScoreParams.DecayInterval = cfg.params.DecayInterval
+		s.peerScoreParams.DecayInterval = cfg.params.PeerScoring.Internal.DecayInterval
 		s.logger.
 			Warn().
 			Str(logging.KeyNetworkingSecurity, "true").
-			Dur("decay_interval_ms", cfg.params.DecayInterval).
+			Dur("decay_interval_ms", cfg.params.PeerScoring.Internal.DecayInterval).
 			Msg("decay interval is overridden, should never happen in production")
 	}
 

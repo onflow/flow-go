@@ -205,7 +205,7 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 	conf.NetworkConfig.GossipSub.RpcInspector.Validation.IHave.MaxSampleSize = 10000
 	conf.NetworkConfig.GossipSub.RpcInspector.Validation.IHave.MaxMessageIDSampleSize = 10000
 	// we override the decay interval to 1 second so that the score is updated within 1 second intervals.
-	conf.NetworkConfig.GossipSub.ScoringParameters.DecayInterval = 1 * time.Second
+	conf.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Internal.DecayInterval = 1 * time.Second
 	// score tracer interval is set to 500 milliseconds to speed up the test, it should be shorter than the heartbeat interval (1 second) of gossipsub to catch the score updates in time.
 	conf.NetworkConfig.GossipSub.RpcTracer.ScoreTracerInterval = 500 * time.Millisecond
 
