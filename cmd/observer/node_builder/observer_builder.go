@@ -561,6 +561,10 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			defaultConfig.upstreamNodePublicKeys,
 			"the networking public key of the upstream access node (in the same order as the upstream node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
 		flags.BoolVar(&builder.rpcMetricsEnabled, "rpc-metrics-enabled", defaultConfig.rpcMetricsEnabled, "whether to enable the rpc metrics")
+		flags.BoolVar(&builder.executionDataIndexingEnabled,
+			"execution-data-indexing-enabled",
+			defaultConfig.executionDataIndexingEnabled,
+			"whether to enable the execution data indexing")
 	})
 }
 
