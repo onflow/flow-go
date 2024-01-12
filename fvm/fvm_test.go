@@ -3016,11 +3016,6 @@ func TestEVM(t *testing.T) {
 
 	t.Run("deploy contract code", newVMTest().
 		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
-		// we keep this dissabled during bootstrap and later overwrite in the test for test transaction
-		withContextOptions(
-			fvm.WithEVMEnabled(false),
-			fvm.WithCadenceLogging(true),
-		).
 		run(func(
 			t *testing.T,
 			vm fvm.VM,
