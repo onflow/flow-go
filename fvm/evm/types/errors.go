@@ -16,8 +16,9 @@ var (
 	// left in the context of flow transaction to execute the evm operation.
 	ErrInsufficientComputation = errors.New("insufficient computation")
 
-	// unauthorized method call, usually emited when calls are called on EOA accounts
+	// ErrUnAuthroizedMethodCall method call, usually emited when calls are called on EOA accounts
 	ErrUnAuthroizedMethodCall = errors.New("unauthroized method call")
+
 	// ErrInsufficientTotalSupply is returned when flow token
 	// is withdraw request is there but not enough balance is on EVM vault
 	// this should never happen but its a saftey measure to protect Flow against EVM issues.
@@ -117,7 +118,7 @@ func IsAStateError(err error) bool {
 	return errors.As(err, &StateError{})
 }
 
-// FatalError is user for any error that is not user related and something
+// FatalError is used for any error that is not user related and something
 // unusual has happend. Usually we stop the node when this happens
 // given it might have a non-deterministic root.
 type FatalError struct {

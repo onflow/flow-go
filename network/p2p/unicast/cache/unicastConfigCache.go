@@ -2,7 +2,6 @@ package unicastcache
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
@@ -15,13 +14,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/unicast"
 )
 
-// ErrUnicastConfigNotFound is a benign error that indicates that the unicast config does not exist in the cache. It is not a fatal error.
-var ErrUnicastConfigNotFound = fmt.Errorf("unicast config not found")
-
 type UnicastConfigCache struct {
-	// mutex is temporarily protect the edge case in HeroCache that optimistic adjustment causes the cache to be full.
-	// TODO: remove this mutex after the HeroCache is fixed.
-	mutex      sync.RWMutex
 	peerCache  *stdmap.Backend
 	cfgFactory func() unicast.Config // factory function that creates a new unicast config.
 }
@@ -56,7 +49,7 @@ func NewUnicastConfigCache(
 	}
 }
 
-// Adjust applies the given adjust function to the unicast config of the given peer ID, and stores the adjusted config in the cache.
+// AdjustWithInit applies the given adjust function to the unicast config of the given peer ID, and stores the adjusted config in the cache.
 // It returns an error if the adjustFunc returns an error.
 // Note that if the Adjust is called when the config does not exist, the config is initialized and the
 // adjust function is applied to the initialized config again. In this case, the adjust function should not return an error.
@@ -65,51 +58,11 @@ func NewUnicastConfigCache(
 // - adjustFunc: the function that adjusts the unicast config.
 // Returns:
 //   - error any returned error should be considered as an irrecoverable error and indicates a bug.
-func (d *UnicastConfigCache) Adjust(peerID peer.ID, adjustFunc unicast.UnicastConfigAdjustFunc) (*unicast.Config, error) {
-	d.mutex.Lock() // making optimistic adjustment atomic.
-	defer d.mutex.Unlock()
-
-	// first we translate the peer id to a flow id (taking
-	peerIdHash := PeerIdToFlowId(peerID)
-	adjustedUnicastCfg, err := d.adjust(peerIdHash, adjustFunc)
-	if err != nil {
-		if err == ErrUnicastConfigNotFound {
-			// if the config does not exist, we initialize the config and try to adjust it again.
-			// Note: there is an edge case where the config is initialized by another goroutine between the two calls.
-			// In this case, the init function is invoked twice, but it is not a problem because the underlying
-			// cache is thread-safe. Hence, we do not need to synchronize the two calls. In such cases, one of the
-			// two calls returns false, and the other call returns true. We do not care which call returns false, hence,
-			// we ignore the return value of the init function.
-			e := UnicastConfigEntity{
-				PeerId: peerID,
-				Config: d.cfgFactory(),
-			}
-
-			_ = d.peerCache.Add(e)
-
-			// as the config is initialized, the adjust function should not return an error, and any returned error
-			// is an irrecoverable error and indicates a bug.
-			return d.adjust(peerIdHash, adjustFunc)
-		}
-		// if the adjust function returns an unexpected error on the first attempt, we return the error directly.
-		// any returned error should be considered as an irrecoverable error and indicates a bug.
-		return nil, fmt.Errorf("failed to adjust unicast config: %w", err)
-	}
-	// if the adjust function returns no error on the first attempt, we return the adjusted config.
-	return adjustedUnicastCfg, nil
-}
-
-// adjust applies the given adjust function to the unicast config of the given origin id.
-// It returns an error if the adjustFunc returns an error or if the config does not exist.
-// Args:
-// - peerIDHash: the hash value of the peer id of the unicast config (i.e., the ID of the unicast config entity).
-// - adjustFunc: the function that adjusts the unicast config.
-// Returns:
-//   - error if the adjustFunc returns an error or if the config does not exist (ErrUnicastConfigNotFound). Except the ErrUnicastConfigNotFound,
-//     any other error should be treated as an irrecoverable error and indicates a bug.
-func (d *UnicastConfigCache) adjust(peerIdHash flow.Identifier, adjustFunc unicast.UnicastConfigAdjustFunc) (*unicast.Config, error) {
+func (d *UnicastConfigCache) AdjustWithInit(peerID peer.ID, adjustFunc unicast.UnicastConfigAdjustFunc) (*unicast.Config, error) {
+	entityId := entityIdOf(peerID)
 	var rErr error
-	adjustedEntity, adjusted := d.peerCache.Adjust(peerIdHash, func(entity flow.Entity) flow.Entity {
+	// wraps external adjust function to adjust the unicast config.
+	wrapAdjustFunc := func(entity flow.Entity) flow.Entity {
 		cfgEntity, ok := entity.(UnicastConfigEntity)
 		if !ok {
 			// sanity check
@@ -127,14 +80,23 @@ func (d *UnicastConfigCache) adjust(peerIdHash flow.Identifier, adjustFunc unica
 		// Return the adjusted config.
 		cfgEntity.Config = adjustedCfg
 		return cfgEntity
-	})
+	}
 
+	initFunc := func() flow.Entity {
+		return UnicastConfigEntity{
+			PeerId:   peerID,
+			Config:   d.cfgFactory(),
+			EntityId: entityId,
+		}
+	}
+
+	adjustedEntity, adjusted := d.peerCache.AdjustWithInit(entityId, wrapAdjustFunc, initFunc)
 	if rErr != nil {
-		return nil, fmt.Errorf("failed to adjust config: %w", rErr)
+		return nil, fmt.Errorf("adjust operation aborted with an error: %w", rErr)
 	}
 
 	if !adjusted {
-		return nil, ErrUnicastConfigNotFound
+		return nil, fmt.Errorf("adjust operation aborted, entity not found")
 	}
 
 	return &unicast.Config{
@@ -143,37 +105,27 @@ func (d *UnicastConfigCache) adjust(peerIdHash flow.Identifier, adjustFunc unica
 	}, nil
 }
 
-// GetOrInit returns the unicast config for the given peer id. If the config does not exist, it creates a new config
+// GetWithInit returns the unicast config for the given peer id. If the config does not exist, it creates a new config
 // using the factory function and stores it in the cache.
 // Args:
 // - peerID: the peer id of the unicast config.
 // Returns:
 //   - *Config, the unicast config for the given peer id.
 //   - error if the factory function returns an error. Any error should be treated as an irrecoverable error and indicates a bug.
-func (d *UnicastConfigCache) GetOrInit(peerID peer.ID) (*unicast.Config, error) {
-	// first we translate the peer id to a flow id (taking
-	flowPeerId := PeerIdToFlowId(peerID)
-	cfg, ok := d.get(flowPeerId)
-	if !ok {
-		_ = d.peerCache.Add(UnicastConfigEntity{
-			PeerId: peerID,
-			Config: d.cfgFactory(),
-		})
-		cfg, ok = d.get(flowPeerId)
-		if !ok {
-			return nil, fmt.Errorf("failed to initialize unicast config for peer %s", peerID)
+func (d *UnicastConfigCache) GetWithInit(peerID peer.ID) (*unicast.Config, error) {
+	// ensuring that the init-and-get operation is atomic.
+	entityId := entityIdOf(peerID)
+	initFunc := func() flow.Entity {
+		return UnicastConfigEntity{
+			PeerId:   peerID,
+			Config:   d.cfgFactory(),
+			EntityId: entityId,
 		}
 	}
-	return cfg, nil
-}
-
-// Get returns the unicast config of the given peer ID.
-func (d *UnicastConfigCache) get(peerIDHash flow.Identifier) (*unicast.Config, bool) {
-	entity, ok := d.peerCache.ByID(peerIDHash)
+	entity, ok := d.peerCache.GetWithInit(entityId, initFunc)
 	if !ok {
-		return nil, false
+		return nil, fmt.Errorf("get or init for unicast config for peer %s failed", peerID)
 	}
-
 	cfg, ok := entity.(UnicastConfigEntity)
 	if !ok {
 		// sanity check
@@ -185,7 +137,7 @@ func (d *UnicastConfigCache) get(peerIDHash flow.Identifier) (*unicast.Config, b
 	return &unicast.Config{
 		StreamCreationRetryAttemptBudget: cfg.StreamCreationRetryAttemptBudget,
 		ConsecutiveSuccessfulStream:      cfg.ConsecutiveSuccessfulStream,
-	}, true
+	}, nil
 }
 
 // Size returns the number of unicast configs in the cache.

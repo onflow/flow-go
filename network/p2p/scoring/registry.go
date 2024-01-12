@@ -113,9 +113,6 @@ type GossipSubAppSpecificScoreRegistry struct {
 
 	penalty GossipSubCtrlMsgPenaltyValue
 
-	// initial application specific penalty record, used to initialize the penalty cache entry.
-	init func() p2p.GossipSubSpamRecord
-
 	validator p2p.SubscriptionValidator
 
 	// scoreTTL is the time to live of the application specific score of a peer; the registry keeps a cached copy of the
@@ -148,10 +145,6 @@ type GossipSubAppSpecificScoreRegistryConfig struct {
 	// IdProvider is the identity provider used to translate peer ids at the networking layer to Flow identifiers (if
 	// an authorized peer is found).
 	IdProvider module.IdentityProvider `validate:"required"`
-
-	// Init is a factory function that returns a new GossipSubSpamRecord. It is used to initialize the spam record of
-	// a peer when the peer is first observed by the local peer.
-	Init func() p2p.GossipSubSpamRecord `validate:"required"`
 
 	// SpamRecordCacheFactory is a factory function that returns a new GossipSubSpamRecordCache. It is used to initialize the spamScoreCache.
 	// The cache is used to store the application specific penalty of peers.
@@ -191,7 +184,6 @@ func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegis
 		spamScoreCache: config.SpamRecordCacheFactory(),
 		appScoreCache:  config.AppScoreCacheFactory(),
 		penalty:        config.Penalty,
-		init:           config.Init,
 		validator:      config.Validator,
 		idProvider:     config.IdProvider,
 		scoreTTL:       config.Parameters.ScoreTTL,
@@ -342,7 +334,7 @@ func (r *GossipSubAppSpecificScoreRegistry) computeAppSpecificScore(pid peer.ID)
 // - error: an error if the update failed; any returned error is an irrecoverable error and indicates a bug or misconfiguration.
 func (r *GossipSubAppSpecificScoreRegistry) processAppSpecificScoreUpdateWork(p peer.ID) error {
 	appSpecificScore := r.computeAppSpecificScore(p)
-	err := r.appScoreCache.Add(p, appSpecificScore, time.Now())
+	err := r.appScoreCache.AdjustWithInit(p, appSpecificScore, time.Now())
 	if err != nil {
 		// the error is considered fatal as it means the cache is not working properly.
 		return fmt.Errorf("could not add application specific score %f for peer to cache: %w", appSpecificScore, err)
@@ -412,16 +404,7 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 		Str("peer_id", p2plogging.PeerId(notification.PeerID)).
 		Str("misbehavior_type", notification.MsgType.String()).Logger()
 
-	// try initializing the application specific penalty for the peer if it is not yet initialized.
-	// this is done to avoid the case where the peer is not yet cached and the application specific penalty is not yet initialized.
-	// initialization is successful only if the peer is not yet cached. If any error is occurred during initialization we log a fatal error
-	initRecord := r.init()
-	initialized := r.spamScoreCache.Add(notification.PeerID, initRecord)
-	if initialized {
-		lg.Trace().Str("peer_id", p2plogging.PeerId(notification.PeerID)).Msg("application specific penalty initialized for peer")
-	}
-
-	record, err := r.spamScoreCache.Update(notification.PeerID, func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
+	record, err := r.spamScoreCache.Adjust(notification.PeerID, func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
 		penalty := 0.0
 		switch notification.MsgType {
 		case p2pmsg.CtrlMsgGraft:
