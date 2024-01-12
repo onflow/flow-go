@@ -300,14 +300,7 @@ func TestDefaultDecayFunction(t *testing.T) {
 		},
 	}
 	scoringRegistryConfig := flowConfig.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters
-	decayFunc := scoring.DefaultDecayFunction(&scoring.DecayFunctionConfig{
-		SlowerDecayPenaltyThreshold:   scoringRegistryConfig.SpamRecordCache.Decay.PenaltyDecaySlowdownThreshold,
-		DecayRateReductionFactor:      scoringRegistryConfig.SpamRecordCache.Decay.DecayRateReductionFactor,
-		DecayAdjustInterval:           scoringRegistryConfig.SpamRecordCache.Decay.PenaltyDecayEvaluationPeriod,
-		MaximumSpamPenaltyDecayFactor: flowConfig.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.SpamRecordCache.Decay.MaximumSpamPenaltyDecayFactor,
-		MinimumSpamPenaltyDecayFactor: flowConfig.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.SpamRecordCache.Decay.MinimumSpamPenaltyDecayFactor,
-		SkipDecayThreshold:            flowConfig.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.SpamRecordCache.Decay.SkipDecayThreshold,
-	})
+	decayFunc := scoring.DefaultDecayFunction(scoringRegistryConfig.SpamRecordCache.Decay)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

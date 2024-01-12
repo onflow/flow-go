@@ -120,14 +120,7 @@ func NewScoreOption(cfg *ScoreOptionConfig, provider p2p.SubscriptionProvider) (
 		SpamRecordCacheFactory: func() p2p.GossipSubSpamRecordCache {
 			collector := metrics.GossipSubSpamRecordCacheMetricsFactory(cfg.heroCacheMetricsFactory, cfg.networkingType)
 			return netcache.NewGossipSubSpamRecordCache(cfg.params.ScoringRegistryParameters.SpamRecordCache.CacheSize, cfg.logger, collector,
-				DefaultDecayFunction(&DecayFunctionConfig{
-					SlowerDecayPenaltyThreshold:   cfg.params.ScoringRegistryParameters.SpamRecordCache.Decay.PenaltyDecaySlowdownThreshold,
-					DecayRateReductionFactor:      cfg.params.ScoringRegistryParameters.SpamRecordCache.Decay.DecayRateReductionFactor,
-					DecayAdjustInterval:           cfg.params.ScoringRegistryParameters.SpamRecordCache.Decay.PenaltyDecayEvaluationPeriod,
-					MaximumSpamPenaltyDecayFactor: cfg.params.ScoringRegistryParameters.SpamRecordCache.Decay.MaximumSpamPenaltyDecayFactor,
-					MinimumSpamPenaltyDecayFactor: cfg.params.ScoringRegistryParameters.SpamRecordCache.Decay.MinimumSpamPenaltyDecayFactor,
-					SkipDecayThreshold:            cfg.params.ScoringRegistryParameters.SpamRecordCache.Decay.SkipDecayThreshold,
-				}))
+				DefaultDecayFunction(cfg.params.ScoringRegistryParameters.SpamRecordCache.Decay))
 		},
 		Parameters:                 cfg.params.ScoringRegistryParameters.AppSpecificScore,
 		NetworkingType:             cfg.networkingType,

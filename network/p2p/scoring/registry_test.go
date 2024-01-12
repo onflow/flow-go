@@ -957,14 +957,7 @@ func newGossipSubAppSpecificScoreRegistry(t *testing.T, params p2pconfig.Scoring
 	cache := netcache.NewGossipSubSpamRecordCache(100,
 		unittest.Logger(),
 		metrics.NewNoopCollector(),
-		scoring.DefaultDecayFunction(&scoring.DecayFunctionConfig{
-			SlowerDecayPenaltyThreshold:   params.ScoringRegistryParameters.SpamRecordCache.Decay.PenaltyDecaySlowdownThreshold,
-			DecayRateReductionFactor:      params.ScoringRegistryParameters.SpamRecordCache.Decay.DecayRateReductionFactor,
-			DecayAdjustInterval:           params.ScoringRegistryParameters.SpamRecordCache.Decay.PenaltyDecayEvaluationPeriod,
-			MaximumSpamPenaltyDecayFactor: params.ScoringRegistryParameters.SpamRecordCache.Decay.MaximumSpamPenaltyDecayFactor,
-			MinimumSpamPenaltyDecayFactor: params.ScoringRegistryParameters.SpamRecordCache.Decay.MinimumSpamPenaltyDecayFactor,
-			SkipDecayThreshold:            params.ScoringRegistryParameters.SpamRecordCache.Decay.SkipDecayThreshold,
-		}))
+		scoring.DefaultDecayFunction(params.ScoringRegistryParameters.SpamRecordCache.Decay))
 	appSpecificScoreCache := internal.NewAppSpecificScoreCache(100, unittest.Logger(), metrics.NewNoopCollector())
 
 	validator := mockp2p.NewSubscriptionValidator(t)

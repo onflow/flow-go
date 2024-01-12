@@ -407,19 +407,10 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 		Msg("applied misbehaviour penalty and updated application specific penalty")
 }
 
-type DecayFunctionConfig struct {
-	SlowerDecayPenaltyThreshold   float64
-	DecayRateReductionFactor      float64
-	DecayAdjustInterval           time.Duration
-	MaximumSpamPenaltyDecayFactor float64
-	MinimumSpamPenaltyDecayFactor float64
-	SkipDecayThreshold            float64
-}
-
 // DefaultDecayFunction is the default decay function that is used to decay the application specific penalty of a peer.
 // It is used if no decay function is provided in the configuration.
 // It decays the application specific penalty of a peer if it is negative.
-func DefaultDecayFunction(cfg *DecayFunctionConfig) netcache.PreprocessorFunc {
+func DefaultDecayFunction(cfg p2pconfig.SpamRecordCacheDecay) netcache.PreprocessorFunc {
 	return func(record p2p.GossipSubSpamRecord, lastUpdated time.Time) (p2p.GossipSubSpamRecord, error) {
 		if record.Penalty >= 0 {
 			// no need to decay the penalty if it is positive, the reason is currently the app specific penalty
@@ -443,8 +434,8 @@ func DefaultDecayFunction(cfg *DecayFunctionConfig) netcache.PreprocessorFunc {
 		}
 		record.Penalty = penalty
 
-		if record.Penalty <= cfg.SlowerDecayPenaltyThreshold {
-			if time.Since(record.LastDecayAdjustment) > cfg.DecayAdjustInterval || record.LastDecayAdjustment.IsZero() {
+		if record.Penalty <= cfg.PenaltyDecaySlowdownThreshold {
+			if time.Since(record.LastDecayAdjustment) > cfg.PenaltyDecayEvaluationPeriod || record.LastDecayAdjustment.IsZero() {
 				// reduces the decay speed flooring at MinimumSpamRecordDecaySpeed
 				record.Decay = math.Min(record.Decay+cfg.DecayRateReductionFactor, cfg.MinimumSpamPenaltyDecayFactor)
 				record.LastDecayAdjustment = time.Now()
