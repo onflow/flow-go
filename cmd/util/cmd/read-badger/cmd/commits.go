@@ -4,7 +4,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
-	findBlockByCommit "github.com/onflow/flow-go/cmd/util/cmd/read-badger/cmd/find-block-by-commit"
+	findBlockByCommits "github.com/onflow/flow-go/cmd/util/cmd/read-badger/cmd/find-block-by-commits"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -14,7 +14,7 @@ func init() {
 	commitsCmd.Flags().StringVarP(&flagBlockID, "block-id", "b", "", "the block id of which to query the state commitment")
 	_ = commitsCmd.MarkFlagRequired("block-id")
 
-	rootCmd.AddCommand(findBlockByCommit.Init(InitStorages))
+	rootCmd.AddCommand(findBlockByCommits.Init(InitStorages))
 }
 
 var commitsCmd = &cobra.Command{
