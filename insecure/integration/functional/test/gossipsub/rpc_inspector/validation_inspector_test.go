@@ -1104,7 +1104,7 @@ func TestGossipSubSpamMitigationIntegration(t *testing.T) {
 	spammer.SpamControlMessage(t, victimNode, pruneCtlMsgsWithMalformedTopic)
 	spammer.SpamControlMessage(t, victimNode, pruneCtlMsgsInvalidSporkIDTopic)
 	spammer.SpamControlMessage(t, victimNode, pruneCtlMsgsDuplicateTopic)
-	scoreOptParameters := cfg.NetworkConfig.GossipSub.ScoringParameters.ScoreOption
+	scoreOptParameters := cfg.NetworkConfig.GossipSub.ScoringParameters.InternalPeerScoring
 	// wait for three GossipSub heartbeat intervals to ensure that the victim node has penalized the spammer node.
 	require.Eventually(t, func() bool {
 		score, ok := victimNode.PeerScoreExposer().GetScore(spammer.SpammerNode.ID())

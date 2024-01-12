@@ -91,7 +91,7 @@ type ScoringParameters struct {
 	SpamRecordCache  SpamRecordCacheParameters  `validate:"required" mapstructure:"spam-record-cache"`
 	// DecayInterval is the interval at which the counters associated with a peer behavior in GossipSub system are decayed.
 	DecayInterval             time.Duration             `validate:"gt=0s" mapstructure:"decay-interval"`
-	ScoreOption               ScoreOption               `validate:"required" mapstructure:"score-option"`
+	InternalPeerScoring       InternalPeerScoring       `validate:"required" mapstructure:"internal-peer-scoring"`
 	ScoringRegistryParameters ScoringRegistryParameters `validate:"required" mapstructure:"scoring-registry"`
 }
 

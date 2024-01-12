@@ -3,7 +3,7 @@ package p2pconfig
 import "time"
 
 const (
-	ScoreOptionKey              = "score-option"
+	ScoreOptionKey              = "internal-peer-scoring"
 	AppScoreWeightKey           = "app-specific-score-weight"
 	MaxDebugLogsKey             = "max-debug-logs"
 	ScoreOptionDecayIntervalKey = "decay-interval"
@@ -15,8 +15,8 @@ const (
 	ScoreOptionTopicKey         = "topic"
 )
 
-// ScoreOption gossipsub scoring option configuration parameters.
-type ScoreOption struct {
+// InternalPeerScoring gossipsub scoring option configuration parameters.
+type InternalPeerScoring struct {
 	// AppSpecificScoreWeight is the  weight for app-specific scores. It is used to scale the app-specific
 	// scores to the same range as the other scores. At the current version, we don't distinguish between the app-specific
 	// scores and the other scores, so we set it to 1.

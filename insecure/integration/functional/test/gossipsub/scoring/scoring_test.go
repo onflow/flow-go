@@ -151,15 +151,15 @@ func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory fun
 		if !ok {
 			return false
 		}
-		if spammerScore >= scoreParams.ScoreOption.Thresholds.Gossip {
+		if spammerScore >= scoreParams.InternalPeerScoring.Thresholds.Gossip {
 			// ensure the score is low enough so that no gossip is routed by victim node to spammer node.
 			return false
 		}
-		if spammerScore >= scoreParams.ScoreOption.Thresholds.Publish {
+		if spammerScore >= scoreParams.InternalPeerScoring.Thresholds.Publish {
 			// ensure the score is low enough so that non of the published messages of the victim node are routed to the spammer node.
 			return false
 		}
-		if spammerScore >= scoreParams.ScoreOption.Thresholds.Graylist {
+		if spammerScore >= scoreParams.InternalPeerScoring.Thresholds.Graylist {
 			// ensure the score is low enough so that the victim node does not accept RPC messages from the spammer node.
 			return false
 		}
@@ -257,7 +257,7 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_SingleTopic(t *testing.T) {
 		return unittest.ProposalFixture()
 	})
 
-	scoreParams := conf.NetworkConfig.GossipSub.ScoringParameters.ScoreOption
+	scoreParams := conf.NetworkConfig.GossipSub.ScoringParameters.InternalPeerScoring
 
 	// Also initially the under-performing node should have a score that is at least equal to the MaxAppSpecificReward.
 	// The reason is in our scoring system, we reward the staked nodes by MaxAppSpecificReward, and the under-performing node is considered staked
@@ -373,7 +373,7 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_TwoTopics(t *testing.T) {
 		}
 	}
 
-	scoreParams := conf.NetworkConfig.GossipSub.ScoringParameters.ScoreOption
+	scoreParams := conf.NetworkConfig.GossipSub.ScoringParameters.InternalPeerScoring
 
 	// Initially the under-performing node should have a score that is at least equal to the MaxAppSpecificReward.
 	// The reason is in our scoring system, we reward the staked nodes by MaxAppSpecificReward, and the under-performing node is considered staked
@@ -485,7 +485,7 @@ func TestGossipSubMeshDeliveryScoring_Replay_Will_Not_Counted(t *testing.T) {
 		return unittest.ProposalFixture()
 	})
 
-	scoreParams := conf.NetworkConfig.GossipSub.ScoringParameters.ScoreOption
+	scoreParams := conf.NetworkConfig.GossipSub.ScoringParameters.InternalPeerScoring
 
 	// Initially the replaying node should have a score that is at least equal to the MaxAppSpecificReward.
 	// The reason is in our scoring system, we reward the staked nodes by MaxAppSpecificReward, and initially every node is considered staked
@@ -596,7 +596,7 @@ func TestGossipSubMeshDeliveryScoring_Replay_Will_Not_Counted(t *testing.T) {
 func defaultTopicScoreParams(t *testing.T) *pubsub.TopicScoreParams {
 	defaultConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
-	topicScoreParams := defaultConfig.NetworkConfig.GossipSub.ScoringParameters.ScoreOption.TopicValidation
+	topicScoreParams := defaultConfig.NetworkConfig.GossipSub.ScoringParameters.InternalPeerScoring.TopicValidation
 	p := &pubsub.TopicScoreParams{
 		TopicWeight:                     topicScoreParams.TopicWeight,
 		SkipAtomicValidation:            topicScoreParams.SkipAtomicValidation,

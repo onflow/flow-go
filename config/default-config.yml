@@ -231,7 +231,7 @@ network-config:
         penalty-decay-evaluation-period: 10m
       # the intervals at which counters associated with a peer behavior in gossipsub system are decayed.
       decay-interval: 1m
-      score-option:
+      internal-peer-scoring:
         # The weight for app-specific scores.
         # It is used to scale the app-specific scores to the same range as the other scores.
         # At the current version, we don't distinguish between the app-specific scores

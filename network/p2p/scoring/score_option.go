@@ -96,7 +96,7 @@ func (c *ScoreOptionConfig) SetRegisterNotificationConsumerFunc(f func(p2p.Gossi
 
 // NewScoreOption creates a new penalty option with the given configuration.
 func NewScoreOption(cfg *ScoreOptionConfig, provider p2p.SubscriptionProvider) (*ScoreOption, error) {
-	throttledSampler := logging.BurstSampler(cfg.params.ScoreOption.MaxDebugLogs, time.Second)
+	throttledSampler := logging.BurstSampler(cfg.params.InternalPeerScoring.MaxDebugLogs, time.Second)
 	logger := cfg.logger.With().
 		Str("module", "pubsub_score_option").
 		Logger().
@@ -130,10 +130,10 @@ func NewScoreOption(cfg *ScoreOptionConfig, provider p2p.SubscriptionProvider) (
 		},
 		Parameters:                 cfg.params.AppSpecificScore,
 		NetworkingType:             cfg.networkingType,
-		UnknownIdentityPenalty:     cfg.params.ScoreOption.Penalties.UnknownIdentityPenalty,
-		MinAppSpecificPenalty:      cfg.params.ScoreOption.Penalties.MinAppSpecificPenalty,
-		StakedIdentityReward:       cfg.params.ScoreOption.Rewards.StakedIdentityReward,
-		InvalidSubscriptionPenalty: cfg.params.ScoreOption.Penalties.InvalidSubscriptionPenalty,
+		UnknownIdentityPenalty:     cfg.params.InternalPeerScoring.Penalties.UnknownIdentityPenalty,
+		MinAppSpecificPenalty:      cfg.params.InternalPeerScoring.Penalties.MinAppSpecificPenalty,
+		StakedIdentityReward:       cfg.params.InternalPeerScoring.Rewards.StakedIdentityReward,
+		InvalidSubscriptionPenalty: cfg.params.InternalPeerScoring.Penalties.InvalidSubscriptionPenalty,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create gossipsub app specific score registry: %w", err)
@@ -146,44 +146,44 @@ func NewScoreOption(cfg *ScoreOptionConfig, provider p2p.SubscriptionProvider) (
 			Topics: make(map[string]*pubsub.TopicScoreParams),
 			// we don't set all the parameters, so we skip the atomic validation.
 			// atomic validation fails initialization if any parameter is not set.
-			SkipAtomicValidation: cfg.params.ScoreOption.TopicValidation.SkipAtomicValidation,
+			SkipAtomicValidation: cfg.params.InternalPeerScoring.TopicValidation.SkipAtomicValidation,
 			// DecayInterval is the interval over which we decay the effect of past behavior, so that
 			// a good or bad behavior will not have a permanent effect on the penalty. It is also the interval
 			// that GossipSub uses to refresh the scores of all peers.
-			DecayInterval: cfg.params.ScoreOption.DecayInterval,
+			DecayInterval: cfg.params.InternalPeerScoring.DecayInterval,
 			// DecayToZero defines the maximum value below which a peer scoring counter is reset to zero.
 			// This is to prevent the counter from decaying to a very small value.
 			// When a counter hits the DecayToZero threshold, it means that the peer did not exhibit the behavior
 			// for a long time, and we can reset the counter.
-			DecayToZero: cfg.params.ScoreOption.DecayToZero,
+			DecayToZero: cfg.params.InternalPeerScoring.DecayToZero,
 			// AppSpecificWeight is the weight of the application specific penalty.
-			AppSpecificWeight: cfg.params.ScoreOption.AppSpecificScoreWeight,
+			AppSpecificWeight: cfg.params.InternalPeerScoring.AppSpecificScoreWeight,
 			// PenaltyThreshold is the threshold above which a peer is penalized for GossipSub-level misbehaviors.
-			BehaviourPenaltyThreshold: cfg.params.ScoreOption.Behaviour.PenaltyThreshold,
+			BehaviourPenaltyThreshold: cfg.params.InternalPeerScoring.Behaviour.PenaltyThreshold,
 			// PenaltyWeight is the weight of the GossipSub-level penalty.
-			BehaviourPenaltyWeight: cfg.params.ScoreOption.Behaviour.PenaltyWeight,
+			BehaviourPenaltyWeight: cfg.params.InternalPeerScoring.Behaviour.PenaltyWeight,
 			// PenaltyDecay is the decay of the GossipSub-level penalty (applied every decay interval).
-			BehaviourPenaltyDecay: cfg.params.ScoreOption.Behaviour.PenaltyDecay,
+			BehaviourPenaltyDecay: cfg.params.InternalPeerScoring.Behaviour.PenaltyDecay,
 		},
 		peerThresholdParams: &pubsub.PeerScoreThresholds{
-			GossipThreshold:             cfg.params.ScoreOption.Thresholds.Gossip,
-			PublishThreshold:            cfg.params.ScoreOption.Thresholds.Publish,
-			GraylistThreshold:           cfg.params.ScoreOption.Thresholds.Graylist,
-			AcceptPXThreshold:           cfg.params.ScoreOption.Thresholds.AcceptPX,
-			OpportunisticGraftThreshold: cfg.params.ScoreOption.Thresholds.OpportunisticGraft,
+			GossipThreshold:             cfg.params.InternalPeerScoring.Thresholds.Gossip,
+			PublishThreshold:            cfg.params.InternalPeerScoring.Thresholds.Publish,
+			GraylistThreshold:           cfg.params.InternalPeerScoring.Thresholds.Graylist,
+			AcceptPXThreshold:           cfg.params.InternalPeerScoring.Thresholds.AcceptPX,
+			OpportunisticGraftThreshold: cfg.params.InternalPeerScoring.Thresholds.OpportunisticGraft,
 		},
 		defaultTopicScoreParams: &pubsub.TopicScoreParams{
-			TopicWeight:                     cfg.params.ScoreOption.TopicValidation.TopicWeight,
-			SkipAtomicValidation:            cfg.params.ScoreOption.TopicValidation.SkipAtomicValidation,
-			InvalidMessageDeliveriesWeight:  cfg.params.ScoreOption.TopicValidation.InvalidMessageDeliveriesWeight,
-			InvalidMessageDeliveriesDecay:   cfg.params.ScoreOption.TopicValidation.InvalidMessageDeliveriesDecay,
-			TimeInMeshQuantum:               cfg.params.ScoreOption.TopicValidation.TimeInMeshQuantum,
-			MeshMessageDeliveriesWeight:     cfg.params.ScoreOption.TopicValidation.MeshDeliveriesWeight,
-			MeshMessageDeliveriesDecay:      cfg.params.ScoreOption.TopicValidation.MeshMessageDeliveriesDecay,
-			MeshMessageDeliveriesCap:        cfg.params.ScoreOption.TopicValidation.MeshMessageDeliveriesCap,
-			MeshMessageDeliveriesThreshold:  cfg.params.ScoreOption.TopicValidation.MeshMessageDeliveryThreshold,
-			MeshMessageDeliveriesWindow:     cfg.params.ScoreOption.TopicValidation.MeshMessageDeliveriesWindow,
-			MeshMessageDeliveriesActivation: cfg.params.ScoreOption.TopicValidation.MeshMessageDeliveryActivation,
+			TopicWeight:                     cfg.params.InternalPeerScoring.TopicValidation.TopicWeight,
+			SkipAtomicValidation:            cfg.params.InternalPeerScoring.TopicValidation.SkipAtomicValidation,
+			InvalidMessageDeliveriesWeight:  cfg.params.InternalPeerScoring.TopicValidation.InvalidMessageDeliveriesWeight,
+			InvalidMessageDeliveriesDecay:   cfg.params.InternalPeerScoring.TopicValidation.InvalidMessageDeliveriesDecay,
+			TimeInMeshQuantum:               cfg.params.InternalPeerScoring.TopicValidation.TimeInMeshQuantum,
+			MeshMessageDeliveriesWeight:     cfg.params.InternalPeerScoring.TopicValidation.MeshDeliveriesWeight,
+			MeshMessageDeliveriesDecay:      cfg.params.InternalPeerScoring.TopicValidation.MeshMessageDeliveriesDecay,
+			MeshMessageDeliveriesCap:        cfg.params.InternalPeerScoring.TopicValidation.MeshMessageDeliveriesCap,
+			MeshMessageDeliveriesThreshold:  cfg.params.InternalPeerScoring.TopicValidation.MeshMessageDeliveryThreshold,
+			MeshMessageDeliveriesWindow:     cfg.params.InternalPeerScoring.TopicValidation.MeshMessageDeliveriesWindow,
+			MeshMessageDeliveriesActivation: cfg.params.InternalPeerScoring.TopicValidation.MeshMessageDeliveryActivation,
 		},
 		appScoreFunc: scoreRegistry.AppSpecificScoreFunc(),
 	}
