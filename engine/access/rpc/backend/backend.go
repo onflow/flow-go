@@ -71,6 +71,7 @@ type Backend struct {
 
 	*subscription.BlocksWatcher
 	backendSubscribeBlocks
+	backendSubscribeTransactions
 
 	state             protocol.State
 	chainID           flow.ChainID
@@ -244,6 +245,15 @@ func New(params Params) (*Backend, error) {
 			snapshotHistoryLimit: params.SnapshotHistoryLimit,
 		},
 		backendSubscribeBlocks: backendSubscribeBlocks{
+			log:            params.Log,
+			state:          params.State,
+			blocks:         params.Blocks,
+			Broadcaster:    params.SubscriptionParams.Broadcaster,
+			sendTimeout:    params.SubscriptionParams.SendTimeout,
+			responseLimit:  params.SubscriptionParams.ResponseLimit,
+			sendBufferSize: params.SubscriptionParams.SendBufferSize,
+		},
+		backendSubscribeTransactions: backendSubscribeTransactions{
 			log:            params.Log,
 			state:          params.State,
 			blocks:         params.Blocks,

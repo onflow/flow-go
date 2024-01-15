@@ -57,6 +57,8 @@ type API interface {
 	// SubscribeBlocks subscribes to the blocks starting from a specific block ID and block height, with an optional block status.
 	// By default, returns sealed blocks.
 	SubscribeBlocks(ctx context.Context, startBlockID flow.Identifier, startHeight uint64, blockStatus flow.BlockStatus) subscription.Subscription
+	// SendAndSubscribeTransactionStatuses subscribe to the transaction statuses
+	SendAndSubscribeTransactionStatuses(ctx context.Context, tx *flow.TransactionBody) subscription.Subscription
 }
 
 // TODO: Combine this with flow.TransactionResult?

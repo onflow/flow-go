@@ -769,8 +769,54 @@ func (h *Handler) SubscribeBlocks(request *access.SubscribeBlocksRequest, stream
 	}
 }
 
-func (h *Handler) SendAndSubscribeTransactionStatuses(request *access.SendAndSubscribeTransactionStatusesRequest, stream access.AccessAPI_SendAndSubscribeTransactionStatusesServer) error {
-	panic("not implemented!")
+func (h *Handler) SendAndSubscribeTransactionStatuses(
+	request *access.SendAndSubscribeTransactionStatusesRequest,
+	stream access.AccessAPI_SendAndSubscribeTransactionStatusesServer,
+) error {
+	// check if the maximum number of streams is reached
+	if h.StreamCount.Load() >= h.MaxStreams {
+		return status.Errorf(codes.ResourceExhausted, "maximum number of streams reached")
+	}
+	h.StreamCount.Add(1)
+	defer h.StreamCount.Add(-1)
+
+	txMsg := request.GetTransaction()
+
+	tx, err := convert.MessageToTransaction(txMsg, h.chain)
+	if err != nil {
+		return status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	err = h.api.SendTransaction(stream.Context(), &tx)
+	if err != nil {
+		return err
+	}
+
+	sub := h.api.SendAndSubscribeTransactionStatuses(stream.Context(), &tx)
+	txId := tx.ID()
+
+	for {
+		v, ok := <-sub.Channel()
+		if !ok {
+			if sub.Err() != nil {
+				return rpc.ConvertError(sub.Err(), "stream encountered an error", codes.Internal)
+			}
+			return nil
+		}
+
+		resp, ok := v.(*flow.TransactionStatus)
+		if !ok {
+			return status.Errorf(codes.Internal, "unexpected response type: %T", v)
+		}
+
+		err = stream.Send(&access.SendAndSubscribeTransactionStatusesResponse{
+			Id:     txId[:],
+			Status: entities.TransactionStatus(*resp),
+		})
+		if err != nil {
+			return rpc.ConvertError(err, "could not send response", codes.Internal)
+		}
+	}
 }
 
 func (h *Handler) blockResponse(block *flow.Block, fullResponse bool, status flow.BlockStatus) (*access.BlockResponse, error) {
