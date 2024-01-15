@@ -352,6 +352,13 @@ type GossipSubRpcValidationInspectorMetrics interface {
 	// Args:
 	// 	duplicateTopicIds: the number of duplicate topic ids received by the node on a graft message at the end of the async inspection grafts.
 	OnGraftMessageInspected(duplicateTopicIds int)
+
+	// OnPublishMessageInspected tracks the number of errors that occurred during the async inspection of publish messages.
+	// Note that this function is called on each publish message received by the node regardless of the result of the inspection.
+	// If the number of errors exceeds the threshold, a misbehaviour report is sent, but this function is still called.
+	// Args:
+	// - errCount: the number of errors that occurred during the async inspection of publish messages.
+	OnPublishMessageInspected(errCount int)
 }
 
 // NetworkInboundQueueMetrics encapsulates the metrics collectors for the inbound queue of the networking layer.

@@ -329,6 +329,7 @@ func (c *ControlMsgValidationInspector) inspectGraftMessages(from peer.ID, graft
 	duplicateTopicTracker := make(duplicateStrTracker)
 	totalDuplicateTopicIds := 0
 	defer func() {
+		// regardless of inspection result, update metrics
 		c.metrics.OnGraftMessageInspected(totalDuplicateTopicIds)
 	}()
 	for _, graft := range grafts {
@@ -366,6 +367,7 @@ func (c *ControlMsgValidationInspector) inspectPruneMessages(from peer.ID, prune
 	tracker := make(duplicateStrTracker)
 	totalDuplicateTopicIds := 0
 	defer func() {
+		// regardless of inspection result, update metrics
 		c.metrics.OnPruneMessageInspected(totalDuplicateTopicIds)
 	}()
 	for _, prune := range prunes {
@@ -414,6 +416,7 @@ func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihave
 	totalDuplicateTopicIds := 0
 	totalDuplicateMessageIds := 0
 	defer func() {
+		// regardless of inspection result, update metrics
 		c.metrics.OnIHaveMessagesInspected(totalDuplicateTopicIds, totalDuplicateMessageIds)
 	}()
 	for _, ihave := range ihaves {
@@ -482,6 +485,7 @@ func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWant
 	cacheMisses := 0
 	duplicateMessageIds := 0
 	defer func() {
+		// regardless of inspection result, update metrics
 		c.metrics.OnIWantMessagesInspected(duplicateMessageIds, cacheMisses)
 	}()
 
@@ -566,6 +570,14 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 		return false
 	}
 	var errs *multierror.Error
+	defer func() {
+		// regardless of inspection result, update metrics
+		if errs != nil {
+			c.metrics.OnPublishMessageInspected(errs.Len())
+		} else {
+			c.metrics.OnPublishMessageInspected(0)
+		}
+	}()
 	for _, message := range messages[:sampleSize] {
 		if c.networkingType == network.PrivateNetwork {
 			err := c.checkPubsubMessageSender(message)

@@ -60,6 +60,7 @@ type GossipSubRpcValidationInspectorMetrics struct {
 	publishMessageInspectionErrExceedThresholdCount prometheus.Counter
 	publishMessageInvalidSenderCount                prometheus.Counter
 	publishMessageInvalidSubscriptionsCount         prometheus.Counter
+	publishMessageInspectedErrHistogram             prometheus.Histogram
 }
 
 var _ module.GossipSubRpcValidationInspectorMetrics = (*GossipSubRpcValidationInspectorMetrics)(nil)
@@ -286,6 +287,13 @@ func NewGossipSubRPCValidationInspectorMetrics(prefix string) *GossipSubRpcValid
 		Help:      "number of times that the async inspection of prune messages failed due to the number of duplicate topic ids exceeding the threshold",
 	})
 
+	gc.publishMessageInspectedErrHistogram = promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceNetwork,
+		Subsystem: subsystemGossip,
+		Name:      gc.prefix + "publish_message_inspected_err_histogram",
+		Help:      "histogram of publish message inspection errors",
+	})
+
 	return gc
 }
 
@@ -470,4 +478,13 @@ func (c *GossipSubRpcValidationInspectorMetrics) OnGraftDuplicateTopicIdsExceedT
 //	duplicateTopicIds: the number of duplicate topic ids received by the node on a graft message at the end of the async inspection grafts.
 func (c *GossipSubRpcValidationInspectorMetrics) OnGraftMessageInspected(duplicateTopicIds int) {
 	c.graftDuplicateTopicIdsHistogram.Observe(float64(duplicateTopicIds))
+}
+
+// OnPublishMessageInspected tracks the number of errors that occurred during the async inspection of publish messages.
+// Note that this function is called on each publish message received by the node regardless of the result of the inspection.
+// If the number of errors exceeds the threshold, a misbehaviour report is sent, but this function is still called.
+// Args:
+// - errCount: the number of errors that occurred during the async inspection of publish messages.
+func (c *GossipSubRpcValidationInspectorMetrics) OnPublishMessageInspected(errCount int) {
+	c.publishMessageInspectedErrHistogram.Observe(float64(errCount))
 }
