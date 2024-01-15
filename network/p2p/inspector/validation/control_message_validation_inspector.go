@@ -562,6 +562,7 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 		if c.networkingType == network.PrivateNetwork {
 			err := c.checkPubsubMessageSender(message)
 			if err != nil {
+				c.metrics.OnInvalidSenderForPublishMessage()
 				errs = multierror.Append(errs, err)
 				continue
 			}
@@ -579,12 +580,14 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 		}
 
 		if !hasSubscription(topic.String()) {
+			c.metrics.OnPublishMessageInvalidSubscription()
 			errs = multierror.Append(errs, fmt.Errorf("subscription for topic %s not found", topic))
 		}
 	}
 
 	// return an error when we exceed the error threshold
 	if errs != nil && errs.Len() > c.config.PublishMessages.ErrorThreshold {
+		c.metrics.OnPublishMessagesInspectionErrorExceedsThreshold()
 		return NewInvalidRpcPublishMessagesErr(errs.ErrorOrNil(), errs.Len()), uint64(errs.Len())
 	}
 

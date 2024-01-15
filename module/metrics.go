@@ -322,6 +322,17 @@ type GossipSubRpcValidationInspectorMetrics interface {
 
 	// OnInvalidControlMessageSent tracks the number of times that the async inspection of a control message failed and an invalid control message was sent.
 	OnInvalidControlMessageSent()
+
+	// OnInvalidSenderForPublishMessage tracks the number of times that the async inspection of a publish message detected an invalid sender.
+	// Note that it does not cause a misbehaviour report; unless the number of times that this happens exceeds the threshold.
+	OnInvalidSenderForPublishMessage()
+
+	// OnPublishMessagesInspectionErrorExceedsThreshold tracks the number of times that async inspection of publish messages failed due to the number of errors.
+	OnPublishMessagesInspectionErrorExceedsThreshold()
+
+	// OnPublishMessageInvalidSubscription tracks the number of times that the async inspection of a publish message detected an invalid subscription.
+	// Note that it does not cause a misbehaviour report; unless the number of times that this happens exceeds the threshold.
+	OnPublishMessageInvalidSubscription()
 }
 
 // NetworkInboundQueueMetrics encapsulates the metrics collectors for the inbound queue of the networking layer.

@@ -47,6 +47,11 @@ type GossipSubRpcValidationInspectorMetrics struct {
 	errActiveClusterIdsNotSetCount       prometheus.Counter
 	errUnstakedPeerInspectionFailedCount prometheus.Counter
 	invalidControlMessageSentCount       prometheus.Counter
+
+	// publish messages
+	publishMessageInspectionErrExceedThresholdCount prometheus.Counter
+	publishMessageInvalidSenderCount                prometheus.Counter
+	publishMessageInvalidSubscriptionsCount         prometheus.Counter
 }
 
 var _ module.GossipSubRpcValidationInspectorMetrics = (*GossipSubRpcValidationInspectorMetrics)(nil)
@@ -224,6 +229,27 @@ func NewGossipSubRPCValidationInspectorMetrics(prefix string) *GossipSubRpcValid
 		Help:      "number of invalid control messages sent due to async inspection failure",
 	})
 
+	gc.publishMessageInvalidSenderCount = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace: namespaceNetwork,
+		Subsystem: subsystemGossip,
+		Name:      gc.prefix + "publish_message_invalid_sender_count",
+		Help:      "number of invalid sender detected for publish messages",
+	})
+
+	gc.publishMessageInspectionErrExceedThresholdCount = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace: namespaceNetwork,
+		Subsystem: subsystemGossip,
+		Name:      gc.prefix + "publish_message_inspection_err_exceed_threshold_count",
+		Help:      "number of publish messages inspection errors exceeding the threshold",
+	})
+
+	gc.publishMessageInvalidSubscriptionsCount = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace: namespaceNetwork,
+		Subsystem: subsystemGossip,
+		Name:      gc.prefix + "publish_message_invalid_subscriptions_count",
+		Help:      "number of publish messages with invalid subscriptions",
+	})
+
 	return gc
 }
 
@@ -362,4 +388,21 @@ func (c *GossipSubRpcValidationInspectorMetrics) OnUnstakedPeerInspectionFailed(
 // OnInvalidControlMessageSent tracks the number of times that the async inspection of a control message failed and an invalid control message was sent.
 func (c *GossipSubRpcValidationInspectorMetrics) OnInvalidControlMessageSent() {
 	c.invalidControlMessageSentCount.Inc()
+}
+
+// OnInvalidSenderForPublishMessage tracks the number of times that the async inspection of a publish message detected an invalid sender.
+// Note that it does not cause a misbehaviour report; unless the number of times that this happens exceeds the threshold.
+func (c *GossipSubRpcValidationInspectorMetrics) OnInvalidSenderForPublishMessage() {
+	c.publishMessageInvalidSenderCount.Inc()
+}
+
+// OnPublishMessagesInspectionErrorExceedsThreshold tracks the number of times that async inspection of publish messages failed due to the number of errors.
+func (c *GossipSubRpcValidationInspectorMetrics) OnPublishMessagesInspectionErrorExceedsThreshold() {
+	c.publishMessageInspectionErrExceedThresholdCount.Inc()
+}
+
+// OnPublishMessageInvalidSubscription tracks the number of times that the async inspection of a publish message detected an invalid subscription.
+// Note that it does not cause a misbehaviour report; unless the number of times that this happens exceeds the threshold.
+func (c *GossipSubRpcValidationInspectorMetrics) OnPublishMessageInvalidSubscription() {
+	c.publishMessageInvalidSubscriptionsCount.Inc()
 }
