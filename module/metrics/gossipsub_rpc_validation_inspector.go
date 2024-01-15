@@ -31,6 +31,14 @@ type GossipSubRpcValidationInspectorMetrics struct {
 	receivedPublishMessageCount            prometheus.Counter
 	incomingRpcCount                       prometheus.Counter
 
+	// graft inspection
+	graftDuplicateTopicIdsHistogram            prometheus.Histogram
+	graftDuplicateTopicIdsExceedThresholdCount prometheus.Counter
+
+	// prune inspection
+	pruneDuplicateTopicIdsHistogram            prometheus.Histogram
+	pruneDuplicateTopicIdsExceedThresholdCount prometheus.Counter
+
 	// iHave inspection
 	iHaveDuplicateMessageIdHistogram            prometheus.Histogram
 	iHaveDuplicateTopicIdHistogram              prometheus.Histogram
@@ -250,6 +258,34 @@ func NewGossipSubRPCValidationInspectorMetrics(prefix string) *GossipSubRpcValid
 		Help:      "number of publish messages with invalid subscriptions",
 	})
 
+	gc.graftDuplicateTopicIdsHistogram = promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceNetwork,
+		Subsystem: subsystemGossip,
+		Name:      gc.prefix + "rpc_inspection_graft_duplicate_topic_ids",
+		Help:      "number of duplicate topic ids received from gossipsub protocol during the async inspection of graft messages",
+	})
+
+	gc.graftDuplicateTopicIdsExceedThresholdCount = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace: namespaceNetwork,
+		Subsystem: subsystemGossip,
+		Name:      gc.prefix + "rpc_inspection_graft_duplicate_topic_ids_exceed_threshold_total",
+		Help:      "number of times that the async inspection of graft messages failed due to the number of duplicate topic ids exceeding the threshold",
+	})
+
+	gc.pruneDuplicateTopicIdsHistogram = promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceNetwork,
+		Subsystem: subsystemGossip,
+		Name:      gc.prefix + "rpc_inspection_prune_duplicate_topic_ids",
+		Help:      "number of duplicate topic ids received from gossipsub protocol during the async inspection of prune messages",
+	})
+
+	gc.pruneDuplicateTopicIdsExceedThresholdCount = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace: namespaceNetwork,
+		Subsystem: subsystemGossip,
+		Name:      gc.prefix + "rpc_inspection_prune_duplicate_topic_ids_exceed_threshold_total",
+		Help:      "number of times that the async inspection of prune messages failed due to the number of duplicate topic ids exceeding the threshold",
+	})
+
 	return gc
 }
 
@@ -405,4 +441,33 @@ func (c *GossipSubRpcValidationInspectorMetrics) OnPublishMessagesInspectionErro
 // Note that it does not cause a misbehaviour report; unless the number of times that this happens exceeds the threshold.
 func (c *GossipSubRpcValidationInspectorMetrics) OnPublishMessageInvalidSubscription() {
 	c.publishMessageInvalidSubscriptionsCount.Inc()
+}
+
+// OnPruneDuplicateTopicIdsExceedThreshold tracks the number of times that the async inspection of a prune message failed due to the number of duplicate topic ids
+// received by the node on prune messages of the same rpc excesses threshold, which results in a misbehaviour report.
+// Note that it does cause a misbehaviour report.
+func (c *GossipSubRpcValidationInspectorMetrics) OnPruneDuplicateTopicIdsExceedThreshold() {
+	c.pruneDuplicateTopicIdsExceedThresholdCount.Inc()
+}
+
+// OnPruneMessageInspected is called at the end of the async inspection of prune messages, regardless of the result of the inspection.
+// Args:
+//
+//	duplicateTopicIds: the number of duplicate topic ids received by the node on a prune message at the end of the async inspection prunes.
+func (c *GossipSubRpcValidationInspectorMetrics) OnPruneMessageInspected(duplicateTopicIds int) {
+	c.pruneDuplicateTopicIdsHistogram.Observe(float64(duplicateTopicIds))
+}
+
+// OnGraftDuplicateTopicIdsExceedThreshold tracks the number of times that the async inspection of a graft message failed due to the number of duplicate topic ids.
+// received by the node on graft messages of the same rpc excesses threshold, which results in a misbehaviour report.
+func (c *GossipSubRpcValidationInspectorMetrics) OnGraftDuplicateTopicIdsExceedThreshold() {
+	c.graftDuplicateTopicIdsExceedThresholdCount.Inc()
+}
+
+// OnGraftMessageInspected is called at the end of the async inspection of graft messages, regardless of the result of the inspection.
+// Args:
+//
+//	duplicateTopicIds: the number of duplicate topic ids received by the node on a graft message at the end of the async inspection grafts.
+func (c *GossipSubRpcValidationInspectorMetrics) OnGraftMessageInspected(duplicateTopicIds int) {
+	c.graftDuplicateTopicIdsHistogram.Observe(float64(duplicateTopicIds))
 }

@@ -333,6 +333,25 @@ type GossipSubRpcValidationInspectorMetrics interface {
 	// OnPublishMessageInvalidSubscription tracks the number of times that the async inspection of a publish message detected an invalid subscription.
 	// Note that it does not cause a misbehaviour report; unless the number of times that this happens exceeds the threshold.
 	OnPublishMessageInvalidSubscription()
+
+	// OnPruneDuplicateTopicIdsExceedThreshold tracks the number of times that the async inspection of a prune message failed due to the number of duplicate topic ids
+	// received by the node on prune messages of the same rpc excesses threshold, which results in a misbehaviour report.
+	// Note that it does cause a misbehaviour report.
+	OnPruneDuplicateTopicIdsExceedThreshold()
+
+	// OnPruneMessageInspected is called at the end of the async inspection of prune messages, regardless of the result of the inspection.
+	// Args:
+	// 	duplicateTopicIds: the number of duplicate topic ids received by the node on a prune message at the end of the async inspection prunes.
+	OnPruneMessageInspected(duplicateTopicIds int)
+
+	// OnGraftDuplicateTopicIdsExceedThreshold tracks the number of times that the async inspection of a graft message failed due to the number of duplicate topic ids.
+	// received by the node on graft messages of the same rpc excesses threshold, which results in a misbehaviour report.
+	OnGraftDuplicateTopicIdsExceedThreshold()
+
+	// OnGraftMessageInspected is called at the end of the async inspection of graft messages, regardless of the result of the inspection.
+	// Args:
+	// 	duplicateTopicIds: the number of duplicate topic ids received by the node on a graft message at the end of the async inspection grafts.
+	OnGraftMessageInspected(duplicateTopicIds int)
 }
 
 // NetworkInboundQueueMetrics encapsulates the metrics collectors for the inbound queue of the networking layer.

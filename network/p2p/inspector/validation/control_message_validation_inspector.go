@@ -328,6 +328,9 @@ func (c *ControlMsgValidationInspector) checkPubsubMessageSender(message *pubsub
 func (c *ControlMsgValidationInspector) inspectGraftMessages(from peer.ID, grafts []*pubsub_pb.ControlGraft, activeClusterIDS flow.ChainIDList) (error, p2p.CtrlMsgTopicType) {
 	duplicateTopicTracker := make(duplicateStrTracker)
 	totalDuplicateTopicIds := 0
+	defer func() {
+		c.metrics.OnGraftMessageInspected(totalDuplicateTopicIds)
+	}()
 	for _, graft := range grafts {
 		topic := channels.Topic(graft.GetTopicID())
 		if duplicateTopicTracker.track(topic.String()) > 1 {
@@ -335,6 +338,7 @@ func (c *ControlMsgValidationInspector) inspectGraftMessages(from peer.ID, graft
 			totalDuplicateTopicIds++
 			// check if the total number of duplicates exceeds the configured threshold.
 			if totalDuplicateTopicIds > c.config.GraftPrune.DuplicateTopicIdThreshold {
+				c.metrics.OnGraftDuplicateTopicIdsExceedThreshold()
 				return NewDuplicateTopicErr(topic.String(), totalDuplicateTopicIds, p2pmsg.CtrlMsgGraft), p2p.CtrlMsgNonClusterTopicType
 			}
 		}
@@ -361,6 +365,9 @@ func (c *ControlMsgValidationInspector) inspectGraftMessages(from peer.ID, graft
 func (c *ControlMsgValidationInspector) inspectPruneMessages(from peer.ID, prunes []*pubsub_pb.ControlPrune, activeClusterIDS flow.ChainIDList) (error, p2p.CtrlMsgTopicType) {
 	tracker := make(duplicateStrTracker)
 	totalDuplicateTopicIds := 0
+	defer func() {
+		c.metrics.OnPruneMessageInspected(totalDuplicateTopicIds)
+	}()
 	for _, prune := range prunes {
 		topic := channels.Topic(prune.GetTopicID())
 		if tracker.track(topic.String()) > 1 {
@@ -368,6 +375,7 @@ func (c *ControlMsgValidationInspector) inspectPruneMessages(from peer.ID, prune
 			totalDuplicateTopicIds++
 			// check if the total number of duplicates exceeds the configured threshold.
 			if totalDuplicateTopicIds > c.config.GraftPrune.DuplicateTopicIdThreshold {
+				c.metrics.OnPruneDuplicateTopicIdsExceedThreshold()
 				return NewDuplicateTopicErr(topic.String(), totalDuplicateTopicIds, p2pmsg.CtrlMsgPrune), p2p.CtrlMsgNonClusterTopicType
 			}
 		}
