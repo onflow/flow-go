@@ -340,6 +340,8 @@ func (c *ControlMsgValidationInspector) inspectGraftMessages(from peer.ID, graft
 		}
 		err, ctrlMsgType := c.validateTopic(from, topic, activeClusterIDS)
 		if err != nil {
+			// TODO: consider adding a threshold for this error similar to the duplicate topic id threshold.
+			c.metrics.OnInvalidTopicIdDetectedForControlMessage(p2pmsg.CtrlMsgGraft)
 			return err, ctrlMsgType
 		}
 	}
@@ -371,6 +373,8 @@ func (c *ControlMsgValidationInspector) inspectPruneMessages(from peer.ID, prune
 		}
 		err, ctrlMsgType := c.validateTopic(from, topic, activeClusterIDS)
 		if err != nil {
+			// TODO: consider adding a threshold for this error similar to the duplicate topic id threshold.
+			c.metrics.OnInvalidTopicIdDetectedForControlMessage(p2pmsg.CtrlMsgPrune)
 			return err, ctrlMsgType
 		}
 	}
@@ -569,6 +573,7 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 		err, _ := c.validateTopic(from, topic, activeClusterIDS)
 		if err != nil {
 			// we can skip checking for subscription of topic that failed validation and continue
+			c.metrics.OnInvalidTopicIdDetectedForControlMessage(p2pmsg.RpcPublishMessage)
 			errs = multierror.Append(errs, err)
 			continue
 		}
