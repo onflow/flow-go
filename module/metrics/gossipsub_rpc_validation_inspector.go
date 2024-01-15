@@ -29,6 +29,18 @@ type GossipSubRpcValidationInspectorMetrics struct {
 	receivedGraftCount                     prometheus.Counter
 	receivedPublishMessageCount            prometheus.Counter
 	incomingRpcCount                       prometheus.Counter
+
+	// iHave inspection
+	iHaveDuplicateMessageIdHistogram            prometheus.Histogram
+	iHaveDuplicateTopicIdHistogram              prometheus.Histogram
+	iHaveDuplicateMessageIdExceedThresholdCount prometheus.Counter
+	iHaveDuplicateTopicIdExceedThresholdCount   prometheus.Counter
+
+	// iWant inspection
+	iWantDuplicateMessageIdHistogram            prometheus.Histogram
+	iWantCacheMissHistogram                     prometheus.Histogram
+	iWantDuplicateMessageIdExceedThresholdCount prometheus.Counter
+	iWantCacheMissMessageIdExceedThresholdCount prometheus.Counter
 }
 
 var _ module.GossipSubRpcValidationInspectorMetrics = (*GossipSubRpcValidationInspectorMetrics)(nil)
@@ -118,6 +130,62 @@ func NewGossipSubRPCValidationInspectorMetrics(prefix string) *GossipSubRpcValid
 		Help:      "number of incoming rpc messages from gossipsub protocol",
 	})
 
+	gc.iHaveDuplicateMessageIdHistogram = promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceNetwork,
+		Subsystem: subsystemGossip,
+		Buckets:   []float64{1, 100, 1000},
+		Name:      gc.prefix + "rpc_inspection_ihave_duplicate_message_ids",
+		Help:      "number of duplicate message ids received from gossipsub protocol during the async inspection",
+	})
+
+	gc.iHaveDuplicateTopicIdHistogram = promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceNetwork,
+		Subsystem: subsystemGossip,
+		Buckets:   []float64{1, 100, 1000},
+		Name:      gc.prefix + "rpc_inspection_ihave_duplicate_topic_ids",
+		Help:      "number of duplicate topic ids received from gossipsub protocol during the async inspection",
+	})
+
+	gc.iHaveDuplicateMessageIdExceedThresholdCount = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace: namespaceNetwork,
+		Subsystem: subsystemGossip,
+		Name:      gc.prefix + "rpc_inspection_ihave_duplicate_message_ids_exceed_threshold_total",
+	})
+
+	gc.iHaveDuplicateTopicIdExceedThresholdCount = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace: namespaceNetwork,
+		Subsystem: subsystemGossip,
+		Name:      gc.prefix + "rpc_inspection_ihave_duplicate_topic_ids_exceed_threshold_total",
+	})
+
+	gc.iWantDuplicateMessageIdHistogram = promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceNetwork,
+		Subsystem: subsystemGossip,
+		Name:      gc.prefix + "rpc_inspection_iwant_duplicate_message_ids",
+		Buckets:   []float64{1, 100, 1000},
+		Help:      "number of duplicate message ids received from gossipsub protocol during the async inspection",
+	})
+
+	gc.iWantCacheMissHistogram = promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceNetwork,
+		Subsystem: subsystemGossip,
+		Name:      gc.prefix + "rpc_inspection_iwant_cache_miss_message_ids",
+		Buckets:   []float64{1, 100, 1000},
+		Help:      "number of cache miss message ids received from gossipsub protocol during the async inspection",
+	})
+
+	gc.iWantDuplicateMessageIdExceedThresholdCount = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace: namespaceNetwork,
+		Subsystem: subsystemGossip,
+		Name:      gc.prefix + "rpc_inspection_iwant_duplicate_message_ids_exceed_threshold_total",
+	})
+
+	gc.iWantCacheMissMessageIdExceedThresholdCount = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace: namespaceNetwork,
+		Subsystem: subsystemGossip,
+		Name:      gc.prefix + "rpc_inspection_iwant_cache_miss_message_ids_exceed_threshold_total",
+	})
+
 	return gc
 }
 
@@ -187,4 +255,49 @@ func (c *GossipSubRpcValidationInspectorMetrics) OnIncomingRpcReceived(iHaveCoun
 	c.receivedGraftCount.Add(float64(graftCount))
 	c.receivedIWantMsgCount.Add(float64(iWantCount))
 	c.receivedIHaveMsgCount.Add(float64(iHaveCount))
+}
+
+// OnIWantMessagesInspected tracks the number of duplicate and cache miss message ids received by the node on an iWant message at the end of the async inspection iWants
+// across one RPC.
+//
+//	duplicateCount: the number of duplicate message ids received by the node on an iWant message at the end of the async inspection iWants.
+//	cacheMissCount: the number of cache miss message ids received by the node on an iWant message at the end of the async inspection iWants.
+func (c *GossipSubRpcValidationInspectorMetrics) OnIWantMessagesInspected(duplicateCount int, cacheMissCount int) {
+	c.iWantDuplicateMessageIdHistogram.Observe(float64(duplicateCount))
+	c.iWantCacheMissHistogram.Observe(float64(cacheMissCount))
+}
+
+// OnIWantDuplicateMessageIdsExceedThreshold tracks the number of times that async inspection of iWant messages failed due to the number of duplicate message ids
+// received by the node on an iWant message exceeding the threshold, which results in a misbehaviour report.
+func (c *GossipSubRpcValidationInspectorMetrics) OnIWantDuplicateMessageIdsExceedThreshold() {
+	c.iWantDuplicateMessageIdExceedThresholdCount.Inc()
+}
+
+// OnIWantCacheMissMessageIdsExceedThreshold tracks the number of times that async inspection of iWant messages failed due to the number of cache miss message ids
+// received by the node on an iWant message exceeding the threshold, which results in a misbehaviour report.
+func (c *GossipSubRpcValidationInspectorMetrics) OnIWantCacheMissMessageIdsExceedThreshold() {
+	c.iWantCacheMissMessageIdExceedThresholdCount.Inc()
+}
+
+// OnIHaveMessagesInspected is called at the end of the async inspection of iHave messages, regardless of the result of the inspection.
+// It tracks the number of duplicate topic ids and duplicate message ids received by the node on an iHave message at the end of the async inspection iHaves.
+// Args:
+//
+//	duplicateTopicIds: the number of duplicate topic ids received by the node on an iHave message at the end of the async inspection iHaves.
+//	duplicateMessageIds: the number of duplicate message ids received by the node on an iHave message at the end of the async inspection iHaves.
+func (c *GossipSubRpcValidationInspectorMetrics) OnIHaveMessagesInspected(duplicateTopicIds int, duplicateMessageIds int) {
+	c.iHaveDuplicateTopicIdHistogram.Observe(float64(duplicateTopicIds))
+	c.iHaveDuplicateMessageIdHistogram.Observe(float64(duplicateMessageIds))
+}
+
+// OnIHaveDuplicateTopicIdsExceedThreshold tracks the number of times the number times that the async inspection of iHave messages failed due to the number of duplicate topic ids
+// received by the node on an iHave message exceeding the threshold, which results in a misbehaviour report.
+func (c *GossipSubRpcValidationInspectorMetrics) OnIHaveDuplicateTopicIdsExceedThreshold() {
+	c.iHaveDuplicateTopicIdExceedThresholdCount.Inc()
+}
+
+// OnIHaveDuplicateMessageIdsExceedThreshold tracks the number of times the number times that the async inspection of iHave messages failed due to the number of duplicate message ids
+// received by the node on an iHave message exceeding the threshold, which results in a misbehaviour report.
+func (c *GossipSubRpcValidationInspectorMetrics) OnIHaveDuplicateMessageIdsExceedThreshold() {
+	c.iHaveDuplicateMessageIdExceedThresholdCount.Inc()
 }

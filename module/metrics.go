@@ -276,6 +276,36 @@ type GossipSubRpcValidationInspectorMetrics interface {
 	//	messageType: the type of the control message that was truncated
 	//	diff: the number of control messages truncated.
 	OnControlMessagesTruncated(messageType p2pmsg.ControlMessageType, diff int)
+
+	// OnIWantMessagesInspected tracks the number of duplicate and cache miss message ids received by the node on an iWant message at the end of the async inspection iWants
+	// across one RPC.
+	// Args:
+	// 	duplicateCount: the number of duplicate message ids received by the node on an iWant message at the end of the async inspection iWants.
+	// 	cacheMissCount: the number of cache miss message ids received by the node on an iWant message at the end of the async inspection iWants.
+	OnIWantMessagesInspected(duplicateCount int, cacheMissCount int)
+
+	// OnIWantDuplicateMessageIdsExceedThreshold tracks the number of times that async inspection of iWant messages failed due to the number of duplicate message ids
+	// received by the node on an iWant message exceeding the threshold, which results in a misbehaviour report.
+	OnIWantDuplicateMessageIdsExceedThreshold()
+
+	// OnIWantCacheMissMessageIdsExceedThreshold tracks the number of times that async inspection of iWant messages failed due to the number of cache miss message ids
+	// received by the node on an iWant message exceeding the threshold, which results in a misbehaviour report.
+	OnIWantCacheMissMessageIdsExceedThreshold()
+
+	// OnIHaveMessagesInspected is called at the end of the async inspection of iHave messages, regardless of the result of the inspection.
+	// It tracks the number of duplicate topic ids and duplicate message ids received by the node on an iHave message at the end of the async inspection iHaves.
+	// Args:
+	// 	duplicateTopicIds: the number of duplicate topic ids received by the node on an iHave message at the end of the async inspection iHaves.
+	// 	duplicateMessageIds: the number of duplicate message ids received by the node on an iHave message at the end of the async inspection iHaves.
+	OnIHaveMessagesInspected(duplicateTopicIds int, duplicateMessageIds int)
+
+	// OnIHaveDuplicateTopicIdsExceedThreshold tracks the number of times the number times that the async inspection of iHave messages failed due to the number of duplicate topic ids
+	// received by the node on an iHave message exceeding the threshold, which results in a misbehaviour report.
+	OnIHaveDuplicateTopicIdsExceedThreshold()
+
+	// OnIHaveDuplicateMessageIdsExceedThreshold tracks the number of times the number times that the async inspection of iHave messages failed due to the number of duplicate message ids
+	// received by the node on an iHave message exceeding the threshold, which results in a misbehaviour report.
+	OnIHaveDuplicateMessageIdsExceedThreshold()
 }
 
 // NetworkInboundQueueMetrics encapsulates the metrics collectors for the inbound queue of the networking layer.

@@ -401,6 +401,9 @@ func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihave
 	totalMessageIds := 0
 	totalDuplicateTopicIds := 0
 	totalDuplicateMessageIds := 0
+	defer func() {
+		c.metrics.OnIHaveMessagesInspected(totalDuplicateTopicIds, totalDuplicateMessageIds)
+	}()
 	for _, ihave := range ihaves {
 		messageIds := ihave.GetMessageIDs()
 		topic := ihave.GetTopicID()
@@ -416,6 +419,7 @@ func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihave
 			totalDuplicateTopicIds++
 			// the topic is duplicated, check if the total number of duplicates exceeds the configured threshold
 			if totalDuplicateTopicIds > c.config.IHave.DuplicateTopicIdThreshold {
+				c.metrics.OnIHaveDuplicateTopicIdsExceedThreshold()
 				return NewDuplicateTopicErr(topic, totalDuplicateTopicIds, p2pmsg.CtrlMsgIHave), p2p.CtrlMsgNonClusterTopicType
 			}
 		}
@@ -425,6 +429,7 @@ func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihave
 				totalDuplicateMessageIds++
 				// the message is duplicated, check if the total number of duplicates exceeds the configured threshold
 				if totalDuplicateMessageIds > c.config.IHave.DuplicateMessageIdThreshold {
+					c.metrics.OnIHaveDuplicateMessageIdsExceedThreshold()
 					return NewDuplicateMessageIDErr(messageID, totalDuplicateMessageIds, p2pmsg.CtrlMsgIHave), p2p.CtrlMsgNonClusterTopicType
 				}
 			}
@@ -459,19 +464,18 @@ func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWant
 		Uint("max_sample_size", c.config.IWant.MessageCountThreshold).
 		Int64("last_highest_ihave_rpc_size", lastHighest).
 		Logger()
-	sampleSize := uint(len(iWants))
 	duplicateMsgIdTracker := make(duplicateStrTracker)
 	cacheMisses := 0
-	// keeps track of the total duplicate message ids found in the sample; a message id is considered duplicate if it appears
-	// more than a configurable threshold count in the sample.
-	totalDuplicateMessageIds := 0
-	allowedCacheMissesThreshold := float64(sampleSize) * c.config.IWant.CacheMissThreshold
-	allowedDuplicatesThreshold := float64(sampleSize) * c.config.IWant.DuplicateMsgIDThreshold
+	duplicateMessageIds := 0
+	defer func() {
+		c.metrics.OnIWantMessagesInspected(duplicateMessageIds, cacheMisses)
+	}()
+
 	checkCacheMisses := len(iWants) >= c.config.IWant.CacheMissCheckSize
 	lg = lg.With().
-		Uint("iwant_sample_size", sampleSize).
-		Float64("allowed_cache_misses_threshold", allowedCacheMissesThreshold).
-		Float64("allowed_duplicates_threshold", allowedDuplicatesThreshold).Logger()
+		Int("iwant_msg_count", len(iWants)).
+		Float64("cache_misses_threshold", c.config.IWant.CacheMissThreshold).
+		Float64("duplicates_threshold", c.config.IWant.DuplicateMsgIDThreshold).Logger()
 
 	lg.Trace().Msg("validating sample of message ids from iwant control message")
 
@@ -483,16 +487,18 @@ func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWant
 			// check duplicate allowed threshold
 			if duplicateMsgIdTracker.track(messageID) > 1 {
 				// ideally, an iWant message should not have any duplicate message IDs, hence a message id is considered duplicate when it is repeated more than once.
-				totalDuplicateMessageIds++
-				if float64(totalDuplicateMessageIds) > allowedDuplicatesThreshold {
-					return NewIWantDuplicateMsgIDThresholdErr(totalDuplicateMessageIds, messageIDCount, c.config.IWant.DuplicateMsgIDThreshold)
+				duplicateMessageIds++
+				if float64(duplicateMessageIds) > c.config.IWant.DuplicateMsgIDThreshold {
+					c.metrics.OnIWantDuplicateMessageIdsExceedThreshold()
+					return NewIWantDuplicateMsgIDThresholdErr(duplicateMessageIds, messageIDCount, c.config.IWant.DuplicateMsgIDThreshold)
 				}
 			}
 			// check cache miss threshold
 			if !c.rpcTracker.WasIHaveRPCSent(messageID) {
 				cacheMisses++
 				if checkCacheMisses {
-					if float64(cacheMisses) > allowedCacheMissesThreshold {
+					if float64(cacheMisses) > c.config.IWant.CacheMissThreshold {
+						c.metrics.OnIWantCacheMissMessageIdsExceedThreshold()
 						return NewIWantCacheMissThresholdErr(cacheMisses, messageIDCount, c.config.IWant.CacheMissThreshold)
 					}
 				}
@@ -505,7 +511,7 @@ func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWant
 	lg.Debug().
 		Int("total_message_ids", totalMessageIds).
 		Int("cache_misses", cacheMisses).
-		Int("total_duplicate_message_ids", totalDuplicateMessageIds).
+		Int("total_duplicate_message_ids", duplicateMessageIds).
 		Msg("iwant control message validation complete")
 
 	return nil
