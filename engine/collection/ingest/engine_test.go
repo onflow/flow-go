@@ -126,7 +126,7 @@ func (suite *Suite) SetupTest() {
 
 	suite.conf = DefaultConfig()
 	chain := flow.Testnet.Chain()
-	suite.engine, err = New(log, net, suite.state, metrics, metrics, metrics, suite.me, chain, suite.pools, suite.conf, NewAddressRateLimiter(rate.Limit(1)))
+	suite.engine, err = New(log, net, suite.state, metrics, metrics, metrics, suite.me, chain, suite.pools, suite.conf, NewAddressRateLimiter(rate.Limit(1), 1))
 	suite.Require().NoError(err)
 }
 

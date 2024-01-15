@@ -12,12 +12,14 @@ type AddressRateLimiter struct {
 	mu       sync.RWMutex
 	limiters map[flow.Address]*rate.Limiter
 	limit    rate.Limit
+	burst    int // X messages allowed at one time
 }
 
-func NewAddressRateLimiter(limit rate.Limit) *AddressRateLimiter {
+func NewAddressRateLimiter(limit rate.Limit, burst int) *AddressRateLimiter {
 	return &AddressRateLimiter{
 		limiters: make(map[flow.Address]*rate.Limiter),
 		limit:    limit,
+		burst:    burst,
 	}
 }
 
@@ -45,7 +47,7 @@ func (r *AddressRateLimiter) AddAddress(address flow.Address) {
 		return
 	}
 
-	r.limiters[address] = rate.NewLimiter(r.limit, 1)
+	r.limiters[address] = rate.NewLimiter(r.limit, r.burst)
 }
 
 // RemoveAddress remove an address for being rate limitted

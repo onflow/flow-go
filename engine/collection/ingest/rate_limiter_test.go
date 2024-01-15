@@ -1,16 +1,18 @@
 package ingest_test
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/access"
-	"github.com/onflow/flow-go/engine/collection/ingest"
-	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 	"golang.org/x/time/rate"
+
+	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine/collection/ingest"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 var _ access.RateLimiter = (*ingest.AddressRateLimiter)(nil)
@@ -23,7 +25,8 @@ func TestLimiterAddRemoveAddress(t *testing.T) {
 	limited2 := unittest.RandomAddressFixture()
 
 	numPerSec := rate.Limit(1)
-	l := ingest.NewAddressRateLimiter(numPerSec)
+	burst := 1
+	l := ingest.NewAddressRateLimiter(numPerSec, burst)
 
 	require.False(t, l.IsRateLimited(good1))
 	require.False(t, l.IsRateLimited(good1)) // address are not limited
@@ -49,6 +52,24 @@ func TestLimiterAddRemoveAddress(t *testing.T) {
 	require.True(t, l.IsRateLimited(limited2))
 }
 
+func TestLImiterBurst(t *testing.T) {
+	t.Parallel()
+
+	limited1 := unittest.RandomAddressFixture()
+
+	numPerSec := rate.Limit(1)
+	burst := 3
+	l := ingest.NewAddressRateLimiter(numPerSec, burst)
+
+	l.AddAddress(limited1)
+	for i := 0; i < burst; i++ {
+		require.False(t, l.IsRateLimited(limited1), fmt.Sprintf("%v-nth call", i))
+	}
+
+	require.True(t, l.IsRateLimited(limited1)) // limitted
+	require.True(t, l.IsRateLimited(limited1)) // limitted
+}
+
 // verify that if wait long enough after rate limited
 func TestLimiterWaitLongEnough(t *testing.T) {
 	t.Parallel()
@@ -56,7 +77,8 @@ func TestLimiterWaitLongEnough(t *testing.T) {
 	addr1 := unittest.RandomAddressFixture()
 
 	numPerSec := rate.Limit(1)
-	l := ingest.NewAddressRateLimiter(numPerSec)
+	burst := 1
+	l := ingest.NewAddressRateLimiter(numPerSec, burst)
 
 	l.AddAddress(addr1)
 	require.False(t, l.IsRateLimited(addr1))
@@ -73,7 +95,8 @@ func TestLimiterConcurrentSafe(t *testing.T) {
 	limited1 := unittest.RandomAddressFixture()
 
 	numPerSec := rate.Limit(1)
-	l := ingest.NewAddressRateLimiter(numPerSec)
+	burst := 1
+	l := ingest.NewAddressRateLimiter(numPerSec, burst)
 
 	l.AddAddress(limited1)
 
