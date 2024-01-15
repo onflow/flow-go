@@ -131,11 +131,12 @@ func (v *BaseView) GetCode(addr gethCommon.Address) ([]byte, error) {
 
 // GetCodeHash returns the code hash of an address
 //
-// for non-existent accounts or accounts without a code (e.g. EOAs) it returns default empty
+// for non-existent accounts it returns gethCommon.Hash{}
+// and for accounts without a code (e.g. EOAs) it returns default empty
 // hash value (gethTypes.EmptyCodeHash)
 func (v *BaseView) GetCodeHash(addr gethCommon.Address) (gethCommon.Hash, error) {
 	acc, err := v.getAccount(addr)
-	codeHash := gethTypes.EmptyCodeHash
+	codeHash := gethCommon.Hash{}
 	if acc != nil {
 		codeHash = acc.CodeHash
 	}
@@ -426,7 +427,7 @@ func (v *BaseView) getCode(addr gethCommon.Address) ([]byte, error) {
 		return nil, err
 	}
 	code = codeCont.Code()
-	if code != nil {
+	if len(code) > 0 {
 		v.cachedCodes[addr] = code
 	}
 	return code, nil
