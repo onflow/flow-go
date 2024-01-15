@@ -84,6 +84,7 @@ func main() {
 
 		pools               *epochpool.TransactionPools // epoch-scoped transaction pools
 		followerDistributor *pubsub.FollowerDistributor
+		addressRateLimiter  *ingest.AddressRateLimiter
 
 		push              *pusher.Engine
 		ing               *ingest.Engine
@@ -100,6 +101,8 @@ func main() {
 		accessNodeIDS      []string
 		apiRatelimits      map[string]int
 		apiBurstlimits     map[string]int
+		txRatelimits       float64
+		txBurstlimits      int
 	)
 	var deprecatedFlagBlockRateDelay time.Duration
 
@@ -160,6 +163,10 @@ func main() {
 		flags.StringToIntVar(&apiRatelimits, "api-rate-limits", map[string]int{}, "per second rate limits for GRPC API methods e.g. Ping=300,SendTransaction=500 etc. note limits apply globally to all clients.")
 		flags.StringToIntVar(&apiBurstlimits, "api-burst-limits", map[string]int{}, "burst limits for gRPC API methods e.g. Ping=100,SendTransaction=100 etc. note limits apply globally to all clients.")
 
+		// rate limiting for accounts, default is 2 transactions every 2.5 seconds
+		flags.Float64Var(&txRatelimits, "tx-rate-limits", 2.5, "per second rate limits for processing transactions for limited account")
+		flags.IntVar(&txBurstlimits, "tx-burst-limits", 2, "burst limits for processing transactions for limited account")
+
 		// deprecated flags
 		flags.DurationVar(&deprecatedFlagBlockRateDelay, "block-rate-delay", 0, "the delay to broadcast block proposal in order to control block production rate")
 	}).ValidateFlags(func() error {
@@ -182,6 +189,11 @@ func main() {
 
 	nodeBuilder.
 		PreInit(cmd.DynamicStartPreInit).
+		Module("transaction rate limiter", func(node *cmd.NodeConfig) error {
+			// To be managed by admin tool, and used by ingestion engine
+			addressRateLimiter = ingest.NewAddressRateLimiter(rate.Limit(txRatelimits), txBurstlimits)
+			return nil
+		}).
 		AdminCommand("read-range-cluster-blocks", func(conf *cmd.NodeConfig) commands.AdminCommand {
 			clusterPayloads := badger.NewClusterPayloads(&metrics.NoopCollector{}, conf.DB)
 			headers, ok := conf.Storage.Headers.(*badger.Headers)
@@ -381,7 +393,6 @@ func main() {
 			return sync, nil
 		}).
 		Component("ingestion engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			limiter := ingest.NewAddressRateLimiter(rate.Limit(1), 1) // one tps
 			ing, err = ingest.New(
 				node.Logger,
 				node.EngineRegistry,
@@ -393,7 +404,7 @@ func main() {
 				node.RootChainID.Chain(),
 				pools,
 				ingestConf,
-				limiter,
+				addressRateLimiter,
 			)
 			return ing, err
 		}).
