@@ -311,6 +311,17 @@ type GossipSubRpcValidationInspectorMetrics interface {
 	// Args:
 	// - messageType: the type of the control message that was truncated.
 	OnInvalidTopicIdDetectedForControlMessage(messageType p2pmsg.ControlMessageType)
+
+	// OnActiveClusterIDsNotSetErr tracks the number of times that the async inspection of a control message failed due to active cluster ids not set inspection failure.
+	// This is not causing a misbehaviour report.
+	OnActiveClusterIDsNotSetErr()
+
+	// OnUnstakedPeerInspectionFailed tracks the number of times that the async inspection of a control message failed due to unstaked peer inspection failure.
+	// This is not causing a misbehaviour report.
+	OnUnstakedPeerInspectionFailed()
+
+	// OnInvalidControlMessageSent tracks the number of times that the async inspection of a control message failed and an invalid control message was sent.
+	OnInvalidControlMessageSent()
 }
 
 // NetworkInboundQueueMetrics encapsulates the metrics collectors for the inbound queue of the networking layer.

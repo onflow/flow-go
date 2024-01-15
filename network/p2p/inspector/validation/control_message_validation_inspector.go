@@ -914,10 +914,13 @@ func (c *ControlMsgValidationInspector) logAndDistributeAsyncInspectErrs(req *In
 
 	switch {
 	case IsErrActiveClusterIDsNotSet(err):
+		c.metrics.OnActiveClusterIDsNotSetErr()
 		lg.Warn().Msg("active cluster ids not set")
 	case IsErrUnstakedPeer(err):
+		c.metrics.OnUnstakedPeerInspectionFailed()
 		lg.Warn().Msg("control message received from unstaked peer")
 	default:
+		c.metrics.OnInvalidControlMessageSent()
 		distErr := c.distributor.Distribute(p2p.NewInvalidControlMessageNotification(req.Peer, ctlMsgType, err, count, topicType))
 		if distErr != nil {
 			lg.Error().

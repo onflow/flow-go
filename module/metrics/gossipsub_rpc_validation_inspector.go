@@ -42,6 +42,11 @@ type GossipSubRpcValidationInspectorMetrics struct {
 	iWantCacheMissHistogram                     prometheus.Histogram
 	iWantDuplicateMessageIdExceedThresholdCount prometheus.Counter
 	iWantCacheMissMessageIdExceedThresholdCount prometheus.Counter
+
+	// inspection result
+	errActiveClusterIdsNotSetCount       prometheus.Counter
+	errUnstakedPeerInspectionFailedCount prometheus.Counter
+	invalidControlMessageSentCount       prometheus.Counter
 }
 
 var _ module.GossipSubRpcValidationInspectorMetrics = (*GossipSubRpcValidationInspectorMetrics)(nil)
@@ -198,6 +203,27 @@ func NewGossipSubRPCValidationInspectorMetrics(prefix string) *GossipSubRpcValid
 		Help:      "number of control messages with invalid topic id received from gossipsub protocol during the async inspection",
 	}, []string{LabelMessage})
 
+	gc.errActiveClusterIdsNotSetCount = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace: namespaceNetwork,
+		Subsystem: subsystemGossip,
+		Name:      gc.prefix + "active_cluster_ids_not_inspection_err_count",
+		Help:      "number of inspection errors due to active cluster ids not set inspection failure",
+	})
+
+	gc.errUnstakedPeerInspectionFailedCount = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace: namespaceNetwork,
+		Subsystem: subsystemGossip,
+		Name:      gc.prefix + "unstaked_peer_inspection_err_count",
+		Help:      "number of inspection errors due to unstaked peer inspection failure",
+	})
+
+	gc.invalidControlMessageSentCount = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace: namespaceNetwork,
+		Subsystem: subsystemGossip,
+		Name:      gc.prefix + "invalid_control_message_sent_count",
+		Help:      "number of invalid control messages sent due to async inspection failure",
+	})
+
 	return gc
 }
 
@@ -319,4 +345,21 @@ func (c *GossipSubRpcValidationInspectorMetrics) OnIHaveDuplicateMessageIdsExcee
 // - messageType: the type of the control message that was truncated.
 func (c *GossipSubRpcValidationInspectorMetrics) OnInvalidTopicIdDetectedForControlMessage(messageType p2pmsg.ControlMessageType) {
 	c.ctrlMsgInvalidTopicIdCount.WithLabelValues(messageType.String()).Inc()
+}
+
+// OnActiveClusterIDsNotSetErr tracks the number of times that the async inspection of a control message failed due to active cluster ids not set inspection failure.
+// This is not causing a misbehaviour report.
+func (c *GossipSubRpcValidationInspectorMetrics) OnActiveClusterIDsNotSetErr() {
+	c.errActiveClusterIdsNotSetCount.Inc()
+}
+
+// OnUnstakedPeerInspectionFailed tracks the number of times that the async inspection of a control message failed due to unstaked peer inspection failure.
+// This is not causing a misbehaviour report.
+func (c *GossipSubRpcValidationInspectorMetrics) OnUnstakedPeerInspectionFailed() {
+	c.errUnstakedPeerInspectionFailedCount.Inc()
+}
+
+// OnInvalidControlMessageSent tracks the number of times that the async inspection of a control message failed and an invalid control message was sent.
+func (c *GossipSubRpcValidationInspectorMetrics) OnInvalidControlMessageSent() {
+	c.invalidControlMessageSentCount.Inc()
 }
