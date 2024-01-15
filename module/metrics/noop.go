@@ -323,8 +323,27 @@ func (nc *NoopCollector) OnControlMessagesTruncated(messageType p2pmsg.ControlMe
 }
 func (nc *NoopCollector) OnIncomingRpcReceived(iHaveCount, iWantCount, graftCount, pruneCount, msgCount int) {
 }
-func (nc *NoopCollector) AsyncProcessingStarted()               {}
-func (nc *NoopCollector) AsyncProcessingFinished(time.Duration) {}
+func (nc *NoopCollector) AsyncProcessingStarted()                                                 {}
+func (nc *NoopCollector) AsyncProcessingFinished(time.Duration)                                   {}
+func (nc *NoopCollector) OnIWantMessagesInspected(duplicateCount int, cacheMissCount int)         {}
+func (nc *NoopCollector) OnIWantDuplicateMessageIdsExceedThreshold()                              {}
+func (nc *NoopCollector) OnIWantCacheMissMessageIdsExceedThreshold()                              {}
+func (nc *NoopCollector) OnIHaveMessagesInspected(duplicateTopicIds int, duplicateMessageIds int) {}
+func (nc *NoopCollector) OnIHaveDuplicateTopicIdsExceedThreshold()                                {}
+func (nc *NoopCollector) OnIHaveDuplicateMessageIdsExceedThreshold()                              {}
+func (nc *NoopCollector) OnInvalidTopicIdDetectedForControlMessage(messageType p2pmsg.ControlMessageType) {
+}
+func (nc *NoopCollector) OnActiveClusterIDsNotSetErr()                      {}
+func (nc *NoopCollector) OnUnstakedPeerInspectionFailed()                   {}
+func (nc *NoopCollector) OnInvalidControlMessageSent()                      {}
+func (nc *NoopCollector) OnInvalidSenderForPublishMessage()                 {}
+func (nc *NoopCollector) OnPublishMessagesInspectionErrorExceedsThreshold() {}
+func (nc *NoopCollector) OnPublishMessageInvalidSubscription()              {}
+func (nc *NoopCollector) OnPruneDuplicateTopicIdsExceedThreshold()          {}
+func (nc *NoopCollector) OnPruneMessageInspected(duplicateTopicIds int)     {}
+func (nc *NoopCollector) OnGraftDuplicateTopicIdsExceedThreshold()          {}
+func (nc *NoopCollector) OnGraftMessageInspected(duplicateTopicIds int)     {}
+func (nc *NoopCollector) OnPublishMessageInspected(errCount int)            {}
 
 func (nc *NoopCollector) OnMisbehaviorReported(string, string) {}
 func (nc *NoopCollector) OnViolationReportSkipped()            {}
