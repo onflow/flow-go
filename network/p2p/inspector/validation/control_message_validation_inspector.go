@@ -411,6 +411,8 @@ func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihave
 		// first check if the topic is valid, fail fast if it is not
 		err, ctrlMsgType := c.validateTopic(from, channels.Topic(topic), activeClusterIDS)
 		if err != nil {
+			// TODO: consider adding a threshold for this error similar to the duplicate topic id threshold.
+			c.metrics.OnInvalidTopicIdDetectedForControlMessage(p2pmsg.CtrlMsgIHave)
 			return err, ctrlMsgType
 		}
 

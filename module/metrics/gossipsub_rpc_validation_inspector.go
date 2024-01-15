@@ -21,6 +21,7 @@ type GossipSubRpcValidationInspectorMetrics struct {
 	rpcCtrlMsgInAsyncPreProcessingGauge    prometheus.Gauge
 	rpcCtrlMsgAsyncProcessingTimeHistogram prometheus.Histogram
 	rpcCtrlMsgTruncation                   prometheus.HistogramVec
+	ctrlMsgInvalidTopicIdCount             prometheus.CounterVec
 	receivedIWantMsgCount                  prometheus.Counter
 	receivedIWantMsgIDsHistogram           prometheus.Histogram
 	receivedIHaveMsgCount                  prometheus.Counter
@@ -150,12 +151,14 @@ func NewGossipSubRPCValidationInspectorMetrics(prefix string) *GossipSubRpcValid
 		Namespace: namespaceNetwork,
 		Subsystem: subsystemGossip,
 		Name:      gc.prefix + "rpc_inspection_ihave_duplicate_message_ids_exceed_threshold_total",
+		Help:      "number of times that the async inspection of iHave messages failed due to the number of duplicate message ids exceeding the threshold",
 	})
 
 	gc.iHaveDuplicateTopicIdExceedThresholdCount = promauto.NewCounter(prometheus.CounterOpts{
 		Namespace: namespaceNetwork,
 		Subsystem: subsystemGossip,
 		Name:      gc.prefix + "rpc_inspection_ihave_duplicate_topic_ids_exceed_threshold_total",
+		Help:      "number of times that the async inspection of iHave messages failed due to the number of duplicate topic ids exceeding the threshold",
 	})
 
 	gc.iWantDuplicateMessageIdHistogram = promauto.NewHistogram(prometheus.HistogramOpts{
@@ -178,13 +181,22 @@ func NewGossipSubRPCValidationInspectorMetrics(prefix string) *GossipSubRpcValid
 		Namespace: namespaceNetwork,
 		Subsystem: subsystemGossip,
 		Name:      gc.prefix + "rpc_inspection_iwant_duplicate_message_ids_exceed_threshold_total",
+		Help:      "number of times that the async inspection of iWant messages failed due to the number of duplicate message ids ",
 	})
 
 	gc.iWantCacheMissMessageIdExceedThresholdCount = promauto.NewCounter(prometheus.CounterOpts{
 		Namespace: namespaceNetwork,
 		Subsystem: subsystemGossip,
 		Name:      gc.prefix + "rpc_inspection_iwant_cache_miss_message_ids_exceed_threshold_total",
+		Help:      "number of times that the async inspection of iWant messages failed due to the number of cache miss message ids ",
 	})
+
+	gc.ctrlMsgInvalidTopicIdCount = *promauto.NewCounterVec(prometheus.CounterOpts{
+		Namespace: namespaceNetwork,
+		Subsystem: subsystemGossip,
+		Name:      gc.prefix + "control_message_invalid_topic_id_count",
+		Help:      "number of control messages with invalid topic id received from gossipsub protocol during the async inspection",
+	}, []string{LabelMessage})
 
 	return gc
 }
@@ -300,4 +312,11 @@ func (c *GossipSubRpcValidationInspectorMetrics) OnIHaveDuplicateTopicIdsExceedT
 // received by the node on an iHave message exceeding the threshold, which results in a misbehaviour report.
 func (c *GossipSubRpcValidationInspectorMetrics) OnIHaveDuplicateMessageIdsExceedThreshold() {
 	c.iHaveDuplicateMessageIdExceedThresholdCount.Inc()
+}
+
+// OnInvalidTopicIdDetectedForControlMessage tracks the number of times that the async inspection of a control message failed due to an invalid topic id.
+// Args:
+// - messageType: the type of the control message that was truncated.
+func (c *GossipSubRpcValidationInspectorMetrics) OnInvalidTopicIdDetectedForControlMessage(messageType p2pmsg.ControlMessageType) {
+	c.ctrlMsgInvalidTopicIdCount.WithLabelValues(messageType.String()).Inc()
 }

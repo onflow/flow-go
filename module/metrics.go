@@ -306,6 +306,11 @@ type GossipSubRpcValidationInspectorMetrics interface {
 	// OnIHaveDuplicateMessageIdsExceedThreshold tracks the number of times the number times that the async inspection of iHave messages failed due to the number of duplicate message ids
 	// received by the node on an iHave message exceeding the threshold, which results in a misbehaviour report.
 	OnIHaveDuplicateMessageIdsExceedThreshold()
+
+	// OnInvalidTopicIdDetectedForControlMessage tracks the number of times that the async inspection of a control message failed due to an invalid topic id.
+	// Args:
+	// - messageType: the type of the control message that was truncated.
+	OnInvalidTopicIdDetectedForControlMessage(messageType p2pmsg.ControlMessageType)
 }
 
 // NetworkInboundQueueMetrics encapsulates the metrics collectors for the inbound queue of the networking layer.
