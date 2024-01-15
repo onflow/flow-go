@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
+	"golang.org/x/time/rate"
 
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
@@ -380,6 +381,7 @@ func main() {
 			return sync, nil
 		}).
 		Component("ingestion engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			limiter := ingest.NewAddressRateLimiter(rate.Limit(1), 1) // one tps
 			ing, err = ingest.New(
 				node.Logger,
 				node.EngineRegistry,
@@ -391,6 +393,7 @@ func main() {
 				node.RootChainID.Chain(),
 				pools,
 				ingestConf,
+				limiter,
 			)
 			return ing, err
 		}).

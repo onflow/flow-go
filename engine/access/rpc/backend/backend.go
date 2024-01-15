@@ -286,7 +286,7 @@ func configureTransactionValidator(state protocol.State, chainID flow.ChainID) *
 			MaxTransactionByteSize:       flow.DefaultMaxTransactionByteSize,
 			MaxCollectionByteSize:        flow.DefaultMaxCollectionByteSize,
 		},
-		access.NewNoopLimit(),
+		access.NewNoopLimiter(),
 	)
 }
 
