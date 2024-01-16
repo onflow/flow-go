@@ -60,7 +60,7 @@ func New(
 
 	logger := log.With().Str("engine", "ingest").Logger()
 
-	transactionValidator := access.NewTransactionValidator(
+	transactionValidator := access.NewTransactionValidatorWithLimiter(
 		access.NewProtocolStateBlocks(state),
 		chain,
 		access.TransactionValidationOptions{

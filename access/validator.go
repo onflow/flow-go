@@ -79,6 +79,20 @@ func NewTransactionValidator(
 	blocks Blocks,
 	chain flow.Chain,
 	options TransactionValidationOptions,
+) *TransactionValidator {
+	return &TransactionValidator{
+		blocks:                blocks,
+		chain:                 chain,
+		options:               options,
+		serviceAccountAddress: chain.ServiceAddress(),
+		limiter:               NewNoopLimiter(),
+	}
+}
+
+func NewTransactionValidatorWithLimiter(
+	blocks Blocks,
+	chain flow.Chain,
+	options TransactionValidationOptions,
 	rateLimiter RateLimiter,
 ) *TransactionValidator {
 	return &TransactionValidator{
