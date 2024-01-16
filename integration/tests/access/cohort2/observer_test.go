@@ -74,7 +74,9 @@ func (s *ObserverSuite) SetupTest() {
 
 	nodeConfigs := []testnet.NodeConfig{
 		// access node with unstaked nodes supported
-		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.InfoLevel), testnet.WithAdditionalFlag("--supports-observer=true")),
+		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.InfoLevel),
+			testnet.WithAdditionalFlag("--supports-observer=true"),
+		),
 
 		// need one dummy execution node
 		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel)),
@@ -400,7 +402,7 @@ func (s *ObserverSuite) getRestEndpoints() []RestEndpointTest {
 	block := unittest.BlockFixture()
 	executionResult := unittest.ExecutionResultFixture()
 	collection := unittest.CollectionFixture(2)
-	eventType := "A.0123456789abcdef.flow.event"
+	eventType := unittest.EventTypeFixture(flow.Localnet)
 
 	return []RestEndpointTest{
 		{

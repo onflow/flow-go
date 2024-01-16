@@ -13,15 +13,13 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/internal/p2pfixtures"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/scoring"
+	p2pconfig "github.com/onflow/flow-go/network/p2p/config"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
-	"github.com/onflow/flow-go/network/p2p/tracer"
 	flowpubsub "github.com/onflow/flow-go/network/validator/pubsub"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -38,16 +36,13 @@ func TestFullGossipSubConnectivity(t *testing.T) {
 	// two groups of non-access nodes and one group of access nodes.
 	groupOneNodes, groupOneIds := p2ptest.NodesFixture(t, sporkId, t.Name(), 5,
 		idProvider,
-		p2ptest.WithRole(flow.RoleConsensus),
-		p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride))
+		p2ptest.WithRole(flow.RoleConsensus))
 	groupTwoNodes, groupTwoIds := p2ptest.NodesFixture(t, sporkId, t.Name(), 5,
 		idProvider,
-		p2ptest.WithRole(flow.RoleCollection),
-		p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride))
+		p2ptest.WithRole(flow.RoleCollection))
 	accessNodeGroup, accessNodeIds := p2ptest.NodesFixture(t, sporkId, t.Name(), 5,
 		idProvider,
-		p2ptest.WithRole(flow.RoleAccess),
-		p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride))
+		p2ptest.WithRole(flow.RoleAccess))
 
 	ids := append(append(groupOneIds, groupTwoIds...), accessNodeIds...)
 	nodes := append(append(groupOneNodes, groupTwoNodes...), accessNodeGroup...)
@@ -131,27 +126,13 @@ func TestFullGossipSubConnectivityAmongHonestNodesWithMaliciousMajority(t *testi
 	sporkId := unittest.IdentifierFixture()
 
 	idProvider := mock.NewIdentityProvider(t)
-	// two (honest) consensus nodes
-	opts := []p2ptest.NodeFixtureParameterOption{p2ptest.WithRole(flow.RoleConsensus)}
-	opts = append(opts, p2ptest.EnablePeerScoringWithOverride(p2p.PeerScoringConfigNoOverride))
-
 	defaultConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
-	meshTracerCfg := &tracer.GossipSubMeshTracerConfig{
-		Logger:                             unittest.Logger(),
-		Metrics:                            metrics.NewNoopCollector(),
-		IDProvider:                         idProvider,
-		LoggerInterval:                     time.Second,
-		HeroCacheMetricsFactory:            metrics.NewNoopHeroCacheMetricsFactory(),
-		RpcSentTrackerCacheSize:            defaultConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerCacheSize,
-		RpcSentTrackerWorkerQueueCacheSize: defaultConfig.NetworkConfig.GossipSubConfig.RPCSentTrackerQueueCacheSize,
-		RpcSentTrackerNumOfWorkers:         defaultConfig.NetworkConfig.GossipSubConfig.RpcSentTrackerNumOfWorkers,
-	}
+	// override the default config to make the mesh tracer log more frequently
+	defaultConfig.NetworkConfig.GossipSub.RpcTracer.LocalMeshLogInterval = time.Second
 
-	con1NodeTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg) // mesh tracer for con1
-	con2NodeTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg) // mesh tracer for con2
-	con1Node, con1Id := p2ptest.NodeFixture(t, sporkId, t.Name(), idProvider, append(opts, p2ptest.WithGossipSubTracer(con1NodeTracer))...)
-	con2Node, con2Id := p2ptest.NodeFixture(t, sporkId, t.Name(), idProvider, append(opts, p2ptest.WithGossipSubTracer(con2NodeTracer))...)
+	con1Node, con1Id := p2ptest.NodeFixture(t, sporkId, t.Name(), idProvider, p2ptest.WithRole(flow.RoleConsensus), p2ptest.OverrideFlowConfig(defaultConfig))
+	con2Node, con2Id := p2ptest.NodeFixture(t, sporkId, t.Name(), idProvider, p2ptest.WithRole(flow.RoleConsensus), p2ptest.OverrideFlowConfig(defaultConfig))
 
 	// create > 2 * 12 malicious access nodes
 	// 12 is the maximum size of default GossipSub mesh.
@@ -161,7 +142,7 @@ func TestFullGossipSubConnectivityAmongHonestNodesWithMaliciousMajority(t *testi
 		p2ptest.WithRole(flow.RoleAccess),
 		// overrides the default peer scoring parameters to mute GossipSub traffic from/to honest nodes.
 		p2ptest.EnablePeerScoringWithOverride(&p2p.PeerScoringConfigOverride{
-			AppSpecificScoreParams: maliciousAppSpecificScore(flow.IdentityList{&con1Id, &con2Id}),
+			AppSpecificScoreParams: maliciousAppSpecificScore(flow.IdentityList{&con1Id, &con2Id}, defaultConfig.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Protocol),
 		}),
 	)
 
@@ -214,7 +195,7 @@ func TestFullGossipSubConnectivityAmongHonestNodesWithMaliciousMajority(t *testi
 	for {
 		select {
 		case <-ticker.C:
-			con1BlockTopicPeers := con1NodeTracer.GetMeshPeers(blockTopic.String())
+			con1BlockTopicPeers := con1Node.GetLocalMeshPeers(blockTopic)
 			for _, p := range con1BlockTopicPeers {
 				if p == con2Node.ID() {
 					con2HasCon1 = true
@@ -222,7 +203,7 @@ func TestFullGossipSubConnectivityAmongHonestNodesWithMaliciousMajority(t *testi
 				}
 			}
 
-			con2BlockTopicPeers := con2NodeTracer.GetMeshPeers(blockTopic.String())
+			con2BlockTopicPeers := con2Node.GetLocalMeshPeers(blockTopic)
 			for _, p := range con2BlockTopicPeers {
 				if p == con1Node.ID() {
 					con1HasCon2 = true
@@ -242,14 +223,14 @@ func TestFullGossipSubConnectivityAmongHonestNodesWithMaliciousMajority(t *testi
 
 // maliciousAppSpecificScore returns a malicious app specific penalty function that rewards the malicious node and
 // punishes the honest nodes.
-func maliciousAppSpecificScore(honestIds flow.IdentityList) func(peer.ID) float64 {
+func maliciousAppSpecificScore(honestIds flow.IdentityList, optionCfg p2pconfig.ProtocolLevelGossipSubScoreParams) func(peer.ID) float64 {
 	honestIdProvider := id.NewFixedIdentityProvider(honestIds)
 	return func(p peer.ID) float64 {
 		_, isHonest := honestIdProvider.ByPeerID(p)
 		if isHonest {
-			return scoring.MaxAppSpecificPenalty
+			return optionCfg.AppSpecificScore.MaxAppSpecificPenalty
 		}
 
-		return scoring.MaxAppSpecificReward
+		return optionCfg.AppSpecificScore.MaxAppSpecificReward
 	}
 }

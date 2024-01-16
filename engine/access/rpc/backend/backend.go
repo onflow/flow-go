@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/common/rpc"
-	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -84,10 +83,12 @@ type Params struct {
 	HistoricalAccessNodes     []accessproto.AccessAPIClient
 	Blocks                    storage.Blocks
 	Headers                   storage.Headers
+	Events                    storage.Events
 	Collections               storage.Collections
 	Transactions              storage.Transactions
 	ExecutionReceipts         storage.ExecutionReceipts
 	ExecutionResults          storage.ExecutionResults
+	LightTransactionResults   storage.LightTransactionResults
 	ChainID                   flow.ChainID
 	AccessMetrics             module.AccessMetrics
 	ConnFactory               connection.ConnectionFactory
@@ -99,13 +100,15 @@ type Params struct {
 	SnapshotHistoryLimit      int
 	Communicator              Communicator
 	TxResultCacheSize         uint
+	TxErrorMessagesCacheSize  uint
 	ScriptExecutor            execution.ScriptExecutor
-	ScriptExecutionMode       ScriptExecutionMode
+	ScriptExecutionMode       IndexQueryMode
+	EventQueryMode            IndexQueryMode
 }
 
 // New creates backend instance
 func New(params Params) (*Backend, error) {
-	retry := newRetry()
+	retry := newRetry(params.Log)
 	if params.RetryEnabled {
 		retry.Activate()
 	}
@@ -123,6 +126,18 @@ func New(params Params) (*Backend, error) {
 		}
 	}
 
+	// NOTE: The transaction error message cache is currently only used by the access node and not by the observer node.
+	//       To avoid introducing unnecessary command line arguments in the observer, one case could be that the error
+	//       message cache is nil for the observer node.
+	var txErrorMessagesCache *lru.Cache[flow.Identifier, string]
+
+	if params.TxErrorMessagesCacheSize > 0 {
+		txErrorMessagesCache, err = lru.New[flow.Identifier, string](int(params.TxErrorMessagesCacheSize))
+		if err != nil {
+			return nil, fmt.Errorf("failed to init cache for transaction error messages: %w", err)
+		}
+	}
+
 	// initialize node version info
 	nodeInfo, err := getNodeVersionInfo(params.State.Params())
 	if err != nil {
@@ -133,11 +148,11 @@ func New(params Params) (*Backend, error) {
 		state: params.State,
 		// create the sub-backends
 		backendScripts: backendScripts{
+			log:               params.Log,
 			headers:           params.Headers,
 			executionReceipts: params.ExecutionReceipts,
 			connFactory:       params.ConnFactory,
 			state:             params.State,
-			log:               params.Log,
 			metrics:           params.AccessMetrics,
 			loggedScripts:     loggedScripts,
 			nodeCommunicator:  params.Communicator,
@@ -145,30 +160,35 @@ func New(params Params) (*Backend, error) {
 			scriptExecMode:    params.ScriptExecutionMode,
 		},
 		backendTransactions: backendTransactions{
+			log:                  params.Log,
 			staticCollectionRPC:  params.CollectionRPC,
 			state:                params.State,
 			chainID:              params.ChainID,
 			collections:          params.Collections,
 			blocks:               params.Blocks,
 			transactions:         params.Transactions,
+			results:              params.LightTransactionResults,
 			executionReceipts:    params.ExecutionReceipts,
 			transactionValidator: configureTransactionValidator(params.State, params.ChainID),
 			transactionMetrics:   params.AccessMetrics,
 			retry:                retry,
 			connFactory:          params.ConnFactory,
 			previousAccessNodes:  params.HistoricalAccessNodes,
-			log:                  params.Log,
 			nodeCommunicator:     params.Communicator,
 			txResultCache:        txResCache,
+			txErrorMessagesCache: txErrorMessagesCache,
 		},
 		backendEvents: backendEvents{
+			log:               params.Log,
+			chain:             params.ChainID.Chain(),
 			state:             params.State,
 			headers:           params.Headers,
+			events:            params.Events,
 			executionReceipts: params.ExecutionReceipts,
 			connFactory:       params.ConnFactory,
-			log:               params.Log,
 			maxHeightRange:    params.MaxHeightRange,
 			nodeCommunicator:  params.Communicator,
+			queryMode:         params.EventQueryMode,
 		},
 		backendBlockHeaders: backendBlockHeaders{
 			headers: params.Headers,
@@ -179,11 +199,11 @@ func New(params Params) (*Backend, error) {
 			state:  params.State,
 		},
 		backendAccounts: backendAccounts{
+			log:               params.Log,
 			state:             params.State,
 			headers:           params.Headers,
 			executionReceipts: params.ExecutionReceipts,
 			connFactory:       params.ConnFactory,
-			log:               params.Log,
 			nodeCommunicator:  params.Communicator,
 			scriptExecutor:    params.ScriptExecutor,
 			scriptExecMode:    params.ScriptExecutionMode,
@@ -194,6 +214,7 @@ func New(params Params) (*Backend, error) {
 		backendNetwork: backendNetwork{
 			state:                params.State,
 			chainID:              params.ChainID,
+			headers:              params.Headers,
 			snapshotHistoryLimit: params.SnapshotHistoryLimit,
 		},
 		collections:       params.Collections,
@@ -341,18 +362,6 @@ func (b *Backend) GetNetworkParameters(_ context.Context) access.NetworkParamete
 	return access.NetworkParameters{
 		ChainID: b.chainID,
 	}
-}
-
-// GetLatestProtocolStateSnapshot returns the latest finalized snapshot
-func (b *Backend) GetLatestProtocolStateSnapshot(_ context.Context) ([]byte, error) {
-	snapshot := b.state.Final()
-
-	validSnapshot, err := b.getValidSnapshot(snapshot, 0)
-	if err != nil {
-		return nil, err
-	}
-
-	return convert.SnapshotToBytes(validSnapshot)
 }
 
 // executionNodesForBlockID returns upto maxNodesCnt number of randomly chosen execution node identities

@@ -4,8 +4,9 @@ package bootstrap
 import (
 	"encoding/json"
 	"fmt"
-	"sort"
 	"strings"
+
+	"golang.org/x/exp/slices"
 
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
@@ -172,6 +173,18 @@ type decodableNodeInfoPub struct {
 	// Stake previously was used in place of the Weight field.
 	// Deprecated: supported in decoding for backward-compatibility
 	Stake uint64
+}
+
+func (info *NodeInfoPub) Equals(other *NodeInfoPub) bool {
+	if other == nil {
+		return false
+	}
+	return info.Address == other.Address &&
+		info.NodeID == other.NodeID &&
+		info.Role == other.Role &&
+		info.Weight == other.Weight &&
+		info.NetworkPubKey.PublicKey.Equals(other.NetworkPubKey.PublicKey) &&
+		info.StakingPubKey.PublicKey.Equals(other.StakingPubKey.PublicKey)
 }
 
 func (info *NodeInfoPub) UnmarshalJSON(b []byte) error {
@@ -390,12 +403,14 @@ func FilterByRole(nodes []NodeInfo, role flow.Role) []NodeInfo {
 	return filtered
 }
 
-// Sort sorts the NodeInfo list using the given ordering.
+// Sort sorts the NodeInfo list using the given order.
+//
+// The sorted list is returned and the original list is untouched.
 func Sort(nodes []NodeInfo, order flow.IdentityOrder) []NodeInfo {
 	dup := make([]NodeInfo, len(nodes))
 	copy(dup, nodes)
-	sort.Slice(dup, func(i, j int) bool {
-		return order(dup[i].Identity(), dup[j].Identity())
+	slices.SortFunc(dup, func(i, j NodeInfo) int {
+		return order(i.Identity(), j.Identity())
 	})
 	return dup
 }

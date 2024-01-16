@@ -27,10 +27,7 @@ func EpochSetupRandomSourceFixture() []byte {
 // EpochSetupFixtureByChainID returns an EpochSetup service event as a Cadence event
 // representation and as a protocol model representation.
 func EpochSetupFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochSetup) {
-	events, err := systemcontracts.ServiceEventsForChain(chain)
-	if err != nil {
-		panic(err)
-	}
+	events := systemcontracts.ServiceEventsForChain(chain)
 
 	event := EventFixture(events.EpochSetup.EventType(), 1, 1, IdentifierFixture(), 0)
 	randomSource := EpochSetupRandomSourceFixture()
@@ -121,10 +118,7 @@ func EpochSetupFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochSetu
 // representation and as a protocol model representation.
 func EpochCommitFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochCommit) {
 
-	events, err := systemcontracts.ServiceEventsForChain(chain)
-	if err != nil {
-		panic(err)
-	}
+	events := systemcontracts.ServiceEventsForChain(chain)
 
 	event := EventFixture(events.EpochCommit.EventType(), 1, 1, IdentifierFixture(), 0)
 	event.Payload = EpochCommitFixtureCCF
@@ -160,10 +154,7 @@ func EpochCommitFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochCom
 // representation and as a protocol model representation.
 func VersionBeaconFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.VersionBeacon) {
 
-	events, err := systemcontracts.ServiceEventsForChain(chain)
-	if err != nil {
-		panic(err)
-	}
+	events := systemcontracts.ServiceEventsForChain(chain)
 
 	event := EventFixture(events.VersionBeacon.EventType(), 1, 1, IdentifierFixture(), 0)
 	event.Payload = VersionBeaconFixtureCCF

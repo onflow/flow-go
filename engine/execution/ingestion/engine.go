@@ -202,7 +202,7 @@ func (e *Engine) reloadUnexecutedBlocks() error {
 			e.log.Debug().Hex("block_id", blockID[:]).Msg("reloaded block")
 		}
 
-		log.Info().Msg("all unexecuted have been successfully reloaded")
+		e.log.Info().Int("count", len(unexecuted)).Msg("all unexecuted have been successfully reloaded")
 
 		return nil
 	})
@@ -396,6 +396,8 @@ func (e *Engine) enqueueBlockAndCheckExecutable(
 		Uint64("first_unexecuted_in_queue", firstUnexecutedHeight).
 		Bool("complete", complete).
 		Bool("head_of_queue", head).
+		Int("cols", len(executableBlock.Block.Payload.Guarantees)).
+		Int("missing_cols", len(missingCollections)).
 		Msg("block is enqueued")
 
 	return missingCollections, nil
@@ -430,8 +432,8 @@ func (e *Engine) executeBlock(
 	}
 
 	snapshot := e.execState.NewStorageSnapshot(*executableBlock.StartState,
-		executableBlock.ID(),
-		executableBlock.Block.Header.Height,
+		executableBlock.Block.Header.ParentID,
+		executableBlock.Block.Header.Height-1,
 	)
 
 	computationResult, err := e.computationManager.ComputeBlock(

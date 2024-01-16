@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -58,7 +57,7 @@ func TestIdentityEncodingJSON(t *testing.T) {
 		var dec flow.Identity
 		err = json.Unmarshal(enc, &dec)
 		require.NoError(t, err)
-		require.Equal(t, identity, &dec)
+		require.True(t, identity.Equals(&dec))
 	})
 
 	t.Run("empty address should be omitted", func(t *testing.T) {
@@ -71,7 +70,7 @@ func TestIdentityEncodingJSON(t *testing.T) {
 		var dec flow.Identity
 		err = json.Unmarshal(enc, &dec)
 		require.NoError(t, err)
-		require.Equal(t, identity, &dec)
+		require.True(t, identity.Equals(&dec))
 	})
 
 	t.Run("compat: should accept old files using Stake field", func(t *testing.T) {
@@ -83,7 +82,7 @@ func TestIdentityEncodingJSON(t *testing.T) {
 		var dec flow.Identity
 		err = json.Unmarshal(enc, &dec)
 		require.NoError(t, err)
-		require.Equal(t, identity, &dec)
+		require.True(t, identity.Equals(&dec))
 	})
 }
 
@@ -94,7 +93,7 @@ func TestIdentityEncodingMsgpack(t *testing.T) {
 	var dec flow.Identity
 	err = msgpack.Unmarshal(enc, &dec)
 	require.NoError(t, err)
-	require.Equal(t, identity, &dec)
+	require.True(t, identity.Equals(&dec))
 }
 
 func TestIdentityList_Exists(t *testing.T) {
@@ -103,7 +102,7 @@ func TestIdentityList_Exists(t *testing.T) {
 		il2 := unittest.IdentityListFixture(1)
 
 		// sort the first list
-		il1 = il1.Sort(order.Canonical)
+		il1 = il1.Sort(flow.Canonical)
 
 		for i := 0; i < 10; i++ {
 			assert.True(t, il1.Exists(il1[i]))
@@ -118,7 +117,7 @@ func TestIdentityList_IdentifierExists(t *testing.T) {
 		il2 := unittest.IdentityListFixture(1)
 
 		// sort the first list
-		il1 = il1.Sort(order.Canonical)
+		il1 = il1.Sort(flow.Canonical)
 
 		for i := 0; i < 10; i++ {
 			assert.True(t, il1.IdentifierExists(il1[i].NodeID))
@@ -243,12 +242,18 @@ func TestIdentity_ID(t *testing.T) {
 
 func TestIdentity_Sort(t *testing.T) {
 	il := unittest.IdentityListFixture(20)
-	random, err := il.Shuffle()
-	require.NoError(t, err)
-	assert.False(t, random.Sorted(order.Canonical))
+	// make sure the list is not sorted
+	il[0].NodeID[0], il[1].NodeID[0] = 2, 1
+	require.False(t, flow.IsCanonical(il[0], il[1]))
+	assert.False(t, flow.IsIdentityListCanonical(il))
 
-	canonical := il.Sort(order.Canonical)
-	assert.True(t, canonical.Sorted(order.Canonical))
+	canonical := il.Sort(flow.Canonical)
+	assert.True(t, flow.IsIdentityListCanonical(canonical))
+
+	// check `IsIdentityListCanonical` detects order equality in a sorted list
+	il[1] = il[10] // add a duplication
+	canonical = il.Sort(flow.Canonical)
+	assert.False(t, flow.IsIdentityListCanonical(canonical))
 }
 
 func TestIdentity_EqualTo(t *testing.T) {

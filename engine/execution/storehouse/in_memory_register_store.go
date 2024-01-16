@@ -15,11 +15,12 @@ var ErrNotExecuted = fmt.Errorf("block is not executed")
 
 type PrunedError struct {
 	PrunedHeight uint64
+	PrunedID     flow.Identifier
 	Height       uint64
 }
 
-func NewPrunedError(height uint64, prunedHeight uint64) error {
-	return PrunedError{Height: height, PrunedHeight: prunedHeight}
+func NewPrunedError(height uint64, prunedHeight uint64, prunedID flow.Identifier) error {
+	return PrunedError{Height: height, PrunedHeight: prunedHeight, PrunedID: prunedID}
 }
 
 func (e PrunedError) Error() string {
@@ -115,7 +116,7 @@ func (s *InMemoryRegisterStore) GetRegister(height uint64, blockID flow.Identifi
 	defer s.RUnlock()
 
 	if height <= s.prunedHeight {
-		return flow.RegisterValue{}, NewPrunedError(height, s.prunedHeight)
+		return flow.RegisterValue{}, NewPrunedError(height, s.prunedHeight, s.prunedID)
 	}
 
 	_, ok := s.registersByBlockID[blockID]
@@ -144,7 +145,7 @@ func (s *InMemoryRegisterStore) GetRegister(height uint64, blockID flow.Identifi
 			// caller could check with OnDiskRegisterStore to find if this register has a updated value
 			// at earlier height.
 			if block == s.prunedID {
-				return flow.RegisterValue{}, NewPrunedError(height, s.prunedHeight)
+				return flow.RegisterValue{}, NewPrunedError(height, s.prunedHeight, s.prunedID)
 			}
 
 			// in this case, it means the state of in-memory register store is inconsistent,
@@ -245,8 +246,16 @@ func (s *InMemoryRegisterStore) IsBlockExecuted(height uint64, blockID flow.Iden
 	defer s.RUnlock()
 
 	// finalized and executed blocks are pruned
-	if height <= s.prunedHeight {
+	// so if the height is below pruned height, in memory register store is not sure if
+	// it's executed or not
+	if height < s.prunedHeight {
 		return false, fmt.Errorf("below pruned height")
+	}
+
+	// if the height is the pruned height, then it's executed only if the blockID is the prunedID
+	// since the pruned block must be finalized and executed.
+	if height == s.prunedHeight {
+		return blockID == s.prunedID, nil
 	}
 
 	_, ok := s.registersByBlockID[blockID]
@@ -259,9 +268,18 @@ func (s *InMemoryRegisterStore) findFinalizedFork(height uint64, blockID flow.Id
 	s.RLock()
 	defer s.RUnlock()
 
-	if height <= s.prunedHeight {
+	if height < s.prunedHeight {
 		return nil, fmt.Errorf("cannot find finalized fork at height %d, it is pruned (prunedHeight: %v)", height, s.prunedHeight)
 	}
+
+	if height == s.prunedHeight {
+		if blockID != s.prunedID {
+			return nil, fmt.Errorf("cannot find finalized fork at height %d, it is pruned (prunedHeight: %v, prunedID: %v)", height, s.prunedHeight, s.prunedID)
+		}
+
+		return nil, nil
+	}
+
 	prunedHeight := height
 	block := blockID
 

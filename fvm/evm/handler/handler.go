@@ -103,7 +103,6 @@ func (h *ContractHandler) Run(rlpEncodedTx []byte, coinbase types.Address) {
 	bp, err := h.blockstore.BlockProposal()
 	handleError(err)
 
-	bp.StateRoot = res.StateRootHash
 	txHash := tx.Hash()
 	bp.AppendTxHash(txHash)
 
@@ -136,10 +135,10 @@ func (h *ContractHandler) meterGasUsage(res *types.Result) {
 }
 
 func (h *ContractHandler) emitEvent(event *types.Event) {
-	// TODO add extra metering for rlp encoding
-	encoded, err := event.Payload.Encode()
+	ev, err := event.Payload.CadenceEvent()
 	handleError(err)
-	err = h.backend.EmitRawEvent(event.Etype, encoded)
+
+	err = h.backend.EmitEvent(ev)
 	handleError(err)
 }
 
@@ -301,7 +300,6 @@ func (a *Account) executeAndHandleCall(
 	bp, err := a.fch.blockstore.BlockProposal()
 	handleError(err)
 	bp.AppendTxHash(callHash)
-	bp.StateRoot = res.StateRootHash
 	if deductSupplyDiff {
 		bp.TotalSupply -= totalSupplyDiff
 	} else {

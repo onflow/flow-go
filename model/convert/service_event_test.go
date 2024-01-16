@@ -245,11 +245,9 @@ func TestVersionBeaconEventConversion(t *testing.T) {
 	runVersionBeaconTestCase := func(t *testing.T, test vbTestCase) {
 		chainID := flow.Emulator
 		t.Run(test.name, func(t *testing.T) {
-			events, err := systemcontracts.ServiceEventsForChain(chainID)
-			if err != nil {
-				panic(err)
-			}
+			events := systemcontracts.ServiceEventsForChain(chainID)
 
+			var err error
 			event := unittest.EventFixture(events.VersionBeacon.EventType(), 1, 1, unittest.IdentifierFixture(), 0)
 			event.Payload, err = ccf.Encode(test.event)
 			require.NoError(t, err)

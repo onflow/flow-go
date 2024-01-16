@@ -8,8 +8,10 @@ import (
 
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/maps"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/meter"
@@ -50,35 +52,58 @@ func fullKey(owner, key []byte) string {
 func GetSimpleValueStore() *TestValueStore {
 	data := make(map[string][]byte)
 	allocator := make(map[string]uint64)
-
+	bytesRead := 0
+	bytesWritten := 0
 	return &TestValueStore{
 		GetValueFunc: func(owner, key []byte) ([]byte, error) {
-			return data[fullKey(owner, key)], nil
+			fk := fullKey(owner, key)
+			value := data[fk]
+			bytesRead += len(fk) + len(value)
+			return value, nil
 		},
 		SetValueFunc: func(owner, key, value []byte) error {
-			data[fullKey(owner, key)] = value
+			fk := fullKey(owner, key)
+			data[fk] = value
+			bytesWritten += len(fk) + len(value)
 			return nil
 		},
 		ValueExistsFunc: func(owner, key []byte) (bool, error) {
-			return len(data[fullKey(owner, key)]) > 0, nil
-
+			fk := fullKey(owner, key)
+			value := data[fk]
+			bytesRead += len(fk) + len(value)
+			return len(value) > 0, nil
 		},
 		AllocateStorageIndexFunc: func(owner []byte) (atree.StorageIndex, error) {
 			index := allocator[string(owner)]
 			var data [8]byte
 			allocator[string(owner)] = index + 1
 			binary.BigEndian.PutUint64(data[:], index)
+			bytesRead += len(owner) + 8
+			bytesWritten += len(owner) + 8
 			return atree.StorageIndex(data), nil
 		},
 		TotalStorageSizeFunc: func() int {
-			sum := 0
-			for key, value := range data {
-				sum += len(key) + len(value)
+			size := 0
+			for key, item := range data {
+				size += len(item) + len([]byte(key))
 			}
 			for key := range allocator {
-				sum += len(key) + 8
+				size += len(key) + 8
 			}
-			return sum
+			return size
+		},
+		TotalBytesReadFunc: func() int {
+			return bytesRead
+		},
+		TotalBytesWrittenFunc: func() int {
+			return bytesWritten
+		},
+		TotalStorageItemsFunc: func() int {
+			return len(maps.Keys(data)) + len(maps.Keys(allocator))
+		},
+		ResetStatsFunc: func() {
+			bytesRead = 0
+			bytesWritten = 0
 		},
 	}
 }
@@ -86,8 +111,13 @@ func GetSimpleValueStore() *TestValueStore {
 func getSimpleEventEmitter() *testEventEmitter {
 	events := make(flow.EventsList, 0)
 	return &testEventEmitter{
-		emitRawEvent: func(etype flow.EventType, payload []byte) error {
-			events = append(events, flow.Event{Type: etype, Payload: payload})
+		emitEvent: func(event cadence.Event) error {
+			payload, err := jsoncdc.Encode(event)
+			if err != nil {
+				return err
+			}
+
+			events = append(events, flow.Event{Type: flow.EventType(event.EventType.QualifiedIdentifier), Payload: payload})
 			return nil
 		},
 		events: func() flow.EventsList {
@@ -145,6 +175,10 @@ type TestValueStore struct {
 	ValueExistsFunc          func(owner, key []byte) (bool, error)
 	AllocateStorageIndexFunc func(owner []byte) (atree.StorageIndex, error)
 	TotalStorageSizeFunc     func() int
+	TotalBytesReadFunc       func() int
+	TotalBytesWrittenFunc    func() int
+	TotalStorageItemsFunc    func() int
+	ResetStatsFunc           func()
 }
 
 var _ environment.ValueStore = &TestValueStore{}
@@ -177,11 +211,39 @@ func (vs *TestValueStore) AllocateStorageIndex(owner []byte) (atree.StorageIndex
 	return vs.AllocateStorageIndexFunc(owner)
 }
 
+func (vs *TestValueStore) TotalBytesRead() int {
+	if vs.TotalBytesReadFunc == nil {
+		panic("method not set")
+	}
+	return vs.TotalBytesReadFunc()
+}
+
+func (vs *TestValueStore) TotalBytesWritten() int {
+	if vs.TotalBytesWrittenFunc == nil {
+		panic("method not set")
+	}
+	return vs.TotalBytesWrittenFunc()
+}
+
 func (vs *TestValueStore) TotalStorageSize() int {
 	if vs.TotalStorageSizeFunc == nil {
 		panic("method not set")
 	}
 	return vs.TotalStorageSizeFunc()
+}
+
+func (vs *TestValueStore) TotalStorageItems() int {
+	if vs.TotalStorageItemsFunc == nil {
+		panic("method not set")
+	}
+	return vs.TotalStorageItemsFunc()
+}
+
+func (vs *TestValueStore) ResetStats() {
+	if vs.ResetStatsFunc == nil {
+		panic("method not set")
+	}
+	vs.ResetStatsFunc()
 }
 
 type testMeter struct {
@@ -272,7 +334,6 @@ func (m *testMeter) TotalEmittedEventBytes() uint64 {
 
 type testEventEmitter struct {
 	emitEvent              func(event cadence.Event) error
-	emitRawEvent           func(etype flow.EventType, payload []byte) error
 	events                 func() flow.EventsList
 	serviceEvents          func() flow.EventsList
 	convertedServiceEvents func() flow.ServiceEventList
@@ -286,13 +347,6 @@ func (vs *testEventEmitter) EmitEvent(event cadence.Event) error {
 		panic("method not set")
 	}
 	return vs.emitEvent(event)
-}
-
-func (vs *testEventEmitter) EmitRawEvent(etype flow.EventType, payload []byte) error {
-	if vs.emitRawEvent == nil {
-		panic("method not set")
-	}
-	return vs.emitRawEvent(etype, payload)
 }
 
 func (vs *testEventEmitter) Events() flow.EventsList {

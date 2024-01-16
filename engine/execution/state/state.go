@@ -9,6 +9,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/engine/execution"
+	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
@@ -52,9 +53,6 @@ type ScriptExecutionState interface {
 	// StateCommitmentByBlockID returns the final state commitment for the provided block ID.
 	StateCommitmentByBlockID(flow.Identifier) (flow.StateCommitment, error)
 
-	// HasState returns true if the state with the given state commitment exists in memory
-	HasState(flow.StateCommitment) bool
-
 	// Any error returned is exception
 	IsBlockExecuted(height uint64, blockID flow.Identifier) (bool, error)
 }
@@ -86,6 +84,10 @@ type ExecutionState interface {
 		ctx context.Context,
 		result *execution.ComputationResult,
 	) error
+
+	// only available with storehouse enabled
+	// panic when called with storehouse disabled (which should be a bug)
+	GetHighestFinalizedExecuted() uint64
 }
 
 type state struct {
@@ -102,6 +104,11 @@ type state struct {
 	serviceEvents      storage.ServiceEvents
 	transactionResults storage.TransactionResults
 	db                 *badger.DB
+
+	registerStore execution.RegisterStore
+	// when it is true, registers are stored in both register store and ledger
+	// and register queries will send to the register store instead of ledger
+	enableRegisterStore bool
 }
 
 // NewExecutionState returns a new execution state access layer for the given ledger storage.
@@ -119,21 +126,25 @@ func NewExecutionState(
 	transactionResults storage.TransactionResults,
 	db *badger.DB,
 	tracer module.Tracer,
+	registerStore execution.RegisterStore,
+	enableRegisterStore bool,
 ) ExecutionState {
 	return &state{
-		tracer:             tracer,
-		ls:                 ls,
-		commits:            commits,
-		blocks:             blocks,
-		headers:            headers,
-		collections:        collections,
-		chunkDataPacks:     chunkDataPacks,
-		results:            results,
-		myReceipts:         myReceipts,
-		events:             events,
-		serviceEvents:      serviceEvents,
-		transactionResults: transactionResults,
-		db:                 db,
+		tracer:              tracer,
+		ls:                  ls,
+		commits:             commits,
+		blocks:              blocks,
+		headers:             headers,
+		collections:         collections,
+		chunkDataPacks:      chunkDataPacks,
+		results:             results,
+		myReceipts:          myReceipts,
+		events:              events,
+		serviceEvents:       serviceEvents,
+		transactionResults:  transactionResults,
+		db:                  db,
+		registerStore:       registerStore,
+		enableRegisterStore: enableRegisterStore,
 	}
 
 }
@@ -242,6 +253,9 @@ func (s *state) NewStorageSnapshot(
 	blockID flow.Identifier,
 	height uint64,
 ) snapshot.StorageSnapshot {
+	if s.enableRegisterStore {
+		return storehouse.NewBlockEndStateSnapshot(s.registerStore, blockID, height)
+	}
 	return NewLedgerStorageSnapshot(s.ls, commitment)
 }
 
@@ -258,15 +272,26 @@ func (s *state) CreateStorageSnapshot(
 	if err != nil {
 		// statecommitment not exists means the block hasn't been executed yet
 		if errors.Is(err, storage.ErrNotFound) {
-			return nil, nil, fmt.Errorf("block %v is not executed: %w", blockID, ErrNotExecuted)
+			return nil, nil, fmt.Errorf("block %v is never executed: %w", blockID, ErrNotExecuted)
 		}
 
 		return nil, header, fmt.Errorf("cannot get commit by block ID: %w", err)
 	}
 
 	// make sure we have trie state for this block
-	if !s.HasState(commit) {
-		return nil, header, fmt.Errorf("state not found for commit %x (block %v): %w", commit, blockID, ErrExecutionStatePruned)
+	ledgerHasState := s.ls.HasState(ledger.State(commit))
+	if !ledgerHasState {
+		return nil, header, fmt.Errorf("state not found in ledger for commit %x (block %v): %w", commit, blockID, ErrExecutionStatePruned)
+	}
+
+	if s.enableRegisterStore {
+		isExecuted, err := s.registerStore.IsBlockExecuted(header.Height, blockID)
+		if err != nil {
+			return nil, header, fmt.Errorf("cannot check if block %v is executed: %w", blockID, err)
+		}
+		if !isExecuted {
+			return nil, header, fmt.Errorf("block %v is not executed yet: %w", blockID, ErrNotExecuted)
+		}
 	}
 
 	return s.NewStorageSnapshot(commit, blockID, header.Height), header, nil
@@ -308,10 +333,6 @@ func CommitDelta(
 	return newCommit, trieUpdate, newStorageSnapshot, nil
 }
 
-func (s *state) HasState(commitment flow.StateCommitment) bool {
-	return s.ls.HasState(ledger.State(commitment))
-}
-
 func (s *state) StateCommitmentByBlockID(blockID flow.Identifier) (flow.StateCommitment, error) {
 	return s.commits.ByBlockID(blockID)
 }
@@ -348,6 +369,18 @@ func (s *state) SaveExecutionResults(
 	err := s.saveExecutionResults(ctx, result)
 	if err != nil {
 		return fmt.Errorf("could not save execution results: %w", err)
+	}
+
+	if s.enableRegisterStore {
+		// save registers to register store
+		err = s.registerStore.SaveRegisters(
+			result.BlockExecutionResult.ExecutableBlock.Block.Header,
+			result.BlockExecutionResult.AllUpdatedRegisters(),
+		)
+
+		if err != nil {
+			return fmt.Errorf("could not save updated registers: %w", err)
+		}
 	}
 
 	//outside batch because it requires read access
@@ -448,7 +481,19 @@ func (s *state) UpdateHighestExecutedBlockIfHigher(ctx context.Context, header *
 	return operation.RetryOnConflict(s.db.Update, procedure.UpdateHighestExecutedBlockIfHigher(header))
 }
 
+// deprecated by storehouse's GetHighestFinalizedExecuted
 func (s *state) GetHighestExecutedBlockID(ctx context.Context) (uint64, flow.Identifier, error) {
+	if s.enableRegisterStore {
+		// when storehouse is enabled, the highest executed block is consisted as
+		// the highest finalized and executed block
+		height := s.GetHighestFinalizedExecuted()
+		finalizedID, err := s.headers.BlockIDByHeight(height)
+		if err != nil {
+			return 0, flow.ZeroID, fmt.Errorf("could not get header by height %v: %w", height, err)
+		}
+		return height, finalizedID, nil
+	}
+
 	var blockID flow.Identifier
 	var height uint64
 	err := s.db.View(procedure.GetHighestExecutedBlock(&height, &blockID))
@@ -459,12 +504,22 @@ func (s *state) GetHighestExecutedBlockID(ctx context.Context) (uint64, flow.Ide
 	return height, blockID, nil
 }
 
+func (s *state) GetHighestFinalizedExecuted() uint64 {
+	if !s.enableRegisterStore {
+		panic("could not get highest finalized executed height without register store enabled")
+	}
+	return s.registerStore.LastFinalizedAndExecutedHeight()
+}
+
 // IsBlockExecuted returns true if the block is executed, which means registers, events,
 // results, etc are all stored.
 // otherwise returns false
 func (s *state) IsBlockExecuted(height uint64, blockID flow.Identifier) (bool, error) {
+	if s.enableRegisterStore {
+		return s.registerStore.IsBlockExecuted(height, blockID)
+	}
+
 	// ledger-based execution state uses commitment to determine if a block has been executed
-	// TODO: storehouse-based execution state will check its storage to determine if a block has been executed
 	_, err := s.StateCommitmentByBlockID(blockID)
 
 	// statecommitment exists means the block has been executed
@@ -478,4 +533,5 @@ func (s *state) IsBlockExecuted(height uint64, blockID flow.Identifier) (bool, e
 	}
 
 	return false, err
+
 }

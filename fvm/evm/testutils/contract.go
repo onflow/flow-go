@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/atree"
 
 	"github.com/onflow/flow-go/fvm/evm/emulator"
-	"github.com/onflow/flow-go/fvm/evm/emulator/database"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -38,9 +37,9 @@ func (tc *TestContract) SetDeployedAt(deployedAt types.Address) {
 	tc.DeployedAt = deployedAt
 }
 
-func GetStorageTestContract(t *testing.T) *TestContract {
+func GetStorageTestContract(tb testing.TB) *TestContract {
 	byteCodes, err := hex.DecodeString("608060405261022c806100136000396000f3fe608060405234801561001057600080fd5b50600436106100575760003560e01c80632e64cec11461005c57806348b151661461007a57806357e871e7146100985780636057361d146100b657806385df51fd146100d2575b600080fd5b610064610102565b6040516100719190610149565b60405180910390f35b61008261010b565b60405161008f9190610149565b60405180910390f35b6100a0610113565b6040516100ad9190610149565b60405180910390f35b6100d060048036038101906100cb9190610195565b61011b565b005b6100ec60048036038101906100e79190610195565b610125565b6040516100f991906101db565b60405180910390f35b60008054905090565b600042905090565b600043905090565b8060008190555050565b600081409050919050565b6000819050919050565b61014381610130565b82525050565b600060208201905061015e600083018461013a565b92915050565b600080fd5b61017281610130565b811461017d57600080fd5b50565b60008135905061018f81610169565b92915050565b6000602082840312156101ab576101aa610164565b5b60006101b984828501610180565b91505092915050565b6000819050919050565b6101d5816101c2565b82525050565b60006020820190506101f060008301846101cc565b9291505056fea26469706673582212203ee61567a25f0b1848386ae6b8fdbd7733c8a502c83b5ed305b921b7933f4e8164736f6c63430008120033")
-	require.NoError(t, err)
+	require.NoError(tb, err)
 	return &TestContract{
 		Code: `
 			contract Storage {
@@ -381,11 +380,13 @@ func GetDummyKittyTestContract(t testing.TB) *TestContract {
 }
 
 func RunWithDeployedContract(t testing.TB, tc *TestContract, led atree.Ledger, flowEVMRootAddress flow.Address, f func(*TestContract)) {
-	// deploy contract
-	db, err := database.NewDatabase(led, flowEVMRootAddress)
-	require.NoError(t, err)
+	DeployContract(t, tc, led, flowEVMRootAddress)
+	f(tc)
+}
 
-	e := emulator.NewEmulator(db)
+func DeployContract(t testing.TB, tc *TestContract, led atree.Ledger, flowEVMRootAddress flow.Address) {
+	// deploy contract
+	e := emulator.NewEmulator(led, flowEVMRootAddress)
 
 	blk, err := e.NewBlockView(types.NewDefaultBlockContext(2))
 	require.NoError(t, err)
@@ -413,5 +414,4 @@ func RunWithDeployedContract(t testing.TB, tc *TestContract, led atree.Ledger, f
 	require.NoError(t, err)
 
 	tc.SetDeployedAt(res.DeployedContractAddress)
-	f(tc)
 }

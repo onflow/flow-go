@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/assignment"
-	"github.com/onflow/flow-go/model/flow/order"
 )
 
 // ServiceEvent converts a service event encoded as the generic flow.Event
@@ -20,10 +19,7 @@ import (
 // state. This acts as the conversion from the Cadence type to the flow-go type.
 func ServiceEvent(chainID flow.ChainID, event flow.Event) (*flow.ServiceEvent, error) {
 
-	events, err := systemcontracts.ServiceEventsForChain(chainID)
-	if err != nil {
-		return nil, fmt.Errorf("could not get service event info: %w", err)
-	}
+	events := systemcontracts.ServiceEventsForChain(chainID)
 
 	// depending on type of service event construct Go type
 	switch event.Type {
@@ -637,7 +633,7 @@ func convertParticipants(cdcParticipants []cadence.Value) (flow.IdentityList, er
 		participants = append(participants, identity)
 	}
 
-	participants = participants.Sort(order.Canonical)
+	participants = participants.Sort(flow.Canonical)
 	return participants, nil
 }
 

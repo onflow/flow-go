@@ -83,7 +83,7 @@ func (c *ExecutionStateIndexerCollector) InitializeLatestHeight(height uint64) {
 }
 
 // BlockIndexed records metrics from indexing execution data from a single block.
-func (c *ExecutionStateIndexerCollector) BlockIndexed(height uint64, duration time.Duration, registers, events, transactionResults int) {
+func (c *ExecutionStateIndexerCollector) BlockIndexed(height uint64, duration time.Duration, events, registers, transactionResults int) {
 	c.indexDuration.Observe(float64(duration.Milliseconds()))
 	c.highestIndexedHeight.Set(float64(height))
 	c.indexedEvents.Add(float64(events))

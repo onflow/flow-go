@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"testing"
 
-	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
@@ -18,10 +17,13 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/execution"
 	execmock "github.com/onflow/flow-go/module/execution/mock"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
+
+	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 )
 
 type BackendAccountsSuite struct {
@@ -137,7 +139,7 @@ func (s *BackendAccountsSuite) TestGetAccountFromExecutionNode_HappyPath() {
 	s.setupENSuccessResponse(s.block.ID())
 
 	backend := s.defaultBackend()
-	backend.scriptExecMode = ScriptExecutionModeExecutionNodesOnly
+	backend.scriptExecMode = IndexQueryModeExecutionNodesOnly
 
 	s.Run("GetAccount - happy path", func() {
 		s.testGetAccount(ctx, backend, codes.OK)
@@ -164,7 +166,7 @@ func (s *BackendAccountsSuite) TestGetAccountFromExecutionNode_Fails() {
 	s.setupENFailingResponse(s.block.ID(), errToReturn)
 
 	backend := s.defaultBackend()
-	backend.scriptExecMode = ScriptExecutionModeExecutionNodesOnly
+	backend.scriptExecMode = IndexQueryModeExecutionNodesOnly
 
 	s.Run("GetAccount - fails with backend err", func() {
 		s.testGetAccount(ctx, backend, statusCode)
@@ -188,7 +190,7 @@ func (s *BackendAccountsSuite) TestGetAccountFromStorage_HappyPath() {
 		Return(s.account, nil)
 
 	backend := s.defaultBackend()
-	backend.scriptExecMode = ScriptExecutionModeLocalOnly
+	backend.scriptExecMode = IndexQueryModeLocalOnly
 	backend.scriptExecutor = scriptExecutor
 
 	s.Run("GetAccount - happy path", func() {
@@ -212,7 +214,7 @@ func (s *BackendAccountsSuite) TestGetAccountFromStorage_Fails() {
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
 
 	backend := s.defaultBackend()
-	backend.scriptExecMode = ScriptExecutionModeLocalOnly
+	backend.scriptExecMode = IndexQueryModeLocalOnly
 	backend.scriptExecutor = scriptExecutor
 
 	testCases := []struct {
@@ -262,7 +264,7 @@ func (s *BackendAccountsSuite) TestGetAccountFromFailover_HappyPath() {
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
 
 	backend := s.defaultBackend()
-	backend.scriptExecMode = ScriptExecutionModeFailover
+	backend.scriptExecMode = IndexQueryModeFailover
 	backend.scriptExecutor = scriptExecutor
 
 	for _, errToReturn := range []error{execution.ErrDataNotAvailable, storage.ErrNotFound} {
@@ -300,7 +302,7 @@ func (s *BackendAccountsSuite) TestGetAccountFromFailover_ReturnsENErrors() {
 		Return(nil, execution.ErrDataNotAvailable)
 
 	backend := s.defaultBackend()
-	backend.scriptExecMode = ScriptExecutionModeFailover
+	backend.scriptExecMode = IndexQueryModeFailover
 	backend.scriptExecutor = scriptExecutor
 
 	s.Run("GetAccount - fails with backend err", func() {
@@ -313,6 +315,30 @@ func (s *BackendAccountsSuite) TestGetAccountFromFailover_ReturnsENErrors() {
 
 	s.Run("GetAccountAtBlockHeight - fails with backend err", func() {
 		s.testGetAccountAtBlockHeight(ctx, backend, statusCode)
+	})
+}
+
+// TestGetAccountAtLatestBlock_InconsistentState tests that signaler context received error when node state is
+// inconsistent
+func (s *BackendAccountsSuite) TestGetAccountAtLatestBlockFromStorage_InconsistentState() {
+	scriptExecutor := execmock.NewScriptExecutor(s.T())
+
+	backend := s.defaultBackend()
+	backend.scriptExecMode = IndexQueryModeLocalOnly
+	backend.scriptExecutor = scriptExecutor
+
+	s.Run(fmt.Sprintf("GetAccountAtLatestBlock - fails with %v", "inconsistent node's state"), func() {
+		s.state.On("Sealed").Return(s.snapshot, nil)
+
+		err := fmt.Errorf("inconsistent node's state")
+		s.snapshot.On("Head").Return(nil, err)
+
+		signCtxErr := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
+		signalerCtx := irrecoverable.WithSignalerContext(context.Background(), irrecoverable.NewMockSignalerContextExpectError(s.T(), context.Background(), signCtxErr))
+
+		actual, err := backend.GetAccountAtLatestBlock(signalerCtx, s.failingAddress)
+		s.Require().Error(err)
+		s.Require().Nil(actual)
 	})
 }
 
@@ -350,7 +376,7 @@ func (s *BackendAccountsSuite) testGetAccountAtLatestBlock(ctx context.Context, 
 
 func (s *BackendAccountsSuite) testGetAccountAtBlockHeight(ctx context.Context, backend *backendAccounts, statusCode codes.Code) {
 	height := s.block.Header.Height
-	s.headers.On("ByHeight", height).Return(s.block.Header, nil).Once()
+	s.headers.On("BlockIDByHeight", height).Return(s.block.Header.ID(), nil).Once()
 
 	if statusCode == codes.OK {
 		actual, err := backend.GetAccountAtBlockHeight(ctx, s.account.Address, height)
