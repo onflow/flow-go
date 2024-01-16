@@ -6,6 +6,7 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/errors"
 )
 
 type Unwrappable interface {
@@ -212,4 +213,30 @@ func NewEventEncodingError(err error) CodedError {
 	return NewCodedError(
 		ErrCodeEventEncodingError,
 		"error while encoding emitted event: %w ", err)
+}
+
+// EVMError needs to satisfy the user error interface
+// in order for Cadence to correctly handle the error
+var _ errors.UserError = &(EVMError{})
+
+type EVMError struct {
+	CodedError
+}
+
+func (e EVMError) IsUserError() {}
+
+// NewEVMError constructs a new CodedError which captures a
+// collection of errors provided by (non-fatal) evm runtime.
+func NewEVMError(err error) EVMError {
+	return EVMError{
+		WrapCodedError(
+			ErrEVMExecutionError,
+			err,
+			"evm runtime error"),
+	}
+}
+
+// IsEVMError returns true if error is an EVM error
+func IsEVMError(err error) bool {
+	return HasErrorCode(err, ErrEVMExecutionError)
 }
