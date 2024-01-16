@@ -622,6 +622,43 @@ func TestControlMessageInspection_ValidRpc(t *testing.T) {
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
 
+// TestIWantInspection_DuplicateMessageIds_BelowThreshold ensures inspector does not disseminate an invalid control message notification for
+// iWant messages when duplicate message ids are below allowed threshold.
+func TestIWantInspection_DuplicateMessageIds_BelowThreshold(t *testing.T) {
+	inspector, signalerCtx, cancel, distributor, rpcTracker, _, _, _ := inspectorFixture(t)
+	// oracle must be set even though iWant messages do not have topic IDs
+	duplicateMsgID := unittest.IdentifierFixture()
+	duplicates := flow.IdentifierList{}
+	cfg, err := config.DefaultConfig()
+	require.NoError(t, err)
+	// includes as many duplicates as allowed by the threshold
+	for i := 0; i < int(cfg.NetworkConfig.GossipSub.RpcInspector.Validation.IWant.DuplicateMsgIDThreshold)-2; i++ {
+		duplicates = append(duplicates, duplicateMsgID)
+	}
+	msgIds := append(duplicates, unittest.IdentifierListFixture(5)...).Strings()
+	duplicateMsgIDIWant := unittest.P2PRPCIWantFixture(msgIds...)
+
+	duplicateMsgIDRpc := unittest.P2PRPCFixture(unittest.WithIWants(duplicateMsgIDIWant))
+
+	from := unittest.PeerIdFixture(t)
+	distributor.AssertNotCalled(t, "Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif"))
+	rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
+	rpcTracker.On("WasIHaveRPCSent", mock.AnythingOfType("string")).Return(true).Run(func(args mock.Arguments) {
+		id, ok := args[0].(string)
+		require.True(t, ok)
+		require.Contains(t, msgIds, id)
+	}).Maybe() // if iwant message ids count are not bigger than cache miss check size, this method is not called, anyway in this test we do not care about this method.
+
+	inspector.Start(signalerCtx)
+	unittest.RequireComponentsReadyBefore(t, 1*time.Second, inspector)
+
+	require.NoError(t, inspector.Inspect(from, duplicateMsgIDRpc))
+	// sleep for 1 second to ensure rpc's is processed
+	time.Sleep(time.Second)
+	cancel()
+	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
+}
+
 // TestIWantInspection_DuplicateMessageIds_AboveThreshold ensures inspector disseminates invalid control message notifications for iWant messages when duplicate message ids exceeds allowed threshold.
 func TestIWantInspection_DuplicateMessageIds_AboveThreshold(t *testing.T) {
 	inspector, signalerCtx, cancel, distributor, rpcTracker, _, _, _ := inspectorFixture(t)
