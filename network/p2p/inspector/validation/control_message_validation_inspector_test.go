@@ -503,69 +503,6 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		cancel()
 		unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 	})
-
-	// ihave duplicate topic ids below threshold should NOT trigger invalid control message notification.
-	t.Run("ihave duplicate message ids below threshold", func(t *testing.T) {
-		inspector, signalerCtx, cancel, distributor, _, sporkID, _, topicProviderOracle := inspectorFixture(t)
-		validTopic := fmt.Sprintf("%s/%s", channels.PushBlocks.String(), sporkID)
-		// avoid unknown topics errors
-		topicProviderOracle.UpdateTopics([]string{validTopic})
-		duplicateMsgID := unittest.IdentifierFixture()
-
-		cfg, err := config.DefaultConfig()
-		require.NoError(t, err)
-		msgIds := flow.IdentifierList{}
-		// includes as many duplicates as allowed by the threshold
-		for i := 0; i < cfg.NetworkConfig.GossipSub.RpcInspector.Validation.IHave.DuplicateMessageIdThreshold; i++ {
-			msgIds = append(msgIds, duplicateMsgID)
-		}
-		duplicateMsgIDIHave := unittest.P2PRPCIHaveFixture(&validTopic, append(msgIds, unittest.IdentifierListFixture(5)...).Strings()...)
-		duplicateMsgIDRpc := unittest.P2PRPCFixture(unittest.WithIHaves(duplicateMsgIDIHave))
-		from := unittest.PeerIdFixture(t)
-
-		// no notification should be disseminated for valid messages as long as the number of duplicates is below the threshold
-		distributor.AssertNotCalled(t, "Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif"))
-		inspector.Start(signalerCtx)
-		unittest.RequireComponentsReadyBefore(t, 1*time.Second, inspector)
-
-		require.NoError(t, inspector.Inspect(from, duplicateMsgIDRpc))
-		// TODO: this sleeps should be replaced with a queue size checker.
-		time.Sleep(time.Second)
-		cancel()
-		unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
-	})
-
-	// ihave duplicate topic ids beyond threshold should trigger invalid control message notification.
-	t.Run("ihave duplicate message ids above threshold", func(t *testing.T) {
-		inspector, signalerCtx, cancel, distributor, _, sporkID, _, topicProviderOracle := inspectorFixture(t)
-		validTopic := fmt.Sprintf("%s/%s", channels.PushBlocks.String(), sporkID)
-		// avoid unknown topics errors
-		topicProviderOracle.UpdateTopics([]string{validTopic})
-		duplicateMsgID := unittest.IdentifierFixture()
-
-		cfg, err := config.DefaultConfig()
-		require.NoError(t, err)
-		msgIds := flow.IdentifierList{}
-		// includes as many duplicates as beyond the threshold
-		for i := 0; i < cfg.NetworkConfig.GossipSub.RpcInspector.Validation.IHave.DuplicateMessageIdThreshold+2; i++ {
-			msgIds = append(msgIds, duplicateMsgID)
-		}
-		duplicateMsgIDIHave := unittest.P2PRPCIHaveFixture(&validTopic, append(msgIds, unittest.IdentifierListFixture(5)...).Strings()...)
-		duplicateMsgIDRpc := unittest.P2PRPCFixture(unittest.WithIHaves(duplicateMsgIDIHave))
-		from := unittest.PeerIdFixture(t)
-
-		// one notification should be disseminated for invalid messages when the number of duplicates exceeds the threshold
-		checkNotification := checkNotificationFunc(t, from, p2pmsg.CtrlMsgIHave, validation.IsDuplicateMessageIDErr, p2p.CtrlMsgNonClusterTopicType)
-		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Once().Run(checkNotification)
-		inspector.Start(signalerCtx)
-		unittest.RequireComponentsReadyBefore(t, 1*time.Second, inspector)
-
-		require.NoError(t, inspector.Inspect(from, duplicateMsgIDRpc))
-		// TODO: this sleeps should be replaced with a queue size checker.
-		time.Sleep(time.Second)
-		cancel()
-		unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
-	})
 }
 
 // TestControlMessageInspection_ValidRpc ensures inspector does not disseminate invalid control message notifications for a valid RPC.
@@ -617,6 +554,71 @@ func TestControlMessageInspection_ValidRpc(t *testing.T) {
 	from := unittest.PeerIdFixture(t)
 	require.NoError(t, inspector.Inspect(from, rpc))
 	// sleep for 1 second to ensure rpc is processed
+	time.Sleep(time.Second)
+	cancel()
+	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
+}
+
+// TestIHaveInspection_DuplicateMessageIds_BelowThreshold ensures inspector does not disseminate an invalid control message notification for
+// iHave messages when duplicate message ids are below allowed threshold.
+func TestIHaveInspection_DuplicateMessageIds_BelowThreshold(t *testing.T) {
+	inspector, signalerCtx, cancel, distributor, _, sporkID, _, topicProviderOracle := inspectorFixture(t)
+	validTopic := fmt.Sprintf("%s/%s", channels.PushBlocks.String(), sporkID)
+	// avoid unknown topics errors
+	topicProviderOracle.UpdateTopics([]string{validTopic})
+	duplicateMsgID := unittest.IdentifierFixture()
+
+	cfg, err := config.DefaultConfig()
+	require.NoError(t, err)
+	msgIds := flow.IdentifierList{}
+	// includes as many duplicates as allowed by the threshold
+	for i := 0; i < cfg.NetworkConfig.GossipSub.RpcInspector.Validation.IHave.DuplicateMessageIdThreshold; i++ {
+		msgIds = append(msgIds, duplicateMsgID)
+	}
+	duplicateMsgIDIHave := unittest.P2PRPCIHaveFixture(&validTopic, append(msgIds, unittest.IdentifierListFixture(5)...).Strings()...)
+	duplicateMsgIDRpc := unittest.P2PRPCFixture(unittest.WithIHaves(duplicateMsgIDIHave))
+	from := unittest.PeerIdFixture(t)
+
+	// no notification should be disseminated for valid messages as long as the number of duplicates is below the threshold
+	distributor.AssertNotCalled(t, "Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif"))
+	inspector.Start(signalerCtx)
+	unittest.RequireComponentsReadyBefore(t, 1*time.Second, inspector)
+
+	require.NoError(t, inspector.Inspect(from, duplicateMsgIDRpc))
+	// TODO: this sleeps should be replaced with a queue size checker.
+	time.Sleep(time.Second)
+	cancel()
+	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
+}
+
+// TestIHaveInspection_DuplicateMessageIds_AboveThreshold ensures inspector disseminates an invalid control message notification for
+// iHave messages when duplicate message ids are above allowed threshold.
+func TestIHaveInspection_DuplicateMessageIds_AboveThreshold(t *testing.T) {
+	inspector, signalerCtx, cancel, distributor, _, sporkID, _, topicProviderOracle := inspectorFixture(t)
+	validTopic := fmt.Sprintf("%s/%s", channels.PushBlocks.String(), sporkID)
+	// avoid unknown topics errors
+	topicProviderOracle.UpdateTopics([]string{validTopic})
+	duplicateMsgID := unittest.IdentifierFixture()
+
+	cfg, err := config.DefaultConfig()
+	require.NoError(t, err)
+	msgIds := flow.IdentifierList{}
+	// includes as many duplicates as beyond the threshold
+	for i := 0; i < cfg.NetworkConfig.GossipSub.RpcInspector.Validation.IHave.DuplicateMessageIdThreshold+2; i++ {
+		msgIds = append(msgIds, duplicateMsgID)
+	}
+	duplicateMsgIDIHave := unittest.P2PRPCIHaveFixture(&validTopic, append(msgIds, unittest.IdentifierListFixture(5)...).Strings()...)
+	duplicateMsgIDRpc := unittest.P2PRPCFixture(unittest.WithIHaves(duplicateMsgIDIHave))
+	from := unittest.PeerIdFixture(t)
+
+	// one notification should be disseminated for invalid messages when the number of duplicates exceeds the threshold
+	checkNotification := checkNotificationFunc(t, from, p2pmsg.CtrlMsgIHave, validation.IsDuplicateMessageIDErr, p2p.CtrlMsgNonClusterTopicType)
+	distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Once().Run(checkNotification)
+	inspector.Start(signalerCtx)
+	unittest.RequireComponentsReadyBefore(t, 1*time.Second, inspector)
+
+	require.NoError(t, inspector.Inspect(from, duplicateMsgIDRpc))
+	// TODO: this sleeps should be replaced with a queue size checker.
 	time.Sleep(time.Second)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
