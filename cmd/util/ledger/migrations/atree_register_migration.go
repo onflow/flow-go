@@ -135,15 +135,6 @@ func (m *AtreeRegisterMigrator) MigrateAccount(
 		})
 	}
 
-	if address == cricketMomentsAddress {
-		// extra logging for cricket moments
-		m.log.Info().
-			Str("address", address.Hex()).
-			Int("originalLen", originalLen).
-			Int("newLen", newLen).
-			Msgf("done migrating cricketMomentsAddress")
-	}
-
 	return newPayloads, nil
 }
 
@@ -160,30 +151,15 @@ func (m *AtreeRegisterMigrator) migrateAccountStorage(
 		}
 	}
 
-	if mr.Address == cricketMomentsAddress {
-		m.log.Info().Msg("Committing storage domain changes")
-	}
-
-	// commit the storage changes
-	// TODO: for cricket moments `commitNewStorageMaps` already happened potentially
-	// try switching directly to s.PersistentSlabStorage.FastCommit(runtime.NumCPU())
 	err := mr.Storage.Commit(mr.Interpreter, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to commit storage: %w", err)
-	}
-
-	if mr.Address == cricketMomentsAddress {
-		m.log.Info().Msg("Finalizing storage domain changes transaction")
 	}
 
 	// finalize the transaction
 	result, err := mr.TransactionState.FinalizeMainTransaction()
 	if err != nil {
 		return nil, fmt.Errorf("failed to finalize main transaction: %w", err)
-	}
-
-	if mr.Address == cricketMomentsAddress {
-		m.log.Info().Msg("Storage domain changes transaction finalized")
 	}
 
 	return result.WriteSet, nil
@@ -230,7 +206,7 @@ func (m *AtreeRegisterMigrator) convertStorageDomain(
 				return fmt.Errorf("failed to read value for key %s: %w", key, err)
 			}
 
-			value, err = m.cloneValue(mr, domain, key, value)
+			value, err = m.cloneValue(mr, value)
 
 			if err != nil {
 				return fmt.Errorf("failed to clone value for key %s: %w", key, err)
@@ -276,14 +252,6 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 	var statePayload *ledger.Payload
 	progressLog := func(int) {}
 
-	if mr.Address == cricketMomentsAddress {
-		progressLog = util2.LogProgress(m.log,
-			util2.DefaultLogProgressConfig(
-				"applying changes",
-				len(changes),
-			))
-	}
-
 	for id, value := range changes {
 		progressLog(1)
 		// delete all values that were changed from the original payloads so that we can
@@ -324,13 +292,7 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 
 	// add all values that were not changed
 	if len(originalPayloads) > 0 {
-		if mr.Address == cricketMomentsAddress {
-			progressLog = util2.LogProgress(m.log,
-				util2.DefaultLogProgressConfig(
-					"checking unchanged registers",
-					len(originalPayloads)),
-			)
-		}
+
 		for id, value := range originalPayloads {
 			progressLog(1)
 
@@ -363,13 +325,6 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 				// This is needed because storage map can be empty.
 				// Empty storage map only exists in old payloads because there isn't any element to migrate.
 				newPayloads = append(newPayloads, value)
-				continue
-			}
-
-			if mr.Address == cricketMomentsAddress {
-				// to be sure, copy all cricket moments keys
-				newPayloads = append(newPayloads, value)
-				m.log.Info().Msgf("copying cricket moments key %s", id)
 				continue
 			}
 
@@ -423,30 +378,8 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 
 func (m *AtreeRegisterMigrator) cloneValue(
 	mr *migratorRuntime,
-	domain string,
-	key interpreter.StorageMapKey,
 	value interpreter.Value,
 ) (interpreter.Value, error) {
-
-	if isCricketMomentsShardedCollection(mr, value) {
-		m.log.Info().Msg("migrating CricketMomentsShardedCollection")
-		value, err := cloneCricketMomentsShardedCollection(
-			m.log,
-			m.nWorkers,
-			mr,
-			domain,
-			key,
-			value,
-		)
-
-		if err != nil {
-			m.log.Info().Err(err).Msg("failed to clone value")
-			return nil, err
-		}
-
-		m.log.Info().Msg("done migrating CricketMomentsShardedCollection")
-		return value, nil
-	}
 
 	err := capturePanic(func() {
 		// force the value to be read entirely

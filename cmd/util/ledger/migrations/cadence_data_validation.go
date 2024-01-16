@@ -106,7 +106,7 @@ func (m *preMigration) MigrateAccount(
 	payloads []*ledger.Payload,
 ) ([]*ledger.Payload, error) {
 
-	accountHash, err := m.v.hashAccountCadenceValues(m.log, address, payloads)
+	accountHash, err := m.v.hashAccountCadenceValues(address, payloads)
 	if err != nil {
 		m.log.Info().
 			Err(err).
@@ -166,7 +166,7 @@ func (m *postMigration) MigrateAccount(
 	address common.Address,
 	payloads []*ledger.Payload,
 ) ([]*ledger.Payload, error) {
-	newHash, err := m.v.hashAccountCadenceValues(m.log, address, payloads)
+	newHash, err := m.v.hashAccountCadenceValues(address, payloads)
 	if err != nil {
 		m.log.Info().
 			Err(err).
@@ -212,7 +212,6 @@ func (m *postMigration) MigrateAccount(
 }
 
 func (m *CadenceDataValidationMigrations) hashAccountCadenceValues(
-	log zerolog.Logger,
 	address common.Address,
 	payloads []*ledger.Payload,
 ) ([]byte, error) {
@@ -223,7 +222,7 @@ func (m *CadenceDataValidationMigrations) hashAccountCadenceValues(
 	}
 
 	for _, domain := range domains {
-		domainHash, err := m.hashDomainCadenceValues(log, mr, domain)
+		domainHash, err := m.hashDomainCadenceValues(mr, domain)
 		if err != nil {
 			return nil, fmt.Errorf("failed to hash storage domain %s : %w", domain, err)
 		}
@@ -237,7 +236,6 @@ func (m *CadenceDataValidationMigrations) hashAccountCadenceValues(
 }
 
 func (m *CadenceDataValidationMigrations) hashDomainCadenceValues(
-	log zerolog.Logger,
 	mr *migratorRuntime,
 	domain string,
 ) ([]byte, error) {
@@ -263,7 +261,7 @@ func (m *CadenceDataValidationMigrations) hashDomainCadenceValues(
 			break
 		}
 
-		h, err := m.recursiveString(log, mr, domain, interpreter.StringStorageMapKey(key.(interpreter.StringAtreeValue)), value, hasher)
+		h, err := m.recursiveString(value, hasher)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert value to string: %w", err)
 		}
@@ -277,17 +275,9 @@ func (m *CadenceDataValidationMigrations) hashDomainCadenceValues(
 }
 
 func (m *CadenceDataValidationMigrations) recursiveString(
-	log zerolog.Logger,
-	mr *migratorRuntime,
-	domain string,
-	key interpreter.StorageMapKey,
 	value interpreter.Value,
 	hasher hash.Hasher,
 ) ([]byte, error) {
-	if isCricketMomentsShardedCollection(mr, value) {
-		log.Info().Msg("recursive string hash for cricket moments sharded collection")
-		return recursiveStringShardedCollection(log, m.nWorkers, mr, domain, key, value)
-	}
 
 	var s string
 	err := capturePanic(
