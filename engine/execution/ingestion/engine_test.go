@@ -25,7 +25,6 @@ import (
 	uploadermock "github.com/onflow/flow-go/engine/execution/ingestion/uploader/mock"
 	provider "github.com/onflow/flow-go/engine/execution/provider/mock"
 	stateMock "github.com/onflow/flow-go/engine/execution/state/mock"
-	"github.com/onflow/flow-go/engine/testutil/mocklocal"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/metrics"
@@ -68,8 +67,6 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	myIdentity := unittest.IdentityFixture()
 	myIdentity.Role = flow.RoleExecution
 	myIdentity.StakingPubKey = sk.PublicKey()
-
-	me := mocklocal.NewMockLocal(sk, myIdentity.ID(), t)
 
 	headers := storage.NewHeaders(t)
 	blocks := storage.NewBlocks(t)
@@ -119,7 +116,6 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		unit,
 		log,
 		net,
-		me,
 		fetcher,
 		headers,
 		blocks,
