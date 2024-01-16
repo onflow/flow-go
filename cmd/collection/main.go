@@ -104,6 +104,7 @@ func main() {
 		apiBurstlimits     map[string]int
 		txRatelimits       float64
 		txBurstlimits      int
+		txRatelimitPayers  string
 	)
 	var deprecatedFlagBlockRateDelay time.Duration
 
@@ -167,6 +168,7 @@ func main() {
 		// rate limiting for accounts, default is 2 transactions every 2.5 seconds
 		flags.Float64Var(&txRatelimits, "tx-rate-limits", 2.5, "per second rate limits for processing transactions for limited account")
 		flags.IntVar(&txBurstlimits, "tx-burst-limits", 2, "burst limits for processing transactions for limited account")
+		flags.StringVar(&txRatelimitPayers, "tx-rate-limit-payers", "", "comma separated list of accounts to apply rate limiting to")
 
 		// deprecated flags
 		flags.DurationVar(&deprecatedFlagBlockRateDelay, "block-rate-delay", 0, "the delay to broadcast block proposal in order to control block production rate")
@@ -193,6 +195,13 @@ func main() {
 		Module("transaction rate limiter", func(node *cmd.NodeConfig) error {
 			// To be managed by admin tool, and used by ingestion engine
 			addressRateLimiter = ingest.NewAddressRateLimiter(rate.Limit(txRatelimits), txBurstlimits)
+			// read the rate limit addresses from flag and add to the rate limiter
+			addrs, err := ingest.ParseAddresses(txRatelimitPayers)
+			if err != nil {
+				return fmt.Errorf("could not parse rate limit addresses: %w", err)
+			}
+			ingest.AddAddresses(addressRateLimiter, addrs)
+
 			return nil
 		}).
 		AdminCommand("tx-rate-limit", func(node *cmd.NodeConfig) commands.AdminCommand {

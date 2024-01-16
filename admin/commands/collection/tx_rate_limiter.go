@@ -3,12 +3,10 @@ package collection
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/engine/collection/ingest"
-	"github.com/onflow/flow-go/model/flow"
 )
 
 var _ commands.AdminCommand = (*TxRateLimitCommand)(nil)
@@ -58,41 +56,20 @@ func (s *TxRateLimitCommand) Validator(_ *admin.CommandRequest) error {
 }
 
 func (s *TxRateLimitCommand) Handle(command string, addresses string) (string, error) {
-	addrList, err := splitAndTrim(addresses)
+	addrList, err := ingest.ParseAddresses(addresses)
 	if err != nil {
 		return "", err
 	}
 
 	if command == "add" {
-		for _, addr := range addrList {
-			s.limiter.AddAddress(addr)
-		}
+		ingest.AddAddresses(s.limiter, addrList)
 		return fmt.Sprintf("added %d addresses", len(addrList)), nil
 	}
 
 	if command == "remove" {
-		for _, addr := range addrList {
-			s.limiter.RemoveAddress(addr)
-		}
+		ingest.RemoveAddresses(s.limiter, addrList)
 		return fmt.Sprintf("removed %d addresses", len(addrList)), nil
 	}
 
 	return "", fmt.Errorf("invalid command name %s (must be either 'add' or 'remove')", command)
-}
-
-// parse addresses string into a list of flow addresses
-func splitAndTrim(addresses string) ([]flow.Address, error) {
-	addressList := make([]flow.Address, 0)
-	for _, addr := range strings.Split(addresses, ",") {
-		addr = strings.TrimSpace(addr)
-		if addr == "" {
-			continue
-		}
-		flowAddr, err := flow.StringToAddress(addr)
-		if err != nil {
-			return nil, err
-		}
-		addressList = append(addressList, flowAddr)
-	}
-	return addressList, nil
 }

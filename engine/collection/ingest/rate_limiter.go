@@ -1,6 +1,7 @@
 package ingest
 
 import (
+	"strings"
 	"sync"
 
 	"golang.org/x/time/rate"
@@ -71,4 +72,34 @@ func (r *AddressRateLimiter) GetAddresses() []flow.Address {
 	}
 
 	return addresses
+}
+
+// Util functions
+func AddAddresses(r *AddressRateLimiter, addresses []flow.Address) {
+	for _, address := range addresses {
+		r.AddAddress(address)
+	}
+}
+
+func RemoveAddresses(r *AddressRateLimiter, addresses []flow.Address) {
+	for _, address := range addresses {
+		r.RemoveAddress(address)
+	}
+}
+
+// parse addresses string into a list of flow addresses
+func ParseAddresses(addresses string) ([]flow.Address, error) {
+	addressList := make([]flow.Address, 0)
+	for _, addr := range strings.Split(addresses, ",") {
+		addr = strings.TrimSpace(addr)
+		if addr == "" {
+			continue
+		}
+		flowAddr, err := flow.StringToAddress(addr)
+		if err != nil {
+			return nil, err
+		}
+		addressList = append(addressList, flowAddr)
+	}
+	return addressList, nil
 }
