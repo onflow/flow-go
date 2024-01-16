@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/onflow/cadence/runtime/stdlib"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
@@ -202,7 +203,7 @@ func (m *AtreeRegisterMigrator) convertStorageDomain(
 	storageMapIds[string(atree.SlabIndexToLedgerKey(storageMap.StorageID().Index))] = struct{}{}
 
 	iterator := storageMap.Iterator(util.NopMemoryGauge{})
-	keys := make([]interpreter.StringStorageMapKey, 0)
+	keys := make([]interpreter.StringStorageMapKey, 0, storageMap.Count())
 	// to be safe avoid modifying the map while iterating
 	for {
 		key := iterator.NextKey()
@@ -299,7 +300,7 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 			return nil, fmt.Errorf("failed to convert owner address: %w", err)
 		}
 
-		if ownerAddress.Hex() != mr.Address.Hex() {
+		if ownerAddress != mr.Address {
 			// something was changed that does not belong to this account. Log it.
 			m.log.Error().
 				Str("key", id.String()).
@@ -352,21 +353,15 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 				continue
 			}
 
-			isADomainKey := false
-			for _, domain := range domains {
-				if id.Key == domain {
-					isADomainKey = true
-					break
-				}
-			}
-			if isADomainKey {
-				// TODO: check if this is really expected
+			if _, isADomainKey := domainsLookupMap[id.Key]; isADomainKey {
 				// this is expected. Move it to the new payloads
 				newPayloads = append(newPayloads, value)
 				continue
 			}
 
 			if _, ok := storageMapIds[id.Key]; ok {
+				// This is needed because storage map can be empty.
+				// Empty storage map only exists in old payloads because there isn't any element to migrate.
 				newPayloads = append(newPayloads, value)
 				continue
 			}
@@ -383,7 +378,7 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 				Key:     id.String(),
 				Size:    len(mr.Snapshot.Payloads),
 				Kind:    "not_migrated",
-				Msg:     fmt.Sprintf("%x", value),
+				Msg:     fmt.Sprintf("%x", value.Value()),
 			})
 
 			size, err := payloadSize(key, value)
@@ -493,6 +488,15 @@ var domains = []string{
 	common.PathDomainPrivate.Identifier(),
 	common.PathDomainPublic.Identifier(),
 	runtime.StorageDomainContract,
+	stdlib.InboxStorageDomain,
+}
+
+var domainsLookupMap = map[string]struct{}{
+	common.PathDomainStorage.Identifier(): {},
+	common.PathDomainPrivate.Identifier(): {},
+	common.PathDomainPublic.Identifier():  {},
+	runtime.StorageDomainContract:         {},
+	stdlib.InboxStorageDomain:             {},
 }
 
 // migrationProblem is a struct for reporting errors
