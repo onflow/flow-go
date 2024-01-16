@@ -60,7 +60,7 @@ func TestLimiterAddRemoveAddress(t *testing.T) {
 	require.True(t, l.IsRateLimited(limited2))
 }
 
-func TestLImiterBurst(t *testing.T) {
+func TestLimiterBurst(t *testing.T) {
 	t.Parallel()
 
 	limited1 := unittest.RandomAddressFixture()
