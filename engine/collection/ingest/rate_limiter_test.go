@@ -12,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/collection/ingest"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -23,6 +24,7 @@ func TestLimiterAddRemoveAddress(t *testing.T) {
 	good1 := unittest.RandomAddressFixture()
 	limited1 := unittest.RandomAddressFixture()
 	limited2 := unittest.RandomAddressFixture()
+	fmt.Println(limited1, limited2)
 
 	numPerSec := rate.Limit(1)
 	burst := 1
@@ -32,6 +34,8 @@ func TestLimiterAddRemoveAddress(t *testing.T) {
 	require.False(t, l.IsRateLimited(good1)) // address are not limited
 
 	l.AddAddress(limited1)
+	require.Equal(t, []flow.Address{limited1}, l.GetAddresses())
+
 	require.False(t, l.IsRateLimited(limited1)) // address 1 is not limitted on the first call
 	require.True(t, l.IsRateLimited(limited1))  // limitted on the second call immediately
 	require.True(t, l.IsRateLimited(limited1))  // limitted on the second call immediately
@@ -40,6 +44,10 @@ func TestLimiterAddRemoveAddress(t *testing.T) {
 	require.False(t, l.IsRateLimited(good1)) // address are not limited
 
 	l.AddAddress(limited2)
+	list := l.GetAddresses()
+	require.Len(t, list, 2)
+	require.Contains(t, list, limited1)
+
 	require.False(t, l.IsRateLimited(limited2)) // address 1 is not limitted on the first call
 	require.True(t, l.IsRateLimited(limited2))  // limitted on the second call immediately
 	require.True(t, l.IsRateLimited(limited2))  // limitted on the second call immediately

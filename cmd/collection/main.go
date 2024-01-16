@@ -10,6 +10,7 @@ import (
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/admin/commands"
+	collectionCommands "github.com/onflow/flow-go/admin/commands/collection"
 	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
@@ -193,6 +194,9 @@ func main() {
 			// To be managed by admin tool, and used by ingestion engine
 			addressRateLimiter = ingest.NewAddressRateLimiter(rate.Limit(txRatelimits), txBurstlimits)
 			return nil
+		}).
+		AdminCommand("tx-rate-limit", func(node *cmd.NodeConfig) commands.AdminCommand {
+			return collectionCommands.NewTxRateLimitCommand(addressRateLimiter)
 		}).
 		AdminCommand("read-range-cluster-blocks", func(conf *cmd.NodeConfig) commands.AdminCommand {
 			clusterPayloads := badger.NewClusterPayloads(&metrics.NoopCollector{}, conf.DB)

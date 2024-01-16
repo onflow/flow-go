@@ -15,6 +15,8 @@ type AddressRateLimiter struct {
 	burst    int // X messages allowed at one time
 }
 
+// AddressRateLimiter limits the rate of messages sent to a given address
+// It allows the given "limit" amount messages per second with a "burst" amount of messages to be sent at once
 func NewAddressRateLimiter(limit rate.Limit, burst int) *AddressRateLimiter {
 	return &AddressRateLimiter{
 		limiters: make(map[flow.Address]*rate.Limiter),
@@ -56,4 +58,17 @@ func (r *AddressRateLimiter) RemoveAddress(address flow.Address) {
 	defer r.mu.Unlock()
 
 	delete(r.limiters, address)
+}
+
+// GetAddresses get the list of rate limited address
+func (r *AddressRateLimiter) GetAddresses() []flow.Address {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	addresses := make([]flow.Address, 0, len(r.limiters))
+	for address := range r.limiters {
+		addresses = append(addresses, address)
+	}
+
+	return addresses
 }
