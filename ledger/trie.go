@@ -319,6 +319,16 @@ func (p *Payload) Key() (Key, error) {
 	return *k, nil
 }
 
+// EncodedKey returns payload key.
+// CAUTION: do not modify returned encoded key
+// because it shares underlying data with payload key.
+func (p *Payload) EncodedKey() []byte {
+	if p == nil {
+		return nil
+	}
+	return p.encKey
+}
+
 // Value returns payload value.
 // CAUTION: do not modify returned value because it shares underlying data with payload value.
 func (p *Payload) Value() Value {

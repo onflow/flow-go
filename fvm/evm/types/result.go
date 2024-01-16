@@ -1,7 +1,6 @@
 package types
 
 import (
-	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 )
 
@@ -20,8 +19,6 @@ type Result struct {
 	TxType uint8
 	// total gas consumed during an opeartion
 	GasConsumed uint64
-	// the root hash of the state after execution
-	StateRootHash gethCommon.Hash
 	// the address where the contract is deployed (if any)
 	DeployedContractAddress Address
 	// returned value from a function call
@@ -35,7 +32,6 @@ type Result struct {
 func (res *Result) Receipt() *gethTypes.ReceiptForStorage {
 	receipt := &gethTypes.Receipt{
 		Type:              res.TxType,
-		PostState:         res.StateRootHash[:],
 		CumulativeGasUsed: res.GasConsumed, // TODO: update to capture cumulative
 		Logs:              res.Logs,
 		ContractAddress:   res.DeployedContractAddress.ToCommon(),

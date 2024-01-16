@@ -79,62 +79,14 @@ type GossipSubParameters struct {
 }
 
 const (
-	AppSpecificScoreRegistryKey = "app-specific-score"
-	SpamRecordCacheKey          = "spam-record-cache"
-	DecayIntervalKey            = "decay-interval"
+	DecayIntervalKey = "decay-interval"
 )
 
 // ScoringParameters are the parameters for the score option.
 // Parameters are "numerical values" that are used to compute or build components that compute the score of a peer in GossipSub system.
 type ScoringParameters struct {
-	AppSpecificScore AppSpecificScoreParameters `validate:"required" mapstructure:"app-specific-score"`
-	SpamRecordCache  SpamRecordCacheParameters  `validate:"required" mapstructure:"spam-record-cache"`
-	// DecayInterval is the interval at which the counters associated with a peer behavior in GossipSub system are decayed.
-	DecayInterval time.Duration `validate:"gt=0s" mapstructure:"decay-interval"`
-}
-
-const (
-	ScoreUpdateWorkerNumKey        = "score-update-worker-num"
-	ScoreUpdateRequestQueueSizeKey = "score-update-request-queue-size"
-	ScoreTTLKey                    = "score-ttl"
-)
-
-// AppSpecificScoreParameters is the parameters for the GossipSubAppSpecificScoreRegistry.
-// Parameters are "numerical values" that are used to compute or build components that compute or maintain the application specific score of peers.
-type AppSpecificScoreParameters struct {
-	// ScoreUpdateWorkerNum is the number of workers in the worker pool for handling the application specific score update of peers in a non-blocking way.
-	ScoreUpdateWorkerNum int `validate:"gt=0" mapstructure:"score-update-worker-num"`
-
-	// ScoreUpdateRequestQueueSize is the size of the worker pool for handling the application specific score update of peers in a non-blocking way.
-	ScoreUpdateRequestQueueSize uint32 `validate:"gt=0" mapstructure:"score-update-request-queue-size"`
-
-	// ScoreTTL is the time to live of the application specific score of a peer; the registry keeps a cached copy of the
-	// application specific score of a peer for this duration. When the duration expires, the application specific score
-	// of the peer is updated asynchronously. As long as the update is in progress, the cached copy of the application
-	// specific score of the peer is used even if it is expired.
-	ScoreTTL time.Duration `validate:"required" mapstructure:"score-ttl"`
-}
-
-const (
-	PenaltyDecaySlowdownThresholdKey = "penalty-decay-slowdown-threshold"
-	DecayRateReductionFactorKey      = "penalty-decay-rate-reduction-factor"
-	PenaltyDecayEvaluationPeriodKey  = "penalty-decay-evaluation-period"
-)
-
-type SpamRecordCacheParameters struct {
-	// CacheSize is size of the cache used to store the spam records of peers.
-	// The spam records are used to penalize peers that send invalid messages.
-	CacheSize uint32 `validate:"gt=0" mapstructure:"cache-size"`
-
-	// PenaltyDecaySlowdownThreshold defines the penalty level which the decay rate is reduced by `DecayRateReductionFactor` every time the penalty of a node falls below the threshold, thereby slowing down the decay process.
-	// This mechanism ensures that malicious nodes experience longer decay periods, while honest nodes benefit from quicker decay.
-	PenaltyDecaySlowdownThreshold float64 `validate:"lt=0" mapstructure:"penalty-decay-slowdown-threshold"`
-
-	// DecayRateReductionFactor defines the value by which the decay rate is decreased every time the penalty is below the PenaltyDecaySlowdownThreshold. A reduced decay rate extends the time it takes for penalties to diminish.
-	DecayRateReductionFactor float64 `validate:"gt=0,lt=1" mapstructure:"penalty-decay-rate-reduction-factor"`
-
-	// PenaltyDecayEvaluationPeriod defines the interval at which the decay for a spam record is okay to be adjusted.
-	PenaltyDecayEvaluationPeriod time.Duration `validate:"gt=0" mapstructure:"penalty-decay-evaluation-period"`
+	PeerScoring               PeerScoringParameters     `validate:"required" mapstructure:"peer-scoring"`
+	ScoringRegistryParameters ScoringRegistryParameters `validate:"required" mapstructure:"scoring-registry"`
 }
 
 // SubscriptionProviderParameters keys.
