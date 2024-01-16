@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
+	p2pconfig "github.com/onflow/flow-go/network/p2p/config"
 	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
 	"github.com/onflow/flow-go/network/p2p/tracer/internal"
 	"github.com/onflow/flow-go/utils/logging"
@@ -54,7 +55,7 @@ type GossipSubMeshTracer struct {
 	loggerInterval               time.Duration
 	metrics                      module.LocalGossipSubRouterMetrics
 	rpcSentTracker               *internal.RPCSentTracker
-	duplicateMessageTrackerCache *internal.GossipSubDuplicateMessageTrackerCache
+	duplicateMessageTrackerCache *internal.DuplicateMessageTrackerCache
 }
 
 var _ p2p.PubSubTracer = (*GossipSubMeshTracer)(nil)
@@ -71,14 +72,14 @@ type DuplicateMessageTrackerCacheConfig struct {
 }
 
 type GossipSubMeshTracerConfig struct {
-	network.NetworkingType          `validate:"required"`
-	metrics.HeroCacheMetricsFactory `validate:"required"`
-	Logger                          zerolog.Logger                     `validate:"required"`
-	Metrics                         module.LocalGossipSubRouterMetrics `validate:"required"`
-	IDProvider                      module.IdentityProvider            `validate:"required"`
-	LoggerInterval                  time.Duration                      `validate:"required"`
-	DuplicateMessageTracker         DuplicateMessageTrackerCacheConfig `validate:"required"`
-	RpcSentTracker                  RpcSentTrackerConfig               `validate:"required"`
+	network.NetworkingType             `validate:"required"`
+	metrics.HeroCacheMetricsFactory    `validate:"required"`
+	Logger                             zerolog.Logger                          `validate:"required"`
+	Metrics                            module.LocalGossipSubRouterMetrics      `validate:"required"`
+	IDProvider                         module.IdentityProvider                 `validate:"required"`
+	LoggerInterval                     time.Duration                           `validate:"required"`
+	DuplicateMessageTrackerCacheConfig p2pconfig.DuplicateMessageTrackerConfig `validate:"required"`
+	RpcSentTracker                     RpcSentTrackerConfig                    `validate:"required"`
 }
 
 // NewGossipSubMeshTracer creates a new *GossipSubMeshTracer.
@@ -104,9 +105,10 @@ func NewGossipSubMeshTracer(config *GossipSubMeshTracerConfig) *GossipSubMeshTra
 		logger:         lg,
 		loggerInterval: config.LoggerInterval,
 		rpcSentTracker: rpcSentTracker,
-		duplicateMessageTrackerCache: internal.NewGossipSubDuplicateMessageTrackerCache(
-			config.DuplicateMessageTracker.CacheSize,
-			config.DuplicateMessageTracker.Decay,
+		duplicateMessageTrackerCache: internal.NewDuplicateMessageTrackerCache(
+			config.DuplicateMessageTrackerCacheConfig.CacheSize,
+			config.DuplicateMessageTrackerCacheConfig.Decay,
+			config.DuplicateMessageTrackerCacheConfig.SkipDecayThreshold,
 			config.Logger,
 			metrics.GossipSubDuplicateMessageTrackerCacheMetricFactory(config.HeroCacheMetricsFactory, config.NetworkingType),
 		),
@@ -375,7 +377,7 @@ func (t *GossipSubMeshTracer) DuplicateMessage(msg *pubsub.Message) {
 		lg = lg.With().Str("remote_peer_id", p2plogging.PeerId(from)).Logger()
 	}
 
-	count, err := t.duplicateMessageTrackerCache.Inc(msg.ReceivedFrom)
+	count, err := t.duplicateMessageTrackerCache.DuplicateMessageReceived(msg.ReceivedFrom)
 	if err != nil {
 		t.logger.Fatal().
 			Err(err).
@@ -479,7 +481,7 @@ func (t *GossipSubMeshTracer) LastHighestIHaveRPCSize() int64 {
 
 // DuplicateMessageCount returns the current duplicate message count for the peer.
 func (t *GossipSubMeshTracer) DuplicateMessageCount(peerID peer.ID) float64 {
-	count, err, found := t.duplicateMessageTrackerCache.Get(peerID)
+	count, found, err := t.duplicateMessageTrackerCache.GetWithInit(peerID)
 	if err != nil {
 		t.logger.Err(err).
 			Bool(logging.KeyNetworkingSecurity, true).

@@ -128,9 +128,10 @@ func NewScoreOption(cfg *ScoreOptionConfig, provider p2p.SubscriptionProvider) (
 		GetDuplicateMessageCount: func(id peer.ID) float64 {
 			return cfg.getDuplicateMessageCount(id)
 		},
-		Parameters:             cfg.params.ScoringRegistryParameters.AppSpecificScore,
-		NetworkingType:         cfg.networkingType,
-		AppSpecificScoreParams: cfg.params.PeerScoring.Protocol.AppSpecificScore,
+		Parameters:                cfg.params.ScoringRegistryParameters.AppSpecificScore,
+		NetworkingType:            cfg.networkingType,
+		AppSpecificScoreParams:    cfg.params.PeerScoring.Protocol.AppSpecificScore,
+		DuplicateMessageThreshold: cfg.params.PeerScoring.Internal.Thresholds.DuplicateMessage,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create gossipsub app specific score registry: %w", err)

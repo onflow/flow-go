@@ -140,6 +140,8 @@ type DuplicateMessageTrackerConfig struct {
 	CacheSize uint32 `validate:"gt=0" mapstructure:"cache-size"`
 	// Decay rate of decay for the peer duplicate message counters.
 	Decay float64 `validate:"gt=0,lt=1" mapstructure:"decay"`
+	// SkipDecayThreshold the threshold for which when the counter is below this value, the decay function will not be called
+	SkipDecayThreshold float64 `validate:"gt=0,lt=1" mapstructure:"skip-decay-threshold"`
 }
 
 // ResourceScope is the scope of the resource, e.g., system, transient, protocol, peer, peer-protocol.

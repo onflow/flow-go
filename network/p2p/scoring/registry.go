@@ -61,10 +61,8 @@ type GossipSubAppSpecificScoreRegistry struct {
 	// appScoreUpdateWorkerPool is the worker pool for handling the application specific score update of peers in a non-blocking way.
 	appScoreUpdateWorkerPool *worker.Pool[peer.ID]
 
-	unknownIdentityPenalty     float64
-	minAppSpecificPenalty      float64
-	stakedIdentityReward       float64
-	invalidSubscriptionPenalty float64
+	appSpecificScoreParams    p2pconfig.ApplicationSpecificScoreParameters
+	duplicateMessageThreshold float64
 }
 
 // GossipSubAppSpecificScoreRegistryConfig is the configuration for the GossipSubAppSpecificScoreRegistry.
@@ -101,6 +99,8 @@ type GossipSubAppSpecificScoreRegistryConfig struct {
 	NetworkingType network.NetworkingType `validate:"required"`
 
 	AppSpecificScoreParams p2pconfig.ApplicationSpecificScoreParameters `validate:"required"`
+
+	DuplicateMessageThreshold float64 `validate:"required"`
 }
 
 // NewGossipSubAppSpecificScoreRegistry returns a new GossipSubAppSpecificScoreRegistry.
@@ -124,18 +124,16 @@ func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegis
 		metrics.GossipSubAppSpecificScoreUpdateQueueMetricFactory(config.HeroCacheMetricsFactory, config.NetworkingType))
 
 	reg := &GossipSubAppSpecificScoreRegistry{
-		logger:                     config.Logger.With().Str("module", "app_score_registry").Logger(),
-		getDuplicateMessageCount:   config.GetDuplicateMessageCount,
-		spamScoreCache:             config.SpamRecordCacheFactory(),
-		appScoreCache:              config.AppScoreCacheFactory(),
-		penalty:                    config.Penalty,
-		validator:                  config.Validator,
-		idProvider:                 config.IdProvider,
-		scoreTTL:                   config.Parameters.ScoreTTL,
-		unknownIdentityPenalty:     config.AppSpecificScoreParams.UnknownIdentityPenalty,
-		minAppSpecificPenalty:      config.AppSpecificScoreParams.MinAppSpecificPenalty,
-		stakedIdentityReward:       config.AppSpecificScoreParams.StakedIdentityReward,
-		invalidSubscriptionPenalty: config.AppSpecificScoreParams.InvalidSubscriptionPenalty,
+		logger:                    config.Logger.With().Str("module", "app_score_registry").Logger(),
+		getDuplicateMessageCount:  config.GetDuplicateMessageCount,
+		spamScoreCache:            config.SpamRecordCacheFactory(),
+		appScoreCache:             config.AppScoreCacheFactory(),
+		penalty:                   config.Penalty,
+		validator:                 config.Validator,
+		idProvider:                config.IdProvider,
+		scoreTTL:                  config.Parameters.ScoreTTL,
+		appSpecificScoreParams:    config.AppSpecificScoreParams,
+		duplicateMessageThreshold: config.DuplicateMessageThreshold,
 	}
 
 	reg.appScoreUpdateWorkerPool = worker.NewWorkerPoolBuilder[peer.ID](lg.With().Str("component", "app_specific_score_update_worker_pool").Logger(),
@@ -313,7 +311,7 @@ func (r *GossipSubAppSpecificScoreRegistry) stakingScore(pid peer.ID) (float64, 
 			Err(err).
 			Bool(logging.KeySuspicious, true).
 			Msg("invalid peer identity, penalizing peer")
-		return r.unknownIdentityPenalty, flow.Identifier{}, 0
+		return r.appSpecificScoreParams.UnknownIdentityPenalty, flow.Identifier{}, 0
 	}
 
 	lg = lg.With().
@@ -326,13 +324,13 @@ func (r *GossipSubAppSpecificScoreRegistry) stakingScore(pid peer.ID) (float64, 
 	if flowId.Role == flow.RoleAccess {
 		lg.Trace().
 			Msg("pushing access node to edge by penalizing with minimum penalty value")
-		return r.minAppSpecificPenalty, flowId.NodeID, flowId.Role
+		return r.appSpecificScoreParams.MinAppSpecificPenalty, flowId.NodeID, flowId.Role
 	}
 
 	lg.Trace().
 		Msg("rewarding well-behaved non-access node peer with maximum reward value")
 
-	return r.stakedIdentityReward, flowId.NodeID, flowId.Role
+	return r.appSpecificScoreParams.StakedIdentityReward, flowId.NodeID, flowId.Role
 }
 
 func (r *GossipSubAppSpecificScoreRegistry) subscriptionPenalty(pid peer.ID, flowId flow.Identifier, role flow.Role) float64 {
@@ -344,7 +342,7 @@ func (r *GossipSubAppSpecificScoreRegistry) subscriptionPenalty(pid peer.ID, flo
 			Hex("flow_id", logging.ID(flowId)).
 			Bool(logging.KeySuspicious, true).
 			Msg("invalid subscription detected, penalizing peer")
-		return r.invalidSubscriptionPenalty
+		return r.appSpecificScoreParams.InvalidSubscriptionPenalty
 	}
 
 	return 0
@@ -355,10 +353,10 @@ func (r *GossipSubAppSpecificScoreRegistry) subscriptionPenalty(pid peer.ID, flo
 // messages above the DefaultDuplicateMessageThreshold.
 func (r *GossipSubAppSpecificScoreRegistry) duplicateMessagesPenalty(pid peer.ID) float64 {
 	duplicateMessageCount := r.getDuplicateMessageCount(pid)
-	if duplicateMessageCount > DefaultDuplicateMessageThreshold {
-		duplicateMessagePenalty := (duplicateMessageCount - DefaultDuplicateMessageThreshold) * DefaultDuplicateMessagePenalty
-		if duplicateMessagePenalty < MaxAppSpecificPenalty {
-			return MaxAppSpecificPenalty
+	if duplicateMessageCount > r.duplicateMessageThreshold {
+		duplicateMessagePenalty := (duplicateMessageCount - r.duplicateMessageThreshold) * r.appSpecificScoreParams.DuplicateMessagePenalty
+		if duplicateMessagePenalty < r.appSpecificScoreParams.MaxAppSpecificPenalty {
+			return r.appSpecificScoreParams.MaxAppSpecificPenalty
 		}
 		return duplicateMessagePenalty
 	}

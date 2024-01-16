@@ -585,7 +585,7 @@ func testScoreRegistrySpamRecordWithoutDuplicateMessagesPenalty(t *testing.T, me
 	// app specific score should not be effected by duplicate messages count
 	require.Never(t, func() bool {
 		score := reg.AppSpecificScoreFunc()(peerID)
-		return score != scoring.MaxAppSpecificReward
+		return score != cfg.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Protocol.AppSpecificScore.MaxAppSpecificReward
 	}, 5*time.Second, 100*time.Millisecond)
 
 	// report a misbehavior for the peer id.
@@ -599,7 +599,7 @@ func testScoreRegistrySpamRecordWithoutDuplicateMessagesPenalty(t *testing.T, me
 	assert.True(t, ok)
 	assert.NoError(t, err)
 	unittest.RequireNumericallyClose(t, expectedPenalty, record.Penalty, 0.01)
-	assert.Equal(t, scoring.InitAppScoreRecordStateFunc(maximumSpamPenaltyDecayFactor), record.Decay) // decay should be initialized to the initial state.
+	assert.Equal(t, scoring.InitAppScoreRecordStateFunc(maximumSpamPenaltyDecayFactor)().Decay, record.Decay) // decay should be initialized to the initial state.
 
 	queryTime := time.Now()
 	// eventually, the app specific score should be updated in the cache.
