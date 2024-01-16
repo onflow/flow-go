@@ -7,8 +7,10 @@ import (
 	gethCrypto "github.com/ethereum/go-ethereum/crypto"
 )
 
+const FunctionSignatureLength = 4
+
 // This is derived as the first 4 bytes of the Keccak hash of the ASCII form of the signature of the method
-type FunctionSignature [4]byte
+type FunctionSignature [FunctionSignatureLength]byte
 
 func (fs FunctionSignature) Bytes() []byte {
 	return fs[:]
@@ -20,7 +22,7 @@ func (fs FunctionSignature) Bytes() []byte {
 func ComputeFunctionSignature(name string, args []string) FunctionSignature {
 	var sig FunctionSignature
 	input := fmt.Sprintf("%v(%v)", name, strings.Join(args, ","))
-	copy(sig[0:4], gethCrypto.Keccak256([]byte(input))[:4])
+	copy(sig[0:FunctionSignatureLength], gethCrypto.Keccak256([]byte(input))[:FunctionSignatureLength])
 	return sig
 }
 
@@ -28,6 +30,6 @@ func ComputeFunctionSignature(name string, args []string) FunctionSignature {
 // returns the rest of the data
 func SplitFunctionSignature(input []byte) (FunctionSignature, []byte) {
 	var funcSig FunctionSignature
-	copy(funcSig[:], input[0:4])
-	return funcSig, input[4:]
+	copy(funcSig[:], input[0:FunctionSignatureLength])
+	return funcSig, input[FunctionSignatureLength:]
 }

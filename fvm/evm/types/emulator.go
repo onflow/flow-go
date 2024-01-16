@@ -37,7 +37,6 @@ func NewDefaultBlockContext(BlockNumber uint64) BlockContext {
 		BlockNumber:            BlockNumber,
 		DirectCallBaseGasUsage: DefaultDirectCallBaseGasUsage,
 		DirectCallGasPrice:     DefaultDirectCallGasPrice,
-		ExtraPrecompiles:       make([]Precompile, 0),
 	}
 }
 

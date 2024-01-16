@@ -14,7 +14,7 @@ func TestFunctionSignatures(t *testing.T) {
 	expected := gethCrypto.Keccak256([]byte("test()"))[:4]
 	require.Equal(t, expected, precompiles.ComputeFunctionSignature("test", nil).Bytes())
 
-	expected = gethCrypto.Keccak256([]byte("test(uint32,uint16)"))[:4]
+	expected = gethCrypto.Keccak256([]byte("test(uint32,uint16)"))[:precompiles.FunctionSignatureLength]
 	require.Equal(t, expected,
 		precompiles.ComputeFunctionSignature("test", []string{"uint32", "uint16"}).Bytes())
 }

@@ -9,14 +9,17 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-const ledgerAddressAllocatorKey = "AddressAllocator"
+const (
+	ledgerAddressAllocatorKey = "AddressAllocator"
+	uint64ByteSize            = 8
+)
 
 var (
 	// prefixes:
 	// the first 12 bytes of addresses allocation
 	// leading zeros helps with storage and all zero is reserved for the EVM precompiles
-	FlowEVMPrecompileAddressPrefix = []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}
-	FlowEVMCOAAddressPrefix        = []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2}
+	FlowEVMPrecompileAddressPrefix = [...]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}
+	FlowEVMCOAAddressPrefix        = [...]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2}
 )
 
 type AddressAllocator struct {
@@ -61,8 +64,9 @@ func (aa *AddressAllocator) AllocateCOAAddress() (types.Address, error) {
 
 func MakeCOAAddress(index uint64) types.Address {
 	var addr types.Address
-	copy(addr[:types.AddressLength-8], FlowEVMCOAAddressPrefix)
-	binary.BigEndian.PutUint64(addr[types.AddressLength-8:], index)
+	prefixIndex := types.AddressLength - uint64ByteSize
+	copy(addr[:prefixIndex], FlowEVMCOAAddressPrefix[:])
+	binary.BigEndian.PutUint64(addr[prefixIndex:], index)
 	return addr
 }
 
@@ -73,7 +77,8 @@ func (aa *AddressAllocator) AllocatePrecompileAddress(index uint64) types.Addres
 
 func MakePrecompileAddress(index uint64) types.Address {
 	var addr types.Address
-	copy(addr[:types.AddressLength-8], FlowEVMPrecompileAddressPrefix)
-	binary.BigEndian.PutUint64(addr[types.AddressLength-8:], index)
+	prefixIndex := types.AddressLength - uint64ByteSize
+	copy(addr[:prefixIndex], FlowEVMPrecompileAddressPrefix[:])
+	binary.BigEndian.PutUint64(addr[prefixIndex:], index)
 	return addr
 }

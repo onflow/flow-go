@@ -93,7 +93,6 @@ func defaultConfig() *Config {
 				return gethCommon.BytesToHash(gethCrypto.Keccak256([]byte(new(big.Int).SetUint64(n).String())))
 			},
 		},
-		ExtraPrecompiles: make(map[gethCommon.Address]gethVM.PrecompiledContract),
 	}
 }
 
@@ -193,6 +192,9 @@ func WithDirectCallBaseGasUsage(gas uint64) Option {
 func WithExtraPrecompiles(precompiles []types.Precompile) Option {
 	return func(c *Config) *Config {
 		for _, pc := range precompiles {
+			if c.ExtraPrecompiles == nil {
+				c.ExtraPrecompiles = make(map[gethCommon.Address]gethVM.PrecompiledContract)
+			}
 			c.ExtraPrecompiles[pc.Address().ToCommon()] = pc
 		}
 		return c

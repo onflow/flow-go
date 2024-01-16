@@ -54,10 +54,7 @@ func (em *Emulator) NewReadOnlyBlockView(ctx types.BlockContext) (types.ReadOnly
 // NewBlockView constructs a new block view (mutable)
 func (em *Emulator) NewBlockView(ctx types.BlockContext) (types.BlockView, error) {
 	cfg := newConfig(ctx)
-	err := SetupPrecompile(cfg)
-	if err != nil {
-		return nil, err
-	}
+	SetupPrecompile(cfg)
 	return &BlockView{
 		config:   cfg,
 		rootAddr: em.rootAddr,
@@ -285,7 +282,7 @@ func (proc *procedure) run(msg *gethCore.Message, txType uint8) (*types.Result, 
 	return &res, err
 }
 
-func SetupPrecompile(cfg *Config) error {
+func SetupPrecompile(cfg *Config) {
 	rules := cfg.ChainRules()
 	// captures the pointer to the map that has to be augmented
 	var precompiles map[gethCommon.Address]gethVM.PrecompiledContract
@@ -301,8 +298,8 @@ func SetupPrecompile(cfg *Config) error {
 	default:
 		precompiles = gethVM.PrecompiledContractsHomestead
 	}
-	for k, v := range cfg.ExtraPrecompiles {
-		precompiles[k] = v
+	for addr, contract := range cfg.ExtraPrecompiles {
+		// we override if exist since we call this method on every block
+		precompiles[addr] = contract
 	}
-	return nil
 }

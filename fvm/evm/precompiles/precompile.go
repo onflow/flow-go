@@ -1,10 +1,16 @@
 package precompiles
 
 import (
-	"fmt"
+	"errors"
 
 	"github.com/onflow/flow-go/fvm/evm/types"
 )
+
+// InvalidMethodCallGasUsage captures how much gas we charge for invalid method call
+const InvalidMethodCallGasUsage = uint64(1)
+
+// ErrInvalidMethodCall is returned when the method is not available on the contract
+var ErrInvalidMethodCall = errors.New("invalid method call")
 
 // Function is an interface for a function in a multi-function precompile contract
 type Function interface {
@@ -45,12 +51,12 @@ func (p *precompile) Address() types.Address {
 // RequiredPrice calculates the contract gas use
 func (p *precompile) RequiredGas(input []byte) uint64 {
 	if len(input) < 4 {
-		return 0
+		return InvalidMethodCallGasUsage
 	}
 	sig, data := SplitFunctionSignature(input)
 	callable, found := p.functions[sig]
 	if !found {
-		return 0
+		return InvalidMethodCallGasUsage
 	}
 	return callable.ComputeGas(data)
 }
@@ -58,12 +64,12 @@ func (p *precompile) RequiredGas(input []byte) uint64 {
 // Run runs the precompiled contract
 func (p *precompile) Run(input []byte) ([]byte, error) {
 	if len(input) < 4 {
-		return nil, fmt.Errorf("invalid method") // TODO return the right error based on geth
+		return nil, ErrInvalidMethodCall
 	}
 	sig, data := SplitFunctionSignature(input)
 	callable, found := p.functions[sig]
 	if !found {
-		return nil, fmt.Errorf("invalid method") // TODO return the right error based on geth
+		return nil, ErrInvalidMethodCall
 	}
 	return callable.Run(data)
 }
