@@ -489,7 +489,6 @@ func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWant
 		c.metrics.OnIWantMessagesInspected(duplicateMessageIds, cacheMisses)
 	}()
 
-	checkCacheMisses := len(iWants) >= c.config.IWant.CacheMissCheckSize
 	lg = lg.With().
 		Int("iwant_msg_count", len(iWants)).
 		Float64("cache_misses_threshold", c.config.IWant.CacheMissThreshold).
@@ -500,6 +499,7 @@ func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWant
 	totalMessageIds := 0
 	for _, iWant := range iWants {
 		messageIds := iWant.GetMessageIDs()
+		checkCacheMisses := len(messageIds) >= c.config.IWant.CacheMissCheckSize
 		messageIDCount := uint(len(messageIds))
 		for _, messageID := range messageIds {
 			// check duplicate allowed threshold
@@ -512,13 +512,11 @@ func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWant
 				}
 			}
 			// check cache miss threshold
-			if !c.rpcTracker.WasIHaveRPCSent(messageID) {
+			if checkCacheMisses && !c.rpcTracker.WasIHaveRPCSent(messageID) {
 				cacheMisses++
-				if checkCacheMisses {
-					if float64(cacheMisses) > c.config.IWant.CacheMissThreshold {
-						c.metrics.OnIWantCacheMissMessageIdsExceedThreshold()
-						return NewIWantCacheMissThresholdErr(cacheMisses, messageIDCount, c.config.IWant.CacheMissThreshold)
-					}
+				if float64(cacheMisses) > c.config.IWant.CacheMissThreshold {
+					c.metrics.OnIWantCacheMissMessageIdsExceedThreshold()
+					return NewIWantCacheMissThresholdErr(cacheMisses, messageIDCount, c.config.IWant.CacheMissThreshold)
 				}
 			}
 			duplicateMsgIdTracker.track(messageID)
