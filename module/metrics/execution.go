@@ -81,6 +81,7 @@ type ExecutionCollector struct {
 	stateSyncActive                         prometheus.Gauge
 	blockDataUploadsInProgress              prometheus.Gauge
 	blockDataUploadsDuration                prometheus.Histogram
+	maxCollectionHeightData                 uint64
 	maxCollectionHeight                     prometheus.Gauge
 	computationResultUploadedCount          prometheus.Counter
 	computationResultUploadRetriedCount     prometheus.Counter
@@ -683,6 +684,7 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 			Help:      "the number of times a program was found in the cache",
 		}),
 
+		maxCollectionHeightData: 0,
 		maxCollectionHeight: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name:      "max_collection_height",
 			Namespace: namespaceExecution,
@@ -950,7 +952,10 @@ func (ec *ExecutionCollector) RuntimeTransactionProgramsCacheHit() {
 }
 
 func (ec *ExecutionCollector) UpdateCollectionMaxHeight(height uint64) {
-	ec.maxCollectionHeight.Set(float64(height))
+	if height > ec.maxCollectionHeightData {
+		ec.maxCollectionHeight.Set(float64(height))
+		ec.maxCollectionHeightData = height
+	}
 }
 
 func (ec *ExecutionCollector) ExecutionComputationResultUploaded() {
