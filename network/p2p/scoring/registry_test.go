@@ -445,6 +445,8 @@ func testScoreRegistrySpamRecordWithDuplicateMessagesPenalty(t *testing.T, messa
 	require.NoError(t, err)
 	// refresh cached app-specific score every 100 milliseconds to speed up the test.
 	cfg.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.AppSpecificScore.ScoreTTL = 10 * time.Millisecond
+	duplicateMessageThreshold := cfg.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Internal.Thresholds.DuplicateMessage
+	duplicateMessagePenalty := cfg.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Protocol.AppSpecificScore.DuplicateMessagePenalty
 	maximumSpamPenaltyDecayFactor := cfg.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.SpamRecordCache.Decay.MaximumSpamPenaltyDecayFactor
 	duplicateMessagesCount := 10000.0
 	reg, spamRecords, appScoreCache := newGossipSubAppSpecificScoreRegistry(t, cfg.NetworkConfig.GossipSub.ScoringParameters,
@@ -453,8 +455,8 @@ func testScoreRegistrySpamRecordWithDuplicateMessagesPenalty(t *testing.T, messa
 		withValidSubscriptions(peerID),
 		func(registryConfig *scoring.GossipSubAppSpecificScoreRegistryConfig) {
 			registryConfig.GetDuplicateMessageCount = func(_ peer.ID) float64 {
-				// we add the DefaultDuplicateMessageThreshold so that penalization is triggered
-				return duplicateMessagesCount + scoring.DefaultDuplicateMessageThreshold
+				// we add the duplicate message threshold so that penalization is triggered
+				return duplicateMessagesCount + duplicateMessageThreshold
 			}
 		})
 
@@ -471,7 +473,7 @@ func testScoreRegistrySpamRecordWithDuplicateMessagesPenalty(t *testing.T, messa
 	require.Equal(t, time.Time{}, updated)
 	require.Equal(t, float64(0), score)
 
-	expectedDuplicateMessagesPenalty := duplicateMessagesCount * scoring.DefaultDuplicateMessagePenalty
+	expectedDuplicateMessagesPenalty := duplicateMessagesCount * duplicateMessagePenalty
 	// eventually, the app specific score should be updated in the cache.
 	require.Eventually(t, func() bool {
 		// calling the app specific score function when there is no app specific score in the cache should eventually update the cache.
@@ -552,6 +554,7 @@ func testScoreRegistrySpamRecordWithoutDuplicateMessagesPenalty(t *testing.T, me
 	require.NoError(t, err)
 	// refresh cached app-specific score every 100 milliseconds to speed up the test.
 	cfg.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.AppSpecificScore.ScoreTTL = 10 * time.Millisecond
+	duplicateMessageThreshold := cfg.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Internal.Thresholds.DuplicateMessage
 	maximumSpamPenaltyDecayFactor := cfg.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.SpamRecordCache.Decay.MaximumSpamPenaltyDecayFactor
 	reg, spamRecords, appScoreCache := newGossipSubAppSpecificScoreRegistry(t, cfg.NetworkConfig.GossipSub.ScoringParameters,
 		scoring.InitAppScoreRecordStateFunc(maximumSpamPenaltyDecayFactor),
@@ -560,7 +563,7 @@ func testScoreRegistrySpamRecordWithoutDuplicateMessagesPenalty(t *testing.T, me
 		func(registryConfig *scoring.GossipSubAppSpecificScoreRegistryConfig) {
 			registryConfig.GetDuplicateMessageCount = func(_ peer.ID) float64 {
 				// duplicate message count never exceeds scoring.DefaultDuplicateMessageThreshold so a penalty should never be applied
-				return scoring.DefaultDuplicateMessageThreshold - 1
+				return duplicateMessageThreshold - 1
 			}
 		})
 

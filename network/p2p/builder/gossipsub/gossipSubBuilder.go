@@ -169,12 +169,9 @@ func NewGossipSubBuilder(logger zerolog.Logger,
 			WorkerQueueCacheSize: gossipSubCfg.RpcTracer.RPCSentTrackerQueueCacheSize,
 			WorkerQueueNumber:    gossipSubCfg.RpcTracer.RpcSentTrackerNumOfWorkers,
 		},
-		DuplicateMessageTracker: tracer.DuplicateMessageTrackerCacheConfig{
-			CacheSize: gossipSubCfg.RpcTracer.DuplicateMessageTrackerConfig.CacheSize,
-			Decay:     gossipSubCfg.RpcTracer.DuplicateMessageTrackerConfig.Decay,
-		},
-		HeroCacheMetricsFactory: metricsCfg.HeroCacheFactory,
-		NetworkingType:          networkType,
+		DuplicateMessageTrackerCacheConfig: gossipSubCfg.RpcTracer.DuplicateMessageTrackerConfig,
+		HeroCacheMetricsFactory:            metricsCfg.HeroCacheFactory,
+		NetworkingType:                     networkType,
 	}
 	meshTracer := tracer.NewGossipSubMeshTracer(meshTracerCfg)
 
