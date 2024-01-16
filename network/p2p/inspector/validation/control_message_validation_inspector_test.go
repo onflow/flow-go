@@ -597,10 +597,6 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		cancel()
 		unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 	})
-
-	t.Run("inspectIWantMessages should disseminate invalid control message notification for iWant messages when cache misses exceeds allowed threshold", func(t *testing.T) {
-
-	})
 }
 
 // TestControlMessageInspection_ValidRpc ensures inspector does not disseminate invalid control message notifications for a valid RPC.
@@ -616,19 +612,19 @@ func TestControlMessageInspection_ValidRpc(t *testing.T) {
 	}
 	// avoid unknown topics errors
 	topicProviderOracle.UpdateTopics(topics)
+	cfg, err := config.DefaultConfig()
+	require.NoError(t, err)
+
 	inspector.Start(signalerCtx)
+	unittest.RequireComponentsReadyBefore(t, 1*time.Second, inspector)
+
 	grafts := unittest.P2PRPCGraftFixtures(topics...)
 	prunes := unittest.P2PRPCPruneFixtures(topics...)
 	ihaves := unittest.P2PRPCIHaveFixtures(50, topics...)
-	iwants := unittest.P2PRPCIWantFixtures(2, 5)
+	// makes sure each iwant has enough message ids to trigger cache misses check
+	iwants := unittest.P2PRPCIWantFixtures(2, int(cfg.NetworkConfig.GossipSub.RpcInspector.Validation.IWant.CacheMissCheckSize)+1)
 	pubsubMsgs := unittest.GossipSubMessageFixtures(10, topics[0])
 
-	// avoid cache misses for iwant messages.
-	iwants[0].MessageIDs = ihaves[0].MessageIDs[:10]
-	iwants[1].MessageIDs = ihaves[1].MessageIDs[11:20]
-	expectedMsgIds := make([]string, 0)
-	expectedMsgIds = append(expectedMsgIds, ihaves[0].MessageIDs...)
-	expectedMsgIds = append(expectedMsgIds, ihaves[1].MessageIDs...)
 	rpc := unittest.P2PRPCFixture(
 		unittest.WithGrafts(grafts...),
 		unittest.WithPrunes(prunes...),
@@ -639,7 +635,14 @@ func TestControlMessageInspection_ValidRpc(t *testing.T) {
 	rpcTracker.On("WasIHaveRPCSent", mock.AnythingOfType("string")).Return(true).Run(func(args mock.Arguments) {
 		id, ok := args[0].(string)
 		require.True(t, ok)
-		require.Contains(t, expectedMsgIds, id)
+		for _, iwant := range iwants {
+			for _, messageID := range iwant.GetMessageIDs() {
+				if id == messageID {
+					return
+				}
+			}
+		}
+		require.Fail(t, "message id not found in iwant messages")
 	})
 
 	from := unittest.PeerIdFixture(t)
