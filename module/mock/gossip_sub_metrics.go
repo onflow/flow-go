@@ -122,7 +122,7 @@ func (_m *GossipSubMetrics) OnIncomingRpcReceived(iHaveCount int, iWantCount int
 }
 
 // OnInvalidControlMessageSent provides a mock function with given fields:
-func (_m *GossipSubMetrics) OnInvalidControlMessageSent() {
+func (_m *GossipSubMetrics) OnInvalidControlMessageNotificationSent() {
 	_m.Called()
 }
 
@@ -227,8 +227,8 @@ func (_m *GossipSubMetrics) OnPruneMessageInspected(duplicateTopicIds int) {
 }
 
 // OnPublishMessageInspected provides a mock function with given fields: errCount
-func (_m *GossipSubMetrics) OnPublishMessageInspected(errCount int) {
-	_m.Called(errCount)
+func (_m *GossipSubMetrics) OnPublishMessageInspected(totalErrCount int, invalidTopicIdsCount int, invalidSubscriptionsCount int, invalidSendersCount int) {
+	_m.Called(totalErrCount)
 }
 
 // OnPublishMessageInvalidSubscription provides a mock function with given fields:

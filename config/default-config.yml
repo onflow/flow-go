@@ -166,7 +166,7 @@ network-config:
           #	in a single RPC message exceeds this threshold, a random sample of iHave messages will be taken and the RPC message will be truncated to this sample size.
           #	The sample size is equal to the configured message-count-threshold.
           message-count-threshold: 1000
-          # MessageIdCountThreshold is the maximum allowed number of message ids in a single iHave message.
+          # The maximum allowed number of message ids in a single iHave message.
           #	Each iHave message represents the list of message ids for a specific topic, and this parameter controls the maximum number of message ids
           #	that can be included in a single iHave message. When the total number of message ids in a single iHave message exceeds this threshold,
           #	a random sample of message ids will be taken and the iHave message will be truncated to this sample size.

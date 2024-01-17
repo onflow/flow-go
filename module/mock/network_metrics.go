@@ -273,7 +273,7 @@ func (_m *NetworkMetrics) OnIncomingRpcReceived(iHaveCount int, iWantCount int, 
 }
 
 // OnInvalidControlMessageSent provides a mock function with given fields:
-func (_m *NetworkMetrics) OnInvalidControlMessageSent() {
+func (_m *NetworkMetrics) OnInvalidControlMessageNotificationSent() {
 	_m.Called()
 }
 
@@ -393,8 +393,8 @@ func (_m *NetworkMetrics) OnPruneMessageInspected(duplicateTopicIds int) {
 }
 
 // OnPublishMessageInspected provides a mock function with given fields: errCount
-func (_m *NetworkMetrics) OnPublishMessageInspected(errCount int) {
-	_m.Called(errCount)
+func (_m *NetworkMetrics) OnPublishMessageInspected(totalErrCount int, invalidTopicIdsCount int, invalidSubscriptionsCount int, invalidSendersCount int) {
+	_m.Called(totalErrCount)
 }
 
 // OnPublishMessageInvalidSubscription provides a mock function with given fields:

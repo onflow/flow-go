@@ -567,19 +567,18 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 		return false
 	}
 	var errs *multierror.Error
+	invalidTopicIdsCount := 0
+	invalidSubscriptionsCount := 0
+	invalidSendersCount := 0
 	defer func() {
 		// regardless of inspection result, update metrics
-		if errs != nil {
-			c.metrics.OnPublishMessageInspected(errs.Len())
-		} else {
-			c.metrics.OnPublishMessageInspected(0)
-		}
+		c.metrics.OnPublishMessageInspected(errs.Len(), invalidTopicIdsCount, invalidSubscriptionsCount, invalidSendersCount)
 	}()
 	for _, message := range messages[:sampleSize] {
 		if c.networkingType == network.PrivateNetwork {
 			err := c.checkPubsubMessageSender(message)
 			if err != nil {
-				c.metrics.OnInvalidSenderForPublishMessage()
+				invalidSendersCount++
 				errs = multierror.Append(errs, err)
 				continue
 			}
@@ -591,13 +590,13 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 		err, _ := c.validateTopic(from, topic, activeClusterIDS)
 		if err != nil {
 			// we can skip checking for subscription of topic that failed validation and continue
-			c.metrics.OnInvalidTopicIdDetectedForControlMessage(p2pmsg.RpcPublishMessage)
+			invalidTopicIdsCount++
 			errs = multierror.Append(errs, err)
 			continue
 		}
 
 		if !hasSubscription(topic.String()) {
-			c.metrics.OnPublishMessageInvalidSubscription()
+			invalidSubscriptionsCount++
 			errs = multierror.Append(errs, fmt.Errorf("subscription for topic %s not found", topic))
 		}
 	}
@@ -940,7 +939,7 @@ func (c *ControlMsgValidationInspector) logAndDistributeAsyncInspectErrs(req *In
 		c.metrics.OnUnstakedPeerInspectionFailed()
 		lg.Warn().Msg("control message received from unstaked peer")
 	default:
-		c.metrics.OnInvalidControlMessageSent()
+		c.metrics.OnInvalidControlMessageNotificationSent()
 		distErr := c.distributor.Distribute(p2p.NewInvalidControlMessageNotification(req.Peer, ctlMsgType, err, count, topicType))
 		if distErr != nil {
 			lg.Error().

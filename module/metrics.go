@@ -277,88 +277,82 @@ type GossipSubRpcValidationInspectorMetrics interface {
 	//	diff: the number of control messages truncated.
 	OnControlMessagesTruncated(messageType p2pmsg.ControlMessageType, diff int)
 
-	// OnIWantMessagesInspected tracks the number of duplicate and cache miss message ids received by the node on an iWant message at the end of the async inspection iWants
-	// across one RPC.
-	// Args:
-	// 	duplicateCount: the number of duplicate message ids received by the node on an iWant message at the end of the async inspection iWants.
-	// 	cacheMissCount: the number of cache miss message ids received by the node on an iWant message at the end of the async inspection iWants.
+	// OnIWantMessagesInspected tracks the number of duplicate and cache miss message ids received by the node on iWant messages at the end of the async inspection iWants
+	// across one RPC, regardless of the result of the inspection.
+	//
+	//	duplicateCount: the total number of duplicate message ids received by the node on the iWant messages at the end of the async inspection of the RPC.
+	//	cacheMissCount: the total number of cache miss message ids received by the node on the iWant message at the end of the async inspection of the RPC.
 	OnIWantMessagesInspected(duplicateCount int, cacheMissCount int)
 
-	// OnIWantDuplicateMessageIdsExceedThreshold tracks the number of times that async inspection of iWant messages failed due to the number of duplicate message ids
-	// received by the node on an iWant message exceeding the threshold, which results in a misbehaviour report.
+	// OnIWantDuplicateMessageIdsExceedThreshold tracks the number of times that async inspection of iWant messages failed due to the total number of duplicate message ids
+	// received by the node on the iWant messages of a single RPC exceeding the threshold, which results in a misbehaviour report.
 	OnIWantDuplicateMessageIdsExceedThreshold()
 
-	// OnIWantCacheMissMessageIdsExceedThreshold tracks the number of times that async inspection of iWant messages failed due to the number of cache miss message ids
-	// received by the node on an iWant message exceeding the threshold, which results in a misbehaviour report.
+	// OnIWantCacheMissMessageIdsExceedThreshold tracks the number of times that async inspection of iWant messages failed due to the total
+	// number of cache miss message ids received by the node on the iWant messages of a single RPC exceeding the threshold, which results in a misbehaviour report.
 	OnIWantCacheMissMessageIdsExceedThreshold()
 
-	// OnIHaveMessagesInspected is called at the end of the async inspection of iHave messages, regardless of the result of the inspection.
-	// It tracks the number of duplicate topic ids and duplicate message ids received by the node on an iHave message at the end of the async inspection iHaves.
+	// OnIHaveMessagesInspected is called at the end of the async inspection of iHave messages of a single RPC, regardless of the result of the inspection.
+	// It tracks the number of duplicate topic ids and duplicate message ids received by the node on the iHave messages of that single RPC at the end of the async inspection iHaves.
 	// Args:
-	// 	duplicateTopicIds: the number of duplicate topic ids received by the node on an iHave message at the end of the async inspection iHaves.
-	// 	duplicateMessageIds: the number of duplicate message ids received by the node on an iHave message at the end of the async inspection iHaves.
+	//
+	//	duplicateTopicIds: the total number of duplicate topic ids received by the node on the iHave messages at the end of the async inspection of the RPC.
+	//	duplicateMessageIds: the number of duplicate message ids received by the node on the iHave messages at the end of the async inspection of the RPC.
 	OnIHaveMessagesInspected(duplicateTopicIds int, duplicateMessageIds int)
 
-	// OnIHaveDuplicateTopicIdsExceedThreshold tracks the number of times the number times that the async inspection of iHave messages failed due to the number of duplicate topic ids
-	// received by the node on an iHave message exceeding the threshold, which results in a misbehaviour report.
+	// OnIHaveDuplicateTopicIdsExceedThreshold tracks the number of times that the async inspection of iHave messages of a single RPC failed due to the total number of duplicate topic ids
+	// received by the node on the iHave messages of that RPC exceeding the threshold, which results in a misbehaviour report.
 	OnIHaveDuplicateTopicIdsExceedThreshold()
 
-	// OnIHaveDuplicateMessageIdsExceedThreshold tracks the number of times the number times that the async inspection of iHave messages failed due to the number of duplicate message ids
+	// OnIHaveDuplicateMessageIdsExceedThreshold tracks the number of times that the async inspection of iHave messages of a single RPC failed due to the total number of duplicate message ids
 	// received by the node on an iHave message exceeding the threshold, which results in a misbehaviour report.
 	OnIHaveDuplicateMessageIdsExceedThreshold()
 
-	// OnInvalidTopicIdDetectedForControlMessage tracks the number of times that the async inspection of a control message failed due to an invalid topic id.
+	// OnInvalidTopicIdDetectedForControlMessage tracks the number of times that the async inspection of a control message type on a single RPC failed due to an invalid topic id.
 	// Args:
 	// - messageType: the type of the control message that was truncated.
 	OnInvalidTopicIdDetectedForControlMessage(messageType p2pmsg.ControlMessageType)
 
-	// OnActiveClusterIDsNotSetErr tracks the number of times that the async inspection of a control message failed due to active cluster ids not set inspection failure.
+	// OnActiveClusterIDsNotSetErr tracks the number of times that the async inspection of a control message type on a single RPC failed due to active cluster ids not set inspection failure.
 	// This is not causing a misbehaviour report.
 	OnActiveClusterIDsNotSetErr()
 
-	// OnUnstakedPeerInspectionFailed tracks the number of times that the async inspection of a control message failed due to unstaked peer inspection failure.
+	// OnUnstakedPeerInspectionFailed tracks the number of times that the async inspection of a control message type on a single RPC failed due to unstaked peer inspection failure.
 	// This is not causing a misbehaviour report.
 	OnUnstakedPeerInspectionFailed()
 
-	// OnInvalidControlMessageSent tracks the number of times that the async inspection of a control message failed and an invalid control message was sent.
-	OnInvalidControlMessageSent()
-
-	// OnInvalidSenderForPublishMessage tracks the number of times that the async inspection of a publish message detected an invalid sender.
-	// Note that it does not cause a misbehaviour report; unless the number of times that this happens exceeds the threshold.
-	OnInvalidSenderForPublishMessage()
+	// OnInvalidControlMessageNotificationSent tracks the number of times that the async inspection of a control message failed and resulted in dissemination of an invalid control message was sent.
+	OnInvalidControlMessageNotificationSent()
 
 	// OnPublishMessagesInspectionErrorExceedsThreshold tracks the number of times that async inspection of publish messages failed due to the number of errors.
 	OnPublishMessagesInspectionErrorExceedsThreshold()
 
-	// OnPublishMessageInvalidSubscription tracks the number of times that the async inspection of a publish message detected an invalid subscription.
-	// Note that it does not cause a misbehaviour report; unless the number of times that this happens exceeds the threshold.
-	OnPublishMessageInvalidSubscription()
-
-	// OnPruneDuplicateTopicIdsExceedThreshold tracks the number of times that the async inspection of a prune message failed due to the number of duplicate topic ids
-	// received by the node on prune messages of the same rpc excesses threshold, which results in a misbehaviour report.
-	// Note that it does cause a misbehaviour report.
+	// OnPruneDuplicateTopicIdsExceedThreshold tracks the number of times that the async inspection of prune messages for an RPC failed due to the number of duplicate topic ids
+	// received by the node on prune messages of the same RPC excesses threshold, which results in a misbehaviour report.
 	OnPruneDuplicateTopicIdsExceedThreshold()
 
-	// OnPruneMessageInspected is called at the end of the async inspection of prune messages, regardless of the result of the inspection.
+	// OnPruneMessageInspected is called at the end of the async inspection of prune messages of the RPC, regardless of the result of the inspection.
 	// Args:
-	// 	duplicateTopicIds: the number of duplicate topic ids received by the node on a prune message at the end of the async inspection prunes.
+	// 	duplicateTopicIds: the number of duplicate topic ids received by the node on the prune messages of the RPC at the end of the async inspection prunes.
 	OnPruneMessageInspected(duplicateTopicIds int)
 
-	// OnGraftDuplicateTopicIdsExceedThreshold tracks the number of times that the async inspection of a graft message failed due to the number of duplicate topic ids.
-	// received by the node on graft messages of the same rpc excesses threshold, which results in a misbehaviour report.
+	// OnGraftDuplicateTopicIdsExceedThreshold tracks the number of times that the async inspection of the graft messages of a single RPC failed due to the number of duplicate topic ids
+	// received by the node on graft messages of the same RPC excesses threshold, which results in a misbehaviour report.
 	OnGraftDuplicateTopicIdsExceedThreshold()
 
-	// OnGraftMessageInspected is called at the end of the async inspection of graft messages, regardless of the result of the inspection.
+	// OnGraftMessageInspected is called at the end of the async inspection of graft messages of a single RPC, regardless of the result of the inspection.
 	// Args:
-	// 	duplicateTopicIds: the number of duplicate topic ids received by the node on a graft message at the end of the async inspection grafts.
+	// 	duplicateTopicIds: the number of duplicate topic ids received by the node on the graft messages at the end of the async inspection of a single RPC.
 	OnGraftMessageInspected(duplicateTopicIds int)
 
-	// OnPublishMessageInspected tracks the number of errors that occurred during the async inspection of publish messages.
-	// Note that this function is called on each publish message received by the node regardless of the result of the inspection.
-	// If the number of errors exceeds the threshold, a misbehaviour report is sent, but this function is still called.
+	// OnPublishMessageInspected is called at the end of the async inspection of publish messages of a single RPC, regardless of the result of the inspection.
+	// It tracks the total number of errors detected during the async inspection of the rpc together with their individual breakdown.
 	// Args:
 	// - errCount: the number of errors that occurred during the async inspection of publish messages.
-	OnPublishMessageInspected(errCount int)
+	// - invalidTopicIdsCount: the number of times that an invalid topic id was detected during the async inspection of publish messages.
+	// - invalidSubscriptionsCount: the number of times that an invalid subscription was detected during the async inspection of publish messages.
+	// - invalidSendersCount: the number of times that an invalid sender was detected during the async inspection of publish messages.
+	OnPublishMessageInspected(totalErrCount int, invalidTopicIdsCount int, invalidSubscriptionsCount int, invalidSendersCount int)
 }
 
 // NetworkInboundQueueMetrics encapsulates the metrics collectors for the inbound queue of the networking layer.

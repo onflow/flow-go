@@ -335,15 +335,14 @@ func (nc *NoopCollector) OnInvalidTopicIdDetectedForControlMessage(messageType p
 }
 func (nc *NoopCollector) OnActiveClusterIDsNotSetErr()                      {}
 func (nc *NoopCollector) OnUnstakedPeerInspectionFailed()                   {}
-func (nc *NoopCollector) OnInvalidControlMessageSent()                      {}
-func (nc *NoopCollector) OnInvalidSenderForPublishMessage()                 {}
+func (nc *NoopCollector) OnInvalidControlMessageNotificationSent()          {}
 func (nc *NoopCollector) OnPublishMessagesInspectionErrorExceedsThreshold() {}
-func (nc *NoopCollector) OnPublishMessageInvalidSubscription()              {}
 func (nc *NoopCollector) OnPruneDuplicateTopicIdsExceedThreshold()          {}
 func (nc *NoopCollector) OnPruneMessageInspected(duplicateTopicIds int)     {}
 func (nc *NoopCollector) OnGraftDuplicateTopicIdsExceedThreshold()          {}
 func (nc *NoopCollector) OnGraftMessageInspected(duplicateTopicIds int)     {}
-func (nc *NoopCollector) OnPublishMessageInspected(errCount int)            {}
+func (nc *NoopCollector) OnPublishMessageInspected(totalErrCount int, invalidTopicIdsCount int, invalidSubscriptionsCount int, invalidSendersCount int) {
+}
 
 func (nc *NoopCollector) OnMisbehaviorReported(string, string) {}
 func (nc *NoopCollector) OnViolationReportSkipped()            {}
