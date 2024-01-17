@@ -196,8 +196,6 @@ network-config:
           # The allowed threshold of iWant messages received without a corresponding tracked iHave message that was sent.
           # If the cache miss threshold is exceeded an invalid control message notification is disseminated and the sender will be penalized.
           cache-miss-threshold: 500
-          # The iWants size at which message id cache misses will be checked.
-          cache-miss-check-size: 1000
           # The max allowed number of duplicate message ids in a single iwant message.
           # Note that ideally there should be no duplicate message ids in a single iwant message but
           # we allow for some tolerance to avoid penalizing peers that are not malicious

@@ -301,17 +301,13 @@ func TestControlMessageInspection_ValidRpc(t *testing.T) {
 	}
 	// avoid unknown topics errors
 	topicProviderOracle.UpdateTopics(topics)
-	cfg, err := config.DefaultConfig()
-	require.NoError(t, err)
-
 	inspector.Start(signalerCtx)
 	unittest.RequireComponentsReadyBefore(t, 1*time.Second, inspector)
 
 	grafts := unittest.P2PRPCGraftFixtures(topics...)
 	prunes := unittest.P2PRPCPruneFixtures(topics...)
 	ihaves := unittest.P2PRPCIHaveFixtures(50, topics...)
-	// makes sure each iwant has enough message ids to trigger cache misses check
-	iwants := unittest.P2PRPCIWantFixtures(2, int(cfg.NetworkConfig.GossipSub.RpcInspector.Validation.IWant.CacheMissCheckSize)+1)
+	iwants := unittest.P2PRPCIWantFixtures(2, 50)
 	pubsubMsgs := unittest.GossipSubMessageFixtures(10, topics[0])
 
 	rpc := unittest.P2PRPCFixture(
@@ -699,7 +695,7 @@ func TestIWantInspection_DuplicateMessageIds_BelowThreshold(t *testing.T) {
 	cfg, err := config.DefaultConfig()
 	require.NoError(t, err)
 	// includes as many duplicates as allowed by the threshold
-	for i := 0; i < int(cfg.NetworkConfig.GossipSub.RpcInspector.Validation.IWant.DuplicateMsgIDThreshold)-2; i++ {
+	for i := 0; i < int(cfg.NetworkConfig.GossipSub.RpcInspector.Validation.IWant.DuplicateMsgIdThreshold)-2; i++ {
 		duplicates = append(duplicates, duplicateMsgID)
 	}
 	msgIds := append(duplicates, unittest.IdentifierListFixture(5)...).Strings()
@@ -735,7 +731,7 @@ func TestIWantInspection_DuplicateMessageIds_AboveThreshold(t *testing.T) {
 	cfg, err := config.DefaultConfig()
 	require.NoError(t, err)
 	// includes as many duplicates as allowed by the threshold
-	for i := 0; i < int(cfg.NetworkConfig.GossipSub.RpcInspector.Validation.IWant.DuplicateMsgIDThreshold)+2; i++ {
+	for i := 0; i < int(cfg.NetworkConfig.GossipSub.RpcInspector.Validation.IWant.DuplicateMsgIdThreshold)+2; i++ {
 		duplicates = append(duplicates, duplicateMsgID)
 	}
 	msgIds := append(duplicates, unittest.IdentifierListFixture(5)...).Strings()
@@ -766,7 +762,6 @@ func TestIWantInspection_DuplicateMessageIds_AboveThreshold(t *testing.T) {
 // TestIWantInspection_CacheMiss_AboveThreshold ensures inspector disseminates invalid control message notifications for iWant messages when cache misses exceeds allowed threshold.
 func TestIWantInspection_CacheMiss_AboveThreshold(t *testing.T) {
 	inspector, signalerCtx, cancel, distributor, rpcTracker, _, _, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
-		params.Config.IWant.CacheMissCheckSize = 99 // when size of an iwant message is above this threshold, it is checked for cache misses
 		// set high cache miss threshold to ensure we only disseminate notification when it is exceeded
 		params.Config.IWant.CacheMissThreshold = 900
 	})
@@ -810,8 +805,6 @@ func TestIWantInspection_CacheMiss_AboveThreshold(t *testing.T) {
 
 func TestIWantInspection_CacheMiss_BelowThreshold(t *testing.T) {
 	inspector, signalerCtx, cancel, distributor, rpcTracker, _, _, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
-		// if size of iwants is below cache miss check size, it is not checked for cache misses
-		params.Config.IWant.CacheMissCheckSize = 90
 		// set high cache miss threshold to ensure that we do not disseminate notification in this test
 		params.Config.IWant.CacheMissThreshold = 99
 	})

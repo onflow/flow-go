@@ -12,7 +12,7 @@ import (
 type IWantDuplicateMsgIDThresholdErr struct {
 	duplicates int
 	sampleSize uint
-	threshold  float64
+	threshold  int
 }
 
 func (e IWantDuplicateMsgIDThresholdErr) Error() string {
@@ -20,7 +20,7 @@ func (e IWantDuplicateMsgIDThresholdErr) Error() string {
 }
 
 // NewIWantDuplicateMsgIDThresholdErr returns a new IWantDuplicateMsgIDThresholdErr.
-func NewIWantDuplicateMsgIDThresholdErr(duplicates int, sampleSize uint, threshold float64) IWantDuplicateMsgIDThresholdErr {
+func NewIWantDuplicateMsgIDThresholdErr(duplicates int, sampleSize uint, threshold int) IWantDuplicateMsgIDThresholdErr {
 	return IWantDuplicateMsgIDThresholdErr{duplicates, sampleSize, threshold}
 }
 
@@ -34,7 +34,7 @@ func IsIWantDuplicateMsgIDThresholdErr(err error) bool {
 type IWantCacheMissThresholdErr struct {
 	cacheMissCount int // total iwant cache misses
 	sampleSize     uint
-	threshold      float64
+	threshold      int
 }
 
 func (e IWantCacheMissThresholdErr) Error() string {
@@ -42,7 +42,7 @@ func (e IWantCacheMissThresholdErr) Error() string {
 }
 
 // NewIWantCacheMissThresholdErr returns a new IWantCacheMissThresholdErr.
-func NewIWantCacheMissThresholdErr(cacheMissCount int, sampleSize uint, threshold float64) IWantCacheMissThresholdErr {
+func NewIWantCacheMissThresholdErr(cacheMissCount int, sampleSize uint, threshold int) IWantCacheMissThresholdErr {
 	return IWantCacheMissThresholdErr{cacheMissCount, sampleSize, threshold}
 }
 

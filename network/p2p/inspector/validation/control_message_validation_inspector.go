@@ -491,30 +491,29 @@ func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWant
 
 	lg = lg.With().
 		Int("iwant_msg_count", len(iWants)).
-		Float64("cache_misses_threshold", c.config.IWant.CacheMissThreshold).
-		Float64("duplicates_threshold", c.config.IWant.DuplicateMsgIDThreshold).Logger()
+		Int("cache_misses_threshold", c.config.IWant.CacheMissThreshold).
+		Int("duplicates_threshold", c.config.IWant.DuplicateMsgIdThreshold).Logger()
 
 	lg.Trace().Msg("validating sample of message ids from iwant control message")
 
 	totalMessageIds := 0
 	for _, iWant := range iWants {
 		messageIds := iWant.GetMessageIDs()
-		checkCacheMisses := len(messageIds) >= c.config.IWant.CacheMissCheckSize
 		messageIDCount := uint(len(messageIds))
 		for _, messageID := range messageIds {
 			// check duplicate allowed threshold
 			if duplicateMsgIdTracker.track(messageID) > 1 {
 				// ideally, an iWant message should not have any duplicate message IDs, hence a message id is considered duplicate when it is repeated more than once.
 				duplicateMessageIds++
-				if float64(duplicateMessageIds) > c.config.IWant.DuplicateMsgIDThreshold {
+				if duplicateMessageIds > c.config.IWant.DuplicateMsgIdThreshold {
 					c.metrics.OnIWantDuplicateMessageIdsExceedThreshold()
-					return NewIWantDuplicateMsgIDThresholdErr(duplicateMessageIds, messageIDCount, c.config.IWant.DuplicateMsgIDThreshold)
+					return NewIWantDuplicateMsgIDThresholdErr(duplicateMessageIds, messageIDCount, c.config.IWant.DuplicateMsgIdThreshold)
 				}
 			}
 			// check cache miss threshold
-			if checkCacheMisses && !c.rpcTracker.WasIHaveRPCSent(messageID) {
+			if !c.rpcTracker.WasIHaveRPCSent(messageID) {
 				cacheMisses++
-				if float64(cacheMisses) > c.config.IWant.CacheMissThreshold {
+				if cacheMisses > c.config.IWant.CacheMissThreshold {
 					c.metrics.OnIWantCacheMissMessageIdsExceedThreshold()
 					return NewIWantCacheMissThresholdErr(cacheMisses, messageIDCount, c.config.IWant.CacheMissThreshold)
 				}

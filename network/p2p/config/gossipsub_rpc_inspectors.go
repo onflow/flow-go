@@ -85,7 +85,6 @@ const (
 	MessageCountThreshold      = "message-count-threshold"
 	MessageIdCountThreshold    = "message-id-count-threshold"
 	CacheMissThresholdKey      = "cache-miss-threshold"
-	CacheMissCheckSizeKey      = "cache-miss-check-size"
 	DuplicateMsgIDThresholdKey = "duplicate-message-id-threshold"
 )
 
@@ -104,14 +103,18 @@ type IWantRpcInspectionParameters struct {
 	// a random sample of message ids will be taken and the iWant message will be truncated to this sample size.
 	// The sample size is equal to the configured MessageIdCountThreshold.
 	MessageIdCountThreshold int `validate:"gte=0" mapstructure:"message-id-count-threshold"`
-	// CacheMissThreshold the threshold of missing corresponding iHave messages for iWant messages received before an invalid control message notification is disseminated.
-	// If the cache miss threshold is exceeded an invalid control message notification is disseminated and the sender will be penalized.
-	CacheMissThreshold float64 `validate:"gt=0" mapstructure:"cache-miss-threshold"`
-	// CacheMissCheckSize the iWants size at which message id cache misses will be checked.
-	CacheMissCheckSize int `validate:"gt=0" mapstructure:"cache-miss-check-size"`
-	// DuplicateMsgIDThreshold maximum allowed duplicate message IDs in a single iWant control message.
-	// If the duplicate message threshold is exceeded an invalid control message notification is disseminated and the sender will be penalized.
-	DuplicateMsgIDThreshold float64 `validate:"gt=0" mapstructure:"duplicate-message-id-threshold"`
+	// CacheMissThreshold is the threshold of tolerance for the total cache misses in all iWant messages in a single RPC message.
+	// When the total number of cache misses in all iWant messages in a single RPC message exceeds this threshold, the inspection of message will fail.
+	// An iWant message is considered a cache miss if it contains a message id that is not present in the local cache for iHave messages, i.e., the node
+	// does not have a record of an iHave message for this message id.
+	// When the total number of cache misses in all iWant messages in a single RPC message exceeds this threshold, the inspection of message will fail, and
+	// a single misbehavior notification will be reported.
+	CacheMissThreshold int `validate:"gt=0" mapstructure:"cache-miss-threshold"`
+	// DuplicateMsgIdThreshold is the maximum allowed number of duplicate message ids in a all iWant messages in a single RPC message.
+	// Each iWant message represents the list of message ids, and this parameter controls the maximum number of duplicate message ids
+	// that can be included in all iWant messages in a single RPC message. When the total number of duplicate message ids in a single iWant message exceeds this threshold,
+	// a single misbehavior notification will be reported, and the inspection of message will fail.
+	DuplicateMsgIdThreshold int `validate:"gt=0" mapstructure:"duplicate-message-id-threshold"`
 }
 
 const (
