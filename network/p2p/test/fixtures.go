@@ -917,6 +917,18 @@ func WithIHave(msgCount, msgIDCount int, topicId string) GossipSubCtrlOption {
 	}
 }
 
+// WithIHaveMessageIDs adds iHave control messages with the given message IDs to the control message.
+func WithIHaveMessageIDs(msgIDs []string, topicId string) GossipSubCtrlOption {
+	return func(msg *pb.ControlMessage) {
+		msg.Ihave = []*pb.ControlIHave{
+			{
+				TopicID:    &topicId,
+				MessageIDs: msgIDs,
+			},
+		}
+	}
+}
+
 // WithIWant adds iWant control messages of the given size and number to the control message.
 // The message IDs are generated randomly.
 // Args:

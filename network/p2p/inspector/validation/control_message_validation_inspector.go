@@ -418,10 +418,12 @@ func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihave
 	defer func() {
 		// regardless of inspection result, update metrics
 		c.metrics.OnIHaveMessagesInspected(totalDuplicateTopicIds, totalDuplicateMessageIds)
+		fmt.Println("IHaveMessagesInspected", totalDuplicateTopicIds, totalDuplicateMessageIds, totalMessageIds)
 	}()
 	for _, ihave := range ihaves {
 		messageIds := ihave.GetMessageIDs()
 		topic := ihave.GetTopicID()
+		totalMessageIds += len(messageIds)
 
 		// first check if the topic is valid, fail fast if it is not
 		err, ctrlMsgType := c.validateTopic(from, channels.Topic(topic), activeClusterIDS)
@@ -572,7 +574,11 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 	invalidSendersCount := 0
 	defer func() {
 		// regardless of inspection result, update metrics
-		c.metrics.OnPublishMessageInspected(errs.Len(), invalidTopicIdsCount, invalidSubscriptionsCount, invalidSendersCount)
+		errCnt := 0
+		if errs != nil {
+			errCnt = errs.Len()
+		}
+		c.metrics.OnPublishMessageInspected(errCnt, invalidTopicIdsCount, invalidSubscriptionsCount, invalidSendersCount)
 	}()
 	for _, message := range messages[:sampleSize] {
 		if c.networkingType == network.PrivateNetwork {

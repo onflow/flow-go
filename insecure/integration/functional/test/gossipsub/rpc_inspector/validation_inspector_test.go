@@ -3,6 +3,7 @@ package rpc_inspector
 import (
 	"context"
 	"fmt"
+	"math"
 	"os"
 	"testing"
 	"time"
@@ -181,7 +182,9 @@ func TestValidationInspector_DuplicateTopicId_Detection(t *testing.T) {
 
 	inspectorConfig.InspectionQueue.NumberOfWorkers = 1
 
-	messageCount := 10
+	// sets the message count to the max of the duplicate topic id threshold for graft and prune control messages to ensure
+	// a successful attack
+	messageCount := int(math.Max(float64(inspectorConfig.IHave.DuplicateTopicIdThreshold), float64(inspectorConfig.GraftPrune.DuplicateTopicIdThreshold))) + 2
 	controlMessageCount := int64(1)
 
 	count := atomic.NewInt64(0)
@@ -301,7 +304,7 @@ func TestValidationInspector_IHaveDuplicateMessageId_Detection(t *testing.T) {
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
 			require.Equal(t, notification.TopicType, p2p.CtrlMsgNonClusterTopicType, "IsClusterPrefixed is expected to be false, no RPC with cluster prefixed topic sent in this test")
-			require.True(t, validation.IsDuplicateTopicErr(notification.Error))
+			require.True(t, validation.IsDuplicateMessageIDErr(notification.Error))
 			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
 			require.True(t,
 				notification.MsgType == p2pmsg.CtrlMsgIHave,
@@ -361,21 +364,25 @@ func TestValidationInspector_IHaveDuplicateMessageId_Detection(t *testing.T) {
 	validationInspector.Start(signalerCtx)
 	nodes := []p2p.LibP2PNode{victimNode, spammer.SpammerNode}
 	startNodesAndEnsureConnected(t, signalerCtx, nodes, sporkID)
+	// to suppress peers provider not set
+	p2ptest.RegisterPeerProviders(t, nodes)
 	spammer.Start(t)
 	defer stopComponents(t, cancel, nodes, validationInspector)
 
 	// generate 2 control messages with iHaves for different topics
-	ihaveCtlMsgs1 := spammer.GenerateCtlMessages(1, p2ptest.WithIHave(1, 1, pushBlocks.String()))
-	ihaveCtlMsgs2 := spammer.GenerateCtlMessages(1, p2ptest.WithIHave(1, 1, reqChunks.String()))
-
-	// duplicate message ids for a single topic is invalid and will cause an error
-	ihaveCtlMsgs1[0].Ihave[0].MessageIDs = append(ihaveCtlMsgs1[0].Ihave[0].MessageIDs, ihaveCtlMsgs1[0].Ihave[0].MessageIDs[0])
-	// duplicate message ids across different topics is valid
-	ihaveCtlMsgs2[0].Ihave[0].MessageIDs[0] = ihaveCtlMsgs1[0].Ihave[0].MessageIDs[0]
+	messageIdCount := inspectorConfig.IHave.DuplicateMessageIdThreshold + 2
+	messageIds := unittest.IdentifierListFixture(1)
+	for i := 0; i < messageIdCount; i++ {
+		messageIds = append(messageIds, messageIds[0])
+	}
+	// prepares 2 control messages with iHave messages for different topics with duplicate message IDs
+	ihaveCtlMsgs1 := spammer.GenerateCtlMessages(
+		1,
+		p2ptest.WithIHaveMessageIDs(messageIds.Strings(), pushBlocks.String()),
+		p2ptest.WithIHaveMessageIDs(messageIds.Strings(), reqChunks.String()))
 
 	// start spamming the victim peer
 	spammer.SpamControlMessage(t, victimNode, ihaveCtlMsgs1)
-	spammer.SpamControlMessage(t, victimNode, ihaveCtlMsgs2)
 
 	unittest.RequireCloseBefore(t, done, 5*time.Second, "failed to inspect RPC messages on time")
 	// ensure we receive the expected number of invalid control message notifications
