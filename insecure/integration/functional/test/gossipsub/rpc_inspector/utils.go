@@ -60,16 +60,17 @@ func withExpectedNotificationDissemination(expectedNumOfTotalNotif int, f onNoti
 
 func meshTracerFixture(flowConfig *config.FlowConfig, idProvider module.IdentityProvider) *tracer.GossipSubMeshTracer {
 	meshTracerCfg := &tracer.GossipSubMeshTracerConfig{
-		Logger:                             unittest.Logger(),
-		Metrics:                            metrics.NewNoopCollector(),
-		IDProvider:                         idProvider,
-		LoggerInterval:                     time.Second,
-		HeroCacheMetricsFactory:            metrics.NewNoopHeroCacheMetricsFactory(),
-		RpcSentTrackerCacheSize:            flowConfig.NetworkConfig.GossipSub.RpcTracer.RPCSentTrackerCacheSize,
-		RpcSentTrackerWorkerQueueCacheSize: flowConfig.NetworkConfig.GossipSub.RpcTracer.RPCSentTrackerQueueCacheSize,
-		RpcSentTrackerNumOfWorkers:         flowConfig.NetworkConfig.GossipSub.RpcTracer.RpcSentTrackerNumOfWorkers,
-		DuplicateMessageTrackerCacheSize:   flowConfig.NetworkConfig.GossipSub.DuplicateMessageTrackerCacheSize,
-		DuplicateMessageTrackerGaugeDecay:  flowConfig.NetworkConfig.GossipSub.DuplicateMessageTrackerGuageDecay,
+		Logger:                  unittest.Logger(),
+		Metrics:                 metrics.NewNoopCollector(),
+		IDProvider:              idProvider,
+		LoggerInterval:          time.Second,
+		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
+		RpcSentTracker: tracer.RpcSentTrackerConfig{
+			CacheSize:            flowConfig.NetworkConfig.GossipSub.RpcTracer.RPCSentTrackerCacheSize,
+			WorkerQueueCacheSize: flowConfig.NetworkConfig.GossipSub.RpcTracer.RPCSentTrackerQueueCacheSize,
+			WorkerQueueNumber:    flowConfig.NetworkConfig.GossipSub.RpcTracer.RpcSentTrackerNumOfWorkers,
+		},
+		DuplicateMessageTrackerCacheConfig: flowConfig.NetworkConfig.GossipSub.RpcTracer.DuplicateMessageTrackerConfig,
 	}
 	return tracer.NewGossipSubMeshTracer(meshTracerCfg)
 }
