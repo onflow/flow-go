@@ -342,51 +342,47 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 		Str("peer_id", p2plogging.PeerId(notification.PeerID)).
 		Str("misbehavior_type", notification.MsgType.String()).Logger()
 
-	// try initializing the application specific penalty for the peer if it is not yet initialized.
-	// this is done to avoid the case where the peer is not yet cached and the application specific penalty is not yet initialized.
-	// initialization is successful only if the peer is not yet cached. If any error is occurred during initialization we log a fatal error
-	initRecord := r.init()
-	initialized := r.spamScoreCache.Add(notification.PeerID, initRecord)
-	if initialized {
-		lg.Trace().Str("peer_id", p2plogging.PeerId(notification.PeerID)).Msg("application specific penalty initialized for peer")
-	}
-
-	basePenalty := float64(0)
-	switch notification.MsgType {
-	case p2pmsg.CtrlMsgGraft:
-		basePenalty += r.penalty.Graft
-	case p2pmsg.CtrlMsgPrune:
-		basePenalty += r.penalty.Prune
-	case p2pmsg.CtrlMsgIHave:
-		basePenalty += r.penalty.IHave
-	case p2pmsg.CtrlMsgIWant:
-		basePenalty += r.penalty.IWant
-	case p2pmsg.RpcPublishMessage:
-		basePenalty += r.penalty.RpcPublishMessage
-	default:
-		// the error is considered fatal as it means that we have an unsupported misbehaviour type, we should crash the node to prevent routing attack vulnerability.
-		lg.Fatal().Str("misbehavior_type", notification.MsgType.String()).Msg("unknown misbehaviour type")
-	}
-	// apply the base penalty to the application specific penalty.
-	appliedPenalty := float64(0)
-	for _, err := range notification.Errors {
-		errPenalty := basePenalty
-		// reduce penalty for cluster prefixed topics allowing nodes that are potentially behind to catch up
-		if err.CtrlMsgTopicType() == p2p.CtrlMsgTopicTypeClusterPrefixed {
-			errPenalty *= r.penalty.ClusterPrefixedPenaltyReductionFactor
+	record, err := r.spamScoreCache.Adjust(notification.PeerID, func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
+		basePenalty := float64(0)
+		switch notification.MsgType {
+		case p2pmsg.CtrlMsgGraft:
+			basePenalty += r.penalty.GraftMisbehaviour
+		case p2pmsg.CtrlMsgPrune:
+			basePenalty += r.penalty.PruneMisbehaviour
+		case p2pmsg.CtrlMsgIHave:
+			basePenalty += r.penalty.IHaveMisbehaviour
+		case p2pmsg.CtrlMsgIWant:
+			basePenalty += r.penalty.IWantMisbehaviour
+		case p2pmsg.RpcPublishMessage:
+			basePenalty += r.penalty.PublishMisbehaviour
+		default:
+			// the error is considered fatal as it means that we have an unsupported misbehaviour type, we should crash the node to prevent routing attack vulnerability.
+			lg.Fatal().Str("misbehavior_type", notification.MsgType.String()).Msg("unknown misbehaviour type")
 		}
-		appliedPenalty += errPenalty
-	}
-	lg.Debug().
-		Err(notification.Errors.Error()).
-		Str("control_message_type", notification.MsgType.String()).
-		Bool(logging.KeySuspicious, true).
-		Bool(logging.KeyNetworkingSecurity, true).
-		Int("error_count", notification.Errors.Len()).
-		Msg("invalid control message notification processed")
 
-	record, err := r.spamScoreCache.Update(notification.PeerID, func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
+		// apply the base penalty to the application specific penalty.
+		appliedPenalty := float64(0)
+		for _, err := range notification.Errors {
+			errPenalty := basePenalty
+			// reduce penalty for cluster prefixed topics allowing nodes that are potentially behind to catch up
+			if err.CtrlMsgTopicType() == p2p.CtrlMsgTopicTypeClusterPrefixed {
+				errPenalty *= r.penalty.ClusterPrefixedReductionFactor
+			}
+			appliedPenalty += errPenalty
+		}
+
 		record.Penalty += appliedPenalty
+
+		lg.Debug().
+			Err(notification.Errors.Error()).
+			Str("control_message_type", notification.MsgType.String()).
+			Bool(logging.KeySuspicious, true).
+			Bool(logging.KeyNetworkingSecurity, true).
+			Int("error_count", notification.Errors.Len()).
+			Float64("applied_penalty", appliedPenalty).
+			Float64("app_specific_score", record.Penalty).
+			Msg("processed invalid control message notification, applied misbehaviour penalty and updated application specific penalty ")
+
 		return record
 	})
 	if err != nil {
@@ -395,9 +391,9 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 	}
 
 	lg.Debug().
-		Float64("applied_penalty", appliedPenalty).
-		Float64("app_specific_score", record.Penalty).
+		Float64("spam_record_penalty", record.Penalty).
 		Msg("applied misbehaviour penalty and updated application specific penalty")
+
 }
 
 // DefaultDecayFunction is the default decay function that is used to decay the application specific penalty of a peer.

@@ -909,10 +909,11 @@ func TestInvalidControlMessageMultiErrorScoreCalculation(t *testing.T) {
 	cfg, err := config.DefaultConfig()
 	require.NoError(t, err)
 	// refresh cached app-specific score every 100 milliseconds to speed up the test.
-	cfg.NetworkConfig.GossipSub.ScoringParameters.AppSpecificScore.ScoreTTL = 100 * time.Millisecond
-
+	cfg.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.AppSpecificScore.ScoreTTL = 100 * time.Millisecond
+	maximumSpamPenaltyDecayFactor := cfg.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.SpamRecordCache.Decay.MaximumSpamPenaltyDecayFactor
 	reg, spamRecords, _ := newGossipSubAppSpecificScoreRegistry(t,
 		cfg.NetworkConfig.GossipSub.ScoringParameters,
+		scoring.InitAppScoreRecordStateFunc(maximumSpamPenaltyDecayFactor),
 		withStakedIdentities(peerIds...),
 		withValidSubscriptions(peerIds...))
 
@@ -929,7 +930,7 @@ func TestInvalidControlMessageMultiErrorScoreCalculation(t *testing.T) {
 			// since the peer id does not have a spam record, the app specific score should be the max app specific reward, which
 			// is the default reward for a staked peer that has valid subscriptions.
 			score := reg.AppSpecificScoreFunc()(peerID)
-			return score == cfg.NetworkConfig.GossipSub.ScoringParameters.ScoreOption.Rewards.MaxAppSpecificReward
+			return score == cfg.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Protocol.AppSpecificScore.MaxAppSpecificReward
 		}, 5*time.Second, 500*time.Millisecond)
 	}
 
@@ -948,7 +949,7 @@ func TestInvalidControlMessageMultiErrorScoreCalculation(t *testing.T) {
 					p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid graft"), p2p.CtrlMsgNonClusterTopicType),
 				},
 			},
-			expectedPenalty: penaltyValues.Graft,
+			expectedPenalty: penaltyValues.GraftMisbehaviour,
 		},
 		// multiple errors with, with same severity
 		{
@@ -961,7 +962,7 @@ func TestInvalidControlMessageMultiErrorScoreCalculation(t *testing.T) {
 					p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid prune"), p2p.CtrlMsgNonClusterTopicType),
 				},
 			},
-			expectedPenalty: penaltyValues.Prune * 3,
+			expectedPenalty: penaltyValues.PruneMisbehaviour * 3,
 		},
 		// multiple errors with, with random severity's
 		{
@@ -975,10 +976,10 @@ func TestInvalidControlMessageMultiErrorScoreCalculation(t *testing.T) {
 					p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid ihave"), p2p.CtrlMsgNonClusterTopicType),
 				},
 			},
-			expectedPenalty: penaltyValues.IHave +
-				penaltyValues.IHave +
-				penaltyValues.IHave +
-				penaltyValues.IHave,
+			expectedPenalty: penaltyValues.IHaveMisbehaviour +
+				penaltyValues.IHaveMisbehaviour +
+				penaltyValues.IHaveMisbehaviour +
+				penaltyValues.IHaveMisbehaviour,
 		},
 		// multiple errors with, with random severity's iwant
 		{
@@ -992,10 +993,10 @@ func TestInvalidControlMessageMultiErrorScoreCalculation(t *testing.T) {
 					p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid iwant"), p2p.CtrlMsgNonClusterTopicType),
 				},
 			},
-			expectedPenalty: penaltyValues.IWant +
-				penaltyValues.IWant +
-				penaltyValues.IWant +
-				penaltyValues.IWant,
+			expectedPenalty: penaltyValues.IWantMisbehaviour +
+				penaltyValues.IWantMisbehaviour +
+				penaltyValues.IWantMisbehaviour +
+				penaltyValues.IWantMisbehaviour,
 		},
 		// multiple errors with mixed cluster prefixed and non cluster prefixed, with random severity's iwant
 		{
@@ -1009,10 +1010,10 @@ func TestInvalidControlMessageMultiErrorScoreCalculation(t *testing.T) {
 					p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid iwant"), p2p.CtrlMsgTopicTypeClusterPrefixed),
 				},
 			},
-			expectedPenalty: penaltyValues.IWant +
-				penaltyValues.IWant +
-				(penaltyValues.IWant * penaltyValues.ClusterPrefixedPenaltyReductionFactor) +
-				(penaltyValues.IWant * penaltyValues.ClusterPrefixedPenaltyReductionFactor),
+			expectedPenalty: penaltyValues.IWantMisbehaviour +
+				penaltyValues.IWantMisbehaviour +
+				(penaltyValues.IWantMisbehaviour * penaltyValues.ClusterPrefixedReductionFactor) +
+				(penaltyValues.IWantMisbehaviour * penaltyValues.ClusterPrefixedReductionFactor),
 		},
 	}
 
@@ -1023,8 +1024,8 @@ func TestInvalidControlMessageMultiErrorScoreCalculation(t *testing.T) {
 		record, err, ok := spamRecords.Get(tCase.notification.PeerID) // get the record from the spamRecords.
 		require.True(t, ok)
 		require.NoError(t, err)
-		require.Less(t, math.Abs(tCase.expectedPenalty-record.Penalty), 10e-3)                                                                                                             // penalty should be updated to -10.
-		require.Equal(t, scoring.InitAppScoreRecordStateFunc(cfg.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.MaximumSpamPenaltyDecayFactor)().Decay, record.Decay) // decay should be initialized to the initial state.
+		require.Less(t, math.Abs(tCase.expectedPenalty-record.Penalty), 10e-3)                                     // penalty should be updated to -10.
+		require.Equal(t, scoring.InitAppScoreRecordStateFunc(maximumSpamPenaltyDecayFactor)().Decay, record.Decay) // decay should be initialized to the initial state.
 
 		require.Eventually(t, func() bool {
 			// this peer has a spam record, with no subscription penalty. Hence, the app specific score should only be the spam penalty,
