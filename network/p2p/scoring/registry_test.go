@@ -1223,10 +1223,11 @@ func newGossipSubAppSpecificScoreRegistry(t *testing.T,
 		GetDuplicateMessageCount: func(id peer.ID) float64 {
 			return 0
 		},
-		Parameters:              params.ScoringRegistryParameters.AppSpecificScore,
-		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
-		NetworkingType:          network.PrivateNetwork,
-		AppSpecificScoreParams:  params.PeerScoring.Protocol.AppSpecificScore,
+		Parameters:                params.ScoringRegistryParameters.AppSpecificScore,
+		HeroCacheMetricsFactory:   metrics.NewNoopHeroCacheMetricsFactory(),
+		NetworkingType:            network.PrivateNetwork,
+		AppSpecificScoreParams:    params.PeerScoring.Protocol.AppSpecificScore,
+		DuplicateMessageThreshold: params.PeerScoring.Internal.Thresholds.DuplicateMessage,
 	}
 	for _, opt := range opts {
 		opt(cfg)
