@@ -125,8 +125,8 @@ func (tb *TransactionBody) SetReferenceBlockID(blockID Identifier) *TransactionB
 	return tb
 }
 
-// SetGasLimit sets the gas limit for this transaction.
-func (tb *TransactionBody) SetGasLimit(limit uint64) *TransactionBody {
+// SetComputeLimit sets the gas limit for this transaction.
+func (tb *TransactionBody) SetComputeLimit(limit uint64) *TransactionBody {
 	tb.GasLimit = limit
 	return tb
 }

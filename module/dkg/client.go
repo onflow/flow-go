@@ -127,7 +127,7 @@ func (c *Client) Broadcast(msg model.BroadcastDKGMessage) error {
 	// construct transaction to send dkg whiteboard message to contract
 	tx := sdk.NewTransaction().
 		SetScript(templates.GenerateSendDKGWhiteboardMessageScript(c.env)).
-		SetGasLimit(9999).
+		SetComputeLimit(9999).
 		SetReferenceBlockID(latestBlock.ID).
 		SetProposalKey(account.Address, int(c.AccountKeyIndex), account.Keys[int(c.AccountKeyIndex)].SequenceNumber).
 		SetPayer(account.Address).
@@ -193,7 +193,7 @@ func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []cryp
 
 	tx := sdk.NewTransaction().
 		SetScript(templates.GenerateSendDKGFinalSubmissionScript(c.env)).
-		SetGasLimit(9999).
+		SetComputeLimit(9999).
 		SetReferenceBlockID(latestBlock.ID).
 		SetProposalKey(account.Address, int(c.AccountKeyIndex), account.Keys[int(c.AccountKeyIndex)].SequenceNumber).
 		SetPayer(account.Address).

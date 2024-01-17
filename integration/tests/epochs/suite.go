@@ -342,7 +342,7 @@ func (s *Suite) SubmitSetApprovedListTx(ctx context.Context, env templates.Envir
 	idTableAddress := sdk.HexToAddress(env.IDTableAddress)
 	tx := sdk.NewTransaction().
 		SetScript(templates.GenerateSetApprovedNodesScript(env)).
-		SetGasLimit(9999).
+		SetComputeLimit(9999).
 		SetReferenceBlockID(sdk.Identifier(latestBlockID)).
 		SetProposalKey(s.Client.SDKServiceAddress(), 0, s.Client.Account().Keys[0].SequenceNumber).
 		SetPayer(s.Client.SDKServiceAddress()).

@@ -958,7 +958,7 @@ func mintNFTs(b *testing.B, be TestBenchBlockExecutor, batchNFTAccount *TestBenc
 	mintScript := []byte(fmt.Sprintf(mintScriptTemplate, batchNFTAccount.Address.Hex(), size))
 
 	txBody := flow.NewTransactionBody().
-		SetGasLimit(999999).
+		SetComputeLimit(999999).
 		SetScript(mintScript).
 		SetProposalKey(serviceAccount.Address, 0, serviceAccount.RetAndIncSeqNumber()).
 		AddAuthorizer(batchNFTAccount.Address).

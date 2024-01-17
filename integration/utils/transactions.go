@@ -58,7 +58,7 @@ func MakeCreateAndSetupNodeTx(
 	script := []byte(templates.ReplaceAddresses(createAndSetupNodeTxScript, env))
 	tx := sdk.NewTransaction().
 		SetScript(script).
-		SetGasLimit(9999).
+		SetComputeLimit(9999).
 		SetReferenceBlockID(latestBlockID).
 		SetProposalKey(service.Address, 0, service.Keys[0].SequenceNumber).
 		AddAuthorizer(service.Address).
@@ -164,7 +164,7 @@ func MakeAdminRemoveNodeTx(
 	accountKey := adminAccount.Keys[adminAccountKeyID]
 	tx := sdk.NewTransaction().
 		SetScript([]byte(templates.ReplaceAddresses(removeNodeTxScript, env))).
-		SetGasLimit(9999).
+		SetComputeLimit(9999).
 		SetReferenceBlockID(latestBlockID).
 		SetProposalKey(adminAccount.Address, adminAccountKeyID, accountKey.SequenceNumber).
 		SetPayer(adminAccount.Address).

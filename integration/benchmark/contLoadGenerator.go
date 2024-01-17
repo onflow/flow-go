@@ -355,7 +355,7 @@ func (lg *ContLoadGenerator) setupFavContract() error {
 	deploymentTx := flowsdk.NewTransaction().
 		SetReferenceBlockID(lg.follower.BlockID()).
 		SetScript(deployScript).
-		SetGasLimit(9999)
+		SetComputeLimit(9999)
 
 	lg.log.Trace().Msg("signing transaction")
 
@@ -482,7 +482,7 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 	createAccountTx := flowsdk.NewTransaction().
 		SetScript(CreateAccountsScript(*lg.networkParams.FungibleTokenAddress, *lg.networkParams.FlowTokenAddress)).
 		SetReferenceBlockID(lg.follower.BlockID()).
-		SetGasLimit(999999)
+		SetComputeLimit(999999)
 
 	publicKey := bytesToCadenceArray(accountKey.PublicKey.Encode())
 	count := cadence.NewInt(num)
@@ -601,7 +601,7 @@ func (lg *ContLoadGenerator) createAddKeyTx(accountAddress flowsdk.Address, numb
 		SetScript(addKeysScript).
 		AddAuthorizer(accountAddress).
 		SetReferenceBlockID(lg.follower.BlockID()).
-		SetGasLimit(9999)
+		SetComputeLimit(9999)
 
 	err = addKeysTx.AddArgument(cadenceKeysArray)
 	if err != nil {
@@ -715,7 +715,7 @@ func (lg *ContLoadGenerator) sendConstExecCostTx(workerID int) {
 	tx := flowsdk.NewTransaction().
 		SetReferenceBlockID(lg.follower.BlockID()).
 		SetScript(txScriptNoComment).
-		SetGasLimit(10). // const-exec tx has empty transaction
+		SetComputeLimit(10). // const-exec tx has empty transaction
 		SetProposalKey(*proposerKey.Address, proposerKey.Index, proposerKey.SequenceNumber).
 		SetPayer(*proposerKey.Address)
 
@@ -845,7 +845,7 @@ func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
 	log.Trace().Msg("creating token transfer transaction")
 	transferTx = transferTx.
 		SetReferenceBlockID(lg.follower.BlockID()).
-		SetGasLimit(9999)
+		SetComputeLimit(9999)
 
 	log.Trace().Msg("signing transaction")
 
@@ -925,7 +925,7 @@ func (lg *ContLoadGenerator) sendFavContractTx(workerID int) {
 	tx := flowsdk.NewTransaction().
 		SetReferenceBlockID(lg.follower.BlockID()).
 		SetScript(txScript).
-		SetGasLimit(9999)
+		SetComputeLimit(9999)
 
 	log.Trace().Msg("signing transaction")
 

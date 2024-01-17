@@ -1009,9 +1009,9 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			txBody.SetPayer(address)
 
 			if tc.gasLimit == 0 {
-				txBody.SetGasLimit(fvm.DefaultComputationLimit)
+				txBody.SetComputeLimit(fvm.DefaultComputationLimit)
 			} else {
-				txBody.SetGasLimit(tc.gasLimit)
+				txBody.SetComputeLimit(tc.gasLimit)
 			}
 
 			err = testutil.SignEnvelope(
@@ -1421,7 +1421,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 				SetProposalKey(chain.ServiceAddress(), 0, 0).
 				AddAuthorizer(chain.ServiceAddress()).
 				SetPayer(chain.ServiceAddress()).
-				SetGasLimit(maxExecutionEffort)
+				SetComputeLimit(maxExecutionEffort)
 
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
@@ -1447,7 +1447,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 				SetProposalKey(chain.ServiceAddress(), 0, 1).
 				AddAuthorizer(chain.ServiceAddress()).
 				SetPayer(chain.ServiceAddress()).
-				SetGasLimit(maxExecutionEffort)
+				SetComputeLimit(maxExecutionEffort)
 
 			err = testutil.SignTransactionAsServiceAccount(txBody, 1, chain)
 			require.NoError(t, err)
@@ -1634,11 +1634,11 @@ func TestEnforcingComputationLimit(t *testing.T) {
 
 			txBody := flow.NewTransactionBody().
 				SetScript(script).
-				SetGasLimit(computationLimit)
+				SetComputeLimit(computationLimit)
 
 			if test.payerIsServAcc {
 				txBody.SetPayer(chain.ServiceAddress()).
-					SetGasLimit(0)
+					SetComputeLimit(0)
 			}
 			tx := fvm.Transaction(txBody, 0)
 

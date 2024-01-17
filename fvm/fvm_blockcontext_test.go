@@ -909,7 +909,7 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 		t.Run(tt.label, func(t *testing.T) {
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(tt.script)).
-				SetGasLimit(tt.gasLimit)
+				SetComputeLimit(tt.gasLimit)
 
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
