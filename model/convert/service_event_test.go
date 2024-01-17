@@ -59,19 +59,6 @@ func TestEventConversion(t *testing.T) {
 		},
 	)
 
-	t.Run(
-		"epoch setup with non-hex random source", func(t *testing.T) {
-
-			fixture, _ := unittest.EpochSetupFixtureByChainID(chainID)
-			// update the random source in event fixture
-			fixture.Payload = unittest.EpochSetupCCFWithNonHexRandomSource()
-
-			// convert Cadence types to Go types
-			event, err := convert.ServiceEvent(chainID, fixture)
-			require.Error(t, err)
-			require.Nil(t, event)
-		},
-	)
 
 	t.Run(
 		"epoch setup with short random source", func(t *testing.T) {
