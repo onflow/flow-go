@@ -113,7 +113,7 @@ func TestKeyListSignature(t *testing.T) {
                               signatureSet.append(
                                   Crypto.KeyListSignature(
                                       keyIndex: i,
-                                      signature: signature
+                                      signature: signature,
                                   )
                               )
                               i = i + 1
@@ -122,11 +122,13 @@ func TestKeyListSignature(t *testing.T) {
                           return keyList.verify(
                               signatureSet: signatureSet,
                               signedData: message,
+							  domainSeparationTag: "%s",
                           )
                       }
                     `,
 				signatureAlgorithm.name,
 				hashAlgorithm.name,
+				tag,
 			),
 		)
 
