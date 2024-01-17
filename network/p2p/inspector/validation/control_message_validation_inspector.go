@@ -418,7 +418,6 @@ func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihave
 	defer func() {
 		// regardless of inspection result, update metrics
 		c.metrics.OnIHaveMessagesInspected(totalDuplicateTopicIds, totalDuplicateMessageIds)
-		fmt.Println("IHaveMessagesInspected", totalDuplicateTopicIds, totalDuplicateMessageIds, totalMessageIds)
 	}()
 	for _, ihave := range ihaves {
 		messageIds := ihave.GetMessageIDs()
