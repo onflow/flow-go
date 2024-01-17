@@ -59,7 +59,7 @@ func TestDuplicateMessageIDErrRoundTrip(t *testing.T) {
 
 // TestIWantCacheMissThresholdErrRoundTrip ensures correct error formatting for IWantCacheMissThresholdErr.
 func TestIWantCacheMissThresholdErrRoundTrip(t *testing.T) {
-	err := NewIWantCacheMissThresholdErr(5, 10, .4)
+	err := NewIWantCacheMissThresholdErr(5, 10, 5)
 
 	// tests the error message formatting.
 	expectedErrMsg := "5/10 iWant cache misses exceeds the allowed threshold: 0.400000"
@@ -75,7 +75,7 @@ func TestIWantCacheMissThresholdErrRoundTrip(t *testing.T) {
 
 // TestIWantDuplicateMsgIDThresholdErrRoundTrip ensures correct error formatting for IWantDuplicateMsgIDThresholdErr.
 func TestIWantDuplicateMsgIDThresholdErrRoundTrip(t *testing.T) {
-	err := NewIWantDuplicateMsgIDThresholdErr(5, 10, .4)
+	err := NewIWantDuplicateMsgIDThresholdErr(5, 10, 5)
 
 	// tests the error message formatting.
 	expectedErrMsg := "5/10 iWant duplicate message ids exceeds the allowed threshold: 0.400000"
