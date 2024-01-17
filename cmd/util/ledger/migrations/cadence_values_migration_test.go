@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"os"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -21,9 +22,13 @@ import (
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/convert"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 const snapshotPath = "test-data/cadence_values_migration/snapshot_cadence_v0.42.6"
+
+const updatedTestContract = "test-data/cadence_values_migration/test_contract_upgraded.cdc"
 
 const testAccountAddress = "01cf0e2f2f715450"
 
@@ -35,8 +40,11 @@ func TestCadenceValuesMigration(t *testing.T) {
 	require.NoError(t, err)
 
 	// Get the old payloads
-
 	payloads, err := util.PayloadsFromEmulatorSnapshot(snapshotPath)
+	require.NoError(t, err)
+
+	// Update contracts to stable cadence.
+	payloads, err = updateContracts(payloads, address)
 	require.NoError(t, err)
 
 	// Migrate
@@ -68,7 +76,7 @@ func TestCadenceValuesMigration(t *testing.T) {
 
 	storageMap := mr.Storage.GetStorageMap(address, common.PathDomainStorage.Identifier(), false)
 	require.NotNil(t, storageMap)
-	require.Equal(t, 9, int(storageMap.Count()))
+	require.Equal(t, 11, int(storageMap.Count()))
 
 	iterator := storageMap.Iterator(mr.Interpreter)
 
@@ -113,6 +121,23 @@ func TestCadenceValuesMigration(t *testing.T) {
 		testContractLocation,
 		"Test.R",
 	)
+
+	entitlementType := interpreter.NewCompositeStaticTypeComputeTypeID(
+		nil,
+		testContractLocation,
+		"Test.E",
+	)
+
+	entitlementAuthorization := func() interpreter.EntitlementSetAuthorization {
+		return interpreter.NewEntitlementSetAuthorization(
+			nil,
+			func() (entitlements []common.TypeID) {
+				return []common.TypeID{entitlementType.TypeID}
+			},
+			1,
+			sema.Conjunction,
+		)
+	}
 
 	expectedValues := []interpreter.Value{
 		// Both string values should be in the normalized form.
@@ -174,7 +199,7 @@ func TestCadenceValuesMigration(t *testing.T) {
 			common.CompositeKindResource,
 			[]interpreter.CompositeField{
 				{
-					Value: interpreter.NewUnmeteredUInt64Value(360287970189639680),
+					Value: interpreter.NewUnmeteredUInt64Value(1369094286720630784),
 					Name:  "uuid",
 				},
 			},
@@ -185,7 +210,7 @@ func TestCadenceValuesMigration(t *testing.T) {
 			interpreter.NewUnmeteredCapabilityValue(
 				interpreter.NewUnmeteredUInt64Value(1),
 				interpreter.NewAddressValue(nil, address),
-				interpreter.NewReferenceStaticType(nil, interpreter.UnauthorizedAccess, rResourceType),
+				interpreter.NewReferenceStaticType(nil, entitlementAuthorization(), rResourceType),
 			),
 		),
 
@@ -216,6 +241,41 @@ func TestCadenceValuesMigration(t *testing.T) {
 			interpreter.NewUnmeteredTypeValue(interpreter.AccountKeyStaticType),
 			interpreter.NewUnmeteredIntValueFromInt64(9),
 		),
+
+		interpreter.NewDictionaryValue(
+			mr.Interpreter,
+			interpreter.EmptyLocationRange,
+			interpreter.NewDictionaryStaticType(
+				nil,
+				interpreter.PrimitiveStaticTypeMetaType,
+				interpreter.PrimitiveStaticTypeString,
+			),
+			interpreter.NewUnmeteredTypeValue(
+				interpreter.NewReferenceStaticType(
+					nil,
+					entitlementAuthorization(),
+					rResourceType,
+				),
+			),
+			interpreter.NewUnmeteredStringValue("non_auth_ref"),
+		),
+		interpreter.NewDictionaryValue(
+			mr.Interpreter,
+			interpreter.EmptyLocationRange,
+			interpreter.NewDictionaryStaticType(
+				nil,
+				interpreter.PrimitiveStaticTypeMetaType,
+				interpreter.PrimitiveStaticTypeString,
+			),
+			interpreter.NewUnmeteredTypeValue(
+				interpreter.NewReferenceStaticType(
+					nil,
+					entitlementAuthorization(),
+					rResourceType,
+				),
+			),
+			interpreter.NewUnmeteredStringValue("auth_ref"),
+		),
 	}
 
 	require.Equal(t, len(expectedValues), len(values))
@@ -245,92 +305,42 @@ func TestCadenceValuesMigration(t *testing.T) {
 
 	reportWriter := valueMigration.reporter.(*testReportWriter)
 
-	acctTypedDictKeyMigrationReportEntry := cadenceValueMigrationReportEntry{
-		Address: interpreter.AddressPath{
-			Address: address,
-			Path: interpreter.PathValue{
-				Identifier: "dictionary_with_account_type_keys",
-				Domain:     common.PathDomainStorage,
+	reportEntry := func(migration, key string, domain common.PathDomain) cadenceValueMigrationReportEntry {
+		return cadenceValueMigrationReportEntry{
+			Address: interpreter.AddressPath{
+				Address: address,
+				Path: interpreter.PathValue{
+					Identifier: key,
+					Domain:     domain,
+				},
 			},
-		},
-		Migration: "AccountTypeMigration",
+			Migration: migration,
+		}
 	}
+
+	acctTypedDictKeyMigrationReportEntry := reportEntry(
+		"AccountTypeMigration",
+		"dictionary_with_account_type_keys",
+		common.PathDomainStorage)
 
 	// Order is non-deterministic, so use 'ElementsMatch'.
 	assert.ElementsMatch(
 		t,
 		reportWriter.entries,
 		[]any{
-			cadenceValueMigrationReportEntry{
-				Address: interpreter.AddressPath{
-					Address: address,
-					Path: interpreter.PathValue{
-						Identifier: "string_value_1",
-						Domain:     common.PathDomainStorage,
-					},
-				},
-				Migration: "StringNormalizingMigration",
-			},
-			cadenceValueMigrationReportEntry{
-				Address: interpreter.AddressPath{
-					Address: address,
-					Path: interpreter.PathValue{
-						Identifier: "string_value_2",
-						Domain:     common.PathDomainStorage,
-					},
-				},
-				Migration: "StringNormalizingMigration",
-			},
-			cadenceValueMigrationReportEntry{
-				Address: interpreter.AddressPath{
-					Address: address,
-					Path: interpreter.PathValue{
-						Identifier: "type_value",
-						Domain:     common.PathDomainStorage,
-					},
-				},
-				Migration: "AccountTypeMigration",
-			},
-			cadenceValueMigrationReportEntry{
-				Address: interpreter.AddressPath{
-					Address: address,
-					Path: interpreter.PathValue{
-						Identifier: "dictionary_with_string_keys",
-						Domain:     common.PathDomainStorage,
-					},
-				},
-				Migration: "StringNormalizingMigration",
-			},
-			cadenceValueMigrationReportEntry{
-				Address: interpreter.AddressPath{
-					Address: address,
-					Path: interpreter.PathValue{
-						Identifier: "dictionary_with_string_keys",
-						Domain:     common.PathDomainStorage,
-					},
-				},
-				Migration: "StringNormalizingMigration",
-			},
-			cadenceValueMigrationReportEntry{
-				Address: interpreter.AddressPath{
-					Address: address,
-					Path: interpreter.PathValue{
-						Identifier: "dictionary_with_restricted_typed_keys",
-						Domain:     common.PathDomainStorage,
-					},
-				},
-				Migration: "TypeValueMigration",
-			},
-			cadenceValueMigrationReportEntry{
-				Address: interpreter.AddressPath{
-					Address: address,
-					Path: interpreter.PathValue{
-						Identifier: "dictionary_with_restricted_typed_keys",
-						Domain:     common.PathDomainStorage,
-					},
-				},
-				Migration: "TypeValueMigration",
-			},
+			reportEntry("StringNormalizingMigration", "string_value_1", common.PathDomainStorage),
+			reportEntry("StringNormalizingMigration", "string_value_2", common.PathDomainStorage),
+			reportEntry("AccountTypeMigration", "type_value", common.PathDomainStorage),
+
+			// String keys in dictionary
+			reportEntry("StringNormalizingMigration", "dictionary_with_string_keys", common.PathDomainStorage),
+			reportEntry("StringNormalizingMigration", "dictionary_with_string_keys", common.PathDomainStorage),
+
+			// Restricted typed keys in dictionary
+			reportEntry("TypeValueMigration", "dictionary_with_restricted_typed_keys", common.PathDomainStorage),
+			reportEntry("TypeValueMigration", "dictionary_with_restricted_typed_keys", common.PathDomainStorage),
+
+			// Capabilities and links
 			cadenceValueMigrationReportEntry{
 				Address: interpreter.AddressPath{
 					Address: address,
@@ -341,6 +351,7 @@ func TestCadenceValuesMigration(t *testing.T) {
 				},
 				Migration: "CapabilityValueMigration",
 			},
+			reportEntry("EntitlementsMigration", "capability", common.PathDomainStorage),
 			capConsPathCapabilityMigration{
 				AccountAddress: address,
 				AddressPath: interpreter.AddressPath{
@@ -349,6 +360,9 @@ func TestCadenceValuesMigration(t *testing.T) {
 				},
 				BorrowType: interpreter.NewReferenceStaticType(nil, interpreter.UnauthorizedAccess, rResourceType),
 			},
+			reportEntry("EntitlementsMigration", "linkR", common.PathDomainPublic),
+
+			// Account-typed keys in dictionary
 			acctTypedDictKeyMigrationReportEntry,
 			acctTypedDictKeyMigrationReportEntry,
 			acctTypedDictKeyMigrationReportEntry,
@@ -358,11 +372,56 @@ func TestCadenceValuesMigration(t *testing.T) {
 			acctTypedDictKeyMigrationReportEntry,
 			acctTypedDictKeyMigrationReportEntry,
 			acctTypedDictKeyMigrationReportEntry,
+
+			// Entitled typed keys in dictionary
+			reportEntry("EntitlementsMigration", "dictionary_with_auth_reference_typed_key", common.PathDomainStorage),
+			reportEntry("StringNormalizingMigration", "dictionary_with_auth_reference_typed_key", common.PathDomainStorage),
+			reportEntry("EntitlementsMigration", "dictionary_with_reference_typed_key", common.PathDomainStorage),
+			reportEntry("StringNormalizingMigration", "dictionary_with_reference_typed_key", common.PathDomainStorage),
 		},
 	)
 
-	// Check error logs - should be empty.
-	assert.Equal(t, 0, buf.Len())
+	// Check error logs.
+	lines := readLines(&buf)
+	require.Len(t, lines, 1)
+	// Error due to un-migrated contract.
+	assert.Contains(
+		t,
+		lines[0],
+		fmt.Sprintf(
+			"failed to run EntitlementsMigration for path {%s /storage/flowTokenVault}",
+			testAccountAddress,
+		),
+	)
+}
+
+func updateContracts(payloads []*ledger.Payload, address common.Address) ([]*ledger.Payload, error) {
+	testContractRegisterId := flow.ContractRegisterID(flow.ConvertAddress(address), "Test")
+
+	updatedContractCode, err := os.ReadFile(updatedTestContract)
+	if err != nil {
+		return nil, err
+	}
+
+	for payloadIndex, payload := range payloads {
+		key, err := payload.Key()
+		if err != nil {
+			return nil, err
+		}
+
+		registerID, err := convert.LedgerKeyToRegisterID(key)
+		if err != nil {
+			return nil, err
+		}
+
+		if registerID == testContractRegisterId {
+			// change contract code
+			payloads[payloadIndex] = ledger.NewPayload(key, updatedContractCode)
+		}
+
+	}
+
+	return payloads, nil
 }
 
 func runLinkMigration(

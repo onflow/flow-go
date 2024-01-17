@@ -6,8 +6,10 @@ access(all) contract Test {
 
 	access(all) struct interface Baz {}
 
+	access(all) entitlement E
+
 	access(all) resource R {
-        access(all) fun foo() {}
+        access(E) fun foo() {}
 	}
 
 	access(all) fun createR(): @R {

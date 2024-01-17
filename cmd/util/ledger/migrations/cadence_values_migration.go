@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/cadence/migrations"
 	"github.com/onflow/cadence/migrations/account_type"
 	"github.com/onflow/cadence/migrations/capcons"
+	"github.com/onflow/cadence/migrations/entitlements"
 	"github.com/onflow/cadence/migrations/string_normalization"
 	"github.com/onflow/cadence/migrations/type_value"
 	"github.com/onflow/cadence/runtime/common"
@@ -28,7 +29,8 @@ type CadenceBaseMigrator struct {
 	log             zerolog.Logger
 	reporter        reporters.ReportWriter
 	valueMigrations func(
-		_ environment.Accounts,
+		inter *interpreter.Interpreter,
+		accounts environment.Accounts,
 		reporter *cadenceValueMigrationReporter,
 	) []migrations.ValueMigration
 }
@@ -80,7 +82,7 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 		},
 		migration.NewValueMigrationsPathMigrator(
 			reporter,
-			m.valueMigrations(migrationRuntime.Accounts, reporter)...,
+			m.valueMigrations(migrationRuntime.Interpreter, migrationRuntime.Accounts, reporter)...,
 		),
 	)
 
@@ -141,7 +143,8 @@ func NewCadenceValueMigrator(
 	return &CadenceBaseMigrator{
 		reporter: rwf.ReportWriter("cadence-value-migrator"),
 		valueMigrations: func(
-			accounts environment.Accounts,
+			inter *interpreter.Interpreter,
+			_ environment.Accounts,
 			reporter *cadenceValueMigrationReporter,
 		) []migrations.ValueMigration {
 			// All cadence migrations except the `capcons.LinkValueMigration`.
@@ -150,6 +153,9 @@ func NewCadenceValueMigrator(
 					CapabilityIDs: capabilityIDs,
 					Reporter:      reporter,
 				},
+				// Must be run before account-type migration
+				entitlements.NewEntitlementsMigration(inter),
+
 				string_normalization.NewStringNormalizingMigration(),
 				account_type.NewAccountTypeMigration(),
 				type_value.NewTypeValueMigration(),
@@ -165,6 +171,7 @@ func NewCadenceLinkValueMigrator(
 	return &CadenceBaseMigrator{
 		reporter: rwf.ReportWriter("cadence-link-value-migrator"),
 		valueMigrations: func(
+			_ *interpreter.Interpreter,
 			accounts environment.Accounts,
 			reporter *cadenceValueMigrationReporter,
 		) []migrations.ValueMigration {
