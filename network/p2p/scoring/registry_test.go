@@ -3,7 +3,6 @@ package scoring_test
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/network"
 	"math"
 	"os"
 	"sync"
@@ -18,11 +17,11 @@ import (
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/config"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
 	netcache "github.com/onflow/flow-go/network/p2p/cache"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/config"

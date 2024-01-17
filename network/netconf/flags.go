@@ -43,8 +43,6 @@ const (
 	alspSyncEngineBatchRequestBaseProb = "alsp-sync-engine-batch-request-base-prob"
 	alspSyncEngineRangeRequestBaseProb = "alsp-sync-engine-range-request-base-prob"
 	alspSyncEngineSyncRequestProb      = "alsp-sync-engine-sync-request-prob"
-
-	scoringRegistryStartupSilenceDuration = "gossipsub-scoring-registry-startup-silence-duration"
 )
 
 func AllFlagNames() []string {
