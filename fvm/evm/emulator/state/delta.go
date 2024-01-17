@@ -102,23 +102,35 @@ func (d *DeltaView) Exist(addr gethCommon.Address) (bool, error) {
 
 // CreateAccount creates a new account for the given address
 //
-// if address has been flaged earlier for destruction, carry over the balance
+// if address already extists (even if destructed), carry over the balance
 // and reset the data from the orginal account.
 func (d *DeltaView) CreateAccount(addr gethCommon.Address) error {
 	// if is already created return
 	if d.IsCreated(addr) {
 		return nil
 	}
+	exist, err := d.Exist(addr)
+	if err != nil {
+		return err
+	}
+	if exist {
+		// check if already destructed
+		destructed, balance := d.HasSelfDestructed(addr)
+		if !destructed {
+			balance, err = d.GetBalance(addr)
+			if err != nil {
+				return err
+			}
+			err = d.SelfDestruct(addr)
+			if err != nil {
+				return err
+			}
+		}
 
-	d.dirtyAddresses[addr] = struct{}{}
-
-	// if it has flagged for destruction in this transction,
-	// reset everything and carry over the balance
-	destructed, balance := d.HasSelfDestructed(addr)
-	if destructed {
 		d.nonces[addr] = 0
 		d.codes[addr] = nil
 		d.codeHashes[addr] = gethTypes.EmptyCodeHash
+		// carrying over the balance. (legacy behaviour of the Geth stateDB)
 		d.balances[addr] = balance
 
 		// flag addr as recreated, this flag helps with postponing deletion of slabs
@@ -131,16 +143,9 @@ func (d *DeltaView) CreateAccount(addr gethCommon.Address) error {
 				delete(d.slots, k)
 			}
 		}
-		return nil
 	}
-
+	d.dirtyAddresses[addr] = struct{}{}
 	d.created[addr] = struct{}{}
-	// Carrying over the balance ensures that Ether doesn't disappear. (legacy behaviour of the Geth stateDB)
-	bal, err := d.GetBalance(addr)
-	if err != nil {
-		return err
-	}
-	d.balances[addr] = bal
 	return nil
 }
 
