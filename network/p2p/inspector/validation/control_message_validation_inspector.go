@@ -939,14 +939,15 @@ func (c *ControlMsgValidationInspector) logAndDistributeAsyncInspectErrs(req *In
 		c.metrics.OnUnstakedPeerInspectionFailed()
 		lg.Warn().Msg("control message received from unstaked peer")
 	default:
-		c.metrics.OnInvalidControlMessageNotificationSent()
 		distErr := c.distributor.Distribute(p2p.NewInvalidControlMessageNotification(req.Peer, ctlMsgType, err, count, topicType))
 		if distErr != nil {
 			lg.Error().
 				Err(distErr).
 				Msg("failed to distribute invalid control message notification")
+			return
 		}
 		lg.Error().Msg("rpc control message async inspection failed")
+		c.metrics.OnInvalidControlMessageNotificationSent()
 	}
 }
 
