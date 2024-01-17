@@ -19,7 +19,7 @@ ifeq (${IMAGE_TAG},)
 IMAGE_TAG := ${SHORT_COMMIT}
 endif
 
-IMAGE_TAG_NO_NETGO := $(IMAGE_TAG)-without-netgo
+IMAGE_TAG_NO_NETGO := $(IMAGE_TAG)+without-netgo
 
 # Name of the cover profile
 COVER_PROFILE := coverage.txt
