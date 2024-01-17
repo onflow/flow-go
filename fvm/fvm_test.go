@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	cadenceErrors "github.com/onflow/cadence/runtime/errors"
 	"github.com/onflow/cadence/runtime/tests/utils"
+	"github.com/stretchr/testify/assert"
 	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -3010,6 +3011,60 @@ func TestEVM(t *testing.T) {
 				chain.ServiceAddress(),
 				addrBytes.String(),
 			))
+		}),
+	)
+
+	// this test makes sure that only ABI encoding/decoding functionality is
+	// available through the EVM contract, when bootstraped with `WithEVMABIOnly`
+	t.Run("with ABI only EVM", newVMTest().
+		withBootstrapProcedureOptions(
+			fvm.WithSetupEVMEnabled(true),
+			fvm.WithEVMABIOnly(true),
+		).
+		withContextOptions(
+			fvm.WithEVMEnabled(false),
+		).
+		run(func(
+			t *testing.T,
+			vm fvm.VM,
+			chain flow.Chain,
+			ctx fvm.Context,
+			snapshotTree snapshot.SnapshotTree,
+		) {
+			txBody := flow.NewTransactionBody().
+				SetScript([]byte(fmt.Sprintf(`
+						import EVM from %s
+
+						transaction {
+							execute {
+								let data = EVM.encodeABI(["John Doe", UInt64(33), false])
+								log(data.length)
+								assert(data.length == 160)
+
+								let acc <- EVM.createBridgedAccount()
+								destroy acc
+							}
+						}
+					`, chain.ServiceAddress().HexWithPrefix()))).
+				SetProposalKey(chain.ServiceAddress(), 0, 0).
+				SetPayer(chain.ServiceAddress())
+
+			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
+			require.NoError(t, err)
+
+			ctx = fvm.NewContextFromParent(ctx, fvm.WithEVMEnabled(true))
+			_, output, err := vm.Run(
+				ctx,
+				fvm.Transaction(txBody, 0),
+				snapshotTree)
+
+			require.NoError(t, err)
+			require.Error(t, output.Err)
+			assert.ErrorContains(
+				t,
+				output.Err,
+				"value of type `EVM` has no member `createBridgedAccount`",
+			)
 		}),
 	)
 
