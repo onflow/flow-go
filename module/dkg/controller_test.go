@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	msg "github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/signature"

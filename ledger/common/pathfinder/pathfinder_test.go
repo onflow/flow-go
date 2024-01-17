@@ -4,9 +4,9 @@ import (
 	"crypto/sha256"
 	"testing"
 
+	"github.com/onflow/crypto/hash"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/crypto/hash"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/common/testutils"

@@ -6,11 +6,11 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/google/go-cmp/cmp"
+	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/require"
 	"github.com/vmihailenco/msgpack"
 	"gotest.tools/assert"
 
-	"github.com/onflow/crypto"
 	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"

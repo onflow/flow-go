@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/crypto"
+
 	"github.com/onflow/flow-go/model/encoding/rlp"
 	"github.com/onflow/flow-go/model/flow"
 )

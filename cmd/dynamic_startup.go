@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 	"github.com/sethvargo/go-retry"
 
-	"github.com/onflow/crypto"
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/bootstrap"

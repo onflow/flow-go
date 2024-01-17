@@ -10,7 +10,6 @@ import (
 	lcrypto "github.com/libp2p/go-libp2p/core/crypto"
 	lcrypto_pb "github.com/libp2p/go-libp2p/core/crypto/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
-
 	"github.com/onflow/crypto"
 )
 

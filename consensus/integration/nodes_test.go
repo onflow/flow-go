@@ -10,11 +10,11 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/gammazero/workerpool"
+	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/crypto"
 	bootstrapDKG "github.com/onflow/flow-go/cmd/bootstrap/dkg"
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/consensus"

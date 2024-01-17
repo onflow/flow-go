@@ -10,9 +10,10 @@ import (
 
 	"github.com/ipfs/go-cid"
 	mh "github.com/multiformats/go-multihash"
-	"github.com/onflow/crypto"
 
+	"github.com/onflow/crypto"
 	"github.com/onflow/crypto/hash"
+
 	"github.com/onflow/flow-go/model/fingerprint"
 	"github.com/onflow/flow-go/storage/merkle"
 	"github.com/onflow/flow-go/utils/rand"

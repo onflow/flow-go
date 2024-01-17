@@ -5,11 +5,9 @@ import (
 	"path"
 
 	"github.com/onflow/crypto"
-
-	"github.com/onflow/flow-go/cmd/bootstrap/utils"
-
 	"github.com/spf13/cobra"
 
+	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	model "github.com/onflow/flow-go/model/bootstrap"
 )
 

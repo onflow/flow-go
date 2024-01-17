@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/crypto/hash"
+
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 )

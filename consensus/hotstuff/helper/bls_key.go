@@ -4,9 +4,8 @@ import (
 	"crypto/rand"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/onflow/crypto"
+	"github.com/stretchr/testify/require"
 )
 
 func MakeBLSKey(t *testing.T) crypto.PrivateKey {

@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence/runtime"
-
 	"github.com/onflow/crypto"
 	"github.com/onflow/crypto/hash"
+
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
 	msig "github.com/onflow/flow-go/module/signature"

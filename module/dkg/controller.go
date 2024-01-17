@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )

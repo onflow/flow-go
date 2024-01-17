@@ -8,11 +8,11 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/protocol"
+	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/crypto"
 	p2pbuilder "github.com/onflow/flow-go/network/p2p/builder"
 	"github.com/onflow/flow-go/network/p2p/node/internal"
 	"github.com/onflow/flow-go/utils/unittest"

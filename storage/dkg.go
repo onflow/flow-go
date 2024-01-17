@@ -2,6 +2,7 @@ package storage
 
 import (
 	"github.com/onflow/crypto"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 

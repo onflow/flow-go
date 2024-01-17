@@ -5,7 +5,6 @@ package mock
 import (
 	crypto "github.com/onflow/crypto"
 	hash "github.com/onflow/crypto/hash"
-
 	mock "github.com/stretchr/testify/mock"
 )
 

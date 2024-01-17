@@ -7,15 +7,16 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/onflow/cadence"
-	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	"github.com/rs/zerolog"
+
+	"github.com/onflow/cadence"
+	"github.com/onflow/crypto"
+	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
-	"github.com/onflow/flow-go/model/flow"
 
-	"github.com/onflow/crypto"
+	"github.com/onflow/flow-go/model/flow"
 	model "github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/epochs"

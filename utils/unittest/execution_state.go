@@ -4,10 +4,9 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	"github.com/onflow/cadence"
 	"github.com/onflow/crypto"
 	"github.com/onflow/crypto/hash"
-
-	"github.com/onflow/cadence"
 
 	"github.com/onflow/flow-go/model/flow"
 )

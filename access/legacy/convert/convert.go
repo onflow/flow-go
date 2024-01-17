@@ -4,12 +4,12 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/onflow/crypto"
+	"github.com/onflow/crypto/hash"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/legacy/access"
 	entitiesproto "github.com/onflow/flow/protobuf/go/flow/legacy/entities"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/onflow/crypto"
-	"github.com/onflow/crypto/hash"
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"

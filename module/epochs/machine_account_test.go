@@ -3,13 +3,14 @@ package epochs
 import (
 	"testing"
 
-	"github.com/onflow/cadence"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/cadence"
 	"github.com/onflow/crypto"
-	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
+	"github.com/onflow/crypto/hash"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -42,13 +43,13 @@ func TestMachineAccountChecking(t *testing.T) {
 	})
 	t.Run("inconsistent hash algo", func(t *testing.T) {
 		local, remote := unittest.MachineAccountFixture(t)
-		remote.Keys[0].HashAlgo = sdkcrypto.SHA2_384
+		remote.Keys[0].HashAlgo = hash.SHA2_384
 		err := CheckMachineAccountInfo(zerolog.Nop(), conf, flow.RoleConsensus, local, remote)
 		require.Error(t, err)
 	})
 	t.Run("inconsistent sig algo", func(t *testing.T) {
 		local, remote := unittest.MachineAccountFixture(t)
-		remote.Keys[0].SigAlgo = sdkcrypto.ECDSA_secp256k1
+		remote.Keys[0].SigAlgo = crypto.ECDSASecp256k1
 		err := CheckMachineAccountInfo(zerolog.Nop(), conf, flow.RoleConsensus, local, remote)
 		require.Error(t, err)
 	})
@@ -141,8 +142,8 @@ func TestMachineAccountChecking(t *testing.T) {
 	t.Run("local file deviates from defaults", func(t *testing.T) {
 		t.Run("hash algo", func(t *testing.T) {
 			local, remote := unittest.MachineAccountFixture(t)
-			local.HashAlgorithm = sdkcrypto.SHA3_384     // non-standard hash algo
-			remote.Keys[0].HashAlgo = sdkcrypto.SHA3_384 // consistent between local/remote
+			local.HashAlgorithm = hash.SHA3_384     // non-standard hash algo
+			remote.Keys[0].HashAlgo = hash.SHA3_384 // consistent between local/remote
 			log, hook := unittest.HookedLogger()
 
 			err := CheckMachineAccountInfo(log, conf, flow.RoleConsensus, local, remote)
@@ -155,10 +156,10 @@ func TestMachineAccountChecking(t *testing.T) {
 			// non-standard sig algo
 			sk := unittest.PrivateKeyFixture(crypto.ECDSASecp256k1, unittest.DefaultSeedFixtureLength)
 			local.EncodedPrivateKey = sk.Encode()
-			local.SigningAlgorithm = sdkcrypto.ECDSA_secp256k1
+			local.SigningAlgorithm = crypto.ECDSASecp256k1
 			// consistent between local/remote
 			remote.Keys[0].PublicKey = sk.PublicKey()
-			remote.Keys[0].SigAlgo = sdkcrypto.ECDSA_secp256k1
+			remote.Keys[0].SigAlgo = crypto.ECDSASecp256k1
 			log, hook := unittest.HookedLogger()
 
 			err := CheckMachineAccountInfo(log, conf, flow.RoleConsensus, local, remote)

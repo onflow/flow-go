@@ -1,10 +1,10 @@
 package convert
 
 import (
-	"github.com/onflow/flow/protobuf/go/flow/entities"
-
 	"github.com/onflow/crypto"
 	"github.com/onflow/crypto/hash"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 

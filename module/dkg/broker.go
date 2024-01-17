@@ -6,10 +6,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 	"github.com/sethvargo/go-retry"
 
-	"github.com/onflow/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/fingerprint"
 	"github.com/onflow/flow-go/model/flow"

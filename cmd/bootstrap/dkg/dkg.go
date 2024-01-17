@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/crypto"
+
 	model "github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/module/signature"
 )

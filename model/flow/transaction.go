@@ -3,10 +3,10 @@ package flow
 import (
 	"fmt"
 
-	"golang.org/x/exp/slices"
-
 	"github.com/onflow/crypto"
 	"github.com/onflow/crypto/hash"
+	"golang.org/x/exp/slices"
+
 	"github.com/onflow/flow-go/model/fingerprint"
 )
 

@@ -4,9 +4,9 @@ import (
 	"crypto/rand"
 	"testing"
 
+	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/crypto"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/signature"

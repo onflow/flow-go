@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
+	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/crypto"
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"

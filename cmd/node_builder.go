@@ -6,11 +6,11 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 	madns "github.com/multiformats/go-multiaddr-dns"
+	"github.com/onflow/crypto"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
-	"github.com/onflow/crypto"
 	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/fvm"

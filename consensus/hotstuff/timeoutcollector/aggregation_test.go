@@ -5,10 +5,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/onflow/crypto"
 	"github.com/onflow/crypto/hash"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"

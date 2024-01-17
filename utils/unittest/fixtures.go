@@ -14,10 +14,10 @@ import (
 	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/onflow/cadence"
-	"github.com/stretchr/testify/require"
-
 	"github.com/onflow/crypto"
 	"github.com/onflow/crypto/hash"
+	"github.com/stretchr/testify/require"
+
 	sdk "github.com/onflow/flow-go-sdk"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"

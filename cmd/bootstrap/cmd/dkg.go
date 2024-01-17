@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/crypto"
+
 	bootstrapDKG "github.com/onflow/flow-go/cmd/bootstrap/dkg"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/dkg"

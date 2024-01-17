@@ -5,9 +5,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/onflow/crypto"
 	"github.com/spf13/cobra"
 
-	"github.com/onflow/crypto"
 	"github.com/onflow/flow-go/cmd"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"

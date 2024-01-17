@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/crypto/random"
+
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/module/trace"

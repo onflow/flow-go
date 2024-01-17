@@ -6,6 +6,7 @@ import (
 	"math"
 
 	"github.com/onflow/crypto/random"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 

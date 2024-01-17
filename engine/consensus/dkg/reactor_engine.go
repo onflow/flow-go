@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
