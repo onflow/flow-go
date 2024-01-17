@@ -61,6 +61,6 @@ func (r *ReceiveCache) Add(eventID []byte) bool {
 	return r.c.Add(receiveCacheEntry{eventID: flow.HashToID(eventID)}) // ignore eviction status
 }
 
-func (r ReceiveCache) Size() uint {
+func (r *ReceiveCache) Size() uint {
 	return r.c.Size()
 }
