@@ -310,10 +310,6 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 		config.GossipSub.ScoringParameters.PeerScoring.Internal.DecayToZero,
 		"the maximum value below which a peer scoring counter is reset to zero")
 
-	flags.Duration(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.StartupSilenceDurationKey),
-		config.GossipSub.ScoringParameters.ScoringRegistryParameters.StartupSilenceDuration,
-		"the duration of time, after the node startup, during which the scoring registry remains inactive before penalizing nodes.")
-
 	flags.Bool(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.PeerScoringKey, p2pconfig.InternalKey, p2pconfig.TopicKey, p2pconfig.SkipAtomicValidationKey),
 		config.GossipSub.ScoringParameters.PeerScoring.Internal.TopicParameters.SkipAtomicValidation,
 		"the default value for the skip atomic validation flag for topics")
@@ -396,6 +392,9 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 		config.GossipSub.ScoringParameters.PeerScoring.Protocol.AppSpecificScore.StakedIdentityReward,
 		"the reward for staking peers")
 
+	flags.Duration(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoringRegistryKey, p2pconfig.StartupSilenceDurationKey),
+		config.GossipSub.ScoringParameters.ScoringRegistryParameters.StartupSilenceDuration,
+		"the duration of time, after the node startup, during which the scoring registry remains inactive before penalizing nodes.")
 	flags.Int(BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoringRegistryKey, p2pconfig.AppSpecificScoreRegistryKey, p2pconfig.ScoreUpdateWorkerNumKey),
 		config.GossipSub.ScoringParameters.ScoringRegistryParameters.AppSpecificScore.ScoreUpdateWorkerNum,
 		"number of workers for the app specific score update worker pool")
