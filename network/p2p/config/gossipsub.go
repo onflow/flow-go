@@ -79,24 +79,14 @@ type GossipSubParameters struct {
 }
 
 const (
-	DecayIntervalKey                         = "decay-interval"
-	ScoringRegistryStartupSilenceDurationKey = "scoring-registry-startup-silence-duration"
+	DecayIntervalKey = "decay-interval"
 )
 
 // ScoringParameters are the parameters for the score option.
 // Parameters are "numerical values" that are used to compute or build components that compute the score of a peer in GossipSub system.
 type ScoringParameters struct {
-	// ScoringRegistryStartupSilenceDuration defines the duration of time, after the node startup,
-	// during which the scoring registry remains inactive before penalizing nodes.
-	// Throughout this startup silence period, the application-specific penalty
-	// for all nodes will be set to 0, and any invalid control message notifications
-	// will be ignored.
-	//
-	// This configuration allows nodes to stabilize and initialize before
-	// applying penalties or responding processing invalid control message notifications.
-	ScoringRegistryStartupSilenceDuration time.Duration             `validate:"gt=10m" mapstructure:"scoring-registry-startup-silence-duration"`
-	PeerScoring                           PeerScoringParameters     `validate:"required" mapstructure:"peer-scoring"`
-	ScoringRegistryParameters             ScoringRegistryParameters `validate:"required" mapstructure:"scoring-registry"`
+	PeerScoring               PeerScoringParameters     `validate:"required" mapstructure:"peer-scoring"`
+	ScoringRegistryParameters ScoringRegistryParameters `validate:"required" mapstructure:"scoring-registry"`
 }
 
 // SubscriptionProviderParameters keys.
