@@ -324,33 +324,6 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		cancel()
 		unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 	})
-
-	// duplicate graft topic ids below threshold should NOT trigger invalid control message notification
-	t.Run("duplicate graft topic ids below threshold", func(t *testing.T) {
-		inspector, signalerCtx, cancel, distributor, _, sporkID, _, topicProviderOracle := inspectorFixture(t)
-		duplicateTopic := fmt.Sprintf("%s/%s", channels.TestNetworkChannel, sporkID)
-		// avoid unknown topics errors
-		topicProviderOracle.UpdateTopics([]string{duplicateTopic})
-		var grafts []*pubsub_pb.ControlGraft
-		cfg, err := config.DefaultConfig()
-		require.NoError(t, err)
-		for i := 0; i < cfg.NetworkConfig.GossipSub.RpcInspector.Validation.GraftPrune.DuplicateTopicIdThreshold; i++ {
-			grafts = append(grafts, unittest.P2PRPCGraftFixture(&duplicateTopic))
-		}
-		from := unittest.PeerIdFixture(t)
-		rpc := unittest.P2PRPCFixture(unittest.WithGrafts(grafts...))
-		// no notification should be disseminated for valid messages as long as the number of duplicates is below the threshold
-		distributor.AssertNotCalled(t, "Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif"))
-
-		inspector.Start(signalerCtx)
-		unittest.RequireComponentsReadyBefore(t, 100*time.Millisecond, inspector)
-
-		require.NoError(t, inspector.Inspect(from, rpc))
-		// sleep for 1 second to ensure rpc's is processed
-		time.Sleep(time.Second)
-		cancel()
-		unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
-	})
 }
 
 // TestControlMessageInspection_ValidRpc ensures inspector does not disseminate invalid control message notifications for a valid RPC.
@@ -402,6 +375,34 @@ func TestControlMessageInspection_ValidRpc(t *testing.T) {
 	from := unittest.PeerIdFixture(t)
 	require.NoError(t, inspector.Inspect(from, rpc))
 	// sleep for 1 second to ensure rpc is processed
+	time.Sleep(time.Second)
+	cancel()
+	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
+}
+
+// TestGraftInspection_DuplicateTopicIds_BelowThreshold ensures inspector does not disseminate invalid control message notifications
+// for a valid RPC with duplicate graft topic ids below the threshold.
+func TestGraftInspection_DuplicateTopicIds_BelowThreshold(t *testing.T) {
+	inspector, signalerCtx, cancel, distributor, _, sporkID, _, topicProviderOracle := inspectorFixture(t)
+	duplicateTopic := fmt.Sprintf("%s/%s", channels.TestNetworkChannel, sporkID)
+	// avoid unknown topics errors
+	topicProviderOracle.UpdateTopics([]string{duplicateTopic})
+	var grafts []*pubsub_pb.ControlGraft
+	cfg, err := config.DefaultConfig()
+	require.NoError(t, err)
+	for i := 0; i < cfg.NetworkConfig.GossipSub.RpcInspector.Validation.GraftPrune.DuplicateTopicIdThreshold; i++ {
+		grafts = append(grafts, unittest.P2PRPCGraftFixture(&duplicateTopic))
+	}
+	from := unittest.PeerIdFixture(t)
+	rpc := unittest.P2PRPCFixture(unittest.WithGrafts(grafts...))
+	// no notification should be disseminated for valid messages as long as the number of duplicates is below the threshold
+	distributor.AssertNotCalled(t, "Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif"))
+
+	inspector.Start(signalerCtx)
+	unittest.RequireComponentsReadyBefore(t, 100*time.Millisecond, inspector)
+
+	require.NoError(t, inspector.Inspect(from, rpc))
+	// sleep for 1 second to ensure rpc's is processed
 	time.Sleep(time.Second)
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
