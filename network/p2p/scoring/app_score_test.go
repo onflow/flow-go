@@ -142,7 +142,7 @@ func TestFullGossipSubConnectivityAmongHonestNodesWithMaliciousMajority(t *testi
 		p2ptest.WithRole(flow.RoleAccess),
 		// overrides the default peer scoring parameters to mute GossipSub traffic from/to honest nodes.
 		p2ptest.EnablePeerScoringWithOverride(&p2p.PeerScoringConfigOverride{
-			AppSpecificScoreParams: maliciousAppSpecificScore(flow.IdentityList{&con1Id, &con2Id}, defaultConfig.NetworkConfig.GossipSub.ScoringParameters.ScoreOption),
+			AppSpecificScoreParams: maliciousAppSpecificScore(flow.IdentityList{&con1Id, &con2Id}, defaultConfig.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Protocol),
 		}),
 	)
 
@@ -223,14 +223,14 @@ func TestFullGossipSubConnectivityAmongHonestNodesWithMaliciousMajority(t *testi
 
 // maliciousAppSpecificScore returns a malicious app specific penalty function that rewards the malicious node and
 // punishes the honest nodes.
-func maliciousAppSpecificScore(honestIds flow.IdentityList, optionCfg p2pconfig.ScoreOption) func(peer.ID) float64 {
+func maliciousAppSpecificScore(honestIds flow.IdentityList, optionCfg p2pconfig.ProtocolLevelGossipSubScoreParams) func(peer.ID) float64 {
 	honestIdProvider := id.NewFixedIdentityProvider(honestIds)
 	return func(p peer.ID) float64 {
 		_, isHonest := honestIdProvider.ByPeerID(p)
 		if isHonest {
-			return optionCfg.Penalties.MaxAppSpecificPenalty
+			return optionCfg.AppSpecificScore.MaxAppSpecificPenalty
 		}
 
-		return optionCfg.Rewards.MaxAppSpecificReward
+		return optionCfg.AppSpecificScore.MaxAppSpecificReward
 	}
 }

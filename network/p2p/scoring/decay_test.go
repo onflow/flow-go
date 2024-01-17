@@ -287,7 +287,7 @@ func TestDefaultDecayFunction(t *testing.T) {
 				record: p2p.GossipSubSpamRecord{
 					Penalty:             -100,
 					Decay:               0.8,
-					LastDecayAdjustment: time.Now().Add(-flowConfig.NetworkConfig.GossipSub.ScoringParameters.SpamRecordCache.PenaltyDecayEvaluationPeriod),
+					LastDecayAdjustment: time.Now().Add(-flowConfig.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.SpamRecordCache.Decay.PenaltyDecayEvaluationPeriod),
 				},
 				lastUpdated: time.Now(),
 			},
@@ -299,15 +299,8 @@ func TestDefaultDecayFunction(t *testing.T) {
 			},
 		},
 	}
-	scoringRegistryConfig := flowConfig.NetworkConfig.GossipSub.ScoringParameters.SpamRecordCache
-	decayFunc := scoring.DefaultDecayFunction(&scoring.DecayFunctionConfig{
-		SlowerDecayPenaltyThreshold:   scoringRegistryConfig.PenaltyDecaySlowdownThreshold,
-		DecayRateReductionFactor:      scoringRegistryConfig.DecayRateReductionFactor,
-		DecayAdjustInterval:           scoringRegistryConfig.PenaltyDecayEvaluationPeriod,
-		MaximumSpamPenaltyDecayFactor: flowConfig.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.MaximumSpamPenaltyDecayFactor,
-		MinimumSpamPenaltyDecayFactor: flowConfig.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.MinimumSpamPenaltyDecayFactor,
-		SkipDecayThreshold:            flowConfig.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.MisbehaviourPenalties.SkipDecayThreshold,
-	})
+	scoringRegistryConfig := flowConfig.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters
+	decayFunc := scoring.DefaultDecayFunction(scoringRegistryConfig.SpamRecordCache.Decay)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

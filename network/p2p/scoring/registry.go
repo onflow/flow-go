@@ -27,30 +27,6 @@ import (
 
 type SpamRecordInitFunc func() p2p.GossipSubSpamRecord
 
-// GossipSubCtrlMsgPenaltyValue is the penalty value for each control message type.
-type GossipSubCtrlMsgPenaltyValue struct {
-	Graft float64 // penalty value for an individual graft message misbehaviour.
-	Prune float64 // penalty value for an individual prune message misbehaviour.
-	IHave float64 // penalty value for an individual iHave message misbehaviour.
-	IWant float64 // penalty value for an individual iWant message misbehaviour.
-	// ClusterPrefixedPenaltyReductionFactor factor used to reduce the penalty for control message misbehaviours on cluster prefixed topics. This is allows a more lenient punishment for nodes
-	// that fall behind and may need to request old data.
-	ClusterPrefixedPenaltyReductionFactor float64
-	RpcPublishMessage                     float64 // penalty value for an individual RpcPublishMessage message misbehaviour.
-}
-
-// GossipSubCtrlMsgPenaltyValues returns the default penalty value for each control message type.
-func GossipSubCtrlMsgPenaltyValues(penalties p2pconfig.MisbehaviourPenalties) GossipSubCtrlMsgPenaltyValue {
-	return GossipSubCtrlMsgPenaltyValue{
-		Graft:                                 penalties.GraftMisbehaviour,
-		Prune:                                 penalties.PruneMisbehaviour,
-		IHave:                                 penalties.IHaveMisbehaviour,
-		IWant:                                 penalties.IWantMisbehaviour,
-		ClusterPrefixedPenaltyReductionFactor: penalties.ClusterPrefixedReductionFactor,
-		RpcPublishMessage:                     penalties.PublishMisbehaviour,
-	}
-}
-
 // GossipSubAppSpecificScoreRegistry is the registry for the application specific score of peers in the GossipSub protocol.
 // The application specific score is part of the overall score of a peer, and is used to determine the peer's score based
 // on its behavior related to the application (Flow protocol).
@@ -66,10 +42,7 @@ type GossipSubAppSpecificScoreRegistry struct {
 	// spamScoreCache currently only holds the control message misbehaviour penalty (spam related penalty).
 	spamScoreCache p2p.GossipSubSpamRecordCache
 
-	penalty GossipSubCtrlMsgPenaltyValue
-
-	// initial application specific penalty record, used to initialize the penalty cache entry.
-	init func() p2p.GossipSubSpamRecord
+	penalty p2pconfig.MisbehaviourPenalties
 
 	validator p2p.SubscriptionValidator
 
@@ -103,15 +76,11 @@ type GossipSubAppSpecificScoreRegistryConfig struct {
 	Validator p2p.SubscriptionValidator `validate:"required"`
 
 	// Penalty encapsulates the penalty unit for each control message type misbehaviour.
-	Penalty GossipSubCtrlMsgPenaltyValue `validate:"required"`
+	Penalty p2pconfig.MisbehaviourPenalties `validate:"required"`
 
 	// IdProvider is the identity provider used to translate peer ids at the networking layer to Flow identifiers (if
 	// an authorized peer is found).
 	IdProvider module.IdentityProvider `validate:"required"`
-
-	// Init is a factory function that returns a new GossipSubSpamRecord. It is used to initialize the spam record of
-	// a peer when the peer is first observed by the local peer.
-	Init func() p2p.GossipSubSpamRecord `validate:"required"`
 
 	// SpamRecordCacheFactory is a factory function that returns a new GossipSubSpamRecordCache. It is used to initialize the spamScoreCache.
 	// The cache is used to store the application specific penalty of peers.
@@ -125,14 +94,7 @@ type GossipSubAppSpecificScoreRegistryConfig struct {
 
 	NetworkingType network.NetworkingType `validate:"required"`
 
-	// UnknownIdentityPenalty This is the penalty for unknown identity.
-	UnknownIdentityPenalty float64 `validate:"required"`
-	// MinAppSpecificPenalty This is the minimum penalty for severe offenses that we apply to a remote node score
-	MinAppSpecificPenalty float64 `validate:"required"`
-	// StakedIdentityReward This is the reward for staking peers.
-	StakedIdentityReward float64 `validate:"required"`
-	// InvalidSubscriptionPenalty This is the penalty for invalid subscription.
-	InvalidSubscriptionPenalty float64 `validate:"required"`
+	AppSpecificScoreParams p2pconfig.ApplicationSpecificScoreParameters `validate:"required"`
 }
 
 // NewGossipSubAppSpecificScoreRegistry returns a new GossipSubAppSpecificScoreRegistry.
@@ -160,14 +122,13 @@ func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegis
 		spamScoreCache:             config.SpamRecordCacheFactory(),
 		appScoreCache:              config.AppScoreCacheFactory(),
 		penalty:                    config.Penalty,
-		init:                       config.Init,
 		validator:                  config.Validator,
 		idProvider:                 config.IdProvider,
 		scoreTTL:                   config.Parameters.ScoreTTL,
-		unknownIdentityPenalty:     config.UnknownIdentityPenalty,
-		minAppSpecificPenalty:      config.MinAppSpecificPenalty,
-		stakedIdentityReward:       config.StakedIdentityReward,
-		invalidSubscriptionPenalty: config.InvalidSubscriptionPenalty,
+		unknownIdentityPenalty:     config.AppSpecificScoreParams.UnknownIdentityPenalty,
+		minAppSpecificPenalty:      config.AppSpecificScoreParams.MinAppSpecificPenalty,
+		stakedIdentityReward:       config.AppSpecificScoreParams.StakedIdentityReward,
+		invalidSubscriptionPenalty: config.AppSpecificScoreParams.InvalidSubscriptionPenalty,
 	}
 
 	reg.appScoreUpdateWorkerPool = worker.NewWorkerPoolBuilder[peer.ID](lg.With().Str("component", "app_specific_score_update_worker_pool").Logger(),
@@ -311,7 +272,7 @@ func (r *GossipSubAppSpecificScoreRegistry) computeAppSpecificScore(pid peer.ID)
 // - error: an error if the update failed; any returned error is an irrecoverable error and indicates a bug or misconfiguration.
 func (r *GossipSubAppSpecificScoreRegistry) processAppSpecificScoreUpdateWork(p peer.ID) error {
 	appSpecificScore := r.computeAppSpecificScore(p)
-	err := r.appScoreCache.Add(p, appSpecificScore, time.Now())
+	err := r.appScoreCache.AdjustWithInit(p, appSpecificScore, time.Now())
 	if err != nil {
 		// the error is considered fatal as it means the cache is not working properly.
 		return fmt.Errorf("could not add application specific score %f for peer to cache: %w", appSpecificScore, err)
@@ -439,19 +400,10 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 		Msg("applied misbehaviour penalty and updated application specific penalty")
 }
 
-type DecayFunctionConfig struct {
-	SlowerDecayPenaltyThreshold   float64
-	DecayRateReductionFactor      float64
-	DecayAdjustInterval           time.Duration
-	MaximumSpamPenaltyDecayFactor float64
-	MinimumSpamPenaltyDecayFactor float64
-	SkipDecayThreshold            float64
-}
-
 // DefaultDecayFunction is the default decay function that is used to decay the application specific penalty of a peer.
 // It is used if no decay function is provided in the configuration.
 // It decays the application specific penalty of a peer if it is negative.
-func DefaultDecayFunction(cfg *DecayFunctionConfig) netcache.PreprocessorFunc {
+func DefaultDecayFunction(cfg p2pconfig.SpamRecordCacheDecay) netcache.PreprocessorFunc {
 	return func(record p2p.GossipSubSpamRecord, lastUpdated time.Time) (p2p.GossipSubSpamRecord, error) {
 		if record.Penalty >= 0 {
 			// no need to decay the penalty if it is positive, the reason is currently the app specific penalty
@@ -475,8 +427,8 @@ func DefaultDecayFunction(cfg *DecayFunctionConfig) netcache.PreprocessorFunc {
 		}
 		record.Penalty = penalty
 
-		if record.Penalty <= cfg.SlowerDecayPenaltyThreshold {
-			if time.Since(record.LastDecayAdjustment) > cfg.DecayAdjustInterval || record.LastDecayAdjustment.IsZero() {
+		if record.Penalty <= cfg.PenaltyDecaySlowdownThreshold {
+			if time.Since(record.LastDecayAdjustment) > cfg.PenaltyDecayEvaluationPeriod || record.LastDecayAdjustment.IsZero() {
 				// reduces the decay speed flooring at MinimumSpamRecordDecaySpeed
 				record.Decay = math.Min(record.Decay+cfg.DecayRateReductionFactor, cfg.MinimumSpamPenaltyDecayFactor)
 				record.LastDecayAdjustment = time.Now()

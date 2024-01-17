@@ -151,15 +151,15 @@ func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory fun
 		if !ok {
 			return false
 		}
-		if spammerScore >= scoreParams.ScoreOption.Thresholds.Gossip {
+		if spammerScore >= scoreParams.PeerScoring.Internal.Thresholds.Gossip {
 			// ensure the score is low enough so that no gossip is routed by victim node to spammer node.
 			return false
 		}
-		if spammerScore >= scoreParams.ScoreOption.Thresholds.Publish {
+		if spammerScore >= scoreParams.PeerScoring.Internal.Thresholds.Publish {
 			// ensure the score is low enough so that non of the published messages of the victim node are routed to the spammer node.
 			return false
 		}
-		if spammerScore >= scoreParams.ScoreOption.Thresholds.Graylist {
+		if spammerScore >= scoreParams.PeerScoring.Internal.Thresholds.Graylist {
 			// ensure the score is low enough so that the victim node does not accept RPC messages from the spammer node.
 			return false
 		}
@@ -216,7 +216,7 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_SingleTopic(t *testing.T) {
 	conf, err := config.DefaultConfig()
 	require.NoError(t, err)
 	// we override the decay interval to 1 second so that the score is updated within 1 second intervals.
-	conf.NetworkConfig.GossipSub.ScoringParameters.DecayInterval = 1 * time.Second
+	conf.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Internal.DecayInterval = 1 * time.Second
 	conf.NetworkConfig.GossipSub.RpcTracer.ScoreTracerInterval = 1 * time.Second
 	thisNode, thisId := p2ptest.NodeFixture( // this node is the one that will be penalizing the under-performer node.
 		t,
@@ -257,7 +257,7 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_SingleTopic(t *testing.T) {
 		return unittest.ProposalFixture()
 	})
 
-	scoreParams := conf.NetworkConfig.GossipSub.ScoringParameters.ScoreOption
+	scoreParams := conf.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Protocol
 
 	// Also initially the under-performing node should have a score that is at least equal to the MaxAppSpecificReward.
 	// The reason is in our scoring system, we reward the staked nodes by MaxAppSpecificReward, and the under-performing node is considered staked
@@ -267,7 +267,7 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_SingleTopic(t *testing.T) {
 		if !ok {
 			return false
 		}
-		if underPerformingNodeScore < scoreParams.Rewards.MaxAppSpecificReward {
+		if underPerformingNodeScore < scoreParams.AppSpecificScore.MaxAppSpecificReward {
 			// ensure the score is high enough so that gossip is routed by victim node to spammer node.
 			return false
 		}
@@ -282,17 +282,17 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_SingleTopic(t *testing.T) {
 		if !ok {
 			return false
 		}
-		if underPerformingNodeScore > 0.96*scoreParams.Rewards.MaxAppSpecificReward { // score must be penalized by -0.05 * MaxAppSpecificReward.
+		if underPerformingNodeScore > 0.96*scoreParams.AppSpecificScore.MaxAppSpecificReward { // score must be penalized by -0.05 * MaxAppSpecificReward.
 			// 0.96 is to account for floating point errors.
 			return false
 		}
-		if underPerformingNodeScore < scoreParams.Thresholds.Gossip { // even the node is slightly penalized, it should still be able to gossip with this node.
+		if underPerformingNodeScore < conf.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Internal.Thresholds.Gossip { // even the node is slightly penalized, it should still be able to gossip with this node.
 			return false
 		}
-		if underPerformingNodeScore < scoreParams.Thresholds.Publish { // even the node is slightly penalized, it should still be able to publish to this node.
+		if underPerformingNodeScore < conf.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Internal.Thresholds.Publish { // even the node is slightly penalized, it should still be able to publish to this node.
 			return false
 		}
-		if underPerformingNodeScore < scoreParams.Thresholds.Graylist { // even the node is slightly penalized, it should still be able to establish rpc connection with this node.
+		if underPerformingNodeScore < conf.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Internal.Thresholds.Graylist { // even the node is slightly penalized, it should still be able to establish rpc connection with this node.
 			return false
 		}
 
@@ -328,7 +328,7 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_TwoTopics(t *testing.T) {
 	conf, err := config.DefaultConfig()
 	require.NoError(t, err)
 	// we override the decay interval to 1 second so that the score is updated within 1 second intervals.
-	conf.NetworkConfig.GossipSub.ScoringParameters.DecayInterval = 1 * time.Second
+	conf.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Internal.DecayInterval = 1 * time.Second
 	conf.NetworkConfig.GossipSub.RpcTracer.ScoreTracerInterval = 1 * time.Second
 	thisNode, thisId := p2ptest.NodeFixture( // this node is the one that will be penalizing the under-performer node.
 		t,
@@ -373,7 +373,7 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_TwoTopics(t *testing.T) {
 		}
 	}
 
-	scoreParams := conf.NetworkConfig.GossipSub.ScoringParameters.ScoreOption
+	scoreParams := conf.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Protocol.AppSpecificScore
 
 	// Initially the under-performing node should have a score that is at least equal to the MaxAppSpecificReward.
 	// The reason is in our scoring system, we reward the staked nodes by MaxAppSpecificReward, and the under-performing node is considered staked
@@ -383,7 +383,7 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_TwoTopics(t *testing.T) {
 		if !ok {
 			return false
 		}
-		if underPerformingNodeScore < scoreParams.Rewards.MaxAppSpecificReward {
+		if underPerformingNodeScore < scoreParams.MaxAppSpecificReward {
 			// ensure the score is high enough so that gossip is routed by victim node to spammer node.
 			return false
 		}
@@ -399,17 +399,17 @@ func TestGossipSubMeshDeliveryScoring_UnderDelivery_TwoTopics(t *testing.T) {
 		if !ok {
 			return false
 		}
-		if underPerformingNodeScore > 0.91*scoreParams.Rewards.MaxAppSpecificReward { // score must be penalized by ~ 2 * -0.05 * MaxAppSpecificReward.
+		if underPerformingNodeScore > 0.91*scoreParams.MaxAppSpecificReward { // score must be penalized by ~ 2 * -0.05 * MaxAppSpecificReward.
 			// 0.91 is to account for the floating point errors.
 			return false
 		}
-		if underPerformingNodeScore < scoreParams.Thresholds.Gossip { // even the node is slightly penalized, it should still be able to gossip with this node.
+		if underPerformingNodeScore < conf.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Internal.Thresholds.Gossip { // even the node is slightly penalized, it should still be able to gossip with this node.
 			return false
 		}
-		if underPerformingNodeScore < scoreParams.Thresholds.Publish { // even the node is slightly penalized, it should still be able to publish to this node.
+		if underPerformingNodeScore < conf.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Internal.Thresholds.Publish { // even the node is slightly penalized, it should still be able to publish to this node.
 			return false
 		}
-		if underPerformingNodeScore < scoreParams.Thresholds.Graylist { // even the node is slightly penalized, it should still be able to establish rpc connection with this node.
+		if underPerformingNodeScore < conf.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Internal.Thresholds.Graylist { // even the node is slightly penalized, it should still be able to establish rpc connection with this node.
 			return false
 		}
 
@@ -442,7 +442,7 @@ func TestGossipSubMeshDeliveryScoring_Replay_Will_Not_Counted(t *testing.T) {
 	conf, err := config.DefaultConfig()
 	require.NoError(t, err)
 	// we override the decay interval to 1 second so that the score is updated within 1 second intervals.
-	conf.NetworkConfig.GossipSub.ScoringParameters.DecayInterval = 1 * time.Second
+	conf.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Internal.DecayInterval = 1 * time.Second
 	conf.NetworkConfig.GossipSub.RpcTracer.ScoreTracerInterval = 1 * time.Second
 	blockTopicOverrideParams := defaultTopicScoreParams(t)
 	blockTopicOverrideParams.MeshMessageDeliveriesActivation = 1 * time.Second // we start observing the mesh message deliveries after 1 second of the node startup.
@@ -485,7 +485,7 @@ func TestGossipSubMeshDeliveryScoring_Replay_Will_Not_Counted(t *testing.T) {
 		return unittest.ProposalFixture()
 	})
 
-	scoreParams := conf.NetworkConfig.GossipSub.ScoringParameters.ScoreOption
+	scoreParams := conf.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Protocol.AppSpecificScore
 
 	// Initially the replaying node should have a score that is at least equal to the MaxAppSpecificReward.
 	// The reason is in our scoring system, we reward the staked nodes by MaxAppSpecificReward, and initially every node is considered staked
@@ -496,7 +496,7 @@ func TestGossipSubMeshDeliveryScoring_Replay_Will_Not_Counted(t *testing.T) {
 		if !ok {
 			return false
 		}
-		if replayingNodeScore < scoreParams.Rewards.MaxAppSpecificReward {
+		if replayingNodeScore < scoreParams.MaxAppSpecificReward {
 			// ensure the score is high enough so that gossip is routed by victim node to spammer node.
 			return false
 		}
@@ -523,7 +523,7 @@ func TestGossipSubMeshDeliveryScoring_Replay_Will_Not_Counted(t *testing.T) {
 		if !ok {
 			return false
 		}
-		if replayingNodeScore < scoreParams.Rewards.MaxAppSpecificReward {
+		if replayingNodeScore < scoreParams.MaxAppSpecificReward {
 			// ensure the score is high enough so that gossip is routed by victim node to spammer node.
 			return false
 		}
@@ -563,22 +563,22 @@ func TestGossipSubMeshDeliveryScoring_Replay_Will_Not_Counted(t *testing.T) {
 			return false
 		}
 
-		if replayingNodeScore >= scoreParams.Rewards.MaxAppSpecificReward {
+		if replayingNodeScore >= scoreParams.MaxAppSpecificReward {
 			// node must be penalized for just replaying the same messages.
 			return false
 		}
 
 		// following if-statements check that even though the node is penalized, it is not penalized too much, and
 		// can still participate in the network. We don't desire to disallow list a node for just under-performing.
-		if replayingNodeScore < scoreParams.Thresholds.Gossip {
+		if replayingNodeScore < conf.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Internal.Thresholds.Gossip {
 			return false
 		}
 
-		if replayingNodeScore < scoreParams.Thresholds.Publish {
+		if replayingNodeScore < conf.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Internal.Thresholds.Publish {
 			return false
 		}
 
-		if replayingNodeScore < scoreParams.Thresholds.Graylist {
+		if replayingNodeScore < conf.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Internal.Thresholds.Graylist {
 			return false
 		}
 
@@ -596,7 +596,7 @@ func TestGossipSubMeshDeliveryScoring_Replay_Will_Not_Counted(t *testing.T) {
 func defaultTopicScoreParams(t *testing.T) *pubsub.TopicScoreParams {
 	defaultConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
-	topicScoreParams := defaultConfig.NetworkConfig.GossipSub.ScoringParameters.ScoreOption.TopicValidation
+	topicScoreParams := defaultConfig.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Internal.TopicParameters
 	p := &pubsub.TopicScoreParams{
 		TopicWeight:                     topicScoreParams.TopicWeight,
 		SkipAtomicValidation:            topicScoreParams.SkipAtomicValidation,

@@ -18,7 +18,8 @@ type ClusterPrefixedMessagesReceivedTracker struct {
 }
 
 // NewClusterPrefixedMessagesReceivedTracker returns a new *ClusterPrefixedMessagesReceivedTracker.
-func NewClusterPrefixedMessagesReceivedTracker(logger zerolog.Logger, sizeLimit uint32, clusterPrefixedCacheCollector module.HeroCacheMetrics, decay float64) (*ClusterPrefixedMessagesReceivedTracker, error) {
+func NewClusterPrefixedMessagesReceivedTracker(logger zerolog.Logger, sizeLimit uint32, clusterPrefixedCacheCollector module.HeroCacheMetrics, decay float64) (*ClusterPrefixedMessagesReceivedTracker,
+	error) {
 	config := &RecordCacheConfig{
 		sizeLimit:   sizeLimit,
 		logger:      logger,
@@ -45,7 +46,7 @@ func (c *ClusterPrefixedMessagesReceivedTracker) Inc(nodeID flow.Identifier) (fl
 // Load loads the current number of cluster prefixed control messages received by a peer.
 // All errors returned from this func are unexpected and irrecoverable.
 func (c *ClusterPrefixedMessagesReceivedTracker) Load(nodeID flow.Identifier) (float64, error) {
-	count, _, err := c.cache.Get(nodeID)
+	count, _, err := c.cache.GetWithInit(nodeID)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get cluster prefixed received tracker gauge value for peer %s: %w", nodeID, err)
 	}

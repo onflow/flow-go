@@ -16,7 +16,7 @@ type disallowListCacheEntity struct {
 	causes map[network.DisallowListedCause]struct{}
 	// id is the hash of the peerID which is used as the key for storing the entity in the cache.
 	// we cache it internally to avoid hashing the peerID multiple times.
-	id flow.Identifier
+	entityId flow.Identifier
 }
 
 var _ flow.Entity = (*disallowListCacheEntity)(nil)
@@ -25,7 +25,7 @@ var _ flow.Entity = (*disallowListCacheEntity)(nil)
 // Returns:
 // - the hash of the peerID as a flow.Identifier.
 func (d *disallowListCacheEntity) ID() flow.Identifier {
-	return d.id
+	return d.entityId
 }
 
 // Checksum returns the hash of the peerID, there is no use for this method in the cache. It is implemented to satisfy
@@ -33,7 +33,7 @@ func (d *disallowListCacheEntity) ID() flow.Identifier {
 // Returns:
 // - the hash of the peerID as a flow.Identifier.
 func (d *disallowListCacheEntity) Checksum() flow.Identifier {
-	return d.id
+	return d.entityId
 }
 
 // makeId is a helper function for creating the id field of the disallowListCacheEntity by hashing the peerID.
