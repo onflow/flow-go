@@ -242,7 +242,7 @@ func (_m *LibP2PMetrics) OnIncomingRpcReceived(iHaveCount int, iWantCount int, g
 	_m.Called(iHaveCount, iWantCount, graftCount, pruneCount, msgCount)
 }
 
-// OnInvalidControlMessageSent provides a mock function with given fields:
+// OnInvalidControlMessageNotificationSent provides a mock function with given fields:
 func (_m *LibP2PMetrics) OnInvalidControlMessageNotificationSent() {
 	_m.Called()
 }
@@ -250,11 +250,6 @@ func (_m *LibP2PMetrics) OnInvalidControlMessageNotificationSent() {
 // OnInvalidMessageDeliveredUpdated provides a mock function with given fields: _a0, _a1
 func (_m *LibP2PMetrics) OnInvalidMessageDeliveredUpdated(_a0 channels.Topic, _a1 float64) {
 	_m.Called(_a0, _a1)
-}
-
-// OnInvalidSenderForPublishMessage provides a mock function with given fields:
-func (_m *LibP2PMetrics) OnInvalidSenderForPublishMessage() {
-	_m.Called()
 }
 
 // OnInvalidTopicIdDetectedForControlMessage provides a mock function with given fields: messageType
@@ -357,14 +352,9 @@ func (_m *LibP2PMetrics) OnPruneMessageInspected(duplicateTopicIds int) {
 	_m.Called(duplicateTopicIds)
 }
 
-// OnPublishMessageInspected provides a mock function with given fields: errCount
+// OnPublishMessageInspected provides a mock function with given fields: totalErrCount, invalidTopicIdsCount, invalidSubscriptionsCount, invalidSendersCount
 func (_m *LibP2PMetrics) OnPublishMessageInspected(totalErrCount int, invalidTopicIdsCount int, invalidSubscriptionsCount int, invalidSendersCount int) {
-	_m.Called(totalErrCount)
-}
-
-// OnPublishMessageInvalidSubscription provides a mock function with given fields:
-func (_m *LibP2PMetrics) OnPublishMessageInvalidSubscription() {
-	_m.Called()
+	_m.Called(totalErrCount, invalidTopicIdsCount, invalidSubscriptionsCount, invalidSendersCount)
 }
 
 // OnPublishMessagesInspectionErrorExceedsThreshold provides a mock function with given fields:

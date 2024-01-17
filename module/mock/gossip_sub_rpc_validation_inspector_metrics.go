@@ -100,13 +100,8 @@ func (_m *GossipSubRpcValidationInspectorMetrics) OnIncomingRpcReceived(iHaveCou
 	_m.Called(iHaveCount, iWantCount, graftCount, pruneCount, msgCount)
 }
 
-// OnInvalidControlMessageSent provides a mock function with given fields:
+// OnInvalidControlMessageNotificationSent provides a mock function with given fields:
 func (_m *GossipSubRpcValidationInspectorMetrics) OnInvalidControlMessageNotificationSent() {
-	_m.Called()
-}
-
-// OnInvalidSenderForPublishMessage provides a mock function with given fields:
-func (_m *GossipSubRpcValidationInspectorMetrics) OnInvalidSenderForPublishMessage() {
 	_m.Called()
 }
 
@@ -125,14 +120,9 @@ func (_m *GossipSubRpcValidationInspectorMetrics) OnPruneMessageInspected(duplic
 	_m.Called(duplicateTopicIds)
 }
 
-// OnPublishMessageInspected provides a mock function with given fields: errCount
+// OnPublishMessageInspected provides a mock function with given fields: totalErrCount, invalidTopicIdsCount, invalidSubscriptionsCount, invalidSendersCount
 func (_m *GossipSubRpcValidationInspectorMetrics) OnPublishMessageInspected(totalErrCount int, invalidTopicIdsCount int, invalidSubscriptionsCount int, invalidSendersCount int) {
-	_m.Called(totalErrCount)
-}
-
-// OnPublishMessageInvalidSubscription provides a mock function with given fields:
-func (_m *GossipSubRpcValidationInspectorMetrics) OnPublishMessageInvalidSubscription() {
-	_m.Called()
+	_m.Called(totalErrCount, invalidTopicIdsCount, invalidSubscriptionsCount, invalidSendersCount)
 }
 
 // OnPublishMessagesInspectionErrorExceedsThreshold provides a mock function with given fields:
