@@ -42,7 +42,6 @@ func SetupEnvironment(
 		return err
 	}
 
-	// TODO replace with a proper
 	contractHandler := handler.NewContractHandler(common.Address(flowToken), bs, aa, backend, em)
 
 	stdlib.SetupEnvironment(env, contractHandler, service)

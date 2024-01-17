@@ -48,5 +48,7 @@ func (c *flowBlockHeightFunction) Run(input []byte) ([]byte, error) {
 	}
 	encoded := make([]byte, 8)
 	binary.BigEndian.PutUint64(encoded, bh)
+	// the EVM works natively in 256-bit words,
+	// we left pad to that size to prevent extra gas consumtion for masking.
 	return gethCommon.LeftPadBytes(encoded, 32), nil
 }
