@@ -159,7 +159,7 @@ network-config:
           # Maximum number of total duplicate topic ids in a single GRAFT or PRUNE message, ideally this should be 0 but we allow for some tolerance
           # to avoid penalizing peers that are not malicious but are misbehaving due to bugs or other issues.
           # A topic id is considered duplicate if it appears more than once in a single GRAFT or PRUNE message.
-          duplicate-topic-id-threshold: 10
+          duplicate-topic-id-threshold: 50
         ihave:
           # The maximum allowed number of iHave messages in a single RPC message.
           #	Each iHave message represents the list of message ids. When the total number of iHave messages
@@ -175,12 +175,12 @@ network-config:
           # The tolerance threshold for having duplicate topics in an iHave message under inspection.
           #	When the total number of duplicate topic ids in a single iHave message exceeds this threshold, the inspection of message will fail.
           #	Note that a topic ID is counted as a duplicate only if it is repeated more than once.
-          duplicate-topic-id-threshold: 10
+          duplicate-topic-id-threshold: 50
           # Threshold of tolerance for having duplicate message IDs in a single iHave message under inspection.
           # When the total number of duplicate message ids in a single iHave message exceeds this threshold, the inspection of message will fail.
           # Ideally, an iHave message should not have any duplicate message IDs, hence a message id is considered duplicate when it is repeated more than once
           # within the same iHave message. When the total number of duplicate message ids in a single iHave message exceeds this threshold, the inspection of message will fail.
-          duplicate-message-id-threshold: 10
+          duplicate-message-id-threshold: 100
         iwant:
           # The maximum allowed number of iWant messages in a single RPC message.
           #	Each iWant message represents the list of message ids. When the total number of iWant messages
@@ -199,7 +199,7 @@ network-config:
           # The max allowed number of duplicate message ids in a single iwant message.
           # Note that ideally there should be no duplicate message ids in a single iwant message but
           # we allow for some tolerance to avoid penalizing peers that are not malicious
-          duplicate-message-id-threshold: 10
+          duplicate-message-id-threshold: 100
         cluster-prefixed-messages:
           # Cluster prefixed control message validation configs
           # The size of the cache used to track the amount of cluster prefixed topics received by peers

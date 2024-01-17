@@ -62,7 +62,7 @@ func TestIWantCacheMissThresholdErrRoundTrip(t *testing.T) {
 	err := NewIWantCacheMissThresholdErr(5, 10, 5)
 
 	// tests the error message formatting.
-	expectedErrMsg := "5/10 iWant cache misses exceeds the allowed threshold: 0.400000"
+	expectedErrMsg := "5/10 iWant cache misses exceeds the allowed threshold: 5"
 	assert.Equal(t, expectedErrMsg, err.Error(), "the error message should be correctly formatted")
 
 	// tests the IsIWantCacheMissThresholdErr function.
@@ -78,7 +78,7 @@ func TestIWantDuplicateMsgIDThresholdErrRoundTrip(t *testing.T) {
 	err := NewIWantDuplicateMsgIDThresholdErr(5, 10, 5)
 
 	// tests the error message formatting.
-	expectedErrMsg := "5/10 iWant duplicate message ids exceeds the allowed threshold: 0.400000"
+	expectedErrMsg := "5/10 iWant duplicate message ids exceeds the allowed threshold: 5"
 	assert.Equal(t, expectedErrMsg, err.Error(), "the error message should be correctly formatted")
 
 	// tests the IsIWantDuplicateMsgIDThresholdErr function.
