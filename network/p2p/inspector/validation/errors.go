@@ -16,7 +16,7 @@ type IWantDuplicateMsgIDThresholdErr struct {
 }
 
 func (e IWantDuplicateMsgIDThresholdErr) Error() string {
-	return fmt.Sprintf("%d/%d iWant duplicate message ids exceeds the allowed threshold: %f", e.duplicates, e.sampleSize, e.threshold)
+	return fmt.Sprintf("%d/%d iWant duplicate message ids exceeds the allowed threshold: %d", e.duplicates, e.sampleSize, e.threshold)
 }
 
 // NewIWantDuplicateMsgIDThresholdErr returns a new IWantDuplicateMsgIDThresholdErr.
@@ -38,7 +38,7 @@ type IWantCacheMissThresholdErr struct {
 }
 
 func (e IWantCacheMissThresholdErr) Error() string {
-	return fmt.Sprintf("%d/%d iWant cache misses exceeds the allowed threshold: %f", e.cacheMissCount, e.sampleSize, e.threshold)
+	return fmt.Sprintf("%d/%d iWant cache misses exceeds the allowed threshold: %d", e.cacheMissCount, e.sampleSize, e.threshold)
 }
 
 // NewIWantCacheMissThresholdErr returns a new IWantCacheMissThresholdErr.
