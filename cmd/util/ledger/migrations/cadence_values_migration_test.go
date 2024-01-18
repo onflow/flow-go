@@ -1,8 +1,6 @@
 package migrations
 
 import (
-	"bufio"
-	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -32,6 +30,17 @@ const updatedTestContract = "test-data/cadence_values_migration/test_contract_up
 
 const testAccountAddress = "01cf0e2f2f715450"
 
+type writer struct {
+	logs []string
+}
+
+var _ io.Writer = &writer{}
+
+func (w *writer) Write(p []byte) (n int, err error) {
+	w.logs = append(w.logs, string(p))
+	return len(p), nil
+}
+
 func TestCadenceValuesMigration(t *testing.T) {
 
 	t.Parallel()
@@ -58,8 +67,8 @@ func TestCadenceValuesMigration(t *testing.T) {
 	// Run remaining migrations
 	valueMigration := NewCadenceValueMigrator(rwf, capabilityIDs)
 
-	buf := bytes.Buffer{}
-	logger := zerolog.New(&buf).Level(zerolog.ErrorLevel)
+	logWriter := &writer{}
+	logger := zerolog.New(logWriter).Level(zerolog.ErrorLevel)
 	err = valueMigration.InitMigration(logger, nil, 0)
 	require.NoError(t, err)
 
@@ -382,17 +391,30 @@ func TestCadenceValuesMigration(t *testing.T) {
 	)
 
 	// Check error logs.
-	lines := readLines(&buf)
-	require.Len(t, lines, 1)
+	require.Len(t, logWriter.logs, 8)
+
 	// Error due to un-migrated contract.
 	assert.Contains(
 		t,
-		lines[0],
+		logWriter.logs[0],
 		fmt.Sprintf(
 			"failed to run EntitlementsMigration for path {%s /storage/flowTokenVault}",
 			testAccountAddress,
 		),
 	)
+
+	// Error due to deprecated types.
+	for _, line := range logWriter.logs[1:] {
+		assert.Contains(
+			t,
+			line,
+			fmt.Sprintf(
+				"failed to run EntitlementsMigration for path {%s /storage/dictionary_with_account_type_keys}:"+
+					" internal error: cannot convert deprecated type",
+				testAccountAddress,
+			),
+		)
+	}
 }
 
 func updateContracts(payloads []*ledger.Payload, address common.Address) ([]*ledger.Payload, error) {
@@ -433,10 +455,10 @@ func runLinkMigration(
 ) []*ledger.Payload {
 	linkValueMigration := NewCadenceLinkValueMigrator(rwf, capabilityIDs)
 
-	linkMigrationBuf := bytes.Buffer{}
-	linkMigrationLogger := zerolog.New(&linkMigrationBuf).Level(zerolog.ErrorLevel)
+	logWriter := &writer{}
+	logger := zerolog.New(logWriter).Level(zerolog.ErrorLevel)
 
-	err := linkValueMigration.InitMigration(linkMigrationLogger, nil, 0)
+	err := linkValueMigration.InitMigration(logger, nil, 0)
 	require.NoError(t, err)
 
 	payloads, err = linkValueMigration.MigrateAccount(nil, address, payloads)
@@ -473,12 +495,11 @@ func runLinkMigration(
 	)
 
 	// Check error logs.
-	lines := readLines(&linkMigrationBuf)
-	require.Len(t, lines, 2)
+	require.Len(t, logWriter.logs, 2)
 
 	assert.Contains(
 		t,
-		lines[0],
+		logWriter.logs[0],
 		fmt.Sprintf(
 			"failed to run LinkValueMigration for path {%s /public/flowTokenReceiver}",
 			testAccountAddress,
@@ -487,29 +508,13 @@ func runLinkMigration(
 
 	assert.Contains(
 		t,
-		lines[1],
+		logWriter.logs[1],
 		fmt.Sprintf(
 			"failed to run LinkValueMigration for path {%s /public/flowTokenBalance}",
 			testAccountAddress,
 		),
 	)
 	return payloads
-}
-
-func readLines(reader io.Reader) []string {
-	lines := make([]string, 0)
-	var line []byte
-	var err error
-
-	r := bufio.NewReader(reader)
-	for {
-		line, _, err = r.ReadLine()
-		if err != nil {
-			break
-		}
-		lines = append(lines, string(line))
-	}
-	return lines
 }
 
 type testReportWriterFactory struct{}
