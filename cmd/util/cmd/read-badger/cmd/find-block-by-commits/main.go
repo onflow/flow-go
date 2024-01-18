@@ -36,7 +36,7 @@ func Init(f func() (*storage.All, *badger.DB)) *cobra.Command {
 	_ = cmd.MarkFlagRequired("end-height")
 
 	cmd.Flags().StringVar(&flagStateCommitments, "state-commitments", "",
-		"State commitments (each must be 64 chars, hex-encoded)")
+		"Comma separated list of state commitments (each must be 64 chars, hex-encoded)")
 	_ = cmd.MarkFlagRequired("state-commitments")
 
 	return cmd
@@ -116,7 +116,12 @@ func run(*cobra.Command, []string) {
 	}
 
 	storage, db := loader()
-	defer db.Close()
+	defer func () { 
+		err := db.Close()
+		if err != nil {
+			log.Warn().Err(err).Msg("error closing db")
+		}
+	}()
 
 	_, err = FindBlockIDByCommits(
 		log.Logger,
