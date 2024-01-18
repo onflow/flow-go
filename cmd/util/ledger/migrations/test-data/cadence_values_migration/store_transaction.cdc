@@ -30,7 +30,7 @@ transaction {
     var cap = acct.link<&Test.R>(/public/linkR, target: /storage/r)
     acct.save(cap, to: /storage/capability)
 
-    // Account-typed keys in dictionary
+    // account-typed keys in dictionary
     acct.save(
       {
         Type<AuthAccount>(): 1,
@@ -48,17 +48,16 @@ transaction {
       to: /storage/dictionary_with_account_type_keys,
     )
 
-    // Entitled typed keys in dictionary.
-    // Both keys produces the same result, so having them both
-    // in the same dictionary will replace one from the other.
+    // Entitlements. Both keys produces the same result,
+    // so having them both in the same dictionary will replace one from the other.
     // Therefore use two separate dictionaries.
     acct.save(
-      { Type<&Test.R>(): "OK" },
-      to: /storage/dictionary_with_reference_typed_key,
+      { Type<&Test.R>(): "non_auth_ref" },
+      to: /storage/dictionary_with_reference_typed_key
     )
     acct.save(
-      { Type<auth &Test.R>(): "OK" },
-      to: /storage/dictionary_with_auth_reference_typed_key,
+      { Type<auth &Test.R>(): "auth_ref" },
+      to: /storage/dictionary_with_auth_reference_typed_key
     )
   }
 

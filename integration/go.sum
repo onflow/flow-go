@@ -1947,8 +1947,8 @@ github.com/onflow/atree v0.6.0/go.mod h1:gBHU0M05qCbv9NN0kijLWMgC47gHVNBIp4KmsVF
 github.com/onflow/atree v0.6.1-0.20230711151834-86040b30171f h1:Z8/PgTqOgOg02MTRpTBYO2k16FE6z4wEOtaC2WBR9Xo=
 github.com/onflow/atree v0.6.1-0.20230711151834-86040b30171f/go.mod h1:xvP61FoOs95K7IYdIYRnNcYQGf4nbF/uuJ0tHf4DRuM=
 github.com/onflow/cadence v0.39.13-stable-cadence/go.mod h1:SxT8/IEkS1drFj2ofUEK9S6KyJ5GQbrm0LX4EFCp/7Q=
-github.com/onflow/cadence v1.0.0-preview.2.0.20240117232918-ea9086cc59f1 h1:iUmP3n24xUay6XQZYt6a8KzveEu3zp+jzZqtxdQtp0E=
-github.com/onflow/cadence v1.0.0-preview.2.0.20240117232918-ea9086cc59f1/go.mod h1:JmTHN1dOmN5330TkvSC8P50RcteXegxQS5+Aw2zr7+I=
+github.com/onflow/cadence v1.0.0-preview.2.0.20240118172708-efd96205743b h1:nR6j0vCS5UB4zqz4Be2QwRMj4HmfHYUVBAbBw+nEv48=
+github.com/onflow/cadence v1.0.0-preview.2.0.20240118172708-efd96205743b/go.mod h1:JmTHN1dOmN5330TkvSC8P50RcteXegxQS5+Aw2zr7+I=
 github.com/onflow/crypto v0.25.0 h1:BeWbLsh3ZD13Ej+Uky6kg1PL1ZIVBDVX+2MVBNwqddg=
 github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.1-0.20231212203043-37cbe453d425 h1:zvLHFxySeg61/dgp/IbvaN+k4BXPuAhBOslrPQjrX9Q=
 github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.1-0.20231212203043-37cbe453d425/go.mod h1:N+1bEs/159Efg75hSQIkb90FVinxUMxL/6mA3I6dXtQ=

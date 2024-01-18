@@ -51,7 +51,7 @@ require (
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/multiformats/go-multihash v0.2.3
 	github.com/onflow/atree v0.6.1-0.20230711151834-86040b30171f
-	github.com/onflow/cadence v1.0.0-preview.2.0.20240117232918-ea9086cc59f1
+	github.com/onflow/cadence v1.0.0-preview.2.0.20240118172708-efd96205743b
 	github.com/onflow/flow v0.3.4
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.1-0.20231212203043-37cbe453d425
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.15.1-0.20231204202154-f8dfacb39d86
@@ -316,5 +316,3 @@ require (
 	modernc.org/sqlite v1.28.0 // indirect
 	nhooyr.io/websocket v1.8.7 // indirect
 )
-
-replace github.com/onflow/cadence => ../cadence
