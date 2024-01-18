@@ -369,3 +369,5 @@ replace github.com/onflow/cadence => github.com/onflow/cadence v0.42.7
 replace github.com/onflow/flow-ft/lib/go/contracts => github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20230711213910-baad011d2b13
 
 replace github.com/onflow/flow-nft/lib/go/contracts => github.com/onflow/flow-nft/lib/go/contracts v1.1.0
+
+replace github.com/onflow/sdks => github.com/onflow/sdks v0.5.0
