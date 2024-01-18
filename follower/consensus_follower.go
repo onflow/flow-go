@@ -6,9 +6,9 @@ import (
 	"sync"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/crypto"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"

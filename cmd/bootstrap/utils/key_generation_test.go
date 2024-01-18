@@ -5,9 +5,10 @@ import (
 	"testing"
 
 	"github.com/onflow/crypto"
-	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
