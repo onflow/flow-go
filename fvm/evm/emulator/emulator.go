@@ -3,13 +3,12 @@ package emulator
 import (
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethCore "github.com/ethereum/go-ethereum/core"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	gethVM "github.com/ethereum/go-ethereum/core/vm"
 	gethCrypto "github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/params"
+	gethParams "github.com/ethereum/go-ethereum/params"
 	"github.com/onflow/atree"
 
 	"github.com/onflow/flow-go/fvm/evm/emulator/state"
@@ -106,7 +105,7 @@ func (bl *BlockView) DirectCall(call *types.DirectCall) (*types.Result, error) {
 		return proc.withdrawFrom(call.From, call.Value)
 	case types.DeployCallSubType:
 		if call.HasNonEmptyToField() {
-			return proc.deployAt(call.From, call.To, call.Data, call.GasLimit)
+			return proc.deployAt(call.From, call.To, call.Data, call.GasLimit, call.Value)
 		}
 		fallthrough
 	default:
@@ -236,39 +235,51 @@ func (proc *procedure) withdrawFrom(address types.Address, amount *big.Int) (*ty
 // behaviour should be similar to what evm.create internal method does with
 // less checks on the configs (no call to this is possible on the old forks).
 func (proc *procedure) deployAt(
-	from types.Address,
+	caller types.Address,
 	to types.Address,
 	data types.Code,
 	gasLimit uint64,
+	value *big.Int,
 ) (*types.Result, error) {
-	addr := to.ToCommon()
 	res := &types.Result{
 		TxType: types.DirectCallTxType,
 	}
+	addr := to.ToCommon()
 
-	// ensure there's no existing contract
+	// precheck 1 - check balance of the source
+	if value.Sign() != 0 && !proc.evm.Context.CanTransfer(proc.state, caller.ToCommon(), value) {
+		return res, gethVM.ErrInsufficientBalance
+	}
+
+	// precheck 2 - ensure there's no existing contract is deployed at the address
 	contractHash := proc.state.GetCodeHash(addr)
-	if proc.state.GetNonce(addr) != 0 || (contractHash != (common.Hash{}) && contractHash != gethTypes.EmptyCodeHash) {
+	if proc.state.GetNonce(addr) != 0 || (contractHash != (gethCommon.Hash{}) && contractHash != gethTypes.EmptyCodeHash) {
 		return res, gethVM.ErrContractAddressCollision
 	}
 
+	// setup account
 	proc.state.CreateAccount(addr)
-	// set the nonce to 1 (EIP-158)
-	proc.state.SetNonce(addr, 1)
+	proc.state.SetNonce(addr, 1) // (EIP-158)
+	proc.evm.Context.Transfer(   // transfer value
+		proc.state,
+		caller.ToCommon(),
+		addr,
+		value,
+	)
 
+	// run code through interpreter
+	// this would check for errors and computes the final bytes to be stored under account
 	var err error
 	inter := gethVM.NewEVMInterpreter(proc.evm)
-	contract := gethVM.NewContract(gethVM.AccountRef(from), gethVM.AccountRef(addr), new(big.Int), gasLimit)
+	contract := gethVM.NewContract(gethVM.AccountRef(caller.ToCommon()), gethVM.AccountRef(addr), value, gasLimit)
 	contract.Code = data
 	contract.CodeHash = gethCrypto.Keccak256Hash(data)
 	contract.CodeAddr = &addr
-
 	// update access list (Berlin)
 	proc.state.AddAddressToAccessList(addr)
 
-	// run through interpreter to catch error and compute gas
 	ret, err := inter.Run(contract, nil, false)
-	gasCost := uint64(len(ret)) * params.CreateDataGas
+	gasCost := uint64(len(ret)) * gethParams.CreateDataGas
 	res.GasConsumed = gasCost
 
 	// handle errors
@@ -277,20 +288,23 @@ func (proc *procedure) deployAt(
 		if err != gethVM.ErrExecutionReverted {
 			res.GasConsumed = gasLimit
 		}
+		res.Failed = true
 		return res, err
 	}
 
-	// check gas usage
+	// update gas usage
 	if gasCost > gasLimit {
 		// consume all the remaining gas (Homestead)
 		res.GasConsumed = gasLimit
+		res.Failed = true
 		return res, gethVM.ErrCodeStoreOutOfGas
 	}
 
 	// check max code size (EIP-158)
-	if len(ret) > params.MaxCodeSize {
+	if len(ret) > gethParams.MaxCodeSize {
 		// consume all the remaining gas (Homestead)
 		res.GasConsumed = gasLimit
+		res.Failed = true
 		return res, gethVM.ErrMaxCodeSizeExceeded
 	}
 
@@ -298,6 +312,7 @@ func (proc *procedure) deployAt(
 	if len(ret) >= 1 && ret[0] == 0xEF {
 		// consume all the remaining gas (Homestead)
 		res.GasConsumed = gasLimit
+		res.Failed = true
 		return res, gethVM.ErrInvalidCode
 	}
 

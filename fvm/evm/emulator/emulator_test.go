@@ -285,6 +285,37 @@ func TestContractInteraction(t *testing.T) {
 					require.True(t, types.IsEVMValidationError(err))
 				})
 			})
+			t.Run("deploy contract at target address", func(t *testing.T) {
+				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
+					target := types.Address{1, 2, 3}
+					RunWithNewBlockView(t, env, func(blk types.BlockView) {
+						res, err := blk.DirectCall(
+							types.NewDeployCallWithTargetAddress(
+								testAccount,
+								target,
+								testContract.ByteCode,
+								math.MaxUint64,
+								amountToBeTransfered),
+						)
+						require.NoError(t, err)
+						require.Equal(t, target, res.DeployedContractAddress)
+					})
+					RunWithNewReadOnlyBlockView(t, env, func(blk types.ReadOnlyBlockView) {
+						require.NotNil(t, target)
+						retCode, err := blk.CodeOf(target)
+						require.NoError(t, err)
+						require.NotEmpty(t, retCode)
+
+						retBalance, err := blk.BalanceOf(target)
+						require.NoError(t, err)
+						require.Equal(t, amountToBeTransfered, retBalance)
+
+						retBalance, err = blk.BalanceOf(testAccount)
+						require.NoError(t, err)
+						require.Equal(t, amount.Sub(amount, amountToBeTransfered), retBalance)
+					})
+				})
+			})
 
 		})
 	})
