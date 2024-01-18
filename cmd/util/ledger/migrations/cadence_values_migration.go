@@ -26,6 +26,7 @@ import (
 )
 
 type CadenceBaseMigrator struct {
+	name            string
 	log             zerolog.Logger
 	reporter        reporters.ReportWriter
 	valueMigrations func(
@@ -49,7 +50,7 @@ func (m *CadenceBaseMigrator) InitMigration(
 	_ []*ledger.Payload,
 	_ int,
 ) error {
-	m.log = log.With().Str("migration", "cadence-value-migration").Logger()
+	m.log = log.With().Str("migration", m.name).Logger()
 	return nil
 }
 
@@ -141,6 +142,7 @@ func NewCadenceValueMigrator(
 	capabilityIDs map[interpreter.AddressPath]interpreter.UInt64Value,
 ) *CadenceBaseMigrator {
 	return &CadenceBaseMigrator{
+		name:     "cadence-value-migration",
 		reporter: rwf.ReportWriter("cadence-value-migrator"),
 		valueMigrations: func(
 			inter *interpreter.Interpreter,
@@ -153,9 +155,7 @@ func NewCadenceValueMigrator(
 					CapabilityIDs: capabilityIDs,
 					Reporter:      reporter,
 				},
-				// Must be run before account-type migration
 				entitlements.NewEntitlementsMigration(inter),
-
 				string_normalization.NewStringNormalizingMigration(),
 				account_type.NewAccountTypeMigration(),
 				type_value.NewTypeValueMigration(),
@@ -169,6 +169,7 @@ func NewCadenceLinkValueMigrator(
 	capabilityIDs map[interpreter.AddressPath]interpreter.UInt64Value,
 ) *CadenceBaseMigrator {
 	return &CadenceBaseMigrator{
+		name:     "cadence-link-value-migration",
 		reporter: rwf.ReportWriter("cadence-link-value-migrator"),
 		valueMigrations: func(
 			_ *interpreter.Interpreter,

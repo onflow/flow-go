@@ -120,6 +120,7 @@ func TestCadenceValuesMigrationWithSwappedOrder(t *testing.T) {
 
 	// Run remaining migrations
 	valueMigration := &CadenceBaseMigrator{
+		name:     "cadence-value-migration",
 		reporter: rwf.ReportWriter("cadence-value-migrator"),
 		valueMigrations: func(
 			inter *interpreter.Interpreter,
