@@ -319,4 +319,4 @@ require (
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
 
-replace github.com/ethereum/go-ethereum => github.com/onflow/go-ethereum v0.0.0-20240118045355-49fd3d04b1fd
+replace github.com/ethereum/go-ethereum => github.com/onflow/go-ethereum v0.0.0-20240118045355-6bd1363be1e4
