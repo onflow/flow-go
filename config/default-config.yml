@@ -182,7 +182,7 @@ network-config:
           hard-threshold: 100
         process:
           inspection:
-            # Disables rpc inspection entirely.
+            # Disables rpc inspection for all control message types.
             disabled: false
             # Enables graft control message inspection.
             graft-enabled: true
@@ -195,6 +195,8 @@ network-config:
             # Enables publish message inspection.
             publish-enabled: true
           truncation:
+            # Disables rpc truncation for all control message types.
+            disabled: false
             # Enables graft control message truncation.
             graft-enabled: true
             # Enables prune control message truncation.

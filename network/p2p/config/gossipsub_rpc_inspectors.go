@@ -61,7 +61,7 @@ const (
 
 // Inspect configuration to enable/disable RPC inspection for a particular control message type.
 type Inspect struct {
-	// Disabled disables rpc inspection entirely.
+	// Disabled disables rpc inspection for all control message types.
 	Disabled bool `mapstructure:"disabled"`
 	// GraftEnabled enable graft control message inspection.
 	GraftEnabled bool `validate:"required" mapstructure:"graft-enabled"`
@@ -77,6 +77,8 @@ type Inspect struct {
 
 // Truncate configuration to enable/disable RPC truncation for a particular control message type.
 type Truncate struct {
+	// Disabled disables truncation for all control message types.
+	Disabled bool `mapstructure:"disabled"`
 	// GraftEnabled enable graft control message truncation.
 	GraftEnabled bool `validate:"required" mapstructure:"graft-enabled"`
 	// PruneEnabled enable prune control message truncation.
