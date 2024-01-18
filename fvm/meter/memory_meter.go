@@ -243,6 +243,12 @@ var (
 		common.MemoryKindEntitlementMapStaticAccess:  17,
 		common.MemoryKindCadenceEntitlementSetAccess: 33,
 		common.MemoryKindCadenceEntitlementMapAccess: 17,
+
+		// InclusiveRange
+		common.MemoryKindInclusiveRangeStaticType:   17,
+		common.MemoryKindCadenceInclusiveRangeValue: 81,
+		common.MemoryKindCadenceInclusiveRangeType:  33,
+		common.MemoryKindInclusiveRangeSemaType:     17,
 	}
 )
 
