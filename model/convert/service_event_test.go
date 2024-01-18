@@ -4,11 +4,10 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/convert"
@@ -58,7 +57,6 @@ func TestEventConversion(t *testing.T) {
 			require.True(t, ok)
 		},
 	)
-
 
 	t.Run(
 		"epoch setup with short random source", func(t *testing.T) {
