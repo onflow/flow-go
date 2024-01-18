@@ -401,12 +401,12 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 				Metrics: metrics.DisallowListCacheMetricsFactory(fnb.HeroCacheMetricsFactory(), network.PrivateNetwork),
 			},
 			UnicastConfig: uniCfg,
+			GossipSubCfg:  &fnb.FlowConfig.NetworkConfig.GossipSub,
 		}
 		builder, err := p2pbuilder.DefaultNodeBuilder(params,
 			fnb.Resolver,
 			fnb.BaseConfig.NodeRole,
 			connGaterCfg,
-			&fnb.FlowConfig.NetworkConfig.GossipSub,
 			&fnb.FlowConfig.NetworkConfig.ConnectionManager,
 			dhtActivationStatus)
 		if err != nil {

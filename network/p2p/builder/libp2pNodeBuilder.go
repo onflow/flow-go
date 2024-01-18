@@ -407,7 +407,6 @@ func DefaultNodeBuilder(params *LibP2PNodeBuilderConfig,
 	resolver madns.BasicResolver,
 	role string,
 	connGaterCfg *p2pbuilderconfig.ConnectionGaterConfig,
-	gossipCfg *p2pconfig.GossipSubParameters,
 	connMgrConfig *netconf.ConnectionManager,
 	dhtSystemActivation DhtSystemActivation,
 ) (p2p.NodeBuilder, error) {

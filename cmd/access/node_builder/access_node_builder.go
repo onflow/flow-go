@@ -1770,6 +1770,7 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 			Unicast:                builder.FlowConfig.NetworkConfig.Unicast,
 			RateLimiterDistributor: builder.UnicastRateLimiterDistributor,
 		},
+		GossipSubCfg: &builder.FlowConfig.NetworkConfig.GossipSub,
 	}
 	nodeBuilder, err := p2pbuilder.NewNodeBuilder(params)
 	if err != nil {

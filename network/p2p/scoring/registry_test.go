@@ -1033,7 +1033,7 @@ func TestInvalidControlMessageMultiErrorScoreCalculation(t *testing.T) {
 		record, err, ok := spamRecords.Get(tCase.notification.PeerID) // get the record from the spamRecords.
 		require.True(t, ok)
 		require.NoError(t, err)
-		require.Less(t, math.Abs(tCase.expectedPenalty-record.Penalty), 10e-3)                                     // penalty should be updated to -10.
+		unittest.RequireNumericallyClose(t, tCase.expectedPenalty, record.Penalty, 10e-3)
 		require.Equal(t, scoring.InitAppScoreRecordStateFunc(maximumSpamPenaltyDecayFactor)().Decay, record.Decay) // decay should be initialized to the initial state.
 
 		require.Eventually(t, func() bool {
@@ -1103,6 +1103,9 @@ func TestScoringRegistrySilencePeriod(t *testing.T) {
 		reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 			PeerID:  peerID,
 			MsgType: p2pmsg.CtrlMsgGraft,
+			Errors: p2p.InvCtrlMsgErrs{
+				p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid graft"), p2p.CtrlMsgNonClusterTopicType),
+			},
 		})
 		expectedNumOfSilencedNotif++
 		// spam records should not be created during the silence period
@@ -1127,13 +1130,16 @@ func TestScoringRegistrySilencePeriod(t *testing.T) {
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: p2pmsg.CtrlMsgGraft,
+		Errors: p2p.InvCtrlMsgErrs{
+			p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid graft"), p2p.CtrlMsgNonClusterTopicType),
+		},
 	})
 	// the penalty should now be applied and spam records created.
 	record, err, ok := spamRecords.Get(peerID)
 	assert.True(t, ok)
 	assert.NoError(t, err)
 	expectedPenalty := penaltyValueFixtures().GraftMisbehaviour
-	assert.Less(t, math.Abs(expectedPenalty-record.Penalty), 10e-3)
+	unittest.RequireNumericallyClose(t, expectedPenalty, record.Penalty, 10e-3)
 	assert.Equal(t, scoring.InitAppScoreRecordStateFunc(maximumSpamPenaltyDecayFactor)().Decay, record.Decay) // decay should be initialized to the initial state.
 
 	require.Eventually(t, func() bool {

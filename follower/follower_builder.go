@@ -595,6 +595,7 @@ func (builder *FollowerServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 			Unicast:                builder.FlowConfig.NetworkConfig.Unicast,
 			RateLimiterDistributor: builder.UnicastRateLimiterDistributor,
 		},
+		GossipSubCfg: &builder.FlowConfig.NetworkConfig.GossipSub,
 	}
 	nodeBuilder, err := p2pbuilder.NewNodeBuilder(params)
 	if err != nil {

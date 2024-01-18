@@ -94,12 +94,12 @@ func InitCorruptLibp2pNode(
 		SubscriptionProviderParams: &netConfig.GossipSub.SubscriptionProvider,
 		DisallowListCacheCfg:       disallowListCacheCfg,
 		UnicastConfig:              uniCfg,
+		GossipSubCfg:               &netConfig.GossipSub,
 	}
 	builder, err := p2pbuilder.DefaultNodeBuilder(params,
 		resolver,
 		role,
 		connGaterCfg,
-		&netConfig.GossipSub,
 		&netConfig.ConnectionManager,
 		dhtActivationStatus)
 	if err != nil {

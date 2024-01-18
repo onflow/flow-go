@@ -1154,6 +1154,9 @@ func TestValidationInspector_MultiErrorNotification(t *testing.T) {
 
 	inspectorMetrics := mock.NewGossipSubRpcValidationInspectorMetrics(t)
 	inspectorMetrics.On("AsyncProcessingStarted")
+	inspectorMetrics.On("OnIHaveMessageIDsReceived", mockery.AnythingOfType("string"), mockery.AnythingOfType("int"))
+	inspectorMetrics.On("OnIWantMessageIDsReceived", mockery.AnythingOfType("int"))
+	inspectorMetrics.On("OnIncomingRpcReceived", mockery.AnythingOfType("int"), mockery.AnythingOfType("int"), mockery.AnythingOfType("int"), mockery.AnythingOfType("int"), mockery.AnythingOfType("int"))
 	inspectorMetrics.On("AsyncProcessingFinished", mockery.AnythingOfType("time.Duration"))
 	inspectorMetrics.On("InvalidControlMessageNotificationError", mockery.AnythingOfType("p2pmsg.ControlMessageType"), mockery.AnythingOfType("float64")).Run(func(args mockery.Arguments) {
 		count, ok := args.Get(1).(float64)
