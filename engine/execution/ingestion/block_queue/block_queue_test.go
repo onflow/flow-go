@@ -178,7 +178,7 @@ func TestOnForksWithSameCollections(t *testing.T) {
 
 	q := NewBlockQueue()
 
-	missing, executables, err := q.OnBlock(blockA, commitFor("R"))
+	missing, executables, err := q.OnBlock(blockA, commitFor("A"))
 	require.NoError(t, err)
 	require.Empty(t, executables)
 	requireCollectionHas(t, missing)
@@ -350,7 +350,7 @@ func makeChainABCDE() (GetBlock, GetCollection, GetCommit) {
 	getCommit := func(name string) *flow.StateCommitment {
 		commit, ok := commitLookup[name]
 		if !ok {
-			panic("commit not found")
+			panic("commit not found for " + name)
 		}
 		return commit
 	}
