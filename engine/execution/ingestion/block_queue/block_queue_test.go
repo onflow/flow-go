@@ -169,8 +169,9 @@ func TestMultipleBlockBecomesReady(t *testing.T) {
 func TestOnForksWithSameCollections(t *testing.T) {
 	t.Parallel()
 	// Given a chain
-	// A() <- B(C1, C2) <- C (C3)
-	// ^--- D(C1, C2) <- E (C3)
+	// R() <- A() <- B(C1, C2) <- C(C3)
+	// -      ^----- D(C1, C2) <- E(C3)
+	// TODO: add A <- F(C1, C2, C3)
 	block, coll, commitFor := makeChainABCDE()
 	blockA, blockB, blockC, blockD, blockE :=
 		block("A"), block("B"), block("C"), block("D"), block("E")
@@ -178,9 +179,9 @@ func TestOnForksWithSameCollections(t *testing.T) {
 
 	q := NewBlockQueue()
 
-	missing, executables, err := q.OnBlock(blockA, commitFor("A"))
+	missing, executables, err := q.OnBlock(blockA, commitFor("R"))
 	require.NoError(t, err)
-	require.Empty(t, executables)
+	requireExecutableHas(t, executables, blockA)
 	requireCollectionHas(t, missing)
 
 	// receiving block B and D which have the same collections (C1, C2)
@@ -200,6 +201,11 @@ func TestOnForksWithSameCollections(t *testing.T) {
 	executables, err = q.OnCollection(c1)
 	require.NoError(t, err)
 	requireExecutableHas(t, executables)
+
+	// A is executed
+	executables, err = q.OnBlockExecuted(blockA.ID(), *commitFor("A"))
+	require.NoError(t, err)
+	requireExecutableHas(t, executables) // because C2 is not received
 
 	executables, err = q.OnCollection(c2)
 	require.NoError(t, err)
@@ -303,8 +309,8 @@ func makeChainABCDEFG() (GetBlock, GetCollection, GetCommit) {
 	return getBlock, getCol, getCommit
 }
 
-// A() <- B(C1, C2) <- C (C3)
-// ^--- D(C1, C2) <- E (C3)
+// R() <- A() <- B(C1, C2) <- C(C3)
+// -      ^----- D(C1, C2) <- E(C3)
 func makeChainABCDE() (GetBlock, GetCollection, GetCommit) {
 	cs := unittest.CollectionListFixture(3)
 	c1, c2, c3 := cs[0], cs[1], cs[2]
@@ -315,10 +321,10 @@ func makeChainABCDE() (GetBlock, GetCollection, GetCommit) {
 		return cs[name-1]
 	}
 
-	a := unittest.BlockFixture()
-	blockA := &a
-	bs := unittest.ChainBlockFixtureWithRoot(blockA.Header, 2)
-	blockB, blockC := bs[0], bs[1]
+	r := unittest.BlockFixture()
+	blockR := &r
+	bs := unittest.ChainBlockFixtureWithRoot(blockR.Header, 3)
+	blockA, blockB, blockC := bs[0], bs[1], bs[2]
 	unittest.AddCollectionsToBlock(blockB, []*flow.Collection{c1, c2})
 	unittest.AddCollectionsToBlock(blockC, []*flow.Collection{c3})
 	unittest.RechainBlocks(bs)
@@ -330,6 +336,7 @@ func makeChainABCDE() (GetBlock, GetCollection, GetCommit) {
 	unittest.RechainBlocks(bs)
 
 	blockLookup := map[string]*flow.Block{
+		"R": blockR,
 		"A": blockA,
 		"B": blockB,
 		"C": blockC,
