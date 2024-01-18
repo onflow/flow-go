@@ -180,6 +180,9 @@ func checkMigratedPayloads(
 
 	iterator := storageMap.Iterator(mr.Interpreter)
 
+	// Check whether the account ID is properly incremented.
+	checkAccountID(t, mr, address)
+
 	fullyEntitledAccountReferenceType := interpreter.ConvertSemaToStaticType(nil, sema.FullyEntitledAccountReferenceType)
 	accountReferenceType := interpreter.ConvertSemaToStaticType(nil, sema.AccountReferenceType)
 
@@ -401,6 +404,17 @@ func checkMigratedPayloads(
 		assert.Fail(t, fmt.Sprintf("%d extra item(s) in expected values", len(expectedValues)))
 	}
 	return rResourceType
+}
+
+func checkAccountID(t *testing.T, mr *migratorRuntime, address common.Address) {
+	id := flow.AccountStatusRegisterID(flow.Address(address))
+	statusBytes, err := mr.Accounts.GetValue(id)
+	require.NoError(t, err)
+
+	accountStatus, err := environment.AccountStatusFromBytes(statusBytes)
+	require.NoError(t, err)
+
+	assert.Equal(t, uint64(1), accountStatus.AccountIdCounter())
 }
 
 func checkErrorLogs(t *testing.T, logWriter *writer, expectDeprecatedTypesErrors bool) {
