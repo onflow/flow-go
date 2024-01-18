@@ -12,10 +12,10 @@ import (
 
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 
-	gethCommon "github.com/onflow/go-ethereum/common"
-	gethTypes "github.com/onflow/go-ethereum/core/types"
-	gethParams "github.com/onflow/go-ethereum/params"
-	"github.com/onflow/go-ethereum/rlp"
+	gethCommon "github.com/ethereum/go-ethereum/common"
+	gethTypes "github.com/ethereum/go-ethereum/core/types"
+	gethParams "github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 

@@ -9,8 +9,8 @@ import (
 	"regexp"
 	"strings"
 
-	gethABI "github.com/onflow/go-ethereum/accounts/abi"
-	gethCommon "github.com/onflow/go-ethereum/common"
+	gethABI "github.com/ethereum/go-ethereum/accounts/abi"
+	gethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"

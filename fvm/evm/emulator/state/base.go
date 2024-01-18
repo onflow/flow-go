@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"math/big"
 
-	gethCommon "github.com/onflow/go-ethereum/common"
-	gethTypes "github.com/onflow/go-ethereum/core/types"
+	gethCommon "github.com/ethereum/go-ethereum/common"
+	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/onflow/atree"
 
 	"github.com/onflow/flow-go/fvm/evm/types"

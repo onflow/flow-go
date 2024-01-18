@@ -7,9 +7,9 @@ import (
 	"math/big"
 	"sort"
 
-	gethCommon "github.com/onflow/go-ethereum/common"
-	gethTypes "github.com/onflow/go-ethereum/core/types"
-	gethParams "github.com/onflow/go-ethereum/params"
+	gethCommon "github.com/ethereum/go-ethereum/common"
+	gethTypes "github.com/ethereum/go-ethereum/core/types"
+	gethParams "github.com/ethereum/go-ethereum/params"
 	"github.com/onflow/atree"
 
 	"github.com/onflow/flow-go/fvm/errors"

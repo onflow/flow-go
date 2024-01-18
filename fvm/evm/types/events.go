@@ -3,8 +3,8 @@ package types
 import (
 	"encoding/hex"
 
-	gethCommon "github.com/onflow/go-ethereum/common"
-	"github.com/onflow/go-ethereum/rlp"
+	gethCommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime/stdlib"
 

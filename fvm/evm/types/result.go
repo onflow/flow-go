@@ -1,7 +1,7 @@
 package types
 
 import (
-	gethTypes "github.com/onflow/go-ethereum/core/types"
+	gethTypes "github.com/ethereum/go-ethereum/core/types"
 )
 
 // Result captures the result of an interaction to the emulator

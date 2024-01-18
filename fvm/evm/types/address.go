@@ -3,7 +3,7 @@ package types
 import (
 	"math/big"
 
-	gethCommon "github.com/onflow/go-ethereum/common"
+	gethCommon "github.com/ethereum/go-ethereum/common"
 )
 
 // Address is an EVM-compatible address

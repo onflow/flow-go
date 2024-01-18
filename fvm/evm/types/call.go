@@ -3,10 +3,10 @@ package types
 import (
 	"math/big"
 
-	gethCommon "github.com/onflow/go-ethereum/common"
-	gethCore "github.com/onflow/go-ethereum/core"
-	gethCrypto "github.com/onflow/go-ethereum/crypto"
-	"github.com/onflow/go-ethereum/rlp"
+	gethCommon "github.com/ethereum/go-ethereum/common"
+	gethCore "github.com/ethereum/go-ethereum/core"
+	gethCrypto "github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/rlp"
 )
 
 const (
