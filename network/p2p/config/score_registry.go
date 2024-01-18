@@ -75,11 +75,11 @@ type SpamRecordCacheDecay struct {
 
 const (
 	MisbehaviourPenaltiesKey          = "misbehaviour-penalties"
-	GraftMisbehaviourKey              = "graft"
-	PruneMisbehaviourKey              = "prune"
-	IHaveMisbehaviourKey              = "ihave"
-	IWantMisbehaviourKey              = "iwant"
-	PublishMisbehaviourKey            = "publish"
+	GraftKey                          = "graft"
+	PruneKey                          = "prune"
+	IWantKey                          = "iwant"
+	IHaveKey                          = "ihave"
+	PublishKey                        = "publish"
 	ClusterPrefixedReductionFactorKey = "cluster-prefixed-reduction-factor"
 )
 

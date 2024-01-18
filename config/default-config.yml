@@ -180,6 +180,21 @@ network-config:
           tracker-cache-decay: 0.99
           # The upper bound on the amount of cluster prefixed control messages that will be processed
           hard-threshold: 100
+        process:
+          inspection:
+            graft-enabled: true
+            prune-enabled: true
+            ihave-enabled: true
+            iwant-enabled: true
+            publish-enabled: true
+          truncation:
+            graft-enabled: true
+            prune-enabled: true
+            ihave-enabled: true
+            ihave-message-id-enabled: true
+            iwant-enabled: true
+            iwant-message-id-enabled: true
+            publish-enabled: true
     rpc-tracer:
       # The default interval at which the mesh tracer logs the mesh topology. This is used for debugging and forensics purposes.
       #	Note that we purposefully choose this logging interval high enough to avoid spamming the logs. Moreover, the

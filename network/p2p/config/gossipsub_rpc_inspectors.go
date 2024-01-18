@@ -18,15 +18,14 @@ type RpcInspectorParameters struct {
 // RpcValidationInspectorParameters keys.
 const (
 	ClusterPrefixedMessageConfigKey   = "cluster-prefixed-messages"
-	IWantConfigKey                    = "iwant"
-	IHaveConfigKey                    = "ihave"
 	QueueSizeKey                      = "queue-size"
 	GraftPruneMessageMaxSampleSizeKey = "graft-and-prune-message-max-sample-size"
 	MessageMaxSampleSizeKey           = "message-max-sample-size"
 	MessageErrorThresholdKey          = "error-threshold"
+	ProcessKey                        = "process"
 )
 
-// RpcValidationInspector validation limits used for gossipsub RPC control message inspection.
+// RpcValidationInspector rpc control message validation inspector configuration.
 type RpcValidationInspector struct {
 	ClusterPrefixedMessage ClusterPrefixedMessageInspectionParameters `mapstructure:"cluster-prefixed-messages"`
 	IWant                  IWantRPCInspectionParameters               `mapstructure:"iwant"`
@@ -42,6 +41,51 @@ type RpcValidationInspector struct {
 	MessageMaxSampleSize int `validate:"gte=1000" mapstructure:"message-max-sample-size"`
 	// RPCMessageErrorThreshold the threshold at which an error will be returned if the number of invalid RPC messages exceeds this value.
 	MessageErrorThreshold int `validate:"gte=500" mapstructure:"error-threshold"`
+	// InspectionProcess configuration that controls which aspects of rpc inspection are enabled and disabled during inspect message request processing.
+	InspectionProcess InspectionProcess `mapstructure:"process"`
+}
+
+// InspectionProcess configuration that controls which aspects of rpc inspection are enabled and disabled during inspect message request processing.
+type InspectionProcess struct {
+	Inspect  Inspect  `validate:"required" mapstructure:"inspection"`
+	Truncate Truncate `validate:"required" mapstructure:"truncation"`
+}
+
+const (
+	InspectionKey = "inspection"
+	TruncationKey = "truncation"
+	EnabledKey    = "enabled"
+	MessageIDKey  = "message-id"
+)
+
+// Inspect configuration to enable/disable RPC inspection for a particular control message type.
+type Inspect struct {
+	// GraftEnabled enable graft control message inspection.
+	GraftEnabled bool `validate:"required" mapstructure:"graft-enabled"`
+	// PruneEnabled enable prune control message inspection.
+	PruneEnabled bool `validate:"required" mapstructure:"prune-enabled"`
+	// IHaveEnabled enable iHave control message inspection.
+	IHaveEnabled bool `validate:"required" mapstructure:"ihave-enabled"`
+	// IWantEnabled enable iWant control message inspection.
+	IWantEnabled bool `validate:"required" mapstructure:"iwant-enabled"`
+	// PublishEnabled enable publish message inspection.
+	PublishEnabled bool `validate:"required" mapstructure:"publish-enabled"`
+}
+
+// Truncate configuration to enable/disable RPC truncation for a particular control message type.
+type Truncate struct {
+	// GraftEnabled enable graft control message truncation.
+	GraftEnabled bool `validate:"required" mapstructure:"graft-enabled"`
+	// PruneEnabled enable prune control message truncation.
+	PruneEnabled bool `validate:"required" mapstructure:"prune-enabled"`
+	// IHaveEnabled enable iHave control message truncation.
+	IHaveEnabled bool `validate:"required" mapstructure:"ihave-enabled"`
+	// IHaveMessageIdsEnabled enable iHave message id truncation.
+	IHaveMessageIdsEnabled bool `validate:"required" mapstructure:"ihave-message-id-enabled"`
+	// IWantEnabled enable iWant control message truncation.
+	IWantEnabled bool `validate:"required" mapstructure:"iwant-enabled"`
+	// IWantMessageIdsEnabled enable iWant message id truncation.
+	IWantMessageIdsEnabled bool `validate:"required" mapstructure:"iwant-message-id-enabled"`
 }
 
 const (
