@@ -2,6 +2,13 @@ package migrations
 
 import (
 	"fmt"
+	"github.com/onflow/cadence/migrations"
+	"github.com/onflow/cadence/migrations/account_type"
+	"github.com/onflow/cadence/migrations/capcons"
+	"github.com/onflow/cadence/migrations/entitlements"
+	"github.com/onflow/cadence/migrations/string_normalization"
+	"github.com/onflow/cadence/migrations/type_value"
+	"github.com/onflow/flow-go/fvm/environment"
 	"io"
 	"os"
 	"testing"
@@ -79,7 +86,91 @@ func TestCadenceValuesMigration(t *testing.T) {
 	require.NoError(t, err)
 
 	// Assert the migrated payloads
+	rResourceType := checkMigratedPayloads(t, err, address, newPayloads)
 
+	// Check reporters
+	checkReporters(t, valueMigration, address, rResourceType)
+
+	// Check error logs.
+	checkErrorLogs(t, logWriter, true)
+}
+
+func TestCadenceValuesMigrationWithSwappedOrder(t *testing.T) {
+
+	t.Parallel()
+
+	address, err := common.HexToAddress(testAccountAddress)
+	require.NoError(t, err)
+
+	// Get the old payloads
+	payloads, err := util.PayloadsFromEmulatorSnapshot(snapshotPath)
+	require.NoError(t, err)
+
+	// Update contracts to stable cadence.
+	payloads, err = updateContracts(payloads, address)
+	require.NoError(t, err)
+
+	// Migrate
+
+	rwf := &testReportWriterFactory{}
+	capabilityIDs := map[interpreter.AddressPath]interpreter.UInt64Value{}
+
+	// Run link values migration
+	payloads = runLinkMigration(t, address, payloads, capabilityIDs, rwf)
+
+	// Run remaining migrations
+	valueMigration := &CadenceBaseMigrator{
+		reporter: rwf.ReportWriter("cadence-value-migrator"),
+		valueMigrations: func(
+			inter *interpreter.Interpreter,
+			_ environment.Accounts,
+			reporter *cadenceValueMigrationReporter,
+		) []migrations.ValueMigration {
+			// All cadence migrations except the `capcons.LinkValueMigration`.
+			return []migrations.ValueMigration{
+				&capcons.CapabilityValueMigration{
+					CapabilityIDs: capabilityIDs,
+					Reporter:      reporter,
+				},
+				string_normalization.NewStringNormalizingMigration(),
+				account_type.NewAccountTypeMigration(),
+				type_value.NewTypeValueMigration(),
+
+				// Run this at the end
+				entitlements.NewEntitlementsMigration(inter),
+			}
+		},
+	}
+
+	logWriter := &writer{}
+	logger := zerolog.New(logWriter).Level(zerolog.ErrorLevel)
+	err = valueMigration.InitMigration(logger, nil, 0)
+	require.NoError(t, err)
+
+	newPayloads, err := valueMigration.MigrateAccount(nil, address, payloads)
+	require.NoError(t, err)
+
+	err = valueMigration.Close()
+	require.NoError(t, err)
+
+	// Assert the migrated payloads
+	rResourceType := checkMigratedPayloads(t, err, address, newPayloads)
+
+	// Check reporters
+	checkReporters(t, valueMigration, address, rResourceType)
+
+	// Check error logs.
+	// Given entitlement migration was run at the end,
+	// we shouldn't get the deprecated-type errors
+	checkErrorLogs(t, logWriter, false)
+}
+
+func checkMigratedPayloads(
+	t *testing.T,
+	err error,
+	address common.Address,
+	newPayloads []*ledger.Payload,
+) *interpreter.CompositeStaticType {
 	mr, err := newMigratorRuntime(address, newPayloads)
 	require.NoError(t, err)
 
@@ -309,9 +400,50 @@ func TestCadenceValuesMigration(t *testing.T) {
 	if len(expectedValues) != 0 {
 		assert.Fail(t, fmt.Sprintf("%d extra item(s) in expected values", len(expectedValues)))
 	}
+	return rResourceType
+}
 
-	// Check reporters
+func checkErrorLogs(t *testing.T, logWriter *writer, expectDeprecatedTypesErrors bool) {
+	if expectDeprecatedTypesErrors {
+		require.Len(t, logWriter.logs, 8)
+	} else {
+		require.Len(t, logWriter.logs, 1)
+	}
 
+	// Error due to un-migrated contract.
+	assert.Contains(
+		t,
+		logWriter.logs[0],
+		fmt.Sprintf(
+			"failed to run EntitlementsMigration for path {%s /storage/flowTokenVault}",
+			testAccountAddress,
+		),
+	)
+
+	if expectDeprecatedTypesErrors {
+		return
+	}
+
+	// Error due to deprecated types.
+	for _, line := range logWriter.logs[1:] {
+		assert.Contains(
+			t,
+			line,
+			fmt.Sprintf(
+				"failed to run EntitlementsMigration for path {%s /storage/dictionary_with_account_type_keys}:"+
+					" internal error: cannot convert deprecated type",
+				testAccountAddress,
+			),
+		)
+	}
+}
+
+func checkReporters(
+	t *testing.T,
+	valueMigration *CadenceBaseMigrator,
+	address common.Address,
+	rResourceType *interpreter.CompositeStaticType,
+) {
 	reportWriter := valueMigration.reporter.(*testReportWriter)
 
 	reportEntry := func(migration, key string, domain common.PathDomain) cadenceValueMigrationReportEntry {
@@ -389,32 +521,6 @@ func TestCadenceValuesMigration(t *testing.T) {
 			reportEntry("StringNormalizingMigration", "dictionary_with_reference_typed_key", common.PathDomainStorage),
 		},
 	)
-
-	// Check error logs.
-	require.Len(t, logWriter.logs, 8)
-
-	// Error due to un-migrated contract.
-	assert.Contains(
-		t,
-		logWriter.logs[0],
-		fmt.Sprintf(
-			"failed to run EntitlementsMigration for path {%s /storage/flowTokenVault}",
-			testAccountAddress,
-		),
-	)
-
-	// Error due to deprecated types.
-	for _, line := range logWriter.logs[1:] {
-		assert.Contains(
-			t,
-			line,
-			fmt.Sprintf(
-				"failed to run EntitlementsMigration for path {%s /storage/dictionary_with_account_type_keys}:"+
-					" internal error: cannot convert deprecated type",
-				testAccountAddress,
-			),
-		)
-	}
 }
 
 func updateContracts(payloads []*ledger.Payload, address common.Address) ([]*ledger.Payload, error) {
