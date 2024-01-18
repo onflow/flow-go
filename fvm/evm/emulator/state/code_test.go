@@ -21,7 +21,7 @@ func TestCodeContainer(t *testing.T) {
 	require.Equal(t, uint64(2), cc.RefCount())
 
 	// test encoding
-	encoded := cc.Encoded()
+	encoded := cc.Encode()
 	cc, err := state.CodeContainerFromEncoded(encoded)
 	require.NoError(t, err)
 	require.Equal(t, uint64(2), cc.RefCount())

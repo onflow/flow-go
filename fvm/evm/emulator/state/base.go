@@ -486,7 +486,7 @@ func (v *BaseView) removeCode(codeHash gethCommon.Hash) error {
 	if cc.DecRefCount() {
 		return v.codes.Remove(codeHash.Bytes())
 	}
-	return v.codes.Set(codeHash.Bytes(), cc.Encoded())
+	return v.codes.Set(codeHash.Bytes(), cc.Encode())
 }
 
 func (v *BaseView) addCode(code []byte, codeHash gethCommon.Hash) error {
@@ -496,7 +496,7 @@ func (v *BaseView) addCode(code []byte, codeHash gethCommon.Hash) error {
 	}
 	// if is the first time the code is getting deployed
 	if len(encoded) == 0 {
-		return v.codes.Set(codeHash.Bytes(), NewCodeContainer(code).Encoded())
+		return v.codes.Set(codeHash.Bytes(), NewCodeContainer(code).Encode())
 	}
 
 	// otherwise update the cc
@@ -505,7 +505,7 @@ func (v *BaseView) addCode(code []byte, codeHash gethCommon.Hash) error {
 		return err
 	}
 	cc.IncRefCount()
-	return v.codes.Set(codeHash.Bytes(), cc.Encoded())
+	return v.codes.Set(codeHash.Bytes(), cc.Encode())
 }
 
 func (v *BaseView) getSlot(sk types.SlotAddress) (gethCommon.Hash, error) {
