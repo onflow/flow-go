@@ -6,12 +6,22 @@ const (
 	SpamRecordCacheKey          = "spam-record-cache"
 	ScoringRegistryKey          = "scoring-registry"
 	AppSpecificScoreRegistryKey = "app-specific-score"
+	StartupSilenceDurationKey   = "startup-silence-duration"
 )
 
 type ScoringRegistryParameters struct {
-	AppSpecificScore      AppSpecificScoreParameters `validate:"required" mapstructure:"app-specific-score"`
-	SpamRecordCache       SpamRecordCacheParameters  `validate:"required" mapstructure:"spam-record-cache"`
-	MisbehaviourPenalties MisbehaviourPenalties      `validate:"required" mapstructure:"misbehaviour-penalties"`
+	// StartupSilenceDuration defines the duration of time, after the node startup,
+	// during which the scoring registry remains inactive before penalizing nodes.
+	// Throughout this startup silence period, the application-specific penalty
+	// for all nodes will be set to 0, and any invalid control message notifications
+	// will be ignored.
+	//
+	// This configuration allows nodes to stabilize and initialize before
+	// applying penalties or responding processing invalid control message notifications.
+	StartupSilenceDuration time.Duration              `validate:"gt=10m" mapstructure:"startup-silence-duration"`
+	AppSpecificScore       AppSpecificScoreParameters `validate:"required" mapstructure:"app-specific-score"`
+	SpamRecordCache        SpamRecordCacheParameters  `validate:"required" mapstructure:"spam-record-cache"`
+	MisbehaviourPenalties  MisbehaviourPenalties      `validate:"required" mapstructure:"misbehaviour-penalties"`
 }
 
 const (
