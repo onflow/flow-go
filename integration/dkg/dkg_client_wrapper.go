@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/onflow/crypto"
 	"go.uber.org/atomic"
 
 	sdk "github.com/onflow/flow-go-sdk"
 
-	"github.com/onflow/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	model "github.com/onflow/flow-go/model/messages"

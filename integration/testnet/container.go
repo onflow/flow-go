@@ -13,6 +13,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
+	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -21,7 +22,6 @@ import (
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkclient "github.com/onflow/flow-go-sdk/access/grpc"
 
-	"github.com/onflow/crypto"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	ghostclient "github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/integration/client"

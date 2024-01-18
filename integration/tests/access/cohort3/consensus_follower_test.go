@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/crypto"
+
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	consensus_follower "github.com/onflow/flow-go/follower"
