@@ -197,7 +197,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 				eoa := testutils.GetTestEOAAccount(t, testutils.EOATestAccount1KeyHex)
 
 				// deposit 1 Flow to the foa account
-				addr := handler.AllocateAddress()
+				addr := handler.DeployACOAAccount()
 				orgBalance, err := types.NewBalanceFromAttoFlow(types.OneFlowInAttoFlow)
 				require.NoError(t, err)
 				vault := types.NewFlowTokenVault(orgBalance)
@@ -224,7 +224,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 				)
 
 				// setup coinbase
-				foa2 := handler.AllocateAddress()
+				foa2 := handler.DeployACOAAccount()
 				account2 := handler.AccountByAddress(foa2, true)
 				require.Equal(t, types.Balance(0), account2.Balance())
 
@@ -268,24 +268,21 @@ func TestHandler_OpsWithoutEmulator(t *testing.T) {
 		})
 	})
 
-	t.Run("test address allocation", func(t *testing.T) {
+	t.Run("test coa deployment", func(t *testing.T) {
 		t.Parallel()
 
 		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
-				blockchain, err := handler.NewBlockStore(backend, rootAddr)
-				require.NoError(t, err)
+				h := SetupHandler(t, backend, rootAddr)
 
-				aa, err := handler.NewAddressAllocator(backend, rootAddr)
-				require.NoError(t, err)
-
-				handler := handler.NewContractHandler(flowTokenAddress, blockchain, aa, backend, nil)
-
-				foa := handler.AllocateAddress()
-				require.NotNil(t, foa)
+				coa := h.DeployACOAAccount()
+				require.NotNil(t, coa)
 
 				expectedAddress := types.NewAddress(gethCommon.HexToAddress("0x00000000000000000001"))
-				require.Equal(t, expectedAddress, foa)
+				require.Equal(t, expectedAddress, coa)
+
+				acc := h.AccountByAddress(coa, true)
+				require.Equal(t, handler.COAContractBytes, acc.Code())
 			})
 		})
 	})
@@ -300,7 +297,7 @@ func TestHandler_BridgedAccount(t *testing.T) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				handler := SetupHandler(t, backend, rootAddr)
 
-				foa := handler.AccountByAddress(handler.AllocateAddress(), true)
+				foa := handler.AccountByAddress(handler.DeployACOAAccount(), true)
 				require.NotNil(t, foa)
 
 				zeroBalance, err := types.NewBalanceFromAttoFlow(big.NewInt(0))
@@ -474,7 +471,7 @@ func TestHandler_BridgedAccount(t *testing.T) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				handler := SetupHandler(t, backend, rootAddr)
 
-				foa := handler.AccountByAddress(handler.AllocateAddress(), true)
+				foa := handler.AccountByAddress(handler.DeployACOAAccount(), true)
 				require.NotNil(t, foa)
 
 				// deposit 10000 flow

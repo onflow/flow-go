@@ -1146,7 +1146,7 @@ func newInternalEVMTypeCreateBridgedAccountFunction(
 		internalEVMTypeCreateBridgedAccountFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
 			inter := invocation.Interpreter
-			address := handler.AllocateAddress()
+			address := handler.DeployACOAAccount()
 			return EVMAddressToAddressBytesArrayValue(inter, address)
 		},
 	)

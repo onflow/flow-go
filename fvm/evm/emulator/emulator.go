@@ -72,14 +72,19 @@ func (bv *ReadOnlyBlockView) BalanceOf(address types.Address) (*big.Int, error) 
 	return bv.state.GetBalance(address.ToCommon()), nil
 }
 
+// NonceOf returns the nonce of the given address
+func (bv *ReadOnlyBlockView) NonceOf(address types.Address) (uint64, error) {
+	return bv.state.GetNonce(address.ToCommon()), nil
+}
+
 // CodeOf returns the code of the given address
 func (bv *ReadOnlyBlockView) CodeOf(address types.Address) (types.Code, error) {
 	return bv.state.GetCode(address.ToCommon()), nil
 }
 
-// NonceOf returns the nonce of the given address
-func (bv *ReadOnlyBlockView) NonceOf(address types.Address) (uint64, error) {
-	return bv.state.GetNonce(address.ToCommon()), nil
+// CodeHashOf returns the code hash of the given address
+func (bv *ReadOnlyBlockView) CodeHashOf(address types.Address) ([]byte, error) {
+	return bv.state.GetCodeHash(address.ToCommon()).Bytes(), nil
 }
 
 // BlockView allows mutation of the evm state as part of a block

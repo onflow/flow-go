@@ -24,8 +24,8 @@ import (
 
 // ContractHandler handles operations on the evm environment
 type ContractHandler interface {
-	// AllocateAddress allocates an address to be used by a bridged account resource
-	AllocateAddress() Address
+	// Deploys a cadence-owned-account
+	DeployACOAAccount() Address
 
 	// AccountByAddress returns an account by address
 	// if isAuthorized is set, it allows for functionality like `call`, `deploy`

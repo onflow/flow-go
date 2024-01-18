@@ -15,8 +15,14 @@ type Account interface {
 	// Returns the address of this account
 	Address() Address
 
-	// Returns balance of this account
+	// Returns the balance of this account
 	Balance() Balance
+
+	// Returns the code of this account
+	Code() Code
+
+	// Returns the code hash of this account
+	CodeHash() []byte
 
 	// Deposit deposits the token from the given vault into this account
 	Deposit(*FLOWTokenVault)
