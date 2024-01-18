@@ -229,10 +229,11 @@ func TestOnForksWithSameCollections(t *testing.T) {
 	require.Empty(t, executables)
 	requireCollectionHas(t, missing)
 
-	// verify only E is executable, because F's parent is not executed yet.
-	executables, err = q.OnCollection(c1)
+	// verify only C is executable, because C's parent (B) has been executed,
+	// E is not executable, because E's parent (D) is not executed yet.
+	executables, err = q.OnCollection(c3)
 	require.NoError(t, err)
-	requireExecutableHas(t, executables, blockE)
+	requireExecutableHas(t, executables, blockC)
 }
 
 /* ==== Test utils ==== */
@@ -315,7 +316,7 @@ func makeChainABCDE() (GetBlock, GetCollection, GetCommit) {
 	cs := unittest.CollectionListFixture(3)
 	c1, c2, c3 := cs[0], cs[1], cs[2]
 	getCol := func(name int) *flow.Collection {
-		if name < 1 || name >= len(cs) {
+		if name < 1 || name > len(cs) {
 			return nil
 		}
 		return cs[name-1]
