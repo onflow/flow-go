@@ -171,10 +171,10 @@ func TestOnForksWithSameCollections(t *testing.T) {
 	// Given a chain
 	// R() <- A() <- B(C1, C2) <- C(C3)
 	// -      ^----- D(C1, C2) <- E(C3)
-	// TODO: add A <- F(C1, C2, C3)
-	block, coll, commitFor := makeChainABCDE()
-	blockA, blockB, blockC, blockD, blockE :=
-		block("A"), block("B"), block("C"), block("D"), block("E")
+	// -      ^----- F(C1, C2, C3)
+	block, coll, commitFor := makeChainABCDEF()
+	blockA, blockB, blockC, blockD, blockE, blockF :=
+		block("A"), block("B"), block("C"), block("D"), block("E"), block("F")
 	c1, c2, c3 := coll(1), coll(2), coll(3)
 
 	q := NewBlockQueue()
@@ -189,6 +189,12 @@ func TestOnForksWithSameCollections(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, executables)
 	requireCollectionHas(t, missing, c1, c2)
+
+	// receiving block F (C1, C2, C3)
+	missing, executables, err = q.OnBlock(blockF, nil)
+	require.NoError(t, err)
+	require.Empty(t, executables)
+	requireCollectionHas(t, missing, c3) // c1 and c2 are requested before, only c3 is missing
 
 	// verify receiving D will not return any missing collections because
 	// missing collections were returned when receiving B
@@ -215,25 +221,45 @@ func TestOnForksWithSameCollections(t *testing.T) {
 	// but only one block (C) whose parent (B) is executed, then only that block (C) becomes executable
 	// the other block (E) is not executable
 
-	executables, err = q.OnBlockExecuted(blockB.ID(), *commitFor("B"))
-	require.NoError(t, err)
-	requireExecutableHas(t, executables)
-
-	missing, executables, err = q.OnBlock(blockC, commitFor("B"))
+	missing, executables, err = q.OnBlock(blockC, nil)
 	require.NoError(t, err)
 	require.Empty(t, executables)
-	requireCollectionHas(t, missing, c3)
+	requireCollectionHas(t, missing) // because C3 is requested when F is received
 
 	missing, executables, err = q.OnBlock(blockE, nil)
 	require.NoError(t, err)
 	require.Empty(t, executables)
 	requireCollectionHas(t, missing)
 
-	// verify only C is executable, because C's parent (B) has been executed,
+	executables, err = q.OnBlockExecuted(blockB.ID(), *commitFor("B"))
+	require.NoError(t, err)
+	requireExecutableHas(t, executables)
+
+	// verify C and F are executable, because their parent have been executed
 	// E is not executable, because E's parent (D) is not executed yet.
 	executables, err = q.OnCollection(c3)
 	require.NoError(t, err)
-	requireExecutableHas(t, executables, blockC)
+	requireExecutableHas(t, executables, blockC, blockF)
+
+	// verify when D is executed, E becomes executable
+	executables, err = q.OnBlockExecuted(blockD.ID(), *commitFor("D"))
+	require.NoError(t, err)
+	requireExecutableHas(t, executables, blockE)
+
+	// verify the remaining blocks (C,E,F) are executed, the queue is empty
+	executables, err = q.OnBlockExecuted(blockE.ID(), *commitFor("E"))
+	require.NoError(t, err)
+	requireExecutableHas(t, executables)
+
+	executables, err = q.OnBlockExecuted(blockF.ID(), *commitFor("F"))
+	require.NoError(t, err)
+	requireExecutableHas(t, executables)
+
+	executables, err = q.OnBlockExecuted(blockC.ID(), *commitFor("C"))
+	require.NoError(t, err)
+	requireExecutableHas(t, executables)
+
+	requireQueueIsEmpty(t, q)
 }
 
 /* ==== Test utils ==== */
@@ -312,7 +338,8 @@ func makeChainABCDEFG() (GetBlock, GetCollection, GetCommit) {
 
 // R() <- A() <- B(C1, C2) <- C(C3)
 // -      ^----- D(C1, C2) <- E(C3)
-func makeChainABCDE() (GetBlock, GetCollection, GetCommit) {
+// -      ^----- F(C1, C2, C3)
+func makeChainABCDEF() (GetBlock, GetCollection, GetCommit) {
 	cs := unittest.CollectionListFixture(3)
 	c1, c2, c3 := cs[0], cs[1], cs[2]
 	getCol := func(name int) *flow.Collection {
@@ -336,6 +363,11 @@ func makeChainABCDE() (GetBlock, GetCollection, GetCommit) {
 	unittest.AddCollectionsToBlock(blockE, []*flow.Collection{c3})
 	unittest.RechainBlocks(bs)
 
+	bs = unittest.ChainBlockFixtureWithRoot(blockA.Header, 1)
+	blockF := bs[0]
+	unittest.AddCollectionsToBlock(blockF, []*flow.Collection{c1, c2, c3})
+	unittest.RechainBlocks(bs)
+
 	blockLookup := map[string]*flow.Block{
 		"R": blockR,
 		"A": blockA,
@@ -343,6 +375,7 @@ func makeChainABCDE() (GetBlock, GetCollection, GetCommit) {
 		"C": blockC,
 		"D": blockD,
 		"E": blockE,
+		"F": blockF,
 	}
 
 	getBlock := func(name string) *flow.Block {
