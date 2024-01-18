@@ -285,6 +285,26 @@ func TestContractInteraction(t *testing.T) {
 					require.True(t, types.IsEVMValidationError(err))
 				})
 			})
+		})
+	})
+}
+
+func TestDeployAtFunctionality(t *testing.T) {
+	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+			testContract := testutils.GetStorageTestContract(t)
+			testAccount := types.NewAddressFromString("test")
+			amount := big.NewInt(0).Mul(big.NewInt(1337), big.NewInt(gethParams.Ether))
+			amountToBeTransfered := big.NewInt(0).Mul(big.NewInt(100), big.NewInt(gethParams.Ether))
+
+			// fund test account
+			RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
+				RunWithNewBlockView(t, env, func(blk types.BlockView) {
+					_, err := blk.DirectCall(types.NewDepositCall(testAccount, amount))
+					require.NoError(t, err)
+				})
+			})
+
 			t.Run("deploy contract at target address", func(t *testing.T) {
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
 					target := types.Address{1, 2, 3}
@@ -314,9 +334,32 @@ func TestContractInteraction(t *testing.T) {
 						require.NoError(t, err)
 						require.Equal(t, amount.Sub(amount, amountToBeTransfered), retBalance)
 					})
+					// test deployment to an address that is already exist
+					RunWithNewBlockView(t, env, func(blk types.BlockView) {
+						_, err := blk.DirectCall(
+							types.NewDeployCallWithTargetAddress(
+								testAccount,
+								target,
+								testContract.ByteCode,
+								math.MaxUint64,
+								amountToBeTransfered),
+						)
+						require.Error(t, err)
+					})
+					// test deployment with not enough gas
+					RunWithNewBlockView(t, env, func(blk types.BlockView) {
+						_, err := blk.DirectCall(
+							types.NewDeployCallWithTargetAddress(
+								testAccount,
+								types.Address{3, 4, 5},
+								testContract.ByteCode,
+								100,
+								new(big.Int)),
+						)
+						require.Error(t, err)
+					})
 				})
 			})
-
 		})
 	})
 }

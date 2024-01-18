@@ -233,7 +233,9 @@ func (proc *procedure) withdrawFrom(address types.Address, amount *big.Int) (*ty
 
 // deployAt deploys a contract at the given target address
 // behaviour should be similar to what evm.create internal method does with
-// less checks on the configs (no call to this is possible on the old forks).
+// a few diffrences, don't need to check for previous forks given this
+// functionality was not available to anyone, we don't need to
+// follow snapshoting, given we do commit/revert style in this code base.
 func (proc *procedure) deployAt(
 	caller types.Address,
 	to types.Address,
@@ -247,13 +249,15 @@ func (proc *procedure) deployAt(
 	addr := to.ToCommon()
 
 	// precheck 1 - check balance of the source
-	if value.Sign() != 0 && !proc.evm.Context.CanTransfer(proc.state, caller.ToCommon(), value) {
+	if value.Sign() != 0 &&
+		!proc.evm.Context.CanTransfer(proc.state, caller.ToCommon(), value) {
 		return res, gethVM.ErrInsufficientBalance
 	}
 
 	// precheck 2 - ensure there's no existing contract is deployed at the address
 	contractHash := proc.state.GetCodeHash(addr)
-	if proc.state.GetNonce(addr) != 0 || (contractHash != (gethCommon.Hash{}) && contractHash != gethTypes.EmptyCodeHash) {
+	if proc.state.GetNonce(addr) != 0 ||
+		(contractHash != (gethCommon.Hash{}) && contractHash != gethTypes.EmptyCodeHash) {
 		return res, gethVM.ErrContractAddressCollision
 	}
 
@@ -271,7 +275,11 @@ func (proc *procedure) deployAt(
 	// this would check for errors and computes the final bytes to be stored under account
 	var err error
 	inter := gethVM.NewEVMInterpreter(proc.evm)
-	contract := gethVM.NewContract(gethVM.AccountRef(caller.ToCommon()), gethVM.AccountRef(addr), value, gasLimit)
+	contract := gethVM.NewContract(
+		gethVM.AccountRef(caller.ToCommon()),
+		gethVM.AccountRef(addr),
+		value,
+		gasLimit)
 	contract.Code = data
 	contract.CodeHash = gethCrypto.Keccak256Hash(data)
 	contract.CodeAddr = &addr
