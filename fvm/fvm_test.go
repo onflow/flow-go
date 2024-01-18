@@ -8,27 +8,29 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/onflow/flow-go/fvm/evm/stdlib"
-
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
+	cadenceErrors "github.com/onflow/cadence/runtime/errors"
 	"github.com/onflow/cadence/runtime/tests/utils"
+	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
-
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	exeUtils "github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
 	fvmCrypto "github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/environment"
-	errors "github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/evm/stdlib"
+	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/meter"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/fvm/storage/snapshot/mock"
 	"github.com/onflow/flow-go/fvm/storage/testutils"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
@@ -2955,12 +2957,10 @@ func TestTransientNetworkCoreContractAddresses(t *testing.T) {
 }
 
 func TestEVM(t *testing.T) {
-
 	t.Run("successful transaction", newVMTest().
 		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
-		// we keep this dissabled during bootstrap and later overwrite in the test for test transaction
 		withContextOptions(
-			fvm.WithEVMEnabled(false),
+			fvm.WithEVMEnabled(true),
 			fvm.WithCadenceLogging(true),
 		).
 		run(func(
@@ -2997,7 +2997,6 @@ func TestEVM(t *testing.T) {
 			err = testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
 
-			ctx = fvm.NewContextFromParent(ctx, fvm.WithEVMEnabled(true))
 			_, output, err := vm.Run(
 				ctx,
 				fvm.Transaction(txBody, 0),
@@ -3011,6 +3010,96 @@ func TestEVM(t *testing.T) {
 				chain.ServiceAddress(),
 				addrBytes.String(),
 			))
+		}),
+	)
+
+	// this test makes sure the execution error is correctly handled and returned as a correct type
+	t.Run("execution reverted", newVMTest().
+		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
+		withContextOptions(fvm.WithEVMEnabled(true)).
+		run(func(
+			t *testing.T,
+			vm fvm.VM,
+			chain flow.Chain,
+			ctx fvm.Context,
+			snapshotTree snapshot.SnapshotTree,
+		) {
+			script := fvm.Script([]byte(fmt.Sprintf(`
+				import EVM from %s
+				
+				pub fun main() {
+					let bal = EVM.Balance(flow: 1.0);
+					let acc <- EVM.createBridgedAccount();
+					// withdraw insufficient balance
+					destroy acc.withdraw(balance: bal);
+					destroy acc;
+				}
+			`, chain.ServiceAddress().HexWithPrefix())))
+
+			_, output, err := vm.Run(ctx, script, snapshotTree)
+
+			require.NoError(t, err)
+			require.Error(t, output.Err)
+			require.True(t, errors.IsEVMError(output.Err))
+
+			// make sure error is not treated as internal error by Cadence
+			var internal cadenceErrors.InternalError
+			require.False(t, errors.As(output.Err, &internal))
+		}),
+	)
+
+	// this test makes sure the EVM error is correctly returned as an error and has a correct type
+	// we have implemented a snapshot wrapper to return an error from the EVM
+	t.Run("internal evm error handling", newVMTest().
+		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
+		withContextOptions(fvm.WithEVMEnabled(true)).
+		run(func(
+			t *testing.T,
+			vm fvm.VM,
+			chain flow.Chain,
+			ctx fvm.Context,
+			snapshotTree snapshot.SnapshotTree,
+		) {
+
+			tests := []struct {
+				err        error
+				errChecker func(error) bool
+			}{{
+				types.ErrNotImplemented,
+				types.IsAFatalError,
+			}, {
+				types.NewStateError(fmt.Errorf("test state error")),
+				types.IsAStateError,
+			}}
+
+			for _, e := range tests {
+				// this mock will return an error we provide with the test once it starts to access address allocator registers
+				// that is done to make sure the error is coming out of EVM execution
+				errStorage := &mock.StorageSnapshot{}
+				errStorage.
+					On("Get", mockery.AnythingOfType("flow.RegisterID")).
+					Return(func(id flow.RegisterID) (flow.RegisterValue, error) {
+						if id.Key == "AddressAllocator" {
+							return nil, e.err
+						}
+						return snapshotTree.Get(id)
+					})
+
+				script := fvm.Script([]byte(fmt.Sprintf(`
+					import EVM from %s
+					
+					pub fun main() {
+						destroy <- EVM.createBridgedAccount();
+					}
+				`, chain.ServiceAddress().HexWithPrefix())))
+
+				_, output, err := vm.Run(ctx, script, errStorage)
+
+				require.NoError(t, output.Err)
+				require.Error(t, err)
+				// make sure error it's the right type of error
+				require.True(t, e.errChecker(err), "error is not of the right type")
+			}
 		}),
 	)
 }
