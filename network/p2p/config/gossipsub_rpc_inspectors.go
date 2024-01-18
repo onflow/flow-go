@@ -55,11 +55,14 @@ const (
 	InspectionKey = "inspection"
 	TruncationKey = "truncation"
 	EnabledKey    = "enabled"
+	DisabledKey   = "disabled"
 	MessageIDKey  = "message-id"
 )
 
 // Inspect configuration to enable/disable RPC inspection for a particular control message type.
 type Inspect struct {
+	// Disabled disables rpc inspection entirely.
+	Disabled bool `mapstructure:"disabled"`
 	// GraftEnabled enable graft control message inspection.
 	GraftEnabled bool `validate:"required" mapstructure:"graft-enabled"`
 	// PruneEnabled enable prune control message inspection.

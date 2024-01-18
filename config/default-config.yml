@@ -182,19 +182,31 @@ network-config:
           hard-threshold: 100
         process:
           inspection:
+            # Disables rpc inspection entirely.
+            disabled: false
+            # Enables graft control message inspection.
             graft-enabled: true
+            # Enables prune control message inspection.
             prune-enabled: true
+            # Enables ihave control message inspection.
             ihave-enabled: true
+            # Enables iwant control message inspection.
             iwant-enabled: true
+            # Enables publish message inspection.
             publish-enabled: true
           truncation:
+            # Enables graft control message truncation.
             graft-enabled: true
+            # Enables prune control message truncation.
             prune-enabled: true
+            # Enables ihave control message truncation.
             ihave-enabled: true
+            # Enables ihave message id truncation.
             ihave-message-id-enabled: true
+            # Enables iwant control message truncation.
             iwant-enabled: true
+            # Enables iwant message id truncation.
             iwant-message-id-enabled: true
-            publish-enabled: true
     rpc-tracer:
       # The default interval at which the mesh tracer logs the mesh topology. This is used for debugging and forensics purposes.
       #	Note that we purposefully choose this logging interval high enough to avoid spamming the logs. Moreover, the
