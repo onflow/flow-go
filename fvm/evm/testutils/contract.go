@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	gethABI "github.com/ethereum/go-ethereum/accounts/abi"
-	gethCommon "github.com/ethereum/go-ethereum/common"
+	gethABI "github.com/onflow/go-ethereum/accounts/abi"
+	gethCommon "github.com/onflow/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/atree"

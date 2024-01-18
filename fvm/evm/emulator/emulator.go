@@ -3,11 +3,11 @@ package emulator
 import (
 	"math/big"
 
-	gethCommon "github.com/ethereum/go-ethereum/common"
-	gethCore "github.com/ethereum/go-ethereum/core"
-	gethTypes "github.com/ethereum/go-ethereum/core/types"
-	gethVM "github.com/ethereum/go-ethereum/core/vm"
-	gethCrypto "github.com/ethereum/go-ethereum/crypto"
+	gethCommon "github.com/onflow/go-ethereum/common"
+	gethCore "github.com/onflow/go-ethereum/core"
+	gethTypes "github.com/onflow/go-ethereum/core/types"
+	gethVM "github.com/onflow/go-ethereum/core/vm"
+	gethCrypto "github.com/onflow/go-ethereum/crypto"
 	"github.com/onflow/atree"
 
 	"github.com/onflow/flow-go/fvm/evm/emulator/state"

@@ -3,7 +3,7 @@ package types
 import (
 	"math/big"
 
-	gethTypes "github.com/ethereum/go-ethereum/core/types"
+	gethTypes "github.com/onflow/go-ethereum/core/types"
 )
 
 var (

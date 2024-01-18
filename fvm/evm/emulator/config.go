@@ -4,11 +4,11 @@ import (
 	"math"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/vm"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/params"
+	"github.com/onflow/go-ethereum/common"
+	"github.com/onflow/go-ethereum/core"
+	"github.com/onflow/go-ethereum/core/vm"
+	"github.com/onflow/go-ethereum/crypto"
+	"github.com/onflow/go-ethereum/params"
 )
 
 var (
