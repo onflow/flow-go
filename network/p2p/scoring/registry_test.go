@@ -165,6 +165,7 @@ func testScoreRegistryPeerWithSpamRecord(t *testing.T, messageType p2pmsg.Contro
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: messageType,
+		Errors:  p2p.InvCtrlMsgErrs{p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid graft"), p2p.CtrlMsgNonClusterTopicType)},
 	})
 
 	// the penalty should now be updated in the spamRecords
@@ -264,13 +265,12 @@ func testScoreRegistrySpamRecordWithUnknownIdentity(t *testing.T, messageType p2
 		return scoreOptParameters.UnknownIdentityPenalty == score
 	}, 5*time.Second, 100*time.Millisecond)
 
-	// queryTime := time.Now()
 	// report a misbehavior for the peer id.
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: messageType,
+		Errors:  p2p.InvCtrlMsgErrs{p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid graft"), p2p.CtrlMsgNonClusterTopicType)},
 	})
-
 	// the penalty should now be updated.
 	record, err, ok := spamRecords.Get(peerID) // get the record from the spamRecords.
 	require.True(t, ok)
@@ -376,8 +376,8 @@ func testScoreRegistrySpamRecordWithSubscriptionPenalty(t *testing.T, messageTyp
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: messageType,
+		Errors:  p2p.InvCtrlMsgErrs{p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid graft"), p2p.CtrlMsgNonClusterTopicType)},
 	})
-
 	// the penalty should now be updated.
 	record, err, ok := spamRecords.Get(peerID) // get the record from the spamRecords.
 	assert.True(t, ok)
@@ -420,6 +420,7 @@ func TestScoreRegistry_SpamPenaltyDecaysInCache(t *testing.T) {
 		scoring.InitAppScoreRecordStateFunc(cfg.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.SpamRecordCache.Decay.MaximumSpamPenaltyDecayFactor),
 		withStakedIdentities(peerID),
 		withValidSubscriptions(peerID))
+
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 	reg.Start(signalerCtx)
@@ -431,6 +432,7 @@ func TestScoreRegistry_SpamPenaltyDecaysInCache(t *testing.T) {
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: p2pmsg.CtrlMsgPrune,
+		Errors:  p2p.InvCtrlMsgErrs{p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid graft"), p2p.CtrlMsgNonClusterTopicType)},
 	})
 
 	time.Sleep(1 * time.Second) // wait for the penalty to decay.
@@ -438,6 +440,7 @@ func TestScoreRegistry_SpamPenaltyDecaysInCache(t *testing.T) {
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: p2pmsg.CtrlMsgGraft,
+		Errors:  p2p.InvCtrlMsgErrs{p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid graft"), p2p.CtrlMsgNonClusterTopicType)},
 	})
 
 	time.Sleep(1 * time.Second) // wait for the penalty to decay.
@@ -445,6 +448,7 @@ func TestScoreRegistry_SpamPenaltyDecaysInCache(t *testing.T) {
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: p2pmsg.CtrlMsgIHave,
+		Errors:  p2p.InvCtrlMsgErrs{p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid graft"), p2p.CtrlMsgNonClusterTopicType)},
 	})
 
 	time.Sleep(1 * time.Second) // wait for the penalty to decay.
@@ -452,6 +456,7 @@ func TestScoreRegistry_SpamPenaltyDecaysInCache(t *testing.T) {
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: p2pmsg.CtrlMsgIWant,
+		Errors:  p2p.InvCtrlMsgErrs{p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid graft"), p2p.CtrlMsgNonClusterTopicType)},
 	})
 
 	time.Sleep(1 * time.Second) // wait for the penalty to decay.
@@ -459,6 +464,7 @@ func TestScoreRegistry_SpamPenaltyDecaysInCache(t *testing.T) {
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: p2pmsg.RpcPublishMessage,
+		Errors:  p2p.InvCtrlMsgErrs{p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid graft"), p2p.CtrlMsgNonClusterTopicType)},
 	})
 
 	time.Sleep(1 * time.Second) // wait for the penalty to decay.
@@ -523,6 +529,7 @@ func TestScoreRegistry_SpamPenaltyDecayToZero(t *testing.T) {
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: p2pmsg.CtrlMsgGraft,
+		Errors:  p2p.InvCtrlMsgErrs{p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid graft"), p2p.CtrlMsgNonClusterTopicType)},
 	})
 
 	// decays happen every second, so we wait for 1 second to make sure the penalty is updated.
@@ -597,6 +604,7 @@ func TestScoreRegistry_PersistingUnknownIdentityPenalty(t *testing.T) {
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: p2pmsg.CtrlMsgGraft,
+		Errors:  p2p.InvCtrlMsgErrs{p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid graft"), p2p.CtrlMsgNonClusterTopicType)},
 	})
 
 	// decays happen every second, so we wait for 1 second to make sure the penalty is updated.
@@ -672,8 +680,8 @@ func TestScoreRegistry_PersistingInvalidSubscriptionPenalty(t *testing.T) {
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: p2pmsg.CtrlMsgGraft,
+		Errors:  p2p.InvCtrlMsgErrs{p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid graft"), p2p.CtrlMsgNonClusterTopicType)},
 	})
-
 	// with reported spam, the app specific score should be the default invalid subscription penalty + the spam penalty.
 	require.Eventually(t, func() bool {
 		score := reg.AppSpecificScoreFunc()(peerID)
@@ -747,9 +755,15 @@ func TestScoreRegistry_TestSpamRecordDecayAdjustment(t *testing.T) {
 	prevDecay := scoringRegistryParameters.SpamRecordCache.Decay.MaximumSpamPenaltyDecayFactor
 	tolerance := 0.1
 	require.Eventually(t, func() bool {
+		errCount := 500
+		errs := make(p2p.InvCtrlMsgErrs, errCount)
+		for i := 0; i < errCount; i++ {
+			errs[i] = p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid prune"), p2p.CtrlMsgNonClusterTopicType)
+		}
 		reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 			PeerID:  peer1,
 			MsgType: p2pmsg.CtrlMsgPrune,
+			Errors:  errs,
 		})
 		record, err, ok := spamRecords.Get(peer1)
 		require.NoError(t, err)
@@ -763,6 +777,7 @@ func TestScoreRegistry_TestSpamRecordDecayAdjustment(t *testing.T) {
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peer2,
 		MsgType: p2pmsg.CtrlMsgPrune,
+		Errors:  p2p.InvCtrlMsgErrs{p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid prune"), p2p.CtrlMsgNonClusterTopicType)},
 	})
 	// reduce penalty and increase Decay to scoring.MinimumSpamPenaltyDecayFactor
 	record, err := spamRecords.Adjust(peer2, func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
@@ -791,6 +806,7 @@ func TestScoreRegistry_TestSpamRecordDecayAdjustment(t *testing.T) {
 		reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 			PeerID:  peer2,
 			MsgType: p2pmsg.CtrlMsgPrune,
+			Errors:  p2p.InvCtrlMsgErrs{p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid prune"), p2p.CtrlMsgNonClusterTopicType)},
 		})
 		record, err, ok := spamRecords.Get(peer1)
 		require.NoError(t, err)
@@ -855,17 +871,17 @@ func TestPeerSpamPenaltyClusterPrefixed(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
-				PeerID:    peerID,
-				MsgType:   ctlMsgType,
-				TopicType: p2p.CtrlMsgNonClusterTopicType,
+				PeerID:  peerID,
+				MsgType: ctlMsgType,
+				Errors:  p2p.InvCtrlMsgErrs{p2p.NewInvCtrlMsgErr(fmt.Errorf(fmt.Sprintf("invalid %s", ctlMsgType)), p2p.CtrlMsgNonClusterTopicType)},
 			})
 		}()
 		go func() {
 			defer wg.Done()
 			reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
-				PeerID:    peerID,
-				MsgType:   ctlMsgType,
-				TopicType: p2p.CtrlMsgTopicTypeClusterPrefixed,
+				PeerID:  peerID,
+				MsgType: ctlMsgType,
+				Errors:  p2p.InvCtrlMsgErrs{p2p.NewInvCtrlMsgErr(fmt.Errorf(fmt.Sprintf("invalid %s", ctlMsgType)), p2p.CtrlMsgTopicTypeClusterPrefixed)},
 			})
 		}()
 		unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "timed out waiting for goroutines to finish")
@@ -888,6 +904,145 @@ func TestPeerSpamPenaltyClusterPrefixed(t *testing.T) {
 		} else {
 			assert.Less(t, math.Abs(expectedPenalty-score)/expectedPenalty, tolerance)
 		}
+	}
+
+	// stop the registry.
+	cancel()
+	unittest.RequireCloseBefore(t, reg.Done(), 1*time.Second, "failed to stop GossipSubAppSpecificScoreRegistry")
+}
+
+// TestInvalidControlMessageMultiErrorScoreCalculation tests that invalid control message penalties are calculated as expected when notifications
+// contain multiple errors with multiple different severity levels.
+func TestInvalidControlMessageMultiErrorScoreCalculation(t *testing.T) {
+	peerIds := unittest.PeerIdFixtures(t, 5)
+	cfg, err := config.DefaultConfig()
+	require.NoError(t, err)
+	// refresh cached app-specific score every 100 milliseconds to speed up the test.
+	cfg.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.AppSpecificScore.ScoreTTL = 100 * time.Millisecond
+	maximumSpamPenaltyDecayFactor := cfg.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.SpamRecordCache.Decay.MaximumSpamPenaltyDecayFactor
+	reg, spamRecords, _ := newGossipSubAppSpecificScoreRegistry(t,
+		cfg.NetworkConfig.GossipSub.ScoringParameters,
+		scoring.InitAppScoreRecordStateFunc(maximumSpamPenaltyDecayFactor),
+		withStakedIdentities(peerIds...),
+		withValidSubscriptions(peerIds...))
+
+	// starts the registry.
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+	reg.Start(signalerCtx)
+	unittest.RequireCloseBefore(t, reg.Ready(), 1*time.Second, "failed to start GossipSubAppSpecificScoreRegistry")
+
+	for _, peerID := range peerIds {
+		require.Eventually(t, func() bool {
+			// initially, the spamRecords should not have the peer id.
+			assert.False(t, spamRecords.Has(peerID))
+			// since the peer id does not have a spam record, the app specific score should be the max app specific reward, which
+			// is the default reward for a staked peer that has valid subscriptions.
+			score := reg.AppSpecificScoreFunc()(peerID)
+			return score == cfg.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Protocol.AppSpecificScore.MaxAppSpecificReward
+		}, 5*time.Second, 500*time.Millisecond)
+	}
+
+	type testCase struct {
+		notification    *p2p.InvCtrlMsgNotif
+		expectedPenalty float64
+	}
+	penaltyValues := penaltyValueFixtures()
+	testCases := []*testCase{
+		// single error with, with random severity
+		{
+			notification: &p2p.InvCtrlMsgNotif{
+				PeerID:  peerIds[0],
+				MsgType: p2pmsg.CtrlMsgGraft,
+				Errors: p2p.InvCtrlMsgErrs{
+					p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid graft"), p2p.CtrlMsgNonClusterTopicType),
+				},
+			},
+			expectedPenalty: penaltyValues.GraftMisbehaviour,
+		},
+		// multiple errors with, with same severity
+		{
+			notification: &p2p.InvCtrlMsgNotif{
+				PeerID:  peerIds[1],
+				MsgType: p2pmsg.CtrlMsgPrune,
+				Errors: p2p.InvCtrlMsgErrs{
+					p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid prune"), p2p.CtrlMsgNonClusterTopicType),
+					p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid prune"), p2p.CtrlMsgNonClusterTopicType),
+					p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid prune"), p2p.CtrlMsgNonClusterTopicType),
+				},
+			},
+			expectedPenalty: penaltyValues.PruneMisbehaviour * 3,
+		},
+		// multiple errors with, with random severity's
+		{
+			notification: &p2p.InvCtrlMsgNotif{
+				PeerID:  peerIds[2],
+				MsgType: p2pmsg.CtrlMsgIHave,
+				Errors: p2p.InvCtrlMsgErrs{
+					p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid ihave"), p2p.CtrlMsgNonClusterTopicType),
+					p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid ihave"), p2p.CtrlMsgNonClusterTopicType),
+					p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid ihave"), p2p.CtrlMsgNonClusterTopicType),
+					p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid ihave"), p2p.CtrlMsgNonClusterTopicType),
+				},
+			},
+			expectedPenalty: penaltyValues.IHaveMisbehaviour +
+				penaltyValues.IHaveMisbehaviour +
+				penaltyValues.IHaveMisbehaviour +
+				penaltyValues.IHaveMisbehaviour,
+		},
+		// multiple errors with, with random severity's iwant
+		{
+			notification: &p2p.InvCtrlMsgNotif{
+				PeerID:  peerIds[3],
+				MsgType: p2pmsg.CtrlMsgIWant,
+				Errors: p2p.InvCtrlMsgErrs{
+					p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid iwant"), p2p.CtrlMsgNonClusterTopicType),
+					p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid iwant"), p2p.CtrlMsgNonClusterTopicType),
+					p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid iwant"), p2p.CtrlMsgNonClusterTopicType),
+					p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid iwant"), p2p.CtrlMsgNonClusterTopicType),
+				},
+			},
+			expectedPenalty: penaltyValues.IWantMisbehaviour +
+				penaltyValues.IWantMisbehaviour +
+				penaltyValues.IWantMisbehaviour +
+				penaltyValues.IWantMisbehaviour,
+		},
+		// multiple errors with mixed cluster prefixed and non cluster prefixed, with random severity's iwant
+		{
+			notification: &p2p.InvCtrlMsgNotif{
+				PeerID:  peerIds[4],
+				MsgType: p2pmsg.CtrlMsgIWant,
+				Errors: p2p.InvCtrlMsgErrs{
+					p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid iwant"), p2p.CtrlMsgNonClusterTopicType),
+					p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid iwant"), p2p.CtrlMsgNonClusterTopicType),
+					p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid iwant"), p2p.CtrlMsgTopicTypeClusterPrefixed),
+					p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid iwant"), p2p.CtrlMsgTopicTypeClusterPrefixed),
+				},
+			},
+			expectedPenalty: penaltyValues.IWantMisbehaviour +
+				penaltyValues.IWantMisbehaviour +
+				(penaltyValues.IWantMisbehaviour * penaltyValues.ClusterPrefixedReductionFactor) +
+				(penaltyValues.IWantMisbehaviour * penaltyValues.ClusterPrefixedReductionFactor),
+		},
+	}
+
+	for _, tCase := range testCases {
+		// report a misbehavior for the peer id.
+		reg.OnInvalidControlMessageNotification(tCase.notification)
+		// the penalty should now be updated in the spamRecords
+		record, err, ok := spamRecords.Get(tCase.notification.PeerID) // get the record from the spamRecords.
+		require.True(t, ok)
+		require.NoError(t, err)
+		unittest.RequireNumericallyClose(t, tCase.expectedPenalty, record.Penalty, 10e-3)
+		require.Equal(t, scoring.InitAppScoreRecordStateFunc(maximumSpamPenaltyDecayFactor)().Decay, record.Decay) // decay should be initialized to the initial state.
+
+		require.Eventually(t, func() bool {
+			// this peer has a spam record, with no subscription penalty. Hence, the app specific score should only be the spam penalty,
+			// and the peer should be deprived of the default reward for its valid staked role.
+			score := reg.AppSpecificScoreFunc()(tCase.notification.PeerID)
+			tolerance := 10e-2
+			return math.Abs(tCase.expectedPenalty-score)/tCase.expectedPenalty < tolerance
+		}, 5*time.Second, 500*time.Millisecond)
 	}
 
 	// stop the registry.
@@ -948,6 +1103,9 @@ func TestScoringRegistrySilencePeriod(t *testing.T) {
 		reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 			PeerID:  peerID,
 			MsgType: p2pmsg.CtrlMsgGraft,
+			Errors: p2p.InvCtrlMsgErrs{
+				p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid graft"), p2p.CtrlMsgNonClusterTopicType),
+			},
 		})
 		expectedNumOfSilencedNotif++
 		// spam records should not be created during the silence period
@@ -972,13 +1130,16 @@ func TestScoringRegistrySilencePeriod(t *testing.T) {
 	reg.OnInvalidControlMessageNotification(&p2p.InvCtrlMsgNotif{
 		PeerID:  peerID,
 		MsgType: p2pmsg.CtrlMsgGraft,
+		Errors: p2p.InvCtrlMsgErrs{
+			p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid graft"), p2p.CtrlMsgNonClusterTopicType),
+		},
 	})
 	// the penalty should now be applied and spam records created.
 	record, err, ok := spamRecords.Get(peerID)
 	assert.True(t, ok)
 	assert.NoError(t, err)
 	expectedPenalty := penaltyValueFixtures().GraftMisbehaviour
-	assert.Less(t, math.Abs(expectedPenalty-record.Penalty), 10e-3)
+	unittest.RequireNumericallyClose(t, expectedPenalty, record.Penalty, 10e-3)
 	assert.Equal(t, scoring.InitAppScoreRecordStateFunc(maximumSpamPenaltyDecayFactor)().Decay, record.Decay) // decay should be initialized to the initial state.
 
 	require.Eventually(t, func() bool {

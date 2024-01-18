@@ -246,7 +246,6 @@ func (r *GossipSubAppSpecificScoreRegistry) AppSpecificScoreFunc() func(peer.ID)
 // - float64: the application specific score of the peer.
 func (r *GossipSubAppSpecificScoreRegistry) computeAppSpecificScore(pid peer.ID) float64 {
 	appSpecificScore := float64(0)
-
 	lg := r.logger.With().Str("peer_id", p2plogging.PeerId(pid)).Logger()
 	// (1) spam penalty: the penalty is applied to the application specific penalty when a peer conducts a spamming misbehaviour.
 	spamRecord, err, spamRecordExists := r.spamScoreCache.Get(pid)
@@ -292,7 +291,6 @@ func (r *GossipSubAppSpecificScoreRegistry) computeAppSpecificScore(pid peer.ID)
 	lg.Trace().
 		Float64("total_app_specific_score", appSpecificScore).
 		Msg("application specific score computed")
-
 	return appSpecificScore
 }
 
@@ -370,7 +368,7 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 	// we use mutex to ensure the method is concurrency safe.
 
 	lg := r.logger.With().
-		Err(notification.Error).
+		Err(notification.Errors.Error()).
 		Str("peer_id", p2plogging.PeerId(notification.PeerID)).
 		Str("misbehavior_type", notification.MsgType.String()).Logger()
 
@@ -381,29 +379,45 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 	}
 
 	record, err := r.spamScoreCache.Adjust(notification.PeerID, func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
-		penalty := 0.0
+		basePenalty := float64(0)
 		switch notification.MsgType {
 		case p2pmsg.CtrlMsgGraft:
-			penalty += r.penalty.GraftMisbehaviour
+			basePenalty += r.penalty.GraftMisbehaviour
 		case p2pmsg.CtrlMsgPrune:
-			penalty += r.penalty.PruneMisbehaviour
+			basePenalty += r.penalty.PruneMisbehaviour
 		case p2pmsg.CtrlMsgIHave:
-			penalty += r.penalty.IHaveMisbehaviour
+			basePenalty += r.penalty.IHaveMisbehaviour
 		case p2pmsg.CtrlMsgIWant:
-			penalty += r.penalty.IWantMisbehaviour
+			basePenalty += r.penalty.IWantMisbehaviour
 		case p2pmsg.RpcPublishMessage:
-			penalty += r.penalty.PublishMisbehaviour
+			basePenalty += r.penalty.PublishMisbehaviour
 		default:
 			// the error is considered fatal as it means that we have an unsupported misbehaviour type, we should crash the node to prevent routing attack vulnerability.
 			lg.Fatal().Str("misbehavior_type", notification.MsgType.String()).Msg("unknown misbehaviour type")
 		}
 
-		// reduce penalty for cluster prefixed topics allowing nodes that are potentially behind to catch up
-		if notification.TopicType == p2p.CtrlMsgTopicTypeClusterPrefixed {
-			penalty *= r.penalty.ClusterPrefixedReductionFactor
+		// apply the base penalty to the application specific penalty.
+		appliedPenalty := float64(0)
+		for _, err := range notification.Errors {
+			errPenalty := basePenalty
+			// reduce penalty for cluster prefixed topics allowing nodes that are potentially behind to catch up
+			if err.CtrlMsgTopicType() == p2p.CtrlMsgTopicTypeClusterPrefixed {
+				errPenalty *= r.penalty.ClusterPrefixedReductionFactor
+			}
+			appliedPenalty += errPenalty
 		}
 
-		record.Penalty += penalty
+		record.Penalty += appliedPenalty
+
+		lg.Debug().
+			Err(notification.Errors.Error()).
+			Str("control_message_type", notification.MsgType.String()).
+			Bool(logging.KeySuspicious, true).
+			Bool(logging.KeyNetworkingSecurity, true).
+			Int("error_count", notification.Errors.Len()).
+			Float64("applied_penalty", appliedPenalty).
+			Float64("app_specific_score", record.Penalty).
+			Msg("processed invalid control message notification, applied misbehaviour penalty and updated application specific penalty ")
 
 		return record
 	})
@@ -415,6 +429,7 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 	lg.Debug().
 		Float64("spam_record_penalty", record.Penalty).
 		Msg("applied misbehaviour penalty and updated application specific penalty")
+
 }
 
 // afterSilencePeriod returns true if registry silence period is over, false otherwise.

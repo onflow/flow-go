@@ -34,7 +34,7 @@ type InternalGossipSubScoreParams struct {
 	// DecayInterval is the  decay interval for the overall score of a peer at the GossipSub scoring
 	// system. We set it to 1 minute so that it is not too short so that a malicious node can recover from a penalty
 	// and is not too long so that a well-behaved node can't recover from a penalty.
-	DecayInterval time.Duration `validate:"gte=1m" mapstructure:"decay-interval"`
+	DecayInterval time.Duration `validate:"gt=0" mapstructure:"decay-interval"`
 	// DecayToZero is the  decay to zero for the overall score of a peer at the GossipSub scoring system.
 	// It defines the maximum value below which a peer scoring counter is reset to zero.
 	// This is to prevent the counter from decaying to a very small value.
