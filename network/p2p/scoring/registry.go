@@ -8,6 +8,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/engine/common/worker"
 	"github.com/onflow/flow-go/model/flow"
@@ -23,6 +24,11 @@ import (
 	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 	"github.com/onflow/flow-go/utils/logging"
+)
+
+const (
+	// NotificationSilencedMsg log messages for silenced notifications
+	NotificationSilencedMsg = "ignoring invalid control message notification for peer during silence period"
 )
 
 type SpamRecordInitFunc func() p2p.GossipSubSpamRecord
@@ -57,6 +63,13 @@ type GossipSubAppSpecificScoreRegistry struct {
 
 	// appScoreUpdateWorkerPool is the worker pool for handling the application specific score update of peers in a non-blocking way.
 	appScoreUpdateWorkerPool *worker.Pool[peer.ID]
+
+	// silencePeriodDuration duration that the startup silence period will last, during which nodes will not be penalized
+	silencePeriodDuration time.Duration
+	// silencePeriodStartTime time that the silence period begins, this is the time that the registry is started by the node.
+	silencePeriodStartTime time.Time
+	// silencePeriodElapsed atomic bool that stores a bool flag which indicates if the silence period is over or not.
+	silencePeriodElapsed *atomic.Bool
 
 	unknownIdentityPenalty     float64
 	minAppSpecificPenalty      float64
@@ -94,6 +107,10 @@ type GossipSubAppSpecificScoreRegistryConfig struct {
 
 	NetworkingType network.NetworkingType `validate:"required"`
 
+	// ScoringRegistryStartupSilenceDuration defines the duration of time, after the node startup,
+	// during which the scoring registry remains inactive before penalizing nodes.
+	ScoringRegistryStartupSilenceDuration time.Duration
+
 	AppSpecificScoreParams p2pconfig.ApplicationSpecificScoreParameters `validate:"required"`
 }
 
@@ -125,6 +142,8 @@ func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegis
 		validator:                  config.Validator,
 		idProvider:                 config.IdProvider,
 		scoreTTL:                   config.Parameters.ScoreTTL,
+		silencePeriodDuration:      config.ScoringRegistryStartupSilenceDuration,
+		silencePeriodElapsed:       atomic.NewBool(false),
 		unknownIdentityPenalty:     config.AppSpecificScoreParams.UnknownIdentityPenalty,
 		minAppSpecificPenalty:      config.AppSpecificScoreParams.MinAppSpecificPenalty,
 		stakedIdentityReward:       config.AppSpecificScoreParams.StakedIdentityReward,
@@ -147,11 +166,16 @@ func NewGossipSubAppSpecificScoreRegistry(config *GossipSubAppSpecificScoreRegis
 			ready()
 			reg.logger.Info().Msg("subscription validator is ready")
 		}
-
 		<-ctx.Done()
 		reg.logger.Info().Msg("stopping subscription validator")
 		<-reg.validator.Done()
 		reg.logger.Info().Msg("subscription validator stopped")
+	}).AddWorker(func(parent irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		if !reg.silencePeriodStartTime.IsZero() {
+			parent.Throw(fmt.Errorf("gossipsub scoring registry started more than once"))
+		}
+		reg.silencePeriodStartTime = time.Now()
+		ready()
 	})
 
 	for i := 0; i < config.Parameters.ScoreUpdateWorkerNum; i++ {
@@ -176,6 +200,13 @@ var _ p2p.GossipSubInvCtrlMsgNotifConsumer = (*GossipSubAppSpecificScoreRegistry
 func (r *GossipSubAppSpecificScoreRegistry) AppSpecificScoreFunc() func(peer.ID) float64 {
 	return func(pid peer.ID) float64 {
 		lg := r.logger.With().Str("remote_peer_id", p2plogging.PeerId(pid)).Logger()
+
+		// during startup silence period avoid penalizing nodes
+		if !r.afterSilencePeriod() {
+			lg.Trace().Msg("returning 0 app specific score penalty for node during silence period")
+			return 0
+		}
+
 		appSpecificScore, lastUpdated, ok := r.appScoreCache.Get(pid)
 		switch {
 		case !ok:
@@ -193,7 +224,6 @@ func (r *GossipSubAppSpecificScoreRegistry) AppSpecificScoreFunc() func(peer.ID)
 				Float64("app_specific_score", appSpecificScore).
 				Dur("score_ttl", r.scoreTTL).
 				Msg("application specific score expired, submitting worker to update it")
-
 			return appSpecificScore // in the mean time, return the expired score.
 		default:
 			// record found in the cache.
@@ -342,6 +372,12 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 		Str("peer_id", p2plogging.PeerId(notification.PeerID)).
 		Str("misbehavior_type", notification.MsgType.String()).Logger()
 
+	// during startup silence period avoid penalizing nodes, ignore all notifications
+	if !r.afterSilencePeriod() {
+		lg.Trace().Msg("ignoring invalid control message notification for peer during silence period")
+		return
+	}
+
 	record, err := r.spamScoreCache.Adjust(notification.PeerID, func(record p2p.GossipSubSpamRecord) p2p.GossipSubSpamRecord {
 		basePenalty := float64(0)
 		switch notification.MsgType {
@@ -394,6 +430,18 @@ func (r *GossipSubAppSpecificScoreRegistry) OnInvalidControlMessageNotification(
 		Float64("spam_record_penalty", record.Penalty).
 		Msg("applied misbehaviour penalty and updated application specific penalty")
 
+}
+
+// afterSilencePeriod returns true if registry silence period is over, false otherwise.
+func (r *GossipSubAppSpecificScoreRegistry) afterSilencePeriod() bool {
+	if !r.silencePeriodElapsed.Load() {
+		if time.Since(r.silencePeriodStartTime) > r.silencePeriodDuration {
+			r.silencePeriodElapsed.Store(true)
+			return true
+		}
+		return false
+	}
+	return true
 }
 
 // DefaultDecayFunction is the default decay function that is used to decay the application specific penalty of a peer.

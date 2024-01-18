@@ -443,6 +443,13 @@ network-config:
             # peers for their contribution to the network and prioritize them in neighbor selection.
             staked-identity-reward: 100
       scoring-registry:
+        # Defines the duration of time, after the node startup,
+        # during which the scoring registry remains inactive before penalizing nodes.
+        # Throughout this startup silence period, the application-specific penalty
+        # returned for all nodes will be 0, and any invalid control message notifications
+        # will be ignored. This configuration allows nodes to stabilize and initialize before
+        # applying penalties or processing invalid control message notifications.
+        startup-silence-duration: 1h
         app-specific-score:
           # number of workers that asynchronously update the app specific score requests when they are expired.
           score-update-worker-num: 5
