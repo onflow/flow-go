@@ -11,6 +11,7 @@ import (
 	corrupt "github.com/yhassanzadeh13/go-libp2p-pubsub"
 
 	fcrypto "github.com/onflow/crypto"
+
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
