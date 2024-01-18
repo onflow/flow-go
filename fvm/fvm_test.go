@@ -2957,12 +2957,10 @@ func TestTransientNetworkCoreContractAddresses(t *testing.T) {
 }
 
 func TestEVM(t *testing.T) {
-
 	t.Run("successful transaction", newVMTest().
 		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
-		// we keep this dissabled during bootstrap and later overwrite in the test for test transaction
 		withContextOptions(
-			fvm.WithEVMEnabled(false),
+			fvm.WithEVMEnabled(true),
 			fvm.WithCadenceLogging(true),
 		).
 		run(func(
@@ -2999,7 +2997,6 @@ func TestEVM(t *testing.T) {
 			err = testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
 
-			ctx = fvm.NewContextFromParent(ctx, fvm.WithEVMEnabled(true))
 			_, output, err := vm.Run(
 				ctx,
 				fvm.Transaction(txBody, 0),
