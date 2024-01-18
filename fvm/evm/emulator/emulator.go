@@ -3,11 +3,13 @@ package emulator
 import (
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/common"
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethCore "github.com/ethereum/go-ethereum/core"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	gethVM "github.com/ethereum/go-ethereum/core/vm"
 	gethCrypto "github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/onflow/atree"
 
 	"github.com/onflow/flow-go/fvm/evm/emulator/state"
@@ -97,16 +99,19 @@ func (bl *BlockView) DirectCall(call *types.DirectCall) (*types.Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	var res *types.Result
 	switch call.SubType {
 	case types.DepositCallSubType:
-		res, err = proc.mintTo(call.To, call.Value)
+		return proc.mintTo(call.To, call.Value)
 	case types.WithdrawCallSubType:
-		res, err = proc.withdrawFrom(call.From, call.Value)
+		return proc.withdrawFrom(call.From, call.Value)
+	case types.DeployCallSubType:
+		if call.HasNonEmptyToField() {
+			return proc.deployAt(call.From, call.To, call.Data, call.GasLimit)
+		}
+		fallthrough
 	default:
-		res, err = proc.run(call.Message(), types.DirectCallTxType)
+		return proc.run(call.Message(), types.DirectCallTxType)
 	}
-	return res, err
 }
 
 // RunTransaction runs an evm transaction
@@ -206,9 +211,6 @@ func (proc *procedure) withdrawFrom(address types.Address, amount *big.Int) (*ty
 	// while this method is only called from bridged accounts
 	// it might be the case that someone creates a bridged account
 	// and never transfer tokens to and call for withdraw
-	// TODO: we might revisit this apporach and
-	// 		return res, types.ErrAccountDoesNotExist
-	// instead
 	if !proc.state.Exist(addr) {
 		proc.state.CreateAccount(addr)
 	}
@@ -227,6 +229,80 @@ func (proc *procedure) withdrawFrom(address types.Address, amount *big.Int) (*ty
 	nonce := proc.state.GetNonce(addr)
 	proc.state.SetNonce(addr, nonce+1)
 
+	return res, proc.commit()
+}
+
+// deployAt deploys a contract at the given target address
+// behaviour should be similar to what evm.create internal method does with
+// less checks on the configs (no call to this is possible on the old forks).
+func (proc *procedure) deployAt(
+	from types.Address,
+	to types.Address,
+	data types.Code,
+	gasLimit uint64,
+) (*types.Result, error) {
+	addr := to.ToCommon()
+	res := &types.Result{
+		TxType: types.DirectCallTxType,
+	}
+
+	// ensure there's no existing contract
+	contractHash := proc.state.GetCodeHash(addr)
+	if proc.state.GetNonce(addr) != 0 || (contractHash != (common.Hash{}) && contractHash != gethTypes.EmptyCodeHash) {
+		return res, gethVM.ErrContractAddressCollision
+	}
+
+	proc.state.CreateAccount(addr)
+	// set the nonce to 1 (EIP-158)
+	proc.state.SetNonce(addr, 1)
+
+	var err error
+	inter := gethVM.NewEVMInterpreter(proc.evm)
+	contract := gethVM.NewContract(gethVM.AccountRef(from), gethVM.AccountRef(addr), new(big.Int), gasLimit)
+	contract.Code = data
+	contract.CodeHash = gethCrypto.Keccak256Hash(data)
+	contract.CodeAddr = &addr
+
+	// update access list (Berlin)
+	proc.state.AddAddressToAccessList(addr)
+
+	// run through interpreter to catch error and compute gas
+	ret, err := inter.Run(contract, nil, false)
+	gasCost := uint64(len(ret)) * params.CreateDataGas
+	res.GasConsumed = gasCost
+
+	// handle errors
+	if err != nil {
+		// for all errors except this one consume all the remaining gas (Homestead)
+		if err != gethVM.ErrExecutionReverted {
+			res.GasConsumed = gasLimit
+		}
+		return res, err
+	}
+
+	// check gas usage
+	if gasCost > gasLimit {
+		// consume all the remaining gas (Homestead)
+		res.GasConsumed = gasLimit
+		return res, gethVM.ErrCodeStoreOutOfGas
+	}
+
+	// check max code size (EIP-158)
+	if len(ret) > params.MaxCodeSize {
+		// consume all the remaining gas (Homestead)
+		res.GasConsumed = gasLimit
+		return res, gethVM.ErrMaxCodeSizeExceeded
+	}
+
+	// reject code starting with 0xEF (EIP-3541)
+	if len(ret) >= 1 && ret[0] == 0xEF {
+		// consume all the remaining gas (Homestead)
+		res.GasConsumed = gasLimit
+		return res, gethVM.ErrInvalidCode
+	}
+
+	proc.state.SetCode(addr, ret)
+	res.DeployedContractAddress = to
 	return res, proc.commit()
 }
 

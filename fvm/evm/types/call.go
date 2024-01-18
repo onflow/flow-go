@@ -52,7 +52,7 @@ func (dc *DirectCall) Hash() (gethCommon.Hash, error) {
 // Message constructs a core.Message from the direct call
 func (dc *DirectCall) Message() *gethCore.Message {
 	var to *gethCommon.Address
-	if dc.To != EmptyAddress {
+	if dc.HasNonEmptyToField() {
 		ct := dc.To.ToCommon()
 		to = &ct
 	}
@@ -68,6 +68,11 @@ func (dc *DirectCall) Message() *gethCore.Message {
 		// AccessList:        tx.AccessList(), // TODO revisit this value, the cost matter but performance might
 		SkipAccountChecks: true, // this would let us not set the nonce
 	}
+}
+
+// HasNonEmptyTo returns true if to has a non empty value
+func (dc *DirectCall) HasNonEmptyToField() bool {
+	return dc.To != EmptyAddress
 }
 
 func NewDepositCall(address Address, amount *big.Int) *DirectCall {
@@ -106,7 +111,12 @@ func NewTransferCall(from Address, to Address, amount *big.Int) *DirectCall {
 	}
 }
 
-func NewDeployCall(caller Address, code Code, gasLimit uint64, value *big.Int) *DirectCall {
+func NewDeployCall(
+	caller Address,
+	code Code,
+	gasLimit uint64,
+	value *big.Int,
+) *DirectCall {
 	return &DirectCall{
 		Type:     DirectCallTxType,
 		SubType:  DeployCallSubType,
@@ -118,7 +128,34 @@ func NewDeployCall(caller Address, code Code, gasLimit uint64, value *big.Int) *
 	}
 }
 
-func NewContractCall(caller Address, to Address, data Data, gasLimit uint64, value *big.Int) *DirectCall {
+// this subtype should only be used internally for
+// deploying contracts at given addresses (e.g. COA account init setup)
+// should not be used for other means.
+func NewDeployCallWithTargetAddress(
+	caller Address,
+	to Address,
+	code Code,
+	gasLimit uint64,
+	value *big.Int,
+) *DirectCall {
+	return &DirectCall{
+		Type:     DirectCallTxType,
+		SubType:  DeployCallSubType,
+		From:     caller,
+		To:       to,
+		Data:     code,
+		Value:    value,
+		GasLimit: gasLimit,
+	}
+}
+
+func NewContractCall(
+	caller Address,
+	to Address,
+	data Data,
+	gasLimit uint64,
+	value *big.Int,
+) *DirectCall {
 	return &DirectCall{
 		Type:     DirectCallTxType,
 		SubType:  ContractCallSubType,
