@@ -27,9 +27,16 @@ import (
 //go:embed contract.cdc
 var contractCode string
 
+//go:embed abiOnlyContract.cdc
+var abiOnlyContractCode string
+
 var flowTokenImportPattern = regexp.MustCompile(`^import "FlowToken"\n`)
 
-func ContractCode(flowTokenAddress flow.Address) []byte {
+func ContractCode(flowTokenAddress flow.Address, evmAbiOnly bool) []byte {
+	if evmAbiOnly {
+		return []byte(abiOnlyContractCode)
+	}
+
 	return []byte(flowTokenImportPattern.ReplaceAllString(
 		contractCode,
 		fmt.Sprintf("import FlowToken from %s", flowTokenAddress.HexWithPrefix()),
