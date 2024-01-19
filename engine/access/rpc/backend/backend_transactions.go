@@ -91,7 +91,7 @@ func (b *backendTransactions) trySendTransaction(ctx context.Context, tx *flow.T
 	}
 
 	// otherwise choose all collection nodes to try
-	collNodes, err := b.chooseCollectionNodes(tx)
+	collNodes, err := b.chooseCollectionNodes(tx.ID())
 	if err != nil {
 		return fmt.Errorf("failed to determine collection node for tx %x: %w", tx, err)
 	}
@@ -122,7 +122,7 @@ func (b *backendTransactions) trySendTransaction(ctx context.Context, tx *flow.T
 
 // chooseCollectionNodes finds a random subset of size sampleSize of collection node addresses from the
 // collection node cluster responsible for the given tx
-func (b *backendTransactions) chooseCollectionNodes(tx *flow.TransactionBody) (flow.IdentityList, error) {
+func (b *backendTransactions) chooseCollectionNodes(txID flow.Identifier) (flow.IdentityList, error) {
 
 	// retrieve the set of collector clusters
 	clusters, err := b.state.Final().Epochs().Current().Clustering()
@@ -131,18 +131,20 @@ func (b *backendTransactions) chooseCollectionNodes(tx *flow.TransactionBody) (f
 	}
 
 	// get the cluster responsible for the transaction
-	targetNodes, ok := clusters.ByTxID(tx.ID())
+	targetNodes, ok := clusters.ByTxID(txID)
 	if !ok {
-		return nil, fmt.Errorf("could not get local cluster by txID: %x", tx.ID())
+		return nil, fmt.Errorf("could not get local cluster by txID: %x", txID)
 	}
 
 	return targetNodes, nil
 }
 
 // sendTransactionToCollection sends the transaction to the given collection node via grpc
-func (b *backendTransactions) sendTransactionToCollector(ctx context.Context,
+func (b *backendTransactions) sendTransactionToCollector(
+	ctx context.Context,
 	tx *flow.TransactionBody,
-	collectionNodeAddr string) error {
+	collectionNodeAddr string,
+) error {
 
 	collectionRPC, closer, err := b.connFactory.GetAccessAPIClient(collectionNodeAddr)
 	if err != nil {
