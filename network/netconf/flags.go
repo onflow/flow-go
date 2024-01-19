@@ -36,10 +36,11 @@ const (
 	fileDescriptorsLimit       = "fd"
 	memoryLimitBytes           = "memory-bytes"
 
-	alspDisabled                       = "alsp-disable-penalty"
-	alspSpamRecordCacheSize            = "alsp-spam-record-cache-size"
-	alspSpamRecordQueueSize            = "alsp-spam-report-queue-size"
-	alspHearBeatInterval               = "alsp-heart-beat-interval"
+	alspDisabled            = "alsp-disable-penalty"
+	alspSpamRecordCacheSize = "alsp-spam-record-cache-size"
+	alspSpamRecordQueueSize = "alsp-spam-report-queue-size"
+	alspHearBeatInterval    = "alsp-heart-beat-interval"
+
 	alspSyncEngineBatchRequestBaseProb = "alsp-sync-engine-batch-request-base-prob"
 	alspSyncEngineRangeRequestBaseProb = "alsp-sync-engine-range-request-base-prob"
 	alspSyncEngineSyncRequestProb      = "alsp-sync-engine-sync-request-prob"

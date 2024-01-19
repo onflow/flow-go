@@ -453,6 +453,15 @@ func GenerateRandomStringWithLen(commentLen uint) string {
 	return string(bytes)
 }
 
+// GenerateRandomStringsWithLen returns a list of random strings of the provided length.
+func GenerateRandomStringsWithLen(n, commentLen uint) []string {
+	strs := make([]string, n)
+	for i := uint(0); i < n; i++ {
+		strs[i] = GenerateRandomStringWithLen(commentLen)
+	}
+	return strs
+}
+
 // PeerIdFixture creates a random and unique peer ID (libp2p node ID).
 func PeerIdFixture(tb testing.TB) peer.ID {
 	peerID, err := peerIDFixture()

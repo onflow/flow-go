@@ -112,6 +112,11 @@ func (_m *LibP2PMetrics) InboundConnections(connectionCount uint) {
 	_m.Called(connectionCount)
 }
 
+// InvalidControlMessageNotificationError provides a mock function with given fields: msgType, count
+func (_m *LibP2PMetrics) InvalidControlMessageNotificationError(msgType p2pmsg.ControlMessageType, count float64) {
+	_m.Called(msgType, count)
+}
+
 // OnAppSpecificScoreUpdated provides a mock function with given fields: _a0
 func (_m *LibP2PMetrics) OnAppSpecificScoreUpdated(_a0 float64) {
 	_m.Called(_a0)
