@@ -255,9 +255,6 @@ type GossipSubRpcValidationInspectorMetrics interface {
 	// the number of inspect message requests  being processed asynchronously by the rpc validation inspector workers.
 	AsyncProcessingFinished(duration time.Duration)
 
-	// InvalidControlMessageNotificationError tracks the number of errors in each invalid control message notification per msg type.
-	InvalidControlMessageNotificationError(msgType p2pmsg.ControlMessageType, count float64)
-
 	// OnIHaveControlMessageIdsTruncated tracks the number of times message ids on an iHave message were truncated.
 	// Note that this function is called only when the message ids are truncated from an iHave message, not when the iHave message itself is truncated.
 	// This is different from the OnControlMessagesTruncated function which is called when a slice of control messages truncated from an RPC with all their message ids.
