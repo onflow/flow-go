@@ -1713,6 +1713,11 @@ func EventsFixture(
 	return events
 }
 
+func EventTypeFixture(chainID flow.ChainID) flow.EventType {
+	eventType := fmt.Sprintf("A.%s.TestContract.TestEvent1", RandomAddressFixtureForChain(chainID))
+	return flow.EventType(eventType)
+}
+
 // EventFixture returns an event
 func EventFixture(
 	eType flow.EventType,

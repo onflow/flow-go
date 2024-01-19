@@ -987,7 +987,7 @@ func (suite *Suite) TestExecuteScript() {
 			Log:                      suite.log,
 			SnapshotHistoryLimit:     backend.DefaultSnapshotHistoryLimit,
 			Communicator:             backend.NewNodeCommunicator(false),
-			ScriptExecutionMode:      backend.ScriptExecutionModeExecutionNodesOnly,
+			ScriptExecutionMode:      backend.IndexQueryModeExecutionNodesOnly,
 			TxErrorMessagesCacheSize: 1000,
 		})
 		require.NoError(suite.T(), err)
