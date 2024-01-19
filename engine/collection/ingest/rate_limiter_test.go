@@ -24,7 +24,6 @@ func TestLimiterAddRemoveAddress(t *testing.T) {
 	good1 := unittest.RandomAddressFixture()
 	limited1 := unittest.RandomAddressFixture()
 	limited2 := unittest.RandomAddressFixture()
-	fmt.Println(limited1, limited2)
 
 	numPerSec := rate.Limit(1)
 	burst := 1
@@ -84,7 +83,12 @@ func TestLimiterWaitLongEnough(t *testing.T) {
 
 	addr1 := unittest.RandomAddressFixture()
 
-	numPerSec := rate.Limit(1)
+	// with limit set to 10, it means we allow 10 messages per second,
+	// and with burst set to 1, it means we only allow 1 message at a time,
+	// so the limit is 1 message per 100 milliseconds.
+	// Note rate.Limit(0.1) is not to set 1 message per 100 milliseconds, but
+	// 1 message per 10 seconds.
+	numPerSec := rate.Limit(10)
 	burst := 1
 	l := ingest.NewAddressRateLimiter(numPerSec, burst)
 
@@ -92,9 +96,13 @@ func TestLimiterWaitLongEnough(t *testing.T) {
 	require.False(t, l.IsRateLimited(addr1))
 	require.True(t, l.IsRateLimited(addr1))
 
-	time.Sleep(time.Millisecond * 1100) // wait 1.1 second
-	require.False(t, l.IsRateLimited(addr1))
-	require.True(t, l.IsRateLimited(addr1))
+	// check every 10 Millisecond then after 100 Millisecond it should be allowed
+	require.Eventually(t, func() bool {
+		return l.Allow(addr1)
+	}, 110*time.Millisecond, 10*time.Millisecond)
+
+	// block until another 100 ms
+	require.False(t, l.Allow(addr1))
 }
 
 func TestLimiterConcurrentSafe(t *testing.T) {

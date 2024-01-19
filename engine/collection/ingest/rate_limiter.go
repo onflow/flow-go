@@ -26,6 +26,11 @@ func NewAddressRateLimiter(limit rate.Limit, burst int) *AddressRateLimiter {
 	}
 }
 
+// Allow returns whether the given address should be allowed (not rate limited)
+func (r *AddressRateLimiter) Allow(address flow.Address) bool {
+	return !r.IsRateLimited(address)
+}
+
 // IsRateLimited returns whether the given address should be rate limited
 func (r *AddressRateLimiter) IsRateLimited(address flow.Address) bool {
 	r.mu.RLock()
