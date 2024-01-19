@@ -318,9 +318,7 @@ func (nc *NoopCollector) OnBehaviourPenaltyUpdated(f float64)                   
 func (nc *NoopCollector) OnIPColocationFactorUpdated(f float64)                            {}
 func (nc *NoopCollector) OnAppSpecificScoreUpdated(f float64)                              {}
 func (nc *NoopCollector) OnOverallPeerScoreUpdated(f float64)                              {}
-
-func (nc *NoopCollector) InvalidControlMessageNotificationError(p2pmsg.ControlMessageType, float64) {}
-func (nc *NoopCollector) OnIHaveControlMessageIdsTruncated(diff int)                                {}
+func (nc *NoopCollector) OnIHaveControlMessageIdsTruncated(diff int)                       {}
 func (nc *NoopCollector) OnControlMessagesTruncated(messageType p2pmsg.ControlMessageType, diff int) {
 }
 func (nc *NoopCollector) OnIncomingRpcReceived(iHaveCount, iWantCount, graftCount, pruneCount, msgCount int) {
