@@ -3,10 +3,12 @@ package collection
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/engine/collection/ingest"
+	"golang.org/x/time/rate"
 )
 
 var _ commands.AdminCommand = (*TxRateLimitCommand)(nil)
@@ -25,7 +27,7 @@ func NewTxRateLimitCommand(limiter *ingest.AddressRateLimiter) *TxRateLimitComma
 func (s *TxRateLimitCommand) Handler(_ context.Context, req *admin.CommandRequest) (interface{}, error) {
 	input, ok := req.Data.(map[string]string)
 	if !ok {
-		return admin.NewInvalidAdminReqFormatError("expected { \"command\": \"add|remove|get\", \"addresses\": \"addresses\""), nil
+		return admin.NewInvalidAdminReqFormatError("expected { \"command\": \"add|remove|get|get_config|set_config\", \"addresses\": \"addresses\""), nil
 	}
 
 	cmd, ok := input["command"]
@@ -37,24 +39,54 @@ func (s *TxRateLimitCommand) Handler(_ context.Context, req *admin.CommandReques
 		return s.limiter.GetAddresses(), nil
 	}
 
-	addresses, ok := input["addresses"]
-	if !ok {
-		return admin.NewInvalidAdminReqErrorf("the \"addresses\" field is empty, must be hex formated addresses, can be splitted by \",\""), nil
+	if cmd == "add" || cmd == "remove" {
+		addresses, ok := input["addresses"]
+		if !ok {
+			return admin.NewInvalidAdminReqErrorf("the \"addresses\" field is empty, must be hex formated addresses, can be splitted by \",\""), nil
+		}
+
+		resp, err := s.AddOrRemove(cmd, addresses)
+		if err != nil {
+			return nil, err
+		}
+		return resp, nil
 	}
 
-	resp, err := s.Handle(cmd, addresses)
-	if err != nil {
-		return nil, err
+	if cmd == "get_config" {
+		limit, burst := s.limiter.GetLimitConfig()
+		return fmt.Sprintf("limit: %v, burst: %v", limit, burst), nil
 	}
 
-	return resp, nil
+	if cmd == "set_config" {
+		strLimit, limit_ok := input["limit"]
+		strBurst, burst_ok := input["burst"]
+		if !limit_ok || !burst_ok {
+			return admin.NewInvalidAdminReqErrorf("the \"limit\" or \"burst\" field is empty, must be number"), nil
+		}
+		limit, err := strconv.ParseFloat(strLimit, 64)
+		if err == nil {
+			return admin.NewInvalidAdminReqErrorf("the \"limit\" field is not number: %v", strLimit), nil
+		}
+
+		burst, err := strconv.Atoi(strBurst)
+		if err == nil {
+			return admin.NewInvalidAdminReqErrorf("the \"burst\" field is not number: %v", strBurst), nil
+		}
+
+		s.limiter.SetLimitConfig(rate.Limit(limit), burst)
+		return fmt.Sprintf("set limit: %v, burst: %v", limit, burst), nil
+	}
+
+	return fmt.Sprintf(
+		"invalid command field (%s), must be either \"add\" or \"remove\" or \"get\" or \"get_config\" or \"set_config\"",
+		cmd), nil
 }
 
 func (s *TxRateLimitCommand) Validator(_ *admin.CommandRequest) error {
 	return nil
 }
 
-func (s *TxRateLimitCommand) Handle(command string, addresses string) (string, error) {
+func (s *TxRateLimitCommand) AddOrRemove(command string, addresses string) (string, error) {
 	addrList, err := ingest.ParseAddresses(addresses)
 	if err != nil {
 		return "", err
@@ -65,10 +97,7 @@ func (s *TxRateLimitCommand) Handle(command string, addresses string) (string, e
 		return fmt.Sprintf("added %d addresses", len(addrList)), nil
 	}
 
-	if command == "remove" {
-		ingest.RemoveAddresses(s.limiter, addrList)
-		return fmt.Sprintf("removed %d addresses", len(addrList)), nil
-	}
-
-	return "", fmt.Errorf("invalid command name %s (must be either 'add' or 'remove')", command)
+	// command == "remove"
+	ingest.RemoveAddresses(s.limiter, addrList)
+	return fmt.Sprintf("removed %d addresses", len(addrList)), nil
 }

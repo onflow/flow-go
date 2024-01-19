@@ -88,6 +88,25 @@ func (r *AddressRateLimiter) GetAddresses() []flow.Address {
 	return addresses
 }
 
+// GetLimitConfig get the limit config
+func (r *AddressRateLimiter) GetLimitConfig() (rate.Limit, int) {
+	return r.limit, r.burst
+}
+
+// SetLimitConfig update the limit config
+// Note all the existing limiters will be updated, and reset
+func (r *AddressRateLimiter) SetLimitConfig(limit rate.Limit, burst int) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	for address := range r.limiters {
+		r.limiters[address] = rate.NewLimiter(limit, burst)
+	}
+
+	r.limit = limit
+	r.burst = burst
+}
+
 // Util functions
 func AddAddresses(r *AddressRateLimiter, addresses []flow.Address) {
 	for _, address := range addresses {
