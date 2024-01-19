@@ -184,31 +184,31 @@ network-config:
           inspection:
             # Disables rpc inspection for all control message types.
             disabled: false
-            # Enables graft control message inspection.
-            graft-enabled: true
-            # Enables prune control message inspection.
-            prune-enabled: true
-            # Enables ihave control message inspection.
-            ihave-enabled: true
-            # Enables iwant control message inspection.
-            iwant-enabled: true
-            # Enables publish message inspection.
-            publish-enabled: true
+            # Disables graft control message inspection.
+            graft-disabled: false
+            # Disables prune control message inspection.
+            prune-disabled: false
+            # Disables ihave control message inspection.
+            ihave-disabled: false
+            # Disables iwant control message inspection.
+            iwant-disabled: false
+            # Disables publish message inspection.
+            publish-disabled: false
           truncation:
             # Disables rpc truncation for all control message types.
             disabled: false
-            # Enables graft control message truncation.
-            graft-enabled: true
-            # Enables prune control message truncation.
-            prune-enabled: true
-            # Enables ihave control message truncation.
-            ihave-enabled: true
-            # Enables ihave message id truncation.
-            ihave-message-id-enabled: true
-            # Enables iwant control message truncation.
-            iwant-enabled: true
-            # Enables iwant message id truncation.
-            iwant-message-id-enabled: true
+            # Disables graft control message truncation.
+            graft-disabled: false
+            # Disables prune control message truncation.
+            prune-disabled: false
+            # Disables ihave control message truncation.
+            ihave-disabled: false
+            # Disables ihave message id truncation.
+            ihave-message-id-disabled: false
+            # Disables iwant control message truncation.
+            iwant-disabled: false
+            # Disables iwant message id truncation.
+            iwant-message-id-disabled: false
     rpc-tracer:
       # The default interval at which the mesh tracer logs the mesh topology. This is used for debugging and forensics purposes.
       #	Note that we purposefully choose this logging interval high enough to avoid spamming the logs. Moreover, the

@@ -340,12 +340,12 @@ func TestControlMessageValidationInspector_TruncationConfigToggle(t *testing.T) 
 			params.Config.GraftPruneMessageMaxSampleSize = numOfMsgs
 			params.Logger = logger
 			// disable truncation for all control message types individually
-			params.Config.InspectionProcess.Truncate.GraftEnabled = false
-			params.Config.InspectionProcess.Truncate.PruneEnabled = false
-			params.Config.InspectionProcess.Truncate.IHaveEnabled = false
-			params.Config.InspectionProcess.Truncate.IHaveMessageIdsEnabled = false
-			params.Config.InspectionProcess.Truncate.IWantEnabled = false
-			params.Config.InspectionProcess.Truncate.IWantMessageIdsEnabled = false
+			params.Config.InspectionProcess.Truncate.GraftDisabled = true
+			params.Config.InspectionProcess.Truncate.PruneDisabled = true
+			params.Config.InspectionProcess.Truncate.IHaveDisabled = true
+			params.Config.InspectionProcess.Truncate.IHaveMessageIdsDisabled = true
+			params.Config.InspectionProcess.Truncate.IWantDisabled = true
+			params.Config.InspectionProcess.Truncate.IWantMessageIdsDisabled = true
 		})
 
 		// topic validation is ignored set any topic oracle
@@ -434,11 +434,11 @@ func TestControlMessageValidationInspector_InspectionConfigToggle(t *testing.T) 
 			params.Config.GraftPruneMessageMaxSampleSize = numOfMsgs
 			params.Logger = logger
 			// disable inspection for all control message types individually
-			params.Config.InspectionProcess.Inspect.GraftEnabled = false
-			params.Config.InspectionProcess.Inspect.PruneEnabled = false
-			params.Config.InspectionProcess.Inspect.IHaveEnabled = false
-			params.Config.InspectionProcess.Inspect.IWantEnabled = false
-			params.Config.InspectionProcess.Inspect.PublishEnabled = false
+			params.Config.InspectionProcess.Inspect.GraftDisabled = true
+			params.Config.InspectionProcess.Inspect.PruneDisabled = true
+			params.Config.InspectionProcess.Inspect.IHaveDisabled = true
+			params.Config.InspectionProcess.Inspect.IWantDisabled = true
+			params.Config.InspectionProcess.Inspect.PublishDisabled = true
 		})
 
 		// distribute should never be called when inspection is disabled
