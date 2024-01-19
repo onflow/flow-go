@@ -1060,7 +1060,7 @@ func stopInspector(t *testing.T, cancel context.CancelFunc, inspector *validatio
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }
 
-// utility function to track the number of warn-level calls to a logger
+// utility function to track the number of logs expected logs for the expected log level.
 func hookedLogger(counter *atomic.Int64, expectedLogLevel zerolog.Level, expectedLogs map[string]struct{}) zerolog.Logger {
 	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
 		if _, ok := expectedLogs[message]; ok && level == expectedLogLevel {
@@ -1070,6 +1070,7 @@ func hookedLogger(counter *atomic.Int64, expectedLogLevel zerolog.Level, expecte
 	return zerolog.New(os.Stdout).Level(expectedLogLevel).Hook(hook)
 }
 
+// ensureMessageIdsLen ensures RPC IHave and IWant message ids are the expected len.
 func ensureMessageIdsLen(t *testing.T, msgType p2pmsg.ControlMessageType, rpc *pubsub.RPC, expectedLen int) {
 	switch msgType {
 	case p2pmsg.CtrlMsgIHave:
