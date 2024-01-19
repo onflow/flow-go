@@ -183,7 +183,7 @@ func TestTransactionStorageLimiter(t *testing.T) {
 	)
 	t.Run("special account is skipped", func(t *testing.T) {
 		sc := systemcontracts.SystemContractsForChain(ctx.Chain.ChainID())
-		evm := sc.EVM.Address
+		evm := sc.EVMStorage.Address
 
 		executionSnapshot := &snapshot.ExecutionSnapshot{
 			WriteSet: map[flow.RegisterID]flow.RegisterValue{
