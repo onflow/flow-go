@@ -819,9 +819,15 @@ func (b *bootstrapExecutor) setStakingAllowlist(
 
 func (b *bootstrapExecutor) setupEVM(serviceAddress, fungibleTokenAddress, flowTokenAddress flow.Address) {
 	if b.setupEVMEnabled {
-		evmAcc := b.createAccount(nil) // account for storage
+		// account for storage
+		// we dont need to deploy anything to this account, but it needs to exist
+		// so that we can store the EVM state on it
+		evmAcc := b.createAccount(nil)
+		b.setupStorageForAccount(evmAcc, serviceAddress, fungibleTokenAddress, flowTokenAddress)
+
+		// deploy the EVM contract to the service account
 		tx := blueprints.DeployContractTransaction(
-			evmAcc,
+			serviceAddress,
 			stdlib.ContractCode(flowTokenAddress, bool(b.evmAbiOnly)),
 			stdlib.ContractName,
 		)
@@ -831,8 +837,6 @@ func (b *bootstrapExecutor) setupEVM(serviceAddress, fungibleTokenAddress, flowT
 			Transaction(tx, 0),
 		)
 		panicOnMetaInvokeErrf("failed to deploy EVM contract: %s", txError, err)
-
-		b.setupStorageForAccount(evmAcc, serviceAddress, fungibleTokenAddress, flowTokenAddress)
 	}
 }
 
