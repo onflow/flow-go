@@ -16,7 +16,7 @@ else
 	ADX_SUPPORT := 1
 endif
 
-DISABLE_ADX := "-O -D__BLST_PORTABLE__"
+DISABLE_ADX := "-O2 -D__BLST_PORTABLE__"
 
 # Then, set `CRYPTO_FLAG`
 # the crypto package uses BLST source files underneath which may use ADX instructions.
