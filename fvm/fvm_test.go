@@ -3022,7 +3022,7 @@ func TestEVM(t *testing.T) {
 			fvm.WithEVMABIOnly(true),
 		).
 		withContextOptions(
-			fvm.WithEVMEnabled(false),
+			fvm.WithEVMEnabled(true),
 		).
 		run(func(
 			t *testing.T,
@@ -3052,7 +3052,6 @@ func TestEVM(t *testing.T) {
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
 
-			ctx = fvm.NewContextFromParent(ctx, fvm.WithEVMEnabled(true))
 			_, output, err := vm.Run(
 				ctx,
 				fvm.Transaction(txBody, 0),
