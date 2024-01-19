@@ -31,9 +31,11 @@ jobs:
         gcloud auth configure-docker
     - name: Docker build
       run: |
-        make docker-build-flow
-        make docker-build-flow-without-netgo
+        make docker-build-flow-with-adx
+        make docker-build-flow-without-adx
+        make docker-build-flow-without-netgo-without-adx
     - name: Docker push
       run: |
-        make docker-push-flow
-        make docker-push-flow-without-netgo
+        make docker-push-flow-with-adx
+        make docker-push-flow-without-adx
+        make docker-push-flow-without-netgo-without-adx

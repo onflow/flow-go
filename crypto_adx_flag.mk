@@ -16,6 +16,8 @@ else
 	ADX_SUPPORT := 1
 endif
 
+DISABLE_ADX := "-O -D__BLST_PORTABLE__"
+
 # Then, set `CRYPTO_FLAG`
 # the crypto package uses BLST source files underneath which may use ADX instructions.
 ifeq ($(ADX_SUPPORT), 1)
@@ -23,5 +25,5 @@ ifeq ($(ADX_SUPPORT), 1)
 	CRYPTO_FLAG := ""
 else
 # if ADX instructions aren't supported, this CGO flags uses a slower non-ADX implementation 
-	CRYPTO_FLAG := "-O -D__BLST_PORTABLE__"
+	CRYPTO_FLAG := $(DISABLE_ADX)
 endif
