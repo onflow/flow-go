@@ -35,6 +35,8 @@ WORKDIR /app
 ARG GOARCH=amd64
 # TAGS can be overriden to modify the go build tags (e.g. build without netgo)
 ARG TAGS="netgo"
+# CC flag can be overwritten to specify a C compiler
+ARG CC=""
 # CGO_FLAG uses ADX instructions by default, flag can be overwritten to build without ADX
 ARG CGO_FLAG=""
 
@@ -43,7 +45,7 @@ ARG CGO_FLAG=""
 RUN --mount=type=cache,sharing=locked,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=secret,id=git_creds,dst=/root/.netrc \
-    CGO_ENABLED=1 GOOS=linux GOARCH=${GOARCH} CGO_FLAGS="${CGO_FLAG}" go build --tags "${TAGS}" -ldflags "-extldflags -static \
+    CGO_ENABLED=1 GOOS=linux GOARCH=${GOARCH} CC="${CC}" CGO_FLAGS="${CGO_FLAG}" go build --tags "${TAGS}" -ldflags "-extldflags -static \
     -X 'github.com/onflow/flow-go/cmd/build.commit=${COMMIT}' -X  'github.com/onflow/flow-go/cmd/build.semver=${VERSION}'" \
     -o ./app ${TARGET}
 
@@ -61,10 +63,12 @@ ENTRYPOINT ["/bin/app"]
 FROM build-env as build-debug
 WORKDIR /app
 ARG GOARCH=amd64
+ARG CC=""
+ARG CGO_FLAG=""
 RUN --mount=type=ssh \
     --mount=type=cache,sharing=locked,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=1 GOOS=linux GOARCH=${GOARCH} CGO_FLAGS="${CGO_FLAG}" go build --tags "netgo" -ldflags "-extldflags -static \
+    CGO_ENABLED=1 GOOS=linux GOARCH=${GOARCH} CC="${CC}" CGO_FLAGS="${CGO_FLAG}" go build --tags "netgo" -ldflags "-extldflags -static \
     -X 'github.com/onflow/flow-go/cmd/build.commit=${COMMIT}' -X  'github.com/onflow/flow-go/cmd/build.semver=${VERSION}'" \
     -gcflags="all=-N -l" -o ./app ${TARGET}
 
