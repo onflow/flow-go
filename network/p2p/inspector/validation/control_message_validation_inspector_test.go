@@ -109,8 +109,7 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 			shouldNotBeTruncated := len(graftsLessThanMaxSampleSize.GetControl().GetGraft()) == 50
 			return shouldBeTruncated && shouldNotBeTruncated
 		}, time.Second, 500*time.Millisecond)
-		cancel()
-		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
+		stopInspector(t, cancel, inspector)
 	})
 
 	t.Run("truncatePruneMessages should truncate prune messages as expected", func(t *testing.T) {
@@ -140,8 +139,7 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 			shouldNotBeTruncated := len(prunesLessThanMaxSampleSize.GetControl().GetPrune()) == 50
 			return shouldBeTruncated && shouldNotBeTruncated
 		}, time.Second, 500*time.Millisecond)
-		cancel()
-		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
+		stopInspector(t, cancel, inspector)
 	})
 
 	t.Run("truncateIHaveMessages should truncate iHave messages as expected", func(t *testing.T) {
@@ -171,8 +169,7 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 			shouldNotBeTruncated := len(iHavesLessThanMaxSampleSize.GetControl().GetIhave()) == 50
 			return shouldBeTruncated && shouldNotBeTruncated
 		}, time.Second, 500*time.Millisecond)
-		cancel()
-		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
+		stopInspector(t, cancel, inspector)
 	})
 
 	t.Run("truncateIHaveMessageIds should truncate iHave message ids as expected", func(t *testing.T) {
@@ -208,8 +205,7 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 			}
 			return true
 		}, time.Second, 500*time.Millisecond)
-		cancel()
-		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
+		stopInspector(t, cancel, inspector)
 	})
 
 	t.Run("truncateIWantMessages should truncate iWant messages as expected", func(t *testing.T) {
@@ -237,8 +233,7 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 			shouldNotBeTruncated := len(iWantsLessThanMaxSampleSize.GetControl().GetIwant()) == 50
 			return shouldBeTruncated && shouldNotBeTruncated
 		}, time.Second, 500*time.Millisecond)
-		cancel()
-		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
+		stopInspector(t, cancel, inspector)
 	})
 
 	t.Run("truncateIWantMessageIds should truncate iWant message ids as expected", func(t *testing.T) {
@@ -272,8 +267,7 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 			}
 			return true
 		}, time.Second, 500*time.Millisecond)
-		cancel()
-		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
+		stopInspector(t, cancel, inspector)
 	})
 }
 
@@ -321,16 +315,9 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 
 		from := unittest.PeerIdFixture(t)
 		require.NoError(t, inspector.Inspect(from, rpc))
-		require.Never(t, func() bool {
-			for _, call := range distributor.Calls {
-				if call.Method == "Distribute" {
-					return true
-				}
-			}
-			return false
-		}, time.Second, 100*time.Millisecond)
-		cancel()
-		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
+		// sleep for 1 second to ensure rpc is processed
+		time.Sleep(time.Second)
+		stopInspector(t, cancel, inspector)
 	})
 
 	t.Run("processInspectRPCReq should disseminate invalid control message notification for control messages with duplicate topics", func(t *testing.T) {
@@ -347,15 +334,13 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		duplicateTopicGraftsRpc := unittest.P2PRPCFixture(unittest.WithGrafts(grafts...))
 		duplicateTopicPrunesRpc := unittest.P2PRPCFixture(unittest.WithPrunes(prunes...))
 		duplicateTopicIHavesRpc := unittest.P2PRPCFixture(unittest.WithIHaves(ihaves...))
-		expectedNotifications := 3
-		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Times(expectedNotifications).Run(func(args mock.Arguments) {
+		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Times(3).Run(func(args mock.Arguments) {
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
-			require.Equal(t, duplicateTopic, notification.Errors[0].Topic())
-			require.Equal(t, notification.Errors[0].CtrlMsgTopicType(), p2p.CtrlMsgNonClusterTopicType, "expected p2p.CtrlMsgNonClusterTopicType notification type, no RPC with cluster prefixed topic sent in this test")
+			require.Equal(t, notification.TopicType, p2p.CtrlMsgNonClusterTopicType, "expected p2p.CtrlMsgNonClusterTopicType notification type, no RPC with cluster prefixed topic sent in this test")
 			require.Equal(t, from, notification.PeerID)
 			require.Contains(t, []p2pmsg.ControlMessageType{p2pmsg.CtrlMsgGraft, p2pmsg.CtrlMsgPrune, p2pmsg.CtrlMsgIHave}, notification.MsgType)
-			require.True(t, validation.IsDuplicateTopicErr(notification.Errors[0].Err))
+			require.True(t, validation.IsDuplicateTopicErr(notification.Error))
 		})
 
 		inspector.Start(signalerCtx)
@@ -363,17 +348,9 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		require.NoError(t, inspector.Inspect(from, duplicateTopicGraftsRpc))
 		require.NoError(t, inspector.Inspect(from, duplicateTopicPrunesRpc))
 		require.NoError(t, inspector.Inspect(from, duplicateTopicIHavesRpc))
-		require.Never(t, func() bool {
-			calls := 0
-			for _, call := range distributor.Calls {
-				if call.Method == "Distribute" {
-					calls++
-				}
-			}
-			return calls > expectedNotifications
-		}, time.Second, 100*time.Millisecond)
-		cancel()
-		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
+		// sleep for 1 second to ensure rpc's is processed
+		time.Sleep(time.Second)
+		stopInspector(t, cancel, inspector)
 	})
 
 	t.Run("inspectGraftMessages should disseminate invalid control message notification for invalid graft messages as expected", func(t *testing.T) {
@@ -381,8 +358,7 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		// create unknown topic
 		unknownTopic, malformedTopic, invalidSporkIDTopic := invalidTopics(t, sporkID)
 		// avoid unknown topics errors
-		allTopics := []string{unknownTopic, malformedTopic, invalidSporkIDTopic}
-		topicProviderOracle.UpdateTopics(allTopics)
+		topicProviderOracle.UpdateTopics([]string{unknownTopic, malformedTopic, invalidSporkIDTopic})
 		unknownTopicGraft := unittest.P2PRPCGraftFixture(&unknownTopic)
 		malformedTopicGraft := unittest.P2PRPCGraftFixture(&malformedTopic)
 		invalidSporkIDTopicGraft := unittest.P2PRPCGraftFixture(&invalidSporkIDTopic)
@@ -392,26 +368,17 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		invalidSporkIDTopicReq := unittest.P2PRPCFixture(unittest.WithGrafts(invalidSporkIDTopicGraft))
 
 		from := unittest.PeerIdFixture(t)
-		checkNotification := checkNotificationFunc(t, from, []p2pmsg.ControlMessageType{p2pmsg.CtrlMsgGraft}, channels.IsInvalidTopicErr, p2p.CtrlMsgNonClusterTopicType, allTopics, nil)
-		expectedNotifications := 3
-		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Times(expectedNotifications).Run(checkNotification)
+		checkNotification := checkNotificationFunc(t, from, p2pmsg.CtrlMsgGraft, channels.IsInvalidTopicErr, p2p.CtrlMsgNonClusterTopicType)
+		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Times(3).Run(checkNotification)
 
 		inspector.Start(signalerCtx)
 
 		require.NoError(t, inspector.Inspect(from, unknownTopicReq))
 		require.NoError(t, inspector.Inspect(from, malformedTopicReq))
 		require.NoError(t, inspector.Inspect(from, invalidSporkIDTopicReq))
-		require.Never(t, func() bool {
-			calls := 0
-			for _, call := range distributor.Calls {
-				if call.Method == "Distribute" {
-					calls++
-				}
-			}
-			return calls > expectedNotifications
-		}, time.Second, 100*time.Millisecond)
-		cancel()
-		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
+		// sleep for 1 second to ensure rpc's is processed
+		time.Sleep(time.Second)
+		stopInspector(t, cancel, inspector)
 	})
 
 	t.Run("inspectPruneMessages should disseminate invalid control message notification for invalid prune messages as expected", func(t *testing.T) {
@@ -422,34 +389,23 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		malformedTopicPrune := unittest.P2PRPCPruneFixture(&malformedTopic)
 		invalidSporkIDTopicPrune := unittest.P2PRPCPruneFixture(&invalidSporkIDTopic)
 		// avoid unknown topics errors
-		allTopics := []string{unknownTopic, malformedTopic, invalidSporkIDTopic}
-		topicProviderOracle.UpdateTopics(allTopics)
+		topicProviderOracle.UpdateTopics([]string{unknownTopic, malformedTopic, invalidSporkIDTopic})
 		unknownTopicRpc := unittest.P2PRPCFixture(unittest.WithPrunes(unknownTopicPrune))
 		malformedTopicRpc := unittest.P2PRPCFixture(unittest.WithPrunes(malformedTopicPrune))
 		invalidSporkIDTopicRpc := unittest.P2PRPCFixture(unittest.WithPrunes(invalidSporkIDTopicPrune))
 
 		from := unittest.PeerIdFixture(t)
-		checkNotification := checkNotificationFunc(t, from, []p2pmsg.ControlMessageType{p2pmsg.CtrlMsgPrune}, channels.IsInvalidTopicErr, p2p.CtrlMsgNonClusterTopicType, allTopics, nil)
-		expectedNotifications := 3
-		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Times(expectedNotifications).Run(checkNotification)
+		checkNotification := checkNotificationFunc(t, from, p2pmsg.CtrlMsgPrune, channels.IsInvalidTopicErr, p2p.CtrlMsgNonClusterTopicType)
+		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Times(3).Run(checkNotification)
 
 		inspector.Start(signalerCtx)
 
 		require.NoError(t, inspector.Inspect(from, unknownTopicRpc))
 		require.NoError(t, inspector.Inspect(from, malformedTopicRpc))
 		require.NoError(t, inspector.Inspect(from, invalidSporkIDTopicRpc))
-		require.Never(t, func() bool {
-			calls := 0
-			for _, call := range distributor.Calls {
-				if call.Method == "Distribute" {
-					calls++
-				}
-			}
-			return calls > expectedNotifications
-		}, time.Second, 100*time.Millisecond)
-
-		cancel()
-		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
+		// sleep for 1 second to ensure rpc's is processed
+		time.Sleep(time.Second)
+		stopInspector(t, cancel, inspector)
 	})
 
 	t.Run("inspectIHaveMessages should disseminate invalid control message notification for iHave messages with invalid topics as expected", func(t *testing.T) {
@@ -457,8 +413,7 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		// create unknown topic
 		unknownTopic, malformedTopic, invalidSporkIDTopic := invalidTopics(t, sporkID)
 		// avoid unknown topics errors
-		allTopics := []string{unknownTopic, malformedTopic, invalidSporkIDTopic}
-		topicProviderOracle.UpdateTopics(allTopics)
+		topicProviderOracle.UpdateTopics([]string{unknownTopic, malformedTopic, invalidSporkIDTopic})
 		unknownTopicIhave := unittest.P2PRPCIHaveFixture(&unknownTopic, unittest.IdentifierListFixture(5).Strings()...)
 		malformedTopicIhave := unittest.P2PRPCIHaveFixture(&malformedTopic, unittest.IdentifierListFixture(5).Strings()...)
 		invalidSporkIDTopicIhave := unittest.P2PRPCIHaveFixture(&invalidSporkIDTopic, unittest.IdentifierListFixture(5).Strings()...)
@@ -468,56 +423,36 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		invalidSporkIDTopicRpc := unittest.P2PRPCFixture(unittest.WithIHaves(invalidSporkIDTopicIhave))
 
 		from := unittest.PeerIdFixture(t)
-		checkNotification := checkNotificationFunc(t, from, []p2pmsg.ControlMessageType{p2pmsg.CtrlMsgIHave}, channels.IsInvalidTopicErr, p2p.CtrlMsgNonClusterTopicType, allTopics, nil)
-		expectedNotifications := 3
-		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Times(expectedNotifications).Run(checkNotification)
+		checkNotification := checkNotificationFunc(t, from, p2pmsg.CtrlMsgIHave, channels.IsInvalidTopicErr, p2p.CtrlMsgNonClusterTopicType)
+		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Times(3).Run(checkNotification)
 		inspector.Start(signalerCtx)
 
 		require.NoError(t, inspector.Inspect(from, unknownTopicRpc))
 		require.NoError(t, inspector.Inspect(from, malformedTopicRpc))
 		require.NoError(t, inspector.Inspect(from, invalidSporkIDTopicRpc))
-		require.Never(t, func() bool {
-			calls := 0
-			for _, call := range distributor.Calls {
-				if call.Method == "Distribute" {
-					calls++
-				}
-			}
-			return calls > expectedNotifications
-		}, time.Second, 100*time.Millisecond)
-
-		cancel()
-		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
+		// sleep for 1 second to ensure rpc's is processed
+		time.Sleep(time.Second)
+		stopInspector(t, cancel, inspector)
 	})
 
 	t.Run("inspectIHaveMessages should disseminate invalid control message notification for iHave messages with duplicate message ids as expected", func(t *testing.T) {
 		inspector, signalerCtx, cancel, distributor, _, sporkID, _, topicProviderOracle := inspectorFixture(t)
 		validTopic := fmt.Sprintf("%s/%s", channels.PushBlocks.String(), sporkID)
 		// avoid unknown topics errors
-		allTopics := []string{validTopic}
-		topicProviderOracle.UpdateTopics(allTopics)
+		topicProviderOracle.UpdateTopics([]string{validTopic})
 		duplicateMsgID := unittest.IdentifierFixture()
 		msgIds := flow.IdentifierList{duplicateMsgID, duplicateMsgID, duplicateMsgID}
 		duplicateMsgIDIHave := unittest.P2PRPCIHaveFixture(&validTopic, append(msgIds, unittest.IdentifierListFixture(5)...).Strings()...)
 		duplicateMsgIDRpc := unittest.P2PRPCFixture(unittest.WithIHaves(duplicateMsgIDIHave))
 		from := unittest.PeerIdFixture(t)
-		checkNotification := checkNotificationFunc(t, from, []p2pmsg.ControlMessageType{p2pmsg.CtrlMsgIHave}, validation.IsDuplicateMessageIDErr, p2p.CtrlMsgNonClusterTopicType, nil, msgIds.Strings())
+		checkNotification := checkNotificationFunc(t, from, p2pmsg.CtrlMsgIHave, validation.IsDuplicateTopicErr, p2p.CtrlMsgNonClusterTopicType)
 		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Once().Run(checkNotification)
 		inspector.Start(signalerCtx)
 
 		require.NoError(t, inspector.Inspect(from, duplicateMsgIDRpc))
-		require.Never(t, func() bool {
-			calls := 0
-			for _, call := range distributor.Calls {
-				if call.Method == "Distribute" {
-					calls++
-				}
-			}
-			return calls > 1
-		}, time.Second, 100*time.Millisecond)
-
-		cancel()
-		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
+		// sleep for 1 second to ensure rpc's is processed
+		time.Sleep(time.Second)
+		stopInspector(t, cancel, inspector)
 	})
 
 	t.Run("inspectIWantMessages should disseminate invalid control message notification for iWant messages when duplicate message ids exceeds the allowed threshold", func(t *testing.T) {
@@ -531,7 +466,7 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		duplicateMsgIDRpc := unittest.P2PRPCFixture(unittest.WithIWants(duplicateMsgIDIWant))
 
 		from := unittest.PeerIdFixture(t)
-		checkNotification := checkNotificationFunc(t, from, []p2pmsg.ControlMessageType{p2pmsg.CtrlMsgIWant}, validation.IsIWantDuplicateMsgIDThresholdErr, p2p.CtrlMsgNonClusterTopicType, nil, msgIds)
+		checkNotification := checkNotificationFunc(t, from, p2pmsg.CtrlMsgIWant, validation.IsIWantDuplicateMsgIDThresholdErr, p2p.CtrlMsgNonClusterTopicType)
 		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Once().Run(checkNotification)
 		rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
 		rpcTracker.On("WasIHaveRPCSent", mock.AnythingOfType("string")).Return(true).Run(func(args mock.Arguments) {
@@ -543,17 +478,9 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		inspector.Start(signalerCtx)
 
 		require.NoError(t, inspector.Inspect(from, duplicateMsgIDRpc))
-		require.Never(t, func() bool {
-			calls := 0
-			for _, call := range distributor.Calls {
-				if call.Method == "Distribute" {
-					calls++
-				}
-			}
-			return calls > 1
-		}, time.Second, 100*time.Millisecond)
-		cancel()
-		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
+		// sleep for 1 second to ensure rpc's is processed
+		time.Sleep(time.Second)
+		stopInspector(t, cancel, inspector)
 	})
 
 	t.Run("inspectIWantMessages should disseminate invalid control message notification for iWant messages when cache misses exceeds allowed threshold", func(t *testing.T) {
@@ -567,7 +494,7 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		inspectMsgRpc := unittest.P2PRPCFixture(unittest.WithIWants(unittest.P2PRPCIWantFixtures(cacheMissCheckSize+1, 100)...))
 
 		from := unittest.PeerIdFixture(t)
-		checkNotification := checkNotificationFunc(t, from, []p2pmsg.ControlMessageType{p2pmsg.CtrlMsgIWant}, validation.IsIWantCacheMissThresholdErr, p2p.CtrlMsgNonClusterTopicType, nil, nil)
+		checkNotification := checkNotificationFunc(t, from, p2pmsg.CtrlMsgIWant, validation.IsIWantCacheMissThresholdErr, p2p.CtrlMsgNonClusterTopicType)
 		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Once().Run(checkNotification)
 		rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
 		// return false each time to eventually force a notification to be disseminated when the cache miss count finally exceeds the 90% threshold
@@ -588,54 +515,41 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		inspector.Start(signalerCtx)
 
 		require.NoError(t, inspector.Inspect(from, inspectMsgRpc))
-		require.Never(t, func() bool {
-			calls := 0
-			for _, call := range distributor.Calls {
-				if call.Method == "Distribute" {
-					calls++
-				}
-			}
-			return calls > 1
-		}, time.Second, 100*time.Millisecond)
-		cancel()
-		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
+		// sleep for 1 second to ensure rpc's is processed
+		time.Sleep(time.Second)
+		stopInspector(t, cancel, inspector)
 	})
 
-	t.Run("inspectIWantMessages should not disseminate invalid control message notification for iWant messages when cache misses exceeds allowed threshold if cache miss check size not exceeded", func(t *testing.T) {
-		inspector, signalerCtx, cancel, distributor, rpcTracker, _, _, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
-			// if size of iwants not greater than 10 cache misses will not be checked
-			params.Config.IWant.CacheMissCheckSize = 10
-			// set high cache miss threshold to ensure we only disseminate notification when it is exceeded
-			params.Config.IWant.CacheMissThreshold = .9
+	t.Run("inspectIWantMessages should not disseminate invalid control message notification for iWant messages when cache misses exceeds allowed threshold if cache miss check size not exceeded",
+		func(t *testing.T) {
+			inspector, signalerCtx, cancel, distributor, rpcTracker, _, _, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
+				// if size of iwants not greater than 10 cache misses will not be checked
+				params.Config.IWant.CacheMissCheckSize = 10
+				// set high cache miss threshold to ensure we only disseminate notification when it is exceeded
+				params.Config.IWant.CacheMissThreshold = .9
+			})
+			// oracle must be set even though iWant messages do not have topic IDs
+			defer distributor.AssertNotCalled(t, "Distribute")
+
+			msgIds := unittest.IdentifierListFixture(100).Strings()
+			inspectMsgRpc := unittest.P2PRPCFixture(unittest.WithIWants(unittest.P2PRPCIWantFixture(msgIds...)))
+			rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
+			// return false each time to eventually force a notification to be disseminated when the cache miss count finally exceeds the 90% threshold
+			rpcTracker.On("WasIHaveRPCSent", mock.AnythingOfType("string")).Return(false).Run(func(args mock.Arguments) {
+				id, ok := args[0].(string)
+				require.True(t, ok)
+				require.Contains(t, msgIds, id)
+			})
+
+			from := unittest.PeerIdFixture(t)
+			inspector.Start(signalerCtx)
+
+			require.NoError(t, inspector.Inspect(from, inspectMsgRpc))
+			// sleep for 1 second to ensure rpc's is processed
+			time.Sleep(time.Second)
+			stopInspector(t, cancel, inspector)
 		})
-		// oracle must be set even though iWant messages do not have topic IDs
-		defer distributor.AssertNotCalled(t, "Distribute")
 
-		msgIds := unittest.IdentifierListFixture(100).Strings()
-		inspectMsgRpc := unittest.P2PRPCFixture(unittest.WithIWants(unittest.P2PRPCIWantFixture(msgIds...)))
-		rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
-		// return false each time to eventually force a notification to be disseminated when the cache miss count finally exceeds the 90% threshold
-		rpcTracker.On("WasIHaveRPCSent", mock.AnythingOfType("string")).Return(false).Run(func(args mock.Arguments) {
-			id, ok := args[0].(string)
-			require.True(t, ok)
-			require.Contains(t, msgIds, id)
-		})
-
-		from := unittest.PeerIdFixture(t)
-		inspector.Start(signalerCtx)
-
-		require.NoError(t, inspector.Inspect(from, inspectMsgRpc))
-		require.Never(t, func() bool {
-			for _, call := range distributor.Calls {
-				if call.Method == "Distribute" {
-					return true
-				}
-			}
-			return false
-		}, time.Second, 100*time.Millisecond)
-		cancel()
-		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
-	})
 	t.Run("inspectRpcPublishMessages should disseminate invalid control message notification when invalid pubsub messages count greater than configured RpcMessageErrorThreshold", func(t *testing.T) {
 		errThreshold := 500
 		inspector, signalerCtx, cancel, distributor, _, sporkID, _, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
@@ -666,48 +580,31 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		// set topic oracle to return list of topics to avoid hasSubscription errors and force topic validation
 		topicProviderOracle.UpdateTopics(topics)
 		from := unittest.PeerIdFixture(t)
-		checkNotification := checkNotificationFunc(t, from, []p2pmsg.ControlMessageType{p2pmsg.RpcPublishMessage}, validation.IsInvalidRpcPublishMessagesErr, p2p.CtrlMsgNonClusterTopicType, nil, nil)
+		checkNotification := checkNotificationFunc(t, from, p2pmsg.RpcPublishMessage, validation.IsInvalidRpcPublishMessagesErr, p2p.CtrlMsgNonClusterTopicType)
 		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Once().Run(checkNotification)
 
 		inspector.Start(signalerCtx)
 
 		require.NoError(t, inspector.Inspect(from, rpc))
-		require.Never(t, func() bool {
-			calls := 0
-			for _, call := range distributor.Calls {
-				if call.Method == "Distribute" {
-					calls++
-				}
-			}
-			return calls > 1
-		}, time.Second, 100*time.Millisecond)
-		cancel()
-		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
+		// sleep for 1 second to ensure rpc's is processed
+		time.Sleep(time.Second)
+		stopInspector(t, cancel, inspector)
 	})
 	t.Run("inspectRpcPublishMessages should disseminate invalid control message notification when subscription missing for topic", func(t *testing.T) {
 		errThreshold := 500
 		inspector, signalerCtx, cancel, distributor, _, sporkID, _, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
 			params.Config.MessageErrorThreshold = errThreshold
 		})
-		topic := fmt.Sprintf("%s/%s", channels.TestNetworkChannel, sporkID)
-		pubsubMsgs := unittest.GossipSubMessageFixtures(errThreshold+1, topic)
+		pubsubMsgs := unittest.GossipSubMessageFixtures(errThreshold+1, fmt.Sprintf("%s/%s", channels.TestNetworkChannel, sporkID))
 		from := unittest.PeerIdFixture(t)
 		rpc := unittest.P2PRPCFixture(unittest.WithPubsubMessages(pubsubMsgs...))
-		checkNotification := checkNotificationFunc(t, from, []p2pmsg.ControlMessageType{p2pmsg.RpcPublishMessage}, validation.IsInvalidRpcPublishMessagesErr, p2p.CtrlMsgNonClusterTopicType, nil, nil)
+		checkNotification := checkNotificationFunc(t, from, p2pmsg.RpcPublishMessage, validation.IsInvalidRpcPublishMessagesErr, p2p.CtrlMsgNonClusterTopicType)
 		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Once().Run(checkNotification)
 		inspector.Start(signalerCtx)
 		require.NoError(t, inspector.Inspect(from, rpc))
-		require.Never(t, func() bool {
-			calls := 0
-			for _, call := range distributor.Calls {
-				if call.Method == "Distribute" {
-					calls++
-				}
-			}
-			return calls > 1
-		}, time.Second, 100*time.Millisecond)
-		cancel()
-		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
+		// sleep for 1 second to ensure rpc's is processed
+		time.Sleep(time.Second)
+		stopInspector(t, cancel, inspector)
 	})
 
 	t.Run("inspectRpcPublishMessages should disseminate invalid control message notification when publish messages contain no topic", func(t *testing.T) {
@@ -724,24 +621,16 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		}
 		// set topic oracle to return list of topics excluding first topic sent
 		from := unittest.PeerIdFixture(t)
-		checkNotification := checkNotificationFunc(t, from, []p2pmsg.ControlMessageType{p2pmsg.RpcPublishMessage}, validation.IsInvalidRpcPublishMessagesErr, p2p.CtrlMsgNonClusterTopicType, topics, nil)
+		checkNotification := checkNotificationFunc(t, from, p2pmsg.RpcPublishMessage, validation.IsInvalidRpcPublishMessagesErr, p2p.CtrlMsgNonClusterTopicType)
 		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Once().Run(checkNotification)
 		inspector.Start(signalerCtx)
 		require.NoError(t, inspector.Inspect(from, rpc))
-		require.Never(t, func() bool {
-			calls := 0
-			for _, call := range distributor.Calls {
-				if call.Method == "Distribute" {
-					calls++
-				}
-			}
-			return calls > 1
-		}, time.Second, 100*time.Millisecond)
-		cancel()
-		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
+		// sleep for 1 second to ensure rpc's is processed
+		time.Sleep(time.Second)
+		stopInspector(t, cancel, inspector)
 	})
 	t.Run("inspectRpcPublishMessages should not inspect pubsub message sender on public networks", func(t *testing.T) {
-		inspector, signalerCtx, cancel, distributor, _, sporkID, idProvider, topicProviderOracle := inspectorFixture(t)
+		inspector, signalerCtx, cancel, _, _, sporkID, idProvider, topicProviderOracle := inspectorFixture(t)
 		from := unittest.PeerIdFixture(t)
 		defer idProvider.AssertNotCalled(t, "ByPeerID", from)
 		topic := fmt.Sprintf("%s/%s", channels.TestNetworkChannel, sporkID)
@@ -750,16 +639,9 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		rpc := unittest.P2PRPCFixture(unittest.WithPubsubMessages(pubsubMsgs...))
 		inspector.Start(signalerCtx)
 		require.NoError(t, inspector.Inspect(from, rpc))
-		require.Never(t, func() bool {
-			for _, call := range distributor.Calls {
-				if call.Method == "Distribute" {
-					return true
-				}
-			}
-			return false
-		}, time.Second, 100*time.Millisecond)
-		cancel()
-		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
+		// sleep for 1 second to ensure rpc's is processed
+		time.Sleep(time.Second)
+		stopInspector(t, cancel, inspector)
 	})
 	t.Run("inspectRpcPublishMessages should disseminate invalid control message notification when message is from unstaked peer", func(t *testing.T) {
 		inspector, signalerCtx, cancel, distributor, _, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
@@ -773,21 +655,13 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		pubsubMsgs := unittest.GossipSubMessageFixtures(501, topic, unittest.WithFrom(from))
 		idProvider.On("ByPeerID", from).Return(nil, false).Times(501)
 		rpc := unittest.P2PRPCFixture(unittest.WithPubsubMessages(pubsubMsgs...))
-		checkNotification := checkNotificationFunc(t, from, []p2pmsg.ControlMessageType{p2pmsg.RpcPublishMessage}, validation.IsInvalidRpcPublishMessagesErr, p2p.CtrlMsgNonClusterTopicType, nil, nil)
+		checkNotification := checkNotificationFunc(t, from, p2pmsg.RpcPublishMessage, validation.IsInvalidRpcPublishMessagesErr, p2p.CtrlMsgNonClusterTopicType)
 		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Once().Run(checkNotification)
 		inspector.Start(signalerCtx)
 		require.NoError(t, inspector.Inspect(from, rpc))
-		require.Never(t, func() bool {
-			calls := 0
-			for _, call := range distributor.Calls {
-				if call.Method == "Distribute" {
-					calls++
-				}
-			}
-			return calls > 1
-		}, time.Second, 100*time.Millisecond)
-		cancel()
-		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
+		// sleep for 1 second to ensure rpc's is processed
+		time.Sleep(time.Second)
+		stopInspector(t, cancel, inspector)
 	})
 	t.Run("inspectRpcPublishMessages should disseminate invalid control message notification when message is from ejected peer", func(t *testing.T) {
 		inspector, signalerCtx, cancel, distributor, _, sporkID, idProvider, topicProviderOracle := inspectorFixture(t, func(params *validation.InspectorParams) {
@@ -802,106 +676,13 @@ func TestControlMessageValidationInspector_processInspectRPCReq(t *testing.T) {
 		pubsubMsgs := unittest.GossipSubMessageFixtures(501, topic, unittest.WithFrom(from))
 		idProvider.On("ByPeerID", from).Return(id, true).Times(501)
 		rpc := unittest.P2PRPCFixture(unittest.WithPubsubMessages(pubsubMsgs...))
-		checkNotification := checkNotificationFunc(t, from, []p2pmsg.ControlMessageType{p2pmsg.RpcPublishMessage}, validation.IsInvalidRpcPublishMessagesErr, p2p.CtrlMsgNonClusterTopicType, nil, nil)
+		checkNotification := checkNotificationFunc(t, from, p2pmsg.RpcPublishMessage, validation.IsInvalidRpcPublishMessagesErr, p2p.CtrlMsgNonClusterTopicType)
 		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Once().Run(checkNotification)
 		inspector.Start(signalerCtx)
 		require.NoError(t, inspector.Inspect(from, rpc))
-		require.Never(t, func() bool {
-			calls := 0
-			for _, call := range distributor.Calls {
-				if call.Method == "Distribute" {
-					calls++
-				}
-			}
-			return calls > 1
-		}, time.Second, 100*time.Millisecond)
-		cancel()
-		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
-	})
-	t.Run("rpc inspection should disseminate invalid control message notification with multiple errors when a control message contains multiple errors", func(t *testing.T) {
-		inspector, signalerCtx, cancel, distributor, rpcTracker, sporkID, _, topicProviderOracle := inspectorFixture(t)
-
-		// create unknown topic
-		unknownTopic, malformedTopic, invalidSporkIDTopic := invalidTopics(t, sporkID)
-		validTopic := fmt.Sprintf("%s/%s", channels.PushBlocks, sporkID)
-		// avoid unknown topics errors
-		topicProviderOracle.UpdateTopics([]string{unknownTopic, malformedTopic, invalidSporkIDTopic, validTopic})
-		duplicateMessageID := unittest.GenerateRandomStringWithLen(10)
-		invalidGrafts := []*pubsub_pb.ControlGraft{unittest.P2PRPCGraftFixture(&unknownTopic), unittest.P2PRPCGraftFixture(&malformedTopic), unittest.P2PRPCGraftFixture(&invalidSporkIDTopic)}
-		invalidPrunes := []*pubsub_pb.ControlPrune{unittest.P2PRPCPruneFixture(&unknownTopic), unittest.P2PRPCPruneFixture(&malformedTopic), unittest.P2PRPCPruneFixture(&invalidSporkIDTopic)}
-		invalidIHaves := []*pubsub_pb.ControlIHave{
-			unittest.P2PRPCIHaveFixture(&unknownTopic, unittest.GenerateRandomStringsWithLen(10, 10)...),
-			unittest.P2PRPCIHaveFixture(&malformedTopic, unittest.GenerateRandomStringsWithLen(10, 10)...),
-			unittest.P2PRPCIHaveFixture(&invalidSporkIDTopic, unittest.GenerateRandomStringsWithLen(10, 10)...),
-			unittest.P2PRPCIHaveFixture(&validTopic, duplicateMessageID, duplicateMessageID)}
-		invalidIWants := []*pubsub_pb.ControlIWant{unittest.P2PRPCIWantFixture(duplicateMessageID, duplicateMessageID)}
-
-		graftsReq := unittest.P2PRPCFixture(unittest.WithGrafts(invalidGrafts...))
-		prunesReq := unittest.P2PRPCFixture(unittest.WithPrunes(invalidPrunes...))
-		ihavesReq := unittest.P2PRPCFixture(unittest.WithIHaves(invalidIHaves...))
-		iwantsReq := unittest.P2PRPCFixture(unittest.WithIWants(invalidIWants...))
-
-		from := unittest.PeerIdFixture(t)
-		ensureIsInvalidTopicErr := func(errors p2p.InvCtrlMsgErrs) {
-			for _, err := range errors {
-				require.True(t, channels.IsInvalidTopicErr(err.Err))
-			}
-		}
-		expectedNotifications := 4
-		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Times(expectedNotifications).Run(func(args mock.Arguments) {
-			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
-			require.True(t, ok)
-			require.Equal(t, from, notification.PeerID)
-			switch notification.MsgType {
-			case p2pmsg.CtrlMsgGraft:
-				require.Equal(t, len(invalidGrafts), notification.Errors.Len())
-				ensureIsInvalidTopicErr(notification.Errors)
-			case p2pmsg.CtrlMsgPrune:
-				require.Equal(t, len(invalidPrunes), notification.Errors.Len())
-				ensureIsInvalidTopicErr(notification.Errors)
-			case p2pmsg.CtrlMsgIHave:
-				require.Equal(t, len(invalidIHaves), notification.Errors.Len())
-				for _, err := range notification.Errors {
-					switch {
-					case channels.IsInvalidTopicErr(err.Err):
-						continue
-					case validation.IsDuplicateMessageIDErr(err.Err):
-						continue
-					default:
-						require.Fail(t, fmt.Sprintf("unexpected error encountered %s for iHave control message", err.Err))
-					}
-				}
-			case p2pmsg.CtrlMsgIWant:
-				require.Equal(t, len(invalidIWants), notification.Errors.Len())
-				require.True(t, validation.IsIWantDuplicateMsgIDThresholdErr(notification.Errors[0].Err))
-			default:
-				require.Fail(t, fmt.Sprintf("unexpected control message type: %s", notification.MsgType))
-			}
-		})
-		rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
-		rpcTracker.On("WasIHaveRPCSent", mock.AnythingOfType("string")).Return(true).Run(func(args mock.Arguments) {
-			id, ok := args[0].(string)
-			require.True(t, ok)
-			require.Contains(t, duplicateMessageID, id)
-		})
-		inspector.Start(signalerCtx)
-		unittest.RequireCloseBefore(t, inspector.Ready(), 1*time.Second, "inspector did not start in time")
-
-		require.NoError(t, inspector.Inspect(from, graftsReq))
-		require.NoError(t, inspector.Inspect(from, prunesReq))
-		require.NoError(t, inspector.Inspect(from, ihavesReq))
-		require.NoError(t, inspector.Inspect(from, iwantsReq))
-		require.Never(t, func() bool {
-			calls := 0
-			for _, call := range distributor.Calls {
-				if call.Method == "Distribute" {
-					calls++
-				}
-			}
-			return calls > expectedNotifications
-		}, time.Second, 100*time.Millisecond)
-		cancel()
-		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
+		// sleep for 1 second to ensure rpc's is processed
+		time.Sleep(time.Second)
+		stopInspector(t, cancel, inspector)
 	})
 }
 
@@ -919,16 +700,9 @@ func TestNewControlMsgValidationInspector_validateClusterPrefixedTopic(t *testin
 		inspector.ActiveClustersChanged(flow.ChainIDList{clusterID, flow.ChainID(unittest.IdentifierFixture().String()), flow.ChainID(unittest.IdentifierFixture().String())})
 		inspector.Start(signalerCtx)
 		require.NoError(t, inspector.Inspect(from, inspectMsgRpc))
-		require.Never(t, func() bool {
-			for _, call := range distributor.Calls {
-				if call.Method == "Distribute" {
-					return true
-				}
-			}
-			return false
-		}, time.Second, 100*time.Millisecond)
-		cancel()
-		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
+		// sleep for 1 second to ensure rpc's is processed
+		time.Sleep(time.Second)
+		stopInspector(t, cancel, inspector)
 	})
 
 	t.Run("validateClusterPrefixedTopic should not return error if cluster prefixed hard threshold not exceeded for unknown cluster ids", func(t *testing.T) {
@@ -945,51 +719,27 @@ func TestNewControlMsgValidationInspector_validateClusterPrefixedTopic(t *testin
 		idProvider.On("ByPeerID", from).Return(id, true).Once()
 		inspector.Start(signalerCtx)
 		require.NoError(t, inspector.Inspect(from, inspectMsgRpc))
-		require.Never(t, func() bool {
-			for _, call := range distributor.Calls {
-				if call.Method == "Distribute" {
-					return true
-				}
-			}
-			return false
-		}, time.Second, 100*time.Millisecond)
-		cancel()
-		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
+		// sleep for 1 second to ensure rpc's is processed
+		time.Sleep(time.Second)
+		stopInspector(t, cancel, inspector)
+		stopInspector(t, cancel, inspector)
 	})
 
 	t.Run("validateClusterPrefixedTopic should return an error when sender is unstaked", func(t *testing.T) {
 		inspector, signalerCtx, cancel, distributor, _, sporkID, idProvider, topicProviderOracle := inspectorFixture(t)
+		defer distributor.AssertNotCalled(t, "Distribute")
 		clusterID := flow.ChainID(unittest.IdentifierFixture().String())
 		clusterPrefixedTopic := channels.Topic(fmt.Sprintf("%s/%s", channels.SyncCluster(clusterID), sporkID)).String()
 		topicProviderOracle.UpdateTopics([]string{clusterPrefixedTopic})
 		from := unittest.PeerIdFixture(t)
-		checkNotification := checkNotificationFunc(t, from, []p2pmsg.ControlMessageType{p2pmsg.CtrlMsgGraft, p2pmsg.CtrlMsgPrune, p2pmsg.CtrlMsgIHave}, validation.IsErrUnstakedPeer, p2p.CtrlMsgTopicTypeClusterPrefixed, []string{clusterPrefixedTopic}, nil)
-		expectedNotifications := 3
-		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Times(expectedNotifications).Run(checkNotification)
-		idProvider.On("ByPeerID", from).Return(nil, false).Times(3)
-		grafts := unittest.P2PRPCGraftFixtures(clusterPrefixedTopic)
-		prunes := unittest.P2PRPCPruneFixtures(clusterPrefixedTopic)
-		ihaves := unittest.P2PRPCIHaveFixtures(50, clusterPrefixedTopic)
-		graftRpc := unittest.P2PRPCFixture(unittest.WithGrafts(grafts...))
-		pruneRpc := unittest.P2PRPCFixture(unittest.WithPrunes(prunes...))
-		ihaveRpc := unittest.P2PRPCFixture(unittest.WithIHaves(ihaves...))
-
+		idProvider.On("ByPeerID", from).Return(nil, false).Once()
+		inspectMsgRpc := unittest.P2PRPCFixture(unittest.WithGrafts(unittest.P2PRPCGraftFixture(&clusterPrefixedTopic)))
 		inspector.ActiveClustersChanged(flow.ChainIDList{flow.ChainID(unittest.IdentifierFixture().String())})
 		inspector.Start(signalerCtx)
-		require.NoError(t, inspector.Inspect(from, graftRpc))
-		require.NoError(t, inspector.Inspect(from, pruneRpc))
-		require.NoError(t, inspector.Inspect(from, ihaveRpc))
-		require.Never(t, func() bool {
-			calls := 0
-			for _, call := range distributor.Calls {
-				if call.Method == "Distribute" {
-					calls++
-				}
-			}
-			return calls > expectedNotifications
-		}, time.Second, 100*time.Millisecond)
-		cancel()
-		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
+		require.NoError(t, inspector.Inspect(from, inspectMsgRpc))
+		// sleep for 1 second to ensure rpc's is processed
+		time.Sleep(time.Second)
+		stopInspector(t, cancel, inspector)
 	})
 
 	t.Run("validateClusterPrefixedTopic should return error if cluster prefixed hard threshold exceeded for unknown cluster ids", func(t *testing.T) {
@@ -1003,7 +753,7 @@ func TestNewControlMsgValidationInspector_validateClusterPrefixedTopic(t *testin
 		from := unittest.PeerIdFixture(t)
 		identity := unittest.IdentityFixture()
 		idProvider.On("ByPeerID", from).Return(identity, true).Times(11)
-		checkNotification := checkNotificationFunc(t, from, []p2pmsg.ControlMessageType{p2pmsg.CtrlMsgGraft}, channels.IsUnknownClusterIDErr, p2p.CtrlMsgTopicTypeClusterPrefixed, []string{clusterPrefixedTopic}, nil)
+		checkNotification := checkNotificationFunc(t, from, p2pmsg.CtrlMsgGraft, channels.IsUnknownClusterIDErr, p2p.CtrlMsgTopicTypeClusterPrefixed)
 		inspectMsgRpc := unittest.P2PRPCFixture(unittest.WithGrafts(unittest.P2PRPCGraftFixture(&clusterPrefixedTopic)))
 		inspector.ActiveClustersChanged(flow.ChainIDList{flow.ChainID(unittest.IdentifierFixture().String())})
 		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Once().Run(checkNotification)
@@ -1011,17 +761,9 @@ func TestNewControlMsgValidationInspector_validateClusterPrefixedTopic(t *testin
 		for i := 0; i < 11; i++ {
 			require.NoError(t, inspector.Inspect(from, inspectMsgRpc))
 		}
-		require.Never(t, func() bool {
-			calls := 0
-			for _, call := range distributor.Calls {
-				if call.Method == "Distribute" {
-					calls++
-				}
-			}
-			return calls > 1
-		}, time.Second, 100*time.Millisecond)
-		cancel()
-		unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
+		// sleep for 1 second to ensure rpc's is processed
+		time.Sleep(time.Second)
+		stopInspector(t, cancel, inspector)
 	})
 }
 
@@ -1043,16 +785,9 @@ func TestControlMessageValidationInspector_ActiveClustersChanged(t *testing.T) {
 		rpc := unittest.P2PRPCFixture(unittest.WithGrafts(unittest.P2PRPCGraftFixture(&topic)))
 		require.NoError(t, inspector.Inspect(from, rpc))
 	}
-	require.Never(t, func() bool {
-		for _, call := range distributor.Calls {
-			if call.Method == "Distribute" {
-				return true
-			}
-		}
-		return false
-	}, time.Second, 100*time.Millisecond)
-	cancel()
-	unittest.RequireCloseBefore(t, inspector.Done(), 500*time.Millisecond, "inspector did not stop")
+	// sleep for 1 second to ensure rpc's is processed
+	time.Sleep(time.Second)
+	stopInspector(t, cancel, inspector)
 }
 
 // invalidTopics returns 3 invalid topics.
@@ -1070,23 +805,18 @@ func invalidTopics(t *testing.T, sporkID flow.Identifier) (string, string, strin
 }
 
 // checkNotificationFunc returns util func used to ensure invalid control message notification disseminated contains expected information.
-func checkNotificationFunc(t *testing.T, expectedPeerID peer.ID, expectedMsgType []p2pmsg.ControlMessageType, isExpectedErr func(err error) bool, topicType p2p.CtrlMsgTopicType, topics []string, messageIds []string) func(args mock.Arguments) {
+func checkNotificationFunc(t *testing.T,
+	expectedPeerID peer.ID,
+	expectedMsgType p2pmsg.ControlMessageType,
+	isExpectedErr func(err error) bool,
+	topicType p2p.CtrlMsgTopicType) func(args mock.Arguments) {
 	return func(args mock.Arguments) {
 		notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 		require.True(t, ok)
-		require.Equal(t, topicType, notification.Errors[0].CtrlMsgTopicType())
-		for _, err := range notification.Errors {
-			if topics != nil {
-				require.Contains(t, topics, err.Topic())
-			}
-
-			if messageIds != nil {
-				require.Contains(t, messageIds, err.MessageID())
-			}
-		}
+		require.Equal(t, topicType, notification.TopicType)
 		require.Equal(t, expectedPeerID, notification.PeerID)
-		require.Contains(t, expectedMsgType, notification.MsgType)
-		require.True(t, isExpectedErr(notification.Errors[0].Err))
+		require.Equal(t, expectedMsgType, notification.MsgType)
+		require.True(t, isExpectedErr(notification.Error))
 	}
 }
 
@@ -1130,6 +860,7 @@ func inspectorFixture(t *testing.T, opts ...func(params *validation.InspectorPar
 	return validationInspector, signalerCtx, cancel, distributor, rpcTracker, sporkID, idProvider, topicProviderOracle
 }
 
-func defaultTopicOracle() []string {
-	return []string{}
+func stopInspector(t *testing.T, cancel context.CancelFunc, inspector *validation.ControlMsgValidationInspector) {
+	cancel()
+	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
 }

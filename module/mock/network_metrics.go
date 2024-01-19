@@ -122,11 +122,6 @@ func (_m *NetworkMetrics) InboundMessageReceived(sizeBytes int, topic string, _a
 	_m.Called(sizeBytes, topic, _a2, messageType)
 }
 
-// InvalidControlMessageNotificationError provides a mock function with given fields: msgType, count
-func (_m *NetworkMetrics) InvalidControlMessageNotificationError(msgType p2pmsg.ControlMessageType, count float64) {
-	_m.Called(msgType, count)
-}
-
 // MessageAdded provides a mock function with given fields: priority
 func (_m *NetworkMetrics) MessageAdded(priority int) {
 	_m.Called(priority)

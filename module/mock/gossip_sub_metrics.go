@@ -26,11 +26,6 @@ func (_m *GossipSubMetrics) AsyncProcessingStarted() {
 	_m.Called()
 }
 
-// InvalidControlMessageNotificationError provides a mock function with given fields: msgType, count
-func (_m *GossipSubMetrics) InvalidControlMessageNotificationError(msgType p2pmsg.ControlMessageType, count float64) {
-	_m.Called(msgType, count)
-}
-
 // OnAppSpecificScoreUpdated provides a mock function with given fields: _a0
 func (_m *GossipSubMetrics) OnAppSpecificScoreUpdated(_a0 float64) {
 	_m.Called(_a0)

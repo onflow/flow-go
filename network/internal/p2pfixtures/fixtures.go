@@ -99,33 +99,27 @@ func CreateNode(t *testing.T, networkKey crypto.PrivateKey, sporkID flow.Identif
 	defaultFlowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
 
-	params := &p2pbuilder.LibP2PNodeBuilderConfig{
-		Logger: logger,
-		MetricsConfig: &p2pbuilderconfig.MetricsConfig{
+	builder := p2pbuilder.NewNodeBuilder(
+		logger,
+		&defaultFlowConfig.NetworkConfig.GossipSub,
+		&p2pbuilderconfig.MetricsConfig{
 			HeroCacheFactory: metrics.NewNoopHeroCacheMetricsFactory(),
 			Metrics:          metrics.NewNoopCollector(),
 		},
-		NetworkingType:             flownet.PrivateNetwork,
-		Address:                    unittest.DefaultAddress,
-		NetworkKey:                 networkKey,
-		SporkId:                    sporkID,
-		IdProvider:                 idProvider,
-		ResourceManagerParams:      &defaultFlowConfig.NetworkConfig.ResourceManager,
-		RpcInspectorParams:         &defaultFlowConfig.NetworkConfig.GossipSub.RpcInspector,
-		PeerManagerParams:          p2pbuilderconfig.PeerManagerDisableConfig(),
-		SubscriptionProviderParams: &defaultFlowConfig.NetworkConfig.GossipSub.SubscriptionProvider,
-		DisallowListCacheCfg: &p2p.DisallowListCacheConfig{
+		flownet.PrivateNetwork,
+		unittest.DefaultAddress,
+		networkKey,
+		sporkID,
+		idProvider,
+		&defaultFlowConfig.NetworkConfig.ResourceManager,
+		p2pbuilderconfig.PeerManagerDisableConfig(),
+		&p2p.DisallowListCacheConfig{
 			MaxSize: uint32(1000),
 			Metrics: metrics.NewNoopCollector(),
 		},
-		UnicastConfig: &p2pbuilderconfig.UnicastConfig{
+		&p2pbuilderconfig.UnicastConfig{
 			Unicast: defaultFlowConfig.NetworkConfig.Unicast,
-		},
-		GossipSubCfg: &defaultFlowConfig.NetworkConfig.GossipSub,
-	}
-	builder, err := p2pbuilder.NewNodeBuilder(params)
-	require.NoError(t, err)
-	builder.
+		}).
 		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
 			return p2pdht.NewDHT(c, h, protocols.FlowDHTProtocolID(sporkID), zerolog.Nop(), metrics.NewNoopCollector())
 		}).

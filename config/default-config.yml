@@ -512,15 +512,15 @@ network-config:
             skip-decay-threshold: -0.1
         misbehaviour-penalties:
           # The penalty applied to the application specific penalty when a peer conducts a graft misbehaviour.
-          graft: -0.01
+          graft: -10
           # The penalty applied to the application specific penalty when a peer conducts a prune misbehaviour.
-          prune: -0.01
+          prune: -10
           # The penalty applied to the application specific penalty when a peer conducts a iHave misbehaviour.
-          ihave: -0.01
+          ihave: -10
           # The penalty applied to the application specific penalty when a peer conducts a iWant misbehaviour.
-          iwant: -0.01
+          iwant: -10
           # The penalty applied to the application specific penalty when a peer conducts a rpc publish message misbehaviour.
-          publish: -0.01
+          publish: -10
           # The factor used to reduce the penalty for control message misbehaviours on cluster prefixed topics. This allows a more lenient punishment for nodes
           # that fall behind and may need to request old data.
           cluster-prefixed-reduction-factor: 0.2
