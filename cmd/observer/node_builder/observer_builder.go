@@ -806,27 +806,36 @@ func (builder *ObserverServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 		pis = append(pis, pi)
 	}
 
-	node, err := p2pbuilder.NewNodeBuilder(
-		builder.Logger,
-		&builder.FlowConfig.NetworkConfig.GossipSub,
-		&p2pbuilderconfig.MetricsConfig{
+	params := &p2pbuilder.LibP2PNodeBuilderConfig{
+		Logger: builder.Logger,
+		MetricsConfig: &p2pbuilderconfig.MetricsConfig{
 			HeroCacheFactory: builder.HeroCacheMetricsFactory(),
 			Metrics:          builder.Metrics.Network,
 		},
-		network.PublicNetwork,
-		builder.BaseConfig.BindAddr,
-		networkKey,
-		builder.SporkID,
-		builder.IdentityProvider,
-		&builder.FlowConfig.NetworkConfig.ResourceManager,
-		p2pbuilderconfig.PeerManagerDisableConfig(), // disable peer manager for observer node.
-		&p2p.DisallowListCacheConfig{
+		NetworkingType:             network.PublicNetwork,
+		Address:                    builder.BaseConfig.BindAddr,
+		NetworkKey:                 networkKey,
+		SporkId:                    builder.SporkID,
+		IdProvider:                 builder.IdentityProvider,
+		ResourceManagerParams:      &builder.FlowConfig.NetworkConfig.ResourceManager,
+		RpcInspectorParams:         &builder.FlowConfig.NetworkConfig.GossipSub.RpcInspector,
+		PeerManagerParams:          p2pbuilderconfig.PeerManagerDisableConfig(),
+		SubscriptionProviderParams: &builder.FlowConfig.NetworkConfig.GossipSub.SubscriptionProvider,
+		DisallowListCacheCfg: &p2p.DisallowListCacheConfig{
 			MaxSize: builder.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
 			Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
 		},
-		&p2pbuilderconfig.UnicastConfig{
-			Unicast: builder.FlowConfig.NetworkConfig.Unicast,
-		}).
+		UnicastConfig: &p2pbuilderconfig.UnicastConfig{
+			Unicast:                builder.FlowConfig.NetworkConfig.Unicast,
+			RateLimiterDistributor: builder.UnicastRateLimiterDistributor,
+		},
+		GossipSubCfg: &builder.FlowConfig.NetworkConfig.GossipSub,
+	}
+	nodeBuilder, err := p2pbuilder.NewNodeBuilder(params)
+	if err != nil {
+		return nil, fmt.Errorf("could not create libp2p node builder: %w", err)
+	}
+	libp2pNode, err := nodeBuilder.
 		SetSubscriptionFilter(
 			subscription.NewRoleBasedFilter(
 				subscription.UnstakedRole, builder.IdentityProvider,
@@ -846,7 +855,7 @@ func (builder *ObserverServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 		return nil, fmt.Errorf("could not initialize libp2p node for observer: %w", err)
 	}
 
-	builder.LibP2PNode = node
+	builder.LibP2PNode = libp2pNode
 
 	return builder.LibP2PNode, nil
 }

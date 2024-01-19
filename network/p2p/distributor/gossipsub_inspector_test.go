@@ -92,10 +92,12 @@ func invalidControlMessageNotificationListFixture(t *testing.T, n int) []*p2p.In
 	return list
 }
 
+// invalidControlMessageNotificationFixture creates an invalid control message notification fixture with a random message type.
 func invalidControlMessageNotificationFixture(t *testing.T) *p2p.InvCtrlMsgNotif {
+	msgType := []p2pmsg.ControlMessageType{p2pmsg.CtrlMsgGraft, p2pmsg.CtrlMsgPrune, p2pmsg.CtrlMsgIHave, p2pmsg.CtrlMsgIWant}[rand.Intn(4)]
 	return &p2p.InvCtrlMsgNotif{
 		PeerID:  unittest.PeerIdFixture(t),
-		MsgType: []p2pmsg.ControlMessageType{p2pmsg.CtrlMsgGraft, p2pmsg.CtrlMsgPrune, p2pmsg.CtrlMsgIHave, p2pmsg.CtrlMsgIWant}[rand.Intn(4)],
-		Error:   fmt.Errorf("this is an error"),
+		MsgType: msgType,
+		Errors:  p2p.InvCtrlMsgErrs{p2p.NewInvCtrlMsgErr(fmt.Errorf("invalid control message"), p2p.CtrlMsgTopicTypeClusterPrefixed)},
 	}
 }

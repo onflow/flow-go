@@ -23,14 +23,31 @@ func TestBindPFlags(t *testing.T) {
 	t.Run("should override config values when any flag is set", func(t *testing.T) {
 		c := defaultConfig(t)
 		flags := testFlagSet(c)
+
 		err := flags.Set("networking-connection-pruning", "false")
 		require.NoError(t, err)
+		err = flags.Set("gossipsub-scoring-parameters-scoring-registry-misbehaviour-penalties-graft", "-10")
+		require.NoError(t, err)
+		err = flags.Set("gossipsub-scoring-parameters-scoring-registry-misbehaviour-penalties-prune", "-5")
+		require.NoError(t, err)
+		err = flags.Set("gossipsub-scoring-parameters-scoring-registry-misbehaviour-penalties-ihave", "-2")
+		require.NoError(t, err)
+		err = flags.Set("gossipsub-scoring-parameters-scoring-registry-misbehaviour-penalties-iwant", "-.9")
+		require.NoError(t, err)
+		err = flags.Set("gossipsub-scoring-parameters-scoring-registry-misbehaviour-penalties-publish", "-.1")
+		require.NoError(t, err)
+
 		require.NoError(t, flags.Parse(nil))
 
 		configFileUsed, err := BindPFlags(c, flags)
 		require.NoError(t, err)
 		require.False(t, configFileUsed)
 		require.False(t, c.NetworkConfig.NetworkConnectionPruning)
+		require.Equal(t, c.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.MisbehaviourPenalties.GraftMisbehaviour, float64(-10))
+		require.Equal(t, c.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.MisbehaviourPenalties.PruneMisbehaviour, float64(-5))
+		require.Equal(t, c.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.MisbehaviourPenalties.IHaveMisbehaviour, float64(-2))
+		require.Equal(t, c.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.MisbehaviourPenalties.IWantMisbehaviour, float64(-.9))
+		require.Equal(t, c.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.MisbehaviourPenalties.PublishMisbehaviour, float64(-.1))
 	})
 	t.Run("should return an error if flags are not parsed", func(t *testing.T) {
 		c := defaultConfig(t)

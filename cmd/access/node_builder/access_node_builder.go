@@ -1784,30 +1784,42 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 		return nil, fmt.Errorf("could not create connection manager: %w", err)
 	}
 
-	libp2pNode, err := p2pbuilder.NewNodeBuilder(builder.Logger, &builder.FlowConfig.NetworkConfig.GossipSub, &p2pbuilderconfig.MetricsConfig{
-		HeroCacheFactory: builder.HeroCacheMetricsFactory(),
-		Metrics:          networkMetrics,
-	},
-		network.PublicNetwork,
-		bindAddress,
-		networkKey,
-		builder.SporkID,
-		builder.IdentityProvider,
-		&builder.FlowConfig.NetworkConfig.ResourceManager,
-		&p2pbuilderconfig.PeerManagerConfig{
+	params := &p2pbuilder.LibP2PNodeBuilderConfig{
+		Logger: builder.Logger,
+		MetricsConfig: &p2pbuilderconfig.MetricsConfig{
+			HeroCacheFactory: builder.HeroCacheMetricsFactory(),
+			Metrics:          networkMetrics,
+		},
+		NetworkingType:        network.PublicNetwork,
+		Address:               bindAddress,
+		NetworkKey:            networkKey,
+		SporkId:               builder.SporkID,
+		IdProvider:            builder.IdentityProvider,
+		ResourceManagerParams: &builder.FlowConfig.NetworkConfig.ResourceManager,
+		RpcInspectorParams:    &builder.FlowConfig.NetworkConfig.GossipSub.RpcInspector,
+		PeerManagerParams: &p2pbuilderconfig.PeerManagerConfig{
 			// TODO: eventually, we need pruning enabled even on public network. However, it needs a modified version of
 			// the peer manager that also operate on the public identities.
 			ConnectionPruning: connection.PruningDisabled,
 			UpdateInterval:    builder.FlowConfig.NetworkConfig.PeerUpdateInterval,
 			ConnectorFactory:  connection.DefaultLibp2pBackoffConnectorFactory(),
 		},
-		&p2p.DisallowListCacheConfig{
+		SubscriptionProviderParams: &builder.FlowConfig.NetworkConfig.GossipSub.SubscriptionProvider,
+		DisallowListCacheCfg: &p2p.DisallowListCacheConfig{
 			MaxSize: builder.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
 			Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
 		},
-		&p2pbuilderconfig.UnicastConfig{
-			Unicast: builder.FlowConfig.NetworkConfig.Unicast,
-		}).
+		UnicastConfig: &p2pbuilderconfig.UnicastConfig{
+			Unicast:                builder.FlowConfig.NetworkConfig.Unicast,
+			RateLimiterDistributor: builder.UnicastRateLimiterDistributor,
+		},
+		GossipSubCfg: &builder.FlowConfig.NetworkConfig.GossipSub,
+	}
+	nodeBuilder, err := p2pbuilder.NewNodeBuilder(params)
+	if err != nil {
+		return nil, fmt.Errorf("could not create libp2p node builder: %w", err)
+	}
+	libp2pNode, err := nodeBuilder.
 		SetBasicResolver(builder.Resolver).
 		SetSubscriptionFilter(subscription.NewRoleBasedFilter(flow.RoleAccess, builder.IdentityProvider)).
 		SetConnectionManager(connManager).
@@ -1815,7 +1827,6 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 			return dht.NewDHT(ctx, h, protocols.FlowPublicDHTProtocolID(builder.SporkID), builder.Logger, networkMetrics, dht.AsServer())
 		}).
 		Build()
-
 	if err != nil {
 		return nil, fmt.Errorf("could not build libp2p node for staked access node: %w", err)
 	}

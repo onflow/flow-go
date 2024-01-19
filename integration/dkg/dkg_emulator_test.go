@@ -51,7 +51,7 @@ func (s *EmulatorSuite) runTest(goodNodes int, emulatorProblems bool) {
 		DKGPhase3FinalView: 250,
 		FinalView:          300,
 		Participants:       s.netIDs,
-		RandomSource:       []byte("random bytes for seed"),
+		RandomSource:       unittest.EpochSetupRandomSourceFixture(),
 	}
 
 	// create the EpochSetup that will trigger the next DKG run with all the
@@ -59,7 +59,7 @@ func (s *EmulatorSuite) runTest(goodNodes int, emulatorProblems bool) {
 	nextEpochSetup := flow.EpochSetup{
 		Counter:      currentCounter + 1,
 		Participants: s.netIDs,
-		RandomSource: []byte("random bytes for seed"),
+		RandomSource: unittest.EpochSetupRandomSourceFixture(),
 		FirstView:    301,
 		FinalView:    600,
 	}
