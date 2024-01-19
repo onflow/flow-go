@@ -42,7 +42,9 @@ func (b *ProtocolStateBlocks) FinalizedHeader() (*flow.Header, error) {
 	return b.state.Final().Head()
 }
 
+// RateLimiter is an interface for checking if an address is rate limited
 type RateLimiter interface {
+	// IsRateLimited returns true if the address is rate limited
 	IsRateLimited(address flow.Address) bool
 }
 
