@@ -118,11 +118,11 @@ fuzz-fvm:
 test: verify-mocks unittest-main
 
 .PHONY: integration-test
-integration-test: docker-build-native-flow
+integration-test: docker-native-build-flow
 	$(MAKE) -C integration integration-test
 
 .PHONY: benchmark
-benchmark: docker-build-native-flow
+benchmark: docker-native-build-flow
 	$(MAKE) -C integration benchmark
 
 .PHONY: coverage
@@ -247,7 +247,7 @@ ci-integration:
 	$(MAKE) -C integration integration-test
 
 # Runs benchmark tests
-# NOTE: we do not need `docker-build-native-flow` as this is run as a separate step
+# NOTE: we do not need `docker-native-build-flow` as this is run as a separate step
 # on Teamcity
 .PHONY: ci-benchmark
 ci-benchmark: install-tools
@@ -281,8 +281,8 @@ install-cross-build-tools:
 	apt-get update
 	apt-get -y install apt-utils gcc-aarch64-linux-gnu
 
-.PHONY: docker-build-native-collection
-docker-build-native-collection:
+.PHONY: docker-native-build-collection
+docker-native-build-collection:
 	docker build -f cmd/Dockerfile --build-arg TARGET=./cmd/collection --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target production \
 		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
@@ -322,8 +322,8 @@ docker-build-collection-debug:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/collection --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target debug \
 		-t "$(CONTAINER_REGISTRY)/collection-debug:latest" -t "$(CONTAINER_REGISTRY)/collection-debug:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/collection-debug:$(IMAGE_TAG)" .
 
-.PHONY: docker-build-native-consensus
-docker-build-native-consensus:
+.PHONY: docker-native-build-consensus
+docker-native-build-consensus:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/consensus --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target production \
 		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
@@ -350,8 +350,8 @@ docker-cross-build-consensus-arm:
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG_ARM}" \
 		-t "$(CONTAINER_REGISTRY)/consensus:$(IMAGE_TAG_ARM)"  .
 
-.PHONY: docker-build-native-consensus
-docker-build-native-consensus:
+.PHONY: docker-native-build-consensus
+docker-native-build-consensus:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/consensus --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target production \
 		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
@@ -363,8 +363,8 @@ docker-build-consensus-debug:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/consensus --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target debug \
 		-t "$(CONTAINER_REGISTRY)/consensus-debug:latest" -t "$(CONTAINER_REGISTRY)/consensus-debug:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/consensus-debug:$(IMAGE_TAG)" .
 
-.PHONY: docker-build-native-execution
-docker-build-native-execution:
+.PHONY: docker-native-build-execution
+docker-native-build-execution:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/execution --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target production \
 		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
@@ -404,8 +404,8 @@ docker-build-execution-debug:
 		-t "$(CONTAINER_REGISTRY)/execution-debug:latest" -t "$(CONTAINER_REGISTRY)/execution-debug:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/execution-debug:$(IMAGE_TAG)" .
 
 # build corrupt execution node for BFT testing
-.PHONY: docker-build-native-execution-corrupt
-docker-build-native-execution-corrupt:
+.PHONY: docker-native-build-execution-corrupt
+docker-native-build-execution-corrupt:
 	# temporarily make insecure/ a non-module to allow Docker to use corrupt builders there
 	./insecure/cmd/mods_override.sh
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./insecure/cmd/execution --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target production \
@@ -413,8 +413,8 @@ docker-build-native-execution-corrupt:
 		-t "$(CONTAINER_REGISTRY)/execution-corrupted:latest" -t "$(CONTAINER_REGISTRY)/execution-corrupted:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/execution-corrupted:$(IMAGE_TAG)" .
 	./insecure/cmd/mods_restore.sh
 
-.PHONY: docker-build-native-verification
-docker-build-native-verification:
+.PHONY: docker-native-build-verification
+docker-native-build-verification:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/verification --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target production \
 		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
@@ -454,8 +454,8 @@ docker-build-verification-debug:
 		-t "$(CONTAINER_REGISTRY)/verification-debug:latest" -t "$(CONTAINER_REGISTRY)/verification-debug:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/verification-debug:$(IMAGE_TAG)" .
 
 # build corrupt verification node for BFT testing
-.PHONY: docker-build-native-verification-corrupt
-docker-build-native-verification-corrupt:
+.PHONY: docker-native-build-verification-corrupt
+docker-native-build-verification-corrupt:
 	# temporarily make insecure/ a non-module to allow Docker to use corrupt builders there
 	./insecure/cmd/mods_override.sh
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./insecure/cmd/verification --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target production \
@@ -463,8 +463,8 @@ docker-build-native-verification-corrupt:
 		-t "$(CONTAINER_REGISTRY)/verification-corrupted:latest" -t "$(CONTAINER_REGISTRY)/verification-corrupted:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/verification-corrupted:$(IMAGE_TAG)" .
 	./insecure/cmd/mods_restore.sh
 
-.PHONY: docker-build-native-access
-docker-build-native-access:
+.PHONY: docker-native-build-access
+docker-native-build-access:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/access --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target production \
 		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
@@ -505,8 +505,8 @@ docker-build-access-debug:
 		-t "$(CONTAINER_REGISTRY)/access-debug:latest" -t "$(CONTAINER_REGISTRY)/access-debug:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/access-debug:$(IMAGE_TAG)" .
 
 # build corrupt access node for BFT testing
-.PHONY: docker-build-native-access-corrupt
-docker-build-native-access-corrupt:
+.PHONY: docker-native-build-access-corrupt
+docker-native-build-access-corrupt:
 	#temporarily make insecure/ a non-module to allow Docker to use corrupt builders there
 	./insecure/cmd/mods_override.sh
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./insecure/cmd/access --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target production \
@@ -514,8 +514,8 @@ docker-build-native-access-corrupt:
 		-t "$(CONTAINER_REGISTRY)/access-corrupted:latest" -t "$(CONTAINER_REGISTRY)/access-corrupted:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/access-corrupted:$(IMAGE_TAG)" .
 	./insecure/cmd/mods_restore.sh
 
-.PHONY: docker-build-native-observer
-docker-build-native-observer:
+.PHONY: docker-native-build-observer
+docker-native-build-observer:
 	docker build -f cmd/Dockerfile --build-arg TARGET=./cmd/observer --build-arg COMMIT=$(COMMIT) --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target production \
 		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
@@ -550,8 +550,8 @@ docker-cross-build-observer-arm:
 		-t "$(CONTAINER_REGISTRY)/observer:$(IMAGE_TAG_ARM)" .
 
 
-.PHONY: docker-build-native-ghost
-docker-build-native-ghost:
+.PHONY: docker-native-build-ghost
+docker-native-build-ghost:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/ghost --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target production \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
 		-t "$(CONTAINER_REGISTRY)/ghost:latest" -t "$(CONTAINER_REGISTRY)/ghost:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/ghost:$(IMAGE_TAG)" .
@@ -581,14 +581,14 @@ PHONY: tool-transit
 tool-transit: docker-build-bootstrap-transit
 	docker container create --name transit $(CONTAINER_REGISTRY)/bootstrap-transit:latest;docker container cp transit:/bin/app ./transit;docker container rm transit
 
-.PHONY: docker-build-native-loader
-docker-build-native-loader:
+.PHONY: docker-native-build-loader
+docker-native-build-loader:
 	docker build -f ./integration/benchmark/cmd/manual/Dockerfile --build-arg TARGET=./benchmark/cmd/manual  --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target production \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
 		-t "$(CONTAINER_REGISTRY)/loader:latest" -t "$(CONTAINER_REGISTRY)/loader:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/loader:$(IMAGE_TAG)" .
 
-.PHONY: docker-build-native-flow
-docker-build-native-flow: docker-build-native-collection docker-build-native-consensus docker-build-native-execution docker-build-native-verification docker-build-native-access docker-build-native-observer docker-build-native-ghost
+.PHONY: docker-native-build-flow
+docker-native-build-flow: docker-native-build-collection docker-native-build-consensus docker-native-build-execution docker-native-build-verification docker-native-build-access docker-native-build-observer docker-native-build-ghost
 
 .PHONY: docker-build-flow-with-adx
 docker-build-flow-with-adx: docker-build-collection-with-adx docker-build-consensus-with-adx docker-build-execution-with-adx docker-build-verification-with-adx docker-build-access-with-adx docker-build-observer-with-adx
@@ -604,11 +604,11 @@ docker-build-flow-without-netgo-without-adx: docker-build-collection-without-net
 .PHONY: docker-cross-build-flow-arm
 docker-cross-build-flow-arm: docker-cross-build-collection-arm docker-cross-build-consensus-arm docker-cross-build-execution-arm docker-cross-build-verification-arm docker-cross-build-access-arm docker-cross-build-observer-arm
 
-.PHONY: docker-build-native-flow-corrupt
-docker-build-native-flow-corrupt: docker-build-native-execution-corrupt docker-build-native-verification-corrupt docker-build-native-access-corrupt
+.PHONY: docker-native-build-flow-corrupt
+docker-native-build-flow-corrupt: docker-native-build-execution-corrupt docker-native-build-verification-corrupt docker-native-build-access-corrupt
 
-.PHONY: docker-build-native-benchnet
-docker-build-native-benchnet: docker-build-native-flow docker-build-native-loader
+.PHONY: docker-native-build-benchnet
+docker-native-build-benchnet: docker-native-build-flow docker-native-build-loader
 
 .PHONY: docker-push-collection-with-adx
 docker-push-collection-with-adx:

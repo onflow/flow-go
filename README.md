@@ -100,13 +100,13 @@ The recommended way to build and run Flow for local development is using Docker.
 Build a Docker image for all nodes:
 
 ```bash
-make docker-build-native-flow
+make docker-native-build-flow
 ```
 
 Build a Docker image for a particular node role (replace `$ROLE` with `collection`, `consensus`, etc.):
 
 ```bash
-make docker-build-native-$ROLE
+make docker-native-build-$ROLE
 ```
 
 ### Local Network
