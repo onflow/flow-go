@@ -1,5 +1,7 @@
-# This script can be imported by Makefiles in order to set the `CRYPTO_FLAG` automatically.
-# The `CRYPTO_FLAG` is a Go command flag that should be used when the machine's CPU executing 
+# This script can be imported by Makefiles in order to set the `CRYPTO_FLAG` automatically for 
+# a native build (build and run on the same machine NOT for cross-compilation).
+#
+# The `CRYPTO_FLAG` is a Go command flag that should be used when the target machine's CPU executing 
 # the command may not support ADX instructions.
 # For new machines that support ADX instructions, the `CRYPTO_FLAG` flag is not needed (or set
 # to an empty string).  

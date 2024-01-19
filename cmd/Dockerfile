@@ -44,7 +44,7 @@ ARG CGO_FLAG
 RUN --mount=type=cache,sharing=locked,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=secret,id=git_creds,dst=/root/.netrc \
-    CGO_ENABLED=1 GOOS=linux CGO_FLAGS="${CGO_FLAG}" go build --tags "${TAGS}" -ldflags "-extldflags -static \
+    CGO_ENABLED=1 GOOS=linux GOARCH=${GOARCH} CGO_FLAGS="${CGO_FLAG}" go build --tags "${TAGS}" -ldflags "-extldflags -static \
     -X 'github.com/onflow/flow-go/cmd/build.commit=${COMMIT}' -X  'github.com/onflow/flow-go/cmd/build.semver=${VERSION}'" \
     -o ./app ${TARGET}
 

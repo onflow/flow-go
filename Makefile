@@ -39,9 +39,8 @@ K8S_YAMLS_LOCATION_STAGING=./k8s/staging
 export CONTAINER_REGISTRY := gcr.io/flow-container-registry
 export DOCKER_BUILDKIT := 1
 
+# set `CRYPTO_FLAG` when building natively (not cross-compiling)
 include crypto_adx_flag.mk
-
-CGO_FLAG := CGO_CFLAGS=$(CRYPTO_FLAG)
 
 # needed for CI
 .PHONY: noop
@@ -49,10 +48,10 @@ noop:
 	@echo "This is a no-op target"
 
 cmd/collection/collection:
-	$(CGO_FLAG) go build -o cmd/collection/collection cmd/collection/main.go
+	CGO_CFLAGS=$(CRYPTO_FLAG) go build -o cmd/collection/collection cmd/collection/main.go
 
 cmd/util/util:
-	$(CGO_FLAG) go build -o cmd/util/util cmd/util/main.go
+	CGO_CFLAGS=$(CRYPTO_FLAG) go build -o cmd/util/util cmd/util/main.go
 
 .PHONY: update-core-contracts-version
 update-core-contracts-version:
@@ -71,7 +70,7 @@ update-cadence-version:
 .PHONY: unittest-main
 unittest-main:
 	# test all packages
-	$(CGO_FLAG) go test $(if $(VERBOSE),-v,) -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(RACE_DETECTOR),-race,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) $(GO_TEST_PACKAGES)
+	CGO_CFLAGS=$(CRYPTO_FLAG) go test $(if $(VERBOSE),-v,) -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(RACE_DETECTOR),-race,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) $(GO_TEST_PACKAGES)
 
 .PHONY: install-mock-generators
 install-mock-generators:
@@ -111,7 +110,7 @@ code-sanity-check: go-math-rand-check
 .PHONY: fuzz-fvm
 fuzz-fvm:
 	# run fuzz tests in the fvm package
-	cd ./fvm && $(CGO_FLAG) go test -fuzz=Fuzz -run ^$$
+	cd ./fvm && CGO_CFLAGS=$(CRYPTO_FLAG) go test -fuzz=Fuzz -run ^$$
 
 .PHONY: test
 test: verify-mocks unittest-main
@@ -149,14 +148,14 @@ generate-proto:
 
 .PHONY: generate-fvm-env-wrappers
 generate-fvm-env-wrappers:
-	$(CGO_FLAG) go run ./fvm/environment/generate-wrappers fvm/environment/parse_restricted_checker.go
+	CGO_CFLAGS=$(CRYPTO_FLAG) go run ./fvm/environment/generate-wrappers fvm/environment/parse_restricted_checker.go
 
 .PHONY: generate-mocks
 generate-mocks: install-mock-generators
 	mockery --name '(Connector|PingInfoProvider)' --dir=network/p2p --case=underscore --output="./network/mocknetwork" --outpkg="mocknetwork"
-	$(CGO_FLAG) mockgen -destination=storage/mocks/storage.go -package=mocks github.com/onflow/flow-go/storage Blocks,Headers,Payloads,Collections,Commits,Events,ServiceEvents,TransactionResults
-	$(CGO_FLAG) mockgen -destination=module/mocks/network.go -package=mocks github.com/onflow/flow-go/module Local,Requester
-	$(CGO_FLAG) mockgen -destination=network/mocknetwork/mock_network.go -package=mocknetwork github.com/onflow/flow-go/network EngineRegistry
+	CGO_CFLAGS=$(CRYPTO_FLAG) mockgen -destination=storage/mocks/storage.go -package=mocks github.com/onflow/flow-go/storage Blocks,Headers,Payloads,Collections,Commits,Events,ServiceEvents,TransactionResults
+	CGO_CFLAGS=$(CRYPTO_FLAG) mockgen -destination=module/mocks/network.go -package=mocks github.com/onflow/flow-go/module Local,Requester
+	CGO_CFLAGS=$(CRYPTO_FLAG) mockgen -destination=network/mocknetwork/mock_network.go -package=mocknetwork github.com/onflow/flow-go/network EngineRegistry
 	mockery --name='.*' --dir=integration/benchmark/mocksiface --case=underscore --output="integration/benchmark/mock" --outpkg="mock"
 	mockery --name=ExecutionDataStore --dir=module/executiondatasync/execution_data --case=underscore --output="./module/executiondatasync/execution_data/mock" --outpkg="mock"
 	mockery --name=Downloader --dir=module/executiondatasync/execution_data --case=underscore --output="./module/executiondatasync/execution_data/mock" --outpkg="mock"
