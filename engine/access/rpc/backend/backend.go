@@ -168,6 +168,7 @@ func New(params Params) (*Backend, error) {
 			blocks:               params.Blocks,
 			transactions:         params.Transactions,
 			results:              params.LightTransactionResults,
+			events:               params.Events,
 			executionReceipts:    params.ExecutionReceipts,
 			transactionValidator: configureTransactionValidator(params.State, params.ChainID),
 			transactionMetrics:   params.AccessMetrics,

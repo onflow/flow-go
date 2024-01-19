@@ -34,6 +34,7 @@ type backendTransactions struct {
 	collections          storage.Collections
 	blocks               storage.Blocks
 	results              storage.LightTransactionResults
+	events               storage.Events
 	state                protocol.State
 	chainID              flow.ChainID
 	transactionMetrics   module.TransactionMetrics
@@ -750,7 +751,19 @@ func (b *backendTransactions) lookupTransactionResult(
 	blockID flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) (bool, []flow.Event, uint32, string, error) {
-	events, txStatus, message, err := b.getTransactionResultFromExecutionNode(ctx, blockID, txID[:], requiredEventEncodingVersion)
+
+	events, txStatus, message, err := b.getTransactionResultFromStorage(ctx, blockID, txID, requiredEventEncodingVersion)
+	if err == nil {
+		// considered executed as long as some result is returned, even if it's an error message
+		return true, events, txStatus, message, nil
+	}
+
+	if err != nil && !errors.Is(err, storage.ErrNotFound) {
+		// Other Error trying to retrieve the result, return with err
+		return false, nil, 0, "", err
+	}
+
+	events, txStatus, message, err = b.getTransactionResultFromExecutionNode(ctx, blockID, txID, requiredEventEncodingVersion)
 	if err != nil {
 		// if either the execution node reported no results or the execution node could not be chosen
 		if status.Code(err) == codes.NotFound {
@@ -829,17 +842,57 @@ func (b *backendTransactions) registerTransactionForRetry(tx *flow.TransactionBo
 	b.retry.RegisterTransaction(referenceBlock.Height, tx)
 }
 
+func (b *backendTransactions) getTransactionResultFromStorage(
+	ctx context.Context,
+	blockID flow.Identifier,
+	transactionID flow.Identifier,
+	requiredEventEncodingVersion entities.EventEncodingVersion,
+) ([]flow.Event, uint32, string, error) {
+	txResult, err := b.results.ByBlockIDTransactionID(blockID, transactionID)
+	if err != nil {
+		return nil, 0, "", rpc.ConvertStorageError(err)
+	}
+
+	var txErrorMessage string
+	var txStatusCode uint32 = 0
+	if txResult.Failed {
+		txErrorMessage, err = b.lookupTransactionErrorMessage(ctx, blockID, transactionID)
+		if err != nil {
+			return nil, 0, "", err
+		}
+		txStatusCode = 1 // statusCode of 1 indicates an error and 0 indicates no error, the same as on EN
+	}
+
+	events, err := b.events.ByBlockIDTransactionID(blockID, transactionID)
+	if err != nil {
+		return nil, 0, "", rpc.ConvertStorageError(err)
+	}
+
+	for _, e := range events {
+		// events are encoded in CCF format in storage. convert to JSON-CDC if requested
+		if requiredEventEncodingVersion == entities.EventEncodingVersion_JSON_CDC_V0 {
+			payload, err := convert.CcfPayloadToJsonPayload(e.Payload)
+			if err != nil {
+				err = fmt.Errorf("failed to convert event payload for block %s: %w", blockID, err)
+				return nil, 0, "", rpc.ConvertError(err, "failed to convert event payload", codes.Internal)
+			}
+			e.Payload = payload
+		}
+	}
+
+	return events, txStatusCode, txErrorMessage, nil
+}
+
 func (b *backendTransactions) getTransactionResultFromExecutionNode(
 	ctx context.Context,
 	blockID flow.Identifier,
-	transactionID []byte,
+	transactionID flow.Identifier,
 	requiredEventEncodingVersion entities.EventEncodingVersion,
 ) ([]flow.Event, uint32, string, error) {
-
 	// create an execution API request for events at blockID and transactionID
 	req := &execproto.GetTransactionResultRequest{
 		BlockId:       blockID[:],
-		TransactionId: transactionID,
+		TransactionId: transactionID[:],
 	}
 
 	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
