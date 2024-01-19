@@ -24,7 +24,6 @@ func SetupEnvironment(
 	service flow.Address,
 	flowToken flow.Address,
 ) error {
-	// TODO: setup proper root address based on chainID
 	evmRootAddress, err := RootAccountAddress(chainID)
 	if err != nil {
 		return err
@@ -44,7 +43,7 @@ func SetupEnvironment(
 
 	contractHandler := handler.NewContractHandler(common.Address(flowToken), bs, aa, backend, em)
 
-	stdlib.SetupEnvironment(env, contractHandler, service)
+	stdlib.SetupEnvironment(env, contractHandler, evmRootAddress)
 
 	return nil
 }

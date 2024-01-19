@@ -821,7 +821,7 @@ func (b *bootstrapExecutor) setupEVM(serviceAddress, fungibleTokenAddress, flowT
 	if b.setupEVMEnabled {
 		evmAcc := b.createAccount(nil) // account for storage
 		tx := blueprints.DeployContractTransaction(
-			serviceAddress,
+			evmAcc,
 			stdlib.ContractCode(flowTokenAddress, bool(b.evmAbiOnly)),
 			stdlib.ContractName,
 		)
