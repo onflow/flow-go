@@ -297,7 +297,7 @@ docker-build-collection-without-adx:
 
 .PHONY: docker-build-collection-without-netgo-without-adx
 docker-build-collection-without-netgo-without-adx:
-	docker build -f cmd/Dockerfile --build-arg TARGET=./cmd/collection --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG_NO_NETGO_NO_ADX) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(DISABLE_ADX) --target production \
+	docker build -f cmd/Dockerfile --build-arg TARGET=./cmd/collection --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG_NO_NETGO_NO_ADX) --build-arg GOARCH=$(GOARCH) --build-arg TAGS="" --build-arg CGO_FLAG=$(DISABLE_ADX) --target production \
 		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
 		--label "git_commit=${COMMIT}" --label "git_tag=$(IMAGE_TAG_NO_NETGO_NO_ADX)" \
 		-t "$(CONTAINER_REGISTRY)/collection:$(IMAGE_TAG_NO_NETGO_NO_ADX)"  .
@@ -331,7 +331,7 @@ docker-build-consensus-without-adx:
 
 .PHONY: docker-build-consensus-without-netgo-without-adx
 docker-build-consensus-without-netgo-without-adx:
-	docker build -f cmd/Dockerfile --build-arg TARGET=./cmd/consensus --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG_NO_NETGO_NO_ADX) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(DISABLE_ADX) --target production \
+	docker build -f cmd/Dockerfile --build-arg TARGET=./cmd/consensus --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG_NO_NETGO_NO_ADX) --build-arg GOARCH=$(GOARCH) --build-arg TAGS="" --build-arg CGO_FLAG=$(DISABLE_ADX) --target production \
 		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
 		--label "git_commit=${COMMIT}" --label "git_tag=$(IMAGE_TAG_NO_NETGO_NO_ADX)" \
 		-t "$(CONTAINER_REGISTRY)/consensus:$(IMAGE_TAG_NO_NETGO_NO_ADX)" .
@@ -364,7 +364,7 @@ docker-build-execution-without-adx:
 
 .PHONY: docker-build-execution-without-netgo-without-adx
 docker-build-execution-without-netgo-without-adx:
-	docker build -f cmd/Dockerfile --build-arg TARGET=./cmd/execution --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG_NO_NETGO_NO_ADX) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(DISABLE_ADX) --target production \
+	docker build -f cmd/Dockerfile --build-arg TARGET=./cmd/execution --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG_NO_NETGO_NO_ADX) --build-arg GOARCH=$(GOARCH) --build-arg TAGS="" --build-arg CGO_FLAG=$(DISABLE_ADX) --target production \
 		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
 		--label "git_commit=${COMMIT}" --label "git_tag=$(IMAGE_TAG_NO_NETGO_NO_ADX)" \
 		-t "$(CONTAINER_REGISTRY)/execution:$(IMAGE_TAG_NO_NETGO_NO_ADX)" .
@@ -407,7 +407,7 @@ docker-build-verification-without-adx:
 
 .PHONY: docker-build-verification-without-netgo-without-adx
 docker-build-verification-without-netgo-without-adx:
-	docker build -f cmd/Dockerfile --build-arg TARGET=./cmd/verification --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG_NO_NETGO_NO_ADX) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(DISABLE_ADX) --target production \
+	docker build -f cmd/Dockerfile --build-arg TARGET=./cmd/verification --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG_NO_NETGO_NO_ADX) --build-arg GOARCH=$(GOARCH) --build-arg TAGS=""  --build-arg CGO_FLAG=$(DISABLE_ADX) --target production \
 		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
 		--label "git_commit=${COMMIT}" --label "git_tag=$(IMAGE_TAG_NO_NETGO_NO_ADX)" \
 		-t "$(CONTAINER_REGISTRY)/verification:$(IMAGE_TAG_NO_NETGO_NO_ADX)" .
@@ -450,7 +450,7 @@ docker-build-access-without-adx:
 
 .PHONY: docker-build-access-without-netgo-without-adx
 docker-build-access-without-netgo-without-adx:
-	docker build -f cmd/Dockerfile --build-arg TARGET=./cmd/access --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG_NO_NETGO_NO_ADX) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(DISABLE_ADX) --target production \
+	docker build -f cmd/Dockerfile --build-arg TARGET=./cmd/access --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG_NO_NETGO_NO_ADX) --build-arg GOARCH=$(GOARCH) --build-arg TAGS="" --build-arg CGO_FLAG=$(DISABLE_ADX) --target production \
 		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
 		--label "git_commit=${COMMIT}" --label "git_tag=$(IMAGE_TAG_NO_NETGO_NO_ADX)" \
 		-t "$(CONTAINER_REGISTRY)/access:$(IMAGE_TAG_NO_NETGO_NO_ADX)" .
@@ -493,7 +493,7 @@ docker-build-observer-without-adx:
 
 .PHONY: docker-build-observer-without-netgo-without-adx
 docker-build-observer-without-netgo-without-adx:
-	docker build -f cmd/Dockerfile --build-arg TARGET=./cmd/observer --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG_NO_NETGO_NO_ADX) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(DISABLE_ADX) --target production \
+	docker build -f cmd/Dockerfile --build-arg TARGET=./cmd/observer --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG_NO_NETGO_NO_ADX) --build-arg GOARCH=$(GOARCH) ---build-arg TAGS="" -build-arg CGO_FLAG=$(DISABLE_ADX) --target production \
 		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
 		--label "git_commit=${COMMIT}" --label "git_tag=$(IMAGE_TAG_NO_NETGO_NO_ADX)" \
 		-t "$(CONTAINER_REGISTRY)/observer:$(IMAGE_TAG_NO_NETGO_NO_ADX)" .
