@@ -14,15 +14,15 @@ Since the test cases run docker instances as a network of nodes, we need to ensu
 To ensure the latest docker images have been built, you can run:
 
 ```
-make docker-build-access
-make docker-build-collection
-make docker-build-consensus
-make docker-build-execution
-make docker-build-verification
-make docker-build-ghost
+make docker-build-native-access
+make docker-build-native-collection
+make docker-build-native-consensus
+make docker-build-native-execution
+make docker-build-native-verification
+make docker-build-native-ghost
 ```
 
-Or simply run `make docker-build-flow`
+Or simply run `make docker-build-native-flow`
 
 After images have been built, we can run the integration tests:
 ```
@@ -65,11 +65,11 @@ Because launching a full execution node in the consensus integration tests will 
 ### Rebuild image when debugging
 During test cases debugging, you might want to update some code. However, if you run `make integration-test` after updating the code, the new change will not be included, because the integration tests still use the old code from the docker image, which was built before adding the changes.
 
-So you need to rebuild all the images by running `make docker-build-flow` again before re-running the integration tests.
+So you need to rebuild all the images by running `make docker-build-native-flow` again before re-running the integration tests.
 
 Rebuilding all images takes quite some time, here is a shortcut:
 
-If consensus's code was changed, then only consensus's image need to be rebuilt, so simply run `make docker-build-consensus` instead of rebuilding all the images.
+If consensus's code was changed, then only consensus's image need to be rebuilt, so simply run `make docker-build-native-consensus` instead of rebuilding all the images.
 
 ### Organization
 
@@ -81,4 +81,4 @@ in the Makefile.
 
 To send random transactions, for example to load test a network, run `cd integration/localnet; make load`.
 
-In order to build a docker container with the benchmarking binary, run `make docker-build-loader` from the root of this repository.
+In order to build a docker container with the benchmarking binary, run `make docker-build-native-loader` from the root of this repository.
