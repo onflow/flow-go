@@ -360,7 +360,6 @@ func TestHandler_BridgedAccount(t *testing.T) {
 				// transfer money
 				acc2.Transfer(
 					coa,
-					types.DefaultTransferGasUsageToCOAs,
 					makeABalanceInFlow(1),
 				)
 
