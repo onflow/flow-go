@@ -21,6 +21,8 @@ const (
 	ContractCallSubType = byte(5)
 
 	TransferGasUsage = 21_000
+	// 21_000 for transaction + gas limit for receive and fallback
+	DefaultGasLimitForTokenTransfer = 21_000 + 2_300
 )
 
 // DirectCall captures all the data related to a direct call to evm
@@ -107,7 +109,7 @@ func NewTransferCall(from Address, to Address, amount *big.Int) *DirectCall {
 		To:       to,
 		Data:     nil,
 		Value:    amount,
-		GasLimit: TransferGasUsage,
+		GasLimit: DefaultGasLimitForTokenTransfer,
 	}
 }
 
