@@ -343,19 +343,19 @@ docker-build-consensus-without-adx:
 		--label "git_commit=${COMMIT}" --label "git_tag=$(IMAGE_TAG_NO_ADX)" \
 		-t "$(CONTAINER_REGISTRY)/consensus:$(IMAGE_TAG_NO_ADX)" .
 
+.PHONY: docker-build-consensus-without-netgo-without-adx
+docker-build-consensus-without-netgo-without-adx:
+	docker build -f cmd/Dockerfile --build-arg TARGET=./cmd/consensus --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG_NO_ADX) --build-arg GOARCH=$(GOARCH) --build-arg TAGS="" --build-arg CGO_FLAG=$(DISABLE_ADX) --target production \
+		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
+		--label "git_commit=${COMMIT}" --label "git_tag=$(IMAGE_TAG_NO_ADX)" \
+		-t "$(CONTAINER_REGISTRY)/consensus:$(IMAGE_TAG_NO_ADX)" .
+
 .PHONY: docker-cross-build-consensus-arm
 docker-cross-build-consensus-arm:
 	docker build -f cmd/Dockerfile --build-arg TARGET=./cmd/consensus --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG_ARM) --build-arg GOARCH=arm --build-arg CC=aarch64-linux-gnu-gcc --target production \
 		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG_ARM}" \
 		-t "$(CONTAINER_REGISTRY)/consensus:$(IMAGE_TAG_ARM)"  .
-
-.PHONY: docker-native-build-consensus
-docker-native-build-consensus:
-	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/consensus --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target production \
-		--secret id=git_creds,env=GITHUB_CREDS --build-arg GOPRIVATE=$(GOPRIVATE) \
-		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
-		-t "$(CONTAINER_REGISTRY)/consensus:latest" -t "$(CONTAINER_REGISTRY)/consensus:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/consensus:$(IMAGE_TAG)"  .
 
 
 .PHONY: docker-build-consensus-debug
