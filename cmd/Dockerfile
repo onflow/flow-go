@@ -23,10 +23,6 @@ ENV GOPRIVATE=
 
 COPY . .
 
-RUN --mount=type=cache,sharing=locked,target=/go/pkg/mod \
-    --mount=type=cache,target=/root/.cache/go-build \
-    --mount=type=secret,id=git_creds,dst=/root/.netrc
-
 ####################################
 ## (3) Build the production app binary
 FROM build-env as build-production
@@ -43,7 +39,8 @@ ARG CGO_FLAG
 # https://github.com/golang/go/issues/27719#issuecomment-514747274
 RUN --mount=type=cache,sharing=locked,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    --mount=type=secret,id=git_creds,dst=/root/.netrc \
+    --mount=type=secret,id=cadence_deploy_key \
+    eval `ssh-agent -s` && printf "%s\n" "$(cat /run/secrets/cadence_deploy_key)" | ssh-add - && \
     CGO_ENABLED=1 GOOS=linux CGO_FLAGS="${CGO_FLAG}" go build --tags "${TAGS}" -ldflags "-extldflags -static \
     -X 'github.com/onflow/flow-go/cmd/build.commit=${COMMIT}' -X  'github.com/onflow/flow-go/cmd/build.semver=${VERSION}'" \
     -o ./app ${TARGET}
@@ -62,9 +59,12 @@ ENTRYPOINT ["/bin/app"]
 FROM build-env as build-debug
 WORKDIR /app
 ARG GOARCH=amd64
+
 RUN --mount=type=ssh \
     --mount=type=cache,sharing=locked,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=secret,id=cadence_deploy_key \
+    eval `ssh-agent -s` && printf "%s\n" "$(cat /run/secrets/cadence_deploy_key)" | ssh-add - && \
     CGO_ENABLED=1 GOOS=linux CGO_FLAGS="${CGO_FLAG}" go build --tags "netgo" -ldflags "-extldflags -static \
     -X 'github.com/onflow/flow-go/cmd/build.commit=${COMMIT}' -X  'github.com/onflow/flow-go/cmd/build.semver=${VERSION}'" \
     -gcflags="all=-N -l" -o ./app ${TARGET}
