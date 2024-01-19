@@ -229,6 +229,12 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 	// the node would be penalized for invalid message delivery way sooner than it can mount an ihave broken-promises spam attack.
 	blockTopicOverrideParams.InvalidMessageDeliveriesWeight = 0.0
 	blockTopicOverrideParams.InvalidMessageDeliveriesDecay = 0.0
+
+	// relaxing the scoring parameters to fit the test scenario.
+	conf.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Internal.Behaviour.PenaltyDecay = 0.99
+	conf.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Internal.Behaviour.PenaltyThreshold = 10
+	conf.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Internal.Behaviour.PenaltyWeight = -1
+
 	victimNode, victimIdentity := p2ptest.NodeFixture(
 		t,
 		sporkId,
