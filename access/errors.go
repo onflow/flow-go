@@ -91,10 +91,10 @@ func (e InvalidTxByteSizeError) Error() string {
 	return fmt.Sprintf("transaction byte size (%d) exceeds the maximum byte size allowed for a transaction (%d)", e.Actual, e.Maximum)
 }
 
-type InvalidTxRateLimittedError struct {
+type InvalidTxRateLimitedError struct {
 	Payer flow.Address
 }
 
-func (e InvalidTxRateLimittedError) Error() string {
-	return fmt.Sprintf("transaction rate limitted for payer (%s)", e.Payer)
+func (e InvalidTxRateLimitedError) Error() string {
+	return fmt.Sprintf("transaction rate limited for payer (%s)", e.Payer)
 }

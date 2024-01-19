@@ -161,7 +161,7 @@ func (v *TransactionValidator) Validate(tx *flow.TransactionBody) (err error) {
 
 func (v *TransactionValidator) checkRateLimitPayer(tx *flow.TransactionBody) error {
 	if v.limiter.IsRateLimited(tx.Payer) {
-		return InvalidTxRateLimittedError{
+		return InvalidTxRateLimitedError{
 			Payer: tx.Payer,
 		}
 	}

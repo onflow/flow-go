@@ -40,7 +40,7 @@ func (r *AddressRateLimiter) IsRateLimited(address flow.Address) bool {
 	return rateLimited
 }
 
-// AddAddress add an address to be rate limitted
+// AddAddress add an address to be rate limited
 func (r *AddressRateLimiter) AddAddress(address flow.Address) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -53,7 +53,7 @@ func (r *AddressRateLimiter) AddAddress(address flow.Address) {
 	r.limiters[address] = rate.NewLimiter(r.limit, r.burst)
 }
 
-// RemoveAddress remove an address for being rate limitted
+// RemoveAddress remove an address for being rate limited
 func (r *AddressRateLimiter) RemoveAddress(address flow.Address) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

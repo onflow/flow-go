@@ -36,9 +36,9 @@ func TestLimiterAddRemoveAddress(t *testing.T) {
 	l.AddAddress(limited1)
 	require.Equal(t, []flow.Address{limited1}, l.GetAddresses())
 
-	require.False(t, l.IsRateLimited(limited1)) // address 1 is not limitted on the first call
-	require.True(t, l.IsRateLimited(limited1))  // limitted on the second call immediately
-	require.True(t, l.IsRateLimited(limited1))  // limitted on the second call immediately
+	require.False(t, l.IsRateLimited(limited1)) // address 1 is not limited on the first call
+	require.True(t, l.IsRateLimited(limited1))  // limited on the second call immediately
+	require.True(t, l.IsRateLimited(limited1))  // limited on the second call immediately
 
 	require.False(t, l.IsRateLimited(good1))
 	require.False(t, l.IsRateLimited(good1)) // address are not limited
@@ -48,9 +48,9 @@ func TestLimiterAddRemoveAddress(t *testing.T) {
 	require.Len(t, list, 2)
 	require.Contains(t, list, limited1)
 
-	require.False(t, l.IsRateLimited(limited2)) // address 2 is not limitted on the first call
-	require.True(t, l.IsRateLimited(limited2))  // limitted on the second call immediately
-	require.True(t, l.IsRateLimited(limited2))  // limitted on the second call immediately
+	require.False(t, l.IsRateLimited(limited2)) // address 2 is not limited on the first call
+	require.True(t, l.IsRateLimited(limited2))  // limited on the second call immediately
+	require.True(t, l.IsRateLimited(limited2))  // limited on the second call immediately
 
 	l.RemoveAddress(limited1) // after remove the limit, it no longer limited
 	require.False(t, l.IsRateLimited(limited1))
@@ -74,8 +74,8 @@ func TestLimiterBurst(t *testing.T) {
 		require.False(t, l.IsRateLimited(limited1), fmt.Sprintf("%v-nth call", i))
 	}
 
-	require.True(t, l.IsRateLimited(limited1)) // limitted
-	require.True(t, l.IsRateLimited(limited1)) // limitted
+	require.True(t, l.IsRateLimited(limited1)) // limited
+	require.True(t, l.IsRateLimited(limited1)) // limited
 }
 
 // verify that if wait long enough after rate limited
