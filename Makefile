@@ -537,7 +537,7 @@ docker-build-native-loader:
 		-t "$(CONTAINER_REGISTRY)/loader:latest" -t "$(CONTAINER_REGISTRY)/loader:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/loader:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-native-flow
-docker-build-flow: docker-build-native-collection docker-build-native-consensus docker-build-native-execution docker-build-native-verification docker-build-native-access docker-build-native-observer docker-build-native-ghost
+docker-build-native-flow: docker-build-native-collection docker-build-native-consensus docker-build-native-execution docker-build-native-verification docker-build-native-access docker-build-native-observer docker-build-native-ghost
 
 .PHONY: docker-build-flow-with-adx
 docker-build-flow-with-adx: docker-build-collection-with-adx docker-build-consensus-with-adx docker-build-execution-with-adx docker-build-verification-with-adx docker-build-access-with-adx docker-build-observer-with-adx
