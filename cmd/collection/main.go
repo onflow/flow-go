@@ -166,9 +166,9 @@ func main() {
 		flags.StringToIntVar(&apiBurstlimits, "api-burst-limits", map[string]int{}, "burst limits for gRPC API methods e.g. Ping=100,SendTransaction=100 etc. note limits apply globally to all clients.")
 
 		// rate limiting for accounts, default is 2 transactions every 2.5 seconds
-		flags.Float64Var(&txRatelimits, "tx-rate-limits", 2.5, "per second rate limits for processing transactions for limited account")
-		flags.IntVar(&txBurstlimits, "tx-burst-limits", 2, "burst limits for processing transactions for limited account")
-		flags.StringVar(&txRatelimitPayers, "tx-rate-limit-payers", "", "comma separated list of accounts to apply rate limiting to")
+		flags.Float64Var(&txRatelimits, "ingest-tx-rate-limits", 2.5, "per second rate limits for processing transactions for limited account")
+		flags.IntVar(&txBurstlimits, "ingest-tx-burst-limits", 2, "burst limits for processing transactions for limited account")
+		flags.StringVar(&txRatelimitPayers, "ingest-tx-rate-limit-payers", "", "comma separated list of accounts to apply rate limiting to")
 
 		// deprecated flags
 		flags.DurationVar(&deprecatedFlagBlockRateDelay, "block-rate-delay", 0, "the delay to broadcast block proposal in order to control block production rate")

@@ -11,8 +11,7 @@ import (
 
 var _ commands.AdminCommand = (*TxRateLimitCommand)(nil)
 
-// TxRateLimitCommand will send a signal to compactor to trigger checkpoint
-// once finishing writing the current WAL segment file
+// TxRateLimitCommand will adjust the transaction ingest rate limiter.
 type TxRateLimitCommand struct {
 	limiter *ingest.AddressRateLimiter
 }

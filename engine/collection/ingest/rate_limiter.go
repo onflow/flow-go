@@ -16,7 +16,7 @@ type AddressRateLimiter struct {
 	burst    int // X messages allowed at one time
 }
 
-// AddressRateLimiter limits the rate of messages sent to a given address
+// AddressRateLimiter limits the rate of ingested transactions with a given payer address.
 // It allows the given "limit" amount messages per second with a "burst" amount of messages to be sent at once
 func NewAddressRateLimiter(limit rate.Limit, burst int) *AddressRateLimiter {
 	return &AddressRateLimiter{
