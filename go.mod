@@ -317,3 +317,5 @@ require (
 	nhooyr.io/websocket v1.8.7 // indirect
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
+
+replace github.com/onflow/cadence => github.com/dapperlabs/cadence-internal v0.42.7-patch.1

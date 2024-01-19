@@ -306,3 +306,5 @@ require (
 )
 
 replace github.com/onflow/flow-go => ../
+
+replace github.com/onflow/cadence => github.com/dapperlabs/cadence-internal v0.42.7-patch.1
