@@ -173,5 +173,9 @@ func (limiter TransactionStorageLimiter) shouldSkipSpecialAddress(
 	address flow.Address,
 	sc *systemcontracts.SystemContracts,
 ) bool {
+	if !ctx.EVMEnabled {
+		return false
+	}
+
 	return sc.EVMStorage.Address == address
 }
