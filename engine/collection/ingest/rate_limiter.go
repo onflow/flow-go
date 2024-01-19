@@ -9,15 +9,24 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// AddressRateLimiter limits the rate of ingested transactions with a given payer address.
 type AddressRateLimiter struct {
 	mu       sync.RWMutex
 	limiters map[flow.Address]*rate.Limiter
-	limit    rate.Limit
-	burst    int // X messages allowed at one time
+	limit    rate.Limit // X messages allowed per second
+	burst    int        // X messages allowed at one time
 }
 
 // AddressRateLimiter limits the rate of ingested transactions with a given payer address.
 // It allows the given "limit" amount messages per second with a "burst" amount of messages to be sent at once
+//
+// for example,
+// To config 1 message per 100 milliseconds, convert to per second first, which is 10 message per second,
+// so limit is 10 ( rate.Limit(10) ), and burst is 1.
+// Note: rate.Limit(0.1), burst = 1 means 1 message per 10 seconds, instead of 1 message per 100 milliseconds.
+//
+// To config 3 message per minute, the per-second-basis is 0.05 (3/60), so the limit should be rate.Limit(0.05),
+// and burst is 3.
 func NewAddressRateLimiter(limit rate.Limit, burst int) *AddressRateLimiter {
 	return &AddressRateLimiter{
 		limiters: make(map[flow.Address]*rate.Limiter),
