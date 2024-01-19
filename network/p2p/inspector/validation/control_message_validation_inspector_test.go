@@ -4,13 +4,17 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"os"
 	"testing"
 	"time"
 
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	pubsub_pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/config"
 	"github.com/onflow/flow-go/model/flow"
@@ -267,6 +271,197 @@ func TestControlMessageValidationInspector_truncateRPC(t *testing.T) {
 			}
 			return true
 		}, time.Second, 500*time.Millisecond)
+		stopInspector(t, cancel, inspector)
+	})
+}
+
+// TestControlMessageValidationInspector_TruncationConfigToggle ensures that rpc's are not truncated when truncation is disabled through configs.
+func TestControlMessageValidationInspector_TruncationConfigToggle(t *testing.T) {
+	t.Run("should not perform truncation when disabled is set to true", func(t *testing.T) {
+		numOfMsgs := 5000
+
+		// we expected a single warning for the entire RPC
+		expectedWarningLogs := int64(1)
+		expectedLogStrs := map[string]struct{}{validation.RPCTruncationDisabledWarning: {}}
+		logCounter := atomic.NewInt64(0)
+		logger := hookedLogger(logCounter, zerolog.WarnLevel, expectedLogStrs)
+		inspector, signalerCtx, cancel, distributor, rpcTracker, _, _, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
+			params.Config.GraftPruneMessageMaxSampleSize = numOfMsgs
+			params.Logger = logger
+			// disable truncation for all control message types
+			params.Config.InspectionProcess.Truncate.Disabled = true
+		})
+
+		// topic validation is ignored set any topic oracle
+		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Maybe()
+		rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
+		rpcTracker.On("WasIHaveRPCSent", mock.AnythingOfType("string")).Return(true).Maybe()
+		inspector.Start(signalerCtx)
+
+		rpc := unittest.P2PRPCFixture(
+			unittest.WithGrafts(unittest.P2PRPCGraftFixtures(unittest.IdentifierListFixture(numOfMsgs).Strings()...)...),
+			unittest.WithPrunes(unittest.P2PRPCPruneFixtures(unittest.IdentifierListFixture(numOfMsgs).Strings()...)...),
+			unittest.WithIHaves(unittest.P2PRPCIHaveFixtures(numOfMsgs, unittest.IdentifierListFixture(numOfMsgs).Strings()...)...),
+			unittest.WithIWants(unittest.P2PRPCIWantFixtures(numOfMsgs, numOfMsgs)...),
+		)
+
+		from := unittest.PeerIdFixture(t)
+		require.NoError(t, inspector.Inspect(from, rpc))
+
+		require.Eventually(t, func() bool {
+			return logCounter.Load() == expectedWarningLogs
+		}, time.Second, 500*time.Millisecond)
+
+		// ensure truncation not performed
+		require.Len(t, rpc.GetControl().GetGraft(), numOfMsgs)
+		require.Len(t, rpc.GetControl().GetPrune(), numOfMsgs)
+		require.Len(t, rpc.GetControl().GetIhave(), numOfMsgs)
+		ensureMessageIdsLen(t, p2pmsg.CtrlMsgIHave, rpc, numOfMsgs)
+		require.Len(t, rpc.GetControl().GetIwant(), numOfMsgs)
+		ensureMessageIdsLen(t, p2pmsg.CtrlMsgIWant, rpc, numOfMsgs)
+
+		stopInspector(t, cancel, inspector)
+	})
+
+	t.Run("should not perform truncation when disabled for each individual control message type directly", func(t *testing.T) {
+		numOfMsgs := 5000
+
+		expectedLogStrs := map[string]struct{}{
+			validation.GraftTruncationDisabledWarning:          {},
+			validation.PruneTruncationDisabledWarning:          {},
+			validation.IHaveTruncationDisabledWarning:          {},
+			validation.IHaveMessageIDTruncationDisabledWarning: {},
+			validation.IWantTruncationDisabledWarning:          {},
+			validation.IWantMessageIDTruncationDisabledWarning: {},
+		}
+		logCounter := atomic.NewInt64(0)
+		logger := hookedLogger(logCounter, zerolog.TraceLevel, expectedLogStrs)
+		inspector, signalerCtx, cancel, distributor, rpcTracker, _, _, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
+			params.Config.GraftPruneMessageMaxSampleSize = numOfMsgs
+			params.Logger = logger
+			// disable truncation for all control message types individually
+			params.Config.InspectionProcess.Truncate.GraftEnabled = false
+			params.Config.InspectionProcess.Truncate.PruneEnabled = false
+			params.Config.InspectionProcess.Truncate.IHaveEnabled = false
+			params.Config.InspectionProcess.Truncate.IHaveMessageIdsEnabled = false
+			params.Config.InspectionProcess.Truncate.IWantEnabled = false
+			params.Config.InspectionProcess.Truncate.IWantMessageIdsEnabled = false
+		})
+
+		// topic validation is ignored set any topic oracle
+		distributor.On("Distribute", mock.AnythingOfType("*p2p.InvCtrlMsgNotif")).Return(nil).Maybe()
+		rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
+		rpcTracker.On("WasIHaveRPCSent", mock.AnythingOfType("string")).Return(true).Maybe()
+		inspector.Start(signalerCtx)
+
+		rpc := unittest.P2PRPCFixture(
+			unittest.WithGrafts(unittest.P2PRPCGraftFixtures(unittest.IdentifierListFixture(numOfMsgs).Strings()...)...),
+			unittest.WithPrunes(unittest.P2PRPCPruneFixtures(unittest.IdentifierListFixture(numOfMsgs).Strings()...)...),
+			unittest.WithIHaves(unittest.P2PRPCIHaveFixtures(numOfMsgs, unittest.IdentifierListFixture(numOfMsgs).Strings()...)...),
+			unittest.WithIWants(unittest.P2PRPCIWantFixtures(numOfMsgs, numOfMsgs)...),
+		)
+
+		from := unittest.PeerIdFixture(t)
+		require.NoError(t, inspector.Inspect(from, rpc))
+
+		require.Eventually(t, func() bool {
+			return logCounter.Load() == int64(len(expectedLogStrs))
+		}, time.Second, 500*time.Millisecond)
+
+		// ensure truncation not performed
+		require.Len(t, rpc.GetControl().GetGraft(), numOfMsgs)
+		require.Len(t, rpc.GetControl().GetPrune(), numOfMsgs)
+		require.Len(t, rpc.GetControl().GetIhave(), numOfMsgs)
+		ensureMessageIdsLen(t, p2pmsg.CtrlMsgIHave, rpc, numOfMsgs)
+		require.Len(t, rpc.GetControl().GetIwant(), numOfMsgs)
+		ensureMessageIdsLen(t, p2pmsg.CtrlMsgIWant, rpc, numOfMsgs)
+
+		stopInspector(t, cancel, inspector)
+	})
+}
+
+// TestControlMessageValidationInspector_InspectionConfigToggle ensures that rpc's are not inspected when inspection is disabled through configs.
+func TestControlMessageValidationInspector_InspectionConfigToggle(t *testing.T) {
+	t.Run("should not perform inspection when disabled is set to true", func(t *testing.T) {
+		numOfMsgs := 5000
+
+		// we expected a single warning for the entire RPC
+		expectedWarningLogs := int64(1)
+		expectedLogStrs := map[string]struct{}{validation.RPCInspectionDisabledWarning: {}}
+		logCounter := atomic.NewInt64(0)
+		logger := hookedLogger(logCounter, zerolog.WarnLevel, expectedLogStrs)
+		inspector, signalerCtx, cancel, distributor, rpcTracker, _, _, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
+			params.Logger = logger
+			// disable inspector for all control message types
+			params.Config.InspectionProcess.Inspect.Disabled = true
+		})
+
+		// distribute should never be called when inspection is disabled
+		defer distributor.AssertNotCalled(t, "Distribute")
+		rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
+		rpcTracker.On("WasIHaveRPCSent", mock.AnythingOfType("string")).Return(true).Maybe()
+		inspector.Start(signalerCtx)
+
+		rpc := unittest.P2PRPCFixture(
+			unittest.WithGrafts(unittest.P2PRPCGraftFixtures(unittest.IdentifierListFixture(numOfMsgs).Strings()...)...),
+			unittest.WithPrunes(unittest.P2PRPCPruneFixtures(unittest.IdentifierListFixture(numOfMsgs).Strings()...)...),
+			unittest.WithIHaves(unittest.P2PRPCIHaveFixtures(numOfMsgs, unittest.IdentifierListFixture(numOfMsgs).Strings()...)...),
+			unittest.WithIWants(unittest.P2PRPCIWantFixtures(numOfMsgs, numOfMsgs)...),
+		)
+
+		from := unittest.PeerIdFixture(t)
+		require.NoError(t, inspector.Inspect(from, rpc))
+
+		require.Eventually(t, func() bool {
+			return logCounter.Load() == expectedWarningLogs
+		}, time.Second, 500*time.Millisecond)
+		stopInspector(t, cancel, inspector)
+	})
+
+	t.Run("should not perform inspection when disabled for each individual control message type directly", func(t *testing.T) {
+		numOfMsgs := 5000
+
+		expectedLogStrs := map[string]struct{}{
+			validation.GraftInspectionDisabledWarning:   {},
+			validation.PruneInspectionDisabledWarning:   {},
+			validation.IHaveInspectionDisabledWarning:   {},
+			validation.IWantInspectionDisabledWarning:   {},
+			validation.PublishInspectionDisabledWarning: {},
+		}
+		logCounter := atomic.NewInt64(0)
+		logger := hookedLogger(logCounter, zerolog.TraceLevel, expectedLogStrs)
+		inspector, signalerCtx, cancel, distributor, rpcTracker, _, _, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
+			params.Config.GraftPruneMessageMaxSampleSize = numOfMsgs
+			params.Logger = logger
+			// disable inspection for all control message types individually
+			params.Config.InspectionProcess.Inspect.GraftEnabled = false
+			params.Config.InspectionProcess.Inspect.PruneEnabled = false
+			params.Config.InspectionProcess.Inspect.IHaveEnabled = false
+			params.Config.InspectionProcess.Inspect.IWantEnabled = false
+			params.Config.InspectionProcess.Inspect.PublishEnabled = false
+		})
+
+		// distribute should never be called when inspection is disabled
+		defer distributor.AssertNotCalled(t, "Distribute")
+		rpcTracker.On("LastHighestIHaveRPCSize").Return(int64(100)).Maybe()
+		rpcTracker.On("WasIHaveRPCSent", mock.AnythingOfType("string")).Return(true).Maybe()
+		inspector.Start(signalerCtx)
+
+		rpc := unittest.P2PRPCFixture(
+			unittest.WithGrafts(unittest.P2PRPCGraftFixtures(unittest.IdentifierListFixture(numOfMsgs).Strings()...)...),
+			unittest.WithPrunes(unittest.P2PRPCPruneFixtures(unittest.IdentifierListFixture(numOfMsgs).Strings()...)...),
+			unittest.WithIHaves(unittest.P2PRPCIHaveFixtures(numOfMsgs, unittest.IdentifierListFixture(numOfMsgs).Strings()...)...),
+			unittest.WithIWants(unittest.P2PRPCIWantFixtures(numOfMsgs, numOfMsgs)...),
+			unittest.WithPubsubMessages(unittest.GossipSubMessageFixtures(numOfMsgs, unittest.RandomStringFixture(t, 100), unittest.WithFrom(unittest.PeerIdFixture(t)))...),
+		)
+
+		from := unittest.PeerIdFixture(t)
+		require.NoError(t, inspector.Inspect(from, rpc))
+
+		require.Eventually(t, func() bool {
+			return logCounter.Load() == int64(len(expectedLogStrs))
+		}, time.Second, 500*time.Millisecond)
+
 		stopInspector(t, cancel, inspector)
 	})
 }
@@ -863,4 +1058,29 @@ func inspectorFixture(t *testing.T, opts ...func(params *validation.InspectorPar
 func stopInspector(t *testing.T, cancel context.CancelFunc, inspector *validation.ControlMsgValidationInspector) {
 	cancel()
 	unittest.RequireCloseBefore(t, inspector.Done(), 5*time.Second, "inspector did not stop")
+}
+
+// utility function to track the number of warn-level calls to a logger
+func hookedLogger(counter *atomic.Int64, expectedLogLevel zerolog.Level, expectedLogs map[string]struct{}) zerolog.Logger {
+	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
+		if _, ok := expectedLogs[message]; ok && level == expectedLogLevel {
+			counter.Inc()
+		}
+	})
+	return zerolog.New(os.Stdout).Level(expectedLogLevel).Hook(hook)
+}
+
+func ensureMessageIdsLen(t *testing.T, msgType p2pmsg.ControlMessageType, rpc *pubsub.RPC, expectedLen int) {
+	switch msgType {
+	case p2pmsg.CtrlMsgIHave:
+		for _, ihave := range rpc.GetControl().GetIhave() {
+			require.Len(t, ihave.GetMessageIDs(), expectedLen)
+		}
+	case p2pmsg.CtrlMsgIWant:
+		for _, iwant := range rpc.GetControl().GetIwant() {
+			require.Len(t, iwant.GetMessageIDs(), expectedLen)
+		}
+	default:
+		require.Fail(t, "control message type provided does not contain message ids expected ihave or iwant")
+	}
 }

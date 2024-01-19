@@ -31,6 +31,26 @@ import (
 	flowrand "github.com/onflow/flow-go/utils/rand"
 )
 
+const (
+	RPCInspectionDisabledWarning     = "rpc inspection disabled for all control message types, skipping inspection"
+	GraftInspectionDisabledWarning   = "rpc graft inspection disabled skipping"
+	PruneInspectionDisabledWarning   = "rpc prune inspection disabled skipping"
+	IWantInspectionDisabledWarning   = "rpc iwant inspection disabled skipping"
+	IHaveInspectionDisabledWarning   = "rpc ihave inspection disabled skipping"
+	PublishInspectionDisabledWarning = "rpc publish message inspection disabled skipping"
+
+	RPCTruncationDisabledWarning            = "rpc truncation disabled for all control message types, skipping truncation"
+	GraftTruncationDisabledWarning          = "rpc graft truncation disabled skipping"
+	PruneTruncationDisabledWarning          = "rpc prune truncation disabled skipping"
+	IHaveTruncationDisabledWarning          = "rpc ihave truncation disabled skipping"
+	IHaveMessageIDTruncationDisabledWarning = "ihave message ids truncation disabled skipping"
+	IWantTruncationDisabledWarning          = "rpc iwant truncation disabled skipping"
+	IWantMessageIDTruncationDisabledWarning = "iwant message ids truncation disabled skipping"
+
+	// rpcInspectorComponentName the rpc inspector component name.
+	rpcInspectorComponentName = "gossipsub_rpc_validation_inspector"
+)
+
 // ControlMsgValidationInspector RPC message inspector that inspects control messages and performs some validation on them,
 // when some validation rule is broken feedback is given via the Peer scoring notifier.
 type ControlMsgValidationInspector struct {
@@ -192,16 +212,12 @@ func (c *ControlMsgValidationInspector) ActiveClustersChanged(clusterIDList flow
 //   - error: if a new inspect rpc request cannot be created, all errors returned are considered irrecoverable.
 func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) error {
 	if c.config.InspectionProcess.Inspect.Disabled {
-		c.logger.Warn().Msg("rpc inspection disabled for all control message types, skipping inspection")
+		c.logger.Warn().Msg(RPCInspectionDisabledWarning)
 		return nil
 	}
 
-	if c.config.InspectionProcess.Truncate.Disabled {
-		c.logger.Warn().Msg("rpc truncation disabled for all control message types, skipping truncation")
-	} else {
-		// first truncate the rpc to the configured max sample size; if needed
-		c.truncateRPC(from, rpc)
-	}
+	// first truncate the rpc to the configured max sample size; if needed
+	c.truncateRPC(from, rpc)
 
 	// second, queue further async inspection
 	req, err := NewInspectRPCRequest(from, rpc)
@@ -266,40 +282,24 @@ func (c *ControlMsgValidationInspector) processInspectRPCReq(req *InspectRPCRequ
 	for _, ctrlMsgType := range p2pmsg.ControlMessageTypes() {
 		switch ctrlMsgType {
 		case p2pmsg.CtrlMsgGraft:
-			if !c.config.InspectionProcess.Inspect.GraftEnabled {
-				c.logger.Debug().Msg("rpc graft inspection disabled skipping")
-				continue
-			}
 			err, topicType := c.inspectGraftMessages(req.Peer, req.rpc.GetControl().GetGraft(), activeClusterIDS)
 			if err != nil {
 				c.logAndDistributeAsyncInspectErrs(req, p2pmsg.CtrlMsgGraft, err, 1, topicType)
 				return nil
 			}
 		case p2pmsg.CtrlMsgPrune:
-			if !c.config.InspectionProcess.Inspect.PruneEnabled {
-				c.logger.Debug().Msg("rpc prune inspection disabled skipping")
-				continue
-			}
 			err, topicType := c.inspectPruneMessages(req.Peer, req.rpc.GetControl().GetPrune(), activeClusterIDS)
 			if err != nil {
 				c.logAndDistributeAsyncInspectErrs(req, p2pmsg.CtrlMsgPrune, err, 1, topicType)
 				return nil
 			}
 		case p2pmsg.CtrlMsgIWant:
-			if !c.config.InspectionProcess.Inspect.IWantEnabled {
-				c.logger.Debug().Msg("rpc iwant inspection disabled skipping")
-				continue
-			}
 			err := c.inspectIWantMessages(req.Peer, req.rpc.GetControl().GetIwant())
 			if err != nil {
 				c.logAndDistributeAsyncInspectErrs(req, p2pmsg.CtrlMsgIWant, err, 1, p2p.CtrlMsgNonClusterTopicType)
 				return nil
 			}
 		case p2pmsg.CtrlMsgIHave:
-			if !c.config.InspectionProcess.Inspect.IHaveEnabled {
-				c.logger.Debug().Msg("rpc ihave inspection disabled skipping")
-				continue
-			}
 			err, topicType := c.inspectIHaveMessages(req.Peer, req.rpc.GetControl().GetIhave(), activeClusterIDS)
 			if err != nil {
 				c.logAndDistributeAsyncInspectErrs(req, p2pmsg.CtrlMsgIHave, err, 1, topicType)
@@ -308,15 +308,11 @@ func (c *ControlMsgValidationInspector) processInspectRPCReq(req *InspectRPCRequ
 		}
 	}
 
-	if c.config.InspectionProcess.Inspect.PublishEnabled {
-		// inspect rpc publish messages after all control message validation has passed
-		err, errCount := c.inspectRpcPublishMessages(req.Peer, req.rpc.GetPublish(), activeClusterIDS)
-		if err != nil {
-			c.logAndDistributeAsyncInspectErrs(req, p2pmsg.RpcPublishMessage, err, errCount, p2p.CtrlMsgNonClusterTopicType)
-			return nil
-		}
-	} else {
-		c.logger.Debug().Msg("rpc publish message inspection disabled skipping")
+	// inspect rpc publish messages after all control message validation has passed
+	err, errCount := c.inspectRpcPublishMessages(req.Peer, req.rpc.GetPublish(), activeClusterIDS)
+	if err != nil {
+		c.logAndDistributeAsyncInspectErrs(req, p2pmsg.RpcPublishMessage, err, errCount, p2p.CtrlMsgNonClusterTopicType)
+		return nil
 	}
 
 	return nil
@@ -355,6 +351,11 @@ func (c *ControlMsgValidationInspector) checkPubsubMessageSender(message *pubsub
 // - error: if any error occurs while sampling or validating topics, all returned errors are benign and should not cause the node to crash.
 // - bool: true if an error is returned and the topic that failed validation was a cluster prefixed topic, false otherwise.
 func (c *ControlMsgValidationInspector) inspectGraftMessages(from peer.ID, grafts []*pubsub_pb.ControlGraft, activeClusterIDS flow.ChainIDList) (error, p2p.CtrlMsgTopicType) {
+	if !c.config.InspectionProcess.Inspect.GraftEnabled {
+		c.logger.Trace().Msg(GraftInspectionDisabledWarning)
+		return nil, p2p.CtrlMsgNonClusterTopicType
+	}
+
 	tracker := make(duplicateStrTracker)
 	for _, graft := range grafts {
 		topic := channels.Topic(graft.GetTopicID())
@@ -381,6 +382,10 @@ func (c *ControlMsgValidationInspector) inspectGraftMessages(from peer.ID, graft
 //   - error: if any error occurs while sampling or validating topics, all returned errors are benign and should not cause the node to crash.
 //   - bool: true if an error is returned and the topic that failed validation was a cluster prefixed topic, false otherwise.
 func (c *ControlMsgValidationInspector) inspectPruneMessages(from peer.ID, prunes []*pubsub_pb.ControlPrune, activeClusterIDS flow.ChainIDList) (error, p2p.CtrlMsgTopicType) {
+	if !c.config.InspectionProcess.Inspect.PruneEnabled {
+		c.logger.Trace().Msg(PruneInspectionDisabledWarning)
+		return nil, p2p.CtrlMsgNonClusterTopicType
+	}
 	tracker := make(duplicateStrTracker)
 	for _, prune := range prunes {
 		topic := channels.Topic(prune.GetTopicID())
@@ -407,6 +412,11 @@ func (c *ControlMsgValidationInspector) inspectPruneMessages(from peer.ID, prune
 //   - error: if any error occurs while sampling or validating topics, all returned errors are benign and should not cause the node to crash.
 //   - bool: true if an error is returned and the topic that failed validation was a cluster prefixed topic, false otherwise.
 func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihaves []*pubsub_pb.ControlIHave, activeClusterIDS flow.ChainIDList) (error, p2p.CtrlMsgTopicType) {
+	if !c.config.InspectionProcess.Inspect.IHaveEnabled {
+		c.logger.Trace().Msg(IHaveInspectionDisabledWarning)
+		return nil, p2p.CtrlMsgNonClusterTopicType
+	}
+
 	if len(ihaves) == 0 {
 		return nil, p2p.CtrlMsgNonClusterTopicType
 	}
@@ -455,6 +465,11 @@ func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihave
 // - DuplicateTopicErr: if there are any duplicate message ids found in any of the iWants.
 // - IWantCacheMissThresholdErr: if the rate of cache misses exceeds the configured allowed threshold.
 func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWants []*pubsub_pb.ControlIWant) error {
+	if !c.config.InspectionProcess.Inspect.IWantEnabled {
+		c.logger.Trace().Msg(IWantInspectionDisabledWarning)
+		return nil
+	}
+
 	if len(iWants) == 0 {
 		return nil
 	}
@@ -526,6 +541,11 @@ func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWant
 // - InvalidRpcPublishMessagesErr: if the amount of invalid messages exceeds the configured RPCMessageErrorThreshold.
 // - int: the number of invalid pubsub messages
 func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, messages []*pubsub_pb.Message, activeClusterIDS flow.ChainIDList) (error, uint64) {
+	if !c.config.InspectionProcess.Inspect.PublishEnabled {
+		c.logger.Trace().Msg(PublishInspectionDisabledWarning)
+		return nil, 0
+	}
+
 	totalMessages := len(messages)
 	if totalMessages == 0 {
 		return nil, 0
@@ -585,32 +605,23 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 // - from: peer ID of the sender.
 // - rpc: the pubsub RPC.
 func (c *ControlMsgValidationInspector) truncateRPC(from peer.ID, rpc *pubsub.RPC) {
+	if c.config.InspectionProcess.Truncate.Disabled {
+		c.logger.Warn().Msg(RPCTruncationDisabledWarning)
+		return
+	}
+
 	for _, ctlMsgType := range p2pmsg.ControlMessageTypes() {
 		switch ctlMsgType {
 		case p2pmsg.CtrlMsgGraft:
-			if !c.config.InspectionProcess.Truncate.GraftEnabled {
-				c.logger.Debug().Msg("rpc graft truncation disabled skipping")
-				continue
-			}
 			c.truncateGraftMessages(rpc)
 		case p2pmsg.CtrlMsgPrune:
-			if !c.config.InspectionProcess.Truncate.PruneEnabled {
-				c.logger.Debug().Msg("rpc prune truncation disabled skipping")
-				continue
-			}
 			c.truncatePruneMessages(rpc)
 		case p2pmsg.CtrlMsgIHave:
-			if !c.config.InspectionProcess.Truncate.IHaveEnabled {
-				c.logger.Debug().Msg("rpc ihave truncation disabled skipping")
-				continue
-			}
 			c.truncateIHaveMessages(rpc)
+			c.truncateIHaveMessageIds(rpc)
 		case p2pmsg.CtrlMsgIWant:
-			if !c.config.InspectionProcess.Truncate.IWantEnabled {
-				c.logger.Debug().Msg("rpc iwant truncation disabled skipping")
-				continue
-			}
 			c.truncateIWantMessages(from, rpc)
+			c.truncateIWantMessageIds(from, rpc)
 		default:
 			// sanity check this should never happen
 			c.logAndThrowError(fmt.Errorf("unknown control message type encountered during RPC truncation"))
@@ -623,6 +634,11 @@ func (c *ControlMsgValidationInspector) truncateRPC(from peer.ID, rpc *pubsub.RP
 // Args:
 //   - rpc: the rpc message to truncate.
 func (c *ControlMsgValidationInspector) truncateGraftMessages(rpc *pubsub.RPC) {
+	if !c.config.InspectionProcess.Truncate.GraftEnabled {
+		c.logger.Trace().Msg(GraftTruncationDisabledWarning)
+		return
+	}
+
 	grafts := rpc.GetControl().GetGraft()
 	originalGraftSize := len(grafts)
 	if originalGraftSize <= c.config.GraftPruneMessageMaxSampleSize {
@@ -643,6 +659,11 @@ func (c *ControlMsgValidationInspector) truncateGraftMessages(rpc *pubsub.RPC) {
 // Args:
 //   - rpc: the rpc message to truncate.
 func (c *ControlMsgValidationInspector) truncatePruneMessages(rpc *pubsub.RPC) {
+	if !c.config.InspectionProcess.Truncate.PruneEnabled {
+		c.logger.Trace().Msg(PruneTruncationDisabledWarning)
+		return
+	}
+
 	prunes := rpc.GetControl().GetPrune()
 	originalPruneSize := len(prunes)
 	if originalPruneSize <= c.config.GraftPruneMessageMaxSampleSize {
@@ -662,6 +683,11 @@ func (c *ControlMsgValidationInspector) truncatePruneMessages(rpc *pubsub.RPC) {
 // Args:
 //   - rpc: the rpc message to truncate.
 func (c *ControlMsgValidationInspector) truncateIHaveMessages(rpc *pubsub.RPC) {
+	if !c.config.InspectionProcess.Truncate.IHaveEnabled {
+		c.logger.Trace().Msg(IHaveTruncationDisabledWarning)
+		return
+	}
+
 	ihaves := rpc.GetControl().GetIhave()
 	originalIHaveCount := len(ihaves)
 	if originalIHaveCount == 0 {
@@ -680,7 +706,6 @@ func (c *ControlMsgValidationInspector) truncateIHaveMessages(rpc *pubsub.RPC) {
 		rpc.Control.Ihave = ihaves[:sampleSize]
 		c.metrics.OnControlMessagesTruncated(p2pmsg.CtrlMsgIHave, originalIHaveCount-len(rpc.Control.Ihave))
 	}
-	c.truncateIHaveMessageIds(rpc)
 }
 
 // truncateIHaveMessageIds truncates the message ids for each iHave control message in the RPC. If the total number of message ids in a single iHave exceeds the configured
@@ -689,9 +714,10 @@ func (c *ControlMsgValidationInspector) truncateIHaveMessages(rpc *pubsub.RPC) {
 //   - rpc: the rpc message to truncate.
 func (c *ControlMsgValidationInspector) truncateIHaveMessageIds(rpc *pubsub.RPC) {
 	if !c.config.InspectionProcess.Truncate.IHaveMessageIdsEnabled {
-		c.logger.Debug().Msg("ihave message ids truncation disabled skipping")
+		c.logger.Trace().Msg(IHaveMessageIDTruncationDisabledWarning)
 		return
 	}
+
 	for _, ihave := range rpc.GetControl().GetIhave() {
 		messageIDs := ihave.GetMessageIDs()
 		originalMessageIdCount := len(messageIDs)
@@ -719,6 +745,11 @@ func (c *ControlMsgValidationInspector) truncateIHaveMessageIds(rpc *pubsub.RPC)
 // Args:
 //   - rpc: the rpc message to truncate.
 func (c *ControlMsgValidationInspector) truncateIWantMessages(from peer.ID, rpc *pubsub.RPC) {
+	if !c.config.InspectionProcess.Truncate.IWantEnabled {
+		c.logger.Trace().Msg(IWantTruncationDisabledWarning)
+		return
+	}
+
 	iWants := rpc.GetControl().GetIwant()
 	originalIWantCount := uint(len(iWants))
 	if originalIWantCount == 0 {
@@ -737,7 +768,6 @@ func (c *ControlMsgValidationInspector) truncateIWantMessages(from peer.ID, rpc 
 		rpc.Control.Iwant = iWants[:sampleSize]
 		c.metrics.OnControlMessagesTruncated(p2pmsg.CtrlMsgIWant, int(originalIWantCount)-len(rpc.Control.Iwant))
 	}
-	c.truncateIWantMessageIds(from, rpc)
 }
 
 // truncateIWantMessageIds truncates the message ids for each iWant control message in the RPC. If the total number of message ids in a single iWant exceeds the configured
@@ -746,9 +776,10 @@ func (c *ControlMsgValidationInspector) truncateIWantMessages(from peer.ID, rpc 
 //   - rpc: the rpc message to truncate.
 func (c *ControlMsgValidationInspector) truncateIWantMessageIds(from peer.ID, rpc *pubsub.RPC) {
 	if !c.config.InspectionProcess.Truncate.IWantMessageIdsEnabled {
-		c.logger.Debug().Msg("iwant message ids truncation disabled skipping")
+		c.logger.Trace().Msg(IWantMessageIDTruncationDisabledWarning)
 		return
 	}
+
 	lastHighest := c.rpcTracker.LastHighestIHaveRPCSize()
 	lg := c.logger.With().
 		Str("peer_id", p2plogging.PeerId(from)).

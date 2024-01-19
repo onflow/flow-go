@@ -64,15 +64,15 @@ type Inspect struct {
 	// Disabled disables rpc inspection for all control message types.
 	Disabled bool `mapstructure:"disabled"`
 	// GraftEnabled enable graft control message inspection.
-	GraftEnabled bool `validate:"required" mapstructure:"graft-enabled"`
+	GraftEnabled bool `mapstructure:"graft-enabled"`
 	// PruneEnabled enable prune control message inspection.
-	PruneEnabled bool `validate:"required" mapstructure:"prune-enabled"`
+	PruneEnabled bool `mapstructure:"prune-enabled"`
 	// IHaveEnabled enable iHave control message inspection.
-	IHaveEnabled bool `validate:"required" mapstructure:"ihave-enabled"`
+	IHaveEnabled bool `mapstructure:"ihave-enabled"`
 	// IWantEnabled enable iWant control message inspection.
-	IWantEnabled bool `validate:"required" mapstructure:"iwant-enabled"`
+	IWantEnabled bool `mapstructure:"iwant-enabled"`
 	// PublishEnabled enable publish message inspection.
-	PublishEnabled bool `validate:"required" mapstructure:"publish-enabled"`
+	PublishEnabled bool `mapstructure:"publish-enabled"`
 }
 
 // Truncate configuration to enable/disable RPC truncation for a particular control message type.
@@ -80,17 +80,17 @@ type Truncate struct {
 	// Disabled disables truncation for all control message types.
 	Disabled bool `mapstructure:"disabled"`
 	// GraftEnabled enable graft control message truncation.
-	GraftEnabled bool `validate:"required" mapstructure:"graft-enabled"`
+	GraftEnabled bool `mapstructure:"graft-enabled"`
 	// PruneEnabled enable prune control message truncation.
-	PruneEnabled bool `validate:"required" mapstructure:"prune-enabled"`
+	PruneEnabled bool `mapstructure:"prune-enabled"`
 	// IHaveEnabled enable iHave control message truncation.
-	IHaveEnabled bool `validate:"required" mapstructure:"ihave-enabled"`
+	IHaveEnabled bool `mapstructure:"ihave-enabled"`
 	// IHaveMessageIdsEnabled enable iHave message id truncation.
-	IHaveMessageIdsEnabled bool `validate:"required" mapstructure:"ihave-message-id-enabled"`
+	IHaveMessageIdsEnabled bool `mapstructure:"ihave-message-id-enabled"`
 	// IWantEnabled enable iWant control message truncation.
-	IWantEnabled bool `validate:"required" mapstructure:"iwant-enabled"`
+	IWantEnabled bool `mapstructure:"iwant-enabled"`
 	// IWantMessageIdsEnabled enable iWant message id truncation.
-	IWantMessageIdsEnabled bool `validate:"required" mapstructure:"iwant-message-id-enabled"`
+	IWantMessageIdsEnabled bool `mapstructure:"iwant-message-id-enabled"`
 }
 
 const (
