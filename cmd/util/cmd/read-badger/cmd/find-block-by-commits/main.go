@@ -116,7 +116,7 @@ func run(*cobra.Command, []string) {
 	}
 
 	storage, db := loader()
-	defer func () { 
+	defer func() {
 		err := db.Close()
 		if err != nil {
 			log.Warn().Err(err).Msg("error closing db")
