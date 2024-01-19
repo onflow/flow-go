@@ -991,7 +991,6 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		exeNode.ingestionUnit,
 		node.Logger,
 		node.EngineRegistry,
-		node.Me,
 		fetcher,
 		node.Storage.Headers,
 		node.Storage.Blocks,

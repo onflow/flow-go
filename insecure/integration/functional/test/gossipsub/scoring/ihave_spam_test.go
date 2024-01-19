@@ -67,6 +67,12 @@ func TestGossipSubIHaveBrokenPromises_Below_Threshold(t *testing.T) {
 	conf.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Internal.DecayInterval = 1 * time.Second
 	// score tracer interval is set to 500 milliseconds to speed up the test, it should be shorter than the heartbeat interval (1 second) of gossipsub to catch the score updates in time.
 	conf.NetworkConfig.GossipSub.RpcTracer.ScoreTracerInterval = 500 * time.Millisecond
+
+	// relaxing the scoring parameters to fit the test scenario.
+	conf.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Internal.Behaviour.PenaltyDecay = 0.99
+	conf.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Internal.Behaviour.PenaltyThreshold = 10
+	conf.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Internal.Behaviour.PenaltyWeight = -1
+
 	victimNode, victimIdentity := p2ptest.NodeFixture(
 		t,
 		sporkId,
@@ -218,6 +224,12 @@ func TestGossipSubIHaveBrokenPromises_Above_Threshold(t *testing.T) {
 	// the node would be penalized for invalid message delivery way sooner than it can mount an ihave broken-promises spam attack.
 	blockTopicOverrideParams.InvalidMessageDeliveriesWeight = 0.0
 	blockTopicOverrideParams.InvalidMessageDeliveriesDecay = 0.0
+
+	// relaxing the scoring parameters to fit the test scenario.
+	conf.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Internal.Behaviour.PenaltyDecay = 0.99
+	conf.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Internal.Behaviour.PenaltyThreshold = 10
+	conf.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Internal.Behaviour.PenaltyWeight = -1
+
 	victimNode, victimIdentity := p2ptest.NodeFixture(
 		t,
 		sporkId,
