@@ -173,5 +173,5 @@ func (limiter TransactionStorageLimiter) shouldSkipSpecialAddress(
 	address flow.Address,
 	sc *systemcontracts.SystemContracts,
 ) bool {
-	return sc.EVM.Address == address
+	return sc.EVMStorage.Address == address
 }
