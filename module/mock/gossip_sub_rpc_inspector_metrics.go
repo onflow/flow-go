@@ -9,44 +9,19 @@ type GossipSubRpcInspectorMetrics struct {
 	mock.Mock
 }
 
-// OnGraftReceived provides a mock function with given fields: count
-func (_m *GossipSubRpcInspectorMetrics) OnGraftReceived(count int) {
-	_m.Called(count)
+// OnIHaveMessageIDsReceived provides a mock function with given fields: channel, msgIdCount
+func (_m *GossipSubRpcInspectorMetrics) OnIHaveMessageIDsReceived(channel string, msgIdCount int) {
+	_m.Called(channel, msgIdCount)
 }
 
-// OnIHaveReceived provides a mock function with given fields: count
-func (_m *GossipSubRpcInspectorMetrics) OnIHaveReceived(count int) {
-	_m.Called(count)
+// OnIWantMessageIDsReceived provides a mock function with given fields: msgIdCount
+func (_m *GossipSubRpcInspectorMetrics) OnIWantMessageIDsReceived(msgIdCount int) {
+	_m.Called(msgIdCount)
 }
 
-// OnIWantReceived provides a mock function with given fields: count
-func (_m *GossipSubRpcInspectorMetrics) OnIWantReceived(count int) {
-	_m.Called(count)
-}
-
-// OnIncomingRpcAcceptedFully provides a mock function with given fields:
-func (_m *GossipSubRpcInspectorMetrics) OnIncomingRpcAcceptedFully() {
-	_m.Called()
-}
-
-// OnIncomingRpcAcceptedOnlyForControlMessages provides a mock function with given fields:
-func (_m *GossipSubRpcInspectorMetrics) OnIncomingRpcAcceptedOnlyForControlMessages() {
-	_m.Called()
-}
-
-// OnIncomingRpcRejected provides a mock function with given fields:
-func (_m *GossipSubRpcInspectorMetrics) OnIncomingRpcRejected() {
-	_m.Called()
-}
-
-// OnPruneReceived provides a mock function with given fields: count
-func (_m *GossipSubRpcInspectorMetrics) OnPruneReceived(count int) {
-	_m.Called(count)
-}
-
-// OnPublishedGossipMessagesReceived provides a mock function with given fields: count
-func (_m *GossipSubRpcInspectorMetrics) OnPublishedGossipMessagesReceived(count int) {
-	_m.Called(count)
+// OnIncomingRpcReceived provides a mock function with given fields: iHaveCount, iWantCount, graftCount, pruneCount, msgCount
+func (_m *GossipSubRpcInspectorMetrics) OnIncomingRpcReceived(iHaveCount int, iWantCount int, graftCount int, pruneCount int, msgCount int) {
+	_m.Called(iHaveCount, iWantCount, graftCount, pruneCount, msgCount)
 }
 
 type mockConstructorTestingTNewGossipSubRpcInspectorMetrics interface {

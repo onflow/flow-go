@@ -39,10 +39,10 @@ func TestSubscriptionCache_GetSubscribedTopics(t *testing.T) {
 
 	// case when the peer has a subscription
 	topics := []string{"topic1", "topic2"}
-	updatedTopics, err := cache.AddTopicForPeer(peerID, topics[0])
+	updatedTopics, err := cache.AddWithInitTopicForPeer(peerID, topics[0])
 	require.NoError(t, err, "adding topic 1 should not produce an error")
 	require.Equal(t, topics[:1], updatedTopics, "updated topics should match the added topic")
-	updatedTopics, err = cache.AddTopicForPeer(peerID, topics[1])
+	updatedTopics, err = cache.AddWithInitTopicForPeer(peerID, topics[1])
 	require.NoError(t, err, "adding topic 2 should not produce an error")
 	require.Equal(t, topics, updatedTopics, "updated topics should match the added topic")
 
@@ -89,11 +89,11 @@ func TestSubscriptionCache_TestAddTopicForPeer(t *testing.T) {
 	secondTopic := "topic2"
 
 	// add first topic to the existing peer
-	_, err := cache.AddTopicForPeer(existingPeerID, firstTopic)
+	_, err := cache.AddWithInitTopicForPeer(existingPeerID, firstTopic)
 	require.NoError(t, err, "adding first topic to existing peer should not produce an error")
 
 	// add second topic to the same peer
-	updatedTopics, err := cache.AddTopicForPeer(existingPeerID, secondTopic)
+	updatedTopics, err := cache.AddWithInitTopicForPeer(existingPeerID, secondTopic)
 	require.NoError(t, err, "adding second topic to existing peer should not produce an error")
 	require.ElementsMatch(t, []string{firstTopic, secondTopic}, updatedTopics, "updated topics should match the added topics")
 
@@ -102,7 +102,7 @@ func TestSubscriptionCache_TestAddTopicForPeer(t *testing.T) {
 	newTopic := "newTopic"
 
 	// add a topic to the new peer
-	updatedTopics, err = cache.AddTopicForPeer(newPeerID, newTopic)
+	updatedTopics, err = cache.AddWithInitTopicForPeer(newPeerID, newTopic)
 	require.NoError(t, err, "adding topic to new peer should not produce an error")
 	require.Equal(t, []string{newTopic}, updatedTopics, "updated topics for new peer should match the added topic")
 
@@ -124,18 +124,18 @@ func TestSubscriptionCache_DuplicateTopics(t *testing.T) {
 	topic := "topic1"
 
 	// add first topic to the existing peer
-	_, err := cache.AddTopicForPeer(peerID, topic)
+	_, err := cache.AddWithInitTopicForPeer(peerID, topic)
 	require.NoError(t, err, "adding first topic to existing peer should not produce an error")
 
 	// add second topic to the same peer
-	updatedTopics, err := cache.AddTopicForPeer(peerID, topic)
+	updatedTopics, err := cache.AddWithInitTopicForPeer(peerID, topic)
 	require.NoError(t, err, "adding duplicate topic to existing peer should not produce an error")
 	require.Equal(t, []string{topic}, updatedTopics, "duplicate topic should not be added")
 }
 
-// TestSubscriptionCache_MoveUpdateCycle tests that (1) within one update cycle, "AddTopicForPeer" calls append the topics to the list of
-// subscribed topics for peer, (2) as long as there is no "AddTopicForPeer" call, moving to the next update cycle
-// does not change the subscribed topics for a peer, and (3) calling "AddTopicForPeer" after moving to the next update
+// TestSubscriptionCache_MoveUpdateCycle tests that (1) within one update cycle, "AddWithInitTopicForPeer" calls append the topics to the list of
+// subscribed topics for peer, (2) as long as there is no "AddWithInitTopicForPeer" call, moving to the next update cycle
+// does not change the subscribed topics for a peer, and (3) calling "AddWithInitTopicForPeer" after moving to the next update
 // cycle clears the subscribed topics for a peer and adds the new topic.
 func TestSubscriptionCache_MoveUpdateCycle(t *testing.T) {
 	sizeLimit := uint32(100)
@@ -151,13 +151,13 @@ func TestSubscriptionCache_MoveUpdateCycle(t *testing.T) {
 	topic4 := "topic4"
 
 	// adds topic1, topic2, and topic3 to the peer
-	topics, err := cache.AddTopicForPeer(peerID, topic1)
+	topics, err := cache.AddWithInitTopicForPeer(peerID, topic1)
 	require.NoError(t, err, "adding first topic to existing peer should not produce an error")
 	require.Equal(t, []string{topic1}, topics, "updated topics should match the added topic")
-	topics, err = cache.AddTopicForPeer(peerID, topic2)
+	topics, err = cache.AddWithInitTopicForPeer(peerID, topic2)
 	require.NoError(t, err, "adding second topic to existing peer should not produce an error")
 	require.Equal(t, []string{topic1, topic2}, topics, "updated topics should match the added topics")
-	topics, err = cache.AddTopicForPeer(peerID, topic3)
+	topics, err = cache.AddWithInitTopicForPeer(peerID, topic3)
 	require.NoError(t, err, "adding third topic to existing peer should not produce an error")
 	require.Equal(t, []string{topic1, topic2, topic3}, topics, "updated topics should match the added topics")
 
@@ -169,7 +169,7 @@ func TestSubscriptionCache_MoveUpdateCycle(t *testing.T) {
 
 	// add topic4 to the peer; since we moved to the next update cycle, the topics for the peer should be cleared
 	// and topic4 should be the only topic for the peer
-	topics, err = cache.AddTopicForPeer(peerID, topic4)
+	topics, err = cache.AddWithInitTopicForPeer(peerID, topic4)
 	require.NoError(t, err, "adding fourth topic to existing peer should not produce an error")
 	require.Equal(t, []string{topic4}, topics, "updated topics should match the added topic")
 
@@ -197,12 +197,12 @@ func TestSubscriptionCache_MoveUpdateCycleWithDifferentPeers(t *testing.T) {
 	topic2 := "topic2"
 
 	// add topic1 to peer1
-	topics, err := cache.AddTopicForPeer(peer1, topic1)
+	topics, err := cache.AddWithInitTopicForPeer(peer1, topic1)
 	require.NoError(t, err, "adding first topic to peer1 should not produce an error")
 	require.Equal(t, []string{topic1}, topics, "updated topics should match the added topic")
 
 	// add topic2 to peer2
-	topics, err = cache.AddTopicForPeer(peer2, topic2)
+	topics, err = cache.AddWithInitTopicForPeer(peer2, topic2)
 	require.NoError(t, err, "adding first topic to peer2 should not produce an error")
 	require.Equal(t, []string{topic2}, topics, "updated topics should match the added topic")
 
@@ -219,7 +219,7 @@ func TestSubscriptionCache_MoveUpdateCycleWithDifferentPeers(t *testing.T) {
 	require.ElementsMatch(t, []string{topic2}, topics, "retrieved topics should match the added topics")
 
 	// now add topic2 to peer1; it should overwrite the previous topics for peer1, but not affect the topics for peer2
-	topics, err = cache.AddTopicForPeer(peer1, topic2)
+	topics, err = cache.AddWithInitTopicForPeer(peer1, topic2)
 	require.NoError(t, err, "adding second topic to peer1 should not produce an error")
 	require.Equal(t, []string{topic2}, topics, "updated topics should match the added topic")
 
@@ -230,7 +230,6 @@ func TestSubscriptionCache_MoveUpdateCycleWithDifferentPeers(t *testing.T) {
 
 // TestSubscriptionCache_ConcurrentUpdate tests subscription cache update in a concurrent environment.
 func TestSubscriptionCache_ConcurrentUpdate(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_TODO, "this test requires atomic AdjustOrGet method to be implemented for backend")
 	sizeLimit := uint32(100)
 	cache := internal.NewSubscriptionRecordCache(
 		sizeLimit,
@@ -248,7 +247,7 @@ func TestSubscriptionCache_ConcurrentUpdate(t *testing.T) {
 			allUpdatesDone.Add(1)
 			go func() {
 				defer allUpdatesDone.Done()
-				_, err := cache.AddTopicForPeer(pid, topic)
+				_, err := cache.AddWithInitTopicForPeer(pid, topic)
 				require.NoError(t, err, "adding topic to peer should not produce an error")
 			}()
 		}
@@ -286,7 +285,7 @@ func TestSubscriptionCache_TestSizeLimit(t *testing.T) {
 	// add topics to peers
 	for _, pid := range peerIds {
 		for _, topic := range topics {
-			_, err := cache.AddTopicForPeer(pid, topic)
+			_, err := cache.AddWithInitTopicForPeer(pid, topic)
 			require.NoError(t, err, "adding topic to peer should not produce an error")
 		}
 	}
@@ -300,7 +299,7 @@ func TestSubscriptionCache_TestSizeLimit(t *testing.T) {
 
 	// add one more peer and verify that the first peer is evicted
 	newPeerID := unittest.PeerIdFixture(t)
-	_, err := cache.AddTopicForPeer(newPeerID, topics[0])
+	_, err := cache.AddWithInitTopicForPeer(newPeerID, topics[0])
 	require.NoError(t, err, "adding topic to peer should not produce an error")
 
 	_, found := cache.GetSubscribedTopics(peerIds[0])

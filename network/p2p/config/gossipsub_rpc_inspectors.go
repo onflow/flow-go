@@ -11,8 +11,6 @@ const (
 type RpcInspectorParameters struct {
 	// RpcValidationInspector control message validation inspector validation configuration and limits.
 	Validation RpcValidationInspector `mapstructure:"validation"`
-	// RpcMetricsInspectorConfigs control message metrics inspector configuration.
-	Metrics RpcMetricsInspectorConfigs `mapstructure:"metrics"`
 	// NotificationCacheSize size of the queue for notifications about invalid RPC messages.
 	NotificationCacheSize uint32 `mapstructure:"notification-cache-size"`
 }
@@ -105,11 +103,3 @@ type ClusterPrefixedMessageInspectionParameters struct {
 const (
 	NumberOfWorkersKey = "workers"
 )
-
-// RpcMetricsInspectorConfigs contains the "numerical values" for the gossipsub RPC control message metrics inspectors parameters.
-type RpcMetricsInspectorConfigs struct {
-	// NumberOfWorkers number of worker pool workers.
-	NumberOfWorkers int `validate:"gte=1" mapstructure:"workers"`
-	// CacheSize size of the queue used by worker pool for the control message metrics inspector.
-	CacheSize uint32 `validate:"gt=0" mapstructure:"cache-size"`
-}

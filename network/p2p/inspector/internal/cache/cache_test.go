@@ -8,7 +8,6 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -28,18 +27,14 @@ func TestRecordCache_Init(t *testing.T) {
 	nodeID2 := unittest.IdentifierFixture()
 
 	// test initializing a record for an node ID that doesn't exist in the cache
-	initialized := cache.Init(nodeID1)
-	require.True(t, initialized, "expected record to be initialized")
-	gauge, ok, err := cache.Get(nodeID1)
+	gauge, ok, err := cache.GetWithInit(nodeID1)
 	require.NoError(t, err)
 	require.True(t, ok, "expected record to exist")
 	require.Zerof(t, gauge, "expected gauge to be 0")
 	require.Equal(t, uint(1), cache.Size(), "expected cache to have one additional record")
 
 	// test initializing a record for an node ID that already exists in the cache
-	initialized = cache.Init(nodeID1)
-	require.False(t, initialized, "expected record not to be initialized")
-	gaugeAgain, ok, err := cache.Get(nodeID1)
+	gaugeAgain, ok, err := cache.GetWithInit(nodeID1)
 	require.NoError(t, err)
 	require.True(t, ok, "expected record to still exist")
 	require.Zerof(t, gaugeAgain, "expected same gauge to be 0")
@@ -47,9 +42,7 @@ func TestRecordCache_Init(t *testing.T) {
 	require.Equal(t, uint(1), cache.Size(), "expected cache to still have one additional record")
 
 	// test initializing a record for another node ID
-	initialized = cache.Init(nodeID2)
-	require.True(t, initialized, "expected record to be initialized")
-	gauge2, ok, err := cache.Get(nodeID2)
+	gauge2, ok, err := cache.GetWithInit(nodeID2)
 	require.NoError(t, err)
 	require.True(t, ok, "expected record to exist")
 	require.Zerof(t, gauge2, "expected second gauge to be 0")
@@ -71,26 +64,21 @@ func TestRecordCache_ConcurrentInit(t *testing.T) {
 	for _, nodeID := range nodeIDs {
 		go func(id flow.Identifier) {
 			defer wg.Done()
-			cache.Init(id)
+			gauge, found, err := cache.GetWithInit(id)
+			require.NoError(t, err)
+			require.True(t, found)
+			require.Zerof(t, gauge, "expected all gauge values to be initialized to 0")
 		}(nodeID)
 	}
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "timed out waiting for goroutines to finish")
-
-	// ensure that all records are correctly initialized
-	for _, nodeID := range nodeIDs {
-		gauge, found, err := cache.Get(nodeID)
-		require.NoError(t, err)
-		require.True(t, found)
-		require.Zerof(t, gauge, "expected all gauge values to be initialized to 0")
-	}
 }
 
 // TestRecordCache_ConcurrentSameRecordInit tests the concurrent initialization of the same record.
 // The test covers the following scenarios:
 // 1. Multiple goroutines attempting to initialize the same record concurrently.
 // 2. Only one goroutine successfully initializes the record, and others receive false on initialization.
-// 3. The record is correctly initialized in the cache and can be retrieved using the Get method.
+// 3. The record is correctly initialized in the cache and can be retrieved using the GetWithInit method.
 func TestRecordCache_ConcurrentSameRecordInit(t *testing.T) {
 	cache := cacheFixture(t, 100, defaultDecay, zerolog.Nop(), metrics.NewNoopCollector())
 
@@ -100,28 +88,20 @@ func TestRecordCache_ConcurrentSameRecordInit(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(concurrentAttempts)
 
-	successGauge := atomic.Int32{}
-
 	for i := 0; i < concurrentAttempts; i++ {
 		go func() {
 			defer wg.Done()
-			initSuccess := cache.Init(nodeID)
-			if initSuccess {
-				successGauge.Inc()
-			}
+			gauge, found, err := cache.GetWithInit(nodeID)
+			require.NoError(t, err)
+			require.True(t, found)
+			require.Zero(t, gauge)
 		}()
 	}
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "timed out waiting for goroutines to finish")
 
 	// ensure that only one goroutine successfully initialized the record
-	require.Equal(t, int32(1), successGauge.Load())
-
-	// ensure that the record is correctly initialized in the cache
-	gauge, found, err := cache.Get(nodeID)
-	require.NoError(t, err)
-	require.True(t, found)
-	require.Zero(t, gauge)
+	require.Equal(t, uint(1), cache.Size())
 }
 
 // TestRecordCache_ReceivedClusterPrefixedMessage tests the ReceivedClusterPrefixedMessage method of the RecordCache.
@@ -135,21 +115,21 @@ func TestRecordCache_ReceivedClusterPrefixedMessage(t *testing.T) {
 	nodeID1 := unittest.IdentifierFixture()
 	nodeID2 := unittest.IdentifierFixture()
 
-	// initialize spam records for nodeID1 and nodeID2
-	require.True(t, cache.Init(nodeID1))
-	require.True(t, cache.Init(nodeID2))
-
 	gauge, err := cache.ReceivedClusterPrefixedMessage(nodeID1)
 	require.NoError(t, err)
 	require.Equal(t, float64(1), gauge)
 
 	// get will apply a slightl decay resulting
 	// in a gauge value less than gauge which is 1 but greater than 0.9
-	currentGauge, ok, err := cache.Get(nodeID1)
+	currentGauge, ok, err := cache.GetWithInit(nodeID1)
 	require.NoError(t, err)
 	require.True(t, ok)
 	require.LessOrEqual(t, currentGauge, gauge)
 	require.Greater(t, currentGauge, 0.9)
+
+	_, ok, err = cache.GetWithInit(nodeID2)
+	require.NoError(t, err)
+	require.True(t, ok)
 
 	// test adjusting the spam record for a non-existing node ID
 	nodeID3 := unittest.IdentifierFixture()
@@ -172,11 +152,10 @@ func TestRecordCache_Decay(t *testing.T) {
 	nodeID1 := unittest.IdentifierFixture()
 
 	// initialize spam records for nodeID1 and nodeID2
-	require.True(t, cache.Init(nodeID1))
 	gauge, err := cache.ReceivedClusterPrefixedMessage(nodeID1)
 	require.Equal(t, float64(1), gauge)
 	require.NoError(t, err)
-	gauge, ok, err := cache.Get(nodeID1)
+	gauge, ok, err := cache.GetWithInit(nodeID1)
 	require.True(t, ok)
 	require.NoError(t, err)
 	// gauge should have been delayed slightly
@@ -184,7 +163,7 @@ func TestRecordCache_Decay(t *testing.T) {
 
 	time.Sleep(time.Second)
 
-	gauge, ok, err = cache.Get(nodeID1)
+	gauge, ok, err = cache.GetWithInit(nodeID1)
 	require.True(t, ok)
 	require.NoError(t, err)
 	// gauge should have been delayed slightly, but closer to 0
@@ -203,9 +182,15 @@ func TestRecordCache_Identities(t *testing.T) {
 	nodeID2 := unittest.IdentifierFixture()
 	nodeID3 := unittest.IdentifierFixture()
 
-	require.True(t, cache.Init(nodeID1))
-	require.True(t, cache.Init(nodeID2))
-	require.True(t, cache.Init(nodeID3))
+	_, ok, err := cache.GetWithInit(nodeID1)
+	require.NoError(t, err)
+	require.True(t, ok)
+	_, ok, err = cache.GetWithInit(nodeID2)
+	require.NoError(t, err)
+	require.True(t, ok)
+	_, ok, err = cache.GetWithInit(nodeID3)
+	require.NoError(t, err)
+	require.True(t, ok)
 
 	// check if the NodeIDs method returns the correct set of node IDs
 	identities := cache.NodeIDs()
@@ -227,9 +212,15 @@ func TestRecordCache_Remove(t *testing.T) {
 	nodeID2 := unittest.IdentifierFixture()
 	nodeID3 := unittest.IdentifierFixture()
 
-	require.True(t, cache.Init(nodeID1))
-	require.True(t, cache.Init(nodeID2))
-	require.True(t, cache.Init(nodeID3))
+	_, ok, err := cache.GetWithInit(nodeID1)
+	require.NoError(t, err)
+	require.True(t, ok)
+	_, ok, err = cache.GetWithInit(nodeID2)
+	require.NoError(t, err)
+	require.True(t, ok)
+	_, ok, err = cache.GetWithInit(nodeID3)
+	require.NoError(t, err)
+	require.True(t, ok)
 
 	numOfIds := uint(3)
 	require.Equal(t, numOfIds, cache.Size(), fmt.Sprintf("expected size of the cache to be %d", numOfIds))
@@ -238,10 +229,10 @@ func TestRecordCache_Remove(t *testing.T) {
 	require.NotContains(t, nodeID1, cache.NodeIDs())
 
 	// check if the other node IDs are still in the cache
-	_, exists, err := cache.Get(nodeID2)
+	_, exists, err := cache.GetWithInit(nodeID2)
 	require.NoError(t, err)
 	require.True(t, exists)
-	_, exists, err = cache.Get(nodeID3)
+	_, exists, err = cache.GetWithInit(nodeID3)
 	require.NoError(t, err)
 	require.True(t, exists)
 
@@ -259,7 +250,9 @@ func TestRecordCache_ConcurrentRemove(t *testing.T) {
 
 	nodeIDs := unittest.IdentifierListFixture(10)
 	for _, nodeID := range nodeIDs {
-		cache.Init(nodeID)
+		_, ok, err := cache.GetWithInit(nodeID)
+		require.NoError(t, err)
+		require.True(t, ok)
 	}
 
 	var wg sync.WaitGroup
@@ -289,7 +282,9 @@ func TestRecordCache_ConcurrentUpdatesAndReads(t *testing.T) {
 
 	nodeIDs := unittest.IdentifierListFixture(10)
 	for _, nodeID := range nodeIDs {
-		cache.Init(nodeID)
+		_, ok, err := cache.GetWithInit(nodeID)
+		require.NoError(t, err)
+		require.True(t, ok)
 	}
 
 	var wg sync.WaitGroup
@@ -306,7 +301,7 @@ func TestRecordCache_ConcurrentUpdatesAndReads(t *testing.T) {
 		// get spam records concurrently
 		go func(id flow.Identifier) {
 			defer wg.Done()
-			_, found, err := cache.Get(id)
+			_, found, err := cache.GetWithInit(id)
 			require.NoError(t, err)
 			require.True(t, found)
 		}(nodeID)
@@ -316,7 +311,7 @@ func TestRecordCache_ConcurrentUpdatesAndReads(t *testing.T) {
 
 	// ensure that the records are correctly updated in the cache
 	for _, nodeID := range nodeIDs {
-		gauge, found, err := cache.Get(nodeID)
+		gauge, found, err := cache.GetWithInit(nodeID)
 		require.NoError(t, err)
 		require.True(t, found)
 		// slight decay will result in 0.9 < gauge < 1
@@ -339,7 +334,9 @@ func TestRecordCache_ConcurrentInitAndRemove(t *testing.T) {
 	nodeIDsToRemove := nodeIDs[10:]
 
 	for _, nodeID := range nodeIDsToRemove {
-		cache.Init(nodeID)
+		_, ok, err := cache.GetWithInit(nodeID)
+		require.NoError(t, err)
+		require.True(t, ok)
 	}
 
 	var wg sync.WaitGroup
@@ -349,7 +346,9 @@ func TestRecordCache_ConcurrentInitAndRemove(t *testing.T) {
 	for _, nodeID := range nodeIDsToAdd {
 		go func(id flow.Identifier) {
 			defer wg.Done()
-			cache.Init(id)
+			_, ok, err := cache.GetWithInit(id)
+			require.NoError(t, err)
+			require.True(t, ok)
 		}(nodeID)
 	}
 
@@ -383,7 +382,9 @@ func TestRecordCache_ConcurrentInitRemoveUpdate(t *testing.T) {
 	nodeIDsToAdjust := nodeIDs[20:]
 
 	for _, nodeID := range nodeIDsToRemove {
-		cache.Init(nodeID)
+		_, ok, err := cache.GetWithInit(nodeID)
+		require.NoError(t, err)
+		require.True(t, ok)
 	}
 
 	var wg sync.WaitGroup
@@ -393,7 +394,9 @@ func TestRecordCache_ConcurrentInitRemoveUpdate(t *testing.T) {
 	for _, nodeID := range nodeIDsToAdd {
 		go func(id flow.Identifier) {
 			defer wg.Done()
-			cache.Init(id)
+			_, ok, err := cache.GetWithInit(id)
+			require.NoError(t, err)
+			require.True(t, ok)
 		}(nodeID)
 	}
 
@@ -431,7 +434,9 @@ func TestRecordCache_EdgeCasesAndInvalidInputs(t *testing.T) {
 	nodeIDsToRemove := nodeIDs[10:20]
 
 	for _, nodeID := range nodeIDsToRemove {
-		cache.Init(nodeID)
+		_, ok, err := cache.GetWithInit(nodeID)
+		require.NoError(t, err)
+		require.True(t, ok)
 	}
 
 	var wg sync.WaitGroup
@@ -441,8 +446,7 @@ func TestRecordCache_EdgeCasesAndInvalidInputs(t *testing.T) {
 	for _, nodeID := range nodeIDsToAdd {
 		go func(id flow.Identifier) {
 			defer wg.Done()
-			require.True(t, cache.Init(id))
-			retrieved, ok, err := cache.Get(id)
+			retrieved, ok, err := cache.GetWithInit(id)
 			require.NoError(t, err)
 			require.True(t, ok)
 			require.Zero(t, retrieved)

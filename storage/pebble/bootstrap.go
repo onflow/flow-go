@@ -12,6 +12,7 @@ import (
 	"go.uber.org/atomic"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 )
@@ -26,6 +27,7 @@ type RegisterBootstrap struct {
 	checkpointFileName string
 	leafNodeChan       chan *wal.LeafNode
 	rootHeight         uint64
+	rootHash           ledger.RootHash
 	registerCount      *atomic.Uint64
 }
 
@@ -36,6 +38,7 @@ func NewRegisterBootstrap(
 	db *pebble.DB,
 	checkpointFile string,
 	rootHeight uint64,
+	rootHash ledger.RootHash,
 	log zerolog.Logger,
 ) (*RegisterBootstrap, error) {
 	// check for pre-populated heights, fail if it is populated
@@ -57,6 +60,7 @@ func NewRegisterBootstrap(
 		checkpointFileName: checkpointFileName,
 		leafNodeChan:       make(chan *wal.LeafNode, checkpointLeafNodeBufSize),
 		rootHeight:         rootHeight,
+		rootHash:           rootHash,
 		registerCount:      atomic.NewUint64(0),
 	}, nil
 }
@@ -131,6 +135,12 @@ func (b *RegisterBootstrap) IndexCheckpointFile(ctx context.Context, workerCount
 	cct, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	// validate the checkpoint has correct root hash
+	err := wal.CheckpointHasRootHash(b.log, b.checkpointDir, b.checkpointFileName, b.rootHash)
+	if err != nil {
+		return fmt.Errorf("the root checkpoint to have the trie root hash %v does not match with the root state commitment: %w", b.rootHash, err)
+	}
+
 	g, gCtx := errgroup.WithContext(cct)
 
 	start := time.Now()
@@ -141,7 +151,7 @@ func (b *RegisterBootstrap) IndexCheckpointFile(ctx context.Context, workerCount
 		})
 	}
 
-	err := wal.OpenAndReadLeafNodesFromCheckpointV6(b.leafNodeChan, b.checkpointDir, b.checkpointFileName, b.log)
+	err = wal.OpenAndReadLeafNodesFromCheckpointV6(b.leafNodeChan, b.checkpointDir, b.checkpointFileName, b.log)
 	if err != nil {
 		return fmt.Errorf("error reading leaf node: %w", err)
 	}

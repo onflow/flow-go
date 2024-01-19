@@ -643,7 +643,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	require.NoError(t, err)
 
 	checkpointHeight := uint64(0)
-	require.NoError(t, esbootstrap.ImportRegistersFromCheckpoint(node.Log, checkpointFile, checkpointHeight, pebbledb, 2))
+	require.NoError(t, esbootstrap.ImportRegistersFromCheckpoint(node.Log, checkpointFile, checkpointHeight, matchTrie.RootHash(), pebbledb, 2))
 
 	diskStore, err := storagepebble.NewRegisters(pebbledb)
 	require.NoError(t, err)
@@ -653,7 +653,9 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		diskStore,
 		nil, // TOOD(leo): replace with real WAL
 		reader,
-		node.Log)
+		node.Log,
+		storehouse.NewNoopNotifier(),
+	)
 	require.NoError(t, err)
 
 	storehouseEnabled := true
@@ -761,7 +763,6 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		unit,
 		node.Log,
 		node.Net,
-		node.Me,
 		fetcher,
 		node.Headers,
 		node.Blocks,

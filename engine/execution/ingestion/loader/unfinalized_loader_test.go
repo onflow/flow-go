@@ -37,9 +37,9 @@ func TestLoadingUnfinalizedBlocks(t *testing.T) {
 	es := new(stateMock.FinalizedExecutionState)
 	es.On("GetHighestFinalizedExecuted").Return(genesis.Header.Height)
 	headers := new(storage.Headers)
-	headers.On("ByHeight", blockA.Header.Height).Return(blockA.Header, nil)
-	headers.On("ByHeight", blockB.Header.Height).Return(blockB.Header, nil)
-	headers.On("ByHeight", blockC.Header.Height).Return(blockC.Header, nil)
+	headers.On("BlockIDByHeight", blockA.Header.Height).Return(blockA.Header.ID(), nil)
+	headers.On("BlockIDByHeight", blockB.Header.Height).Return(blockB.Header.ID(), nil)
+	headers.On("BlockIDByHeight", blockC.Header.Height).Return(blockC.Header.ID(), nil)
 
 	loader := loader.NewUnfinalizedLoader(unittest.Logger(), ps, headers, es)
 
