@@ -25,6 +25,11 @@ func (_m *GossipSubRpcValidationInspectorMetrics) AsyncProcessingStarted() {
 	_m.Called()
 }
 
+// InvalidControlMessageNotificationError provides a mock function with given fields: msgType, count
+func (_m *GossipSubRpcValidationInspectorMetrics) InvalidControlMessageNotificationError(msgType p2pmsg.ControlMessageType, count float64) {
+	_m.Called(msgType, count)
+}
+
 // OnControlMessagesTruncated provides a mock function with given fields: messageType, diff
 func (_m *GossipSubRpcValidationInspectorMetrics) OnControlMessagesTruncated(messageType p2pmsg.ControlMessageType, diff int) {
 	_m.Called(messageType, diff)

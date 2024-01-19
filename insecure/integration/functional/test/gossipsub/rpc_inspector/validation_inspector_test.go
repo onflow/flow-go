@@ -28,7 +28,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/inspector/validation"
 	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 	mockp2p "github.com/onflow/flow-go/network/p2p/mock"
-	"github.com/onflow/flow-go/network/p2p/scoring"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -56,15 +55,33 @@ func TestValidationInspector_InvalidTopicId_Detection(t *testing.T) {
 	invIHaveNotifCount := atomic.NewUint64(0)
 	done := make(chan struct{})
 	expectedNumOfTotalNotif := 9
-	// ensure expected notifications are disseminated with expected error
-	inspectDisseminatedNotifyFunc := func(spammer *corruptlibp2p.GossipSubRouterSpammer) func(args mockery.Arguments) {
-		return func(args mockery.Arguments) {
+
+	idProvider := mock.NewIdentityProvider(t)
+	spammer := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkID, role, idProvider)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+
+	// create unknown topic
+	unknownTopic := channels.Topic(fmt.Sprintf("%s/%s", p2ptest.GossipSubTopicIdFixture(), sporkID))
+	// create malformed topic
+	malformedTopic := channels.Topic(unittest.RandomStringFixture(t, 100))
+	// a topics spork ID is considered invalid if it does not match the current spork ID
+	invalidSporkIDTopic := channels.Topic(fmt.Sprintf("%s/%s", channels.PushBlocks, unittest.IdentifierFixture()))
+	allTopics := []string{unknownTopic.String(), malformedTopic.String(), invalidSporkIDTopic.String()}
+	distributor := mockp2p.NewGossipSubInspectorNotificationDistributor(t)
+	p2ptest.MockInspectorNotificationDistributorReadyDoneAware(distributor)
+	distributor.
+		On("Distribute", mockery.Anything).
+		Times(expectedNumOfTotalNotif).
+		Run(func(args mockery.Arguments) {
 			count.Inc()
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
-			require.Equal(t, notification.TopicType, p2p.CtrlMsgNonClusterTopicType, "IsClusterPrefixed is expected to be false, no RPC with cluster prefixed topic sent in this test")
+			require.Contains(t, allTopics, notification.Errors[0].Topic())
+			require.Equal(t, notification.Errors[0].CtrlMsgTopicType(), p2p.CtrlMsgNonClusterTopicType, "IsClusterPrefixed is expected to be false, no RPC with cluster prefixed topic sent in this test")
 			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
-			require.True(t, channels.IsInvalidTopicErr(notification.Error))
+			require.True(t, channels.IsInvalidTopicErr(notification.Errors[0].Err))
 			switch notification.MsgType {
 			case p2pmsg.CtrlMsgGraft:
 				invGraftNotifCount.Inc()
@@ -73,23 +90,13 @@ func TestValidationInspector_InvalidTopicId_Detection(t *testing.T) {
 			case p2pmsg.CtrlMsgIHave:
 				invIHaveNotifCount.Inc()
 			default:
-				require.Fail(t, fmt.Sprintf("unexpected control message type %s error: %s", notification.MsgType, notification.Error))
+				require.Fail(t, fmt.Sprintf("unexpected control message type %s error: %s", notification.MsgType, notification.Errors[0].Err))
 			}
 			if count.Load() == uint64(expectedNumOfTotalNotif) {
 				close(done)
 			}
-		}
-	}
-
-	idProvider := mock.NewIdentityProvider(t)
-	spammer := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkID, role, idProvider)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
-
-	distributor := mockp2p.NewGossipSubInspectorNotificationDistributor(t)
-	p2ptest.MockInspectorNotificationDistributorReadyDoneAware(distributor)
-	withExpectedNotificationDissemination(expectedNumOfTotalNotif, inspectDisseminatedNotifyFunc)(distributor, spammer)
+		}).
+		Return(nil)
 
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
 	topicProvider := newMockUpdatableTopicProvider()
@@ -118,15 +125,8 @@ func TestValidationInspector_InvalidTopicId_Detection(t *testing.T) {
 	idProvider.On("ByPeerID", victimNode.ID()).Return(&victimIdentity, true).Maybe()
 	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Maybe()
 
-	// create unknown topic
-	unknownTopic := channels.Topic(fmt.Sprintf("%s/%s", p2ptest.GossipSubTopicIdFixture(), sporkID))
-	// create malformed topic
-	malformedTopic := channels.Topic(unittest.RandomStringFixture(t, 100))
-	// a topics spork ID is considered invalid if it does not match the current spork ID
-	invalidSporkIDTopic := channels.Topic(fmt.Sprintf("%s/%s", channels.PushBlocks, unittest.IdentifierFixture()))
-
 	// set topic oracle to return list with all topics to avoid hasSubscription failures and force topic validation
-	topicProvider.UpdateTopics([]string{unknownTopic.String(), malformedTopic.String(), invalidSporkIDTopic.String()})
+	topicProvider.UpdateTopics(allTopics)
 
 	validationInspector.Start(signalerCtx)
 	nodes := []p2p.LibP2PNode{victimNode, spammer.SpammerNode}
@@ -136,6 +136,7 @@ func TestValidationInspector_InvalidTopicId_Detection(t *testing.T) {
 
 	// prepare to spam - generate control messages
 	graftCtlMsgsWithUnknownTopic := spammer.GenerateCtlMessages(int(controlMessageCount), p2ptest.WithGraft(messageCount, unknownTopic.String()))
+
 	graftCtlMsgsWithMalformedTopic := spammer.GenerateCtlMessages(int(controlMessageCount), p2ptest.WithGraft(messageCount, malformedTopic.String()))
 	graftCtlMsgsInvalidSporkIDTopic := spammer.GenerateCtlMessages(int(controlMessageCount), p2ptest.WithGraft(messageCount, invalidSporkIDTopic.String()))
 
@@ -191,30 +192,6 @@ func TestValidationInspector_DuplicateTopicId_Detection(t *testing.T) {
 	invGraftNotifCount := atomic.NewUint64(0)
 	invPruneNotifCount := atomic.NewUint64(0)
 	invIHaveNotifCount := atomic.NewUint64(0)
-	inspectDisseminatedNotifyFunc := func(spammer *corruptlibp2p.GossipSubRouterSpammer) func(args mockery.Arguments) {
-		return func(args mockery.Arguments) {
-			count.Inc()
-			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
-			require.True(t, ok)
-			require.Equal(t, notification.TopicType, p2p.CtrlMsgNonClusterTopicType, "IsClusterPrefixed is expected to be false, no RPC with cluster prefixed topic sent in this test")
-			require.True(t, validation.IsDuplicateTopicErr(notification.Error))
-			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
-			switch notification.MsgType {
-			case p2pmsg.CtrlMsgGraft:
-				invGraftNotifCount.Inc()
-			case p2pmsg.CtrlMsgPrune:
-				invPruneNotifCount.Inc()
-			case p2pmsg.CtrlMsgIHave:
-				invIHaveNotifCount.Inc()
-			default:
-				require.Fail(t, fmt.Sprintf("unexpected control message type %s error: %s", notification.MsgType, notification.Error))
-			}
-
-			if count.Load() == int64(expectedNumOfTotalNotif) {
-				close(done)
-			}
-		}
-	}
 
 	idProvider := mock.NewIdentityProvider(t)
 	spammer := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkID, role, idProvider)
@@ -224,7 +201,36 @@ func TestValidationInspector_DuplicateTopicId_Detection(t *testing.T) {
 
 	distributor := mockp2p.NewGossipSubInspectorNotificationDistributor(t)
 	p2ptest.MockInspectorNotificationDistributorReadyDoneAware(distributor)
-	withExpectedNotificationDissemination(expectedNumOfTotalNotif, inspectDisseminatedNotifyFunc)(distributor, spammer)
+	// a topics spork ID is considered invalid if it does not match the current spork ID
+	duplicateTopic := channels.Topic(fmt.Sprintf("%s/%s", channels.PushBlocks, sporkID))
+	distributor.
+		On("Distribute", mockery.Anything).
+		Times(expectedNumOfTotalNotif).
+		Run(func(args mockery.Arguments) {
+			count.Inc()
+			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
+			require.True(t, ok)
+			require.Equal(t, duplicateTopic.String(), notification.Errors[0].Topic())
+			require.Equal(t, notification.Errors[0].CtrlMsgTopicType(), p2p.CtrlMsgNonClusterTopicType, "IsClusterPrefixed is expected to be false, no RPC with cluster prefixed topic sent in this test")
+			require.True(t, validation.IsDuplicateTopicErr(notification.Errors[0].Err))
+			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
+			switch notification.MsgType {
+			case p2pmsg.CtrlMsgGraft:
+				invGraftNotifCount.Inc()
+			case p2pmsg.CtrlMsgPrune:
+				invPruneNotifCount.Inc()
+			case p2pmsg.CtrlMsgIHave:
+				invIHaveNotifCount.Inc()
+			default:
+				require.Fail(t, fmt.Sprintf("unexpected control message type %s error: %s", notification.MsgType, notification.Errors[0].Err))
+			}
+
+			if count.Load() == int64(expectedNumOfTotalNotif) {
+				close(done)
+			}
+		}).
+		Return(nil)
+
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
 	topicProvider := newMockUpdatableTopicProvider()
 	validationInspector, err := validation.NewControlMsgValidationInspector(&validation.InspectorParams{
@@ -253,8 +259,6 @@ func TestValidationInspector_DuplicateTopicId_Detection(t *testing.T) {
 	idProvider.On("ByPeerID", victimNode.ID()).Return(&victimIdentity, true).Maybe()
 	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Maybe()
 
-	// a topics spork ID is considered invalid if it does not match the current spork ID
-	duplicateTopic := channels.Topic(fmt.Sprintf("%s/%s", channels.PushBlocks, sporkID))
 	// set topic oracle to return list with all topics to avoid hasSubscription failures and force topic validation
 	topicProvider.UpdateTopics([]string{duplicateTopic.String()})
 
@@ -296,24 +300,6 @@ func TestValidationInspector_IHaveDuplicateMessageId_Detection(t *testing.T) {
 	done := make(chan struct{})
 	expectedNumOfTotalNotif := 1
 	invIHaveNotifCount := atomic.NewUint64(0)
-	inspectDisseminatedNotifyFunc := func(spammer *corruptlibp2p.GossipSubRouterSpammer) func(args mockery.Arguments) {
-		return func(args mockery.Arguments) {
-			count.Inc()
-			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
-			require.True(t, ok)
-			require.Equal(t, notification.TopicType, p2p.CtrlMsgNonClusterTopicType, "IsClusterPrefixed is expected to be false, no RPC with cluster prefixed topic sent in this test")
-			require.True(t, validation.IsDuplicateTopicErr(notification.Error))
-			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
-			require.True(t,
-				notification.MsgType == p2pmsg.CtrlMsgIHave,
-				fmt.Sprintf("unexpected control message type %s error: %s", notification.MsgType, notification.Error))
-			invIHaveNotifCount.Inc()
-
-			if count.Load() == int64(expectedNumOfTotalNotif) {
-				close(done)
-			}
-		}
-	}
 
 	idProvider := mock.NewIdentityProvider(t)
 	spammer := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkID, role, idProvider)
@@ -323,7 +309,7 @@ func TestValidationInspector_IHaveDuplicateMessageId_Detection(t *testing.T) {
 
 	distributor := mockp2p.NewGossipSubInspectorNotificationDistributor(t)
 	p2ptest.MockInspectorNotificationDistributorReadyDoneAware(distributor)
-	withExpectedNotificationDissemination(expectedNumOfTotalNotif, inspectDisseminatedNotifyFunc)(distributor, spammer)
+
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
 
 	topicProvider := newMockUpdatableTopicProvider()
@@ -361,9 +347,6 @@ func TestValidationInspector_IHaveDuplicateMessageId_Detection(t *testing.T) {
 
 	validationInspector.Start(signalerCtx)
 	nodes := []p2p.LibP2PNode{victimNode, spammer.SpammerNode}
-	startNodesAndEnsureConnected(t, signalerCtx, nodes, sporkID)
-	spammer.Start(t)
-	defer stopComponents(t, cancel, nodes, validationInspector)
 
 	// generate 2 control messages with iHaves for different topics
 	ihaveCtlMsgs1 := spammer.GenerateCtlMessages(1, p2ptest.WithIHave(1, 1, pushBlocks.String()))
@@ -373,6 +356,32 @@ func TestValidationInspector_IHaveDuplicateMessageId_Detection(t *testing.T) {
 	ihaveCtlMsgs1[0].Ihave[0].MessageIDs = append(ihaveCtlMsgs1[0].Ihave[0].MessageIDs, ihaveCtlMsgs1[0].Ihave[0].MessageIDs[0])
 	// duplicate message ids across different topics is valid
 	ihaveCtlMsgs2[0].Ihave[0].MessageIDs[0] = ihaveCtlMsgs1[0].Ihave[0].MessageIDs[0]
+
+	distributor.
+		On("Distribute", mockery.Anything).
+		Times(expectedNumOfTotalNotif).
+		Run(func(args mockery.Arguments) {
+			count.Inc()
+			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
+			require.True(t, ok)
+			require.Contains(t, ihaveCtlMsgs1[0].Ihave[0].MessageIDs, notification.Errors[0].MessageID())
+			require.Equal(t, notification.Errors[0].CtrlMsgTopicType(), p2p.CtrlMsgNonClusterTopicType, "IsClusterPrefixed is expected to be false, no RPC with cluster prefixed topic sent in this test")
+			require.True(t, validation.IsDuplicateMessageIDErr(notification.Errors[0].Err))
+			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
+			require.True(t,
+				notification.MsgType == p2pmsg.CtrlMsgIHave,
+				fmt.Sprintf("unexpected control message type %s error: %s", notification.MsgType, notification.Errors[0].Err))
+			invIHaveNotifCount.Inc()
+
+			if count.Load() == int64(expectedNumOfTotalNotif) {
+				close(done)
+			}
+		}).
+		Return(nil)
+
+	startNodesAndEnsureConnected(t, signalerCtx, nodes, sporkID)
+	spammer.Start(t)
+	defer stopComponents(t, cancel, nodes, validationInspector)
 
 	// start spamming the victim peer
 	spammer.SpamControlMessage(t, victimNode, ihaveCtlMsgs1)
@@ -398,7 +407,7 @@ func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
 
 	// SafetyThreshold < messageCount < HardThreshold ensures that the RPC message will be further inspected and topic IDs will be checked
 	// restricting the message count to 1 allows us to only aggregate a single error when the error is logged in the inspector.
-	messageCount := 10
+	messageCount := 1
 	controlMessageCount := int64(1)
 
 	count := atomic.NewInt64(0)
@@ -406,28 +415,6 @@ func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
 	expectedNumOfTotalNotif := 2
 	invGraftNotifCount := atomic.NewUint64(0)
 	invPruneNotifCount := atomic.NewUint64(0)
-	inspectDisseminatedNotifyFunc := func(spammer *corruptlibp2p.GossipSubRouterSpammer) func(args mockery.Arguments) {
-		return func(args mockery.Arguments) {
-			count.Inc()
-			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
-			require.True(t, ok)
-			require.Equal(t, notification.TopicType, p2p.CtrlMsgTopicTypeClusterPrefixed)
-			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
-			require.True(t, channels.IsUnknownClusterIDErr(notification.Error))
-			switch notification.MsgType {
-			case p2pmsg.CtrlMsgGraft:
-				invGraftNotifCount.Inc()
-			case p2pmsg.CtrlMsgPrune:
-				invPruneNotifCount.Inc()
-			default:
-				require.Fail(t, fmt.Sprintf("unexpected control message type %s error: %s", notification.MsgType, notification.Error))
-			}
-
-			if count.Load() == int64(expectedNumOfTotalNotif) {
-				close(done)
-			}
-		}
-	}
 
 	idProvider := mock.NewIdentityProvider(t)
 	spammer := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkID, role, idProvider)
@@ -436,7 +423,34 @@ func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
 
 	distributor := mockp2p.NewGossipSubInspectorNotificationDistributor(t)
 	p2ptest.MockInspectorNotificationDistributorReadyDoneAware(distributor)
-	withExpectedNotificationDissemination(expectedNumOfTotalNotif, inspectDisseminatedNotifyFunc)(distributor, spammer)
+	// setup cluster prefixed topic with an invalid cluster ID
+	unknownClusterID := channels.Topic(channels.SyncCluster("unknown-cluster-ID"))
+	distributor.
+		On("Distribute", mockery.Anything).
+		Times(expectedNumOfTotalNotif).
+		Run(func(args mockery.Arguments) {
+			count.Inc()
+			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
+			require.True(t, ok)
+			require.Equal(t, unknownClusterID.String(), notification.Errors[0].Topic())
+			require.Equal(t, notification.Errors[0].CtrlMsgTopicType(), p2p.CtrlMsgTopicTypeClusterPrefixed)
+			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
+			require.True(t, channels.IsUnknownClusterIDErr(notification.Errors[0].Err))
+			switch notification.MsgType {
+			case p2pmsg.CtrlMsgGraft:
+				invGraftNotifCount.Inc()
+			case p2pmsg.CtrlMsgPrune:
+				invPruneNotifCount.Inc()
+			default:
+				require.Fail(t, fmt.Sprintf("unexpected control message type %s error: %s", notification.MsgType, notification.Errors[0].Err))
+			}
+
+			if count.Load() == int64(expectedNumOfTotalNotif) {
+				close(done)
+			}
+		}).
+		Return(nil)
+
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
 	topicProvider := newMockUpdatableTopicProvider()
 	validationInspector, err := validation.NewControlMsgValidationInspector(&validation.InspectorParams{
@@ -465,8 +479,6 @@ func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
 	idProvider.On("ByPeerID", victimNode.ID()).Return(&victimIdentity, true).Maybe()
 	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Times(4)
 
-	// setup cluster prefixed topic with an invalid cluster ID
-	unknownClusterID := channels.Topic(channels.SyncCluster("unknown-cluster-ID"))
 	// set topic oracle to return list with all topics to avoid hasSubscription failures and force topic validation
 	topicProvider.UpdateTopics([]string{unknownClusterID.String()})
 
@@ -504,20 +516,23 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection(t *testing.T
 	inspectorConfig := flowConfig.NetworkConfig.GossipSub.RpcInspector.Validation
 	inspectorConfig.ClusterPrefixedMessage.HardThreshold = 5
 	inspectorConfig.NumberOfWorkers = 1
-	controlMessageCount := int64(10)
+	controlMessageCount := int64(6)
 
 	count := atomic.NewInt64(0)
-	done := make(chan struct{})
+	invGraftNotifCount := atomic.NewInt64(0)
+	logHookDone := make(chan struct{})
+	notificationDone := make(chan struct{})
 	expectedNumOfLogs := 5
-
+	expectedNumOfTotalNotif := 1
 	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
 		if level == zerolog.WarnLevel {
-			if message == "active cluster ids not set" {
+			if message == "failed to validate cluster prefixed control message with cluster prefixed topic active cluster ids not set" {
 				count.Inc()
 			}
-		}
-		if count.Load() == int64(expectedNumOfLogs) {
-			close(done)
+
+			if count.Load() == int64(expectedNumOfLogs) {
+				close(logHookDone)
+			}
 		}
 	})
 	logger := zerolog.New(os.Stdout).Level(zerolog.WarnLevel).Hook(hook)
@@ -530,6 +545,27 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection(t *testing.T
 
 	distributor := mockp2p.NewGossipSubInspectorNotificationDistributor(t)
 	p2ptest.MockInspectorNotificationDistributorReadyDoneAware(distributor)
+	distributor.
+		On("Distribute", mockery.Anything).
+		Times(expectedNumOfTotalNotif).
+		Run(func(args mockery.Arguments) {
+			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
+			require.True(t, ok)
+			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
+			require.True(t, validation.IsErrActiveClusterIDsNotSet(notification.Errors[0].Err))
+			switch notification.MsgType {
+			case p2pmsg.CtrlMsgGraft:
+				invGraftNotifCount.Inc()
+			default:
+				require.Fail(t, fmt.Sprintf("unexpected control message type %s error: %s", notification.MsgType, notification.Errors[0].Err))
+			}
+
+			if invGraftNotifCount.Load() == int64(expectedNumOfTotalNotif) {
+				close(notificationDone)
+			}
+		}).
+		Return(nil)
+
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
 
 	topicProvider := newMockUpdatableTopicProvider()
@@ -560,6 +596,7 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection(t *testing.T
 	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Maybe()
 	// we expect controlMessageCount plus 1 extra call, this is due to messages that are exchanged when the nodes startup
 	inspectorIdProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Times(int(controlMessageCount + 1))
+
 	clusterPrefixedTopic := randomClusterPrefixedTopic()
 
 	// set topic oracle to return list with all topics to avoid hasSubscription failures and force topic validation
@@ -578,7 +615,8 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection(t *testing.T
 	// start spamming the victim peer
 	spammer.SpamControlMessage(t, victimNode, ctlMsgs)
 
-	unittest.RequireCloseBefore(t, done, 5*time.Second, "failed to inspect RPC messages on time")
+	unittest.RequireCloseBefore(t, logHookDone, 2*time.Second, "failed to observe warning logs on time")
+	unittest.RequireCloseBefore(t, notificationDone, 2*time.Second, "failed to observe invalid control message notification on time")
 }
 
 // TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection ensures that an error is returned only after the cluster prefixed topics received for a peer exceed the configured
@@ -592,19 +630,23 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection(t *testing.T
 	inspectorConfig := flowConfig.NetworkConfig.GossipSub.RpcInspector.Validation
 	inspectorConfig.ClusterPrefixedMessage.HardThreshold = 5
 	inspectorConfig.NumberOfWorkers = 1
-	controlMessageCount := int64(10)
+	controlMessageCount := int64(6)
 
 	count := atomic.NewInt64(0)
-	done := make(chan struct{})
+	invPruneNotifCount := atomic.NewInt64(0)
+	logHookDone := make(chan struct{})
+	notificationDone := make(chan struct{})
 	expectedNumOfLogs := 5
+	expectedNumOfTotalNotif := 1
 	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
 		if level == zerolog.WarnLevel {
-			if message == "active cluster ids not set" {
+			if message == "failed to validate cluster prefixed control message with cluster prefixed topic active cluster ids not set" {
 				count.Inc()
 			}
-		}
-		if count.Load() == int64(expectedNumOfLogs) {
-			close(done)
+
+			if count.Load() == int64(expectedNumOfLogs) {
+				close(logHookDone)
+			}
 		}
 	})
 	logger := zerolog.New(os.Stdout).Level(zerolog.WarnLevel).Hook(hook)
@@ -616,6 +658,27 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection(t *testing.T
 
 	distributor := mockp2p.NewGossipSubInspectorNotificationDistributor(t)
 	p2ptest.MockInspectorNotificationDistributorReadyDoneAware(distributor)
+	distributor.
+		On("Distribute", mockery.Anything).
+		Times(expectedNumOfTotalNotif).
+		Run(func(args mockery.Arguments) {
+			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
+			require.True(t, ok)
+			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
+			require.True(t, validation.IsErrActiveClusterIDsNotSet(notification.Errors[0].Err))
+			switch notification.MsgType {
+			case p2pmsg.CtrlMsgPrune:
+				invPruneNotifCount.Inc()
+			default:
+				require.Fail(t, fmt.Sprintf("unexpected control message type %s error: %s", notification.MsgType, notification.Errors[0].Err))
+			}
+
+			if invPruneNotifCount.Load() == int64(expectedNumOfTotalNotif) {
+				close(notificationDone)
+			}
+		}).
+		Return(nil)
+
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
 	topicProvider := newMockUpdatableTopicProvider()
 	inspectorIdProvider := mock.NewIdentityProvider(t)
@@ -663,7 +726,8 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection(t *testing.T
 	// start spamming the victim peer
 	spammer.SpamControlMessage(t, victimNode, ctlMsgs)
 
-	unittest.RequireCloseBefore(t, done, 5*time.Second, "failed to inspect RPC messages on time")
+	unittest.RequireCloseBefore(t, logHookDone, 2*time.Second, "failed to observe warning logs on time")
+	unittest.RequireCloseBefore(t, notificationDone, 2*time.Second, "failed to observe invalid control message notification on time")
 }
 
 // TestValidationInspector_Unstaked_Node_Detection ensures that RPC control message inspector disseminates an invalid control message notification when an unstaked peer
@@ -679,25 +743,7 @@ func TestValidationInspector_UnstakedNode_Detection(t *testing.T) {
 	inspectorConfig.ClusterPrefixedMessage.HardThreshold = 0
 	inspectorConfig.NumberOfWorkers = 1
 
-	// SafetyThreshold < messageCount < HardThreshold ensures that the RPC message will be further inspected and topic IDs will be checked
-	// restricting the message count to 1 allows us to only aggregate a single error when the error is logged in the inspector.
-	messageCount := 10
-	controlMessageCount := int64(1)
-
-	count := atomic.NewInt64(0)
 	done := make(chan struct{})
-	expectedNumOfLogs := 2
-	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
-		if level == zerolog.WarnLevel {
-			if message == "control message received from unstaked peer" {
-				count.Inc()
-			}
-		}
-		if count.Load() == int64(expectedNumOfLogs) {
-			close(done)
-		}
-	})
-	logger := zerolog.New(os.Stdout).Level(zerolog.WarnLevel).Hook(hook)
 
 	idProvider := mock.NewIdentityProvider(t)
 	spammer := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkID, role, idProvider)
@@ -706,12 +752,42 @@ func TestValidationInspector_UnstakedNode_Detection(t *testing.T) {
 
 	distributor := mockp2p.NewGossipSubInspectorNotificationDistributor(t)
 	p2ptest.MockInspectorNotificationDistributorReadyDoneAware(distributor)
+
+	invGraftNotifCount := atomic.NewInt64(0)
+	invPruneNotifCount := atomic.NewInt64(0)
+	invIHaveNotifCount := atomic.NewInt64(0)
+	expectedNumOfTotalNotif := 3
+	distributor.
+		On("Distribute", mockery.Anything).
+		Times(expectedNumOfTotalNotif).
+		Run(func(args mockery.Arguments) {
+			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
+			require.True(t, ok)
+			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
+			require.True(t, validation.IsErrUnstakedPeer(notification.Errors[0].Err))
+			switch notification.MsgType {
+			case p2pmsg.CtrlMsgGraft:
+				invGraftNotifCount.Inc()
+			case p2pmsg.CtrlMsgPrune:
+				invPruneNotifCount.Inc()
+			case p2pmsg.CtrlMsgIHave:
+				invIHaveNotifCount.Inc()
+			default:
+				require.Fail(t, fmt.Sprintf("unexpected control message type %s error: %s", notification.MsgType, notification.Errors[0].Err))
+			}
+
+			if (invGraftNotifCount.Load() + invPruneNotifCount.Load() + invIHaveNotifCount.Load()) == int64(expectedNumOfTotalNotif) {
+				close(done)
+			}
+		}).
+		Return(nil)
+	p2ptest.MockInspectorNotificationDistributorReadyDoneAware(distributor)
 	meshTracer := meshTracerFixture(flowConfig, idProvider)
 
 	topicProvider := newMockUpdatableTopicProvider()
 	inspectorIdProvider := mock.NewIdentityProvider(t)
 	validationInspector, err := validation.NewControlMsgValidationInspector(&validation.InspectorParams{
-		Logger:                  logger,
+		Logger:                  unittest.Logger(),
 		SporkID:                 sporkID,
 		Config:                  &inspectorConfig,
 		Distributor:             distributor,
@@ -734,8 +810,9 @@ func TestValidationInspector_UnstakedNode_Detection(t *testing.T) {
 		internal.WithCorruptGossipSub(corruptlibp2p.CorruptGossipSubFactory(), corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(corruptInspectorFunc)))
 	idProvider.On("ByPeerID", victimNode.ID()).Return(&victimIdentity, true).Maybe()
 	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Maybe()
-	// we expect 2 calls from notification inspection plus 1 extra call, this is due to messages that are exchanged when the nodes startup
-	inspectorIdProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(nil, false).Times(3)
+	controlMessageCount := 3
+	// we expect controlMessageCount plus 1 extra call, this is due to messages that are exchanged when the nodes startup
+	inspectorIdProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(nil, false).Times(controlMessageCount + 1)
 
 	// setup cluster prefixed topic with an invalid cluster ID
 	clusterID := flow.ChainID("known-cluster-id")
@@ -753,12 +830,14 @@ func TestValidationInspector_UnstakedNode_Detection(t *testing.T) {
 	defer stopComponents(t, cancel, nodes, validationInspector)
 
 	// prepare to spam - generate control messages
-	graftCtlMsgsDuplicateTopic := spammer.GenerateCtlMessages(int(controlMessageCount), p2ptest.WithGraft(messageCount, clusterIDTopic.String()))
-	pruneCtlMsgsDuplicateTopic := spammer.GenerateCtlMessages(int(controlMessageCount), p2ptest.WithPrune(messageCount, clusterIDTopic.String()))
+	grafts := spammer.GenerateCtlMessages(1, p2ptest.WithGraft(1, clusterIDTopic.String()))
+	prunes := spammer.GenerateCtlMessages(1, p2ptest.WithPrune(1, clusterIDTopic.String()))
+	ihaves := spammer.GenerateCtlMessages(1, p2ptest.WithIHave(1, 100, clusterIDTopic.String()))
 
 	// start spamming the victim peer
-	spammer.SpamControlMessage(t, victimNode, graftCtlMsgsDuplicateTopic)
-	spammer.SpamControlMessage(t, victimNode, pruneCtlMsgsDuplicateTopic)
+	spammer.SpamControlMessage(t, victimNode, grafts)
+	spammer.SpamControlMessage(t, victimNode, prunes)
+	spammer.SpamControlMessage(t, victimNode, ihaves)
 
 	unittest.RequireCloseBefore(t, done, 5*time.Second, "failed to inspect RPC messages on time")
 }
@@ -785,13 +864,10 @@ func TestValidationInspector_InspectIWants_CacheMissThreshold(t *testing.T) {
 		return func(args mockery.Arguments) {
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
-			require.Equal(t, notification.TopicType, p2p.CtrlMsgNonClusterTopicType, "IsClusterPrefixed is expected to be false, no RPC with cluster prefixed topic sent in this test")
+			require.Equal(t, notification.Errors[0].CtrlMsgTopicType(), p2p.CtrlMsgNonClusterTopicType, "IsClusterPrefixed is expected to be false, no RPC with cluster prefixed topic sent in this test")
 			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
-			require.True(t,
-				notification.MsgType == p2pmsg.CtrlMsgIWant,
-				fmt.Sprintf("unexpected control message type %s error: %s", notification.MsgType, notification.Error))
-			require.True(t, validation.IsIWantCacheMissThresholdErr(notification.Error))
-
+			require.True(t, notification.MsgType == p2pmsg.CtrlMsgIWant, fmt.Sprintf("unexpected control message type %s error: %s", notification.MsgType, notification.Errors[0].Err))
+			require.True(t, validation.IsIWantCacheMissThresholdErr(notification.Errors[0].Err))
 			cacheMissThresholdNotifCount.Inc()
 			if cacheMissThresholdNotifCount.Load() == 1 {
 				close(done)
@@ -919,18 +995,16 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 		return func(args mockery.Arguments) {
 			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
 			require.True(t, ok)
-			require.Equal(t, notification.TopicType, p2p.CtrlMsgNonClusterTopicType, "IsClusterPrefixed is expected to be false, no RPC with cluster prefixed topic sent in this test")
+			require.Equal(t, notification.Errors[0].CtrlMsgTopicType(), p2p.CtrlMsgNonClusterTopicType, "IsClusterPrefixed is expected to be false, no RPC with cluster prefixed topic sent in this test")
 			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
-			require.True(t,
-				notification.MsgType == p2pmsg.RpcPublishMessage,
-				fmt.Sprintf("unexpected control message type %s error: %s", notification.MsgType, notification.Error))
-			require.True(t, validation.IsInvalidRpcPublishMessagesErr(notification.Error))
+			require.Equal(t, p2pmsg.RpcPublishMessage, notification.MsgType, fmt.Sprintf("unexpected control message type %s error: %s", notification.MsgType, notification.Errors[0].Err))
+			require.True(t, validation.IsInvalidRpcPublishMessagesErr(notification.Errors[0].Err))
 			require.Contains(t,
-				notification.Error.Error(),
+				notification.Errors[0].Err.Error(),
 				fmt.Sprintf("%d error(s) encountered", len(invalidPublishMsgs)),
 				fmt.Sprintf("expected %d errors, an error for each invalid pubsub message", len(invalidPublishMsgs)))
-			require.Contains(t, notification.Error.Error(), fmt.Sprintf("received rpc publish message from unstaked peer: %s", unknownPeerID))
-			require.Contains(t, notification.Error.Error(), fmt.Sprintf("received rpc publish message from ejected peer: %s", ejectedIdentityPeerID))
+			require.Contains(t, notification.Errors[0].Err.Error(), fmt.Sprintf("received rpc publish message from unstaked peer: %s", unknownPeerID))
+			require.Contains(t, notification.Errors[0].Err.Error(), fmt.Sprintf("received rpc publish message from ejected peer: %s", ejectedIdentityPeerID))
 			notificationCount.Inc()
 			if notificationCount.Load() == 1 {
 				close(done)
@@ -1007,6 +1081,156 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 	require.Equal(t, uint64(1), notificationCount.Load())
 }
 
+// TestValidationInspector_MultiErrorNotification ensures that control message validation captures all errors for invalid control messages for a single control message type. RPC validation is performed
+// on each control message type, during this validation a sample of the control messages for that type are inspected. This test ensures that the entire sample is inspected and all errors are captured in
+// the p2p.InvCtrlMsgErrs field of the invalid control message notification.
+func TestValidationInspector_MultiErrorNotification(t *testing.T) {
+	t.Parallel()
+	role := flow.RoleConsensus
+	sporkID := unittest.IdentifierFixture()
+	flowConfig, err := config.DefaultConfig()
+	require.NoError(t, err)
+	inspectorConfig := flowConfig.NetworkConfig.GossipSub.RpcInspector.Validation
+
+	inspectorConfig.NumberOfWorkers = 1
+	controlMessageCount := int64(1)
+	invGraftCount := atomic.NewUint64(0)
+	invPruneCount := atomic.NewUint64(0)
+	invIHaveCount := atomic.NewUint64(0)
+	invIWantCount := atomic.NewUint64(0)
+	done := make(chan struct{})
+	expectedNumOfTotalNotif := 4
+
+	requireExpectedNotifErr := func(notification *p2p.InvCtrlMsgNotif) {
+		for _, invErr := range notification.Errors {
+			require.True(t, channels.IsInvalidTopicErr(invErr.Err))
+		}
+	}
+
+	idProvider := mock.NewIdentityProvider(t)
+	spammer := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkID, role, idProvider)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
+
+	distributor := mockp2p.NewGossipSubInspectorNotificationDistributor(t)
+	p2ptest.MockInspectorNotificationDistributorReadyDoneAware(distributor)
+	topicProvider := newMockUpdatableTopicProvider()
+	distributor.
+		On("Distribute", mockery.Anything).
+		Times(expectedNumOfTotalNotif).
+		Run(func(args mockery.Arguments) {
+			notification, ok := args[0].(*p2p.InvCtrlMsgNotif)
+			require.True(t, ok)
+			require.Equal(t, spammer.SpammerNode.ID(), notification.PeerID)
+			switch notification.MsgType {
+			case p2pmsg.CtrlMsgGraft:
+				requireExpectedNotifErr(notification)
+				require.Len(t, notification.Errors, 3)
+				invGraftCount.Inc()
+			case p2pmsg.CtrlMsgPrune:
+				requireExpectedNotifErr(notification)
+				require.Len(t, notification.Errors, 3)
+				invPruneCount.Inc()
+			case p2pmsg.CtrlMsgIHave:
+				requireExpectedNotifErr(notification)
+				require.Len(t, notification.Errors, 3)
+				invIHaveCount.Inc()
+			case p2pmsg.CtrlMsgIWant:
+				require.Len(t, notification.Errors, 1)
+				require.True(t, validation.IsIWantDuplicateMsgIDThresholdErr(notification.Errors[0].Err))
+				invIWantCount.Inc()
+			default:
+				require.Fail(t, fmt.Sprintf("unexpected control message type %s error: %s", notification.MsgType, notification.Errors[0].Err))
+			}
+
+			if invGraftCount.Load()+invPruneCount.Load()+invIHaveCount.Load()+invIWantCount.Load() == uint64(expectedNumOfTotalNotif) {
+				close(done)
+			}
+		}).
+		Return(nil)
+
+	meshTracer := meshTracerFixture(flowConfig, idProvider)
+
+	inspectorMetrics := mock.NewGossipSubRpcValidationInspectorMetrics(t)
+	inspectorMetrics.On("AsyncProcessingStarted")
+	inspectorMetrics.On("OnIHaveMessageIDsReceived", mockery.AnythingOfType("string"), mockery.AnythingOfType("int"))
+	inspectorMetrics.On("OnIWantMessageIDsReceived", mockery.AnythingOfType("int"))
+	inspectorMetrics.On("OnIncomingRpcReceived", mockery.AnythingOfType("int"), mockery.AnythingOfType("int"), mockery.AnythingOfType("int"), mockery.AnythingOfType("int"), mockery.AnythingOfType("int"))
+	inspectorMetrics.On("AsyncProcessingFinished", mockery.AnythingOfType("time.Duration"))
+	inspectorMetrics.On("InvalidControlMessageNotificationError", mockery.AnythingOfType("p2pmsg.ControlMessageType"), mockery.AnythingOfType("float64")).Run(func(args mockery.Arguments) {
+		count, ok := args.Get(1).(float64)
+		require.True(t, ok)
+		// count is expected to be 3 for graft, prune and ihave messages that have been configured with 3 invalid topics.
+		// 1 for iwant control message with a single duplicate message ID error.
+		require.True(t, count == 3 || count == 1)
+	})
+	validationInspector, err := validation.NewControlMsgValidationInspector(&validation.InspectorParams{
+		Logger:                  unittest.Logger(),
+		SporkID:                 sporkID,
+		Config:                  &inspectorConfig,
+		Distributor:             distributor,
+		IdProvider:              idProvider,
+		HeroCacheMetricsFactory: metrics.NewNoopHeroCacheMetricsFactory(),
+		InspectorMetrics:        inspectorMetrics,
+		RpcTracker:              meshTracer,
+		NetworkingType:          network.PrivateNetwork,
+		TopicOracle: func() p2p.TopicProvider {
+			return topicProvider
+		},
+	})
+	require.NoError(t, err)
+
+	corruptInspectorFunc := corruptlibp2p.CorruptInspectorFunc(validationInspector)
+	victimNode, victimIdentity := p2ptest.NodeFixture(
+		t,
+		sporkID,
+		t.Name(),
+		idProvider,
+		p2ptest.WithRole(role),
+		internal.WithCorruptGossipSub(corruptlibp2p.CorruptGossipSubFactory(),
+			corruptlibp2p.CorruptGossipSubConfigFactoryWithInspector(corruptInspectorFunc)),
+	)
+	idProvider.On("ByPeerID", victimNode.ID()).Return(&victimIdentity, true).Maybe()
+	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Maybe()
+
+	// create unknown topic
+	unknownTopic := channels.Topic(fmt.Sprintf("%s/%s", p2ptest.GossipSubTopicIdFixture(), sporkID))
+	// create malformed topic
+	malformedTopic := channels.Topic(channels.TestNetworkChannel)
+	// a topics spork ID is considered invalid if it does not match the current spork ID
+	invalidSporkIDTopic := channels.Topic(fmt.Sprintf("%s/%s", channels.PushBlocks, unittest.IdentifierFixture()))
+	// set topic oracle to return list with all topics to avoid hasSubscription failures and force topic validation
+	topicProvider.UpdateTopics([]string{unknownTopic.String(), malformedTopic.String(), invalidSporkIDTopic.String()})
+
+	validationInspector.Start(signalerCtx)
+	nodes := []p2p.LibP2PNode{victimNode, spammer.SpammerNode}
+	startNodesAndEnsureConnected(t, signalerCtx, nodes, sporkID)
+	spammer.Start(t)
+	defer stopComponents(t, cancel, nodes, validationInspector)
+
+	// prepare to spam - generate control messages
+	grafts := spammer.GenerateCtlMessages(int(controlMessageCount), p2ptest.WithGrafts(unknownTopic.String(), malformedTopic.String(), invalidSporkIDTopic.String()))
+	prunes := spammer.GenerateCtlMessages(int(controlMessageCount), p2ptest.WithPrunes(unknownTopic.String(), malformedTopic.String(), invalidSporkIDTopic.String()))
+	ihaves := spammer.GenerateCtlMessages(int(controlMessageCount), p2ptest.WithIHaves(100, unknownTopic.String(), malformedTopic.String(), invalidSporkIDTopic.String()))
+	iwants := spammer.GenerateCtlMessages(int(controlMessageCount), p2ptest.WithIWantMessageIds("duplicate_message_id", "duplicate_message_id"))
+
+	// spam the victim peer with invalid graft messages
+	spammer.SpamControlMessage(t, victimNode, grafts)
+	// spam the victim peer with invalid prune messages
+	spammer.SpamControlMessage(t, victimNode, prunes)
+	// spam the victim peer with invalid ihaves messages
+	spammer.SpamControlMessage(t, victimNode, ihaves)
+	// spam the victim peer with invalid iwants messages
+	spammer.SpamControlMessage(t, victimNode, iwants)
+	unittest.RequireCloseBefore(t, done, 5*time.Second, "failed to inspect RPC messages on time")
+
+	require.Equal(t, uint64(1), invGraftCount.Load())
+	require.Equal(t, uint64(1), invPruneCount.Load())
+	require.Equal(t, uint64(1), invIWantCount.Load())
+	require.Equal(t, uint64(1), invIHaveCount.Load())
+}
+
 // TestGossipSubSpamMitigationIntegration tests that the spam mitigation feature of GossipSub is working as expected.
 // The test puts toghether the spam detection (through the GossipSubInspector) and the spam mitigation (through the
 // scoring system) and ensures that the mitigation is triggered when the spam detection detects spam.
@@ -1024,7 +1248,7 @@ func TestGossipSubSpamMitigationIntegration(t *testing.T) {
 	require.NoError(t, err)
 	// set the scoring parameters to be more aggressive to speed up the test
 	cfg.NetworkConfig.GossipSub.RpcTracer.ScoreTracerInterval = 100 * time.Millisecond
-	cfg.NetworkConfig.GossipSub.ScoringParameters.AppSpecificScore.ScoreTTL = 100 * time.Millisecond
+	cfg.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.AppSpecificScore.ScoreTTL = 100 * time.Millisecond
 	victimNode, victimId := p2ptest.NodeFixture(t,
 		sporkID,
 		t.Name(),
@@ -1054,8 +1278,8 @@ func TestGossipSubSpamMitigationIntegration(t *testing.T) {
 		}
 	})
 
-	spamRpcCount := 100            // total number of individual rpc messages to send
-	spamCtrlMsgCount := int64(100) // total number of control messages to send on each RPC
+	spamRpcCount := 1000           // total number of individual rpc messages to send
+	spamCtrlMsgCount := int64(500) // total number of control messages to send on each RPC
 
 	// unknownTopic is an unknown topic to the victim node but shaped like a valid topic (i.e., it has the correct prefix and spork ID).
 	unknownTopic := channels.Topic(fmt.Sprintf("%s/%s", p2ptest.GossipSubTopicIdFixture(), sporkID))
@@ -1105,11 +1329,11 @@ func TestGossipSubSpamMitigationIntegration(t *testing.T) {
 	spammer.SpamControlMessage(t, victimNode, pruneCtlMsgsWithMalformedTopic)
 	spammer.SpamControlMessage(t, victimNode, pruneCtlMsgsInvalidSporkIDTopic)
 	spammer.SpamControlMessage(t, victimNode, pruneCtlMsgsDuplicateTopic)
-
+	scoreOptParameters := cfg.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Internal.Thresholds
 	// wait for three GossipSub heartbeat intervals to ensure that the victim node has penalized the spammer node.
 	require.Eventually(t, func() bool {
 		score, ok := victimNode.PeerScoreExposer().GetScore(spammer.SpammerNode.ID())
-		return ok && score < 2*scoring.DefaultGraylistThreshold
+		return ok && score < 2*scoreOptParameters.Graylist
 	}, 5*time.Second, 100*time.Millisecond, "expected victim node to penalize spammer node")
 
 	// now we expect the detection and mitigation to kick in and the victim node to disconnect from the spammer node.

@@ -80,25 +80,28 @@ func InitCorruptLibp2pNode(
 	if err != nil {
 		return nil, fmt.Errorf("could not get dht system activation status: %w", err)
 	}
-	builder, err := p2pbuilder.DefaultNodeBuilder(
-		log,
-		address,
-		network.PrivateNetwork,
-		flowKey,
-		sporkId,
-		idProvider,
-		metCfg,
+	params := &p2pbuilder.LibP2PNodeBuilderConfig{
+		Logger:                     log,
+		MetricsConfig:              metCfg,
+		NetworkingType:             network.PrivateNetwork,
+		Address:                    address,
+		NetworkKey:                 flowKey,
+		SporkId:                    sporkId,
+		IdProvider:                 idProvider,
+		ResourceManagerParams:      &netConfig.ResourceManager,
+		RpcInspectorParams:         &netConfig.GossipSub.RpcInspector,
+		PeerManagerParams:          peerManagerCfg,
+		SubscriptionProviderParams: &netConfig.GossipSub.SubscriptionProvider,
+		DisallowListCacheCfg:       disallowListCacheCfg,
+		UnicastConfig:              uniCfg,
+		GossipSubCfg:               &netConfig.GossipSub,
+	}
+	builder, err := p2pbuilder.DefaultNodeBuilder(params,
 		resolver,
 		role,
 		connGaterCfg,
-		peerManagerCfg,
-		&netConfig.GossipSub,
-		&netConfig.ResourceManager,
-		uniCfg,
 		&netConfig.ConnectionManager,
-		disallowListCacheCfg,
 		dhtActivationStatus)
-
 	if err != nil {
 		return nil, fmt.Errorf("could not create corrupt libp2p node builder: %w", err)
 	}

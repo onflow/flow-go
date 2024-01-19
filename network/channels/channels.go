@@ -154,9 +154,10 @@ const (
 	ProvideApprovalsByChunk  = RequestApprovalsByChunk
 
 	// Public network channels
-	PublicPushBlocks    = Channel("public-push-blocks")
-	PublicReceiveBlocks = PublicPushBlocks
-	PublicSyncCommittee = Channel("public-sync-committee")
+	PublicPushBlocks           = Channel("public-push-blocks")
+	PublicReceiveBlocks        = PublicPushBlocks
+	PublicSyncCommittee        = Channel("public-sync-committee")
+	PublicExecutionDataService = Channel("public-execution-data-service")
 
 	// Execution data service
 	ExecutionDataService = Channel("execution-data-service")

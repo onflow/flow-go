@@ -6,14 +6,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
+	badger "github.com/ipfs/go-ds-badger2"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
+	"github.com/onflow/go-bitswap"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc/credentials"
@@ -39,6 +43,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	rpcConnection "github.com/onflow/flow-go/engine/access/rpc/connection"
+	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/engine/common/follower"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
@@ -51,13 +56,16 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/execution"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	execdatacache "github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/local"
+	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
@@ -69,6 +77,7 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/converter"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/blob"
 	p2pbuilder "github.com/onflow/flow-go/network/p2p/builder"
 	p2pbuilderconfig "github.com/onflow/flow-go/network/p2p/builder/config"
 	"github.com/onflow/flow-go/network/p2p/cache"
@@ -122,8 +131,6 @@ type ObserverServiceConfig struct {
 	apiBurstlimits               map[string]int
 	rpcConf                      rpc.Config
 	rpcMetricsEnabled            bool
-	executionDataSyncEnabled     bool
-	executionDataIndexingEnabled bool
 	registersDBPath              string
 	checkpointFile               string
 	apiTimeout                   time.Duration
@@ -131,10 +138,17 @@ type ObserverServiceConfig struct {
 	upstreamNodePublicKeys       []string
 	upstreamIdentities           flow.IdentityList // the identity list of upstream peers the node uses to forward API requests to
 	scriptExecutorConfig         query.QueryConfig
+	executionDataSyncEnabled     bool
+	executionDataIndexingEnabled bool
+	executionDataDir             string
+	executionDataStartHeight     uint64
+	executionDataConfig          edrequester.ExecutionDataConfig
+	executionDataCacheSize       uint32 // TODO: remove it when state stream is added
 }
 
 // DefaultObserverServiceConfig defines all the default values for the ObserverServiceConfig
 func DefaultObserverServiceConfig() *ObserverServiceConfig {
+	homedir, _ := os.UserHomeDir()
 	return &ObserverServiceConfig{
 		rpcConf: rpc.Config{
 			UnsecureGRPCListenAddr: "0.0.0.0:9000",
@@ -159,15 +173,31 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 			MaxMsgSize:     grpcutils.DefaultMaxMsgSize,
 			CompressorName: grpcutils.NoCompressor,
 		},
-		rpcMetricsEnabled:         false,
-		apiRatelimits:             nil,
-		apiBurstlimits:            nil,
-		bootstrapNodeAddresses:    []string{},
-		bootstrapNodePublicKeys:   []string{},
-		observerNetworkingKeyPath: cmd.NotSet,
-		apiTimeout:                3 * time.Second,
-		upstreamNodeAddresses:     []string{},
-		upstreamNodePublicKeys:    []string{},
+		rpcMetricsEnabled:            false,
+		apiRatelimits:                nil,
+		apiBurstlimits:               nil,
+		bootstrapNodeAddresses:       []string{},
+		bootstrapNodePublicKeys:      []string{},
+		observerNetworkingKeyPath:    cmd.NotSet,
+		apiTimeout:                   3 * time.Second,
+		upstreamNodeAddresses:        []string{},
+		upstreamNodePublicKeys:       []string{},
+		registersDBPath:              filepath.Join(homedir, ".flow", "execution_state"),
+		checkpointFile:               cmd.NotSet,
+		scriptExecutorConfig:         query.NewDefaultConfig(),
+		executionDataSyncEnabled:     false,
+		executionDataIndexingEnabled: false,
+		executionDataDir:             filepath.Join(homedir, ".flow", "execution_data"),
+		executionDataStartHeight:     0,
+		executionDataConfig: edrequester.ExecutionDataConfig{
+			InitialBlockHeight: 0,
+			MaxSearchAhead:     edrequester.DefaultMaxSearchAhead,
+			FetchTimeout:       edrequester.DefaultFetchTimeout,
+			MaxFetchTimeout:    edrequester.DefaultMaxFetchTimeout,
+			RetryDelay:         edrequester.DefaultRetryDelay,
+			MaxRetryDelay:      edrequester.DefaultMaxRetryDelay,
+		},
+		executionDataCacheSize: state_stream.DefaultCacheSize,
 	}
 }
 
@@ -211,6 +241,9 @@ type ObserverServiceBuilder struct {
 	// grpc servers
 	secureGrpcServer   *grpcserver.GrpcServer
 	unsecureGrpcServer *grpcserver.GrpcServer
+
+	ExecutionDataDownloader execution_data.Downloader
+	ExecutionDataStore      execution_data.ExecutionDataStore
 }
 
 // deriveBootstrapPeerIdentities derives the Flow Identity of the bootstrap peers from the parameters.
@@ -565,6 +598,32 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			"execution-data-indexing-enabled",
 			defaultConfig.executionDataIndexingEnabled,
 			"whether to enable the execution data indexing")
+
+		// ExecutionDataRequester config
+		flags.BoolVar(&builder.executionDataSyncEnabled, "execution-data-sync-enabled", defaultConfig.executionDataSyncEnabled, "whether to enable the execution data sync protocol")
+		flags.StringVar(&builder.executionDataDir, "execution-data-dir", defaultConfig.executionDataDir, "directory to use for Execution Data database")
+		flags.Uint64Var(&builder.executionDataStartHeight, "execution-data-start-height", defaultConfig.executionDataStartHeight, "height of first block to sync execution data from when starting with an empty Execution Data database")
+		flags.Uint64Var(&builder.executionDataConfig.MaxSearchAhead,
+			"execution-data-max-search-ahead",
+			defaultConfig.executionDataConfig.MaxSearchAhead,
+			"max number of heights to search ahead of the lowest outstanding execution data height")
+		flags.DurationVar(&builder.executionDataConfig.FetchTimeout,
+			"execution-data-fetch-timeout",
+			defaultConfig.executionDataConfig.FetchTimeout,
+			"initial timeout to use when fetching execution data from the network. timeout increases using an incremental backoff until execution-data-max-fetch-timeout. e.g. 30s")
+		flags.DurationVar(&builder.executionDataConfig.MaxFetchTimeout,
+			"execution-data-max-fetch-timeout",
+			defaultConfig.executionDataConfig.MaxFetchTimeout,
+			"maximum timeout to use when fetching execution data from the network e.g. 300s")
+		flags.DurationVar(&builder.executionDataConfig.RetryDelay,
+			"execution-data-retry-delay",
+			defaultConfig.executionDataConfig.RetryDelay,
+			"initial delay for exponential backoff when fetching execution data fails e.g. 10s")
+		flags.DurationVar(&builder.executionDataConfig.MaxRetryDelay,
+			"execution-data-max-retry-delay",
+			defaultConfig.executionDataConfig.MaxRetryDelay,
+			"maximum delay for exponential backoff when fetching execution data fails e.g. 5m")
+		flags.Uint32Var(&builder.executionDataCacheSize, "execution-data-cache-size", defaultConfig.executionDataCacheSize, "block execution data cache size")
 	})
 }
 
@@ -773,27 +832,36 @@ func (builder *ObserverServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 		pis = append(pis, pi)
 	}
 
-	node, err := p2pbuilder.NewNodeBuilder(
-		builder.Logger,
-		&builder.FlowConfig.NetworkConfig.GossipSub,
-		&p2pbuilderconfig.MetricsConfig{
+	params := &p2pbuilder.LibP2PNodeBuilderConfig{
+		Logger: builder.Logger,
+		MetricsConfig: &p2pbuilderconfig.MetricsConfig{
 			HeroCacheFactory: builder.HeroCacheMetricsFactory(),
 			Metrics:          builder.Metrics.Network,
 		},
-		network.PublicNetwork,
-		builder.BaseConfig.BindAddr,
-		networkKey,
-		builder.SporkID,
-		builder.IdentityProvider,
-		&builder.FlowConfig.NetworkConfig.ResourceManager,
-		p2pbuilderconfig.PeerManagerDisableConfig(), // disable peer manager for observer node.
-		&p2p.DisallowListCacheConfig{
+		NetworkingType:             network.PublicNetwork,
+		Address:                    builder.BaseConfig.BindAddr,
+		NetworkKey:                 networkKey,
+		SporkId:                    builder.SporkID,
+		IdProvider:                 builder.IdentityProvider,
+		ResourceManagerParams:      &builder.FlowConfig.NetworkConfig.ResourceManager,
+		RpcInspectorParams:         &builder.FlowConfig.NetworkConfig.GossipSub.RpcInspector,
+		PeerManagerParams:          p2pbuilderconfig.PeerManagerDisableConfig(),
+		SubscriptionProviderParams: &builder.FlowConfig.NetworkConfig.GossipSub.SubscriptionProvider,
+		DisallowListCacheCfg: &p2p.DisallowListCacheConfig{
 			MaxSize: builder.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
 			Metrics: metrics.DisallowListCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork),
 		},
-		&p2pbuilderconfig.UnicastConfig{
-			Unicast: builder.FlowConfig.NetworkConfig.Unicast,
-		}).
+		UnicastConfig: &p2pbuilderconfig.UnicastConfig{
+			Unicast:                builder.FlowConfig.NetworkConfig.Unicast,
+			RateLimiterDistributor: builder.UnicastRateLimiterDistributor,
+		},
+		GossipSubCfg: &builder.FlowConfig.NetworkConfig.GossipSub,
+	}
+	nodeBuilder, err := p2pbuilder.NewNodeBuilder(params)
+	if err != nil {
+		return nil, fmt.Errorf("could not create libp2p node builder: %w", err)
+	}
+	libp2pNode, err := nodeBuilder.
 		SetSubscriptionFilter(
 			subscription.NewRoleBasedFilter(
 				subscription.UnstakedRole, builder.IdentityProvider,
@@ -813,7 +881,7 @@ func (builder *ObserverServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 		return nil, fmt.Errorf("could not initialize libp2p node for observer: %w", err)
 	}
 
-	builder.LibP2PNode = node
+	builder.LibP2PNode = libp2pNode
 
 	return builder.LibP2PNode, nil
 }
@@ -844,18 +912,180 @@ func (builder *ObserverServiceBuilder) initObserverLocal() func(node *cmd.NodeCo
 // Build enqueues the sync engine and the follower engine for the observer.
 // Currently, the observer only runs the follower engine.
 func (builder *ObserverServiceBuilder) Build() (cmd.Node, error) {
+	builder.BuildConsensusFollower()
 	if builder.executionDataSyncEnabled {
 		builder.BuildExecutionSyncComponents()
 	}
-
-	builder.BuildConsensusFollower()
 	return builder.FlowNodeBuilder.Build()
 }
 
 func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverServiceBuilder {
-
-	var executionDataStoreCache *execdatacache.ExecutionDataCache
+	var ds *badger.Datastore
+	var bs network.BlobService
+	var processedBlockHeight storage.ConsumerProgress
+	var processedNotifications storage.ConsumerProgress
+	var publicBsDependable *module.ProxiedReadyDoneAware
 	var execDataDistributor *edrequester.ExecutionDataDistributor
+	var execDataCacheBackend *herocache.BlockExecutionData
+	var executionDataStoreCache *execdatacache.ExecutionDataCache
+
+	// setup dependency chain to ensure indexer starts after the requester
+	requesterDependable := module.NewProxiedReadyDoneAware()
+
+	builder.
+		AdminCommand("read-execution-data", func(config *cmd.NodeConfig) commands.AdminCommand {
+			return stateSyncCommands.NewReadExecutionDataCommand(builder.ExecutionDataStore)
+		}).
+		Module("execution data datastore and blobstore", func(node *cmd.NodeConfig) error {
+			datastoreDir := filepath.Join(builder.executionDataDir, "blobstore")
+			err := os.MkdirAll(datastoreDir, 0700)
+			if err != nil {
+				return err
+			}
+
+			ds, err = badger.NewDatastore(datastoreDir, &badger.DefaultOptions)
+			if err != nil {
+				return err
+			}
+
+			builder.ShutdownFunc(func() error {
+				if err := ds.Close(); err != nil {
+					return fmt.Errorf("could not close execution data datastore: %w", err)
+				}
+				return nil
+			})
+
+			return nil
+		}).
+		Module("processed block height consumer progress", func(node *cmd.NodeConfig) error {
+			// Note: progress is stored in the datastore's DB since that is where the jobqueue
+			// writes execution data to.
+			processedBlockHeight = bstorage.NewConsumerProgress(ds.DB, module.ConsumeProgressExecutionDataRequesterBlockHeight)
+			return nil
+		}).
+		Module("processed notifications consumer progress", func(node *cmd.NodeConfig) error {
+			// Note: progress is stored in the datastore's DB since that is where the jobqueue
+			// writes execution data to.
+			processedNotifications = bstorage.NewConsumerProgress(ds.DB, module.ConsumeProgressExecutionDataRequesterNotification)
+			return nil
+		}).
+		Module("blobservice peer manager dependencies", func(node *cmd.NodeConfig) error {
+			publicBsDependable = module.NewProxiedReadyDoneAware()
+			builder.PeerManagerDependencies.Add(publicBsDependable)
+			return nil
+		}).
+		Module("execution datastore", func(node *cmd.NodeConfig) error {
+			blobstore := blobs.NewBlobstore(ds)
+			builder.ExecutionDataStore = execution_data.NewExecutionDataStore(blobstore, execution_data.DefaultSerializer)
+			return nil
+		}).
+		Module("execution data cache", func(node *cmd.NodeConfig) error {
+			var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
+			if builder.HeroCacheMetricsEnable {
+				heroCacheCollector = metrics.AccessNodeExecutionDataCacheMetrics(builder.MetricsRegisterer)
+			}
+
+			execDataCacheBackend = herocache.NewBlockExecutionData(builder.executionDataCacheSize, builder.Logger, heroCacheCollector)
+
+			return nil
+		}).
+		Component("public execution data service", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			opts := []network.BlobServiceOption{
+				blob.WithBitswapOptions(
+					// Only allow block requests from staked ENs and ANs
+					bitswap.WithPeerBlockRequestFilter(
+						blob.AuthorizedRequester(nil, builder.IdentityProvider, builder.Logger),
+					),
+					bitswap.WithTracer(
+						blob.NewTracer(node.Logger.With().Str("public_blob_service", channels.PublicExecutionDataService.String()).Logger()),
+					),
+				),
+			}
+
+			var err error
+			bs, err = node.EngineRegistry.RegisterBlobService(channels.PublicExecutionDataService, ds, opts...)
+			if err != nil {
+				return nil, fmt.Errorf("could not register blob service: %w", err)
+			}
+
+			// add blobservice into ReadyDoneAware dependency passed to peer manager
+			// this starts the blob service and configures peer manager to wait for the blobservice
+			// to be ready before starting
+			publicBsDependable.Init(bs)
+
+			builder.ExecutionDataDownloader = execution_data.NewDownloader(bs)
+
+			return builder.ExecutionDataDownloader, nil
+		}).
+		Component("execution data requester", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			// Validation of the start block height needs to be done after loading state
+			if builder.executionDataStartHeight > 0 {
+				if builder.executionDataStartHeight <= builder.FinalizedRootBlock.Header.Height {
+					return nil, fmt.Errorf(
+						"execution data start block height (%d) must be greater than the root block height (%d)",
+						builder.executionDataStartHeight, builder.FinalizedRootBlock.Header.Height)
+				}
+
+				latestSeal, err := builder.State.Sealed().Head()
+				if err != nil {
+					return nil, fmt.Errorf("failed to get latest sealed height")
+				}
+
+				// Note: since the root block of a spork is also sealed in the root protocol state, the
+				// latest sealed height is always equal to the root block height. That means that at the
+				// very beginning of a spork, this check will always fail. Operators should not specify
+				// an InitialBlockHeight when starting from the beginning of a spork.
+				if builder.executionDataStartHeight > latestSeal.Height {
+					return nil, fmt.Errorf(
+						"execution data start block height (%d) must be less than or equal to the latest sealed block height (%d)",
+						builder.executionDataStartHeight, latestSeal.Height)
+				}
+
+				// executionDataStartHeight is provided as the first block to sync, but the
+				// requester expects the initial last processed height, which is the first height - 1
+				builder.executionDataConfig.InitialBlockHeight = builder.executionDataStartHeight - 1
+			} else {
+				builder.executionDataConfig.InitialBlockHeight = builder.FinalizedRootBlock.Header.Height
+			}
+
+			execDataDistributor = edrequester.NewExecutionDataDistributor()
+
+			// Execution Data cache with a downloader as the backend. This is used by the requester
+			// to download and cache execution data for each block. It shares a cache backend instance
+			// with the datastore implementation.
+			executionDataCache := execdatacache.NewExecutionDataCache(
+				builder.ExecutionDataDownloader,
+				builder.Storage.Headers,
+				builder.Storage.Seals,
+				builder.Storage.Results,
+				execDataCacheBackend,
+			)
+
+			r, err := edrequester.New(
+				builder.Logger,
+				metrics.NewExecutionDataRequesterCollector(),
+				builder.ExecutionDataDownloader,
+				executionDataCache,
+				processedBlockHeight,
+				processedNotifications,
+				builder.State,
+				builder.Storage.Headers,
+				builder.executionDataConfig,
+				execDataDistributor,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create execution data requester: %w", err)
+			}
+			builder.ExecutionDataRequester = r
+
+			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.ExecutionDataRequester.OnBlockFinalized)
+
+			// add requester into ReadyDoneAware dependency passed to indexer. This allows the indexer
+			// to wait for the requester to be ready before starting.
+			requesterDependable.Init(builder.ExecutionDataRequester)
+
+			return builder.ExecutionDataRequester, nil
+		})
 
 	if builder.executionDataIndexingEnabled {
 		var indexedBlockHeight storage.ConsumerProgress
@@ -989,7 +1219,6 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 
 			return builder.ExecutionIndexer, nil
 		}, builder.IndexerDependencies)
-
 	}
 
 	return builder
