@@ -380,34 +380,28 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		if err != nil {
 			return nil, fmt.Errorf("could not determine dht activation status: %w", err)
 		}
-
-		params := &p2pbuilder.LibP2PNodeBuilderConfig{
-			Logger: fnb.Logger,
-			MetricsConfig: &p2pbuilderconfig.MetricsConfig{
+		builder, err := p2pbuilder.DefaultNodeBuilder(fnb.Logger,
+			myAddr,
+			network.PrivateNetwork,
+			fnb.NetworkKey,
+			fnb.SporkID,
+			fnb.IdentityProvider,
+			&p2pbuilderconfig.MetricsConfig{
 				Metrics:          fnb.Metrics.Network,
 				HeroCacheFactory: fnb.HeroCacheMetricsFactory(),
 			},
-			NetworkingType:             network.PrivateNetwork,
-			Address:                    myAddr,
-			NetworkKey:                 fnb.NetworkKey,
-			SporkId:                    fnb.SporkID,
-			IdProvider:                 fnb.IdentityProvider,
-			ResourceManagerParams:      &fnb.FlowConfig.NetworkConfig.ResourceManager,
-			RpcInspectorParams:         &fnb.FlowConfig.NetworkConfig.GossipSub.RpcInspector,
-			PeerManagerParams:          peerManagerCfg,
-			SubscriptionProviderParams: &fnb.FlowConfig.NetworkConfig.GossipSub.SubscriptionProvider,
-			DisallowListCacheCfg: &p2p.DisallowListCacheConfig{
-				MaxSize: fnb.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
-				Metrics: metrics.DisallowListCacheMetricsFactory(fnb.HeroCacheMetricsFactory(), network.PrivateNetwork),
-			},
-			UnicastConfig: uniCfg,
-			GossipSubCfg:  &fnb.FlowConfig.NetworkConfig.GossipSub,
-		}
-		builder, err := p2pbuilder.DefaultNodeBuilder(params,
 			fnb.Resolver,
 			fnb.BaseConfig.NodeRole,
 			connGaterCfg,
+			peerManagerCfg,
+			&fnb.FlowConfig.NetworkConfig.GossipSub,
+			&fnb.FlowConfig.NetworkConfig.ResourceManager,
+			uniCfg,
 			&fnb.FlowConfig.NetworkConfig.ConnectionManager,
+			&p2p.DisallowListCacheConfig{
+				MaxSize: fnb.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
+				Metrics: metrics.DisallowListCacheMetricsFactory(fnb.HeroCacheMetricsFactory(), network.PrivateNetwork),
+			},
 			dhtActivationStatus)
 		if err != nil {
 			return nil, fmt.Errorf("could not create libp2p node builder: %w", err)
