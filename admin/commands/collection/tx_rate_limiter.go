@@ -3,6 +3,7 @@ package collection
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
@@ -25,19 +26,14 @@ func NewTxRateLimitCommand(limiter *ingest.AddressRateLimiter) *TxRateLimitComma
 }
 
 func (s *TxRateLimitCommand) Handler(_ context.Context, req *admin.CommandRequest) (interface{}, error) {
-	input, ok := req.Data.(map[string]interface{})
+	input, ok := req.Data.(map[string]string)
 	if !ok {
 		return admin.NewInvalidAdminReqFormatError("expected { \"command\": \"add|remove|get|get_config|set_config\", \"addresses\": \"addresses\""), nil
 	}
 
-	command, ok := input["command"]
+	cmd, ok := input["command"]
 	if !ok {
 		return admin.NewInvalidAdminReqErrorf("the \"command\" field is empty, must be one of add|remove|get|get_config|set_config"), nil
-	}
-
-	cmd, ok := command.(string)
-	if !ok {
-		return admin.NewInvalidAdminReqErrorf("the \"command\" field is not string, must be one of add|remove|get|get_config|set_config"), nil
 	}
 
 	if cmd == "get" {
@@ -46,13 +42,9 @@ func (s *TxRateLimitCommand) Handler(_ context.Context, req *admin.CommandReques
 	}
 
 	if cmd == "add" || cmd == "remove" {
-		result, ok := input["addresses"]
+		addresses, ok := input["addresses"]
 		if !ok {
 			return admin.NewInvalidAdminReqErrorf("the \"addresses\" field is empty, must be hex formated addresses, can be splitted by \",\""), nil
-		}
-		addresses, ok := result.(string)
-		if !ok {
-			return admin.NewInvalidAdminReqErrorf("the \"addresses\" field is not string, must be hex formated addresses, can be splitted by \",\""), nil
 		}
 
 		log.Info().Msgf("admintool %v addresses: %v", cmd, addresses)
@@ -75,14 +67,14 @@ func (s *TxRateLimitCommand) Handler(_ context.Context, req *admin.CommandReques
 		if !limit_ok || !burst_ok {
 			return admin.NewInvalidAdminReqErrorf("the \"limit\" or \"burst\" field is empty, must be number"), nil
 		}
-		limit, ok := dataLimit.(float64)
-		if !ok {
-			return admin.NewInvalidAdminReqErrorf("the \"limit\" field is not number: %v", dataLimit), nil
+		limit, err := strconv.ParseFloat(dataLimit, 64)
+		if err != nil {
+			return admin.NewInvalidAdminReqErrorf("the \"limit\" field is not number %v, %s", dataLimit, err), nil
 		}
 
-		burst, ok := dataBurst.(int)
-		if !ok {
-			return admin.NewInvalidAdminReqErrorf("the \"burst\" field is not number: %v", dataBurst), nil
+		burst, err := strconv.Atoi(dataBurst)
+		if err != nil {
+			return admin.NewInvalidAdminReqErrorf("the \"burst\" field is not number: %v, %s", dataBurst, err), nil
 		}
 
 		oldLimit, oldBurst := s.limiter.GetLimitConfig()
