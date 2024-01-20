@@ -101,8 +101,13 @@ func TestLimiterWaitLongEnough(t *testing.T) {
 		return l.Allow(addr1)
 	}, 110*time.Millisecond, 10*time.Millisecond)
 
+	// block again until another 100 ms
+	require.True(t, l.IsRateLimited(addr1))
+
 	// block until another 100 ms
-	require.False(t, l.Allow(addr1))
+	require.Eventually(t, func() bool {
+		return l.Allow(addr1)
+	}, 110*time.Millisecond, 10*time.Millisecond)
 }
 
 func TestLimiterConcurrentSafe(t *testing.T) {
@@ -140,4 +145,41 @@ func TestLimiterConcurrentSafe(t *testing.T) {
 
 	wg.Wait()
 	require.Equal(t, uint64(1), succeed.Load()) // should only succeed once
+}
+
+func TestLimiterGetSetConfig(t *testing.T) {
+	t.Parallel()
+
+	addr1 := unittest.RandomAddressFixture()
+
+	// with limit set to 10, it means we allow 10 messages per second,
+	// and with burst set to 1, it means we only allow 1 message at a time,
+	// so the limit is 1 message per 100 milliseconds.
+	// Note rate.Limit(0.1) is not to set 1 message per 100 milliseconds, but
+	// 1 message per 10 seconds.
+	numPerSec := rate.Limit(10)
+	burst := 1
+	l := ingest.NewAddressRateLimiter(numPerSec, burst)
+
+	l.AddAddress(addr1)
+	require.False(t, l.IsRateLimited(addr1))
+	require.True(t, l.IsRateLimited(addr1))
+
+	limitConfig, burstConfig := l.GetLimitConfig()
+	require.Equal(t, numPerSec, limitConfig)
+	require.Equal(t, burst, burstConfig)
+
+	// change from 1 message per 100 ms to 4 messages per 200 ms
+	l.SetLimitConfig(rate.Limit(20), 4)
+
+	// verify the quota is reset, and the new limit is applied
+	for i := 0; i < 4; i++ {
+		require.False(t, l.IsRateLimited(addr1), fmt.Sprintf("fail at %v-th call", i))
+	}
+	require.True(t, l.IsRateLimited(addr1))
+
+	// check every 10 Millisecond then after 100 Millisecond it should be allowed
+	require.Eventually(t, func() bool {
+		return l.Allow(addr1)
+	}, 210*time.Millisecond, 10*time.Millisecond)
 }
