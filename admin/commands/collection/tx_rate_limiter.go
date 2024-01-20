@@ -40,7 +40,8 @@ func (s *TxRateLimitCommand) Handler(_ context.Context, req *admin.CommandReques
 	}
 
 	if cmd == "get" {
-		return s.limiter.GetAddresses(), nil
+		list := s.limiter.GetAddresses()
+		return fmt.Sprintf("rate limited list contains a total of %d addresses: %v", len(list), list), nil
 	}
 
 	if cmd == "add" || cmd == "remove" {
@@ -82,7 +83,7 @@ func (s *TxRateLimitCommand) Handler(_ context.Context, req *admin.CommandReques
 		}
 
 		s.limiter.SetLimitConfig(rate.Limit(limit), burst)
-		return fmt.Sprintf("succesfully set limit: %v, burst: %v", limit, burst), nil
+		return fmt.Sprintf("succesfully set limit: , burst: "), nil
 	}
 
 	return fmt.Sprintf(

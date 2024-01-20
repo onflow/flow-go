@@ -204,7 +204,7 @@ func main() {
 
 			return nil
 		}).
-		AdminCommand("tx-rate-limit", func(node *cmd.NodeConfig) commands.AdminCommand {
+		AdminCommand("ingest-tx-rate-limit", func(node *cmd.NodeConfig) commands.AdminCommand {
 			return collectionCommands.NewTxRateLimitCommand(addressRateLimiter)
 		}).
 		AdminCommand("read-range-cluster-blocks", func(conf *cmd.NodeConfig) commands.AdminCommand {
