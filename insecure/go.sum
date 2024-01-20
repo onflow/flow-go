@@ -1893,8 +1893,9 @@ github.com/onflow/atree v0.6.0/go.mod h1:gBHU0M05qCbv9NN0kijLWMgC47gHVNBIp4KmsVF
 github.com/onflow/atree v0.6.1-0.20230711151834-86040b30171f h1:Z8/PgTqOgOg02MTRpTBYO2k16FE6z4wEOtaC2WBR9Xo=
 github.com/onflow/atree v0.6.1-0.20230711151834-86040b30171f/go.mod h1:xvP61FoOs95K7IYdIYRnNcYQGf4nbF/uuJ0tHf4DRuM=
 github.com/onflow/cadence v0.39.13-stable-cadence/go.mod h1:SxT8/IEkS1drFj2ofUEK9S6KyJ5GQbrm0LX4EFCp/7Q=
-github.com/onflow/cadence v1.0.0-preview.1.0.20231213191345-0ff20e15e7e1 h1:xIFPRIA/pmyplEu5JxuMCfC6zfdqRW7QDHYJ8ogCNuc=
-github.com/onflow/cadence v1.0.0-preview.1.0.20231213191345-0ff20e15e7e1/go.mod h1:60RhxKY5V4DXFQfvXQa48eZZVN19O7Lu9cp53FM54vo=
+github.com/onflow/cadence v1.0.0-preview.2.0.20240120000236-f3397a0efdad h1:byQlVs03hkss2a0x/c8sGJRCzm5xOkC1oJIuDBaupso=
+github.com/onflow/cadence v1.0.0-preview.2.0.20240120000236-f3397a0efdad/go.mod h1:odXGZZ/wGNA5mwT8bC9v8u8EXACHllB2ABSZK65TGL8=
+github.com/onflow/crypto v0.25.0 h1:BeWbLsh3ZD13Ej+Uky6kg1PL1ZIVBDVX+2MVBNwqddg=
 github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.1-0.20231219201108-fbdb10b0a2da h1:8CEioYNnP0rwjnRbKDgs8SmiQTsdaroeX4d/Q3pQuh4=
 github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.1-0.20231219201108-fbdb10b0a2da/go.mod h1:WHp24VkUQfcfZi0XjI1uRVRt5alM5SHVkwOil1U2Tpc=
 github.com/onflow/flow-core-contracts/lib/go/templates v0.15.1-0.20231219201108-fbdb10b0a2da h1:V2zI6AfDtPykMGhgw69ZEGcvyMudRUFOVHYCMN4BbQo=
@@ -1902,8 +1903,8 @@ github.com/onflow/flow-core-contracts/lib/go/templates v0.15.1-0.20231219201108-
 github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20231212194336-a2802ba36596 h1:MTgrwXkiWwNysYpWGzWjc1n9w1nfXvizmGkSAuEY6jk=
 github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20231212194336-a2802ba36596/go.mod h1:uugR8U8Rlk2Xbn1ne7WWkPIcLReOyyXeQ/6tBg2Lsu8=
 github.com/onflow/flow-go-sdk v0.41.7-stable-cadence/go.mod h1:ejVN+bqcsTHVvRpDDJDoBNdmcxUfFMW4IvdTbMeQ/hQ=
-github.com/onflow/flow-go-sdk v0.44.0-stable-cadence.2 h1:vUVO6m85BiT8c50Oc8YGc3CU+sGqiKW9FZbmiRph2dU=
-github.com/onflow/flow-go-sdk v0.44.0-stable-cadence.2/go.mod h1:mbLrR3MkYbi9LH3yasDj1jrR4QTR8vjRLVFCm4jMHn0=
+github.com/onflow/flow-go-sdk v0.44.0-stable-cadence.2.0.20240120000948-4c9b2354a373 h1:639XcZXnjAEEjSBPAbvAfGR4MO8RZK5dtRTn4inK+JA=
+github.com/onflow/flow-go-sdk v0.44.0-stable-cadence.2.0.20240120000948-4c9b2354a373/go.mod h1:uwHkyjJQlL5V4OYqJwJhRpILekbllHHUCd9HMAEDOc8=
 github.com/onflow/flow-go/crypto v0.24.7/go.mod h1:fqCzkIBBMRRkciVrvW21rECKq1oD7Q6u+bCI78lfNX0=
 github.com/onflow/flow-go/crypto v0.25.0 h1:6lmoiAQ3APCF+nV7f4f2AXL3PuDKqQiWqRJXmjrMEq4=
 github.com/onflow/flow-go/crypto v0.25.0/go.mod h1:OOb2vYcS8AOCajBClhHTJ0NKftFl1RQgTQ0+Vh4nbqk=
@@ -2411,8 +2412,8 @@ golang.org/x/exp v0.0.0-20200331195152-e8c3332aa8e5/go.mod h1:4M0jN8W1tt0AVLNr8H
 golang.org/x/exp v0.0.0-20220827204233-334a2380cb91/go.mod h1:cyybsKvd6eL0RnXn6p/Grxp8F5bW7iYuBgsNCOHpMYE=
 golang.org/x/exp v0.0.0-20221110155412-d0897a79cd37/go.mod h1:CxIveKay+FTh1D0yPZemJVgC/95VzuuOLq5Qi4xnoYc=
 golang.org/x/exp v0.0.0-20230321023759-10a507213a29/go.mod h1:CxIveKay+FTh1D0yPZemJVgC/95VzuuOLq5Qi4xnoYc=
-golang.org/x/exp v0.0.0-20231214170342-aacd6d4b4611 h1:qCEDpW1G+vcj3Y7Fy52pEM1AWm3abj8WimGYejI3SC4=
-golang.org/x/exp v0.0.0-20231214170342-aacd6d4b4611/go.mod h1:iRJReGqOEeBhDZGkGbynYwcHlctCvnjTYIamk7uXpHI=
+golang.org/x/exp v0.0.0-20240103183307-be819d1f06fc h1:ao2WRsKSzW6KuUY9IWPwWahcHCgR0s52IfwutMfEbdM=
+golang.org/x/exp v0.0.0-20240103183307-be819d1f06fc/go.mod h1:iRJReGqOEeBhDZGkGbynYwcHlctCvnjTYIamk7uXpHI=
 golang.org/x/image v0.0.0-20180708004352-c73c2afc3b81/go.mod h1:ux5Hcp/YLpHSI86hEcLt0YII63i6oz57MZXIpbrjZUs=
 golang.org/x/image v0.0.0-20190227222117-0694c2d4d067/go.mod h1:kZ7UVZpmo3dzQBMxlp+ypCbDeSB+sBbTgSJuh5dn5js=
 golang.org/x/image v0.0.0-20190802002840-cff245a6509b/go.mod h1:FeLwcggjj3mMvU+oOTbSwawSJRM1uh48EjtB4UJZlP0=

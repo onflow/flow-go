@@ -51,11 +51,11 @@ require (
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/multiformats/go-multihash v0.2.3
 	github.com/onflow/atree v0.6.1-0.20230711151834-86040b30171f
-	github.com/onflow/cadence v1.0.0-preview.1.0.20231213191345-0ff20e15e7e1
+	github.com/onflow/cadence v1.0.0-preview.2.0.20240120000236-f3397a0efdad
 	github.com/onflow/flow v0.3.4
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.1-0.20231212203043-37cbe453d425
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.15.1-0.20231204202154-f8dfacb39d86
-	github.com/onflow/flow-go-sdk v0.44.0-stable-cadence.2
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.1-0.20240120002724-ff3d1a4bab55
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.15.1-0.20240120002724-ff3d1a4bab55
+	github.com/onflow/flow-go-sdk v0.44.0-stable-cadence.2.0.20240120000948-4c9b2354a373
 	github.com/onflow/flow-go/crypto v0.25.0
 	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20231213135419-ae911cc351a2
 	github.com/onflow/go-bitswap v0.0.0-20230703214630-6d3db958c73d
@@ -82,7 +82,7 @@ require (
 	go.uber.org/atomic v1.11.0
 	go.uber.org/multierr v1.11.0
 	golang.org/x/crypto v0.17.0
-	golang.org/x/exp v0.0.0-20231214170342-aacd6d4b4611
+	golang.org/x/exp v0.0.0-20240103183307-be819d1f06fc
 	golang.org/x/sync v0.5.0
 	golang.org/x/sys v0.15.0
 	golang.org/x/text v0.14.0
@@ -106,7 +106,7 @@ require (
 	github.com/hashicorp/golang-lru/v2 v2.0.2
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20231212194336-a2802ba36596
-	github.com/onflow/flow-nft/lib/go/contracts v1.1.1-0.20231212194623-24d595274bdd
+	github.com/onflow/flow-nft/lib/go/contracts v1.1.1-0.20240120002146-9f1763b66d80
 	github.com/onflow/wal v0.0.0-20230529184820-bc9f8244608d
 	github.com/slok/go-http-metrics v0.10.0
 	github.com/sony/gobreaker v0.5.0
@@ -121,7 +121,7 @@ require (
 	cloud.google.com/go/iam v1.1.1 // indirect
 	github.com/DataDog/zstd v1.5.2 // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
-	github.com/SaveTheRbtz/mph v0.1.2 // indirect
+	github.com/SaveTheRbtz/mph v0.1.1-0.20240117162131-4166ec7869bc // indirect
 	github.com/StackExchange/wmi v1.2.1 // indirect
 	github.com/VictoriaMetrics/fastcache v1.12.1 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.21.2 // indirect
@@ -295,7 +295,6 @@ require (
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	github.com/zeebo/blake3 v0.2.3 // indirect
-	github.com/zeebo/xxh3 v1.0.2 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/internal/retry v1.16.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.16.0 // indirect
