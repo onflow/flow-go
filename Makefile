@@ -374,7 +374,6 @@ docker-build-verification-corrupt:
 .PHONY: docker-build-access
 docker-build-access:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/access --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target production \
-		--secret id=cadence_deploy_key,env=CADENCE_DEPLOY_KEY --build-arg GOPRIVATE=$(GOPRIVATE) \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
 		--secret id=cadence_deploy_key,env=CADENCE_DEPLOY_KEY --build-arg GOPRIVATE=$(GOPRIVATE) \
 		-t "$(CONTAINER_REGISTRY)/access:latest" -t "$(CONTAINER_REGISTRY)/access:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/access:$(IMAGE_TAG)" .
@@ -423,7 +422,6 @@ docker-build-ghost:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/ghost --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target production \
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
 		--secret id=cadence_deploy_key,env=CADENCE_DEPLOY_KEY --build-arg GOPRIVATE=$(GOPRIVATE) \
-		--label "git_commit=${COMMIT}" --label "git_tag=$(IMAGE_TAG_NO_NETGO)" \
 		-t "$(CONTAINER_REGISTRY)/ghost:latest" -t "$(CONTAINER_REGISTRY)/ghost:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/ghost:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-ghost-debug
