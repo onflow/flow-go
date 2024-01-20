@@ -27,8 +27,6 @@ import (
 // a spammer peer, the victim will eventually penalize the spammer and stop receiving messages from them.
 // Note: the term integration is used here because it requires integrating all components of the libp2p stack.
 func TestGossipSubInvalidMessageDelivery_Integration(t *testing.T) {
-	t.Parallel()
-
 	tt := []struct {
 		name           string
 		spamMsgFactory func(spammerId peer.ID, victimId peer.ID, topic channels.Topic) *pubsub_pb.Message
@@ -101,7 +99,7 @@ func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory fun
 	sporkId := unittest.IdentifierFixture()
 	blockTopic := channels.TopicFromChannel(channels.PushBlocks, sporkId)
 
-	idProvider := mock.NewIdentityProvider(t)
+	idProvider := unittest.NewUpdatableIDProvider(flow.IdentityList{})
 	spammer := corruptlibp2p.NewGossipSubRouterSpammer(t, sporkId, role, idProvider)
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
@@ -118,9 +116,8 @@ func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory fun
 		p2ptest.WithRole(role),
 		p2ptest.OverrideFlowConfig(cfg))
 
-	idProvider.On("ByPeerID", victimNode.ID()).Return(&victimIdentity, true).Maybe()
-	idProvider.On("ByPeerID", spammer.SpammerNode.ID()).Return(&spammer.SpammerId, true).Maybe()
 	ids := flow.IdentityList{&spammer.SpammerId, &victimIdentity}
+	idProvider.SetIdentities(ids)
 	nodes := []p2p.LibP2PNode{spammer.SpammerNode, victimNode}
 
 	p2ptest.StartNodes(t, signalerCtx, nodes)
@@ -134,12 +131,17 @@ func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory fun
 		return unittest.ProposalFixture()
 	})
 
-	totalSpamMessages := 20
+	// generates 2000 spam messages to send to the victim node; based on default-config.yaml, ~1400 of these messages are enough to
+	// penalize the spammer node to disconnect from the victim node.
+	totalSpamMessages := 2000
+	msgs := make([]*pubsub_pb.Message, 0)
 	for i := 0; i <= totalSpamMessages; i++ {
-		spammer.SpamControlMessage(t, victimNode,
-			spammer.GenerateCtlMessages(1),
-			spamMsgFactory(spammer.SpammerNode.ID(), victimNode.ID(), blockTopic))
+		msgs = append(msgs, spamMsgFactory(spammer.SpammerNode.ID(), victimNode.ID(), blockTopic))
 	}
+
+	// sends all 2000 spam messages to the victim node over 1 RPC.
+	spammer.SpamControlMessage(t, victimNode,
+		spammer.GenerateCtlMessages(1), msgs...)
 
 	scoreParams := cfg.NetworkConfig.GossipSub.ScoringParameters
 
@@ -174,12 +176,10 @@ func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory fun
 	blkTopicSnapshot, ok := topicsSnapshot[blockTopic.String()]
 	require.True(t, ok)
 
-	// ensure that the topic snapshot of the spammer contains a record of at least (60%) of the spam messages sent. The 60% is to account for the messages that were
+	// ensure that the topic snapshot of the spammer contains a record of at least (40%) of the spam messages sent. The 40% is to account for the messages that were
 	// delivered before the score was updated, after the spammer is PRUNED, as well as to account for decay.
-	require.True(t,
-		blkTopicSnapshot.InvalidMessageDeliveries > 0.6*float64(totalSpamMessages),
-		"invalid message deliveries must be greater than %f. invalid message deliveries: %f",
-		0.9*float64(totalSpamMessages),
+	require.True(t, blkTopicSnapshot.InvalidMessageDeliveries > 0.4*float64(totalSpamMessages),
+		"invalid message deliveries must be greater than %f. invalid message deliveries: %f", 0.4*float64(totalSpamMessages),
 		blkTopicSnapshot.InvalidMessageDeliveries)
 
 	p2ptest.EnsureNoPubsubExchangeBetweenGroups(
