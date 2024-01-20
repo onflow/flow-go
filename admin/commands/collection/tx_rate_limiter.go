@@ -7,6 +7,7 @@ import (
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/engine/collection/ingest"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/time/rate"
 )
 
@@ -54,6 +55,8 @@ func (s *TxRateLimitCommand) Handler(_ context.Context, req *admin.CommandReques
 			return admin.NewInvalidAdminReqErrorf("the \"addresses\" field is not string, must be hex formated addresses, can be splitted by \",\""), nil
 		}
 
+		log.Info().Msgf("admintool %v addresses: %v", cmd, addresses)
+
 		resp, err := s.AddOrRemove(cmd, addresses)
 		if err != nil {
 			return nil, err
@@ -82,8 +85,10 @@ func (s *TxRateLimitCommand) Handler(_ context.Context, req *admin.CommandReques
 			return admin.NewInvalidAdminReqErrorf("the \"burst\" field is not number: %v", dataBurst), nil
 		}
 
+		oldLimit, oldBurst := s.limiter.GetLimitConfig()
+		log.Info().Msgf("admintool set_config limit: %v, burst: %v, old limit: %v, old burst: %v", limit, burst, oldLimit, oldBurst)
 		s.limiter.SetLimitConfig(rate.Limit(limit), burst)
-		return fmt.Sprintf("succesfully set limit: , burst: "), nil
+		return fmt.Sprintf("succesfully set limit %v, burst %v", limit, burst), nil
 	}
 
 	return fmt.Sprintf(
