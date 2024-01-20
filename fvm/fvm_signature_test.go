@@ -122,11 +122,13 @@ func TestKeyListSignature(t *testing.T) {
                           return keyList.verify(
                               signatureSet: signatureSet,
                               signedData: message,
+                              domainSeparationTag: "%s"
                           )
                       }
                     `,
 				signatureAlgorithm.name,
 				hashAlgorithm.name,
+				tag,
 			),
 		)
 
