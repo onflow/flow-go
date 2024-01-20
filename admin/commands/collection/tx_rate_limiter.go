@@ -18,6 +18,10 @@ type TxRateLimitCommand struct {
 	limiter *ingest.AddressRateLimiter
 }
 
+type TxRateLimitCommandAddress struct {
+	Addresses []string
+}
+
 func NewTxRateLimitCommand(limiter *ingest.AddressRateLimiter) *TxRateLimitCommand {
 	return &TxRateLimitCommand{
 		limiter: limiter,
@@ -72,7 +76,7 @@ func (s *TxRateLimitCommand) Handler(_ context.Context, req *admin.CommandReques
 	if cmd == "set_config" {
 		dataLimit, limit_ok := input["limit"]
 		dataBurst, burst_ok := input["burst"]
-		if !limit_ok || !burst_ok {
+		if !burst_ok || !limit_ok {
 			return admin.NewInvalidAdminReqErrorf("the \"limit\" or \"burst\" field is empty, must be number"), nil
 		}
 		limit, ok := dataLimit.(float64)
@@ -80,14 +84,14 @@ func (s *TxRateLimitCommand) Handler(_ context.Context, req *admin.CommandReques
 			return admin.NewInvalidAdminReqErrorf("the \"limit\" field is not number: %v", dataLimit), nil
 		}
 
-		burst, ok := dataBurst.(int)
+		burst, ok := dataBurst.(float64)
 		if !ok {
 			return admin.NewInvalidAdminReqErrorf("the \"burst\" field is not number: %v", dataBurst), nil
 		}
 
 		oldLimit, oldBurst := s.limiter.GetLimitConfig()
 		log.Info().Msgf("admintool set_config limit: %v, burst: %v, old limit: %v, old burst: %v", limit, burst, oldLimit, oldBurst)
-		s.limiter.SetLimitConfig(rate.Limit(limit), burst)
+		s.limiter.SetLimitConfig(rate.Limit(limit), int(burst))
 		return fmt.Sprintf("succesfully set limit %v, burst %v", limit, burst), nil
 	}
 
@@ -96,7 +100,7 @@ func (s *TxRateLimitCommand) Handler(_ context.Context, req *admin.CommandReques
 		cmd), nil
 }
 
-func (s *TxRateLimitCommand) Validator(_ *admin.CommandRequest) error {
+func (s *TxRateLimitCommand) Validator(req *admin.CommandRequest) error {
 	return nil
 }
 
