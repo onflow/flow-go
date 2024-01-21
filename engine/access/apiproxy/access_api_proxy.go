@@ -2,6 +2,7 @@ package apiproxy
 
 import (
 	"context"
+	"github.com/onflow/flow-go/storage"
 
 	"google.golang.org/grpc/status"
 
@@ -23,6 +24,7 @@ type FlowAccessAPIRouter struct {
 	Metrics  *metrics.ObserverCollector
 	Upstream *FlowAccessAPIForwarder
 	Observer *protocol.Handler
+	Storage  *FlowObserverStorageForwarder
 }
 
 func (h *FlowAccessAPIRouter) log(handler, rpc string, err error) {
@@ -535,4 +537,28 @@ func (h *FlowAccessAPIForwarder) GetExecutionResultByID(context context.Context,
 	}
 	defer closer.Close()
 	return upstream.GetExecutionResultByID(context, req)
+}
+
+// FlowObserverStorageForwarder forwards all requests to a set of upstream access nodes or observers
+type FlowObserverStorageForwarder struct {
+	headers *storage.Headers
+	events  *storage.Events
+	results *storage.LightTransactionResults
+}
+
+func NewFlowObserverStorageForwarder(
+	headers *storage.Headers,
+	events *storage.Events,
+	results *storage.LightTransactionResults) (*FlowObserverStorageForwarder, error) {
+
+	return &FlowObserverStorageForwarder{
+		//registers: forwarder,
+		headers: headers,
+		events:  events,
+		results: results,
+	}, nil
+}
+
+func (h *FlowObserverStorageForwarder) GetExecutionResultByID(context context.Context, req *access.GetExecutionResultByIDRequest) (*access.ExecutionResultByIDResponse, error) {
+
 }
