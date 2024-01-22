@@ -23,7 +23,6 @@ const (
 	LabelStatusCode          = "code"
 	LabelMethod              = "method"
 	LabelService             = "service"
-	LabelCtrlMsgType         = "ctlmsgtype"
 	LabelRejectionReason     = "rejection_reason"
 )
 

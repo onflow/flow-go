@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/go-playground/validator/v10"
 	"github.com/libp2p/go-libp2p"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/config"
@@ -74,49 +73,39 @@ type LibP2PNodeBuilder struct {
 	networkingType       flownet.NetworkingType // whether the node is running in private (staked) or public (unstaked) network
 }
 
-// LibP2PNodeBuilderConfig parameters required to create a new *LibP2PNodeBuilder with NewNodeBuilder.
-type LibP2PNodeBuilderConfig struct {
-	Logger                     zerolog.Logger                            `validate:"required"`
-	MetricsConfig              *p2pbuilderconfig.MetricsConfig           `validate:"required"`
-	NetworkingType             flownet.NetworkingType                    `validate:"required"`
-	Address                    string                                    `validate:"required"`
-	NetworkKey                 fcrypto.PrivateKey                        `validate:"required"`
-	SporkId                    flow.Identifier                           `validate:"required"`
-	IdProvider                 module.IdentityProvider                   `validate:"required"`
-	ResourceManagerParams      *p2pconfig.ResourceManagerConfig          `validate:"required"`
-	RpcInspectorParams         *p2pconfig.RpcInspectorParameters         `validate:"required"`
-	PeerManagerParams          *p2pbuilderconfig.PeerManagerConfig       `validate:"required"`
-	SubscriptionProviderParams *p2pconfig.SubscriptionProviderParameters `validate:"required"`
-	DisallowListCacheCfg       *p2p.DisallowListCacheConfig              `validate:"required"`
-	UnicastConfig              *p2pbuilderconfig.UnicastConfig           `validate:"required"`
-	GossipSubCfg               *p2pconfig.GossipSubParameters            `validate:"required"`
-}
-
-func NewNodeBuilder(params *LibP2PNodeBuilderConfig) (*LibP2PNodeBuilder, error) {
-	err := validator.New().Struct(params)
-	if err != nil {
-		return nil, fmt.Errorf("libp2p node builder params validation failed: %w", err)
-	}
+func NewNodeBuilder(
+	logger zerolog.Logger,
+	gossipSubCfg *p2pconfig.GossipSubParameters,
+	metricsConfig *p2pbuilderconfig.MetricsConfig,
+	networkingType flownet.NetworkingType,
+	address string,
+	networkKey fcrypto.PrivateKey,
+	sporkId flow.Identifier,
+	idProvider module.IdentityProvider,
+	rCfg *p2pconfig.ResourceManagerConfig,
+	peerManagerConfig *p2pbuilderconfig.PeerManagerConfig,
+	disallowListCacheCfg *p2p.DisallowListCacheConfig,
+	unicastConfig *p2pbuilderconfig.UnicastConfig,
+) *LibP2PNodeBuilder {
 	return &LibP2PNodeBuilder{
-		logger:               params.Logger,
-		sporkId:              params.SporkId,
-		address:              params.Address,
-		networkKey:           params.NetworkKey,
+		logger:               logger,
+		sporkId:              sporkId,
+		address:              address,
+		networkKey:           networkKey,
 		createNode:           func(cfg *p2p.NodeConfig) (p2p.LibP2PNode, error) { return p2pnode.NewNode(cfg) },
-		metricsConfig:        params.MetricsConfig,
-		resourceManagerCfg:   params.ResourceManagerParams,
-		disallowListCacheCfg: params.DisallowListCacheCfg,
-		networkingType:       params.NetworkingType,
-		gossipSubBuilder: gossipsubbuilder.NewGossipSubBuilder(params.Logger,
-			params.MetricsConfig,
-			params.GossipSubCfg,
-			params.NetworkingType,
-			params.SporkId,
-			params.IdProvider,
-		),
-		peerManagerConfig: params.PeerManagerParams,
-		unicastConfig:     params.UnicastConfig,
-	}, nil
+		metricsConfig:        metricsConfig,
+		resourceManagerCfg:   rCfg,
+		disallowListCacheCfg: disallowListCacheCfg,
+		networkingType:       networkingType,
+		gossipSubBuilder: gossipsubbuilder.NewGossipSubBuilder(logger,
+			metricsConfig,
+			gossipSubCfg,
+			networkingType,
+			sporkId,
+			idProvider),
+		peerManagerConfig: peerManagerConfig,
+		unicastConfig:     unicastConfig,
+	}
 }
 
 var _ p2p.NodeBuilder = &LibP2PNodeBuilder{}
@@ -403,34 +392,52 @@ func defaultLibP2POptions(address string, key fcrypto.PrivateKey) ([]config.Opti
 }
 
 // DefaultNodeBuilder returns a node builder.
-func DefaultNodeBuilder(params *LibP2PNodeBuilderConfig,
+func DefaultNodeBuilder(
+	logger zerolog.Logger,
+	address string,
+	networkingType flownet.NetworkingType,
+	flowKey fcrypto.PrivateKey,
+	sporkId flow.Identifier,
+	idProvider module.IdentityProvider,
+	metricsCfg *p2pbuilderconfig.MetricsConfig,
 	resolver madns.BasicResolver,
 	role string,
 	connGaterCfg *p2pbuilderconfig.ConnectionGaterConfig,
+	peerManagerCfg *p2pbuilderconfig.PeerManagerConfig,
+	gossipCfg *p2pconfig.GossipSubParameters,
+	rCfg *p2pconfig.ResourceManagerConfig,
+	uniCfg *p2pbuilderconfig.UnicastConfig,
 	connMgrConfig *netconf.ConnectionManager,
+	disallowListCacheCfg *p2p.DisallowListCacheConfig,
 	dhtSystemActivation DhtSystemActivation,
 ) (p2p.NodeBuilder, error) {
 
-	connManager, err := connection.NewConnManager(params.Logger, params.MetricsConfig.Metrics, connMgrConfig)
+	connManager, err := connection.NewConnManager(logger, metricsCfg.Metrics, connMgrConfig)
 	if err != nil {
 		return nil, fmt.Errorf("could not create connection manager: %w", err)
 	}
 
 	// set the default connection gater peer filters for both InterceptPeerDial and InterceptSecured callbacks
-	peerFilter := notEjectedPeerFilter(params.IdProvider)
+	peerFilter := notEjectedPeerFilter(idProvider)
 	peerFilters := []p2p.PeerFilter{peerFilter}
 
 	connGater := connection.NewConnGater(
-		params.Logger,
-		params.IdProvider,
+		logger,
+		idProvider,
 		connection.WithOnInterceptPeerDialFilters(append(peerFilters, connGaterCfg.InterceptPeerDialFilters...)),
 		connection.WithOnInterceptSecuredFilters(append(peerFilters, connGaterCfg.InterceptSecuredFilters...)))
 
-	builder, err := NewNodeBuilder(params)
-	if err != nil {
-		return nil, fmt.Errorf("could not create libp2p node builder: %w", err)
-	}
-	builder.
+	builder := NewNodeBuilder(logger,
+		gossipCfg,
+		metricsCfg,
+		networkingType,
+		address,
+		flowKey,
+		sporkId,
+		idProvider,
+		rCfg, peerManagerCfg,
+		disallowListCacheCfg,
+		uniCfg).
 		SetBasicResolver(resolver).
 		SetConnectionManager(connManager).
 		SetConnectionGater(connGater)
@@ -440,12 +447,12 @@ func DefaultNodeBuilder(params *LibP2PNodeBuilderConfig,
 		if err != nil {
 			return nil, fmt.Errorf("could not parse role: %w", err)
 		}
-		builder.SetSubscriptionFilter(subscription.NewRoleBasedFilter(r, params.IdProvider))
+		builder.SetSubscriptionFilter(subscription.NewRoleBasedFilter(r, idProvider))
 
 		if dhtSystemActivation == DhtSystemEnabled {
 			builder.SetRoutingSystem(
 				func(ctx context.Context, host host.Host) (routing.Routing, error) {
-					return dht.NewDHT(ctx, host, protocols.FlowDHTProtocolID(params.SporkId), params.Logger, params.MetricsConfig.Metrics, dht.AsServer())
+					return dht.NewDHT(ctx, host, protocols.FlowDHTProtocolID(sporkId), logger, metricsCfg.Metrics, dht.AsServer())
 				})
 		}
 	}
