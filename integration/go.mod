@@ -364,6 +364,8 @@ replace github.com/onflow/flow-go => ../
 
 replace github.com/onflow/flow-go/insecure => ../insecure
 
+// the replaces below should not be needed once flow-go and all the repos are updated 
+// to use Cadence 1.0
 replace github.com/onflow/cadence => github.com/onflow/cadence v0.42.7
 
 replace github.com/onflow/flow-ft/lib/go/contracts => github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20230711213910-baad011d2b13
