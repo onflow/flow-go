@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/counters"
 )
 
 type ExecutionCollector struct {
@@ -81,7 +82,7 @@ type ExecutionCollector struct {
 	stateSyncActive                         prometheus.Gauge
 	blockDataUploadsInProgress              prometheus.Gauge
 	blockDataUploadsDuration                prometheus.Histogram
-	maxCollectionHeightData                 uint64
+	maxCollectionHeightData                 counters.StrictMonotonousCounter
 	maxCollectionHeight                     prometheus.Gauge
 	computationResultUploadedCount          prometheus.Counter
 	computationResultUploadRetriedCount     prometheus.Counter
@@ -684,7 +685,7 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 			Help:      "the number of times a program was found in the cache",
 		}),
 
-		maxCollectionHeightData: 0,
+		maxCollectionHeightData: counters.NewMonotonousCounter(0),
 		maxCollectionHeight: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name:      "max_collection_height",
 			Namespace: namespaceExecution,
@@ -952,9 +953,9 @@ func (ec *ExecutionCollector) RuntimeTransactionProgramsCacheHit() {
 }
 
 func (ec *ExecutionCollector) UpdateCollectionMaxHeight(height uint64) {
-	if height > ec.maxCollectionHeightData {
+	updated := ec.maxCollectionHeightData.Set(height)
+	if updated {
 		ec.maxCollectionHeight.Set(float64(height))
-		ec.maxCollectionHeightData = height
 	}
 }
 
