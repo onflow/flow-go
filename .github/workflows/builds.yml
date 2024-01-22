@@ -38,9 +38,21 @@ on:
         type: boolean
         description: 'Observer'
         required: false
-      include_without_netgo:
+      include_with_adx:
         type: boolean
-        description: 'Build `without_netgo` images'
+        description: 'Build `with_adx` images'
+        required: false
+      include_without_adx:
+        type: boolean
+        description: 'Build `without_adx` images'
+        required: false
+      include_without_netgo_without_adx:
+        type: boolean
+        description: 'Build `without_netgo_without_adx` images'
+        required: false
+      include_without_arm:
+        type: boolean
+        description: 'Build `without_arm` images'
         required: false
 
 jobs:
@@ -112,6 +124,7 @@ jobs:
         gcloud auth configure-docker
 
     - name: Build/Push ${{ matrix.role }} images with adx 
+    if: ${{ inputs.include_with_adx }}
       env:
         IMAGE_TAG: ${{ inputs.docker_tag }}
         GITHUB_CREDS: "machine github.com login ${{ secrets.REPO_SYNC_USER }} password ${{ secrets.REPO_SYNC }}"
@@ -119,6 +132,7 @@ jobs:
         make docker-build-${{ matrix.role }}-with-adx docker-push-${{ matrix.role }}-with-adx
 
     - name: Build/Push ${{ matrix.role }} images without adx 
+      if: ${{ inputs.include_without_adx }}
       env:
         IMAGE_TAG: ${{ inputs.docker_tag }}
         GITHUB_CREDS: "machine github.com login ${{ secrets.REPO_SYNC_USER }} password ${{ secrets.REPO_SYNC }}"
@@ -126,7 +140,7 @@ jobs:
         make docker-build-${{ matrix.role }}-without-adx docker-push-${{ matrix.role }}-without-adx
 
     - name: Build/Push ${{ matrix.role }} without netgo without adx images
-      if: ${{ inputs.include_without_netgo }}
+      if: ${{ inputs.include_without_netgo_without_adx }}
       env:
         IMAGE_TAG: ${{ inputs.docker_tag }}
         GITHUB_CREDS: "machine github.com login ${{ secrets.REPO_SYNC_USER }} password ${{ secrets.REPO_SYNC }}"
@@ -134,7 +148,7 @@ jobs:
         make docker-build-${{ matrix.role }}-without-netgo-without-adx docker-push-${{ matrix.role }}-without-netgo-without-adx
 
     - name: Build/Push ${{ matrix.role }} arm images
-      if: ${{ inputs.include_without_netgo }}
+      if: ${{ inputs.include_arm }}
       env:
         IMAGE_TAG: ${{ inputs.docker_tag }}
         GITHUB_CREDS: "machine github.com login ${{ secrets.REPO_SYNC_USER }} password ${{ secrets.REPO_SYNC }}"
