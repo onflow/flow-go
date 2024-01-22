@@ -1210,13 +1210,14 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			return nil, err
 		}
 
-		// upstream access node forwarder
-		storage, err := apiproxy.NewFlowObserverStorageForwarder(
-			&builder.Storage.Headers,
-			&builder.Storage.Events,
-			&builder.Storage.LightTransactionResults)
-		if err != nil {
-			return nil, err
+		// check for flag
+		var localData *apiproxy.ObserverLocalDataService
+
+		if builder.executionDataIndexingEnabled {
+			localData = apiproxy.NewObserverLocalDataService(
+				builder.Storage.Headers,
+				builder.Storage.Events,
+				builder.Storage.LightTransactionResults)
 		}
 
 		rpcHandler := &apiproxy.FlowAccessAPIRouter{
@@ -1234,7 +1235,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 					backend.DefaultSnapshotHistoryLimit,
 				),
 			)),
-			Storage: storage,
+			LocalData: localData,
 		}
 
 		// build the rpc engine

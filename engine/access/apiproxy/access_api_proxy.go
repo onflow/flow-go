@@ -2,7 +2,14 @@ package apiproxy
 
 import (
 	"context"
+	"errors"
+	"fmt"
+
+	"github.com/onflow/flow-go/engine/common/rpc"
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow/protobuf/go/flow/entities"
+	"google.golang.org/grpc/codes"
 
 	"google.golang.org/grpc/status"
 
@@ -20,11 +27,11 @@ import (
 // FlowAccessAPIRouter is a structure that represents the routing proxy algorithm.
 // It splits requests between a local and a remote API service.
 type FlowAccessAPIRouter struct {
-	Logger   zerolog.Logger
-	Metrics  *metrics.ObserverCollector
-	Upstream *FlowAccessAPIForwarder
-	Observer *protocol.Handler
-	Storage  *FlowObserverStorageForwarder
+	Logger    zerolog.Logger
+	Metrics   *metrics.ObserverCollector
+	Upstream  *FlowAccessAPIForwarder
+	Observer  *protocol.Handler
+	LocalData *ObserverLocalDataService
 }
 
 func (h *FlowAccessAPIRouter) log(handler, rpc string, err error) {
@@ -539,26 +546,100 @@ func (h *FlowAccessAPIForwarder) GetExecutionResultByID(context context.Context,
 	return upstream.GetExecutionResultByID(context, req)
 }
 
-// FlowObserverStorageForwarder forwards all requests to a set of upstream access nodes or observers
-type FlowObserverStorageForwarder struct {
-	headers *storage.Headers
-	events  *storage.Events
-	results *storage.LightTransactionResults
+// ObserverLocalDataService forwards all requests to a set of upstream access nodes or observers
+type ObserverLocalDataService struct {
+	headers storage.Headers
+	events  storage.Events
+	results storage.LightTransactionResults
 }
 
-func NewFlowObserverStorageForwarder(
-	headers *storage.Headers,
-	events *storage.Events,
-	results *storage.LightTransactionResults) (*FlowObserverStorageForwarder, error) {
+func NewObserverLocalDataService(
+	headers storage.Headers,
+	events storage.Events,
+	results storage.LightTransactionResults) *ObserverLocalDataService {
 
-	return &FlowObserverStorageForwarder{
-		//registers: forwarder,
+	return &ObserverLocalDataService{
 		headers: headers,
 		events:  events,
 		results: results,
-	}, nil
+	}
 }
 
-func (h *FlowObserverStorageForwarder) GetExecutionResultByID(context context.Context, req *access.GetExecutionResultByIDRequest) (*access.ExecutionResultByIDResponse, error) {
+func (h *ObserverLocalDataService) GetEventsForBlockIDs(context context.Context, req *access.GetEventsForBlockIDsRequest) (*access.EventsResponse, error) {
+	eventType, err := convert.EventType(req.GetType())
+	if err != nil {
+		return nil, err
+	}
+
+	blockIDs, err := convert.BlockIDs(req.GetBlockIds())
+	if err != nil {
+		return nil, err
+	}
+
+	eventEncodingVersion := req.GetEventEncodingVersion()
+
+	// find the block headers for all the block IDs
+	blockHeaders := make([]*flow.Header, 0)
+	for _, blockID := range blockIDs {
+		header, err := h.headers.ByBlockID(blockID)
+		if err != nil {
+			return nil, rpc.ConvertStorageError(fmt.Errorf("failed to get events: %w", err))
+		}
+
+		blockHeaders = append(blockHeaders, header)
+	}
+
+	missing := make([]*flow.Header, 0)
+	resp := make([]flow.BlockEvents, 0)
+	for _, header := range blockHeaders {
+
+		events, err := h.events.ByBlockID(header.ID())
+		if err != nil {
+			// Note: if there are no events for a block, an empty slice is returned
+			if errors.Is(err, storage.ErrNotFound) {
+				missing = append(missing, header)
+				continue
+			}
+			err = fmt.Errorf("failed to get events for block %s: %w", header.ID(), err)
+			return nil, rpc.ConvertError(err, "failed to get events from storage", codes.Internal)
+		}
+
+		filteredEvents := make([]flow.Event, 0)
+		for _, e := range events {
+			if e.Type != flow.EventType(eventType) {
+				continue
+			}
+
+			// events are encoded in CCF format in storage. convert to JSON-CDC if requested
+			if eventEncodingVersion == entities.EventEncodingVersion_JSON_CDC_V0 {
+				payload, err := convert.CcfPayloadToJsonPayload(e.Payload)
+				if err != nil {
+					err = fmt.Errorf("failed to convert event payload for block %s: %w", header.ID(), err)
+					return nil, rpc.ConvertError(err, "failed to convert event payload", codes.Internal)
+				}
+				e.Payload = payload
+			}
+
+			filteredEvents = append(filteredEvents, e)
+		}
+
+		resp = append(resp, flow.BlockEvents{
+			BlockID:        header.ID(),
+			BlockHeight:    header.Height,
+			BlockTimestamp: header.Timestamp,
+			Events:         filteredEvents,
+		})
+
+	}
+
+	resultEvents, err := convert.BlockEventsToMessages(resp)
+	if err != nil {
+		return nil, err
+	}
+
+	return &access.EventsResponse{
+		Results:  resultEvents,
+		Metadata: metadata,
+	}, nil
 
 }
