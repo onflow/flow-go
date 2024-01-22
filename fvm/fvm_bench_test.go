@@ -542,7 +542,7 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 			sc.FungibleToken.Address.Hex(),
 			sc.FlowToken.Address.Hex(),
 			testContractAddress,
-			sc.EVM.Address.Hex(),
+			sc.EVMContract.Address.Hex(),
 			rep,
 			prepare,
 		)
