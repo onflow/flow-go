@@ -34,7 +34,7 @@ func TestBaseView(t *testing.T) {
 			big.NewInt(0),
 			uint64(0),
 			nil,
-			gethTypes.EmptyCodeHash,
+			gethCommon.Hash{},
 		)
 
 		// create an account with code
@@ -124,7 +124,7 @@ func TestBaseView(t *testing.T) {
 			big.NewInt(0),
 			uint64(0),
 			nil,
-			gethTypes.EmptyCodeHash,
+			gethCommon.Hash{},
 		)
 
 		// commit the changes and create a new baseview
@@ -141,7 +141,7 @@ func TestBaseView(t *testing.T) {
 			big.NewInt(0),
 			uint64(0),
 			nil,
-			gethTypes.EmptyCodeHash,
+			gethCommon.Hash{},
 		)
 	})
 
