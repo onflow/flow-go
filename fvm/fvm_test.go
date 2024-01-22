@@ -2980,6 +2980,8 @@ func TestEVM(t *testing.T) {
 			encodedArg, err := jsoncdc.Encode(addrBytes)
 			require.NoError(t, err)
 
+			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(fmt.Sprintf(`
 						import EVM from %s
@@ -2990,7 +2992,7 @@ func TestEVM(t *testing.T) {
 								log(addr)
 							}
 						}
-					`, chain.ServiceAddress().HexWithPrefix()))).
+					`, sc.EVMContract.Address.HexWithPrefix()))).
 				SetProposalKey(chain.ServiceAddress(), 0, 0).
 				SetPayer(chain.ServiceAddress()).
 				AddArgument(encodedArg)
@@ -3008,7 +3010,7 @@ func TestEVM(t *testing.T) {
 			require.Len(t, output.Logs, 1)
 			require.Equal(t, output.Logs[0], fmt.Sprintf(
 				"A.%s.EVM.EVMAddress(bytes: %s)",
-				chain.ServiceAddress(),
+				sc.EVMContract.Address,
 				addrBytes.String(),
 			))
 		}),
@@ -3078,6 +3080,7 @@ func TestEVM(t *testing.T) {
 			ctx fvm.Context,
 			snapshotTree snapshot.SnapshotTree,
 		) {
+			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 			script := fvm.Script([]byte(fmt.Sprintf(`
 				import EVM from %s
 				
@@ -3088,7 +3091,7 @@ func TestEVM(t *testing.T) {
 					destroy acc.withdraw(balance: bal);
 					destroy acc;
 				}
-			`, chain.ServiceAddress().HexWithPrefix())))
+			`, sc.EVMContract.Address.HexWithPrefix())))
 
 			_, output, err := vm.Run(ctx, script, snapshotTree)
 
@@ -3114,6 +3117,7 @@ func TestEVM(t *testing.T) {
 			ctx fvm.Context,
 			snapshotTree snapshot.SnapshotTree,
 		) {
+			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
 			tests := []struct {
 				err        error
@@ -3145,7 +3149,7 @@ func TestEVM(t *testing.T) {
 					pub fun main() {
 						destroy <- EVM.createBridgedAccount();
 					}
-				`, chain.ServiceAddress().HexWithPrefix())))
+				`, sc.EVMContract.Address.HexWithPrefix())))
 
 				_, output, err := vm.Run(ctx, script, errStorage)
 
@@ -3154,6 +3158,62 @@ func TestEVM(t *testing.T) {
 				// make sure error it's the right type of error
 				require.True(t, e.errChecker(err), "error is not of the right type")
 			}
+		}),
+	)
+
+	t.Run("deploy contract code", newVMTest().
+		withBootstrapProcedureOptions(fvm.WithSetupEVMEnabled(true)).
+		run(func(
+			t *testing.T,
+			vm fvm.VM,
+			chain flow.Chain,
+			ctx fvm.Context,
+			snapshotTree snapshot.SnapshotTree,
+		) {
+			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
+			txBody := flow.NewTransactionBody().
+				SetScript([]byte(fmt.Sprintf(`
+					import FungibleToken from %s
+					import FlowToken from %s						
+					import EVM from %s
+
+					transaction() {
+						prepare(acc: AuthAccount) {
+							let vaultRef = acc.borrow<&{FungibleToken.Provider}>(from: /storage/flowTokenVault)
+							?? panic("Could not borrow reference to the owner's Vault!")
+
+							let acc <- EVM.createBridgedAccount()
+							let amount <- vaultRef.withdraw(amount: 0.0000001) as! @FlowToken.Vault
+							acc.deposit(from: <- amount)
+							destroy acc
+						}
+					}`,
+					sc.FungibleToken.Address.HexWithPrefix(),
+					sc.FlowToken.Address.HexWithPrefix(),
+					sc.FlowServiceAccount.Address.HexWithPrefix(), // TODO this should be sc.EVM.Address not found there???
+				))).
+				SetProposalKey(chain.ServiceAddress(), 0, 0).
+				AddAuthorizer(chain.ServiceAddress()).
+				SetPayer(chain.ServiceAddress())
+
+			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
+			require.NoError(t, err)
+
+			ctx = fvm.NewContextFromParent(ctx, fvm.WithEVMEnabled(true))
+			_, output, err := vm.Run(
+				ctx,
+				fvm.Transaction(txBody, 0),
+				snapshotTree)
+
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+			require.Len(t, output.Events, 3)
+
+			evmLocation := types.EVMLocation{}
+			txExe, blockExe := output.Events[1], output.Events[2]
+			assert.Equal(t, evmLocation.TypeID(nil, string(types.EventTypeTransactionExecuted)), common.TypeID(txExe.Type))
+			assert.Equal(t, evmLocation.TypeID(nil, string(types.EventTypeBlockExecuted)), common.TypeID(blockExe.Type))
 		}),
 	)
 }

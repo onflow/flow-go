@@ -423,7 +423,7 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 	}
 	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
-	testContractAddress, err := chain.AddressAtIndex(systemcontracts.EVMAccountIndex + 1)
+	testContractAddress, err := chain.AddressAtIndex(systemcontracts.EVMStorageAccountIndex + 1)
 	require.NoError(b, err)
 
 	benchTransaction := func(
@@ -448,7 +448,7 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 		for _, account := range accounts {
 			addrs = append(addrs, account.Address)
 		}
-		evmAddress, err := chain.AddressAtIndex(systemcontracts.EVMAccountIndex)
+		evmAddress, err := chain.AddressAtIndex(systemcontracts.EVMStorageAccountIndex)
 		require.NoError(b, err)
 		addrs = append(addrs, evmAddress)
 
@@ -542,7 +542,7 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 			sc.FungibleToken.Address.Hex(),
 			sc.FlowToken.Address.Hex(),
 			testContractAddress,
-			sc.FlowServiceAccount.Address.Hex(),
+			sc.EVMContract.Address.Hex(),
 			rep,
 			prepare,
 		)
