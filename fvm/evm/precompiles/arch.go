@@ -10,12 +10,14 @@ import (
 )
 
 var (
-	FlowBlockHeightFuncSig = ComputeFunctionSignature("flowBlockHeight", nil)
+	FlowBlockHeightFuncSig = ComputeFunctionSelector("flowBlockHeight", nil)
 	// TODO update me with a higher value if needed
 	FlowBlockHeightFixedGas = uint64(1)
 )
 
 // ArchContract return a procompile for the Cadence Arch contract
+// which facilitates access of Flow EVM environment into the Cadence environment.
+// for more details see this Flip 223.
 func ArchContract(
 	address types.Address,
 	heightProvider func() (uint64, error),
@@ -30,7 +32,7 @@ type flowBlockHeightFunction struct {
 	flowBlockHeightLookUp func() (uint64, error)
 }
 
-func (c *flowBlockHeightFunction) FunctionSignature() FunctionSignature {
+func (c *flowBlockHeightFunction) FunctionSelector() FunctionSelector {
 	return FlowBlockHeightFuncSig
 }
 

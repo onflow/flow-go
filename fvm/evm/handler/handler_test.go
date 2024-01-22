@@ -477,9 +477,7 @@ func TestHandler_BridgedAccount(t *testing.T) {
 				require.NotNil(t, foa)
 
 				// deposit 10000 flow
-				orgBalance, err := types.NewBalanceFromAttoFlow(new(big.Int).Mul(big.NewInt(1e18), big.NewInt(10000)))
-				require.NoError(t, err)
-				vault := types.NewFlowTokenVault(orgBalance)
+				vault := types.NewFlowTokenVault(testutils.MakeABalanceInFlow(10000))
 				foa.Deposit(vault)
 
 				testContract := testutils.GetStorageTestContract(t)
@@ -519,9 +517,7 @@ func TestHandler_BridgedAccount(t *testing.T) {
 				foa := h.AccountByAddress(h.AllocateAddress(), true)
 				require.NotNil(t, foa)
 
-				orgBalance, err := types.NewBalanceFromAttoFlow(new(big.Int).Mul(big.NewInt(1e18), big.NewInt(10000)))
-				require.NoError(t, err)
-				vault := types.NewFlowTokenVault(orgBalance)
+				vault := types.NewFlowTokenVault(testutils.MakeABalanceInFlow(10000))
 				foa.Deposit(vault)
 
 				arch := handler.MakePrecompileAddress(1)

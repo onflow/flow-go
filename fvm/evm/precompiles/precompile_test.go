@@ -11,7 +11,7 @@ import (
 
 func TestMutiFunctionContract(t *testing.T) {
 	address := testutils.RandomAddress(t)
-	sig := precompiles.FunctionSignature{1, 2, 3, 4}
+	sig := precompiles.FunctionSelector{1, 2, 3, 4}
 	data := "data"
 	input := append(sig[:], data...)
 	gas := uint64(20)
@@ -19,7 +19,7 @@ func TestMutiFunctionContract(t *testing.T) {
 
 	pc := precompiles.MultiFunctionPrecompileContract(address, []precompiles.Function{
 		&mockedFunction{
-			FunctionSignatureFunc: func() precompiles.FunctionSignature {
+			FunctionSelectorFunc: func() precompiles.FunctionSelector {
 				return sig
 			},
 			ComputeGasFunc: func(inp []byte) uint64 {
@@ -40,20 +40,20 @@ func TestMutiFunctionContract(t *testing.T) {
 
 	input2 := []byte("non existing signature and data")
 	_, err = pc.Run(input2)
-	require.Error(t, err)
+	require.Equal(t, precompiles.ErrInvalidMethodCall, err)
 }
 
 type mockedFunction struct {
-	FunctionSignatureFunc func() precompiles.FunctionSignature
-	ComputeGasFunc        func(input []byte) uint64
-	RunFunc               func(input []byte) ([]byte, error)
+	FunctionSelectorFunc func() precompiles.FunctionSelector
+	ComputeGasFunc       func(input []byte) uint64
+	RunFunc              func(input []byte) ([]byte, error)
 }
 
-func (mf *mockedFunction) FunctionSignature() precompiles.FunctionSignature {
-	if mf.FunctionSignatureFunc == nil {
+func (mf *mockedFunction) FunctionSelector() precompiles.FunctionSelector {
+	if mf.FunctionSelectorFunc == nil {
 		panic("method not set for mocked function")
 	}
-	return mf.FunctionSignatureFunc()
+	return mf.FunctionSelectorFunc()
 }
 
 func (mf *mockedFunction) ComputeGas(input []byte) uint64 {

@@ -63,11 +63,7 @@ func (aa *AddressAllocator) AllocateCOAAddress() (types.Address, error) {
 }
 
 func MakeCOAAddress(index uint64) types.Address {
-	var addr types.Address
-	prefixIndex := types.AddressLength - uint64ByteSize
-	copy(addr[:prefixIndex], FlowEVMCOAAddressPrefix[:])
-	binary.BigEndian.PutUint64(addr[prefixIndex:], index)
-	return addr
+	return makePrefixedAddress(index, FlowEVMCOAAddressPrefix)
 }
 
 func (aa *AddressAllocator) AllocatePrecompileAddress(index uint64) types.Address {
@@ -76,9 +72,13 @@ func (aa *AddressAllocator) AllocatePrecompileAddress(index uint64) types.Addres
 }
 
 func MakePrecompileAddress(index uint64) types.Address {
+	return makePrefixedAddress(index, FlowEVMPrecompileAddressPrefix)
+}
+
+func makePrefixedAddress(index uint64, prefix [12]byte) types.Address {
 	var addr types.Address
 	prefixIndex := types.AddressLength - uint64ByteSize
-	copy(addr[:prefixIndex], FlowEVMPrecompileAddressPrefix[:])
+	copy(addr[:prefixIndex], prefix[:])
 	binary.BigEndian.PutUint64(addr[prefixIndex:], index)
 	return addr
 }

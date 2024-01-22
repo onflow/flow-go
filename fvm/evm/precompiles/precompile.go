@@ -14,8 +14,8 @@ var ErrInvalidMethodCall = errors.New("invalid method call")
 
 // Function is an interface for a function in a multi-function precompile contract
 type Function interface {
-	// FunctionSignature returns the function signature for this function
-	FunctionSignature() FunctionSignature
+	// FunctionSelector returns the function selector bytes for this function
+	FunctionSelector() FunctionSelector
 
 	// ComputeGas computes the gas needed for the given input
 	ComputeGas(input []byte) uint64
@@ -30,30 +30,30 @@ func MultiFunctionPrecompileContract(
 	functions []Function,
 ) types.Precompile {
 	pc := &precompile{
-		functions: make(map[FunctionSignature]Function),
+		functions: make(map[FunctionSelector]Function),
 		address:   address,
 	}
 	for _, f := range functions {
-		pc.functions[f.FunctionSignature()] = f
+		pc.functions[f.FunctionSelector()] = f
 	}
 	return pc
 }
 
 type precompile struct {
 	address   types.Address
-	functions map[FunctionSignature]Function
+	functions map[FunctionSelector]Function
 }
 
 func (p *precompile) Address() types.Address {
 	return p.address
 }
 
-// RequiredPrice calculates the contract gas use
+// RequiredGas calculates the contract gas use
 func (p *precompile) RequiredGas(input []byte) uint64 {
 	if len(input) < 4 {
 		return InvalidMethodCallGasUsage
 	}
-	sig, data := SplitFunctionSignature(input)
+	sig, data := SplitFunctionSelector(input)
 	callable, found := p.functions[sig]
 	if !found {
 		return InvalidMethodCallGasUsage
@@ -66,7 +66,7 @@ func (p *precompile) Run(input []byte) ([]byte, error) {
 	if len(input) < 4 {
 		return nil, ErrInvalidMethodCall
 	}
-	sig, data := SplitFunctionSignature(input)
+	sig, data := SplitFunctionSelector(input)
 	callable, found := p.functions[sig]
 	if !found {
 		return nil, ErrInvalidMethodCall
