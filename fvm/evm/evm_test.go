@@ -44,7 +44,7 @@ func TestEVMRun(t *testing.T) {
                               EVM.run(tx: tx, coinbase: coinbase)
                           }
                         `,
-								sc.EVM.Address.HexWithPrefix(),
+								sc.EVMContract.Address.HexWithPrefix(),
 							))
 
 							gasLimit := uint64(100_000)
@@ -144,7 +144,7 @@ func TestEVMAddressDeposit(t *testing.T) {
                                    address.deposit(from: <-vault)
                                }
                             `,
-							sc.EVM.Address.HexWithPrefix(),
+							sc.EVMContract.Address.HexWithPrefix(),
 							sc.FlowToken.Address.HexWithPrefix(),
 							sc.FlowServiceAccount.Address.HexWithPrefix(),
 						))
@@ -205,7 +205,7 @@ func TestBridgedAccountWithdraw(t *testing.T) {
                                    return balance
                                }
                             `,
-							sc.EVM.Address.HexWithPrefix(),
+							sc.EVMContract.Address.HexWithPrefix(),
 							sc.FlowToken.Address.HexWithPrefix(),
 							sc.FlowServiceAccount.Address.HexWithPrefix(),
 						))
@@ -268,7 +268,7 @@ func TestBridgedAccountDeploy(t *testing.T) {
                                    return address.bytes
                                 }
                             `,
-							sc.EVM.Address.HexWithPrefix(),
+							sc.EVMContract.Address.HexWithPrefix(),
 							sc.FlowToken.Address.HexWithPrefix(),
 							sc.FlowServiceAccount.Address.HexWithPrefix(),
 						))
