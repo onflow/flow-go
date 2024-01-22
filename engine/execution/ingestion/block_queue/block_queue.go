@@ -8,6 +8,11 @@ import (
 	"github.com/onflow/flow-go/module/mempool/entity"
 )
 
+// BlockQueue keeps track of state of blocks and determines which blocks are executable
+// A block becomes executable when all the following conditions are met:
+// 1. the block has been validated by consensus algorithm
+// 2. the block's parent has been executed
+// 3. all the collections included in the block have been received
 type BlockQueue struct {
 	sync.Mutex
 	// when receiving a new block, adding it to the map, and add missing collections to the map
@@ -18,7 +23,7 @@ type BlockQueue struct {
 	// when a block is executed, its collections should be removed from this map unless a collection
 	// is still referenced by other blocks, which will eventually be removed when those blocks are
 	// executed.
-	collections map[flow.Identifier]*CollectionInfo
+	collections map[flow.Identifier]*collectionInfo
 
 	// blockIDsByHeight is used to find next executable block.
 	// when a block is executed, the next executable block must be a block with height = current block height + 1
@@ -26,7 +31,9 @@ type BlockQueue struct {
 	blockIDsByHeight map[uint64]map[flow.Identifier]*entity.ExecutableBlock // for finding next executable block
 }
 
-type CollectionInfo struct {
+// collectionInfo is an internal struct used to keep track of the state of a collection,
+// and the blocks that include the collection
+type collectionInfo struct {
 	Collection *entity.CompleteCollection
 	IncludedIn map[flow.Identifier]*entity.ExecutableBlock
 }
@@ -34,7 +41,7 @@ type CollectionInfo struct {
 func NewBlockQueue() *BlockQueue {
 	return &BlockQueue{
 		blocks:           make(map[flow.Identifier]*entity.ExecutableBlock),
-		collections:      make(map[flow.Identifier]*CollectionInfo),
+		collections:      make(map[flow.Identifier]*collectionInfo),
 		blockIDsByHeight: make(map[uint64]map[flow.Identifier]*entity.ExecutableBlock),
 	}
 }
@@ -102,7 +109,7 @@ func (q *BlockQueue) OnBlock(block *flow.Block, parentFinalState *flow.StateComm
 			colls[colID] = col
 
 			// add new collection to collections
-			q.collections[colID] = &CollectionInfo{
+			q.collections[colID] = &collectionInfo{
 				Collection: col,
 				IncludedIn: map[flow.Identifier]*entity.ExecutableBlock{
 					blockID: executable,
