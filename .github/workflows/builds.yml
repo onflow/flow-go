@@ -124,7 +124,7 @@ jobs:
         gcloud auth configure-docker
 
     - name: Build/Push ${{ matrix.role }} images with adx 
-    if: ${{ inputs.include_with_adx }}
+      if: ${{ inputs.include_with_adx }}
       env:
         IMAGE_TAG: ${{ inputs.docker_tag }}
         GITHUB_CREDS: "machine github.com login ${{ secrets.REPO_SYNC_USER }} password ${{ secrets.REPO_SYNC }}"
