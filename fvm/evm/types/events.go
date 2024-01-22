@@ -17,7 +17,7 @@ import (
 const (
 	EventTypeBlockExecuted       flow.EventType = "BlockExecuted"
 	EventTypeTransactionExecuted flow.EventType = "TransactionExecuted"
-	evmLocationPrefix                           = "evm"
+	EVMLocationPrefix                           = "evm"
 	locationDivider                             = "."
 )
 
@@ -36,7 +36,7 @@ var _ common.Location = EVMLocation{}
 type EVMLocation struct{}
 
 func (l EVMLocation) TypeID(memoryGauge common.MemoryGauge, qualifiedIdentifier string) common.TypeID {
-	id := fmt.Sprintf("%s%s%s", evmLocationPrefix, locationDivider, qualifiedIdentifier)
+	id := fmt.Sprintf("%s%s%s", EVMLocationPrefix, locationDivider, qualifiedIdentifier)
 	common.UseMemory(memoryGauge, common.NewRawStringMemoryUsage(len(id)))
 
 	return common.TypeID(id)
@@ -53,15 +53,15 @@ func (l EVMLocation) QualifiedIdentifier(typeID common.TypeID) string {
 }
 
 func (l EVMLocation) String() string {
-	return evmLocationPrefix
+	return EVMLocationPrefix
 }
 
 func (l EVMLocation) Description() string {
-	return evmLocationPrefix
+	return EVMLocationPrefix
 }
 
 func (l EVMLocation) ID() string {
-	return evmLocationPrefix
+	return EVMLocationPrefix
 }
 
 func (l EVMLocation) MarshalJSON() ([]byte, error) {
@@ -74,7 +74,7 @@ func (l EVMLocation) MarshalJSON() ([]byte, error) {
 
 func init() {
 	common.RegisterTypeIDDecoder(
-		evmLocationPrefix,
+		EVMLocationPrefix,
 		func(_ common.MemoryGauge, typeID string) (common.Location, string, error) {
 			if typeID == "" {
 				return nil, "", fmt.Errorf("invalid EVM type location ID: missing type prefix")
@@ -82,7 +82,7 @@ func init() {
 
 			parts := strings.SplitN(typeID, ".", 2)
 			prefix := parts[0]
-			if prefix != evmLocationPrefix {
+			if prefix != EVMLocationPrefix {
 				return EVMLocation{}, "", fmt.Errorf("invalid EVM type location ID: invalid prefix")
 			}
 
