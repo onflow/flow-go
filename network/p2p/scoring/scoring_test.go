@@ -104,7 +104,7 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 	cfg, err := config.DefaultConfig()
 	require.NoError(t, err)
 
-	cfg.NetworkConfig.GossipSub.ScoringParameters.AppSpecificScore.ScoreTTL = 10 * time.Millisecond // speed up the test
+	cfg.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.AppSpecificScore.ScoreTTL = 10 * time.Millisecond // speed up the test
 
 	node1, id1 := p2ptest.NodeFixture(
 		t,

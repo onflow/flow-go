@@ -221,7 +221,7 @@ func TestWithWhiteboard(t *testing.T) {
 		DKGPhase3FinalView: 250,
 		FinalView:          300,
 		Participants:       conIdentities,
-		RandomSource:       []byte("random bytes for seed"),
+		RandomSource:       unittest.EpochSetupRandomSourceFixture(),
 	}
 
 	// create the EpochSetup that will trigger the next DKG run with all the
@@ -229,7 +229,7 @@ func TestWithWhiteboard(t *testing.T) {
 	nextEpochSetup := flow.EpochSetup{
 		Counter:      currentCounter + 1,
 		Participants: conIdentities,
-		RandomSource: []byte("random bytes for seed"),
+		RandomSource: unittest.EpochSetupRandomSourceFixture(),
 	}
 
 	nodes, _ := createNodes(
