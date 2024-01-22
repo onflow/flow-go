@@ -2980,6 +2980,8 @@ func TestEVM(t *testing.T) {
 			encodedArg, err := jsoncdc.Encode(addrBytes)
 			require.NoError(t, err)
 
+			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(fmt.Sprintf(`
 						import EVM from %s
@@ -2990,7 +2992,7 @@ func TestEVM(t *testing.T) {
 								log(addr)
 							}
 						}
-					`, chain.ServiceAddress().HexWithPrefix()))).
+					`, sc.EVMContract.Address.HexWithPrefix()))).
 				SetProposalKey(chain.ServiceAddress(), 0, 0).
 				SetPayer(chain.ServiceAddress()).
 				AddArgument(encodedArg)
@@ -3008,7 +3010,7 @@ func TestEVM(t *testing.T) {
 			require.Len(t, output.Logs, 1)
 			require.Equal(t, output.Logs[0], fmt.Sprintf(
 				"A.%s.EVM.EVMAddress(bytes: %s)",
-				chain.ServiceAddress(),
+				sc.EVMContract.Address,
 				addrBytes.String(),
 			))
 		}),
@@ -3078,6 +3080,7 @@ func TestEVM(t *testing.T) {
 			ctx fvm.Context,
 			snapshotTree snapshot.SnapshotTree,
 		) {
+			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 			script := fvm.Script([]byte(fmt.Sprintf(`
 				import EVM from %s
 				
@@ -3088,7 +3091,7 @@ func TestEVM(t *testing.T) {
 					destroy acc.withdraw(balance: bal);
 					destroy acc;
 				}
-			`, chain.ServiceAddress().HexWithPrefix())))
+			`, sc.EVMContract.Address.HexWithPrefix())))
 
 			_, output, err := vm.Run(ctx, script, snapshotTree)
 
@@ -3114,6 +3117,7 @@ func TestEVM(t *testing.T) {
 			ctx fvm.Context,
 			snapshotTree snapshot.SnapshotTree,
 		) {
+			sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 
 			tests := []struct {
 				err        error
@@ -3145,7 +3149,7 @@ func TestEVM(t *testing.T) {
 					pub fun main() {
 						destroy <- EVM.createBridgedAccount();
 					}
-				`, chain.ServiceAddress().HexWithPrefix())))
+				`, sc.EVMContract.Address.HexWithPrefix())))
 
 				_, output, err := vm.Run(ctx, script, errStorage)
 
