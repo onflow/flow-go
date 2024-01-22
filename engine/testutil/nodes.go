@@ -763,7 +763,6 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		unit,
 		node.Log,
 		node.Net,
-		node.Me,
 		fetcher,
 		node.Headers,
 		node.Blocks,
