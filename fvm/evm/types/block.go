@@ -67,5 +67,6 @@ func NewBlockFromBytes(encoded []byte) (*Block, error) {
 var GenesisBlock = &Block{
 	ParentBlockHash: gethCommon.Hash{},
 	Height:          uint64(0),
+	TotalSupply:     new(big.Int),
 	ReceiptRoot:     gethTypes.EmptyRootHash,
 }
