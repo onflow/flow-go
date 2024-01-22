@@ -168,6 +168,7 @@ var blockExecutedEventCadenceType = &cadence.EventType{
 	QualifiedIdentifier: string(EventTypeBlockExecuted),
 	Fields: []cadence.Field{
 		cadence.NewField("height", cadence.UInt64Type{}),
+		cadence.NewField("hash", cadence.StringType{}),
 		cadence.NewField("totalSupply", cadence.UInt64Type{}),
 		cadence.NewField("parentHash", cadence.StringType{}),
 		cadence.NewField("receiptRoot", cadence.StringType{}),
@@ -188,8 +189,14 @@ func (p *BlockExecutedEventPayload) CadenceEvent() (cadence.Event, error) {
 		hashes[i] = cadence.String(hash.String())
 	}
 
+	blockHash, err := p.Block.Hash()
+	if err != nil {
+		return cadence.Event{}, err
+	}
+
 	fields := []cadence.Value{
 		cadence.NewUInt64(p.Block.Height),
+		cadence.String(blockHash.String()),
 		cadence.NewUInt64(p.Block.TotalSupply),
 		cadence.String(p.Block.ParentBlockHash.String()),
 		cadence.String(p.Block.ReceiptRoot.String()),
