@@ -48,8 +48,9 @@ func NewBlockQueue() *BlockQueue {
 
 // OnBlock is called when a new block is received, and its parent is not executed.
 // It returns a list of missing collections and a list of executable blocks
-// Note caller must check if the parent is executed, if yes, then
-// caller must call OnBlock again with the finalState of its parent
+// Note: caller must ensure when OnBlock is called with a block,
+// if its parent is not executed, then the parent must be added to the queue first.
+// if it sparent is executed, then the parent's finalState must be passed in.
 func (q *BlockQueue) OnBlock(block *flow.Block, parentFinalState *flow.StateCommitment) (
 	[]*flow.CollectionGuarantee, // missing collections
 	[]*entity.ExecutableBlock, // blocks ready to execute
