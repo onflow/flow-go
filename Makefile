@@ -20,7 +20,7 @@ IMAGE_TAG := ${SHORT_COMMIT}
 endif
 
 IMAGE_TAG_NO_ADX := $(IMAGE_TAG)+without-adx
-IMAGE_TAG_NO_NETGO_NO_ADX := $(IMAGE_TAG)+without-netgo+without-adx
+IMAGE_TAG_NO_NETGO_NO_ADX := $(IMAGE_TAG)+without-netgo-without-adx
 IMAGE_TAG_ARM := $(IMAGE_TAG)+arm
 
 # Name of the cover profile
