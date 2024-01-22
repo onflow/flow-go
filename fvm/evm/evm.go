@@ -14,7 +14,7 @@ import (
 
 func ContractAccountAddress(chainID flow.ChainID) (flow.Address, error) {
 	sc := systemcontracts.SystemContractsForChain(chainID)
-	return sc.EVM.Address, nil
+	return sc.EVMContract.Address, nil
 }
 
 func StorageAccountAddress(chainID flow.ChainID) (flow.Address, error) {

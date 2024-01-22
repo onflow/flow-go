@@ -140,8 +140,8 @@ type SystemContracts struct {
 	ViewResolver     SystemContract
 
 	// EVM related contracts
-	EVM        SystemContract
-	EVMStorage SystemAccount
+	EVMContract SystemContract
+	EVMStorage  SystemAccount
 }
 
 // AsTemplateEnv returns a template environment with all system contracts filled in.
@@ -194,7 +194,7 @@ func (c SystemContracts) All() []SystemContract {
 		c.MetadataViews,
 		c.ViewResolver,
 
-		c.EVM,
+		c.EVMContract,
 		// EVMStorage is not included here, since it is not a contract
 	}
 }
@@ -354,8 +354,8 @@ func init() {
 			MetadataViews:    addressOfContract(ContractNameMetadataViews),
 			ViewResolver:     addressOfContract(ContractNameViewResolver),
 
-			EVM:        addressOfContract(ContractNameEVM),
-			EVMStorage: addressOfAccount(AccountNameEVMStorage),
+			EVMContract: addressOfContract(ContractNameEVM),
+			EVMStorage:  addressOfAccount(AccountNameEVMStorage),
 		}
 
 		return contracts
