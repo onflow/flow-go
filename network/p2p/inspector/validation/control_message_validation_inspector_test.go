@@ -30,7 +30,7 @@ import (
 )
 
 func TestNewControlMsgValidationInspector(t *testing.T) {
-	
+
 	t.Run("should create validation inspector without error", func(t *testing.T) {
 		sporkID := unittest.IdentifierFixture()
 		flowConfig, err := config.DefaultConfig()
