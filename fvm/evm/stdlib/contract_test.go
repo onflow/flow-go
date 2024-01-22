@@ -2274,7 +2274,7 @@ func TestEVMEncodeABIWithSignature(t *testing.T) {
 	}
 	encodedABI := cadence.NewArray(
 		cdcBytes,
-	).WithType(cadence.NewVariableSizedArrayType(cadence.TheUInt8Type))
+	).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type))
 
 	assert.Equal(t,
 		encodedABI,
@@ -2394,7 +2394,7 @@ func TestEVMDecodeABIWithSignature(t *testing.T) {
 	}
 	encodedABI := cadence.NewArray(
 		cdcBytes,
-	).WithType(cadence.NewVariableSizedArrayType(cadence.TheUInt8Type))
+	).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type))
 
 	result, err := rt.ExecuteScript(
 		runtime.Script{
@@ -2509,7 +2509,7 @@ func TestEVMDecodeABIWithSignatureMismatch(t *testing.T) {
 	}
 	encodedABI := cadence.NewArray(
 		cdcBytes,
-	).WithType(cadence.NewVariableSizedArrayType(cadence.TheUInt8Type))
+	).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type))
 
 	_, err := rt.ExecuteScript(
 		runtime.Script{

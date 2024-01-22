@@ -2856,7 +2856,7 @@ func TestEVM(t *testing.T) {
 			script := fvm.Script([]byte(fmt.Sprintf(`
 				import EVM from %s
 				
-				pub fun main() {
+				access(all) fun main() {
 					let bal = EVM.Balance(flow: 1.0);
 					let acc <- EVM.createBridgedAccount();
 					// withdraw insufficient balance
@@ -2917,7 +2917,7 @@ func TestEVM(t *testing.T) {
 				script := fvm.Script([]byte(fmt.Sprintf(`
 					import EVM from %s
 					
-					pub fun main() {
+					access(all) fun main() {
 						destroy <- EVM.createBridgedAccount();
 					}
 				`, chain.ServiceAddress().HexWithPrefix())))

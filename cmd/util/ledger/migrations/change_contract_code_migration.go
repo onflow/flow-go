@@ -282,6 +282,7 @@ func SystemContractChanges(chainID flow.ChainID) []SystemContractChange {
 			systemContracts.FlowToken,
 			coreContracts.FlowToken(
 				systemContracts.FungibleToken.Address.HexWithPrefix(),
+				fungibleTokenMetadataViewsAddress.HexWithPrefix(),
 				systemContracts.MetadataViews.Address.HexWithPrefix(),
 				systemContracts.ViewResolver.Address.HexWithPrefix(),
 			),
@@ -296,6 +297,7 @@ func SystemContractChanges(chainID flow.ChainID) []SystemContractChange {
 			NewContractCode: string(ftContracts.FungibleTokenMetadataViews(
 				systemContracts.FungibleToken.Address.HexWithPrefix(),
 				systemContracts.MetadataViews.Address.HexWithPrefix(),
+				systemContracts.ViewResolver.Address.HexWithPrefix(),
 			)),
 		},
 		{
@@ -309,13 +311,16 @@ func SystemContractChanges(chainID flow.ChainID) []SystemContractChange {
 		// NFT related contracts
 		NewSystemContractChange(
 			systemContracts.NonFungibleToken,
-			nftContracts.NonFungibleToken(),
+			nftContracts.NonFungibleToken(
+				sdk.Address(systemContracts.ViewResolver.Address),
+			),
 		),
 		NewSystemContractChange(
 			systemContracts.MetadataViews,
 			nftContracts.MetadataViews(
 				sdk.Address(systemContracts.FungibleToken.Address),
 				sdk.Address(systemContracts.NonFungibleToken.Address),
+				sdk.Address(systemContracts.ViewResolver.Address),
 			),
 		),
 		NewSystemContractChange(
