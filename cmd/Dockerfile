@@ -27,7 +27,7 @@ COPY . .
 RUN git config --global url.git@github.com:.insteadOf https://github.com/
 RUN mkdir ~/.ssh
 
-# Add GitHub known host
+# Add GitHub known host to avoid prompts or failures on key check
 RUN ssh-keyscan -t rsa github.com >> ~/.ssh/known_hosts
 
 ####################################
@@ -47,6 +47,8 @@ ARG CGO_FLAG
 RUN --mount=type=cache,sharing=locked,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=secret,id=cadence_deploy_key \
+    # We evaluate the SSH agent to safely pass in a key for cloning builds
+    # We explicitly use ";" rather than && as we want to safely pass if it is unavailable
     eval `ssh-agent -s` && printf "%s\n" "$(cat /run/secrets/cadence_deploy_key)" | ssh-add - ; \
     CGO_ENABLED=1 GOOS=linux CGO_FLAGS="${CGO_FLAG}" go build --tags "${TAGS}" -ldflags "-extldflags -static \
     -X 'github.com/onflow/flow-go/cmd/build.commit=${COMMIT}' -X  'github.com/onflow/flow-go/cmd/build.semver=${VERSION}'" \
@@ -71,6 +73,8 @@ RUN --mount=type=ssh \
     --mount=type=cache,sharing=locked,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=secret,id=cadence_deploy_key \
+    # We evaluate the SSH agent to safely pass in a key for cloning builds
+    # We explicitly use ";" rather than && as we want to safely pass if it is unavailable
     eval `ssh-agent -s` && printf "%s\n" "$(cat /run/secrets/cadence_deploy_key)" | ssh-add - ; \
     CGO_ENABLED=1 GOOS=linux CGO_FLAGS="${CGO_FLAG}" go build --tags "netgo" -ldflags "-extldflags -static \
     -X 'github.com/onflow/flow-go/cmd/build.commit=${COMMIT}' -X  'github.com/onflow/flow-go/cmd/build.semver=${VERSION}'" \
