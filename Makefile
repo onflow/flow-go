@@ -320,8 +320,8 @@ docker-cross-build-collection-arm:
 		-t "$(CONTAINER_REGISTRY)/collection:$(IMAGE_TAG_ARM)"  .
 
 # is this for native build?
-.PHONY: docker-build-collection-debug
-docker-build-collection-debug:
+.PHONY: docker-native-build-collection-debug
+docker-native-build-collection-debug:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/collection --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target debug \
 		-t "$(CONTAINER_REGISTRY)/collection-debug:latest" -t "$(CONTAINER_REGISTRY)/collection-debug:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/collection-debug:$(IMAGE_TAG)" .
 
@@ -361,8 +361,8 @@ docker-cross-build-consensus-arm:
 		-t "$(CONTAINER_REGISTRY)/consensus:$(IMAGE_TAG_ARM)"  .
 
 
-.PHONY: docker-build-consensus-debug
-docker-build-consensus-debug:
+.PHONY: docker-native-build-consensus-debug
+docker-build-native-consensus-debug:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/consensus --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target debug \
 		-t "$(CONTAINER_REGISTRY)/consensus-debug:latest" -t "$(CONTAINER_REGISTRY)/consensus-debug:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/consensus-debug:$(IMAGE_TAG)" .
 
@@ -401,8 +401,8 @@ docker-cross-build-execution-arm:
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG_ARM}" \
 		-t "$(CONTAINER_REGISTRY)/execution:$(IMAGE_TAG_ARM)" .
 
-.PHONY: docker-build-execution-debug
-docker-build-execution-debug:
+.PHONY: docker-native-build-execution-debug
+docker-native-build-execution-debug:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/execution --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target debug \
 		-t "$(CONTAINER_REGISTRY)/execution-debug:latest" -t "$(CONTAINER_REGISTRY)/execution-debug:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/execution-debug:$(IMAGE_TAG)" .
 
@@ -451,8 +451,8 @@ docker-cross-build-verification-arm:
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG_ARM}" \
 		-t "$(CONTAINER_REGISTRY)/verification:$(IMAGE_TAG_ARM)" .
 
-.PHONY: docker-build-verification-debug
-docker-build-verification-debug:
+.PHONY: docker-native-build-verification-debug
+docker-native-build-verification-debug:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/verification --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target debug \
 		-t "$(CONTAINER_REGISTRY)/verification-debug:latest" -t "$(CONTAINER_REGISTRY)/verification-debug:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/verification-debug:$(IMAGE_TAG)" .
 
@@ -502,8 +502,8 @@ docker-cross-build-access-arm:
 		-t "$(CONTAINER_REGISTRY)/access:$(IMAGE_TAG_ARM)" .
 
 
-.PHONY: docker-build-access-debug
-docker-build-access-debug:
+.PHONY: docker-native-build-access-debug
+docker-native-build-access-debug:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/access  --build-arg COMMIT=$(COMMIT) --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target debug \
 		-t "$(CONTAINER_REGISTRY)/access-debug:latest" -t "$(CONTAINER_REGISTRY)/access-debug:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/access-debug:$(IMAGE_TAG)" .
 
@@ -559,8 +559,8 @@ docker-native-build-ghost:
 		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
 		-t "$(CONTAINER_REGISTRY)/ghost:latest" -t "$(CONTAINER_REGISTRY)/ghost:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/ghost:$(IMAGE_TAG)" .
 
-.PHONY: docker-build-ghost-debug
-docker-build-ghost-debug:
+.PHONY: docker-native-build-ghost-debug
+docker-native-build-ghost-debug:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/ghost --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target debug \
 		-t "$(CONTAINER_REGISTRY)/ghost-debug:latest" -t "$(CONTAINER_REGISTRY)/ghost-debug:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/ghost-debug:$(IMAGE_TAG)" .
 
