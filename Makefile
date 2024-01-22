@@ -275,11 +275,14 @@ docker-ci-integration:
 		-w "/go/flow" "$(CONTAINER_REGISTRY)/golang-cmake:v0.0.7" \
 		make ci-integration
 
-# only works on linux
-.PHONY: install-cross-build-tools
+# only works on Debian
+.SILENT: install-cross-build-tools
 install-cross-build-tools:
-	apt-get update
-	apt-get -y install apt-utils gcc-aarch64-linux-gnu
+	if [ "$(UNAME)" = "Debian" ] ; then \
+		apt-get update && apt-get -y install apt-utils gcc-aarch64-linux-gnu ; \
+	else \
+		echo "only works on Debian!" ; \
+	fi
 
 .PHONY: docker-native-build-collection
 docker-native-build-collection:
