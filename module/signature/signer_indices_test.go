@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/filter/id"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -110,7 +109,7 @@ func Test_EncodeSignerToIndicesAndSigType(t *testing.T) {
 		numRandomBeaconSigners := rapid.IntRange(0, committeeSize-numStakingSigners).Draw(t, "numRandomBeaconSigners").(int)
 
 		// create committee
-		committeeIdentities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).Sort(order.Canonical)
+		committeeIdentities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).Sort(flow.Canonical)
 		committee := committeeIdentities.NodeIDs()
 		stakingSigners, beaconSigners := sampleSigners(t, committee, numStakingSigners, numRandomBeaconSigners)
 
@@ -148,7 +147,7 @@ func Test_DecodeSigTypeToStakingAndBeaconSigners(t *testing.T) {
 		numRandomBeaconSigners := rapid.IntRange(0, committeeSize-numStakingSigners).Draw(t, "numRandomBeaconSigners").(int)
 
 		// create committee
-		committeeIdentities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).Sort(order.Canonical)
+		committeeIdentities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).Sort(flow.Canonical)
 		committee := committeeIdentities.NodeIDs()
 		stakingSigners, beaconSigners := sampleSigners(t, committee, numStakingSigners, numRandomBeaconSigners)
 
@@ -274,7 +273,7 @@ func Test_EncodeSignersToIndices(t *testing.T) {
 		numSigners := rapid.IntRange(0, committeeSize).Draw(t, "numSigners").(int)
 
 		// create committee
-		identities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).Sort(order.Canonical)
+		identities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).Sort(flow.Canonical)
 		committee := identities.NodeIDs()
 		signers, err := committee.Sample(uint(numSigners))
 		require.NoError(t, err)
@@ -304,7 +303,7 @@ func Test_DecodeSignerIndicesToIdentifiers(t *testing.T) {
 		numSigners := rapid.IntRange(0, committeeSize).Draw(t, "numSigners").(int)
 
 		// create committee
-		identities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).Sort(order.Canonical)
+		identities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).Sort(flow.Canonical)
 		committee := identities.NodeIDs()
 		signers, err := committee.Sample(uint(numSigners))
 		require.NoError(t, err)
@@ -341,7 +340,7 @@ func Test_DecodeSignerIndicesToIdentities(t *testing.T) {
 		numSigners := rapid.IntRange(0, committeeSize).Draw(t, "numSigners").(int)
 
 		// create committee
-		identities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).Sort(order.Canonical)
+		identities := unittest.IdentityListFixture(committeeSize, unittest.WithRole(flow.RoleConsensus)).Sort(flow.Canonical)
 		signers, err := identities.Sample(uint(numSigners))
 		require.NoError(t, err)
 
@@ -352,7 +351,7 @@ func Test_DecodeSignerIndicesToIdentities(t *testing.T) {
 		// decode and verify
 		decodedSigners, err := signature.DecodeSignerIndicesToIdentities(identities, signerIndices)
 		require.NoError(t, err)
-		require.Equal(t, signers.Sort(order.Canonical), decodedSigners.Sort(order.Canonical))
+		require.Equal(t, signers.Sort(flow.Canonical), decodedSigners.Sort(flow.Canonical))
 	})
 }
 

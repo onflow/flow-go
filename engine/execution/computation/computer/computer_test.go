@@ -601,7 +601,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 			serviceEvents := systemcontracts.ServiceEventsForChain(execCtx.Chain.ChainID())
 
-			payload, err := ccf.Decode(nil, unittest.EpochSetupFixtureCCF)
+			randomSource := unittest.EpochSetupRandomSourceFixture()
+			payload, err := ccf.Decode(nil, unittest.EpochSetupFixtureCCF(randomSource))
 			require.NoError(t, err)
 
 			serviceEventA, ok := payload.(cadence.Event)
@@ -1247,7 +1248,7 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 	noopCollector := metrics.NewNoopCollector()
 
 	expectedNumberOfEvents := 3
-	expectedEventSize := 1484
+	expectedEventSize := 1497
 
 	// bootstrapping does not cache programs
 	expectedCachedPrograms := 0

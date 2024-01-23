@@ -69,7 +69,10 @@ func defaultConfig() *Config {
 		EVMConfig: vm.Config{
 			NoBaseFee: true,
 		},
-		TxContext: &vm.TxContext{},
+		TxContext: &vm.TxContext{
+			GasPrice:   new(big.Int),
+			BlobFeeCap: new(big.Int),
+		},
 		BlockContext: &vm.BlockContext{
 			CanTransfer: core.CanTransfer,
 			Transfer:    core.Transfer,

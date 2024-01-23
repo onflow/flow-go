@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type EventGeneratorOption func(*Events)
@@ -41,8 +42,13 @@ func EventGenerator(opts ...EventGeneratorOption) *Events {
 }
 
 func (g *Events) New() flow.Event {
-	location := common.StringLocation("test")
-	identifier := fmt.Sprintf("FooEvent%d", g.count)
+	address, err := common.BytesToAddress(unittest.RandomAddressFixture().Bytes())
+	if err != nil {
+		panic(fmt.Sprintf("unexpected error while creating random address: %s", err))
+	}
+
+	location := common.NewAddressLocation(nil, address, "TestContract")
+	identifier := fmt.Sprintf("TestContract.FooEvent%d", g.count)
 	typeID := location.TypeID(nil, identifier)
 
 	testEventType := &cadence.EventType{
