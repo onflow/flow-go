@@ -13,11 +13,21 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	util2 "github.com/onflow/flow-go/module/util"
 )
+
+type migrationTransactionPreparer struct {
+	state.NestedTransactionPreparer
+	derived.DerivedTransactionPreparer
+}
+
+var _ storage.TransactionPreparer = migrationTransactionPreparer{}
 
 // migratorRuntime is a runtime that can be used to run a migration on a single account
 func newMigratorRuntime(
@@ -31,14 +41,35 @@ func newMigratorRuntime(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create payload snapshot: %w", err)
 	}
+
 	transactionState := state.NewTransactionState(snapshot, state.DefaultParameters())
 	accounts := environment.NewAccounts(transactionState)
 
 	accountsAtreeLedger := util.NewAccountsAtreeLedger(accounts)
-	storage := runtime.NewStorage(accountsAtreeLedger, util.NopMemoryGauge{})
+	runtimeStorage := runtime.NewStorage(accountsAtreeLedger, util.NopMemoryGauge{})
+
+	derivedChainData, err := derived.NewDerivedChainData(derived.DefaultDerivedDataCacheSize)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create derived chain data: %w", err)
+	}
+
+	// TODO: how to get currentBlockId (flow.Identifier) for NewDerivedBlockDataForScript?
+	derivedTransactionData := derivedChainData.
+		NewDerivedBlockDataForScript(flow.Identifier{}).
+		NewSnapshotReadDerivedTransactionData()
 
 	ri := &util.MigrationRuntimeInterface{
 		Accounts: accounts,
+		Programs: environment.NewPrograms(
+			tracing.NewTracerSpan(),
+			util.NopMeter{},
+			environment.NoopMetricsReporter{},
+			migrationTransactionPreparer{
+				NestedTransactionPreparer:  transactionState,
+				DerivedTransactionPreparer: derivedTransactionData,
+			},
+			accounts,
+		),
 	}
 
 	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{
@@ -49,21 +80,15 @@ func newMigratorRuntime(
 	env.Configure(
 		ri,
 		runtime.NewCodesAndPrograms(),
-		storage,
+		runtimeStorage,
 		runtime.NewCoverageReport(),
 	)
-
-	ri.GetOrLoadProgramFunc = func(
-		location runtime.Location,
-		load func() (*interpreter.Program, error),
-	) (*interpreter.Program, error) {
-		return load()
-	}
 
 	inter, err := interpreter.NewInterpreter(
 		nil,
 		nil,
-		env.InterpreterConfig)
+		env.InterpreterConfig,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +99,7 @@ func newMigratorRuntime(
 		Snapshot:         snapshot,
 		TransactionState: transactionState,
 		Interpreter:      inter,
-		Storage:          storage,
+		Storage:          runtimeStorage,
 		AccountsLedger:   accountsAtreeLedger,
 		Accounts:         accounts,
 	}, nil
