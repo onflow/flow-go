@@ -300,13 +300,6 @@ func TestBackend_AdjustWithInit_Concurrent_MapBased(t *testing.T) {
 	backend := stdmap.NewBackend(stdmap.WithLimit(sizeLimit))
 	entities := unittest.EntityListFixture(sizeLimit)
 
-	dup := make(map[flow.Identifier]struct{})
-	for _, e := range entities {
-		require.NotContains(t, dup, e.ID())
-		dup[e.ID()] = struct{}{}
-	}
-	require.Equal(t, len(entities), len(dup))
-
 	adjustDone := sync.WaitGroup{}
 	for _, e := range entities {
 		adjustDone.Add(1)
