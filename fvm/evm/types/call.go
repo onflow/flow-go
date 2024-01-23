@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	// tx type 255 is used for direct calls from bridged accounts
+	// tx type 255 is used for direct calls from COAs
 	DirectCallTxType = byte(255)
 
 	UnknownCallSubType  = byte(0)

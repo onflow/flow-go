@@ -80,7 +80,7 @@ func (h *ContractHandler) DeployACOAAccount() types.Address {
 }
 
 // AccountByAddress returns the account for the given address,
-// if isAuthorized is set, account is controlled by the FVM (bridged accounts)
+// if isAuthorized is set, account is controlled by the FVM (COAs)
 func (h *ContractHandler) AccountByAddress(addr types.Address, isAuthorized bool) types.Account {
 	return newAccount(h, addr, isAuthorized)
 }
@@ -375,7 +375,7 @@ func (a *Account) Call(to types.Address, data types.Data, gaslimit types.GasLimi
 }
 
 func (a *Account) checkAuthorized() {
-	// check if account is authorized (i.e. is a bridged account)
+	// check if account is authorized (i.e. is a COA)
 	if !a.isAuthorized {
 		handleError(types.ErrUnAuthroizedMethodCall)
 	}

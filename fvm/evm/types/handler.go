@@ -15,12 +15,12 @@ import (
 // First, passing a signed transaction (EOA account) to the `EVM.run` Cadence function
 // creates a new block, updates the internal merkle tree, and emits a new root hash.
 //
-// The Second way is through a new form of account called bridged accounts,
+// The Second way is through a new form of account called cadence-owned-accounts (COAs),
 // which is represented and controlled through a resource, owned by a Flow account.
-// The owner of the bridged account resource can interact with the evm environment on behalf of the address stored on the resource.
+// The owner of the COA resource can interact with the evm environment on behalf of the address stored on the resource.
 //
 // The evm environment shares the same native token as Flow, there are no new tokens minted.
-// Other ERC-20 fungible tokens can be bridged between bridged account resources and Flow accounts.
+// Other ERC-20 fungible tokens can be bridged between COA resources and Flow accounts.
 
 // ContractHandler handles operations on the evm environment
 type ContractHandler interface {
@@ -39,6 +39,7 @@ type ContractHandler interface {
 	// collects the gas fees, and transfers the gas fees to the given coinbase account.
 	Run(tx []byte, coinbase Address)
 
+	// FlowTokenAddress returns the address where FLOW token is deployed
 	FlowTokenAddress() common.Address
 }
 
@@ -51,7 +52,7 @@ type Backend interface {
 
 // AddressAllocator allocates addresses, used by the handler
 type AddressAllocator interface {
-	// AllocateAddress allocates an address to be used by a bridged account resource
+	// AllocateAddress allocates an address to be used by a COA resource
 	AllocateAddress() (Address, error)
 }
 

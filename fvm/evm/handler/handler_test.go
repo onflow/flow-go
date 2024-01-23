@@ -275,7 +275,7 @@ func TestHandler_OpsWithoutEmulator(t *testing.T) {
 
 }
 
-func TestHandler_BridgedAccount(t *testing.T) {
+func TestHandler_COA(t *testing.T) {
 	t.Parallel()
 	t.Run("test deposit/withdraw (with integrated emulator)", func(t *testing.T) {
 		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {

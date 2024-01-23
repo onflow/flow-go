@@ -165,7 +165,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 	})
 }
 
-func TestBridgedAccountWithdraw(t *testing.T) {
+func TestCOAWithdraw(t *testing.T) {
 
 	t.Parallel()
 
