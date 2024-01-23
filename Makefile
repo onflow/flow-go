@@ -279,9 +279,9 @@ docker-ci-integration:
 .SILENT: install-cross-build-tools
 install-cross-build-tools:
 	if [ "$(UNAME)" = "Debian" ] ; then \
-		apt-get update && apt-get -y install apt-utils gcc-aarch64-linux-gnu ; \
+		sudo apt-get update && sudo apt-get -y install apt-utils gcc-aarch64-linux-gnu ; \
 	elif [ "$(UNAME)" = "Linux" ] ; then \
-		apt-get update && apt-get -y install apt-utils gcc-aarch64-linux-gnu ; \
+		sudo apt-get update && sudo apt-get -y install apt-utils gcc-aarch64-linux-gnu ; \
 	else \
 		echo "this target only works on Debian or Linux, host runs on" $(UNAME) ; \
 	fi
