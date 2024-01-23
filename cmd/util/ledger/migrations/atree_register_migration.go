@@ -349,9 +349,7 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 	}
 
 	if statePayload == nil {
-		m.log.Error().Msg("state payload was not found")
-		return newPayloads, nil
-		//return nil, fmt.Errorf("state payload was not found")
+		return nil, fmt.Errorf("state payload was not found")
 	}
 
 	// since some registers were removed, we need to update the storage used
