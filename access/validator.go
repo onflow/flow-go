@@ -111,7 +111,7 @@ func NewTransactionValidatorWithLimiter(
 
 func (v *TransactionValidator) Validate(tx *flow.TransactionBody) (err error) {
 	// rate limit transactions for specific payers.
-	// a short term solution to prevent attracks that send too many failed transactions
+	// a short term solution to prevent attacks that send too many failed transactions
 	// if a transaction is from a payer that should be rate limited, all the following
 	// checks will be skipped
 	err = v.checkRateLimitPayer(tx)
