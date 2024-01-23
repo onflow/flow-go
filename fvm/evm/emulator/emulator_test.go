@@ -290,6 +290,76 @@ func TestContractInteraction(t *testing.T) {
 	})
 }
 
+// Self destruct test deploys a contract with a selfdestruct function
+// this function is called and we make sure the balance the contract had
+// is returned to the address provided, and the contract address no longer
+// contains data.
+func TestSelfdestruct(t *testing.T) {
+	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+			testutils.RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *testutils.EOATestAccount) {
+				testContract := testutils.GetSelfDestructTestContract(t)
+
+				testAddress := types.NewAddressFromString("testaddr")
+
+				startBalance := big.NewInt(0).Mul(big.NewInt(1000), big.NewInt(gethParams.Ether))
+				deployBalance := big.NewInt(0).Mul(big.NewInt(10), big.NewInt(gethParams.Ether))
+				var contractAddr types.Address
+
+				// setup the test with funded account and deploying a selfdestruct contract.
+				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
+					RunWithNewBlockView(t, env, func(blk types.BlockView) {
+						_, err := blk.DirectCall(types.NewDepositCall(testAddress, startBalance))
+						require.NoError(t, err)
+					})
+
+					RunWithNewBlockView(t, env, func(blk types.BlockView) {
+						res, err := blk.DirectCall(
+							types.NewDeployCall(
+								testAddress,
+								testContract.ByteCode,
+								math.MaxUint64,
+								deployBalance),
+						)
+						require.NoError(t, err)
+						contractAddr = res.DeployedContractAddress
+					})
+
+					// call the destroy method which executes selfdestruct call.
+					RunWithNewBlockView(t, env, func(blk types.BlockView) {
+						res, err := blk.DirectCall(&types.DirectCall{
+							Type:     types.DirectCallTxType,
+							From:     testAddress,
+							To:       contractAddr,
+							Data:     testContract.MakeCallData(t, "destroy"),
+							Value:    big.NewInt(0),
+							GasLimit: 100_000,
+						})
+						require.NoError(t, err)
+						require.False(t, res.Failed)
+					})
+
+					// after calling selfdestruct the balance should be returned to the caller and
+					// equal initial funded balance of the caller.
+					RunWithNewReadOnlyBlockView(t, env, func(blk types.ReadOnlyBlockView) {
+						bal, err := blk.BalanceOf(testAddress)
+						require.NoError(t, err)
+						require.Equal(t, startBalance, bal)
+
+						bal, err = blk.BalanceOf(contractAddr)
+						require.NoError(t, err)
+						require.Equal(t, big.NewInt(0), bal)
+
+						code, err := blk.CodeOf(contractAddr)
+						require.NoError(t, err)
+						require.Len(t, code, 0)
+					})
+				})
+			})
+		})
+	})
+}
+
 func TestTransfers(t *testing.T) {
 	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
