@@ -166,6 +166,12 @@ func main() {
 		flags.StringToIntVar(&apiBurstlimits, "api-burst-limits", map[string]int{}, "burst limits for gRPC API methods e.g. Ping=100,SendTransaction=100 etc. note limits apply globally to all clients.")
 
 		// rate limiting for accounts, default is 2 transactions every 2.5 seconds
+		// Note: The rate limit configured for each node may differ from the effective network-wide rate limit
+		// for a given payer. In particular, the number of clusters and the message propagation factor will
+		// influence how the individual rate limit translates to a network-wide rate limit. 
+		// For example, suppose we have 5 collection clusters and configure each Collection Node with a rate
+		// limit of 1 message per second. Then, the effective network-wide rate limit for a payer address would
+		// be *at least* 5 messages per second.
 		flags.Float64Var(&txRatelimits, "ingest-tx-rate-limits", 2.5, "per second rate limits for processing transactions for limited account")
 		flags.IntVar(&txBurstlimits, "ingest-tx-burst-limits", 2, "burst limits for processing transactions for limited account")
 		flags.StringVar(&txRatelimitPayers, "ingest-tx-rate-limit-payers", "", "comma separated list of accounts to apply rate limiting to")
