@@ -6,6 +6,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/entity"
+	"github.com/rs/zerolog"
 )
 
 // BlockQueue keeps track of state of blocks and determines which blocks are executable
@@ -15,6 +16,8 @@ import (
 // 3. all the collections included in the block have been received
 type BlockQueue struct {
 	sync.Mutex
+	log zerolog.Logger
+
 	// when receiving a new block, adding it to the map, and add missing collections to the map
 	blocks map[flow.Identifier]*entity.ExecutableBlock
 	// a collection could be included in multiple blocks,
@@ -38,8 +41,11 @@ type collectionInfo struct {
 	IncludedIn map[flow.Identifier]*entity.ExecutableBlock
 }
 
-func NewBlockQueue() *BlockQueue {
+func NewBlockQueue(logger zerolog.Logger) *BlockQueue {
+	log := logger.With().Str("module", "block_queue").Logger()
+
 	return &BlockQueue{
+		log:              log,
 		blocks:           make(map[flow.Identifier]*entity.ExecutableBlock),
 		collections:      make(map[flow.Identifier]*collectionInfo),
 		blockIDsByHeight: make(map[uint64]map[flow.Identifier]*entity.ExecutableBlock),
@@ -50,7 +56,7 @@ func NewBlockQueue() *BlockQueue {
 // It returns a list of missing collections and a list of executable blocks
 // Note: caller must ensure when OnBlock is called with a block,
 // if its parent is not executed, then the parent must be added to the queue first.
-// if it sparent is executed, then the parent's finalState must be passed in.
+// if its parent is executed, then the parent's finalState must be passed in.
 func (q *BlockQueue) OnBlock(block *flow.Block, parentFinalState *flow.StateCommitment) (
 	[]*flow.CollectionGuarantee, // missing collections
 	[]*entity.ExecutableBlock, // blocks ready to execute
@@ -62,16 +68,38 @@ func (q *BlockQueue) OnBlock(block *flow.Block, parentFinalState *flow.StateComm
 	// check if the block already exists
 	blockID := block.ID()
 	executable, ok := q.blocks[blockID]
+	// handle the case where the block has seen before
 	if ok {
+		// we have already received this block, and its parent still has not been executed yet
 		if executable.StartState == nil && parentFinalState == nil {
 			return nil, nil, nil
 		}
 
-		if executable.StartState == nil || parentFinalState == nil {
-			return nil, nil, fmt.Errorf("block %s has already been executed with a nil parent final state, %v != %v",
-				blockID, executable.StartState, parentFinalState)
+		// this is an edge case where parentFinalState is provided, but its parent block has not been
+		// marked as executed yet (OnBlockExecuted(parent) is not called),
+		// in this edge case, we will internally call OnBlockExecuted(parentBlockID, parentFinalState) first
+		if executable.StartState == nil && parentFinalState != nil {
+			executables, err := q.onBlockExecuted(block.Header.ParentID, *parentFinalState)
+			if err != nil {
+				return nil, nil, fmt.Errorf("receiving block %v with parent commitment %v, but parent block %v already exists with no commitment, fail to call mark parent as executed: %w",
+					blockID, *parentFinalState, block.Header.ParentID, err)
+			}
+
+			// we already have this block, its collection must have been fetched, so we only return the
+			// executables from marking its parent as executed.
+			return nil, executables, nil
 		}
 
+		// this is an edge case could be ignored
+		if executable.StartState != nil && parentFinalState == nil {
+			q.log.Warn().
+				Str("blockID", blockID.String()).
+				Hex("parentID", block.Header.ParentID[:]).
+				Msg("edge case: receiving block with no parent commitment, but its parent block actually has been executed")
+			return nil, nil, nil
+		}
+
+		// this is an exception that should not happen
 		if *executable.StartState != *parentFinalState {
 			return nil, nil,
 				fmt.Errorf("block %s has already been executed with a different parent final state, %v != %v",
@@ -79,6 +107,16 @@ func (q *BlockQueue) OnBlock(block *flow.Block, parentFinalState *flow.StateComm
 		}
 
 		return nil, nil, nil
+	}
+
+	// if parentFinalState is not provided, then its parent block must exists in the queue
+	// otherwise it's an exception
+	if parentFinalState == nil {
+		_, parentExists := q.blocks[block.Header.ParentID]
+		if !parentExists {
+			return nil, nil, fmt.Errorf("parent block %s of block %s is not in the queue",
+				block.Header.ParentID, blockID)
+		}
 	}
 
 	executable = &entity.ExecutableBlock{
@@ -132,6 +170,9 @@ func (q *BlockQueue) OnBlock(block *flow.Block, parentFinalState *flow.StateComm
 	// check if the block is executable
 	var executables []*entity.ExecutableBlock
 	if executable.IsComplete() {
+		// executables might contain other siblings, but won't contain "executable",
+		// which is the block itself, that's because executables are created
+		// from OnBlockExecuted(
 		executables = []*entity.ExecutableBlock{executable}
 	}
 
@@ -189,6 +230,14 @@ func (q *BlockQueue) OnBlockExecuted(
 ) ([]*entity.ExecutableBlock, error) {
 	q.Lock()
 	defer q.Unlock()
+
+	return q.onBlockExecuted(blockID, commit)
+}
+
+func (q *BlockQueue) onBlockExecuted(
+	blockID flow.Identifier,
+	commit flow.StateCommitment,
+) ([]*entity.ExecutableBlock, error) {
 	// when a block is executed, the child block might become executable
 	// we also remove it from all the indexes
 
