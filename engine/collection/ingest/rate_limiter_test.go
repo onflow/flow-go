@@ -45,7 +45,7 @@ func TestLimiterAddRemoveAddress(t *testing.T) {
 	l.AddAddress(limited2)
 	list := l.GetAddresses()
 	require.Len(t, list, 2)
-	require.Contains(t, list, limited1)
+	require.Contains(t, list, limited1, limited2)
 
 	require.False(t, l.IsRateLimited(limited2)) // address 2 is not limited on the first call
 	require.True(t, l.IsRateLimited(limited2))  // limited on the second call immediately
