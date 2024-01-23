@@ -1,6 +1,7 @@
 package handler_test
 
 import (
+	"math/big"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -32,7 +33,7 @@ func TestBlockStore(t *testing.T) {
 			require.Equal(t, expectedParentHash, bp.ParentBlockHash)
 
 			// commit block proposal
-			supply := uint64(100)
+			supply := big.NewInt(100)
 			bp.TotalSupply = supply
 			err = bs.CommitBlockProposal()
 			require.NoError(t, err)

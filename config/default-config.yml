@@ -253,21 +253,28 @@ network-config:
             skip-atomic-validation: true
             # This value is applied to the square of the number of invalid message deliveries on a topic.
             # It is used to penalize peers that send invalid messages. By an invalid message, we mean a message that is not signed by the
-            # publisher, or a message that is not signed by the peer that sent it. We set it to -1.0, which means that with around 14 invalid
+            # publisher, or a message that is not signed by the peer that sent it.
+            # An invalid message also can be a self-origin message, i.e., the peer sees its own message bounced back to it.
+            # GossipSub has an edge-case that a peer may inadvertently request a self-origin message from a peer that it is connected to, through iHave-iWant messages, which is a
+            # false-positive edge-case.
+            # We set it to -10e-4, which means that with around 1414 invalid
             # message deliveries within a gossipsub heartbeat interval, the peer will be disconnected.
+            # Note that we intentionally set this threshold high to avoid false-positively penalizing nodes due to self-origin message requests by iHave-iWants (a known issue in gossipsub).
             # The supporting math is as follows:
             # - each staked (i.e., authorized) peer is rewarded by the fixed reward of 100 (i.e., DefaultStakedIdentityReward).
-            # - x invalid message deliveries will result in a penalty of x^2 * DefaultTopicInvalidMessageDeliveriesWeight, i.e., -x^2.
+            # - x invalid message deliveries will result in a penalty of x^2 * DefaultTopicInvalidMessageDeliveriesWeight, i.e., -x^2 * 10-e4.
             # - the peer will be disconnected when its penalty reaches -100 (i.e., MaxAppSpecificPenalty).
-            # - so, the maximum number of invalid message deliveries that a peer can have before being disconnected is sqrt(200/DefaultTopicInvalidMessageDeliveriesWeight) ~ 14.
-            invalid-message-deliveries-weight: -1.0
+            # - so, the maximum number of invalid message deliveries that a peer can have before being disconnected is sqrt(200/10-e4) ~ 1414.
+            invalid-message-deliveries-weight: -10e-4
             # The decay factor used to decay the number of invalid message deliveries.
             # The total number of invalid message deliveries is multiplied by this factor at each heartbeat interval to
             # decay the number of invalid message deliveries, and prevent the peer from being disconnected if it stops
-            # sending invalid messages. We set it to 0.99, which means that the number of invalid message deliveries will
-            # decay by 1% at each heartbeat interval.
+            # sending invalid messages. We set it to 0.5, which means that the number of invalid message deliveries will
+            # decay by 50% at each heartbeat interval.
             # The decay heartbeats are defined by the heartbeat interval of the gossipsub scoring system, which is 1 Minute (defaultDecayInterval).
-            invalid-message-deliveries-decay: 0.99
+            # Note that we set the decay factor low so that the invalid message deliveries will be decayed fast enough to prevent the peer from being disconnected on mediocre loads.
+            # This is to address the false-positive disconnections that we observed in the network due to the self-origin message requests by iHave-iWants (a known issue in gossipsub).
+            invalid-message-deliveries-decay: 0.5
             # The default time in mesh quantum for the GossipSub scoring system. It is used to gauge
             # a discrete time interval for the time in mesh counter. We set it to 1 hour, which means that every one complete hour a peer is
             # in a topic mesh, the time in mesh counter will be incremented by 1 and is counted towards the availability score of the peer in that topic mesh.
