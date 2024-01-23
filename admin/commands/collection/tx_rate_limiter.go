@@ -4,11 +4,12 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/rs/zerolog/log"
+	"golang.org/x/time/rate"
+
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/engine/collection/ingest"
-	"github.com/rs/zerolog/log"
-	"golang.org/x/time/rate"
 )
 
 var _ commands.AdminCommand = (*TxRateLimitCommand)(nil)

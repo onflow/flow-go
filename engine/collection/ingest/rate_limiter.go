@@ -30,7 +30,7 @@ type AddressRateLimiter struct {
 //
 // Note: The rate limit configured for each node may differ from the effective network-wide rate limit
 // for a given payer. In particular, the number of clusters and the message propagation factor will
-// influence how the individual rate limit translates to a network-wide rate limit. 
+// influence how the individual rate limit translates to a network-wide rate limit.
 // For example, suppose we have 5 collection clusters and configure each Collection Node with a rate
 // limit of 1 message per second. Then, the effective network-wide rate limit for a payer address would
 // be *at least* 5 messages per second.
