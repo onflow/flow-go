@@ -6,7 +6,7 @@
 FROM golang:1.20-bullseye AS build-setup
 
 RUN apt-get update
-RUN apt-get -y install zip
+RUN apt-get -y install zip apt-utils gcc-aarch64-linux-gnu
 
 ## (2) Setup crypto dependencies
 FROM build-setup AS build-env

@@ -38,8 +38,6 @@ jobs:
     - name: Authenticate docker with gcloud
       run: |
         gcloud auth configure-docker
-    - name: Install Tools
-      run: make install-cross-build-tools
     - name: Docker build
       env:
         CADENCE_DEPLOY_KEY: ${{ secrets.CADENCE_DEPLOY_KEY }}
