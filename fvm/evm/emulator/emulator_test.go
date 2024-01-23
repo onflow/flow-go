@@ -350,6 +350,10 @@ func TestSelfdestruct(t *testing.T) {
 						require.NoError(t, err)
 						require.Equal(t, big.NewInt(0), bal)
 
+						nonce, err := blk.NonceOf(contractAddr)
+						require.NoError(t, err)
+						require.Zero(t, nonce)
+
 						code, err := blk.CodeOf(contractAddr)
 						require.NoError(t, err)
 						require.Len(t, code, 0)
