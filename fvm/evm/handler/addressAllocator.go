@@ -12,14 +12,15 @@ import (
 const (
 	ledgerAddressAllocatorKey = "AddressAllocator"
 	uint64ByteSize            = 8
+	addressPrefixLen          = 12
 )
 
 var (
 	// prefixes:
 	// the first 12 bytes of addresses allocation
 	// leading zeros helps with storage and all zero is reserved for the EVM precompiles
-	FlowEVMPrecompileAddressPrefix = [...]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}
-	FlowEVMCOAAddressPrefix        = [...]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2}
+	FlowEVMPrecompileAddressPrefix = [addressPrefixLen]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}
+	FlowEVMCOAAddressPrefix        = [addressPrefixLen]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2}
 )
 
 type AddressAllocator struct {
@@ -75,7 +76,7 @@ func MakePrecompileAddress(index uint64) types.Address {
 	return makePrefixedAddress(index, FlowEVMPrecompileAddressPrefix)
 }
 
-func makePrefixedAddress(index uint64, prefix [12]byte) types.Address {
+func makePrefixedAddress(index uint64, prefix [addressPrefixLen]byte) types.Address {
 	var addr types.Address
 	prefixIndex := types.AddressLength - uint64ByteSize
 	copy(addr[:prefixIndex], prefix[:])

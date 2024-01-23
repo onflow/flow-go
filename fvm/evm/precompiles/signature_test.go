@@ -10,6 +10,8 @@ import (
 )
 
 func TestFunctionSelector(t *testing.T) {
+	t.Parallel()
+
 	expected := gethCrypto.Keccak256([]byte("test()"))[:4]
 	require.Equal(t, expected, precompiles.ComputeFunctionSelector("test", nil).Bytes())
 

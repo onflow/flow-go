@@ -50,7 +50,7 @@ func (p *precompile) Address() types.Address {
 
 // RequiredGas calculates the contract gas use
 func (p *precompile) RequiredGas(input []byte) uint64 {
-	if len(input) < 4 {
+	if len(input) < FunctionSelectorLength {
 		return InvalidMethodCallGasUsage
 	}
 	sig, data := SplitFunctionSelector(input)
@@ -63,7 +63,7 @@ func (p *precompile) RequiredGas(input []byte) uint64 {
 
 // Run runs the precompiled contract
 func (p *precompile) Run(input []byte) ([]byte, error) {
-	if len(input) < 4 {
+	if len(input) < FunctionSelectorLength {
 		return nil, ErrInvalidMethodCall
 	}
 	sig, data := SplitFunctionSelector(input)

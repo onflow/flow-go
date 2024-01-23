@@ -10,6 +10,8 @@ import (
 )
 
 func TestMutiFunctionContract(t *testing.T) {
+	t.Parallel()
+
 	address := testutils.RandomAddress(t)
 	sig := precompiles.FunctionSelector{1, 2, 3, 4}
 	data := "data"
