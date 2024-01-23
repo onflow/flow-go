@@ -6,7 +6,6 @@ import (
 
 	gethCommon "github.com/ethereum/go-ethereum/common"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
-	gethCrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/evm/emulator/state"
@@ -34,7 +33,7 @@ func TestBaseView(t *testing.T) {
 			big.NewInt(0),
 			uint64(0),
 			nil,
-			gethCommon.Hash{},
+			gethTypes.EmptyCodeHash,
 		)
 
 		// create an account with code
@@ -124,7 +123,7 @@ func TestBaseView(t *testing.T) {
 			big.NewInt(0),
 			uint64(0),
 			nil,
-			gethCommon.Hash{},
+			gethTypes.EmptyCodeHash,
 		)
 
 		// commit the changes and create a new baseview
@@ -141,7 +140,7 @@ func TestBaseView(t *testing.T) {
 			big.NewInt(0),
 			uint64(0),
 			nil,
-			gethCommon.Hash{},
+			gethTypes.EmptyCodeHash,
 		)
 	})
 
@@ -211,97 +210,6 @@ func TestBaseView(t *testing.T) {
 		require.Equal(t, false, addrFound)
 		require.Equal(t, false, slotFound)
 	})
-
-	t.Run("test code storage", func(t *testing.T) {
-		ledger := testutils.GetSimpleValueStore()
-		rootAddr := flow.Address{1, 2, 3, 4, 5, 6, 7, 8}
-		view, err := state.NewBaseView(ledger, rootAddr)
-		require.NoError(t, err)
-
-		bal := new(big.Int)
-		nonce := uint64(0)
-
-		addr1 := testutils.RandomCommonAddress(t)
-		var code1 []byte
-		codeHash1 := gethTypes.EmptyCodeHash
-		err = view.CreateAccount(addr1, bal, nonce, code1, codeHash1)
-		require.NoError(t, err)
-
-		ret, err := view.GetCode(addr1)
-		require.NoError(t, err)
-		require.Equal(t, code1, ret)
-
-		addr2 := testutils.RandomCommonAddress(t)
-		code2 := []byte("code2")
-		codeHash2 := gethCrypto.Keccak256Hash(code2)
-		err = view.CreateAccount(addr2, bal, nonce, code2, codeHash2)
-		require.NoError(t, err)
-
-		ret, err = view.GetCode(addr2)
-		require.NoError(t, err)
-		require.Equal(t, code2, ret)
-
-		err = view.Commit()
-		require.NoError(t, err)
-		orgSize := ledger.TotalStorageSize()
-		require.Equal(t, uint64(1), view.NumberOfContracts())
-
-		err = view.UpdateAccount(addr1, bal, nonce, code2, codeHash2)
-		require.NoError(t, err)
-
-		err = view.Commit()
-		require.NoError(t, err)
-		require.Equal(t, orgSize, ledger.TotalStorageSize())
-		require.Equal(t, uint64(1), view.NumberOfContracts())
-
-		ret, err = view.GetCode(addr1)
-		require.NoError(t, err)
-		require.Equal(t, code2, ret)
-
-		// now remove the code from account 1
-		err = view.UpdateAccount(addr1, bal, nonce, code1, codeHash1)
-		require.NoError(t, err)
-
-		// there should not be any side effect on the code return for account 2
-		// and no impact on storage size
-		ret, err = view.GetCode(addr2)
-		require.NoError(t, err)
-		require.Equal(t, code2, ret)
-
-		ret, err = view.GetCode(addr1)
-		require.NoError(t, err)
-		require.Equal(t, code1, ret)
-
-		err = view.Commit()
-		require.NoError(t, err)
-		require.Equal(t, orgSize, ledger.TotalStorageSize())
-		require.Equal(t, uint64(1), view.NumberOfContracts())
-
-		// now update account 2 and there should a reduction in storage
-		err = view.UpdateAccount(addr2, bal, nonce, code1, codeHash1)
-		require.NoError(t, err)
-
-		ret, err = view.GetCode(addr2)
-		require.NoError(t, err)
-		require.Equal(t, code1, ret)
-
-		err = view.Commit()
-		require.NoError(t, err)
-		require.Greater(t, orgSize, ledger.TotalStorageSize())
-		require.Equal(t, uint64(0), view.NumberOfContracts())
-
-		// delete account 2
-		err = view.DeleteAccount(addr2)
-		require.NoError(t, err)
-
-		ret, err = view.GetCode(addr2)
-		require.NoError(t, err)
-		require.Len(t, ret, 0)
-
-		require.Greater(t, orgSize, ledger.TotalStorageSize())
-		require.Equal(t, uint64(1), view.NumberOfAccounts())
-	})
-
 }
 
 func checkAccount(t *testing.T,

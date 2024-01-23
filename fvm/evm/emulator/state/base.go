@@ -131,12 +131,11 @@ func (v *BaseView) GetCode(addr gethCommon.Address) ([]byte, error) {
 
 // GetCodeHash returns the code hash of an address
 //
-// for non-existent accounts it returns gethCommon.Hash{}
-// and for accounts without a code (e.g. EOAs) it returns default empty
+// for non-existent accounts or accounts without a code (e.g. EOAs) it returns default empty
 // hash value (gethTypes.EmptyCodeHash)
 func (v *BaseView) GetCodeHash(addr gethCommon.Address) (gethCommon.Hash, error) {
 	acc, err := v.getAccount(addr)
-	codeHash := gethCommon.Hash{}
+	codeHash := gethTypes.EmptyCodeHash
 	if acc != nil {
 		codeHash = acc.CodeHash
 	}
@@ -205,7 +204,7 @@ func (v *BaseView) CreateAccount(
 	var colID []byte
 	// if is an smart contract account
 	if len(code) > 0 {
-		err := v.updateAccountCode(addr, code, codeHash)
+		err := v.storeCode(addr, code)
 		if err != nil {
 			return err
 		}
@@ -236,17 +235,17 @@ func (v *BaseView) UpdateAccount(
 	if acc == nil {
 		return v.CreateAccount(addr, balance, nonce, code, codeHash)
 	}
-
-	// update account code
-	err = v.updateAccountCode(addr, code, codeHash)
-	if err != nil {
-		return err
+	// if it has a code change
+	if codeHash != acc.CodeHash {
+		err := v.storeCode(addr, code)
+		if err != nil {
+			return err
+		}
+		// TODO: maybe purge the state in the future as well
+		// currently the behaviour of stateDB doesn't purge the data
+		// We don't need to check if the code is empty and we purge the state
+		// this is not possible right now.
 	}
-	// TODO: maybe purge the state in the future as well
-	// currently the behaviour of stateDB doesn't purge the data
-	// We don't need to check if the code is empty and we purge the state
-	// this is not possible right now.
-
 	newAcc := NewAccount(addr, balance, nonce, codeHash, acc.CollectionID)
 	// no need to update the cache , storeAccount would update the cache
 	return v.storeAccount(newAcc)
@@ -264,21 +263,21 @@ func (v *BaseView) DeleteAccount(addr gethCommon.Address) error {
 		return fmt.Errorf("account doesn't exist to be deleted")
 	}
 
-	// 2. remove the code
-	if acc.HasCode() {
-		err = v.updateAccountCode(addr, nil, gethTypes.EmptyCodeHash)
-		if err != nil {
-			return err
-		}
-	}
-
-	// 3. update the cache
+	// 2. update the cache
 	delete(v.cachedAccounts, addr)
 
-	// 4. collections
+	// 3. collections
 	err = v.accounts.Remove(addr.Bytes())
 	if err != nil {
 		return err
+	}
+
+	// 4. remove the code
+	if acc.HasCode() {
+		err = v.storeCode(addr, nil)
+		if err != nil {
+			return err
+		}
 	}
 
 	// 5. remove storage slots
@@ -339,16 +338,6 @@ func (v *BaseView) Commit() error {
 	return nil
 }
 
-// NumberOfContracts returns the number of unique contracts
-func (v *BaseView) NumberOfContracts() uint64 {
-	return v.codes.Size()
-}
-
-// NumberOfContracts returns the number of accounts
-func (v *BaseView) NumberOfAccounts() uint64 {
-	return v.accounts.Size()
-}
-
 func (v *BaseView) fetchOrCreateCollection(path string) (collection *Collection, created bool, error error) {
 	collectionID, err := v.ledger.GetValue(v.rootAddress[:], []byte(path))
 	if err != nil {
@@ -402,110 +391,29 @@ func (v *BaseView) getCode(addr gethCommon.Address) ([]byte, error) {
 	if found {
 		return code, nil
 	}
-
-	// get account
-	acc, err := v.getAccount(addr)
-	if err != nil {
-		return nil, err
-	}
-
-	if acc == nil || !acc.HasCode() {
+	// check if account exist in cache and has codeHash
+	acc, found := v.cachedAccounts[addr]
+	if found && !acc.HasCode() {
 		return nil, nil
 	}
-
-	// collect the container from the code collection by codeHash
-	encoded, err := v.codes.Get(acc.CodeHash.Bytes())
+	// then collect it from the code collection
+	code, err := v.codes.Get(addr.Bytes())
 	if err != nil {
 		return nil, err
 	}
-	if len(encoded) == 0 {
-		return nil, nil
-	}
-
-	codeCont, err := CodeContainerFromEncoded(encoded)
-	if err != nil {
-		return nil, err
-	}
-	code = codeCont.Code()
-	if len(code) > 0 {
+	if code != nil {
 		v.cachedCodes[addr] = code
 	}
 	return code, nil
 }
 
-func (v *BaseView) updateAccountCode(addr gethCommon.Address, code []byte, codeHash gethCommon.Hash) error {
-	// get account
-	acc, err := v.getAccount(addr)
-	if err != nil {
-		return err
-	}
-	// if is a new account
-	if acc == nil {
-		if len(code) == 0 {
-			return nil
-		}
-		v.cachedCodes[addr] = code
-		return v.addCode(code, codeHash)
-	}
-
-	// skip if is the same code
-	if acc.CodeHash == codeHash {
-		return nil
-	}
-
-	// clean old code first if exist
-	if acc.HasCode() {
-		delete(v.cachedCodes, addr)
-		err = v.removeCode(acc.CodeHash)
-		if err != nil {
-			return err
-		}
-	}
-
-	// add new code
+func (v *BaseView) storeCode(addr gethCommon.Address, code []byte) error {
 	if len(code) == 0 {
-		return nil
+		delete(v.cachedCodes, addr)
+		return v.codes.Remove(addr.Bytes())
 	}
 	v.cachedCodes[addr] = code
-	return v.addCode(code, codeHash)
-}
-
-func (v *BaseView) removeCode(codeHash gethCommon.Hash) error {
-	encoded, err := v.codes.Get(codeHash.Bytes())
-	if err != nil {
-		return err
-	}
-	if len(encoded) == 0 {
-		return nil
-	}
-
-	cc, err := CodeContainerFromEncoded(encoded)
-	if err != nil {
-		return err
-	}
-	if cc.DecRefCount() {
-		return v.codes.Remove(codeHash.Bytes())
-	}
-	return v.codes.Set(codeHash.Bytes(), cc.Encode())
-}
-
-func (v *BaseView) addCode(code []byte, codeHash gethCommon.Hash) error {
-	encoded, err := v.codes.Get(codeHash.Bytes())
-	if err != nil {
-		return err
-	}
-	// if is the first time the code is getting deployed
-	if len(encoded) == 0 {
-		return v.codes.Set(codeHash.Bytes(), NewCodeContainer(code).Encode())
-	}
-
-	// otherwise update the cc
-	cc, err := CodeContainerFromEncoded(encoded)
-	if err != nil {
-		return err
-	}
-	cc.IncRefCount()
-	return v.codes.Set(codeHash.Bytes(), cc.Encode())
+	return v.codes.Set(addr.Bytes(), code)
 }
 
 func (v *BaseView) getSlot(sk types.SlotAddress) (gethCommon.Hash, error) {

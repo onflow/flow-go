@@ -325,7 +325,7 @@ func SystemContractChanges(chainID flow.ChainID) []SystemContractChange {
 
 		// EVM related contracts
 		NewSystemContractChange(
-			systemContracts.EVMContract,
+			systemContracts.EVM,
 			evm.ContractCode(
 				systemContracts.FlowToken.Address,
 			),

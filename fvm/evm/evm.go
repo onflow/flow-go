@@ -12,14 +12,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func ContractAccountAddress(chainID flow.ChainID) (flow.Address, error) {
+func RootAccountAddress(chainID flow.ChainID) (flow.Address, error) {
 	sc := systemcontracts.SystemContractsForChain(chainID)
-	return sc.EVMContract.Address, nil
-}
-
-func StorageAccountAddress(chainID flow.ChainID) (flow.Address, error) {
-	sc := systemcontracts.SystemContractsForChain(chainID)
-	return sc.EVMStorage.Address, nil
+	return sc.EVM.Address, nil
 }
 
 func SetupEnvironment(
@@ -29,31 +24,27 @@ func SetupEnvironment(
 	service flow.Address,
 	flowToken flow.Address,
 ) error {
-	evmStorageAccountAddress, err := StorageAccountAddress(chainID)
+	// TODO: setup proper root address based on chainID
+	evmRootAddress, err := RootAccountAddress(chainID)
 	if err != nil {
 		return err
 	}
 
-	evmContractAccountAddress, err := ContractAccountAddress(chainID)
+	em := evm.NewEmulator(backend, evmRootAddress)
+
+	bs, err := handler.NewBlockStore(backend, evmRootAddress)
 	if err != nil {
 		return err
 	}
 
-	em := evm.NewEmulator(backend, evmStorageAccountAddress)
-
-	bs, err := handler.NewBlockStore(backend, evmStorageAccountAddress)
-	if err != nil {
-		return err
-	}
-
-	aa, err := handler.NewAddressAllocator(backend, evmStorageAccountAddress)
+	aa, err := handler.NewAddressAllocator(backend, evmRootAddress)
 	if err != nil {
 		return err
 	}
 
 	contractHandler := handler.NewContractHandler(common.Address(flowToken), bs, aa, backend, em)
 
-	stdlib.SetupEnvironment(env, contractHandler, evmContractAccountAddress)
+	stdlib.SetupEnvironment(env, contractHandler, service)
 
 	return nil
 }
