@@ -39,13 +39,9 @@ on:
         description: 'Observer'
         required: false
       # GHA allows only up to 10 inputs - regroup two entries in one
-      include_alternative_amd64_builds:
+      include_alternative_builds:
         type: boolean
-        description: 'Build amd64 `without_adx` and `without_netgo_without_adx` images'
-        required: false
-      include_arm:
-        type: boolean
-        description: 'Build arm64
+        description: 'Build amd64 `without_adx` and `without_netgo_without_adx` images', and arm64 images
         required: false
 
 jobs:
@@ -123,19 +119,14 @@ jobs:
       run: |
         make docker-build-${{ matrix.role }}-with-adx docker-push-${{ matrix.role }}-with-adx
 
-    - name: Build/Push ${{ matrix.role }} amd64 images without netgo and without adx
-      if: ${{ inputs.include_alternative_amd64_builds }}
+    - name: Build/Push ${{ matrix.role }} amd64 images without netgo and without adx, arm64 images
+      if: ${{ inputs.include_alternative_builds }}
       env:
         IMAGE_TAG: ${{ inputs.docker_tag }}
         CADENCE_DEPLOY_KEY: ${{ secrets.CADENCE_DEPLOY_KEY }}
       run: |
         make docker-build-${{ matrix.role }}-without-adx docker-push-${{ matrix.role }}-without-adx |
-        make docker-build-${{ matrix.role }}-without-netgo-without-adx docker-push-${{ matrix.role }}-without-netgo-without-adx
-
-    - name: Build/Push ${{ matrix.role }} arm64 images
-      if: ${{ inputs.include_arm }}
-      env:
-        IMAGE_TAG: ${{ inputs.docker_tag }}
-        CADENCE_DEPLOY_KEY: ${{ secrets.CADENCE_DEPLOY_KEY }}
-      run: |
+        make docker-build-${{ matrix.role }}-without-netgo-without-adx docker-push-${{ matrix.role }}-without-netgo-without-adx |
         make docker-build-${{ matrix.role }}-arm docker-push-${{ matrix.role }}-arm
+
+        
