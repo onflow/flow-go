@@ -825,6 +825,22 @@ func MockInspectorNotificationDistributorReadyDoneAware(d *mockp2p.GossipSubInsp
 	}()).Maybe()
 }
 
+// MockScoringRegistrySubscriptionValidatorReadyDoneAware mocks the Ready and Done methods of the subscription validator to return a channel that is already closed,
+// so that the distributor is considered ready and done when the test needs.
+func MockScoringRegistrySubscriptionValidatorReadyDoneAware(s *mockp2p.SubscriptionValidator) {
+	s.On("Start", mockery.Anything).Return().Maybe()
+	s.On("Ready").Return(func() <-chan struct{} {
+		ch := make(chan struct{})
+		close(ch)
+		return ch
+	}()).Maybe()
+	s.On("Done").Return(func() <-chan struct{} {
+		ch := make(chan struct{})
+		close(ch)
+		return ch
+	}()).Maybe()
+}
+
 // GossipSubRpcFixtures returns a slice of random message IDs for testing.
 // Args:
 // - t: *testing.T instance
@@ -914,6 +930,18 @@ func WithIHave(msgCount, msgIDCount int, topicId string) GossipSubCtrlOption {
 			}
 		}
 		msg.Ihave = iHaves
+	}
+}
+
+// WithIHaveMessageIDs adds iHave control messages with the given message IDs to the control message.
+func WithIHaveMessageIDs(msgIDs []string, topicId string) GossipSubCtrlOption {
+	return func(msg *pb.ControlMessage) {
+		msg.Ihave = []*pb.ControlIHave{
+			{
+				TopicID:    &topicId,
+				MessageIDs: msgIDs,
+			},
+		}
 	}
 }
 

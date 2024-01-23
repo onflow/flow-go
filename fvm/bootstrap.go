@@ -76,7 +76,13 @@ type BootstrapParams struct {
 	minimumStorageReservation        cadence.UFix64
 	storagePerFlow                   cadence.UFix64
 	restrictedAccountCreationEnabled cadence.Bool
-	setupEVMEnabled                  cadence.Bool
+
+	// `setupEVMEnabled` == true && `evmAbiOnly` == true will enable the ABI-only EVM
+	// `setupEVMEnabled` == true && `evmAbiOnly` == false will enable the full EVM functionality
+	// `setupEVMEnabled` == false will disable EVM
+	// This will allow to quickly disable the ABI-only EVM, in case there's a bug or something.
+	setupEVMEnabled cadence.Bool
+	evmAbiOnly      cadence.Bool
 
 	// versionFreezePeriod is the number of blocks in the future where the version
 	// changes are frozen. The Node version beacon manages the freeze period,
@@ -215,6 +221,13 @@ func WithRestrictedAccountCreationEnabled(enabled cadence.Bool) BootstrapProcedu
 func WithSetupEVMEnabled(enabled cadence.Bool) BootstrapProcedureOption {
 	return func(bp *BootstrapProcedure) *BootstrapProcedure {
 		bp.setupEVMEnabled = enabled
+		return bp
+	}
+}
+
+func WithEVMABIOnly(evmAbiOnly cadence.Bool) BootstrapProcedureOption {
+	return func(bp *BootstrapProcedure) *BootstrapProcedure {
+		bp.evmAbiOnly = evmAbiOnly
 		return bp
 	}
 }
@@ -806,10 +819,16 @@ func (b *bootstrapExecutor) setStakingAllowlist(
 
 func (b *bootstrapExecutor) setupEVM(serviceAddress, fungibleTokenAddress, flowTokenAddress flow.Address) {
 	if b.setupEVMEnabled {
-		evmAcc := b.createAccount(nil) // account for storage
+		// account for storage
+		// we dont need to deploy anything to this account, but it needs to exist
+		// so that we can store the EVM state on it
+		evmAcc := b.createAccount(nil)
+		b.setupStorageForAccount(evmAcc, serviceAddress, fungibleTokenAddress, flowTokenAddress)
+
+		// deploy the EVM contract to the service account
 		tx := blueprints.DeployContractTransaction(
 			serviceAddress,
-			stdlib.ContractCode(flowTokenAddress),
+			stdlib.ContractCode(flowTokenAddress, bool(b.evmAbiOnly)),
 			stdlib.ContractName,
 		)
 		// WithEVMEnabled should only be used after we create an account for storage
@@ -818,8 +837,6 @@ func (b *bootstrapExecutor) setupEVM(serviceAddress, fungibleTokenAddress, flowT
 			Transaction(tx, 0),
 		)
 		panicOnMetaInvokeErrf("failed to deploy EVM contract: %s", txError, err)
-
-		b.setupStorageForAccount(evmAcc, serviceAddress, fungibleTokenAddress, flowTokenAddress)
 	}
 }
 

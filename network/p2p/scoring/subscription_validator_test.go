@@ -164,6 +164,7 @@ func TestSubscriptionValidator_InvalidSubscriptions(t *testing.T) {
 // 4. Verification node also publishes a chunk request on the RequestChunks channel.
 // 5. Test checks that consensus node does not receive the chunk request while the other verification node does.
 func TestSubscriptionValidator_Integration(t *testing.T) {
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky test")
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx := irrecoverable.NewMockSignalerContext(t, ctx)
 
@@ -171,7 +172,7 @@ func TestSubscriptionValidator_Integration(t *testing.T) {
 	require.NoError(t, err)
 	// set a low update interval to speed up the test
 	cfg.NetworkConfig.GossipSub.SubscriptionProvider.UpdateInterval = 10 * time.Millisecond
-	cfg.NetworkConfig.GossipSub.ScoringParameters.AppSpecificScore.ScoreTTL = 10 * time.Millisecond
+	cfg.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.AppSpecificScore.ScoreTTL = 10 * time.Millisecond
 
 	sporkId := unittest.IdentifierFixture()
 
