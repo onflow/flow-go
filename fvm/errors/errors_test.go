@@ -43,7 +43,7 @@ func TestErrorHandling(t *testing.T) {
 		e5 := NewInvalidProposalSignatureError(flow.ProposalKey{}, e4)
 		e6 := fmt.Errorf("wrapped: %w", e5)
 
-		expectedErr := WrapCodedError(
+		expectedErr := WrapCodedFailure(
 			e3.Code(), // The shallowest failure's error code
 			e6,        // All the error message detail.
 			"failure caused by")
