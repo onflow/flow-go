@@ -38,14 +38,14 @@ on:
         type: boolean
         description: 'Observer'
         required: false
-      include_with_adx:
-        type: boolean
-        description: 'Build `with_adx` images'
-        required: false
       # GHA allows only up to 10 inputs - regroup two entries in one
-      include_without_netgo_without_adx:
+      include_alternative_amd64_builds:
         type: boolean
-        description: 'Build `without_adx` and `without_netgo_without_adx` images'
+        description: 'Build amd64 `without_adx` and `without_netgo_without_adx` images'
+        required: false
+      include_arm:
+        type: boolean
+        description: 'Build arm64
         required: false
 
 jobs:
@@ -116,19 +116,26 @@ jobs:
       run: |
         gcloud auth configure-docker
 
-    - name: Build/Push ${{ matrix.role }} images with adx 
-      if: ${{ inputs.include_with_adx }}
+    - name: Build/Push ${{ matrix.role }} amd64 images with adx (default)
       env:
         IMAGE_TAG: ${{ inputs.docker_tag }}
         CADENCE_DEPLOY_KEY: ${{ secrets.CADENCE_DEPLOY_KEY }}
       run: |
         make docker-build-${{ matrix.role }}-with-adx docker-push-${{ matrix.role }}-with-adx
 
-    - name: Build/Push ${{ matrix.role }} without netgo without adx images
-      if: ${{ inputs.include_without_netgo_without_adx }}
+    - name: Build/Push ${{ matrix.role }} amd64 images without netgo and without adx
+      if: ${{ inputs.include_alternative_amd64_builds }}
       env:
         IMAGE_TAG: ${{ inputs.docker_tag }}
         CADENCE_DEPLOY_KEY: ${{ secrets.CADENCE_DEPLOY_KEY }}
       run: |
         make docker-build-${{ matrix.role }}-without-adx docker-push-${{ matrix.role }}-without-adx |
         make docker-build-${{ matrix.role }}-without-netgo-without-adx docker-push-${{ matrix.role }}-without-netgo-without-adx
+
+    - name: Build/Push ${{ matrix.role }} arm64 images
+      if: ${{ inputs.include_arm }}
+      env:
+        IMAGE_TAG: ${{ inputs.docker_tag }}
+        CADENCE_DEPLOY_KEY: ${{ secrets.CADENCE_DEPLOY_KEY }}
+      run: |
+        make docker-build-${{ matrix.role }}-arm docker-push-${{ matrix.role }}-arm
