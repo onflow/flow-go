@@ -48,12 +48,16 @@ type Backend interface {
 	environment.ValueStore
 	environment.Meter
 	environment.EventEmitter
+	environment.BlockInfo
 }
 
 // AddressAllocator allocates addresses, used by the handler
 type AddressAllocator interface {
 	// AllocateAddress allocates an address to be used by a COA resource
-	AllocateAddress() (Address, error)
+	AllocateCOAAddress() (Address, error)
+
+	// AllocateAddress allocates an address by index to be used by a precompile contract
+	AllocatePrecompileAddress(index uint64) Address
 }
 
 // BlockStore stores the chain of blocks

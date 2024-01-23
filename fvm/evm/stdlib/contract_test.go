@@ -149,6 +149,7 @@ func deployContracts(
 	runtimeInterface *TestRuntimeInterface,
 	transactionEnvironment runtime.Environment,
 	nextTransactionLocation func() common.TransactionLocation,
+	evmAbiOnly bool,
 ) {
 
 	contractsAddressHex := contractsAddress.Hex()
@@ -201,7 +202,7 @@ func deployContracts(
 		},
 		{
 			name: stdlib.ContractName,
-			code: stdlib.ContractCode(contractsAddress),
+			code: stdlib.ContractCode(contractsAddress, evmAbiOnly),
 		},
 	}
 
@@ -322,6 +323,7 @@ func TestEVMEncodeABI(t *testing.T) {
 		runtimeInterface,
 		transactionEnvironment,
 		nextTransactionLocation,
+		true,
 	)
 
 	// Run script
@@ -450,6 +452,7 @@ func TestEVMEncodeABIComputation(t *testing.T) {
 		runtimeInterface,
 		transactionEnvironment,
 		nextTransactionLocation,
+		true,
 	)
 
 	// Run script
@@ -545,6 +548,7 @@ func TestEVMEncodeABIComputationEmptyDynamicVariables(t *testing.T) {
 		runtimeInterface,
 		transactionEnvironment,
 		nextTransactionLocation,
+		true,
 	)
 
 	// Run script
@@ -649,6 +653,7 @@ func TestEVMEncodeABIComputationDynamicVariablesAboveChunkSize(t *testing.T) {
 		runtimeInterface,
 		transactionEnvironment,
 		nextTransactionLocation,
+		true,
 	)
 
 	// Run script
@@ -747,6 +752,7 @@ func TestEVMDecodeABI(t *testing.T) {
 		runtimeInterface,
 		transactionEnvironment,
 		nextTransactionLocation,
+		true,
 	)
 
 	// Run script
@@ -881,6 +887,7 @@ func TestEVMDecodeABIComputation(t *testing.T) {
 		runtimeInterface,
 		transactionEnvironment,
 		nextTransactionLocation,
+		true,
 	)
 
 	// Run script
@@ -1154,6 +1161,7 @@ func TestEVMEncodeDecodeABIRoundtrip(t *testing.T) {
 		runtimeInterface,
 		transactionEnvironment,
 		nextTransactionLocation,
+		true,
 	)
 
 	// Run script
@@ -1232,6 +1240,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			runtimeInterface,
 			transactionEnvironment,
 			nextTransactionLocation,
+			true,
 		)
 
 		// Run script
@@ -1318,6 +1327,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			runtimeInterface,
 			transactionEnvironment,
 			nextTransactionLocation,
+			true,
 		)
 
 		// Run script
@@ -1403,6 +1413,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			runtimeInterface,
 			transactionEnvironment,
 			nextTransactionLocation,
+			true,
 		)
 
 		// Run script
@@ -1489,6 +1500,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			runtimeInterface,
 			transactionEnvironment,
 			nextTransactionLocation,
+			true,
 		)
 
 		// Run script
@@ -1575,6 +1587,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			runtimeInterface,
 			transactionEnvironment,
 			nextTransactionLocation,
+			true,
 		)
 
 		// Run script
@@ -1671,6 +1684,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			runtimeInterface,
 			transactionEnvironment,
 			nextTransactionLocation,
+			true,
 		)
 
 		// Run script
@@ -1757,6 +1771,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			runtimeInterface,
 			transactionEnvironment,
 			nextTransactionLocation,
+			true,
 		)
 
 		// Run script
@@ -1843,6 +1858,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			runtimeInterface,
 			transactionEnvironment,
 			nextTransactionLocation,
+			true,
 		)
 
 		// Run script
@@ -1929,6 +1945,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			runtimeInterface,
 			transactionEnvironment,
 			nextTransactionLocation,
+			true,
 		)
 
 		// Run script
@@ -2015,6 +2032,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			runtimeInterface,
 			transactionEnvironment,
 			nextTransactionLocation,
+			true,
 		)
 
 		// Run script
@@ -2101,6 +2119,7 @@ func TestEVMEncodeDecodeABIErrors(t *testing.T) {
 			runtimeInterface,
 			transactionEnvironment,
 			nextTransactionLocation,
+			true,
 		)
 
 		// Run script
@@ -2232,6 +2251,7 @@ func TestEVMEncodeABIWithSignature(t *testing.T) {
 		runtimeInterface,
 		transactionEnvironment,
 		nextTransactionLocation,
+		true,
 	)
 
 	// Run script
@@ -2365,6 +2385,7 @@ func TestEVMDecodeABIWithSignature(t *testing.T) {
 		runtimeInterface,
 		transactionEnvironment,
 		nextTransactionLocation,
+		true,
 	)
 
 	// Run script
@@ -2479,6 +2500,7 @@ func TestEVMDecodeABIWithSignatureMismatch(t *testing.T) {
 		runtimeInterface,
 		transactionEnvironment,
 		nextTransactionLocation,
+		true,
 	)
 
 	// Run script
@@ -2588,6 +2610,7 @@ func TestEVMAddressConstructionAndReturn(t *testing.T) {
 		runtimeInterface,
 		transactionEnvironment,
 		nextTransactionLocation,
+		true,
 	)
 
 	// Run script
@@ -2680,6 +2703,7 @@ func TestBalanceConstructionAndReturn(t *testing.T) {
 		runtimeInterface,
 		transactionEnvironment,
 		nextTransactionLocation,
+		false,
 	)
 
 	// Run script
@@ -2810,6 +2834,7 @@ func TestEVMRun(t *testing.T) {
 		runtimeInterface,
 		transactionEnvironment,
 		nextTransactionLocation,
+		false,
 	)
 
 	// Run script
@@ -2897,6 +2922,7 @@ func TestEVMCreateBridgedAccount(t *testing.T) {
 		runtimeInterface,
 		transactionEnvironment,
 		nextTransactionLocation,
+		false,
 	)
 
 	// Run script
@@ -3027,6 +3053,7 @@ func TestBridgedAccountCall(t *testing.T) {
 		runtimeInterface,
 		transactionEnvironment,
 		nextTransactionLocation,
+		false,
 	)
 
 	// Run script
@@ -3145,6 +3172,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 		runtimeInterface,
 		transactionEnvironment,
 		nextTransactionLocation,
+		false,
 	)
 
 	// Run script
@@ -3273,6 +3301,7 @@ func TestBridgedAccountWithdraw(t *testing.T) {
 		runtimeInterface,
 		transactionEnvironment,
 		nextTransactionLocation,
+		false,
 	)
 
 	// Run script
@@ -3386,6 +3415,7 @@ func TestBridgedAccountDeploy(t *testing.T) {
 		runtimeInterface,
 		transactionEnvironment,
 		nextTransactionLocation,
+		false,
 	)
 
 	// Run script
@@ -3506,6 +3536,7 @@ func TestEVMAccountBalance(t *testing.T) {
 		runtimeInterface,
 		transactionEnvironment,
 		nextTransactionLocation,
+		false,
 	)
 
 	// Run script
@@ -3524,4 +3555,112 @@ func TestEVMAccountBalance(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, expectedBalance, actual)
+}
+
+func TestEVMAccountBalanceForABIOnlyContract(t *testing.T) {
+
+	t.Parallel()
+
+	contractsAddress := flow.BytesToAddress([]byte{0x1})
+
+	expectedBalanceValue, err := cadence.NewUFix64FromParts(1, 1337000)
+	require.NoError(t, err)
+
+	handler := &testContractHandler{
+		flowTokenAddress: common.Address(contractsAddress),
+		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
+			assert.Equal(t, types.Address{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
+			assert.False(t, isAuthorized)
+
+			return &testFlowAccount{
+				address: fromAddress,
+				balance: func() types.Balance {
+					return types.Balance(expectedBalanceValue)
+				},
+			}
+		},
+	}
+
+	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+
+	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+
+	script := []byte(`
+      import EVM from 0x1
+
+      access(all)
+      fun main(): EVM.Balance {
+          let bridgedAccount <- EVM.createBridgedAccount()
+          let balance = bridgedAccount.balance()
+          destroy bridgedAccount
+          return balance
+      }
+    `)
+
+	accountCodes := map[common.Location][]byte{}
+	var events []cadence.Event
+
+	runtimeInterface := &TestRuntimeInterface{
+		Storage: NewTestLedger(nil, nil),
+		OnGetSigningAccounts: func() ([]runtime.Address, error) {
+			return []runtime.Address{runtime.Address(contractsAddress)}, nil
+		},
+		OnResolveLocation: SingleIdentifierLocationResolver(t),
+		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+			accountCodes[location] = code
+			return nil
+		},
+		OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+			code = accountCodes[location]
+			return code, nil
+		},
+		OnEmitEvent: func(event cadence.Event) error {
+			events = append(events, event)
+			return nil
+		},
+		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+			return json.Decode(nil, b)
+		},
+	}
+
+	nextTransactionLocation := NewTransactionLocationGenerator()
+	nextScriptLocation := NewScriptLocationGenerator()
+
+	// Deploy contracts
+
+	deployContracts(
+		t,
+		rt,
+		contractsAddress,
+		runtimeInterface,
+		transactionEnvironment,
+		nextTransactionLocation,
+		true,
+	)
+
+	// Run script
+
+	_, err = rt.ExecuteScript(
+		runtime.Script{
+			Source: script,
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: scriptEnvironment,
+			Location:    nextScriptLocation(),
+		},
+	)
+	require.Error(t, err)
+
+	assert.ErrorContains(
+		t,
+		err,
+		"error: cannot find type in this scope: `EVM.Balance`",
+	)
+	assert.ErrorContains(
+		t,
+		err,
+		"error: value of type `EVM` has no member `createBridgedAccount`",
+	)
 }

@@ -24,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm/emulator"
 	"github.com/onflow/flow-go/fvm/evm/handler"
+	"github.com/onflow/flow-go/fvm/evm/precompiles"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -273,6 +274,27 @@ func TestHandler_OpsWithoutEmulator(t *testing.T) {
 		})
 	})
 
+	t.Run("test address allocation", func(t *testing.T) {
+		t.Parallel()
+
+		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+				blockchain, err := handler.NewBlockStore(backend, rootAddr)
+				require.NoError(t, err)
+
+				aa, err := handler.NewAddressAllocator(backend, rootAddr)
+				require.NoError(t, err)
+
+				h := handler.NewContractHandler(flowTokenAddress, blockchain, aa, backend, nil)
+
+				foa := h.DeployACOAAccount()
+				require.NotNil(t, foa)
+
+				expectedAddress := handler.MakeCOAAddress(1)
+				require.Equal(t, expectedAddress, foa)
+			})
+		})
+	})
 }
 
 func TestHandler_COA(t *testing.T) {
@@ -390,8 +412,6 @@ func TestHandler_COA(t *testing.T) {
 	})
 
 	t.Run("test withdraw (unhappy case)", func(t *testing.T) {
-		t.Parallel()
-
 		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
@@ -513,9 +533,7 @@ func TestHandler_COA(t *testing.T) {
 				require.NotNil(t, foa)
 
 				// deposit 10000 flow
-				orgBalance, err := types.NewBalanceFromAttoFlow(new(big.Int).Mul(big.NewInt(1e18), big.NewInt(10000)))
-				require.NoError(t, err)
-				vault := types.NewFlowTokenVault(orgBalance)
+				vault := types.NewFlowTokenVault(testutils.MakeABalanceInFlow(10000))
 				foa.Deposit(vault)
 
 				testContract := testutils.GetStorageTestContract(t)
@@ -537,6 +555,31 @@ func TestHandler_COA(t *testing.T) {
 					types.Balance(0))
 
 				require.Equal(t, num, new(big.Int).SetBytes(ret))
+			})
+		})
+	})
+
+	t.Run("test call to cadence arch", func(t *testing.T) {
+		t.Parallel()
+
+		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+			blockHeight := uint64(123)
+			backend.GetCurrentBlockHeightFunc = func() (uint64, error) {
+				return blockHeight, nil
+			}
+			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+				h := SetupHandler(t, backend, rootAddr)
+
+				foa := h.AccountByAddress(h.DeployACOAAccount(), true)
+				require.NotNil(t, foa)
+
+				vault := types.NewFlowTokenVault(testutils.MakeABalanceInFlow(10000))
+				foa.Deposit(vault)
+
+				arch := handler.MakePrecompileAddress(1)
+
+				ret := foa.Call(arch, precompiles.FlowBlockHeightFuncSig[:], math.MaxUint64, types.Balance(0))
+				require.Equal(t, big.NewInt(int64(blockHeight)), new(big.Int).SetBytes(ret))
 			})
 		})
 	})
