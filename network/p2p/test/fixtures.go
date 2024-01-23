@@ -120,31 +120,26 @@ func NodeFixture(t *testing.T,
 
 	connManager, err := connection.NewConnManager(logger, parameters.MetricsCfg.Metrics, &parameters.FlowConfig.NetworkConfig.ConnectionManager)
 	require.NoError(t, err)
-	libP2PNodeBuilderParams := &p2pbuilder.LibP2PNodeBuilderConfig{
-		Logger:                     logger,
-		MetricsConfig:              parameters.MetricsCfg,
-		NetworkingType:             parameters.NetworkingType,
-		Address:                    parameters.Address,
-		NetworkKey:                 parameters.Key,
-		SporkId:                    sporkID,
-		IdProvider:                 parameters.IdProvider,
-		ResourceManagerParams:      &parameters.FlowConfig.NetworkConfig.ResourceManager,
-		RpcInspectorParams:         &parameters.FlowConfig.NetworkConfig.GossipSub.RpcInspector,
-		PeerManagerParams:          parameters.PeerManagerConfig,
-		SubscriptionProviderParams: &parameters.FlowConfig.NetworkConfig.GossipSub.SubscriptionProvider,
-		DisallowListCacheCfg: &p2p.DisallowListCacheConfig{
+
+	builder := p2pbuilder.NewNodeBuilder(
+		logger,
+		&parameters.FlowConfig.NetworkConfig.GossipSub,
+		parameters.MetricsCfg,
+		parameters.NetworkingType,
+		parameters.Address,
+		parameters.Key,
+		sporkID,
+		parameters.IdProvider,
+		&parameters.FlowConfig.NetworkConfig.ResourceManager,
+		parameters.PeerManagerConfig,
+		&p2p.DisallowListCacheConfig{
 			MaxSize: uint32(1000),
 			Metrics: metrics.NewNoopCollector(),
 		},
-		UnicastConfig: &p2pbuilderconfig.UnicastConfig{
+		&p2pbuilderconfig.UnicastConfig{
 			Unicast:                parameters.FlowConfig.NetworkConfig.Unicast,
 			RateLimiterDistributor: parameters.UnicastRateLimiterDistributor,
-		},
-		GossipSubCfg: &parameters.FlowConfig.NetworkConfig.GossipSub,
-	}
-	builder, err := p2pbuilder.NewNodeBuilder(libP2PNodeBuilderParams)
-	require.NoError(t, err)
-	builder.
+		}).
 		SetConnectionManager(connManager).
 		SetResourceManager(parameters.ResourceManager)
 
@@ -916,15 +911,6 @@ func GossipSubRpcFixture(t *testing.T, msgCnt int, opts ...GossipSubCtrlOption) 
 type GossipSubCtrlOption func(*pb.ControlMessage)
 
 // GossipSubCtrlFixture returns a ControlMessage with the given options.
-//
-// Args:
-//
-//	opts: variable number of GossipSubCtrlOption functions to configure the ControlMessage.
-//
-// Returns:
-// A ControlMessage configured with the specified options.
-// Example: GossipSubCtrlFixture(WithGraft(2, "exampleTopic"), WithPrune("topic1", "topic2")) will return a ControlMessage
-// with configured GRAFT and PRUNE messages.
 func GossipSubCtrlFixture(opts ...GossipSubCtrlOption) *pb.ControlMessage {
 	msg := &pb.ControlMessage{}
 	for _, opt := range opts {
@@ -934,16 +920,6 @@ func GossipSubCtrlFixture(opts ...GossipSubCtrlOption) *pb.ControlMessage {
 }
 
 // WithIHave adds iHave control messages of the given size and number to the control message.
-//
-// Args:
-//
-//	msgCount: number of iHave messages to add.
-//	msgIDCount: number of message IDs to add to each iHave message.
-//	topicId: topic ID for the iHave messages.
-//
-// Returns:
-// A GossipSubCtrlOption that adds iHave messages to the control message.
-// Example: WithIHave(2, 3, "exampleTopic") will add 2 iHave messages, each with 3 message IDs and the specified topic ID.
 func WithIHave(msgCount, msgIDCount int, topicId string) GossipSubCtrlOption {
 	return func(msg *pb.ControlMessage) {
 		iHaves := make([]*pb.ControlIHave, msgCount)
@@ -957,43 +933,15 @@ func WithIHave(msgCount, msgIDCount int, topicId string) GossipSubCtrlOption {
 	}
 }
 
-// WithIHaves adds iHave control messages for each topic ID with m number of message IDs.
-//
-// Args:
-//
-//	m: number of message IDs to add to each iHave message.
-//	topicIds: variable number of topic IDs for which iHave messages will be added.
-//
-// Returns:
-// A GossipSubCtrlOption that adds iHave messages to the control message.
-// Example: WithIHaves(3, "topic1", "topic2") will add iHave messages for each specified topic ID, each with 3 message IDs.
-func WithIHaves(m int, topicIds ...string) GossipSubCtrlOption {
+// WithIHaveMessageIDs adds iHave control messages with the given message IDs to the control message.
+func WithIHaveMessageIDs(msgIDs []string, topicId string) GossipSubCtrlOption {
 	return func(msg *pb.ControlMessage) {
-		iHaves := make([]*pb.ControlIHave, len(topicIds))
-		for i, topicId := range topicIds {
-			topicId := topicId
-			iHaves[i] = &pb.ControlIHave{
+		msg.Ihave = []*pb.ControlIHave{
+			{
 				TopicID:    &topicId,
-				MessageIDs: GossipSubMessageIdsFixture(m),
-			}
+				MessageIDs: msgIDs,
+			},
 		}
-		msg.Ihave = iHaves
-	}
-}
-
-// WithIWantMessageIds adds an iWant control message to the list of iWants with the provided message ids.
-// Args:
-//
-//	msgIds: list of message ids.
-//
-// Returns:
-// A GossipSubCtrlOption that adds iWant messages to the control message.
-// Example: WithIWantMessageIds("message_id_1", "message_id_2") will add one iWant message with 2 message IDs.
-func WithIWantMessageIds(messageIds ...string) GossipSubCtrlOption {
-	return func(msg *pb.ControlMessage) {
-		msg.Iwant = append(msg.Iwant, &pb.ControlIWant{
-			MessageIDs: messageIds,
-		})
 	}
 }
 
@@ -1019,17 +967,7 @@ func WithIWant(iWantCount int, msgIdsPerIWant int) GossipSubCtrlOption {
 	}
 }
 
-// WithGraft adds Graft control messages to the control message.
-// Graft messages are added based on the specified number and topic ID.
-//
-// Args:
-//
-//	msgCount: number of Graft messages to add.
-//	topicId: topic ID for the Graft messages.
-//
-// Returns:
-// A GossipSubCtrlOption that adds Graft messages to the control message.
-// Example: WithGraft(2, "exampleTopic") will add 2 Graft messages, each with the specified topic ID.
+// WithGraft adds GRAFT control messages with given topicID to the control message.
 func WithGraft(msgCount int, topicId string) GossipSubCtrlOption {
 	return func(msg *pb.ControlMessage) {
 		grafts := make([]*pb.ControlGraft, msgCount)
@@ -1042,60 +980,7 @@ func WithGraft(msgCount int, topicId string) GossipSubCtrlOption {
 	}
 }
 
-// WithGrafts adds GRAFT control messages for each topic ID to the control message.
-//
-// Args:
-//
-//	topicIds: variable number of topic IDs for which GRAFT messages will be added.
-//
-// Returns:
-// A GossipSubCtrlOption that adds GRAFT messages to the control message.
-// Example: WithGrafts("topic1", "topic2", "topic3") will add one GRAFT messages for each specified topic ID.
-func WithGrafts(topicIds ...string) GossipSubCtrlOption {
-	return func(msg *pb.ControlMessage) {
-		grafts := make([]*pb.ControlGraft, len(topicIds))
-		for i, topicId := range topicIds {
-			topicId := topicId
-			grafts[i] = &pb.ControlGraft{
-				TopicID: &topicId,
-			}
-		}
-		msg.Graft = grafts
-	}
-}
-
-// WithPrunes adds PRUNE control messages for each topic ID to the control message.
-//
-// Args:
-//
-//	topicIds: variable number of topic IDs for which PRUNE messages will be added.
-//
-// Returns:
-// A GossipSubCtrlOption that adds PRUNE messages to the control message.
-// Example: WithPrunes("topic1", "topic2", "topic3") will add one PRUNE messages for each specified topic ID.
-func WithPrunes(topicIds ...string) GossipSubCtrlOption {
-	return func(msg *pb.ControlMessage) {
-		prunes := make([]*pb.ControlPrune, len(topicIds))
-		for i, topicId := range topicIds {
-			topicId := topicId
-			prunes[i] = &pb.ControlPrune{
-				TopicID: &topicId,
-			}
-		}
-		msg.Prune = prunes
-	}
-}
-
-// WithPrune adds PRUNE control messages with the given topic ID to the control message.
-//
-// Args:
-//
-//	msgCount: number of PRUNE messages to add.
-//	topicId: topic ID for the PRUNE messages.
-//
-// Returns:
-// A GossipSubCtrlOption that adds PRUNE messages to the control message.
-// Example: WithPrune(2, "exampleTopic") will add 2 PRUNE messages, each with the specified topic ID.
+// WithPrune adds PRUNE control messages with given topicID to the control message.
 func WithPrune(msgCount int, topicId string) GossipSubCtrlOption {
 	return func(msg *pb.ControlMessage) {
 		prunes := make([]*pb.ControlPrune, msgCount)
