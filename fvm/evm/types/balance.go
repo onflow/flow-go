@@ -81,7 +81,7 @@ func (b *Balance) Sub(other *Balance) error {
 	otherInAtto := other.ToAttoFlow()
 	// check underflow b < other
 	if b.Value.Cmp(otherInAtto) == -1 {
-		return ErrBalanceConversion
+		return ErrWithdrawBalanceRounding
 	}
 	b.Value = new(big.Int).Sub(b.Value, otherInAtto)
 	return nil

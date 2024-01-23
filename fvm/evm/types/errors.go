@@ -25,10 +25,9 @@ var (
 	// TODO: we might consider this fatal
 	ErrInsufficientTotalSupply = errors.New("insufficient total supply")
 
-	// ErrBalanceConversion is returned conversion of balance has failed, usually
-	// is returned when the balance presented in attoflow has values that could
-	// be marginally lost on the conversion.
-	ErrBalanceConversion = errors.New("balance converion error")
+	// ErrWithdrawBalanceRounding is returned when withdraw call has a balance that could
+	// yeild to rounding error, i.e. the balance contains fractions smaller than 10^8 Flow (smallest unit allowed to transfer).
+	ErrWithdrawBalanceRounding = errors.New("withdraw failed! balance is susceptible to the rounding error")
 
 	// ErrNotImplemented is a fatal error when something is called that is not implemented
 	ErrNotImplemented = NewFatalError(errors.New("a functionality is called that is not implemented"))
@@ -153,10 +152,10 @@ func IsAInsufficientTotalSupplyError(err error) bool {
 	return errors.Is(err, ErrInsufficientTotalSupply)
 }
 
-// IsBalanceConversionError returns true if the error type is
-// ErrBalanceConversion
-func IsBalanceConversionError(err error) bool {
-	return errors.Is(err, ErrBalanceConversion)
+// IsWithdrawBalanceRoundingError returns true if the error type is
+// ErrWithdrawBalanceRounding
+func IsWithdrawBalanceRoundingError(err error) bool {
+	return errors.Is(err, ErrWithdrawBalanceRounding)
 }
 
 // IsAUnAuthroizedMethodCallError returns true if the error type is

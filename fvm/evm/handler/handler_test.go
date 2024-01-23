@@ -207,7 +207,8 @@ func TestHandler_TransactionRun(t *testing.T) {
 				deduction := types.NewBalanceFromAttoFlow(big.NewInt(1e17))
 				foa.Call(eoa.Address(), nil, 400000, deduction)
 				expected := orgBalance.Copy()
-				expected.Sub(deduction)
+				err := expected.Sub(deduction)
+				require.NoError(t, err)
 				require.Equal(t, expected, foa.Balance())
 
 				// transfer 0.01 flow back to the foa through
@@ -230,8 +231,10 @@ func TestHandler_TransactionRun(t *testing.T) {
 				// no panic means success here
 				handler.Run(tx, account2.Address())
 				expected = orgBalance.Copy()
-				expected.Sub(deduction)
-				expected.Add(addition)
+				err = expected.Sub(deduction)
+				require.NoError(t, err)
+				err = expected.Add(addition)
+				require.NoError(t, err)
 				require.Equal(t, expected, foa.Balance())
 
 				// fees has been collected to the coinbase
@@ -347,7 +350,7 @@ func TestHandler_BridgedAccount(t *testing.T) {
 				require.Equal(t, types.DefaultDirectCallBaseGasUsage*2, computationUsed)
 
 				// Withdraw with invalid balance
-				assertPanic(t, types.IsBalanceConversionError, func() {
+				assertPanic(t, types.IsWithdrawBalanceRoundingError, func() {
 					// deposit some money
 					foa.Deposit(vault)
 					// then withdraw invalid balance
