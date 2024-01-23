@@ -19,6 +19,8 @@ jobs:
   docker-push:
     name: Push to container registry
     runs-on: ubuntu-latest
+    env:
+      CADENCE_DEPLOY_KEY: ${{ secrets.CADENCE_DEPLOY_KEY }}
     steps:
     - name: Setup Go
       uses: actions/setup-go@v4
