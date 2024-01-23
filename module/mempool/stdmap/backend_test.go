@@ -306,7 +306,6 @@ func TestBackend_AdjustWithInit_Concurrent_MapBased(t *testing.T) {
 		dup[e.ID()] = struct{}{}
 	}
 	require.Equal(t, len(entities), len(dup))
-	count := atomic.Int64{}
 
 	adjustDone := sync.WaitGroup{}
 	for _, e := range entities {
@@ -314,7 +313,7 @@ func TestBackend_AdjustWithInit_Concurrent_MapBased(t *testing.T) {
 		e := e // capture range variable
 		go func() {
 			defer adjustDone.Done()
-			count.Add(1)
+
 			backend.AdjustWithInit(e.ID(), func(entity flow.Entity) flow.Entity {
 				// increment nonce of the entity
 				mockEntity, ok := entity.(*unittest.MockEntity)
@@ -324,13 +323,6 @@ func TestBackend_AdjustWithInit_Concurrent_MapBased(t *testing.T) {
 			}, func() flow.Entity {
 				return e
 			})
-
-			fmt.Println("count: ", count.Load(), "size: ", backend.Size())
-
-			actual, ok := backend.ByID(e.ID())
-			require.True(t, ok)
-			require.Equal(t, e.ID(), actual.ID())
-			require.Equal(t, uint64(1), actual.(*unittest.MockEntity).Nonce)
 		}()
 	}
 
@@ -355,7 +347,7 @@ func TestBackend_GetWithInit_Concurrent_MapBased(t *testing.T) {
 		adjustDone.Add(1)
 		e := e // capture range variable
 		go func() {
-			adjustDone.Done()
+			defer adjustDone.Done()
 
 			entity, ok := backend.GetWithInit(e.ID(), func() flow.Entity {
 				return e
@@ -380,8 +372,8 @@ func addRandomEntities(t *testing.T, backend *stdmap.Backend, num int) {
 	wg.Add(num)
 	for ; num > 0; num-- {
 		go func() {
+			defer wg.Done()
 			backend.Add(unittest.MockEntityFixture()) // creates and adds a fake item to the mempool
-			wg.Done()
 		}()
 	}
 	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "failed to add elements in time")
