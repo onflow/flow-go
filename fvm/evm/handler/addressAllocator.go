@@ -9,7 +9,19 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-const ledgerAddressAllocatorKey = "AddressAllocator"
+const (
+	ledgerAddressAllocatorKey = "AddressAllocator"
+	uint64ByteSize            = 8
+	addressPrefixLen          = 12
+)
+
+var (
+	// prefixes:
+	// the first 12 bytes of addresses allocation
+	// leading zeros helps with storage and all zero is reserved for the EVM precompiles
+	FlowEVMPrecompileAddressPrefix = [addressPrefixLen]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}
+	FlowEVMCOAAddressPrefix        = [addressPrefixLen]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2}
+)
 
 type AddressAllocator struct {
 	led         atree.Ledger
@@ -26,8 +38,8 @@ func NewAddressAllocator(led atree.Ledger, flexAddress flow.Address) (*AddressAl
 	}, nil
 }
 
-// AllocateAddress allocates an address
-func (aa *AddressAllocator) AllocateAddress() (types.Address, error) {
+// AllocateCOAAddress allocates an address for COA
+func (aa *AddressAllocator) AllocateCOAAddress() (types.Address, error) {
 	data, err := aa.led.GetValue(aa.flexAddress[:], []byte(ledgerAddressAllocatorKey))
 	if err != nil {
 		return types.Address{}, err
@@ -38,10 +50,7 @@ func (aa *AddressAllocator) AllocateAddress() (types.Address, error) {
 		uuid = binary.BigEndian.Uint64(data)
 	}
 
-	target := types.Address{}
-	// first 12 bytes would be zero
-	// the next 8 bytes would be an increment of the UUID index
-	binary.BigEndian.PutUint64(target[12:], uuid)
+	target := MakeCOAAddress(uuid)
 
 	// store new uuid
 	newData := make([]byte, 8)
@@ -52,4 +61,25 @@ func (aa *AddressAllocator) AllocateAddress() (types.Address, error) {
 	}
 
 	return target, nil
+}
+
+func MakeCOAAddress(index uint64) types.Address {
+	return makePrefixedAddress(index, FlowEVMCOAAddressPrefix)
+}
+
+func (aa *AddressAllocator) AllocatePrecompileAddress(index uint64) types.Address {
+	target := MakePrecompileAddress(index)
+	return target
+}
+
+func MakePrecompileAddress(index uint64) types.Address {
+	return makePrefixedAddress(index, FlowEVMPrecompileAddressPrefix)
+}
+
+func makePrefixedAddress(index uint64, prefix [addressPrefixLen]byte) types.Address {
+	var addr types.Address
+	prefixIndex := types.AddressLength - uint64ByteSize
+	copy(addr[:prefixIndex], prefix[:])
+	binary.BigEndian.PutUint64(addr[prefixIndex:], index)
+	return addr
 }
