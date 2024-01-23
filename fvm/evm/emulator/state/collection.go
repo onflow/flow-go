@@ -197,6 +197,11 @@ func (c *Collection) Destroy() ([][]byte, error) {
 	return keys, c.storage.Remove(c.omap.StorageID())
 }
 
+// Size returns the number of items in the collection
+func (c *Collection) Size() uint64 {
+	return c.omap.Count()
+}
+
 type ByteStringValue struct {
 	data []byte
 	size uint32
