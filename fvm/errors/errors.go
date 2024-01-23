@@ -114,6 +114,39 @@ func HandleRuntimeError(err error) error {
 		return NewUnknownFailure(err)
 	}
 
+	errs := []error{runErr}
+	var parentErr errors.ParentError
+	if As(err, &parentErr) {
+		errs = parentErr.ChildErrors()
+	}
+
+	codedErrs := make([]CodedError, 0)
+	for _, err := range errs {
+		coded, isUnknown := findImportantCodedError(err)
+		if isUnknown {
+			// ignore uncoded errors
+			continue
+		}
+
+		if coded.Code().IsFailure() {
+			return WrapCodedError(
+				coded.Code(),
+				err,
+				"cadence runtime failure caused by",
+			)
+		}
+
+		codedErrs = append(codedErrs, coded)
+	}
+
+	if len(codedErrs) > 0 {
+		return WrapCodedError(
+			codedErrs[0].Code(),
+			err,
+			"cadence runtime error caused by",
+		)
+	}
+
 	// All other errors are non-fatal Cadence errors.
 	return NewCadenceRuntimeError(runErr)
 }

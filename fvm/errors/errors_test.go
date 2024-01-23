@@ -4,6 +4,10 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/onflow/cadence/runtime"
+	cadenceErr "github.com/onflow/cadence/runtime/errors"
+	"github.com/onflow/cadence/runtime/sema"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -60,4 +64,108 @@ func TestErrorHandling(t *testing.T) {
 
 		require.True(t, IsFailure(e1))
 	})
+}
+
+func TestHandleRuntimeError(t *testing.T) {
+	baseErr := fmt.Errorf("base error")
+	tests := []struct {
+		name string
+		err  error
+		code ErrorCode
+	}{
+		{
+			name: "nil error",
+			err:  nil,
+			code: 0,
+		},
+		{
+			name: "unknown error",
+			err:  baseErr,
+			code: FailureCodeUnknownFailure,
+		},
+		{
+			name: "runtime error",
+			err:  runtime.Error{Err: baseErr},
+			code: ErrCodeCadenceRunTimeError,
+		},
+		{
+			name: "coded error in Unwrappable error",
+			err: runtime.Error{
+				Err: cadenceErr.ExternalError{
+					Recovered: NewScriptExecutionCancelledError(baseErr),
+				},
+			},
+			code: ErrCodeScriptExecutionCancelledError,
+		},
+		{
+			name: "coded error in ParentError error",
+			err: runtime.Error{
+				Err: cadenceErr.ExternalError{
+					Recovered: sema.CheckerError{
+						Errors: []error{
+							fmt.Errorf("first error"),
+							NewScriptExecutionTimedOutError(),
+						},
+					},
+				},
+			},
+			code: ErrCodeScriptExecutionTimedOutError,
+		},
+		{
+			name: "first coded error returned",
+			err: runtime.Error{
+				Err: cadenceErr.ExternalError{
+					Recovered: sema.CheckerError{
+						Errors: []error{
+							fmt.Errorf("first error"),
+							NewScriptExecutionTimedOutError(),
+							NewScriptExecutionCancelledError(baseErr),
+						},
+					},
+				},
+			},
+			code: ErrCodeScriptExecutionTimedOutError,
+		},
+		{
+			name: "failure returned",
+			err: runtime.Error{
+				Err: cadenceErr.ExternalError{
+					Recovered: sema.CheckerError{
+						Errors: []error{
+							fmt.Errorf("first error"),
+							NewLedgerFailure(baseErr),
+						},
+					},
+				},
+			},
+			code: FailureCodeLedgerFailure,
+		},
+		{
+			name: "error returned if before failure",
+			err: runtime.Error{
+				Err: cadenceErr.ExternalError{
+					Recovered: sema.CheckerError{
+						Errors: []error{
+							fmt.Errorf("first error"),
+							NewScriptExecutionTimedOutError(),
+							NewLedgerFailure(baseErr),
+						},
+					},
+				},
+			},
+			code: FailureCodeLedgerFailure,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := HandleRuntimeError(tc.err)
+			if tc.code == 0 {
+				assert.NoError(t, actual)
+			} else {
+				coded := actual.(CodedError)
+				assert.Equalf(t, tc.code, coded.Code(), "error code mismatch: expected %d, got %d", tc.code, coded.Code())
+			}
+		})
+	}
 }
