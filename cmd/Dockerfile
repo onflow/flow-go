@@ -23,9 +23,12 @@ ENV GOPRIVATE=
 
 COPY . .
 
-RUN --mount=type=cache,sharing=locked,target=/go/pkg/mod \
-    --mount=type=cache,target=/root/.cache/go-build \
-    --mount=type=secret,id=git_creds,dst=/root/.netrc
+# Update the git config to use SSH rather than HTTPS for clones
+RUN git config --global url.git@github.com:.insteadOf https://github.com/
+RUN mkdir ~/.ssh
+
+# Add GitHub known host to avoid prompts or failures on key check
+RUN ssh-keyscan -t rsa github.com >> ~/.ssh/known_hosts
 
 ####################################
 ## (3) Build the production app binary
@@ -44,7 +47,10 @@ ARG CGO_FLAG=""
 # https://github.com/golang/go/issues/27719#issuecomment-514747274
 RUN --mount=type=cache,sharing=locked,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    --mount=type=secret,id=git_creds,dst=/root/.netrc \
+    --mount=type=secret,id=cadence_deploy_key \
+    # We evaluate the SSH agent to safely pass in a key for cloning dependencies
+    # We explicitly use ";" rather than && as we want to safely pass if it is unavailable
+    eval `ssh-agent -s` && printf "%s\n" "$(cat /run/secrets/cadence_deploy_key)" | ssh-add - ; \
     CGO_ENABLED=1 GOOS=linux GOARCH=${GOARCH} CC="${CC}" CGO_FLAGS="${CGO_FLAG}" go build --tags "${TAGS}" -ldflags "-extldflags -static \
     -X 'github.com/onflow/flow-go/cmd/build.commit=${COMMIT}' -X  'github.com/onflow/flow-go/cmd/build.semver=${VERSION}'" \
     -o ./app ${TARGET}
@@ -68,6 +74,10 @@ ARG CGO_FLAG=""
 RUN --mount=type=ssh \
     --mount=type=cache,sharing=locked,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=secret,id=cadence_deploy_key \
+    # We evaluate the SSH agent to safely pass in a key for cloning dependencies
+    # We explicitly use ";" rather than && as we want to safely pass if it is unavailable
+    eval `ssh-agent -s` && printf "%s\n" "$(cat /run/secrets/cadence_deploy_key)" | ssh-add - ; \
     CGO_ENABLED=1 GOOS=linux GOARCH=${GOARCH} CC="${CC}" CGO_FLAGS="${CGO_FLAG}" go build --tags "netgo" -ldflags "-extldflags -static \
     -X 'github.com/onflow/flow-go/cmd/build.commit=${COMMIT}' -X  'github.com/onflow/flow-go/cmd/build.semver=${VERSION}'" \
     -gcflags="all=-N -l" -o ./app ${TARGET}

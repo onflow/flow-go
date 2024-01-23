@@ -41,6 +41,8 @@ jobs:
     - name: Install Tools
       run: make install-cross-build-tools
     - name: Docker build
+      env:
+        CADENCE_DEPLOY_KEY: ${{ secrets.CADENCE_DEPLOY_KEY }}
       run: |
         make docker-build-flow-with-adx
         make docker-build-flow-without-adx
