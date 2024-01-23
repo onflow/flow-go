@@ -367,7 +367,7 @@ func TestHandler_BridgedAccount(t *testing.T) {
 				ret := acc2.Call(
 					coa,
 					testutils.MakeCallData(t,
-						handler.COAContractABI,
+						handler.COAContractABIJSON,
 						"onERC721Received",
 						gethCommon.Address{1},
 						gethCommon.Address{1},

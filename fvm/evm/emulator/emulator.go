@@ -238,9 +238,11 @@ func (proc *procedure) withdrawFrom(address types.Address, amount *big.Int) (*ty
 
 // deployAt deploys a contract at the given target address
 // behaviour should be similar to what evm.create internal method does with
-// a few diffrences, don't need to check for previous forks given this
+// a few differences, don't need to check for previous forks given this
 // functionality was not available to anyone, we don't need to
 // follow snapshoting, given we do commit/revert style in this code base.
+// in the future we might optimize this method accepting deploy-ready byte codes
+// and skip interpreter call, gas calculations and many checks.
 func (proc *procedure) deployAt(
 	caller types.Address,
 	to types.Address,

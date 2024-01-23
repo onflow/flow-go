@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"fmt"
 	"math/big"
 
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
@@ -56,7 +57,7 @@ func NewContractHandler(
 // DeployACOAAccount deploys a cadence-owned-account and returns the address
 func (h *ContractHandler) DeployACOAAccount() types.Address {
 	target, err := h.addressAllocator.AllocateAddress()
-	gaslimit := types.GasLimit(30_000_000) // TODO figure out me
+	gaslimit := types.GasLimit(COAContractDeploymentRequiredGas)
 	handleError(err)
 	h.checkGasLimit(gaslimit)
 
@@ -70,9 +71,12 @@ func (h *ContractHandler) DeployACOAAccount() types.Address {
 		uint64(gaslimit),
 		new(big.Int),
 	)
-	// TODO use the returned result
-	h.executeAndHandleCall(h.getBlockContext(), call, 0, false)
-	return target
+	res := h.executeAndHandleCall(h.getBlockContext(), call, 0, false)
+	// check deployed contract address matches
+	if res.DeployedContractAddress != target {
+		handleError(fmt.Errorf("coa contract deployment failure for address %x", target))
+	}
+	return res.DeployedContractAddress
 }
 
 // AccountByAddress returns the account for the given address,

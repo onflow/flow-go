@@ -33,7 +33,7 @@ func (aa *AddressAllocator) AllocateAddress() (types.Address, error) {
 		return types.Address{}, err
 	}
 	// default value for uuid is 1
-	uuid := uint64(100)
+	uuid := uint64(1)
 	if len(data) > 0 {
 		uuid = binary.BigEndian.Uint64(data)
 	}
