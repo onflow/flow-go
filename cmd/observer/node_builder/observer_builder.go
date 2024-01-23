@@ -598,6 +598,26 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			defaultConfig.executionDataConfig.MaxRetryDelay,
 			"maximum delay for exponential backoff when fetching execution data fails e.g. 5m")
 		flags.Uint32Var(&builder.executionDataCacheSize, "execution-data-cache-size", defaultConfig.executionDataCacheSize, "block execution data cache size")
+	}).ValidateFlags(func() error {
+		if builder.executionDataSyncEnabled {
+			if builder.executionDataConfig.FetchTimeout <= 0 {
+				return errors.New("execution-data-fetch-timeout must be greater than 0")
+			}
+			if builder.executionDataConfig.MaxFetchTimeout < builder.executionDataConfig.FetchTimeout {
+				return errors.New("execution-data-max-fetch-timeout must be greater than execution-data-fetch-timeout")
+			}
+			if builder.executionDataConfig.RetryDelay <= 0 {
+				return errors.New("execution-data-retry-delay must be greater than 0")
+			}
+			if builder.executionDataConfig.MaxRetryDelay < builder.executionDataConfig.RetryDelay {
+				return errors.New("execution-data-max-retry-delay must be greater than or equal to execution-data-retry-delay")
+			}
+			if builder.executionDataConfig.MaxSearchAhead == 0 {
+				return errors.New("execution-data-max-search-ahead must be greater than 0")
+			}
+		}
+
+		return nil
 	})
 }
 
