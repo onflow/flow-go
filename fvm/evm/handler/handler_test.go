@@ -366,11 +366,6 @@ func TestHandler_COA(t *testing.T) {
 				h := SetupHandler(t, backend, rootAddr)
 
 				coa := h.DeployACOAAccount()
-				require.NotNil(t, coa)
-
-				// expectedAddress := types.NewAddress(gethCommon.HexToAddress("0x00000000000000000001"))
-				// require.Equal(t, expectedAddress, coa)
-
 				acc := h.AccountByAddress(coa, true)
 				require.NotEmpty(t, acc.Code())
 
@@ -379,7 +374,7 @@ func TestHandler_COA(t *testing.T) {
 				acc2 := h.AccountByAddress(coa2, true)
 				acc2.Deposit(types.NewFlowTokenVault(makeABalanceInFlow(100)))
 
-				// transfer money
+				// transfer money to COA
 				acc2.Transfer(
 					coa,
 					makeABalanceInFlow(1),

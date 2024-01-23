@@ -264,8 +264,6 @@ func (a *Account) Balance() types.Balance {
 	bl, err := blk.BalanceOf(a.address)
 	handleError(err)
 
-	// TODO: this might cause issues, we might need to update the
-	// way we represent balance
 	balance, err := types.NewBalanceFromAttoFlow(bl)
 	handleError(err)
 	return balance

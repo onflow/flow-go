@@ -20,8 +20,10 @@ const (
 	DeployCallSubType   = byte(4)
 	ContractCallSubType = byte(5)
 
-	TransferGasUsage = 21_000
-	// 21_000 for transaction + gas limit for receive and fallback
+	DepositCallGasLimit  = 21_000
+	WithdrawCallGasLimit = 21_000
+
+	// 21_000 is the minimum for a transaction + max gas allowed for receive/fallback methods
 	DefaultGasLimitForTokenTransfer = 21_000 + 2_300
 )
 
@@ -85,7 +87,7 @@ func NewDepositCall(address Address, amount *big.Int) *DirectCall {
 		To:       address,
 		Data:     nil,
 		Value:    amount,
-		GasLimit: TransferGasUsage,
+		GasLimit: DepositCallGasLimit,
 	}
 }
 
@@ -97,7 +99,7 @@ func NewWithdrawCall(address Address, amount *big.Int) *DirectCall {
 		To:       EmptyAddress,
 		Data:     nil,
 		Value:    amount,
-		GasLimit: TransferGasUsage,
+		GasLimit: WithdrawCallGasLimit,
 	}
 }
 
