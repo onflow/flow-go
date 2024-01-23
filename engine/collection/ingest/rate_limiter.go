@@ -27,6 +27,13 @@ type AddressRateLimiter struct {
 //
 // To config 3 message per minute, the per-second-basis is 0.05 (3/60), so the limit should be rate.Limit(0.05),
 // and burst is 3.
+//
+// Note: The rate limit configured for each node may differ from the effective network-wide rate limit
+// for a given payer. In particular, the number of clusters and the message propagation factor will
+// influence how the individual rate limit translates to a network-wide rate limit. 
+// For example, suppose we have 5 collection clusters and configure each Collection Node with a rate
+// limit of 1 message per second. Then, the effective network-wide rate limit for a payer address would
+// be *at least* 5 messages per second.
 func NewAddressRateLimiter(limit rate.Limit, burst int) *AddressRateLimiter {
 	return &AddressRateLimiter{
 		limiters: make(map[flow.Address]*rate.Limiter),
