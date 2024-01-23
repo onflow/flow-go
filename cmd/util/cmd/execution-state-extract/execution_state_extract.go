@@ -28,11 +28,12 @@ func getStateCommitment(commits storage.Commits, blockHash flow.Identifier) (flo
 }
 
 func extractExecutionState(
+	log zerolog.Logger,
 	dir string,
 	targetHash flow.StateCommitment,
 	outputDir string,
-	log zerolog.Logger,
 	nWorker int, // number of concurrent worker to migation payloads
+	runMigrations bool,
 ) error {
 
 	log.Info().Msg("init WAL")
@@ -83,26 +84,31 @@ func extractExecutionState(
 		<-compactor.Done()
 	}()
 
-	rwf := reporters.NewReportFileWriterFactory(dir, log)
+	var migrations []ledger.Migration
 
-	var migrations = []ledger.Migration{
-		migrators.CreateAccountBasedMigration(
-			log,
-			nWorker,
-			[]migrators.AccountBasedMigration{
-				migrators.NewAtreeRegisterMigrator(
-					rwf,
-					flagValidateMigration,
-					flagLogVerboseValidationError,
-				),
+	if runMigrations {
+		rwf := reporters.NewReportFileWriterFactory(dir, log)
 
-				&migrators.DeduplicateContractNamesMigration{},
+		migrations = []ledger.Migration{
+			migrators.CreateAccountBasedMigration(
+				log,
+				nWorker,
+				[]migrators.AccountBasedMigration{
+					migrators.NewAtreeRegisterMigrator(
+						rwf,
+						flagValidateMigration,
+						flagLogVerboseValidationError,
+					),
 
-				// This will fix storage used discrepancies caused by the
-				// DeduplicateContractNamesMigration.
-				&migrators.AccountUsageMigrator{},
-			}),
+					&migrators.DeduplicateContractNamesMigration{},
+
+					// This will fix storage used discrepancies caused by the
+					// DeduplicateContractNamesMigration.
+					&migrators.AccountUsageMigrator{},
+				}),
+		}
 	}
+
 	newState := ledger.State(targetHash)
 
 	// migrate the trie if there are migrations

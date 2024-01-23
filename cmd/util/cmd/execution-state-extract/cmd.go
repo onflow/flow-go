@@ -140,10 +140,6 @@ func run(*cobra.Command, []string) {
 		log.Warn().Msgf("--no-report flag is deprecated")
 	}
 
-	if flagNoMigration {
-		log.Warn().Msgf("--no-migration flag is deprecated")
-	}
-
 	if flagValidateMigration {
 		log.Warn().Msgf("atree migration validation flag is enabled and will increase duration of migration")
 	}
@@ -153,11 +149,12 @@ func run(*cobra.Command, []string) {
 	}
 
 	err := extractExecutionState(
+		log.Logger,
 		flagExecutionStateDir,
 		stateCommitment,
 		flagOutputDir,
-		log.Logger,
 		flagNWorker,
+		!flagNoMigration,
 	)
 
 	if err != nil {
