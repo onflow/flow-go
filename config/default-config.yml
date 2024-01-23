@@ -140,38 +140,66 @@ network-config:
       # The size of the queue for notifications about invalid RPC messages
       notification-cache-size: 10_000
       validation: # RPC control message validation inspector configs
-        # Rpc validation inspector number of pool workers
-        workers: 5
-        # The size of the queue used by worker pool for the control message validation inspector
-        queue-size: 100
-        # The max sample size used for RPC message validation. If the total number of RPC messages exceeds this value a sample will be taken but messages will not be truncated
-        message-max-sample-size: 1000
-        # Max number of control messages in a sample to be inspected when inspecting GRAFT and PRUNE message types. If the total number of control messages (GRAFT or PRUNE)
-        # exceeds this max sample size then the respective message will be truncated before being processed.
-        graft-and-prune-message-max-sample-size: 1000
-        # The threshold at which an error will be returned if the number of invalid RPC messages exceeds this value
-        error-threshold: 500
-        ihave: # Max number of ihave messages in a sample to be inspected. If the number of ihave messages exceeds this configured value
-          # the control message ihaves will be truncated to the max sample size. This sample is randomly selected.
+        inspection-queue:
+          # Rpc validation inspector number of pool workers
+          workers: 5
+          # The size of the queue used by worker pool for the control message validation inspector
+          queue-size: 100
+        publish-messages:
+          # The maximum number of messages in a single RPC message that are randomly sampled for async inspection.
+          #	When the size of a single RPC message exceeds this threshold, a random sample is taken for inspection, but the RPC message is not truncated.
           max-sample-size: 1000
-          # Max number of ihave message ids in a sample to be inspected per ihave. Each ihave message includes a list of message ids
-          # each. If the size of the message ids list for a single ihave message exceeds the configured max message id sample size the list of message ids will be truncated.
-          max-message-id-sample-size: 1000
+          # The threshold at which an error will be returned if the number of invalid RPC messages exceeds this value
+          error-threshold: 500
+        graft-and-prune:
+          # The maximum number of GRAFT or PRUNE messages in a single RPC message.
+          # When the total number of GRAFT or PRUNE messages in a single RPC message exceeds this threshold,
+          #	a random sample of GRAFT or PRUNE messages will be taken and the RPC message will be truncated to this sample size.
+          message-count-threshold: 1000
+          # Maximum number of total duplicate topic ids in a single GRAFT or PRUNE message, ideally this should be 0 but we allow for some tolerance
+          # to avoid penalizing peers that are not malicious but are misbehaving due to bugs or other issues.
+          # A topic id is considered duplicate if it appears more than once in a single GRAFT or PRUNE message.
+          duplicate-topic-id-threshold: 50
+        ihave:
+          # The maximum allowed number of iHave messages in a single RPC message.
+          #	Each iHave message represents the list of message ids. When the total number of iHave messages
+          #	in a single RPC message exceeds this threshold, a random sample of iHave messages will be taken and the RPC message will be truncated to this sample size.
+          #	The sample size is equal to the configured message-count-threshold.
+          message-count-threshold: 1000
+          # The maximum allowed number of message ids in a single iHave message.
+          #	Each iHave message represents the list of message ids for a specific topic, and this parameter controls the maximum number of message ids
+          #	that can be included in a single iHave message. When the total number of message ids in a single iHave message exceeds this threshold,
+          #	a random sample of message ids will be taken and the iHave message will be truncated to this sample size.
+          #	The sample size is equal to the configured message-id-count-threshold.
+          message-id-count-threshold: 1000
+          # The tolerance threshold for having duplicate topics in an iHave message under inspection.
+          #	When the total number of duplicate topic ids in a single iHave message exceeds this threshold, the inspection of message will fail.
+          #	Note that a topic ID is counted as a duplicate only if it is repeated more than once.
+          duplicate-topic-id-threshold: 50
+          # Threshold of tolerance for having duplicate message IDs in a single iHave message under inspection.
+          # When the total number of duplicate message ids in a single iHave message exceeds this threshold, the inspection of message will fail.
+          # Ideally, an iHave message should not have any duplicate message IDs, hence a message id is considered duplicate when it is repeated more than once
+          # within the same iHave message. When the total number of duplicate message ids in a single iHave message exceeds this threshold, the inspection of message will fail.
+          duplicate-message-id-threshold: 100
         iwant:
-          # Max number of iwant messages in a sample to be inspected. If the total number of iWant control messages
-          # exceeds this max sample size then the respective message will be truncated before being processed.
-          max-sample-size: 1000
-          # Max number of iwant message ids in a sample to be inspected per iwant. Each iwant message includes a list of message ids
-          # each, if the size of this list exceeds the configured max message id sample size the list of message ids will be truncated.
-          max-message-id-sample-size: 1000
-          # The allowed threshold of iWant messages received without a corresponding tracked iHave message that was sent. If the cache miss threshold is exceeded an
-          # invalid control message notification is disseminated and the sender will be penalized.
-          cache-miss-threshold: .5
-          # The iWants size at which message id cache misses will be checked.
-          cache-miss-check-size: 1000
-          # The max allowed duplicate message IDs in a single iWant control message. If the duplicate message threshold is exceeded an invalid control message
-          # notification is disseminated and the sender will be penalized.
-          duplicate-message-id-threshold: .15
+          # The maximum allowed number of iWant messages in a single RPC message.
+          #	Each iWant message represents the list of message ids. When the total number of iWant messages
+          #	in a single RPC message exceeds this threshold, a random sample of iWant messages will be taken and the RPC message will be truncated to this sample size.
+          #	The sample size is equal to the configured message-count-threshold.
+          message-count-threshold: 1000
+          # The maximum allowed number of message ids in a single iWant message.
+          #	Each iWant message represents the list of message ids for a specific topic, and this parameter controls the maximum number of message ids
+          #	that can be included in a single iWant message. When the total number of message ids in a single iWant message exceeds this threshold,
+          #	a random sample of message ids will be taken and the iWant message will be truncated to this sample size.
+          #	The sample size is equal to the configured message-id-count-threshold.
+          message-id-count-threshold: 1000
+          # The allowed threshold of iWant messages received without a corresponding tracked iHave message that was sent.
+          # If the cache miss threshold is exceeded an invalid control message notification is disseminated and the sender will be penalized.
+          cache-miss-threshold: 500
+          # The max allowed number of duplicate message ids in a single iwant message.
+          # Note that ideally there should be no duplicate message ids in a single iwant message but
+          # we allow for some tolerance to avoid penalizing peers that are not malicious
+          duplicate-message-id-threshold: 100
         cluster-prefixed-messages:
           # Cluster prefixed control message validation configs
           # The size of the cache used to track the amount of cluster prefixed topics received by peers
@@ -225,21 +253,28 @@ network-config:
             skip-atomic-validation: true
             # This value is applied to the square of the number of invalid message deliveries on a topic.
             # It is used to penalize peers that send invalid messages. By an invalid message, we mean a message that is not signed by the
-            # publisher, or a message that is not signed by the peer that sent it. We set it to -1.0, which means that with around 14 invalid
+            # publisher, or a message that is not signed by the peer that sent it.
+            # An invalid message also can be a self-origin message, i.e., the peer sees its own message bounced back to it.
+            # GossipSub has an edge-case that a peer may inadvertently request a self-origin message from a peer that it is connected to, through iHave-iWant messages, which is a
+            # false-positive edge-case.
+            # We set it to -10e-4, which means that with around 1414 invalid
             # message deliveries within a gossipsub heartbeat interval, the peer will be disconnected.
+            # Note that we intentionally set this threshold high to avoid false-positively penalizing nodes due to self-origin message requests by iHave-iWants (a known issue in gossipsub).
             # The supporting math is as follows:
             # - each staked (i.e., authorized) peer is rewarded by the fixed reward of 100 (i.e., DefaultStakedIdentityReward).
-            # - x invalid message deliveries will result in a penalty of x^2 * DefaultTopicInvalidMessageDeliveriesWeight, i.e., -x^2.
+            # - x invalid message deliveries will result in a penalty of x^2 * DefaultTopicInvalidMessageDeliveriesWeight, i.e., -x^2 * 10-e4.
             # - the peer will be disconnected when its penalty reaches -100 (i.e., MaxAppSpecificPenalty).
-            # - so, the maximum number of invalid message deliveries that a peer can have before being disconnected is sqrt(200/DefaultTopicInvalidMessageDeliveriesWeight) ~ 14.
-            invalid-message-deliveries-weight: -1.0
+            # - so, the maximum number of invalid message deliveries that a peer can have before being disconnected is sqrt(200/10-e4) ~ 1414.
+            invalid-message-deliveries-weight: -10e-4
             # The decay factor used to decay the number of invalid message deliveries.
             # The total number of invalid message deliveries is multiplied by this factor at each heartbeat interval to
             # decay the number of invalid message deliveries, and prevent the peer from being disconnected if it stops
-            # sending invalid messages. We set it to 0.99, which means that the number of invalid message deliveries will
-            # decay by 1% at each heartbeat interval.
+            # sending invalid messages. We set it to 0.5, which means that the number of invalid message deliveries will
+            # decay by 50% at each heartbeat interval.
             # The decay heartbeats are defined by the heartbeat interval of the gossipsub scoring system, which is 1 Minute (defaultDecayInterval).
-            invalid-message-deliveries-decay: 0.99
+            # Note that we set the decay factor low so that the invalid message deliveries will be decayed fast enough to prevent the peer from being disconnected on mediocre loads.
+            # This is to address the false-positive disconnections that we observed in the network due to the self-origin message requests by iHave-iWants (a known issue in gossipsub).
+            invalid-message-deliveries-decay: 0.5
             # The default time in mesh quantum for the GossipSub scoring system. It is used to gauge
             # a discrete time interval for the time in mesh counter. We set it to 1 hour, which means that every one complete hour a peer is
             # in a topic mesh, the time in mesh counter will be incremented by 1 and is counted towards the availability score of the peer in that topic mesh.
