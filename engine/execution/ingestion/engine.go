@@ -680,7 +680,6 @@ func (e *Engine) addCollectionToMempool(
 				blockID)
 		}
 
-		// record collection max height metrics
 		e.metrics.UpdateCollectionMaxHeight(executableBlock.Block.Header.Height)
 
 		if completeCollection.IsCompleted() {
