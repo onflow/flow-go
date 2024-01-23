@@ -155,6 +155,54 @@ func TestHandleRuntimeError(t *testing.T) {
 			},
 			code: FailureCodeLedgerFailure,
 		},
+		{
+			name: "embedded coded errors return deepest error",
+			err: runtime.Error{
+				Err: cadenceErr.ExternalError{
+					Recovered: sema.CheckerError{
+						Errors: []error{
+							fmt.Errorf("first error"),
+							NewScriptExecutionCancelledError(
+								NewScriptExecutionTimedOutError(),
+							),
+						},
+					},
+				},
+			},
+			code: ErrCodeScriptExecutionTimedOutError,
+		},
+		{
+			name: "failure with embedded error returns failure",
+			err: runtime.Error{
+				Err: cadenceErr.ExternalError{
+					Recovered: sema.CheckerError{
+						Errors: []error{
+							fmt.Errorf("first error"),
+							NewLedgerFailure(
+								NewScriptExecutionTimedOutError(),
+							),
+						},
+					},
+				},
+			},
+			code: FailureCodeLedgerFailure,
+		},
+		{
+			name: "coded error with embedded failure returns failure",
+			err: runtime.Error{
+				Err: cadenceErr.ExternalError{
+					Recovered: sema.CheckerError{
+						Errors: []error{
+							fmt.Errorf("first error"),
+							NewScriptExecutionCancelledError(
+								NewLedgerFailure(baseErr),
+							),
+						},
+					},
+				},
+			},
+			code: FailureCodeLedgerFailure,
+		},
 	}
 
 	for _, tc := range tests {
@@ -162,9 +210,26 @@ func TestHandleRuntimeError(t *testing.T) {
 			actual := HandleRuntimeError(tc.err)
 			if tc.code == 0 {
 				assert.NoError(t, actual)
-			} else {
-				coded := actual.(CodedError)
+				return
+			}
+
+			coded, ok := actual.(CodedError)
+			require.True(t, ok, "error is not a CodedError")
+
+			if tc.code == FailureCodeUnknownFailure {
 				assert.Equalf(t, tc.code, coded.Code(), "error code mismatch: expected %d, got %d", tc.code, coded.Code())
+				return
+			}
+
+			// split the error to ensure that the wrapped error is available
+			actualCoded, failureCoded := SplitErrorTypes(coded)
+
+			if tc.code.IsFailure() {
+				assert.NoError(t, actualCoded)
+				assert.Equalf(t, tc.code, failureCoded.Code(), "error code mismatch: expected %d, got %d", tc.code, failureCoded.Code())
+			} else {
+				assert.NoError(t, failureCoded)
+				assert.Equalf(t, tc.code, actualCoded.Code(), "error code mismatch: expected %d, got %d", tc.code, actualCoded.Code())
 			}
 		})
 	}

@@ -77,7 +77,7 @@ func NewPayerBalanceCheckFailure(
 	payer flow.Address,
 	err error,
 ) CodedError {
-	return WrapCodedError(
+	return WrapCodedFailure(
 		FailureCodePayerBalanceCheckFailure,
 		err,
 		"failed to check if the payer %s has sufficient balance",
@@ -89,7 +89,7 @@ func NewPayerBalanceCheckFailure(
 func NewDerivedDataCacheImplementationFailure(
 	err error,
 ) CodedError {
-	return WrapCodedError(
+	return WrapCodedFailure(
 		FailureCodeDerivedDataCacheImplementationFailure,
 		err,
 		"implementation error in derived data cache")
@@ -100,7 +100,7 @@ func NewDerivedDataCacheImplementationFailure(
 func NewRandomSourceFailure(
 	err error,
 ) CodedError {
-	return WrapCodedError(
+	return WrapCodedFailure(
 		FailureCodeRandomSourceFailure,
 		err,
 		"implementation error in random source provider")

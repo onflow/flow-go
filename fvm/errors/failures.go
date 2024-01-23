@@ -5,7 +5,7 @@ import (
 )
 
 func NewUnknownFailure(err error) CodedError {
-	return WrapCodedError(
+	return WrapCodedFailure(
 		FailureCodeUnknownFailure,
 		err,
 		"unknown failure")
@@ -17,7 +17,7 @@ func NewEncodingFailuref(
 	msg string,
 	args ...interface{},
 ) CodedError {
-	return WrapCodedError(
+	return WrapCodedFailure(
 		FailureCodeEncodingFailure,
 		err,
 		"encoding failed: "+msg,
@@ -27,7 +27,7 @@ func NewEncodingFailuref(
 // NewLedgerFailure constructs a new CodedError which captures a fatal error
 // cause by ledger failures.
 func NewLedgerFailure(err error) CodedError {
-	return WrapCodedError(
+	return WrapCodedFailure(
 		FailureCodeLedgerFailure,
 		err,
 		"ledger returns unsuccessful")
@@ -42,7 +42,7 @@ func IsLedgerFailure(err error) bool {
 // NewStateMergeFailure constructs a new CodedError which captures a fatal
 // caused by state merge.
 func NewStateMergeFailure(err error) CodedError {
-	return WrapCodedError(
+	return WrapCodedFailure(
 		FailureCodeStateMergeFailure,
 		err,
 		"can not merge the state")
@@ -51,7 +51,7 @@ func NewStateMergeFailure(err error) CodedError {
 // NewBlockFinderFailure constructs a new CodedError which captures a fatal
 // caused by block finder.
 func NewBlockFinderFailure(err error) CodedError {
-	return WrapCodedError(
+	return WrapCodedFailure(
 		FailureCodeBlockFinderFailure,
 		err,
 		"can not retrieve the block")
@@ -63,7 +63,7 @@ func NewBlockFinderFailure(err error) CodedError {
 func NewParseRestrictedModeInvalidAccessFailure(
 	spanName trace.SpanName,
 ) CodedError {
-	return NewCodedError(
+	return NewCodedFailure(
 		FailureCodeParseRestrictedModeInvalidAccessFailure,
 		"cannot access %s while cadence is in parse restricted mode",
 		spanName)
