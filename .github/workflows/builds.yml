@@ -41,7 +41,7 @@ on:
       # GHA allows only up to 10 inputs - regroup two entries in one
       include_alternative_builds:
         type: boolean
-        description: 'Build amd64 `without_adx` and `without_netgo_without_adx` images', and arm64 images
+        description: 'Build amd64 `without_adx` and `without_netgo_without_adx` images, and arm64 images'
         required: false
 
 jobs:
