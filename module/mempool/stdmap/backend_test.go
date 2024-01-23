@@ -296,7 +296,6 @@ func TestBackend_GetWithInit_Concurrent_HeroCache(t *testing.T) {
 // TestBackend_AdjustWithInit_Concurrent_MapBased tests the AdjustWithInit method of the Backend with golang map as the backdata.
 // It concurrently attempts on adjusting non-existent entities, and verifies that the entities are initialized and adjusted correctly.
 func TestBackend_AdjustWithInit_Concurrent_MapBased(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flakey on CI, fix is in progress")
 	sizeLimit := uint(100)
 	backend := stdmap.NewBackend(stdmap.WithLimit(sizeLimit))
 	entities := unittest.EntityListFixture(sizeLimit)
