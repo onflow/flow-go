@@ -129,3 +129,14 @@ func NewContractCall(caller Address, to Address, data Data, gasLimit uint64, val
 		GasLimit: gasLimit,
 	}
 }
+
+type GasLimit uint64
+
+type Code []byte
+
+type Data []byte
+
+// AsBigInt process the data and return it as a big integer
+func (d Data) AsBigInt() *big.Int {
+	return new(big.Int).SetBytes(d)
+}

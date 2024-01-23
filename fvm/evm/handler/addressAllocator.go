@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"bytes"
 	"encoding/binary"
 
 	"github.com/onflow/atree"
@@ -13,16 +12,7 @@ import (
 const (
 	ledgerAddressAllocatorKey = "AddressAllocator"
 	uint64ByteSize            = 8
-	addressPrefixLen          = 12
-)
-
-var (
-	// prefixes:
-	// the first 12 bytes of addresses allocation
-	// leading zeros helps with storage and all zero is reserved for the EVM precompiles
-	FlowEVMPrecompileAddressPrefix = [addressPrefixLen]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}
-	FlowEVMCOAAddressPrefix        = [addressPrefixLen]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2}
-	// this seed is used for shuffling address index
+	// addressIndexShuffleSeed is used for shuffling address index
 	// shuffling index is used to make address postfixes look random
 	addressIndexShuffleSeed = uint64(0xFFEEDDCCBBAA9987)
 )
@@ -68,7 +58,7 @@ func (aa *AddressAllocator) AllocateCOAAddress() (types.Address, error) {
 }
 
 func MakeCOAAddress(index uint64) types.Address {
-	return makePrefixedAddress(shuffleAddressIndex(index), FlowEVMCOAAddressPrefix)
+	return makePrefixedAddress(shuffleAddressIndex(index), types.FlowEVMCOAAddressPrefix)
 }
 
 func (aa *AddressAllocator) AllocatePrecompileAddress(index uint64) types.Address {
@@ -77,10 +67,13 @@ func (aa *AddressAllocator) AllocatePrecompileAddress(index uint64) types.Addres
 }
 
 func MakePrecompileAddress(index uint64) types.Address {
-	return makePrefixedAddress(index, FlowEVMPrecompileAddressPrefix)
+	return makePrefixedAddress(index, types.FlowEVMExtendedPrecompileAddressPrefix)
 }
 
-func makePrefixedAddress(index uint64, prefix [addressPrefixLen]byte) types.Address {
+func makePrefixedAddress(
+	index uint64,
+	prefix [types.FlowEVMSpecialAddressPrefixLen]byte,
+) types.Address {
 	var addr types.Address
 	prefixIndex := types.AddressLength - uint64ByteSize
 	copy(addr[:prefixIndex], prefix[:])
@@ -90,9 +83,4 @@ func makePrefixedAddress(index uint64, prefix [addressPrefixLen]byte) types.Addr
 
 func shuffleAddressIndex(preShuffleIndex uint64) uint64 {
 	return uint64(preShuffleIndex * addressIndexShuffleSeed)
-}
-
-// IsACOAAddress returns true if the address is a COA address
-func IsACOAAddress(addr types.Address) bool {
-	return bytes.HasPrefix(addr[:], FlowEVMCOAAddressPrefix[:])
 }
