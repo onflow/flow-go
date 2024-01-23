@@ -175,7 +175,7 @@ func (a *Account) Address() types.Address {
 //
 // TODO: we might need to meter computation for read only operations as well
 // currently the storage limits is enforced
-func (a *Account) Balance() types.Balance {
+func (a *Account) Balance() *types.Balance {
 	ctx := a.fch.getBlockContext()
 
 	blk, err := a.fch.emulator.NewReadOnlyBlockView(ctx)
@@ -184,9 +184,7 @@ func (a *Account) Balance() types.Balance {
 	bl, err := blk.BalanceOf(a.address)
 	handleError(err)
 
-	balance, err := types.NewBalanceFromAttoFlow(bl)
-	handleError(err)
-	return balance
+	return types.NewBalanceFromAttoFlow(bl)
 }
 
 // Deposit deposits the token from the given vault into the flow evm main vault
@@ -204,7 +202,7 @@ func (a *Account) Deposit(v *types.FLOWTokenVault) {
 
 // Withdraw deducts the balance from the account and
 // withdraw and return flow token from the Flex main vault.
-func (a *Account) Withdraw(b types.Balance) *types.FLOWTokenVault {
+func (a *Account) Withdraw(b *types.Balance) *types.FLOWTokenVault {
 	a.checkAuthorized()
 
 	cfg := a.fch.getBlockContext()
@@ -216,7 +214,10 @@ func (a *Account) Withdraw(b types.Balance) *types.FLOWTokenVault {
 	if b.ToAttoFlow().Uint64() > bp.TotalSupply {
 		handleError(types.ErrInsufficientTotalSupply)
 	}
-
+	// Don't allow withdraw for balances that has rounding error
+	if b.HasUFix64RoundingError() {
+		handleError(types.ErrBalanceConversion)
+	}
 	call := types.NewWithdrawCall(
 		a.address,
 		b.ToAttoFlow(),
@@ -227,7 +228,7 @@ func (a *Account) Withdraw(b types.Balance) *types.FLOWTokenVault {
 }
 
 // Transfer transfers tokens between accounts
-func (a *Account) Transfer(to types.Address, balance types.Balance) {
+func (a *Account) Transfer(to types.Address, balance *types.Balance) {
 	a.checkAuthorized()
 
 	ctx := a.fch.getBlockContext()
@@ -244,7 +245,7 @@ func (a *Account) Transfer(to types.Address, balance types.Balance) {
 // Deploy deploys a contract to the EVM environment
 // the new deployed contract would be at the returned address and
 // the contract data is not controlled by the caller accounts
-func (a *Account) Deploy(code types.Code, gaslimit types.GasLimit, balance types.Balance) types.Address {
+func (a *Account) Deploy(code types.Code, gaslimit types.GasLimit, balance *types.Balance) types.Address {
 	a.checkAuthorized()
 	a.fch.checkGasLimit(gaslimit)
 
@@ -262,7 +263,7 @@ func (a *Account) Deploy(code types.Code, gaslimit types.GasLimit, balance types
 // it would limit the gas used according to the limit provided
 // given it doesn't goes beyond what Flow transaction allows.
 // the balance would be deducted from the OFA account and would be transferred to the target address
-func (a *Account) Call(to types.Address, data types.Data, gaslimit types.GasLimit, balance types.Balance) types.Data {
+func (a *Account) Call(to types.Address, data types.Data, gaslimit types.GasLimit, balance *types.Balance) types.Data {
 	a.checkAuthorized()
 	a.fch.checkGasLimit(gaslimit)
 	call := types.NewContractCall(

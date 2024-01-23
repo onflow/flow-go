@@ -153,6 +153,12 @@ func IsAInsufficientTotalSupplyError(err error) bool {
 	return errors.Is(err, ErrInsufficientTotalSupply)
 }
 
+// IsBalanceConversionError returns true if the error type is
+// ErrBalanceConversion
+func IsBalanceConversionError(err error) bool {
+	return errors.Is(err, ErrBalanceConversion)
+}
+
 // IsAUnAuthroizedMethodCallError returns true if the error type is
 // UnAuthroizedMethodCallError
 func IsAUnAuthroizedMethodCallError(err error) bool {

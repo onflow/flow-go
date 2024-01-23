@@ -16,7 +16,7 @@ type Account interface {
 	Address() Address
 
 	// Returns balance of this account
-	Balance() Balance
+	Balance() *Balance
 
 	// Deposit deposits the token from the given vault into this account
 	Deposit(*FLOWTokenVault)
@@ -24,16 +24,16 @@ type Account interface {
 	// Withdraw withdraws the balance from account and
 	// return it as a FlowTokenVault
 	// works only for bridged accounts
-	Withdraw(Balance) *FLOWTokenVault
+	Withdraw(*Balance) *FLOWTokenVault
 
 	// Transfer is a utility method on top of call for transfering tokens to another account
-	Transfer(to Address, balance Balance)
+	Transfer(to Address, balance *Balance)
 
 	// Deploy deploys a contract to the environment
 	// the new deployed contract would be at the returned address and
 	// the contract data is not controlled by the bridge account
 	// works only for bridged accounts
-	Deploy(Code, GasLimit, Balance) Address
+	Deploy(Code, GasLimit, *Balance) Address
 
 	// Call calls a smart contract function with the given data.
 	// The gas usage is limited by the given gas limit,
@@ -43,5 +43,5 @@ type Account interface {
 	// if no data is provided it would behave as transfering tokens to the
 	// target address
 	// works only for bridged accounts
-	Call(Address, Data, GasLimit, Balance) Data
+	Call(Address, Data, GasLimit, *Balance) Data
 }
