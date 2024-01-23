@@ -108,7 +108,7 @@ func (m *preMigration) MigrateAccount(
 
 	accountHash, err := m.v.hashAccountCadenceValues(address, payloads)
 	if err != nil {
-		m.log.Info().
+		m.log.Error().
 			Err(err).
 			Hex("address", address[:]).
 			Msg("failed to hash cadence values")
