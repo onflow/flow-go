@@ -280,8 +280,10 @@ docker-ci-integration:
 install-cross-build-tools:
 	if [ "$(UNAME)" = "Debian" ] ; then \
 		apt-get update && apt-get -y install apt-utils gcc-aarch64-linux-gnu ; \
+	elif [ "$(UNAME)" = "Linux" ] ; then \
+		apt-get update && apt-get -y install apt-utils gcc-aarch64-linux-gnu ; \
 	else \
-		echo "only works on Debian!" ; \
+		echo "this target only works on Debian or Linux, host runs on" $(UNAME) ; \
 	fi
 
 .PHONY: docker-native-build-collection
