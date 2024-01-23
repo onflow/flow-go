@@ -22,20 +22,22 @@ func TestAddressAllocator(t *testing.T) {
 			adr := aa.AllocatePrecompileAddress(3)
 			expectedAddress := types.NewAddress(gethCommon.HexToAddress("0x0000000000000000000000010000000000000003"))
 			require.Equal(t, expectedAddress, adr)
+			require.False(t, handler.IsACOAAddress(adr))
 
 			// test default value fall back
 			adr, err = aa.AllocateCOAAddress()
 			require.NoError(t, err)
-			expectedAddress = types.NewAddress(gethCommon.HexToAddress("0x0000000000000000000000020000000000000001"))
+			expectedAddress = types.NewAddress(gethCommon.HexToAddress("0x000000000000000000000002ffeeddccbbaa9987"))
 			require.Equal(t, expectedAddress, adr)
+			require.True(t, handler.IsACOAAddress(adr))
 
 			// continous allocation logic
 			adr, err = aa.AllocateCOAAddress()
 			require.NoError(t, err)
-			expectedAddress = types.NewAddress(gethCommon.HexToAddress("0x0000000000000000000000020000000000000002"))
+			expectedAddress = types.NewAddress(gethCommon.HexToAddress("0x000000000000000000000002ffddbb997755330e"))
 			require.Equal(t, expectedAddress, adr)
+			require.True(t, handler.IsACOAAddress(adr))
 		})
-
 	})
 
 }

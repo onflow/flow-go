@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"bytes"
 	"encoding/binary"
 
 	"github.com/onflow/atree"
@@ -21,6 +22,9 @@ var (
 	// leading zeros helps with storage and all zero is reserved for the EVM precompiles
 	FlowEVMPrecompileAddressPrefix = [addressPrefixLen]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}
 	FlowEVMCOAAddressPrefix        = [addressPrefixLen]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2}
+	// this seed is used for shuffling address index
+	// shuffling index is used to make address postfixes look random
+	addressIndexShuffleSeed = uint64(0xFFEEDDCCBBAA9987)
 )
 
 type AddressAllocator struct {
@@ -44,7 +48,7 @@ func (aa *AddressAllocator) AllocateCOAAddress() (types.Address, error) {
 	if err != nil {
 		return types.Address{}, err
 	}
-	// default value for uuid is 1
+	// default value for uuid is 1, zero is not good for shuffling
 	uuid := uint64(1)
 	if len(data) > 0 {
 		uuid = binary.BigEndian.Uint64(data)
@@ -64,7 +68,7 @@ func (aa *AddressAllocator) AllocateCOAAddress() (types.Address, error) {
 }
 
 func MakeCOAAddress(index uint64) types.Address {
-	return makePrefixedAddress(index, FlowEVMCOAAddressPrefix)
+	return makePrefixedAddress(shuffleAddressIndex(index), FlowEVMCOAAddressPrefix)
 }
 
 func (aa *AddressAllocator) AllocatePrecompileAddress(index uint64) types.Address {
@@ -82,4 +86,13 @@ func makePrefixedAddress(index uint64, prefix [addressPrefixLen]byte) types.Addr
 	copy(addr[:prefixIndex], prefix[:])
 	binary.BigEndian.PutUint64(addr[prefixIndex:], index)
 	return addr
+}
+
+func shuffleAddressIndex(preShuffleIndex uint64) uint64 {
+	return uint64(preShuffleIndex * addressIndexShuffleSeed)
+}
+
+// IsACOAAddress returns true if the address is a COA address
+func IsACOAAddress(addr types.Address) bool {
+	return bytes.HasPrefix(addr[:], FlowEVMCOAAddressPrefix[:])
 }
