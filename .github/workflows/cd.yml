@@ -2,18 +2,9 @@ name: CD
 
 on:
   push:
-    branches:
-      - 'auto-cadence-upgrade/**'
-      - staging
-      - trying
-      - 'feature/**'
-      - 'v[0-9]+.[0-9]+'
-  pull_request:
-    branches:
-      - master*
-      - 'auto-cadence-upgrade/**'
-      - 'feature/**'
-      - 'v[0-9]+.[0-9]+'
+    tags: 
+      - '*'
+      - "!daily-*"
 
 jobs:
   docker-push:
