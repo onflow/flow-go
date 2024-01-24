@@ -5,7 +5,6 @@ import (
 	"math"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/fixedpoint"
 )
@@ -16,8 +15,8 @@ var (
 	UFixedToAttoConversionScale    = AttoScale - UFixedScale
 	UFixToAttoConversionMultiplier = new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(UFixedToAttoConversionScale)), nil)
 
-	OneFlow           = cadence.UFix64(uint64(math.Pow(10, float64(UFixedScale))))
-	OneFlowInAttoFlow = new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(AttoScale)), nil)
+	OneFlowInUFix64 = cadence.UFix64(uint64(math.Pow(10, float64(UFixedScale))))
+	OneFlowBalance  = Balance(new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(AttoScale)), nil))
 )
 
 // Balance represents the balance of an address
@@ -26,82 +25,60 @@ var (
 // But on the FLOW Vaults, we use Cadence.UFix64 to store values in Flow.
 // this could result in accidental conversion mistakes, the balance object here would
 // do the conversions and does appropriate checks.
-type Balance struct {
-	Value *big.Int
+type Balance *big.Int
+
+// NewBalanceconstructs a new balance from an atto flow value
+func NewBalance(inp *big.Int) Balance {
+	return Balance(inp)
 }
 
-// NewBalance constructs a new balance from flow value (how its stored in Cadence Flow)
-func NewBalance(inp cadence.UFix64) *Balance {
-	return &Balance{
-		Value: new(big.Int).Mul(
-			new(big.Int).SetUint64(uint64(inp)),
-			UFixToAttoConversionMultiplier),
-	}
+// NewBalanceFromUFix64 constructs a new balance from flow value (how its stored in Cadence Flow)
+func NewBalanceFromUFix64(inp cadence.UFix64) Balance {
+	return new(big.Int).Mul(
+		new(big.Int).SetUint64(uint64(inp)),
+		UFixToAttoConversionMultiplier)
 }
 
-// NewBalanceFromAttoFlow constructs a new balance from atto flow value
-func NewBalanceFromAttoFlow(inp *big.Int) *Balance {
-	return &Balance{
-		Value: inp,
-	}
+// CopyBalance creates a copy of the balance
+func CopyBalance(inp Balance) Balance {
+	return Balance(new(big.Int).Set(inp))
 }
 
-// ToAttoFlow returns the balance in AttoFlow
-func (b *Balance) ToAttoFlow() *big.Int {
-	return b.Value
+// BalanceToBigInt convert balance into big int
+func BalanceToBigInt(bal Balance) *big.Int {
+	return (*big.Int)(bal)
 }
 
-// Copy creates a copy of this balance
-func (b *Balance) Copy() *Balance {
-	return NewBalanceFromAttoFlow(b.ToAttoFlow())
-}
-
-// ToUFix64 casts the balance into a UFix64,
+// ConvertBalanceToUFix64 casts the balance into a UFix64,
 //
 // Warning! The smallest unit of Flow token that a FlowVault (Cadence) could store is 1e10^-8,
 // so transfering smaller values (or values with smalls fractions) could result in loss in
 // conversion. The rounded flag should be used to prevent loss of assets.
-func (b *Balance) ToUFix64() (cadence.UFix64, error) {
-	var err error
-	converted := new(big.Int).Div(b.Value, UFixToAttoConversionMultiplier)
+func ConvertBalanceToUFix64(bal Balance) (value cadence.UFix64, roundedOff bool, err error) {
+	converted := new(big.Int).Div(bal, UFixToAttoConversionMultiplier)
 	if !converted.IsUint64() {
 		// this should never happen
 		err = fmt.Errorf("balance can't be casted to a uint64")
 	}
-	return cadence.UFix64(converted.Uint64()), err
+	return cadence.UFix64(converted.Uint64()), BalanceConvertionToUFix64ProneToRoundingError(bal), err
+
 }
 
-// HasUFix64RoundingError returns true if casting to UFix64 has rounding error
-func (b *Balance) HasUFix64RoundingError() bool {
-	return new(big.Int).Mod(b.Value, UFixToAttoConversionMultiplier).Cmp(big.NewInt(0)) != 0
+// BalanceConvertionToUFix64ProneToRoundingError returns true
+// if casting to UFix64 could result in rounding error
+func BalanceConvertionToUFix64ProneToRoundingError(bal Balance) bool {
+	return new(big.Int).Mod(bal, UFixToAttoConversionMultiplier).BitLen() != 0
 }
 
-// Sub subtract the other balance from this balance
-func (b *Balance) Sub(other *Balance) error {
-	otherInAtto := other.ToAttoFlow()
-	// check underflow b < other
-	if b.Value.Cmp(otherInAtto) == -1 {
-		return ErrWithdrawBalanceRounding
+// Subtract balance 2 from balance 1 and returns the result as a new balance
+func SubBalance(bal1 Balance, bal2 Balance) (Balance, error) {
+	if (*big.Int)(bal1).Cmp(bal2) == -1 {
+		return nil, ErrInsufficientBalance
 	}
-	b.Value = new(big.Int).Sub(b.Value, otherInAtto)
-	return nil
+	return new(big.Int).Sub(bal1, bal2), nil
 }
 
-// Add adds the other balance to this balance
-func (b *Balance) Add(other *Balance) error {
-	// no need to check for overflow, as go does it
-	b.Value = new(big.Int).Add(b.Value, other.ToAttoFlow())
-	return nil
-}
-
-// Encode encodes the balance into byte slice
-func (b *Balance) Encode() ([]byte, error) {
-	return rlp.EncodeToBytes(b)
-}
-
-// DecodeBalance decodes a balance from an encoded byte slice
-func DecodeBalance(encoded []byte) (*Balance, error) {
-	b := &Balance{}
-	return b, rlp.DecodeBytes(encoded, b)
-
+// AddBalance balance 2 to balance 1 and returns the result as a new balance
+func AddBalance(bal1 Balance, bal2 Balance) (Balance, error) {
+	return new(big.Int).Add(bal1, bal2), nil
 }

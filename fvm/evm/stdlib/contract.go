@@ -1125,7 +1125,7 @@ func newInternalEVMTypeCallFunction(
 				panic(errors.NewUnreachableError())
 			}
 
-			balance := types.NewBalance(cadence.UFix64(balanceValue))
+			balance := types.NewBalanceFromUFix64(cadence.UFix64(balanceValue))
 			// Call
 
 			const isAuthorized = true
@@ -1203,7 +1203,7 @@ func newInternalEVMTypeDepositFunction(
 				panic(errors.NewUnreachableError())
 			}
 
-			amount := types.NewBalance(cadence.UFix64(amountValue))
+			amount := types.NewBalanceFromUFix64(cadence.UFix64(amountValue))
 
 			// Get to address
 
@@ -1270,7 +1270,8 @@ func newInternalEVMTypeBalanceFunction(
 			const isAuthorized = false
 			account := handler.AccountByAddress(address, isAuthorized)
 
-			ufix, err := account.Balance().ToUFix64()
+			// TODO: return roundoff flag or handle it
+			ufix, _, err := types.ConvertBalanceToUFix64(account.Balance())
 			if err != nil {
 				panic(err)
 			}
@@ -1325,7 +1326,7 @@ func newInternalEVMTypeWithdrawFunction(
 				panic(errors.NewUnreachableError())
 			}
 
-			amount := types.NewBalance(cadence.UFix64(amountValue))
+			amount := types.NewBalanceFromUFix64(cadence.UFix64(amountValue))
 
 			// Withdraw
 
@@ -1333,10 +1334,12 @@ func newInternalEVMTypeWithdrawFunction(
 			account := handler.AccountByAddress(fromAddress, isAuthorized)
 			vault := account.Withdraw(amount)
 
-			ufix, err := vault.Balance().ToUFix64()
+			// TODO: return rounded off flag or handle it ?
+			ufix, _, err := types.ConvertBalanceToUFix64(vault.Balance())
 			if err != nil {
 				panic(err)
 			}
+
 			// TODO: improve: maybe call actual constructor
 			return interpreter.NewCompositeValue(
 				inter,
@@ -1433,7 +1436,7 @@ func newInternalEVMTypeDeployFunction(
 				panic(errors.NewUnreachableError())
 			}
 
-			amount := types.NewBalance(cadence.UFix64(amountValue))
+			amount := types.NewBalanceFromUFix64(cadence.UFix64(amountValue))
 
 			// Deploy
 

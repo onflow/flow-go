@@ -70,12 +70,12 @@ func (t *testContractHandler) Run(tx []byte, coinbase types.Address) {
 
 type testFlowAccount struct {
 	address  types.Address
-	balance  func() *types.Balance
-	transfer func(address types.Address, balance *types.Balance)
+	balance  func() types.Balance
+	transfer func(address types.Address, balance types.Balance)
 	deposit  func(vault *types.FLOWTokenVault)
-	withdraw func(balance *types.Balance) *types.FLOWTokenVault
-	deploy   func(code types.Code, limit types.GasLimit, balance *types.Balance) types.Address
-	call     func(address types.Address, data types.Data, limit types.GasLimit, balance *types.Balance) types.Data
+	withdraw func(balance types.Balance) *types.FLOWTokenVault
+	deploy   func(code types.Code, limit types.GasLimit, balance types.Balance) types.Address
+	call     func(address types.Address, data types.Data, limit types.GasLimit, balance types.Balance) types.Data
 }
 
 var _ types.Account = &testFlowAccount{}
@@ -84,14 +84,14 @@ func (t *testFlowAccount) Address() types.Address {
 	return t.address
 }
 
-func (t *testFlowAccount) Balance() *types.Balance {
+func (t *testFlowAccount) Balance() types.Balance {
 	if t.balance == nil {
-		return types.NewBalance(0)
+		return types.NewBalanceFromUFix64(0)
 	}
 	return t.balance()
 }
 
-func (t *testFlowAccount) Transfer(address types.Address, balance *types.Balance) {
+func (t *testFlowAccount) Transfer(address types.Address, balance types.Balance) {
 	if t.transfer == nil {
 		panic("unexpected Transfer")
 	}
@@ -105,21 +105,21 @@ func (t *testFlowAccount) Deposit(vault *types.FLOWTokenVault) {
 	t.deposit(vault)
 }
 
-func (t *testFlowAccount) Withdraw(balance *types.Balance) *types.FLOWTokenVault {
+func (t *testFlowAccount) Withdraw(balance types.Balance) *types.FLOWTokenVault {
 	if t.withdraw == nil {
 		panic("unexpected Withdraw")
 	}
 	return t.withdraw(balance)
 }
 
-func (t *testFlowAccount) Deploy(code types.Code, limit types.GasLimit, balance *types.Balance) types.Address {
+func (t *testFlowAccount) Deploy(code types.Code, limit types.GasLimit, balance types.Balance) types.Address {
 	if t.deploy == nil {
 		panic("unexpected Deploy")
 	}
 	return t.deploy(code, limit, balance)
 }
 
-func (t *testFlowAccount) Call(address types.Address, data types.Data, limit types.GasLimit, balance *types.Balance) types.Data {
+func (t *testFlowAccount) Call(address types.Address, data types.Data, limit types.GasLimit, balance types.Balance) types.Data {
 	if t.call == nil {
 		panic("unexpected Call")
 	}
@@ -2960,12 +2960,12 @@ func TestBridgedAccountCall(t *testing.T) {
 					toAddress types.Address,
 					data types.Data,
 					limit types.GasLimit,
-					balance *types.Balance,
+					balance types.Balance,
 				) types.Data {
 					assert.Equal(t, types.Address{2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, toAddress)
 					assert.Equal(t, types.Data{4, 5, 6}, data)
 					assert.Equal(t, types.GasLimit(9999), limit)
-					assert.Equal(t, types.NewBalance(expectedBalance), balance)
+					assert.Equal(t, types.NewBalanceFromUFix64(expectedBalance), balance)
 
 					return types.Data{3, 1, 4}
 				},
@@ -3084,7 +3084,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 					deposited = true
 					assert.Equal(
 						t,
-						types.NewBalance(expectedBalance),
+						types.NewBalanceFromUFix64(expectedBalance),
 						vault.Balance(),
 					)
 				},
@@ -3202,13 +3202,13 @@ func TestBridgedAccountWithdraw(t *testing.T) {
 				deposit: func(vault *types.FLOWTokenVault) {
 					deposited = true
 					assert.Equal(t,
-						types.NewBalance(expectedDepositBalance),
+						types.NewBalanceFromUFix64(expectedDepositBalance),
 						vault.Balance(),
 					)
 				},
-				withdraw: func(balance *types.Balance) *types.FLOWTokenVault {
+				withdraw: func(balance types.Balance) *types.FLOWTokenVault {
 					assert.Equal(t,
-						types.NewBalance(expectedWithdrawBalance),
+						types.NewBalanceFromUFix64(expectedWithdrawBalance),
 						balance,
 					)
 					withdrew = true
@@ -3327,11 +3327,11 @@ func TestBridgedAccountDeploy(t *testing.T) {
 
 			return &testFlowAccount{
 				address: fromAddress,
-				deploy: func(code types.Code, limit types.GasLimit, balance *types.Balance) types.Address {
+				deploy: func(code types.Code, limit types.GasLimit, balance types.Balance) types.Address {
 					deployed = true
 					assert.Equal(t, types.Code{4, 5, 6}, code)
 					assert.Equal(t, types.GasLimit(9999), limit)
-					assert.Equal(t, types.NewBalance(expectedBalance), balance)
+					assert.Equal(t, types.NewBalanceFromUFix64(expectedBalance), balance)
 
 					return handler.AllocateAddress()
 				},
@@ -3458,8 +3458,8 @@ func TestEVMAccountBalance(t *testing.T) {
 
 			return &testFlowAccount{
 				address: fromAddress,
-				balance: func() *types.Balance {
-					return types.NewBalance(expectedBalanceValue)
+				balance: func() types.Balance {
+					return types.NewBalanceFromUFix64(expectedBalanceValue)
 				},
 			}
 		},
@@ -3558,8 +3558,8 @@ func TestEVMAccountBalanceForABIOnlyContract(t *testing.T) {
 
 			return &testFlowAccount{
 				address: fromAddress,
-				balance: func() *types.Balance {
-					return types.NewBalance(expectedBalanceValue)
+				balance: func() types.Balance {
+					return types.NewBalanceFromUFix64(expectedBalanceValue)
 				},
 			}
 		},
