@@ -14,9 +14,20 @@ import (
 	"github.com/onflow/flow-go/utils/slices"
 )
 
+// uuid is partitioned with 3rd byte for compatibility reasons.
+// (database types and Javascript safe integer limits)
+//
+// counter(C) is 7 bytes, paritition(P) is 1 byte
+// uuid is assembled by first reading the counter from the register value of the partitioned register,
+// and then left shifting the 6th and 7th byte, and placing the partition byte at 6th byte:
+// C7 C6 P C5 C4 C3 C2 C1
+//
+// Until resource ids start filling the bits above the 48th one, dapps will have enough time
+// to switch to a larger data type.
+
 const (
-	// The max value for any is uuid partition is MaxUint56, since the top
-	// 8 bits in the uuid are used for partitioning.
+	// The max value for any is uuid partition is MaxUint56, since one byte
+	// in the uuid is used for partitioning.
 	MaxUint56 = (uint64(1) << 56) - 1
 
 	// Start warning when there's only a single high bit left.  This should give
@@ -108,8 +119,8 @@ func NewUUIDGenerator(
 	}
 }
 
-// getUint64 reads the uint64 value from the partitioned uuid register.
-func (generator *uUIDGenerator) getUint64() (uint64, error) {
+// getCounter reads the uint64 value from the partitioned uuid register.
+func (generator *uUIDGenerator) getCounter() (uint64, error) {
 	stateBytes, err := generator.txnState.Get(generator.registerId)
 	if err != nil {
 		return 0, fmt.Errorf(
@@ -122,8 +133,8 @@ func (generator *uUIDGenerator) getUint64() (uint64, error) {
 	return binary.BigEndian.Uint64(bytes), nil
 }
 
-// setUint56 sets a new uint56 value into the partitioned uuid register.
-func (generator *uUIDGenerator) setUint56(
+// setCounter sets a new uint56 value into the partitioned uuid register.
+func (generator *uUIDGenerator) setCounter(
 	value uint64,
 ) error {
 	if value > Uint56OverflowWarningThreshold {
@@ -184,17 +195,20 @@ func (generator *uUIDGenerator) GenerateUUID() (uint64, error) {
 
 	generator.maybeInitializePartition()
 
-	value, err := generator.getUint64()
+	counter, err := generator.getCounter()
 	if err != nil {
 		return 0, fmt.Errorf("cannot generate UUID: %w", err)
 	}
 
-	err = generator.setUint56(value + 1)
+	err = generator.setCounter(counter + 1)
 	if err != nil {
 		return 0, fmt.Errorf("cannot generate UUID: %w", err)
 	}
 
 	// Since the partition counter only goes up to MaxUint56, we can use the
-	// upper 8 bits to represent which partition was used.
-	return (uint64(generator.partition) << 56) | value, nil
+	// assemble a UUID value with the partition (P) and the counter (C).
+	// Note: partition (P) is represented by the 6th byte
+	// (C7 C6) | P | (C5 C4 C3 C2 C1)
+	return ((counter & 0xFF_FF00_0000_0000) << 8) | (uint64(generator.partition) << 40) | (counter & 0xFF_FFFF_FFFF), nil
+
 }
