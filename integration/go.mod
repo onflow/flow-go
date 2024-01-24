@@ -375,4 +375,3 @@ replace github.com/onflow/flow-nft/lib/go/contracts => github.com/onflow/flow-nf
 replace github.com/onflow/sdks => github.com/onflow/sdks v0.5.0
 
 replace github.com/onflow/flow-core-contracts/lib/go/contracts => github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.1-0.20231219201108-fbdb10b0a2da
-
