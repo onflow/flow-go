@@ -157,7 +157,7 @@ func HandleRuntimeError(inp error) (err error) {
 
 		// first search through all of the errors for a coded failure. this ensures that a failure
 		// is returned if there were any failures anywhere in the error tree.
-		// Note: failure usually means unexpected fatal exceptions, and best to be treated 
+		// Note: failure usually means unexpected fatal exceptions, and best to be treated
 		// as high priority to look into before any other errors. That's why as soon as we can
 		// find them, they should be returned.
 		var failure CodedFailure
@@ -172,7 +172,7 @@ func HandleRuntimeError(inp error) (err error) {
 
 		// next, do a depth-first search for the first coded error. this ensures that the deepest
 		// coded error in the chain is returned.
-		// Note, the coded error are for known non-fatal error cases, if we can find any of them, we 
+		// Note, the coded error are for known non-fatal error cases, if we can find any of them, we
 		// will highlight its code
 		var coded CodedError
 		if As(wrapped, &coded) {
