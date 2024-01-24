@@ -53,7 +53,7 @@ func newMigratorRuntime(
 		return nil, fmt.Errorf("failed to create derived chain data: %w", err)
 	}
 
-	// TODO: how to get currentBlockId (flow.Identifier) for NewDerivedBlockDataForScript?
+	// The current block ID does not matter here, it is only for keeping a cross-block cache, which is not needed here.
 	derivedTransactionData := derivedChainData.
 		NewDerivedBlockDataForScript(flow.Identifier{}).
 		NewSnapshotReadDerivedTransactionData()
