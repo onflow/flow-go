@@ -381,60 +381,6 @@ func (a *Account) Call(to types.Address, data types.Data, gaslimit types.GasLimi
 	return res.ReturnedValue
 }
 
-func (a *Account) executeAndHandleCall(
-	ctx types.BlockContext,
-	call *types.DirectCall,
-	totalSupplyDiff *big.Int,
-	deductSupplyDiff bool,
-) *types.Result {
-	// execute the call
-	blk, err := a.fch.emulator.NewBlockView(ctx)
-	handleError(err)
-
-	res, err := blk.DirectCall(call)
-	a.fch.meterGasUsage(res)
-	handleError(err)
-
-	// update block proposal
-	callHash, err := call.Hash()
-	if err != nil {
-		err = types.NewFatalError(err)
-		handleError(err)
-	}
-
-	bp, err := a.fch.blockstore.BlockProposal()
-	handleError(err)
-	bp.AppendTxHash(callHash)
-	if totalSupplyDiff != nil {
-		if deductSupplyDiff {
-			bp.TotalSupply = new(big.Int).Sub(bp.TotalSupply, totalSupplyDiff)
-		} else {
-			bp.TotalSupply = new(big.Int).Add(bp.TotalSupply, totalSupplyDiff)
-		}
-
-	}
-
-	// emit events
-	encoded, err := call.Encode()
-	handleError(err)
-
-	a.fch.emitEvent(
-		types.NewTransactionExecutedEvent(
-			bp.Height,
-			encoded,
-			callHash,
-			res,
-		),
-	)
-	a.fch.emitEvent(types.NewBlockExecutedEvent(bp))
-
-	// commit block proposal
-	err = a.fch.blockstore.CommitBlockProposal()
-	handleError(err)
-
-	return res
-}
-
 func (a *Account) checkAuthorized() {
 	// check if account is authorized (i.e. is a COA)
 	if !a.isAuthorized {
