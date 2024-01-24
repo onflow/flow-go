@@ -141,7 +141,7 @@ func TestHandleRuntimeError(t *testing.T) {
 			code: FailureCodeLedgerFailure,
 		},
 		{
-			name: "error returned if before failure",
+			name: "error before failure returns failure",
 			err: runtime.Error{
 				Err: cadenceErr.ExternalError{
 					Recovered: sema.CheckerError{

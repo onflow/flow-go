@@ -234,6 +234,8 @@ type codedError struct {
 	err error
 }
 
+var _ CodedError = (*codedError)(nil)
+
 func newError(
 	code ErrorCode,
 	rootCause error,
@@ -287,6 +289,8 @@ func (err codedError) Code() ErrorCode {
 type codedFailure struct {
 	CodedError
 }
+
+var _ CodedFailure = (*codedFailure)(nil)
 
 func newFailure(
 	code ErrorCode,
