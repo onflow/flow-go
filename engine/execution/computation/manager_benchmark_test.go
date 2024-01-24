@@ -307,7 +307,7 @@ func createTokenTransferTransaction(b *testing.B, accs *testAccounts) *flow.Tran
 
 	tx := testutil.CreateTokenTransferTransaction(chain, 1, dst.address, src.address)
 	tx.SetProposalKey(chain.ServiceAddress(), 0, accs.seq).
-		SetGasLimit(1000).
+		SetComputeLimit(1000).
 		SetPayer(chain.ServiceAddress())
 	accs.seq++
 
