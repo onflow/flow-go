@@ -1,5 +1,7 @@
 package types
 
+import "math/big"
+
 // FLOWTokenVault holds a balance of flow token
 type FLOWTokenVault struct {
 	balance Balance
@@ -22,5 +24,7 @@ func (t *FLOWTokenVault) Withdraw(b Balance) (*FLOWTokenVault, error) {
 func (t *FLOWTokenVault) Deposit(inp *FLOWTokenVault) error {
 	var err error
 	t.balance, err = AddBalance(t.balance, inp.balance)
+	// reset balance for the inp incase
+	inp.balance = new(big.Int)
 	return err
 }
