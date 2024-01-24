@@ -273,6 +273,14 @@ func (proc *procedure) deployAt(
 		return res, gethVM.ErrContractAddressCollision
 	}
 
+	callerCommon := caller.ToCommon()
+	// setup caller if doesn't exist
+	if !proc.state.Exist(callerCommon) {
+		proc.state.CreateAccount(callerCommon)
+	}
+	// increment the nonce for the caller
+	proc.state.SetNonce(callerCommon, proc.state.GetNonce(callerCommon)+1)
+
 	// setup account
 	proc.state.CreateAccount(addr)
 	proc.state.SetNonce(addr, 1) // (EIP-158)

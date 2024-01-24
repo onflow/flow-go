@@ -68,9 +68,7 @@ func (h *ContractHandler) DeployACOAAccount() types.Address {
 	handleError(err)
 	h.checkGasLimit(gaslimit)
 
-	// TODO replace the caller
-	factory := types.Address{0, 0, 0, 0, 0, 1, 0, 0}
-
+	factory := h.addressAllocator.COAFactoryAddress()
 	call := types.NewDeployCallWithTargetAddress(
 		factory,
 		target,

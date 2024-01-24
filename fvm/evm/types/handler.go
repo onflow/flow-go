@@ -56,6 +56,9 @@ type AddressAllocator interface {
 	// AllocateAddress allocates an address to be used by a COA resource
 	AllocateCOAAddress() (Address, error)
 
+	// COAFactoryAddress returns the address for the COA factory
+	COAFactoryAddress() Address
+
 	// AllocateAddress allocates an address by index to be used by a precompile contract
 	AllocatePrecompileAddress(index uint64) Address
 }
