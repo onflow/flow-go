@@ -2,7 +2,6 @@ package handler
 
 import (
 	"bytes"
-	"fmt"
 	"math/big"
 
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
@@ -77,10 +76,6 @@ func (h *ContractHandler) DeployACOAAccount() types.Address {
 		new(big.Int),
 	)
 	res := h.executeAndHandleCall(h.getBlockContext(), call, nil, false)
-	// check deployed contract address matches
-	if res.DeployedContractAddress != target {
-		handleError(fmt.Errorf("coa contract deployment failure for address %x", target))
-	}
 	return res.DeployedContractAddress
 }
 
