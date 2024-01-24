@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/state_synchronization"
-	"github.com/rs/zerolog"
 )
 
 type ScriptExecutor struct {
