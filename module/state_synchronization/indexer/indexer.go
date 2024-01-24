@@ -1,6 +1,7 @@
 package indexer
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -56,12 +57,24 @@ func NewIndexer(
 	executionCache *cache.ExecutionDataCache,
 	executionDataLatestHeight func() (uint64, error),
 	processedHeight storage.ConsumerProgress,
+	forceResetIndexerHeight bool,
 ) (*Indexer, error) {
 	r := &Indexer{
 		log:             log.With().Str("module", "execution_indexer").Logger(),
 		exeDataNotifier: engine.NewNotifier(),
 		indexer:         indexer,
 		registers:       registers,
+	}
+
+	bootstrapped, err := r.validateStartState(processedHeight, forceResetIndexerHeight)
+	if err != nil {
+		return nil, fmt.Errorf("error validating start state: %w", err)
+	}
+	if forceResetIndexerHeight && bootstrapped {
+		err = r.resetIndexedHeight(processedHeight)
+		if err != nil {
+			return nil, fmt.Errorf("error resetting indexed height: %w", err)
+		}
 	}
 
 	r.exeDataReader = jobs.NewExecutionDataReader(executionCache, fetchTimeout, executionDataLatestHeight)
@@ -87,6 +100,58 @@ func NewIndexer(
 	r.Component = r.jobConsumer
 
 	return r, nil
+}
+
+// validateStartState validates that the start state of the register db and the indexer's jobqueue
+// are in sync, and that if forceResetIndexerHeight
+func (i *Indexer) validateStartState(processedHeight storage.ConsumerProgress, forceResetIndexerHeight bool) (bool, error) {
+	lastHeight, err := processedHeight.ProcessedIndex()
+	if err != nil {
+		if !errors.Is(err, storage.ErrNotFound) {
+			return false, fmt.Errorf("could not get indexed block height: %w", err)
+		}
+
+		// if no blocks have been indexed yet, then the register db must only have data from loading
+		// the checkpoint.
+		if i.registers.LatestHeight() != i.registers.FirstHeight() {
+			return false, fmt.Errorf("indexed height is not set, but register db has indexed data")
+		}
+
+		// the indexer is uninitialized, and the register db has a single block from the checkpoint
+		return false, nil
+	}
+
+	if forceResetIndexerHeight {
+		// resetting the indexer's progress index is only supported when bootstrapping a new register db,
+		// otherwise the register db will throw exceptions when indexing an already indexed height.
+		if i.registers.LatestHeight() != i.registers.FirstHeight() {
+			return false, fmt.Errorf("cannot reset indexed height, register db is already initialized")
+		}
+
+		return true, nil
+	}
+
+	// the jobqueue must either be the same as the last processed height or one block behind.
+	// this accounts for the case where the node crashed after it finished indexing registers,
+	// but before updating the processed height.
+	if lastHeight > i.registers.LatestHeight() || lastHeight < i.registers.LatestHeight()-1 {
+		return false, fmt.Errorf("indexed height %d does not match register db's latest height %d", lastHeight, i.registers.LatestHeight())
+	}
+
+	return true, nil
+}
+
+func (i *Indexer) resetIndexedHeight(processedHeight storage.ConsumerProgress) error {
+	checkpointHeight := i.registers.FirstHeight()
+
+	i.log.Info().Uint64("height", checkpointHeight).Msg("attempting to reset indexer start height")
+	err := processedHeight.SetProcessedIndex(checkpointHeight)
+	if err != nil {
+		return fmt.Errorf("could not reset indexed block height: %w", err)
+	}
+	i.log.Info().Uint64("height", checkpointHeight).Msg("successfully reset indexer start height")
+
+	return nil
 }
 
 // Start the worker jobqueue to consume the available data.
@@ -132,4 +197,11 @@ func (i *Indexer) processExecutionData(ctx irrecoverable.SignalerContext, job mo
 	}
 
 	done()
+
+	// validate state matches between the registers db and indexer
+	if i.jobConsumer.LastProcessedIndex() != i.registers.LatestHeight() {
+		ctx.Throw(fmt.Errorf("indexer height %d does not match register db's latest height %d",
+			i.jobConsumer.LastProcessedIndex(),
+			i.registers.LatestHeight()))
+	}
 }

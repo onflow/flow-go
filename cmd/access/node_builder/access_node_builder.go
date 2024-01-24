@@ -147,6 +147,7 @@ type AccessNodeConfig struct {
 	registersDBPath              string
 	checkpointFile               string
 	scriptExecutorConfig         query.QueryConfig
+	forceResetIndexerHeight      bool
 }
 
 type PublicNetworkConfig struct {
@@ -763,6 +764,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					executionDataStoreCache,
 					builder.ExecutionDataRequester.HighestConsecutiveHeight,
 					indexedBlockHeight,
+					builder.forceResetIndexerHeight,
 				)
 				if err != nil {
 					return nil, err
@@ -1080,6 +1082,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"whether to enable the execution data indexing")
 		flags.StringVar(&builder.registersDBPath, "execution-state-dir", defaultConfig.registersDBPath, "directory to use for execution-state database")
 		flags.StringVar(&builder.checkpointFile, "execution-state-checkpoint", defaultConfig.checkpointFile, "execution-state checkpoint file")
+		flags.BoolVar(&builder.forceResetIndexerHeight, "execution-data-force-reset-indexer-height", false, "reset indexer processed height to root block. DO NOT use unless you know what you are doing")
 
 		flags.StringVar(&builder.rpcConf.BackendConfig.EventQueryMode,
 			"event-query-mode",
