@@ -284,7 +284,7 @@ func TestControlMessageValidationInspector_TruncationConfigToggle(t *testing.T) 
 		expectedWarningLogs := int64(1)
 		expectedLogStrs := map[string]struct{}{validation.RPCTruncationDisabledWarning: {}}
 		logCounter := atomic.NewInt64(0)
-		logger := hookedLogger(logCounter, zerolog.WarnLevel, expectedLogStrs)
+		logger := hookedLogger(logCounter, zerolog.TraceLevel, expectedLogStrs)
 		inspector, signalerCtx, cancel, distributor, rpcTracker, _, _, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
 			params.Config.GraftPruneMessageMaxSampleSize = numOfMsgs
 			params.Logger = logger
@@ -389,7 +389,7 @@ func TestControlMessageValidationInspector_InspectionConfigToggle(t *testing.T) 
 		expectedWarningLogs := int64(1)
 		expectedLogStrs := map[string]struct{}{validation.RPCInspectionDisabledWarning: {}}
 		logCounter := atomic.NewInt64(0)
-		logger := hookedLogger(logCounter, zerolog.WarnLevel, expectedLogStrs)
+		logger := hookedLogger(logCounter, zerolog.TraceLevel, expectedLogStrs)
 		inspector, signalerCtx, cancel, distributor, rpcTracker, _, _, _ := inspectorFixture(t, func(params *validation.InspectorParams) {
 			params.Logger = logger
 			// disable inspector for all control message types

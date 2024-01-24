@@ -212,7 +212,11 @@ func (c *ControlMsgValidationInspector) ActiveClustersChanged(clusterIDList flow
 //   - error: if a new inspect rpc request cannot be created, all errors returned are considered irrecoverable.
 func (c *ControlMsgValidationInspector) Inspect(from peer.ID, rpc *pubsub.RPC) error {
 	if c.config.InspectionProcess.Inspect.Disabled {
-		c.logger.Warn().Msg(RPCInspectionDisabledWarning)
+		c.logger.
+			Trace().
+			Str("peer_id", p2plogging.PeerId(from)).
+			Bool(logging.KeyNetworkingSecurity, true).
+			Msg(RPCInspectionDisabledWarning)
 		return nil
 	}
 
@@ -352,7 +356,11 @@ func (c *ControlMsgValidationInspector) checkPubsubMessageSender(message *pubsub
 // - bool: true if an error is returned and the topic that failed validation was a cluster prefixed topic, false otherwise.
 func (c *ControlMsgValidationInspector) inspectGraftMessages(from peer.ID, grafts []*pubsub_pb.ControlGraft, activeClusterIDS flow.ChainIDList) (error, p2p.CtrlMsgTopicType) {
 	if !c.config.InspectionProcess.Inspect.EnableGraft {
-		c.logger.Trace().Msg(GraftInspectionDisabledWarning)
+		c.logger.
+			Trace().
+			Str("peer_id", p2plogging.PeerId(from)).
+			Bool(logging.KeyNetworkingSecurity, true).
+			Msg(GraftInspectionDisabledWarning)
 		return nil, p2p.CtrlMsgNonClusterTopicType
 	}
 
@@ -383,7 +391,11 @@ func (c *ControlMsgValidationInspector) inspectGraftMessages(from peer.ID, graft
 //   - bool: true if an error is returned and the topic that failed validation was a cluster prefixed topic, false otherwise.
 func (c *ControlMsgValidationInspector) inspectPruneMessages(from peer.ID, prunes []*pubsub_pb.ControlPrune, activeClusterIDS flow.ChainIDList) (error, p2p.CtrlMsgTopicType) {
 	if !c.config.InspectionProcess.Inspect.EnablePrune {
-		c.logger.Trace().Msg(PruneInspectionDisabledWarning)
+		c.logger.
+			Trace().
+			Str("peer_id", p2plogging.PeerId(from)).
+			Bool(logging.KeyNetworkingSecurity, true).
+			Msg(PruneInspectionDisabledWarning)
 		return nil, p2p.CtrlMsgNonClusterTopicType
 	}
 	tracker := make(duplicateStrTracker)
@@ -413,7 +425,11 @@ func (c *ControlMsgValidationInspector) inspectPruneMessages(from peer.ID, prune
 //   - bool: true if an error is returned and the topic that failed validation was a cluster prefixed topic, false otherwise.
 func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihaves []*pubsub_pb.ControlIHave, activeClusterIDS flow.ChainIDList) (error, p2p.CtrlMsgTopicType) {
 	if !c.config.InspectionProcess.Inspect.EnableIHave {
-		c.logger.Trace().Msg(IHaveInspectionDisabledWarning)
+		c.logger.
+			Trace().
+			Str("peer_id", p2plogging.PeerId(from)).
+			Bool(logging.KeyNetworkingSecurity, true).
+			Msg(IHaveInspectionDisabledWarning)
 		return nil, p2p.CtrlMsgNonClusterTopicType
 	}
 
@@ -466,7 +482,11 @@ func (c *ControlMsgValidationInspector) inspectIHaveMessages(from peer.ID, ihave
 // - IWantCacheMissThresholdErr: if the rate of cache misses exceeds the configured allowed threshold.
 func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWants []*pubsub_pb.ControlIWant) error {
 	if !c.config.InspectionProcess.Inspect.EnableIWant {
-		c.logger.Trace().Msg(IWantInspectionDisabledWarning)
+		c.logger.
+			Trace().
+			Str("peer_id", p2plogging.PeerId(from)).
+			Bool(logging.KeyNetworkingSecurity, true).
+			Msg(IWantInspectionDisabledWarning)
 		return nil
 	}
 
@@ -542,7 +562,11 @@ func (c *ControlMsgValidationInspector) inspectIWantMessages(from peer.ID, iWant
 // - int: the number of invalid pubsub messages
 func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, messages []*pubsub_pb.Message, activeClusterIDS flow.ChainIDList) (error, uint64) {
 	if !c.config.InspectionProcess.Inspect.EnablePublish {
-		c.logger.Trace().Msg(PublishInspectionDisabledWarning)
+		c.logger.
+			Trace().
+			Str("peer_id", p2plogging.PeerId(from)).
+			Bool(logging.KeyNetworkingSecurity, true).
+			Msg(PublishInspectionDisabledWarning)
 		return nil, 0
 	}
 
@@ -606,21 +630,25 @@ func (c *ControlMsgValidationInspector) inspectRpcPublishMessages(from peer.ID, 
 // - rpc: the pubsub RPC.
 func (c *ControlMsgValidationInspector) truncateRPC(from peer.ID, rpc *pubsub.RPC) {
 	if c.config.InspectionProcess.Truncate.Disabled {
-		c.logger.Warn().Msg(RPCTruncationDisabledWarning)
+		c.logger.
+			Warn().
+			Str("peer_id", p2plogging.PeerId(from)).
+			Bool(logging.KeyNetworkingSecurity, true).
+			Msg(RPCTruncationDisabledWarning)
 		return
 	}
 
 	for _, ctlMsgType := range p2pmsg.ControlMessageTypes() {
 		switch ctlMsgType {
 		case p2pmsg.CtrlMsgGraft:
-			c.truncateGraftMessages(rpc)
+			c.truncateGraftMessages(from, rpc)
 		case p2pmsg.CtrlMsgPrune:
-			c.truncatePruneMessages(rpc)
+			c.truncatePruneMessages(from, rpc)
 		case p2pmsg.CtrlMsgIHave:
-			c.truncateIHaveMessages(rpc)
-			c.truncateIHaveMessageIds(rpc)
+			c.truncateIHaveMessages(from, rpc)
+			c.truncateIHaveMessageIds(from, rpc)
 		case p2pmsg.CtrlMsgIWant:
-			c.truncateIWantMessages(rpc)
+			c.truncateIWantMessages(from, rpc)
 			c.truncateIWantMessageIds(from, rpc)
 		default:
 			// sanity check this should never happen
@@ -633,9 +661,13 @@ func (c *ControlMsgValidationInspector) truncateRPC(from peer.ID, rpc *pubsub.RP
 // GraftPruneMessageMaxSampleSize the list of Grafts will be truncated.
 // Args:
 //   - rpc: the rpc message to truncate.
-func (c *ControlMsgValidationInspector) truncateGraftMessages(rpc *pubsub.RPC) {
+func (c *ControlMsgValidationInspector) truncateGraftMessages(from peer.ID, rpc *pubsub.RPC) {
 	if !c.config.InspectionProcess.Truncate.EnableGraft {
-		c.logger.Trace().Msg(GraftTruncationDisabledWarning)
+		c.logger.
+			Trace().
+			Str("peer_id", p2plogging.PeerId(from)).
+			Bool(logging.KeyNetworkingSecurity, true).
+			Msg(GraftTruncationDisabledWarning)
 		return
 	}
 
@@ -658,9 +690,13 @@ func (c *ControlMsgValidationInspector) truncateGraftMessages(rpc *pubsub.RPC) {
 // GraftPruneMessageMaxSampleSize the list of Prunes will be truncated.
 // Args:
 //   - rpc: the rpc message to truncate.
-func (c *ControlMsgValidationInspector) truncatePruneMessages(rpc *pubsub.RPC) {
+func (c *ControlMsgValidationInspector) truncatePruneMessages(from peer.ID, rpc *pubsub.RPC) {
 	if !c.config.InspectionProcess.Truncate.EnablePrune {
-		c.logger.Trace().Msg(PruneTruncationDisabledWarning)
+		c.logger.
+			Trace().
+			Str("peer_id", p2plogging.PeerId(from)).
+			Bool(logging.KeyNetworkingSecurity, true).
+			Msg(PruneTruncationDisabledWarning)
 		return
 	}
 
@@ -682,9 +718,13 @@ func (c *ControlMsgValidationInspector) truncatePruneMessages(rpc *pubsub.RPC) {
 // MaxSampleSize the list of iHaves will be truncated.
 // Args:
 //   - rpc: the rpc message to truncate.
-func (c *ControlMsgValidationInspector) truncateIHaveMessages(rpc *pubsub.RPC) {
+func (c *ControlMsgValidationInspector) truncateIHaveMessages(from peer.ID, rpc *pubsub.RPC) {
 	if !c.config.InspectionProcess.Truncate.EnableIHave {
-		c.logger.Trace().Msg(IHaveTruncationDisabledWarning)
+		c.logger.
+			Trace().
+			Str("peer_id", p2plogging.PeerId(from)).
+			Bool(logging.KeyNetworkingSecurity, true).
+			Msg(IHaveTruncationDisabledWarning)
 		return
 	}
 
@@ -712,9 +752,13 @@ func (c *ControlMsgValidationInspector) truncateIHaveMessages(rpc *pubsub.RPC) {
 // MaxMessageIDSampleSize the list of message ids will be truncated. Before message ids are truncated the iHave control messages should have been truncated themselves.
 // Args:
 //   - rpc: the rpc message to truncate.
-func (c *ControlMsgValidationInspector) truncateIHaveMessageIds(rpc *pubsub.RPC) {
+func (c *ControlMsgValidationInspector) truncateIHaveMessageIds(from peer.ID, rpc *pubsub.RPC) {
 	if !c.config.InspectionProcess.Truncate.EnableIHaveMessageIds {
-		c.logger.Trace().Msg(IHaveMessageIDTruncationDisabledWarning)
+		c.logger.
+			Trace().
+			Str("peer_id", p2plogging.PeerId(from)).
+			Bool(logging.KeyNetworkingSecurity, true).
+			Msg(IHaveMessageIDTruncationDisabledWarning)
 		return
 	}
 
@@ -744,9 +788,13 @@ func (c *ControlMsgValidationInspector) truncateIHaveMessageIds(rpc *pubsub.RPC)
 // MaxSampleSize the list of iWants will be truncated.
 // Args:
 //   - rpc: the rpc message to truncate.
-func (c *ControlMsgValidationInspector) truncateIWantMessages(rpc *pubsub.RPC) {
+func (c *ControlMsgValidationInspector) truncateIWantMessages(from peer.ID, rpc *pubsub.RPC) {
 	if !c.config.InspectionProcess.Truncate.EnableIWant {
-		c.logger.Trace().Msg(IWantTruncationDisabledWarning)
+		c.logger.
+			Trace().
+			Str("peer_id", p2plogging.PeerId(from)).
+			Bool(logging.KeyNetworkingSecurity, true).
+			Msg(IWantTruncationDisabledWarning)
 		return
 	}
 
@@ -776,7 +824,11 @@ func (c *ControlMsgValidationInspector) truncateIWantMessages(rpc *pubsub.RPC) {
 //   - rpc: the rpc message to truncate.
 func (c *ControlMsgValidationInspector) truncateIWantMessageIds(from peer.ID, rpc *pubsub.RPC) {
 	if !c.config.InspectionProcess.Truncate.EnableIWantMessageIds {
-		c.logger.Trace().Msg(IWantMessageIDTruncationDisabledWarning)
+		c.logger.
+			Trace().
+			Str("peer_id", p2plogging.PeerId(from)).
+			Bool(logging.KeyNetworkingSecurity, true).
+			Msg(IWantMessageIDTruncationDisabledWarning)
 		return
 	}
 

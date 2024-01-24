@@ -61,7 +61,11 @@ const (
 
 // Inspect configuration to enable/disable RPC inspection for a particular control message type.
 type Inspect struct {
-	// Disabled  disables all aspects of the inspection logic, irrespective of individual configurations like EnableGraft, EnablePrune
+	// Disabled serves as a fail-safe mechanism to globally deactivate inspection logic. When this fail-safe is activated it disables all
+	// aspects of the inspection logic, irrespective of individual configurations like inspection.enable-graft, inspection.enable-prune, etc.
+	// Consequently, all metrics collection and logging related to the rpc and inspection will also be disabled.
+	// It is important to note that activating this fail-safe results in a comprehensive deactivation inspection features.
+	// Please use this setting judiciously, considering its broad impact on the behavior of control message handling.
 	Disabled bool `mapstructure:"disabled"`
 	// EnableGraft enable graft control message inspection.
 	EnableGraft bool `mapstructure:"enable-graft"`
@@ -77,7 +81,11 @@ type Inspect struct {
 
 // Truncate configuration to enable/disable RPC truncation for a particular control message type.
 type Truncate struct {
-	// Disabled disables all aspects of the truncation logic, irrespective of individual configurations like EnableGraft, EnablePrune
+	// Disabled serves as a fail-safe mechanism to globally deactivate truncation logic. When this fail-safe is activated it disables all
+	// aspects of the truncation logic, irrespective of individual configurations like truncation.enable-graft, truncation.enable-prune, etc.
+	// Consequently, all metrics collection and logging related to the rpc and inspection will also be disabled.
+	// It is important to note that activating this fail-safe results in a comprehensive deactivation truncation features.
+	// Please use this setting judiciously, considering its broad impact on the behavior of control message handling.
 	Disabled bool `mapstructure:"disabled"`
 	// EnableGraft enable graft control message truncation.
 	EnableGraft bool `mapstructure:"enable-graft"`
