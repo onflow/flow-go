@@ -7,6 +7,14 @@ import (
 	"os"
 	"testing"
 
+	"github.com/onflow/cadence/migrations"
+	"github.com/onflow/cadence/migrations/capcons"
+	"github.com/onflow/cadence/migrations/entitlements"
+	"github.com/onflow/cadence/migrations/statictypes"
+	"github.com/onflow/cadence/migrations/string_normalization"
+
+	"github.com/onflow/flow-go/fvm/environment"
+
 	"github.com/rs/zerolog"
 
 	_ "github.com/glebarez/go-sqlite"
@@ -73,7 +81,16 @@ func TestCadenceValuesMigration(t *testing.T) {
 	payloads = runLinkMigration(t, address, payloads, capabilityIDs, rwf)
 
 	// Run remaining migrations
-	valueMigration := NewCadenceValueMigrator(rwf, capabilityIDs)
+	valueMigration := NewCadenceValueMigrator(
+		rwf,
+		capabilityIDs,
+		func(staticType *interpreter.CompositeStaticType) interpreter.StaticType {
+			return staticType
+		},
+		func(staticType *interpreter.InterfaceStaticType) interpreter.StaticType {
+			return staticType
+		},
+	)
 
 	logWriter := &writer{}
 	logger := zerolog.New(logWriter).Level(zerolog.ErrorLevel)
