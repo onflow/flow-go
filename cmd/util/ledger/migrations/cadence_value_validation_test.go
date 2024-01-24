@@ -62,7 +62,7 @@ func TestValidateCadenceValues(t *testing.T) {
 			nestedArray := interpreter.NewArrayValue(
 				mr.Interpreter,
 				interpreter.EmptyLocationRange,
-				interpreter.VariableSizedStaticType{
+				&interpreter.VariableSizedStaticType{
 					Type: interpreter.PrimitiveStaticTypeUInt64,
 				},
 				address,
@@ -76,7 +76,7 @@ func TestValidateCadenceValues(t *testing.T) {
 				interpreter.NewArrayValue(
 					mr.Interpreter,
 					interpreter.EmptyLocationRange,
-					interpreter.VariableSizedStaticType{
+					&interpreter.VariableSizedStaticType{
 						Type: interpreter.PrimitiveStaticTypeAnyStruct,
 					},
 					address,
@@ -168,7 +168,7 @@ func createTestPayloads(t *testing.T, address common.Address, domain string) []*
 		interpreter.StringStorageMapKey(strconv.FormatUint(storageMap.Count(), 10)),
 		interpreter.NewArrayValueWithIterator(
 			mr.Interpreter,
-			interpreter.VariableSizedStaticType{
+			&interpreter.VariableSizedStaticType{
 				Type: interpreter.PrimitiveStaticTypeAnyStruct,
 			},
 			address,
@@ -199,7 +199,7 @@ func createTestPayloads(t *testing.T, address common.Address, domain string) []*
 		interpreter.NewDictionaryValueWithAddress(
 			mr.Interpreter,
 			interpreter.EmptyLocationRange,
-			interpreter.DictionaryStaticType{
+			&interpreter.DictionaryStaticType{
 				KeyType:   interpreter.PrimitiveStaticTypeUInt64,
 				ValueType: interpreter.PrimitiveStaticTypeString,
 			},
@@ -230,7 +230,7 @@ func createTestPayloads(t *testing.T, address common.Address, domain string) []*
 	nestedArrayValue := interpreter.NewArrayValue(
 		mr.Interpreter,
 		interpreter.EmptyLocationRange,
-		interpreter.VariableSizedStaticType{
+		&interpreter.VariableSizedStaticType{
 			Type: interpreter.PrimitiveStaticTypeUInt64,
 		},
 		address,
@@ -243,7 +243,7 @@ func createTestPayloads(t *testing.T, address common.Address, domain string) []*
 		interpreter.NewArrayValue(
 			mr.Interpreter,
 			interpreter.EmptyLocationRange,
-			interpreter.VariableSizedStaticType{
+			&interpreter.VariableSizedStaticType{
 				Type: interpreter.PrimitiveStaticTypeAnyStruct,
 			},
 			address,
