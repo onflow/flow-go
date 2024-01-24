@@ -3,16 +3,18 @@ package backend
 import (
 	"context"
 	"fmt"
-	"math"
 
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/state_synchronization"
+	"github.com/rs/zerolog"
 )
 
 type ScriptExecutor struct {
+	log zerolog.Logger
+
 	// scriptExecutor is used to interact with execution state
 	scriptExecutor *execution.Scripts
 
@@ -29,11 +31,18 @@ type ScriptExecutor struct {
 	maxCompatibleHeight *atomic.Uint64
 }
 
-func NewScriptExecutor() *ScriptExecutor {
+func NewScriptExecutor(log zerolog.Logger, minHeight, maxHeight uint64) *ScriptExecutor {
+	logger := log.With().Str("component", "script-executor").Logger()
+	logger.Info().
+		Uint64("min_height", minHeight).
+		Uint64("max_height", maxHeight).
+		Msg("script executor created")
+
 	return &ScriptExecutor{
+		log:                 logger,
 		initialized:         atomic.NewBool(false),
-		minCompatibleHeight: atomic.NewUint64(0),
-		maxCompatibleHeight: atomic.NewUint64(math.MaxUint64),
+		minCompatibleHeight: atomic.NewUint64(minHeight),
+		maxCompatibleHeight: atomic.NewUint64(maxHeight),
 	}
 }
 
@@ -41,12 +50,14 @@ func NewScriptExecutor() *ScriptExecutor {
 // Use this to limit the executable block range supported by the node's current software version.
 func (s *ScriptExecutor) SetMinCompatibleHeight(height uint64) {
 	s.minCompatibleHeight.Store(height)
+	s.log.Info().Uint64("height", height).Msg("minimum compatible height set")
 }
 
 // SetMaxCompatibleHeight sets the highest block height (inclusive) that can be queried using local execution
 // Use this to limit the executable block range supported by the node's current software version.
 func (s *ScriptExecutor) SetMaxCompatibleHeight(height uint64) {
 	s.maxCompatibleHeight.Store(height)
+	s.log.Info().Uint64("height", height).Msg("maximum compatible height set")
 }
 
 // InitReporter initializes the indexReporter and script executor
@@ -54,6 +65,7 @@ func (s *ScriptExecutor) SetMaxCompatibleHeight(height uint64) {
 // made to the other methods will return execution.ErrDataNotAvailable until this method is called.
 func (s *ScriptExecutor) InitReporter(indexReporter state_synchronization.IndexReporter, scriptExecutor *execution.Scripts) {
 	if s.initialized.CompareAndSwap(false, true) {
+		s.log.Info().Msg("script executor initialized")
 		s.indexReporter = indexReporter
 		s.scriptExecutor = scriptExecutor
 	}
