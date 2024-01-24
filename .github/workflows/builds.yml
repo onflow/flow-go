@@ -125,8 +125,9 @@ jobs:
         IMAGE_TAG: ${{ inputs.docker_tag }}
         CADENCE_DEPLOY_KEY: ${{ secrets.CADENCE_DEPLOY_KEY }}
       run: |
-        make docker-build-${{ matrix.role }}-without-adx docker-push-${{ matrix.role }}-without-adx |
-        make docker-build-${{ matrix.role }}-without-netgo-without-adx docker-push-${{ matrix.role }}-without-netgo-without-adx |
-        make docker-build-${{ matrix.role }}-arm docker-push-${{ matrix.role }}-arm
+        make docker-build-${{ matrix.role }}-without-adx docker-push-${{ matrix.role }}-without-adx \
+          docker-build-${{ matrix.role }}-without-netgo-without-adx docker-push-${{ matrix.role }}-without-netgo-without-adx \
+          docker-cross-build-${{ matrix.role }}-arm docker-push-${{ matrix.role }}-arm
+
 
         
